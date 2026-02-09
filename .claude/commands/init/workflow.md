@@ -56,16 +56,11 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 
 ## 사용 가능한 명령어
 
-| 명령어 | 설명 |
-|--------|------|
-| `cc:implement` | 기능 구현 |
-| `cc:refactor` | 코드 리팩토링 |
-| `cc:review` | 코드 리뷰 |
-| `cc:build` | 빌드 스크립트 생성 |
-| `cc:analyze` | 요구사항/코드/DB/데이터 분석 |
-| `cc:architect` | 아키텍처 설계 및 다이어그램 |
-| `cc:framework` | 프레임워크 프로젝트 초기화 |
-| `cc:research` | 연구/조사 |
+터미널에서 `wf-commands`를 실행하면 `.claude/commands/cc/*.md`를 동적 스캔하여 최신 명령어 목록을 확인할 수 있습니다.
+
+```bash
+wf-commands
+```
 
 ## 사용자 재질의 원칙
 
