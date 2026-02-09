@@ -223,12 +223,16 @@ def main() -> None:
         # Phase color
         phase_color = PHASE_COLORS.get(phase, "\033[90m")
         if phase:
-            workflow_display = f" {phase_color}[{phase}]{RESET} {title}"
+            agent = wf.get("agent", "")
+            if agent:
+                workflow_display = f" {phase_color}[{phase}:{agent}]{RESET} {title}"
+            else:
+                workflow_display = f" {phase_color}[{phase}]{RESET} {title}"
         elif title:
             workflow_display = f" \033[90m{title}{RESET}"
 
     # -- Output --
-    # Format: model [PHASE] title branch ctx:bar +added/-removed
+    # Format: model [PHASE:agent] title branch ctx:bar +added/-removed
     line = (
         f"\033[36m{model}\033[0m"
         f"{workflow_display}"

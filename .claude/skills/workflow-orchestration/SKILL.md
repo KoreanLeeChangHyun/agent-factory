@@ -95,7 +95,7 @@ Workflow <registryKey> <phase> <status>
 **호출 시점:**
 - INIT 시작 전: `Workflow INIT none <command>` (레거시 방식, workDir 미확보 상태)
 - PLAN 시작 전: `Workflow <registryKey> PLAN`
-- PLAN 완료 후: `Workflow <registryKey> PLAN done` (path 자동 추론: plan.md)
+- PLAN 완료 후: `Workflow <registryKey> PLAN done` (path 자동 추론: plan.md) **-- AskUserQuestion 이전에 반드시 호출 완료 (병렬 호출 금지)**
 - WORK 시작 전: `Workflow <registryKey> WORK`
 - WORK 완료 후: `Workflow <registryKey> WORK done` (path 자동 추론: work/)
 - REPORT 시작 전: `Workflow <registryKey> REPORT`
@@ -147,7 +147,7 @@ Workflow <registryKey> <phase> <status>
 |----------|----------|----------|
 | Step 0 (INIT) 시작 전 | (1) INIT 시작 배너 호출 (`Workflow INIT none <command>`), (2) init 에이전트 호출 | 반환값 요약, 진행 안내, 분석 텍스트 |
 | Step 0 (INIT) 완료 | (1) 반환값에서 파라미터 추출/보관, (2) PLAN 시작 배너 호출, (3) 상태 업데이트 스크립트 호출, (4) planner 에이전트 호출 | 반환값 요약, 진행 안내, 분석 텍스트 |
-| Step 1a (PLAN) 완료 | (1) PLAN 완료 배너 호출, (2) AskUserQuestion 호출 (Step 1b) | 계획 요약, 반환값 해석, 진행 안내 |
+| Step 1a (PLAN) 완료 | (1) PLAN 완료 배너 호출 **(Bash 완료 대기 필수)**, (2) AskUserQuestion 호출 (Step 1b) -- **(1)과 (2)는 반드시 순차 실행. 병렬 호출 금지** | 계획 요약, 반환값 해석, 진행 안내, **(1)과 (2)의 병렬 호출** |
 | Step 1b (승인) 완료 | (1) 승인 결과에 따른 분기 처리 (WORK 진행 / planner 재호출 / CANCELLED 처리), (2) WORK 시작 배너 호출, (3) 상태 업데이트 스크립트 호출 | 승인 결과 설명, 진행 안내 |
 | Step 2 (WORK) 진행 중 | (1) 다음 worker 호출, (2) 병렬 worker 동시 호출, (3) 종속성 확인 후 순차 worker 호출 | planner 재호출, status.json 롤백, phase 변경, 자의적 맥락 보강 판단, 계획 수정 |
 | Step 2 (WORK) 완료 | (1) WORK 완료 배너 호출, (2) 반환값에서 첫 3줄 추출, (3) REPORT 시작 배너 호출, (4) 상태 업데이트 스크립트 호출, (5) reporter 에이전트 호출 | 작업 결과 요약, 변경 파일 나열, 진행 안내 |
@@ -269,6 +269,12 @@ AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전
 ```
 
 #### 1b-3. AskUserQuestion으로 사용자 승인
+
+> **순차 실행 강제 (Critical):**
+> PLAN 완료 배너(`Workflow <registryKey> PLAN done`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
+> - PLAN 완료 배너와 AskUserQuestion을 **동일 응답에서 병렬로 호출하는 것은 절대 금지**합니다.
+> - 반드시 **(1) PLAN 완료 배너 Bash 호출 → 응답 수신 확인 → (2) AskUserQuestion 호출** 순서로 2회의 별도 도구 호출 턴에서 실행합니다.
+> - 이를 위반하면 사용자가 계획서 링크를 확인하지 못한 채 승인을 요청받는 UX 결함이 발생합니다.
 
 planner가 계획서를 작성 완료하고 `작성완료` 상태를 반환하면, 오케스트레이터가 계획서 파일 경로를 터미널에 출력한 후 AskUserQuestion 도구로 승인/거부 선택지를 제시합니다. 계획 요약은 터미널에 직접 출력하지 않습니다 (사용자가 계획서 파일을 직접 확인).
 
