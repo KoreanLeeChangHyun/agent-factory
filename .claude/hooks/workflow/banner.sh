@@ -284,8 +284,9 @@ else
             REPORT) DOC_PATH="${WORK_DIR}/report.md" ;;
         esac
     fi
-    echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}"
     if [ -n "$DOC_PATH" ]; then
-        echo -e "  ${DIM}→ ${DOC_PATH}${RESET}"
+        echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}  ${DIM}→ ${DOC_PATH}${RESET}"
+    else
+        echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}"
     fi
 fi

@@ -309,7 +309,21 @@ AskUserQuestion(
 | **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단 |
 
 > **"수정 (prompt.txt)" 선택 시 오케스트레이터 동작:**
-> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 (prompt.txt)"을 선택합니다. 오케스트레이터는 prompt.txt의 내용을 읽어 planner를 재호출 (prompt에 `mode: revise` 및 피드백 내용 추가)하여 계획 재수립 -> Step 1b 반복
+> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 (prompt.txt)"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
+>
+> 1. **prompt.txt 읽기**: `.prompt/prompt.txt`의 내용을 읽어 피드백 내용을 확보
+> 2. **prompt.txt 클리어 (필수)**: 읽기 직후 반드시 prompt.txt를 클리어하여 다음 작업에 대비
+>    ```bash
+>    > .prompt/prompt.txt
+>    ```
+>    클리어 실패 시 재시도:
+>    ```bash
+>    : > .prompt/prompt.txt
+>    ```
+> 3. **planner 재호출**: 확보한 피드백 내용을 prompt에 `mode: revise` 및 피드백 내용으로 추가하여 계획 재수립
+> 4. **Step 1b 반복**: 재수립된 계획에 대해 다시 사용자 승인 요청
+>
+> **주의:** prompt.txt 클리어를 생략하면 이전 피드백 내용이 잔존하여 후속 작업에서 중복/오염이 발생합니다. INIT 단계의 init-workflow.sh Step 4와 동일한 패턴을 따릅니다.
 
 #### 중지 시 status.json CANCELLED 처리
 
@@ -377,6 +391,8 @@ Bash("wf-state status 20260205-213000 PLAN CANCELLED")
 > 위반 시 워크플로우 무결성이 훼손됩니다. WORK phase에서 문제가 발생하면 worker 반환값의 "실패" 상태로 처리하고, 오케스트레이터가 임의로 PLAN으로 회귀하지 않습니다.
 
 **상세 가이드:** workflow-work 스킬 참조
+
+> **Worker 내부 처리 절차 (4단계):** 각 worker는 호출 후 내부적으로 `계획서 확인 → 스킬 로드 → 작업 진행 → 실행 내역 작성`의 4단계를 수행합니다. 상세는 workflow-work 스킬 및 worker.md 참조.
 
 #### Phase 0: 준비 단계 (필수, 순차 1개 worker)
 
