@@ -10,3 +10,9 @@
 .prompt/
 
 CLAUDE.md
+
+# Python cache
+__pycache__/
+
+# Uploads
+uploads/
