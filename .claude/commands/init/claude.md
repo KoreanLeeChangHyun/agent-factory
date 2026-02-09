@@ -49,7 +49,7 @@ Bash 도구로 실행:
 wf-claude setup-alias
 ```
 
-결과 메시지 출력 후 Step 4로 진행.
+PATH export(`~/.local/bin`)와 alias(cc, ccc)가 블록 마커 안에 함께 설정됩니다. 결과 메시지 출력 후 Step 4로 진행.
 
 ### Step 4. StatusLine 설정
 
@@ -118,6 +118,7 @@ wf-claude verify
 === Claude Code 환경 초기화 완료 ===
 
 [v] Shell Alias: cc, ccc 등록 완료
+[v] PATH: ~/.local/bin 추가 완료
 [v] StatusLine: settings.json, statusline.sh 설정 완료
 [v] Slack: CLAUDE_CODE_SLACK_WEBHOOK_URL 설정 완료 (또는 스킵됨)
 [v] Git: user.name, user.email 설정 완료 (또는 .env 편집 필요)
@@ -136,6 +137,7 @@ wf-claude verify
 | `statusline.sh` (실행 권한) | `~/.claude/statusline.sh` | 필수 |
 | `CLAUDE_CODE_SLACK_WEBHOOK_URL` | `.claude.env` 또는 `~/.zshrc` | 선택 |
 | `CLAUDE_CODE_SLACK_BOT_TOKEN` | `.claude.env` (수동 설정) | 선택 |
+| `~/.local/bin` in PATH | `~/.zshrc` (export PATH) | 필수 |
 | `user.name`, `user.email` | `git config --global` | 필수 |
 
 > **참고**: `CLAUDE_CODE_SLACK_BOT_TOKEN`은 `/init:claude` 오케스트레이션 흐름에서 자동 설정되지 않습니다. `.claude.env` 파일에 `CLAUDE_CODE_SLACK_BOT_TOKEN=xoxb-...` 형식으로 수동 설정할 수 있으며, verify 단계에서 Webhook URL과 함께 검증됩니다.

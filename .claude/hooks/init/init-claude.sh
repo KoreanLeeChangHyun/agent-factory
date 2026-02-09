@@ -160,10 +160,11 @@ cmd_setup_alias() {
     tmpfile=$(mktemp)
     awk 'NF{blank=0} !NF{blank++} blank<=1' "$ZSHRC" > "$tmpfile" && mv "$tmpfile" "$ZSHRC"
 
-    # --- 4. 새 alias 블록 추가 (블록 마커 포함) ---
+    # --- 4. 새 alias 블록 추가 (블록 마커 포함, PATH export 포함) ---
     {
         echo ""
         echo "$ALIAS_BLOCK_BEGIN"
+        echo 'export PATH="$HOME/.local/bin:$PATH"'
         echo "alias cc='claude --dangerously-skip-permissions \"/init:workflow\"'"
         echo "alias ccc='claude --dangerously-skip-permissions --continue'"
         echo "$ALIAS_BLOCK_END"
@@ -480,7 +481,20 @@ cmd_verify() {
         slack_source="zshrc"
     fi
 
-    # 5. Git 설정 검증
+    # 5. PATH에 ~/.local/bin 포함 여부 검증
+    local path_local_bin="false"
+    if echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then
+        path_local_bin="true"
+    fi
+    local path_local_bin_zshrc="false"
+    if [ -f "$ZSHRC" ] && grep -q 'export PATH=.*\$HOME/\.local/bin' "$ZSHRC" 2>/dev/null; then
+        path_local_bin_zshrc="true"
+    fi
+    if [ "$path_local_bin" = "false" ] && [ "$path_local_bin_zshrc" = "false" ]; then
+        all_ok=false
+    fi
+
+    # 6. Git 설정 검증
     local git_name git_email
     git_name=$(git config --global user.name 2>/dev/null || echo "")
     git_email=$(git config --global user.email 2>/dev/null || echo "")
@@ -505,6 +519,8 @@ cmd_verify() {
     if [ -n "$slack_source" ]; then
         printf '"slack_source":"%s",' "$slack_source"
     fi
+    printf '"path_local_bin":%s,' "$path_local_bin"
+    printf '"path_local_bin_zshrc":%s,' "$path_local_bin_zshrc"
     printf '"git_configured":%s,' "$git_configured"
     printf '"git_user_name":"%s",' "$(json_escape "$git_name")"
     printf '"git_user_email":"%s"' "$(json_escape "$git_email")"

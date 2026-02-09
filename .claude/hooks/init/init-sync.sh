@@ -2,7 +2,7 @@
 # .claude 디렉토리 원격 동기화 스크립트
 # 사용법: ./init-sync.sh [--dry-run]
 #
-# 원격 리포(git@github.com:kusrc-dev/claude.git)에서 .claude 디렉토리를 가져와
+# 원격 리포(https://github.com/KoreanLeeChangHyun/claude-workflow.git)에서 .claude 디렉토리를 가져와
 # 현재 프로젝트에 rsync --delete로 덮어쓰기합니다.
 # .claude.env 파일은 보존됩니다.
 
@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-REMOTE_REPO="git@github.com:kusrc-dev/claude.git"
+REMOTE_REPO="https://github.com/KoreanLeeChangHyun/claude-workflow.git"
 TEMP_DIR=$(mktemp -d "/tmp/claude-sync-XXXXXX")
 CLONE_DIR="$TEMP_DIR/claude-remote"
 BACKUP_DIR="$TEMP_DIR/sync-backup"
@@ -87,11 +87,10 @@ rm -rf "$CLONE_DIR"
 if ! git clone --depth 1 "$REMOTE_REPO" "$CLONE_DIR" 2>&1; then
     echo ""
     echo "[ERROR] git clone 실패."
-    echo "  - SSH 키 설정을 확인하세요."
     echo "  - 네트워크 연결을 확인하세요."
     echo "  - 리포지토리 URL을 확인하세요: $REMOTE_REPO"
     echo ""
-    echo "  SSH 키가 설정되지 않았다면 /init:claude 를 실행하여 초기 환경을 구성하세요."
+    echo "  HTTPS 접속이 차단되어 있다면 네트워크 환경(프록시, 방화벽 등)을 확인하세요."
     exit 1
 fi
 echo "[CLONE] 완료."

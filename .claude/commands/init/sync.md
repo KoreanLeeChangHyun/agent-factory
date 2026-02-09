@@ -5,7 +5,7 @@ disable-model-invocation: true
 
 # Sync .claude from Remote Repository
 
-원격 리파지토리(`git@github.com:kusrc-dev/claude.git`)에서 `.claude` 디렉토리를 가져와 현재 프로젝트에 덮어쓰기합니다.
+원격 리파지토리(`https://github.com/KoreanLeeChangHyun/claude-workflow.git`)에서 `.claude` 디렉토리를 가져와 현재 프로젝트에 덮어쓰기합니다.
 
 > **주의:** 프로젝트 자체의 git과 `.claude` 원격 리파지토리는 별개입니다. 이 명령어는 `.claude` 설정 전용 리파지토리에서 최신 설정을 가져옵니다.
 
@@ -57,7 +57,7 @@ wf-sync $ARGUMENTS
 
 | 오류 상황 | 대응 |
 |----------|------|
-| git clone 실패 | 에러 메시지 출력, SSH 키/네트워크 확인 안내 |
+| git clone 실패 | 에러 메시지 출력, 네트워크/URL 확인 안내 |
 | rsync 실패 | 에러 메시지 출력, 디스크 공간/권한 확인 안내 |
 | .env 복원 실패 | WARNING 출력, TEMP_DIR 내 sync-backup/.env에서 수동 복원 안내 |
 | 원격에 .claude 디렉토리 없음 | 에러 메시지 출력, 원격 리포지토리 구조 확인 안내 |
@@ -68,5 +68,5 @@ wf-sync $ARGUMENTS
 | 명령어 | 설명 |
 |--------|------|
 | `/init:workflow` | 워크플로우 재초기화 (동기화 후 실행 권장) |
-| `/init:claude` | 사용자 환경 초기화 (SSH 키 설정 포함) |
-| `/git:config` | Git 설정 (SSH 인증 문제 시) |
+| `/init:claude` | 사용자 환경 초기화 |
+| `/git:config` | Git 설정 (인증 문제 시) |
