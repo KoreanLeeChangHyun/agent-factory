@@ -15,7 +15,7 @@ disable-model-invocation: true
 skill-manager 스킬을 사용하여 새 스킬을 자동으로 생성할 수 있습니다:
 
 ```
-cc:asset-manager "PDF 처리 스킬 만들어줘"
+cc:implement "PDF 처리 스킬 만들어줘"
 ```
 
 ### 수동 생성
@@ -33,4 +33,4 @@ cc:asset-manager "PDF 처리 스킬 만들어줘"
 
 ## 참고
 
-새 스킬 생성 시 `cc:asset-manager` 명령어 또는 command-skill-manager 스킬 사용을 권장합니다.
+새 스킬 생성 시 `cc:implement` 명령어 또는 command-skill-manager 스킬 사용을 권장합니다.

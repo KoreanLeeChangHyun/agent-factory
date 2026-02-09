@@ -285,8 +285,11 @@ else
         esac
     fi
     if [ -n "$DOC_PATH" ]; then
-        echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}  ${DIM}→ ${DOC_PATH}${RESET}"
+        echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}"
+        echo -e "${COLOR}  ✓ ${DIM}${DOC_PATH}${RESET}"
     else
         echo -e "${COLOR}  ✓ ${BOLD}${PHASE}${RESET}  ${DIM}${WORK_ID} · ${TITLE}${RESET}"
     fi
+    # 패딩: 의미 있는 텍스트로 AskUserQuestion UI 덮어쓰기 방지
+    echo -e "${COLOR}  ✓ ${BOLD}${PHASE} DONE${RESET}"
 fi

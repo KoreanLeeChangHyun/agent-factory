@@ -6,7 +6,7 @@
 #   init-workflow.sh <command> <workDir> <workId> <title> [claude_session_id]
 #
 # 인자:
-#   command           - 실행 명령어 (implement, refactor, review, research, build, analyze, architect, asset-manager, framework)
+#   command           - 실행 명령어 (implement, refactor, review, research, build, analyze, architect, framework)
 #   workDir           - 작업 디렉터리 경로 (예: .workflow/20260208-133900/디렉터리-구조-변경/implement)
 #   workId            - 작업 ID (예: 133900)
 #   title             - 작업 제목

@@ -6,6 +6,10 @@
 .claude.env
 .claude.env*
 
+.uoloads/
+
+.filebase/
+
 # Prompts and temps
 .prompt/
 

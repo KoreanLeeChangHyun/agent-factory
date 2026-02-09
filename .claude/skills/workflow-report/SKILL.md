@@ -71,7 +71,7 @@ workPath: <workDir>/work/
 
 1. **보고서 작성**
    1. command에 해당하는 템플릿 파일을 Read 도구로 로드
-      - 매핑: implement/refactor/build/framework → `templates/implement.md`, review/analyze → `templates/review.md`, research → `templates/research.md`, architect → `templates/architect.md`, asset-manager → `templates/asset-manager.md`
+      - 매핑: implement/refactor/build/framework → `templates/implement.md`, review/analyze → `templates/review.md`, research → `templates/research.md`, architect → `templates/architect.md`
       - 템플릿 경로: `.claude/skills/workflow-report/templates/<템플릿파일>`
       - placeholder 치환 가이드: `templates/_guide.md` 참조
    2. 작업 내역(`work/` 디렉터리) 취합 및 분석
@@ -158,7 +158,6 @@ command별 보고서 구조가 다르므로, `templates/` 디렉토리에 유형
 | analyze | `templates/review.md` | 검토/분석형 (분석 결과 구조) |
 | research | `templates/research.md` | 조사형 (조사-결론 구조) |
 | architect | `templates/architect.md` | 설계형 (아키텍처 구조) |
-| asset-manager | `templates/asset-manager.md` | 에셋형 (에셋 변경 내역) |
 
 > **참고**: 템플릿 선택 가이드 및 placeholder 목록은 `templates/_guide.md`를 참조하세요.
 > 템플릿은 권장 구조이며, 내용에 따라 reporter가 유연하게 조정할 수 있습니다.

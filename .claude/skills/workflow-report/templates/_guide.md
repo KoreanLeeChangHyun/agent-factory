@@ -14,7 +14,6 @@ reporter 에이전트가 보고서 작성 시 참조하는 템플릿 선택 가�
 | analyze | `templates/review.md` | 검토/분석형 (분석 결과 구조) |
 | research | `templates/research.md` | 조사형 (조사-결론 구조) |
 | architect | `templates/architect.md` | 설계형 (아키텍처 구조) |
-| asset-manager | `templates/asset-manager.md` | 에셋형 (에셋 변경 내역) |
 
 ## 사용 방법
 

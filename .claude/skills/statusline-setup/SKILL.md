@@ -70,9 +70,28 @@ StatusLine은 두 가지로 구성됩니다:
 | `\033[90m` | 회색 |
 | `\033[0m` | 리셋 |
 
+#### 워크플로우 세션 필터링
+
+StatusLine은 **현재 터미널 세션에 연결된 워크플로우만** 표시합니다. 여러 터미널에서 각각 다른 워크플로우를 실행할 때, 각 터미널은 자신의 워크플로우만 상태줄에 표시합니다.
+
+**필터링 흐름:**
+
+1. 환경변수 `CLAUDE_SESSION_ID`에서 현재 세션 ID를 획득
+2. `.workflow/registry.json`의 각 워크플로우 엔트리를 순회
+3. 각 워크플로우의 `status.json`에서 세션 소유권을 확인:
+   - `session_id` 필드: 오케스트레이터(메인) 세션 ID
+   - `linked_sessions` 배열: 워커/리포터 등 하위 세션 ID 목록
+4. 현재 세션 ID가 `session_id` 또는 `linked_sessions`에 포함된 워크플로우를 표시
+
+**폴백 동작:**
+
+- `CLAUDE_SESSION_ID`가 설정되지 않은 경우: 워크플로우 표시 생략
+- 매칭되는 워크플로우가 없는 경우: 워크플로우 표시 생략
+- `status.json` 읽기 실패: 해당 워크플로우를 건너뛰고 다음 엔트리 검사
+
 #### 워크플로우 Phase별 색상 코드
 
-StatusLine은 `.workflow/registry.json`에서 활성 워크플로우를 찾아 **Phase(단계)**와 **제목(title)**을 `[PHASE] 제목` 형식으로 표시합니다. Phase별 색상은 `banner.sh`의 색상 체계와 일치합니다.
+StatusLine은 세션 필터링을 통해 매칭된 워크플로우의 **Phase(단계)**와 **제목(title)**을 `[PHASE] 제목` 또는 `[PHASE:agent] 제목` 형식으로 표시합니다. Phase별 색상은 `banner.sh`의 색상 체계와 일치합니다.
 
 | Phase | 색상 | ANSI 코드 | 의미 |
 |-------|------|-----------|------|
@@ -81,7 +100,7 @@ StatusLine은 `.workflow/registry.json`에서 활성 워크플로우를 찾아 *
 | WORK | 초록(Green) | `\033[32m` | 실행 |
 | REPORT | 보라(Magenta) | `\033[35m` | 보고 |
 
-워크플로우가 비활성이면 Phase/제목 표시를 생략하고 기존 포맷을 유지합니다.
+워크플로우가 비활성이거나 현재 세션에 매칭되는 워크플로우가 없으면 Phase/제목 표시를 생략하고 기존 포맷을 유지합니다.
 제목이 30자를 초과하면 30자로 잘라내고 "..."을 붙입니다.
 
 #### 기본 템플릿 (Python)
@@ -126,9 +145,12 @@ PHASE_COLORS = {
 }
 RESET = "\033[0m"
 
-# Read workflow info from registry.json -> local .context.json
+# Read workflow info filtered by current session
+# Uses CLAUDE_SESSION_ID to match against status.json's
+# session_id (orchestrator) and linked_sessions (workers)
 workflow_display = ""
-if cwd:
+current_session = os.environ.get("CLAUDE_SESSION_ID", "")
+if cwd and current_session:
     registry_path = os.path.join(cwd, ".workflow", "registry.json")
     try:
         with open(registry_path, "r") as f:
@@ -138,9 +160,19 @@ if cwd:
                 work_dir = entry.get("workDir", "")
                 if not work_dir:
                     continue
+                # Check session ownership via status.json
+                status_path = os.path.join(cwd, work_dir, "status.json")
+                try:
+                    with open(status_path, "r") as sf:
+                        status = json.load(sf)
+                except Exception:
+                    continue
+                orch_sid = status.get("session_id", "")
+                linked = status.get("linked_sessions", [])
+                if current_session != orch_sid and current_session not in linked:
+                    continue
                 title = entry.get("title", "")
                 phase = entry.get("phase", "")
-                # Truncate title to 30 chars
                 if len(title) > 30:
                     title = title[:30] + "..."
                 phase_color = PHASE_COLORS.get(phase, "\033[90m")
@@ -148,7 +180,7 @@ if cwd:
                     workflow_display = f" {phase_color}[{phase}]{RESET} {title}"
                 elif title:
                     workflow_display = f" \033[90m{title}{RESET}"
-                break  # 첫 번째 워크플로우만 사용
+                break  # 매칭된 첫 번째 워크플로우만 사용
     except Exception:
         pass
 
@@ -169,7 +201,7 @@ print(f"\033[36m{model}\033[0m{workflow_display}{branch} \033[35mctx:{pct}%\033[
 사용자 요청에 따라 아래 항목을 추가/제거 가능:
 
 - **모델명**: `data["model"]["display_name"]`
-- **에이전트 표시**: `.workflow/registry.json` -> 로컬 `.context.json`의 `agent` 필드 (에이전트별 고유 색상)
+- **에이전트 표시**: `.workflow/registry.json` -> `status.json`의 세션 매칭 -> `.context.json`의 `agent` 필드 (에이전트별 고유 색상)
 - **Git 브랜치**: `git branch --show-current`
 - **컨텍스트 사용률**: 입력 토큰 / 컨텍스트 윈도우 크기
 - **추가/삭제 라인 수**: `total_lines_added`, `total_lines_removed`

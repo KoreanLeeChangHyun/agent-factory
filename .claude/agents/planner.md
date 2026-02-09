@@ -27,7 +27,7 @@ maxTurns: 30
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, asset-manager, framework, research)
+- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
 - `workId`: 작업 ID (HHMMSS 6자리)
 - `request`: 사용자 요청 내용 (원본 그대로 전달됨)
 - `workDir`: 작업 디렉토리 경로 (INIT 단계에서 생성됨, 예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)

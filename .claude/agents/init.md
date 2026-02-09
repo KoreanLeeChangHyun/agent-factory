@@ -18,7 +18,7 @@ model: sonnet
 
 메인 에이전트(orchestration)로부터 전달받는 정보:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, asset-manager, framework, research)
+- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
 
 ## 절차
 

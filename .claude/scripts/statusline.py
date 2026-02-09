@@ -128,19 +128,27 @@ def get_git_branch(cwd: str) -> str:
 
 
 def get_active_workflow(cwd: str) -> dict | None:
-    """Read active workflow info from registry.json and .context.json.
+    """Read active workflow info filtered by the current session.
 
-    Scans registry.json for the first active workflow entry to get
-    title and phase, then reads the agent field from the workflow's
-    local .context.json file.
+    Reads CLAUDE_SESSION_ID from the environment, then scans
+    registry.json for workflow entries whose status.json contains
+    the current session ID in either the ``session_id`` field
+    (orchestrator) or the ``linked_sessions`` array (workers/reporters).
+
+    If CLAUDE_SESSION_ID is not set or no matching workflow is found,
+    returns None so that no workflow info is displayed.
 
     Args:
         cwd: Current working directory (project root).
 
     Returns:
         Dict with keys (title, phase, command, agent) or None if no
-        active workflow found.
+        matching workflow found for the current session.
     """
+    current_session = os.environ.get("CLAUDE_SESSION_ID", "")
+    if not current_session:
+        return None
+
     registry_path = os.path.join(cwd, ".workflow", "registry.json")
     try:
         with open(registry_path, "r", encoding="utf-8") as f:
@@ -154,6 +162,20 @@ def get_active_workflow(cwd: str) -> dict | None:
     for _key, entry in registry.items():
         work_dir = entry.get("workDir", "")
         if not work_dir:
+            continue
+
+        # Read status.json to check session ownership
+        status_path = os.path.join(cwd, work_dir, "status.json")
+        try:
+            with open(status_path, "r", encoding="utf-8") as f:
+                status = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            continue
+
+        # Match: current session is the orchestrator or a linked worker/reporter
+        orchestrator_sid = status.get("session_id", "")
+        linked = status.get("linked_sessions", [])
+        if current_session != orchestrator_sid and current_session not in linked:
             continue
 
         title = entry.get("title", "")
@@ -176,7 +198,6 @@ def get_active_workflow(cwd: str) -> dict | None:
                 "command": command,
                 "agent": agent,
             }
-        break  # Only check first workflow entry
 
     return None
 

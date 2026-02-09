@@ -64,7 +64,6 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 | `cc:build` | 빌드 스크립트 생성 |
 | `cc:analyze` | 요구사항/코드/DB/데이터 분석 |
 | `cc:architect` | 아키텍처 설계 및 다이어그램 |
-| `cc:asset-manager` | 에이전트/스킬/커맨드 관리 |
 | `cc:framework` | 프레임워크 프로젝트 초기화 |
 | `cc:research` | 연구/조사 |
 

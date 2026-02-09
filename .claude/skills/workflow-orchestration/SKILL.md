@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "워크플로우 오케스트레이션 스킬. INIT -> PLAN -> WORK -> REPORT 워크플로우를 관리합니다. cc:implement, cc:refactor, cc:review, cc:build, cc:analyze, cc:architect, cc:asset-manager, cc:framework, cc:research 등의 커맨드에서 호출됩니다."
+description: "워크플로우 오케스트레이션 스킬. INIT -> PLAN -> WORK -> REPORT 워크플로우를 관리합니다. cc:implement, cc:refactor, cc:review, cc:build, cc:analyze, cc:architect, cc:framework, cc:research 등의 커맨드에서 호출됩니다."
 disable-model-invocation: true
 ---
 
@@ -53,7 +53,6 @@ INIT -> PLAN -> WORK -> REPORT
 | build | 빌드 스크립트 생성 |
 | analyze | 요구사항 분석 |
 | architect | 아키텍처 설계 및 다이어그램 생성 |
-| asset-manager | 에셋 관리 (에이전트/스킬/커맨드) |
 | framework | 프레임워크 프로젝트 초기화 |
 | research | 연구/조사 |
 

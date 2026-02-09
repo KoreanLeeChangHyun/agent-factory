@@ -117,13 +117,12 @@ worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
-| implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증 |
+| implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증. 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
 | refactor | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증 |
 | review | command-requesting-code-review | 리뷰 체크리스트 적용 |
 | build | command-verification-before-completion | 빌드 스크립트 검증 |
 | analyze | analyze-* (키워드 판단) | 분석 유형별 스킬 |
 | architect | command-architect, command-mermaid-diagrams | 아키텍처 설계, 다이어그램 생성 |
-| asset-manager | command-agent-manager, command-skill-manager, command-manager (키워드 판단) | 에셋 유형별 스킬 |
 | framework | framework-* (프레임워크명 판단) | 프레임워크별 스킬 |
 | research | command-research, deep-research | 조사 및 심층 연구 |
 

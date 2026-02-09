@@ -33,7 +33,6 @@ tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
   - build: command-verification-before-completion
   - analyze: analyze-* (키워드 판단)
   - architect: command-architect, command-mermaid-diagrams
-  - asset-manager: command-agent-manager, command-skill-manager, command-manager (키워드 판단)
   - framework: framework-* (프레임워크명 판단)
   - research: command-research, deep-research
 
@@ -60,7 +59,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, asset-manager, framework, research)
+- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
 - `workId`: 작업 ID
 - `planPath`: 계획서 경로
 - `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`
