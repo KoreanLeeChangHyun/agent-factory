@@ -122,15 +122,18 @@ workPath: <workDir>/work/
 
 ### 형식 결정 기준
 
-```
-데이터가 테이블 형태인가?
-|-- 예 -> 열이 5개 이상이거나 수식 필요?
-|       |-- 예 -> 엑셀 (.xlsx)
-|       |-- 아니오 -> CSV (.csv)
-|-- 아니오 -> 마크다운 (.md)
-
-시각화가 필요한가?
-|-- 예 -> command-mermaid-diagrams 스킬 호출
+```mermaid
+flowchart TD
+    A{데이터가 테이블 형태인가?} -->|예| B{열 5개 이상 또는 수식 필요?}
+    A -->|아니오| C[마크다운 .md]
+    B -->|예| D[엑셀 .xlsx]
+    B -->|아니오| E[CSV .csv]
+    C --> F{시각화가 필요한가?}
+    D --> F
+    E --> F
+    F -->|예| G[mermaid 다이어그램 작성]
+    F -->|아니오| H[완료]
+    G --> H
 ```
 
 ## 보고서 구조
@@ -224,19 +227,70 @@ wb.save('report.xlsx')
 
 ## 다이어그램 연동
 
-시각화가 필요한 경우 command-mermaid-diagrams 스킬 호출:
+시각화가 필요한 경우 command-mermaid-diagrams 스킬을 참조하여 mermaid 코드 블록을 작성합니다.
 
+**다이어그램 유형별 mermaid 예시:**
+
+**작업 흐름도 (flowchart):**
+```mermaid
+flowchart TD
+    A[시작] --> B[처리]
+    B --> C{조건}
+    C -->|Yes| D[완료]
+    C -->|No| E[재시도]
+    E --> B
 ```
-작업 흐름도 -> flowchart
-시스템 구조 -> class diagram
-상태 변화 -> state diagram
-타임라인 -> gantt chart
+
+**시스템 구조 (class diagram):**
+```mermaid
+classDiagram
+    class Module {
+        +String name
+        +process()
+    }
+    class SubModule {
+        +execute()
+    }
+    Module <|-- SubModule
 ```
+
+**상태 변화 (state diagram):**
+```mermaid
+stateDiagram-v2
+    [*] --> INIT
+    INIT --> PLAN
+    PLAN --> WORK
+    WORK --> REPORT
+    REPORT --> COMPLETED
+    REPORT --> FAILED
+```
+
+**타임라인 (gantt chart):**
+```mermaid
+gantt
+    title 작업 일정
+    dateFormat YYYY-MM-DD
+    section Phase 1
+        태스크1 :a1, 2026-01-01, 3d
+    section Phase 2
+        태스크2 :b1, after a1, 2d
+```
+
+> **원칙**: 보고서 내 다이어그램은 반드시 mermaid 코드 블록을 사용합니다. ASCII art나 텍스트 화살표(`→`, `↓`)를 다이어그램 대용으로 사용하지 않습니다.
+> **방향 필수**: Flowchart 연결선은 반드시 방향 화살표(`-->`, `-.->`, `==>`)를 사용합니다. 방향 없는 연결(`---`, `-.-`, `===`)은 금지합니다.
 
 ## 워크플로우
 
-```
-작업 내역 로드 → 형식 결정 → 보고서 작성 → 파일 저장 → history.md 갱신 → CLAUDE.md 필요시 갱신 → status.json 완료 처리 → 레지스트리 해제 → 경로 출력
+```mermaid
+flowchart TD
+    A[작업 내역 로드] --> B[형식 결정]
+    B --> C[보고서 작성]
+    C --> D[파일 저장]
+    D --> E[history.md 갱신]
+    E --> F[CLAUDE.md 필요시 갱신]
+    F --> G[status.json 완료 처리]
+    G --> H[레지스트리 해제]
+    H --> I[경로 출력]
 ```
 
 1. **작업 내역 로드** (필수): `{workDir}/work/`에서 로드
