@@ -1,6 +1,6 @@
 ---
 name: safety-fallback
-description: 에이전트 시스템의 안전장치, 제한 사항, 오류 복구 전략 가이드. 사용 시점: 에이전트 제한 확인, Task 실패/에러 복구, 자체 검증 기준 이해 시.
+description: "에이전트 시스템의 안전장치, 제한 사항, 오류 복구 전략 가이드. Use for error recovery and safety tasks: (1) 에이전트 제한 사항 확인, (2) Task 실패/에러 발생 시 복구 전략 참고, (3) 자체 검증 기준 이해, (4) 반복 제한/자원 보호 정책 참고. 트리거: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'."
 ---
 
 # 안전장치 및 Fallback 가이드

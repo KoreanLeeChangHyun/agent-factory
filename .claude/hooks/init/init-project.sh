@@ -831,31 +831,31 @@ cmd_setup_wf_alias() {
   local content
   content=$(cat "$zshrc")
 
-  # 대상 alias 정의
-  local -A alias_map=(
-    ["Workflow"]="bash .claude/hooks/workflow/banner.sh"
-    ["wf-state"]="bash .claude/hooks/workflow/update-state.sh"
-    ["wf-init"]="bash .claude/hooks/init/init-workflow.sh"
-    ["wf-claude"]="bash .claude/hooks/init/init-claude.sh"
-    ["wf-project"]="bash .claude/hooks/init/init-project.sh"
-    ["wf-clear"]="bash .claude/hooks/init/init-clear.sh"
-    ["wf-sync"]="bash .claude/hooks/init/init-sync.sh"
-    ["wf-git-config"]="bash .claude/hooks/init/git-config.sh"
-    ["wf-slack"]="bash .claude/hooks/slack/slack.sh"
-    ["wf-info"]="bash .claude/hooks/workflow/info.sh"
-    ["wf-commands"]="bash .claude/hooks/workflow/commands.sh"
+  # 대상 alias 정의 (bash 3.2 호환: 연관 배열 대신 일반 배열 사용)
+  local alias_names=("Workflow" "wf-state" "wf-init" "wf-claude" "wf-project" "wf-clear" "wf-sync" "wf-git-config" "wf-slack" "wf-info" "wf-commands")
+  local alias_cmds=(
+    "bash .claude/hooks/workflow/banner.sh"
+    "bash .claude/hooks/workflow/update-state.sh"
+    "bash .claude/hooks/init/init-workflow.sh"
+    "bash .claude/hooks/init/init-claude.sh"
+    "bash .claude/hooks/init/init-project.sh"
+    "bash .claude/hooks/init/init-clear.sh"
+    "bash .claude/hooks/init/init-sync.sh"
+    "bash .claude/hooks/init/git-config.sh"
+    "bash .claude/hooks/slack/slack.sh"
+    "bash .claude/hooks/workflow/info.sh"
+    "bash .claude/hooks/workflow/commands.sh"
   )
-  local alias_order=("Workflow" "wf-state" "wf-init" "wf-claude" "wf-project" "wf-clear" "wf-sync" "wf-git-config" "wf-slack" "wf-info" "wf-commands")
 
   local added=()
   local skipped=()
 
-  for name in "${alias_order[@]}"; do
-    local cmd="${alias_map[$name]}"
+  for (( i=0; i<${#alias_names[@]}; i++ )); do
+    local name="${alias_names[$i]}"
     if echo "$content" | grep -q "^alias ${name}="; then
       skipped+=("$name")
     else
-      added+=("$name")
+      added+=("$i")
     fi
   done
 
@@ -869,8 +869,9 @@ cmd_setup_wf_alias() {
       } >> "$zshrc"
     fi
 
-    for name in "${added[@]}"; do
-      local cmd="${alias_map[$name]}"
+    for idx in "${added[@]}"; do
+      local name="${alias_names[$idx]}"
+      local cmd="${alias_cmds[$idx]}"
       echo "alias ${name}='${cmd}'" >> "$zshrc"
     done
   fi
@@ -884,8 +885,9 @@ cmd_setup_wf_alias() {
   local wrapper_added=()
   local wrapper_skipped=()
 
-  for name in "${alias_order[@]}"; do
-    local cmd="${alias_map[$name]}"
+  for (( i=0; i<${#alias_names[@]}; i++ )); do
+    local name="${alias_names[$i]}"
+    local cmd="${alias_cmds[$i]}"
     local wrapper_path="${bin_dir}/${name}"
 
     # 항상 덮어쓰기 (idempotent) - 내용이 최신인지 보장
@@ -900,6 +902,12 @@ WRAPPER_EOF
     wrapper_added+=("$name")
   done
 
+  # added 인덱스를 이름으로 변환
+  local added_names=()
+  for idx in "${added[@]:-}"; do
+    [ -n "$idx" ] && added_names+=("${alias_names[$idx]}")
+  done
+
   # JSON 결과 출력
   python3 -c '
 import json, sys
@@ -911,7 +919,7 @@ result = {
 }
 print(json.dumps(result, ensure_ascii=False))
 ' \
-    "$(printf '%s\n' "${added[@]:-}" | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')" \
+    "$(printf '%s\n' "${added_names[@]:-}" | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')" \
     "$(printf '%s\n' "${skipped[@]:-}" | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')" \
     "$(printf '%s\n' "${wrapper_added[@]:-}" | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
 }

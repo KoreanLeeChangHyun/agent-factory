@@ -1,6 +1,6 @@
 ---
 name: workflow-work
-description: "병렬 작업 실행을 위한 범용 에이전트. workflow-plan 스킬 또는 다른 에이전트가 Task 도구로 호출하여 독립적인 작업을 병렬 처리한다. 사용 시점: (1) subagent_type='worker'로 Task 도구 호출 시, (2) 병렬 실행이 필요한 독립 작업 처리 시. 코드 작성, 파일 수정, 검색, 분석 등 모든 유형의 작업을 처리할 수 있다."
+description: "워크플로우 WORK 단계 전용 내부 스킬. 오케스트레이터가 Task 도구로 호출하여 할당된 작업을 독립적으로 병렬 처리한다. Use for parallel task execution: 코드 작성, 파일 수정, 검색, 분석 등 모든 유형의 작업을 처리하며, command-skill-map.md 기반으로 명령어별 스킬을 자동 로드한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
 disable-model-invocation: true
 ---
 
@@ -48,7 +48,7 @@ disable-model-invocation: true
 - **출력 허용**: 반환값 (3줄 규격), 에러 메시지
 - **출력 금지**: 코드 분석 과정, 변경 사항 설명, 파일 탐색 과정, 판단 근거, "~를 살펴보겠습니다" 류, 중간 진행 보고, 작업 계획 설명
 - 코드 작성/수정, 파일 탐색, 테스트 실행 등 모든 작업은 묵묵히 수행하고 최종 반환값만 출력
-- 배너 출력은 오케스트레이터가 담당 (worker 에이전트는 배너를 직접 호출하지 않음)
+- 배너 출력은 오케스트레이터가 담당 (worker 에이전트는 배너를 직접 호출하지 않음). Phase 서브배너(`WORK-PHASE`)도 오케스트레이터가 각 Phase의 Worker 호출 직전에 출력하며, Worker가 호출하지 않음
 - **작업 내역 경로는 반드시 터미널에 출력**: 단, worker가 직접 출력하는 것이 아니라 오케스트레이터가 완료 배너를 통해 출력함. worker는 반환값에 경로를 포함하면 오케스트레이터가 배너에 반영
 
 ---
@@ -87,21 +87,43 @@ flowchart TD
 | 항목 | full 모드 | no-plan 모드 |
 |------|----------|-------------|
 | 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
-| Phase 0 (skill-map) | 필수 | 불필요 (스킵) |
+| Phase 0 (skill-map) | 조건부 (태스크 >= 6개) | 불필요 (스킵) |
 | 태스크 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
 | 병렬 실행 | 가능 | 불필요 (단일 Worker) |
+| Phase 배너 | 오케스트레이터가 각 Phase 시작 시 출력 | 출력하지 않음 (단일 Worker) |
 | planPath | 필수 | 없음 |
 
-### Phase 0: 준비 단계 (필수, 순차 1개 worker)
+### Phase 0: 준비 단계 (조건부, 순차 1개 worker)
 
-> **no-plan 모드에서는 Phase 0을 스킵합니다.** 단일 태스크이므로 스킬 매핑이 불필요합니다.
+> **Phase 0 스킵 조건:**
+> - **no-plan 모드**: 단일 태스크이므로 스킬 매핑이 불필요하여 항상 스킵
+> - **태스크 6개 미만**: 소규모 워크플로우에서는 개별 Worker의 자율 스킬 결정으로 충분하므로 스킵
 
-Phase 1~N 실행 전에 반드시 Phase 0을 먼저 수행합니다. Phase 0은 **1개 worker 에이전트가 순차적으로** 실행합니다.
+> **Phase 배너**: 오케스트레이터는 Phase 0 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE 0 "phase0" sequential` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
-**Phase 0 호출:**
+Phase 0은 계획서의 태스크 수가 **6개 이상**일 때만 실행합니다. 태스크 수가 6개 미만이면 `mkdir -p <workDir>/work`로 디렉터리만 생성하고 바로 Phase 1로 진행합니다.
+
+**Phase 0 실행 판단:**
+
+```mermaid
+flowchart TD
+    START[계획서 태스크 수 확인] --> Q1{태스크 >= 6개?}
+    Q1 -->|예| P0[Phase 0 실행]
+    Q1 -->|아니오| SKIP[Phase 0 스킵]
+    P0 --> P0R{Phase 0 성공?}
+    P0R -->|성공| P1S[Phase 1~N: skills 파라미터 전달]
+    P0R -->|실패| FALLBACK[C 방식 폴백: 자율 결정]
+    SKIP --> P1A[Phase 1~N: Worker 자율 스킬 결정]
+    FALLBACK --> P1A
+```
+
+**Phase 0 실행 시 (태스크 >= 6개):**
+
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, mode: phase0")
 ```
+
+Phase 0은 **1개 worker 에이전트가 순차적으로** 실행합니다.
 
 **Phase 0의 2가지 기능:**
 
@@ -127,9 +149,24 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 
 **Phase 0 완료 후:** 오케스트레이터는 skill-map.md를 참고하여 후속 Phase 1~N의 worker 호출 시 skills 파라미터를 전달합니다.
 
+**Phase 0 스킵 시 (태스크 < 6개):**
+
+work 디렉터리만 생성하고 바로 Phase 1로 진행합니다. 각 Worker는 skills 파라미터 없이 호출되며, `command-skill-map.md`의 명령어별 기본 매핑과 키워드 분석, 그리고 `.claude/skills/*/SKILL.md`의 description 필드를 참조하여 자율적으로 스킬을 결정합니다.
+
+**Phase 0 실패 시 폴백:**
+
+Phase 0이 실행되었으나 실패를 반환한 경우, C 방식(개별 자율 결정)으로 자동 폴백합니다:
+1. Phase 0 실패를 로그에 기록
+2. skill-map.md 없이 Phase 1로 진행
+3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
+
+이 폴백 메커니즘은 Phase 0의 SPOF(단일 장애점) 위험을 완화합니다.
+
 ### Phase 1~N: 작업 실행
 
-Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다:
+Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
+
+> **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다. no-plan 모드에서는 단일 Worker이므로 Phase 배너를 출력하지 않습니다.
 
 **독립 작업 (병렬 실행):**
 ```
@@ -220,7 +257,7 @@ flowchart TD
 - `Bash`: 명령어 실행
 - `Task`: 하위 작업 위임 (필요시)
 
-**4. 작업 실행 내역 작성:** 수행한 작업의 내역을 `<workDir>/work/WXX-<작업명>.md` 파일에 기록하고, 구조화된 3줄 형식으로 결과를 반환한다.
+**4. 작업 실행 내역 작성:** 수행한 작업의 내역을 `<workDir>/work/WXX-<작업명>.md` 파일에 기록하고, 구조화된 3줄 형식으로 결과를 반환한다. **"로드된 스킬" 섹션은 필수**로 포함한다.
 
 **다이어그램 표현 원칙:**
 
@@ -256,6 +293,55 @@ flowchart TD
 | framework | 3 | research | 4 |
 
 > **참고**: 상세 정의는 `workflow-plan/SKILL.md`의 "품질 레벨 프레임워크" 섹션을 참조하세요. 계획서에서 기본 Level을 override할 수 있습니다.
+
+### "로드된 스킬" 섹션 가이드
+
+작업 내역 파일(`work/WXX-*.md`)에 로드한 스킬과 매칭 근거를 기록하는 **필수** 섹션입니다. 스킬 매칭 전략의 투명성을 보장하고, 매칭 정확도 개선에 필요한 피드백 데이터를 수집합니다.
+
+**포함 시점:** 모든 작업 내역 파일에 필수로 포함합니다 (선택적 섹션이 아님).
+
+**기록 형식:**
+
+```markdown
+## 로드된 스킬
+
+| 스킬명 | 매칭 방식 | 근거 |
+|--------|----------|------|
+| [스킬명] | [매칭 방식] | [구체적 근거] |
+```
+
+**매칭 방식 분류:**
+
+| 매칭 방식 | 설명 |
+|----------|------|
+| skills 파라미터 | 오케스트레이터가 skill-map.md 또는 계획서 기반으로 명시 전달 |
+| 명령어 기본 | command-skill-map.md의 명령어별 기본 스킬 매핑에 의한 자동 로드 |
+| 키워드 판단 | 태스크 내용의 키워드가 command-skill-map.md의 키워드 매핑과 일치 |
+| description 폴백 | 위 방식으로 매칭되지 않아 SKILL.md description 필드를 탐색하여 매칭 |
+
+**예시:**
+
+```markdown
+## 로드된 스킬
+
+| 스킬명 | 매칭 방식 | 근거 |
+|--------|----------|------|
+| command-code-quality-checker | 명령어 기본 | implement 명령어의 기본 스킬 |
+| command-verification-before-completion | 명령어 기본 | implement 명령어의 기본 스킬 |
+| tdd-guard-hook | 키워드 판단 | 태스크 내용에 "테스트" 키워드 포함 |
+```
+
+**스킬 미로드 시:**
+
+```markdown
+## 로드된 스킬
+
+| 스킬명 | 매칭 방식 | 근거 |
+|--------|----------|------|
+| (없음) | - | skills 파라미터로 workflow-work만 지정되어 추가 스킬 로드 불필요 |
+```
+
+**작업 내역 파일 내 배치 위치:** "변경 파일" 섹션 바로 다음, "수행 내용" 섹션 앞에 배치합니다. "What Didn't Work" 섹션(선택적)과 달리 필수 섹션입니다.
 
 ### "What Didn't Work" 섹션 가이드
 
@@ -303,6 +389,11 @@ flowchart TD
 
 ## 변경 파일
 ...
+
+## 로드된 스킬              <-- 여기 (필수)
+| 스킬명 | 매칭 방식 | 근거 |
+|--------|----------|------|
+| [스킬명] | skills 파라미터 / 명령어 기본 / 키워드 판단 / description 폴백 | [근거] |
 
 ## 수행 내용
 ...

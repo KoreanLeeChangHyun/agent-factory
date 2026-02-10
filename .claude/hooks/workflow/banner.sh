@@ -13,9 +13,11 @@
 #
 # 단축/신규 방식 인자:
 #   workDir - YYYYMMDD-HHMMSS 또는 워크플로우 작업 디렉토리 경로
-#   phase   - 워크플로우 단계 (INIT, PLAN, WORK, REPORT, DONE)
+#   phase   - 워크플로우 단계 (INIT, PLAN, WORK, WORK-PHASE, REPORT, DONE)
 #   status  - (선택) 완료 상태 메시지. 지정 시 완료 배너 출력
+#             WORK-PHASE일 때는 phaseNum (Phase 번호)으로 사용
 #   path    - (선택) 문서 경로. 완료 배너에 보고서 링크로 표시
+#             WORK-PHASE일 때는 taskIds (태스크 목록)로 사용
 #             미전달 시 phase별 기본 경로 자동 추론:
 #               PLAN -> ${workDir}/plan.md, WORK -> ${workDir}/work/, REPORT -> ${workDir}/report.md
 #
@@ -28,10 +30,12 @@
 #   workDir - (선택) 워크플로우 작업 디렉토리. DONE 시 Slack 완료 알림 전송
 #
 # 예시 (단축):
-#   PLAN 시작:  ./workflow-banner.sh 20260207-084248 PLAN
-#   PLAN 완료:  ./workflow-banner.sh 20260207-084248 PLAN done          # path 자동 추론
-#   PLAN 완료:  ./workflow-banner.sh 20260207-084248 PLAN done "/custom/path"  # 명시적 path (우선)
-#   DONE:       ./workflow-banner.sh 20260207-084248 DONE done
+#   PLAN 시작:      ./workflow-banner.sh 20260207-084248 PLAN
+#   PLAN 완료:      ./workflow-banner.sh 20260207-084248 PLAN done          # path 자동 추론
+#   PLAN 완료:      ./workflow-banner.sh 20260207-084248 PLAN done "/custom/path"  # 명시적 path (우선)
+#   WORK-PHASE:     ./workflow-banner.sh 20260207-084248 WORK-PHASE 0 "phase0" sequential
+#   WORK-PHASE:     ./workflow-banner.sh 20260207-084248 WORK-PHASE 1 "W01,W02" parallel
+#   DONE:           ./workflow-banner.sh 20260207-084248 DONE done
 #
 # 예시 (신규):
 #   INIT 완료:  ./workflow-banner.sh .workflow/20260207-084248/터미널-출력-명확화/implement INIT done
@@ -208,6 +212,25 @@ get_progress() {
         *)      echo "${GRAY}□□□□${RESET}" ;;
     esac
 }
+
+# --- WORK-PHASE 서브배너 ---
+# WORK 단계 내부 Phase 진행 상황을 경량 한 줄로 출력
+# 시그니처: <workDir|registryKey> WORK-PHASE <phaseNum> [taskIds] [mode]
+# 예시: ./banner.sh 20260210-223709 WORK-PHASE 1 "W01,W02" parallel
+#   출력:     ► Phase 1  W01,W02  parallel
+if [ "$PHASE" = "WORK-PHASE" ]; then
+    _WP_PHASE_NUM="$STATUS"    # 3번째 인자: phaseNum (STATUS 위치에 해당)
+    _WP_TASK_IDS="$DOC_PATH"   # 4번째 인자: taskIds (DOC_PATH 위치에 해당)
+    _WP_MODE="$5"              # 5번째 인자: mode (parallel/sequential)
+    # 레거시 방식 대응: positional arg 위치 보정
+    if [[ ! "$_RESOLVED_ARG1" == .workflow/* ]] && [[ ! "$_RESOLVED_ARG1" == /* ]] && [[ ! "$1" =~ ^[0-9]{8}-[0-9]{6}$ ]]; then
+        _WP_PHASE_NUM="$4"
+        _WP_TASK_IDS="$5"
+        _WP_MODE="$6"
+    fi
+    echo -e "    ${GREEN}►${RESET} ${BOLD}Phase ${_WP_PHASE_NUM}${RESET}  ${DIM}${_WP_TASK_IDS}${RESET}  ${GRAY}${_WP_MODE}${RESET}"
+    exit 0
+fi
 
 # --- INIT 완료 배너 방어 로직 ---
 # INIT phase의 완료 배너(status 지정)는 출력하지 않고 조기 종료

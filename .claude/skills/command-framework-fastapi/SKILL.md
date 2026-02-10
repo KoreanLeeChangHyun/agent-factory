@@ -1,6 +1,6 @@
 ---
 name: framework-fastapi
-description: "FastAPI 프레임워크 프로젝트 구조 및 베스트 프랙티스. FastAPI 프로젝트 생성, 구조화, 개발 시 참고합니다."
+description: "FastAPI 프레임워크 프로젝트 구조 및 베스트 프랙티스. Use for FastAPI project tasks: (1) FastAPI 프로젝트 초기화 및 구조 설정, (2) Domain-Driven 디렉토리 구조 적용, (3) API 엔드포인트/라우터/의존성 설계, (4) FastAPI 개발 시 프로덕션 레디 패턴 참고. 트리거: 'FastAPI', 'fastapi', 'fast api', 'Python API', 'Python 웹 서버'."
 ---
 
 # FastAPI Framework Skill

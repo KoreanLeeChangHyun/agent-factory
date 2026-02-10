@@ -1,6 +1,6 @@
 ---
 name: template-skill
-description: 새 스킬 생성 시 참고할 수 있는 템플릿 스킬입니다. 이 스킬을 직접 사용하지 마세요. skill-manager 스킬을 사용하여 새 스킬을 만드세요.
+description: "새 스킬 생성 시 참고할 수 있는 템플릿 스킬. 이 스킬을 직접 사용하지 마세요. Use for skill template reference only: skill-manager 스킬을 사용하여 새 스킬을 만드세요. 이 파일은 SKILL.md 구조의 참고 자료 역할만 합니다."
 disable-model-invocation: true
 ---
 

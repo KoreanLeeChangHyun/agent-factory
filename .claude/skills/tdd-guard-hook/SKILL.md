@@ -1,6 +1,6 @@
 ---
 name: tdd-guard-hook
-description: "TDD(Test-Driven Development) 원칙 위반을 PreToolUse 훅으로 모니터링하고, 테스트 없이 소스 파일을 수정하려는 시도를 경고하는 가드"
+description: "TDD(Test-Driven Development) 원칙 위반을 PreToolUse 훅으로 모니터링하고, 테스트 없이 소스 파일을 수정하려는 시도를 경고하는 가드. Use for TDD enforcement: (1) 소스 파일 수정 시 관련 테스트 파일 존재 여부 확인, (2) 테스트 없이 코드 수정 시도 경고, (3) 테스트 커버리지 자연스러운 향상 유도. 트리거: '테스트', 'test', 'TDD', '테스트 주도 개발'."
 ---
 
 # TDD Guard Hook

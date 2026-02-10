@@ -1,6 +1,6 @@
 ---
 name: workflow-init
-description: "워크플로우 초기화 스킬. prompt.txt 읽기, 시나리오 분기, 제목 생성, init-workflow.sh 통합 스크립트 실행을 수행합니다."
+description: "워크플로우 INIT 단계 전용 내부 스킬. 사용자 요청을 전처리하여 워크플로우 입력을 준비한다. Use for workflow initialization: prompt.txt 읽기, 시나리오 분기(full/no-plan/prompt), 제목 생성, init-workflow.sh 통합 스크립트 실행을 수행한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
 disable-model-invocation: true
 ---
 

@@ -47,3 +47,49 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 1. **명령어별 기본 스킬**: 위 "명령어별 기본 스킬 매핑" 테이블에 행을 추가
 2. **키워드 기반 추가 스킬**: 위 "키워드 기반 추가 스킬 로드" 테이블에 행을 추가
 3. **worker.md/SKILL.md 수정 불필요**: 두 파일 모두 이 파일을 참조하므로 별도 수정 없이 매핑이 반영됨
+
+## Description 기반 폴백 가이드
+
+위의 명령어별 기본 매핑과 키워드 매핑에서 적합한 스킬을 찾지 못한 경우, `.claude/skills/*/SKILL.md`의 `description` 필드를 탐색하여 태스크 내용과 매칭할 수 있습니다.
+
+### 매칭 우선순위
+
+스킬을 결정할 때 다음 우선순위를 따릅니다. 상위 단계에서 적합한 스킬을 찾으면 하위 단계는 실행하지 않습니다.
+
+| 우선순위 | 매칭 방식 | 설명 |
+|---------|----------|------|
+| 1순위 | **skills 파라미터** | 오케스트레이터가 명시적으로 전달한 스킬. 무조건 사용 |
+| 2순위 | **명령어별 기본 매핑** | 위 "명령어별 기본 스킬 매핑" 테이블 참조 |
+| 3순위 | **키워드 기반 매핑** | 위 "키워드 기반 추가 스킬 로드" 테이블 참조 |
+| 4순위 | **description 기반 폴백** | SKILL.md의 description 필드를 태스크 내용과 의미론적으로 매칭 |
+
+### Description 기반 폴백 절차
+
+1순위~3순위에서 적합한 스킬을 찾지 못했을 때 다음 절차를 수행합니다.
+
+1. **description 스캔**: `.claude/skills/*/SKILL.md`의 frontmatter에서 `description` 필드를 읽어 사용 가능한 스킬 목록을 파악합니다.
+2. **태스크 내용 대조**: 현재 태스크의 작업 내용(계획서의 태스크 설명, 대상 파일, 작업 상세)과 각 스킬의 description을 의미론적으로 비교합니다.
+3. **매칭 판단 기준**: description에 다음 패턴이 포함된 스킬을 우선 선택합니다.
+   - `"use for [태스크 유형]"` - 태스크 유형이 현재 작업과 일치하는 경우
+   - `"Use this when [상황]"` - 상황이 현재 태스크와 부합하는 경우
+   - 태스크 내용의 핵심 키워드가 description에 자연어로 포함된 경우
+4. **선택**: 가장 적합한 스킬을 선택하여 로드합니다. 복수의 스킬이 매칭되면 description의 구체성이 높은 것을 우선합니다.
+
+### 제외 대상
+
+다음 스킬은 description 폴백 대상에서 제외합니다.
+
+| 제외 조건 | 이유 |
+|----------|------|
+| `disable-model-invocation: true` 플래그가 설정된 스킬 | 내부 워크플로우 전용으로 자동 호출 차단 |
+| `workflow-*` 접두사 스킬 | 워크플로우 오케스트레이션 전용, Worker가 직접 로드 대상이 아님 |
+
+### Description 품질 기준
+
+description 기반 폴백의 정확도는 각 스킬의 description 품질에 직접 의존합니다. 스킬 작성 시 다음 기준을 따르면 폴백 매칭 정확도가 향상됩니다.
+
+| 기준 | 양호한 예시 | 미흡한 예시 |
+|------|-----------|-----------|
+| 역할 명시 | "Use this when generating PR summaries for GitHub pull requests" | "PR helper" |
+| 태스크 유형 포함 | "use for code review checklist validation and quality gates" | "review skill" |
+| 최소 길이 50자 이상 | "Mermaid diagram generator. Use this when creating flowcharts, sequence diagrams, or architecture visualizations in markdown documents" | "mermaid diagrams" |

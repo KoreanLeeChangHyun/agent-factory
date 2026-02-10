@@ -45,20 +45,42 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 | 항목 | full 모드 | no-plan 모드 |
 |------|----------|-------------|
 | State transition | PLAN -> WORK | INIT -> WORK |
-| Phase 0 (skill-map) | 필수 | 스킵 |
+| Phase 0 (skill-map) | 조건부 (태스크 >= 6개) | 스킵 |
 | planPath | 필수 | 없음 |
 | Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
 | 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
 
 no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악하고, 명령어별 기본 스킬 매핑으로 스킬을 자동 결정하여 작업을 수행합니다.
 
+> **Note:** no-plan 모드에서는 단일 Worker이므로 WORK-PHASE 서브배너를 출력하지 않습니다.
+
 ---
 
-## Full Mode: Phase 0 - Preparation (REQUIRED, Sequential 1 worker)
+## Full Mode: Phase 0 - Preparation (Conditional, Sequential 1 worker)
 
-Phase 1~N 실행 전에 MUST execute Phase 0 먼저. Phase 0은 1개 worker가 순차로 실행합니다.
+> **조건부 실행**: Phase 0은 계획서의 태스크 수가 **6개 이상**일 때만 실행합니다.
+> 태스크 수가 6개 미만이면 Phase 0을 스킵하고 바로 Phase 1로 진행합니다.
+
+**Phase 0 실행 판단 흐름:**
+
+```mermaid
+flowchart TD
+    START[계획서 태스크 수 확인] --> Q1{태스크 >= 6개?}
+    Q1 -->|예| P0[Phase 0 실행: skill-map.md 생성]
+    Q1 -->|아니오| SKIP[Phase 0 스킵: work 디렉터리만 생성]
+    P0 --> P1[Phase 1~N: skills 파라미터 전달]
+    SKIP --> P1_AUTO[Phase 1~N: Worker 자율 스킬 결정]
+```
+
+**Phase 0 실행 시 (태스크 >= 6개):**
+
+```bash
+# Phase 0 서브배너 출력
+Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
+```
 
 ```
+mkdir -p <workDir>/work
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
 ```
 
@@ -66,17 +88,47 @@ Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스�
 
 Phase 0 완료 후 skill-map.md를 참고하여 후속 worker 호출 시 skills 파라미터를 전달합니다.
 
+**Phase 0 스킵 시 (태스크 < 6개):**
+
+```bash
+mkdir -p <workDir>/work
+```
+
+work 디렉터리만 생성하고 바로 Phase 1로 진행합니다. Worker는 skills 파라미터 없이 호출되며, 각 Worker가 `command-skill-map.md`의 명령어별 기본 매핑과 키워드 분석, 그리고 `.claude/skills/*/SKILL.md`의 description 필드를 참조하여 자율적으로 스킬을 결정합니다.
+
+**Phase 0 실패 시 폴백:**
+
+Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, C 방식(개별 자율 결정)으로 자동 폴백합니다:
+1. Phase 0 실패를 로그에 기록
+2. skill-map.md 없이 Phase 1로 진행
+3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
+
+이 폴백은 Phase 0의 SPOF(단일 장애점) 위험을 완화합니다.
+
 ## Phase 1~N: Task Execution
 
-계획서의 Phase 순서대로 실행합니다:
+계획서의 Phase 순서대로 실행합니다. 각 Phase의 Worker 호출 **직전**에 Phase 서브배너를 출력합니다:
+
+```bash
+# Phase N 서브배너 출력 (Worker 호출 직전, 각 Phase마다 1회)
+Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
+```
 
 **Independent tasks (parallel):**
+```bash
+# Phase 서브배너 출력
+Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
 ```
 
 **Dependent tasks (sequential):**
+```bash
+# Phase 서브배너 출력
+Workflow <registryKey> WORK-PHASE 2 "W04" sequential
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
 ```

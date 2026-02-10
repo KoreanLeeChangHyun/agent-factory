@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "Workflow orchestration skill with Supporting Files. SKILL.md is a navigation hub (~300 lines). SessionStart hook injects summary.md (~3KB). Detailed guides: step0-init.md, step1-plan.md, step2-work.md, step3-report.md, common-reference.md."
+description: "워크플로우 전체 오케스트레이션 내부 스킬. INIT -> PLAN -> WORK -> REPORT 4단계 워크플로우를 관리한다. Use for workflow orchestration: cc:* 커맨드 실행 시 자동 로드되어 단계별 흐름 제어, 서브에이전트 호출, 상태 관리를 수행한다. SKILL.md는 네비게이션 허브(~300줄)이며, 상세 가이드는 step0-init.md ~ step3-report.md, common-reference.md에 분리."
 disable-model-invocation: true
 ---
 
@@ -96,6 +96,7 @@ Workflow <registryKey> <phase> <status>
 | Before INIT | `Workflow INIT none <command>` |
 | Before/After PLAN | `Workflow <registryKey> PLAN` / `Workflow <registryKey> PLAN done` |
 | Before/After WORK | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` |
+| WORK Phase N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
 | Before/After REPORT | `Workflow <registryKey> REPORT` / `Workflow <registryKey> REPORT done` |
 | Final | `Workflow <registryKey> DONE done` |
 | Prompt mode Final | `Workflow <registryKey> DONE done` (after direct work, no PLAN/WORK/REPORT banners) |
@@ -121,6 +122,7 @@ DONE banner: Called after REPORT completion + status.json finalization + registr
 | INIT done (prompt) | Direct work by main agent | Sub-agent calls, PLAN/WORK/REPORT banners |
 | PLAN (1a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
 | PLAN (1b) done | Branch on approval, WORK banner, status update | Approval explanation |
+| WORK Phase start | WORK-PHASE banner, then worker call(s) for that phase | Skipping Phase banner |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
 | REPORT done | REPORT completion banner, DONE banner, **immediate termination** | Report summary, any post-DONE text |
@@ -219,11 +221,17 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 - Single worker call (taskId: W01 fixed)
 
 **Full Mode - Phase 0 (REQUIRED, sequential):**
+```bash
+Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
 ```
 
-**Full Mode - Phase 1~N:** Execute per plan. Independent tasks parallel, dependent tasks sequential.
+**Full Mode - Phase 1~N:** Execute per plan. Independent tasks parallel, dependent tasks sequential. Call WORK-PHASE banner before each phase's worker(s).
+```bash
+Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <skillName>")
 ```

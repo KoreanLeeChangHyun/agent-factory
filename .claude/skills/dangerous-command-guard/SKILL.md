@@ -1,6 +1,6 @@
 ---
 name: dangerous-command-guard
-description: "rm -rf, git reset --hard, git push --force 등 위험한 명령어를 PreToolUse 훅으로 차단하는 안전 가드"
+description: "rm -rf, git reset --hard, git push --force 등 위험한 명령어를 PreToolUse 훅으로 차단하는 안전 가드. Use for safety enforcement: (1) 위험한 시스템/Git 명령어 사전 차단, (2) 데이터 손실 및 저장소 손상 방지, (3) Hook 기반 자동 안전 검증. 트리거: 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command'."
 ---
 
 # Dangerous Command Guard

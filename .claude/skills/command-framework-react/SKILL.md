@@ -1,6 +1,6 @@
 ---
 name: framework-react
-description: "React 프레임워크 프로젝트 구조 및 베스트 프랙티스. React/Next.js 프로젝트 생성, 구조화, 개발 시 참고합니다."
+description: "React 프레임워크 프로젝트 구조 및 베스트 프랙티스. Use for React/Next.js project tasks: (1) React 프로젝트 초기화 및 Feature-Based 구조 설정, (2) Next.js App Router 구조 적용, (3) 컴포넌트/훅/상태 관리 패턴 참고, (4) Bulletproof React 아키텍처 기반 개발. 트리거: 'React', 'react', 'Next.js', 'nextjs', 'React 프로젝트', '프론트엔드 프레임워크'."
 ---
 
 # React Framework Skill
