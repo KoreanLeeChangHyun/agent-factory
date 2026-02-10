@@ -16,7 +16,7 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | analyze | analyze-* (키워드 판단) | 분석 유형별 스킬 |
 | architect | command-architect, command-mermaid-diagrams | 아키텍처 설계, 다이어그램 생성 |
 | framework | framework-* (프레임워크명 판단) | 프레임워크별 스킬 |
-| research | command-research, deep-research | 조사 및 심층 연구 |
+| research | command-research, deep-research | 웹 조사(command-research) + 코드 탐색(deep-research). references/ 가이드로 교차 검증 및 출처 평가 지원 |
 
 ## 키워드 기반 추가 스킬 로드
 
@@ -39,6 +39,8 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | LWC, Lightning Web Component, Salesforce, 세일즈포스 | lwc-custom |
 | Apple, HIG, 애플, apple design | apple-design |
 | GHA, GitHub Actions, CI, CI/CD, pipeline, 빌드 실패, workflow run | command-gha-analysis |
+| 교차 검증, cross-validation, 출처 평가, source evaluation | command-research |
+| 심층 조사, deep research, 코드 탐색, 대규모 분석 | deep-research |
 
 ## 확장 가이드
 

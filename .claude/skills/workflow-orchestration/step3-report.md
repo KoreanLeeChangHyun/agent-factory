@@ -47,9 +47,24 @@ wf-state unregister <registryKey>
 
 ## DONE Banner
 
-> **REPORT 완료 후 DONE banner**: 오케스트레이터가 status.json 완료 처리 + 레지스트리 해제를 수행한 후, DONE 배너를 호출하여 워크플로우 최종 종료를 사용자에게 알립니다. DONE 배너 호출 후 즉시 종료.
+> **REPORT 완료 후 DONE banner**: 오케스트레이터가 status.json 완료 처리 + 레지스트리 해제를 수행한 후, DONE 배너를 호출하여 워크플로우 최종 종료를 사용자에게 알립니다.
 >
-> **DONE Banner Call Order**: REPORT 완료 배너 -> 오케스트레이터가 status.json 완료 처리 -> 오케스트레이터가 레지스트리 해제 -> DONE 배너 호출 -> 종료
+> **DONE Banner Call Order**: REPORT 완료 배너 -> 오케스트레이터가 status.json 완료 처리 -> 오케스트레이터가 레지스트리 해제 -> DONE 배너 호출 -> **즉시 종료 (추가 텍스트 출력 절대 금지)**
 > ```bash
 > Workflow <registryKey> DONE done
 > ```
+
+### DONE 배너 이후 절대 금지 규칙 (Post-DONE Silence)
+
+**DONE 배너 호출 후 오케스트레이터는 어떤 텍스트도 출력하지 않고 즉시 종료해야 합니다.**
+
+다음 문구는 DONE 배너 이후 절대 출력 금지입니다:
+
+- "Workflow already completed."
+- "Workflow already completed. All tasks finished and DONE banner was issued."
+- "All tasks finished"
+- "DONE banner was issued"
+- 워크플로우 상태를 설명하는 모든 문장
+- 완료를 재확인하는 모든 문장
+
+**위반 시 사용자에게 불필요한 노이즈가 발생합니다. DONE 배너가 워크플로우의 마지막 출력이어야 합니다.**

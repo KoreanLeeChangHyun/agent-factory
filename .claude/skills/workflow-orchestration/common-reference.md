@@ -2,20 +2,11 @@
 
 ## Glossary (용어 사전)
 
-워크플로우 시스템 전반에서 사용되는 핵심 용어의 정의입니다. 모든 에이전트, 스킬, 스크립트 문서는 아래 정의를 기준으로 용어를 사용합니다.
-
 ### 용어 분류: Workflow Skill vs Command Skill
 
-시스템에서 "skill"은 두 가지 레벨로 구분됩니다. 혼동을 방지하기 위해 반드시 접두어를 사용합니다.
-
-| 구분 | 접두어 | 수량 | 역할 | 경로 패턴 | 예시 |
-|------|--------|------|------|----------|------|
-| **Workflow Skill** | `workflow-` | 5개 | 워크플로우 단계(Phase) 관리 및 오케스트레이션 | `.claude/skills/workflow-*` | workflow-orchestration, workflow-init, workflow-plan, workflow-work, workflow-report |
-| **Command Skill** | `command-` 또는 기능명 | 40+개 | 개별 명령어의 구체적 기능 수행 | `.claude/skills/<skill-name>` | command-code-quality-checker, command-research, tdd-guard-hook, deep-research |
-
-- "skill"을 단독으로 사용할 때는 **두 가지 레벨을 포괄**하는 총칭을 의미합니다.
-- 특정 레벨을 지칭할 때는 반드시 **"workflow skill"** 또는 **"command skill"** 접두어를 붙입니다.
-- 문서 내에서 "5개 스킬"이라고 하면 workflow skill 5개를, "40+개 스킬"이라고 하면 command skill을 지칭합니다.
+- **Workflow Skill** (`workflow-*`, 5개): 워크플로우 단계 관리 및 오케스트레이션
+- **Command Skill** (`command-*` 또는 기능명, 40+개): 개별 명령어의 구체적 기능 수행
+- "skill" 단독 사용 시 두 가지 레벨을 포괄하는 총칭
 
 ### 핵심 용어 정의
 
@@ -40,14 +31,9 @@
 
 ### 한영 표기 규약
 
-| 규칙 | 설명 | 예시 |
-|------|------|------|
-| **시스템 내부 식별자** | 영문 원형 사용 | `phase`, `command`, `workDir`, `registryKey`, `status.json` |
-| **에이전트 참조** | 영문 원형 사용 | init, planner, worker, reporter, orchestrator |
-| **사용자 대면 문서** | 한글 병기 허용 | "Phase(단계)", "agent(에이전트)" |
-| **계획서/보고서** | 한글 중심, 영문 병기 | "워커(worker)가 태스크를 실행합니다" |
-| **코드/스크립트 주석** | 영문 사용 | `# Update phase transition` |
-| **검색 일관성** | 최초 등장 시 한영 병기 후 이후 일관 사용 | 첫 번째: "에이전트(agent)", 이후: "에이전트" |
+- 시스템 내부 식별자/에이전트 참조/코드 주석: 영문 원형 사용 (`phase`, `workDir`, init, planner 등)
+- 사용자 대면 문서/계획서/보고서: 한글 중심, 최초 등장 시 한영 병기 (예: "워커(worker)")
+- 검색 일관성: 최초 등장 시 한영 병기 후 이후 일관 사용
 
 ## Sub-agent Return Formats (REQUIRED)
 
@@ -60,11 +46,8 @@
 
 ### Common Rules
 
-| Rule | Description |
-|------|-------------|
-| 작업 상세는 .workflow에 저장 | 서브에이전트는 모든 작업 상세를 파일로 기록 |
-| 메인에 최소 반환 | 아래 에이전트별 형식만 반환 (추가 정보 MUST NOT) |
-| 대량 내역 MUST NOT | 코드 변경 내용, 상세 로그, 파일 목록 테이블 등 반환 MUST NOT |
+- 작업 상세는 `.workflow/` 파일에 기록, 메인에는 아래 형식만 반환 (코드/로그/테이블 MUST NOT)
+- 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 후 즉시 종료 (추가 텍스트 절대 금지)
 
 ### init Return Format (7 lines)
 
@@ -78,8 +61,6 @@ workName: <작업이름>
 근거: [1줄 요약]
 ```
 
-**MUST NOT**: 요청 전문, 다음 단계 안내, 상세 설명, 마크다운 헤더, 판단 근거 상세, 변경 파일 목록, 예상 작업 시간 등 추가 정보
-
 ### planner Return Format (3 lines)
 
 ```
@@ -87,8 +68,6 @@ workName: <작업이름>
 계획서: <계획서 파일 경로>
 태스크 수: N개
 ```
-
-**MUST NOT**: 계획 요약, 태스크 목록, 다음 단계 안내 등
 
 ### worker Return Format (3 lines)
 
@@ -98,8 +77,6 @@ workName: <작업이름>
 변경 파일: N개
 ```
 
-**MUST NOT**: 변경 파일 목록 테이블, 코드 스니펫, 작업 요약, 다음 단계 안내 등
-
 ### reporter Return Format (3 lines)
 
 ```
@@ -108,65 +85,31 @@ workName: <작업이름>
 CLAUDE.md: 갱신완료 | 스킵 | 실패
 ```
 
-**MUST NOT**: 요약, 태스크 수, 변경 파일 수, 다음 단계 등 추가 정보 일체
-
 ## Call Method Rules
 
-| Target Type | Method | Example |
-|-------------|--------|---------|
-| Agent (4개) | Task | `Task(subagent_type="init", prompt="...")` |
-| Skill (5개) | Skill | `Skill(skill="workflow-report")` |
-
-**Agents:** init, planner, worker, reporter
-**Skills:** workflow-orchestration, workflow-init, workflow-plan, workflow-work, workflow-report
-
-> 에이전트별 색상 정보는 각 에이전트 정의 파일(`.claude/agents/*.md`)의 frontmatter 참조.
+> Agents(4): Task 호출, Skills(5): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
 
 ## State Update Methods
 
-단계 전환 시 `both` 모드로 로컬 .context.json(agent)과 status.json(phase)을 동시 업데이트합니다. 각 단계별 `both` 호출은 서브에이전트 호출 섹션에 기재되어 있습니다.
+`wf-state <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
 
-```bash
-# 로컬 .context.json의 agent 필드만 업데이트
-wf-state context <registryKey> <agent>
-# 로컬 status.json의 phase 변경
-wf-state status <registryKey> <fromPhase> <toPhase>
-# 로컬 context + status 동시 업데이트 (권장)
-wf-state both <registryKey> <agent> <fromPhase> <toPhase>
-# 전역 레지스트리에 워크플로우 등록 (INIT 완료 시)
-wf-state register <registryKey>
-# 전역 레지스트리에서 워크플로우 해제 (REPORT 완료 시)
-wf-state unregister <registryKey>
-# status.json의 linked_sessions 배열에 세션 ID 추가 (worker/reporter가 자체 호출)
-wf-state link-session <registryKey> <sessionId>
-```
+| Mode | Arguments | Description |
+|------|-----------|-------------|
+| context | `<registryKey> <agent>` | .context.json agent 필드 업데이트 |
+| status | `<registryKey> <fromPhase> <toPhase>` | status.json phase 변경 |
+| both | `<registryKey> <agent> <fromPhase> <toPhase>` | context + status 동시 (권장) |
+| register / unregister | `<registryKey>` | 전역 레지스트리 등록/해제 |
+| link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 
-> **Note**: `context` 모드와 `both` 모드는 로컬 `<workDir>/.context.json`의 `agent` 필드만 업데이트. 전역 `.workflow/registry.json`은 레지스트리 전용이며, `register`/`unregister` 모드로만 접근.
-> **registryKey format**: `YYYYMMDD-HHMMSS` 형식의 워크플로우 식별자. 스크립트 내부에서 registry.json을 조회하여 전체 workDir 경로를 자동 해석. 전체 workDir 경로(`.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)도 하위 호환.
-
-agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`. 실패 시 경고만 출력, 워크플로우 정상 진행.
-
-**Mode-aware State Update Examples:**
-
-| Mode | WORK transition | Command |
-|------|----------------|---------|
-| full | PLAN -> WORK | `wf-state both <registryKey> worker PLAN WORK` |
-| no-plan | INIT -> WORK | `wf-state both <registryKey> worker INIT WORK` |
-| prompt | INIT -> COMPLETED | `wf-state status <registryKey> INIT COMPLETED` |
+- registryKey: `YYYYMMDD-HHMMSS` 형식. 전체 workDir 경로도 하위 호환.
+- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`
+- 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행
 
 ## State Management (status.json)
 
-각 워크플로우 작업은 `status.json`으로 현재 단계와 전이 이력을 추적합니다.
+`<workDir>/status.json`으로 현재 단계와 전이 이력을 추적합니다. 스키마(9개 필드)는 workflow-init skill 참조.
 
-> status.json 스키마(9개 필드)와 저장 위치는 workflow-init skill 참조. 저장 경로: `<workDir>/status.json` (workDir = `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
-
-### status.json `linked_sessions` Field
-
-`linked_sessions`는 워크플로우에 참여한 세션 ID의 배열입니다. init이 초기 세션 ID로 배열을 생성하고, 이후 worker/reporter가 자신의 세션 ID를 `link-session` 모드로 추가합니다. 세션 재시작 시에도 새 세션 ID가 자동 병합됩니다.
-
-- 용도: 워크플로우에 참여한 세션 ID 추적 (디버깅/감사 목적)
-- 갱신: `wf-state link-session <registryKey> <sessionId>` (중복 자동 방지, 비차단)
-- 오케스트레이터는 link-session을 직접 호출하지 않음 (worker/reporter가 자체 등록)
+`linked_sessions`: 워크플로우에 참여한 세션 ID 배열. worker/reporter가 `link-session`으로 자체 등록 (중복 자동 방지, 비차단).
 
 ### FSM Transition Rules
 

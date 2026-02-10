@@ -105,11 +105,13 @@ PLAN completion banner MUST complete before AskUserQuestion (sequential, 2 separ
 
 DONE banner: Called after REPORT completion + status.json finalization + registry unregister. Auto-sends Slack notification.
 
+**CRITICAL: After DONE banner, the orchestrator MUST terminate immediately. Output ZERO text after DONE banner. Any post-DONE output (e.g., "Workflow already completed", "All tasks finished", status explanations) is a protocol violation.**
+
 ### Output Rules
 
 **Allowed:** Phase banners, phase report links, file paths, approval requests, error messages, status returns.
 
-**MUST NOT output:** analysis process, reasoning, code review details, comparisons, internal thoughts, work plans, progress reports, free-text messages, sub-agent return interpretation, any text after DONE banner.
+**MUST NOT output:** analysis process, reasoning, code review details, comparisons, internal thoughts, work plans, progress reports, free-text messages, sub-agent return interpretation, any text after DONE banner, workflow completion status messages (e.g., "Workflow already completed", "All tasks finished", "DONE banner was issued"), post-completion explanations or summaries.
 
 **Sub-agents:** Standard return format only. MUST NOT quote/explain skill content in terminal.
 
@@ -125,7 +127,7 @@ DONE banner: Called after REPORT completion + status.json finalization + registr
 | WORK Phase start | WORK-PHASE banner, then worker call(s) for that phase | Skipping Phase banner |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
-| REPORT done | REPORT completion banner, DONE banner, **immediate termination** | Report summary, any post-DONE text |
+| REPORT done | REPORT completion banner, DONE banner, **immediate termination** | Report summary, any post-DONE text, "Workflow already completed", "All tasks finished", "DONE banner was issued", any workflow status message |
 
 ---
 
@@ -258,70 +260,12 @@ Workflow <registryKey> DONE done
 
 ## Common Reference
 
-**Full details:** See [common-reference.md](common-reference.md)
-
-### Sub-agent Return Formats
-
-> Return values exceeding line limits cause context bloat and system failure.
-
-| Agent | Lines | Format |
-|-------|-------|--------|
-| init | 7 | `request`, `workDir`, `workId`, `date`, `title`, `workName`, `rationale` |
-| planner | 3 | `status`, `plan path`, `task count` |
-| worker | 3 | `status`, `work log path`, `changed file count` |
-| reporter | 3 | `status`, `report path`, `CLAUDE.md status` |
-
-### Invocation Rules
-
-| Target | Method | Example |
-|--------|--------|---------|
-| Agent (4) | Task | `Task(subagent_type="init", prompt="...")` |
-| Skill (5) | Skill | `Skill(skill="workflow-report")` |
-
-Agents: init, planner, worker, reporter. Skills: workflow-orchestration, workflow-init, workflow-plan, workflow-work, workflow-report.
-
-### State Update
-
-```bash
-wf-state <mode> <registryKey> [args...]
-```
-
-| Mode | Arguments | Description |
-|------|-----------|-------------|
-| context | `<registryKey> <agent>` | Update .context.json agent field |
-| status | `<registryKey> <fromPhase> <toPhase>` | Update status.json phase |
-| both | `<registryKey> <agent> <fromPhase> <toPhase>` | Update both (recommended) |
-| register | `<registryKey>` | Register in global registry |
-| unregister | `<registryKey>` | Unregister from global registry |
-| link-session | `<registryKey> <sessionId>` | Add session to linked_sessions |
-
-registryKey: `YYYYMMDD-HHMMSS` format. Non-blocking: failures emit warning only.
-
-### FSM Transition
-
-Mode-aware: full=`INIT->PLAN->WORK->REPORT->COMPLETED`, no-plan=`INIT->WORK->REPORT->COMPLETED`, prompt=`INIT->COMPLETED`. Branches: PLAN->CANCELLED, WORK/REPORT->FAILED, TTL->STALE. Illegal transitions blocked by system guard. Emergency: `WORKFLOW_SKIP_GUARD=1`.
-
-### Error Handling
-
-| Situation | Action |
-|-----------|--------|
-| INIT error | Retry up to 3 times |
-| Phase error | Retry up to 3 times, then error report |
-| Independent task failure | Other tasks continue |
-| Dependent blocker failure | Halt chain, others continue |
-| Failure rate >50% | Halt workflow, AskUserQuestion |
+> Sub-agent return formats, invocation rules, state update methods, FSM transitions, error handling: See [common-reference.md](common-reference.md)
 
 ---
 
 ## Notes
 
-1. MUST run INIT first to obtain request, workDir
-2. On cc:* command, MUST NOT check user input -- always call init immediately
-3. Phase order per mode strictly enforced (full: INIT->PLAN->WORK->REPORT, no-plan: INIT->WORK->REPORT, prompt: INIT->COMPLETED)
-4. Full clarification in PLAN; WORK cannot ask questions
-5. After planner returns, orchestrator performs AskUserQuestion directly
-6. Independent tasks parallel; dependent tasks sequential
-7. All phases MUST save documents
-8. REPORT MUST update CLAUDE.md
-9. Slack failure does not block workflow
-10. Git commits via `/git:commit` separately
+1. MUST run INIT first; on cc:* command, call init immediately without checking user input
+2. Phase order per mode strictly enforced; WORK cannot ask questions (clarification in PLAN only)
+3. Git commits via `/git:commit` separately; Slack failure does not block workflow

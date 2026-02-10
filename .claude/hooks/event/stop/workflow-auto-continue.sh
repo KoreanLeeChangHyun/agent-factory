@@ -70,17 +70,21 @@ if not registry:
     sys.exit(0)
 
 # 활성 워크플로우 중 진행 중인 것 찾기
+terminal_phases = ('COMPLETED', 'FAILED', 'CANCELLED', 'STALE', '')
 active_workflows = []
 for key, entry in registry.items():
     phase = entry.get('phase', '').upper()
     # 종료 상태가 아닌 워크플로우
-    if phase not in ('COMPLETED', 'FAILED', 'CANCELLED', 'STALE', ''):
+    if phase not in terminal_phases:
         active_workflows.append({'key': key, 'phase': phase, 'entry': entry})
 
 if not active_workflows:
-    # 모든 워크플로우가 종료 상태 -> 통과
-    if os.path.exists(counter_file):
-        os.remove(counter_file)
+    # 모든 워크플로우가 종료 상태 -> 카운터 확실히 정리 후 통과
+    try:
+        if os.path.exists(counter_file):
+            os.remove(counter_file)
+    except OSError:
+        pass
     sys.exit(0)
 
 # PLAN phase 예외: AskUserQuestion 대기 중일 수 있으므로 차단하지 않음
@@ -119,10 +123,10 @@ except IOError:
     pass
 
 # 차단: 워크플로우가 진행 중
-phases_info = ', '.join([f\"{w['key']}({w['phase']})\" for w in active_workflows if w['phase'] != 'PLAN'])
+# block reason은 최소한의 정보만 포함 (LLM이 불필요한 상태 설명을 출력하지 않도록)
 result = {
     'decision': 'block',
-    'reason': f'Active workflow in progress: {phases_info}. Continue working on the current workflow tasks. (block {block_count}/3)'
+    'reason': f'Continue workflow. ({block_count}/3)'
 }
 print(json.dumps(result, ensure_ascii=False))
 " 2>/dev/null
