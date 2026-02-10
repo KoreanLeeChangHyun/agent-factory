@@ -480,23 +480,24 @@ update_status() {
     local from_phase="$1"
     local to_phase="$2"
 
-    WF_FROM_PHASE="$from_phase" WF_TO_PHASE="$to_phase" WF_STATUS_FILE="$STATUS_FILE" python3 -c "
+    WF_FROM_PHASE="$from_phase" WF_TO_PHASE="$to_phase" WF_STATUS_FILE="$STATUS_FILE" WF_SCRIPT_DIR="$SCRIPT_DIR" python3 -c "
 import json, sys, os, tempfile, shutil
 from datetime import datetime, timezone, timedelta
 
 from_phase = os.environ['WF_FROM_PHASE']
 to_phase = os.environ['WF_TO_PHASE']
 status_file = os.environ['WF_STATUS_FILE']
+script_dir = os.environ['WF_SCRIPT_DIR']
 skip_guard = os.environ.get('WORKFLOW_SKIP_GUARD', '') == '1'
 
-# 합법 전이 테이블
-ALLOWED_TRANSITIONS = {
-    'NONE': ['INIT'],
-    'INIT': ['PLAN'],
-    'PLAN': ['WORK', 'CANCELLED'],
-    'WORK': ['REPORT', 'FAILED'],
-    'REPORT': ['COMPLETED', 'FAILED'],
-}
+# 합법 전이 테이블을 fsm-transitions.json에서 로드
+fsm_file = os.path.join(script_dir, 'fsm-transitions.json')
+try:
+    with open(fsm_file, 'r', encoding='utf-8') as f:
+        fsm_data = json.load(f)
+except Exception as e:
+    print(f'[WARN] fsm-transitions.json load failed: {e}', file=sys.stderr)
+    sys.exit(0)
 
 if not os.path.exists(status_file):
     print(f'[WARN] status.json not found: {status_file}', file=sys.stderr)
@@ -509,12 +510,14 @@ try:
     # FSM 전이 검증 (WORKFLOW_SKIP_GUARD=1 시 우회)
     if not skip_guard:
         current_phase = data.get('phase', 'NONE')
+        workflow_mode = data.get('mode', 'full').lower()
         # from_phase와 현재 phase 일치 검증
         if from_phase != current_phase:
             print(f'[WARN] FSM guard: from_phase mismatch. expected={current_phase}, got={from_phase}. transition blocked.', file=sys.stderr)
             sys.exit(0)
-        # 합법 전이 검증
-        allowed = ALLOWED_TRANSITIONS.get(from_phase, [])
+        # 모드별 합법 전이 검증 (fsm-transitions.json 참조)
+        allowed_table = fsm_data.get('modes', {}).get(workflow_mode, fsm_data.get('modes', {}).get('full', {}))
+        allowed = allowed_table.get(from_phase, [])
         if to_phase not in allowed:
             print(f'[WARN] FSM guard: illegal transition {from_phase}->{to_phase}. allowed={allowed}. transition blocked.', file=sys.stderr)
             sys.exit(0)

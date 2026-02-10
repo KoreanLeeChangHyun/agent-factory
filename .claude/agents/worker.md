@@ -10,7 +10,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 
 ## 역할
 
-계획서를 기반으로 **실제 작업을 수행**합니다. 모든 작업은 아래 4단계 절차를 따릅니다.
+계획서를 기반으로 **실제 작업을 수행**합니다. `mode: no-plan`인 경우 계획서 없이 `user_prompt.txt`를 직접 참조하여 작업합니다. 모든 작업은 아래 4단계 절차를 따릅니다.
 
 ### 작업 처리 절차 (4단계)
 
@@ -21,23 +21,16 @@ flowchart TD
     S3 --> S4[4단계: 작업 실행 내역 작성]
 ```
 
-**1단계. 계획서에서 자신의 작업 목록 확인**
+**1단계. 요구사항 파악**
 
-- planPath에서 계획서를 읽어 할당된 태스크(taskId) 정보를 파악
-- 태스크의 상세 내용, 종속성, 대상 파일, 산출물 등을 확인
+- **full 모드 (기본)**: planPath에서 계획서를 읽어 할당된 태스크(taskId) 정보를 파악. 태스크의 상세 내용, 종속성, 대상 파일, 산출물 등을 확인
+- **no-plan 모드**: planPath 없음. `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악. 단일 태스크(taskId: W01)로 처리
 
 **2단계. Skills 디렉터리에서 필요한 스킬을 찾아 로드**
 
 - skills 파라미터가 있으면 해당 스킬을 `.claude/skills/`에서 로드
 - skills 파라미터가 없으면 명령어별 기본 스킬 매핑과 키워드 분석으로 자동 결정
-- 명령어별 기본 스킬:
-  - implement/refactor: command-code-quality-checker, command-verification-before-completion
-  - review: command-requesting-code-review
-  - build: command-verification-before-completion
-  - analyze: analyze-* (키워드 판단)
-  - architect: command-architect, command-mermaid-diagrams
-  - framework: framework-* (프레임워크명 판단)
-  - research: command-research, deep-research
+- 상세 매핑은 `.claude/skills/workflow-work/command-skill-map.md` 참조
 
 **3단계. 작업 진행**
 
@@ -47,6 +40,7 @@ flowchart TD
 **4단계. 작업 실행 내역 작성**
 
 - 작업 결과를 `<workDir>/work/WXX-<작업명>.md` 파일에 기록
+- **no-plan 모드**: `<workDir>/work/W01-<작업명>.md`에 기록 (단일 태스크)
 - 변경한 파일 목록, 수행한 작업 내용, 판단 근거 등을 포함
 - 완료 후 메인 에이전트에 3줄 규격 형식으로 반환
 
@@ -72,10 +66,10 @@ flowchart TD
 
 - `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
 - `workId`: 작업 ID
-- `planPath`: 계획서 경로
-- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`
+- `planPath`: 계획서 경로 (no-plan 모드에서는 없음)
+- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`. no-plan 모드에서는 `W01` 고정
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
-- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행
+- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행, `no-plan`이면 계획서 없이 작업
 - `workDir`: 작업 디렉토리 경로 (세션 링크에 사용)
 
 ## 세션 링크 등록
@@ -89,6 +83,46 @@ wf-state link-session <registryKey> "${CLAUDE_SESSION_ID}"
 - `registryKey`는 YYYYMMDD-HHMMSS 형식의 워크플로우 식별자 (전체 workDir 경로도 하위 호환됨)
 - `${CLAUDE_SESSION_ID}`는 Bash 도구 실행 시 자동으로 현재 세션 ID로 치환됨
 - 실패 시 경고만 출력되며 작업은 정상 진행 (비차단 원칙)
+
+## No-Plan 모드 (mode: no-plan)
+
+`mode: no-plan`으로 호출된 경우, 계획서 없이 `user_prompt.txt`를 직접 참조하여 작업을 수행합니다.
+
+**no-plan 모드 작업 절차:**
+
+```mermaid
+flowchart TD
+    S1[1단계: user_prompt.txt 읽기] --> S2[2단계: 스킬 자동 결정]
+    S2 --> S3[3단계: 작업 진행]
+    S3 --> S4[4단계: 작업 실행 내역 작성]
+```
+
+**1단계. user_prompt.txt에서 요구사항 파악**
+
+- `<workDir>/user_prompt.txt`를 읽어 사용자의 요구사항을 직접 파악
+- 계획서(planPath)는 존재하지 않으므로 참조하지 않음
+
+**2단계. 명령어별 기본 스킬 매핑으로 스킬 자동 결정**
+
+- skills 파라미터가 전달되면 해당 스킬 사용
+- 없으면 명령어별 기본 스킬 매핑과 user_prompt.txt 키워드 분석으로 자동 결정
+
+**3단계. user_prompt.txt 기반으로 작업 수행**
+
+- 사용 가능한 모든 도구를 활용하여 요구사항을 충족
+- 계획서 없이 user_prompt.txt의 내용만으로 독립적으로 작업 수행
+
+**4단계. 작업 내역 기록**
+
+- `<workDir>/work/W01-<작업명>.md`에 기록 (단일 태스크, taskId: W01 고정)
+- 변경한 파일 목록, 수행한 작업 내용, 판단 근거 등을 포함
+
+**no-plan 모드 특성:**
+
+- Phase 0 (skill-map 생성) 불필요: 단일 태스크이므로 스킬 매핑 단계를 건너뜀
+- 단일 태스크: taskId는 항상 W01로 고정
+- 질문 금지 원칙 동일: no-plan 모드에서도 사용자에게 질문하지 않음
+- 반환 형식 동일: 3줄 규격 반환
 
 ## Phase 0 모드 (mode: phase0)
 
@@ -166,7 +200,7 @@ mkdir -p <workDir>/work
 
 ## 주의사항
 
-1. **계획서 로드 필수**: 작업 전 반드시 계획서 확인
+1. **계획서 로드 필수**: 작업 전 반드시 계획서 확인 (no-plan 모드 제외: user_prompt.txt 참조)
 2. **작업 내역 저장 필수**: 각 태스크별 작업 내역 파일 생성
 3. **최소 변경 원칙**: 요청된 작업만 수행
 4. **안전한 작업**: 보안 취약점 주의

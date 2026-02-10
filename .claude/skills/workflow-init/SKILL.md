@@ -77,7 +77,7 @@ TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"
 그 다음, Bash 도구로 통합 초기화 스크립트를 실행합니다:
 
 ```bash
-wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <제목>
+wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <제목> ${CLAUDE_SESSION_ID} <mode>
 ```
 
 > **workDir 형식:**
@@ -95,6 +95,8 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 | 2 | workDir | 작업 디렉터리 경로 (`.workflow/YYYYMMDD-HHMMSS/<workName>/<command>`) |
 | 3 | workId | 작업 ID (HHMMSS) |
 | 4 | title | 작업 제목 |
+| 5 | claude_session_id | (선택적) `${CLAUDE_SESSION_ID}` - 현재 세션 UUID 자동 치환 |
+| 6 | mode | (선택적) 워크플로우 모드: `full`(기본값), `no-plan`, `prompt` |
 
 **스크립트가 수행하는 작업:**
 1. `.prompt/prompt.txt` 읽기
@@ -103,7 +105,7 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 4. `.prompt/prompt.txt` 클리어
 5. `.prompt/querys.txt` 갱신
 6. `<workDir>/.context.json` 생성
-7. `<workDir>/status.json` 생성
+7. `<workDir>/status.json` 생성 (`mode` 필드 포함 - 6번째 인자로 전달된 모드 값)
 8. 좀비 정리 (TTL 만료 워크플로우 STALE 전환)
 9. 전역 레지스트리 등록
 

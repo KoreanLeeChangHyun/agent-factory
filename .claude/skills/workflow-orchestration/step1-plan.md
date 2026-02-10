@@ -1,5 +1,17 @@
 # Step 1: PLAN (planner Agent)
 
+## No-Plan Mode Skip Condition
+
+> **no-plan 모드(`-np` 플래그)에서는 PLAN 단계 전체를 건너뛰고 WORK로 직행합니다.**
+>
+> 판별: status.json의 `mode` 필드가 `no-plan`이면 아래 모든 절차(1a~1b)를 스킵합니다.
+> - planner 에이전트 호출 없음
+> - AskUserQuestion 승인 절차 없음
+> - PLAN 배너 출력 없음
+> - 오케스트레이터는 즉시 Step 2: WORK로 진행
+
+---
+
 ## Step 1a: PLAN - planner Call
 
 > **State Update** before PLAN start:

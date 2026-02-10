@@ -1,0 +1,22 @@
+{
+  "description": "FSM 전이 규칙 단일 정의 소스. update-state.sh와 workflow-transition-guard.sh가 이 파일을 참조합니다.",
+  "modes": {
+    "full": {
+      "NONE": ["INIT"],
+      "INIT": ["PLAN"],
+      "PLAN": ["WORK", "CANCELLED"],
+      "WORK": ["REPORT", "FAILED"],
+      "REPORT": ["COMPLETED", "FAILED"]
+    },
+    "no-plan": {
+      "NONE": ["INIT"],
+      "INIT": ["WORK"],
+      "WORK": ["REPORT", "FAILED"],
+      "REPORT": ["COMPLETED", "FAILED"]
+    },
+    "prompt": {
+      "NONE": ["INIT"],
+      "INIT": ["COMPLETED"]
+    }
+  }
+}

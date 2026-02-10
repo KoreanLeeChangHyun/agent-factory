@@ -4,6 +4,19 @@ description: 시스템 아키텍처 설계 및 UML 다이어그램 생성. 클�
 
 # Architect
 
+## -np 플래그 (No-Plan 모드)
+
+`$ARGUMENTS`에 `-np` 플래그가 포함된 경우 Tier 2 (no-plan) 모드로 실행합니다.
+
+- `-np` 감지 시: init 에이전트 호출에 `mode: no-plan` 전달
+- `-np` 미감지 시: 기존과 동일 (mode: full)
+
+```
+# -np 플래그 감지 예시
+cc:architect -np "간단한 시퀀스 다이어그램"
+→ Task(subagent_type="init", prompt="command: architect\nmode: no-plan")
+```
+
 ## 다이어그램 유형 선택
 
 요청에 따라 적절한 다이어그램 유형을 결정합니다.

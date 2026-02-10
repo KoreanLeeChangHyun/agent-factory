@@ -17,16 +17,39 @@ workPath: <workDir>/work/
 ```
 
 - reporter가 `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적 구성
-- reporter가 보고서 작성 + CLAUDE.md 갱신
+- reporter가 보고서 작성 + history.md 갱신 + CLAUDE.md 갱신
 - **Output:** 보고서 경로, CLAUDE.md 갱신 완료
 
-## REPORT Completion and DONE Banner
+## REPORT Completion: Orchestrator Post-Processing
 
-> **REPORT 완료 후 DONE banner**: REPORT 완료 배너 호출 후, 오케스트레이터는 자유 텍스트 완료 메시지를 출력하지 않는다. 대신 DONE 배너를 호출하여 워크플로우 최종 종료를 사용자에게 알린다. DONE 배너 호출 후 즉시 종료.
+reporter 완료 후, **오케스트레이터**가 다음 2가지 후처리를 수행합니다:
+
+### 1. status.json 완료 처리
+
+reporter가 성공적으로 반환된 경우:
+```bash
+wf-state status <registryKey> REPORT COMPLETED
+```
+
+reporter가 실패로 반환된 경우:
+```bash
+wf-state status <registryKey> REPORT FAILED
+```
+
+### 2. 레지스트리 해제
+
+status.json 완료 처리 후, 전역 레지스트리에서 워크플로우를 해제합니다:
+```bash
+wf-state unregister <registryKey>
+```
+
+> **책임 분리 원칙**: reporter는 보고서 생성에 집중하고, 워크플로우 상태 관리(status.json, 레지스트리)는 오케스트레이터가 담당합니다. 이는 SRP(단일 책임 원칙)에 따른 설계입니다.
+
+## DONE Banner
+
+> **REPORT 완료 후 DONE banner**: 오케스트레이터가 status.json 완료 처리 + 레지스트리 해제를 수행한 후, DONE 배너를 호출하여 워크플로우 최종 종료를 사용자에게 알립니다. DONE 배너 호출 후 즉시 종료.
 >
-> **DONE Banner Call Order**: REPORT 완료 배너 -> (reporter가 status.json 완료 처리 + 레지스트리 해제 수행) -> DONE 배너 호출 -> 종료
+> **DONE Banner Call Order**: REPORT 완료 배너 -> 오케스트레이터가 status.json 완료 처리 -> 오케스트레이터가 레지스트리 해제 -> DONE 배너 호출 -> 종료
 > ```bash
 > Workflow <registryKey> DONE done
 > ```
->
-> **Note**: `status.json 완료 처리`(REPORT->COMPLETED)와 `레지스트리 해제`(unregister)는 reporter 에이전트가 전담 수행. 오케스트레이터는 이를 중복 호출하지 않는다.

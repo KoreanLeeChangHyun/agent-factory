@@ -14,8 +14,8 @@ disable-model-invocation: true
 - REPORT: 작업 결과를 정리하여 보고서 생성
 - history.md 갱신 (`.workflow/history.md` 작업 이력 테이블에 행 추가)
 - CLAUDE.md 갱신 (Known Issues/Next Steps 필요시 업데이트)
-- status.json 상태 업데이트 (REPORT 완료 시 COMPLETED, 실패 시 FAILED)
-- 레지스트리 해제 (status.json 완료 처리 후 전역 레지스트리에서 워크플로우 해제)
+
+> **책임 경계**: status.json 완료 처리(REPORT->COMPLETED)와 레지스트리 해제(wf-state unregister)는 오케스트레이터가 담당합니다. reporter는 보고서 작성에만 집중합니다.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
 
@@ -86,28 +86,16 @@ workPath: <workDir>/work/
    - Known Issues/Next Steps에 변경이 필요한 경우에만 업데이트
    - 갱신 불필요 시 스킵
 
-4. **status.json 완료 처리**
-   - REPORT 성공 시:
-     ```bash
-     wf-state status <registryKey> REPORT COMPLETED
-     ```
-   - REPORT 실패 시:
-     ```bash
-     wf-state status <registryKey> REPORT FAILED
-     ```
-
-5. **레지스트리 해제** (status.json 완료 처리 후 실행)
-   - 완료/실패 모두 전역 레지스트리에서 워크플로우 해제:
-     ```bash
-     wf-state unregister <registryKey>
-     ```
+> **Note**: status.json 완료 처리(REPORT->COMPLETED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후 오케스트레이터가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`의 "REPORT Completion: Orchestrator Post-Processing" 섹션을 참조하세요.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
 
 ### reporter 출력
 
 - 보고서 경로: `{workDir}/report.md`
-- CLAUDE.md 갱신 완료
+- CLAUDE.md 갱신 완료 (또는 스킵)
+
+> **Note**: reporter 반환 후, 오케스트레이터가 status.json 완료 처리 및 레지스트리 해제를 수행합니다.
 
 ---
 
@@ -288,9 +276,7 @@ flowchart TD
     C --> D[파일 저장]
     D --> E[history.md 갱신]
     E --> F[CLAUDE.md 필요시 갱신]
-    F --> G[status.json 완료 처리]
-    G --> H[레지스트리 해제]
-    H --> I[경로 출력]
+    F --> G[경로 출력]
 ```
 
 1. **작업 내역 로드** (필수): `{workDir}/work/`에서 로드
@@ -299,9 +285,9 @@ flowchart TD
 4. **저장**: `{workDir}/report.md`에 저장 (workDir은 오케스트레이터로부터 전달받은 확정 경로)
 5. **history.md 갱신**: `.workflow/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
 6. **CLAUDE.md 갱신**: Known Issues/Next Steps에 변경이 필요한 경우에만 갱신 (갱신 불필요 시 스킵)
-7. **status.json 완료 처리**: `wf-state status <registryKey> REPORT COMPLETED`
-8. **레지스트리 해제**: `wf-state unregister <registryKey>`
-9. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
+7. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
+
+> **Note**: reporter 반환 후, 오케스트레이터가 status.json 완료 처리(`wf-state status <registryKey> REPORT COMPLETED`) 및 레지스트리 해제(`wf-state unregister <registryKey>`)를 수행합니다.
 
 > **Slack 완료 알림**: DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다. reporter는 Slack 호출을 수행하지 않습니다.
 
@@ -394,67 +380,9 @@ history.md 갱신 실패 시 경고만 출력하고 계속 진행합니다. 워�
 
 ---
 
-## status.json 상태 업데이트 (필수)
+---
 
-보고서 작성, CLAUDE.md 갱신이 모두 완료된 후, 마지막으로 status.json을 업데이트하여 워크플로우 완료를 기록합니다.
-
-### 업데이트 방법
-
-`update-workflow-state.sh` 쉘스크립트를 사용하여 단일 Bash 호출로 업데이트합니다.
-
-**REPORT 성공 시:**
-```bash
-wf-state status <registryKey> REPORT COMPLETED
-```
-
-**REPORT 실패 시:**
-```bash
-wf-state status <registryKey> REPORT FAILED
-```
-
-스크립트가 내부적으로 수행하는 작업:
-1. `<workDir>/status.json`의 `phase` 필드를 업데이트
-2. `transitions` 배열에 전이 기록 추가 (`{"from": "REPORT", "to": "COMPLETED", "at": "<현재시간>"}`)
-3. `updated_at`을 현재 시간(KST, ISO 8601)으로 갱신
-
-### 성공 시 예시
-
-```json
-{
-  "workId": "212636",
-  "command": "refactor",
-  "title": "워크플로우상태관리시스템도입",
-  "session_id": "20260205-212636-a1b2c3",
-  "phase": "COMPLETED",
-  "started_at": "2026-02-05T21:26:36+09:00",
-  "updated_at": "2026-02-05T21:35:00+09:00",
-  "ttl_seconds": 7200,
-  "transitions": [
-    {"from": "INIT", "to": "PLAN", "at": "..."},
-    {"from": "PLAN", "to": "WORK", "at": "..."},
-    {"from": "WORK", "to": "REPORT", "at": "..."},
-    {"from": "REPORT", "to": "COMPLETED", "at": "2026-02-05T21:35:00+09:00"}
-  ]
-}
-```
-
-### 실패 시 예시
-
-```json
-{
-  "phase": "FAILED",
-  "transitions": [
-    {"from": "REPORT", "to": "FAILED", "at": "2026-02-05T21:35:00+09:00"}
-  ]
-}
-```
-
-### 실패 처리
-
-- **status.json 파일 미존재**: 경고만 출력, 워크플로우 정상 완료 처리 (하위 호환)
-- **JSON 파싱 실패**: 경고만 출력, 워크플로우 정상 완료 처리
-- **Write 실패**: 경고만 출력, 워크플로우 정상 완료 처리
-- **비차단 원칙**: status.json 업데이트 실패가 워크플로우를 중단시키지 않음
+> **Note**: status.json 완료 처리(REPORT->COMPLETED/FAILED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후 오케스트레이터가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`를 참조하세요.
 
 ---
 
@@ -486,6 +414,5 @@ wf-state status <registryKey> REPORT FAILED
 | 예상치 못한 에러 | 에러 내용 기록 후 사용자에게 보고 |
 | history.md 갱신 실패 | 경고 출력 후 계속 진행, 워크플로우 정상 완료 처리 |
 | CLAUDE.md 갱신 실패 | 경고 출력 후 계속 진행, 작업 내역에 기록 |
-| status.json 업데이트 실패 | 경고 출력 후 계속 진행, 워크플로우 정상 완료 처리 |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기

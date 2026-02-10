@@ -4,6 +4,19 @@ description: 코드 구현 및 수정. 기능 구현, 버그 수정, 코드 변�
 
 # Implement
 
+## -np 플래그 (No-Plan 모드)
+
+`$ARGUMENTS`에 `-np` 플래그가 포함된 경우 Tier 2 (no-plan) 모드로 실행합니다.
+
+- `-np` 감지 시: init 에이전트 호출에 `mode: no-plan` 전달
+- `-np` 미감지 시: 기존과 동일 (mode: full)
+
+```
+# -np 플래그 감지 예시
+cc:implement -np "간단한 버그 수정"
+→ Task(subagent_type="init", prompt="command: implement\nmode: no-plan")
+```
+
 ## 에셋 관리 (에이전트/스킬/커맨드)
 
 사용자 요청에 에이전트, 스킬, 커맨드 관리가 포함된 경우 아래 키워드 매핑에 따라 적절한 Manager 스킬을 실행합니다.

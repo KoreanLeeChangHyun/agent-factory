@@ -19,6 +19,7 @@ model: sonnet
 메인 에이전트(orchestration)로부터 전달받는 정보:
 
 - `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
+- `mode`: (선택적) 워크플로우 모드. `full`(기본값), `no-plan`, `prompt` 중 하나
 
 ## 절차
 
@@ -67,10 +68,12 @@ TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"
 이어서 스크립트를 1회 호출합니다:
 
 ```bash
-wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID}
+wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 ```
 
 > **5번째 인자 `${CLAUDE_SESSION_ID}`**: Claude Code 내장 템플릿 변수로, 현재 세션 UUID가 자동 치환됩니다. 이 값은 `status.json`의 `linked_sessions` 필드에 기록되어 워크플로우 세션 추적에 사용됩니다.
+
+> **6번째 인자 `mode`**: 워크플로우 모드를 지정합니다. `full`(기본값), `no-plan`, `prompt` 중 하나입니다. 전달하지 않으면 `full`로 설정됩니다. 이 값은 `status.json`의 `mode` 필드에 기록되어 FSM 가드 및 오케스트레이션 분기에 사용됩니다.
 
 - `workDir`은 `.workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>` 형식 (중첩 구조)
 
@@ -86,7 +89,7 @@ wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID}
 - prompt.txt 클리어
 - querys.txt 갱신
 - .context.json 생성
-- status.json 생성
+- status.json 생성 (mode 필드 포함)
 - 좀비 정리 (TTL 만료 -> STALE)
 - 전역 레지스트리 등록
 

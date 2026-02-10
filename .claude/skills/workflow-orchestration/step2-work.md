@@ -2,7 +2,10 @@
 
 > **State Update** before WORK start:
 > ```bash
+> # full mode (default): transition from PLAN
 > wf-state both <registryKey> worker PLAN WORK
+> # no-plan mode: transition from INIT (PLAN was skipped)
+> wf-state both <registryKey> worker INIT WORK
 > ```
 
 > **WORK Phase Rules (REQUIRED)**
@@ -21,7 +24,37 @@
 
 > **Worker Internal Procedure (4 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 4단계를 수행합니다. 상세는 workflow-work skill 및 worker.md 참조.
 
-## Phase 0: Preparation (REQUIRED, Sequential 1 worker)
+## No-Plan Mode Worker Call Pattern
+
+> **no-plan 모드에서는 Phase 0과 Phase 1~N 대신 단일 Worker를 호출합니다.**
+
+no-plan 모드 판별: status.json의 `mode` 필드가 `no-plan`이면 아래 패턴으로 실행합니다.
+
+**State Update:**
+```bash
+wf-state both <registryKey> worker INIT WORK
+```
+
+**Single Worker Call (no planPath, no Phase 0):**
+```
+Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
+```
+
+**no-plan 모드 특성:**
+
+| 항목 | full 모드 | no-plan 모드 |
+|------|----------|-------------|
+| State transition | PLAN -> WORK | INIT -> WORK |
+| Phase 0 (skill-map) | 필수 | 스킵 |
+| planPath | 필수 | 없음 |
+| Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
+| 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
+
+no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악하고, 명령어별 기본 스킬 매핑으로 스킬을 자동 결정하여 작업을 수행합니다.
+
+---
+
+## Full Mode: Phase 0 - Preparation (REQUIRED, Sequential 1 worker)
 
 Phase 1~N 실행 전에 MUST execute Phase 0 먼저. Phase 0은 1개 worker가 순차로 실행합니다.
 
