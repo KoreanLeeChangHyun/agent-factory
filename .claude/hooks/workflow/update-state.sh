@@ -51,6 +51,26 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
+# ANSI 색상 코드
+C_RED='\033[0;31m'
+C_BLUE='\033[0;34m'
+C_GREEN='\033[0;32m'
+C_PURPLE='\033[0;35m'
+C_YELLOW='\033[0;33m'
+C_RESET='\033[0m'
+
+# phase별 색상 함수 (phase 이름을 ANSI 색상으로 감싸서 반환)
+colorize_phase() {
+    local phase="$1"
+    case "$phase" in
+        INIT)       echo "${C_RED}${phase}${C_RESET}" ;;
+        PLAN)       echo "${C_BLUE}${phase}${C_RESET}" ;;
+        WORK)       echo "${C_GREEN}${phase}${C_RESET}" ;;
+        REPORT)     echo "${C_PURPLE}${phase}${C_RESET}" ;;
+        *)          echo "${phase}" ;;
+    esac
+}
+
 # 인자 확인
 if [ $# -lt 2 ]; then
     echo "[WARN] 사용법: $0 context|status|both|register|unregister <workDir> [args...]" >&2
@@ -531,7 +551,19 @@ try:
             os.unlink(tmp_path)
         raise
 
-    print(f'status -> {from_phase}->{to_phase}')
+    # 색상 매핑
+    phase_colors = {
+        'INIT': '\033[0;31m',
+        'PLAN': '\033[0;34m',
+        'WORK': '\033[0;32m',
+        'REPORT': '\033[0;35m',
+    }
+    reset = '\033[0m'
+    c_from = phase_colors.get(from_phase, '')
+    r_from = reset if c_from else ''
+    c_to = phase_colors.get(to_phase, '')
+    r_to = reset if c_to else ''
+    print(f'status -> {c_from}{from_phase}{r_from}->{c_to}{to_phase}{r_to}')
 except Exception as e:
     print(f'[WARN] status.json update failed: {e}', file=sys.stderr)
 " 2>&1
@@ -549,7 +581,7 @@ case "$MODE" in
             exit 0
         fi
         RESULT=$(update_context "$AGENT")
-        echo "[OK] state updated: $RESULT"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
     status)
@@ -560,7 +592,7 @@ case "$MODE" in
             exit 0
         fi
         RESULT=$(update_status "$FROM_PHASE" "$TO_PHASE")
-        echo "[OK] state updated: $RESULT"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
     both)
@@ -573,19 +605,19 @@ case "$MODE" in
         fi
         RESULT_CTX=$(update_context "$AGENT")
         RESULT_STS=$(update_status "$FROM_PHASE" "$TO_PHASE")
-        echo "[OK] state updated: $RESULT_CTX, $RESULT_STS"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT_CTX, $RESULT_STS"
         ;;
 
     register)
         REG_TITLE="${3:-}"
         REG_COMMAND="${4:-}"
         RESULT=$(register_workflow "$REG_TITLE" "$REG_COMMAND")
-        echo "[OK] state updated: $RESULT"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
     unregister)
         RESULT=$(unregister_workflow)
-        echo "[OK] state updated: $RESULT"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
     link-session)
@@ -595,7 +627,7 @@ case "$MODE" in
             exit 0
         fi
         RESULT=$(link_session "$SESSION_ID")
-        echo "[OK] state updated: $RESULT"
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
     *)
