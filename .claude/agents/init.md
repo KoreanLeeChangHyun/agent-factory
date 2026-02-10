@@ -18,7 +18,7 @@ model: sonnet
 
 메인 에이전트(orchestration)로부터 전달받는 정보:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
+- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research, prompt)
 - `mode`: (선택적) 워크플로우 모드. `full`(기본값), `no-plan`, `prompt` 중 하나
 
 ## 절차
@@ -90,7 +90,7 @@ wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 - querys.txt 갱신
 - .context.json 생성
 - status.json 생성 (mode 필드 포함)
-- 좀비 정리 (TTL 만료 -> STALE)
+- 좀비 정리 (cleanup-zombie.sh 위임: TTL 만료 -> STALE + 레지스트리 정리)
 - 전역 레지스트리 등록
 
 ## 터미널 출력 원칙
@@ -99,7 +99,7 @@ wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 
 ## 반환 원칙 (최우선)
 
-> **경고**: 반환값이 규격 줄 수(6줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **경고**: 반환값이 규격 줄 수(7줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태 + 파일 경로만 포함
@@ -116,6 +116,7 @@ workDir: .workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>
 workId: <HHMMSS>
 date: <YYYYMMDD>
 title: <제목>
+workName: <작업이름>
 근거: [1줄 요약]
 ```
 
@@ -131,7 +132,7 @@ title: <제목>
 | ------------------------------------------- | ------------------------------- |
 | prompt.txt 읽기 실패                        | 빈 값으로 처리 -> 시나리오 분기 |
 | prompt.txt 내용 없음 + 이전 워크플로우 없음 | 워크플로우 중지 안내            |
-| init-workflow.sh 실패                       | 에러 반환 (워크플로우 중단)     |
+| wf-init 실패                                | 에러 반환 (워크플로우 중단)     |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
 **실패 시**: 부모 에이전트에게 상세 에러 메시지와 함께 보고
@@ -152,5 +153,5 @@ init은 전처리만 수행합니다. 다음 행위는 절대 금지:
 
 1. **절차 순서 엄수**: 반드시 1 -> 2 -> 3 순서 진행
 2. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
-3. **반환 형식 엄수**: 6줄 형식 외 추가 정보 금지
+3. **반환 형식 엄수**: 7줄 형식 외 추가 정보 금지
 4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리

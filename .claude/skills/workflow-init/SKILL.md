@@ -16,7 +16,7 @@ disable-model-invocation: true
 
 > 내부 분석/사고 과정을 터미널에 출력하지 않는다. 결과만 출력한다.
 
-- **출력 허용**: 반환값 (6줄 규격), 에러 메시지, AskUserQuestion 호출
+- **출력 허용**: 반환값 (7줄 규격), 에러 메시지, AskUserQuestion 호출
 - **출력 금지**: 분석 과정, 판단 근거 설명, "~를 살펴보겠습니다" 류, 중간 진행 보고, 작업 계획 설명
 - 파일 읽기/쓰기 등 내부 작업은 묵묵히 수행하고 최종 반환값만 출력
 - INIT 시작/완료 배너는 오케스트레이터가 호출. init 에이전트는 배너를 직접 호출하지 않음
@@ -106,7 +106,7 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 5. `.prompt/querys.txt` 갱신
 6. `<workDir>/.context.json` 생성
 7. `<workDir>/status.json` 생성 (`mode` 필드 포함 - 6번째 인자로 전달된 모드 값)
-8. 좀비 정리 (TTL 만료 워크플로우 STALE 전환)
+8. 좀비 정리 (cleanup-zombie.sh 위임: TTL 만료 → STALE 전환 + 레지스트리 정리)
 9. 전역 레지스트리 등록
 
 **주의:** 스크립트 stdout 출력은 무시합니다. 에이전트는 Step 1에서 읽은 prompt.txt 내용만 사용합니다.
@@ -153,8 +153,8 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 
 ## 반환 형식 (필수)
 
-> **엄격 준수**: 아래 6줄 형식만 반환합니다. 추가 정보 금지.
-> **경고**: 반환값이 규격 줄 수(6줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **엄격 준수**: 아래 7줄 형식만 반환합니다. 추가 정보 금지.
+> **경고**: 반환값이 규격 줄 수(7줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 ```
 request: <user_prompt.txt의 첫 50자>
@@ -180,7 +180,7 @@ workName: <작업이름>
 | 에러 | 처리 |
 |------|------|
 | prompt.txt 없거나 비어있음 | 시나리오 분기 (Step 1 참조) |
-| init-workflow.sh 실행 실패 | 에러 반환 (워크플로우 중단) |
+| wf-init 실행 실패 | 에러 반환 (워크플로우 중단) |
 | 파일 읽기 실패 | 경로 확인 후 재시도 (최대 3회) |
 
 ### 에러 시 반환
@@ -200,7 +200,7 @@ workName: <작업이름>
 
 ## 역할 경계 (Boundary)
 
-init은 **전처리**만 수행합니다. 다음 행위는 절대 금지:
+init은 **전처리**만 수행합니다. 모든 command(implement, refactor, review, build, analyze, architect, framework, research, prompt)가 init을 통과합니다. 다음 행위는 절대 금지:
 
 - 소스 코드 파일을 Read/Grep으로 탐색하지 마라
 - 소스 코드를 Write/Edit하지 마라
@@ -223,6 +223,6 @@ init은 **전처리**만 수행합니다. 다음 행위는 절대 금지:
 ## 주의사항
 
 1. **Step 순서 엄수**: 반드시 Step 1 -> 2 -> 3 순서로 진행
-2. **반환 형식 엄수**: 6줄 형식 외 추가 정보 금지
+2. **반환 형식 엄수**: 7줄 형식 외 추가 정보 금지
 3. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
 4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록을 처리함
