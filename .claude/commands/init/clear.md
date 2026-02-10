@@ -22,7 +22,7 @@ wf-clear list
 스크립트가 삭제 대상 목록과 크기를 출력합니다. 출력 결과를 사용자에게 표시합니다.
 
 **삭제 대상:**
-- `.workflow/` - 워크플로우 서브디렉토리 내용 (context.json 보존)
+- `.workflow/` - 워크플로우 날짜 디렉토리 내용 삭제 (registry.json은 보존 후 `{}` 초기화)
 - `.prompt/` - 프롬프트 파일 (history.md, prompt.txt 등)
 
 ### Step 2. 사용자 확인 (대화형)
@@ -43,6 +43,26 @@ wf-clear execute
 ```
 
 삭제 결과를 사용자에게 표시합니다.
+
+**실행 결과 예시:**
+```
+=== 작업 내역 삭제 실행 ===
+
+[.workflow/]
+  삭제 완료: .workflow/20260210-123456/
+
+[.prompt/]
+  삭제 완료: .prompt/*
+
+[.workflow/registry.json]
+  초기화 완료: .workflow/registry.json ({})
+
+---
+삭제 완료: 2개 디렉토리 정리됨
+
+초기화된 파일:
+  - .workflow/registry.json ({})
+```
 
 ---
 

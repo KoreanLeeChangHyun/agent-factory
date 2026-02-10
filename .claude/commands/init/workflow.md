@@ -9,7 +9,7 @@ description: 워크플로우 초기화. CLAUDE.md 로드, workflow-orchestration
 
 ## 사용 안내
 
-이 명령어는 `cc` alias에서 `--system-prompt` 옵션으로 **자동 실행**됩니다.
+이 명령어는 `cc` alias에서 **자동 실행**됩니다.
 
 ```bash
 # cc alias 정의 (자동 실행)
@@ -61,6 +61,18 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 ```bash
 wf-commands
 ```
+
+## 워크플로우 모드 (Tier)
+
+cc:* 명령어는 모드에 따라 실행 단계가 달라집니다.
+
+| 모드 | 단계 순서 | 설명 |
+|------|-----------|------|
+| full (기본) | INIT -> PLAN -> WORK -> REPORT | 전체 워크플로우 |
+| no-plan (-np) | INIT -> WORK -> REPORT | 계획 단계 생략 |
+| prompt | INIT -> 메인 에이전트 직접 수행 | 경량 작업 |
+
+상세는 `workflow-orchestration` 스킬을 참조하세요.
 
 ## 사용자 재질의 원칙
 

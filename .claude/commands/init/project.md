@@ -69,12 +69,13 @@ wf-project setup-wf-alias
 ```json
 {
   "status": "ok",
-  "added": ["WORKFLOW", "wf-state", "wf-init"],
-  "skipped": []
+  "zshrc_added": ["Workflow", "wf-state", "wf-init", "wf-claude", "wf-project", "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info", "wf-commands"],
+  "zshrc_skipped": [],
+  "wrapper_added": ["Workflow", "wf-state", "wf-init", "wf-claude", "wf-project", "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info", "wf-commands"]
 }
 ```
 
-추가/스킵된 alias 결과 메시지 출력.
+추가/스킵된 alias 및 wrapper 스크립트 결과 메시지 출력.
 
 ### Step 4. .gitignore 업데이트
 
@@ -111,7 +112,8 @@ wf-project verify
 [v] CLAUDE.md 빈 템플릿 생성 완료 (또는 "기존 파일 유지")
 [v] 디렉토리 생성: .workflow, .prompt
 [v] 파일 생성: .prompt/prompt.txt, .prompt/memo.txt, .prompt/querys.txt, .claude.env, .workflow/history.md, .workflow/registry.json
-[v] 워크플로우 alias 설정 완료
+[v] 워크플로우 alias 설정 완료 (zshrc + ~/.local/bin wrapper)
+[v] wrapper 스크립트 검증 완료: Workflow, wf-state, wf-init, wf-claude, wf-project, wf-clear, wf-sync, wf-git-config, wf-slack, wf-info, wf-commands
 [v] .gitignore 업데이트 완료
 
 다음 단계:

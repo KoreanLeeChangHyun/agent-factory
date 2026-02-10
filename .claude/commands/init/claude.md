@@ -148,10 +148,10 @@ wf-claude verify
 
 | 명령어 | 설명 |
 |--------|------|
-| `/init:project` | 프로젝트 초기화 (디렉토리, 파일, .gitignore) |
-| `/init:context` | 코드베이스 분석 후 CLAUDE.md 갱신 |
-| `/init:workflow` | 워크플로우 초기화 (CLAUDE.md 로드, 스킬 로드) |
-| `/git:config` | Git config 개별 설정 |
+| `/init:project` | 프로젝트 초기 구조 설정 (디렉토리, .gitignore, 빈 CLAUDE.md 템플릿). (프로젝트당 1회) |
+| `/init:context` | 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다. 코드 변경 후 CLAUDE.md를 최신화할 때 수시로 실행 |
+| `/init:workflow` | 워크플로우 초기화. CLAUDE.md 로드, workflow-orchestration 스킬 로드. (매 세션마다) |
+| `/git:config` | .claude.env에서 Git 설정을 읽어 git config를 자동 설정합니다 |
 
 ---
 
