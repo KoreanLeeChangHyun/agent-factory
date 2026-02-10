@@ -340,7 +340,7 @@ old_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
 new_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->\n| <YYYY-MM-DD> | <YYYYMMDD-HHMMSS> | <제목> | <command> | <상태> | <보고서링크> |"
 ```
 
-- `<보고서링크>`: `[보고서](<workDir>/report.md)` 형식 또는 보고서가 없으면 `-`
+- `<보고서링크>`: `[보고서](<workDir에서 .workflow/ 접두사를 제거한 경로>/report.md)` 형식 (history.md가 .workflow/ 안에 있으므로 상대 경로 기준으로 .workflow/ 제거 필요) 또는 보고서가 없으면 `-`
 
 ### history.md 초기 생성
 

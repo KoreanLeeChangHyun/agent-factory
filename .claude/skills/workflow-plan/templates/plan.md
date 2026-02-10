@@ -4,6 +4,8 @@
 - 명령어: {{command}}
 - 작성일: {{date}} (KST)
 - 요청: {{request}}
+<!-- 선택. 명령어별 기본값과 다를 때만 명시. 기본값: implement/refactor/framework=3, build=2, review/architect/analyze/research=4 -->
+<!-- - 품질 레벨: Level N -->
 
 ## 사용자 질의응답 내역
 
