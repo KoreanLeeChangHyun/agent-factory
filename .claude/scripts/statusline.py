@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.8"
 # dependencies = []
 # ///
 """
 Claude Code Statusline - Context Usage Progress Bar
 
 stdin으로 JSON 데이터를 받아 컨텍스트 사용률 프로그레스 바를 stdout으로 출력합니다.
-외부 의존성 없이 Python 3.12+ 표준 라이브러리만 사용합니다.
+외부 의존성 없이 Python 3.8+ 표준 라이브러리만 사용합니다.
 
 CCWO의 설계 패턴을 참고하되, 우리 시스템(.workflow/ 기반)에 맞게 재작성했습니다.
 """
+
+from __future__ import annotations
 
 import json
 import os
