@@ -4,18 +4,6 @@
     "command": "python3 .claude/scripts/statusline.py"
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 .claude/hooks/event/session-start/inject-workflow-orchestrator.py",
-            "statusMessage": "워크플로우 오케스트레이션 주입 중..."
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",

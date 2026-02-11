@@ -40,8 +40,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── slack-common.sh                 # Slack 공통 함수
 │   └── resolve-workflow.py             # 워크플로우 경로 해석
 ├── event/                              # Hook 이벤트 핸들러 (settings.json 등록)
-│   ├── session-start/
-│   │   └── inject-workflow-orchestrator.py
 │   ├── pre-tool-use/
 │   │   ├── dangerous-command-guard.sh
 │   │   ├── tdd-guard.sh
@@ -67,33 +65,11 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 ### 현재 프로젝트 Hook 설정
 
-현재 `.claude/settings.json`에 등록된 Hook은 총 7개입니다: SessionStart 1개, PreToolUse 5개, Stop 1개.
-
-#### SessionStart Hooks
-
-##### 1. 워크플로우 오케스트레이션 주입
-
-```json
-{
-  "matcher": "",
-  "hooks": [
-    {
-      "type": "command",
-      "command": "python3 .claude/hooks/event/session-start/inject-workflow-orchestrator.py",
-      "statusMessage": "워크플로우 오케스트레이션 주입 중..."
-    }
-  ]
-}
-```
-
-- **트리거**: 세션 시작 시
-- **동작**: 활성 워크플로우가 있을 경우 오케스트레이션 컨텍스트를 세션에 주입
-- **스크립트**: `.claude/hooks/event/session-start/inject-workflow-orchestrator.py`
-- **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
+현재 `.claude/settings.json`에 등록된 Hook은 총 6개입니다: PreToolUse 5개, Stop 1개.
 
 #### PreToolUse Hooks
 
-##### 2. Slack 질문 알림 (AskUserQuestion)
+##### 1. Slack 질문 알림 (AskUserQuestion)
 
 ```json
 {
@@ -116,7 +92,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **사전 조건**: `.workflow/registry.json`에 워크플로우 등록 필요
 - **관련 스킬**: `workflow-plan` (PLAN 단계에서 사용자 승인 대기 시)
 
-##### 3. 위험 명령어 차단 (Bash)
+##### 2. 위험 명령어 차단 (Bash)
 
 ```json
 {
@@ -137,7 +113,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **스크립트**: `.claude/hooks/event/pre-tool-use/dangerous-command-guard.sh`
 - **관련 스킬**: `dangerous-command-guard`
 
-##### 4. TDD 가드 (Write|Edit)
+##### 3. TDD 가드 (Write|Edit)
 
 ```json
 {
@@ -158,7 +134,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **스크립트**: `.claude/hooks/event/pre-tool-use/tdd-guard.sh`
 - **관련 스킬**: `tdd-guard-hook`
 
-##### 5. 워크플로우 Phase 전이 검증 (Bash)
+##### 4. 워크플로우 Phase 전이 검증 (Bash)
 
 ```json
 {
@@ -179,7 +155,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **스크립트**: `.claude/hooks/event/pre-tool-use/workflow-transition-guard.sh`
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
-##### 6. 워크플로우 에이전트 호출 검증 (Task)
+##### 5. 워크플로우 에이전트 호출 검증 (Task)
 
 ```json
 {
@@ -202,7 +178,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 #### Stop Hooks
 
-##### 7. 워크플로우 자동 계속 (Stop)
+##### 6. 워크플로우 자동 계속 (Stop)
 
 ```json
 {
@@ -289,11 +265,10 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 ## Hook 스크립트 목록
 
-### 이벤트 핸들러 (settings.json 등록, 7개)
+### 이벤트 핸들러 (settings.json 등록, 6개)
 
 | 파일 | 역할 | 이벤트 | 매칭 도구 |
 |------|------|--------|-----------|
-| `.claude/hooks/event/session-start/inject-workflow-orchestrator.py` | 워크플로우 오케스트레이션 주입 | SessionStart | (전체) |
 | `.claude/hooks/event/pre-tool-use/slack-ask.sh` | Slack 질문 알림 전송 | PreToolUse | AskUserQuestion |
 | `.claude/hooks/event/pre-tool-use/dangerous-command-guard.sh` | 위험 명령어 차단 | PreToolUse | Bash |
 | `.claude/hooks/event/pre-tool-use/tdd-guard.sh` | TDD 원칙 위반 경고 | PreToolUse | Write, Edit |
