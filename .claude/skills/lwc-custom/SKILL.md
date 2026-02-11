@@ -1,6 +1,7 @@
 ---
 name: lwc-custom
 description: Salesforce Lightning Web Components(LWC) 커스텀 컴포넌트 개발 스킬. 표준 lightning-* 컴포넌트를 사용하지 않고 순수 HTML, CSS, JavaScript로 LWC를 개발합니다. 사용 시점: LWC 컴포넌트 생성, Salesforce UI 개발, Lightning 앱 개발 요청 시. 키워드: LWC, Lightning Web Component, Salesforce, 세일즈포스.
+disable-model-invocation: true
 ---
 
 # LWC Custom Component Development

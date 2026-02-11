@@ -1,6 +1,7 @@
 ---
 name: theme-factory
 description: Toolkit for styling artifacts with a theme. Use for applying consistent visual themes to slides, docs, reports, HTML landing pages, and other artifacts. There are 10 pre-set themes with colors/fonts that you can apply to any artifact, or generate a new theme on-the-fly. Use this when the user requests theming, branding, or consistent styling across documents.
+disable-model-invocation: true
 license: Complete terms in LICENSE.txt
 ---
 

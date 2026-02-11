@@ -4,6 +4,32 @@
     "command": "python3 .claude/scripts/statusline.py"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "히스토리 동기화 중..."
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",

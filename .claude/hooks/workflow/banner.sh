@@ -119,14 +119,17 @@ if [[ "$_RESOLVED_ARG1" == .workflow/* ]] || [[ "$_RESOLVED_ARG1" == /* ]]; then
     _CONTEXT_FILE="${_ABS_WORK_DIR}/.context.json"
     WORK_ID=""
     TITLE=""
+    COMMAND=""
 
     if [ -f "$_CONTEXT_FILE" ]; then
         if command -v jq &>/dev/null; then
             WORK_ID=$(jq -r '.workId // ""' "$_CONTEXT_FILE" 2>/dev/null)
             TITLE=$(jq -r '.title // ""' "$_CONTEXT_FILE" 2>/dev/null)
+            COMMAND=$(jq -r '.command // ""' "$_CONTEXT_FILE" 2>/dev/null)
         elif command -v python3 &>/dev/null; then
             WORK_ID=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('workId',''))" "$_CONTEXT_FILE" 2>/dev/null)
             TITLE=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('title',''))" "$_CONTEXT_FILE" 2>/dev/null)
+            COMMAND=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('command',''))" "$_CONTEXT_FILE" 2>/dev/null)
         fi
     fi
 
@@ -173,6 +176,16 @@ except Exception:
             _ABS_WORK_DIR="$WORK_DIR"
         else
             _ABS_WORK_DIR="${PROJECT_ROOT}/${WORK_DIR}"
+        fi
+
+        # 레거시 방식에서 .context.json으로부터 command 읽기
+        _LEG_CTX="${_ABS_WORK_DIR}/.context.json"
+        if [ -f "$_LEG_CTX" ]; then
+            if command -v jq &>/dev/null; then
+                COMMAND=$(jq -r '.command // ""' "$_LEG_CTX" 2>/dev/null)
+            elif command -v python3 &>/dev/null; then
+                COMMAND=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('command',''))" "$_LEG_CTX" 2>/dev/null)
+            fi
         fi
     fi
 fi
@@ -273,7 +286,9 @@ LINE=$(printf '─%.0s' $(seq 1 $WIDTH))
 if [ "$PHASE" = "DONE" ]; then
     # 최종 완료 배너 (박스 없이 한 줄)
     echo ""
-    echo -e "  ${PROGRESS}  ${YELLOW}${BOLD}DONE${RESET}  ${WORK_ID} · ${TITLE}  ${YELLOW}${BOLD}워크플로우 완료${RESET}"
+    _CMD_LABEL=""
+    [ -n "$COMMAND" ] && _CMD_LABEL=" (${COMMAND})"
+    echo -e "  ${PROGRESS}  ${YELLOW}${BOLD}DONE${RESET}  ${WORK_ID} · ${TITLE} ${_CMD_LABEL} ${YELLOW}${BOLD}워크플로우 완료${RESET}"
     echo ""
 
     # --- Slack 완료 알림 (비동기, 비차단) ---
