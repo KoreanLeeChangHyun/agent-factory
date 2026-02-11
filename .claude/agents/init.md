@@ -99,7 +99,7 @@ wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 
 ## 반환 원칙 (최우선)
 
-> **경고**: 반환값이 규격 줄 수(7줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **경고**: 반환값이 규격 줄 수(8줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태 + 파일 경로만 포함
@@ -114,6 +114,7 @@ wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 request: <user_prompt.txt의 첫 50자>
 workDir: .workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>
 workId: <HHMMSS>
+registryKey: <YYYYMMDD>-<HHMMSS>
 date: <YYYYMMDD>
 title: <제목>
 workName: <작업이름>
@@ -153,5 +154,5 @@ init은 전처리만 수행합니다. 다음 행위는 절대 금지:
 
 1. **절차 순서 엄수**: 반드시 1 -> 2 -> 3 순서 진행
 2. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
-3. **반환 형식 엄수**: 7줄 형식 외 추가 정보 금지
+3. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
 4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리

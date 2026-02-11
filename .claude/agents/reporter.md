@@ -19,9 +19,9 @@ permissionMode: acceptEdits
 - 작업 내역 로드
 - 결과 취합 및 정리
 - 보고서 파일 생성 (md, csv, xlsx, png)
-- **history.md 갱신** (보고서 작성 완료 후, `.workflow/history.md`에 작업 이력 행 추가 - init에서 이관됨)
+- **history.md 갱신** (보고서 작성 완료 후, `.prompt/history.md`에 작업 이력 행 추가 - init에서 이관됨)
   - 행 형식: `| YYYY-MM-DD | YYYYMMDD-HHMMSS | 제목 | command | 상태 | [보고서](상대경로) |`
-  - 보고서 링크: `[보고서](<workDir에서 .workflow/ 접두사를 제거한 경로>/report.md)` 형식 (history.md가 .workflow/ 안에 있으므로 상대 경로 기준으로 .workflow/ 제거 필요, 보고서 없으면 `-`)
+  - 보고서 링크: `[보고서](../<workDir>/report.md)` 형식 (history.md가 .prompt/ 안에 있으므로 상대 경로 기준으로 ../ 접두사 추가 필요, 보고서 없으면 `-`)
 - **CLAUDE.md 갱신** (Known Issues/Next Steps 필요시 업데이트)
 
 **담당 범위:** 보고서 생성 + history.md 갱신 + CLAUDE.md 필요시 갱신

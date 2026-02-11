@@ -106,8 +106,8 @@ AskUserQuestion(
     question: "위 계획대로 진행하시겠습니까?",
     header: "승인 요청",
     options: [
-      { label: "승인 (Recommended)", description: "WORK 단계로 진행합니다" },
-      { label: "수정 (prompt.txt)", description: "prompt.txt에 피드백을 작성한 후 선택합니다" },
+      { label: "승인", description: "WORK 단계로 진행합니다" },
+      { label: "수정", description: "prompt.txt에 피드백을 작성한 후 선택합니다" },
       { label: "중지", description: "워크플로우를 중단합니다" }
     ],
     multiSelect: false
@@ -127,11 +127,11 @@ AskUserQuestion(
 | Selection | Action |
 |-----------|--------|
 | **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행) |
-| **수정 (prompt.txt)** | 사용자가 prompt.txt에 피드백을 작성한 후 선택. planner를 재호출하여 피드백 반영 후 계획 재수립, 다시 Step 1b 수행 |
+| **수정** | 사용자가 prompt.txt에 피드백을 작성한 후 선택. planner를 재호출하여 피드백 반영 후 계획 재수립, 다시 Step 1b 수행 |
 | **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단 |
 
-> **"수정 (prompt.txt)" selection handling:**
-> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 (prompt.txt)"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
+> **"수정" selection handling:**
+> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
 >
 > 1. **prompt.txt read**: `.prompt/prompt.txt`의 내용을 읽어 피드백 내용을 확보
 > 2. **prompt.txt clear (REQUIRED)**: 읽기 직후 MUST clear prompt.txt
@@ -186,7 +186,7 @@ Bash("wf-state status 20260205-213000 PLAN CANCELLED")
 >
 > 사용자가 "승인"을 선택한 시점에서 계획서는 Binding Contract가 됩니다.
 > 오케스트레이터는 승인된 계획서의 태스크를 변경, 추가, 제거하지 않습니다.
-> 계획 변경이 필요하면 사용자가 "수정 (prompt.txt)" 선택지를 통해 재계획을 요청해야 합니다.
+> 계획 변경이 필요하면 사용자가 "수정" 선택지를 통해 재계획을 요청해야 합니다.
 >
 > **MUST NOT:**
 > - 오케스트레이터가 독자적으로 태스크를 추가/삭제/변경

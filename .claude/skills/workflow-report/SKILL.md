@@ -12,7 +12,7 @@ disable-model-invocation: true
 
 **workflow-report 스킬의 책임:**
 - REPORT: 작업 결과를 정리하여 보고서 생성
-- history.md 갱신 (`.workflow/history.md` 작업 이력 테이블에 행 추가)
+- history.md 갱신 (`.prompt/history.md` 작업 이력 테이블에 행 추가)
 - CLAUDE.md 갱신 (Known Issues/Next Steps 필요시 업데이트)
 
 > **책임 경계**: status.json 완료 처리(REPORT->COMPLETED)와 레지스트리 해제(wf-state unregister)는 오케스트레이터가 담당합니다. reporter는 보고서 작성에만 집중합니다.
@@ -80,7 +80,7 @@ workPath: <workDir>/work/
    5. 보고서 저장: `{workDir}/report.md`
 
 2. **history.md 갱신**
-   - `.workflow/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
+   - `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
 
 3. **CLAUDE.md 갱신** (필요시)
    - Known Issues/Next Steps에 변경이 필요한 경우에만 업데이트
@@ -283,7 +283,7 @@ flowchart TD
 2. **형식 결정**: 데이터 특성에 맞는 형식 선택
 3. **보고서 작성**: 템플릿에 따라 작성
 4. **저장**: `{workDir}/report.md`에 저장 (workDir은 오케스트레이터로부터 전달받은 확정 경로)
-5. **history.md 갱신**: `.workflow/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
+5. **history.md 갱신**: `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
 6. **CLAUDE.md 갱신**: Known Issues/Next Steps에 변경이 필요한 경우에만 갱신 (갱신 불필요 시 스킵)
 7. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
 
@@ -295,11 +295,11 @@ flowchart TD
 
 ## history.md 갱신 (필수)
 
-보고서 작성 완료 후, `.workflow/history.md`에 작업 이력을 추가합니다.
+보고서 작성 완료 후, `.prompt/history.md`에 작업 이력을 추가합니다.
 
 ### 대상 파일
 
-`.workflow/history.md` (프로젝트 루트 기준)
+`.prompt/history.md` (프로젝트 루트 기준)
 
 ### 갱신 내용
 
@@ -307,15 +307,18 @@ flowchart TD
 
 **행 형식:**
 ```
-| YYYY-MM-DD | YYYYMMDD-HHMMSS | 제목 | command | 상태 | [보고서](상대경로) |
+| YYYY-MM-DD<br><sub>HH:MM</sub> | YYYYMMDD-HHMMSS | 제목<br><sub>요약 60자</sub> | command | 상태 | [계획서](경로) | [질의](경로) | 이미지링크 | [보고서](경로) |
 ```
 
-- `YYYY-MM-DD`: 작업 날짜 (ISO 형식, 10자리)
+- `YYYY-MM-DD<br><sub>HH:MM</sub>`: 작업 날짜와 시간 (2행 구조, HH:MM은 작업ID에서 추출)
 - `YYYYMMDD-HHMMSS`: 작업 ID (전체 워크플로우 키)
-- `제목`: 작업 제목
+- `제목<br><sub>요약 60자</sub>`: 작업 제목과 요약 (2행 구조, 요약은 계획서 작업 요약 또는 user_prompt.txt 첫 줄에서 60자 이내)
 - `command`: 실행 명령어 (implement, refactor, review 등)
-- `상태`: `완료` / `부분완료` / `실패`
-- `보고서`: 보고서 파일 링크 (`[보고서](상대경로)`) 또는 `-` (보고서 없음)
+- `상태`: `완료` / `부분완료` / `실패` / `진행중` / `중단`
+- `계획서`: 계획서 링크 (`[계획서](경로)`) 또는 `-` (계획서 없음)
+- `질의`: 질의 링크 (`[질의](경로)`) 또는 `-` (질의 없음)
+- `이미지`: 이미지 링크 (`[이미지(N)](경로)`) 또는 `-` (이미지 없음). N은 이미지 파일 수
+- `보고서`: 보고서 파일 링크 (`[보고서](경로)`) 또는 `-` (보고서 없음)
 
 ### 갱신 방법
 
@@ -323,21 +326,28 @@ Edit 도구로 마커 아래에 행을 추가합니다:
 
 ```
 old_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-new_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->\n| <YYYY-MM-DD> | <YYYYMMDD-HHMMSS> | <제목> | <command> | <상태> | <보고서링크> |"
+new_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->\n| <날짜2행> | <YYYYMMDD-HHMMSS> | <제목2행> | <command> | <상태> | <계획서링크> | <질의링크> | <이미지링크> | <보고서링크> |"
 ```
 
-- `<보고서링크>`: `[보고서](<workDir에서 .workflow/ 접두사를 제거한 경로>/report.md)` 형식 (history.md가 .workflow/ 안에 있으므로 상대 경로 기준으로 .workflow/ 제거 필요) 또는 보고서가 없으면 `-`
+- `<날짜2행>`: `YYYY-MM-DD<br><sub>HH:MM</sub>` (작업ID에서 추출, 예: `2026-02-11<br><sub>04:14</sub>`)
+- `<제목2행>`: `제목<br><sub>요약 60자</sub>` (계획서 작업 요약 또는 user_prompt.txt 첫 줄에서 60자 이내로 절단)
+- `<계획서링크>`: `[계획서](../<workDir>/plan.md)` 또는 `-`
+- `<질의링크>`: `[질의](../<workDir>/user_prompt.txt)` 또는 `-`
+- `<이미지링크>`: `[이미지(N)](../<workDir>/files/)` 또는 `-` (N은 files/ 내 이미지 파일 수)
+- `<보고서링크>`: `[보고서](../<workDir>/report.md)` 또는 `-`
+- 모든 경로는 history.md가 `.prompt/` 안에 있으므로 `../` 접두사 필요
 
 ### history.md 초기 생성
 
 파일이 없으면 아래 템플릿으로 생성 후 행을 추가합니다:
 
 ```markdown
-# 작업 히스토리
+# 워크플로우 실행 이력
 
-| 날짜 | 작업ID | 제목 | 명령어 | 상태 | 보고서 |
-|------|--------|------|--------|------|--------|
 <!-- 새 항목은 이 줄 아래에 추가됩니다 -->
+
+| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |
+|------|--------|------------|--------|------|--------|------|--------|--------|
 ```
 
 ### 실패 처리
@@ -368,7 +378,7 @@ history.md 갱신 실패 시 경고만 출력하고 계속 진행합니다. 워�
 5. **파일 저장**: Edit 도구로 변경사항 저장
 
 **주의사항:**
-- 작업 이력은 `.workflow/history.md`에서 관리 (CLAUDE.md에 기록하지 않음)
+- 작업 이력은 `.prompt/history.md`에서 관리 (CLAUDE.md에 기록하지 않음)
 - 갱신 불필요 시 반드시 스킵하여 불필요한 파일 변경을 방지
 
 ---

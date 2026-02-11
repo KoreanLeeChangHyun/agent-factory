@@ -644,8 +644,8 @@ do_step_5() {
         created=$((created + 1))
     fi
 
-    if [ ! -f "$PROJECT_ROOT/.workflow/history.md" ]; then
-        cat > "$PROJECT_ROOT/.workflow/history.md" << 'HIST_EOF'
+    if [ ! -f "$PROJECT_ROOT/.prompt/history.md" ]; then
+        cat > "$PROJECT_ROOT/.prompt/history.md" << 'HIST_EOF'
 # Work History
 
 | Date | WorkID | Title | Command | Status | Report |

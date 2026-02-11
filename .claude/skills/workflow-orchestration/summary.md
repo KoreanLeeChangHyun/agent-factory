@@ -113,7 +113,7 @@ Illegal transitions blocked by system guard. Emergency: `WORKFLOW_SKIP_GUARD=1`.
 
 1. On `cc:*` command, call init immediately (MUST NOT check user input first)
 2. After INIT, check mode to determine branch: prompt -> direct work, no-plan -> skip PLAN, full -> PLAN
-3. PLAN approval via AskUserQuestion (Approve / Revise / Cancel) -- full mode only, PLAN banner MUST complete before AskUserQuestion
+3. PLAN approval via AskUserQuestion (승인 / 수정 / 중지) -- full mode only, PLAN banner MUST complete before AskUserQuestion
 4. WORK: only worker/reporter calls; MUST NOT re-call planner/init or reverse phase
 5. no-plan WORK: single worker call (taskId: W01, no planPath, no Phase 0)
 6. prompt mode: main agent direct work after INIT, then INIT->COMPLETED + unregister + DONE banner

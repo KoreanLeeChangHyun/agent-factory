@@ -46,7 +46,8 @@
 #
 # 출력:
 #   성공: [OK] state updated: <상세>
-#   실패: [WARN] <에러 내용> (stderr)
+#   FSM 가드 차단 시: [ERROR] <에러 내용> (stderr)
+#   기타 실패: [WARN] <에러 내용> (stderr)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -513,13 +514,13 @@ try:
         workflow_mode = data.get('mode', 'full').lower()
         # from_phase와 현재 phase 일치 검증
         if from_phase != current_phase:
-            print(f'[WARN] FSM guard: from_phase mismatch. expected={current_phase}, got={from_phase}. transition blocked.', file=sys.stderr)
+            print(f'[ERROR] FSM guard: from_phase mismatch. expected={current_phase}, got={from_phase}. transition blocked.', file=sys.stderr)
             sys.exit(0)
         # 모드별 합법 전이 검증 (fsm-transitions.json 참조)
         allowed_table = fsm_data.get('modes', {}).get(workflow_mode, fsm_data.get('modes', {}).get('full', {}))
         allowed = allowed_table.get(from_phase, [])
         if to_phase not in allowed:
-            print(f'[WARN] FSM guard: illegal transition {from_phase}->{to_phase}. allowed={allowed}. transition blocked.', file=sys.stderr)
+            print(f'[ERROR] FSM guard: illegal transition {from_phase}->{to_phase}. allowed={allowed}. transition blocked.', file=sys.stderr)
             sys.exit(0)
 
     # KST 시간 생성

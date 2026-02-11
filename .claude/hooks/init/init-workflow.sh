@@ -29,6 +29,7 @@
 #   1. .prompt/prompt.txt 읽기
 #   2. 작업 디렉터리 생성 (mkdir -p)
 #   3. prompt.txt -> <workDir>/user_prompt.txt 복사
+#   3-B. .uploads/ 파일 -> <workDir>/files/ 복사 + .uploads/ 클리어
 #   4. .prompt/prompt.txt 클리어 (파일 유지, 내용 비움)
 #   5. .prompt/querys.txt에 날짜+제목 append
 #   6. <workDir>/.context.json 생성
@@ -100,6 +101,17 @@ if [ -n "$PROMPT_CONTENT" ]; then
 else
     # 빈 파일 생성
     touch "$ABS_WORK_DIR/user_prompt.txt"
+fi
+
+# --- Step 3-B: .uploads/ 파일 처리 ---
+
+if [ -d "$PROJECT_ROOT/.uploads" ] && [ "$(ls -A "$PROJECT_ROOT/.uploads" 2>/dev/null)" ]; then
+    # workDir/files/ 디렉터리 생성 및 파일 복사
+    mkdir -p "$ABS_WORK_DIR/files"
+    cp -r "$PROJECT_ROOT/.uploads/"* "$ABS_WORK_DIR/files/"
+
+    # .uploads/ 내용 클리어 (디렉터리 자체는 유지)
+    rm -rf "$PROJECT_ROOT/.uploads/"*
 fi
 
 # --- Step 4: prompt.txt 클리어 ---

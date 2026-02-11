@@ -49,7 +49,7 @@ wf-project setup-dirs
 ```json
 {
   "created_dirs": [".workflow", ".prompt"],
-  "created_files": [".prompt/prompt.txt", ".prompt/memo.txt", ".prompt/querys.txt", ".claude.env", ".workflow/history.md", ".workflow/registry.json"],
+  "created_files": [".prompt/prompt.txt", ".prompt/memo.txt", ".prompt/querys.txt", ".claude.env", ".prompt/history.md", ".workflow/registry.json"],
   "all_dirs_exist": true,
   "all_files_exist": true
 }
@@ -111,7 +111,7 @@ wf-project verify
 [초기화 결과]
 [v] CLAUDE.md 빈 템플릿 생성 완료 (또는 "기존 파일 유지")
 [v] 디렉토리 생성: .workflow, .prompt
-[v] 파일 생성: .prompt/prompt.txt, .prompt/memo.txt, .prompt/querys.txt, .claude.env, .workflow/history.md, .workflow/registry.json
+[v] 파일 생성: .prompt/prompt.txt, .prompt/memo.txt, .prompt/querys.txt, .claude.env, .prompt/history.md, .workflow/registry.json
 [v] 워크플로우 alias 설정 완료 (zshrc + ~/.local/bin wrapper)
 [v] wrapper 스크립트 검증 완료: Workflow, wf-state, wf-init, wf-claude, wf-project, wf-clear, wf-sync, wf-git-config, wf-slack, wf-info, wf-commands
 [v] .gitignore 업데이트 완료

@@ -6,9 +6,7 @@
 .claude.env
 .claude.env*
 
-.uoloads/
-
-.filebase/
+.uploads/
 
 # Prompts and temps
 .prompt/
@@ -17,6 +15,3 @@ CLAUDE.md
 
 # Python cache
 __pycache__/
-
-# Uploads
-uploads/

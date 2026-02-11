@@ -5,6 +5,9 @@
 # 입력: stdin으로 JSON (tool_name, tool_input)
 # 출력: 불법 전이 시 hookSpecificOutput JSON, 통과 시 빈 출력
 #
+# deny 시 exit 2 + JSON hookSpecificOutput 병행 출력
+#   exit 2는 stderr 피드백 경로 제공, JSON deny는 공식 차단 시그널
+#
 # 모드별 합법 전이 테이블:
 #   .claude/hooks/workflow/fsm-transitions.json 참조 (단일 정의 소스)
 #   full, no-plan, prompt 3개 모드의 전이 규칙이 JSON으로 정의됨
@@ -179,7 +182,7 @@ result = {
 }
 print(json.dumps(result, ensure_ascii=False))
 " 2>/dev/null
-    exit 0
+    exit 2
 fi
 
 # fsm-transitions.json에서 모드별 합법 전이 테이블 로드 및 검증
@@ -246,7 +249,7 @@ result = {
 }
 print(json.dumps(result, ensure_ascii=False))
 " 2>/dev/null
-    exit 0
+    exit 2
 fi
 
 # 합법 전이 - 통과 (빈 출력)

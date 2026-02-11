@@ -122,10 +122,11 @@ if stale_count > 0:
     print(f'[INFO] zombie cleanup: {stale_count} workflow(s) marked as STALE', file=sys.stderr)
 " 2>&1 || true
 
-# --- Step 2: registry.json 좀비 정리 (STALE/COMPLETED/FAILED/CANCELLED 제거 + 고아 정리) ---
+# --- Step 2: registry.json 좀비 정리 (STALE/COMPLETED/FAILED/CANCELLED 제거 + REPORT 잔류 + 고아 정리) ---
 
 WF_PROJECT_ROOT="$PROJECT_ROOT" python3 -c "
 import json, os, sys, tempfile, shutil
+from datetime import datetime, timezone, timedelta
 
 project_root = os.environ['WF_PROJECT_ROOT']
 registry_file = os.path.join(project_root, '.workflow', 'registry.json')
@@ -142,13 +143,19 @@ except (json.JSONDecodeError, IOError):
 if not isinstance(registry, dict) or not registry:
     sys.exit(0)
 
+kst = timezone(timedelta(hours=9))
+now = datetime.now(kst)
+report_ttl_hours = 1  # REPORT 단계 잔류 TTL
+
 remove_phases = {'STALE', 'COMPLETED', 'FAILED', 'CANCELLED'}
-keys_to_remove = []
+keys_to_remove = []   # (key, reason) 튜플 리스트
+removed_keys = []     # 키만 보관 (삭제용)
 
 for key, entry in registry.items():
     work_dir = entry.get('workDir', '')
     if not work_dir:
-        keys_to_remove.append(key)
+        keys_to_remove.append((key, 'empty workDir'))
+        removed_keys.append(key)
         continue
 
     # status.json 존재 여부 확인 (고아 정리)
@@ -160,24 +167,54 @@ for key, entry in registry.items():
     status_file = os.path.join(abs_work_dir, 'status.json')
 
     if not os.path.isfile(status_file):
-        keys_to_remove.append(key)
+        keys_to_remove.append((key, 'orphan (no status.json)'))
+        removed_keys.append(key)
         continue
 
-    # status.json의 phase 확인 (STALE/COMPLETED/FAILED/CANCELLED 제거)
+    # status.json 읽기
     try:
         with open(status_file, 'r', encoding='utf-8') as f:
             status_data = json.load(f)
-        phase = status_data.get('phase', '')
-        if phase in remove_phases:
-            keys_to_remove.append(key)
     except (json.JSONDecodeError, IOError):
         # 읽기 실패한 엔트리는 고아로 간주
-        keys_to_remove.append(key)
+        keys_to_remove.append((key, 'orphan (status.json unreadable)'))
+        removed_keys.append(key)
+        continue
+
+    status_phase = status_data.get('phase', '')
+    registry_phase = entry.get('phase', '')
+
+    # 1. 기존 정리: STALE/COMPLETED/FAILED/CANCELLED (status.json 기준)
+    if status_phase in remove_phases:
+        keys_to_remove.append((key, f'status phase={status_phase}'))
+        removed_keys.append(key)
+        continue
+
+    # 2. registry와 status.json의 phase 불일치 정리
+    #    status.json이 COMPLETED인데 registry에는 REPORT로 남은 경우 등
+    if status_phase in remove_phases and registry_phase not in remove_phases:
+        keys_to_remove.append((key, f'phase mismatch: registry={registry_phase}, status={status_phase}'))
+        removed_keys.append(key)
+        continue
+
+    # 3. REPORT 단계 잔류 엔트리 정리 (1시간 초과)
+    if registry_phase == 'REPORT' or status_phase == 'REPORT':
+        time_str = status_data.get('updated_at') or status_data.get('created_at', '')
+        if time_str:
+            try:
+                updated = datetime.fromisoformat(time_str)
+                elapsed = now - updated
+                if elapsed.total_seconds() > report_ttl_hours * 3600:
+                    keys_to_remove.append((key, f'REPORT stale ({elapsed.total_seconds()/3600:.1f}h elapsed)'))
+                    removed_keys.append(key)
+                    continue
+            except (ValueError, TypeError):
+                pass
 
 if not keys_to_remove:
     sys.exit(0)
 
-for key in keys_to_remove:
+for key in removed_keys:
     del registry[key]
 
 # 원자적 쓰기
@@ -188,7 +225,9 @@ try:
         json.dump(registry, f, ensure_ascii=False, indent=2)
         f.write('\n')
     shutil.move(tmp_path, registry_file)
-    print(f'[INFO] registry cleanup: {len(keys_to_remove)} entry(ies) removed ({\", \".join(keys_to_remove)})', file=sys.stderr)
+    # 사유 포함 로그 출력
+    details = '; '.join(f'{k}({r})' for k, r in keys_to_remove)
+    print(f'[INFO] registry cleanup: {len(keys_to_remove)} entry(ies) removed [{details}]', file=sys.stderr)
 except Exception:
     if os.path.exists(tmp_path):
         os.unlink(tmp_path)

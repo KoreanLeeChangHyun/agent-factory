@@ -664,16 +664,17 @@ cmd_setup_dirs() {
     fi
   done
 
-  # .workflow/history.md 초기 템플릿 생성
-  if [ ! -f ".workflow/history.md" ]; then
-    cat > ".workflow/history.md" << 'HISTORY_TMPL'
-# 작업 히스토리
+  # .prompt/history.md 초기 템플릿 생성
+  if [ ! -f ".prompt/history.md" ]; then
+    cat > ".prompt/history.md" << 'HISTORY_TMPL'
+# 워크플로우 실행 이력
 
-| 날짜 | 작업ID | 제목 | 명령어 | 상태 | 보고서 |
-|------|--------|------|--------|------|--------|
 <!-- 새 항목은 이 줄 아래에 추가됩니다 -->
+
+| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |
+|------|--------|------------|--------|------|--------|------|--------|--------|
 HISTORY_TMPL
-    created_files+=(".workflow/history.md")
+    created_files+=(".prompt/history.md")
   fi
 
   # .workflow/registry.json 초기값 생성
@@ -684,7 +685,7 @@ HISTORY_TMPL
 
   # JSON 결과 출력
   local all_dirs=(".workflow" ".prompt")
-  local all_files=(".prompt/prompt.txt" ".prompt/memo.txt" ".prompt/querys.txt" ".claude.env" ".workflow/history.md" ".workflow/registry.json")
+  local all_files=(".prompt/prompt.txt" ".prompt/memo.txt" ".prompt/querys.txt" ".claude.env" ".prompt/history.md" ".workflow/registry.json")
 
   python3 -c '
 import json, sys
@@ -832,7 +833,7 @@ cmd_setup_wf_alias() {
   content=$(cat "$zshrc")
 
   # 대상 alias 정의 (bash 3.2 호환: 연관 배열 대신 일반 배열 사용)
-  local alias_names=("Workflow" "wf-state" "wf-init" "wf-claude" "wf-project" "wf-clear" "wf-sync" "wf-git-config" "wf-slack" "wf-info" "wf-commands")
+  local alias_names=("Workflow" "wf-state" "wf-init" "wf-claude" "wf-project" "wf-clear" "wf-registry" "wf-sync" "wf-git-config" "wf-slack" "wf-info" "wf-commands" "wf-history")
   local alias_cmds=(
     "bash .claude/hooks/workflow/banner.sh"
     "bash .claude/hooks/workflow/update-state.sh"
@@ -840,11 +841,13 @@ cmd_setup_wf_alias() {
     "bash .claude/hooks/init/init-claude.sh"
     "bash .claude/hooks/init/init-project.sh"
     "bash .claude/hooks/init/init-clear.sh"
+    "bash .claude/hooks/workflow/registry.sh"
     "bash .claude/hooks/init/init-sync.sh"
     "bash .claude/hooks/init/git-config.sh"
     "bash .claude/hooks/slack/slack.sh"
     "bash .claude/hooks/workflow/info.sh"
     "bash .claude/hooks/workflow/commands.sh"
+    "bash .claude/hooks/workflow/history-sync.sh"
   )
 
   local added=()
@@ -951,7 +954,7 @@ cmd_verify() {
   done
 
   # 파일 확인
-  for f in .prompt/prompt.txt .prompt/memo.txt .prompt/querys.txt .claude.env; do
+  for f in .prompt/prompt.txt .prompt/memo.txt .prompt/querys.txt .prompt/history.md .claude.env; do
     if [ -f "$f" ]; then
       checks+=("{\"item\":\"$f\",\"status\":\"PASS\",\"detail\":\"파일 존재\"}")
     else
@@ -961,7 +964,7 @@ cmd_verify() {
   done
 
   # .workflow 파일 확인
-  for f in .workflow/history.md .workflow/registry.json; do
+  for f in .workflow/registry.json; do
     if [ -f "$f" ]; then
       checks+=("{\"item\":\"$f\",\"status\":\"PASS\",\"detail\":\"파일 존재\"}")
     else
@@ -974,7 +977,7 @@ cmd_verify() {
   if [ -f "$HOME/.zshrc" ]; then
     local zshrc_content
     zshrc_content=$(cat "$HOME/.zshrc")
-    for alias_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands; do
+    for alias_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history; do
       if echo "$zshrc_content" | grep -q "^alias ${alias_name}="; then
         checks+=("{\"item\":\"~/.zshrc(${alias_name})\",\"status\":\"PASS\",\"detail\":\"alias 존재\"}")
       else
@@ -989,7 +992,7 @@ cmd_verify() {
 
   # 워크플로우 wrapper 스크립트 확인 (~/.local/bin/)
   local bin_dir="$HOME/.local/bin"
-  for cmd_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands; do
+  for cmd_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history; do
     local wrapper_path="${bin_dir}/${cmd_name}"
     if [ -x "$wrapper_path" ]; then
       checks+=("{\"item\":\"~/.local/bin/${cmd_name}\",\"status\":\"PASS\",\"detail\":\"wrapper 스크립트 존재 (실행 가능)\"}")

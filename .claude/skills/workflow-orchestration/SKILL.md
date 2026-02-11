@@ -37,7 +37,7 @@ Main agent controls workflow sequencing and agent dispatch only.
 ```
 Main Agent (Orchestrator)
     |
-    +-- 0. INIT: init agent -> returns: request, workDir, workId, date, title, workName, rationale
+    +-- 0. INIT: init agent -> returns: request, workDir, workId, registryKey, date, title, workName, rationale
     +-- 1. PLAN: planner agent (workflow-plan skill) -> returns: plan path
     +-- 2. WORK: worker agent (workflow-work skill) -> returns: work log path
     +-- 3. REPORT: reporter agent (workflow-report skill) -> returns: report path
@@ -145,7 +145,7 @@ Task(subagent_type="init", prompt="command: <command>, mode: <mode>")
 
 > `mode` is determined before calling init: `prompt` for cc:prompt, `no-plan` if `-np` flag detected in `$ARGUMENTS`, `full` (default) otherwise.
 
-Returns: `request`, `workDir`, `workId`, `date`, `title`, `workName`, `rationale` -- all MUST be retained for subsequent phases.
+Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workName`, `rationale` -- all MUST be retained for subsequent phases.
 
 ### Mode Branching (After INIT)
 
@@ -163,7 +163,7 @@ If command is `prompt`, the orchestrator performs direct work after INIT:
 2. Perform work directly (using Read, Write, Edit, Grep, Glob, Bash, etc.)
 3. On completion:
    ```bash
-   # Update history.md (append 1 row)
+   # Update .prompt/history.md (append 1 row)
    # Transition status: INIT -> COMPLETED
    wf-state status <registryKey> INIT COMPLETED
    # Unregister from global registry
@@ -202,7 +202,7 @@ If `$ARGUMENTS` contains `-np` flag, the orchestrator skips PLAN and proceeds di
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options: Approve / Revise / Cancel). See step1-plan.md for full approval flow, .context.json handling, Slack notification, CANCELLED processing, and Binding Contract rule.
+After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options: 승인 / 수정 / 중지). See step1-plan.md for full approval flow, .context.json handling, Slack notification, CANCELLED processing, and Binding Contract rule.
 
 ### Step 2: WORK
 

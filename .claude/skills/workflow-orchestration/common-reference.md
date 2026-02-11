@@ -49,12 +49,13 @@
 - 작업 상세는 `.workflow/` 파일에 기록, 메인에는 아래 형식만 반환 (코드/로그/테이블 MUST NOT)
 - 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 후 즉시 종료 (추가 텍스트 절대 금지)
 
-### init Return Format (7 lines)
+### init Return Format (8 lines)
 
 ```
 request: <user_prompt.txt의 첫 50자>
 workDir: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>
 workId: <workId>
+registryKey: <YYYYMMDD>-<HHMMSS>
 date: <YYYYMMDD>
 title: <제목>
 workName: <작업이름>
@@ -89,6 +90,8 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 
 > Agents(4): Task 호출, Skills(5): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
 
+> **registryKey 구성 규칙 (REQUIRED):** `registryKey = date + "-" + workId` (예: `20260211-035949`). init 반환값의 `registryKey` 필드를 직접 사용하거나, `date`와 `workId`를 결합하여 구성. 6자리 `workId` 단독 사용은 FSM 전이 실패의 원인이 됨.
+
 ## State Update Methods
 
 `wf-state <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
@@ -101,9 +104,9 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 | register / unregister | `<registryKey>` | 전역 레지스트리 등록/해제 |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 
-- registryKey: `YYYYMMDD-HHMMSS` 형식. 전체 workDir 경로도 하위 호환.
+- registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`
-- 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행
+- 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행 (단, 오케스트레이터의 Phase 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
 
 ## State Management (status.json)
 
@@ -123,7 +126,7 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 
 불법 전이 시 시스템 가드가 차단. update-workflow-state.sh는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
-> 업데이트 방법은 "State Update Methods" 섹션 참조. 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행.
+> 업데이트 방법은 "State Update Methods" 섹션 참조. 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행. (단, 오케스트레이터의 Phase 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
 
 ## Error Handling
@@ -135,3 +138,4 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 | Independent task failure | 다른 독립 태스크는 계속 진행 |
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
+| wf-state deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청. 비차단 원칙은 sub-agent 내부에만 적용되며, 오케스트레이터의 Phase 전이 실패는 사용자 확인 필수. |

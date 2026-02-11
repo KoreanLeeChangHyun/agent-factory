@@ -153,13 +153,17 @@ cmd_execute() {
         done
     fi
 
-    # 2. .prompt 파일 삭제
+    # 2. .prompt 파일 삭제 (history.md 보존)
     echo ""
     echo "[.prompt/]"
     local prompt_dir="${PROJECT_ROOT}/.prompt"
     if [ -d "$prompt_dir" ] && [ -n "$(ls -A "$prompt_dir" 2>/dev/null)" ]; then
+        # history.md 임시 백업
+        [ -f "${prompt_dir}/history.md" ] && cp "${prompt_dir}/history.md" /tmp/_history_md_backup
         rm -rf "${prompt_dir:?}"/*
-        echo "  삭제 완료: .prompt/*"
+        # history.md 복원
+        [ -f /tmp/_history_md_backup ] && mv /tmp/_history_md_backup "${prompt_dir}/history.md"
+        echo "  삭제 완료: .prompt/* (history.md 보존)"
         deleted_count=$(( deleted_count + 1 ))
     else
         echo "  (비어있음, 스킵)"

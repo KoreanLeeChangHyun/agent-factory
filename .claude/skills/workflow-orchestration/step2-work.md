@@ -22,7 +22,7 @@
 
 **Detailed Guide:** workflow-work skill 참조
 
-> **Worker Internal Procedure (4 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 4단계를 수행합니다. 상세는 workflow-work skill 및 worker.md 참조.
+> **Worker Internal Procedure (5 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 선행 결과 읽기(종속 시) -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 5단계를 수행합니다. 종속 태스크(계획서의 종속성 컬럼에 선행 태스크 ID가 명시된 경우)에서는 2단계에서 선행 작업 내역 파일을 필수로 읽어 판단 근거와 What Didn't Work을 확인합니다. 상세는 workflow-work skill 및 worker.md 참조.
 
 ## No-Plan Mode Worker Call Pattern
 
@@ -107,6 +107,16 @@ Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, C 방�
 
 ## Phase 1~N: Task Execution
 
+### Phase 간 결과 공유 원칙
+
+현행 워크플로우는 **파일 시스템 기반 암묵적 공유** 방식을 사용합니다. 각 Worker는 작업 내역을 `<workDir>/work/WXX-*.md`에 기록하고, 후속 Phase의 종속 Worker가 해당 파일을 직접 탐색하여 읽습니다. 오케스트레이터는 선행 작업 내역 경로를 별도로 전달하지 않습니다.
+
+**Phase 2+ Worker의 선행 결과 참조:**
+- 종속 태스크(계획서 종속성 컬럼에 선행 태스크 ID가 명시된 경우)를 수행하는 Worker는 `<workDir>/work/` 디렉터리에서 선행 태스크의 작업 내역 파일을 **필수로 읽어야** 합니다
+- Worker는 `Glob("<workDir>/work/W01-*.md")` 패턴으로 선행 작업 내역 파일을 자율적으로 탐색합니다
+- 선행 작업의 판단 근거, What Didn't Work, 핵심 발견을 확인하여 불필요한 시행착오를 방지하고 일관성을 보장합니다
+- 종속성이 없는 독립 태스크(Phase 1 등)에서는 이 과정이 불필요합니다
+
 계획서의 Phase 순서대로 실행합니다. 각 Phase의 Worker 호출 **직전**에 Phase 서브배너를 출력합니다:
 
 ```bash
@@ -154,6 +164,12 @@ Task(subagent_type="explore", prompt="
 - **Parallel calls**: 여러 Explore 에이전트를 동시에 호출하여 파일 분배 가능
 - **Worker combination**: Explore(읽기) 결과를 수집한 후 Worker(쓰기)에 전달하는 파이프라인 구성 가능
 - **Plan compliance**: 계획서에 `서브에이전트: Explore`로 명시된 태스크만 Explore로 호출. 명시되지 않은 태스크는 Worker 사용
+
+## 선행 결과 공유 메커니즘
+
+오케스트레이터는 Worker 호출 시 선행 작업 내역 파일 경로를 별도로 전달하지 않습니다. Worker가 계획서의 종속성 정보와 `workDir` 경로를 기반으로 `<workDir>/work/` 디렉터리에서 선행 태스크의 작업 내역 파일을 자율적으로 탐색하되, **읽기 자체는 필수**입니다. 읽은 후 내용을 어떻게 반영할지는 Worker의 재량입니다.
+
+이 방식은 오케스트레이터의 프롬프트 크기를 일정하게 유지하면서도, 종속 태스크 간 비코드 작업 결과(판단 근거, What Didn't Work, 핵심 발견 등)의 전달을 보장합니다.
 
 ## Worker Return Value Processing (REQUIRED)
 

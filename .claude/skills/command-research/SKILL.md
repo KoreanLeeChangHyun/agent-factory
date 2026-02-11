@@ -69,7 +69,7 @@ description: "연구/조사 결과를 체계적인 리포트로 제공하는 스
 1. 핵심 키워드로 검색 시작
 2. 공식 문서, 신뢰할 수 있는 소스 우선
 3. 최신 정보 확인 (날짜 주의)
-4. 복수의 소스에서 교차 검증
+4. 복수의 소스에서 교차 검증 (상세: `references/cross-validation.md`)
 ```
 
 **코드베이스 탐색 가이드:**
@@ -82,6 +82,20 @@ description: "연구/조사 결과를 체계적인 리포트로 제공하는 스
 ```
 
 > **상세 가이드**: 교차 검증 워크플로우는 `references/cross-validation.md`를, 출처 신뢰도 평가 기준은 `references/source-evaluation.md`를 참조하세요.
+
+#### 출처 신뢰도 적용 가이드
+
+수집된 정보의 신뢰도를 5등급 체계로 평가하여, 핵심 결론의 근거 품질을 보장합니다.
+
+| 등급 | 소스 유형 | 신뢰도 | 예시 |
+|:----:|----------|:------:|------|
+| S | 공식 문서, 표준 규격 | 최고 | 프레임워크 공식 문서, RFC, W3C/ECMA 표준 |
+| A | 학술 논문, 기술 보고서 | 높음 | 피어 리뷰 논문, 기업 공식 기술 블로그 |
+| B | 전문가 기술 블로그 | 중간 | 검증된 전문가 블로그, InfoQ, ThoughtWorks |
+| C | 커뮤니티 콘텐츠 | 낮음 | Stack Overflow, Reddit, GitHub Discussions |
+| D | 비검증 콘텐츠 | 최저 | 출처 불명 블로그, AI 생성 의심 콘텐츠 |
+
+> **핵심 원칙**: 핵심 결론은 반드시 S-A 등급 소스에 근거해야 합니다. B-D 등급 소스는 보조 정보로만 활용합니다. 상세 평가 기준은 `references/source-evaluation.md`를 참조하세요.
 
 ### 4단계: 분석 및 정리
 
@@ -253,12 +267,15 @@ Sources:
 | 스킬 | 용도 | 경로 |
 |------|------|------|
 | deep-research | context:fork를 사용한 격리 환경에서 코드베이스 심층 탐색 | `.claude/skills/deep-research/SKILL.md` |
+| research-integrated | 웹 검색과 코드베이스 탐색을 단일 워크플로우로 통합한 복합 조사 | `.claude/skills/research-integrated/SKILL.md` |
+| research-parallel | 다중 에이전트 병렬 연구 (질문 분해 후 동시 조사) | `.claude/skills/research-parallel/SKILL.md` |
+| research-grounding | 출처 검증 및 신뢰도 자동 평가 (Google Search 그라운딩 기반) | `.claude/skills/research-grounding/SKILL.md` |
 
 ## 주의사항
 
 1. **출처 명시 필수**: 모든 정보에 대해 출처 기록
 2. **최신성 확인**: 정보의 작성 날짜 확인
-3. **교차 검증**: 중요 정보는 복수 소스에서 확인
+3. **교차 검증**: 중요 정보는 최소 3개 독립 소스에서 확인 (`references/cross-validation.md` 워크플로우 준수)
 4. **객관성 유지**: 개인적 의견보다 사실 기반 정보
 5. **문서 저장 필수**: 모든 연구 결과는 리포트로 저장
 6. **실용성 고려**: 실제 적용 가능한 인사이트 제공
