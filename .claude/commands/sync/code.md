@@ -68,5 +68,7 @@ wf-sync $ARGUMENTS
 | 명령어 | 설명 |
 |--------|------|
 | `/init:workflow` | 워크플로우 재초기화 (동기화 후 실행 권장) |
-| `/init:claude` | 사용자 환경 초기화 |
+| `/sync:history` | .workflow/ 작업 내역을 history.md에 동기화 |
+| `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
+| `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 |
 | `/git:config` | Git 설정 (인증 문제 시) |

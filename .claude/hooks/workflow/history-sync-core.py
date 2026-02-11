@@ -264,6 +264,7 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
     marker_idx = -1
     in_table = False
     table_header_seen = False
+    header_separator_seen = False
 
     for i, line in enumerate(lines):
         stripped = line.rstrip("\n")
@@ -282,7 +283,11 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
             continue
 
         if table_header_seen and stripped.startswith("|---"):
-            header_lines.append(line)
+            if not header_separator_seen:
+                # 테이블 헤더 직후 첫 구분선 -> 헤더의 일부
+                header_lines.append(line)
+                header_separator_seen = True
+            # 데이터 행 사이의 중간 구분선은 무시 (data_rows에 추가하지 않음)
             continue
 
         # 데이터 행
@@ -397,7 +402,8 @@ def cmd_sync(args: argparse.Namespace) -> int:
             final_rows.append(row)
 
     # 신규 행을 날짜순으로 삽입 (전체를 합친 후 재정렬)
-    all_rows = final_rows + new_rows
+    # 중간 구분선 행을 필터링하여 최종 출력에 포함시키지 않음
+    all_rows = [r for r in (final_rows + new_rows) if not r.strip().startswith("|---")]
 
     # 작업ID(역순)로 정렬
     def sort_key(row):

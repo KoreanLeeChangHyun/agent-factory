@@ -139,3 +139,4 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
 | wf-state deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청. 비차단 원칙은 sub-agent 내부에만 적용되며, 오케스트레이터의 Phase 전이 실패는 사용자 확인 필수. |
+| Workflow cancel/abort (중단/취소) | 반드시 `wf-state unregister <registryKey>`를 호출하여 레지스트리에서 해제. CANCELLED 상태 전이(`wf-state status`)만으로는 레지스트리 잔류 발생. status 전이와 unregister는 순차 실행 필수. |

@@ -4,7 +4,7 @@ description: 프로젝트 초기 구조 설정 (디렉토리, .gitignore, 빈 CL
 # Initialize Project
 
 > **실행 시점:** 새 프로젝트에서 **1회만** 실행하세요. 매 세션마다 실행하는 것은 `/init:workflow`입니다.
-> 코드베이스 분석 후 상세한 CLAUDE.md를 생성하려면 `/init:context`를 사용하세요.
+> 코드베이스 분석 후 상세한 CLAUDE.md를 생성하려면 `/sync:context`를 사용하세요.
 
 프로젝트 초기 구조를 설정합니다.
 
@@ -117,7 +117,7 @@ wf-project verify
 [v] .gitignore 업데이트 완료
 
 다음 단계:
-- /init:context 명령어로 코드베이스를 분석하고 CLAUDE.md를 갱신하세요
+- /sync:context 명령어로 코드베이스를 분석하고 CLAUDE.md를 갱신하세요
 - /init:workflow 명령어로 워크플로우를 로드하세요
 ```
 
@@ -149,7 +149,7 @@ wf-project verify
 
 | 명령어 | 설명 |
 |--------|------|
-| `/init:context` | 코드베이스 분석 후 CLAUDE.md 갱신 (수시 실행 가능) |
+| `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 (수시 실행 가능) |
 | `/init:claude` | 사용자 환경 초기화 (alias, StatusLine, Slack, Git global) |
 | `/init:workflow` | 워크플로우 로드 (CLAUDE.md, orchestration 스킬) |
 | `/init:clear` | 작업 내역 클리어 |

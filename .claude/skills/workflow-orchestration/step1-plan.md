@@ -151,20 +151,27 @@ AskUserQuestion(
 
 사용자가 "중지"를 선택하면 오케스트레이터가 `update-workflow-state.sh`를 호출하여 CANCELLED 상태를 기록합니다.
 
-**Update Method (1 Tool Call):**
+**Update Method (2 Tool Calls, sequential):**
 ```bash
+# 1. CANCELLED 상태로 전이
 Bash("wf-state status <registryKey> PLAN CANCELLED")
+# 2. 레지스트리에서 해제 (MUST: 누락 시 잔류 엔트리 발생)
+Bash("wf-state unregister <registryKey>")
 ```
 
 **Example:**
 ```bash
 Bash("wf-state status 20260205-213000 PLAN CANCELLED")
+Bash("wf-state unregister 20260205-213000")
 ```
+
+> **REQUIRED:** `unregister` 호출을 생략하면 CANCELLED 상태의 엔트리가 레지스트리에 잔류합니다. status 전이와 unregister는 반드시 순차 실행하세요.
 
 **Script behavior:**
 - `<workDir>/status.json`의 `phase`를 `"CANCELLED"`로 변경
 - `transitions` 배열에 `{"from": "PLAN", "to": "CANCELLED", "at": "<현재시간ISO>"}` 추가
 - `updated_at`을 현재 시간(ISO 8601, KST)으로 갱신
+- 전역 레지스트리(`.workflow/registry.json`)에서 해당 워크플로우 엔트리 제거
 
 **Result example:**
 ```json

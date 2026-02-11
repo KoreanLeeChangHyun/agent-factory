@@ -161,16 +161,17 @@ After INIT returns, check the command to determine mode:
 If command is `prompt`, the orchestrator performs direct work after INIT:
 1. Read `<workDir>/user_prompt.txt` for the user request
 2. Perform work directly (using Read, Write, Edit, Grep, Glob, Bash, etc.)
-3. On completion:
+3. On completion (MUST execute steps 3a-3d sequentially, skipping none):
    ```bash
-   # Update .prompt/history.md (append 1 row)
-   # Transition status: INIT -> COMPLETED
+   # 3a. Update .prompt/history.md (append 1 row)
+   # 3b. Transition status: INIT -> COMPLETED
    wf-state status <registryKey> INIT COMPLETED
-   # Unregister from global registry
+   # 3c. Unregister from global registry (MUST NOT skip: 누락 시 INIT phase 잔류 엔트리 발생)
    wf-state unregister <registryKey>
-   # DONE banner
+   # 3d. DONE banner
    Workflow <registryKey> DONE done
    ```
+   > **REQUIRED:** `wf-state status` (3b)와 `wf-state unregister` (3c)는 반드시 순차 실행. unregister 누락 시 INIT phase로 레지스트리에 잔류하여 `wf-registry clean`에서도 정리되지 않는 고아 엔트리가 됩니다.
 4. Terminate immediately after DONE banner
 
 **No-Plan Mode (Tier 2):**

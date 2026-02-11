@@ -71,9 +71,11 @@ TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"
 wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
 ```
 
+> **WARNING**: mode 인자를 생략하면 status.json이 mode: "full"로 생성되어 prompt/no-plan 모드의 FSM 전이가 차단됩니다. 입력받은 mode 값을 반드시 6번째 인자로 전달하세요.
+
 > **5번째 인자 `${CLAUDE_SESSION_ID}`**: Claude Code 내장 템플릿 변수로, 현재 세션 UUID가 자동 치환됩니다. 이 값은 `status.json`의 `linked_sessions` 필드에 기록되어 워크플로우 세션 추적에 사용됩니다.
 
-> **6번째 인자 `mode`**: 워크플로우 모드를 지정합니다. `full`(기본값), `no-plan`, `prompt` 중 하나입니다. 전달하지 않으면 `full`로 설정됩니다. 이 값은 `status.json`의 `mode` 필드에 기록되어 FSM 가드 및 오케스트레이션 분기에 사용됩니다.
+> **6번째 인자 `mode`** (필수: 입력받은 mode 값을 반드시 전달. 생략 시 full로 기본 설정되어 FSM 전이 오류 발생): 워크플로우 모드를 지정합니다. `full`(기본값), `no-plan`, `prompt` 중 하나입니다. 전달하지 않으면 `full`로 설정됩니다. 이 값은 `status.json`의 `mode` 필드에 기록되어 FSM 가드 및 오케스트레이션 분기에 사용됩니다.
 
 - `workDir`은 `.workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>` 형식 (중첩 구조)
 
@@ -156,3 +158,4 @@ init은 전처리만 수행합니다. 다음 행위는 절대 금지:
 2. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
 3. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
 4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리
+5. **mode 파라미터 전달 필수**: wf-init 호출 시 입력받은 mode 값(full/no-plan/prompt)을 6번째 인자로 반드시 전달한다. 누락 시 status.json의 mode가 full로 설정되어 FSM 전이가 차단된다.

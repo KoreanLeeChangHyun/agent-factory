@@ -46,6 +46,7 @@ cmd_help() {
     echo "  - status.json이 없는 고아 엔트리"
     echo "  - registry phase와 status.json phase가 불일치하는 엔트리"
     echo "  - REPORT phase인데 1시간 이상 경과한 잔류 엔트리"
+    echo "  - INIT / PLAN phase인데 1시간 이상 경과한 잔류 엔트리 (중단된 워크플로우)"
     echo ""
     echo -e "${DIM}참고: .workflow/ 하위 디렉토리 물리 파일 삭제는 wf-clear를 사용하세요${RESET}"
 }
@@ -272,6 +273,19 @@ for key, entry in registry.items():
                 elapsed = now - updated
                 if elapsed.total_seconds() > report_ttl_hours * 3600:
                     targets.append((key, f'REPORT stale ({elapsed.total_seconds()/3600:.1f}h)'))
+                    continue
+            except (ValueError, TypeError):
+                pass
+
+    # INIT/PLAN 잔류 1시간 초과 (중단된 워크플로우 정리)
+    if status_phase in ('INIT', 'PLAN'):
+        time_str = status_data.get('updated_at') or status_data.get('created_at', '')
+        if time_str:
+            try:
+                updated = datetime.fromisoformat(time_str)
+                elapsed = now - updated
+                if elapsed.total_seconds() > report_ttl_hours * 3600:
+                    targets.append((key, f'{status_phase} stale ({elapsed.total_seconds()/3600:.1f}h)'))
                     continue
             except (ValueError, TypeError):
                 pass

@@ -1,5 +1,5 @@
 ---
-description: 간단한 파일 변경. 워크플로우 없이 메인 에이전트가 직접 작업을 수행합니다.
+description: 간단한 질의응답 및 파일 변경. 워크플로우 없이 메인 에이전트가 직접 작업을 수행합니다.
 ---
 
 # Prompt (Tier 3)
@@ -38,19 +38,10 @@ flowchart TD
 ## 특징
 
 - **워크플로우 없음**: PLAN, WORK, REPORT 단계를 거치지 않음
-- **파일 변경 가능**: Write/Edit 도구로 코드 수정 가능 (cc:query와의 차이점)
+- **파일 변경 가능**: Write/Edit 도구로 코드 수정 가능
+- **질의응답 지원**: 간단한 질문에 즉시 답변 (기존 cc:query 역할 통합)
 - **히스토리 기록**: history.md에 1행 기록
 - **경량화**: 서브에이전트 호출 최소화 (init만 사용)
-
-## vs cc:query
-
-| 항목 | cc:query | cc:prompt |
-|------|----------|-----------|
-| 워크플로우 | 없음 | 없음 (히스토리만) |
-| INIT 수행 | O | O |
-| 파일 변경 | 불가 (읽기 전용) | 가능 (Write/Edit 포함) |
-| 히스토리 기록 | 없음 | 있음 |
-| 적합한 용도 | 간단한 질의 | 간단한 수정, 즉석 변경 |
 
 ## vs cc:implement -np
 
@@ -73,6 +64,8 @@ flowchart TD
 cc:prompt "로그인 함수에 null 체크 추가"
 cc:prompt "README.md에 설치 방법 섹션 추가"
 cc:prompt "config.ts에서 타임아웃 값 30초로 변경"
+cc:prompt "TypeScript에서 interface와 type의 차이점"
+cc:prompt "이 프로젝트에서 사용하는 인증 방식"
 ```
 
 ## 주의사항
@@ -80,3 +73,4 @@ cc:prompt "config.ts에서 타임아웃 값 30초로 변경"
 1. **복잡한 작업은 cc:implement 사용**: 다중 파일 변경, 아키텍처 변경 등은 전체 워크플로우 권장
 2. **보고서 필요시 cc:implement -np 사용**: 작업 보고서가 필요하면 no-plan 모드 사용
 3. **코드 리뷰는 cc:review 사용**: 리뷰가 필요하면 전용 커맨드 사용
+4. **심층 조사는 cc:research 사용**: 비교 분석, 심층 연구가 필요하면 cc:research 권장

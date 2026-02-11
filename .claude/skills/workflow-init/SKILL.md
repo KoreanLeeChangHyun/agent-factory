@@ -108,7 +108,7 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 | 3 | workId | 작업 ID (HHMMSS) |
 | 4 | title | 작업 제목 |
 | 5 | claude_session_id | (선택적) `${CLAUDE_SESSION_ID}` - 현재 세션 UUID 자동 치환 |
-| 6 | mode | (선택적) 워크플로우 모드: `full`(기본값), `no-plan`, `prompt` |
+| 6 | mode | 워크플로우 모드: `full`(기본값), `no-plan`, `prompt`. **누락 시 full 기본값으로 인해 prompt/no-plan 모드 FSM 전이 차단 버그 발생. 반드시 전달 필수.** |
 
 **스크립트가 수행하는 작업:**
 1. `.prompt/prompt.txt` 읽기

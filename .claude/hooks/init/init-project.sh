@@ -977,7 +977,7 @@ cmd_verify() {
   if [ -f "$HOME/.zshrc" ]; then
     local zshrc_content
     zshrc_content=$(cat "$HOME/.zshrc")
-    for alias_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history; do
+    for alias_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history wf-registry; do
       if echo "$zshrc_content" | grep -q "^alias ${alias_name}="; then
         checks+=("{\"item\":\"~/.zshrc(${alias_name})\",\"status\":\"PASS\",\"detail\":\"alias 존재\"}")
       else
@@ -992,7 +992,7 @@ cmd_verify() {
 
   # 워크플로우 wrapper 스크립트 확인 (~/.local/bin/)
   local bin_dir="$HOME/.local/bin"
-  for cmd_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history; do
+  for cmd_name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands wf-history wf-registry; do
     local wrapper_path="${bin_dir}/${cmd_name}"
     if [ -x "$wrapper_path" ]; then
       checks+=("{\"item\":\"~/.local/bin/${cmd_name}\",\"status\":\"PASS\",\"detail\":\"wrapper 스크립트 존재 (실행 가능)\"}")
