@@ -64,6 +64,17 @@ TITLE="$4"
 CLAUDE_SID="${5:-}"
 MODE="${6:-full}"
 
+# 5번째 인자가 mode 값이고 6번째 인자가 비어있으면 인자 보정
+# (에이전트가 session_id를 생략하고 mode를 5번째에 넣는 버그 방어)
+if [ -z "${6:-}" ]; then
+    case "$CLAUDE_SID" in
+        full|no-plan|prompt)
+            MODE="$CLAUDE_SID"
+            CLAUDE_SID=""
+            ;;
+    esac
+fi
+
 # mode 값 검증 (허용: full, no-plan, prompt)
 case "$MODE" in
     full|no-plan|prompt) ;;

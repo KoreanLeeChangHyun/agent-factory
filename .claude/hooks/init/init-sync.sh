@@ -166,6 +166,11 @@ echo "[보존] .claude.env"
 if [ "$DRY_RUN" = true ]; then
     echo "[모드] dry-run (미리보기만 수행)"
 fi
+# --- 7. 버전 출력 ---
+VERSION_FILE="$PROJECT_ROOT/.claude/.version"
+if [ -f "$VERSION_FILE" ]; then
+    echo "[VERSION] v$(cat "$VERSION_FILE")"
+fi
 echo ""
 echo "다음 단계:"
 echo "  - /init:workflow 로 워크플로우를 재초기화하세요"
