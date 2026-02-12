@@ -213,16 +213,16 @@ get_color() {
     esac
 }
 
-# 프로그레스 바: 현재 단계까지 채움, 나머지 빈칸
+# 프로그레스 바: 현재 단계까지 채움, 나머지 빈칸 (5단계: INIT/PLAN/WORK/REPORT/DONE)
 get_progress() {
     local phase="$1"
     case "$phase" in
-        INIT)   echo "${RED}${BOLD}■${RESET}${GRAY}□□□${RESET}" ;;
-        PLAN)   echo "${RED}■${BLUE}${BOLD}■${RESET}${GRAY}□□${RESET}" ;;
-        WORK)   echo "${RED}■${BLUE}■${GREEN}${BOLD}■${RESET}${GRAY}□${RESET}" ;;
-        REPORT) echo "${RED}■${BLUE}■${GREEN}■${PURPLE}${BOLD}■${RESET}" ;;
-        DONE)   echo "${RED}■${BLUE}■${GREEN}■${PURPLE}■${RESET}" ;;
-        *)      echo "${GRAY}□□□□${RESET}" ;;
+        INIT)   echo "${RED}${BOLD}■${RESET}${GRAY}□□□□${RESET}" ;;
+        PLAN)   echo "${RED}■${BLUE}${BOLD}■${RESET}${GRAY}□□□${RESET}" ;;
+        WORK)   echo "${RED}■${BLUE}■${GREEN}${BOLD}■${RESET}${GRAY}□□${RESET}" ;;
+        REPORT) echo "${RED}■${BLUE}■${GREEN}■${PURPLE}${BOLD}■${RESET}${GRAY}□${RESET}" ;;
+        DONE)   echo "${RED}■${BLUE}■${GREEN}■${PURPLE}■${YELLOW}${BOLD}■${RESET}" ;;
+        *)      echo "${GRAY}□□□□□${RESET}" ;;
     esac
 }
 
