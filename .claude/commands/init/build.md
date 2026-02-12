@@ -1,21 +1,10 @@
 ---
-description: 프로젝트 빌드 및 실행 스크립트(build.sh, run.sh)를 생성합니다.
+description: 프로젝트 빌드 및 실행 스크립트(build.sh, run.sh)를 생성합니다. (프로젝트당 1회)
 ---
 
 # Build Scripts
 
-## -np 플래그 (No-Plan 모드)
-
-`$ARGUMENTS`에 `-np` 플래그가 포함된 경우 Tier 2 (no-plan) 모드로 실행합니다.
-
-- `-np` 감지 시: init 에이전트 호출에 `mode: no-plan` 전달
-- `-np` 미감지 시: 기존과 동일 (mode: full)
-
-```
-# -np 플래그 감지 예시
-cc:build -np "빌드 스크립트 생성"
-→ Task(subagent_type="init", prompt="command: build\nmode: no-plan")
-```
+> **실행 시점:** 프로젝트 빌드/실행 스크립트가 필요할 때 사용합니다. (프로젝트당 1회)
 
 ## 프레임워크 감지
 
@@ -149,3 +138,10 @@ chmod 700 build.sh run.sh
 - 기존 build.sh/run.sh 파일이 있으면 AskUserQuestion 도구로 백업/덮어쓰기 확인
 - Windows 환경은 지원하지 않음 (bash 스크립트)
 - 실행 전 build.sh를 먼저 실행해야 함
+
+## 관련 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/init:framework` | 프레임워크별 프로젝트 초기화 |
+| `/init:project` | 프로젝트 초기 구조 설정 |

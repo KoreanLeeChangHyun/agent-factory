@@ -36,7 +36,16 @@ reporter가 실패로 반환된 경우:
 wf-state status <registryKey> REPORT FAILED
 ```
 
-### 2. 레지스트리 해제
+### 2. 사용량 확정
+
+reporter가 성공적으로 반환된 경우, status 갱신 후 usage를 확정합니다:
+```bash
+wf-state usage-finalize <registryKey>
+```
+
+> 실패 시 경고만 출력하고 워크플로우를 블로킹하지 않습니다 (비차단 원칙).
+
+### 3. 레지스트리 해제
 
 status.json 완료 처리 후, 전역 레지스트리에서 워크플로우를 해제합니다:
 ```bash
@@ -49,7 +58,7 @@ wf-state unregister <registryKey>
 
 > **REPORT 완료 후 DONE banner**: 오케스트레이터가 status.json 완료 처리 + 레지스트리 해제를 수행한 후, DONE 배너를 호출하여 워크플로우 최종 종료를 사용자에게 알립니다.
 >
-> **DONE Banner Call Order**: REPORT 완료 배너 -> 오케스트레이터가 status.json 완료 처리 -> 오케스트레이터가 레지스트리 해제 -> DONE 배너 호출 -> **즉시 종료 (추가 텍스트 출력 절대 금지)**
+> **DONE Banner Call Order**: REPORT 완료 배너 -> 오케스트레이터가 status.json 완료 처리 -> usage-finalize -> 오케스트레이터가 레지스트리 해제 -> DONE 배너 호출 -> **즉시 종료 (추가 텍스트 출력 절대 금지)**
 > ```bash
 > Workflow <registryKey> DONE done
 > ```

@@ -13,7 +13,7 @@
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
 | **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. |
-| **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, refactor, review, build, analyze, architect, framework, research, prompt 중 하나. |
+| **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
 | **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, reporter 4개와 orchestrator(메인 에이전트)로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, reporter가 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |

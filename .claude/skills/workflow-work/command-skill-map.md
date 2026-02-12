@@ -10,13 +10,9 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
 | implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증. 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
-| refactor | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증 |
 | review | command-requesting-code-review | 리뷰 체크리스트 적용 |
-| build | command-verification-before-completion | 빌드 스크립트 검증 |
-| analyze | analyze-* (키워드 판단) | 분석 유형별 스킬 |
-| architect | command-architect, command-mermaid-diagrams | 아키텍처 설계, 다이어그램 생성 |
-| framework | framework-* (프레임워크명 판단) | 프레임워크별 스킬 |
-| research | command-research, deep-research, research-integrated | 웹 조사(command-research) + 코드 탐색(deep-research) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드 |
+| research | command-research, deep-research, research-integrated | 웹 조사(command-research) + 코드 탐색(deep-research) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드 |
+| strategy | command-strategy | 다중 워크플로우 전략 수립, 로드맵 생성 |
 
 ## 키워드 기반 추가 스킬 로드
 
@@ -27,6 +23,7 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 테스트, test, TDD | tdd-guard-hook |
 | PR, pull request | pr-summary, github-integration |
 | 다이어그램, diagram, UML | command-mermaid-diagrams |
+| 아키텍처, architecture, 설계, architect, 시스템 구조, 컴포넌트 | command-architect, command-mermaid-diagrams |
 | 프론트엔드, frontend, UI | frontend-design |
 | 웹앱, webapp | webapp-testing |
 | docx, 문서, document, 워드 | document-skills/docx |
@@ -48,6 +45,8 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 접근성, a11y, accessibility, WCAG | command-web-design-guidelines |
 | 디버깅, debugging, 버그, bug, 에러 추적, error tracking, 근본 원인 | command-systematic-debugging |
 | React, Next.js, 리액트, react 성능, react performance | command-react-best-practices |
+| 전략, strategy, 로드맵, roadmap, 마일스톤, milestone, 다중 워크플로우 | command-strategy |
+| 요구사항 분석, SRS, 코드베이스 분석, 코드 구조, 데이터베이스 분석, DB 분석, 데이터 분석, EDA | analyze-* (키워드 판단) |
 
 ## 확장 가이드
 

@@ -9,6 +9,9 @@
 #   update-workflow-state.sh register <workDir> [title] [command]
 #   update-workflow-state.sh unregister <workDir>
 #   update-workflow-state.sh link-session <workDir> <sessionId>
+#   update-workflow-state.sh usage-pending <workDir> <agent_id> <task_id>
+#   update-workflow-state.sh usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
+#   update-workflow-state.sh usage-finalize <workDir>
 #
 # workDir 형식 (3가지, 하위 호환):
 #   단축 형식: YYYYMMDD-HHMMSS (registry.json에서 자동 해석)
@@ -30,6 +33,12 @@
 #   unregister   - 전역 레지스트리에서 워크플로우 해제 (mkdir 잠금)
 #   link-session - <workDir>/status.json의 linked_sessions 배열에 세션 ID를 중복 없이 추가
 #                  빈 sessionId는 무시 (안전장치). 실패 시 경고만 출력, 워크플로우 비차단
+#   usage-pending - <workDir>/usage.json의 _pending_workers 객체에 agent_id->taskId 매핑 등록
+#                  Worker 호출 직전에 오케스트레이터가 실행. mkdir 잠금으로 원자적 기록
+#   usage        - <workDir>/usage.json의 agents 객체에 에이전트별 토큰 데이터 기록
+#                  Hook(usage-tracker.sh)에서 호출. Worker는 agents.workers.<taskId> 하위에 기록
+#   usage-finalize - 워크플로우 완료 시 totals 계산, effective_tokens 산출, .prompt/usage.md 행 추가
+#                  오케스트레이터가 reporter 반환 후 unregister 전에 호출
 #
 # 레지스트리 스키마 (.workflow/registry.json):
 #   {
@@ -576,6 +585,377 @@ except Exception as e:
     sync_registry_phase "$to_phase"
 }
 
+# usage-pending 함수: usage.json의 _pending_workers에 agent_id-taskId 매핑 등록
+# Worker 호출 직전에 오케스트레이터가 실행하여, SubagentStop Hook에서 taskId를 조회할 수 있게 한다
+usage_pending() {
+    local agent_id="$1"
+    local task_id="$2"
+
+    if [ -z "$agent_id" ] || [ -z "$task_id" ]; then
+        echo "[WARN] usage-pending: agent_id, task_id 인자가 필요합니다." >&2
+        return
+    fi
+
+    local usage_file="$ABS_WORK_DIR/usage.json"
+    local usage_lock="${usage_file}.lockdir"
+
+    # mkdir 잠금 획득 (usage.json 전용)
+    local max_wait=5 waited=0
+    while ! mkdir "$usage_lock" 2>/dev/null; do
+        waited=$((waited + 1))
+        if [ "$waited" -ge "$max_wait" ]; then
+            echo "[WARN] usage-pending: 잠금 획득 실패" >&2
+            return
+        fi
+        sleep 1
+    done
+
+    WF_USAGE_FILE="$usage_file" WF_AGENT_ID="$agent_id" WF_TASK_ID="$task_id" python3 -c "
+import json, sys, os, tempfile, shutil
+
+usage_file = os.environ['WF_USAGE_FILE']
+agent_id = os.environ['WF_AGENT_ID']
+task_id = os.environ['WF_TASK_ID']
+
+# usage.json 읽기 (없으면 초기 구조 생성)
+if os.path.exists(usage_file):
+    try:
+        with open(usage_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        data = {}
+else:
+    data = {}
+
+# _pending_workers 초기화
+if '_pending_workers' not in data or not isinstance(data.get('_pending_workers'), dict):
+    data['_pending_workers'] = {}
+
+data['_pending_workers'][agent_id] = task_id
+
+# 원자적 쓰기
+dir_name = os.path.dirname(usage_file)
+os.makedirs(dir_name, exist_ok=True)
+fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    shutil.move(tmp_path, usage_file)
+except Exception:
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+    raise
+
+print(f'usage-pending -> {agent_id}={task_id}')
+" 2>&1
+
+    rmdir "$usage_lock" 2>/dev/null
+}
+
+# usage 함수: usage.json의 agents 객체에 에이전트별 토큰 데이터 기록
+# Hook(usage-tracker.sh) 또는 오케스트레이터에서 호출
+usage_record() {
+    local agent_name="$1"
+    local input_tokens="$2"
+    local output_tokens="$3"
+    local cache_creation="${4:-0}"
+    local cache_read="${5:-0}"
+    local task_id="${6:-}"
+
+    if [ -z "$agent_name" ] || [ -z "$input_tokens" ] || [ -z "$output_tokens" ]; then
+        echo "[WARN] usage: agent_name, input_tokens, output_tokens 인자가 필요합니다." >&2
+        return
+    fi
+
+    local usage_file="$ABS_WORK_DIR/usage.json"
+    local usage_lock="${usage_file}.lockdir"
+
+    # mkdir 잠금 획득
+    local max_wait=5 waited=0
+    while ! mkdir "$usage_lock" 2>/dev/null; do
+        waited=$((waited + 1))
+        if [ "$waited" -ge "$max_wait" ]; then
+            echo "[WARN] usage: 잠금 획득 실패" >&2
+            return
+        fi
+        sleep 1
+    done
+
+    WF_USAGE_FILE="$usage_file" WF_AGENT="$agent_name" WF_INPUT="$input_tokens" WF_OUTPUT="$output_tokens" WF_CACHE_CREATE="$cache_creation" WF_CACHE_READ="$cache_read" WF_TASK_ID="$task_id" python3 -c "
+import json, sys, os, tempfile, shutil
+
+usage_file = os.environ['WF_USAGE_FILE']
+agent_name = os.environ['WF_AGENT']
+input_tokens = int(os.environ['WF_INPUT'])
+output_tokens = int(os.environ['WF_OUTPUT'])
+cache_creation = int(os.environ.get('WF_CACHE_CREATE', '0'))
+cache_read = int(os.environ.get('WF_CACHE_READ', '0'))
+task_id = os.environ.get('WF_TASK_ID', '')
+
+# usage.json 읽기
+if os.path.exists(usage_file):
+    try:
+        with open(usage_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        data = {}
+else:
+    data = {}
+
+if 'agents' not in data or not isinstance(data.get('agents'), dict):
+    data['agents'] = {}
+
+token_data = {
+    'input_tokens': input_tokens,
+    'output_tokens': output_tokens,
+    'cache_creation_tokens': cache_creation,
+    'cache_read_tokens': cache_read,
+    'method': 'subagent_transcript'
+}
+
+# Worker인 경우 agents.workers.<taskId> 하위에 기록
+if agent_name == 'worker' and task_id:
+    if 'workers' not in data['agents'] or not isinstance(data['agents'].get('workers'), dict):
+        data['agents']['workers'] = {}
+    data['agents']['workers'][task_id] = token_data
+    label = f'workers.{task_id}'
+else:
+    data['agents'][agent_name] = token_data
+    label = agent_name
+
+# 원자적 쓰기
+dir_name = os.path.dirname(usage_file)
+os.makedirs(dir_name, exist_ok=True)
+fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    shutil.move(tmp_path, usage_file)
+except Exception:
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+    raise
+
+print(f'usage -> {label}: in={input_tokens} out={output_tokens} cc={cache_creation} cr={cache_read}')
+" 2>&1
+
+    rmdir "$usage_lock" 2>/dev/null
+}
+
+# usage-finalize 함수: totals 계산, effective_tokens 산출, .prompt/usage.md 행 추가
+usage_finalize() {
+    local usage_file="$ABS_WORK_DIR/usage.json"
+
+    if [ ! -f "$usage_file" ]; then
+        echo "[WARN] usage-finalize: usage.json not found: $usage_file" >&2
+        return
+    fi
+
+    WF_USAGE_FILE="$usage_file" WF_REGISTRY="$GLOBAL_REGISTRY" WF_ABS_WORK_DIR="$ABS_WORK_DIR" WF_PROJECT_ROOT="$PROJECT_ROOT" python3 -c "
+import json, sys, os, tempfile, shutil, re
+
+usage_file = os.environ['WF_USAGE_FILE']
+registry_file = os.environ['WF_REGISTRY']
+work_dir = os.environ['WF_ABS_WORK_DIR']
+project_root = os.environ['WF_PROJECT_ROOT']
+
+def calc_effective(d):
+    \"\"\"effective_tokens = input + output*5 + cache_creation*1.25 + cache_read*0.1\"\"\"
+    return (
+        d.get('input_tokens', 0)
+        + d.get('output_tokens', 0) * 5
+        + d.get('cache_creation_tokens', 0) * 1.25
+        + d.get('cache_read_tokens', 0) * 0.1
+    )
+
+def sum_tokens(agents_list):
+    \"\"\"에이전트 목록의 토큰 합산\"\"\"
+    totals = {'input_tokens': 0, 'output_tokens': 0, 'cache_creation_tokens': 0, 'cache_read_tokens': 0}
+    for a in agents_list:
+        for k in totals:
+            totals[k] += a.get(k, 0)
+    return totals
+
+def to_k(n):
+    if n == 0:
+        return '-'
+    return f'{int(n) // 1000}k'
+
+def to_k_precise(n):
+    if n == 0:
+        return '-'
+    return f'{n / 1000:.1f}k'
+
+try:
+    # 1. usage.json 읽기
+    with open(usage_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    agents = data.get('agents', {})
+
+    # 2. 모든 에이전트 토큰 데이터 수집
+    all_agents = []
+    for key in ['orchestrator', 'init', 'planner', 'reporter']:
+        if key in agents and isinstance(agents[key], dict):
+            all_agents.append(agents[key])
+
+    workers = agents.get('workers', {})
+    if isinstance(workers, dict):
+        for w in workers.values():
+            if isinstance(w, dict):
+                all_agents.append(w)
+
+    # 3. totals 계산
+    totals = sum_tokens(all_agents)
+    totals['effective_tokens'] = calc_effective(totals)
+    data['totals'] = totals
+
+    # 4. usage.json 원자적 갱신
+    dir_name = os.path.dirname(usage_file)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write('\n')
+        shutil.move(tmp_path, usage_file)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+    # 5. registryKey 추출 (workDir에서)
+    ts_pattern = re.compile(r'^\d{8}-\d{6}$')
+    basename = os.path.basename(work_dir)
+    if ts_pattern.match(basename):
+        registry_key = basename
+    else:
+        grandparent = os.path.basename(os.path.dirname(os.path.dirname(work_dir)))
+        if ts_pattern.match(grandparent):
+            registry_key = grandparent
+        else:
+            parts = work_dir.replace(os.sep, '/').split('/')
+            registry_key = basename
+            for part in parts:
+                if ts_pattern.match(part):
+                    registry_key = part
+                    break
+
+    # 6. registry에서 메타데이터 조회
+    reg_title = ''
+    reg_command = ''
+    if os.path.exists(registry_file):
+        try:
+            with open(registry_file, 'r', encoding='utf-8') as f:
+                reg_data = json.load(f)
+            if registry_key in reg_data:
+                reg_title = reg_data[registry_key].get('title', '')
+                reg_command = reg_data[registry_key].get('command', '')
+        except Exception:
+            pass
+
+    # 제목 30자 절단
+    title = reg_title[:30] if reg_title else ''
+
+    # 날짜 추출: registryKey YYYYMMDD-HHMMSS -> MM-DD HH:MM
+    date_str = ''
+    if len(registry_key) >= 15:
+        try:
+            date_str = f'{registry_key[4:6]}-{registry_key[6:8]} {registry_key[9:11]}:{registry_key[11:13]}'
+        except Exception:
+            date_str = registry_key
+
+    # 7. 에이전트별 effective_tokens 계산
+    orch_eff = calc_effective(agents.get('orchestrator', {})) if 'orchestrator' in agents else 0
+    init_eff = calc_effective(agents.get('init', {})) if 'init' in agents else 0
+    plan_eff = calc_effective(agents.get('planner', {})) if 'planner' in agents else 0
+    work_eff = sum(calc_effective(w) for w in workers.values() if isinstance(w, dict)) if isinstance(workers, dict) else 0
+    report_eff = calc_effective(agents.get('reporter', {})) if 'reporter' in agents else 0
+    total_eff = orch_eff + init_eff + plan_eff + work_eff + report_eff
+    eff_weighted = totals.get('effective_tokens', total_eff)
+
+    # 8. usage.md 행 생성
+    row = (
+        f'| {date_str} '
+        f'| {registry_key} '
+        f'| {title} '
+        f'| {reg_command} '
+        f'| {to_k(orch_eff)} '
+        f'| {to_k(init_eff)} '
+        f'| {to_k(plan_eff)} '
+        f'| {to_k(work_eff)} '
+        f'| {to_k(report_eff)} '
+        f'| {to_k(total_eff)} '
+        f'| {to_k_precise(eff_weighted)} |'
+    )
+
+    # 9. .prompt/usage.md 갱신
+    usage_md = os.path.join(project_root, '.prompt', 'usage.md')
+    marker = '<!-- 새 항목은 이 줄 아래에 추가됩니다 -->'
+    header_line = '| 날짜 | 작업ID | 제목 | 명령어 | Orch | Init | Plan | Work | Report | 합계 | eff |'
+    separator_line = '|------|--------|------|--------|------|------|------|------|--------|------|-----|'
+
+    if os.path.exists(usage_md):
+        with open(usage_md, 'r', encoding='utf-8') as f:
+            content = f.read()
+    else:
+        content = ''
+
+    # 마커가 없으면 초기 구조 생성
+    if marker not in content:
+        content = f'# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n'
+
+    # separator 행 바로 아래에 데이터 행 삽입 (최신이 테이블 최상단)
+    # 패턴: ...separator\n -> ...separator\nrow\n
+    if separator_line in content:
+        # separator 행의 첫 번째 출현 위치 찾기 (마커 이후)
+        marker_pos = content.find(marker)
+        if marker_pos >= 0:
+            sep_pos = content.find(separator_line, marker_pos)
+            if sep_pos >= 0:
+                insert_pos = sep_pos + len(separator_line)
+                # separator 다음에 이미 줄바꿈이 있으면 그 뒤에 삽입
+                if insert_pos < len(content) and content[insert_pos] == '\n':
+                    insert_pos += 1
+                content = content[:insert_pos] + row + '\n' + content[insert_pos:]
+            else:
+                # separator를 찾지 못한 경우 마커 아래에 전체 테이블 구조 삽입
+                content = content.replace(
+                    marker,
+                    f'{marker}\n\n{header_line}\n{separator_line}\n{row}'
+                )
+        else:
+            content = content.replace(
+                marker,
+                f'{marker}\n\n{header_line}\n{separator_line}\n{row}'
+            )
+    else:
+        # separator가 없는 경우 (마커만 존재) 전체 테이블 구조 생성
+        content = content.replace(
+            marker,
+            f'{marker}\n\n{header_line}\n{separator_line}\n{row}'
+        )
+
+    # usage.md 원자적 쓰기
+    os.makedirs(os.path.dirname(usage_md), exist_ok=True)
+    fd2, tmp2 = tempfile.mkstemp(dir=os.path.dirname(usage_md), suffix='.tmp')
+    try:
+        with os.fdopen(fd2, 'w', encoding='utf-8') as f:
+            f.write(content)
+        shutil.move(tmp2, usage_md)
+    except Exception:
+        if os.path.exists(tmp2):
+            os.unlink(tmp2)
+        raise
+
+    print(f'usage-finalize -> totals: eff={to_k_precise(eff_weighted)}, usage.md updated')
+
+except Exception as e:
+    print(f'[WARN] usage-finalize failed: {e}', file=sys.stderr)
+" 2>&1
+}
+
 # 모드별 실행
 case "$MODE" in
     context)
@@ -634,8 +1014,39 @@ case "$MODE" in
         echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
+    usage-pending)
+        AGENT_ID="$3"
+        TASK_ID="$4"
+        if [ -z "$AGENT_ID" ] || [ -z "$TASK_ID" ]; then
+            echo "[WARN] usage-pending 모드: agent_id, task_id 인자가 필요합니다." >&2
+            exit 0
+        fi
+        RESULT=$(usage_pending "$AGENT_ID" "$TASK_ID")
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
+        ;;
+
+    usage)
+        AGENT_NAME="$3"
+        INPUT_TOKENS="$4"
+        OUTPUT_TOKENS="$5"
+        CACHE_CREATION="${6:-0}"
+        CACHE_READ="${7:-0}"
+        TASK_ID_ARG="${8:-}"
+        if [ -z "$AGENT_NAME" ] || [ -z "$INPUT_TOKENS" ] || [ -z "$OUTPUT_TOKENS" ]; then
+            echo "[WARN] usage 모드: agent_name, input_tokens, output_tokens 인자가 필요합니다." >&2
+            exit 0
+        fi
+        RESULT=$(usage_record "$AGENT_NAME" "$INPUT_TOKENS" "$OUTPUT_TOKENS" "$CACHE_CREATION" "$CACHE_READ" "$TASK_ID_ARG")
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
+        ;;
+
+    usage-finalize)
+        RESULT=$(usage_finalize)
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
+        ;;
+
     *)
-        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session 중 선택)" >&2
+        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session|usage-pending|usage|usage-finalize 중 선택)" >&2
         ;;
 esac
 

@@ -82,6 +82,18 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/subagent-stop/usage-tracker.sh",
+            "async": true,
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

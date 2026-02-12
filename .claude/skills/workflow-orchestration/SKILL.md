@@ -52,21 +52,17 @@ Core Principles:
 
 | Command | Description |
 |---------|------------|
-| implement | Feature implementation |
-| refactor | Code refactoring |
+| implement | Feature implementation, refactoring, architecture diagrams |
 | review | Code review |
-| build | Build script generation |
-| analyze | Requirements analysis |
-| architect | Architecture design and diagrams |
-| framework | Framework project initialization |
-| research | Research/investigation |
+| research | Research/investigation and internal asset analysis |
+| strategy | Multi-workflow strategy and roadmap generation |
 | prompt | Lightweight direct work (Tier 3, no workflow) |
 
 Commands follow their mode's phase order. Default is full (INIT -> PLAN -> WORK -> REPORT). `prompt` always runs in Tier 3 mode.
 
 ## Input Parameters
 
-- `command`: execution command (implement, refactor, review, etc.)
+- `command`: execution command (implement, review, research, strategy, prompt)
 
 > cc:* commands do NOT use `$ARGUMENTS` for prompt content. User requests are handled by init agent via `.prompt/prompt.txt`. Mode flags (`-np`) in `$ARGUMENTS` are allowed for mode selection only.
 

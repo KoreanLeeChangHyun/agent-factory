@@ -36,6 +36,10 @@ wf-state both <registryKey> worker INIT WORK
 ```
 
 **Single Worker Call (no planPath, no Phase 0):**
+```bash
+# usage-pending: Worker 호출 직전에 실행 (taskId를 agent_id 대체 키로 사용)
+wf-state usage-pending <registryKey> W01 W01
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
 ```
@@ -129,6 +133,13 @@ Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
 # Phase 서브배너 출력
 Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
+```bash
+# usage-pending: 각 Worker 호출 직전에 개별 실행 (taskId를 agent_id 대체 키로 사용)
+# Note: Claude Code에서 Task 호출 전 agent_id를 사전에 알 수 없으므로,
+#       taskId를 agent_id 위치에 전달하여 SubagentStop Hook의 폴백 키로 활용
+wf-state usage-pending <registryKey> W01 W01
+wf-state usage-pending <registryKey> W02 W02
+```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
@@ -138,6 +149,10 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 ```bash
 # Phase 서브배너 출력
 Workflow <registryKey> WORK-PHASE 2 "W04" sequential
+```
+```bash
+# usage-pending: Worker 호출 직전에 실행
+wf-state usage-pending <registryKey> W04 W04
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
@@ -188,3 +203,24 @@ Task(worker) 호출 후 반환값 처리 규칙:
 ```
 
 - **Output:** 작업 내역 경로
+
+## Usage Tracking: usage-pending 연동 (REQUIRED)
+
+> Worker 토큰 사용량을 taskId 단위로 정확히 추적하기 위해, **모든 Worker Task 호출 직전에** `usage-pending`을 실행해야 합니다.
+
+**목적:** SubagentStop Hook(`usage-tracker.sh`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId(W01, W02 등)에 귀속시킵니다. `usage-pending` 미호출 시 토큰이 agent_id(시스템 내부 ID)로 기록되어 추적 불가능해집니다.
+
+**호출 규칙:**
+
+| 상황 | 패턴 | 비고 |
+|------|------|------|
+| 병렬 Worker (Phase 1) | 각 Worker 호출 직전마다 개별 `usage-pending` | 모든 pending을 일괄 등록 후 병렬 Task 호출 |
+| 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
+| no-plan 단일 Worker | Worker 호출 직전에 `usage-pending` | taskId=W01 고정 |
+
+**agent_id 제약:** Claude Code에서 Task 호출 전에 `agent_id`를 사전에 알 수 없으므로, `taskId`를 `agent_id` 위치에 대체 키로 전달합니다. SubagentStop Hook은 실제 `agent_id`로 조회 실패 시 이 폴백 키를 사용합니다.
+
+```bash
+# 형식: wf-state usage-pending <registryKey> <agent_id_or_taskId> <taskId>
+wf-state usage-pending <registryKey> W01 W01
+```

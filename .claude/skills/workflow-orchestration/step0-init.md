@@ -43,6 +43,10 @@ init 반환값(request, workDir, workId, registryKey, date, title, workName, 근
 | `date`, `title`, `workName` | REPORT (Step 3), Prompt mode (history) | 경로 구성 시 사용 |
 | `근거` | Logging only | 로깅용 |
 
+### usage.json 초기화
+
+- **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage-tracker.sh가 서브에이전트별 토큰을 기록)
+
 ## Prompt Mode (Tier 3) Post-INIT Flow
 
 When command is `prompt`, the orchestrator does NOT proceed to PLAN/WORK/REPORT. Instead:

@@ -1,21 +1,12 @@
 ---
-description: 특정 프레임워크로 프로젝트를 초기화합니다. 프레임워크별 베스트 프랙티스와 구조를 적용합니다.
+description: 특정 프레임워크로 프로젝트를 초기화합니다. 프레임워크별 베스트 프랙티스와 구조를 적용합니다. (프로젝트당 1회)
 ---
 
-# Framework
+# Initialize Framework
 
-## -np 플래그 (No-Plan 모드)
+> **실행 시점:** 새 프로젝트에서 프레임워크 초기화 시 사용합니다. (프로젝트당 1회)
 
-`$ARGUMENTS`에 `-np` 플래그가 포함된 경우 Tier 2 (no-plan) 모드로 실행합니다.
-
-- `-np` 감지 시: init 에이전트 호출에 `mode: no-plan` 전달
-- `-np` 미감지 시: 기존과 동일 (mode: full)
-
-```
-# -np 플래그 감지 예시
-cc:framework -np "fastapi 프로젝트"
-→ Task(subagent_type="init", prompt="command: framework\nmode: no-plan")
-```
+프레임워크 프로젝트를 초기화합니다. 사용자가 지정한 프레임워크에 맞는 프로젝트 구조, 설정 파일, 베스트 프랙티스를 적용합니다.
 
 ## 지원 프레임워크
 
@@ -30,12 +21,12 @@ cc:framework -np "fastapi 프로젝트"
 프레임워크에 따라 적절한 스킬을 로드합니다:
 
 ```
-fastapi → command-framework-fastapi 스킬
-django  → framework-django 스킬 (미구현, 향후 생성 예정)
-react   → command-framework-react 스킬
+fastapi -> command-framework-fastapi 스킬
+django  -> framework-django 스킬 (미구현, 향후 생성 예정)
+react   -> command-framework-react 스킬
 ```
 
-**주의**: Django는 현재 전용 스킬이 없습니다. `cc:framework django` 실행 시 framework-django 스킬이 필요하며, 미구현 상태임을 사용자에게 안내합니다.
+**주의**: Django는 현재 전용 스킬이 없습니다. `init:framework django` 실행 시 framework-django 스킬이 필요하며, 미구현 상태임을 사용자에게 안내합니다.
 
 ## 실행 방식
 
@@ -47,8 +38,8 @@ react   → command-framework-react 스킬
 
 ```
 입력: "fastapi myproject"
-→ framework: fastapi
-→ project_name: myproject (optional)
+-> framework: fastapi
+-> project_name: myproject (optional)
 ```
 
 ### Step 2: 스킬 로드 및 실행
@@ -71,7 +62,6 @@ react   → command-framework-react 스킬
 **프로젝트명**: myproject
 
 ### 생성된 구조
-```
 myproject/
 ├── src/
 │   ├── __init__.py
@@ -81,7 +71,6 @@ myproject/
 ├── tests/
 ├── requirements/
 └── README.md
-```
 
 ### 다음 단계
 1. `cd myproject`
@@ -93,3 +82,23 @@ myproject/
 
 - `command-framework-fastapi` - FastAPI 프로젝트 구조 및 베스트 프랙티스
 - `command-framework-react` - React 프로젝트 구조 및 베스트 프랙티스
+
+---
+
+## 오류 처리
+
+| 오류 상황 | 대응 |
+|----------|------|
+| 지원하지 않는 프레임워크 지정 | 지원 프레임워크 목록 안내 |
+| 스킬 파일 미존재 (django 등) | 미구현 상태 안내, 수동 설정 가이드 제공 |
+| 프로젝트 디렉토리 이미 존재 | 덮어쓰기 여부 확인 |
+
+---
+
+## 관련 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/init:project` | 프로젝트 기본 구조 초기화 |
+| `/init:build` | 빌드/실행 스크립트 생성 |
+| `/init:workflow` | 워크플로우 로드 |
