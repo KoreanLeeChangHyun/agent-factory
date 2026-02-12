@@ -14,7 +14,7 @@
 |-------------|----------|------|
 | **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
-| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, reporter 4개와 orchestrator(메인 에이전트)로 구성. |
+| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, reporter, end 5개와 orchestrator(메인 에이전트)로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, reporter가 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
 | **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 메인 에이전트. Application Service 역할. |
@@ -78,17 +78,22 @@ workName: <작업이름>
 변경 파일: N개
 ```
 
-### reporter Return Format (3 lines)
+### reporter Return Format (2 lines)
 
 ```
 상태: 완료 | 실패
 보고서: <보고서 파일 경로>
-CLAUDE.md: 갱신완료 | 스킵 | 실패
+```
+
+### end Return Format (1 line)
+
+```
+상태: 완료 | 실패
 ```
 
 ## Call Method Rules
 
-> Agents(4): Task 호출, Skills(5): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
+> Agents(5): Task 호출, Skills(5): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
 
 > **registryKey 구성 규칙 (REQUIRED):** `registryKey = date + "-" + workId` (예: `20260211-035949`). init 반환값의 `registryKey` 필드를 직접 사용하거나, `date`와 `workId`를 결합하여 구성. 6자리 `workId` 단독 사용은 FSM 전이 실패의 원인이 됨.
 
@@ -105,7 +110,7 @@ CLAUDE.md: 갱신완료 | 스킵 | 실패
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
-- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`
+- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`, END=`end`
 - 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행 (단, 오케스트레이터의 Phase 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
 
 ## State Management (status.json)

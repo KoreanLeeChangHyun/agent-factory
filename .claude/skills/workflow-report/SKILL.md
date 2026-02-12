@@ -272,8 +272,7 @@ flowchart TD
     B --> C[보고서 작성]
     C --> D[파일 저장]
     D --> E[summary.txt 생성]
-    E --> F[history.md 갱신]
-    F --> G[경로 출력]
+    E --> G[경로 출력]
 ```
 
 1. **작업 내역 로드** (필수): `{workDir}/work/`에서 로드
@@ -281,77 +280,15 @@ flowchart TD
 3. **보고서 작성**: 템플릿에 따라 작성
 4. **저장**: `{workDir}/report.md`에 저장 (workDir은 오케스트레이터로부터 전달받은 확정 경로)
 5. **summary.txt 생성**: 최종 작업 2줄 요약을 `{workDir}/summary.txt`에 저장
-6. **history.md 갱신**: `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
-7. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
+6. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
 
-> **Note**: reporter 반환 후, 오케스트레이터가 status.json 완료 처리(`wf-state status <registryKey> REPORT COMPLETED`) 및 레지스트리 해제(`wf-state unregister <registryKey>`)를 수행합니다.
+> **Note**: reporter 반환 후, end 에이전트가 status.json 완료 처리(`wf-state status <registryKey> REPORT COMPLETED`) 및 레지스트리 해제(`wf-state unregister <registryKey>`)를 수행합니다.
 
 > **Slack 완료 알림**: DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다. reporter는 Slack 호출을 수행하지 않습니다.
 
 **Git 커밋**: 워크플로우 완료 후 `/git:commit` 명령어로 별도 실행 (report 스킬 범위 외)
 
-## history.md 갱신 (필수)
-
-보고서 작성 완료 후, `.prompt/history.md`에 작업 이력을 추가합니다.
-
-### 대상 파일
-
-`.prompt/history.md` (프로젝트 루트 기준)
-
-### 갱신 내용
-
-마크다운 테이블의 마커 아래에 행을 추가합니다.
-
-**행 형식:**
-```
-| YYYY-MM-DD<br><sub>HH:MM</sub> | YYYYMMDD-HHMMSS | 제목<br><sub>요약 60자</sub> | command | 상태 | [계획서](경로) | [질의](경로) | 이미지링크 | [보고서](경로) |
-```
-
-- `YYYY-MM-DD<br><sub>HH:MM</sub>`: 작업 날짜와 시간 (2행 구조, HH:MM은 작업ID에서 추출)
-- `YYYYMMDD-HHMMSS`: 작업 ID (전체 워크플로우 키)
-- `제목<br><sub>요약 60자</sub>`: 작업 제목과 요약 (2행 구조, 요약은 계획서 작업 요약 또는 user_prompt.txt 첫 줄에서 60자 이내)
-- `command`: 실행 명령어 (implement, refactor, review 등)
-- `상태`: `완료` / `부분완료` / `실패` / `진행중` / `중단`
-- `계획서`: 계획서 링크 (`[계획서](경로)`) 또는 `-` (계획서 없음)
-- `질의`: 질의 링크 (`[질의](경로)`) 또는 `-` (질의 없음)
-- `이미지`: 이미지 링크 (`[이미지(N)](경로)`) 또는 `-` (이미지 없음). N은 이미지 파일 수
-- `보고서`: 보고서 파일 링크 (`[보고서](경로)`) 또는 `-` (보고서 없음)
-
-### 갱신 방법
-
-Edit 도구로 마커 아래에 행을 추가합니다:
-
-```
-old_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-new_string: "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->\n| <날짜2행> | <YYYYMMDD-HHMMSS> | <제목2행> | <command> | <상태> | <계획서링크> | <질의링크> | <이미지링크> | <보고서링크> |"
-```
-
-- `<날짜2행>`: `YYYY-MM-DD<br><sub>HH:MM</sub>` (작업ID에서 추출, 예: `2026-02-11<br><sub>04:14</sub>`)
-- `<제목2행>`: `제목<br><sub>요약 60자</sub>` (계획서 작업 요약 또는 user_prompt.txt 첫 줄에서 60자 이내로 절단)
-- `<계획서링크>`: `[계획서](../<workDir>/plan.md)` 또는 `-`
-- `<질의링크>`: `[질의](../<workDir>/user_prompt.txt)` 또는 `-`
-- `<이미지링크>`: `[이미지(N)](../<workDir>/files/)` 또는 `-` (N은 files/ 내 이미지 파일 수)
-- `<보고서링크>`: `[보고서](../<workDir>/report.md)` 또는 `-`
-- 모든 경로는 history.md가 `.prompt/` 안에 있으므로 `../` 접두사 필요
-
-> **주의: 구분선 삽입 금지** -- Edit 도구로 마커 아래에 데이터 행을 추가할 때, `|------|...|` 형태의 구분선 행을 데이터 행 사이에 삽입하지 마십시오. 구분선(`|------|--------|...|`)은 테이블 헤더 바로 다음에 1번만 존재해야 합니다. 데이터 행 사이에 구분선이 삽입되면 파싱 오류와 렌더링 오류가 발생합니다.
-
-### history.md 초기 생성
-
-파일이 없으면 아래 템플릿으로 생성 후 행을 추가합니다:
-
-```markdown
-# 워크플로우 실행 이력
-
-<!-- 새 항목은 이 줄 아래에 추가됩니다 -->
-
-| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |
-|------|--------|------------|--------|------|--------|------|--------|--------|
-```
-
-### 실패 처리
-
-history.md 갱신 실패 시 경고만 출력하고 계속 진행합니다. 워크플로우를 중단시키지 않습니다.
+> **Note**: history.md 갱신은 end 에이전트가 담당합니다. 상세 절차는 end.md를 참조하세요.
 
 ---
 
@@ -366,7 +303,7 @@ history.md 갱신 실패 시 경고만 출력하고 계속 진행합니다. 워�
 
 ---
 
-> **Note**: status.json 완료 처리(REPORT->COMPLETED/FAILED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후 오케스트레이터가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`를 참조하세요.
+> **Note**: status.json 완료 처리(REPORT->COMPLETED/FAILED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후, end 에이전트가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`를 참조하세요.
 
 ---
 
@@ -396,6 +333,5 @@ history.md 갱신 실패 시 경고만 출력하고 계속 진행합니다. 워�
 | 파일 쓰기 실패 | 권한 확인 후 재시도, 3회 실패 시 사용자에게 보고 |
 | 필수 정보 누락 | 부모 에이전트에게 에러 보고 (필요 시 부모가 AskUserQuestion으로 사용자에게 재확인) |
 | 예상치 못한 에러 | 에러 내용 기록 후 사용자에게 보고 |
-| history.md 갱신 실패 | 경고 출력 후 계속 진행, 워크플로우 정상 완료 처리 |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
