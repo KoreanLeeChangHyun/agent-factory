@@ -1,20 +1,20 @@
 ---
 name: workflow-report
-description: "작업 완료 후 결과 보고서를 생성하고, history.md를 갱신하며, 완료 알림을 전송하는 스킬. 사용 시점: (1) /report 명령어로 명시적 호출, (2) 작업 완료 후 결과 정리 요청 시, (3) 보고서, 리포트, report 키워드 포함 요청 시. 마크다운(.md), CSV, 엑셀(.xlsx) 등 다양한 형식으로 출력하며, 다이어그램 스킬과 연동하여 시각화 가능."
+description: "작업 완료 후 결과 보고서를 생성하고 summary.txt를 작성하는 스킬. history.md 갱신과 워크플로우 완료 처리는 end 에이전트가 담당. 사용 시점: (1) /report 명령어로 명시적 호출, (2) 작업 완료 후 결과 정리 요청 시, (3) 보고서, 리포트, report 키워드 포함 요청 시. 마크다운(.md), CSV, 엑셀(.xlsx) 등 다양한 형식으로 출력하며, 다이어그램 스킬과 연동하여 시각화 가능."
 disable-model-invocation: true
 ---
 
 # Report
 
-작업 완료 후 결과를 정리하여 보고서를 생성하고, history.md를 갱신하며, 완료 알림을 전송하는 스킬.
+작업 완료 후 결과를 정리하여 보고서를 생성하고 summary.txt를 작성하는 스킬.
 
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
 **workflow-report 스킬의 책임:**
 - REPORT: 작업 결과를 정리하여 보고서 생성
-- history.md 갱신 (`.prompt/history.md` 작업 이력 테이블에 행 추가)
+- summary.txt 생성 (최종 작업 2줄 요약)
 
-> **책임 경계**: status.json 완료 처리(REPORT->COMPLETED)와 레지스트리 해제(wf-state unregister)는 오케스트레이터가 담당합니다. reporter는 보고서 작성에만 집중합니다.
+> **책임 경계**: history.md 갱신, status.json 완료 처리(REPORT->COMPLETED), 사용량 확정, 레지스트리 해제(wf-state unregister), DONE 배너는 end 에이전트가 담당합니다. reporter는 보고서 작성에만 집중합니다.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
 
@@ -35,9 +35,9 @@ disable-model-invocation: true
 
 > 내부 분석/사고 과정을 터미널에 출력하지 않는다. 결과만 출력한다.
 
-- **출력 허용**: 보고서 파일 경로, 반환값 (3줄 규격), 에러 메시지
+- **출력 허용**: 보고서 파일 경로, 반환값 (2줄 규격), 에러 메시지
 - **출력 금지**: 보고서 내용 요약, 작업 결과 분석 과정, 변경 파일 목록 나열, "~를 살펴보겠습니다" 류, 중간 진행 보고, "워크플로우가 완료되었습니다" 등 완료 안내 메시지 (보고서 경로는 REPORT 완료 배너가 이미 출력하므로 중복 금지)
-- 보고서 작성, history.md 갱신 등 모든 작업은 묵묵히 수행하고 최종 보고서 경로만 출력
+- 보고서 작성, summary.txt 생성 등 모든 작업은 묵묵히 수행하고 최종 보고서 경로만 출력
 - 배너 출력은 오케스트레이터가 담당 (reporter 에이전트는 배너를 직접 호출하지 않음)
 - **보고서 경로 터미널 출력 필수**: 보고서 경로(`report.md`)는 반드시 터미널에 출력되어야 함. 단, 출력 주체는 오케스트레이터이며, REPORT 완료 배너의 5번째 인자로 경로를 전달하여 자동 표시됨. reporter 에이전트가 직접 경로를 터미널에 출력하지 않음.
 
@@ -78,18 +78,21 @@ workPath: <workDir>/work/
    4. 보고서 경로를 `{workDir}/report.md`로 확정적 구성 (LLM 추론에 의존하지 않음)
    5. 보고서 저장: `{workDir}/report.md`
 
-2. **history.md 갱신**
-   - `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
+2. **summary.txt 생성**
+   - 보고서 작성 완료 후, 최종 작업 2줄 요약을 `{workDir}/summary.txt`에 저장
+   - 1줄: 작업 제목 및 command
+   - 2줄: 핵심 결과 요약 (변경 파일 수, 주요 성과 등)
 
-> **Note**: status.json 완료 처리(REPORT->COMPLETED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후 오케스트레이터가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`의 "REPORT Completion: Orchestrator Post-Processing" 섹션을 참조하세요.
+> **Note**: reporter 반환 후, end 에이전트(Haiku)가 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제, DONE 배너를 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`의 "Step 4: END" 섹션을 참조하세요.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
 
 ### reporter 출력
 
 - 보고서 경로: `{workDir}/report.md`
+- summary.txt: `{workDir}/summary.txt`
 
-> **Note**: reporter 반환 후, 오케스트레이터가 status.json 완료 처리 및 레지스트리 해제를 수행합니다.
+> **Note**: reporter 반환 후, end 에이전트가 마무리 처리를 수행합니다.
 
 ---
 
@@ -268,16 +271,18 @@ flowchart TD
     A[작업 내역 로드] --> B[형식 결정]
     B --> C[보고서 작성]
     C --> D[파일 저장]
-    D --> E[history.md 갱신]
-    E --> F[경로 출력]
+    D --> E[summary.txt 생성]
+    E --> F[history.md 갱신]
+    F --> G[경로 출력]
 ```
 
 1. **작업 내역 로드** (필수): `{workDir}/work/`에서 로드
 2. **형식 결정**: 데이터 특성에 맞는 형식 선택
 3. **보고서 작성**: 템플릿에 따라 작성
 4. **저장**: `{workDir}/report.md`에 저장 (workDir은 오케스트레이터로부터 전달받은 확정 경로)
-5. **history.md 갱신**: `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
-6. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
+5. **summary.txt 생성**: 최종 작업 2줄 요약을 `{workDir}/summary.txt`에 저장
+6. **history.md 갱신**: `.prompt/history.md`에 작업 이력 행 추가 (상세 절차는 아래 참조)
+7. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
 
 > **Note**: reporter 반환 후, 오케스트레이터가 status.json 완료 처리(`wf-state status <registryKey> REPORT COMPLETED`) 및 레지스트리 해제(`wf-state unregister <registryKey>`)를 수행합니다.
 

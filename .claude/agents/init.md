@@ -2,7 +2,7 @@
 name: init
 description: "워크플로우 초기화 에이전트. prompt.txt 읽기, 작업 제목 생성, init-workflow.sh 스크립트 실행을 순차 수행합니다."
 tools: Read, Edit, Bash, Glob, Grep
-model: sonnet
+model: haiku
 ---
 워크플로우 초기화 전문 에이전트입니다.
 
