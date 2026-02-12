@@ -17,8 +17,8 @@ workPath: <workDir>/work/
 ```
 
 - reporter가 `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적 구성
-- reporter가 보고서 작성 + history.md 갱신 + CLAUDE.md 갱신
-- **Output:** 보고서 경로, CLAUDE.md 갱신 완료
+- reporter가 보고서 작성 + history.md 갱신
+- **Output:** 보고서 경로
 
 ## REPORT Completion: Orchestrator Post-Processing
 
