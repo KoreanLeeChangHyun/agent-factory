@@ -1,5 +1,5 @@
 ---
-name: analyze-database
+name: command-analyze-database
 description: "데이터베이스 분석 스킬. 스키마, 테이블 구조, 관계, 인덱스, 쿼리 성능을 분석합니다. Use for database analysis tasks: (1) 스키마 구조 파악 및 ERD 생성, (2) 테이블 간 관계 시각화, (3) 인덱스 및 쿼리 성능 최적화 포인트 식별, (4) 정규화 수준 및 데이터 무결성 검토. cc:analyze 커맨드에서 호출되며, ERD 다이어그램 생성을 위해 command-mermaid-diagrams 스킬과 연동됩니다. 트리거: 'DB 분석', 'database', '스키마', 'schema', 'ERD', '테이블 구조', '쿼리 성능'."
 ---
 

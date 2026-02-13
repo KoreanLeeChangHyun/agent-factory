@@ -1,5 +1,5 @@
 ---
-name: verification-before-completion
+name: command-verification-before-completion
 description: "작업 완료 선언 전 자동 검증을 강제하는 스킬. 커밋, PR 생성, 태스크 완료 보고 전에 반드시 검증 명령어를 실행하고 그 결과를 확인해야 함. 증거 없는 완료 주장을 방지. 사용 시점: 작업 완료 직전, 커밋/PR 직전, 성공/완료를 주장하기 전. 트리거: 'Done', 'Complete', '완료', '끝', 'PASS', '통과'."
 ---
 

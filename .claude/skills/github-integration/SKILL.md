@@ -1,6 +1,6 @@
 ---
 name: github-integration
-description: "GitHub 연동 가이드. gh CLI를 사용한 커밋/푸시/PR 생성 방법을 안내합니다. 사용 시점: GitHub에 작업 결과 푸시, PR 생성, 이슈 관리, 브랜치 관리 시. 트리거: 'github', 'push', 'PR', 'pull request', '푸시', '커밋'."
+description: "gh CLI 기반 GitHub 연동 스킬. 커밋/푸시, PR 생성/관리, 이슈 조회/생성, 브랜치 관리 등 GitHub 워크플로우를 수행합니다. Use for 작업 결과 GitHub 푸시, PR 생성, 이슈 관리, 브랜치 관리 요청 시. 트리거: 'github', 'push', 'PR', 'pull request', '푸시', '커밋', '이슈'."
 ---
 
 # GitHub 연동 가이드

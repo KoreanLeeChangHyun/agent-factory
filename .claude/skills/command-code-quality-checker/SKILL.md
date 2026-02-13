@@ -1,5 +1,5 @@
 ---
-name: code-quality-checker
+name: command-code-quality-checker
 description: "코드 품질 자동 검사 스킬. ESLint/Prettier/타입체크 자동 실행, DRY/KISS/YAGNI 원칙 위반 탐지, 코드 메트릭(순환 복잡도/함수 크기/파일 크기/중첩 깊이) 측정, 정량적 Code Quality Score 산출. 사용 시점: implement/refactor 완료 후, 코드 리뷰 전, PR 생성 전, 코드 품질 평가 요청 시. 트리거: '코드 품질', 'code quality', '린트', 'lint', '타입체크', '품질 검사'."
 ---
 

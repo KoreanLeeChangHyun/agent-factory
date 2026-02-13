@@ -1,5 +1,5 @@
 ---
-name: analyze-data
+name: command-analyze-data
 description: "데이터 분석 스킬. 데이터셋 탐색, 통계 분석, 시각화, 인사이트 도출을 수행합니다. Use for data analysis tasks: (1) CSV/JSON/Excel 데이터셋 탐색 및 EDA, (2) 통계 분석 및 분포 확인, (3) 데이터 품질 검사(결측치, 이상치), (4) 인사이트 도출 및 시각화. 트리거: '데이터 분석', 'data analysis', 'EDA', '통계', '데이터셋', 'dataset'."
 ---
 

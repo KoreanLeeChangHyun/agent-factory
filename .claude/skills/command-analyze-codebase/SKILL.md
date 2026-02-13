@@ -1,5 +1,5 @@
 ---
-name: analyze-codebase
+name: command-analyze-codebase
 description: "코드베이스 분석 스킬. 프로젝트 구조, 아키텍처, 의존성, 코드 품질을 분석합니다. 사용 시점: (1) 프로젝트 구조 파악 요청, (2) 아키텍처 분석 요청, (3) cc:analyze 명령어로 호출, (4) '코드베이스', '아키텍처', '코드 구조', '의존성', '모듈' 키워드 포함 요청."
 ---
 

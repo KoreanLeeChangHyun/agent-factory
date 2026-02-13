@@ -1,6 +1,6 @@
 ---
 name: software-design-patterns
-description: "소프트웨어 디자인 패턴 참조 가이드. GoF 23개 디자인 패턴(생성/구조/행위)과 현대 아키텍처 패턴(MVC, MVVM, Repository, DI, CQRS, Event Sourcing, Microservices, Saga, Circuit Breaker, Clean Architecture, Hexagonal Architecture, DDD 등)을 포함한다. 사용 시점: (1) 코드 구현 시 적절한 디자인 패턴 선택이 필요할 때, (2) 리팩토링 시 패턴 적용 방안을 검토할 때, (3) 아키텍처 설계 시 패턴 조합을 결정할 때, (4) 코드 리뷰 시 패턴 준수 여부를 확인할 때, (5) '디자인 패턴', 'design pattern', '패턴 적용', 'GoF', 'SOLID' 키워드가 포함된 요청."
+description: "GoF 23개 디자인 패턴(생성/구조/행위)과 16개 현대 아키텍처 패턴(MVC, MVVM, Repository, DI, CQRS, Event Sourcing, Microservices, Saga, Circuit Breaker, Clean/Hexagonal Architecture, DDD 등) 총 39개 패턴의 종합 참조 가이드를 제공한다. Use when 코드 구현 시 패턴 선택, 리팩토링 시 패턴 적용 검토, 아키텍처 설계 시 패턴 조합, 코드 리뷰 시 패턴 준수 확인이 필요할 때. 키워드: 디자인 패턴, design pattern, GoF, SOLID, 아키텍처 패턴."
 ---
 
 # Software Design Patterns

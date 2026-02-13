@@ -1,6 +1,6 @@
 ---
-name: framework-react
-description: "React 프레임워크 프로젝트 구조 및 베스트 프랙티스. Use for React/Next.js project tasks: (1) React 프로젝트 초기화 및 Feature-Based 구조 설정, (2) Next.js App Router 구조 적용, (3) 컴포넌트/훅/상태 관리 패턴 참고, (4) Bulletproof React 아키텍처 기반 개발. 트리거: 'React', 'react', 'Next.js', 'nextjs', 'React 프로젝트', '프론트엔드 프레임워크'."
+name: command-framework-react
+description: "Bulletproof React 아키텍처 기반 Feature-Based 프로젝트 구조, Next.js App Router 구조, 기술 스택 권장(Vite, Zustand, React Query, Tailwind), 단방향 의존성 원칙을 제공한다. Use when React/Next.js 프로젝트 초기화, Feature-Based 구조 설정, 아키텍처 기반 개발이 필요할 때. 키워드: React, Next.js, nextjs, React 프로젝트, 프론트엔드 프레임워크."
 ---
 
 # React Framework Skill

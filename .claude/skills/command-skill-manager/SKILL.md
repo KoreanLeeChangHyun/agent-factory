@@ -1,6 +1,6 @@
 ---
-name: skill-manager
-description: 스킬 생성 및 수정을 위한 통합 관리 스킬. 사용자가 스킬을 생성, 수정, 업데이트할 때 사용합니다. 예시 트리거 - "스킬 만들어줘", "새 스킬 생성", "스킬 수정해줘", "스킬 업데이트", "/skill 생성", "skill 만들기", "create skill", "update skill", "modify skill".
+name: command-skill-manager
+description: "Claude Code 스킬 생성 및 수정을 위한 통합 관리 스킬. .claude/skills/ 디렉토리에 SKILL.md frontmatter 규격에 맞는 스킬 패키지를 생성하거나 기존 스킬을 수정합니다. Use for 스킬 생성, 수정, 업데이트, 삭제 요청 시. 트리거: '스킬 만들어줘', '새 스킬 생성', 'create skill', 'update skill', 'modify skill', '스킬 수정'."
 license: Complete terms in LICENSE.txt
 ---
 

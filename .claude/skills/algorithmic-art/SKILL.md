@@ -1,6 +1,6 @@
 ---
 name: algorithmic-art
-description: Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.
+description: "p5.js 기반 알고리즘 아트 생성 스킬. 시드 랜덤, 노이즈 필드, 파티클 시스템을 활용한 제너레이티브 아트를 .md(철학) + .html/.js(인터랙티브 뷰어) 파일로 산출합니다. Use for generative art, algorithmic art, flow fields, particle systems 개발 요청 시. 트리거: 'generative art', '알고리즘 아트', 'p5.js', 'flow field', 'particle system', '제너레이티브'."
 disable-model-invocation: true
 ---
 

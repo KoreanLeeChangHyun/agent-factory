@@ -1,5 +1,5 @@
 ---
-name: agent-manager
+name: command-agent-manager
 description: Claude Code 에이전트(서브에이전트) 생성 및 수정을 위한 통합 관리 스킬. 사용자가 에이전트를 생성, 수정, 업데이트할 때 사용합니다. 예시 트리거 - "에이전트 만들어줘", "새 에이전트 생성", "에이전트 수정해줘", "에이전트 업데이트", "/agent 생성", "agent 만들기", "create agent", "update agent", "modify agent", "서브에이전트 추가/수정". 이 스킬은 반드시 사용자로부터 모델 정보(sonnet/opus/haiku/inherit)와 도구 정보(Read, Edit, Bash 등)를 수집해야 합니다.
 ---
 

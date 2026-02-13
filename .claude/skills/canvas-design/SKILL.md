@@ -1,6 +1,6 @@
 ---
 name: canvas-design
-description: Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.
+description: "디자인 철학 기반 시각 아트 생성 스킬. .md(디자인 철학) + .pdf/.png(캔버스 표현) 파일을 산출하며, 폼/공간/색채/구성을 활용한 오리지널 비주얼 디자인을 제작합니다. Use for 포스터, 아트워크, 정적 디자인 제작 요청 시. 트리거: 'poster', '포스터', 'design', '디자인', 'visual art', '아트워크', 'canvas'."
 disable-model-invocation: true
 ---
 

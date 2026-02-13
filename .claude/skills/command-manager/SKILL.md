@@ -1,6 +1,6 @@
 ---
 name: command-manager
-description: Claude Code 슬래시 명령어(커맨드) 생성 및 수정을 위한 통합 관리 스킬. 사용자가 커스텀 슬래시 명령어를 생성, 수정, 업데이트할 때 사용합니다. 예시 트리거 - "명령어 만들어줘", "커맨드 생성", "명령어 수정해줘", "커맨드 업데이트", "/command 생성", "command 만들기", "create command", "update command", "modify command", "슬래시 명령어 추가/수정". 반드시 사용자로부터 명령어 이름, 용도, 범위(프로젝트/개인)를 수집해야 합니다.
+description: "Claude Code 슬래시 명령어(커맨드) 생성 및 수정을 위한 통합 관리 스킬. 명령어 이름, 용도, 범위(프로젝트/개인) 수집 후 .claude/commands/ 파일을 생성하거나 수정합니다. Use for 커스텀 슬래시 명령어 생성, 수정, 업데이트 요청 시. 트리거: '명령어 만들어줘', '커맨드 생성', 'create command', 'update command', '슬래시 명령어'."
 ---
 
 # Command Manager

@@ -41,7 +41,7 @@ Main Agent (Orchestrator)
     +-- 1. PLAN: planner agent (workflow-plan skill) -> returns: plan path
     +-- 2. WORK: worker agent (workflow-work skill) -> returns: work log path
     +-- 3. REPORT: reporter agent (workflow-report skill) -> returns: report path
-    +-- 4. END: end agent (history.md, status.json, usage, unregister, DONE)
+    +-- 4. END: end agent (history.md, status.json, usage, unregister) + orchestrator DONE banner
 ```
 
 Core Principles:
@@ -95,12 +95,12 @@ Workflow <registryKey> <phase> <status>
 | Before/After WORK | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` |
 | WORK Phase N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
 | Before/After REPORT | `Workflow <registryKey> REPORT` / `Workflow <registryKey> REPORT done` |
-| Final | `Workflow <registryKey> DONE done` |
+| Before/After DONE | `Workflow <registryKey> DONE` / `Workflow <registryKey> DONE done` |
 | Prompt mode Final | `Workflow <registryKey> DONE done` (after direct work, no PLAN/WORK/REPORT banners) |
 
 PLAN completion banner MUST complete before AskUserQuestion (sequential, 2 separate turns).
 
-DONE banner: Called by end agent after REPORT completion. Auto-sends Slack notification.
+DONE start banner: Called by orchestrator before dispatching end agent. DONE completion banner: Called by orchestrator after end agent returns. Auto-sends Slack notification.
 
 **CRITICAL: After DONE banner, the orchestrator MUST terminate immediately. Output ZERO text after DONE banner. Any post-DONE output (e.g., "Workflow already completed", "All tasks finished", status explanations) is a protocol violation.**
 
@@ -124,7 +124,7 @@ DONE banner: Called by end agent after REPORT completion. Auto-sends Slack notif
 | WORK Phase start | WORK-PHASE banner, then worker call(s) for that phase | Skipping Phase banner |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
-| REPORT done | REPORT completion banner, end agent call, extract first 2 lines, immediate termination after end returns | Report summary, any post-DONE text, "Workflow already completed", "All tasks finished", "DONE banner was issued", any workflow status message |
+| REPORT done | REPORT completion banner, DONE start banner, end agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text, "Workflow already completed", "All tasks finished", "DONE banner was issued", any workflow status message |
 
 ---
 
@@ -248,9 +248,14 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
 ```
 
-After REPORT: completion banner -> end agent call (history.md, status.json, usage, unregister, DONE) -> terminate.
+After REPORT: completion banner -> DONE start banner -> end agent call (history.md, status.json, usage, unregister) -> DONE completion banner -> terminate.
 
 ```bash
+# Orchestrator calls DONE start banner before end agent
+Workflow <registryKey> DONE
+# Orchestrator dispatches end agent
+Task(subagent_type="end", ...)
+# Orchestrator calls DONE completion banner after end agent returns
 Workflow <registryKey> DONE done
 ```
 

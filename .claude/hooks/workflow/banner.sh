@@ -283,7 +283,7 @@ WIDTH=$CONTENT_LEN
 
 LINE=$(printf '─%.0s' $(seq 1 $WIDTH))
 
-if [ "$PHASE" = "DONE" ]; then
+if [ "$PHASE" = "DONE" ] && [ -n "$STATUS" ]; then
     # 최종 완료 배너 (박스 없이 한 줄)
     echo ""
     _CMD_LABEL=""

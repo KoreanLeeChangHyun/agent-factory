@@ -1,6 +1,6 @@
 ---
 name: mcp-manager
-description: MCP 서버 생성 및 수정을 위한 통합 관리 스킬. 사용자가 MCP 서버를 생성, 수정, 업데이트할 때 사용합니다. 예시 트리거 - "MCP 만들어줘", "MCP 서버 생성", "MCP 수정해줘", "MCP 업데이트", "/mcp 생성", "mcp 만들기", "create mcp", "update mcp", "modify mcp server", "MCP 도구 추가".
+description: "MCP(Model Context Protocol) 서버 생성 및 수정을 위한 통합 관리 스킬. 설계/구현/테스트/배포 4단계 워크플로우로 LLM 외부 서비스 연동 MCP 서버를 구축합니다. Use for MCP 서버 생성, 수정, 도구 추가, 업데이트 요청 시. 트리거: 'MCP', 'MCP 서버', 'create mcp', 'MCP 만들어줘', 'MCP 도구 추가', 'Model Context Protocol'."
 ---
 
 # MCP Manager

@@ -1,6 +1,6 @@
 ---
 name: command-gha-analysis
-description: "GitHub Actions 실패 분석 스킬. CI/CD 파이프라인 실패의 근본 원인을 체계적으로 조사한다. 사용 시점: (1) GHA 워크플로우 실패 원인 분석 시, (2) CI 빌드 실패 디버깅 시, (3) 플레이키 테스트 식별 시. 트리거: 'GHA', 'GitHub Actions', 'CI', 'CI/CD', 'workflow run', 'build failure', '빌드 실패', 'pipeline'."
+description: "GitHub Actions 워크플로우 실패의 근본 원인을 5단계 프로세스(정보 수집, 플레이크 검사, 브레이킹 커밋 식별, 근본 원인 분석, 기존 Fix 검색)로 체계적으로 조사한다. Use when GHA 워크플로우 실패 원인 분석, CI 빌드 실패 디버깅, 플레이키 테스트 식별이 필요할 때. 키워드: GHA, GitHub Actions, CI, CI/CD, workflow run, build failure, 빌드 실패, pipeline."
 ---
 
 # GHA Analysis

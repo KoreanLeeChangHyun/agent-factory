@@ -1,6 +1,6 @@
 ---
 name: command-systematic-debugging
-description: "체계적 디버깅 방법론을 적용하여 버그의 근본 원인을 분석하고 해결하는 스킬. 4단계 근본 원인 분석(증상 수집, 가설 수립, 격리 검증, 수정 확인), 심층 방어 디버깅, 조건 기반 대기 패턴, 에러 처리 일관성 가이드를 제공한다. Use when debugging bugs, tracking errors, performing root-cause analysis, or establishing error handling patterns. 키워드: 디버깅, debugging, 버그, bug, 에러, error, 근본원인, root-cause, 에러 추적, error tracking, 에러 핸들링, exception handling, 그레이스풀 디그레이드, graceful degradation."
+description: "4단계 근본 원인 분석(증상 수집, 가설 수립, 격리 검증, 수정 확인) 방법론으로 버그를 체계적으로 진단하고 해결한다. 심층 방어 디버깅, 조건 기반 대기 패턴, 에러 처리 일관성 가이드를 포함. Use when 버그 디버깅, 에러 추적, 근본 원인 분석, 에러 핸들링 패턴 수립이 필요할 때. 키워드: 디버깅, debugging, 버그, bug, 에러, error, root-cause, 에러 핸들링, exception handling, graceful degradation."
 ---
 
 # Systematic Debugging

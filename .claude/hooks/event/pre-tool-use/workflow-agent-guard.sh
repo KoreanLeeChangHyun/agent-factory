@@ -40,7 +40,7 @@ fi
 INPUT=$(cat)
 
 # python3으로 전체 로직 처리
-echo "$INPUT" | python3 -c "
+echo "$INPUT" | PROJECT_ROOT_AG="$PROJECT_ROOT_AG" python3 -c "
 import sys, json, os, re
 
 data = json.load(sys.stdin)
@@ -62,10 +62,7 @@ if not match:
 work_dir = match.group(1).rstrip(',')
 
 # 절대 경로 구성
-project_root = os.environ.get('PROJECT_ROOT', os.getcwd())
-if project_root.endswith('.claude/hook') or '/hooks/' in project_root:
-    # .claude/hooks/event/pre-tool-use -> project root (4 levels up)
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(project_root))))
+project_root = os.environ.get('PROJECT_ROOT_AG', os.getcwd())
 
 if not os.path.isabs(work_dir):
     work_dir = os.path.join(project_root, work_dir)

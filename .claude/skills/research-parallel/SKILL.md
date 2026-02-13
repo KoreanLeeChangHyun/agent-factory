@@ -1,6 +1,6 @@
 ---
 name: research-parallel
-description: "다중 에이전트 병렬 연구 스킬. danielmiessler/research 패턴 참조. Use for parallel research: 질문을 3-10개 하위 질문으로 분해하고 병렬 에이전트로 동시 조사하여 1분 내 종합 보고서 생성. 병렬 조사, parallel, 종합 조사 키워드 트리거"
+description: "복합 질문을 3-10개 하위 질문으로 분해하고 병렬 에이전트(WebSearch, Perplexity, Gemini)로 동시 조사하여 신뢰도 기반 종합 보고서를 생성한다. Use for parallel research: 다중 관점 종합 조사, 기술 선택 비교 분석, 시장/트렌드 동시 수집이 필요할 때. 키워드: 병렬 조사, parallel, 종합 조사, 다중 에이전트, 동시 조사."
 ---
 
 # Research Parallel

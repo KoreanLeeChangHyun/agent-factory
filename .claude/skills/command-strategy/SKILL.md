@@ -1,6 +1,6 @@
 ---
 name: command-strategy
-description: "다중 워크플로우 전략 수립 및 로드맵 생성 스킬. Use this when planning multi-workflow strategies, creating milestones, dependency graphs, and roadmaps for large-scale projects. 복잡도 산정, 워크플로우 체인 설계, 리스크 분석을 체계적으로 수행한다."
+description: "대규모 작업을 다중 워크플로우로 분해하여 마일스톤, 종속성 그래프, 실행 로드맵을 생성한다. 복잡도 산정(T1/T2/T3 티어), 워크플로우 체인 설계, 크리티컬 패스 식별, 리스크 분석을 수행. Use when 다중 워크플로우 전략 수립, 대규모 프로젝트 로드맵 생성, 마일스톤 설계가 필요할 때. 키워드: strategy, 전략, 로드맵, roadmap, 마일스톤, milestone, 워크플로우 체인."
 ---
 
 # Command Strategy
