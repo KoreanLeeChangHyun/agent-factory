@@ -22,6 +22,8 @@ workPath: <workDir>/work/
 
 ## Step 4: END (end Agent)
 
+**Detailed Guide:** workflow-end skill 참조
+
 reporter 완료 후, 오케스트레이터가 **DONE 시작 배너**를 호출한 뒤 **end 에이전트**를 디스패치합니다.
 
 ```bash

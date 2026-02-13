@@ -4,7 +4,7 @@
 
 ### 용어 분류: Workflow Skill vs Command Skill
 
-- **Workflow Skill** (`workflow-*`, 5개): 워크플로우 단계 관리 및 오케스트레이션
+- **Workflow Skill** (`workflow-*`, 6개): 워크플로우 단계 관리 및 오케스트레이션
 - **Command Skill** (`command-*` 또는 기능명, 40+개): 개별 명령어의 구체적 기능 수행
 - "skill" 단독 사용 시 두 가지 레벨을 포괄하는 총칭
 
@@ -93,7 +93,7 @@ workName: <작업이름>
 
 ## Call Method Rules
 
-> Agents(5): Task 호출, Skills(5): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
+> Agents(5): Task 호출, Skills(6): Skill 호출. 상세는 SKILL.md "Invocation Rules" 참조.
 
 > **registryKey 구성 규칙 (REQUIRED):** `registryKey = date + "-" + workId` (예: `20260211-035949`). init 반환값의 `registryKey` 필드를 직접 사용하거나, `date`와 `workId`를 결합하여 구성. 6자리 `workId` 단독 사용은 FSM 전이 실패의 원인이 됨.
 

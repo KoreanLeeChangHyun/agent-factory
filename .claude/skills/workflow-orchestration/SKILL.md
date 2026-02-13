@@ -41,7 +41,7 @@ Main Agent (Orchestrator)
     +-- 1. PLAN: planner agent (workflow-plan skill) -> returns: plan path
     +-- 2. WORK: worker agent (workflow-work skill) -> returns: work log path
     +-- 3. REPORT: reporter agent (workflow-report skill) -> returns: report path
-    +-- 4. END: end agent (history.md, status.json, usage, unregister) + orchestrator DONE banner
+    +-- 4. END: end agent (workflow-end skill) -> history.md, status.json, usage, unregister + orchestrator DONE banner
 ```
 
 Core Principles:
