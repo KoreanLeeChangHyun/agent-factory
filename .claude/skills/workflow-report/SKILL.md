@@ -1,6 +1,6 @@
 ---
 name: workflow-report
-description: "작업 완료 후 결과 보고서를 생성하고 summary.txt를 작성하는 스킬. history.md 갱신과 워크플로우 완료 처리는 end 에이전트가 담당. 사용 시점: (1) /report 명령어로 명시적 호출, (2) 작업 완료 후 결과 정리 요청 시, (3) 보고서, 리포트, report 키워드 포함 요청 시. 마크다운(.md), CSV, 엑셀(.xlsx) 등 다양한 형식으로 출력하며, 다이어그램 스킬과 연동하여 시각화 가능."
+description: "워크플로우 REPORT 단계 전용 내부 스킬. 작업 완료 후 결과 보고서를 생성하고 summary.txt를 작성한다. Use for workflow reporting: work/ 디렉터리의 작업 내역을 취합하여 report.md 보고서 생성, summary.txt 2줄 요약 작성을 수행한다. 마크다운, CSV, 엑셀 등 다양한 형식 지원. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
 disable-model-invocation: true
 ---
 
@@ -14,13 +14,9 @@ disable-model-invocation: true
 - REPORT: 작업 결과를 정리하여 보고서 생성
 - summary.txt 생성 (최종 작업 2줄 요약)
 
-> **책임 경계**: history.md 갱신, status.json 완료 처리(REPORT->COMPLETED), 사용량 확정, 레지스트리 해제(wf-state unregister), DONE 배너는 end 에이전트가 담당합니다. reporter는 보고서 작성에만 집중합니다.
+> **책임 경계**: history.md 갱신, status.json 완료 처리(REPORT->COMPLETED), 사용량 확정, 레지스트리 해제(wf-state unregister), DONE 배너는 done 에이전트가 담당합니다. reporter는 보고서 작성에만 집중합니다.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
-
-**호출 시점:**
-- 오케스트레이터(workflow-orchestration)에서 reporter 에이전트를 통해 호출됨
-- 또는 사용자가 `/report` 명령어로 명시적 호출
 
 ## 핵심 원칙
 
@@ -70,7 +66,7 @@ workPath: <workDir>/work/
 
 1. **보고서 작성**
    1. command에 해당하는 템플릿 파일을 Read 도구로 로드
-      - 매핑: implement/refactor/build/framework → `templates/implement.md`, review/analyze → `templates/review.md`, research → `templates/research.md`, architect → `templates/architect.md`
+      - 매핑: implement/refactor/build/framework -> `templates/implement.md`, review/analyze -> `templates/review.md`, research -> `templates/research.md`, architect -> `templates/architect.md`
       - 템플릿 경로: `.claude/skills/workflow-report/templates/<템플릿파일>`
       - placeholder 치환 가이드: `templates/_guide.md` 참조
    2. 작업 내역(`work/` 디렉터리) 취합 및 분석
@@ -83,16 +79,12 @@ workPath: <workDir>/work/
    - 1줄: 작업 제목 및 command
    - 2줄: 핵심 결과 요약 (변경 파일 수, 주요 성과 등)
 
-> **Note**: reporter 반환 후, end 에이전트(Haiku)가 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제, DONE 배너를 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`의 "Step 4: END" 섹션을 참조하세요.
-
-> **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
+> **Note**: reporter 반환 후, done 에이전트(Haiku)가 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제, DONE 배너를 수행합니다. 상세 절차는 `workflow-orchestration/step5-end.md`를 참조하세요.
 
 ### reporter 출력
 
 - 보고서 경로: `{workDir}/report.md`
 - summary.txt: `{workDir}/summary.txt`
-
-> **Note**: reporter 반환 후, end 에이전트가 마무리 처리를 수행합니다.
 
 ---
 
@@ -120,6 +112,8 @@ flowchart TD
     F -->|아니오| H[완료]
     G --> H
 ```
+
+---
 
 ## 보고서 구조
 
@@ -183,32 +177,7 @@ wb = Workbook()
 wb.save('report.xlsx')
 ```
 
-## 저장 위치
-
-| 단계 | 저장 위치 |
-|------|----------|
-| PLAN | `<workDir>/plan.md` |
-| WORK | `<workDir>/work/WXX-<작업명>.md` |
-| REPORT | `{workDir}/report.md` |
-
-**경로 구성:**
-- `workDir`: 오케스트레이터로부터 전달받은 작업 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
-- reporter는 `workDir`을 직접 사용하여 보고서 경로를 확정적으로 구성 (LLM 추론으로 경로를 재조합하지 않음)
-
-**예시:**
-```
-.workflow/20260203-143000/로그인기능추가/implement/report.md
-.workflow/20260203-144500/API-리팩토링/refactor/report.md
-.workflow/20260203-150000/코드리뷰/review/report.md
-```
-
-**다중 파일이 필요한 경우 (CSV, Excel 등):**
-```
-.workflow/20260203-143000/로그인기능추가/implement/
-|-- report.md        # 메인 보고서
-|-- summary.csv        # 요약 테이블 (필요시)
-|-- diagram.png        # 시각화 다이어그램 (필요시)
-```
+---
 
 ## 다이어그램 연동
 
@@ -261,8 +230,10 @@ gantt
         태스크2 :b1, after a1, 2d
 ```
 
-> **원칙**: 보고서 내 다이어그램은 반드시 mermaid 코드 블록을 사용합니다. ASCII art나 텍스트 화살표(`→`, `↓`)를 다이어그램 대용으로 사용하지 않습니다.
+> **원칙**: 보고서 내 다이어그램은 반드시 mermaid 코드 블록을 사용합니다. ASCII art나 텍스트 화살표를 다이어그램 대용으로 사용하지 않습니다.
 > **방향 필수**: Flowchart 연결선은 반드시 방향 화살표(`-->`, `-.->`, `==>`)를 사용합니다. 방향 없는 연결(`---`, `-.-`, `===`)은 금지합니다.
+
+---
 
 ## 워크플로우
 
@@ -282,28 +253,36 @@ flowchart TD
 5. **summary.txt 생성**: 최종 작업 2줄 요약을 `{workDir}/summary.txt`에 저장
 6. **출력**: 보고서 파일 경로만 출력 (요약은 터미널에 직접 출력하지 않음, 사용자가 보고서 파일을 직접 확인)
 
-> **Note**: reporter 반환 후, end 에이전트가 status.json 완료 처리(`wf-state status <registryKey> REPORT COMPLETED`) 및 레지스트리 해제(`wf-state unregister <registryKey>`)를 수행합니다.
-
-> **Slack 완료 알림**: DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다. reporter는 Slack 호출을 수행하지 않습니다.
-
-**Git 커밋**: 워크플로우 완료 후 `/git:commit` 명령어로 별도 실행 (report 스킬 범위 외)
-
-> **Note**: history.md 갱신은 end 에이전트가 담당합니다. 상세 절차는 end.md를 참조하세요.
+> **Note**: reporter 반환 후, done 에이전트가 status.json 완료 처리 및 레지스트리 해제를 수행합니다.
 
 ---
 
----
+## 저장 위치
 
-## Slack 완료 알림
+| 단계 | 저장 위치 |
+|------|----------|
+| PLAN | `<workDir>/plan.md` |
+| WORK | `<workDir>/work/WXX-<작업명>.md` |
+| REPORT | `{workDir}/report.md` |
 
-> **reporter는 Slack 호출을 수행하지 않습니다.** Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
-> 이전에는 reporter가 직접 `slack.sh`를 호출했으나, DONE 시점으로 일원화되어 reporter의 Slack 책임이 제거되었습니다.
+**경로 구성:**
+- `workDir`: 오케스트레이터로부터 전달받은 작업 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
+- reporter는 `workDir`을 직접 사용하여 보고서 경로를 확정적으로 구성 (LLM 추론으로 경로를 재조합하지 않음)
 
----
+**예시:**
+```
+.workflow/20260203-143000/로그인기능추가/implement/report.md
+.workflow/20260203-144500/API-리팩토링/refactor/report.md
+.workflow/20260203-150000/코드리뷰/review/report.md
+```
 
----
-
-> **Note**: status.json 완료 처리(REPORT->COMPLETED/FAILED)와 레지스트리 해제(wf-state unregister)는 reporter 반환 후, end 에이전트가 수행합니다. 상세 절차는 `workflow-orchestration/step3-report.md`를 참조하세요.
+**다중 파일이 필요한 경우 (CSV, Excel 등):**
+```
+.workflow/20260203-143000/로그인기능추가/implement/
+|-- report.md        # 메인 보고서
+|-- summary.csv        # 요약 테이블 (필요시)
+|-- diagram.png        # 시각화 다이어그램 (필요시)
+```
 
 ---
 
@@ -313,15 +292,7 @@ flowchart TD
 
 **참고**: `/git:commit` 명령어 상세는 `.claude/commands/git/commit.md` 참조
 
-## 연관 스킬
-
-보고서 작성 품질 향상을 위해 다음 스킬을 참조할 수 있습니다:
-
-| 스킬 | 용도 | 경로 |
-|------|------|------|
-| changelog-generator | Git 커밋 기반 CHANGELOG/릴리스 노트 자동 생성 | `.claude/skills/changelog-generator/SKILL.md` |
-| pr-summary | 동적 컨텍스트 주입으로 PR 제목/요약 자동 생성 | `.claude/skills/pr-summary/SKILL.md` |
-| command-verification-before-completion | 작업 완료 선언 전 자동 검증 강제 | `.claude/skills/command-verification-before-completion/SKILL.md` |
+---
 
 ## 에러 처리
 
@@ -335,3 +306,15 @@ flowchart TD
 | 예상치 못한 에러 | 에러 내용 기록 후 사용자에게 보고 |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
+
+---
+
+## 연관 스킬
+
+보고서 작성 품질 향상을 위해 다음 스킬을 참조할 수 있습니다:
+
+| 스킬 | 용도 | 경로 |
+|------|------|------|
+| changelog-generator | Git 커밋 기반 CHANGELOG/릴리스 노트 자동 생성 | `.claude/skills/changelog-generator/SKILL.md` |
+| pr-summary | 동적 컨텍스트 주입으로 PR 제목/요약 자동 생성 | `.claude/skills/pr-summary/SKILL.md` |
+| command-verification-before-completion | 작업 완료 선언 전 자동 검증 강제 | `.claude/skills/command-verification-before-completion/SKILL.md` |

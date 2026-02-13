@@ -57,6 +57,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash .claude/hooks/event/pre-tool-use/hooks-self-guard.sh",
+            "statusMessage": "Hooks 보호 검사 중..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "bash .claude/hooks/event/pre-tool-use/tdd-guard.sh",
             "statusMessage": "TDD 가드 검사 중..."
           }

@@ -16,7 +16,9 @@
     },
     "prompt": {
       "NONE": ["INIT"],
-      "INIT": ["COMPLETED"]
+      "INIT": ["WORK"],
+      "WORK": ["REPORT", "FAILED"],
+      "REPORT": ["COMPLETED", "FAILED"]
     }
   }
 }

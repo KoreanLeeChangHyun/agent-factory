@@ -200,6 +200,7 @@ DIM='\033[2m'
 RESET='\033[0m'
 YELLOW='\033[0;33m'
 GRAY='\033[0;90m'
+CYAN='\033[0;36m'
 
 # 단계별 색상
 get_color() {
@@ -256,7 +257,7 @@ COLOR=$(get_color "$PHASE")
 PROGRESS=$(get_progress "$PHASE")
 
 # 배너 폭: 콘텐츠 표시 너비에 따라 동적 계산 (최소 60, 최대 100)
-MIN_WIDTH=60
+MIN_WIDTH=75
 MAX_WIDTH=100
 
 # 터미널 표시 너비 계산 (한글 등 wide 문자는 2칸 차지)
@@ -287,8 +288,8 @@ if [ "$PHASE" = "DONE" ] && [ -n "$STATUS" ]; then
     # 최종 완료 배너 (박스 없이 한 줄)
     echo ""
     _CMD_LABEL=""
-    [ -n "$COMMAND" ] && _CMD_LABEL=" (${COMMAND})"
-    echo -e "  ${PROGRESS}  ${YELLOW}${BOLD}DONE${RESET}  ${WORK_ID} · ${TITLE} ${_CMD_LABEL} ${YELLOW}${BOLD}워크플로우 완료${RESET}"
+    [ -n "$COMMAND" ] && _CMD_LABEL=" (${CYAN}${COMMAND}${RESET})"
+    echo -e "  ${YELLOW}${BOLD}[OK]${RESET}  ${WORK_ID} · ${TITLE} ${_CMD_LABEL} ${YELLOW}워크플로우 완료${RESET}"
     echo ""
 
     # --- Slack 완료 알림 (비동기, 비차단) ---

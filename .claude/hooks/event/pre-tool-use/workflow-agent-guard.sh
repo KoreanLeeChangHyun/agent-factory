@@ -11,18 +11,20 @@
 #     INIT: planner만 허용
 #     PLAN: planner + worker 허용
 #     WORK: worker(재호출) + reporter 허용
-#     REPORT: reporter(재호출)만 허용
+#     REPORT: reporter(재호출) + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 #   [no-plan 모드]
 #     NONE/비존재: init만 허용
 #     INIT: worker만 허용 (planner 대신)
 #     WORK: worker(재호출) + reporter 허용
-#     REPORT: reporter(재호출)만 허용
+#     REPORT: reporter(재호출) + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 #   [prompt 모드]
 #     NONE/비존재: init만 허용
-#     INIT: 없음 (메인 에이전트 직접 작업, 에이전트 호출 없음)
-#     COMPLETED: 모든 에이전트 차단
+#     INIT: worker 허용 (메인 에이전트 직접 작업 후 worker 산출물 구조 생성)
+#     WORK: worker + reporter 허용
+#     REPORT: reporter + done 허용
+#     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 
 # 비상 우회
 if [ "$WORKFLOW_SKIP_GUARD" = "1" ]; then
@@ -100,7 +102,7 @@ ALLOWED_AGENTS_FULL = {
     'INIT': ['planner'],
     'PLAN': ['planner', 'worker'],
     'WORK': ['worker', 'reporter'],
-    'REPORT': ['reporter', 'end'],
+    'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],
     'STALE': [],
@@ -111,7 +113,7 @@ ALLOWED_AGENTS_NO_PLAN = {
     'NONE': ['init'],
     'INIT': ['worker'],
     'WORK': ['worker', 'reporter'],
-    'REPORT': ['reporter', 'end'],
+    'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],
     'STALE': [],
@@ -120,7 +122,9 @@ ALLOWED_AGENTS_NO_PLAN = {
 
 ALLOWED_AGENTS_PROMPT = {
     'NONE': ['init'],
-    'INIT': [],
+    'INIT': ['worker'],
+    'WORK': ['worker', 'reporter'],
+    'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],
     'STALE': [],

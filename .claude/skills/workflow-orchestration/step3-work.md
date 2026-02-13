@@ -1,4 +1,10 @@
-# Step 2: WORK (worker Agent)
+# Step 3: WORK (worker Agent)
+
+> **Agent-Skill Binding**
+> - Agent: `worker` (model: inherit, maxTurns: 50)
+> - Skill: `workflow-work` (항상 바인딩) + command skills (동적 바인딩, command-skill-map.md 참조)
+> - Task prompt (full): `command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>`
+> - Task prompt (no-plan): `command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan`
 
 > **State Update** before WORK start:
 > ```bash
@@ -17,12 +23,10 @@
 > | **Reverse transition MUST NOT** | WORK->PLAN, WORK->INIT 등 역방향 phase 변경 MUST NOT |
 > | **Autonomous judgment MUST NOT** | 오케스트레이터가 독자적으로 맥락 보강, 계획 수정, 태스크 추가/삭제/변경을 판단하지 않음 |
 > | **Plan tasks only** | 계획서에 명시된 태스크만 순서대로 실행. 계획서에 없는 작업은 수행하지 않음 |
->
-> 위반 시 워크플로우 무결성이 훼손됩니다. WORK phase에서 문제가 발생하면 worker 반환값의 "실패" 상태로 처리하고, 오케스트레이터가 임의로 PLAN으로 회귀하지 않습니다.
 
 **Detailed Guide:** workflow-work skill 참조
 
-> **Worker Internal Procedure (5 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 선행 결과 읽기(종속 시) -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 5단계를 수행합니다. 종속 태스크(계획서의 종속성 컬럼에 선행 태스크 ID가 명시된 경우)에서는 2단계에서 선행 작업 내역 파일을 필수로 읽어 판단 근거와 What Didn't Work을 확인합니다. 상세는 workflow-work skill 및 worker.md 참조.
+> **Worker Internal Procedure (5 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 선행 결과 읽기(종속 시) -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 5단계를 수행합니다. 종속 태스크에서는 선행 작업 내역 파일을 필수로 읽어 판단 근거와 What Didn't Work을 확인합니다.
 
 ## No-Plan Mode Worker Call Pattern
 
@@ -102,12 +106,10 @@ work 디렉터리만 생성하고 바로 Phase 1로 진행합니다. Worker는 s
 
 **Phase 0 실패 시 폴백:**
 
-Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, C 방식(개별 자율 결정)으로 자동 폴백합니다:
+Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별 자율 결정으로 자동 폴백합니다:
 1. Phase 0 실패를 로그에 기록
 2. skill-map.md 없이 Phase 1로 진행
 3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
-
-이 폴백은 Phase 0의 SPOF(단일 장애점) 위험을 완화합니다.
 
 ## Phase 1~N: Task Execution
 
@@ -116,9 +118,9 @@ Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, C 방�
 현행 워크플로우는 **파일 시스템 기반 암묵적 공유** 방식을 사용합니다. 각 Worker는 작업 내역을 `<workDir>/work/WXX-*.md`에 기록하고, 후속 Phase의 종속 Worker가 해당 파일을 직접 탐색하여 읽습니다. 오케스트레이터는 선행 작업 내역 경로를 별도로 전달하지 않습니다.
 
 **Phase 2+ Worker의 선행 결과 참조:**
-- 종속 태스크(계획서 종속성 컬럼에 선행 태스크 ID가 명시된 경우)를 수행하는 Worker는 `<workDir>/work/` 디렉터리에서 선행 태스크의 작업 내역 파일을 **필수로 읽어야** 합니다
+- 종속 태스크를 수행하는 Worker는 `<workDir>/work/` 디렉터리에서 선행 태스크의 작업 내역 파일을 **필수로 읽어야** 합니다
 - Worker는 `Glob("<workDir>/work/W01-*.md")` 패턴으로 선행 작업 내역 파일을 자율적으로 탐색합니다
-- 선행 작업의 판단 근거, What Didn't Work, 핵심 발견을 확인하여 불필요한 시행착오를 방지하고 일관성을 보장합니다
+- 선행 작업의 판단 근거, What Didn't Work, 핵심 발견을 확인하여 불필요한 시행착오를 방지합니다
 - 종속성이 없는 독립 태스크(Phase 1 등)에서는 이 과정이 불필요합니다
 
 계획서의 Phase 순서대로 실행합니다. 각 Phase의 Worker 호출 **직전**에 Phase 서브배너를 출력합니다:
@@ -134,9 +136,7 @@ Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
 Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
-# usage-pending: 각 Worker 호출 직전에 개별 실행 (taskId를 agent_id 대체 키로 사용)
-# Note: Claude Code에서 Task 호출 전 agent_id를 사전에 알 수 없으므로,
-#       taskId를 agent_id 위치에 전달하여 SubagentStop Hook의 폴백 키로 활용
+# usage-pending: 각 Worker 호출 직전에 개별 실행
 wf-state usage-pending <registryKey> W01 W01
 wf-state usage-pending <registryKey> W02 W02
 ```
@@ -178,13 +178,7 @@ Task(subagent_type="explore", prompt="
 - **Read-only tasks only**: 파일 수정이 필요 없는 대량 분석 태스크에만 사용
 - **Parallel calls**: 여러 Explore 에이전트를 동시에 호출하여 파일 분배 가능
 - **Worker combination**: Explore(읽기) 결과를 수집한 후 Worker(쓰기)에 전달하는 파이프라인 구성 가능
-- **Plan compliance**: 계획서에 `서브에이전트: Explore`로 명시된 태스크만 Explore로 호출. 명시되지 않은 태스크는 Worker 사용
-
-## 선행 결과 공유 메커니즘
-
-오케스트레이터는 Worker 호출 시 선행 작업 내역 파일 경로를 별도로 전달하지 않습니다. Worker가 계획서의 종속성 정보와 `workDir` 경로를 기반으로 `<workDir>/work/` 디렉터리에서 선행 태스크의 작업 내역 파일을 자율적으로 탐색하되, **읽기 자체는 필수**입니다. 읽은 후 내용을 어떻게 반영할지는 Worker의 재량입니다.
-
-이 방식은 오케스트레이터의 프롬프트 크기를 일정하게 유지하면서도, 종속 태스크 간 비코드 작업 결과(판단 근거, What Didn't Work, 핵심 발견 등)의 전달을 보장합니다.
+- **Plan compliance**: 계획서에 `서브에이전트: Explore`로 명시된 태스크만 Explore로 호출
 
 ## Worker Return Value Processing (REQUIRED)
 
@@ -195,20 +189,11 @@ Task(worker) 호출 후 반환값 처리 규칙:
 2. 나머지는 무시 (상세 내용은 .workflow/ 파일에 이미 저장됨)
 3. 3줄 형식이 아닌 반환값이라도 첫 3줄만 사용, 초과분은 MUST NOT retain
 
-**Normal Return Value (3 lines):**
-```
-상태: 성공 | 부분성공 | 실패
-작업 내역: <파일 경로>
-변경 파일: N개
-```
-
-- **Output:** 작업 내역 경로
-
-## Usage Tracking: usage-pending 연동 (REQUIRED)
+## Usage Tracking: usage-pending (REQUIRED)
 
 > Worker 토큰 사용량을 taskId 단위로 정확히 추적하기 위해, **모든 Worker Task 호출 직전에** `usage-pending`을 실행해야 합니다.
 
-**목적:** SubagentStop Hook(`usage-tracker.sh`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId(W01, W02 등)에 귀속시킵니다. `usage-pending` 미호출 시 토큰이 agent_id(시스템 내부 ID)로 기록되어 추적 불가능해집니다.
+**목적:** SubagentStop Hook(`usage-tracker.sh`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId에 귀속시킵니다.
 
 **호출 규칙:**
 
@@ -217,8 +202,6 @@ Task(worker) 호출 후 반환값 처리 규칙:
 | 병렬 Worker (Phase 1) | 각 Worker 호출 직전마다 개별 `usage-pending` | 모든 pending을 일괄 등록 후 병렬 Task 호출 |
 | 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
 | no-plan 단일 Worker | Worker 호출 직전에 `usage-pending` | taskId=W01 고정 |
-
-**agent_id 제약:** Claude Code에서 Task 호출 전에 `agent_id`를 사전에 알 수 없으므로, `taskId`를 `agent_id` 위치에 대체 키로 전달합니다. SubagentStop Hook은 실제 `agent_id`로 조회 실패 시 이 폴백 키를 사용합니다.
 
 ```bash
 # 형식: wf-state usage-pending <registryKey> <agent_id_or_taskId> <taskId>

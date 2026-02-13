@@ -46,21 +46,17 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 - 배너는 **`cc:*` 워크플로우 명령어 실행 시에만 오케스트레이터가 호출**합니다
 - `/init:workflow`는 세션 초기화 전용이므로 배너 출력 대상이 아닙니다
 
-## 3. 워크플로우 필수 준수 원칙
+## 3. 초기화 완료 출력
+
+CLAUDE.md 로드와 workflow-orchestration 스킬 로드가 완료되면, Read 도구로 `.claude/hooks/workflow/help.txt`를 읽어 그 내용만 초기화 완료 메시지로 출력한다. 메인 에이전트는 이 파일의 내용 외에 어떠한 텍스트도 직접 출력하지 않는다.
+
+## 4. 워크플로우 필수 준수 원칙
 
 이후 모든 cc:* 명령어는 `workflow-orchestration` 스킬의 워크플로우를 **반드시** 따릅니다.
 
 1. 모든 단계 **절대 생략 불가**, **순서대로** 수행
 2. 각 단계 완료 후 **반드시 다음 단계로 진행**
 3. 모든 작업 내역은 `.workflow/` 디렉터리에 자동 저장
-
-## 사용 가능한 명령어
-
-터미널에서 `wf-commands`를 실행하면 `.claude/commands/cc/*.md`를 동적 스캔하여 최신 명령어 목록을 확인할 수 있습니다.
-
-```bash
-wf-commands
-```
 
 ## 워크플로우 모드 (Tier)
 
@@ -70,7 +66,7 @@ cc:* 명령어는 모드에 따라 실행 단계가 달라집니다.
 |------|-----------|------|
 | full (기본) | INIT -> PLAN -> WORK -> REPORT | 전체 워크플로우 |
 | no-plan (-np) | INIT -> WORK -> REPORT | 계획 단계 생략 |
-| prompt | INIT -> 메인 에이전트 직접 수행 | 경량 작업 |
+| prompt | INIT -> WORK -> REPORT -> DONE | 경량 작업 (메인 에이전트 직접 수행 + 보고서 + 마무리) |
 
 상세는 `workflow-orchestration` 스킬을 참조하세요.
 

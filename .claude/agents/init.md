@@ -1,6 +1,6 @@
 ---
 name: init
-description: "워크플로우 초기화 에이전트. prompt.txt 읽기, 작업 제목 생성, init-workflow.sh 스크립트 실행을 수행합니다."
+description: "워크플로우 초기화를 수행하는 에이전트"
 tools: Bash, Edit, Glob, Grep, Read
 model: haiku
 skills:
@@ -19,6 +19,39 @@ maxTurns: 15
 2. **작업 제목 생성** - prompt.txt 기반 한글 제목 생성
 3. **workId 생성 및 init-workflow.sh 실행** - KST 기반 시간 생성 + 디렉터리/파일/레지스트리 일괄 생성
 
+## 역할 경계 (서브에이전트로서의 위치)
+
+이 에이전트는 서브에이전트이며 오케스트레이터(메인 에이전트)가 Task 도구로 호출한다.
+
+### 서브에이전트 공통 제약
+
+| 제약 | 설명 |
+|------|------|
+| AskUserQuestion 호출 불가 | 서브에이전트는 사용자에게 직접 질문할 수 없음 (GitHub Issue #12890). 사용자 확인이 필요한 경우 오케스트레이터가 수행 |
+| Bash 출력 비표시 | 서브에이전트 내부의 Bash 호출 결과는 사용자 터미널에 표시되지 않음. Phase 배너 등 사용자 가시 출력은 오케스트레이터가 호출 |
+| 다른 서브에이전트 직접 호출 불가 | Task 도구를 사용한 에이전트 호출은 오케스트레이터만 수행 가능. 서브에이전트 간 직접 호출 불가 |
+
+### 이 에이전트의 전담 행위
+
+- 워크플로우 디렉토리/파일 초기화 (`wf-init` 실행)
+- workDir 생성 및 구조 셋업
+- prompt.txt 읽기 및 작업 제목 생성
+- status.json/registry 초기 설정
+
+### 메인 에이전트가 대신 수행하는 행위
+
+- INIT Phase 배너 호출 (`Workflow INIT none <command>`)
+- INIT 완료 후 모드 분기 판단 및 다음 Phase로 전이
+- wf-state 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
+
+## 스킬 바인딩
+
+| 스킬 | 유형 | 바인딩 방식 | 용도 |
+|------|------|------------|------|
+| `workflow-init` | 워크플로우 | frontmatter `skills` | INIT 단계 절차 상세, wf-init 호출 규약 |
+
+> init 에이전트는 커맨드 스킬을 사용하지 않습니다. 초기화 전용이므로 워크플로우 스킬만 바인딩됩니다.
+
 ## 입력
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
@@ -28,77 +61,13 @@ maxTurns: 15
 
 ## 절차
 
-### 1. prompt.txt 읽기
+1. **prompt.txt 읽기** - `.prompt/prompt.txt`를 절대 경로로 Read. 내용 없으면 시나리오 분기 (이전 COMPLETED 워크플로우 존재 시 후속 제안, 없으면 중지 안내)
+2. **작업 제목 생성** - prompt.txt 기반 20자 이내 한글 요약, 공백->하이픈, 특수문자 제거
+3. **workId 생성** - `TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"` (LLM 추정 금지)
+4. **wf-init 실행** - `wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>` 1회 호출. mode 인자 필수
+   - workDir 형식: `.workflow/YYYYMMDD-HHMMSS/<workName>/<command>`
 
-Read 도구로 **프로젝트 루트의** `.prompt/prompt.txt`를 읽습니다. (CWD가 프로젝트 루트가 아닐 수 있으므로 반드시 절대 경로를 사용)
-
-**내용 있음** -> 2단계로 진행
-
-**내용 없음** (파일 없음, 비어있음, 공백/줄바꿈만) -> 시나리오 분기:
-
-- **시나리오 1**: 이전 COMPLETED 워크플로우가 존재하는 경우
-
-  1. `.workflow/` 하위에서 가장 최근 COMPLETED 상태의 워크플로우 탐색
-  2. 해당 워크플로우의 `report.md`를 읽어 분석
-  3. 후속 작업을 제안하고 AskUserQuestion으로 사용자에게 확인
-  4. 사용자가 승인하면 그 내용을 prompt로 사용하여 2단계로 진행
-  5. 사용자가 거부하면 워크플로우 중지
-- **시나리오 2**: 이전 워크플로우가 없는 경우
-
-  - 워크플로우 중지: "`<프로젝트루트>/.prompt/prompt.txt`에 요청 내용을 작성한 후 다시 실행해주세요." (절대 경로로 안내)
-
-### 2. 작업 제목 생성
-
-prompt.txt 내용을 기반으로 작업 제목을 생성합니다.
-
-**규칙:**
-
-- 요청의 핵심을 20자 이내로 요약
-- 한글 사용 가능
-- 공백 -> 하이픈(-)으로 변환
-- 특수문자 제거, 마침표 -> 하이픈
-- 연속 하이픈 -> 단일 하이픈
-- 20자 초과 시 절단
-
-### 3. workId 생성 및 init-workflow.sh 실행
-
-Bash 도구로 KST 기반 시간을 생성합니다 (LLM 추정 금지):
-
-```bash
-TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"
-```
-
-출력 예: `20260205-204500` -> date: `20260205`, workId: `204500`
-
-이어서 스크립트를 1회 호출합니다:
-
-```bash
-wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>
-```
-
-> **WARNING**: mode 인자를 생략하면 status.json이 mode: "full"로 생성되어 prompt/no-plan 모드의 FSM 전이가 차단됩니다. 입력받은 mode 값을 반드시 6번째 인자로 전달하세요.
-
-> **5번째 인자 `${CLAUDE_SESSION_ID}`**: Claude Code 내장 템플릿 변수로, 현재 세션 UUID가 자동 치환됩니다. 이 값은 `status.json`의 `linked_sessions` 필드에 기록되어 워크플로우 세션 추적에 사용됩니다.
-
-> **6번째 인자 `mode`** (필수: 입력받은 mode 값을 반드시 전달. 생략 시 full로 기본 설정되어 FSM 전이 오류 발생): 워크플로우 모드를 지정합니다. `full`(기본값), `no-plan`, `prompt` 중 하나입니다. 전달하지 않으면 `full`로 설정됩니다. 이 값은 `status.json`의 `mode` 필드에 기록되어 FSM 가드 및 오케스트레이션 분기에 사용됩니다.
-
-- `workDir`은 `.workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>` 형식 (중첩 구조)
-
-> **workDir 형식 주의 (필수):**
-> `workDir`은 `.workflow/YYYYMMDD-HHMMSS/<workName>/<command>` 형식입니다. timestamp 디렉터리 하위에 작업이름과 명령어 디렉터리가 포함됩니다.
-> - 올바른 예: `.workflow/20260208-133900/디렉터리-구조-변경/implement`
-> - 잘못된 예: `.workflow/20260208-133900` (구 플랫 형식)
-
-스크립트가 수행하는 작업:
-
-- 작업 디렉터리 생성
-- user_prompt.txt 저장 (prompt.txt 내용)
-- prompt.txt 클리어
-- querys.txt 갱신
-- .context.json 생성
-- status.json 생성 (mode 필드 포함)
-- 좀비 정리 (cleanup-zombie.sh 위임: TTL 만료 -> STALE + 레지스트리 정리)
-- 전역 레지스트리 등록
+> 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, wf-init 인자 상세, 스크립트 수행 목록)는 `workflow-init/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

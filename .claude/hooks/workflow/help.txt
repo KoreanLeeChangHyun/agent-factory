@@ -1,0 +1,6 @@
+워크플로우 초기화 완료.
+- /cc:prompt     -> 직접 작업
+- /cc:research   -> 연구/조사/분석
+- /cc:strategy   -> 전략/마일스톤
+- /cc:implement  -> 구현/개발/작업
+- /cc:review     -> 검토/검증/검사

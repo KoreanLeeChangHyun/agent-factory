@@ -1,53 +1,57 @@
 ---
 name: workflow-orchestration
-description: "워크플로우 전체 오케스트레이션 내부 스킬. INIT -> PLAN -> WORK -> REPORT 4단계 워크플로우를 관리한다. Use for workflow orchestration: cc:* 커맨드 실행 시 자동 로드되어 단계별 흐름 제어, 서브에이전트 호출, 상태 관리를 수행한다. SKILL.md는 네비게이션 허브(~300줄)이며, 상세 가이드는 step0-init.md ~ step3-report.md, common-reference.md에 분리."
+description: "워크플로우 전체 오케스트레이션 내부 스킬. INIT -> PLAN -> WORK -> REPORT -> DONE 5단계 워크플로우를 관리한다. Use for workflow orchestration: cc:* 커맨드 실행 시 자동 로드되어 단계별 흐름 제어, 서브에이전트 호출, 상태 관리를 수행한다. SKILL.md는 네비게이션 허브이며, 상세 가이드는 step1-init.md ~ step5-done.md, common-reference.md에 분리."
 disable-model-invocation: true
----
-
-## Workflow Compliance
-
-All cc:* commands execute phases according to their mode:
-
-```
-Tier 1 (full):    INIT -> PLAN -> WORK -> REPORT
-Tier 2 (no-plan): INIT -> WORK -> REPORT
-Tier 3 (prompt):  INIT -> Direct Work by Main Agent
-```
-
-**Mode Rules:**
-
-| Mode | Phase Order | Skip Allowed |
-|------|-------------|-------------|
-| full (default) | INIT -> PLAN -> WORK -> REPORT | None |
-| no-plan (-np) | INIT -> WORK -> REPORT | PLAN skipped |
-| prompt | INIT -> Main Agent Direct | PLAN, WORK, REPORT skipped |
-
-1. Phase order within each mode MUST NOT be violated
-2. PLAN approval REQUIRED before WORK proceeds (full mode only)
-3. Violation: halt workflow and report error
-
 ---
 
 # Orchestrator
 
 Main agent controls workflow sequencing and agent dispatch only.
 
-## Workflow Structure
+## FSM State Transition Diagram
 
-```
-Main Agent (Orchestrator)
-    |
-    +-- 0. INIT: init agent -> returns: request, workDir, workId, registryKey, date, title, workName, rationale
-    +-- 1. PLAN: planner agent (workflow-plan skill) -> returns: plan path
-    +-- 2. WORK: worker agent (workflow-work skill) -> returns: work log path
-    +-- 3. REPORT: reporter agent (workflow-report skill) -> returns: report path
-    +-- 4. END: end agent (workflow-end skill) -> history.md, status.json, usage, unregister + orchestrator DONE banner
+```mermaid
+stateDiagram-v2
+    [*] --> INIT
+    INIT --> PLAN: full mode
+    INIT --> WORK: no-plan mode
+    INIT --> WORK: prompt mode(main direct)
+    PLAN --> WORK: 승인
+    PLAN --> CANCELLED: 중지
+    WORK --> REPORT
+    WORK --> REPORT: prompt mode
+    REPORT --> COMPLETED: 성공
+    REPORT --> COMPLETED: prompt mode 성공
+    REPORT --> FAILED: 실패
+    INIT --> STALE: TTL 만료
+    PLAN --> STALE: TTL 만료
+    WORK --> STALE: TTL 만료
+    REPORT --> STALE: TTL 만료
 ```
 
-Core Principles:
-- All phases execute via sub-agents
-- Sub-agents MUST NOT call other sub-agents; main agent chains directly
-- Git commits run separately via `/git:commit` after workflow completion
+## Mode-Phase Order
+
+| Mode | Phase Order | Agent Sequence | Skip |
+|------|-------------|----------------|------|
+| full (default) | INIT -> PLAN -> WORK -> REPORT -> COMPLETED | init -> planner -> worker(s) -> reporter -> done | None |
+| no-plan (`-np`) | INIT -> WORK -> REPORT -> COMPLETED | init -> worker -> reporter -> done | PLAN |
+| prompt | INIT -> WORK -> REPORT -> COMPLETED | init -> (main direct) -> reporter -> done | PLAN |
+
+1. Phase order within each mode MUST NOT be violated
+2. PLAN approval REQUIRED before WORK proceeds (full mode only)
+3. Violation: halt workflow and report error
+
+## Agent-Phase Mapping
+
+| Phase | Agent | Skill | Return Lines | Key Output |
+|-------|-------|-------|-------------|------------|
+| INIT | init | workflow-init | 8 | request, workDir, workId, registryKey |
+| PLAN | planner | workflow-plan | 3 | plan path |
+| WORK | worker | workflow-work + command skills | 3 | work log path |
+| REPORT | reporter | workflow-report | 2 | report path |
+| END | done | workflow-end | 1 | status |
+
+---
 
 ## Supported Commands
 
@@ -57,9 +61,9 @@ Core Principles:
 | review | Code review |
 | research | Research/investigation and internal asset analysis |
 | strategy | Multi-workflow strategy and roadmap generation |
-| prompt | Lightweight direct work (Tier 3, no workflow) |
+| prompt | Lightweight direct work (Tier 3, main agent direct + reporter + done) |
 
-Commands follow their mode's phase order. Default is full (INIT -> PLAN -> WORK -> REPORT). `prompt` always runs in Tier 3 mode.
+Commands follow their mode's phase order. Default is full. `prompt` always runs in prompt mode.
 
 ## Input Parameters
 
@@ -84,7 +88,6 @@ Workflow <registryKey> <phase> <status>
 ```
 
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
-- **`[path]`**: (optional) Auto-inferred if omitted. Explicit path overrides.
 
 **Call Timing:**
 
@@ -96,21 +99,13 @@ Workflow <registryKey> <phase> <status>
 | WORK Phase N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
 | Before/After REPORT | `Workflow <registryKey> REPORT` / `Workflow <registryKey> REPORT done` |
 | Before/After DONE | `Workflow <registryKey> DONE` / `Workflow <registryKey> DONE done` |
-| Prompt mode Final | `Workflow <registryKey> DONE done` (after direct work, no PLAN/WORK/REPORT banners) |
+| Before/After WORK (prompt) | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` (main direct work) |
 
 PLAN completion banner MUST complete before AskUserQuestion (sequential, 2 separate turns).
 
-DONE start banner: Called by orchestrator before dispatching end agent. DONE completion banner: Called by orchestrator after end agent returns. Auto-sends Slack notification.
+DONE start banner: Called by orchestrator before dispatching done agent. DONE completion banner: Called by orchestrator after done agent returns. Auto-sends Slack notification.
 
-**CRITICAL: After DONE banner, the orchestrator MUST terminate immediately. Output ZERO text after DONE banner. Any post-DONE output (e.g., "Workflow already completed", "All tasks finished", status explanations) is a protocol violation.**
-
-### Output Rules
-
-**Allowed:** Phase banners, phase report links, file paths, approval requests, error messages, status returns.
-
-**MUST NOT output:** analysis process, reasoning, code review details, comparisons, internal thoughts, work plans, progress reports, free-text messages, sub-agent return interpretation, any text after DONE banner, workflow completion status messages (e.g., "Workflow already completed", "All tasks finished", "DONE banner was issued"), post-completion explanations or summaries.
-
-**Sub-agents:** Standard return format only. MUST NOT quote/explain skill content in terminal.
+**CRITICAL: After DONE banner, the orchestrator MUST terminate immediately. Output ZERO text after DONE banner. Any post-DONE output is a protocol violation.**
 
 ### Post-Return Silence Rules
 
@@ -118,19 +113,19 @@ DONE start banner: Called by orchestrator before dispatching end agent. DONE com
 |---------------|----------------|------------|
 | INIT done (full) | Extract/retain params, PLAN banner, status update, planner call | Return summary, progress text |
 | INIT done (no-plan) | Extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), single worker call | PLAN banner, planner call, AskUserQuestion |
-| INIT done (prompt) | Direct work by main agent | Sub-agent calls, PLAN/WORK/REPORT banners |
-| PLAN (1a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
-| PLAN (1b) done | Branch on approval, WORK banner, status update | Approval explanation |
+| INIT done (prompt) | Direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call |
+| PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
+| PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation |
 | WORK Phase start | WORK-PHASE banner, then worker call(s) for that phase | Skipping Phase banner |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
-| REPORT done | REPORT completion banner, DONE start banner, end agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text, "Workflow already completed", "All tasks finished", "DONE banner was issued", any workflow status message |
+| REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text |
 
 ---
 
-## Step 0: INIT
+## Step 1: INIT
 
-**Details:** See [step0-init.md](step0-init.md)
+**Details:** See [step1-init.md](step1-init.md)
 
 ```bash
 Workflow INIT none <command>
@@ -140,59 +135,23 @@ Workflow INIT none <command>
 Task(subagent_type="init", prompt="command: <command>, mode: <mode>")
 ```
 
-> `mode` is determined before calling init: `prompt` for cc:prompt, `no-plan` if `-np` flag detected in `$ARGUMENTS`, `full` (default) otherwise.
-
 Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workName`, `rationale` -- all MUST be retained for subsequent phases.
 
 ### Mode Branching (After INIT)
 
-After INIT returns, check the command to determine mode:
-
 | Command | Mode | Next Step |
 |---------|------|-----------|
-| `prompt` | Tier 3 | Main agent direct work (skip PLAN/WORK/REPORT) |
-| Others with `-np` | Tier 2 | Skip to WORK (skip PLAN) |
-| Others (default) | Tier 1 | Proceed to PLAN |
-
-**Prompt Mode (Tier 3):**
-If command is `prompt`, the orchestrator performs direct work after INIT:
-1. Read `<workDir>/user_prompt.txt` for the user request
-2. Perform work directly (using Read, Write, Edit, Grep, Glob, Bash, etc.)
-3. On completion (MUST execute steps 3a-3d sequentially, skipping none):
-   ```bash
-   # 3a. Update .prompt/history.md (append 1 row)
-   # 3b. Transition status: INIT -> COMPLETED
-   wf-state status <registryKey> INIT COMPLETED
-   # 3c. Unregister from global registry (MUST NOT skip: 누락 시 INIT phase 잔류 엔트리 발생)
-   wf-state unregister <registryKey>
-   # 3d. DONE banner
-   Workflow <registryKey> DONE done
-   ```
-   > **REQUIRED:** `wf-state status` (3b)와 `wf-state unregister` (3c)는 반드시 순차 실행. unregister 누락 시 INIT phase로 레지스트리에 잔류하여 `wf-registry clean`에서도 정리되지 않는 고아 엔트리가 됩니다.
-4. Terminate immediately after DONE banner
-
-**No-Plan Mode (Tier 2):**
-If `$ARGUMENTS` contains `-np` flag, the orchestrator skips PLAN and proceeds directly to WORK after INIT:
-1. INIT returns normally (init agent called with `mode: no-plan`)
-2. Skip PLAN entirely (no planner call, no AskUserQuestion, no PLAN banners)
-3. WORK banner, then single Worker call with `mode: no-plan` (no planPath, no Phase 0):
-   ```bash
-   Workflow <registryKey> WORK
-   wf-state both <registryKey> worker INIT WORK
-   ```
-   ```
-   Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
-   ```
-4. After Worker returns, proceed to REPORT as normal
-5. Phase order: INIT -> WORK -> REPORT -> COMPLETED
+| `prompt` | prompt | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step1-init.md](step1-init.md) "Prompt Mode Post-INIT Flow" |
+| Others with `-np` | no-plan | Skip to WORK. See [step1-init.md](step1-init.md) "No-Plan Mode" |
+| Others (default) | full | Proceed to PLAN |
 
 ---
 
 ## Sub-agent Dispatch
 
-### Step 1: PLAN
+### Step 2: PLAN
 
-**Details:** See [step1-plan.md](step1-plan.md)
+**Details:** See [step2-plan.md](step2-plan.md)
 
 **Status update:** `wf-state both <registryKey> planner INIT PLAN`
 
@@ -200,47 +159,26 @@ If `$ARGUMENTS` contains `-np` flag, the orchestrator skips PLAN and proceeds di
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options: 승인 / 수정 / 중지). See step1-plan.md for full approval flow, .context.json handling, Slack notification, CANCELLED processing, and Binding Contract rule.
+After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options). See [step2-plan.md](step2-plan.md) for approval flow, .context.json handling, CANCELLED processing, and Binding Contract rule.
 
-### Step 2: WORK
+### Step 3: WORK
 
-**Details:** See [step2-work.md](step2-work.md)
+**Details:** See [step3-work.md](step3-work.md)
 
 **Status update (mode-aware):**
 - full mode: `wf-state both <registryKey> worker PLAN WORK`
 - no-plan mode: `wf-state both <registryKey> worker INIT WORK`
+- prompt mode: `wf-state both <registryKey> worker INIT WORK` (main agent direct work, no worker sub-agent)
 
-**Rules:** Only worker/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. MUST NOT augment context autonomously. Execute ONLY plan tasks (full mode) or user_prompt.txt request (no-plan mode).
+**Rules:** Only worker/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode), user_prompt.txt request (no-plan mode), or main agent direct work (prompt mode).
 
-**No-Plan Mode (single worker, no Phase 0):**
-```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
-```
-- Phase 0 (skill-map) skipped
-- planPath not provided; worker reads `<workDir>/user_prompt.txt` directly
-- Single worker call (taskId: W01 fixed)
-
-**Full Mode - Phase 0 (REQUIRED, sequential):**
-```bash
-Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
-```
-```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
-```
-
-**Full Mode - Phase 1~N:** Execute per plan. Independent tasks parallel, dependent tasks sequential. Call WORK-PHASE banner before each phase's worker(s).
-```bash
-Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
-```
-```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <skillName>")
-```
+**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for No-Plan mode, Phase 0 conditional execution, Phase 1~N task execution, Explore sub-agent, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 
-### Step 3: REPORT
+### Step 4: REPORT
 
-**Details:** See [step3-report.md](step3-report.md)
+**Details:** See [step4-report.md](step4-report.md)
 
 **Status update:** `wf-state both <registryKey> reporter WORK REPORT`
 
@@ -248,14 +186,15 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
 ```
 
-After REPORT: completion banner -> DONE start banner -> end agent call (history.md, status.json, usage, unregister) -> DONE completion banner -> terminate.
+### Step 5: END
+
+**Details:** See [step5-done.md](step5-done.md)
+
+After REPORT completion: DONE start banner -> done agent call -> DONE completion banner -> terminate.
 
 ```bash
-# Orchestrator calls DONE start banner before end agent
 Workflow <registryKey> DONE
-# Orchestrator dispatches end agent
-Task(subagent_type="end", ...)
-# Orchestrator calls DONE completion banner after end agent returns
+Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")
 Workflow <registryKey> DONE done
 ```
 
@@ -263,7 +202,51 @@ Workflow <registryKey> DONE done
 
 ## Common Reference
 
-> Sub-agent return formats, invocation rules, state update methods, FSM transitions, error handling: See [common-reference.md](common-reference.md)
+> Sub-agent return formats, state update methods, FSM transition rules, error handling: See [common-reference.md](common-reference.md)
+
+---
+
+## Main Agent vs Sub-agent Responsibility Boundary
+
+### Orchestrator-Only Actions
+
+| Action | Description |
+|--------|-------------|
+| Phase banner Bash calls | `Workflow <registryKey> <phase>` start/completion banners |
+| AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
+| wf-state transition/registry | `wf-state both/status/context/register/unregister/link-session` |
+| Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
+| prompt.txt read/clear | Read user_prompt.txt via init, clear on modify-selection |
+| Post-DONE immediate termination | Zero text output after DONE completion banner |
+
+### Sub-agent-Only Actions
+
+| Agent | Exclusive Actions |
+|-------|-------------------|
+| init | Workflow initialization, workDir creation, prompt.txt processing, status.json/registry setup |
+| planner | Plan document authoring (`plan.md`), task decomposition, phase/dependency design |
+| worker | Source code read/modify/create (Read/Write/Edit), code analysis, test execution, work log authoring (`work/WXX-*.md`) |
+| reporter | Final report authoring (`report.md`), work log aggregation |
+| done | Finalization processing, Slack notification, cleanup |
+
+### Orchestrator Prohibited Actions
+
+| Prohibited Action | Reason |
+|-------------------|--------|
+| Direct source code modification (Write/Edit) | Worker exclusive; orchestrator is sequencing-only |
+| Direct code analysis/review | Worker exclusive; orchestrator must not interpret code |
+| Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
+| Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
+
+### Platform Constraints Requiring Orchestrator Execution
+
+Certain actions must be performed by the orchestrator due to Claude Code platform limitations, not by design preference.
+
+| Constraint | Explanation |
+|------------|-------------|
+| AskUserQuestion unavailable in sub-agents | Sub-agents cannot invoke AskUserQuestion (GitHub Issue #12890); all user interaction must route through orchestrator |
+| Sub-agent Bash output not visible to user | Sub-agent terminal output is not displayed to the user; phase banners must be called by orchestrator to be visible |
+| No direct sub-agent-to-sub-agent invocation | All dispatch goes through orchestrator; sub-agents cannot call Task to spawn sibling agents |
 
 ---
 
