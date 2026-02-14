@@ -4,6 +4,32 @@
     "command": "python3 .claude/scripts/statusline.py"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "히스토리 동기화 중..."
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
@@ -23,16 +49,6 @@
             "type": "command",
             "command": "bash .claude/hooks/event/pre-tool-use/dangerous-command-guard.sh",
             "statusMessage": "위험 명령어 검사 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/hooks-self-guard.sh",
-            "statusMessage": "Hooks 보호 검사 중..."
           }
         ]
       },

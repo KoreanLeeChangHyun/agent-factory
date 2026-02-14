@@ -1,7 +1,7 @@
 ---
 name: init
 description: "워크플로우 초기화를 수행하는 에이전트"
-tools: Bash, Edit, Glob, Grep, Read
+tools: Bash, Glob, Grep, Read
 model: haiku
 skills:
   - workflow-init
@@ -139,6 +139,8 @@ title: <Step 2에서 생성한 제목>
 workName: <wf-init stdout의 workName 값>
 근거: [1줄 요약]
 ```
+
+> **참고**: `request`(50자 요약)와 `근거`(1줄)는 후속 Phase 라우팅을 위한 최소 식별 정보(routing hint)이며, 작업 내용(work content)이 아닙니다. 전체 요청 원문은 `user_prompt.txt`에 보존되어 planner가 읽습니다.
 
 > **금지 항목**: 요청 전문, "다음 단계" 안내, 판단 근거 상세, 마크다운 헤더, 부가 섹션, 변경 파일 목록, 예상 작업 시간, 복잡도 등 상세 정보
 

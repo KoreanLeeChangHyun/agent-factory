@@ -20,6 +20,9 @@ if [ "$WORKFLOW_SKIP_GUARD" = "1" ]; then
     exit 0
 fi
 
+# Guard disable check
+if [ "$GUARD_WORKFLOW_TRANSITION" = "0" ]; then exit 0; fi
+
 # Bypass 메커니즘: 파일 기반 또는 환경변수 기반
 if [ "$WORKFLOW_GUARD_DISABLE" = "1" ] || [ -f "$PROJECT_ROOT/.workflow/bypass" ]; then
     exit 0

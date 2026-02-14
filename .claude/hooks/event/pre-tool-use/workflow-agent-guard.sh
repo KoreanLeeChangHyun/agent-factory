@@ -31,6 +31,9 @@ if [ "$WORKFLOW_SKIP_GUARD" = "1" ]; then
     exit 0
 fi
 
+# Guard disable check
+if [ "$GUARD_WORKFLOW_AGENT" = "0" ]; then exit 0; fi
+
 # Bypass 메커니즘: 파일 기반 또는 환경변수 기반
 SCRIPT_DIR_AG="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT_AG="$(cd "$SCRIPT_DIR_AG/../../../.." && pwd)"

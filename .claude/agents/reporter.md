@@ -64,7 +64,7 @@ permissionMode: acceptEdits
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
+- `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID (HHMMSS 6자리, 예: "143000")
 - `workDir`: 작업 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
 - `workPath`: 작업 내역 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/work/`)

@@ -180,6 +180,52 @@ Task(subagent_type="explore", prompt="
 - **Worker combination**: Explore(읽기) 결과를 수집한 후 Worker(쓰기)에 전달하는 파이프라인 구성 가능
 - **Plan compliance**: 계획서에 `서브에이전트: Explore`로 명시된 태스크만 Explore로 호출
 
+## Error Handling
+
+Worker 실패 시 태스크 종속성과 전체 실패율에 따라 처리합니다.
+
+### 독립 태스크 실패
+
+같은 Phase 내 독립(병렬) 태스크가 실패한 경우, 다른 독립 태스크는 계속 진행합니다. 실패한 태스크의 상태만 기록하고 후속 Phase로 이동합니다.
+
+```
+# Phase 1 (병렬): W01, W02, W03
+results = parallel_execute([W01, W02, W03])
+# W02가 실패해도 W01, W03 결과는 유효
+failed = [r for r in results if r.status == "실패"]
+# 실패 태스크를 기록하고 계속 진행
+```
+
+### 종속 태스크 체인 중단
+
+선행 태스크가 실패한 경우, 해당 태스크에 종속된 후속 태스크 체인을 중단합니다. 종속 관계가 없는 다른 체인은 정상 진행합니다.
+
+```
+# W01 실패 → W04(W01 종속) 스킵, W05(W02 종속) 정상 진행
+if dependency_task.status == "실패":
+    log("[WARN] {taskId} 스킵: 선행 태스크 {dependency} 실패")
+    skip_task(taskId)
+```
+
+### 50% 실패율 기준 워크플로우 중단
+
+전체 태스크 중 50% 이상이 실패하면 워크플로우를 중단하고 사용자에게 확인을 요청합니다.
+
+```
+total_tasks = count(all_tasks)
+failed_tasks = count(tasks where status == "실패" or status == "스킵")
+
+if failed_tasks / total_tasks >= 0.5:
+    AskUserQuestion("전체 {total_tasks}개 태스크 중 {failed_tasks}개가 실패했습니다. 계속 진행하시겠습니까?")
+```
+
+| 상황 | 처리 |
+|------|------|
+| 독립 태스크 실패 | 다른 독립 태스크 계속 진행 |
+| 종속 선행 태스크 실패 | 해당 종속 체인 중단, 다른 체인 계속 |
+| 실패율 >= 50% | 워크플로우 중단, AskUserQuestion으로 사용자 확인 |
+| Worker 반환 상태 "실패" | 최대 3회 재호출. 3회 모두 실패 시 해당 태스크를 실패로 기록하고 종속성 규칙에 따라 처리 |
+
 ## Worker Return Value Processing (REQUIRED)
 
 > **WARNING: Worker 반환값이 3줄을 초과하면 메인 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
@@ -207,3 +253,34 @@ Task(worker) 호출 후 반환값 처리 규칙:
 # 형식: wf-state usage-pending <registryKey> <agent_id_or_taskId> <taskId>
 wf-state usage-pending <registryKey> W01 W01
 ```
+
+## Hooks 수정 태스크 실행 패턴
+
+> hooks 디렉토리(`.claude/hooks/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
+> 오케스트레이터가 `wf-state env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
+
+**실행 순서:**
+
+```bash
+# 1. Worker 호출 전: hooks 수정 허용 환경변수 설정
+wf-state env <registryKey> set HOOKS_EDIT_ALLOWED 1
+
+# 2. Worker 호출 (hooks 파일 수정 태스크)
+wf-state usage-pending <registryKey> W01 W01
+```
+```
+Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
+```
+```bash
+# 3. Worker 완료 후: 환경변수 해제 (반드시 실행)
+wf-state env <registryKey> unset HOOKS_EDIT_ALLOWED
+```
+
+**규칙:**
+
+| 항목 | 설명 |
+|------|------|
+| 설정 시점 | Worker Task 호출 직전 (usage-pending보다 먼저) |
+| 해제 시점 | Worker 반환값 수신 직후 (성공/실패 무관, 반드시 해제) |
+| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `wf-state env`의 화이트리스트로 제한 |
+| 적용 대상 | 계획서에서 hooks 디렉토리 파일을 수정 대상으로 명시한 태스크만 해당 |

@@ -35,6 +35,31 @@ mode: <mode>
 - **status.json**: init이 `<workDir>/status.json` 생성 완료 (phase: "INIT"). 좀비 정리도 이 단계에서 수행
 - **workDir format**: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` (중첩 구조)
 
+## Error Handling
+
+INIT 에이전트 호출 실패 시 최대 3회 재시도합니다.
+
+```
+retry_count = 0
+MAX_RETRIES = 3
+
+while retry_count < MAX_RETRIES:
+    result = Task(subagent_type="init", prompt="command: <command>, mode: <mode>")
+    if result does not start with "에러:":
+        break  # 성공 → Mode Branching 진행
+    retry_count += 1
+    log("[WARN] INIT 실패 (시도 {retry_count}/{MAX_RETRIES}): {result}")
+
+if retry_count >= MAX_RETRIES:
+    AskUserQuestion("INIT 에이전트가 3회 연속 실패했습니다. 워크플로우를 재시도하거나 중단할 수 있습니다.")
+```
+
+| 상황 | 처리 |
+|------|------|
+| init 반환값이 `에러:` 접두사 | 재시도 (최대 3회) |
+| 3회 모두 실패 | AskUserQuestion으로 사용자에게 상황 보고 |
+| 재시도 중 성공 | 경고 로그만 남기고 정상 진행 |
+
 ## Orchestrator Post-INIT Rules (CRITICAL)
 
 > **init이 에러 없이 반환하면, 오케스트레이터는 반환값을 있는 그대로 수용하고 즉시 Mode Branching으로 진행한다. 어떠한 판단도 개입하지 않는다.**

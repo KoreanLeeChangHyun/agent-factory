@@ -134,6 +134,8 @@ AskUserQuestion(
 | **수정** | 사용자가 prompt.txt에 피드백을 작성한 후 선택. planner를 재호출하여 피드백 반영 후 계획 재수립, 다시 Step 2b 수행 |
 | **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단 |
 
+> **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
+
 > **"수정" selection handling:**
 > 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
 >

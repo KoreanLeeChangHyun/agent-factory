@@ -3,22 +3,22 @@
   "modes": {
     "full": {
       "NONE": ["INIT"],
-      "INIT": ["PLAN"],
-      "PLAN": ["WORK", "CANCELLED"],
-      "WORK": ["REPORT", "FAILED"],
-      "REPORT": ["COMPLETED", "FAILED"]
+      "INIT": ["PLAN", "STALE"],
+      "PLAN": ["WORK", "CANCELLED", "STALE"],
+      "WORK": ["REPORT", "FAILED", "STALE"],
+      "REPORT": ["COMPLETED", "FAILED", "STALE"]
     },
     "no-plan": {
       "NONE": ["INIT"],
-      "INIT": ["WORK"],
-      "WORK": ["REPORT", "FAILED"],
-      "REPORT": ["COMPLETED", "FAILED"]
+      "INIT": ["WORK", "STALE"],
+      "WORK": ["REPORT", "FAILED", "STALE"],
+      "REPORT": ["COMPLETED", "FAILED", "STALE"]
     },
     "prompt": {
       "NONE": ["INIT"],
-      "INIT": ["WORK"],
-      "WORK": ["REPORT", "FAILED"],
-      "REPORT": ["COMPLETED", "FAILED"]
+      "INIT": ["WORK", "STALE"],
+      "WORK": ["REPORT", "FAILED", "STALE"],
+      "REPORT": ["COMPLETED", "FAILED", "STALE"]
     }
   }
 }

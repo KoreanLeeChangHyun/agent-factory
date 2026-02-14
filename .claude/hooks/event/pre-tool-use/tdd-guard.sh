@@ -6,6 +6,9 @@
 # 입력: stdin으로 JSON (tool_name, tool_input)
 # 출력: 항상 빈 stdout (차단하지 않음), 경고는 stderr로 출력
 
+# Guard disable check
+if [ "$GUARD_TDD" = "0" ]; then exit 0; fi
+
 # stdin에서 JSON 읽기
 INPUT=$(cat)
 

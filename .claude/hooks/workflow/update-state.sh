@@ -12,6 +12,7 @@
 #   update-workflow-state.sh usage-pending <workDir> <agent_id> <task_id>
 #   update-workflow-state.sh usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
 #   update-workflow-state.sh usage-finalize <workDir>
+#   update-workflow-state.sh env <workDir> set|unset <KEY> [VALUE]
 #
 # workDir 형식 (3가지, 하위 호환):
 #   단축 형식: YYYYMMDD-HHMMSS (registry.json에서 자동 해석)
@@ -39,6 +40,8 @@
 #                  Hook(usage-tracker.sh)에서 호출. Worker는 agents.workers.<taskId> 하위에 기록
 #   usage-finalize - 워크플로우 완료 시 totals 계산, effective_tokens 산출, .prompt/usage.md 행 추가
 #                  오케스트레이터가 reporter 반환 후 unregister 전에 호출
+#   env          - .claude.env 파일의 환경 변수를 관리 (set/unset)
+#                  허용 KEY: HOOKS_EDIT_ALLOWED, GUARD_ 접두사. 비허용 KEY는 경고 후 무시
 #
 # 레지스트리 스키마 (.workflow/registry.json):
 #   {
@@ -138,16 +141,29 @@ acquire_lock() {
     local max_wait=5
     local waited=0
     while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+        # stale lock 감지: PID 파일에서 보유 프로세스 확인
+        if [ -f "$LOCK_DIR/pid" ]; then
+            local lock_pid
+            lock_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+            if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                # 프로세스가 존재하지 않으므로 stale lock 제거
+                rm -rf "$LOCK_DIR"
+                continue
+            fi
+        fi
         waited=$((waited + 1))
         if [ "$waited" -ge "$max_wait" ]; then
             return 1
         fi
         sleep 1
     done
+    # 잠금 보유 프로세스 PID 기록
+    echo $$ > "$LOCK_DIR/pid"
     return 0
 }
 
 release_lock() {
+    rm -f "$LOCK_DIR/pid" 2>/dev/null
     rmdir "$LOCK_DIR" 2>/dev/null
 }
 
@@ -602,6 +618,15 @@ usage_pending() {
     # mkdir 잠금 획득 (usage.json 전용)
     local max_wait=5 waited=0
     while ! mkdir "$usage_lock" 2>/dev/null; do
+        # stale lock 감지: PID 파일에서 보유 프로세스 확인
+        if [ -f "$usage_lock/pid" ]; then
+            local lock_pid
+            lock_pid=$(cat "$usage_lock/pid" 2>/dev/null)
+            if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                rm -rf "$usage_lock"
+                continue
+            fi
+        fi
         waited=$((waited + 1))
         if [ "$waited" -ge "$max_wait" ]; then
             echo "[WARN] usage-pending: 잠금 획득 실패" >&2
@@ -609,6 +634,8 @@ usage_pending() {
         fi
         sleep 1
     done
+    # 잠금 보유 프로세스 PID 기록
+    echo $$ > "$usage_lock/pid"
 
     WF_USAGE_FILE="$usage_file" WF_AGENT_ID="$agent_id" WF_TASK_ID="$task_id" python3 -c "
 import json, sys, os, tempfile, shutil
@@ -650,7 +677,118 @@ except Exception:
 print(f'usage-pending -> {agent_id}={task_id}')
 " 2>&1
 
+    rm -f "$usage_lock/pid" 2>/dev/null
     rmdir "$usage_lock" 2>/dev/null
+}
+
+# env 관리 함수: .claude.env 파일의 환경 변수를 set/unset
+# 허용 KEY: HOOKS_EDIT_ALLOWED, GUARD_ 접두사
+# 원자적 수정: tmpfile + mv 패턴 적용
+env_manage() {
+    local action="$1"
+    local key="$2"
+    local value="$3"
+
+    # 인자 검증
+    if [ -z "$action" ] || [ -z "$key" ]; then
+        echo "[WARN] env: action(set|unset)과 KEY 인자가 필요합니다." >&2
+        return
+    fi
+
+    if [ "$action" != "set" ] && [ "$action" != "unset" ]; then
+        echo "[WARN] env: action은 set 또는 unset만 허용됩니다. got=$action" >&2
+        return
+    fi
+
+    if [ "$action" = "set" ] && [ -z "$value" ]; then
+        echo "[WARN] env: set 명령에는 VALUE 인자가 필요합니다." >&2
+        return
+    fi
+
+    # KEY 화이트리스트 검증: HOOKS_EDIT_ALLOWED 또는 GUARD_ 접두사만 허용
+    if [ "$key" != "HOOKS_EDIT_ALLOWED" ] && [[ "$key" != GUARD_* ]]; then
+        echo "[WARN] env: 허용되지 않는 KEY입니다: $key (허용: HOOKS_EDIT_ALLOWED, GUARD_* 접두사)" >&2
+        return
+    fi
+
+    local env_file="$PROJECT_ROOT/.claude.env"
+
+    # .claude.env 파일이 없으면 경고
+    if [ ! -f "$env_file" ]; then
+        echo "[WARN] env: .claude.env not found: $env_file" >&2
+        return
+    fi
+
+    WF_ENV_FILE="$env_file" WF_ACTION="$action" WF_KEY="$key" WF_VALUE="$value" python3 -c "
+import sys, os, tempfile, shutil
+
+env_file = os.environ['WF_ENV_FILE']
+action = os.environ['WF_ACTION']
+key = os.environ['WF_KEY']
+value = os.environ.get('WF_VALUE', '')
+
+try:
+    with open(env_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    if action == 'set':
+        # KEY가 존재하면 값 갱신, 미존재 시 마지막 줄에 추가
+        found = False
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(key + '='):
+                new_lines.append(f'{key}={value}\n')
+                found = True
+            else:
+                new_lines.append(line)
+
+        if not found:
+            # 마지막 줄이 빈 줄이 아니면 줄바꿈 추가
+            if new_lines and not new_lines[-1].endswith('\n'):
+                new_lines[-1] += '\n'
+            new_lines.append(f'{key}={value}\n')
+
+        lines = new_lines
+        label = f'env -> set {key}={value}'
+
+    elif action == 'unset':
+        # KEY와 직전 주석 줄 함께 제거
+        new_lines = []
+        skip_prev_comment = False
+        i = 0
+        while i < len(lines):
+            stripped = lines[i].strip()
+            if stripped.startswith(key + '='):
+                # 직전 줄이 주석이면 함께 제거
+                if new_lines and new_lines[-1].strip().startswith('#'):
+                    new_lines.pop()
+                # 현재 KEY 줄도 건너뜀
+                i += 1
+                continue
+            new_lines.append(lines[i])
+            i += 1
+
+        lines = new_lines
+        label = f'env -> unset {key}'
+
+    # 원자적 쓰기: tmpfile + mv
+    dir_name = os.path.dirname(env_file)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+        shutil.move(tmp_path, env_file)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+    print(label)
+except Exception as e:
+    print(f'[WARN] env failed: {e}', file=sys.stderr)
+    sys.exit(0)
+" 2>&1
 }
 
 # usage 함수: usage.json의 agents 객체에 에이전트별 토큰 데이터 기록
@@ -674,6 +812,15 @@ usage_record() {
     # mkdir 잠금 획득
     local max_wait=5 waited=0
     while ! mkdir "$usage_lock" 2>/dev/null; do
+        # stale lock 감지: PID 파일에서 보유 프로세스 확인
+        if [ -f "$usage_lock/pid" ]; then
+            local lock_pid
+            lock_pid=$(cat "$usage_lock/pid" 2>/dev/null)
+            if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                rm -rf "$usage_lock"
+                continue
+            fi
+        fi
         waited=$((waited + 1))
         if [ "$waited" -ge "$max_wait" ]; then
             echo "[WARN] usage: 잠금 획득 실패" >&2
@@ -681,6 +828,8 @@ usage_record() {
         fi
         sleep 1
     done
+    # 잠금 보유 프로세스 PID 기록
+    echo $$ > "$usage_lock/pid"
 
     WF_USAGE_FILE="$usage_file" WF_AGENT="$agent_name" WF_INPUT="$input_tokens" WF_OUTPUT="$output_tokens" WF_CACHE_CREATE="$cache_creation" WF_CACHE_READ="$cache_read" WF_TASK_ID="$task_id" python3 -c "
 import json, sys, os, tempfile, shutil
@@ -741,6 +890,7 @@ except Exception:
 print(f'usage -> {label}: in={input_tokens} out={output_tokens} cc={cache_creation} cr={cache_read}')
 " 2>&1
 
+    rm -f "$usage_lock/pid" 2>/dev/null
     rmdir "$usage_lock" 2>/dev/null
 }
 
@@ -1045,8 +1195,20 @@ case "$MODE" in
         echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
+    env)
+        ACTION="$3"
+        KEY="$4"
+        VALUE="${5:-}"
+        if [ -z "$ACTION" ] || [ -z "$KEY" ]; then
+            echo "[WARN] env 모드: action(set|unset), KEY 인자가 필요합니다." >&2
+            exit 0
+        fi
+        RESULT=$(env_manage "$ACTION" "$KEY" "$VALUE")
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
+        ;;
+
     *)
-        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session|usage-pending|usage|usage-finalize 중 선택)" >&2
+        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session|usage-pending|usage|usage-finalize|env 중 선택)" >&2
         ;;
 esac
 

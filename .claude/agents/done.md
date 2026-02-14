@@ -1,7 +1,7 @@
 ---
 name: done
 description: "워크플로우 마무리 처리를 수행하는 에이전트"
-tools: Bash, Edit, Glob, Grep, Read
+tools: Bash, Edit, Grep, Read
 model: haiku
 skills:
   - workflow-end
@@ -89,7 +89,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 > **경고**: 반환값이 규격 줄 수(1줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
-1. 모든 작업 결과는 파일에 기록 완료 후 반환
+1. 모든 작업 결과는 `.workflow/` 및 `.prompt/` 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태만 포함
 3. 코드, 목록, 테이블, 요약, 마크다운 헤더는 반환에 절대 포함 금지
 4. 규격 외 내용 1줄이라도 추가 시 시스템 장애 발생

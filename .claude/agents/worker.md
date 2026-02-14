@@ -56,7 +56,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research)
+- `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID
 - `planPath`: 계획서 경로 (no-plan 모드에서는 없음)
 - `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`. no-plan 모드에서는 `W01` 고정

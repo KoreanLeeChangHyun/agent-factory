@@ -12,7 +12,7 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. |
+| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. <!-- END는 FSM Phase가 아닌 done 에이전트 활동 구간의 별칭이다 --> |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
 | **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, reporter, done 5개와 orchestrator(메인 에이전트)로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
@@ -49,7 +49,7 @@ flowchart TD
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
-- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, reporter=REPORT, done=END).
+- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, reporter=REPORT, done=END (END는 REPORT->COMPLETED 전이 구간의 별칭)).
 - **스킬 바인딩 이중 구조**: workflow skill은 frontmatter로 정적 바인딩, command skill은 command-skill-map.md로 동적 바인딩 (worker 전용).
 - **역할 경계 원칙**: 오케스트레이터는 조율(sequencing, dispatch, state management)만 수행하고 실제 작업(파일 수정, 계획서/보고서 작성)은 서브에이전트에 위임한다. 단, 플랫폼 제약 행위는 오케스트레이터가 직접 수행한다.
 
@@ -67,7 +67,7 @@ flowchart TD
 | planner | PLAN | workflow-plan | - | frontmatter `skills:` |
 | worker | WORK | workflow-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-work) + 런타임 동적 (command skills) |
 | reporter | REPORT | workflow-report | - | frontmatter `skills:` |
-| done | END | workflow-end | - | frontmatter `skills:` |
+| done | END (별칭) | workflow-end | - | frontmatter `skills:` |
 
 > **worker의 command skill 동적 로드**: worker는 `workflow-work` skill만 frontmatter에 선언합니다. command skill은 `command-skill-map.md`의 4단계 우선순위(skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백)로 런타임에 결정됩니다.
 
@@ -77,7 +77,7 @@ flowchart TD
 |--------|------|------|
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
 | Workflow 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시 |
-| wf-state 호출 (transition/registry) | Main | 플랫폼 제약: 상태 전이는 오케스트레이터 전용 (FSM 일관성 보장) |
+| wf-state 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
 | 소스 코드 수정 (Read/Write/Edit) | Sub (worker) | 역할 분리: 실제 작업은 서브에이전트에 위임 |
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
 | 보고서 작성 (report.md) | Sub (reporter) | 역할 분리: 보고서 종합은 reporter 전담 |
@@ -152,9 +152,23 @@ workName: <작업이름>
 | both | `<registryKey> <agent> <fromPhase> <toPhase>` | context + status 동시 (권장) |
 | register / unregister | `<registryKey>` | 전역 레지스트리 등록/해제 |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
+| env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`, END=`done`
+### 호출 주체별 허용 모드
+
+| 모드 | 오케스트레이터 | 서브에이전트 |
+|------|--------------|-------------|
+| context | O | X |
+| status | O | X |
+| both | O | X |
+| register | O | X |
+| unregister | O | O (done only) |
+| link-session | X | O (worker, reporter) |
+| env | O | X |
+| usage-* | X | O (Hook) |
+
 - 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행 (단, 오케스트레이터의 Phase 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
 
 ## State Management (status.json)

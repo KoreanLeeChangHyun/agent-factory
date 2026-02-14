@@ -6,7 +6,10 @@
 # 출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
 #
 # 우회: 환경변수 HOOKS_EDIT_ALLOWED=1 설정 시 차단 해제
-#       (사용자가 명시적으로 수정을 요청한 경우 오케스트레이터가 설정)
+#       (오케스트레이터가 `wf-state env <registryKey> set HOOKS_EDIT_ALLOWED 1` 명령으로 설정/해제)
+
+# Guard disable check
+if [ "$GUARD_HOOKS_SELF_PROTECT" = "0" ]; then exit 0; fi
 
 # stdin에서 JSON 읽기
 INPUT=$(cat)
@@ -38,8 +41,8 @@ except:
     print('')
 " 2>/dev/null)
 
-    # command에 .claude/hooks/ 경로가 없으면 통과
-    if ! echo "$BASH_CMD" | grep -q '\.claude/hooks/' 2>/dev/null; then
+    # command에 .claude/hooks/ 또는 .workflow/bypass 경로가 없으면 통과
+    if ! echo "$BASH_CMD" | grep -q '\.claude/hooks/\|\.workflow/bypass' 2>/dev/null; then
         exit 0
     fi
 
@@ -124,13 +127,50 @@ modify_patterns = [
 ]
 
 hooks_path_re = re.compile(r'\.claude/hooks/')
+bypass_path_re = re.compile(r'\.workflow/bypass')
+protected_path_res = [hooks_path_re, bypass_path_re]
+
+# 인라인 코드 쓰기 패턴: python3 -c / node -e 등에서 파일 쓰기 함수 탐지
+inline_write_patterns = [
+    r'open\s*\(',
+    r'write\s*\(',
+    r'writeFile',
+    r'writeFileSync',
+    r'appendFile',
+    r'appendFileSync',
+    r'>\s*',
+]
+
+def check_inline_write(subcmd):
+    \"\"\"인라인 코드(-c/-e 플래그) 내에서 보호 대상 경로에 대한 쓰기를 탐지\"\"\"
+    # -c 또는 -e 플래그가 포함된 인라인 코드인지 확인
+    if not re.search(r'\s+-(c|e)\s', subcmd):
+        return False
+    # 보호 대상 경로를 참조하는지 확인
+    refs_protected = False
+    for p_re in protected_path_res:
+        if p_re.search(subcmd):
+            refs_protected = True
+            break
+    if not refs_protected:
+        return False
+    # 파일 쓰기 패턴이 포함되어 있는지 확인
+    for wp in inline_write_patterns:
+        if re.search(wp, subcmd):
+            return True
+    return False
 
 for sc in subcmds:
     sc = sc.strip()
     if not sc:
         continue
-    # 이 서브커맨드가 .claude/hooks/ 를 참조하는지
-    if not hooks_path_re.search(sc):
+    # 이 서브커맨드가 보호 대상 경로(.claude/hooks/ 또는 .workflow/bypass)를 참조하는지
+    refs_any_protected = False
+    for p_re in protected_path_res:
+        if p_re.search(sc):
+            refs_any_protected = True
+            break
+    if not refs_any_protected:
         continue
     # 읽기 전용 명령인지 검사
     is_ro = False
@@ -139,6 +179,10 @@ for sc in subcmds:
             is_ro = True
             break
     if is_ro:
+        # 읽기 전용이라도 인라인 코드 쓰기 패턴이 있으면 MODIFY
+        if check_inline_write(sc):
+            print('MODIFY')
+            sys.exit(0)
         continue
     # 수정 패턴 검사
     for mod_pat in modify_patterns:
@@ -158,10 +202,17 @@ print('READONLY')
         exit 0
     fi
 
+    # .workflow/bypass 참조 여부에 따라 차단 메시지 분기
+    if echo "$BASH_CMD" | grep -q '\.workflow/bypass' 2>/dev/null; then
+        DENY_REASON='.workflow/bypass 파일 생성/수정이 차단되었습니다. 이 파일은 워크플로우 가드를 우회하는 보안 민감 파일입니다.'
+    else
+        DENY_REASON='Bash를 통한 hooks 디렉토리 파일 수정이 차단되었습니다. 사용자의 명시적 수정 요청이 필요합니다.'
+    fi
+
     # 차단
     python3 -c "
-import json
-reason = 'Bash를 통한 hooks 디렉토리 파일 수정이 차단되었습니다. 사용자의 명시적 수정 요청이 필요합니다.'
+import json, sys
+reason = sys.argv[1]
 result = {
     'hookSpecificOutput': {
         'hookEventName': 'PreToolUse',
@@ -170,7 +221,7 @@ result = {
     }
 }
 print(json.dumps(result, ensure_ascii=False))
-" 2>/dev/null
+" "$DENY_REASON" 2>/dev/null
     exit 0
 fi
 
@@ -187,6 +238,24 @@ except:
 " 2>/dev/null)
 
 if [ -z "$FILE_PATH" ]; then
+    exit 0
+fi
+
+# .workflow/bypass 경로 포함 여부 검사
+if echo "$FILE_PATH" | grep -q '\.workflow/bypass' 2>/dev/null; then
+    # bypass 파일은 환경변수 우회 불가 (무조건 차단)
+    python3 -c "
+import json
+reason = '.workflow/bypass 파일 생성/수정이 차단되었습니다. 이 파일은 워크플로우 가드를 우회하는 보안 민감 파일입니다.'
+result = {
+    'hookSpecificOutput': {
+        'hookEventName': 'PreToolUse',
+        'permissionDecision': 'deny',
+        'permissionDecisionReason': reason
+    }
+}
+print(json.dumps(result, ensure_ascii=False))
+" 2>/dev/null
     exit 0
 fi
 
