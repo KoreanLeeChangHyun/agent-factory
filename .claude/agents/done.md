@@ -72,7 +72,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 2. **status.json 완료 처리** - `wf-state status <registryKey> REPORT COMPLETED|FAILED` 실행
 3. **사용량 확정** - 성공 시 `wf-state usage-finalize <registryKey>` 실행 (실패 시 비차단)
 4. **레지스트리 해제** - `wf-state unregister <registryKey>` 실행
-5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history-sync.sh sync`가 자동 처리)
+5. **워크플로우 아카이빙** - `bash .claude/hooks/workflow/archive-workflow.sh <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history-sync.sh sync`가 자동 처리)
 
 > 상세 절차 (history.md 행 형식, 링크 구성, wf-state 호출 규약)는 `workflow-end/SKILL.md`를 참조하세요.
 

@@ -115,13 +115,16 @@ wf-state unregister <registryKey>
 
 `.workflow/` 내 워크플로우 디렉터리를 최신 10개만 유지하고 나머지를 `.history/`로 이동합니다.
 
-**절차:**
+**실행:**
 
-1. `.workflow/.history/` 디렉터리가 없으면 `mkdir -p .workflow/.history/`로 생성
-2. `.workflow/` 내 `[0-9]*` 패턴 디렉터리를 디렉터리명(YYYYMMDD-HHMMSS) 역순으로 정렬
-3. 현재 워크플로우(registryKey)는 이동 대상에서 제외
-4. 11번째 이후 디렉터리를 `.workflow/.history/`로 `mv` 이동
-5. history.md 링크 갱신은 별도 수행 불필요 (`history-sync.sh sync`가 Step 1에서 자동 처리)
+```bash
+bash .claude/hooks/workflow/archive-workflow.sh <registryKey>
+```
+
+스크립트가 다음을 자동 처리합니다:
+- 현재 워크플로우(registryKey)를 제외한 디렉터리를 역순 정렬
+- 11번째 이후 디렉터리를 `.workflow/.history/`로 이동 (`.history/` 미존재 시 자동 생성)
+- history.md 링크 갱신은 별도 수행 불필요 (Step 1의 `history-sync.sh sync`가 자동 처리)
 
 > 아카이빙 실패(이동)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
 
