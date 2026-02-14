@@ -25,8 +25,6 @@ from pathlib import Path
 # 상수
 # ============================================================
 
-MARKER_LINE = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-
 HEADER_LINE = "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |"
 SEPARATOR_LINE = "|------|--------|------------|--------|------|--------|------|--------|--------|"
 
@@ -435,12 +433,6 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
     for i, line in enumerate(lines):
         stripped = line.rstrip("\n")
 
-        # 마커 라인 감지
-        if MARKER_LINE in stripped:
-            marker_idx = i
-            header_lines.append(line)
-            continue
-
         # 테이블 헤더/구분선 감지
         if "| 날짜" in stripped and "작업ID" in stripped:
             in_table = True
@@ -655,8 +647,6 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     # 제목
     output_lines.append("# 워크플로우 실행 이력\n")
-    output_lines.append("\n")
-    output_lines.append(f"{MARKER_LINE}\n")
     output_lines.append("\n")
     output_lines.append(f"{HEADER_LINE}\n")
     output_lines.append(f"{SEPARATOR_LINE}\n")
