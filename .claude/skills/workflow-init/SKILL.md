@@ -12,6 +12,39 @@ disable-model-invocation: true
 
 ---
 
+## !! 최우선 규칙: LLM은 경로/시간/ID를 직접 생성하지 않는다 !!
+
+> **이 규칙은 모든 다른 지시보다 우선합니다.**
+
+wf-init 스크립트가 **registryKey, workId, workName, workDir을 전부 내부에서 자동 생성**합니다.
+LLM이 직접 생성하면 한글→영어 번역, 경로 불일치 등 치명적 버그가 발생합니다.
+
+### LLM이 전달하는 것: command, title, mode (3개뿐)
+
+```bash
+wf-init <command> <title> <mode>
+```
+
+### 스크립트가 자동 생성하는 것: registryKey, workId, workName, workDir
+
+```
+workDir=.workflow/20260214-121327/history-동기화-수정/implement
+registryKey=20260214-121327
+workId=121327
+workName=history-동기화-수정
+```
+
+### 절대 금지
+
+| 금지 행위 | 과거 발생한 버그 |
+|-----------|-----------------|
+| `TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"` 직접 실행 | 스크립트가 내부에서 실행함. LLM이 별도 실행 불필요 |
+| `.workflow/YYYYMMDD-HHMMSS/xxx/implement` 경로 조립 | LLM이 "history-동기화-수정"을 "history-sync"로 번역 |
+| workName을 title에서 직접 변환 | 스크립트의 Python 정규식과 결과가 달라짐 |
+| `${CLAUDE_SESSION_ID}` 인자로 전달 | 스크립트가 환경변수에서 직접 읽음 |
+
+---
+
 ## 터미널 출력 원칙
 
 > 내부 분석/사고 과정을 터미널에 출력하지 않는다. 결과만 출력한다.
@@ -57,36 +90,73 @@ Read 도구로 **프로젝트 루트의** `.prompt/prompt.txt`를 읽습니다. 
 - 20자 초과 시 절단
 
 **예시:**
-- "로그인 기능 추가" -> "로그인기능추가"
+- "로그인 기능 추가" -> "로그인-기능-추가"
 - "PR #123 리뷰" -> "PR-123-리뷰"
 - "src/auth/login.ts 버그 수정" -> "src-auth-login-ts-버그수정" (20자 절단)
 
-### Step 3: workId 생성 및 init-workflow.sh 스크립트 실행
+### Step 3: wf-init 스크립트 실행 및 stdout 파싱
 
-Bash 도구로 **정확한 KST 기반** 현재 시간을 가져옵니다:
-```bash
-TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"
-```
-
-**반드시 Bash 실행 결과를 그대로 사용하세요. LLM이 자체 추정하지 마세요.**
-
-출력 예: `20260205-204500`
-- date: 하이픈 앞 8자리 (예: 20260205)
-- workId: 하이픈 뒤 6자리 (예: 204500)
-
-그 다음, Bash 도구로 통합 초기화 스크립트를 실행합니다:
+Bash 도구로 wf-init을 **인자 3개만** 전달하여 실행합니다:
 
 ```bash
-wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <제목> ${CLAUDE_SESSION_ID} <mode>
+wf-init <command> "<title>" <mode>
 ```
 
-> **workDir 형식:**
-> 두 번째 인자 `workDir`은 `.workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>` 형식입니다.
-> - 올바른 예: `.workflow/20260208-133900/로그인기능추가/implement`
-> - 잘못된 예: `.workflow/20260208-133900` (구 플랫 형식)
-> - 잘못된 예: `.workflow/20260208-133900-워크플로우-완료/implement` (레거시 형식)
->
-> `<workName>`은 Step 2에서 생성한 작업 제목 기반 하이픈 변환 값입니다.
+**인자:**
+| 순서 | 인자 | 설명 | 예시 |
+|------|------|------|------|
+| 1 | command | 오케스트레이터로부터 전달받은 명령어 | `implement` |
+| 2 | title | **Step 2에서 생성한 제목을 그대로 전달** | `"history-동기화-수정"` |
+| 3 | mode | 오케스트레이터로부터 전달받은 모드 | `full` |
+
+**올바른 호출 예시:**
+```bash
+# GOOD
+wf-init implement "로그인-기능-추가" full
+wf-init review "PR-123-리뷰" full
+wf-init research "API-성능-조사" no-plan
+wf-init prompt "간단한-질문" prompt
+```
+
+**잘못된 호출 예시 (절대 금지):**
+```bash
+# BAD - 경로를 직접 조립
+wf-init implement .workflow/20260214-121327/login-feature/implement 121327 "로그인-기능-추가" full
+
+# BAD - date 명령을 별도 실행
+TIMESTAMP=$(TZ=Asia/Seoul date +"%Y%m%d-%H%M%S")
+wf-init implement .workflow/$TIMESTAMP/로그인-기능-추가/implement ...
+
+# BAD - CLAUDE_SESSION_ID를 인자로 전달
+wf-init implement "로그인-기능-추가" ${CLAUDE_SESSION_ID} full
+
+# BAD - title을 영어로 번역
+wf-init implement "login-feature" full  # (원래 제목이 한글이었다면)
+```
+
+**스크립트가 내부에서 수행하는 작업:**
+1. `TZ=Asia/Seoul date` 로 registryKey/workId 자동 생성
+2. title에서 Python 정규식으로 workName 자동 변환
+3. `.workflow/<registryKey>/<workName>/<command>` 경로 자동 조립 및 디렉터리 생성
+4. `.prompt/prompt.txt` -> `<workDir>/user_prompt.txt` 복사
+5. `.uploads/` 파일 -> `<workDir>/files/` 복사 + `.uploads/` 클리어
+6. `.prompt/prompt.txt` 클리어
+7. `.prompt/querys.txt` 갱신
+8. `<workDir>/.context.json` 생성
+9. `<workDir>/status.json` 생성 (mode 필드 포함)
+10. 좀비 정리 (cleanup-zombie.sh)
+11. 전역 레지스트리 등록
+12. **stdout으로 결과 출력**
+
+**stdout 출력 형식 (파싱 대상):**
+```
+workDir=.workflow/20260214-121327/로그인-기능-추가/implement
+registryKey=20260214-121327
+workId=121327
+workName=로그인-기능-추가
+```
+
+**이 stdout 출력을 파싱하여 반환값을 구성한다. 값을 직접 계산하거나 추측하지 않는다.**
 
 > **workDir 내부 구조:**
 > ```
@@ -95,48 +165,10 @@ wf-init <command> .workflow/<YYYYMMDD>-<workId>/<workName>/<command> <workId> <�
 >   status.json
 >   user_prompt.txt
 >   plan.md
->   files/              <- .uploads/에서 복사된 첨부 파일 (Step 3-B)
+>   files/              <- .uploads/에서 복사된 첨부 파일
 >   work/
 >   report.md
 > ```
-
-**인자:**
-| 순서 | 인자 | 설명 |
-|------|------|------|
-| 1 | command | 실행 명령어 (implement, refactor 등) |
-| 2 | workDir | 작업 디렉터리 경로 (`.workflow/YYYYMMDD-HHMMSS/<workName>/<command>`) |
-| 3 | workId | 작업 ID (HHMMSS) |
-| 4 | title | 작업 제목 |
-| 5 | claude_session_id | (선택적) `${CLAUDE_SESSION_ID}` - 현재 세션 UUID 자동 치환 |
-| 6 | mode | 워크플로우 모드: `full`(기본값), `no-plan`, `prompt`. **누락 시 full 기본값으로 인해 prompt/no-plan 모드 FSM 전이 차단 버그 발생. 반드시 전달 필수.** |
-
-**스크립트가 수행하는 작업:**
-1. `.prompt/prompt.txt` 읽기
-2. 작업 디렉터리 생성 (`mkdir -p`)
-3. `prompt.txt` -> `<workDir>/user_prompt.txt` 복사
-3-B. `.uploads/` 파일 -> `<workDir>/files/` 복사 + `.uploads/` 클리어
-4. `.prompt/prompt.txt` 클리어
-5. `.prompt/querys.txt` 갱신
-6. `<workDir>/.context.json` 생성
-7. `<workDir>/status.json` 생성 (`mode` 필드 포함 - 6번째 인자로 전달된 모드 값)
-8. 좀비 정리 (cleanup-zombie.sh 위임: TTL 만료 → STALE 전환 + 레지스트리 정리)
-9. 전역 레지스트리 등록
-
-**Step 3-B 파일 파이프라인:**
-
-`.uploads/` 디렉터리에 사용자가 첨부한 파일(이미지, PDF 등)이 있으면, 스크립트가 자동으로 다음 흐름을 수행합니다:
-
-```mermaid
-flowchart TD
-    A[".uploads/ 파일 존재 확인"] --> B["workDir/files/ 에 복사"]
-    B --> D[".uploads/ 내용 클리어"]
-```
-
-- **복사 대상**: `.uploads/` 내 모든 파일을 `<workDir>/files/`로 물리적 복사
-- **클리어**: `.uploads/` 디렉터리는 유지하되 내부 파일만 삭제
-- **조건**: `.uploads/` 디렉터리가 없거나 비어있으면 이 단계를 건너뜀
-
-**주의:** 스크립트 stdout 출력은 무시합니다. 에이전트는 Step 1에서 읽은 prompt.txt 내용만 사용합니다.
 
 ---
 
@@ -182,15 +214,16 @@ flowchart TD
 
 > **엄격 준수**: 아래 8줄 형식만 반환합니다. 추가 정보 금지.
 > **경고**: 반환값이 규격 줄 수(8줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **workDir, registryKey, workId, workName은 반드시 wf-init stdout에서 파싱한 값을 사용한다.**
 
 ```
 request: <user_prompt.txt의 첫 50자>
-workDir: .workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>
-workId: <workId>
-registryKey: <YYYYMMDD>-<HHMMSS>
-date: <YYYYMMDD>
-title: <제목>
-workName: <작업이름>
+workDir: <wf-init stdout의 workDir 값>
+workId: <wf-init stdout의 workId 값>
+registryKey: <wf-init stdout의 registryKey 값>
+date: <registryKey 앞 8자리>
+title: <Step 2에서 생성한 제목>
+workName: <wf-init stdout의 workName 값>
 근거: [1줄 요약]
 ```
 
@@ -228,7 +261,7 @@ workName: <작업이름>
 
 ## 역할 경계 (Boundary)
 
-init은 **전처리**만 수행합니다. 모든 command(implement, refactor, review, build, analyze, architect, framework, research, prompt)가 init을 통과합니다. 다음 행위는 절대 금지:
+init은 **전처리**만 수행합니다. 모든 command(implement, review, research, strategy, prompt)가 init을 통과합니다. 다음 행위는 절대 금지:
 
 - 소스 코드 파일을 Read/Grep으로 탐색하지 마라
 - 소스 코드를 Write/Edit하지 마라
@@ -252,5 +285,6 @@ init은 **전처리**만 수행합니다. 모든 command(implement, refactor, re
 
 1. **Step 순서 엄수**: 반드시 Step 1 -> 2 -> 3 순서로 진행
 2. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
-3. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
-4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록을 처리함
+3. **wf-init 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
+4. **경로/시간/ID를 직접 생성하지 마라**: 스크립트 stdout에서 파싱한다
+5. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록을 처리함

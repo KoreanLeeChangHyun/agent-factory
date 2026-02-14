@@ -111,7 +111,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
-| INIT done (full) | Extract/retain params, PLAN banner, status update, planner call | Return summary, progress text |
+| INIT done (full) | Extract/retain params, PLAN banner, status update, planner call | Return summary, progress text, **AskUserQuestion**, init 반환값 판단/검증 |
 | INIT done (no-plan) | Extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), single worker call | PLAN banner, planner call, AskUserQuestion |
 | INIT done (prompt) | Direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
@@ -136,6 +136,18 @@ Task(subagent_type="init", prompt="command: <command>, mode: <mode>")
 ```
 
 Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workName`, `rationale` -- all MUST be retained for subsequent phases.
+
+### INIT Return Handling (CRITICAL)
+
+> **init이 8줄 규격으로 정상 반환하면, 오케스트레이터는 반환값을 무조건 수용하고 즉시 다음 단계로 진행한다.**
+
+| 금지 행위 | 이유 |
+|-----------|------|
+| `request` 필드의 품질/완전성 평가 | request가 불완전해 보여도 판단은 오케스트레이터의 역할이 아님. user_prompt.txt 원문은 workDir에 보존되어 있으며 planner가 읽음 |
+| init 반환값 기반 AskUserQuestion | 사용자 확인이 필요한 시나리오(prompt.txt 비어있음 등)는 init 에이전트가 자체 처리 완료 |
+| 반환값 재해석/보정 | init이 반환한 값을 수정하거나 다른 값으로 대체 금지 |
+
+**오케스트레이터의 유일한 분기 조건:** init이 `에러:` 접두사로 반환한 경우에만 워크플로우를 중단한다. 그 외 모든 경우 → Mode Branching으로 진행.
 
 ### Mode Branching (After INIT)
 

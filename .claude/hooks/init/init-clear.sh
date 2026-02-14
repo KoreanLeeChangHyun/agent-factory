@@ -87,6 +87,25 @@ cmd_list() {
         done
     fi
 
+    # 1-1. .workflow/.history/ 아카이브 디렉토리
+    echo ""
+    echo "[.workflow/.history/]"
+    local history_dir="$WORKFLOW_ROOT/.history"
+    if [ -d "$history_dir" ] && [ -n "$(ls -A "$history_dir" 2>/dev/null)" ]; then
+        local fcount
+        fcount=$(count_files "$history_dir")
+        local bytes
+        bytes=$(dir_size_bytes "$history_dir")
+        local hsize
+        hsize=$(human_size "$bytes")
+        echo "  .workflow/.history/  (${fcount}개 파일, ${hsize})"
+        total_files=$(( total_files + fcount ))
+        total_bytes=$(( total_bytes + bytes ))
+        has_content=true
+    else
+        echo "  (비어있음)"
+    fi
+
     # 2. .prompt 디렉토리
     echo ""
     echo "[.prompt/]"
@@ -151,6 +170,13 @@ cmd_execute() {
                 deleted_count=$(( deleted_count + 1 ))
             fi
         done
+    fi
+
+    # 1-1. .workflow/.history/ 아카이브 디렉토리 삭제
+    if [ -d "$WORKFLOW_ROOT/.history" ]; then
+        rm -rf "$WORKFLOW_ROOT/.history"/[0-9]*
+        echo "  삭제 완료: .workflow/.history/[0-9]* (아카이브)"
+        deleted_count=$(( deleted_count + 1 ))
     fi
 
     # 2. .prompt 파일 삭제 (history.md 보존)

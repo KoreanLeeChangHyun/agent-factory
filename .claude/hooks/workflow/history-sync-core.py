@@ -2,7 +2,7 @@
 """
 wf-history sync/status Python 코어 스크립트.
 
-.workflow/ 디렉토리를 스캔하여 history.md와 비교하고,
+.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
@@ -100,19 +100,101 @@ def extract_summary_from_prompt(prompt_file: str, max_len: int = 60) -> str:
         return ""
 
 
-def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict]:
-    """
-    .workflow/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
+def extract_summary_from_file(summary_file: str, max_len: int = 60) -> str:
+    """summary.txt의 첫 줄을 읽어 max_len 이내로 잘라 반환."""
+    try:
+        with open(summary_file, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        if not first_line:
+            return ""
+        if len(first_line) > max_len:
+            first_line = first_line[:max_len]
+        return first_line
+    except (IOError, UnicodeDecodeError):
+        return ""
 
-    디렉토리 구조: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+
+def extract_title_from_context(context_file: str) -> str:
+    """.context.json에서 title 필드를 읽어 반환. JSON 파싱 실패 시 빈 문자열 반환."""
+    try:
+        with open(context_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        title = data.get("title", "")
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+    except (json.JSONDecodeError, IOError, KeyError):
+        pass
+    return ""
+
+
+def ensure_entry_data(cmd_path: str) -> None:
+    """
+    단일 워크플로우 디렉터리의 필수 파일을 검증하고, 누락 시 자동 생성한다.
+
+    대상 디렉터리: <YYYYMMDD-HHMMSS>/<workName>/<command>/
+
+    검증 대상 파일:
+        - summary.txt: 1줄 텍스트 요약 파일
+
+    자동 생성 규칙 (summary.txt):
+        다음 우선순위로 요약 텍스트를 추출하여 summary.txt를 생성한다.
+        (a) plan.md의 '## 작업 요약' 섹션 첫 문장
+        (b) user_prompt.txt의 첫 줄
+        (c) .context.json의 'title' 필드
+        모든 소스에서 추출 실패 시 생성하지 않는다.
+    """
+    summary_file = os.path.join(cmd_path, "summary.txt")
+    if os.path.exists(summary_file):
+        return
+
+    summary = ""
+
+    # (a) plan.md의 '## 작업 요약' 섹션 첫 문장
+    plan_file = os.path.join(cmd_path, "plan.md")
+    if not summary and os.path.exists(plan_file):
+        summary = extract_summary_from_plan(plan_file)
+
+    # (b) user_prompt.txt의 첫 줄
+    prompt_file = os.path.join(cmd_path, "user_prompt.txt")
+    if not summary and os.path.exists(prompt_file):
+        summary = extract_summary_from_prompt(prompt_file)
+
+    # (c) .context.json의 'title' 필드
+    context_file = os.path.join(cmd_path, ".context.json")
+    if not summary and os.path.exists(context_file):
+        try:
+            with open(context_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            title = data.get("title", "")
+            if isinstance(title, str) and title.strip():
+                summary = title.strip()
+                if len(summary) > 60:
+                    summary = summary[:60]
+        except (json.JSONDecodeError, IOError, KeyError):
+            pass
+
+    if summary:
+        try:
+            with open(summary_file, "w", encoding="utf-8") as f:
+                f.write(summary + "\n")
+        except IOError:
+            pass
+
+
+def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict]:
+    """
+    단일 디렉토리를 스캔하여 워크플로우 엔트리 목록을 반환.
+
+    디렉토리 구조: base_dir/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+    rel_prefix: history.md에서의 상대 경로 접두사 (예: "../.workflow" 또는 "../.workflow/.history")
     """
     entries = []
 
-    if not os.path.isdir(workflow_dir):
+    if not os.path.isdir(base_dir):
         return entries
 
-    for dir_name in os.listdir(workflow_dir):
-        dir_path = os.path.join(workflow_dir, dir_name)
+    for dir_name in os.listdir(base_dir):
+        dir_path = os.path.join(base_dir, dir_name)
 
         # YYYYMMDD-HHMMSS 패턴 확인
         if not TIMESTAMP_PATTERN.match(dir_name):
@@ -131,6 +213,9 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
                 if not os.path.isdir(cmd_path):
                     continue
 
+                ensure_entry_data(cmd_path)
+
+                # 파일 경로 구성
                 status_file = os.path.join(cmd_path, "status.json")
                 plan_file = os.path.join(cmd_path, "plan.md")
                 prompt_file = os.path.join(cmd_path, "user_prompt.txt")
@@ -138,32 +223,39 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
                 files_dir = os.path.join(cmd_path, "files")
 
                 # status.json에서 메타 정보 추출
+                # 우선순위: <command>/status.json > <workName>/status.json
                 phase = "UNKNOWN"
                 created_at = None
                 if os.path.exists(status_file):
                     phase, created_at = extract_status_from_json(status_file)
-
-                # include_all=False 시 INIT/PLAN 중단 작업 제외하지 않음
-                # (기본적으로 모든 항목을 포함하되, include_all은 이미 기본 동작)
-                # 기획 변경: include_all=False 시에도 모든 항목 포함
-                # -> research 보고서에서는 --all 옵션으로 중단 작업 포함이지만
-                #    W01에서 이미 모든 항목 포함하여 마이그레이션 완료.
-                #    따라서 기본 동작도 모든 항목 포함으로 통일.
+                else:
+                    # fallback: workName 레벨의 status.json
+                    work_status_file = os.path.join(work_path, "status.json")
+                    if os.path.exists(work_status_file):
+                        phase, created_at = extract_status_from_json(work_status_file)
 
                 status_text = PHASE_STATUS_MAP.get(phase, "불명")
 
                 # 날짜/시간 추출
                 date_str, time_str = parse_timestamp_from_dir(dir_name)
 
-                # 요약 추출 (plan.md 우선, user_prompt.txt 폴백)
+                # 요약 추출 (summary.txt 최우선, plan.md 차선, user_prompt.txt 폴백)
                 summary = ""
-                if os.path.exists(plan_file):
+                summary_file = os.path.join(cmd_path, "summary.txt")
+                if os.path.exists(summary_file):
+                    summary = extract_summary_from_file(summary_file)
+                if not summary and os.path.exists(plan_file):
                     summary = extract_summary_from_plan(plan_file)
                 if not summary and os.path.exists(prompt_file):
                     summary = extract_summary_from_prompt(prompt_file)
 
-                # 제목: work_name (하이픈을 공백으로 변환하지 않고 그대로 사용)
-                title = work_name
+                # 제목: .context.json의 title 필드 우선, 없으면 work_name 폴백
+                context_file = os.path.join(cmd_path, ".context.json")
+                title = ""
+                if os.path.exists(context_file):
+                    title = extract_title_from_context(context_file)
+                if not title:
+                    title = work_name
 
                 # 각 파일/디렉토리 존재 여부
                 has_plan = os.path.exists(plan_file)
@@ -190,10 +282,37 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
                     "has_files": has_files,
                     "files_count": files_count,
                     "has_report": has_report,
-                    # 상대 경로 구성용
                     "work_name": work_name,
-                    "rel_base": f"../.workflow/{dir_name}/{work_name}/{command}",
+                    "rel_base": f"{rel_prefix}/{dir_name}/{work_name}/{command}",
                 })
+
+    return entries
+
+
+def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict]:
+    """
+    .workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
+
+    디렉토리 구조: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+    .history/ 하위도 동일 구조로 탐색하며, rel_base를 ../.workflow/.history/...로 구성.
+
+    .workflow/ 엔트리가 .history/ 엔트리보다 우선한다 (같은 work_id인 경우).
+    """
+    # .workflow/ 스캔 (우선)
+    entries = _scan_entries_in_dir(workflow_dir, "../.workflow")
+
+    # 이미 수집된 work_id 셋 (우선순위 보호)
+    seen_ids = {e["work_id"] for e in entries}
+
+    # .workflow/.history/ 스캔
+    history_dir = os.path.join(workflow_dir, ".history")
+    history_entries = _scan_entries_in_dir(history_dir, "../.workflow/.history")
+
+    # .workflow/에 없는 항목만 추가
+    for entry in history_entries:
+        if entry["work_id"] not in seen_ids:
+            entries.append(entry)
+            seen_ids.add(entry["work_id"])
 
     # 날짜 역순 정렬 (최신순)
     entries.sort(key=lambda x: x["work_id"], reverse=True)
@@ -341,14 +460,26 @@ def cmd_sync(args: argparse.Namespace) -> int:
     # history.md 파싱
     header_lines, existing_ids, marker_idx, data_rows = parse_history_md(target)
 
+    # scanned 데이터를 work_id -> entry 맵으로 구성
+    # (scan_workflow_directory에서 이미 .workflow/ 우선 처리됨)
+    scanned_map = {}
+    for entry in scanned:
+        scanned_map.setdefault(entry["work_id"], entry)
+
     # 기존 행을 work_id -> row 딕셔너리로 변환
+    # 레거시 형식 감지를 위해 원본 행도 보존
     existing_rows = {}
+    original_rows = {}
     for row in data_rows:
         wid = extract_work_id_from_row(row)
         if wid:
-            existing_rows[wid] = row
+            if wid in scanned_map:
+                existing_rows[wid] = format_row(scanned_map[wid])
+            else:
+                existing_rows[wid] = row
+            original_rows.setdefault(wid, row)
 
-    # 비교: 누락 항목 및 상태 변경 항목 탐지
+    # 비교: 누락 항목 및 상태 변경/레거시 형식 항목 탐지
     new_entries = []
     updated_entries = []
 
@@ -363,8 +494,28 @@ def cmd_sync(args: argparse.Namespace) -> int:
             new_status = entry["status"]
             if old_status != new_status:
                 updated_entries.append(entry)
+            else:
+                # 레거시 형식 행(9컬럼 미만) 탐지: O(1) dict lookup
+                orig_row = original_rows.get(wid, "")
+                if orig_row and len(orig_row.split("|")) < 10:
+                    updated_entries.append(entry)
 
-    if not new_entries and not updated_entries:
+    # 중복 행 존재 여부 확인
+    wid_counts: dict[str, int] = {}
+    for row in data_rows:
+        wid = extract_work_id_from_row(row)
+        if wid:
+            wid_counts[wid] = wid_counts.get(wid, 0) + 1
+    has_duplicates = any(c > 1 for c in wid_counts.values())
+
+    # 레거시 형식 행 존재 여부 확인 (셀 수 10 미만)
+    has_legacy = any(
+        len(row.split("|")) < 10
+        for row in data_rows
+        if extract_work_id_from_row(row)
+    )
+
+    if not new_entries and not updated_entries and not has_duplicates and not has_legacy:
         print("[INFO] history.md는 최신 상태입니다. 변경 사항 없음.")
         return 0
 
@@ -393,11 +544,14 @@ def cmd_sync(args: argparse.Namespace) -> int:
     # 신규 행 생성
     new_rows = [format_row(e) for e in new_entries]
 
-    # 기존 행 업데이트
+    # 기존 행 업데이트 (scanned 데이터가 있으면 format_row로 재생성)
     for row in data_rows:
         wid = extract_work_id_from_row(row)
         if wid in updated_row_map:
             final_rows.append(updated_row_map[wid])
+        elif wid in scanned_map:
+            # scanned 데이터로 재생성 (레거시 형식/누락 링크 해소)
+            final_rows.append(format_row(scanned_map[wid]))
         else:
             final_rows.append(row)
 
@@ -411,6 +565,18 @@ def cmd_sync(args: argparse.Namespace) -> int:
         return wid if wid else ""
 
     all_rows.sort(key=sort_key, reverse=True)
+
+    # work_id 기준 중복 행 제거 (정렬 후 첫 번째 행만 유지)
+    seen_wids: set[str] = set()
+    deduped_rows = []
+    for row in all_rows:
+        wid = extract_work_id_from_row(row)
+        if wid and wid in seen_wids:
+            continue
+        if wid:
+            seen_wids.add(wid)
+        deduped_rows.append(row)
+    all_rows = deduped_rows
 
     # history.md 파일 재구성
     output_lines = []
@@ -478,7 +644,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     extra_ids = existing_ids - scanned_ids
 
     # 상태별 분류
-    status_counts = {}
+    status_counts: dict[str, int] = {}
     for entry in scanned:
         s = entry["status"]
         status_counts[s] = status_counts.get(s, 0) + 1

@@ -19,6 +19,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 2. **status.json 완료 처리**
 3. **사용량 확정**
 4. **레지스트리 해제**
+5. **워크플로우 아카이빙** (최신 10개 유지)
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -38,6 +39,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 - status.json 완료 처리 (`wf-state status`)
 - 사용량 확정 (`wf-state usage-finalize`)
 - 레지스트리 해제 (`wf-state unregister`)
+- 워크플로우 아카이빙 (최신 10개 유지, .history 이동, history.md 링크 갱신)
 
 ### 메인 에이전트가 대신 수행하는 행위
 
@@ -70,6 +72,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 2. **status.json 완료 처리** - `wf-state status <registryKey> REPORT COMPLETED|FAILED` 실행
 3. **사용량 확정** - 성공 시 `wf-state usage-finalize <registryKey>` 실행 (실패 시 비차단)
 4. **레지스트리 해제** - `wf-state unregister <registryKey>` 실행
+5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 후 `.prompt/history.md` 링크 갱신
 
 > 상세 절차 (history.md 행 형식, 링크 구성, wf-state 호출 규약)는 `workflow-end/SKILL.md`를 참조하세요.
 
@@ -84,7 +87,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 반환 원칙 (최우선)
 
-> **경고**: 반환값이 규격 줄 수(2줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **경고**: 반환값이 규격 줄 수(1줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 1. 모든 작업 결과는 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태만 포함
@@ -106,11 +109,11 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 주의사항
 
-1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) 순서를 반드시 준수
+1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
 2. **history.md 형식 준수**: 테이블 행 형식을 정확히 따르며, 날짜/시간은 registryKey에서 파싱
 3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
-5. **반환 형식 엄수**: 2줄 규격 외 추가 정보(갱신 결과, 배너 출력 여부 등)를 절대 포함하지 않음
+5. **반환 형식 엄수**: 1줄 규격 외 추가 정보(갱신 결과, 배너 출력 여부 등)를 절대 포함하지 않음
 
 ## 에러 처리
 

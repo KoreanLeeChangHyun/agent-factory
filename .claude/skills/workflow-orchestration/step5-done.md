@@ -31,6 +31,7 @@ done 에이전트가 수행하는 작업:
 2. **status.json 완료 처리** - 성공: `wf-state status <registryKey> REPORT COMPLETED`, 실패: `wf-state status <registryKey> REPORT FAILED`
 3. **사용량 확정** - 성공 시: `wf-state usage-finalize <registryKey>` (실패 시 경고만, 비차단)
 4. **레지스트리 해제** - `wf-state unregister <registryKey>`
+5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동, history.md 링크 갱신
 
 ### DONE 배너 (오케스트레이터 호출)
 
@@ -42,6 +43,8 @@ Workflow <registryKey> DONE done
 > **주의**: 서브에이전트(Task) 내부의 Bash 출력은 사용자 터미널에 표시되지 않으므로, DONE 완료 배너는 반드시 오케스트레이터가 done 에이전트 반환 후 직접 호출해야 합니다.
 
 > **책임 분리 원칙**: reporter는 보고서 생성 + summary.txt에 집중하고, 워크플로우 상태 관리(history.md, status.json, 레지스트리)는 done 에이전트가 담당합니다. DONE 배너는 오케스트레이터가 호출합니다.
+
+> **아카이빙**: done 에이전트는 레지스트리 해제 후 워크플로우 아카이빙을 수행합니다. 아카이빙 실패는 비차단 원칙에 따라 경고만 출력합니다.
 
 ## Post-DONE Silence (REQUIRED)
 

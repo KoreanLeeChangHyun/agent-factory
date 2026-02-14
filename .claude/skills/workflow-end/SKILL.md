@@ -1,6 +1,6 @@
 ---
 name: workflow-end
-description: "워크플로우 END 단계 전용 내부 스킬. reporter 완료 후 워크플로우 마무리 처리를 수행한다. Use for workflow finalization: history.md 갱신(summary.txt 활용), status.json 완료 처리, 사용량 확정, 레지스트리 해제를 4단계 절차로 수행한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
+description: "워크플로우 END 단계 전용 내부 스킬. reporter 완료 후 워크플로우 마무리 처리를 수행한다. Use for workflow finalization: history.md 갱신(summary.txt 활용), status.json 완료 처리, 사용량 확정, 레지스트리 해제, 워크플로우 아카이빙(최신 10개 유지)을 5단계 절차로 수행한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
 disable-model-invocation: true
 ---
 
@@ -15,6 +15,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - status.json 완료 처리 (REPORT -> COMPLETED / FAILED)
 - 사용량 확정 (usage-finalize)
 - 레지스트리 해제 (unregister)
+- 워크플로우 아카이빙 (최신 10개 유지, 나머지 .history 이동)
 
 > **책임 경계**: 보고서 작성과 summary.txt 생성은 reporter 에이전트가 담당합니다. end 에이전트는 reporter가 생성한 summary.txt를 읽어서 history.md 갱신에 활용합니다.
 
@@ -26,7 +27,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 ## 핵심 원칙
 
-1. **절차 순서 엄수**: 4단계를 반드시 순서대로 실행
+1. **절차 순서 엄수**: 5단계를 반드시 순서대로 실행
 2. **비차단 원칙**: history.md, usage, unregister 실패는 경고 후 계속 진행
 3. **최소 출력**: 내부 처리 과정을 터미널에 출력하지 않음
 4. **확정적 처리**: 모든 경로와 명령은 입력 파라미터로부터 확정적으로 구성
@@ -57,7 +58,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 ---
 
-## 절차 (4단계)
+## 절차 (5단계)
 
 ### 1. history.md 갱신
 
@@ -109,6 +110,21 @@ wf-state usage-finalize <registryKey>
 wf-state unregister <registryKey>
 ```
 
+### 5. 워크플로우 아카이빙
+
+`.workflow/` 내 워크플로우 디렉터리를 최신 10개만 유지하고 나머지를 `.history/`로 이동합니다.
+
+**절차:**
+
+1. `.workflow/.history/` 디렉터리가 없으면 `mkdir -p .workflow/.history/`로 생성
+2. `.workflow/` 내 `[0-9]*` 패턴 디렉터리를 디렉터리명(YYYYMMDD-HHMMSS) 역순으로 정렬
+3. 현재 워크플로우(registryKey)는 이동 대상에서 제외
+4. 11번째 이후 디렉터리를 `.workflow/.history/`로 `mv` 이동
+5. 이동 후 `.prompt/history.md`에서 해당 디렉터리 경로 링크를 갱신:
+   - `../.workflow/YYYYMMDD-HHMMSS/` -> `../.workflow/.history/YYYYMMDD-HHMMSS/`
+
+> 아카이빙 실패(이동, 링크 갱신)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
+
 ---
 
 ## 에러 처리
@@ -119,6 +135,7 @@ wf-state unregister <registryKey>
 | status.json 전이 실패 | 에러 반환 |
 | usage-finalize 실패 | 경고만 출력, 계속 진행 |
 | unregister 실패 | 경고만 출력, 계속 진행 |
+| 아카이빙 이동 실패 | 경고 출력 후 계속 진행 |
 
 **실패 시**: history.md/usage/unregister 실패는 경고만 출력하고 계속 진행. status.json 전이 실패 시 부모 에이전트에게 에러 보고.
 
@@ -142,8 +159,9 @@ end는 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
 
 ## 주의사항
 
-1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) 순서를 반드시 준수
+1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
 2. **history.md 형식 준수**: 테이블 행 형식을 정확히 따르며, 날짜/시간은 registryKey에서 파싱
 3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 반환 형식은 agent.md를 참조
+6. **아카이빙 비차단**: 아카이빙 실패(이동, 링크 갱신)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)

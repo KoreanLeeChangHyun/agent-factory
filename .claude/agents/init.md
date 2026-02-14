@@ -13,11 +13,10 @@ maxTurns: 15
 
 ## 역할
 
-워크플로우의 시작점에서 **3단계 순차 처리**를 수행합니다:
+워크플로우의 시작점에서 **2단계 순차 처리**를 수행합니다:
 
 1. **prompt.txt 읽기** - 사용자 요청 확인
-2. **작업 제목 생성** - prompt.txt 기반 한글 제목 생성
-3. **workId 생성 및 init-workflow.sh 실행** - KST 기반 시간 생성 + 디렉터리/파일/레지스트리 일괄 생성
+2. **작업 제목 생성 + wf-init 실행** - prompt.txt 기반 한글 제목 생성 후 스크립트에 전달
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -33,10 +32,9 @@ maxTurns: 15
 
 ### 이 에이전트의 전담 행위
 
-- 워크플로우 디렉토리/파일 초기화 (`wf-init` 실행)
-- workDir 생성 및 구조 셋업
 - prompt.txt 읽기 및 작업 제목 생성
-- status.json/registry 초기 설정
+- `wf-init` 스크립트 호출 (디렉토리/파일/레지스트리 일괄 생성은 스크립트가 수행)
+- 스크립트 stdout 파싱 후 오케스트레이터에 반환
 
 ### 메인 에이전트가 대신 수행하는 행위
 
@@ -56,18 +54,54 @@ maxTurns: 15
 
 메인 에이전트로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, refactor, review, build, analyze, architect, framework, research, prompt)
+- `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `mode`: (선택적) 워크플로우 모드. `full`(기본값), `no-plan`, `prompt` 중 하나
 
 ## 절차
 
 1. **prompt.txt 읽기** - `.prompt/prompt.txt`를 절대 경로로 Read. 내용 없으면 시나리오 분기 (이전 COMPLETED 워크플로우 존재 시 후속 제안, 없으면 중지 안내)
 2. **작업 제목 생성** - prompt.txt 기반 20자 이내 한글 요약, 공백->하이픈, 특수문자 제거
-3. **workId 생성** - `TZ=Asia/Seoul date +"%Y%m%d-%H%M%S"` (LLM 추정 금지)
-4. **wf-init 실행** - `wf-init <command> <workDir> <workId> <title> ${CLAUDE_SESSION_ID} <mode>` 1회 호출. mode 인자 필수
-   - workDir 형식: `.workflow/YYYYMMDD-HHMMSS/<workName>/<command>`
+3. **wf-init 실행** - `wf-init <command> <title> <mode>` 1회 호출. **stdout 출력을 파싱**하여 반환값 구성
 
 > 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, wf-init 인자 상세, 스크립트 수행 목록)는 `workflow-init/SKILL.md`를 참조하세요.
+
+---
+
+## !! 절대 금지 - 경로/시간/ID 직접 생성 !!
+
+> **이 섹션은 최우선 규칙입니다. 어떤 상황에서도 위반하지 마세요.**
+
+### 금지 행위 목록
+
+| 금지 행위 | 이유 | 올바른 방법 |
+|-----------|------|-------------|
+| 디렉터리 경로(workDir) 직접 조립 | LLM이 한글 제목을 영어로 번역/축약하는 버그 발생 | 스크립트가 title에서 자동 생성 |
+| workId/registryKey 직접 생성 | `date` 명령어 결과를 LLM이 재해석할 위험 | 스크립트가 내부에서 자동 생성 |
+| workName 직접 변환 | title→workName 변환은 스크립트의 Python 정규식이 수행 | 스크립트가 자동 처리 |
+| title을 번역/축약/로마자 변환 | "history-동기화-수정"을 "history-sync"로 바꾸는 치명적 버그 | Step 2에서 생성한 제목을 **그대로** 전달 |
+
+### 올바른 호출 예시
+
+```bash
+# GOOD - 제목만 전달, 나머지는 스크립트가 처리
+wf-init implement "history-동기화-수정" full
+
+# BAD - 경로를 직접 조립 (절대 하지 마라)
+wf-init implement .workflow/20260214-121327/history-sync/implement 121327 "history-동기화-수정" full
+```
+
+### 스크립트가 stdout으로 출력하는 값
+
+```
+workDir=.workflow/20260214-121327/history-동기화-수정/implement
+registryKey=20260214-121327
+workId=121327
+workName=history-동기화-수정
+```
+
+**이 stdout 출력을 파싱하여 반환값을 구성한다. 직접 계산하지 않는다.**
+
+---
 
 ## 터미널 출력 원칙
 
@@ -91,17 +125,18 @@ maxTurns: 15
 
 > **엄격히 준수**: 메인 에이전트에 반환할 때 반드시 아래 형식만 사용합니다.
 > 이 형식 외의 추가 정보는 절대 포함하지 않습니다.
+> **workDir, registryKey, workId, workName은 반드시 wf-init stdout 출력에서 파싱한 값을 사용한다.**
 
 ### 반환 형식
 
 ```
 request: <user_prompt.txt의 첫 50자>
-workDir: .workflow/<YYYYMMDD>-<HHMMSS>/<workName>/<command>
-workId: <HHMMSS>
-registryKey: <YYYYMMDD>-<HHMMSS>
-date: <YYYYMMDD>
-title: <제목>
-workName: <작업이름>
+workDir: <wf-init stdout의 workDir 값>
+workId: <wf-init stdout의 workId 값>
+registryKey: <wf-init stdout의 registryKey 값>
+date: <registryKey 앞 8자리>
+title: <Step 2에서 생성한 제목>
+workName: <wf-init stdout의 workName 값>
 근거: [1줄 요약]
 ```
 
@@ -110,10 +145,10 @@ workName: <작업이름>
 ## 주의사항
 
 1. **절차 순서 엄수**: 반드시 1 -> 2 -> 3 순서 진행
-2. **workId는 Bash로 생성**: LLM이 자체 추정하지 않음
-3. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
-4. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리
-5. **mode 파라미터 전달 필수**: wf-init 호출 시 입력받은 mode 값(full/no-plan/prompt)을 6번째 인자로 반드시 전달한다. 누락 시 status.json의 mode가 full로 설정되어 FSM 전이가 차단된다.
+2. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
+3. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리
+4. **wf-init 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
+5. **경로/시간/ID를 직접 생성하지 마라**: 스크립트 stdout에서 파싱한다
 
 > **금지 행위**: init은 전처리만 수행합니다. 다음 행위는 절대 금지:
 >

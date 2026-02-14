@@ -35,6 +35,28 @@ mode: <mode>
 - **status.json**: init이 `<workDir>/status.json` 생성 완료 (phase: "INIT"). 좀비 정리도 이 단계에서 수행
 - **workDir format**: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` (중첩 구조)
 
+## Orchestrator Post-INIT Rules (CRITICAL)
+
+> **init이 에러 없이 반환하면, 오케스트레이터는 반환값을 있는 그대로 수용하고 즉시 Mode Branching으로 진행한다. 어떠한 판단도 개입하지 않는다.**
+
+### 절대 금지 (오케스트레이터)
+
+| 금지 행위 | 위반 사례 |
+|-----------|----------|
+| init 반환값의 품질/완전성/정확성 평가 | "request가 불완전해 보인다" → AskUserQuestion |
+| init 반환 후 AskUserQuestion 호출 | "무엇을 구현하시겠습니까?" 질문 |
+| init 반환값 재해석/보정/보완 | request 필드를 다른 값으로 교체 |
+| init 반환 후 추가 정보 수집 시도 | prompt.txt를 직접 다시 읽기 |
+
+### 유일한 분기 조건
+
+- init이 `에러:` 접두사로 반환 → 워크플로우 중단
+- 그 외 모든 경우 → **무조건** Mode Branching 진행
+
+> **근거:** prompt.txt가 비어있는 경우의 사용자 확인은 init 에이전트가 자체 처리한다 (시나리오 1/2). init이 정상 반환했다는 것은 사용자 요청이 확보되었다는 의미이다. 오케스트레이터가 이를 재검증하는 것은 역할 침범이다.
+
+---
+
 ## Return Value Retention Rules (REQUIRED)
 
 init 반환값(request, workDir, workId, registryKey, date, title, workName, 근거)을 모두 보관하고, 후속 단계에 필요한 파라미터를 전달한다:
