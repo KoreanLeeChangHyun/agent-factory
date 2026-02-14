@@ -68,11 +68,11 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 절차
 
-1. **history.md 갱신** - `.prompt/history.md`에 작업 이력 행 추가 (summary.txt 활용, registryKey에서 날짜/시간 파싱)
+1. **history.md 갱신** - `bash .claude/hooks/workflow/history-sync.sh sync` 실행으로 `.prompt/history.md` 자동 갱신
 2. **status.json 완료 처리** - `wf-state status <registryKey> REPORT COMPLETED|FAILED` 실행
 3. **사용량 확정** - 성공 시 `wf-state usage-finalize <registryKey>` 실행 (실패 시 비차단)
 4. **레지스트리 해제** - `wf-state unregister <registryKey>` 실행
-5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 후 `.prompt/history.md` 링크 갱신
+5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history-sync.sh sync`가 자동 처리)
 
 > 상세 절차 (history.md 행 형식, 링크 구성, wf-state 호출 규약)는 `workflow-end/SKILL.md`를 참조하세요.
 
@@ -110,7 +110,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 ## 주의사항
 
 1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
-2. **history.md 형식 준수**: 테이블 행 형식을 정확히 따르며, 날짜/시간은 registryKey에서 파싱
+2. **history.md 스크립트 실행**: `history-sync.sh sync`의 종료 코드를 확인하여 성공/실패 판단
 3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 1줄 규격 외 추가 정보(갱신 결과, 배너 출력 여부 등)를 절대 포함하지 않음

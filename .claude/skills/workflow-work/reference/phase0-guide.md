@@ -1,28 +1,23 @@
 # Phase 0: 준비 단계 상세 가이드
 
-> **Phase 0 스킵 조건:**
-> - **no-plan 모드**: 단일 태스크이므로 스킬 매핑이 불필요하여 항상 스킵
-> - **태스크 6개 미만**: 소규모 워크플로우에서는 개별 Worker의 자율 스킬 결정으로 충분하므로 스킵
+> **Phase 0 스킵 조건:** no-plan 모드에서만 스킵 (단일 태스크이므로 스킬 매핑 불필요)
 
 > **Phase 배너**: 오케스트레이터는 Phase 0 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE 0 "phase0" sequential` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
-Phase 0은 계획서의 태스크 수가 **6개 이상**일 때만 실행합니다. 태스크 수가 6개 미만이면 `mkdir -p <workDir>/work`로 디렉터리만 생성하고 바로 Phase 1로 진행합니다.
+Phase 0은 모든 full 모드 워크플로우에서 **필수로** 실행합니다. no-plan 모드에서만 스킵합니다.
 
 **Phase 0 실행 판단:**
 
 ```mermaid
 flowchart TD
-    START[계획서 태스크 수 확인] --> Q1{태스크 >= 6개?}
-    Q1 -->|예| P0[Phase 0 실행]
-    Q1 -->|아니오| SKIP[Phase 0 스킵]
+    START[WORK 시작] --> P0[Phase 0 실행]
     P0 --> P0R{Phase 0 성공?}
     P0R -->|성공| P1S[Phase 1~N: skills 파라미터 전달]
-    P0R -->|실패| FALLBACK[C 방식 폴백: 자율 결정]
-    SKIP --> P1A[Phase 1~N: Worker 자율 스킬 결정]
-    FALLBACK --> P1A
+    P0R -->|실패| FALLBACK[폴백: Worker 자율 스킬 결정]
+    FALLBACK --> P1S
 ```
 
-**Phase 0 실행 시 (태스크 >= 6개):**
+**Phase 0 실행:**
 
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, mode: phase0")
@@ -53,10 +48,6 @@ Phase 0은 **1개 worker 에이전트가 순차적으로** 실행합니다.
 ```
 
 **Phase 0 완료 후:** 오케스트레이터는 skill-map.md를 참고하여 후속 Phase 1~N의 worker 호출 시 skills 파라미터를 전달합니다.
-
-**Phase 0 스킵 시 (태스크 < 6개):**
-
-work 디렉터리만 생성하고 바로 Phase 1로 진행합니다. 각 Worker는 skills 파라미터 없이 호출되며, `command-skill-map.md`의 명령어별 기본 매핑과 키워드 분석, 그리고 `.claude/skills/*/SKILL.md`의 description 필드를 참조하여 자율적으로 스킬을 결정합니다.
 
 **Phase 0 실패 시 폴백:**
 

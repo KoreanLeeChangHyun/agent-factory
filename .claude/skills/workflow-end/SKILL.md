@@ -64,22 +64,23 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 `.prompt/history.md`에 작업 이력 행을 추가합니다.
 
-**summary.txt 활용:**
-- `{workDir}/summary.txt` 파일이 있으면 읽어서 내용 요약에 활용
-- 없으면 title과 command만으로 구성
+**사전 확인:**
+- `{workDir}/summary.txt` 파일 존재 확인 (없어도 스크립트가 title/command로 대체 처리)
 
-**행 형식:**
-```
-| YYYY-MM-DD<br><sub>HH:MM</sub> | YYYYMMDD-HHMMSS | 제목<br><sub>요약</sub> | command | 상태 | 계획서 | 질의 | 이미지 | 보고서 |
+**갱신 실행:**
+```bash
+bash .claude/hooks/workflow/history-sync.sh sync
 ```
 
-**갱신 절차:**
-1. `.prompt/history.md`를 Read로 읽기 (offset/limit 사용, 상단 7줄만)
-2. 테이블 헤더 행 바로 다음에 새 행 삽입 (Edit 사용)
-3. 보고서 링크: `[보고서](../<workDir>/report.md)` (보고서 없으면 `-`)
-4. 계획서 링크: plan.md 존재 시 `[계획서](../<workDir>/plan.md)` (없으면 `-`)
-5. 질의 링크: `[질의](../<workDir>/user_prompt.txt)` (prompt 모드는 `../<workDir>/user_prompt.txt`)
-6. 날짜/시간은 registryKey에서 파싱 (YYYYMMDD -> YYYY-MM-DD, HHMMSS -> HH:MM)
+스크립트가 다음을 자동 처리합니다:
+- `.workflow/` 디렉토리 스캔 및 history.md 누락 항목 감지
+- 테이블 행 생성 (날짜/시간 파싱, 제목/요약 구성, 상태 매핑)
+- 보고서/계획서/질의 링크 자동 구성
+- 테이블 헤더 다음 위치에 새 행 삽입
+
+**결과 확인:**
+- 종료 코드 0: 성공
+- 종료 코드 1: 실패 (경고 출력 후 계속 진행, 비차단 원칙)
 
 ### 2. status.json 완료 처리
 
@@ -120,10 +121,9 @@ wf-state unregister <registryKey>
 2. `.workflow/` 내 `[0-9]*` 패턴 디렉터리를 디렉터리명(YYYYMMDD-HHMMSS) 역순으로 정렬
 3. 현재 워크플로우(registryKey)는 이동 대상에서 제외
 4. 11번째 이후 디렉터리를 `.workflow/.history/`로 `mv` 이동
-5. 이동 후 `.prompt/history.md`에서 해당 디렉터리 경로 링크를 갱신:
-   - `../.workflow/YYYYMMDD-HHMMSS/` -> `../.workflow/.history/YYYYMMDD-HHMMSS/`
+5. history.md 링크 갱신은 별도 수행 불필요 (`history-sync.sh sync`가 Step 1에서 자동 처리)
 
-> 아카이빙 실패(이동, 링크 갱신)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
+> 아카이빙 실패(이동)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
 
 ---
 
@@ -160,7 +160,7 @@ end는 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
 ## 주의사항
 
 1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
-2. **history.md 형식 준수**: 테이블 행 형식을 정확히 따르며, 날짜/시간은 registryKey에서 파싱
+2. **history.md 스크립트 실행**: `history-sync.sh sync`의 종료 코드를 확인하여 성공/실패 판단
 3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 반환 형식은 agent.md를 참조

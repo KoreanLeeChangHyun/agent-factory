@@ -72,15 +72,15 @@ flowchart TD
 | 항목 | full 모드 | no-plan 모드 |
 |------|----------|-------------|
 | 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
-| Phase 0 (skill-map) | 조건부 (태스크 >= 6개) | 불필요 (스킵) |
+| Phase 0 (skill-map) | 필수 | 불필요 (스킵) |
 | 태스크 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
 | 병렬 실행 | 가능 | 불필요 (단일 Worker) |
 | Phase 배너 | 오케스트레이터가 각 Phase 시작 시 출력 | 출력하지 않음 (단일 Worker) |
 | planPath | 필수 | 없음 |
 
-### Phase 0: 준비 단계 (조건부, 순차 1개 worker)
+### Phase 0: 준비 단계 (필수, 순차 1개 worker)
 
-Phase 0은 태스크 **6개 이상**일 때만 실행하며, work 디렉터리 생성과 스킬 매핑(`skill-map.md`)을 수행합니다. 태스크 6개 미만 또는 no-plan 모드에서는 스킵합니다. 실패 시 Worker 자율 결정으로 폴백합니다.
+Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work 디렉터리 생성과 스킬 매핑(`skill-map.md`)을 수행합니다. no-plan 모드에서는 스킵합니다. 실패 시 Worker 자율 결정으로 폴백합니다.
 
 > 상세 가이드(실행 판단 흐름도, 호출 방법, skill-map 형식, 폴백 메커니즘)는 `reference/phase0-guide.md`를 참조하세요.
 

@@ -59,16 +59,37 @@ def parse_timestamp_from_dir(dir_name: str) -> tuple[str, str]:
     return formatted_date, formatted_time
 
 
-def extract_status_from_json(status_file: str) -> tuple[str, str | None]:
-    """status.json에서 phase와 created_at을 추출."""
+def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | None]:
+    """status.json에서 phase, created_at, updated_at을 추출."""
     try:
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         phase = data.get("phase", "UNKNOWN")
         created_at = data.get("created_at")
-        return phase, created_at
+        updated_at = data.get("updated_at")
+        return phase, created_at, updated_at
     except (json.JSONDecodeError, IOError, KeyError):
-        return "UNKNOWN", None
+        return "UNKNOWN", None, None
+
+
+# 스테일 판정 TTL (초)
+STALE_TTL_SECONDS = 2 * 60 * 60  # 2시간
+
+
+def is_stale(phase: str, updated_at: str | None) -> bool:
+    """WORK 또는 PLAN 단계에서 updated_at 기준 2시간 이상 경과하면 스테일로 판정."""
+    if phase not in ("WORK", "PLAN"):
+        return False
+    if not updated_at:
+        return False
+    try:
+        # ISO 8601 형식 파싱 (타임존 포함)
+        updated_dt = datetime.fromisoformat(updated_at)
+        now = datetime.now(updated_dt.tzinfo)
+        elapsed = (now - updated_dt).total_seconds()
+        return elapsed > STALE_TTL_SECONDS
+    except (ValueError, TypeError):
+        return False
 
 
 def extract_summary_from_plan(plan_file: str, max_len: int = 60) -> str:
@@ -181,11 +202,94 @@ def ensure_entry_data(cmd_path: str) -> None:
             pass
 
 
+def _build_entry(dir_name: str, work_name: str, command: str,
+                  cmd_path: str, work_path: str, rel_prefix: str) -> dict:
+    """단일 엔트리의 메타정보를 수집하여 dict로 반환하는 내부 헬퍼."""
+    ensure_entry_data(cmd_path)
+
+    # 파일 경로 구성
+    status_file = os.path.join(cmd_path, "status.json")
+    plan_file = os.path.join(cmd_path, "plan.md")
+    prompt_file = os.path.join(cmd_path, "user_prompt.txt")
+    report_file = os.path.join(cmd_path, "report.md")
+    files_dir = os.path.join(cmd_path, "files")
+
+    # status.json에서 메타 정보 추출
+    # 우선순위: <command>/status.json > <workName>/status.json
+    phase = "UNKNOWN"
+    created_at = None
+    updated_at = None
+    if os.path.exists(status_file):
+        phase, created_at, updated_at = extract_status_from_json(status_file)
+    else:
+        # fallback: workName 레벨의 status.json
+        work_status_file = os.path.join(work_path, "status.json")
+        if os.path.exists(work_status_file):
+            phase, created_at, updated_at = extract_status_from_json(work_status_file)
+
+    # T1: 스테일 감지 - WORK/PLAN 단계에서 2시간 이상 경과 시 "중단"
+    if is_stale(phase, updated_at):
+        status_text = "중단"
+    else:
+        status_text = PHASE_STATUS_MAP.get(phase, "불명")
+
+    # 날짜/시간 추출
+    date_str, time_str = parse_timestamp_from_dir(dir_name)
+
+    # 요약 추출 (summary.txt 최우선, plan.md 차선, user_prompt.txt 폴백)
+    summary = ""
+    summary_file = os.path.join(cmd_path, "summary.txt")
+    if os.path.exists(summary_file):
+        summary = extract_summary_from_file(summary_file)
+    if not summary and os.path.exists(plan_file):
+        summary = extract_summary_from_plan(plan_file)
+    if not summary and os.path.exists(prompt_file):
+        summary = extract_summary_from_prompt(prompt_file)
+
+    # 제목: .context.json의 title 필드 우선, 없으면 work_name 폴백
+    context_file = os.path.join(cmd_path, ".context.json")
+    title = ""
+    if os.path.exists(context_file):
+        title = extract_title_from_context(context_file)
+    if not title:
+        title = work_name
+
+    # 각 파일/디렉토리 존재 여부
+    has_plan = os.path.exists(plan_file)
+    has_prompt = os.path.exists(prompt_file)
+    has_files = os.path.isdir(files_dir) and len(os.listdir(files_dir)) > 0
+    has_report = os.path.exists(report_file)
+
+    # 이미지 파일 개수 (files 디렉토리)
+    files_count = 0
+    if has_files:
+        files_count = len(os.listdir(files_dir))
+
+    return {
+        "work_id": dir_name,
+        "title": title,
+        "summary": summary,
+        "command": command,
+        "phase": phase,
+        "status": status_text,
+        "date": date_str,
+        "time": time_str,
+        "has_plan": has_plan,
+        "has_prompt": has_prompt,
+        "has_files": has_files,
+        "files_count": files_count,
+        "has_report": has_report,
+        "work_name": work_name,
+        "rel_base": f"{rel_prefix}/{dir_name}/{work_name}/{command}",
+    }
+
+
 def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict]:
     """
     단일 디렉토리를 스캔하여 워크플로우 엔트리 목록을 반환.
 
     디렉토리 구조: base_dir/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+    command 서브디렉토리가 없고 workName에 직접 파일이 있으면 command="unknown"으로 폴백.
     rel_prefix: history.md에서의 상대 경로 접두사 (예: "../.workflow" 또는 "../.workflow/.history")
     """
     entries = []
@@ -208,83 +312,26 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict]:
             if not os.path.isdir(work_path):
                 continue
 
+            # command 서브디렉토리 탐색
+            has_command_subdir = False
             for command in os.listdir(work_path):
                 cmd_path = os.path.join(work_path, command)
                 if not os.path.isdir(cmd_path):
                     continue
 
-                ensure_entry_data(cmd_path)
+                has_command_subdir = True
+                entry = _build_entry(dir_name, work_name, command,
+                                     cmd_path, work_path, rel_prefix)
+                entries.append(entry)
 
-                # 파일 경로 구성
-                status_file = os.path.join(cmd_path, "status.json")
-                plan_file = os.path.join(cmd_path, "plan.md")
-                prompt_file = os.path.join(cmd_path, "user_prompt.txt")
-                report_file = os.path.join(cmd_path, "report.md")
-                files_dir = os.path.join(cmd_path, "files")
-
-                # status.json에서 메타 정보 추출
-                # 우선순위: <command>/status.json > <workName>/status.json
-                phase = "UNKNOWN"
-                created_at = None
-                if os.path.exists(status_file):
-                    phase, created_at = extract_status_from_json(status_file)
-                else:
-                    # fallback: workName 레벨의 status.json
-                    work_status_file = os.path.join(work_path, "status.json")
-                    if os.path.exists(work_status_file):
-                        phase, created_at = extract_status_from_json(work_status_file)
-
-                status_text = PHASE_STATUS_MAP.get(phase, "불명")
-
-                # 날짜/시간 추출
-                date_str, time_str = parse_timestamp_from_dir(dir_name)
-
-                # 요약 추출 (summary.txt 최우선, plan.md 차선, user_prompt.txt 폴백)
-                summary = ""
-                summary_file = os.path.join(cmd_path, "summary.txt")
-                if os.path.exists(summary_file):
-                    summary = extract_summary_from_file(summary_file)
-                if not summary and os.path.exists(plan_file):
-                    summary = extract_summary_from_plan(plan_file)
-                if not summary and os.path.exists(prompt_file):
-                    summary = extract_summary_from_prompt(prompt_file)
-
-                # 제목: .context.json의 title 필드 우선, 없으면 work_name 폴백
-                context_file = os.path.join(cmd_path, ".context.json")
-                title = ""
-                if os.path.exists(context_file):
-                    title = extract_title_from_context(context_file)
-                if not title:
-                    title = work_name
-
-                # 각 파일/디렉토리 존재 여부
-                has_plan = os.path.exists(plan_file)
-                has_prompt = os.path.exists(prompt_file)
-                has_files = os.path.isdir(files_dir) and len(os.listdir(files_dir)) > 0
-                has_report = os.path.exists(report_file)
-
-                # 이미지 파일 개수 (files 디렉토리)
-                files_count = 0
-                if has_files:
-                    files_count = len(os.listdir(files_dir))
-
-                entries.append({
-                    "work_id": dir_name,
-                    "title": title,
-                    "summary": summary,
-                    "command": command,
-                    "phase": phase,
-                    "status": status_text,
-                    "date": date_str,
-                    "time": time_str,
-                    "has_plan": has_plan,
-                    "has_prompt": has_prompt,
-                    "has_files": has_files,
-                    "files_count": files_count,
-                    "has_report": has_report,
-                    "work_name": work_name,
-                    "rel_base": f"{rel_prefix}/{dir_name}/{work_name}/{command}",
-                })
+            # T2: command 디렉토리가 없고, workName에 직접 파일이 존재하는 경우 폴백
+            if not has_command_subdir:
+                work_status = os.path.join(work_path, "status.json")
+                work_prompt = os.path.join(work_path, "user_prompt.txt")
+                if os.path.exists(work_status) or os.path.exists(work_prompt):
+                    entry = _build_entry(dir_name, work_name, "unknown",
+                                         work_path, work_path, rel_prefix)
+                    entries.append(entry)
 
     return entries
 
@@ -432,6 +479,15 @@ def extract_status_from_row(row: str) -> str:
     return ""
 
 
+def replace_status_in_row(row: str, new_status: str) -> str:
+    """기존 데이터 행의 상태 셀 값을 교체."""
+    cells = row.split("|")
+    if len(cells) >= 6:
+        cells[5] = f" {new_status} "
+        return "|".join(cells)
+    return row
+
+
 def extract_work_id_from_row(row: str) -> str:
     """기존 데이터 행에서 작업ID를 추출."""
     cells = row.split("|")
@@ -515,7 +571,16 @@ def cmd_sync(args: argparse.Namespace) -> int:
         if extract_work_id_from_row(row)
     )
 
-    if not new_entries and not updated_entries and not has_duplicates and not has_legacy:
+    # T3: 고아 엔트리 감지 - history.md에는 있으나 파일시스템에 디렉토리가 없는 엔트리
+    orphan_wids: set[str] = set()
+    for row in data_rows:
+        wid = extract_work_id_from_row(row)
+        if wid and wid not in scanned_map:
+            old_status = extract_status_from_row(row)
+            if old_status != "삭제됨":
+                orphan_wids.add(wid)
+
+    if not new_entries and not updated_entries and not has_duplicates and not has_legacy and not orphan_wids:
         print("[INFO] history.md는 최신 상태입니다. 변경 사항 없음.")
         return 0
 
@@ -530,6 +595,10 @@ def cmd_sync(args: argparse.Namespace) -> int:
             old_row = existing_rows.get(e["work_id"], "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
+        if orphan_wids:
+            print(f"  고아 엔트리(삭제됨 표시): {len(orphan_wids)}건")
+            for wid in sorted(orphan_wids, reverse=True):
+                print(f"    ! {wid} | 삭제됨")
         return 0
 
     # 실제 갱신
@@ -552,6 +621,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
         elif wid in scanned_map:
             # scanned 데이터로 재생성 (레거시 형식/누락 링크 해소)
             final_rows.append(format_row(scanned_map[wid]))
+        elif wid in orphan_wids:
+            # T3: 고아 엔트리 - 상태를 "삭제됨"으로 변경
+            final_rows.append(replace_status_in_row(row, "삭제됨"))
         else:
             final_rows.append(row)
 
@@ -617,6 +689,10 @@ def cmd_sync(args: argparse.Namespace) -> int:
             old_row = existing_rows.get(e["work_id"], "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
+    if orphan_wids:
+        print(f"  고아 엔트리(삭제됨 표시): {len(orphan_wids)}건")
+        for wid in sorted(orphan_wids, reverse=True):
+            print(f"    ! {wid} | 삭제됨")
     print(f"  총 행 수: {len(all_rows)}건")
 
     return 0

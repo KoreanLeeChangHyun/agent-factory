@@ -53,7 +53,7 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 | 항목 | full 모드 | no-plan 모드 |
 |------|----------|-------------|
 | State transition | PLAN -> WORK | INIT -> WORK |
-| Phase 0 (skill-map) | 조건부 (태스크 >= 6개) | 스킵 |
+| Phase 0 (skill-map) | 필수 | 스킵 |
 | planPath | 필수 | 없음 |
 | Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
 | 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
@@ -64,23 +64,19 @@ no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 �
 
 ---
 
-## Full Mode: Phase 0 - Preparation (Conditional, Sequential 1 worker)
+## Full Mode: Phase 0 - Preparation (Required, Sequential 1 worker)
 
-> **조건부 실행**: Phase 0은 계획서의 태스크 수가 **6개 이상**일 때만 실행합니다.
-> 태스크 수가 6개 미만이면 Phase 0을 스킵하고 바로 Phase 1로 진행합니다.
+> **필수 실행**: Phase 0은 모든 full 모드 워크플로우에서 필수로 실행합니다.
 
-**Phase 0 실행 판단 흐름:**
+**Phase 0 실행 흐름:**
 
 ```mermaid
 flowchart TD
-    START[계획서 태스크 수 확인] --> Q1{태스크 >= 6개?}
-    Q1 -->|예| P0[Phase 0 실행: skill-map.md 생성]
-    Q1 -->|아니오| SKIP[Phase 0 스킵: work 디렉터리만 생성]
+    START[WORK 시작] --> P0[Phase 0 실행: skill-map.md 생성]
     P0 --> P1[Phase 1~N: skills 파라미터 전달]
-    SKIP --> P1_AUTO[Phase 1~N: Worker 자율 스킬 결정]
 ```
 
-**Phase 0 실행 시 (태스크 >= 6개):**
+**Phase 0 실행:**
 
 ```bash
 # Phase 0 서브배너 출력
@@ -95,14 +91,6 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스크와 스킬을 매핑하여 `<workDir>/work/skill-map.md` 생성.
 
 Phase 0 완료 후 skill-map.md를 참고하여 후속 worker 호출 시 skills 파라미터를 전달합니다.
-
-**Phase 0 스킵 시 (태스크 < 6개):**
-
-```bash
-mkdir -p <workDir>/work
-```
-
-work 디렉터리만 생성하고 바로 Phase 1로 진행합니다. Worker는 skills 파라미터 없이 호출되며, 각 Worker가 `command-skill-map.md`의 명령어별 기본 매핑과 키워드 분석, 그리고 `.claude/skills/*/SKILL.md`의 description 필드를 참조하여 자율적으로 스킬을 결정합니다.
 
 **Phase 0 실패 시 폴백:**
 
