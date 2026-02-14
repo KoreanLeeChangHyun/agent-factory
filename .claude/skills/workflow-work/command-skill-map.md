@@ -10,7 +10,7 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
 | implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증. 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
-| review | command-requesting-code-review | 리뷰 체크리스트 적용 |
+| review | command-requesting-code-review, command-code-quality-checker | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
 | research | command-research, deep-research, research-integrated | 웹 조사(command-research) + 코드 탐색(deep-research) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드 |
 | strategy | command-strategy | 다중 워크플로우 전략 수립, 로드맵 생성 |
 
@@ -41,6 +41,13 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 웹+코드 통합, integrated research, 통합 조사, 복합 조사 | research-integrated |
 | 병렬 조사, parallel research, 종합 조사, 다중 에이전트 | research-parallel |
 | 신뢰도 검증, 출처 검증, source verification, grounding | research-grounding |
+| 보안 리뷰, security review, OWASP 리뷰, 취약점 리뷰, 보안 감사 | command-review-security |
+| 아키텍처 리뷰, architecture review, 설계 리뷰, 구조 리뷰, 계층 검증 | command-review-architecture |
+| 프론트엔드 리뷰, frontend review, React 리뷰, UI 리뷰, 컴포넌트 리뷰 | command-review-frontend |
+| 성능 리뷰, performance review, 쿼리 리뷰, DB 리뷰, N+1 | command-review-performance |
+| 종합 리뷰, comprehensive review, 전체 리뷰, full review | review-comprehensive |
+| 리뷰 반영, review feedback, 피드백 구현, 리뷰 수정, 리뷰 대응 | review-feedback-handler |
+| PR 리뷰, pull request review, PR 검증, PR 체크 | review-pr-integration |
 | 보안, security, OWASP, 취약점, 정적 분석, static analysis, CodeQL, Semgrep | command-static-analysis |
 | 접근성, a11y, accessibility, WCAG | command-web-design-guidelines |
 | 디버깅, debugging, 버그, bug, 에러 추적, error tracking, 근본 원인 | command-systematic-debugging |
