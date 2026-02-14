@@ -20,7 +20,7 @@ flowchart TD
 **Phase 0 실행:**
 
 ```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, mode: phase0")
+Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
 ```
 
 Phase 0은 **1개 worker 에이전트가 순차적으로** 실행합니다.

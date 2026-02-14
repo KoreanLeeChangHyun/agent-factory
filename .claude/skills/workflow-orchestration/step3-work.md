@@ -50,13 +50,13 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 
 **no-plan 모드 특성:**
 
-| 항목 | full 모드 | no-plan 모드 |
-|------|----------|-------------|
-| State transition | PLAN -> WORK | INIT -> WORK |
-| Phase 0 (skill-map) | 필수 | 스킵 |
-| planPath | 필수 | 없음 |
-| Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
-| 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
+| 항목 | full 모드 | no-plan 모드 | prompt 모드 |
+|------|----------|-------------|------------|
+| State transition | PLAN -> WORK | INIT -> WORK | INIT -> WORK |
+| Phase 0 (skill-map) | 필수 | 스킵 | 해당 없음 |
+| planPath | 필수 | 없음 | 없음 |
+| Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) | 단일 (main direct) |
+| 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt | user_prompt.txt |
 
 no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악하고, 명령어별 기본 스킬 매핑으로 스킬을 자동 결정하여 작업을 수행합니다.
 
@@ -67,6 +67,7 @@ no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 �
 ## Full Mode: Phase 0 - Preparation (Required, Sequential 1 worker)
 
 > **필수 실행**: Phase 0은 모든 full 모드 워크플로우에서 필수로 실행합니다.
+> **REQUIRED**: Phase 0 Worker 호출 직전에 반드시 WORK-PHASE 0 배너를 출력해야 합니다.
 
 **Phase 0 실행 흐름:**
 
@@ -79,12 +80,14 @@ flowchart TD
 **Phase 0 실행:**
 
 ```bash
-# Phase 0 서브배너 출력
+# Phase 0 서브배너 출력 (필수 - 스킵 금지)
 Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
-```
 
-```
+# Phase 0 디렉토리 생성 및 Worker 호출
 mkdir -p <workDir>/work
+wf-state usage-pending <registryKey> phase0 phase0
+```
+```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
 ```
 

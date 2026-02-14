@@ -96,7 +96,7 @@ Workflow <registryKey> <phase> <status>
 | Before INIT | `Workflow INIT none <command>` |
 | Before/After PLAN | `Workflow <registryKey> PLAN` / `Workflow <registryKey> PLAN done` |
 | Before/After WORK | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` |
-| WORK Phase N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
+| WORK Phase 0~N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
 | Before/After REPORT | `Workflow <registryKey> REPORT` / `Workflow <registryKey> REPORT done` |
 | Before/After DONE | `Workflow <registryKey> DONE` / `Workflow <registryKey> DONE done` |
 | Before/After WORK (prompt) | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` (main direct work) |
@@ -116,7 +116,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | INIT done (prompt) | Direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
 | PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation |
-| WORK Phase start | WORK-PHASE banner, then worker call(s) for that phase | Skipping Phase banner |
+| WORK Phase start | WORK-PHASE banner (Phase 0 포함), then worker call(s) for that phase | Skipping Phase banner, Skipping Phase 0 banner |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
 | REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text |
@@ -184,7 +184,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Rules:** Only worker/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode), user_prompt.txt request (no-plan mode), or main agent direct work (prompt mode).
 
-**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for No-Plan mode, Phase 0 conditional execution, Phase 1~N task execution, Explore sub-agent, and usage-pending tracking.
+**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for No-Plan mode, Phase 0 mandatory execution, Phase 1~N task execution, Explore sub-agent, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 
