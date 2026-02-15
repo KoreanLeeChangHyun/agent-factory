@@ -41,7 +41,8 @@ wf-state both <registryKey> worker INIT WORK
 
 **Single Worker Call (no planPath, no Phase 0):**
 ```bash
-# usage-pending: Worker 호출 직전에 실행 (taskId를 agent_id 대체 키로 사용)
+# task-status + usage-pending: Worker 호출 직전에 실행
+wf-state task-status <registryKey> W01 running
 wf-state usage-pending <registryKey> W01 W01
 ```
 ```
@@ -85,10 +86,18 @@ Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
 
 # Phase 0 디렉토리 생성 및 Worker 호출
 mkdir -p <workDir>/work
+wf-state task-status <registryKey> phase0 running
 wf-state usage-pending <registryKey> phase0 phase0
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
+```
+
+**Phase 0 완료 후 task-status 갱신:**
+```bash
+# Worker 반환값 수신 후 (성공/실패에 따라)
+wf-state task-status <registryKey> phase0 completed   # 성공 시
+wf-state task-status <registryKey> phase0 failed       # 실패 시
 ```
 
 Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스크와 스킬을 매핑하여 `<workDir>/work/skill-map.md` 생성.
@@ -127,7 +136,9 @@ Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
 Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
-# usage-pending: 각 Worker 호출 직전에 개별 실행
+# task-status + usage-pending: 각 Worker 호출 직전에 개별 실행
+wf-state task-status <registryKey> W01 running
+wf-state task-status <registryKey> W02 running
 wf-state usage-pending <registryKey> W01 W01
 wf-state usage-pending <registryKey> W02 W02
 ```
@@ -142,7 +153,8 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 Workflow <registryKey> WORK-PHASE 2 "W04" sequential
 ```
 ```bash
-# usage-pending: Worker 호출 직전에 실행
+# task-status + usage-pending: Worker 호출 직전에 실행
+wf-state task-status <registryKey> W04 running
 wf-state usage-pending <registryKey> W04 W04
 ```
 ```
@@ -150,26 +162,6 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 ```
 
 > **skills parameter**: Phase 0에서 생성된 skill-map.md의 추천 스킬 또는 계획서에 명시된 스킬을 전달. 미명시 태스크는 worker가 자동 결정.
-
-## Explore Sub-agent
-
-계획서에서 `서브에이전트: Explore`로 지정된 태스크는 Explore(Haiku) 서브에이전트를 사용합니다.
-
-**Explore Call Pattern:**
-```
-Task(subagent_type="explore", prompt="
-다음 파일들을 분석하고 각 파일의 주요 기능과 구조를 요약하세요:
-- <파일 경로 목록>
-
-출력 형식: 파일별 1-3줄 요약
-")
-```
-
-**Explore Usage Rules:**
-- **Read-only tasks only**: 파일 수정이 필요 없는 대량 분석 태스크에만 사용
-- **Parallel calls**: 여러 Explore 에이전트를 동시에 호출하여 파일 분배 가능
-- **Worker combination**: Explore(읽기) 결과를 수집한 후 Worker(쓰기)에 전달하는 파이프라인 구성 가능
-- **Plan compliance**: 계획서에 `서브에이전트: Explore`로 명시된 태스크만 Explore로 호출
 
 ## Error Handling
 
@@ -226,6 +218,20 @@ Task(worker) 호출 후 반환값 처리 규칙:
 2. 나머지는 무시 (상세 내용은 .workflow/ 파일에 이미 저장됨)
 3. 3줄 형식이 아닌 반환값이라도 첫 3줄만 사용, 초과분은 MUST NOT retain
 
+**Task Status Update (REQUIRED):**
+
+Worker 반환값 수신 후, 반환 상태에 따라 `task-status`를 갱신합니다:
+
+```bash
+# 반환값 첫 줄이 "상태: 성공" 또는 "상태: 부분성공"인 경우
+wf-state task-status <registryKey> <taskId> completed
+
+# 반환값 첫 줄이 "상태: 실패"인 경우
+wf-state task-status <registryKey> <taskId> failed
+```
+
+> **Note:** task-status 갱신은 반환값 처리(3줄 추출) 직후, 다음 Worker 호출 전에 실행합니다. 병렬 Worker의 경우 각 Worker 반환 시점에 개별적으로 갱신합니다.
+
 ## Usage Tracking: usage-pending (REQUIRED)
 
 > Worker 토큰 사용량을 taskId 단위로 정확히 추적하기 위해, **모든 Worker Task 호출 직전에** `usage-pending`을 실행해야 합니다.
@@ -257,13 +263,15 @@ wf-state usage-pending <registryKey> W01 W01
 wf-state env <registryKey> set HOOKS_EDIT_ALLOWED 1
 
 # 2. Worker 호출 (hooks 파일 수정 태스크)
+wf-state task-status <registryKey> W01 running
 wf-state usage-pending <registryKey> W01 W01
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
 ```
 ```bash
-# 3. Worker 완료 후: 환경변수 해제 (반드시 실행)
+# 3. Worker 완료 후: task-status 갱신 + 환경변수 해제 (반드시 실행)
+wf-state task-status <registryKey> W01 completed   # 또는 failed
 wf-state env <registryKey> unset HOOKS_EDIT_ALLOWED
 ```
 

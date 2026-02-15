@@ -114,12 +114,6 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 
 worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 로드하는 스킬과, 작업 내용의 키워드에 따라 추가 로드하는 스킬이 command-skill-map.md에 정의되어 있습니다.
 
-### Explore 서브에이전트 활용 가이드
-
-Explore(Haiku) 서브에이전트는 읽기 전용/저비용/고속의 대량 파일 분석 전용 에이전트입니다. 수정 불가.
-
-> 상세 가이드(호출 패턴, 토폴로지 파티셔닝, 사용 시나리오)는 `reference/explore-guide.md`를 참조하세요.
-
 ### worker 작업 처리 절차
 
 ```mermaid

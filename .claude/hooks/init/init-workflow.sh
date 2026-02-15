@@ -70,6 +70,29 @@ COMMAND="$1"
 TITLE="$2"
 MODE="${3:-full}"
 
+# Validate command
+case "$COMMAND" in
+  implement|review|research|strategy|prompt) ;;
+  *)
+    echo "[ERROR] Invalid command: '$COMMAND'. Allowed: implement, review, research, strategy, prompt" >&2
+    exit 1
+    ;;
+esac
+
+# Validate title is not empty
+if [ -z "$TITLE" ] || [[ "$TITLE" =~ ^[[:space:]]*$ ]]; then
+  echo "[ERROR] Title must not be empty" >&2
+  exit 1
+fi
+
+# Reject file path patterns in title
+case "$TITLE" in
+  .workflow/*|./*|/*)
+    echo "[ERROR] Invalid title: must not be a file path" >&2
+    exit 1
+    ;;
+esac
+
 # mode 값 검증 (허용: full, no-plan, prompt)
 case "$MODE" in
     full|no-plan|prompt) ;;
@@ -96,6 +119,12 @@ name = name.strip('-')
 name = name[:20]
 print(name)
 ")
+
+# Validate workName is not empty after sanitization
+if [ -z "$WORK_NAME" ]; then
+  echo "[ERROR] Title produced empty workName after sanitization: '$TITLE'" >&2
+  exit 1
+fi
 
 WORK_DIR=".workflow/${REGISTRY_KEY}/${WORK_NAME}/${COMMAND}"
 ABS_WORK_DIR="$PROJECT_ROOT/$WORK_DIR"

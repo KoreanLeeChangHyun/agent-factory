@@ -184,7 +184,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Rules:** Only worker/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode), user_prompt.txt request (no-plan mode), or main agent direct work (prompt mode).
 
-**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for No-Plan mode, Phase 0 mandatory execution, Phase 1~N task execution, Explore sub-agent, and usage-pending tracking.
+**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for No-Plan mode, Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 

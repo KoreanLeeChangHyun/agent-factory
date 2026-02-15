@@ -139,19 +139,18 @@ AskUserQuestion(
 > **"수정" selection handling:**
 > 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
 >
-> 1. **prompt.txt read**: `.prompt/prompt.txt`의 내용을 읽어 피드백 내용을 확보
-> 2. **prompt.txt clear (REQUIRED)**: 읽기 직후 MUST clear prompt.txt
+> 1. **reload-prompt.sh 호출**: 오케스트레이터가 스크립트를 1회 호출하여 피드백을 수신합니다.
 >    ```bash
->    > .prompt/prompt.txt
+>    Bash(".claude/hooks/init/reload-prompt.sh <workDir>")
 >    ```
->    클리어 실패 시 재시도:
->    ```bash
->    : > .prompt/prompt.txt
->    ```
-> 3. **planner re-call**: 확보한 피드백 내용을 prompt에 `mode: revise` 및 피드백 내용으로 추가하여 계획 재수립
-> 4. **Step 2b repeat**: 재수립된 계획에 대해 다시 사용자 승인 요청
+>    - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행
+>    - stdout으로 피드백 전문을 출력
+>    - 종료코드 0: 정상 완료 → stdout 내용을 피드백으로 사용
+>    - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
+> 2. **planner re-call**: stdout으로 수신한 피드백 내용을 `mode: revise` 프롬프트에 포함하여 planner를 재호출, 계획 재수립
+> 3. **Step 2b repeat**: 재수립된 계획에 대해 다시 사용자 승인 요청
 >
-> **Note:** prompt.txt 클리어를 생략하면 이전 피드백 내용이 잔존하여 후속 작업에서 중복/오염이 발생. INIT 단계의 init-workflow.sh Step 4와 동일한 패턴.
+> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어, `querys.txt` 기록은 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
 
 ### CANCELLED Processing
 

@@ -13,6 +13,7 @@
 #   update-workflow-state.sh usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
 #   update-workflow-state.sh usage-finalize <workDir>
 #   update-workflow-state.sh env <workDir> set|unset <KEY> [VALUE]
+#   update-workflow-state.sh task-status <workDir> <task_id> <status>
 #
 # workDir 형식 (3가지, 하위 호환):
 #   단축 형식: YYYYMMDD-HHMMSS (registry.json에서 자동 해석)
@@ -42,6 +43,9 @@
 #                  오케스트레이터가 reporter 반환 후 unregister 전에 호출
 #   env          - .claude.env 파일의 환경 변수를 관리 (set/unset)
 #                  허용 KEY: HOOKS_EDIT_ALLOWED, GUARD_ 접두사. 비허용 KEY는 경고 후 무시
+#   task-status  - <workDir>/status.json의 tasks 객체에 태스크 진행 상태를 원자적으로 기록
+#                  인자: task_id (W01, W02 등), status (pending|running|completed|failed)
+#                  tasks 필드가 없으면 빈 딕셔너리로 초기화. link_session()과 동일한 원자적 쓰기 패턴
 #
 # 레지스트리 스키마 (.workflow/registry.json):
 #   {
@@ -496,6 +500,77 @@ try:
     print(f'link-session -> added: {session_id} (total: {len(data[\"linked_sessions\"])})')
 except Exception as e:
     print(f'[WARN] link-session failed: {e}', file=sys.stderr)
+    sys.exit(0)
+" 2>&1
+}
+
+# task-status 업데이트 함수 (원자적: 임시 파일 -> mv)
+# status.json의 tasks 객체에 {taskId: {status, updated_at}} 형식으로 기록
+update_task_status() {
+    local task_id="$1"
+    local task_status="$2"
+
+    # 인자 검증
+    if [ -z "$task_id" ] || [ -z "$task_status" ]; then
+        echo "[WARN] task-status: task_id, status 인자가 필요합니다." >&2
+        return
+    fi
+
+    # status 값 검증
+    case "$task_status" in
+        pending|running|completed|failed) ;;
+        *)
+            echo "[WARN] task-status: status는 pending|running|completed|failed 중 하나여야 합니다. (받은 값: $task_status)" >&2
+            return
+            ;;
+    esac
+
+    WF_TASK_ID="$task_id" WF_TASK_STATUS="$task_status" WF_STATUS_FILE="$STATUS_FILE" python3 -c "
+import json, sys, os, tempfile, shutil
+from datetime import datetime, timezone, timedelta
+
+task_id = os.environ['WF_TASK_ID']
+task_status = os.environ['WF_TASK_STATUS']
+status_file = os.environ['WF_STATUS_FILE']
+
+if not os.path.exists(status_file):
+    print(f'[WARN] status.json not found: {status_file}', file=sys.stderr)
+    sys.exit(0)
+
+try:
+    with open(status_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # tasks 객체 초기화 (없으면 빈 딕셔너리)
+    if 'tasks' not in data or not isinstance(data.get('tasks'), dict):
+        data['tasks'] = {}
+
+    # KST 타임스탬프
+    kst = timezone(timedelta(hours=9))
+    now = datetime.now(kst).strftime('%Y-%m-%dT%H:%M:%S+09:00')
+
+    # 태스크 상태 기록
+    data['tasks'][task_id] = {
+        'status': task_status,
+        'updated_at': now
+    }
+
+    # 원자적 업데이트: 임시 파일에 쓴 후 mv로 교체
+    dir_name = os.path.dirname(status_file)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write('\n')
+        shutil.move(tmp_path, status_file)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+    print(f'task-status -> {task_id}: {task_status} (updated_at: {now})')
+except Exception as e:
+    print(f'[WARN] task-status failed: {e}', file=sys.stderr)
     sys.exit(0)
 " 2>&1
 }
@@ -1207,8 +1282,19 @@ case "$MODE" in
         echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
         ;;
 
+    task-status)
+        TASK_ID="$3"
+        TASK_STATUS="$4"
+        if [ -z "$TASK_ID" ] || [ -z "$TASK_STATUS" ]; then
+            echo "[WARN] task-status 모드: task_id, status 인자가 필요합니다." >&2
+            exit 0
+        fi
+        RESULT=$(update_task_status "$TASK_ID" "$TASK_STATUS")
+        echo -e "${C_YELLOW}[OK]${C_RESET} state updated: $RESULT"
+        ;;
+
     *)
-        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session|usage-pending|usage|usage-finalize|env 중 선택)" >&2
+        echo "[WARN] 알 수 없는 모드: $MODE (context|status|both|register|unregister|link-session|usage-pending|usage|usage-finalize|env|task-status 중 선택)" >&2
         ;;
 esac
 

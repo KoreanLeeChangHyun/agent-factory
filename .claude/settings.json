@@ -91,6 +91,12 @@
             "command": "bash .claude/hooks/event/subagent-stop/usage-tracker.sh",
             "async": true,
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/subagent-stop/completion-notify.sh",
+            "async": true,
+            "timeout": 10
           }
         ]
       }

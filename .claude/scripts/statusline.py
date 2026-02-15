@@ -193,12 +193,16 @@ def get_active_workflow(cwd: str) -> dict | None:
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             pass
 
+        # Read tasks progress from status.json
+        tasks = status.get("tasks", {})
+
         if title or phase:
             return {
                 "title": title,
                 "phase": phase,
                 "command": command,
                 "agent": agent,
+                "tasks": tasks,
             }
 
     return None
@@ -247,7 +251,22 @@ def main() -> None:
         phase_color = PHASE_COLORS.get(phase, "\033[90m")
         if phase:
             agent = wf.get("agent", "")
-            if agent:
+            tasks = wf.get("tasks", {})
+            # Show progress in WORK phase when tasks info is available
+            progress = ""
+            if phase == "WORK" and tasks:
+                completed = sum(
+                    1 for t in tasks.values()
+                    if isinstance(t, dict) and t.get("status") == "completed"
+                )
+                total = len(tasks)
+                progress = f"{completed}/{total}"
+
+            if progress and agent:
+                workflow_display = f" {phase_color}[{phase}:{progress}:{agent}]{RESET} {title}"
+            elif progress:
+                workflow_display = f" {phase_color}[{phase}:{progress}]{RESET} {title}"
+            elif agent:
                 workflow_display = f" {phase_color}[{phase}:{agent}]{RESET} {title}"
             else:
                 workflow_display = f" {phase_color}[{phase}]{RESET} {title}"
