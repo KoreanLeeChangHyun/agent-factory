@@ -15,7 +15,7 @@
 #
 # 종료 코드:
 #   0 - 성공 (이동 대상 없어도 성공)
-#   1 - 인자 오류
+#   1 - 인자 오류 또는 아카이브 이동 실패
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -93,4 +93,9 @@ if [ $MOVED -gt 0 ]; then
     echo -e "${C_CYAN}[archive]${C_RESET} $MOVED directories archived to .history/"
 fi
 
+if [ $FAILED -gt 0 ]; then
+    echo "[WARN] $FAILED directories failed to archive" >&2
+fi
+
+if [ $FAILED -gt 0 ]; then exit 1; fi
 exit 0

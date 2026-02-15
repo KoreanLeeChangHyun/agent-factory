@@ -42,6 +42,7 @@
 #   6. <workDir>/.context.json 생성
 #   7. <workDir>/status.json 생성
 #   8. 좀비 정리 (TTL 24시간 만료 + 미완료 워크플로우 -> STALE)
+#   8b. 활성 디렉토리 수 점검 및 KEEP_COUNT 초과 시 보조 아카이빙 트리거
 #   9. 전역 레지스트리 등록
 #
 # 출력 (stdout):
@@ -269,6 +270,20 @@ except Exception:
 # --- Step 8: 좀비 정리 ---
 
 bash "$SCRIPT_DIR/cleanup-zombie.sh" "$PROJECT_ROOT" 2>&1 || true
+
+# --- Step 8b: 활성 디렉토리 수 점검 및 보조 아카이빙 ---
+
+KEEP_COUNT=10
+ACTIVE_COUNT=0
+while IFS= read -r _dir; do
+    dir_name="$(basename "$_dir")"
+    [ "$dir_name" != "$REGISTRY_KEY" ] && ACTIVE_COUNT=$((ACTIVE_COUNT + 1))
+done < <(ls -d "$PROJECT_ROOT/.workflow"/[0-9]* 2>/dev/null)
+
+if [ "$ACTIVE_COUNT" -gt "$KEEP_COUNT" ]; then
+    echo "[init] Active directories ($ACTIVE_COUNT) exceed KEEP_COUNT ($KEEP_COUNT), triggering archive..." >&2
+    bash "$SCRIPT_DIR/../workflow/archive-workflow.sh" "$REGISTRY_KEY" 2>&1 || true
+fi
 
 # --- Step 9: 전역 레지스트리 등록 ---
 
