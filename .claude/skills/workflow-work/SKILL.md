@@ -1,7 +1,8 @@
 ---
 name: workflow-work
-description: "워크플로우 WORK 단계 전용 내부 스킬. 오케스트레이터가 Task 도구로 호출하여 할당된 작업을 독립적으로 병렬 처리한다. Use for parallel task execution: 코드 작성, 파일 수정, 검색, 분석 등 모든 유형의 작업을 처리하며, command-skill-map.md 기반으로 명령어별 스킬을 자동 로드한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
+description: "Internal skill for workflow WORK stage. Independently processes assigned tasks in parallel when invoked by orchestrator via Task tool. Use for parallel task execution: handles all task types including code writing, file modification, search, and analysis; auto-loads command-specific skills based on command-skill-map.md. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Work

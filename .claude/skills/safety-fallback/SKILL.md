@@ -1,6 +1,7 @@
 ---
 name: safety-fallback
-description: "에이전트 시스템의 안전장치, 제한 사항, 오류 복구 전략 가이드. Use for error recovery and safety tasks: (1) 에이전트 제한 사항 확인, (2) Task 실패/에러 발생 시 복구 전략 참고, (3) 자체 검증 기준 이해, (4) 반복 제한/자원 보호 정책 참고. 트리거: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'."
+description: "Agent system safety guard, limitation reference, and error recovery strategy guide. For hook-based safety, refer to hooks-guide skill. Use for error recovery and safety tasks: (1) agent limitation reference, (2) Task failure/error recovery strategy, (3) self-verification criteria understanding, (4) iteration limits/resource protection policies. Triggers: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'."
+license: "Apache-2.0"
 ---
 
 # 안전장치 및 Fallback 가이드
@@ -59,19 +60,6 @@ description: "에이전트 시스템의 안전장치, 제한 사항, 오류 복�
 | **Documenter** | 포맷 정확, 내용 완전 | 예시 포함 |
 
 > 이 검증 항목들은 각 에이전트/스킬이 작업 완료 전 자체적으로 확인해야 하는 가이드라인입니다.
-
-### Hook 기반 안전장치
-
-`.claude/settings.json`에 등록된 Hook을 통해 실시간 안전장치가 동작합니다:
-
-| Hook | 트리거 | 스크립트 | 역할 |
-|------|--------|---------|------|
-| PreToolUse(Bash) | Bash 실행 전 | `dangerous-command-guard.sh` | 위험 명령어 차단 |
-| PreToolUse(Write\|Edit) | 파일 수정 전 | `tdd-guard.sh` | TDD 원칙 위반 경고 |
-| PreToolUse(Bash) | Bash 실행 전 | `workflow-transition-guard.sh` | 워크플로우 Phase 전이 검증 |
-| PreToolUse(Task) | 에이전트 호출 전 | `workflow-agent-guard.sh` | 워크플로우 에이전트 호출 검증 |
-
-> Hook 스크립트 위치: `.claude/hooks/` 디렉터리 (이벤트별 서브디렉터리 구조)
 
 ### 컨텍스트 압축
 

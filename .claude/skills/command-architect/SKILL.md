@@ -1,6 +1,7 @@
 ---
 name: command-architect
-description: "시스템 아키텍처 설계 및 UML 다이어그램 생성 스킬. 클래스/시퀀스/ER/컴포넌트/배포/상태 다이어그램을 Mermaid(.md)와 이미지(.png)로 산출합니다. Use for 시스템 설계, 아키텍처 다이어그램, 데이터 모델 설계, 시스템 흐름 시각화 요청 시. 트리거: '설계해줘', '아키텍처', '다이어그램', 'UML', 'ERD', '시퀀스'."
+description: "System architecture design and UML diagram generation skill. Produces class/sequence/ER/component/deployment/state diagrams as Mermaid (.md) and image (.png) files. Use for system design: architecture diagrams, data model design, system flow visualization. Triggers: '설계해줘', '아키텍처', 'architecture', '다이어그램', 'UML', 'ERD', '시퀀스'."
+license: "Apache-2.0"
 ---
 
 # Architect
@@ -46,6 +47,8 @@ description: "시스템 아키텍처 설계 및 UML 다이어그램 생성 스�
 
 ## 다이어그램 유형 가이드
 
+> 모든 다이어그램 유형의 상세 Mermaid 문법, 코드 예시, 스타일링 옵션은 `command-mermaid-diagrams` 스킬(`Read: .claude/skills/command-mermaid-diagrams/SKILL.md`)을 참조하세요.
+
 ### 1. 클래스 다이어그램 (Class Diagram)
 
 **용도**: 객체 지향 구조, 클래스 관계, 상속/구성/의존 관계 표현
@@ -55,39 +58,7 @@ description: "시스템 아키텍처 설계 및 UML 다이어그램 생성 스�
 - 객체 간 관계 정의
 - API 설계 문서화
 
-```mermaid
-classDiagram
-    class User {
-        +String id
-        +String name
-        +String email
-        +login()
-        +logout()
-    }
-    class Order {
-        +String orderId
-        +Date createdAt
-        +Decimal total
-        +addItem()
-        +removeItem()
-    }
-    class Product {
-        +String productId
-        +String name
-        +Decimal price
-    }
-
-    User "1" --> "*" Order : places
-    Order "*" --> "*" Product : contains
-```
-
-**관계 표현**:
-- `<|--` : 상속 (Inheritance)
-- `*--` : 구성 (Composition)
-- `o--` : 집합 (Aggregation)
-- `-->` : 연관 (Association)
-- `..>` : 의존 (Dependency)
-- `..|>` : 구현 (Realization)
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -100,26 +71,7 @@ classDiagram
 - 사용자 시나리오 문서화
 - 시스템 간 통신 설계
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as API Gateway
-    participant S as Auth Service
-    participant D as Database
-
-    C->>A: POST /login
-    A->>S: Validate credentials
-    S->>D: Query user
-    D-->>S: User data
-    S-->>A: JWT Token
-    A-->>C: 200 OK (token)
-```
-
-**메시지 유형**:
-- `->>` : 동기 요청
-- `-->>` : 응답
-- `--)` : 비동기 메시지
-- `--x` : 실패 응답
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -132,37 +84,7 @@ sequenceDiagram
 - 테이블 관계 정의
 - 데이터 모델 문서화
 
-```mermaid
-erDiagram
-    USER ||--o{ ORDER : places
-    ORDER ||--|{ ORDER_ITEM : contains
-    PRODUCT ||--o{ ORDER_ITEM : includes
-    CATEGORY ||--o{ PRODUCT : has
-
-    USER {
-        int id PK
-        string name
-        string email UK
-        datetime created_at
-    }
-    ORDER {
-        int id PK
-        int user_id FK
-        decimal total
-        string status
-    }
-    PRODUCT {
-        int id PK
-        string name
-        decimal price
-        int category_id FK
-    }
-```
-
-**카디널리티**:
-- `||--||` : 일대일
-- `||--o{` : 일대다
-- `o{--o{` : 다대다
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -175,36 +97,7 @@ erDiagram
 - 모듈 구조 문서화
 - 시스템 통합 설계
 
-```mermaid
-flowchart TB
-    subgraph Frontend["Frontend Layer"]
-        Web[Web App]
-        Mobile[Mobile App]
-    end
-
-    subgraph Backend["Backend Layer"]
-        API[API Gateway]
-        Auth[Auth Service]
-        User[User Service]
-        Order[Order Service]
-    end
-
-    subgraph Data["Data Layer"]
-        DB[(PostgreSQL)]
-        Cache[(Redis)]
-        MQ[Message Queue]
-    end
-
-    Web --> API
-    Mobile --> API
-    API --> Auth
-    API --> User
-    API --> Order
-    User --> DB
-    User --> Cache
-    Order --> DB
-    Order --> MQ
-```
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -217,27 +110,7 @@ flowchart TB
 - 작업 워크플로우 정의
 - 상태 머신 설계
 
-```mermaid
-stateDiagram-v2
-    [*] --> Pending: Order Created
-
-    Pending --> Confirmed: Payment Received
-    Pending --> Cancelled: Timeout/Cancel
-
-    Confirmed --> Processing: Start Fulfillment
-    Confirmed --> Cancelled: Refund Requested
-
-    Processing --> Shipped: Package Sent
-    Processing --> Cancelled: Out of Stock
-
-    Shipped --> Delivered: Package Received
-    Shipped --> Returned: Return Requested
-
-    Delivered --> [*]
-    Returned --> Refunded
-    Cancelled --> Refunded
-    Refunded --> [*]
-```
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -250,25 +123,7 @@ stateDiagram-v2
 - 알고리즘 시각화
 - 의사결정 흐름 문서화
 
-```mermaid
-flowchart TD
-    Start([시작]) --> Input[/사용자 입력/]
-    Input --> Validate{유효성 검사}
-
-    Validate -->|Valid| Process[데이터 처리]
-    Validate -->|Invalid| Error[에러 메시지]
-    Error --> Input
-
-    Process --> Save[(DB 저장)]
-    Save --> Success[성공 응답]
-    Success --> End([종료])
-```
-
-**방향 옵션**:
-- `TD` / `TB` : 위에서 아래
-- `BT` : 아래에서 위
-- `LR` : 왼쪽에서 오른쪽
-- `RL` : 오른쪽에서 왼쪽
+> 상세 문법 및 예시는 `command-mermaid-diagrams` 스킬을 참조하세요.
 
 ---
 
@@ -286,57 +141,20 @@ flowchart TD
 
 ---
 
-## mermaid-diagrams 스킬 참조
-
-상세한 Mermaid 문법 및 스타일링은 `command-mermaid-diagrams` 스킬을 참조합니다.
-
-**참조 방법**:
-```
-Read: .claude/skills/command-mermaid-diagrams/SKILL.md
-```
-
-**포함 내용**:
-- 모든 다이어그램 타입 상세 문법
-- 스타일링 옵션 (색상, 폰트 등)
-- HTML 임베드 방법
-- 참고 링크
-
----
-
 ## mmdc CLI 사용법
 
-### 설치
-
 ```bash
+# 설치
 npm install -g @mermaid-js/mermaid-cli
-```
 
-### Markdown 파일에서 PNG 변환
-
-```bash
-# 기본 변환
+# PNG 변환 (기본)
 mmdc -i diagram.md -o diagram.png
+# 옵션: -b white (배경색), -t dark (테마: default/dark/forest/neutral), -w 1200 (너비)
 
-# 배경색 지정
-mmdc -i diagram.md -o diagram.png -b white
-
-# 테마 적용 (default, dark, forest, neutral)
-mmdc -i diagram.md -o diagram.png -t dark
-
-# 너비 지정
-mmdc -i diagram.md -o diagram.png -w 1200
-```
-
-### SVG 변환
-
-```bash
+# SVG 변환
 mmdc -i diagram.md -o diagram.svg
-```
 
-### 일괄 변환
-
-```bash
-# 디렉토리 내 모든 .md 파일 변환
+# 일괄 변환
 for f in *.md; do mmdc -i "$f" -o "${f%.md}.png"; done
 ```
 
@@ -344,59 +162,15 @@ for f in *.md; do mmdc -i "$f" -o "${f%.md}.png"; done
 
 ## 출력 파일 규칙
 
-### 파일명 규칙
+**파일명**: `<diagram-type>-<description>.md` / `.png` (예: `class-user-domain.md`, `sequence-login-flow.png`)
 
-```
-<diagram-type>-<description>.md   # Mermaid 소스
-<diagram-type>-<description>.png  # 이미지 파일
-```
+**저장 경로**: 기본 `.workflow/architect/<YYYYMMDD>-<HHMMSS>-<제목>/diagrams/`, 사용자 지정 경로 우선
 
-**예시**:
-```
-class-user-domain.md
-class-user-domain.png
-sequence-login-flow.md
-sequence-login-flow.png
-er-database-schema.md
-er-database-schema.png
-```
-
-### 저장 경로
-
-기본적으로 현재 작업 디렉토리에 저장합니다.
-사용자가 지정한 경로가 있으면 해당 경로에 저장합니다.
-
-```
-# 기본 경로 (cc:architect 사용 시)
-.workflow/architect/<YYYYMMDD>-<HHMMSS>-<제목>/diagrams/
-
-# 사용자 지정 경로
-<사용자 지정 경로>/
-```
-
-### Markdown 파일 구조
-
-```markdown
-# [다이어그램 제목]
-
-## 설명
-[다이어그램에 대한 설명]
-
-## 다이어그램
-
-```mermaid
-[Mermaid 코드]
-```
-
-## 참고사항
-[추가 참고사항]
-```
+**Markdown 파일 구조**: `# 제목` > `## 설명` > `## 다이어그램` (mermaid 코드 블록) > `## 참고사항`
 
 ---
 
 ## Mermaid 표현 한계
-
-Mermaid로 표현하기 어려운 경우:
 
 | 다이어그램 | 한계 | 대안 |
 |-----------|------|------|
@@ -409,27 +183,8 @@ Mermaid로 표현하기 어려운 경우:
 
 ## 사용 예시
 
-### 전체 시스템 설계
-
-```
-사용자 요청: "이커머스 시스템 아키텍처 설계해줘"
-
-생성할 다이어그램:
-1. 컴포넌트 다이어그램 - 전체 시스템 구조
-2. ER 다이어그램 - 데이터 모델
-3. 클래스 다이어그램 - 도메인 모델
-4. 시퀀스 다이어그램 - 주문 프로세스
-5. 상태 다이어그램 - 주문 상태 흐름
-```
-
-### 특정 다이어그램 요청
-
-```
-사용자 요청: "로그인 흐름 시퀀스 다이어그램 그려줘"
-
-생성할 다이어그램:
-1. 시퀀스 다이어그램 - 로그인 인증 흐름
-```
+- **전체 시스템 설계** ("이커머스 시스템 아키텍처 설계해줘"): 컴포넌트 + ER + 클래스 + 시퀀스 + 상태 다이어그램 조합
+- **특정 다이어그램** ("로그인 흐름 시퀀스 다이어그램 그려줘"): 시퀀스 다이어그램 단일 생성
 
 ---
 

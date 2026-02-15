@@ -1,6 +1,7 @@
 ---
 name: command-framework-fastapi
-description: "FastAPI 프로젝트의 Domain-Driven 디렉토리 구조, 라우터/스키마/서비스 패턴, 의존성 주입, async DB 연동 등 프로덕션 레디 구조와 베스트 프랙티스를 제공한다. Use when FastAPI 프로젝트 초기화, 구조 설정, API 엔드포인트 설계, 프로덕션 패턴 참고가 필요할 때. 키워드: FastAPI, fastapi, Python API, Python 웹 서버."
+description: "Provides production-ready FastAPI project structure and best practices including Domain-Driven directory layout, router/schema/service patterns, dependency injection, and async DB integration. Use for FastAPI development: project initialization, structure setup, API endpoint design, production pattern reference. Triggers: 'FastAPI', 'fastapi', 'Python API', 'Python 웹 서버'."
+license: "Apache-2.0"
 ---
 
 # FastAPI Framework Skill

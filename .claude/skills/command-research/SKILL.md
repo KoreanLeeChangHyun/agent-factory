@@ -1,6 +1,7 @@
 ---
 name: command-research
-description: "연구/조사 결과를 체계적인 리포트로 제공하는 스킬. 기술 조사, 특정 주제 연구, 비교 분석 등을 수행합니다. 사용 시점: (1) 기술 조사 요청, (2) 특정 주제 연구 요청, (3) cc:research 명령어로 호출, (4) '조사해줘', '리서치', '연구', '알아봐줘', '비교해줘' 키워드 포함 요청."
+description: "Research skill that delivers systematic reports on technology investigations, topic research, and comparative analysis. Use for research tasks: (1) technology investigation, (2) topic-specific research, (3) invoked via cc:research command. Triggers: '조사해줘', '리서치', '연구', '알아봐줘', '비교해줘', 'research', 'investigate'."
+license: "Apache-2.0"
 ---
 
 # Research

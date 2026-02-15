@@ -1,6 +1,7 @@
 ---
 name: research-parallel
-description: "복합 질문을 3-10개 하위 질문으로 분해하고 병렬 에이전트(WebSearch, Perplexity, Gemini)로 동시 조사하여 신뢰도 기반 종합 보고서를 생성한다. Use for parallel research: 다중 관점 종합 조사, 기술 선택 비교 분석, 시장/트렌드 동시 수집이 필요할 때. 키워드: 병렬 조사, parallel, 종합 조사, 다중 에이전트, 동시 조사."
+description: "[WIP] Decomposes complex questions into 3-10 sub-questions and conducts simultaneous investigation via parallel agents (WebSearch, Perplexity, Gemini) to produce credibility-based comprehensive reports. Use for parallel research: multi-perspective comprehensive investigation, technology comparison analysis, market/trend simultaneous collection. Triggers: '병렬 조사', 'parallel', '종합 조사', '다중 에이전트', '동시 조사'."
+license: "Apache-2.0"
 ---
 
 # Research Parallel

@@ -1,6 +1,7 @@
 ---
 name: git-config
-description: ".claude.env 파일에서 Git 사용자명/이메일/SSH 키 설정을 읽어 git config를 자동 구성하는 스킬. 환경변수 기반으로 로컬 Git 설정과 SSH 키 경로를 일괄 초기화합니다. Use for Git 사용자 설정, SSH 키 경로 설정, Git 환경 초기화 요청 시. 트리거: 'git config', 'git 설정', 'Git 사용자 설정', 'git:config'."
+description: "Auto-configures git config by reading Git username/email/SSH key settings from .claude.env file. Batch-initializes local Git settings and SSH key paths from environment variables. Use for Git environment setup: Git user configuration, SSH key path setup, Git environment initialization. Triggers: 'git config', 'git 설정', 'Git 사용자 설정', 'git:config'."
+license: "Apache-2.0"
 ---
 
 # Git Config 스킬

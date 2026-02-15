@@ -1,10 +1,13 @@
 ---
 name: template-skill
-description: "새 스킬 생성 시 참고할 수 있는 템플릿 스킬. 이 스킬을 직접 사용하지 마세요. Use for skill template reference only: skill-manager 스킬을 사용하여 새 스킬을 만드세요. 이 파일은 SKILL.md 구조의 참고 자료 역할만 합니다."
+description: "[DEPRECATED] Template skill for reference when creating new skills. Do not use this skill directly. Use for skill template reference only: use the skill-manager skill to create new skills. This file serves as a structural reference for SKILL.md format."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Template Skill
+
+> **DEPRECATED**: This skill has been replaced by command-skill-manager. Use command-skill-manager for creating new skills.
 
 이 파일은 새 스킬 생성 시 복사하여 사용할 수 있는 템플릿입니다.
 

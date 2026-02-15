@@ -1,6 +1,7 @@
 ---
 name: statusline-setup
-description: "Claude Code CLI 하단 상태줄(StatusLine) 설정 스킬. Use for StatusLine configuration tasks: (1) settings.json에 StatusLine 등록, (2) statusline.sh 스크립트 작성/수정, (3) 상태줄 표시 내용 커스터마이징. 트리거: 'statusline 설정', '상태줄 설정', 'statusline 수정', 'status line 변경', 'init:statusLine'."
+description: "Claude Code CLI bottom status line (StatusLine) configuration skill. Use for StatusLine configuration tasks: (1) registering StatusLine in settings.json, (2) writing/modifying statusline.sh scripts, (3) customizing status line display content. Triggers: 'statusline 설정', '상태줄 설정', 'statusline 수정', 'status line 변경', 'init:statusLine'."
+license: "Apache-2.0"
 ---
 
 # StatusLine Setup

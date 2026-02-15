@@ -1,6 +1,7 @@
 ---
 name: review-comprehensive
-description: "종합 코드 리뷰 스킬. 모든 리뷰 영역(코드 품질, 보안, 아키텍처, 성능, 테스트)을 통합 체크리스트로 일괄 검사하고 PASS/CONCERNS/REWORK/FAIL 4단계 판정을 산출한다. 사용 시점: 주요 기능 완성 후, 릴리스 전 종합 점검, 머지 전 최종 리뷰. 트리거: '종합 리뷰', 'comprehensive review', '전체 리뷰', 'full review'."
+description: "Comprehensive code review skill. Inspects all review domains (code quality, security, architecture, performance, testing) via an integrated checklist and produces a PASS/CONCERNS/ISSUES_FOUND/FAIL 4-level verdict. Use for comprehensive review: after major feature completion, pre-release comprehensive check, final review before merge. Triggers: '종합 리뷰', 'comprehensive review', '전체 리뷰', 'full review'."
+license: "Apache-2.0"
 ---
 
 # Comprehensive Review
@@ -112,14 +113,14 @@ description: "종합 코드 리뷰 스킬. 모든 리뷰 영역(코드 품질, �
 |------|------|------|----------|
 | **PASS** | 모든 영역 80% 이상, Critical 0건 | 프로덕션 준비 완료 | 머지 진행 |
 | **CONCERNS** | 일부 영역 60-80%, Critical 0건, Important 3건 이하 | 조건부 통과 | 지적 사항 검토 후 판단 |
-| **REWORK** | 1개 이상 영역 60% 미달 또는 Critical 존재 | 수정 필요 | Critical/주요 이슈 수정 후 재리뷰 |
+| **ISSUES_FOUND** | 1개 이상 영역 60% 미달 또는 Critical 존재 | 수정 필요 | Critical/주요 이슈 수정 후 재리뷰 |
 | **FAIL** | 다수 영역 실패 또는 보안 Critical 존재 | 근본적 재작업 필요 | 설계 재검토 후 재구현 |
 
 **기존 이슈 분류와의 매핑:**
 
 | command-requesting-code-review 분류 | 판정 영향 |
 |-------------------------------------|----------|
-| Critical (보안/데이터 손실/기능 장애) | 1건 이상 시 REWORK 이상. 보안 Critical은 FAIL |
+| Critical (보안/데이터 손실/기능 장애) | 1건 이상 시 ISSUES_FOUND 이상. 보안 Critical은 FAIL |
 | Important (아키텍처/성능/잠재적 버그) | 4건 이상 시 CONCERNS 이상 |
 | Minor (스타일/최적화/문서) | 판정에 직접 영향 없음. 기록만 유지 |
 
@@ -138,7 +139,7 @@ flowchart TD
     C -->|6개 영역 x 5-6개 항목 검사| C
     D -->|Critical/Important/Minor 분류| D
     E -->|영역별 통과율 + 가중 평균| E
-    F -->|PASS/CONCERNS/REWORK/FAIL 판정| F
+    F -->|PASS/CONCERNS/ISSUES_FOUND/FAIL 판정| F
 ```
 
 **단계별 상세:**
@@ -153,7 +154,7 @@ flowchart TD
 ## Output Format
 
 ```yaml
-verdict: PASS | CONCERNS | REWORK | FAIL
+verdict: PASS | CONCERNS | ISSUES_FOUND | FAIL
 checklist_pass_rate: {0-100}%
 domain_scores:
   code_quality:

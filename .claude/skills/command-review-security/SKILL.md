@@ -1,6 +1,7 @@
 ---
 name: command-review-security
-description: "보안 전문 코드 리뷰 스킬. OWASP Top 10 체크리스트 기반 리뷰, 시크릿 탐지, 의존성 취약점 확인, blast radius 추정, 에스컬레이션 기준 적용. 사용 시점: 보안 관련 코드 변경 리뷰, 인증/인가 모듈 리뷰, 외부 입력 처리 리뷰. 트리거: '보안 리뷰', 'security review', 'OWASP 리뷰', '취약점 리뷰'."
+description: "Security-specialized code review skill. Performs OWASP Top 10 checklist-based review, secret detection, dependency vulnerability checks, blast radius estimation, and escalation criteria enforcement. Use for security review: security-related code changes, auth/authz module review, external input handling review. Triggers: '보안 리뷰', 'security review', 'OWASP 리뷰', '취약점 리뷰'."
+license: "Apache-2.0"
 ---
 
 # Security Code Review
@@ -27,12 +28,27 @@ description: "보안 전문 코드 리뷰 스킬. OWASP Top 10 체크리스트 �
 | 목적 | 보안 도구 실행 및 심층 검사 | 리뷰 관점 체크리스트 및 판정 |
 | 사용 시점 | implement/refactor 중 코드 작성 시 | review 명령어에서 리뷰어 관점 평가 시 |
 | 도구 의존 | npm audit, pip-audit, cargo-audit 등 실행 | 도구 비의존, 코드 리딩 기반 판단 |
-| 산출물 | 의존성 스캔 결과, OWASP 검사 결과 | 보안 리뷰 판정(SECURE/WARNINGS/VULNERABILITIES_FOUND) |
+| 산출물 | 의존성 스캔 결과, OWASP 검사 결과 | 보안 리뷰 판정(PASS/CONCERNS/ISSUES_FOUND) |
 | OWASP 접근 | 코드 패턴 탐지 및 도구 기반 검증 | 리뷰 관점 체크리스트 기반 평가 |
 | Blast Radius | 해당 없음 | SMALL/MEDIUM/LARGE 3단계 분류 |
 | 에스컬레이션 | 심각도 매핑(CRITICAL~LOW) | 즉시 에스컬레이션 대상 판정 |
 
 **상호 보완:** 두 스킬이 동시 로드되면 review-security가 리뷰 체크리스트 관점에서 판정하고, static-analysis가 도구 실행으로 검증한다. review-security의 체크리스트에서 의심 항목을 식별하면 static-analysis의 도구 실행 결과로 증거를 보강한다.
+
+> This skill reviews OWASP Top 10 from a code review perspective. For automated tool-based scanning, refer to the command-static-analysis skill.
+
+### OWASP 역할 분리 상세
+
+| Area | review-security | static-analysis |
+|------|----------------|-----------------|
+| OWASP approach | Checklist-based code review evaluation | Automated pattern detection and tool-based verification |
+| Injection (A03) | Review parameterized query usage in changed code | Detect string concatenation SQL, eval/exec patterns |
+| Access Control (A01) | Verify authorization decorators on new endpoints | Scan for missing auth middleware, IDOR patterns |
+| Crypto (A02) | Review algorithm choices and key management | Detect hardcoded keys, weak hash usage |
+| Authentication (A07) | Evaluate JWT/session logic correctness | Detect missing signature verification, weak policies |
+| Dependencies (A06) | Check if new deps have known issues | Run npm audit/pip-audit/cargo-audit tools |
+| Secrets | Manual review of credential handling | Regex-based automated secret pattern scanning |
+| Output | Security review verdict with blast radius | Tool scan results with severity mapping |
 
 ## OWASP Top 10 리뷰 체크리스트
 
@@ -173,7 +189,7 @@ description: "보안 전문 코드 리뷰 스킬. OWASP Top 10 체크리스트 �
 
 ```yaml
 security_review:
-  verdict: SECURE | WARNINGS | VULNERABILITIES_FOUND
+  verdict: PASS | CONCERNS | ISSUES_FOUND
   blast_radius: SMALL | MEDIUM | LARGE
   owasp_findings:
     - category: "A03: Injection"

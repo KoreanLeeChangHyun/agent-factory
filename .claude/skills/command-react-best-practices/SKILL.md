@@ -1,6 +1,7 @@
 ---
 name: command-react-best-practices
-description: "React/Next.js 코드 레벨 베스트 프랙티스를 제공한다. 컴포넌트 설계, 상태 관리, 훅 규칙, 렌더링 최적화, 에러 경계, 서버 컴포넌트, 데이터 페칭 등 8개 카테고리 40+ 규칙을 포함. Use when React/Next.js 코드 작성, 성능 최적화, 훅 사용 규칙 준수, 서버/클라이언트 컴포넌트 분리, 코드 리뷰 시. 키워드: React, Next.js, 리액트, react-performance, 컴포넌트, hooks, 리액트 최적화. 역할 구분: command-framework-react는 프로젝트 구조 설정, 이 스킬은 코드 패턴/성능 규칙."
+description: "Provides React/Next.js code-level best practices covering 8 categories with 40+ rules: component design, state management, hook rules, rendering optimization, error boundaries, server components, data fetching. Use for React/Next.js coding: code authoring, performance optimization, hook compliance, server/client component separation, code review. Role distinction: command-framework-react handles project structure, this skill handles code patterns/performance rules. Triggers: 'React', 'Next.js', '리액트', 'react-performance', '컴포넌트', 'hooks', '리액트 최적화'."
+license: "Apache-2.0"
 ---
 
 # React Best Practices

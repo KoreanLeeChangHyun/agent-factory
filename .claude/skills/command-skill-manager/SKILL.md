@@ -1,6 +1,6 @@
 ---
 name: command-skill-manager
-description: "Claude Code 스킬 생성 및 수정을 위한 통합 관리 스킬. .claude/skills/ 디렉토리에 SKILL.md frontmatter 규격에 맞는 스킬 패키지를 생성하거나 기존 스킬을 수정합니다. Use for 스킬 생성, 수정, 업데이트, 삭제 요청 시. 트리거: '스킬 만들어줘', '새 스킬 생성', 'create skill', 'update skill', 'modify skill', '스킬 수정'."
+description: "Unified management skill for creating and modifying Claude Code skills. Creates or modifies skill packages in .claude/skills/ directory conforming to SKILL.md frontmatter spec. Use for skill lifecycle management: creating, updating, modifying, or deleting skills. Triggers: '스킬 만들어줘', '새 스킬 생성', 'create skill', 'update skill', 'modify skill', '스킬 수정'."
 license: Complete terms in LICENSE.txt
 ---
 

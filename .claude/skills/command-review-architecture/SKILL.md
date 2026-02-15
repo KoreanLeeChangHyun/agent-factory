@@ -1,6 +1,7 @@
 ---
 name: command-review-architecture
-description: "아키텍처 전문 코드 리뷰 스킬. 계층 위반 탐지, 순환 의존성 검사, SOLID 원칙 검증, 패턴 일관성 확인, DB 스키마/API 변경 에스컬레이션. 사용 시점: 새 모듈/패키지 도입 리뷰, API 인터페이스 변경 리뷰, 의존성 구조 변경 리뷰. 트리거: '아키텍처 리뷰', 'architecture review', '설계 리뷰', '구조 리뷰'."
+description: "Architecture-specialized code review skill. Detects layer violations, circular dependencies, SOLID principle violations, pattern inconsistencies, and DB schema/API change escalation. Use for structural review: new module/package introduction, API interface changes, dependency structure changes. Triggers: '아키텍처 리뷰', 'architecture review', '설계 리뷰', '구조 리뷰'."
+license: "Apache-2.0"
 ---
 
 # Architecture Review
@@ -146,7 +147,7 @@ flowchart TD
 ## Output Format
 
 ```yaml
-verdict: SOUND | CONCERNS | VIOLATIONS_FOUND
+verdict: PASS | CONCERNS | ISSUES_FOUND
 summary: "아키텍처 리뷰 요약 (1-2문장)"
 layer_violations:
   - type: "하위->상위 직접 참조"
@@ -174,7 +175,7 @@ escalation_items:
 
 ## Critical Rules
 
-1. **계층 방향 엄수**: 의존성은 반드시 상위->하위 방향만 허용. 역방향 참조는 무조건 VIOLATIONS_FOUND 판정
+1. **계층 방향 엄수**: 의존성은 반드시 상위->하위 방향만 허용. 역방향 참조는 무조건 ISSUES_FOUND 판정
 2. **에스컬레이션 누락 금지**: DB 스키마 변경, 공개 API 계약 변경 등 에스컬레이션 대상이 발견되면 verdict와 무관하게 반드시 escalation_items에 포함
 3. **증거 기반 판정**: 모든 위반 사항에 파일:라인 참조와 구체적 수정 방안 포함. 추상적 지적 금지
 4. **프로젝트 컨벤션 우선**: 표준 계층 구조가 아닌 프로젝트 고유 아키텍처가 있으면 해당 규칙을 우선 적용

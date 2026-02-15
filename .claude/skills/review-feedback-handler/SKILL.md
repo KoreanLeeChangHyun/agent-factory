@@ -1,6 +1,7 @@
 ---
 name: review-feedback-handler
-description: "리뷰 피드백 수신/평가/구현 프로토콜 스킬. 무비판적 수용 금지 원칙 적용, 기술적 검증 -> 메리트 평가 -> 구현 -> 테스트 순서의 피드백 처리 워크플로우, TODO 추적 통합. 사용 시점: 리뷰 피드백 수신 후, REWORK 단계 진입 시, 리뷰 수정 사항 구현 시. 트리거: '리뷰 반영', 'review feedback', '피드백 구현', '리뷰 수정', '리뷰 대응'."
+description: "Review feedback receive/evaluate/implement protocol skill. Applies no-uncritical-acceptance principle with technical verification -> merit evaluation -> implementation -> test workflow, integrated with TODO tracking. Use for feedback handling: after receiving review feedback, entering REWORK stage, implementing review modifications. Triggers: '리뷰 반영', 'review feedback', '피드백 구현', '리뷰 수정', '리뷰 대응'."
+license: "Apache-2.0"
 ---
 
 # Review Feedback Handler

@@ -1,6 +1,7 @@
 ---
 name: command-review-frontend
-description: "프론트엔드 전문 코드 리뷰 스킬. React/Vue 패턴 검증, 상태 관리 리뷰, 접근성(a11y/WCAG) 체크, 렌더링 성능 리뷰, 컴포넌트 설계 패턴 검증. 사용 시점: React/Vue 컴포넌트 리뷰, UI 변경 리뷰, 프론트엔드 성능 리뷰. 트리거: '프론트엔드 리뷰', 'frontend review', 'React 리뷰', 'UI 리뷰', '컴포넌트 리뷰'."
+description: "Frontend-specialized code review skill. Validates React/Vue patterns, state management, accessibility (a11y/WCAG), rendering performance, and component design patterns. Use for frontend review: React/Vue component review, UI change review, frontend performance review. Triggers: '프론트엔드 리뷰', 'frontend review', 'React 리뷰', 'UI 리뷰', '컴포넌트 리뷰'."
+license: "Apache-2.0"
 ---
 
 # Frontend Code Review

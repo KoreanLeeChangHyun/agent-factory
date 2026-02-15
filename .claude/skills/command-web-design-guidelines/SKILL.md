@@ -1,6 +1,7 @@
 ---
 name: command-web-design-guidelines
 description: Provides web accessibility and standards compliance checklists for implementation tasks. Use this skill when building or reviewing web interfaces that must meet WCAG 2.1 Level AA, ARIA requirements, keyboard navigation, form accessibility, dark mode support, or internationalization readiness. Triggers on keywords including accessibility, a11y, WCAG, form, dark mode, color contrast, keyboard navigation, screen reader, semantic HTML, and responsive design.
+license: "Apache-2.0"
 ---
 
 # Web Design Guidelines

@@ -1,6 +1,7 @@
 ---
 name: review-pr-integration
-description: "PR 리뷰 통합 스킬. gh CLI 기반 PR diff 추출, 인라인 코멘트 생성, CI 상태 확인, 체크리스트 자동 검증. 사용 시점: PR 리뷰 요청 시, PR 머지 전 최종 검증 시. 트리거: 'PR 리뷰', 'pull request review', 'PR 검증', 'PR 체크'."
+description: "PR review integration skill. Performs gh CLI-based PR diff extraction, inline comment generation, CI status checks, and checklist auto-verification. Use for PR review: PR review requests, final verification before PR merge. Triggers: 'PR 리뷰', 'pull request review', 'PR 검증', 'PR 체크'."
+license: "Apache-2.0"
 ---
 
 # PR Review Integration

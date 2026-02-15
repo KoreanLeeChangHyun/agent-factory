@@ -1,6 +1,7 @@
 ---
 name: command-review-performance
-description: "성능 전문 코드 리뷰 스킬. 알고리즘 복잡도 검증, N+1 쿼리 탐지, 캐싱 전략 리뷰, 인덱스 적정성 확인, 프레임워크별 성능 안티패턴 탐지. 사용 시점: DB 쿼리 변경 리뷰, 알고리즘 구현 리뷰, 캐싱/인덱스 설정 변경 리뷰. 트리거: '성능 리뷰', 'performance review', '쿼리 리뷰', 'DB 리뷰', 'N+1'."
+description: "Performance-specialized code review skill. Validates algorithm complexity, detects N+1 queries, reviews caching strategies, checks index adequacy, and identifies framework-specific performance anti-patterns. Use for performance review: DB query changes, algorithm implementations, caching/index configuration changes. Triggers: '성능 리뷰', 'performance review', '쿼리 리뷰', 'DB 리뷰', 'N+1'."
+license: "Apache-2.0"
 ---
 
 # Performance Code Review

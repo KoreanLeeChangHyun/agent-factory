@@ -1,7 +1,8 @@
 ---
 name: workflow-plan
-description: "워크플로우 PLAN 단계 전용 내부 스킬. 복잡한 작업을 분석하여 종속성/독립성을 파악하고 병렬 실행 계획을 수립한다. Use for workflow planning: 불명확한 요청은 명확해질 때까지 반복 질문하고, 태스크 간 종속성 분석, Phase별 병렬 실행 계획 수립, WORK 전 최종 컨펌을 수행한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
+description: "Internal skill for workflow PLAN stage. Analyzes complex tasks to identify dependencies/independence and establish parallel execution plans. Use for workflow planning: iterative questioning until ambiguity is resolved, inter-task dependency analysis, Phase-based parallel execution planning, final confirmation before WORK. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Plan

@@ -1,6 +1,7 @@
 ---
 name: command-manager
-description: "Claude Code 슬래시 명령어(커맨드) 생성 및 수정을 위한 통합 관리 스킬. 명령어 이름, 용도, 범위(프로젝트/개인) 수집 후 .claude/commands/ 파일을 생성하거나 수정합니다. Use for 커스텀 슬래시 명령어 생성, 수정, 업데이트 요청 시. 트리거: '명령어 만들어줘', '커맨드 생성', 'create command', 'update command', '슬래시 명령어'."
+description: "Unified management skill for creating and modifying Claude Code slash commands. Collects command name, purpose, and scope (project/personal), then creates or modifies .claude/commands/ files. Use for custom command management: creating, updating, or modifying slash commands. Triggers: '명령어 만들어줘', '커맨드 생성', 'create command', 'update command', '슬래시 명령어'."
+license: "Apache-2.0"
 ---
 
 # Command Manager

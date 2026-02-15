@@ -51,8 +51,14 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 보안, security, OWASP, 취약점, 정적 분석, static analysis, CodeQL, Semgrep | command-static-analysis |
 | 접근성, a11y, accessibility, WCAG | command-web-design-guidelines |
 | 디버깅, debugging, 버그, bug, 에러 추적, error tracking, 근본 원인 | command-systematic-debugging |
-| React, Next.js, 리액트, react 성능, react performance | command-react-best-practices |
+| React, Next.js, 리액트, react 성능, react performance | command-react-best-practices, command-framework-react |
+| FastAPI, fastapi, Python API, 파이썬 API | command-framework-fastapi |
 | 전략, strategy, 로드맵, roadmap, 마일스톤, milestone, 다중 워크플로우 | command-strategy |
+| 디자인 패턴, design pattern, GoF, SOLID 패턴 | software-design-patterns |
+| RICE, 우선순위, 작업 분해, task decomposition, scope | scope-decomposer |
+| 명령어 관리, command manager, 명령어 등록 | command-manager |
+| 스킬 생성, skill create, 스킬 관리, skill manage | command-skill-manager |
+| 에이전트 관리, agent manager, 에이전트 목록 | command-agent-manager |
 | 요구사항 분석, SRS, 코드베이스 분석, 코드 구조, 데이터베이스 분석, DB 분석, 데이터 분석, EDA | analyze-* (키워드 판단) |
 
 ## 확장 가이드

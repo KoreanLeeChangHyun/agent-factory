@@ -1,6 +1,7 @@
 ---
 name: github-integration
-description: "gh CLI 기반 GitHub 연동 스킬. 커밋/푸시, PR 생성/관리, 이슈 조회/생성, 브랜치 관리 등 GitHub 워크플로우를 수행합니다. Use for 작업 결과 GitHub 푸시, PR 생성, 이슈 관리, 브랜치 관리 요청 시. 트리거: 'github', 'push', 'PR', 'pull request', '푸시', '커밋', '이슈'."
+description: "gh CLI-based GitHub integration skill. Performs commit/push, PR creation/management, issue viewing/creation, branch management, and other GitHub workflows. Use for GitHub operations: pushing work results, PR creation, issue management, branch management. Triggers: 'github', 'push', 'PR', 'pull request', '푸시', '커밋', '이슈'."
+license: "Apache-2.0"
 ---
 
 # GitHub 연동 가이드

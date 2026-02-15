@@ -1,6 +1,7 @@
 ---
 name: scope-decomposer
-description: "대규모 요청을 에픽(3-7개)과 스토리(5-10개/에픽)로 체계적으로 분해하고 RICE 스코어 기반 우선순위(P0-P3)를 산정한다. 인프라 에픽 자동 판별, 종속성 그래프 생성, MECE 원칙 검증을 포함. Use when 대규모 기능 요청 분해, 프로젝트 스코프 정의, 요구사항 구조화, 우선순위 판단이 필요할 때. 키워드: 분해, decompose, 에픽, epic, 스토리, story, 우선순위, RICE, 스코프."
+description: "Systematically decomposes large-scale requests into epics (3-7) and stories (5-10/epic) with RICE score-based prioritization (P0-P3). Includes infra epic auto-detection, dependency graph generation, and MECE principle validation. Use for scope planning: large-scale feature decomposition, project scope definition, requirements structuring, priority determination. Triggers: '분해', 'decompose', '에픽', 'epic', '스토리', 'story', '우선순위', 'RICE', '스코프'."
+license: "Apache-2.0"
 ---
 
 # Scope Decomposer

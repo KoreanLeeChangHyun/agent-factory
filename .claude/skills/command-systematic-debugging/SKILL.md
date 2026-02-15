@@ -1,6 +1,7 @@
 ---
 name: command-systematic-debugging
-description: "4단계 근본 원인 분석(증상 수집, 가설 수립, 격리 검증, 수정 확인) 방법론으로 버그를 체계적으로 진단하고 해결한다. 심층 방어 디버깅, 조건 기반 대기 패턴, 에러 처리 일관성 가이드를 포함. Use when 버그 디버깅, 에러 추적, 근본 원인 분석, 에러 핸들링 패턴 수립이 필요할 때. 키워드: 디버깅, debugging, 버그, bug, 에러, error, root-cause, 에러 핸들링, exception handling, graceful degradation."
+description: "Systematically diagnoses and resolves bugs using a 4-step root cause analysis methodology (symptom collection, hypothesis formation, isolation testing, fix verification). Includes defense-in-depth debugging, condition-based wait patterns, and error handling consistency guide. Use for bug resolution: debugging, error tracing, root cause analysis, error handling pattern design. Triggers: '디버깅', 'debugging', '버그', 'bug', '에러', 'error', 'root-cause', '에러 핸들링', 'exception handling', 'graceful degradation'."
+license: "Apache-2.0"
 ---
 
 # Systematic Debugging

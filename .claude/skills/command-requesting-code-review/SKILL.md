@@ -1,6 +1,7 @@
 ---
 name: command-requesting-code-review
-description: "태스크 완료, 주요 기능 구현, 머지 전에 코드 리뷰를 요청하여 품질을 검증하는 스킬. 리뷰 체크리스트 기반 사전 검증, 이슈 분류(Critical/Important/Minor), 프로덕션 준비 상태 평가. 사용 시점: 태스크 완료 후, 주요 기능 구현 후, 머지 전, 복잡한 버그 수정 후. 트리거: 'code review', '코드 리뷰', '리뷰 요청', 'review before merge'."
+description: "Requests code review to verify quality after task completion, major feature implementation, or before merge. Performs checklist-based pre-verification, issue classification (Critical/Important/Minor), and production readiness assessment. Use for quality verification: after task completion, after major features, before merge, after complex bug fixes. Triggers: 'code review', '코드 리뷰', '리뷰 요청', 'review before merge'."
+license: "Apache-2.0"
 ---
 
 # Requesting Code Review

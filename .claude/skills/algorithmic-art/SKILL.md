@@ -1,7 +1,8 @@
 ---
 name: algorithmic-art
-description: "p5.js 기반 알고리즘 아트 생성 스킬. 시드 랜덤, 노이즈 필드, 파티클 시스템을 활용한 제너레이티브 아트를 .md(철학) + .html/.js(인터랙티브 뷰어) 파일로 산출합니다. Use for generative art, algorithmic art, flow fields, particle systems 개발 요청 시. 트리거: 'generative art', '알고리즘 아트', 'p5.js', 'flow field', 'particle system', '제너레이티브'."
+description: "p5.js-based algorithmic art generation skill. Produces generative art using seed random, noise fields, and particle systems as .md (philosophy) + .html/.js (interactive viewer) files. Use for generative art creation: algorithmic art, flow fields, particle systems development. Triggers: 'generative art', '알고리즘 아트', 'p5.js', 'flow field', 'particle system', '제너레이티브'."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 Algorithmic philosophies are computational aesthetic movements that are then expressed through code. Output .md files (philosophy), .html files (interactive viewer), and .js files (generative algorithms).

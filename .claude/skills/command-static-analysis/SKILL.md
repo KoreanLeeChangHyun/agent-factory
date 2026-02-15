@@ -1,6 +1,7 @@
 ---
 name: command-static-analysis
-description: "보안 심층 정적 분석 스킬. OWASP Top 10 전체 취약점 검사, 의존성 취약점 스캔(npm audit/pip-audit/cargo-audit), 시크릿 탐지, CSRF/XSS/SQL Injection 방어 검증, 인증/인가 로직 패턴 검증, CSP 설정 가이드를 제공한다. 사용 시점: implement/refactor에서 보안 관련 코드를 작성하거나 검토할 때, 보안 감사가 필요할 때, 프로덕션 배포 전 보안 체크가 필요할 때. 트리거: '보안', 'security', 'OWASP', '취약점', '정적 분석', 'static analysis', 'CodeQL', 'Semgrep', '시크릿 탐지', 'secret detection', '의존성 취약점', 'dependency vulnerability'."
+description: "Security deep static analysis skill. Performs OWASP Top 10 full vulnerability scan, dependency vulnerability scanning (npm audit/pip-audit/cargo-audit), secret detection, CSRF/XSS/SQL Injection defense verification, auth/authz logic pattern validation, and CSP configuration guidance. Use for security analysis: security-related code during implement/refactor, security audits, pre-production security checks. Triggers: '보안', 'security', 'OWASP', '취약점', '정적 분석', 'static analysis', 'CodeQL', 'Semgrep', '시크릿 탐지', 'secret detection', '의존성 취약점', 'dependency vulnerability'."
+license: "Apache-2.0"
 ---
 
 # Static Analysis - Security Deep Inspection
@@ -18,6 +19,21 @@ description: "보안 심층 정적 분석 스킬. OWASP Top 10 전체 취약점 
 - 안전하지 않은 기본값 탐지
 
 보안 기본값 및 언어별 체크리스트는 [references/insecure-defaults.md](references/insecure-defaults.md) 참조.
+
+> This skill performs automated static analysis scanning for OWASP Top 10. For manual code review perspective, refer to the command-review-security skill.
+
+### OWASP 역할 분리 상세
+
+| Area | review-security | static-analysis |
+|------|----------------|-----------------|
+| OWASP approach | Checklist-based code review evaluation | Automated pattern detection and tool-based verification |
+| Injection (A03) | Review parameterized query usage in changed code | Detect string concatenation SQL, eval/exec patterns |
+| Access Control (A01) | Verify authorization decorators on new endpoints | Scan for missing auth middleware, IDOR patterns |
+| Crypto (A02) | Review algorithm choices and key management | Detect hardcoded keys, weak hash usage |
+| Authentication (A07) | Evaluate JWT/session logic correctness | Detect missing signature verification, weak policies |
+| Dependencies (A06) | Check if new deps have known issues | Run npm audit/pip-audit/cargo-audit tools |
+| Secrets | Manual review of credential handling | Regex-based automated secret pattern scanning |
+| Output | Security review verdict with blast radius | Tool scan results with severity mapping |
 
 ## OWASP Top 10 검사 체크리스트
 
@@ -264,7 +280,7 @@ Content-Security-Policy:
 
 ```yaml
 security_scan:
-  verdict: SECURE | WARNINGS | VULNERABILITIES_FOUND
+  verdict: PASS | CONCERNS | ISSUES_FOUND
   owasp_findings:
     - category: "A03: Injection"
       severity: CRITICAL

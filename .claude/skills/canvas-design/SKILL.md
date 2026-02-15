@@ -1,7 +1,8 @@
 ---
 name: canvas-design
-description: "디자인 철학 기반 시각 아트 생성 스킬. .md(디자인 철학) + .pdf/.png(캔버스 표현) 파일을 산출하며, 폼/공간/색채/구성을 활용한 오리지널 비주얼 디자인을 제작합니다. Use for 포스터, 아트워크, 정적 디자인 제작 요청 시. 트리거: 'poster', '포스터', 'design', '디자인', 'visual art', '아트워크', 'canvas'."
+description: "Design philosophy-based visual art generation skill. Produces .md (design philosophy) + .pdf/.png (canvas expression) files with original visual designs using form, space, color, and composition. Use for static design creation: posters, artwork, visual design projects. Triggers: 'poster', '포스터', 'design', '디자인', 'visual art', '아트워크', 'canvas'."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 These are instructions for creating design philosophies - aesthetic movements that are then EXPRESSED VISUALLY. Output only .md files, .pdf files, and .png files.

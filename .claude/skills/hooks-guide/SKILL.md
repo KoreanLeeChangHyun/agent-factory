@@ -1,6 +1,7 @@
 ---
 name: hooks-guide
-description: "Claude Code의 Hooks 시스템 사용법 가이드. Hook 이벤트, 실행 타이밍, 새 Hook 추가/수정 방법을 안내합니다. 사용 시점: Hook 설정 확인, Hook 추가/수정, PreToolUse Hook 동작 이해 시. 트리거: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정'."
+description: "Claude Code Hooks system usage guide. Covers hook events, execution timing, and how to add/modify hooks. Use for hook management: hook configuration review, hook addition/modification, PreToolUse hook behavior understanding. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정'."
+license: "Apache-2.0"
 ---
 
 # Hooks 시스템 가이드

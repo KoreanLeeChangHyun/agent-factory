@@ -1,6 +1,7 @@
 ---
 name: mcp-manager
-description: "MCP(Model Context Protocol) 서버 생성 및 수정을 위한 통합 관리 스킬. 설계/구현/테스트/배포 4단계 워크플로우로 LLM 외부 서비스 연동 MCP 서버를 구축합니다. Use for MCP 서버 생성, 수정, 도구 추가, 업데이트 요청 시. 트리거: 'MCP', 'MCP 서버', 'create mcp', 'MCP 만들어줘', 'MCP 도구 추가', 'Model Context Protocol'."
+description: "Unified management skill for creating and modifying MCP (Model Context Protocol) servers. Builds LLM external service integration MCP servers through a 4-step workflow (design/implement/test/deploy). Use for MCP server management: creating, modifying, adding tools, updating MCP servers. Triggers: 'MCP', 'MCP 서버', 'create mcp', 'MCP 만들어줘', 'MCP 도구 추가', 'Model Context Protocol'."
+license: "Apache-2.0"
 ---
 
 # MCP Manager

@@ -1,7 +1,8 @@
 ---
 name: workflow-orchestration
-description: "워크플로우 전체 오케스트레이션 내부 스킬. INIT -> PLAN -> WORK -> REPORT -> DONE 5단계 워크플로우를 관리한다. Use for workflow orchestration: cc:* 커맨드 실행 시 자동 로드되어 단계별 흐름 제어, 서브에이전트 호출, 상태 관리를 수행한다. SKILL.md는 네비게이션 허브이며, 상세 가이드는 step1-init.md ~ step5-done.md, common-reference.md에 분리."
+description: "Internal skill for full workflow orchestration. Manages the INIT -> PLAN -> WORK -> REPORT -> DONE 5-stage workflow. Use for workflow orchestration: auto-loaded on cc:* command execution for stage flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step1-init.md ~ step5-done.md, common-reference.md."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Orchestrator

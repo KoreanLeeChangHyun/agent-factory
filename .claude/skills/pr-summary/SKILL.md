@@ -1,6 +1,7 @@
 ---
 name: pr-summary
-description: "현재 브랜치의 PR diff를 분석하여 PR 제목, 요약, 변경사항 목록, 테스트 계획을 자동 생성하는 스킬. 동적 컨텍스트 주입으로 실시간 diff 데이터를 활용. 사용 시점: (1) PR 생성 요청, (2) REPORT 단계에서 PR 작성, (3) 'PR', 'pull request', 'PR 요약', 'PR 생성' 키워드 포함 요청, (4) gh pr create 실행 전."
+description: "Auto-generates PR title, summary, change list, and test plan by analyzing the current branch's PR diff. Uses dynamic context injection for real-time diff data. Use for PR authoring: (1) PR creation requests, (2) PR writing during REPORT stage, (3) before gh pr create execution. Triggers: 'PR', 'pull request', 'PR 요약', 'PR 생성'."
+license: "Apache-2.0"
 ---
 
 # PR Summary

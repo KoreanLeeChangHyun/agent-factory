@@ -1,6 +1,7 @@
 ---
 name: changelog-generator
-description: "Git 커밋 히스토리를 분석하여 CHANGELOG 및 릴리스 노트를 자동 생성하는 스킬. Conventional Commits 패턴을 인식하고 마크다운 포맷으로 출력. 사용 시점: (1) REPORT 단계에서 변경 내역 자동 요약, (2) CLAUDE.md Recent Changes 갱신, (3) 릴리스 노트 작성, (4) 'changelog', 'release notes', '변경 이력', '릴리스 노트' 키워드 포함 요청."
+description: "Auto-generates CHANGELOG and release notes by analyzing Git commit history. Recognizes Conventional Commits patterns and outputs in markdown format. Use for change documentation: (1) REPORT stage change summary, (2) CLAUDE.md Recent Changes update, (3) release notes authoring. Triggers: 'changelog', 'release notes', '변경 이력', '릴리스 노트'."
+license: "Apache-2.0"
 ---
 
 # Changelog Generator

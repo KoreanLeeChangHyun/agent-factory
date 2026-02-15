@@ -1,6 +1,7 @@
 ---
 name: command-mermaid-diagrams
 description: Create Mermaid diagrams including flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, pie charts, and more. Use when users ask for diagrams, flowcharts, process flows, system architecture, data models, or any visual representation of relationships and workflows. Supports output as Mermaid code (.md), HTML preview, PNG, or SVG images.
+license: "Apache-2.0"
 ---
 
 # Mermaid Diagrams

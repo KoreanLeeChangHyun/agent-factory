@@ -1,7 +1,8 @@
 ---
 name: handoff-management
-description: "세션 간 HANDOFF.md를 자동 생성/관리하여 컨텍스트 연속성을 보장하는 스킬. 현재 작업 상태, 완료/미완료 항목, 다음 단계를 자동 요약. 사용 시점: (1) 세션 종료 전 핸드오프 문서 생성, (2) 컨텍스트 컴팩션 전 상태 저장, (3) 대규모 작업의 태스크 전환 시, (4) 'handoff', '핸드오프', '세션 저장', '인수인계' 키워드 포함 요청."
+description: "Auto-generates/manages HANDOFF.md between sessions to ensure context continuity. Automatically summarizes current work status, completed/incomplete items, and next steps. Use for session continuity: (1) handoff document creation before session end, (2) state saving before context compaction, (3) task switching in large-scale work. Triggers: 'handoff', '핸드오프', '세션 저장', '인수인계'."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Handoff Management

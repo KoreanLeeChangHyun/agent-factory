@@ -1,7 +1,8 @@
 ---
 name: workflow-report
-description: "워크플로우 REPORT 단계 전용 내부 스킬. 작업 완료 후 결과 보고서를 생성하고 summary.txt를 작성한다. Use for workflow reporting: work/ 디렉터리의 작업 내역을 취합하여 report.md 보고서 생성, summary.txt 2줄 요약 작성을 수행한다. 마크다운, CSV, 엑셀 등 다양한 형식 지원. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
+description: "Internal skill for workflow REPORT stage. Generates result reports and writes summary.txt after task completion. Use for workflow reporting: aggregates work records from work/ directory to generate report.md, writes 2-line summary.txt. Supports markdown, CSV, Excel, and other formats. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Report

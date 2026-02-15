@@ -1,6 +1,7 @@
 ---
 name: command-analyze-srs
-description: "요구사항 분석(SRS) 스킬. 불명확한 요청을 체계적으로 분석하여 구체적인 요구사항 명세서(Software Requirements Specification)를 작성합니다. Use for requirements analysis tasks: (1) 불명확한 요청의 구체화, (2) 목표 파악 및 범위 정의, (3) 제약사항 식별 및 예상 결과물 정의, (4) 기능/비기능 요구사항 분류. 트리거: '요구사항', '명세서', '스펙', 'SRS', 'specification', 'requirement', '기능 정의'."
+description: "Requirements analysis (SRS) skill. Systematically analyzes ambiguous requests to produce a concrete Software Requirements Specification. Use for requirements analysis tasks: (1) clarifying ambiguous requests, (2) goal identification and scope definition, (3) constraint identification and expected deliverables, (4) functional/non-functional requirements classification. Triggers: '요구사항', '명세서', '스펙', 'SRS', 'specification', 'requirement', '기능 정의'."
+license: "Apache-2.0"
 ---
 
 # Analyze SRS

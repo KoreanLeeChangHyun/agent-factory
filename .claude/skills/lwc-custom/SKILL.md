@@ -1,7 +1,8 @@
 ---
 name: lwc-custom
-description: "Salesforce Lightning Web Components(LWC) 커스텀 컴포넌트 개발 스킬. 표준 lightning-* 컴포넌트 대신 순수 HTML/CSS/JavaScript로 LWC를 개발하며, Apex 연동 및 Wire 서비스를 활용합니다. Use for LWC 컴포넌트 생성, Salesforce UI 개발, Lightning 앱 개발 요청 시. 트리거: 'LWC', 'Lightning Web Component', 'Salesforce', '세일즈포스', 'Lightning'."
+description: "Salesforce Lightning Web Components (LWC) custom component development skill. Develops LWC using pure HTML/CSS/JavaScript instead of standard lightning-* components, with Apex integration and Wire service. Use for Salesforce UI development: LWC component creation, Lightning app development. Triggers: 'LWC', 'Lightning Web Component', 'Salesforce', '세일즈포스', 'Lightning'."
 disable-model-invocation: true
+license: "Apache-2.0. Complete terms in LICENSE.txt"
 ---
 
 # LWC Custom Component Development

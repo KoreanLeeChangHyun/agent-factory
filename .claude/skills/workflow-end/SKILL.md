@@ -1,7 +1,8 @@
 ---
 name: workflow-end
-description: "워크플로우 END 단계 전용 내부 스킬. reporter 완료 후 워크플로우 마무리 처리를 수행한다. Use for workflow finalization: history.md 갱신(summary.txt 활용), status.json 완료 처리, 사용량 확정, 레지스트리 해제, 워크플로우 아카이빙(최신 10개 유지)을 5단계 절차로 수행한다. 오케스트레이터가 내부적으로 호출하며 사용자 직접 호출 대상이 아님."
+description: "Internal skill for workflow END stage. Performs workflow finalization after reporter completion. Use for workflow finalization: history.md update (using summary.txt), status.json completion, usage finalization, registry release, workflow archiving (keeping latest 10) in a 5-step procedure. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # End
