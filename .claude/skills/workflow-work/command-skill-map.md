@@ -65,6 +65,11 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 스킬 생성, skill create, 스킬 관리, skill manage | command-skill-manager |
 | 에이전트 관리, agent manager, 에이전트 목록 | command-agent-manager |
 | 요구사항 분석, SRS, 코드베이스 분석, 코드 구조, 데이터베이스 분석, DB 분석, 데이터 분석, EDA | analyze-* (키워드 판단) |
+| 커버리지, coverage, diff coverage, 코드 커버리지, 테스트 커버리지 | command-coverage-analysis |
+| PBT, property-based, 속성 기반 테스트, Hypothesis, fast-check | command-property-based-testing |
+| 런타임 검증, runtime validation, Zod, beartype, 스키마 검증, 계약 검증 | command-runtime-contract |
+| 뮤테이션, mutation testing, Stryker, mutmut, 테스트 품질 | command-mutation-testing |
+| 테스트 설계, test design, 동치 분할, 경계값, 결정 테이블 | command-test-design |
 
 ## 확장 가이드
 
