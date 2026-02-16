@@ -9,9 +9,9 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
-| implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사, 완료 전 검증. 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
+| implement | command-code-quality-checker, command-verification-before-completion | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
 | review | command-requesting-code-review, command-code-quality-checker | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
-| research | command-research, deep-research, research-integrated | 웹 조사(command-research) + 코드 탐색(deep-research) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드 |
+| research | command-research, research-integrated | 웹 조사(command-research) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(deep-research)은 키워드 매핑으로 조건부 로드 |
 | strategy | command-strategy | 다중 워크플로우 전략 수립, 로드맵 생성 |
 
 ## 키워드 기반 추가 스킬 로드
@@ -21,6 +21,11 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | 키워드 | 추가 로드 스킬 |
 |--------|---------------|
 | 테스트, test, TDD | tdd-guard-hook |
+| 구현, implement, 기능 추가, feature | command-verification-before-completion |
+| 리팩토링, refactor, 리팩터, 코드 개선 | command-code-quality-checker |
+| 마이그레이션, migration, 스키마 변경, DB 변경 | command-code-quality-checker, command-verification-before-completion |
+| 품질, quality, 코드 품질, code quality | command-code-quality-checker |
+| API, REST, GraphQL, 엔드포인트, endpoint | command-code-quality-checker |
 | PR, pull request | pr-summary, github-integration |
 | 다이어그램, diagram, UML | command-mermaid-diagrams |
 | 아키텍처, architecture, 설계, architect, 시스템 구조, 컴포넌트 | command-architect, command-mermaid-diagrams |

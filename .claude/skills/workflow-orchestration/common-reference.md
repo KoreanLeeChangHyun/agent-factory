@@ -4,7 +4,7 @@
 
 ### 용어 분류: Workflow Skill vs Command Skill
 
-- **Workflow Skill** (`workflow-*`, 6개): 워크플로우 단계 관리 및 오케스트레이션. 에이전트 frontmatter의 `skills:` 필드로 정적 바인딩.
+- **Workflow Skill** (`workflow-*`, 7개): 워크플로우 단계 관리 및 오케스트레이션. 에이전트 frontmatter의 `skills:` 필드로 정적 바인딩.
 - **Command Skill** (`command-*` 또는 기능명, 40+개): 개별 명령어의 구체적 기능 수행. `command-skill-map.md` 기반 동적 바인딩 (worker 전용).
 - "skill" 단독 사용 시 두 가지 레벨을 포괄하는 총칭
 
@@ -14,9 +14,10 @@
 |-------------|----------|------|
 | **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. <!-- END는 FSM Phase가 아닌 done 에이전트 활동 구간의 별칭이다 --> |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
-| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, reporter, done 5개와 orchestrator(메인 에이전트)로 구성. |
-| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
+| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, reporter, done 6개와 orchestrator(메인 에이전트)로 구성. |
+| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
+| **explorer** | 익스플로러 | WORK Phase에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
 | **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 메인 에이전트. Application Service 역할. |
 | **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, Workflow 배너, wf-state 호출 등. |
 | **workDir** | 작업 디렉토리 | 워크플로우의 모든 산출물이 저장되는 디렉토리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
@@ -66,6 +67,7 @@ flowchart TD
 | init | INIT | workflow-init | - | frontmatter `skills:` |
 | planner | PLAN | workflow-plan | - | frontmatter `skills:` |
 | worker | WORK | workflow-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-work) + 런타임 동적 (command skills) |
+| explorer | WORK | workflow-explore | - | frontmatter `skills:` |
 | reporter | REPORT | workflow-report | - | frontmatter `skills:` |
 | done | END (별칭) | workflow-end | - | frontmatter `skills:` |
 
@@ -165,7 +167,7 @@ workName: <작업이름>
 | both | O | X |
 | register | O | X |
 | unregister | O | O (done only) |
-| link-session | X | O (worker, reporter) |
+| link-session | X | O (worker, explorer, reporter) |
 | env | O | X |
 | usage-* | X | O (Hook) |
 
@@ -175,7 +177,7 @@ workName: <작업이름>
 
 `<workDir>/status.json`으로 현재 단계와 전이 이력을 추적합니다. 스키마(9개 필드)는 workflow-init skill 참조.
 
-`linked_sessions`: 워크플로우에 참여한 세션 ID 배열. worker/reporter가 `link-session`으로 자체 등록 (중복 자동 방지, 비차단).
+`linked_sessions`: 워크플로우에 참여한 세션 ID 배열. worker/explorer/reporter가 `link-session`으로 자체 등록 (중복 자동 방지, 비차단).
 
 ### FSM Transition Rules
 

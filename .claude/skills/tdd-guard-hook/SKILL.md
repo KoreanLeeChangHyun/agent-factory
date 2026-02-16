@@ -15,6 +15,7 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
 - 테스트 없이 소스 코드를 수정하려는 시도에 경고
 - 테스트 커버리지를 자연스럽게 향상
 - **차단하지 않고 경고만** (개발 흐름을 방해하지 않음)
+- **strict 모드**: `GUARD_TDD=strict` 환경변수 설정 시 테스트 미존재 파일의 Write/Edit를 차단 (stdout에 차단 메시지 출력, exit 0)
 
 ## 동작 방식
 
@@ -39,7 +40,10 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
 [테스트 파일 존재?] --YES--> 통과 (경고 없음)
     |NO
     v
-경고 메시지 출력 (차단하지 않음)
+[strict 모드?] --YES--> 차단 메시지 출력 (stdout)
+    |NO
+    v
+경고 메시지 출력 (stderr, 차단하지 않음)
 ```
 
 ### 제외 대상 (경고하지 않는 파일)
@@ -133,7 +137,13 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
 [TDD-GUARD] 경고: src/utils/helper.ts에 대한 테스트 파일이 없습니다. 테스트를 먼저 작성하는 것을 권장합니다.
 ```
 
-**참고**: 이 Hook은 경고만 하고 차단하지 않습니다. 따라서 stdout에는 아무것도 출력하지 않으며 (통과), stderr로 경고 메시지만 전달합니다.
+**참고**: 기본 모드에서는 경고만 하고 차단하지 않습니다. 따라서 stdout에는 아무것도 출력하지 않으며 (통과), stderr로 경고 메시지만 전달합니다.
+
+**테스트 미존재 시 (strict 모드 - 차단):**
+stdout에 차단 JSON을 출력합니다.
+```json
+{"decision": "block", "reason": "[TDD-GUARD] src/utils/helper.ts에 대한 테스트 파일이 없습니다. strict 모드에서 차단합니다."}
+```
 
 **통과 시:**
 빈 출력 (stdout에 아무것도 출력하지 않음)
@@ -158,6 +168,28 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
   }
 }
 ```
+
+## strict 모드 활성화
+
+### 환경변수 설정
+
+```bash
+export GUARD_TDD=strict
+```
+
+`GUARD_TDD` 환경변수를 `strict`로 설정하면 테스트 파일이 없는 소스 파일에 대한 Write/Edit를 차단합니다. 미설정 또는 다른 값일 경우 기존 경고 전용 모드로 동작합니다.
+
+| 환경변수 값 | 동작 |
+|------------|------|
+| 미설정 | 경고 모드 (stderr 경고, 차단하지 않음) |
+| `0` | Hook 비활성화 (검사하지 않음) |
+| `strict` | strict 모드 (stdout JSON 출력으로 차단) |
+
+### 사용 시나리오
+
+- **implement 명령어의 Level 3+ 품질 레벨에서 권장**: 코드 품질 기준이 높은 작업에서 테스트 없는 코드 작성을 사전에 차단
+- **TDD 원칙을 엄격히 적용해야 하는 프로젝트**: Red-Green-Refactor 사이클을 강제하여 테스트 선행 작성을 보장
+- **CI/CD 파이프라인 연동 시**: 빌드 전 테스트 커버리지 보장을 위한 게이트로 활용
 
 ## 적용 단계
 

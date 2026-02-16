@@ -246,15 +246,21 @@ for PATTERN in "${TEST_PATTERNS[@]}"; do
     fi
 done
 
-# 테스트 미존재 시 경고 (stderr로 출력, 차단하지 않음)
+# 테스트 미존재 시 처리
 if [ "$FOUND_TEST" = false ]; then
     # 상대 경로로 변환하여 표시
     REL_FILE=$(echo "$FILE_PATH" | sed "s|$(pwd)/||" 2>/dev/null)
     if [ -z "$REL_FILE" ]; then
         REL_FILE="$FILE_PATH"
     fi
-    echo "[TDD-GUARD] 경고: ${REL_FILE}에 대한 테스트 파일이 없습니다. 테스트를 먼저 작성하는 것을 권장합니다." >&2
+
+    if [ "$GUARD_TDD" = "strict" ]; then
+        # strict 모드: stdout에 차단 JSON 출력
+        echo "{\"decision\": \"block\", \"reason\": \"[TDD-GUARD] ${REL_FILE}에 대한 테스트 파일이 없습니다. strict 모드에서 차단합니다.\"}"
+    else
+        # 기본 모드: stderr로 경고만 출력 (차단하지 않음)
+        echo "[TDD-GUARD] 경고: ${REL_FILE}에 대한 테스트 파일이 없습니다. 테스트를 먼저 작성하는 것을 권장합니다." >&2
+    fi
 fi
 
-# 항상 통과 (차단하지 않음 - stdout은 비어있음)
 exit 0

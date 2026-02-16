@@ -157,6 +157,72 @@ issues:
     suggested_action: "공통 유효성 검사기로 추출"
 ```
 
+### 7. Generator-Critic 반복 루프
+
+Score < 70 (ISSUES_FOUND) 판정 시, 자동 수정-재검증 루프를 실행하여 코드 품질을 개선한다.
+
+```mermaid
+flowchart TD
+    A[6단계 Score 산출] --> B{Score >= 70?}
+    B -->|Yes| C[종료: PASS 또는 CONCERNS]
+    B -->|No| D[반복 루프 진입]
+    D --> E[이전 이슈 목록 기반 자동 수정]
+    E --> F[1~6단계 재검증]
+    F --> G{종료 조건 충족?}
+    G -->|No| D
+    G -->|Yes| H[최종 결과 보고]
+```
+
+**루프 실행 조건:** 6단계 Score 산출 결과가 70 미만 (ISSUES_FOUND)인 경우에만 진입한다.
+
+**반복 절차:**
+1. 이전 검증에서 발견된 이슈 목록(id, severity, file, finding, suggested_action)을 입력으로 수집
+2. 각 이슈의 suggested_action을 기반으로 자동 수정 시도 (Edit/Write 도구 사용)
+3. 수정 완료 후 1~6단계를 재실행하여 Score를 재산출
+4. 종료 조건을 평가하여 계속 반복할지 결정
+
+**종료 조건 (하나라도 충족 시 루프 종료):**
+
+| # | 조건 | 설명 |
+|---|------|------|
+| a | Score >= 70 달성 | 목표 점수에 도달하여 PASS 또는 CONCERNS 판정 |
+| b | 최대 반복 횟수(3회) 도달 | 3회 반복 후에도 Score < 70이면 현재 상태로 최종 보고 |
+| c | 이전 반복 대비 Score 개선 없음 | Score가 동일하거나 하락하면 추가 반복이 무의미하므로 종료 |
+
+**반복 루프 결과 기록:**
+
+각 반복의 진행 상황을 아래 테이블 형식으로 보고에 포함한다:
+
+```yaml
+generator_critic_loop:
+  triggered: true
+  iterations:
+    - round: 1
+      score_before: {이전 Score}
+      score_after: {수정 후 Score}
+      fixed_issues: ["SEC-001", "MNT-002"]
+      remaining_issues:
+        - id: "PERF-001"
+          severity: high
+          finding: "..."
+    - round: 2
+      score_before: {이전 Score}
+      score_after: {수정 후 Score}
+      fixed_issues: ["PERF-001"]
+      remaining_issues: []
+  termination_reason: "score_threshold_met | max_iterations | no_improvement"
+  final_score: {최종 Score}
+  total_fixed: {총 수정 이슈 수}
+```
+
+| 반복 | 수정 전 Score | 수정 후 Score | 수정된 이슈 | 남은 이슈 |
+|------|-------------|-------------|-----------|----------|
+| 1회차 | {score} | {score} | {이슈 ID 목록} | {남은 이슈 목록} |
+| 2회차 | {score} | {score} | {이슈 ID 목록} | {남은 이슈 목록} |
+| 3회차 | {score} | {score} | {이슈 ID 목록} | {남은 이슈 목록} |
+
+**루프 미실행 시:** Score >= 70이면 루프를 실행하지 않으며, 결과에 `generator_critic_loop.triggered: false`로 기록한다.
+
 ## Critical Rules
 
 1. **도구 실행 우선**: 사용 가능한 린트/타입체크 도구가 있으면 반드시 실행
@@ -166,6 +232,7 @@ issues:
 5. **기존 컨벤션 존중**: 프로젝트 기존 코딩 스타일을 기준으로 판단
 6. **정량적 보고**: 주관적 평가 대신 메트릭 기반 점수 사용
 7. **변경 범위 준수**: 계획서에 명시된 범위를 초과하는 변경이 있으면 SCOPE- 이슈로 보고
+8. **Generator-Critic 루프**: Score < 70 시 자동 수정-재검증 루프를 최대 3회 실행
 
 ## 변경 범위 검증 (Change Scope Verification)
 

@@ -5,24 +5,31 @@
 # 입력: stdin으로 JSON (tool_name, tool_input)
 # 출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
 #
+# 설계 의도: 워크플로우는 FSM(유한 상태 기계) 기반으로 Phase를 전이하며,
+# 각 Phase에 전담 에이전트만 허용한다.
+# 허용 에이전트 6종(init, planner, worker, explorer, reporter, done)은
+# INIT->PLAN->WORK->REPORT->COMPLETED 전이 경로의 각 단계를 전담한다.
+# Explorer는 WORK Phase에서 Worker와 동일 레벨로 호출되며,
+# 코드베이스+웹 탐색 전문 에이전트로 3줄 반환값 규격을 준수한다.
+#
 # 모드별 Phase별 허용 에이전트:
 #   [full 모드 (기본)]
 #     NONE/비존재: init만 허용
 #     INIT: planner만 허용
 #     PLAN: planner + worker 허용
-#     WORK: worker(재호출) + reporter 허용
+#     WORK: worker + explorer + reporter 허용
 #     REPORT: reporter(재호출) + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 #   [no-plan 모드]
 #     NONE/비존재: init만 허용
 #     INIT: worker만 허용 (planner 대신)
-#     WORK: worker(재호출) + reporter 허용
+#     WORK: worker + explorer + reporter 허용
 #     REPORT: reporter(재호출) + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 #   [prompt 모드]
 #     NONE/비존재: init만 허용
 #     INIT: worker 허용 (메인 에이전트 직접 작업 후 worker 산출물 구조 생성)
-#     WORK: worker + reporter 허용
+#     WORK: worker + explorer + reporter 허용
 #     REPORT: reporter + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 
@@ -100,11 +107,14 @@ if agent == 'init':
     sys.exit(0)
 
 # 모드별 Phase별 허용 에이전트 맵
+# - 허용 6종: init(초기화), planner(계획), worker(실행), explorer(탐색), reporter(보고), done(완료)
+# - 각 Phase의 전담 에이전트만 허용 (WORK Phase는 worker+explorer 병행)
+# - 미등록 에이전트는 의도적 제외 (FSM 상태 일관성, 반환값 규격 보호)
 ALLOWED_AGENTS_FULL = {
     'NONE': ['init'],
     'INIT': ['planner'],
     'PLAN': ['planner', 'worker'],
-    'WORK': ['worker', 'reporter'],
+    'WORK': ['worker', 'explorer', 'reporter'],
     'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],
@@ -115,7 +125,7 @@ ALLOWED_AGENTS_FULL = {
 ALLOWED_AGENTS_NO_PLAN = {
     'NONE': ['init'],
     'INIT': ['worker'],
-    'WORK': ['worker', 'reporter'],
+    'WORK': ['worker', 'explorer', 'reporter'],
     'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],
@@ -126,7 +136,7 @@ ALLOWED_AGENTS_NO_PLAN = {
 ALLOWED_AGENTS_PROMPT = {
     'NONE': ['init'],
     'INIT': ['worker'],
-    'WORK': ['worker', 'reporter'],
+    'WORK': ['worker', 'explorer', 'reporter'],
     'REPORT': ['reporter', 'done'],
     'COMPLETED': [],
     'FAILED': [],

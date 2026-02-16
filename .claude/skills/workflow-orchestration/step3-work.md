@@ -1,4 +1,4 @@
-# Step 3: WORK (worker Agent)
+# Step 3: WORK (worker/explorer Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `worker` (model: inherit, maxTurns: 50)
@@ -18,7 +18,7 @@
 >
 > | Category | Rule |
 > |----------|------|
-> | **Allowed calls** | worker, reporter 에이전트만 호출 가능 |
+> | **Allowed calls** | worker, explorer, reporter 에이전트만 호출 가능 |
 > | **Re-call MUST NOT** | planner, init 에이전트 재호출 MUST NOT |
 > | **Reverse transition MUST NOT** | WORK->PLAN, WORK->INIT 등 역방향 phase 변경 MUST NOT |
 > | **Autonomous judgment MUST NOT** | 오케스트레이터가 독자적으로 맥락 보강, 계획 수정, 태스크 추가/삭제/변경을 판단하지 않음 |
@@ -27,6 +27,62 @@
 **Detailed Guide:** workflow-work skill 참조
 
 > **Worker Internal Procedure (5 steps):** 각 worker는 호출 후 내부적으로 `계획서 확인 -> 선행 결과 읽기(종속 시) -> 스킬 로드 -> 작업 진행 -> 실행 내역 작성`의 5단계를 수행합니다. 종속 태스크에서는 선행 작업 내역 파일을 필수로 읽어 판단 근거와 What Didn't Work을 확인합니다.
+
+## Explorer Call Pattern
+
+> **Explorer Agent-Skill Binding**
+> - Agent: `explorer` (model: sonnet, maxTurns: 30)
+> - Skill: `workflow-explore` (항상 바인딩)
+> - Task prompt: `command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>`
+
+Explorer는 WORK Phase에서 Worker와 동일 레벨로 호출되는 탐색 전용 서브에이전트입니다. Planner가 계획서에서 서브에이전트 타입을 `Explorer`로 지정한 태스크에 대해 호출합니다.
+
+**Explorer 호출 형식:**
+```
+Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>")
+```
+
+**usage-pending 등록:**
+```bash
+# Worker와 동일한 방식으로 usage-pending 등록
+wf-state task-status <registryKey> <taskId> running
+wf-state usage-pending <registryKey> <taskId> <taskId>
+```
+
+**반환값 처리:**
+- Worker와 동일한 3줄 추출 규칙 적용 (첫 3줄만 추출, 4줄째부터 MUST discard)
+- 반환 형식: `상태: 성공|부분성공|실패`, `작업 내역: <path>`, `탐색 파일: N개`
+
+**Worker와의 차이점:**
+
+| 항목 | Worker | Explorer |
+|------|--------|----------|
+| 서브에이전트 타입 | `worker` | `explorer` |
+| 스킬 | workflow-work + command skills | workflow-explore |
+| 역할 | 코드 수정/생성, 테스트 실행 | 코드 탐색, 웹 조사, 정보 수집 |
+| Edit 도구 | 보유 | 미보유 (코드 수정 불가) |
+| 모델 | inherit (Opus) | sonnet (비용-품질 균형) |
+| 반환 3줄째 | `변경 파일: N개` | `탐색 파일: N개` |
+
+**병렬 호출 예시 (Worker + Explorer 혼합):**
+```bash
+# Phase 1에서 Worker와 Explorer가 병렬 실행
+Workflow <registryKey> WORK-PHASE 1 "W01,W02,W03" parallel
+
+wf-state task-status <registryKey> W01 running
+wf-state task-status <registryKey> W02 running
+wf-state task-status <registryKey> W03 running
+wf-state usage-pending <registryKey> W01 W01
+wf-state usage-pending <registryKey> W02 W02
+wf-state usage-pending <registryKey> W03 W03
+```
+```
+Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
+Task(subagent_type="explorer", prompt="command: implement, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
+Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W03, planPath: <planPath>, workDir: <workDir>")
+```
+
+---
 
 ## No-Plan Mode Worker Call Pattern
 
@@ -81,13 +137,12 @@ flowchart TD
 **Phase 0 실행:**
 
 ```bash
-# Phase 0 서브배너 출력 (필수 - 스킵 금지)
+# MUST: Phase 0 서브배너 출력 (스킵 금지, taskIds는 반드시 "phase0"으로 전달)
 Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
-
-# Phase 0 디렉토리 생성 및 Worker 호출
-mkdir -p <workDir>/work
-wf-state task-status <registryKey> phase0 running
-wf-state usage-pending <registryKey> phase0 phase0
+```
+```bash
+# MUST: Phase 0 배너 직후, Task 호출 전에 반드시 아래 3개 명령을 단일 Bash로 실행
+mkdir -p <workDir>/work && wf-state task-status <registryKey> phase0 running && wf-state usage-pending <registryKey> phase0 phase0
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
@@ -136,11 +191,8 @@ Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
 Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
-# task-status + usage-pending: 각 Worker 호출 직전에 개별 실행
-wf-state task-status <registryKey> W01 running
-wf-state task-status <registryKey> W02 running
-wf-state usage-pending <registryKey> W01 W01
-wf-state usage-pending <registryKey> W02 W02
+# MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 일괄 실행 (스킵 금지)
+wf-state task-status <registryKey> W01 running && wf-state task-status <registryKey> W02 running && wf-state usage-pending <registryKey> W01 W01 && wf-state usage-pending <registryKey> W02 W02
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -153,9 +205,8 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 Workflow <registryKey> WORK-PHASE 2 "W04" sequential
 ```
 ```bash
-# task-status + usage-pending: Worker 호출 직전에 실행
-wf-state task-status <registryKey> W04 running
-wf-state usage-pending <registryKey> W04 W04
+# MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 실행 (스킵 금지)
+wf-state task-status <registryKey> W04 running && wf-state usage-pending <registryKey> W04 W04
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
@@ -209,11 +260,11 @@ if failed_tasks / total_tasks >= 0.5:
 | 실패율 >= 50% | 워크플로우 중단, AskUserQuestion으로 사용자 확인 |
 | Worker 반환 상태 "실패" | 최대 3회 재호출. 3회 모두 실패 시 해당 태스크를 실패로 기록하고 종속성 규칙에 따라 처리 |
 
-## Worker Return Value Processing (REQUIRED)
+## Worker/Explorer Return Value Processing (REQUIRED)
 
-> **WARNING: Worker 반환값이 3줄을 초과하면 메인 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
+> **WARNING: Worker/Explorer 반환값이 3줄을 초과하면 메인 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
 
-Task(worker) 호출 후 반환값 처리 규칙:
+Task(worker/explorer) 호출 후 반환값 처리 규칙:
 1. 반환값에서 **첫 3줄만** 추출하여 컨텍스트에 보관 (4줄째부터는 MUST discard)
 2. 나머지는 무시 (상세 내용은 .workflow/ 파일에 이미 저장됨)
 3. 3줄 형식이 아닌 반환값이라도 첫 3줄만 사용, 초과분은 MUST NOT retain
@@ -229,6 +280,8 @@ wf-state task-status <registryKey> <taskId> completed
 # 반환값 첫 줄이 "상태: 실패"인 경우
 wf-state task-status <registryKey> <taskId> failed
 ```
+
+> **MUST: Worker 반환값 수신 직후, 다음 Phase 배너 호출 전에 반드시 task-status를 갱신합니다. 스킵 금지.** 병렬 Worker의 경우, 모든 Worker 반환 후 단일 Bash로 일괄 갱신합니다.
 
 > **Note:** task-status 갱신은 반환값 처리(3줄 추출) 직후, 다음 Worker 호출 전에 실행합니다. 병렬 Worker의 경우 각 Worker 반환 시점에 개별적으로 갱신합니다.
 

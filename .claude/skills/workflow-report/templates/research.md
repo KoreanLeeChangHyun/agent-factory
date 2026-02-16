@@ -75,7 +75,7 @@ flowchart TD
 - [제목](URL)
 
 ### 내부 파일
-- `path/to/file` - [설명]
+- [`path/to/file`](path/to/file) - [설명]
 
 ## 결론
 

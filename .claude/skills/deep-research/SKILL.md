@@ -136,11 +136,20 @@ deep-research src/utils/ 디렉토리의 공통 패턴을 찾아줘
 - [추가 조사가 필요한 부분]
 ```
 
-## 적용 단계
+## 사용 환경
 
-- **WORK**: `research`, `analyze` 명령어에서 코드베이스 심층 탐색 시 활용
-- 기존 `command-research` 스킬과 독립적으로 사용 가능
-- `command-research` 스킬은 웹 검색 중심, `deep-research`는 코드베이스 탐색 중심
+### 워크플로우 외부 (직접 호출)
+
+메인 에이전트 또는 사용자가 `deep-research <탐색 주제>` 형태로 직접 호출하여 사용한다. 호출 시 `context: fork`에 의해 격리된 Explore 에이전트가 생성되고, 메인 컨텍스트를 오염시키지 않고 코드베이스를 탐색한 뒤 요약만 반환한다. `command-research` 스킬(웹 검색 중심)과는 독립적으로 사용할 수 있으며, 양쪽을 순차적으로 활용하면 웹 정보와 코드베이스 분석을 결합한 포괄적 조사가 가능하다.
+
+### 워크플로우 내부 (제약)
+
+WORK Phase에서는 이 스킬이 동작하지 않는다. 2중 차단 구조에 의해 호출 자체가 불가능하다:
+
+1. **Worker의 Task 도구 미보유**: deep-research는 `context: fork`로 Explore 서브에이전트를 생성해야 하므로 Task 도구가 필요하지만, Worker 에이전트는 Task 도구를 보유하지 않는다
+2. **workflow-agent-guard 허용 목록 미포함**: PreToolUse Hook(`workflow-agent-guard.sh`)의 WORK Phase 허용 에이전트가 `worker`, `reporter`로 한정되어 있어 Explore 에이전트 호출이 차단된다
+
+WORK Phase에서 코드베이스 탐색이 필요한 경우, Worker가 직접 Glob, Grep, Read, Bash 도구를 사용하여 탐색을 수행한다.
 
 ## 기존 command-research 스킬과의 차이
 
