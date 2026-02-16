@@ -12,7 +12,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
 **workflow-end 스킬의 책임:**
-- history.md 갱신 (summary.txt 활용)
+- history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
 - status.json 완료 처리 (REPORT -> COMPLETED / FAILED)
 - 사용량 확정 (usage-finalize)
 - 레지스트리 해제 (unregister)
@@ -61,9 +61,9 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 ## 절차 (5단계)
 
-### 1. history.md 갱신
+### 1. history.md 최종 확인 갱신
 
-`.prompt/history.md`에 작업 이력 행을 추가합니다.
+`.prompt/history.md`의 최종 상태를 확인하고 갱신합니다. phase 전이 시 자동 갱신의 최종 확인 역할로서 중간 경합 손실 시 안전망으로 동작합니다.
 
 **사전 확인:**
 - `{workDir}/summary.txt` 파일 존재 확인 (없어도 스크립트가 title/command로 대체 처리)

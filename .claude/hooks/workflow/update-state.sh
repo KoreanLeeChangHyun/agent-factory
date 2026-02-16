@@ -674,6 +674,9 @@ except Exception as e:
 
     # 전역 레지스트리 phase 동기화
     sync_registry_phase "$to_phase"
+
+    # history.md 실시간 갱신 (비동기, 실패 무시)
+    ( bash "$SCRIPT_DIR/history-sync.sh" sync 2>/dev/null || true ) &
 }
 
 # usage-pending 함수: usage.json의 _pending_workers에 agent_id-taskId 매핑 등록

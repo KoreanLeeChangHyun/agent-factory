@@ -35,7 +35,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ### 이 에이전트의 전담 행위
 
-- history.md 갱신 (summary.txt 활용)
+- history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
 - status.json 완료 처리 (`wf-state status`)
 - 사용량 확정 (`wf-state usage-finalize`)
 - 레지스트리 해제 (`wf-state unregister`)
@@ -68,7 +68,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 절차
 
-1. **history.md 갱신** - `bash .claude/hooks/workflow/history-sync.sh sync` 실행으로 `.prompt/history.md` 자동 갱신
+1. **history.md 최종 확인 갱신** - `bash .claude/hooks/workflow/history-sync.sh sync` 실행으로 `.prompt/history.md` 최종 상태 확인 및 갱신 (phase 전이 시 자동 갱신의 안전망 역할)
 2. **status.json 완료 처리** - `wf-state status <registryKey> REPORT COMPLETED|FAILED` 실행
 3. **사용량 확정** - 성공 시 `wf-state usage-finalize <registryKey>` 실행 (실패 시 비차단)
 4. **레지스트리 해제** - `wf-state unregister <registryKey>` 실행

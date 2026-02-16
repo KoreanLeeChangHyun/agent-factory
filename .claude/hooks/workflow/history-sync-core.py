@@ -33,11 +33,12 @@ TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 # status.json phase -> 표시 상태 매핑
 PHASE_STATUS_MAP = {
     "COMPLETED": "완료",
-    "REPORT": "완료",
-    "STALE": "완료",
+    "REPORT": "진행중",
+    "STALE": "중단",
     "WORK": "진행중",
-    "PLAN": "중단",
-    "INIT": "중단",
+    "PLAN": "진행중",
+    "INIT": "진행중",
+    "CANCELLED": "중단",
     "FAILED": "실패",
     "UNKNOWN": "불명",
     "NONE": "불명",
@@ -76,7 +77,7 @@ STALE_TTL_SECONDS = 2 * 60 * 60  # 2시간
 
 def is_stale(phase: str, updated_at: str | None) -> bool:
     """WORK 또는 PLAN 단계에서 updated_at 기준 2시간 이상 경과하면 스테일로 판정."""
-    if phase not in ("WORK", "PLAN"):
+    if phase not in ("WORK", "PLAN", "INIT"):
         return False
     if not updated_at:
         return False
