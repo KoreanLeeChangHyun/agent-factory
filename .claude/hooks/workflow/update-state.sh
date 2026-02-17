@@ -597,8 +597,8 @@ try:
     with open(fsm_file, 'r', encoding='utf-8') as f:
         fsm_data = json.load(f)
 except Exception as e:
-    print(f'[WARN] fsm-transitions.json load failed: {e}', file=sys.stderr)
-    sys.exit(0)
+    print(f'[ERROR] FSM 규칙 파일 로드 실패: {e}', file=sys.stderr)
+    sys.exit(1)
 
 if not os.path.exists(status_file):
     print(f'[WARN] status.json not found: {status_file}', file=sys.stderr)

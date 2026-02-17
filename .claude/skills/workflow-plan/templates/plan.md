@@ -53,6 +53,7 @@ flowchart TD
 
 ### WXX: [작업명]
 
+<!-- 대상 파일 경로는 기존 파일이면 [`path/to/file`](path/to/file) 링크 형식 사용 가능. 미존재 파일은 `path/to/file` 백틱만 사용 -->
 - 대상 파일: `path/to/file`
 - 산출물: `work/WXX-작업명.md`
 
@@ -118,5 +119,6 @@ flowchart TD
 
 ### 수정 대상 파일
 <!-- 선택. implement/refactor 등 파일 수정이 수반되는 command에서 활용 -->
+<!-- 파일 경로는 [`path/to/file`](path/to/file) 링크 형식 권장. 미존재 파일(신규 생성 예정)은 `path/to/file` 백틱만 사용 -->
 
 [대상 파일 목록 또는 범위 경계]

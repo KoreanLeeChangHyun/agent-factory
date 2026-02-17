@@ -198,9 +198,9 @@ fsm_file = os.environ['GUARD_FSM_FILE']
 try:
     with open(fsm_file, 'r', encoding='utf-8') as f:
         fsm_data = json.load(f)
-except Exception:
-    # JSON 로드 실패 시 통과 (안전 측)
-    print('yes')
+except Exception as e:
+    # JSON 로드 실패 시 차단 (페일-세이프)
+    print('deny:' + str(e))
     sys.exit()
 
 mode = os.environ.get('GUARD_MODE', 'full')
@@ -216,6 +216,24 @@ if to_phase in allowed_targets:
 else:
     print('no')
 " 2>/dev/null)
+
+# FSM 파일 로드 실패 시 페일-세이프 차단
+if [[ "$VALID" == deny:* ]]; then
+    FSM_ERROR_MSG="${VALID#deny:}"
+    GUARD_FSM_ERROR="$FSM_ERROR_MSG" python3 -c "
+import json, os
+err = os.environ['GUARD_FSM_ERROR']
+result = {
+    'hookSpecificOutput': {
+        'hookEventName': 'PreToolUse',
+        'permissionDecision': 'deny',
+        'permissionDecisionReason': f'FSM 전이 규칙 파일(fsm-transitions.json) 로드 실패: {err}'
+    }
+}
+print(json.dumps(result, ensure_ascii=False))
+" 2>/dev/null
+    exit 2
+fi
 
 if [ "$VALID" = "no" ]; then
     # 모드별 합법 전이 대상 목록 생성

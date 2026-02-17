@@ -13,12 +13,14 @@
 #
 # 정합성 검증 항목:
 #   (a) roadmap.md의 마일스톤 ID 목록과 .kanbanboard의 마일스톤 ID 목록 일치 여부
-#   (b) 워크플로우 ID 교차 검증
+#   (b) 워크플로우 ID 교차 검증 (GAP-V3: roadmap SSOT 기준 ERROR/WARN 분류)
 #   (c) 상태 불일치 감지 (roadmap에 없는 WF가 kanbanboard에 존재하는 경우 경고)
+#   (d) GAP-V2: roadmap.md 마일스톤 완료 상태 교차 확인 (프로젝트 완료 조건 3)
 #
 # 프로젝트 완료 판단:
 #   .kanbanboard의 Done 컬럼 마일스톤 수와 전체 마일스톤 수 비교
-#   모두 Done이면 "프로젝트 완료" 메시지 출력
+#   + roadmap.md의 모든 마일스톤에 완료 상태가 기록되어 있는지 확인
+#   모두 충족 시 "프로젝트 완료" 메시지 출력
 #
 # 종료 코드:
 #   0  정합성 통과 (프로젝트 미완료)
@@ -93,6 +95,33 @@ count_total_milestones() {
     grep -cP '^### MS-[0-9]+:' "$KANBAN_PATH" || echo "0"
 }
 
+# --- GAP-V2: roadmap.md 마일스톤 완료 상태 교차 확인 ---
+
+# .kanbanboard Done 컬럼의 마일스톤 ID 목록 추출
+extract_done_milestone_ids() {
+    awk '
+    BEGIN { in_done = 0 }
+    /^## Done/ { in_done = 1; next }
+    /^## / { if (in_done) in_done = 0 }
+    in_done && /^### (MS-[0-9]+):/ { print $2 }
+    ' "$KANBAN_PATH" | sed 's/:$//' | sort -u
+}
+
+# roadmap.md에서 완료 상태가 기록된 마일스톤 ID 목록 추출
+# 패턴: "### MS-N:" 또는 "## MS-N:" 헤더 이후 "- **상태**: 완료" 가 존재하는 마일스톤
+extract_roadmap_completed_milestone_ids() {
+    awk '
+    /^##/ && /MS-[0-9]+:/ {
+        if (ms_id != "" && completed) print ms_id
+        match($0, /MS-[0-9]+/)
+        ms_id = substr($0, RSTART, RLENGTH)
+        completed = 0
+    }
+    /^- \*\*상태\*\*: 완료/ { completed = 1 }
+    END { if (ms_id != "" && completed) print ms_id }
+    ' "$ROADMAP_PATH" | sort -u
+}
+
 # --- 검증 실행 ---
 
 HAS_ERROR=0
@@ -133,17 +162,19 @@ fi
 WF_ONLY_IN_ROADMAP=$(comm -23 "$ROADMAP_WF" "$KANBAN_WF")
 WF_ONLY_IN_KANBAN=$(comm -13 "$ROADMAP_WF" "$KANBAN_WF")
 
+# GAP-V3: roadmap이 SSOT이므로 roadmap에만 있는 WF는 kanban 누락(ERROR),
+#          kanban에만 있는 WF는 독자 추가(WARN)
 if [[ -n "$WF_ONLY_IN_ROADMAP" ]]; then
+    HAS_ERROR=1
     while IFS= read -r wf_id; do
-        WARNINGS+=("워크플로우 누락: ${wf_id}가 roadmap에 있으나 kanbanboard에 없음")
+        ERRORS+=("워크플로우 누락: ${wf_id}가 roadmap에 있으나 kanbanboard에 없음")
     done <<< "$WF_ONLY_IN_ROADMAP"
 fi
 
-# (c) 상태 불일치 감지 - roadmap에 없는 WF가 kanbanboard에 존재
+# (c) 상태 불일치 감지 - roadmap에 없는 WF가 kanbanboard에 존재 (경고)
 if [[ -n "$WF_ONLY_IN_KANBAN" ]]; then
-    HAS_ERROR=1
     while IFS= read -r wf_id; do
-        ERRORS+=("상태 불일치: ${wf_id}가 kanbanboard에 있으나 roadmap에 없음")
+        WARNINGS+=("상태 불일치: ${wf_id}가 kanbanboard에 있으나 roadmap에 없음")
     done <<< "$WF_ONLY_IN_KANBAN"
 fi
 
@@ -165,6 +196,25 @@ if [[ $HAS_ERROR -ne 0 ]]; then
     exit 1
 fi
 
+# --- GAP-V2: roadmap.md 마일스톤 완료 상태 교차 확인 ---
+# kanban Done 컬럼의 마일스톤이 roadmap.md에도 완료 상태로 기록되어 있는지 검증
+# (프로젝트 완료 조건 3: roadmap.md의 모든 마일스톤에 완료 상태가 기록되어 있다)
+
+DONE_MS_IDS=$(mktemp)
+ROADMAP_COMPLETED_MS_IDS=$(mktemp)
+trap "rm -f '$ROADMAP_MS' '$KANBAN_MS' '$ROADMAP_WF' '$KANBAN_WF' '$DONE_MS_IDS' '$ROADMAP_COMPLETED_MS_IDS'" EXIT
+
+extract_done_milestone_ids > "$DONE_MS_IDS"
+extract_roadmap_completed_milestone_ids > "$ROADMAP_COMPLETED_MS_IDS"
+
+# kanban Done에 있지만 roadmap에 완료 상태가 미기록된 마일스톤
+DONE_BUT_NOT_IN_ROADMAP=$(comm -23 "$DONE_MS_IDS" "$ROADMAP_COMPLETED_MS_IDS")
+if [[ -n "$DONE_BUT_NOT_IN_ROADMAP" ]]; then
+    while IFS= read -r ms_id; do
+        WARNINGS+=("완료 상태 미기록: ${ms_id}가 kanbanboard Done에 있으나 roadmap.md에 완료 상태가 기록되지 않음")
+    done <<< "$DONE_BUT_NOT_IN_ROADMAP"
+fi
+
 # --- 프로젝트 완료 판단 ---
 
 TOTAL_MS=$(count_total_milestones)
@@ -178,7 +228,14 @@ if [[ ${#WARNINGS[@]} -gt 0 ]]; then
 fi
 
 if [[ "$TOTAL_MS" -gt 0 && "$DONE_MS" -eq "$TOTAL_MS" ]]; then
-    echo "프로젝트 완료: 모든 마일스톤(${TOTAL_MS}개)이 Done 상태입니다."
+    # 프로젝트 완료 조건 3 검증: roadmap.md의 모든 마일스톤에 완료 상태가 기록되어 있는가
+    ROADMAP_COMPLETED_COUNT=$(wc -l < "$ROADMAP_COMPLETED_MS_IDS" | tr -d ' ')
+    if [[ "$ROADMAP_COMPLETED_COUNT" -lt "$TOTAL_MS" ]]; then
+        echo "warn: 프로젝트 완료 조건 미충족 - roadmap.md에 완료 상태 미기록 마일스톤 존재 (${ROADMAP_COMPLETED_COUNT}/${TOTAL_MS})" >&2
+        echo "프로젝트 미완료: kanban은 모두 Done이나 roadmap.md 완료 상태 미기록 (${ROADMAP_COMPLETED_COUNT}/${TOTAL_MS})"
+        exit 0
+    fi
+    echo "프로젝트 완료: 모든 마일스톤(${TOTAL_MS}개)이 Done 상태이며 roadmap.md에 완료 기록됨."
     exit 2
 fi
 

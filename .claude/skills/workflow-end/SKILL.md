@@ -17,6 +17,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - 사용량 확정 (usage-finalize)
 - 레지스트리 해제 (unregister)
 - 워크플로우 아카이빙 (최신 10개 유지, 나머지 .history 이동)
+- .kanbanboard 갱신 (strategy 프로젝트 연동, 선택적)
 
 > **책임 경계**: 보고서 작성과 summary.txt 생성은 reporter 에이전트가 담당합니다. end 에이전트는 reporter가 생성한 summary.txt를 읽어서 history.md 갱신에 활용합니다.
 
@@ -28,8 +29,8 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 ## 핵심 원칙
 
-1. **절차 순서 엄수**: 5단계를 반드시 순서대로 실행
-2. **비차단 원칙**: history.md, usage, unregister 실패는 경고 후 계속 진행
+1. **절차 순서 엄수**: 6단계를 반드시 순서대로 실행
+2. **비차단 원칙**: history.md, usage, unregister, .kanbanboard 갱신 실패는 경고 후 계속 진행
 3. **최소 출력**: 내부 처리 과정을 터미널에 출력하지 않음
 4. **확정적 처리**: 모든 경로와 명령은 입력 파라미터로부터 확정적으로 구성
 
@@ -56,10 +57,11 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - `title`: 작업 제목
 - `reportPath`: 보고서 경로 (reporter 반환값)
 - `status`: reporter 반환 상태 (완료 | 실패)
+- `workflow_id`: 워크플로우 ID (WF-N 형식, 선택). strategy 프로젝트의 칸반보드 갱신에 사용. 전달되지 않으면 Step 6 스킵
 
 ---
 
-## 절차 (5단계)
+## 절차 (6단계)
 
 ### 1. history.md 최종 확인 갱신
 
@@ -129,6 +131,30 @@ bash .claude/hooks/workflow/archive-workflow.sh <registryKey>
 
 > 아카이빙 실패(이동)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
 
+### 6. .kanbanboard 갱신
+
+`workflow_id`가 전달되고 프로젝트 `.kanbanboard` 파일이 존재하는 경우, 워크플로우 완료 상태를 칸반보드에 반영합니다.
+
+**사전 확인:**
+- `workflow_id` 파라미터가 전달되었는지 확인 (없으면 이 단계 스킵)
+- 프로젝트 루트에서 `.kanbanboard` 파일 존재 여부 확인 (없으면 이 단계 스킵)
+
+**갱신 실행:**
+```bash
+bash .claude/skills/command-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
+```
+
+- `kanbanboard_path`: `.kanbanboard` 파일 경로
+- `workflow_id`: 전달받은 워크플로우 ID (WF-N 형식)
+- `status`: `completed` (성공 시) 또는 `failed` (실패 시)
+
+**결과 확인:**
+- 종료 코드 0: 정상 완료
+- 종료 코드 1: 인자 오류 또는 파일 없음 (경고 출력 후 계속 진행)
+- 종료 코드 2: 워크플로우 ID를 찾을 수 없음 (경고 출력 후 계속 진행)
+
+> .kanbanboard 갱신 실패는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
+
 ---
 
 ## 에러 처리
@@ -140,8 +166,9 @@ bash .claude/hooks/workflow/archive-workflow.sh <registryKey>
 | usage-finalize 실패 | 경고만 출력, 계속 진행 |
 | unregister 실패 | 경고만 출력, 계속 진행 |
 | 아카이빙 이동 실패 | 경고 출력 후 계속 진행 |
+| .kanbanboard 갱신 실패 | 경고 출력 후 계속 진행 |
 
-**실패 시**: history.md/usage/unregister 실패는 경고만 출력하고 계속 진행. status.json 전이 실패 시 부모 에이전트에게 에러 보고.
+**실패 시**: history.md/usage/unregister/.kanbanboard 실패는 경고만 출력하고 계속 진행. status.json 전이 실패 시 부모 에이전트에게 에러 보고.
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
 
@@ -159,13 +186,16 @@ end는 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
 - 배너를 직접 호출하지 마라 (오케스트레이터가 담당)
 - Slack 알림을 직접 전송하지 마라 (DONE 배너가 담당)
 
+> `.kanbanboard` 갱신(Step 6)은 마무리 처리에 포함되며, 비차단 원칙이 적용됩니다. 갱신 실패 시 경고만 출력하고 계속 진행합니다.
+
 ---
 
 ## 주의사항
 
-1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
+1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) -> 6(.kanbanboard) 순서를 반드시 준수
 2. **history.md 스크립트 실행**: `history-sync.sh sync`의 종료 코드를 확인하여 성공/실패 판단
-3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
+3. **비차단 원칙**: history.md, usage, unregister, .kanbanboard 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 반환 형식은 agent.md를 참조
 6. **아카이빙 비차단**: 아카이빙 실패(이동, 링크 갱신)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
+7. **.kanbanboard 비차단**: .kanbanboard 갱신 실패는 경고만 출력하고 계속 진행 (비차단 원칙 적용). workflow_id 미전달 또는 .kanbanboard 파일 부재 시 Step 6 스킵

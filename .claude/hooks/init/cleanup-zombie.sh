@@ -53,7 +53,7 @@ def process_status_file(status_file, status_dir):
             data = json.load(f)
 
         phase = data.get('phase', '')
-        if phase in ('COMPLETED', 'FAILED', 'STALE'):
+        if phase in ('COMPLETED', 'FAILED', 'STALE', 'CANCELLED'):
             return False
 
         time_str = data.get('updated_at') or data.get('created_at', '')

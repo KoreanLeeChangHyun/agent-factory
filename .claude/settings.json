@@ -32,6 +32,16 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/pre-tool-use/hooks-self-guard.sh",
+            "statusMessage": "hooks 자기보호 검사 중..."
+          }
+        ]
+      },
+      {
         "matcher": "AskUserQuestion",
         "hooks": [
           {

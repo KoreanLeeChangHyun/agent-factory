@@ -145,6 +145,27 @@ command별 보고서 구조가 다르므로, `templates/` 디렉토리에 유형
 > **참고**: 템플릿 선택 가이드 및 placeholder 목록은 `templates/_guide.md`를 참조하세요.
 > 템플릿은 권장 구조이며, 내용에 따라 reporter가 유연하게 조정할 수 있습니다.
 
+### 변경 파일 테이블 경로 링크 형식
+
+보고서의 **변경 파일 목록** 테이블에서 파일 경로는 마크다운 링크 형식으로 작성합니다.
+
+**형식**: `` [`경로`](경로) ``
+
+**예시**:
+```markdown
+| 파일 경로 | 변경 유형 | 설명 |
+|----------|----------|------|
+| [`src/components/Login.tsx`](src/components/Login.tsx) | 생성 | 로그인 컴포넌트 |
+| [`.claude/skills/workflow-work/SKILL.md`](.claude/skills/workflow-work/SKILL.md) | 수정 | 링크 지침 추가 |
+```
+
+**규칙**:
+- 변경 파일 테이블의 파일 경로에만 링크 적용
+- 본문 인라인 경로(`작업 내역` 섹션 등)는 백틱(`` ` ``) 유지
+- 산출물 경로(work/WXX-*.md, report.md 등 .workflow/ 하위)는 백틱 유지, 링크 미적용
+
+**이중 접두사 버그 주의**: 링크 경로에 workDir 접두사를 중복 부여하지 않습니다. 보고서가 `.workflow/<id>/` 하위에 위치하므로, 파일 경로는 프로젝트 루트 기준 상대 경로를 그대로 사용합니다. `../.workflow/../.workflow/` 같은 이중 접두사가 발생하면 링크가 깨집니다.
+
 ### CSV 보고서 템플릿
 
 ```csv

@@ -208,7 +208,7 @@ After REPORT completion: DONE start banner -> done agent call -> DONE completion
 
 ```bash
 Workflow <registryKey> DONE
-Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")
+Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>")
 Workflow <registryKey> DONE done
 ```
 

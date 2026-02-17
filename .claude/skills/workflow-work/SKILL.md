@@ -212,6 +212,43 @@ Read("<workDir>/files/<filename>.jpg")
 
 `<workDir>/work/WXX-<작업명>.md` (workDir = `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
 
+### 변경 파일 테이블 경로 링크 형식
+
+작업 내역 파일(`work/WXX-*.md`)의 **변경 파일 테이블**에서 파일 경로를 기술할 때, 마크다운 링크 형식을 적용하여 클릭으로 파일을 열 수 있게 합니다.
+
+**형식:** `` [`경로`](경로) ``
+
+**예시:**
+
+```markdown
+## 변경 파일
+
+| 파일 | 변경 유형 | 요약 |
+|------|----------|------|
+| [`.claude/skills/workflow-work/SKILL.md`](.claude/skills/workflow-work/SKILL.md) | 지침 추가 | 변경 파일 테이블 링크 형식 서브섹션 신규 생성 |
+| [`src/utils/parser.ts`](src/utils/parser.ts) | 수정 | 파서 로직 개선 |
+```
+
+**링크 대상 제한 규칙:**
+
+| 대상 | 형식 | 이유 |
+|------|------|------|
+| 변경 파일 테이블의 파일 경로 | `` [`경로`](경로) `` | 파일 시스템에 존재하는 파일이므로 링크 유효 |
+| 본문 인라인 경로 (설명 텍스트 내) | `` `경로` `` (백틱만) | 설명 맥락에서 참조하는 경로이며 링크 불필요 |
+| 산출물 경로 (work/WXX-*.md 등) | `` `경로` `` (백틱만) | 작업 내역 파일 자체의 경로는 링크 대상 아님 |
+
+**이중 접두사 버그 주의:**
+
+경로에 `.workflow/` 접두사가 포함된 파일을 참조할 때, 작업 내역 파일 자체가 `.workflow/` 하위에 위치하므로 상대 경로 계산 시 `../.workflow/../.workflow/` 형태의 이중 접두사가 발생할 수 있습니다. 경로는 항상 **프로젝트 루트 기준 상대 경로**로 작성하세요.
+
+```
+# 올바른 예
+[`.claude/skills/workflow-work/SKILL.md`](.claude/skills/workflow-work/SKILL.md)
+
+# 잘못된 예 (이중 접두사)
+[`.claude/skills/workflow-work/SKILL.md`](../.workflow/../.workflow/../.claude/skills/workflow-work/SKILL.md)
+```
+
 ### 품질 레벨 참조 가이드
 
 계획서에 품질 레벨이 명시된 경우, Worker는 해당 레벨의 검증 기준을 적용합니다. 명시되지 않은 경우 명령어별 기본 Level이 자동 적용됩니다.

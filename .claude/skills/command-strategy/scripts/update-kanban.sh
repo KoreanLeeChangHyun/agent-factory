@@ -94,7 +94,7 @@ BEGIN {
     next
 }
 
-/^### .+: .+/ {
+/^### MS-[0-9]+: .+/ {
     if (in_ms_block) {
         flush_milestone()
     }

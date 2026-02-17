@@ -255,8 +255,19 @@ if [ "$FOUND_TEST" = false ]; then
     fi
 
     if [ "$GUARD_TDD" = "strict" ]; then
-        # strict 모드: stdout에 차단 JSON 출력
-        echo "{\"decision\": \"block\", \"reason\": \"[TDD-GUARD] ${REL_FILE}에 대한 테스트 파일이 없습니다. strict 모드에서 차단합니다.\"}"
+        # strict 모드: stdout에 표준 hookSpecificOutput deny JSON 출력
+        TDD_DENY_REASON="[TDD-GUARD] ${REL_FILE}에 대한 테스트 파일이 없습니다. strict 모드에서 차단합니다." python3 -c "
+import json, os
+reason = os.environ['TDD_DENY_REASON']
+result = {
+    'hookSpecificOutput': {
+        'hookEventName': 'PreToolUse',
+        'permissionDecision': 'deny',
+        'permissionDecisionReason': reason
+    }
+}
+print(json.dumps(result, ensure_ascii=False))
+" 2>/dev/null
     else
         # 기본 모드: stderr로 경고만 출력 (차단하지 않음)
         echo "[TDD-GUARD] 경고: ${REL_FILE}에 대한 테스트 파일이 없습니다. 테스트를 먼저 작성하는 것을 권장합니다." >&2
