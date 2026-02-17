@@ -63,6 +63,7 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 | RICE, 우선순위, 작업 분해, task decomposition, scope | scope-decomposer |
 | 명령어 관리, command manager, 명령어 등록 | command-manager |
 | 스킬 생성, skill create, 스킬 관리, skill manage | command-skill-manager |
+| 스킬 검색, skill search, find skill, 스킬 설치, 스킬 통합, auto integrate | skill-auto-integrator |
 | 에이전트 관리, agent manager, 에이전트 목록 | command-agent-manager |
 | 요구사항 분석, SRS, 코드베이스 분석, 코드 구조, 데이터베이스 분석, DB 분석, 데이터 분석, EDA | analyze-* (키워드 판단) |
 | 커버리지, coverage, diff coverage, 코드 커버리지, 테스트 커버리지 | command-coverage-analysis |
