@@ -84,7 +84,7 @@ Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskI
 
 ---
 
-## No-Plan Mode Worker Call Pattern
+## no-plan Mode Worker Call Pattern
 
 > **no-plan 모드에서는 Phase 0과 Phase 1~N 대신 단일 Worker를 호출합니다.**
 

@@ -5,7 +5,7 @@ disable-model-invocation: true
 license: "Apache-2.0"
 ---
 
-# End
+# Done
 
 reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
@@ -19,12 +19,12 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - 워크플로우 아카이빙 (최신 10개 유지, 나머지 .history 이동)
 - .kanbanboard 갱신 (strategy 프로젝트 연동, 선택적)
 
-> **책임 경계**: 보고서 작성과 summary.txt 생성은 reporter 에이전트가 담당합니다. end 에이전트는 reporter가 생성한 summary.txt를 읽어서 history.md 갱신에 활용합니다.
+> **책임 경계**: 보고서 작성과 summary.txt 생성은 reporter 에이전트가 담당합니다. done 에이전트는 reporter가 생성한 summary.txt를 읽어서 history.md 갱신에 활용합니다.
 
-> **Slack 완료 알림**: end 에이전트는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
+> **Slack 완료 알림**: done 에이전트는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
 
 **호출 시점:**
-- 오케스트레이터(workflow-orchestration)에서 end 에이전트를 통해 호출됨
+- 오케스트레이터(workflow-orchestration)에서 done 에이전트를 통해 호출됨
 - reporter 반환 후 마지막 단계로 실행
 
 ## 핵심 원칙

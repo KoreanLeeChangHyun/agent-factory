@@ -1,4 +1,4 @@
-# Architecture Report: [제목]
+# [제목] - 아키텍처 보고서
 
 - 작업 ID: {{workId}}
 - 워크플로우: {{workflowId}}

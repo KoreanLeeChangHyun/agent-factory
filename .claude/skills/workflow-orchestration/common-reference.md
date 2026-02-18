@@ -30,6 +30,13 @@
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
 | **Phase 0** | 준비 단계 | WORK Phase 시작 전 1개 worker가 수행하는 준비 작업. work 디렉토리 생성 및 skill-map 작성. full 모드에서 필수 실행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Phase 시작/완료 시 호출. |
+| **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
+| **work log** | 작업 내역 | Worker/Explorer가 태스크 실행 후 생성하는 기록 파일. `work/WXX-*.md` 형식. |
+| **plan document** | 계획서 | planner가 PLAN 단계에서 생성하는 작업 계획 문서. `plan.md`. |
+| **report document** | 보고서 | reporter가 REPORT 단계에서 생성하는 결과 문서. `report.md`. |
+| **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
+| **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
+| **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step1-init.md~step5-done.md 파일명에 사용. |
 
 ### 에이전트-Phase-스킬 관계
 
@@ -198,7 +205,7 @@ workName: <작업이름>
 | Situation | Action |
 |-----------|--------|
 | INIT error | 최대 3회 재시도 (경고 로그 출력) |
-| Step error (PLAN/WORK/REPORT) | 최대 3회 재시도 후 에러 보고 |
+| Phase error (PLAN/WORK/REPORT) | 최대 3회 재시도 후 에러 보고 |
 | Independent task failure | 다른 독립 태스크는 계속 진행 |
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |

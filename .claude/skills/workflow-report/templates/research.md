@@ -1,4 +1,4 @@
-# Research Report: [제목]
+# [제목] - 리서치 보고서
 
 - 작업 ID: {{workId}}
 - 워크플로우: {{workflowId}}
@@ -7,7 +7,7 @@
 - 작성일: {{date}} (KST)
 - 원본 계획: {{planPath}}
 
-## Executive Summary
+## 요약
 
 [핵심 결론 1-3문장 요약]
 

@@ -5,7 +5,7 @@
 > - Skill: `workflow-plan`
 > - Task prompt: `command: <command>, workId: <workId>, request: <request>, workDir: <workDir>`
 
-## No-Plan Mode Skip Condition
+## no-plan Mode Skip Condition
 
 > **no-plan 모드(`-np` 플래그)에서는 PLAN 단계 전체를 건너뛰고 WORK로 직행합니다.**
 >

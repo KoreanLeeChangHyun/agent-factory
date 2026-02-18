@@ -1,4 +1,4 @@
-# Review Report: [제목]
+# [제목] - 리뷰 보고서
 
 - 작업 ID: {{workId}}
 - 워크플로우: {{workflowId}}
@@ -7,7 +7,7 @@
 - 작성일: {{date}} (KST)
 - 원본 계획: {{planPath}}
 
-## Executive Summary
+## 요약
 
 [검증 결과 1-3문장 요약]
 
@@ -15,7 +15,7 @@
 - Important 이슈: N건
 - Minor 이슈: N건
 
-## Review Scope
+## 검토 범위
 
 | 태스크 ID | 설명 | 스킬 | 상태 |
 |-----------|------|------|------|
@@ -33,7 +33,7 @@ flowchart TD
     C --> D
 ```
 
-## Task Results
+## 작업 결과
 
 ### W01: [태스크명]
 
@@ -43,10 +43,10 @@ flowchart TD
 |----------|------|--------|------|
 | [항목] | PASS/FAIL | Critical/Important/Minor | [설명] |
 
-**Strengths**:
+**강점**:
 - [강점 1]
 
-**Issues**:
+**이슈**:
 - [이슈 1]
 
 ---
@@ -55,16 +55,16 @@ flowchart TD
 
 (동일 구조 반복)
 
-## Overall Assessment
+## 종합 평가
 
 **최종 판정**: PASS / CONDITIONAL PASS / FAIL
 
 **판정 근거**: [근거 설명]
 
-**Strengths**:
+**강점**:
 - [전체 강점 1]
 
-**Issues Summary**:
+**이슈 요약**:
 
 | 심각도 | 건수 | 주요 내용 |
 |--------|------|----------|
@@ -72,11 +72,11 @@ flowchart TD
 | Important | N | [내용] |
 | Minor | N | [내용] |
 
-## Recommendations
+## 권고 사항
 
 1. [권장사항 1]
 2. [권장사항 2]
 
-## Conclusion
+## 결론
 
 [종합 결론]
