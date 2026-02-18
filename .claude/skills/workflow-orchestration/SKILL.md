@@ -230,7 +230,7 @@ Workflow <registryKey> DONE done
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
 | wf-state transition/registry | `wf-state both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
-| prompt.txt read/clear | Read user_prompt.txt via init, clear on modify-selection |
+| prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: reload-prompt.sh가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
 
 ### Sub-agent-Only Actions
@@ -252,6 +252,7 @@ Workflow <registryKey> DONE done
 | Direct code analysis/review | Worker exclusive; orchestrator must not interpret code |
 | Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
 | Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
+| 승인/중지 후 .prompt/prompt.txt 읽기 | "수정 요청" 외 분기에서 prompt.txt를 읽으면 다른 워크플로우 질의와 충돌 발생. prompt.txt 접근은 INIT(init agent)과 수정 요청(reload-prompt.sh)으로 한정 |
 
 ### Platform Constraints Requiring Orchestrator Execution
 

@@ -130,13 +130,22 @@ AskUserQuestion(
 
 | Selection | Action |
 |-----------|--------|
-| **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행) |
+| **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload-prompt.sh` 호출, `user_prompt.txt` 갱신 |
 | **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload-prompt.sh`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단 |
+| **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload-prompt.sh` 호출, `user_prompt.txt` 갱신 |
+
+> **prompt.txt Isolation Rule (CRITICAL):**
+> `.prompt/prompt.txt` 읽기 및 `reload-prompt.sh` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
+> "승인" 또는 "중지" 선택 후 `.prompt/prompt.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
+> - "승인" 시: prompt.txt 무시, WORK 단계로 즉시 진행
+> - "중지" 시: prompt.txt 무시, CANCELLED 처리만 수행
+> - "수정 요청" 시: reload-prompt.sh 1회 호출 (유일한 prompt.txt 접근 경로)
 
 > **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
 
 > **"수정 요청" selection handling:**
+> **Precondition:** 아래 3단계 절차는 사용자가 "수정 요청"을 선택한 경우에만 실행합니다. "승인" 또는 "중지" 선택 시 이 절차를 실행하는 것은 MUST NOT입니다.
+>
 > 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
 >
 > **1단계. reload-prompt.sh 호출** — 피드백 수신

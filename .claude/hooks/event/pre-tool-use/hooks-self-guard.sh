@@ -60,6 +60,7 @@ cmd = sys.stdin.read().strip()
 
 # 읽기 전용 명령 패턴 화이트리스트
 # 이 명령들이 .claude/hooks/ 경로를 참조하더라도 파일을 수정하지 않으므로 통과
+# 스크립트 직접 실행(.claude/hooks/*.sh, 절대 경로 포함)도 읽기 전용으로 허용
 readonly_patterns = [
     r'^\s*git\s',
     r'^\s*python3?\s',
@@ -80,6 +81,8 @@ readonly_patterns = [
     r'^\s*exec\s',
     r'^\s*env\s',
     r'^(?:\s*\w+=\S*\s+)*(?:bash|sh|python3?|node)\s',
+    r'^\s*\.claude/hooks/.*\.sh\b',
+    r'^\s*/.*/\.claude/hooks/.*\.sh\b',
     r'^\s*less\s',
     r'^\s*more\s',
     r'^\s*find\s',
