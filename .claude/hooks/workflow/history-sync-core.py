@@ -72,11 +72,11 @@ def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | N
 
 
 # 스테일 판정 TTL (초)
-STALE_TTL_SECONDS = 2 * 60 * 60  # 2시간
+STALE_TTL_SECONDS = 30 * 60  # 30분
 
 
 def is_stale(phase: str, updated_at: str | None) -> bool:
-    """WORK 또는 PLAN 단계에서 updated_at 기준 2시간 이상 경과하면 스테일로 판정."""
+    """WORK 또는 PLAN 단계에서 updated_at 기준 30분 이상 경과하면 스테일로 판정."""
     if phase not in ("WORK", "PLAN", "INIT"):
         return False
     if not updated_at:

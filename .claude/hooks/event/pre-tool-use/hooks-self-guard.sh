@@ -8,6 +8,19 @@
 # 우회: 환경변수 HOOKS_EDIT_ALLOWED=1 설정 시 차단 해제
 #       (오케스트레이터가 `wf-state env <registryKey> set HOOKS_EDIT_ALLOWED 1` 명령으로 설정/해제)
 
+# Load variables from .claude.env (process env takes precedence)
+SCRIPT_DIR_HSG="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT_HSG="$(cd "$SCRIPT_DIR_HSG/../../../.." && pwd)"
+ENV_FILE_HSG="$PROJECT_ROOT_HSG/.claude.env"
+if [ -f "$ENV_FILE_HSG" ]; then
+    if [ -z "$GUARD_HOOKS_SELF_PROTECT" ]; then
+        GUARD_HOOKS_SELF_PROTECT=$(grep "^GUARD_HOOKS_SELF_PROTECT=" "$ENV_FILE_HSG" | head -1 | sed "s/^GUARD_HOOKS_SELF_PROTECT=//")
+    fi
+    if [ -z "$HOOKS_EDIT_ALLOWED" ]; then
+        HOOKS_EDIT_ALLOWED=$(grep "^HOOKS_EDIT_ALLOWED=" "$ENV_FILE_HSG" | head -1 | sed "s/^HOOKS_EDIT_ALLOWED=//")
+    fi
+fi
+
 # Guard disable check
 if [ "$GUARD_HOOKS_SELF_PROTECT" = "0" ]; then exit 0; fi
 

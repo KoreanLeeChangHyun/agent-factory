@@ -15,6 +15,17 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
+# Load variables from .claude.env (process env takes precedence)
+ENV_FILE_WTG="$PROJECT_ROOT/.claude.env"
+if [ -f "$ENV_FILE_WTG" ]; then
+    if [ -z "$GUARD_WORKFLOW_TRANSITION" ]; then
+        GUARD_WORKFLOW_TRANSITION=$(grep "^GUARD_WORKFLOW_TRANSITION=" "$ENV_FILE_WTG" | head -1 | sed "s/^GUARD_WORKFLOW_TRANSITION=//")
+    fi
+    if [ -z "$WORKFLOW_SKIP_GUARD" ]; then
+        WORKFLOW_SKIP_GUARD=$(grep "^WORKFLOW_SKIP_GUARD=" "$ENV_FILE_WTG" | head -1 | sed "s/^WORKFLOW_SKIP_GUARD=//")
+    fi
+fi
+
 # 비상 우회 수단
 if [ "$WORKFLOW_SKIP_GUARD" = "1" ]; then
     exit 0

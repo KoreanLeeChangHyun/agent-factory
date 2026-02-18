@@ -6,6 +6,16 @@
 # 입력: stdin으로 JSON (tool_name, tool_input)
 # 출력: 항상 빈 stdout (차단하지 않음), 경고는 stderr로 출력
 
+# Load variables from .claude.env (process env takes precedence)
+SCRIPT_DIR_TG="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT_TG="$(cd "$SCRIPT_DIR_TG/../../../.." && pwd)"
+ENV_FILE_TG="$PROJECT_ROOT_TG/.claude.env"
+if [ -f "$ENV_FILE_TG" ]; then
+    if [ -z "$GUARD_TDD" ]; then
+        GUARD_TDD=$(grep "^GUARD_TDD=" "$ENV_FILE_TG" | head -1 | sed "s/^GUARD_TDD=//")
+    fi
+fi
+
 # Guard disable check
 if [ "$GUARD_TDD" = "0" ]; then exit 0; fi
 

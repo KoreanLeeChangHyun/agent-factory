@@ -33,6 +33,20 @@
 #     REPORT: reporter + done 허용
 #     COMPLETED/FAILED/STALE/CANCELLED: 모든 에이전트 차단
 
+SCRIPT_DIR_AG="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT_AG="$(cd "$SCRIPT_DIR_AG/../../../.." && pwd)"
+
+# Load variables from .claude.env (process env takes precedence)
+ENV_FILE_WAG="$PROJECT_ROOT_AG/.claude.env"
+if [ -f "$ENV_FILE_WAG" ]; then
+    if [ -z "$GUARD_WORKFLOW_AGENT" ]; then
+        GUARD_WORKFLOW_AGENT=$(grep "^GUARD_WORKFLOW_AGENT=" "$ENV_FILE_WAG" | head -1 | sed "s/^GUARD_WORKFLOW_AGENT=//")
+    fi
+    if [ -z "$WORKFLOW_SKIP_GUARD" ]; then
+        WORKFLOW_SKIP_GUARD=$(grep "^WORKFLOW_SKIP_GUARD=" "$ENV_FILE_WAG" | head -1 | sed "s/^WORKFLOW_SKIP_GUARD=//")
+    fi
+fi
+
 # 비상 우회
 if [ "$WORKFLOW_SKIP_GUARD" = "1" ]; then
     exit 0
@@ -42,8 +56,6 @@ fi
 if [ "$GUARD_WORKFLOW_AGENT" = "0" ]; then exit 0; fi
 
 # Bypass 메커니즘: 파일 기반 또는 환경변수 기반
-SCRIPT_DIR_AG="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT_AG="$(cd "$SCRIPT_DIR_AG/../../../.." && pwd)"
 if [ "$WORKFLOW_GUARD_DISABLE" = "1" ] || [ -f "$PROJECT_ROOT_AG/.workflow/bypass" ]; then
     exit 0
 fi

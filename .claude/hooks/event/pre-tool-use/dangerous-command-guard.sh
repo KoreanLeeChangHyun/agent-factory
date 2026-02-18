@@ -5,6 +5,16 @@
 # 입력: stdin으로 JSON (tool_name, tool_input)
 # 출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
 
+# Load variables from .claude.env (process env takes precedence)
+SCRIPT_DIR_DCG="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT_DCG="$(cd "$SCRIPT_DIR_DCG/../../../.." && pwd)"
+ENV_FILE_DCG="$PROJECT_ROOT_DCG/.claude.env"
+if [ -f "$ENV_FILE_DCG" ]; then
+    if [ -z "$GUARD_DANGEROUS_COMMAND" ]; then
+        GUARD_DANGEROUS_COMMAND=$(grep "^GUARD_DANGEROUS_COMMAND=" "$ENV_FILE_DCG" | head -1 | sed "s/^GUARD_DANGEROUS_COMMAND=//")
+    fi
+fi
+
 # Guard disable check
 if [ "$GUARD_DANGEROUS_COMMAND" = "0" ]; then exit 0; fi
 
