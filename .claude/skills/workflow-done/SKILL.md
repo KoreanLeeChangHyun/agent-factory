@@ -1,5 +1,5 @@
 ---
-name: workflow-end
+name: workflow-done
 description: "Internal skill for workflow END stage. Performs workflow finalization after reporter completion. Use for workflow finalization: history.md update (using summary.txt), status.json completion, usage finalization, registry release, workflow archiving (keeping latest 10) in a 5-step procedure. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
 license: "Apache-2.0"
@@ -11,7 +11,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
-**workflow-end 스킬의 책임:**
+**workflow-done 스킬의 책임:**
 - history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
 - status.json 완료 처리 (REPORT -> COMPLETED / FAILED)
 - 사용량 확정 (usage-finalize)

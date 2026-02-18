@@ -51,7 +51,7 @@ stateDiagram-v2
 | WORK | worker | workflow-work + command skills | 3 | work log path |
 | WORK | explorer | workflow-explore | 3 | exploration result path |
 | REPORT | reporter | workflow-report | 2 | report path |
-| END | done | workflow-end | 1 | status |
+| END | done | workflow-done | 1 | status |
 
 ---
 

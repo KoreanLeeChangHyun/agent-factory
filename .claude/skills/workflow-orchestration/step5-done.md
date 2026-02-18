@@ -2,10 +2,10 @@
 
 > **Agent-Skill Binding**
 > - Agent: `done` (model: haiku, maxTurns: 15)
-> - Skill: `workflow-end`
+> - Skill: `workflow-done`
 > - Task prompt: `registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>`
 
-**Detailed Guide:** workflow-end skill 참조
+**Detailed Guide:** workflow-done skill 참조
 
 reporter 완료 후, 오케스트레이터가 **DONE 시작 배너**를 호출한 뒤 **done 에이전트**를 디스패치합니다.
 

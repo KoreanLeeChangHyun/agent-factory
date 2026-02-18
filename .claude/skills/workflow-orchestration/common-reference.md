@@ -53,7 +53,7 @@ flowchart TD
     WORK_A -->|정적 바인딩| WF_WORK[workflow-work]
     WORK_A -->|동적 바인딩| CMD_SKILLS[command skills]
     REPORT_A -->|바인딩| WF_REPORT[workflow-report]
-    END_A -->|바인딩| WF_END[workflow-end]
+    END_A -->|바인딩| WF_END[workflow-done]
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
@@ -76,7 +76,7 @@ flowchart TD
 | worker | WORK | workflow-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-work) + 런타임 동적 (command skills) |
 | explorer | WORK | workflow-explore | - | frontmatter `skills:` |
 | reporter | REPORT | workflow-report | - | frontmatter `skills:` |
-| done | END (별칭) | workflow-end | - | frontmatter `skills:` |
+| done | END (별칭) | workflow-done | - | frontmatter `skills:` |
 
 > **worker의 command skill 동적 로드**: worker는 `workflow-work` skill만 frontmatter에 선언합니다. command skill은 `command-skill-map.md`의 4단계 우선순위(skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백)로 런타임에 결정됩니다.
 
