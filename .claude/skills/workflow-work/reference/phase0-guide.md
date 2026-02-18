@@ -1,16 +1,19 @@
 # Phase 0: 준비 단계 상세 가이드
 
+> **CRITICAL WARNING: Phase 0은 full 모드에서 절대 스킵할 수 없습니다.** 오케스트레이터가 WORK 단계에 진입하면, Phase 1이나 다른 Phase보다 반드시 Phase 0을 가장 먼저 실행해야 합니다. Phase 0을 건너뛰는 것은 워크플로우 프로토콜의 중대한 위반입니다.
+
 > **Phase 0 스킵 조건:** no-plan 모드에서만 스킵 (단일 태스크이므로 스킬 매핑 불필요)
 
 > **Phase 배너**: 오케스트레이터는 Phase 0 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE 0 "phase0" sequential` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
-Phase 0은 모든 full 모드 워크플로우에서 **필수로** 실행합니다. no-plan 모드에서만 스킵합니다.
+Phase 0은 모든 full 모드 워크플로우에서 **무조건 실행**합니다. 예외 없음. 스킵 사유 없음. 어떤 최적화 판단으로도 생략 불가. no-plan 모드에서만 스킵합니다.
 
 **Phase 0 실행 판단:**
 
 ```mermaid
 flowchart TD
     START[WORK 시작] --> P0[Phase 0 실행]
+    START -->|"스킵 금지"| VIOLATION[프로토콜 위반 - 즉시 중단]
     P0 --> P0R{Phase 0 성공?}
     P0R -->|성공| P1S[Phase 1~N: skills 파라미터 전달]
     P0R -->|실패| FALLBACK[폴백: Worker 자율 스킬 결정]
@@ -57,3 +60,14 @@ Phase 0이 실행되었으나 실패를 반환한 경우, C 방식(개별 자율
 3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
 
 이 폴백 메커니즘은 Phase 0의 SPOF(단일 장애점) 위험을 완화합니다.
+
+## Phase 0 스킵 방지 체크리스트
+
+오케스트레이터가 WORK 단계 진입 시 반드시 확인:
+
+1. Phase 0 WORK-PHASE 배너를 출력했는가?
+2. Phase 0 Worker를 호출했는가?
+3. Phase 0 Worker의 반환값을 수신했는가?
+4. 위 3개를 모두 완료한 후에야 Phase 1으로 진행하는가?
+
+> 하나라도 "아니오"면 프로토콜 위반. 즉시 Phase 0을 실행하라.

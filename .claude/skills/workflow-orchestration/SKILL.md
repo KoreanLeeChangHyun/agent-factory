@@ -118,8 +118,8 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | INIT done (prompt) | Direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
 | PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation |
-| WORK Phase start | WORK-PHASE banner (Phase 0 포함), then worker call(s) for that phase | Skipping Phase banner, Skipping Phase 0 banner, **progress/waiting text** |
-| WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **progress/waiting text (any language), phase status messages** |
+| WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0 worker call, then Phase 1~N | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text** |
+| WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages** |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
 | REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text |
 
@@ -186,7 +186,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode), user_prompt.txt request (no-plan mode), or main agent direct work (prompt mode).
 
-**Worker dispatch patterns:** See [step3-work.md](step3-work.md) for no-plan mode, Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
+**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE and MUST execute before any Phase 1~N worker calls. See [step3-work.md](step3-work.md) for no-plan mode, Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 

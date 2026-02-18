@@ -6,7 +6,7 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|compact",
         "hooks": [
           {
             "type": "command",
@@ -91,6 +91,34 @@
             "statusMessage": "워크플로우 에이전트 검증 중..."
           }
         ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/pre-tool-use/task-history-sync.sh",
+            "async": true,
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/stop/workflow-auto-continue.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "async": true,
+            "timeout": 30
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -107,6 +135,12 @@
             "command": "bash .claude/hooks/event/subagent-stop/completion-notify.sh",
             "async": true,
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/event/subagent-stop/history-sync-trigger.sh",
+            "async": true,
+            "timeout": 30
           }
         ]
       }

@@ -123,6 +123,8 @@ no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 �
 
 ## Full Mode: Phase 0 - Preparation (Required, Sequential 1 worker)
 
+> **CRITICAL: Phase 0 스킵 절대 금지.** full 모드에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
+
 > **필수 실행**: Phase 0은 모든 full 모드 워크플로우에서 필수로 실행합니다.
 > **REQUIRED**: Phase 0 Worker 호출 직전에 반드시 WORK-PHASE 0 배너를 출력해야 합니다.
 
@@ -132,7 +134,13 @@ no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 �
 flowchart TD
     START[WORK 시작] --> P0[Phase 0 실행: skill-map.md 생성]
     P0 --> P1[Phase 1~N: skills 파라미터 전달]
+    START --> |"Phase 0 스킵 금지"| FAIL[프로토콜 위반]
 ```
+
+**Phase 0 실행 전 자가 검증 (MUST):**
+- [ ] WORK 배너 출력 완료했는가?
+- [ ] Phase 0 WORK-PHASE 배너를 호출하려 하는가? (Phase 1이 아닌 Phase 0인가?)
+- [ ] Phase 0을 스킵하려는 충동이 있는가? → 스킵 금지, 반드시 실행
 
 **Phase 0 실행:**
 
@@ -165,6 +173,8 @@ Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별
 1. Phase 0 실패를 로그에 기록
 2. skill-map.md 없이 Phase 1로 진행
 3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
+
+> **GATE: Phase 1 진입 전 Phase 0 완료 필수.** Phase 0 Worker가 반환값을 돌려주지 않았다면 Phase 1으로 진행할 수 없습니다. Phase 0을 실행하지 않고 Phase 1 배너를 출력하는 것은 프로토콜 위반입니다.
 
 ## Phase 1~N: Task Execution
 
