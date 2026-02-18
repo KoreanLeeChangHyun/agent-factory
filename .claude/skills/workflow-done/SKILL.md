@@ -43,16 +43,16 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - **출력 허용**: 반환값 (1줄 규격), 에러 메시지
 - **출력 금지**: "history.md를 갱신합니다", "status.json을 업데이트합니다" 류의 진행 상황 설명, 중간 진행 보고, 작업 계획 설명
 - 파일 읽기/쓰기 등 내부 작업은 묵묵히 수행하고 최종 반환값만 출력
-- DONE 완료 배너는 오케스트레이터가 end 반환 후 직접 호출 (서브에이전트 내부 Bash 출력은 사용자 터미널에 표시되지 않음)
+- DONE 완료 배너는 오케스트레이터가 done 에이전트 반환 후 직접 호출 (서브에이전트 내부 Bash 출력은 사용자 터미널에 표시되지 않음)
 
 ---
 
 ## 입력
 
-메인 에이전트로부터 다음 정보를 전달받습니다:
+오케스트레이터로부터 다음 정보를 전달받습니다:
 
 - `registryKey`: 워크플로우 식별자 (YYYYMMDD-HHMMSS)
-- `workDir`: 작업 디렉토리 경로
+- `workDir`: 작업 디렉터리 경로
 - `command`: 실행 명령어
 - `title`: 작업 제목
 - `reportPath`: 보고서 경로 (reporter 반환값)
@@ -76,7 +76,7 @@ bash .claude/hooks/workflow/history-sync.sh sync
 ```
 
 스크립트가 다음을 자동 처리합니다:
-- `.workflow/` 디렉토리 스캔 및 history.md 누락 항목 감지
+- `.workflow/` 디렉터리 스캔 및 history.md 누락 항목 감지
 - 테이블 행 생성 (날짜/시간 파싱, 제목/요약 구성, 상태 매핑)
 - 보고서/계획서/질의 링크 자동 구성
 - 테이블 헤더 다음 위치에 새 행 삽입
@@ -168,7 +168,7 @@ bash .claude/skills/command-strategy/scripts/update-kanban.sh <kanbanboard_path>
 | 아카이빙 이동 실패 | 경고 출력 후 계속 진행 |
 | .kanbanboard 갱신 실패 | 경고 출력 후 계속 진행 |
 
-**실패 시**: history.md/usage/unregister/.kanbanboard 실패는 경고만 출력하고 계속 진행. status.json 전이 실패 시 부모 에이전트에게 에러 보고.
+**실패 시**: history.md/usage/unregister/.kanbanboard 실패는 경고만 출력하고 계속 진행. status.json 전이 실패 시 오케스트레이터에게 에러 보고.
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
 
@@ -176,7 +176,7 @@ bash .claude/skills/command-strategy/scripts/update-kanban.sh <kanbanboard_path>
 
 ## 역할 경계 (Boundary)
 
-end는 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
+done은 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
 
 - 보고서(report.md)를 작성하거나 수정하지 마라
 - summary.txt를 생성하지 마라 (읽기만 허용)

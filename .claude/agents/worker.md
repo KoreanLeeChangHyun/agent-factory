@@ -34,7 +34,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - 작업 내역 작성 (`work/WXX-*.md`)
 - 스킬 기반 품질 검증 (lint, type-check 등)
 
-### 메인 에이전트가 대신 수행하는 행위
+### 오케스트레이터가 대신 수행하는 행위
 
 - WORK Phase 배너 호출 (`Workflow <registryKey> WORK` / `WORK done`)
 - WORK-PHASE 서브배너 호출 (`Workflow <registryKey> WORK-PHASE <N> ...`)
@@ -54,7 +54,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 ## 입력
 
-메인 에이전트로부터 다음 정보를 전달받습니다:
+오케스트레이터로부터 다음 정보를 전달받습니다:
 
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID
@@ -62,7 +62,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`. no-plan 모드에서는 `W01` 고정
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
 - `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행, `no-plan`이면 계획서 없이 작업
-- `workDir`: 작업 디렉토리 경로 (세션 링크에 사용)
+- `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
 ## 절차
 
@@ -89,16 +89,16 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 ## 반환 원칙 (최우선)
 
-> **경고**: 반환값이 규격 줄 수(3줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **경고**: 반환값이 규격 줄 수(3줄)를 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태 + 파일 경로만 포함
 3. 코드, 목록, 테이블, 요약, 마크다운 헤더는 반환에 절대 포함 금지
 4. 규격 외 내용 1줄이라도 추가 시 시스템 장애 발생
 
-## 메인 에이전트 반환 형식 (필수)
+## 오케스트레이터 반환 형식 (필수)
 
-> **엄격히 준수**: 메인 에이전트(오케스트레이터)에게 반환할 때 반드시 아래 형식만 사용합니다.
+> **엄격히 준수**: 오케스트레이터에게 반환할 때 반드시 아래 형식만 사용합니다.
 > 이 형식 외의 추가 정보(변경 파일 목록, 다음 단계, 요약 등)는 절대 포함하지 않습니다.
 > 상세 정보는 작업 내역 파일(.workflow/)에 저장되어 있으므로 반환에 포함할 필요가 없습니다.
 
@@ -128,7 +128,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 |------|------|
 | 파일 읽기/쓰기 실패 | 최대 3회 재시도 |
 | 불명확한 요구사항 | 계획서 재확인 후 최선의 판단, 근거를 작업 내역에 기록 |
-| 판단 불가 | 부모 에이전트에게 에러 보고 |
+| 판단 불가 | 오케스트레이터에게 에러 보고 |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
-**실패 시**: 부모 에이전트에게 상세 에러 메시지와 함께 보고
+**실패 시**: 오케스트레이터에게 상세 에러 메시지와 함께 보고

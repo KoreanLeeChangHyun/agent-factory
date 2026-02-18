@@ -40,7 +40,7 @@ workDir: <workDir>
 
 ## Step 2b: PLAN - Orchestrator User Approval
 
-> planner가 `작성완료`를 반환하면, **오케스트레이터(메인 에이전트)가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
+> planner가 `작성완료`를 반환하면, **오케스트레이터가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
 > 서브에이전트(planner)는 AskUserQuestion을 호출할 수 없으므로(플랫폼 제약), 승인 절차는 반드시 오케스트레이터가 담당합니다.
 
 ### 2b-1. .context.json Check/Update

@@ -306,7 +306,7 @@ wf-state usage-pending <registryKey> W01 W01
 
 ## Hooks 수정 태스크 실행 패턴
 
-> hooks 디렉토리(`.claude/hooks/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
+> hooks 디렉터리(`.claude/hooks/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
 > 오케스트레이터가 `wf-state env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
 
 **실행 순서:**
@@ -335,4 +335,4 @@ wf-state env <registryKey> unset HOOKS_EDIT_ALLOWED
 | 설정 시점 | Worker Task 호출 직전 (usage-pending보다 먼저) |
 | 해제 시점 | Worker 반환값 수신 직후 (성공/실패 무관, 반드시 해제) |
 | 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `wf-state env`의 화이트리스트로 제한 |
-| 적용 대상 | 계획서에서 hooks 디렉토리 파일을 수정 대상으로 명시한 태스크만 해당 |
+| 적용 대상 | 계획서에서 hooks 디렉터리 파일을 수정 대상으로 명시한 태스크만 해당 |

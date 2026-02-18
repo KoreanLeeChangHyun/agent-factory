@@ -46,7 +46,7 @@ permissionMode: acceptEdits
 - summary.txt 생성 (2줄 요약)
 - command별 보고서 템플릿 적용
 
-### 메인 에이전트가 대신 수행하는 행위
+### 오케스트레이터가 대신 수행하는 행위
 
 - REPORT Phase 배너 호출 (`Workflow <registryKey> REPORT` / `REPORT done`)
 - wf-state 상태 전이 (WORK -> REPORT)
@@ -58,16 +58,16 @@ permissionMode: acceptEdits
 |------|------|------------|------|
 | `workflow-report` | 워크플로우 | frontmatter `skills` | REPORT 단계 절차, 보고서 템플릿, command별 템플릿 매핑, 다이어그램 원칙 |
 
-> reporter 에이전트는 커맨드 스킬을 사용하지 않습니다. 보고서 생성 전용이므로 워크플로우 스킬만 바인딩됩니다. 보고서 템플릿은 `.claude/skills/workflow-report/templates/` 디렉토리에 위치합니다.
+> reporter 에이전트는 커맨드 스킬을 사용하지 않습니다. 보고서 생성 전용이므로 워크플로우 스킬만 바인딩됩니다. 보고서 템플릿은 `.claude/skills/workflow-report/templates/` 디렉터리에 위치합니다.
 
 ## 입력
 
-메인 에이전트로부터 다음 정보를 전달받습니다:
+오케스트레이터로부터 다음 정보를 전달받습니다:
 
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID (HHMMSS 6자리, 예: "143000")
-- `workDir`: 작업 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
-- `workPath`: 작업 내역 디렉토리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/work/`)
+- `workDir`: 작업 디렉터리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
+- `workPath`: 작업 내역 디렉터리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/work/`)
 
 > **보고서 경로 구성**: `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적으로 구성합니다. workPath에서 역변환하여 경로를 추론하지 마세요.
 
@@ -96,16 +96,16 @@ permissionMode: acceptEdits
 
 ## 반환 원칙 (최우선)
 
-> **경고**: 반환값이 규격 줄 수(2줄)를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+> **경고**: 반환값이 규격 줄 수(2줄)를 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
 
 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
 2. 반환값은 오직 상태 + 파일 경로만 포함
 3. 코드, 목록, 테이블, 요약, 마크다운 헤더는 반환에 절대 포함 금지
 4. 규격 외 내용 1줄이라도 추가 시 시스템 장애 발생
 
-## 메인 에이전트 반환 형식 (필수)
+## 오케스트레이터 반환 형식 (필수)
 
-> **엄격히 준수**: 메인 에이전트에 반환할 때 반드시 아래 형식만 사용합니다.
+> **엄격히 준수**: 오케스트레이터에게 반환할 때 반드시 아래 형식만 사용합니다.
 > 이 형식 외의 추가 정보는 절대 포함하지 않습니다.
 
 ### 반환 형식
@@ -139,8 +139,8 @@ permissionMode: acceptEdits
 | ------------------- | ---------------------------------------- |
 | 파일 읽기 실패      | 경로 확인 후 재시도 (최대 3회)           |
 | 파일 쓰기 실패      | 권한 확인 후 재시도 (최대 3회)           |
-| 필수 정보 누락      | 부모 에이전트에게 보고                   |
-| 예상치 못한 에러    | 에러 내용 기록 후 부모 에이전트에게 보고 |
+| 필수 정보 누락      | 오케스트레이터에게 보고                   |
+| 예상치 못한 에러    | 에러 내용 기록 후 오케스트레이터에게 보고 |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
-**실패 시**: 부모 에이전트에게 상세 에러 메시지와 함께 보고
+**실패 시**: 오케스트레이터에게 상세 에러 메시지와 함께 보고

@@ -12,15 +12,19 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. <!-- END는 FSM Phase가 아닌 done 에이전트 활동 구간의 별칭이다 --> |
+| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. END는 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
-| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, reporter, done 6개와 orchestrator(메인 에이전트)로 구성. |
+| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, reporter, done 6개와 orchestrator로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
 | **explorer** | 익스플로러 | WORK Phase에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
-| **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 메인 에이전트. Application Service 역할. |
+| **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 최상위 에이전트. Application Service 역할. 과거 문서에서 "메인 에이전트"로 지칭되었으나 "오케스트레이터"로 통일. |
+| **init** | 이닛 | INIT Phase를 전담하는 서브에이전트. 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
+| **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
+| **reporter** | 리포터 | REPORT Phase를 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
+| **done** | 던 | REPORT->COMPLETED 전이 구간(END)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
 | **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, Workflow 배너, wf-state 호출 등. |
-| **workDir** | 작업 디렉토리 | 워크플로우의 모든 산출물이 저장되는 디렉토리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
+| **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
 | **registryKey** | 레지스트리 키 | 워크플로우를 전역적으로 식별하는 키. 형식: `YYYYMMDD-HHMMSS`. registry.json에서 workDir로 해석됨. |
 | **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update-state.sh + transition-guard.sh)로 불법 전이를 차단. |
@@ -28,7 +32,7 @@
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `no-plan`(INIT->WORK->REPORT->COMPLETED), `prompt`(INIT->WORK->REPORT->COMPLETED) 3가지. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
-| **Phase 0** | 준비 단계 | WORK Phase 시작 전 1개 worker가 수행하는 준비 작업. work 디렉토리 생성 및 skill-map 작성. full 모드에서 필수 실행. |
+| **Phase 0** | 준비 단계 | WORK Phase 시작 전 1개 worker가 수행하는 준비 작업. work 디렉터리 생성 및 skill-map 작성. full 모드에서 필수 실행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Phase 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
 | **work log** | 작업 내역 | Worker/Explorer가 태스크 실행 후 생성하는 기록 파일. `work/WXX-*.md` 형식. |
@@ -37,6 +41,10 @@
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
 | **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step1-init.md~step5-done.md 파일명에 사용. |
+| **END** | (단계 레이블) | done 에이전트 활동 구간의 별칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리키는 Step 이름. Agent-Phase 매핑 테이블과 Step 헤딩(Step 5: END)에서만 사용. |
+| **DONE** | (배너 명칭) | done 에이전트 관련 배너의 접두어. `Workflow <registryKey> DONE` (시작), `Workflow <registryKey> DONE done` (완료) 형식. FSM Phase 명칭이 아님. |
+| **summary.txt** | 요약 파일 | 사용자 요청 원문을 보존하는 파일. `<workDir>/summary.txt`에 저장되며 init 에이전트가 생성. |
+| **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `.prompt/user_prompt.txt`에 저장되며 오케스트레이터가 워크플로우 시작 전 생성. |
 
 ### 에이전트-Phase-스킬 관계
 
@@ -67,6 +75,22 @@ flowchart TD
 - 사용자 대면 문서/계획서/보고서: 한글 중심, 최초 등장 시 한영 병기 (예: "워커(worker)")
 - 검색 일관성: 최초 등장 시 한영 병기 후 이후 일관 사용
 
+### 외래어 표기 기준
+
+| 표준 표기 | 비표준 표기 (사용 금지) | 근거 |
+|----------|----------------------|------|
+| 디렉터리 | 디렉토리 | 국립국어원 외래어 표기법 (directory) |
+
+### 용어 통일 기준
+
+다음 표현은 문서 전체에서 통일된 용어로 사용한다.
+
+| 통일 용어 | 대체된 표현 (사용 금지) | 적용 문맥 |
+|----------|----------------------|----------|
+| 오케스트레이터 | 메인 에이전트, 부모 에이전트, 상위 에이전트 | 에이전트/스킬 문서 전체. 섹션 제목, 입력/반환 설명, 에러 보고 등 모든 문맥. |
+| DONE 배너 | DONE Phase 배너 | DONE은 배너 명칭이며 FSM Phase가 아니므로 "Phase"를 붙이지 않는다. |
+| 디렉터리 | 디렉토리 | 외래어 표기법 기준. 위 "외래어 표기 기준" 참조. |
+
 ## Agent-Skill Mapping Matrix
 
 | Agent | Phase | Workflow Skill | Command Skills | Binding |
@@ -96,7 +120,7 @@ flowchart TD
 
 ## Sub-agent Return Formats (REQUIRED)
 
-> **WARNING: 반환값이 규격 줄 수를 초과하면 메인 에이전트 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
+> **WARNING: 반환값이 규격 줄 수를 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
 >
 > 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
 > 2. 반환값은 오직 상태 + 파일 경로만 포함
