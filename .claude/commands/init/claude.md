@@ -10,7 +10,7 @@ Claude Code 사용을 위한 사용자 환경을 초기화합니다.
 
 ## 스크립트
 
-`.claude/hooks/init/init-claude.sh` - 서브커맨드: check-alias, setup-alias, setup-statusline, setup-slack, setup-git, verify
+`.claude/scripts/init/init-claude.sh` - 서브커맨드: check-alias, setup-alias, setup-statusline, setup-slack, setup-git, verify
 
 ## 오케스트레이션 흐름
 

@@ -72,7 +72,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 **갱신 실행:**
 ```bash
-bash .claude/hooks/workflow/history-sync.sh sync
+bash .claude/scripts/workflow/history-sync.sh sync
 ```
 
 스크립트가 다음을 자동 처리합니다:
@@ -121,7 +121,7 @@ wf-state unregister <registryKey>
 **실행:**
 
 ```bash
-bash .claude/hooks/workflow/archive-workflow.sh <registryKey>
+bash .claude/scripts/workflow/archive-workflow.sh <registryKey>
 ```
 
 스크립트가 다음을 자동 처리합니다:

@@ -7,7 +7,7 @@ description: 레지스트리 관리. 워크플로우 레지스트리 조회, 정
 
 ## 스크립트
 
-`.claude/hooks/workflow/registry.sh` - 서브커맨드: list, clean, remove, help
+`.claude/scripts/workflow/registry.sh` - 서브커맨드: list, clean, remove, help
 
 ## 오케스트레이션 흐름
 

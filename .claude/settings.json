@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "command": "python3 .claude/scripts/workflow/history_sync.py sync",
             "timeout": 30,
             "async": true
           }
@@ -22,10 +22,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "command": "python3 .claude/scripts/workflow/history_sync.py sync",
             "timeout": 30,
             "async": true,
-            "statusMessage": "히스토리 동기화 중..."
+            "statusMessage": "히스토리 동기화 (SessionEnd)"
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/hooks-self-guard.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/hooks-self-guard.py",
             "statusMessage": "hooks 자기보호 검사 중..."
           }
         ]
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/slack-ask.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/slack-ask.py",
             "async": true,
             "statusMessage": "Slack 알림 전송 중..."
           }
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/dangerous-command-guard.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/dangerous-command-guard.py",
             "statusMessage": "위험 명령어 검사 중..."
           }
         ]
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/tdd-guard.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/tdd-guard.py",
             "statusMessage": "TDD 가드 검사 중..."
           }
         ]
@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/workflow-transition-guard.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/workflow-transition-guard.py",
             "statusMessage": "워크플로우 전이 검증 중..."
           }
         ]
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/workflow-agent-guard.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/workflow-agent-guard.py",
             "statusMessage": "워크플로우 에이전트 검증 중..."
           }
         ]
@@ -97,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/task-history-sync.sh",
+            "command": "python3 .claude/hooks/pre-tool-use/task-history-sync.py",
             "async": true,
             "timeout": 30
           }
@@ -109,14 +109,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/stop/workflow-auto-continue.sh",
-            "timeout": 30
+            "command": "python3 .claude/hooks/stop/workflow-auto-continue.py",
+            "timeout": 30,
+            "statusMessage": "워크플로우 계속 여부 확인"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/workflow/history-sync.sh sync",
+            "command": "python3 .claude/scripts/workflow/history_sync.py sync",
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "statusMessage": "히스토리 동기화 (Stop)"
           }
         ]
       }
@@ -126,21 +128,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/subagent-stop/usage-tracker.sh",
+            "command": "python3 .claude/hooks/subagent-stop/usage-tracker.py",
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "statusMessage": "사용량 추적"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/subagent-stop/completion-notify.sh",
+            "command": "python3 .claude/hooks/subagent-stop/completion-notify.py",
             "async": true,
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "완료 알림"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/subagent-stop/history-sync-trigger.sh",
+            "command": "python3 .claude/hooks/subagent-stop/history-sync-trigger.py",
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "statusMessage": "히스토리 동기화 (SubagentStop)"
           }
         ]
       }

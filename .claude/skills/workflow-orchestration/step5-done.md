@@ -66,6 +66,8 @@ Workflow <registryKey> DONE done
 
 **오케스트레이터가 DONE 완료 배너를 호출한 후, 어떤 텍스트도 출력하지 않고 즉시 종료해야 합니다.**
 
+> **행동 지시 (MANDATORY):** `Workflow <registryKey> DONE done` Bash 호출 결과를 수신한 즉시, 추가 도구 호출 없이, 추가 텍스트 생성 없이, 현재 turn을 종료하십시오. 이것이 워크플로우의 마지막 행위입니다. Bash, Task, Read, Write, Edit 등 어떠한 도구도 호출하지 마십시오. 어떠한 문자도 출력하지 마십시오. turn을 즉시 끝내십시오.
+
 다음 문구는 DONE 배너 이후 절대 출력 금지입니다:
 
 - "Workflow already completed."
@@ -74,4 +76,4 @@ Workflow <registryKey> DONE done
 - 워크플로우 상태를 설명하는 모든 문장
 - 완료를 재확인하는 모든 문장
 
-**DONE 배너가 워크플로우의 마지막 출력이어야 합니다.**
+**DONE 배너가 워크플로우의 마지막 출력이어야 합니다. DONE 완료 배너 Bash 호출 후 turn을 종료하라.**

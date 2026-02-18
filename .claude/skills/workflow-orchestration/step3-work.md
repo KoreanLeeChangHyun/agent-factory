@@ -316,7 +316,7 @@ wf-state usage-pending <registryKey> W01 W01
 
 ## Hooks 수정 태스크 실행 패턴
 
-> hooks 디렉터리(`.claude/hooks/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
+> hooks/scripts 디렉터리(`.claude/hooks/`, `.claude/scripts/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
 > 오케스트레이터가 `wf-state env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
 
 **실행 순서:**

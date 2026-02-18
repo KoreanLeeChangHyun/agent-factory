@@ -10,7 +10,7 @@ description: 프로젝트 초기 구조 설정 (디렉토리, .gitignore, 빈 CL
 
 ## 스크립트
 
-`.claude/hooks/init/init-project.sh` - 서브커맨드: generate-empty-template, setup-dirs, setup-wf-alias, setup-gitignore, verify
+`.claude/scripts/init/init-project.sh` - 서브커맨드: generate-empty-template, setup-dirs, setup-wf-alias, setup-gitignore, verify
 
 ## 오케스트레이션 흐름
 

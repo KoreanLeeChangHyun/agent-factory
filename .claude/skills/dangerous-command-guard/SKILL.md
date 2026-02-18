@@ -20,7 +20,7 @@ license: "Apache-2.0"
 
 - **이벤트**: `PreToolUse`
 - **매처**: `Bash`
-- **스크립트**: `.claude/hooks/event/pre-tool-use/dangerous-command-guard.sh`
+- **스크립트**: `.claude/hooks/pre-tool-use/dangerous-command-guard.sh` (thin wrapper -> `.claude/scripts/guards/dangerous-command-guard.sh`)
 
 ### 차단 대상 패턴
 
@@ -59,7 +59,7 @@ license: "Apache-2.0"
 
 ## Hook 스크립트
 
-**경로**: `.claude/hooks/event/pre-tool-use/dangerous-command-guard.sh`
+**경로**: `.claude/hooks/pre-tool-use/dangerous-command-guard.sh` (thin wrapper -> `.claude/scripts/guards/dangerous-command-guard.sh`)
 
 ### 입력 (stdin JSON)
 
@@ -99,7 +99,7 @@ license: "Apache-2.0"
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/dangerous-command-guard.sh",
+            "command": "bash .claude/hooks/pre-tool-use/dangerous-command-guard.sh",
             "statusMessage": "위험 명령어 검사 중..."
           }
         ]
@@ -166,6 +166,6 @@ pipe_results=(0 1 0)
 
 ## 참고
 
-- Hook 스크립트: `.claude/hooks/event/pre-tool-use/dangerous-command-guard.sh`
+- Hook 스크립트: `.claude/hooks/pre-tool-use/dangerous-command-guard.sh` (thin wrapper -> `.claude/scripts/guards/dangerous-command-guard.sh`)
 - 설정 파일: `.claude/settings.json`
 - 관련 스킬: `safety-fallback` (에이전트 안전장치 가이드)

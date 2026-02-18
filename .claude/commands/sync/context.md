@@ -14,7 +14,7 @@ description: 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다
 
 ## 스크립트
 
-`.claude/hooks/init/init-project.sh` - 서브커맨드: analyze, generate-claude-md
+`.claude/scripts/init/init-project.sh` - 서브커맨드: analyze, generate-claude-md
 
 ## 오케스트레이션 흐름
 

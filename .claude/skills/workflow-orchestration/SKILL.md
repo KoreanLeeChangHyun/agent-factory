@@ -107,7 +107,7 @@ PLAN completion banner MUST complete before AskUserQuestion (sequential, 2 separ
 
 DONE start banner: Called by orchestrator before dispatching done agent. DONE completion banner: Called by orchestrator after done agent returns. Auto-sends Slack notification.
 
-**CRITICAL: After DONE banner, the orchestrator MUST terminate immediately. Output ZERO text after DONE banner. Any post-DONE output is a protocol violation.**
+**CRITICAL: After `Workflow <registryKey> DONE done` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
 
 ### Post-Return Silence Rules
 
@@ -121,7 +121,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0 worker call, then Phase 1~N | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages** |
 | WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
-| REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner, immediate termination | Report summary, any post-DONE text |
+| REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner → **DONE completion banner Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner |
 
 ---
 

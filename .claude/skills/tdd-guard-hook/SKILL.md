@@ -23,7 +23,7 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
 
 - **이벤트**: `PreToolUse`
 - **매처**: `Write`, `Edit`
-- **스크립트**: `.claude/hooks/event/pre-tool-use/tdd-guard.sh`
+- **스크립트**: `.claude/hooks/pre-tool-use/tdd-guard.sh` (thin wrapper -> `.claude/scripts/guards/tdd-guard.sh`)
 
 ### 판단 로직
 
@@ -102,7 +102,7 @@ TDD(Test-Driven Development) 원칙 준수를 모니터링하는 PreToolUse Hook
 
 ## Hook 스크립트
 
-**경로**: `.claude/hooks/event/pre-tool-use/tdd-guard.sh`
+**경로**: `.claude/hooks/pre-tool-use/tdd-guard.sh` (thin wrapper -> `.claude/scripts/guards/tdd-guard.sh`)
 
 ### 입력 (stdin JSON)
 
@@ -159,7 +159,7 @@ stdout에 차단 JSON을 출력합니다.
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/event/pre-tool-use/tdd-guard.sh",
+            "command": "bash .claude/hooks/pre-tool-use/tdd-guard.sh",
             "statusMessage": "TDD 가드 검사 중..."
           }
         ]
@@ -198,6 +198,6 @@ export GUARD_TDD=strict
 
 ## 참고
 
-- Hook 스크립트: `.claude/hooks/event/pre-tool-use/tdd-guard.sh`
+- Hook 스크립트: `.claude/hooks/pre-tool-use/tdd-guard.sh` (thin wrapper -> `.claude/scripts/guards/tdd-guard.sh`)
 - 설정 파일: `.claude/settings.json`
 - 관련: TDD Red-Green-Refactor 사이클

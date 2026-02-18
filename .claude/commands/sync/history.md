@@ -8,7 +8,7 @@ description: ".workflow/* 작업 내역을 .prompt/history.md에 동기화합니
 
 ## 스크립트
 
-`.claude/hooks/workflow/history-sync.sh` - 서브커맨드: sync, status
+`.claude/scripts/workflow/history-sync.sh` - 서브커맨드: sync, status
 
 ## 오케스트레이션 흐름
 

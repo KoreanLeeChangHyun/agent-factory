@@ -18,7 +18,7 @@ disable-model-invocation: true
 
 ## 스크립트
 
-`.claude/hooks/init/init-sync.sh` - 옵션: `[--dry-run | -h | --help]`
+`.claude/scripts/init/init-sync.sh` - 옵션: `[--dry-run | -h | --help]`
 
 ## 오케스트레이션 흐름
 

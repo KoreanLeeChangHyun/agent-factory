@@ -7,7 +7,7 @@ description: 작업 내역 클리어. .workflow/* 디렉토리의 모든 문서�
 
 ## 스크립트
 
-`.claude/hooks/init/init-clear.sh` - 서브커맨드: list, execute
+`.claude/scripts/init/init-clear.sh` - 서브커맨드: list, execute
 
 ## 오케스트레이션 흐름
 

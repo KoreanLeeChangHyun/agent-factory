@@ -82,7 +82,7 @@ Bash("wf-state context <registryKey> <agent>")
 
 AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전송합니다.
 
-- Hook script: `.claude/hooks/event/pre-tool-use/slack-ask.sh`
+- Hook script: `.claude/hooks/pre-tool-use/slack-ask.sh` (thin wrapper -> `.claude/scripts/slack/slack-ask.sh`)
 - Hook이 활성 워크플로우 레지스트리(`.workflow/registry.json`)에서 해당 워크플로우의 로컬 .context.json을 읽어 통일 포맷으로 Slack 전송
 - 레지스트리 또는 로컬 .context.json이 없으면 폴백 포맷 사용
 
@@ -154,7 +154,7 @@ AskUserQuestion(
 >
 > ```bash
 > # 오케스트레이터 실행 코드
-> feedback=$(Bash(".claude/hooks/init/reload-prompt.sh <workDir>"))
+> feedback=$(Bash(".claude/scripts/init/reload-prompt.sh <workDir>"))
 > ```
 >
 > - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행

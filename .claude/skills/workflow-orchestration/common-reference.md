@@ -129,7 +129,7 @@ flowchart TD
 ### Common Rules
 
 - 작업 상세는 `.workflow/` 파일에 기록, 메인에는 아래 형식만 반환 (코드/로그/테이블 MUST NOT)
-- 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 후 즉시 종료 (추가 텍스트 절대 금지)
+- 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 Bash 결과 수신 → turn 즉시 종료 (도구 호출 0개, 텍스트 출력 0자). `Workflow <registryKey> DONE done` 호출 후 어떠한 행위도 하지 않고 turn을 끝내라
 
 ### init Return Format (8 lines)
 

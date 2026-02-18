@@ -16,7 +16,7 @@ argument-hint: "[--global | --local]"
 
 ## 스크립트
 
-`.claude/hooks/init/git-config.sh` - 옵션: `[--global|--local]`
+`.claude/scripts/init/git-config.sh` - 옵션: `[--global|--local]`
 
 ## 오케스트레이션 흐름
 
