@@ -1,12 +1,12 @@
 ---
-description: 간단한 질의응답 및 파일 변경. 워크플로우 없이 메인 에이전트가 직접 작업을 수행합니다.
+description: 간단한 질의응답 및 파일 변경. 워크플로우 없이 오케스트레이터가 직접 작업을 수행합니다.
 ---
 
 # Prompt (Tier 3)
 
 ## 개요
 
-cc:prompt는 경량 작업을 위한 Tier 3 모드입니다. PLAN/WORK/REPORT 단계 없이 INIT 후 메인 에이전트가 직접 작업을 수행합니다.
+cc:prompt는 경량 작업을 위한 Tier 3 모드입니다. PLAN/WORK/REPORT 단계 없이 INIT 후 오케스트레이터가 직접 작업을 수행합니다.
 
 ## 입력 처리
 
@@ -25,14 +25,14 @@ init이 반환한 `request`, `workDir`, `workId` 등을 보관합니다.
 
 ```mermaid
 flowchart TD
-    A[INIT] --> B[메인 에이전트 직접 작업]
+    A[INIT] --> B[오케스트레이터 직접 작업]
     B --> C[히스토리 기록]
     C --> D[상태 완료 + 레지스트리 해제]
     D --> E[DONE 배너]
 ```
 
 1. **INIT**: init 에이전트가 workDir 생성, user_prompt.txt 저장
-2. **직접 작업**: 메인 에이전트(오케스트레이터)가 user_prompt.txt 기반으로 직접 작업 수행
+2. **직접 작업**: 오케스트레이터가 user_prompt.txt 기반으로 직접 작업 수행
 3. **완료 처리**: history.md 갱신, status.json 전이, 레지스트리 해제, DONE 배너
 
 ## 특징
@@ -48,7 +48,7 @@ flowchart TD
 | 항목 | cc:prompt | cc:implement -np |
 |------|-----------|------------------|
 | 실행 흐름 | INIT -> 직접 작업 | INIT -> WORK -> REPORT |
-| 에이전트 | init + 메인 | init + worker + reporter |
+| 에이전트 | init + 오케스트레이터 | init + worker + reporter |
 | 보고서 | 없음 | 있음 (report.md) |
 | 적합한 용도 | 즉석 수정 (1-2개 파일) | 가벼운 단일 태스크 |
 

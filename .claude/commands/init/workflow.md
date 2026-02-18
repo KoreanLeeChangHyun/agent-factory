@@ -29,7 +29,7 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 
 `.claude/skills/workflow-orchestration/SKILL.md`를 로드합니다.
 
-- **이 스킬만 메인 에이전트가 로드**합니다
+- **이 스킬만 오케스트레이터가 로드**합니다
 - 나머지 워크플로우 스킬(routing, plan, work, report)은 **각 에이전트가 자율적으로 로드**합니다
 - 상세 워크플로우 가이드는 orchestration 스킬을 참조하세요
 
@@ -48,7 +48,7 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 
 ## 3. 초기화 완료 출력
 
-CLAUDE.md 로드와 workflow-orchestration 스킬 로드가 완료되면, Read 도구로 `.claude/hooks/workflow/help.txt`를 읽어 그 내용만 초기화 완료 메시지로 출력한다. 메인 에이전트는 이 파일의 내용 외에 어떠한 텍스트도 직접 출력하지 않는다.
+CLAUDE.md 로드와 workflow-orchestration 스킬 로드가 완료되면, Read 도구로 `.claude/hooks/workflow/help.txt`를 읽어 그 내용만 초기화 완료 메시지로 출력한다. 오케스트레이터는 이 파일의 내용 외에 어떠한 텍스트도 직접 출력하지 않는다.
 
 ## 4. 워크플로우 필수 준수 원칙
 
@@ -66,7 +66,7 @@ cc:* 명령어는 모드에 따라 실행 단계가 달라집니다.
 |------|-----------|------|
 | full (기본) | INIT -> PLAN -> WORK -> REPORT | 전체 워크플로우 |
 | no-plan (-np) | INIT -> WORK -> REPORT | 계획 단계 생략 |
-| prompt | INIT -> WORK -> REPORT -> DONE | 경량 작업 (메인 에이전트 직접 수행 + 보고서 + 마무리) |
+| prompt | INIT -> WORK -> REPORT -> DONE | 경량 작업 (오케스트레이터 직접 수행 + 보고서 + 마무리) |
 
 상세는 `workflow-orchestration` 스킬을 참조하세요.
 

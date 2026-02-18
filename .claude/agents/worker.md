@@ -17,7 +17,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
-이 에이전트는 서브에이전트이며 오케스트레이터(메인 에이전트)가 Task 도구로 호출한다.
+이 에이전트는 서브에이전트이며 오케스트레이터가 Task 도구로 호출한다.
 
 ### 서브에이전트 공통 제약
 
