@@ -112,7 +112,7 @@ AskUserQuestion(
     header: "승인 요청",
     options: [
       { label: "승인", description: "WORK 단계로 진행합니다" },
-      { label: "수정", description: "prompt.txt에 피드백을 작성한 후 선택합니다" },
+      { label: "수정 요청", description: "계획서 수정 후 재검토합니다" },
       { label: "중지", description: "워크플로우를 중단합니다" }
     ],
     multiSelect: false
@@ -121,7 +121,7 @@ AskUserQuestion(
 ```
 
 > **AskUserQuestion Options Strictly Fixed (REQUIRED):**
-> - 위 3개 옵션(승인/수정/중지)만 허용. 옵션 추가/변경/제거 MUST NOT.
+> - 위 3개 옵션(승인/수정 요청/중지)만 허용. 옵션 추가/변경/제거 MUST NOT.
 > - `freeformLabel`, `freeformPlaceholder` 등 자유 입력 필드 사용 MUST NOT.
 > - `multiSelect: false` MUST maintain.
 > - 옵션의 label, description 텍스트를 임의로 변경하지 않음.
@@ -131,24 +131,50 @@ AskUserQuestion(
 | Selection | Action |
 |-----------|--------|
 | **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행) |
-| **수정** | 사용자가 prompt.txt에 피드백을 작성한 후 선택. planner를 재호출하여 피드백 반영 후 계획 재수립, 다시 Step 2b 수행 |
+| **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload-prompt.sh`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
 | **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단 |
 
 > **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
 
-> **"수정" selection handling:**
-> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정"을 선택합니다. 오케스트레이터는 다음 절차를 순서대로 수행합니다:
+> **"수정 요청" selection handling:**
+> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
 >
-> 1. **reload-prompt.sh 호출**: 오케스트레이터가 스크립트를 1회 호출하여 피드백을 수신합니다.
->    ```bash
->    Bash(".claude/hooks/init/reload-prompt.sh <workDir>")
->    ```
->    - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행
->    - stdout으로 피드백 전문을 출력
->    - 종료코드 0: 정상 완료 → stdout 내용을 피드백으로 사용
->    - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
-> 2. **planner re-call**: stdout으로 수신한 피드백 내용을 `mode: revise` 프롬프트에 포함하여 planner를 재호출, 계획 재수립
-> 3. **Step 2b repeat**: 재수립된 계획에 대해 다시 사용자 승인 요청
+> **1단계. reload-prompt.sh 호출** — 피드백 수신
+>
+> 오케스트레이터가 스크립트를 1회 호출하여 사용자 피드백을 수신합니다.
+>
+> ```bash
+> # 오케스트레이터 실행 코드
+> feedback=$(Bash(".claude/hooks/init/reload-prompt.sh <workDir>"))
+> ```
+>
+> - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행
+> - stdout으로 피드백 전문을 출력
+> - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
+> - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
+> - stdout에 `[WARN] prompt.txt is empty`가 포함된 경우: prompt.txt가 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
+>
+> **2단계. planner re-call** — 피드백 포함 계획 재수립
+>
+> stdout으로 수신한 피드백 내용을 `mode: revise` 프롬프트에 포함하여 planner를 재호출합니다.
+>
+> ```
+> Task(subagent_type="planner", prompt="
+> command: <command>
+> workId: <workId>
+> request: <request>
+> workDir: <workDir>
+> mode: revise
+> feedback: <reload-prompt.sh stdout>
+> ")
+> ```
+>
+> - `feedback` 값이 빈 문자열인 경우(`[WARN] prompt.txt is empty` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
+> - planner는 기존 계획서를 기반으로 피드백을 반영한 수정 계획서를 작성하여 `작성완료` 반환
+>
+> **3단계. Step 2b repeat** — 재승인 요청
+>
+> 재수립된 계획에 대해 다시 Step 2b(사용자 승인 요청)를 반복합니다. 사용자가 "승인"을 선택할 때까지 1~3단계를 반복할 수 있습니다.
 >
 > **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어, `querys.txt` 기록은 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
 
@@ -180,7 +206,7 @@ Bash("wf-state unregister <registryKey>")
 >
 > 사용자가 "승인"을 선택한 시점에서 계획서는 Binding Contract가 됩니다.
 > 오케스트레이터는 승인된 계획서의 태스크를 변경, 추가, 제거하지 않습니다.
-> 계획 변경이 필요하면 사용자가 "수정" 선택지를 통해 재계획을 요청해야 합니다.
+> 계획 변경이 필요하면 사용자가 "수정 요청" 선택지를 통해 재계획을 요청해야 합니다.
 >
 > **MUST NOT:**
 > - 오케스트레이터가 독자적으로 태스크를 추가/삭제/변경
