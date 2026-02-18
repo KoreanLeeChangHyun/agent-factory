@@ -40,9 +40,9 @@ maxTurns: 30
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- WORK Phase 배너 호출 (`Workflow <registryKey> WORK` / `WORK done`)
-- WORK-PHASE 서브배너 호출 (`Workflow <registryKey> WORK-PHASE <N> ...`)
-- wf-state 상태 전이 (PLAN -> WORK, WORK -> REPORT)
+- WORK Phase 배너 호출 (`step-start <registryKey> WORK` / `step-end WORK`)
+- WORK-PHASE 서브배너 호출 (`step-start <registryKey> WORK-PHASE <N> ...`)
+- `python3 .claude/scripts/workflow/update_state.py` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
 - Explorer 반환값 추출 (첫 3줄만 보관, 나머지 폐기)
 - usage-pending 추적
 
@@ -85,7 +85,7 @@ maxTurns: 30
 
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
 - **코드 수정 금지**: Explorer는 탐색 전용 에이전트. 코드 수정/생성은 Worker가 담당
-- **세션 링크 등록**: 작업 시작 시 `wf-state link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
+- **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
 > 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, deep-research와의 역할 분리)는 `workflow-explore/SKILL.md`를 참조하세요.
 

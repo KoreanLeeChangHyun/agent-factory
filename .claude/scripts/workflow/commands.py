@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 사용 가능한 cc:* 명령어 목록을 동적 스캔하여 출력
 (commands.sh -> commands.py 1:1 포팅)
 
 사용법:
-  wf-commands
-  python3 commands.py
+  python3 .claude/scripts/workflow/commands.py
 """
 
 import os
@@ -90,7 +89,7 @@ def main():
 
     print(f"  {C_DIM}{separator}{C_RESET}")
     print(f"  {C_DIM}실행: /cc:<명령어> <요청내용>{C_RESET}")
-    print()
+    print(flush=True)
 
 
 if __name__ == "__main__":

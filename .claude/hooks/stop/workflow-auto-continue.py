@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """Workflow auto-continue (thin wrapper)
 Real logic: .claude/scripts/workflow/workflow_auto_continue.py
 """

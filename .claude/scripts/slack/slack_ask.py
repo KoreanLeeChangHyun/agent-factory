@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 slack_ask.py - AskUserQuestion 호출 시 Slack 알림 전송 스크립트
 

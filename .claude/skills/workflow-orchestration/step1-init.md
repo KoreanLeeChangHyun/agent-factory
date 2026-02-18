@@ -10,7 +10,7 @@
 ## INIT Banner (Before init Agent Call)
 
 ```bash
-Workflow INIT none <command>
+step-start INIT none <command>
 ```
 
 ## Agent Call
@@ -23,17 +23,32 @@ mode: <mode>
 ```
 
 > `mode` parameter is optional. Default is `full`. Values: `full`, `no-plan`, `prompt`.
-> For prompt command, always pass `mode: prompt`.
-> For commands with `-np` flag, pass `mode: no-plan`.
+> 오케스트레이터가 "Mode Auto-Determination Rule" (SKILL.md)에 따라 결정한 값을 전달한다.
 
 ## Return Values
 
 `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workName`, `근거`
 
 - init이 전처리(prompt.txt 읽기, 작업 디렉터리 생성, user_prompt.txt 복사, prompt.txt 클리어)를 수행
-- **registryKey**: init이 반환하는 `YYYYMMDD-HHMMSS` 형식 식별자. 후속 모든 `Workflow` 배너 및 `wf-state` 호출에 사용
+- **registryKey**: init이 반환하는 `YYYYMMDD-HHMMSS` 형식 식별자. 후속 모든 `step-start`/`step-end` 배너 및 `update_state.py` 호출에 사용
 - **status.json**: init이 `<workDir>/status.json` 생성 완료 (phase: "INIT"). 좀비 정리도 이 단계에서 수행
 - **workDir format**: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` (중첩 구조)
+
+## INIT Completion Banner
+
+init 에이전트가 정상 반환(에러 없음)한 후, Mode Branching 전에 INIT 완료 배너를 호출한다.
+
+```bash
+step-end <registryKey> INIT
+```
+
+**호출 타이밍:**
+1. init 에이전트 정상 반환 확인
+2. 반환값(request, workDir, workId, registryKey 등) 추출/보관
+3. `step-end <registryKey> INIT` 호출
+4. Mode Branching 진행 (full -> PLAN, no-plan -> WORK, prompt -> WORK)
+
+> init이 `에러:` 접두사로 반환한 경우에는 step-end를 호출하지 않고 재시도 로직으로 진행한다.
 
 ## Error Handling
 
@@ -91,29 +106,37 @@ init 반환값(request, workDir, workId, registryKey, date, title, workName, 근
 | `request` | PLAN (Step 2) | user_prompt.txt의 첫 50자 |
 | `workDir` | PLAN (Step 2), REPORT (Step 4) | 작업 디렉터리 경로 |
 | `workId` | PLAN (Step 2), WORK (Step 3), REPORT (Step 4) | 작업 식별자 |
-| `registryKey` | PLAN (Step 2), WORK (Step 3), REPORT (Step 4) | Workflow/wf-state 호출의 식별자. date + "-" + workId 형식 |
+| `registryKey` | PLAN (Step 2), WORK (Step 3), REPORT (Step 4) | step-start/step-end/update_state.py 호출의 식별자. date + "-" + workId 형식 |
 | `date`, `title`, `workName` | REPORT (Step 4), Prompt mode (history) | 경로 구성 시 사용 |
 | `근거` | Logging only | 로깅용 |
 
 ### usage.json 초기화
 
-- **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage-tracker.sh가 서브에이전트별 토큰을 기록)
+- **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage_tracker.py가 서브에이전트별 토큰을 기록)
 
 ## Prompt Mode (Tier 3) Post-INIT Flow
 
-When command is `prompt`, the orchestrator skips PLAN and proceeds directly to WORK (main agent direct work) -> REPORT -> DONE:
+When command is `prompt`, the orchestrator skips PLAN and proceeds directly to WORK (main agent direct work) -> REPORT -> DONE.
 
-1. `wf-state both <registryKey> worker INIT WORK`
-2. `Workflow <registryKey> WORK` (WORK start banner)
-3. Read `<workDir>/user_prompt.txt` for user request
-4. Main agent performs direct work (file changes allowed)
+### Prompt Mode Direct Write/Edit Scope
+
+> **허용 범위**: 1-2개 파일 즉석 수정, 질의응답 텍스트 답변
+> **권장하지 않음**: 3개 이상 파일 수정, 새 기능 구현 -> `cc:implement -np` 사용 권장
+> **근거**: prompt 모드의 핵심 가치는 Worker 없이 오케스트레이터가 직접 처리하는 경량성. 복잡한 작업은 Worker 위임(no-plan 모드)이 적합
+
+### Flow
+
+1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK`
+2. `step-start <registryKey> WORK` (WORK start banner)
+3. Read `<workDir>/user_prompt.txt` for user request (1회만, 반복 읽기 금지)
+4. Main agent performs direct work (file changes allowed, scope: 1-2 files)
 5. `mkdir -p <workDir>/work` (ensure work directory exists for reporter)
-6. `Workflow <registryKey> WORK done` (WORK completion banner)
-7. `wf-state both <registryKey> reporter WORK REPORT`
-8. `Workflow <registryKey> REPORT` (REPORT start banner)
+6. `step-end <registryKey> WORK` (WORK completion)
+7. `python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT`
+8. `step-start <registryKey> REPORT` (REPORT start banner)
 9. Reporter call: `Task(subagent_type="reporter", prompt="command: prompt, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
-10. `Workflow <registryKey> REPORT done` (REPORT completion banner)
-11. `Workflow <registryKey> DONE` (DONE start banner)
+10. `step-end <registryKey> REPORT` (REPORT completion)
+11. `step-start <registryKey> DONE` (DONE start banner)
 12. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: prompt, title: <title>, reportPath: <reportPath>, status: <status>")`
-13. `Workflow <registryKey> DONE done` (DONE completion banner)
+13. `step-end <registryKey> DONE done` (DONE completion)
 14. Terminate

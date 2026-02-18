@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """Task history sync trigger (thin wrapper)
-Triggers history-sync.sh sync in background when a workflow agent Task is called.
-Original logic: task-history-sync.sh
+Triggers history_sync.py sync in background when a workflow agent Task is called.
 """
 import os
 import sys
@@ -36,19 +35,11 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
 
-    # Try Python version first, fall back to shell
     py_target = os.path.join(project_root, '.claude', 'scripts', 'workflow', 'history_sync.py')
-    sh_target = os.path.join(project_root, '.claude', 'scripts', 'workflow', 'history-sync.sh')
 
     if os.path.exists(py_target):
         subprocess.Popen(
             [sys.executable, py_target, 'sync'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    elif os.path.exists(sh_target):
-        subprocess.Popen(
-            ['bash', sh_target, 'sync'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

@@ -42,6 +42,27 @@ stateDiagram-v2
 2. PLAN approval REQUIRED before WORK proceeds (full mode only)
 3. Violation: halt workflow and report error
 
+## Mode Auto-Determination Rule
+
+오케스트레이터는 INIT 에이전트 호출 전, command와 `$ARGUMENTS` 플래그 조합으로 `mode`를 자동 결정한다.
+
+**결정 알고리즘:**
+1. `command == "prompt"` → `mode: prompt` (플래그 무관, early return)
+2. `$ARGUMENTS`에 `-np` 포함 → `mode: no-plan`
+3. 그 외 → `mode: full` (기본값)
+
+**매핑 테이블:**
+
+| Command | 플래그 없음 | `-np` 포함 |
+|---------|------------|------------|
+| `prompt` | `prompt` | `prompt` |
+| `implement` | `full` | `no-plan` |
+| `review` | `full` | `no-plan` |
+| `research` | `full` | `no-plan` |
+| `strategy` | `full` | `no-plan` |
+
+> 이 룰은 각 cc:* 커맨드 문서에 분산되어 있던 `-np` 감지 로직을 오케스트레이터 단일 책임으로 통합한 것이다. 개별 커맨드 문서는 mode 결정 로직을 포함하지 않는다.
+
 ## Agent-Phase Mapping
 
 | Phase | Agent | Skill | Return Lines | Key Output |
@@ -81,47 +102,64 @@ Commands follow their mode's phase order. Default is full. `prompt` always runs 
 
 ### Phase Banner Calls
 
-```bash
-# Phase start banner
-Workflow <registryKey> <phase>
+배너 출력은 2개의 shell alias 명령어로 수행한다. Bash 도구에서 **명령어 이름을 그대로** 호출해야 한다.
 
-# Phase completion banner (status included, path auto-inferred)
-Workflow <registryKey> <phase> <status>
+```bash
+# Phase start banner — Bash 도구에서 이 명령어를 그대로 실행
+step-start <registryKey> <phase>
+
+# Phase completion message — Bash 도구에서 이 명령어를 그대로 실행
+step-end <registryKey> <phase>
 ```
+
+> **CRITICAL**: `step-start`와 `step-end`는 `.zshrc`에 등록된 shell alias이다. Bash 도구 호출 시 **반드시 alias 이름으로만 호출**해야 한다.
+> - **올바른 호출**: `step-start 20260219-051347 PLAN`
+> - **잘못된 호출**: `bash .claude/scripts/workflow/banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
+> - **잘못된 호출**: `bash .claude/scripts/workflow/banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
 
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
 
 **Call Timing:**
 
-| Timing | Command |
-|--------|---------|
-| Before INIT | `Workflow INIT none <command>` |
-| Before/After PLAN | `Workflow <registryKey> PLAN` / `Workflow <registryKey> PLAN done` |
-| Before/After WORK | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` |
-| WORK Phase 0~N start | `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` |
-| Before/After REPORT | `Workflow <registryKey> REPORT` / `Workflow <registryKey> REPORT done` |
-| Before/After DONE | `Workflow <registryKey> DONE` / `Workflow <registryKey> DONE done` |
-| Before/After WORK (prompt) | `Workflow <registryKey> WORK` / `Workflow <registryKey> WORK done` (main direct work) |
+| Timing | Start (step-start) | Complete (step-end) |
+|--------|--------------------|-----------------------------|
+| INIT | `step-start INIT none <command>` | `step-end <key> INIT` |
+| PLAN | `step-start <key> PLAN` | `step-end <key> PLAN` |
+| WORK | `step-start <key> WORK` | `step-end <key> WORK` |
+| WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) |
+| REPORT | `step-start <key> REPORT` | `step-end <key> REPORT` |
+| DONE | `step-start <key> DONE` | `step-end <key> DONE done` |
+| WORK (prompt) | `step-start <key> WORK` | `step-end <key> WORK` |
 
-PLAN completion banner MUST complete before AskUserQuestion (sequential, 2 separate turns).
+**각 phase의 오케스트레이터 호출 순서 (INIT/PLAN/WORK/REPORT/DONE 공통):**
+1. `step-start <key> <PHASE>` — 시작 배너
+2. (에이전트 작업 수행)
+3. `python3 .claude/scripts/workflow/update_state.py both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
+4. `step-end <key> <PHASE>` — 완료 메시지
 
-DONE start banner: Called by orchestrator before dispatching done agent. DONE completion banner: Called by orchestrator after done agent returns. Auto-sends Slack notification.
+> INIT도 동일한 4단계 패턴을 따른다. init 에이전트 정상 반환 후, Mode Branching 전에 `step-end <key> INIT`를 호출한다.
 
-**CRITICAL: After `Workflow <registryKey> DONE done` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
+PLAN step-end MUST complete before AskUserQuestion (sequential, 2 separate turns).
+
+DONE start banner: Called by orchestrator before dispatching done agent. DONE completion: `step-end <key> DONE done` called after done agent returns. Auto-sends Slack notification.
+
+**CRITICAL: After `step-end <key> DONE done` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
 
 ### Post-Return Silence Rules
 
+> **적용 범위**: 이 규칙은 해당 Step 완료 후뿐 아니라 **워크플로우 전 구간**에 적용됩니다. 에이전트 호출 전/중/후 모든 시점에서 내부 추론/분석 텍스트 출력은 금지입니다.
+
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
-| INIT done (full) | Extract/retain params, PLAN banner, status update, planner call | Return summary, progress text, **AskUserQuestion**, init 반환값 판단/검증 |
-| INIT done (no-plan) | Extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), single worker call | PLAN banner, planner call, AskUserQuestion |
-| INIT done (prompt) | Direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call |
-| PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask |
-| PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation |
-| WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0 worker call, then Phase 1~N | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text** |
-| WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages** |
-| WORK done | WORK completion banner, extract first 3 lines, REPORT banner, reporter call | Work summary, file listing |
-| REPORT done | REPORT completion banner, DONE start banner, done agent call, extract first 2 lines, DONE completion banner → **DONE completion banner Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner |
+| INIT done (full) | INIT step-end, extract/retain params, PLAN step-start, status update, planner call | Return summary, progress text, **AskUserQuestion**, init 반환값 판단/검증, **내부 추론/분석 텍스트 출력** |
+| INIT done (no-plan) | INIT step-end, extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), single worker call | PLAN banner, planner call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
+| INIT done (prompt) | INIT step-end, direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call, **내부 추론/분석 텍스트 출력** |
+| PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask, **내부 추론/분석 텍스트 출력** |
+| PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
+| WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0 worker call, then Phase 1~N | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
+| WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages**, **내부 추론/분석 텍스트 출력** |
+| WORK done | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
+| REPORT done | REPORT step-end, DONE step-start, done agent call, extract first 2 lines, DONE step-end → **DONE step-end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
 
 ---
 
@@ -130,7 +168,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 **Details:** See [step1-init.md](step1-init.md)
 
 ```bash
-Workflow INIT none <command>
+step-start INIT none <command>
 ```
 
 ```
@@ -153,11 +191,13 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 ### Mode Branching (After INIT)
 
-| Command | Mode | Next Step |
-|---------|------|-----------|
-| `prompt` | prompt | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step1-init.md](step1-init.md) "Prompt Mode Post-INIT Flow" |
-| Others with `-np` | no-plan | Skip to WORK. See [step1-init.md](step1-init.md) "No-Plan Mode" |
-| Others (default) | full | Proceed to PLAN |
+> `mode`는 "Mode Auto-Determination Rule"에 의해 INIT 호출 전 자동 결정된 값이다.
+
+| Mode | Next Step |
+|------|-----------|
+| `prompt` | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step1-init.md](step1-init.md) "Prompt Mode Post-INIT Flow" |
+| `no-plan` | Skip to WORK. See [step1-init.md](step1-init.md) "No-Plan Mode" |
+| `full` | Proceed to PLAN |
 
 ---
 
@@ -167,7 +207,7 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 **Details:** See [step2-plan.md](step2-plan.md)
 
-**Status update:** `wf-state both <registryKey> planner INIT PLAN`
+**Status update:** `python3 .claude/scripts/workflow/update_state.py both <registryKey> planner INIT PLAN`
 
 ```
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
@@ -180,9 +220,9 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 **Details:** See [step3-work.md](step3-work.md)
 
 **Status update (mode-aware):**
-- full mode: `wf-state both <registryKey> worker PLAN WORK`
-- no-plan mode: `wf-state both <registryKey> worker INIT WORK`
-- prompt mode: `wf-state both <registryKey> worker INIT WORK` (main agent direct work, no worker sub-agent)
+- full mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK`
+- no-plan mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK`
+- prompt mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK` (main agent direct work, no worker sub-agent)
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode), user_prompt.txt request (no-plan mode), or main agent direct work (prompt mode).
 
@@ -194,7 +234,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Details:** See [step4-report.md](step4-report.md)
 
-**Status update:** `wf-state both <registryKey> reporter WORK REPORT`
+**Status update:** `python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT`
 
 ```
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
@@ -204,12 +244,12 @@ Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, wor
 
 **Details:** See [step5-done.md](step5-done.md)
 
-After REPORT completion: DONE start banner -> done agent call -> DONE completion banner -> terminate.
+After REPORT completion: DONE start banner -> done agent call -> DONE step_complete -> terminate.
 
 ```bash
-Workflow <registryKey> DONE
+step-start <registryKey> DONE
 Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>")
-Workflow <registryKey> DONE done
+step-end <registryKey> DONE done
 ```
 
 ---
@@ -226,11 +266,11 @@ Workflow <registryKey> DONE done
 
 | Action | Description |
 |--------|-------------|
-| Phase banner Bash calls | `Workflow <registryKey> <phase>` start/completion banners |
+| Phase banner Bash calls | `step-start` (start) + `step-end` (completion) |
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
-| wf-state transition/registry | `wf-state both/status/context/register/unregister/link-session` |
+| State transition/registry | `python3 .claude/scripts/workflow/update_state.py both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
-| prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: reload-prompt.sh가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
+| prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: reload_prompt.py가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
 
 ### Sub-agent-Only Actions
@@ -252,7 +292,20 @@ Workflow <registryKey> DONE done
 | Direct code analysis/review | Worker exclusive; orchestrator must not interpret code |
 | Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
 | Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
-| 승인/중지 후 .prompt/prompt.txt 읽기 | "수정 요청" 외 분기에서 prompt.txt를 읽으면 다른 워크플로우 질의와 충돌 발생. prompt.txt 접근은 INIT(init agent)과 수정 요청(reload-prompt.sh)으로 한정 |
+| **내부 추론/분석/사고 과정 텍스트 출력** | Terminal Output Protocol 위반: 사용자는 phase 결과만 필요. plan.md 분석 결과, 진행 상황 설명, 판단 근거, 에이전트 호출 전 설명("플래너를 호출하겠습니다" 류) 등 모든 내부 사고 과정의 텍스트 출력 금지. 컨텍스트 낭비 및 터미널 오염 원인 |
+| 승인/중지 후 .prompt/prompt.txt 읽기 | "수정 요청" 외 분기에서 prompt.txt를 읽으면 다른 워크플로우 질의와 충돌 발생. prompt.txt 접근은 INIT(init agent)과 수정 요청(reload_prompt.py)으로 한정 |
+| 다른 워크플로우 산출물 읽기 | 현재 워크플로우(`<workDir>`) 외부의 `.workflow/` 파일(다른 워크플로우의 plan.md, report.md, work/*.md 등)을 Read하면 컨텍스트 오염 및 토큰 낭비 발생. 오케스트레이터가 읽을 수 있는 파일은 현재 워크플로우의 workDir 내부로 한정 |
+
+### Orchestrator Allowed Reads
+
+오케스트레이터가 Read 도구로 읽어도 되는 파일은 아래 허용 목록(allowlist)으로 **엄격히** 한정합니다. 이 목록 외의 `.workflow/` 파일은 읽기 금지입니다.
+
+| 허용 파일 | 용도 | 필수 근거 |
+|-----------|------|----------|
+| `<workDir>/plan.md` | WORK Phase 태스크 디스패치 | 서브에이전트 간 직접 통신 불가(플랫폼 제약)로 오케스트레이터만 taskId/phase/dependency/parallelism/agentType을 추출하여 디스패치 순서를 결정할 수 있음 |
+| `<workDir>/user_prompt.txt` | prompt 모드에서 직접 작업 시 | prompt 모드는 오케스트레이터가 직접 Write/Edit를 수행하므로 사용자 요청 파악이 불가피 |
+
+> **skill-map.md는 오케스트레이터가 읽지 않습니다.** Phase 0 완료 후 skill-map.md는 Phase 1+ Worker가 직접 읽습니다. 오케스트레이터는 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로만 파라미터로 전달합니다.
 
 ### Platform Constraints Requiring Orchestrator Execution
 

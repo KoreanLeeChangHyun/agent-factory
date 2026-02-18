@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 init_sync.py - .claude 디렉토리 원격 동기화 스크립트
 

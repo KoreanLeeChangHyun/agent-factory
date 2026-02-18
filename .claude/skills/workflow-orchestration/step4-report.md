@@ -7,7 +7,7 @@
 
 > **State Update** before REPORT start:
 > ```bash
-> wf-state both <registryKey> reporter WORK REPORT
+> python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT
 > ```
 
 **Detailed Guide:** workflow-report skill 참조
@@ -41,8 +41,8 @@ while retry_count < MAX_RETRIES:
     log("[WARN] REPORT 실패 (시도 {retry_count}/{MAX_RETRIES})")
 
 if retry_count >= MAX_RETRIES:
-    wf-state status <registryKey> REPORT FAILED
-    wf-state unregister <registryKey>
+    python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT FAILED
+    python3 .claude/scripts/workflow/update_state.py unregister <registryKey>
     # 워크플로우 종료 (DONE 단계 스킵)
 ```
 

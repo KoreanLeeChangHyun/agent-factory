@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """AskUserQuestion Slack notification (thin wrapper)
 Real logic: .claude/scripts/slack/slack_ask.py
 """

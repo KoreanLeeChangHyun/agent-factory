@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 slack_notify.py - Slack 메시지 전송 스크립트
 

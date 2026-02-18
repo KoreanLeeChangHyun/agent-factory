@@ -21,7 +21,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 > **책임 경계**: 보고서 작성과 summary.txt 생성은 reporter 에이전트가 담당합니다. done 에이전트는 reporter가 생성한 summary.txt를 읽어서 history.md 갱신에 활용합니다.
 
-> **Slack 완료 알림**: done 에이전트는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`Workflow <registryKey> DONE done`)에서 자동 전송됩니다.
+> **Slack 완료 알림**: done 에이전트는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`step-end <registryKey> DONE done`)에서 자동 전송됩니다.
 
 **호출 시점:**
 - 오케스트레이터(workflow-orchestration)에서 done 에이전트를 통해 호출됨
@@ -72,7 +72,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 **갱신 실행:**
 ```bash
-bash .claude/scripts/workflow/history-sync.sh sync
+python3 .claude/scripts/workflow/history_sync.py sync
 ```
 
 스크립트가 다음을 자동 처리합니다:
@@ -91,19 +91,19 @@ reporter 반환 상태에 따라:
 
 **성공 시:**
 ```bash
-wf-state status <registryKey> REPORT COMPLETED
+python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT COMPLETED
 ```
 
 **실패 시:**
 ```bash
-wf-state status <registryKey> REPORT FAILED
+python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT FAILED
 ```
 
 ### 3. 사용량 확정
 
 성공 시에만 실행:
 ```bash
-wf-state usage-finalize <registryKey>
+python3 .claude/scripts/workflow/update_state.py usage-finalize <registryKey>
 ```
 
 > 실패 시 경고만 출력하고 계속 진행 (비차단 원칙)
@@ -111,7 +111,7 @@ wf-state usage-finalize <registryKey>
 ### 4. 레지스트리 해제
 
 ```bash
-wf-state unregister <registryKey>
+python3 .claude/scripts/workflow/update_state.py unregister <registryKey>
 ```
 
 ### 5. 워크플로우 아카이빙
@@ -121,13 +121,13 @@ wf-state unregister <registryKey>
 **실행:**
 
 ```bash
-bash .claude/scripts/workflow/archive-workflow.sh <registryKey>
+python3 .claude/scripts/workflow/archive_workflow.py <registryKey>
 ```
 
 스크립트가 다음을 자동 처리합니다:
 - 현재 워크플로우(registryKey)를 제외한 디렉터리를 역순 정렬
 - 11번째 이후 디렉터리를 `.workflow/.history/`로 이동 (`.history/` 미존재 시 자동 생성)
-- history.md 링크 갱신은 별도 수행 불필요 (Step 1의 `history-sync.sh sync`가 자동 처리)
+- history.md 링크 갱신은 별도 수행 불필요 (Step 1의 `history_sync.py sync`가 자동 처리)
 
 > 아카이빙 실패(이동)는 경고만 출력하고 계속 진행 (비차단 원칙 적용)
 
@@ -193,7 +193,7 @@ done은 **마무리 처리**만 수행합니다. 다음 행위는 절대 금지:
 ## 주의사항
 
 1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) -> 6(.kanbanboard) 순서를 반드시 준수
-2. **history.md 스크립트 실행**: `history-sync.sh sync`의 종료 코드를 확인하여 성공/실패 판단
+2. **history.md 스크립트 실행**: `history_sync.py sync`의 종료 코드를 확인하여 성공/실패 판단
 3. **비차단 원칙**: history.md, usage, unregister, .kanbanboard 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 반환 형식은 agent.md를 참조

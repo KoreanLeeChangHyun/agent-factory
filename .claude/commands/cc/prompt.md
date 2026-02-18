@@ -10,14 +10,7 @@ cc:prompt는 경량 작업을 위한 Tier 3 모드입니다. PLAN/WORK/REPORT �
 
 ## 입력 처리
 
-사용자 요청 전처리는 INIT 단계(init 에이전트)에서 자동 수행됩니다.
-
-```
-Task(subagent_type="init", prompt="
-command: prompt
-mode: prompt
-")
-```
+사용자 요청 전처리는 INIT 단계(init 에이전트)에서 자동 수행됩니다. 오케스트레이터가 `command=prompt` 기반으로 Mode Auto-Determination Rule에 따라 `mode=prompt`를 자동 결정합니다.
 
 init이 반환한 `request`, `workDir`, `workId` 등을 보관합니다.
 

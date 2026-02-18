@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 registry.py - 워크플로우 레지스트리 관리 CLI (registry.sh -> registry.py 1:1 포팅)
 
 사용법:
-  wf-registry list                    # 모든 엔트리 컬러 테이블 출력
-  wf-registry clean                   # 정리 대상 엔트리 제거
-  wf-registry clean --dry-run         # 정리 대상 미리보기만
-  wf-registry clean --force           # 전체 registry 초기화 ({})
-  wf-registry remove <key>            # 특정 키 단건 제거
+  python3 .claude/scripts/workflow/registry.py list                    # 모든 엔트리 컬러 테이블 출력
+  python3 .claude/scripts/workflow/registry.py clean                   # 정리 대상 엔트리 제거
+  python3 .claude/scripts/workflow/registry.py clean --dry-run         # 정리 대상 미리보기만
+  python3 .claude/scripts/workflow/registry.py clean --force           # 전체 registry 초기화 ({})
+  python3 .claude/scripts/workflow/registry.py remove <key>            # 특정 키 단건 제거
 
 종료 코드: 0 성공, 1 실패
 """
@@ -54,7 +54,7 @@ def check_registry():
 
 def cmd_help():
     """도움말 출력."""
-    print(f"{C_BOLD}wf-registry{C_RESET} - 워크플로우 레지스트리 관리")
+    print(f"{C_BOLD}registry.py{C_RESET} - 워크플로우 레지스트리 관리")
     print()
     print(f"  {C_CYAN}list{C_RESET}                  모든 엔트리 조회 (컬러 테이블)")
     print(f"  {C_CYAN}clean{C_RESET}                 정리 대상 엔트리 제거")
@@ -70,7 +70,7 @@ def cmd_help():
     print("  - REPORT phase인데 1시간 이상 경과한 잔류 엔트리")
     print("  - INIT / PLAN phase인데 1시간 이상 경과한 잔류 엔트리 (중단된 워크플로우)")
     print()
-    print(f"{C_DIM}참고: .workflow/ 하위 디렉토리 물리 파일 삭제는 wf-clear를 사용하세요{C_RESET}")
+    print(f"{C_DIM}참고: .workflow/ 하위 디렉토리 물리 파일 삭제는 python3 .claude/scripts/init/init_clear.py를 사용하세요{C_RESET}", flush=True)
 
 
 def cmd_list():
@@ -119,7 +119,7 @@ def cmd_list():
         print(f"  {key:<{max_key}}  {title:<{max_title}}  {color}{phase:<{max_phase}}{reset}  {command:<{max_cmd}}")
 
     print(f"  {C_DIM}{separator}{C_RESET}")
-    print()
+    print(flush=True)
 
 
 def cmd_clean(args):
@@ -221,8 +221,8 @@ def cmd_clean(args):
     print()
 
     if dry_run:
-        print(f"  {C_DIM}실제 삭제하려면: wf-registry clean{C_RESET}")
-        print()
+        print(f"  {C_DIM}실제 삭제하려면: python3 .claude/scripts/workflow/registry.py clean{C_RESET}")
+        print(flush=True)
         sys.exit(0)
 
     # 삭제 실행
@@ -232,7 +232,7 @@ def cmd_clean(args):
     try:
         atomic_write_json(REGISTRY_FILE, registry)
         print(f"  {C_GREEN}[OK]{C_RESET} {len(targets)}개 엔트리를 제거했습니다. (잔여: {len(registry)}개)")
-        print()
+        print(flush=True)
     except Exception as e:
         print(f"{C_RED}[ERROR] registry.json 쓰기 실패: {e}{C_RESET}", file=sys.stderr)
         sys.exit(1)
@@ -241,7 +241,7 @@ def cmd_clean(args):
 def cmd_remove(args):
     """특정 키 단건 제거."""
     if not args or not args[0]:
-        print(f"{C_RED}[ERROR] 사용법: wf-registry remove <YYYYMMDD-HHMMSS>{C_RESET}")
+        print(f"{C_RED}[ERROR] 사용법: python3 .claude/scripts/workflow/registry.py remove <YYYYMMDD-HHMMSS>{C_RESET}")
         sys.exit(1)
 
     target_key = args[0]
@@ -265,7 +265,7 @@ def cmd_remove(args):
 
     try:
         atomic_write_json(REGISTRY_FILE, registry)
-        print(f"{C_GREEN}[OK]{C_RESET} 키 {target_key}을 제거했습니다. (잔여: {len(registry)}개)")
+        print(f"{C_GREEN}[OK]{C_RESET} 키 {target_key}을 제거했습니다. (잔여: {len(registry)}개)", flush=True)
     except Exception as e:
         print(f"{C_RED}[ERROR] registry.json 쓰기 실패: {e}{C_RESET}", file=sys.stderr)
         sys.exit(1)
@@ -289,7 +289,7 @@ def main():
         cmd_help()
     else:
         print(f"{C_RED}[ERROR] 알 수 없는 서브커맨드: {subcmd}{C_RESET}")
-        print(f"{C_DIM}사용법: wf-registry list | clean [--dry-run|--force] | remove <key> | help{C_RESET}")
+        print(f"{C_DIM}사용법: python3 .claude/scripts/workflow/registry.py list | clean [--dry-run|--force] | remove <key> | help{C_RESET}")
         sys.exit(1)
 
 

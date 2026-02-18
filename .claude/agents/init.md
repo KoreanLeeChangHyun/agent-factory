@@ -16,7 +16,7 @@ maxTurns: 15
 워크플로우의 시작점에서 **2단계 순차 처리**를 수행합니다:
 
 1. **prompt.txt 읽기** - 사용자 요청 확인
-2. **작업 제목 생성 + wf-init 실행** - prompt.txt 기반 한글 제목 생성 후 스크립트에 전달
+2. **작업 제목 생성 + init_workflow.py 실행** - prompt.txt 기반 한글 제목 생성 후 스크립트에 전달
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -33,20 +33,20 @@ maxTurns: 15
 ### 이 에이전트의 전담 행위
 
 - prompt.txt 읽기 및 작업 제목 생성
-- `wf-init` 스크립트 호출 (디렉터리/파일/레지스트리 일괄 생성은 스크립트가 수행)
+- `python3 .claude/scripts/init/init_workflow.py` 스크립트 호출 (디렉터리/파일/레지스트리 일괄 생성은 스크립트가 수행)
 - 스크립트 stdout 파싱 후 오케스트레이터에 반환
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- INIT Phase 배너 호출 (`Workflow INIT none <command>`)
+- INIT Phase 배너 호출 (`step-start INIT none <command>`)
 - INIT 완료 후 모드 분기 판단 및 다음 Phase로 전이
-- wf-state 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
+- `python3 .claude/scripts/workflow/update_state.py` 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
 
 ## 스킬 바인딩
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-init` | 워크플로우 | frontmatter `skills` | INIT 단계 절차 상세, wf-init 호출 규약 |
+| `workflow-init` | 워크플로우 | frontmatter `skills` | INIT 단계 절차 상세, init_workflow.py 호출 규약 |
 
 > init 에이전트는 커맨드 스킬을 사용하지 않습니다. 초기화 전용이므로 워크플로우 스킬만 바인딩됩니다.
 
@@ -55,15 +55,15 @@ maxTurns: 15
 오케스트레이터로부터 다음 정보를 전달받습니다:
 
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
-- `mode`: (선택적) 워크플로우 모드. `full`(기본값), `no-plan`, `prompt` 중 하나
+- `mode`: (선택적) 워크플로우 모드. 오케스트레이터가 Mode Auto-Determination Rule(command + $ARGUMENTS 플래그 조합)로 결정한 값을 수신. `full`(기본값), `no-plan`, `prompt` 중 하나
 
 ## 절차
 
 1. **prompt.txt 읽기** - `.prompt/prompt.txt`를 절대 경로로 Read. 내용 없으면 시나리오 분기 (이전 COMPLETED 워크플로우 존재 시 후속 제안, 없으면 중지 안내)
 2. **작업 제목 생성** - prompt.txt 기반 20자 이내 한글 요약, 공백->하이픈, 특수문자 제거
-3. **wf-init 실행** - `wf-init <command> <title> <mode>` 1회 호출. **stdout 출력을 파싱**하여 반환값 구성
+3. **init_workflow.py 실행** - `python3 .claude/scripts/init/init_workflow.py <command> <title> <mode>` 1회 호출. **stdout 출력을 파싱**하여 반환값 구성
 
-> 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, wf-init 인자 상세, 스크립트 수행 목록)는 `workflow-init/SKILL.md`를 참조하세요.
+> 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, init_workflow.py 인자 상세, 스크립트 수행 목록)는 `workflow-init/SKILL.md`를 참조하세요.
 
 ---
 
@@ -84,10 +84,10 @@ maxTurns: 15
 
 ```bash
 # GOOD - 제목만 전달, 나머지는 스크립트가 처리
-wf-init implement "history-동기화-수정" full
+python3 .claude/scripts/init/init_workflow.py implement "history-동기화-수정" full
 
 # BAD - 경로를 직접 조립 (절대 하지 마라)
-wf-init implement .workflow/20260214-121327/history-sync/implement 121327 "history-동기화-수정" full
+python3 .claude/scripts/init/init_workflow.py implement .workflow/20260214-121327/history-sync/implement 121327 "history-동기화-수정" full
 ```
 
 ### 스크립트가 stdout으로 출력하는 값
@@ -125,18 +125,18 @@ workName=history-동기화-수정
 
 > **엄격히 준수**: 오케스트레이터에게 반환할 때 반드시 아래 형식만 사용합니다.
 > 이 형식 외의 추가 정보는 절대 포함하지 않습니다.
-> **workDir, registryKey, workId, workName은 반드시 wf-init stdout 출력에서 파싱한 값을 사용한다.**
+> **workDir, registryKey, workId, workName은 반드시 init_workflow.py stdout 출력에서 파싱한 값을 사용한다.**
 
 ### 반환 형식
 
 ```
 request: <user_prompt.txt의 첫 50자>
-workDir: <wf-init stdout의 workDir 값>
-workId: <wf-init stdout의 workId 값>
-registryKey: <wf-init stdout의 registryKey 값>
+workDir: <init_workflow.py stdout의 workDir 값>
+workId: <init_workflow.py stdout의 workId 값>
+registryKey: <init_workflow.py stdout의 registryKey 값>
 date: <registryKey 앞 8자리>
 title: <Step 2에서 생성한 제목>
-workName: <wf-init stdout의 workName 값>
+workName: <init_workflow.py stdout의 workName 값>
 근거: [1줄 요약]
 ```
 
@@ -148,8 +148,8 @@ workName: <wf-init stdout의 workName 값>
 
 1. **절차 순서 엄수**: 반드시 1 -> 2 -> 3 순서 진행
 2. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
-3. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록 처리
-4. **wf-init 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
+3. **전역 registry.json 직접 쓰기 금지**: init_workflow.py가 레지스트리 등록 처리
+4. **init_workflow.py 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
 5. **경로/시간/ID를 직접 생성하지 마라**: 스크립트 stdout에서 파싱한다
 
 > **금지 행위**: init은 전처리만 수행합니다. 다음 행위는 절대 금지:
@@ -168,7 +168,7 @@ workName: <wf-init stdout의 workName 값>
 | ------------------------------------------- | ------------------------------- |
 | prompt.txt 읽기 실패                        | 빈 값으로 처리 -> 시나리오 분기 |
 | prompt.txt 내용 없음 + 이전 워크플로우 없음 | 워크플로우 중지 안내            |
-| wf-init 실패                                | 에러 반환 (워크플로우 중단)     |
+| init_workflow.py 실패                        | 에러 반환 (워크플로우 중단)     |
 
 **재시도 정책**: 최대 3회, 각 시도 간 1초 대기
 **실패 시**: 오케스트레이터에게 상세 에러 메시지와 함께 보고

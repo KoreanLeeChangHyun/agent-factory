@@ -7,7 +7,7 @@ description: 작업 내역 클리어. .workflow/* 디렉토리의 모든 문서�
 
 ## 스크립트
 
-`.claude/scripts/init/init-clear.sh` - 서브커맨드: list, execute
+`.claude/scripts/init/init_clear.py` - 서브커맨드: list, execute
 
 ## 오케스트레이션 흐름
 
@@ -16,7 +16,7 @@ description: 작업 내역 클리어. .workflow/* 디렉토리의 모든 문서�
 Bash 도구로 실행:
 
 ```bash
-wf-clear list
+python3 .claude/scripts/init/init_clear.py list
 ```
 
 스크립트가 삭제 대상 목록과 크기를 출력합니다. 출력 결과를 사용자에게 표시합니다.
@@ -39,7 +39,7 @@ wf-clear list
 Bash 도구로 실행:
 
 ```bash
-wf-clear execute
+python3 .claude/scripts/init/init_clear.py execute
 ```
 
 삭제 결과를 사용자에게 표시합니다.

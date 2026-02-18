@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 env_utils.py - .claude.env 공통 파싱 유틸리티
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 cleanup_zombie.py - 좀비 워크플로우 정리 독립 스크립트
 

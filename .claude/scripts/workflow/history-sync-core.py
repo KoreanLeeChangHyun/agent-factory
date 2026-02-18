@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
-wf-history sync/status Python 코어 스크립트.
+history sync/status Python 코어 스크립트.
 
 .workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
-    python3 history-sync-core.py sync --workflow-dir <path> --target <path> [--dry-run] [--all]
-    python3 history-sync-core.py status --workflow-dir <path> --target <path> [--all]
+    python3 .claude/scripts/workflow/history-sync-core.py sync --workflow-dir <path> --target <path> [--dry-run] [--all]
+    python3 .claude/scripts/workflow/history-sync-core.py status --workflow-dir <path> --target <path> [--all]
 """
 
 import argparse
@@ -717,7 +717,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         status_counts[s] = status_counts.get(s, 0) + 1
 
     # 출력
-    print("=== wf-history status ===")
+    print("=== history-sync status ===")
     print(f"  .workflow/ 디렉토리 수: {len(scanned)}개")
     print(f"  history.md 행 수:       {len(data_rows)}행")
     print(f"  누락 항목:              {len(missing_ids)}건")
@@ -743,7 +743,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 # ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="wf-history sync/status core")
+    parser = argparse.ArgumentParser(description="history sync/status core")
     subparsers = parser.add_subparsers(dest="subcmd", required=True)
 
     # sync 서브커맨드

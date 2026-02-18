@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 init_project.py - 프로젝트 분석 및 초기화 스크립트
 
@@ -702,21 +702,51 @@ def cmd_setup_wf_alias():
 
     content = open(zshrc, "r", encoding="utf-8").read()
 
-    # 대상 alias 정의
+    # --- 구 alias 정리 (wf-*, Workflow 등 슬래시 커맨드로 대체된 항목) ---
+    deprecated_aliases = [
+        "Workflow", "wf-state", "wf-init", "wf-claude", "wf-project",
+        "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info",
+        "wf-commands", "wf-registry", "wf-history",
+    ]
+    lines = content.splitlines(True)
+    cleaned_lines = []
+    removed_names = []
+    for line in lines:
+        stripped = line.strip()
+        # "# Workflow shortcut aliases" 헤더도 제거
+        if stripped == "# Workflow shortcut aliases (for Claude Code Bash tool)":
+            removed_names.append("(header)")
+            continue
+        matched = False
+        for dep_name in deprecated_aliases:
+            if stripped.startswith(f"alias {dep_name}="):
+                removed_names.append(dep_name)
+                matched = True
+                break
+        if not matched:
+            cleaned_lines.append(line)
+
+    if removed_names:
+        content = "".join(cleaned_lines)
+        # 연속 빈 줄 정리 (3줄 이상 → 2줄)
+        while "\n\n\n" in content:
+            content = content.replace("\n\n\n", "\n\n")
+        with open(zshrc, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    # --- 구 wrapper 스크립트 정리 (~/.local/bin/) ---
+    bin_dir = os.path.join(os.environ.get("HOME", ""), ".local", "bin")
+    removed_wrappers = []
+    for dep_name in deprecated_aliases:
+        wrapper_path = os.path.join(bin_dir, dep_name)
+        if os.path.isfile(wrapper_path):
+            os.remove(wrapper_path)
+            removed_wrappers.append(dep_name)
+
+    # --- 현행 alias 정의 (step-start, step-end만 유지) ---
     alias_defs = [
-        ("Workflow", "python3 .claude/scripts/workflow/banner.py"),
-        ("wf-state", "python3 .claude/scripts/workflow/update_state.py"),
-        ("wf-init", "python3 .claude/scripts/init/init_workflow.py"),
-        ("wf-claude", "python3 .claude/scripts/init/init_claude.py"),
-        ("wf-project", "python3 .claude/scripts/init/init_project.py"),
-        ("wf-clear", "python3 .claude/scripts/init/init_clear.py"),
-        ("wf-registry", "python3 .claude/scripts/workflow/registry.py"),
-        ("wf-sync", "python3 .claude/scripts/init/init_sync.py"),
-        ("wf-git-config", "python3 .claude/scripts/init/git_config.py"),
-        ("wf-slack", "python3 .claude/scripts/slack/slack_notify.py"),
-        ("wf-info", "python3 .claude/scripts/workflow/info.py"),
-        ("wf-commands", "python3 .claude/scripts/workflow/commands.py"),
-        ("wf-history", "python3 .claude/scripts/workflow/history_sync.py"),
+        ("step-start", "bash .claude/scripts/workflow/banner.sh"),
+        ("step-end", "bash .claude/scripts/workflow/step_complete.sh"),
     ]
 
     added_indices = []
@@ -730,10 +760,6 @@ def cmd_setup_wf_alias():
 
     # 추가할 alias가 있으면 append
     if added_indices:
-        if "# Workflow shortcut aliases" not in content:
-            with open(zshrc, "a", encoding="utf-8") as f:
-                f.write("\n# Workflow shortcut aliases (for Claude Code Bash tool)\n")
-
         with open(zshrc, "a", encoding="utf-8") as f:
             for idx in added_indices:
                 name, cmd = alias_defs[idx]
@@ -810,8 +836,7 @@ def cmd_verify():
     # 워크플로우 alias 확인 (~/.zshrc)
     zshrc = os.path.join(os.environ.get("HOME", ""), ".zshrc")
     alias_names = [
-        "Workflow", "wf-state", "wf-init", "wf-claude", "wf-project", "wf-clear",
-        "wf-sync", "wf-git-config", "wf-slack", "wf-info", "wf-commands", "wf-history", "wf-registry",
+        "step-start", "step-end",
     ]
     if os.path.isfile(zshrc):
         zshrc_content = open(zshrc, "r", encoding="utf-8").read()

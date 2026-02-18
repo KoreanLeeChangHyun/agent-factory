@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 에이전트 호출 가드 Hook 스크립트
 

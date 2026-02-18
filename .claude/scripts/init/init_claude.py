@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 init_claude.py - Claude Code 사용자 환경 초기화 스크립트
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 상태 일괄 업데이트 스크립트 (update-state.sh -> update_state.py 1:1 포팅)
 
@@ -852,6 +852,7 @@ def main():
             file=sys.stderr,
         )
 
+    sys.stdout.flush()
     sys.exit(0)
 
 

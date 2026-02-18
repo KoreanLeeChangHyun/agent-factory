@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 단계 배너 출력 스크립트 (banner.sh -> banner.py 1:1 포팅)
 
@@ -203,11 +203,10 @@ def main():
             wp_phase_num = args[3] if len(args) > 3 else ""
             wp_task_ids = args[4] if len(args) > 4 else ""
             wp_mode = args[5] if len(args) > 5 else ""
-        print(f"    {C_GREEN}\u25ba{C_RESET} {C_BOLD}Phase {wp_phase_num}{C_RESET}  {C_DIM}{wp_task_ids}{C_RESET}  {C_GRAY}{wp_mode}{C_RESET}")
-        sys.exit(0)
-
-    # --- INIT 완료 배너 방어 ---
-    if phase == "INIT" and status:
+        # mode 검증: parallel|sequential 만 허용, 그 외(full 등)는 sequential 폴백
+        if wp_mode not in ("parallel", "sequential"):
+            wp_mode = "sequential"
+        print(f"    {C_GREEN}\u25ba{C_RESET} {C_BOLD}Phase {wp_phase_num}{C_RESET}  {C_DIM}{wp_task_ids}{C_RESET}  {C_GRAY}{wp_mode}{C_RESET}", flush=True)
         sys.exit(0)
 
     color = get_color(phase)
@@ -234,7 +233,7 @@ def main():
         if command:
             cmd_label = f" ({C_CYAN}{command}{C_RESET})"
         print(f"  {C_YELLOW}{C_BOLD}[OK]{C_RESET}  {work_id} \u00b7 {title} {cmd_label} {C_YELLOW}\uc6cc\ud06c\ud50c\ub85c\uc6b0 \uc644\ub8cc{C_RESET}")
-        print()
+        print(flush=True)
 
         # .done-marker 생성
         done_marker = os.path.join(PROJECT_ROOT, ".workflow", ".done-marker")
@@ -282,7 +281,7 @@ def main():
             print(f"  {progress}  {color}{C_BOLD}{phase}{C_RESET}  {title}")
         else:
             print(f"  {progress}  {color}{C_BOLD}{phase}{C_RESET}  {work_id} \u00b7 {title}")
-        print(f"{color}\u2514{line}\u2518{C_RESET}")
+        print(f"{color}\u2514{line}\u2518{C_RESET}", flush=True)
 
     else:
         # 완료 배너
@@ -300,7 +299,7 @@ def main():
         else:
             print(f"{color}  \u2713 {C_BOLD}{phase}{C_RESET}  {C_DIM}{work_id} \u00b7 {title}{C_RESET}")
 
-        print(f"{color}  \u2713 {C_BOLD}{phase} DONE{C_RESET}")
+        print(f"{color}  \u2713 {C_BOLD}{phase} DONE{C_RESET}", flush=True)
 
 
 if __name__ == "__main__":

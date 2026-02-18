@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """Worker/Reporter completion desktop notification (thin wrapper)
 Real logic: .claude/scripts/workflow/completion_notify.py
 """

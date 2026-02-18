@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트
 

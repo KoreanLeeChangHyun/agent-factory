@@ -10,7 +10,7 @@ description: 프로젝트 초기 구조 설정 (디렉토리, .gitignore, 빈 CL
 
 ## 스크립트
 
-`.claude/scripts/init/init-project.sh` - 서브커맨드: generate-empty-template, setup-dirs, setup-wf-alias, setup-gitignore, verify
+`.claude/scripts/init/init_project.py` - 서브커맨드: generate-empty-template, setup-dirs, setup-wf-alias, setup-gitignore, verify
 
 ## 오케스트레이션 흐름
 
@@ -24,7 +24,7 @@ CLAUDE.md 파일 존재 여부를 확인합니다.
 - 파일이 없으면 -> Bash 도구로 빈 템플릿 생성:
 
 ```bash
-wf-project generate-empty-template
+python3 .claude/scripts/init/init_project.py generate-empty-template
 ```
 
 **결과 JSON 예시:**
@@ -42,7 +42,7 @@ wf-project generate-empty-template
 Bash 도구로 실행:
 
 ```bash
-wf-project setup-dirs
+python3 .claude/scripts/init/init_project.py setup-dirs
 ```
 
 **결과 JSON 예시:**
@@ -62,16 +62,16 @@ wf-project setup-dirs
 Bash 도구로 실행:
 
 ```bash
-wf-project setup-wf-alias
+python3 .claude/scripts/init/init_project.py setup-wf-alias
 ```
 
 **결과 JSON 예시:**
 ```json
 {
   "status": "ok",
-  "zshrc_added": ["Workflow", "wf-state", "wf-init", "wf-claude", "wf-project", "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info", "wf-commands"],
+  "zshrc_added": ["step-start", "step-end"],
   "zshrc_skipped": [],
-  "wrapper_added": ["Workflow", "wf-state", "wf-init", "wf-claude", "wf-project", "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info", "wf-commands"]
+  "wrapper_added": ["step-start", "step-end"]
 }
 ```
 
@@ -82,7 +82,7 @@ wf-project setup-wf-alias
 Bash 도구로 실행:
 
 ```bash
-wf-project setup-gitignore
+python3 .claude/scripts/init/init_project.py setup-gitignore
 ```
 
 **결과 JSON 예시:**
@@ -100,7 +100,7 @@ wf-project setup-gitignore
 Bash 도구로 실행:
 
 ```bash
-wf-project verify
+python3 .claude/scripts/init/init_project.py verify
 ```
 
 결과 JSON의 `checks` 배열을 파싱하여 최종 결과 출력:
@@ -113,7 +113,7 @@ wf-project verify
 [v] 디렉토리 생성: .workflow, .prompt
 [v] 파일 생성: .prompt/prompt.txt, .prompt/memo.txt, .prompt/querys.txt, .claude.env, .prompt/history.md, .workflow/registry.json
 [v] 워크플로우 alias 설정 완료 (zshrc + ~/.local/bin wrapper)
-[v] wrapper 스크립트 검증 완료: Workflow, wf-state, wf-init, wf-claude, wf-project, wf-clear, wf-sync, wf-git-config, wf-slack, wf-info, wf-commands
+[v] wrapper 스크립트 검증 완료: step-start, step-end
 [v] .gitignore 업데이트 완료
 
 다음 단계:

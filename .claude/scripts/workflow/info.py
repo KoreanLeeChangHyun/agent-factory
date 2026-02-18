@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 정보 조회 스크립트 (info.sh -> info.py 1:1 포팅)
 
 사용법:
-  wf-info 20260208-135954
-  wf-info .workflow/20260208-135954/디렉터리-구조-변경/implement
-  wf-info .workflow/20260208-135954
+  python3 .claude/scripts/workflow/info.py 20260208-135954
+  python3 .claude/scripts/workflow/info.py .workflow/20260208-135954/디렉터리-구조-변경/implement
+  python3 .claude/scripts/workflow/info.py .workflow/20260208-135954
 """
 
 import os
@@ -59,9 +59,9 @@ def count_files(dir_path):
 
 def main():
     if len(sys.argv) < 2 or not sys.argv[1]:
-        print(f"{C_RED}사용법: wf-info <워크플로우ID 또는 workDir 경로>{C_RESET}")
-        print(f"{C_DIM}  예: wf-info 20260208-135954{C_RESET}")
-        print(f"{C_DIM}  예: wf-info .workflow/20260208-135954/디렉터리-구조-변경/implement{C_RESET}")
+        print(f"{C_RED}사용법: python3 .claude/scripts/workflow/info.py <워크플로우ID 또는 workDir 경로>{C_RESET}")
+        print(f"{C_DIM}  예: python3 .claude/scripts/workflow/info.py 20260208-135954{C_RESET}")
+        print(f"{C_DIM}  예: python3 .claude/scripts/workflow/info.py .workflow/20260208-135954/디렉터리-구조-변경/implement{C_RESET}")
         sys.exit(1)
 
     input_arg = sys.argv[1]
@@ -140,7 +140,7 @@ def main():
     else:
         print(f"  {C_RED}\u25cb{C_RESET} report.md {C_DIM}\u2192{C_RESET}  {C_DIM}(없음){C_RESET}")
 
-    print()
+    print(flush=True)
 
 
 if __name__ == "__main__":

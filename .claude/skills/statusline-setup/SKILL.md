@@ -92,7 +92,7 @@ StatusLine은 **현재 터미널 세션에 연결된 워크플로우만** 표시
 
 #### 워크플로우 Phase별 색상 코드
 
-StatusLine은 세션 필터링을 통해 매칭된 워크플로우의 **Phase(단계)**와 **제목(title)**을 `[PHASE] 제목` 또는 `[PHASE:agent] 제목` 형식으로 표시합니다. Phase별 색상은 `banner.sh`의 색상 체계와 일치합니다.
+StatusLine은 세션 필터링을 통해 매칭된 워크플로우의 **Phase(단계)**와 **제목(title)**을 `[PHASE] 제목` 또는 `[PHASE:agent] 제목` 형식으로 표시합니다. Phase별 색상은 `step-start`의 색상 체계와 일치합니다.
 
 | Phase | 색상 | ANSI 코드 | 의미 |
 |-------|------|-----------|------|

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """hooks directory self-protection guard (thin wrapper)
 Real logic: .claude/scripts/guards/hooks_self_guard.py
 """

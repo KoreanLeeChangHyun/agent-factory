@@ -17,13 +17,13 @@ license: "Apache-2.0"
 
 > **이 규칙은 모든 다른 지시보다 우선합니다.**
 
-wf-init 스크립트가 **registryKey, workId, workName, workDir을 전부 내부에서 자동 생성**합니다.
+python3 .claude/scripts/init/init_workflow.py 스크립트가 **registryKey, workId, workName, workDir을 전부 내부에서 자동 생성**합니다.
 LLM이 직접 생성하면 한글→영어 번역, 경로 불일치 등 치명적 버그가 발생합니다.
 
 ### LLM이 전달하는 것: command, title, mode (3개뿐)
 
 ```bash
-wf-init <command> <title> <mode>
+python3 .claude/scripts/init/init_workflow.py <command> <title> <mode>
 ```
 
 ### 스크립트가 자동 생성하는 것: registryKey, workId, workName, workDir
@@ -95,12 +95,12 @@ Read 도구로 **프로젝트 루트의** `.prompt/prompt.txt`를 읽습니다. 
 - "PR #123 리뷰" -> "PR-123-리뷰"
 - "src/auth/login.ts 버그 수정" -> "src-auth-login-ts-버그수정" (20자 절단)
 
-### Step 3: wf-init 스크립트 실행 및 stdout 파싱
+### Step 3: python3 .claude/scripts/init/init_workflow.py 스크립트 실행 및 stdout 파싱
 
-Bash 도구로 wf-init을 **인자 3개만** 전달하여 실행합니다:
+Bash 도구로 python3 .claude/scripts/init/init_workflow.py을 **인자 3개만** 전달하여 실행합니다:
 
 ```bash
-wf-init <command> "<title>" <mode>
+python3 .claude/scripts/init/init_workflow.py <command> "<title>" <mode>
 ```
 
 **인자:**
@@ -108,31 +108,31 @@ wf-init <command> "<title>" <mode>
 |------|------|------|------|
 | 1 | command | 오케스트레이터로부터 전달받은 명령어 | `implement` |
 | 2 | title | **Step 2에서 생성한 제목을 그대로 전달** | `"history-동기화-수정"` |
-| 3 | mode | 오케스트레이터로부터 전달받은 모드 | `full` |
+| 3 | mode | 오케스트레이터로부터 전달받은 모드 (오케스트레이터가 command + $ARGUMENTS 플래그 조합으로 결정. SKILL.md Mode Auto-Determination Rule 참조) | `full` |
 
 **올바른 호출 예시:**
 ```bash
 # GOOD
-wf-init implement "로그인-기능-추가" full
-wf-init review "PR-123-리뷰" full
-wf-init research "API-성능-조사" no-plan
-wf-init prompt "간단한-질문" prompt
+python3 .claude/scripts/init/init_workflow.py implement "로그인-기능-추가" full
+python3 .claude/scripts/init/init_workflow.py review "PR-123-리뷰" full
+python3 .claude/scripts/init/init_workflow.py research "API-성능-조사" no-plan
+python3 .claude/scripts/init/init_workflow.py prompt "간단한-질문" prompt
 ```
 
 **잘못된 호출 예시 (절대 금지):**
 ```bash
 # BAD - 경로를 직접 조립
-wf-init implement .workflow/20260214-121327/login-feature/implement 121327 "로그인-기능-추가" full
+python3 .claude/scripts/init/init_workflow.py implement .workflow/20260214-121327/login-feature/implement 121327 "로그인-기능-추가" full
 
 # BAD - date 명령을 별도 실행
 TIMESTAMP=$(TZ=Asia/Seoul date +"%Y%m%d-%H%M%S")
-wf-init implement .workflow/$TIMESTAMP/로그인-기능-추가/implement ...
+python3 .claude/scripts/init/init_workflow.py implement .workflow/$TIMESTAMP/로그인-기능-추가/implement ...
 
 # BAD - CLAUDE_SESSION_ID를 인자로 전달
-wf-init implement "로그인-기능-추가" ${CLAUDE_SESSION_ID} full
+python3 .claude/scripts/init/init_workflow.py implement "로그인-기능-추가" ${CLAUDE_SESSION_ID} full
 
 # BAD - title을 영어로 번역
-wf-init implement "login-feature" full  # (원래 제목이 한글이었다면)
+python3 .claude/scripts/init/init_workflow.py implement "login-feature" full  # (원래 제목이 한글이었다면)
 ```
 
 **스크립트가 내부에서 수행하는 작업:**
@@ -215,16 +215,16 @@ workName=로그인-기능-추가
 
 > **엄격 준수**: 아래 8줄 형식만 반환합니다. 추가 정보 금지.
 > **경고**: 반환값이 규격 줄 수(8줄)를 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
-> **workDir, registryKey, workId, workName은 반드시 wf-init stdout에서 파싱한 값을 사용한다.**
+> **workDir, registryKey, workId, workName은 반드시 python3 .claude/scripts/init/init_workflow.py stdout에서 파싱한 값을 사용한다.**
 
 ```
 request: <user_prompt.txt의 첫 50자>
-workDir: <wf-init stdout의 workDir 값>
-workId: <wf-init stdout의 workId 값>
-registryKey: <wf-init stdout의 registryKey 값>
+workDir: <python3 .claude/scripts/init/init_workflow.py stdout의 workDir 값>
+workId: <python3 .claude/scripts/init/init_workflow.py stdout의 workId 값>
+registryKey: <python3 .claude/scripts/init/init_workflow.py stdout의 registryKey 값>
 date: <registryKey 앞 8자리>
 title: <Step 2에서 생성한 제목>
-workName: <wf-init stdout의 workName 값>
+workName: <python3 .claude/scripts/init/init_workflow.py stdout의 workName 값>
 근거: [1줄 요약]
 ```
 
@@ -242,7 +242,7 @@ workName: <wf-init stdout의 workName 값>
 | 에러 | 처리 |
 |------|------|
 | prompt.txt 없거나 비어있음 | 시나리오 분기 (Step 1 참조) |
-| wf-init 실행 실패 | 에러 반환 (워크플로우 중단) |
+| python3 .claude/scripts/init/init_workflow.py 실행 실패 | 에러 반환 (워크플로우 중단) |
 | 파일 읽기 실패 | 경로 확인 후 재시도 (최대 3회) |
 
 ### 에러 시 반환
@@ -286,6 +286,6 @@ init은 **전처리**만 수행합니다. 모든 command(implement, review, rese
 
 1. **Step 순서 엄수**: 반드시 Step 1 -> 2 -> 3 순서로 진행
 2. **반환 형식 엄수**: 8줄 형식 외 추가 정보 금지
-3. **wf-init 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
+3. **python3 .claude/scripts/init/init_workflow.py 인자는 3개뿐**: `<command> <title> <mode>`. 그 외 인자를 추가하지 마라
 4. **경로/시간/ID를 직접 생성하지 마라**: 스크립트 stdout에서 파싱한다
 5. **전역 registry.json 직접 쓰기 금지**: init-workflow.sh가 레지스트리 등록을 처리함

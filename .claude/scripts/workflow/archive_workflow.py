@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 오래된 워크플로우 디렉토리를 .workflow/.history/로 아카이브
 (archive-workflow.sh -> archive_workflow.py 1:1 포팅)

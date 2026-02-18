@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 init_workflow.py - 워크플로우 초기화 통합 스크립트
 

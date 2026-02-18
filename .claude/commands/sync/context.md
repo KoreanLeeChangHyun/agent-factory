@@ -14,7 +14,7 @@ description: 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다
 
 ## 스크립트
 
-`.claude/scripts/init/init-project.sh` - 서브커맨드: analyze, generate-claude-md
+`.claude/scripts/init/init_project.py` - 서브커맨드: analyze, generate-claude-md
 
 ## 오케스트레이션 흐름
 
@@ -25,7 +25,7 @@ description: 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다
 Bash 도구로 실행:
 
 ```bash
-wf-project analyze
+python3 .claude/scripts/init/init_project.py analyze
 ```
 
 **결과 JSON 예시:**
@@ -76,7 +76,7 @@ wf-project analyze
 Step 1의 analyze 결과 JSON을 stdin으로 전달하여 실행:
 
 ```bash
-echo '<analyze_json>' | wf-project generate-claude-md
+echo '<analyze_json>' | python3 .claude/scripts/init/init_project.py generate-claude-md
 ```
 
 스크립트가 기존 CLAUDE.md의 Recent Changes, Known Issues, Next Steps를 자동 보존합니다.

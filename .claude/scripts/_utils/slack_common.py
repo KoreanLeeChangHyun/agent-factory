@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 slack_common.py - Slack 공용 함수 라이브러리
 

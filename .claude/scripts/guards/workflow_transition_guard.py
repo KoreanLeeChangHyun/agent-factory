@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 전이 가드 Hook 스크립트
 
-PreToolUse(Bash) 이벤트에서 update-workflow-state.sh 또는 wf-state alias 호출의
+PreToolUse(Bash) 이벤트에서 update_state.py 또는 update-workflow-state.sh 호출의
 phase 전이를 검증.
 
 입력: stdin으로 JSON (tool_name, tool_input)
@@ -45,12 +45,12 @@ def _deny(reason, exit_code=2):
 
 def _parse_command(command):
     """
-    wf-state / update-workflow-state.sh 호출에서 workDir, fromPhase, toPhase를 추출.
+    update_state.py / update-workflow-state.sh 호출에서 workDir, fromPhase, toPhase를 추출.
 
     Returns:
         tuple: (work_dir, from_phase, to_phase) or (None, None, None)
     """
-    m = re.search(r"(?:update-workflow-state\.sh|wf-state)\s+(.+)", command)
+    m = re.search(r"(?:update_state\.py|update-workflow-state\.sh|wf-state)\s+(.+)", command)
     if not m:
         return None, None, None
 
@@ -105,8 +105,8 @@ def main():
     if not command:
         sys.exit(0)
 
-    # update-workflow-state.sh 또는 wf-state 호출이 아니면 통과
-    if "update-workflow-state.sh" not in command and "wf-state" not in command:
+    # update_state.py 또는 update-workflow-state.sh 호출이 아니면 통과
+    if "update_state.py" not in command and "update-workflow-state.sh" not in command and "wf-state" not in command:
         sys.exit(0)
 
     # command에서 workDir, fromPhase, toPhase 파싱

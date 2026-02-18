@@ -9,7 +9,7 @@
 
 > **no-plan 모드(`-np` 플래그)에서는 PLAN 단계 전체를 건너뛰고 WORK로 직행합니다.**
 >
-> 판별: status.json의 `mode` 필드가 `no-plan`이면 아래 모든 절차(2a~2b)를 스킵합니다.
+> 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `no-plan`이면 아래 모든 절차(2a~2b)를 스킵합니다. (status.json Read 불필요)
 > - planner 에이전트 호출 없음
 > - AskUserQuestion 승인 절차 없음
 > - PLAN 배너 출력 없음
@@ -21,7 +21,7 @@
 
 > **State Update** before PLAN start:
 > ```bash
-> wf-state both <registryKey> planner INIT PLAN
+> python3 .claude/scripts/workflow/update_state.py both <registryKey> planner INIT PLAN
 > ```
 
 **Detailed Guide:** workflow-plan skill 참조
@@ -50,7 +50,7 @@ workDir: <workDir>
 **Update가 필요한 경우:**
 - agent 필드가 "planner"로 설정되어 있지 않은 경우
 
-> **Note:** `update-workflow-state.sh context` 모드는 `agent` 필드만 갱신할 수 있습니다. title, workName 등 다른 필드를 변경해야 하는 경우, planner가 `.context.json`에 직접 쓰기를 수행하세요.
+> **Note:** `update_state.py context` 모드는 `agent` 필드만 갱신할 수 있습니다. title, workName 등 다른 필드를 변경해야 하는 경우, planner가 `.context.json`에 직접 쓰기를 수행하세요.
 
 **Local .context.json Schema:**
 
@@ -71,22 +71,22 @@ workDir: <workDir>
 
 **Update Method (agent field, 1 Tool Call):**
 ```bash
-Bash("wf-state context <registryKey> <agent>")
+Bash("python3 .claude/scripts/workflow/update_state.py context <registryKey> <agent>")
 ```
 
 > **Note:**
-> - `update-workflow-state.sh context` 모드의 3번째 인자는 에이전트 이름 문자열 (예: "planner", "worker", "reporter"). JSON 문자열을 인자로 받지 않음.
+> - `update_state.py context` 모드의 3번째 인자는 에이전트 이름 문자열 (예: "planner", "worker", "reporter"). JSON 문자열을 인자로 받지 않음.
 > - 이 모드는 로컬 `<workDir>/.context.json`의 `agent` 필드만 업데이트. 전역 `.workflow/registry.json`은 활성 워크플로우 레지스트리로 사용되며, `register`/`unregister` 모드로만 접근. 직접 쓰기 금지.
 
 ### 2b-2. Slack Notification (Automatic)
 
 AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전송합니다.
 
-- Hook script: `.claude/hooks/pre-tool-use/slack-ask.sh` (thin wrapper -> `.claude/scripts/slack/slack-ask.sh`)
+- Hook script: `.claude/hooks/pre-tool-use/slack-ask.py` (thin wrapper -> `.claude/scripts/slack/slack_ask.py`)
 - Hook이 활성 워크플로우 레지스트리(`.workflow/registry.json`)에서 해당 워크플로우의 로컬 .context.json을 읽어 통일 포맷으로 Slack 전송
 - 레지스트리 또는 로컬 .context.json이 없으면 폴백 포맷 사용
 
-**Slack Notification Format (slack-ask.sh):**
+**Slack Notification Format (slack-ask.py):**
 ```
 <작업 제목>
 - 작업ID: <YYYYMMDD>-<workId>
@@ -98,7 +98,7 @@ AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전
 ### 2b-3. AskUserQuestion으로 사용자 승인
 
 > **Sequential Execution REQUIRED (Critical):**
-> PLAN 완료 배너(`Workflow <registryKey> PLAN done`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
+> PLAN 완료 배너(`step-end <registryKey> PLAN`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
 > - PLAN 완료 배너와 AskUserQuestion을 **동일 응답에서 병렬로 호출하는 것은 MUST NOT**.
 > - 반드시 **(1) PLAN 완료 배너 Bash 호출 -> 응답 수신 확인 -> (2) AskUserQuestion 호출** 순서로 2회의 별도 도구 호출 턴에서 실행.
 > - 위반 시 사용자가 계획서 링크를 확인하지 못한 채 승인을 요청받는 UX 결함 발생.
@@ -130,16 +130,16 @@ AskUserQuestion(
 
 | Selection | Action |
 |-----------|--------|
-| **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload-prompt.sh` 호출, `user_prompt.txt` 갱신 |
-| **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload-prompt.sh`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload-prompt.sh` 호출, `user_prompt.txt` 갱신 |
+| **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
+| **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
+| **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
 
 > **prompt.txt Isolation Rule (CRITICAL):**
-> `.prompt/prompt.txt` 읽기 및 `reload-prompt.sh` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
+> `.prompt/prompt.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
 > "승인" 또는 "중지" 선택 후 `.prompt/prompt.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
 > - "승인" 시: prompt.txt 무시, WORK 단계로 즉시 진행
 > - "중지" 시: prompt.txt 무시, CANCELLED 처리만 수행
-> - "수정 요청" 시: reload-prompt.sh 1회 호출 (유일한 prompt.txt 접근 경로)
+> - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 prompt.txt 접근 경로)
 
 > **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
 
@@ -148,13 +148,13 @@ AskUserQuestion(
 >
 > 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
 >
-> **1단계. reload-prompt.sh 호출** — 피드백 수신
+> **1단계. reload_prompt.py 호출** — 피드백 수신
 >
 > 오케스트레이터가 스크립트를 1회 호출하여 사용자 피드백을 수신합니다.
 >
 > ```bash
 > # 오케스트레이터 실행 코드
-> feedback=$(Bash(".claude/scripts/init/reload-prompt.sh <workDir>"))
+> feedback=$(Bash("python3 .claude/scripts/init/reload_prompt.py <workDir>"))
 > ```
 >
 > - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행
@@ -174,7 +174,7 @@ AskUserQuestion(
 > request: <request>
 > workDir: <workDir>
 > mode: revise
-> feedback: <reload-prompt.sh stdout>
+> feedback: <reload_prompt.py stdout>
 > ")
 > ```
 >
@@ -189,14 +189,14 @@ AskUserQuestion(
 
 ### CANCELLED Processing
 
-사용자가 "중지"를 선택하면 오케스트레이터가 `update-workflow-state.sh`를 호출하여 CANCELLED 상태를 기록합니다.
+사용자가 "중지"를 선택하면 오케스트레이터가 `update_state.py`를 호출하여 CANCELLED 상태를 기록합니다.
 
 **Update Method (2 Tool Calls, sequential):**
 ```bash
 # 1. CANCELLED 상태로 전이
-Bash("wf-state status <registryKey> PLAN CANCELLED")
+Bash("python3 .claude/scripts/workflow/update_state.py status <registryKey> PLAN CANCELLED")
 # 2. 레지스트리에서 해제 (MUST: 누락 시 잔류 엔트리 발생)
-Bash("wf-state unregister <registryKey>")
+Bash("python3 .claude/scripts/workflow/update_state.py unregister <registryKey>")
 ```
 
 > **REQUIRED:** `unregister` 호출을 생략하면 CANCELLED 상태의 엔트리가 레지스트리에 잔류합니다. status 전이와 unregister는 반드시 순차 실행하세요.

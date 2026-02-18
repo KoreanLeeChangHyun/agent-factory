@@ -74,5 +74,5 @@ license: "Apache-2.0"
 
 ## 참고
 - `.claude/settings.json` - Hook 설정 (안전장치 트리거)
-- `.claude/hooks/` - Hook thin wrapper 디렉터리, `.claude/scripts/` - 실제 로직 스크립트 디렉터리
+- `.claude/hooks/` - Hook thin wrapper 디렉터리 (.py), `.claude/scripts/` - 실제 로직 스크립트 디렉터리 (.py)
 - `hooks-guide` 스킬 - Hook 시스템 상세 가이드

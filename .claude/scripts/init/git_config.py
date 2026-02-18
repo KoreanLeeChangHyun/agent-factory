@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 git_config.py - Git Config 자동 설정 스크립트
 

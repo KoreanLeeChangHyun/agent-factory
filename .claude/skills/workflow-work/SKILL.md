@@ -89,7 +89,7 @@ Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work
 
 Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
 
-> **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다. no-plan 모드에서는 단일 Worker이므로 Phase 배너를 출력하지 않습니다.
+> **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다. no-plan 모드에서는 단일 Worker이므로 Phase 배너를 출력하지 않습니다.
 
 **독립 작업 (병렬 실행):**
 ```

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """Subagent token usage tracker (thin wrapper)
 Real logic: .claude/scripts/workflow/usage_tracker.py
 """

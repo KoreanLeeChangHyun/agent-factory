@@ -23,11 +23,11 @@
 | **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
 | **reporter** | 리포터 | REPORT Phase를 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
 | **done** | 던 | REPORT->COMPLETED 전이 구간(DONE)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
-| **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, Workflow 배너, wf-state 호출 등. |
+| **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, `step-start`/`step-end` 배너(shell alias — Bash 도구에서 alias 이름으로 직접 호출), update_state.py 호출 등. |
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
 | **registryKey** | 레지스트리 키 | 워크플로우를 전역적으로 식별하는 키. 형식: `YYYYMMDD-HHMMSS`. registry.json에서 workDir로 해석됨. |
-| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update-state.sh + transition-guard.sh)로 불법 전이를 차단. |
+| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update_state.py + transition-guard)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Phase에서 다른 Phase로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `no-plan`(INIT->WORK->REPORT->COMPLETED), `prompt`(INIT->WORK->REPORT->COMPLETED) 3가지. |
@@ -108,9 +108,12 @@ flowchart TD
 | Action | 주체 | 근거 |
 |--------|------|------|
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
-| Workflow 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시 |
-| wf-state 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
-| 소스 코드 수정 (Read/Write/Edit) | Sub (worker) | 역할 분리: 실제 작업은 서브에이전트에 위임 |
+| step-start/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시 |
+| update_state.py 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
+| 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
+| plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
+| skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 |
+| user_prompt.txt Read | Main (prompt 모드) / Sub (no-plan 모드) | 모드별 주체 다름. prompt 모드: 오케스트레이터 직접 작업. no-plan 모드: Worker가 직접 읽기 |
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
 | 보고서 작성 (report.md) | Sub (reporter) | 역할 분리: 보고서 종합은 reporter 전담 |
 | 작업 내역 작성 (work/WXX-*.md) | Sub (worker) | 역할 분리: 태스크 실행 기록은 worker 전담 |
@@ -129,7 +132,7 @@ flowchart TD
 ### Common Rules
 
 - 작업 상세는 `.workflow/` 파일에 기록, 메인에는 아래 형식만 반환 (코드/로그/테이블 MUST NOT)
-- 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 Bash 결과 수신 → turn 즉시 종료 (도구 호출 0개, 텍스트 출력 0자). `Workflow <registryKey> DONE done` 호출 후 어떠한 행위도 하지 않고 turn을 끝내라
+- 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 Bash 결과 수신 → turn 즉시 종료 (도구 호출 0개, 텍스트 출력 0자). `step-end <registryKey> DONE done` 호출 후 어떠한 행위도 하지 않고 turn을 끝내라
 
 ### init Return Format (8 lines)
 
@@ -175,7 +178,7 @@ workName: <작업이름>
 
 ## State Update Methods
 
-`wf-state <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
+`python3 .claude/scripts/workflow/update_state.py <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
 
 | Mode | Arguments | Description |
 |------|-----------|-------------|
@@ -219,7 +222,7 @@ workName: <작업이름>
 | no-plan | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
 | prompt | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
 
-불법 전이 시 시스템 가드가 차단. update-workflow-state.sh는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
+불법 전이 시 시스템 가드가 차단. update_state.py는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
 
@@ -232,5 +235,5 @@ workName: <작업이름>
 | Independent task failure | 다른 독립 태스크는 계속 진행 |
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
-| wf-state deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청 |
-| Workflow cancel/abort (중단/취소) | 반드시 `wf-state unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |
+| update_state.py deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청 |
+| Workflow cancel/abort (중단/취소) | 반드시 `python3 .claude/scripts/workflow/update_state.py unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |

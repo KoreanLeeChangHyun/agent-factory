@@ -35,13 +35,13 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 
 ## 금지 행위
 
-> **절대 금지:** 이 명령어(`/init:workflow`) 실행 중 `init-workflow.sh`를 Bash 도구로 직접 호출하지 않습니다.
+> **절대 금지:** 이 명령어(`/init:workflow`) 실행 중 `init_workflow.py`를 Bash 도구로 직접 호출하지 않습니다.
 
-- `init-workflow.sh`는 **cc:* 명령어 실행 시 init 에이전트가 Step 3에서만 호출**하는 스크립트입니다
+- `init_workflow.py`는 **cc:* 명령어 실행 시 init 에이전트가 Step 3에서만 호출**하는 스크립트입니다
 - `/init:workflow`는 **세션 초기화 전용**이며, 역할은 CLAUDE.md 로드 + workflow-orchestration 스킬 로드뿐입니다
 - 셸 스크립트 실행, 디렉터리 생성, 상태 파일 생성 등은 이 명령어의 범위가 아닙니다
 
-> **절대 금지:** 이 명령어(`/init:workflow`) 실행 중 `Workflow` (workflow-banner.sh) 배너를 호출하지 않습니다.
+> **절대 금지:** 이 명령어(`/init:workflow`) 실행 중 `Workflow` (banner.py) 배너를 호출하지 않습니다.
 
 - 배너는 **`cc:*` 워크플로우 명령어 실행 시에만 오케스트레이터가 호출**합니다
 - `/init:workflow`는 세션 초기화 전용이므로 배너 출력 대상이 아닙니다

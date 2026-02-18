@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 히스토리 동기화 및 상태 확인 명령어 (history-sync.sh -> history_sync.py 1:1 포팅)
 
@@ -78,7 +78,7 @@ def main():
         sys.exit(1)
 
     if subcmd == "sync":
-        print(f"{C_CYAN}[wf-history]{C_RESET} sync 시작...")
+        print(f"{C_CYAN}[history-sync]{C_RESET} sync 시작...")
 
         cmd = ["python3", CORE_SCRIPT, "sync", "--workflow-dir", workflow_dir, "--target", target_path]
         if dry_run:

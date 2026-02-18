@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 SubagentStop Hook: Worker/Reporter 완료 시 데스크톱 알림 발송
 (completion-notify.sh -> completion_notify.py 1:1 포팅)

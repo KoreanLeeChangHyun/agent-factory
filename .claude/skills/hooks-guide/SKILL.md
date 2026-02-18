@@ -37,54 +37,54 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ```
 .claude/hooks/                          # Hook thin wrappers (이벤트별 디렉터리)
 ├── pre-tool-use/
-│   ├── hooks-self-guard.sh             # -> scripts/guards/hooks-self-guard.sh
-│   ├── dangerous-command-guard.sh      # -> scripts/guards/dangerous-command-guard.sh
-│   ├── tdd-guard.sh                    # -> scripts/guards/tdd-guard.sh
-│   ├── workflow-transition-guard.sh    # -> scripts/guards/workflow-transition-guard.sh
-│   ├── workflow-agent-guard.sh         # -> scripts/guards/workflow-agent-guard.sh
-│   ├── slack-ask.sh                    # -> scripts/slack/slack-ask.sh
-│   └── task-history-sync.sh            # history-sync.sh 호출 (인라인)
+│   ├── hooks-self-guard.py             # -> scripts/guards/hooks_self_guard.py
+│   ├── dangerous-command-guard.py      # -> scripts/guards/dangerous_command_guard.py
+│   ├── tdd-guard.py                    # -> scripts/guards/tdd_guard.py
+│   ├── workflow-transition-guard.py    # -> scripts/guards/workflow_transition_guard.py
+│   ├── workflow-agent-guard.py         # -> scripts/guards/workflow_agent_guard.py
+│   ├── slack-ask.py                    # -> scripts/slack/slack_ask.py
+│   └── task-history-sync.py            # history_sync.py 호출 (인라인)
 ├── stop/
-│   └── workflow-auto-continue.sh       # -> scripts/workflow/workflow-auto-continue.sh
+│   └── workflow-auto-continue.py       # -> scripts/workflow/workflow_auto_continue.py
 └── subagent-stop/
-    ├── usage-tracker.sh                # -> scripts/workflow/usage-tracker.sh
-    ├── completion-notify.sh            # -> scripts/workflow/completion-notify.sh
-    └── history-sync-trigger.sh         # history-sync.sh 호출 (인라인)
+    ├── usage-tracker.py                # -> scripts/workflow/usage_tracker.py
+    ├── completion-notify.py            # -> scripts/workflow/completion_notify.py
+    └── history-sync-trigger.py         # history_sync.py 호출 (인라인)
 
 .claude/scripts/                        # 실제 로직 스크립트
 ├── _utils/                             # 공통 유틸리티
-│   ├── env-utils.sh                    # 환경변수 파싱
-│   ├── slack-common.sh                 # Slack 공통 함수
+│   ├── env_utils.py                    # 환경변수 파싱
+│   ├── slack_common.py                 # Slack 공통 함수
 │   └── resolve-workflow.py             # 워크플로우 경로 해석
 ├── guards/                             # 가드 스크립트
-│   ├── hooks-self-guard.sh
-│   ├── dangerous-command-guard.sh
-│   ├── tdd-guard.sh
-│   ├── workflow-transition-guard.sh
-│   └── workflow-agent-guard.sh
+│   ├── hooks_self_guard.py
+│   ├── dangerous_command_guard.py
+│   ├── tdd_guard.py
+│   ├── workflow_transition_guard.py
+│   └── workflow_agent_guard.py
 ├── init/                               # 초기화/설정 스크립트 (alias 호출)
-│   ├── init-workflow.sh
-│   ├── init-claude.sh
-│   ├── init-project.sh
-│   ├── init-clear.sh
-│   ├── init-sync.sh
-│   ├── git-config.sh
-│   ├── reload-prompt.sh
-│   └── cleanup-zombie.sh
+│   ├── init_workflow.py
+│   ├── init_claude.py
+│   ├── init_project.py
+│   ├── init_clear.py
+│   ├── init_sync.py
+│   ├── git_config.py
+│   ├── reload_prompt.py
+│   └── cleanup_zombie.py
 ├── workflow/                           # 워크플로우 런타임 유틸리티
-│   ├── update-state.sh
-│   ├── banner.sh
-│   ├── info.sh
-│   ├── commands.sh
-│   ├── registry.sh
-│   ├── history-sync.sh
-│   ├── archive-workflow.sh
-│   ├── workflow-auto-continue.sh
-│   ├── usage-tracker.sh
-│   └── completion-notify.sh
+│   ├── update_state.py
+│   ├── banner.py
+│   ├── info.py
+│   ├── commands.py
+│   ├── registry.py
+│   ├── history_sync.py
+│   ├── archive_workflow.py
+│   ├── workflow_auto_continue.py
+│   ├── usage_tracker.py
+│   └── completion_notify.py
 └── slack/                              # Slack 알림 (alias 호출)
-    ├── slack.sh
-    └── slack-ask.sh
+    ├── slack_notify.py
+    └── slack_ask.py
 ```
 
 ### 현재 프로젝트 Hook 설정
@@ -101,7 +101,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/pre-tool-use/slack-ask.sh",
+      "command": "python3 .claude/hooks/pre-tool-use/slack-ask.py",
       "async": true,
       "statusMessage": "Slack 알림 전송 중..."
     }
@@ -112,7 +112,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **트리거**: AskUserQuestion 도구 호출 시
 - **동작**: Slack으로 "사용자 입력 대기 중" 알림 전송
 - **비동기**: async: true (도구 실행을 차단하지 않음)
-- **스크립트**: `.claude/hooks/pre-tool-use/slack-ask.sh` (thin wrapper -> `.claude/scripts/slack/slack-ask.sh`)
+- **스크립트**: `.claude/hooks/pre-tool-use/slack-ask.py` (thin wrapper -> `.claude/scripts/slack/slack_ask.py`)
 - **사전 조건**: `.workflow/registry.json`에 워크플로우 등록 필요
 - **관련 스킬**: `workflow-plan` (PLAN 단계에서 사용자 승인 대기 시)
 
@@ -124,7 +124,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/pre-tool-use/dangerous-command-guard.sh",
+      "command": "python3 .claude/hooks/pre-tool-use/dangerous-command-guard.py",
       "statusMessage": "위험 명령어 검사 중..."
     }
   ]
@@ -134,7 +134,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **트리거**: Bash 도구 호출 시
 - **동작**: `rm -rf`, `git reset --hard`, `git push --force` 등 위험 명령어 감지 시 실행 차단
 - **동기**: 도구 실행을 차단할 수 있음
-- **스크립트**: `.claude/hooks/pre-tool-use/dangerous-command-guard.sh` (thin wrapper -> `.claude/scripts/guards/dangerous-command-guard.sh`)
+- **스크립트**: `.claude/hooks/pre-tool-use/dangerous-command-guard.py` (thin wrapper -> `.claude/scripts/guards/dangerous_command_guard.py`)
 - **관련 스킬**: `dangerous-command-guard`
 
 ##### 3. TDD 가드 (Write|Edit)
@@ -145,7 +145,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/pre-tool-use/tdd-guard.sh",
+      "command": "python3 .claude/hooks/pre-tool-use/tdd-guard.py",
       "statusMessage": "TDD 가드 검사 중..."
     }
   ]
@@ -155,7 +155,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **트리거**: Write 또는 Edit 도구 호출 시
 - **동작**: 테스트 없이 소스 파일을 수정하려는 시도 감지 시 경고
 - **동기**: 경고만 표시 (차단하지 않음)
-- **스크립트**: `.claude/hooks/pre-tool-use/tdd-guard.sh` (thin wrapper -> `.claude/scripts/guards/tdd-guard.sh`)
+- **스크립트**: `.claude/hooks/pre-tool-use/tdd-guard.py` (thin wrapper -> `.claude/scripts/guards/tdd_guard.py`)
 - **관련 스킬**: `tdd-guard-hook`
 
 ##### 4. 워크플로우 Phase 전이 검증 (Bash)
@@ -166,7 +166,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/pre-tool-use/workflow-transition-guard.sh",
+      "command": "python3 .claude/hooks/pre-tool-use/workflow-transition-guard.py",
       "statusMessage": "워크플로우 전이 검증 중..."
     }
   ]
@@ -176,7 +176,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **트리거**: Bash 도구 호출 시
 - **동작**: 워크플로우 Phase 전이가 올바른 순서로 진행되는지 검증 (INIT -> PLAN -> WORK -> REPORT)
 - **동기**: 잘못된 Phase 전이 시 차단 가능
-- **스크립트**: `.claude/hooks/pre-tool-use/workflow-transition-guard.sh` (thin wrapper -> `.claude/scripts/guards/workflow-transition-guard.sh`)
+- **스크립트**: `.claude/hooks/pre-tool-use/workflow-transition-guard.py` (thin wrapper -> `.claude/scripts/guards/workflow_transition_guard.py`)
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
 ##### 5. 워크플로우 에이전트 호출 검증 (Task)
@@ -187,7 +187,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/pre-tool-use/workflow-agent-guard.sh",
+      "command": "python3 .claude/hooks/pre-tool-use/workflow-agent-guard.py",
       "statusMessage": "워크플로우 에이전트 검증 중..."
     }
   ]
@@ -197,7 +197,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **트리거**: Task(서브에이전트) 도구 호출 시
 - **동작**: 워크플로우 단계에 맞는 에이전트만 호출되는지 검증 (예: WORK 단계에서 planner 호출 차단)
 - **동기**: 잘못된 에이전트 호출 시 차단 가능
-- **스크립트**: `.claude/hooks/pre-tool-use/workflow-agent-guard.sh` (thin wrapper -> `.claude/scripts/guards/workflow-agent-guard.sh`)
+- **스크립트**: `.claude/hooks/pre-tool-use/workflow-agent-guard.py` (thin wrapper -> `.claude/scripts/guards/workflow_agent_guard.py`)
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
 #### Stop Hooks
@@ -210,7 +210,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "bash .claude/hooks/stop/workflow-auto-continue.sh",
+      "command": "python3 .claude/hooks/stop/workflow-auto-continue.py",
       "statusMessage": "워크플로우 자동 계속 확인 중..."
     }
   ]
@@ -221,7 +221,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **동작**: 활성 워크플로우가 진행 중(INIT/WORK/REPORT phase)이면 자동 중단 차단
 - **안전장치**: 연속 3회 차단 시 허용 (무한 루프 방지), PLAN phase 예외 (AskUserQuestion 대기 존중)
 - **bypass**: `WORKFLOW_GUARD_DISABLE=1` 환경변수 또는 `.workflow/bypass` 파일
-- **스크립트**: `.claude/hooks/stop/workflow-auto-continue.sh` (thin wrapper -> `.claude/scripts/workflow/workflow-auto-continue.sh`)
+- **스크립트**: `.claude/hooks/stop/workflow-auto-continue.py` (thin wrapper -> `.claude/scripts/workflow/workflow_auto_continue.py`)
 - **출력 형식**: `{"decision":"block","reason":"..."}`
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
@@ -276,7 +276,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post-tool-use/post-bash-hook.sh",
+            "command": "python3 .claude/hooks/post-tool-use/post-bash-hook.py",
             "statusMessage": "후처리 중..."
           }
         ]
@@ -294,45 +294,47 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 | thin wrapper | 실제 로직 | 역할 | 이벤트 | 매칭 도구 |
 |------|------|--------|-----------|-----------|
-| `.claude/hooks/pre-tool-use/hooks-self-guard.sh` | `.claude/scripts/guards/hooks-self-guard.sh` | hooks/scripts 자기 보호 | PreToolUse | Write, Edit, Bash |
-| `.claude/hooks/pre-tool-use/slack-ask.sh` | `.claude/scripts/slack/slack-ask.sh` | Slack 질문 알림 전송 | PreToolUse | AskUserQuestion |
-| `.claude/hooks/pre-tool-use/dangerous-command-guard.sh` | `.claude/scripts/guards/dangerous-command-guard.sh` | 위험 명령어 차단 | PreToolUse | Bash |
-| `.claude/hooks/pre-tool-use/tdd-guard.sh` | `.claude/scripts/guards/tdd-guard.sh` | TDD 원칙 위반 경고 | PreToolUse | Write, Edit |
-| `.claude/hooks/pre-tool-use/workflow-transition-guard.sh` | `.claude/scripts/guards/workflow-transition-guard.sh` | 워크플로우 Phase 전이 검증 | PreToolUse | Bash |
-| `.claude/hooks/pre-tool-use/workflow-agent-guard.sh` | `.claude/scripts/guards/workflow-agent-guard.sh` | 워크플로우 에이전트 호출 검증 | PreToolUse | Task |
-| `.claude/hooks/stop/workflow-auto-continue.sh` | `.claude/scripts/workflow/workflow-auto-continue.sh` | 워크플로우 자동 계속 (Stop 차단) | Stop | (전체) |
+| `.claude/hooks/pre-tool-use/hooks-self-guard.py` | `.claude/scripts/guards/hooks_self_guard.py` | hooks/scripts 자기 보호 | PreToolUse | Write, Edit, Bash |
+| `.claude/hooks/pre-tool-use/slack-ask.py` | `.claude/scripts/slack/slack_ask.py` | Slack 질문 알림 전송 | PreToolUse | AskUserQuestion |
+| `.claude/hooks/pre-tool-use/dangerous-command-guard.py` | `.claude/scripts/guards/dangerous_command_guard.py` | 위험 명령어 차단 | PreToolUse | Bash |
+| `.claude/hooks/pre-tool-use/tdd-guard.py` | `.claude/scripts/guards/tdd_guard.py` | TDD 원칙 위반 경고 | PreToolUse | Write, Edit |
+| `.claude/hooks/pre-tool-use/workflow-transition-guard.py` | `.claude/scripts/guards/workflow_transition_guard.py` | 워크플로우 Phase 전이 검증 | PreToolUse | Bash |
+| `.claude/hooks/pre-tool-use/workflow-agent-guard.py` | `.claude/scripts/guards/workflow_agent_guard.py` | 워크플로우 에이전트 호출 검증 | PreToolUse | Task |
+| `.claude/hooks/stop/workflow-auto-continue.py` | `.claude/scripts/workflow/workflow_auto_continue.py` | 워크플로우 자동 계속 (Stop 차단) | Stop | (전체) |
 
-### 초기화/설정 스크립트 (alias 호출)
+### 초기화/설정 스크립트 (슬래시 커맨드로 호출)
 
-| 파일 | alias | 용도 |
-|------|-------|------|
-| `.claude/scripts/init/init-workflow.sh` | wf-init | 워크플로우 시작 |
-| `.claude/scripts/init/init-claude.sh` | wf-claude | 사용자 환경 초기화 |
-| `.claude/scripts/init/init-project.sh` | wf-project | 프로젝트 설정 |
-| `.claude/scripts/init/init-clear.sh` | wf-clear | 워크플로우 삭제 |
-| `.claude/scripts/init/init-sync.sh` | wf-sync | 설정 동기화 |
-| `.claude/scripts/init/git-config.sh` | wf-git-config | Git 설정 |
+| 파일 | 슬래시 커맨드 | 용도 |
+|------|-------------|------|
+| `.claude/scripts/init/init_workflow.py` | `/init:workflow` | 워크플로우 시작 |
+| `.claude/scripts/init/init_claude.py` | `/init:claude` | 사용자 환경 초기화 |
+| `.claude/scripts/init/init_project.py` | `/init:project` | 프로젝트 설정 |
+| `.claude/scripts/init/init_clear.py` | `/init:clear` | 워크플로우 삭제 |
+| `.claude/scripts/init/init_sync.py` | `/sync:history` | 설정 동기화 |
+| `.claude/scripts/init/git_config.py` | `/git:config` | Git 설정 |
 
-### 워크플로우 유틸리티 (alias/내부 호출)
+### 워크플로우 유틸리티
 
-| 파일 | alias/호출 방식 | 용도 |
-|------|----------------|------|
-| `.claude/scripts/workflow/update-state.sh` | wf-state | 워크플로우 상태 관리 |
-| `.claude/scripts/workflow/banner.sh` | Workflow | 배너 출력 |
-| `.claude/scripts/workflow/info.sh` | wf-info | 워크플로우 정보 조회 |
+| 파일 | 호출 방식 | 용도 |
+|------|----------|------|
+| `.claude/scripts/workflow/update_state.py` | `python3` 직접 호출 | 워크플로우 상태 관리 |
+| `.claude/scripts/workflow/banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
+| `.claude/scripts/workflow/step_complete.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
+| `.claude/scripts/workflow/banner.py` | 내부 호출 | 배너 출력 (Python 버전) |
+| `.claude/scripts/workflow/info.py` | `python3` 직접 호출 | 워크플로우 정보 조회 |
 
 ### Slack 관련
 
 | 파일 | 용도 |
 |------|------|
-| `.claude/scripts/slack/slack.sh` | Slack 완료 알림 (alias: wf-slack) |
-| `.claude/scripts/_utils/slack-common.sh` | 공통 함수 라이브러리 |
+| `.claude/scripts/slack/slack_notify.py` | Slack 완료 알림 |
+| `.claude/scripts/_utils/slack_common.py` | 공통 함수 라이브러리 |
 
 ### 공통 유틸리티
 
 | 파일 | 용도 |
 |------|------|
-| `.claude/scripts/_utils/env-utils.sh` | 환경변수 파싱 유틸리티 |
+| `.claude/scripts/_utils/env_utils.py` | 환경변수 파싱 유틸리티 |
 | `.claude/scripts/_utils/resolve-workflow.py` | 워크플로우 경로 해석 |
 
 ## 참고

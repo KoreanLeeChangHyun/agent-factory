@@ -10,7 +10,7 @@ Claude Code 사용을 위한 사용자 환경을 초기화합니다.
 
 ## 스크립트
 
-`.claude/scripts/init/init-claude.sh` - 서브커맨드: check-alias, setup-alias, setup-statusline, setup-slack, setup-git, verify
+`.claude/scripts/init/init_claude.py` - 서브커맨드: check-alias, setup-alias, setup-statusline, setup-slack, setup-git, verify
 
 ## 오케스트레이션 흐름
 
@@ -21,7 +21,7 @@ Claude Code 사용을 위한 사용자 환경을 초기화합니다.
 Bash 도구로 실행:
 
 ```bash
-wf-claude check-alias
+python3 .claude/scripts/init/init_claude.py check-alias
 ```
 
 **결과 JSON 예시:**
@@ -46,7 +46,7 @@ wf-claude check-alias
 Bash 도구로 실행:
 
 ```bash
-wf-claude setup-alias
+python3 .claude/scripts/init/init_claude.py setup-alias
 ```
 
 PATH export(`~/.local/bin`)와 alias(cc, ccc)가 블록 마커 안에 함께 설정됩니다. 결과 메시지 출력 후 Step 4로 진행.
@@ -56,7 +56,7 @@ PATH export(`~/.local/bin`)와 alias(cc, ccc)가 블록 마커 안에 함께 설
 Bash 도구로 실행:
 
 ```bash
-wf-claude setup-statusline
+python3 .claude/scripts/init/init_claude.py setup-statusline
 ```
 
 결과 JSON에서 `settings_updated`, `script_created` 확인 후 결과 메시지 출력.
@@ -77,7 +77,7 @@ wf-claude setup-statusline
 Bash 도구로 실행 (URL은 사용자 입력값):
 
 ```bash
-wf-claude setup-slack "<입력받은_URL>"
+python3 .claude/scripts/init/init_claude.py setup-slack "<입력받은_URL>"
 ```
 
 결과 메시지 출력 후 Step 7로 진행.
@@ -87,7 +87,7 @@ wf-claude setup-slack "<입력받은_URL>"
 Bash 도구로 실행:
 
 ```bash
-wf-claude setup-git
+python3 .claude/scripts/init/init_claude.py setup-git
 ```
 
 **결과 JSON 분기:**
@@ -109,7 +109,7 @@ wf-claude setup-git
 Bash 도구로 실행:
 
 ```bash
-wf-claude verify
+python3 .claude/scripts/init/init_claude.py verify
 ```
 
 결과 JSON의 `checks` 객체를 파싱하여 최종 결과 출력:
@@ -171,7 +171,7 @@ wf-claude verify
 
 | 항목 | 설명 | 필수 |
 |------|------|------|
-| `wf-claude` 커맨드 | `~/.local/bin/wf-claude` wrapper 스크립트 (init-claude.sh 호출용) | 필수 |
+| `python3` | `init_claude.py` 스크립트 실행용 | 필수 |
 | `python3` | settings.json JSON 병합에 사용 (setup-statusline) | 필수 |
 | `~/.zshrc` | Shell alias, Slack export 등록 대상 (없으면 자동 생성) | 자동 |
 

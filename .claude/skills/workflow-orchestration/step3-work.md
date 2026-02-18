@@ -9,9 +9,9 @@
 > **State Update** before WORK start:
 > ```bash
 > # full mode (default): transition from PLAN
-> wf-state both <registryKey> worker PLAN WORK
+> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK
 > # no-plan mode: transition from INIT (PLAN was skipped)
-> wf-state both <registryKey> worker INIT WORK
+> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
 > ```
 
 > **WORK Phase Rules (REQUIRED)**
@@ -45,8 +45,8 @@ Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, tas
 **usage-pending 등록:**
 ```bash
 # Worker와 동일한 방식으로 usage-pending 등록
-wf-state task-status <registryKey> <taskId> running
-wf-state usage-pending <registryKey> <taskId> <taskId>
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> running
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <taskId> <taskId>
 ```
 
 **반환값 처리:**
@@ -67,14 +67,14 @@ wf-state usage-pending <registryKey> <taskId> <taskId>
 **병렬 호출 예시 (Worker + Explorer 혼합):**
 ```bash
 # Phase 1에서 Worker와 Explorer가 병렬 실행
-Workflow <registryKey> WORK-PHASE 1 "W01,W02,W03" parallel
+step-start <registryKey> WORK-PHASE 1 "W01,W02,W03" parallel
 
-wf-state task-status <registryKey> W01 running
-wf-state task-status <registryKey> W02 running
-wf-state task-status <registryKey> W03 running
-wf-state usage-pending <registryKey> W01 W01
-wf-state usage-pending <registryKey> W02 W02
-wf-state usage-pending <registryKey> W03 W03
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W02 running
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W03 running
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W02 W02
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W03 W03
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
@@ -88,18 +88,18 @@ Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskI
 
 > **no-plan 모드에서는 Phase 0과 Phase 1~N 대신 단일 Worker를 호출합니다.**
 
-no-plan 모드 판별: status.json의 `mode` 필드가 `no-plan`이면 아래 패턴으로 실행합니다.
+no-plan 모드 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `no-plan`이면 아래 패턴으로 실행합니다. (status.json Read 불필요)
 
 **State Update:**
 ```bash
-wf-state both <registryKey> worker INIT WORK
+python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
 ```
 
 **Single Worker Call (no planPath, no Phase 0):**
 ```bash
 # task-status + usage-pending: Worker 호출 직전에 실행
-wf-state task-status <registryKey> W01 running
-wf-state usage-pending <registryKey> W01 W01
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
@@ -118,6 +118,28 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악하고, 명령어별 기본 스킬 매핑으로 스킬을 자동 결정하여 작업을 수행합니다.
 
 > **Note:** no-plan 모드에서는 단일 Worker이므로 WORK-PHASE 서브배너를 출력하지 않습니다.
+
+---
+
+## Plan Reading for Task Dispatch (REQUIRED)
+
+<!-- plan.md 직접 Read가 불가피한 이유: 서브에이전트 간 직접 통신 불가(플랫폼 제약)로 오케스트레이터만이 디스패치 순서를 제어할 수 있으며, INIT/planner 반환값 줄 수 제한(8줄/3줄)으로 전체 태스크 구조를 전달할 수 없음 -->
+
+WORK 단계 진입 후, 오케스트레이터는 `<workDir>/plan.md`를 **1회만** 읽어 아래 **최소 5개 필드만** 추출합니다:
+
+| 필수 추출 필드 | 설명 |
+|---------------|------|
+| `taskId` | 태스크 ID (W01, W02, ...) |
+| `phase` | Phase 할당 (Phase 0, Phase 1, Phase 2, ...) |
+| `dependencies` | 종속성 (dependency chain) |
+| `parallelism` | 병렬/순차 여부 (parallel/sequential) |
+| `agentType` | 서브에이전트 타입 (Worker/Explorer) |
+
+> **위 5개 필드 외 계획서 내용(작업 설명, 복잡도, 대상 파일 등)은 Worker가 직접 참조합니다. 오케스트레이터 컨텍스트에 보관하지 않습니다.**
+
+이 시점에 `planPath` 변수를 확정하여 후속 Worker/Explorer 호출 시 전달합니다.
+
+> **WARNING: 오케스트레이터는 현재 워크플로우의 `<workDir>/plan.md`만 읽는다. 다른 워크플로우 디렉터리의 파일은 절대 읽지 않는다.** 현재 워크플로우(`<workDir>`) 외부의 `.workflow/` 경로에 있는 파일(다른 워크플로우의 plan.md, report.md, work/*.md 등)을 읽으면 컨텍스트 오염 및 토큰 낭비가 발생합니다.
 
 ---
 
@@ -146,11 +168,11 @@ flowchart TD
 
 ```bash
 # MUST: Phase 0 서브배너 출력 (스킵 금지, taskIds는 반드시 "phase0"으로 전달)
-Workflow <registryKey> WORK-PHASE 0 "phase0" sequential
+step-start <registryKey> WORK-PHASE 0 "phase0" sequential
 ```
 ```bash
 # MUST: Phase 0 배너 직후, Task 호출 전에 반드시 아래 3개 명령을 단일 Bash로 실행
-mkdir -p <workDir>/work && wf-state task-status <registryKey> phase0 running && wf-state usage-pending <registryKey> phase0 phase0
+mkdir -p <workDir>/work && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> phase0 phase0
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
@@ -159,13 +181,13 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 **Phase 0 완료 후 task-status 갱신:**
 ```bash
 # Worker 반환값 수신 후 (성공/실패에 따라)
-wf-state task-status <registryKey> phase0 completed   # 성공 시
-wf-state task-status <registryKey> phase0 failed       # 실패 시
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 completed   # 성공 시
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 failed       # 실패 시
 ```
 
 Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스크와 스킬을 매핑하여 `<workDir>/work/skill-map.md` 생성.
 
-Phase 0 완료 후 skill-map.md를 참고하여 후속 worker 호출 시 skills 파라미터를 전달합니다.
+Phase 0 완료 후, 오케스트레이터는 skill-map.md를 직접 Read하지 않습니다. 대신 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로를 파라미터로 전달하고, Phase 1+ Worker가 직접 읽어 스킬을 결정합니다.
 
 **Phase 0 실패 시 폴백:**
 
@@ -192,17 +214,17 @@ Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별
 
 ```bash
 # Phase N 서브배너 출력 (Worker 호출 직전, 각 Phase마다 1회)
-Workflow <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
+step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>
 ```
 
 **Independent tasks (parallel):**
 ```bash
 # Phase 서브배너 출력
-Workflow <registryKey> WORK-PHASE 1 "W01,W02" parallel
+step-start <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 일괄 실행 (스킵 금지)
-wf-state task-status <registryKey> W01 running && wf-state task-status <registryKey> W02 running && wf-state usage-pending <registryKey> W01 W01 && wf-state usage-pending <registryKey> W02 W02
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W02 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01 && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W02 W02
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -212,17 +234,17 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 **Dependent tasks (sequential):**
 ```bash
 # Phase 서브배너 출력
-Workflow <registryKey> WORK-PHASE 2 "W04" sequential
+step-start <registryKey> WORK-PHASE 2 "W04" sequential
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 실행 (스킵 금지)
-wf-state task-status <registryKey> W04 running && wf-state usage-pending <registryKey> W04 W04
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W04 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W04 W04
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
 ```
 
-> **skills parameter**: Phase 0에서 생성된 skill-map.md의 추천 스킬 또는 계획서에 명시된 스킬을 전달. 미명시 태스크는 worker가 자동 결정.
+> **skills parameter**: 계획서에 태스크별 스킬이 명시된 경우 전달. Phase 0 skill-map.md는 오케스트레이터가 읽지 않고, Worker에게 `skillMapPath: <workDir>/work/skill-map.md`로 경로만 전달하여 Worker가 직접 참조. 미명시 태스크는 worker가 자동 결정.
 
 ## Error Handling
 
@@ -285,10 +307,10 @@ Worker 반환값 수신 후, 반환 상태에 따라 `task-status`를 갱신합�
 
 ```bash
 # 반환값 첫 줄이 "상태: 성공" 또는 "상태: 부분성공"인 경우
-wf-state task-status <registryKey> <taskId> completed
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> completed
 
 # 반환값 첫 줄이 "상태: 실패"인 경우
-wf-state task-status <registryKey> <taskId> failed
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> failed
 ```
 
 > **MUST: Worker 반환값 수신 직후, 다음 Phase 배너 호출 전에 반드시 task-status를 갱신합니다. 스킵 금지.** 병렬 Worker의 경우, 모든 Worker 반환 후 단일 Bash로 일괄 갱신합니다.
@@ -299,7 +321,7 @@ wf-state task-status <registryKey> <taskId> failed
 
 > Worker 토큰 사용량을 taskId 단위로 정확히 추적하기 위해, **모든 Worker Task 호출 직전에** `usage-pending`을 실행해야 합니다.
 
-**목적:** SubagentStop Hook(`usage-tracker.sh`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId에 귀속시킵니다.
+**목적:** SubagentStop Hook(`usage_tracker.py`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId에 귀속시킵니다.
 
 **호출 규칙:**
 
@@ -310,32 +332,32 @@ wf-state task-status <registryKey> <taskId> failed
 | no-plan 단일 Worker | Worker 호출 직전에 `usage-pending` | taskId=W01 고정 |
 
 ```bash
-# 형식: wf-state usage-pending <registryKey> <agent_id_or_taskId> <taskId>
-wf-state usage-pending <registryKey> W01 W01
+# 형식: python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <agent_id_or_taskId> <taskId>
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
 ```
 
 ## Hooks 수정 태스크 실행 패턴
 
-> hooks/scripts 디렉터리(`.claude/hooks/`, `.claude/scripts/`)의 파일을 수정하는 태스크는 `hooks-self-guard.sh`에 의해 차단됩니다.
-> 오케스트레이터가 `wf-state env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
+> hooks/scripts 디렉터리(`.claude/hooks/`, `.claude/scripts/`)의 파일을 수정하는 태스크는 `hooks-self-guard.py`에 의해 차단됩니다.
+> 오케스트레이터가 `python3 .claude/scripts/workflow/update_state.py env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
 
 **실행 순서:**
 
 ```bash
 # 1. Worker 호출 전: hooks 수정 허용 환경변수 설정
-wf-state env <registryKey> set HOOKS_EDIT_ALLOWED 1
+python3 .claude/scripts/workflow/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1
 
 # 2. Worker 호출 (hooks 파일 수정 태스크)
-wf-state task-status <registryKey> W01 running
-wf-state usage-pending <registryKey> W01 W01
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
+python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
 ```
 ```bash
 # 3. Worker 완료 후: task-status 갱신 + 환경변수 해제 (반드시 실행)
-wf-state task-status <registryKey> W01 completed   # 또는 failed
-wf-state env <registryKey> unset HOOKS_EDIT_ALLOWED
+python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 completed   # 또는 failed
+python3 .claude/scripts/workflow/update_state.py env <registryKey> unset HOOKS_EDIT_ALLOWED
 ```
 
 **규칙:**
@@ -344,5 +366,5 @@ wf-state env <registryKey> unset HOOKS_EDIT_ALLOWED
 |------|------|
 | 설정 시점 | Worker Task 호출 직전 (usage-pending보다 먼저) |
 | 해제 시점 | Worker 반환값 수신 직후 (성공/실패 무관, 반드시 해제) |
-| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `wf-state env`의 화이트리스트로 제한 |
+| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `python3 .claude/scripts/workflow/update_state.py env`의 화이트리스트로 제한 |
 | 적용 대상 | 계획서에서 hooks 디렉터리 파일을 수정 대상으로 명시한 태스크만 해당 |

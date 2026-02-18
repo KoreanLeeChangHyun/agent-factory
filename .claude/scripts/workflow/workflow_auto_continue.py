@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 워크플로우 자동 계속 Stop Hook (workflow-auto-continue.sh -> workflow_auto_continue.py 1:1 포팅)
 

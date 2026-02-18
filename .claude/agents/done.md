@@ -36,14 +36,14 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 ### 이 에이전트의 전담 행위
 
 - history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
-- status.json 완료 처리 (`wf-state status`)
-- 사용량 확정 (`wf-state usage-finalize`)
-- 레지스트리 해제 (`wf-state unregister`)
+- status.json 완료 처리 (`python3 .claude/scripts/workflow/update_state.py status`)
+- 사용량 확정 (`python3 .claude/scripts/workflow/update_state.py usage-finalize`)
+- 레지스트리 해제 (`python3 .claude/scripts/workflow/update_state.py unregister`)
 - 워크플로우 아카이빙 (최신 10개 유지, .history 이동, history.md 링크 갱신)
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- DONE 배너 호출 (`Workflow <registryKey> DONE` / `DONE done`)
+- DONE 배너 호출 (`step-start <registryKey> DONE` / `step-end DONE`)
 - DONE 완료 배너 후 즉시 종료 판단
 - Slack 완료 알림 (DONE 배너에 의해 자동 전송)
 
@@ -51,7 +51,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-done` | 워크플로우 | frontmatter `skills` | done 에이전트 활동 구간 절차, history.md 갱신 형식, wf-state 호출 규약 |
+| `workflow-done` | 워크플로우 | frontmatter `skills` | done 에이전트 활동 구간 절차, history.md 갱신 형식, update_state.py 호출 규약 |
 
 > done 에이전트는 커맨드 스킬을 사용하지 않습니다. 마무리 처리 전용이므로 워크플로우 스킬만 바인딩됩니다.
 
@@ -68,13 +68,13 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 절차
 
-1. **history.md 최종 확인 갱신** - `bash .claude/scripts/workflow/history-sync.sh sync` 실행으로 `.prompt/history.md` 최종 상태 확인 및 갱신 (phase 전이 시 자동 갱신의 안전망 역할)
-2. **status.json 완료 처리** - `wf-state status <registryKey> REPORT COMPLETED|FAILED` 실행
-3. **사용량 확정** - 성공 시 `wf-state usage-finalize <registryKey>` 실행 (실패 시 비차단)
-4. **레지스트리 해제** - `wf-state unregister <registryKey>` 실행
-5. **워크플로우 아카이빙** - `bash .claude/scripts/workflow/archive-workflow.sh <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history-sync.sh sync`가 자동 처리)
+1. **history.md 최종 확인 갱신** - `python3 .claude/scripts/workflow/history_sync.py sync` 실행으로 `.prompt/history.md` 최종 상태 확인 및 갱신 (phase 전이 시 자동 갱신의 안전망 역할)
+2. **status.json 완료 처리** - `python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT COMPLETED|FAILED` 실행
+3. **사용량 확정** - 성공 시 `python3 .claude/scripts/workflow/update_state.py usage-finalize <registryKey>` 실행 (실패 시 비차단)
+4. **레지스트리 해제** - `python3 .claude/scripts/workflow/update_state.py unregister <registryKey>` 실행
+5. **워크플로우 아카이빙** - `python3 .claude/scripts/workflow/archive_workflow.py <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history_sync.py sync`가 자동 처리)
 
-> 상세 절차 (history.md 행 형식, 링크 구성, wf-state 호출 규약)는 `workflow-done/SKILL.md`를 참조하세요.
+> 상세 절차 (history.md 행 형식, 링크 구성, update_state.py 호출 규약)는 `workflow-done/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 
@@ -110,7 +110,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 ## 주의사항
 
 1. **절차 순서 엄수**: 1(history.md) -> 2(status.json) -> 3(usage) -> 4(unregister) -> 5(아카이빙) 순서를 반드시 준수
-2. **history.md 스크립트 실행**: `history-sync.sh sync`의 종료 코드를 확인하여 성공/실패 판단
+2. **history.md 스크립트 실행**: `history_sync.py sync`의 종료 코드를 확인하여 성공/실패 판단
 3. **비차단 원칙**: history.md, usage, unregister 실패는 경고만 출력하고 계속 진행
 4. **status.json 전이만 에러 반환 대상**: status.json 전이 실패만 유일한 에러 반환 사유
 5. **반환 형식 엄수**: 1줄 규격 외 추가 정보(갱신 결과, 배너 출력 여부 등)를 절대 포함하지 않음

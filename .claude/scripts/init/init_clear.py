@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 """
 init_clear.py - 작업 내역 클리어 스크립트
 
