@@ -1,6 +1,6 @@
 ---
 name: workflow-done
-description: "Internal skill for workflow END stage. Performs workflow finalization after reporter completion. Use for workflow finalization: history.md update (using summary.txt), status.json completion, usage finalization, registry release, workflow archiving (keeping latest 10) in a 5-step procedure. Internally invoked by orchestrator; not intended for direct user invocation."
+description: "Internal skill for workflow DONE stage. Performs workflow finalization after reporter completion. Use for workflow finalization: history.md update (using summary.txt), status.json completion, usage finalization, registry release, workflow archiving (keeping latest 10) in a 5-step procedure. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---

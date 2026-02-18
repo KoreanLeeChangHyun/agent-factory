@@ -1,4 +1,4 @@
-# Step 5: END (done Agent)
+# Step 5: DONE (done Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `done` (model: haiku, maxTurns: 15)

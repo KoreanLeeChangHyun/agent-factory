@@ -51,7 +51,7 @@ stateDiagram-v2
 | WORK | worker | workflow-work + command skills | 3 | work log path |
 | WORK | explorer | workflow-explore | 3 | exploration result path |
 | REPORT | reporter | workflow-report | 2 | report path |
-| END | done | workflow-done | 1 | status |
+| DONE | done | workflow-done | 1 | status |
 
 ---
 
@@ -200,7 +200,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
 ```
 
-### Step 5: END
+### Step 5: DONE
 
 **Details:** See [step5-done.md](step5-done.md)
 

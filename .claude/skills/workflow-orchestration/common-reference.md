@@ -12,7 +12,7 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. END는 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
+| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. DONE은 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
 | **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, reporter, done 6개와 orchestrator로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
@@ -22,7 +22,7 @@
 | **init** | 이닛 | INIT Phase를 전담하는 서브에이전트. 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
 | **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
 | **reporter** | 리포터 | REPORT Phase를 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
-| **done** | 던 | REPORT->COMPLETED 전이 구간(END)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
+| **done** | 던 | REPORT->COMPLETED 전이 구간(DONE)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
 | **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, Workflow 배너, wf-state 호출 등. |
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
@@ -41,8 +41,7 @@
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
 | **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step1-init.md~step5-done.md 파일명에 사용. |
-| **END** | (단계 레이블) | done 에이전트 활동 구간의 별칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리키는 Step 이름. Agent-Phase 매핑 테이블과 Step 헤딩(Step 5: END)에서만 사용. |
-| **DONE** | (배너 명칭) | done 에이전트 관련 배너의 접두어. `Workflow <registryKey> DONE` (시작), `Workflow <registryKey> DONE done` (완료) 형식. FSM Phase 명칭이 아님. |
+| **DONE** | (Step 레이블/배너 명칭) | done 에이전트 활동 구간의 Step 레이블이자 배너 명칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리킨다. Agent-Phase 매핑 테이블, Step 헤딩(Step 5: DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
 | **summary.txt** | 요약 파일 | 사용자 요청 원문을 보존하는 파일. `<workDir>/summary.txt`에 저장되며 init 에이전트가 생성. |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `.prompt/user_prompt.txt`에 저장되며 오케스트레이터가 워크플로우 시작 전 생성. |
 
@@ -54,18 +53,18 @@ flowchart TD
     ORCH -->|"Task(planner)"| PLAN_A[planner agent]
     ORCH -->|"Task(worker)"| WORK_A[worker agent]
     ORCH -->|"Task(reporter)"| REPORT_A[reporter agent]
-    ORCH -->|"Task(done)"| END_A[done agent]
+    ORCH -->|"Task(done)"| DONE_A[done agent]
 
     INIT_A -->|바인딩| WF_INIT[workflow-init]
     PLAN_A -->|바인딩| WF_PLAN[workflow-plan]
     WORK_A -->|정적 바인딩| WF_WORK[workflow-work]
     WORK_A -->|동적 바인딩| CMD_SKILLS[command skills]
     REPORT_A -->|바인딩| WF_REPORT[workflow-report]
-    END_A -->|바인딩| WF_END[workflow-done]
+    DONE_A -->|바인딩| WF_DONE[workflow-done]
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
-- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, reporter=REPORT, done=END (END는 REPORT->COMPLETED 전이 구간의 별칭)).
+- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, reporter=REPORT, done=DONE (DONE은 REPORT->COMPLETED 전이 구간의 별칭)).
 - **스킬 바인딩 이중 구조**: workflow skill은 frontmatter로 정적 바인딩, command skill은 command-skill-map.md로 동적 바인딩 (worker 전용).
 - **역할 경계 원칙**: 오케스트레이터는 조율(sequencing, dispatch, state management)만 수행하고 실제 작업(파일 수정, 계획서/보고서 작성)은 서브에이전트에 위임한다. 단, 플랫폼 제약 행위는 오케스트레이터가 직접 수행한다.
 
@@ -100,7 +99,7 @@ flowchart TD
 | worker | WORK | workflow-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-work) + 런타임 동적 (command skills) |
 | explorer | WORK | workflow-explore | - | frontmatter `skills:` |
 | reporter | REPORT | workflow-report | - | frontmatter `skills:` |
-| done | END (별칭) | workflow-done | - | frontmatter `skills:` |
+| done | DONE (별칭) | workflow-done | - | frontmatter `skills:` |
 
 > **worker의 command skill 동적 로드**: worker는 `workflow-work` skill만 frontmatter에 선언합니다. command skill은 `command-skill-map.md`의 4단계 우선순위(skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백)로 런타임에 결정됩니다.
 
@@ -188,7 +187,7 @@ workName: <작업이름>
 | env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
-- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`, END=`done`
+- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`, DONE=`done`
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |
