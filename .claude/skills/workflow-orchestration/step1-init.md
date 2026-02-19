@@ -143,16 +143,17 @@ When command is `prompt`, the orchestrator skips PLAN and proceeds directly to W
 
 ## Strategy Mode Post-INIT Flow
 
-When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and proceeds directly to STRATEGY (main agent direct work) -> DONE.
+When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and dispatches the strategy sub-agent for STRATEGY phase -> DONE.
 
 ### Flow
 
-1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT STRATEGY`
-2. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
-3. Read `<workDir>/user_prompt.txt` for user request (1회만, 반복 읽기 금지)
-4. Main agent performs direct strategy work (roadmap.md + .kanbanboard 생성)
-5. `step-end <registryKey> STRATEGY` (STRATEGY completion)
-6. `step-start <registryKey> DONE` (DONE start banner)
-7. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>")`
-8. `step-end <registryKey> DONE done` (DONE completion)
-9. Terminate
+1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> strategy INIT STRATEGY`
+2. `step-status <registryKey>`
+3. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
+4. `Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")`
+5. Extract first 3 lines from strategy return (discard from line 4)
+6. `step-end <registryKey> STRATEGY` (STRATEGY completion)
+7. `step-start <registryKey> DONE` (DONE start banner)
+8. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>")`
+9. `step-end <registryKey> DONE done` (DONE completion)
+10. Terminate

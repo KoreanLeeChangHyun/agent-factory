@@ -4,7 +4,7 @@
 
 ### 용어 분류: Workflow Skill vs Command Skill
 
-- **Workflow Skill** (`workflow-*`, 7개): 워크플로우 단계 관리 및 오케스트레이션. 에이전트 frontmatter의 `skills:` 필드로 정적 바인딩.
+- **Workflow Skill** (`workflow-*`, 8개): 워크플로우 단계 관리 및 오케스트레이션. 에이전트 frontmatter의 `skills:` 필드로 정적 바인딩.
 - **Command Skill** (`command-*` 또는 기능명, 40+개): 개별 명령어의 구체적 기능 수행. `command-skill-map.md` 기반 동적 바인딩 (worker 전용).
 - "skill" 단독 사용 시 두 가지 레벨을 포괄하는 총칭
 
@@ -12,12 +12,13 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. DONE은 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
+| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, STRATEGY, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. DONE은 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
-| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, reporter, done 6개와 orchestrator로 구성. |
-| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
+| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, strategy, reporter, done 7개와 orchestrator로 구성. |
+| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, strategy, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
 | **explorer** | 익스플로러 | WORK Phase에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
+| **strategy** | 스트래티지 | STRATEGY Phase를 전담하는 서브에이전트. 대규모 작업을 다중 워크플로우 마일스톤으로 분해하고 roadmap.md와 .kanbanboard를 생성. |
 | **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 최상위 에이전트. Application Service 역할. "메인 에이전트", "부모 에이전트"와 동일한 개념이며, 모든 문서에서 "오케스트레이터"로 통일. |
 | **init** | 이닛 | INIT Phase를 전담하는 서브에이전트. 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
 | **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
@@ -52,6 +53,7 @@ flowchart TD
     ORCH[orchestrator] -->|"Task(init)"| INIT_A[init agent]
     ORCH -->|"Task(planner)"| PLAN_A[planner agent]
     ORCH -->|"Task(worker)"| WORK_A[worker agent]
+    ORCH -->|"Task(strategy)"| STRAT_A[strategy agent]
     ORCH -->|"Task(reporter)"| REPORT_A[reporter agent]
     ORCH -->|"Task(done)"| DONE_A[done agent]
 
@@ -59,12 +61,13 @@ flowchart TD
     PLAN_A -->|바인딩| WF_PLAN[workflow-plan]
     WORK_A -->|정적 바인딩| WF_WORK[workflow-work]
     WORK_A -->|동적 바인딩| CMD_SKILLS[command skills]
+    STRAT_A -->|바인딩| WF_STRAT[workflow-strategy]
     REPORT_A -->|바인딩| WF_REPORT[workflow-report]
     DONE_A -->|바인딩| WF_DONE[workflow-done]
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
-- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, reporter=REPORT, done=DONE (DONE은 REPORT->COMPLETED 전이 구간의 별칭)).
+- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, strategy=STRATEGY, reporter=REPORT, done=DONE (DONE은 REPORT->COMPLETED 전이 구간의 별칭)).
 - **스킬 바인딩 이중 구조**: workflow skill은 frontmatter로 정적 바인딩, command skill은 command-skill-map.md로 동적 바인딩 (worker 전용).
 - **역할 경계 원칙**: 오케스트레이터는 조율(sequencing, dispatch, state management)만 수행하고 실제 작업(파일 수정, 계획서/보고서 작성)은 서브에이전트에 위임한다. 단, 플랫폼 제약 행위는 오케스트레이터가 직접 수행한다.
 
@@ -98,6 +101,7 @@ flowchart TD
 | planner | PLAN | workflow-plan | - | frontmatter `skills:` |
 | worker | WORK | workflow-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-work) + 런타임 동적 (command skills) |
 | explorer | WORK | workflow-explore | - | frontmatter `skills:` |
+| strategy | STRATEGY | workflow-strategy | - | frontmatter `skills:` |
 | reporter | REPORT | workflow-report | - | frontmatter `skills:` |
 | done | DONE (별칭) | workflow-done | - | frontmatter `skills:` |
 
@@ -110,11 +114,13 @@ flowchart TD
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
 | step-start/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시 |
 | update_state.py 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
+| step-status 호출 (상태 전이 시각화) | Main | update_state.py 호출 후 순차 실행. 서브에이전트 Bash 출력이 터미널에 미표시되므로 오케스트레이터 전용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
 | skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 |
-| user_prompt.txt Read | Main (prompt/strategy 모드) | prompt 모드: 오케스트레이터 직접 작업. strategy 모드: 오케스트레이터 직접 작업 |
+| user_prompt.txt Read | Main (prompt 모드) / Sub (strategy 모드) | prompt 모드: 오케스트레이터 직접 작업. strategy 모드: strategy 서브에이전트가 직접 읽기 |
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
+| 로드맵 작성 (roadmap.md) | Sub (strategy) | 역할 분리: 전략 수립은 strategy 전담 |
 | 보고서 작성 (report.md) | Sub (reporter) | 역할 분리: 보고서 종합은 reporter 전담 |
 | 작업 내역 작성 (work/WXX-*.md) | Sub (worker) | 역할 분리: 태스크 실행 기록은 worker 전담 |
 | 초기화 (workDir/status.json 생성) | Sub (init) | 역할 분리: 워크플로우 초기화는 init 전담 |
@@ -170,6 +176,14 @@ workName: <작업이름>
 보고서: <보고서 파일 경로>
 ```
 
+### strategy Return Format (3 lines)
+
+```
+상태: 성공 | 실패
+로드맵: <로드맵 파일 경로>
+워크플로우: N개
+```
+
 ### done Return Format (1 line)
 
 ```
@@ -190,7 +204,9 @@ workName: <작업이름>
 | env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
-- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, REPORT=`reporter`, DONE=`done`
+- agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, STRATEGY=`strategy`, REPORT=`reporter`, DONE=`done`
+
+> **Note:** `update_state.py` 호출 후 `step-status <registryKey>`를 순차 호출하여 상태 전이를 터미널에 시각적으로 표시한다. `step-status`는 `.zshrc`에 등록된 shell alias로, status.json의 마지막 전이 항목을 읽어 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력한다.
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |
@@ -200,7 +216,7 @@ workName: <작업이름>
 | both | O | X |
 | register | O | X |
 | unregister | O | O (done only) |
-| link-session | X | O (worker, explorer, reporter) |
+| link-session | X | O (worker, explorer, strategy, reporter) |
 | env | O | X |
 | usage-* | X | O (Hook) |
 
