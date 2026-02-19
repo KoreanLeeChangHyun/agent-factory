@@ -80,7 +80,7 @@ workPath: <workDir>/work/
    - 1줄: 작업 제목 및 command
    - 2줄: 핵심 결과 요약 (변경 파일 수, 주요 성과 등)
 
-> **Note**: reporter 반환 후, done 에이전트(Haiku)가 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제, DONE 배너를 수행합니다. 상세 절차는 `workflow-orchestration/step5-done.md`를 참조하세요.
+> **Note**: reporter 반환 후, done 에이전트(Haiku)가 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제, DONE 배너를 수행합니다. 상세 절차는 `workflow-orchestration/step-done.md`를 참조하세요.
 
 ### reporter 출력
 

@@ -1,4 +1,4 @@
-# Step 3: WORK (worker/explorer Agent)
+# WORK (worker/explorer Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `worker` (model: inherit, maxTurns: 50)
@@ -10,7 +10,7 @@
 > # full mode (default): transition from PLAN
 > python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK
 > ```
-> Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행). prompt 모드는 INIT -> WORK 전이 (step1-init.md 참조).
+> Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행). prompt 모드는 INIT -> WORK 전이 (step-init.md 참조).
 
 > **WORK Phase Rules (REQUIRED)**
 >

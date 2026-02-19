@@ -1,4 +1,4 @@
-# Step 4: REPORT (reporter Agent)
+# REPORT (reporter Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `reporter` (model: sonnet, maxTurns: 30, permissionMode: acceptEdits)

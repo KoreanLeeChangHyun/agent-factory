@@ -1,4 +1,4 @@
-# Step 2: PLAN (planner Agent)
+# PLAN (planner Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `planner` (model: inherit, maxTurns: 30)
@@ -13,7 +13,7 @@
 > - planner 에이전트 호출 없음
 > - AskUserQuestion 승인 절차 없음
 > - PLAN 배너 출력 없음
-> - 오케스트레이터는 즉시 Strategy Mode Post-INIT Flow (step1-init.md 참조)로 진행
+> - 오케스트레이터는 즉시 Strategy Mode Post-INIT Flow (step-init.md 참조)로 진행
 
 ---
 

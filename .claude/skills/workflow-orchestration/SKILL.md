@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "Internal skill for full workflow orchestration. Manages the INIT -> PLAN -> WORK -> REPORT -> DONE 5-stage workflow. Use for workflow orchestration: auto-loaded on cc:* command execution for stage flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step1-init.md ~ step5-done.md, common-reference.md."
+description: "Internal skill for full workflow orchestration. Manages the INIT -> PLAN -> WORK -> REPORT -> DONE 5-stage workflow. Use for workflow orchestration: auto-loaded on cc:* command execution for stage flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step-init.md ~ step-done.md, common-reference.md."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -169,9 +169,9 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 
 ---
 
-## Step 1: INIT
+## INIT
 
-**Details:** See [step1-init.md](step1-init.md)
+**Details:** See [step-init.md](step-init.md)
 
 ```bash
 step-start INIT none <command>
@@ -201,17 +201,17 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 | Mode | Next Step |
 |------|-----------|
-| `prompt` | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step1-init.md](step1-init.md) "Prompt Mode Post-INIT Flow" |
-| `strategy` | Skip PLAN/WORK/REPORT, strategy agent STRATEGY -> DONE. See [step1-init.md](step1-init.md) "Strategy Mode Post-INIT Flow" |
+| `prompt` | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step-init.md](step-init.md) "Prompt Mode Post-INIT Flow" |
+| `strategy` | Skip PLAN/WORK/REPORT, strategy agent STRATEGY -> DONE. See [step-init.md](step-init.md) "Strategy Mode Post-INIT Flow" |
 | `full` | Proceed to PLAN |
 
 ---
 
 ## Sub-agent Dispatch
 
-### Step 2: PLAN
+### PLAN
 
-**Details:** See [step2-plan.md](step2-plan.md)
+**Details:** See [step-plan.md](step-plan.md)
 
 **Status update:** `python3 .claude/scripts/workflow/update_state.py both <registryKey> planner INIT PLAN`
 
@@ -219,11 +219,11 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options). See [step2-plan.md](step2-plan.md) for approval flow, .context.json handling, CANCELLED processing, and Binding Contract rule.
+After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options). See [step-plan.md](step-plan.md) for approval flow, .context.json handling, CANCELLED processing, and Binding Contract rule.
 
-### Step 3: WORK
+### WORK
 
-**Details:** See [step3-work.md](step3-work.md)
+**Details:** See [step-work.md](step-work.md)
 
 **Status update (mode-aware):**
 - full mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK`
@@ -232,11 +232,13 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode) or main agent direct work (prompt mode).
 
-**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE and MUST execute before any Phase 1~N worker calls. See [step3-work.md](step3-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
+**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 
 ### STRATEGY (strategy mode only)
+
+**Details:** See [step-strategy.md](step-strategy.md)
 
 **Status update:** `python3 .claude/scripts/workflow/update_state.py both <registryKey> strategy INIT STRATEGY`
 
@@ -246,9 +248,9 @@ Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, requ
 
 **Strategy return:** Extract first 3 lines only (discard from line 4). Details in roadmap.md and .kanbanboard.
 
-### Step 4: REPORT
+### REPORT
 
-**Details:** See [step4-report.md](step4-report.md)
+**Details:** See [step-report.md](step-report.md)
 
 **Status update:** `python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT`
 
@@ -256,9 +258,9 @@ Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, requ
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
 ```
 
-### Step 5: DONE
+### DONE
 
-**Details:** See [step5-done.md](step5-done.md)
+**Details:** See [step-done.md](step-done.md)
 
 After REPORT completion: DONE start banner -> done agent call -> DONE step_complete -> terminate.
 

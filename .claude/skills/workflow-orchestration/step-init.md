@@ -1,4 +1,4 @@
-# Step 1: INIT (init Agent)
+# INIT (init Agent)
 
 > **Agent-Skill Binding**
 > - Agent: `init` (model: haiku, maxTurns: 15)

@@ -41,8 +41,8 @@
 | **report document** | 보고서 | reporter가 REPORT 단계에서 생성하는 결과 문서. `report.md`. |
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
-| **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step1-init.md~step5-done.md 파일명에 사용. |
-| **DONE** | (Step 레이블/배너 명칭) | done 에이전트 활동 구간의 Step 레이블이자 배너 명칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리킨다. Agent-Phase 매핑 테이블, Step 헤딩(Step 5: DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
+| **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step-init.md~step-done.md 파일명에 사용. |
+| **DONE** | (Step 레이블/배너 명칭) | done 에이전트 활동 구간의 Step 레이블이자 배너 명칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리킨다. Agent-Phase 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
 | **summary.txt** | 요약 파일 | init 에이전트가 1차로 생성, done 에이전트가 최종 결과 보고서를 기반으로 2차로 갱신 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `.prompt/user_prompt.txt`에 저장되며 오케스트레이터가 워크플로우 시작 전 생성. |
 
