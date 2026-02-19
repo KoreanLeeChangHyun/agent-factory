@@ -1,5 +1,5 @@
 {
-  "description": "FSM 전이 규칙 단일 정의 소스. update-state.sh와 workflow-transition-guard.sh가 이 파일을 참조합니다.",
+  "description": "FSM 전이 규칙 단일 정의 소스. update_state.py와 workflow_transition_guard.py가 이 파일을 참조합니다.",
   "modes": {
     "full": {
       "NONE": ["INIT"],
@@ -8,11 +8,10 @@
       "WORK": ["REPORT", "FAILED", "STALE"],
       "REPORT": ["COMPLETED", "FAILED", "STALE"]
     },
-    "no-plan": {
+    "strategy": {
       "NONE": ["INIT"],
-      "INIT": ["WORK", "STALE"],
-      "WORK": ["REPORT", "FAILED", "STALE"],
-      "REPORT": ["COMPLETED", "FAILED", "STALE"]
+      "INIT": ["STRATEGY", "STALE"],
+      "STRATEGY": ["COMPLETED", "FAILED", "STALE"]
     },
     "prompt": {
       "NONE": ["INIT"],

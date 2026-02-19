@@ -2,11 +2,9 @@
 
 > **CRITICAL WARNING: Phase 0은 full 모드에서 절대 스킵할 수 없습니다.** 오케스트레이터가 WORK 단계에 진입하면, Phase 1이나 다른 Phase보다 반드시 Phase 0을 가장 먼저 실행해야 합니다. Phase 0을 건너뛰는 것은 워크플로우 프로토콜의 중대한 위반입니다.
 
-> **Phase 0 스킵 조건:** no-plan 모드에서만 스킵 (단일 태스크이므로 스킬 매핑 불필요)
-
 > **Phase 배너**: 오케스트레이터는 Phase 0 Worker 호출 직전에 `Workflow <registryKey> WORK-PHASE 0 "phase0" sequential` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
-Phase 0은 모든 full 모드 워크플로우에서 **무조건 실행**합니다. 예외 없음. 스킵 사유 없음. 어떤 최적화 판단으로도 생략 불가. no-plan 모드에서만 스킵합니다.
+Phase 0은 모든 full 모드 워크플로우에서 **무조건 실행**합니다. 예외 없음. 스킵 사유 없음. 어떤 최적화 판단으로도 생략 불가.
 
 **Phase 0 실행 판단:**
 

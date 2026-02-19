@@ -4,9 +4,16 @@ description: 다중 워크플로우 전략 수립. 대규모 작업을 분석하
 
 # Strategy
 
-## -np 플래그 (No-Plan 모드)
+## 실행 흐름
 
-mode 결정은 오케스트레이터의 Mode Auto-Determination Rule에 의해 자동 수행됩니다. `-np` 플래그는 `$ARGUMENTS`를 통해 오케스트레이터에 전달됩니다.
+strategy 명령어는 INIT -> STRATEGY -> DONE 흐름으로 실행됩니다. PLAN, WORK, REPORT 단계를 거치지 않으며, STRATEGY Phase에서 오케스트레이터가 직접 작업을 수행합니다.
+
+```mermaid
+flowchart TD
+    A[INIT] --> B[STRATEGY]
+    B --> C[오케스트레이터 직접 작업]
+    C --> D[DONE]
+```
 
 ## 실행 모드 분기
 

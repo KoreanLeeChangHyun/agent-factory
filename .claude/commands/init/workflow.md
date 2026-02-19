@@ -64,8 +64,8 @@ cc:* 명령어는 모드에 따라 실행 단계가 달라집니다.
 
 | 모드 | 단계 순서 | 설명 |
 |------|-----------|------|
-| full (기본) | INIT -> PLAN -> WORK -> REPORT | 전체 워크플로우 |
-| no-plan (-np) | INIT -> WORK -> REPORT | 계획 단계 생략 |
+| full (기본) | INIT -> PLAN -> WORK -> REPORT -> DONE | 전체 워크플로우 |
+| strategy | INIT -> STRATEGY -> DONE | 전략/로드맵 생성 (오케스트레이터 직접 수행) |
 | prompt | INIT -> WORK -> REPORT -> DONE | 경량 작업 (오케스트레이터 직접 수행 + 보고서 + 마무리) |
 
 상세는 `workflow-orchestration` 스킬을 참조하세요.

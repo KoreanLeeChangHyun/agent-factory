@@ -1,6 +1,6 @@
 ---
 name: workflow-init
-description: "Internal skill for workflow INIT stage. Preprocesses user requests to prepare workflow inputs. Use for workflow initialization: prompt.txt reading, scenario branching (full/no-plan/prompt), title generation, init-workflow.sh integrated script execution. Internally invoked by orchestrator; not intended for direct user invocation."
+description: "Internal skill for workflow INIT stage. Preprocesses user requests to prepare workflow inputs. Use for workflow initialization: prompt.txt reading, scenario branching (full/strategy/prompt), title generation, init-workflow.py integrated script execution. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -115,7 +115,7 @@ python3 .claude/scripts/init/init_workflow.py <command> "<title>" <mode>
 # GOOD
 python3 .claude/scripts/init/init_workflow.py implement "로그인-기능-추가" full
 python3 .claude/scripts/init/init_workflow.py review "PR-123-리뷰" full
-python3 .claude/scripts/init/init_workflow.py research "API-성능-조사" no-plan
+python3 .claude/scripts/init/init_workflow.py strategy "마이그레이션-전략" strategy
 python3 .claude/scripts/init/init_workflow.py prompt "간단한-질문" prompt
 ```
 

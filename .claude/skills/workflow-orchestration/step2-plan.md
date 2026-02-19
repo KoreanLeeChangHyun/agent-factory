@@ -5,15 +5,15 @@
 > - Skill: `workflow-plan`
 > - Task prompt: `command: <command>, workId: <workId>, request: <request>, workDir: <workDir>`
 
-## no-plan Mode Skip Condition
+## Strategy Mode Skip Condition
 
-> **no-plan 모드(`-np` 플래그)에서는 PLAN 단계 전체를 건너뛰고 WORK로 직행합니다.**
+> **strategy 모드에서는 PLAN 단계 전체를 건너뛰고 STRATEGY Phase로 직행합니다.**
 >
-> 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `no-plan`이면 아래 모든 절차(2a~2b)를 스킵합니다. (status.json Read 불필요)
+> 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `strategy`이면 아래 모든 절차(2a~2b)를 스킵합니다. (status.json Read 불필요)
 > - planner 에이전트 호출 없음
 > - AskUserQuestion 승인 절차 없음
 > - PLAN 배너 출력 없음
-> - 오케스트레이터는 즉시 Step 3: WORK로 진행
+> - 오케스트레이터는 즉시 Strategy Mode Post-INIT Flow (step1-init.md 참조)로 진행
 
 ---
 

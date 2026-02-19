@@ -13,7 +13,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 ## 역할
 
-계획서를 기반으로 **실제 작업을 수행**합니다. `mode: no-plan`인 경우 계획서 없이 `user_prompt.txt`를 직접 참조하여 작업합니다. 모든 작업은 아래 5단계 절차를 따릅니다.
+계획서를 기반으로 **실제 작업을 수행**합니다. 모든 작업은 아래 5단계 절차를 따릅니다.
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -58,15 +58,15 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID
-- `planPath`: 계획서 경로 (no-plan 모드에서는 없음)
-- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`. no-plan 모드에서는 `W01` 고정
+- `planPath`: 계획서 경로
+- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
-- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행, `no-plan`이면 계획서 없이 작업
+- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
 ## 절차
 
-1. **요구사항 파악** - full 모드: 계획서에서 태스크 정보 확인 / no-plan 모드: user_prompt.txt 직접 읽기
+1. **요구사항 파악** - 계획서에서 태스크 정보 확인
 2. **선행 결과 읽기** - 종속 태스크 시 `<workDir>/work/` 에서 선행 태스크 작업 내역을 Read (독립 태스크는 스킵)
 3. **스킬 로드** - skills 파라미터 또는 명령어/키워드 기반 자동 매핑으로 스킬 결정
 4. **작업 진행** - 요구사항 + 로드된 스킬 기반으로 실제 작업 수행
@@ -75,7 +75,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, No-Plan 모드, Phase 0 모드, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
+> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 
@@ -114,7 +114,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 ## 주의사항
 
-1. **계획서 로드 필수**: 작업 전 반드시 계획서 확인 (no-plan 모드 제외: user_prompt.txt 참조)
+1. **계획서 로드 필수**: 작업 전 반드시 계획서 확인
 2. **작업 내역 저장 필수**: 각 태스크별 작업 내역 파일 생성
 3. **최소 변경 원칙**: 요청된 작업만 수행
 4. **안전한 작업**: 보안 취약점 주의

@@ -22,7 +22,7 @@ mode: <mode>
 ")
 ```
 
-> `mode` parameter is optional. Default is `full`. Values: `full`, `no-plan`, `prompt`.
+> `mode` parameter is optional. Default is `full`. Values: `full`, `strategy`, `prompt`.
 > 오케스트레이터가 "Mode Auto-Determination Rule" (SKILL.md)에 따라 결정한 값을 전달한다.
 
 ## Return Values
@@ -46,7 +46,7 @@ step-end <registryKey> INIT
 1. init 에이전트 정상 반환 확인
 2. 반환값(request, workDir, workId, registryKey 등) 추출/보관
 3. `step-end <registryKey> INIT` 호출
-4. Mode Branching 진행 (full -> PLAN, no-plan -> WORK, prompt -> WORK)
+4. Mode Branching 진행 (full -> PLAN, strategy -> STRATEGY, prompt -> WORK)
 
 > init이 `에러:` 접두사로 반환한 경우에는 step-end를 호출하지 않고 재시도 로직으로 진행한다.
 
@@ -121,8 +121,8 @@ When command is `prompt`, the orchestrator skips PLAN and proceeds directly to W
 ### Prompt Mode Direct Write/Edit Scope
 
 > **허용 범위**: 1-2개 파일 즉석 수정, 질의응답 텍스트 답변
-> **권장하지 않음**: 3개 이상 파일 수정, 새 기능 구현 -> `cc:implement -np` 사용 권장
-> **근거**: prompt 모드의 핵심 가치는 Worker 없이 오케스트레이터가 직접 처리하는 경량성. 복잡한 작업은 Worker 위임(no-plan 모드)이 적합
+> **권장하지 않음**: 3개 이상 파일 수정, 새 기능 구현 -> `cc:implement` 사용 권장
+> **근거**: prompt 모드의 핵심 가치는 Worker 없이 오케스트레이터가 직접 처리하는 경량성. 복잡한 작업은 Worker 위임(full 모드)이 적합
 
 ### Flow
 
@@ -140,3 +140,19 @@ When command is `prompt`, the orchestrator skips PLAN and proceeds directly to W
 12. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: prompt, title: <title>, reportPath: <reportPath>, status: <status>")`
 13. `step-end <registryKey> DONE done` (DONE completion)
 14. Terminate
+
+## Strategy Mode Post-INIT Flow
+
+When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and proceeds directly to STRATEGY (main agent direct work) -> DONE.
+
+### Flow
+
+1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT STRATEGY`
+2. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
+3. Read `<workDir>/user_prompt.txt` for user request (1회만, 반복 읽기 금지)
+4. Main agent performs direct strategy work (roadmap.md + .kanbanboard 생성)
+5. `step-end <registryKey> STRATEGY` (STRATEGY completion)
+6. `step-start <registryKey> DONE` (DONE start banner)
+7. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>")`
+8. `step-end <registryKey> DONE done` (DONE completion)
+9. Terminate

@@ -36,14 +36,14 @@ flowchart TD
 - **히스토리 기록**: history.md에 1행 기록
 - **경량화**: 서브에이전트 호출 최소화 (init만 사용)
 
-## vs cc:implement -np
+## vs cc:implement
 
-| 항목 | cc:prompt | cc:implement -np |
-|------|-----------|------------------|
-| 실행 흐름 | INIT -> 직접 작업 | INIT -> WORK -> REPORT |
-| 에이전트 | init + 오케스트레이터 | init + worker + reporter |
+| 항목 | cc:prompt | cc:implement |
+|------|-----------|--------------|
+| 실행 흐름 | INIT -> 직접 작업 -> DONE | INIT -> PLAN -> WORK -> REPORT -> DONE |
+| 에이전트 | init + 오케스트레이터 | init + planner + worker + reporter |
 | 보고서 | 없음 | 있음 (report.md) |
-| 적합한 용도 | 즉석 수정 (1-2개 파일) | 가벼운 단일 태스크 |
+| 적합한 용도 | 즉석 수정 (1-2개 파일) | 계획이 필요한 구현 작업 |
 
 ## 수행 방식
 
@@ -64,6 +64,6 @@ cc:prompt "이 프로젝트에서 사용하는 인증 방식"
 ## 주의사항
 
 1. **복잡한 작업은 cc:implement 사용**: 다중 파일 변경, 아키텍처 변경 등은 전체 워크플로우 권장
-2. **보고서 필요시 cc:implement -np 사용**: 작업 보고서가 필요하면 no-plan 모드 사용
+2. **보고서 필요시 cc:implement 사용**: 작업 보고서가 필요하면 implement 명령어 사용
 3. **코드 리뷰는 cc:review 사용**: 리뷰가 필요하면 전용 커맨드 사용
 4. **심층 조사는 cc:research 사용**: 비교 분석, 심층 연구가 필요하면 cc:research 권장

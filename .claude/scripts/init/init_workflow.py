@@ -11,7 +11,7 @@ prompt.txt 읽기, 디렉터리 생성, 파일 복사/클리어, 메타데이터
 인자:
   command - 실행 명령어 (implement, review, research, strategy, prompt)
   title   - 작업 제목 (init 에이전트가 prompt.txt로부터 생성한 한글 제목)
-  mode    - (선택적) 워크플로우 모드 (full, no-plan, prompt). 기본값: full
+  mode    - (선택적) 워크플로우 모드 (full, strategy, prompt). 기본값: full
 
 출력 (stdout):
   workDir=.workflow/<registryKey>/<workName>/<command>
@@ -34,7 +34,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 
 _VALID_COMMANDS = {"implement", "review", "research", "strategy", "prompt"}
-_VALID_MODES = {"full", "no-plan", "prompt"}
+_VALID_MODES = {"full", "strategy", "prompt"}
 _KST = timezone(timedelta(hours=9))
 
 

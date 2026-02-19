@@ -4,10 +4,6 @@ description: 코드 구현, 수정, 리팩토링. 기능 구현, 버그 수정, 
 
 # Implement
 
-## -np 플래그 (No-Plan 모드)
-
-mode 결정은 오케스트레이터의 Mode Auto-Determination Rule에 의해 자동 수행됩니다. `-np` 플래그는 `$ARGUMENTS`를 통해 오케스트레이터에 전달됩니다.
-
 ## 리팩토링 지원
 
 implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refactor` 명령어의 기능이 여기에 통합되었습니다.

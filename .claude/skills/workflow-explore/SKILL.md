@@ -53,7 +53,6 @@ flowchart TD
 계획서(`planPath`)에서 자신의 `taskId`에 해당하는 태스크 정보를 확인한다.
 
 - 대상 파일/범위, 탐색 주제, 종속성 등을 파악
-- no-plan 모드에서는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항 파악
 
 ### 0.5. 선행 결과 읽기 (종속 태스크 시 필수)
 

@@ -55,7 +55,7 @@ maxTurns: 15
 오케스트레이터로부터 다음 정보를 전달받습니다:
 
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
-- `mode`: (선택적) 워크플로우 모드. 오케스트레이터가 Mode Auto-Determination Rule(command + $ARGUMENTS 플래그 조합)로 결정한 값을 수신. `full`(기본값), `no-plan`, `prompt` 중 하나
+- `mode`: (선택적) 워크플로우 모드. 오케스트레이터가 Mode Auto-Determination Rule(command + $ARGUMENTS 플래그 조합)로 결정한 값을 수신. `full`(기본값), `strategy`, `prompt` 중 하나
 
 ## 절차
 

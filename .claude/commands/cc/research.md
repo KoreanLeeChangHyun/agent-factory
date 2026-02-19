@@ -4,10 +4,6 @@ description: 웹 검색 기반 연구/조사 및 내부 자산 분석 수행. �
 
 # Research
 
-## -np 플래그 (No-Plan 모드)
-
-mode 결정은 오케스트레이터의 Mode Auto-Determination Rule에 의해 자동 수행됩니다. `-np` 플래그는 `$ARGUMENTS`를 통해 오케스트레이터에 전달됩니다.
-
 ## 연구 절차
 
 1. **주제 파악 및 범위 정의**

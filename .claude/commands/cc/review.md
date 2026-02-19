@@ -4,10 +4,6 @@ description: 코드 리뷰 수행. 파일, 디렉토리, PR 등을 리뷰합니�
 
 # Review
 
-## -np 플래그 (No-Plan 모드)
-
-mode 결정은 오케스트레이터의 Mode Auto-Determination Rule에 의해 자동 수행됩니다. `-np` 플래그는 `$ARGUMENTS`를 통해 오케스트레이터에 전달됩니다.
-
 **입력:**
 - `command`: review
 

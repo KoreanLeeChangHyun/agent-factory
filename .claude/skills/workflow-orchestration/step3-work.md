@@ -4,15 +4,13 @@
 > - Agent: `worker` (model: inherit, maxTurns: 50)
 > - Skill: `workflow-work` (항상 바인딩) + command skills (동적 바인딩, command-skill-map.md 참조)
 > - Task prompt (full): `command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>`
-> - Task prompt (no-plan): `command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan`
 
 > **State Update** before WORK start:
 > ```bash
 > # full mode (default): transition from PLAN
 > python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK
-> # no-plan mode: transition from INIT (PLAN was skipped)
-> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
 > ```
+> Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행). prompt 모드는 INIT -> WORK 전이 (step1-init.md 참조).
 
 > **WORK Phase Rules (REQUIRED)**
 >
@@ -81,43 +79,6 @@ Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskI
 Task(subagent_type="explorer", prompt="command: implement, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W03, planPath: <planPath>, workDir: <workDir>")
 ```
-
----
-
-## no-plan Mode Worker Call Pattern
-
-> **no-plan 모드에서는 Phase 0과 Phase 1~N 대신 단일 Worker를 호출합니다.**
-
-no-plan 모드 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `no-plan`이면 아래 패턴으로 실행합니다. (status.json Read 불필요)
-
-**State Update:**
-```bash
-python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
-```
-
-**Single Worker Call (no planPath, no Phase 0):**
-```bash
-# task-status + usage-pending: Worker 호출 직전에 실행
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
-```
-```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
-```
-
-**no-plan 모드 특성:**
-
-| 항목 | full 모드 | no-plan 모드 | prompt 모드 |
-|------|----------|-------------|------------|
-| State transition | PLAN -> WORK | INIT -> WORK | INIT -> WORK |
-| Phase 0 (skill-map) | 필수 | 스킵 | 해당 없음 |
-| planPath | 필수 | 없음 | 없음 |
-| Worker 수 | 다수 (W01~WNN) | 단일 (W01 고정) | 단일 (main direct) |
-| 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt | user_prompt.txt |
-
-no-plan Worker는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악하고, 명령어별 기본 스킬 매핑으로 스킬을 자동 결정하여 작업을 수행합니다.
-
-> **Note:** no-plan 모드에서는 단일 Worker이므로 WORK-PHASE 서브배너를 출력하지 않습니다.
 
 ---
 
@@ -329,7 +290,6 @@ python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <task
 |------|------|------|
 | 병렬 Worker (Phase 1) | 각 Worker 호출 직전마다 개별 `usage-pending` | 모든 pending을 일괄 등록 후 병렬 Task 호출 |
 | 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
-| no-plan 단일 Worker | Worker 호출 직전에 `usage-pending` | taskId=W01 고정 |
 
 ```bash
 # 형식: python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <agent_id_or_taskId> <taskId>

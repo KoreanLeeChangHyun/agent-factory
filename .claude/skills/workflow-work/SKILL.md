@@ -43,45 +43,9 @@ license: "Apache-2.0"
 
 오케스트레이터가 worker 에이전트를 Task 도구로 호출하여 작업을 수행합니다.
 
-### No-Plan 모드 (계획서 없는 작업 절차)
-
-`mode: no-plan`으로 호출된 경우, 계획서 없이 `user_prompt.txt`를 직접 참조하여 단일 태스크로 작업합니다.
-
-**no-plan 모드 판별:** worker에 전달된 mode 파라미터가 `no-plan`이면 계획서 없이 동작합니다.
-
-**no-plan 모드 호출:**
-```
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, workDir: <workDir>, mode: no-plan")
-```
-
-**no-plan 모드 작업 절차:**
-
-```mermaid
-flowchart TD
-    S1[1. user_prompt.txt 읽기] --> S2[2. 스킬 자동 결정]
-    S2 --> S3[3. 작업 수행]
-    S3 --> S4[4. W01 작업 내역 작성]
-```
-
-1. **요구사항 파악**: `<workDir>/user_prompt.txt`를 직접 읽어 사용자 요구사항 파악 (planPath 없음)
-2. **스킬 자동 결정**: skills 파라미터가 있으면 사용, 없으면 명령어별 기본 스킬 매핑과 키워드 분석으로 자동 결정
-3. **작업 수행**: user_prompt.txt 기반으로 사용 가능한 모든 도구를 활용하여 작업 수행
-4. **작업 내역 기록**: `<workDir>/work/W01-<작업명>.md`에 기록 (단일 태스크, taskId: W01 고정)
-
-**no-plan 모드 특성:**
-
-| 항목 | full 모드 | no-plan 모드 |
-|------|----------|-------------|
-| 요구사항 소스 | 계획서 (plan.md) | user_prompt.txt |
-| Phase 0 (skill-map) | 필수 | 불필요 (스킵) |
-| 태스크 수 | 다수 (W01~WNN) | 단일 (W01 고정) |
-| 병렬 실행 | 가능 | 불필요 (단일 Worker) |
-| Phase 배너 | 오케스트레이터가 각 Phase 시작 시 출력 | 출력하지 않음 (단일 Worker) |
-| planPath | 필수 | 없음 |
-
 ### Phase 0: 준비 단계 (필수, 순차 1개 worker)
 
-Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work 디렉터리 생성과 스킬 매핑(`skill-map.md`)을 수행합니다. no-plan 모드에서는 스킵합니다. 실패 시 Worker 자율 결정으로 폴백합니다.
+Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work 디렉터리 생성과 스킬 매핑(`skill-map.md`)을 수행합니다. 실패 시 Worker 자율 결정으로 폴백합니다.
 
 > 상세 가이드(실행 판단 흐름도, 호출 방법, skill-map 형식, 폴백 메커니즘)는 `reference/phase0-guide.md`를 참조하세요.
 
@@ -89,7 +53,7 @@ Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work
 
 Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
 
-> **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다. no-plan 모드에서는 단일 Worker이므로 Phase 배너를 출력하지 않습니다.
+> **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
 **독립 작업 (병렬 실행):**
 ```
@@ -127,7 +91,7 @@ flowchart TD
     S3 --> S4[4. 실행 내역 작성]
 ```
 
-**1. 요구사항 파악:** full 모드에서는 프롬프트의 planPath에서 계획서를 읽어 자신의 taskId에 해당하는 태스크 정보(대상 파일, 작업 내용, 종속성 등)를 파악한다. no-plan 모드에서는 `<workDir>/user_prompt.txt`를 직접 읽어 요구사항을 파악한다.
+**1. 요구사항 파악:** 프롬프트의 planPath에서 계획서를 읽어 자신의 taskId에 해당하는 태스크 정보(대상 파일, 작업 내용, 종속성 등)를 파악한다.
 
 **1.5. 선행 결과 읽기 (종속 태스크 시 필수):** 계획서의 종속성 컬럼에 선행 태스크 ID(예: W01, W02)가 명시된 경우, `<workDir>/work/` 디렉터리에서 해당 선행 태스크의 작업 내역 파일(`W01-*.md`, `W02-*.md` 등)을 **반드시** Read 도구로 읽어야 한다. 선행 작업의 판단 근거, What Didn't Work, 핵심 발견을 확인하여 불필요한 시행착오를 방지하고 일관성을 보장한다. 종속성이 없는 독립 태스크(Phase 1 등)는 이 단계를 건너뛴다.
 
