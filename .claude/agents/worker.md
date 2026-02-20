@@ -59,9 +59,9 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID
 - `planPath`: 계획서 경로
-- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0`
+- `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0` (Phase 0: 스킬 탐색/매핑 준비 단계)
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
-- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업 수행
+- `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업(스킬 탐색/매핑) 수행. Phase 1+에서는 skill-map.md를 참조하여 계획서 태스크를 실행
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
 ## 절차
@@ -75,7 +75,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
+> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, Phase 0(스킬 탐색/매핑 준비)과 Phase 1+(계획서 태스크 실행)의 역할 구분, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

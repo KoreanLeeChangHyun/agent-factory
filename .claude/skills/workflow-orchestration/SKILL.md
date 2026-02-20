@@ -162,7 +162,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | INIT done (prompt) | INIT step-end, direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call, **내부 추론/분석 텍스트 출력** |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask, **내부 추론/분석 텍스트 출력** |
 | PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
-| WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0 worker call, then Phase 1~N | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
+| WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0(스킬 탐색/매핑) worker call, then Phase 1~N(계획서 태스크 실행) | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages**, **내부 추론/분석 텍스트 출력** |
 | WORK done | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
 | REPORT done | REPORT step-end, DONE step-start, done agent call, extract first 2 lines, DONE step-end → **DONE step-end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
@@ -232,7 +232,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode) or main agent direct work (prompt mode).
 
-**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
+**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE (Phase 0 = 스킬 탐색/매핑 준비, Phase 1+ = skill-map 참조하여 계획서 태스크 실행, 스킬 미발견 시 Worker 자율 결정으로 진행) and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 
@@ -325,6 +325,8 @@ step-end <registryKey> DONE done
 | `<workDir>/user_prompt.txt` | prompt 모드에서 직접 작업 시 | prompt 모드는 오케스트레이터가 직접 Write/Edit를 수행하므로 사용자 요청 파악이 불가피. strategy 모드에서는 strategy 서브에이전트가 직접 읽음 |
 
 > **skill-map.md는 오케스트레이터가 읽지 않습니다.** Phase 0 완료 후 skill-map.md는 Phase 1+ Worker가 직접 읽습니다. 오케스트레이터는 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로만 파라미터로 전달합니다.
+
+Phase 0(준비 단계)에서 생성된 skill-map.md는 Phase 1+(작업 실행 단계)의 Worker가 참조하는 구조이다.
 
 ### Platform Constraints Requiring Orchestrator Execution
 

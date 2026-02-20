@@ -104,6 +104,22 @@ WORK 단계 진입 후, 오케스트레이터는 `<workDir>/plan.md`를 **1회�
 
 ---
 
+## WORK Phase 역할 구분: Phase 0 vs Phase 1+
+
+WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
+
+- **Phase 0 (준비 단계)**: 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 준비 단계.
+- **Phase 1+ (작업 실행 단계)**: `skill-map.md`를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계.
+
+**스킬 미발견 시 폴백:** Phase 0이 스킬을 찾지 못하거나 실패한 경우, Phase 1+는 스킬 없이 작업을 계속 진행한다(Worker 자율 결정).
+
+| Phase | 역할 | 실행 주체 | 산출물 |
+|-------|------|----------|--------|
+| Phase 0 | 스킬 탐색/매핑 준비 | 1개 Worker (순차) | `skill-map.md` |
+| Phase 1+ | 계획서 태스크 실행 | N개 Worker/Explorer (병렬/순차) | `WXX-*.md` 작업 내역, 코드 변경 |
+
+---
+
 ## Full Mode: Phase 0 - Preparation (Required, Sequential 1 worker)
 
 > **CRITICAL: Phase 0 스킵 절대 금지.** full 모드에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
@@ -160,6 +176,8 @@ Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별
 > **GATE: Phase 1 진입 전 Phase 0 완료 필수.** Phase 0 Worker가 반환값을 돌려주지 않았다면 Phase 1으로 진행할 수 없습니다. Phase 0을 실행하지 않고 Phase 1 배너를 출력하는 것은 프로토콜 위반입니다.
 
 ## Phase 1~N: Task Execution
+
+Phase 1+는 Phase 0에서 생성된 skill-map.md를 참조하여 계획서의 태스크를 실행하는 단계이다.
 
 ### Phase 간 결과 공유 원칙
 

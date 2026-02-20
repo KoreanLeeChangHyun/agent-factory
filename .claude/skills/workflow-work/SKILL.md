@@ -43,6 +43,8 @@ license: "Apache-2.0"
 
 오케스트레이터가 worker 에이전트를 Task 도구로 호출하여 작업을 수행합니다.
 
+WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다. Phase 0은 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 탐색하고 skill-map.md로 매핑하는 준비 단계이며, Phase 1+는 skill-map.md를 참조하여 계획서의 태스크를 순서대로 실행하는 단계이다. 스킬을 찾지 못한 경우 Phase 1+는 스킬 없이 작업을 진행한다.
+
 ### Phase 0: 준비 단계 (필수, 순차 1개 worker)
 
 Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work 디렉터리 생성과 스킬 매핑(`skill-map.md`)을 수행합니다. 실패 시 Worker 자율 결정으로 폴백합니다.
@@ -52,6 +54,8 @@ Phase 0은 모든 full 모드 워크플로우에서 필수로 실행하며, work
 ### Phase 1~N: 작업 실행
 
 Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
+
+Phase 1+의 각 Worker는 Phase 0에서 생성된 skill-map.md를 참조하여 태스크에 적합한 스킬을 로드한 후 작업을 수행한다. skill-map.md가 없는 경우(Phase 0 실패 시) Worker는 자율적으로 스킬을 결정한다.
 
 > **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 

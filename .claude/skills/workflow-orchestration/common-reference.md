@@ -33,7 +33,8 @@
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `strategy`(INIT->STRATEGY->COMPLETED), `prompt`(INIT->WORK->REPORT->COMPLETED) 3가지. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
-| **Phase 0** | 준비 단계 | WORK Phase 시작 전 1개 worker가 수행하는 준비 작업. work 디렉터리 생성 및 skill-map 작성. full 모드에서 필수 실행 (strategy/prompt 모드에서는 WORK Phase 자체가 없거나 다른 흐름). |
+| **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. full 모드에서 필수 실행 (strategy/prompt 모드에서는 WORK Phase 자체가 없거나 다른 흐름). |
+| **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md에서 추천 스킬을 로드하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Phase 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
 | **work log** | 작업 내역 | Worker/Explorer가 태스크 실행 후 생성하는 기록 파일. `work/WXX-*.md` 형식. |
@@ -117,7 +118,7 @@ flowchart TD
 | step-status 호출 (상태 전이 시각화) | Main | update_state.py 호출 후 순차 실행. 서브에이전트 Bash 출력이 터미널에 미표시되므로 오케스트레이터 전용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
-| skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 |
+| skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 (Phase 1+에서 참조) |
 | user_prompt.txt Read | Main (prompt 모드) / Sub (strategy 모드) | prompt 모드: 오케스트레이터 직접 작업. strategy 모드: strategy 서브에이전트가 직접 읽기 |
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
 | 로드맵 작성 (roadmap.md) | Sub (strategy) | 역할 분리: 전략 수립은 strategy 전담 |

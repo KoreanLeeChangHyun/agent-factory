@@ -72,7 +72,7 @@ maxTurns: 30
 - `planPath`: 계획서 경로
 - `taskId`: 수행할 태스크 ID (W01, W02 등)
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
-- `mode`: 동작 모드 (선택적)
+- `mode`: 동작 모드 (선택적). Explorer는 Phase 1+(작업 실행 단계)에서만 호출된다. Phase 0(스킬 탐색/매핑 준비 단계)은 Worker가 전담
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
 ## 절차
@@ -87,7 +87,7 @@ maxTurns: 30
 - **코드 수정 금지**: Explorer는 탐색 전용 에이전트. 코드 수정/생성은 Worker가 담당
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, deep-research와의 역할 분리)는 `workflow-explore/SKILL.md`를 참조하세요.
+> 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, deep-research와의 역할 분리)는 `workflow-explore/SKILL.md`를 참조하세요. Explorer는 Phase 1+(skill-map.md를 참조하여 계획서 태스크를 실행하는 단계)에서 호출되며, Phase 0(스킬 탐색/매핑 준비)은 Worker가 전담한다.
 
 ## 터미널 출력 원칙
 
