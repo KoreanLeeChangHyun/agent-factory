@@ -7,8 +7,8 @@ PreToolUse(Write|Edit|Bash) 이벤트에서 .claude/hooks/ 경로 파일 수정�
 입력: stdin으로 JSON (tool_name, tool_input)
 출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
 
-우회: 환경변수 HOOKS_EDIT_ALLOWED=1 설정 시 차단 해제
-      (오케스트레이터가 `python3 .claude/scripts/workflow/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1` 명령으로 설정/해제)
+우회: 환경변수 HOOK_EDIT_ALLOWED=true 설정 시 차단 해제
+      (오케스트레이터가 `python3 .claude/scripts/workflow/update_state.py env <registryKey> set HOOK_EDIT_ALLOWED true` 명령으로 설정/해제)
 """
 
 import json
@@ -188,11 +188,11 @@ def _classify_bash_command(bash_cmd):
 
 def main():
     # .claude.env에서 설정 로드
-    guard_protect = os.environ.get("GUARD_HOOKS_SELF_PROTECT") or read_env("GUARD_HOOKS_SELF_PROTECT")
-    hooks_edit_allowed = os.environ.get("HOOKS_EDIT_ALLOWED") or read_env("HOOKS_EDIT_ALLOWED")
+    hook_flag = os.environ.get("HOOK_HOOKS_SELF_PROTECT") or read_env("HOOK_HOOKS_SELF_PROTECT")
+    hook_edit_allowed = os.environ.get("HOOK_EDIT_ALLOWED") or read_env("HOOK_EDIT_ALLOWED")
 
-    # Guard disable check
-    if guard_protect == "0":
+    # Hook disable check (false = disabled)
+    if hook_flag in ("false", "0"):
         sys.exit(0)
 
     # stdin에서 JSON 읽기
@@ -220,7 +220,7 @@ def main():
             sys.exit(0)
 
         # 환경변수 우회 검사
-        if hooks_edit_allowed == "1":
+        if hook_edit_allowed in ("true", "1"):
             sys.exit(0)
 
         classification = _classify_bash_command(bash_cmd)
@@ -255,7 +255,7 @@ def main():
     # .claude/hooks/ 경로 포함 여부 검사
     if ".claude/hooks/" in file_path:
         # 환경변수 우회 검사
-        if hooks_edit_allowed == "1":
+        if hook_edit_allowed in ("true", "1"):
             sys.exit(0)
 
         _deny(

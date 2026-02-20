@@ -32,74 +32,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/hooks-self-guard.py",
-            "statusMessage": "hooks 자기보호 검사 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/slack-ask.py",
-            "async": true,
-            "statusMessage": "Slack 알림 전송 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/dangerous-command-guard.py",
-            "statusMessage": "위험 명령어 검사 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/tdd-guard.py",
-            "statusMessage": "TDD 가드 검사 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/workflow-transition-guard.py",
-            "statusMessage": "워크플로우 전이 검증 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/workflow-agent-guard.py",
-            "statusMessage": "워크플로우 에이전트 검증 중..."
-          }
-        ]
-      },
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use/task-history-sync.py",
-            "async": true,
-            "timeout": 30
+            "command": "python3 -u .claude/hooks/pre-tool-use.py",
+            "statusMessage": "pre-tool-use 디스패처 실행 중..."
           }
         ]
       }
@@ -109,9 +46,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/stop/workflow-auto-continue.py",
+            "command": "python3 -u .claude/hooks/stop.py",
             "timeout": 30,
-            "statusMessage": "워크플로우 계속 여부 확인"
+            "statusMessage": "stop 디스패처 실행 중..."
           }
         ]
       }
@@ -121,10 +58,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/subagent-stop/usage-tracker.py",
-            "async": true,
+            "command": "python3 -u .claude/hooks/subagent-stop.py",
             "timeout": 30,
-            "statusMessage": "사용량 추적"
+            "statusMessage": "subagent-stop 디스패처 실행 중..."
           }
         ]
       }

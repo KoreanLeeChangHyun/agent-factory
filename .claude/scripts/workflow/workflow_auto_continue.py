@@ -139,8 +139,8 @@ def main():
             except (ValueError, TypeError):
                 pass
 
-        # STALE 판정 — 세션이 일치하면 자기 워크플로우이므로 STALE 전환하지 않음
-        if not session_match and (current_session_id or elapsed > stale_threshold):
+        # STALE 판정 — TTL 만료가 필수 조건. 세션 불일치만으로는 STALE 전환하지 않음
+        if not session_match and elapsed > stale_threshold:
             is_stale = True
             transition_time = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
             old_phase = status_data.get("phase", "")

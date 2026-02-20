@@ -183,10 +183,10 @@ DANGER_PATTERNS = [
 
 def main():
     # .claude.env에서 설정 로드
-    guard_dangerous = os.environ.get("GUARD_DANGEROUS_COMMAND") or read_env("GUARD_DANGEROUS_COMMAND")
+    hook_flag = os.environ.get("HOOK_DANGEROUS_COMMAND") or read_env("HOOK_DANGEROUS_COMMAND")
 
-    # Guard disable check
-    if guard_dangerous == "0":
+    # Hook disable check (false = disabled)
+    if hook_flag in ("false", "0"):
         sys.exit(0)
 
     # stdin에서 JSON 읽기

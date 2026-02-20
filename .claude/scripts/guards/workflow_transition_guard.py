@@ -71,15 +71,15 @@ def main():
     project_root = resolve_project_root()
 
     # .claude.env에서 설정 로드
-    guard_transition = os.environ.get("GUARD_WORKFLOW_TRANSITION") or read_env("GUARD_WORKFLOW_TRANSITION")
+    hook_flag = os.environ.get("HOOK_WORKFLOW_TRANSITION") or read_env("HOOK_WORKFLOW_TRANSITION")
     skip_guard = os.environ.get("WORKFLOW_SKIP_GUARD") or read_env("WORKFLOW_SKIP_GUARD")
 
     # 비상 우회 수단
     if skip_guard == "1":
         sys.exit(0)
 
-    # Guard disable check
-    if guard_transition == "0":
+    # Hook disable check (false = disabled)
+    if hook_flag in ("false", "0"):
         sys.exit(0)
 
     # Bypass 메커니즘: 파일 기반 또는 환경변수 기반

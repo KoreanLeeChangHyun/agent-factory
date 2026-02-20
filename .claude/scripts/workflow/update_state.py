@@ -675,8 +675,8 @@ def env_manage(action, key, value=""):
         return "env -> skipped (missing value)"
 
     # KEY 화이트리스트 검증
-    if key != "HOOKS_EDIT_ALLOWED" and not key.startswith("GUARD_"):
-        print(f"[WARN] env: 허용되지 않는 KEY입니다: {key} (허용: HOOKS_EDIT_ALLOWED, GUARD_* 접두사)", file=sys.stderr)
+    if not key.startswith("HOOK_") and not key.startswith("GUARD_") and key != "HOOKS_EDIT_ALLOWED":
+        print(f"[WARN] env: 허용되지 않는 KEY입니다: {key} (허용: HOOK_*, GUARD_* 접두사)", file=sys.stderr)
         return "env -> skipped (disallowed key)"
 
     env_file = os.path.join(PROJECT_ROOT, ".claude.env")

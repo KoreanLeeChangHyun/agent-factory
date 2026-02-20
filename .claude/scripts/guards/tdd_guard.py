@@ -209,10 +209,10 @@ def _find_test_patterns(file_path, basename, extension, dirpath):
 
 def main():
     # .claude.env에서 설정 로드
-    guard_tdd = os.environ.get("GUARD_TDD") or read_env("GUARD_TDD")
+    hook_flag = os.environ.get("HOOK_TDD") or read_env("HOOK_TDD")
 
-    # Guard disable check
-    if guard_tdd == "0":
+    # Hook disable check (false = disabled)
+    if hook_flag in ("false", "0"):
         sys.exit(0)
 
     # stdin에서 JSON 읽기
@@ -267,7 +267,7 @@ def main():
         except ValueError:
             rel_file = file_path
 
-        if guard_tdd == "strict":
+        if hook_flag == "strict":
             # strict 모드: deny
             _deny(
                 f"[TDD-GUARD] {rel_file}에 대한 테스트 파일이 없습니다. "
