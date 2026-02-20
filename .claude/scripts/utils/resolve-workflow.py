@@ -19,13 +19,13 @@ import sys
 
 # common 모듈에서 load_json_file을 import
 # 이 파일이 직접 실행될 때를 위해 sys.path 조정
-# _utils/ 디렉터리는 scripts/ 하위이므로, scripts/를 sys.path에 추가
+# utils/ 디렉터리는 scripts/ 하위이므로, scripts/를 sys.path에 추가
 _utils_dir = os.path.dirname(os.path.abspath(__file__))
 _scripts_dir = os.path.dirname(_utils_dir)
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from _utils.common import load_json_file
+from utils.common import load_json_file
 
 
 def get_updated_at(project_root, entry):

@@ -1,5 +1,5 @@
 """
-.claude/scripts/_utils - 공통 유틸리티 Python 패키지
+.claude/scripts/utils - 공통 유틸리티 Python 패키지
 
 제공 모듈:
     env_utils    - .claude.env 파일 파싱/쓰기 (read_env, set_env)

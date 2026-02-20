@@ -73,7 +73,7 @@ def resolve_project_root(start_path=None):
     """
     프로젝트 루트 경로 해석.
 
-    _utils -> scripts -> .claude -> project root 순서로 상위 디렉터리를 탐색하여
+    utils -> scripts -> .claude -> project root 순서로 상위 디렉터리를 탐색하여
     프로젝트 루트를 결정합니다.
 
     Args:
@@ -85,7 +85,7 @@ def resolve_project_root(start_path=None):
     if start_path:
         base = os.path.abspath(start_path)
     else:
-        # _utils -> scripts -> .claude -> project root
+        # utils -> scripts -> .claude -> project root
         utils_dir = os.path.dirname(os.path.abspath(__file__))
         base = os.path.normpath(os.path.join(utils_dir, "..", "..", ".."))
     return base

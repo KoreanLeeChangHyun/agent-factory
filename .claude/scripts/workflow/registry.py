@@ -19,12 +19,12 @@ import tempfile
 import shutil
 from datetime import datetime, timedelta, timezone
 
-# _utils 패키지 import
+# utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from _utils.common import (
+from utils.common import (
     C_BOLD,
     C_CYAN,
     C_DIM,

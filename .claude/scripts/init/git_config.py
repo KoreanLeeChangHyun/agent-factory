@@ -23,7 +23,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 sys.path.insert(0, _SCRIPTS_DIR)
 
-from _utils.env_utils import read_env
+from utils.env_utils import read_env
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _ENV_FILE = os.path.join(_PROJECT_ROOT, ".claude.env")

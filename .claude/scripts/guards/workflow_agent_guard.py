@@ -37,13 +37,13 @@ import os
 import re
 import sys
 
-# _utils 패키지 import 경로 설정
+# utils 패키지 import 경로 설정
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from _utils.env_utils import read_env
-from _utils.common import resolve_project_root, load_json_file
+from utils.env_utils import read_env
+from utils.common import resolve_project_root, load_json_file
 
 
 def _deny(reason):

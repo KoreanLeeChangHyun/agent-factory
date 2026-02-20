@@ -52,7 +52,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
     └── history-sync-trigger.py         # history_sync.py 호출 (인라인)
 
 .claude/scripts/                        # 실제 로직 스크립트
-├── _utils/                             # 공통 유틸리티
+├── utils/                              # 공통 유틸리티
 │   ├── env_utils.py                    # 환경변수 파싱
 │   ├── slack_common.py                 # Slack 공통 함수
 │   └── resolve-workflow.py             # 워크플로우 경로 해석
@@ -328,14 +328,14 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | 파일 | 용도 |
 |------|------|
 | `.claude/scripts/slack/slack_notify.py` | Slack 완료 알림 |
-| `.claude/scripts/_utils/slack_common.py` | 공통 함수 라이브러리 |
+| `.claude/scripts/utils/slack_common.py` | 공통 함수 라이브러리 |
 
 ### 공통 유틸리티
 
 | 파일 | 용도 |
 |------|------|
-| `.claude/scripts/_utils/env_utils.py` | 환경변수 파싱 유틸리티 |
-| `.claude/scripts/_utils/resolve-workflow.py` | 워크플로우 경로 해석 |
+| `.claude/scripts/utils/env_utils.py` | 환경변수 파싱 유틸리티 |
+| `.claude/scripts/utils/resolve-workflow.py` | 워크플로우 경로 해석 |
 
 ## 참고
 - `.claude/hooks/` 디렉터리에서 thin wrapper Hook 스크립트 확인

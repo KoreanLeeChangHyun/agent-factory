@@ -28,7 +28,7 @@ def _resolve_env_file(env_file=None):
         return env_file
     if _DEFAULT_ENV_FILE:
         return _DEFAULT_ENV_FILE
-    # 프로젝트 루트 추론: _utils -> scripts -> .claude -> project root
+    # 프로젝트 루트 추론: utils -> scripts -> .claude -> project root
     utils_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.normpath(os.path.join(utils_dir, "..", "..", ".."))
     return os.path.join(project_root, ".claude.env")

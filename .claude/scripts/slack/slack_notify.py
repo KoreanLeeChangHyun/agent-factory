@@ -25,13 +25,13 @@ import os
 import sys
 import urllib.parse
 
-# _utils 패키지 import를 위한 경로 설정
+# utils 패키지 import를 위한 경로 설정
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 _scripts_dir = os.path.normpath(os.path.join(_script_dir, ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from _utils.slack_common import (
+from utils.slack_common import (
     build_json_payload,
     get_agent_emoji,
     load_slack_env,
@@ -39,7 +39,7 @@ from _utils.slack_common import (
     send_slack_message,
     SLACK_CHANNEL_ID,
 )
-from _utils.common import (
+from utils.common import (
     extract_registry_key,
     load_json_file,
     resolve_project_root,
@@ -210,7 +210,7 @@ def main():
     )
 
     # JSON payload 구성 + Slack 전송
-    from _utils.slack_common import SLACK_CHANNEL_ID as _channel
+    from utils.slack_common import SLACK_CHANNEL_ID as _channel
     json_payload = build_json_payload(_channel, message)
     send_slack_message(json_payload)
 
