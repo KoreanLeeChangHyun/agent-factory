@@ -227,7 +227,7 @@ def main():
     if active_count > keep_count:
         print(f"[init] Active directories ({active_count}) exceed KEEP_COUNT ({keep_count}), triggering archive...",
               file=sys.stderr)
-        archive_script = os.path.join(_SCRIPT_DIR, "..", "workflow", "history_archive_sync.py")
+        archive_script = os.path.join(_SCRIPT_DIR, "..", "sync", "history_archive_sync.py")
         if os.path.isfile(archive_script):
             try:
                 subprocess.run(
@@ -237,7 +237,7 @@ def main():
             except Exception:
                 pass
         else:
-            archive_sh = os.path.join(_SCRIPT_DIR, "..", "workflow", "archive-workflow.sh")
+            archive_sh = os.path.join(_SCRIPT_DIR, "..", "sync", "archive-workflow.sh")
             if os.path.isfile(archive_sh):
                 try:
                     subprocess.run(
@@ -248,7 +248,7 @@ def main():
                     pass
 
     # --- Step 9: 전역 레지스트리 등록 ---
-    update_state_script = os.path.join(_SCRIPT_DIR, "..", "workflow", "update_state.py")
+    update_state_script = os.path.join(_SCRIPT_DIR, "..", "state", "update_state.py")
     if os.path.isfile(update_state_script):
         try:
             subprocess.run(
@@ -258,7 +258,7 @@ def main():
         except Exception:
             pass
     else:
-        update_state_sh = os.path.join(_SCRIPT_DIR, "..", "workflow", "update-state.sh")
+        update_state_sh = os.path.join(_SCRIPT_DIR, "..", "state", "update-state.sh")
         if os.path.isfile(update_state_sh):
             try:
                 subprocess.run(
