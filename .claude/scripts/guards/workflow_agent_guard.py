@@ -26,9 +26,9 @@ INIT->PLAN->WORK->REPORT->COMPLETED 전이 경로의 각 단계를 전담한다.
     STRATEGY: done 허용 (오케스트레이터가 직접 작업)
     COMPLETED: done 허용 (마무리 처리)
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
-  [prompt 모드]
+  [noplan 모드]
     NONE/비존재: init만 허용
-    INIT: worker 허용
+    INIT: worker + explorer 허용 (Phase 0 스킬 탐색 포함)
     WORK: worker + explorer + reporter 허용
     REPORT: reporter + done 허용
     COMPLETED: done 허용 (마무리 처리)
@@ -85,9 +85,9 @@ ALLOWED_AGENTS_STRATEGY = {
     "CANCELLED": [],
 }
 
-ALLOWED_AGENTS_PROMPT = {
+ALLOWED_AGENTS_NOPLAN = {
     "NONE": ["init"],
-    "INIT": ["worker"],
+    "INIT": ["worker", "explorer"],
     "WORK": ["worker", "explorer", "reporter"],
     "REPORT": ["reporter", "done"],
     "COMPLETED": ["done"],
@@ -99,7 +99,7 @@ ALLOWED_AGENTS_PROMPT = {
 MODE_AGENTS_MAP = {
     "full": ALLOWED_AGENTS_FULL,
     "strategy": ALLOWED_AGENTS_STRATEGY,
-    "prompt": ALLOWED_AGENTS_PROMPT,
+    "noplan": ALLOWED_AGENTS_NOPLAN,
 }
 
 

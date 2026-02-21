@@ -15,14 +15,12 @@ Main agent controls workflow sequencing and agent dispatch only.
 stateDiagram-v2
     [*] --> INIT
     INIT --> PLAN: full mode
-    INIT --> WORK: prompt mode(main direct)
     INIT --> STRATEGY: strategy mode
+    INIT --> WORK: noplan mode
     PLAN --> WORK: 승인
     PLAN --> CANCELLED: 중지
     WORK --> REPORT
-    WORK --> REPORT: prompt mode
     REPORT --> COMPLETED: 성공
-    REPORT --> COMPLETED: prompt mode 성공
     REPORT --> FAILED: 실패
     STRATEGY --> COMPLETED: 성공
     STRATEGY --> FAILED: 실패
@@ -38,7 +36,7 @@ stateDiagram-v2
 | Mode | Phase Order | Agent Sequence | Skip |
 |------|-------------|----------------|------|
 | full (default) | INIT -> PLAN -> WORK -> REPORT -> COMPLETED | init -> planner -> worker(s)/explorer(s) -> reporter -> done | None |
-| prompt | INIT -> WORK -> REPORT -> COMPLETED | init -> (main direct) -> reporter -> done | PLAN |
+| noplan | INIT -> WORK -> REPORT -> COMPLETED | init -> worker(s)/explorer(s) -> reporter -> done | PLAN |
 | strategy | INIT -> STRATEGY -> COMPLETED | init -> strategy -> done | PLAN, WORK, REPORT |
 
 1. Phase order within each mode MUST NOT be violated
@@ -50,21 +48,23 @@ stateDiagram-v2
 오케스트레이터는 INIT 에이전트 호출 전, command로 `mode`를 자동 결정한다.
 
 **결정 알고리즘:**
-1. `command == "prompt"` → `mode: prompt` (early return)
-2. `command == "strategy"` → `mode: strategy` (early return)
+1. `command == "strategy"` → `mode: strategy` (early return)
+2. `$ARGUMENTS`에 `-np` 플래그 포함 AND `command in ["implement", "review", "research"]` → `mode: noplan` (early return)
 3. 그 외 → `mode: full` (기본값)
 
 **매핑 테이블:**
 
-| Command | Mode |
-|---------|------|
-| `prompt` | `prompt` |
-| `strategy` | `strategy` |
-| `implement` | `full` |
-| `review` | `full` |
-| `research` | `full` |
+| Command | Condition | Mode |
+|---------|-----------|------|
+| `strategy` | - | `strategy` |
+| `implement` | `-np` 플래그 | `noplan` |
+| `implement` | (기본) | `full` |
+| `review` | `-np` 플래그 | `noplan` |
+| `review` | (기본) | `full` |
+| `research` | `-np` 플래그 | `noplan` |
+| `research` | (기본) | `full` |
 
-> mode는 command에 의해 일의적으로 결정된다. 개별 커맨드 문서는 mode 결정 로직을 포함하지 않는다.
+> mode는 command와 `-np` 플래그에 의해 결정된다. `-np` 플래그는 `$ARGUMENTS`에서 감지한다. 개별 커맨드 문서는 mode 결정 로직을 포함하지 않는다.
 
 ## Agent-Phase Mapping
 
@@ -88,15 +88,14 @@ stateDiagram-v2
 | review | Code review |
 | research | Research/investigation and internal asset analysis |
 | strategy | Multi-workflow strategy (INIT->STRATEGY->DONE, strategy sub-agent) |
-| prompt | Lightweight direct work (Tier 3, main agent direct + reporter + done) |
 
-Commands follow their mode's phase order. Default is full. `prompt` always runs in prompt mode. `strategy` always runs in strategy mode.
+Commands follow their mode's phase order. Default is full. `strategy` always runs in strategy mode.
 
 ## Input Parameters
 
-- `command`: execution command (implement, review, research, strategy, prompt)
+- `command`: execution command (implement, review, research, strategy)
 
-> cc:* commands do NOT use `$ARGUMENTS` for prompt content. User requests are handled by init agent via `.prompt/prompt.txt`.
+> cc:* commands use `$ARGUMENTS` only for flag detection (`-np`). User requests are handled by init agent via `.prompt/prompt.txt`.
 
 ---
 
@@ -133,7 +132,6 @@ step-end <registryKey> <phase>
 | WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) |
 | REPORT | `step-start <key> REPORT` | `step-end <key> REPORT` |
 | DONE | `step-start <key> DONE` | `step-end <key> DONE done` |
-| WORK (prompt) | `step-start <key> WORK` | `step-end <key> WORK` |
 | STRATEGY | `step-start <key> STRATEGY` | `step-end <key> STRATEGY` |
 
 **각 phase의 오케스트레이터 호출 순서 (PLAN/WORK/REPORT/DONE 공통):**
@@ -158,8 +156,8 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
 | INIT done (full) | INIT step-end, extract/retain params, PLAN step-start, status update, planner call | Return summary, progress text, **AskUserQuestion**, init 반환값 판단/검증, **내부 추론/분석 텍스트 출력** |
+| INIT done (noplan) | INIT step-end, extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), worker call(s) | PLAN banner, planner call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
 | INIT done (strategy) | INIT step-end, extract/retain params, skip PLAN/WORK/REPORT, STRATEGY banner, status update (INIT->STRATEGY), strategy agent call | PLAN banner, WORK banner, planner call, worker call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
-| INIT done (prompt) | INIT step-end, direct work by main agent, WORK banner, status update (INIT->WORK) | PLAN banner, planner call, **내부 추론/분석 텍스트 출력** |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask, **내부 추론/분석 텍스트 출력** |
 | PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0(스킬 탐색/매핑) worker call, then Phase 1~N(계획서 태스크 실행) | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
@@ -201,8 +199,8 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 | Mode | Next Step |
 |------|-----------|
-| `prompt` | Skip PLAN, main agent direct WORK -> REPORT -> DONE. See [step-init.md](step-init.md) "Prompt Mode Post-INIT Flow" |
 | `strategy` | Skip PLAN/WORK/REPORT, strategy agent STRATEGY -> DONE. See [step-init.md](step-init.md) "Strategy Mode Post-INIT Flow" |
+| `noplan` | Skip PLAN, worker sub-agent WORK -> REPORT -> DONE. See [step-init.md](step-init.md) "Noplan Mode Post-INIT Flow" |
 | `full` | Proceed to PLAN |
 
 ---
@@ -227,10 +225,10 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Status update (mode-aware):**
 - full mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK`
-- prompt mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK` (main agent direct work, no worker sub-agent)
+- noplan mode: `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK`
 - strategy mode: WORK Phase 없음 (STRATEGY Phase에서 strategy 서브에이전트가 작업)
 
-**Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode) or main agent direct work (prompt mode).
+**Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode). noplan mode: worker가 user_prompt.txt를 직접 해석하여 작업 수행.
 
 **Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE (Phase 0 = 스킬 탐색/매핑 준비, Phase 1+ = skill-map 참조하여 계획서 태스크 실행, 스킬 미발견 시 Worker 자율 결정으로 진행) and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
@@ -322,7 +320,7 @@ step-end <registryKey> DONE done
 | 허용 파일 | 용도 | 필수 근거 |
 |-----------|------|----------|
 | `<workDir>/plan.md` | WORK Phase 태스크 디스패치 | 서브에이전트 간 직접 통신 불가(플랫폼 제약)로 오케스트레이터만 taskId/phase/dependency/parallelism/agentType을 추출하여 디스패치 순서를 결정할 수 있음 |
-| `<workDir>/user_prompt.txt` | prompt 모드에서 직접 작업 시 | prompt 모드는 오케스트레이터가 직접 Write/Edit를 수행하므로 사용자 요청 파악이 불가피. strategy 모드에서는 strategy 서브에이전트가 직접 읽음 |
+| `<workDir>/user_prompt.txt` | strategy/noplan 모드에서 참조 시 | strategy 모드: strategy 서브에이전트가 직접 읽음. noplan 모드: worker 서브에이전트가 직접 읽음 |
 
 > **skill-map.md는 오케스트레이터가 읽지 않습니다.** Phase 0 완료 후 skill-map.md는 Phase 1+ Worker가 직접 읽습니다. 오케스트레이터는 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로만 파라미터로 전달합니다.
 

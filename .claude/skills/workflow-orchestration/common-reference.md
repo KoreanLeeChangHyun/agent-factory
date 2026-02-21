@@ -13,7 +13,7 @@
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
 | **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, STRATEGY, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. DONE은 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
-| **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy, prompt 중 하나. |
+| **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy 중 하나. |
 | **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, strategy, reporter, done 7개와 orchestrator로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, strategy, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
@@ -31,9 +31,9 @@
 | **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update_state.py + transition-guard)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Phase에서 다른 Phase로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
-| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `strategy`(INIT->STRATEGY->COMPLETED), `prompt`(INIT->WORK->REPORT->COMPLETED) 3가지. |
+| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `noplan`(INIT->WORK->REPORT->COMPLETED, worker 서브에이전트 사용, PLAN 스킵), `strategy`(INIT->STRATEGY->COMPLETED) 3가지. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
-| **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. full 모드에서 필수 실행 (strategy/prompt 모드에서는 WORK Phase 자체가 없거나 다른 흐름). |
+| **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. full 모드 및 noplan 모드에서 필수 실행 (strategy 모드에서는 WORK Phase 자체가 없어 해당 없음). |
 | **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md에서 추천 스킬을 로드하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Phase 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
@@ -119,7 +119,7 @@ flowchart TD
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
 | skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 (Phase 1+에서 참조) |
-| user_prompt.txt Read | Main (prompt 모드) / Sub (strategy 모드) | prompt 모드: 오케스트레이터 직접 작업. strategy 모드: strategy 서브에이전트가 직접 읽기 |
+| user_prompt.txt Read | Sub (strategy/noplan 모드) | strategy 모드: strategy 서브에이전트가 직접 읽기. noplan 모드: worker 서브에이전트가 직접 읽기 |
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
 | 로드맵 작성 (roadmap.md) | Sub (strategy) | 역할 분리: 전략 수립은 strategy 전담 |
 | 보고서 작성 (report.md) | Sub (reporter) | 역할 분리: 보고서 종합은 reporter 전담 |
@@ -236,8 +236,8 @@ workName: <작업이름>
 | Mode | Normal Flow | Branches |
 |------|-------------|----------|
 | full (default) | `INIT -> PLAN -> WORK -> REPORT -> COMPLETED` | PLAN->CANCELLED, WORK/REPORT->FAILED, TTL->STALE |
+| noplan | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
 | strategy | `INIT -> STRATEGY -> COMPLETED` | STRATEGY->FAILED, TTL->STALE |
-| prompt | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
 
 불법 전이 시 시스템 가드가 차단. update_state.py는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 

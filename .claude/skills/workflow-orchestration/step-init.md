@@ -22,7 +22,7 @@ mode: <mode>
 ")
 ```
 
-> `mode` parameter is optional. Default is `full`. Values: `full`, `strategy`, `prompt`.
+> `mode` parameter is optional. Default is `full`. Values: `full`, `strategy`, `noplan`.
 > 오케스트레이터가 "Mode Auto-Determination Rule" (SKILL.md)에 따라 결정한 값을 전달한다.
 
 ## Return Values
@@ -46,7 +46,7 @@ step-end <registryKey> INIT
 1. init 에이전트 정상 반환 확인
 2. 반환값(request, workDir, workId, registryKey 등) 추출/보관
 3. `step-end <registryKey> INIT` 호출
-4. Mode Branching 진행 (full -> PLAN, strategy -> STRATEGY, prompt -> WORK)
+4. Mode Branching 진행 (full -> PLAN, strategy -> STRATEGY, noplan -> WORK)
 
 > init이 `에러:` 접두사로 반환한 경우에는 step-end를 호출하지 않고 재시도 로직으로 진행한다.
 
@@ -107,39 +107,51 @@ init 반환값(request, workDir, workId, registryKey, date, title, workName, 근
 | `workDir` | PLAN (Step 2), REPORT (Step 4) | 작업 디렉터리 경로 |
 | `workId` | PLAN (Step 2), WORK (Step 3), REPORT (Step 4) | 작업 식별자 |
 | `registryKey` | PLAN (Step 2), WORK (Step 3), REPORT (Step 4) | step-start/step-end/update_state.py 호출의 식별자. date + "-" + workId 형식 |
-| `date`, `title`, `workName` | REPORT (Step 4), Prompt mode (history) | 경로 구성 시 사용 |
+| `date`, `title`, `workName` | REPORT (Step 4), Noplan mode (history) | 경로 구성 시 사용 |
 | `근거` | Logging only | 로깅용 |
 
 ### usage.json 초기화
 
 - **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage_tracker.py가 서브에이전트별 토큰을 기록)
 
-## Prompt Mode (Tier 3) Post-INIT Flow
+## Noplan Mode Post-INIT Flow
 
-When command is `prompt`, the orchestrator skips PLAN and proceeds directly to WORK (main agent direct work) -> REPORT -> DONE.
+When `-np` flag is detected in `$ARGUMENTS` for implement/review/research commands, the orchestrator skips PLAN and proceeds directly to WORK (worker sub-agent) -> REPORT -> DONE.
 
-### Prompt Mode Direct Write/Edit Scope
+### Noplan Mode Characteristics
 
-> **허용 범위**: 1-2개 파일 즉석 수정, 질의응답 텍스트 답변
-> **권장하지 않음**: 3개 이상 파일 수정, 새 기능 구현 -> `cc:implement` 사용 권장
-> **근거**: prompt 모드의 핵심 가치는 Worker 없이 오케스트레이터가 직접 처리하는 경량성. 복잡한 작업은 Worker 위임(full 모드)이 적합
+> **핵심 차이 (full 모드 대비)**: PLAN 단계를 스킵하고 INIT에서 바로 WORK로 전이한다.
+> **worker 서브에이전트 사용**: full 모드와 동일하게 worker 서브에이전트가 작업을 수행한다.
+> **Phase 0 필수**: noplan 모드에서도 Phase 0(스킬 탐색/매핑)은 필수 실행한다.
+> **plan.md 부재**: plan.md가 없으므로 worker 호출 시 `planPath` 대신 `userPromptPath: <workDir>/user_prompt.txt` 경로를 전달한다.
 
 ### Flow
 
 1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK`
-2. `step-start <registryKey> WORK` (WORK start banner)
-3. Read `<workDir>/user_prompt.txt` for user request (1회만, 반복 읽기 금지)
-4. Main agent performs direct work (file changes allowed, scope: 1-2 files)
-5. `mkdir -p <workDir>/work` (ensure work directory exists for reporter)
+2. `step-status <registryKey>`
+3. `step-start <registryKey> WORK` (WORK start banner)
+4. Phase 0 실행 (스킬 탐색/매핑 준비):
+   - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
+   - `mkdir -p <workDir>/work && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> phase0 phase0`
+   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")`
+   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 completed`
+5. Phase 1+ 실행 (작업 수행):
+   - `step-start <registryKey> WORK-PHASE 1 "W01" sequential`
+   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01`
+   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
+   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 completed`
 6. `step-end <registryKey> WORK` (WORK completion)
 7. `python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT`
-8. `step-start <registryKey> REPORT` (REPORT start banner)
-9. Reporter call: `Task(subagent_type="reporter", prompt="command: prompt, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
-10. `step-end <registryKey> REPORT` (REPORT completion)
-11. `step-start <registryKey> DONE` (DONE start banner)
-12. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: prompt, title: <title>, reportPath: <reportPath>, status: <status>")`
-13. `step-end <registryKey> DONE done` (DONE completion)
-14. Terminate
+8. `step-status <registryKey>`
+9. `step-start <registryKey> REPORT` (REPORT start banner)
+10. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
+11. `step-end <registryKey> REPORT` (REPORT completion)
+12. `step-start <registryKey> DONE` (DONE start banner)
+13. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")`
+14. `step-end <registryKey> DONE done` (DONE completion)
+15. Terminate
+
+> **Note:** noplan 모드에서는 plan.md가 없으므로 오케스트레이터가 plan.md를 Read하는 단계(Plan Reading for Task Dispatch)가 없다. 대신 Phase 0 Worker가 user_prompt.txt를 분석하여 skill-map.md를 생성하고, Phase 1 Worker가 user_prompt.txt를 직접 해석하여 작업을 수행한다. 단일 Worker(W01)로 실행하는 것이 기본이며, Phase 0이 태스크 분할이 필요하다고 판단하면 skill-map.md에 복수 태스크를 정의할 수 있다.
 
 ## Strategy Mode Post-INIT Flow
 

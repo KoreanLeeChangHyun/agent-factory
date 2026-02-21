@@ -9,8 +9,11 @@
 > ```bash
 > # full mode (default): transition from PLAN
 > python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK
+>
+> # noplan mode: transition from INIT (PLAN 스킵)
+> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
 > ```
-> Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행). prompt 모드는 INIT -> WORK 전이 (step-init.md 참조).
+> Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행).
 
 > **WORK Phase Rules (REQUIRED)**
 >
@@ -120,11 +123,11 @@ WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 
 ---
 
-## Full Mode: Phase 0 - Preparation (Required, Sequential 1 worker)
+## Phase 0 - Preparation (Required, Sequential 1 worker)
 
-> **CRITICAL: Phase 0 스킵 절대 금지.** full 모드에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
+> **CRITICAL: Phase 0 스킵 절대 금지.** full 모드 및 noplan 모드에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
 
-> **필수 실행**: Phase 0은 모든 full 모드 워크플로우에서 필수로 실행합니다.
+> **필수 실행**: Phase 0은 모든 full 모드 및 noplan 모드 워크플로우에서 필수로 실행합니다.
 > **REQUIRED**: Phase 0 Worker 호출 직전에 반드시 WORK-PHASE 0 배너를 출력해야 합니다.
 
 **Phase 0 실행 흐름:**
@@ -152,7 +155,11 @@ step-start <registryKey> WORK-PHASE 0 "phase0" sequential
 mkdir -p <workDir>/work && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> phase0 phase0
 ```
 ```
+# full mode:
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
+
+# noplan mode (plan.md 없음, userPromptPath 사용):
+Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")
 ```
 
 **Phase 0 완료 후 task-status 갱신:**

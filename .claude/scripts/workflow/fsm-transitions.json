@@ -13,7 +13,7 @@
       "INIT": ["STRATEGY", "STALE"],
       "STRATEGY": ["COMPLETED", "FAILED", "STALE"]
     },
-    "prompt": {
+    "noplan": {
       "NONE": ["INIT"],
       "INIT": ["WORK", "STALE"],
       "WORK": ["REPORT", "FAILED", "STALE"],
