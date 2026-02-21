@@ -20,7 +20,6 @@ Worker가 skills 파라미터 없이 호출될 때 명령어에 따라 자동 �
 
 | 키워드 | 추가 로드 스킬 |
 |--------|---------------|
-| 테스트, test, TDD | tdd-guard-hook |
 | 구현, implement, 기능 추가, feature | command-verification-before-completion |
 | 리팩토링, refactor, 리팩터, 코드 개선 | command-code-quality-checker |
 | 마이그레이션, migration, 스키마 변경, DB 변경 | command-code-quality-checker, command-verification-before-completion |

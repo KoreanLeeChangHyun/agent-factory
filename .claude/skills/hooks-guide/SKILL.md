@@ -39,7 +39,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ├── pre-tool-use/
 │   ├── hooks-self-guard.py             # -> scripts/guards/hooks_self_guard.py
 │   ├── dangerous-command-guard.py      # -> scripts/guards/dangerous_command_guard.py
-│   ├── tdd-guard.py                    # -> scripts/guards/tdd_guard.py
 │   ├── workflow-transition-guard.py    # -> scripts/guards/workflow_transition_guard.py
 │   ├── workflow-agent-guard.py         # -> scripts/guards/workflow_agent_guard.py
 │   ├── slack-ask.py                    # -> scripts/slack/slack_ask.py
@@ -59,7 +58,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ├── guards/                             # 가드 스크립트
 │   ├── hooks_self_guard.py
 │   ├── dangerous_command_guard.py
-│   ├── tdd_guard.py
 │   ├── workflow_transition_guard.py
 │   └── workflow_agent_guard.py
 ├── init/                               # 초기화/설정 스크립트 (alias 호출)
@@ -89,7 +87,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 ### 현재 프로젝트 Hook 설정
 
-현재 `.claude/settings.json`에 등록된 Hook은 총 6개입니다: PreToolUse 5개, Stop 1개.
+현재 `.claude/settings.json`에 등록된 Hook은 총 5개입니다: PreToolUse 4개, Stop 1개.
 
 #### PreToolUse Hooks
 
@@ -137,28 +135,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **스크립트**: `.claude/hooks/pre-tool-use/dangerous-command-guard.py` (thin wrapper -> `.claude/scripts/guards/dangerous_command_guard.py`)
 - **관련 스킬**: `dangerous-command-guard`
 
-##### 3. TDD 가드 (Write|Edit)
-
-```json
-{
-  "matcher": "Write|Edit",
-  "hooks": [
-    {
-      "type": "command",
-      "command": "python3 .claude/hooks/pre-tool-use/tdd-guard.py",
-      "statusMessage": "TDD 가드 검사 중..."
-    }
-  ]
-}
-```
-
-- **트리거**: Write 또는 Edit 도구 호출 시
-- **동작**: 테스트 없이 소스 파일을 수정하려는 시도 감지 시 경고
-- **동기**: 경고만 표시 (차단하지 않음)
-- **스크립트**: `.claude/hooks/pre-tool-use/tdd-guard.py` (thin wrapper -> `.claude/scripts/guards/tdd_guard.py`)
-- **관련 스킬**: `tdd-guard-hook`
-
-##### 4. 워크플로우 Phase 전이 검증 (Bash)
+##### 3. 워크플로우 Phase 전이 검증 (Bash)
 
 ```json
 {
@@ -179,7 +156,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **스크립트**: `.claude/hooks/pre-tool-use/workflow-transition-guard.py` (thin wrapper -> `.claude/scripts/guards/workflow_transition_guard.py`)
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
-##### 5. 워크플로우 에이전트 호출 검증 (Task)
+##### 4. 워크플로우 에이전트 호출 검증 (Task)
 
 ```json
 {
@@ -202,7 +179,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 #### Stop Hooks
 
-##### 6. 워크플로우 자동 계속 (Stop)
+##### 5. 워크플로우 자동 계속 (Stop)
 
 ```json
 {
@@ -297,7 +274,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/hooks/pre-tool-use/hooks-self-guard.py` | `.claude/scripts/guards/hooks_self_guard.py` | hooks/scripts 자기 보호 | PreToolUse | Write, Edit, Bash |
 | `.claude/hooks/pre-tool-use/slack-ask.py` | `.claude/scripts/slack/slack_ask.py` | Slack 질문 알림 전송 | PreToolUse | AskUserQuestion |
 | `.claude/hooks/pre-tool-use/dangerous-command-guard.py` | `.claude/scripts/guards/dangerous_command_guard.py` | 위험 명령어 차단 | PreToolUse | Bash |
-| `.claude/hooks/pre-tool-use/tdd-guard.py` | `.claude/scripts/guards/tdd_guard.py` | TDD 원칙 위반 경고 | PreToolUse | Write, Edit |
 | `.claude/hooks/pre-tool-use/workflow-transition-guard.py` | `.claude/scripts/guards/workflow_transition_guard.py` | 워크플로우 Phase 전이 검증 | PreToolUse | Bash |
 | `.claude/hooks/pre-tool-use/workflow-agent-guard.py` | `.claude/scripts/guards/workflow_agent_guard.py` | 워크플로우 에이전트 호출 검증 | PreToolUse | Task |
 | `.claude/hooks/stop/workflow-auto-continue.py` | `.claude/scripts/workflow/workflow_auto_continue.py` | 워크플로우 자동 계속 (Stop 차단) | Stop | (전체) |
@@ -342,4 +318,3 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - `.claude/scripts/` 디렉터리에서 실제 로직 스크립트 확인
 - `.claude/settings.json`에서 현재 활성화된 Hooks 확인
 - `dangerous-command-guard` 스킬 - 차단 패턴 상세 정보
-- `tdd-guard-hook` 스킬 - TDD 가드 상세 정보

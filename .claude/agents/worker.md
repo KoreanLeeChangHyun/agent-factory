@@ -48,7 +48,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 |------|------|------------|------|
 | `workflow-work` | 워크플로우 | frontmatter `skills` | WORK 단계 절차, 선행 결과 읽기, 작업 내역 작성 규격 |
 | `command-skill-map.md` 기반 스킬 | 커맨드 | 런타임 동적 로드 | 명령어별 자동 로드 (implement -> code-quality-checker 등) |
-| 키워드 기반 스킬 | 커맨드 | 런타임 동적 로드 | 작업 내용 키워드에 따라 추가 로드 (test -> tdd-guard-hook 등) |
+| 키워드 기반 스킬 | 커맨드 | 런타임 동적 로드 | 작업 내용 키워드에 따라 추가 로드 (architecture -> command-architect 등) |
 
 > worker는 `workflow-work` 스킬만 frontmatter에 정적 바인딩합니다. 커맨드 스킬은 `.claude/skills/workflow-work/command-skill-map.md`의 매핑 규칙에 따라 실행 시점에 동적으로 로드됩니다.
 

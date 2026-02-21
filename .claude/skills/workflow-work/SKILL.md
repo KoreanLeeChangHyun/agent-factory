@@ -274,7 +274,6 @@ Read("<workDir>/files/<filename>.jpg")
 |--------|----------|------|
 | command-code-quality-checker | 명령어 기본 | implement 명령어의 기본 스킬 |
 | command-verification-before-completion | 명령어 기본 | implement 명령어의 기본 스킬 |
-| tdd-guard-hook | 키워드 판단 | 태스크 내용에 "테스트" 키워드 포함 |
 ```
 
 **스킬 미로드 시:**
@@ -417,7 +416,6 @@ Read("<workDir>/files/<filename>.jpg")
 |------|------|------|
 | command-verification-before-completion | 작업 완료 전 자동 검증 체크리스트 | `.claude/skills/command-verification-before-completion/SKILL.md` |
 | command-code-quality-checker | 린트/타입체크 자동 실행 | `.claude/skills/command-code-quality-checker/SKILL.md` |
-| tdd-guard-hook | TDD 원칙 위반 모니터링 (Hook 자동 적용) | `.claude/skills/tdd-guard-hook/SKILL.md` |
 | dangerous-command-guard | 위험 명령어 차단 (Hook 자동 적용) | `.claude/skills/dangerous-command-guard/SKILL.md` |
 | command-requesting-code-review | 리뷰 전 사전 검증 체크리스트 | `.claude/skills/command-requesting-code-review/SKILL.md` |
 

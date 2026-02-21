@@ -113,16 +113,6 @@ def main():
         )
         sync_results.append(r)
 
-    # --- Write|Edit: tdd-guard (sync) ---
-    if tool_name in ('Write', 'Edit'):
-        r = dispatch(
-            'HOOK_TDD',
-            scripts_dir('guards', 'tdd_guard.py'),
-            stdin_data,
-            flags=flags,
-        )
-        sync_results.append(r)
-
     # --- Bash: workflow-transition-guard (sync) ---
     if tool_name == 'Bash':
         r = dispatch(
