@@ -1,11 +1,11 @@
 ---
 name: prompt-engineering-guide
-description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt improvements, or providing prompt writing guidance. Triggers: cc:query prompt refinement, 'prompt ambiguity analysis', 'improve prompt quality', 'prompt structure guide', 'prompt template'."
+description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt improvements, or providing prompt writing guidance. Triggers: cc:prompt prompt refinement, 'prompt ambiguity analysis', 'improve prompt quality', 'prompt structure guide', 'prompt template'."
 ---
 
 # Prompt Engineering Guide
 
-cc:query 프롬프트 정제 시 참조하는 가이드 스킬. 프롬프트의 모호성을 분석하고 구조화된 개선을 제안한다.
+cc:prompt 프롬프트 정제 시 참조하는 가이드 스킬. 프롬프트의 모호성을 분석하고 구조화된 개선을 제안한다.
 
 ## 모호성 분석 체크리스트
 

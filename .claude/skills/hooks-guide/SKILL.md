@@ -71,9 +71,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   └── cleanup_zombie.py
 ├── workflow/                           # 워크플로우 런타임 유틸리티
 │   ├── update_state.py
-│   ├── banner.py
-│   ├── info.py
-│   ├── commands.py
 │   ├── registry.py
 │   ├── history_sync.py
 │   ├── archive_workflow.py
@@ -296,8 +293,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/scripts/workflow/update_state.py` | `python3` 직접 호출 | 워크플로우 상태 관리 |
 | `.claude/scripts/workflow/banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
 | `.claude/scripts/workflow/step_complete.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
-| `.claude/scripts/workflow/banner.py` | 내부 호출 | 배너 출력 (Python 버전) |
-| `.claude/scripts/workflow/info.py` | `python3` 직접 호출 | 워크플로우 정보 조회 |
 
 ### Slack 관련
 

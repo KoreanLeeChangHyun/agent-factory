@@ -3,7 +3,7 @@ description: ".prompt/prompt.txt의 내용을 대화형으로 정제합니다. �
 argument-hint: "[--clear]"
 ---
 
-# Query (Prompt Refinement)
+# Prompt (Prompt Refinement)
 
 `.prompt/prompt.txt`의 프롬프트를 대화형 질의응답으로 정제합니다. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어입니다.
 

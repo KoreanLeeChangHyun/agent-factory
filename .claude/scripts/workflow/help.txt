@@ -1,6 +1,5 @@
 워크플로우 초기화 완료.
-- /cc:prompt     -> 직접 작업
-- /cc:query      -> 프롬프트 정제
+- /cc:prompt     -> 프롬프트 정제
 - /cc:research   -> 연구/조사/분석
 - /cc:strategy   -> 전략/마일스톤
 - /cc:implement  -> 구현/개발/작업
