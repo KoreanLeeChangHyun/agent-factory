@@ -88,4 +88,3 @@ cc:* 명령어는 모드에 따라 실행 단계가 달라집니다.
 - `/init:claude` - 사용자 환경 초기화 (alias, StatusLine, Slack, Git)
 - `/init:project` - 프로젝트 초기화 (디렉토리, 파일, .gitignore)
 - `/sync:context` - 코드베이스 분석 후 CLAUDE.md 갱신
-- `/init:clear` - 작업 내역 클리어

@@ -152,4 +152,3 @@ python3 .claude/scripts/init/init_project.py verify
 | `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 (수시 실행 가능) |
 | `/init:claude` | 사용자 환경 초기화 (alias, StatusLine, Slack, Git global) |
 | `/init:workflow` | 워크플로우 로드 (CLAUDE.md, orchestration 스킬) |
-| `/init:clear` | 작업 내역 클리어 |

@@ -774,7 +774,6 @@ _inline_setup_wf_alias() {
         "wf-init:bash .claude/hooks/init/init-workflow.sh"
         "wf-claude:bash .claude/hooks/init/init-claude.sh"
         "wf-project:bash .claude/hooks/init/init-project.sh"
-        "wf-clear:bash .claude/hooks/init/init-clear.sh"
         "wf-sync:bash .claude/hooks/init/init-sync.sh"
         "wf-git-config:bash .claude/hooks/init/git-config.sh"
         "wf-slack:bash .claude/hooks/slack/slack.sh"
@@ -1170,16 +1169,16 @@ do_step_10() {
     if [ -f "$SHELL_RC" ]; then
         local rc_content
         rc_content=$(cat "$SHELL_RC" 2>/dev/null || true)
-        for name in Workflow wf-state wf-init wf-claude wf-project wf-clear wf-sync wf-git-config wf-slack wf-info wf-commands; do
+        for name in Workflow wf-state wf-init wf-claude wf-project wf-sync wf-git-config wf-slack wf-info wf-commands; do
             if echo "$rc_content" | grep -q "^alias ${name}="; then
                 wf_alias_count=$((wf_alias_count + 1))
             fi
         done
     fi
-    if [ $wf_alias_count -ge 11 ]; then
-        _check "Workflow aliases (11)" "OK" "${wf_alias_count}/11 in $SHELL_RC"
+    if [ $wf_alias_count -ge 10 ]; then
+        _check "Workflow aliases (10)" "OK" "${wf_alias_count}/10 in $SHELL_RC"
     else
-        _check "Workflow aliases (11)" "WARN" "${wf_alias_count}/11 in $SHELL_RC"
+        _check "Workflow aliases (10)" "WARN" "${wf_alias_count}/10 in $SHELL_RC"
     fi
 
     # 9. .gitignore patterns (파일 한 번 읽어서 카운트)

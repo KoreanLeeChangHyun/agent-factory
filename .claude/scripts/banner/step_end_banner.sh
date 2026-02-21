@@ -132,7 +132,7 @@ fi
 # ─── 일반 단계 완료 배너 ───
 DOC_PATH=$(get_doc_path "$PHASE")
 
-echo -e "${COLOR}  ✓ ${C_BOLD}${PHASE}${C_RESET}  ${C_CYAN}${WORK_ID} · ${TITLE}${C_RESET}"
+echo -e "${COLOR}  ✓ ${C_BOLD}${PHASE}${C_RESET}  ${C_DIM}${WORK_ID} · ${TITLE}${C_RESET}"
 if [[ -n "$DOC_PATH" ]]; then
     echo -e "${COLOR}  ✓ ${C_DIM}${DOC_PATH}${C_RESET}"
 fi

@@ -70,7 +70,6 @@ def cmd_help():
     print("  - REPORT phase인데 1시간 이상 경과한 잔류 엔트리")
     print("  - INIT / PLAN phase인데 1시간 이상 경과한 잔류 엔트리 (중단된 워크플로우)")
     print()
-    print(f"{C_DIM}참고: .workflow/ 하위 디렉토리 물리 파일 삭제는 python3 .claude/scripts/init/init_clear.py를 사용하세요{C_RESET}", flush=True)
 
 
 def cmd_list():

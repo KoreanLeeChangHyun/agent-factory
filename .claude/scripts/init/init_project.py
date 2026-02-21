@@ -705,7 +705,7 @@ def cmd_setup_wf_alias():
     # --- 구 alias 정리 (wf-*, Workflow 등 슬래시 커맨드로 대체된 항목) ---
     deprecated_aliases = [
         "Workflow", "wf-state", "wf-init", "wf-claude", "wf-project",
-        "wf-clear", "wf-sync", "wf-git-config", "wf-slack", "wf-info",
+        "wf-sync", "wf-git-config", "wf-slack", "wf-info",
         "wf-commands", "wf-registry", "wf-history",
     ]
     lines = content.splitlines(True)

@@ -77,18 +77,8 @@ python3 .claude/scripts/sync/registry_sync.py remove <YYYYMMDD-HHMMSS>
 
 ---
 
-## init:clear와의 역할 구분
-
-| 항목 | sync:registry (이 명령어) | init:clear |
-|------|--------------------------|------------|
-| 대상 | registry.json 엔트리만 | .workflow/ 디렉토리 + .prompt/ 파일 전체 |
-| 방식 | 선택적 정리 (조건 기반) | 전체 삭제 (nuclear) |
-| 물리 파일 | 삭제하지 않음 | 삭제함 |
-| 용도 | 좀비 엔트리 정리, 레지스트리 정돈 | 작업 내역 완전 초기화 |
-
 ## 관련 명령어
 
 - `/sync:history` - .workflow/ 작업 내역을 history.md에 동기화
 - `/sync:code` - 원격 리포지토리에서 .claude 동기화
-- `/init:clear` - 작업 내역 전체 삭제 (.workflow/ + .prompt/)
 - `/init:project` - 프로젝트 초기화

@@ -89,4 +89,3 @@ python3 .claude/scripts/sync/history_sync.py sync $ARGUMENTS
 | `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
 | `/sync:code` | 원격 리포지토리에서 .claude 동기화 |
 | `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 |
-| `/init:clear` | 작업 내역 전체 삭제 (.workflow/ + .prompt/) |
