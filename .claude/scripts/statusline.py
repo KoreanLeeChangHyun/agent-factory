@@ -20,15 +20,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# -- sys.path 보장: data.constants import를 위해 scripts/ 디렉터리 추가 --
+_scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
-# -- Phase color mapping (ANSI codes) --
-PHASE_COLORS: dict[str, str] = {
-    "INIT":     "\033[31m",        # Red
-    "PLAN":     "\033[34m",        # Blue
-    "WORK":     "\033[32m",        # Green
-    "REPORT":   "\033[35m",        # Magenta
-}
-RESET = "\033[0m"
+from data.constants import PHASE_COLORS, C_RESET  # noqa: E402
+
+# -- RESET alias (기존 코드 하위 호환) --
+RESET = C_RESET
 
 
 def format_tokens(tokens: int) -> str:

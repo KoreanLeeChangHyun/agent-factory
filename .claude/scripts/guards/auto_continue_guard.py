@@ -31,9 +31,12 @@ from utils.common import (
     load_json_file,
     resolve_project_root,
 )
+from data.constants import (
+    STALE_TTL_MINUTES,
+    AUTO_CONTINUE_INACTIVE_PHASES,
+)
 
 PROJECT_ROOT = resolve_project_root()
-STALE_TTL_MINUTES = 30
 COUNTER_FILE = os.path.join(PROJECT_ROOT, ".workflow", ".stop-block-counter")
 
 
@@ -80,7 +83,7 @@ def main():
         sys.exit(0)
 
     # 활성 워크플로우 필터링
-    terminal_phases = ("COMPLETED", "FAILED", "CANCELLED", "STALE", "", "REPORT")
+    terminal_phases = AUTO_CONTINUE_INACTIVE_PHASES
     active_workflows = []
     for key, entry in registry.items():
         phase = entry.get("phase", "").upper()
@@ -92,8 +95,8 @@ def main():
         sys.exit(0)
 
     # --- TTL 검사 ---
-    kst = timezone(timedelta(hours=9))
-    now = datetime.now(kst)
+    from data.constants import KST
+    now = datetime.now(KST)
     stale_threshold = STALE_TTL_MINUTES * 60
 
     registry_changed = False

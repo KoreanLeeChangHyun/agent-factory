@@ -25,11 +25,17 @@ prompt.txt의 피드백을 user_prompt.txt에 append하고,
 import os
 import shutil
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
-_KST = timezone(timedelta(hours=9))
+_SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from data.constants import KST
+
+_KST = KST
 
 
 def main():

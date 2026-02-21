@@ -1,0 +1,136 @@
+{
+  "whitelist": [
+    {
+      "pattern": "rm\\s+-r[f]?\\s+/tmp/",
+      "note": null
+    },
+    {
+      "pattern": "rm\\s+-r[f]?\\s+.*\\.workflow/",
+      "note": null
+    },
+    {
+      "pattern": "sudo\\s+rm\\s+-r[f]?\\s+/tmp/",
+      "note": null
+    },
+    {
+      "pattern": "sudo\\s+rm\\s+-r[f]?\\s+.*\\.workflow/",
+      "note": null
+    },
+    {
+      "pattern": "git\\s+push\\s+--force-with-lease",
+      "note": null
+    }
+  ],
+  "danger": [
+    {
+      "pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+/\\s*$",
+      "blocked": "rm -rf / (\ub8e8\ud2b8 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \uacbd\ub85c\ub97c \uc9c0\uc815\ud558\uac70\ub098 rm -ri\ub85c \ub300\ud654\ud615 \uc0ad\uc81c\ub97c \uc0ac\uc6a9\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+--recursive\\s+(-f|--force)\\s+/\\s*$",
+      "blocked": "rm --recursive --force / (\ub8e8\ud2b8 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \uacbd\ub85c\ub97c \uc9c0\uc815\ud558\uac70\ub098 rm -ri\ub85c \ub300\ud654\ud615 \uc0ad\uc81c\ub97c \uc0ac\uc6a9\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+(-f|--force)\\s+--recursive\\s+/\\s*$",
+      "blocked": "rm --force --recursive / (\ub8e8\ud2b8 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \uacbd\ub85c\ub97c \uc9c0\uc815\ud558\uac70\ub098 rm -ri\ub85c \ub300\ud654\ud615 \uc0ad\uc81c\ub97c \uc0ac\uc6a9\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+--recursive\\s+/\\s*$",
+      "blocked": "rm --recursive / (\ub8e8\ud2b8 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \uacbd\ub85c\ub97c \uc9c0\uc815\ud558\uac70\ub098 rm -ri\ub85c \ub300\ud654\ud615 \uc0ad\uc81c\ub97c \uc0ac\uc6a9\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+~",
+      "blocked": "rm -rf ~ (\ud648 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+~",
+      "blocked": "rm --recursive ~ (\ud648 \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\.\\s*$",
+      "blocked": "rm -rf . (\ud604\uc7ac \ub514\ub809\ud1a0\ub9ac \uc804\uccb4 \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\.\\s*$",
+      "blocked": "rm --recursive . (\ud604\uc7ac \ub514\ub809\ud1a0\ub9ac \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\*",
+      "blocked": "rm -rf * (\uc640\uc77c\ub4dc\uce74\ub4dc \uc804\uccb4 \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uac70\ub098 ls\ub85c \ubaa9\ub85d\uc744 \uba3c\uc800 \ud655\uc778\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\*",
+      "blocked": "rm --recursive * (\uc640\uc77c\ub4dc\uce74\ub4dc \uc0ad\uc81c)",
+      "alternative": "\ud2b9\uc815 \ud30c\uc77c/\ub514\ub809\ud1a0\ub9ac\ub97c \uc9c0\uc815\ud558\uac70\ub098 ls\ub85c \ubaa9\ub85d\uc744 \uba3c\uc800 \ud655\uc778\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?git\\s+reset\\s+--hard",
+      "blocked": "git reset --hard (\ucee4\ubc0b\ub418\uc9c0 \uc54a\uc740 \ubcc0\uacbd\uc0ac\ud56d \uc804\uccb4 \uc0ad\uc81c)",
+      "alternative": "git stash\ub85c \ubcc0\uacbd\uc0ac\ud56d\uc744 \uc784\uc2dc \uc800\uc7a5\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?git\\s+push\\s+(--force|-f)",
+      "blocked": "git push --force (\uc6d0\uaca9 \ud788\uc2a4\ud1a0\ub9ac \ub36e\uc5b4\uc4f0\uae30)",
+      "alternative": "git push --force-with-lease\ub97c \uc0ac\uc6a9\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f",
+      "blocked": "git clean -f (\ucd94\uc801\ub418\uc9c0 \uc54a\ub294 \ud30c\uc77c \uc804\uccb4 \uc0ad\uc81c)",
+      "alternative": "git clean -n\uc73c\ub85c \ub4dc\ub77c\uc774\ub7f0\ud558\uc5ec \uc0ad\uc81c \ub300\uc0c1\uc744 \uba3c\uc800 \ud655\uc778\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)",
+      "blocked": "git branch -D main/master (\uc8fc\uc694 \ube0c\ub79c\uce58 \uac15\uc81c \uc0ad\uc81c)",
+      "alternative": "\uc8fc\uc694 \ube0c\ub79c\uce58 \uc0ad\uc81c\ub294 \ub9e4\uc6b0 \uc704\ud5d8\ud569\ub2c8\ub2e4. \uc815\ub9d0 \ud544\uc694\ud55c\uc9c0 \uc7ac\ud655\uc778\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$",
+      "blocked": "git checkout/restore . (\ubaa8\ub4e0 \ubcc0\uacbd\uc0ac\ud56d \ub418\ub3cc\ub9ac\uae30)",
+      "alternative": "git stash\ub85c \ubcc0\uacbd\uc0ac\ud56d\uc744 \uc784\uc2dc \uc800\uc7a5\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)",
+      "blocked": "DROP TABLE/DATABASE (\ub370\uc774\ud130\ubca0\uc774\uc2a4/\ud14c\uc774\ube14 \uc0ad\uc81c)",
+      "alternative": "\ubc31\uc5c5\uc744 \uba3c\uc800 \uc218\ud589\ud558\uace0, \ud2b8\ub79c\uc7ad\uc158 \ub0b4\uc5d0\uc11c \uc2e4\ud589\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?chmod\\s+777",
+      "blocked": "chmod 777 (\uacfc\ub3c4\ud55c \uad8c\ud55c \ubd80\uc5ec)",
+      "alternative": "chmod 755 \ub610\ub294 \ud544\uc694\ud55c \ucd5c\uc18c \uad8c\ud55c\ub9cc \ubd80\uc5ec\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?chmod\\s+a\\+rwx",
+      "blocked": "chmod a+rwx (\uc804\uccb4 \uc0ac\uc6a9\uc790\uc5d0\uac8c \ubaa8\ub4e0 \uad8c\ud55c \ubd80\uc5ec)",
+      "alternative": "chmod 755 \ub610\ub294 \ud544\uc694\ud55c \ucd5c\uc18c \uad8c\ud55c\ub9cc \ubd80\uc5ec\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?chmod\\s+o\\+w",
+      "blocked": "chmod o+w (\uae30\ud0c0 \uc0ac\uc6a9\uc790\uc5d0\uac8c \uc4f0\uae30 \uad8c\ud55c \ubd80\uc5ec)",
+      "alternative": "chmod 755 \ub610\ub294 \ud544\uc694\ud55c \ucd5c\uc18c \uad8c\ud55c\ub9cc \ubd80\uc5ec\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx",
+      "blocked": "chmod ugo+rwx (\uc804\uccb4 \uc0ac\uc6a9\uc790\uc5d0\uac8c \ubaa8\ub4e0 \uad8c\ud55c \ubd80\uc5ec)",
+      "alternative": "chmod 755 \ub610\ub294 \ud544\uc694\ud55c \ucd5c\uc18c \uad8c\ud55c\ub9cc \ubd80\uc5ec\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?mkfs",
+      "blocked": "mkfs (\ub514\uc2a4\ud06c \ud3ec\ub9f7)",
+      "alternative": "\ub514\uc2a4\ud06c \ud3ec\ub9f7\uc740 \ub9e4\uc6b0 \uc704\ud5d8\ud569\ub2c8\ub2e4. \ub300\uc0c1 \ub514\ubc14\uc774\uc2a4\ub97c \uc7ac\ud655\uc778\ud558\uc138\uc694."
+    },
+    {
+      "pattern": "(sudo\\s+)?dd\\s+if=",
+      "blocked": "dd if= (\ub514\uc2a4\ud06c \ub36e\uc5b4\uc4f0\uae30)",
+      "alternative": "dd \uba85\ub839\uc5b4\ub294 \ub418\ub3cc\ub9b4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4. \ub300\uc0c1 \ub514\ubc14\uc774\uc2a4\ub97c \uc7ac\ud655\uc778\ud558\uc138\uc694."
+    }
+  ]
+}

@@ -37,85 +37,40 @@ def _deny(reason):
     sys.exit(0)
 
 
-# 읽기 전용 명령 패턴 화이트리스트
-READONLY_PATTERNS = [
-    r"^\s*git\s",
-    r"^\s*python3?\s",
-    r"^\s*node\s",
-    r"^\s*cat\s",
-    r"^\s*ls\b",
-    r"^\s*head\s",
-    r"^\s*tail\s",
-    r"^\s*wc\s",
-    r"^\s*grep\s",
-    r"^\s*file\s",
-    r"^\s*stat\s",
-    r"^\s*diff\s",
-    r"^\s*bash\s",
-    r"^\s*sh\s",
-    r"^\s*source\s",
-    r"^\s*\.\s",
-    r"^\s*exec\s",
-    r"^\s*env\s",
-    r"^(?:\s*\w+=\S*\s+)*(?:bash|sh|python3?|node)\s",
-    r"^\s*\.claude/hooks/.*\.sh\b",
-    r"^\s*/.*/\.claude/hooks/.*\.sh\b",
-    r"^\s*less\s",
-    r"^\s*more\s",
-    r"^\s*find\s",
-    r"^\s*tree\b",
-    r"^\s*realpath\s",
-    r"^\s*readlink\s",
-    r"^\s*sha256sum\s",
-    r"^\s*md5sum\s",
-    r"^\s*test\s",
-    r"^\s*\[\s",
-]
+def _load_guard_patterns():
+    """data/guard_patterns.json에서 패턴을 로드.
 
-# 수정 가능 패턴 (이 패턴이 보호 대상 경로를 타겟으로 하면 차단)
-MODIFY_PATTERNS = [
-    r"sed\s+.*-i",
-    r"sed\s+-i",
-    r"\bcp\b",
-    r"\bmv\b",
-    r"echo\s.*>\s*",
-    r"echo\s.*>>\s*",
-    r"printf\s.*>\s*",
-    r"printf\s.*>>\s*",
-    r"\btee\b",
-    r"cat\s.*>\s*",
-    r"cat\s.*>>\s*",
-    r"\bdd\b",
-    r"\binstall\b",
-    r"\brsync\b",
-    r"\bchmod\b",
-    r"\bchown\b",
-    r"ln\s+-sf?\b",
-    r"rm\s+-rf?\b",
-    r"rm\s+-f\b",
-    r"\btouch\b",
-    r"\bmkdir\b",
-    r"\brmdir\b",
-    r">\s*\S",
-    r">>\s*\S",
-]
+    보안 우선: 로드 실패 시 모든 수정 명령을 차단하는 보수적 폴백 적용.
 
-# 보호 대상 경로 패턴
-PROTECTED_PATH_RES = [
-    re.compile(r"\.claude/hooks/"),
-    re.compile(r"\.workflow/bypass"),
-]
+    Returns:
+        tuple: (readonly_patterns, modify_patterns, protected_path_res, inline_write_patterns)
+    """
+    data_file = os.path.join(_scripts_dir, "data", "guard_patterns.json")
+    try:
+        with open(data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-# 인라인 코드 쓰기 패턴
-INLINE_WRITE_PATTERNS = [
-    r"open\s*\(",
-    r"write\s*\(",
-    r"writeFile",
-    r"writeFileSync",
-    r"appendFile",
-    r"appendFileSync",
-    r">\s*",
-]
+        readonly = data.get("readonly_patterns", [])
+        modify = data.get("modify_patterns", [])
+        protected = [re.compile(p) for p in data.get("protected_path_patterns", [])]
+        inline_write = data.get("inline_write_patterns", [])
+        return readonly, modify, protected, inline_write
+    except (json.JSONDecodeError, IOError, OSError, KeyError, TypeError, re.error):
+        # 보안 우선: 로드 실패 시 보호 경로만 설정하고 모든 명령을 수정으로 분류
+        print(
+            f"[hooks_self_guard] CRITICAL: guard_patterns.json 로드 실패 - 보안 폴백 적용",
+            file=sys.stderr,
+        )
+        return (
+            [],  # 빈 읽기전용 -> 모든 명령이 수정으로 분류됨
+            [r"."],  # 모든 것을 수정 패턴으로 매칭
+            [re.compile(r"\.claude/hooks/"), re.compile(r"\.workflow/bypass")],
+            [r"."],  # 모든 것을 인라인 쓰기로 매칭
+        )
+
+
+# 모듈 레벨에서 한 번만 로드
+READONLY_PATTERNS, MODIFY_PATTERNS, PROTECTED_PATH_RES, INLINE_WRITE_PATTERNS = _load_guard_patterns()
 
 
 def _refs_protected(text):

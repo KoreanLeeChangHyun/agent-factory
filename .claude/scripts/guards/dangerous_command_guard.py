@@ -35,150 +35,44 @@ def _deny(blocked, alternative):
     sys.exit(0)
 
 
-# 화이트리스트 패턴 (안전한 패턴은 통과)
-WHITELIST_PATTERNS = [
-    (r"rm\s+-r[f]?\s+/tmp/", None),
-    (r"rm\s+-r[f]?\s+.*\.workflow/", None),
-    (r"sudo\s+rm\s+-r[f]?\s+/tmp/", None),
-    (r"sudo\s+rm\s+-r[f]?\s+.*\.workflow/", None),
-    (r"git\s+push\s+--force-with-lease", None),
-]
+def _load_patterns():
+    """data/danger_patterns.json에서 패턴을 로드.
 
-# 위험 패턴 목록: (regex_pattern, blocked_msg, alternative_msg)
-DANGER_PATTERNS = [
-    # 1. rm -rf / (루트 삭제)
-    (
-        r"(sudo\s+)?rm\s+-r[f]*\s+/\s*$",
-        "rm -rf / (루트 디렉토리 삭제)",
-        "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요.",
-    ),
-    # 1b. rm --recursive / (장형 옵션 루트 삭제 - 모든 조합)
-    (
-        r"(sudo\s+)?rm\s+--recursive\s+(-f|--force)\s+/\s*$",
-        "rm --recursive --force / (루트 디렉토리 삭제)",
-        "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요.",
-    ),
-    # 1c. rm -f/--force --recursive / (역순 장형 옵션 루트 삭제)
-    (
-        r"(sudo\s+)?rm\s+(-f|--force)\s+--recursive\s+/\s*$",
-        "rm --force --recursive / (루트 디렉토리 삭제)",
-        "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요.",
-    ),
-    # 1d. rm --recursive / (장형 옵션, --force 없이)
-    (
-        r"(sudo\s+)?rm\s+--recursive\s+/\s*$",
-        "rm --recursive / (루트 디렉토리 삭제)",
-        "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요.",
-    ),
-    # 2. rm -rf ~ (홈 디렉토리 삭제)
-    (
-        r"(sudo\s+)?rm\s+-r[f]*\s+~",
-        "rm -rf ~ (홈 디렉토리 삭제)",
-        "특정 파일/디렉토리를 지정하세요.",
-    ),
-    # 2b. rm --recursive ~ (장형 옵션 홈 디렉토리 삭제)
-    (
-        r"(sudo\s+)?rm\s+--recursive(\s+--force)?\s+~",
-        "rm --recursive ~ (홈 디렉토리 삭제)",
-        "특정 파일/디렉토리를 지정하세요.",
-    ),
-    # 3. rm -rf . (현재 디렉토리 전체 삭제)
-    (
-        r"(sudo\s+)?rm\s+-r[f]*\s+\.\s*$",
-        "rm -rf . (현재 디렉토리 전체 삭제)",
-        "특정 파일/디렉토리를 지정하세요.",
-    ),
-    # 3b. rm --recursive . (장형 옵션 현재 디렉토리 삭제)
-    (
-        r"(sudo\s+)?rm\s+--recursive(\s+--force)?\s+\.\s*$",
-        "rm --recursive . (현재 디렉토리 전체 삭제)",
-        "특정 파일/디렉토리를 지정하세요.",
-    ),
-    # 4. rm -rf * (와일드카드 전체 삭제)
-    (
-        r"(sudo\s+)?rm\s+-r[f]*\s+\*",
-        "rm -rf * (와일드카드 전체 삭제)",
-        "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요.",
-    ),
-    # 4b. rm --recursive * (장형 옵션 와일드카드 삭제)
-    (
-        r"(sudo\s+)?rm\s+--recursive(\s+--force)?\s+\*",
-        "rm --recursive * (와일드카드 전체 삭제)",
-        "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요.",
-    ),
-    # 5. git reset --hard
-    (
-        r"(sudo\s+)?git\s+reset\s+--hard",
-        "git reset --hard (커밋되지 않은 변경사항 전체 삭제)",
-        "git stash로 변경사항을 임시 저장하세요.",
-    ),
-    # 6. git push --force / git push -f (--force-with-lease 제외)
-    (
-        r"(sudo\s+)?git\s+push\s+(--force|-f)",
-        "git push --force (원격 히스토리 덮어쓰기)",
-        "git push --force-with-lease를 사용하세요.",
-    ),
-    # 7. git clean -f / git clean -fd
-    (
-        r"(sudo\s+)?git\s+clean\s+-[fd]*f",
-        "git clean -f (추적되지 않는 파일 전체 삭제)",
-        "git clean -n으로 드라이런하여 삭제 대상을 먼저 확인하세요.",
-    ),
-    # 8. git branch -D main/master
-    (
-        r"(sudo\s+)?git\s+branch\s+-D\s+(main|master)",
-        "git branch -D main/master (주요 브랜치 강제 삭제)",
-        "주요 브랜치 삭제는 매우 위험합니다. 정말 필요한지 재확인하세요.",
-    ),
-    # 9. git checkout . / git restore .
-    (
-        r"(sudo\s+)?git\s+(checkout|restore)\s+\.\s*$",
-        "git checkout/restore . (모든 변경사항 되돌리기)",
-        "git stash로 변경사항을 임시 저장하세요.",
-    ),
-    # 10. DROP TABLE / DROP DATABASE (대소문자 무시)
-    (
-        r"(?i)(sudo\s+)?DROP\s+(TABLE|DATABASE)",
-        "DROP TABLE/DATABASE (데이터베이스/테이블 삭제)",
-        "백업을 먼저 수행하고, 트랜잭션 내에서 실행하세요.",
-    ),
-    # 11. chmod 777
-    (
-        r"(sudo\s+)?chmod\s+777",
-        "chmod 777 (과도한 권한 부여)",
-        "chmod 755 또는 필요한 최소 권한만 부여하세요.",
-    ),
-    # 11b. chmod a+rwx
-    (
-        r"(sudo\s+)?chmod\s+a\+rwx",
-        "chmod a+rwx (전체 사용자에게 모든 권한 부여)",
-        "chmod 755 또는 필요한 최소 권한만 부여하세요.",
-    ),
-    # 11c. chmod o+w
-    (
-        r"(sudo\s+)?chmod\s+o\+w",
-        "chmod o+w (기타 사용자에게 쓰기 권한 부여)",
-        "chmod 755 또는 필요한 최소 권한만 부여하세요.",
-    ),
-    # 11d. chmod ugo+rwx
-    (
-        r"(sudo\s+)?chmod\s+ugo\+rwx",
-        "chmod ugo+rwx (전체 사용자에게 모든 권한 부여)",
-        "chmod 755 또는 필요한 최소 권한만 부여하세요.",
-    ),
-    # 12. mkfs (디스크 포맷)
-    (
-        r"(sudo\s+)?mkfs",
-        "mkfs (디스크 포맷)",
-        "디스크 포맷은 매우 위험합니다. 대상 디바이스를 재확인하세요.",
-    ),
-    # 13. dd if= (디스크 덮어쓰기)
-    (
-        r"(sudo\s+)?dd\s+if=",
-        "dd if= (디스크 덮어쓰기)",
-        "dd 명령어는 되돌릴 수 없습니다. 대상 디바이스를 재확인하세요.",
-    ),
-]
+    보안 우선: 로드 실패 시 모든 명령을 차단하는 폴백 패턴 반환.
+
+    Returns:
+        tuple: (whitelist_patterns, danger_patterns)
+            whitelist_patterns: [(pattern, None), ...]
+            danger_patterns: [(pattern, blocked, alternative), ...]
+    """
+    data_file = os.path.join(_scripts_dir, "data", "danger_patterns.json")
+    try:
+        with open(data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        whitelist = [(item["pattern"], None) for item in data.get("whitelist", [])]
+        danger = [
+            (item["pattern"], item["blocked"], item["alternative"])
+            for item in data.get("danger", [])
+        ]
+        return whitelist, danger
+    except (json.JSONDecodeError, IOError, OSError, KeyError, TypeError):
+        # 보안 우선: 로드 실패 시 빈 화이트리스트 + 전체 차단 폴백
+        print(
+            f"[dangerous_command_guard] CRITICAL: danger_patterns.json 로드 실패 - 보안 폴백 적용",
+            file=sys.stderr,
+        )
+        return [], [
+            (
+                r".",
+                "위험 패턴 데이터 로드 실패 (보안 폴백)",
+                "시스템 관리자에게 data/danger_patterns.json 파일 상태를 확인 요청하세요.",
+            )
+        ]
+
+
+# 모듈 레벨에서 한 번만 로드
+WHITELIST_PATTERNS, DANGER_PATTERNS = _load_patterns()
 
 
 def main():

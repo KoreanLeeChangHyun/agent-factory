@@ -21,7 +21,34 @@ import sys
 import urllib.request
 import urllib.error
 
+# data 패키지 import (sys.path 기반)
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from data.constants import SLACK_API_URL
+
 from . import env_utils
+
+# slack_emoji_map.json 로드
+_DATA_DIR = os.path.join(_scripts_dir, "data")
+
+def _load_emoji_map():
+    """data/slack_emoji_map.json에서 이모지 맵을 로드."""
+    json_path = os.path.join(_DATA_DIR, "slack_emoji_map.json")
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (IOError, json.JSONDecodeError):
+        # 폴백: 하드코딩 기본값
+        return {
+            "init": ":large_orange_circle:",
+            "planner": ":large_blue_circle:",
+            "worker": ":large_green_circle:",
+            "reporter": ":purple_circle:",
+        }
+
+_EMOJI_MAP = _load_emoji_map()
 
 
 # 모듈 수준 변수 (load_slack_env 호출 후 설정됨)
@@ -76,13 +103,7 @@ def get_agent_emoji(agent_name):
     Returns:
         str: 이모지 문자열 (매칭 없으면 빈 문자열)
     """
-    emoji_map = {
-        "init": ":large_orange_circle:",
-        "planner": ":large_blue_circle:",
-        "worker": ":large_green_circle:",
-        "reporter": ":purple_circle:",
-    }
-    return emoji_map.get(agent_name, "")
+    return _EMOJI_MAP.get(agent_name, "")
 
 
 def extract_json_field(data, *keys, default="N/A"):
@@ -151,7 +172,7 @@ def send_slack_message(json_payload, token=None):
         log_warn("SLACK_BOT_TOKEN이 설정되지 않았습니다.")
         return False
 
-    url = "https://slack.com/api/chat.postMessage"
+    url = SLACK_API_URL
     headers = {
         "Authorization": f"Bearer {bot_token}",
         "Content-Type": "application/json",

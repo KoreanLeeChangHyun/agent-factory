@@ -19,7 +19,14 @@ import tempfile
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", "..", ".."))
 
-_REMOTE_REPO = "https://github.com/KoreanLeeChangHyun/claude-workflow.git"
+# data 패키지 import (sys.path 기반)
+_scripts_dir = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from data.constants import CODE_SYNC_REMOTE_REPO
+
+_REMOTE_REPO = CODE_SYNC_REMOTE_REPO
 _ENV_FILE = os.path.join(_PROJECT_ROOT, ".claude.env")
 
 _TEMP_DIR = tempfile.mkdtemp(prefix="claude-sync-")

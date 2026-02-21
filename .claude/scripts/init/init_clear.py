@@ -20,16 +20,21 @@ import sys
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _WORKFLOW_ROOT = os.path.join(_PROJECT_ROOT, ".workflow")
+_SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from data.constants import BYTES_GB, BYTES_MB, BYTES_KB
 
 
 def _human_size(bytes_val):
     """바이트를 사람이 읽기 쉬운 형태로 변환."""
-    if bytes_val >= 1073741824:
-        return f"{bytes_val // 1073741824}G"
-    elif bytes_val >= 1048576:
-        return f"{bytes_val // 1048576}M"
-    elif bytes_val >= 1024:
-        return f"{bytes_val // 1024}K"
+    if bytes_val >= BYTES_GB:
+        return f"{bytes_val // BYTES_GB}G"
+    elif bytes_val >= BYTES_MB:
+        return f"{bytes_val // BYTES_MB}M"
+    elif bytes_val >= BYTES_KB:
+        return f"{bytes_val // BYTES_KB}K"
     else:
         return f"{bytes_val}B"
 

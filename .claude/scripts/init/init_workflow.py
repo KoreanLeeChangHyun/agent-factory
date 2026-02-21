@@ -28,14 +28,19 @@ import subprocess
 import sys
 import tempfile
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+_SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
-_VALID_COMMANDS = {"implement", "review", "research", "strategy"}
-_VALID_MODES = {"full", "strategy", "noplan"}
-_KST = timezone(timedelta(hours=9))
+from data.constants import KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN
+
+_VALID_COMMANDS = VALID_COMMANDS
+_VALID_MODES = VALID_MODES
+_KST = KST
 
 
 def _err(msg):
@@ -54,7 +59,7 @@ def _sanitize_work_name(title):
     name = re.sub(r"\.", "-", name)
     name = re.sub(r"-{2,}", "-", name)
     name = name.strip("-")
-    name = name[:20]
+    name = name[:WORK_NAME_MAX_LEN]
     return name
 
 
@@ -214,7 +219,7 @@ def main():
                 pass
 
     # --- Step 8b: 활성 디렉토리 수 점검 및 보조 아카이빙 ---
-    keep_count = 10
+    keep_count = KEEP_COUNT
     workflow_root = os.path.join(_PROJECT_ROOT, ".workflow")
     active_count = 0
     if os.path.isdir(workflow_root):

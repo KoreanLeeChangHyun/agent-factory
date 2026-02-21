@@ -77,45 +77,37 @@ def _deny(reason, *, status_file=None, current_phase=None):
     sys.exit(0)
 
 
-# 모드별 Phase별 허용 에이전트 맵
-ALLOWED_AGENTS_FULL = {
-    "NONE": ["init"],
-    "INIT": ["planner"],
-    "PLAN": ["planner", "worker"],
-    "WORK": ["worker", "explorer", "reporter"],
-    "REPORT": ["reporter", "done"],
-    "COMPLETED": ["done"],
-    "FAILED": [],
-    "STALE": [],
-    "CANCELLED": [],
-}
+def _load_agent_permissions():
+    """data/agent_permissions.json에서 모드별 에이전트 권한 맵을 로드.
 
-ALLOWED_AGENTS_STRATEGY = {
-    "NONE": ["init"],
-    "INIT": [],
-    "STRATEGY": ["done"],
-    "COMPLETED": ["done"],
-    "FAILED": [],
-    "STALE": [],
-    "CANCELLED": [],
-}
+    보안 우선: 로드 실패 시 모든 에이전트를 차단하는 빈 맵 반환.
 
-ALLOWED_AGENTS_NOPLAN = {
-    "NONE": ["init"],
-    "INIT": ["worker", "explorer"],
-    "WORK": ["worker", "explorer", "reporter"],
-    "REPORT": ["reporter", "done"],
-    "COMPLETED": ["done"],
-    "FAILED": [],
-    "STALE": [],
-    "CANCELLED": [],
-}
+    Returns:
+        dict: {mode: {phase: [agents]}} 형태의 MODE_AGENTS_MAP
+    """
+    data_file = os.path.join(_scripts_dir, "data", "agent_permissions.json")
+    try:
+        with open(data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-MODE_AGENTS_MAP = {
-    "full": ALLOWED_AGENTS_FULL,
-    "strategy": ALLOWED_AGENTS_STRATEGY,
-    "noplan": ALLOWED_AGENTS_NOPLAN,
-}
+        if not isinstance(data, dict):
+            raise ValueError("agent_permissions.json root must be dict")
+        return data
+    except (json.JSONDecodeError, IOError, OSError, ValueError, TypeError):
+        # 보안 우선: 로드 실패 시 모든 에이전트 차단 (빈 허용 목록)
+        print(
+            f"[workflow_agent_guard] CRITICAL: agent_permissions.json 로드 실패 - 보안 폴백 적용",
+            file=sys.stderr,
+        )
+        empty_phases = {
+            "NONE": [], "INIT": [], "PLAN": [], "WORK": [],
+            "REPORT": [], "COMPLETED": [], "FAILED": [], "STALE": [], "CANCELLED": [],
+        }
+        return {"full": empty_phases, "strategy": empty_phases, "noplan": empty_phases}
+
+
+# 모듈 레벨에서 한 번만 로드
+MODE_AGENTS_MAP = _load_agent_permissions()
 
 
 def main():
@@ -183,7 +175,7 @@ def main():
             agent_preview = os.path.basename(agent_preview)
         if agent_preview.endswith(".md"):
             agent_preview = agent_preview[:-3]
-        if agent_preview != "init" and agent_preview not in ALLOWED_AGENTS_FULL.get("INIT", []):
+        if agent_preview != "init" and agent_preview not in MODE_AGENTS_MAP.get("full", {}).get("INIT", []):
             print(
                 f"[workflow_agent_guard] WARNING: 상태 전이 누락 의심 - "
                 f"status_file={status_file}, current_phase={current_phase}, "
@@ -203,7 +195,7 @@ def main():
         sys.exit(0)
 
     # 모드별 허용 에이전트 테이블
-    agents_table = MODE_AGENTS_MAP.get(workflow_mode, ALLOWED_AGENTS_FULL)
+    agents_table = MODE_AGENTS_MAP.get(workflow_mode, MODE_AGENTS_MAP.get("full", {}))
     allowed = agents_table.get(current_phase, [])
 
     if agent not in allowed:

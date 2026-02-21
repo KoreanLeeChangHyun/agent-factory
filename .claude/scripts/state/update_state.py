@@ -27,13 +27,14 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+from data.constants import FSM_TRANSITIONS_FILENAME, KST
 from utils.common import (
     C_GREEN,
     C_PURPLE,
@@ -252,7 +253,7 @@ def update_status(abs_work_dir, global_registry, status_file, from_phase, to_pha
     skip_guard = os.environ.get("WORKFLOW_SKIP_GUARD", "") == "1"
 
     # FSM 전이 규칙 로드
-    fsm_file = os.path.join(SCRIPT_DIR, "fsm-transitions.json")
+    fsm_file = os.path.join(SCRIPT_DIR, FSM_TRANSITIONS_FILENAME)
     fsm_data = load_json_file(fsm_file)
     if fsm_data is None:
         print(f"[ERROR] FSM 규칙 파일 로드 실패: {fsm_file}", file=sys.stderr)
@@ -292,7 +293,7 @@ def update_status(abs_work_dir, global_registry, status_file, from_phase, to_pha
                 return "status -> FSM guard blocked (illegal)"
 
         # KST 시간
-        kst = timezone(timedelta(hours=9))
+        kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
         data["phase"] = to_phase
@@ -395,7 +396,7 @@ def update_task_status(status_file, task_id, task_status):
         if "tasks" not in data or not isinstance(data.get("tasks"), dict):
             data["tasks"] = {}
 
-        kst = timezone(timedelta(hours=9))
+        kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
         data["tasks"][task_id] = {"status": task_status, "updated_at": now}

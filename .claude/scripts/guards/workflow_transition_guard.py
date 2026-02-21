@@ -141,7 +141,7 @@ def main():
         )
 
     # fsm-transitions.json에서 모드별 합법 전이 테이블 로드
-    fsm_file = os.path.join(project_root, ".claude", "scripts", "workflow", "state", "fsm-transitions.json")
+    fsm_file = os.path.join(_scripts_dir, "state", "fsm-transitions.json")
     fsm_data = load_json_file(fsm_file)
     if fsm_data is None:
         _deny(f"FSM 전이 규칙 파일(fsm-transitions.json) 로드 실패")

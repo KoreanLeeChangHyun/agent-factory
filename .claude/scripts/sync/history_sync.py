@@ -38,29 +38,38 @@ except ImportError:
     def resolve_project_root():
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from data.constants import STALE_TTL_SECONDS
 
 # ============================================================
-# 상수
+# 상수 (phase_status_map.json에서 로드)
 # ============================================================
 
-HEADER_LINE = "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |"
-SEPARATOR_LINE = "|------|--------|------------|--------|------|--------|------|--------|--------|"
+def _load_phase_status_map():
+    """data/phase_status_map.json에서 HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP을 로드."""
+    json_path = os.path.join(_scripts_dir, "data", "phase_status_map.json")
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return (
+            data["header_line"],
+            data["separator_line"],
+            data["phase_status_map"],
+        )
+    except (IOError, json.JSONDecodeError, KeyError):
+        # 폴백: 하드코딩 기본값
+        return (
+            "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |",
+            "|------|--------|------------|--------|------|--------|------|--------|--------|",
+            {
+                "COMPLETED": "완료", "REPORT": "진행중", "STALE": "중단",
+                "WORK": "진행중", "PLAN": "진행중", "INIT": "진행중",
+                "CANCELLED": "중단", "FAILED": "실패", "UNKNOWN": "불명", "NONE": "불명",
+            },
+        )
+
+HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP = _load_phase_status_map()
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
-
-# status.json phase -> 표시 상태 매핑
-PHASE_STATUS_MAP = {
-    "COMPLETED": "완료",
-    "REPORT": "진행중",
-    "STALE": "중단",
-    "WORK": "진행중",
-    "PLAN": "진행중",
-    "INIT": "진행중",
-    "CANCELLED": "중단",
-    "FAILED": "실패",
-    "UNKNOWN": "불명",
-    "NONE": "불명",
-}
 
 
 # ============================================================
@@ -87,10 +96,6 @@ def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | N
         return phase, created_at, updated_at
     except (json.JSONDecodeError, IOError, KeyError):
         return "UNKNOWN", None, None
-
-
-# 스테일 판정 TTL (초)
-STALE_TTL_SECONDS = 30 * 60  # 30분
 
 
 def is_stale(phase: str, updated_at: str | None) -> bool:

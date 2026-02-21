@@ -18,39 +18,33 @@ registry.json 조회 등 전역적으로 사용되는 공통 기능을 제공합
 
 import json
 import os
-import re
 import shutil
 import sys
 import tempfile
 
-# =============================================================================
-# ANSI 색상 코드 상수
-# =============================================================================
-C_RED = "\033[0;31m"
-C_BLUE = "\033[0;34m"
-C_GREEN = "\033[0;32m"
-C_PURPLE = "\033[0;35m"
-C_YELLOW = "\033[0;33m"
-C_CYAN = "\033[0;36m"
-C_GRAY = "\033[0;90m"
-C_BOLD = "\033[1m"
-C_DIM = "\033[2m"
-C_RESET = "\033[0m"
+# -- sys.path 보장: 이 모듈이 직접 실행될 때를 위해 scripts/ 디렉터리 추가 --
+_utils_dir = os.path.dirname(os.path.abspath(__file__))
+_scripts_dir = os.path.dirname(_utils_dir)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
-# phase별 색상 매핑
-PHASE_COLORS = {
-    "INIT": C_RED,
-    "PLAN": C_BLUE,
-    "WORK": C_GREEN,
-    "REPORT": C_PURPLE,
-    "COMPLETED": C_GRAY,
-    "STALE": C_GRAY,
-    "FAILED": C_YELLOW,
-    "CANCELLED": C_GRAY,
-}
-
-# YYYYMMDD-HHMMSS 패턴 정규식
-TS_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+# =============================================================================
+# 상수를 data.constants에서 import (re-export하여 하위 호환성 보장)
+# =============================================================================
+from data.constants import (  # noqa: E402
+    C_RED,
+    C_BLUE,
+    C_GREEN,
+    C_PURPLE,
+    C_YELLOW,
+    C_CYAN,
+    C_GRAY,
+    C_BOLD,
+    C_DIM,
+    C_RESET,
+    PHASE_COLORS,
+    TS_PATTERN,
+)
 
 
 def colorize_phase(phase):

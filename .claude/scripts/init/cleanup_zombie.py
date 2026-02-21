@@ -18,13 +18,19 @@ import os
 import shutil
 import sys
 import tempfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_KST = timezone(timedelta(hours=9))
-_TTL_HOURS = 24
-_REPORT_TTL_HOURS = 1
-_TERMINAL_PHASES = {"COMPLETED", "FAILED", "STALE", "CANCELLED"}
+_SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from data.constants import KST, ZOMBIE_TTL_HOURS, REPORT_TTL_HOURS, TERMINAL_PHASES
+
+_KST = KST
+_TTL_HOURS = ZOMBIE_TTL_HOURS
+_REPORT_TTL_HOURS = REPORT_TTL_HOURS
+_TERMINAL_PHASES = TERMINAL_PHASES
 
 
 def _atomic_write_json(path, data):

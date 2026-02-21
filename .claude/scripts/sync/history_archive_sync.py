@@ -30,11 +30,11 @@ from utils.common import (
     C_YELLOW,
     resolve_project_root,
 )
+from data.constants import KEEP_COUNT
 
 PROJECT_ROOT = resolve_project_root()
 WORKFLOW_DIR = os.path.join(PROJECT_ROOT, ".workflow")
 HISTORY_DIR = os.path.join(WORKFLOW_DIR, ".history")
-KEEP_COUNT = 10
 
 
 def main():

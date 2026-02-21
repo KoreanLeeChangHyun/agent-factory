@@ -12,17 +12,6 @@
 
 set -euo pipefail
 
-# ─── ANSI 색상 ───
-C_RED='\033[0;31m'
-C_BLUE='\033[0;34m'
-C_GREEN='\033[0;32m'
-C_PURPLE='\033[0;35m'
-C_YELLOW='\033[0;33m'
-C_CYAN='\033[0;36m'
-C_BOLD='\033[1m'
-C_DIM='\033[2m'
-C_RESET='\033[0m'
-
 # ─── 인자 파싱 ───
 REGISTRY_KEY="${1:-}"
 PHASE="${2:-}"
@@ -36,6 +25,9 @@ fi
 # ─── 프로젝트 루트 해석 ───
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+# ─── 공통 색상/유틸리티 로드 ───
+source "$SCRIPT_DIR/../data/colors.sh"
 
 # ─── registryKey → workDir 해석 ───
 REGISTRY_FILE="$PROJECT_ROOT/.workflow/registry.json"
@@ -95,18 +87,6 @@ fi
 # 폴백
 WORK_ID="${WORK_ID:-none}"
 TITLE="${TITLE:-unknown}"
-
-# ─── phase별 색상 ───
-get_color() {
-    case "$1" in
-        INIT)   echo "$C_RED" ;;
-        PLAN)   echo "$C_BLUE" ;;
-        WORK)   echo "$C_GREEN" ;;
-        REPORT) echo "$C_PURPLE" ;;
-        DONE)   echo "$C_YELLOW" ;;
-        *)      echo '\033[0;37m' ;;
-    esac
-}
 
 COLOR=$(get_color "$PHASE")
 

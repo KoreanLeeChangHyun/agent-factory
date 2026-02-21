@@ -13,17 +13,6 @@
 
 set -euo pipefail
 
-# ─── ANSI 색상 ───
-C_RED='\033[0;31m'
-C_BLUE='\033[0;34m'
-C_GREEN='\033[0;32m'
-C_PURPLE='\033[0;35m'
-C_YELLOW='\033[0;33m'
-C_GRAY='\033[0;90m'
-C_BOLD='\033[1m'
-C_DIM='\033[2m'
-C_RESET='\033[0m'
-
 # ─── 인자 파싱 ───
 ARG1="${1:-}"
 PHASE="${2:-}"
@@ -37,18 +26,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# ─── phase별 색상 ───
-get_color() {
-    case "$1" in
-        INIT)                       echo "$C_RED" ;;
-        PLAN)                       echo "$C_BLUE" ;;
-        WORK)                       echo "$C_GREEN" ;;
-        REPORT)                     echo "$C_PURPLE" ;;
-        DONE|COMPLETED)             echo "$C_YELLOW" ;;
-        CANCELLED|STALE|FAILED)     echo "$C_GRAY" ;;
-        *)                          echo '\033[0;37m' ;;
-    esac
-}
+# ─── 공통 색상/유틸리티 로드 ───
+source "$SCRIPT_DIR/../data/colors.sh"
 
 # ─── 프로그레스 바 ───
 get_progress() {
@@ -150,9 +129,8 @@ fi
 COLOR=$(get_color "$PHASE")
 PROGRESS=$(get_progress "$PHASE")
 
-# 배너 폭 계산 (고정 75)
-WIDTH=75
-LINE=$(printf '─%.0s' $(seq 1 $WIDTH))
+# 배너 폭 계산
+LINE=$(printf '─%.0s' $(seq 1 $BANNER_WIDTH))
 
 echo ""
 echo -e "${COLOR}┌${LINE}┐${C_RESET}"
