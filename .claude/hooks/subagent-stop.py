@@ -36,7 +36,7 @@ def _history_sync_trigger(stdin_data, flags):
         return
 
     import subprocess
-    target = scripts_dir('workflow', 'history_sync.py')
+    target = scripts_dir('workflow', 'sync', 'history_sync.py')
     if os.path.exists(target):
         subprocess.Popen(
             [sys.executable, target, 'sync'],
@@ -52,7 +52,7 @@ def main():
     # usage-tracker (async)
     dispatch_async(
         'HOOK_USAGE_TRACKER',
-        scripts_dir('workflow', 'usage_tracker.py'),
+        scripts_dir('workflow', 'hooks', 'usage_tracker.py'),
         stdin_data,
         flags=flags,
     )
@@ -60,7 +60,7 @@ def main():
     # completion-notify (async)
     dispatch_async(
         'HOOK_COMPLETION_NOTIFY',
-        scripts_dir('workflow', 'completion_notify.py'),
+        scripts_dir('workflow', 'hooks', 'completion_notify.py'),
         stdin_data,
         flags=flags,
     )

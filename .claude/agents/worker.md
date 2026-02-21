@@ -38,7 +38,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 - WORK Phase 배너 호출 (`step-start <registryKey> WORK` / `step-end WORK`)
 - WORK-PHASE 서브배너 호출 (`step-start <registryKey> WORK-PHASE <N> ...`)
-- `python3 .claude/scripts/workflow/update_state.py` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
+- `python3 .claude/scripts/workflow/state/update_state.py` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
 - Worker 반환값 추출 (첫 3줄만 보관, 나머지 폐기)
 - usage-pending 추적
 
@@ -73,7 +73,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 5. **실행 내역 작성** - `<workDir>/work/WXX-<작업명>.md`에 변경 파일, 수행 내용, 로드된 스킬 섹션 기록
 
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
-- **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
+- **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/workflow/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
 > 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, Phase 0(스킬 탐색/매핑 준비)과 Phase 1+(계획서 태스크 실행)의 역할 구분, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
 

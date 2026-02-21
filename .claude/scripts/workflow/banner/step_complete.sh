@@ -35,7 +35,7 @@ fi
 
 # ─── 프로젝트 루트 해석 ───
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # ─── registryKey → workDir 해석 ───
 REGISTRY_FILE="$PROJECT_ROOT/.workflow/registry.json"
@@ -141,7 +141,7 @@ if [[ "$PHASE" == "DONE" && -n "$STATUS" ]]; then
         if [[ -f "$PROJECT_ROOT/$WORK_DIR/report.md" ]]; then
             REPORT_PATH="$WORK_DIR/report.md"
         fi
-        SLACK_PY="$SCRIPT_DIR/../slack/slack_notify.py"
+        SLACK_PY="$SCRIPT_DIR/../../slack/slack_notify.py"
         if [[ -f "$SLACK_PY" ]]; then
             python3 "$SLACK_PY" "$WORK_DIR" "완료" "$REPORT_PATH" "" &>/dev/null &
         fi

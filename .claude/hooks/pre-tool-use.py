@@ -55,7 +55,7 @@ def _task_history_sync_main(stdin_data):
     if subagent_type not in valid_types:
         return 0
 
-    py_target = scripts_dir('workflow', 'history_sync.py')
+    py_target = scripts_dir('workflow', 'sync', 'history_sync.py')
     if os.path.exists(py_target):
         subprocess.Popen(
             [sys.executable, py_target, 'sync'],

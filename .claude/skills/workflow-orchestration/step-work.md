@@ -8,10 +8,10 @@
 > **State Update** before WORK start:
 > ```bash
 > # full mode (default): transition from PLAN
-> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker PLAN WORK
+> python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker PLAN WORK
 >
 > # noplan mode: transition from INIT (PLAN 스킵)
-> python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK
+> python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker INIT WORK
 > ```
 > Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행).
 
@@ -46,8 +46,8 @@ Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, tas
 **usage-pending 등록:**
 ```bash
 # Worker와 동일한 방식으로 usage-pending 등록
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> running
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <taskId> <taskId>
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> <taskId> running
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> <taskId> <taskId>
 ```
 
 **반환값 처리:**
@@ -70,12 +70,12 @@ python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <ta
 # Phase 1에서 Worker와 Explorer가 병렬 실행
 step-start <registryKey> WORK-PHASE 1 "W01,W02,W03" parallel
 
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W02 running
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W03 running
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W02 W02
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W03 W03
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 running
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W02 running
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W03 running
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W01 W01
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W02 W02
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W03 W03
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
@@ -152,7 +152,7 @@ step-start <registryKey> WORK-PHASE 0 "phase0" sequential
 ```
 ```bash
 # MUST: Phase 0 배너 직후, Task 호출 전에 반드시 아래 3개 명령을 단일 Bash로 실행
-mkdir -p <workDir>/work && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> phase0 phase0
+mkdir -p <workDir>/work && python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> phase0 phase0
 ```
 ```
 # full mode:
@@ -165,8 +165,8 @@ Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskI
 **Phase 0 완료 후 task-status 갱신:**
 ```bash
 # Worker 반환값 수신 후 (성공/실패에 따라)
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 completed   # 성공 시
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 failed       # 실패 시
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> phase0 completed   # 성공 시
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> phase0 failed       # 실패 시
 ```
 
 Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스크와 스킬을 매핑하여 `<workDir>/work/skill-map.md` 생성.
@@ -210,7 +210,7 @@ step-start <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 일괄 실행 (스킵 금지)
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W02 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01 && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W02 W02
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W02 running && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W01 W01 && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W02 W02
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -224,7 +224,7 @@ step-start <registryKey> WORK-PHASE 2 "W04" sequential
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 실행 (스킵 금지)
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W04 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W04 W04
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W04 running && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W04 W04
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
@@ -293,10 +293,10 @@ Worker 반환값 수신 후, 반환 상태에 따라 `task-status`를 갱신합�
 
 ```bash
 # 반환값 첫 줄이 "상태: 성공" 또는 "상태: 부분성공"인 경우
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> completed
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> <taskId> completed
 
 # 반환값 첫 줄이 "상태: 실패"인 경우
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <taskId> failed
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> <taskId> failed
 ```
 
 > **MUST: Worker 반환값 수신 직후, 다음 Phase 배너 호출 전에 반드시 task-status를 갱신합니다. 스킵 금지.** 병렬 Worker의 경우, 모든 Worker 반환 후 단일 Bash로 일괄 갱신합니다.
@@ -317,32 +317,32 @@ python3 .claude/scripts/workflow/update_state.py task-status <registryKey> <task
 | 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
 
 ```bash
-# 형식: python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> <agent_id_or_taskId> <taskId>
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
+# 형식: python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> <agent_id_or_taskId> <taskId>
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W01 W01
 ```
 
 ## Hooks 수정 태스크 실행 패턴
 
 > hooks/scripts 디렉터리(`.claude/hooks/`, `.claude/scripts/`)의 파일을 수정하는 태스크는 `hooks-self-guard.py`에 의해 차단됩니다.
-> 오케스트레이터가 `python3 .claude/scripts/workflow/update_state.py env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
+> 오케스트레이터가 `python3 .claude/scripts/workflow/state/update_state.py env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
 
 **실행 순서:**
 
 ```bash
 # 1. Worker 호출 전: hooks 수정 허용 환경변수 설정
-python3 .claude/scripts/workflow/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1
+python3 .claude/scripts/workflow/state/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1
 
 # 2. Worker 호출 (hooks 파일 수정 태스크)
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running
-python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 running
+python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W01 W01
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
 ```
 ```bash
 # 3. Worker 완료 후: task-status 갱신 + 환경변수 해제 (반드시 실행)
-python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 completed   # 또는 failed
-python3 .claude/scripts/workflow/update_state.py env <registryKey> unset HOOKS_EDIT_ALLOWED
+python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 completed   # 또는 failed
+python3 .claude/scripts/workflow/state/update_state.py env <registryKey> unset HOOKS_EDIT_ALLOWED
 ```
 
 **규칙:**
@@ -351,5 +351,5 @@ python3 .claude/scripts/workflow/update_state.py env <registryKey> unset HOOKS_E
 |------|------|
 | 설정 시점 | Worker Task 호출 직전 (usage-pending보다 먼저) |
 | 해제 시점 | Worker 반환값 수신 직후 (성공/실패 무관, 반드시 해제) |
-| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `python3 .claude/scripts/workflow/update_state.py env`의 화이트리스트로 제한 |
+| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `python3 .claude/scripts/workflow/state/update_state.py env`의 화이트리스트로 제한 |
 | 적용 대상 | 계획서에서 hooks 디렉터리 파일을 수정 대상으로 명시한 태스크만 해당 |

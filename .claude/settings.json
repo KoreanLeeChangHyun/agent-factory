@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/workflow/history_sync.py sync",
+            "command": "python3 -u .claude/scripts/workflow/sync/history_sync.py sync",
             "timeout": 30,
             "async": true
           }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/workflow/history_sync.py sync",
+            "command": "python3 -u .claude/scripts/workflow/sync/history_sync.py sync",
             "timeout": 30,
             "async": true,
             "statusMessage": "히스토리 동기화 (SessionEnd)"

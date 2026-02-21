@@ -1,13 +1,13 @@
 #!/usr/bin/env -S python3 -u
 """
-history sync/status Python 코어 스크립트.
+히스토리 동기화 및 상태 확인 명령어.
 
 .workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
-    python3 .claude/scripts/workflow/history-sync-core.py sync --workflow-dir <path> --target <path> [--dry-run] [--all]
-    python3 .claude/scripts/workflow/history-sync-core.py status --workflow-dir <path> --target <path> [--all]
+    python3 .claude/scripts/workflow/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
+    python3 .claude/scripts/workflow/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
 """
 
 import argparse
@@ -19,6 +19,24 @@ import tempfile
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+# utils 패키지 import
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+try:
+    from utils.common import (
+        C_CYAN,
+        C_GREEN,
+        C_RED,
+        C_RESET,
+        resolve_project_root,
+    )
+except ImportError:
+    C_CYAN = C_GREEN = C_RED = C_RESET = ""
+    def resolve_project_root():
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 # ============================================================
@@ -495,10 +513,18 @@ def extract_work_id_from_row(row: str) -> str:
 
 def cmd_sync(args: argparse.Namespace) -> int:
     """sync 서브커맨드 실행."""
+    print(f"{C_CYAN}[history-sync]{C_RESET} sync 시작...")
+
     workflow_dir = args.workflow_dir
     target = args.target
     dry_run = args.dry_run
     include_all = args.all
+
+    # 상대경로를 PROJECT_ROOT 기준 절대경로로 변환
+    if not os.path.isabs(target):
+        target = os.path.join(PROJECT_ROOT, target)
+    if not os.path.isabs(workflow_dir):
+        workflow_dir = os.path.join(PROJECT_ROOT, workflow_dir)
 
     # .workflow/ 스캔
     scanned = scan_workflow_directory(workflow_dir, include_all)
@@ -686,6 +712,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             print(f"    ! {wid} | 삭제됨")
     print(f"  총 행 수: {len(all_rows)}건")
 
+    print(f"{C_GREEN}[OK]{C_RESET} sync 완료")
     return 0
 
 
@@ -698,6 +725,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     workflow_dir = args.workflow_dir
     target = args.target
     include_all = args.all
+
+    # 상대경로를 PROJECT_ROOT 기준 절대경로로 변환
+    if not os.path.isabs(target):
+        target = os.path.join(PROJECT_ROOT, target)
+    if not os.path.isabs(workflow_dir):
+        workflow_dir = os.path.join(PROJECT_ROOT, workflow_dir)
 
     # .workflow/ 스캔
     scanned = scan_workflow_directory(workflow_dir, include_all)
@@ -742,27 +775,34 @@ def cmd_status(args: argparse.Namespace) -> int:
 # main
 # ============================================================
 
+PROJECT_ROOT = resolve_project_root()
+
+
 def main():
     parser = argparse.ArgumentParser(description="history sync/status core")
     subparsers = parser.add_subparsers(dest="subcmd", required=True)
 
     # sync 서브커맨드
     sync_parser = subparsers.add_parser("sync", help="history.md 동기화")
-    sync_parser.add_argument("--workflow-dir", required=True, help=".workflow 디렉토리 경로")
-    sync_parser.add_argument("--target", required=True, help="history.md 파일 경로")
+    sync_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
+    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", "history.md"), help="history.md 파일 경로")
     sync_parser.add_argument("--dry-run", action="store_true", help="변경 미리보기만 수행")
     sync_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     # status 서브커맨드
     status_parser = subparsers.add_parser("status", help="동기화 상태 요약")
-    status_parser.add_argument("--workflow-dir", required=True, help=".workflow 디렉토리 경로")
-    status_parser.add_argument("--target", required=True, help="history.md 파일 경로")
+    status_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
+    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", "history.md"), help="history.md 파일 경로")
     status_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     args = parser.parse_args()
 
     if args.subcmd == "sync":
-        return cmd_sync(args)
+        try:
+            return cmd_sync(args)
+        except Exception as e:
+            print(f"{C_RED}[FAIL]{C_RESET} sync 실패: {e}", file=sys.stderr)
+            return 1
     elif args.subcmd == "status":
         return cmd_status(args)
     else:

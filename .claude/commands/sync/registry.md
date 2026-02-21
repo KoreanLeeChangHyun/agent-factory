@@ -7,7 +7,7 @@ description: 레지스트리 관리. 워크플로우 레지스트리 조회, 정
 
 ## 스크립트
 
-`.claude/scripts/workflow/registry.py` - 서브커맨드: list, clean, remove, help
+`.claude/scripts/workflow/sync/registry.py` - 서브커맨드: list, clean, remove, help
 
 ## 오케스트레이션 흐름
 
@@ -16,7 +16,7 @@ description: 레지스트리 관리. 워크플로우 레지스트리 조회, 정
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/workflow/registry.py list
+python3 .claude/scripts/workflow/sync/registry.py list
 ```
 
 모든 레지스트리 엔트리를 컬러 테이블로 출력합니다. KEY, TITLE, PHASE, COMMAND 컬럼이 표시되며, phase별 색상이 적용됩니다.
@@ -32,7 +32,7 @@ python3 .claude/scripts/workflow/registry.py list
 정리 전에 대상을 확인하려면:
 
 ```bash
-python3 .claude/scripts/workflow/registry.py clean --dry-run
+python3 .claude/scripts/workflow/sync/registry.py clean --dry-run
 ```
 
 제거 대상 엔트리 목록과 사유를 출력하되, 실제 삭제는 수행하지 않습니다.
@@ -48,7 +48,7 @@ python3 .claude/scripts/workflow/registry.py clean --dry-run
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/workflow/registry.py clean
+python3 .claude/scripts/workflow/sync/registry.py clean
 ```
 
 정리 대상 엔트리만 제거합니다. 진행 중인 워크플로우(INIT, PLAN, WORK, REPORT)는 보존됩니다.
@@ -58,7 +58,7 @@ python3 .claude/scripts/workflow/registry.py clean
 모든 엔트리를 제거하고 레지스트리를 비우려면:
 
 ```bash
-python3 .claude/scripts/workflow/registry.py clean --force
+python3 .claude/scripts/workflow/sync/registry.py clean --force
 ```
 
 registry.json을 `{}`로 초기화합니다. 확인 없이 즉시 실행되므로 주의가 필요합니다.
@@ -70,7 +70,7 @@ registry.json을 `{}`로 초기화합니다. 확인 없이 즉시 실행되므�
 특정 엔트리만 제거하려면:
 
 ```bash
-python3 .claude/scripts/workflow/registry.py remove <YYYYMMDD-HHMMSS>
+python3 .claude/scripts/workflow/sync/registry.py remove <YYYYMMDD-HHMMSS>
 ```
 
 해당 키의 엔트리를 registry에서 단건 제거합니다. 존재하지 않는 키에 대해서는 경고만 출력합니다.

@@ -127,21 +127,21 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
 
 ### Flow
 
-1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> worker INIT WORK`
+1. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker INIT WORK`
 2. `step-status <registryKey>`
 3. `step-start <registryKey> WORK` (WORK start banner)
 4. Phase 0 실행 (스킬 탐색/매핑 준비):
    - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
-   - `mkdir -p <workDir>/work && python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> phase0 phase0`
+   - `mkdir -p <workDir>/work && python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> phase0 phase0`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")`
-   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> phase0 completed`
+   - `python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> phase0 completed`
 5. Phase 1+ 실행 (작업 수행):
    - `step-start <registryKey> WORK-PHASE 1 "W01" sequential`
-   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/update_state.py usage-pending <registryKey> W01 W01`
+   - `python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/workflow/state/update_state.py usage-pending <registryKey> W01 W01`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
-   - `python3 .claude/scripts/workflow/update_state.py task-status <registryKey> W01 completed`
+   - `python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 completed`
 6. `step-end <registryKey> WORK` (WORK completion)
-7. `python3 .claude/scripts/workflow/update_state.py both <registryKey> reporter WORK REPORT`
+7. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> reporter WORK REPORT`
 8. `step-status <registryKey>`
 9. `step-start <registryKey> REPORT` (REPORT start banner)
 10. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
@@ -159,7 +159,7 @@ When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and dispat
 
 ### Flow
 
-1. `python3 .claude/scripts/workflow/update_state.py both <registryKey> strategy INIT STRATEGY`
+1. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> strategy INIT STRATEGY`
 2. `step-status <registryKey>`
 3. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
 4. `Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")`

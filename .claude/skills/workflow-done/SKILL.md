@@ -72,7 +72,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 **갱신 실행:**
 ```bash
-python3 .claude/scripts/workflow/history_sync.py sync
+python3 .claude/scripts/workflow/sync/history_sync.py sync
 ```
 
 스크립트가 다음을 자동 처리합니다:
@@ -91,19 +91,19 @@ reporter 반환 상태에 따라:
 
 **성공 시:**
 ```bash
-python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT COMPLETED
+python3 .claude/scripts/workflow/state/update_state.py status <registryKey> REPORT COMPLETED
 ```
 
 **실패 시:**
 ```bash
-python3 .claude/scripts/workflow/update_state.py status <registryKey> REPORT FAILED
+python3 .claude/scripts/workflow/state/update_state.py status <registryKey> REPORT FAILED
 ```
 
 ### 3. 사용량 확정
 
 성공 시에만 실행:
 ```bash
-python3 .claude/scripts/workflow/update_state.py usage-finalize <registryKey>
+python3 .claude/scripts/workflow/state/update_state.py usage-finalize <registryKey>
 ```
 
 > 실패 시 경고만 출력하고 계속 진행 (비차단 원칙)
@@ -111,7 +111,7 @@ python3 .claude/scripts/workflow/update_state.py usage-finalize <registryKey>
 ### 4. 레지스트리 해제
 
 ```bash
-python3 .claude/scripts/workflow/update_state.py unregister <registryKey>
+python3 .claude/scripts/workflow/state/update_state.py unregister <registryKey>
 ```
 
 ### 5. 워크플로우 아카이빙
@@ -121,7 +121,7 @@ python3 .claude/scripts/workflow/update_state.py unregister <registryKey>
 **실행:**
 
 ```bash
-python3 .claude/scripts/workflow/archive_workflow.py <registryKey>
+python3 .claude/scripts/workflow/sync/archive_workflow.py <registryKey>
 ```
 
 스크립트가 다음을 자동 처리합니다:

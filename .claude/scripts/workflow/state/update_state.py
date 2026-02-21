@@ -30,7 +30,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 # utils 패키지 import
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
@@ -318,18 +318,11 @@ def update_status(abs_work_dir, global_registry, status_file, from_phase, to_pha
     sync_registry_phase(abs_work_dir, global_registry, to_phase)
 
     # history.md 실시간 갱신 (비동기, 실패 무시)
-    history_sync_py = os.path.join(SCRIPT_DIR, "history_sync.py")
-    history_sync_sh = os.path.join(SCRIPT_DIR, "history-sync.sh")
+    history_sync_py = os.path.join(SCRIPT_DIR, "..", "sync", "history_sync.py")
     try:
         if os.path.isfile(history_sync_py):
             subprocess.Popen(
                 [sys.executable, history_sync_py, "sync"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        elif os.path.isfile(history_sync_sh):
-            subprocess.Popen(
-                ["bash", history_sync_sh, "sync"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
