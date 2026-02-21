@@ -163,7 +163,8 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | INIT done (noplan) | INIT step-end, extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), worker call(s) | PLAN banner, planner call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
 | INIT done (strategy) | INIT step-end, extract/retain params, skip PLAN/WORK/REPORT, STRATEGY banner, status update (INIT->STRATEGY), strategy agent call | PLAN banner, WORK banner, planner call, worker call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask, **내부 추론/분석 텍스트 출력** |
-| PLAN (2b) done | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
+| PLAN (2b) 승인 | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
+| PLAN (2b) 중지 | CANCELLED Processing (step-plan.md 참조), status 전이(PLAN->CANCELLED), unregister | **done 에이전트 호출**, **DONE 배너 호출 (step-start DONE)**, **step-end DONE 호출**, **WORK 배너 호출**, **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0(스킬 탐색/매핑) worker call, then Phase 1~N(계획서 태스크 실행) | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages**, **내부 추론/분석 텍스트 출력** |
 | WORK done | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
@@ -221,7 +222,7 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options). See [step-plan.md](step-plan.md) for approval flow, .context.json handling, CANCELLED processing, and Binding Contract rule.
+After planner returns, orchestrator performs **AskUserQuestion** approval (3 fixed options). See [step-plan.md](step-plan.md) for approval flow, .context.json handling, CANCELLED processing, and Binding Contract rule. 중지 시 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
 
 ### WORK
 
@@ -263,6 +264,8 @@ Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, wor
 ### DONE
 
 **Details:** See [step-done.md](step-done.md)
+
+> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
 
 After REPORT completion: DONE start banner -> done agent call -> DONE step_complete -> terminate.
 

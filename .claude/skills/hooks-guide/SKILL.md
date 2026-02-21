@@ -65,7 +65,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── init_claude.py
 │   ├── init_project.py
 │   ├── init_clear.py
-│   ├── init_sync.py
 │   ├── git_config.py
 │   ├── reload_prompt.py
 │   └── cleanup_zombie.py
@@ -78,6 +77,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   │   ├── step_change_banner.sh
 │   │   └── step_end_banner.sh
 │   ├── sync/                          # 동기화 및 레지스트리
+│   │   ├── sync_code.py
 │   │   ├── history_sync.py
 │   │   ├── registry.py
 │   │   └── archive_workflow.py
@@ -293,7 +293,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/scripts/init/init_claude.py` | `/init:claude` | 사용자 환경 초기화 |
 | `.claude/scripts/init/init_project.py` | `/init:project` | 프로젝트 설정 |
 | `.claude/scripts/init/init_clear.py` | `/init:clear` | 워크플로우 삭제 |
-| `.claude/scripts/init/init_sync.py` | `/sync:history` | 설정 동기화 |
+| `.claude/scripts/workflow/sync/sync_code.py` | `/sync:code` | 설정 동기화 |
 | `.claude/scripts/init/git_config.py` | `/git:config` | Git 설정 |
 
 ### 워크플로우 유틸리티

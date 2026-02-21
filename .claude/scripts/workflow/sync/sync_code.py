@@ -1,12 +1,12 @@
 #!/usr/bin/env -S python3 -u
 """
-init_sync.py - .claude 디렉토리 원격 동기화 스크립트
+sync_code.py - .claude 디렉토리 원격 동기화 스크립트
 
 원격 리포(https://github.com/KoreanLeeChangHyun/claude-workflow.git)에서
 .claude 디렉토리를 가져와 현재 프로젝트에 rsync --delete로 덮어쓰기합니다.
 .claude.env 파일은 보존됩니다.
 
-사용법: python3 init_sync.py [--dry-run]
+사용법: python3 sync_code.py [--dry-run]
 """
 
 import atexit
@@ -17,7 +17,7 @@ import sys
 import tempfile
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+_PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", "..", ".."))
 
 _REMOTE_REPO = "https://github.com/KoreanLeeChangHyun/claude-workflow.git"
 _ENV_FILE = os.path.join(_PROJECT_ROOT, ".claude.env")

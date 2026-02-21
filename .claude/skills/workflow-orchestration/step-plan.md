@@ -48,6 +48,19 @@ workDir: <workDir>
 - planner가 요구사항 완전 명확화 + 계획서 저장 후 `작성완료` 반환
 - **Output:** 계획서 경로
 
+### 2a-Post: planner 반환 후 오케스트레이터 호출 순서 (REQUIRED)
+
+> planner가 `작성완료`를 반환한 직후, 오케스트레이터는 아래 순서를 **정확히 1회씩** 실행합니다.
+
+1. `step-end <registryKey> PLAN` — PLAN 완료 배너 출력 (**1회만 호출, 재호출 MUST NOT**)
+2. `step-end` Bash 호출의 응답 수신을 확인
+3. **즉시** Step 2b의 AskUserQuestion으로 진행
+
+> **MUST NOT:**
+> - `step-end <registryKey> PLAN`을 2회 이상 호출
+> - Step 2b 진입 시 `step-end`를 "보장을 위해" 재호출
+> - `step-end`와 AskUserQuestion을 동일 응답에서 병렬 호출
+
 ## Step 2b: PLAN - Orchestrator User Approval
 
 > planner가 `작성완료`를 반환하면, **오케스트레이터가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
@@ -142,7 +155,7 @@ AskUserQuestion(
 |-----------|--------|
 | **승인** | WORK 단계로 진행 (status.json phase 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
 | **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | status.json phase="CANCELLED" 업데이트 후 워크플로우 중단. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
+| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **done 에이전트 호출**, **DONE 배너(`step-start DONE`) 호출** |
 
 > **prompt.txt Isolation Rule (CRITICAL):**
 > `.prompt/prompt.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
@@ -199,6 +212,12 @@ AskUserQuestion(
 
 ### CANCELLED Processing
 
+> **CRITICAL WARNING: 중지 선택 시 DONE 단계를 거치지 않는다.**
+>
+> "중지" 선택 시 done 에이전트 호출, DONE 배너(`step-start DONE`, `step-end DONE`) 호출을 **절대 수행하지 않는다**.
+> 오케스트레이터가 직접 status 전이(`PLAN` → `CANCELLED`) + `unregister`만 수행한 후 워크플로우를 **즉시 종료**한다.
+> DONE 단계는 정상 완료(승인 → WORK → REPORT → DONE) 경로에서만 진입하는 단계이다.
+
 사용자가 "중지"를 선택하면 오케스트레이터가 `update_state.py`를 호출하여 CANCELLED 상태를 기록합니다.
 
 **Update Method (2 Tool Calls, sequential):**
@@ -218,6 +237,12 @@ Bash("python3 .claude/scripts/workflow/state/update_state.py unregister <registr
 - 전역 레지스트리(`.workflow/registry.json`)에서 해당 워크플로우 엔트리 제거
 
 **Failure handling:** 스크립트 실패 시 `[WARN]` 경고만 출력하고 exit 0으로 종료. 워크플로우를 정상 진행(중단). status.json은 보조 상태 관리이므로 실패가 워크플로우를 차단하지 않음.
+
+**CANCELLED 후 오케스트레이터 종료 방법 (REQUIRED):**
+
+> status 전이(`update_state.py status`) + unregister(`update_state.py unregister`) 호출이 완료되면,
+> 오케스트레이터는 **추가 배너 호출(`step-start`, `step-end`), 에이전트 호출(`done`, `reporter`, `worker` 등)을 일체 수행하지 않고** 현재 turn을 즉시 종료합니다.
+> CANCELLED 처리 후 남은 행위는 없습니다.
 
 ## Binding Contract Rule (REQUIRED)
 
