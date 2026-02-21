@@ -34,7 +34,7 @@ fi
 
 # ─── 프로젝트 루트 해석 ───
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # ─── phase별 색상 ───
 get_color() {
