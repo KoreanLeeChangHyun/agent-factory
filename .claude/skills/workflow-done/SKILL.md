@@ -121,7 +121,7 @@ python3 .claude/scripts/state/update_state.py unregister <registryKey>
 **실행:**
 
 ```bash
-python3 .claude/scripts/sync/history_archive_sync.py <registryKey>
+python3 .claude/scripts/sync/history_sync.py archive <registryKey>
 ```
 
 스크립트가 다음을 자동 처리합니다:

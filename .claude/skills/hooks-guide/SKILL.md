@@ -80,7 +80,6 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   │   ├── code_sync.py
 │   │   ├── history_sync.py
 │   │   ├── registry_sync.py
-│   │   ├── history_archive_sync.py
 │   │   └── usage_sync.py
 │   └── data/                          # 정적 데이터
 │       └── help.txt

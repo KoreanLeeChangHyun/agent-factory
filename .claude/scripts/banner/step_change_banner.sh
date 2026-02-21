@@ -34,4 +34,4 @@ TIMESTAMP=$(date +%H:%M:%S 2>/dev/null || echo "")
 # ─── 상태 전이 출력 ───
 COLOR_FROM=$(get_color "$FROM_PHASE")
 COLOR_TO=$(get_color "$TO_PHASE")
-echo -e "  \xe2\x9f\xab ${COLOR_FROM}${FROM_PHASE}${C_RESET} \xe2\x86\x92 ${COLOR_TO}${TO_PHASE}${C_RESET}  ${C_DIM}${TIMESTAMP}${C_RESET}"
+echo -e "  \xe2\x9f\xab ${COLOR_FROM}${FROM_PHASE}${C_RESET} \xe2\x86\x92 ${COLOR_TO}${TO_PHASE}${C_RESET}  ${C_CYAN}${TIMESTAMP}${C_RESET}"

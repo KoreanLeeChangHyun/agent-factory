@@ -8,6 +8,7 @@
 사용법:
     python3 .claude/scripts/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
     python3 .claude/scripts/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
+    python3 .claude/scripts/sync/history_sync.py archive <registryKey>
 """
 
 import argparse
@@ -31,14 +32,15 @@ try:
         C_GREEN,
         C_RED,
         C_RESET,
+        C_YELLOW,
         resolve_project_root,
     )
 except ImportError:
-    C_CYAN = C_GREEN = C_RED = C_RESET = ""
+    C_CYAN = C_GREEN = C_RED = C_RESET = C_YELLOW = ""
     def resolve_project_root():
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from data.constants import STALE_TTL_SECONDS
+from data.constants import STALE_TTL_SECONDS, KEEP_COUNT
 
 # ============================================================
 # 상수 (phase_status_map.json에서 로드)
@@ -777,6 +779,62 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 # ============================================================
+# archive 명령어
+# ============================================================
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    """archive 서브커맨드 실행. 오래된 워크플로우 디렉토리를 .history/로 이동."""
+    current_key = args.registry_key
+    workflow_dir = os.path.join(PROJECT_ROOT, ".workflow")
+    history_dir = os.path.join(workflow_dir, ".history")
+
+    if not os.path.isdir(workflow_dir):
+        print(f"{C_YELLOW}[WARN]{C_RESET} .workflow/ 디렉토리가 존재하지 않습니다.", file=sys.stderr)
+        return 0
+
+    # [0-9]* 패턴 디렉토리를 역순 정렬
+    dirs = []
+    for name in sorted(os.listdir(workflow_dir), reverse=True):
+        full_path = os.path.join(workflow_dir, name)
+        if os.path.isdir(full_path) and re.match(r"^[0-9]", name):
+            dirs.append(name)
+
+    if not dirs:
+        return 0
+
+    # 현재 워크플로우 제외
+    filtered = [d for d in dirs if d != current_key]
+
+    if len(filtered) <= KEEP_COUNT:
+        return 0
+
+    # .history/ 디렉토리 생성
+    os.makedirs(history_dir, exist_ok=True)
+
+    moved = 0
+    failed = 0
+    for target in filtered[KEEP_COUNT:]:
+        src = os.path.join(workflow_dir, target)
+        dst = os.path.join(history_dir, target)
+        try:
+            shutil.move(src, dst)
+            moved += 1
+            print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+        except Exception:
+            failed += 1
+            print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
+
+    if moved > 0:
+        print(f"{C_CYAN}[archive]{C_RESET} {moved} directories archived to .history/")
+
+    if failed > 0:
+        print(f"[WARN] {failed} directories failed to archive", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+# ============================================================
 # main
 # ============================================================
 
@@ -800,6 +858,10 @@ def main():
     status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", "history.md"), help="history.md 파일 경로")
     status_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
+    # archive 서브커맨드
+    archive_parser = subparsers.add_parser("archive", help="오래된 워크플로우를 .history/로 아카이브")
+    archive_parser.add_argument("registry_key", help="현재 워크플로우의 registryKey")
+
     args = parser.parse_args()
 
     if args.subcmd == "sync":
@@ -810,6 +872,12 @@ def main():
             return 1
     elif args.subcmd == "status":
         return cmd_status(args)
+    elif args.subcmd == "archive":
+        try:
+            return cmd_archive(args)
+        except Exception as e:
+            print(f"{C_RED}[FAIL]{C_RESET} archive 실패: {e}", file=sys.stderr)
+            return 1
     else:
         parser.print_help()
         return 1

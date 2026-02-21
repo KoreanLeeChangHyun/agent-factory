@@ -232,11 +232,11 @@ def main():
     if active_count > keep_count:
         print(f"[init] Active directories ({active_count}) exceed KEEP_COUNT ({keep_count}), triggering archive...",
               file=sys.stderr)
-        archive_script = os.path.join(_SCRIPT_DIR, "..", "sync", "history_archive_sync.py")
+        archive_script = os.path.join(_SCRIPT_DIR, "..", "sync", "history_sync.py")
         if os.path.isfile(archive_script):
             try:
                 subprocess.run(
-                    ["python3", archive_script, registry_key],
+                    ["python3", archive_script, "archive", registry_key],
                     timeout=30, capture_output=True
                 )
             except Exception:
