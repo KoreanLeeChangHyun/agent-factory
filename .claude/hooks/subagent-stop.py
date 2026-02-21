@@ -52,7 +52,7 @@ def main():
     # usage-tracker (async)
     dispatch_async(
         'HOOK_USAGE_TRACKER',
-        scripts_dir('workflow', 'hooks', 'usage_tracker.py'),
+        scripts_dir('workflow', 'sync', 'usage_sync.py'),
         stdin_data,
         flags=flags,
     )

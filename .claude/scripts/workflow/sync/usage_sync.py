@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """
 SubagentStop Hook: 워크플로우 서브에이전트별 토큰 사용량 자동 추적
-(usage-tracker.sh -> usage_tracker.py 1:1 포팅)
+(usage-tracker.sh -> usage_sync.py 1:1 포팅)
 
 입력 (stdin JSON): agent_type, agent_id, agent_transcript_path
 비차단 원칙: 모든 에러 경로에서 exit 0

@@ -20,7 +20,7 @@ def main():
     # workflow-auto-continue (sync)
     results.append(dispatch(
         'HOOK_WORKFLOW_AUTO_CONTINUE',
-        scripts_dir('workflow', 'hooks', 'workflow_auto_continue.py'),
+        scripts_dir('guards', 'auto_continue_guard.py'),
         stdin_data,
         flags=flags,
     ))

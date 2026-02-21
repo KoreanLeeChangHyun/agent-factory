@@ -307,7 +307,7 @@ python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey>
 
 > Worker 토큰 사용량을 taskId 단위로 정확히 추적하기 위해, **모든 Worker Task 호출 직전에** `usage-pending`을 실행해야 합니다.
 
-**목적:** SubagentStop Hook(`usage_tracker.py`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId에 귀속시킵니다.
+**목적:** SubagentStop Hook(`usage_sync.py`)이 Worker 종료 시 `_pending_workers` 매핑을 조회하여 토큰을 올바른 taskId에 귀속시킵니다.
 
 **호출 규칙:**
 

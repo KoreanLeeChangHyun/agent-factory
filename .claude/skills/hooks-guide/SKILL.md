@@ -44,9 +44,9 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── slack-ask.py                    # -> scripts/slack/slack_ask.py
 │   └── task-history-sync.py            # history_sync.py 호출 (인라인)
 ├── stop/
-│   └── workflow-auto-continue.py       # -> scripts/workflow/hooks/workflow_auto_continue.py
+│   └── workflow-auto-continue.py       # -> scripts/guards/auto_continue_guard.py
 └── subagent-stop/
-    ├── usage-tracker.py                # -> scripts/workflow/hooks/usage_tracker.py
+    ├── usage-tracker.py                # -> scripts/workflow/sync/usage_sync.py
     ├── completion-notify.py            # -> scripts/workflow/hooks/completion_notify.py
     └── history-sync-trigger.py         # history_sync.py 호출 (인라인)
 
@@ -59,7 +59,8 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── hooks_self_guard.py
 │   ├── dangerous_command_guard.py
 │   ├── workflow_transition_guard.py
-│   └── workflow_agent_guard.py
+│   ├── workflow_agent_guard.py
+│   └── auto_continue_guard.py
 ├── init/                               # 초기화/설정 스크립트 (alias 호출)
 │   ├── init_workflow.py
 │   ├── init_claude.py
@@ -80,10 +81,9 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   │   ├── sync_code.py
 │   │   ├── history_sync.py
 │   │   ├── registry.py
-│   │   └── archive_workflow.py
+│   │   ├── archive_workflow.py
+│   │   └── usage_sync.py
 │   ├── hooks/                         # Hook 스크립트
-│   │   ├── workflow_auto_continue.py
-│   │   ├── usage_tracker.py
 │   │   └── completion_notify.py
 │   └── data/                          # 정적 데이터
 │       └── help.txt
@@ -205,7 +205,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 - **동작**: 활성 워크플로우가 진행 중(INIT/WORK/REPORT phase)이면 자동 중단 차단
 - **안전장치**: 연속 3회 차단 시 허용 (무한 루프 방지), PLAN phase 예외 (AskUserQuestion 대기 존중)
 - **bypass**: `WORKFLOW_GUARD_DISABLE=1` 환경변수 또는 `.workflow/bypass` 파일
-- **스크립트**: `.claude/hooks/stop/workflow-auto-continue.py` (thin wrapper -> `.claude/scripts/workflow/hooks/workflow_auto_continue.py`)
+- **스크립트**: `.claude/hooks/stop/workflow-auto-continue.py` (thin wrapper -> `.claude/scripts/guards/auto_continue_guard.py`)
 - **출력 형식**: `{"decision":"block","reason":"..."}`
 - **관련**: `.workflow/registry.json`의 워크플로우 상태 참조
 
@@ -283,7 +283,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/hooks/pre-tool-use/dangerous-command-guard.py` | `.claude/scripts/guards/dangerous_command_guard.py` | 위험 명령어 차단 | PreToolUse | Bash |
 | `.claude/hooks/pre-tool-use/workflow-transition-guard.py` | `.claude/scripts/guards/workflow_transition_guard.py` | 워크플로우 Phase 전이 검증 | PreToolUse | Bash |
 | `.claude/hooks/pre-tool-use/workflow-agent-guard.py` | `.claude/scripts/guards/workflow_agent_guard.py` | 워크플로우 에이전트 호출 검증 | PreToolUse | Task |
-| `.claude/hooks/stop/workflow-auto-continue.py` | `.claude/scripts/workflow/hooks/workflow_auto_continue.py` | 워크플로우 자동 계속 (Stop 차단) | Stop | (전체) |
+| `.claude/hooks/stop/workflow-auto-continue.py` | `.claude/scripts/guards/auto_continue_guard.py` | 워크플로우 자동 계속 (Stop 차단) | Stop | (전체) |
 
 ### 초기화/설정 스크립트 (슬래시 커맨드로 호출)
 

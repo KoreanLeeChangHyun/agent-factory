@@ -112,7 +112,7 @@ init 반환값(request, workDir, workId, registryKey, date, title, workName, 근
 
 ### usage.json 초기화
 
-- **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage_tracker.py가 서브에이전트별 토큰을 기록)
+- **usage.json**: register 시점에 `<workDir>/usage.json` 빈 구조 자동 생성 (usage_sync.py가 서브에이전트별 토큰을 기록)
 
 ## Noplan Mode Post-INIT Flow
 
