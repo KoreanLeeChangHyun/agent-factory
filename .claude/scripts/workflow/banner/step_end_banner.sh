@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# step_complete.sh - 워크플로우 단계 완료 메시지 출력
+# step_end_banner.sh - 워크플로우 단계 완료 메시지 출력
 #
 # 사용법:
-#   step_complete.sh <registryKey> <phase>          # 일반 단계 완료
-#   step_complete.sh <registryKey> DONE done        # 최종 완료
+#   step_end_banner.sh <registryKey> <phase>          # 일반 단계 완료
+#   step_end_banner.sh <registryKey> DONE done        # 최종 완료
 #
 # 예시:
-#   step_complete.sh 20260219-042258 WORK
-#   step_complete.sh 20260219-042258 REPORT
-#   step_complete.sh 20260219-042258 DONE done
+#   step_end_banner.sh 20260219-042258 WORK
+#   step_end_banner.sh 20260219-042258 REPORT
+#   step_end_banner.sh 20260219-042258 DONE done
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ PHASE="${2:-}"
 STATUS="${3:-}"
 
 if [[ -z "$REGISTRY_KEY" || -z "$PHASE" ]]; then
-    echo "사용법: step_complete.sh <registryKey> <phase> [done]" >&2
+    echo "사용법: step_end_banner.sh <registryKey> <phase> [done]" >&2
     exit 0
 fi
 

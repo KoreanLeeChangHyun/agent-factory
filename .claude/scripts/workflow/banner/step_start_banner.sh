@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# banner.sh - 워크플로우 단계 시작 배너 출력
+# step_start_banner.sh - 워크플로우 단계 시작 배너 출력
 #
 # 사용법:
-#   banner.sh INIT none <command>                          # INIT 시작
-#   banner.sh <registryKey> <phase>                        # 일반 시작
-#   banner.sh <registryKey> WORK-PHASE <N> "<taskIds>" <mode>  # WORK-PHASE 서브배너
+#   step_start_banner.sh INIT none <command>                          # INIT 시작
+#   step_start_banner.sh <registryKey> <phase>                        # 일반 시작
+#   step_start_banner.sh <registryKey> WORK-PHASE <N> "<taskIds>" <mode>  # WORK-PHASE 서브배너
 #
 # 예시:
-#   banner.sh INIT none prompt
+#   step_start_banner.sh INIT none prompt
 #   banner.sh 20260219-042258 WORK
 #   banner.sh 20260219-042258 WORK-PHASE 0 "T1,T2" parallel
 
@@ -29,7 +29,7 @@ ARG1="${1:-}"
 PHASE="${2:-}"
 
 if [[ -z "$ARG1" || -z "$PHASE" ]]; then
-    echo "사용법: banner.sh <registryKey|INIT> <phase> [args...]" >&2
+    echo "사용법: step_start_banner.sh <registryKey|INIT> <phase> [args...]" >&2
     exit 0
 fi
 
@@ -40,12 +40,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 # ─── phase별 색상 ───
 get_color() {
     case "$1" in
-        INIT)   echo "$C_RED" ;;
-        PLAN)   echo "$C_BLUE" ;;
-        WORK)   echo "$C_GREEN" ;;
-        REPORT) echo "$C_PURPLE" ;;
-        DONE)   echo "$C_YELLOW" ;;
-        *)      echo '\033[0;37m' ;;
+        INIT)                       echo "$C_RED" ;;
+        PLAN)                       echo "$C_BLUE" ;;
+        WORK)                       echo "$C_GREEN" ;;
+        REPORT)                     echo "$C_PURPLE" ;;
+        DONE|COMPLETED)             echo "$C_YELLOW" ;;
+        CANCELLED|STALE|FAILED)     echo "$C_GRAY" ;;
+        *)                          echo '\033[0;37m' ;;
     esac
 }
 

@@ -743,10 +743,11 @@ def cmd_setup_wf_alias():
             os.remove(wrapper_path)
             removed_wrappers.append(dep_name)
 
-    # --- 현행 alias 정의 (step-start, step-end만 유지) ---
+    # --- 현행 alias 정의 (step-start, step-change, step-end) ---
     alias_defs = [
-        ("step-start", "bash .claude/scripts/workflow/banner/banner.sh"),
-        ("step-end", "bash .claude/scripts/workflow/banner/step_complete.sh"),
+        ("step-start", "bash .claude/scripts/workflow/banner/step_start_banner.sh"),
+        ("step-change", "bash .claude/scripts/workflow/banner/step_change_banner.sh"),
+        ("step-end", "bash .claude/scripts/workflow/banner/step_end_banner.sh"),
     ]
 
     added_indices = []
@@ -836,7 +837,7 @@ def cmd_verify():
     # 워크플로우 alias 확인 (~/.zshrc)
     zshrc = os.path.join(os.environ.get("HOME", ""), ".zshrc")
     alias_names = [
-        "step-start", "step-end",
+        "step-start", "step-change", "step-end",
     ]
     if os.path.isfile(zshrc):
         zshrc_content = open(zshrc, "r", encoding="utf-8").read()

@@ -72,11 +72,11 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ├── workflow/                           # 워크플로우 런타임 유틸리티
 │   ├── state/                         # 상태 관리
 │   │   ├── update_state.py
-│   │   ├── show_state.sh
 │   │   └── fsm-transitions.json
 │   ├── banner/                        # 배너 출력
-│   │   ├── banner.sh
-│   │   └── step_complete.sh
+│   │   ├── step_start_banner.sh
+│   │   ├── step_change_banner.sh
+│   │   └── step_end_banner.sh
 │   ├── sync/                          # 동기화 및 레지스트리
 │   │   ├── history_sync.py
 │   │   ├── registry.py
@@ -301,8 +301,9 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | 파일 | 호출 방식 | 용도 |
 |------|----------|------|
 | `.claude/scripts/workflow/state/update_state.py` | `python3` 직접 호출 | 워크플로우 상태 관리 |
-| `.claude/scripts/workflow/banner/banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
-| `.claude/scripts/workflow/banner/step_complete.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
+| `.claude/scripts/workflow/banner/step_start_banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
+| `.claude/scripts/workflow/banner/step_change_banner.sh` | `step-change` alias | 배너 출력 (상태 전이 시각화) |
+| `.claude/scripts/workflow/banner/step_end_banner.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
 
 ### Slack 관련
 

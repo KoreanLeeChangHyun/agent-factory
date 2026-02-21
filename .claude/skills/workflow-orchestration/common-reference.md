@@ -24,7 +24,7 @@
 | **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
 | **reporter** | 리포터 | REPORT Phase를 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
 | **done** | 던 | REPORT->COMPLETED 전이 구간(DONE)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
-| **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, `step-start`/`step-end` 배너(shell alias — Bash 도구에서 alias 이름으로 직접 호출), update_state.py 호출 등. |
+| **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, `step-start`/`step-change`/`step-end` 배너(shell alias — Bash 도구에서 alias 이름으로 직접 호출), update_state.py 호출 등. |
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
 | **registryKey** | 레지스트리 키 | 워크플로우를 전역적으로 식별하는 키. 형식: `YYYYMMDD-HHMMSS`. registry.json에서 workDir로 해석됨. |
@@ -113,9 +113,8 @@ flowchart TD
 | Action | 주체 | 근거 |
 |--------|------|------|
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
-| step-start/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시 |
+| step-start/step-change/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. step-change가 상태 전이 시각화를 전담 |
 | update_state.py 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
-| step-status 호출 (상태 전이 시각화) | Main | update_state.py 호출 후 순차 실행. 서브에이전트 Bash 출력이 터미널에 미표시되므로 오케스트레이터 전용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
 | skill-map.md Read | **Sub (worker, Phase 1+)** | 오케스트레이터는 경로(`skillMapPath`)만 전달. Worker가 직접 읽어 스킬을 결정 (Phase 1+에서 참조) |
@@ -207,7 +206,7 @@ workName: <작업이름>
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, STRATEGY=`strategy`, REPORT=`reporter`, DONE=`done`
 
-> **Note:** `update_state.py` 호출 후 `step-status <registryKey>`를 순차 호출하여 상태 전이를 터미널에 시각적으로 표시한다. `step-status`는 `.zshrc`에 등록된 shell alias로, status.json의 마지막 전이 항목을 읽어 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력한다.
+> **Note:** 상태 전이 시각화는 `step-change` 배너가 전담한다. `update_state.py` 호출 후 `step-change <key> <fromPhase> <toPhase>`를 실행하면 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다. 그 후 `step-start`를 호출하여 시작 배너를 출력한다. (INIT, WORK-PHASE에서는 step-change 스킵)
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |

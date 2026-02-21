@@ -105,43 +105,47 @@ Commands follow their mode's phase order. Default is full. `strategy` always run
 
 ### Phase Banner Calls
 
-배너 출력은 2개의 shell alias 명령어로 수행한다. Bash 도구에서 **명령어 이름을 그대로** 호출해야 한다.
+배너 출력은 3개의 shell alias 명령어로 수행한다. Bash 도구에서 **명령어 이름을 그대로** 호출해야 한다.
 
 ```bash
 # Phase start banner — Bash 도구에서 이 명령어를 그대로 실행
 step-start <registryKey> <phase>
 
+# State transition visualization — Bash 도구에서 이 명령어를 그대로 실행
+step-change <registryKey> <fromPhase> <toPhase>
+
 # Phase completion message — Bash 도구에서 이 명령어를 그대로 실행
 step-end <registryKey> <phase>
 ```
 
-> **CRITICAL**: `step-start`와 `step-end`는 `.zshrc`에 등록된 shell alias이다. Bash 도구 호출 시 **반드시 alias 이름으로만 호출**해야 한다.
+> **CRITICAL**: `step-start`, `step-change`, `step-end`는 `.zshrc`에 등록된 shell alias이다. Bash 도구 호출 시 **반드시 alias 이름으로만 호출**해야 한다.
 > - **올바른 호출**: `step-start 20260219-051347 PLAN`
-> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
-> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
+> - **올바른 호출**: `step-change 20260219-051347 PLAN WORK`
+> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/step_start_banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
+> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/step_start_banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
 
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
 
 **Call Timing:**
 
-| Timing | Start (step-start) | Complete (step-end) |
-|--------|--------------------|-----------------------------|
-| INIT | `step-start INIT none <command>` | `step-end <key> INIT` |
-| PLAN | `step-start <key> PLAN` | `step-end <key> PLAN` |
-| WORK | `step-start <key> WORK` | `step-end <key> WORK` |
-| WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) |
-| REPORT | `step-start <key> REPORT` | `step-end <key> REPORT` |
-| DONE | `step-start <key> DONE` | `step-end <key> DONE done` |
-| STRATEGY | `step-start <key> STRATEGY` | `step-end <key> STRATEGY` |
+| Timing | Start (step-start) | Change (step-change) | Complete (step-end) |
+|--------|--------------------|-----------------------|-----------------------------|
+| INIT | `step-start INIT none <command>` | (없음) | `step-end <key> INIT` |
+| PLAN | `step-start <key> PLAN` | `step-change <key> INIT PLAN` | `step-end <key> PLAN` |
+| WORK | `step-start <key> WORK` | `step-change <key> PLAN WORK` | `step-end <key> WORK` |
+| WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) | (없음) |
+| REPORT | `step-start <key> REPORT` | `step-change <key> WORK REPORT` | `step-end <key> REPORT` |
+| DONE | `step-start <key> DONE` | (없음) | `step-end <key> DONE done` |
+| STRATEGY | `step-start <key> STRATEGY` | `step-change <key> INIT STRATEGY` | `step-end <key> STRATEGY` |
 
 **각 phase의 오케스트레이터 호출 순서 (PLAN/WORK/REPORT/DONE 공통):**
 1. `python3 .claude/scripts/workflow/state/update_state.py both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
-2. `step-status <key>` — 상태 전이 시각화 (shell alias)
+2. `step-change <key> <fromPhase> <toPhase>` — 상태 전이 시각화
 3. `step-start <key> <PHASE>` — 시작 배너
 4. (에이전트 작업 수행)
 5. `step-end <key> <PHASE>` — 완료 메시지
 
-> **INIT 예외:** INIT는 `update_state.py both` 및 `step-status` 호출 없이 `step-start → init 에이전트 → step-end`만 수행한다. 상태 전환(`INIT->PLAN` 또는 `INIT->WORK`)은 step-end 이후 Mode Branching에서 후속 phase의 update_state.py both가 처리한다. INIT 단계에서 `update_state.py both`를 호출하면 `INIT->INIT` FSM 에러가 발생한다.
+> **INIT 예외:** INIT는 `update_state.py both` 호출 없이 `step-start → init 에이전트 → step-end`만 수행한다. `step-change`도 호출하지 않는다. 상태 전환(`INIT->PLAN` 또는 `INIT->WORK`)은 step-end 이후 Mode Branching에서 후속 phase의 update_state.py both + step-change가 처리한다. INIT 단계에서 `update_state.py both`를 호출하면 `INIT->INIT` FSM 에러가 발생한다.
 
 PLAN step-end MUST complete before AskUserQuestion (sequential, 2 separate turns).
 
@@ -282,7 +286,7 @@ step-end <registryKey> DONE done
 
 | Action | Description |
 |--------|-------------|
-| Phase banner Bash calls | `step-start` (start) + `step-end` (completion) |
+| Phase banner Bash calls | `step-start` (start) + `step-change` (transition) + `step-end` (completion) |
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
 | State transition/registry | `python3 .claude/scripts/workflow/state/update_state.py both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |

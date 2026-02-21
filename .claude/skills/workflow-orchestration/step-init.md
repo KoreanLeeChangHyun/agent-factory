@@ -30,7 +30,7 @@ mode: <mode>
 `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workName`, `근거`
 
 - init이 전처리(prompt.txt 읽기, 작업 디렉터리 생성, user_prompt.txt 복사, prompt.txt 클리어)를 수행
-- **registryKey**: init이 반환하는 `YYYYMMDD-HHMMSS` 형식 식별자. 후속 모든 `step-start`/`step-end` 배너 및 `update_state.py` 호출에 사용
+- **registryKey**: init이 반환하는 `YYYYMMDD-HHMMSS` 형식 식별자. 후속 모든 `step-start`/`step-change`/`step-end` 배너 및 `update_state.py` 호출에 사용
 - **status.json**: init이 `<workDir>/status.json` 생성 완료 (phase: "INIT"). 좀비 정리도 이 단계에서 수행
 - **workDir format**: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` (중첩 구조)
 
@@ -128,7 +128,7 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
 ### Flow
 
 1. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker INIT WORK`
-2. `step-status <registryKey>`
+2. `step-change <registryKey> INIT WORK` (상태 전이 시각화)
 3. `step-start <registryKey> WORK` (WORK start banner)
 4. Phase 0 실행 (스킬 탐색/매핑 준비):
    - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
@@ -142,7 +142,7 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
    - `python3 .claude/scripts/workflow/state/update_state.py task-status <registryKey> W01 completed`
 6. `step-end <registryKey> WORK` (WORK completion)
 7. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> reporter WORK REPORT`
-8. `step-status <registryKey>`
+8. `step-change <registryKey> WORK REPORT` (상태 전이 시각화)
 9. `step-start <registryKey> REPORT` (REPORT start banner)
 10. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
 11. `step-end <registryKey> REPORT` (REPORT completion)
@@ -160,7 +160,7 @@ When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and dispat
 ### Flow
 
 1. `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> strategy INIT STRATEGY`
-2. `step-status <registryKey>`
+2. `step-change <registryKey> INIT STRATEGY` (상태 전이 시각화)
 3. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
 4. `Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")`
 5. Extract first 3 lines from strategy return (discard from line 4)
