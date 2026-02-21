@@ -327,7 +327,7 @@ new Paragraph({
 
 ## Constants & Quick Reference
 - **Underlines:** `SINGLE`, `DOUBLE`, `WAVY`, `DASH`
-- **Borders:** `SINGLE`, `DOUBLE`, `DASHED`, `DOTTED`  
+- **Borders:** `SINGLE`, `DOUBLE`, `DASHED`, `DOTTED`
 - **Numbering:** `DECIMAL` (1,2,3), `UPPER_ROMAN` (I,II,III), `LOWER_LETTER` (a,b,c)
 - **Tabs:** `LEFT`, `CENTER`, `RIGHT`, `DECIMAL`
 - **Symbols:** `"2022"` (•), `"00A9"` (©), `"00AE"` (®), `"2122"` (™), `"00B0"` (°), `"F070"` (✓), `"F0FC"` (✗)

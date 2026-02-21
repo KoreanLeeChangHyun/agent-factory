@@ -337,6 +337,8 @@ Any example files and directories not needed for the skill should be deleted. Th
 
 **Writing Guidelines:** Always use imperative/infinitive form.
 
+**Markdown Line Break Rule:** When a line break is needed in MD files, always use the `<br>` tag or a blank line instead of trailing double spaces at the end of a line. Trailing spaces are invisible, making intent unclear, and may be stripped by editors or formatters.
+
 ##### Frontmatter
 
 Write the YAML frontmatter with `name` and `description`:

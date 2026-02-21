@@ -72,6 +72,14 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 | 스킬 | `.claude/skills/<skill-name>/` |
 | 커맨드 | `.claude/commands/cc/*.md` |
 
+## 실행 옵션
+
+| 옵션 | 모드명 | 설명 | Phase Order |
+|------|--------|------|-------------|
+| `-np` | noplan | PLAN 단계를 스킵하고 즉시 WORK로 진행 | INIT -> WORK -> REPORT -> DONE |
+| `-nr` | noreport | REPORT 단계를 스킵하고 WORK 완료 후 즉시 DONE으로 진행 | INIT -> PLAN -> WORK -> DONE |
+| `-np -nr` | noplan+noreport | PLAN과 REPORT 모두 스킵 | INIT -> WORK -> DONE |
+
 ## 프로젝트 플로우 연동
 
 워크플로우가 프로젝트 플로우(`.kanbanboard`) 컨텍스트 내에서 실행될 때, REPORT 단계 완료 후 칸반보드를 자동 갱신한다.

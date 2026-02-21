@@ -12,8 +12,15 @@
 >
 > # noplan mode: transition from INIT (PLAN 스킵)
 > python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK
+>
+> # noreport mode: transition from PLAN (full과 동일, WORK 완료 후 REPORT 스킵)
+> python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK
+>
+> # noplan+noreport mode: transition from INIT (noplan과 동일, WORK 완료 후 REPORT 스킵)
+> python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK
 > ```
 > Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행).
+> Note: noreport/noplan+noreport 모드에서는 WORK 완료 후 REPORT를 스킵하고 바로 DONE으로 진행한다. 오케스트레이터는 WORK step-end 후 reporter를 호출하지 않고 `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED` → DONE step-start → done agent call → DONE step-end 순서로 진행.
 
 > **WORK Phase Rules (REQUIRED)**
 >

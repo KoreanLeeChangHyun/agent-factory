@@ -31,7 +31,7 @@
 | **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update_state.py + transition-guard)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Phase에서 다른 Phase로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
-| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `noplan`(INIT->WORK->REPORT->COMPLETED, worker 서브에이전트 사용, PLAN 스킵), `strategy`(INIT->STRATEGY->COMPLETED) 3가지. |
+| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `noplan`(INIT->WORK->REPORT->COMPLETED, PLAN 스킵), `noreport`(INIT->PLAN->WORK->COMPLETED, REPORT 스킵), `noplan+noreport`(INIT->WORK->COMPLETED, PLAN+REPORT 스킵), `strategy`(INIT->STRATEGY->COMPLETED) 5가지. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
 | **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. full 모드 및 noplan 모드에서 필수 실행 (strategy 모드에서는 WORK Phase 자체가 없어 해당 없음). |
 | **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md에서 추천 스킬을 로드하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
@@ -236,6 +236,8 @@ workName: <작업이름>
 |------|-------------|----------|
 | full (default) | `INIT -> PLAN -> WORK -> REPORT -> COMPLETED` | PLAN->CANCELLED, WORK/REPORT->FAILED, TTL->STALE |
 | noplan | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
+| noreport | `INIT -> PLAN -> WORK -> COMPLETED` | PLAN->CANCELLED, WORK->FAILED, TTL->STALE |
+| noplan+noreport | `INIT -> WORK -> COMPLETED` | WORK->FAILED, TTL->STALE |
 | strategy | `INIT -> STRATEGY -> COMPLETED` | STRATEGY->FAILED, TTL->STALE |
 
 불법 전이 시 시스템 가드가 차단. update_state.py는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.

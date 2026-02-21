@@ -20,6 +20,7 @@ stateDiagram-v2
     PLAN --> WORK: 승인
     PLAN --> CANCELLED: 중지
     WORK --> REPORT
+    WORK --> COMPLETED: noreport mode
     REPORT --> COMPLETED: 성공
     REPORT --> FAILED: 실패
     STRATEGY --> COMPLETED: 성공
@@ -37,6 +38,8 @@ stateDiagram-v2
 |------|-------------|----------------|------|
 | full (default) | INIT -> PLAN -> WORK -> REPORT -> COMPLETED | init -> planner -> worker(s)/explorer(s) -> reporter -> done | None |
 | noplan | INIT -> WORK -> REPORT -> COMPLETED | init -> worker(s)/explorer(s) -> reporter -> done | PLAN |
+| noreport | INIT -> PLAN -> WORK -> COMPLETED | init -> planner -> worker(s)/explorer(s) -> done | REPORT |
+| noplan+noreport | INIT -> WORK -> COMPLETED | init -> worker(s)/explorer(s) -> done | PLAN, REPORT |
 | strategy | INIT -> STRATEGY -> COMPLETED | init -> strategy -> done | PLAN, WORK, REPORT |
 
 1. Phase order within each mode MUST NOT be violated
@@ -49,22 +52,30 @@ stateDiagram-v2
 
 **결정 알고리즘:**
 1. `command == "strategy"` → `mode: strategy` (early return)
-2. `$ARGUMENTS`에 `-np` 플래그 포함 AND `command in ["implement", "review", "research"]` → `mode: noplan` (early return)
-3. 그 외 → `mode: full` (기본값)
+2. `$ARGUMENTS`에 `-np` 플래그와 `-nr` 플래그 동시 포함 AND `command in ["implement", "review", "research"]` → `mode: noplan+noreport` (early return)
+3. `$ARGUMENTS`에 `-np` 플래그 포함 AND `command in ["implement", "review", "research"]` → `mode: noplan` (early return)
+4. `$ARGUMENTS`에 `-nr` 플래그 포함 AND `command in ["implement", "review", "research"]` → `mode: noreport` (early return)
+5. 그 외 → `mode: full` (기본값)
 
 **매핑 테이블:**
 
 | Command | Condition | Mode |
 |---------|-----------|------|
 | `strategy` | - | `strategy` |
+| `implement` | `-np -nr` 플래그 | `noplan+noreport` |
 | `implement` | `-np` 플래그 | `noplan` |
+| `implement` | `-nr` 플래그 | `noreport` |
 | `implement` | (기본) | `full` |
+| `review` | `-np -nr` 플래그 | `noplan+noreport` |
 | `review` | `-np` 플래그 | `noplan` |
+| `review` | `-nr` 플래그 | `noreport` |
 | `review` | (기본) | `full` |
+| `research` | `-np -nr` 플래그 | `noplan+noreport` |
 | `research` | `-np` 플래그 | `noplan` |
+| `research` | `-nr` 플래그 | `noreport` |
 | `research` | (기본) | `full` |
 
-> mode는 command와 `-np` 플래그에 의해 결정된다. `-np` 플래그는 `$ARGUMENTS`에서 감지한다. 개별 커맨드 문서는 mode 결정 로직을 포함하지 않는다.
+> mode는 command와 `-np`/`-nr` 플래그에 의해 결정된다. `-np`/`-nr` 플래그는 `$ARGUMENTS`에서 감지한다. `-np -nr` 동시 지정 시 `noplan+noreport` 모드가 된다. 개별 커맨드 문서는 mode 결정 로직을 포함하지 않는다.
 
 ## Agent-Phase Mapping
 
@@ -95,7 +106,7 @@ Commands follow their mode's phase order. Default is full. `strategy` always run
 
 - `command`: execution command (implement, review, research, strategy)
 
-> cc:* commands use `$ARGUMENTS` only for flag detection (`-np`). User requests are handled by init agent via `.prompt/prompt.txt`.
+> cc:* commands use `$ARGUMENTS` only for flag detection (`-np`, `-nr`). User requests are handled by init agent via `.prompt/prompt.txt`.
 
 ---
 
@@ -161,13 +172,16 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 |---------------|----------------|------------|
 | INIT done (full) | INIT step-end, extract/retain params, PLAN step-start, status update, planner call | Return summary, progress text, **AskUserQuestion**, init 반환값 판단/검증, **내부 추론/분석 텍스트 출력** |
 | INIT done (noplan) | INIT step-end, extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), worker call(s) | PLAN banner, planner call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
+| INIT done (noreport) | INIT step-end, extract/retain params, PLAN step-start, status update, planner call. WORK 완료 후 REPORT 스킵하여 DONE 직행 | Return summary, progress text, **AskUserQuestion**, REPORT banner, reporter call, **내부 추론/분석 텍스트 출력** |
+| INIT done (noplan+noreport) | INIT step-end, extract/retain params, skip PLAN, WORK banner, status update (INIT->WORK), worker call(s). WORK 완료 후 REPORT 스킵하여 DONE 직행 | PLAN banner, planner call, REPORT banner, reporter call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
 | INIT done (strategy) | INIT step-end, extract/retain params, skip PLAN/WORK/REPORT, STRATEGY banner, status update (INIT->STRATEGY), strategy agent call | PLAN banner, WORK banner, planner call, worker call, AskUserQuestion, **내부 추론/분석 텍스트 출력** |
 | PLAN (2a) done | PLAN completion banner **(await Bash)**, then AskUserQuestion **(sequential, MUST NOT parallel)** | Plan summary, parallel banner+ask, **내부 추론/분석 텍스트 출력** |
 | PLAN (2b) 승인 | Branch on approval, WORK banner, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
 | PLAN (2b) 중지 | CANCELLED Processing (step-plan.md 참조), status 전이(PLAN->CANCELLED), unregister | **done 에이전트 호출**, **DONE 배너 호출 (step-start DONE)**, **step-end DONE 호출**, **WORK 배너 호출**, **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | WORK-PHASE 0 banner (MUST FIRST), then Phase 0(스킬 탐색/매핑) worker call, then Phase 1~N(계획서 태스크 실행) | Skipping Phase banner, Skipping Phase 0 banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages**, **내부 추론/분석 텍스트 출력** |
-| WORK done | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
+| WORK done (full/noplan) | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
+| WORK done (noreport/noplan+noreport) | WORK step-end, extract first 3 lines, skip REPORT, DONE step-start, done agent call (reportPath 없음) | REPORT banner, reporter call, Work summary, **내부 추론/분석 텍스트 출력** |
 | REPORT done | REPORT step-end, DONE step-start, done agent call, extract first 2 lines, DONE step-end → **DONE step-end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
 
 ---
@@ -206,6 +220,8 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 |------|-----------|
 | `strategy` | Skip PLAN/WORK/REPORT, strategy agent STRATEGY -> DONE. See [step-init.md](step-init.md) "Strategy Mode Post-INIT Flow" |
 | `noplan` | Skip PLAN, worker sub-agent WORK -> REPORT -> DONE. See [step-init.md](step-init.md) "Noplan Mode Post-INIT Flow" |
+| `noreport` | Proceed to PLAN, worker sub-agent WORK -> DONE (skip REPORT). See [step-init.md](step-init.md) "Noreport Mode Post-INIT Flow" |
+| `noplan+noreport` | Skip PLAN, worker sub-agent WORK -> DONE (skip PLAN+REPORT). See [step-init.md](step-init.md) "Noplan+Noreport Mode Post-INIT Flow" |
 | `full` | Proceed to PLAN |
 
 ---
@@ -231,6 +247,8 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 **Status update (mode-aware):**
 - full mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
 - noplan mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
+- noreport mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
+- noplan+noreport mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
 - strategy mode: WORK Phase 없음 (STRATEGY Phase에서 strategy 서브에이전트가 작업)
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode). noplan mode: worker가 user_prompt.txt를 직접 해석하여 작업 수행.
@@ -255,6 +273,8 @@ Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, requ
 
 **Details:** See [step-report.md](step-report.md)
 
+**Noreport mode skip:** noreport/noplan+noreport 모드에서는 REPORT 단계를 스킵하고 WORK 완료 후 바로 DONE으로 진행한다. WORK step-end 후 `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED` → DONE step-start → done agent call → DONE step-end 순서로 진행. reporter를 호출하지 않으며 `reportPath`는 done 에이전트에 전달하지 않는다.
+
 **Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> reporter WORK REPORT`
 
 ```
@@ -265,9 +285,9 @@ Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, wor
 
 **Details:** See [step-done.md](step-done.md)
 
-> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
+> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후 또는 noreport 모드에서 WORK 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
 
-After REPORT completion: DONE start banner -> done agent call -> DONE step_complete -> terminate.
+After REPORT completion (or WORK completion in noreport mode): DONE start banner -> done agent call -> DONE step_complete -> terminate.
 
 ```bash
 step-start <registryKey> DONE

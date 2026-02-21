@@ -22,7 +22,7 @@ mode: <mode>
 ")
 ```
 
-> `mode` parameter is optional. Default is `full`. Values: `full`, `strategy`, `noplan`.
+> `mode` parameter is optional. Default is `full`. Values: `full`, `strategy`, `noplan`, `noreport`, `noplan+noreport`.
 > 오케스트레이터가 "Mode Auto-Determination Rule" (SKILL.md)에 따라 결정한 값을 전달한다.
 
 ## Return Values
@@ -46,9 +46,19 @@ step-end <registryKey> INIT
 1. init 에이전트 정상 반환 확인
 2. 반환값(request, workDir, workId, registryKey 등) 추출/보관
 3. `step-end <registryKey> INIT` 호출
-4. Mode Branching 진행 (full -> PLAN, strategy -> STRATEGY, noplan -> WORK)
+4. Mode Branching 진행 (full -> PLAN, strategy -> STRATEGY, noplan -> WORK, noreport -> PLAN, noplan+noreport -> WORK)
 
 > init이 `에러:` 접두사로 반환한 경우에는 step-end를 호출하지 않고 재시도 로직으로 진행한다.
+
+## Mode Branching (After INIT)
+
+| Mode | Next Step | Phase Order | Skip |
+|------|-----------|-------------|------|
+| full | Proceed to PLAN | INIT -> PLAN -> WORK -> REPORT -> DONE | - |
+| noplan | Skip PLAN, proceed to WORK | INIT -> WORK -> REPORT -> DONE | PLAN |
+| noreport | Proceed to PLAN, WORK 완료 후 REPORT 스킵하여 DONE 직행 | INIT -> PLAN -> WORK -> DONE | REPORT |
+| noplan+noreport | Skip PLAN, WORK 완료 후 REPORT 스킵하여 DONE 직행 | INIT -> WORK -> DONE | PLAN, REPORT |
+| strategy | Proceed to STRATEGY | INIT -> STRATEGY -> DONE | PLAN, WORK, REPORT |
 
 ## Error Handling
 
@@ -152,6 +162,79 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
 15. Terminate
 
 > **Note:** noplan 모드에서는 plan.md가 없으므로 오케스트레이터가 plan.md를 Read하는 단계(Plan Reading for Task Dispatch)가 없다. 대신 Phase 0 Worker가 user_prompt.txt를 분석하여 skill-map.md를 생성하고, Phase 1 Worker가 user_prompt.txt를 직접 해석하여 작업을 수행한다. 단일 Worker(W01)로 실행하는 것이 기본이며, Phase 0이 태스크 분할이 필요하다고 판단하면 skill-map.md에 복수 태스크를 정의할 수 있다.
+
+## Noreport Mode Post-INIT Flow
+
+When `-nr` flag is detected in `$ARGUMENTS` for implement/review/research commands, the orchestrator proceeds through PLAN -> WORK as normal but skips REPORT after WORK, going directly to DONE.
+
+### Noreport Mode Characteristics
+
+> **핵심 차이 (full 모드 대비)**: WORK 완료 후 REPORT 단계를 스킵하고 바로 DONE으로 전이한다.
+> **PLAN 단계 포함**: full 모드와 동일하게 PLAN 단계를 거쳐 plan.md를 생성한다.
+> **worker 서브에이전트 사용**: full 모드와 동일하게 worker 서브에이전트가 작업을 수행한다.
+> **reporter 미호출**: WORK 완료 후 reporter 서브에이전트를 호출하지 않고 DONE으로 직행한다.
+> **done 에이전트 호출 시 reportPath 부재**: report.md가 생성되지 않으므로 done 에이전트에 `reportPath`를 전달하지 않는다.
+
+### Flow
+
+1. `python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN`
+2. `step-change <registryKey> INIT PLAN` (상태 전이 시각화)
+3. `step-start <registryKey> PLAN` (PLAN start banner)
+4. Planner call: `Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")`
+5. `step-end <registryKey> PLAN` (PLAN completion)
+6. Plan Reading for Task Dispatch (full 모드와 동일)
+7. `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
+8. `step-change <registryKey> PLAN WORK` (상태 전이 시각화)
+9. `step-start <registryKey> WORK` (WORK start banner)
+10. Phase 0 + Phase 1+ 실행 (full 모드와 동일한 Worker dispatch)
+11. `step-end <registryKey> WORK` (WORK completion)
+12. `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED`
+13. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
+14. `step-start <registryKey> DONE` (DONE start banner)
+15. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
+16. `step-end <registryKey> DONE done` (DONE completion)
+17. Terminate
+
+> **Note:** noreport 모드에서는 WORK 완료 후 REPORT 단계를 완전히 스킵한다. reporter 서브에이전트를 호출하지 않으며, report.md가 생성되지 않는다. done 에이전트 호출 시 `reportPath` 파라미터가 없는 상태로 전달된다.
+
+## Noplan+Noreport Mode Post-INIT Flow
+
+When both `-np` and `-nr` flags are detected in `$ARGUMENTS` for implement/review/research commands, the orchestrator skips both PLAN and REPORT, proceeding directly from INIT to WORK to DONE.
+
+### Noplan+Noreport Mode Characteristics
+
+> **핵심 차이 (full 모드 대비)**: PLAN과 REPORT 단계를 모두 스킵하고 INIT에서 바로 WORK, WORK에서 바로 DONE으로 전이한다.
+> **noplan 모드와의 차이**: noplan 모드는 WORK 후 REPORT를 거치지만, noplan+noreport는 REPORT도 스킵한다.
+> **noreport 모드와의 차이**: noreport 모드는 PLAN을 거치지만, noplan+noreport는 PLAN도 스킵한다.
+> **worker 서브에이전트 사용**: noplan 모드와 동일하게 worker 서브에이전트가 작업을 수행한다.
+> **Phase 0 필수**: noplan 모드와 동일하게 Phase 0(스킬 탐색/매핑)은 필수 실행한다.
+> **plan.md 부재**: noplan 모드와 동일하게 plan.md가 없으므로 worker 호출 시 `planPath` 대신 `userPromptPath: <workDir>/user_prompt.txt`를 전달한다.
+> **reporter 미호출**: noreport 모드와 동일하게 reporter 서브에이전트를 호출하지 않고 DONE으로 직행한다.
+
+### Flow
+
+1. `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
+2. `step-change <registryKey> INIT WORK` (상태 전이 시각화)
+3. `step-start <registryKey> WORK` (WORK start banner)
+4. Phase 0 실행 (스킬 탐색/매핑 준비):
+   - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
+   - `mkdir -p <workDir>/work && python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> phase0 phase0`
+   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")`
+   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 completed`
+5. Phase 1+ 실행 (작업 수행):
+   - `step-start <registryKey> WORK-PHASE 1 "W01" sequential`
+   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01`
+   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
+   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 completed`
+6. `step-end <registryKey> WORK` (WORK completion)
+7. `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED`
+8. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
+9. `step-start <registryKey> DONE` (DONE start banner)
+10. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
+11. `step-end <registryKey> DONE done` (DONE completion)
+12. Terminate
+
+> **Note:** noplan+noreport 모드는 noplan 모드와 동일한 WORK 흐름(plan.md 부재, Phase 0 필수, user_prompt.txt 기반)을 따르되, WORK 완료 후 REPORT를 스킵하고 바로 DONE으로 직행한다. reporter 서브에이전트를 호출하지 않으며, report.md가 생성되지 않는다. done 에이전트 호출 시 `reportPath` 파라미터가 없는 상태로 전달된다.
 
 ## Strategy Mode Post-INIT Flow
 

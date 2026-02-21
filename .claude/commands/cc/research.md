@@ -87,3 +87,11 @@ description: 웹 검색 기반 연구/조사 및 내부 자산 분석 수행. �
 - `.claude/skills/command-analyze-codebase/SKILL.md` - 코드베이스 분석 절차
 - `.claude/skills/command-analyze-database/SKILL.md` - 데이터베이스 분석 절차
 - `.claude/skills/command-analyze-data/SKILL.md` - 데이터 분석 절차
+
+## 실행 옵션
+
+| 옵션 | 모드명 | 설명 | Phase Order |
+|------|--------|------|-------------|
+| `-np` | noplan | PLAN 단계를 스킵하고 즉시 WORK로 진행 | INIT -> WORK -> REPORT -> DONE |
+| `-nr` | noreport | REPORT 단계를 스킵하고 WORK 완료 후 즉시 DONE으로 진행 | INIT -> PLAN -> WORK -> DONE |
+| `-np -nr` | noplan+noreport | PLAN과 REPORT 모두 스킵 | INIT -> WORK -> DONE |

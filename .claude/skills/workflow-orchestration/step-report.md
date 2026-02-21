@@ -1,5 +1,24 @@
 # REPORT (reporter Agent)
 
+## Noreport Mode Skip Condition
+
+> **noreport/noplan+noreport 모드에서는 REPORT 단계가 스킵된다.** 오케스트레이터는 reporter를 호출하지 않고 WORK 완료 후 바로 DONE으로 직행한다.
+
+| Mode | REPORT 실행 여부 | WORK 완료 후 경로 |
+|------|-----------------|------------------|
+| full | O (실행) | WORK -> REPORT -> DONE |
+| noplan | O (실행) | WORK -> REPORT -> DONE |
+| noreport | X (스킵) | WORK -> DONE (REPORT 스킵) |
+| noplan+noreport | X (스킵) | WORK -> DONE (REPORT 스킵) |
+
+**스킵 시 오케스트레이터 동작:**
+1. WORK step-end 출력
+2. `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED` — REPORT를 거치지 않고 WORK에서 COMPLETED로 직행
+3. DONE step-start → done agent call → DONE step-end
+4. reporter를 호출하지 않으며 `reportPath`는 done 에이전트에 전달하지 않음
+
+---
+
 > **Agent-Skill Binding**
 > - Agent: `reporter` (model: sonnet, maxTurns: 30, permissionMode: acceptEdits)
 > - Skill: `workflow-report`
