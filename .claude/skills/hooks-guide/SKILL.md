@@ -46,8 +46,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ├── stop/
 │   └── workflow-auto-continue.py       # -> scripts/guards/auto_continue_guard.py
 └── subagent-stop/
-    ├── usage-tracker.py                # -> scripts/workflow/sync/usage_sync.py
-    ├── completion-notify.py            # -> scripts/workflow/hooks/completion_notify.py
+    ├── usage-tracker.py                # -> scripts/sync/usage_sync.py
     └── history-sync-trigger.py         # history_sync.py 호출 (인라인)
 
 .claude/scripts/                        # 실제 로직 스크립트
@@ -78,13 +77,11 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   │   ├── step_change_banner.sh
 │   │   └── step_end_banner.sh
 │   ├── sync/                          # 동기화 및 레지스트리
-│   │   ├── sync_code.py
+│   │   ├── code_sync.py
 │   │   ├── history_sync.py
-│   │   ├── registry.py
-│   │   ├── archive_workflow.py
+│   │   ├── registry_sync.py
+│   │   ├── history_archive_sync.py
 │   │   └── usage_sync.py
-│   ├── hooks/                         # Hook 스크립트
-│   │   └── completion_notify.py
 │   └── data/                          # 정적 데이터
 │       └── help.txt
 └── slack/                              # Slack 알림 (alias 호출)
@@ -293,17 +290,17 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/scripts/init/init_claude.py` | `/init:claude` | 사용자 환경 초기화 |
 | `.claude/scripts/init/init_project.py` | `/init:project` | 프로젝트 설정 |
 | `.claude/scripts/init/init_clear.py` | `/init:clear` | 워크플로우 삭제 |
-| `.claude/scripts/workflow/sync/sync_code.py` | `/sync:code` | 설정 동기화 |
+| `.claude/scripts/sync/code_sync.py` | `/sync:code` | 설정 동기화 |
 | `.claude/scripts/init/git_config.py` | `/git:config` | Git 설정 |
 
 ### 워크플로우 유틸리티
 
 | 파일 | 호출 방식 | 용도 |
 |------|----------|------|
-| `.claude/scripts/workflow/state/update_state.py` | `python3` 직접 호출 | 워크플로우 상태 관리 |
-| `.claude/scripts/workflow/banner/step_start_banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
-| `.claude/scripts/workflow/banner/step_change_banner.sh` | `step-change` alias | 배너 출력 (상태 전이 시각화) |
-| `.claude/scripts/workflow/banner/step_end_banner.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
+| `.claude/scripts/state/update_state.py` | `python3` 직접 호출 | 워크플로우 상태 관리 |
+| `.claude/scripts/banner/step_start_banner.sh` | `step-start` alias | 배너 출력 (Phase 시작) |
+| `.claude/scripts/banner/step_change_banner.sh` | `step-change` alias | 배너 출력 (상태 전이 시각화) |
+| `.claude/scripts/banner/step_end_banner.sh` | `step-end` alias | 배너 출력 (Phase 완료) |
 
 ### Slack 관련
 

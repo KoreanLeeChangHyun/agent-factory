@@ -47,7 +47,7 @@ maxTurns: 30
 - PLAN Phase 배너 호출 (`step-start <registryKey> PLAN` / `step-end PLAN`)
 - 계획서 작성 완료 후 사용자 승인 (AskUserQuestion)
 - 승인/수정/중지 분기 처리
-- `python3 .claude/scripts/workflow/state/update_state.py` 상태 전이 (PLAN -> WORK 또는 PLAN -> CANCELLED)
+- `python3 .claude/scripts/state/update_state.py` 상태 전이 (PLAN -> WORK 또는 PLAN -> CANCELLED)
 
 ## 스킬 바인딩
 

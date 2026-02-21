@@ -49,7 +49,7 @@ permissionMode: acceptEdits
 ### 오케스트레이터가 대신 수행하는 행위
 
 - REPORT Phase 배너 호출 (`step-start <registryKey> REPORT` / `step-end REPORT`)
-- `python3 .claude/scripts/workflow/state/update_state.py` 상태 전이 (WORK -> REPORT)
+- `python3 .claude/scripts/state/update_state.py` 상태 전이 (WORK -> REPORT)
 - Reporter 반환값 추출 (첫 2줄만 보관)
 
 ## 스킬 바인딩
@@ -73,7 +73,7 @@ permissionMode: acceptEdits
 
 ## 절차
 
-1. **세션 링크 등록** - `python3 .claude/scripts/workflow/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행 (실패 시 비차단)
+1. **세션 링크 등록** - `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행 (실패 시 비차단)
 2. **템플릿 로드** - `.claude/skills/workflow-report/templates/` 에서 command별 템플릿 Read 로드 (필수)
 3. **작업 내역 분석** - `{workDir}/work/` 디렉터리의 작업 내역 파일 읽기
 4. **보고서 작성** - 템플릿 placeholder 치환, 섹션 작성, 선택 섹션 처리

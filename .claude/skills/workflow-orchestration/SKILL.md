@@ -121,8 +121,8 @@ step-end <registryKey> <phase>
 > **CRITICAL**: `step-start`, `step-change`, `step-end`는 `.zshrc`에 등록된 shell alias이다. Bash 도구 호출 시 **반드시 alias 이름으로만 호출**해야 한다.
 > - **올바른 호출**: `step-start 20260219-051347 PLAN`
 > - **올바른 호출**: `step-change 20260219-051347 PLAN WORK`
-> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/step_start_banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
-> - **잘못된 호출**: `bash .claude/scripts/workflow/banner/step_start_banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
+> - **잘못된 호출**: `bash .claude/scripts/banner/step_start_banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
+> - **잘못된 호출**: `bash .claude/scripts/banner/step_start_banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
 
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
 
@@ -139,7 +139,7 @@ step-end <registryKey> <phase>
 | STRATEGY | `step-start <key> STRATEGY` | `step-change <key> INIT STRATEGY` | `step-end <key> STRATEGY` |
 
 **각 phase의 오케스트레이터 호출 순서 (PLAN/WORK/REPORT/DONE 공통):**
-1. `python3 .claude/scripts/workflow/state/update_state.py both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
+1. `python3 .claude/scripts/state/update_state.py both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
 2. `step-change <key> <fromPhase> <toPhase>` — 상태 전이 시각화
 3. `step-start <key> <PHASE>` — 시작 배너
 4. (에이전트 작업 수행)
@@ -216,7 +216,7 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 **Details:** See [step-plan.md](step-plan.md)
 
-**Status update:** `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> planner INIT PLAN`
+**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN`
 
 ```
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
@@ -229,8 +229,8 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 **Details:** See [step-work.md](step-work.md)
 
 **Status update (mode-aware):**
-- full mode: `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker PLAN WORK`
-- noplan mode: `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> worker INIT WORK`
+- full mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
+- noplan mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
 - strategy mode: WORK Phase 없음 (STRATEGY Phase에서 strategy 서브에이전트가 작업)
 
 **Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode). noplan mode: worker가 user_prompt.txt를 직접 해석하여 작업 수행.
@@ -243,7 +243,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Details:** See [step-strategy.md](step-strategy.md)
 
-**Status update:** `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> strategy INIT STRATEGY`
+**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> strategy INIT STRATEGY`
 
 ```
 Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")
@@ -255,7 +255,7 @@ Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, requ
 
 **Details:** See [step-report.md](step-report.md)
 
-**Status update:** `python3 .claude/scripts/workflow/state/update_state.py both <registryKey> reporter WORK REPORT`
+**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> reporter WORK REPORT`
 
 ```
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
@@ -291,7 +291,7 @@ step-end <registryKey> DONE done
 |--------|-------------|
 | Phase banner Bash calls | `step-start` (start) + `step-change` (transition) + `step-end` (completion) |
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
-| State transition/registry | `python3 .claude/scripts/workflow/state/update_state.py both/status/context/register/unregister/link-session` |
+| State transition/registry | `python3 .claude/scripts/state/update_state.py both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
 | prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: reload_prompt.py가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |

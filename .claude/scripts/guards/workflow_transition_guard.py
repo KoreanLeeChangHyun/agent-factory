@@ -12,7 +12,7 @@ deny 시 exit 2 + JSON hookSpecificOutput 병행 출력
   exit 2는 stderr 피드백 경로 제공, JSON deny는 공식 차단 시그널
 
 모드별 합법 전이 테이블:
-  .claude/scripts/workflow/state/fsm-transitions.json 참조 (단일 정의 소스)
+  .claude/scripts/state/fsm-transitions.json 참조 (단일 정의 소스)
   full, strategy, prompt 3개 모드의 전이 규칙이 JSON으로 정의됨
 """
 

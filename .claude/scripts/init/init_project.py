@@ -745,9 +745,9 @@ def cmd_setup_wf_alias():
 
     # --- 현행 alias 정의 (step-start, step-change, step-end) ---
     alias_defs = [
-        ("step-start", "bash .claude/scripts/workflow/banner/step_start_banner.sh"),
-        ("step-change", "bash .claude/scripts/workflow/banner/step_change_banner.sh"),
-        ("step-end", "bash .claude/scripts/workflow/banner/step_end_banner.sh"),
+        ("step-start", "bash .claude/scripts/banner/step_start_banner.sh"),
+        ("step-change", "bash .claude/scripts/banner/step_change_banner.sh"),
+        ("step-end", "bash .claude/scripts/banner/step_end_banner.sh"),
     ]
 
     added_indices = []

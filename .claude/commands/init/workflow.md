@@ -48,7 +48,7 @@ CLAUDE.md를 읽어 프로젝트 구조와 최근 변경사항을 파악합니�
 
 ## 3. 초기화 완료 출력
 
-CLAUDE.md 로드와 workflow-orchestration 스킬 로드가 완료되면, Read 도구로 `.claude/scripts/workflow/data/help.txt`를 읽어 그 내용만 초기화 완료 메시지로 출력한다. 오케스트레이터는 이 파일의 내용 외에 어떠한 텍스트도 직접 출력하지 않는다.
+CLAUDE.md 로드와 workflow-orchestration 스킬 로드가 완료되면, Read 도구로 `.claude/scripts/data/help.txt`를 읽어 그 내용만 초기화 완료 메시지로 출력한다. 오케스트레이터는 이 파일의 내용 외에 어떠한 텍스트도 직접 출력하지 않는다.
 
 ## 4. 워크플로우 필수 준수 원칙
 

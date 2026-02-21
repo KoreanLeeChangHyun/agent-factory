@@ -49,13 +49,28 @@ from utils.env_utils import read_env
 from utils.common import resolve_project_root, load_json_file
 
 
-def _deny(reason):
-    """차단 JSON을 출력하고 종료."""
+def _deny(reason, *, status_file=None, current_phase=None):
+    """차단 JSON을 출력하고 종료.
+
+    Args:
+        reason: 차단 사유 문자열
+        status_file: status.json 파일 경로 (디버깅용)
+        current_phase: 현재 읽은 phase 값 (디버깅용)
+    """
+    debug_ctx = ""
+    if status_file or current_phase:
+        parts = []
+        if status_file:
+            parts.append(f"status_file={status_file}")
+        if current_phase:
+            parts.append(f"phase={current_phase}")
+        debug_ctx = f" [{', '.join(parts)}]"
+
     result = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
+            "permissionDecisionReason": f"{reason}{debug_ctx}",
         }
     }
     print(json.dumps(result, ensure_ascii=False))
@@ -161,6 +176,21 @@ def main():
         current_phase = status_data.get("phase", "NONE")
         workflow_mode = status_data.get("mode", "full").lower()
 
+    # 상태 전이 누락 감지: INIT phase에서 planner 외 에이전트 호출 시도 시 조기 경고
+    if current_phase == "INIT" and workflow_mode == "full":
+        agent_preview = subagent_type.strip().lower()
+        if "/" in agent_preview:
+            agent_preview = os.path.basename(agent_preview)
+        if agent_preview.endswith(".md"):
+            agent_preview = agent_preview[:-3]
+        if agent_preview != "init" and agent_preview not in ALLOWED_AGENTS_FULL.get("INIT", []):
+            print(
+                f"[workflow_agent_guard] WARNING: 상태 전이 누락 의심 - "
+                f"status_file={status_file}, current_phase={current_phase}, "
+                f"workflow_mode={workflow_mode}, requested_agent={agent_preview}",
+                file=sys.stderr,
+            )
+
     # 에이전트 이름 정규화
     agent = subagent_type.strip().lower()
     if "/" in agent:
@@ -178,11 +208,27 @@ def main():
 
     if agent not in allowed:
         allowed_desc = ", ".join(allowed) if allowed else "없음 (종료 상태)"
+        hint = ""
+        if current_phase == "INIT" and agent == "worker":
+            hint = (
+                " | 힌트: update_state.py both <registryKey> worker PLAN WORK 으로 "
+                "상태 전이를 먼저 수행하세요"
+            )
+        elif current_phase in ("FAILED", "STALE", "CANCELLED"):
+            hint = " | 힌트: 워크플로우가 종료 상태입니다. 새 워크플로우를 시작하세요"
         reason = (
             f"불법 에이전트 호출: {current_phase} phase에서 {agent} 에이전트를 호출할 수 없습니다. "
             f"(mode: {workflow_mode}) 허용: {allowed_desc}"
+            f" | work_dir: {work_dir}{hint}"
         )
-        _deny(reason)
+        # stderr에 디버깅 정보 출력
+        print(
+            f"[workflow_agent_guard] DENIED: status_file={status_file}, "
+            f"current_phase={current_phase}, workflow_mode={workflow_mode}, "
+            f"agent={agent}, allowed={allowed}",
+            file=sys.stderr,
+        )
+        _deny(reason, status_file=status_file, current_phase=current_phase)
 
     # 허용된 호출 -> 통과
     sys.exit(0)

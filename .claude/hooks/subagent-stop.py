@@ -57,14 +57,6 @@ def main():
         flags=flags,
     )
 
-    # completion-notify (async)
-    dispatch_async(
-        'HOOK_COMPLETION_NOTIFY',
-        scripts_dir('workflow', 'hooks', 'completion_notify.py'),
-        stdin_data,
-        flags=flags,
-    )
-
     # history-sync-trigger (async, inline logic)
     _history_sync_trigger(stdin_data, flags)
 

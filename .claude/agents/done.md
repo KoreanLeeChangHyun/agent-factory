@@ -36,9 +36,9 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 ### 이 에이전트의 전담 행위
 
 - history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
-- status.json 완료 처리 (`python3 .claude/scripts/workflow/state/update_state.py status`)
-- 사용량 확정 (`python3 .claude/scripts/workflow/state/update_state.py usage-finalize`)
-- 레지스트리 해제 (`python3 .claude/scripts/workflow/state/update_state.py unregister`)
+- status.json 완료 처리 (`python3 .claude/scripts/state/update_state.py status`)
+- 사용량 확정 (`python3 .claude/scripts/state/update_state.py usage-finalize`)
+- 레지스트리 해제 (`python3 .claude/scripts/state/update_state.py unregister`)
 - 워크플로우 아카이빙 (최신 10개 유지, .history 이동, history.md 링크 갱신)
 
 ### 오케스트레이터가 대신 수행하는 행위
@@ -68,11 +68,11 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 ## 절차
 
-1. **history.md 최종 확인 갱신** - `python3 .claude/scripts/workflow/sync/history_sync.py sync` 실행으로 `.prompt/history.md` 최종 상태 확인 및 갱신 (phase 전이 시 자동 갱신의 안전망 역할)
-2. **status.json 완료 처리** - `python3 .claude/scripts/workflow/state/update_state.py status <registryKey> REPORT COMPLETED|FAILED` 실행
-3. **사용량 확정** - 성공 시 `python3 .claude/scripts/workflow/state/update_state.py usage-finalize <registryKey>` 실행 (실패 시 비차단)
-4. **레지스트리 해제** - `python3 .claude/scripts/workflow/state/update_state.py unregister <registryKey>` 실행
-5. **워크플로우 아카이빙** - `python3 .claude/scripts/workflow/sync/archive_workflow.py <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history_sync.py sync`가 자동 처리)
+1. **history.md 최종 확인 갱신** - `python3 .claude/scripts/sync/history_sync.py sync` 실행으로 `.prompt/history.md` 최종 상태 확인 및 갱신 (phase 전이 시 자동 갱신의 안전망 역할)
+2. **status.json 완료 처리** - `python3 .claude/scripts/state/update_state.py status <registryKey> REPORT COMPLETED|FAILED` 실행
+3. **사용량 확정** - 성공 시 `python3 .claude/scripts/state/update_state.py usage-finalize <registryKey>` 실행 (실패 시 비차단)
+4. **레지스트리 해제** - `python3 .claude/scripts/state/update_state.py unregister <registryKey>` 실행
+5. **워크플로우 아카이빙** - `python3 .claude/scripts/sync/history_archive_sync.py <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history_sync.py sync`가 자동 처리)
 
 > 상세 절차 (history.md 행 형식, 링크 구성, update_state.py 호출 규약)는 `workflow-done/SKILL.md`를 참조하세요.
 

@@ -8,7 +8,7 @@ description: ".workflow/* 작업 내역을 .prompt/history.md에 동기화합니
 
 ## 스크립트
 
-`.claude/scripts/workflow/sync/history_sync.py` - 서브커맨드: sync, status
+`.claude/scripts/sync/history_sync.py` - 서브커맨드: sync, status
 
 ## 오케스트레이션 흐름
 
@@ -17,7 +17,7 @@ description: ".workflow/* 작업 내역을 .prompt/history.md에 동기화합니
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/workflow/sync/history_sync.py status
+python3 .claude/scripts/sync/history_sync.py status
 ```
 
 `.workflow/` 디렉토리 수, history.md 행 수, 누락 수를 요약 출력합니다.
@@ -28,7 +28,7 @@ python3 .claude/scripts/workflow/sync/history_sync.py status
 누락 항목이 있으면 변경 예정 사항을 먼저 확인합니다:
 
 ```bash
-python3 .claude/scripts/workflow/sync/history_sync.py sync --dry-run
+python3 .claude/scripts/sync/history_sync.py sync --dry-run
 ```
 
 신규 추가 건수와 상태 업데이트 건수를 미리 출력합니다.
@@ -38,7 +38,7 @@ python3 .claude/scripts/workflow/sync/history_sync.py sync --dry-run
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/workflow/sync/history_sync.py sync
+python3 .claude/scripts/sync/history_sync.py sync
 ```
 
 누락 항목을 추가하고 상태 변경 항목을 업데이트합니다.
@@ -65,10 +65,10 @@ python3 .claude/scripts/workflow/sync/history_sync.py sync
 
 ```bash
 # status만 실행
-python3 .claude/scripts/workflow/sync/history_sync.py status
+python3 .claude/scripts/sync/history_sync.py status
 
 # 옵션과 함께 sync 실행
-python3 .claude/scripts/workflow/sync/history_sync.py sync $ARGUMENTS
+python3 .claude/scripts/sync/history_sync.py sync $ARGUMENTS
 ```
 
 ---

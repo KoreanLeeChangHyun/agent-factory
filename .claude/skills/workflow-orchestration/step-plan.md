@@ -31,7 +31,7 @@
 
 > **State Update** before PLAN start:
 > ```bash
-> python3 .claude/scripts/workflow/state/update_state.py both <registryKey> planner INIT PLAN
+> python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN
 > ```
 
 **Detailed Guide:** workflow-plan skill 참조
@@ -94,7 +94,7 @@ workDir: <workDir>
 
 **Update Method (agent field, 1 Tool Call):**
 ```bash
-Bash("python3 .claude/scripts/workflow/state/update_state.py context <registryKey> <agent>")
+Bash("python3 .claude/scripts/state/update_state.py context <registryKey> <agent>")
 ```
 
 > **Note:**
@@ -223,9 +223,9 @@ AskUserQuestion(
 **Update Method (2 Tool Calls, sequential):**
 ```bash
 # 1. CANCELLED 상태로 전이
-Bash("python3 .claude/scripts/workflow/state/update_state.py status <registryKey> PLAN CANCELLED")
+Bash("python3 .claude/scripts/state/update_state.py status <registryKey> PLAN CANCELLED")
 # 2. 레지스트리에서 해제 (MUST: 누락 시 잔류 엔트리 발생)
-Bash("python3 .claude/scripts/workflow/state/update_state.py unregister <registryKey>")
+Bash("python3 .claude/scripts/state/update_state.py unregister <registryKey>")
 ```
 
 > **REQUIRED:** `unregister` 호출을 생략하면 CANCELLED 상태의 엔트리가 레지스트리에 잔류합니다. status 전이와 unregister는 반드시 순차 실행하세요.

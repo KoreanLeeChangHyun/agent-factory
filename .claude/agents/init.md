@@ -40,7 +40,7 @@ maxTurns: 15
 
 - INIT Phase 배너 호출 (`step-start INIT none <command>`)
 - INIT 완료 후 모드 분기 판단 및 다음 Phase로 전이
-- `python3 .claude/scripts/workflow/state/update_state.py` 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
+- `python3 .claude/scripts/state/update_state.py` 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
 
 ## 스킬 바인딩
 

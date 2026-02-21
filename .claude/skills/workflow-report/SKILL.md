@@ -49,7 +49,7 @@ license: "Apache-2.0"
 오케스트레이터는 reporter 에이전트를 호출하기 전에 로컬 `<workDir>/.context.json`의 `agent` 필드를 `"reporter"`로 업데이트합니다.
 
 ```bash
-python3 .claude/scripts/workflow/state/update_state.py context <registryKey> reporter
+python3 .claude/scripts/state/update_state.py context <registryKey> reporter
 ```
 
 ### reporter 에이전트 호출 시그니처

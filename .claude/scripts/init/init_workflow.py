@@ -227,7 +227,7 @@ def main():
     if active_count > keep_count:
         print(f"[init] Active directories ({active_count}) exceed KEEP_COUNT ({keep_count}), triggering archive...",
               file=sys.stderr)
-        archive_script = os.path.join(_SCRIPT_DIR, "..", "workflow", "archive_workflow.py")
+        archive_script = os.path.join(_SCRIPT_DIR, "..", "workflow", "history_archive_sync.py")
         if os.path.isfile(archive_script):
             try:
                 subprocess.run(

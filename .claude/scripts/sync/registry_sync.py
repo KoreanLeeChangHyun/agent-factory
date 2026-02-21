@@ -1,13 +1,13 @@
 #!/usr/bin/env -S python3 -u
 """
-registry.py - 워크플로우 레지스트리 관리 CLI (registry.sh -> registry.py 1:1 포팅)
+registry_sync.py - 워크플로우 레지스트리 관리 CLI (registry.sh -> registry_sync.py 1:1 포팅)
 
 사용법:
-  python3 .claude/scripts/workflow/sync/registry.py list                    # 모든 엔트리 컬러 테이블 출력
-  python3 .claude/scripts/workflow/sync/registry.py clean                   # 정리 대상 엔트리 제거
-  python3 .claude/scripts/workflow/sync/registry.py clean --dry-run         # 정리 대상 미리보기만
-  python3 .claude/scripts/workflow/sync/registry.py clean --force           # 전체 registry 초기화 ({})
-  python3 .claude/scripts/workflow/sync/registry.py remove <key>            # 특정 키 단건 제거
+  python3 .claude/scripts/sync/registry_sync.py list                    # 모든 엔트리 컬러 테이블 출력
+  python3 .claude/scripts/sync/registry_sync.py clean                   # 정리 대상 엔트리 제거
+  python3 .claude/scripts/sync/registry_sync.py clean --dry-run         # 정리 대상 미리보기만
+  python3 .claude/scripts/sync/registry_sync.py clean --force           # 전체 registry 초기화 ({})
+  python3 .claude/scripts/sync/registry_sync.py remove <key>            # 특정 키 단건 제거
 
 종료 코드: 0 성공, 1 실패
 """
@@ -20,7 +20,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 
 # utils 패키지 import
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
@@ -54,7 +54,7 @@ def check_registry():
 
 def cmd_help():
     """도움말 출력."""
-    print(f"{C_BOLD}registry.py{C_RESET} - 워크플로우 레지스트리 관리")
+    print(f"{C_BOLD}registry_sync.py{C_RESET} - 워크플로우 레지스트리 관리")
     print()
     print(f"  {C_CYAN}list{C_RESET}                  모든 엔트리 조회 (컬러 테이블)")
     print(f"  {C_CYAN}clean{C_RESET}                 정리 대상 엔트리 제거")
@@ -221,7 +221,7 @@ def cmd_clean(args):
     print()
 
     if dry_run:
-        print(f"  {C_DIM}실제 삭제하려면: python3 .claude/scripts/workflow/sync/registry.py clean{C_RESET}")
+        print(f"  {C_DIM}실제 삭제하려면: python3 .claude/scripts/sync/registry_sync.py clean{C_RESET}")
         print(flush=True)
         sys.exit(0)
 
@@ -241,7 +241,7 @@ def cmd_clean(args):
 def cmd_remove(args):
     """특정 키 단건 제거."""
     if not args or not args[0]:
-        print(f"{C_RED}[ERROR] 사용법: python3 .claude/scripts/workflow/sync/registry.py remove <YYYYMMDD-HHMMSS>{C_RESET}")
+        print(f"{C_RED}[ERROR] 사용법: python3 .claude/scripts/sync/registry_sync.py remove <YYYYMMDD-HHMMSS>{C_RESET}")
         sys.exit(1)
 
     target_key = args[0]
@@ -289,7 +289,7 @@ def main():
         cmd_help()
     else:
         print(f"{C_RED}[ERROR] 알 수 없는 서브커맨드: {subcmd}{C_RESET}")
-        print(f"{C_DIM}사용법: python3 .claude/scripts/workflow/sync/registry.py list | clean [--dry-run|--force] | remove <key> | help{C_RESET}")
+        print(f"{C_DIM}사용법: python3 .claude/scripts/sync/registry_sync.py list | clean [--dry-run|--force] | remove <key> | help{C_RESET}")
         sys.exit(1)
 
 

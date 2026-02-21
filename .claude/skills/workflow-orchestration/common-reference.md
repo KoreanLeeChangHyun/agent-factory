@@ -192,7 +192,7 @@ workName: <작업이름>
 
 ## State Update Methods
 
-`python3 .claude/scripts/workflow/state/update_state.py <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
+`python3 .claude/scripts/state/update_state.py <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
 
 | Mode | Arguments | Description |
 |------|-----------|-------------|
@@ -252,4 +252,4 @@ workName: <작업이름>
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
 | update_state.py deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청 |
-| Workflow cancel/abort (중단/취소) | 반드시 `python3 .claude/scripts/workflow/state/update_state.py unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |
+| Workflow cancel/abort (중단/취소) | 반드시 `python3 .claude/scripts/state/update_state.py unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |

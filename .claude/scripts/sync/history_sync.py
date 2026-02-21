@@ -6,8 +6,8 @@
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
-    python3 .claude/scripts/workflow/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
-    python3 .claude/scripts/workflow/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
+    python3 .claude/scripts/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
+    python3 .claude/scripts/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
 """
 
 import argparse
@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 # utils 패키지 import
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 

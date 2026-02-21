@@ -11,7 +11,7 @@
 
 > **State Update** before STRATEGY start:
 > ```bash
-> python3 .claude/scripts/workflow/state/update_state.py both <registryKey> strategy INIT STRATEGY
+> python3 .claude/scripts/state/update_state.py both <registryKey> strategy INIT STRATEGY
 > ```
 
 ## STRATEGY Banner
@@ -80,8 +80,8 @@ while retry_count < MAX_RETRIES:
     log("[WARN] STRATEGY 실패 (시도 {retry_count}/{MAX_RETRIES})")
 
 if retry_count >= MAX_RETRIES:
-    python3 .claude/scripts/workflow/state/update_state.py status <registryKey> STRATEGY FAILED
-    python3 .claude/scripts/workflow/state/update_state.py unregister <registryKey>
+    python3 .claude/scripts/state/update_state.py status <registryKey> STRATEGY FAILED
+    python3 .claude/scripts/state/update_state.py unregister <registryKey>
     # 워크플로우 종료 (DONE 단계 스킵)
 ```
 

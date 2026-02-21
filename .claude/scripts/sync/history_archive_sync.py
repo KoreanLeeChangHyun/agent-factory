@@ -1,10 +1,10 @@
 #!/usr/bin/env -S python3 -u
 """
 오래된 워크플로우 디렉토리를 .workflow/.history/로 아카이브
-(archive-workflow.sh -> archive_workflow.py 1:1 포팅)
+(archive-workflow.sh -> history_archive_sync.py 1:1 포팅)
 
 사용법:
-  archive_workflow.py <registryKey>
+  history_archive_sync.py <registryKey>
 
 동작:
   1. .workflow/ 내 [0-9]* 패턴 디렉토리를 역순 정렬하여 수집
@@ -18,7 +18,7 @@ import shutil
 import sys
 
 # utils 패키지 import
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
@@ -39,7 +39,7 @@ KEEP_COUNT = 10
 
 def main():
     if len(sys.argv) < 2:
-        print(f"{C_RED}[ERROR]{C_RESET} 사용법: archive_workflow.py <registryKey>", file=sys.stderr)
+        print(f"{C_RED}[ERROR]{C_RESET} 사용법: history_archive_sync.py <registryKey>", file=sys.stderr)
         sys.exit(1)
 
     current_key = sys.argv[1]

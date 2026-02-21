@@ -18,7 +18,7 @@ disable-model-invocation: true
 
 ## 스크립트
 
-`.claude/scripts/workflow/sync/sync_code.py` - 옵션: `[--dry-run | -h | --help]`
+`.claude/scripts/sync/code_sync.py` - 옵션: `[--dry-run | -h | --help]`
 
 ## 오케스트레이션 흐름
 
@@ -29,7 +29,7 @@ disable-model-invocation: true
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/workflow/sync/sync_code.py $ARGUMENTS
+python3 .claude/scripts/sync/code_sync.py $ARGUMENTS
 ```
 
 ### Step 2. 결과 출력
