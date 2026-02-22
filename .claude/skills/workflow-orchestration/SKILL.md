@@ -135,6 +135,13 @@ step-end <registryKey> <phase>
 > - **잘못된 호출**: `bash .claude/scripts/banner/step_start_banner.sh step-start 20260219-051347 PLAN` (step-start가 첫 번째 인자로 전달되어 파싱 오류 발생)
 > - **잘못된 호출**: `bash .claude/scripts/banner/step_start_banner.sh 20260219-051347 PLAN` (alias 대신 직접 스크립트 경로 호출 금지)
 
+> **Banner Call Isolation Rule**: `step-start`, `step-change`, `step-end` 각 배너 명령은 반드시 **개별 Bash 도구 호출**로 실행해야 한다. `&&` 또는 `;`로 여러 배너 명령을 단일 Bash 호출에 체이닝하는 것을 **금지**한다. `update_state.py` 호출과 배너 명령의 체이닝도 동일하게 금지한다.
+> - **올바른 호출** (각각 개별 Bash 도구 호출):
+>   1. `step-change 20260219-051347 INIT PLAN` ← 개별 Bash 호출
+>   2. `step-start 20260219-051347 PLAN` ← 개별 Bash 호출
+> - **잘못된 호출**: `step-change 20260219-051347 INIT PLAN && step-start 20260219-051347 PLAN` (단일 Bash 호출에 `&&` 체이닝 금지)
+> - **잘못된 호출**: `python3 .claude/scripts/state/update_state.py both 20260219-051347 planner INIT PLAN && step-change 20260219-051347 INIT PLAN` (`update_state.py`와 배너 명령 체이닝 금지)
+
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
 
 **Call Timing:**
@@ -155,6 +162,8 @@ step-end <registryKey> <phase>
 3. `step-start <key> <PHASE>` — 시작 배너
 4. (에이전트 작업 수행)
 5. `step-end <key> <PHASE>` — 완료 메시지
+
+> 위 1~5 각 항목은 **개별 Bash 도구 호출**로 실행한다. 단일 Bash 호출에 합치지 않는다.
 
 > **INIT 예외:** INIT는 `update_state.py both` 호출 없이 `step-start → init 에이전트 → step-end`만 수행한다. `step-change`도 호출하지 않는다. 상태 전환(`INIT->PLAN` 또는 `INIT->WORK`)은 step-end 이후 Mode Branching에서 후속 phase의 update_state.py both + step-change가 처리한다. INIT 단계에서 `update_state.py both`를 호출하면 `INIT->INIT` FSM 에러가 발생한다.
 

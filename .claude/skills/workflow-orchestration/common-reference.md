@@ -113,7 +113,7 @@ flowchart TD
 | Action | 주체 | 근거 |
 |--------|------|------|
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
-| step-start/step-change/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. step-change가 상태 전이 시각화를 전담 |
+| step-start/step-change/step-end 배너 (Phase banner Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. step-change가 상태 전이 시각화를 전담. 각 명령은 개별 Bash 호출로 실행 (체이닝 금지) |
 | update_state.py 호출 (transition/registry) | Main + Sub (모드별) | Phase 전이(status)와 레지스트리(register/unregister)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용) | **Main** | 최소 5개 필드(taskId, phase, dependencies, parallelism, agentType)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
@@ -206,7 +206,7 @@ workName: <작업이름>
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, STRATEGY=`strategy`, REPORT=`reporter`, DONE=`done`
 
-> **Note:** 상태 전이 시각화는 `step-change` 배너가 전담한다. `update_state.py` 호출 후 `step-change <key> <fromPhase> <toPhase>`를 실행하면 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다. 그 후 `step-start`를 호출하여 시작 배너를 출력한다. (INIT, WORK-PHASE에서는 step-change 스킵)
+> **Note:** 상태 전이 시각화는 `step-change` 배너가 전담한다. `update_state.py` 호출 후 `step-change <key> <fromPhase> <toPhase>`를 실행하면 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다. 그 후 `step-start`를 호출하여 시작 배너를 출력한다. (INIT, WORK-PHASE에서는 step-change 스킵) 각각 개별 Bash 도구 호출로 실행한다. `&&`/`;` 체이닝 금지.
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |
