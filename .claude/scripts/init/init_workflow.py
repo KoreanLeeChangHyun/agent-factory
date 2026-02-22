@@ -197,7 +197,7 @@ def main():
     _atomic_write_json(os.path.join(abs_work_dir, "status.json"), status_data)
 
     # --- Step 8: 좀비 정리 ---
-    cleanup_script = os.path.join(_SCRIPT_DIR, "cleanup_zombie.py")
+    cleanup_script = os.path.join(_SCRIPT_DIR, "..", "state", "cleanup_zombie.py")
     if os.path.isfile(cleanup_script):
         try:
             subprocess.run(

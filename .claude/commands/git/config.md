@@ -16,7 +16,7 @@ argument-hint: "[--global | --local]"
 
 ## 스크립트
 
-`.claude/scripts/init/git_config.py` - 옵션: `[--global|--local]`
+`.claude/scripts/utils/git_config.py` - 옵션: `[--global|--local]`
 
 ## 오케스트레이션 흐름
 
@@ -27,13 +27,13 @@ argument-hint: "[--global | --local]"
 $ARGUMENTS에 따라 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/init/git_config.py $ARGUMENTS
+python3 .claude/scripts/utils/git_config.py $ARGUMENTS
 ```
 
 $ARGUMENTS가 없으면 기본값 `--global` 적용:
 
 ```bash
-python3 .claude/scripts/init/git_config.py --global
+python3 .claude/scripts/utils/git_config.py --global
 ```
 
 ### Step 2. 결과 출력

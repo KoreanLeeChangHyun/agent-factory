@@ -52,6 +52,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 .claude/scripts/                        # 실제 로직 스크립트
 ├── utils/                              # 공통 유틸리티
 │   ├── env_utils.py                    # 환경변수 파싱
+│   ├── git_config.py                   # Git config 유틸리티
 │   ├── slack_common.py                 # Slack 공통 함수
 │   └── resolve-workflow.py             # 워크플로우 경로 해석
 ├── guards/                             # 가드 스크립트
@@ -60,16 +61,14 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── workflow_transition_guard.py
 │   ├── workflow_agent_guard.py
 │   └── auto_continue_guard.py
-├── init/                               # 초기화/설정 스크립트 (alias 호출)
+├── init/                               # 초기화 스크립트
 │   ├── init_workflow.py
 │   ├── init_claude.py
-│   ├── init_project.py
-│   ├── git_config.py
-│   ├── reload_prompt.py
-│   └── cleanup_zombie.py
+│   └── init_project.py
 ├── workflow/                           # 워크플로우 런타임 유틸리티
 │   ├── state/                         # 상태 관리
 │   │   ├── update_state.py
+│   │   ├── cleanup_zombie.py
 │   │   └── fsm-transitions.json
 │   ├── banner/                        # 배너 출력
 │   │   ├── step_start_banner.sh
@@ -78,6 +77,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 │   ├── sync/                          # 동기화 및 레지스트리
 │   │   ├── code_sync.py
 │   │   ├── history_sync.py
+│   │   ├── reload_prompt.py
 │   │   ├── registry_sync.py
 │   │   └── usage_sync.py
 │   └── data/                          # 정적 데이터
@@ -288,7 +288,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | `.claude/scripts/init/init_claude.py` | `/init:claude` | 사용자 환경 초기화 |
 | `.claude/scripts/init/init_project.py` | `/init:project` | 프로젝트 설정 |
 | `.claude/scripts/sync/code_sync.py` | `/sync:code` | 설정 동기화 |
-| `.claude/scripts/init/git_config.py` | `/git:config` | Git 설정 |
+| `.claude/scripts/utils/git_config.py` | `/git:config` | Git 설정 |
 
 ### 워크플로우 유틸리티
 

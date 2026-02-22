@@ -177,7 +177,7 @@ AskUserQuestion(
 >
 > ```bash
 > # 오케스트레이터 실행 코드
-> feedback=$(Bash("python3 .claude/scripts/init/reload_prompt.py <workDir>"))
+> feedback=$(Bash("python3 .claude/scripts/sync/reload_prompt.py <workDir>"))
 > ```
 >
 > - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행

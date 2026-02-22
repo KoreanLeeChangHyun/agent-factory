@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # colors.sh - Shell 배너 스크립트 공통 ANSI 색상 변수 및 유틸리티
+# 이 파일은 Shell 배너 스크립트용입니다. Python 코드에서는 data.colors를 import하세요.
 #
 # 사용법:
 #   source "$SCRIPT_DIR/../data/colors.sh"

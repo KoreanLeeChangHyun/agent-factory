@@ -322,7 +322,7 @@ step-end <registryKey> DONE done
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
 | State transition/registry | `python3 .claude/scripts/state/update_state.py both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
-| prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: reload_prompt.py가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
+| prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: `.claude/scripts/sync/reload_prompt.py`가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
 
 ### Sub-agent-Only Actions
@@ -346,7 +346,7 @@ step-end <registryKey> DONE done
 | Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
 | Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
 | **내부 추론/분석/사고 과정 텍스트 출력** | Terminal Output Protocol 위반: 사용자는 phase 결과만 필요. plan.md 분석 결과, 진행 상황 설명, 판단 근거, 에이전트 호출 전 설명("플래너를 호출하겠습니다" 류) 등 모든 내부 사고 과정의 텍스트 출력 금지. 컨텍스트 낭비 및 터미널 오염 원인 |
-| 승인/중지 후 .prompt/prompt.txt 읽기 | "수정 요청" 외 분기에서 prompt.txt를 읽으면 다른 워크플로우 질의와 충돌 발생. prompt.txt 접근은 INIT(init agent)과 수정 요청(reload_prompt.py)으로 한정 |
+| 승인/중지 후 .prompt/prompt.txt 읽기 | "수정 요청" 외 분기에서 prompt.txt를 읽으면 다른 워크플로우 질의와 충돌 발생. prompt.txt 접근은 INIT(init agent)과 수정 요청(`.claude/scripts/sync/reload_prompt.py`)으로 한정 |
 | 다른 워크플로우 산출물 읽기 | 현재 워크플로우(`<workDir>`) 외부의 `.workflow/` 파일(다른 워크플로우의 plan.md, report.md, work/*.md 등)을 Read하면 컨텍스트 오염 및 토큰 낭비 발생. 오케스트레이터가 읽을 수 있는 파일은 현재 워크플로우의 workDir 내부로 한정 |
 
 ### Orchestrator Allowed Reads

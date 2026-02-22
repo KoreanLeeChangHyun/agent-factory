@@ -23,6 +23,25 @@ if _scripts_dir not in sys.path:
 
 from utils.env_utils import read_env
 
+# 가드 패턴 로드 (보안 우선: import 실패 시 보수적 폴백)
+try:
+    from data.guard_patterns import (
+        READONLY_PATTERNS,
+        MODIFY_PATTERNS,
+        PROTECTED_PATH_PATTERNS,
+        INLINE_WRITE_PATTERNS,
+    )
+    PROTECTED_PATH_RES = [re.compile(p) for p in PROTECTED_PATH_PATTERNS]
+except ImportError:
+    print(
+        "[hooks_self_guard] CRITICAL: data.guard_patterns import 실패 - 보안 폴백 적용",
+        file=sys.stderr,
+    )
+    READONLY_PATTERNS = []  # 빈 읽기전용 -> 모든 명령이 수정으로 분류됨
+    MODIFY_PATTERNS = [r"."]  # 모든 것을 수정 패턴으로 매칭
+    PROTECTED_PATH_RES = [re.compile(r"\.claude/hooks/"), re.compile(r"\.workflow/bypass")]
+    INLINE_WRITE_PATTERNS = [r"."]  # 모든 것을 인라인 쓰기로 매칭
+
 
 def _deny(reason):
     """차단 JSON을 출력하고 종료."""
@@ -35,42 +54,6 @@ def _deny(reason):
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _load_guard_patterns():
-    """data/guard_patterns.json에서 패턴을 로드.
-
-    보안 우선: 로드 실패 시 모든 수정 명령을 차단하는 보수적 폴백 적용.
-
-    Returns:
-        tuple: (readonly_patterns, modify_patterns, protected_path_res, inline_write_patterns)
-    """
-    data_file = os.path.join(_scripts_dir, "data", "guard_patterns.json")
-    try:
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        readonly = data.get("readonly_patterns", [])
-        modify = data.get("modify_patterns", [])
-        protected = [re.compile(p) for p in data.get("protected_path_patterns", [])]
-        inline_write = data.get("inline_write_patterns", [])
-        return readonly, modify, protected, inline_write
-    except (json.JSONDecodeError, IOError, OSError, KeyError, TypeError, re.error):
-        # 보안 우선: 로드 실패 시 보호 경로만 설정하고 모든 명령을 수정으로 분류
-        print(
-            f"[hooks_self_guard] CRITICAL: guard_patterns.json 로드 실패 - 보안 폴백 적용",
-            file=sys.stderr,
-        )
-        return (
-            [],  # 빈 읽기전용 -> 모든 명령이 수정으로 분류됨
-            [r"."],  # 모든 것을 수정 패턴으로 매칭
-            [re.compile(r"\.claude/hooks/"), re.compile(r"\.workflow/bypass")],
-            [r"."],  # 모든 것을 인라인 쓰기로 매칭
-        )
-
-
-# 모듈 레벨에서 한 번만 로드
-READONLY_PATTERNS, MODIFY_PATTERNS, PROTECTED_PATH_RES, INLINE_WRITE_PATTERNS = _load_guard_patterns()
 
 
 def _refs_protected(text):

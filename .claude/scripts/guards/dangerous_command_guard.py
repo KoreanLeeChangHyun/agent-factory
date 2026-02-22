@@ -20,6 +20,28 @@ if _scripts_dir not in sys.path:
 
 from utils.env_utils import read_env
 
+# 위험 명령어 패턴 로드 (보안 우선: import 실패 시 전체 차단 폴백)
+try:
+    from data.danger_patterns import WHITELIST, DANGER_PATTERNS
+    WHITELIST_PATTERNS = [(item["pattern"], None) for item in WHITELIST]
+    DANGER_PATTERN_LIST = [
+        (item["pattern"], item["blocked"], item["alternative"])
+        for item in DANGER_PATTERNS
+    ]
+except ImportError:
+    print(
+        "[dangerous_command_guard] CRITICAL: data.danger_patterns import 실패 - 보안 폴백 적용",
+        file=sys.stderr,
+    )
+    WHITELIST_PATTERNS = []
+    DANGER_PATTERN_LIST = [
+        (
+            r".",
+            "위험 패턴 데이터 로드 실패 (보안 폴백)",
+            "시스템 관리자에게 data/danger_patterns.py 파일 상태를 확인 요청하세요.",
+        )
+    ]
+
 
 def _deny(blocked, alternative):
     """차단 JSON을 출력하고 종료."""
@@ -33,46 +55,6 @@ def _deny(blocked, alternative):
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _load_patterns():
-    """data/danger_patterns.json에서 패턴을 로드.
-
-    보안 우선: 로드 실패 시 모든 명령을 차단하는 폴백 패턴 반환.
-
-    Returns:
-        tuple: (whitelist_patterns, danger_patterns)
-            whitelist_patterns: [(pattern, None), ...]
-            danger_patterns: [(pattern, blocked, alternative), ...]
-    """
-    data_file = os.path.join(_scripts_dir, "data", "danger_patterns.json")
-    try:
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        whitelist = [(item["pattern"], None) for item in data.get("whitelist", [])]
-        danger = [
-            (item["pattern"], item["blocked"], item["alternative"])
-            for item in data.get("danger", [])
-        ]
-        return whitelist, danger
-    except (json.JSONDecodeError, IOError, OSError, KeyError, TypeError):
-        # 보안 우선: 로드 실패 시 빈 화이트리스트 + 전체 차단 폴백
-        print(
-            f"[dangerous_command_guard] CRITICAL: danger_patterns.json 로드 실패 - 보안 폴백 적용",
-            file=sys.stderr,
-        )
-        return [], [
-            (
-                r".",
-                "위험 패턴 데이터 로드 실패 (보안 폴백)",
-                "시스템 관리자에게 data/danger_patterns.json 파일 상태를 확인 요청하세요.",
-            )
-        ]
-
-
-# 모듈 레벨에서 한 번만 로드
-WHITELIST_PATTERNS, DANGER_PATTERNS = _load_patterns()
 
 
 def main():
@@ -106,7 +88,7 @@ def main():
             sys.exit(0)
 
     # 위험 패턴 검사
-    for pattern, blocked, alternative in DANGER_PATTERNS:
+    for pattern, blocked, alternative in DANGER_PATTERN_LIST:
         if re.search(pattern, command):
             _deny(blocked, alternative)
 

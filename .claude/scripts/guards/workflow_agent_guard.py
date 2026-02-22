@@ -77,37 +77,20 @@ def _deny(reason, *, status_file=None, current_phase=None):
     sys.exit(0)
 
 
-def _load_agent_permissions():
-    """data/agent_permissions.json에서 모드별 에이전트 권한 맵을 로드.
-
-    보안 우선: 로드 실패 시 모든 에이전트를 차단하는 빈 맵 반환.
-
-    Returns:
-        dict: {mode: {phase: [agents]}} 형태의 MODE_AGENTS_MAP
-    """
-    data_file = os.path.join(_scripts_dir, "data", "agent_permissions.json")
-    try:
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if not isinstance(data, dict):
-            raise ValueError("agent_permissions.json root must be dict")
-        return data
-    except (json.JSONDecodeError, IOError, OSError, ValueError, TypeError):
-        # 보안 우선: 로드 실패 시 모든 에이전트 차단 (빈 허용 목록)
-        print(
-            f"[workflow_agent_guard] CRITICAL: agent_permissions.json 로드 실패 - 보안 폴백 적용",
-            file=sys.stderr,
-        )
-        empty_phases = {
-            "NONE": [], "INIT": [], "PLAN": [], "WORK": [],
-            "REPORT": [], "COMPLETED": [], "FAILED": [], "STALE": [], "CANCELLED": [],
-        }
-        return {"full": empty_phases, "strategy": empty_phases, "noplan": empty_phases}
-
-
-# 모듈 레벨에서 한 번만 로드
-MODE_AGENTS_MAP = _load_agent_permissions()
+# 에이전트 권한 맵 로드 (보안 우선: import 실패 시 전체 차단 폴백)
+try:
+    from data.agent_permissions import AGENT_PERMISSIONS
+    MODE_AGENTS_MAP = AGENT_PERMISSIONS
+except ImportError:
+    print(
+        "[workflow_agent_guard] CRITICAL: data.agent_permissions import 실패 - 보안 폴백 적용",
+        file=sys.stderr,
+    )
+    _empty_phases = {
+        "NONE": [], "INIT": [], "PLAN": [], "WORK": [],
+        "REPORT": [], "COMPLETED": [], "FAILED": [], "STALE": [], "CANCELLED": [],
+    }
+    MODE_AGENTS_MAP = {"full": _empty_phases, "strategy": _empty_phases, "noplan": _empty_phases}
 
 
 def main():

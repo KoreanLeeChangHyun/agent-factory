@@ -43,33 +43,10 @@ except ImportError:
 from data.constants import STALE_TTL_SECONDS, KEEP_COUNT
 
 # ============================================================
-# 상수 (phase_status_map.json에서 로드)
+# 상수 (Phase-상태 매핑)
 # ============================================================
 
-def _load_phase_status_map():
-    """data/phase_status_map.json에서 HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP을 로드."""
-    json_path = os.path.join(_scripts_dir, "data", "phase_status_map.json")
-    try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return (
-            data["header_line"],
-            data["separator_line"],
-            data["phase_status_map"],
-        )
-    except (IOError, json.JSONDecodeError, KeyError):
-        # 폴백: 하드코딩 기본값
-        return (
-            "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 계획서 | 질의 | 이미지 | 보고서 |",
-            "|------|--------|------------|--------|------|--------|------|--------|--------|",
-            {
-                "COMPLETED": "완료", "REPORT": "진행중", "STALE": "중단",
-                "WORK": "진행중", "PLAN": "진행중", "INIT": "진행중",
-                "CANCELLED": "중단", "FAILED": "실패", "UNKNOWN": "불명", "NONE": "불명",
-            },
-        )
-
-HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP = _load_phase_status_map()
+from data.phase_status_map import HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 
