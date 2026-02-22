@@ -50,7 +50,7 @@ if [[ "$PHASE" == "WORK-PHASE" ]]; then
     if [[ "$WP_MODE" != "parallel" && "$WP_MODE" != "sequential" ]]; then
         WP_MODE="sequential"
     fi
-    echo -e "    ${C_GREEN}►${C_RESET} ${C_BOLD}Phase ${WP_NUM}${C_RESET}  ${C_DIM}${WP_TASKS}${C_RESET}  ${C_GRAY}${WP_MODE}${C_RESET}"
+    echo -e "    ${C_GREEN}►${C_RESET} ${C_GREEN}${C_BOLD}Phase ${WP_NUM}${C_RESET}  ${C_DIM}${WP_TASKS}${C_RESET}  ${C_GRAY}${WP_MODE}${C_RESET}"
     exit 0
 fi
 

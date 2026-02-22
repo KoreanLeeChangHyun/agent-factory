@@ -1,5 +1,6 @@
 ---
 description: 코드 리뷰 수행. 파일, 디렉토리, PR 등을 리뷰합니다.
+argument-hint: "[-np] [-nr]"
 ---
 
 # Review

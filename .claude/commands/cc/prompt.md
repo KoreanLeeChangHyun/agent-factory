@@ -1,6 +1,6 @@
 ---
 description: ".prompt/prompt.txt의 내용을 대화형으로 정제합니다. 모호한 프롬프트를 질의응답으로 개선합니다."
-argument-hint: "[--clear] [--ccv]"
+argument-hint: ""
 skills:
   - prompt-engineering-guide
 ---
@@ -11,42 +11,7 @@ skills:
 
 > **스킬 참조**: 이 명령어는 `prompt-engineering-guide` 스킬을 사용합니다. 분석 시작 전 `.claude/skills/prompt-engineering-guide/SKILL.md`를 Read로 로드하고, 필요 시 하위 references도 참조합니다.
 
-## 입력: $ARGUMENTS
-
-| 인자 | 설명 | 필수 |
-|------|------|------|
-| `--clear` | prompt.txt를 빈 파일로 초기화 | 아니오 |
-| `--ccv` | Claude Code Vanilla 모드. 스킬 참조 없이 일반 Claude처럼 동작 | 아니오 |
-
 ## 실행 흐름
-
-### 0. --clear 인자 확인
-
-`$ARGUMENTS`에 `--clear`가 포함된 경우:
-
-1. Write 도구로 `.prompt/prompt.txt`에 빈 문자열을 덮어쓰기
-2. "prompt.txt가 초기화되었습니다." 출력 후 종료
-
-AskUserQuestion 없이 즉시 실행합니다.
-
-### 0.5. --ccv 인자 확인
-
-`$ARGUMENTS`에 `--ccv`가 포함된 경우, **Claude Code Vanilla 모드**로 전환합니다.
-
-이 모드에서는 다음과 같이 동작합니다:
-
-1. **스킬 로드 건너뛰기**: `prompt-engineering-guide` 스킬을 로드하지 않습니다 (Step 1.5 생략)
-2. **모호성 분석 생략**: 5대 모호성 유형 체크와 자가 점검 체크리스트를 적용하지 않습니다 (Step 2의 스킬 기반 분석 생략)
-3. **구조화된 질의 생략**: AskUserQuestion 반복 루프를 사용하지 않습니다 (Step 3 생략)
-
-대신 다음의 단순 흐름으로 전환합니다:
-
-1. Read 도구로 `.prompt/prompt.txt`를 읽어 현재 내용을 확인합니다
-2. 일반 Claude처럼 사용자와 자유 대화로 프롬프트를 정제합니다
-3. 사용자가 만족하면 Write 도구로 `.prompt/prompt.txt`에 개선된 내용을 저장합니다
-4. 완료 메시지를 출력합니다
-
-> `--ccv` 모드에서는 프롬프트 구조화 5요소, 용도별 템플릿 등 스킬 기반 규칙을 적용하지 않습니다. 사용자의 의도와 대화 흐름에 따라 자연스럽게 프롬프트를 개선합니다.
 
 ### 1. prompt.txt 읽기
 
@@ -164,8 +129,6 @@ prompt.txt가 업데이트되었습니다. 이제 cc:implement, cc:research 등�
 |------|------|
 | 사용자가 "완료" 선택 | 개선된 prompt.txt 저장 후 종료 |
 | prompt.txt 빈 파일 | 안내 메시지 출력 후 종료 |
-| `$ARGUMENTS`에 `--clear` 포함 | AskUserQuestion 없이 prompt.txt를 빈 파일로 초기화 후 종료 |
-| `$ARGUMENTS`에 `--ccv` 포함 | 스킬 참조 없이 일반 Claude 대화로 prompt.txt 정제 후 저장 |
 
 ## 주의사항
 
@@ -173,4 +136,3 @@ prompt.txt가 업데이트되었습니다. 이제 cc:implement, cc:research 등�
 2. **Bash 도구 호출 금지**: 가드 스크립트 비간섭을 보장합니다. 셸 명령어 실행이 필요 없습니다
 3. **사용 가능 도구**: Read, Write, AskUserQuestion만 사용합니다
 4. **워크플로우 무관**: FSM 상태 전이, init_workflow.py, workflow_agent_guard.py, workflow_transition_guard.py와 완전히 무관합니다. 배너 출력, workDir 생성, status.json/registry.json 조작을 하지 않습니다
-5. **--ccv 모드 제한**: --ccv 모드에서는 prompt-engineering-guide 스킬의 모호성 분석 체크리스트, 프롬프트 구조화 5요소, 용도별 템플릿을 참조하지 않는다. 사용자와의 자연스러운 대화를 통해 프롬프트를 개선한다
