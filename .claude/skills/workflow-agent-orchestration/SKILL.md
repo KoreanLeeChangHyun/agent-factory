@@ -20,6 +20,7 @@ stateDiagram-v2
     PLAN --> WORK: 승인
     PLAN --> CANCELLED: 중지
     WORK --> REPORT
+    WORK --> FAILED: 실패
     WORK --> COMPLETED: noreport mode
     REPORT --> COMPLETED: 성공
     REPORT --> FAILED: 실패

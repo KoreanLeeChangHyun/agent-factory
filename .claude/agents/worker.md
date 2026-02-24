@@ -59,6 +59,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `workId`: 작업 ID
 - `planPath`: 계획서 경로
+- `userPromptPath`: 사용자 프롬프트 경로 (noplan 모드 전용, planPath 대체)
 - `taskId`: 수행할 태스크 ID (W01, W02 등) 또는 `phase0` (Phase 0: 스킬 탐색/매핑 준비 단계)
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
 - `mode`: 동작 모드 (선택적). `phase0`이면 Phase 0 준비 작업(스킬 탐색/매핑) 수행. Phase 1+에서는 skill-map.md를 참조하여 계획서 태스크를 실행

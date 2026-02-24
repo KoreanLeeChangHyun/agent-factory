@@ -23,7 +23,7 @@ INIT->PLAN->WORK->REPORT->COMPLETED 전이 경로의 각 단계를 전담한다.
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
   [strategy 모드]
     NONE/비존재: init만 허용
-    STRATEGY: done 허용 (오케스트레이터가 직접 작업)
+    STRATEGY: strategy + done 허용 (strategy 에이전트가 작업 수행)
     COMPLETED: done 허용 (마무리 처리)
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
   [noplan 모드]

@@ -202,6 +202,10 @@ workName: <작업이름>
 | register / unregister | `<registryKey>` | 전역 레지스트리 등록/해제 |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 | env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
+| usage-pending | `<registryKey> <agentId> <taskId>` | 사용량 대기 등록 |
+| usage | `<registryKey> <taskId> <inputTokens> <outputTokens>` | 사용량 기록 |
+| usage-finalize | `<registryKey>` | 사용량 집계 확정 |
+| task-status | `<registryKey> <taskId> <status>` | 태스크 상태 갱신 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. init 반환값에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: INIT=`init`, PLAN=`planner`, WORK=`worker`, STRATEGY=`strategy`, REPORT=`reporter`, DONE=`done`
