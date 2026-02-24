@@ -63,8 +63,9 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 - `workDir`: 작업 디렉터리 경로
 - `command`: 실행 명령어
 - `title`: 작업 제목
-- `reportPath`: 보고서 경로 (reporter 반환값)
+- `reportPath`: 보고서 경로 (reporter 반환값, noreport 모드에서는 없음)
 - `status`: reporter 반환 상태 (완료 | 실패)
+- `workflow_id`: (선택적) 칸반보드 워크플로우 ID. 전달 시 `.kanbanboard` 완료 상태 반영
 
 ## 절차
 

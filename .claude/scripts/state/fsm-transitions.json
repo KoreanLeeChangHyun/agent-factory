@@ -18,6 +18,17 @@
       "INIT": ["WORK", "STALE"],
       "WORK": ["REPORT", "FAILED", "STALE"],
       "REPORT": ["COMPLETED", "FAILED", "STALE"]
+    },
+    "noreport": {
+      "NONE": ["INIT"],
+      "INIT": ["PLAN", "STALE"],
+      "PLAN": ["WORK", "CANCELLED", "STALE"],
+      "WORK": ["COMPLETED", "FAILED", "STALE"]
+    },
+    "noplan+noreport": {
+      "NONE": ["INIT"],
+      "INIT": ["WORK", "STALE"],
+      "WORK": ["COMPLETED", "FAILED", "STALE"]
     }
   }
 }

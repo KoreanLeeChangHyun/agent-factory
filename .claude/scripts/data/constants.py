@@ -81,7 +81,7 @@ FSM_TRANSITIONS_FILENAME = "fsm-transitions.json"
 # 유효 명령어/모드 집합
 # =============================================================================
 VALID_COMMANDS = {"implement", "review", "research", "strategy"}
-VALID_MODES = {"full", "strategy", "noplan"}
+VALID_MODES = {"full", "strategy", "noplan", "noreport", "noplan+noreport"}
 
 # =============================================================================
 # 터미널 phase 집합

@@ -11,7 +11,7 @@ prompt.txt 읽기, 디렉터리 생성, 파일 복사/클리어, 메타데이터
 인자:
   command - 실행 명령어 (implement, review, research, strategy)
   title   - 작업 제목 (init 에이전트가 prompt.txt로부터 생성한 한글 제목)
-  mode    - (선택적) 워크플로우 모드 (full, strategy, noplan). 기본값: full
+  mode    - (선택적) 워크플로우 모드 (full, strategy, noplan, noreport, noplan+noreport). 기본값: full
 
 출력 (stdout):
   workDir=.workflow/<registryKey>/<workName>/<command>
@@ -98,8 +98,7 @@ def main():
         _err("Invalid title: must not be a file path")
 
     if mode not in _VALID_MODES:
-        _warn(f"Unknown mode '{mode}', defaulting to 'full'")
-        mode = "full"
+        _err(f"Invalid mode: '{mode}'. Allowed: {', '.join(sorted(_VALID_MODES))}")
 
     claude_sid = os.environ.get("CLAUDE_SESSION_ID", "")
 
