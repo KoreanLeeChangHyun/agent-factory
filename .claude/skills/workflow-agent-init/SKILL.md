@@ -1,6 +1,6 @@
 ---
 name: workflow-agent-init
-description: "Internal skill for workflow INIT stage. Preprocesses user requests to prepare workflow inputs. Use for workflow initialization: prompt.txt reading, scenario branching (full/strategy/prompt), title generation, init-workflow.py integrated script execution. Internally invoked by orchestrator; not intended for direct user invocation."
+description: "Internal skill for workflow INIT stage. Preprocesses user requests to prepare workflow inputs. Use for workflow initialization: prompt.txt reading, scenario branching (full/strategy), title generation, init-workflow.py integrated script execution. Internally invoked by orchestrator; not intended for direct user invocation."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -67,8 +67,8 @@ Read 도구로 **프로젝트 루트의** `.prompt/prompt.txt`를 읽습니다. 
 - 파일에 내용이 있으면 (공백/줄바꿈 외 텍스트 존재) -> Step 2로 진행
 - 파일이 없거나 내용이 비어있으면 -> 시나리오 분기:
 
-  - **시나리오 1**: 이전 COMPLETED 워크플로우가 존재하는 경우
-    1. `.workflow/` 하위에서 가장 최근 COMPLETED 상태의 워크플로우 탐색
+  - **시나리오 1**: 이전 DONE 워크플로우가 존재하는 경우
+    1. `.workflow/` 하위에서 가장 최근 DONE 상태의 워크플로우 탐색
     2. 해당 워크플로우의 `report.md`를 읽어 분석
     3. 후속 작업을 제안하고 AskUserQuestion으로 사용자에게 확인
     4. 사용자가 승인하면 그 내용을 prompt로 사용하여 Step 2로 진행
@@ -116,7 +116,6 @@ python3 .claude/scripts/init/init_workflow.py <command> "<title>" <mode>
 python3 .claude/scripts/init/init_workflow.py implement "로그인-기능-추가" full
 python3 .claude/scripts/init/init_workflow.py review "PR-123-리뷰" full
 python3 .claude/scripts/init/init_workflow.py strategy "마이그레이션-전략" strategy
-python3 .claude/scripts/init/init_workflow.py prompt "간단한-질문" prompt
 ```
 
 **잘못된 호출 예시 (절대 금지):**
@@ -144,8 +143,9 @@ python3 .claude/scripts/init/init_workflow.py implement "login-feature" full  # 
 6. `.prompt/prompt.txt` 클리어
 7. `.prompt/querys.txt` 갱신
 8. `<workDir>/.context.json` 생성
+8b. 워크플로우 아카이빙 (최신 10개 유지, 초과분 `.workflow/.history/`로 이동)
 9. `<workDir>/status.json` 생성 (mode 필드 포함)
-10. 좀비 정리 (cleanup-zombie.sh)
+10. 좀비 정리 (cleanup_zombie.py)
 11. 전역 레지스트리 등록
 12. **stdout으로 결과 출력**
 
@@ -262,13 +262,13 @@ workName: <python3 .claude/scripts/init/init_workflow.py stdout의 workName 값>
 
 ## 역할 경계 (Boundary)
 
-init은 **전처리**만 수행합니다. 모든 command(implement, review, research, strategy, prompt)가 init을 통과합니다. 다음 행위는 절대 금지:
+init은 **전처리**만 수행합니다. 모든 command(implement, review, research, strategy)가 init을 통과합니다. 다음 행위는 절대 금지:
 
 - 소스 코드 파일을 Read/Grep으로 탐색하지 마라
 - 소스 코드를 Write/Edit하지 마라
 - 코드 리뷰 의견을 제시하지 마라
-- 이전 워크플로우의 report.md를 분석하지 마라 (**예외**: Step 1 시나리오 1 - prompt.txt 비어있고 이전 COMPLETED 워크플로우 존재 시 허용)
-- 후속 작업을 제안하지 마라 (**예외**: Step 1 시나리오 1 - prompt.txt 비어있고 이전 COMPLETED 워크플로우 존재 시 허용)
+- 이전 워크플로우의 report.md를 분석하지 마라 (**예외**: Step 1 시나리오 1 - prompt.txt 비어있고 이전 DONE 워크플로우 존재 시 허용)
+- 후속 작업을 제안하지 마라 (**예외**: Step 1 시나리오 1 - prompt.txt 비어있고 이전 DONE 워크플로우 존재 시 허용)
 - PLAN/WORK/REPORT 단계의 작업을 수행하지 마라
 - 미완료 워크플로우를 확인하거나 상태 테이블을 출력하지 마라 (registry.json 조회 포함). 다중 워크플로우 동시 실행은 시스템 설계 사항이며, 새 워크플로우 시작에 영향을 주지 않는다.
 

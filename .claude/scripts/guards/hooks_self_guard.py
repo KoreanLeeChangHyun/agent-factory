@@ -7,8 +7,8 @@ PreToolUse(Write|Edit|Bash) 이벤트에서 .claude/hooks/ 경로 파일 수정�
 입력: stdin으로 JSON (tool_name, tool_input)
 출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
 
-우회: 환경변수 HOOKS_EDIT_ALLOWED=true 설정 시 차단 해제
-      (오케스트레이터가 `python3 .claude/scripts/state/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED true` 명령으로 설정/해제)
+우회: 환경변수 HOOKS_EDIT_ALLOWED=1 설정 시 차단 해제
+      (오케스트레이터가 `step-update env <registryKey> set HOOKS_EDIT_ALLOWED 1` 명령으로 설정/해제)
 """
 
 import json

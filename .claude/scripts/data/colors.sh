@@ -34,7 +34,8 @@ get_color() {
         PLAN)                       echo "$C_BLUE" ;;
         WORK)                       echo "$C_GREEN" ;;
         REPORT)                     echo "$C_PURPLE" ;;
-        DONE|COMPLETED)             echo "$C_YELLOW" ;;
+        STRATEGY)                   echo "$C_CYAN" ;;
+        DONE)                       echo "$C_YELLOW" ;;
         CANCELLED|STALE|FAILED)     echo "$C_GRAY" ;;
         *)                          echo '\033[0;37m' ;;
     esac

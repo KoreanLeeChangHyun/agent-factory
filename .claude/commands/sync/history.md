@@ -87,5 +87,6 @@ python3 .claude/scripts/sync/history_sync.py sync $ARGUMENTS
 | 명령어 | 설명 |
 |--------|------|
 | `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
+| `/sync:catalog` | 스킬 카탈로그(skill-catalog.md) 재생성 |
 | `/sync:code` | 원격 리포지토리에서 .claude 동기화 |
 | `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 |

@@ -13,7 +13,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 
 **workflow-agent-done 스킬의 책임:**
 - history.md 최종 확인 갱신 (phase 전이 시 자동 갱신 안전망)
-- status.json 완료 처리 (REPORT -> COMPLETED / FAILED)
+- status.json 완료 처리 (REPORT -> DONE / FAILED)
 - 사용량 확정 (usage-finalize)
 - 레지스트리 해제 (unregister)
 - 워크플로우 아카이빙 (최신 10개 유지, 나머지 .history 이동)
@@ -91,19 +91,31 @@ reporter 반환 상태에 따라:
 
 **성공 시:**
 ```bash
-python3 .claude/scripts/state/update_state.py status <registryKey> REPORT COMPLETED
+step-update status <registryKey> REPORT DONE
 ```
 
 **실패 시:**
 ```bash
-python3 .claude/scripts/state/update_state.py status <registryKey> REPORT FAILED
+step-update status <registryKey> REPORT FAILED
+```
+
+**noreport 모드 (REPORT 단계 없음):**
+
+noreport/noplan+noreport 모드에서는 REPORT 단계를 거치지 않으므로 `from_phase`가 `WORK`입니다:
+
+```bash
+# 성공 시
+step-update status <registryKey> WORK DONE
+
+# 실패 시
+step-update status <registryKey> WORK FAILED
 ```
 
 ### 3. 사용량 확정
 
 성공 시에만 실행:
 ```bash
-python3 .claude/scripts/state/update_state.py usage-finalize <registryKey>
+step-update usage-finalize <registryKey>
 ```
 
 > 실패 시 경고만 출력하고 계속 진행 (비차단 원칙)
@@ -111,7 +123,7 @@ python3 .claude/scripts/state/update_state.py usage-finalize <registryKey>
 ### 4. 레지스트리 해제
 
 ```bash
-python3 .claude/scripts/state/update_state.py unregister <registryKey>
+step-update unregister <registryKey>
 ```
 
 ### 5. 워크플로우 아카이빙

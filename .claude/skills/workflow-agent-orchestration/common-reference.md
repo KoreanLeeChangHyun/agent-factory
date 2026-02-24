@@ -12,10 +12,11 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, STRATEGY, REPORT, COMPLETED, FAILED, CANCELLED, STALE 중 하나. DONE은 FSM Phase가 아니며 done 에이전트 활동 구간(REPORT->COMPLETED 전이)의 별칭이다. |
+| **Phase** | 단계 | 워크플로우의 실행 단위. INIT, PLAN, WORK, STRATEGY, REPORT, DONE, FAILED, CANCELLED, STALE 중 하나. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research, strategy 중 하나. |
-| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, worker, explorer, strategy, reporter, done 7개와 orchestrator로 구성. |
-| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, worker, explorer, strategy, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
+| **agent** | 에이전트 | 특정 Phase를 전담하는 실행 주체. init, planner, indexer, worker, explorer, strategy, reporter, done 8개와 orchestrator로 구성. |
+| **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. init, planner, indexer, worker, explorer, strategy, reporter, done이 해당. sub-agent 간 직접 호출은 금지. |
+| **indexer** | 인덱서 | WORK Phase의 Phase 0(스킬 매핑 준비)를 전담하는 서브에이전트. 스킬 카탈로그를 참조하여 skill-map.md를 생성. |
 | **worker** | 워커 | WORK Phase를 전담하는 서브에이전트. 계획서의 태스크를 독립적으로 실행하며, 병렬 실행이 가능. |
 | **explorer** | 익스플로러 | WORK Phase에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
 | **strategy** | 스트래티지 | STRATEGY Phase를 전담하는 서브에이전트. 대규모 작업을 다중 워크플로우 마일스톤으로 분해하고 roadmap.md와 .kanbanboard를 생성. |
@@ -23,7 +24,7 @@
 | **init** | 이닛 | INIT Phase를 전담하는 서브에이전트. 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
 | **planner** | 플래너 | PLAN Phase를 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
 | **reporter** | 리포터 | REPORT Phase를 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
-| **done** | 던 | REPORT->COMPLETED 전이 구간(DONE)을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
+| **done** | 던 | REPORT->DONE 전이 구간을 전담하는 서브에이전트. history.md 갱신, 워크플로우 디렉터리 정리, 레지스트리 해제를 수행. |
 | **orchestrator exclusive action** | 오케스트레이터 전용 행위 | 서브에이전트가 플랫폼 제약으로 수행할 수 없어 오케스트레이터만 수행 가능한 행위. AskUserQuestion, `step-start`/`step-change`/`step-end` 배너(shell alias — Bash 도구에서 alias 이름으로 직접 호출), update_state.py 호출 등. |
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
@@ -31,9 +32,9 @@
 | **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Phase 전이를 제어하는 상태 기계. 이중 가드(update_state.py + transition-guard)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Phase에서 다른 Phase로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)과 registry.json(전역 레지스트리)이 각각 Aggregate Root 역할. |
-| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->COMPLETED), `noplan`(INIT->WORK->REPORT->COMPLETED, PLAN 스킵), `noreport`(INIT->PLAN->WORK->COMPLETED, REPORT 스킵), `noplan+noreport`(INIT->WORK->COMPLETED, PLAN+REPORT 스킵), `strategy`(INIT->STRATEGY->COMPLETED) 5가지. |
+| **mode** | 모드 | 워크플로우 실행 모드. `full`(INIT->PLAN->WORK->REPORT->DONE), `noplan`(INIT->WORK->REPORT->DONE, PLAN 스킵), `noreport`(INIT->PLAN->WORK->DONE, REPORT 스킵), `noplan+noreport`(INIT->WORK->DONE, PLAN+REPORT 스킵), `strategy`(INIT->STRATEGY->DONE) 5가지. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
-| **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. full 모드 및 noplan 모드에서 필수 실행 (strategy 모드에서는 WORK Phase 자체가 없어 해당 없음). |
+| **Phase 0** | 준비 단계 | WORK Phase 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. WORK Phase가 있는 모든 모드(full, noplan, noreport, noplan+noreport)에서 필수 실행 (strategy 모드에서는 WORK Phase 자체가 없어 해당 없음). |
 | **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md에서 추천 스킬을 로드하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Phase 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
@@ -43,7 +44,7 @@
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
 | **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step-init.md~step-done.md 파일명에 사용. |
-| **DONE** | (Step 레이블/배너 명칭) | done 에이전트 활동 구간의 Step 레이블이자 배너 명칭. FSM Phase가 아니며 REPORT->COMPLETED 전이 구간을 가리킨다. Agent-Phase 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
+| **DONE** | (FSM Phase/배너 명칭) | 워크플로우 완료를 나타내는 FSM Phase이자 배너 명칭. done 에이전트가 REPORT->DONE 전이를 수행. Agent-Phase 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
 | **summary.txt** | 요약 파일 | init 에이전트가 1차로 생성, done 에이전트가 최종 결과 보고서를 기반으로 2차로 갱신 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `.prompt/user_prompt.txt`에 저장되며 오케스트레이터가 워크플로우 시작 전 생성. |
 
@@ -53,6 +54,7 @@
 flowchart TD
     ORCH[orchestrator] -->|"Task(init)"| INIT_A[init agent]
     ORCH -->|"Task(planner)"| PLAN_A[planner agent]
+    ORCH -->|"Task(indexer)"| INDEX_A[indexer agent]
     ORCH -->|"Task(worker)"| WORK_A[worker agent]
     ORCH -->|"Task(strategy)"| STRAT_A[strategy agent]
     ORCH -->|"Task(reporter)"| REPORT_A[reporter agent]
@@ -60,6 +62,7 @@ flowchart TD
 
     INIT_A -->|바인딩| WF_INIT[workflow-agent-init]
     PLAN_A -->|바인딩| WF_PLAN[workflow-agent-plan]
+    INDEX_A -->|바인딩| WF_INDEX[workflow-agent-index]
     WORK_A -->|정적 바인딩| WF_WORK[workflow-agent-work]
     WORK_A -->|동적 바인딩| CMD_SKILLS[command skills]
     STRAT_A -->|바인딩| WF_STRAT[workflow-agent-strategy]
@@ -68,7 +71,7 @@ flowchart TD
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
-- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, worker=WORK, strategy=STRATEGY, reporter=REPORT, done=DONE (DONE은 REPORT->COMPLETED 전이 구간의 별칭)).
+- **에이전트-Phase 1:1 매핑**: 각 에이전트는 특정 Phase를 전담 (init=INIT, planner=PLAN, indexer=WORK Phase 0, worker=WORK, strategy=STRATEGY, reporter=REPORT, done=DONE).
 - **스킬 바인딩 이중 구조**: workflow skill은 frontmatter로 정적 바인딩, command skill은 command-skill-map.md로 동적 바인딩 (worker 전용).
 - **역할 경계 원칙**: 오케스트레이터는 조율(sequencing, dispatch, state management)만 수행하고 실제 작업(파일 수정, 계획서/보고서 작성)은 서브에이전트에 위임한다. 단, 플랫폼 제약 행위는 오케스트레이터가 직접 수행한다.
 
@@ -100,10 +103,11 @@ flowchart TD
 |-------|-------|---------------|----------------|---------|
 | init | INIT | workflow-agent-init | - | frontmatter `skills:` |
 | planner | PLAN | workflow-agent-plan | - | frontmatter `skills:` |
+| indexer | WORK (Phase 0) | workflow-agent-index | - | frontmatter `skills:` |
 | worker | WORK | workflow-agent-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-agent-work) + 런타임 동적 (command skills) |
 | explorer | WORK | workflow-agent-explore | - | frontmatter `skills:` |
 | strategy | STRATEGY | workflow-agent-strategy | - | frontmatter `skills:` |
-| reporter | REPORT | workflow-agent-report | - | frontmatter `skills:` |
+| reporter (sonnet) | REPORT | workflow-agent-report | - | frontmatter `skills:` |
 | done | DONE (별칭) | workflow-agent-done | - | frontmatter `skills:` |
 
 > **worker의 command skill 동적 로드**: worker는 `workflow-agent-work` skill만 frontmatter에 선언합니다. command skill은 `command-skill-map.md`의 4단계 우선순위(skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백)로 런타임에 결정됩니다.
@@ -122,7 +126,7 @@ flowchart TD
 | 계획서 작성 (plan.md) | Sub (planner) | 역할 분리: 계획 수립은 planner 전담 |
 | 로드맵 작성 (roadmap.md) | Sub (strategy) | 역할 분리: 전략 수립은 strategy 전담 |
 | 보고서 작성 (report.md) | Sub (reporter) | 역할 분리: 보고서 종합은 reporter 전담 |
-| 작업 내역 작성 (work/WXX-*.md) | Sub (worker) | 역할 분리: 태스크 실행 기록은 worker 전담 |
+| 작업 내역 작성 (work/WXX-*.md) | Sub (worker, explorer) | 역할 분리: 태스크 실행 기록은 worker/explorer 전담 |
 | 초기화 (workDir/status.json 생성) | Sub (init) | 역할 분리: 워크플로우 초기화는 init 전담 |
 | 마무리 (Slack 알림/정리) | Sub (done) | 역할 분리: 마무리 처리는 done 전담 |
 
@@ -161,12 +165,28 @@ workName: <작업이름>
 태스크 수: N개
 ```
 
+### indexer Return Format (3 lines)
+
+```
+상태: 성공 | 실패
+스킬맵: <workDir>/work/skill-map.md
+매핑 스킬: N개
+```
+
 ### worker Return Format (3 lines)
 
 ```
 상태: 성공 | 부분성공 | 실패
 작업 내역: <작업 내역 파일 경로>
 변경 파일: N개
+```
+
+### explorer Return Format (3 lines)
+
+```
+상태: 성공 | 부분성공 | 실패
+작업 내역: <작업 내역 파일 경로>
+탐색 파일: N개
 ```
 
 ### reporter Return Format (2 lines)
@@ -192,7 +212,7 @@ workName: <작업이름>
 
 ## State Update Methods
 
-`python3 .claude/scripts/state/update_state.py <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
+`step-update <mode> <registryKey> [args...]` 명령으로 상태를 업데이트합니다. `both` 모드 권장.
 
 | Mode | Arguments | Description |
 |------|-----------|-------------|
@@ -220,7 +240,7 @@ workName: <작업이름>
 | both | O | X |
 | register | O | X |
 | unregister | O | O (done only) |
-| link-session | X | O (worker, explorer, strategy, reporter) |
+| link-session | X | O (indexer, worker, explorer, strategy, reporter) |
 | env | O | X |
 | usage-* | X | O (Hook) |
 
@@ -238,11 +258,11 @@ workName: <작업이름>
 
 | Mode | Normal Flow | Branches |
 |------|-------------|----------|
-| full (default) | `INIT -> PLAN -> WORK -> REPORT -> COMPLETED` | PLAN->CANCELLED, WORK/REPORT->FAILED, TTL->STALE |
-| noplan | `INIT -> WORK -> REPORT -> COMPLETED` | WORK/REPORT->FAILED, TTL->STALE |
-| noreport | `INIT -> PLAN -> WORK -> COMPLETED` | PLAN->CANCELLED, WORK->FAILED, TTL->STALE |
-| noplan+noreport | `INIT -> WORK -> COMPLETED` | WORK->FAILED, TTL->STALE |
-| strategy | `INIT -> STRATEGY -> COMPLETED` | STRATEGY->FAILED, TTL->STALE |
+| full (default) | `INIT -> PLAN -> WORK -> REPORT -> DONE` | PLAN->CANCELLED, WORK/REPORT->FAILED, TTL->STALE |
+| noplan | `INIT -> WORK -> REPORT -> DONE` | WORK/REPORT->FAILED, TTL->STALE |
+| noreport | `INIT -> PLAN -> WORK -> DONE` | PLAN->CANCELLED, WORK->FAILED, TTL->STALE |
+| noplan+noreport | `INIT -> WORK -> DONE` | WORK->FAILED, TTL->STALE |
+| strategy | `INIT -> STRATEGY -> DONE` | STRATEGY->FAILED, TTL->STALE |
 
 불법 전이 시 시스템 가드가 차단. update_state.py는 전이 미수행(no-op), PreToolUse Hook은 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
@@ -258,4 +278,4 @@ workName: <작업이름>
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
 | update_state.py deny/failure (Phase 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청 |
-| Workflow cancel/abort (중단/취소) | 반드시 `python3 .claude/scripts/state/update_state.py unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |
+| Workflow cancel/abort (중단/취소) | 반드시 `step-update unregister <registryKey>`를 호출하여 레지스트리에서 해제. status 전이와 unregister는 순차 실행 필수. |

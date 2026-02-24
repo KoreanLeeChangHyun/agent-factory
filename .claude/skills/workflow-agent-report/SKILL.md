@@ -15,7 +15,7 @@ license: "Apache-2.0"
 - REPORT: 작업 결과를 정리하여 보고서 생성
 - summary.txt 생성 (최종 작업 2줄 요약)
 
-> **책임 경계**: history.md 갱신, status.json 완료 처리(REPORT->COMPLETED), 사용량 확정, 레지스트리 해제(`update_state.py unregister`), DONE 배너는 done 에이전트가 담당합니다. reporter는 보고서 작성에만 집중합니다.
+> **책임 경계**: history.md 갱신, status.json 완료 처리(REPORT->DONE), 사용량 확정, 레지스트리 해제(`update_state.py unregister`), DONE 배너는 done 에이전트가 담당합니다. reporter는 보고서 작성에만 집중합니다.
 
 > **Slack 완료 알림**: reporter는 Slack 호출을 수행하지 않습니다. Slack 완료 알림은 DONE 배너(`step-end <registryKey> DONE done`)에서 자동 전송됩니다.
 
@@ -49,7 +49,7 @@ license: "Apache-2.0"
 오케스트레이터는 reporter 에이전트를 호출하기 전에 로컬 `<workDir>/.context.json`의 `agent` 필드를 `"reporter"`로 업데이트합니다.
 
 ```bash
-python3 .claude/scripts/state/update_state.py context <registryKey> reporter
+step-update context <registryKey> reporter
 ```
 
 ### reporter 에이전트 호출 시그니처
@@ -237,7 +237,7 @@ stateDiagram-v2
     INIT --> PLAN
     PLAN --> WORK
     WORK --> REPORT
-    REPORT --> COMPLETED
+    REPORT --> DONE
     REPORT --> FAILED
 ```
 

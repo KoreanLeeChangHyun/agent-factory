@@ -41,7 +41,8 @@ PHASE_COLORS = {
     "PLAN": C_BLUE,
     "WORK": C_GREEN,
     "REPORT": C_PURPLE,
-    "COMPLETED": C_GRAY,
+    "STRATEGY": C_CYAN,
+    "DONE": C_YELLOW,
     "STALE": C_GRAY,
     "FAILED": C_YELLOW,
     "CANCELLED": C_GRAY,
@@ -86,10 +87,10 @@ VALID_MODES = {"full", "strategy", "noplan", "noreport", "noplan+noreport"}
 # =============================================================================
 # 터미널 phase 집합
 # =============================================================================
-TERMINAL_PHASES = {"COMPLETED", "FAILED", "STALE", "CANCELLED"}
+TERMINAL_PHASES = {"DONE", "FAILED", "STALE", "CANCELLED"}
 
 # auto_continue_guard용 비활성 phase 집합 (빈 문자열, REPORT 포함)
-AUTO_CONTINUE_INACTIVE_PHASES = ("COMPLETED", "FAILED", "CANCELLED", "STALE", "", "REPORT")
+AUTO_CONTINUE_INACTIVE_PHASES = ("DONE", "FAILED", "CANCELLED", "STALE", "", "REPORT")
 
 # =============================================================================
 # 바이트 단위 상수

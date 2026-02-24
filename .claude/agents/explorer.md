@@ -42,7 +42,7 @@ maxTurns: 30
 
 - WORK Phase 배너 호출 (`step-start <registryKey> WORK` / `step-end WORK`)
 - WORK-PHASE 서브배너 호출 (`step-start <registryKey> WORK-PHASE <N> ...`)
-- `python3 .claude/scripts/state/update_state.py` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
+- `step-update` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
 - Explorer 반환값 추출 (첫 3줄만 보관, 나머지 폐기)
 - usage-pending 추적
 
@@ -85,7 +85,7 @@ maxTurns: 30
 
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
 - **코드 수정 금지**: Explorer는 탐색 전용 에이전트. 코드 수정/생성은 Worker가 담당
-- **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
+- **세션 링크 등록**: 작업 시작 시 `step-update link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
 > 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, research-deep와의 역할 분리)는 `workflow-agent-explore/SKILL.md`를 참조하세요. Explorer는 Phase 1+(skill-map.md를 참조하여 계획서 태스크를 실행하는 단계)에서 호출되며, Phase 0(스킬 탐색/매핑 준비)은 Worker가 전담한다.
 

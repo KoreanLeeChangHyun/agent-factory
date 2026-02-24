@@ -7,10 +7,12 @@
 
 **Detailed Guide:** workflow-agent-done skill 참조
 
-reporter 완료 후, 오케스트레이터가 **DONE 시작 배너**를 호출한 뒤 **done 에이전트**를 디스패치합니다.
+reporter 완료 후, 오케스트레이터가 `step-update both` → `step-change` → **DONE 시작 배너** 순서로 호출한 뒤 **done 에이전트**를 디스패치합니다.
 
 ```bash
-# 오케스트레이터: DONE 시작 배너
+# 오케스트레이터: REPORT → DONE 전이
+step-update both <registryKey> done REPORT DONE
+step-change <registryKey> REPORT DONE
 step-start <registryKey> DONE
 ```
 
@@ -29,9 +31,9 @@ workflow_id: <workflow_id>
 done 에이전트가 수행하는 작업:
 
 1. **history.md 갱신** - summary.txt를 읽어 `.prompt/history.md`에 이력 행 추가
-2. **status.json 완료 처리** - 성공: `python3 .claude/scripts/state/update_state.py status <registryKey> REPORT COMPLETED`, 실패: `python3 .claude/scripts/state/update_state.py status <registryKey> REPORT FAILED`
-3. **사용량 확정** - 성공 시: `python3 .claude/scripts/state/update_state.py usage-finalize <registryKey>` (실패 시 경고만, 비차단)
-4. **레지스트리 해제** - `python3 .claude/scripts/state/update_state.py unregister <registryKey>`
+2. **status.json 완료 처리** - 성공: `step-update status <registryKey> REPORT DONE`, 실패: `step-update status <registryKey> REPORT FAILED`
+3. **사용량 확정** - 성공 시: `step-update usage-finalize <registryKey>` (실패 시 경고만, 비차단)
+4. **레지스트리 해제** - `step-update unregister <registryKey>`
 5. **워크플로우 아카이빙** - 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동, history.md 링크 갱신
 6. **.kanbanboard 갱신** - `workflow_id` 전달 시 `.kanbanboard` 파일의 워크플로우 완료 상태 반영 (`update-kanban.sh` 호출, 비차단)
 

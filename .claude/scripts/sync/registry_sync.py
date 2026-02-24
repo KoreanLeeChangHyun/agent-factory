@@ -64,7 +64,7 @@ def cmd_help():
     print(f"  {C_CYAN}help{C_RESET}                  이 도움말 표시")
     print()
     print(f"{C_BOLD}정리 대상 (clean):{C_RESET}")
-    print("  - COMPLETED / FAILED / STALE / CANCELLED phase 엔트리")
+    print("  - DONE / FAILED / STALE / CANCELLED phase 엔트리")
     print("  - status.json이 없는 고아 엔트리")
     print("  - registry phase와 status.json phase가 불일치하는 엔트리")
     print("  - REPORT phase인데 1시간 이상 경과한 잔류 엔트리")
@@ -143,7 +143,7 @@ def cmd_clean(args):
     now = datetime.now(kst)
     report_ttl_hours = 1
 
-    remove_phases = {"STALE", "COMPLETED", "FAILED", "CANCELLED"}
+    remove_phases = {"STALE", "DONE", "FAILED", "CANCELLED"}
     targets = []
 
     for key, entry in registry.items():

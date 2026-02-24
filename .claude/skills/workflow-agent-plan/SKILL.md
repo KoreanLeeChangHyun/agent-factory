@@ -243,6 +243,21 @@ Task(prompt="T3: 상태 관리 설정...")
 
 **중요:** 병렬 실행 시 반드시 단일 메시지에 여러 Task 호출을 포함해야 한다.
 
+### 핵심 원칙
+
+| 원칙 | 권장값 | 근거 |
+|------|--------|------|
+| Phase당 워커 수 상한 | **3-5개** (Anthropic 공식 문서) | "Start with 3-5 teammates for most workflows" (Agent Teams 공식 권장) |
+| 컨텍스트 윈도우 제한 | **200K 토큰**/에이전트 (Anthropic 공식 문서) | 각 서브에이전트는 독립적인 200K 컨텍스트 윈도우 보유. 상세 결과 반환 시 메인 에이전트 컨텍스트 소비 급증에 주의 |
+| 태스크 그룹화 | 팀메이트당 **5-6개** 태스크 (Anthropic 공식 문서) | "Having 5-6 tasks per teammate keeps everyone productive without excessive context switching" |
+| 공식 하드리밋 | **없음** (Anthropic 공식 문서) | "There's no hard limit on the number of teammates, but practical constraints apply" |
+| 커뮤니티 실용 상한 | **3-4개** 초과 시 생산성 저하 보고 | 3-4개 초과 시 조율 오버헤드 증가, 수확체감 발생 |
+
+<!-- 공식 하드리밋 아님, 운영 권장값: Phase당 워커 수 3-5개는 Anthropic Agent Teams 공식 권장 + 커뮤니티 운영 경험(3-4개)을 종합한 수치 -->
+<!-- 토큰 비용: N개 서브에이전트 병렬 실행 시 토큰 소비는 N배 선형 증가 (Anthropic 공식 문서) -->
+
+> 상세 가이드는 `reference/parallel-execution-guide.md`를 참조하세요.
+
 ---
 
 ## 워커별 작업 상세 작성 방법론

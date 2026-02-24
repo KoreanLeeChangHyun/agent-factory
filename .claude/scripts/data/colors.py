@@ -17,7 +17,7 @@ C_RED = "\033[0;31m"       # 빨강 - INIT phase
 C_BLUE = "\033[0;34m"      # 파랑 - PLAN phase
 C_GREEN = "\033[0;32m"     # 초록 - WORK phase
 C_PURPLE = "\033[0;35m"    # 보라 - REPORT phase
-C_YELLOW = "\033[0;33m"    # 노랑 - DONE/COMPLETED phase
+C_YELLOW = "\033[0;33m"    # 노랑 - DONE phase
 C_CYAN = "\033[0;36m"      # 시안
 C_GRAY = "\033[0;90m"      # 회색 - CANCELLED/STALE/FAILED phase
 C_BOLD = "\033[1m"         # 굵게
@@ -37,8 +37,8 @@ _PHASE_COLOR_MAP = {
     "PLAN": C_BLUE,
     "WORK": C_GREEN,
     "REPORT": C_PURPLE,
+    "STRATEGY": C_CYAN,
     "DONE": C_YELLOW,
-    "COMPLETED": C_YELLOW,
     "CANCELLED": C_GRAY,
     "STALE": C_GRAY,
     "FAILED": C_GRAY,
@@ -51,7 +51,7 @@ def get_color(phase: str) -> str:
     """phase별 ANSI 색상 코드를 반환한다.
 
     Args:
-        phase: Phase 이름 (INIT, PLAN, WORK, REPORT, DONE, COMPLETED, CANCELLED, STALE, FAILED 등)
+        phase: Phase 이름 (INIT, PLAN, WORK, REPORT, DONE, CANCELLED, STALE, FAILED 등)
 
     Returns:
         해당 phase의 ANSI 색상 코드 문자열. 매핑되지 않는 phase는 흰색(\033[0;37m]) 반환.

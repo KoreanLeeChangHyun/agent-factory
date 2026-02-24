@@ -4,7 +4,7 @@ cleanup_zombie.py - 좀비 워크플로우 정리 독립 스크립트
 
 기능:
   1. .workflow/ 하위에서 TTL(24시간) 만료 + 미완료 status.json을 STALE로 전환
-  2. registry.json에서 STALE/COMPLETED/FAILED/CANCELLED 엔트리 제거 + 고아 정리
+  2. registry.json에서 STALE/DONE/FAILED/CANCELLED 엔트리 제거 + 고아 정리
 
 사용법:
   python3 cleanup_zombie.py [project_root]
@@ -172,17 +172,12 @@ def _step2_clean_registry(project_root):
         status_phase = status_data.get("phase", "")
         registry_phase = entry.get("phase", "")
 
-        # 1. 기존 정리: STALE/COMPLETED/FAILED/CANCELLED (status.json 기준)
+        # 1. 기존 정리: STALE/DONE/FAILED/CANCELLED (status.json 기준)
         if status_phase in _TERMINAL_PHASES:
             keys_to_remove.append((key, f"status phase={status_phase}"))
             continue
 
-        # 2. registry와 status.json의 phase 불일치 정리
-        if status_phase in _TERMINAL_PHASES and registry_phase not in _TERMINAL_PHASES:
-            keys_to_remove.append((key, f"phase mismatch: registry={registry_phase}, status={status_phase}"))
-            continue
-
-        # 3. REPORT 단계 잔류 엔트리 정리 (1시간 초과)
+        # 2. REPORT 단계 잔류 엔트리 정리 (1시간 초과)
         if registry_phase == "REPORT" or status_phase == "REPORT":
             time_str = status_data.get("updated_at") or status_data.get("created_at", "")
             if time_str:

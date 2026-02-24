@@ -137,29 +137,31 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
 
 ### Flow
 
-1. `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
+1. `step-update both <registryKey> worker INIT WORK`
 2. `step-change <registryKey> INIT WORK` (상태 전이 시각화)
 3. `step-start <registryKey> WORK` (WORK start banner)
 4. Phase 0 실행 (스킬 탐색/매핑 준비):
    - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
-   - `mkdir -p <workDir>/work && python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> phase0 phase0`
-   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 completed`
+   - `step-update task-status <registryKey> phase0 running && step-update usage-pending <registryKey> phase0 phase0`
+   - `Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>")`
+   - `step-update task-status <registryKey> phase0 completed`
 5. Phase 1+ 실행 (작업 수행):
    - `step-start <registryKey> WORK-PHASE 1 "W01" sequential`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01`
+   - `step-update task-status <registryKey> W01 running && step-update usage-pending <registryKey> W01 W01`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 completed`
+   - `step-update task-status <registryKey> W01 completed`
 6. `step-end <registryKey> WORK` (WORK completion)
-7. `python3 .claude/scripts/state/update_state.py both <registryKey> reporter WORK REPORT`
+7. `step-update both <registryKey> reporter WORK REPORT`
 8. `step-change <registryKey> WORK REPORT` (상태 전이 시각화)
 9. `step-start <registryKey> REPORT` (REPORT start banner)
 10. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
 11. `step-end <registryKey> REPORT` (REPORT completion)
-12. `step-start <registryKey> DONE` (DONE start banner)
-13. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")`
-14. `step-end <registryKey> DONE done` (DONE completion)
-15. Terminate
+12. `step-update both <registryKey> done REPORT DONE`
+13. `step-change <registryKey> REPORT DONE` (상태 전이 시각화)
+14. `step-start <registryKey> DONE` (DONE start banner)
+15. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")`
+16. `step-end <registryKey> DONE done` (DONE completion)
+17. Terminate
 
 > **Note:** noplan 모드에서는 plan.md가 없으므로 오케스트레이터가 plan.md를 Read하는 단계(Plan Reading for Task Dispatch)가 없다. 대신 Phase 0 Worker가 user_prompt.txt를 분석하여 skill-map.md를 생성하고, Phase 1 Worker가 user_prompt.txt를 직접 해석하여 작업을 수행한다. 단일 Worker(W01)로 실행하는 것이 기본이며, Phase 0이 태스크 분할이 필요하다고 판단하면 skill-map.md에 복수 태스크를 정의할 수 있다.
 
@@ -177,18 +179,18 @@ When `-nr` flag is detected in `$ARGUMENTS` for implement/review/research comman
 
 ### Flow
 
-1. `python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN`
+1. `step-update both <registryKey> planner INIT PLAN`
 2. `step-change <registryKey> INIT PLAN` (상태 전이 시각화)
 3. `step-start <registryKey> PLAN` (PLAN start banner)
 4. Planner call: `Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")`
 5. `step-end <registryKey> PLAN` (PLAN completion)
 6. Plan Reading for Task Dispatch (full 모드와 동일)
-7. `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
+7. `step-update both <registryKey> worker PLAN WORK`
 8. `step-change <registryKey> PLAN WORK` (상태 전이 시각화)
 9. `step-start <registryKey> WORK` (WORK start banner)
 10. Phase 0 + Phase 1+ 실행 (full 모드와 동일한 Worker dispatch)
 11. `step-end <registryKey> WORK` (WORK completion)
-12. `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED`
+12. `step-update both <registryKey> done WORK DONE`
 13. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
 14. `step-start <registryKey> DONE` (DONE start banner)
 15. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
@@ -213,21 +215,21 @@ When both `-np` and `-nr` flags are detected in `$ARGUMENTS` for implement/revie
 
 ### Flow
 
-1. `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
+1. `step-update both <registryKey> worker INIT WORK`
 2. `step-change <registryKey> INIT WORK` (상태 전이 시각화)
 3. `step-start <registryKey> WORK` (WORK start banner)
 4. Phase 0 실행 (스킬 탐색/매핑 준비):
    - `step-start <registryKey> WORK-PHASE 0 "phase0" sequential`
-   - `mkdir -p <workDir>/work && python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> phase0 phase0`
-   - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 completed`
+   - `step-update task-status <registryKey> phase0 running && step-update usage-pending <registryKey> phase0 phase0`
+   - `Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>")`
+   - `step-update task-status <registryKey> phase0 completed`
 5. Phase 1+ 실행 (작업 수행):
    - `step-start <registryKey> WORK-PHASE 1 "W01" sequential`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01`
+   - `step-update task-status <registryKey> W01 running && step-update usage-pending <registryKey> W01 W01`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
-   - `python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 completed`
+   - `step-update task-status <registryKey> W01 completed`
 6. `step-end <registryKey> WORK` (WORK completion)
-7. `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED`
+7. `step-update both <registryKey> done WORK DONE`
 8. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
 9. `step-start <registryKey> DONE` (DONE start banner)
 10. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
@@ -242,13 +244,15 @@ When command is `strategy`, the orchestrator skips PLAN, WORK, REPORT and dispat
 
 ### Flow
 
-1. `python3 .claude/scripts/state/update_state.py both <registryKey> strategy INIT STRATEGY`
+1. `step-update both <registryKey> strategy INIT STRATEGY`
 2. `step-change <registryKey> INIT STRATEGY` (상태 전이 시각화)
 3. `step-start <registryKey> STRATEGY` (STRATEGY start banner)
 4. `Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")`
 5. Extract first 3 lines from strategy return (discard from line 4)
 6. `step-end <registryKey> STRATEGY` (STRATEGY completion)
-7. `step-start <registryKey> DONE` (DONE start banner)
-8. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>")`
-9. `step-end <registryKey> DONE done` (DONE completion)
-10. Terminate
+7. `step-update both <registryKey> done STRATEGY DONE`
+8. `step-change <registryKey> STRATEGY DONE` (상태 전이 시각화)
+9. `step-start <registryKey> DONE` (DONE start banner)
+10. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>")`
+11. `step-end <registryKey> DONE done` (DONE completion)
+12. Terminate

@@ -21,6 +21,16 @@ Read 도구로 `.prompt/prompt.txt`를 읽습니다.
 
 "prompt.txt에 내용이 없습니다. 먼저 .prompt/prompt.txt에 프롬프트를 작성해주세요." 출력 후 종료합니다.
 
+### 1.2. .uploads 디렉터리 읽기
+
+`.uploads/` 디렉터리의 존재 여부를 확인하고, 첨부 파일이 있으면 정제 컨텍스트에 포함합니다.
+
+1. Glob 도구로 `.uploads/**/*` 패턴을 검색합니다
+2. 파일이 존재하면 Read 도구로 각 파일을 읽어 컨텍스트에 추가합니다
+3. `.uploads/` 디렉터리가 없거나 비어있으면 이 단계를 무시하고 다음 단계로 진행합니다
+
+> 읽어들인 `.uploads/` 파일 내용은 이후 모호성 분석, 코드베이스 탐색 판단, 프롬프트 구조화 시 추가 컨텍스트로 활용됩니다.
+
 ### 1.5. 스킬 로드
 
 Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 모호성 분석 체크리스트, 프롬프트 구조화 5요소, 핵심 원칙을 로드합니다.
@@ -38,6 +48,20 @@ Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 �
 | 에이전트, 서브에이전트, 도구 | `references/claude-code-patterns.md` (Claude Code 특화 패턴) |
 
 > 용도가 불명확하면 `references/prompt-templates.md`와 `references/claude-code-patterns.md`를 모두 로드합니다.
+
+### 1.7. 코드베이스 탐색/웹검색 자동 판단
+
+프롬프트 내용과 `.uploads/` 컨텍스트를 분석하여, 코드베이스 탐색이나 웹검색이 프롬프트 정제 품질 향상에 도움되는지 AI가 자동 판단하고 필요 시 자율적으로 수행합니다. 사용자에게 수행 여부를 묻지 않습니다.
+
+**판단 기준:**
+
+| 감지 키워드 | 수행 액션 | 사용 도구 |
+|------------|----------|----------|
+| 함수, 모듈, 파일, 클래스, 컴포넌트, 변수, 메서드 | 코드베이스 탐색 | Grep, Glob, Read |
+| API, 프레임워크, 패키지, 버전, 라이브러리, SDK, 외부 서비스 | 웹검색 | WebSearch, WebFetch |
+| 양쪽 키워드 모두 감지 | 코드베이스 탐색 + 웹검색 모두 수행 | Grep, Glob, Read, WebSearch, WebFetch |
+
+> 탐색/검색 결과는 이후 모호성 분석 및 질문 생성 시 컨텍스트로 활용합니다. 코드 구조나 기술 사양을 파악한 상태에서 더 정확한 개선 질문을 생성할 수 있습니다.
 
 ### 2. 현재 내용 표시 및 분석
 
@@ -134,5 +158,5 @@ prompt.txt가 업데이트되었습니다. 이제 cc:implement, cc:research 등�
 
 1. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
 2. **Bash 도구 호출 금지**: 가드 스크립트 비간섭을 보장합니다. 셸 명령어 실행이 필요 없습니다
-3. **사용 가능 도구**: Read, Write, AskUserQuestion만 사용합니다
+3. **사용 가능 도구**: Read, Write, AskUserQuestion, Glob, Grep, WebSearch, WebFetch를 사용합니다
 4. **워크플로우 무관**: FSM 상태 전이, init_workflow.py, workflow_agent_guard.py, workflow_transition_guard.py와 완전히 무관합니다. 배너 출력, workDir 생성, status.json/registry.json 조작을 하지 않습니다

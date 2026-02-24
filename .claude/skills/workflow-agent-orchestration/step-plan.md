@@ -17,13 +17,13 @@
 
 ## Noplan Mode Skip Condition
 
-> **noplan 모드에서는 PLAN 단계 전체를 건너뛰고 WORK Phase로 직행합니다.**
+> **noplan 모드 및 noplan+noreport 모드에서는 PLAN 단계 전체를 건너뛰고 WORK Phase로 직행합니다.**
 >
-> 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `noplan`이면 아래 모든 절차(2a~2b)를 스킵합니다. (status.json Read 불필요)
+> 판별: 오케스트레이터가 INIT 전 "Mode Auto-Determination Rule"로 결정한 `mode` 변수가 `noplan` 또는 `noplan+noreport`이면 아래 모든 절차(2a~2b)를 스킵합니다. (status.json Read 불필요)
 > - planner 에이전트 호출 없음
 > - AskUserQuestion 승인 절차 없음
 > - PLAN 배너 출력 없음
-> - 오케스트레이터는 즉시 Noplan Mode Post-INIT Flow (step-init.md 참조)로 진행
+> - 오케스트레이터는 즉시 Noplan Mode Post-INIT Flow (step-init.md 참조)로 진행 (`noplan+noreport`의 경우 Noplan+Noreport Mode Post-INIT Flow)
 
 ---
 
@@ -31,7 +31,7 @@
 
 > **State Update** before PLAN start:
 > ```bash
-> python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN
+> step-update both <registryKey> planner INIT PLAN
 > ```
 
 **Detailed Guide:** workflow-agent-plan skill 참조
@@ -94,7 +94,7 @@ workDir: <workDir>
 
 **Update Method (agent field, 1 Tool Call):**
 ```bash
-Bash("python3 .claude/scripts/state/update_state.py context <registryKey> <agent>")
+Bash("step-update context <registryKey> <agent>")
 ```
 
 > **Note:**
@@ -223,9 +223,9 @@ AskUserQuestion(
 **Update Method (2 Tool Calls, sequential):**
 ```bash
 # 1. CANCELLED 상태로 전이
-Bash("python3 .claude/scripts/state/update_state.py status <registryKey> PLAN CANCELLED")
+Bash("step-update status <registryKey> PLAN CANCELLED")
 # 2. 레지스트리에서 해제 (MUST: 누락 시 잔류 엔트리 발생)
-Bash("python3 .claude/scripts/state/update_state.py unregister <registryKey>")
+Bash("step-update unregister <registryKey>")
 ```
 
 > **REQUIRED:** `unregister` 호출을 생략하면 CANCELLED 상태의 엔트리가 레지스트리에 잔류합니다. status 전이와 unregister는 반드시 순차 실행하세요.

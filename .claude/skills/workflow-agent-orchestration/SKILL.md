@@ -16,15 +16,15 @@ stateDiagram-v2
     [*] --> INIT
     INIT --> PLAN: full mode
     INIT --> STRATEGY: strategy mode
-    INIT --> WORK: noplan mode
+    INIT --> WORK: noplan/noplan+noreport mode
     PLAN --> WORK: 승인
     PLAN --> CANCELLED: 중지
     WORK --> REPORT
     WORK --> FAILED: 실패
-    WORK --> COMPLETED: noreport mode
-    REPORT --> COMPLETED: 성공
+    WORK --> DONE: noreport mode
+    REPORT --> DONE: 성공
     REPORT --> FAILED: 실패
-    STRATEGY --> COMPLETED: 성공
+    STRATEGY --> DONE: 성공
     STRATEGY --> FAILED: 실패
     STRATEGY --> STALE: TTL 만료
     INIT --> STALE: TTL 만료
@@ -37,11 +37,11 @@ stateDiagram-v2
 
 | Mode | Phase Order | Agent Sequence | Skip |
 |------|-------------|----------------|------|
-| full (default) | INIT -> PLAN -> WORK -> REPORT -> COMPLETED | init -> planner -> worker(s)/explorer(s) -> reporter -> done | None |
-| noplan | INIT -> WORK -> REPORT -> COMPLETED | init -> worker(s)/explorer(s) -> reporter -> done | PLAN |
-| noreport | INIT -> PLAN -> WORK -> COMPLETED | init -> planner -> worker(s)/explorer(s) -> done | REPORT |
-| noplan+noreport | INIT -> WORK -> COMPLETED | init -> worker(s)/explorer(s) -> done | PLAN, REPORT |
-| strategy | INIT -> STRATEGY -> COMPLETED | init -> strategy -> done | PLAN, WORK, REPORT |
+| full (default) | INIT -> PLAN -> WORK -> REPORT -> DONE | init -> planner -> worker(s)/explorer(s) -> validator -> reporter -> done | None |
+| noplan | INIT -> WORK -> REPORT -> DONE | init -> worker(s)/explorer(s) -> validator -> reporter -> done | PLAN |
+| noreport | INIT -> PLAN -> WORK -> DONE | init -> planner -> worker(s)/explorer(s) -> validator -> done | REPORT |
+| noplan+noreport | INIT -> WORK -> DONE | init -> worker(s)/explorer(s) -> validator -> done | PLAN, REPORT |
+| strategy | INIT -> STRATEGY -> DONE | init -> strategy -> done | PLAN, WORK, REPORT |
 
 1. Phase order within each mode MUST NOT be violated
 2. PLAN approval REQUIRED before WORK proceeds (full mode only)
@@ -84,8 +84,10 @@ stateDiagram-v2
 |-------|-------|-------|-------------|------------|
 | INIT | init | workflow-agent-init | 8 | request, workDir, workId, registryKey |
 | PLAN | planner | workflow-agent-plan | 3 | plan path |
+| WORK (Phase 0) | indexer | workflow-agent-index | 3 | skill-map path |
 | WORK | worker | workflow-agent-work + command skills | 3 | work log path |
 | WORK | explorer | workflow-agent-explore | 3 | exploration result path |
+| WORK | validator | workflow-agent-validate | 3 | validation result path |
 | REPORT | reporter | workflow-agent-report | 2 | report path |
 | STRATEGY | strategy | workflow-agent-strategy | 3 | roadmap.md + .kanbanboard |
 | DONE | done | workflow-agent-done | 1 | status |
@@ -141,7 +143,7 @@ step-end <registryKey> <phase>
 >   1. `step-change 20260219-051347 INIT PLAN` ← 개별 Bash 호출
 >   2. `step-start 20260219-051347 PLAN` ← 개별 Bash 호출
 > - **잘못된 호출**: `step-change 20260219-051347 INIT PLAN && step-start 20260219-051347 PLAN` (단일 Bash 호출에 `&&` 체이닝 금지)
-> - **잘못된 호출**: `python3 .claude/scripts/state/update_state.py both 20260219-051347 planner INIT PLAN && step-change 20260219-051347 INIT PLAN` (`update_state.py`와 배너 명령 체이닝 금지)
+> - **잘못된 호출**: `step-update both 20260219-051347 planner INIT PLAN && step-change 20260219-051347 INIT PLAN` (`update_state.py`와 배너 명령 체이닝 금지)
 
 - **`<registryKey>`**: `YYYYMMDD-HHMMSS` format workflow identifier (full workDir path backward compatible)
 
@@ -151,14 +153,14 @@ step-end <registryKey> <phase>
 |--------|--------------------|-----------------------|-----------------------------|
 | INIT | `step-start INIT none <command>` | (없음) | `step-end <key> INIT` |
 | PLAN | `step-start <key> PLAN` | `step-change <key> INIT PLAN` | `step-end <key> PLAN` |
-| WORK | `step-start <key> WORK` | `step-change <key> PLAN WORK` | `step-end <key> WORK` |
+| WORK | `step-start <key> WORK` | `step-change <key> PLAN WORK` (noplan/noplan+noreport: `step-change <key> INIT WORK`) | `step-end <key> WORK` |
 | WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) | (없음) |
 | REPORT | `step-start <key> REPORT` | `step-change <key> WORK REPORT` | `step-end <key> REPORT` |
-| DONE | `step-start <key> DONE` | (없음) | `step-end <key> DONE done` |
+| DONE | `step-start <key> DONE` | `step-change <key> REPORT DONE` (full/noplan: `step-change <key> REPORT DONE`, strategy: `step-change <key> STRATEGY DONE`, noreport/noplan+noreport: `step-change <key> WORK DONE`) | `step-end <key> DONE done` |
 | STRATEGY | `step-start <key> STRATEGY` | `step-change <key> INIT STRATEGY` | `step-end <key> STRATEGY` |
 
 **각 phase의 오케스트레이터 호출 순서 (PLAN/WORK/REPORT/DONE 공통):**
-1. `python3 .claude/scripts/state/update_state.py both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
+1. `step-update both <key> <agent> <fromPhase> <toPhase>` — 상태 업데이트
 2. `step-change <key> <fromPhase> <toPhase>` — 상태 전이 시각화
 3. `step-start <key> <PHASE>` — 시작 배너
 4. (에이전트 작업 수행)
@@ -192,7 +194,7 @@ DONE start banner: Called by orchestrator before dispatching done agent. DONE co
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text (any language), phase status messages**, **내부 추론/분석 텍스트 출력** |
 | WORK done (full/noplan) | WORK step-end, extract first 3 lines, REPORT step-start, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
 | WORK done (noreport/noplan+noreport) | WORK step-end, extract first 3 lines, skip REPORT, DONE step-start, done agent call (reportPath 없음) | REPORT banner, reporter call, Work summary, **내부 추론/분석 텍스트 출력** |
-| REPORT done | REPORT step-end, DONE step-start, done agent call, extract first 2 lines, DONE step-end → **DONE step-end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
+| REPORT done | REPORT step-end, `step-update both <key> done REPORT DONE`, `step-change <key> REPORT DONE`, DONE step-start, done agent call, extract first 2 lines, DONE step-end → **DONE step-end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
 
 ---
 
@@ -242,7 +244,7 @@ Returns: `request`, `workDir`, `workId`, `registryKey`, `date`, `title`, `workNa
 
 **Details:** See [step-plan.md](step-plan.md)
 
-**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> planner INIT PLAN`
+**Status update:** `step-update both <registryKey> planner INIT PLAN`
 
 ```
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
@@ -255,15 +257,15 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 **Details:** See [step-work.md](step-work.md)
 
 **Status update (mode-aware):**
-- full mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
-- noplan mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
-- noreport mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK`
-- noplan+noreport mode: `python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK`
+- full mode: `step-update both <registryKey> worker PLAN WORK`
+- noplan mode: `step-update both <registryKey> worker INIT WORK`
+- noreport mode: `step-update both <registryKey> worker PLAN WORK`
+- noplan+noreport mode: `step-update both <registryKey> worker INIT WORK`
 - strategy mode: WORK Phase 없음 (STRATEGY Phase에서 strategy 서브에이전트가 작업)
 
-**Rules:** Only worker/explorer/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode). noplan mode: worker가 user_prompt.txt를 직접 해석하여 작업 수행.
+**Rules:** Only indexer/worker/explorer/validator/reporter calls allowed. MUST NOT re-call planner/init. MUST NOT reverse phase. Execute ONLY plan tasks (full mode). noplan mode: worker가 user_prompt.txt를 직접 해석하여 작업 수행.
 
-**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE (Phase 0 = 스킬 탐색/매핑 준비, Phase 1+ = skill-map 참조하여 계획서 태스크 실행, 스킬 미발견 시 Worker 자율 결정으로 진행) and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
+**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE (Phase 0 = indexer 에이전트가 스킬 카탈로그 기반 스킬 매핑 준비, Phase 1+ = skill-map 참조하여 계획서 태스크 실행, 스킬 미발견 시 Worker 자율 결정으로 진행) and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
 
 **Worker return:** Extract first 3 lines only (discard from line 4). Details in .workflow/ files.
 
@@ -271,7 +273,7 @@ After planner returns, orchestrator performs **AskUserQuestion** approval (3 fix
 
 **Details:** See [step-strategy.md](step-strategy.md)
 
-**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> strategy INIT STRATEGY`
+**Status update:** `step-update both <registryKey> strategy INIT STRATEGY`
 
 ```
 Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, request: <request>, workDir: <workDir>")
@@ -283,9 +285,9 @@ Task(subagent_type="strategy", prompt="command: strategy, workId: <workId>, requ
 
 **Details:** See [step-report.md](step-report.md)
 
-**Noreport mode skip:** noreport/noplan+noreport 모드에서는 REPORT 단계를 스킵하고 WORK 완료 후 바로 DONE으로 진행한다. WORK step-end 후 `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED` → DONE step-start → done agent call → DONE step-end 순서로 진행. reporter를 호출하지 않으며 `reportPath`는 done 에이전트에 전달하지 않는다.
+**Noreport mode skip:** noreport/noplan+noreport 모드에서는 REPORT 단계를 스킵하고 WORK 완료 후 바로 DONE으로 진행한다. WORK step-end 후 `step-update both <registryKey> done WORK DONE` → `step-change <registryKey> WORK DONE` → DONE step-start → done agent call → DONE step-end 순서로 진행. reporter를 호출하지 않으며 `reportPath`는 done 에이전트에 전달하지 않는다.
 
-**Status update:** `python3 .claude/scripts/state/update_state.py both <registryKey> reporter WORK REPORT`
+**Status update:** `step-update both <registryKey> reporter WORK REPORT`
 
 ```
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
@@ -295,11 +297,13 @@ Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, wor
 
 **Details:** See [step-done.md](step-done.md)
 
-> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후 또는 noreport 모드에서 WORK 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
+> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후, noreport 모드에서 WORK 완료 후, 또는 strategy 모드에서 STRATEGY 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
 
-After REPORT completion (or WORK completion in noreport mode): DONE start banner -> done agent call -> DONE step_complete -> terminate.
+After REPORT completion (or WORK completion in noreport mode): step-update both -> step-change -> DONE start banner -> done agent call -> DONE step_complete -> terminate.
 
 ```bash
+step-update both <registryKey> done REPORT DONE
+step-change <registryKey> REPORT DONE
 step-start <registryKey> DONE
 Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>")
 step-end <registryKey> DONE done
@@ -321,7 +325,7 @@ step-end <registryKey> DONE done
 |--------|-------------|
 | Phase banner Bash calls | `step-start` (start) + `step-change` (transition) + `step-end` (completion) |
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
-| State transition/registry | `python3 .claude/scripts/state/update_state.py both/status/context/register/unregister/link-session` |
+| State transition/registry | `step-update both/status/context/register/unregister/link-session` |
 | Sub-agent return extraction | Extract first N lines only from sub-agent returns (discard remainder) |
 | prompt.txt handling (INIT + 수정 요청 only) | INIT: init agent가 prompt.txt -> user_prompt.txt 복사 + prompt.txt 클리어. 수정 요청: `.claude/scripts/sync/reload_prompt.py`가 prompt.txt -> user_prompt.txt append + prompt.txt 클리어. 승인/중지 시 prompt.txt 접근 MUST NOT |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
@@ -334,6 +338,7 @@ step-end <registryKey> DONE done
 | planner | Plan document authoring (`plan.md`), task decomposition, phase/dependency design |
 | worker | Source code read/modify/create (Read/Write/Edit), code analysis, test execution, work log authoring (`work/WXX-*.md`) |
 | explorer | Codebase+web exploration, structured exploration result reporting, work log authoring (`work/WXX-*.md`) |
+| validator | Lint/type-check/build verification, validation report authoring (`work/validation-report.md`) |
 | reporter | Final report authoring (`report.md`), work log aggregation |
 | strategy | Codebase/workflow analysis, milestone decomposition, roadmap authoring (`roadmap.md`), kanbanboard generation (`.kanbanboard`) |
 | done | Finalization processing, Slack notification, cleanup |

@@ -47,7 +47,7 @@ maxTurns: 50
 ### 오케스트레이터가 대신 수행하는 행위
 
 - STRATEGY Phase 배너 호출 (`step-start <registryKey> STRATEGY` / `step-end STRATEGY`)
-- `python3 .claude/scripts/state/update_state.py` 상태 전이 (INIT -> STRATEGY, STRATEGY -> DONE)
+- `step-update` 상태 전이 (INIT -> STRATEGY, STRATEGY -> DONE)
 - Strategy 반환값 추출 (첫 3줄만 보관, 나머지 폐기)
 
 ## 스킬 바인딩
@@ -77,7 +77,7 @@ maxTurns: 50
 6. **산출물 생성** - `{workDir}/roadmap.md` 생성 후 `{workDir}/.kanbanboard` 생성
 
 - **질문 금지**: 불명확한 부분은 분석 결과 기반 최선의 판단
-- **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
+- **세션 링크 등록**: 작업 시작 시 `step-update link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
 > 상세 절차 (복잡도 산정 가이드, 종속성 그래프 생성 규칙, 로드맵 템플릿, .kanbanboard 생성 절차, Judge 모드 상세)는 `workflow-agent-strategy/SKILL.md`를 참조하세요.
 

@@ -8,25 +8,25 @@
 > **State Update** before WORK start:
 > ```bash
 > # full mode (default): transition from PLAN
-> python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK
+> step-update both <registryKey> worker PLAN WORK
 >
 > # noplan mode: transition from INIT (PLAN 스킵)
-> python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK
+> step-update both <registryKey> worker INIT WORK
 >
 > # noreport mode: transition from PLAN (full과 동일, WORK 완료 후 REPORT 스킵)
-> python3 .claude/scripts/state/update_state.py both <registryKey> worker PLAN WORK
+> step-update both <registryKey> worker PLAN WORK
 >
 > # noplan+noreport mode: transition from INIT (noplan과 동일, WORK 완료 후 REPORT 스킵)
-> python3 .claude/scripts/state/update_state.py both <registryKey> worker INIT WORK
+> step-update both <registryKey> worker INIT WORK
 > ```
 > Note: strategy 모드에서는 WORK Phase가 없으므로 해당 없음 (INIT -> STRATEGY로 직행).
-> Note: noreport/noplan+noreport 모드에서는 WORK 완료 후 REPORT를 스킵하고 바로 DONE으로 진행한다. 오케스트레이터는 WORK step-end 후 reporter를 호출하지 않고 `python3 .claude/scripts/state/update_state.py both <registryKey> done WORK COMPLETED` → DONE step-start → done agent call → DONE step-end 순서로 진행.
+> Note: noreport/noplan+noreport 모드에서는 WORK 완료 후 REPORT를 스킵하고 바로 DONE으로 진행한다. 오케스트레이터는 WORK step-end 후 reporter를 호출하지 않고 `step-update both <registryKey> done WORK DONE` → `step-change <registryKey> WORK DONE` → DONE step-start → done agent call → DONE step-end 순서로 진행.
 
 > **WORK Phase Rules (REQUIRED)**
 >
 > | Category | Rule |
 > |----------|------|
-> | **Allowed calls** | worker, explorer, reporter 에이전트만 호출 가능 |
+> | **Allowed calls** | indexer, worker, explorer, validator, reporter 에이전트만 호출 가능 |
 > | **Re-call MUST NOT** | planner, init 에이전트 재호출 MUST NOT |
 > | **Reverse transition MUST NOT** | WORK->PLAN, WORK->INIT 등 역방향 phase 변경 MUST NOT |
 > | **Autonomous judgment MUST NOT** | 오케스트레이터가 독자적으로 맥락 보강, 계획 수정, 태스크 추가/삭제/변경을 판단하지 않음 |
@@ -53,8 +53,8 @@ Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, tas
 **usage-pending 등록:**
 ```bash
 # Worker와 동일한 방식으로 usage-pending 등록
-python3 .claude/scripts/state/update_state.py task-status <registryKey> <taskId> running
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> <taskId> <taskId>
+step-update task-status <registryKey> <taskId> running
+step-update usage-pending <registryKey> <taskId> <taskId>
 ```
 
 **반환값 처리:**
@@ -77,12 +77,12 @@ python3 .claude/scripts/state/update_state.py usage-pending <registryKey> <taskI
 # Phase 1에서 Worker와 Explorer가 병렬 실행
 step-start <registryKey> WORK-PHASE 1 "W01,W02,W03" parallel
 
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W02 running
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W03 running
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W02 W02
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W03 W03
+step-update task-status <registryKey> W01 running
+step-update task-status <registryKey> W02 running
+step-update task-status <registryKey> W03 running
+step-update usage-pending <registryKey> W01 W01
+step-update usage-pending <registryKey> W02 W02
+step-update usage-pending <registryKey> W03 W03
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
@@ -125,17 +125,17 @@ WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 
 | Phase | 역할 | 실행 주체 | 산출물 |
 |-------|------|----------|--------|
-| Phase 0 | 스킬 탐색/매핑 준비 | 1개 Worker (순차) | `skill-map.md` |
+| Phase 0 | 스킬 탐색/매핑 준비 | indexer 에이전트 (순차) | `skill-map.md` |
 | Phase 1+ | 계획서 태스크 실행 | N개 Worker/Explorer (병렬/순차) | `WXX-*.md` 작업 내역, 코드 변경 |
 
 ---
 
-## Phase 0 - Preparation (Required, Sequential 1 worker)
+## Phase 0 - Preparation (Required, Sequential 1 indexer)
 
-> **CRITICAL: Phase 0 스킵 절대 금지.** full 모드 및 noplan 모드에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
+> **CRITICAL: Phase 0 스킵 절대 금지.** WORK Phase가 있는 모든 모드(full/noplan/noreport/noplan+noreport)에서 Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 워크플로우 프로토콜 위반입니다. Phase 0은 WORK 단계 진입 후 가장 먼저 실행해야 하는 필수 단계이며, 어떤 상황에서도 생략할 수 없습니다.
 
-> **필수 실행**: Phase 0은 모든 full 모드 및 noplan 모드 워크플로우에서 필수로 실행합니다.
-> **REQUIRED**: Phase 0 Worker 호출 직전에 반드시 WORK-PHASE 0 배너를 출력해야 합니다.
+> **필수 실행**: Phase 0은 WORK Phase가 있는 모든 모드(full, noplan, noreport, noplan+noreport) 워크플로우에서 필수로 실행합니다.
+> **REQUIRED**: Phase 0 indexer 호출 직전에 반드시 WORK-PHASE 0 배너를 출력해야 합니다.
 
 **Phase 0 실행 흐름:**
 
@@ -158,36 +158,36 @@ flowchart TD
 step-start <registryKey> WORK-PHASE 0 "phase0" sequential
 ```
 ```bash
-# MUST: Phase 0 배너 직후, Task 호출 전에 반드시 아래 3개 명령을 단일 Bash로 실행
-mkdir -p <workDir>/work && python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> phase0 phase0
+# MUST: Phase 0 배너 직후, Task 호출 전에 반드시 아래 2개 명령을 단일 Bash로 실행
+step-update task-status <registryKey> phase0 running && step-update usage-pending <registryKey> phase0 phase0
 ```
 ```
 # full mode:
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>, mode: phase0")
+Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, planPath: <planPath>, workDir: <workDir>")
 
 # noplan mode (plan.md 없음, userPromptPath 사용):
-Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: phase0, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, mode: phase0")
+Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>")
 ```
 
 **Phase 0 완료 후 task-status 갱신:**
 ```bash
-# Worker 반환값 수신 후 (성공/실패에 따라)
-python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 completed   # 성공 시
-python3 .claude/scripts/state/update_state.py task-status <registryKey> phase0 failed       # 실패 시
+# indexer 반환값 수신 후 (성공/실패에 따라)
+step-update task-status <registryKey> phase0 completed   # 성공 시
+step-update task-status <registryKey> phase0 failed       # 실패 시
 ```
 
-Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 계획서 태스크와 스킬을 매핑하여 `<workDir>/work/skill-map.md` 생성.
+Phase 0 기능: (1) `<workDir>/work/` 디렉터리 생성, (2) 스킬 카탈로그(`skill-catalog.md`)를 참조하여 계획서 태스크에 적합한 스킬을 매핑하고 `<workDir>/work/skill-map.md` 생성.
 
 Phase 0 완료 후, 오케스트레이터는 skill-map.md를 직접 Read하지 않습니다. 대신 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로를 파라미터로 전달하고, Phase 1+ Worker가 직접 읽어 스킬을 결정합니다.
 
 **Phase 0 실패 시 폴백:**
 
-Phase 0이 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별 자율 결정으로 자동 폴백합니다:
-1. Phase 0 실패를 로그에 기록
+indexer 에이전트가 실행되었으나 실패(상태: 실패)를 반환한 경우, 개별 자율 결정으로 자동 폴백합니다:
+1. indexer 실패를 로그에 기록
 2. skill-map.md 없이 Phase 1로 진행
 3. 각 Worker가 skills 파라미터 없이 자율 결정으로 작업 수행
 
-> **GATE: Phase 1 진입 전 Phase 0 완료 필수.** Phase 0 Worker가 반환값을 돌려주지 않았다면 Phase 1으로 진행할 수 없습니다. Phase 0을 실행하지 않고 Phase 1 배너를 출력하는 것은 프로토콜 위반입니다.
+> **GATE: Phase 1 진입 전 Phase 0 완료 필수.** Phase 0 indexer가 반환값을 돌려주지 않았다면 Phase 1으로 진행할 수 없습니다. Phase 0을 실행하지 않고 Phase 1 배너를 출력하는 것은 프로토콜 위반입니다.
 
 ## Phase 1~N: Task Execution
 
@@ -217,7 +217,7 @@ step-start <registryKey> WORK-PHASE 1 "W01,W02" parallel
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 일괄 실행 (스킵 금지)
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running && python3 .claude/scripts/state/update_state.py task-status <registryKey> W02 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01 && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W02 W02
+step-update task-status <registryKey> W01 running && step-update task-status <registryKey> W02 running && step-update usage-pending <registryKey> W01 W01 && step-update usage-pending <registryKey> W02 W02
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -231,7 +231,7 @@ step-start <registryKey> WORK-PHASE 2 "W04" sequential
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 실행 (스킵 금지)
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W04 running && python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W04 W04
+step-update task-status <registryKey> W04 running && step-update usage-pending <registryKey> W04 W04
 ```
 ```
 Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
@@ -300,10 +300,10 @@ Worker 반환값 수신 후, 반환 상태에 따라 `task-status`를 갱신합�
 
 ```bash
 # 반환값 첫 줄이 "상태: 성공" 또는 "상태: 부분성공"인 경우
-python3 .claude/scripts/state/update_state.py task-status <registryKey> <taskId> completed
+step-update task-status <registryKey> <taskId> completed
 
 # 반환값 첫 줄이 "상태: 실패"인 경우
-python3 .claude/scripts/state/update_state.py task-status <registryKey> <taskId> failed
+step-update task-status <registryKey> <taskId> failed
 ```
 
 > **MUST: Worker 반환값 수신 직후, 다음 Phase 배너 호출 전에 반드시 task-status를 갱신합니다. 스킵 금지.** 병렬 Worker의 경우, 모든 Worker 반환 후 단일 Bash로 일괄 갱신합니다.
@@ -324,32 +324,32 @@ python3 .claude/scripts/state/update_state.py task-status <registryKey> <taskId>
 | 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
 
 ```bash
-# 형식: python3 .claude/scripts/state/update_state.py usage-pending <registryKey> <agent_id_or_taskId> <taskId>
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01
+# 형식: step-update usage-pending <registryKey> <agent_id_or_taskId> <taskId>
+step-update usage-pending <registryKey> W01 W01
 ```
 
 ## Hooks 수정 태스크 실행 패턴
 
 > hooks/scripts 디렉터리(`.claude/hooks/`, `.claude/scripts/`)의 파일을 수정하는 태스크는 `hooks-self-guard.py`에 의해 차단됩니다.
-> 오케스트레이터가 `python3 .claude/scripts/state/update_state.py env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
+> 오케스트레이터가 `step-update env` 명령으로 `HOOKS_EDIT_ALLOWED=1` 환경변수를 설정한 후 Worker를 호출하고, 완료 후 해제해야 합니다.
 
 **실행 순서:**
 
 ```bash
 # 1. Worker 호출 전: hooks 수정 허용 환경변수 설정
-python3 .claude/scripts/state/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1
+step-update env <registryKey> set HOOKS_EDIT_ALLOWED 1
 
 # 2. Worker 호출 (hooks 파일 수정 태스크)
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 running
-python3 .claude/scripts/state/update_state.py usage-pending <registryKey> W01 W01
+step-update task-status <registryKey> W01 running
+step-update usage-pending <registryKey> W01 W01
 ```
 ```
 Task(subagent_type="worker", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
 ```
 ```bash
 # 3. Worker 완료 후: task-status 갱신 + 환경변수 해제 (반드시 실행)
-python3 .claude/scripts/state/update_state.py task-status <registryKey> W01 completed   # 또는 failed
-python3 .claude/scripts/state/update_state.py env <registryKey> unset HOOKS_EDIT_ALLOWED
+step-update task-status <registryKey> W01 completed   # 또는 failed
+step-update env <registryKey> unset HOOKS_EDIT_ALLOWED
 ```
 
 **규칙:**
@@ -358,5 +358,108 @@ python3 .claude/scripts/state/update_state.py env <registryKey> unset HOOKS_EDIT
 |------|------|
 | 설정 시점 | Worker Task 호출 직전 (usage-pending보다 먼저) |
 | 해제 시점 | Worker 반환값 수신 직후 (성공/실패 무관, 반드시 해제) |
-| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `python3 .claude/scripts/state/update_state.py env`의 화이트리스트로 제한 |
+| 허용 범위 | `HOOKS_EDIT_ALLOWED` KEY만 사용. 다른 KEY는 `step-update env`의 화이트리스트로 제한 |
 | 적용 대상 | 계획서에서 hooks 디렉터리 파일을 수정 대상으로 명시한 태스크만 해당 |
+
+---
+
+## Validator Phase (Phase N+1)
+
+> **Agent-Skill Binding**
+> - Agent: `validator` (model: sonnet, maxTurns: 25)
+> - Skill: `workflow-agent-validate` (항상 바인딩)
+> - Task prompt: `command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>`
+
+모든 Worker Phase(1~N)가 완료된 후 마지막 Phase로 실행되는 통합 검증 단계이다. validator 에이전트가 린트/타입체크/빌드/작업 내역 확인의 MVP 검증을 수행한다.
+
+### 실행 조건
+
+| 명령어 | validator 실행 |
+|--------|---------------|
+| implement | 실행 |
+| review | 실행 |
+| research | 스킵 (코드 변경 없음) |
+| strategy | 스킵 (코드 변경 없음) |
+| prompt | 스킵 (코드 변경 없음) |
+
+```
+# 오케스트레이터 판단 로직
+if command in ["implement", "review"]:
+    # Validator Phase N+1 실행
+else:
+    # Validator 스킵, 바로 REPORT 또는 DONE 단계로 진행
+```
+
+### 호출 패턴
+
+모든 Worker Phase 완료 후, 마지막 Phase 번호(N)에 1을 더한 Phase N+1로 validator를 호출한다.
+
+```bash
+# Phase N+1 서브배너 출력
+step-start <registryKey> WORK-PHASE <N+1> "validator" sequential
+```
+```bash
+# MUST: Phase 배너 직후, Task 호출 직전에 반드시 실행
+step-update task-status <registryKey> validator running && step-update usage-pending <registryKey> validator validator
+```
+```
+# Validator 호출
+Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>")
+```
+
+> **Note:** `agent_permissions.py`의 WORK 리스트에 `"validator"`가 포함되어 있으므로 `workflow_agent_guard.py`를 정상 통과한다.
+
+### 반환값 처리
+
+Validator 반환값은 Worker와 동일한 3줄 추출 규칙을 적용한다.
+
+**반환 형식:**
+```
+상태: 통과|경고|실패
+검증 내역: <workDir>/work/validation-report.md
+검증 항목: N개
+```
+
+**상태별 처리:**
+
+| 상태 | 처리 | 후속 단계 |
+|------|------|----------|
+| 통과 | 정상 진행 | REPORT 또는 DONE |
+| 경고 | 경고 로그 기록 후 정상 진행 | REPORT 또는 DONE |
+| 실패 | 경고 로그 기록 후 정상 진행 (soft blocking) | REPORT 또는 DONE |
+
+> **soft blocking 설계**: 상태가 "실패"여도 WORK Phase를 실패로 처리하지 않는다. validator는 정보 제공 역할이며 워크플로우 차단 결정을 하지 않는다. 오케스트레이터는 경고 로그만 남기고 다음 단계(REPORT 또는 DONE)로 정상 진행한다.
+
+**Task Status 갱신:**
+```bash
+# Validator 반환값 수신 후
+step-update task-status <registryKey> validator completed   # 상태가 통과/경고/실패 모두 completed
+```
+
+### Worker와의 차이점
+
+| 항목 | Worker (Phase 1~N) | Validator (Phase N+1) |
+|------|--------------------|-----------------------|
+| 서브에이전트 타입 | `worker` | `validator` |
+| 스킬 | workflow-agent-work + command skills | workflow-agent-validate |
+| 역할 | 코드 수정/생성, 테스트 실행 | 린트/타입체크/빌드/작업 내역 확인 |
+| Edit 도구 | 보유 | 미보유 (코드 수정 금지) |
+| 모델 | inherit (Opus) | sonnet (비용-품질 균형) |
+| 산출물 | `work/WXX-*.md` (태스크별) | `work/validation-report.md` (단일) |
+| 반환 상태 | 성공/부분성공/실패 | 통과/경고/실패 |
+| 실패 시 워크플로우 | 종속 체인 중단 가능 | 항상 정상 진행 (soft blocking) |
+
+### 전체 WORK Phase 흐름 (Validator 포함)
+
+```mermaid
+flowchart TD
+    P0[Phase 0: indexer] --> P1[Phase 1~N: Worker/Explorer]
+    P1 --> CHECK{command?}
+    CHECK -->|implement/review| VPH[Phase N+1: validator]
+    CHECK -->|research/strategy/prompt| NEXT[다음 단계]
+    VPH --> VR{validator 상태}
+    VR -->|통과| NEXT
+    VR -->|경고| LOG1[경고 로그] --> NEXT
+    VR -->|실패| LOG2[경고 로그] --> NEXT
+    NEXT --> DONE[REPORT 또는 DONE]
+```

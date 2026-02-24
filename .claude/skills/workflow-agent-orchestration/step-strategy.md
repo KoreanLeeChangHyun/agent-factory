@@ -11,7 +11,7 @@
 
 > **State Update** before STRATEGY start:
 > ```bash
-> python3 .claude/scripts/state/update_state.py both <registryKey> strategy INIT STRATEGY
+> step-update both <registryKey> strategy INIT STRATEGY
 > ```
 
 ## STRATEGY Banner
@@ -59,10 +59,12 @@ step-end <registryKey> STRATEGY
 
 STRATEGY 완료 후 DONE Phase로 진행합니다:
 
-1. `step-start <registryKey> DONE` (DONE start banner)
-2. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>")`
-3. `step-end <registryKey> DONE done` (DONE completion)
-4. Terminate
+1. `step-update both <registryKey> done STRATEGY DONE` (상태 업데이트)
+2. `step-change <registryKey> STRATEGY DONE` (상태 전이 시각화)
+3. `step-start <registryKey> DONE` (DONE start banner)
+4. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: strategy, title: <title>, reportPath: <reportPath>, status: <status>, workflow_id: <workflow_id>")`
+5. `step-end <registryKey> DONE done` (DONE completion)
+6. Terminate
 
 ## Error Handling
 
@@ -80,8 +82,8 @@ while retry_count < MAX_RETRIES:
     log("[WARN] STRATEGY 실패 (시도 {retry_count}/{MAX_RETRIES})")
 
 if retry_count >= MAX_RETRIES:
-    python3 .claude/scripts/state/update_state.py status <registryKey> STRATEGY FAILED
-    python3 .claude/scripts/state/update_state.py unregister <registryKey>
+    step-update status <registryKey> STRATEGY FAILED
+    step-update unregister <registryKey>
     # 워크플로우 종료 (DONE 단계 스킵)
 ```
 

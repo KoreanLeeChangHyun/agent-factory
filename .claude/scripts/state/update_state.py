@@ -40,7 +40,6 @@ from utils.common import (
     C_PURPLE,
     C_RED,
     C_RESET,
-    C_YELLOW,
     C_BLUE,
     PHASE_COLORS,
     TS_PATTERN,
@@ -755,7 +754,7 @@ def main():
             print("[WARN] context 모드: agent 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_context(local_context, agent)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "status":
         from_phase = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -764,7 +763,7 @@ def main():
             print("[WARN] status 모드: fromPhase, toPhase 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_status(abs_work_dir, global_registry, status_file, from_phase, to_phase)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "both":
         agent = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -775,17 +774,17 @@ def main():
             sys.exit(0)
         result_ctx = update_context(local_context, agent)
         result_sts = update_status(abs_work_dir, global_registry, status_file, from_phase, to_phase)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result_ctx}, {result_sts}")
+        print(f"state updated: {result_ctx}, {result_sts}")
 
     elif mode == "register":
         reg_title = sys.argv[3] if len(sys.argv) > 3 else ""
         reg_command = sys.argv[4] if len(sys.argv) > 4 else ""
         result = register_workflow(abs_work_dir, global_registry, reg_title, reg_command)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "unregister":
         result = unregister_workflow(abs_work_dir, global_registry)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "link-session":
         session_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -793,7 +792,7 @@ def main():
             print("[WARN] link-session 모드: sessionId 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = link_session(status_file, session_id)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "usage-pending":
         agent_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -802,7 +801,7 @@ def main():
             print("[WARN] usage-pending 모드: agent_id, task_id 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = usage_pending(abs_work_dir, agent_id, task_id)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "usage":
         agent_name = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -815,11 +814,11 @@ def main():
             print("[WARN] usage 모드: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_creation, cache_read, task_id_arg)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "usage-finalize":
         result = usage_finalize(abs_work_dir, global_registry)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "env":
         action = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -829,7 +828,7 @@ def main():
             print("[WARN] env 모드: action(set|unset), KEY 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = env_manage(action, key, value)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     elif mode == "task-status":
         task_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -838,7 +837,7 @@ def main():
             print("[WARN] task-status 모드: task_id, status 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_task_status(status_file, task_id, task_status)
-        print(f"{C_YELLOW}[OK]{C_RESET} state updated: {result}")
+        print(f"state updated: {result}")
 
     else:
         print(

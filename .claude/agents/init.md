@@ -40,7 +40,7 @@ maxTurns: 15
 
 - INIT Phase 배너 호출 (`step-start INIT none <command>`)
 - INIT 완료 후 모드 분기 판단 및 다음 Phase로 전이
-- `python3 .claude/scripts/state/update_state.py` 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
+- `step-update` 상태 전이 (INIT -> PLAN 또는 INIT -> WORK)
 
 ## 스킬 바인딩
 
@@ -54,12 +54,12 @@ maxTurns: 15
 
 오케스트레이터로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, review, research, strategy, prompt)
+- `command`: 실행 명령어 (implement, review, research, strategy)
 - `mode`: (선택적) 워크플로우 모드. 오케스트레이터가 Mode Auto-Determination Rule(command + $ARGUMENTS 플래그 조합)로 결정한 값을 수신. `full`(기본값), `strategy`, `noplan`, `noreport`, `noplan+noreport` 중 하나
 
 ## 절차
 
-1. **prompt.txt 읽기** - `.prompt/prompt.txt`를 절대 경로로 Read. 내용 없으면 시나리오 분기 (이전 COMPLETED 워크플로우 존재 시 후속 제안, 없으면 중지 안내)
+1. **prompt.txt 읽기** - `.prompt/prompt.txt`를 절대 경로로 Read. 내용 없으면 시나리오 분기 (이전 DONE 워크플로우 존재 시 후속 제안, 없으면 중지 안내)
 2. **작업 제목 생성** - prompt.txt 기반 20자 이내 한글 요약, 공백->하이픈, 특수문자 제거
 3. **init_workflow.py 실행** - `python3 .claude/scripts/init/init_workflow.py <command> <title> <mode>` 1회 호출. **stdout 출력을 파싱**하여 반환값 구성
 
@@ -157,8 +157,8 @@ workName: <init_workflow.py stdout의 workName 값>
 > 1. **코드 파일 읽기/분석 금지**: 소스 코드를 Read/Grep으로 탐색하지 마라
 > 2. **코드 작성/수정 금지**: 소스 코드를 Write/Edit하지 마라
 > 3. **리뷰 의견 제시 금지**: 코드 품질, 버그, 개선점을 언급하지 마라
-> 4. **보고서 분석 금지**: 이전 워크플로우의 report.md를 읽거나 분석하지 마라 (**예외**: Step 1 시나리오 1에서 prompt.txt가 비어있고 이전 COMPLETED 워크플로우가 존재할 때는 report.md 분석 허용)
-> 5. **후속 작업 제안 금지**: 다음에 할 작업을 제안하지 마라 (**예외**: Step 1 시나리오 1에서 prompt.txt가 비어있고 이전 COMPLETED 워크플로우가 존재할 때는 후속 작업 제안 허용)
+> 4. **보고서 분석 금지**: 이전 워크플로우의 report.md를 읽거나 분석하지 마라 (**예외**: Step 1 시나리오 1에서 prompt.txt가 비어있고 이전 DONE 워크플로우가 존재할 때는 report.md 분석 허용)
+> 5. **후속 작업 제안 금지**: 다음에 할 작업을 제안하지 마라 (**예외**: Step 1 시나리오 1에서 prompt.txt가 비어있고 이전 DONE 워크플로우가 존재할 때는 후속 작업 제안 허용)
 > 6. **PLAN/WORK/REPORT 작업 금지**: 계획 수립, 실제 작업 수행, 보고서 작성을 하지 마라
 > 7. **미완료 워크플로우 확인/출력 금지**: registry.json을 조회하여 활성 워크플로우 상태를 확인하거나 테이블을 출력하지 마라. 다중 워크플로우 동시 실행은 시스템이 지원하는 정상 동작이다.
 

@@ -31,7 +31,7 @@ def _history_sync_trigger(stdin_data, flags):
         return
 
     agent_type = data.get('agent_type', '')
-    valid_types = {'init', 'planner', 'worker', 'explorer', 'reporter', 'done'}
+    valid_types = {'init', 'planner', 'indexer', 'worker', 'explorer', 'validator', 'reporter', 'strategy', 'done'}
     if agent_type not in valid_types:
         return
 

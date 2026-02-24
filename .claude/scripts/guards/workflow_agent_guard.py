@@ -9,29 +9,29 @@ PreToolUse(Task) 이벤트에서 phase별 허용 에이전트를 검증하여 �
 
 설계 의도: 워크플로우는 FSM(유한 상태 기계) 기반으로 Phase를 전이하며,
 각 Phase에 전담 에이전트만 허용한다.
-허용 에이전트 6종(init, planner, worker, explorer, reporter, done)은
-INIT->PLAN->WORK->REPORT->COMPLETED 전이 경로의 각 단계를 전담한다.
+허용 에이전트 8종(init, planner, indexer, worker, explorer, reporter, strategy, done)은
+INIT->PLAN->WORK->REPORT->DONE 전이 경로의 각 단계를 전담한다.
 
 모드별 Phase별 허용 에이전트:
   [full 모드 (기본)]
     NONE/비존재: init만 허용
     INIT: planner만 허용
     PLAN: planner + worker 허용
-    WORK: worker + explorer + reporter 허용
+    WORK: indexer + worker + explorer + reporter 허용
     REPORT: reporter(재호출) + done 허용
-    COMPLETED: done 허용 (마무리 처리)
+    DONE: done 허용 (마무리 처리)
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
   [strategy 모드]
     NONE/비존재: init만 허용
     STRATEGY: strategy + done 허용 (strategy 에이전트가 작업 수행)
-    COMPLETED: done 허용 (마무리 처리)
+    DONE: done 허용 (마무리 처리)
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
   [noplan 모드]
     NONE/비존재: init만 허용
-    INIT: worker + explorer 허용 (Phase 0 스킬 탐색 포함)
-    WORK: worker + explorer + reporter 허용
+    INIT: indexer + worker + explorer 허용 (Phase 0 스킬 탐색 포함)
+    WORK: indexer + worker + explorer + reporter 허용
     REPORT: reporter + done 허용
-    COMPLETED: done 허용 (마무리 처리)
+    DONE: done 허용 (마무리 처리)
     FAILED/STALE/CANCELLED: 모든 에이전트 차단
 """
 
@@ -88,9 +88,15 @@ except ImportError:
     )
     _empty_phases = {
         "NONE": [], "INIT": [], "PLAN": [], "WORK": [],
-        "REPORT": [], "COMPLETED": [], "FAILED": [], "STALE": [], "CANCELLED": [],
+        "REPORT": [], "DONE": [], "FAILED": [], "STALE": [], "CANCELLED": [],
     }
-    MODE_AGENTS_MAP = {"full": _empty_phases, "strategy": _empty_phases, "noplan": _empty_phases}
+    MODE_AGENTS_MAP = {
+        "full": _empty_phases,
+        "strategy": _empty_phases,
+        "noplan": _empty_phases,
+        "noreport": _empty_phases,
+        "noplan+noreport": _empty_phases,
+    }
 
 
 def main():

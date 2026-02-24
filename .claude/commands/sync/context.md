@@ -131,4 +131,5 @@ echo '<analyze_json>' | python3 .claude/scripts/init/init_project.py generate-cl
 | `/init:workflow` | 워크플로우 로드 (CLAUDE.md, orchestration 스킬) |
 | `/sync:history` | .workflow/ 작업 내역을 history.md에 동기화 |
 | `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
+| `/sync:catalog` | 스킬 카탈로그(skill-catalog.md) 재생성 |
 | `/sync:code` | 원격 리포지토리에서 .claude 동기화 |

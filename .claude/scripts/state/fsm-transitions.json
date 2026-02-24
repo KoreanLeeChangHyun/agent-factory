@@ -6,29 +6,29 @@
       "INIT": ["PLAN", "STALE"],
       "PLAN": ["WORK", "CANCELLED", "STALE"],
       "WORK": ["REPORT", "FAILED", "STALE"],
-      "REPORT": ["COMPLETED", "FAILED", "STALE"]
+      "REPORT": ["DONE", "FAILED", "STALE"]
     },
     "strategy": {
       "NONE": ["INIT"],
       "INIT": ["STRATEGY", "STALE"],
-      "STRATEGY": ["COMPLETED", "FAILED", "STALE"]
+      "STRATEGY": ["DONE", "FAILED", "STALE"]
     },
     "noplan": {
       "NONE": ["INIT"],
       "INIT": ["WORK", "STALE"],
       "WORK": ["REPORT", "FAILED", "STALE"],
-      "REPORT": ["COMPLETED", "FAILED", "STALE"]
+      "REPORT": ["DONE", "FAILED", "STALE"]
     },
     "noreport": {
       "NONE": ["INIT"],
       "INIT": ["PLAN", "STALE"],
       "PLAN": ["WORK", "CANCELLED", "STALE"],
-      "WORK": ["COMPLETED", "FAILED", "STALE"]
+      "WORK": ["DONE", "FAILED", "STALE"]
     },
     "noplan+noreport": {
       "NONE": ["INIT"],
       "INIT": ["WORK", "STALE"],
-      "WORK": ["COMPLETED", "FAILED", "STALE"]
+      "WORK": ["DONE", "FAILED", "STALE"]
     }
   }
 }
