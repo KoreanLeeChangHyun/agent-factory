@@ -14,14 +14,14 @@ Main agent controls workflow sequencing and agent dispatch only.
 ```mermaid
 stateDiagram-v2
     [*] --> INIT
-    INIT --> PLAN: full mode
+    INIT --> PLAN: full/noreport mode
     INIT --> STRATEGY: strategy mode
     INIT --> WORK: noplan/noplan+noreport mode
     PLAN --> WORK: 승인
     PLAN --> CANCELLED: 중지
     WORK --> REPORT
     WORK --> FAILED: 실패
-    WORK --> DONE: noreport mode
+    WORK --> DONE: noreport/noplan+noreport mode
     REPORT --> DONE: 성공
     REPORT --> FAILED: 실패
     STRATEGY --> DONE: 성공

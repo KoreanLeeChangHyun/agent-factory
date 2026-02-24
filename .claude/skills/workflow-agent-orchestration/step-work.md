@@ -163,7 +163,7 @@ step-update task-status <registryKey> phase0 running && step-update usage-pendin
 ```
 ```
 # full mode:
-Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, planPath: <planPath>, workDir: <workDir>")
+Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, taskId: phase0, planPath: <planPath>, workDir: <workDir>")
 
 # noplan mode (plan.md 없음, userPromptPath 사용):
 Task(subagent_type="indexer", prompt="command: <command>, workId: <workId>, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>")
@@ -380,7 +380,6 @@ step-update env <registryKey> unset HOOKS_EDIT_ALLOWED
 | review | 실행 |
 | research | 스킵 (코드 변경 없음) |
 | strategy | 스킵 (코드 변경 없음) |
-| prompt | 스킵 (코드 변경 없음) |
 
 ```
 # 오케스트레이터 판단 로직
@@ -456,7 +455,7 @@ flowchart TD
     P0[Phase 0: indexer] --> P1[Phase 1~N: Worker/Explorer]
     P1 --> CHECK{command?}
     CHECK -->|implement/review| VPH[Phase N+1: validator]
-    CHECK -->|research/strategy/prompt| NEXT[다음 단계]
+    CHECK -->|research/strategy| NEXT[다음 단계]
     VPH --> VR{validator 상태}
     VR -->|통과| NEXT
     VR -->|경고| LOG1[경고 로그] --> NEXT

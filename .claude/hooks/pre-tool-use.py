@@ -51,7 +51,7 @@ def _task_history_sync_main(stdin_data):
     if not match:
         return 0
 
-    valid_types = {'init', 'planner', 'worker', 'explorer', 'reporter', 'done'}
+    valid_types = {'init', 'planner', 'indexer', 'worker', 'explorer', 'validator', 'reporter', 'strategy', 'done'}
     if subagent_type not in valid_types:
         return 0
 

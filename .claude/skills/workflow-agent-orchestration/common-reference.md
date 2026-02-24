@@ -45,7 +45,7 @@
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
 | **Step** | 스텝 | 오케스트레이터 절차 순서. Phase(FSM 상태)와 구분되는 개념으로 step-init.md~step-done.md 파일명에 사용. |
 | **DONE** | (FSM Phase/배너 명칭) | 워크플로우 완료를 나타내는 FSM Phase이자 배너 명칭. done 에이전트가 REPORT->DONE 전이를 수행. Agent-Phase 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE / DONE done)에서 사용. |
-| **summary.txt** | 요약 파일 | init 에이전트가 1차로 생성, done 에이전트가 최종 결과 보고서를 기반으로 2차로 갱신 |
+| **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, done 에이전트가 읽어서 history.md 갱신에 활용 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `.prompt/user_prompt.txt`에 저장되며 오케스트레이터가 워크플로우 시작 전 생성. |
 
 ### 에이전트-Phase-스킬 관계
@@ -106,6 +106,7 @@ flowchart TD
 | indexer | WORK (Phase 0) | workflow-agent-index | - | frontmatter `skills:` |
 | worker | WORK | workflow-agent-work | command-skill-map.md 기반 동적 로드 (implement, review, research, strategy별 기본 매핑 + 키워드 매칭 + description 폴백) | frontmatter `skills:` (workflow-agent-work) + 런타임 동적 (command skills) |
 | explorer | WORK | workflow-agent-explore | - | frontmatter `skills:` |
+| validator | WORK (Phase N+1) | workflow-agent-validate | - | frontmatter `skills:` |
 | strategy | STRATEGY | workflow-agent-strategy | - | frontmatter `skills:` |
 | reporter (sonnet) | REPORT | workflow-agent-report | - | frontmatter `skills:` |
 | done | DONE (별칭) | workflow-agent-done | - | frontmatter `skills:` |
@@ -189,6 +190,14 @@ workName: <작업이름>
 탐색 파일: N개
 ```
 
+### validator Return Format (3 lines)
+
+```
+상태: 통과 | 경고 | 실패
+검증 내역: <workDir>/work/validation-report.md
+검증 항목: N개
+```
+
 ### reporter Return Format (2 lines)
 
 ```
@@ -219,11 +228,11 @@ workName: <작업이름>
 | context | `<registryKey> <agent>` | .context.json agent 필드 업데이트 |
 | status | `<registryKey> <fromPhase> <toPhase>` | status.json phase 변경 |
 | both | `<registryKey> <agent> <fromPhase> <toPhase>` | context + status 동시 (권장) |
-| register / unregister | `<registryKey>` | 전역 레지스트리 등록/해제 |
+| register / unregister | `<registryKey> [title] [command]` | 전역 레지스트리 등록/해제 |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 | env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
 | usage-pending | `<registryKey> <agentId> <taskId>` | 사용량 대기 등록 |
-| usage | `<registryKey> <taskId> <inputTokens> <outputTokens>` | 사용량 기록 |
+| usage | `<registryKey> <taskId> <inputTokens> <outputTokens> [agent_name] [cache_creation] [cache_read] [task_id]` | 사용량 기록 |
 | usage-finalize | `<registryKey>` | 사용량 집계 확정 |
 | task-status | `<registryKey> <taskId> <status>` | 태스크 상태 갱신 |
 

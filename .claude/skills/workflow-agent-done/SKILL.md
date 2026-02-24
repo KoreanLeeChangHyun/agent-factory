@@ -57,6 +57,7 @@ reporter 완료 후 워크플로우의 마무리 처리를 수행하는 스킬.
 - `title`: 작업 제목
 - `reportPath`: 보고서 경로 (reporter 반환값)
 - `status`: reporter 반환 상태 (완료 | 실패)
+- `mode`: 워크플로우 실행 모드 (full, noplan, noreport, noplan+noreport, strategy). noreport/noplan+noreport 모드에서 Step 2 스킵 판단에 사용
 - `workflow_id`: 워크플로우 ID (WF-N 형식, 선택). strategy 프로젝트의 칸반보드 갱신에 사용. 전달되지 않으면 Step 6 스킵
 
 ---
@@ -99,16 +100,14 @@ step-update status <registryKey> REPORT DONE
 step-update status <registryKey> REPORT FAILED
 ```
 
-**noreport 모드 (REPORT 단계 없음):**
+**noreport/noplan+noreport 모드 (Step 2 스킵):**
 
-noreport/noplan+noreport 모드에서는 REPORT 단계를 거치지 않으므로 `from_phase`가 `WORK`입니다:
+noreport/noplan+noreport 모드에서는 오케스트레이터가 이미 `step-update both`로 WORK->DONE 전이를 완료한 상태이므로, done 에이전트는 status 전이(Step 2)를 **스킵**한다. 이 모드에서 done 에이전트가 `step-update status`를 재호출하면 FSM 가드가 from_phase 불일치(DONE != WORK)로 차단하므로 무의미하다.
 
 ```bash
-# 성공 시
-step-update status <registryKey> WORK DONE
-
-# 실패 시
-step-update status <registryKey> WORK FAILED
+# 오케스트레이터가 이미 WORK->DONE 전이를 수행하였으므로
+# done 에이전트는 이 단계를 건너뛴다
+# (mode가 noreport 또는 noplan+noreport인 경우 Step 2 전체를 스킵)
 ```
 
 ### 3. 사용량 확정

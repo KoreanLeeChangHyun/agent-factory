@@ -16,6 +16,19 @@ disable-model-invocation: true
 - 계획서 태스크에 적합한 스킬을 4단계 매칭 우선순위로 매핑
 - 결과를 skill-map.md로 생성하여 오케스트레이터에 반환
 
+## 입력
+
+오케스트레이터로부터 다음 정보를 전달받습니다:
+
+| 파라미터 | 설명 | 비고 |
+|----------|------|------|
+| `command` | 실행 명령어 (implement, review, research 등) | 필수 |
+| `workId` | 작업 ID | 필수 |
+| `taskId` | `phase0` 고정 | 필수 |
+| `planPath` | 계획서 경로 | full 모드 |
+| `userPromptPath` | 사용자 프롬프트 경로 | noplan 모드 (planPath 대체) |
+| `workDir` | 작업 디렉터리 경로 | 필수 |
+
 ## 실행 절차
 
 ### 1. work 디렉터리 생성

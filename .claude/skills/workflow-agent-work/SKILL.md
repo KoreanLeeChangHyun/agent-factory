@@ -57,6 +57,18 @@ Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
 
 Phase 1+의 각 Worker는 Phase 0에서 indexer 에이전트가 생성한 skill-map.md를 참조하여 태스크에 적합한 스킬을 로드한 후 작업을 수행한다. skill-map.md가 없는 경우(Phase 0 indexer 실패 시) Worker는 자율적으로 스킬을 결정한다.
 
+**입력 파라미터:**
+
+| 파라미터 | 설명 | 비고 |
+|----------|------|------|
+| `command` | 실행 명령어 | 필수 |
+| `workId` | 작업 ID | 필수 |
+| `taskId` | 수행할 태스크 ID (W01, W02 등) | 필수 |
+| `planPath` | 계획서 경로 | 필수 |
+| `skillMapPath` | Phase 0 indexer가 생성한 스킬 맵 경로 | 선택. 오케스트레이터가 `<workDir>/work/skill-map.md` 경로를 전달하면 Worker가 직접 읽어 스킬을 결정 |
+| `skills` | 사용자가 명시한 스킬 목록 | 선택 |
+| `workDir` | 작업 디렉터리 경로 | 필수 |
+
 > **Phase 배너**: 오케스트레이터는 각 Phase의 Worker 호출 직전에 `step-start <registryKey> WORK-PHASE <N> "<taskIds>" <parallel|sequential>` 배너를 출력합니다. Worker 자체는 Phase 배너를 호출하지 않습니다.
 
 **독립 작업 (병렬 실행):**
