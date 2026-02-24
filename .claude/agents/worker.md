@@ -3,7 +3,7 @@ name: worker
 description: "계획서 기반 실제 작업을 수행하는 에이전트"
 model: inherit
 skills:
-  - workflow-work
+  - workflow-agent-work
 maxTurns: 50
 tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 ---
@@ -46,11 +46,11 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-work` | 워크플로우 | frontmatter `skills` | WORK 단계 절차, 선행 결과 읽기, 작업 내역 작성 규격 |
+| `workflow-agent-work` | 워크플로우 | frontmatter `skills` | WORK 단계 절차, 선행 결과 읽기, 작업 내역 작성 규격 |
 | `command-skill-map.md` 기반 스킬 | 커맨드 | 런타임 동적 로드 | 명령어별 자동 로드 (implement -> code-quality-checker 등) |
-| 키워드 기반 스킬 | 커맨드 | 런타임 동적 로드 | 작업 내용 키워드에 따라 추가 로드 (architecture -> command-architect 등) |
+| 키워드 기반 스킬 | 커맨드 | 런타임 동적 로드 | 작업 내용 키워드에 따라 추가 로드 (architecture -> design-architect 등) |
 
-> worker는 `workflow-work` 스킬만 frontmatter에 정적 바인딩합니다. 커맨드 스킬은 `.claude/skills/workflow-work/command-skill-map.md`의 매핑 규칙에 따라 실행 시점에 동적으로 로드됩니다.
+> worker는 `workflow-agent-work` 스킬만 frontmatter에 정적 바인딩합니다. 커맨드 스킬은 `.claude/skills/workflow-agent-work/command-skill-map.md`의 매핑 규칙에 따라 실행 시점에 동적으로 로드됩니다.
 
 ## 입력
 
@@ -75,7 +75,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 - **질문 금지**: 모든 질의응답은 PLAN 단계에서 완료. 불명확한 부분은 계획서 기반 최선의 판단
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, Phase 0(스킬 탐색/매핑 준비)과 Phase 1+(계획서 태스크 실행)의 역할 구분, 다이어그램 표현 원칙)는 `workflow-work/SKILL.md`를 참조하세요.
+> 상세 절차 (선행 결과 읽기 패턴, 스킬 매핑 규칙, 작업 내역 작성 규격, Phase 0 모드, Phase 0(스킬 탐색/매핑 준비)과 Phase 1+(계획서 태스크 실행)의 역할 구분, 다이어그램 표현 원칙)는 `workflow-agent-work/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

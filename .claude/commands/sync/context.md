@@ -8,8 +8,6 @@ description: 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다
 >
 > **멱등성:** 반복 실행해도 안전합니다. 기존 CLAUDE.md의 Recent Changes, Known Issues, Next Steps 섹션은 자동 보존됩니다.
 >
-> **init:project와의 차이:** `init:project`는 프로젝트 scaffolding(디렉토리, .gitignore 등 껍데기)을 1회 생성합니다. `sync:context`는 코드베이스를 분석하여 CLAUDE.md를 갱신하는 역할을 전담합니다.
-
 프로젝트 코드베이스를 분석하고 CLAUDE.md를 생성 또는 갱신합니다.
 
 ## 스크립트
@@ -130,9 +128,7 @@ echo '<analyze_json>' | python3 .claude/scripts/init/init_project.py generate-cl
 
 | 명령어 | 설명 |
 |--------|------|
-| `/init:project` | 프로젝트 초기화 - scaffolding (디렉토리, 파일, .gitignore). 프로젝트당 1회 |
 | `/init:workflow` | 워크플로우 로드 (CLAUDE.md, orchestration 스킬) |
-| `/init:claude` | 사용자 환경 초기화 (alias, StatusLine, Slack, Git global) |
 | `/sync:history` | .workflow/ 작업 내역을 history.md에 동기화 |
 | `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
 | `/sync:code` | 원격 리포지토리에서 .claude 동기화 |

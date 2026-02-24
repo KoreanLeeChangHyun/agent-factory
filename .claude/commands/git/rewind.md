@@ -140,11 +140,11 @@ git stash push -m "rewind-backup-$(date +%Y%m%d-%H%M%S)"
 git reset --hard <target>
 ```
 
-**dangerous-command-guard 차단 대응:**
+**devops-dangerous-guard 차단 대응:**
 
-`git reset --hard`가 dangerous-command-guard에 의해 차단될 수 있습니다. 차단된 경우:
+`git reset --hard`가 devops-dangerous-guard에 의해 차단될 수 있습니다. 차단된 경우:
 
-1. 사용자에게 안내: "dangerous-command-guard에 의해 `git reset --hard`가 차단되었습니다."
+1. 사용자에게 안내: "devops-dangerous-guard에 의해 `git reset --hard`가 차단되었습니다."
 2. 대안 제시: "`--mode soft`로 되돌리면 변경사항이 staging area에 보존됩니다. soft 모드로 진행하시겠습니까?"
 3. AskUserQuestion으로 soft 모드 전환 여부 확인
 

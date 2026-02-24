@@ -24,12 +24,12 @@ license: "Apache-2.0"
 
 | 스킬 | 계층 | 역할 | 종합 리뷰에서의 위치 |
 |------|------|------|---------------------|
-| command-requesting-code-review | 기본 | 리뷰 체크리스트, 이슈 분류 | 리뷰 프레임워크 제공 |
-| command-code-quality-checker | 기본 | 린트/타입체크, 코드 메트릭, CQS 산출 | 코드 품질 영역 데이터 공급 |
-| command-review-security | 심화 | 보안 전문 검사 | 보안 영역 체크리스트 수행 |
-| command-review-architecture | 심화 | 아키텍처 전문 검사 | 아키텍처 영역 체크리스트 수행 |
-| command-review-frontend | 심화 | 프론트엔드 전문 검사 | 해당 시 프론트엔드 영역 추가 |
-| command-review-performance | 심화 | 성능 전문 검사 | 성능 영역 체크리스트 수행 |
+| review-requesting | 기본 | 리뷰 체크리스트, 이슈 분류 | 리뷰 프레임워크 제공 |
+| review-code-quality | 기본 | 린트/타입체크, 코드 메트릭, CQS 산출 | 코드 품질 영역 데이터 공급 |
+| review-security | 심화 | 보안 전문 검사 | 보안 영역 체크리스트 수행 |
+| review-architecture | 심화 | 아키텍처 전문 검사 | 아키텍처 영역 체크리스트 수행 |
+| review-frontend | 심화 | 프론트엔드 전문 검사 | 해당 시 프론트엔드 영역 추가 |
+| review-performance | 심화 | 성능 전문 검사 | 성능 영역 체크리스트 수행 |
 | **review-comprehensive** | **통합** | **전 영역 오케스트레이션, 통합 판정** | **본 스킬** |
 
 **오케스트레이션 원칙:**
@@ -118,7 +118,7 @@ license: "Apache-2.0"
 
 **기존 이슈 분류와의 매핑:**
 
-| command-requesting-code-review 분류 | 판정 영향 |
+| review-requesting 분류 | 판정 영향 |
 |-------------------------------------|----------|
 | Critical (보안/데이터 손실/기능 장애) | 1건 이상 시 ISSUES_FOUND 이상. 보안 Critical은 FAIL |
 | Important (아키텍처/성능/잠재적 버그) | 4건 이상 시 CONCERNS 이상 |
@@ -202,9 +202,9 @@ summary: |
 
 | 스킬 | 경로 | 관계 |
 |------|------|------|
-| command-requesting-code-review | `.claude/skills/command-requesting-code-review/SKILL.md` | 리뷰 프레임워크 및 이슈 분류 체계 제공 |
-| command-code-quality-checker | `.claude/skills/command-code-quality-checker/SKILL.md` | 코드 품질 영역 정량적 데이터 공급 |
-| command-review-security | `.claude/skills/command-review-security/SKILL.md` | 보안 영역 전문 체크리스트 수행 |
-| command-review-architecture | `.claude/skills/command-review-architecture/SKILL.md` | 아키텍처 영역 전문 체크리스트 수행 |
-| command-review-frontend | `.claude/skills/command-review-frontend/SKILL.md` | 프론트엔드 영역 전문 체크리스트 수행 (해당 시) |
-| command-review-performance | `.claude/skills/command-review-performance/SKILL.md` | 성능 영역 전문 체크리스트 수행 |
+| review-requesting | `.claude/skills/review-requesting/SKILL.md` | 리뷰 프레임워크 및 이슈 분류 체계 제공 |
+| review-code-quality | `.claude/skills/review-code-quality/SKILL.md` | 코드 품질 영역 정량적 데이터 공급 |
+| review-security | `.claude/skills/review-security/SKILL.md` | 보안 영역 전문 체크리스트 수행 |
+| review-architecture | `.claude/skills/review-architecture/SKILL.md` | 아키텍처 영역 전문 체크리스트 수행 |
+| review-frontend | `.claude/skills/review-frontend/SKILL.md` | 프론트엔드 영역 전문 체크리스트 수행 (해당 시) |
+| review-performance | `.claude/skills/review-performance/SKILL.md` | 성능 영역 전문 체크리스트 수행 |

@@ -17,7 +17,7 @@ license: "Apache-2.0"
 
 ## 기존 스킬과의 차이
 
-| 항목 | command-research | deep-research | research-integrated |
+| 항목 | research-general | research-deep | research-integrated |
 |------|-----------------|---------------|-------------------|
 | 주요 대상 | 웹 (WebSearch, WebFetch) | 코드베이스 (Read, Grep, Glob) | 웹 + 코드베이스 통합 |
 | 컨텍스트 | 메인 컨텍스트 | 격리 (context:fork, Explore) | 메인 컨텍스트 |
@@ -29,8 +29,8 @@ license: "Apache-2.0"
 
 **언제 어떤 스킬을 사용할지:**
 
-- **command-research**: 순수 웹 조사 (기술 트렌드, 비교 분석, 문서 수집)
-- **deep-research**: 순수 코드 탐색 (구조 분석, 패턴 발견, 의존성 추적)
+- **research-general**: 순수 웹 조사 (기술 트렌드, 비교 분석, 문서 수집)
+- **research-deep**: 순수 코드 탐색 (구조 분석, 패턴 발견, 의존성 추적)
 - **research-integrated**: 웹 정보와 코드 현황을 함께 봐야 하는 복합 조사
 
 ## 워크플로우
@@ -182,13 +182,13 @@ WebSearch, WebFetch를 사용하여 2단계에서 식별된 기술의 최신 동
 2. **토큰 관리**: 웹+코드 양쪽 정보가 축적되므로 토큰 사용량이 높음. 불필요한 파일 전체 읽기를 피하고 핵심 부분만 탐색
 3. **교차 검증 필수**: 핵심 결론은 `references/cross-validation.md` 워크플로우 준수. 코드 현황 자체를 1차 소스로 활용 가능
 4. **출처 등급 적용**: `references/source-evaluation.md`의 5등급 체계(S/A/B/C/D) 적용. 핵심 결론은 S-A 등급 소스에 근거
-5. **역할 구분**: 순수 웹 조사는 command-research, 순수 코드 탐색은 deep-research 사용. 양쪽을 결합해야 할 때만 이 스킬 사용
+5. **역할 구분**: 순수 웹 조사는 research-general, 순수 코드 탐색은 research-deep 사용. 양쪽을 결합해야 할 때만 이 스킬 사용
 
 ## 연관 스킬
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| command-research | 웹 중심 조사, 리포트 작성 | `.claude/skills/command-research/SKILL.md` |
-| deep-research | context:fork 기반 코드베이스 심층 탐색 | `.claude/skills/deep-research/SKILL.md` |
+| research-general | 웹 중심 조사, 리포트 작성 | `.claude/skills/research-general/SKILL.md` |
+| research-deep | context:fork 기반 코드베이스 심층 탐색 | `.claude/skills/research-deep/SKILL.md` |
 | research-parallel | 다중 에이전트 병렬 연구 (골격) | `.claude/skills/research-parallel/SKILL.md` |
 | research-grounding | 출처 검증 및 신뢰도 자동 평가 (골격) | `.claude/skills/research-grounding/SKILL.md` |

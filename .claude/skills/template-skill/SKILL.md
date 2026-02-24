@@ -7,7 +7,7 @@ license: "Apache-2.0"
 
 # Template Skill
 
-> **DEPRECATED**: This skill has been replaced by command-skill-manager. Use command-skill-manager for creating new skills.
+> **DEPRECATED**: This skill has been replaced by management-skill. Use management-skill for creating new skills.
 
 이 파일은 새 스킬 생성 시 복사하여 사용할 수 있는 템플릿입니다.
 
@@ -32,8 +32,8 @@ cc:implement "PDF 처리 스킬 만들어줘"
 
 ## 관련 스킬
 
-- `.claude/skills/command-skill-manager/SKILL.md` - 스킬 생성/수정 자동화
+- `.claude/skills/management-skill/SKILL.md` - 스킬 생성/수정 자동화
 
 ## 참고
 
-새 스킬 생성 시 `cc:implement` 명령어 또는 command-skill-manager 스킬 사용을 권장합니다.
+새 스킬 생성 시 `cc:implement` 명령어 또는 management-skill 스킬 사용을 권장합니다.

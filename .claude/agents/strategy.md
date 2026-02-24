@@ -4,7 +4,7 @@ description: "전략 수립 및 로드맵 생성을 수행하는 에이전트"
 model: inherit
 tools: Bash, Glob, Grep, Read, Write
 skills:
-  - workflow-strategy
+  - workflow-agent-strategy
 maxTurns: 50
 ---
 # Strategy Agent
@@ -54,9 +54,9 @@ maxTurns: 50
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-strategy` | 워크플로우 | frontmatter `skills` | STRATEGY 단계 절차, 복잡도 산정 가이드, 종속성 그래프 생성, 로드맵 템플릿, .kanbanboard 생성, Judge 모드 |
+| `workflow-agent-strategy` | 워크플로우 | frontmatter `skills` | STRATEGY 단계 절차, 복잡도 산정 가이드, 종속성 그래프 생성, 로드맵 템플릿, .kanbanboard 생성, Judge 모드 |
 
-> strategy 에이전트는 `workflow-strategy` 스킬만 frontmatter에 정적 바인딩합니다. 전략 수립 전용이므로 커맨드 스킬을 사용하지 않습니다.
+> strategy 에이전트는 `workflow-agent-strategy` 스킬만 frontmatter에 정적 바인딩합니다. 전략 수립 전용이므로 커맨드 스킬을 사용하지 않습니다.
 
 ## 입력
 
@@ -79,7 +79,7 @@ maxTurns: 50
 - **질문 금지**: 불명확한 부분은 분석 결과 기반 최선의 판단
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (복잡도 산정 가이드, 종속성 그래프 생성 규칙, 로드맵 템플릿, .kanbanboard 생성 절차, Judge 모드 상세)는 `workflow-strategy/SKILL.md`를 참조하세요.
+> 상세 절차 (복잡도 산정 가이드, 종속성 그래프 생성 규칙, 로드맵 템플릿, .kanbanboard 생성 절차, Judge 모드 상세)는 `workflow-agent-strategy/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

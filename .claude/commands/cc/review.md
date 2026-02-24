@@ -20,12 +20,12 @@ argument-hint: "[-np] [-nr]"
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| command-requesting-code-review | 리뷰 체크리스트 및 사전 검증 | `.claude/skills/command-requesting-code-review/SKILL.md` |
-| command-code-quality-checker | 기본 로드 - 정량적 품질 검사, Code Quality Score 산출 | `.claude/skills/command-code-quality-checker/SKILL.md` |
-| command-review-security | 키워드 조건부 로드 - 보안 전문 리뷰 | `.claude/skills/command-review-security/SKILL.md` |
-| command-review-architecture | 키워드 조건부 로드 - 아키텍처 전문 리뷰 | `.claude/skills/command-review-architecture/SKILL.md` |
-| command-review-frontend | 키워드 조건부 로드 - 프론트엔드 전문 리뷰 | `.claude/skills/command-review-frontend/SKILL.md` |
-| command-review-performance | 키워드 조건부 로드 - 성능 전문 리뷰 | `.claude/skills/command-review-performance/SKILL.md` |
+| review-requesting | 리뷰 체크리스트 및 사전 검증 | `.claude/skills/review-requesting/SKILL.md` |
+| review-code-quality | 기본 로드 - 정량적 품질 검사, Code Quality Score 산출 | `.claude/skills/review-code-quality/SKILL.md` |
+| review-security | 키워드 조건부 로드 - 보안 전문 리뷰 | `.claude/skills/review-security/SKILL.md` |
+| review-architecture | 키워드 조건부 로드 - 아키텍처 전문 리뷰 | `.claude/skills/review-architecture/SKILL.md` |
+| review-frontend | 키워드 조건부 로드 - 프론트엔드 전문 리뷰 | `.claude/skills/review-frontend/SKILL.md` |
+| review-performance | 키워드 조건부 로드 - 성능 전문 리뷰 | `.claude/skills/review-performance/SKILL.md` |
 | review-comprehensive | 키워드 조건부 로드 - 종합 리뷰 | `.claude/skills/review-comprehensive/SKILL.md` |
 | review-feedback-handler | 키워드 조건부 로드 - 피드백 처리 | `.claude/skills/review-feedback-handler/SKILL.md` |
 | review-pr-integration | 키워드 조건부 로드 - PR 리뷰 통합 | `.claude/skills/review-pr-integration/SKILL.md` |
@@ -53,7 +53,7 @@ argument-hint: "[-np] [-nr]"
 REPORT 단계가 완료(DONE 상태 전이)된 후 다음을 수행한다:
 
 ```bash
-bash .claude/skills/command-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
+bash .claude/skills/design-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
 ```
 
 | 인자 | 값 |

@@ -12,18 +12,18 @@ description: 특정 프레임워크로 프로젝트를 초기화합니다. 프�
 
 | 프레임워크 | 스킬 | 설명 |
 |------------|------|------|
-| fastapi | command-framework-fastapi | Python FastAPI 웹 프레임워크 |
+| fastapi | framework-fastapi | Python FastAPI 웹 프레임워크 |
 | django | (framework-django 미구현) | Python Django 웹 프레임워크 (향후 스킬 생성 예정) |
-| react | command-framework-react | React 프론트엔드 프레임워크 |
+| react | framework-react | React 프론트엔드 프레임워크 |
 
 ## 스킬 매핑
 
 프레임워크에 따라 적절한 스킬을 로드합니다:
 
 ```
-fastapi -> command-framework-fastapi 스킬
+fastapi -> framework-fastapi 스킬
 django  -> framework-django 스킬 (미구현, 향후 생성 예정)
-react   -> command-framework-react 스킬
+react   -> framework-react 스킬
 ```
 
 **주의**: Django는 현재 전용 스킬이 없습니다. `init:framework django` 실행 시 framework-django 스킬이 필요하며, 미구현 상태임을 사용자에게 안내합니다.
@@ -46,8 +46,8 @@ react   -> command-framework-react 스킬
 
 해당 프레임워크 스킬을 읽고 프로젝트 구조를 생성합니다.
 
-- **fastapi/django**: `.claude/skills/command-framework-fastapi/SKILL.md` 참조
-- **react**: `.claude/skills/command-framework-react/SKILL.md` 참조
+- **fastapi/django**: `.claude/skills/framework-fastapi/SKILL.md` 참조
+- **react**: `.claude/skills/framework-react/SKILL.md` 참조
 
 ### Step 3: 프로젝트 초기화
 
@@ -80,8 +80,8 @@ myproject/
 
 ## 관련 스킬
 
-- `command-framework-fastapi` - FastAPI 프로젝트 구조 및 베스트 프랙티스
-- `command-framework-react` - React 프로젝트 구조 및 베스트 프랙티스
+- `framework-fastapi` - FastAPI 프로젝트 구조 및 베스트 프랙티스
+- `framework-react` - React 프로젝트 구조 및 베스트 프랙티스
 
 ---
 
@@ -99,6 +99,5 @@ myproject/
 
 | 명령어 | 설명 |
 |--------|------|
-| `/init:project` | 프로젝트 기본 구조 초기화 |
 | `/init:build` | 빌드/실행 스크립트 생성 |
 | `/init:workflow` | 워크플로우 로드 |

@@ -103,7 +103,7 @@ def main():
             flags=flags,
         )
 
-    # --- Bash: dangerous-command-guard (sync) ---
+    # --- Bash: devops-dangerous-guard (sync) ---
     if tool_name == 'Bash':
         r = dispatch(
             'HOOK_DANGEROUS_COMMAND',

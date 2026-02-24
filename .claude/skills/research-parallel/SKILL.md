@@ -12,7 +12,7 @@ license: "Apache-2.0"
 
 > **골격(scaffold) 상태** - 병렬 에이전트 실행 로직 미구현, 단계별 가이드라인만 제공
 
-이 스킬은 워크플로우 가이드라인과 구조만 정의된 상태이며, 실제 병렬 에이전트 실행 로직(Perplexity/Gemini API 연동, 에이전트 풀 관리, 타임아웃 처리 등)은 별도 구현이 필요합니다. 현재는 command-research 스킬의 순차 조사 워크플로우를 병렬화하기 위한 설계 청사진 역할을 합니다.
+이 스킬은 워크플로우 가이드라인과 구조만 정의된 상태이며, 실제 병렬 에이전트 실행 로직(Perplexity/Gemini API 연동, 에이전트 풀 관리, 타임아웃 처리 등)은 별도 구현이 필요합니다. 현재는 research-general 스킬의 순차 조사 워크플로우를 병렬화하기 위한 설계 청사진 역할을 합니다.
 
 ## 목적
 
@@ -26,7 +26,7 @@ license: "Apache-2.0"
 1. **질문 분해 우선**: 복합 질문을 독립적 하위 질문으로 분해한 후 조사 시작
 2. **병렬 실행**: 하위 질문별 에이전트를 동시에 실행하여 조사 시간 최소화
 3. **신뢰도 기반 종합**: 출처 등급(S/A/B/C/D)별 가중치를 적용하여 결과 종합
-4. **Graceful Fallback**: 외부 API 미설정 시 command-research로 자동 전환
+4. **Graceful Fallback**: 외부 API 미설정 시 research-general로 자동 전환
 
 ## Prerequisites
 
@@ -41,9 +41,9 @@ license: "Apache-2.0"
 
 | 요건 | 확인 방법 | 미충족 시 |
 |------|----------|----------|
-| Perplexity API 키 | `echo $PERPLEXITY_API_KEY` | command-research 폴백 |
-| Gemini API 키 | `echo $GOOGLE_API_KEY` | command-research 폴백 |
-| Gemini CLI | `which gemini` | command-research 폴백 |
+| Perplexity API 키 | `echo $PERPLEXITY_API_KEY` | research-general 폴백 |
+| Gemini API 키 | `echo $GOOGLE_API_KEY` | research-general 폴백 |
+| Gemini CLI | `which gemini` | research-general 폴백 |
 
 ### Graceful Fallback 절차
 
@@ -51,15 +51,15 @@ license: "Apache-2.0"
 
 1. **환경 변수 확인**: `PERPLEXITY_API_KEY`, `GOOGLE_API_KEY` 존재 여부 체크
 2. **API 키 미설정 시**: 병렬 에이전트 풀을 WebSearch/WebFetch 기반 에이전트로 축소
-3. **WebSearch도 불가 시**: command-research 스킬의 순차 5단계 워크플로우로 완전 폴백
-4. **폴백 기록**: 리포트에 "병렬 조사 미수행 - command-research 순차 조사로 대체" 명시
+3. **WebSearch도 불가 시**: research-general 스킬의 순차 5단계 워크플로우로 완전 폴백
+4. **폴백 기록**: 리포트에 "병렬 조사 미수행 - research-general 순차 조사로 대체" 명시
 
 ```
 확인 순서:
   Perplexity API -> 사용 가능하면 Perplexity Researcher 에이전트 활성화
   Gemini API     -> 사용 가능하면 Gemini Researcher 에이전트 활성화
   WebSearch      -> 기본 에이전트 (항상 활성화)
-  모두 불가      -> command-research 순차 폴백
+  모두 불가      -> research-general 순차 폴백
 ```
 
 ## 워크플로우
@@ -195,7 +195,7 @@ Task("하위 질문 3에 대해 WebSearch로 조사") -- 동시 실행
 
 ## 기존 스킬과의 차이
 
-| 항목 | command-research | deep-research | research-parallel |
+| 항목 | research-general | research-deep | research-parallel |
 |------|-----------------|---------------|-------------------|
 | 주요 대상 | 웹 (WebSearch, WebFetch) | 코드베이스 (Read, Grep, Glob) | 웹 (다중 소스 병렬) |
 | 실행 방식 | 순차 5단계 | 격리 컨텍스트(context:fork) | 병렬 에이전트 (Task 동시 호출) |
@@ -213,6 +213,6 @@ Task("하위 질문 3에 대해 WebSearch로 조사") -- 동시 실행
 ## 참고
 
 - danielmiessler/PAIPlugin: https://github.com/danielmiessler/PAIPlugin
-- command-research 스킬: `.claude/skills/command-research/SKILL.md`
-- 출처 신뢰도 평가: `.claude/skills/command-research/references/source-evaluation.md`
-- 교차 검증 워크플로우: `.claude/skills/command-research/references/cross-validation.md`
+- research-general 스킬: `.claude/skills/research-general/SKILL.md`
+- 출처 신뢰도 평가: `.claude/skills/research-general/references/source-evaluation.md`
+- 교차 검증 워크플로우: `.claude/skills/research-general/references/cross-validation.md`

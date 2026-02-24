@@ -4,7 +4,7 @@ description: "작업 계획 수립을 수행하는 에이전트"
 model: inherit
 tools: Bash, Glob, Grep, Read, Write
 skills:
-  - workflow-plan
+  - workflow-agent-plan
 maxTurns: 30
 ---
 # Planner Agent
@@ -53,7 +53,7 @@ maxTurns: 30
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-plan` | 워크플로우 | frontmatter `skills` | PLAN 단계 절차, 계획서 템플릿, 질의응답 프로토콜, 섹션 판단 기준 |
+| `workflow-agent-plan` | 워크플로우 | frontmatter `skills` | PLAN 단계 절차, 계획서 템플릿, 질의응답 프로토콜, 섹션 판단 기준 |
 
 > planner 에이전트는 커맨드 스킬을 사용하지 않습니다. 계획 수립 전용이므로 워크플로우 스킬만 바인딩됩니다.
 
@@ -88,7 +88,7 @@ request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 
 
 1. **user_prompt.txt 전문 읽기** - `{workDir}/user_prompt.txt`를 Read로 전체 내용 확인 (request는 50자 요약본)
 2. **요구사항 분석 및 질의** - 불명확한 점은 계획서의 가정 사항 섹션에 명시 (오케스트레이터가 승인 시 사용자에게 확인)
-3. **템플릿 로드** - `.claude/skills/workflow-plan/templates/plan.md`를 Read로 로드 (필수)
+3. **템플릿 로드** - `.claude/skills/workflow-agent-plan/templates/plan.md`를 Read로 로드 (필수)
 4. **계획서 작성** - 템플릿 구조에 따라 13개 섹션 순서 준수, 태스크 분해 및 종속성 분석
 5. **계획서 저장** - `{workDir}/plan.md`에 Write로 저장 후 `작성완료` 반환
 
@@ -99,7 +99,7 @@ request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 
 3. **피드백 반영하여 계획서 수정** - 피드백 내용을 분석하여 기존 계획서의 해당 부분을 수정. 태스크 추가/삭제/변경, 종속성 재분석, Phase 재구성 등을 반영
 4. **수정된 계획서 저장** - `{workDir}/plan.md`에 Write로 덮어쓰기 저장 후 `작성완료` 반환
 
-> 상세 절차 (템플릿 섹션 순서, 필수/선택 분류, 워커별 작업 상세 형식, 재질의 가이드라인, 선택 섹션 판단 기준)는 `workflow-plan/SKILL.md`를 참조하세요.
+> 상세 절차 (템플릿 섹션 순서, 필수/선택 분류, 워커별 작업 상세 형식, 재질의 가이드라인, 선택 섹션 판단 기준)는 `workflow-agent-plan/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 
@@ -148,7 +148,7 @@ request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 
 6. **Write 도구 사용**: 계획서 저장에 Write 도구 사용
 7. **명령어별 특성 반영**: 각 명령어의 고유한 작업 흐름을 계획에 반영
 8. **Worker/Reporter 역할 분리 (필수)**: Worker에게 최종 보고서(`report.md`) 생성 태스크를 할당하지 않는다. Worker의 산출물은 작업 내역 파일(`work/WXX-*.md`)에 한정된다.
-9. **템플릿 준수 의무**: 계획서 작성 시 반드시 템플릿 로드, 섹션 순서, 워커별 작업 상세 형식을 준수한다. 상세 규칙은 `workflow-plan/SKILL.md` 참조.
+9. **템플릿 준수 의무**: 계획서 작성 시 반드시 템플릿 로드, 섹션 순서, 워커별 작업 상세 형식을 준수한다. 상세 규칙은 `workflow-agent-plan/SKILL.md` 참조.
 
 ## 에러 처리
 

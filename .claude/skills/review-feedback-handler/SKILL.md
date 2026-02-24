@@ -14,7 +14,7 @@ license: "Apache-2.0"
 
 리뷰 피드백 처리의 목적은 코드 품질 향상이지, 리뷰어의 모든 의견을 무조건 반영하는 것이 아니다. 피드백을 받으면 먼저 기술적 타당성을 검증하고, 메리트를 평가한 뒤, 수용 여부를 결정한다. 리뷰어가 틀릴 수 있고, 구현자가 더 나은 맥락을 가질 수 있다. 근거 없는 수용은 코드 품질을 오히려 저하시킨다.
 
-이 스킬은 `command-requesting-code-review`의 "피드백 처리" 섹션(Critical/Important/Minor/리뷰어가 틀린 경우)을 확장하여, 피드백 수신부터 구현 완료까지의 전체 프로토콜을 정의한다.
+이 스킬은 `review-requesting`의 "피드백 처리" 섹션(Critical/Important/Minor/리뷰어가 틀린 경우)을 확장하여, 피드백 수신부터 구현 완료까지의 전체 프로토콜을 정의한다.
 
 ## 핵심 원칙
 
@@ -172,7 +172,7 @@ license: "Apache-2.0"
 
 | 스킬 | 경로 | 관계 |
 |------|------|------|
-| command-requesting-code-review | `.claude/skills/command-requesting-code-review/SKILL.md` | 상위 스킬. 리뷰 요청 및 기본 피드백 분류(Critical/Important/Minor) 정의. 본 스킬은 해당 분류를 확장하여 처리 프로토콜 제공 |
+| review-requesting | `.claude/skills/review-requesting/SKILL.md` | 상위 스킬. 리뷰 요청 및 기본 피드백 분류(Critical/Important/Minor) 정의. 본 스킬은 해당 분류를 확장하여 처리 프로토콜 제공 |
 
 ## Critical Rules
 

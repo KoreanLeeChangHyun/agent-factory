@@ -16,7 +16,7 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 
 ### 키워드 기반 스킬 로드
 
-작업 내용에 리팩토링 관련 키워드(`리팩토링`, `refactor`, `코드 개선`, `추출`, `extract`)가 포함되면 `command-code-quality-checker` 스킬이 자동 로드되어 코드 품질 검사를 병행합니다.
+작업 내용에 리팩토링 관련 키워드(`리팩토링`, `refactor`, `코드 개선`, `추출`, `extract`)가 포함되면 `review-code-quality` 스킬이 자동 로드되어 코드 품질 검사를 병행합니다.
 
 ## 아키텍처/다이어그램 지원
 
@@ -24,7 +24,7 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 
 ### 키워드 기반 스킬 로드
 
-작업 내용에 아키텍처 관련 키워드(`아키텍처`, `architecture`, `설계`, `architect`, `시스템 구조`, `컴포넌트`)가 포함되면 `command-architect` + `command-mermaid-diagrams` 스킬이 자동 로드됩니다.
+작업 내용에 아키텍처 관련 키워드(`아키텍처`, `architecture`, `설계`, `architect`, `시스템 구조`, `컴포넌트`)가 포함되면 `design-architect` + `design-mermaid-diagrams` 스킬이 자동 로드됩니다.
 
 ### 지원 기능
 
@@ -42,17 +42,17 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 
 | 키워드 | 대상 | 실행할 스킬 |
 |--------|------|-------------|
-| 에이전트, agent | 에이전트 | command-agent-manager |
-| 스킬, skill | 스킬 | command-skill-manager |
-| 커맨드, command, 명령어 | 커맨드 | command-manager |
+| 에이전트, agent | 에이전트 | management-agent |
+| 스킬, skill | 스킬 | management-skill |
+| 커맨드, command, 명령어 | 커맨드 | management-command |
 
 ### Manager 스킬 실행
 
 요청 유형에 따라 적절한 manager 스킬을 실행합니다.
 
-- **command-agent-manager**: `.claude/skills/command-agent-manager/` 참조
-- **command-skill-manager**: `.claude/skills/command-skill-manager/` 참조
-- **command-manager**: `.claude/skills/command-manager/` 참조
+- **management-agent**: `.claude/skills/management-agent/` 참조
+- **management-skill**: `.claude/skills/management-skill/` 참조
+- **management-command**: `.claude/skills/management-command/` 참조
 
 ### 지원 작업
 
@@ -96,7 +96,7 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 REPORT 단계가 완료(DONE 상태 전이)된 후 다음을 수행한다:
 
 ```bash
-bash .claude/skills/command-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
+bash .claude/skills/design-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
 ```
 
 | 인자 | 값 |

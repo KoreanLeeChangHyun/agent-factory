@@ -4,7 +4,7 @@ description: "워크플로우 초기화를 수행하는 에이전트"
 tools: Bash, Glob, Grep, Read
 model: haiku
 skills:
-  - workflow-init
+  - workflow-agent-init
 maxTurns: 15
 ---
 # Init Agent
@@ -46,7 +46,7 @@ maxTurns: 15
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-init` | 워크플로우 | frontmatter `skills` | INIT 단계 절차 상세, init_workflow.py 호출 규약 |
+| `workflow-agent-init` | 워크플로우 | frontmatter `skills` | INIT 단계 절차 상세, init_workflow.py 호출 규약 |
 
 > init 에이전트는 커맨드 스킬을 사용하지 않습니다. 초기화 전용이므로 워크플로우 스킬만 바인딩됩니다.
 
@@ -63,7 +63,7 @@ maxTurns: 15
 2. **작업 제목 생성** - prompt.txt 기반 20자 이내 한글 요약, 공백->하이픈, 특수문자 제거
 3. **init_workflow.py 실행** - `python3 .claude/scripts/init/init_workflow.py <command> <title> <mode>` 1회 호출. **stdout 출력을 파싱**하여 반환값 구성
 
-> 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, init_workflow.py 인자 상세, 스크립트 수행 목록)는 `workflow-init/SKILL.md`를 참조하세요.
+> 상세 절차 (시나리오 분기 조건, 제목 생성 규칙, init_workflow.py 인자 상세, 스크립트 수행 목록)는 `workflow-agent-init/SKILL.md`를 참조하세요.
 
 ---
 

@@ -116,8 +116,8 @@ chmod 700 build.sh run.sh
 
 프레임워크별 상세 빌드/실행 설정은 해당 프레임워크 스킬을 참조합니다:
 
-- Python (FastAPI): `command-framework-fastapi` 스킬
-- React/Next.js: `command-framework-react` 스킬
+- Python (FastAPI): `framework-fastapi` 스킬
+- React/Next.js: `framework-react` 스킬
 
 ## 출력 파일
 
@@ -130,7 +130,7 @@ chmod 700 build.sh run.sh
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| command-verification-before-completion | 빌드 스크립트 검증 | `.claude/skills/command-verification-before-completion/SKILL.md` |
+| devops-verification | 빌드 스크립트 검증 | `.claude/skills/devops-verification/SKILL.md` |
 
 ## 주의사항
 
@@ -144,4 +144,3 @@ chmod 700 build.sh run.sh
 | 명령어 | 설명 |
 |--------|------|
 | `/init:framework` | 프레임워크별 프로젝트 초기화 |
-| `/init:project` | 프로젝트 초기 구조 설정 |

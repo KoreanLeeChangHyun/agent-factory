@@ -28,7 +28,7 @@ argument-hint: "[-np] [-nr]"
    - 구조화된 문서 생성
    - 출처 명시
 
-리포트 템플릿, 주의사항 등 상세 절차는 command-research 스킬(`.claude/skills/command-research/SKILL.md`)을 참조합니다.
+리포트 템플릿, 주의사항 등 상세 절차는 research-general 스킬(`.claude/skills/research-general/SKILL.md`)을 참조합니다.
 
 ## 분석 지원
 
@@ -38,11 +38,11 @@ argument-hint: "[-np] [-nr]"
 
 | 유형 | 스킬 | 키워드 |
 |------|------|--------|
-| 요구사항 분석 | command-analyze-srs | 요구사항, 명세서, 스펙, SRS, 기능 정의, requirement, spec |
-| 코드베이스 분석 | command-analyze-codebase | 코드베이스, 아키텍처, 코드 구조, 의존성, 모듈, codebase, architecture |
-| 데이터베이스 분석 | command-analyze-database | 데이터베이스, DB, 스키마, 테이블, ERD, 인덱스, database, schema |
-| 데이터 분석 | command-analyze-data | 데이터 분석, 통계, 데이터셋, EDA, 시각화, data analysis, statistics |
-| 기본값 | command-analyze-srs | (분석 키워드 있으나 유형 불명 시) |
+| 요구사항 분석 | analyze-srs | 요구사항, 명세서, 스펙, SRS, 기능 정의, requirement, spec |
+| 코드베이스 분석 | analyze-codebase | 코드베이스, 아키텍처, 코드 구조, 의존성, 모듈, codebase, architecture |
+| 데이터베이스 분석 | analyze-database | 데이터베이스, DB, 스키마, 테이블, ERD, 인덱스, database, schema |
+| 데이터 분석 | analyze-data | 데이터 분석, 통계, 데이터셋, EDA, 시각화, data analysis, statistics |
+| 기본값 | analyze-srs | (분석 키워드 있으나 유형 불명 시) |
 
 ### 분석 유형 판단
 
@@ -52,21 +52,21 @@ argument-hint: "[-np] [-nr]"
 1. 요청 문자열을 소문자로 변환
 2. 각 유형의 키워드를 순서대로 확인
 3. 첫 번째 매칭된 키워드의 유형 선택
-4. 분석 키워드는 있으나 유형 불명이면 기본값: 요구사항 분석 (command-analyze-srs)
+4. 분석 키워드는 있으나 유형 불명이면 기본값: 요구사항 분석 (analyze-srs)
 
 **예시:**
-- "로그인 기능 요구사항 분석" -> command-analyze-srs
-- "프로젝트 코드베이스 구조 분석" -> command-analyze-codebase
-- "사용자 테이블 스키마 분석" -> command-analyze-database
-- "매출 데이터 통계 분석" -> command-analyze-data
+- "로그인 기능 요구사항 분석" -> analyze-srs
+- "프로젝트 코드베이스 구조 분석" -> analyze-codebase
+- "사용자 테이블 스키마 분석" -> analyze-database
+- "매출 데이터 통계 분석" -> analyze-data
 
 ### 스킬 로드
 
 판단된 유형에 따라 해당 스킬을 자동 로드합니다:
-- command-analyze-srs: `.claude/skills/command-analyze-srs/SKILL.md`
-- command-analyze-codebase: `.claude/skills/command-analyze-codebase/SKILL.md`
-- command-analyze-database: `.claude/skills/command-analyze-database/SKILL.md`
-- command-analyze-data: `.claude/skills/command-analyze-data/SKILL.md`
+- analyze-srs: `.claude/skills/analyze-srs/SKILL.md`
+- analyze-codebase: `.claude/skills/analyze-codebase/SKILL.md`
+- analyze-database: `.claude/skills/analyze-database/SKILL.md`
+- analyze-data: `.claude/skills/analyze-data/SKILL.md`
 
 각 분석 유형의 상세 절차와 템플릿은 해당 스킬의 SKILL.md를 참조하세요.
 
@@ -83,11 +83,11 @@ argument-hint: "[-np] [-nr]"
 
 ## 관련 스킬
 
-- `.claude/skills/command-research/SKILL.md` - 연구/조사 워크플로우 상세 정의, 리포트 템플릿
-- `.claude/skills/command-analyze-srs/SKILL.md` - 요구사항 분석 절차 및 명세서 템플릿
-- `.claude/skills/command-analyze-codebase/SKILL.md` - 코드베이스 분석 절차
-- `.claude/skills/command-analyze-database/SKILL.md` - 데이터베이스 분석 절차
-- `.claude/skills/command-analyze-data/SKILL.md` - 데이터 분석 절차
+- `.claude/skills/research-general/SKILL.md` - 연구/조사 워크플로우 상세 정의, 리포트 템플릿
+- `.claude/skills/analyze-srs/SKILL.md` - 요구사항 분석 절차 및 명세서 템플릿
+- `.claude/skills/analyze-codebase/SKILL.md` - 코드베이스 분석 절차
+- `.claude/skills/analyze-database/SKILL.md` - 데이터베이스 분석 절차
+- `.claude/skills/analyze-data/SKILL.md` - 데이터 분석 절차
 
 ## 실행 옵션
 

@@ -81,4 +81,3 @@ python3 .claude/scripts/sync/registry_sync.py remove <YYYYMMDD-HHMMSS>
 
 - `/sync:history` - .workflow/ 작업 내역을 history.md에 동기화
 - `/sync:code` - 원격 리포지토리에서 .claude 동기화
-- `/init:project` - 프로젝트 초기화

@@ -2,14 +2,14 @@
 description: ".prompt/prompt.txt의 내용을 대화형으로 정제합니다. 모호한 프롬프트를 질의응답으로 개선합니다."
 argument-hint: ""
 skills:
-  - prompt-engineering-guide
+  - research-prompt-engineering
 ---
 
 # Prompt (Prompt Refinement)
 
 `.prompt/prompt.txt`의 프롬프트를 대화형 질의응답으로 정제합니다. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어입니다.
 
-> **스킬 참조**: 이 명령어는 `prompt-engineering-guide` 스킬을 사용합니다. 분석 시작 전 `.claude/skills/prompt-engineering-guide/SKILL.md`를 Read로 로드하고, 필요 시 하위 references도 참조합니다.
+> **스킬 참조**: 이 명령어는 `research-prompt-engineering` 스킬을 사용합니다. 분석 시작 전 `.claude/skills/research-prompt-engineering/SKILL.md`를 Read로 로드하고, 필요 시 하위 references도 참조합니다.
 
 ## 실행 흐름
 
@@ -23,7 +23,7 @@ Read 도구로 `.prompt/prompt.txt`를 읽습니다.
 
 ### 1.5. 스킬 로드
 
-Read 도구로 `.claude/skills/prompt-engineering-guide/SKILL.md`를 읽어 모호성 분석 체크리스트, 프롬프트 구조화 5요소, 핵심 원칙을 로드합니다.
+Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 모호성 분석 체크리스트, 프롬프트 구조화 5요소, 핵심 원칙을 로드합니다.
 
 프롬프트 내용으로부터 **용도를 판별**합니다:
 
@@ -49,7 +49,7 @@ Read 도구로 `.claude/skills/prompt-engineering-guide/SKILL.md`를 읽어 모�
 <prompt.txt 내용 전체>
 ```
 
-**스킬 기반 모호성 분석**: 로드한 `prompt-engineering-guide` 스킬의 **모호성 분석 체크리스트** (5대 모호성 유형)와 **자가 점검 체크리스트** (7개 항목)를 기준으로 프롬프트를 분석합니다.
+**스킬 기반 모호성 분석**: 로드한 `research-prompt-engineering` 스킬의 **모호성 분석 체크리스트** (5대 모호성 유형)와 **자가 점검 체크리스트** (7개 항목)를 기준으로 프롬프트를 분석합니다.
 
 | # | 모호성 유형 | 판단 기준 |
 |---|------------|----------|
@@ -114,7 +114,7 @@ Write 도구로 `.prompt/prompt.txt`에 개선된 내용 전체를 덮어쓰기�
 **개선 전**: <원본 내용 요약 (1-2줄)>
 **개선 후**: <개선된 내용 요약 (1-2줄)>
 **주요 변경**: <추가/수정/구체화된 항목 나열>
-**적용 스킬**: prompt-engineering-guide (<적용된 체크리스트/템플릿 항목>)
+**적용 스킬**: research-prompt-engineering (<적용된 체크리스트/템플릿 항목>)
 ```
 
 ### 5. 완료 메시지

@@ -1,6 +1,6 @@
 ---
 name: safety-fallback
-description: "Agent system safety guard, limitation reference, and error recovery strategy guide. For hook-based safety, refer to hooks-guide skill. Use for error recovery and safety tasks: (1) agent limitation reference, (2) Task failure/error recovery strategy, (3) self-verification criteria understanding, (4) iteration limits/resource protection policies. Triggers: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'."
+description: "Agent system safety guard, limitation reference, and error recovery strategy guide. For hook-based safety, refer to devops-hooks-guide skill. Use for error recovery and safety tasks: (1) agent limitation reference, (2) Task failure/error recovery strategy, (3) self-verification criteria understanding, (4) iteration limits/resource protection policies. Triggers: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'."
 license: "Apache-2.0"
 ---
 
@@ -68,11 +68,11 @@ license: "Apache-2.0"
 - `/compact` - 대화 요약 (Claude Code 내장 기능)
 - `/clear` - 컨텍스트 초기화 (Claude Code 내장 기능)
 
-> 대규모 코드베이스 탐색 시 `deep-research` 스킬의 `context:fork`를 활용하면 메인 컨텍스트 오염 없이 심층 조사가 가능합니다.
+> 대규모 코드베이스 탐색 시 `research-deep` 스킬의 `context:fork`를 활용하면 메인 컨텍스트 오염 없이 심층 조사가 가능합니다.
 
 ---
 
 ## 참고
 - `.claude/settings.json` - Hook 설정 (안전장치 트리거)
 - `.claude/hooks/` - Hook thin wrapper 디렉터리 (.py), `.claude/scripts/` - 실제 로직 스크립트 디렉터리 (.py)
-- `hooks-guide` 스킬 - Hook 시스템 상세 가이드
+- `devops-hooks-guide` 스킬 - Hook 시스템 상세 가이드

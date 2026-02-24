@@ -4,7 +4,7 @@ description: "코드베이스 및 웹 탐색을 통한 정보 수집 전문 에�
 model: sonnet
 tools: Bash, Glob, Grep, Read, WebFetch, WebSearch, Write
 skills:
-  - workflow-explore
+  - workflow-agent-explore
 maxTurns: 30
 ---
 # Explorer Agent
@@ -59,9 +59,9 @@ maxTurns: 30
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-explore` | 워크플로우 | frontmatter `skills` | 탐색 프로세스 절차, 결과 구조화 규격, 작업 내역 작성 규격 |
+| `workflow-agent-explore` | 워크플로우 | frontmatter `skills` | 탐색 프로세스 절차, 결과 구조화 규격, 작업 내역 작성 규격 |
 
-> Explorer는 `workflow-explore` 스킬만 frontmatter에 정적 바인딩합니다. Explorer는 Planner가 계획서에서 서브에이전트 타입으로 직접 지정하며, command-skill-map.md의 동적 매핑 대상이 아닙니다.
+> Explorer는 `workflow-agent-explore` 스킬만 frontmatter에 정적 바인딩합니다. Explorer는 Planner가 계획서에서 서브에이전트 타입으로 직접 지정하며, command-skill-map.md의 동적 매핑 대상이 아닙니다.
 
 ## 입력
 
@@ -87,7 +87,7 @@ maxTurns: 30
 - **코드 수정 금지**: Explorer는 탐색 전용 에이전트. 코드 수정/생성은 Worker가 담당
 - **세션 링크 등록**: 작업 시작 시 `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행
 
-> 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, deep-research와의 역할 분리)는 `workflow-explore/SKILL.md`를 참조하세요. Explorer는 Phase 1+(skill-map.md를 참조하여 계획서 태스크를 실행하는 단계)에서 호출되며, Phase 0(스킬 탐색/매핑 준비)은 Worker가 전담한다.
+> 상세 절차 (3단계 프로세스, 결과 구조화 규격, 작업 내역 작성 규격, research-deep와의 역할 분리)는 `workflow-agent-explore/SKILL.md`를 참조하세요. Explorer는 Phase 1+(skill-map.md를 참조하여 계획서 태스크를 실행하는 단계)에서 호출되며, Phase 0(스킬 탐색/매핑 준비)은 Worker가 전담한다.
 
 ## 터미널 출력 원칙
 

@@ -4,7 +4,7 @@ description: "워크플로우 마무리 처리를 수행하는 에이전트"
 tools: Bash, Edit, Grep, Read
 model: haiku
 skills:
-  - workflow-done
+  - workflow-agent-done
 maxTurns: 15
 ---
 # Done Agent
@@ -51,7 +51,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-done` | 워크플로우 | frontmatter `skills` | done 에이전트 활동 구간 절차, history.md 갱신 형식, update_state.py 호출 규약 |
+| `workflow-agent-done` | 워크플로우 | frontmatter `skills` | done 에이전트 활동 구간 절차, history.md 갱신 형식, update_state.py 호출 규약 |
 
 > done 에이전트는 커맨드 스킬을 사용하지 않습니다. 마무리 처리 전용이므로 워크플로우 스킬만 바인딩됩니다.
 
@@ -74,7 +74,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 4. **레지스트리 해제** - `python3 .claude/scripts/state/update_state.py unregister <registryKey>` 실행
 5. **워크플로우 아카이빙** - `python3 .claude/scripts/sync/history_sync.py archive <registryKey>` 실행하여 최신 10개 워크플로우만 `.workflow/`에 유지, 나머지를 `.workflow/.history/`로 이동 (history.md 링크 갱신은 Step 1의 `history_sync.py sync`가 자동 처리)
 
-> 상세 절차 (history.md 행 형식, 링크 구성, update_state.py 호출 규약)는 `workflow-done/SKILL.md`를 참조하세요.
+> 상세 절차 (history.md 행 형식, 링크 구성, update_state.py 호출 규약)는 `workflow-agent-done/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

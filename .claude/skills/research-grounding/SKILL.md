@@ -169,7 +169,7 @@ flowchart TD
 
 ## 기존 스킬과의 차이
 
-| 항목 | command-research | research-grounding |
+| 항목 | research-general | research-grounding |
 |------|-----------------|-------------------|
 | 주요 역할 | 정보 수집 및 리포트 작성 | 수집된 정보의 출처 검증 및 신뢰도 평가 |
 | 워크플로우 위치 | 정보 수집 단계 | 정보 수집 후 검증 단계 |
@@ -180,7 +180,7 @@ flowchart TD
 
 ## 사용 시나리오
 
-1. **리포트 팩트체크**: command-research로 생성된 리포트의 핵심 결론을 검증할 때 Quick/Comprehensive 모드로 사용
+1. **리포트 팩트체크**: research-general로 생성된 리포트의 핵심 결론을 검증할 때 Quick/Comprehensive 모드로 사용
 2. **기술 선정 검증**: 아키텍처 결정이나 라이브러리 선정 시 비교 데이터의 정확성을 Deep 모드로 검증
 3. **외부 정보 신뢰도 확인**: 블로그, 커뮤니티 등에서 수집한 정보의 신뢰도를 등급화하여 의사결정에 반영
 
@@ -188,7 +188,7 @@ flowchart TD
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| command-research | 웹 기반 정보 수집 및 리포트 작성 (검증 대상 정보 제공) | `.claude/skills/command-research/SKILL.md` |
+| research-general | 웹 기반 정보 수집 및 리포트 작성 (검증 대상 정보 제공) | `.claude/skills/research-general/SKILL.md` |
 | research-integrated | 웹+코드 통합 조사 (검증 대상 확대) | `.claude/skills/research-integrated/SKILL.md` |
 | research-parallel | 병렬 다중 에이전트 조사 (대량 소스 수집 후 검증) | `.claude/skills/research-parallel/SKILL.md` |
 
@@ -196,8 +196,8 @@ flowchart TD
 
 | 리소스 | 경로 | 용도 |
 |--------|------|------|
-| 교차 검증 워크플로우 | `.claude/skills/command-research/references/cross-validation.md` | 모순 탐지 체크리스트, 검증 결과 기록 템플릿 |
-| 출처 신뢰도 평가 기준 | `.claude/skills/command-research/references/source-evaluation.md` | 5등급 체계, URL 패턴별 매핑, 등급 조정 기준 |
+| 교차 검증 워크플로우 | `.claude/skills/research-general/references/cross-validation.md` | 모순 탐지 체크리스트, 검증 결과 기록 템플릿 |
+| 출처 신뢰도 평가 기준 | `.claude/skills/research-general/references/source-evaluation.md` | 5등급 체계, URL 패턴별 매핑, 등급 조정 기준 |
 
 ## 주의사항
 

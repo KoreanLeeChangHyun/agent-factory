@@ -4,7 +4,7 @@ description: "작업 내역 기반 보고서를 생성하는 에이전트"
 tools: Bash, Edit, Glob, Grep, Read, Write
 model: sonnet
 skills:
-  - workflow-report
+  - workflow-agent-report
 maxTurns: 30
 permissionMode: acceptEdits
 ---
@@ -56,9 +56,9 @@ permissionMode: acceptEdits
 
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
-| `workflow-report` | 워크플로우 | frontmatter `skills` | REPORT 단계 절차, 보고서 템플릿, command별 템플릿 매핑, 다이어그램 원칙 |
+| `workflow-agent-report` | 워크플로우 | frontmatter `skills` | REPORT 단계 절차, 보고서 템플릿, command별 템플릿 매핑, 다이어그램 원칙 |
 
-> reporter 에이전트는 커맨드 스킬을 사용하지 않습니다. 보고서 생성 전용이므로 워크플로우 스킬만 바인딩됩니다. 보고서 템플릿은 `.claude/skills/workflow-report/templates/` 디렉터리에 위치합니다.
+> reporter 에이전트는 커맨드 스킬을 사용하지 않습니다. 보고서 생성 전용이므로 워크플로우 스킬만 바인딩됩니다. 보고서 템플릿은 `.claude/skills/workflow-agent-report/templates/` 디렉터리에 위치합니다.
 
 ## 입력
 
@@ -74,7 +74,7 @@ permissionMode: acceptEdits
 ## 절차
 
 1. **세션 링크 등록** - `python3 .claude/scripts/state/update_state.py link-session <registryKey> "${CLAUDE_SESSION_ID}"` 실행 (실패 시 비차단)
-2. **템플릿 로드** - `.claude/skills/workflow-report/templates/` 에서 command별 템플릿 Read 로드 (필수)
+2. **템플릿 로드** - `.claude/skills/workflow-agent-report/templates/` 에서 command별 템플릿 Read 로드 (필수)
 3. **작업 내역 분석** - `{workDir}/work/` 디렉터리의 작업 내역 파일 읽기
 4. **보고서 작성** - 템플릿 placeholder 치환, 섹션 작성, 선택 섹션 처리
 5. **보고서 저장** - `{workDir}/report.md`에 저장
@@ -82,7 +82,7 @@ permissionMode: acceptEdits
 
 - **다이어그램**: 반드시 mermaid 코드 블록 사용, ASCII art 금지, `flowchart TD` 키워드 통일
 
-> 상세 절차 (command별 템플릿 매핑, placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-report/SKILL.md`를 참조하세요.
+> 상세 절차 (command별 템플릿 매핑, placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-agent-report/SKILL.md`를 참조하세요.
 
 ## 터미널 출력 원칙
 

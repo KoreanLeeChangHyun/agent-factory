@@ -10,9 +10,9 @@ gh CLI 기반으로 PR 리뷰의 전 과정(diff 추출, 코드 리뷰, 인라�
 
 **핵심 목적:** PR을 머지하기 전에 코드 변경사항을 체계적으로 검증하고, 리뷰 결과를 GitHub PR에 직접 반영한다.
 
-## pr-summary 및 github-integration과의 역할 분리
+## devops-pr-summary 및 devops-github과의 역할 분리
 
-| 항목 | pr-summary | github-integration | review-pr-integration |
+| 항목 | devops-pr-summary | devops-github | review-pr-integration |
 |------|-----------|-------------------|----------------------|
 | 역할 | PR 제목/본문 자동 생성 | GitHub API 범용 연동 (커밋, 푸시, 이슈) | PR 리뷰 전용 워크플로우 |
 | 입력 | git diff, 커밋 히스토리 | 사용자 명령 | PR 번호 또는 현재 브랜치 PR |
@@ -20,7 +20,7 @@ gh CLI 기반으로 PR 리뷰의 전 과정(diff 추출, 코드 리뷰, 인라�
 | 시점 | PR 생성 전 | 수시 (커밋, 푸시, 이슈 등) | PR 생성 후 리뷰 단계 |
 | 관점 | 작성자 (PR을 만드는 사람) | 작업자 (GitHub 조작) | 리뷰어 (PR을 검증하는 사람) |
 
-**보완 관계:** pr-summary로 PR을 생성한 뒤, review-pr-integration으로 해당 PR을 리뷰한다. github-integration은 두 스킬 모두에서 gh CLI 실행의 기반이 된다.
+**보완 관계:** devops-pr-summary로 PR을 생성한 뒤, review-pr-integration으로 해당 PR을 리뷰한다. devops-github은 두 스킬 모두에서 gh CLI 실행의 기반이 된다.
 
 ## PR Diff 추출 워크플로우
 
@@ -233,6 +233,6 @@ Checklist Status:
 
 | 스킬 | 경로 | 관계 |
 |------|------|------|
-| pr-summary | `.claude/skills/pr-summary/SKILL.md` | PR 생성 시 제목/본문 생성 (작성자 관점) |
-| github-integration | `.claude/skills/github-integration/SKILL.md` | gh CLI 기반 GitHub 범용 연동 |
-| command-requesting-code-review | `.claude/skills/command-requesting-code-review/SKILL.md` | 코드 리뷰 요청 체크리스트 및 판정 기준 |
+| devops-pr-summary | `.claude/skills/devops-pr-summary/SKILL.md` | PR 생성 시 제목/본문 생성 (작성자 관점) |
+| devops-github | `.claude/skills/devops-github/SKILL.md` | gh CLI 기반 GitHub 범용 연동 |
+| review-requesting | `.claude/skills/review-requesting/SKILL.md` | 코드 리뷰 요청 체크리스트 및 판정 기준 |
