@@ -1,34 +1,34 @@
 {
-  "description": "FSM 전이 규칙 단일 정의 소스. update_state.py와 workflow_transition_guard.py가 이 파일을 참조합니다.",
+  "description": "FSM 전이 규칙 단일 정의 소스. update_state.py와 workflow_transition_guard.py가 이 파일을 참조합니다. 모든 비종료 Phase에서 STALE, FAILED, CANCELLED 전이를 허용합니다.",
   "modes": {
     "full": {
       "NONE": ["INIT"],
-      "INIT": ["PLAN", "STALE"],
-      "PLAN": ["WORK", "CANCELLED", "STALE"],
-      "WORK": ["REPORT", "FAILED", "STALE"],
-      "REPORT": ["DONE", "FAILED", "STALE"]
+      "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
+      "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
+      "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
+      "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"]
     },
     "strategy": {
       "NONE": ["INIT"],
-      "INIT": ["STRATEGY", "STALE"],
-      "STRATEGY": ["DONE", "FAILED", "STALE"]
+      "INIT": ["STRATEGY", "STALE", "FAILED", "CANCELLED"],
+      "STRATEGY": ["DONE", "STALE", "FAILED", "CANCELLED"]
     },
     "noplan": {
       "NONE": ["INIT"],
-      "INIT": ["WORK", "STALE"],
-      "WORK": ["REPORT", "FAILED", "STALE"],
-      "REPORT": ["DONE", "FAILED", "STALE"]
+      "INIT": ["WORK", "STALE", "FAILED", "CANCELLED"],
+      "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
+      "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"]
     },
     "noreport": {
       "NONE": ["INIT"],
-      "INIT": ["PLAN", "STALE"],
-      "PLAN": ["WORK", "CANCELLED", "STALE"],
-      "WORK": ["DONE", "FAILED", "STALE"]
+      "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
+      "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
+      "WORK": ["DONE", "STALE", "FAILED", "CANCELLED"]
     },
     "noplan+noreport": {
       "NONE": ["INIT"],
-      "INIT": ["WORK", "STALE"],
-      "WORK": ["DONE", "FAILED", "STALE"]
+      "INIT": ["WORK", "STALE", "FAILED", "CANCELLED"],
+      "WORK": ["DONE", "STALE", "FAILED", "CANCELLED"]
     }
   }
 }

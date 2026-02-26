@@ -9,6 +9,29 @@ Phase를 한글 상태 텍스트로 변환하는 매핑을 정의합니다.
     테이블 헤더 라인   - HEADER_LINE (10컬럼: 날짜|작업ID|제목 & 내용|명령어|상태|질의|파일|계획|작업|보고)
     테이블 구분선      - SEPARATOR_LINE
     Phase-상태 매핑    - PHASE_STATUS_MAP (3값: 진행/완료/중단 + 보조: 불명)
+
+FSM 전이 다이어그램과의 관계:
+    PHASE_STATUS_MAP은 FSM(fsm-transitions.json)의 Phase를 히스토리 테이블의
+    "상태" 컬럼에 표시할 한글 텍스트로 변환한다. 매핑 카테고리는 다음과 같다:
+
+    "진행" (활성 Phase):
+        INIT     - 초기화 단계 (FSM 시작점, 모든 모드의 첫 번째 활성 Phase)
+        PLAN     - 계획 수립 단계 (full/noreport 모드에서 INIT 다음)
+        STRATEGY - 전략 수립 단계 (strategy 모드 전용, INIT 다음)
+        WORK     - 작업 실행 단계 (PLAN 또는 INIT 다음, 모드에 따라 다름)
+        REPORT   - 보고서 작성 단계 (full/noplan 모드에서 WORK 다음)
+
+    "완료" (종료 Phase):
+        DONE     - 작업 완료 (모든 모드의 정상 종료 상태)
+
+    "중단" (비정상 종료 Phase):
+        STALE     - TTL 만료로 인한 중단 (모든 활성 Phase에서 전이 가능)
+        FAILED    - 실패로 인한 중단 (WORK, REPORT, STRATEGY에서 전이 가능)
+        CANCELLED - 사용자에 의한 취소 (모든 활성 Phase에서 전이 가능)
+
+    "불명" (보조):
+        NONE    - 워크플로우 시작 전 상태 (FSM 진입 전, INIT로만 전이)
+        UNKNOWN - 매핑되지 않은 미지 상태 (폴백용)
 """
 
 # =============================================================================

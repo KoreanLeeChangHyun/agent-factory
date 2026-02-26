@@ -155,6 +155,7 @@ step-end <registryKey> <phase>
 | PLAN | `step-start <key> PLAN` | `step-change <key> INIT PLAN` | `step-end <key> PLAN` |
 | WORK | `step-start <key> WORK` | `step-change <key> PLAN WORK` (noplan/noplan+noreport: `step-change <key> INIT WORK`) | `step-end <key> WORK` |
 | WORK Phase 0~N | `step-start <key> WORK-PHASE <N> "<taskIds>" <parallel\|sequential>` | (없음) | (없음) |
+| WORK Phase N+1 (validator) | `step-start <key> WORK-PHASE <N+1> "validator" sequential` | (없음) | (없음) |
 | REPORT | `step-start <key> REPORT` | `step-change <key> WORK REPORT` | `step-end <key> REPORT` |
 | DONE | `step-start <key> DONE` | `step-change <key> REPORT DONE` (full/noplan: `step-change <key> REPORT DONE`, strategy: `step-change <key> STRATEGY DONE`, noreport/noplan+noreport: `step-change <key> WORK DONE`) | `step-end <key> DONE done` |
 | STRATEGY | `step-start <key> STRATEGY` | `step-change <key> INIT STRATEGY` | `step-end <key> STRATEGY` |

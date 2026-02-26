@@ -23,7 +23,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -248,7 +247,24 @@ def sync_registry_phase(abs_work_dir, global_registry, to_phase):
 # =============================================================================
 
 def update_status(abs_work_dir, global_registry, status_file, from_phase, to_phase):
-    """status.json 업데이트 + registry phase 동기화."""
+    """status.json 업데이트 + registry phase 동기화.
+
+    FSM 검증 로직:
+      1. WORKFLOW_SKIP_GUARD=1 환경변수가 설정된 경우 검증을 건너뜀
+      2. current_phase 확인: status.json의 현재 phase와 from_phase가 일치하는지 검증
+      3. allowed 확인: fsm-transitions.json에서 현재 mode/from_phase에 허용된 대상 목록을 조회하고
+         to_phase가 포함되어 있는지 검증
+
+    비차단 원칙:
+      FSM 검증 실패 시에도 프로세스를 종료하지 않음 (항상 exit 0).
+      검증 실패 시 구조화된 에러 메시지를 반환하되, 상태 전이는 수행하지 않음.
+      에러 메시지에는 from_phase, to_phase, current_phase, workflow_mode, allowed_targets
+      5개 필드가 모두 포함되어 디버깅을 용이하게 함.
+
+    참고:
+      register, unregister, link-session 등 status 전이가 아닌 명령은
+      main()에서 별도 분기로 처리되므로 이 함수가 호출되지 않음.
+    """
     skip_guard = os.environ.get("WORKFLOW_SKIP_GUARD", "") == "1"
 
     # FSM 전이 규칙 로드
@@ -273,23 +289,38 @@ def update_status(abs_work_dir, global_registry, status_file, from_phase, to_pha
             current_phase = data.get("phase", "NONE")
             workflow_mode = data.get("mode", "full").lower()
 
-            if from_phase != current_phase:
-                print(
-                    f"[ERROR] FSM guard: from_phase mismatch. expected={current_phase}, got={from_phase}. transition blocked.",
-                    file=sys.stderr,
-                )
-                return "status -> FSM guard blocked (mismatch)"
-
+            # allowed_targets는 두 검증 모두에서 에러 메시지에 필요하므로 미리 조회
             allowed_table = fsm_data.get("modes", {}).get(
                 workflow_mode, fsm_data.get("modes", {}).get("full", {})
             )
-            allowed = allowed_table.get(from_phase, [])
-            if to_phase not in allowed:
+            allowed = allowed_table.get(current_phase, [])
+
+            if from_phase != current_phase:
                 print(
-                    f"[ERROR] FSM guard: illegal transition {from_phase}->{to_phase}. allowed={allowed}. transition blocked.",
+                    f"[ERROR] FSM guard: from_phase mismatch. "
+                    f"from_phase={from_phase}, to_phase={to_phase}, "
+                    f"current_phase={current_phase}, workflow_mode={workflow_mode}, "
+                    f"allowed_targets={allowed}. transition blocked.",
                     file=sys.stderr,
                 )
-                return "status -> FSM guard blocked (illegal)"
+                return (
+                    f"status -> FSM guard blocked "
+                    f"(reason: from_phase mismatch, expected={current_phase}, got={from_phase}, "
+                    f"workflow_mode={workflow_mode}, allowed_targets={allowed})"
+                )
+
+            if to_phase not in allowed:
+                print(
+                    f"[ERROR] FSM guard: illegal transition {from_phase}->{to_phase}. "
+                    f"current_phase={current_phase}, workflow_mode={workflow_mode}, "
+                    f"allowed_targets={allowed}. transition blocked.",
+                    file=sys.stderr,
+                )
+                return (
+                    f"status -> FSM guard blocked "
+                    f"(reason: illegal transition {from_phase}->{to_phase}, "
+                    f"workflow_mode={workflow_mode}, allowed_targets={allowed})"
+                )
 
         # KST 시간
         kst = KST
@@ -316,18 +347,6 @@ def update_status(abs_work_dir, global_registry, status_file, from_phase, to_pha
 
     # 전역 레지스트리 phase 동기화
     sync_registry_phase(abs_work_dir, global_registry, to_phase)
-
-    # history.md 실시간 갱신 (비동기, 실패 무시)
-    history_sync_py = os.path.join(SCRIPT_DIR, "..", "sync", "history_sync.py")
-    try:
-        if os.path.isfile(history_sync_py):
-            subprocess.Popen(
-                [sys.executable, history_sync_py, "sync"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-    except Exception:
-        pass
 
     return result
 
@@ -494,7 +513,7 @@ def usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_cr
 # =============================================================================
 
 def usage_finalize(abs_work_dir, global_registry):
-    """totals 계산, effective_tokens 산출, .prompt/usage.md 행 추가."""
+    """totals 계산, effective_tokens 산출, .prompt/.usage.md 행 추가."""
     usage_file = os.path.join(abs_work_dir, "usage.json")
     if not os.path.isfile(usage_file):
         print(f"[WARN] usage-finalize: usage.json not found: {usage_file}", file=sys.stderr)
@@ -605,8 +624,8 @@ def usage_finalize(abs_work_dir, global_registry):
             f"| {to_k(total_eff)} |"
         )
 
-        # .prompt/usage.md 갱신
-        usage_md = os.path.join(PROJECT_ROOT, ".prompt", "usage.md")
+        # .prompt/.usage.md 갱신
+        usage_md = os.path.join(PROJECT_ROOT, ".prompt", ".usage.md")
         marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
         header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | INI | PLN | IDX | WRK | EXP | VAL | RPT | DON | STR | 합계 |"
         separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|------|"

@@ -20,7 +20,7 @@ from dispatcher import (
 def _history_sync_trigger(stdin_data, flags):
     """Inline history-sync-trigger logic (migrated from subagent-stop/history-sync-trigger.py).
 
-    Triggers history_sync.py sync in background when a workflow agent subagent stops.
+    Triggers history_sync.py sync+archive in background when a workflow agent subagent stops.
     """
     if not is_enabled(flags, 'HOOK_HISTORY_SYNC_TRIGGER'):
         return
@@ -40,6 +40,11 @@ def _history_sync_trigger(stdin_data, flags):
     if os.path.exists(target):
         subprocess.Popen(
             [sys.executable, target, 'sync'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.Popen(
+            [sys.executable, target, 'archive'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

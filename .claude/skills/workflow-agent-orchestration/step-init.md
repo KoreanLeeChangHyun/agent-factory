@@ -150,18 +150,24 @@ When `-np` flag is detected in `$ARGUMENTS` for implement/review/research comman
    - `step-update task-status <registryKey> W01 running && step-update usage-pending <registryKey> W01 W01`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
    - `step-update task-status <registryKey> W01 completed`
-6. `step-end <registryKey> WORK` (WORK completion)
-7. `step-update both <registryKey> reporter WORK REPORT`
-8. `step-change <registryKey> WORK REPORT` (상태 전이 시각화)
-9. `step-start <registryKey> REPORT` (REPORT start banner)
-10. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
-11. `step-end <registryKey> REPORT` (REPORT completion)
-12. `step-update both <registryKey> done REPORT DONE`
-13. `step-change <registryKey> REPORT DONE` (상태 전이 시각화)
-14. `step-start <registryKey> DONE` (DONE start banner)
-15. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")`
-16. `step-end <registryKey> DONE done` (DONE completion)
-17. Terminate
+6. Phase N+1 실행 (validator, implement/review만):
+   - `if command in ["implement", "review"]:`
+   - `step-start <registryKey> WORK-PHASE <N+1> "validator" sequential`
+   - `step-update task-status <registryKey> validator running && step-update usage-pending <registryKey> validator validator`
+   - `Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, userPromptPath: <workDir>/user_prompt.txt")`
+   - `step-update task-status <registryKey> validator completed`
+7. `step-end <registryKey> WORK` (WORK completion)
+8. `step-update both <registryKey> reporter WORK REPORT`
+9. `step-change <registryKey> WORK REPORT` (상태 전이 시각화)
+10. `step-start <registryKey> REPORT` (REPORT start banner)
+11. Reporter call: `Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")`
+12. `step-end <registryKey> REPORT` (REPORT completion)
+13. `step-update both <registryKey> done REPORT DONE`
+14. `step-change <registryKey> REPORT DONE` (상태 전이 시각화)
+15. `step-start <registryKey> DONE` (DONE start banner)
+16. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, reportPath: <reportPath>, status: <status>")`
+17. `step-end <registryKey> DONE done` (DONE completion)
+18. Terminate
 
 > **Note:** noplan 모드에서는 plan.md가 없으므로 오케스트레이터가 plan.md를 Read하는 단계(Plan Reading for Task Dispatch)가 없다. 대신 Phase 0 Worker가 user_prompt.txt를 분석하여 skill-map.md를 생성하고, Phase 1 Worker가 user_prompt.txt를 직접 해석하여 작업을 수행한다. 단일 Worker(W01)로 실행하는 것이 기본이며, Phase 0이 태스크 분할이 필요하다고 판단하면 skill-map.md에 복수 태스크를 정의할 수 있다.
 
@@ -189,13 +195,19 @@ When `-nr` flag is detected in `$ARGUMENTS` for implement/review/research comman
 8. `step-change <registryKey> PLAN WORK` (상태 전이 시각화)
 9. `step-start <registryKey> WORK` (WORK start banner)
 10. Phase 0 + Phase 1+ 실행 (full 모드와 동일한 Worker dispatch)
-11. `step-end <registryKey> WORK` (WORK completion)
-12. `step-update both <registryKey> done WORK DONE`
-13. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
-14. `step-start <registryKey> DONE` (DONE start banner)
-15. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
-16. `step-end <registryKey> DONE done` (DONE completion)
-17. Terminate
+11. Phase N+1 실행 (validator, implement/review만):
+    - `if command in ["implement", "review"]:`
+    - `step-start <registryKey> WORK-PHASE <N+1> "validator" sequential`
+    - `step-update task-status <registryKey> validator running && step-update usage-pending <registryKey> validator validator`
+    - `Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>")`
+    - `step-update task-status <registryKey> validator completed`
+12. `step-end <registryKey> WORK` (WORK completion)
+13. `step-update both <registryKey> done WORK DONE`
+14. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
+15. `step-start <registryKey> DONE` (DONE start banner)
+16. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
+17. `step-end <registryKey> DONE done` (DONE completion)
+18. Terminate
 
 > **Note:** noreport 모드에서는 WORK 완료 후 REPORT 단계를 완전히 스킵한다. reporter 서브에이전트를 호출하지 않으며, report.md가 생성되지 않는다. done 에이전트 호출 시 `reportPath` 파라미터가 없는 상태로 전달된다.
 
@@ -228,13 +240,19 @@ When both `-np` and `-nr` flags are detected in `$ARGUMENTS` for implement/revie
    - `step-update task-status <registryKey> W01 running && step-update usage-pending <registryKey> W01 W01`
    - `Task(subagent_type="worker", prompt="command: <command>, workId: <workId>, taskId: W01, userPromptPath: <workDir>/user_prompt.txt, workDir: <workDir>, skillMapPath: <workDir>/work/skill-map.md")`
    - `step-update task-status <registryKey> W01 completed`
-6. `step-end <registryKey> WORK` (WORK completion)
-7. `step-update both <registryKey> done WORK DONE`
-8. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
-9. `step-start <registryKey> DONE` (DONE start banner)
-10. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
-11. `step-end <registryKey> DONE done` (DONE completion)
-12. Terminate
+6. Phase N+1 실행 (validator, implement/review만):
+   - `if command in ["implement", "review"]:`
+   - `step-start <registryKey> WORK-PHASE <N+1> "validator" sequential`
+   - `step-update task-status <registryKey> validator running && step-update usage-pending <registryKey> validator validator`
+   - `Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, userPromptPath: <workDir>/user_prompt.txt")`
+   - `step-update task-status <registryKey> validator completed`
+7. `step-end <registryKey> WORK` (WORK completion)
+8. `step-update both <registryKey> done WORK DONE`
+9. `step-change <registryKey> WORK DONE` (상태 전이 시각화 - REPORT 스킵)
+10. `step-start <registryKey> DONE` (DONE start banner)
+11. Done agent call: `Task(subagent_type="done", prompt="registryKey: <registryKey>, workDir: <workDir>, command: <command>, title: <title>, status: <status>")`
+12. `step-end <registryKey> DONE done` (DONE completion)
+13. Terminate
 
 > **Note:** noplan+noreport 모드는 noplan 모드와 동일한 WORK 흐름(plan.md 부재, Phase 0 필수, user_prompt.txt 기반)을 따르되, WORK 완료 후 REPORT를 스킵하고 바로 DONE으로 직행한다. reporter 서브에이전트를 호출하지 않으며, report.md가 생성되지 않는다. done 에이전트 호출 시 `reportPath` 파라미터가 없는 상태로 전달된다.
 

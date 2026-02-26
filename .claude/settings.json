@@ -10,22 +10,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/sync/history_sync.py sync",
+            "command": "python3 -u .claude/scripts/sync/history_sync.py sync && python3 -u .claude/scripts/sync/history_sync.py archive",
             "timeout": 30,
             "async": true
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/scripts/sync/history_sync.py sync",
-            "timeout": 30,
-            "async": true,
-            "statusMessage": "히스토리 동기화 (SessionEnd)"
           }
         ]
       }

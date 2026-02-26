@@ -368,7 +368,7 @@ step-update env <registryKey> unset HOOKS_EDIT_ALLOWED
 > **Agent-Skill Binding**
 > - Agent: `validator` (model: sonnet, maxTurns: 25)
 > - Skill: `workflow-agent-validate` (항상 바인딩)
-> - Task prompt: `command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>`
+> - Task prompt: `command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>` (noplan/noplan+noreport: `userPromptPath: <workDir>/user_prompt.txt`)
 
 모든 Worker Phase(1~N)가 완료된 후 마지막 Phase로 실행되는 통합 검증 단계이다. validator 에이전트가 린트/타입체크/빌드/작업 내역 확인의 MVP 검증을 수행한다.
 
@@ -405,6 +405,8 @@ step-update task-status <registryKey> validator running && step-update usage-pen
 # Validator 호출
 Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>")
 ```
+
+> **Note:** noplan/noplan+noreport 모드에서는 plan.md가 부재하므로 `planPath` 대신 `userPromptPath: <workDir>/user_prompt.txt`를 전달한다.
 
 > **Note:** `agent_permissions.py`의 WORK 리스트에 `"validator"`가 포함되어 있으므로 `workflow_agent_guard.py`를 정상 통과한다.
 

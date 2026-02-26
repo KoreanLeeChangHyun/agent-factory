@@ -8,7 +8,7 @@
 사용법:
     python3 .claude/scripts/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
     python3 .claude/scripts/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
-    python3 .claude/scripts/sync/history_sync.py archive <registryKey>
+    python3 .claude/scripts/sync/history_sync.py archive [registryKey]
 """
 
 import argparse
@@ -774,9 +774,46 @@ def cmd_status(args: argparse.Namespace) -> int:
 # archive 명령어
 # ============================================================
 
+def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
+    """활성 워크플로우(완료 상태가 아닌)의 디렉터리 이름 집합을 반환."""
+    active_keys: set[str] = set()
+    terminal_phases = {"DONE", "FAILED", "CANCELLED"}
+
+    if not os.path.isdir(workflow_dir):
+        return active_keys
+
+    for dir_name in os.listdir(workflow_dir):
+        dir_path = os.path.join(workflow_dir, dir_name)
+        if not os.path.isdir(dir_path) or not re.match(r"^[0-9]", dir_name):
+            continue
+
+        # workName 서브디렉터리 탐색
+        for work_name in os.listdir(dir_path):
+            work_path = os.path.join(dir_path, work_name)
+            if not os.path.isdir(work_path):
+                continue
+
+            # command 서브디렉터리 탐색
+            for command in os.listdir(work_path):
+                cmd_path = os.path.join(work_path, command)
+                if not os.path.isdir(cmd_path):
+                    continue
+                status_file = os.path.join(cmd_path, "status.json")
+                if os.path.exists(status_file):
+                    phase, _, _ = extract_status_from_json(status_file)
+                    if phase not in terminal_phases:
+                        active_keys.add(dir_name)
+                        break
+            else:
+                continue
+            break
+
+    return active_keys
+
+
 def cmd_archive(args: argparse.Namespace) -> int:
     """archive 서브커맨드 실행. 오래된 워크플로우 디렉토리를 .history/로 이동."""
-    current_key = args.registry_key
+    current_key = getattr(args, 'registry_key', None)
     workflow_dir = os.path.join(PROJECT_ROOT, ".workflow")
     history_dir = os.path.join(workflow_dir, ".history")
 
@@ -794,8 +831,12 @@ def cmd_archive(args: argparse.Namespace) -> int:
     if not dirs:
         return 0
 
-    # 현재 워크플로우 제외
-    filtered = [d for d in dirs if d != current_key]
+    # registry_key가 None이면 활성 워크플로우를 자동 감지하여 제외
+    if current_key:
+        filtered = [d for d in dirs if d != current_key]
+    else:
+        active_keys = _detect_active_workflow_keys(workflow_dir)
+        filtered = [d for d in dirs if d not in active_keys]
 
     if len(filtered) <= KEEP_COUNT:
         return 0
@@ -852,7 +893,7 @@ def main():
 
     # archive 서브커맨드
     archive_parser = subparsers.add_parser("archive", help="오래된 워크플로우를 .history/로 아카이브")
-    archive_parser.add_argument("registry_key", help="현재 워크플로우의 registryKey")
+    archive_parser.add_argument("registry_key", nargs='?', default=None, help="현재 워크플로우의 registryKey (생략 시 활성 워크플로우 자동 감지)")
 
     args = parser.parse_args()
 
