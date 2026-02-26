@@ -74,6 +74,7 @@ maxTurns: 30
 - `skills`: 사용자가 명시한 스킬 목록 (선택적)
 - `mode`: 동작 모드 (선택적). Explorer는 Phase 1+(작업 실행 단계)에서만 호출된다. Phase 0(스킬 탐색/매핑 준비 단계)은 Worker가 전담
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
+- `registryKey`: 워크플로우 식별자 (YYYYMMDD-HHMMSS, 세션 링크 등록에 사용)
 
 ## 절차
 

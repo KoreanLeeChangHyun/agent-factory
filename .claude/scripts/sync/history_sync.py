@@ -2,7 +2,7 @@
 """
 히스토리 동기화 및 상태 확인 명령어.
 
-.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 history.md와 비교하고,
+.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 .prompt/.history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
@@ -49,11 +49,18 @@ from data.constants import STALE_TTL_SECONDS, KEEP_COUNT
 from data.phase_status_map import HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+EXPECTED_CELL_COUNT = 12
+ORPHAN_STATUS = "삭제됨"
 
 
 # ============================================================
 # 헬퍼 함수
 # ============================================================
+
+def _escape_pipe(text: str) -> str:
+    """마크다운 테이블 셀 내 파이프 문자를 HTML 엔티티로 이스케이프."""
+    return text.replace("|", "&#124;")
+
 
 def parse_timestamp_from_dir(dir_name: str) -> tuple[str, str]:
     """YYYYMMDD-HHMMSS 형식에서 날짜와 시간을 추출."""
@@ -260,6 +267,7 @@ def _build_entry(dir_name: str, work_name: str, command: str,
     has_prompt = os.path.exists(prompt_file)
     has_files = os.path.isdir(files_dir) and len(os.listdir(files_dir)) > 0
     has_report = os.path.exists(report_file)
+    has_work = os.path.isdir(os.path.join(cmd_path, "work"))
 
     # 이미지 파일 개수 (files 디렉토리)
     files_count = 0
@@ -280,6 +288,7 @@ def _build_entry(dir_name: str, work_name: str, command: str,
         "has_files": has_files,
         "files_count": files_count,
         "has_report": has_report,
+        "has_work": has_work,
         "work_name": work_name,
         "rel_base": f"{rel_prefix}/{dir_name}/{work_name}/{command}",
     }
@@ -368,21 +377,15 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
 
 
 def format_row(entry: dict) -> str:
-    """9컬럼 테이블 행을 생성."""
+    """10컬럼 테이블 행을 생성."""
     # 날짜 셀: YYYY-MM-DD<br><sub>HH:MM</sub>
     date_cell = f"{entry['date']}<br><sub>{entry['time']}</sub>"
 
     # 제목 & 내용 셀: 제목<br><sub>요약</sub>
     if entry["summary"]:
-        title_cell = f"{entry['title']}<br><sub>{entry['summary']}</sub>"
+        title_cell = f"{_escape_pipe(entry['title'])}<br><sub>{_escape_pipe(entry['summary'])}</sub>"
     else:
-        title_cell = entry["title"]
-
-    # 계획서 링크
-    if entry["has_plan"]:
-        plan_cell = f"[계획서]({entry['rel_base']}/plan.md)"
-    else:
-        plan_cell = "-"
+        title_cell = _escape_pipe(entry["title"])
 
     # 질의 링크
     if entry["has_prompt"]:
@@ -390,19 +393,31 @@ def format_row(entry: dict) -> str:
     else:
         prompt_cell = "-"
 
-    # 이미지 링크
+    # 파일 링크
     if entry["has_files"]:
-        files_cell = f"[이미지({entry['files_count']})]({entry['rel_base']}/files/)"
+        files_cell = f"[파일({entry['files_count']})]({entry['rel_base']}/files/)"
     else:
         files_cell = "-"
 
-    # 보고서 링크
+    # 계획 링크
+    if entry["has_plan"]:
+        plan_cell = f"[계획]({entry['rel_base']}/plan.md)"
+    else:
+        plan_cell = "-"
+
+    # 작업 링크
+    if entry["has_work"]:
+        work_cell = f"[작업]({entry['rel_base']}/work/)"
+    else:
+        work_cell = "-"
+
+    # 보고 링크
     if entry["has_report"]:
-        report_cell = f"[보고서]({entry['rel_base']}/report.md)"
+        report_cell = f"[보고]({entry['rel_base']}/report.md)"
     else:
         report_cell = "-"
 
-    return f"| {date_cell} | {entry['work_id']} | {title_cell} | {entry['command']} | {entry['status']} | {plan_cell} | {prompt_cell} | {files_cell} | {report_cell} |"
+    return f"| {date_cell} | {entry['work_id']} | {title_cell} | {entry['command']} | {entry['status']} | {prompt_cell} | {files_cell} | {plan_cell} | {work_cell} | {report_cell} |"
 
 
 # ============================================================
@@ -556,7 +571,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             else:
                 # 레거시 형식 행(9컬럼 미만) 탐지: O(1) dict lookup
                 orig_row = original_rows.get(wid, "")
-                if orig_row and len(orig_row.split("|")) < 10:
+                if orig_row and len(orig_row.split("|")) < EXPECTED_CELL_COUNT:
                     updated_entries.append(entry)
 
     # 중복 행 존재 여부 확인
@@ -569,7 +584,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     # 레거시 형식 행 존재 여부 확인 (셀 수 10 미만)
     has_legacy = any(
-        len(row.split("|")) < 10
+        len(row.split("|")) < EXPECTED_CELL_COUNT
         for row in data_rows
         if extract_work_id_from_row(row)
     )
@@ -580,7 +595,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         wid = extract_work_id_from_row(row)
         if wid and wid not in scanned_map:
             old_status = extract_status_from_row(row)
-            if old_status != "삭제됨":
+            if old_status != ORPHAN_STATUS:
                 orphan_wids.add(wid)
 
     if not new_entries and not updated_entries and not has_duplicates and not has_legacy and not orphan_wids:
@@ -626,7 +641,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             final_rows.append(format_row(scanned_map[wid]))
         elif wid in orphan_wids:
             # T3: 고아 엔트리 - 상태를 "삭제됨"으로 변경
-            final_rows.append(replace_status_in_row(row, "삭제됨"))
+            final_rows.append(replace_status_in_row(row, ORPHAN_STATUS))
         else:
             final_rows.append(row)
 
@@ -825,14 +840,14 @@ def main():
     # sync 서브커맨드
     sync_parser = subparsers.add_parser("sync", help="history.md 동기화")
     sync_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
-    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", "history.md"), help="history.md 파일 경로")
+    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", ".history.md"), help=".history.md 파일 경로")
     sync_parser.add_argument("--dry-run", action="store_true", help="변경 미리보기만 수행")
     sync_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     # status 서브커맨드
     status_parser = subparsers.add_parser("status", help="동기화 상태 요약")
     status_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
-    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", "history.md"), help="history.md 파일 경로")
+    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", ".history.md"), help=".history.md 파일 경로")
     status_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     # archive 서브커맨드

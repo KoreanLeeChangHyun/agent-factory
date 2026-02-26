@@ -36,7 +36,7 @@ def _history_sync_trigger(stdin_data, flags):
         return
 
     import subprocess
-    target = scripts_dir('workflow', 'sync', 'history_sync.py')
+    target = scripts_dir('sync', 'history_sync.py')
     if os.path.exists(target):
         subprocess.Popen(
             [sys.executable, target, 'sync'],
@@ -52,13 +52,26 @@ def main():
     # usage-tracker (async)
     dispatch_async(
         'HOOK_USAGE_TRACKER',
-        scripts_dir('workflow', 'sync', 'usage_sync.py'),
+        scripts_dir('sync', 'usage_sync.py'),
         stdin_data,
         flags=flags,
     )
 
     # history-sync-trigger (async, inline logic)
     _history_sync_trigger(stdin_data, flags)
+
+    # usage-jsonl-sync: done 에이전트 종료 시 전체 JSONL 일괄 파싱 (async)
+    try:
+        data = json.loads(stdin_data)
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+    if data.get('agent_type') == 'done':
+        dispatch_async(
+            'HOOK_USAGE_JSONL_SYNC',
+            scripts_dir('sync', 'usage_jsonl_sync.py'),
+            stdin_data,
+            flags=flags,
+        )
 
     # All hooks are async/fire-and-forget, no exit code aggregation needed
     sys.exit(0)

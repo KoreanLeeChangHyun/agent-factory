@@ -42,7 +42,7 @@ def main():
     transcript_path = input_data.get("agent_transcript_path", "")
 
     # 워크플로우 에이전트 필터링
-    if agent_type not in ("init", "planner", "worker", "reporter"):
+    if agent_type not in ("init", "planner", "indexer", "worker", "explorer", "validator", "reporter", "strategy", "done"):
         sys.exit(0)
 
     # transcript 경로 유효성 확인
@@ -71,15 +71,30 @@ def main():
 
     usage_file = os.path.join(work_dir, "usage.json")
 
-    # JSONL 파싱: 마지막 100줄에서 역방향으로 유효 usage 라인 탐색
+    # JSONL 파싱: 전체 파일의 모든 assistant 레코드 usage를 합산
+    # (usage는 API 호출당 증분값이므로 마지막 1개가 아닌 전체 합산 필요)
+    tokens = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+    }
+    found_any = False
+
     try:
-        result = subprocess.run(
-            ["tail", "-n", "100", transcript_path],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        file_size = os.path.getsize(transcript_path)
+        # 50MB 초과 시 tail 폴백 (대용량 JSONL 성능 보호)
+        if file_size > 50 * 1024 * 1024:
+            result = subprocess.run(
+                ["tail", "-n", "500", transcript_path],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        else:
+            with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
     except Exception:
         sys.exit(0)
 
@@ -87,8 +102,7 @@ def main():
         print(f"[usage-tracker] JSONL file empty or no valid lines: {transcript_path}", file=sys.stderr)
         sys.exit(0)
 
-    tokens = None
-    for line in reversed(lines):
+    for line in lines:
         if not line.strip():
             continue
         try:
@@ -99,6 +113,9 @@ def main():
         if data.get("isApiErrorMessage"):
             continue
 
+        if data.get("type") != "assistant":
+            continue
+
         usage = None
         msg = data.get("message")
         if isinstance(msg, dict) and "usage" in msg:
@@ -107,16 +124,14 @@ def main():
             usage = data["usage"]
 
         if isinstance(usage, dict):
-            tokens = {
-                "input_tokens": usage.get("input_tokens", 0),
-                "output_tokens": usage.get("output_tokens", 0),
-                "cache_creation_tokens": usage.get("cache_creation_input_tokens", 0),
-                "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
-            }
-            break
+            tokens["input_tokens"] += usage.get("input_tokens", 0)
+            tokens["output_tokens"] += usage.get("output_tokens", 0)
+            tokens["cache_creation_tokens"] += usage.get("cache_creation_input_tokens", 0)
+            tokens["cache_read_tokens"] += usage.get("cache_read_input_tokens", 0)
+            found_any = True
 
-    if not tokens:
-        print(f"[usage-tracker] No valid usage data found in last 100 lines: {transcript_path}", file=sys.stderr)
+    if not found_any:
+        print(f"[usage-tracker] No valid usage data found in: {transcript_path}", file=sys.stderr)
         sys.exit(0)
 
     # mkdir 기반 POSIX 잠금
@@ -147,6 +162,12 @@ def main():
             usage_data["agents"] = {}
 
         tokens["method"] = "subagent_transcript"
+
+        # _agent_map에 agent_id -> agent_type 매핑 기록
+        # (usage_jsonl_sync.py가 done SubagentStop 시점에 참조)
+        if "_agent_map" not in usage_data:
+            usage_data["_agent_map"] = {}
+        usage_data["_agent_map"][agent_id] = agent_type
 
         if agent_type == "worker":
             pending = usage_data.get("_pending_workers", {})

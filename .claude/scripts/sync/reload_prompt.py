@@ -3,7 +3,7 @@
 reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트
 
 prompt.txt의 피드백을 user_prompt.txt에 append하고,
-.uploads/ 파일 복사, prompt.txt 클리어, querys.txt 갱신을 수행한다.
+.uploads/ 파일 복사, prompt.txt 클리어를 수행한다.
 
 사용법:
   python3 reload_prompt.py <workDir>
@@ -16,7 +16,6 @@ prompt.txt의 피드백을 user_prompt.txt에 append하고,
   2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
   3. .uploads/ -> <workDir>/files/ 복사 후 .uploads/ 클리어
   4. .prompt/prompt.txt 클리어
-  5. .prompt/querys.txt에 수정 기록 append
 
 출력 (stdout):
   피드백 내용 전문
@@ -53,7 +52,6 @@ def main():
 
     prompt_dir = os.path.join(_PROJECT_ROOT, ".prompt")
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
-    querys_file = os.path.join(prompt_dir, "querys.txt")
 
     # --- Step 1: prompt.txt 읽기 ---
     feedback = ""
@@ -105,11 +103,6 @@ def main():
             pass  # truncate
     except Exception:
         pass
-
-    # --- Step 5: querys.txt 갱신 ---
-    feedback_summary = feedback[:30]
-    with open(querys_file, "a", encoding="utf-8") as f:
-        f.write(f"{kst_date} [수정] {feedback_summary}\n")
 
     # --- stdout: 피드백 내용 전문 출력 ---
     print(feedback)

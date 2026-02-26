@@ -2,10 +2,10 @@
 name: indexer
 description: "스킬 카탈로그 기반 스킬 매핑 준비 에이전트. WORK Phase 0에서 skill-map.md를 생성한다."
 model: inherit
-maxTurns: 15
 tools: Bash, Glob, Grep, Read, Write
 skills:
   - workflow-agent-index
+maxTurns: 15
 ---
 # Indexer Agent
 
@@ -87,12 +87,18 @@ WORK Phase 0(준비 단계)에서 **스킬 카탈로그(`skill-catalog.md`)를 1
 ## 오케스트레이터 반환 형식 (필수)
 
 > **엄격히 준수**: 오케스트레이터에게 반환할 때 반드시 아래 형식만 사용합니다.
+> 이 형식 외의 추가 정보는 절대 포함하지 않습니다.
+> 상세 정보는 skill-map.md 파일에 저장되어 있으므로 반환에 포함할 필요가 없습니다.
+
+### 반환 형식
 
 ```
 상태: 성공 | 실패
 스킬맵: <workDir>/work/skill-map.md
 매핑 스킬: N개
 ```
+
+> **금지 항목**: 스킬 매핑 결과 테이블, 분석 과정, 카탈로그 내용 요약 등을 반환에 포함하지 않습니다. 이러한 정보는 skill-map.md 파일에만 기록합니다.
 
 ## 주의사항
 

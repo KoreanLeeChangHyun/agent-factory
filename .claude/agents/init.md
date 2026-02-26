@@ -1,8 +1,8 @@
 ---
 name: init
 description: "워크플로우 초기화를 수행하는 에이전트"
-tools: Bash, Glob, Grep, Read
 model: haiku
+tools: Bash, Glob, Grep, Read
 skills:
   - workflow-agent-init
 maxTurns: 15
@@ -54,7 +54,7 @@ maxTurns: 15
 
 오케스트레이터로부터 다음 정보를 전달받습니다:
 
-- `command`: 실행 명령어 (implement, review, research, strategy)
+- `command`: 실행 명령어 (implement, review, research, strategy, prompt)
 - `mode`: (선택적) 워크플로우 모드. 오케스트레이터가 Mode Auto-Determination Rule(command + $ARGUMENTS 플래그 조합)로 결정한 값을 수신. `full`(기본값), `strategy`, `noplan`, `noreport`, `noplan+noreport` 중 하나
 
 ## 절차

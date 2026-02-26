@@ -2,6 +2,7 @@
 name: workflow-agent-index
 description: "Internal skill for workflow WORK Phase 0 (skill mapping preparation). Reads skill-catalog.md once to acquire all skill metadata, then maps plan tasks to appropriate skills using a 4-level matching priority. Produces skill-map.md for subsequent Worker phases. Internally invoked by orchestrator via indexer agent; not intended for direct user invocation."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Index
@@ -107,6 +108,30 @@ mkdir -p <workDir>/work
 ```
 
 - **매핑 스킬 N개**: 중복 제거된 고유 스킬 수
+
+---
+
+## 터미널 출력 원칙
+
+> **핵심: 내부 분석/사고 과정을 터미널에 출력하지 않는다. 결과만 출력한다.**
+
+- 스킬 분석 과정, 매핑 판단 근거, 카탈로그 탐색 과정 등 내부 사고를 텍스트로 출력하지 않는다
+- "~를 살펴보겠습니다", "~를 매핑합니다" 류의 진행 상황 설명을 출력하지 않는다
+- 허용되는 출력: 반환 형식(규격 반환값), 에러 메시지
+- 도구 호출(Read, Write 등)은 자유롭게 사용하되, 도구 호출 전후에 불필요한 설명을 붙이지 않는다
+
+---
+
+## 에러 처리
+
+| 에러 | 처리 |
+|------|------|
+| skill-catalog.md 읽기 실패 | 최대 3회 재시도 후 실패 반환 |
+| 계획서 읽기 실패 | 최대 3회 재시도 후 실패 반환 |
+| 매핑 불가 | 해당 태스크에 "(없음)" 기록 후 계속 진행 |
+
+**재시도 정책**: 최대 3회, 각 시도 간 1초 대기
+**실패 시**: 오케스트레이터에게 에러 보고. 오케스트레이터는 폴백(Worker 자율 스킬 결정)으로 전환
 
 ---
 

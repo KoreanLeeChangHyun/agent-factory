@@ -175,7 +175,6 @@ create_directories_and_files() {
         ".prompt/history.md"
         ".prompt/memo.txt"
         ".prompt/prompt.txt"
-        ".prompt/querys.txt"
         ".prompt/usage.md"
         ".claude.env"
         "CLAUDE.md"

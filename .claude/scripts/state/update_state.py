@@ -138,7 +138,7 @@ def update_context(local_context, agent):
 
         data["agent"] = agent
         atomic_write_json(local_context, data)
-        return f"context -> agent={agent} (local)"
+        return f"context -> agent={agent}"
     except Exception as e:
         print(f"[WARN] .context.json update failed ({local_context}): {e}", file=sys.stderr)
         return "context -> failed"
@@ -530,7 +530,7 @@ def usage_finalize(abs_work_dir, global_registry):
 
         # 모든 에이전트 토큰 데이터 수집
         all_agents = []
-        for key in ["orchestrator", "init", "planner", "reporter"]:
+        for key in ["orchestrator", "init", "planner", "indexer", "explorer", "validator", "reporter", "strategy", "done"]:
             if key in agents and isinstance(agents[key], dict):
                 all_agents.append(agents[key])
 
@@ -572,16 +572,21 @@ def usage_finalize(abs_work_dir, global_registry):
         orch_eff = calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
         init_eff = calc_effective(agents.get("init", {})) if "init" in agents else 0
         plan_eff = calc_effective(agents.get("planner", {})) if "planner" in agents else 0
+        idx_eff = calc_effective(agents.get("indexer", {})) if "indexer" in agents else 0
         work_eff = (
             sum(calc_effective(w) for w in workers.values() if isinstance(w, dict))
             if isinstance(workers, dict)
             else 0
         )
+        exp_eff = calc_effective(agents.get("explorer", {})) if "explorer" in agents else 0
+        val_eff = calc_effective(agents.get("validator", {})) if "validator" in agents else 0
         report_eff = calc_effective(agents.get("reporter", {})) if "reporter" in agents else 0
-        total_eff = orch_eff + init_eff + plan_eff + work_eff + report_eff
+        don_eff = calc_effective(agents.get("done", {})) if "done" in agents else 0
+        str_eff = calc_effective(agents.get("strategy", {})) if "strategy" in agents else 0
+        total_eff = orch_eff + init_eff + plan_eff + idx_eff + work_eff + exp_eff + val_eff + report_eff + don_eff + str_eff
         eff_weighted = totals.get("effective_tokens", total_eff)
 
-        # usage.md 행 생성
+        # usage.md 행 생성 (15칸럼 스키마: 날짜|작업ID|제목|명령|ORC|INI|PLN|IDX|WRK|EXP|VAL|RPT|DON|STR|합계)
         row = (
             f"| {date_str} "
             f"| {registry_key} "
@@ -590,17 +595,21 @@ def usage_finalize(abs_work_dir, global_registry):
             f"| {to_k(orch_eff)} "
             f"| {to_k(init_eff)} "
             f"| {to_k(plan_eff)} "
+            f"| {to_k(idx_eff)} "
             f"| {to_k(work_eff)} "
+            f"| {to_k(exp_eff)} "
+            f"| {to_k(val_eff)} "
             f"| {to_k(report_eff)} "
-            f"| {to_k(total_eff)} "
-            f"| {to_k_precise(eff_weighted)} |"
+            f"| {to_k(don_eff)} "
+            f"| {to_k(str_eff)} "
+            f"| {to_k(total_eff)} |"
         )
 
         # .prompt/usage.md 갱신
         usage_md = os.path.join(PROJECT_ROOT, ".prompt", "usage.md")
         marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-        header_line = "| 날짜 | 작업ID | 제목 | 명령어 | Orch | Init | Plan | Work | Report | 합계 | eff |"
-        separator_line = "|------|--------|------|--------|------|------|------|------|--------|------|-----|"
+        header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | INI | PLN | IDX | WRK | EXP | VAL | RPT | DON | STR | 합계 |"
+        separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|------|"
 
         content = ""
         if os.path.exists(usage_md):
@@ -754,7 +763,7 @@ def main():
             print("[WARN] context 모드: agent 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_context(local_context, agent)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "status":
         from_phase = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -763,7 +772,7 @@ def main():
             print("[WARN] status 모드: fromPhase, toPhase 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_status(abs_work_dir, global_registry, status_file, from_phase, to_phase)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "both":
         agent = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -774,17 +783,17 @@ def main():
             sys.exit(0)
         result_ctx = update_context(local_context, agent)
         result_sts = update_status(abs_work_dir, global_registry, status_file, from_phase, to_phase)
-        print(f"state updated: {result_ctx}, {result_sts}")
+        print(f"state: {result_ctx}, {result_sts}")
 
     elif mode == "register":
         reg_title = sys.argv[3] if len(sys.argv) > 3 else ""
         reg_command = sys.argv[4] if len(sys.argv) > 4 else ""
         result = register_workflow(abs_work_dir, global_registry, reg_title, reg_command)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "unregister":
         result = unregister_workflow(abs_work_dir, global_registry)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "link-session":
         session_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -792,7 +801,7 @@ def main():
             print("[WARN] link-session 모드: sessionId 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = link_session(status_file, session_id)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "usage-pending":
         agent_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -801,7 +810,7 @@ def main():
             print("[WARN] usage-pending 모드: agent_id, task_id 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = usage_pending(abs_work_dir, agent_id, task_id)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "usage":
         agent_name = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -814,11 +823,11 @@ def main():
             print("[WARN] usage 모드: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_creation, cache_read, task_id_arg)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "usage-finalize":
         result = usage_finalize(abs_work_dir, global_registry)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "env":
         action = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -828,7 +837,7 @@ def main():
             print("[WARN] env 모드: action(set|unset), KEY 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = env_manage(action, key, value)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     elif mode == "task-status":
         task_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -837,7 +846,7 @@ def main():
             print("[WARN] task-status 모드: task_id, status 인자가 필요합니다.", file=sys.stderr)
             sys.exit(0)
         result = update_task_status(status_file, task_id, task_status)
-        print(f"state updated: {result}")
+        print(f"state: {result}")
 
     else:
         print(

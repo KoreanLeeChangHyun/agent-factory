@@ -141,13 +141,12 @@ python3 .claude/scripts/init/init_workflow.py implement "login-feature" full  # 
 4. `.prompt/prompt.txt` -> `<workDir>/user_prompt.txt` 복사
 5. `.uploads/` 파일 -> `<workDir>/files/` 복사 + `.uploads/` 클리어
 6. `.prompt/prompt.txt` 클리어
-7. `.prompt/querys.txt` 갱신
-8. `<workDir>/.context.json` 생성
-8b. 워크플로우 아카이빙 (최신 10개 유지, 초과분 `.workflow/.history/`로 이동)
-9. `<workDir>/status.json` 생성 (mode 필드 포함)
-10. 좀비 정리 (cleanup_zombie.py)
-11. 전역 레지스트리 등록
-12. **stdout으로 결과 출력**
+7. `<workDir>/.context.json` 생성
+7b. 워크플로우 아카이빙 (최신 10개 유지, 초과분 `.workflow/.history/`로 이동)
+8. `<workDir>/status.json` 생성 (mode 필드 포함)
+9. 좀비 정리 (cleanup_zombie.py)
+10. 전역 레지스트리 등록
+11. **stdout으로 결과 출력**
 
 **stdout 출력 형식 (파싱 대상):**
 ```

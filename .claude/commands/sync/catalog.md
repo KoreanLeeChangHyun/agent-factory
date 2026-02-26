@@ -61,5 +61,4 @@ python3 .claude/scripts/sync/catalog_sync.py
 |--------|------|
 | `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
 | `/sync:history` | .workflow/ 작업 내역을 history.md에 동기화 |
-| `/sync:code` | 원격 리포지토리에서 .claude 동기화 |
 | `/sync:context` | 코드베이스 분석 후 CLAUDE.md 갱신 |

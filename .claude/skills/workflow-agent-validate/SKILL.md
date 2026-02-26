@@ -211,7 +211,7 @@ flowchart TD
 
 | 조건 | 최종 상태 | 워크플로우 진행 |
 |------|---------|--------------|
-| 빌드 FAIL | 실패 | 경고 로그 남기고 정상 진행 (soft blocking) |
+| 빌드 FAIL | 실패 | 정상 진행 (soft blocking - 경고만 기록) |
 | WARN 항목 1개 이상 (빌드 PASS/SKIP) | 경고 | 정상 진행 |
 | 전체 PASS 또는 SKIP | 통과 | 정상 진행 |
 

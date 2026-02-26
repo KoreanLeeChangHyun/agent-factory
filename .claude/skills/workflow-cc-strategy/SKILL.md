@@ -14,7 +14,7 @@ strategy 명령어는 INIT -> STRATEGY -> DONE 흐름으로 실행된다. PLAN, 
 
 ## 실행 모드 분기
 
-`.kanbanboard` 파일 존재 여부로 모드를 판별한다.
+`.kanbanboard` 파일 존재 여부로 모드를 판별한다. `.kanbanboard` 파일은 프로젝트 루트에 위치한다.
 
 | 조건 | 모드 | 역할 |
 |------|------|------|
@@ -40,7 +40,7 @@ strategy 명령어는 INIT -> STRATEGY -> DONE 흐름으로 실행된다. PLAN, 
 - 마일스톤별 필요한 워크플로우 식별
 - 워크플로우 간 종속성 그래프 설계
 - 워크플로우별 명령어 유형 결정 (implement, research, review 등)
-- 워크플로우별 예상 복잡도(T1/T2/T3) 산정
+- 워크플로우별 예상 복잡도(T1/T2/T3) 산정 (복잡도 산정 공식은 `workflow-agent-plan/SKILL.md`의 '태스크 복잡도 자동 평가' 섹션 참조)
 
 ### 4단계: 로드맵 생성
 

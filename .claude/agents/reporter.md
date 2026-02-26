@@ -1,8 +1,8 @@
 ---
 name: reporter
 description: "작업 내역 기반 보고서를 생성하는 에이전트"
-tools: Bash, Edit, Glob, Grep, Read, Write
 model: sonnet
+tools: Bash, Edit, Glob, Grep, Read, Write
 skills:
   - workflow-agent-report
 maxTurns: 30

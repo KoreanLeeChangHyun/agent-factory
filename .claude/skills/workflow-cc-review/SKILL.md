@@ -38,24 +38,20 @@ disable-model-invocation: true
 | review-feedback-handler | 키워드 조건부 로드 - 피드백 처리 | `.claude/skills/review-feedback-handler/SKILL.md` |
 | review-pr-integration | 키워드 조건부 로드 - PR 리뷰 통합 | `.claude/skills/review-pr-integration/SKILL.md` |
 
+## 키워드 기반 스킬 로드
+
+리뷰 요청에 아래 키워드가 포함되면 해당 review-* 스킬을 자동 로드한다.
+
+| 스킬 | 트리거 키워드 |
+|------|--------------|
+| review-security | 보안, security, 취약점, vulnerability, OWASP |
+| review-architecture | 아키텍처, architecture, 구조, 설계, 레이어 |
+| review-frontend | 프론트엔드, frontend, React, UI, 컴포넌트 |
+| review-performance | 성능, performance, 쿼리, DB, N+1 |
+| review-comprehensive | 종합, comprehensive, 전체, full review |
+| review-feedback-handler | 리뷰 반영, review feedback, 피드백 구현, 리뷰 수정, 리뷰 대응 |
+| review-pr-integration | PR 리뷰, pull request review, PR 검증, PR 체크 |
+
 ## 프로젝트 플로우 연동
 
-워크플로우가 `.kanbanboard` 컨텍스트 내에서 실행될 때, REPORT 완료 후 칸반보드를 자동 갱신한다.
-
-### 후처리 조건
-
-1. 프로젝트 루트에서 `.kanbanboard` 파일 존재 여부 확인
-2. 존재하지 않으면 후처리 스킵
-3. 존재하면 아래 갱신 절차 실행
-
-### 갱신 절차
-
-```bash
-bash .claude/skills/design-strategy/scripts/update-kanban.sh <kanbanboard_path> <workflow_id> <status>
-```
-
-| 인자 | 값 |
-|------|-----|
-| `kanbanboard_path` | 프로젝트 루트의 `.kanbanboard` 파일 경로 |
-| `workflow_id` | 현재 워크플로우 ID |
-| `status` | `completed` 또는 `failed` |
+`workflow-cc-implement/SKILL.md`의 '프로젝트 플로우 연동' 섹션을 참조한다.

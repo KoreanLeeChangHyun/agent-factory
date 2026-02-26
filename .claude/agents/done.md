@@ -1,8 +1,8 @@
 ---
 name: done
 description: "워크플로우 마무리 처리를 수행하는 에이전트"
-tools: Bash, Edit, Grep, Read
 model: haiku
+tools: Bash, Edit, Grep, Read
 skills:
   - workflow-agent-done
 maxTurns: 15
@@ -83,7 +83,7 @@ reporter 완료 후 워크플로우의 **마무리 처리**를 수행합니다:
 
 - "history.md를 갱신합니다", "status.json을 업데이트합니다" 류의 진행 상황 설명 금지
 - 허용되는 출력: 반환 형식(규격 반환값), 에러 메시지
-- 도구 호출은 자유롭게 사용하되 불필요한 설명 금지
+- 도구 호출(Read, Bash, Grep 등)은 자유롭게 사용하되, 도구 호출 전후에 불필요한 설명을 붙이지 않는다
 - DONE 완료 배너는 오케스트레이터가 done 반환 후 직접 호출 (서브에이전트 내부 Bash 출력은 사용자 터미널에 표시되지 않음)
 
 ## 반환 원칙 (최우선)

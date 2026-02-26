@@ -116,7 +116,6 @@ def main():
 
     prompt_dir = os.path.join(_PROJECT_ROOT, ".prompt")
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
-    querys_file = os.path.join(prompt_dir, "querys.txt")
 
     # --- Step 1: prompt.txt 읽기 ---
     prompt_content = ""
@@ -157,15 +156,7 @@ def main():
         with open(prompt_file, "w", encoding="utf-8") as f:
             pass  # truncate
 
-    # --- Step 5: querys.txt 갱신 ---
-    os.makedirs(prompt_dir, exist_ok=True)
-    kst_date = now.strftime("%Y-%m-%d %H:%M")
-    with open(querys_file, "a", encoding="utf-8") as f:
-        f.write(f"{kst_date} [{command}] {title}\n")
-        if prompt_content:
-            f.write(f"{prompt_content}\n\n")
-
-    # --- Step 6: .context.json 생성 ---
+    # --- Step 5: .context.json 생성 ---
     context_data = {
         "title": title,
         "workId": work_id,
@@ -176,7 +167,7 @@ def main():
     }
     _atomic_write_json(os.path.join(abs_work_dir, ".context.json"), context_data)
 
-    # --- Step 7: status.json 생성 ---
+    # --- Step 6: status.json 생성 ---
     session_id = str(uuid.uuid4())[:8]
     status_data = {
         "phase": "INIT",
@@ -195,7 +186,7 @@ def main():
     }
     _atomic_write_json(os.path.join(abs_work_dir, "status.json"), status_data)
 
-    # --- Step 8: 좀비 정리 ---
+    # --- Step 7: 좀비 정리 ---
     cleanup_script = os.path.join(_SCRIPT_DIR, "..", "state", "cleanup_zombie.py")
     if os.path.isfile(cleanup_script):
         try:
@@ -217,7 +208,7 @@ def main():
             except Exception:
                 pass
 
-    # --- Step 8b: 활성 디렉토리 수 점검 및 보조 아카이빙 ---
+    # --- Step 7b: 활성 디렉토리 수 점검 및 보조 아카이빙 ---
     keep_count = KEEP_COUNT
     workflow_root = os.path.join(_PROJECT_ROOT, ".workflow")
     active_count = 0
@@ -251,7 +242,7 @@ def main():
                 except Exception:
                     pass
 
-    # --- Step 9: 전역 레지스트리 등록 ---
+    # --- Step 8: 전역 레지스트리 등록 ---
     update_state_script = os.path.join(_SCRIPT_DIR, "..", "state", "update_state.py")
     if os.path.isfile(update_state_script):
         try:

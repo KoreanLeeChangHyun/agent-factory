@@ -2,10 +2,10 @@
 name: worker
 description: "계획서 기반 실제 작업을 수행하는 에이전트"
 model: inherit
+tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 skills:
   - workflow-agent-work
 maxTurns: 50
-tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 ---
 # Worker Agent
 

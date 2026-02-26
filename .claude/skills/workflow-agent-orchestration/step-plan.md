@@ -180,7 +180,7 @@ AskUserQuestion(
 > feedback=$(Bash("python3 .claude/scripts/sync/reload_prompt.py <workDir>"))
 > ```
 >
-> - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어, querys.txt 기록을 일괄 수행
+> - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어를 일괄 수행
 > - stdout으로 피드백 전문을 출력
 > - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
 > - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
@@ -208,7 +208,7 @@ AskUserQuestion(
 >
 > 재수립된 계획에 대해 다시 Step 2b(사용자 승인 요청)를 반복합니다. 사용자가 "승인"을 선택할 때까지 1~3단계를 반복할 수 있습니다.
 >
-> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어, `querys.txt` 기록은 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
+> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어는 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
 
 ### CANCELLED Processing
 
