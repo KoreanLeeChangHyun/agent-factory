@@ -1,7 +1,7 @@
 ---
 name: validator
 description: "WORK Phase 완료 후 통합 검증을 수행하는 에이전트"
-model: sonnet
+model: inherit
 tools: Bash, Glob, Grep, Read, Write
 skills:
   - workflow-agent-validate
