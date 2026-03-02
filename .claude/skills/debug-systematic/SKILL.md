@@ -13,7 +13,7 @@ license: "Apache-2.0"
 | 스킬 | 역할 | 시점 |
 |------|------|------|
 | **debug-systematic** | 문제 발생 시 근본 원인 분석 및 해결 전략 | 버그/에러 발생 시 (사중) |
-| devops-verification | 완료 선언 전 검증 증거 확보 | 작업 완료 직전 (사후) |
+| workflow-system-verification | 완료 선언 전 검증 증거 확보 | 작업 완료 직전 (사후) |
 
 ## 4단계 근본 원인 분석 (RCA)
 

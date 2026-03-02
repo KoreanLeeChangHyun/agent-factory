@@ -1,0 +1,342 @@
+# PLAN (planner Agent)
+
+> **Agent-Skill Binding**
+> - Agent: `planner` (model: opus, maxTurns: 100)
+> - Skill: `workflow-agent-planner`
+> - Task prompt: `command: <command>, workId: <workId>, request: <request>, workDir: <workDir>`
+
+PLAN Step은 모든 워크플로우에서 필수로 실행됩니다.
+
+---
+
+## Step 2-pre: Prompt Quality Check
+
+> **하위 호환 보장**: `init-result.json`에 `prompt_quality` 필드가 없으면 이 단계 전체를 스킵하고 Step 2a로 진행합니다.
+
+initialization.py가 `init-result.json`에 기록한 `prompt_quality.quality_score`를 확인하여 사용자에게 피드백을 제공합니다.
+
+**실행 조건:**
+
+- `init-result.json`에 `prompt_quality` 필드가 존재하는 경우에만 실행
+- 필드가 없으면 즉시 Step 2a로 진행
+
+**처리 분기:**
+
+| `quality_score` | 동작 |
+|-----------------|------|
+| 필드 없음 | 스킵 → Step 2a로 진행 |
+| `>= 0.6` | 정상 진행 → Step 2a로 진행 |
+| `< 0.6` | 역방향 피드백 표시 후 AskUserQuestion 제시 |
+
+**score < 0.6 시 피드백 표시 및 선택지 제시:**
+
+`prompt_quality.feedback` 목록을 사용자에게 표시한 후 AskUserQuestion을 호출합니다.
+
+```markdown
+AskUserQuestion(
+  questions: [{
+    question: "prompt.txt 품질 점수가 낮습니다 (score: {quality_score:.2f}).\n\n개선이 필요한 항목:\n{feedback_lines}\n\n계속 진행하시겠습니까?",
+    header: "Prompt 품질 확인",
+    options: [
+      { label: "계속 진행", description: "현재 prompt.txt로 planner를 호출합니다" },
+      { label: "prompt 보강 후 재실행", description: "cc:prompt로 prompt.txt를 보강한 뒤 커맨드를 다시 실행합니다" }
+    ],
+    multiSelect: false
+  }]
+)
+```
+
+> `{feedback_lines}`: `prompt_quality.feedback` 목록의 각 항목을 `\n- ` 형식으로 결합한 문자열
+> `{quality_score:.2f}`: `prompt_quality.quality_score`를 소수 2자리로 표시
+
+**선택 결과 처리:**
+
+| 선택 | 동작 |
+|------|------|
+| **계속 진행** | Step 2a로 진행 |
+| **prompt 보강 후 재실행** | 오케스트레이터 현재 turn 즉시 종료 (FSM 상태 전이 없음) |
+
+> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `cc:prompt`로 prompt.txt를 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
+
+---
+
+## Step 2a: PLAN - planner Call
+
+> **State Update** before PLAN Step start:
+> ```bash
+> flow-update both <registryKey> planner PLAN
+> ```
+
+**Detailed Guide:** workflow-agent-planner skill 참조
+
+```
+Task(subagent_type="planner", prompt="
+command: <command>
+workId: <workId>
+request: <request>
+workDir: <workDir>
+")
+```
+
+- planner가 요구사항 완전 명확화 + 계획서 저장 후 `작성완료` 반환
+- **Output:** 계획서 경로
+
+### 2a-Post: planner 반환 후 오케스트레이터 호출 순서 (REQUIRED)
+
+> planner가 `작성완료`를 반환한 직후, 오케스트레이터는 아래 순서를 **정확히 1회씩** 실행합니다.
+
+1. **plan_validator.py 자동 실행** — 계획서 구조 검증 (상세: [2a-Post-Validator](#2a-post-validator-plan_validatorpy-자동-실행) 참조)
+2. `flow-step end <registryKey> planSubmit` — PLAN Step 완료 배너 + plan.md 링크 + [OK] 출력 (**1회만 호출**)
+3. **즉시** Step 2b의 AskUserQuestion으로 진행
+
+> **MUST NOT:**
+> - `flow-step end`를 2회 이상 호출
+> - Step 2b 진입 시 `flow-step end`를 "보장을 위해" 재호출
+> - `flow-step end`와 AskUserQuestion을 동일 응답에서 병렬 호출
+
+### 2a-Post-Validator: plan_validator.py 자동 실행
+
+> planner가 `작성완료`를 반환한 후, `flow-step end` 호출 **전에** 오케스트레이터가 plan_validator.py를 실행한다.
+
+**실행 명령:**
+```bash
+validator_output=$(python3 .claude/scripts/flow/plan_validator.py <workDir>/plan.md 2>&1)
+validator_exit=$?
+```
+
+**stdout 파싱 규칙:**
+
+| stdout 내용 | 판단 | 처리 |
+|------------|------|------|
+| `"검증 통과"` | 경고 없음 | 경고 변수를 빈 문자열로 설정 |
+| 그 외 출력 | 경고 있음 | 경고 내용을 변수에 보관하여 Step 2b-3 AskUserQuestion에 포함 |
+
+**폴백 동작 (실행 실패 시):**
+
+plan_validator.py 실행이 다음 이유로 실패하는 경우, 검증을 **스킵**하고 기존 흐름대로 `flow-step end` 및 AskUserQuestion을 진행한다. 검증은 advisory이므로 blocking하지 않는다.
+
+- 스크립트 파일 미존재 (`No such file or directory`)
+- exit code 1 (런타임 에러)
+- 기타 예외 발생
+
+```bash
+# 폴백: 실패 시 경고 변수를 빈 문자열로 처리하여 기존 흐름 유지
+if [ $validator_exit -ne 0 ]; then
+    validator_output=""
+fi
+```
+
+> **경고 표시 타이밍:** validator 실행은 `flow-step end` 배너 출력 **전에** 완료된다. 경고 내용은 배너와 분리되어 AskUserQuestion의 `question` 필드에만 포함된다.
+
+## Step 2b: PLAN - Orchestrator User Approval
+
+> planner가 `작성완료`를 반환하면, **오케스트레이터가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
+> 서브에이전트(planner)는 AskUserQuestion을 호출할 수 없으므로(플랫폼 제약), 승인 절차는 반드시 오케스트레이터가 담당합니다.
+
+### 2b-1. .context.json Check/Update
+
+> **.context.json은 hook 초기화 단계에서 이미 저장되어 있습니다.** PLAN Step에서는 내용 변경이 필요한 경우(제목 변경, 작업 이름 수정 등)에만 업데이트합니다. 변경이 없으면 이 단계를 건너뜁니다.
+
+**Update가 필요한 경우:**
+- agent 필드가 "planner"로 설정되어 있지 않은 경우
+
+> **Note:** `update_state.py context` 모드는 `agent` 필드만 갱신할 수 있습니다. title, workName 등 다른 필드를 변경해야 하는 경우, planner가 `.context.json`에 직접 쓰기를 수행하세요.
+
+**Local .context.json Schema:**
+
+`<workDir>/.context.json` (hook 초기화 단계에서 생성, 이력 보존용):
+```json
+{
+  "title": "<작업 제목>",
+  "workId": "<workId>",
+  "workName": "<작업 이름>",
+  "command": "<command>",
+  "agent": "planner",
+  "created_at": "<KST ISO 타임스탬프>"
+}
+```
+
+> - `workId`는 HHMMSS 6자리 형식 (예: "170327"). `<YYYYMMDD>-<workId>` 형식은 레지스트리 키에서 사용.
+> - `workName`은 hook 초기화 단계에서 title 인자를 기반으로 .context.json에 저장.
+
+**Update Method (agent field, 1 Tool Call):**
+```bash
+Bash("flow-update context <registryKey> <agent>")
+```
+
+> **Note:**
+> - `update_state.py context` 모드의 3번째 인자는 에이전트 이름 문자열 (예: "planner", "worker", "reporter"). JSON 문자열을 인자로 받지 않음.
+> - 이 모드는 로컬 `<workDir>/.context.json`의 `agent` 필드만 업데이트.
+
+### 2b-2. Slack Notification (Automatic)
+
+AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전송합니다.
+
+- Hook script: `.claude/hooks/pre-tool-use/slack-ask.py` (thin wrapper -> `.claude/scripts/slack/slack_ask.py`)
+- Hook이 디렉터리 스캔으로 활성 워크플로우를 탐색하고 해당 워크플로우의 로컬 .context.json을 읽어 통일 포맷으로 Slack 전송
+- .context.json이 없으면 폴백 포맷 사용
+
+**Slack Notification Format (slack-ask.py):**
+```
+<작업 제목>
+- 작업ID: <YYYYMMDD>-<workId>
+- 작업이름: <작업 이름>
+- 명령어: <명령어>
+- 상태: 사용자 입력 대기 중
+```
+
+### 2b-3. AskUserQuestion으로 사용자 승인
+
+> **Sequential Execution REQUIRED (Critical):**
+> PLAN 완료 배너(`flow-step end <registryKey> planSubmit`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
+> - 반드시 **(1) flow-step end → (2) AskUserQuestion 호출** 순서로 별도 도구 호출 턴에서 실행.
+> - 위반 시 사용자가 계획서 링크를 확인하지 못한 채 승인을 요청받는 UX 결함 발생.
+
+planner가 계획서를 작성 완료하고 `작성완료` 상태를 반환하면, 오케스트레이터가 계획서 파일 경로를 터미널에 출력한 후 AskUserQuestion 도구로 승인/거부 선택지를 제시합니다. 계획 요약은 터미널에 직접 출력하지 않습니다 (사용자가 계획서 파일을 직접 확인).
+
+**경고 유무에 따른 `question` 필드 조건부 분기:**
+
+> `validator_output` 변수는 2a-Post-Validator 단계에서 설정된 값을 사용한다. 경고 0건일 때는 기존 동작을 그대로 유지한다.
+
+**경고 0건 (validator_output이 빈 문자열 또는 "검증 통과"):**
+```markdown
+AskUserQuestion(
+  questions: [{
+    question: "위 계획대로 진행하시겠습니까?",
+    header: "승인 요청",
+    options: [
+      { label: "승인", description: "WORK 단계로 진행합니다" },
+      { label: "수정 요청", description: "계획서 수정 후 재검토합니다" },
+      { label: "중지", description: "워크플로우를 중단합니다" }
+    ],
+    multiSelect: false
+  }]
+)
+```
+
+**경고 1건 이상 (validator_output에 경고 내용이 있는 경우):**
+```markdown
+AskUserQuestion(
+  questions: [{
+    question: "계획서 검증 결과 N건의 경고가 발견되었습니다:\n{validator_output}\n위 계획대로 진행하시겠습니까?",
+    header: "승인 요청",
+    options: [
+      { label: "승인", description: "WORK 단계로 진행합니다" },
+      { label: "수정 요청", description: "계획서 수정 후 재검토합니다" },
+      { label: "중지", description: "워크플로우를 중단합니다" }
+    ],
+    multiSelect: false
+  }]
+)
+```
+
+> `N`은 경고 건수, `{validator_output}`은 plan_validator.py의 stdout 전문이다.
+
+> **AskUserQuestion Options Strictly Fixed (REQUIRED):**
+> - 위 3개 옵션(승인/수정 요청/중지)만 허용. 옵션 추가/변경/제거 MUST NOT.
+> - `freeformLabel`, `freeformPlaceholder` 등 자유 입력 필드 사용 MUST NOT.
+> - `multiSelect: false` MUST maintain.
+> - 옵션의 label, description 텍스트를 임의로 변경하지 않음.
+> - `question` 필드만 경고 유무에 따라 조건부로 달라진다. 나머지 필드(`header`, `options`, `multiSelect`)는 두 분기 모두 동일.
+
+### 2b-4. Approval Result Processing
+
+| Selection | Action |
+|-----------|--------|
+| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
+| **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
+| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
+
+> **prompt.txt Isolation Rule (CRITICAL):**
+> `.prompt/prompt.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
+> "승인" 또는 "중지" 선택 후 `.prompt/prompt.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
+> - "승인" 시: prompt.txt 무시, WORK 단계로 즉시 진행
+> - "중지" 시: prompt.txt 무시, CANCELLED 처리만 수행
+> - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 prompt.txt 접근 경로)
+
+> **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
+
+> **"수정 요청" selection handling:**
+> **Precondition:** 아래 3단계 절차는 사용자가 "수정 요청"을 선택한 경우에만 실행합니다. "승인" 또는 "중지" 선택 시 이 절차를 실행하는 것은 MUST NOT입니다.
+>
+> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
+>
+> **1단계. reload_prompt.py 호출** — 피드백 수신
+>
+> 오케스트레이터가 스크립트를 1회 호출하여 사용자 피드백을 수신합니다.
+>
+> ```bash
+> # 오케스트레이터 실행 코드
+> feedback=$(Bash("flow-reload <workDir>"))
+> ```
+>
+> - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어를 일괄 수행
+> - stdout으로 피드백 전문을 출력
+> - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
+> - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
+> - stdout에 `[WARN] prompt.txt is empty`가 포함된 경우: prompt.txt가 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
+>
+> **2단계. planner re-call** — 피드백 포함 계획 재수립
+>
+> stdout으로 수신한 피드백 내용을 `mode: revise` 프롬프트에 포함하여 planner를 재호출합니다.
+>
+> ```
+> Task(subagent_type="planner", prompt="
+> command: <command>
+> workId: <workId>
+> request: <request>
+> workDir: <workDir>
+> mode: revise
+> feedback: <reload_prompt.py stdout>
+> ")
+> ```
+>
+> - `feedback` 값이 빈 문자열인 경우(`[WARN] prompt.txt is empty` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
+> - planner는 기존 계획서를 기반으로 피드백을 반영한 수정 계획서를 작성하여 `작성완료` 반환
+>
+> **3단계. Step 2b repeat** — 재승인 요청
+>
+> 재수립된 계획에 대해 다시 Step 2b(사용자 승인 요청)를 반복합니다. 사용자가 "승인"을 선택할 때까지 1~3단계를 반복할 수 있습니다.
+>
+> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어는 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
+
+### CANCELLED Processing
+
+> **CRITICAL WARNING: 중지 선택 시 DONE 단계를 거치지 않는다.**
+>
+> "중지" 선택 시 flow-finish, flow-claude end 를 **절대 수행하지 않는다**.
+> 오케스트레이터가 직접 status 전이(`PLAN` → `CANCELLED`)만 수행한 후 워크플로우를 **즉시 종료**한다.
+> DONE 단계는 정상 완료(승인 → WORK → REPORT → DONE) 경로에서만 진입하는 단계이다.
+
+사용자가 "중지"를 선택하면 오케스트레이터가 `update_state.py`를 호출하여 CANCELLED 상태를 기록합니다.
+
+**Update Method (1 Tool Call):**
+```bash
+# 1. CANCELLED 상태로 전이
+Bash("flow-update status <registryKey> CANCELLED")
+```
+
+**Script behavior:**
+- `<workDir>/status.json`의 `step`을 `"CANCELLED"`로 변경
+- `transitions` 배열에 `{"from": "PLAN", "to": "CANCELLED", "at": "<현재시간ISO>"}` 추가
+- `updated_at`을 현재 시간(ISO 8601, KST)으로 갱신
+**Failure handling:** 스크립트 실패 시 `[WARN]` 경고만 출력하고 exit 0으로 종료. 워크플로우를 정상 진행(중단). status.json은 보조 상태 관리이므로 실패가 워크플로우를 차단하지 않음.
+
+**CANCELLED 후 오케스트레이터 종료 방법 (REQUIRED):**
+
+> status 전이(`update_state.py status`) 호출이 완료되면,
+> 오케스트레이터는 **추가 배너 호출(`flow-step`/`flow-phase`), 에이전트 호출(`reporter`, `worker` 등), 마무리 호출(`flow-finish`, `flow-claude end`)을 일체 수행하지 않고** 현재 turn을 즉시 종료합니다.
+> CANCELLED 처리 후 남은 행위는 없습니다.
+
+## Binding Contract Rule (REQUIRED)
+
+> **PLAN 승인 후 계획 변경 불가 원칙**
+>
+> 사용자가 "승인"을 선택한 시점에서 계획서는 Binding Contract가 됩니다.
+> 오케스트레이터는 승인된 계획서의 태스크를 변경, 추가, 제거하지 않습니다.
+> 계획 변경이 필요하면 사용자가 "수정 요청" 선택지를 통해 재계획을 요청해야 합니다.
+>
+> **MUST NOT:**
+> - 오케스트레이터가 독자적으로 태스크를 추가/삭제/변경
+> - Worker 반환값을 근거로 계획을 임의 수정
+> - "맥락 보강"을 이유로 계획에 없는 작업 수행

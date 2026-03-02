@@ -121,13 +121,25 @@ setup_shell_aliases() {
 export PATH="$HOME/.local/bin:$PATH"
 
 alias claude='~/.local/bin/claude'
-alias cc='claude --dangerously-skip-permissions "/init:workflow"'
+alias cc='claude --dangerously-skip-permissions'
 alias ccc='claude --dangerously-skip-permissions --continue'
 alias ccv='claude --dangerously-skip-permissions'
-alias step-start='bash .claude/scripts/banner/step_start_banner.sh'
-alias step-end='bash .claude/scripts/banner/step_end_banner.sh'
-alias step-change='bash .claude/scripts/banner/step_change_banner.sh'
-alias step-update='.claude/scripts/state/update_state.py'
+
+# flow-* 배너 alias
+alias flow-claude='.claude/scripts/banner/flow_claude_banner.sh'
+alias flow-step='.claude/scripts/banner/flow_step_banner.sh'
+alias flow-phase='.claude/scripts/banner/flow_phase_banner.sh'
+
+# flow-* 스크립트 alias
+alias flow-init='python3 .claude/scripts/flow/initialization.py'
+alias flow-finish='python3 .claude/scripts/flow/finalization.py'
+alias flow-reload='python3 .claude/scripts/flow/reload_prompt.py'
+alias flow-update='python3 .claude/scripts/flow/update_state.py'
+alias flow-skillmap='python3 .claude/scripts/flow/skill_mapper.py'
+alias flow-validate='python3 .claude/scripts/flow/plan_validator.py'
+alias flow-validate-p='python3 .claude/scripts/flow/prompt_validator.py'
+alias flow-recommend='python3 .claude/scripts/flow/skill_recommender.py'
+alias flow-gc='python3 .claude/scripts/flow/garbage_collect.py'
 ALIASES_EOF
 
     print_success ".claude.aliases 파일 생성 완료 ($aliases_file)"
@@ -172,10 +184,10 @@ create_directories_and_files() {
     # 파일 생성 (존재하지 않는 경우만)
     local files=(
         ".prompt/error.txt"
-        ".prompt/history.md"
+        ".dashboard/history.md"
         ".prompt/memo.txt"
         ".prompt/prompt.txt"
-        ".prompt/.usage.md"
+        ".dashboard/.usage.md"
         ".claude.env"
         "CLAUDE.md"
     )
@@ -188,13 +200,6 @@ create_directories_and_files() {
         fi
     done
 
-    # registry.json은 {} 초기값으로 생성
-    if [ ! -f ".workflow/registry.json" ]; then
-        echo '{}' > ".workflow/registry.json"
-        print_success "파일 생성: .workflow/registry.json (초기값: {})"
-    else
-        print_info "파일 이미 존재: .workflow/registry.json"
-    fi
 }
 
 # ==============================================================================

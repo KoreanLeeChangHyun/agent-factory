@@ -25,7 +25,7 @@ _scripts_dir = os.path.dirname(os.path.abspath(__file__))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from data.constants import PHASE_COLORS, C_RESET  # noqa: E402
+from data.constants import STEP_COLORS, PHASE_COLORS, C_RESET  # noqa: E402
 
 # -- RESET alias (기존 코드 하위 호환) --
 RESET = C_RESET
@@ -133,8 +133,8 @@ def get_active_workflow(cwd: str) -> dict | None:
     """Read active workflow info filtered by the current session.
 
     Reads CLAUDE_SESSION_ID from the environment, then scans
-    registry.json for workflow entries whose status.json contains
-    the current session ID in either the ``session_id`` field
+    .workflow/ directories for workflow entries whose status.json
+    contains the current session ID in either the ``session_id`` field
     (orchestrator) or the ``linked_sessions`` array (workers/reporters).
 
     If CLAUDE_SESSION_ID is not set or no matching workflow is found,
@@ -151,17 +151,20 @@ def get_active_workflow(cwd: str) -> dict | None:
     if not current_session:
         return None
 
-    registry_path = os.path.join(cwd, ".workflow", "registry.json")
+    # 디렉터리 스캔으로 활성 워크플로우 조회
     try:
-        with open(registry_path, "r", encoding="utf-8") as f:
-            registry = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        _scripts_dir_local = os.path.dirname(os.path.abspath(__file__))
+        if _scripts_dir_local not in sys.path:
+            sys.path.insert(0, _scripts_dir_local)
+        from common import scan_active_workflows
+        workflows = scan_active_workflows(project_root=cwd)
+    except Exception:
         return None
 
-    if not isinstance(registry, dict):
+    if not workflows:
         return None
 
-    for _key, entry in registry.items():
+    for _key, entry in workflows.items():
         work_dir = entry.get("workDir", "")
         if not work_dir:
             continue
@@ -181,7 +184,7 @@ def get_active_workflow(cwd: str) -> dict | None:
             continue
 
         title = entry.get("title", "")
-        phase = entry.get("phase", "")
+        phase = entry.get("step") or entry.get("phase", "")
         command = entry.get("command", "")
         agent = ""
 
@@ -199,7 +202,7 @@ def get_active_workflow(cwd: str) -> dict | None:
         if title or phase:
             return {
                 "title": title,
-                "phase": phase,
+                "step": phase,
                 "command": command,
                 "agent": agent,
                 "tasks": tasks,
@@ -242,13 +245,13 @@ def main() -> None:
     wf = get_active_workflow(cwd) if cwd else None
     workflow_display = ""
     if wf:
-        phase = wf.get("phase", "")
+        phase = wf.get("step", "")
         title = wf.get("title", "")
         # Truncate title to 30 chars
         if len(title) > 30:
             title = title[:30] + "..."
-        # Phase color
-        phase_color = PHASE_COLORS.get(phase, "\033[90m")
+        # Step color
+        phase_color = STEP_COLORS.get(phase, "\033[90m")
         if phase:
             agent = wf.get("agent", "")
             tasks = wf.get("tasks", {})

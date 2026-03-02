@@ -119,4 +119,4 @@ git rebase origin/main
 ## 참고
 - `.claude/settings.json` - 프로젝트 설정 확인
 - `git:commit` 명령어 - 프로젝트 커밋 워크플로우
-- `devops-pr-summary` 스킬 - PR 요약 자동 생성
+- `workflow-system-report-output` 스킬 - PR 요약 자동 생성

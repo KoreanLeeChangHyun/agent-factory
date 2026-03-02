@@ -1,12 +1,22 @@
 ---
-description: 코드 리뷰 수행. 파일, 디렉토리, PR 등을 리뷰합니다.
-argument-hint: "[-np] [-nr]"
+description: "코드 리뷰 수행. 파일, 디렉토리, PR 등을 리뷰합니다. Use when: 코드 리뷰, PR 리뷰, 보안 리뷰, 성능 리뷰, 아키텍처 리뷰 / Do not use when: 코드 수정이 목적일 때 (cc:implement 사용)"
+argument-hint: "리뷰 대상 파일, 디렉터리, 또는 PR 번호"
 ---
+
+> **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
 
 # Review
 
 **입력:**
 - `command`: review
+
+## 기본 리뷰 절차
+
+1. **대상 파악** - 리뷰 대상 파일/디렉터리/PR을 식별하고 변경 범위를 확인한다
+2. **코드 읽기** - 변경 내용을 맥락(의도, 설계, 의존성)과 함께 이해한다
+3. **이슈 식별** - 버그, 보안, 성능, 아키텍처 문제를 탐지한다
+4. **심각도 분류** - 식별된 이슈를 Critical/Important/Minor 기준으로 분류한다
+5. **피드백 작성** - 구체적 개선안과 근거를 포함한 리뷰 코멘트를 생성한다
 
 ## 심각도 기준
 
@@ -30,13 +40,35 @@ argument-hint: "[-np] [-nr]"
 | review-feedback-handler | 키워드 조건부 로드 - 피드백 처리 | `.claude/skills/review-feedback-handler/SKILL.md` |
 | review-pr-integration | 키워드 조건부 로드 - PR 리뷰 통합 | `.claude/skills/review-pr-integration/SKILL.md` |
 
-## 실행 옵션
+## 스킬 우선순위 정책
 
-| 옵션 | 모드명 | 설명 | Phase Order |
-|------|--------|------|-------------|
-| `-np` | noplan | PLAN 단계를 스킵하고 즉시 WORK로 진행 | INIT -> WORK -> REPORT -> DONE |
-| `-nr` | noreport | REPORT 단계를 스킵하고 WORK 완료 후 즉시 DONE으로 진행 | INIT -> PLAN -> WORK -> DONE |
-| `-np -nr` | noplan+noreport | PLAN과 REPORT 모두 스킵 | INIT -> WORK -> DONE |
+| 상황 | 로드 스킬 | 비고 |
+|------|----------|------|
+| 종합 리뷰 키워드 (종합, comprehensive, 전체) | `review-comprehensive` 단독 | 다른 전문 스킬 비활성 |
+| 전문 키워드 (보안, 성능, 아키텍처, 프론트엔드) | 해당 전문 스킬 단독 | `review-comprehensive` 비활성 |
+| 혼합 (종합 + 전문 키워드 동시) | `review-comprehensive` 우선 | 전문 스킬 추가 로드 생략 |
+
+## 동적 컨텍스트
+
+리뷰 대상에 따라 컨텍스트 주입 방식이 달라진다.
+
+### PR 번호가 인수로 전달된 경우
+
+PR 동적 컨텍스트를 활성화하여 PR의 diff와 기존 코멘트를 자동 수집한다.
+
+```
+!gh pr diff <PR번호>
+!gh pr view <PR번호> --comments
+```
+
+### 파일 또는 디렉터리가 대상인 경우
+
+로컬 diff 기반 컨텍스트를 사용한다.
+
+```
+!git diff HEAD -- <파일경로>
+!git log --oneline -5 -- <파일경로>
+```
 
 ## 프로젝트 플로우 연동
 

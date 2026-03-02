@@ -180,7 +180,7 @@ $ARGUMENTS 배포:
 동적 컨텍스트 주입:
 ```yaml
 ---
-name: devops-pr-summary
+name: workflow-system-report-output
 description: PR 요약
 context: fork
 agent: Explore

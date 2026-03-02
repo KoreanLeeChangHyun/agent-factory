@@ -2,7 +2,7 @@
 """
 히스토리 동기화 및 상태 확인 명령어.
 
-.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 .prompt/.history.md와 비교하고,
+.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 .dashboard/.history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
 사용법:
@@ -27,7 +27,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 try:
-    from utils.common import (
+    from common import (
         C_CYAN,
         C_GREEN,
         C_RED,
@@ -46,7 +46,7 @@ from data.constants import STALE_TTL_SECONDS, KEEP_COUNT
 # 상수 (Phase-상태 매핑)
 # ============================================================
 
-from data.phase_status_map import HEADER_LINE, SEPARATOR_LINE, PHASE_STATUS_MAP
+from data.constants import HEADER_LINE, SEPARATOR_LINE, STEP_STATUS_MAP
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 EXPECTED_CELL_COUNT = 12
@@ -72,21 +72,21 @@ def parse_timestamp_from_dir(dir_name: str) -> tuple[str, str]:
 
 
 def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | None]:
-    """status.json에서 phase, created_at, updated_at을 추출."""
+    """status.json에서 step(phase), created_at, updated_at을 추출."""
     try:
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        phase = data.get("phase", "UNKNOWN")
+        step = data.get("step") or data.get("phase", "UNKNOWN")
         created_at = data.get("created_at")
         updated_at = data.get("updated_at")
-        return phase, created_at, updated_at
+        return step, created_at, updated_at
     except (json.JSONDecodeError, IOError, KeyError):
         return "UNKNOWN", None, None
 
 
-def is_stale(phase: str, updated_at: str | None) -> bool:
+def is_stale(step: str, updated_at: str | None) -> bool:
     """WORK 또는 PLAN 단계에서 updated_at 기준 30분 이상 경과하면 스테일로 판정."""
-    if phase not in ("WORK", "PLAN", "INIT"):
+    if step not in ("WORK", "PLAN", "INIT", "REPORT"):
         return False
     if not updated_at:
         return False
@@ -224,22 +224,22 @@ def _build_entry(dir_name: str, work_name: str, command: str,
 
     # status.json에서 메타 정보 추출
     # 우선순위: <command>/status.json > <workName>/status.json
-    phase = "UNKNOWN"
+    step = "UNKNOWN"
     created_at = None
     updated_at = None
     if os.path.exists(status_file):
-        phase, created_at, updated_at = extract_status_from_json(status_file)
+        step, created_at, updated_at = extract_status_from_json(status_file)
     else:
         # fallback: workName 레벨의 status.json
         work_status_file = os.path.join(work_path, "status.json")
         if os.path.exists(work_status_file):
-            phase, created_at, updated_at = extract_status_from_json(work_status_file)
+            step, created_at, updated_at = extract_status_from_json(work_status_file)
 
     # T1: 스테일 감지 - WORK/PLAN 단계에서 2시간 이상 경과 시 "중단"
-    if is_stale(phase, updated_at):
+    if is_stale(step, updated_at):
         status_text = "중단"
     else:
-        status_text = PHASE_STATUS_MAP.get(phase, "불명")
+        status_text = STEP_STATUS_MAP.get(step, "불명")
 
     # 날짜/시간 추출
     date_str, time_str = parse_timestamp_from_dir(dir_name)
@@ -279,7 +279,7 @@ def _build_entry(dir_name: str, work_name: str, command: str,
         "title": title,
         "summary": summary,
         "command": command,
-        "phase": phase,
+        "step": step,
         "status": status_text,
         "date": date_str,
         "time": time_str,
@@ -563,7 +563,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             new_entries.append(entry)
         else:
             # 상태 변경 확인
-            old_row = existing_rows.get(wid, "")
+            old_row = original_rows.get(wid, "")
             old_status = extract_status_from_row(old_row)
             new_status = entry["status"]
             if old_status != new_status:
@@ -610,7 +610,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             print(f"    + {e['work_id']} | {e['title']} | {e['command']} | {e['status']}")
         print(f"  상태 업데이트: {len(updated_entries)}건")
         for e in updated_entries:
-            old_row = existing_rows.get(e["work_id"], "")
+            old_row = original_rows.get(e["work_id"], "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
         if orphan_wids:
@@ -702,7 +702,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     if updated_entries:
         print(f"  상태 업데이트: {len(updated_entries)}건")
         for e in updated_entries:
-            old_row = existing_rows.get(e["work_id"], "")
+            old_row = original_rows.get(e["work_id"], "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
     if orphan_wids:
@@ -881,14 +881,14 @@ def main():
     # sync 서브커맨드
     sync_parser = subparsers.add_parser("sync", help="history.md 동기화")
     sync_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
-    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", ".history.md"), help=".history.md 파일 경로")
+    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".dashboard", ".history.md"), help=".history.md 파일 경로")
     sync_parser.add_argument("--dry-run", action="store_true", help="변경 미리보기만 수행")
     sync_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     # status 서브커맨드
     status_parser = subparsers.add_parser("status", help="동기화 상태 요약")
     status_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".workflow"), help=".workflow 디렉토리 경로")
-    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".prompt", ".history.md"), help=".history.md 파일 경로")
+    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".dashboard", ".history.md"), help=".history.md 파일 경로")
     status_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
 
     # archive 서브커맨드

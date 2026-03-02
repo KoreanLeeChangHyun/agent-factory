@@ -10,53 +10,28 @@ description: 코드베이스를 분석하여 CLAUDE.md를 생성/갱신합니다
 >
 프로젝트 코드베이스를 분석하고 CLAUDE.md를 생성 또는 갱신합니다.
 
-## 스크립트
-
-`.claude/scripts/init/init_project.py` - 서브커맨드: analyze, generate-claude-md
-
 ## 오케스트레이션 흐름
 
-아래 순서대로 실행합니다. 각 단계에서 Bash 도구로 스크립트를 호출하고, 결과 JSON을 파싱하여 다음 단계를 결정합니다.
+아래 순서대로 실행합니다. 도구(Glob, Read, Bash)로 프로젝트를 직접 분석하고 결과를 바탕으로 CLAUDE.md를 생성/갱신합니다.
 
 ### Step 1. 프로젝트 분석
 
-Bash 도구로 실행:
+Glob, Read, Bash 도구를 사용하여 프로젝트를 직접 분석합니다:
 
-```bash
-python3 .claude/scripts/init/init_project.py analyze
-```
-
-**결과 JSON 예시:**
-```json
-{
-  "project_name": "my-project",
-  "project_description": "...",
-  "project_type": "Configuration",
-  "detected_languages": "Markdown, Shell",
-  "detected_frameworks": "None",
-  "runtime": "None",
-  "package_manager": "None",
-  "key_dependencies": "None",
-  "existing_directories": ".claude, .github",
-  "git_initialized": true,
-  "git_repository": "git@github.com:user/repo.git",
-  "git_current_branch": "main",
-  "git_main_branch": "main",
-  "git_branch_strategy": "GitHub Flow"
-}
-```
+- **언어 감지**: 파일 확장자 분포 확인 (Glob `**/*.py`, `**/*.ts` 등)
+- **프레임워크 감지**: package.json, requirements.txt, Cargo.toml 등 의존성 파일 Read
+- **프로젝트 구조**: 디렉터리 레이아웃 확인 (Bash `ls`)
+- **Git 정보**: Bash `git remote -v`, `git branch --show-current`
 
 분석 결과를 사용자에게 요약 표시:
 
 ```
 [분석 결과]
-- 언어: (detected_languages)
-- 프레임워크: (detected_frameworks)
-- 프로젝트 유형: (project_type)
-- Git: (git_initialized) ((git_branch_strategy))
+- 언어: (감지된 언어)
+- 프레임워크: (감지된 프레임워크)
+- 프로젝트 유형: (유형)
+- Git: (초기화 여부) (브랜치 전략)
 ```
-
-**analyze 결과 JSON을 변수에 보존** -> Step 2~3에서 사용.
 
 ### Step 2. CLAUDE.md 덮어쓰기 확인 (대화형)
 
@@ -71,13 +46,9 @@ python3 .claude/scripts/init/init_project.py analyze
 
 ### Step 3. CLAUDE.md 생성/갱신
 
-Step 1의 analyze 결과 JSON을 stdin으로 전달하여 실행:
+Step 1의 분석 결과를 바탕으로 Write 도구를 사용하여 CLAUDE.md를 직접 생성/갱신합니다.
 
-```bash
-echo '<analyze_json>' | python3 .claude/scripts/init/init_project.py generate-claude-md
-```
-
-스크립트가 기존 CLAUDE.md의 Recent Changes, Known Issues, Next Steps를 자동 보존합니다.
+기존 CLAUDE.md가 있는 경우 Recent Changes, Known Issues, Next Steps 섹션을 보존합니다.
 
 ### Step 4. 완료 메시지
 
@@ -130,5 +101,4 @@ echo '<analyze_json>' | python3 .claude/scripts/init/init_project.py generate-cl
 |--------|------|
 | `/init:workflow` | 워크플로우 로드 (CLAUDE.md, orchestration 스킬) |
 | `/sync:history` | .workflow/ 작업 내역을 history.md에 동기화 |
-| `/sync:registry` | 워크플로우 레지스트리 조회 및 정리 |
 | `/sync:catalog` | 스킬 카탈로그(skill-catalog.md) 재생성 |

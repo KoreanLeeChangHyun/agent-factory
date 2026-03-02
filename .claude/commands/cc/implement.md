@@ -1,7 +1,9 @@
 ---
-description: 코드 구현, 수정, 리팩토링. 기능 구현, 버그 수정, 코드 변경, 리팩토링을 수행합니다. 에이전트/스킬/커맨드 관리 포함.
-argument-hint: "[-np] [-nr]"
+description: "코드 구현, 수정, 리팩토링. 기능 구현, 버그 수정, 코드 변경, 리팩토링을 수행합니다. 에이전트/스킬/커맨드 관리 포함. Use when: 기능 구현, 코드 수정, 버그 수정, 리팩토링, 아키텍처 설계, 에이전트/스킬/커맨드 관리 / Do not use when: 코드 리뷰가 목적일 때 (cc:review 사용)"
+argument-hint: "구현할 기능, 수정할 파일, 또는 리팩토링 대상"
 ---
+
+> **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
 
 # Implement
 
@@ -73,13 +75,28 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 | 스킬 | `.claude/skills/<skill-name>/` |
 | 커맨드 | `.claude/commands/cc/*.md` |
 
-## 실행 옵션
+## 구현 완료 검증
 
-| 옵션 | 모드명 | 설명 | Phase Order |
-|------|--------|------|-------------|
-| `-np` | noplan | PLAN 단계를 스킵하고 즉시 WORK로 진행 | INIT -> WORK -> REPORT -> DONE |
-| `-nr` | noreport | REPORT 단계를 스킵하고 WORK 완료 후 즉시 DONE으로 진행 | INIT -> PLAN -> WORK -> DONE |
-| `-np -nr` | noplan+noreport | PLAN과 REPORT 모두 스킵 | INIT -> WORK -> DONE |
+`workflow-system-verification` 스킬 연동. 구현 완료 후 아래 4단계 검증을 순서대로 수행한다.
+
+1. **빌드/컴파일 확인**: 변경 파일 대상으로 빌드 또는 컴파일 오류가 없는지 확인
+2. **테스트 실행**: 관련 테스트를 실행하여 모두 통과하는지 확인
+3. **타입 체크**: 타입스크립트 등 정적 타입 언어의 경우 타입 체크 통과 확인
+4. **재검증 루프**: 검증 실패 시 즉시 수정 후 해당 단계부터 재검증. 모든 단계 통과 후 완료 선언
+
+## 동적 컨텍스트
+
+구현 시작 시 현재 작업 상태를 자동 파악하여 컨텍스트에 포함한다. 아래 명령어를 주입하여 변경 현황을 실시간으로 확인한다.
+
+```
+!git diff --name-only
+!git status
+```
+
+| 명령어 | 용도 |
+|--------|------|
+| `!git diff --name-only` | 현재 수정된 파일 목록 파악 |
+| `!git status` | 스테이징 상태 및 미추적 파일 파악 |
 
 ## 프로젝트 플로우 연동
 

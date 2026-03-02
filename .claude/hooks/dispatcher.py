@@ -3,19 +3,9 @@
 Provides shared functions for loading .claude.env flags and dispatching
 hook scripts based on HOOK_* environment variable toggles.
 
-dispatcher.py
-notification.py 
-permission-request.py 
-post-tool-use.py 
-post-tool-use-failure.py 
-pre-compact.py 
-session-end.py 
-session-start.py 
-subagent-start.py 
-task-completed.py 
-teammate-idle.py
-user-prompt-submit.py
-
+현재 등록된 디스패처:
+  pre-tool-use.py    - PreToolUse 이벤트
+  subagent-stop.py   - SubagentStop 이벤트
 """
 
 import os
@@ -43,7 +33,7 @@ def load_env_flags(prefix='HOOK_'):
 
     Returns:
         dict mapping flag names (with prefix) to bool values.
-        e.g. {'HOOK_DANGEROUS_COMMAND': False, 'HOOK_WORKFLOW_AGENT': True}
+        e.g. {'HOOK_DANGEROUS_COMMAND': False, 'HOOK_SLACK_ASK': True}
     """
     flags = {}
     env_file = _env_path()
@@ -62,10 +52,10 @@ def load_env_flags(prefix='HOOK_'):
             value = value.strip()
             if not key.startswith(prefix):
                 continue
-            # Support both true/false strings and legacy 0/1
-            if value.lower() in ('true', '1'):
+            # Support both true/false strings and legacy 0/1, plus yes/no, on/off
+            if value.lower() in ('true', '1', 'yes', 'on'):
                 flags[key] = True
-            elif value.lower() in ('false', '0'):
+            elif value.lower() in ('false', '0', 'no', 'off'):
                 flags[key] = False
             else:
                 flags[key] = bool(value)
@@ -145,7 +135,7 @@ def dispatch_async(hook_flag_name, script_path, stdin_data, flags=None):
         proc.stdin.write(stdin_data)
         proc.stdin.close()
     except BrokenPipeError:
-        pass
+        sys.stderr.write(f"[WARN] dispatch_async: BrokenPipeError for {script_path}\n")
     return proc
 
 
@@ -187,7 +177,7 @@ def collect_exit_codes(results):
     """Aggregate exit codes from multiple dispatch results.
 
     Args:
-        results: List of (subprocess.CompletedProcess | None | int).
+        results: List of (subprocess.CompletedProcess | subprocess.Popen | None | int).
 
     Returns:
         0 if all succeeded, otherwise the first non-zero exit code.
@@ -195,7 +185,13 @@ def collect_exit_codes(results):
     for r in results:
         if r is None:
             continue
-        code = r if isinstance(r, int) else r.returncode
+        if isinstance(r, int):
+            code = r
+        elif isinstance(r, subprocess.Popen):
+            r.wait()
+            code = r.returncode
+        else:
+            code = r.returncode
         if code != 0:
             return code
     return 0

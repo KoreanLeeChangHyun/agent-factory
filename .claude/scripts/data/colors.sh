@@ -20,17 +20,18 @@ C_PURPLE='\033[0;35m'
 C_YELLOW='\033[0;33m'
 C_CYAN='\033[0;36m'
 C_GRAY='\033[0;90m'
+C_WHITE='\033[0;37m'
+C_CLAUDE='\033[38;2;222;115;86m'  # Claude brand Peach #DE7356
 C_BOLD='\033[1m'
 C_DIM='\033[2m'
 C_RESET='\033[0m'
 
 # ─── 배너 폭 ───
-BANNER_WIDTH=75
+BANNER_WIDTH=60
 
 # ─── phase별 색상 ───
 get_color() {
     case "$1" in
-        INIT)                       echo "$C_RED" ;;
         PLAN)                       echo "$C_BLUE" ;;
         WORK)                       echo "$C_GREEN" ;;
         REPORT)                     echo "$C_PURPLE" ;;

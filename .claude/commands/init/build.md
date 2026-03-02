@@ -130,7 +130,7 @@ chmod 700 build.sh run.sh
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| devops-verification | 빌드 스크립트 검증 | `.claude/skills/devops-verification/SKILL.md` |
+| workflow-system-verification | 빌드 스크립트 검증 | `.claude/skills/workflow-system-verification/SKILL.md` |
 
 ## 주의사항
 

@@ -8,8 +8,8 @@ PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
 
-워크플로우 식별 방식 (활성 워크플로우 레지스트리 기반):
-    1. 전역 .workflow/registry.json 딕셔너리에서 활성 워크플로우 목록 조회
+워크플로우 식별 방식 (디렉터리 스캔 기반):
+    1. .workflow/ 디렉터리 스캔으로 활성 워크플로우 목록 조회
     2. 활성 워크플로우 1개 -> 해당 워크플로우 선택
     3. 복수 -> phase="PLAN" 인 워크플로우 필터링
     4. PLAN 복수 -> 각 워크플로우의 status.json에서 가장 최근 updated_at인 워크플로우 선택
@@ -22,7 +22,6 @@ PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
 
 import json
 import os
-import subprocess
 import sys
 
 # utils 패키지 import를 위한 경로 설정
@@ -31,7 +30,7 @@ _scripts_dir = os.path.normpath(os.path.join(_script_dir, ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from utils.slack_common import (
+from slack.slack_common import (
     build_json_payload,
     extract_json_field,
     get_agent_emoji,
@@ -39,8 +38,8 @@ from utils.slack_common import (
     log_warn,
     send_slack_message,
 )
-from utils.common import (
-    load_json_file,
+from common import (
+    resolve_active_workflow,
     resolve_project_root,
 )
 
@@ -72,50 +71,6 @@ def _extract_options(data):
     return " | ".join(parts) if parts else ""
 
 
-def _resolve_workflow_context(project_root):
-    """
-    활성 워크플로우 레지스트리에서 워크플로우 식별 및 컨텍스트 로드.
-
-    외부 resolve-workflow.py 스크립트를 호출하여 워크플로우를 식별.
-
-    Returns:
-        dict or None: {title, work_id, work_name, command, agent, phase}
-    """
-    registry_file = os.path.join(project_root, ".workflow", "registry.json")
-    if not os.path.isfile(registry_file):
-        return None
-
-    resolve_script = os.path.join(
-        project_root, ".claude", "scripts", "utils", "resolve-workflow.py"
-    )
-
-    try:
-        result = subprocess.run(
-            ["python3", resolve_script, registry_file, project_root],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0 or not result.stdout.strip():
-            return None
-
-        lines = result.stdout.strip().split("\n")
-        if len(lines) < 6:
-            return None
-
-        return {
-            "title": lines[0],
-            "work_id": lines[1],
-            "work_name": lines[2],
-            "command": lines[3],
-            "agent": lines[4],
-            "phase": lines[5],
-        }
-
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return None
-
-
 def main():
     # .claude.env에서 환경변수 로드
     if not load_slack_env():
@@ -134,23 +89,23 @@ def main():
     options_raw = _extract_options(input_data)
     options_line = f"\n- 선택지: {options_raw}" if options_raw else ""
 
-    # 활성 워크플로우 레지스트리에서 워크플로우 식별
+    # 활성 워크플로우 식별 (직접 import)
     project_root = resolve_project_root()
-    ctx = _resolve_workflow_context(project_root)
+    ctx = resolve_active_workflow(project_root)
 
     if ctx:
         # 에이전트 이모지 결정
         agent_emoji = get_agent_emoji(ctx["agent"])
         emoji_prefix = f"{agent_emoji} " if agent_emoji else ""
 
-        # phase 정보 문자열 생성
-        phase_line = f"\n- 현재 단계: {ctx['phase']}" if ctx.get("phase") else ""
+        # step 정보 문자열 생성
+        phase_line = f"\n- 현재 단계: {ctx['step']}" if ctx.get("step") else ""
 
         # 통일 포맷 (slack_notify.py와 동일, 에이전트 이모지 포함, 보고서 링크 제외)
         message = (
             f"{emoji_prefix}*{ctx['title']}*\n"
-            f"- 작업ID: `{ctx['work_id']}`\n"
-            f"- 작업이름: {ctx['work_name']}\n"
+            f"- 작업ID: `{ctx['workId']}`\n"
+            f"- 작업이름: {ctx['workName']}\n"
             f"- 명령어: `{ctx['command']}`"
             f"{phase_line}\n"
             f"- 상태: 사용자 입력 대기 중\n"
@@ -158,7 +113,7 @@ def main():
             f"{options_line}"
         )
     else:
-        # 폴백 포맷 (registry.json 없거나 워크플로우 식별 실패)
+        # 폴백 포맷 (워크플로우 식별 실패)
         message = (
             f":bell: *사용자 입력 대기 중*\n"
             f"- 질문: {question}"
@@ -166,7 +121,7 @@ def main():
         )
 
     # JSON payload 구성 + Slack 전송
-    from utils.slack_common import SLACK_CHANNEL_ID as _channel
+    from slack.slack_common import SLACK_CHANNEL_ID as _channel
     json_payload = build_json_payload(_channel, message)
     send_slack_message(json_payload)
 

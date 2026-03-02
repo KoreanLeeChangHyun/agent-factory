@@ -1,19 +1,8 @@
 """
-constants.py - 프로젝트 공통 상수 정의
+constants.py - 프로젝트 공통 상수 및 정적 데이터 통합 모듈
 
-.claude/scripts/ 하위 스크립트에서 공통 사용하는 상수를 한 곳에 정의합니다.
+.claude/scripts/ 하위 스크립트에서 공통 사용하는 상수, 패턴, 매핑을 한 곳에 정의합니다.
 이 모듈은 순수 상수만 정의하며, 다른 모듈을 import하지 않는 leaf 모듈입니다.
-
-카테고리:
-    ANSI 색상 코드          - C_RED, C_BLUE, C_GREEN, C_PURPLE, C_YELLOW, C_CYAN, C_GRAY, C_BOLD, C_DIM, C_RESET
-    Phase별 색상 매핑       - PHASE_COLORS
-    타임스탬프 정규식       - TS_PATTERN
-    KST 타임존              - KST
-    공통 타임아웃/제한값    - STALE_TTL_MINUTES, ZOMBIE_TTL_HOURS, REPORT_TTL_HOURS, KEEP_COUNT, WORK_NAME_MAX_LEN
-    터미널 파일명 상수      - REGISTRY_FILENAME, STATUS_FILENAME, CONTEXT_FILENAME, DONE_MARKER_FILENAME, ...
-    유효 명령어/모드 집합   - VALID_COMMANDS, VALID_MODES
-    터미널 phase 집합       - TERMINAL_PHASES
-    바이트 단위 상수        - BYTES_GB, BYTES_MB, BYTES_KB
 """
 
 import re
@@ -29,14 +18,15 @@ C_PURPLE = "\033[0;35m"
 C_YELLOW = "\033[0;33m"
 C_CYAN = "\033[0;36m"
 C_GRAY = "\033[0;90m"
+C_CLAUDE = "\033[38;2;222;115;86m"  # Claude brand Peach #DE7356
 C_BOLD = "\033[1m"
 C_DIM = "\033[2m"
 C_RESET = "\033[0m"
 
 # =============================================================================
-# Phase별 색상 매핑
+# Step별 색상 매핑
 # =============================================================================
-PHASE_COLORS = {
+STEP_COLORS = {
     "INIT": C_RED,
     "PLAN": C_BLUE,
     "WORK": C_GREEN,
@@ -44,9 +34,12 @@ PHASE_COLORS = {
     "STRATEGY": C_CYAN,
     "DONE": C_YELLOW,
     "STALE": C_GRAY,
-    "FAILED": C_YELLOW,
+    "FAILED": C_RED,
     "CANCELLED": C_GRAY,
 }
+
+# 하위 호환 별칭
+PHASE_COLORS = STEP_COLORS
 
 # =============================================================================
 # YYYYMMDD-HHMMSS 패턴 정규식
@@ -70,27 +63,33 @@ WORK_NAME_MAX_LEN = 20
 # =============================================================================
 # 터미널 파일명 상수
 # =============================================================================
-REGISTRY_FILENAME = "registry.json"
 STATUS_FILENAME = "status.json"
 CONTEXT_FILENAME = ".context.json"
-DONE_MARKER_FILENAME = ".done-marker"
 STOP_BLOCK_COUNTER_FILENAME = ".stop-block-counter"
 BYPASS_FILENAME = "bypass"
-FSM_TRANSITIONS_FILENAME = "fsm-transitions.json"
+FSM_TRANSITIONS = {
+    "full": {
+        "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
+        "NONE": ["PLAN", "STALE", "FAILED", "CANCELLED"],
+        "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
+        "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
+        "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
+    },
+}
 
 # =============================================================================
 # 유효 명령어/모드 집합
 # =============================================================================
-VALID_COMMANDS = {"implement", "review", "research", "strategy"}
-VALID_MODES = {"full", "strategy", "noplan", "noreport", "noplan+noreport"}
+VALID_COMMANDS = {"implement", "review", "research"}
+VALID_MODES = {"full"}
 
 # =============================================================================
-# 터미널 phase 집합
+# 터미널 step 집합
 # =============================================================================
-TERMINAL_PHASES = {"DONE", "FAILED", "STALE", "CANCELLED"}
+TERMINAL_STEPS = {"DONE", "FAILED", "STALE", "CANCELLED"}
 
-# auto_continue_guard용 비활성 phase 집합 (빈 문자열, REPORT 포함)
-AUTO_CONTINUE_INACTIVE_PHASES = ("DONE", "FAILED", "CANCELLED", "STALE", "", "REPORT")
+# 하위 호환 별칭
+TERMINAL_PHASES = TERMINAL_STEPS
 
 # =============================================================================
 # 바이트 단위 상수
@@ -109,3 +108,122 @@ SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 # =============================================================================
 CODE_SYNC_REMOTE_REPO = "https://github.com/KoreanLeeChangHyun/claude-workflow.git"
 STALE_TTL_SECONDS = STALE_TTL_MINUTES * 60
+
+# =============================================================================
+# Slack 에이전트별 이모지 매핑
+# =============================================================================
+SLACK_EMOJI_MAP = {
+    "init": ":large_orange_circle:",
+    "planner": ":large_blue_circle:",
+    "worker": ":large_green_circle:",
+    "reporter": ":purple_circle:",
+}
+
+# =============================================================================
+# 히스토리 테이블 헤더/구분선
+# =============================================================================
+HEADER_LINE = "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 질의 | 파일 | 계획 | 작업 | 보고 |"
+SEPARATOR_LINE = "|------|--------|------------|--------|------|------|------|------|------|------|"
+
+# =============================================================================
+# Step → 한글 상태 텍스트 매핑
+# =============================================================================
+STEP_STATUS_MAP = {
+    "DONE": "완료",
+    "REPORT": "진행",
+    "STALE": "중단",
+    "WORK": "진행",
+    "STRATEGY": "진행",
+    "PLAN": "진행",
+    "INIT": "진행",
+    "CANCELLED": "중단",
+    "FAILED": "중단",
+    "UNKNOWN": "불명",
+    "NONE": "불명",
+}
+
+# 하위 호환 별칭
+PHASE_STATUS_MAP = STEP_STATUS_MAP
+
+# =============================================================================
+# 위험 명령어 화이트리스트 (허용 패턴)
+# =============================================================================
+DANGER_WHITELIST = [
+    {"pattern": "rm\\s+-r[f]?\\s+/tmp/", "note": None},
+    {"pattern": "rm\\s+-r[f]?\\s+.*\\.workflow/", "note": None},
+    {"pattern": "sudo\\s+rm\\s+-r[f]?\\s+/tmp/", "note": None},
+    {"pattern": "sudo\\s+rm\\s+-r[f]?\\s+.*\\.workflow/", "note": None},
+    {"pattern": "git\\s+push\\s+--force-with-lease", "note": None},
+]
+
+# =============================================================================
+# 위험 명령어 차단 패턴
+# =============================================================================
+DANGER_PATTERNS = [
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+/\\s*$", "blocked": "rm -rf / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+(-f|--force)\\s+/\\s*$", "blocked": "rm --recursive --force / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+(-f|--force)\\s+--recursive\\s+/\\s*$", "blocked": "rm --force --recursive / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+/\\s*$", "blocked": "rm --recursive / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+~", "blocked": "rm -rf ~ (홈 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+~", "blocked": "rm --recursive ~ (홈 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\.\\s*$", "blocked": "rm -rf . (현재 디렉토리 전체 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\.\\s*$", "blocked": "rm --recursive . (현재 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\*", "blocked": "rm -rf * (와일드카드 전체 삭제)", "alternative": "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\*", "blocked": "rm --recursive * (와일드카드 삭제)", "alternative": "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요."},
+    {"pattern": "(sudo\\s+)?git\\s+reset\\s+--hard", "blocked": "git reset --hard (커밋되지 않은 변경사항 전체 삭제)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
+    {"pattern": "(sudo\\s+)?git\\s+push\\s+(--force|-f)", "blocked": "git push --force (원격 히스토리 덮어쓰기)", "alternative": "git push --force-with-lease를 사용하세요."},
+    {"pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f", "blocked": "git clean -f (추적되지 않는 파일 전체 삭제)", "alternative": "git clean -n으로 드라이런하여 삭제 대상을 먼저 확인하세요."},
+    {"pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)", "blocked": "git branch -D main/master (주요 브랜치 강제 삭제)", "alternative": "주요 브랜치 삭제는 매우 위험합니다. 정말 필요한지 재확인하세요."},
+    {"pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$", "blocked": "git checkout/restore . (모든 변경사항 되돌리기)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
+    {"pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)", "blocked": "DROP TABLE/DATABASE (데이터베이스/테이블 삭제)", "alternative": "백업을 먼저 수행하고, 트랜잭션 내에서 실행하세요."},
+    {"pattern": "(sudo\\s+)?chmod\\s+777", "blocked": "chmod 777 (과도한 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
+    {"pattern": "(sudo\\s+)?chmod\\s+a\\+rwx", "blocked": "chmod a+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
+    {"pattern": "(sudo\\s+)?chmod\\s+o\\+w", "blocked": "chmod o+w (기타 사용자에게 쓰기 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
+    {"pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx", "blocked": "chmod ugo+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
+    {"pattern": "(sudo\\s+)?mkfs", "blocked": "mkfs (디스크 포맷)", "alternative": "디스크 포맷은 매우 위험합니다. 대상 디바이스를 재확인하세요."},
+    {"pattern": "(sudo\\s+)?dd\\s+if=", "blocked": "dd if= (디스크 덮어쓰기)", "alternative": "dd 명령어는 되돌릴 수 없습니다. 대상 디바이스를 재확인하세요."},
+]
+
+# =============================================================================
+# hooks 자기보호 가드: 읽기 전용 명령어 패턴
+# =============================================================================
+GUARD_READONLY_PATTERNS = [
+    "^\\s*git\\s", "^\\s*python3?\\s", "^\\s*node\\s", "^\\s*cat\\s",
+    "^\\s*ls\\b", "^\\s*head\\s", "^\\s*tail\\s", "^\\s*wc\\s",
+    "^\\s*grep\\s", "^\\s*file\\s", "^\\s*stat\\s", "^\\s*diff\\s",
+    "^\\s*bash\\s", "^\\s*sh\\s", "^\\s*source\\s", "^\\s*\\.\\s",
+    "^\\s*exec\\s", "^\\s*env\\s",
+    "^(?:\\s*\\w+=\\S*\\s+)*(?:bash|sh|python3?|node)\\s",
+    "^\\s*\\.claude/hooks/.*\\.sh\\b", "^\\s*/.*/\\.claude/hooks/.*\\.sh\\b",
+    "^\\s*less\\s", "^\\s*more\\s", "^\\s*find\\s", "^\\s*tree\\b",
+    "^\\s*realpath\\s", "^\\s*readlink\\s", "^\\s*sha256sum\\s",
+    "^\\s*md5sum\\s", "^\\s*test\\s", "^\\s*\\[\\s",
+]
+
+# =============================================================================
+# hooks 자기보호 가드: 수정 명령어 패턴
+# =============================================================================
+GUARD_MODIFY_PATTERNS = [
+    "sed\\s+.*-i", "sed\\s+-i", "\\bcp\\b", "\\bmv\\b",
+    "echo\\s.*>\\s*", "echo\\s.*>>\\s*", "printf\\s.*>\\s*", "printf\\s.*>>\\s*",
+    "\\btee\\b", "cat\\s.*>\\s*", "cat\\s.*>>\\s*",
+    "\\bdd\\b", "\\binstall\\b", "\\brsync\\b", "\\bchmod\\b", "\\bchown\\b",
+    "ln\\s+-sf?\\b", "rm\\s+-rf?\\b", "rm\\s+-f\\b",
+    "\\btouch\\b", "\\bmkdir\\b", "\\brmdir\\b", ">\\s*\\S", ">>\\s*\\S",
+]
+
+# =============================================================================
+# hooks 자기보호 가드: 보호 경로 패턴
+# =============================================================================
+GUARD_PROTECTED_PATH_PATTERNS = [
+    "\\.claude/hooks/",
+    "\\.workflow/bypass",
+]
+
+# =============================================================================
+# hooks 자기보호 가드: 인라인 쓰기 패턴
+# =============================================================================
+GUARD_INLINE_WRITE_PATTERNS = [
+    "open\\s*\\(", "write\\s*\\(", "writeFile", "writeFileSync",
+    "appendFile", "appendFileSync", ">\\s*",
+]

@@ -1,13 +1,13 @@
 # Skill Catalog
 
 > 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 55개
+> 활성 스킬: 55개 (전문화: 55, 프로젝트: 0)
 
 ## Command Default Mapping
 
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
-| implement | review-code-quality, devops-verification | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
+| implement | review-code-quality, workflow-system-verification | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
 | review | review-requesting, review-code-quality | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
 | research | research-general, research-integrated | 웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 키워드 매핑으로 조건부 로드 |
 | strategy | design-strategy | 다중 워크플로우 전략 수립, 로드맵 생성 |
@@ -16,12 +16,12 @@
 
 | 키워드 | 추가 로드 스킬 |
 |--------|---------------|
-| 구현, implement, 기능 추가, feature | devops-verification |
+| 구현, implement, 기능 추가, feature | workflow-system-verification |
 | 리팩토링, refactor, 리팩터, 코드 개선 | review-code-quality |
-| 마이그레이션, migration, 스키마 변경, DB 변경 | review-code-quality, devops-verification |
+| 마이그레이션, migration, 스키마 변경, DB 변경 | review-code-quality, workflow-system-verification |
 | 품질, quality, 코드 품질, code quality | review-code-quality |
 | API, REST, GraphQL, 엔드포인트, endpoint | review-code-quality |
-| PR, pull request | devops-pr-summary, devops-github |
+| PR, pull request | workflow-system-report-output, devops-github |
 | 다이어그램, diagram, UML | design-mermaid-diagrams |
 | 아키텍처, architecture, 설계, architect, 시스템 구조, 컴포넌트 | design-architect, design-mermaid-diagrams |
 | 프론트엔드, frontend, UI | design-frontend |
@@ -32,7 +32,7 @@
 | pdf, PDF | document-office/pdf |
 | MCP, Model Context Protocol | management-mcp |
 | 3P, newsletter, status report, 뉴스레터 | document-internal-comms |
-| changelog, release notes, 릴리스 노트, 변경 이력 | devops-changelog |
+| changelog, release notes, 릴리스 노트, 변경 이력 | workflow-system-report-output |
 | LWC, Lightning Web Component, Salesforce, 세일즈포스 | salesforce-lwc |
 | Apple, HIG, 애플, apple design | design-apple |
 | GHA, GitHub Actions, CI, CI/CD, pipeline, 빌드 실패, workflow run | debug-gha-analysis |
@@ -85,17 +85,13 @@
 | design-patterns | Comprehensive reference guide for 39 patterns: 23 GoF design patterns (creational/structural/behavioral) and 16 modern architecture patterns (MVC, MVVM, Repository, DI, CQRS, Event Sourcing, Microservices, Saga, Circuit Breaker, Clean/Hexagonal Architecture, DDD, etc.). Use for pattern guidance: pattern selection during implementation, pattern application review during refactoring, pattern combination during architecture design, pattern compliance during code review. Triggers: '디자인 패턴', 'design pattern', 'GoF', 'SOLID', '아키텍처 패턴'. |
 | design-strategy | Decomposes large-scale tasks into multi-workflow milestones, dependency graphs, and execution roadmaps. Performs complexity estimation (T1/T2/T3 tiers), workflow chain design, critical path identification, and risk analysis. Use for strategic planning: multi-workflow strategy, large-scale project roadmap generation, milestone design. Triggers: 'strategy', '전략', '로드맵', 'roadmap', '마일스톤', 'milestone', '워크플로우 체인'. |
 | design-web-guidelines | Provides web accessibility and standards compliance checklists for implementation tasks. Use this skill when building or reviewing web interfaces that must meet WCAG 2.1 Level AA, ARIA requirements, keyboard navigation, form accessibility, dark mode support, or internationalization readiness. Triggers on keywords including accessibility, a11y, WCAG, form, dark mode, color contrast, keyboard navigation, screen reader, semantic HTML, and responsive design. |
-| devops-changelog | Auto-generates CHANGELOG and release notes by analyzing Git commit history. Recognizes Conventional Commits patterns and outputs in markdown format. Use for change documentation: (1) REPORT stage change summary, (2) CLAUDE.md Recent Changes update, (3) release notes authoring. Triggers: 'changelog', 'release notes', '변경 이력', '릴리스 노트'. |
-| devops-dangerous-guard | Safety guard that blocks dangerous commands (rm -rf, git reset --hard, git push --force, etc.) via PreToolUse hooks. Use for safety enforcement: (1) pre-blocking dangerous system/Git commands, (2) preventing data loss and repository corruption, (3) hook-based automated safety verification. Triggers: 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command'. |
 | devops-git-config | Auto-configures git config by reading Git username/email/SSH key settings from .claude.env file. Batch-initializes local Git settings and SSH key paths from environment variables. Use for Git environment setup: Git user configuration, SSH key path setup, Git environment initialization. Triggers: 'git config', 'git 설정', 'Git 사용자 설정', 'git:config'. |
 | devops-github | gh CLI-based GitHub integration skill. Performs commit/push, PR creation/management, issue viewing/creation, branch management, and other GitHub workflows. Use for GitHub operations: pushing work results, PR creation, issue management, branch management. Triggers: 'github', 'push', 'PR', 'pull request', '푸시', '커밋', '이슈'. |
-| devops-hooks-guide | Claude Code Hooks system usage guide. Covers hook events, execution timing, and how to add/modify hooks. Use for hook management: hook configuration review, hook addition/modification, PreToolUse hook behavior understanding. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정'. |
-| devops-pr-summary | Auto-generates PR title, summary, change list, and test plan by analyzing the current branch's PR diff. Uses dynamic context injection for real-time diff data. Use for PR authoring: (1) PR creation requests, (2) PR writing during REPORT stage, (3) before gh pr create execution. Triggers: 'PR', 'pull request', 'PR 요약', 'PR 생성'. |
 | devops-runtime-contract | Runtime schema validation code generator. Analyzes existing types/interfaces to auto-derive validation schemas and insert runtime checks at trust boundaries. Supports Zod v4 (TypeScript, primary), beartype (Python), io-ts (TypeScript alternative). Use for runtime validation: API boundary input parsing, config file loading, external data ingestion, environment variable parsing, contract verification. Triggers: '런타임 검증', 'runtime validation', 'Zod', 'beartype', '스키마 검증', 'schema validation', '계약 검증', 'contract'. |
-| devops-statusline | Claude Code CLI bottom status line (StatusLine) configuration skill. Use for StatusLine configuration tasks: (1) registering StatusLine in settings.json, (2) writing/modifying statusline.sh scripts, (3) customizing status line display content. Triggers: 'statusline 설정', '상태줄 설정', 'statusline 수정', 'status line 변경', 'init:statusLine'. |
-| devops-verification | Enforces automated verification before declaring task completion. Requires running verification commands and confirming results before commits, PR creation, or task completion reports. Prevents unsubstantiated completion claims. Use for pre-completion verification: before task completion, before commits/PRs, before claiming success. Triggers: 'Done', 'Complete', '완료', '끝', 'PASS', '통과'. |
+| devops-terminal-hyperlink | OSC 8 터미널 하이퍼링크 가이드. 클릭 가능한 파일/URL 링크를 터미널 출력에 삽입하는 방법을 제공한다. Use when: (1) Bash/Python 스크립트에서 클릭 가능한 경로 출력이 필요할 때, (2) 배너/상태줄에 하이퍼링크를 삽입할 때, (3) 터미널 출력에서 파일 경로를 라벨로 표시할 때. Triggers: 'terminal link', 'hyperlink', 'OSC 8', '터미널 링크', '클릭 가능한 경로'. |
 | devops-webapp-testing | Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs. |
 | document-internal-comms | A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.). |
+| document-markdown | > |
 | framework-fastapi | Provides production-ready FastAPI project structure and best practices including Domain-Driven directory layout, router/schema/service patterns, dependency injection, and async DB integration. Use for FastAPI development: project initialization, structure setup, API endpoint design, production pattern reference. Triggers: 'FastAPI', 'fastapi', 'Python API', 'Python 웹 서버'. |
 | framework-react | Provides Bulletproof React architecture-based Feature-Based project structure, Next.js App Router layout, recommended tech stack (Vite, Zustand, React Query, Tailwind), and unidirectional dependency principles. Use for React/Next.js development: project initialization, Feature-Based structure setup, architecture-driven development. Triggers: 'React', 'Next.js', 'nextjs', 'React 프로젝트', '프론트엔드 프레임워크'. |
 | framework-react-best-practices | Provides React/Next.js code-level best practices covering 8 categories with 40+ rules: component design, state management, hook rules, rendering optimization, error boundaries, server components, data fetching. Use for React/Next.js coding: code authoring, performance optimization, hook compliance, server/client component separation, code review. Role distinction: framework-react handles project structure, this skill handles code patterns/performance rules. Triggers: 'React', 'Next.js', '리액트', 'react-performance', '컴포넌트', 'hooks', '리액트 최적화'. |
@@ -121,8 +117,16 @@
 | review-pr-integration | PR review integration skill. Performs gh CLI-based PR diff extraction, inline comment generation, CI status checks, and checklist auto-verification. Use for PR review: PR review requests, final verification before PR merge. Triggers: 'PR 리뷰', 'pull request review', 'PR 검증', 'PR 체크'. |
 | review-requesting | Requests code review to verify quality after task completion, major feature implementation, or before merge. Performs checklist-based pre-verification, issue classification (Critical/Important/Minor), and production readiness assessment. Use for quality verification: after task completion, after major features, before merge, after complex bug fixes. Triggers: 'code review', '코드 리뷰', '리뷰 요청', 'review before merge'. |
 | review-security | Security-specialized code review skill. Performs OWASP Top 10 checklist-based review, secret detection, dependency vulnerability checks, blast radius estimation, and escalation criteria enforcement. Use for security review: security-related code changes, auth/authz module review, external input handling review. Triggers: '보안 리뷰', 'security review', 'OWASP 리뷰', '취약점 리뷰'. |
-| safety-fallback | Agent system safety guard, limitation reference, and error recovery strategy guide. For hook-based safety, refer to devops-hooks-guide skill. Use for error recovery and safety tasks: (1) agent limitation reference, (2) Task failure/error recovery strategy, (3) self-verification criteria understanding, (4) iteration limits/resource protection policies. Triggers: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'. |
+| safety-fallback | Agent system safety guard, limitation reference, and error recovery strategy guide. For hook-based safety, refer to workflow-system-hooks-guide skill. Use for error recovery and safety tasks: (1) agent limitation reference, (2) Task failure/error recovery strategy, (3) self-verification criteria understanding, (4) iteration limits/resource protection policies. Triggers: '안전장치', 'fallback', '에러 복구', 'Task 실패', '제한 사항'. |
 | testing-coverage | Code coverage analysis skill. Measures code coverage using language-appropriate tools, enforces diff coverage gates on changed lines, and suggests tests for uncovered areas. Use for coverage analysis: coverage measurement during implement/refactor, diff coverage gates in PR reviews, uncovered code test suggestions. Triggers: '커버리지', 'coverage', 'diff coverage', '코드 커버리지', '테스트 커버리지'. |
 | testing-design | ISTQB v4.0 test design technique-based test case auto-generation skill. Analyzes function signatures and type information to systematically derive test cases using equivalence partitioning (EP), boundary value analysis (BVA), decision table (DT), and state transition (ST) techniques. Use for test design: generating structured test cases from code, improving input domain coverage, identifying edge cases from type signatures. Triggers: '테스트 설계', 'test design', '동치 분할', '경계값', 'equivalence partitioning', 'boundary value', '결정 테이블', 'decision table', '상태 전이', 'state transition'. |
 | testing-mutation | Mutation testing execution and mutation score quality gate skill. Runs incremental mutation testing on changed files, calculates mutation scores, and enforces quality gates for PR integration. Use for test quality verification: validates test suite effectiveness by detecting survived mutants. Triggers: '뮤테이션', 'mutation testing', 'Stryker', 'mutmut', '뮤턴트', 'mutant', '테스트 품질', 'mutation score', 'cargo-mutants'. |
 | testing-property-based | Property-based testing skill. Automatically infers properties from function signatures, selects type-based generators, and generates PBT code using Hypothesis (Python), fast-check (JS/TS), or QuickCheck (Haskell). Use for property-based testing: adding PBT to existing test suites, discovering edge cases beyond example-based tests, stateful testing, shrinking minimal failure inputs. Triggers: 'PBT', 'property-based', '속성 기반 테스트', 'Hypothesis', 'fast-check', '속성 테스트'. |
+| workflow-system-hooks-guide | Claude Code Hooks system usage guide and dangerous command blocking. Covers hook events, execution timing, how to add/modify hooks, and safety guard patterns (rm -rf, git reset --hard, git push --force). Use for hook management: hook configuration review, hook addition/modification, PreToolUse hook behavior understanding, dangerous command blocking. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정', 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command'. |
+| workflow-system-report-output | REPORT 단계 산출물(CHANGELOG, 릴리스 노트, PR 요약) 자동 생성 스킬. Git 커밋 히스토리와 브랜치 diff를 분석하여 구조화된 CHANGELOG, 릴리스 노트, PR 제목/본문을 생성한다. Triggers: 'changelog', 'release notes', '변경 이력', '릴리스 노트', 'PR', 'pull request', 'PR 요약', 'PR 생성'. |
+| workflow-system-statusline | Claude Code CLI bottom status line (StatusLine) configuration skill. Use for StatusLine configuration tasks: (1) registering StatusLine in settings.json, (2) writing/modifying statusline.sh scripts, (3) customizing status line display content. Triggers: 'statusline 설정', '상태줄 설정', 'statusline 수정', 'status line 변경', 'init:statusLine'. |
+| workflow-system-verification | Enforces automated verification before declaring task completion. Requires running verification commands and confirming results before commits, PR creation, or task completion reports. Prevents unsubstantiated completion claims. Use for pre-completion verification: before task completion, before commits/PRs, before claiming success. Triggers: 'Done', 'Complete', '완료', '끝', 'PASS', '통과'. |
+
+## Project Skills
+
+(프로젝트 스킬 없음)

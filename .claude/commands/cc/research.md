@@ -1,7 +1,9 @@
 ---
-description: 웹 검색 기반 연구/조사 및 내부 자산 분석 수행. 외부 정보 수집, 기술 비교 분석, 내부 코드베이스/DB/데이터 분석을 통해 리포트를 제공합니다.
-argument-hint: "[-np] [-nr]"
+description: "웹 검색 기반 연구/조사 및 내부 자산 분석 수행. 외부 정보 수집, 기술 비교 분석, 내부 코드베이스/DB/데이터 분석을 통해 리포트를 제공합니다. Use when: 기술 조사, 비교 분석, 웹 리서치, 데이터 분석, 코드베이스 분석, DB 분석 / Do not use when: 코드 수정이 목적일 때 (cc:implement 사용)"
+argument-hint: "조사 주제 또는 분석 대상"
 ---
+
+> **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
 
 # Research
 
@@ -27,8 +29,21 @@ argument-hint: "[-np] [-nr]"
 4. **리포트 작성**
    - 구조화된 문서 생성
    - 출처 명시
+   - 리포트는 `.workflow/<YYYYMMDD-HHMMSS>/<작업명>/research/report.md`에 저장된다
 
 리포트 템플릿, 주의사항 등 상세 절차는 research-general 스킬(`.claude/skills/research-general/SKILL.md`)을 참조합니다.
+
+## 출처 검증 기준
+
+수집된 정보는 아래 신뢰도 등급 기준으로 분류하고, 리포트에 등급을 명시합니다.
+
+| 등급 | 출처 유형 | 날짜 기준 |
+|------|----------|----------|
+| S | 공식 문서, RFC, 표준 규격 | 최신 버전 확인 필수 |
+| A | 주요 오픈소스 저장소, 공인 기관 발행물 | 최근 1년 이내 권장 |
+| B | 기술 블로그(검증된 저자), 컨퍼런스 발표 자료 | 최근 2년 이내 |
+| C | 일반 블로그, 포럼, Q&A 사이트 | 교차 검증 필수 |
+| D | 출처 불명, 비공개 자료 | 사용 자제, 사용 시 명시적 경고 |
 
 ## 분석 지원
 
@@ -84,15 +99,19 @@ argument-hint: "[-np] [-nr]"
 ## 관련 스킬
 
 - `.claude/skills/research-general/SKILL.md` - 연구/조사 워크플로우 상세 정의, 리포트 템플릿
+- `.claude/skills/research-integrated/SKILL.md` - 웹+코드 통합 조사 (웹 검색 + 코드베이스 탐색 교차 대조)
 - `.claude/skills/analyze-srs/SKILL.md` - 요구사항 분석 절차 및 명세서 템플릿
 - `.claude/skills/analyze-codebase/SKILL.md` - 코드베이스 분석 절차
 - `.claude/skills/analyze-database/SKILL.md` - 데이터베이스 분석 절차
 - `.claude/skills/analyze-data/SKILL.md` - 데이터 분석 절차
 
-## 실행 옵션
+## 동적 컨텍스트
 
-| 옵션 | 모드명 | 설명 | Phase Order |
-|------|--------|------|-------------|
-| `-np` | noplan | PLAN 단계를 스킵하고 즉시 WORK로 진행 | INIT -> WORK -> REPORT -> DONE |
-| `-nr` | noreport | REPORT 단계를 스킵하고 WORK 완료 후 즉시 DONE으로 진행 | INIT -> PLAN -> WORK -> DONE |
-| `-np -nr` | noplan+noreport | PLAN과 REPORT 모두 스킵 | INIT -> WORK -> DONE |
+연구 시작 시 최근 변경 이력을 자동 참조하여 컨텍스트에 포함합니다.
+
+```
+!git log --oneline -10
+```
+
+최근 10개 커밋 이력을 수집하여, 조사 대상과 연관된 최근 변경사항을 파악합니다.
+

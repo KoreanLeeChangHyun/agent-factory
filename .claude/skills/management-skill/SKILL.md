@@ -349,6 +349,12 @@ Write the YAML frontmatter with `name` and `description`:
   - Include all "when to use" information here - Not in the body. The body is only loaded after triggering, so "When to Use This Skill" sections in the body are not helpful to Claude.
   - Example description for a `docx` skill: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 
+Optional fields:
+
+- `scope`: 스킬의 적용 범위를 지정합니다.
+  - `scope: global` (기본값) — 범용 전문화 스킬. 어느 프로젝트에서든 사용 가능. scope 필드 생략 시 global로 간주.
+  - `scope: project` — DDD 도메인 특화 스킬. 해당 프로젝트에서만 사용. 명명 규칙: `project-<도메인명>`.
+
 Do not include any other fields in YAML frontmatter.
 
 ##### Body

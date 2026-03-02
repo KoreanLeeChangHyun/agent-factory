@@ -18,19 +18,19 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from utils.env_utils import read_env
+from common import read_env
 
 # 위험 명령어 패턴 로드 (보안 우선: import 실패 시 전체 차단 폴백)
 try:
-    from data.danger_patterns import WHITELIST, DANGER_PATTERNS
-    WHITELIST_PATTERNS = [(item["pattern"], None) for item in WHITELIST]
+    from data.constants import DANGER_WHITELIST, DANGER_PATTERNS
+    WHITELIST_PATTERNS = [(item["pattern"], None) for item in DANGER_WHITELIST]
     DANGER_PATTERN_LIST = [
         (item["pattern"], item["blocked"], item["alternative"])
         for item in DANGER_PATTERNS
     ]
 except ImportError:
     print(
-        "[dangerous_command_guard] CRITICAL: data.danger_patterns import 실패 - 보안 폴백 적용",
+        "[dangerous_command_guard] CRITICAL: data.constants import 실패 - 보안 폴백 적용",
         file=sys.stderr,
     )
     WHITELIST_PATTERNS = []
@@ -38,7 +38,7 @@ except ImportError:
         (
             r".",
             "위험 패턴 데이터 로드 실패 (보안 폴백)",
-            "시스템 관리자에게 data/danger_patterns.py 파일 상태를 확인 요청하세요.",
+            "시스템 관리자에게 data/constants.py 파일 상태를 확인 요청하세요.",
         )
     ]
 

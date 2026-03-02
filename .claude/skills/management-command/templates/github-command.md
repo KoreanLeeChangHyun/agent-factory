@@ -33,7 +33,7 @@ allowed-tools: Bash(gh *)
 
 ```yaml
 ---
-name: devops-pr-summary
+name: workflow-system-report-output
 description: Pull Request 변경사항 요약
 context: fork
 agent: Explore

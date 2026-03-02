@@ -8,50 +8,22 @@ disable-model-invocation: true
 
 코드 리뷰를 수행하는 워크플로우 커맨드 스킬.
 
-## 실행 옵션
+상세 실행 절차는 `.claude/commands/cc/review.md`를 참조한다.
 
-| 옵션 | 모드명 | 설명 | Phase Order |
-|------|--------|------|-------------|
-| `-np` | noplan | PLAN 단계 스킵 | INIT -> WORK -> REPORT -> DONE |
-| `-nr` | noreport | REPORT 단계 스킵 | INIT -> PLAN -> WORK -> DONE |
-| `-np -nr` | noplan+noreport | 둘 다 스킵 | INIT -> WORK -> DONE |
+## 메타데이터
 
-## 심각도 기준
+### 키워드-스킬 매핑
 
-| 심각도 | 기준 |
-|--------|------|
-| Critical | 즉시 수정 필요 - 보안, 데이터 손실, 기능 장애 |
-| Important | 수정 권장 - 아키텍처, 성능, 잠재적 버그 |
-| Minor | 개선 제안 - 스타일, 최적화, 문서 |
+| 트리거 키워드 | 로드 스킬 |
+|--------------|----------|
+| 보안, security, 취약점, vulnerability, OWASP | review-security |
+| 아키텍처, architecture, 구조, 설계, 레이어 | review-architecture |
+| 프론트엔드, frontend, React, UI, 컴포넌트 | review-frontend |
+| 성능, performance, 쿼리, DB, N+1 | review-performance |
+| 종합, comprehensive, 전체, full review | review-comprehensive |
+| 리뷰 반영, review feedback, 피드백 구현, 리뷰 수정, 리뷰 대응 | review-feedback-handler |
+| PR 리뷰, pull request review, PR 검증, PR 체크 | review-pr-integration |
 
-## 관련 스킬
+## 참조
 
-| 스킬 | 용도 | 경로 |
-|------|------|------|
-| review-requesting | 리뷰 체크리스트 및 사전 검증 | `.claude/skills/review-requesting/SKILL.md` |
-| review-code-quality | 기본 로드 - 정량적 품질 검사, Code Quality Score 산출 | `.claude/skills/review-code-quality/SKILL.md` |
-| review-security | 키워드 조건부 로드 - 보안 전문 리뷰 | `.claude/skills/review-security/SKILL.md` |
-| review-architecture | 키워드 조건부 로드 - 아키텍처 전문 리뷰 | `.claude/skills/review-architecture/SKILL.md` |
-| review-frontend | 키워드 조건부 로드 - 프론트엔드 전문 리뷰 | `.claude/skills/review-frontend/SKILL.md` |
-| review-performance | 키워드 조건부 로드 - 성능 전문 리뷰 | `.claude/skills/review-performance/SKILL.md` |
-| review-comprehensive | 키워드 조건부 로드 - 종합 리뷰 | `.claude/skills/review-comprehensive/SKILL.md` |
-| review-feedback-handler | 키워드 조건부 로드 - 피드백 처리 | `.claude/skills/review-feedback-handler/SKILL.md` |
-| review-pr-integration | 키워드 조건부 로드 - PR 리뷰 통합 | `.claude/skills/review-pr-integration/SKILL.md` |
-
-## 키워드 기반 스킬 로드
-
-리뷰 요청에 아래 키워드가 포함되면 해당 review-* 스킬을 자동 로드한다.
-
-| 스킬 | 트리거 키워드 |
-|------|--------------|
-| review-security | 보안, security, 취약점, vulnerability, OWASP |
-| review-architecture | 아키텍처, architecture, 구조, 설계, 레이어 |
-| review-frontend | 프론트엔드, frontend, React, UI, 컴포넌트 |
-| review-performance | 성능, performance, 쿼리, DB, N+1 |
-| review-comprehensive | 종합, comprehensive, 전체, full review |
-| review-feedback-handler | 리뷰 반영, review feedback, 피드백 구현, 리뷰 수정, 리뷰 대응 |
-| review-pr-integration | PR 리뷰, pull request review, PR 검증, PR 체크 |
-
-## 프로젝트 플로우 연동
-
-`workflow-cc-implement/SKILL.md`의 '프로젝트 플로우 연동' 섹션을 참조한다.
+이 스킬의 실행 절차는 대응 커맨드 파일(`.claude/commands/cc/review.md`)이 Single Source of Truth이다.

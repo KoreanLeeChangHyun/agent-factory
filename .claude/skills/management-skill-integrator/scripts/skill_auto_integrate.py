@@ -7,7 +7,7 @@ Orchestrates the 7-stage pipeline:
   4. Download         (skill_search - SkillDownloader)
   5. Format conversion(format_converter)
   6. Validation & Install (validator)
-  7. Post-install keyword suggestion (command-skill-map registration)
+  7. Post-install keyword suggestion (skill-catalog registration)
 
 Usage::
 
@@ -70,7 +70,7 @@ class IntegrationResult:
 
 
 # ---------------------------------------------------------------------------
-# TF-IDF keyword extraction for command-skill-map suggestion
+# TF-IDF keyword extraction for skill-catalog suggestion
 # ---------------------------------------------------------------------------
 
 # Common English stop-words for TF-IDF filtering
@@ -174,14 +174,14 @@ def format_keyword_suggestion(
     skill_name: str,
     keywords: list[str],
 ) -> str:
-    """Format a command-skill-map table row suggestion."""
+    """Format a skill-catalog table row suggestion."""
     kw_str = ", ".join(keywords)
     lines = [
         "",
-        "=== command-skill-map registration suggestion ===",
+        "=== skill-catalog registration suggestion ===",
         "",
         "Add the following row to the keyword table in",
-        ".claude/skills/workflow-agent-work/command-skill-map.md:",
+        ".claude/skills/skill-catalog.md:",
         "",
         f"| {kw_str} | {skill_name} |",
         "",

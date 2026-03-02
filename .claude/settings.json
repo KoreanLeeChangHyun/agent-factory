@@ -28,25 +28,13 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -u .claude/hooks/stop.py",
-            "timeout": 30,
-            "statusMessage": "stop 디스패처 실행 중..."
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "python3 -u .claude/hooks/subagent-stop.py",
-            "timeout": 30,
+            "timeout": 10,
             "statusMessage": "subagent-stop 디스패처 실행 중..."
           }
         ]

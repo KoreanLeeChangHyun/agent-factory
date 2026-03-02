@@ -33,6 +33,7 @@ def main():
 
     flags = load_env_flags()
     sync_results = []
+    # Other tool_name values (Read, Glob, Grep, WebFetch, etc.) pass through without hook processing
 
     # --- Write|Edit|Bash: hooks-self-guard (sync) ---
     if tool_name in ('Write', 'Edit', 'Bash'):
@@ -53,31 +54,11 @@ def main():
             flags=flags,
         )
 
-    # --- Bash: devops-dangerous-guard (sync) ---
+    # --- Bash: dangerous-command-guard (sync) ---
     if tool_name == 'Bash':
         r = dispatch(
             'HOOK_DANGEROUS_COMMAND',
             scripts_dir('guards', 'dangerous_command_guard.py'),
-            stdin_data,
-            flags=flags,
-        )
-        sync_results.append(r)
-
-    # --- Bash: workflow-transition-guard (sync) ---
-    if tool_name == 'Bash':
-        r = dispatch(
-            'HOOK_WORKFLOW_TRANSITION',
-            scripts_dir('guards', 'workflow_transition_guard.py'),
-            stdin_data,
-            flags=flags,
-        )
-        sync_results.append(r)
-
-    # --- Task: workflow-agent-guard (sync) ---
-    if tool_name == 'Task':
-        r = dispatch(
-            'HOOK_WORKFLOW_AGENT',
-            scripts_dir('guards', 'workflow_agent_guard.py'),
             stdin_data,
             flags=flags,
         )
