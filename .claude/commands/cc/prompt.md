@@ -83,12 +83,25 @@ AskUserQuestion(
 )
 ```
 
+**용도→command 매핑**: 선택한 용도에 따라 아래 표를 참조하여 `<command>` 태그 값을 결정합니다.
+
+| 용도 | command 값 |
+|------|-----------|
+| 구현 | `implement` |
+| 리뷰 | `review` |
+| 연구 | `research` |
+| 버그수정 | `implement` |
+| 리팩토링 | `implement` |
+| 아키텍처설계 | `implement` |
+| 기타 | AI 자동 판별 (대화 내용 분석으로 implement/research/review 중 선택, 애매하면 AskUserQuestion으로 사용자에게 3종 선택지 제시) |
+
 선택 결과를 기반으로 **초기 prompt.txt 초안을 생성**하고 Write 도구로 `.prompt/prompt.txt`에 저장한 뒤 Step 3으로 진행합니다.
 
 **6종 용도별 XML 태그 기반 초안 템플릿**: 선택한 용도에 맞는 필수 4태그 + 용도별 선택 태그 조합으로 초안을 생성합니다. 태그 내부는 TODO 플레이스홀더 대신 **용도별 가이드 문구**를 기재합니다.
 
 **구현 (기능 구현, 모듈 개발)**:
 ```
+<command>implement</command>
 <goal>이 프로젝트에서 구현하려는 기능의 최종 목표를 작성하세요 (예: "사용자 인증 토큰 갱신 기능 추가")</goal>
 <target>구현 대상 파일과 함수/모듈을 구체적으로 명시하세요 (예: "src/auth/token.ts의 refreshToken() 함수")</target>
 <constraints>유지해야 할 기존 인터페이스, 기술 스택 제약, 하위 호환 요건을 기재하세요</constraints>
@@ -99,6 +112,7 @@ AskUserQuestion(
 
 **리뷰 (코드 리뷰, 품질 검토)**:
 ```
+<command>review</command>
 <goal>리뷰를 통해 확인하려는 품질 목표를 작성하세요 (예: "보안 취약점 및 에러 핸들링 검토")</goal>
 <target>리뷰 대상 파일과 범위를 명시하세요 (예: "src/api/ 디렉터리의 모든 엔드포인트")</target>
 <constraints>리뷰 범위 제한, 기존 패턴 준수 확인 기준을 기재하세요</constraints>
@@ -109,6 +123,7 @@ AskUserQuestion(
 
 **연구 (기술 조사, 비교 분석)**:
 ```
+<command>research</command>
 <goal>조사를 통해 얻으려는 결론을 작성하세요 (예: "Node.js 비동기 HTTP 클라이언트 라이브러리 선택")</goal>
 <target>조사 대상 기술/라이브러리/도구를 명시하세요 (예: "axios, got, node-fetch 3가지 비교")</target>
 <constraints>조사 시 반드시 포함해야 할 비교 기준을 기재하세요 (예: "번들 크기, TypeScript 지원, 유지보수 현황")</constraints>
@@ -119,6 +134,7 @@ AskUserQuestion(
 
 **버그수정 (버그 원인 파악 및 수정)**:
 ```
+<command>implement</command>
 <goal>수정하려는 버그와 기대 동작을 작성하세요 (예: "로그인 후 세션이 유지되지 않는 문제 수정")</goal>
 <target>버그가 발생하는 파일과 함수를 명시하세요 (예: "src/auth/session.ts의 validateSession()")</target>
 <constraints>수정 시 변경하면 안 되는 부분을 기재하세요 (예: "try-catch 억제 금지, session 초기화 로직 유지")</constraints>
@@ -129,6 +145,7 @@ AskUserQuestion(
 
 **리팩토링 (코드 구조 개선)**:
 ```
+<command>implement</command>
 <goal>리팩토링을 통해 달성하려는 코드 품질 목표를 작성하세요 (예: "300줄 함수를 책임별로 분리하여 유지보수성 개선")</goal>
 <target>리팩토링 대상 파일과 함수를 명시하세요 (예: "src/order/process.ts의 processOrder() 함수")</target>
 <constraints>유지해야 할 공개 인터페이스, 동작 보장 범위를 기재하세요 (예: "함수 시그니처 유지, API 호출 순서 유지")</constraints>
@@ -138,6 +155,7 @@ AskUserQuestion(
 
 **아키텍처설계 (시스템 설계, 구조 결정)**:
 ```
+<command>implement</command>
 <goal>설계를 통해 달성하려는 시스템 목표를 작성하세요 (예: "일 100만 건 처리, 3초 내 전달 보장 알림 시스템")</goal>
 <target>설계 대상 시스템이나 컴포넌트를 명시하세요 (예: "실시간 알림 시스템 아키텍처")</target>
 <constraints>기술 스택, 일정, 팀 규모 등 설계 제약을 기재하세요 (예: "기존 AWS 인프라 활용, 6주 구현 일정")</constraints>
@@ -146,6 +164,36 @@ AskUserQuestion(
 <approach>설계 방향을 기재하세요 (예: "메시지 큐 기반 비동기 처리, 채널별 분리")</approach>
 <scope>설계 범위(포함/제외)를 명시하세요 (예: "아키텍처 설계만, 구현 코드 제외")</scope>
 ```
+
+**기타 선택 시 분기 로직**:
+
+"기타"를 선택한 경우, 사용자의 자유 텍스트 입력과 `.prompt/prompt.txt` 기존 내용, `.uploads/` 컨텍스트를 종합 분석하여 command 값을 자동 판별합니다:
+
+1. **자동 판별**: 입력 내용에서 키워드/의도를 분석하여 `implement`, `research`, `review` 중 하나를 결정합니다.
+   - 구현/개발/수정/설계/리팩토링 관련 의도 → `implement`
+   - 조사/분석/비교/리서치 관련 의도 → `research`
+   - 검토/리뷰/감사 관련 의도 → `review`
+
+2. **명확한 경우**: 자동 판별된 command 값을 `<command>` 태그로 초안 최상단에 삽입합니다.
+
+3. **판별이 애매한 경우**: AskUserQuestion으로 3종 선택지를 제시하여 사용자가 직접 선택합니다:
+
+```
+AskUserQuestion(
+  questions: [{
+    question: "어떤 종류의 작업을 진행하실 건가요?",
+    header: "후속 커맨드 선택",
+    options: [
+      { label: "구현/개발/수정", description: "/cc:implement 커맨드를 사용합니다" },
+      { label: "조사/분석/리서치", description: "/cc:research 커맨드를 사용합니다" },
+      { label: "코드 리뷰/검토", description: "/cc:review 커맨드를 사용합니다" }
+    ],
+    multiSelect: false
+  }]
+)
+```
+
+4. **선택 결과 반영**: 선택된 값(`implement` / `research` / `review`)을 `<command>` 태그로 초안 최상단에 삽입합니다.
 
 #### prompt.txt에 내용이 있는 경우
 
@@ -211,6 +259,7 @@ AskUserQuestion(
 | 구현 방향, 접근 방식, 사용할 패턴 | `<approach>` |
 | 포함/제외 범위, 경계 조건 | `<scope>` |
 | 참고 자료, 비교 대상, 기준 문서 | `<reference>` |
+| `<command>` 태그 | **갱신 제외** (보호됨) — 최초 설정값을 대화 전체에서 보존하며, 어떠한 사용자 입력이 있더라도 덮어쓰지 않음 |
 
 > **하이브리드 유지**: 태그 외부에 존재하는 자유 텍스트는 그대로 보존합니다. 사용자 입력이 특정 태그에 명확히 매핑되지 않으면 태그 외부 자연어로 추가합니다.
 
@@ -337,6 +386,13 @@ AskUserQuestion(
 
 완료 메시지와 후속 커맨드 안내를 출력합니다:
 
+**권장 후속 커맨드 강조**: prompt.txt의 `<command>` 태그 값을 확인하여 해당 행에 "← 권장" 표시를 추가합니다.
+
+- `<command>implement</command>` → "구현" 행에 "← 권장" 표시
+- `<command>research</command>` → "조사" 행에 "← 권장" 표시
+- `<command>review</command>` → "리뷰" 행에 "← 권장" 표시
+- `<command>` 태그가 없는 경우 → "← 권장" 표시 없이 테이블만 출력
+
 ```
 prompt.txt가 업데이트되었습니다.
 
@@ -348,6 +404,14 @@ prompt.txt가 업데이트되었습니다.
 | 조사 | `/cc:research` | prompt.txt의 내용이 조사 커맨드의 입력으로 활용됩니다 |
 | 리뷰 | `/cc:review` | prompt.txt의 내용이 리뷰 커맨드의 입력으로 활용됩니다 |
 ```
+
+> 예: `<command>implement</command>`인 경우 출력 예시:
+>
+> | 목적 | 커맨드 | 설명 |
+> |------|--------|------|
+> | 구현 | `/cc:implement` | prompt.txt의 내용이 구현 커맨드의 입력으로 활용됩니다 **← 권장** |
+> | 조사 | `/cc:research` | prompt.txt의 내용이 조사 커맨드의 입력으로 활용됩니다|
+> | 리뷰 | `/cc:review` | prompt.txt의 내용이 리뷰 커맨드의 입력으로 활용됩니다|
 
 ---
 

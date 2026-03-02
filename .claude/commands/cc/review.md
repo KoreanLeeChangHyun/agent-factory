@@ -5,6 +5,22 @@ argument-hint: "리뷰 대상 파일, 디렉터리, 또는 PR 번호"
 
 > **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
 
+## `<command>` 태그 검증
+
+이 검증은 워크플로우 오케스트레이션 스킬의 Step 1(INIT) 완료 후, Step 2(PLAN) 시작 전에 수행된다.
+
+### 검증 절차
+
+오케스트레이터가 INIT Step에서 `user_prompt.txt`를 생성한 후, PLAN Step 진입 전에 다음을 수행한다:
+
+1. `user_prompt.txt` 첫 번째 줄을 파싱하여 `<command>XXX</command>` 패턴을 추출한다
+2. 검증 규칙을 적용한다:
+   - `<command>` 태그가 존재하고 값이 `review`가 **아닌** 경우: AskUserQuestion으로 경고 메시지를 표시한다
+     - 메시지: `"prompt.txt에 <command>{값}</command>으로 지정되어 있지만 cc:review를 실행했습니다."`
+     - 선택지: `"계속 진행"` (현재 커맨드로 진행) / `"중단"` (워크플로우 종료)
+   - `<command>` 태그가 존재하지 않는 경우: 경고 없이 정상 진행 (하위 호환)
+   - `<command>review</command>`인 경우: 정상 진행
+
 # Review
 
 **입력:**

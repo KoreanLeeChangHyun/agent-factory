@@ -321,6 +321,8 @@ def update_task_status(status_file, task_id, task_status):
         print("[WARN] task-status: task_id, status 인자가 필요합니다.", file=sys.stderr)
         return "task-status -> skipped (missing args)"
 
+    STATUS_ALIASES = {"in_progress": "running"}
+    task_status = STATUS_ALIASES.get(task_status, task_status)
     valid_statuses = {"pending", "running", "completed", "failed"}
     if task_status not in valid_statuses:
         print(
@@ -700,6 +702,12 @@ def env_manage(action, key, value=""):
 # 메인
 # =============================================================================
 
+_VALID_MODES = frozenset({
+    "context", "status", "both", "link-session",
+    "usage-pending", "usage", "usage-finalize", "env", "task-status",
+})
+
+
 def main():
     if len(sys.argv) < 3:
         print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status <workDir> [args...]", file=sys.stderr)
@@ -707,6 +715,15 @@ def main():
 
     mode = sys.argv[1]
     work_dir_arg = sys.argv[2]
+
+    # 인자 순서 자동 교정: argv[1]이 모드가 아니고 argv[2]가 모드인 경우 swap
+    if mode not in _VALID_MODES and work_dir_arg in _VALID_MODES:
+        mode, work_dir_arg = work_dir_arg, mode
+        print(
+            f"[WARN] 인자 순서 자동 교정: mode={mode}, workDir={work_dir_arg} "
+            f"(올바른 사용법: update_state.py <mode> <workDir> [args...])",
+            file=sys.stderr,
+        )
 
     abs_work_dir, local_context, status_file = resolve_paths(work_dir_arg)
 
