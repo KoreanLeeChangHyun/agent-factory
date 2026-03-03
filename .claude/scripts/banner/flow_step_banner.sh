@@ -20,14 +20,11 @@ source "$SCRIPT_DIR/../data/colors.sh"
 # ─── 한글 표시 폭 계산 ───
 display_width() {
     local str="$1"
-    local len=${#str}
-    local extra=$(echo -n "$str" | python3 -c "
-import sys, unicodedata
-s=sys.stdin.read()
-extra=sum(1 for c in s if unicodedata.east_asian_width(c) in ('W','F'))
-print(extra)
-" 2>/dev/null || echo 0)
-    echo $((len + extra))
+    python3 -c "
+import unicodedata, sys
+s = sys.argv[1]
+print(sum(2 if unicodedata.east_asian_width(c) in ('W', 'F') else 1 for c in s))
+" "$str" 2>/dev/null || echo "${#str}"
 }
 
 # ─── 한국어 시간 포맷 ───

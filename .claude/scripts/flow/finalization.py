@@ -2,15 +2,14 @@
 """
 워크플로우 마무리 처리 스크립트 (flow-finish)
 
-오케스트레이터가 직접 호출하는 워크플로우 마무리 5단계 결정론적 스크립트.
+오케스트레이터가 직접 호출하는 워크플로우 마무리 4단계 결정론적 스크립트.
 
 사용법:
-  flow-finish <registryKey> <status> <mode> [--workflow-id <id>]
+  flow-finish <registryKey> <status> [--workflow-id <id>]
 
 인자:
   registryKey   워크플로우 식별자 (YYYYMMDD-HHMMSS)
   status        완료 | 실패
-  mode          full (유일 지원 모드)
   --workflow-id WF-N 형식 (선택)
 
 4단계:

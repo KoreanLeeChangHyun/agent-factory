@@ -41,9 +41,8 @@ Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, tas
 
 **usage-pending 등록:**
 ```bash
-# Worker와 동일한 방식으로 usage-pending 등록
-flow-update task-status <registryKey> <taskId> running
-flow-update usage-pending <registryKey> <taskId> <taskId>
+# Worker와 동일한 방식으로 task-start 등록
+flow-update task-start <registryKey> <taskId>
 ```
 
 **반환값 처리:**
@@ -63,12 +62,7 @@ flow-update usage-pending <registryKey> <taskId> <taskId>
 **병렬 호출 예시 (Worker + Explorer 혼합):**
 ```bash
 # Phase 1에서 Worker와 Explorer가 병렬 실행
-flow-update task-status <registryKey> W01 running
-flow-update task-status <registryKey> W02 running
-flow-update task-status <registryKey> W03 running
-flow-update usage-pending <registryKey> W01 W01
-flow-update usage-pending <registryKey> W02 W02
-flow-update usage-pending <registryKey> W03 W03
+flow-update task-start <registryKey> W01 W02 W03
 ```
 ```
 Task(subagent_type="worker-opus", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
@@ -177,7 +171,7 @@ flow-phase <registryKey> 1
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 일괄 실행 (스킵 금지)
-flow-update task-status <registryKey> W01 running && flow-update task-status <registryKey> W02 running && flow-update usage-pending <registryKey> W01 W01 && flow-update usage-pending <registryKey> W02 W02
+flow-update task-start <registryKey> W01 W02
 ```
 ```
 Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -193,7 +187,7 @@ flow-phase <registryKey> 2
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 단일 Bash로 실행 (스킵 금지)
-flow-update task-status <registryKey> W04 running && flow-update usage-pending <registryKey> W04 W04
+flow-update task-start <registryKey> W04
 ```
 ```
 Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
@@ -286,8 +280,8 @@ flow-update task-status <registryKey> <taskId> failed
 | 순차 Worker (Phase 2+) | Worker 호출 직전에 `usage-pending` | 1:1 매핑 |
 
 ```bash
-# 형식: flow-update usage-pending <registryKey> <agent_id_or_taskId> <taskId>
-flow-update usage-pending <registryKey> W01 W01
+# 형식: flow-update usage-pending <registryKey> <id1> [id2] ...
+flow-update usage-pending <registryKey> W01
 ```
 
 ## Hooks 수정 태스크 실행 패턴
@@ -302,8 +296,7 @@ flow-update usage-pending <registryKey> W01 W01
 flow-update env <registryKey> set HOOKS_EDIT_ALLOWED 1
 
 # 2. Worker 호출 (hooks 파일 수정 태스크)
-flow-update task-status <registryKey> W01 running
-flow-update usage-pending <registryKey> W01 W01
+flow-update task-start <registryKey> W01
 ```
 ```
 Task(subagent_type="worker-opus", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
@@ -360,7 +353,7 @@ flow-phase <registryKey> <N+1>
 ```
 ```bash
 # MUST: Phase 배너 직후, Task 호출 직전에 반드시 실행
-flow-update task-status <registryKey> validator running && flow-update usage-pending <registryKey> validator validator
+flow-update task-start <registryKey> validator
 ```
 ```
 # Validator 호출

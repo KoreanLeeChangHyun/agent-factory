@@ -35,15 +35,43 @@ _TODO_PATTERN = re.compile(r"^\s*TODO\s*:", re.IGNORECASE)
 
 
 def _extract_tag_content(text, tag):
-    """태그 내용을 추출한다. 존재하지 않으면 None을 반환."""
-    pattern = re.compile(
-        rf"<{re.escape(tag)}>(.*?)</{re.escape(tag)}>",
-        re.DOTALL | re.IGNORECASE,
-    )
-    match = pattern.search(text)
-    if match is None:
+    """태그 내용을 추출한다. 존재하지 않으면 None을 반환.
+
+    자기 중첩 태그(예: <goal>...<goal>...</goal>...</goal>)를
+    스택 기반으로 파싱하여 가장 외부 태그 쌍의 내용을 반환한다.
+    """
+    tag_escaped = re.escape(tag)
+    open_pat = re.compile(rf"<{tag_escaped}>", re.IGNORECASE)
+    close_pat = re.compile(rf"</{tag_escaped}>", re.IGNORECASE)
+
+    # 개방/폐쇄 태그 위치를 모두 수집
+    events = []
+    for m in open_pat.finditer(text):
+        events.append((m.start(), "open", m.end()))
+    for m in close_pat.finditer(text):
+        events.append((m.start(), "close", m.end()))
+
+    if not events:
         return None
-    return match.group(1)
+
+    # 위치 순서로 정렬
+    events.sort(key=lambda e: e[0])
+
+    # 스택 기반으로 가장 외부 태그 쌍 탐색
+    depth = 0
+    outer_start = None
+    for pos, kind, end_pos in events:
+        if kind == "open":
+            if depth == 0:
+                outer_start = end_pos  # 태그 내용 시작 위치
+            depth += 1
+        else:  # close
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and outer_start is not None:
+                    return text[outer_start:pos]
+
+    return None
 
 
 def _is_valid_content(content):

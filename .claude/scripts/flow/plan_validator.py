@@ -24,7 +24,7 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import resolve_project_root
+from common import resolve_project_root, resolve_work_dir
 
 PROJECT_ROOT = resolve_project_root()
 
@@ -50,6 +50,8 @@ def parse_mermaid_phases(content):
 
         current_phase = None
         worker_count = 0
+        # 중첩 subgraph 지원을 위한 스택: (phase_name, worker_count) 쌍 저장
+        phase_stack = []
 
         for line in lines:
             stripped = line.strip()
@@ -67,16 +69,16 @@ def parse_mermaid_phases(content):
                 subgraph_match = re.match(r'subgraph\s+(\S+)', stripped)
 
             if subgraph_match:
-                # 이전 subgraph 저장
-                if current_phase is not None:
-                    phases[current_phase] = phases.get(current_phase, 0) + worker_count
+                # 현재 subgraph를 스택에 저장 (중첩 지원)
+                phase_stack.append((current_phase, worker_count))
 
-                current_phase = subgraph_match.group(1)
+                new_phase = subgraph_match.group(1)
                 # subgraph label이 있으면 사용
                 if subgraph_match.lastindex and subgraph_match.lastindex >= 2:
                     label = subgraph_match.group(2).strip()
                     if label:
-                        current_phase = label
+                        new_phase = label
+                current_phase = new_phase
                 worker_count = 0
                 continue
 
@@ -84,7 +86,12 @@ def parse_mermaid_phases(content):
             if stripped == "end":
                 if current_phase is not None:
                     phases[current_phase] = phases.get(current_phase, 0) + worker_count
+                # 스택에서 외부 subgraph 복원 (비어있으면 None)
+                if phase_stack:
+                    current_phase, worker_count = phase_stack.pop()
+                else:
                     current_phase = None
+                    worker_count = 0
                 continue
 
             # 워커 노드 식별 (W01[label], W01 [label] 패턴)
@@ -96,6 +103,52 @@ def parse_mermaid_phases(content):
             phases[current_phase] = phases.get(current_phase, 0) + worker_count
 
     return phases
+
+
+def _split_table_row(line):
+    """마크다운 테이블 행을 셀 목록으로 분리. 양 끝 빈 셀만 제거, 내부 빈 셀은 유지."""
+    raw_parts = [p.strip() for p in line.split("|")]
+    return raw_parts[1:-1] if len(raw_parts) >= 2 else raw_parts
+
+
+def _find_table_start(lines, section_pattern, column_keywords):
+    """테이블 섹션 시작 위치를 결정. 없으면 -1 반환."""
+    if section_pattern:
+        for i, line in enumerate(lines):
+            if re.search(section_pattern, line):
+                return i
+
+    # 섹션 헤더 없이 테이블 직접 탐색 (첫 번째 컬럼 키워드로 판별)
+    first_field_keywords = next(iter(column_keywords.values()), [])
+    for i, line in enumerate(lines):
+        if line.startswith("|") and any(k.lower() in line.lower() for k in first_field_keywords):
+            return i
+
+    return -1
+
+
+def _find_header_and_col_map(lines, table_start, column_keywords):
+    """헤더 행과 컬럼 인덱스 맵을 결정. 헤더 없으면 (-1, {}) 반환."""
+    col_map = {}
+    first_field = next(iter(column_keywords))
+    search_end = min(table_start + 15, len(lines))
+
+    for i in range(table_start, search_end):
+        line = lines[i]
+        if not line.startswith("|"):
+            continue
+
+        parts = _split_table_row(line)
+        for j, part in enumerate(parts):
+            lower = part.lower()
+            for field, keywords in column_keywords.items():
+                if field not in col_map and any(k.lower() in lower for k in keywords):
+                    col_map[field] = j
+
+        if first_field in col_map:
+            return i, col_map
+
+    return -1, {}
 
 
 def parse_md_table_columns(content, section_pattern, column_keywords):
@@ -111,59 +164,17 @@ def parse_md_table_columns(content, section_pattern, column_keywords):
         list[dict]: 각 행이 {field_name: cell_value} 딕셔너리인 리스트.
                     인식되지 않은 필드는 포함되지 않음.
     """
-    rows = []
     lines = content.split("\n")
 
-    # 테이블 섹션 시작 위치 결정
-    table_start = -1
-    if section_pattern:
-        for i, line in enumerate(lines):
-            if re.search(section_pattern, line):
-                table_start = i
-                break
-
+    table_start = _find_table_start(lines, section_pattern, column_keywords)
     if table_start < 0:
-        # 섹션 헤더 없이 테이블 직접 탐색 (첫 번째 컬럼 키워드로 판별)
-        first_field_keywords = next(iter(column_keywords.values()), [])
-        for i, line in enumerate(lines):
-            if line.startswith("|") and any(
-                k.lower() in line.lower() for k in first_field_keywords
-            ):
-                table_start = i
-                break
+        return []
 
-    if table_start < 0:
-        return rows
-
-    # 헤더 행 찾기: section_pattern 이후 처음 나오는 | 시작 행
-    header_idx = -1
-    col_map = {}
-
-    search_end = min(table_start + 15, len(lines))
-    for i in range(table_start, search_end):
-        line = lines[i]
-        if not line.startswith("|"):
-            continue
-
-        parts = [p.strip() for p in line.split("|")]
-        parts = [p for p in parts if p != ""]
-
-        for j, part in enumerate(parts):
-            lower = part.lower()
-            for field, keywords in column_keywords.items():
-                if field not in col_map and any(k.lower() in lower for k in keywords):
-                    col_map[field] = j
-
-        # 첫 번째 필드가 인식되면 헤더 확정
-        first_field = next(iter(column_keywords))
-        if first_field in col_map:
-            header_idx = i
-            break
-
+    header_idx, col_map = _find_header_and_col_map(lines, table_start, column_keywords)
     if header_idx < 0:
-        return rows
+        return []
 
-    # 데이터 행 파싱
+    rows = []
     for i in range(header_idx + 1, len(lines)):
         line = lines[i]
         if not line.startswith("|"):
@@ -171,16 +182,11 @@ def parse_md_table_columns(content, section_pattern, column_keywords):
         if re.match(r"^\|\s*[-:]+", line):
             continue
 
-        parts = [p.strip() for p in line.split("|")]
-        parts = [p for p in parts if p != ""]
-
-        row = {}
-        for field, col_idx in col_map.items():
-            if col_idx < len(parts):
-                row[field] = parts[col_idx].strip()
-            else:
-                row[field] = ""
-
+        parts = _split_table_row(line)
+        row = {
+            field: parts[col_idx].strip() if col_idx < len(parts) else ""
+            for field, col_idx in col_map.items()
+        }
         rows.append(row)
 
     return rows
@@ -398,6 +404,14 @@ def print_help():
     print("  python3 plan_validator.py <plan_path>")
     print("  python3 plan_validator.py --help")
     print()
+    print("입력 형식:")
+    print("  1. registryKey (YYYYMMDD-HHMMSS 패턴):")
+    print("     python3 plan_validator.py 20260303-124206")
+    print("  2. workDir 경로:")
+    print("     python3 plan_validator.py .workflow/20260303-124206/plan_validator-경로해석-/implement")
+    print("  3. plan.md 직접 경로:")
+    print("     python3 plan_validator.py .workflow/20260303-124206/.../implement/plan.md")
+    print()
     print("검증 항목:")
     print("  1. Phase 균형: Mermaid 서브그래프에서 Phase별 워커 수 추출,")
     print("     최대/최소 비율 3배 이상 시 경고")
@@ -407,9 +421,6 @@ def print_help():
     print()
     print("출력:")
     print("  경고 목록 또는 '검증 통과'")
-    print()
-    print("예시:")
-    print("  python3 plan_validator.py .workflow/20260302-000041/.../plan.md")
 
 
 def main():
@@ -418,6 +429,12 @@ def main():
         sys.exit(0)
 
     plan_path = sys.argv[1]
+
+    # 3단계 경로 해석 분기
+    if not plan_path.endswith(".md"):
+        # (b) .md로 끝나지 않는 경우: registryKey 또는 workDir로 해석
+        resolved_dir = resolve_work_dir(plan_path, PROJECT_ROOT)
+        plan_path = os.path.join(resolved_dir, "plan.md")
 
     # 상대 경로를 절대 경로로 변환
     if not os.path.isabs(plan_path):

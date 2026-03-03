@@ -171,7 +171,7 @@ create_directories_and_files() {
     print_step "3" "디렉터리 및 파일 생성"
 
     # 디렉터리 생성
-    local dirs=(".prompt" ".uploads" ".workflow/.history")
+    local dirs=(".prompt" ".uploads" ".workflow/.history" ".dashboard" ".workflow/.temp")
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
             mkdir -p "$dir"
@@ -183,10 +183,10 @@ create_directories_and_files() {
 
     # 파일 생성 (존재하지 않는 경우만)
     local files=(
-        ".prompt/error.txt"
-        ".dashboard/history.md"
+        ".dashboard/.history.md"
         ".prompt/memo.txt"
         ".prompt/prompt.txt"
+        ".prompt/spec.txt"
         ".dashboard/.usage.md"
         ".claude.env"
         "CLAUDE.md"
@@ -219,6 +219,11 @@ update_gitignore() {
         ".claude.env*"
         ".uploads/"
         ".prompt/"
+        ".dashboard/"
+        ".temp/"
+        ".temp/*"
+        "temp/"
+        ".vscode/"
         "CLAUDE.md"
         "__pycache__/"
     )
@@ -320,7 +325,7 @@ verify_installation() {
     fi
 
     # 2. 필수 디렉터리 존재 여부
-    local required_dirs=(".claude" ".prompt" ".uploads" ".workflow")
+    local required_dirs=(".claude" ".prompt" ".uploads" ".workflow" ".dashboard")
     local dirs_ok=true
     for dir in "${required_dirs[@]}"; do
         if [ ! -d "$dir" ]; then
@@ -352,7 +357,7 @@ verify_installation() {
     fi
 
     # 4. .gitignore 등록 여부
-    local gitignore_entries=(".workflow/" ".claude.env*" ".uploads/" ".prompt/" "CLAUDE.md" "__pycache__/")
+    local gitignore_entries=(".workflow/" ".claude.env*" ".uploads/" ".prompt/" ".dashboard/" ".temp/" ".temp/*" "temp/" ".vscode/" "CLAUDE.md" "__pycache__/")
     local gitignore_ok=true
     for entry in "${gitignore_entries[@]}"; do
         if ! grep -qxF "$entry" ".gitignore" 2>/dev/null; then

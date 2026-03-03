@@ -7,11 +7,12 @@
   update_state.py status <workDir> <toPhase>
   update_state.py both <workDir> <agent> <toPhase>
   update_state.py link-session <workDir> <sessionId>
-  update_state.py usage-pending <workDir> <agent_id> <task_id>
+  update_state.py usage-pending <workDir> <id1> [id2] ...
   update_state.py usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
   update_state.py usage-finalize <workDir>
   update_state.py env <workDir> set|unset <KEY> [VALUE]
-  update_state.py task-status <workDir> <task_id> <status>
+  update_state.py task-status <workDir> <status> <id1> [id2] ...
+  update_state.py task-start <workDir> <id1> [id2] ...
 
 종료 코드:
   항상 0 (비차단 원칙)
@@ -100,10 +101,10 @@ def acquire_lock(lock_dir, max_wait=5):
     while True:
         try:
             os.makedirs(lock_dir)
-            # PID 기록
+            # PID + 타임스탬프 기록
             try:
                 with open(os.path.join(lock_dir, "pid"), "w") as f:
-                    f.write(str(os.getpid()))
+                    f.write(f"{os.getpid()} {time.time()}")
             except OSError:
                 pass
             return True
@@ -113,14 +114,34 @@ def acquire_lock(lock_dir, max_wait=5):
             if os.path.isfile(pid_file):
                 try:
                     with open(pid_file, "r") as f:
-                        lock_pid = int(f.read().strip())
+                        pid_content = f.read().strip()
+                    parts = pid_content.split()
+                    lock_pid = int(parts[0])
+                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
                     # 프로세스가 존재하지 않으면 stale lock 제거
                     os.kill(lock_pid, 0)
+                    # 프로세스는 존재하지만 max_wait초 이상 경과 시 stale로 판단
+                    if lock_ts and (time.time() - lock_ts) > max_wait:
+                        # 제거 전 PID 파일 재확인 (TOCTOU 방어)
+                        try:
+                            with open(pid_file, "r") as f:
+                                recheck = f.read().strip()
+                            if recheck == pid_content:
+                                shutil.rmtree(lock_dir)
+                                waited += 1
+                                continue
+                        except OSError:
+                            pass
                 except (ValueError, ProcessLookupError, OSError):
+                    # PID 파일 재확인 후 제거 (TOCTOU 방어)
                     try:
-                        shutil.rmtree(lock_dir)
+                        with open(pid_file, "r") as f:
+                            recheck = f.read().strip()
+                        if recheck == pid_content:
+                            shutil.rmtree(lock_dir)
                     except OSError:
                         pass
+                    waited += 1
                     continue
                 except PermissionError:
                     # 프로세스가 살아있지만 kill 권한 없음 → stale lock 아님, 대기
@@ -205,7 +226,9 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
             return "status -> skipped (read failed)"
 
         # FSM 전이 검증
-        if not skip_guard:
+        if skip_guard:
+            print(f"[AUDIT] WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}", file=sys.stderr, flush=True)
+        else:
             current_step = data.get("step") or data.get("phase", "NONE")
             workflow_mode = data.get("mode", "full").lower()
 
@@ -265,12 +288,8 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
         except Exception as e:
             print(f"[WARN] history sync failed: {e}", file=sys.stderr)
 
-        # 색상 출력
-        c_from = STEP_COLORS.get(from_step, "")
-        r_from = C_RESET if c_from else ""
-        c_to = STEP_COLORS.get(to_step, "")
-        r_to = C_RESET if c_to else ""
-        result = f"status -> {c_from}{from_step}{r_from}->{c_to}{to_step}{r_to}"
+        # 반환값에는 ANSI 코드 없음 (배너는 _print_state_banner()가 담당)
+        result = f"status -> {from_step}->{to_step}"
     except Exception as e:
         print(f"[WARN] status.json update failed: {e}", file=sys.stderr)
         return "status -> failed"
@@ -438,6 +457,98 @@ def usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_cr
 
 
 # =============================================================================
+# usage-finalize 헬퍼
+# =============================================================================
+
+def _calc_effective(d):
+    """토큰 데이터 dict에서 effective_tokens를 계산한다."""
+    return (
+        d.get("input_tokens", 0)
+        + d.get("output_tokens", 0) * 5
+        + d.get("cache_creation_tokens", 0) * 1.25
+        + d.get("cache_read_tokens", 0) * 0.1
+    )
+
+
+def _sum_tokens(agents_list):
+    """에이전트 토큰 데이터 리스트의 합계를 반환한다."""
+    totals = {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+    for a in agents_list:
+        for k in totals:
+            totals[k] += a.get(k, 0)
+    return totals
+
+
+def _to_k(n):
+    """숫자를 k 단위 문자열로 변환 (0이면 '-')."""
+    return "-" if n == 0 else f"{int(n) // 1000}k"
+
+
+def _to_k_precise(n):
+    """숫자를 소수점 1자리 k 단위 문자열로 변환 (0이면 '-')."""
+    return "-" if n == 0 else f"{n / 1000:.1f}k"
+
+
+def _update_usage_md(row, eff_weighted):
+    """.dashboard/.usage.md 파일에 사용량 행을 삽입한다. 성공 시 None, 실패 시 에러 문자열 반환."""
+    usage_md = os.path.join(PROJECT_ROOT, ".dashboard", ".usage.md")
+    marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+    header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
+    separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|"
+
+    content = ""
+    if os.path.exists(usage_md):
+        with open(usage_md, "r", encoding="utf-8") as f:
+            content = f.read()
+
+    if marker not in content:
+        content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
+
+    # row 컬럼 수 검증: 11컬럼이 아니면 삽입하지 않음
+    if row.count("|") - 1 != 11:
+        print(
+            f"[WARN] usage-finalize: row column count mismatch (expected 11, got {row.count('|') - 1}). row insertion skipped.",
+            file=sys.stderr,
+        )
+        return f"usage-finalize -> totals: eff={_to_k_precise(eff_weighted)}, usage.md skipped (column mismatch)"
+
+    if separator_line in content:
+        marker_pos = content.find(marker)
+        if marker_pos >= 0:
+            sep_pos = content.find(separator_line, marker_pos)
+            if sep_pos >= 0:
+                insert_pos = sep_pos + len(separator_line)
+                if insert_pos < len(content) and content[insert_pos] == "\n":
+                    insert_pos += 1
+                content = content[:insert_pos] + row + "\n" + content[insert_pos:]
+            else:
+                content = content.replace(
+                    marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
+                )
+        else:
+            content = content.replace(
+                marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
+            )
+    else:
+        content = content.replace(
+            marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
+        )
+
+    os.makedirs(os.path.dirname(usage_md), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(usage_md), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        shutil.move(tmp, usage_md)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+    return None  # 성공
+
+
+# =============================================================================
 # usage-finalize
 # =============================================================================
 
@@ -447,27 +558,6 @@ def usage_finalize(abs_work_dir):
     if not os.path.isfile(usage_file):
         print(f"[WARN] usage-finalize: usage.json not found: {usage_file}", file=sys.stderr)
         return "usage-finalize -> skipped (file not found)"
-
-    def calc_effective(d):
-        return (
-            d.get("input_tokens", 0)
-            + d.get("output_tokens", 0) * 5
-            + d.get("cache_creation_tokens", 0) * 1.25
-            + d.get("cache_read_tokens", 0) * 0.1
-        )
-
-    def sum_tokens(agents_list):
-        totals = {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
-        for a in agents_list:
-            for k in totals:
-                totals[k] += a.get(k, 0)
-        return totals
-
-    def to_k(n):
-        return "-" if n == 0 else f"{int(n) // 1000}k"
-
-    def to_k_precise(n):
-        return "-" if n == 0 else f"{n / 1000:.1f}k"
 
     try:
         data = load_json_file(usage_file)
@@ -495,8 +585,8 @@ def usage_finalize(abs_work_dir):
                     all_agents.append(w)
 
         # totals 계산
-        totals = sum_tokens(all_agents)
-        totals["effective_tokens"] = calc_effective(totals)
+        totals = _sum_tokens(all_agents)
+        totals["effective_tokens"] = _calc_effective(totals)
         data["totals"] = totals
 
         atomic_write_json(usage_file, data)
@@ -524,16 +614,16 @@ def usage_finalize(abs_work_dir):
                 date_str = registry_key
 
         # 에이전트별 effective_tokens
-        orch_eff = calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
-        plan_eff = calc_effective(agents.get("planner", {})) if "planner" in agents else 0
+        orch_eff = _calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
+        plan_eff = _calc_effective(agents.get("planner", {})) if "planner" in agents else 0
         work_eff = (
-            sum(calc_effective(w) for w in workers.values() if isinstance(w, dict))
+            sum(_calc_effective(w) for w in workers.values() if isinstance(w, dict))
             if isinstance(workers, dict)
             else 0
         )
-        exp_eff = calc_effective(agents.get("explorer", {})) if "explorer" in agents else 0
-        val_eff = calc_effective(agents.get("validator", {})) if "validator" in agents else 0
-        report_eff = calc_effective(agents.get("reporter", {})) if "reporter" in agents else 0
+        exp_eff = _calc_effective(agents.get("explorer", {})) if "explorer" in agents else 0
+        val_eff = _calc_effective(agents.get("validator", {})) if "validator" in agents else 0
+        report_eff = _calc_effective(agents.get("reporter", {})) if "reporter" in agents else 0
         total_eff = orch_eff + plan_eff + work_eff + exp_eff + val_eff + report_eff
         eff_weighted = totals.get("effective_tokens", total_eff)
 
@@ -543,71 +633,21 @@ def usage_finalize(abs_work_dir):
             f"| {registry_key} "
             f"| {title} "
             f"| {reg_command} "
-            f"| {to_k(orch_eff)} "
-            f"| {to_k(plan_eff)} "
-            f"| {to_k(work_eff)} "
-            f"| {to_k(exp_eff)} "
-            f"| {to_k(val_eff)} "
-            f"| {to_k(report_eff)} "
-            f"| {to_k(total_eff)} |"
+            f"| {_to_k(orch_eff)} "
+            f"| {_to_k(plan_eff)} "
+            f"| {_to_k(work_eff)} "
+            f"| {_to_k(exp_eff)} "
+            f"| {_to_k(val_eff)} "
+            f"| {_to_k(report_eff)} "
+            f"| {_to_k(total_eff)} |"
         )
 
         # .dashboard/.usage.md 갱신
-        usage_md = os.path.join(PROJECT_ROOT, ".dashboard", ".usage.md")
-        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-        header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
-        separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|"
+        md_err = _update_usage_md(row, eff_weighted)
+        if md_err is not None:
+            return md_err
 
-        content = ""
-        if os.path.exists(usage_md):
-            with open(usage_md, "r", encoding="utf-8") as f:
-                content = f.read()
-
-        if marker not in content:
-            content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
-
-        # row 컬럼 수 검증: 11컬럼이 아니면 삽입하지 않음
-        if row.count("|") - 1 != 11:
-            print(
-                f"[WARN] usage-finalize: row column count mismatch (expected 11, got {row.count('|') - 1}). row insertion skipped.",
-                file=sys.stderr,
-            )
-            return f"usage-finalize -> totals: eff={to_k_precise(eff_weighted)}, usage.md skipped (column mismatch)"
-
-        if separator_line in content:
-            marker_pos = content.find(marker)
-            if marker_pos >= 0:
-                sep_pos = content.find(separator_line, marker_pos)
-                if sep_pos >= 0:
-                    insert_pos = sep_pos + len(separator_line)
-                    if insert_pos < len(content) and content[insert_pos] == "\n":
-                        insert_pos += 1
-                    content = content[:insert_pos] + row + "\n" + content[insert_pos:]
-                else:
-                    content = content.replace(
-                        marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
-                    )
-            else:
-                content = content.replace(
-                    marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
-                )
-        else:
-            content = content.replace(
-                marker, f"{marker}\n\n{header_line}\n{separator_line}\n{row}"
-            )
-
-        os.makedirs(os.path.dirname(usage_md), exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(usage_md), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(content)
-            shutil.move(tmp, usage_md)
-        except Exception:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-            raise
-
-        return f"usage-finalize -> totals: eff={to_k_precise(eff_weighted)}, usage.md updated"
+        return f"usage-finalize -> totals: eff={_to_k_precise(eff_weighted)}, usage.md updated"
     except Exception as e:
         print(f"[WARN] usage-finalize failed: {e}", file=sys.stderr)
         return "usage-finalize -> failed"
@@ -704,13 +744,155 @@ def env_manage(action, key, value=""):
 
 _VALID_MODES = frozenset({
     "context", "status", "both", "link-session",
-    "usage-pending", "usage", "usage-finalize", "env", "task-status",
+    "usage-pending", "usage", "usage-finalize", "env", "task-status", "task-start",
 })
+
+
+# =============================================================================
+# 디스패처 핸들러 함수
+# =============================================================================
+
+def _handle_context(abs_work_dir, local_context, status_file):
+    """context 모드 핸들러."""
+    agent = sys.argv[3] if len(sys.argv) > 3 else ""
+    if not agent:
+        print("[WARN] context 모드: agent 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    update_context(local_context, agent)
+    return None, None, False
+
+
+def _handle_status(abs_work_dir, local_context, status_file):
+    """status 모드 핸들러."""
+    to_step = sys.argv[3] if len(sys.argv) > 3 else ""
+    if not to_step:
+        print("[WARN] status 모드: toPhase 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    _data = load_json_file(status_file) if os.path.isfile(status_file) else None
+    from_step = (_data.get("step") or _data.get("phase", "NONE")) if isinstance(_data, dict) else "NONE"
+    result = update_status(abs_work_dir, status_file, from_step, to_step)
+    banner_ok = not any(x in result for x in ("blocked", "skipped", "failed"))
+    return from_step, to_step, banner_ok
+
+
+def _handle_both(abs_work_dir, local_context, status_file):
+    """both 모드 핸들러."""
+    agent = sys.argv[3] if len(sys.argv) > 3 else ""
+    to_step = sys.argv[4] if len(sys.argv) > 4 else ""
+    if not agent or not to_step:
+        print("[WARN] both 모드: agent, toPhase 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    _data = load_json_file(status_file) if os.path.isfile(status_file) else None
+    from_step = (_data.get("step") or _data.get("phase", "NONE")) if isinstance(_data, dict) else "NONE"
+    update_context(local_context, agent)
+    result = update_status(abs_work_dir, status_file, from_step, to_step)
+    banner_ok = not any(x in result for x in ("blocked", "skipped", "failed"))
+    return from_step, to_step, banner_ok
+
+
+def _handle_link_session(abs_work_dir, local_context, status_file):
+    """link-session 모드 핸들러."""
+    session_id = sys.argv[3] if len(sys.argv) > 3 else ""
+    if not session_id:
+        print("[WARN] link-session 모드: sessionId 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    link_session(status_file, session_id)
+    return None, None, False
+
+
+def _handle_usage_pending(abs_work_dir, local_context, status_file):
+    """usage-pending 모드 핸들러."""
+    task_ids = sys.argv[3:]
+    if not task_ids:
+        print("[WARN] usage-pending 모드: task_id 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    seen = set()
+    for tid in task_ids:
+        if tid not in seen:
+            seen.add(tid)
+            usage_pending(abs_work_dir, tid, tid)
+    return None, None, False
+
+
+def _handle_usage(abs_work_dir, local_context, status_file):
+    """usage 모드 핸들러."""
+    agent_name = sys.argv[3] if len(sys.argv) > 3 else ""
+    input_tokens = sys.argv[4] if len(sys.argv) > 4 else ""
+    output_tokens = sys.argv[5] if len(sys.argv) > 5 else ""
+    cache_creation = sys.argv[6] if len(sys.argv) > 6 else "0"
+    cache_read = sys.argv[7] if len(sys.argv) > 7 else "0"
+    task_id_arg = sys.argv[8] if len(sys.argv) > 8 else ""
+    if not agent_name or not input_tokens or not output_tokens:
+        print("[WARN] usage 모드: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_creation, cache_read, task_id_arg)
+    return None, None, False
+
+
+def _handle_usage_finalize(abs_work_dir, local_context, status_file):
+    """usage-finalize 모드 핸들러."""
+    usage_finalize(abs_work_dir)
+    return None, None, False
+
+
+def _handle_env(abs_work_dir, local_context, status_file):
+    """env 모드 핸들러."""
+    action = sys.argv[3] if len(sys.argv) > 3 else ""
+    key = sys.argv[4] if len(sys.argv) > 4 else ""
+    value = sys.argv[5] if len(sys.argv) > 5 else ""
+    if not action or not key:
+        print("[WARN] env 모드: action(set|unset), KEY 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    env_manage(action, key, value)
+    return None, None, False
+
+
+def _handle_task_start(abs_work_dir, local_context, status_file):
+    """task-start 모드 핸들러: 태스크 상태를 running으로 설정하고 usage-pending 등록."""
+    task_ids = sys.argv[3:]
+    if not task_ids:
+        print("[WARN] task-start 모드: task_id 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    for tid in task_ids:
+        update_task_status(status_file, tid, "running")
+        usage_pending(abs_work_dir, tid, tid)
+    return None, None, False
+
+
+def _handle_task_status(abs_work_dir, local_context, status_file):
+    """task-status 모드 핸들러."""
+    _TS_VALID_STATUSES = {"pending", "running", "completed", "failed", "in_progress"}
+    arg3 = sys.argv[3] if len(sys.argv) > 3 else ""
+    arg4 = sys.argv[4] if len(sys.argv) > 4 else ""
+    if not arg3:
+        print("[WARN] task-status 모드: status, task_id 인자가 필요합니다.", file=sys.stderr)
+        sys.exit(0)
+    if arg3 in _TS_VALID_STATUSES:
+        task_ids = sys.argv[4:]
+        for tid in task_ids:
+            update_task_status(status_file, tid, arg3)
+    else:
+        update_task_status(status_file, arg3, arg4)
+    return None, None, False
+
+
+_HANDLERS = {
+    "context": _handle_context,
+    "status": _handle_status,
+    "both": _handle_both,
+    "link-session": _handle_link_session,
+    "usage-pending": _handle_usage_pending,
+    "usage": _handle_usage,
+    "usage-finalize": _handle_usage_finalize,
+    "env": _handle_env,
+    "task-status": _handle_task_status,
+    "task-start": _handle_task_start,
+}
 
 
 def main():
     if len(sys.argv) < 3:
-        print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status <workDir> [args...]", file=sys.stderr)
+        print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status|task-start <workDir> [args...]", file=sys.stderr)
         sys.exit(0)
 
     mode = sys.argv[1]
@@ -727,101 +909,19 @@ def main():
 
     abs_work_dir, local_context, status_file = resolve_paths(work_dir_arg)
 
-    # 상태 전이 배너 출력용 추적 변수
-    _banner_from = ""
-    _banner_to = ""
-    _banner_ok = False
-
-    if mode == "context":
-        agent = sys.argv[3] if len(sys.argv) > 3 else ""
-        if not agent:
-            print("[WARN] context 모드: agent 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        update_context(local_context, agent)
-
-    elif mode == "status":
-        to_step = sys.argv[3] if len(sys.argv) > 3 else ""
-        if not to_step:
-            print("[WARN] status 모드: toPhase 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        _data = load_json_file(status_file) if os.path.isfile(status_file) else None
-        from_step = (_data.get("step") or _data.get("phase", "NONE")) if isinstance(_data, dict) else "NONE"
-        result = update_status(abs_work_dir, status_file, from_step, to_step)
-        _banner_from = from_step
-        _banner_to = to_step
-        _banner_ok = not any(x in result for x in ("blocked", "skipped", "failed"))
-
-    elif mode == "both":
-        agent = sys.argv[3] if len(sys.argv) > 3 else ""
-        to_step = sys.argv[4] if len(sys.argv) > 4 else ""
-        if not agent or not to_step:
-            print("[WARN] both 모드: agent, toPhase 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        _data = load_json_file(status_file) if os.path.isfile(status_file) else None
-        from_step = (_data.get("step") or _data.get("phase", "NONE")) if isinstance(_data, dict) else "NONE"
-        update_context(local_context, agent)
-        result = update_status(abs_work_dir, status_file, from_step, to_step)
-        _banner_from = from_step
-        _banner_to = to_step
-        _banner_ok = not any(x in result for x in ("blocked", "skipped", "failed"))
-
-    elif mode == "link-session":
-        session_id = sys.argv[3] if len(sys.argv) > 3 else ""
-        if not session_id:
-            print("[WARN] link-session 모드: sessionId 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        link_session(status_file, session_id)
-
-    elif mode == "usage-pending":
-        agent_id = sys.argv[3] if len(sys.argv) > 3 else ""
-        task_id = sys.argv[4] if len(sys.argv) > 4 else ""
-        if not agent_id or not task_id:
-            print("[WARN] usage-pending 모드: agent_id, task_id 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        usage_pending(abs_work_dir, agent_id, task_id)
-
-    elif mode == "usage":
-        agent_name = sys.argv[3] if len(sys.argv) > 3 else ""
-        input_tokens = sys.argv[4] if len(sys.argv) > 4 else ""
-        output_tokens = sys.argv[5] if len(sys.argv) > 5 else ""
-        cache_creation = sys.argv[6] if len(sys.argv) > 6 else "0"
-        cache_read = sys.argv[7] if len(sys.argv) > 7 else "0"
-        task_id_arg = sys.argv[8] if len(sys.argv) > 8 else ""
-        if not agent_name or not input_tokens or not output_tokens:
-            print("[WARN] usage 모드: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_creation, cache_read, task_id_arg)
-
-    elif mode == "usage-finalize":
-        usage_finalize(abs_work_dir)
-
-    elif mode == "env":
-        action = sys.argv[3] if len(sys.argv) > 3 else ""
-        key = sys.argv[4] if len(sys.argv) > 4 else ""
-        value = sys.argv[5] if len(sys.argv) > 5 else ""
-        if not action or not key:
-            print("[WARN] env 모드: action(set|unset), KEY 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        env_manage(action, key, value)
-
-    elif mode == "task-status":
-        task_id = sys.argv[3] if len(sys.argv) > 3 else ""
-        task_status = sys.argv[4] if len(sys.argv) > 4 else ""
-        if not task_id or not task_status:
-            print("[WARN] task-status 모드: task_id, status 인자가 필요합니다.", file=sys.stderr)
-            sys.exit(0)
-        update_task_status(status_file, task_id, task_status)
-
-    else:
+    handler = _HANDLERS.get(mode)
+    if handler is None:
         print(
-            f"[WARN] 알 수 없는 모드: {mode} (context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status 중 선택)",
+            f"[WARN] 알 수 없는 모드: {mode} (context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status|task-start 중 선택)",
             file=sys.stderr,
         )
         print("FAIL", flush=True)
         sys.exit(0)
 
+    _banner_from, _banner_to, _banner_ok = handler(abs_work_dir, local_context, status_file)
+
     if _banner_ok and _banner_from and _banner_to:
-        _print_state_banner(_banner_from, _banner_to)  # from_step, to_step
+        _print_state_banner(_banner_from, _banner_to)
     sys.exit(0)
 
 

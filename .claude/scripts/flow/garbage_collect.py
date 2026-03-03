@@ -79,7 +79,7 @@ def _process_status_file(status_file, status_dir, now):
             return True
 
         return False
-    except (json.JSONDecodeError, IOError, ValueError):
+    except (json.JSONDecodeError, IOError, ValueError, TypeError):
         return False
 
 

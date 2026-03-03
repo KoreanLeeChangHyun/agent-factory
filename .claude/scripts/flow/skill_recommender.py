@@ -216,7 +216,8 @@ def keyword_match_boost(query_text, skill_info):
     for trigger in skill_info["triggers"]:
         if trigger in query_lower:
             boost += 0.3  # 매칭된 trigger당 0.3 보너스
-    return min(boost, 0.9)  # 최대 0.9 (3개 trigger까지)
+    # 부동소수점 누적 오차 해소
+    return round(min(boost, 0.9), 10)  # 최대 0.9 (3개 trigger까지)
 
 
 def recommend(query_text: str, catalog_path: str | None = None) -> list[tuple[str, float]]:

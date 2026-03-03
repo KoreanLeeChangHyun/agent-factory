@@ -71,7 +71,7 @@ def _warn(msg: str) -> None:
 def _sanitize_work_name(title: str) -> str:
     """제목을 파일시스템 안전한 디렉터리명으로 변환한다."""
     name: str = re.sub(r"\s+", "-", title.strip())
-    name = re.sub(r'[!@#%^&*()/:;<>?|~"`\\${}[\]]', "", name)
+    name = re.sub(r"[!@#%^&*()/:;<>?|~\"'`\\${}[\]]", "", name)
     name = re.sub(r"\.", "-", name)
     name = re.sub(r"-{2,}", "-", name)
     name = name.strip("-")
@@ -120,51 +120,49 @@ def read_prompt() -> str | None:
 # ─── Step 2: 워크플로우 초기화 ───────────────────────────────────────────────
 
 
-def init_workflow(command: str, title: str, mode: str, prompt_content: str = "") -> dict[str, str]:
-    """워크플로우 디렉터리 구조와 메타데이터를 일괄 생성한다."""
-    now: datetime = datetime.now(KST)
-    registry_key: str = now.strftime("%Y%m%d-%H%M%S")
-    work_id: str = registry_key.split("-")[1]
-
-    work_name: str = _sanitize_work_name(title)
-    if not work_name:
-        _err(f"Title produced empty workName after sanitization: '{title}'", 4)
-
-    work_dir: str = f".workflow/{registry_key}/{work_name}/{command}"
-    abs_work_dir: str = os.path.join(_PROJECT_ROOT, work_dir)
-
+def _create_work_dir(abs_work_dir: str) -> None:
+    """워크플로우 디렉터리를 생성한다."""
     os.makedirs(abs_work_dir, exist_ok=True)
 
+
+def _write_user_prompt(abs_work_dir: str, prompt_content: str) -> None:
+    """user_prompt.txt를 작성한다."""
     with open(os.path.join(abs_work_dir, "user_prompt.txt"), "w", encoding="utf-8") as f:
         f.write(prompt_content)
 
-    # .uploads/ → <workDir>/files/
-    uploads_dir: str = os.path.join(_PROJECT_ROOT, ".uploads")
-    if os.path.isdir(uploads_dir) and os.listdir(uploads_dir):
-        files_dir: str = os.path.join(abs_work_dir, "files")
-        os.makedirs(files_dir, exist_ok=True)
-        for item in os.listdir(uploads_dir):
-            src: str = os.path.join(uploads_dir, item)
-            dst: str = os.path.join(files_dir, item)
-            if os.path.isdir(src):
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            else:
-                shutil.copy2(src, dst)
-        for item in os.listdir(uploads_dir):
-            item_path: str = os.path.join(uploads_dir, item)
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.unlink(item_path)
 
-    # prompt.txt 클리어
+def _copy_uploads(abs_work_dir: str) -> None:
+    """.uploads/ 디렉터리의 파일을 <workDir>/files/로 복사 후 원본 삭제."""
+    uploads_dir: str = os.path.join(_PROJECT_ROOT, ".uploads")
+    if not os.path.isdir(uploads_dir) or not os.listdir(uploads_dir):
+        return
+    files_dir: str = os.path.join(abs_work_dir, "files")
+    os.makedirs(files_dir, exist_ok=True)
+    for item in os.listdir(uploads_dir):
+        src: str = os.path.join(uploads_dir, item)
+        dst: str = os.path.join(files_dir, item)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        else:
+            shutil.copy2(src, dst)
+    for item in os.listdir(uploads_dir):
+        item_path: str = os.path.join(uploads_dir, item)
+        if os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+        else:
+            os.unlink(item_path)
+
+
+def _clear_prompt() -> None:
+    """prompt.txt를 클리어한다."""
     _prompt_file: str = os.path.join(_PROJECT_ROOT, ".prompt", "prompt.txt")
     if os.path.isfile(_prompt_file):
         with open(_prompt_file, "w", encoding="utf-8") as f:
             pass
 
-    # .context.json
-    ts: str = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+
+def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str) -> None:
+    """.context.json을 작성한다."""
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
         {
@@ -177,7 +175,9 @@ def init_workflow(command: str, title: str, mode: str, prompt_content: str = "")
         },
     )
 
-    # status.json
+
+def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
+    """status.json을 작성한다."""
     claude_sid: str = os.environ.get("CLAUDE_SESSION_ID", "")
     _atomic_write_json(
         os.path.join(abs_work_dir, "status.json"),
@@ -191,6 +191,42 @@ def init_workflow(command: str, title: str, mode: str, prompt_content: str = "")
             "transitions": [],
         },
     )
+
+
+def init_workflow(command: str, title: str, mode: str, prompt_content: str = "") -> dict[str, str]:
+    """워크플로우 디렉터리 구조와 메타데이터를 일괄 생성한다."""
+    now: datetime = datetime.now(KST)
+    registry_key: str = now.strftime("%Y%m%d-%H%M%S")
+    work_id: str = registry_key.split("-")[1]
+
+    work_name: str = _sanitize_work_name(title)
+    if not work_name:
+        _err(f"Title produced empty workName after sanitization: '{title}'", 4)
+
+    work_dir: str = f".workflow/{registry_key}/{work_name}/{command}"
+    abs_work_dir: str = os.path.join(_PROJECT_ROOT, work_dir)
+
+    # registryKey 충돌 방지: 동일 디렉터리가 이미 존재하면 suffix 추가
+    if os.path.exists(abs_work_dir):
+        for suffix in range(1, 100):
+            candidate_key: str = f"{registry_key}-{suffix}"
+            candidate_dir: str = f".workflow/{candidate_key}/{work_name}/{command}"
+            candidate_abs: str = os.path.join(_PROJECT_ROOT, candidate_dir)
+            if not os.path.exists(candidate_abs):
+                registry_key = candidate_key
+                work_id = registry_key.split("-")[1]
+                work_dir = candidate_dir
+                abs_work_dir = candidate_abs
+                break
+
+    _create_work_dir(abs_work_dir)
+    _write_user_prompt(abs_work_dir, prompt_content)
+    _copy_uploads(abs_work_dir)
+    _clear_prompt()
+
+    ts: str = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+    _write_context(abs_work_dir, title, work_id, work_name, command, ts)
+    _write_status(abs_work_dir, mode, ts)
 
     # 좀비 워크플로우 정리
     _run_optional_script(

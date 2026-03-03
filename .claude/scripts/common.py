@@ -341,11 +341,11 @@ def resolve_work_dir(input_key, project_root=None):
     # 디렉터리 스캔으로 workDir 조회
     base_dir = os.path.join(project_root, ".workflow", input_key)
     if os.path.isdir(base_dir):
-        for work_name in os.listdir(base_dir):
+        for work_name in sorted(os.listdir(base_dir)):
             wn_path = os.path.join(base_dir, work_name)
             if not os.path.isdir(wn_path) or work_name.startswith("."):
                 continue
-            for cmd_name in os.listdir(wn_path):
+            for cmd_name in sorted(os.listdir(wn_path)):
                 cmd_path = os.path.join(wn_path, cmd_name)
                 if not os.path.isdir(cmd_path):
                     continue

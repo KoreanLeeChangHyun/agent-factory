@@ -100,33 +100,12 @@ workDir: <workDir>
 
 **실행 명령:**
 ```bash
-validator_output=$(python3 .claude/scripts/flow/plan_validator.py <workDir>/plan.md 2>&1)
-validator_exit=$?
+validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 ```
 
-**stdout 파싱 규칙:**
-
-| stdout 내용 | 판단 | 처리 |
-|------------|------|------|
-| `"검증 통과"` | 경고 없음 | 경고 변수를 빈 문자열로 설정 |
-| 그 외 출력 | 경고 있음 | 경고 내용을 변수에 보관하여 Step 2b-3 AskUserQuestion에 포함 |
-
-**폴백 동작 (실행 실패 시):**
-
-plan_validator.py 실행이 다음 이유로 실패하는 경우, 검증을 **스킵**하고 기존 흐름대로 `flow-step end` 및 AskUserQuestion을 진행한다. 검증은 advisory이므로 blocking하지 않는다.
-
-- 스크립트 파일 미존재 (`No such file or directory`)
-- exit code 1 (런타임 에러)
-- 기타 예외 발생
-
-```bash
-# 폴백: 실패 시 경고 변수를 빈 문자열로 처리하여 기존 흐름 유지
-if [ $validator_exit -ne 0 ]; then
-    validator_output=""
-fi
-```
-
-> **경고 표시 타이밍:** validator 실행은 `flow-step end` 배너 출력 **전에** 완료된다. 경고 내용은 배너와 분리되어 AskUserQuestion의 `question` 필드에만 포함된다.
+- `"검증 통과"` 출력 → 경고 없음
+- 그 외 출력 → 경고 내용을 Step 2b-3 AskUserQuestion에 포함
+- 실행 실패 시 → 빈 문자열로 폴백 (검증은 advisory이므로 blocking하지 않음)
 
 ## Step 2b: PLAN - Orchestrator User Approval
 

@@ -61,7 +61,7 @@ def main():
 
     if not feedback:
         print("FAIL", flush=True)
-        print("[WARN] prompt.txt is empty", file=sys.stderr)
+        print("[WARN] prompt.txt is empty", flush=True)
         sys.exit(0)
 
     # --- Step 2: user_prompt.txt에 피드백 append ---
@@ -105,7 +105,7 @@ def main():
     except Exception:
         pass
 
-    pass  # silent
+    print(feedback, end="", flush=True)
 
 
 if __name__ == "__main__":

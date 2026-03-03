@@ -202,12 +202,58 @@ def resolve_skills(task: dict, command: str, defaults: dict, keywords: dict) -> 
             # score 0.1 이상인 스킬명만 추출
             fallback_skills = [name for name, score in candidates if score >= 0.1]
             skills = list(fallback_skills)
-        except ImportError as e:
-            # import 실패 시 경고 로그 출력
-            print(f"[WARN] skill_recommender import 실패: {e}", file=sys.stderr)
+        except Exception as e:
+            # import 실패 또는 예상치 못한 오류 시 경고 로그 출력, 폴백 체인 정상 진행
+            print(f"[WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
 
     task["fallback_skills"] = fallback_skills
     return skills
+
+
+def _build_skill_map_header(tasks):
+    """skill-map.md의 헤더 및 요약 테이블 행 목록을 생성."""
+    lines = []
+    lines.append("# Skill Map")
+    lines.append("")
+    lines.append("> 이 파일은 `skill_mapper.py`에 의해 자동 생성됩니다.")
+    lines.append("> Worker는 자신의 태스크 섹션(## WXX: 스킬 지침)만 참조합니다.")
+    lines.append("")
+    lines.append("## 태스크별 스킬 매핑")
+    lines.append("")
+    lines.append("| 태스크 | 스킬 |")
+    lines.append("|--------|------|")
+    for task in tasks:
+        lines.extend(_build_skill_map_rows(task))
+    lines.append("")
+    return lines
+
+
+def _build_skill_map_rows(task):
+    """태스크별 요약 테이블 행과 인라인 스킬 지침 섹션 행 목록을 생성."""
+    lines = []
+    resolved = task.get("resolved", [])
+    fallback = set(task.get("fallback_skills", []))
+    if resolved:
+        skill_parts = [f"{s} (추천)" if s in fallback else s for s in resolved]
+        skill_str = ", ".join(skill_parts)
+    else:
+        skill_str = "(없음)"
+    lines.append(f"| {task['taskId']} | {skill_str} |")
+    return lines
+
+
+def _build_task_skill_section(task):
+    """태스크별 인라인 스킬 지침 섹션 행 목록을 생성."""
+    task_resolved = task.get("resolved", [])
+    if not task_resolved:
+        return []
+    lines = ["---", "", f"## {task['taskId']}: 스킬 지침", ""]
+    task_instructions = task.get("instructions", {})
+    for skill_name in task_resolved:
+        compact = task_instructions.get(skill_name, "")
+        if compact:
+            lines.extend([f"### {skill_name}", "", compact, ""])
+    return lines
 
 
 def write_skill_map(work_dir, tasks):
@@ -220,59 +266,12 @@ def write_skill_map(work_dir, tasks):
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "skill-map.md")
 
-    lines = []
-    lines.append("# Skill Map")
-    lines.append("")
-    lines.append("> 이 파일은 `skill_mapper.py`에 의해 자동 생성됩니다.")
-    lines.append("> Worker는 자신의 태스크 섹션(## WXX: 스킬 지침)만 참조합니다.")
-    lines.append("")
-
-    # 요약 테이블
-    lines.append("## 태스크별 스킬 매핑")
-    lines.append("")
-    lines.append("| 태스크 | 스킬 |")
-    lines.append("|--------|------|")
+    lines = _build_skill_map_header(tasks)
     for task in tasks:
-        resolved = task.get("resolved", [])
-        fallback = set(task.get("fallback_skills", []))
-        if resolved:
-            skill_parts = []
-            for s in resolved:
-                if s in fallback:
-                    skill_parts.append(f"{s} (추천)")
-                else:
-                    skill_parts.append(s)
-            skill_str = ", ".join(skill_parts)
-        else:
-            skill_str = "(없음)"
-        lines.append(f"| {task['taskId']} | {skill_str} |")
-    lines.append("")
-
-    # 각 태스크별 인라인 지침 — 해당 태스크의 resolved 스킬만 포함
-    for task in tasks:
-        task_resolved = task.get("resolved", [])
-        if not task_resolved:
-            continue
-
-        lines.append(f"---")
-        lines.append("")
-        lines.append(f"## {task['taskId']}: 스킬 지침")
-        lines.append("")
-
-        # task["resolved"]에 포함된 스킬만 출력 (다른 태스크 스킬은 이 섹션에 포함하지 않음)
-        task_instructions = task.get("instructions", {})
-        for skill_name in task_resolved:
-            compact = task_instructions.get(skill_name, "")
-            if compact:
-                lines.append(f"### {skill_name}")
-                lines.append("")
-                lines.append(compact)
-                lines.append("")
-
-    content = "\n".join(lines)
+        lines.extend(_build_task_skill_section(task))
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write("\n".join(lines))
 
     return output_path
 
@@ -321,9 +320,9 @@ def slice_plan_context(plan_path, tasks, output_dir):
         # H3 섹션이 없으면 스킵
         return []
 
-    # 각 태스크 섹션 끝 위치 결정: 다음 H3/H2/H1이 나오거나 파일 끝
+    # 각 태스크 섹션 끝 위치 결정: 다음 H4 이하/H3/H2/H1이 나오거나 파일 끝
     sorted_starts = sorted(section_starts.items(), key=lambda x: x[1])
-    end_pattern = re.compile(r"^#{1,3}\s+")
+    end_pattern = re.compile(r"^#{1,4}\s+")
 
     os.makedirs(output_dir, exist_ok=True)
     created = []

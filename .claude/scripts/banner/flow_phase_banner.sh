@@ -52,18 +52,45 @@ except FileNotFoundError:
     sys.exit(0)
 
 # 작업 목록 테이블에서 현재 Phase에 해당하는 행 파싱
-# | ID | 작업 | 종속성 | Phase | 복잡도 | 서브에이전트 | 스킬 |
+# 헤더 행에서 컬럼 인덱스를 동적으로 추출
 rows = []
+header_cols = None
+phase_idx = None
+agent_idx = None
+id_idx = None
+task_idx = None
 for line in content.split('\n'):
     line = line.strip()
-    if not line.startswith('|') or '---' in line:
+    if not line.startswith('|'):
+        continue
+    if '---' in line:
         continue
     cols = [c.strip() for c in line.split('|')]
-    # cols[0]='', cols[1]=ID, ..., cols[4]=Phase, cols[6]=서브에이전트
-    if len(cols) >= 7:
+    if header_cols is None:
+        # 첫 번째 데이터 행을 헤더로 인식
+        header_lower = [c.lower() for c in cols]
+        for i, h in enumerate(header_lower):
+            if 'phase' in h:
+                phase_idx = i
+            if '서브에이전트' in h or 'agent' in h:
+                agent_idx = i
+            if h in ('id', '| id'):
+                id_idx = i
+            if '작업' in h or 'task' in h:
+                task_idx = i
+        # 헤더 행에 ID 컬럼이 있으면 헤더로 확정
+        if phase_idx is not None:
+            header_cols = cols
+            continue
+    if header_cols is not None and phase_idx is not None:
         try:
-            if cols[4] == phase:
-                rows.append({'id': cols[1], 'agent': cols[6], 'task': cols[2]})
+            if len(cols) > max(filter(lambda x: x is not None, [phase_idx, agent_idx or 0, id_idx or 0, task_idx or 0])):
+                row_phase = cols[phase_idx] if phase_idx is not None else ''
+                row_agent = cols[agent_idx] if agent_idx is not None else ''
+                row_id = cols[id_idx] if id_idx is not None else cols[1] if len(cols) > 1 else ''
+                row_task = cols[task_idx] if task_idx is not None else cols[2] if len(cols) > 2 else ''
+                if row_phase == phase:
+                    rows.append({'id': row_id, 'agent': row_agent, 'task': row_task})
         except (IndexError, ValueError):
             pass
 

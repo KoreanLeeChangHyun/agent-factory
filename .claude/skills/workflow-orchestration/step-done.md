@@ -18,15 +18,14 @@ flow-finish <registryKey> 완료 [--workflow-id <id>]
 flow-claude end <registryKey>
 ```
 
-### flow-finish 5단계
+### flow-finish 4단계
 
-`flow-finish`(`finalization.py`)가 수행하는 5단계:
+`flow-finish`(`finalization.py`)가 수행하는 4단계:
 
 1. **status.json 완료 처리** — `update_state.py status` (critical, 실패 시 exit 1)
-2. **history.md 갱신** — `history_sync.py sync` (비차단)
-3. **사용량 확정** — `update_state.py usage-finalize` (비차단, 성공 시만)
-4. **아카이빙** — `history_sync.py archive` (비차단)
-5. **.kanbanboard 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단)
+2. **사용량 확정** — `update_state.py usage-finalize` (비차단, 성공 시만)
+3. **아카이빙** — `history_sync.py archive` (비차단)
+4. **.kanbanboard 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단)
 
 ### flow-claude end
 

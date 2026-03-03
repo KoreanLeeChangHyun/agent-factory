@@ -116,18 +116,33 @@ if [[ "$SUBCMD" == "end" ]]; then
         ABS_WORK_DIR="$PROJECT_ROOT/$WORK_DIR"
         CTX_FILE="$ABS_WORK_DIR/.context.json"
         if [[ -f "$CTX_FILE" ]]; then
-            eval "$(python3 -c "
-import json
+            # eval 없이 환경변수를 통해 값을 전달하여 인젝션 방지
+            _CTX_TMPFILE=$(mktemp)
+            CTX_FILE="$CTX_FILE" CTX_TMPFILE="$_CTX_TMPFILE" python3 -c "
+import json, os, re
+def sanitize(s):
+    # 셸 메타 문자 제거: 백틱, 달러기호, 백슬래시, 개행, NUL, 작은따옴표
+    return re.sub(r'[\x00\n\r]', '', str(s))
 try:
-    d=json.load(open('$CTX_FILE'))
-    wid=d.get('workId','').replace(\"'\",\"\")
-    ttl=d.get('title','').replace(\"'\",\"\")
-    cmd=d.get('command','').replace(\"'\",\"\")
-    print(f\"WORK_ID='{wid}'\")
-    print(f\"TITLE='{ttl}'\")
-    print(f\"COMMAND='{cmd}'\")
-except: pass
-" 2>/dev/null || true)"
+    ctx_file = os.environ['CTX_FILE']
+    tmp_file = os.environ['CTX_TMPFILE']
+    with open(ctx_file, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    wid = sanitize(d.get('workId', ''))
+    ttl = sanitize(d.get('title', ''))
+    cmd = sanitize(d.get('command', ''))
+    with open(tmp_file, 'w', encoding='utf-8') as out:
+        out.write(wid + '\n')
+        out.write(ttl + '\n')
+        out.write(cmd + '\n')
+except Exception:
+    pass
+" 2>/dev/null || true
+            if [[ -f "$_CTX_TMPFILE" ]]; then
+                { IFS= read -r WORK_ID; IFS= read -r TITLE; IFS= read -r COMMAND; } < "$_CTX_TMPFILE" || true
+            fi
+            rm -f "$_CTX_TMPFILE"
+            unset _CTX_TMPFILE
         fi
     fi
 

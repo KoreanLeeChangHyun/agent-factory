@@ -47,6 +47,8 @@ stateDiagram-v2
 | WORK | validator | workflow-agent-validator | `상태: 통과\|경고\|실패` | `<workDir>/work/validation-report.md` |
 | REPORT | reporter | workflow-agent-reporter | `상태: 완료\|실패` | `<workDir>/report.md` |
 
+> **Note on worker agent:** The `worker` agent in the table above encompasses three model variants: `worker-opus` (Claude 3 Opus), `worker-sonnet` (Claude 3 Sonnet), and `worker-haiku` (Claude 3 Haiku). These variants are used interchangeably based on task complexity and resource constraints, but all follow the same `workflow-agent-worker` skill specification and return status format.
+
 ---
 
 ## Supported Commands
@@ -171,7 +173,7 @@ After initialization, proceed to PLAN step.
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-planner가 `작성완료`를 반환하면, 오케스트레이터는 `plan_validator.py`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 **AskUserQuestion** 승인을 수행한다(3 고정 옵션, 경고 시 question 필드에 포함). 상세: [step-plan.md](step-plan.md) 참조.
+planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-validate`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 **AskUserQuestion** 승인을 수행한다(3 고정 옵션, 경고 시 question 필드에 포함). 상세: [step-plan.md](step-plan.md) 참조.
 
 ### WORK
 

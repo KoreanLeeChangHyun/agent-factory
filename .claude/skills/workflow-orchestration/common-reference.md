@@ -115,7 +115,7 @@ flowchart TD
 | Action | 주체 | 근거 |
 |--------|------|------|
 | AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
-| flow-claude/flow-step/flow-phase/flow-update 배너 + flow-init/flow-finish/flow-reload 스크립트 (Phase banner & script Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. flow-update가 상태 전이 시각화를 전담. 배너 명령은 개별 Bash 호출로 실행 (체이닝 금지). 단, update_state.py task-status/usage-pending은 && 체이닝 허용 |
+| flow-claude/flow-step/flow-phase/flow-update 배너 + flow-init/flow-finish/flow-reload 스크립트 (Phase banner & script Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. flow-update가 상태 전이 시각화를 전담. 배너 명령은 개별 Bash 호출로 실행 (체이닝 금지). task-start 모드로 통합되어 && 체이닝 불필요 |
 | update_state.py 호출 (transition) | Main + Sub (모드별) | Step 전이(status)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
 | plan.md Read (디스패치용, 1회만) | **Main** | 최소 6개 필드(taskId, phase, dependencies, parallelism, agentType, skills)만 추출. 디스패치 순서 결정 목적으로 한정. 계획서 내용 해석/보관 금지 |
@@ -176,15 +176,16 @@ flowchart TD
 | both | `<registryKey> <agent> <toStep>` | context + status 동시 (권장) |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
 | env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
-| usage-pending | `<registryKey> <agentId> <taskId>` | 워커 호출 전 사용량 추적 대기 등록. taskId는 워커의 태스크 ID(W01/W02/... 형식). 워커별 토큰 추적 준비 목적. |
+| usage-pending | `<registryKey> <id1> [id2] ...` | 워커 호출 전 사용량 추적 대기 등록. 복수 ID 지원. agent_id=task_id 자동 매핑. |
 | usage | `<registryKey> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]` | 워커 완료 후 실제 토큰 사용량 기록. agent_name(planner/worker/reporter), 입출력 토큰, 선택적 캐시 정보, 워커 태스크ID(task_id)를 기록. |
 | usage-finalize | `<registryKey>` | 모든 usage 기록을 취합하여 사용량 집계 완료. workflow 마무리 시 호출. |
+| task-start | `<registryKey> <id1> [id2] ...` | task-status running + usage-pending 일괄 등록. 복수 ID 지원. |
 | task-status | `<registryKey> <taskId> <status>` | 태스크 상태 갱신 |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. hook 초기화 출력에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet/haiku 공통), REPORT=`reporter`
 
-> **Note:** 상태 전이 시각화는 `flow-update` 배너(shell alias)가 전담한다. `flow-update` 호출 시 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다(fromStep은 status.json에서 자동 읽기). 그 후 `flow-step start`를 호출하여 시작 배너를 출력한다. (WORK-PHASE에서는 flow-update 스킵) 각각 개별 Bash 도구 호출로 실행한다. `&&`/`;` 체이닝 금지.
+> **Note:** 상태 전이 시각화는 `flow-update` 배너(shell alias)가 전담한다. `flow-update` 호출 시 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다(fromStep은 status.json에서 자동 읽기). 그 후 `flow-step start`를 호출하여 시작 배너를 출력한다. (WORK-PHASE에서는 flow-update 스킵) task-start 모드는 task-status + usage-pending을 통합하므로 개별 호출이 불필요. 각각 개별 Bash 도구 호출로 실행하며, `&&`/`;` 체이닝은 불필요.
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |
@@ -195,6 +196,7 @@ flowchart TD
 | link-session | X | O (worker, explorer, reporter) |
 | env | O | X |
 | usage-* | X | O (Hook) |
+| task-start | O | X |
 
 - 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행 (단, 오케스트레이터의 Step 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
 
@@ -210,7 +212,7 @@ flowchart TD
 
 | Normal Flow | Branches |
 |-------------|----------|
-| `PLAN -> WORK -> REPORT -> DONE` | PLAN/WORK/REPORT->CANCELLED, WORK/REPORT->FAILED, TTL->STALE |
+| `PLAN -> WORK -> REPORT -> DONE` | PLAN/WORK/REPORT->CANCELLED, PLAN/WORK/REPORT->FAILED, INIT/NONE->{STALE,FAILED,CANCELLED}, TTL->STALE |
 
 불법 전이 시 시스템 가드가 차단. `.claude/scripts/flow/update_state.py`는 전이 미수행(no-op), `.claude/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
