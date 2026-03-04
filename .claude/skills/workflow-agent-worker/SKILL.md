@@ -47,13 +47,13 @@ WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다. Ph
 
 ### Phase 0: 준비 단계 (필수, skill_mapper.py가 실행)
 
-오케스트레이터가 `flow-skillmap`을 실행하여 skill-map.md를 생성합니다. Worker는 Phase 0을 내부적으로 실행하지 않으며, 오케스트레이터가 스크립트를 호출합니다. 실패 시 Worker 자율 결정으로 폴백합니다. skill-map.md에는 각 태스크별 스킬 지침(COMPACT.md)이 인라인되어 있어, Worker는 개별 SKILL.md를 읽을 필요가 없습니다.
+오케스트레이터가 `flow-skillmap`을 실행하여 skill-map.md를 생성합니다. Worker는 Phase 0을 내부적으로 실행하지 않으며, 오케스트레이터가 스크립트를 호출합니다. 실패 시 Worker 자율 결정으로 폴백합니다. skill-map.md에는 태스크별 스킬 매핑 테이블이 포함되어 있으며, Worker는 매핑 테이블에서 자기 태스크의 스킬 목록을 확인한 후 `.claude/skills/<스킬명>/COMPACT.md` (또는 SKILL.md)를 직접 Read하여 지침을 획득합니다.
 
 ### Phase 1~N: 작업 실행
 
 Phase 0 완료 후 계획서의 Phase 순서대로 실행합니다.
 
-Phase 1+의 각 Worker는 Phase 0에서 skill_mapper.py가 생성한 skill-map.md를 1회 Read하여 스킬 지침을 획득한 후 작업을 수행한다. skill-map.md에 COMPACT.md가 인라인되어 있으므로 개별 SKILL.md 읽기가 불필요하다. skill-map.md가 없는 경우(Phase 0 실패 시) Worker는 자율적으로 스킬을 결정한다.
+Phase 1+의 각 Worker는 Phase 0에서 skill_mapper.py가 생성한 skill-map.md를 1회 Read하여 스킬 목록을 확인한 후 작업을 수행한다. Worker는 skill-map.md에서 자기 태스크의 스킬 목록을 확인한 후, `.claude/skills/<스킬명>/COMPACT.md` (COMPACT.md가 없으면 SKILL.md)를 직접 Read하여 스킬 지침을 획득한다. skill-map.md가 없는 경우(Phase 0 실패 시) Worker는 자율적으로 스킬을 결정한다.
 
 **입력 파라미터:**
 
@@ -63,7 +63,7 @@ Phase 1+의 각 Worker는 Phase 0에서 skill_mapper.py가 생성한 skill-map.m
 | `workId` | 작업 ID | 필수 |
 | `taskId` | 수행할 태스크 ID (W01, W02 등) | 필수 |
 | `planPath` | 계획서 경로 | 필수 |
-| `skillMapPath` | Phase 0 skill_mapper.py가 생성한 스킬 맵 경로 | 선택. 오케스트레이터가 `<workDir>/work/skill-map.md` 경로를 전달하면 Worker가 1회 Read로 스킬 지침 획득 |
+| `skillMapPath` | Phase 0 skill_mapper.py가 생성한 스킬 맵 경로 | 선택. 오케스트레이터가 `<workDir>/work/skill-map.md` 경로를 전달하면 Worker가 매핑 테이블을 Read하여 스킬 목록 확인 |
 | `skills` | 사용자가 명시한 스킬 목록 | 선택 |
 | `workDir` | 작업 디렉터리 경로 | 필수 |
 
@@ -123,7 +123,7 @@ Worker의 스킬은 3계층으로 구성된다:
 - **Tier 3 (프로젝트 스킬)**: 반필수. 존재 시 자동 적용
 
 **2a. 전문화 스킬 로드 (필수):**
-skill-map.md 1회 Read (인라인 지침 포함) → skills 파라미터 → skill-catalog.md 기본 → 없으면 진행
+skill-map.md 1회 Read (매핑 테이블) → 스킬 목록에서 `.claude/skills/<스킬명>/COMPACT.md` (또는 SKILL.md) 직접 Read → skills 파라미터 → skill-catalog.md 기본 → 없으면 진행
 
 **2b. 프로젝트 스킬 로드 (반필수):**
 skills 파라미터 → skill-map.md 프로젝트 컬럼 → 없으면 스킵

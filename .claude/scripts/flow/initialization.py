@@ -123,6 +123,11 @@ def read_prompt() -> str | None:
 def _create_work_dir(abs_work_dir: str) -> None:
     """워크플로우 디렉터리를 생성한다."""
     os.makedirs(abs_work_dir, exist_ok=True)
+    # workflow.log 빈 파일 생성
+    try:
+        open(os.path.join(abs_work_dir, "workflow.log"), "a").close()
+    except Exception:
+        pass
 
 
 def _write_user_prompt(abs_work_dir: str, prompt_content: str) -> None:

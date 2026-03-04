@@ -10,8 +10,10 @@
   update_state.py usage-pending <workDir> <id1> [id2] ...
   update_state.py usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
   update_state.py usage-finalize <workDir>
+  update_state.py usage-regenerate (no args)
   update_state.py env <workDir> set|unset <KEY> [VALUE]
   update_state.py task-status <workDir> <status> <id1> [id2] ...
+  update_state.py task-status <workDir> <taskId> <status>  (레거시)
   update_state.py task-start <workDir> <id1> [id2] ...
 
 종료 코드:
@@ -166,6 +168,17 @@ def release_lock(lock_dir):
         pass
 
 
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """workflow.log에 로그 항목을 비차단 방식으로 append한다."""
+    try:
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        timestamp = datetime.now(KST).strftime("%Y-%m-%dT%H:%M:%S")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] [{level}] {message}\n")
+    except Exception:
+        pass
+
+
 # =============================================================================
 # context 업데이트
 # =============================================================================
@@ -217,17 +230,20 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
 
     if not os.path.exists(status_file):
         print(f"[WARN] status.json not found: {status_file}", file=sys.stderr)
+        _append_log(abs_work_dir, "WARN", f"status.json not found: {status_file}")
         return "status -> skipped (file not found)"
 
     try:
         data = load_json_file(status_file)
         if data is None:
             print(f"[WARN] status.json read failed: {status_file}", file=sys.stderr)
+            _append_log(abs_work_dir, "WARN", f"status.json read failed: {status_file}")
             return "status -> skipped (read failed)"
 
         # FSM 전이 검증
         if skip_guard:
             print(f"[AUDIT] WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}", file=sys.stderr, flush=True)
+            _append_log(abs_work_dir, "AUDIT", f"WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}")
         else:
             current_step = data.get("step") or data.get("phase", "NONE")
             workflow_mode = data.get("mode", "full").lower()
@@ -246,6 +262,12 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
                     f"allowed_targets={allowed}. transition blocked.",
                     file=sys.stderr,
                 )
+                _append_log(
+                    abs_work_dir, "ERROR",
+                    f"FSM guard: from_step mismatch. from_step={from_step}, to_step={to_step}, "
+                    f"current_step={current_step}, workflow_mode={workflow_mode}, "
+                    f"allowed_targets={allowed}. transition blocked.",
+                )
                 return (
                     f"status -> FSM guard blocked "
                     f"(reason: from_step mismatch, expected={current_step}, got={from_step}, "
@@ -258,6 +280,12 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
                     f"current_step={current_step}, workflow_mode={workflow_mode}, "
                     f"allowed_targets={allowed}. transition blocked.",
                     file=sys.stderr,
+                )
+                _append_log(
+                    abs_work_dir, "ERROR",
+                    f"FSM guard: illegal transition {from_step}->{to_step}. "
+                    f"current_step={current_step}, workflow_mode={workflow_mode}, "
+                    f"allowed_targets={allowed}. transition blocked.",
                 )
                 return (
                     f"status -> FSM guard blocked "
@@ -287,11 +315,13 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
             )
         except Exception as e:
             print(f"[WARN] history sync failed: {e}", file=sys.stderr)
+            _append_log(abs_work_dir, "WARN", f"history sync failed: {e}")
 
         # 반환값에는 ANSI 코드 없음 (배너는 _print_state_banner()가 담당)
         result = f"status -> {from_step}->{to_step}"
     except Exception as e:
         print(f"[WARN] status.json update failed: {e}", file=sys.stderr)
+        _append_log(abs_work_dir, "WARN", f"status.json update failed: {e}")
         return "status -> failed"
 
     return result
@@ -744,7 +774,7 @@ def env_manage(action, key, value=""):
 
 _VALID_MODES = frozenset({
     "context", "status", "both", "link-session",
-    "usage-pending", "usage", "usage-finalize", "env", "task-status", "task-start",
+    "usage-pending", "usage", "usage-finalize", "usage-regenerate", "env", "task-status", "task-start",
 })
 
 
@@ -835,6 +865,167 @@ def _handle_usage_finalize(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
+# =============================================================================
+# usage-regenerate: .usage.md 레거시 행 전체 재생성
+# =============================================================================
+
+def usage_regenerate():
+    """
+    .workflow/ 및 .workflow/.history/ 하위의 모든 usage.json을 순회하여
+    .dashboard/.usage.md의 v2 스키마 행을 전체 재생성한다.
+    registryKey를 날짜 내림차순으로 정렬하여 최신 항목이 상단에 오도록 배치한다.
+    """
+    try:
+        # 레거시 행 데이터 수집
+        rows_data = []  # (registry_key, date_str, title, command, orch_eff, plan_eff, work_eff, exp_eff, val_eff, report_eff, total_eff)
+
+        workflow_base = os.path.join(PROJECT_ROOT, ".workflow")
+        workflow_history = os.path.join(workflow_base, ".history")
+
+        dirs_to_scan = []
+        if os.path.isdir(workflow_base):
+            for entry in os.listdir(workflow_base):
+                entry_path = os.path.join(workflow_base, entry)
+                if os.path.isdir(entry_path) and entry != ".history":
+                    dirs_to_scan.append(entry_path)
+
+        if os.path.isdir(workflow_history):
+            for entry in os.listdir(workflow_history):
+                entry_path = os.path.join(workflow_history, entry)
+                if os.path.isdir(entry_path):
+                    dirs_to_scan.append(entry_path)
+
+        # 각 워크플로우 디렉터리에서 usage.json과 .context.json 읽기
+        for workflow_dir in dirs_to_scan:
+            usage_file = os.path.join(workflow_dir, "usage.json")
+            context_file = os.path.join(workflow_dir, ".context.json")
+
+            if not os.path.isfile(usage_file):
+                continue
+
+            try:
+                usage_data = load_json_file(usage_file)
+                context_data = load_json_file(context_file) if os.path.isfile(context_file) else {}
+
+                if not isinstance(usage_data, dict):
+                    continue
+
+                # v2 스키마 확인
+                if usage_data.get("$schema") != "usage-v2":
+                    continue
+
+                # registryKey 추출
+                try:
+                    registry_key = extract_registry_key(workflow_dir)
+                except Exception:
+                    continue
+
+                # .context.json에서 메타데이터 추출
+                title = context_data.get("title", "")[:30] if isinstance(context_data, dict) else ""
+                command = context_data.get("command", "") if isinstance(context_data, dict) else ""
+
+                # 날짜 추출
+                date_str = ""
+                if len(registry_key) >= 15:
+                    try:
+                        date_str = f"{registry_key[4:6]}-{registry_key[6:8]} {registry_key[9:11]}:{registry_key[11:13]}"
+                    except Exception:
+                        date_str = registry_key
+
+                # 에이전트별 effective_tokens 계산
+                agents = usage_data.get("agents", {})
+                orch_eff = _calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
+                plan_eff = _calc_effective(agents.get("planner", {})) if "planner" in agents else 0
+                workers = agents.get("workers", {})
+                work_eff = (
+                    sum(_calc_effective(w) for w in workers.values() if isinstance(w, dict))
+                    if isinstance(workers, dict)
+                    else 0
+                )
+                exp_eff = _calc_effective(agents.get("explorer", {})) if "explorer" in agents else 0
+                val_eff = _calc_effective(agents.get("validator", {})) if "validator" in agents else 0
+                report_eff = _calc_effective(agents.get("reporter", {})) if "reporter" in agents else 0
+                total_eff = orch_eff + plan_eff + work_eff + exp_eff + val_eff + report_eff
+
+                rows_data.append((registry_key, date_str, title, command, orch_eff, plan_eff, work_eff, exp_eff, val_eff, report_eff, total_eff))
+
+            except Exception:
+                # 비차단 원칙: 개별 usage.json 파싱 실패해도 계속 진행
+                continue
+
+        # registryKey 날짜 내림차순 정렬 (최신이 상단)
+        rows_data.sort(key=lambda x: x[0], reverse=True)
+
+        # .dashboard/.usage.md 읽기
+        usage_md = os.path.join(PROJECT_ROOT, ".dashboard", ".usage.md")
+        content = ""
+        if os.path.isfile(usage_md):
+            with open(usage_md, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        # 마커와 헤더/분리선 정의
+        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+        header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
+        separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|"
+
+        # <details> 아카이브 섹션 추출 및 보존
+        archive_section = ""
+        if "<details>" in content:
+            details_start = content.find("<details>")
+            archive_section = content[details_start:]
+
+        # 새로운 v2 테이블 행 생성
+        new_rows = []
+        for reg_key, date_str, title, command, orch_eff, plan_eff, work_eff, exp_eff, val_eff, report_eff, total_eff in rows_data:
+            row = (
+                f"| {date_str} "
+                f"| {reg_key} "
+                f"| {title} "
+                f"| {command} "
+                f"| {_to_k(orch_eff)} "
+                f"| {_to_k(plan_eff)} "
+                f"| {_to_k(work_eff)} "
+                f"| {_to_k(exp_eff)} "
+                f"| {_to_k(val_eff)} "
+                f"| {_to_k(report_eff)} "
+                f"| {_to_k(total_eff)} |"
+            )
+            new_rows.append(row)
+
+        # 새로운 콘텐츠 구성
+        new_content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
+        for row in new_rows:
+            new_content += row + "\n"
+
+        # 아카이브 섹션 추가 (있으면)
+        if archive_section:
+            new_content += "\n" + archive_section
+
+        # .usage.md 원자적 갱신
+        os.makedirs(os.path.dirname(usage_md), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(usage_md), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            shutil.move(tmp, usage_md)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+
+        return f"usage-regenerate -> rows regenerated: {len(new_rows)}"
+
+    except Exception as e:
+        print(f"[WARN] usage-regenerate failed: {e}", file=sys.stderr)
+        return "usage-regenerate -> failed"
+
+
+def _handle_usage_regenerate(abs_work_dir, local_context, status_file):
+    """usage-regenerate 모드 핸들러."""
+    usage_regenerate()
+    return None, None, False
+
+
 def _handle_env(abs_work_dir, local_context, status_file):
     """env 모드 핸들러."""
     action = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -853,9 +1044,12 @@ def _handle_task_start(abs_work_dir, local_context, status_file):
     if not task_ids:
         print("[WARN] task-start 모드: task_id 인자가 필요합니다.", file=sys.stderr)
         sys.exit(0)
+    seen = set()
     for tid in task_ids:
-        update_task_status(status_file, tid, "running")
-        usage_pending(abs_work_dir, tid, tid)
+        if tid not in seen:
+            seen.add(tid)
+            update_task_status(status_file, tid, "running")
+            usage_pending(abs_work_dir, tid, tid)
     return None, None, False
 
 
@@ -884,6 +1078,7 @@ _HANDLERS = {
     "usage-pending": _handle_usage_pending,
     "usage": _handle_usage,
     "usage-finalize": _handle_usage_finalize,
+    "usage-regenerate": _handle_usage_regenerate,
     "env": _handle_env,
     "task-status": _handle_task_status,
     "task-start": _handle_task_start,
@@ -892,7 +1087,7 @@ _HANDLERS = {
 
 def main():
     if len(sys.argv) < 3:
-        print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status|task-start <workDir> [args...]", file=sys.stderr)
+        print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|usage-regenerate|env|task-status|task-start <workDir> [args...]", file=sys.stderr)
         sys.exit(0)
 
     mode = sys.argv[1]
@@ -912,7 +1107,7 @@ def main():
     handler = _HANDLERS.get(mode)
     if handler is None:
         print(
-            f"[WARN] 알 수 없는 모드: {mode} (context|status|both|link-session|usage-pending|usage|usage-finalize|env|task-status|task-start 중 선택)",
+            f"[WARN] 알 수 없는 모드: {mode} (context|status|both|link-session|usage-pending|usage|usage-finalize|usage-regenerate|env|task-status|task-start 중 선택)",
             file=sys.stderr,
         )
         print("FAIL", flush=True)

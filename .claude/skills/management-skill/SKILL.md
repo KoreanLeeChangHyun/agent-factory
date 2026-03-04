@@ -361,6 +361,16 @@ Do not include any other fields in YAML frontmatter.
 
 Write instructions for using the skill and its bundled resources.
 
+### Step 4.5: Catalog Sync
+
+스킬 편집 완료 후 skill-catalog.md를 자동 갱신합니다. Bash 도구로 다음 명령어를 실행하여 frontmatter 변경사항을 카탈로그에 반영합니다.
+
+```bash
+python3 .claude/scripts/sync/catalog_sync.py
+```
+
+이 단계는 PostToolUse Hook과 함께 이중 안전망을 구성합니다. Hook이 실패하더라도 이 단계에서 카탈로그가 갱신됩니다.
+
 ### Step 5: Packaging a Skill (Optional)
 
 스킬 개발이 완료되면, 배포를 위해 패키징할 수 있습니다.

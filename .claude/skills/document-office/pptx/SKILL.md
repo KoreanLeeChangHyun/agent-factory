@@ -176,7 +176,7 @@ When edit slides in an existing PowerPoint presentation, you need to work with t
 1. **MANDATORY - READ ENTIRE FILE**: Read [`ooxml.md`](ooxml.md) (~500 lines) completely from start to finish.  **NEVER set any range limits when reading this file.**  Read the full file content for detailed guidance on OOXML structure and editing workflows before any presentation editing.
 2. Unpack the presentation: `python ooxml/scripts/unpack.py <office_file> <output_dir>`
 3. Edit the XML files (primarily `ppt/slides/slide{N}.xml` and related files)
-4. **CRITICAL**: Validate immediately after each edit and fix any validation errors before proceeding: `python ooxml/scripts/validate.py <dir> --original <file>`
+4. **CRITICAL**: Validate immediately after each edit and fix any validation errors before proceeding: `python ../ooxml/scripts/validate.py <dir> --original <file>`
 5. Pack the final presentation: `python ooxml/scripts/pack.py <input_directory> <office_file>`
 
 ## Creating a new PowerPoint presentation **using a template**

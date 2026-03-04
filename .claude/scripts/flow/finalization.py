@@ -27,8 +27,11 @@ import argparse
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+import time
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -36,6 +39,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
+from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 
 PROJECT_ROOT = resolve_project_root()
 
@@ -94,8 +98,9 @@ def run(cmd, label, critical=False, input_data=None):
 def _find_transcript_path(registry_key):
     """registryKey로부터 subagents 디렉터리의 transcript 경로를 구성한다.
 
-    status.json의 linked_sessions에서 세션 ID를 읽고,
-    ~/.claude/projects/ 아래에서 subagents/ 디렉터리를 탐색한다.
+    1차: status.json의 linked_sessions에서 세션 ID를 읽고 subagents/ 탐색.
+    2차(대체): linked_sessions가 비어있을 때 usage.json의 _agent_map에 기록된
+         알려진 agent_id로 glob하여 subagents 디렉터리를 역탐색한다.
     실제 agent-*.jsonl 파일이 존재하는 경우 첫 번째 파일 경로를 반환한다.
     """
     abs_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
@@ -107,12 +112,10 @@ def _find_transcript_path(registry_key):
     if not isinstance(status_data, dict):
         return None
 
-    sessions = status_data.get("linked_sessions", [])
-    if not sessions:
-        return None
-
     project_slug = PROJECT_ROOT.replace("/", "-")
 
+    # 1차: linked_sessions 기반 탐색
+    sessions = status_data.get("linked_sessions", [])
     for claude_base in [
         os.path.expanduser("~/.claude"),
         os.path.expanduser("~/.config/claude"),
@@ -123,10 +126,37 @@ def _find_transcript_path(registry_key):
         for session_id in sessions:
             subagents_dir = os.path.join(projects_dir, session_id, "subagents")
             if os.path.isdir(subagents_dir):
-                # subagents/ 디렉터리 내부의 실제 agent-*.jsonl 파일 탐색
                 matches = sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl")))
                 if matches:
                     return matches[0]
+
+    # 2차: _agent_map에 기록된 알려진 agent_id로 역탐색
+    usage_file = os.path.join(abs_work_dir, "usage.json")
+    usage_data = load_json_file(usage_file)
+    if not isinstance(usage_data, dict):
+        return None
+
+    agent_map = usage_data.get("_agent_map", {})
+    if not agent_map:
+        return None
+
+    for claude_base in [
+        os.path.expanduser("~/.claude"),
+        os.path.expanduser("~/.config/claude"),
+    ]:
+        projects_dir = os.path.join(claude_base, "projects", project_slug)
+        if not os.path.isdir(projects_dir):
+            continue
+        # _agent_map의 각 agent_id에 대해 glob으로 subagents 디렉터리 탐색
+        for agent_id in agent_map:
+            pattern = os.path.join(projects_dir, "*", "subagents", f"agent-{agent_id}.jsonl")
+            matches = glob.glob(pattern)
+            if matches:
+                # subagents/ 상위 = session_dir, 해당 디렉터리의 첫 번째 agent-*.jsonl 반환
+                subagents_dir = os.path.dirname(matches[0])
+                all_agents = sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl")))
+                if all_agents:
+                    return all_agents[0]
 
     return None
 
@@ -142,6 +172,182 @@ def find_kanbanboard():
     if os.path.isfile(root_kanban):
         return root_kanban
     return None
+
+
+def _acquire_lock(lock_dir, max_wait=2):
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
+    waited = 0
+    while True:
+        try:
+            os.makedirs(lock_dir)
+            try:
+                with open(os.path.join(lock_dir, "pid"), "w") as f:
+                    f.write(f"{os.getpid()} {time.time()}")
+            except OSError:
+                pass
+            return True
+        except OSError:
+            pid_file = os.path.join(lock_dir, "pid")
+            if os.path.isfile(pid_file):
+                try:
+                    with open(pid_file, "r") as f:
+                        pid_content = f.read().strip()
+                    parts = pid_content.split()
+                    lock_pid = int(parts[0])
+                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
+                    os.kill(lock_pid, 0)
+                    if lock_ts and (time.time() - lock_ts) > max_wait:
+                        try:
+                            with open(pid_file, "r") as f:
+                                recheck = f.read().strip()
+                            if recheck == pid_content:
+                                shutil.rmtree(lock_dir)
+                                waited += 1
+                                continue
+                        except OSError:
+                            pass
+                except (ValueError, ProcessLookupError, OSError):
+                    try:
+                        with open(pid_file, "r") as f:
+                            recheck = f.read().strip()
+                        if recheck == pid_content:
+                            shutil.rmtree(lock_dir)
+                    except OSError:
+                        pass
+                    waited += 1
+                    continue
+                except PermissionError:
+                    pass
+            waited += 1
+            if waited >= max_wait:
+                return False
+            time.sleep(1)
+
+
+def _release_lock(lock_dir):
+    """잠금 해제."""
+    try:
+        pid_file = os.path.join(lock_dir, "pid")
+        if os.path.exists(pid_file):
+            os.unlink(pid_file)
+    except OSError:
+        pass
+    try:
+        os.rmdir(lock_dir)
+    except OSError:
+        pass
+
+
+def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
+    """.dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다."""
+    try:
+        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+        logs_md = os.path.join(PROJECT_ROOT, ".dashboard", ".logs.md")
+        lock_dir = os.path.join(PROJECT_ROOT, ".dashboard", ".logs.md.lock")
+
+        # .context.json에서 title, command 읽기
+        context_file = os.path.join(abs_work_dir, ".context.json")
+        context = load_json_file(context_file)
+        title = ""
+        command = ""
+        if isinstance(context, dict):
+            title = context.get("title", "")
+            command = context.get("command", "")
+
+        # workflow.log 통계 수집
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        if os.path.isfile(log_path):
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                log_content = f.read()
+            warn_count = log_content.count("[WARN]")
+            error_count = log_content.count("[ERROR]")
+            log_size = os.path.getsize(log_path)
+            if log_size >= 1024 * 1024:
+                size_str = f"{log_size / (1024 * 1024):.1f}MB"
+            elif log_size >= 1024:
+                size_str = f"{log_size / 1024:.1f}KB"
+            else:
+                size_str = f"{log_size}B"
+        else:
+            warn_count = 0
+            error_count = 0
+            size_str = "-"
+
+        # 날짜: registryKey에서 MM-DD HH:MM 추출 (YYYYMMDD-HHMMSS)
+        date_str = "-"
+        try:
+            parts = registry_key.split("-")
+            if len(parts) >= 2:
+                ymd = parts[0]  # YYYYMMDD
+                hms = parts[1]  # HHMMSS
+                date_str = f"{ymd[4:6]}-{ymd[6:8]} {hms[0:2]}:{hms[2:4]}"
+        except Exception:
+            pass
+
+        # 로그 링크: abs_work_dir에서 .dashboard 기준 상대 경로 계산
+        try:
+            rel_work_dir = os.path.relpath(abs_work_dir, os.path.join(PROJECT_ROOT, ".dashboard"))
+            log_link = f"[로그]({rel_work_dir}/workflow.log)"
+        except Exception:
+            log_link = "-"
+
+        # 제목 축약 (20자 초과 시)
+        title_display = title[:20] + "…" if len(title) > 20 else title
+
+        row = (
+            f"| {date_str} | {registry_key} | {title_display} | {command}"
+            f" | {warn_count} | {error_count} | {size_str} | {log_link} |"
+        )
+
+        # .logs.md 읽기
+        content = ""
+        if os.path.exists(logs_md):
+            with open(logs_md, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        if marker not in content:
+            content = f"# 워크플로우 로그 추적\n\n{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n"
+
+        # 마커 + separator 후에 행 삽입
+        if LOGS_SEPARATOR_LINE in content:
+            marker_pos = content.find(marker)
+            if marker_pos >= 0:
+                sep_pos = content.find(LOGS_SEPARATOR_LINE, marker_pos)
+                if sep_pos >= 0:
+                    insert_pos = sep_pos + len(LOGS_SEPARATOR_LINE)
+                    if insert_pos < len(content) and content[insert_pos] == "\n":
+                        insert_pos += 1
+                    content = content[:insert_pos] + row + "\n" + content[insert_pos:]
+                else:
+                    content = content.replace(
+                        marker, f"{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n{row}"
+                    )
+            else:
+                content = content.replace(
+                    marker, f"{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n{row}"
+                )
+        else:
+            content = content.replace(
+                marker, f"{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n{row}"
+            )
+
+        # POSIX lock + 원자적 쓰기
+        os.makedirs(os.path.dirname(logs_md), exist_ok=True)
+        locked = _acquire_lock(lock_dir)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(logs_md), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(content)
+            shutil.move(tmp, logs_md)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+        finally:
+            if locked:
+                _release_lock(lock_dir)
+    except Exception:
+        pass
 
 
 def main():
@@ -185,6 +391,13 @@ def main():
             ["python3", UPDATE_STATE, "usage-finalize", registry_key],
             "Step 2b: usage-finalize",
         )
+
+    # ── Step 5: 로그/스킬 대시보드 갱신 (비차단) ──
+    try:
+        abs_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
+        _update_logs_md(registry_key, abs_work_dir)
+    except Exception:
+        pass
 
     # ── Step 3: 아카이빙 (비차단) ──
     run(

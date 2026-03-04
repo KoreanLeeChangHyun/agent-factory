@@ -19,7 +19,11 @@ skill-map.md를 결정적으로 생성한다. LLM 불필요.
 
 import os
 import re
+import shutil
 import sys
+import tempfile
+import time
+from datetime import datetime, timezone, timedelta
 
 # 프로젝트 루트 결정
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -38,6 +42,127 @@ from plan_validator import parse_md_table_columns
 PROJECT_ROOT = resolve_project_root()
 SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
+
+# ---------------------------------------------------------------------------
+# L4: 시소러스 기반 동의어 매핑 (한국어/영어 혼합 22개 그룹)
+# Level 2 키워드 매칭 전에 적용하여 동의어/변형어 인식률을 향상시킨다.
+# ---------------------------------------------------------------------------
+SYNONYM_MAP = {
+    "조사": ["연구", "리서치", "research", "investigate", "탐색", "분석"],
+    "연구": ["조사", "리서치", "research", "investigate", "탐색"],
+    "리서치": ["조사", "연구", "research", "investigate"],
+    "구현": ["implement", "개발", "코딩", "coding", "implementation", "작성"],
+    "개발": ["구현", "implement", "코딩", "coding", "development"],
+    "검토": ["리뷰", "review", "검사", "점검", "확인", "inspection"],
+    "리뷰": ["검토", "review", "검사", "점검", "확인", "inspection"],
+    "디버깅": ["debugging", "버그", "bug", "에러", "error", "오류", "수정"],
+    "버그": ["디버깅", "debugging", "bug", "에러", "error", "오류", "수정"],
+    "설계": ["아키텍처", "architecture", "architect", "디자인", "design", "구조"],
+    "아키텍처": ["설계", "architecture", "architect", "디자인", "design", "구조"],
+    "보안": ["security", "owasp", "취약점", "vulnerability", "인증", "auth"],
+    "성능": ["performance", "최적화", "optimization", "속도", "speed"],
+    "최적화": ["성능", "performance", "optimization", "속도", "speed"],
+    "테스트": ["testing", "test", "qa", "검증", "validation", "검사"],
+    "검증": ["테스트", "testing", "test", "qa", "validation", "검사"],
+    "인프라": ["infra", "infrastructure", "devops", "배포", "deploy", "운영"],
+    "배포": ["deploy", "deployment", "인프라", "infra", "cd", "release"],
+    "컨테이너": ["container", "docker", "도커", "kubernetes", "k8s"],
+    "도커": ["docker", "컨테이너", "container", "compose"],
+    "데이터베이스": ["database", "db", "스키마", "schema", "쿼리", "query", "sql"],
+    "백엔드": ["backend", "rest", "api 설계", "api design", "엔드포인트", "서버"],
+    "파이프라인": ["pipeline", "ci/cd", "cd", "배포 자동화", "빌드"],
+}
+
+
+def expand_with_synonyms(text: str) -> str:
+    """입력 텍스트에서 SYNONYM_MAP 키/값 단어를 발견하면 동의어 그룹을 부가하여 확장된 텍스트를 반환.
+
+    Level 2 키워드 매칭 전에 적용하여 동의어/변형어 인식률을 향상시킨다.
+    예: "조사" 포함 시 "연구 리서치 research investigate 탐색 분석"이 텍스트에 추가됨.
+
+    Args:
+        text: 이미 lower()가 적용된 텍스트 또는 원본 텍스트
+
+    Returns:
+        동의어를 부가한 확장 텍스트 (소문자)
+    """
+    text_lower = text.lower()
+    extra_terms = []
+
+    for canonical, synonyms in SYNONYM_MAP.items():
+        canonical_lower = canonical.lower()
+        if canonical_lower in text_lower:
+            # 키 자체가 있으면 모든 동의어를 추가
+            extra_terms.extend(synonyms)
+        else:
+            # 동의어 중 하나라도 있으면 키와 나머지 동의어를 추가
+            for syn in synonyms:
+                if syn.lower() in text_lower:
+                    extra_terms.append(canonical_lower)
+                    extra_terms.extend(s for s in synonyms if s.lower() != syn.lower())
+                    break
+
+    if extra_terms:
+        unique_extras = list(dict.fromkeys(e.lower() for e in extra_terms))
+        return text_lower + " " + " ".join(unique_extras)
+
+    return text_lower
+
+
+# 컨텍스트 토큰 예산 가드레일 (200K 기준 25%)
+TOKEN_BUDGET_LIMIT = 50_000
+
+
+def resolve_skill_file(skill_name: str) -> str:
+    """스킬의 로드 경로를 반환한다.
+
+    COMPACT.md가 존재하면 COMPACT.md 경로를, 없으면 SKILL.md 경로를 반환한다.
+    두 파일 모두 없으면 SKILL.md 경로를 반환한다 (존재 여부 보장 불가).
+    """
+    skill_dir = os.path.join(SKILLS_DIR, skill_name)
+    skill_dir = os.path.normpath(skill_dir)
+    if not skill_dir.startswith(os.path.normpath(SKILLS_DIR)):
+        print(f"[WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
+        skill_dir = os.path.join(SKILLS_DIR, "workflow-agent-worker")
+        return os.path.join(skill_dir, "SKILL.md")
+    compact_path = os.path.join(skill_dir, "COMPACT.md")
+    skill_path = os.path.join(skill_dir, "SKILL.md")
+    if os.path.isfile(compact_path):
+        return compact_path
+    return skill_path
+
+
+def estimate_token_budget(resolved_skills: list[str]) -> int:
+    """스킬 목록의 예상 토큰 합산을 반환한다.
+
+    각 스킬의 COMPACT.md 또는 SKILL.md 파일을 바이너리로 읽어
+    ASCII 바이트(ascii_bytes // 4)와 non-ASCII 바이트(non_ascii_bytes // 6)를
+    분리 계산하는 한국어 콘텐츠 보정 방식으로 토큰을 추정한다.
+    합산이 TOKEN_BUDGET_LIMIT를 초과하면 경고 로그를 출력한다.
+
+    Returns:
+        예상 토큰 합산 (int)
+    """
+    total_tokens = 0
+    for skill_name in resolved_skills:
+        file_path = resolve_skill_file(skill_name)
+        if os.path.isfile(file_path):
+            try:
+                with open(file_path, "rb") as f:
+                    data = f.read()
+                ascii_bytes = sum(1 for b in data if b < 0x80)
+                non_ascii_bytes = len(data) - ascii_bytes
+                total_tokens += ascii_bytes // 4 + non_ascii_bytes // 6
+            except OSError:
+                pass
+
+    if total_tokens > TOKEN_BUDGET_LIMIT:
+        print(
+            f"[WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
+            file=sys.stderr,
+        )
+
+    return total_tokens
 
 
 def parse_catalog():
@@ -133,31 +258,6 @@ def parse_plan_tasks(plan_path):
     return tasks
 
 
-def read_compact(skill_name):
-    """스킬의 COMPACT.md 또는 SKILL.md 상위 30줄을 반환."""
-    # COMPACT.md 우선
-    compact_path = os.path.join(SKILLS_DIR, skill_name, "COMPACT.md")
-    if os.path.isfile(compact_path):
-        with open(compact_path, "r", encoding="utf-8") as f:
-            return f.read().strip()
-
-    # SKILL.md 폴백 (상위 30줄, frontmatter 제외)
-    skill_path = os.path.join(SKILLS_DIR, skill_name, "SKILL.md")
-    if os.path.isfile(skill_path):
-        with open(skill_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        # frontmatter 제거
-        fm_match = re.match(r"^---\s*\n.*?\n---\s*\n", content, re.DOTALL)
-        if fm_match:
-            content = content[fm_match.end():]
-
-        lines = content.strip().split("\n")
-        return "\n".join(lines[:30]).strip()
-
-    return f"(스킬 '{skill_name}' 파일 없음)"
-
-
 def deduplicate(skills):
     """순서 유지하면서 중복 제거."""
     seen = set()
@@ -184,8 +284,8 @@ def resolve_skills(task: dict, command: str, defaults: dict, keywords: dict) -> 
     if command in defaults:
         skills.extend(defaults[command])
 
-    # Level 2: 키워드 매칭
-    desc_lower = task["description"].lower()
+    # Level 2: 키워드 매칭 (L4: 시소러스 동의어 확장 적용)
+    desc_lower = expand_with_synonyms(task["description"].lower())
     for kw, skill_list in keywords.items():
         if kw.lower() in desc_lower:
             skills.extend(skill_list)
@@ -216,7 +316,8 @@ def _build_skill_map_header(tasks):
     lines.append("# Skill Map")
     lines.append("")
     lines.append("> 이 파일은 `skill_mapper.py`에 의해 자동 생성됩니다.")
-    lines.append("> Worker는 자신의 태스크 섹션(## WXX: 스킬 지침)만 참조합니다.")
+    lines.append("> Worker는 매핑 테이블에서 스킬 목록을 확인한 후, 각 스킬 디렉터리의 COMPACT.md (없으면 SKILL.md)를 직접 Read하여 지침을 획득합니다.")
+    lines.append("> `resolve_skill_file()` 기준: COMPACT.md 존재 시 우선 로드, 없으면 SKILL.md 로드.")
     lines.append("")
     lines.append("## 태스크별 스킬 매핑")
     lines.append("")
@@ -229,7 +330,7 @@ def _build_skill_map_header(tasks):
 
 
 def _build_skill_map_rows(task):
-    """태스크별 요약 테이블 행과 인라인 스킬 지침 섹션 행 목록을 생성."""
+    """태스크별 매핑 테이블 행 목록을 생성."""
     lines = []
     resolved = task.get("resolved", [])
     fallback = set(task.get("fallback_skills", []))
@@ -242,38 +343,188 @@ def _build_skill_map_rows(task):
     return lines
 
 
-def _build_task_skill_section(task):
-    """태스크별 인라인 스킬 지침 섹션 행 목록을 생성."""
-    task_resolved = task.get("resolved", [])
-    if not task_resolved:
-        return []
-    lines = ["---", "", f"## {task['taskId']}: 스킬 지침", ""]
-    task_instructions = task.get("instructions", {})
-    for skill_name in task_resolved:
-        compact = task_instructions.get(skill_name, "")
-        if compact:
-            lines.extend([f"### {skill_name}", "", compact, ""])
-    return lines
-
-
 def write_skill_map(work_dir, tasks):
     """skill-map.md를 생성.
 
-    각 태스크 섹션에는 해당 태스크에 배정된 스킬 지침만 포함된다.
-    다른 태스크의 스킬 지침이 혼재되지 않도록 태스크별 resolved 스킬로 필터링한다.
+    매핑 테이블만 포함한다. 스킬 지침은 Worker가 직접 Read한다.
     """
     output_dir = os.path.join(work_dir, "work")
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "skill-map.md")
 
     lines = _build_skill_map_header(tasks)
-    for task in tasks:
-        lines.extend(_build_task_skill_section(task))
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
     return output_path
+
+
+# =============================================================================
+# mkdir 기반 POSIX 잠금 (로컬 헬퍼 - 순환 import 방지)
+# =============================================================================
+
+def _acquire_lock(lock_dir, max_wait=2):
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
+    waited = 0
+    while True:
+        try:
+            os.makedirs(lock_dir)
+            try:
+                with open(os.path.join(lock_dir, "pid"), "w") as f:
+                    f.write(f"{os.getpid()} {time.time()}")
+            except OSError:
+                pass
+            return True
+        except OSError:
+            pid_file = os.path.join(lock_dir, "pid")
+            if os.path.isfile(pid_file):
+                try:
+                    with open(pid_file, "r") as f:
+                        pid_content = f.read().strip()
+                    parts = pid_content.split()
+                    lock_pid = int(parts[0])
+                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
+                    os.kill(lock_pid, 0)
+                    if lock_ts and (time.time() - lock_ts) > max_wait:
+                        try:
+                            with open(pid_file, "r") as f:
+                                recheck = f.read().strip()
+                            if recheck == pid_content:
+                                shutil.rmtree(lock_dir)
+                                waited += 1
+                                continue
+                        except OSError:
+                            pass
+                except (ValueError, ProcessLookupError, OSError):
+                    try:
+                        with open(pid_file, "r") as f:
+                            recheck = f.read().strip()
+                        if recheck == pid_content:
+                            shutil.rmtree(lock_dir)
+                    except OSError:
+                        pass
+                    waited += 1
+                    continue
+                except PermissionError:
+                    pass
+            waited += 1
+            if waited >= max_wait:
+                return False
+            time.sleep(1)
+
+
+def _release_lock(lock_dir):
+    """잠금 해제."""
+    try:
+        pid_file = os.path.join(lock_dir, "pid")
+        if os.path.exists(pid_file):
+            os.unlink(pid_file)
+    except OSError:
+        pass
+    try:
+        os.rmdir(lock_dir)
+    except OSError:
+        pass
+
+
+# =============================================================================
+# .dashboard/.skills.md 갱신
+# =============================================================================
+
+def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved: list, token_budget: int) -> None:
+    """skill_mapper.py 실행 결과를 .dashboard/.skills.md에 행으로 삽입한다.
+
+    비차단: 모든 예외를 삼켜서 워크플로우 실행에 영향을 주지 않는다.
+    """
+    try:
+        KST = timezone(timedelta(hours=9))
+        skills_md = os.path.join(PROJECT_ROOT, ".dashboard", ".skills.md")
+        lock_dir = os.path.join(PROJECT_ROOT, ".dashboard", ".skills.md.lock")
+        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+
+        # registryKey에서 날짜 추출: YYYYMMDD-HHMMSS → MM-DD HH:MM
+        try:
+            date_part, time_part = registry_key.split("/")[0].split("-")
+            date_str = f"{date_part[4:6]}-{date_part[6:8]} {time_part[0:2]}:{time_part[2:4]}"
+        except Exception:
+            date_str = datetime.now(KST).strftime("%m-%d %H:%M")
+
+        # 작업ID: registryKey 전체 (경로 포함)
+        work_id = registry_key
+
+        # 스킬 목록 (쉼표 구분, 30자 초과 시 축약)
+        skills_joined = ", ".join(all_resolved) if all_resolved else "(없음)"
+        if len(skills_joined) > 30:
+            skills_joined = skills_joined[:27] + "..."
+
+        # fallback 여부
+        has_fallback = any(task.get("fallback_skills") for task in tasks)
+        fallback_str = "Y" if has_fallback else "N"
+
+        # 토큰초과 여부
+        over_budget = "Y" if token_budget > TOKEN_BUDGET_LIMIT else "N"
+
+        # 행 생성
+        row = (
+            f"| {date_str} | {work_id} | {command} "
+            f"| {len(tasks)} | {len(all_resolved)} | {skills_joined} "
+            f"| {fallback_str} | {over_budget} |"
+        )
+
+        # skills.md 읽기
+        from data.constants import SKILLS_HEADER_LINE, SKILLS_SEPARATOR_LINE
+
+        content = ""
+        if os.path.exists(skills_md):
+            with open(skills_md, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        if marker not in content:
+            content = f"# 스킬 매핑 추적\n\n{marker}\n\n{SKILLS_HEADER_LINE}\n{SKILLS_SEPARATOR_LINE}\n"
+
+        separator_line = SKILLS_SEPARATOR_LINE
+
+        if separator_line in content:
+            marker_pos = content.find(marker)
+            if marker_pos >= 0:
+                sep_pos = content.find(separator_line, marker_pos)
+                if sep_pos >= 0:
+                    insert_pos = sep_pos + len(separator_line)
+                    if insert_pos < len(content) and content[insert_pos] == "\n":
+                        insert_pos += 1
+                    content = content[:insert_pos] + row + "\n" + content[insert_pos:]
+                else:
+                    content = content.replace(
+                        marker, f"{marker}\n\n{SKILLS_HEADER_LINE}\n{separator_line}\n{row}"
+                    )
+            else:
+                content = content.replace(
+                    marker, f"{marker}\n\n{SKILLS_HEADER_LINE}\n{separator_line}\n{row}"
+                )
+        else:
+            content = content.replace(
+                marker, f"{marker}\n\n{SKILLS_HEADER_LINE}\n{separator_line}\n{row}"
+            )
+
+        # 원자적 쓰기
+        os.makedirs(os.path.dirname(skills_md), exist_ok=True)
+        locked = _acquire_lock(lock_dir)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(skills_md), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(content)
+            shutil.move(tmp, skills_md)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+        finally:
+            if locked:
+                _release_lock(lock_dir)
+
+    except Exception:
+        pass
 
 
 def slice_plan_context(plan_path, tasks, output_dir):
@@ -320,9 +571,9 @@ def slice_plan_context(plan_path, tasks, output_dir):
         # H3 섹션이 없으면 스킵
         return []
 
-    # 각 태스크 섹션 끝 위치 결정: 다음 H4 이하/H3/H2/H1이 나오거나 파일 끝
+    # 각 태스크 섹션 끝 위치 결정: 다음 H3/H2/H1이 나오거나 파일 끝
     sorted_starts = sorted(section_starts.items(), key=lambda x: x[1])
-    end_pattern = re.compile(r"^#{1,4}\s+")
+    end_pattern = re.compile(r"^#{1,3}\s+")
 
     os.makedirs(output_dir, exist_ok=True)
     created = []
@@ -386,12 +637,17 @@ def main():
             f.write("# Skill Map\n\n> 태스크 없음\n")
         sys.exit(0)
 
-    # 3. 각 태스크별 스킬 결정 + COMPACT.md 인라인
+    # 3. 각 태스크별 스킬 결정
     for task in tasks:
         task["resolved"] = resolve_skills(task, command, defaults, keywords)
-        task["instructions"] = {}
-        for skill_name in task["resolved"]:
-            task["instructions"][skill_name] = read_compact(skill_name)
+
+    # 3.5. 토큰 예산 검증 (write_skill_map 직전)
+    all_resolved = []
+    for task in tasks:
+        for skill in task.get("resolved", []):
+            if skill not in all_resolved:
+                all_resolved.append(skill)
+    token_budget = estimate_token_budget(all_resolved)
 
     # 4. skill-map.md 생성
     output_path = write_skill_map(work_dir, tasks)
@@ -400,9 +656,12 @@ def main():
     context_dir = os.path.join(work_dir, "work", "context")
     created_contexts = slice_plan_context(plan_path, tasks, context_dir)
 
+    # 5.5. 스킬 매핑 대시보드 갱신 (비차단)
+    _update_skills_md(registry_key, command, tasks, all_resolved, token_budget)
+
     # 배너 출력
     rel_path = os.path.relpath(output_path, PROJECT_ROOT)
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}스킬 탐색{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}스킬 매핑{C_RESET}", flush=True)
     print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{rel_path}{C_RESET}", flush=True)
     if created_contexts:
         rel_ctx = os.path.relpath(context_dir, PROJECT_ROOT)

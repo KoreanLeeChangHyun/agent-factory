@@ -249,16 +249,37 @@ def cmd_track():
             if "workers" not in usage_data["agents"]:
                 usage_data["agents"]["workers"] = {}
 
+            existing_workers = usage_data["agents"]["workers"]
+
             if task_id:
-                usage_data["agents"]["workers"][task_id] = tokens
-                if agent_id in pending:
-                    del pending[agent_id]
+                # agent_id가 pending key로 직접 매핑된 경우 (이상적 경로)
+                existing_workers[task_id] = tokens
+                del pending[agent_id]
             else:
-                print(
-                    f"[usage-sync] WARNING: agent_id '{agent_id}' not found in _pending_workers, using agent_id as key",
-                    file=sys.stderr,
-                )
-                usage_data["agents"]["workers"][agent_id] = tokens
+                # agent_id가 hex 문자열이어서 pending에 없는 경우:
+                # pending의 값(task_id) 중 아직 workers에 기록되지 않은 첫 번째 task_id를 큐 방식으로 할당
+                assigned_task_id = None
+                for pkey, ptid in list(pending.items()):
+                    if ptid not in existing_workers:
+                        assigned_task_id = ptid
+                        del pending[pkey]
+                        break
+
+                if assigned_task_id:
+                    print(
+                        f"[usage-sync] INFO: agent_id '{agent_id}' mapped to task_id '{assigned_task_id}' via queue assignment",
+                        file=sys.stderr,
+                    )
+                    existing_workers[assigned_task_id] = tokens
+                    # _agent_map에 agent_id -> task_id 관계 기록 (batch 참조용)
+                    usage_data["_agent_map"][agent_id] = "worker"
+                else:
+                    # 완전히 매핑 불가: agent_id를 키로 폴백 기록
+                    print(
+                        f"[usage-sync] WARNING: agent_id '{agent_id}' not found in _pending_workers and no unassigned task_id, using agent_id as key",
+                        file=sys.stderr,
+                    )
+                    existing_workers[agent_id] = tokens
         else:
             usage_data["agents"][agent_type] = tokens
 
@@ -290,17 +311,21 @@ def _find_main_session_jsonl(subagents_dir):
 
 
 def _find_main_session_from_status(work_dir):
-    """status.json의 linked_sessions에서 메인 세션 JSONL 경로를 구성."""
+    """status.json의 linked_sessions 또는 _agent_map에서 메인 세션 JSONL 경로를 구성.
+
+    1차: linked_sessions에 기록된 세션 ID로 <session_id>.jsonl을 직접 탐색.
+    2차(대체): linked_sessions가 비어있을 때, usage.json의 _agent_map에 기록된
+         알려진 agent_id로 subagents 디렉터리를 역탐색하여 상위 세션 JSONL을 반환.
+    """
     status_file = os.path.join(work_dir, "status.json")
     status = load_json_file(status_file)
     if not isinstance(status, dict):
         return None
 
-    sessions = status.get("linked_sessions", [])
-    if not sessions:
-        return None
-
     project_slug = PROJECT_ROOT.replace("/", "-")
+
+    # 1차: linked_sessions 기반 탐색
+    sessions = status.get("linked_sessions", [])
     for claude_base in [
         os.path.expanduser("~/.claude"),
         os.path.expanduser("~/.config/claude"),
@@ -312,6 +337,34 @@ def _find_main_session_from_status(work_dir):
             path = os.path.join(projects_dir, f"{session_id}.jsonl")
             if os.path.isfile(path):
                 return path
+
+    # 2차: _agent_map에 기록된 알려진 agent_id로 역탐색
+    usage_file = os.path.join(work_dir, "usage.json")
+    usage_data = load_json_file(usage_file)
+    if not isinstance(usage_data, dict):
+        return None
+
+    agent_map = usage_data.get("_agent_map", {})
+    if not agent_map:
+        return None
+
+    for claude_base in [
+        os.path.expanduser("~/.claude"),
+        os.path.expanduser("~/.config/claude"),
+    ]:
+        projects_dir = os.path.join(claude_base, "projects", project_slug)
+        if not os.path.isdir(projects_dir):
+            continue
+        for agent_id in agent_map:
+            pattern = os.path.join(projects_dir, "*", "subagents", f"agent-{agent_id}.jsonl")
+            matches = glob.glob(pattern)
+            if matches:
+                # subagents/ -> session_dir -> session_dir.jsonl
+                session_dir = os.path.dirname(os.path.dirname(matches[0]))
+                main_jsonl = session_dir + ".jsonl"
+                if os.path.isfile(main_jsonl):
+                    return main_jsonl
+
     return None
 
 
@@ -422,10 +475,38 @@ def cmd_batch():
 
             existing_workers = usage_data["agents"]["workers"]
             pending = usage_data.get("_pending_workers", {})
-            agent_to_task = dict(pending)
+
+            # agent_to_task: _pending_workers 값(task_id)이 키인 경우와
+            # agent_id가 키인 경우 모두 처리.
+            # _pending_workers는 {task_id: task_id} 또는 {agent_id: task_id} 형태일 수 있음.
+            # agent_id가 hex 문자열이고 pending이 {task_id: task_id} 형태인 경우:
+            # pending의 값(task_id) 목록과 worker_tokens의 agent_id 목록을 순서대로 매핑.
+            # agent_to_task: _pending_workers의 pkey가 실제 agent_id인 경우 직접 매핑
+            agent_to_task = {}
+            for pkey, ptid in pending.items():
+                agent_to_task[pkey] = ptid
+
+            # task_id=task_id 형태의 pending만 unassigned 큐에 추가.
+            # agent_id가 hex 문자열일 때 순서대로 매핑하기 위한 폴백 큐.
+            already_mapped_tasks = set(existing_workers.keys())
+            unassigned_queue = [
+                ptid for pkey, ptid in pending.items()
+                if pkey == ptid and ptid not in already_mapped_tasks
+            ]
 
             for agent_id, tokens in worker_tokens.items():
+                # 우선: agent_to_task에서 직접 매핑 시도
                 task_id = agent_to_task.get(agent_id)
+
+                if not task_id:
+                    # agent_id가 hex 문자열인 경우: unassigned_queue에서 순서대로 할당
+                    if unassigned_queue:
+                        task_id = unassigned_queue.pop(0)
+                        print(
+                            f"[usage-sync] INFO: batch agent_id '{agent_id}' mapped to task_id '{task_id}' via queue",
+                            file=sys.stderr,
+                        )
+
                 key = task_id if task_id else agent_id
                 # 보완 모드 스킵: track으로 수집 완료된 worker task
                 if isinstance(existing_workers.get(key), dict) and existing_workers[key].get("method") == "subagent_transcript":

@@ -100,7 +100,7 @@ WORK Step 진입 후, 오케스트레이터는 `<workDir>/plan.md`를 **1회만*
 WORK Step은 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 
 - **Phase 0 (준비 단계)**: `skill_mapper.py` 스크립트가 plan.md skills 컬럼 + 명령어 기본 + 키워드 매칭으로 `skill-map.md`를 결정적 생성하는 준비 단계.
-- **Phase 1+ (작업 실행 단계)**: `skill-map.md`를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. skill-map.md에 COMPACT.md가 인라인되어 Worker는 개별 SKILL.md 읽기가 불필요.
+- **Phase 1+ (작업 실행 단계)**: `skill-map.md`를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. skill-map.md의 매핑 테이블에서 스킬 목록을 확인하고, Worker가 `.claude/skills/<스킬명>/COMPACT.md` (또는 SKILL.md)를 직접 Read하여 지침 획득.
 
 **스킬 미발견 시 폴백:** Phase 0 스크립트가 실패한 경우, Phase 1+는 스킬 없이 작업을 계속 진행한다(Worker 자율 결정).
 
@@ -141,7 +141,7 @@ flow-skillmap <registryKey>
 
 `skill_mapper.py`가 plan.md skills 컬럼 + 명령어 기본 + 키워드 매칭으로 `<workDir>/work/skill-map.md`를 생성. 실패(exit 1) 시 skill-map.md 없이 Phase 1 진행 (Worker 자율 결정).
 
-> Phase 1+ Worker는 skill-map.md를 1회 Read하여 스킬 지침 획득. 개별 SKILL.md 읽기 불필요.
+> Phase 1+ Worker는 skill-map.md를 1회 Read하여 스킬 목록 확인 후, 해당 스킬의 COMPACT.md/SKILL.md를 직접 Read하여 지침 획득.
 
 ## Phase 1~N: Task Execution
 
@@ -283,6 +283,8 @@ flow-update task-status <registryKey> <taskId> failed
 # 형식: flow-update usage-pending <registryKey> <id1> [id2] ...
 flow-update usage-pending <registryKey> W01
 ```
+
+> **Note:** task-start 모드 사용 시 usage-pending이 자동으로 포함되므로, task-start를 호출하는 경우 개별 usage-pending 호출은 불필요합니다. 위 패턴은 task-start를 사용하지 않고 개별적으로 usage-pending을 등록해야 하는 경우에만 적용됩니다.
 
 ## Hooks 수정 태스크 실행 패턴
 

@@ -34,9 +34,9 @@
 | **transition** | 전이 | FSM에서 한 Step에서 다른 Step으로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)이 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. PLAN->WORK->REPORT->DONE 단일 모드. |
-| **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. |
+| **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. Worker는 매핑 테이블에서 스킬 목록을 확인하고 필요한 스킬의 지침을 직접 로드. |
 | **Phase 0** | 준비 단계 | WORK Step 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. 모든 워크플로우에서 필수 실행. |
-| **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md에서 추천 스킬을 로드하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
+| **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md 매핑 테이블에서 스킬 목록을 확인하고, 해당 스킬의 COMPACT.md/SKILL.md를 직접 Read하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Step 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
 | **work log** | 작업 내역 | Worker/Explorer가 태스크 실행 후 생성하는 기록 파일. `work/WXX-*.md` 형식. |
@@ -127,6 +127,16 @@ flowchart TD
 | 초기화 (workDir/status.json 생성) | Main (flow-init) | 워크플로우 초기화는 오케스트레이터가 flow-init을 통해 수행 |
 | 마무리 (Slack 알림/정리) | Main (flow-finish + flow-claude end) | 오케스트레이터가 flow-finish(finalization.py) + flow-claude end로 직접 마무리 수행 |
 
+## Worker Agent Common Rules (공통 규칙)
+
+모든 워커 에이전트(worker-*/explorer/validator)가 따라야 하는 3가지 공통 규칙입니다.
+
+| 규칙 | 설명 | 적용 대상 |
+|------|------|----------|
+| **산출물 필수 생성** | 모든 태스크 실행 후 반드시 작업 내역 파일을 생성해야 함.<br><br>- worker-*/explorer: `work/WXX-*.md`<br>- validator: `work/validation-report.md`<br><br>검증 결과 SKIP이거나 실패하더라도 파일은 반드시 생성. | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>validator |
+| **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. skill-catalog.md 키워드 매칭은 비적용. | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>(validator은 계획서 로드만) |
+| **선행 산출물 참조 필수** | 종속 태스크(dependencies 컬럼에 선행 ID가 있는 경우) 수행 시 `<workDir>/work/` 경로에서 선행 작업 내역 파일을 반드시 Read해야 함.<br><br>- worker-*/explorer: 작업 연속성 보장 목적<br>- validator: 검증 컨텍스트 확보 목적 (Glob으로 전체 W*-*.md 탐색 후 "핵심 발견" 섹션 참조) | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>validator (검증 컨텍스트로 활용) |
+
 ## Sub-agent Return Formats (REQUIRED)
 
 > **WARNING: 반환값이 1줄을 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
@@ -180,12 +190,13 @@ flowchart TD
 | usage | `<registryKey> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]` | 워커 완료 후 실제 토큰 사용량 기록. agent_name(planner/worker/reporter), 입출력 토큰, 선택적 캐시 정보, 워커 태스크ID(task_id)를 기록. |
 | usage-finalize | `<registryKey>` | 모든 usage 기록을 취합하여 사용량 집계 완료. workflow 마무리 시 호출. |
 | task-start | `<registryKey> <id1> [id2] ...` | task-status running + usage-pending 일괄 등록. 복수 ID 지원. |
-| task-status | `<registryKey> <taskId> <status>` | 태스크 상태 갱신 |
+| task-status | `<registryKey> <status> <id1> [id2] ...` 또는 `<registryKey> <taskId> <status>` (레거시) | 태스크 상태 갱신. 복수 ID 지원 (신규). 레거시 단일 ID 형식도 자동 감지. |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. hook 초기화 출력에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
 - agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet/haiku 공통), REPORT=`reporter`
 
 > **Note:** 상태 전이 시각화는 `flow-update` 배너(shell alias)가 전담한다. `flow-update` 호출 시 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다(fromStep은 status.json에서 자동 읽기). 그 후 `flow-step start`를 호출하여 시작 배너를 출력한다. (WORK-PHASE에서는 flow-update 스킵) task-start 모드는 task-status + usage-pending을 통합하므로 개별 호출이 불필요. 각각 개별 Bash 도구 호출로 실행하며, `&&`/`;` 체이닝은 불필요.
+
 ### 호출 주체별 허용 모드
 
 | 모드 | 오케스트레이터 | 서브에이전트 |

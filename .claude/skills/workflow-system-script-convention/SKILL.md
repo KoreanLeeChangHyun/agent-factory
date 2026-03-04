@@ -1,6 +1,6 @@
 ---
 name: workflow-system-script-convention
-description: "Script naming, placement, and alias registration conventions for the Claude Code workflow system. Covers flow-* alias registration rules, Bash chaining prohibition, naming conventions (flow-* prefix), and script directory placement. Use when creating new scripts, modifying existing scripts, or adding new aliases. Triggers: 'script', 'scripts', '스크립트', 'alias', 'aliases', '알리아스', 'flow-', 'flow-*', '배너', 'banner', 'init-claude-workflow', '컨벤션', 'convention'."
+description: "Script naming, placement, and alias registration conventions for the Claude Code workflow system. Covers flow-* alias registration rules, Bash chaining prohibition, naming conventions (flow-* prefix), and script directory placement. Use when creating new scripts, modifying existing scripts, or adding new aliases. Triggers: 'scripts', '스크립트', 'alias', 'aliases', '알리아스', 'flow-', 'flow-*', '배너', 'banner', 'init-claude-workflow', '컨벤션', 'convention'."
 license: "Apache-2.0"
 ---
 

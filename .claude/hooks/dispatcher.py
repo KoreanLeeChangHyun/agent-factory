@@ -5,6 +5,7 @@ hook scripts based on HOOK_* environment variable toggles.
 
 현재 등록된 디스패처:
   pre-tool-use.py    - PreToolUse 이벤트
+  post-tool-use.py   - PostToolUse 이벤트
   subagent-stop.py   - SubagentStop 이벤트
 """
 

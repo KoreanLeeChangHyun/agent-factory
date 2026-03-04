@@ -39,6 +39,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/hooks/post-tool-use.py",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "post-tool-use 디스패처 실행 중..."
+          }
+        ]
+      }
     ]
   }
 }
