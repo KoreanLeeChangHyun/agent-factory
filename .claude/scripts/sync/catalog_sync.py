@@ -2,18 +2,17 @@
 """스킬 카탈로그 생성/갱신 CLI (단일 소스).
 
 .claude/skills/*/SKILL.md를 전수 스캔하여 frontmatter를 파싱하고,
-내장된 Command Default Mapping / Keyword Index 데이터와 결합하여
+내장된 Command Default Mapping 데이터와 결합하여
 skill-catalog.md를 생성합니다.
 
 매핑 데이터는 이 파일이 단일 소스(Single Source of Truth)입니다.
 기존 command-skill-map.md는 폐기되었으며, 매핑 변경 시 이 파일의
-COMMAND_DEFAULTS / KEYWORD_INDEX 상수를 수정하세요.
+COMMAND_DEFAULTS 상수를 수정하세요.
 
 주요 함수:
     parse_frontmatter: SKILL.md frontmatter 파싱
     scan_skills: 전체 스킬 디렉터리 스캔
     build_command_default_mapping: 명령어 기본 스킬 매핑 테이블 생성
-    build_keyword_index: 키워드 인덱스 테이블 생성
     generate_catalog: skill-catalog.md 내용 생성
     main: CLI 진입점
 
@@ -63,59 +62,6 @@ COMMAND_DEFAULTS: list[tuple[str, str, str]] = [
     ("review", "review-requesting, review-code-quality", "리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드"),
     ("research", "research-general, research-integrated", "웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 키워드 매핑으로 조건부 로드"),
     ("strategy", "design-strategy", "다중 워크플로우 전략 수립, 로드맵 생성"),
-]
-
-KEYWORD_INDEX: list[tuple[str, str]] = [
-    ("구현, implement, 기능 추가, feature", "workflow-system-verification"),
-    ("리팩토링, refactor, 리팩터, 코드 개선", "review-code-quality"),
-    ("마이그레이션, migration, 스키마 변경, DB 변경", "review-code-quality, workflow-system-verification"),
-    ("품질, quality, 코드 품질, code quality", "review-code-quality"),
-    ("API, REST, GraphQL, 엔드포인트, endpoint", "review-code-quality"),
-    ("PR, pull request", "workflow-system-report-output, devops-github"),
-    ("다이어그램, diagram, UML", "design-mermaid-diagrams"),
-    ("아키텍처, architecture, 설계, architect, 시스템 구조, 컴포넌트", "design-architect, design-mermaid-diagrams"),
-    ("프론트엔드, frontend, UI", "design-frontend"),
-    ("웹앱, webapp", "devops-webapp-testing"),
-    ("docx, 문서, document, 워드", "document-office/docx"),
-    ("pptx, 프레젠테이션, presentation, 슬라이드", "document-office/pptx"),
-    ("xlsx, 스프레드시트, spreadsheet, 엑셀", "document-office/xlsx"),
-    ("pdf, PDF", "document-office/pdf"),
-    ("MCP, Model Context Protocol", "management-mcp"),
-    ("3P, newsletter, status report, 뉴스레터", "document-internal-comms"),
-    ("changelog, release notes, 릴리스 노트, 변경 이력", "workflow-system-report-output"),
-    ("LWC, Lightning Web Component, Salesforce, 세일즈포스", "salesforce-lwc"),
-    ("Apple, HIG, 애플, apple design", "design-apple"),
-    ("GHA, GitHub Actions, CI, CI/CD, pipeline, 빌드 실패, workflow run", "debug-gha-analysis"),
-    ("교차 검증, cross-validation, 출처 평가, source evaluation", "research-general, research-grounding"),
-    ("심층 조사, deep research, 코드 탐색, 대규모 분석", "research-deep"),
-    ("웹+코드 통합, integrated research, 통합 조사, 복합 조사", "research-integrated"),
-    ("병렬 조사, parallel research, 종합 조사, 다중 에이전트", "research-parallel"),
-    ("신뢰도 검증, 출처 검증, source verification, grounding", "research-grounding"),
-    ("보안 리뷰, security review, OWASP 리뷰, 취약점 리뷰, 보안 감사", "review-security"),
-    ("아키텍처 리뷰, architecture review, 설계 리뷰, 구조 리뷰, 계층 검증", "review-architecture"),
-    ("프론트엔드 리뷰, frontend review, React 리뷰, UI 리뷰, 컴포넌트 리뷰", "review-frontend"),
-    ("성능 리뷰, performance review, 쿼리 리뷰, DB 리뷰, N+1", "review-performance"),
-    ("종합 리뷰, comprehensive review, 전체 리뷰, full review", "review-comprehensive"),
-    ("리뷰 반영, review feedback, 피드백 구현, 리뷰 수정, 리뷰 대응", "review-feedback-handler"),
-    ("PR 리뷰, pull request review, PR 검증, PR 체크", "review-pr-integration"),
-    ("보안, security, OWASP, 취약점, 정적 분석, static analysis, CodeQL, Semgrep", "debug-static-analysis"),
-    ("접근성, a11y, accessibility, WCAG", "design-web-guidelines"),
-    ("디버깅, debugging, 버그, bug, 에러 추적, error tracking, 근본 원인", "debug-systematic"),
-    ("React, Next.js, 리액트, react 성능, react performance", "framework-react-best-practices, framework-react"),
-    ("FastAPI, fastapi, Python API, 파이썬 API", "framework-fastapi"),
-    ("전략, strategy, 로드맵, roadmap, 마일스톤, milestone, 다중 워크플로우", "design-strategy"),
-    ("디자인 패턴, design pattern, GoF, SOLID 패턴", "design-patterns"),
-    ("RICE, 우선순위, 작업 분해, task decomposition, scope", "management-scope-decomposer"),
-    ("명령어 관리, command manager, 명령어 등록", "management-command"),
-    ("스킬 생성, skill create, 스킬 관리, skill manage", "management-skill"),
-    ("스킬 검색, skill search, find skill, 스킬 설치, 스킬 통합, auto integrate", "management-skill-integrator"),
-    ("에이전트 관리, agent manager, 에이전트 목록", "management-agent"),
-    ("요구사항 분석, SRS, 코드베이스 분석, 코드 구조, 데이터베이스 분석, DB 분석, 데이터 분석, EDA", "analyze-* (키워드 판단)"),
-    ("커버리지, coverage, diff coverage, 코드 커버리지, 테스트 커버리지", "testing-coverage"),
-    ("PBT, property-based, 속성 기반 테스트, Hypothesis, fast-check", "testing-property-based"),
-    ("런타임 검증, runtime validation, Zod, beartype, 스키마 검증, 계약 검증", "devops-runtime-contract"),
-    ("뮤테이션, mutation testing, Stryker, mutmut, 테스트 품질", "testing-mutation"),
-    ("테스트 설계, test design, 동치 분할, 경계값, 결정 테이블", "testing-design"),
 ]
 
 
@@ -245,25 +191,11 @@ def build_command_default_mapping() -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_keyword_index() -> str:
-    """내장 KEYWORD_INDEX 상수에서 키워드 기반 추가 스킬 로드 테이블을 생성.
-
-    Returns:
-        마크다운 테이블 형식의 키워드-스킬 인덱스 문자열 (개행 문자 포함)
-    """
-    lines = []
-    lines.append("| 키워드 | 추가 로드 스킬 |")
-    lines.append("|--------|---------------|")
-    for keywords, skills in KEYWORD_INDEX:
-        lines.append(f"| {keywords} | {skills} |")
-    return "\n".join(lines) + "\n"
-
 
 def generate_catalog(
     global_skills: list[dict[str, str]],
     project_skills: list[dict[str, str]],
     command_mapping: str,
-    keyword_index: str,
 ) -> str:
     """skill-catalog.md 내용을 생성.
 
@@ -271,7 +203,6 @@ def generate_catalog(
         global_skills: 전문화(global) 스킬 목록. 각 항목은 name, description 키를 포함.
         project_skills: 프로젝트(project) 스킬 목록. 각 항목은 name, description 키를 포함.
         command_mapping: 명령어 기본 스킬 매핑 마크다운 테이블 문자열
-        keyword_index: 키워드 인덱스 마크다운 테이블 문자열
 
     Returns:
         skill-catalog.md 파일에 쓸 전체 내용 문자열
@@ -291,13 +222,7 @@ def generate_catalog(
     lines.append(command_mapping.rstrip())
     lines.append("")
 
-    # Section 2: Keyword Index
-    lines.append("## Keyword Index")
-    lines.append("")
-    lines.append(keyword_index.rstrip())
-    lines.append("")
-
-    # Section 3: Skill Descriptions (전문화 스킬)
+    # Section 2: Skill Descriptions (전문화 스킬)
     lines.append("## Skill Descriptions")
     lines.append("")
     lines.append("| 스킬명 | description |")

@@ -47,10 +47,10 @@ maxTurns: 50
 | 스킬 | 티어 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
 | `workflow-agent-worker` | Tier 1 (에이전트) | frontmatter `skills` | WORK 단계 절차 |
-| 전문화 스킬 | Tier 2 (전문화) | 계획서/skill-map/skill-catalog 동적 | 범용 도메인 전문성 (필수 1+) |
+| 전문화 스킬 | Tier 2 (전문화) | skill-map 필수 로드(planner 추천) + skill-catalog 자율 추가 선택 | 범용 도메인 전문성 (필수 1+) |
 | 프로젝트 스킬 | Tier 3 (프로젝트) | skill-map 자동 주입 | DDD 도메인 특화 (반필수) |
 
-> worker는 `workflow-agent-worker` 스킬만 frontmatter에 정적 바인딩합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 계획서/skill-map/skill-catalog.md 기반으로 실행 시점에 동적 로드됩니다.
+> worker는 `workflow-agent-worker` 스킬만 frontmatter에 정적 바인딩합니다. 전문화 스킬(Tier 2)은 skill-map.md에 매핑된 planner 추천 스킬을 반드시 로드하며, 추가 필요 시 skill-catalog.md Skill Descriptions를 참조하여 자율 추가 선택할 수 있습니다(토큰 예산 고려). 프로젝트 스킬(Tier 3)은 skill-map 기반으로 자동 주입됩니다.
 
 ## 입력
 

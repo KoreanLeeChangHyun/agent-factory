@@ -123,7 +123,11 @@ Worker의 스킬은 3계층으로 구성된다:
 - **Tier 3 (프로젝트 스킬)**: 반필수. 존재 시 자동 적용
 
 **2a. 전문화 스킬 로드 (필수):**
-skill-map.md 1회 Read (매핑 테이블) → 스킬 목록에서 `.claude/skills/<스킬명>/COMPACT.md` (또는 SKILL.md) 직접 Read → skills 파라미터 → skill-catalog.md 기본 → 없으면 진행
+skill-map.md 1회 Read (매핑 테이블) → 매핑된 스킬 필수 로드(planner 추천) → 추가 필요 시 skill-catalog.md Skill Descriptions 참조하여 자율 추가 선택 가능
+
+> **규칙**: planner 추천 스킬(skill-map.md에 매핑된 스킬)은 반드시 로드해야 하며 생략 불가. 해당 스킬의 `.claude/skills/<스킬명>/COMPACT.md` (없으면 SKILL.md)를 직접 Read하여 지침을 획득한다.
+
+> **자율 추가 선택 가이드**: 추가 스킬이 필요하다고 판단되면 skill-catalog.md의 Skill Descriptions 섹션을 참조하여 선택할 수 있다. 단, 토큰 예산(TOKEN_BUDGET_LIMIT)을 고려하여 최소 필요한 스킬만 추가한다.
 
 **2b. 프로젝트 스킬 로드 (반필수):**
 skills 파라미터 → skill-map.md 프로젝트 컬럼 → 없으면 스킵

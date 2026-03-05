@@ -215,7 +215,9 @@ update_gitignore() {
     fi
 
     local entries=(
+        " "
         ".workflow/"
+        ".claude/"
         ".claude.env*"
         ".uploads/"
         ".prompt/"
