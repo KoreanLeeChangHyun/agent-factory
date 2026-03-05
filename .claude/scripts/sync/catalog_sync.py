@@ -191,7 +191,6 @@ def build_command_default_mapping() -> str:
     return "\n".join(lines) + "\n"
 
 
-
 def generate_catalog(
     global_skills: list[dict[str, str]],
     project_skills: list[dict[str, str]],
@@ -233,7 +232,7 @@ def generate_catalog(
         lines.append(f"| {skill['name']} | {desc} |")
     lines.append("")
 
-    # Section 4: Project Skills (프로젝트 스킬)
+    # Section 3: Project Skills (프로젝트 스킬)
     lines.append("## Project Skills")
     lines.append("")
     if project_skills:
@@ -263,10 +262,9 @@ def main() -> None:
 
     # 매핑 테이블 생성 (내장 데이터에서)
     command_mapping = build_command_default_mapping()
-    keyword_index = build_keyword_index()
 
     # 카탈로그 생성
-    catalog_content = generate_catalog(global_skills, project_skills, command_mapping, keyword_index)
+    catalog_content = generate_catalog(global_skills, project_skills, command_mapping)
     catalog_size = len(catalog_content.encode("utf-8"))
 
     if dry_run:

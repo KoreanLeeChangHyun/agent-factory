@@ -359,7 +359,7 @@ verify_installation() {
     fi
 
     # 4. .gitignore 등록 여부
-    local gitignore_entries=(".workflow/" ".claude.env*" ".uploads/" ".prompt/" ".dashboard/" ".temp/" ".temp/*" "temp/" ".vscode/" "CLAUDE.md" "__pycache__/")
+    local gitignore_entries=(".workflow/" ".claude/" ".claude.env*" ".uploads/" ".prompt/" ".dashboard/" ".temp/" ".temp/*" "temp/" ".vscode/" "CLAUDE.md" "__pycache__/")
     local gitignore_ok=true
     for entry in "${gitignore_entries[@]}"; do
         if ! grep -qxF "$entry" ".gitignore" 2>/dev/null; then

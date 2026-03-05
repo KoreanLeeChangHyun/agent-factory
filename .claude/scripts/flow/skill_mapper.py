@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """skill_mapper.py - Phase 0 결정적 스킬 매핑 스크립트.
 
-plan.md의 태스크 skills 컬럼 + 명령어 기본 매핑 + 키워드 매칭으로
+plan.md의 태스크 skills 컬럼 + 명령어 기본 매핑으로
 skill-map.md를 결정적으로 생성한다. LLM 불필요.
 
 사용법:
@@ -43,72 +43,6 @@ from plan_validator import parse_md_table_columns
 PROJECT_ROOT = resolve_project_root()
 SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
-
-# ---------------------------------------------------------------------------
-# L4: 시소러스 기반 동의어 매핑 (한국어/영어 혼합 22개 그룹)
-# Level 2 키워드 매칭 전에 적용하여 동의어/변형어 인식률을 향상시킨다.
-# ---------------------------------------------------------------------------
-SYNONYM_MAP = {
-    "조사": ["연구", "리서치", "research", "investigate", "탐색", "분석"],
-    "연구": ["조사", "리서치", "research", "investigate", "탐색"],
-    "리서치": ["조사", "연구", "research", "investigate"],
-    "구현": ["implement", "개발", "코딩", "coding", "implementation", "작성"],
-    "개발": ["구현", "implement", "코딩", "coding", "development"],
-    "검토": ["리뷰", "review", "검사", "점검", "확인", "inspection"],
-    "리뷰": ["검토", "review", "검사", "점검", "확인", "inspection"],
-    "디버깅": ["debugging", "버그", "bug", "에러", "error", "오류", "수정"],
-    "버그": ["디버깅", "debugging", "bug", "에러", "error", "오류", "수정"],
-    "설계": ["아키텍처", "architecture", "architect", "디자인", "design", "구조"],
-    "아키텍처": ["설계", "architecture", "architect", "디자인", "design", "구조"],
-    "보안": ["security", "owasp", "취약점", "vulnerability", "인증", "auth"],
-    "성능": ["performance", "최적화", "optimization", "속도", "speed"],
-    "최적화": ["성능", "performance", "optimization", "속도", "speed"],
-    "테스트": ["testing", "test", "qa", "검증", "validation", "검사"],
-    "검증": ["테스트", "testing", "test", "qa", "validation", "검사"],
-    "인프라": ["infra", "infrastructure", "devops", "배포", "deploy", "운영"],
-    "배포": ["deploy", "deployment", "인프라", "infra", "cd", "release"],
-    "컨테이너": ["container", "docker", "도커", "kubernetes", "k8s"],
-    "도커": ["docker", "컨테이너", "container", "compose"],
-    "데이터베이스": ["database", "db", "스키마", "schema", "쿼리", "query", "sql"],
-    "백엔드": ["backend", "rest", "api 설계", "api design", "엔드포인트", "서버"],
-    "파이프라인": ["pipeline", "ci/cd", "cd", "배포 자동화", "빌드"],
-}
-
-
-def expand_with_synonyms(text: str) -> str:
-    """입력 텍스트에서 SYNONYM_MAP 키/값 단어를 발견하면 동의어 그룹을 부가하여 확장된 텍스트를 반환한다.
-
-    Level 2 키워드 매칭 전에 적용하여 동의어/변형어 인식률을 향상시킨다.
-    예: "조사" 포함 시 "연구 리서치 research investigate 탐색 분석"이 텍스트에 추가됨.
-
-    Args:
-        text: 이미 lower()가 적용된 텍스트 또는 원본 텍스트
-
-    Returns:
-        동의어를 부가한 확장 텍스트 (소문자).
-    """
-    text_lower = text.lower()
-    extra_terms = []
-
-    for canonical, synonyms in SYNONYM_MAP.items():
-        canonical_lower = canonical.lower()
-        if canonical_lower in text_lower:
-            # 키 자체가 있으면 모든 동의어를 추가
-            extra_terms.extend(synonyms)
-        else:
-            # 동의어 중 하나라도 있으면 키와 나머지 동의어를 추가
-            for syn in synonyms:
-                if syn.lower() in text_lower:
-                    extra_terms.append(canonical_lower)
-                    extra_terms.extend(s for s in synonyms if s.lower() != syn.lower())
-                    break
-
-    if extra_terms:
-        unique_extras = list(dict.fromkeys(e.lower() for e in extra_terms))
-        return text_lower + " " + " ".join(unique_extras)
-
-    return text_lower
-
 
 # 컨텍스트 토큰 예산 가드레일 (200K 기준 25%)
 TOKEN_BUDGET_LIMIT = 50_000
@@ -178,19 +112,16 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
     return total_tokens
 
 
-def parse_catalog() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
-    """skill-catalog.md에서 command defaults와 keyword index를 파싱한다.
+def parse_catalog() -> dict[str, list[str]]:
+    """skill-catalog.md에서 command defaults를 파싱한다.
 
     Returns:
-        (defaults, keywords) 2-tuple.
-        defaults: command -> [skill_names] 딕셔너리,
-        keywords: keyword -> [skill_names] 딕셔너리.
+        defaults: command -> [skill_names] 딕셔너리.
     """
-    defaults = {}   # command -> [skill_names]
-    keywords = {}   # keyword -> [skill_names]
+    defaults: dict[str, list[str]] = {}
 
     if not os.path.isfile(CATALOG_FILE):
-        return defaults, keywords
+        return defaults
 
     with open(CATALOG_FILE, "r", encoding="utf-8") as f:
         content = f.read()
@@ -213,27 +144,7 @@ def parse_catalog() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
                 if cmd and skills_str:
                     defaults[cmd] = [s.strip() for s in skills_str.split(",")]
 
-    # Keyword Index 섹션 파싱
-    in_kw = False
-    for line in lines:
-        if "## Keyword Index" in line:
-            in_kw = True
-            continue
-        if in_kw and line.startswith("## "):
-            break
-        if in_kw and line.startswith("|") and not line.startswith("| 키워드") and not line.startswith("|---"):
-            parts = [p.strip() for p in line.split("|")]
-            if len(parts) >= 3:
-                kw_str = parts[1].strip()
-                skills_str = parts[2].strip()
-                if kw_str and skills_str:
-                    skill_list = [s.strip() for s in skills_str.split(",")]
-                    for kw in kw_str.split(","):
-                        kw = kw.strip()
-                        if kw:
-                            keywords[kw] = skill_list
-
-    return defaults, keywords
+    return defaults
 
 
 def parse_plan_tasks(plan_path):
@@ -288,10 +199,10 @@ def deduplicate(skills):
     return result
 
 
-def resolve_skills(task: dict, command: str, defaults: dict, keywords: dict) -> list[str]:
-    """3단계 결정적 매칭으로 태스크의 최종 스킬 목록 결정.
+def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
+    """2단계 결정적 매칭으로 태스크의 최종 스킬 목록 결정.
 
-    Level 0~2 매칭 결과가 비어있으면 skill_recommender.py의 TF-IDF 추천을 fallback으로 호출한다.
+    Level 0~1 매칭 결과가 비어있으면 skill_recommender.py의 TF-IDF 추천을 fallback으로 호출한다.
     """
     skills = []
 
@@ -303,15 +214,9 @@ def resolve_skills(task: dict, command: str, defaults: dict, keywords: dict) -> 
     if command in defaults:
         skills.extend(defaults[command])
 
-    # Level 2: 키워드 매칭 (L4: 시소러스 동의어 확장 적용)
-    desc_lower = expand_with_synonyms(task["description"].lower())
-    for kw, skill_list in keywords.items():
-        if kw.lower() in desc_lower:
-            skills.extend(skill_list)
-
     skills = deduplicate(skills)
 
-    # Level 3 (fallback): 3계층 매칭 결과가 없을 때 TF-IDF 추천 호출
+    # Level 2 (fallback): 매칭 결과가 없을 때 TF-IDF 추천 호출
     fallback_skills = []
     if not skills and task.get("description"):
         try:
@@ -644,7 +549,7 @@ def main():
         sys.exit(1)
 
     # 1. 카탈로그 파싱
-    defaults, keywords = parse_catalog()
+    defaults = parse_catalog()
 
     # 2. plan.md 태스크 파싱
     tasks = parse_plan_tasks(plan_path)
@@ -658,7 +563,7 @@ def main():
 
     # 3. 각 태스크별 스킬 결정
     for task in tasks:
-        task["resolved"] = resolve_skills(task, command, defaults, keywords)
+        task["resolved"] = resolve_skills(task, command, defaults)
 
     # 3.5. 토큰 예산 검증 (write_skill_map 직전)
     all_resolved = []
