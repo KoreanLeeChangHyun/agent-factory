@@ -35,8 +35,8 @@ flowchart TD
 
 | ID | 작업 | 종속성 | Phase | 복잡도 | 서브에이전트 | 스킬 |
 |----|------|--------|-------|--------|-------------|------|
-| W01 | ... | - | 1 | T1(3) | worker-haiku | review-code-quality |
-<!-- 서브에이전트: worker-opus(T3 고복잡도), worker-sonnet(T2 중간), worker-haiku(T1 단순), explorer(탐색형)를 지정 -->
+| W01 | ... | - | 1 | T1(3) | worker-sonnet | review-code-quality |
+<!-- 서브에이전트: worker-opus(T3 고복잡도), worker-sonnet(T2 이하), explorer(탐색형)를 지정 -->
 <!-- 스킬: 전문화 스킬 필수 1개+. 프로젝트 스킬 존재 시 + 구분. 예: review-code-quality + project-domain -->
 <!-- Explorer 태스크는 스킬 컬럼에 - 기재 -->
 

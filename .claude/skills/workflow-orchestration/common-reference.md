@@ -19,7 +19,6 @@
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. planner, worker, explorer, reporter가 해당. sub-agent 간 직접 호출은 금지. |
 | **worker-opus** | 워커(Opus) | WORK Step을 전담하는 서브에이전트. 복잡한 코드 생성/리팩토링, 아키텍처 변경 등 고복잡도 작업(Tier 3). |
 | **worker-sonnet** | 워커(Sonnet) | WORK Step을 전담하는 서브에이전트. 일반 구현/수정, 중간 복잡도 작업(Tier 2). |
-| **worker-haiku** | 워커(Haiku) | WORK Step을 전담하는 서브에이전트. 단순 설정 변경, 문서 수정, 간단한 코드 수정(Tier 1). |
 | **explorer** | 익스플로러 | WORK Step에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
 | **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 최상위 에이전트. Application Service 역할. "메인 에이전트", "부모 에이전트"와 동일한 개념이며, 모든 문서에서 "오케스트레이터"로 통일. |
 | **init** | 이닛 | UserPromptSubmit hook이 initialization.py를 실행하여 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
@@ -103,7 +102,6 @@ flowchart TD
 | planner | PLAN | workflow-agent-planner | - | frontmatter `skills:` |
 | worker-opus | WORK | workflow-agent-worker | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백) | frontmatter `skills:` (workflow-agent-worker) + 런타임 동적 (Tier 2 + Tier 3) |
 | worker-sonnet | WORK | workflow-agent-worker | (worker-opus와 동일) | (worker-opus와 동일) |
-| worker-haiku | WORK | workflow-agent-worker | (worker-opus와 동일) | (worker-opus와 동일) |
 | explorer | WORK | workflow-agent-explorer | - | frontmatter `skills:` |
 | validator | WORK (Phase N+1) | workflow-agent-validator | - | frontmatter `skills:` |
 | reporter (sonnet) | REPORT | workflow-agent-reporter | - | frontmatter `skills:` |
@@ -133,9 +131,9 @@ flowchart TD
 
 | 규칙 | 설명 | 적용 대상 |
 |------|------|----------|
-| **산출물 필수 생성** | 모든 태스크 실행 후 반드시 작업 내역 파일을 생성해야 함.<br><br>- worker-*/explorer: `work/WXX-*.md`<br>- validator: `work/validation-report.md`<br><br>검증 결과 SKIP이거나 실패하더라도 파일은 반드시 생성. | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>validator |
-| **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. skill-catalog.md 키워드 매칭은 비적용. | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>(validator은 계획서 로드만) |
-| **선행 산출물 참조 필수** | 종속 태스크(dependencies 컬럼에 선행 ID가 있는 경우) 수행 시 `<workDir>/work/` 경로에서 선행 작업 내역 파일을 반드시 Read해야 함.<br><br>- worker-*/explorer: 작업 연속성 보장 목적<br>- validator: 검증 컨텍스트 확보 목적 (Glob으로 전체 W*-*.md 탐색 후 "핵심 발견" 섹션 참조) | worker-opus<br>worker-sonnet<br>worker-haiku<br>explorer<br>validator (검증 컨텍스트로 활용) |
+| **산출물 필수 생성** | 모든 태스크 실행 후 반드시 작업 내역 파일을 생성해야 함.<br><br>- worker-*/explorer: `work/WXX-*.md`<br>- validator: `work/validation-report.md`<br><br>검증 결과 SKIP이거나 실패하더라도 파일은 반드시 생성. | worker-opus<br>worker-sonnet<br>explorer<br>validator |
+| **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. skill-catalog.md 키워드 매칭은 비적용. | worker-opus<br>worker-sonnet<br>explorer<br>(validator은 계획서 로드만) |
+| **선행 산출물 참조 필수** | 종속 태스크(dependencies 컬럼에 선행 ID가 있는 경우) 수행 시 `<workDir>/work/` 경로에서 선행 작업 내역 파일을 반드시 Read해야 함.<br><br>- worker-*/explorer: 작업 연속성 보장 목적<br>- validator: 검증 컨텍스트 확보 목적 (Glob으로 전체 W*-*.md 탐색 후 "핵심 발견" 섹션 참조) | worker-opus<br>worker-sonnet<br>explorer<br>validator (검증 컨텍스트로 활용) |
 
 ## Sub-agent Return Formats (REQUIRED)
 
@@ -193,7 +191,7 @@ flowchart TD
 | task-status | `<registryKey> <status> <id1> [id2] ...` 또는 `<registryKey> <taskId> <status>` (레거시) | 태스크 상태 갱신. 복수 ID 지원 (신규). 레거시 단일 ID 형식도 자동 감지. |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. hook 초기화 출력에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
-- agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet/haiku 공통), REPORT=`reporter`
+- agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet 공통), REPORT=`reporter`
 
 > **Note:** 상태 전이 시각화는 `flow-update` 배너(shell alias)가 전담한다. `flow-update` 호출 시 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다(fromStep은 status.json에서 자동 읽기). 그 후 `flow-step start`를 호출하여 시작 배너를 출력한다. (WORK-PHASE에서는 flow-update 스킵) task-start 모드는 task-status + usage-pending을 통합하므로 개별 호출이 불필요. 각각 개별 Bash 도구 호출로 실행하며, `&&`/`;` 체이닝은 불필요.
 

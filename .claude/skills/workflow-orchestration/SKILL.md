@@ -47,7 +47,7 @@ stateDiagram-v2
 | WORK | validator | workflow-agent-validator | `상태: 통과\|경고\|실패` | `<workDir>/work/validation-report.md` |
 | REPORT | reporter | workflow-agent-reporter | `상태: 완료\|실패` | `<workDir>/report.md` |
 
-> **Note on worker agent:** The `worker` agent in the table above encompasses three model variants: `worker-opus` (Claude 3 Opus), `worker-sonnet` (Claude 3 Sonnet), and `worker-haiku` (Claude 3 Haiku). These variants are used interchangeably based on task complexity and resource constraints, but all follow the same `workflow-agent-worker` skill specification and return status format.
+> **Note on worker agent:** The `worker` agent in the table above encompasses two model variants: `worker-opus` (Claude Opus) and `worker-sonnet` (Claude Sonnet). These variants are used interchangeably based on task complexity and resource constraints, but all follow the same `workflow-agent-worker` skill specification and return status format.
 
 ---
 

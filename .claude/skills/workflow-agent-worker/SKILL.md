@@ -75,7 +75,7 @@ Phase 1+의 각 Worker는 Phase 0에서 skill_mapper.py가 생성한 skill-map.m
 # skills 파라미터는 skill-map.md 또는 계획서에 태스크별 스킬이 명시된 경우 포함
 Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, skills: <스킬명>")
 Task(subagent_type="worker-sonnet", prompt="command: <command>, workId: <workId>, taskId: W02, planPath: <planPath>")
-Task(subagent_type="worker-haiku", prompt="command: <command>, workId: <workId>, taskId: W03, planPath: <planPath>")
+Task(subagent_type="worker-sonnet", prompt="command: <command>, workId: <workId>, taskId: W03, planPath: <planPath>")
 ```
 
 **종속 작업 (순차 실행):**
