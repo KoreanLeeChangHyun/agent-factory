@@ -423,7 +423,6 @@ def main() -> None:
     if status == "완료":
         # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
         transcript_path = _find_transcript_path(registry_key)
-        print(f"[flow-finish] batch: transcript_path={transcript_path}", file=sys.stderr)
         if transcript_path:
             stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
             run(
