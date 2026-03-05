@@ -1,9 +1,16 @@
 ---
 description: "웹 검색 기반 연구/조사 및 내부 자산 분석 수행. 외부 정보 수집, 기술 비교 분석, 내부 코드베이스/DB/데이터 분석을 통해 리포트를 제공합니다. Use when: 기술 조사, 비교 분석, 웹 리서치, 데이터 분석, 코드베이스 분석, DB 분석 / Do not use when: 코드 수정이 목적일 때 (cc:implement 사용)"
-argument-hint: "조사 주제 또는 분석 대상"
+argument-hint: "[-y] 조사 주제 또는 분석 대상"
 ---
 
 > **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
+
+## `-y` 자동승인 플래그
+
+`$ARGUMENTS`에 `-y` 플래그가 포함되면 오케스트레이터가 `autoApprove=true`로 설정합니다. planner는 정상 실행하되, PLAN Step 2b의 사용자 승인(AskUserQuestion)을 스킵하고 자동으로 WORK 단계로 진행합니다.
+
+- `-y` 미포함: 기존 흐름(AskUserQuestion 3옵션: 승인/수정 요청/중지) 유지
+- `-y` 포함: planner 완료 후 자동 승인 → WORK 즉시 진행
 
 ## `<command>` 태그 검증
 

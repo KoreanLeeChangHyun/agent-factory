@@ -1012,28 +1012,46 @@ def cmd_archive(args: argparse.Namespace) -> int:
     # registry_key가 None이면 활성 워크플로우를 자동 감지하여 제외
     if current_key:
         filtered = [d for d in dirs if d != current_key]
+        if len(filtered) < KEEP_COUNT - 1:
+            return 0
+
+        # .history/ 디렉토리 생성
+        os.makedirs(history_dir, exist_ok=True)
+
+        moved = 0
+        failed = 0
+        for target in filtered[KEEP_COUNT - 1:]:
+            src = os.path.join(workflow_dir, target)
+            dst = os.path.join(history_dir, target)
+            try:
+                shutil.move(src, dst)
+                moved += 1
+                print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+            except Exception:
+                failed += 1
+                print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
     else:
         active_keys = _detect_active_workflow_keys(workflow_dir)
         filtered = [d for d in dirs if d not in active_keys]
+        keep = max(0, KEEP_COUNT - len(active_keys))
+        if len(filtered) < keep:
+            return 0
 
-    if len(filtered) < KEEP_COUNT:
-        return 0
+        # .history/ 디렉토리 생성
+        os.makedirs(history_dir, exist_ok=True)
 
-    # .history/ 디렉토리 생성
-    os.makedirs(history_dir, exist_ok=True)
-
-    moved = 0
-    failed = 0
-    for target in filtered[KEEP_COUNT:]:
-        src = os.path.join(workflow_dir, target)
-        dst = os.path.join(history_dir, target)
-        try:
-            shutil.move(src, dst)
-            moved += 1
-            print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
-        except Exception:
-            failed += 1
-            print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
+        moved = 0
+        failed = 0
+        for target in filtered[keep:]:
+            src = os.path.join(workflow_dir, target)
+            dst = os.path.join(history_dir, target)
+            try:
+                shutil.move(src, dst)
+                moved += 1
+                print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+            except Exception:
+                failed += 1
+                print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
 
     if moved > 0:
         print(f"{C_CYAN}[archive]{C_RESET} {moved} directories archived to .history/")

@@ -67,6 +67,15 @@ Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
 
 > cc:* commands use `$ARGUMENTS` for command detection. User requests are handled by UserPromptSubmit hook via `.prompt/prompt.txt`.
 
+### `-y` 자동승인 플래그
+
+`$ARGUMENTS`에 `-y` 플래그가 포함되면 `autoApprove=true`로 설정됩니다. planner는 정상 실행하되, PLAN Step 2b의 사용자 승인(AskUserQuestion)을 스킵하고 자동으로 WORK 단계로 진행합니다.
+
+| 플래그 | autoApprove | 동작 |
+|--------|-------------|------|
+| `-y` 없음 | `false` | 기존 흐름 (AskUserQuestion 3옵션) |
+| `-y` 있음 | `true` | planner 완료 후 자동 승인 → WORK 즉시 진행 |
+
 ---
 
 ## Terminal Output Protocol
@@ -150,7 +159,7 @@ DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` →
 
 cc:* 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 다음을 순차 실행한다 (hook 없음):
 
-1. 사용자 입력에서 command 파싱 (예: `/cc:implement` → command=implement)
+1. 사용자 입력에서 command 및 플래그 파싱 (예: `/cc:implement` → command=implement, autoApprove=false / `/cc:implement -y` → command=implement, autoApprove=true)
 2. `flow-claude start <command>` — 시작 배너 출력
 3. prompt.txt를 읽어 20자 이내 한글 제목 생성 (오케스트레이터가 직접 생성, LLM 별도 호출 없음)
 4. `flow-init <command> "<title>"` — 워크플로우 디렉터리 생성, status.json 초기화. 실패 시 `FAIL` 출력 + 비정상 종료 코드
@@ -174,6 +183,8 @@ Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, requ
 ```
 
 planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-validate`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 **AskUserQuestion** 승인을 수행한다(3 고정 옵션, 경고 시 question 필드에 포함). 상세: [step-plan.md](step-plan.md) 참조.
+
+`autoApprove=true`이면 AskUserQuestion 승인을 스킵하고 자동으로 WORK 단계로 진행한다. 상세: [step-plan.md](step-plan.md) 2b-0 참조.
 
 ### WORK
 

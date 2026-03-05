@@ -112,6 +112,20 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 > planner가 `작성완료`를 반환하면, **오케스트레이터가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
 > 서브에이전트(planner)는 AskUserQuestion을 호출할 수 없으므로(플랫폼 제약), 승인 절차는 반드시 오케스트레이터가 담당합니다.
 
+### 2b-0. Auto-Approve Check
+
+> INIT Step에서 `$ARGUMENTS`의 `-y` 플래그를 파싱하여 `autoApprove` 변수가 설정됩니다.
+
+`autoApprove=true`인 경우:
+
+1. 2b-1(.context.json Check/Update)과 2b-2(Slack Notification)는 정상 수행합니다.
+2. plan_validator.py 경고가 있으면 터미널에 경고 내용을 출력하되, AskUserQuestion은 호출하지 않습니다.
+3. 2b-3(AskUserQuestion)을 **스킵**하고, 2b-4의 "승인" 분기로 자동 진행합니다.
+
+`autoApprove=false`인 경우 (기본값):
+
+- 기존 흐름(2b-1 → 2b-2 → 2b-3 → 2b-4)을 그대로 따릅니다.
+
 ### 2b-1. .context.json Check/Update
 
 > **.context.json은 hook 초기화 단계에서 이미 저장되어 있습니다.** PLAN Step에서는 내용 변경이 필요한 경우(제목 변경, 작업 이름 수정 등)에만 업데이트합니다. 변경이 없으면 이 단계를 건너뜁니다.
@@ -166,6 +180,8 @@ AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전
 
 ### 2b-3. AskUserQuestion으로 사용자 승인
 
+> **autoApprove 모드**: `autoApprove=true`인 경우 이 단계(2b-3)를 스킵합니다. 2b-0 참조.
+
 > **Sequential Execution REQUIRED (Critical):**
 > PLAN 완료 배너(`flow-step end <registryKey> planSubmit`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
 > - 반드시 **(1) flow-step end → (2) AskUserQuestion 호출** 순서로 별도 도구 호출 턴에서 실행.
@@ -219,6 +235,8 @@ AskUserQuestion(
 > - `question` 필드만 경고 유무에 따라 조건부로 달라진다. 나머지 필드(`header`, `options`, `multiSelect`)는 두 분기 모두 동일.
 
 ### 2b-4. Approval Result Processing
+
+> **autoApprove 모드**: `autoApprove=true`인 경우 "승인" 분기로 자동 진행됩니다. 2b-0 참조.
 
 | Selection | Action |
 |-----------|--------|

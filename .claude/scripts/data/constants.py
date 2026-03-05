@@ -11,8 +11,10 @@
     TERMINAL_STEPS: 종료 상태 집합
     FSM_TRANSITIONS: FSM 상태 전이 규칙
     DANGER_PATTERNS: 위험 명령어 차단 패턴 목록
+    KEEP_COUNT: .workflow/ 디렉터리 유지 최대 갯수 (환경변수 CLAUDE_WORKFLOW_KEEP_COUNT로 오버라이드 가능)
 """
 
+import os
 import re
 from datetime import timezone, timedelta
 
@@ -65,7 +67,7 @@ KST = timezone(timedelta(hours=9))
 STALE_TTL_MINUTES = 30
 ZOMBIE_TTL_HOURS = 24
 REPORT_TTL_HOURS = 1
-KEEP_COUNT = 10
+KEEP_COUNT = int(os.environ.get("CLAUDE_WORKFLOW_KEEP_COUNT", "10"))
 WORK_NAME_MAX_LEN = 20
 
 # =============================================================================

@@ -1,9 +1,16 @@
 ---
 description: "코드 리뷰 수행. 파일, 디렉토리, PR 등을 리뷰합니다. Use when: 코드 리뷰, PR 리뷰, 보안 리뷰, 성능 리뷰, 아키텍처 리뷰 / Do not use when: 코드 수정이 목적일 때 (cc:implement 사용)"
-argument-hint: "리뷰 대상 파일, 디렉터리, 또는 PR 번호"
+argument-hint: "[-y] 리뷰 대상 파일, 디렉터리, 또는 PR 번호"
 ---
 
 > **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
+
+## `-y` 자동승인 플래그
+
+`$ARGUMENTS`에 `-y` 플래그가 포함되면 오케스트레이터가 `autoApprove=true`로 설정합니다. planner는 정상 실행하되, PLAN Step 2b의 사용자 승인(AskUserQuestion)을 스킵하고 자동으로 WORK 단계로 진행합니다.
+
+- `-y` 미포함: 기존 흐름(AskUserQuestion 3옵션: 승인/수정 요청/중지) 유지
+- `-y` 포함: planner 완료 후 자동 승인 → WORK 즉시 진행
 
 ## `<command>` 태그 검증
 
