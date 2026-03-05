@@ -1,8 +1,10 @@
 #!/usr/bin/env -S python3 -u
-"""
-git_config.py - Git Config 자동 설정 스크립트
+"""Git Config 자동 설정 스크립트.
 
 .claude.env에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
+
+주요 함수:
+    main: Git 설정 적용 진입점
 
 사용법: python3 git_config.py [--global|--local]
   --global  전역 설정 (~/.gitconfig) [기본값]
@@ -14,6 +16,8 @@ git_config.py - Git Config 자동 설정 스크립트
   CLAUDE_CODE_GITHUB_USERNAME  - GitHub 사용자명 (선택)
   CLAUDE_CODE_SSH_KEY_GITHUB   - GitHub SSH 키 경로 (선택)
 """
+
+from __future__ import annotations
 
 import os
 import subprocess
@@ -29,8 +33,16 @@ _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", ".."))
 _ENV_FILE = os.path.join(_PROJECT_ROOT, ".claude.env")
 
 
-def _git_config_get(scope, key):
-    """git config 값을 읽기."""
+def _git_config_get(scope: str, key: str) -> str:
+    """git config 값을 읽어 반환한다.
+
+    Args:
+        scope: git config 범위 ('--global' 또는 '--local')
+        key: 읽을 설정 키 (예: 'user.name')
+
+    Returns:
+        설정 값 문자열. 설정이 없거나 오류 발생 시 '(미설정)' 반환.
+    """
     try:
         return subprocess.check_output(
             ["git", "config", scope, key],
@@ -40,7 +52,16 @@ def _git_config_get(scope, key):
         return "(미설정)"
 
 
-def main():
+def main() -> None:
+    """Git config 자동 설정의 진입점.
+
+    .claude.env에서 환경변수를 읽어 git user.name, user.email,
+    core.sshCommand를 지정된 범위(global/local)에 적용한다.
+    변경 전후 상태를 비교하여 출력한다.
+
+    Raises:
+        SystemExit: .claude.env 파일 부재, 필수 환경변수 누락, 알 수 없는 옵션 지정 시
+    """
     # --- 옵션 파싱 ---
     scope = "--global"
     if len(sys.argv) >= 2:

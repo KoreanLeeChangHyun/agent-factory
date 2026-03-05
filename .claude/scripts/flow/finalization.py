@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-워크플로우 마무리 처리 스크립트 (flow-finish)
+"""워크플로우 마무리 처리 스크립트 (flow-finish).
 
 오케스트레이터가 직접 호출하는 워크플로우 마무리 4단계 결정론적 스크립트.
 
@@ -23,6 +22,8 @@
   1  status.json 전이 실패
 """
 
+from __future__ import annotations
+
 import argparse
 import glob
 import json
@@ -34,33 +35,38 @@ import tempfile
 import time
 
 # utils 패키지 import
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+_scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
 from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 
-PROJECT_ROOT = resolve_project_root()
+PROJECT_ROOT: str = resolve_project_root()
 
 # 스크립트 경로
-HISTORY_SYNC = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "history_sync.py")
-UPDATE_STATE = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
-USAGE_SYNC = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "usage_sync.py")
-UPDATE_KANBAN = os.path.join(PROJECT_ROOT, ".claude", "skills", "design-strategy", "scripts", "update-kanban.sh")
+HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "history_sync.py")
+UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
+USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "usage_sync.py")
+UPDATE_KANBAN: str = os.path.join(PROJECT_ROOT, ".claude", "skills", "design-strategy", "scripts", "update-kanban.sh")
 
 
-def run(cmd, label, critical=False, input_data=None):
+def run(
+    cmd: list[str],
+    label: str,
+    critical: bool = False,
+    input_data: str | None = None,
+) -> int:
     """subprocess 실행 래퍼.
 
     Args:
         cmd: 실행할 명령어 리스트
-        label: 로그용 라벨
-        critical: True이면 실패 시 exit 1
+        label: 로그용 라벨 (에러/경고 메시지에 표시)
+        critical: True이면 실패 시 exit 1로 종료
         input_data: stdin으로 전달할 문자열 (선택)
 
     Returns:
-        int: 종료 코드
+        프로세스 종료 코드. 타임아웃 또는 예외 시 1 반환.
     """
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, input=input_data)
@@ -95,13 +101,19 @@ def run(cmd, label, critical=False, input_data=None):
             return 1
 
 
-def _find_transcript_path(registry_key):
+def _find_transcript_path(registry_key: str) -> str | None:
     """registryKey로부터 subagents 디렉터리의 transcript 경로를 구성한다.
 
     1차: status.json의 linked_sessions에서 세션 ID를 읽고 subagents/ 탐색.
     2차(대체): linked_sessions가 비어있을 때 usage.json의 _agent_map에 기록된
          알려진 agent_id로 glob하여 subagents 디렉터리를 역탐색한다.
     실제 agent-*.jsonl 파일이 존재하는 경우 첫 번째 파일 경로를 반환한다.
+
+    Args:
+        registry_key: YYYYMMDD-HHMMSS 형식 워크플로우 식별자
+
+    Returns:
+        agent-*.jsonl 파일 절대 경로. 찾지 못하면 None.
     """
     abs_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
     if not abs_work_dir:
@@ -161,8 +173,14 @@ def _find_transcript_path(registry_key):
     return None
 
 
-def find_kanbanboard():
-    """프로젝트 루트에서 .kanbanboard 파일을 탐색."""
+def find_kanbanboard() -> str | None:
+    """프로젝트 루트에서 .kanbanboard 파일을 탐색한다.
+
+    .workflow/ 하위와 프로젝트 루트를 순서대로 탐색한다.
+
+    Returns:
+        .kanbanboard 파일 절대 경로. 없으면 None.
+    """
     pattern = os.path.join(PROJECT_ROOT, ".workflow", "**", ".kanbanboard")
     matches = sorted(glob.glob(pattern, recursive=True))
     if matches:
@@ -174,8 +192,19 @@ def find_kanbanboard():
     return None
 
 
-def _acquire_lock(lock_dir, max_wait=2):
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
+def _acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
+
+    디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
+    프로세스가 종료되었거나 max_wait 초 초과 시 stale lock을 제거하고 재시도한다.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로
+        max_wait: 최대 대기 초 (기본값 2)
+
+    Returns:
+        잠금 획득 성공 여부.
+    """
     waited = 0
     while True:
         try:
@@ -224,8 +253,15 @@ def _acquire_lock(lock_dir, max_wait=2):
             time.sleep(1)
 
 
-def _release_lock(lock_dir):
-    """잠금 해제."""
+def _release_lock(lock_dir: str) -> None:
+    """잠금을 해제한다.
+
+    PID 파일 삭제 후 잠금 디렉터리를 제거한다.
+    파일시스템 오류는 무시한다.
+
+    Args:
+        lock_dir: 해제할 잠금 디렉터리 경로
+    """
     try:
         pid_file = os.path.join(lock_dir, "pid")
         if os.path.exists(pid_file):
@@ -239,7 +275,16 @@ def _release_lock(lock_dir):
 
 
 def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
-    """.dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다."""
+    """.dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다.
+
+    workflow.log 파일에서 WARN/ERROR 카운트와 파일 크기를 수집하여
+    마크다운 테이블 행을 구성하고 원자적으로 삽입한다.
+    예외 발생 시 무시하고 계속 진행한다.
+
+    Args:
+        registry_key: YYYYMMDD-HHMMSS 형식 워크플로우 식별자
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
+    """
     try:
         marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
         logs_md = os.path.join(PROJECT_ROOT, ".dashboard", ".logs.md")
@@ -350,7 +395,8 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
         pass
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 4단계를 순서대로 실행한다."""
     parser = argparse.ArgumentParser(
         description="워크플로우 마무리 처리 (flow-finish 5단계)",
     )
@@ -360,12 +406,12 @@ def main():
 
     args = parser.parse_args()
 
-    registry_key = args.registryKey
-    status = args.status
-    workflow_id = args.workflow_id
+    registry_key: str = args.registryKey
+    status: str = args.status
+    workflow_id: str | None = args.workflow_id
 
     # ── Step 1: status.json 완료 처리 (critical) ──
-    to_step = "DONE" if status == "완료" else "FAILED"
+    to_step: str = "DONE" if status == "완료" else "FAILED"
 
     run(
         ["python3", UPDATE_STATE, "status", registry_key, to_step],

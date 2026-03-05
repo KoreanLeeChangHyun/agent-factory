@@ -1,7 +1,7 @@
 # Skill Catalog
 
 > 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 59개 (전문화: 59, 프로젝트: 0)
+> 활성 스킬: 60개 (전문화: 60, 프로젝트: 0)
 
 ## Command Default Mapping
 
@@ -75,6 +75,7 @@
 | analyze-data | Data analysis skill. Performs dataset exploration, statistical analysis, visualization, and insight extraction. Use for data analysis tasks: (1) CSV/JSON/Excel dataset exploration and EDA, (2) statistical analysis and distribution checks, (3) data quality inspection (missing values, outliers), (4) insight extraction and visualization. Triggers: '데이터 분석', 'data analysis', 'EDA', '통계', '데이터셋', 'dataset'. |
 | analyze-database | Database analysis skill. Analyzes schema, table structure, relationships, indexes, and query performance. Use for database analysis tasks: (1) schema structure analysis and ERD generation, (2) table relationship visualization, (3) index and query performance optimization, (4) normalization level and data integrity review. Invoked via cc:analyze command; integrates with design-mermaid-diagrams for ERD generation. Triggers: 'DB 분석', 'database', '스키마', 'schema', 'ERD', '테이블 구조', '쿼리 성능'. |
 | analyze-srs | Requirements analysis (SRS) skill. Systematically analyzes ambiguous requests to produce a concrete Software Requirements Specification. Use for requirements analysis tasks: (1) clarifying ambiguous requests, (2) goal identification and scope definition, (3) constraint identification and expected deliverables, (4) functional/non-functional requirements classification. Triggers: '요구사항', '명세서', '스펙', 'SRS', 'specification', 'requirement', '기능 정의'. |
+| convention-python | .py 파일 읽기/쓰기 시 무조건 트리거되는 Python 코딩 컨벤션 강제 스킬. PEP 8 네이밍, 전체 타입 힌트, Google 스타일 docstring, OOP 설계 규칙을 강제한다. Triggers: '*.py', 'Python', 'python', '.py 파일'. |
 | debug-gha-analysis | Systematically investigates GitHub Actions workflow failures using a 5-step process (info gathering, flake check, breaking commit identification, root cause analysis, existing fix search). Use for CI failure analysis: GHA workflow failure diagnosis, CI build failure debugging, flaky test identification. Triggers: 'GHA', 'GitHub Actions', 'CI', 'CI/CD', 'workflow run', 'build failure', '빌드 실패', 'pipeline'. |
 | debug-static-analysis | Security deep static analysis skill. Performs OWASP Top 10 full vulnerability scan, dependency vulnerability scanning (npm audit/pip-audit/cargo-audit), secret detection, CSRF/XSS/SQL Injection defense verification, auth/authz logic pattern validation, and CSP configuration guidance. Use for security analysis: security-related code during implement/refactor, security audits, pre-production security checks. Triggers: '보안', 'security', 'OWASP', '취약점', '정적 분석', 'static analysis', 'CodeQL', 'Semgrep', '시크릿 탐지', 'secret detection', '의존성 취약점', 'dependency vulnerability'. |
 | debug-systematic | Systematically diagnoses and resolves bugs using a 4-step root cause analysis methodology (symptom collection, hypothesis formation, isolation testing, fix verification). Includes defense-in-depth debugging, condition-based wait patterns, and error handling consistency guide. Use for bug resolution: debugging, error tracing, root cause analysis, error handling pattern design. Triggers: '디버깅', 'debugging', '버그', 'bug', '에러', 'error', 'root-cause', '에러 핸들링', 'exception handling', 'graceful degradation'. |

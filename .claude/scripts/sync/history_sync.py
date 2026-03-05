@@ -1,15 +1,25 @@
 #!/usr/bin/env -S python3 -u
-"""
-히스토리 동기화 및 상태 확인 명령어.
+"""히스토리 동기화 및 상태 확인 명령어.
 
 .workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 .dashboard/.history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
+
+주요 함수:
+    parse_timestamp_from_dir: 디렉터리명에서 날짜/시간 추출
+    extract_status_from_json: status.json에서 단계 및 타임스탬프 추출
+    is_stale: WORK/PLAN 단계의 스테일 여부 판정
+    scan_workflow_directory: 워크플로우 디렉터리 스캔
+    cmd_sync: sync 서브커맨드 실행
+    cmd_status: status 서브커맨드 실행
+    cmd_archive: archive 서브커맨드 실행
 
 사용법:
     python3 .claude/scripts/sync/history_sync.py sync [--workflow-dir <path>] [--target <path>] [--dry-run] [--all]
     python3 .claude/scripts/sync/history_sync.py status [--workflow-dir <path>] [--target <path>] [--all]
     python3 .claude/scripts/sync/history_sync.py archive [registryKey]
 """
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -20,6 +30,7 @@ import tempfile
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -37,7 +48,7 @@ try:
     )
 except ImportError:
     C_CYAN = C_GREEN = C_RED = C_RESET = C_YELLOW = ""
-    def resolve_project_root():
+    def resolve_project_root() -> str:
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from data.constants import STALE_TTL_SECONDS, KEEP_COUNT
@@ -58,12 +69,28 @@ ORPHAN_STATUS = "삭제됨"
 # ============================================================
 
 def _escape_pipe(text: str) -> str:
-    """마크다운 테이블 셀 내 파이프 문자를 HTML 엔티티로 이스케이프."""
+    """마크다운 테이블 셀 내 파이프 문자를 HTML 엔티티로 이스케이프.
+
+    Args:
+        text: 이스케이프할 문자열
+
+    Returns:
+        파이프 문자(|)가 &#124;로 치환된 문자열
+    """
     return text.replace("|", "&#124;")
 
 
 def parse_timestamp_from_dir(dir_name: str) -> tuple[str, str]:
-    """YYYYMMDD-HHMMSS 형식에서 날짜와 시간을 추출."""
+    """YYYYMMDD-HHMMSS 형식에서 날짜와 시간을 추출.
+
+    Args:
+        dir_name: YYYYMMDD-HHMMSS 형식의 디렉터리 이름
+
+    Returns:
+        tuple: (formatted_date, formatted_time)
+            - formatted_date: YYYY-MM-DD 형식
+            - formatted_time: HH:MM 형식
+    """
     date_part = dir_name[:8]
     time_part = dir_name[9:15]
     formatted_date = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
@@ -71,8 +98,18 @@ def parse_timestamp_from_dir(dir_name: str) -> tuple[str, str]:
     return formatted_date, formatted_time
 
 
-def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | None]:
-    """status.json에서 step(phase), created_at, updated_at을 추출."""
+def extract_status_from_json(status_file: str) -> tuple[str, Optional[str], Optional[str]]:
+    """status.json에서 step(phase), created_at, updated_at을 추출.
+
+    Args:
+        status_file: status.json 파일 경로
+
+    Returns:
+        tuple: (step, created_at, updated_at)
+            - step: 현재 단계 문자열. 파싱 실패 시 "UNKNOWN"
+            - created_at: ISO 8601 생성 타임스탬프. 없으면 None
+            - updated_at: ISO 8601 갱신 타임스탬프. 없으면 None
+    """
     try:
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -84,8 +121,16 @@ def extract_status_from_json(status_file: str) -> tuple[str, str | None, str | N
         return "UNKNOWN", None, None
 
 
-def is_stale(step: str, updated_at: str | None) -> bool:
-    """WORK 또는 PLAN 단계에서 updated_at 기준 30분 이상 경과하면 스테일로 판정."""
+def is_stale(step: str, updated_at: Optional[str]) -> bool:
+    """WORK 또는 PLAN 단계에서 updated_at 기준 30분 이상 경과하면 스테일로 판정.
+
+    Args:
+        step: 현재 워크플로우 단계 (WORK, PLAN, INIT, REPORT 등)
+        updated_at: ISO 8601 형식의 마지막 갱신 타임스탬프. None이면 False 반환.
+
+    Returns:
+        스테일 여부. STALE_TTL_SECONDS 초 이상 경과하면 True.
+    """
     if step not in ("WORK", "PLAN", "INIT", "REPORT"):
         return False
     if not updated_at:
@@ -101,7 +146,15 @@ def is_stale(step: str, updated_at: str | None) -> bool:
 
 
 def extract_summary_from_plan(plan_file: str, max_len: int = 60) -> str:
-    """plan.md에서 '## 작업 요약' 섹션의 첫 문장을 추출."""
+    """plan.md에서 '## 작업 요약' 섹션의 첫 문장을 추출.
+
+    Args:
+        plan_file: plan.md 파일 경로
+        max_len: 반환할 최대 문자 수. 초과하면 잘라낸다.
+
+    Returns:
+        추출된 요약 문자열. 추출 실패 시 빈 문자열.
+    """
     try:
         with open(plan_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -118,7 +171,15 @@ def extract_summary_from_plan(plan_file: str, max_len: int = 60) -> str:
 
 
 def extract_summary_from_prompt(prompt_file: str, max_len: int = 60) -> str:
-    """user_prompt.txt의 첫 줄을 요약으로 추출."""
+    """user_prompt.txt의 첫 줄을 요약으로 추출.
+
+    Args:
+        prompt_file: user_prompt.txt 파일 경로
+        max_len: 반환할 최대 문자 수. 초과하면 잘라낸다.
+
+    Returns:
+        추출된 첫 줄 문자열. 추출 실패 시 빈 문자열.
+    """
     try:
         with open(prompt_file, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
@@ -130,7 +191,15 @@ def extract_summary_from_prompt(prompt_file: str, max_len: int = 60) -> str:
 
 
 def extract_summary_from_file(summary_file: str, max_len: int = 60) -> str:
-    """summary.txt의 첫 줄을 읽어 max_len 이내로 잘라 반환."""
+    """summary.txt의 첫 줄을 읽어 max_len 이내로 잘라 반환.
+
+    Args:
+        summary_file: summary.txt 파일 경로
+        max_len: 반환할 최대 문자 수. 초과하면 잘라낸다.
+
+    Returns:
+        추출된 첫 줄 문자열. 파일이 비어있거나 읽기 실패 시 빈 문자열.
+    """
     try:
         with open(summary_file, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
@@ -144,7 +213,14 @@ def extract_summary_from_file(summary_file: str, max_len: int = 60) -> str:
 
 
 def extract_title_from_context(context_file: str) -> str:
-    """.context.json에서 title 필드를 읽어 반환. JSON 파싱 실패 시 빈 문자열 반환."""
+    """.context.json에서 title 필드를 읽어 반환. JSON 파싱 실패 시 빈 문자열 반환.
+
+    Args:
+        context_file: .context.json 파일 경로
+
+    Returns:
+        title 필드 값. 파싱 실패 또는 title 없으면 빈 문자열.
+    """
     try:
         with open(context_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -157,8 +233,7 @@ def extract_title_from_context(context_file: str) -> str:
 
 
 def ensure_entry_data(cmd_path: str) -> None:
-    """
-    단일 워크플로우 디렉터리의 필수 파일을 검증하고, 누락 시 자동 생성한다.
+    """단일 워크플로우 디렉터리의 필수 파일을 검증하고, 누락 시 자동 생성한다.
 
     대상 디렉터리: <YYYYMMDD-HHMMSS>/<workName>/<command>/
 
@@ -171,6 +246,9 @@ def ensure_entry_data(cmd_path: str) -> None:
         (b) user_prompt.txt의 첫 줄
         (c) .context.json의 'title' 필드
         모든 소스에서 추출 실패 시 생성하지 않는다.
+
+    Args:
+        cmd_path: <command> 레벨 디렉터리 절대 경로
     """
     summary_file = os.path.join(cmd_path, "summary.txt")
     if os.path.exists(summary_file):
@@ -210,9 +288,29 @@ def ensure_entry_data(cmd_path: str) -> None:
             pass
 
 
-def _build_entry(dir_name: str, work_name: str, command: str,
-                  cmd_path: str, work_path: str, rel_prefix: str) -> dict:
-    """단일 엔트리의 메타정보를 수집하여 dict로 반환하는 내부 헬퍼."""
+def _build_entry(
+    dir_name: str,
+    work_name: str,
+    command: str,
+    cmd_path: str,
+    work_path: str,
+    rel_prefix: str,
+) -> dict[str, object]:
+    """단일 엔트리의 메타정보를 수집하여 dict로 반환하는 내부 헬퍼.
+
+    Args:
+        dir_name: YYYYMMDD-HHMMSS 형식의 타임스탬프 디렉터리 이름
+        work_name: 작업 이름 (workName 서브디렉터리 이름)
+        command: 커맨드 이름 (implement, review 등)
+        cmd_path: <command> 레벨 디렉터리 절대 경로
+        work_path: <workName> 레벨 디렉터리 절대 경로
+        rel_prefix: history.md에서의 상대 경로 접두사
+
+    Returns:
+        엔트리 메타정보 딕셔너리 (work_id, title, summary, command, step, status,
+        date, time, has_plan, has_prompt, has_files, files_count, has_report,
+        has_work, work_name, rel_base 포함)
+    """
     ensure_entry_data(cmd_path)
 
     # 파일 경로 구성
@@ -294,15 +392,21 @@ def _build_entry(dir_name: str, work_name: str, command: str,
     }
 
 
-def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict]:
-    """
-    단일 디렉토리를 스캔하여 워크플로우 엔트리 목록을 반환.
+def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, object]]:
+    """단일 디렉토리를 스캔하여 워크플로우 엔트리 목록을 반환.
 
     디렉토리 구조: base_dir/<YYYYMMDD-HHMMSS>/<workName>/<command>/
     command 서브디렉토리가 없고 workName에 직접 파일이 있으면 command="unknown"으로 폴백.
-    rel_prefix: history.md에서의 상대 경로 접두사 (예: "../.workflow" 또는 "../.workflow/.history")
+
+    Args:
+        base_dir: 스캔할 기본 디렉터리 절대 경로
+        rel_prefix: history.md에서의 상대 경로 접두사
+            (예: "../.workflow" 또는 "../.workflow/.history")
+
+    Returns:
+        발견된 워크플로우 엔트리 딕셔너리 목록
     """
-    entries = []
+    entries: list[dict[str, object]] = []
 
     if not os.path.isdir(base_dir):
         return entries
@@ -346,14 +450,20 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict]:
     return entries
 
 
-def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict]:
-    """
-    .workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
+def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict[str, object]]:
+    """.workflow/ 및 .workflow/.history/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
 
     디렉토리 구조: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/
     .history/ 하위도 동일 구조로 탐색하며, rel_base를 ../.workflow/.history/...로 구성.
 
     .workflow/ 엔트리가 .history/ 엔트리보다 우선한다 (같은 work_id인 경우).
+
+    Args:
+        workflow_dir: .workflow/ 디렉터리 절대 경로
+        include_all: True이면 중단된 작업도 포함. 현재 미사용.
+
+    Returns:
+        발견된 워크플로우 엔트리 딕셔너리 목록 (날짜 역순 정렬)
     """
     # .workflow/ 스캔 (우선)
     entries = _scan_entries_in_dir(workflow_dir, "../.workflow")
@@ -376,16 +486,23 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
     return entries
 
 
-def format_row(entry: dict) -> str:
-    """10컬럼 테이블 행을 생성."""
+def format_row(entry: dict[str, object]) -> str:
+    """10컬럼 테이블 행을 생성.
+
+    Args:
+        entry: _build_entry()가 반환한 워크플로우 엔트리 딕셔너리
+
+    Returns:
+        마크다운 테이블 행 문자열 (| 구분자 포함)
+    """
     # 날짜 셀: YYYY-MM-DD<br><sub>HH:MM</sub>
     date_cell = f"{entry['date']}<br><sub>{entry['time']}</sub>"
 
     # 제목 & 내용 셀: 제목<br><sub>요약</sub>
     if entry["summary"]:
-        title_cell = f"{_escape_pipe(entry['title'])}<br><sub>{_escape_pipe(entry['summary'])}</sub>"
+        title_cell = f"{_escape_pipe(str(entry['title']))}<br><sub>{_escape_pipe(str(entry['summary']))}</sub>"
     else:
-        title_cell = _escape_pipe(entry["title"])
+        title_cell = _escape_pipe(str(entry["title"]))
 
     # 질의 링크
     if entry["has_prompt"]:
@@ -425,14 +542,17 @@ def format_row(entry: dict) -> str:
 # ============================================================
 
 def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]]:
-    """
-    history.md를 파싱하여 구성 요소를 반환.
+    """history.md를 파싱하여 구성 요소를 반환.
+
+    Args:
+        filepath: history.md 파일 경로. 파일이 없으면 빈 결과를 반환.
 
     Returns:
-        - header_lines: 마커까지의 헤더 부분 (마커 포함)
-        - existing_ids: 기존 작업ID Set
-        - marker_idx: 마커 라인의 인덱스 (-1이면 없음)
-        - data_rows: 데이터 행 목록 (테이블 헤더/구분선 제외)
+        tuple: (header_lines, existing_ids, marker_idx, data_rows)
+            - header_lines: 마커까지의 헤더 부분 (마커 포함)
+            - existing_ids: 기존 작업ID Set
+            - marker_idx: 마커 라인의 인덱스 (-1이면 없음)
+            - data_rows: 데이터 행 목록 (테이블 헤더/구분선 제외)
     """
     if not os.path.exists(filepath):
         return [], set(), -1, []
@@ -440,9 +560,9 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
     with open(filepath, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    header_lines = []
-    data_rows = []
-    existing_ids = set()
+    header_lines: list[str] = []
+    data_rows: list[str] = []
+    existing_ids: set[str] = set()
     marker_idx = -1
     in_table = False
     table_header_seen = False
@@ -482,7 +602,14 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
 
 
 def extract_status_from_row(row: str) -> str:
-    """기존 데이터 행에서 상태 셀 값을 추출."""
+    """기존 데이터 행에서 상태 셀 값을 추출.
+
+    Args:
+        row: 마크다운 테이블 데이터 행 문자열
+
+    Returns:
+        상태 셀 값 문자열. 셀 수가 부족하면 빈 문자열.
+    """
     cells = row.split("|")
     if len(cells) >= 6:
         return cells[5].strip()
@@ -490,7 +617,15 @@ def extract_status_from_row(row: str) -> str:
 
 
 def replace_status_in_row(row: str, new_status: str) -> str:
-    """기존 데이터 행의 상태 셀 값을 교체."""
+    """기존 데이터 행의 상태 셀 값을 교체.
+
+    Args:
+        row: 마크다운 테이블 데이터 행 문자열
+        new_status: 교체할 새 상태 값
+
+    Returns:
+        상태 셀이 교체된 행 문자열. 셀 수가 부족하면 원본 행 반환.
+    """
     cells = row.split("|")
     if len(cells) >= 6:
         cells[5] = f" {new_status} "
@@ -499,7 +634,14 @@ def replace_status_in_row(row: str, new_status: str) -> str:
 
 
 def extract_work_id_from_row(row: str) -> str:
-    """기존 데이터 행에서 작업ID를 추출."""
+    """기존 데이터 행에서 작업ID를 추출.
+
+    Args:
+        row: 마크다운 테이블 데이터 행 문자열
+
+    Returns:
+        작업ID 문자열. 셀 수가 부족하면 빈 문자열.
+    """
     cells = row.split("|")
     if len(cells) >= 3:
         return cells[2].strip()
@@ -511,7 +653,16 @@ def extract_work_id_from_row(row: str) -> str:
 # ============================================================
 
 def cmd_sync(args: argparse.Namespace) -> int:
-    """sync 서브커맨드 실행."""
+    """sync 서브커맨드 실행.
+
+    .workflow/ 디렉터리를 스캔하여 history.md와 비교하고 누락/변경 항목을 동기화한다.
+
+    Args:
+        args: argparse.Namespace. workflow_dir, target, dry_run, all 속성 포함.
+
+    Returns:
+        종료 코드. 0: 성공, 1: 실패
+    """
     print(f"{C_CYAN}[history-sync]{C_RESET} sync 시작...")
 
     workflow_dir = args.workflow_dir
@@ -536,14 +687,14 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     # scanned 데이터를 work_id -> entry 맵으로 구성
     # (scan_workflow_directory에서 이미 .workflow/ 우선 처리됨)
-    scanned_map = {}
+    scanned_map: dict[str, dict[str, object]] = {}
     for entry in scanned:
         scanned_map.setdefault(entry["work_id"], entry)
 
     # 기존 행을 work_id -> row 딕셔너리로 변환
     # 레거시 형식 감지를 위해 원본 행도 보존
-    existing_rows = {}
-    original_rows = {}
+    existing_rows: dict[str, str] = {}
+    original_rows: dict[str, str] = {}
     for row in data_rows:
         wid = extract_work_id_from_row(row)
         if wid:
@@ -554,8 +705,8 @@ def cmd_sync(args: argparse.Namespace) -> int:
             original_rows.setdefault(wid, row)
 
     # 비교: 누락 항목 및 상태 변경/레거시 형식 항목 탐지
-    new_entries = []
-    updated_entries = []
+    new_entries: list[dict[str, object]] = []
+    updated_entries: list[dict[str, object]] = []
 
     for entry in scanned:
         wid = entry["work_id"]
@@ -610,7 +761,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             print(f"    + {e['work_id']} | {e['title']} | {e['command']} | {e['status']}")
         print(f"  상태 업데이트: {len(updated_entries)}건")
         for e in updated_entries:
-            old_row = original_rows.get(e["work_id"], "")
+            old_row = original_rows.get(str(e["work_id"]), "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
         if orphan_wids:
@@ -621,12 +772,12 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     # 실제 갱신
     # 1. 기존 행에서 상태 변경 적용
-    updated_row_map = {}
+    updated_row_map: dict[str, str] = {}
     for entry in updated_entries:
-        updated_row_map[entry["work_id"]] = format_row(entry)
+        updated_row_map[str(entry["work_id"])] = format_row(entry)
 
     # 2. 전체 데이터 재구성 (기존 행 업데이트 + 신규 행 추가)
-    final_rows = []
+    final_rows: list[str] = []
 
     # 신규 행 생성
     new_rows = [format_row(e) for e in new_entries]
@@ -650,7 +801,8 @@ def cmd_sync(args: argparse.Namespace) -> int:
     all_rows = [r for r in (final_rows + new_rows) if not r.strip().startswith("|---")]
 
     # 작업ID(역순)로 정렬
-    def sort_key(row):
+    def sort_key(row: str) -> str:
+        """행의 작업ID를 정렬 키로 반환."""
         wid = extract_work_id_from_row(row)
         return wid if wid else ""
 
@@ -658,7 +810,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     # work_id 기준 중복 행 제거 (정렬 후 첫 번째 행만 유지)
     seen_wids: set[str] = set()
-    deduped_rows = []
+    deduped_rows: list[str] = []
     for row in all_rows:
         wid = extract_work_id_from_row(row)
         if wid and wid in seen_wids:
@@ -669,7 +821,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     all_rows = deduped_rows
 
     # history.md 파일 재구성
-    output_lines = []
+    output_lines: list[str] = []
 
     # 제목
     output_lines.append("# 워크플로우 실행 이력\n")
@@ -702,7 +854,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     if updated_entries:
         print(f"  상태 업데이트: {len(updated_entries)}건")
         for e in updated_entries:
-            old_row = original_rows.get(e["work_id"], "")
+            old_row = original_rows.get(str(e["work_id"]), "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
     if orphan_wids:
@@ -720,7 +872,16 @@ def cmd_sync(args: argparse.Namespace) -> int:
 # ============================================================
 
 def cmd_status(args: argparse.Namespace) -> int:
-    """status 서브커맨드 실행."""
+    """status 서브커맨드 실행.
+
+    .workflow/ 디렉터리와 history.md를 비교하여 동기화 상태 요약을 출력한다.
+
+    Args:
+        args: argparse.Namespace. workflow_dir, target, all 속성 포함.
+
+    Returns:
+        종료 코드. 항상 0.
+    """
     workflow_dir = args.workflow_dir
     target = args.target
     include_all = args.all
@@ -745,7 +906,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     # 상태별 분류
     status_counts: dict[str, int] = {}
     for entry in scanned:
-        s = entry["status"]
+        s = str(entry["status"])
         status_counts[s] = status_counts.get(s, 0) + 1
 
     # 출력
@@ -775,7 +936,14 @@ def cmd_status(args: argparse.Namespace) -> int:
 # ============================================================
 
 def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
-    """활성 워크플로우(완료 상태가 아닌)의 디렉터리 이름 집합을 반환."""
+    """활성 워크플로우(완료 상태가 아닌)의 디렉터리 이름 집합을 반환.
+
+    Args:
+        workflow_dir: .workflow/ 디렉터리 절대 경로
+
+    Returns:
+        완료되지 않은(DONE/FAILED/CANCELLED 아닌) 워크플로우 디렉터리 이름 집합
+    """
     active_keys: set[str] = set()
     terminal_phases = {"DONE", "FAILED", "CANCELLED"}
 
@@ -812,7 +980,17 @@ def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
 
 
 def cmd_archive(args: argparse.Namespace) -> int:
-    """archive 서브커맨드 실행. 오래된 워크플로우 디렉토리를 .history/로 이동."""
+    """archive 서브커맨드 실행. 오래된 워크플로우 디렉토리를 .history/로 이동.
+
+    KEEP_COUNT개를 초과하는 오래된 디렉터리를 .workflow/.history/로 이동한다.
+    registry_key가 지정되면 해당 키는 보존하고, 없으면 활성 워크플로우를 자동 감지하여 제외한다.
+
+    Args:
+        args: argparse.Namespace. registry_key 속성 포함 (None 가능).
+
+    Returns:
+        종료 코드. 0: 성공, 1: 일부 실패
+    """
     current_key = getattr(args, 'registry_key', None)
     workflow_dir = os.path.join(PROJECT_ROOT, ".workflow")
     history_dir = os.path.join(workflow_dir, ".history")
@@ -822,7 +1000,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
         return 0
 
     # [0-9]* 패턴 디렉토리를 역순 정렬
-    dirs = []
+    dirs: list[str] = []
     for name in sorted(os.listdir(workflow_dir), reverse=True):
         full_path = os.path.join(workflow_dir, name)
         if os.path.isdir(full_path) and re.match(r"^[0-9]", name):
@@ -874,7 +1052,12 @@ def cmd_archive(args: argparse.Namespace) -> int:
 PROJECT_ROOT = resolve_project_root()
 
 
-def main():
+def main() -> int:
+    """CLI 진입점. 서브커맨드(sync/status/archive)를 파싱하여 실행한다.
+
+    Returns:
+        종료 코드. 0: 성공, 1: 실패
+    """
     parser = argparse.ArgumentParser(description="history sync/status core")
     subparsers = parser.add_subparsers(dest="subcmd", required=True)
 

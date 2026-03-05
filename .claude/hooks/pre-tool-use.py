@@ -4,6 +4,9 @@
 Routes hook logic based on tool_name extracted from stdin JSON.
 Uses dispatcher.py utilities for flag-based conditional execution.
 """
+
+from __future__ import annotations
+
 import json
 import sys
 
@@ -20,7 +23,13 @@ from dispatcher import (
 # Main dispatcher
 # ---------------------------------------------------------------------------
 
-def main():
+def main() -> None:
+    """Dispatch pre-tool-use hooks based on tool_name.
+
+    Reads JSON from stdin, extracts tool_name, and dispatches
+    the appropriate sync or async hook scripts. Exits with the
+    first non-zero exit code from synchronous hooks.
+    """
     stdin_data = sys.stdin.buffer.read()
 
     # Parse tool_name from JSON input

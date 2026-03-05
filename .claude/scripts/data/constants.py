@@ -1,8 +1,16 @@
-"""
-constants.py - 프로젝트 공통 상수 및 정적 데이터 통합 모듈
+"""constants.py - 프로젝트 공통 상수 및 정적 데이터 통합 모듈.
 
 .claude/scripts/ 하위 스크립트에서 공통 사용하는 상수, 패턴, 매핑을 한 곳에 정의합니다.
 이 모듈은 순수 상수만 정의하며, 다른 모듈을 import하지 않는 leaf 모듈입니다.
+
+주요 상수:
+    C_RED, C_BLUE, ..., C_RESET: ANSI 색상 코드
+    STEP_COLORS: step별 색상 매핑
+    TS_PATTERN: YYYYMMDD-HHMMSS 타임스탬프 정규식
+    KST: KST 타임존 (UTC+9)
+    TERMINAL_STEPS: 종료 상태 집합
+    FSM_TRANSITIONS: FSM 상태 전이 규칙
+    DANGER_PATTERNS: 위험 명령어 차단 패턴 목록
 """
 
 import re

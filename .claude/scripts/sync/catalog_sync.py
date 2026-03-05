@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-catalog_sync.py - 스킬 카탈로그 생성/갱신 CLI (단일 소스)
+"""스킬 카탈로그 생성/갱신 CLI (단일 소스).
 
 .claude/skills/*/SKILL.md를 전수 스캔하여 frontmatter를 파싱하고,
 내장된 Command Default Mapping / Keyword Index 데이터와 결합하여
@@ -10,16 +9,27 @@ skill-catalog.md를 생성합니다.
 기존 command-skill-map.md는 폐기되었으며, 매핑 변경 시 이 파일의
 COMMAND_DEFAULTS / KEYWORD_INDEX 상수를 수정하세요.
 
+주요 함수:
+    parse_frontmatter: SKILL.md frontmatter 파싱
+    scan_skills: 전체 스킬 디렉터리 스캔
+    build_command_default_mapping: 명령어 기본 스킬 매핑 테이블 생성
+    build_keyword_index: 키워드 인덱스 테이블 생성
+    generate_catalog: skill-catalog.md 내용 생성
+    main: CLI 진입점
+
 사용법:
-  python3 .claude/scripts/sync/catalog_sync.py              # 카탈로그 생성/갱신
-  python3 .claude/scripts/sync/catalog_sync.py --dry-run     # 미리보기 (파일 쓰기 없음)
+    python3 .claude/scripts/sync/catalog_sync.py              # 카탈로그 생성/갱신
+    python3 .claude/scripts/sync/catalog_sync.py --dry-run     # 미리보기 (파일 쓰기 없음)
 
 종료 코드: 0 성공, 1 실패
 """
 
+from __future__ import annotations
+
 import os
 import re
 import sys
+from typing import Optional
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -48,14 +58,14 @@ EXCLUDE_PREFIXES = ("workflow-agent-", "workflow-cc-")
 # Command Default Mapping (단일 소스 — 기존 command-skill-map.md에서 통합)
 # 매핑 변경 시 이 상수를 수정하세요.
 # =============================================================================
-COMMAND_DEFAULTS = [
+COMMAND_DEFAULTS: list[tuple[str, str, str]] = [
     ("implement", "review-code-quality, workflow-system-verification", "코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드"),
     ("review", "review-requesting, review-code-quality", "리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드"),
     ("research", "research-general, research-integrated", "웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 키워드 매핑으로 조건부 로드"),
     ("strategy", "design-strategy", "다중 워크플로우 전략 수립, 로드맵 생성"),
 ]
 
-KEYWORD_INDEX = [
+KEYWORD_INDEX: list[tuple[str, str]] = [
     ("구현, implement, 기능 추가, feature", "workflow-system-verification"),
     ("리팩토링, refactor, 리팩터, 코드 개선", "review-code-quality"),
     ("마이그레이션, migration, 스키마 변경, DB 변경", "review-code-quality, workflow-system-verification"),
@@ -109,9 +119,17 @@ KEYWORD_INDEX = [
 ]
 
 
-def parse_frontmatter(filepath):
-    """SKILL.md의 YAML frontmatter에서 name, description, disable-model-invocation을 파싱."""
-    result = {"name": None, "description": None, "disable-model-invocation": False}
+def parse_frontmatter(filepath: str) -> Optional[dict[str, object]]:
+    """SKILL.md의 YAML frontmatter에서 name, description, disable-model-invocation을 파싱.
+
+    Args:
+        filepath: SKILL.md 파일의 절대 경로
+
+    Returns:
+        파싱된 frontmatter 딕셔너리. 파일 읽기 실패 또는 frontmatter 없으면 None.
+        키: name, description, disable-model-invocation, scope
+    """
+    result: dict[str, object] = {"name": None, "description": None, "disable-model-invocation": False}
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
@@ -155,10 +173,20 @@ def parse_frontmatter(filepath):
     return result
 
 
-def scan_skills():
-    """모든 SKILL.md를 스캔하여 활성 스킬 목록을 전문화/프로젝트로 분류하여 반환."""
-    global_skills = []
-    project_skills = []
+def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
+    """모든 SKILL.md를 스캔하여 활성 스킬 목록을 전문화/프로젝트로 분류하여 반환.
+
+    SKILLS_DIR 하위 디렉터리를 순회하며 각 스킬의 frontmatter를 파싱한다.
+    disable-model-invocation: true 스킬과 EXCLUDE_PREFIXES 접두사 스킬은 제외한다.
+
+    Returns:
+        tuple: (global_skills, project_skills, excluded_count)
+            - global_skills: scope=global 스킬 목록 (name, description 포함)
+            - project_skills: scope=project 스킬 목록 (name, description 포함)
+            - excluded_count: 제외된 스킬 수
+    """
+    global_skills: list[dict[str, str]] = []
+    project_skills: list[dict[str, str]] = []
     excluded_count = 0
 
     if not os.path.isdir(SKILLS_DIR):
@@ -189,9 +217,9 @@ def scan_skills():
             excluded_count += 1
             continue
 
-        skill_entry = {
-            "name": name,
-            "description": fm["description"] or "(설명 없음)",
+        skill_entry: dict[str, str] = {
+            "name": str(name),
+            "description": str(fm["description"] or "(설명 없음)"),
         }
 
         # scope에 따라 분류
@@ -203,8 +231,12 @@ def scan_skills():
     return global_skills, project_skills, excluded_count
 
 
-def build_command_default_mapping():
-    """내장 COMMAND_DEFAULTS 상수에서 명령어별 기본 스킬 매핑 테이블을 생성."""
+def build_command_default_mapping() -> str:
+    """내장 COMMAND_DEFAULTS 상수에서 명령어별 기본 스킬 매핑 테이블을 생성.
+
+    Returns:
+        마크다운 테이블 형식의 명령어-스킬 매핑 문자열 (개행 문자 포함)
+    """
     lines = []
     lines.append("| 명령어 | 자동 로드 스킬 | 용도 |")
     lines.append("|--------|---------------|------|")
@@ -213,8 +245,12 @@ def build_command_default_mapping():
     return "\n".join(lines) + "\n"
 
 
-def build_keyword_index():
-    """내장 KEYWORD_INDEX 상수에서 키워드 기반 추가 스킬 로드 테이블을 생성."""
+def build_keyword_index() -> str:
+    """내장 KEYWORD_INDEX 상수에서 키워드 기반 추가 스킬 로드 테이블을 생성.
+
+    Returns:
+        마크다운 테이블 형식의 키워드-스킬 인덱스 문자열 (개행 문자 포함)
+    """
     lines = []
     lines.append("| 키워드 | 추가 로드 스킬 |")
     lines.append("|--------|---------------|")
@@ -223,8 +259,23 @@ def build_keyword_index():
     return "\n".join(lines) + "\n"
 
 
-def generate_catalog(global_skills, project_skills, command_mapping, keyword_index):
-    """skill-catalog.md 내용을 생성."""
+def generate_catalog(
+    global_skills: list[dict[str, str]],
+    project_skills: list[dict[str, str]],
+    command_mapping: str,
+    keyword_index: str,
+) -> str:
+    """skill-catalog.md 내용을 생성.
+
+    Args:
+        global_skills: 전문화(global) 스킬 목록. 각 항목은 name, description 키를 포함.
+        project_skills: 프로젝트(project) 스킬 목록. 각 항목은 name, description 키를 포함.
+        command_mapping: 명령어 기본 스킬 매핑 마크다운 테이블 문자열
+        keyword_index: 키워드 인덱스 마크다운 테이블 문자열
+
+    Returns:
+        skill-catalog.md 파일에 쓸 전체 내용 문자열
+    """
     total = len(global_skills) + len(project_skills)
     lines = []
 
@@ -273,7 +324,12 @@ def generate_catalog(global_skills, project_skills, command_mapping, keyword_ind
     return "\n".join(lines)
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. 스킬 카탈로그를 생성하거나 미리보기를 출력한다.
+
+    --dry-run 플래그가 있으면 파일을 쓰지 않고 예상 결과만 출력한다.
+    종료 코드: 0 성공, 1 실패
+    """
     dry_run = "--dry-run" in sys.argv
 
     # 스킬 스캔

@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트
+"""reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트.
 
 prompt.txt의 피드백을 user_prompt.txt에 append하고,
 .uploads/ 파일 복사, prompt.txt 클리어를 수행한다.
@@ -21,6 +20,8 @@ prompt.txt의 피드백을 user_prompt.txt에 append하고,
   피드백 내용 전문
 """
 
+from __future__ import annotations
+
 import os
 import shutil
 import sys
@@ -37,7 +38,18 @@ from data.constants import KST
 _KST = KST
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. workDir 인자를 받아 prompt 피드백 반영 작업을 수행한다.
+
+    수행 작업:
+      1. .prompt/prompt.txt 읽기 (비어있으면 경고 후 종료)
+      2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
+      3. .uploads/ 파일을 <workDir>/files/로 복사 후 .uploads/ 클리어
+      4. .prompt/prompt.txt 클리어
+
+    Raises:
+        SystemExit: 인자 누락(1), workDir 미존재(1), 정상 완료(0).
+    """
     # --- 인자 확인 ---
     if len(sys.argv) < 2:
         print(f"[ERROR] 사용법: {sys.argv[0]} <workDir>", file=sys.stderr)

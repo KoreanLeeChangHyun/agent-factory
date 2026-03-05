@@ -1,17 +1,29 @@
 #!/usr/bin/env -S python3 -u
 """
-common.py - 프로젝트 공통 유틸리티
+common.py - 프로젝트 공통 유틸리티.
 
 프로젝트 루트 경로 해석, ANSI 색상 코드, JSON 원자적 쓰기,
 디렉터리 스캔 기반 워크플로우 조회, 환경변수 파싱 등
 전역적으로 사용되는 공통 기능을 제공합니다.
+
+주요 함수:
+    resolve_project_root: 프로젝트 루트 절대 경로 해석
+    load_json_file: JSON 파일 로드 (실패 시 None 반환)
+    atomic_write_json: JSON 원자적 쓰기
+    scan_active_workflows: 활성 워크플로우 디렉터리 스캔
+    resolve_active_workflow: 현재 활성 워크플로우 컨텍스트 반환
+    resolve_work_dir: 단축 키로 workDir 경로 조회
+    resolve_abs_work_dir: workDir 절대 경로 변환
+    read_env: .claude.env 환경변수 읽기
 """
+from __future__ import annotations
 
 import json
 import os
 import shutil
 import sys
 import tempfile
+from typing import Any
 
 # -- sys.path 보장: 이 모듈이 직접 실행될 때를 위해 scripts/ 디렉터리 추가 --
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
@@ -39,18 +51,17 @@ from data.constants import (  # noqa: E402
 )
 
 
-def resolve_project_root(start_path=None):
-    """
-    프로젝트 루트 경로 해석.
+def resolve_project_root(start_path: str | None = None) -> str:
+    """프로젝트 루트 경로 해석.
 
     utils -> scripts -> .claude -> project root 순서로 상위 디렉터리를 탐색하여
     프로젝트 루트를 결정합니다.
 
     Args:
-        start_path: 탐색 시작 경로 (None이면 이 파일의 위치 기준)
+        start_path: 탐색 시작 경로. None이면 이 파일의 위치 기준.
 
     Returns:
-        str: 프로젝트 루트 절대 경로
+        프로젝트 루트 절대 경로.
     """
     if start_path:
         base = os.path.abspath(start_path)
@@ -61,15 +72,14 @@ def resolve_project_root(start_path=None):
     return base
 
 
-def load_json_file(path):
-    """
-    JSON 파일 로드. 실패 시 None 반환.
+def load_json_file(path: str) -> Any | None:
+    """JSON 파일 로드. 실패 시 None 반환.
 
     Args:
-        path: JSON 파일 경로
+        path: JSON 파일 경로.
 
     Returns:
-        파싱된 JSON 데이터 또는 None
+        파싱된 JSON 데이터. 파일이 없거나 파싱 실패 시 None.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -78,17 +88,18 @@ def load_json_file(path):
         return None
 
 
-def atomic_write_json(path, data, indent=2):
-    """
-    JSON 원자적 쓰기 (임시 파일 + mv).
+def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
+    """JSON 원자적 쓰기 (임시 파일 + mv).
+
+    임시 파일에 JSON을 쓰고 원자적으로 대상 경로로 이동합니다.
 
     Args:
-        path: 쓰기 대상 파일 경로
-        data: JSON 직렬화 가능한 데이터
-        indent: JSON 들여쓰기 (기본 2)
+        path: 쓰기 대상 파일 경로.
+        data: JSON 직렬화 가능한 데이터.
+        indent: JSON 들여쓰기 수준. 기본값 2.
 
     Raises:
-        Exception: 쓰기 실패 시 (임시 파일은 자동 정리)
+        Exception: 쓰기 실패 시. 임시 파일은 자동 정리.
     """
     dir_name = os.path.dirname(path)
     os.makedirs(dir_name, exist_ok=True)
@@ -105,18 +116,17 @@ def atomic_write_json(path, data, indent=2):
         raise
 
 
-def extract_registry_key(work_dir):
-    """
-    workDir 경로에서 YYYYMMDD-HHMMSS 형식의 레지스트리 키 추출.
+def extract_registry_key(work_dir: str) -> str:
+    """workDir 경로에서 YYYYMMDD-HHMMSS 형식의 레지스트리 키 추출.
 
     중첩 구조: .../<YYYYMMDD-HHMMSS>/<workName>/<command>
     레거시 플랫 구조: .../<YYYYMMDD-HHMMSS>
 
     Args:
-        work_dir: 워크플로우 디렉터리 경로
+        work_dir: 워크플로우 디렉터리 경로.
 
     Returns:
-        str: YYYYMMDD-HHMMSS 형식 키
+        YYYYMMDD-HHMMSS 형식 키. 패턴 미매칭 시 basename 반환.
     """
     basename = os.path.basename(work_dir)
     if TS_PATTERN.match(basename):
@@ -137,19 +147,24 @@ def extract_registry_key(work_dir):
     return basename
 
 
-def scan_active_workflows(project_root=None, include_terminal=False):
-    """
-    .workflow/ 디렉터리를 스캔하여 워크플로우 목록을 반환.
+def scan_active_workflows(
+    project_root: str | None = None,
+    include_terminal: bool = False,
+) -> dict[str, dict[str, str]]:
+    """.workflow/ 디렉터리를 스캔하여 워크플로우 목록을 반환.
 
     .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/ 구조를 순회하며
     각 워크플로우의 status.json과 .context.json을 읽어 dict 형태로 반환.
+    동일 entry에 복수 워크플로우가 있을 경우 updated_at 최신순으로 결정적 선택.
 
     Args:
-        project_root: 프로젝트 루트 경로 (None이면 자동 해석)
-        include_terminal: True이면 DONE/FAILED/STALE/CANCELLED도 포함
+        project_root: 프로젝트 루트 경로. None이면 자동 해석.
+        include_terminal: True이면 DONE/FAILED/STALE/CANCELLED도 포함.
 
     Returns:
-        dict: {registryKey: {"title", "step", "workDir", "command"}}
+        registryKey를 키로 하는 딕셔너리.
+        각 값은 {"title", "step", "workDir", "command"} 형식.
+        활성 워크플로우가 없으면 빈 딕셔너리.
     """
     if project_root is None:
         project_root = resolve_project_root()
@@ -160,7 +175,7 @@ def scan_active_workflows(project_root=None, include_terminal=False):
     if not os.path.isdir(workflow_root):
         return {}
 
-    result = {}
+    result: dict[str, dict[str, str]] = {}
     for entry in os.listdir(workflow_root):
         if not TS_PATTERN.match(entry):
             continue
@@ -170,7 +185,7 @@ def scan_active_workflows(project_root=None, include_terminal=False):
 
         # 중첩 구조: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/
         # 동일 entry에 복수 워크플로우가 있을 경우 updated_at 최신순으로 결정적 선택
-        candidates = []
+        candidates: list[dict[str, str]] = []
         for work_name in sorted(os.listdir(entry_path)):
             wn_path = os.path.join(entry_path, work_name)
             if not os.path.isdir(wn_path) or work_name.startswith("."):
@@ -216,8 +231,16 @@ def scan_active_workflows(project_root=None, include_terminal=False):
     return result
 
 
-def _get_workflow_updated_at(project_root, entry):
-    """워크플로우 status.json에서 updated_at 읽기."""
+def _get_workflow_updated_at(project_root: str, entry: dict[str, str]) -> str:
+    """워크플로우 status.json에서 updated_at 읽기.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로.
+        entry: workDir 키를 포함하는 워크플로우 엔트리 딕셔너리.
+
+    Returns:
+        updated_at 문자열. status.json이 없거나 키가 없으면 빈 문자열.
+    """
     work_dir = entry.get("workDir", "")
     abs_wd = (
         os.path.join(project_root, work_dir)
@@ -230,9 +253,20 @@ def _get_workflow_updated_at(project_root, entry):
     return ""
 
 
-def _select_by_most_recent(candidates, project_root):
-    """updated_at 기준 가장 최근 워크플로우 선택."""
-    with_time = []
+def _select_by_most_recent(
+    candidates: list[tuple[str, dict[str, str]]],
+    project_root: str,
+) -> tuple[str | None, dict[str, str] | None]:
+    """updated_at 기준 가장 최근 워크플로우 선택.
+
+    Args:
+        candidates: (registryKey, entry) 튜플 목록.
+        project_root: 프로젝트 루트 절대 경로.
+
+    Returns:
+        (registryKey, entry) 튜플. 후보가 없으면 (None, None).
+    """
+    with_time: list[tuple[str, dict[str, str], str]] = []
     for key, entry in candidates:
         updated_at = _get_workflow_updated_at(project_root, entry)
         with_time.append((key, entry, updated_at))
@@ -242,18 +276,18 @@ def _select_by_most_recent(candidates, project_root):
     return with_time[0][0], with_time[0][1]
 
 
-def resolve_active_workflow(project_root=None):
-    """
-    디렉터리 스캔으로 활성 워크플로우를 식별하여 컨텍스트 반환.
+def resolve_active_workflow(project_root: str | None = None) -> dict[str, str] | None:
+    """디렉터리 스캔으로 활성 워크플로우를 식별하여 컨텍스트 반환.
 
     단일 워크플로우이면 즉시 선택, 복수이면 PLAN 단계 우선,
     동일 조건이면 updated_at 최신순으로 선택.
 
     Args:
-        project_root: 프로젝트 루트 경로 (None이면 자동 해석)
+        project_root: 프로젝트 루트 경로. None이면 자동 해석.
 
     Returns:
-        dict or None: {title, workId, workName, command, agent, step}
+        활성 워크플로우 컨텍스트 딕셔너리 {"title", "workId", "workName",
+        "command", "agent", "step"}. 활성 워크플로우가 없으면 None.
     """
     if project_root is None:
         project_root = resolve_project_root()
@@ -267,7 +301,7 @@ def resolve_active_workflow(project_root=None):
     if not entries:
         return None
 
-    selected_entry = None
+    selected_entry: dict[str, str] | None = None
 
     if len(entries) == 1:
         _, selected_entry = entries[0]
@@ -319,18 +353,17 @@ def resolve_active_workflow(project_root=None):
     }
 
 
-def resolve_work_dir(input_key, project_root=None):
-    """
-    YYYYMMDD-HHMMSS 단축 형식 키로 workDir 디렉터리 스캔 조회.
+def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
+    """YYYYMMDD-HHMMSS 단축 형식 키로 workDir 디렉터리 스캔 조회.
 
     YYYYMMDD-HHMMSS 패턴이 아닌 입력은 그대로 반환.
 
     Args:
-        input_key: 워크플로우 키 또는 경로
-        project_root: 프로젝트 루트 경로 (None이면 자동 해석)
+        input_key: 워크플로우 키(YYYYMMDD-HHMMSS) 또는 경로.
+        project_root: 프로젝트 루트 경로. None이면 자동 해석.
 
     Returns:
-        str: 해석된 workDir 경로 (상대 경로)
+        해석된 workDir 상대 경로. 스캔 실패 시 ".workflow/<input_key>" 폴백.
     """
     if not TS_PATTERN.match(input_key):
         return input_key
@@ -361,19 +394,18 @@ def resolve_work_dir(input_key, project_root=None):
     return fallback
 
 
-def resolve_abs_work_dir(work_dir, project_root=None):
-    """
-    workDir를 절대 경로로 변환.
+def resolve_abs_work_dir(work_dir: str, project_root: str | None = None) -> str:
+    """workDir를 절대 경로로 변환.
 
     YYYYMMDD-HHMMSS 단축 형식이면 디렉터리 스캔으로 조회 후 절대 경로로 변환.
     상대 경로이면 project_root 기준으로 절대 경로 구성.
 
     Args:
-        work_dir: 워크플로우 디렉터리 (단축/상대/절대)
-        project_root: 프로젝트 루트 경로 (None이면 자동 해석)
+        work_dir: 워크플로우 디렉터리 경로. 단축/상대/절대 형식 모두 허용.
+        project_root: 프로젝트 루트 경로. None이면 자동 해석.
 
     Returns:
-        str: 절대 경로
+        절대 경로 문자열.
     """
     if project_root is None:
         project_root = resolve_project_root()
@@ -395,8 +427,17 @@ def resolve_abs_work_dir(work_dir, project_root=None):
 _DEFAULT_ENV_FILE = os.environ.get("ENV_FILE", "")
 
 
-def _resolve_env_file(env_file=None):
-    """env_file 경로를 해석. None이면 환경변수 또는 프로젝트 루트에서 추론."""
+def _resolve_env_file(env_file: str | None = None) -> str:
+    """env_file 경로를 해석.
+
+    None이면 환경변수 또는 프로젝트 루트에서 추론합니다.
+
+    Args:
+        env_file: .claude.env 파일 경로. None이면 자동 해석.
+
+    Returns:
+        해석된 env_file 절대 경로 문자열.
+    """
     if env_file:
         return env_file
     if _DEFAULT_ENV_FILE:
@@ -406,19 +447,18 @@ def _resolve_env_file(env_file=None):
     return os.path.join(project_root, ".claude.env")
 
 
-def read_env(key, default="", env_file=None):
-    """
-    .claude.env에서 환경변수 읽기.
+def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
+    """.claude.env에서 환경변수 읽기.
 
     중복 키 방어(첫 번째 매칭), 따옴표 제거, $HOME/~ 확장 포함.
 
     Args:
-        key: 환경변수 키 이름
-        default: 키가 없을 때 반환할 기본값
-        env_file: .claude.env 파일 경로 (None이면 자동 해석)
+        key: 환경변수 키 이름.
+        default: 키가 없을 때 반환할 기본값.
+        env_file: .claude.env 파일 경로. None이면 자동 해석.
 
     Returns:
-        str: 환경변수 값 또는 기본값
+        환경변수 값. 파일이 없거나 키가 없으면 default 반환.
     """
     resolved = _resolve_env_file(env_file)
     if not resolved or not os.path.isfile(resolved):

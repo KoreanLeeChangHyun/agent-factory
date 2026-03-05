@@ -32,7 +32,14 @@ RESET = C_RESET
 
 
 def format_tokens(tokens: int) -> str:
-    """Format token count with k/M suffixes."""
+    """Format token count with k/M suffixes.
+
+    Args:
+        tokens: Raw token count.
+
+    Returns:
+        Human-readable string with k or M suffix (e.g. '12k', '1.5M').
+    """
     if tokens >= 1_000_000:
         val = f"{tokens / 1_000_000:.1f}M"
         return val.replace(".0M", "M")

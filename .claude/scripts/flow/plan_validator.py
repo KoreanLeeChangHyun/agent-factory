@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-plan_validator.py - 계획서(plan.md) 구조 검증 스크립트
+"""plan_validator.py - 계획서(plan.md) 구조 검증 스크립트.
 
 plan.md를 입력받아 다음을 검증한다:
 (1) Mermaid 서브그래프에서 Phase별 워커 수 추출, 최대/최소 비율 3배 이상 시 경고
@@ -15,28 +14,34 @@ plan.md를 입력받아 다음을 검증한다:
   경고 목록 또는 "검증 통과"
 """
 
+from __future__ import annotations
+
 import os
 import re
 import sys
+from typing import Any
 
 # 프로젝트 루트 결정
-_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+_scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root, resolve_work_dir
 
-PROJECT_ROOT = resolve_project_root()
+PROJECT_ROOT: str = resolve_project_root()
 
 
-def parse_mermaid_phases(content):
-    """
-    Mermaid 서브그래프에서 Phase별 워커 수를 추출.
+def parse_mermaid_phases(content: str) -> dict[str, int]:
+    """Mermaid 서브그래프에서 Phase별 워커 수를 추출한다.
 
     다중 Mermaid 코드 블록을 모두 순회하여 결과를 병합한다.
+    중첩 subgraph를 스택으로 처리하며, W[숫자]+ 패턴의 노드를 워커로 인식한다.
+
+    Args:
+        content: plan.md 전체 내용 문자열
 
     Returns:
-        dict: {phase_name: worker_count}
+        {phase_name: worker_count} 형태의 딕셔너리.
     """
     phases = {}
 
@@ -105,14 +110,35 @@ def parse_mermaid_phases(content):
     return phases
 
 
-def _split_table_row(line):
-    """마크다운 테이블 행을 셀 목록으로 분리. 양 끝 빈 셀만 제거, 내부 빈 셀은 유지."""
+def _split_table_row(line: str) -> list[str]:
+    """마크다운 테이블 행을 셀 목록으로 분리한다.
+
+    양 끝 빈 셀만 제거하고 내부 빈 셀은 유지한다.
+
+    Args:
+        line: 마크다운 테이블 행 문자열 (| 구분자 포함)
+
+    Returns:
+        셀 값 목록 (각 셀은 strip된 문자열).
+    """
     raw_parts = [p.strip() for p in line.split("|")]
     return raw_parts[1:-1] if len(raw_parts) >= 2 else raw_parts
 
 
-def _find_table_start(lines, section_pattern, column_keywords):
-    """테이블 섹션 시작 위치를 결정. 없으면 -1 반환."""
+def _find_table_start(lines: list[str], section_pattern: str | None, column_keywords: dict[str, list[str]]) -> int:
+    """테이블 섹션 시작 위치를 결정한다.
+
+    section_pattern이 있으면 해당 섹션 헤더를 먼저 탐색하고,
+    없으면 첫 번째 컬럼 키워드로 테이블 행을 직접 탐색한다.
+
+    Args:
+        lines: 마크다운 파일 행 목록
+        section_pattern: 섹션 헤더 정규식 패턴. None이면 전체 탐색.
+        column_keywords: {field_name: [keyword, ...]} 형태의 컬럼 탐지 키워드 맵
+
+    Returns:
+        테이블 섹션 시작 행 인덱스. 없으면 -1.
+    """
     if section_pattern:
         for i, line in enumerate(lines):
             if re.search(section_pattern, line):
@@ -127,9 +153,25 @@ def _find_table_start(lines, section_pattern, column_keywords):
     return -1
 
 
-def _find_header_and_col_map(lines, table_start, column_keywords):
-    """헤더 행과 컬럼 인덱스 맵을 결정. 헤더 없으면 (-1, {}) 반환."""
-    col_map = {}
+def _find_header_and_col_map(
+    lines: list[str],
+    table_start: int,
+    column_keywords: dict[str, list[str]],
+) -> tuple[int, dict[str, int]]:
+    """헤더 행과 컬럼 인덱스 맵을 결정한다.
+
+    table_start 위치에서 최대 15행 내에서 헤더 행을 탐색하고
+    column_keywords의 각 필드에 대응하는 컬럼 인덱스를 매핑한다.
+
+    Args:
+        lines: 마크다운 파일 행 목록
+        table_start: 테이블 탐색 시작 행 인덱스
+        column_keywords: {field_name: [keyword, ...]} 형태의 컬럼 탐지 키워드 맵
+
+    Returns:
+        (header_idx, col_map) 튜플. 헤더 없으면 (-1, {}).
+    """
+    col_map: dict[str, int] = {}
     first_field = next(iter(column_keywords))
     search_end = min(table_start + 15, len(lines))
 
@@ -192,13 +234,20 @@ def parse_md_table_columns(content, section_pattern, column_keywords):
     return rows
 
 
-def parse_task_table(content):
-    """
-    작업 목록 테이블에서 태스크 정보를 파싱.
+def parse_task_table(content: str) -> list[dict[str, Any]]:
+    """작업 목록 테이블에서 태스크 정보를 파싱한다.
+
+    Args:
+        content: plan.md 전체 내용 문자열
 
     Returns:
-        list: [{"id": str, "description": str, "complexity": str,
-                "complexity_score": int, "skills": list, "phase": str}, ...]
+        태스크 딕셔너리 목록. 각 항목은 다음 키를 포함:
+            id (str): 태스크 ID (W01 형식)
+            description (str): 작업 설명
+            complexity (str): 복잡도 원문 문자열
+            complexity_score (int): 복잡도 숫자 점수 (없으면 0)
+            skills (list[str]): 스킬 목록
+            phase (str): Phase 식별자
     """
     tasks = []
 
@@ -244,11 +293,17 @@ def parse_task_table(content):
     return tasks
 
 
-def count_task_work_items(content, task_id):
-    """
-    워커별 작업 상세 섹션에서 해당 태스크의 작업 항목 수를 카운트.
+def count_task_work_items(content: str, task_id: str) -> int:
+    """워커별 작업 상세 섹션에서 해당 태스크의 작업 항목 수를 카운트한다.
 
-    "### WXX:" H3 섹션 내의 번호 리스트 항목 수를 반환.
+    "### WXX:" H3 섹션 내의 번호 리스트 항목 수를 반환한다.
+
+    Args:
+        content: plan.md 전체 내용 문자열
+        task_id: 카운트할 태스크 ID (예: "W01")
+
+    Returns:
+        해당 태스크 섹션의 번호 리스트 항목 수.
     """
     lines = content.split("\n")
     in_section = False
@@ -272,8 +327,17 @@ def count_task_work_items(content, task_id):
     return item_count
 
 
-def validate_phase_balance(phases):
-    """Phase별 워커 수 균형을 검증."""
+def validate_phase_balance(phases: dict[str, int]) -> list[str]:
+    """Phase별 워커 수 균형을 검증한다.
+
+    최대/최소 워커 수 비율이 3배 이상이면 경고를 생성한다.
+
+    Args:
+        phases: {phase_name: worker_count} 형태의 딕셔너리
+
+    Returns:
+        경고 메시지 목록. 균형이 맞으면 빈 리스트.
+    """
     warnings = []
 
     if len(phases) < 2:
@@ -300,8 +364,18 @@ def validate_phase_balance(phases):
     return warnings
 
 
-def validate_work_item_deviation(tasks, content):
-    """같은 Phase 내 워커 간 작업 항목 수 편차를 검증."""
+def validate_work_item_deviation(tasks: list[dict[str, Any]], content: str) -> list[str]:
+    """같은 Phase 내 워커 간 작업 항목 수 편차를 검증한다.
+
+    동일 Phase 내 작업 항목 수 최대-최소 차이가 2를 초과하면 경고를 생성한다.
+
+    Args:
+        tasks: parse_task_table()이 반환한 태스크 딕셔너리 목록
+        content: plan.md 전체 내용 문자열
+
+    Returns:
+        경고 메시지 목록. 편차가 허용 범위 내이면 빈 리스트.
+    """
     warnings = []
 
     # Phase별 태스크 그룹화
@@ -344,8 +418,18 @@ def validate_work_item_deviation(tasks, content):
     return warnings
 
 
-def validate_skill_coverage(tasks):
-    """T2(10+) 태스크에서 스킬이 1개만 배정된 경우 경고."""
+def validate_skill_coverage(tasks: list[dict[str, Any]]) -> list[str]:
+    """T2(10+) 태스크에서 스킬이 1개만 배정된 경우 경고를 생성한다.
+
+    복잡도 점수 10 이상인 태스크에 스킬이 1개만 배정되면
+    도메인 커버리지 부족 가능성 경고를 반환한다.
+
+    Args:
+        tasks: parse_task_table()이 반환한 태스크 딕셔너리 목록
+
+    Returns:
+        경고 메시지 목록. 모든 T2 태스크가 충분한 스킬을 가지면 빈 리스트.
+    """
     warnings = []
 
     for task in tasks:
@@ -396,8 +480,8 @@ def validate(plan_path: str) -> list[str]:
     return warnings
 
 
-def print_help():
-    """사용법 출력."""
+def print_help() -> None:
+    """사용법 및 검증 항목 설명을 stdout에 출력한다."""
     print("plan_validator.py - 계획서(plan.md) 구조 검증")
     print()
     print("사용법:")
@@ -423,17 +507,18 @@ def print_help():
     print("  경고 목록 또는 '검증 통과'")
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. 인자 파싱 후 plan.md 검증 결과를 출력한다."""
     if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h"):
         print_help()
         sys.exit(0)
 
-    plan_path = sys.argv[1]
+    plan_path: str = sys.argv[1]
 
     # 3단계 경로 해석 분기
     if not plan_path.endswith(".md"):
         # (b) .md로 끝나지 않는 경우: registryKey 또는 workDir로 해석
-        resolved_dir = resolve_work_dir(plan_path, PROJECT_ROOT)
+        resolved_dir: str = resolve_work_dir(plan_path, PROJECT_ROOT)
         plan_path = os.path.join(resolved_dir, "plan.md")
 
     # 상대 경로를 절대 경로로 변환

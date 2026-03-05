@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-skill_mapper.py - Phase 0 결정적 스킬 매핑 스크립트
+"""skill_mapper.py - Phase 0 결정적 스킬 매핑 스크립트.
 
 plan.md의 태스크 skills 컬럼 + 명령어 기본 매핑 + 키워드 매칭으로
 skill-map.md를 결정적으로 생성한다. LLM 불필요.
@@ -16,6 +15,7 @@ skill-map.md를 결정적으로 생성한다. LLM 불필요.
   <workDir>/work/skill-map.md (exit 0) 또는 에러 (exit 1)
   <workDir>/work/context/WXX-context.md (태스크별 컨텍스트 슬라이스)
 """
+from __future__ import annotations
 
 import os
 import re
@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 from datetime import datetime, timezone, timedelta
+from typing import Any
 
 # 프로젝트 루트 결정
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -75,7 +76,7 @@ SYNONYM_MAP = {
 
 
 def expand_with_synonyms(text: str) -> str:
-    """입력 텍스트에서 SYNONYM_MAP 키/값 단어를 발견하면 동의어 그룹을 부가하여 확장된 텍스트를 반환.
+    """입력 텍스트에서 SYNONYM_MAP 키/값 단어를 발견하면 동의어 그룹을 부가하여 확장된 텍스트를 반환한다.
 
     Level 2 키워드 매칭 전에 적용하여 동의어/변형어 인식률을 향상시킨다.
     예: "조사" 포함 시 "연구 리서치 research investigate 탐색 분석"이 텍스트에 추가됨.
@@ -84,7 +85,7 @@ def expand_with_synonyms(text: str) -> str:
         text: 이미 lower()가 적용된 텍스트 또는 원본 텍스트
 
     Returns:
-        동의어를 부가한 확장 텍스트 (소문자)
+        동의어를 부가한 확장 텍스트 (소문자).
     """
     text_lower = text.lower()
     extra_terms = []
@@ -118,6 +119,15 @@ def resolve_skill_file(skill_name: str) -> str:
 
     COMPACT.md가 존재하면 COMPACT.md 경로를, 없으면 SKILL.md 경로를 반환한다.
     두 파일 모두 없으면 SKILL.md 경로를 반환한다 (존재 여부 보장 불가).
+
+    Args:
+        skill_name: 스킬 이름 (예: 'convention-python', 'review-code-quality')
+
+    Returns:
+        COMPACT.md 또는 SKILL.md의 절대 경로.
+
+    Raises:
+        경로 순회 시도 시 fallback으로 workflow-agent-worker/SKILL.md 경로 반환.
     """
     skill_dir = os.path.join(SKILLS_DIR, skill_name)
     skill_dir = os.path.normpath(skill_dir)
@@ -140,8 +150,11 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
     분리 계산하는 한국어 콘텐츠 보정 방식으로 토큰을 추정한다.
     합산이 TOKEN_BUDGET_LIMIT를 초과하면 경고 로그를 출력한다.
 
+    Args:
+        resolved_skills: 스킬 이름 목록
+
     Returns:
-        예상 토큰 합산 (int)
+        예상 토큰 합산 정수값.
     """
     total_tokens = 0
     for skill_name in resolved_skills:
@@ -165,8 +178,14 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
     return total_tokens
 
 
-def parse_catalog():
-    """skill-catalog.md에서 command defaults와 keyword index를 파싱."""
+def parse_catalog() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """skill-catalog.md에서 command defaults와 keyword index를 파싱한다.
+
+    Returns:
+        (defaults, keywords) 2-tuple.
+        defaults: command -> [skill_names] 딕셔너리,
+        keywords: keyword -> [skill_names] 딕셔너리.
+    """
     defaults = {}   # command -> [skill_names]
     keywords = {}   # keyword -> [skill_names]
 

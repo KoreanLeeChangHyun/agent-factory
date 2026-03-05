@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-prompt_validator.py - prompt.txt XML 계약 스펙 검증 스크립트
+"""prompt_validator.py - prompt.txt XML 계약 스펙 검증 스크립트.
 
 prompt.txt를 입력받아 다음을 검증한다:
 (1) 필수 태그 4개(<goal>, <target>, <constraints>, <criteria>) 존재 확인
@@ -22,6 +21,8 @@ prompt.txt를 입력받아 다음을 검증한다:
   2  인자 오류
 """
 
+from __future__ import annotations
+
 import json
 import re
 import sys
@@ -34,11 +35,18 @@ OPTIONAL_TAGS = ["context", "approach", "scope", "reference"]
 _TODO_PATTERN = re.compile(r"^\s*TODO\s*:", re.IGNORECASE)
 
 
-def _extract_tag_content(text, tag):
+def _extract_tag_content(text: str, tag: str) -> str | None:
     """태그 내용을 추출한다. 존재하지 않으면 None을 반환.
 
     자기 중첩 태그(예: <goal>...<goal>...</goal>...</goal>)를
     스택 기반으로 파싱하여 가장 외부 태그 쌍의 내용을 반환한다.
+
+    Args:
+        text: 검색할 전체 텍스트
+        tag: 추출할 태그 이름 (꺾쇠 제외)
+
+    Returns:
+        태그 내부 텍스트. 태그가 없으면 None.
     """
     tag_escaped = re.escape(tag)
     open_pat = re.compile(rf"<{tag_escaped}>", re.IGNORECASE)
@@ -74,11 +82,16 @@ def _extract_tag_content(text, tag):
     return None
 
 
-def _is_valid_content(content):
-    """
-    태그 내용이 유효한지 판별한다.
+def _is_valid_content(content: str) -> bool:
+    """태그 내용이 유효한지 판별한다.
 
     유효 조건: 공백 제거 후 10자 이상이며, TODO: 패턴만으로 구성되지 않음.
+
+    Args:
+        content: 검사할 태그 내용 문자열
+
+    Returns:
+        내용이 유효하면 True, 그렇지 않으면 False.
     """
     stripped = content.strip()
     if len(stripped) < 10:
@@ -88,27 +101,25 @@ def _is_valid_content(content):
     return True
 
 
-def validate(prompt_text: str) -> dict:
-    """
-    prompt_text를 검증하고 결과 dict를 반환한다.
+def validate(prompt_text: str) -> dict[str, object]:
+    """prompt_text를 검증하고 결과 dict를 반환한다.
 
     Args:
         prompt_text: 검증할 프롬프트 텍스트
 
     Returns:
-        dict: {
-            quality_score: float,
-            has_tags: bool,
-            missing_tags: list[str],
-            empty_tags: list[str],
-            optional_tags: list[str],
-            feedback: list[str],
-        }
+        검증 결과 딕셔너리. 다음 키를 포함한다:
+        - quality_score (float): 0.0~1.0 품질 점수
+        - has_tags (bool): 필수 태그가 하나 이상 존재하는지 여부
+        - missing_tags (list[str]): 누락된 필수 태그 목록
+        - empty_tags (list[str]): 내용이 비어있는 필수 태그 목록
+        - optional_tags (list[str]): 발견된 선택 태그 목록
+        - feedback (list[str]): 개선 피드백 메시지 목록
     """
-    present_tags = []
-    missing_tags = []
-    valid_tags = []
-    empty_tags = []
+    present_tags: list[str] = []
+    missing_tags: list[str] = []
+    valid_tags: list[str] = []
+    empty_tags: list[str] = []
 
     for tag in REQUIRED_TAGS:
         content = _extract_tag_content(prompt_text, tag)
@@ -133,7 +144,7 @@ def validate(prompt_text: str) -> dict:
     ]
 
     # 역방향 피드백 생성
-    feedback = []
+    feedback: list[str] = []
     for tag in missing_tags:
         feedback.append(
             f"<{tag}> 태그가 없습니다. "
@@ -155,8 +166,8 @@ def validate(prompt_text: str) -> dict:
     }
 
 
-def _print_help():
-    """사용법 출력."""
+def _print_help() -> None:
+    """사용법을 stdout으로 출력한다."""
     print("prompt_validator.py - prompt.txt XML 계약 스펙 검증")
     print()
     print("사용법:")
@@ -182,7 +193,12 @@ def _print_help():
     print("  python3 prompt_validator.py .prompt/prompt.txt")
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. 인자를 파싱하여 validate()를 실행하고 JSON을 출력한다.
+
+    Raises:
+        SystemExit: 인자 오류(2), 파일 읽기 실패(1), 정상 완료(0).
+    """
     if len(sys.argv) < 2:
         _print_help()
         sys.exit(2)

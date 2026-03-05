@@ -1,8 +1,10 @@
 #!/usr/bin/env -S python3 -u
-"""
-slack_ask.py - AskUserQuestion 호출 시 Slack 알림 전송 스크립트
+"""AskUserQuestion 호출 시 Slack 알림 전송 스크립트.
 
 PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
+
+주요 함수:
+    main: Slack 알림 전송 진입점
 
 환경변수 (.claude.env에서 로드):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
@@ -20,9 +22,12 @@ PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
     로컬 .context.json의 agent 필드를 읽어 해당 에이전트의 이모지를 메시지 앞에 표시
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
+from typing import Any
 
 # utils 패키지 import를 위한 경로 설정
 _script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -44,15 +49,29 @@ from common import (
 )
 
 
-def _extract_question(data):
-    """stdin JSON에서 첫 번째 질문 추출."""
+def _extract_question(data: dict[str, Any]) -> str:
+    """stdin JSON에서 첫 번째 질문 텍스트를 추출한다.
+
+    Args:
+        data: stdin에서 파싱된 JSON 딕셔너리
+
+    Returns:
+        첫 번째 질문 문자열. 추출 실패 시 'N/A' 반환.
+    """
     return extract_json_field(
         data, "tool_input", "questions", 0, "question", default="N/A"
     )
 
 
-def _extract_options(data):
-    """stdin JSON에서 선택지(options) 추출하여 "label - description | ..." 형식 반환."""
+def _extract_options(data: dict[str, Any]) -> str:
+    """stdin JSON에서 선택지(options)를 추출하여 "label - description | ..." 형식으로 반환한다.
+
+    Args:
+        data: stdin에서 파싱된 JSON 딕셔너리
+
+    Returns:
+        'label - description | ...' 형식의 선택지 문자열. 선택지가 없으면 빈 문자열 반환.
+    """
     options = extract_json_field(
         data, "tool_input", "questions", 0, "options", default=[]
     )
@@ -71,7 +90,13 @@ def _extract_options(data):
     return " | ".join(parts) if parts else ""
 
 
-def main():
+def main() -> None:
+    """AskUserQuestion 훅 Slack 알림 전송의 진입점.
+
+    stdin에서 JSON을 읽어 사용자 질문 내용을 파싱하고,
+    활성 워크플로우 정보를 식별하여 Slack으로 알림을 전송한다.
+    환경변수 로드 실패 시 조용히 종료한다.
+    """
     # .claude.env에서 환경변수 로드
     if not load_slack_env():
         sys.exit(0)

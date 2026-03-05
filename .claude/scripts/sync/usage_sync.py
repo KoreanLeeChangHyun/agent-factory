@@ -1,14 +1,21 @@
 #!/usr/bin/env -S python3 -u
-"""
-usage_sync.py - 워크플로우 토큰 사용량 추적 (증분 + 일괄)
+"""워크플로우 토큰 사용량 추적 (증분 + 일괄).
 
 서브커맨드:
-  track   SubagentStop 훅에서 호출. 개별 에이전트 종료 시 증분 토큰 추적
-  batch   finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 최종 정산
+    track   SubagentStop 훅에서 호출. 개별 에이전트 종료 시 증분 토큰 추적
+    batch   finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 최종 정산
+
+주요 함수:
+    parse_jsonl_usage: JSONL 파일의 usage 합산
+    cmd_track: track 서브커맨드 실행
+    cmd_batch: batch 서브커맨드 실행
+    main: CLI 진입점
 
 입력 (stdin JSON): agent_type, agent_id, agent_transcript_path
 비차단 원칙: 모든 에러 경로에서 exit 0
 """
+
+from __future__ import annotations
 
 import glob
 import json
@@ -16,6 +23,7 @@ import os
 import shutil
 import sys
 import time
+from typing import Optional
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -34,26 +42,56 @@ PROJECT_ROOT = resolve_project_root()
 # 파일 크기 상한 (50MB)
 MAX_JSONL_SIZE = 50 * 1024 * 1024
 
-VALID_AGENT_TYPES = {
+VALID_AGENT_TYPES: set[str] = {
     "orchestrator", "planner", "worker", "explorer",
     "validator", "reporter",
 }
+
+
+def _normalize_agent_type(raw: str) -> str:
+    """agent_type 원시 문자열을 VALID_AGENT_TYPES 중 하나로 정규화한다.
+
+    "worker-opus", "worker-sonnet" 등 모델 접미사가 붙은 타입을
+    정규 타입으로 변환한다. 예외를 발생시키지 않는 순수 문자열 비교 함수.
+
+    Args:
+        raw: 정규화 전 agent_type 문자열
+
+    Returns:
+        VALID_AGENT_TYPES에 속하는 정규 타입. 매칭 없으면 원본 raw 반환.
+    """
+    if not isinstance(raw, str):
+        return raw
+    if raw in VALID_AGENT_TYPES:
+        return raw
+    for t in VALID_AGENT_TYPES:
+        if raw.startswith(t + "-"):
+            return t
+    return raw
 
 
 # =============================================================================
 # 공통 유틸리티
 # =============================================================================
 
-def _read_stdin_json():
-    """stdin에서 JSON을 읽어 반환. 실패 시 exit 0."""
+def _read_stdin_json() -> dict[str, object]:
+    """stdin에서 JSON을 읽어 반환. 실패 시 exit 0.
+
+    Returns:
+        파싱된 JSON 딕셔너리
+    """
     try:
         return json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
         sys.exit(0)
 
 
-def _find_work_dir():
-    """디렉터리 스캔으로 활성 워크플로우의 workDir을 조회."""
+def _find_work_dir() -> Optional[str]:
+    """디렉터리 스캔으로 활성 워크플로우의 workDir을 조회.
+
+    Returns:
+        활성 워크플로우의 절대 workDir 경로. 없으면 None.
+    """
     workflows = scan_active_workflows(project_root=PROJECT_ROOT)
     if not workflows:
         return None
@@ -67,8 +105,16 @@ def _find_work_dir():
     return None
 
 
-def _acquire_lock(lock_dir, max_wait=5):
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
+def _acquire_lock(lock_dir: str, max_wait: int = 5) -> bool:
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로 (존재하지 않아야 잠금 성공)
+        max_wait: 최대 대기 시간 (초). 초과 시 False 반환.
+
+    Returns:
+        잠금 획득 성공 여부
+    """
     waited = 0
     while True:
         try:
@@ -108,8 +154,12 @@ def _acquire_lock(lock_dir, max_wait=5):
             time.sleep(1)
 
 
-def _release_lock(lock_dir):
-    """잠금 해제."""
+def _release_lock(lock_dir: str) -> None:
+    """잠금 해제.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로
+    """
     try:
         pid_file = os.path.join(lock_dir, "pid")
         if os.path.exists(pid_file):
@@ -122,27 +172,40 @@ def _release_lock(lock_dir):
         pass
 
 
-def _load_usage(usage_file):
-    """usage.json을 로드. 없으면 기본 스키마 반환."""
+def _load_usage(usage_file: str) -> dict[str, object]:
+    """usage.json을 로드. 없으면 기본 스키마 반환.
+
+    Args:
+        usage_file: usage.json 파일 경로
+
+    Returns:
+        usage 데이터 딕셔너리. agents, totals, _pending_workers 키 포함.
+    """
     data = load_json_file(usage_file)
     if not isinstance(data, dict):
         data = {"$schema": "usage-v2", "agents": {}, "totals": {}, "_pending_workers": {}}
     if "agents" not in data:
         data["agents"] = {}
+    if "totals" not in data:
+        data["totals"] = {}
     # 기존 usage.json에서 "init", "done" 키 정리
     for old_key in ("init", "done"):
         data["agents"].pop(old_key, None)
     return data
 
 
-def parse_jsonl_usage(filepath):
+def parse_jsonl_usage(filepath: str) -> Optional[dict[str, int]]:
     """JSONL 파일의 모든 assistant 레코드 usage를 합산한다.
 
+    Args:
+        filepath: JSONL 파일 경로
+
     Returns:
-        dict: {input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens}
-        또는 파싱 실패 시 None
+        합산된 토큰 수 딕셔너리.
+        키: input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens.
+        파일 없거나 파싱 실패 시 None.
     """
-    totals = {
+    totals: dict[str, int] = {
         "input_tokens": 0,
         "output_tokens": 0,
         "cache_creation_tokens": 0,
@@ -199,13 +262,20 @@ def parse_jsonl_usage(filepath):
 # track: 개별 에이전트 종료 시 증분 추적
 # =============================================================================
 
-def cmd_track():
-    """SubagentStop 훅에서 호출. 개별 에이전트 토큰을 usage.json에 기록."""
+def cmd_track() -> None:
+    """SubagentStop 훅에서 호출. 개별 에이전트 토큰을 usage.json에 기록.
+
+    stdin에서 JSON을 읽어 agent_type, agent_id, agent_transcript_path를 파싱하고
+    JSONL 파일에서 토큰 사용량을 추출하여 usage.json에 증분 기록한다.
+    모든 에러 경로에서 exit 0 (비차단 원칙).
+    """
     input_data = _read_stdin_json()
 
     agent_type = input_data.get("agent_type", "")
     agent_id = input_data.get("agent_id", "")
     transcript_path = input_data.get("agent_transcript_path", "")
+
+    agent_type = _normalize_agent_type(agent_type)
 
     if agent_type not in VALID_AGENT_TYPES:
         sys.exit(0)
@@ -285,6 +355,8 @@ def cmd_track():
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, usage_data)
+    except Exception as e:
+        print(f"[usage-sync] WARNING: track error: {e}", file=sys.stderr)
     finally:
         _release_lock(lock_dir)
 
@@ -293,16 +365,30 @@ def cmd_track():
 # batch: 워크플로우 종료 시 전체 JSONL 일괄 정산
 # =============================================================================
 
-def _find_subagents_dir(transcript_path):
-    """agent_transcript_path에서 subagents/ 디렉터리 경로를 역산."""
+def _find_subagents_dir(transcript_path: str) -> Optional[str]:
+    """agent_transcript_path에서 subagents/ 디렉터리 경로를 역산.
+
+    Args:
+        transcript_path: agent JSONL 파일 절대 경로
+
+    Returns:
+        subagents/ 디렉터리 경로. transcript_path의 부모가 subagents/가 아니면 None.
+    """
     parent = os.path.dirname(transcript_path)
     if os.path.basename(parent) == "subagents":
         return parent
     return None
 
 
-def _find_main_session_jsonl(subagents_dir):
-    """subagents/ 상위에서 메인 세션 JSONL을 찾는다."""
+def _find_main_session_jsonl(subagents_dir: str) -> Optional[str]:
+    """subagents/ 상위에서 메인 세션 JSONL을 찾는다.
+
+    Args:
+        subagents_dir: subagents/ 디렉터리 절대 경로
+
+    Returns:
+        메인 세션 JSONL 파일 경로. 없으면 None.
+    """
     session_dir = os.path.dirname(subagents_dir)
     session_jsonl = session_dir + ".jsonl"
     if os.path.isfile(session_jsonl):
@@ -310,12 +396,18 @@ def _find_main_session_jsonl(subagents_dir):
     return None
 
 
-def _find_main_session_from_status(work_dir):
+def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     """status.json의 linked_sessions 또는 _agent_map에서 메인 세션 JSONL 경로를 구성.
 
     1차: linked_sessions에 기록된 세션 ID로 <session_id>.jsonl을 직접 탐색.
     2차(대체): linked_sessions가 비어있을 때, usage.json의 _agent_map에 기록된
          알려진 agent_id로 subagents 디렉터리를 역탐색하여 상위 세션 JSONL을 반환.
+
+    Args:
+        work_dir: 워크플로우 작업 디렉터리 절대 경로
+
+    Returns:
+        메인 세션 JSONL 파일 경로. 없으면 None.
     """
     status_file = os.path.join(work_dir, "status.json")
     status = load_json_file(status_file)
@@ -368,8 +460,16 @@ def _find_main_session_from_status(work_dir):
     return None
 
 
-def _resolve_agent_type(agent_filename, agent_map):
-    """agent-<id>.jsonl의 agent_type을 식별. _agent_map 우선, JSONL 폴백."""
+def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optional[str]:
+    """agent-<id>.jsonl의 agent_type을 식별. _agent_map 우선, JSONL 폴백.
+
+    Args:
+        agent_filename: agent JSONL 파일 경로
+        agent_map: agent_id -> agent_type 매핑 딕셔너리
+
+    Returns:
+        식별된 agent_type 문자열. 식별 불가 시 None.
+    """
     basename = os.path.basename(agent_filename)
     if basename.startswith("agent-") and basename.endswith(".jsonl"):
         agent_id = basename[len("agent-"):-len(".jsonl")]
@@ -390,19 +490,23 @@ def _resolve_agent_type(agent_filename, agent_map):
                     continue
                 if rec.get("type") == "user":
                     slug = rec.get("slug", "")
-                    if slug in VALID_AGENT_TYPES:
-                        return slug
-                    for t in VALID_AGENT_TYPES:
-                        if slug.startswith(t):
-                            return t
+                    normalized = _normalize_agent_type(slug)
+                    if normalized in VALID_AGENT_TYPES:
+                        return normalized
                     break
     except Exception:
         pass
     return None
 
 
-def cmd_batch():
-    """finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 usage.json 최종 정산."""
+def cmd_batch() -> None:
+    """finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 usage.json 최종 정산.
+
+    stdin에서 JSON을 읽어 agent_transcript_path를 파싱하고,
+    subagents/ 디렉터리의 모든 agent-*.jsonl 파일을 파싱하여 usage.json에 기록한다.
+    track으로 수집 완료된 에이전트는 보완 모드로 스킵한다.
+    모든 에러 경로에서 exit 0 (비차단 원칙).
+    """
     input_data = _read_stdin_json()
 
     transcript_path = input_data.get("agent_transcript_path", "")
@@ -437,8 +541,8 @@ def cmd_batch():
             sys.exit(0)
 
         # 에이전트별 JSONL 파싱 (보완 모드: track으로 수집 완료된 에이전트는 스킵)
-        worker_tokens = {}
-        skipped_agents = []
+        worker_tokens: dict[str, dict[str, int]] = {}
+        skipped_agents: list[str] = []
         for agent_file in agent_files:
             a_type = _resolve_agent_type(agent_file, agent_map)
             if not a_type:
@@ -482,14 +586,14 @@ def cmd_batch():
             # agent_id가 hex 문자열이고 pending이 {task_id: task_id} 형태인 경우:
             # pending의 값(task_id) 목록과 worker_tokens의 agent_id 목록을 순서대로 매핑.
             # agent_to_task: _pending_workers의 pkey가 실제 agent_id인 경우 직접 매핑
-            agent_to_task = {}
+            agent_to_task: dict[str, str] = {}
             for pkey, ptid in pending.items():
                 agent_to_task[pkey] = ptid
 
             # task_id=task_id 형태의 pending만 unassigned 큐에 추가.
             # agent_id가 hex 문자열일 때 순서대로 매핑하기 위한 폴백 큐.
             already_mapped_tasks = set(existing_workers.keys())
-            unassigned_queue = [
+            unassigned_queue: list[str] = [
                 ptid for pkey, ptid in pending.items()
                 if pkey == ptid and ptid not in already_mapped_tasks
             ]
@@ -533,6 +637,8 @@ def cmd_batch():
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, usage_data)
+    except Exception as e:
+        print(f"[usage-sync] WARNING: batch error: {e}", file=sys.stderr)
     finally:
         _release_lock(lock_dir)
 
@@ -541,7 +647,12 @@ def cmd_batch():
 # 메인
 # =============================================================================
 
-def main():
+def main() -> None:
+    """CLI 진입점. 서브커맨드(track/batch)를 파싱하여 실행한다.
+
+    서브커맨드가 없으면 track을 기본값으로 사용한다 (하위 호환).
+    알 수 없는 서브커맨드는 exit 0 (비차단 원칙).
+    """
     # 서브커맨드 파싱. 인자 없으면 track (하위 호환)
     subcmd = sys.argv[1] if len(sys.argv) > 1 else "track"
 

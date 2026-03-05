@@ -1,6 +1,8 @@
 #!/usr/bin/env -S python3 -u
-"""
-워크플로우 상태 일괄 업데이트 스크립트 (update-state.sh -> update_state.py 1:1 포팅)
+"""워크플로우 상태 일괄 업데이트 스크립트.
+
+update-state.sh에서 update_state.py로 1:1 포팅된 스크립트.
+워크플로우 상태 전이, 컨텍스트 갱신, 사용량 기록 등을 처리한다.
 
 사용법:
   update_state.py context <workDir> <agent>
@@ -19,6 +21,7 @@
 종료 코드:
   항상 0 (비차단 원칙)
 """
+from __future__ import annotations
 
 import json
 import os
@@ -29,6 +32,7 @@ import sys
 import tempfile
 import time
 from datetime import datetime
+from typing import Any
 
 # utils 패키지 import
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -61,8 +65,13 @@ from common import (
 PHASE_COLORS = STEP_COLORS
 
 
-def _print_state_banner(from_step, to_step):
-    """상태 전이 배너 출력: 2줄 포맷."""
+def _print_state_banner(from_step: str, to_step: str) -> None:
+    """상태 전이 배너를 2줄 포맷으로 출력한다.
+
+    Args:
+        from_step: 이전 단계 이름 (예: 'PLAN', 'WORK')
+        to_step: 다음 단계 이름 (예: 'WORK', 'REPORT')
+    """
     c_from = STEP_COLORS.get(from_step, C_GRAY)
     c_to = STEP_COLORS.get(to_step, C_GRAY)
     print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}단계 변경{C_RESET}", flush=True)
@@ -85,8 +94,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = resolve_project_root()
 
 
-def resolve_paths(work_dir_arg):
-    """workDir 인자를 절대 경로로 해석하고 관련 경로들을 반환."""
+def resolve_paths(work_dir_arg: str) -> tuple[str, str, str]:
+    """workDir 인자를 절대 경로로 해석하고 관련 경로들을 반환한다.
+
+    Args:
+        work_dir_arg: 워크 디렉터리 인자 (registryKey 또는 절대 경로)
+
+    Returns:
+        (abs_work_dir, local_context, status_file) 3-tuple.
+        abs_work_dir: 절대 경로로 해석된 워크 디렉터리,
+        local_context: .context.json 경로,
+        status_file: status.json 경로.
+    """
     abs_work_dir = resolve_abs_work_dir(work_dir_arg, PROJECT_ROOT)
     local_context = os.path.join(abs_work_dir, ".context.json")
     status_file = os.path.join(abs_work_dir, "status.json")
@@ -97,8 +116,16 @@ def resolve_paths(work_dir_arg):
 # mkdir 기반 POSIX 잠금
 # =============================================================================
 
-def acquire_lock(lock_dir, max_wait=5):
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
+def acquire_lock(lock_dir: str, max_wait: int = 5) -> bool:
+    """mkdir 기반 POSIX 잠금을 획득한다. stale lock 감지 포함.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로
+        max_wait: 최대 대기 횟수 (초 단위)
+
+    Returns:
+        잠금 획득 성공 시 True, 타임아웃 시 False.
+    """
     waited = 0
     while True:
         try:
@@ -154,8 +181,12 @@ def acquire_lock(lock_dir, max_wait=5):
             time.sleep(1)
 
 
-def release_lock(lock_dir):
-    """잠금 해제."""
+def release_lock(lock_dir: str) -> None:
+    """잠금을 해제한다.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로
+    """
     try:
         pid_file = os.path.join(lock_dir, "pid")
         if os.path.exists(pid_file):
@@ -169,7 +200,13 @@ def release_lock(lock_dir):
 
 
 def _append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """workflow.log에 로그 항목을 비차단 방식으로 append한다."""
+    """workflow.log에 로그 항목을 비차단 방식으로 append한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        level: 로그 레벨 (예: 'INFO', 'WARN', 'ERROR', 'AUDIT')
+        message: 로그 메시지
+    """
     try:
         log_path = os.path.join(abs_work_dir, "workflow.log")
         timestamp = datetime.now(KST).strftime("%Y-%m-%dT%H:%M:%S")
@@ -183,8 +220,17 @@ def _append_log(abs_work_dir: str, level: str, message: str) -> None:
 # context 업데이트
 # =============================================================================
 
-def update_context(local_context, agent):
-    """context.json의 agent 필드만 갱신."""
+def update_context(local_context: str, agent: str) -> str:
+    """context.json의 agent 필드만 갱신한다.
+
+    Args:
+        local_context: .context.json 파일 절대 경로
+        agent: 설정할 에이전트 이름
+
+    Returns:
+        처리 결과 문자열. 예: 'context -> agent=orchestrator',
+        'context -> skipped (file not found)', 'context -> failed'.
+    """
     if not os.path.exists(local_context):
         print(f"[WARN] .context.json not found: {local_context}", file=sys.stderr)
         return "context -> skipped (file not found)"
@@ -207,24 +253,28 @@ def update_context(local_context, agent):
 # status 업데이트
 # =============================================================================
 
-def update_status(abs_work_dir, status_file, from_step, to_step):
-    """status.json 업데이트 + registry step 동기화.
+def update_status(abs_work_dir: str, status_file: str, from_step: str, to_step: str) -> str:
+    """status.json을 업데이트하고 registry step을 동기화한다.
 
     FSM 검증 로직:
       1. WORKFLOW_SKIP_GUARD=1 환경변수가 설정된 경우 검증을 건너뜀
       2. current_step 확인: status.json의 현재 step과 from_step이 일치하는지 검증
-      3. allowed 확인: FSM_TRANSITIONS(constants.py)에서 현재 mode/from_step에 허용된 대상 목록을 조회하고
-         to_step이 포함되어 있는지 검증
+      3. allowed 확인: FSM_TRANSITIONS(constants.py)에서 현재 mode/from_step에 허용된
+         대상 목록을 조회하고 to_step이 포함되어 있는지 검증
 
     비차단 원칙:
       FSM 검증 실패 시에도 프로세스를 종료하지 않음 (항상 exit 0).
-      검증 실패 시 구조화된 에러 메시지를 반환하되, 상태 전이는 수행하지 않음.
-      에러 메시지에는 from_step, to_step, current_step, workflow_mode, allowed_targets
-      5개 필드가 모두 포함되어 디버깅을 용이하게 함.
 
-    참고:
-      register, unregister, link-session 등 status 전이가 아닌 명령은
-      main()에서 별도 분기로 처리되므로 이 함수가 호출되지 않음.
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        status_file: status.json 파일 경로
+        from_step: 전이 시작 단계 이름
+        to_step: 전이 목표 단계 이름
+
+    Returns:
+        처리 결과 문자열. 예: 'status -> PLAN->WORK',
+        'status -> FSM guard blocked (reason: ...)',
+        'status -> skipped (file not found)', 'status -> failed'.
     """
     skip_guard = os.environ.get("WORKFLOW_SKIP_GUARD", "") == "1"
 
@@ -331,8 +381,18 @@ def update_status(abs_work_dir, status_file, from_step, to_step):
 # link-session
 # =============================================================================
 
-def link_session(status_file, session_id):
-    """status.json의 linked_sessions 배열에 세션 ID 추가."""
+def link_session(status_file: str, session_id: str) -> str:
+    """status.json의 linked_sessions 배열에 세션 ID를 추가한다.
+
+    Args:
+        status_file: status.json 파일 경로
+        session_id: 등록할 Claude 세션 ID
+
+    Returns:
+        처리 결과 문자열. 예: 'link-session -> added: abc123 (total: 2)',
+        'link-session -> already linked: abc123',
+        'link-session -> skipped (empty)', 'link-session -> failed'.
+    """
     if not session_id:
         print("[WARN] link-session: sessionId가 비어있어 무시합니다.", file=sys.stderr)
         return "link-session -> skipped (empty)"
@@ -364,8 +424,19 @@ def link_session(status_file, session_id):
 # task-status
 # =============================================================================
 
-def update_task_status(status_file, task_id, task_status):
-    """status.json의 tasks 객체에 태스크 상태 기록."""
+def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
+    """status.json의 tasks 객체에 태스크 상태를 기록한다.
+
+    Args:
+        status_file: status.json 파일 경로
+        task_id: 태스크 ID (예: 'W01', 'W02')
+        task_status: 태스크 상태. 허용값: pending|running|completed|failed.
+            in_progress는 running으로 자동 변환.
+
+    Returns:
+        처리 결과 문자열. 예: 'task-status -> W01: completed (updated_at: ...)',
+        'task-status -> skipped (missing args)', 'task-status -> failed'.
+    """
     if not task_id or not task_status:
         print("[WARN] task-status: task_id, status 인자가 필요합니다.", file=sys.stderr)
         return "task-status -> skipped (missing args)"
@@ -407,8 +478,18 @@ def update_task_status(status_file, task_id, task_status):
 # usage-pending
 # =============================================================================
 
-def usage_pending(abs_work_dir, agent_id, task_id):
-    """usage.json의 _pending_workers에 agent_id->taskId 매핑 등록."""
+def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
+    """usage.json의 _pending_workers에 agent_id->taskId 매핑을 등록한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        agent_id: 에이전트 ID (예: 'W01')
+        task_id: 매핑할 태스크 ID (예: 'W01')
+
+    Returns:
+        처리 결과 문자열. 예: 'usage-pending -> W01=W01',
+        'usage-pending -> skipped (missing args)', 'usage-pending -> lock failed'.
+    """
     if not agent_id or not task_id:
         print("[WARN] usage-pending: agent_id, task_id 인자가 필요합니다.", file=sys.stderr)
         return "usage-pending -> skipped (missing args)"
@@ -441,8 +522,31 @@ def usage_pending(abs_work_dir, agent_id, task_id):
 # usage
 # =============================================================================
 
-def usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_creation=0, cache_read=0, task_id=""):
-    """usage.json의 agents 객체에 에이전트별 토큰 데이터 기록."""
+def usage_record(
+    abs_work_dir: str,
+    agent_name: str,
+    input_tokens: int | str,
+    output_tokens: int | str,
+    cache_creation: int | str = 0,
+    cache_read: int | str = 0,
+    task_id: str = "",
+) -> str:
+    """usage.json의 agents 객체에 에이전트별 토큰 데이터를 기록한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        agent_name: 에이전트 이름 (예: 'orchestrator', 'worker')
+        input_tokens: 입력 토큰 수
+        output_tokens: 출력 토큰 수
+        cache_creation: 캐시 생성 토큰 수 (기본값 0)
+        cache_read: 캐시 읽기 토큰 수 (기본값 0)
+        task_id: worker 에이전트의 태스크 ID (agent_name='worker'일 때만 사용)
+
+    Returns:
+        처리 결과 문자열. 예: 'usage -> orchestrator: in=1000 out=500 cc=0 cr=0',
+        'usage -> workers.W01: in=2000 out=1000 cc=100 cr=50',
+        'usage -> skipped (missing args)', 'usage -> lock failed'.
+    """
     if not agent_name or input_tokens is None or output_tokens is None:
         print("[WARN] usage: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
         return "usage -> skipped (missing args)"
@@ -490,8 +594,16 @@ def usage_record(abs_work_dir, agent_name, input_tokens, output_tokens, cache_cr
 # usage-finalize 헬퍼
 # =============================================================================
 
-def _calc_effective(d):
-    """토큰 데이터 dict에서 effective_tokens를 계산한다."""
+def _calc_effective(d: dict[str, Any]) -> float:
+    """토큰 데이터 dict에서 effective_tokens를 계산한다.
+
+    Args:
+        d: 토큰 데이터 딕셔너리 (input_tokens, output_tokens,
+           cache_creation_tokens, cache_read_tokens 키 포함)
+
+    Returns:
+        가중 합산된 effective_tokens 값.
+    """
     return (
         d.get("input_tokens", 0)
         + d.get("output_tokens", 0) * 5
@@ -500,8 +612,16 @@ def _calc_effective(d):
     )
 
 
-def _sum_tokens(agents_list):
-    """에이전트 토큰 데이터 리스트의 합계를 반환한다."""
+def _sum_tokens(agents_list: list[dict[str, Any]]) -> dict[str, int]:
+    """에이전트 토큰 데이터 리스트의 합계를 반환한다.
+
+    Args:
+        agents_list: 토큰 데이터 딕셔너리 목록
+
+    Returns:
+        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens
+        합산 딕셔너리.
+    """
     totals = {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
     for a in agents_list:
         for k in totals:
@@ -509,18 +629,40 @@ def _sum_tokens(agents_list):
     return totals
 
 
-def _to_k(n):
-    """숫자를 k 단위 문자열로 변환 (0이면 '-')."""
+def _to_k(n: float | int) -> str:
+    """숫자를 k 단위 문자열로 변환한다. 0이면 '-'.
+
+    Args:
+        n: 변환할 숫자
+
+    Returns:
+        k 단위 문자열 (예: '10k', '-').
+    """
     return "-" if n == 0 else f"{int(n) // 1000}k"
 
 
-def _to_k_precise(n):
-    """숫자를 소수점 1자리 k 단위 문자열로 변환 (0이면 '-')."""
+def _to_k_precise(n: float | int) -> str:
+    """숫자를 소수점 1자리 k 단위 문자열로 변환한다. 0이면 '-'.
+
+    Args:
+        n: 변환할 숫자
+
+    Returns:
+        소수점 1자리 k 단위 문자열 (예: '10.5k', '-').
+    """
     return "-" if n == 0 else f"{n / 1000:.1f}k"
 
 
-def _update_usage_md(row, eff_weighted):
-    """.dashboard/.usage.md 파일에 사용량 행을 삽입한다. 성공 시 None, 실패 시 에러 문자열 반환."""
+def _update_usage_md(row: str, eff_weighted: float) -> str | None:
+    """.dashboard/.usage.md 파일에 사용량 행을 삽입한다.
+
+    Args:
+        row: 삽입할 마크다운 테이블 행 문자열 (11컬럼 스키마)
+        eff_weighted: 가중 합산 effective_tokens (경고 메시지 생성용)
+
+    Returns:
+        성공 시 None, 실패 시 에러 결과 문자열.
+    """
     usage_md = os.path.join(PROJECT_ROOT, ".dashboard", ".usage.md")
     marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
     header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
@@ -582,8 +724,16 @@ def _update_usage_md(row, eff_weighted):
 # usage-finalize
 # =============================================================================
 
-def usage_finalize(abs_work_dir):
-    """totals 계산, effective_tokens 산출, .dashboard/.usage.md 행 추가."""
+def usage_finalize(abs_work_dir: str) -> str:
+    """totals를 계산하고 effective_tokens를 산출하여 .dashboard/.usage.md에 행을 추가한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로 (usage.json이 위치하는 디렉터리)
+
+    Returns:
+        처리 결과 문자열. 예: 'usage-finalize -> totals: eff=12.5k, usage.md updated',
+        'usage-finalize -> skipped (file not found)', 'usage-finalize -> failed'.
+    """
     usage_file = os.path.join(abs_work_dir, "usage.json")
     if not os.path.isfile(usage_file):
         print(f"[WARN] usage-finalize: usage.json not found: {usage_file}", file=sys.stderr)
@@ -687,8 +837,18 @@ def usage_finalize(abs_work_dir):
 # env 관리
 # =============================================================================
 
-def env_manage(action, key, value=""):
-    """claude.env 파일의 환경 변수 관리."""
+def env_manage(action: str, key: str, value: str = "") -> str:
+    """claude.env 파일의 환경 변수를 관리한다.
+
+    Args:
+        action: 수행할 동작. 허용값: 'set', 'unset'.
+        key: 환경 변수 키. HOOK_* 또는 GUARD_* 접두사, 또는 HOOKS_EDIT_ALLOWED만 허용.
+        value: 설정할 값 (action='set'일 때 필수)
+
+    Returns:
+        처리 결과 문자열. 예: 'env -> set HOOK_FOO=bar',
+        'env -> unset GUARD_BAR', 'env -> skipped (missing args)', 'env -> failed'.
+    """
     if not action or not key:
         print("[WARN] env: action(set|unset)과 KEY 인자가 필요합니다.", file=sys.stderr)
         return "env -> skipped (missing args)"
@@ -782,8 +942,18 @@ _VALID_MODES = frozenset({
 # 디스패처 핸들러 함수
 # =============================================================================
 
-def _handle_context(abs_work_dir, local_context, status_file):
-    """context 모드 핸들러."""
+def _handle_context(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """context 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (banner_from, banner_to, banner_ok) 3-tuple.
+        context 모드는 배너를 출력하지 않으므로 (None, None, False) 반환.
+    """
     agent = sys.argv[3] if len(sys.argv) > 3 else ""
     if not agent:
         print("[WARN] context 모드: agent 인자가 필요합니다.", file=sys.stderr)
@@ -792,8 +962,18 @@ def _handle_context(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_status(abs_work_dir, local_context, status_file):
-    """status 모드 핸들러."""
+def _handle_status(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """status 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (banner_from, banner_to, banner_ok) 3-tuple.
+        전이 성공 시 (from_step, to_step, True), 실패/스킵 시 (from_step, to_step, False).
+    """
     to_step = sys.argv[3] if len(sys.argv) > 3 else ""
     if not to_step:
         print("[WARN] status 모드: toPhase 인자가 필요합니다.", file=sys.stderr)
@@ -805,8 +985,18 @@ def _handle_status(abs_work_dir, local_context, status_file):
     return from_step, to_step, banner_ok
 
 
-def _handle_both(abs_work_dir, local_context, status_file):
-    """both 모드 핸들러."""
+def _handle_both(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """both 모드 핸들러. context 갱신과 status 전이를 함께 수행한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (banner_from, banner_to, banner_ok) 3-tuple.
+        전이 성공 시 (from_step, to_step, True), 실패/스킵 시 (from_step, to_step, False).
+    """
     agent = sys.argv[3] if len(sys.argv) > 3 else ""
     to_step = sys.argv[4] if len(sys.argv) > 4 else ""
     if not agent or not to_step:
@@ -820,8 +1010,17 @@ def _handle_both(abs_work_dir, local_context, status_file):
     return from_step, to_step, banner_ok
 
 
-def _handle_link_session(abs_work_dir, local_context, status_file):
-    """link-session 모드 핸들러."""
+def _handle_link_session(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """link-session 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     session_id = sys.argv[3] if len(sys.argv) > 3 else ""
     if not session_id:
         print("[WARN] link-session 모드: sessionId 인자가 필요합니다.", file=sys.stderr)
@@ -830,8 +1029,17 @@ def _handle_link_session(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_usage_pending(abs_work_dir, local_context, status_file):
-    """usage-pending 모드 핸들러."""
+def _handle_usage_pending(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """usage-pending 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     task_ids = sys.argv[3:]
     if not task_ids:
         print("[WARN] usage-pending 모드: task_id 인자가 필요합니다.", file=sys.stderr)
@@ -844,8 +1052,17 @@ def _handle_usage_pending(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_usage(abs_work_dir, local_context, status_file):
-    """usage 모드 핸들러."""
+def _handle_usage(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """usage 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     agent_name = sys.argv[3] if len(sys.argv) > 3 else ""
     input_tokens = sys.argv[4] if len(sys.argv) > 4 else ""
     output_tokens = sys.argv[5] if len(sys.argv) > 5 else ""
@@ -859,8 +1076,17 @@ def _handle_usage(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_usage_finalize(abs_work_dir, local_context, status_file):
-    """usage-finalize 모드 핸들러."""
+def _handle_usage_finalize(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """usage-finalize 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     usage_finalize(abs_work_dir)
     return None, None, False
 
@@ -869,11 +1095,15 @@ def _handle_usage_finalize(abs_work_dir, local_context, status_file):
 # usage-regenerate: .usage.md 레거시 행 전체 재생성
 # =============================================================================
 
-def usage_regenerate():
-    """
-    .workflow/ 및 .workflow/.history/ 하위의 모든 usage.json을 순회하여
-    .dashboard/.usage.md의 v2 스키마 행을 전체 재생성한다.
+def usage_regenerate() -> str:
+    """.workflow/ 및 .workflow/.history/ 하위의 모든 usage.json을 순회하여 .dashboard/.usage.md를 재생성한다.
+
+    v2 스키마 행을 전체 재생성한다.
     registryKey를 날짜 내림차순으로 정렬하여 최신 항목이 상단에 오도록 배치한다.
+
+    Returns:
+        처리 결과 문자열. 예: 'usage-regenerate -> rows regenerated: 10',
+        'usage-regenerate -> failed'.
     """
     try:
         # 레거시 행 데이터 수집
@@ -1020,14 +1250,32 @@ def usage_regenerate():
         return "usage-regenerate -> failed"
 
 
-def _handle_usage_regenerate(abs_work_dir, local_context, status_file):
-    """usage-regenerate 모드 핸들러."""
+def _handle_usage_regenerate(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """usage-regenerate 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     usage_regenerate()
     return None, None, False
 
 
-def _handle_env(abs_work_dir, local_context, status_file):
-    """env 모드 핸들러."""
+def _handle_env(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """env 모드 핸들러.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     action = sys.argv[3] if len(sys.argv) > 3 else ""
     key = sys.argv[4] if len(sys.argv) > 4 else ""
     value = sys.argv[5] if len(sys.argv) > 5 else ""
@@ -1038,8 +1286,17 @@ def _handle_env(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_task_start(abs_work_dir, local_context, status_file):
-    """task-start 모드 핸들러: 태스크 상태를 running으로 설정하고 usage-pending 등록."""
+def _handle_task_start(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """task-start 모드 핸들러. 태스크 상태를 running으로 설정하고 usage-pending을 등록한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     task_ids = sys.argv[3:]
     if not task_ids:
         print("[WARN] task-start 모드: task_id 인자가 필요합니다.", file=sys.stderr)
@@ -1053,8 +1310,20 @@ def _handle_task_start(abs_work_dir, local_context, status_file):
     return None, None, False
 
 
-def _handle_task_status(abs_work_dir, local_context, status_file):
-    """task-status 모드 핸들러."""
+def _handle_task_status(abs_work_dir: str, local_context: str, status_file: str) -> tuple[str | None, str | None, bool]:
+    """task-status 모드 핸들러.
+
+    복수 태스크 ID 지원: `update_state.py task-status <workDir> <status> <id1> [id2] ...`
+    레거시 형식도 지원: `update_state.py task-status <workDir> <taskId> <status>`
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로
+        local_context: .context.json 파일 경로
+        status_file: status.json 파일 경로
+
+    Returns:
+        (None, None, False) - 배너 출력 없음.
+    """
     _TS_VALID_STATUSES = {"pending", "running", "completed", "failed", "in_progress"}
     arg3 = sys.argv[3] if len(sys.argv) > 3 else ""
     arg4 = sys.argv[4] if len(sys.argv) > 4 else ""
@@ -1085,7 +1354,8 @@ _HANDLERS = {
 }
 
 
-def main():
+def main() -> None:
+    """커맨드라인 인자를 파싱하여 적절한 핸들러를 디스패치한다."""
     if len(sys.argv) < 3:
         print("[WARN] 사용법: update_state.py context|status|both|link-session|usage-pending|usage|usage-finalize|usage-regenerate|env|task-status|task-start <workDir> [args...]", file=sys.stderr)
         sys.exit(0)

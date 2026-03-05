@@ -1,16 +1,17 @@
 #!/usr/bin/env -S python3 -u
-"""
-cleanup_zombie.py - 좀비 워크플로우 정리 독립 스크립트
+"""garbage_collect.py - 좀비 워크플로우 정리 독립 스크립트.
 
 기능:
   1. .workflow/ 하위에서 TTL(24시간) 만료 + 미완료 status.json을 STALE로 전환
 
 사용법:
-  python3 cleanup_zombie.py [project_root]
+  python3 garbage_collect.py [project_root]
 
 인자:
   project_root - (선택적) 프로젝트 루트 경로. 미지정 시 스크립트 위치 기준으로 자동 탐지
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -31,8 +32,16 @@ _TTL_HOURS = ZOMBIE_TTL_HOURS
 _TERMINAL_PHASES = TERMINAL_STEPS  # TERMINAL_STEPS 사용 (TERMINAL_PHASES는 별칭)
 
 
-def _atomic_write_json(path, data):
-    """JSON 원자적 쓰기."""
+def _atomic_write_json(path: str, data: object) -> None:
+    """JSON을 임시 파일에 쓴 후 원자적으로 대상 경로로 이동한다.
+
+    Args:
+        path: 최종 저장할 파일 경로
+        data: JSON으로 직렬화할 데이터 객체
+
+    Raises:
+        Exception: 쓰기 또는 이동 실패 시 임시 파일을 삭제하고 재발생.
+    """
     dir_name = os.path.dirname(path)
     os.makedirs(dir_name, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
@@ -47,8 +56,17 @@ def _atomic_write_json(path, data):
         raise
 
 
-def _process_status_file(status_file, status_dir, now):
-    """status.json을 TTL 검사하여 STALE로 전환. 반환: 전환 여부."""
+def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bool:
+    """status.json을 TTL 검사하여 STALE로 전환한다.
+
+    Args:
+        status_file: 검사할 status.json 파일 경로
+        status_dir: status.json이 위치한 디렉터리 경로
+        now: 현재 시각 (KST timezone-aware)
+
+    Returns:
+        STALE로 전환되었으면 True, 그렇지 않으면 False.
+    """
     try:
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -83,8 +101,15 @@ def _process_status_file(status_file, status_dir, now):
         return False
 
 
-def _step1_mark_stale(workflow_root):
-    """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환."""
+def _step1_mark_stale(workflow_root: str) -> None:
+    """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환한다.
+
+    중첩 구조(.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json)와
+    레거시 플랫 구조(.workflow/<id>/status.json)를 모두 지원한다.
+
+    Args:
+        workflow_root: .workflow 디렉터리 절대 경로
+    """
     if not os.path.isdir(workflow_root):
         return
 
@@ -123,7 +148,13 @@ def _step1_mark_stale(workflow_root):
         print(f"[INFO] zombie cleanup: {stale_count} workflow(s) marked as STALE", file=sys.stderr)
 
 
-def main():
+def main() -> None:
+    """CLI 진입점. project_root를 인자로 받아 좀비 워크플로우를 정리한다.
+
+    Args (sys.argv):
+        project_root: (선택적) 프로젝트 루트 경로.
+                      미지정 시 스크립트 위치 기준으로 자동 탐지.
+    """
     if len(sys.argv) >= 2 and sys.argv[1]:
         project_root = sys.argv[1]
     else:

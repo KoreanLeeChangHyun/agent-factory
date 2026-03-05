@@ -9,24 +9,35 @@ hook scripts based on HOOK_* environment variable toggles.
   subagent-stop.py   - SubagentStop 이벤트
 """
 
+from __future__ import annotations
+
 import os
-import sys
 import subprocess
+import sys
+from typing import Callable
 
 
-def _find_project_root():
-    """Find project root by locating .claude directory."""
+def _find_project_root() -> str:
+    """Find project root by locating .claude directory.
+
+    Returns:
+        Absolute path to the project root directory.
+    """
     d = os.path.dirname(os.path.abspath(__file__))
     # .claude/hooks/dispatcher.py -> project root is ../..
     return os.path.normpath(os.path.join(d, '..', '..'))
 
 
-def _env_path():
-    """Return path to .claude.env file."""
+def _env_path() -> str:
+    """Return path to .claude.env file.
+
+    Returns:
+        Absolute path to the .claude.env file.
+    """
     return os.path.join(_find_project_root(), '.claude.env')
 
 
-def load_env_flags(prefix='HOOK_'):
+def load_env_flags(prefix: str = 'HOOK_') -> dict[str, bool]:
     """Parse .claude.env and return HOOK_* flags as a dict.
 
     Args:
@@ -36,7 +47,7 @@ def load_env_flags(prefix='HOOK_'):
         dict mapping flag names (with prefix) to bool values.
         e.g. {'HOOK_DANGEROUS_COMMAND': False, 'HOOK_SLACK_ASK': True}
     """
-    flags = {}
+    flags: dict[str, bool] = {}
     env_file = _env_path()
     if not os.path.exists(env_file):
         return flags
@@ -63,7 +74,7 @@ def load_env_flags(prefix='HOOK_'):
     return flags
 
 
-def is_enabled(flags, hook_flag_name):
+def is_enabled(flags: dict[str, bool], hook_flag_name: str) -> bool:
     """Check if a hook is enabled in the flags dict.
 
     Args:
@@ -76,7 +87,12 @@ def is_enabled(flags, hook_flag_name):
     return flags.get(hook_flag_name, True)
 
 
-def dispatch(hook_flag_name, script_path, stdin_data, flags=None):
+def dispatch(
+    hook_flag_name: str,
+    script_path: str,
+    stdin_data: bytes,
+    flags: dict[str, bool] | None = None,
+) -> subprocess.CompletedProcess | None:
     """Dispatch to an external script if the hook is enabled.
 
     Args:
@@ -105,7 +121,12 @@ def dispatch(hook_flag_name, script_path, stdin_data, flags=None):
     return result
 
 
-def dispatch_async(hook_flag_name, script_path, stdin_data, flags=None):
+def dispatch_async(
+    hook_flag_name: str,
+    script_path: str,
+    stdin_data: bytes,
+    flags: dict[str, bool] | None = None,
+) -> subprocess.Popen | None:
     """Dispatch to an external script asynchronously (fire-and-forget).
 
     Args:
@@ -140,7 +161,12 @@ def dispatch_async(hook_flag_name, script_path, stdin_data, flags=None):
     return proc
 
 
-def run_inline(hook_flag_name, main_func, stdin_data, flags=None):
+def run_inline(
+    hook_flag_name: str,
+    main_func: Callable[[bytes | str], int],
+    stdin_data: bytes | str,
+    flags: dict[str, bool] | None = None,
+) -> int:
     """Run an inline hook function if enabled.
 
     Args:
@@ -161,7 +187,7 @@ def run_inline(hook_flag_name, main_func, stdin_data, flags=None):
     return main_func(stdin_data)
 
 
-def scripts_dir(*parts):
+def scripts_dir(*parts: str) -> str:
     """Return absolute path under .claude/scripts/.
 
     Args:
@@ -174,7 +200,9 @@ def scripts_dir(*parts):
     return os.path.join(root, '.claude', 'scripts', *parts)
 
 
-def collect_exit_codes(results):
+def collect_exit_codes(
+    results: list[subprocess.CompletedProcess | subprocess.Popen | int | None],
+) -> int:
     """Aggregate exit codes from multiple dispatch results.
 
     Args:

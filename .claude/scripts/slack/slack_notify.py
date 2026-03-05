@@ -1,6 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""
-slack_notify.py - Slack 메시지 전송 스크립트
+"""Slack 메시지 전송 스크립트.
 
 새 시그니처 (workDir 기반):
     python3 slack_notify.py <workDir> <상태> [보고서경로] [에이전트]
@@ -11,6 +10,9 @@ slack_notify.py - Slack 메시지 전송 스크립트
 기존 시그니처 (하위 호환):
     python3 slack_notify.py <작업제목> <작업ID> <작업이름> <명령어> <상태> [보고서경로] [에이전트]
 
+주요 함수:
+    main: Slack 알림 전송 진입점
+
 환경변수 (.claude.env에서 로드):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
@@ -19,6 +21,8 @@ slack_notify.py - Slack 메시지 전송 스크립트
     agent 인자를 전달받으면 해당 값으로 이모지 결정
     agent 인자가 없으면 이모지 없이 기존 포맷 유지
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -47,8 +51,12 @@ from common import (
 )
 
 
-def _detect_wsl():
-    """WSL 환경인지 감지."""
+def _detect_wsl() -> bool:
+    """WSL 환경인지 감지한다.
+
+    Returns:
+        WSL 환경이면 True, 그렇지 않으면 False
+    """
     try:
         with open("/proc/version", "r") as f:
             return "microsoft" in f.read().lower()
@@ -56,8 +64,14 @@ def _detect_wsl():
         return False
 
 
-def _get_wsl_distro_name():
-    """WSL 배포판 이름 추출 (예: Ubuntu-22.04)."""
+def _get_wsl_distro_name() -> str:
+    """WSL 배포판 이름을 추출한다.
+
+    /etc/os-release에서 배포판 이름과 버전을 읽어 'Ubuntu-22.04' 형식으로 반환.
+
+    Returns:
+        'Distro-Version' 형식의 배포판 이름 문자열. 파싱 실패 시 빈 문자열 반환.
+    """
     distro = ""
     version = ""
     try:
@@ -76,8 +90,17 @@ def _get_wsl_distro_name():
     return ""
 
 
-def _build_vscode_uri(abs_path):
-    """파일 경로를 vscode:// URI로 변환 (WSL/Mac/Linux 대응)."""
+def _build_vscode_uri(abs_path: str) -> str:
+    """파일 경로를 vscode:// URI로 변환한다.
+
+    WSL, Mac, Linux 환경을 각각 감지하여 적절한 URI 형식으로 변환.
+
+    Args:
+        abs_path: 변환할 파일의 절대 경로
+
+    Returns:
+        vscode:// 스킴의 URI 문자열
+    """
     encoded = urllib.parse.quote(abs_path, safe="/")
     if _detect_wsl():
         distro_name = _get_wsl_distro_name()
@@ -85,12 +108,19 @@ def _build_vscode_uri(abs_path):
     return f"vscode://file{encoded}"
 
 
-def _parse_new_signature(args):
-    """
-    새 시그니처 파싱: <workDir> <상태> [보고서경로] [에이전트]
+def _parse_new_signature(args: list[str]) -> dict[str, str]:
+    """새 시그니처를 파싱한다: <workDir> <상태> [보고서경로] [에이전트].
+
+    .context.json에서 title, work_id, work_name, command를 자동으로 읽어온다.
+
+    Args:
+        args: 명령행 인자 리스트 (sys.argv[1:])
 
     Returns:
-        dict: title, work_id, work_name, command, status, report_path, agent
+        title, work_id, work_name, command, status, report_path, agent 키를 가진 딕셔너리
+
+    Raises:
+        SystemExit: 인자 수 부족 또는 .context.json 파일 부재/파싱 실패 시
     """
     if len(args) < 2:
         log_warn("사용법: slack_notify.py <workDir> <상태> [보고서경로] [에이전트]")
@@ -141,12 +171,17 @@ def _parse_new_signature(args):
     }
 
 
-def _parse_legacy_signature(args):
-    """
-    기존 시그니처 파싱: <작업제목> <작업ID> <작업이름> <명령어> <상태> [보고서경로] [에이전트]
+def _parse_legacy_signature(args: list[str]) -> dict[str, str]:
+    """기존 시그니처를 파싱한다: <작업제목> <작업ID> <작업이름> <명령어> <상태> [보고서경로] [에이전트].
+
+    Args:
+        args: 명령행 인자 리스트 (sys.argv[1:])
 
     Returns:
-        dict: title, work_id, work_name, command, status, report_path, agent
+        title, work_id, work_name, command, status, report_path, agent 키를 가진 딕셔너리
+
+    Raises:
+        SystemExit: 필수 인자 5개 미만인 경우
     """
     if len(args) < 5:
         log_warn(
@@ -166,7 +201,13 @@ def _parse_legacy_signature(args):
     }
 
 
-def main():
+def main() -> None:
+    """Slack 메시지 전송의 진입점.
+
+    명령행 인자를 파싱하여 새 시그니처(workDir 기반) 또는 기존 시그니처 방식으로
+    작업 정보를 구성하고 Slack으로 알림을 전송한다.
+    환경변수 로드 실패 시 조용히 종료한다.
+    """
     args = sys.argv[1:]
 
     # 환경변수 로드 (실패 시 조용히 종료)

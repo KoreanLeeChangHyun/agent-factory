@@ -79,6 +79,14 @@ def _sanitize_work_name(title: str) -> str:
 
 
 def _atomic_write_json(path: str, data: dict[str, Any]) -> None:
+    """JSON 데이터를 원자적으로 파일에 기록한다.
+
+    임시 파일에 먼저 쓴 후 최종 경로로 이동하여 파일 시스템 원자성을 보장한다.
+
+    Args:
+        path: 기록할 파일의 절대 경로
+        data: JSON 직렬화할 딕셔너리 데이터
+    """
     dir_name: str = os.path.dirname(path)
     os.makedirs(dir_name, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
@@ -94,6 +102,14 @@ def _atomic_write_json(path: str, data: dict[str, Any]) -> None:
 
 
 def _run_optional_script(script_path: str, cmd_template: list[str]) -> None:
+    """스크립트 파일이 존재하는 경우에만 실행한다 (비차단).
+
+    스크립트가 없거나 실패해도 예외를 전파하지 않는다.
+
+    Args:
+        script_path: 실행할 스크립트 절대 경로
+        cmd_template: 명령어 템플릿 리스트. '{}'는 script_path로 치환됨
+    """
     if not os.path.isfile(script_path):
         return
     cmd: list[str] = [part.replace("{}", script_path) for part in cmd_template]
@@ -107,6 +123,13 @@ def _run_optional_script(script_path: str, cmd_template: list[str]) -> None:
 
 
 def read_prompt() -> str | None:
+    """prompt.txt 파일 내용을 읽어 반환한다.
+
+    파일이 없거나 내용이 비어있으면 None을 반환한다.
+
+    Returns:
+        prompt.txt 파일 내용 문자열. 파일 없음 또는 빈 내용이면 None.
+    """
     prompt_file: str = os.path.join(_PROJECT_ROOT, ".prompt", "prompt.txt")
     if not os.path.isfile(prompt_file):
         return None
@@ -121,7 +144,14 @@ def read_prompt() -> str | None:
 
 
 def _create_work_dir(abs_work_dir: str) -> None:
-    """워크플로우 디렉터리를 생성한다."""
+    """워크플로우 디렉터리를 생성한다.
+
+    디렉터리가 이미 존재해도 오류 없이 진행한다.
+    빈 workflow.log 파일을 함께 생성한다.
+
+    Args:
+        abs_work_dir: 생성할 작업 디렉터리 절대 경로
+    """
     os.makedirs(abs_work_dir, exist_ok=True)
     # workflow.log 빈 파일 생성
     try:
@@ -131,13 +161,24 @@ def _create_work_dir(abs_work_dir: str) -> None:
 
 
 def _write_user_prompt(abs_work_dir: str, prompt_content: str) -> None:
-    """user_prompt.txt를 작성한다."""
+    """user_prompt.txt를 작업 디렉터리에 작성한다.
+
+    Args:
+        abs_work_dir: 작업 디렉터리 절대 경로
+        prompt_content: 사용자 원문 프롬프트 내용
+    """
     with open(os.path.join(abs_work_dir, "user_prompt.txt"), "w", encoding="utf-8") as f:
         f.write(prompt_content)
 
 
 def _copy_uploads(abs_work_dir: str) -> None:
-    """.uploads/ 디렉터리의 파일을 <workDir>/files/로 복사 후 원본 삭제."""
+    """.uploads/ 디렉터리의 파일을 <workDir>/files/로 복사 후 원본 삭제.
+
+    .uploads/ 디렉터리가 없거나 비어있으면 아무것도 하지 않는다.
+
+    Args:
+        abs_work_dir: 복사 대상 작업 디렉터리 절대 경로
+    """
     uploads_dir: str = os.path.join(_PROJECT_ROOT, ".uploads")
     if not os.path.isdir(uploads_dir) or not os.listdir(uploads_dir):
         return
@@ -159,7 +200,11 @@ def _copy_uploads(abs_work_dir: str) -> None:
 
 
 def _clear_prompt() -> None:
-    """prompt.txt를 클리어한다."""
+    """prompt.txt 내용을 비운다.
+
+    파일이 존재하는 경우에만 빈 파일로 덮어쓴다.
+    워크플로우 초기화 후 프롬프트 중복 사용을 방지하기 위해 호출된다.
+    """
     _prompt_file: str = os.path.join(_PROJECT_ROOT, ".prompt", "prompt.txt")
     if os.path.isfile(_prompt_file):
         with open(_prompt_file, "w", encoding="utf-8") as f:
@@ -167,7 +212,16 @@ def _clear_prompt() -> None:
 
 
 def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str) -> None:
-    """.context.json을 작성한다."""
+    """.context.json을 작업 디렉터리에 작성한다.
+
+    Args:
+        abs_work_dir: 작업 디렉터리 절대 경로
+        title: 워크플로우 제목 (20자 이내)
+        work_id: 시간 기반 워크 ID (HHMMSS 형식)
+        work_name: 파일시스템 안전 작업명
+        command: 실행 명령어 (implement | review | research)
+        ts: ISO 8601 형식 타임스탬프 문자열
+    """
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
         {
@@ -182,7 +236,15 @@ def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, 
 
 
 def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
-    """status.json을 작성한다."""
+    """status.json을 작업 디렉터리에 작성한다.
+
+    FSM 초기 상태(NONE)와 현재 세션 ID를 포함한 상태 파일을 생성한다.
+
+    Args:
+        abs_work_dir: 작업 디렉터리 절대 경로
+        mode: 워크플로우 모드 (full 등)
+        ts: ISO 8601 형식 타임스탬프 문자열
+    """
     claude_sid: str = os.environ.get("CLAUDE_SESSION_ID", "")
     _atomic_write_json(
         os.path.join(abs_work_dir, "status.json"),
@@ -199,7 +261,26 @@ def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
 
 
 def init_workflow(command: str, title: str, mode: str, prompt_content: str = "") -> dict[str, str]:
-    """워크플로우 디렉터리 구조와 메타데이터를 일괄 생성한다."""
+    """워크플로우 디렉터리 구조와 메타데이터를 일괄 생성한다.
+
+    registryKey 기반의 작업 디렉터리를 생성하고, .context.json / status.json /
+    user_prompt.txt 파일을 원자적으로 기록한다. 충돌 방지, 좀비 정리,
+    아카이빙 후처리까지 포함한다.
+
+    Args:
+        command: 실행 명령어 (implement | review | research)
+        title: 워크플로우 제목 (20자 이내)
+        mode: 워크플로우 모드 (full)
+        prompt_content: 사용자 원문 프롬프트 내용 (기본값 빈 문자열)
+
+    Returns:
+        초기화 결과 딕셔너리:
+            workDir (str): 프로젝트 루트 상대 작업 경로
+            registryKey (str): YYYYMMDD-HHMMSS 형식 식별자
+            workId (str): HHMMSS 형식 작업 ID
+            workName (str): 파일시스템 안전 작업명
+            promptContent (str): 전달받은 프롬프트 내용
+    """
     now: datetime = datetime.now(KST)
     registry_key: str = now.strftime("%Y%m%d-%H%M%S")
     work_id: str = registry_key.split("-")[1]

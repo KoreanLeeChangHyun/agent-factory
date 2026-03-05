@@ -4,6 +4,9 @@
 Dispatches subagent-stop hooks based on HOOK_* flags in .claude.env.
 Replaces individual wrapper scripts in .claude/hooks/subagent-stop/.
 """
+
+from __future__ import annotations
+
 import os
 import sys
 
@@ -15,7 +18,12 @@ from dispatcher import (
 )
 
 
-def main():
+def main() -> None:
+    """Dispatch subagent-stop hooks for each registered async hook.
+
+    Reads raw stdin data and dispatches async fire-and-forget hooks.
+    All hooks in this dispatcher are async; exits with 0 unconditionally.
+    """
     stdin_data = sys.stdin.buffer.read()
     flags = load_env_flags()
 
