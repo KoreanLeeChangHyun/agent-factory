@@ -1016,7 +1016,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
         active_keys = _detect_active_workflow_keys(workflow_dir)
         filtered = [d for d in dirs if d not in active_keys]
 
-    if len(filtered) <= KEEP_COUNT:
+    if len(filtered) < KEEP_COUNT:
         return 0
 
     # .history/ 디렉토리 생성

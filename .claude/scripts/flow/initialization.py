@@ -328,7 +328,7 @@ def init_workflow(command: str, title: str, mode: str, prompt_content: str = "")
             if e[0].isdigit() and e != registry_key
             and os.path.isdir(os.path.join(workflow_root, e))
         )
-        if active_count > KEEP_COUNT:
+        if active_count >= KEEP_COUNT:
             _run_optional_script(
                 os.path.join(_SCRIPTS_DIR, "sync", "history_sync.py"),
                 ["python3", "{}", "archive", registry_key],
