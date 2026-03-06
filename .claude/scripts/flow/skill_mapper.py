@@ -1,8 +1,8 @@
 #!/usr/bin/env -S python3 -u
-"""skill_mapper.py - Phase 0 결정적 스킬 매핑 스크립트.
+"""skill_mapper.py - Phase 0 스킬 매핑 스크립트.
 
 plan.md의 태스크 skills 컬럼 + 명령어 기본 매핑으로
-skill-map.md를 결정적으로 생성한다. LLM 불필요.
+skill-map.md를 생성한다. LLM 불필요.
 
 사용법:
   python3 .claude/scripts/flow/skill_mapper.py <registryKey>
@@ -24,7 +24,6 @@ import sys
 import tempfile
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Any
 
 # 프로젝트 루트 결정
 _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -200,10 +199,13 @@ def deduplicate(skills):
 
 
 def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
-    """2단계 결정적 매칭으로 태스크의 최종 스킬 목록 결정.
+    """3단계(Level 0-2) 매칭으로 태스크의 최종 스킬 목록 결정.
 
     Level 0~1 매칭 결과가 비어있으면 skill_recommender.py의 TF-IDF 추천을 fallback으로 호출한다.
     """
+    if not command:
+        return []
+
     skills = []
 
     # Level 0: plan.md에 명시된 스킬

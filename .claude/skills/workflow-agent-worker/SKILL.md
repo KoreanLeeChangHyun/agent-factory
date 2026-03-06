@@ -43,7 +43,7 @@ license: "Apache-2.0"
 
 오케스트레이터가 worker 에이전트를 Task 도구로 호출하여 작업을 수행합니다.
 
-WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다. Phase 0은 `skill_mapper.py` 스크립트가 plan.md skills 컬럼 + 명령어 기본 + 키워드 매칭으로 skill-map.md를 결정적 생성하는 준비 단계이며, Phase 1+부터 Worker가 skill-map.md를 참조하여 계획서의 태스크를 순서대로 실행하는 단계이다. 스킬을 찾지 못한 경우 Phase 1+는 스킬 없이 작업을 진행한다.
+WORK Phase는 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다. Phase 0은 `skill_mapper.py` 스크립트가 plan.md skills 컬럼 + 명령어 기본 + TF-IDF fallback으로 skill-map.md를 생성하는 준비 단계이며, Phase 1+부터 Worker가 skill-map.md를 참조하여 계획서의 태스크를 순서대로 실행하는 단계이다. 스킬을 찾지 못한 경우 Phase 1+는 스킬 없이 작업을 진행한다.
 
 ### Phase 0: 준비 단계 (필수, skill_mapper.py가 실행)
 
@@ -88,7 +88,7 @@ Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, 
 
 ### 명령어별 기본 스킬 매핑
 
-> 상세 매핑 테이블은 `skill-catalog.md`의 Command Default Mapping / Keyword Index 섹션을 참조하세요 (단일 소스).
+> 상세 매핑 테이블은 `skill-catalog.md`의 Command Default Mapping / Skill Descriptions 섹션을 참조하세요 (단일 소스).
 > 스킬 매핑을 변경할 때는 skill-catalog.md만 수정하면 됩니다 (catalog_sync.py 재실행).
 
 worker가 skill-map.md 없이 호출될 때 명령어에 따라 자동 로드하는 스킬과, 작업 내용의 키워드에 따라 추가 로드하는 스킬이 skill-catalog.md에 정의되어 있습니다.
@@ -335,8 +335,7 @@ Read("<workDir>/files/<filename>.jpg")
 |----------|------|
 | skills 파라미터 | 오케스트레이터가 skill-map.md 또는 계획서 기반으로 명시 전달 |
 | 명령어 기본 | skill-catalog.md의 Command Default Mapping에 의한 자동 로드 |
-| 키워드 판단 | 태스크 내용의 키워드가 skill-catalog.md의 Keyword Index와 일치 |
-| description 폴백 | 위 방식으로 매칭되지 않아 SKILL.md description 필드를 탐색하여 매칭 |
+| TF-IDF 추천 | Level 0-1 매칭 결과가 없을 때 skill_recommender.py가 description 유사도로 추천 |
 
 **예시:**
 

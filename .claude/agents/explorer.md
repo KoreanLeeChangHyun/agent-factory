@@ -65,7 +65,7 @@ maxTurns: 30
 | 전문화 스킬 | Tier 2 (전문화) | 계획서 스킬 컬럼 기반 동적 로드 | 탐색 도메인 전문성 (선택적) |
 | 프로젝트 스킬 | Tier 3 (프로젝트) | skill-map 자동 주입 | DDD 도메인 특화 (반필수) |
 
-> Explorer는 `workflow-agent-explorer` 스킬만 frontmatter에 정적 바인딩합니다. 전문화 스킬(Tier 2)은 계획서의 스킬 컬럼 또는 `skills` 파라미터 기반으로 동적 로드합니다. 단, explorer는 `skill-catalog.md` 기반 키워드 매칭 대신 **계획서 스킬 컬럼 기반 로드만** 지원합니다.
+> Explorer는 `workflow-agent-explorer` 스킬만 frontmatter에 정적 바인딩합니다. 전문화 스킬(Tier 2)은 계획서의 스킬 컬럼 또는 `skills` 파라미터 기반으로 동적 로드합니다. 단, explorer는 `skill-catalog.md` 기반 자동 매칭(TF-IDF 등) 대신 **계획서 스킬 컬럼 기반 로드만** 지원합니다.
 
 ## 입력
 

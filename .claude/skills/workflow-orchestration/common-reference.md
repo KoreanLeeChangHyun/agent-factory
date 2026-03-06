@@ -100,13 +100,13 @@ flowchart TD
 | Agent | Phase | Workflow Skill | Command Skills | Binding |
 |-------|-------|---------------|----------------|---------|
 | planner | PLAN | workflow-agent-planner | - | frontmatter `skills:` |
-| worker-opus | WORK | workflow-agent-worker | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백) | frontmatter `skills:` (workflow-agent-worker) + 런타임 동적 (Tier 2 + Tier 3) |
+| worker-opus | WORK | workflow-agent-worker | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback) | frontmatter `skills:` (workflow-agent-worker) + 런타임 동적 (Tier 2 + Tier 3) |
 | worker-sonnet | WORK | workflow-agent-worker | (worker-opus와 동일) | (worker-opus와 동일) |
 | explorer | WORK | workflow-agent-explorer | - | frontmatter `skills:` |
 | validator | WORK (Phase N+1) | workflow-agent-validator | - | frontmatter `skills:` |
 | reporter (sonnet) | REPORT | workflow-agent-reporter | - | frontmatter `skills:` |
 
-> **worker의 스킬 동적 로드 (3계층)**: worker는 `workflow-agent-worker` skill만 frontmatter에 선언합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 5단계 우선순위(계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > 키워드 매칭 > description 폴백)로 런타임에 결정됩니다.
+> **worker의 스킬 동적 로드 (3계층)**: worker는 `workflow-agent-worker` skill만 frontmatter에 선언합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 4단계 우선순위(계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback)로 런타임에 결정됩니다.
 
 ## Responsibility Matrix (Main vs Sub-agent)
 
@@ -132,7 +132,7 @@ flowchart TD
 | 규칙 | 설명 | 적용 대상 |
 |------|------|----------|
 | **산출물 필수 생성** | 모든 태스크 실행 후 반드시 작업 내역 파일을 생성해야 함.<br><br>- worker-*/explorer: `work/WXX-*.md`<br>- validator: `work/validation-report.md`<br><br>검증 결과 SKIP이거나 실패하더라도 파일은 반드시 생성. | worker-opus<br>worker-sonnet<br>explorer<br>validator |
-| **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. skill-catalog.md 키워드 매칭은 비적용. | worker-opus<br>worker-sonnet<br>explorer<br>(validator은 계획서 로드만) |
+| **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. TF-IDF fallback은 비적용. | worker-opus<br>worker-sonnet<br>explorer<br>(validator은 계획서 로드만) |
 | **선행 산출물 참조 필수** | 종속 태스크(dependencies 컬럼에 선행 ID가 있는 경우) 수행 시 `<workDir>/work/` 경로에서 선행 작업 내역 파일을 반드시 Read해야 함.<br><br>- worker-*/explorer: 작업 연속성 보장 목적<br>- validator: 검증 컨텍스트 확보 목적 (Glob으로 전체 W*-*.md 탐색 후 "핵심 발견" 섹션 참조) | worker-opus<br>worker-sonnet<br>explorer<br>validator (검증 컨텍스트로 활용) |
 
 ## Sub-agent Return Formats (REQUIRED)

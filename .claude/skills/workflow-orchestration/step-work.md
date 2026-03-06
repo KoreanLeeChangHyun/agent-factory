@@ -99,7 +99,7 @@ WORK Step 진입 후, 오케스트레이터는 `<workDir>/plan.md`를 **1회만*
 
 WORK Step은 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 
-- **Phase 0 (준비 단계)**: `skill_mapper.py` 스크립트가 plan.md skills 컬럼 + 명령어 기본 + 키워드 매칭으로 `skill-map.md`를 결정적 생성하는 준비 단계.
+- **Phase 0 (준비 단계)**: `skill_mapper.py` 스크립트가 plan.md skills 컬럼 + 명령어 기본 + TF-IDF fallback으로 `skill-map.md`를 생성하는 준비 단계.
 - **Phase 1+ (작업 실행 단계)**: `skill-map.md`를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. skill-map.md의 매핑 테이블에서 스킬 목록을 확인하고, Worker가 `.claude/skills/<스킬명>/COMPACT.md` (또는 SKILL.md)를 직접 Read하여 지침 획득.
 
 **스킬 미발견 시 폴백:** Phase 0 스크립트가 실패한 경우, Phase 1+는 스킬 없이 작업을 계속 진행한다(Worker 자율 결정).
@@ -108,6 +108,7 @@ WORK Step은 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 |-------|------|----------|--------|
 | Phase 0 | 결정적 스킬 매핑 | skill_mapper.py 스크립트 (순차) | `skill-map.md` |
 | Phase 1+ | 계획서 태스크 실행 | N개 Worker/Explorer (병렬/순차) | `WXX-*.md` 작업 내역, 코드 변경 |
+| Phase N+1 | 통합 검증 (implement/review만) | validator 에이전트 | `validation-report.md` |
 
 ---
 
@@ -124,6 +125,10 @@ WORK Step은 Phase 0(준비)과 Phase 1+(실행) 두 단계로 구분된다.
 flowchart TD
     START[WORK Step 시작] --> P0[Phase 0 실행: skill_mapper.py로 skill-map.md 생성]
     P0 --> P1[Phase 1~N: Worker가 skill-map.md 1회 Read]
+    P1 --> CHECK{command?}
+    CHECK -->|implement/review| VPH[Phase N+1: validator]
+    CHECK -->|research| NEXT[다음 단계]
+    VPH --> NEXT
     START --> |"Phase 0 스킵 금지"| FAIL[프로토콜 위반]
 ```
 
@@ -139,7 +144,7 @@ flow-phase <registryKey> 0
 flow-skillmap <registryKey>
 ```
 
-`skill_mapper.py`가 plan.md skills 컬럼 + 명령어 기본 + 키워드 매칭으로 `<workDir>/work/skill-map.md`를 생성. 실패(exit 1) 시 skill-map.md 없이 Phase 1 진행 (Worker 자율 결정).
+`skill_mapper.py`가 plan.md skills 컬럼 + 명령어 기본 + TF-IDF fallback으로 `<workDir>/work/skill-map.md`를 생성. 실패(exit 1) 시 skill-map.md 없이 Phase 1 진행 (Worker 자율 결정).
 
 > Phase 1+ Worker는 skill-map.md를 1회 Read하여 스킬 목록 확인 후, 해당 스킬의 COMPACT.md/SKILL.md를 직접 Read하여 지침 획득.
 

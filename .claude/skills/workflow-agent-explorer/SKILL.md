@@ -74,7 +74,7 @@ Glob("<workDir>/work/W02-*.md")
 2. **skills 파라미터**: skill-map.md가 없는 경우, 오케스트레이터가 전달한 `skills` 파라미터에 명시된 스킬을 직접 로드
 3. **스킬 없이 진행**: skill-map.md와 skills 파라미터 모두 없는 경우, 스킬 로드 없이 탐색을 진행
 
-> Explorer는 `skill-catalog.md` 기반 키워드 매칭을 지원하지 않습니다. 계획서 스킬 컬럼 기반(위 1~2단계)으로만 전문화 스킬을 로드합니다.
+> Explorer는 `skill-catalog.md` 기반 자동 매칭(TF-IDF 등)을 지원하지 않습니다. 계획서 스킬 컬럼 기반(위 1~2단계)으로만 전문화 스킬을 로드합니다.
 
 ### 4단계: 탐색 실행
 

@@ -9,8 +9,7 @@
 |--------|---------------|------|
 | implement | review-code-quality, workflow-system-verification | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
 | review | review-requesting, review-code-quality | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
-| research | research-general, research-integrated | 웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 키워드 매핑으로 조건부 로드 |
-| strategy | design-strategy | 다중 워크플로우 전략 수립, 로드맵 생성 |
+| research | research-general, research-integrated | 웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 planner LLM 판단으로 조건부 로드 |
 
 ## Skill Descriptions
 

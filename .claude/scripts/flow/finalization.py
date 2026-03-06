@@ -12,7 +12,7 @@
   --workflow-id WF-N 형식 (선택)
 
 4단계:
-  1. status.json 완료 처리   (update_state.py status, 실패 시 exit 1 — sync 포함)
+  1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
   4. .kanbanboard 갱신       (update-kanban.sh, workflow_id 있을 때만, 비차단)
@@ -413,11 +413,21 @@ def main() -> None:
     # ── Step 1: status.json 완료 처리 (critical) ──
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
-    run(
-        ["python3", UPDATE_STATE, "status", registry_key, to_step],
-        "Step 1: status.json transition",
-        critical=True,
-    )
+    # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
+    _step1_skip: bool = False
+    abs_work_dir: str | None = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
+    if abs_work_dir is not None:
+        _status_data = load_json_file(os.path.join(abs_work_dir, "status.json"))
+        if _status_data is not None and _status_data.get("step") == to_step:
+            print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
+            _step1_skip = True
+
+    if not _step1_skip:
+        run(
+            ["python3", UPDATE_STATE, "status", registry_key, to_step],
+            "Step 1: status.json transition",
+            critical=True,
+        )
 
     # ── Step 2: 사용량 확정 (비차단, 성공 시만) ──
     if status == "완료":
