@@ -274,6 +274,7 @@ def cmd_track() -> None:
     agent_type = input_data.get("agent_type", "")
     agent_id = input_data.get("agent_id", "")
     transcript_path = input_data.get("agent_transcript_path", "")
+    main_transcript_path = input_data.get("transcript_path", "")
 
     agent_type = _normalize_agent_type(agent_type)
 
@@ -311,6 +312,11 @@ def cmd_track() -> None:
         if "_agent_map" not in usage_data:
             usage_data["_agent_map"] = {}
         usage_data["_agent_map"][agent_id] = agent_type
+
+        # 메인 세션 JSONL 경로 기록 (최초 1회만)
+        if "_main_transcript" not in usage_data:
+            if main_transcript_path and os.path.isfile(main_transcript_path):
+                usage_data["_main_transcript"] = main_transcript_path
 
         if agent_type == "worker":
             pending = usage_data.get("_pending_workers", {})
@@ -399,6 +405,7 @@ def _find_main_session_jsonl(subagents_dir: str) -> Optional[str]:
 def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     """status.json의 linked_sessions 또는 _agent_map에서 메인 세션 JSONL 경로를 구성.
 
+    0차(최우선): usage.json의 _main_transcript 경로를 직접 반환.
     1차: linked_sessions에 기록된 세션 ID로 <session_id>.jsonl을 직접 탐색.
     2차(대체): linked_sessions가 비어있을 때, usage.json의 _agent_map에 기록된
          알려진 agent_id로 subagents 디렉터리를 역탐색하여 상위 세션 JSONL을 반환.
@@ -409,6 +416,14 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     Returns:
         메인 세션 JSONL 파일 경로. 없으면 None.
     """
+    # 0차: usage.json의 _main_transcript 경로를 직접 반환
+    usage_file = os.path.join(work_dir, "usage.json")
+    usage_data_early = load_json_file(usage_file)
+    if isinstance(usage_data_early, dict):
+        main_transcript = usage_data_early.get("_main_transcript", "")
+        if main_transcript and os.path.isfile(main_transcript):
+            return main_transcript
+
     status_file = os.path.join(work_dir, "status.json")
     status = load_json_file(status_file)
     if not isinstance(status, dict):

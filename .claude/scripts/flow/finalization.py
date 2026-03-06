@@ -104,6 +104,7 @@ def run(
 def _find_transcript_path(registry_key: str) -> str | None:
     """registryKey로부터 subagents 디렉터리의 transcript 경로를 구성한다.
 
+    0차(최우선): usage.json의 _main_transcript 경로로부터 subagents/ 탐색.
     1차: status.json의 linked_sessions에서 세션 ID를 읽고 subagents/ 탐색.
     2차(대체): linked_sessions가 비어있을 때 usage.json의 _agent_map에 기록된
          알려진 agent_id로 glob하여 subagents 디렉터리를 역탐색한다.
@@ -118,6 +119,20 @@ def _find_transcript_path(registry_key: str) -> str | None:
     abs_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
     if not abs_work_dir:
         return None
+
+    # 0차: usage.json의 _main_transcript 경로로부터 subagents/ 탐색
+    usage_file = os.path.join(abs_work_dir, "usage.json")
+    usage_data_early = load_json_file(usage_file)
+    if isinstance(usage_data_early, dict):
+        main_transcript = usage_data_early.get("_main_transcript", "")
+        if main_transcript and os.path.isfile(main_transcript):
+            # _main_transcript 파일의 디렉터리에 subagents/ 폴더가 있으면 탐색
+            transcript_dir = os.path.dirname(main_transcript)
+            subagents_dir = os.path.join(transcript_dir, "subagents")
+            if os.path.isdir(subagents_dir):
+                matches = sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl")))
+                if matches:
+                    return matches[0]
 
     status_file = os.path.join(abs_work_dir, "status.json")
     status_data = load_json_file(status_file)
