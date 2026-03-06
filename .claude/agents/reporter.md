@@ -5,6 +5,7 @@ model: sonnet
 tools: Bash, Glob, Grep, Read, Write
 skills:
   - workflow-agent-reporter
+  - design-mermaid-diagrams
 maxTurns: 30
 permissionMode: acceptEdits
 ---
@@ -57,6 +58,7 @@ permissionMode: acceptEdits
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
 | `workflow-agent-reporter` | 워크플로우 | frontmatter `skills` | REPORT 단계 절차, 보고서 템플릿, command별 템플릿 매핑, 다이어그램 원칙 |
+| `design-mermaid-diagrams` | 전문화 | frontmatter `skills` | 다이어그램 작성 시 Mermaid 구문 가이드 참조 |
 
 > reporter 에이전트는 커맨드 스킬을 사용하지 않습니다. 보고서 생성 전용이므로 워크플로우 스킬만 바인딩됩니다. 보고서 템플릿은 `.claude/skills/workflow-agent-reporter/templates/` 디렉터리에 위치합니다.
 

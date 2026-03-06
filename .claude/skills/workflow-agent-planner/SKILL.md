@@ -697,6 +697,8 @@ Task(prompt="T3: 상태 관리 설정...")
 
 > 상세 가이드는 `reference/mermaid-guide.md`를 참조하세요.
 
+**강제 규칙**: 다이어그램 작성 시 반드시 `.claude/skills/design-mermaid-diagrams/SKILL.md`를 Read 도구로 로드하여 Mermaid 구문 규칙을 참조한 후 작성한다. `reference/mermaid-guide.md`는 플래너 전용 간략 가이드이며, design-mermaid-diagrams 스킬은 전체 Mermaid 다이어그램 유형별 상세 구문을 제공한다.
+
 ---
 
 ## 재질의 가이드라인

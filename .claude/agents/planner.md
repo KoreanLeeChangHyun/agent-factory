@@ -5,6 +5,7 @@ model: opus
 tools: Bash, Glob, Grep, Read, Write
 skills:
   - workflow-agent-planner
+  - design-mermaid-diagrams
 maxTurns: 100
 ---
 # Planner Agent
@@ -54,8 +55,9 @@ maxTurns: 100
 | 스킬 | 유형 | 바인딩 방식 | 용도 |
 |------|------|------------|------|
 | `workflow-agent-planner` | 워크플로우 | frontmatter `skills` | PLAN 단계 절차, 계획서 템플릿, 질의응답 프로토콜, 섹션 판단 기준 |
+| `design-mermaid-diagrams` | 전문화 | frontmatter `skills` | 다이어그램 작성 시 Mermaid 구문 가이드 참조 |
 
-> planner 에이전트는 커맨드 스킬을 사용하지 않습니다. 계획 수립 전용이므로 워크플로우 스킬만 바인딩됩니다.
+> planner 에이전트는 커맨드 스킬을 사용하지 않습니다. 계획 수립 전용이므로 워크플로우 스킬과 다이어그램 전문화 스킬만 바인딩됩니다.
 
 ### 스킬 선택 책임
 

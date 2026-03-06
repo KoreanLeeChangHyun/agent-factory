@@ -217,7 +217,7 @@ wb.save('report.xlsx')
 
 ## 다이어그램 연동
 
-시각화가 필요한 경우 design-mermaid-diagrams 스킬을 참조하여 mermaid 코드 블록을 작성합니다.
+시각화가 필요한 경우, 반드시 `.claude/skills/design-mermaid-diagrams/SKILL.md`를 Read 도구로 로드하여 Mermaid 구문 규칙을 참조한 후 다이어그램을 작성한다.
 
 **다이어그램 유형별 mermaid 예시:**
 
