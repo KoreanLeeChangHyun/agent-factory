@@ -46,6 +46,14 @@ CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
 # 컨텍스트 토큰 예산 가드레일 (200K 기준 25%)
 TOKEN_BUDGET_LIMIT = 50_000
 
+EXTENSION_SKILL_MAP: dict[str, str] = {
+    ".py": "convention-python",
+    ".js": "convention-javascript",
+    ".ts": "convention-javascript",
+    ".jsx": "convention-javascript",
+    ".tsx": "convention-javascript",
+}
+
 
 def resolve_skill_file(skill_name: str) -> str:
     """스킬의 로드 경로를 반환한다.
@@ -198,8 +206,38 @@ def deduplicate(skills):
     return result
 
 
+def detect_extension_skills(description: str) -> list[str]:
+    """태스크 description에서 파일 확장자를 감지하여 컨벤션 스킬 목록 반환."""
+    found_exts = set()
+
+    # (a) 파일경로.확장자: 단어문자들 + 점 + 확장자
+    pattern_a = re.compile(r"\w+(\.[a-zA-Z]+)")
+    for m in pattern_a.finditer(description):
+        found_exts.add(m.group(1).lower())
+
+    # (b) *.확장자
+    pattern_b = re.compile(r"\*(\.[a-zA-Z]+)")
+    for m in pattern_b.finditer(description):
+        found_exts.add(m.group(1).lower())
+
+    # (c) .확장자 뒤 공백/구두점/한글 (독립 확장자 표기)
+    pattern_c = re.compile(r"(\.[a-zA-Z]+)(?=[\s,.\u3131-\uD7A3]|$)")
+    for m in pattern_c.finditer(description):
+        found_exts.add(m.group(1).lower())
+
+    result = []
+    seen = set()
+    for ext in sorted(found_exts):
+        skill = EXTENSION_SKILL_MAP.get(ext)
+        if skill and skill not in seen:
+            seen.add(skill)
+            result.append(skill)
+
+    return result
+
+
 def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
-    """3단계(Level 0-2) 매칭으로 태스크의 최종 스킬 목록 결정.
+    """4단계(Level 0-1.5-2) 매칭으로 태스크의 최종 스킬 목록 결정.
 
     Level 0~1 매칭 결과가 비어있으면 skill_recommender.py의 TF-IDF 추천을 fallback으로 호출한다.
     """
@@ -217,6 +255,13 @@ def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
         skills.extend(defaults[command])
 
     skills = deduplicate(skills)
+
+    # Level 1.5: 확장자 기반 컨벤션 스킬 자동 매핑
+    if task.get("description"):
+        ext_skills = detect_extension_skills(task["description"])
+        for s in ext_skills:
+            if s not in skills:
+                skills.append(s)
 
     # Level 2 (fallback): 매칭 결과가 없을 때 TF-IDF 추천 호출
     fallback_skills = []
