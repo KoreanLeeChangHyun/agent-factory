@@ -58,6 +58,19 @@ from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMM
 # ─── 유틸리티 ────────────────────────────────────────────────────────────────
 
 
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """워크플로우 로그에 이벤트를 기록한다."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
+
+
 def _err(msg: str, code: int = 1) -> NoReturn:
     print("FAIL", flush=True)
     print(f"에러: {msg}", file=sys.stderr)
@@ -309,6 +322,8 @@ def init_workflow(command: str, title: str, mode: str, prompt_content: str = "")
     _write_user_prompt(abs_work_dir, prompt_content)
     _copy_uploads(abs_work_dir)
     _clear_prompt()
+
+    _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
 
     ts: str = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
     _write_context(abs_work_dir, title, work_id, work_name, command, ts)

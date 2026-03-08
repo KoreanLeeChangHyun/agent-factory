@@ -39,6 +39,20 @@ from common import (
 
 PROJECT_ROOT = resolve_project_root()
 
+
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """워크플로우 로그에 이벤트를 기록한다."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
+
+
 # 파일 크기 상한 (50MB)
 MAX_JSONL_SIZE = 50 * 1024 * 1024
 
@@ -361,6 +375,7 @@ def cmd_track() -> None:
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, usage_data)
+        _append_log(work_dir, "INFO", f"Usage tracked: {agent_type}")
     except Exception as e:
         print(f"[usage-sync] WARNING: track error: {e}", file=sys.stderr)
     finally:
@@ -652,6 +667,7 @@ def cmd_batch() -> None:
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, usage_data)
+        _append_log(work_dir, "INFO", "Usage batch finalized")
     except Exception as e:
         print(f"[usage-sync] WARNING: batch error: {e}", file=sys.stderr)
     finally:

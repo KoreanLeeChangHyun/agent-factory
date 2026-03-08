@@ -379,10 +379,16 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
         # 작업ID: registryKey 전체 (경로 포함)
         work_id = registry_key
 
-        # 스킬 목록 (쉼표 구분, 30자 초과 시 축약)
-        skills_joined = ", ".join(all_resolved) if all_resolved else "(없음)"
-        if len(skills_joined) > 30:
-            skills_joined = skills_joined[:27] + "..."
+        # skill-map.md 링크: .dashboard/에서 ../.workflow/{timestamp}/{workName}/{command}/work/skill-map.md
+        try:
+            rel_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
+            rel_work_dir = os.path.relpath(rel_work_dir, PROJECT_ROOT)
+            skill_map_link = f"[{work_id}](../{rel_work_dir}/work/skill-map.md)"
+        except Exception:
+            skill_map_link = work_id
+
+        # 스킬 목록 (<br> 태그 개행 구분, 전체 표시)
+        skills_joined = "<br>".join(all_resolved) if all_resolved else "(없음)"
 
         # fallback 여부
         has_fallback = any(task.get("fallback_skills") for task in tasks)
@@ -393,7 +399,7 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
 
         # 행 생성
         row = (
-            f"| {date_str} | {work_id} | {command} "
+            f"| {date_str} | {skill_map_link} | {command} "
             f"| {len(tasks)} | {len(all_resolved)} | {skills_joined} "
             f"| {fallback_str} | {over_budget} |"
         )

@@ -65,24 +65,31 @@ from common import (
 PHASE_COLORS = STEP_COLORS
 
 
-def _print_state_banner(from_step: str, to_step: str) -> None:
+def _print_state_banner(from_step: str, to_step: str, abs_work_dir: str = "") -> None:
     """상태 전이 배너를 2줄 포맷으로 출력한다.
 
     Args:
         from_step: 이전 단계 이름 (예: 'PLAN', 'WORK')
         to_step: 다음 단계 이름 (예: 'WORK', 'REPORT')
+        abs_work_dir: 워크 디렉터리 절대 경로 (로그 기록용, 빈 문자열이면 로그 생략)
     """
     c_from = STEP_COLORS.get(from_step, C_GRAY)
     c_to = STEP_COLORS.get(to_step, C_GRAY)
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}단계 변경{C_RESET}", flush=True)
-    print(
+    line1 = f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}단계 변경{C_RESET}"
+    line2 = (
         f"{C_CLAUDE}║{C_RESET} "
         f"{C_CLAUDE}>>{C_RESET} "
         f"{c_from}{from_step}{C_RESET} "
         f"{C_CLAUDE}->{C_RESET} "
-        f"{c_to}{C_BOLD}{to_step}{C_RESET}",
-        flush=True,
+        f"{c_to}{C_BOLD}{to_step}{C_RESET}"
     )
+    print(line1, flush=True)
+    print(line2, flush=True)
+    if abs_work_dir:
+        plain_line1 = re.sub(r'\x1b\[[0-9;]*m', '', line1)
+        plain_line2 = re.sub(r'\x1b\[[0-9;]*m', '', line2)
+        _append_log(abs_work_dir, "INFO", plain_line1)
+        _append_log(abs_work_dir, "INFO", plain_line2)
 
 
 
@@ -243,6 +250,7 @@ def update_context(local_context: str, agent: str) -> str:
 
         data["agent"] = agent
         atomic_write_json(local_context, data)
+        _append_log(os.path.dirname(local_context), "INFO", f"Context updated: agent={agent}")
         return f"context -> agent={agent}"
     except Exception as e:
         print(f"[WARN] .context.json update failed ({local_context}): {e}", file=sys.stderr)
@@ -355,6 +363,7 @@ def update_status(abs_work_dir: str, status_file: str, from_step: str, to_step: 
         data["transitions"].append({"from": from_step, "to": to_step, "at": now})
 
         atomic_write_json(status_file, data)
+        _append_log(abs_work_dir, "INFO", f"State transition: {from_step} -> {to_step}")
 
         # history_sync.py sync 호출 (비차단 원칙: 실패 시 경고만 출력)
         try:
@@ -414,6 +423,7 @@ def link_session(status_file: str, session_id: str) -> str:
 
         data["linked_sessions"].append(session_id)
         atomic_write_json(status_file, data)
+        _append_log(os.path.dirname(status_file), "INFO", f"Session linked: {session_id}")
         return f"link-session -> added: {session_id} (total: {len(data['linked_sessions'])})"
     except Exception as e:
         print(f"[WARN] link-session failed: {e}", file=sys.stderr)
@@ -1386,7 +1396,7 @@ def main() -> None:
     _banner_from, _banner_to, _banner_ok = handler(abs_work_dir, local_context, status_file)
 
     if _banner_ok and _banner_from and _banner_to:
-        _print_state_banner(_banner_from, _banner_to)
+        _print_state_banner(_banner_from, _banner_to, abs_work_dir)
     sys.exit(0)
 
 

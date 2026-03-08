@@ -44,6 +44,20 @@ from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 
 PROJECT_ROOT: str = resolve_project_root()
 
+
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """워크플로우 로그에 이벤트를 기록한다."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
+
+
 # 스크립트 경로
 HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "history_sync.py")
 UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
@@ -443,6 +457,9 @@ def main() -> None:
             "Step 1: status.json transition",
             critical=True,
         )
+
+    if abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
 
     # ── Step 2: 사용량 확정 (비차단, 성공 시만) ──
     if status == "완료":
