@@ -66,9 +66,8 @@ D. 완료 — 작업하지 않고 종료합니다
 - 웹 조사: WebSearch, WebFetch 사용
 - 파일 수정: Read 후 Edit 또는 Write 사용
 
-**사용 가능 도구**: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+**사용 가능 도구**: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 
-> **Bash 도구 호출 금지**: 가드 스크립트 비간섭을 보장합니다.
 > **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다.
 
 #### Q-3. quick.txt 갱신
@@ -494,8 +493,8 @@ prompt.txt가 업데이트되었습니다.
 ## 주의사항
 
 1. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
-2. **Bash 도구 호출 금지**: 가드 스크립트 비간섭을 보장합니다. 셸 명령어 실행이 필요 없습니다
-3. **사용 가능 도구**: Read, Write, Glob, Grep, WebSearch, WebFetch를 사용합니다
+2. **Bash 도구**: Quick 모드(-q)에서만 허용합니다. 프롬프트 작성 모드(-p)에서는 사용하지 않습니다
+3. **사용 가능 도구**: Read, Write, Glob, Grep, WebSearch, WebFetch를 사용합니다. Quick 모드(-q)에서는 Bash도 사용 가능합니다
 4. **워크플로우 무관**: FSM 상태 전이, initialization.py와 완전히 무관합니다. 배너 출력, workDir 생성, status.json 조작을 하지 않습니다
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 모드 표시는 **`[QUICK]`** / **`[PROMPT]`** 접두사를 사용합니다
 6. **모호성 체크리스트 비노출**: 모호성 분석 결과와 체크리스트 항목은 내부 가이드로만 활용하며 사용자에게 직접 출력하지 않습니다

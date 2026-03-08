@@ -30,7 +30,7 @@ skills:
 
 ### 비워크플로우 독립 명령어
 
-이 스킬은 워크플로우 FSM과 무관하게 독립 실행된다. 사용 가능 도구: Read, Write, AskUserQuestion, Glob, Grep, WebSearch, WebFetch. Task 도구 및 Bash 도구 호출 금지.
+이 스킬은 워크플로우 FSM과 무관하게 독립 실행된다. 사용 가능 도구: Bash, Read, Write, AskUserQuestion, Glob, Grep, WebSearch, WebFetch. Task 도구 호출 금지. Bash는 Quick 모드(-q)에서만 허용.
 
 ## 참조
 

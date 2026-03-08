@@ -114,15 +114,25 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 
 ### 2b-0. Auto-Approve Check
 
-> INIT Step에서 `$ARGUMENTS`의 `-y` 플래그를 파싱하여 `autoApprove` 변수가 설정됩니다.
+> INIT Step에서 `$ARGUMENTS`의 `-n` 플래그를 파싱하여 `autoApprove` 변수가 설정됩니다.
+> `-n` 미지정 시 `autoApprove=true` (기본값). `-n` 지정 시 `autoApprove=false`.
 
-`autoApprove=true`인 경우:
+**Step 1: plan_validator.py 경고 기반 autoApprove 오버라이드**
+
+`autoApprove=true`(기본값)인 경우에도 다음 조건에서 `autoApprove=false`로 오버라이드합니다:
+
+- `validator_output`에 경고 내용이 있는 경우 (빈 문자열 또는 "검증 통과"가 아닌 경우)
+
+오버라이드는 현재 실행 turn에만 적용되며, 다음 실행에서는 원래 기본값(true)이 유지됩니다.
+
+**Step 2: 오버라이드 적용 후 분기**
+
+`autoApprove=true`인 경우 (경고 없는 정상 케이스):
 
 1. 2b-1(.context.json Check/Update)과 2b-2(Slack Notification)는 정상 수행합니다.
-2. plan_validator.py 경고가 있으면 터미널에 경고 내용을 출력하되, AskUserQuestion은 호출하지 않습니다.
-3. 2b-3(AskUserQuestion)을 **스킵**하고, 2b-4의 "승인" 분기로 자동 진행합니다.
+2. 2b-3(AskUserQuestion)을 **스킵**하고, 2b-4의 "승인" 분기로 자동 진행합니다.
 
-`autoApprove=false`인 경우 (기본값):
+`autoApprove=false`인 경우 (`-n` 지정 또는 경고 감지로 오버라이드된 경우):
 
 - 기존 흐름(2b-1 → 2b-2 → 2b-3 → 2b-4)을 그대로 따릅니다.
 
@@ -180,7 +190,7 @@ AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전
 
 ### 2b-3. AskUserQuestion으로 사용자 승인
 
-> **autoApprove 모드**: `autoApprove=true`인 경우 이 단계(2b-3)를 스킵합니다. 2b-0 참조.
+> **autoApprove 모드**: `autoApprove=true`인 경우 이 단계(2b-3)를 스킵합니다. 2b-0 Step 2 참조.
 
 > **Sequential Execution REQUIRED (Critical):**
 > PLAN 완료 배너(`flow-step end <registryKey> planSubmit`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
@@ -236,7 +246,7 @@ AskUserQuestion(
 
 ### 2b-4. Approval Result Processing
 
-> **autoApprove 모드**: `autoApprove=true`인 경우 "승인" 분기로 자동 진행됩니다. 2b-0 참조.
+> **autoApprove 모드**: `autoApprove=true`인 경우 "승인" 분기로 자동 진행됩니다. 2b-0 Step 2 참조.
 
 | Selection | Action |
 |-----------|--------|
