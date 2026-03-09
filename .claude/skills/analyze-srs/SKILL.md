@@ -12,7 +12,7 @@ license: "Apache-2.0"
 
 - 불명확한 요청을 명확하게 구조화
 - 작업 범위와 목표를 구체적으로 정의
-- cc:implement 전에 실행하여 정확한 작업 방향 설정
+- `/wf -s` 전에 실행하여 정확한 작업 방향 설정
 - 분석 결과를 문서로 저장하여 참고 자료 제공
 
 ## 핵심 원칙
@@ -177,7 +177,7 @@ license: "Apache-2.0"
 
 이 분석 결과를 바탕으로 다음 명령어 실행 가능:
 ```
-cc:implement [구체적인 작업 내용]
+/wf -s [구체적인 작업 내용]
 ```
 ```
 
@@ -201,7 +201,7 @@ cc:implement [구체적인 작업 내용]
 - **예상 결과물**: [결과물 요약]
 
 ### 다음 단계
-이 분석 결과를 바탕으로 `cc:implement` 명령어로 작업을 진행할 수 있습니다.
+이 분석 결과를 바탕으로 `/wf -s` 명령어로 작업을 진행할 수 있습니다.
 ```
 
 ## 주의사항
@@ -212,13 +212,13 @@ cc:implement [구체적인 작업 내용]
 4. **구조화된 출력**: 일관된 템플릿 사용
 5. **plan과의 차이**: plan은 실행 계획 수립, analyze는 요구사항 분석
 
-## cc:analyze와의 연동
+## /wf와의 연동
 
-cc:analyze 명령어에서 키워드 기반으로 이 스킬을 자동 호출합니다.
+`/wf -s` 명령어에서 키워드 기반으로 이 스킬을 자동 호출합니다.
 
 **호출 흐름:**
 ```
-cc:analyze "로그인 기능 요구사항 분석"
+/wf -s "로그인 기능 요구사항 분석"
     ↓
 키워드 감지: "요구사항" → analyze-srs 스킬 선택
     ↓
@@ -231,6 +231,6 @@ INIT → PLAN → WORK → REPORT
 **키워드 매핑:**
 - 요구사항, 명세서, 스펙, SRS, 기능 정의, specification, requirement → analyze-srs
 
-cc:analyze는 orchestrator 워크플로우를 따르며, analyze-srs 스킬은 WORK 단계에서 worker가 실행합니다.
+`/wf -s`는 orchestrator 워크플로우를 따르며, analyze-srs 스킬은 WORK 단계에서 worker가 실행합니다.
 
 > **WORK 단계 실행 시 주의**: 이 스킬이 WORK 단계의 worker에 의해 실행될 경우, 3단계 재질의는 건너뜁니다. 모든 재질의는 PLAN 단계에서 planner가 AskUserQuestion 도구를 사용하여 완료한 상태이므로, worker는 계획서에 명시된 요구사항만으로 분석을 수행합니다.

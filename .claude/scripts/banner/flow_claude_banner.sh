@@ -74,6 +74,7 @@ print(' '.join(str(w(s)) for s in strs))
     echo -e "${C_ORANGE}║${C_RESET}  ${C_BOLD}${C_ORANGE}Claude Code${C_RESET} - Workflow${TITLE_SPACES}${C_WHITE}${TITLE_RIGHT}${C_RESET}${C_ORANGE}║${C_RESET}"
     echo -e "${C_ORANGE}║${C_RESET}  ${C_ORANGE}▶${C_RESET} ${COMMAND}${INFO_SPACES}${C_WHITE}${INFO_RIGHT}${C_RESET}${C_ORANGE}║${C_RESET}"
     echo -e "${C_ORANGE}╚${BORDER}╝${C_RESET}"
+    # workflow.log 기록은 registryKey 없이 호출되므로 생략 (초기화 직후에는 로그 경로 미확정)
     exit 0
 fi
 
@@ -157,6 +158,23 @@ except Exception:
     BORDER=$(printf '═%.0s' $(seq 1 62))
     echo -e "${C_CLAUDE}║${C_RESET} ${C_YELLOW}${C_BOLD}[OK]${C_RESET} ${C_DIM}${WORK_ID}${C_RESET} · ${TITLE}${CMD_LABEL}"
     echo -e "${C_CLAUDE}${BORDER}${C_RESET}"
+
+    # ─── workflow.log 기록 ───
+    if [[ -n "$WORK_DIR" ]]; then
+        ABS_WORK_DIR_LOG="$PROJECT_ROOT/$WORK_DIR"
+        REGISTRY_KEY_LOG="$REGISTRY_KEY" ABS_WORK_DIR_LOG="$ABS_WORK_DIR_LOG" python3 -c "
+import os
+from datetime import datetime, timezone, timedelta
+try:
+    kst = timezone(timedelta(hours=9))
+    ts = datetime.now(kst).strftime('%Y-%m-%dT%H:%M:%S')
+    log_path = os.path.join(os.environ['ABS_WORK_DIR_LOG'], 'workflow.log')
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(f'[{ts}] [INFO] WORKFLOW_END: {os.environ[\"REGISTRY_KEY_LOG\"]}\n')
+except Exception:
+    pass
+" 2>/dev/null || true
+    fi
 
     # ─── Slack 완료 알림 (비동기, 비차단) ───
     if [[ -n "$WORK_DIR" ]]; then

@@ -68,6 +68,27 @@ print((status.get('step') or status.get('phase', 'NONE')) if isinstance(status, 
 " 2>/dev/null || echo "NONE"
 }
 
+# ─── workflow.log 이벤트 기록 ───
+_log_event() {
+    local REGISTRY_KEY="$1" LEVEL="$2" MESSAGE="$3"
+    REGISTRY_KEY="$REGISTRY_KEY" SCRIPT_DIR="$SCRIPT_DIR" LEVEL="$LEVEL" MESSAGE="$MESSAGE" python3 -c "
+import os, sys
+sys.path.insert(0, os.path.normpath(os.path.join(os.environ['SCRIPT_DIR'], '..')))
+from common import resolve_abs_work_dir, resolve_project_root
+from datetime import datetime, timezone, timedelta
+try:
+    root = resolve_project_root()
+    wd = resolve_abs_work_dir(os.environ['REGISTRY_KEY'], root)
+    kst = timezone(timedelta(hours=9))
+    ts = datetime.now(kst).strftime('%Y-%m-%dT%H:%M:%S')
+    log_path = os.path.join(wd, 'workflow.log')
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(f'[{ts}] [{os.environ[\"LEVEL\"]}] {os.environ[\"MESSAGE\"]}\n')
+except Exception:
+    pass
+" 2>/dev/null || true
+}
+
 # ─── registryKey → 산출물 상대경로 해석 ───
 get_artifact_path() {
     local STEP="$1" REGISTRY_KEY="$2"
@@ -143,6 +164,7 @@ if [[ "$SUBCMD" == "start" ]]; then
     echo -e "${C_CLAUDE}║${C_RESET}  ${C_CLAUDE}[${C_RESET}${PROGRESS}${C_CLAUDE}]${C_RESET}  ${COLOR}${C_BOLD}${STEP}${C_RESET}${LINE1_SPACES}${C_WHITE}${LINE1_RIGHT}${C_RESET}${C_CLAUDE}║${C_RESET}"
     echo -e "${C_CLAUDE}║${C_RESET}  ${C_CLAUDE}▶${C_RESET} ${DESC}${LINE2_SPACES}${C_WHITE}${LINE2_RIGHT}${C_RESET}${C_CLAUDE}║${C_RESET}"
     echo -e "${C_CLAUDE}╚${BORDER}╝${C_RESET}"
+    _log_event "$REGISTRY_KEY" "INFO" "STEP_START: ${STEP}" || true
     exit 0
 fi
 
@@ -173,6 +195,12 @@ if [[ "$SUBCMD" == "end" ]]; then
         echo -e "${C_CLAUDE}║${C_RESET} ${C_YELLOW}${C_BOLD}[OK]${C_RESET} ${C_DIM}${LABEL}${C_RESET}"
     else
         echo -e "${C_CLAUDE}║ [ASK]${C_RESET} ${C_DIM}AskUserQuestion${C_RESET}"
+    fi
+
+    _LOG_MSG="STEP_END: ${STEP} label=${LABEL:-ASK}"
+    _log_event "$REGISTRY_KEY" "INFO" "$_LOG_MSG" || true
+    if [[ -n "$ARTIFACT_PATH" ]]; then
+        _log_event "$REGISTRY_KEY" "INFO" "ARTIFACT: ${ARTIFACT_PATH}" || true
     fi
     exit 0
 fi

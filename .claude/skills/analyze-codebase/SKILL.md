@@ -1,6 +1,6 @@
 ---
 name: analyze-codebase
-description: "Codebase analysis skill. Analyzes project structure, architecture, dependencies, and code quality. Use for codebase inspection: (1) project structure analysis, (2) architecture analysis, (3) invoked via cc:analyze command. Triggers: '코드베이스', 'codebase', '아키텍처', 'architecture', '코드 구조', '의존성', '모듈'."
+description: "Codebase analysis skill. Analyzes project structure, architecture, dependencies, and code quality. Use for codebase inspection: (1) project structure analysis, (2) architecture analysis, (3) invoked via /wf -s command. Triggers: '코드베이스', 'codebase', '아키텍처', 'architecture', '코드 구조', '의존성', '모듈'."
 license: "Apache-2.0"
 ---
 
@@ -321,7 +321,7 @@ project-root/
 2. [우선 개선 사항 2]
 
 ### 다음 단계
-이 분석 결과를 바탕으로 `cc:refactor` 또는 `cc:implement` 명령어로 개선 작업을 진행할 수 있습니다.
+이 분석 결과를 바탕으로 `/wf -s` 명령어로 개선 작업을 진행할 수 있습니다.
 ```
 
 ## 주의사항

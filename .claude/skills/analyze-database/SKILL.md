@@ -1,6 +1,6 @@
 ---
 name: analyze-database
-description: "Database analysis skill. Analyzes schema, table structure, relationships, indexes, and query performance. Use for database analysis tasks: (1) schema structure analysis and ERD generation, (2) table relationship visualization, (3) index and query performance optimization, (4) normalization level and data integrity review. Invoked via cc:analyze command; integrates with design-mermaid-diagrams for ERD generation. Triggers: 'DB 분석', 'database', '스키마', 'schema', 'ERD', '테이블 구조', '쿼리 성능'."
+description: "Database analysis skill. Analyzes schema, table structure, relationships, indexes, and query performance. Use for database analysis tasks: (1) schema structure analysis and ERD generation, (2) table relationship visualization, (3) index and query performance optimization, (4) normalization level and data integrity review. Invoked via /wf -s command; integrates with design-mermaid-diagrams for ERD generation. Triggers: 'DB 분석', 'database', '스키마', 'schema', 'ERD', '테이블 구조', '쿼리 성능'."
 license: "Apache-2.0"
 ---
 
@@ -285,8 +285,7 @@ erDiagram
 ## 다음 단계
 
 이 분석 결과를 바탕으로:
-- `cc:implement` - 스키마 변경 구현
-- `cc:refactor` - 쿼리 최적화
+- `/wf -s` - 스키마 변경 구현 또는 쿼리 최적화
 ```
 
 ## 재질의 가이드라인
@@ -327,7 +326,7 @@ erDiagram
 [다이어그램 또는 다이어그램 링크]
 
 ### 다음 단계
-이 분석 결과를 바탕으로 `cc:implement` 또는 `cc:refactor` 명령어로 작업을 진행할 수 있습니다.
+이 분석 결과를 바탕으로 `/wf -s` 명령어로 작업을 진행할 수 있습니다.
 ```
 
 ## 주의사항

@@ -2,13 +2,13 @@
 #
 # update-kanban.sh
 # ================
-# 워크플로우 완료 시 .kanban/board.md 파일을 갱신한다.
+# 워크플로우 완료 시 .kanban/board.html 파일을 갱신한다.
 #
 # 사용법:
 #   update-kanban.sh <kanban_board_path> <workflow_id> <status>
 #
 # 인자:
-#   kanban_board_path  .kanban/board.md 파일 경로
+#   kanban_board_path  .kanban/board.html 파일 경로
 #   workflow_id       완료된 워크플로우 ID (예: WF-1)
 #   status            새 상태 (completed | failed)
 #

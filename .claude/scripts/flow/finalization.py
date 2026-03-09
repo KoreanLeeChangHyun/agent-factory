@@ -15,7 +15,7 @@
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
-  4. .kanban/board.md 갱신   (update-kanban.sh, workflow_id 있을 때만, 비차단)
+  4. .kanban/board.html 갱신  (kanban.py move, ticket_number 있을 때만, 비차단)
 
 종료 코드:
   0  성공
@@ -203,14 +203,14 @@ def _find_transcript_path(registry_key: str) -> str | None:
 
 
 def find_board() -> str | None:
-    """프로젝트 루트에서 .kanban/board.md 파일을 탐색한다.
+    """프로젝트 루트에서 .kanban/board.html 파일을 탐색한다.
 
-    프로젝트 루트의 .kanban/board.md 경로를 확인한다.
+    프로젝트 루트의 .kanban/board.html 경로를 확인한다.
 
     Returns:
-        .kanban/board.md 파일 절대 경로. 없으면 None.
+        .kanban/board.html 파일 절대 경로. 없으면 None.
     """
-    board_path = os.path.join(PROJECT_ROOT, ".kanban", "board.md")
+    board_path = os.path.join(PROJECT_ROOT, ".kanban", "board.html")
     if os.path.isfile(board_path):
         return board_path
     return None
@@ -446,6 +446,9 @@ def main() -> None:
             print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
             _step1_skip = True
 
+    if abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP1: registryKey={registry_key} toStep={to_step}")
+
     if not _step1_skip:
         run(
             ["python3", UPDATE_STATE, "status", registry_key, to_step],
@@ -461,14 +464,21 @@ def main() -> None:
         # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
         transcript_path = _find_transcript_path(registry_key)
         if transcript_path:
+            if abs_work_dir is not None:
+                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2A: transcript=found path={transcript_path}")
             stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
             run(
                 ["python3", USAGE_SYNC, "batch"],
                 "Step 2a: usage-sync batch",
                 input_data=stdin_json,
             )
+        else:
+            if abs_work_dir is not None:
+                _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
 
         # Step 2b: usage-finalize
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2B: usage-finalize registryKey={registry_key}")
         run(
             ["python3", UPDATE_STATE, "usage-finalize", registry_key],
             "Step 2b: usage-finalize",
@@ -478,18 +488,36 @@ def main() -> None:
     try:
         abs_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
         _update_logs_md(registry_key, abs_work_dir)
+        if abs_work_dir is not None:
+            # workflow.log 통계 수집 (로그 기록 전)
+            _log_path = os.path.join(abs_work_dir, "workflow.log")
+            _warn_count = 0
+            _error_count = 0
+            if os.path.isfile(_log_path):
+                try:
+                    with open(_log_path, "r", encoding="utf-8", errors="replace") as _f:
+                        _log_content = _f.read()
+                    _warn_count = _log_content.count("[WARN]")
+                    _error_count = _log_content.count("[ERROR]")
+                except Exception:
+                    pass
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_LOGS_MD: registryKey={registry_key} warn={_warn_count} error={_error_count}")
     except Exception:
         pass
 
     # ── Step 3: 아카이빙 (비차단) ──
+    if abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP3: archive registryKey={registry_key}")
     run(
         ["python3", HISTORY_SYNC, "archive", registry_key],
         "Step 3: archive",
     )
 
-    # ── Step 4: .kanban/board.md 갱신 (ticket_number 있을 때만, 비차단) ──
+    # ── Step 4: .kanban/board.html 갱신 (ticket_number 있을 때만, 비차단) ──
     if ticket_number:
         target_column = "review" if status == "완료" else "open"
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4: kanban ticket={ticket_number} column={target_column}")
         run(
             ["python3", KANBAN_PY, "move", ticket_number, target_column],
             "Step 4: board update",

@@ -2,23 +2,23 @@
 #
 # validate-kanban.sh
 # ==================
-# .kanban/board.md와 roadmap.md 간의 정합성을 검증하고 프로젝트 완료 여부를 판단한다.
+# .kanban/board.html와 roadmap.md 간의 정합성을 검증하고 프로젝트 완료 여부를 판단한다.
 #
 # 사용법:
 #   validate-kanban.sh <kanban_board_path> <roadmap_path>
 #
 # 인자:
-#   kanban_board_path  .kanban/board.md 파일 경로
+#   kanban_board_path  .kanban/board.html 파일 경로
 #   roadmap_path       roadmap.md 파일 경로
 #
 # 정합성 검증 항목:
-#   (a) roadmap.md의 마일스톤 ID 목록과 .kanban/board.md의 마일스톤 ID 목록 일치 여부
+#   (a) roadmap.md의 마일스톤 ID 목록과 .kanban/board.html의 마일스톤 ID 목록 일치 여부
 #   (b) 워크플로우 ID 교차 검증 (GAP-V3: roadmap SSOT 기준 ERROR/WARN 분류)
-#   (c) 상태 불일치 감지 (roadmap에 없는 WF가 .kanban/board.md에 존재하는 경우 경고)
+#   (c) 상태 불일치 감지 (roadmap에 없는 WF가 .kanban/board.html에 존재하는 경우 경고)
 #   (d) GAP-V2: roadmap.md 마일스톤 완료 상태 교차 확인 (프로젝트 완료 조건 3)
 #
 # 프로젝트 완료 판단:
-#   .kanban/board.md의 Done 컬럼 마일스톤 수와 전체 마일스톤 수 비교
+#   .kanban/board.html의 Done 컬럼 마일스톤 수와 전체 마일스톤 수 비교
 #   + roadmap.md의 모든 마일스톤에 완료 상태가 기록되어 있는지 확인
 #   모두 충족 시 "프로젝트 완료" 메시지 출력
 #
@@ -57,7 +57,7 @@ extract_roadmap_milestone_ids() {
     grep -oP '^#{2,3}\s+\K(MS-[0-9]+)(?=:)' "$ROADMAP_PATH" | sort -u
 }
 
-# .kanban/board.md에서 마일스톤 ID 추출
+# .kanban/board.html에서 마일스톤 ID 추출
 # 패턴: "### MS-N:" 형태의 마일스톤 카드 헤더
 extract_kanban_milestone_ids() {
     grep -oP '^###\s+\K(MS-[0-9]+)(?=:)' "$KANBAN_PATH" | sort -u
@@ -71,7 +71,7 @@ extract_roadmap_workflow_ids() {
     grep -oP '\bWF-[0-9]+\b' "$ROADMAP_PATH" | sort -u
 }
 
-# .kanban/board.md에서 워크플로우 ID 추출
+# .kanban/board.html에서 워크플로우 ID 추출
 # 패턴: "- [ ] WF-N:" 또는 "- [x] WF-N:" 형태의 체크박스 항목
 extract_kanban_workflow_ids() {
     grep -oP '^\s*- \[.\]\s+\K(WF-[0-9]+)(?=:)' "$KANBAN_PATH" | sort -u
@@ -79,7 +79,7 @@ extract_kanban_workflow_ids() {
 
 # --- Done 컬럼 분석 ---
 
-# .kanban/board.md에서 Done 컬럼의 마일스톤 수 계산
+# .kanban/board.html에서 Done 컬럼의 마일스톤 수 계산
 count_done_milestones() {
     awk '
     BEGIN { in_done = 0; count = 0 }
@@ -90,14 +90,14 @@ count_done_milestones() {
     ' "$KANBAN_PATH"
 }
 
-# .kanban/board.md에서 전체 마일스톤 수 계산
+# .kanban/board.html에서 전체 마일스톤 수 계산
 count_total_milestones() {
     grep -cP '^### MS-[0-9]+:' "$KANBAN_PATH" || echo "0"
 }
 
 # --- GAP-V2: roadmap.md 마일스톤 완료 상태 교차 확인 ---
 
-# .kanban/board.md Done 컬럼의 마일스톤 ID 목록 추출
+# .kanban/board.html Done 컬럼의 마일스톤 ID 목록 추출
 extract_done_milestone_ids() {
     awk '
     BEGIN { in_done = 0 }
@@ -147,14 +147,14 @@ ONLY_IN_KANBAN=$(comm -13 "$ROADMAP_MS" "$KANBAN_MS")
 if [[ -n "$ONLY_IN_ROADMAP" ]]; then
     HAS_ERROR=1
     while IFS= read -r ms_id; do
-        ERRORS+=("마일스톤 불일치: ${ms_id}가 roadmap에 있으나 .kanban/board.md에 없음")
+        ERRORS+=("마일스톤 불일치: ${ms_id}가 roadmap에 있으나 .kanban/board.html에 없음")
     done <<< "$ONLY_IN_ROADMAP"
 fi
 
 if [[ -n "$ONLY_IN_KANBAN" ]]; then
     HAS_ERROR=1
     while IFS= read -r ms_id; do
-        ERRORS+=("마일스톤 불일치: ${ms_id}가 .kanban/board.md에 있으나 roadmap에 없음")
+        ERRORS+=("마일스톤 불일치: ${ms_id}가 .kanban/board.html에 있으나 roadmap에 없음")
     done <<< "$ONLY_IN_KANBAN"
 fi
 
@@ -167,14 +167,14 @@ WF_ONLY_IN_KANBAN=$(comm -13 "$ROADMAP_WF" "$KANBAN_WF")
 if [[ -n "$WF_ONLY_IN_ROADMAP" ]]; then
     HAS_ERROR=1
     while IFS= read -r wf_id; do
-        ERRORS+=("워크플로우 누락: ${wf_id}가 roadmap에 있으나 .kanban/board.md에 없음")
+        ERRORS+=("워크플로우 누락: ${wf_id}가 roadmap에 있으나 .kanban/board.html에 없음")
     done <<< "$WF_ONLY_IN_ROADMAP"
 fi
 
 # (c) 상태 불일치 감지 - roadmap에 없는 WF가 kanbanboard에 존재 (경고)
 if [[ -n "$WF_ONLY_IN_KANBAN" ]]; then
     while IFS= read -r wf_id; do
-        WARNINGS+=("상태 불일치: ${wf_id}가 .kanban/board.md에 있으나 roadmap에 없음")
+        WARNINGS+=("상태 불일치: ${wf_id}가 .kanban/board.html에 있으나 roadmap에 없음")
     done <<< "$WF_ONLY_IN_KANBAN"
 fi
 
@@ -211,7 +211,7 @@ extract_roadmap_completed_milestone_ids > "$ROADMAP_COMPLETED_MS_IDS"
 DONE_BUT_NOT_IN_ROADMAP=$(comm -23 "$DONE_MS_IDS" "$ROADMAP_COMPLETED_MS_IDS")
 if [[ -n "$DONE_BUT_NOT_IN_ROADMAP" ]]; then
     while IFS= read -r ms_id; do
-        WARNINGS+=("완료 상태 미기록: ${ms_id}가 .kanban/board.md Done에 있으나 roadmap.md에 완료 상태가 기록되지 않음")
+        WARNINGS+=("완료 상태 미기록: ${ms_id}가 .kanban/board.html Done에 있으나 roadmap.md에 완료 상태가 기록되지 않음")
     done <<< "$DONE_BUT_NOT_IN_ROADMAP"
 fi
 

@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> REPORT -> DONE 4-step workflow. Use for workflow orchestration: auto-loaded on cc:* command execution for step flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step-plan.md ~ step-done.md, common-reference.md."
+description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> REPORT -> DONE 4-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step-plan.md ~ step-done.md, common-reference.md."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -65,7 +65,7 @@ Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
 
 - `command`: execution command (implement, review, research)
 
-> cc:* commands use `$ARGUMENTS` for command detection. User requests are handled via `.kanban/T-NNN.txt` ticket files.
+> `/wf` commands use `$ARGUMENTS` for command detection. User requests are handled via `.kanban/T-NNN.xml` ticket files.
 
 ### 승인 모드 플래그
 
@@ -145,6 +145,61 @@ DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` →
 
 **CRITICAL: After `flow-claude end <key>` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
 
+### Workflow Log Protocol
+
+워크플로우 실행 중 `workflow.log` 파일에 구조화된 이벤트를 기록한다. 배너 스크립트와 Python 스크립트가 자동으로 기록하며, 오케스트레이터는 `update_state.py task-status`를 통해 AGENT_DISPATCH/AGENT_RETURN 이벤트를 간접적으로 트리거한다.
+
+#### 로그 파일 포맷
+
+```
+[YYYY-MM-DDTHH:MM:SS] [LEVEL] MESSAGE
+```
+
+- **레벨 종류**: `INFO`, `WARN`, `ERROR`, `AUDIT`
+- **비차단 원칙**: 모든 로깅 코드는 예외 발생 시 `pass`(Python) 또는 `|| true`(Bash) 패턴으로 감싸 로깅 실패가 워크플로우를 중단하지 않음
+- **파일 위치**: `<abs_work_dir>/workflow.log` (initialization.py가 워크플로우 시작 시 빈 파일로 생성)
+
+#### 로그 이벤트 카탈로그
+
+| 이벤트 | 발생 시점 | 레벨 | 메시지 포맷 | 기록 주체 |
+|--------|----------|------|------------|---------|
+| `STEP_START` | `flow-step start` 배너 출력 직후 | INFO | `STEP_START: {STEP}` | flow_step_banner.sh |
+| `STEP_END` | `flow-step end` 배너 출력 직후 | INFO | `STEP_END: {STEP} label={LABEL\|ASK}` | flow_step_banner.sh |
+| `ARTIFACT` | STEP_END 후 산출물 경로가 있을 때 | INFO | `ARTIFACT: {path}` | flow_step_banner.sh |
+| `PHASE_START` | `flow-phase` 배너 출력 직후 | INFO | `PHASE_START: {N} mode={mode} agents={agents} tasks={tasks}` | flow_phase_banner.sh |
+| `WORKFLOW_END` | `flow-claude end` 배너 출력 직후 | INFO | `WORKFLOW_END: {registryKey}` | flow_claude_banner.sh |
+| `AGENT_DISPATCH` | `update_task_status()` task_status=running 시 | INFO | `AGENT_DISPATCH: taskId={task_id}` | update_state.py |
+| `AGENT_RETURN` | `update_task_status()` task_status=completed/failed 시 | INFO | `AGENT_RETURN: taskId={task_id} status={status}` | update_state.py |
+| `USAGE_PENDING` | `usage_pending()` 등록 성공 후 | INFO | `USAGE_PENDING: agentId={agent_id} taskId={task_id}` | update_state.py |
+| `USAGE_RECORDED` | `usage_record()` 기록 성공 후 | INFO | `USAGE_RECORDED: agent={label}` | update_state.py |
+| `SESSION_LINKED` | `link_session()` 연결 성공 후 | INFO | `SESSION_LINKED: sessionId={sessionId} total={count}` | update_state.py |
+| `STATE_BOTH` | `_handle_both()` context+status 동시 성공 후 | INFO | `STATE_BOTH: agent={agent} step={from}->{to}` | update_state.py |
+| `FINALIZE_STEP1` | finalization.py Step 1(status 전이) 실행 전 | INFO | `FINALIZE_STEP1: registryKey={key} toStep={step}` | finalization.py |
+| `FINALIZE_STEP2A` | Step 2 transcript 탐색 결과 | INFO/WARN | `FINALIZE_STEP2A: transcript=found path={p}` / `transcript=not_found` | finalization.py |
+| `FINALIZE_STEP2B` | Step 2 usage-finalize 실행 전 | INFO | `FINALIZE_STEP2B: usage-finalize registryKey={key}` | finalization.py |
+| `FINALIZE_STEP3` | Step 3(아카이빙) 실행 전 | INFO | `FINALIZE_STEP3: archive registryKey={key}` | finalization.py |
+| `FINALIZE_STEP4` | Step 4(kanban 갱신) 실행 전 | INFO | `FINALIZE_STEP4: kanban ticket={n} column={col}` | finalization.py |
+| `FINALIZE_LOGS_MD` | `_update_logs_md()` 성공 후 | INFO | `FINALIZE_LOGS_MD: registryKey={key} warn={n} error={n}` | finalization.py |
+| `Workflow initialized` | initialization.py 완료 후 | INFO | `Workflow initialized: {registryKey}` | initialization.py |
+| `Workflow finalized` | finalization.py Step 1 완료 후 | INFO | `Workflow finalized: {registryKey} ({status})` | finalization.py |
+
+#### 오케스트레이터의 로그 의존 관계
+
+오케스트레이터는 직접 `workflow.log`에 쓰지 않는다. 대신 아래 명령 호출이 내부적으로 로그를 트리거한다:
+
+| 오케스트레이터 호출 | 트리거되는 로그 이벤트 |
+|-----------------|-------------------|
+| `flow-step start <registryKey>` | `STEP_START` |
+| `flow-step end <registryKey> [label]` | `STEP_END` (+ `ARTIFACT` if present) |
+| `flow-phase <registryKey> <N>` | `PHASE_START` |
+| `flow-claude end <registryKey>` | `WORKFLOW_END` |
+| `flow-update task-status <key> running <taskId>` | `AGENT_DISPATCH` |
+| `flow-update task-status <key> completed\|failed <taskId>` | `AGENT_RETURN` |
+| `flow-update usage-pending <key> <agents>` | `USAGE_PENDING` (복수 가능) |
+| `flow-update both <key> <agent> <toStep>` | `STATE_BOTH` |
+
+---
+
 ### Post-Return Silence Rules
 
 > **적용 범위**: 이 규칙은 해당 Step 완료 후뿐 아니라 **워크플로우 전 구간**에 적용됩니다. 에이전트 호출 전/중/후 모든 시점에서 내부 추론/분석 텍스트 출력은 금지입니다.
@@ -164,9 +219,9 @@ DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` →
 
 ## Initialization (Orchestrator-driven)
 
-cc:* 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 다음을 순차 실행한다 (hook 없음):
+`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 다음을 순차 실행한다 (hook 없음):
 
-1. 사용자 입력에서 command 및 플래그 파싱 (예: `/cc:implement` → command=implement, autoApprove=true / `/cc:implement -n` → command=implement, autoApprove=false)
+1. 사용자 입력에서 command 및 플래그 파싱 (예: `/wf -s implement` → command=implement, autoApprove=true / `/wf -s implement -n` → command=implement, autoApprove=false)
 2. `flow-claude start <command>` — 시작 배너 출력
 3. 티켓 파일을 읽어 20자 이내 한글 제목 생성 (오케스트레이터가 직접 생성, LLM 별도 호출 없음)
 4. `flow-init <command> "<title>"` — 워크플로우 디렉터리 생성, status.json 초기화. 실패 시 `FAIL` 출력 + 비정상 종료 코드
@@ -254,7 +309,7 @@ flow-claude end <registryKey>
 | AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
 | State transition | `flow-update both/status/context/task-status/usage-pending/env/link-session/usage/usage-finalize` |
 | Sub-agent return extraction | 상태만 확인 (1줄). 산출물 경로는 컨벤션으로 확정 |
-| 티켓 파일 handling (initialization.py + 수정 요청 only) | initialization.py가 `.kanban/T-NNN.txt` -> user_prompt.txt 복사. 수정 요청: `flow-reload`가 티켓 파일 -> user_prompt.txt append. 승인/중지 시 티켓 파일 접근 MUST NOT |
+| 티켓 파일 handling (initialization.py + 수정 요청 only) | initialization.py가 `.kanban/T-NNN.xml` -> user_prompt.txt 복사. 수정 요청: `flow-reload`가 티켓 파일 -> user_prompt.txt append. 승인/중지 시 티켓 파일 접근 MUST NOT |
 | Workflow finalization | `flow-finish <registryKey> 완료\|실패` — Slack 알림, cleanup |
 | Workflow end | `flow-claude end <registryKey>` — 완료 배너 출력 + 종료 |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
@@ -307,6 +362,6 @@ Certain actions must be performed by the orchestrator due to Claude Code platfor
 
 ## Notes
 
-1. On cc:* command, orchestrator parses command directly, runs flow-claude start banner then initialization.py, then proceeds to PLAN Step
+1. On /wf command, orchestrator parses command directly, runs flow-claude start banner then initialization.py, then proceeds to PLAN Step
 2. Step order (PLAN -> WORK -> REPORT -> DONE) strictly enforced; WORK cannot ask questions (clarification in PLAN only)
 3. Git commits via `/git:commit` separately; Slack failure does not block workflow

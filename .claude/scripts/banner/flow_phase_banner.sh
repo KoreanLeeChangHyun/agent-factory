@@ -28,6 +28,27 @@ fi
 
 COLOR=$(get_color "WORK")
 
+# ─── workflow.log 이벤트 기록 ───
+_log_event() {
+    local REGISTRY_KEY="$1" LEVEL="$2" MESSAGE="$3"
+    REGISTRY_KEY="$REGISTRY_KEY" SCRIPT_DIR="$SCRIPT_DIR" LEVEL="$LEVEL" MESSAGE="$MESSAGE" python3 -c "
+import os, sys
+sys.path.insert(0, os.path.normpath(os.path.join(os.environ['SCRIPT_DIR'], '..')))
+from common import resolve_abs_work_dir, resolve_project_root
+from datetime import datetime, timezone, timedelta
+try:
+    root = resolve_project_root()
+    wd = resolve_abs_work_dir(os.environ['REGISTRY_KEY'], root)
+    kst = timezone(timedelta(hours=9))
+    ts = datetime.now(kst).strftime('%Y-%m-%dT%H:%M:%S')
+    log_path = os.path.join(wd, 'workflow.log')
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(f'[{ts}] [{os.environ[\"LEVEL\"]}] {os.environ[\"MESSAGE\"]}\n')
+except Exception:
+    pass
+" 2>/dev/null || true
+}
+
 # ─── plan.md에서 Phase 정보 파싱 ───
 if [[ "$PHASE" == "0" ]]; then
     EXEC_MODE="sequential"
@@ -122,3 +143,4 @@ if [[ -n "$AGENTS" && "$AGENTS" != "-" ]]; then
 else
     echo -e "${C_CLAUDE}║${C_RESET} ${C_CLAUDE}>>${C_RESET} ${C_DIM}Phase ${PHASE}${C_RESET}"
 fi
+_log_event "$REGISTRY_KEY" "INFO" "PHASE_START: ${PHASE} mode=${EXEC_MODE} agents=${AGENTS:-none} tasks=${TASKS:-none}" || true

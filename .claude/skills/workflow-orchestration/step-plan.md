@@ -39,7 +39,7 @@ AskUserQuestion(
     header: "Prompt 품질 확인",
     options: [
       { label: "계속 진행", description: "현재 티켓 파일로 planner를 호출합니다" },
-      { label: "prompt 보강 후 재실행", description: "cc:prompt로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
+      { label: "prompt 보강 후 재실행", description: "/wf -p로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
     ],
     multiSelect: false
   }]
@@ -56,7 +56,7 @@ AskUserQuestion(
 | **계속 진행** | Step 2a로 진행 |
 | **prompt 보강 후 재실행** | 오케스트레이터 현재 turn 즉시 종료 (FSM 상태 전이 없음) |
 
-> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `cc:prompt`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
+> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `/wf -p`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
 
 ---
 
@@ -270,13 +270,13 @@ AskUserQuestion(
 
 | Selection | Action |
 |-----------|--------|
-| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.kanban/T-NNN.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
-| **수정 요청** | 사용자가 `.kanban/T-NNN.txt` 티켓에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.kanban/T-NNN.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
+| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.kanban/T-NNN.xml` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
+| **수정 요청** | 사용자가 `.kanban/T-NNN.xml` 티켓에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
+| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.kanban/T-NNN.xml` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
 
 > **Ticket Isolation Rule (CRITICAL):**
-> `.kanban/T-NNN.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
-> "승인" 또는 "중지" 선택 후 `.kanban/T-NNN.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
+> `.kanban/T-NNN.xml` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
+> "승인" 또는 "중지" 선택 후 `.kanban/T-NNN.xml`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
 > - "승인" 시: 티켓 무시, WORK 단계로 즉시 진행
 > - "중지" 시: 티켓 무시, CANCELLED 처리만 수행
 > - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 티켓 접근 경로)
@@ -286,7 +286,7 @@ AskUserQuestion(
 > **"수정 요청" selection handling:**
 > **Precondition:** 아래 3단계 절차는 사용자가 "수정 요청"을 선택한 경우에만 실행합니다. "승인" 또는 "중지" 선택 시 이 절차를 실행하는 것은 MUST NOT입니다.
 >
-> 사용자가 `.kanban/T-NNN.txt` 티켓에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
+> 사용자가 `.kanban/T-NNN.xml` 티켓에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
 >
 > **1단계. reload_prompt.py 호출** — 피드백 수신
 >
@@ -301,7 +301,7 @@ AskUserQuestion(
 > - stdout으로 피드백 전문을 출력
 > - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
 > - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
-> - stdout에 `[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.txt)`가 포함된 경우: 티켓 파일이 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
+> - stdout에 `[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)`가 포함된 경우: 티켓 파일이 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
 >
 > **2단계. planner re-call** — 피드백 포함 계획 재수립
 >
@@ -318,7 +318,7 @@ AskUserQuestion(
 > ")
 > ```
 >
-> - `feedback` 값이 빈 문자열인 경우(`[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.txt)` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
+> - `feedback` 값이 빈 문자열인 경우(`[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
 > - planner는 기존 계획서를 기반으로 피드백을 반영한 수정 계획서를 작성하여 `작성완료` 반환
 >
 > **3단계. Step 2b repeat** — 재승인 요청

@@ -9,10 +9,10 @@ Salesforce CLI를 사용하여 메타데이터를 배포합니다.
 
 ## 워크플로우 특성
 
-sf:deploy는 Salesforce 배포 전용 명령어로, cc:* 명령어와 달리 독립 워크플로우를 사용합니다.
+sf:deploy는 Salesforce 배포 전용 명령어로, /wf 명령어와 달리 독립 워크플로우를 사용합니다.
 
 **표준 워크플로우와의 차이:**
-- cc:* 명령어: ROUTING → PLAN → WORK → REPORT (4단계)
+- /wf 명령어: INIT → PLAN → WORK → REPORT (4단계)
 - sf:deploy: PLAN → WORK → REPORT (3단계, Salesforce 배포 최적화)
 
 **독립 워크플로우 사용 이유:**

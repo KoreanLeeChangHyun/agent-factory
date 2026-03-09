@@ -423,8 +423,13 @@ def link_session(status_file: str, session_id: str) -> str:
 
         data["linked_sessions"].append(session_id)
         atomic_write_json(status_file, data)
-        _append_log(os.path.dirname(status_file), "INFO", f"Session linked: {session_id}")
-        return f"link-session -> added: {session_id} (total: {len(data['linked_sessions'])})"
+        count = len(data["linked_sessions"])
+        _append_log(
+            os.path.dirname(status_file),
+            "INFO",
+            f"SESSION_LINKED: sessionId={session_id} total={count}",
+        )
+        return f"link-session -> added: {session_id} (total: {count})"
     except Exception as e:
         print(f"[WARN] link-session failed: {e}", file=sys.stderr)
         return "link-session -> failed"
@@ -478,6 +483,14 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
 
         data["tasks"][task_id] = {"status": task_status, "updated_at": now}
         atomic_write_json(status_file, data)
+
+        # 상태별 구조화 로그 기록
+        abs_work_dir_log = os.path.dirname(status_file)
+        if task_status == "running":
+            _append_log(abs_work_dir_log, "INFO", f"AGENT_DISPATCH: taskId={task_id}")
+        elif task_status in {"completed", "failed"}:
+            _append_log(abs_work_dir_log, "INFO", f"AGENT_RETURN: taskId={task_id} status={task_status}")
+
         return f"task-status -> {task_id}: {task_status} (updated_at: {now})"
     except Exception as e:
         print(f"[WARN] task-status failed: {e}", file=sys.stderr)
@@ -523,6 +536,7 @@ def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, data)
+        _append_log(abs_work_dir, "INFO", f"USAGE_PENDING: agentId={agent_id} taskId={task_id}")
         return f"usage-pending -> {agent_id}={task_id}"
     finally:
         release_lock(lock_dir)
@@ -595,6 +609,7 @@ def usage_record(
 
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, data)
+        _append_log(abs_work_dir, "INFO", f"USAGE_RECORDED: agent={label}")
         return f"usage -> {label}: in={input_tokens} out={output_tokens} cc={cache_creation} cr={cache_read}"
     finally:
         release_lock(lock_dir)
@@ -1017,6 +1032,8 @@ def _handle_both(abs_work_dir: str, local_context: str, status_file: str) -> tup
     update_context(local_context, agent)
     result = update_status(abs_work_dir, status_file, from_step, to_step)
     banner_ok = not any(x in result for x in ("blocked", "skipped", "failed"))
+    if banner_ok:
+        _append_log(abs_work_dir, "INFO", f"STATE_BOTH: agent={agent} step={from_step}->{to_step}")
     return from_step, to_step, banner_ok
 
 

@@ -25,7 +25,7 @@ flow-claude end <registryKey>
 1. **status.json 완료 처리** — `update_state.py status` (critical, 실패 시 exit 1)
 2. **사용량 확정** — `update_state.py usage-finalize` (비차단, 성공 시만)
 3. **아카이빙** — `history_sync.py archive` (비차단)
-4. **.kanban/board.md 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단)
+4. **.kanban/board.html 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단)
 
 ### flow-claude end
 

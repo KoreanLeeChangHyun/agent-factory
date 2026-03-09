@@ -1,11 +1,11 @@
 ---
 name: research-prompt-engineering
-description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt improvements, or providing prompt writing guidance. Triggers: cc:prompt prompt refinement, 'prompt ambiguity analysis', 'improve prompt quality', 'prompt structure guide', 'prompt template'."
+description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt improvements, or providing prompt writing guidance. Triggers: /wf -p prompt refinement, 'prompt ambiguity analysis', 'improve prompt quality', 'prompt structure guide', 'prompt template'."
 ---
 
 # Prompt Engineering Guide
 
-cc:prompt 프롬프트 정제 시 참조하는 가이드 스킬. 프롬프트의 모호성을 분석하고 구조화된 개선을 제안한다.
+`/wf -p` 프롬프트 정제 시 참조하는 가이드 스킬. 프롬프트의 모호성을 분석하고 구조화된 개선을 제안한다.
 
 ## 모호성 분석 체크리스트
 
@@ -31,7 +31,7 @@ cc:prompt 프롬프트 정제 시 참조하는 가이드 스킬. 프롬프트의
 
 ### planner 핸드오프 완전성 체크리스트
 
-cc:prompt에서 planner로 핸드오프할 때 프롬프트의 구조화 완전성을 검증하는 체크리스트.
+`/wf -p`에서 planner로 핸드오프할 때 프롬프트의 구조화 완전성을 검증하는 체크리스트.
 
 - [ ] **`<goal>` 단일 목표**: 최종 달성 목표가 하나로 명시되어 있는가?
 - [ ] **`<target>` 대상 특정**: 대상 파일/모듈명이 1개 이상 구체적으로 명시되어 있는가?

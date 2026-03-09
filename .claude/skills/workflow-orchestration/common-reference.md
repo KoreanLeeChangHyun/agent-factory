@@ -46,7 +46,7 @@
 | **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. 동일 "Step" 용어와 혼동을 피하기 위해 문맥에서 구분되는 개념으로 step-plan.md~step-done.md 파일명에 사용. FSM Step과 1:1 대응. |
 | **DONE** | (FSM Step/배너 명칭) | 워크플로우 완료를 나타내는 FSM Step이자 배너 명칭. 오케스트레이터가 flow-finish + flow-claude end로 마무리 수행. Agent-Step 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE)에서 사용. |
 | **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, flow-finish(finalization.py)가 읽어서 history.md 갱신에 활용 |
-| **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/T-NNN.txt` 티켓을 읽어 workDir에 복사 후 상태를 in-progress로 전환. |
+| **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/T-NNN.xml` 티켓을 읽어 workDir에 복사 후 상태를 in-progress로 전환. |
 
 ### 에이전트-Step-스킬 관계
 

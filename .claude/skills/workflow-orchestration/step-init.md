@@ -8,17 +8,17 @@
 
 ## INIT 실행 흐름
 
-cc:* 슬래시 커맨드 실행 시 오케스트레이터가 아래 5단계를 순차 실행합니다.
+`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 아래 5단계를 순차 실행합니다.
 
 ### Step 1: Command 및 플래그 파싱
 
 사용자 입력에서 command와 플래그를 파싱합니다.
 
 ```
-/cc:implement      → command=implement, autoApprove=true
-/cc:implement -n   → command=implement, autoApprove=false
-/cc:review         → command=review, autoApprove=true
-/cc:research       → command=research, autoApprove=true
+/wf -s implement      → command=implement, autoApprove=true
+/wf -s implement -n   → command=implement, autoApprove=false
+/wf -s review         → command=review, autoApprove=true
+/wf -s research       → command=research, autoApprove=true
 ```
 
 **`-n` 플래그 파싱:**
@@ -35,7 +35,7 @@ flow-claude start <command>
 
 ### Step 3: 제목 생성
 
-티켓 파일(`.kanban/T-NNN.txt`)을 읽어 20자 이내 한글 제목을 생성합니다.
+티켓 파일(`.kanban/T-NNN.xml`)을 읽어 20자 이내 한글 제목을 생성합니다.
 
 - 오케스트레이터가 직접 생성 (LLM 별도 호출 없음)
 - 티켓 파일 내용을 기반으로 작업 의도를 요약
@@ -50,11 +50,11 @@ python3 .claude/scripts/flow/initialization.py <command> "<title>"
 
 | 순서 | 작업 | 생성 파일 |
 |------|------|----------|
-| 1 | 티켓 파일(`.kanban/T-NNN.txt`) 읽기 | - |
+| 1 | 티켓 파일(`.kanban/T-NNN.xml`) 읽기 | - |
 | 2 | 워크플로우 디렉터리 생성 | `<workDir>/` |
 | 3 | 사용자 원문 요청 보존 | `<workDir>/user_prompt.txt` |
 | 4 | .uploads/ → files/ 복사 + 클리어 | `<workDir>/files/` (첨부 있을 경우) |
-| 5 | 티켓 상태를 board.md에서 In Progress로 전환 | - |
+| 5 | 티켓 상태를 board.html에서 In Progress로 전환 | - |
 | 6 | 작업 메타데이터 생성 | `<workDir>/.context.json` |
 | 7 | FSM 상태 초기화 | `<workDir>/status.json` (step: NONE) |
 | 8 | 좀비 워크플로우 정리 | - |
@@ -130,7 +130,7 @@ INIT 완료 → PLAN Step 진행
 
 | 상황 | 종료 코드 | 처리 |
 |------|----------|------|
-| 티켓 파일 비어있음 | 1 | 사용자에게 `.kanban/T-NNN.txt` 티켓 작성을 안내하고 워크플로우 종료 |
+| 티켓 파일 비어있음 | 1 | 사용자에게 `.kanban/T-NNN.xml` 티켓 작성을 안내하고 워크플로우 종료 |
 | 인자 오류 (잘못된 command) | 2 | 에러 메시지 출력 후 워크플로우 종료 |
 | 워크플로우 초기화 실패 | 4 | 에러 메시지 출력 후 워크플로우 종료 |
 | Bash stdout 파싱 실패 | - | AskUserQuestion으로 사용자에게 상황 보고, 재시도 또는 중단 선택 요청 |

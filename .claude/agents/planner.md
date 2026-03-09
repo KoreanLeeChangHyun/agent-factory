@@ -90,14 +90,14 @@ planner는 각 Worker 태스크에 전문화 스킬을 명시적으로 지정합
 
 ### user_prompt.txt 전문 읽기 (필수)
 
-request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 수립 전 반드시 `{workDir}/user_prompt.txt`를 Read 도구로 읽어 전체 요청 내용을 확인하십시오. 요약본만으로 계획을 수립하면 복잡한 요청의 맥락이 손실됩니다. user_prompt.txt의 원본 소스는 `.kanban/T-NNN.txt` 티켓 파일입니다.
+request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 수립 전 반드시 `{workDir}/user_prompt.txt`를 Read 도구로 읽어 전체 요청 내용을 확인하십시오. 요약본만으로 계획을 수립하면 복잡한 요청의 맥락이 손실됩니다. user_prompt.txt의 원본 소스는 `.kanban/T-NNN.xml` 티켓 파일입니다.
 
 ## 절차
 
 ### 기본 모드 (mode 미지정)
 
 1. **user_prompt.txt 전문 읽기** - `{workDir}/user_prompt.txt`를 Read로 전체 내용 확인 (request는 50자 요약본)
-1.5. **티켓 XML 태그 인식** — user_prompt.txt에서 XML 태그(`<goal>`, `<target>`, `<constraints>`, `<criteria>`)가 존재하면 태그 기반 파싱을 우선 적용한다 (`.kanban/T-NNN.txt` 티켓 형식). 태그가 없으면 기존 자연어 분석 방식으로 폴백한다.
+1.5. **티켓 XML 태그 인식** — user_prompt.txt에서 XML 태그(`<goal>`, `<target>`, `<constraints>`, `<criteria>`)가 존재하면 태그 기반 파싱을 우선 적용한다 (`.kanban/T-NNN.xml` 티켓 형식). 태그가 없으면 기존 자연어 분석 방식으로 폴백한다.
 2. **요구사항 분석 및 질의** - 불명확한 점은 계획서의 가정 사항 섹션에 명시 (오케스트레이터가 승인 시 사용자에게 확인)
 3. **코드베이스 탐색** - Glob으로 구조 파악, Grep으로 키워드 검색하여 대상 파일 식별, Read로 핵심 파일 확인 (현재 패턴, 라인 수 파악)
 4. **스킬 카탈로그 읽기** - `.claude/skills/skill-catalog.md`를 1회 Read하여 Project Skills 섹션 + Command Default Mapping 확인
