@@ -62,7 +62,7 @@ def _append_log(abs_work_dir: str, level: str, message: str) -> None:
 HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "history_sync.py")
 UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
 USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "usage_sync.py")
-UPDATE_KANBAN: str = os.path.join(PROJECT_ROOT, ".claude", "skills", "design-strategy", "scripts", "update-kanban.sh")
+KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "kanban.py")
 
 
 def run(
@@ -426,13 +426,13 @@ def main() -> None:
     )
     parser.add_argument("registryKey", help="워크플로우 식별자 (YYYYMMDD-HHMMSS)")
     parser.add_argument("status", choices=["완료", "실패"], help="워크플로우 결과 상태")
-    parser.add_argument("--workflow-id", default=None, help="WF-N 형식 워크플로우 ID (선택)")
+    parser.add_argument("--ticket-number", default=None, help="T-NNN 형식 티켓 번호 (선택)")
 
     args = parser.parse_args()
 
     registry_key: str = args.registryKey
     status: str = args.status
-    workflow_id: str | None = args.workflow_id
+    ticket_number: str | None = args.ticket_number
 
     # ── Step 1: status.json 완료 처리 (critical) ──
     to_step: str = "DONE" if status == "완료" else "FAILED"
@@ -487,15 +487,13 @@ def main() -> None:
         "Step 3: archive",
     )
 
-    # ── Step 4: .kanban/board.md 갱신 (workflow_id 있을 때만, 비차단) ──
-    if workflow_id:
-        kanban_path = find_board()
-        if kanban_path:
-            kanban_status = "completed" if status == "완료" else "failed"
-            run(
-                ["bash", UPDATE_KANBAN, kanban_path, workflow_id, kanban_status],
-                "Step 4: board update",
-            )
+    # ── Step 4: .kanban/board.md 갱신 (ticket_number 있을 때만, 비차단) ──
+    if ticket_number:
+        target_column = "review" if status == "완료" else "open"
+        run(
+            ["python3", KANBAN_PY, "move", ticket_number, target_column],
+            "Step 4: board update",
+        )
 
     if status == "완료":
         status_label = f"{C_YELLOW}완료{C_RESET}"

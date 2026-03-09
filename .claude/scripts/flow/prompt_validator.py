@@ -190,7 +190,7 @@ def _print_help() -> None:
     print("  2  인자 오류")
     print()
     print("예시:")
-    print("  python3 prompt_validator.py .kanban/T-NNN.txt")
+    print("  python3 prompt_validator.py .kanban/*-T-NNN.txt")
 
 
 def main() -> None:

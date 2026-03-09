@@ -18,9 +18,9 @@ argument-hint: "[-n] [#N] 조사 주제 또는 분석 대상"
 
 ## `#N` 티켓 번호 인자
 
-`$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`, `#123`)을 파싱하여 티켓 번호를 추출합니다. 추출된 번호는 3자리 zero-padding하여 `.kanban/T-NNN.txt` 경로로 변환합니다.
+`$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`, `#123`)을 파싱하여 티켓 번호를 추출합니다. 추출된 번호는 3자리 zero-padding하여 `.kanban/*-T-NNN.txt` glob 패턴으로 현재 상태 파일을 자동 탐색합니다.
 
-- `#N` 지정 시: `.kanban/T-NNN.txt` 파일을 읽어 `user_prompt.txt`로 사용
+- `#N` 지정 시: `.kanban/*-T-NNN.txt` glob 패턴으로 탐색한 파일을 읽어 `user_prompt.txt`로 사용
 - `#N` 미지정 시: `.kanban/board.md`에서 Open 상태 티켓을 자동 선택
   - Open 티켓 1개: 해당 티켓 자동 선택
   - Open 티켓 복수: 메뉴로 사용자에게 선택 요청
@@ -153,4 +153,32 @@ argument-hint: "[-n] [#N] 조사 주제 또는 분석 대상"
 ```
 
 최근 10개 커밋 이력을 수집하여, 조사 대상과 연관된 최근 변경사항을 파악합니다.
+
+## 프로젝트 플로우 연동
+
+워크플로우가 프로젝트 플로우(`.kanban/board.md`) 컨텍스트 내에서 실행될 때, REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
+
+### 후처리 조건
+
+1. 프로젝트 루트 디렉터리에서 `.kanban/board.md` 파일을 검색한다
+2. `.kanban/board.md` 파일이 존재하지 않으면 후처리를 스킵한다
+3. `.kanban/board.md` 파일이 존재하면 아래 전이 절차를 실행한다
+
+### 전이 절차
+
+REPORT 단계가 완료(DONE 상태 전이)된 후 다음을 수행한다:
+
+```bash
+python3 .claude/scripts/flow/kanban.py move T-NNN review
+```
+
+| 인자 | 값 |
+|------|-----|
+| `T-NNN` | 현재 워크플로우와 연결된 티켓 번호 (예: T-001) |
+| `review` | 연구 완료 후 전이할 상태 |
+
+### 동작 요약
+
+- 연구/조사가 완료된 티켓을 Review 상태로 전이한다
+- 티켓 번호는 워크플로우 초기화 시 파싱된 `#N` 인자 또는 자동 선택된 티켓에서 가져온다
 

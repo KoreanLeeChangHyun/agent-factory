@@ -7,7 +7,7 @@ skills:
 
 # Prompt (자유 대화형 티켓 공동 작성)
 
-`.kanban/T-NNN.txt` 티켓 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선합니다. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어입니다.
+`.kanban/*-T-NNN.txt` glob 패턴으로 현재 상태 파일을 자동 탐색하여 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선합니다. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어입니다.
 
 > **스킬 참조**: 이 명령어는 `research-prompt-engineering` 스킬을 사용합니다. 실행 시작 전 `.claude/skills/research-prompt-engineering/SKILL.md`를 Read로 로드하고, 필요 시 하위 references도 참조합니다.
 
@@ -22,11 +22,11 @@ skills:
 | `-p` | 티켓 작성 | 티켓(T-NNN.txt)을 대화로 작성/개선합니다 |
 | `-q` | Quick 모드 | 워크플로우 없이 질문/조사/수정을 자유롭게 처리 |
 | `-d` | 티켓 종료 | 지정한 티켓을 Done 상태로 종료합니다 (예: -d #3) |
-| `#N` | 티켓 번호 | 기존 티켓 T-NNN.txt를 편집합니다 (예: `#1` → `.kanban/T-001.txt`) |
+| `#N` | 티켓 번호 | 기존 티켓 T-NNN.txt를 편집합니다 (예: `#1` → `.kanban/*-T-001.txt` glob 패턴으로 현재 상태 파일 자동 탐색) |
 
 **라우팅 규칙:**
 
-1. `$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`)을 파싱하여 티켓 번호를 추출합니다. 번호가 있으면 3자리 zero-padding 후 `.kanban/T-NNN.txt` 경로를 결정합니다
+1. `$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`)을 파싱하여 티켓 번호를 추출합니다. 번호가 있으면 3자리 zero-padding 후 `.kanban/*-T-NNN.txt` glob 패턴으로 현재 상태 파일을 자동 탐색합니다
 2. `$ARGUMENTS`가 비어있거나 옵션 플래그(`-p`, `-q`)가 없는 경우 → 모드 선택 메뉴를 출력합니다:
 
 ```
@@ -45,7 +45,7 @@ D. 완료 — 작업하지 않고 종료합니다
 
 > **인라인 텍스트 예시**: `/cc:prompt -q JWT 토큰 갱신 방식이 뭐야?` → Quick 모드로 즉시 진입하여 해당 질문에 답변.
 >
-> **티켓 번호 예시**: `/cc:prompt #3` → `.kanban/T-003.txt` 편집 모드로 진입. `/cc:prompt -p #1` → `.kanban/T-001.txt`를 대화로 개선.
+> **티켓 번호 예시**: `/cc:prompt #3` → `.kanban/*-T-003.txt` glob 패턴으로 현재 상태 파일 자동 탐색 후 편집 모드로 진입. `/cc:prompt -p #1` → `.kanban/*-T-001.txt` glob 패턴으로 탐색하여 대화로 개선.
 
 ---
 
@@ -61,58 +61,38 @@ D. 완료 — 작업하지 않고 종료합니다
 -d 플래그는 티켓 번호(#N)를 반드시 지정해야 합니다. 예: /cc:prompt -d #3
 ```
 
-#### D-2. board.md 읽기 및 티켓 검색
+#### D-2. 티켓 상태 확인
 
-Read 도구로 `.kanban/board.md`를 읽습니다. Open, In Progress, Done 3개 컬럼에서 `T-NNN` 패턴을 검색합니다.
+Bash 도구로 아래 명령을 실행하여 티켓 상태를 확인합니다. kanban.py는 Open, In Progress, Review, Done 4개 컬럼에서 `T-NNN` 패턴을 검색합니다:
 
-- **어느 컬럼에서도 찾지 못한 경우** → 아래 에러 메시지를 출력하고 종료합니다:
+```bash
+python3 .claude/scripts/flow/kanban.py done T-NNN
+```
+
+- **exit code 1이 반환되고 "찾을 수 없습니다" 메시지인 경우** → 아래 에러 메시지를 출력하고 종료합니다:
 
   ```
   T-NNN 티켓을 board.md에서 찾을 수 없습니다.
   ```
 
-- **이미 Done 컬럼에 있는 경우** → 아래 안내 메시지를 출력하고 종료합니다:
+- **exit code 1이 반환되고 "이미 Done" 메시지인 경우** → 아래 안내 메시지를 출력하고 종료합니다:
 
   ```
   T-NNN은 이미 Done 상태입니다.
   ```
 
-#### D-3. board.md 갱신
+- **exit code 0인 경우** → kanban.py done이 board.md 갱신과 파일 이동을 완료한 것이므로 D-4로 바로 진행합니다.
 
-해당 티켓 항목을 원래 컬럼(Open 또는 In Progress)에서 삭제하고, Done 컬럼(`## Done` 섹션의 `<!-- 형식 -->` 주석 다음)에 아래 형식으로 추가합니다. 체크박스를 `[ ]`에서 `[x]`로 변경합니다:
+#### D-3. (D-2에서 처리됨)
 
-```
-- [x] T-NNN: 티켓제목 (command)
-```
-
-Write 도구로 갱신된 내용을 `.kanban/board.md`에 저장합니다.
-
-#### D-3.5. 티켓 파일 이동
-
-Bash 도구로 아래 명령을 실행하여 done 디렉터리를 생성합니다(이미 존재하면 무시):
-
-```bash
-mkdir -p .kanban/done
-```
-
-Bash 도구로 아래 명령을 실행하여 티켓 파일을 done 디렉터리로 이동합니다:
-
-```bash
-mv .kanban/T-NNN.txt .kanban/done/T-NNN.txt
-```
-
-이동 실패 시(파일 미존재 등) 아래 경고 메시지를 출력하되, board.md 갱신은 이미 완료되었으므로 종료하지 않고 다음 단계로 진행합니다:
-
-```
-경고: T-NNN.txt 파일을 .kanban/done/으로 이동하지 못했습니다. board.md는 정상 갱신되었습니다.
-```
+D-2의 `kanban.py done T-NNN` 호출이 board.md 갱신과 티켓 파일 이동(.kanban/*-T-NNN.txt → .kanban/done/done-T-NNN.txt)을 내부적으로 처리합니다. 별도의 Write 또는 mv 명령이 필요하지 않습니다.
 
 #### D-4. 완료 메시지 출력
 
-아래 메시지를 출력하고 종료합니다. 티켓 파일(T-NNN.txt)은 `.kanban/done/` 디렉터리로 이동되었습니다 (히스토리 보존):
+아래 메시지를 출력하고 종료합니다. 티켓 파일은 `done-T-NNN.txt`로 이름 변경되어 `.kanban/done/` 디렉터리로 이동되었습니다 (히스토리 보존):
 
 ```
-T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .kanban/done/T-NNN.txt)
+T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .kanban/done/done-T-NNN.txt)
 ```
 
 ---
@@ -174,7 +154,7 @@ D. 완료 — Quick 모드를 마칩니다
 - **"추가 작업"(1)** 선택 시 → Q-2로 복귀
 - **"티켓 작성으로 전환"(P)** 선택 시 → **컨텍스트 자동 반영** 후 Step 1로 분기:
   1. `.kanban/quick.txt`의 `## Memo` 섹션 내용을 읽습니다
-  2. 현재 편집 중인 티켓 파일(`.kanban/T-NNN.txt`)을 Read로 읽어 `<context>` 태그 존재 여부를 확인합니다
+  2. 현재 편집 중인 티켓 파일(`.kanban/*-T-NNN.txt` glob 패턴으로 탐색)을 Read로 읽어 `<context>` 태그 존재 여부를 확인합니다
   3. Memo 내용이 있으면 티켓 파일의 `<context>` 태그에 `- Quick 메모:` 접두사로 병합합니다 (`<context>` 태그가 없으면 새로 추가)
   4. Write 도구로 티켓 파일을 갱신한 뒤 Step 1로 진행합니다
 - **"완료"(D)** 선택 시 → Q-5로 진행
@@ -194,19 +174,18 @@ Read 도구로 `.kanban/board.md`를 읽어 기존 티켓 목록을 파악합니
 #### 1-1. 티켓 파일 결정
 
 `$ARGUMENTS`에서 `#N` 패턴으로 티켓 번호가 지정된 경우:
-- `.kanban/T-NNN.txt` (3자리 zero-padding) 파일을 Read 도구로 읽습니다.
-- 파일이 존재하면 내용을 보존하고 Step 2로 진행합니다.
-- 파일이 존재하지 않으면(Read 실패 시), `.kanban/done/T-NNN.txt`를 Read 도구로 확인합니다:
-  - `.kanban/done/T-NNN.txt`가 존재하면 아래 자동 복원 절차를 즉시 실행합니다 (사용자 확인 없이):
-    1. Bash 도구로 `mv .kanban/done/T-NNN.txt .kanban/T-NNN.txt` 실행하여 티켓 파일을 `.kanban/` 루트로 복원합니다
-    2. Read 도구로 `.kanban/board.md`를 읽어 Done 컬럼에서 해당 티켓 항목을 삭제하고, Open 컬럼(`## Open` 섹션의 `<!-- 형식 -->` 주석 다음)에 `- [ ] T-NNN: 티켓제목 (command)` 형식으로 추가합니다 (체크박스를 `[x]`에서 `[ ]`로 변경)
-    3. Write 도구로 갱신된 내용을 `.kanban/board.md`에 저장합니다
-    4. 아래 안내 메시지를 출력합니다:
+- Glob 도구로 `.kanban/*-T-NNN.txt` 패턴을 검색하여 현재 상태 파일을 탐색합니다.
+- 파일이 발견되면 내용을 보존하고 Step 2로 진행합니다.
+- 파일이 발견되지 않으면 `.kanban/done/done-T-NNN.txt`를 Read 도구로 확인합니다:
+  - `.kanban/done/done-T-NNN.txt`가 존재하면 아래 자동 복원 절차를 즉시 실행합니다 (사용자 확인 없이):
+    1. Bash 도구로 `mv .kanban/done/done-T-NNN.txt .kanban/open-T-NNN.txt` 실행하여 티켓 파일을 `.kanban/` 루트로 복원합니다 (kanban.py move는 파일 이동을 처리하지 않으므로 별도 Bash 명령으로 수행)
+    2. Bash 도구로 `python3 .claude/scripts/flow/kanban.py move T-NNN open` 실행하여 board.md의 Done 컬럼에서 해당 티켓을 Open 컬럼으로 이동합니다 (체크박스 `[x]` → `[ ]` 변경 포함)
+    3. 아래 안내 메시지를 출력합니다:
        ```
        T-NNN 티켓을 Done에서 재오픈했습니다.
        ```
   - 복원 완료 후 파일 내용을 보존하고 Step 2(기존 티켓 편집)로 진행합니다
-  - `.kanban/done/T-NNN.txt`도 존재하지 않으면 기존 동작대로 처리합니다 (신규 티켓으로 취급)
+  - `.kanban/done/done-T-NNN.txt`도 존재하지 않으면 기존 동작대로 처리합니다 (신규 티켓으로 취급)
 
 티켓 번호가 지정되지 않은 경우:
 - `.kanban/board.md`에서 Open 상태 티켓 목록을 확인합니다.
@@ -279,7 +258,13 @@ D. 완료 — 작성하지 않고 종료합니다
 | 아키텍처설계 | `implement` |
 | 리뷰 | `review` |
 
-선택 결과를 기반으로 **초기 티켓 초안을 생성**합니다. `.kanban/board.md`에서 기존 최대 T-NNN 번호를 파싱하여 +1로 새 번호를 채번하고, Write 도구로 `.kanban/T-NNN.txt`에 저장한 뒤 `.kanban/board.md`의 Open 컬럼에 `- [ ] T-NNN: 티켓제목 (command)` 항목을 추가합니다. Step 3으로 진행합니다.
+선택 결과를 기반으로 **초기 티켓 초안을 생성**합니다. Bash 도구로 아래 명령을 실행하여 채번, board.md 갱신, 티켓 파일 생성을 한번에 처리합니다:
+
+```bash
+python3 .claude/scripts/flow/kanban.py create "<티켓제목>" --command <command값>
+```
+
+kanban.py create는 board.md에서 기존 최대 T-NNN 번호를 파싱하여 +1로 새 번호를 채번하고, board.md의 Open 컬럼에 `- [ ] T-NNN: 티켓제목 (command)` 항목을 추가하며, `.kanban/open-T-NNN.txt` 빈 파일을 생성합니다. 이후 Write 도구로 `.kanban/open-T-NNN.txt`에 용도별 초안 내용을 저장한 뒤 Step 3으로 진행합니다.
 
 **6종 용도별 XML 태그 기반 초안 템플릿**: 선택한 용도에 맞는 필수 4태그 + 용도별 선택 태그 조합으로 초안을 생성합니다. 태그 내부는 TODO 플레이스홀더 대신 **용도별 가이드 문구**를 기재합니다.
 
@@ -400,7 +385,7 @@ D. 완료 — 현재 상태로 작성을 마칩니다
 
 **2단계 - 티켓 파일 자동 갱신:**
 
-사용자 입력(선택지 선택 또는 자유 텍스트)을 반영하여 Write 도구로 `.kanban/T-NNN.txt`를 즉시 갱신합니다. 대화 중 어느 시점에 중단하더라도 마지막 갱신 내용이 유지됩니다.
+사용자 입력(선택지 선택 또는 자유 텍스트)을 반영하여 Write 도구로 현재 상태 파일(`.kanban/*-T-NNN.txt` glob 패턴으로 탐색)을 즉시 갱신합니다. 대화 중 어느 시점에 중단하더라도 마지막 갱신 내용이 유지됩니다.
 
 **XML 태그 섹션 매핑 규칙**: 티켓 파일에 XML 태그가 존재하는 경우, 사용자 입력 내용을 해당 XML 태그 섹션에 정확히 매핑하여 갱신합니다.
 
@@ -533,12 +518,10 @@ D. 완료 — 현재 상태로 작성을 마칩니다
 
 완료 메시지와 후속 커맨드 안내를 출력합니다:
 
-**권장 후속 커맨드 강조**: 티켓 파일의 `<command>` 태그 값을 확인하여 해당 행에 "← 권장" 표시를 추가합니다.
+**권장 후속 커맨드 강조**: `<command>` 태그 유무와 관계없이 항상 "제출" 행에 "← 권장" 표시를 추가합니다.
 
-- `<command>implement</command>` → "구현" 행에 "← 권장" 표시
-- `<command>research</command>` → "조사" 행에 "← 권장" 표시
-- `<command>review</command>` → "리뷰" 행에 "← 권장" 표시
-- `<command>` 태그가 없는 경우 → "← 권장" 표시 없이 테이블만 출력
+- `<command>` 태그가 있는 경우 → "제출" 행에 "← 권장" 표시 (자동 라우팅됨)
+- `<command>` 태그가 없는 경우 → "제출" 행에 "← 권장" 표시 (수동 선택 안내)
 
 ```
 T-NNN.txt 티켓이 업데이트되었습니다.
@@ -547,6 +530,7 @@ T-NNN.txt 티켓이 업데이트되었습니다.
 
 | 목적 | 커맨드 | 설명 |
 |------|--------|------|
+| 제출 | `/cc:submit #N` | <command> 태그에 따라 자동 라우팅 |
 | 구현 | `/cc:implement #N` | 티켓의 내용이 구현 커맨드의 입력으로 활용됩니다 |
 | 조사 | `/cc:research #N` | 티켓의 내용이 조사 커맨드의 입력으로 활용됩니다 |
 | 리뷰 | `/cc:review #N` | 티켓의 내용이 리뷰 커맨드의 입력으로 활용됩니다 |
@@ -556,7 +540,8 @@ T-NNN.txt 티켓이 업데이트되었습니다.
 >
 > | 목적 | 커맨드 | 설명 |
 > |------|--------|------|
-> | 구현 | `/cc:implement #N` | 티켓의 내용이 구현 커맨드의 입력으로 활용됩니다 **← 권장** |
+> | 제출 | `/cc:submit #N` | <command> 태그에 따라 자동 라우팅 **← 권장** |
+> | 구현 | `/cc:implement #N` | 티켓의 내용이 구현 커맨드의 입력으로 활용됩니다|
 > | 조사 | `/cc:research #N` | 티켓의 내용이 조사 커맨드의 입력으로 활용됩니다|
 > | 리뷰 | `/cc:review #N` | 티켓의 내용이 리뷰 커맨드의 입력으로 활용됩니다|
 
@@ -580,13 +565,13 @@ T-NNN.txt 티켓이 업데이트되었습니다.
 - **조사 목적**: 기술 조사, 비교 분석, 웹 리서치, 코드베이스 탐색 등 → `/cc:research #N` 사용
 - **리뷰 목적**: 코드 리뷰, 보안/성능/아키텍처 검토 등 → `/cc:review #N` 사용
 
-각 후속 커맨드는 `#N`으로 지정된 티켓 파일의 내용을 입력으로 자동 활용하므로, 티켓 작성 후 바로 해당 커맨드를 실행하면 별도의 추가 설명 없이 작업이 시작됩니다.
+티켓에 `<command>` 태그가 설정된 경우 `/cc:submit #N`을 사용하면 태그 값에 따라 적절한 커맨드로 자동 라우팅되므로, 별도로 커맨드를 선택할 필요 없이 바로 실행할 수 있습니다. 각 후속 커맨드는 `#N`으로 지정된 티켓 파일의 내용을 입력으로 자동 활용하므로, 티켓 작성 후 바로 해당 커맨드를 실행하면 별도의 추가 설명 없이 작업이 시작됩니다.
 
 ## 주의사항
 
 1. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
-2. **Bash 도구**: Quick 모드(-q), Step D(티켓 종료), Step 1-1 done 폴백 복원에서 허용합니다. 일반 프롬프트 작성 모드(-p)에서는 사용하지 않습니다
-3. **사용 가능 도구**: Read, Write, Glob, Grep, WebSearch, WebFetch를 사용합니다. Quick 모드(-q), Step D, done 폴백 복원에서는 Bash도 사용 가능합니다
+2. **Bash 도구**: Quick 모드(-q), Step D(티켓 종료), Step 1-1 done 폴백 복원, Step 2 새 티켓 생성(kanban.py create)에서 허용합니다. 일반 프롬프트 대화 루프(Step 3~5)에서는 사용하지 않습니다
+3. **사용 가능 도구**: Read, Write, Glob, Grep, WebSearch, WebFetch를 사용합니다. Quick 모드(-q), Step D, done 폴백 복원, Step 2 새 티켓 생성에서는 Bash도 사용 가능합니다
 4. **워크플로우 무관**: FSM 상태 전이, initialization.py와 완전히 무관합니다. 배너 출력, workDir 생성, status.json 조작을 하지 않습니다
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 모드 표시는 **`[QUICK]`** / **`[PROMPT]`** 접두사를 사용합니다
 6. **모호성 체크리스트 비노출**: 모호성 분석 결과와 체크리스트 항목은 내부 가이드로만 활용하며 사용자에게 직접 출력하지 않습니다

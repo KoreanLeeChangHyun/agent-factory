@@ -27,12 +27,14 @@ user_prompt.txt에 append하고, .uploads/ 파일 복사를 수행한다.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
 import shutil
 import sys
 from datetime import datetime
+from pathlib import Path
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
@@ -63,6 +65,28 @@ def _normalize_ticket_number(raw: str) -> str | None:
     return None
 
 
+def _find_ticket_file_by_number(kanban_dir: Path, ticket_number: str) -> str | None:
+    """kanban 디렉터리에서 티켓 번호에 해당하는 파일을 glob으로 탐색한다.
+
+    open 상태(*-T-NNN.txt)를 먼저 탐색하고, 없으면 in-progress 서브디렉터리도 탐색한다.
+
+    Args:
+        kanban_dir: .kanban 디렉터리 절대 경로
+        ticket_number: 'T-NNN' 형식 티켓 번호
+
+    Returns:
+        찾은 티켓 파일의 절대 경로 문자열. 없으면 None.
+    """
+    matches: list[str] = glob.glob(str(kanban_dir / f"*-{ticket_number}.txt"))
+    if matches:
+        return matches[0]
+    # in-progress 서브디렉터리 탐색
+    progress_matches: list[str] = glob.glob(str(kanban_dir / "in-progress" / f"*-{ticket_number}.txt"))
+    if progress_matches:
+        return progress_matches[0]
+    return None
+
+
 def _resolve_ticket_file(abs_work_dir: str) -> str | None:
     """현재 워크플로우에 연결된 티켓 파일 경로를 결정한다.
 
@@ -75,14 +99,16 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
         abs_work_dir: 현재 워크플로우 디렉터리 절대 경로
 
     Returns:
-        .kanban/T-NNN.txt 절대 경로. 결정 불가능하면 None.
+        .kanban/*-T-NNN.txt 절대 경로. 결정 불가능하면 None.
     """
+    kanban_dir: Path = Path(_PROJECT_ROOT) / ".kanban"
+
     # 1순위: 환경변수
     env_ticket = os.environ.get("TICKET_NUMBER", "").strip()
     if env_ticket:
         normalized = _normalize_ticket_number(env_ticket)
         if normalized:
-            return os.path.join(_PROJECT_ROOT, ".kanban", f"{normalized}.txt")
+            return _find_ticket_file_by_number(kanban_dir, normalized)
 
     # 2순위: .context.json ticketNumber
     context_path = os.path.join(abs_work_dir, ".context.json")
@@ -94,7 +120,7 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
             if ticket_num:
                 normalized = _normalize_ticket_number(ticket_num)
                 if normalized:
-                    return os.path.join(_PROJECT_ROOT, ".kanban", f"{normalized}.txt")
+                    return _find_ticket_file_by_number(kanban_dir, normalized)
         except Exception:
             pass
 
@@ -115,7 +141,7 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
                     if match:
                         normalized = _normalize_ticket_number(match.group(1))
                         if normalized:
-                            return os.path.join(_PROJECT_ROOT, ".kanban", f"{normalized}.txt")
+                            return _find_ticket_file_by_number(kanban_dir, normalized)
         except Exception:
             pass
 

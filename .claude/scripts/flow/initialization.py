@@ -36,6 +36,7 @@ LLM 호출 없음 (순수 IO).
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -45,6 +46,7 @@ import sys
 import tempfile
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, NoReturn
 
 # ─── 경로 상수 ───────────────────────────────────────────────────────────────
@@ -216,10 +218,33 @@ def _find_open_ticket_from_board() -> str | None:
     return None
 
 
+def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
+    """kanban 디렉터리에서 티켓 파일을 glob 패턴으로 탐색한다.
+
+    open 상태 파일(*-T-NNN.txt)을 먼저 탐색하고, 없으면 done 서브디렉터리도 탐색한다.
+
+    Args:
+        kanban_dir: .kanban 디렉터리 절대 경로
+        ticket_number: 'T-NNN' 형식 티켓 번호
+
+    Returns:
+        찾은 티켓 파일의 Path 객체. 없으면 None.
+    """
+    # open 상태 탐색: .kanban/*-T-NNN.txt
+    matches: list[str] = glob.glob(str(kanban_dir / f"*-{ticket_number}.txt"))
+    if matches:
+        return Path(matches[0])
+    # done 상태 탐색: .kanban/done/*-T-NNN.txt
+    done_matches: list[str] = glob.glob(str(kanban_dir / "done" / f"*-{ticket_number}.txt"))
+    if done_matches:
+        return Path(done_matches[0])
+    return None
+
+
 def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
     """티켓 파일 내용을 읽어 반환한다.
 
-    티켓 번호를 결정한 후 .kanban/T-NNN.txt 파일을 읽는다.
+    티켓 번호를 결정한 후 .kanban/*-T-NNN.txt 파일을 glob으로 탐색하여 읽는다.
     파일이 없거나 내용이 비어있으면 None을 반환한다.
 
     Args:
@@ -233,10 +258,11 @@ def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
     if ticket_number is None:
         return None, None
 
-    ticket_file: str = os.path.join(_PROJECT_ROOT, ".kanban", f"{ticket_number}.txt")
-    if not os.path.isfile(ticket_file):
+    kanban_dir: Path = Path(_PROJECT_ROOT) / ".kanban"
+    ticket_path: Path | None = _find_ticket_file(kanban_dir, ticket_number)
+    if ticket_path is None:
         return None, None
-    with open(ticket_file, "r", encoding="utf-8") as f:
+    with open(ticket_path, "r", encoding="utf-8") as f:
         content: str = f.read()
     if not content.strip():
         return None, None
@@ -303,74 +329,33 @@ def _copy_uploads(abs_work_dir: str) -> None:
 
 
 def _move_ticket_to_in_progress(ticket_number: str) -> None:
-    """board.md에서 해당 티켓을 Open → In Progress 섹션으로 이동한다.
+    """kanban.py를 호출하여 티켓을 Open → In Progress 상태로 이동한다.
 
-    board.md의 Open 섹션에서 해당 티켓 항목을 제거하고,
-    In Progress 섹션에 추가한다.
-    파일 조작 실패 시 경고만 출력하고 계속 진행한다.
+    kanban.py move 서브커맨드를 subprocess로 실행한다.
+    실패 시 경고만 출력하고 계속 진행한다.
 
     Args:
         ticket_number: 이동할 티켓 번호 (예: 'T-001')
     """
-    board_path: str = os.path.join(_PROJECT_ROOT, ".kanban", "board.md")
-    if not os.path.isfile(board_path):
-        _warn(f"board.md를 찾을 수 없습니다: {board_path}")
+    kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
+    if not os.path.isfile(kanban_py_path):
+        _warn(f"kanban.py를 찾을 수 없습니다: {kanban_py_path}")
         return
 
     try:
-        with open(board_path, "r", encoding="utf-8") as f:
-            lines: list[str] = f.readlines()
-    except OSError as e:
-        _warn(f"board.md 읽기 실패: {e}")
-        return
-
-    # Open 섹션에서 해당 티켓 항목 추출
-    ticket_pattern = re.compile(rf"^-\s+\[\s*\]\s+{re.escape(ticket_number)}\s*:")
-    ticket_line: str | None = None
-    new_lines: list[str] = []
-    in_open_section: bool = False
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            in_open_section = stripped == "## Open"
-        if in_open_section and ticket_pattern.match(stripped):
-            ticket_line = line.rstrip("\n")
-            continue  # Open 섹션에서 제거
-        new_lines.append(line)
-
-    if ticket_line is None:
-        _warn(f"{ticket_number}을 board.md Open 섹션에서 찾을 수 없습니다.")
-        return
-
-    # In Progress 섹션에 추가
-    in_progress_idx: int = -1
-    for i, line in enumerate(new_lines):
-        if line.strip() == "## In Progress":
-            in_progress_idx = i
-            break
-
-    if in_progress_idx == -1:
-        _warn("board.md에 '## In Progress' 섹션이 없습니다.")
-        return
-
-    # In Progress 헤더 다음 줄 (빈 줄 또는 주석 줄 이후)에 삽입
-    insert_idx: int = in_progress_idx + 1
-    # 빈 줄 / 주석 줄 건너뛰기
-    while insert_idx < len(new_lines):
-        stripped = new_lines[insert_idx].strip()
-        if stripped == "" or stripped.startswith("<!--"):
-            insert_idx += 1
-        else:
-            break
-
-    new_lines.insert(insert_idx, ticket_line + "\n")
-
-    try:
-        with open(board_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-    except OSError as e:
-        _warn(f"board.md 쓰기 실패: {e}")
+        result = subprocess.run(
+            ["python3", kanban_py_path, "move", ticket_number, "progress"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            _warn(f"kanban.py move 실패 (exit {result.returncode}): {stderr}")
+    except subprocess.TimeoutExpired:
+        _warn("kanban.py move: 타임아웃")
+    except Exception as e:
+        _warn(f"kanban.py move 실행 실패: {e}")
 
 
 def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str) -> None:
