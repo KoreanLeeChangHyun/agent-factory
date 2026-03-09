@@ -8,8 +8,8 @@
 
 .uploads/
 
-# Prompts and temps
-.prompt/
+# Kanban tickets and temps
+.kanban/
 
 CLAUDE.md
 

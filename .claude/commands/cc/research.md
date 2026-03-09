@@ -1,6 +1,6 @@
 ---
 description: "웹 검색 기반 연구/조사 및 내부 자산 분석 수행. 외부 정보 수집, 기술 비교 분석, 내부 코드베이스/DB/데이터 분석을 통해 리포트를 제공합니다. Use when: 기술 조사, 비교 분석, 웹 리서치, 데이터 분석, 코드베이스 분석, DB 분석 / Do not use when: 코드 수정이 목적일 때 (cc:implement 사용)"
-argument-hint: "[-n] 조사 주제 또는 분석 대상"
+argument-hint: "[-n] [#N] 조사 주제 또는 분석 대상"
 ---
 
 > **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
@@ -16,6 +16,16 @@ argument-hint: "[-n] 조사 주제 또는 분석 대상"
 
 `plan_validator.py`가 계획서 검증 중 경고를 발생시키면, `-n` 플래그 여부와 무관하게 자동 승인이 차단되고 사용자 확인을 요청합니다.
 
+## `#N` 티켓 번호 인자
+
+`$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`, `#123`)을 파싱하여 티켓 번호를 추출합니다. 추출된 번호는 3자리 zero-padding하여 `.kanban/T-NNN.txt` 경로로 변환합니다.
+
+- `#N` 지정 시: `.kanban/T-NNN.txt` 파일을 읽어 `user_prompt.txt`로 사용
+- `#N` 미지정 시: `.kanban/board.md`에서 Open 상태 티켓을 자동 선택
+  - Open 티켓 1개: 해당 티켓 자동 선택
+  - Open 티켓 복수: 메뉴로 사용자에게 선택 요청
+  - Open 티켓 0개: `$ARGUMENTS` 텍스트를 그대로 사용 (기존 동작 호환)
+
 ## `<command>` 태그 검증
 
 이 검증은 워크플로우 오케스트레이션 스킬의 Step 1(INIT) 완료 후, Step 2(PLAN) 시작 전에 수행된다.
@@ -27,7 +37,7 @@ argument-hint: "[-n] 조사 주제 또는 분석 대상"
 ### 검증 규칙
 
 - **`<command>` 태그가 존재하고 값이 `research`가 아닌 경우**: AskUserQuestion으로 경고 메시지를 표시한다.
-  - 메시지: `"prompt.txt에 <command>{값}</command>으로 지정되어 있지만 cc:research를 실행했습니다."`
+  - 메시지: `"티켓 파일에 <command>{값}</command>으로 지정되어 있지만 cc:research를 실행했습니다."`
   - 선택지: `"계속 진행"` (현재 커맨드로 진행) / `"중단"` (워크플로우 종료)
 
 - **`<command>` 태그가 존재하지 않는 경우**: 경고 없이 정상 진행 (하위 호환)

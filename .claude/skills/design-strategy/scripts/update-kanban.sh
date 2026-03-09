@@ -2,13 +2,13 @@
 #
 # update-kanban.sh
 # ================
-# 워크플로우 완료 시 .kanbanboard 파일을 갱신한다.
+# 워크플로우 완료 시 .kanban/board.md 파일을 갱신한다.
 #
 # 사용법:
-#   update-kanban.sh <kanbanboard_path> <workflow_id> <status>
+#   update-kanban.sh <kanban_board_path> <workflow_id> <status>
 #
 # 인자:
-#   kanbanboard_path  .kanbanboard 파일 경로
+#   kanban_board_path  .kanban/board.md 파일 경로
 #   workflow_id       완료된 워크플로우 ID (예: WF-1)
 #   status            새 상태 (completed | failed)
 #
@@ -27,8 +27,8 @@ set -euo pipefail
 
 # --- 인자 검증 ---
 if [[ $# -ne 3 ]]; then
-    echo "error: 인자 3개 필요 (kanbanboard_path, workflow_id, status)" >&2
-    echo "사용법: update-kanban.sh <kanbanboard_path> <workflow_id> <status>" >&2
+    echo "error: 인자 3개 필요 (kanban_board_path, workflow_id, status)" >&2
+    echo "사용법: update-kanban.sh <kanban_board_path> <workflow_id> <status>" >&2
     exit 1
 fi
 
@@ -78,7 +78,7 @@ BEGIN {
     done_section_printed = 0
 }
 
-/^## Planned/ { current_column = "planned" }
+/^## Open/ { current_column = "planned" }
 /^## In Progress/ { current_column = "inprogress" }
 
 /^## Done/ {

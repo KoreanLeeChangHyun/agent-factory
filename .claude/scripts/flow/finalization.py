@@ -15,7 +15,7 @@
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
-  4. .kanbanboard 갱신       (update-kanban.sh, workflow_id 있을 때만, 비차단)
+  4. .kanban/board.md 갱신   (update-kanban.sh, workflow_id 있을 때만, 비차단)
 
 종료 코드:
   0  성공
@@ -202,22 +202,17 @@ def _find_transcript_path(registry_key: str) -> str | None:
     return None
 
 
-def find_kanbanboard() -> str | None:
-    """프로젝트 루트에서 .kanbanboard 파일을 탐색한다.
+def find_board() -> str | None:
+    """프로젝트 루트에서 .kanban/board.md 파일을 탐색한다.
 
-    .workflow/ 하위와 프로젝트 루트를 순서대로 탐색한다.
+    프로젝트 루트의 .kanban/board.md 경로를 확인한다.
 
     Returns:
-        .kanbanboard 파일 절대 경로. 없으면 None.
+        .kanban/board.md 파일 절대 경로. 없으면 None.
     """
-    pattern = os.path.join(PROJECT_ROOT, ".workflow", "**", ".kanbanboard")
-    matches = sorted(glob.glob(pattern, recursive=True))
-    if matches:
-        return matches[0]
-    # 프로젝트 루트 직접 확인
-    root_kanban = os.path.join(PROJECT_ROOT, ".kanbanboard")
-    if os.path.isfile(root_kanban):
-        return root_kanban
+    board_path = os.path.join(PROJECT_ROOT, ".kanban", "board.md")
+    if os.path.isfile(board_path):
+        return board_path
     return None
 
 
@@ -492,14 +487,14 @@ def main() -> None:
         "Step 3: archive",
     )
 
-    # ── Step 4: .kanbanboard 갱신 (workflow_id 있을 때만, 비차단) ──
+    # ── Step 4: .kanban/board.md 갱신 (workflow_id 있을 때만, 비차단) ──
     if workflow_id:
-        kanban_path = find_kanbanboard()
+        kanban_path = find_board()
         if kanban_path:
             kanban_status = "completed" if status == "완료" else "failed"
             run(
                 ["bash", UPDATE_KANBAN, kanban_path, workflow_id, kanban_status],
-                "Step 4: kanbanboard update",
+                "Step 4: board update",
             )
 
     if status == "완료":

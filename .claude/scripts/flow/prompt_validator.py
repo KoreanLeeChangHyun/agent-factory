@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
-"""prompt_validator.py - prompt.txt XML 계약 스펙 검증 스크립트.
+"""prompt_validator.py - 티켓 파일 XML 계약 스펙 검증 스크립트.
 
-prompt.txt를 입력받아 다음을 검증한다:
+티켓 파일을 입력받아 다음을 검증한다:
 (1) 필수 태그 4개(<goal>, <target>, <constraints>, <criteria>) 존재 확인
 (2) 빈 섹션 감지 (내용 없음 또는 TODO: 패턴만 존재, 최소 10자 미만)
 (3) 품질 점수 산출: (존재 필수 태그 수 / 4) * 0.6 + (유효 내용 태그 수 / 4) * 0.4
@@ -168,7 +168,7 @@ def validate(prompt_text: str) -> dict[str, object]:
 
 def _print_help() -> None:
     """사용법을 stdout으로 출력한다."""
-    print("prompt_validator.py - prompt.txt XML 계약 스펙 검증")
+    print("prompt_validator.py - 티켓 파일 XML 계약 스펙 검증")
     print()
     print("사용법:")
     print("  python3 prompt_validator.py <prompt_file_path>")
@@ -190,7 +190,7 @@ def _print_help() -> None:
     print("  2  인자 오류")
     print()
     print("예시:")
-    print("  python3 prompt_validator.py .prompt/prompt.txt")
+    print("  python3 prompt_validator.py .kanban/T-NNN.txt")
 
 
 def main() -> None:

@@ -1,6 +1,6 @@
 ---
 description: "코드 구현, 수정, 리팩토링. 기능 구현, 버그 수정, 코드 변경, 리팩토링을 수행합니다. 에이전트/스킬/커맨드 관리 포함. Use when: 기능 구현, 코드 수정, 버그 수정, 리팩토링, 아키텍처 설계, 에이전트/스킬/커맨드 관리 / Do not use when: 코드 리뷰가 목적일 때 (cc:review 사용)"
-argument-hint: "[-n] 구현할 기능, 수정할 파일, 또는 리팩토링 대상"
+argument-hint: "[-n] [#N] 구현할 기능, 수정할 파일, 또는 리팩토링 대상"
 ---
 
 > **워크플로우 스킬 로드**: 이 명령어는 워크플로우 오케스트레이션 스킬을 사용합니다. 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
@@ -16,6 +16,16 @@ argument-hint: "[-n] 구현할 기능, 수정할 파일, 또는 리팩토링 대
 
 `plan_validator.py`가 계획서 검증 중 경고를 발생시키면, `-n` 플래그 여부와 무관하게 자동 승인이 차단되고 사용자 확인을 요청합니다.
 
+## `#N` 티켓 번호 인자
+
+`$ARGUMENTS`에서 `#N` 패턴(예: `#1`, `#12`, `#123`)을 파싱하여 티켓 번호를 추출합니다. 추출된 번호는 3자리 zero-padding하여 `.kanban/T-NNN.txt` 경로로 변환합니다.
+
+- `#N` 지정 시: `.kanban/T-NNN.txt` 파일을 읽어 `user_prompt.txt`로 사용
+- `#N` 미지정 시: `.kanban/board.md`에서 Open 상태 티켓을 자동 선택
+  - Open 티켓 1개: 해당 티켓 자동 선택
+  - Open 티켓 복수: 메뉴로 사용자에게 선택 요청
+  - Open 티켓 0개: `$ARGUMENTS` 텍스트를 그대로 사용 (기존 동작 호환)
+
 ## `<command>` 태그 검증
 
 워크플로우 오케스트레이션 시 `user_prompt.txt` 파일에 명시된 커맨드와 실제 실행 커맨드의 일치를 검증합니다.
@@ -26,7 +36,7 @@ argument-hint: "[-n] 구현할 기능, 수정할 파일, 또는 리팩토링 대
 
 2. **검증 로직**:
    - `<command>` 태그가 존재하고 값이 `implement`가 **아닌** 경우: AskUserQuestion으로 경고 메시지를 표시합니다.
-     - 메시지: `"prompt.txt에 <command>{값}</command>으로 지정되어 있지만 cc:implement를 실행했습니다."`
+     - 메시지: `"티켓 파일에 <command>{값}</command>으로 지정되어 있지만 cc:implement를 실행했습니다."`
      - 선택지: `"계속 진행"` (현재 커맨드로 진행) / `"중단"` (워크플로우 종료)
    - `<command>` 태그가 존재하지 않는 경우: 경고 없이 정상 진행합니다. (하위 호환)
    - `<command>implement</command>`인 경우: 정상 진행합니다.
@@ -128,13 +138,13 @@ implement 명령어는 리팩토링 작업을 포함합니다. 기존 `cc:refact
 
 ## 프로젝트 플로우 연동
 
-워크플로우가 프로젝트 플로우(`.kanbanboard`) 컨텍스트 내에서 실행될 때, REPORT 단계 완료 후 칸반보드를 자동 갱신한다.
+워크플로우가 프로젝트 플로우(`.kanban/board.md`) 컨텍스트 내에서 실행될 때, REPORT 단계 완료 후 칸반보드를 자동 갱신한다.
 
 ### 후처리 조건
 
-1. 프로젝트 루트 디렉토리에서 `.kanbanboard` 파일을 검색한다
-2. `.kanbanboard` 파일이 존재하지 않으면 후처리를 스킵한다
-3. `.kanbanboard` 파일이 존재하면 아래 갱신 절차를 실행한다
+1. 프로젝트 루트 디렉터리에서 `.kanban/board.md` 파일을 검색한다
+2. `.kanban/board.md` 파일이 존재하지 않으면 후처리를 스킵한다
+3. `.kanban/board.md` 파일이 존재하면 아래 갱신 절차를 실행한다
 
 ### 갱신 절차
 
@@ -146,7 +156,7 @@ bash .claude/skills/design-strategy/scripts/update-kanban.sh <kanbanboard_path> 
 
 | 인자 | 값 |
 |------|-----|
-| `kanbanboard_path` | 프로젝트 루트의 `.kanbanboard` 파일 경로 |
+| `kanbanboard_path` | 프로젝트 루트의 `.kanban/board.md` 파일 경로 |
 | `workflow_id` | 현재 워크플로우 ID (예: WF-1) |
 | `status` | `completed` (정상 완료 시) 또는 `failed` (실패 시) |
 

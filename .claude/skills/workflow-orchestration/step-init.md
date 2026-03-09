@@ -35,10 +35,10 @@ flow-claude start <command>
 
 ### Step 3: 제목 생성
 
-prompt.txt를 읽어 20자 이내 한글 제목을 생성합니다.
+티켓 파일(`.kanban/T-NNN.txt`)을 읽어 20자 이내 한글 제목을 생성합니다.
 
 - 오케스트레이터가 직접 생성 (LLM 별도 호출 없음)
-- prompt.txt 내용을 기반으로 작업 의도를 요약
+- 티켓 파일 내용을 기반으로 작업 의도를 요약
 
 ### Step 4: initialization.py 실행
 
@@ -50,11 +50,11 @@ python3 .claude/scripts/flow/initialization.py <command> "<title>"
 
 | 순서 | 작업 | 생성 파일 |
 |------|------|----------|
-| 1 | prompt.txt 읽기 | - |
+| 1 | 티켓 파일(`.kanban/T-NNN.txt`) 읽기 | - |
 | 2 | 워크플로우 디렉터리 생성 | `<workDir>/` |
 | 3 | 사용자 원문 요청 보존 | `<workDir>/user_prompt.txt` |
 | 4 | .uploads/ → files/ 복사 + 클리어 | `<workDir>/files/` (첨부 있을 경우) |
-| 5 | prompt.txt 클리어 | - |
+| 5 | 티켓 상태를 board.md에서 In Progress로 전환 | - |
 | 6 | 작업 메타데이터 생성 | `<workDir>/.context.json` |
 | 7 | FSM 상태 초기화 | `<workDir>/status.json` (step: NONE) |
 | 8 | 좀비 워크플로우 정리 | - |
@@ -67,7 +67,7 @@ python3 .claude/scripts/flow/initialization.py <command> "<title>"
 | 코드 | 의미 |
 |------|------|
 | 0 | 성공 |
-| 1 | prompt.txt 비어있음 |
+| 1 | 티켓 파일 비어있음 |
 | 2 | 인자 오류 |
 | 4 | 워크플로우 초기화 실패 |
 
@@ -122,7 +122,7 @@ INIT 완료 → PLAN Step 진행
 > - INIT 결과를 사용자에게 요약/출력
 > - AskUserQuestion으로 확인 요청
 > - echo로 OK/workDir를 stdout에 출력 (initialization.py가 배너를 직접 출력함)
-> - prompt.txt를 직접 다시 읽기 (initialization.py가 이미 처리 완료)
+> - 티켓 파일을 직접 다시 읽기 (initialization.py가 이미 처리 완료)
 
 ---
 
@@ -130,7 +130,7 @@ INIT 완료 → PLAN Step 진행
 
 | 상황 | 종료 코드 | 처리 |
 |------|----------|------|
-| prompt.txt 비어있음 | 1 | 사용자에게 prompt.txt 작성을 안내하고 워크플로우 종료 |
+| 티켓 파일 비어있음 | 1 | 사용자에게 `.kanban/T-NNN.txt` 티켓 작성을 안내하고 워크플로우 종료 |
 | 인자 오류 (잘못된 command) | 2 | 에러 메시지 출력 후 워크플로우 종료 |
 | 워크플로우 초기화 실패 | 4 | 에러 메시지 출력 후 워크플로우 종료 |
 | Bash stdout 파싱 실패 | - | AskUserQuestion으로 사용자에게 상황 보고, 재시도 또는 중단 선택 요청 |

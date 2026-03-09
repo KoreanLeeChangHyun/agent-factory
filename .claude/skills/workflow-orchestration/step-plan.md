@@ -35,11 +35,11 @@ initialization.py가 `init-result.json`에 기록한 `prompt_quality.quality_sco
 ```markdown
 AskUserQuestion(
   questions: [{
-    question: "prompt.txt 품질 점수가 낮습니다 (score: {quality_score:.2f}).\n\n개선이 필요한 항목:\n{feedback_lines}\n\n계속 진행하시겠습니까?",
+    question: "티켓 파일 품질 점수가 낮습니다 (score: {quality_score:.2f}).\n\n개선이 필요한 항목:\n{feedback_lines}\n\n계속 진행하시겠습니까?",
     header: "Prompt 품질 확인",
     options: [
-      { label: "계속 진행", description: "현재 prompt.txt로 planner를 호출합니다" },
-      { label: "prompt 보강 후 재실행", description: "cc:prompt로 prompt.txt를 보강한 뒤 커맨드를 다시 실행합니다" }
+      { label: "계속 진행", description: "현재 티켓 파일로 planner를 호출합니다" },
+      { label: "prompt 보강 후 재실행", description: "cc:prompt로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
     ],
     multiSelect: false
   }]
@@ -56,7 +56,7 @@ AskUserQuestion(
 | **계속 진행** | Step 2a로 진행 |
 | **prompt 보강 후 재실행** | 오케스트레이터 현재 turn 즉시 종료 (FSM 상태 전이 없음) |
 
-> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `cc:prompt`로 prompt.txt를 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
+> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `cc:prompt`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
 
 ---
 
@@ -117,6 +117,22 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 > INIT Step에서 `$ARGUMENTS`의 `-n` 플래그를 파싱하여 `autoApprove` 변수가 설정됩니다.
 > `-n` 미지정 시 `autoApprove=true` (기본값). `-n` 지정 시 `autoApprove=false`.
 
+---
+
+> ### CRITICAL GATE: autoApprove 분기 — 이 게이트를 먼저 평가한다
+>
+> **Step 2b-0을 진입하는 즉시 아래 분기를 평가하고, 분기에 따라 2b-3 진입 여부를 결정한다.**
+>
+> | autoApprove 값 | 2b-3 실행 여부 | 진행 경로 |
+> |----------------|--------------|----------|
+> | `true` (기본값, 경고 없음) | **MUST NOT 실행** | 2b-1 → 2b-2 → **2b-3 스킵** → 2b-4 승인 자동 진입 |
+> | `false` (`-n` 지정 또는 경고 감지) | 실행 | 2b-1 → 2b-2 → 2b-3 → 2b-4 |
+>
+> **`autoApprove=true`이면 2b-3(AskUserQuestion)을 절대 호출하지 않는다.**
+> 2b-3 코드 블록은 `autoApprove=false`인 경우에만 실행된다.
+
+---
+
 **Step 1: plan_validator.py 경고 기반 autoApprove 오버라이드**
 
 `autoApprove=true`(기본값)인 경우에도 다음 조건에서 `autoApprove=false`로 오버라이드합니다:
@@ -130,7 +146,7 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 `autoApprove=true`인 경우 (경고 없는 정상 케이스):
 
 1. 2b-1(.context.json Check/Update)과 2b-2(Slack Notification)는 정상 수행합니다.
-2. 2b-3(AskUserQuestion)을 **스킵**하고, 2b-4의 "승인" 분기로 자동 진행합니다.
+2. **2b-3(AskUserQuestion)을 MUST SKIP** — 2b-4의 "승인" 분기로 자동 진행합니다.
 
 `autoApprove=false`인 경우 (`-n` 지정 또는 경고 감지로 오버라이드된 경우):
 
@@ -190,7 +206,10 @@ AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전
 
 ### 2b-3. AskUserQuestion으로 사용자 승인
 
-> **autoApprove 모드**: `autoApprove=true`인 경우 이 단계(2b-3)를 스킵합니다. 2b-0 Step 2 참조.
+> **CRITICAL: `autoApprove=true`일 때 이 섹션(2b-3) 전체를 실행하지 않는다.**
+> **즉시 2b-4의 "승인" 분기로 이동한다. 아래 코드 블록을 포함하여 이 섹션의 어떤 지시도 실행하지 않는다.**
+>
+> 이 섹션은 `autoApprove=false`(`-n` 지정 또는 validator 경고 감지)인 경우에만 진입한다.
 
 > **Sequential Execution REQUIRED (Critical):**
 > PLAN 완료 배너(`flow-step end <registryKey> planSubmit`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
@@ -246,27 +265,28 @@ AskUserQuestion(
 
 ### 2b-4. Approval Result Processing
 
-> **autoApprove 모드**: `autoApprove=true`인 경우 "승인" 분기로 자동 진행됩니다. 2b-0 Step 2 참조.
+> **CRITICAL: `autoApprove=true`이면 AskUserQuestion 없이 이 섹션의 "승인" 분기를 직접 실행한다.**
+> 2b-3을 거치지 않고 2b-0 게이트에서 직접 이 섹션으로 진입하며, "승인" 행(WORK 단계로 진행)을 즉시 수행한다.
 
 | Selection | Action |
 |-----------|--------|
-| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
-| **수정 요청** | 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.prompt/prompt.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
+| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.kanban/T-NNN.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
+| **수정 요청** | 사용자가 `.kanban/T-NNN.txt` 티켓에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
+| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.kanban/T-NNN.txt` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
 
-> **prompt.txt Isolation Rule (CRITICAL):**
-> `.prompt/prompt.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
-> "승인" 또는 "중지" 선택 후 `.prompt/prompt.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
-> - "승인" 시: prompt.txt 무시, WORK 단계로 즉시 진행
-> - "중지" 시: prompt.txt 무시, CANCELLED 처리만 수행
-> - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 prompt.txt 접근 경로)
+> **Ticket Isolation Rule (CRITICAL):**
+> `.kanban/T-NNN.txt` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
+> "승인" 또는 "중지" 선택 후 `.kanban/T-NNN.txt`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
+> - "승인" 시: 티켓 무시, WORK 단계로 즉시 진행
+> - "중지" 시: 티켓 무시, CANCELLED 처리만 수행
+> - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 티켓 접근 경로)
 
 > **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
 
 > **"수정 요청" selection handling:**
 > **Precondition:** 아래 3단계 절차는 사용자가 "수정 요청"을 선택한 경우에만 실행합니다. "승인" 또는 "중지" 선택 시 이 절차를 실행하는 것은 MUST NOT입니다.
 >
-> 사용자가 `.prompt/prompt.txt`에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
+> 사용자가 `.kanban/T-NNN.txt` 티켓에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
 >
 > **1단계. reload_prompt.py 호출** — 피드백 수신
 >
@@ -277,11 +297,11 @@ AskUserQuestion(
 > feedback=$(Bash("flow-reload <workDir>"))
 > ```
 >
-> - 스크립트가 prompt.txt 읽기, user_prompt.txt append, .uploads/ 복사/클리어, prompt.txt 클리어를 일괄 수행
+> - 스크립트가 티켓 파일 읽기, user_prompt.txt append, .uploads/ 복사/클리어를 일괄 수행
 > - stdout으로 피드백 전문을 출력
 > - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
 > - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
-> - stdout에 `[WARN] prompt.txt is empty`가 포함된 경우: prompt.txt가 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
+> - stdout에 `[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.txt)`가 포함된 경우: 티켓 파일이 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
 >
 > **2단계. planner re-call** — 피드백 포함 계획 재수립
 >
@@ -298,14 +318,14 @@ AskUserQuestion(
 > ")
 > ```
 >
-> - `feedback` 값이 빈 문자열인 경우(`[WARN] prompt.txt is empty` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
+> - `feedback` 값이 빈 문자열인 경우(`[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.txt)` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
 > - planner는 기존 계획서를 기반으로 피드백을 반영한 수정 계획서를 작성하여 `작성완료` 반환
 >
 > **3단계. Step 2b repeat** — 재승인 요청
 >
 > 재수립된 계획에 대해 다시 Step 2b(사용자 승인 요청)를 반복합니다. 사용자가 "승인"을 선택할 때까지 1~3단계를 반복할 수 있습니다.
 >
-> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append, `prompt.txt` 클리어는 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
+> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append는 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
 
 ### CANCELLED Processing
 
