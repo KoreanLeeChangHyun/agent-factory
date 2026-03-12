@@ -482,7 +482,9 @@
       return res.text();
     }).then(function (html) {
       return parseDirLinks(html).dirs.filter(function (h) {
-        return /\/\d{8}-\d{6}\/$/.test(h);
+        return /\d{8}-\d{6}\/$/.test(h);
+      }).map(function (h) {
+        return baseHref + h;
       });
     }).catch(function () { return []; });
   }
@@ -504,11 +506,11 @@
   function fetchEntryDetail(entryHref) {
     var entry = lastSegment(entryHref);
     return fetch(entryHref).then(function (r) { return r.text(); }).then(function (h2) {
-      var taskLinks = parseDirLinks(h2).dirs;
+      var taskLinks = parseDirLinks(h2).dirs.map(function (h) { return entryHref + h; });
       return Promise.all(taskLinks.map(function (taskHref) {
         var task = lastSegment(taskHref);
         return fetch(taskHref).then(function (r) { return r.text(); }).then(function (h3) {
-          var cmdLinks = parseDirLinks(h3).dirs;
+          var cmdLinks = parseDirLinks(h3).dirs.map(function (h) { return taskHref + h; });
           return Promise.all(cmdLinks.map(function (cmdHref) {
             var cmd = lastSegment(cmdHref);
             var basePath = cmdHref;
