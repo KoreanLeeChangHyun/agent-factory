@@ -37,7 +37,7 @@ flowchart TD
 |----|------|--------|-------|--------|-------------|------|
 | W01 | ... | - | 1 | T1(3) | worker-sonnet | review-code-quality |
 <!-- 서브에이전트: worker-opus(T3 고복잡도), worker-sonnet(T2 이하), explorer(탐색형)를 지정 -->
-<!-- 스킬: 전문화 스킬 필수 1개+. 프로젝트 스킬 존재 시 + 구분. 예: review-code-quality + project-domain -->
+<!-- 스킬: 전문화 스킬 필수 1개+. 복수 스킬은 + 또는 , 로 구분. 프로젝트 스킬 존재 시 + 구분. 예: review-code-quality + project-domain, design-frontend, convention-javascript -->
 <!-- Explorer 태스크는 스킬 컬럼에 - 기재 -->
 
 ## 워커별 작업 상세

@@ -17,11 +17,22 @@
         ]
       },
       {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/scripts/flow/board_server.py",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
         "matcher": "startup|resume|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/hooks/session_start_system_prompt.py",
+            "command": "python3 -u .claude/hooks/session-start.py",
             "timeout": 5
           }
         ]

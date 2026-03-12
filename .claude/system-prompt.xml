@@ -30,6 +30,15 @@
         - /wf -d N     : 티켓 종료 (Done)
         - /wf -c N     : 티켓 삭제
       - aliases: flow-* 스크립트 체계 (flow-kanban, flow-tmux, flow-claude 등)
+      - flow-kanban 유효 서브커맨드 (이 외의 서브커맨드는 존재하지 않음):
+        - create <title>
+        - move <ticket> <target>
+        - done <ticket>
+        - delete <ticket>
+        - add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>"
+        - update-title <ticket> <title>    ← 제목 변경 시 반드시 이것 사용 (update ✕)
+        - update-subnumber <ticket> --id <N> --workdir <path>
+        - archive-subnumber <ticket>
       - 상세 참조:
         - 명령어 사용법: .claude/commands/wf.md
         - 오케스트레이션 스킬: .claude/skills/workflow-orchestration/

@@ -29,6 +29,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,7 @@ if _scripts_dir not in sys.path:
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
 from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
+from flow.tmux_utils import WINDOW_PREFIX_P
 
 PROJECT_ROOT: str = resolve_project_root()
 
@@ -591,18 +593,21 @@ def main() -> None:
                 timeout=5,
             )
             win_name: str = win_result.stdout.strip()
-            if win_name.startswith("T-"):
+            if win_name.startswith(f"{WINDOW_PREFIX_P}T-"):
                 if abs_work_dir is not None:
                     _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: tmux_cleanup win={win_name} pane={tmux_pane} delay=3s")
+                # TMUX_PANE(%N)을 직접 타겟으로 사용: 콜론 포함 윈도우명의 세션:윈도우 오해석 방지
+                pane_target: str = shlex.quote(tmux_pane)
+                bash_cmd: str = f"sleep 3 && tmux kill-window -t {pane_target}"
                 subprocess.Popen(
-                    ["bash", "-c", f"sleep 3 && tmux kill-window -t {win_name}"],
+                    ["bash", "-c", bash_cmd],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
             else:
                 if abs_work_dir is not None:
-                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: skip tmux_cleanup win={win_name!r} (not T-* prefix)")
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: skip tmux_cleanup win={win_name!r} (not P:T-* prefix)")
         except Exception as _e:
             if abs_work_dir is not None:
                 _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP5: tmux_cleanup error={_e}")

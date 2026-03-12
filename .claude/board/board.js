@@ -95,37 +95,35 @@
   }
 
   // ── Fetch Tickets ──
-  var MAX_GAP = 10; // 연속 404 허용 횟수
 
+  /** 디렉터리 URL에서 .xml 파일 목록을 가져온다. 404나 네트워크 오류 시 빈 배열 반환. */
+  function fetchXmlList(dirUrl) {
+    return fetch(dirUrl).then(function (res) {
+      if (!res.ok) return [];
+      return res.text().then(function (html) {
+        return parseDirLinks(html).files.filter(function (f) { return f.endsWith(".xml"); });
+      });
+    }).catch(function () { return []; });
+  }
+
+  /** 디렉터리 리스팅 기반 병렬 fetch로 모든 티켓을 수집한다. */
   function fetchTickets() {
-    var tickets = [];
-    function tryFetch(n, misses) {
-      if (misses >= MAX_GAP) return Promise.resolve();
-      var url = "../../.kanban/T-" + String(n).padStart(3, "0") + ".xml";
-      return fetch(url).then(function (res) {
-        if (!res.ok) return tryFetch(n + 1, misses + 1);
-        return res.text().then(function (text) {
-          var t = parseTicket(text);
-          if (t) tickets.push(t);
-          return tryFetch(n + 1, 0);
-        });
-      }).catch(function () { return tryFetch(n + 1, misses + 1); });
-    }
-    function tryFetchDone(n, misses) {
-      if (misses >= MAX_GAP) return Promise.resolve();
-      var url = "../../.kanban/done/T-" + String(n).padStart(3, "0") + ".xml";
-      return fetch(url).then(function (res) {
-        if (!res.ok) return tryFetchDone(n + 1, misses + 1);
-        return res.text().then(function (text) {
-          var t = parseTicket(text);
-          if (t) tickets.push(t);
-          return tryFetchDone(n + 1, 0);
-        });
-      }).catch(function () { return tryFetchDone(n + 1, misses + 1); });
-    }
-    return tryFetch(1, 0).then(function () {
-      return tryFetchDone(1, 0);
-    }).then(function () { return tickets; });
+    return Promise.all([
+      fetchXmlList("../../.kanban/"),
+      fetchXmlList("../../.kanban/done/"),
+    ]).then(function (results) {
+      var rootFiles = results[0].map(function (f) { return "../../.kanban/" + f; });
+      var doneFiles = results[1].map(function (f) { return "../../.kanban/done/" + f; });
+      var allFiles = rootFiles.concat(doneFiles);
+      return Promise.all(allFiles.map(function (url) {
+        return fetch(url).then(function (res) {
+          if (!res.ok) return null;
+          return res.text().then(function (text) { return parseTicket(text); });
+        }).catch(function () { return null; });
+      }));
+    }).then(function (results) {
+      return results.filter(function (t) { return t !== null; });
+    });
   }
 
   // ── UI State Persistence ──
@@ -133,7 +131,7 @@
 
   function saveUI() {
     var openNums = viewerTabs.map(function (t) { return t.number; });
-    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab };
+    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab, tabHistory: tabHistory };
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
 
@@ -146,9 +144,13 @@
   // ── Tab Switching ──
   var tabs = document.querySelectorAll(".tab");
   var views = document.querySelectorAll(".view");
-  var activeTab = savedState.tab || "kanban";
+  var activeTab = savedState.tab || "dashboard";
+  var tabHistory = savedState.tabHistory || [];
 
-  function switchTab(target) {
+  function switchTab(target, skipPush) {
+    if (!skipPush && activeTab && !(activeTab === "viewer" && target === "viewer")) {
+      tabHistory.push(activeTab);
+    }
     activeTab = target;
     tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
     views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
@@ -251,6 +253,7 @@
 
     // Tab bar
     h += '<div class="vt-bar">';
+    h += '<button class="vt-back-btn" id="vt-back-btn">&#8592; Back</button>';
     viewerTabs.forEach(function (t) {
       var ac = t.number === activeViewerTab ? " vt-tab-active" : "";
       h += '<div class="vt-tab' + ac + '" data-num="' + esc(t.number) + '">';
@@ -303,6 +306,24 @@
     el.querySelectorAll(".wf-dir-file-link").forEach(function (link) {
       link.addEventListener("click", function () {
         openWfFile(link.dataset.label, link.dataset.url);
+      });
+    });
+
+    // Bind back button
+    var backBtn = el.querySelector("#vt-back-btn");
+    if (backBtn) {
+      backBtn.addEventListener("click", function () {
+        switchTab(tabHistory.length > 0 ? tabHistory.pop() : "kanban", true);
+      });
+    }
+
+    // Bind md-file-link clicks
+    el.querySelectorAll(".md-file-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var filePath = link.dataset.filepath;
+        if (!filePath) return;
+        var url = "../../" + filePath;
+        openWfFile(filePath, url);
       });
     });
 
@@ -586,6 +607,8 @@
   }
 
   var wfSearchQuery = "";
+  var wfSortKey = "updated_at";  // default sort column
+  var wfSortDir = "desc";        // default sort direction
   var wfEntryHrefs = [];   // all entry hrefs (sorted newest first)
   var wfLoadedIndex = 0;   // how many entries have been loaded
   var wfLoading = false;
@@ -644,14 +667,19 @@
     var sentinel = document.getElementById("wf-sentinel");
     if (sentinel) sentinel.remove();
     var loading = list.querySelector(".empty");
-    if (loading) loading.remove();
-    // Append new rows
-    var temp = document.createElement("div");
+    if (loading) {
+      var emptyRow = loading.closest("tr");
+      if (emptyRow) emptyRow.remove(); else loading.remove();
+    }
+    // Append new rows using table wrapper to avoid <tr> auto-lifting by browser
+    var temp = document.createElement("table");
+    var tbody = document.createElement("tbody");
+    temp.appendChild(tbody);
     var h = "";
     items.forEach(function (w) { h += renderWfCard(w); });
-    temp.innerHTML = h;
-    while (temp.firstChild) {
-      list.appendChild(temp.firstChild);
+    tbody.innerHTML = h;
+    while (tbody.firstChild) {
+      list.appendChild(tbody.firstChild);
     }
     // Bind file links on new rows
     bindWfFileLinks(list);
@@ -663,25 +691,34 @@
     var hasMore = wfLoadedIndex < wfEntryHrefs.length;
     // Remove old sentinel
     var old = document.getElementById("wf-sentinel");
-    if (old) old.remove();
+    if (old) {
+      var oldRow = old.closest("tr") || old;
+      oldRow.remove();
+    }
     if (wfLoading) {
-      var el = document.createElement("div");
-      el.className = "empty";
-      el.textContent = "Loading...";
-      list.appendChild(el);
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.setAttribute("colspan", "5");
+      td.className = "empty";
+      td.textContent = "Loading...";
+      tr.appendChild(td);
+      list.appendChild(tr);
     } else if (hasMore) {
-      var s = document.createElement("div");
-      s.className = "wf-load-more";
-      s.id = "wf-sentinel";
-      s.textContent = "Scroll for more";
-      list.appendChild(s);
+      var str = document.createElement("tr");
+      var std = document.createElement("td");
+      std.setAttribute("colspan", "5");
+      std.className = "wf-load-more";
+      std.id = "wf-sentinel";
+      std.textContent = "Scroll for more";
+      str.appendChild(std);
+      list.appendChild(str);
       var observer = new IntersectionObserver(function (entries) {
         if (entries[0].isIntersecting) {
           observer.disconnect();
           loadMoreWorkflows();
         }
       });
-      observer.observe(s);
+      observer.observe(std);
     }
   }
 
@@ -692,6 +729,16 @@
         e.stopPropagation();
         openWfFile(link.dataset.label, link.dataset.url);
       });
+    });
+  }
+
+  function sortWorkflows(list) {
+    var key = wfSortKey;
+    var dir = wfSortDir === "asc" ? 1 : -1;
+    return list.slice().sort(function (a, b) {
+      var av = (a[key] || "").toString();
+      var bv = (b[key] || "").toString();
+      return dir * av.localeCompare(bv);
     });
   }
 
@@ -708,16 +755,42 @@
     h += '<span class="wf-search-count">' + filtered.length + (hasMore ? '+' : '') + ' / ' + wfEntryHrefs.length + '</span>';
     h += '</div>';
 
-    // List
-    h += '<div class="wf-list" id="wf-list">';
+    // Table
+    var sortedFiltered = sortWorkflows(filtered);
+    var cols = [
+      { key: "command", label: "Command" },
+      { key: "task",    label: "Task" },
+      { key: "step",    label: "Step" },
+      { key: "files",   label: "Files",       nosort: true },
+      { key: "updated_at", label: "Updated" },
+    ];
 
-    if (filtered.length > 0) {
-      filtered.forEach(function (w) { h += renderWfCard(w); });
+    h += '<div class="wf-table-wrap"><table class="wf-table">';
+    h += '<thead><tr>';
+    cols.forEach(function (col) {
+      var indicator = "";
+      if (!col.nosort) {
+        if (wfSortKey === col.key) {
+          indicator = wfSortDir === "asc"
+            ? ' <span class="wf-sort-indicator">&#9650;</span>'
+            : ' <span class="wf-sort-indicator">&#9660;</span>';
+        } else {
+          indicator = ' <span class="wf-sort-inactive">&#9650;&#9660;</span>';
+        }
+      }
+      var sortable = col.nosort ? "" : ' class="wf-th-sortable" data-sort-key="' + col.key + '"';
+      h += '<th' + sortable + '>' + col.label + indicator + '</th>';
+    });
+    h += '</tr></thead>';
+
+    h += '<tbody id="wf-list">';
+    if (sortedFiltered.length > 0) {
+      sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
     } else if (!wfLoading) {
-      h += '<div class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</div>';
+      h += '<tr><td colspan="5" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
     }
+    h += '</tbody></table></div></div>';
 
-    h += '</div></div>';
     el.innerHTML = h;
 
     // Search input
@@ -727,6 +800,20 @@
       renderWorkflow();
       var input = el.querySelector(".wf-search");
       if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+    });
+
+    // Sort header clicks
+    el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.getAttribute("data-sort-key");
+        if (wfSortKey === key) {
+          wfSortDir = wfSortDir === "asc" ? "desc" : "asc";
+        } else {
+          wfSortKey = key;
+          wfSortDir = "desc";
+        }
+        renderWorkflow();
+      });
     });
 
     bindWfFileLinks(el);
@@ -767,7 +854,22 @@
       return '<pre class="md-code"><code>' + esc(code) + '</code></pre>';
     };
 
-    return marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+    var html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+
+    // Post-process: convert file path patterns inside <code> tags to clickable links
+    // Matches: paths with '/' or known file extensions
+    var FILE_EXT_RE = /\.(md|js|ts|jsx|tsx|css|html|json|py|txt|log|xml|sh|yml|yaml|toml|env|csv)$/i;
+    html = html.replace(/<code>([^<]+)<\/code>/g, function (match, inner) {
+      var decoded = inner.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      var isFilePath = decoded.indexOf("/") !== -1 || FILE_EXT_RE.test(decoded.trim());
+      if (isFilePath) {
+        var escaped = esc(decoded.trim());
+        return '<code class="md-file-link" data-filepath="' + escaped + '">' + inner + '</code>';
+      }
+      return match;
+    });
+
+    return html;
   }
 
   function initMermaid() {
@@ -788,33 +890,40 @@
   }
 
   function renderWfCard(w) {
-    var h = '<div class="wf-row">';
-    h += '<span class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</span>';
-    h += '<span class="wf-row-title">' + esc(w.task) + '</span>';
+    var h = '<tr class="wf-row">';
+    // command cell
+    h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';
+    // task cell
+    h += '<td class="wf-row-title">' + esc(w.task) + '</td>';
+    // step cell
+    var stepIsDone = (w.step || "").toUpperCase() === "DONE";
+    var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
+    var stepText = esc(w.step || "NONE");
+    var stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + '</span>';
+    h += '<td class="wf-row-step">' + stepBadge + '</td>';
+    // files cell
+    h += '<td class="wf-row-files">';
     if (w.files && w.files.length > 0) {
-      h += '<span class="wf-row-files">';
       w.files.forEach(function (f) {
         h += '<span class="wf-file-link" data-label="' + esc(w.task + ' / ' + f.label) + '" data-url="' + esc(f.url) + '">' + esc(f.label) + '</span>';
       });
-      h += '</span>';
     }
-    h += '<span class="wf-row-time">' + esc(w.updated_at.substring(0, 16)) + '</span>';
-    h += '</div>';
+    h += '</td>';
+    // updated_at cell
+    h += '<td class="wf-row-time">' + esc(w.updated_at.substring(0, 16)) + '</td>';
+    h += '</tr>';
     return h;
   }
 
   // ── Dashboard ──
-  var DASH_PAGE_SIZE = 50;
-  var DASH_FILES = ["usage", "logs", "skills", "history"];
-  var dashData = {};          // { usage: text, logs: text, skills: text, history: text }
+  var DASH_FILES = ["usage", "logs", "skills"];
+  var dashData = {};          // { usage: text, logs: text, skills: text }
   var dashFetched = false;
-  var dashActiveSubtab = "usage";
-  var dashHistoryRows = [];   // parsed history table rows (array of strings)
-  var dashHistoryPage = 0;
+  var dashChartInstances = {}; // { canvasId: Chart } - track instances for destroy-before-recreate
 
   /**
    * Fetches a single dashboard markdown file.
-   * @param {string} name - file name without extension (usage|logs|skills|history)
+   * @param {string} name - file name without extension (usage|logs|skills)
    * @returns {Promise<string>}
    */
   function fetchDashboardFile(name) {
@@ -826,7 +935,7 @@
   }
 
   /**
-   * Fetches all four dashboard files in parallel and caches in dashData.
+   * Fetches all dashboard files in parallel and caches in dashData.
    * @returns {Promise<Object>}
    */
   function fetchAllDashboardFiles() {
@@ -957,20 +1066,20 @@
   }
 
   /**
-   * Renders the 4 KPI Summary Cards into #view-dashboard.
-   * @param {Object} stats
+   * Renders the 4 KPI Summary Cards with left accent borders.
+   * @param {Object} stats - KPI stats from computeKpiStats
    * @returns {string} HTML
    */
   function renderDashCards(stats) {
     var cards = [
-      { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time" },
-      { label: "Total Tokens", value: formatTokens(stats.totalTokens), sub: "cumulative" },
-      { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs" },
-      { label: "Top Skill", value: stats.topSkill, sub: "most used" },
+      { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time", accent: "#569cd6" },
+      { label: "Total Tokens", value: formatTokens(stats.totalTokens), sub: "cumulative", accent: "#4ec9b0" },
+      { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs", accent: "#dcdcaa" },
+      { label: "Top Skill", value: stats.topSkill, sub: "most used", accent: "#c586c0" },
     ];
     var h = '<div class="dash-cards">';
     cards.forEach(function (card) {
-      h += '<div class="dash-card">';
+      h += '<div class="dash-card" style="border-left-color:' + card.accent + '">';
       h += '<div class="dash-card-label">' + esc(card.label) + '</div>';
       h += '<div class="dash-card-value">' + esc(card.value) + '</div>';
       h += '<div class="dash-card-sub">' + esc(card.sub) + '</div>';
@@ -1011,45 +1120,264 @@
   }
 
   /**
-   * Renders the History subtab content with pagination.
-   * @param {string} historyText
-   * @param {HTMLElement} contentEl
+   * Destroys an existing Chart instance by canvas ID, if any.
+   * @param {string} canvasId - the id attribute of the canvas element
    */
-  function renderHistoryPage(historyText, contentEl) {
-    if (!dashHistoryRows.length) {
-      dashHistoryRows = parseMdTableRows(historyText || "");
-      // history.md is newest-first, so no sort needed; just reverse for "most recent first"
+  function destroyChart(canvasId) {
+    if (dashChartInstances[canvasId]) {
+      dashChartInstances[canvasId].destroy();
+      delete dashChartInstances[canvasId];
     }
-    var headers = parseMdTableHeader(historyText || "");
-    var totalPages = Math.ceil(dashHistoryRows.length / DASH_PAGE_SIZE);
-    var start = dashHistoryPage * DASH_PAGE_SIZE;
-    var pageRows = dashHistoryRows.slice(start, start + DASH_PAGE_SIZE);
+  }
 
-    var h = renderMdTable(headers, pageRows);
+  /**
+   * Creates a Chart.js instance and tracks it for later cleanup.
+   * @param {string} canvasId - the id attribute of the canvas element
+   * @param {Object} config - Chart.js configuration object
+   * @returns {Object|null} Chart instance or null if canvas not found
+   */
+  function createChart(canvasId, config) {
+    if (typeof Chart === "undefined") return null;
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    destroyChart(canvasId);
+    var instance = new Chart(canvas.getContext("2d"), config);
+    dashChartInstances[canvasId] = instance;
+    return instance;
+  }
 
-    // Pagination
-    if (totalPages > 1) {
-      h += '<div class="dash-pagination">';
-      for (var p = 0; p < totalPages; p++) {
-        var isActive = p === dashHistoryPage ? " active" : "";
-        h += '<button class="dash-page-btn' + isActive + '" data-page="' + p + '">' + (p + 1) + '</button>';
+  /**
+   * Renders token usage bar+line composite chart.
+   * Bar = token total per workflow, Line = same data as line overlay.
+   * @param {Array<Array<string>>} rows - parsed usage table rows
+   */
+  function renderUsageChart(rows) {
+    if (!rows.length) return;
+    // Reverse to chronological order (oldest first)
+    var chronoRows = rows.slice().reverse();
+    var labels = chronoRows.map(function (c) { return c[0] || ""; });
+    var values = chronoRows.map(function (c) { return parseToken(c[c.length - 1] || "0"); });
+
+    createChart("chart-usage", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Tokens",
+            data: values,
+            backgroundColor: "rgba(86,156,214,0.6)",
+            borderColor: "#569cd6",
+            borderWidth: 1,
+            order: 2
+          },
+          {
+            label: "Trend",
+            data: values,
+            type: "line",
+            borderColor: "#4ec9b0",
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            pointRadius: 2,
+            pointBackgroundColor: "#4ec9b0",
+            tension: 0.3,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#cccccc", boxWidth: 12, font: { size: 11 } } }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#858585", font: { size: 10 }, maxRotation: 45 },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          }
+        }
       }
-      h += '</div>';
-    }
+    });
+  }
 
-    contentEl.innerHTML = h;
+  /**
+   * Renders command type pie chart from usage rows.
+   * Aggregates command column (index 3) frequency.
+   * @param {Array<Array<string>>} rows - parsed usage table rows
+   */
+  function renderCommandPieChart(rows) {
+    if (!rows.length) return;
+    var cmdCount = {};
+    rows.forEach(function (cells) {
+      var cmd = (cells[3] || "other").trim().toLowerCase();
+      cmdCount[cmd] = (cmdCount[cmd] || 0) + 1;
+    });
 
-    contentEl.querySelectorAll(".dash-page-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        dashHistoryPage = parseInt(btn.dataset.page, 10);
-        renderHistoryPage(historyText, contentEl);
+    var colorMap = {
+      implement: "#569cd6",
+      review: "#c586c0",
+      research: "#dcdcaa"
+    };
+
+    var labels = Object.keys(cmdCount);
+    var values = labels.map(function (k) { return cmdCount[k]; });
+    var colors = labels.map(function (k) { return colorMap[k] || "#858585"; });
+
+    createChart("chart-command", {
+      type: "pie",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderColor: "#1e1e1e",
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "right",
+            labels: { color: "#cccccc", padding: 12, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Renders WARN/ERROR time series line chart from logs rows.
+   * @param {Array<Array<string>>} rows - parsed logs table rows
+   */
+  function renderWarnErrorChart(rows) {
+    if (!rows.length) return;
+    var chronoRows = rows.slice().reverse();
+    var labels = chronoRows.map(function (c) { return c[0] || ""; });
+    var warns = chronoRows.map(function (c) { return parseInt(c[4] || "0", 10) || 0; });
+    var errors = chronoRows.map(function (c) { return parseInt(c[5] || "0", 10) || 0; });
+
+    createChart("chart-warn-error", {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "WARN",
+            data: warns,
+            borderColor: "#dcdcaa",
+            backgroundColor: "rgba(220,220,170,0.1)",
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#dcdcaa",
+            fill: true,
+            tension: 0.2
+          },
+          {
+            label: "ERROR",
+            data: errors,
+            borderColor: "#f44747",
+            backgroundColor: "rgba(244,71,71,0.1)",
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#f44747",
+            fill: true,
+            tension: 0.2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#cccccc", boxWidth: 12, font: { size: 11 } } }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#858585", font: { size: 10 }, maxRotation: 45 },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Renders skill frequency horizontal bar chart from skills rows.
+   * Shows top 10 most used skills.
+   * @param {Array<Array<string>>} rows - parsed skills table rows
+   */
+  function renderSkillFreqChart(rows) {
+    if (!rows.length) return;
+    var skillCount = {};
+    rows.forEach(function (cells) {
+      var skillList = cells[5] || "";
+      var parts = skillList.split(/<br\s*\/?>/i);
+      parts.forEach(function (part) {
+        var skills = part.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+        skills.forEach(function (s) {
+          skillCount[s] = (skillCount[s] || 0) + 1;
+        });
       });
+    });
+
+    // Sort by count descending, take top 10
+    var sorted = Object.keys(skillCount).sort(function (a, b) {
+      return skillCount[b] - skillCount[a];
+    }).slice(0, 10);
+
+    var labels = sorted;
+    var values = sorted.map(function (k) { return skillCount[k]; });
+
+    createChart("chart-skills", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Frequency",
+          data: values,
+          backgroundColor: "rgba(197,134,192,0.6)",
+          borderColor: "#c586c0",
+          borderWidth: 1
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            ticks: { color: "#cccccc", font: { size: 10 } },
+            grid: { display: false }
+          }
+        }
+      }
     });
   }
 
   /**
    * Main Dashboard render entry point.
-   * Fetches data (first time) then renders cards + subtab UI.
+   * Fetches data (first time) then renders KPI cards + chart sections + tables
+   * in a single scrollable page layout.
    */
   function renderDashboard() {
     var el = document.getElementById("view-dashboard");
@@ -1062,63 +1390,81 @@
       return;
     }
 
+    // Set Chart.js dark theme defaults
+    if (typeof Chart !== "undefined") {
+      Chart.defaults.color = "#cccccc";
+      Chart.defaults.borderColor = "#2d2d2d";
+    }
+
     var stats = computeKpiStats(dashData);
     var h = renderDashCards(stats);
 
-    // Subtabs bar
-    var subtabs = ["Usage", "Logs", "Skills", "History"];
-    h += '<div class="dash-subtabs">';
-    subtabs.forEach(function (name) {
-      var key = name.toLowerCase();
-      var isActive = key === dashActiveSubtab ? " active" : "";
-      h += '<button class="dash-subtab' + isActive + '" data-subtab="' + key + '">' + esc(name) + '</button>';
+    // Parse all data
+    var usageHeaders = parseMdTableHeader(dashData.usage || "");
+    var usageRows = parseMdTableRows(dashData.usage || "");
+    var logsHeaders = parseMdTableHeader(dashData.logs || "");
+    var logsRows = parseMdTableRows(dashData.logs || "");
+    var skillsHeaders = parseMdTableHeader(dashData.skills || "");
+    var skillsRows = parseMdTableRows(dashData.skills || "");
+    // Normalize skills column: replace commas with <br> so each skill is on its own line
+    skillsRows.forEach(function (cells) {
+      if (cells[5]) {
+        cells[5] = cells[5].split(/,\s*|<br\s*\/?>/i).filter(Boolean).join("<br>");
+      }
     });
+
+    // ── Charts (all at top) ──
+    h += '<div class="dash-section">';
+    h += '<h3 class="dash-section-title">Charts</h3>';
+    h += '<div class="dash-chart-row">';
+    h += '<div class="dash-chart-container"><canvas id="chart-usage" height="260"></canvas></div>';
+    h += '<div class="dash-chart-container"><canvas id="chart-command" height="260"></canvas></div>';
+    h += '</div>';
+    h += '<div class="dash-chart-row">';
+    h += '<div class="dash-chart-container"><canvas id="chart-warn-error" height="260"></canvas></div>';
+    h += '<div class="dash-chart-container"><canvas id="chart-skills" height="260"></canvas></div>';
+    h += '</div>';
     h += '</div>';
 
-    // Subtab content container
-    h += '<div class="dash-content" id="dash-content"></div>';
+    // ── Tables (bottom, tabbed) ──
+    h += '<div class="dash-section">';
+    h += '<h3 class="dash-section-title">Data</h3>';
+    h += '<div class="dash-table-tabs">';
+    h += '<button class="dash-table-tab active" data-table="usage">Usage</button>';
+    h += '<button class="dash-table-tab" data-table="logs">Logs</button>';
+    h += '<button class="dash-table-tab" data-table="skills">Skills</button>';
+    h += '</div>';
+    h += '<div class="dash-table-panel active" data-table="usage">' + renderMdTable(usageHeaders, usageRows) + '</div>';
+    h += '<div class="dash-table-panel" data-table="logs">' + renderMdTable(logsHeaders, logsRows) + '</div>';
+    h += '<div class="dash-table-panel" data-table="skills">' + renderMdTable(skillsHeaders, skillsRows) + '</div>';
+    h += '</div>';
 
     el.innerHTML = h;
 
-    // Bind subtab clicks
-    el.querySelectorAll(".dash-subtab").forEach(function (btn) {
+    // Wire up table tab switching
+    el.querySelectorAll(".dash-table-tab").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        dashActiveSubtab = btn.dataset.subtab;
-        dashHistoryPage = 0;
-        el.querySelectorAll(".dash-subtab").forEach(function (b) {
-          b.classList.toggle("active", b.dataset.subtab === dashActiveSubtab);
-        });
-        renderDashSubtabContent();
+        var target = btn.getAttribute("data-table");
+        el.querySelectorAll(".dash-table-tab").forEach(function (b) { b.classList.remove("active"); });
+        el.querySelectorAll(".dash-table-panel").forEach(function (p) { p.classList.remove("active"); });
+        btn.classList.add("active");
+        el.querySelector('.dash-table-panel[data-table="' + target + '"]').classList.add("active");
       });
     });
 
-    renderDashSubtabContent();
-  }
-
-  /**
-   * Renders the active subtab content into #dash-content.
-   */
-  function renderDashSubtabContent() {
-    var contentEl = document.getElementById("dash-content");
-    if (!contentEl) return;
-
-    var key = dashActiveSubtab;
-    var text = dashData[key] || "";
-
-    if (key === "history") {
-      dashHistoryRows = []; // reset to force re-parse on tab switch
-      renderHistoryPage(text, contentEl);
-    } else {
-      var headers = parseMdTableHeader(text);
-      var rows = parseMdTableRows(text);
-      contentEl.innerHTML = renderMdTable(headers, rows);
-    }
+    // Render charts after DOM is populated
+    renderUsageChart(usageRows);
+    renderCommandPieChart(usageRows);
+    renderWarnErrorChart(logsRows);
+    renderSkillFreqChart(skillsRows);
   }
 
   // ── Polling ──
   var POLL_INTERVAL = 500;
   var prevTicketJson = "";
   var prevWfJson = "";
+  var ticketTimerId = null;
+  var wfTimerId = null;
 
   function ticketJson(tickets) {
     return JSON.stringify(tickets.map(function (t) {
@@ -1143,7 +1489,12 @@
         var activeVt = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
         if (activeVt && activeVt.ticket && activeTab === "viewer") renderViewer();
       }
-      setTimeout(pollTickets, POLL_INTERVAL);
+      // 탭이 비활성 상태이면 폴링을 중단하고 visibilitychange에서 재개한다
+      if (document.hidden) {
+        ticketTimerId = null;
+        return;
+      }
+      ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
     });
   }
 
@@ -1158,7 +1509,12 @@
         wfInitialized = false;
         loadMoreWorkflows();
       }
-      setTimeout(pollWorkflows, POLL_INTERVAL);
+      // 탭이 비활성 상태이면 폴링을 중단하고 visibilitychange에서 재개한다
+      if (document.hidden) {
+        wfTimerId = null;
+        return;
+      }
+      wfTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
     });
   }
 
@@ -1180,14 +1536,26 @@
       });
       if (activeTab === "viewer") renderViewer();
     }
-    setTimeout(pollTickets, POLL_INTERVAL);
+    ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
   });
 
   fetchWorkflowEntries().then(function (hrefs) {
     wfEntryHrefs = hrefs;
     prevWfJson = JSON.stringify(hrefs);
     loadMoreWorkflows();
-    setTimeout(pollWorkflows, POLL_INTERVAL);
+    wfTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
+  });
+
+  // 탭 활성화 복귀 시 중단된 폴링을 즉시 재시작한다
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      if (!ticketTimerId) {
+        pollTickets();
+      }
+      if (!wfTimerId) {
+        pollWorkflows();
+      }
+    }
   });
 
   // Pre-fetch dashboard data in background so it's ready on tab switch

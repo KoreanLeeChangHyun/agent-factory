@@ -185,7 +185,7 @@ def parse_plan_tasks(plan_path):
 
         raw_skills = row.get("skills", "")
         if raw_skills and raw_skills != "-" and raw_skills != "없음":
-            skills = [s.strip() for s in raw_skills.split("+") if s.strip()]
+            skills = [s.strip() for s in re.split(r"[+,]", raw_skills) if s.strip()]
         else:
             skills = []
 

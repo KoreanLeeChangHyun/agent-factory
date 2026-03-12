@@ -3,6 +3,7 @@
 
 기능:
   launch  - 지정된 티켓 ID로 새 tmux 윈도우를 생성하고 명령을 전송한다.
+            윈도우명은 P:T-NNN 형식으로 생성되며, _WF_MAIN_WINDOW 환경변수에 메인 윈도우명을 전달한다.
   cleanup - 지정된 티켓 ID의 tmux 윈도우를 종료한다.
 
 사용법:
@@ -13,6 +14,9 @@ exit code:
   0 - 성공 (윈도우 생성 또는 기존 윈도우에 명령 전송 완료)
   1 - 에러 (폴링 타임아웃 등)
   2 - 인라인 실행 필요 (비tmux 환경 또는 재진입 감지)
+
+NOTE: tmux -t 옵션에서 콜론(:)은 세션:윈도우 구분자로 해석되므로,
+      P:T-NNN 형식 윈도우명은 인덱스 기반 타겟으로 변환하여 사용한다.
 """
 
 from __future__ import annotations
@@ -22,6 +26,17 @@ import os
 import subprocess
 import sys
 import time
+
+# sys.path 보장: flow/ 패키지 import를 위해 scripts/ 디렉터리 추가
+_scripts_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from flow.tmux_utils import (  # noqa: E402
+    get_current_window_name,
+    WINDOW_PREFIX_P as _WINDOW_PREFIX_P,
+    MAIN_WINDOW_DEFAULT,
+)
 
 # 폴링 설정
 _POLL_INTERVAL_SECONDS: float = 1.0
@@ -49,6 +64,27 @@ def _run_tmux(*args: str, capture_output: bool = True) -> subprocess.CompletedPr
     )
 
 
+def _tmux_window_target(window_name: str) -> str:
+    """tmux -t 옵션에 사용할 안전한 윈도우 타겟 문자열을 반환한다.
+
+    콜론(:)이 포함된 윈도우명(예: P:T-NNN)은 tmux가 '세션:윈도우'로 오해석하므로,
+    list-windows로 윈도우 인덱스를 조회하여 인덱스 기반 타겟을 반환한다.
+
+    Args:
+        window_name: 타겟으로 사용할 윈도우 이름
+
+    Returns:
+        tmux -t 옵션에 전달할 타겟 문자열 (윈도우 인덱스 또는 폴백으로 원본 이름)
+    """
+    result = _run_tmux("list-windows", "-F", "#{window_index}\t#{window_name}")
+    if result.returncode == 0:
+        for line in result.stdout.strip().splitlines():
+            parts = line.split("\t", 1)
+            if len(parts) == 2 and parts[1] == window_name:
+                return parts[0]
+    return window_name
+
+
 def _is_in_tmux() -> bool:
     """현재 프로세스가 tmux 세션 내에서 실행 중인지 확인한다.
 
@@ -61,20 +97,12 @@ def _is_in_tmux() -> bool:
 def _get_current_window_name() -> str:
     """현재 프로세스가 속한 tmux 윈도우 이름을 반환한다.
 
-    TMUX_PANE 환경변수를 사용하여 프로세스가 실제로 실행 중인 pane의
-    윈도우 이름을 조회한다. TMUX_PANE이 없으면 활성 윈도우 이름을 반환한다.
+    tmux_utils.get_current_window_name()에 위임한다.
 
     Returns:
         현재 윈도우 이름 문자열. 실패 시 빈 문자열.
     """
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if tmux_pane:
-        result = _run_tmux("display-message", "-t", tmux_pane, "-p", "#W")
-    else:
-        result = _run_tmux("display-message", "-p", "#W")
-    if result.returncode == 0:
-        return result.stdout.strip()
-    return ""
+    return get_current_window_name()
 
 
 def _window_exists(window_name: str) -> bool:
@@ -86,6 +114,7 @@ def _window_exists(window_name: str) -> bool:
     Returns:
         윈도우가 존재하면 True, 그렇지 않으면 False.
     """
+    # list-windows -F 는 정확한 이름 비교이므로 콜론 이슈 없음
     result = _run_tmux("list-windows", "-F", "#W")
     if result.returncode != 0:
         return False
@@ -96,17 +125,24 @@ def _window_exists(window_name: str) -> bool:
 def _create_window(window_name: str) -> bool:
     """새 tmux 윈도우를 생성하고 claude를 실행한다.
 
+    _WF_MAIN_WINDOW 환경변수에 메인 윈도우명을 전달한다.
+    tmux new-window 에 -e 옵션으로 환경변수를 직접 주입하여 셸 이스케이프 문제를 방지한다.
+
     Args:
-        window_name: 생성할 윈도우 이름
+        window_name: 생성할 윈도우 이름 (P:T-NNN 형식)
 
     Returns:
         성공 시 True, 실패 시 False.
     """
+    # tmux new-window -e 옵션으로 환경변수를 주입한다.
     result = _run_tmux(
         "new-window",
         "-d",
         "-n",
         window_name,
+        "-e",
+        f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
+        # WARNING: bash -lc 문자열에 변수를 직접 삽입하지 마시오 (셸 인젝션 위험)
         "bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'",
         capture_output=False,
     )
@@ -122,8 +158,9 @@ def _poll_for_prompt(window_name: str) -> bool:
     Returns:
         프롬프트가 감지되면 True, 타임아웃이면 False.
     """
+    target = _tmux_window_target(window_name)
     for _ in range(_POLL_MAX_RETRIES):
-        result = _run_tmux("capture-pane", "-t", window_name, "-p")
+        result = _run_tmux("capture-pane", "-t", target, "-p")
         if result.returncode == 0 and _PROMPT_PATTERN in result.stdout:
             return True
         time.sleep(_POLL_INTERVAL_SECONDS)
@@ -140,7 +177,8 @@ def _send_keys(window_name: str, command: str) -> bool:
     Returns:
         성공 시 True, 실패 시 False.
     """
-    result = _run_tmux("send-keys", "-t", window_name, command, "Enter", capture_output=False)
+    target = _tmux_window_target(window_name)
+    result = _run_tmux("send-keys", "-t", target, command, "Enter", capture_output=False)
     return result.returncode == 0
 
 
@@ -153,19 +191,41 @@ def _kill_window(window_name: str) -> bool:
     Returns:
         성공 시 True, 실패 시 False.
     """
-    result = _run_tmux("kill-window", "-t", window_name, capture_output=False)
+    target = _tmux_window_target(window_name)
+    result = _run_tmux("kill-window", "-t", target, capture_output=False)
+    return result.returncode == 0
+
+
+def _rename_current_window(new_name: str) -> bool:
+    """현재 프로세스가 속한 tmux 윈도우를 지정된 이름으로 리네임한다.
+
+    TMUX_PANE 환경변수를 사용하여 현재 pane의 윈도우를 리네임한다.
+
+    Args:
+        new_name: 새 윈도우 이름
+
+    Returns:
+        성공 시 True, 실패 시 False.
+    """
+    tmux_pane = os.environ.get("TMUX_PANE", "")
+    if tmux_pane:
+        result = _run_tmux("rename-window", "-t", tmux_pane, new_name, capture_output=False)
+    else:
+        result = _run_tmux("rename-window", new_name, capture_output=False)
     return result.returncode == 0
 
 
 def cmd_launch(ticket_id: str, command: str) -> int:
     """새 tmux 윈도우를 생성하고 명령을 전송한다.
 
+    윈도우명은 P:T-NNN 형식으로 생성되며, _WF_MAIN_WINDOW 환경변수에 메인 윈도우명을 전달한다.
+
     stdout 메시지로 결과를 전달한다:
       - "LAUNCH: ..." → 새 윈도우에서 실행 중
       - "INLINE: ..." → 인라인 실행 필요 (비tmux 또는 재진입)
 
     Args:
-        ticket_id: 윈도우 이름으로 사용할 티켓 ID (예: T-001)
+        ticket_id: 티켓 ID (예: T-001). 내부적으로 P:T-NNN 형식 윈도우명으로 변환됨
         command: tmux 윈도우에 전송할 명령 문자열
 
     Returns:
@@ -176,51 +236,57 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         print("INLINE: 비tmux 환경, 인라인 실행 필요")
         return 0
 
-    # 재진입 감지: 현재 윈도우가 T- 로 시작하면 인라인 실행 폴백 신호
+    # 재진입 감지: 현재 윈도우가 P:T- 로 시작하면 인라인 실행 폴백 신호
     current_window = _get_current_window_name()
-    if current_window.startswith("T-"):
+    if current_window.startswith(_WINDOW_PREFIX_P + "T-"):
         print(f"INLINE: 재진입 감지 (현재 윈도우: {current_window}), 인라인 실행 필요")
         return 0
 
-    window_already_exists = _window_exists(ticket_id)
+    # ticket_id(T-NNN)를 P:T-NNN 형식 윈도우명으로 변환
+    window_name = f"{_WINDOW_PREFIX_P}{ticket_id}"
+
+    window_already_exists = _window_exists(window_name)
 
     if not window_already_exists:
         # 새 윈도우 생성
-        if not _create_window(ticket_id):
-            print(f"[ERROR] {ticket_id} 윈도우 생성 실패", file=sys.stderr)
+        if not _create_window(window_name):
+            print(f"[ERROR] {window_name} 윈도우 생성 실패", file=sys.stderr)
             return 1
 
         # 프롬프트 감지 폴링
-        if not _poll_for_prompt(ticket_id):
+        if not _poll_for_prompt(window_name):
             # 타임아웃: 윈도우 kill 후 에러 반환
-            _kill_window(ticket_id)
+            _kill_window(window_name)
             print(
-                f"[ERROR] {ticket_id} 윈도우에서 {_POLL_MAX_RETRIES}초 내 프롬프트 미감지, 윈도우 종료",
+                f"[ERROR] {window_name} 윈도우에서 {_POLL_MAX_RETRIES}초 내 프롬프트 미감지, 윈도우 종료",
                 file=sys.stderr,
             )
             return 1
 
     # 명령 전송
-    if not _send_keys(ticket_id, command):
-        print(f"[ERROR] {ticket_id} 윈도우에 명령 전송 실패", file=sys.stderr)
+    if not _send_keys(window_name, command):
+        print(f"[ERROR] {window_name} 윈도우에 명령 전송 실패", file=sys.stderr)
         return 1
 
-    print(f"LAUNCH: {ticket_id} 윈도우에서 실행 중")
+    print(f"LAUNCH: {window_name} 윈도우에서 실행 중")
     return 0
 
 
 def cmd_cleanup(ticket_id: str) -> int:
     """tmux 윈도우를 종료한다. 윈도우가 없으면 멱등적으로 성공을 반환한다.
 
+    ticket_id(T-NNN)를 내부적으로 P:T-NNN 형식 윈도우명으로 변환한다.
+
     Args:
-        ticket_id: 종료할 윈도우 이름 (예: T-001)
+        ticket_id: 종료할 티켓 ID (예: T-001). 내부적으로 P:T-NNN 형식으로 변환됨
 
     Returns:
         exit code: 항상 0 (멱등성 보장)
     """
-    if _window_exists(ticket_id):
-        _kill_window(ticket_id)
-        print(f"{ticket_id} 윈도우 종료")
+    window_name = f"{_WINDOW_PREFIX_P}{ticket_id}"
+    if _window_exists(window_name):
+        _kill_window(window_name)
+        print(f"{window_name} 윈도우 종료")
     return 0
 
 

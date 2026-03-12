@@ -80,7 +80,6 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
 }
 
 _KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".kanban")
-_CURRENT_FILE: str = os.path.join(_KANBAN_DIR, ".current")
 
 
 # ─── XML 헬퍼 ────────────────────────────────────────────────────────────────
@@ -643,31 +642,6 @@ def _get_max_ticket_number() -> int:
     return max_num
 
 
-def _write_current(ticket_number: str) -> None:
-    """현재 활성 티켓 번호를 .kanban/.current 파일에 기록한다.
-
-    Args:
-        ticket_number: 기록할 티켓 번호 (T-NNN 형식).
-    """
-    try:
-        os.makedirs(_KANBAN_DIR, exist_ok=True)
-        with open(_CURRENT_FILE, "w", encoding="utf-8") as f:
-            f.write(ticket_number)
-    except OSError:
-        # .current 기록 실패는 치명적이지 않으므로 무시
-        pass
-
-
-def _remove_current() -> None:
-    """`.kanban/.current` 파일이 존재하면 삭제한다."""
-    try:
-        if os.path.isfile(_CURRENT_FILE):
-            os.remove(_CURRENT_FILE)
-    except OSError:
-        # .current 삭제 실패는 치명적이지 않으므로 무시
-        pass
-
-
 # ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
 
 
@@ -699,7 +673,6 @@ def cmd_create(title: str, command: str) -> None:
     except OSError as e:
         _err(f"티켓 파일 생성 실패: {e}")
 
-    _write_current(ticket_number)
     suffix = f" ({command})" if command else ""
     print(f"{ticket_number}: {title}{suffix}")
 
@@ -745,7 +718,6 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     # XML <status> 갱신
     _update_ticket_status(ticket_file, target_section)
 
-    _write_current(ticket_number)
     print(f"{ticket_number}: {current_section} → {target_section}")
 
 
@@ -785,7 +757,6 @@ def cmd_done(ticket_number: str) -> None:
         src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
         print(f"파일 이동: {src_rel} → .kanban/done/{dst_filename}")
 
-    _remove_current()
     print(f"{ticket_number}: {current_section} → Done")
 
 
@@ -809,7 +780,6 @@ def cmd_delete(ticket_number: str) -> None:
     except OSError as e:
         _err(f"티켓 파일 삭제 실패: {e}")
 
-    _remove_current()
     print(f"{ticket_number}: 삭제됨")
 
 
@@ -902,7 +872,6 @@ def cmd_add_subnumber(
         subnumber_data["result"] = result
 
     new_id = _add_subnumber(ticket_file, subnumber_data)
-    _write_current(ticket_number)
     print(f"{ticket_number}: subnumber id={new_id} 추가됨")
 
 
@@ -1009,10 +978,15 @@ def _build_parser() -> argparse.ArgumentParser:
     archive_sub_parser = subparsers.add_parser("archive-subnumber", help="active subnumber를 submit에서 history로 이동한다")
     archive_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
 
-    # update-title 서브커맨드
+    # update-title 서브커맨드 (update는 update-title의 alias)
     update_title_parser = subparsers.add_parser("update-title", help="티켓 제목을 갱신한다")
     update_title_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_title_parser.add_argument("title", help="새 제목")
+    update_title_parser.add_argument("title", nargs="?", default="", help="새 제목")
+    update_title_parser.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
+    update_alias = subparsers.add_parser("update", help="update-title의 alias")
+    update_alias.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    update_alias.add_argument("title", nargs="?", default="", help="새 제목")
+    update_alias.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
 
     # update-subnumber 서브커맨드
     update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 result 내부 필드를 갱신한다")
@@ -1085,11 +1059,14 @@ def main() -> None:
         else:
             _err(f"{ticket}: active subnumber가 없습니다")
 
-    elif args.subcommand == "update-title":
+    elif args.subcommand in ("update-title", "update"):
         ticket = _normalize_ticket_number(args.ticket)
         if ticket is None:
             _err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
-        cmd_update_title(ticket, args.title)
+        title = args.title or getattr(args, "title_flag", "") or ""
+        if not title:
+            _err("제목을 지정해야 합니다. 예: flow-kanban update-title T-001 \"새 제목\"", 2)
+        cmd_update_title(ticket, title)
 
     elif args.subcommand == "update-subnumber":
         ticket = _normalize_ticket_number(args.ticket)
