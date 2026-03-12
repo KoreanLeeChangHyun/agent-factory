@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """워크플로우 마무리 처리 스크립트 (flow-finish).
 
-오케스트레이터가 직접 호출하는 워크플로우 마무리 4단계 결정론적 스크립트.
+오케스트레이터가 직접 호출하는 워크플로우 마무리 5단계 결정론적 스크립트.
 
 사용법:
   flow-finish <registryKey> <status> [--workflow-id <id>]
@@ -11,11 +11,12 @@
   status        완료 | 실패
   --workflow-id WF-N 형식 (선택)
 
-4단계:
+5단계:
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
   4. 티켓 상태 갱신          (kanban.py move, ticket_number 있을 때만, 비차단)
+  5. tmux 윈도우 백그라운드 지연 kill (TMUX_PANE+T-* 조건 시만, 비차단)
 
 종료 코드:
   0  성공
@@ -460,7 +461,7 @@ def _build_result_update_args(abs_work_dir: str, rel_work_dir: str) -> list[str]
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 4단계를 순서대로 실행한다."""
+    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 5단계를 순서대로 실행한다."""
     parser = argparse.ArgumentParser(
         description="워크플로우 마무리 처리 (flow-finish 5단계)",
     )
@@ -578,6 +579,36 @@ def main() -> None:
                     ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
                     "Step 4b: ticket result paths update",
                 )
+
+    # ── Step 5: tmux 윈도우 백그라운드 지연 kill (비차단) ──
+    tmux_pane: str | None = os.environ.get("TMUX_PANE")
+    if tmux_pane:
+        try:
+            win_result = subprocess.run(
+                ["tmux", "display-message", "-t", tmux_pane, "-p", "#W"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            win_name: str = win_result.stdout.strip()
+            if win_name.startswith("T-"):
+                if abs_work_dir is not None:
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: tmux_cleanup win={win_name} pane={tmux_pane} delay=3s")
+                subprocess.Popen(
+                    ["bash", "-c", f"sleep 3 && tmux kill-window -t {win_name}"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            else:
+                if abs_work_dir is not None:
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: skip tmux_cleanup win={win_name!r} (not T-* prefix)")
+        except Exception as _e:
+            if abs_work_dir is not None:
+                _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP5: tmux_cleanup error={_e}")
+    else:
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "INFO", "FINALIZE_STEP5: skip tmux_cleanup (TMUX_PANE not set)")
 
     if status == "완료":
         status_label = f"{C_YELLOW}완료{C_RESET}"

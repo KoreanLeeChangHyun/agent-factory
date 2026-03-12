@@ -515,4 +515,4 @@ T-NNN 티켓이 삭제되었습니다.
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 접두사는 **`[WF -플래그]`** 형식을 사용합니다
 6. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
 7. **wf 스킬 직접 로드**: `-s` 플래그 실행 시 SlashCommand/Skill 도구가 아닌 Read 도구로 해당 스킬 파일을 직접 로드하여 실행합니다
-8. **독립 세션 실행**: `-s`와 `-c` 플래그는 `flow-tmux launch T-NNN '<command>'`로 새 윈도우 생성+폴링+명령전송을 위임합니다. stdout 접두사로 분기합니다: `LAUNCH:`=새 윈도우에서 실행 중, `INLINE:`=인라인 실행 필요(비tmux 환경 또는 재진입 감지), exit code 1=에러(타임아웃 등). 워크플로우 완료 시 `flow-tmux cleanup T-NNN`으로 해당 윈도우를 자동 종료합니다. 중복 윈도우 체크, 재진입 방지, 폴링 타임아웃 등 상세는 flow-tmux 내부에서 처리합니다
+8. **독립 세션 실행**: `-s`와 `-c` 플래그는 `flow-tmux launch T-NNN '<command>'`로 새 윈도우 생성+폴링+명령전송을 위임합니다. stdout 접두사로 분기합니다: `LAUNCH:`=새 윈도우에서 실행 중, `INLINE:`=인라인 실행 필요(비tmux 환경 또는 재진입 감지), exit code 1=에러(타임아웃 등). 워크플로우 완료 시 finalization.py Step 5(1차, 3초 지연)와 PostToolUse hook(2차, 5초 지연)가 이중으로 tmux 윈도우를 자동 종료합니다. nohup+sleep 지연으로 flow-claude end 배너 출력이 보장됩니다. 중복 윈도우 체크, 재진입 방지, 폴링 타임아웃 등 상세는 flow-tmux 내부에서 처리합니다
