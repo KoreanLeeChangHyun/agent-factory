@@ -602,7 +602,7 @@ body {
 .wf-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .wf-table thead {
@@ -624,6 +624,8 @@ body {
   user-select: none;
   text-align: left;
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
 
 .wf-table th:not(.wf-th-sortable) {
@@ -648,12 +650,18 @@ body {
   color: #569cd6;
 }
 
-/* Column widths via th */
-.wf-table th:nth-child(1) { width: 80px; }   /* command */
-.wf-table th:nth-child(2) { width: auto; }    /* task (remaining) */
-.wf-table th:nth-child(3) { width: 80px; }    /* step */
-.wf-table th:nth-child(4) { width: 160px; }   /* files */
-.wf-table th:nth-child(5) { width: 130px; }   /* updated_at */
+/* Column widths: STEP | COMMAND | TASK | QUERY..LOG (x7) | UPDATE */
+.wf-table th:nth-child(1)  { width: 70px;  min-width: 50px; }   /* STEP */
+.wf-table th:nth-child(2)  { width: 80px;  min-width: 60px; }   /* COMMAND */
+.wf-table th:nth-child(3)  { min-width: 120px; }                  /* TASK - auto */
+.wf-table th:nth-child(4)  { width: 48px;  min-width: 36px; }   /* QUERY */
+.wf-table th:nth-child(5)  { width: 48px;  min-width: 36px; }   /* PLAN */
+.wf-table th:nth-child(6)  { width: 48px;  min-width: 36px; }   /* WORK */
+.wf-table th:nth-child(7)  { width: 52px;  min-width: 36px; }   /* REPORT */
+.wf-table th:nth-child(8)  { width: 60px;  min-width: 36px; }   /* SUMMARY */
+.wf-table th:nth-child(9)  { width: 48px;  min-width: 36px; }   /* USAGE */
+.wf-table th:nth-child(10) { width: 44px;  min-width: 36px; }   /* LOG */
+.wf-table th:nth-child(11) { width: 130px; min-width: 90px; }   /* UPDATE */
 
 /* Table body scroll wrapper */
 .wf-table-wrap {
@@ -727,6 +735,44 @@ body {
 .wf-file-link:hover {
   background: rgba(86,156,214,0.35);
   color: #a0d0ff;
+}
+
+/* ── Workflow File Indicator Cells ── */
+.wf-row-file {
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.wf-file-indicator {
+  font-size: 10px;
+  color: #3c3c3c;
+  cursor: default;
+  display: inline-block;
+}
+
+.wf-file-indicator.active {
+  color: #7bb8e8;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.wf-file-indicator.active:hover {
+  color: #a0d0ff;
+}
+
+/* ── Column Resize Handle ── */
+.wf-col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.wf-col-resize-handle:hover {
+  background: rgba(86,156,214,0.4);
 }
 
 /* ── Result Links ── */

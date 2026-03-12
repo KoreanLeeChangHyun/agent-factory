@@ -4,253 +4,253 @@ description: "Comprehensive spreadsheet creation, editing, and analysis with sup
 license: Proprietary. LICENSE.txt has complete terms
 ---
 
-# Requirements for Outputs
+# 출력물 요구 사항
 
-## All Excel files
+## 모든 Excel 파일
 
-### Zero Formula Errors
-- Every Excel model MUST be delivered with ZERO formula errors (#REF!, #DIV/0!, #VALUE!, #N/A, #NAME?)
+### 수식 오류 제로
+- 모든 Excel 모델은 수식 오류 (#REF!, #DIV/0!, #VALUE!, #N/A, #NAME?) 없이 납품되어야 한다
 
-### Preserve Existing Templates (when updating templates)
-- Study and EXACTLY match existing format, style, and conventions when modifying files
-- Never impose standardized formatting on files with established patterns
-- Existing template conventions ALWAYS override these guidelines
+### 기존 템플릿 유지 (템플릿 업데이트 시)
+- 파일 수정 시 기존 형식, 스타일, 관례를 연구하고 정확히 일치시키기
+- 확립된 패턴이 있는 파일에 표준화된 서식 강요 금지
+- 기존 템플릿 관례는 항상 이 가이드라인보다 우선
 
-## Financial models
+## 재무 모델
 
-### Color Coding Standards
-Unless otherwise stated by the user or existing template
+### 색상 코딩 표준
+사용자나 기존 템플릿에서 별도로 명시하지 않는 경우
 
-#### Industry-Standard Color Conventions
-- **Blue text (RGB: 0,0,255)**: Hardcoded inputs, and numbers users will change for scenarios
-- **Black text (RGB: 0,0,0)**: ALL formulas and calculations
-- **Green text (RGB: 0,128,0)**: Links pulling from other worksheets within same workbook
-- **Red text (RGB: 255,0,0)**: External links to other files
-- **Yellow background (RGB: 255,255,0)**: Key assumptions needing attention or cells that need to be updated
+#### 업계 표준 색상 규칙
+- **파란색 텍스트 (RGB: 0,0,255)**: 하드코딩된 입력값 및 사용자가 시나리오에 따라 변경할 숫자
+- **검은색 텍스트 (RGB: 0,0,0)**: 모든 수식과 계산
+- **초록색 텍스트 (RGB: 0,128,0)**: 동일 워크북 내 다른 워크시트에서 가져오는 링크
+- **빨간색 텍스트 (RGB: 255,0,0)**: 다른 파일에 대한 외부 링크
+- **노란색 배경 (RGB: 255,255,0)**: 주의가 필요한 핵심 가정 또는 업데이트가 필요한 셀
 
-### Number Formatting Standards
+### 숫자 서식 표준
 
-#### Required Format Rules
-- **Years**: Format as text strings (e.g., "2024" not "2,024")
-- **Currency**: Use $#,##0 format; ALWAYS specify units in headers ("Revenue ($mm)")
-- **Zeros**: Use number formatting to make all zeros "-", including percentages (e.g., "$#,##0;($#,##0);-")
-- **Percentages**: Default to 0.0% format (one decimal)
-- **Multiples**: Format as 0.0x for valuation multiples (EV/EBITDA, P/E)
-- **Negative numbers**: Use parentheses (123) not minus -123
+#### 필수 서식 규칙
+- **연도**: 텍스트 문자열로 서식 지정 (예: "2024" - "2,024" 아님)
+- **통화**: $#,##0 형식 사용; 헤더에 단위 항상 명시 ("Revenue ($mm)")
+- **영(0)**: 숫자 서식으로 퍼센트 포함 모든 0을 "-"로 표시 (예: "$#,##0;($#,##0);-")
+- **퍼센트**: 기본값 0.0% 형식 (소수점 한 자리)
+- **배수**: 밸류에이션 배수 (EV/EBITDA, P/E)는 0.0x 형식
+- **음수**: 마이너스 기호 -123 대신 괄호 (123) 사용
 
-### Formula Construction Rules
+### 수식 작성 규칙
 
-#### Assumptions Placement
-- Place ALL assumptions (growth rates, margins, multiples, etc.) in separate assumption cells
-- Use cell references instead of hardcoded values in formulas
-- Example: Use =B5*(1+$B$6) instead of =B5*1.05
+#### 가정값 배치
+- 모든 가정값 (성장률, 마진, 배수 등)을 별도의 가정 셀에 배치
+- 수식에서 하드코딩된 값 대신 셀 참조 사용
+- 예시: =B5*1.05 대신 =B5*(1+$B$6) 사용
 
-#### Formula Error Prevention
-- Verify all cell references are correct
-- Check for off-by-one errors in ranges
-- Ensure consistent formulas across all projection periods
-- Test with edge cases (zero values, negative numbers)
-- Verify no unintended circular references
+#### 수식 오류 방지
+- 모든 셀 참조가 올바른지 확인
+- 범위에서 off-by-one 오류 확인
+- 모든 예측 기간에 걸쳐 일관된 수식 확보
+- 엣지 케이스 테스트 (영값, 음수, 매우 큰 값)
+- 의도하지 않은 순환 참조 없는지 확인
 
-#### Documentation Requirements for Hardcodes
-- Comment or in cells beside (if end of table). Format: "Source: [System/Document], [Date], [Specific Reference], [URL if applicable]"
-- Examples:
+#### 하드코딩 값에 대한 문서화 요구 사항
+- 셀 내 주석 또는 옆 셀에 기재 (표 끝인 경우). 형식: "Source: [시스템/문서], [날짜], [구체적 참조], [해당 시 URL]"
+- 예시:
   - "Source: Company 10-K, FY2024, Page 45, Revenue Note, [SEC EDGAR URL]"
   - "Source: Company 10-Q, Q2 2025, Exhibit 99.1, [SEC EDGAR URL]"
   - "Source: Bloomberg Terminal, 8/15/2025, AAPL US Equity"
   - "Source: FactSet, 8/20/2025, Consensus Estimates Screen"
 
-# XLSX creation, editing, and analysis
+# XLSX 생성, 편집 및 분석
 
-## Overview
+## 개요
 
-A user may ask you to create, edit, or analyze the contents of an .xlsx file. You have different tools and workflows available for different tasks.
+사용자가 .xlsx 파일의 생성, 편집 또는 내용 분석을 요청할 수 있다. 작업 종류에 따라 다양한 도구와 워크플로우를 사용할 수 있다.
 
-## Important Requirements
+## 중요 요구 사항
 
-**LibreOffice Required for Formula Recalculation**: You can assume LibreOffice is installed for recalculating formula values using the `recalc.py` script. The script automatically configures LibreOffice on first run
+**수식 재계산에 LibreOffice 필요**: `recalc.py` 스크립트를 사용하여 수식 값을 재계산하기 위해 LibreOffice가 설치되어 있다고 가정한다. 스크립트는 첫 실행 시 LibreOffice를 자동으로 구성한다
 
-## Reading and analyzing data
+## 데이터 읽기 및 분석
 
-### Data analysis with pandas
-For data analysis, visualization, and basic operations, use **pandas** which provides powerful data manipulation capabilities:
+### pandas를 사용한 데이터 분석
+데이터 분석, 시각화, 기본 작업에는 강력한 데이터 조작 기능을 제공하는 **pandas**를 사용한다:
 
 ```python
 import pandas as pd
 
-# Read Excel
+# Excel 읽기
 df = pd.read_excel('file.xlsx')  # Default: first sheet
 all_sheets = pd.read_excel('file.xlsx', sheet_name=None)  # All sheets as dict
 
-# Analyze
-df.head()      # Preview data
-df.info()      # Column info
-df.describe()  # Statistics
+# 분석
+df.head()      # 데이터 미리보기
+df.info()      # 열 정보
+df.describe()  # 통계
 
-# Write Excel
+# Excel 쓰기
 df.to_excel('output.xlsx', index=False)
 ```
 
-## Excel File Workflows
+## Excel 파일 워크플로우
 
-## CRITICAL: Use Formulas, Not Hardcoded Values
+## 중요: 하드코딩 값 대신 수식 사용
 
-**Always use Excel formulas instead of calculating values in Python and hardcoding them.** This ensures the spreadsheet remains dynamic and updateable.
+**Python에서 값을 계산하여 하드코딩하는 대신 항상 Excel 수식을 사용한다.** 이렇게 하면 스프레드시트가 동적으로 업데이트 가능한 상태를 유지한다.
 
-### ❌ WRONG - Hardcoding Calculated Values
+### ❌ 잘못된 방법 - 계산된 값 하드코딩
 ```python
-# Bad: Calculating in Python and hardcoding result
+# 잘못됨: Python에서 계산하고 결과를 하드코딩
 total = df['Sales'].sum()
 sheet['B10'] = total  # Hardcodes 5000
 
-# Bad: Computing growth rate in Python
+# 잘못됨: Python에서 성장률 계산
 growth = (df.iloc[-1]['Revenue'] - df.iloc[0]['Revenue']) / df.iloc[0]['Revenue']
 sheet['C5'] = growth  # Hardcodes 0.15
 
-# Bad: Python calculation for average
+# 잘못됨: 평균의 Python 계산
 avg = sum(values) / len(values)
 sheet['D20'] = avg  # Hardcodes 42.5
 ```
 
-### ✅ CORRECT - Using Excel Formulas
+### ✅ 올바른 방법 - Excel 수식 사용
 ```python
-# Good: Let Excel calculate the sum
+# 좋음: Excel이 합계를 계산하도록
 sheet['B10'] = '=SUM(B2:B9)'
 
-# Good: Growth rate as Excel formula
+# 좋음: Excel 수식으로 성장률
 sheet['C5'] = '=(C4-C2)/C2'
 
-# Good: Average using Excel function
+# 좋음: Excel 함수로 평균
 sheet['D20'] = '=AVERAGE(D2:D19)'
 ```
 
-This applies to ALL calculations - totals, percentages, ratios, differences, etc. The spreadsheet should be able to recalculate when source data changes.
+이는 합계, 퍼센트, 비율, 차이 등 모든 계산에 적용된다. 소스 데이터 변경 시 스프레드시트가 재계산될 수 있어야 한다.
 
-## Common Workflow
-1. **Choose tool**: pandas for data, openpyxl for formulas/formatting
-2. **Create/Load**: Create new workbook or load existing file
-3. **Modify**: Add/edit data, formulas, and formatting
-4. **Save**: Write to file
-5. **Recalculate formulas (MANDATORY IF USING FORMULAS)**: Use the recalc.py script
+## 일반 워크플로우
+1. **도구 선택**: 데이터용 pandas, 수식/서식용 openpyxl
+2. **생성/로드**: 새 워크북 생성 또는 기존 파일 로드
+3. **수정**: 데이터, 수식, 서식 추가/편집
+4. **저장**: 파일에 쓰기
+5. **수식 재계산 (수식 사용 시 필수)**: recalc.py 스크립트 사용
    ```bash
    python recalc.py output.xlsx
    ```
-6. **Verify and fix any errors**: 
-   - The script returns JSON with error details
-   - If `status` is `errors_found`, check `error_summary` for specific error types and locations
-   - Fix the identified errors and recalculate again
-   - Common errors to fix:
-     - `#REF!`: Invalid cell references
-     - `#DIV/0!`: Division by zero
-     - `#VALUE!`: Wrong data type in formula
-     - `#NAME?`: Unrecognized formula name
+6. **오류 확인 및 수정**:
+   - 스크립트가 오류 상세 정보가 담긴 JSON 반환
+   - `status`가 `errors_found`이면 `error_summary`에서 특정 오류 유형과 위치 확인
+   - 식별된 오류 수정 후 재계산
+   - 수정할 일반 오류:
+     - `#REF!`: 잘못된 셀 참조
+     - `#DIV/0!`: 0으로 나누기
+     - `#VALUE!`: 수식에 잘못된 데이터 유형
+     - `#NAME?`: 인식할 수 없는 수식명
 
-### Creating new Excel files
+### 새 Excel 파일 생성
 
 ```python
-# Using openpyxl for formulas and formatting
+# 수식 및 서식에 openpyxl 사용
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
 wb = Workbook()
 sheet = wb.active
 
-# Add data
+# 데이터 추가
 sheet['A1'] = 'Hello'
 sheet['B1'] = 'World'
 sheet.append(['Row', 'of', 'data'])
 
-# Add formula
+# 수식 추가
 sheet['B2'] = '=SUM(A1:A10)'
 
-# Formatting
+# 서식
 sheet['A1'].font = Font(bold=True, color='FF0000')
 sheet['A1'].fill = PatternFill('solid', start_color='FFFF00')
 sheet['A1'].alignment = Alignment(horizontal='center')
 
-# Column width
+# 열 너비
 sheet.column_dimensions['A'].width = 20
 
 wb.save('output.xlsx')
 ```
 
-### Editing existing Excel files
+### 기존 Excel 파일 편집
 
 ```python
-# Using openpyxl to preserve formulas and formatting
+# 수식과 서식을 유지하기 위해 openpyxl 사용
 from openpyxl import load_workbook
 
-# Load existing file
+# 기존 파일 로드
 wb = load_workbook('existing.xlsx')
 sheet = wb.active  # or wb['SheetName'] for specific sheet
 
-# Working with multiple sheets
+# 여러 시트 작업
 for sheet_name in wb.sheetnames:
     sheet = wb[sheet_name]
     print(f"Sheet: {sheet_name}")
 
-# Modify cells
+# 셀 수정
 sheet['A1'] = 'New Value'
-sheet.insert_rows(2)  # Insert row at position 2
-sheet.delete_cols(3)  # Delete column 3
+sheet.insert_rows(2)  # 2번 위치에 행 삽입
+sheet.delete_cols(3)  # 3번 열 삭제
 
-# Add new sheet
+# 새 시트 추가
 new_sheet = wb.create_sheet('NewSheet')
 new_sheet['A1'] = 'Data'
 
 wb.save('modified.xlsx')
 ```
 
-## Recalculating formulas
+## 수식 재계산
 
-Excel files created or modified by openpyxl contain formulas as strings but not calculated values. Use the provided `recalc.py` script to recalculate formulas:
+openpyxl로 생성하거나 수정한 Excel 파일에는 수식이 문자열로 포함되지만 계산된 값은 없다. 제공된 `recalc.py` 스크립트를 사용하여 수식을 재계산한다:
 
 ```bash
 python recalc.py <excel_file> [timeout_seconds]
 ```
 
-Example:
+예시:
 ```bash
 python recalc.py output.xlsx 30
 ```
 
-The script:
-- Automatically sets up LibreOffice macro on first run
-- Recalculates all formulas in all sheets
-- Scans ALL cells for Excel errors (#REF!, #DIV/0!, etc.)
-- Returns JSON with detailed error locations and counts
-- Works on both Linux and macOS
+스크립트 동작:
+- 첫 실행 시 LibreOffice 매크로 자동 설정
+- 모든 시트의 모든 수식 재계산
+- 모든 셀에서 Excel 오류 (#REF!, #DIV/0! 등) 스캔
+- 상세한 오류 위치와 수를 포함한 JSON 반환
+- Linux와 macOS 모두 지원
 
-## Formula Verification Checklist
+## 수식 검증 체크리스트
 
-Quick checks to ensure formulas work correctly:
+수식이 올바르게 작동하는지 확인하기 위한 빠른 점검:
 
-### Essential Verification
-- [ ] **Test 2-3 sample references**: Verify they pull correct values before building full model
-- [ ] **Column mapping**: Confirm Excel columns match (e.g., column 64 = BL, not BK)
-- [ ] **Row offset**: Remember Excel rows are 1-indexed (DataFrame row 5 = Excel row 6)
+### 필수 검증
+- [ ] **샘플 참조 2~3개 테스트**: 전체 모델 구축 전에 올바른 값을 가져오는지 확인
+- [ ] **열 매핑**: Excel 열이 일치하는지 확인 (예: 열 64 = BL, BK 아님)
+- [ ] **행 오프셋**: Excel 행은 1부터 인덱스 (DataFrame 행 5 = Excel 행 6)
 
-### Common Pitfalls
-- [ ] **NaN handling**: Check for null values with `pd.notna()`
-- [ ] **Far-right columns**: FY data often in columns 50+ 
-- [ ] **Multiple matches**: Search all occurrences, not just first
-- [ ] **Division by zero**: Check denominators before using `/` in formulas (#DIV/0!)
-- [ ] **Wrong references**: Verify all cell references point to intended cells (#REF!)
-- [ ] **Cross-sheet references**: Use correct format (Sheet1!A1) for linking sheets
+### 일반적인 함정
+- [ ] **NaN 처리**: `pd.notna()`로 null 값 확인
+- [ ] **오른쪽 끝 열**: FY 데이터가 50번 이상의 열에 있는 경우 많음
+- [ ] **여러 일치**: 첫 번째만이 아닌 모든 경우 검색
+- [ ] **0으로 나누기**: 수식에서 `/` 사용 전 분모 확인 (#DIV/0!)
+- [ ] **잘못된 참조**: 모든 셀 참조가 의도한 셀을 가리키는지 확인 (#REF!)
+- [ ] **시트 간 참조**: 시트 연결에 올바른 형식 사용 (Sheet1!A1)
 
-### Formula Testing Strategy
-- [ ] **Start small**: Test formulas on 2-3 cells before applying broadly
-- [ ] **Verify dependencies**: Check all cells referenced in formulas exist
-- [ ] **Test edge cases**: Include zero, negative, and very large values
+### 수식 테스트 전략
+- [ ] **작게 시작**: 광범위하게 적용하기 전에 2~3개 셀에서 수식 테스트
+- [ ] **의존성 확인**: 수식에서 참조하는 모든 셀이 존재하는지 확인
+- [ ] **엣지 케이스 테스트**: 영, 음수, 매우 큰 값 포함
 
-### Interpreting recalc.py Output
-The script returns JSON with error details:
+### recalc.py 출력 해석
+스크립트가 오류 상세 정보가 담긴 JSON 반환:
 ```json
 {
   "status": "success",           // or "errors_found"
-  "total_errors": 0,              // Total error count
-  "total_formulas": 42,           // Number of formulas in file
-  "error_summary": {              // Only present if errors found
+  "total_errors": 0,              // 총 오류 수
+  "total_formulas": 42,           // 파일의 수식 수
+  "error_summary": {              // 오류 발견 시에만 존재
     "#REF!": {
       "count": 2,
       "locations": ["Sheet1!B5", "Sheet1!C10"]
@@ -259,31 +259,31 @@ The script returns JSON with error details:
 }
 ```
 
-## Best Practices
+## 모범 사례
 
-### Library Selection
-- **pandas**: Best for data analysis, bulk operations, and simple data export
-- **openpyxl**: Best for complex formatting, formulas, and Excel-specific features
+### 라이브러리 선택
+- **pandas**: 데이터 분석, 대량 작업, 간단한 데이터 내보내기에 최적
+- **openpyxl**: 복잡한 서식, 수식, Excel 특화 기능에 최적
 
-### Working with openpyxl
-- Cell indices are 1-based (row=1, column=1 refers to cell A1)
-- Use `data_only=True` to read calculated values: `load_workbook('file.xlsx', data_only=True)`
-- **Warning**: If opened with `data_only=True` and saved, formulas are replaced with values and permanently lost
-- For large files: Use `read_only=True` for reading or `write_only=True` for writing
-- Formulas are preserved but not evaluated - use recalc.py to update values
+### openpyxl 사용 시
+- 셀 인덱스는 1부터 시작 (row=1, column=1은 셀 A1 참조)
+- 계산된 값 읽기에 `data_only=True` 사용: `load_workbook('file.xlsx', data_only=True)`
+- **경고**: `data_only=True`로 열고 저장하면 수식이 값으로 대체되어 영구 손실
+- 대용량 파일: 읽기에 `read_only=True`, 쓰기에 `write_only=True` 사용
+- 수식은 유지되지만 평가되지 않음 - 값 업데이트에 recalc.py 사용
 
-### Working with pandas
-- Specify data types to avoid inference issues: `pd.read_excel('file.xlsx', dtype={'id': str})`
-- For large files, read specific columns: `pd.read_excel('file.xlsx', usecols=['A', 'C', 'E'])`
-- Handle dates properly: `pd.read_excel('file.xlsx', parse_dates=['date_column'])`
+### pandas 사용 시
+- 추론 문제 방지를 위해 데이터 유형 지정: `pd.read_excel('file.xlsx', dtype={'id': str})`
+- 대용량 파일은 특정 열만 읽기: `pd.read_excel('file.xlsx', usecols=['A', 'C', 'E'])`
+- 날짜 올바르게 처리: `pd.read_excel('file.xlsx', parse_dates=['date_column'])`
 
-## Code Style Guidelines
-**IMPORTANT**: When generating Python code for Excel operations:
-- Write minimal, concise Python code without unnecessary comments
-- Avoid verbose variable names and redundant operations
-- Avoid unnecessary print statements
+## 코드 스타일 가이드라인
+**중요**: Excel 작업을 위한 Python 코드 생성 시:
+- 불필요한 주석 없이 최소한의 간결한 Python 코드 작성
+- 장황한 변수명과 불필요한 연산 피하기
+- 불필요한 print 문 피하기
 
-**For Excel files themselves**:
-- Add comments to cells with complex formulas or important assumptions
-- Document data sources for hardcoded values
-- Include notes for key calculations and model sections
+**Excel 파일 자체의 경우**:
+- 복잡한 수식이나 중요한 가정이 있는 셀에 주석 추가
+- 하드코딩된 값의 데이터 소스 문서화
+- 핵심 계산 및 모델 섹션에 대한 메모 포함

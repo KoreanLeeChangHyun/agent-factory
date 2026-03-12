@@ -13,7 +13,7 @@ maxTurns: 30
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
-이 에이전트는 서브에이전트이며 오케스트레이터가 Task 도구로 호출한다. 공통 제약: [common-constraints.md](common-constraints.md) 참조
+이 에이전트는 서브에이전트이며 오케스트레이터가 Task 도구로 호출한다. 공통 제약: [common-constraints.md](../docs/common-constraints.md) 참조
 
 ### 이 에이전트의 전담 행위
 

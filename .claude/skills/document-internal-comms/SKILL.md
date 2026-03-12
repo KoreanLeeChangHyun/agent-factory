@@ -4,29 +4,29 @@ description: A set of resources to help me write all kinds of internal communica
 license: Complete terms in LICENSE.txt
 ---
 
-## When to use this skill
-To write internal communications, use this skill for:
-- 3P updates (Progress, Plans, Problems)
-- Company newsletters
-- FAQ responses
-- Status reports
-- Leadership updates
-- Project updates
-- Incident reports
+## 이 스킬을 사용하는 시기
+내부 커뮤니케이션을 작성할 때, 다음 항목에 이 스킬을 사용한다:
+- 3P 업데이트 (Progress, Plans, Problems)
+- 회사 뉴스레터
+- FAQ 답변
+- 상태 보고서
+- 리더십 업데이트
+- 프로젝트 업데이트
+- 인시던트 보고서
 
-## How to use this skill
+## 이 스킬을 사용하는 방법
 
-To write any internal communication:
+내부 커뮤니케이션을 작성하려면:
 
-1. **Identify the communication type** from the request
-2. **Load the appropriate guideline file** from the `examples/` directory:
-    - `examples/3p-updates.md` - For Progress/Plans/Problems team updates
-    - `examples/company-newsletter.md` - For company-wide newsletters
-    - `examples/faq-answers.md` - For answering frequently asked questions
-    - `examples/general-comms.md` - For anything else that doesn't explicitly match one of the above
-3. **Follow the specific instructions** in that file for formatting, tone, and content gathering
+1. 요청에서 **커뮤니케이션 유형을 파악한다**
+2. `examples/` 디렉터리에서 **적절한 가이드라인 파일을 불러온다**:
+    - `examples/3p-updates.md` - 진행상황/계획/문제 팀 업데이트
+    - `examples/company-newsletter.md` - 전사 뉴스레터
+    - `examples/faq-answers.md` - 자주 묻는 질문 답변
+    - `examples/general-comms.md` - 위 항목에 명시적으로 해당하지 않는 그 외 모든 것
+3. 해당 파일의 **구체적인 지침을 따른다** (형식, 톤, 내용 수집)
 
-If the communication type doesn't match any existing guideline, use the AskUserQuestion tool to ask for clarification or more context about the desired format.
+커뮤니케이션 유형이 기존 가이드라인과 일치하지 않는 경우, AskUserQuestion 도구를 사용하여 원하는 형식에 대한 설명이나 추가 컨텍스트를 요청한다.
 
-## Keywords
+## 키워드
 3P updates, company newsletter, company comms, weekly update, faqs, common questions, updates, internal comms

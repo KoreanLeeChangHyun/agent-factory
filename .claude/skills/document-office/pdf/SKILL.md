@@ -4,13 +4,13 @@ description: Comprehensive PDF manipulation toolkit for extracting text and tabl
 license: Proprietary. LICENSE.txt has complete terms
 ---
 
-# PDF Processing Guide
+# PDF 처리 가이드
 
-## Overview
+## 개요
 
-This guide covers essential PDF processing operations using Python libraries and command-line tools. For advanced features, JavaScript libraries, and detailed examples, see reference.md. If you need to fill out a PDF form, read forms.md and follow its instructions.
+이 가이드는 Python 라이브러리와 커맨드라인 도구를 사용한 필수 PDF 처리 작업을 다룬다. 고급 기능, JavaScript 라이브러리, 상세 예제는 reference.md를 참조한다. PDF 양식을 작성해야 한다면 forms.md를 읽고 지침을 따른다.
 
-## Quick Start
+## 빠른 시작
 
 ```python
 from pypdf import PdfReader, PdfWriter
@@ -25,11 +25,11 @@ for page in reader.pages:
     text += page.extract_text()
 ```
 
-## Python Libraries
+## Python 라이브러리
 
-### pypdf - Basic Operations
+### pypdf - 기본 작업
 
-#### Merge PDFs
+#### PDF 병합
 ```python
 from pypdf import PdfWriter, PdfReader
 
@@ -43,7 +43,7 @@ with open("merged.pdf", "wb") as output:
     writer.write(output)
 ```
 
-#### Split PDF
+#### PDF 분할
 ```python
 reader = PdfReader("input.pdf")
 for i, page in enumerate(reader.pages):
@@ -53,7 +53,7 @@ for i, page in enumerate(reader.pages):
         writer.write(output)
 ```
 
-#### Extract Metadata
+#### 메타데이터 추출
 ```python
 reader = PdfReader("document.pdf")
 meta = reader.metadata
@@ -63,7 +63,7 @@ print(f"Subject: {meta.subject}")
 print(f"Creator: {meta.creator}")
 ```
 
-#### Rotate Pages
+#### 페이지 회전
 ```python
 reader = PdfReader("input.pdf")
 writer = PdfWriter()
@@ -76,9 +76,9 @@ with open("rotated.pdf", "wb") as output:
     writer.write(output)
 ```
 
-### pdfplumber - Text and Table Extraction
+### pdfplumber - 텍스트 및 표 추출
 
-#### Extract Text with Layout
+#### 레이아웃과 함께 텍스트 추출
 ```python
 import pdfplumber
 
@@ -88,7 +88,7 @@ with pdfplumber.open("document.pdf") as pdf:
         print(text)
 ```
 
-#### Extract Tables
+#### 표 추출
 ```python
 with pdfplumber.open("document.pdf") as pdf:
     for i, page in enumerate(pdf.pages):
@@ -99,7 +99,7 @@ with pdfplumber.open("document.pdf") as pdf:
                 print(row)
 ```
 
-#### Advanced Table Extraction
+#### 고급 표 추출
 ```python
 import pandas as pd
 
@@ -118,9 +118,9 @@ if all_tables:
     combined_df.to_excel("extracted_tables.xlsx", index=False)
 ```
 
-### reportlab - Create PDFs
+### reportlab - PDF 생성
 
-#### Basic PDF Creation
+#### 기본 PDF 생성
 ```python
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -139,7 +139,7 @@ c.line(100, height - 140, 400, height - 140)
 c.save()
 ```
 
-#### Create PDF with Multiple Pages
+#### 여러 페이지로 PDF 생성
 ```python
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
@@ -166,51 +166,51 @@ story.append(Paragraph("Content for page 2", styles['Normal']))
 doc.build(story)
 ```
 
-## Command-Line Tools
+## 커맨드라인 도구
 
 ### pdftotext (poppler-utils)
 ```bash
-# Extract text
+# 텍스트 추출
 pdftotext input.pdf output.txt
 
-# Extract text preserving layout
+# 레이아웃을 보존하며 텍스트 추출
 pdftotext -layout input.pdf output.txt
 
-# Extract specific pages
-pdftotext -f 1 -l 5 input.pdf output.txt  # Pages 1-5
+# 특정 페이지 추출
+pdftotext -f 1 -l 5 input.pdf output.txt  # 1-5페이지
 ```
 
 ### qpdf
 ```bash
-# Merge PDFs
+# PDF 병합
 qpdf --empty --pages file1.pdf file2.pdf -- merged.pdf
 
-# Split pages
+# 페이지 분할
 qpdf input.pdf --pages . 1-5 -- pages1-5.pdf
 qpdf input.pdf --pages . 6-10 -- pages6-10.pdf
 
-# Rotate pages
-qpdf input.pdf output.pdf --rotate=+90:1  # Rotate page 1 by 90 degrees
+# 페이지 회전
+qpdf input.pdf output.pdf --rotate=+90:1  # 1페이지를 90도 회전
 
-# Remove password
+# 비밀번호 제거
 qpdf --password=mypassword --decrypt encrypted.pdf decrypted.pdf
 ```
 
-### pdftk (if available)
+### pdftk (사용 가능한 경우)
 ```bash
-# Merge
+# 병합
 pdftk file1.pdf file2.pdf cat output merged.pdf
 
-# Split
+# 분할
 pdftk input.pdf burst
 
-# Rotate
+# 회전
 pdftk input.pdf rotate 1east output rotated.pdf
 ```
 
-## Common Tasks
+## 일반 작업
 
-### Extract Text from Scanned PDFs
+### 스캔된 PDF에서 텍스트 추출
 ```python
 # Requires: pip install pytesseract pdf2image
 import pytesseract
@@ -229,7 +229,7 @@ for i, image in enumerate(images):
 print(text)
 ```
 
-### Add Watermark
+### 워터마크 추가
 ```python
 from pypdf import PdfReader, PdfWriter
 
@@ -248,15 +248,15 @@ with open("watermarked.pdf", "wb") as output:
     writer.write(output)
 ```
 
-### Extract Images
+### 이미지 추출
 ```bash
-# Using pdfimages (poppler-utils)
+# pdfimages 사용 (poppler-utils)
 pdfimages -j input.pdf output_prefix
 
-# This extracts all images as output_prefix-000.jpg, output_prefix-001.jpg, etc.
+# output_prefix-000.jpg, output_prefix-001.jpg 등으로 모든 이미지를 추출한다
 ```
 
-### Password Protection
+### 비밀번호 보호
 ```python
 from pypdf import PdfReader, PdfWriter
 
@@ -266,29 +266,29 @@ writer = PdfWriter()
 for page in reader.pages:
     writer.add_page(page)
 
-# Add password
+# 비밀번호 추가
 writer.encrypt("userpassword", "ownerpassword")
 
 with open("encrypted.pdf", "wb") as output:
     writer.write(output)
 ```
 
-## Quick Reference
+## 빠른 참조
 
-| Task | Best Tool | Command/Code |
+| 작업 | 최적 도구 | 명령어/코드 |
 |------|-----------|--------------|
-| Merge PDFs | pypdf | `writer.add_page(page)` |
-| Split PDFs | pypdf | One page per file |
-| Extract text | pdfplumber | `page.extract_text()` |
-| Extract tables | pdfplumber | `page.extract_tables()` |
-| Create PDFs | reportlab | Canvas or Platypus |
-| Command line merge | qpdf | `qpdf --empty --pages ...` |
-| OCR scanned PDFs | pytesseract | Convert to image first |
-| Fill PDF forms | pdf-lib or pypdf (see forms.md) | See forms.md |
+| PDF 병합 | pypdf | `writer.add_page(page)` |
+| PDF 분할 | pypdf | 파일당 한 페이지 |
+| 텍스트 추출 | pdfplumber | `page.extract_text()` |
+| 표 추출 | pdfplumber | `page.extract_tables()` |
+| PDF 생성 | reportlab | Canvas 또는 Platypus |
+| 커맨드라인 병합 | qpdf | `qpdf --empty --pages ...` |
+| 스캔된 PDF OCR | pytesseract | 먼저 이미지로 변환 |
+| PDF 양식 작성 | pdf-lib 또는 pypdf (forms.md 참조) | forms.md 참조 |
 
-## Next Steps
+## 다음 단계
 
-- For advanced pypdfium2 usage, see reference.md
-- For JavaScript libraries (pdf-lib), see reference.md
-- If you need to fill out a PDF form, follow the instructions in forms.md
-- For troubleshooting guides, see reference.md
+- 고급 pypdfium2 사용법은 reference.md를 참조한다
+- JavaScript 라이브러리(pdf-lib)는 reference.md를 참조한다
+- PDF 양식을 작성해야 한다면 forms.md의 지침을 따른다
+- 문제 해결 가이드는 reference.md를 참조한다

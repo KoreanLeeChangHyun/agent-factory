@@ -101,7 +101,8 @@
     return fetch(dirUrl).then(function (res) {
       if (!res.ok) return [];
       return res.text().then(function (html) {
-        return parseDirLinks(html).files.filter(function (f) { return f.endsWith(".xml"); });
+        // 경로 탈출 방지: ../ 포함 항목과 / 시작 항목 제거
+        return parseDirLinks(html).files.filter(function (f) { return f.endsWith(".xml") && !f.includes("../") && !f.startsWith("/"); });
       });
     }).catch(function () { return []; });
   }
@@ -447,14 +448,14 @@
   var WORKFLOWS = [];
 
 
-  // Files to show as links in workflow cards
+  // Files to show as indicators in workflow table columns
   var WF_FILES = [
-    { key: "query", file: "user_prompt.txt", label: "query" },
-    { key: "plan", file: "plan.md", label: "plan" },
-    { key: "report", file: "report.md", label: "report" },
-    { key: "summary", file: "summary.txt", label: "summary" },
-    { key: "log", file: "workflow.log", label: "log" },
-    { key: "usage", file: "usage.json", label: "usage" },
+    { key: "query",   file: "user_prompt.txt", label: "query" },
+    { key: "plan",    file: "plan.md",          label: "plan" },
+    { key: "report",  file: "report.md",        label: "report" },
+    { key: "summary", file: "summary.txt",      label: "summary" },
+    { key: "usage",   file: "usage.json",       label: "usage" },
+    { key: "log",     file: "workflow.log",     label: "log" },
   ];
 
   function parseDirLinks(html) {
@@ -521,24 +522,20 @@
                 return fetch(basePath).then(function (r) { return r.text(); }).then(function (listing) {
                   var parsed = parseDirLinks(listing);
                   var fileNames = parsed.files.map(function (f) { return lastSegment(f); });
-                  var availableFiles = [];
                   var hasWork = parsed.dirs.some(function (d) { return lastSegment(d) === "work"; });
+                  var fileMap = {};
                   WF_FILES.forEach(function (wf) {
-                    if (fileNames.indexOf(wf.file) !== -1) {
-                      availableFiles.push({ label: wf.label, url: basePath + wf.file });
-                    }
-                    // Insert work after plan
-                    if (wf.key === "plan" && hasWork) {
-                      availableFiles.push({ label: "work", url: basePath + "work/", isDir: true });
-                    }
+                    var exists = fileNames.indexOf(wf.file) !== -1;
+                    fileMap[wf.key] = { exists: exists, url: exists ? basePath + wf.file : "" };
                   });
+                  fileMap.work = { exists: hasWork, url: hasWork ? basePath + "work/" : "", isDir: true };
                   return {
                     entry: entry, task: task, command: cmd, basePath: basePath,
                     step: status.step || "NONE",
                     created_at: status.created_at || "",
                     updated_at: status.updated_at || "",
                     transitions: status.transitions || [],
-                    files: availableFiles,
+                    fileMap: fileMap,
                   };
                 });
               }).catch(function () { return null; });
@@ -700,7 +697,7 @@
     if (wfLoading) {
       var tr = document.createElement("tr");
       var td = document.createElement("td");
-      td.setAttribute("colspan", "5");
+      td.setAttribute("colspan", "11");
       td.className = "empty";
       td.textContent = "Loading...";
       tr.appendChild(td);
@@ -708,7 +705,7 @@
     } else if (hasMore) {
       var str = document.createElement("tr");
       var std = document.createElement("td");
-      std.setAttribute("colspan", "5");
+      std.setAttribute("colspan", "11");
       std.className = "wf-load-more";
       std.id = "wf-sentinel";
       std.textContent = "Scroll for more";
@@ -725,11 +722,12 @@
   }
 
   function bindWfFileLinks(container) {
-    container.querySelectorAll(".wf-file-link:not([data-bound])").forEach(function (link) {
+    container.querySelectorAll(".wf-file-indicator.active:not([data-bound])").forEach(function (link) {
       link.setAttribute("data-bound", "1");
       link.addEventListener("click", function (e) {
         e.stopPropagation();
-        openWfFile(link.dataset.label, link.dataset.url);
+        var isDir = link.dataset.isdir === "true";
+        openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
     });
   }
@@ -760,11 +758,17 @@
     // Table
     var sortedFiltered = sortWorkflows(filtered);
     var cols = [
-      { key: "command", label: "Command" },
-      { key: "task",    label: "Task" },
-      { key: "step",    label: "Step" },
-      { key: "files",   label: "Files",       nosort: true },
-      { key: "updated_at", label: "Updated" },
+      { key: "step",       label: "상태" },
+      { key: "command",    label: "명령" },
+      { key: "task",       label: "제목" },
+      { key: "query",      label: "질의",   nosort: true },
+      { key: "plan",       label: "계획",    nosort: true },
+      { key: "work",       label: "작업",    nosort: true },
+      { key: "report",     label: "보고",  nosort: true },
+      { key: "summary",    label: "요약", nosort: true },
+      { key: "usage",      label: "사용",   nosort: true },
+      { key: "log",        label: "로그",     nosort: true },
+      { key: "updated_at", label: "일시" },
     ];
 
     h += '<div class="wf-table-wrap"><table class="wf-table">';
@@ -789,7 +793,7 @@
     if (sortedFiltered.length > 0) {
       sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
     } else if (!wfLoading) {
-      h += '<tr><td colspan="5" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
+      h += '<tr><td colspan="11" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
     }
     h += '</tbody></table></div></div>';
 
@@ -820,6 +824,7 @@
 
     bindWfFileLinks(el);
     attachWfSentinel();
+    bindWfColResize(el);
   }
 
   function renderWfFileView(wfFile) {
@@ -891,30 +896,82 @@
     });
   }
 
+  var WF_FILE_COLS = ["query", "plan", "work", "report", "summary", "usage", "log"];
+
   function renderWfCard(w) {
     var h = '<tr class="wf-row">';
-    // command cell
-    h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';
-    // task cell
-    h += '<td class="wf-row-title">' + esc(w.task) + '</td>';
     // step cell
     var stepIsDone = (w.step || "").toUpperCase() === "DONE";
     var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
     var stepText = esc(w.step || "NONE");
     var stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + '</span>';
     h += '<td class="wf-row-step">' + stepBadge + '</td>';
-    // files cell
-    h += '<td class="wf-row-files">';
-    if (w.files && w.files.length > 0) {
-      w.files.forEach(function (f) {
-        h += '<span class="wf-file-link" data-label="' + esc(w.task + ' / ' + f.label) + '" data-url="' + esc(f.url) + '">' + esc(f.label) + '</span>';
-      });
-    }
-    h += '</td>';
+    // command cell
+    h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';
+    // task cell
+    h += '<td class="wf-row-title">' + esc(w.task) + '</td>';
+    // file indicator cells (query, plan, work, report, summary, usage, log)
+    WF_FILE_COLS.forEach(function (key) {
+      var info = w.fileMap && w.fileMap[key];
+      if (info && info.exists) {
+        var isDir = info.isDir ? ' data-isdir="true"' : '';
+        h += '<td class="wf-row-file"><span class="wf-file-indicator active" data-label="' + esc(w.task + ' / ' + key) + '" data-url="' + esc(info.url) + '"' + isDir + '>&#9679;</span></td>';
+      } else {
+        h += '<td class="wf-row-file"><span class="wf-file-indicator">&#9675;</span></td>';
+      }
+    });
     // updated_at cell
     h += '<td class="wf-row-time">' + esc(w.updated_at.substring(0, 16)) + '</td>';
     h += '</tr>';
     return h;
+  }
+
+  // ── Workflow Column Resize ──
+  function bindWfColResize(container) {
+    var table = container.querySelector(".wf-table");
+    if (!table) return;
+    var ths = table.querySelectorAll("thead th");
+    ths.forEach(function (th, idx) {
+      // Skip last column (no right handle needed on last)
+      if (idx === ths.length - 1) return;
+      var handle = th.querySelector(".wf-col-resize-handle");
+      if (handle) return; // already bound
+      handle = document.createElement("div");
+      handle.className = "wf-col-resize-handle";
+      th.appendChild(handle);
+
+      var startX, startWidth, nextStartWidth, nextTh;
+
+      handle.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        startX = e.clientX;
+        startWidth = th.offsetWidth;
+        nextTh = ths[idx + 1];
+        nextStartWidth = nextTh ? nextTh.offsetWidth : 0;
+
+        // Fix all column widths before dragging
+        ths.forEach(function (t) { t.style.width = t.offsetWidth + "px"; });
+
+        function onMove(ev) {
+          var dx = ev.clientX - startX;
+          var newWidth = Math.max(30, startWidth + dx);
+          th.style.width = newWidth + "px";
+          if (nextTh) {
+            var newNext = Math.max(30, nextStartWidth - dx);
+            nextTh.style.width = newNext + "px";
+          }
+        }
+
+        function onUp() {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        }
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
   }
 
   // ── Dashboard ──
@@ -1466,7 +1523,7 @@
   var prevTicketJson = "";
   var prevWfJson = "";
   var ticketTimerId = null;
-  var wfTimerId = null;
+  var workflowTimerId = null;
 
   function ticketJson(tickets) {
     return JSON.stringify(tickets.map(function (t) {
@@ -1497,6 +1554,13 @@
         return;
       }
       ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
+    }).catch(function () {
+      // 네트워크 오류 시에도 폴링을 재예약한다
+      if (document.hidden) {
+        ticketTimerId = null;
+        return;
+      }
+      ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
     });
   }
 
@@ -1513,10 +1577,17 @@
       }
       // 탭이 비활성 상태이면 폴링을 중단하고 visibilitychange에서 재개한다
       if (document.hidden) {
-        wfTimerId = null;
+        workflowTimerId = null;
         return;
       }
-      wfTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
+      workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
+    }).catch(function () {
+      // 네트워크 오류 시에도 폴링을 재예약한다
+      if (document.hidden) {
+        workflowTimerId = null;
+        return;
+      }
+      workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
     });
   }
 
@@ -1545,7 +1616,7 @@
     wfEntryHrefs = hrefs;
     prevWfJson = JSON.stringify(hrefs);
     loadMoreWorkflows();
-    wfTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
+    workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
   });
 
   // 탭 활성화 복귀 시 중단된 폴링을 즉시 재시작한다
@@ -1554,7 +1625,7 @@
       if (!ticketTimerId) {
         pollTickets();
       }
-      if (!wfTimerId) {
+      if (!workflowTimerId) {
         pollWorkflows();
       }
     }
