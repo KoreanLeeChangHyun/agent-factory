@@ -1,6 +1,6 @@
 ---
 name: workflow-wf-prompt
-description: "Workflow command skill for wf -p. Free-form conversational prompt co-authoring mode. Collaboratively writes and refines prompts through natural dialogue."
+description: "Workflow command skill for wf -o. Free-form conversational prompt co-authoring mode. Collaboratively writes and refines prompts through natural dialogue."
 disable-model-invocation: true
 skills:
   - research-prompt-engineering
@@ -12,8 +12,10 @@ skills:
 
 티켓 파일은 XML 구조를 사용합니다:
 - 루트 요소: `<ticket>`
-- 티켓 메타정보: `<number>`, `<datetime>`, `<status>`, `<current>`, `<title>`
-- 작업 단위: `<subnumber id="N">` (현재 활성 subnumber는 `<current>` 요소 값으로 결정)
+- `<metadata>` 래퍼: `<number>`, `<title>`, `<datetime>`, `<status>`, `<current>` (현재 활성 subnumber는 `<current>` 값으로 결정)
+- `<submit>` 래퍼: active subnumber 목록
+- `<history>` 래퍼: 비활성(이전 사이클) subnumber 목록
+- 작업 단위: `<subnumber id="N">` (직하에 `<command>` 태그, `<prompt>` 래퍼 내에 goal/target/constraints/criteria/context)
 
 상세 실행 절차는 `.claude/commands/wf.md`를 참조한다.
 
@@ -35,8 +37,9 @@ skills:
 
 ### XML 티켓 처리 규칙
 
-- `<command>` 태그는 `<subnumber id="N">` 내부에 위치. 잠금 판정은 XML `<status>` 요소(`Open`/`In Progress`/`Review`)로 판별
-- 사용자 입력 갱신은 현재 활성 subnumber(`<current>` 값) 내부 자식 요소를 대상으로 함
+- `<command>` 태그는 `<subnumber id="N">` 직하(자식)에 위치. `<prompt>` 래퍼 밖에 배치됨. 잠금 판정은 XML `<status>` 요소(`Open`/`In Progress`/`Review`)로 판별
+- `<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>` 태그는 subnumber 내부의 `<prompt>` 래퍼 안에 위치
+- 사용자 입력 갱신은 현재 활성 subnumber(`<current>` 값) 내부의 `<prompt>` 래퍼 자식 요소를 대상으로 함
 - 기존 티켓 편집 시 원시 XML 대신 읽기 쉬운 구조화 형식으로 출력
 
 ### 웹검색/코드탐색 자율 수행

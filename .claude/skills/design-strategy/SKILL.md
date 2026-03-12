@@ -16,7 +16,7 @@ license: "Apache-2.0"
 - **목표 정의**: 최종 목표(End Goal)를 명확화하고, 측정 가능한 마일스톤과 완료 기준(Definition of Done)을 설정
 - **워크플로우 분해**: 마일스톤별 워크플로우를 식별하고, 워크플로우 간 종속성을 분석하여 실행 순서를 결정
 - **로드맵 생성**: 우선순위, 종속성, 리스크를 종합하여 `roadmap.md`를 최종 산출
-- **.kanban/board.html 갱신**: roadmap.md 생성 직후 `.kanban/board.html` 파일을 자동 갱신하여 마일스톤별 실행 상태를 추적하고, 각 워크플로우에 대한 T-NNN.xml 티켓을 자동 생성
+- **T-NNN.xml 티켓 자동 생성**: roadmap.md 생성 직후 각 워크플로우에 대한 `.kanban/T-NNN.xml` 티켓 파일을 자동 생성하여 마일스톤별 실행 상태를 추적
 
 ## 복잡도 산정 가이드
 
@@ -194,76 +194,55 @@ flowchart TD
 - **리스크**: 최소 1개 이상 식별. 기술적 리스크와 일정 리스크를 구분
 - **일정**: 병렬 실행 가능 워크플로우를 명시하여 총 소요 시간 최적화
 
-## .kanban/board.html 갱신 절차
+## T-NNN.xml 티켓 자동 생성 절차
 
-roadmap.md 생성 직후 `.kanban/board.html` 파일을 자동 갱신한다. 템플릿은 `templates/kanbanboard.md`를 사용한다.
+roadmap.md 생성 직후 각 워크플로우에 대한 `.kanban/T-NNN.xml` 티켓 파일을 자동 생성한다. 로드맵 진행 상태는 XML 티켓 파일을 직접 스캔하여 관리한다.
 
 ### SSOT 원칙
 
 | 파일 | 역할 | 소유 데이터 |
 |------|------|------------|
 | roadmap.md | 계획 정보의 단일 진실 소스 | 마일스톤 ID/명/DoD, 워크플로우 체인 정의, 종속성, 일정 |
-| .kanban/board.html | 실행 상태 전용 | 컬럼 배치(Open/In Progress/Done), 워크플로우 체크 상태, 완료일 |
-| .kanban/T-NNN.xml | 워크플로우별 티켓 | 워크플로우 명령어, 목표, 대상, 제약사항, 완료 기준 |
+| .kanban/T-NNN.xml | 워크플로우별 티켓 | 워크플로우 명령어, 목표, 대상, 제약사항, 완료 기준, 실행 상태 |
 
-- roadmap.md의 마일스톤 ID/명/DoD를 **그대로 복제**하여 `.kanban/board.html` 카드에 기록한다
-- 워크플로우 체인 테이블의 ID/명/명령어를 **마일스톤별로 그룹핑**하여 각 마일스톤 카드의 워크플로우 목록에 기록한다
-- `.kanban/board.html`는 roadmap.md에 없는 마일스톤이나 워크플로우를 독자적으로 추가하지 않는다
-- 계획 변경이 필요하면 roadmap.md를 먼저 수정하고, `.kanban/board.html`를 재생성 또는 갱신한다
+- roadmap.md의 마일스톤 ID/명/DoD를 기반으로 워크플로우별 티켓을 생성한다
+- 실행 상태 추적은 `.kanban/` 디렉터리의 XML 파일을 직접 스캔하여 수행한다
+- 계획 변경이 필요하면 roadmap.md를 먼저 수정하고, 해당 워크플로우의 티켓을 재생성한다
 
 ### 생성 절차
 
 1. **roadmap.md 파싱**: 생성된 roadmap.md에서 다음 데이터를 추출한다
-   - H1 제목에서 프로젝트명 추출 → `{{project}}`
+   - H1 제목에서 프로젝트명 추출
    - `## 마일스톤` 섹션에서 각 마일스톤의 ID, 명칭, 완료 기준(DoD) 추출
    - `## 워크플로우 체인` 테이블에서 각 워크플로우의 ID, 명칭, 명령어, 소속 마일스톤 추출
 
-2. **마일스톤별 워크플로우 그룹핑**: 워크플로우 체인 테이블의 `마일스톤` 컬럼을 기준으로 워크플로우를 마일스톤별로 그룹핑한다
-   - 예: MS-1에 속한 WF-1, WF-2를 MS-1 카드의 워크플로우 목록으로 구성
+2. **채번**: `.kanban/` 디렉터리의 XML 파일을 스캔하여 기존 최대 티켓 번호(T-NNN) + 1로 자동 채번한다 (중복 방지)
 
-3. **마일스톤 카드 생성**: 각 마일스톤에 대해 카드 블록을 생성한다
+3. **T-NNN.xml 티켓 생성**: 워크플로우 체인 테이블의 각 워크플로우에 대해 표준 XML 티켓 형식으로 생성한다:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <ticket>
+     <!-- metadata -->
+     <metadata>
+       <number>T-NNN</number>
+       <title>{{wf_name}}</title>
+       <datetime>YYYY-MM-DD HH:MM:SS</datetime>
+       <status>Open</status>
+       <current>0</current>
+     </metadata>
+
+     <!-- submit -->
+     <submit />
+
+     <!-- history -->
+     <history />
+   </ticket>
    ```
-   ### {{ms_id}}: {{ms_name}}
-   <!-- ms_id는 MS-N 형식 (예: MS-1, MS-2) -->
-   - **ID**: {{ms_id}}
-   - **완료 기준 (DoD)**:
-     - [ ] {{dod_item_1}}
-     - [ ] {{dod_item_2}}
-   - **워크플로우**:
-     - [ ] {{wf_id}}: {{wf_name}} ({{wf_command}})
-   - **상태**: 0/{{wf_total}} 완료
-   ```
-
-4. **템플릿 치환**: `templates/kanbanboard.md` 템플릿의 placeholder를 치환한다
-   - `{{project}}` → 추출한 프로젝트명
-   - `{{roadmap_path}}` → roadmap.md의 상대 경로
-   - `{{created_date}}`, `{{updated_date}}` → 현재 날짜 (YYYY-MM-DD)
-   - `{{planned_cards}}` → 생성된 모든 마일스톤 카드 블록 (초기에는 전부 Planned)
-   - `{{in_progress_cards}}`, `{{done_cards}}` → 빈 값 (초기 생성 시)
-
-5. **board.html 갱신**: 치환 완료된 내용을 `.kanban/board.html` 파일에 저장한다
-
-6. **T-NNN.xml 티켓 자동 생성**: 각 워크플로우에 대한 티켓 파일을 `.kanban/` 디렉토리에 자동 생성한다
-   - `.kanban/board.html`를 파싱하여 기존 최대 티켓 번호(T-NNN) + 1로 채번 (중복 방지)
-   - 워크플로우 체인 테이블의 각 워크플로우에 대해 YAML frontmatter + XML 태그 본문 형식으로 생성:
-     ```
-     ---
-     id: T-NNN
-     title: {{wf_name}}
-     status: open
-     created: YYYY-MM-DD
-     ---
-     <command>{{wf_command}}</command>
-     <goal>{{wf_goal}}</goal>
-     <target>{{wf_target}}</target>
-     <constraints></constraints>
-     <criteria>{{wf_dod}}</criteria>
-     ```
-   - `<goal>`, `<target>`, `<criteria>`는 roadmap.md의 해당 워크플로우 정보에서 추출하여 채움
+   - `<goal>`, `<target>`, `<criteria>`는 roadmap.md의 해당 워크플로우 정보에서 추출하여 `flow-kanban add-subnumber`로 추가한다
 
 ## Judge 모드 상세
 
-strategy 재호출 시(`.kanban/board.html` 존재) 실행되는 Judge 모드의 상세 로직을 기술한다.
+strategy 재호출 시(`.kanban/` 디렉터리에 XML 티켓 존재) 실행되는 Judge 모드의 상세 로직을 기술한다.
 
 ### roadmap.md 갱신 로직
 
@@ -273,10 +252,10 @@ strategy 재호출 시(`.kanban/board.html` 존재) 실행되는 Judge 모드의
 
 **갱신 절차**:
 
-1. `.kanban/board.html`의 Done 컬럼에 위치한 마일스톤 ID를 수집한다
+1. `.kanban/` 디렉터리의 XML 파일을 스캔하여 Done 상태인 티켓을 수집하고, 해당 마일스톤의 완료 여부를 판단한다
 2. roadmap.md의 해당 마일스톤 항목에 다음 필드를 추가/갱신한다:
    - `- **상태**: 완료` (신규 추가)
-   - `- **완료일**: YYYY-MM-DD` (신규 추가, `.kanban/board.html`의 완료일 사용)
+   - `- **완료일**: YYYY-MM-DD` (신규 추가, XML 파일의 완료일 사용)
 3. 워크플로우 체인 테이블에서 해당 마일스톤 소속 워크플로우의 상태를 확인할 수 있도록 비고를 추가한다
 
 **예시**:
@@ -290,40 +269,32 @@ strategy 재호출 시(`.kanban/board.html` 존재) 실행되는 Judge 모드의
 - **완료일**: 2026-02-20
 ```
 
-### .kanban/board.html 갱신 로직
+### 마일스톤 상태 판단 로직
 
-Judge 모드 실행 시 `.kanban/board.html`의 상태를 최신화한다.
+Judge 모드 실행 시 `.kanban/` 디렉터리의 XML 파일을 스캔하여 마일스톤 상태를 최신화한다.
 
-**컬럼 이동 규칙**:
+**상태 전이 규칙**:
 
-| 현재 컬럼 | 조건 | 이동 대상 |
+| 현재 상태 | 조건 | 전이 대상 |
 |----------|------|----------|
-| Open | 해당 마일스톤의 첫 워크플로우가 시작됨 | In Progress |
-| In Progress | 해당 마일스톤의 모든 워크플로우 체크박스가 `[x]`이고 모든 DoD 항목이 충족됨 | Done |
-| Done | - | 이동 없음 (최종 상태) |
-
-**Done 컬럼 이동 시 추가 작업**:
-
-1. 마일스톤 카드에 `- **완료일**: YYYY-MM-DD` 필드를 추가한다 (현재 날짜)
-2. `- **상태**:` 필드를 `N/N 완료`로 갱신한다
-3. frontmatter의 `updated` 날짜를 현재 날짜로 갱신한다
+| Open | 해당 마일스톤의 첫 워크플로우 티켓이 In Progress 이상 | In Progress |
+| In Progress | 해당 마일스톤의 모든 워크플로우 티켓이 Done 상태이고 모든 DoD 항목이 충족됨 | Done |
+| Done | - | 전이 없음 (최종 상태) |
 
 ### 프로젝트 완료 판단 조건
 
 다음 조건이 **모두** 충족되면 프로젝트를 완료로 판단한다:
 
-1. `.kanban/board.html`의 **모든 마일스톤**이 Done 컬럼에 위치한다
-2. Open 컬럼과 In Progress 컬럼이 비어 있다
+1. `.kanban/` 디렉터리 스캔 결과 **모든 마일스톤** 소속 티켓이 Done 상태이다
+2. Open 또는 In Progress 상태의 티켓이 존재하지 않는다
 3. roadmap.md의 모든 마일스톤에 완료 상태가 기록되어 있다
 
 **프로젝트 완료 시 수행 작업**:
 
-1. `.kanban/board.html` frontmatter에 `completed: YYYY-MM-DD` 필드를 추가한다
-2. 최종 성과 요약을 출력한다:
+1. 최종 성과 요약을 출력한다:
    - 전체 마일스톤 수 및 완료 마일스톤 수
    - 전체 워크플로우 수 및 완료 워크플로우 수
-   - 프로젝트 시작일(`.kanban/board.html` created)과 완료일 사이의 소요 기간
-3. roadmap.md의 `## 목표` 섹션에 프로젝트 완료 상태를 기록한다:
+2. roadmap.md의 `## 목표` 섹션에 프로젝트 완료 상태를 기록한다:
    - `- **프로젝트 상태**: 완료 (YYYY-MM-DD)`
 
 ## 관련 스킬

@@ -136,6 +136,23 @@ def get_git_branch(cwd: str) -> str:
     return ""
 
 
+def get_current_ticket(cwd: str) -> str:
+    """Read current active ticket number from .kanban/.current.
+
+    Args:
+        cwd: Current working directory (project root).
+
+    Returns:
+        Ticket number string (e.g. 'T-001') or empty string if not found.
+    """
+    current_path = os.path.join(cwd, ".kanban", ".current")
+    try:
+        with open(current_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except (FileNotFoundError, OSError):
+        return ""
+
+
 def get_active_workflow(cwd: str) -> dict | None:
     """Read active workflow info filtered by the current session.
 
@@ -248,6 +265,10 @@ def main() -> None:
     branch = get_git_branch(cwd) if cwd else ""
     branch_display = f" \033[33m{branch}\033[0m" if branch else ""
 
+    # -- Current kanban ticket --
+    ticket = get_current_ticket(cwd) if cwd else ""
+    ticket_display = f" \033[36m[{ticket}]\033[0m" if ticket else ""
+
     # -- Active workflow --
     wf = get_active_workflow(cwd) if cwd else None
     workflow_display = ""
@@ -284,11 +305,12 @@ def main() -> None:
             workflow_display = f" \033[90m{title}{RESET}"
 
     # -- Output --
-    # Format: model [PHASE:agent] title branch ctx:bar +added/-removed
+    # Format: model [PHASE:agent] title branch [T-NNN] ctx:bar +added/-removed
     line = (
         f"\033[36m{model}\033[0m"
         f"{workflow_display}"
         f"{branch_display}"
+        f"{ticket_display}"
         f" {progress_bar}"
         f" \033[32m+{added}\033[0m/\033[31m-{removed}\033[0m"
     )

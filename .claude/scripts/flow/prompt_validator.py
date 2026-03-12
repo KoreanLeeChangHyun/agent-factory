@@ -41,6 +41,13 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
     자기 중첩 태그(예: <goal>...<goal>...</goal>...</goal>)를
     스택 기반으로 파싱하여 가장 외부 태그 쌍의 내용을 반환한다.
 
+    XML 구조 호환성 주석:
+        이 함수는 전체 텍스트에서 태그를 검색하므로 <prompt> 래퍼 내부 깊이와
+        무관하게 동작한다. 새 XML 구조에서 <goal>, <target>, <constraints>,
+        <criteria> 태그가 <submit>/<history> 래퍼 → <subnumber> → <prompt> 래퍼
+        내부에 위치하더라도 정규식 패턴이 전체 텍스트를 대상으로 검색하므로
+        정상 매칭된다.
+
     Args:
         text: 검색할 전체 텍스트
         tag: 추출할 태그 이름 (꺾쇠 제외)

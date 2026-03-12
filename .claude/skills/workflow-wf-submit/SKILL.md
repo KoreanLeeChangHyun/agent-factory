@@ -23,7 +23,7 @@ disable-model-invocation: true
 ### 티켓 파일 처리 규칙
 
 - `#N` 지정 시: `.kanban/T-NNN.xml` 정확 매칭으로 티켓 파일 탐색
-- `#N` 미지정 시: `.kanban/board.html`에서 Open 상태 티켓을 자동 선택
+- `#N` 미지정 시: `.kanban/` 디렉터리의 XML 파일을 스캔하여 Open 상태 티켓을 자동 선택
 - `<current>` 값이 `0` 또는 미존재 시: 에러 출력 후 종료
 - `<command>` 유효 값: `implement`, `research`, `review`
 

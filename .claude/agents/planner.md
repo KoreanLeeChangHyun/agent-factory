@@ -17,12 +17,12 @@ maxTurns: 100
 복잡한 작업을 분석하여 **실행 가능한 단계별 계획**을 수립합니다:
 
 - 요구사항 분석 및 명확화
-- 불명확한 요청은 **가정 사항으로 계획서에 명시**하여 오케스트레이터가 사용자 승인 시 확인
+- 불명확한 요청은 **가정 사항으로 계획서에 명시**
 - 작업을 세부 태스크로 분해
 - 태스크 간 종속성 분석 (독립/종속 판단)
 - 병렬 실행 가능한 작업 식별
 - **계획서를 파일로 저장**
-- **계획서 작성 완료 후 `작성완료` 반환** (사용자 승인은 오케스트레이터가 수행)
+- **계획서 작성 완료 후 `작성완료` 반환** (오케스트레이터가 스킬 매핑 검증 후 WORK로 직행)
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -46,9 +46,8 @@ maxTurns: 100
 ### 오케스트레이터가 대신 수행하는 행위
 
 - PLAN Step 배너 호출 (`flow-claude start <command>` / `flow-claude end <registryKey>`)
-- 계획서 작성 완료 후 사용자 승인 (AskUserQuestion)
-- 승인/수정/중지 분기 처리
-- `update_state.py` 상태 전이 (PLAN -> WORK 또는 PLAN -> CANCELLED)
+- 스킬 매핑 검증 실패 시 planner revise 모드 재호출(최대 3회)
+- `update_state.py` 상태 전이 (PLAN -> WORK)
 
 ## 스킬 바인딩
 
@@ -97,8 +96,8 @@ request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 
 ### 기본 모드 (mode 미지정)
 
 1. **user_prompt.txt 전문 읽기** - `{workDir}/user_prompt.txt`를 Read로 전체 내용 확인 (request는 50자 요약본)
-1.5. **티켓 XML 태그 인식** — user_prompt.txt에서 XML 태그(`<goal>`, `<target>`, `<constraints>`, `<criteria>`)가 존재하면 태그 기반 파싱을 우선 적용한다 (`.kanban/T-NNN.xml` 티켓 형식). 태그가 없으면 기존 자연어 분석 방식으로 폴백한다.
-2. **요구사항 분석 및 질의** - 불명확한 점은 계획서의 가정 사항 섹션에 명시 (오케스트레이터가 승인 시 사용자에게 확인)
+1.5. **티켓 XML 태그 인식** — user_prompt.txt에서 XML 태그(`<goal>`, `<target>`, `<constraints>`, `<criteria>`)가 존재하면 태그 기반 파싱을 우선 적용한다 (`.kanban/T-NNN.xml` 티켓 형식). 이 태그들은 subnumber 내부의 `<prompt>` 래퍼 안에 위치하므로, `<prompt>` 자식 요소로 탐색한다. subnumber는 `<submit>` 래퍼(active=true, 현재 제출) 또는 `<history>` 래퍼(비활성, 이전 제출) 내부에 위치한다. `<command>` 태그는 `<prompt>` 래퍼 밖 subnumber 직하에 위치한다. 태그가 없으면 기존 자연어 분석 방식으로 폴백한다.
+2. **요구사항 분석 및 질의** - 불명확한 점은 계획서의 가정 사항 섹션에 명시
 3. **코드베이스 탐색** - Glob으로 구조 파악, Grep으로 키워드 검색하여 대상 파일 식별, Read로 핵심 파일 확인 (현재 패턴, 라인 수 파악)
 4. **스킬 카탈로그 읽기** - `.claude/skills/skill-catalog.md`를 1회 Read하여 Project Skills 섹션 + Command Default Mapping 확인
 5. **템플릿 로드** - `.claude/skills/workflow-agent-planner/templates/plan.md`를 Read로 로드 (필수)
@@ -148,11 +147,11 @@ request 파라미터는 user_prompt.txt의 첫 50자 요약본입니다. 계획 
 
 ### 상태 값
 
-- `작성완료`: 계획서 작성이 완료되어 오케스트레이터가 사용자 승인을 진행할 수 있음 (기본 모드, revise 모드 동일)
+- `작성완료`: 계획서 작성이 완료되어 오케스트레이터가 스킬 매핑 검증을 진행하고 WORK로 직행 (기본 모드, revise 모드 동일)
 
 ## 주의사항
 
-1. **계획서 작성에 집중**: planner는 기본 모드와 revise 모드 모두 계획서 작성까지만 수행한다. 사용자 최종 승인(AskUserQuestion)은 오케스트레이터가 직접 수행하므로, planner는 계획서 완성 후 `작성완료` 상태로 반환한다.
+1. **계획서 작성에 집중**: planner는 기본 모드와 revise 모드 모두 계획서 작성까지만 수행한다. 스킬 매핑 검증이 실패하면 오케스트레이터가 revise 모드로 재호출하므로, planner는 계획서 완성 후 `작성완료` 상태로 반환한다.
 2. **완전한 명확화 원칙**: WORK 단계에서는 사용자에게 질문할 수 없으므로, PLAN 단계에서 모든 불명확한 점을 완전히 해소해야 함
 3. **명확성 우선**: 불명확한 요청은 가정 사항으로 계획서에 명시
 4. **독립/종속 구분**: 병렬 실행 가능 여부 명확히 판단

@@ -5,7 +5,7 @@
 user_prompt.txt에 append하고, .uploads/ 파일 복사를 수행한다.
 
 티켓 파일은 환경변수 TICKET_NUMBER, .context.json의 ticketNumber 필드,
-또는 board.html In Progress 컬럼에서 순서대로 탐색한다.
+또는 .kanban/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
 
 사용법:
   python3 reload_prompt.py <workDir>
@@ -92,7 +92,7 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
     탐색 우선순위:
       1. 환경변수 TICKET_NUMBER
       2. .context.json의 ticketNumber 필드
-      3. .kanban/board.html In Progress 컬럼의 첫 번째 티켓
+      3. .kanban/ 디렉터리 XML 파일 직접 스캔 (In Progress 상태 첫 번째 티켓)
 
     Args:
         abs_work_dir: 현재 워크플로우 디렉터리 절대 경로
@@ -123,74 +123,44 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
         except Exception:
             pass
 
-    # 3순위: board.html In Progress 컬럼
-    board_path = os.path.join(_PROJECT_ROOT, ".kanban", "board.html")
-    if os.path.isfile(board_path):
-        try:
-            from html.parser import HTMLParser
+    # 3순위: .kanban/ 디렉터리 XML 직접 스캔 (In Progress 상태 첫 번째 티켓)
+    try:
+        import glob as _glob
+        import xml.etree.ElementTree as _ET
 
-            class _InProgressTicketParser(HTMLParser):
-                """board.html In Progress 컬럼에서 첫 번째 티켓 번호를 추출하는 파서."""
-
-                def __init__(self) -> None:
-                    super().__init__()
-                    self._current_column: str | None = None
-                    self._in_column_header: bool = False
-                    self._in_card_meta: bool = False
-                    self._header_text_parts: list[str] = []
-                    self._meta_buf: str = ""
-                    self._in_count: bool = False
-                    self.first_progress_ticket: str | None = None
-
-                def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-                    """태그 시작 이벤트를 처리한다."""
-                    attr_dict: dict[str, str] = {k: (v or "") for k, v in attrs}
-                    cls_parts: list[str] = attr_dict.get("class", "").split()
-                    if tag == "div" and "column-header" in cls_parts:
-                        self._in_column_header = True
-                        self._header_text_parts = []
-                    elif tag == "span" and "count" in cls_parts:
-                        self._in_count = True
-                    elif tag == "div" and "card-meta" in cls_parts and self._current_column == "In Progress":
-                        self._in_card_meta = True
-                        self._meta_buf = ""
-
-                def handle_endtag(self, tag: str) -> None:
-                    """태그 종료 이벤트를 처리한다."""
-                    if tag == "div" and self._in_column_header:
-                        self._in_column_header = False
-                        header_text: str = " ".join(self._header_text_parts).strip()
-                        if "Progress" in header_text:
-                            self._current_column = "In Progress"
-                        elif any(k in header_text for k in ("Open", "Review", "Done")):
-                            self._current_column = None
-                    elif tag == "span" and self._in_count:
-                        self._in_count = False
-                    elif tag == "div" and self._in_card_meta:
-                        self._in_card_meta = False
-                        if self.first_progress_ticket is None:
-                            meta_text: str = self._meta_buf.strip()
-                            m = re.search(r"T-\d+", meta_text)
-                            if m:
-                                self.first_progress_ticket = m.group(0)
-
-                def handle_data(self, data: str) -> None:
-                    """텍스트 데이터를 처리한다."""
-                    if self._in_card_meta and self._current_column == "In Progress":
-                        self._meta_buf += data
-                    elif self._in_column_header and not self._in_count:
-                        self._header_text_parts.append(data.strip())
-
-            with open(board_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            parser = _InProgressTicketParser()
-            parser.feed(content)
-            if parser.first_progress_ticket:
-                normalized = _normalize_ticket_number(parser.first_progress_ticket)
-                if normalized:
-                    return _find_ticket_file_by_number(kanban_dir, normalized)
-        except Exception:
-            pass
+        xml_files: list[str] = sorted(_glob.glob(str(kanban_dir / "T-*.xml")))
+        for xml_path in xml_files:
+            try:
+                tree = _ET.parse(xml_path)
+                root = tree.getroot()
+                # <metadata> 내부의 <status> 탐색
+                metadata = root.find("metadata")
+                if metadata is None:
+                    status_el = root.find("status")
+                else:
+                    status_el = metadata.find("status")
+                if status_el is not None and (status_el.text or "").strip() == "In Progress":
+                    # <metadata>/<number> 탐색
+                    number_el = (metadata or root).find("number")
+                    if number_el is not None and number_el.text:
+                        normalized = _normalize_ticket_number(number_el.text.strip())
+                        if normalized:
+                            ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
+                            if ticket_path:
+                                return ticket_path
+                    # 파일명에서 번호 추출 (T-NNN.xml)
+                    filename = os.path.basename(xml_path)
+                    m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
+                    if m:
+                        normalized = _normalize_ticket_number(m.group(1))
+                        if normalized:
+                            ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
+                            if ticket_path:
+                                return ticket_path
+            except Exception:
+                continue
+    except Exception:
+        pass
 
     return None
 
@@ -202,6 +172,12 @@ def main() -> None:
       1. .kanban/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
       2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
       3. .uploads/ 파일을 <workDir>/files/로 복사 후 .uploads/ 클리어
+
+    XML 구조 호환성 주석:
+        티켓 파일(.kanban/T-NNN.xml) 전체를 문자열로 읽어 user_prompt.txt에
+        append하므로, 새 XML 구조(<metadata>/<submit>/<history> 래퍼 요소, <prompt>
+        래퍼, <result> 구조화)에서도 동작에 영향이 없다. XML 내부 구조를 파싱하거나
+        특정 태그를 추출하지 않으므로 코드 변경이 불필요하다.
 
     Raises:
         SystemExit: 인자 누락(1), workDir 미존재(1), 정상 완료(0).

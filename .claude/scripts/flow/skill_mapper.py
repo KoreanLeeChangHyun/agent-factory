@@ -12,8 +12,13 @@ skill-map.md를 생성한다. LLM 불필요.
                 workDir, plan.md 경로, command는 자동 해석
 
 출력:
-  <workDir>/work/skill-map.md (exit 0) 또는 에러 (exit 1)
+  <workDir>/work/skill-map.md (exit 0) 또는 에러 (exit 1) 또는 검증 실패 (exit 2)
   <workDir>/work/context/WXX-context.md (태스크별 컨텍스트 슬라이스)
+
+exit code:
+  0 - 성공 (스킬 매핑 완료 및 유효성 검증 통과)
+  1 - 오류 (인자 누락, command 미발견 등 실행 오류)
+  2 - 검증 실패 (스킬 미배정 또는 존재하지 않는 스킬명)
 """
 from __future__ import annotations
 
@@ -504,6 +509,88 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
         pass
 
 
+def _get_known_skills() -> set[str]:
+    """skill-catalog.md에 등록된 스킬명 집합을 반환한다.
+
+    CATALOG_FILE에서 Skill Descriptions 섹션을 파싱하여 등록된 스킬명 목록을 추출한다.
+    파일이 없거나 파싱 실패 시 빈 집합을 반환하여 검증을 건너뛴다.
+
+    Returns:
+        등록된 스킬명 집합. 파싱 실패 시 빈 집합.
+    """
+    known: set[str] = set()
+
+    if not os.path.isfile(CATALOG_FILE):
+        return known
+
+    try:
+        with open(CATALOG_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return known
+
+    lines = content.split("\n")
+    in_skills = False
+    for line in lines:
+        if "## Skill Descriptions" in line:
+            in_skills = True
+            continue
+        if in_skills and line.startswith("## "):
+            break
+        if in_skills and line.startswith("|") and not line.startswith("| 스킬명") and not line.startswith("|---"):
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) >= 2 and parts[1]:
+                known.add(parts[1].strip())
+
+    return known
+
+
+def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
+    """태스크 스킬 매핑의 유효성을 검증한다.
+
+    각 태스크에 대해 다음을 검증한다:
+    (a) resolved 스킬이 1개 이상 배정되었는지 확인
+    (b) 배정된 스킬이 skill-catalog.md에 등록된 스킬인지 확인
+
+    skill-catalog.md 파싱에 실패하면 (b) 검증을 건너뛰고
+    (a)만 수행한다.
+
+    Args:
+        tasks: parse_plan_tasks()에서 반환된 태스크 목록.
+               각 태스크는 'taskId'와 'resolved' 키를 포함해야 한다.
+
+    Returns:
+        (True, "") - 모든 검증 통과
+        (False, "실패 사유 상세") - 검증 실패 시 실패한 태스크 ID와 사유 포함
+    """
+    known_skills = _get_known_skills()
+    failures: list[str] = []
+
+    for task in tasks:
+        task_id = task.get("taskId", "(unknown)")
+        resolved = task.get("resolved", [])
+
+        # (a) 스킬 미배정 확인
+        if not resolved:
+            failures.append(f"  - {task_id}: 스킬 미배정 (resolved 스킬 없음)")
+            continue
+
+        # (b) 존재하지 않는 스킬명 확인 (catalog 파싱 성공 시에만)
+        if known_skills:
+            unknown = [s for s in resolved if s not in known_skills]
+            if unknown:
+                failures.append(
+                    f"  - {task_id}: 존재하지 않는 스킬명 {unknown} "
+                    f"(skill-catalog.md 미등록)"
+                )
+
+    if failures:
+        reason = "스킬 매핑 검증 실패:\n" + "\n".join(failures)
+        return False, reason
+
+    return True, ""
+
+
 def slice_plan_context(plan_path, tasks, output_dir):
     """plan.md에서 각 워커의 태스크 섹션만 추출하여 work/context/WXX-context.md로 저장.
 
@@ -635,6 +722,12 @@ def main():
 
     # 5.5. 스킬 매핑 대시보드 갱신 (비차단)
     _update_skills_md(registry_key, command, tasks, all_resolved, token_budget)
+
+    # 5.6. 스킬 매핑 유효성 검증 (exit code 2 = 검증 실패)
+    valid, reason = validate_skill_mapping(tasks)
+    if not valid:
+        print(reason, file=sys.stderr)
+        sys.exit(2)
 
     # 배너 출력
     rel_path = os.path.relpath(output_path, PROJECT_ROOT)

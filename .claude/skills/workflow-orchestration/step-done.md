@@ -12,7 +12,7 @@ flow-update status <registryKey> DONE
 
 # 2. 마무리 스크립트 실행 (history.md, usage, archive, kanban)
 # <status>: "완료" 또는 "실패" (다른 값 사용 금지. "성공" 등은 무효)
-flow-finish <registryKey> 완료 [--workflow-id <id>]
+flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]
 
 # 3. 종료 배너 출력 (Slack 알림 자동 수행)
 flow-claude end <registryKey>
@@ -25,7 +25,7 @@ flow-claude end <registryKey>
 1. **status.json 완료 처리** — `update_state.py status` (critical, 실패 시 exit 1)
 2. **사용량 확정** — `update_state.py usage-finalize` (비차단, 성공 시만)
 3. **아카이빙** — `history_sync.py archive` (비차단)
-4. **.kanban/board.html 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단)
+4. **로드맵 진행 파일 갱신** — `update-kanban.sh` (workflow_id 있을 때만, 비차단). `<metadata>` 래퍼의 `<status>` 필드만 사용하므로 XML 내부 구조(`<metadata>/<submit>/<history>` 래퍼 요소, `<prompt>` 래퍼, `<result>` 구조화) 변경에 무관하게 동작
 
 ### flow-claude end
 

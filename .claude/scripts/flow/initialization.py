@@ -7,15 +7,16 @@ initialization.py - 워크플로우 초기화 스크립트.
 LLM 호출 없음 (순수 IO).
 
 사용법:
-  python3 initialization.py <command> <mode> <title>
+  python3 initialization.py <command> <title> [mode] [#N]
 
 인자:
   command  실행 명령어. implement | review | research
-  mode     워크플로우 모드. full (유일 지원 모드)
-  title    오케스트레이터가 생성한 20자 이내 제목
+  title    오케스트레이터가 생성한 20자 이내 제목 (단일 인자 시 title로 간주, mode=full 기본값)
+  mode     워크플로우 모드. full (유일 지원 모드). 2인자 시 첫 번째가 mode, 두 번째가 title
+  #N       티켓 번호 (T-NNN 또는 #NNN 형식, 선택사항)
 
 환경변수:
-  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 board.html에서 자동 선택.
+  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .kanban/ 디렉터리에서 자동 선택.
 
 출력:
   stdout으로 init-result JSON을 출력한다.
@@ -142,7 +143,7 @@ def _run_optional_script(script_path: str, cmd_template: list[str]) -> None:
 def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
     """티켓 번호를 결정한다.
 
-    환경변수 TICKET_NUMBER → 커맨드 인자 → board.html 자동 선택 순으로 탐색한다.
+    환경변수 TICKET_NUMBER → 커맨드 인자 → .kanban/ 디렉터리 자동 선택 순으로 탐색한다.
 
     Args:
         ticket_arg: 커맨드 인자에서 추출된 티켓 번호 문자열 (예: '#1', 'T-001', '1'). 없으면 None.
@@ -161,8 +162,8 @@ def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
         if normalized:
             return normalized
 
-    # 3순위: board.html에서 Open 상태 티켓 자동 선택
-    return _find_open_ticket_from_board()
+    # 3순위: .kanban/ 디렉터리에서 Open 상태 티켓 자동 선택
+    return _find_open_ticket_from_kanban()
 
 
 def _normalize_ticket_number(raw: str) -> str | None:
@@ -186,82 +187,48 @@ def _normalize_ticket_number(raw: str) -> str | None:
     return None
 
 
-def _find_open_ticket_from_board() -> str | None:
-    """board.html의 Open 컬럼에서 첫 번째 티켓 번호를 반환한다.
+def _find_open_ticket_from_kanban() -> str | None:
+    """.kanban/ 디렉터리의 XML 파일을 glob하여 Open 상태 첫 번째 티켓 번호를 반환한다.
 
-    board.html 파일을 html.parser 기반으로 파싱하여 Open 컬럼의
-    첫 번째 카드 티켓 번호를 찾는다. Open 컬럼이 없거나 티켓이 없으면 None을 반환한다.
+    .kanban/*.xml 파일을 알파벳 순으로 탐색하며, <metadata> 내부의
+    <status>Open</status>를 포함하는 첫 번째 티켓 번호를 반환한다.
 
     Returns:
         'T-NNN' 형식 티켓 번호. 없으면 None.
     """
-    from html.parser import HTMLParser
+    import glob as _glob
+    import xml.etree.ElementTree as _ET
 
-    board_path: str = os.path.join(_PROJECT_ROOT, ".kanban", "board.html")
-    if not os.path.isfile(board_path):
-        return None
-    try:
-        with open(board_path, "r", encoding="utf-8") as f:
-            content: str = f.read()
-    except OSError:
+    kanban_dir: str = os.path.join(_PROJECT_ROOT, ".kanban")
+    if not os.path.isdir(kanban_dir):
         return None
 
-    class _OpenTicketParser(HTMLParser):
-        """board.html Open 컬럼에서 첫 번째 티켓 번호를 추출하는 파서."""
-
-        def __init__(self) -> None:
-            super().__init__()
-            self._current_column: str | None = None
-            self._in_column_header: bool = False
-            self._in_card_meta: bool = False
-            self._header_text_parts: list[str] = []
-            self._meta_buf: str = ""
-            self._in_count: bool = False
-            self.first_open_ticket: str | None = None
-
-        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-            """태그 시작 이벤트를 처리한다."""
-            attr_dict: dict[str, str] = {k: (v or "") for k, v in attrs}
-            cls_parts: list[str] = attr_dict.get("class", "").split()
-            if tag == "div" and "column-header" in cls_parts:
-                self._in_column_header = True
-                self._header_text_parts = []
-            elif tag == "span" and "count" in cls_parts:
-                self._in_count = True
-            elif tag == "div" and "card-meta" in cls_parts and self._current_column == "Open":
-                self._in_card_meta = True
-                self._meta_buf = ""
-
-        def handle_endtag(self, tag: str) -> None:
-            """태그 종료 이벤트를 처리한다."""
-            if tag == "div" and self._in_column_header:
-                self._in_column_header = False
-                header_text: str = " ".join(self._header_text_parts).strip()
-                if "Open" in header_text:
-                    self._current_column = "Open"
-                elif any(k in header_text for k in ("Progress", "Review", "Done")):
-                    self._current_column = None
-            elif tag == "span" and self._in_count:
-                self._in_count = False
-            elif tag == "div" and self._in_card_meta:
-                self._in_card_meta = False
-                if self.first_open_ticket is None:
-                    meta_text: str = self._meta_buf.strip()
-                    m = re.search(r"T-\d+", meta_text)
-                    if m:
-                        self.first_open_ticket = m.group(0)
-
-        def handle_data(self, data: str) -> None:
-            """텍스트 데이터를 처리한다."""
-            if self._in_card_meta and self._current_column == "Open":
-                self._meta_buf += data
-            elif self._in_column_header and not self._in_count:
-                self._header_text_parts.append(data.strip())
-
-    parser = _OpenTicketParser()
-    parser.feed(content)
-    if parser.first_open_ticket:
-        return _normalize_ticket_number(parser.first_open_ticket)
+    xml_files: list[str] = sorted(_glob.glob(os.path.join(kanban_dir, "T-*.xml")))
+    for xml_path in xml_files:
+        try:
+            tree = _ET.parse(xml_path)
+            root = tree.getroot()
+            # <metadata> 내부의 <status> 탐색
+            metadata = root.find("metadata")
+            if metadata is None:
+                # 구형 구조: 루트 직하 <status> 탐색
+                status_el = root.find("status")
+            else:
+                status_el = metadata.find("status")
+            if status_el is not None and (status_el.text or "").strip() == "Open":
+                # <metadata>/<number> 탐색
+                number_el = (metadata or root).find("number")
+                if number_el is not None and number_el.text:
+                    normalized = _normalize_ticket_number(number_el.text.strip())
+                    if normalized:
+                        return normalized
+                # 파일명에서 번호 추출 (T-NNN.xml)
+                filename = os.path.basename(xml_path)
+                m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
+                if m:
+                    return _normalize_ticket_number(m.group(1))
+        except Exception:
+            continue
     return None
 
 
@@ -293,6 +260,13 @@ def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
 
     티켓 번호를 결정한 후 .kanban/T-NNN.xml 파일을 정확 매칭으로 탐색하여 읽는다.
     파일이 없거나 내용이 비어있으면 None을 반환한다.
+
+    XML 구조 호환성 주석:
+        이 함수는 티켓 파일 전체를 문자열로 읽어 반환하며 XML을 파싱하지 않는다.
+        따라서 새 XML 구조(<metadata>/<submit>/<history> 래퍼 요소, <prompt> 래퍼,
+        <result> 구조화)에서도 동작에 영향이 없다. 반환된 content는 user_prompt.txt에
+        그대로 기록되며, prompt_validator.py의 validate() 함수로 전달되어 태그 기반
+        검증에 사용된다.
 
     Args:
         ticket_arg: 커맨드 인자에서 추출된 티켓 번호 (예: '#1'). 없으면 None.
@@ -405,6 +379,37 @@ def _move_ticket_to_in_progress(ticket_number: str) -> None:
         _warn(f"kanban.py move 실행 실패: {e}")
 
 
+def _update_ticket_title(ticket_number: str, title: str) -> None:
+    """kanban.py를 호출하여 티켓 제목을 갱신한다.
+
+    kanban.py update-title 서브커맨드를 subprocess로 실행한다.
+    실패 시 경고만 출력하고 계속 진행한다.
+
+    Args:
+        ticket_number: 티켓 번호 (예: 'T-001')
+        title: 갱신할 제목 문자열
+    """
+    kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
+    if not os.path.isfile(kanban_py_path):
+        _warn(f"kanban.py를 찾을 수 없습니다: {kanban_py_path}")
+        return
+
+    try:
+        result = subprocess.run(
+            ["python3", kanban_py_path, "update-title", ticket_number, title],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            _warn(f"kanban.py update-title 실패 (exit {result.returncode}): {stderr}")
+    except subprocess.TimeoutExpired:
+        _warn("kanban.py update-title: 타임아웃")
+    except Exception as e:
+        _warn(f"kanban.py update-title 실행 실패: {e}")
+
+
 def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str) -> None:
     """.context.json을 작업 디렉터리에 작성한다.
 
@@ -472,7 +477,7 @@ def init_workflow(
         title: 워크플로우 제목 (20자 이내)
         mode: 워크플로우 모드 (full)
         prompt_content: 사용자 원문 프롬프트 내용 (기본값 빈 문자열)
-        ticket_number: 연결된 티켓 번호 (예: 'T-001'). 있으면 board.html을 갱신한다.
+        ticket_number: 연결된 티켓 번호 (예: 'T-001'). 있으면 티켓 상태를 갱신한다.
 
     Returns:
         초기화 결과 딕셔너리:
@@ -511,8 +516,9 @@ def init_workflow(
     _write_user_prompt(abs_work_dir, prompt_content)
     _copy_uploads(abs_work_dir)
 
-    # 티켓이 있으면 board.html에서 Open → In Progress 이동
+    # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:
+        _update_ticket_title(ticket_number, title)
         _move_ticket_to_in_progress(ticket_number)
 
     _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
@@ -592,7 +598,7 @@ def main() -> None:
         if ticket_arg or os.environ.get("TICKET_NUMBER"):
             _err(f"지정한 티켓 파일을 찾을 수 없거나 비어있습니다. .kanban/ 디렉터리를 확인하세요. ({kanban_dir})", 1)
         else:
-            _err(f".kanban/board.html에 Open 상태 티켓이 없거나 .kanban/ 디렉터리가 없습니다. ({kanban_dir})", 1)
+            _err(f".kanban/ 디렉터리에 Open 상태 티켓이 없거나 .kanban/ 디렉터리가 없습니다. ({kanban_dir})", 1)
 
     # Step 2: 워크플로우 디렉터리/메타데이터/레지스트리 일괄 생성
     try:
@@ -610,7 +616,7 @@ def main() -> None:
     try:
         _validator_path: str = os.path.join(_SCRIPT_DIR, "prompt_validator.py")
         if os.path.isfile(_validator_path):
-            import importlib.util as _ilu
+            import importlib.util as _ilu  # 내부 API 호출 (CLI 미사용)
             _spec = _ilu.spec_from_file_location("prompt_validator", _validator_path)
             if _spec and _spec.loader:
                 _mod = _ilu.module_from_spec(_spec)

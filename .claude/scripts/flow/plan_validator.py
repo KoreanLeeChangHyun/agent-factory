@@ -444,14 +444,18 @@ def validate_skill_coverage(tasks: list[dict[str, Any]]) -> list[str]:
 
 
 def validate(plan_path: str) -> list[str]:
-    """
-    plan.md를 검증하고 경고 목록을 반환.
+    """plan.md를 검증하고 경고 목록을 반환.
+
+    advisory, non-blocking 성격의 검증 함수이다.
+    반환값은 오케스트레이터의 워크플로우 흐름을 차단하지 않으며,
+    경고 메시지는 로그 출력용으로만 사용된다.
 
     Args:
         plan_path: plan.md 파일 경로
 
     Returns:
-        list[str]: 경고 메시지 목록 (빈 리스트면 검증 통과)
+        list[str]: 경고 메시지 목록 (빈 리스트면 검증 통과).
+                   반환값에 관계없이 호출자의 흐름을 차단하지 않는다.
     """
     if not os.path.isfile(plan_path):
         return [f"[ERROR] 파일을 찾을 수 없습니다: {plan_path}"]
@@ -531,13 +535,12 @@ def main() -> None:
         print("검증 통과")
         sys.exit(0)
 
-    print(f"경고 {len(warnings)}건 발견:")
+    print(f"[WARN] plan_validator: 경고 {len(warnings)}건 발견:")
     print()
     for i, warning in enumerate(warnings, 1):
         print(f"  {i}. {warning}")
 
-    has_error = any("[ERROR]" in w for w in warnings)
-    sys.exit(1 if has_error else 0)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

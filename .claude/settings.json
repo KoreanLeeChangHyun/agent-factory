@@ -15,6 +15,16 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/scripts/hooks/session_start_system_prompt.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreToolUse": [

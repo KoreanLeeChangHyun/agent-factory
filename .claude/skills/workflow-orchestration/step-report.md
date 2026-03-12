@@ -41,7 +41,7 @@ flow-step end <registryKey> reportDone
 flow-update status <registryKey> DONE
 
 # 3. 마무리 → step-done.md 참조
-flow-finish <registryKey> <status>
+flow-finish <registryKey> <status> --ticket-number <T-NNN>
 
 # 4. 종료 (╚═══╝ closing border)
 flow-claude end <registryKey>

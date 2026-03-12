@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ticket>
+  <!-- metadata -->
+  <metadata>
+    <number>T-NNN</number>
+    <title>제목</title>
+    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
+    <status>상태</status>
+    <current>4</current>
+  </metadata>
+
+  <!-- submit -->
+  <submit>
+    <subnumber id="4" active="true">
+    <command>명령어</command>
+    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
+      <prompt>
+        작업에 따라 포맷 다름 ...
+      </prompt>
+      <result>
+        작업 제출 전임으로 존재 하지 않음
+      </result>
+    </subnumber>
+  </submit>
+
+  <!-- history -->
+  <history>
+    <subnumber id="3">
+    <command>명령어</command>
+    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
+      <prompt>
+        작업에 따라 포맷 다름 ...
+      </prompt>
+      <result>
+        <plan> plan.md 경로 </plan>
+        <work> work 경로 </work>
+        <report> report.md 경로 </report>
+      </result>
+    </subnumber>
+    <subnumber id="2">
+    <command>명령어</command>
+    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
+      <prompt>
+        작업에 따라 포맷 다름 ...
+      </prompt>
+      <result>
+        <plan> plan.md 경로 </plan>
+        <work> work 경로 </work>
+        <report> report.md 경로 </report>
+      </result>
+    </subnumber>
+    <subnumber id="1">
+    <command>명령어</command>
+    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
+      <prompt>
+        작업에 따라 포맷 다름 ...
+      </prompt>
+      <result>
+        <plan> plan.md 경로 </plan>
+        <work> work 경로 </work>
+        <report> report.md 경로 </report>
+      </result>
+    </subnumber>
+  </history>
+
+</ticket>

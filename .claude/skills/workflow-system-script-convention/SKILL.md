@@ -76,6 +76,7 @@ flow-update task-status <registryKey> running W01 W02 && flow-update usage-pendi
 | `flow-validate-p` | `python3 .claude/scripts/flow/prompt_validator.py` | 프롬프트 유효성 검증 |
 | `flow-recommend` | `python3 .claude/scripts/flow/skill_recommender.py` | 스킬 자동 추천 |
 | `flow-gc` | `python3 .claude/scripts/flow/garbage_collect.py` | 좀비 워크플로우 정리 |
+| `flow-tmux` | `python3 .claude/scripts/flow/tmux_launcher.py` | tmux 윈도우 생성/종료 (launch/cleanup 서브커맨드) |
 
 > alias 추가 시 `init-claude-workflow.sh`의 `setup_shell_aliases()` 함수 내 `.claude.aliases` heredoc에 항목을 추가한다.
 

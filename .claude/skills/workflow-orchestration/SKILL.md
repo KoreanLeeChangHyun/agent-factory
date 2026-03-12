@@ -14,8 +14,7 @@ Main agent controls workflow sequencing and agent dispatch only.
 ```mermaid
 stateDiagram-v2
     [*] --> PLAN
-    PLAN --> WORK: 승인
-    PLAN --> CANCELLED: 중지
+    PLAN --> WORK: 계획 완료
     PLAN --> STALE: TTL 만료
     WORK --> REPORT
     WORK --> FAILED: 실패
@@ -34,7 +33,7 @@ stateDiagram-v2
 | PLAN -> WORK -> REPORT -> DONE | planner -> worker(s)/explorer(s) -> validator -> reporter |
 
 1. Step order MUST NOT be violated
-2. PLAN approval REQUIRED before WORK proceeds
+2. PLAN 완료 후 스킬 매핑 검증 통과 시 WORK 즉시 진행
 3. Violation: halt workflow and report error
 
 ## Agent-Step Mapping
@@ -66,22 +65,10 @@ Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
 - `command`: execution command (implement, review, research)
 
 > `/wf` commands use `$ARGUMENTS` for command detection. User requests are handled via `.kanban/T-NNN.xml` ticket files.
-
-### 승인 모드 플래그
-
-PLAN Step 2b의 사용자 승인(AskUserQuestion) 동작은 기본값으로 자동 승인됩니다. `-n` 플래그로 강제 승인 요청 모드로 전환할 수 있습니다.
-
-| 플래그 | autoApprove | 동작 |
-|--------|-------------|------|
-| 없음 (기본) | `true` | planner 완료 후 자동 승인 → WORK 즉시 진행 |
-| `-n` | `false` | AskUserQuestion 3옵션(승인/수정 요청/중지) 제시 |
-
-> **CRITICAL: `autoApprove=true`일 때 AskUserQuestion을 호출하면 안 된다(MUST NOT).** `autoApprove=true` 경로에서 AskUserQuestion을 호출하는 것은 프로토콜 위반이다. 자동 승인 경로는 AskUserQuestion 없이 2b-4의 "승인" 분기를 직접 실행한다.
-
-**plan_validator.py 경고 시 자동 차단:**
-`autoApprove=true`(기본) 상태에서도 plan_validator.py가 구조적 경고를 발견하면 자동으로
-`autoApprove=false`로 오버라이드하여 AskUserQuestion을 강제 호출합니다.
-경고 없는 정상 케이스에서만 완전 자동 승인이 적용됩니다.
+>
+> **Ticket file structure (`.kanban/T-NNN.xml`):** 3-section wrapper layout — `<metadata>` wrapper (number/title/datetime/status/current), `<submit>` wrapper (active subnumbers, active=true), `<history>` wrapper (past subnumbers, active removed). Each `<subnumber>` contains `<command>` directly (outside `<prompt>`) and a `<prompt>` wrapper element enclosing goal/target/constraints/criteria/context fields. The `<result>` element contains workdir/plan/work/report child elements.
+>
+> **SSoT XML structure reference:** See [`references/T-NNN.xml`](references/T-NNN.xml) for the canonical ticket file template.
 
 ---
 
@@ -110,7 +97,7 @@ flow-update both <registryKey> <agent> <toStep>
 flow-skillmap <registryKey>
 
 # 워크플로우 마무리 (DONE 전용)
-flow-finish <registryKey> 완료|실패 [--workflow-id <id>]
+flow-finish <registryKey> 완료|실패 --ticket-number <T-NNN> [--workflow-id <id>]
 flow-claude end <registryKey>
 ```
 
@@ -130,7 +117,7 @@ flow-claude end <registryKey>
 | WORK end | `flow-step end <registryKey> workDone` |
 | REPORT start | `flow-step start <registryKey>` |
 | REPORT end | `flow-step end <registryKey> reportDone` |
-| DONE (마무리) | `flow-finish <registryKey> 완료\|실패 [--workflow-id <id>]` |
+| DONE (마무리) | `flow-finish <registryKey> 완료\|실패 --ticket-number <T-NNN> [--workflow-id <id>]` |
 | DONE (종료) | `flow-claude end <registryKey>` |
 
 **각 step의 오케스트레이터 호출 순서:**
@@ -141,7 +128,7 @@ flow-claude end <registryKey>
 
 > 위 1~3 각 항목은 **개별 Bash 도구 호출**로 실행한다. 단일 Bash 호출에 합치지 않는다.
 
-DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` → terminate. Slack 알림 자동 수행.
+DONE: `flow-finish <registryKey> 완료 --ticket-number <T-NNN>` → `flow-claude end <registryKey>` → terminate. Slack 알림 자동 수행.
 
 **CRITICAL: After `flow-claude end <key>` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
 
@@ -207,13 +194,11 @@ DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` →
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
 | INIT completed | run initialization.py, extract/retain params, `flow-step start <registryKey>`, status update (NONE->PLAN), planner call | Return summary, progress text, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
-| PLAN (2a) done | `flow-step end <registryKey> planSubmit`, AskUserQuestion **(planner 반환 후 순서대로)** | Plan summary, **내부 추론/분석 텍스트 출력** |
-| PLAN (2b) 승인 | Branch on approval, `flow-step start <registryKey>`, status update | Approval explanation, **내부 추론/분석 텍스트 출력** |
-| PLAN (2b) 중지 | CANCELLED Processing (step-plan.md 참조), status 전이(PLAN->CANCELLED) | **DONE 배너 호출**, **WORK 배너 호출**, **내부 추론/분석 텍스트 출력** |
+| PLAN done | `flow-step end <registryKey> planSubmit`, 스킬 매핑 검증 루프, WORK 진행 | Plan summary, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | `flow-phase <registryKey> 0` (MUST FIRST), then Phase 0 skill_mapper.py call, then Phase 1~N | Skipping Phase banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK done | 상태 확인, `flow-step start <registryKey>`, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
-| REPORT done | `flow-update status <key> DONE`, `flow-finish <key> 완료`, `flow-claude end <key>` → **flow-claude end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
+| REPORT done | `flow-update status <key> DONE`, `flow-finish <key> 완료 --ticket-number <T-NNN>`, `flow-claude end <key>` → **flow-claude end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
 
 ---
 
@@ -221,12 +206,12 @@ DONE: `flow-finish <registryKey> 완료` → `flow-claude end <registryKey>` →
 
 `/wf` 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 다음을 순차 실행한다 (hook 없음):
 
-1. 사용자 입력에서 command 및 플래그 파싱 (예: `/wf -s implement` → command=implement, autoApprove=true / `/wf -s implement -n` → command=implement, autoApprove=false)
+1. 사용자 입력에서 command 및 플래그 파싱 (예: `/wf -s implement` → command=implement)
 2. `flow-claude start <command>` — 시작 배너 출력
 3. 티켓 파일을 읽어 20자 이내 한글 제목 생성 (오케스트레이터가 직접 생성, LLM 별도 호출 없음)
-4. `flow-init <command> "<title>"` — 워크플로우 디렉터리 생성, status.json 초기화. 실패 시 `FAIL` 출력 + 비정상 종료 코드
+4. `flow-init <command> "<title>" #N` — 워크플로우 디렉터리 생성, status.json 초기화. `#N`은 티켓 번호(예: `#5`). 실패 시 `FAIL` 출력 + 비정상 종료 코드
 5. 종료 코드 0이면 최신 `.workflow/` 디렉터리의 `init-result.json`을 Read하여 workDir 등 값을 도출하고 후속 Phase에서 유지:
-   - init-result.json 키: workDir, registryKey, workId, date, workName, command, title
+   - init-result.json 키: workDir, registryKey, workId, date, workName, command, title, ticketNumber
 
 After initialization, proceed to PLAN step.
 
@@ -244,17 +229,7 @@ After initialization, proceed to PLAN step.
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-validate`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 승인 분기를 수행한다. 상세: [step-plan.md](step-plan.md) 참조.
-
-> **CRITICAL: autoApprove 분기 규칙**
->
-> | 조건 | 동작 |
-> |------|------|
-> | `autoApprove=true` (기본, validator 경고 없음) | AskUserQuestion 호출 금지(MUST NOT) → 2b-4 "승인" 분기 자동 실행 → WORK 진행 |
-> | `autoApprove=false` (`-n` 지정 또는 validator 경고 감지) | AskUserQuestion 3옵션(승인/수정 요청/중지) 제시 후 사용자 선택에 따라 분기 |
->
-> `autoApprove=true` 경로: AskUserQuestion 호출 금지 → 2b-4 승인 분기 자동 실행 → WORK 진행
-> 상세: [step-plan.md](step-plan.md) 2b-0 CRITICAL GATE 참조.
+planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-validate`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 스킬 매핑 검증 루프를 수행한 뒤 WORK로 직행한다. 상세: [step-plan.md](step-plan.md) 참조.
 
 ### WORK
 
@@ -281,13 +256,13 @@ Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, wor
 
 ### DONE
 
-> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후)에서만 호출된다. 사용자가 "중지"를 선택한 경우 CANCELLED Processing(step-plan.md 참조)을 수행하며 DONE 단계로 진행하지 않는다.
+> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후)에서만 호출된다.
 
 After REPORT completion: update_state.py status -> flow-finish -> flow-claude end -> terminate.
 
 ```bash
 flow-update status <registryKey> DONE
-flow-finish <registryKey> 완료 [--workflow-id <id>]  # status: "완료" 또는 "실패" 만 허용
+flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]  # status: "완료" 또는 "실패" 만 허용. --ticket-number 필수
 flow-claude end <registryKey>
 ```
 
@@ -306,10 +281,10 @@ flow-claude end <registryKey>
 | Action | Description |
 |--------|-------------|
 | Step banner Bash calls | `flow-step start/end` + `flow-phase` (WORK phases) + `flow-finish`/`flow-claude end` (completion) |
-| AskUserQuestion calls | PLAN approval, error escalation, user confirmation |
+| AskUserQuestion calls | error escalation, user confirmation |
 | State transition | `flow-update both/status/context/task-status/usage-pending/env/link-session/usage/usage-finalize` |
 | Sub-agent return extraction | 상태만 확인 (1줄). 산출물 경로는 컨벤션으로 확정 |
-| 티켓 파일 handling (initialization.py + 수정 요청 only) | initialization.py가 `.kanban/T-NNN.xml` -> user_prompt.txt 복사. 수정 요청: `flow-reload`가 티켓 파일 -> user_prompt.txt append. 승인/중지 시 티켓 파일 접근 MUST NOT |
+| 티켓 파일 handling (initialization.py 전용) | initialization.py가 `.kanban/T-NNN.xml` -> user_prompt.txt 복사. 기타 분기에서 티켓 파일 접근 MUST NOT |
 | Workflow finalization | `flow-finish <registryKey> 완료\|실패` — Slack 알림, cleanup |
 | Workflow end | `flow-claude end <registryKey>` — 완료 배너 출력 + 종료 |
 | Post-DONE immediate termination | Zero text output after DONE completion banner |
@@ -333,7 +308,7 @@ flow-claude end <registryKey>
 | Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
 | Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
 | **내부 추론/분석/사고 과정 텍스트 출력** | Terminal Output Protocol 위반: 사용자는 step 결과만 필요. plan.md 분석 결과, 진행 상황 설명, 판단 근거, 에이전트 호출 전 설명("플래너를 호출하겠습니다" 류) 등 모든 내부 사고 과정의 텍스트 출력 금지. 컨텍스트 낭비 및 터미널 오염 원인 |
-| 승인/중지 후 티켓 파일 읽기 | "수정 요청" 외 분기에서 티켓 파일을 읽으면 다른 워크플로우 질의와 충돌 발생. 티켓 파일 접근은 initialization.py 실행과 수정 요청(`flow-reload`)으로 한정 |
+| PLAN 완료 후 티켓 파일 읽기 | PLAN 이후 분기에서 티켓 파일을 읽으면 다른 워크플로우 질의와 충돌 발생. 티켓 파일 접근은 initialization.py 실행으로 한정 |
 | 다른 워크플로우 산출물 읽기 | 현재 워크플로우(`<workDir>`) 외부의 `.workflow/` 파일(다른 워크플로우의 plan.md, report.md, work/*.md 등)을 Read하면 컨텍스트 오염 및 토큰 낭비 발생. 오케스트레이터가 읽을 수 있는 파일은 현재 워크플로우의 workDir 내부로 한정 |
 
 ### Orchestrator Allowed Reads

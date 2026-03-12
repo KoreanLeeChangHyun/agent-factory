@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Workflow</title>
+<link rel="stylesheet" href="board.css">
+</head>
+<body data-server-no-reload>
+
+<header class="header">
+  <div class="header-title"><span class="accent">Claude Code</span> Workflow</div>
+  <nav class="tabs">
+    <button class="tab active" data-view="kanban">Kanban</button>
+    <button class="tab" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="workflow">Workflow</button>
+    <button class="tab" data-view="viewer">Viewer</button>
+  </nav>
+</header>
+
+<main class="main" id="main">
+  <div class="view active" id="view-kanban"></div>
+  <div class="view" id="view-dashboard"></div>
+  <div class="view" id="view-workflow"></div>
+  <div class="view" id="view-viewer"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script>
+<script src="board.js"></script>
+</body>
+</html>

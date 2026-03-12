@@ -8,8 +8,10 @@ Uses dispatcher.py utilities for flag-based conditional execution.
 from __future__ import annotations
 
 import json
+import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dispatcher import (
     collect_exit_codes,
     dispatch,
@@ -53,6 +55,15 @@ def main() -> None:
             flags=flags,
         )
         sync_results.append(r)
+
+    # --- Read|Write|Edit|Bash: kanban-current-guard (async, fire-and-forget) ---
+    if tool_name in ('Read', 'Write', 'Edit', 'Bash'):
+        dispatch_async(
+            'HOOK_KANBAN_CURRENT',
+            scripts_dir('guards', 'kanban_current_guard.py'),
+            stdin_data,
+            flags=flags,
+        )
 
     # --- AskUserQuestion: slack-ask (async, fire-and-forget) ---
     if tool_name == 'AskUserQuestion':

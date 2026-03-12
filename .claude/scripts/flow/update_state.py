@@ -5,18 +5,18 @@ update-state.sh에서 update_state.py로 1:1 포팅된 스크립트.
 워크플로우 상태 전이, 컨텍스트 갱신, 사용량 기록 등을 처리한다.
 
 사용법:
-  update_state.py context <workDir> <agent>
-  update_state.py status <workDir> <toPhase>
-  update_state.py both <workDir> <agent> <toPhase>
-  update_state.py link-session <workDir> <sessionId>
-  update_state.py usage-pending <workDir> <id1> [id2] ...
-  update_state.py usage <workDir> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
-  update_state.py usage-finalize <workDir>
+  update_state.py context <registryKey> <agent>
+  update_state.py status <registryKey> <toPhase>
+  update_state.py both <registryKey> <agent> <toPhase>
+  update_state.py link-session <registryKey> <sessionId>
+  update_state.py usage-pending <registryKey> <id1> [id2] ...
+  update_state.py usage <registryKey> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]
+  update_state.py usage-finalize <registryKey>
   update_state.py usage-regenerate (no args)
-  update_state.py env <workDir> set|unset <KEY> [VALUE]
-  update_state.py task-status <workDir> <status> <id1> [id2] ...
-  update_state.py task-status <workDir> <taskId> <status>  (레거시)
-  update_state.py task-start <workDir> <id1> [id2] ...
+  update_state.py env <registryKey> set|unset <KEY> [VALUE]
+  update_state.py task-status <registryKey> <status> <id1> [id2] ...
+  update_state.py task-status <registryKey> <taskId> <status>  (레거시)
+  update_state.py task-start <registryKey> <id1> [id2] ...
 
 종료 코드:
   항상 0 (비차단 원칙)
@@ -272,6 +272,10 @@ def update_status(abs_work_dir: str, status_file: str, from_step: str, to_step: 
 
     비차단 원칙:
       FSM 검증 실패 시에도 프로세스를 종료하지 않음 (항상 exit 0).
+
+    호출 방식:
+      CLI 호출 시 from_step은 status.json에서 자동 읽기.
+      라이브러리 호출 시 from_step을 명시적으로 전달 필요.
 
     Args:
         abs_work_dir: 워크 디렉터리 절대 경로

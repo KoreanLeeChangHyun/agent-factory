@@ -15,7 +15,7 @@
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
-  4. .kanban/board.html 갱신  (kanban.py move, ticket_number 있을 때만, 비차단)
+  4. 티켓 상태 갱신          (kanban.py move, ticket_number 있을 때만, 비차단)
 
 종료 코드:
   0  성공
@@ -33,6 +33,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 # utils 패키지 import
 _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -201,19 +202,6 @@ def _find_transcript_path(registry_key: str) -> str | None:
 
     return None
 
-
-def find_board() -> str | None:
-    """프로젝트 루트에서 .kanban/board.html 파일을 탐색한다.
-
-    프로젝트 루트의 .kanban/board.html 경로를 확인한다.
-
-    Returns:
-        .kanban/board.html 파일 절대 경로. 없으면 None.
-    """
-    board_path = os.path.join(PROJECT_ROOT, ".kanban", "board.html")
-    if os.path.isfile(board_path):
-        return board_path
-    return None
 
 
 def _acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
@@ -419,6 +407,58 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
         pass
 
 
+def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
+    """티켓 XML에서 현재 활성 subnumber ID를 반환한다.
+
+    `.kanban/T-NNN.xml`을 파싱하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
+    `.kanban/done/T-NNN.xml`도 폴백 탐색한다. 파싱 실패 시 None을 반환한다.
+
+    Args:
+        ticket_number: T-NNN 형식 티켓 번호
+
+    Returns:
+        현재 subnumber ID (int). 파싱 실패 또는 미존재 시 None.
+    """
+    for subdir in ("", "done"):
+        path = os.path.join(PROJECT_ROOT, ".kanban", subdir, f"{ticket_number}.xml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            tree = ET.parse(path)
+            root = tree.getroot()
+            metadata = root.find("metadata")
+            if metadata is not None:
+                current_el = metadata.find("current")
+                if current_el is not None and current_el.text:
+                    return int(current_el.text.strip())
+        except Exception:
+            pass
+    return None
+
+
+def _build_result_update_args(abs_work_dir: str, rel_work_dir: str) -> list[str]:
+    """존재하는 산출물의 update-subnumber CLI 인자 리스트를 반환한다.
+
+    `--workdir`는 항상 포함되며, plan.md/work//report.md 존재 여부에 따라
+    각각 `--plan`/`--work`/`--report` 인자를 선택적으로 추가한다.
+
+    Args:
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
+        rel_work_dir: 프로젝트 루트 기준 상대 경로 (.workflow/...)
+
+    Returns:
+        kanban.py update-subnumber 호출용 추가 인자 리스트.
+    """
+    args: list[str] = ["--workdir", rel_work_dir]
+    if os.path.isfile(os.path.join(abs_work_dir, "plan.md")):
+        args.extend(["--plan", f"{rel_work_dir}/plan.md"])
+    if os.path.isdir(os.path.join(abs_work_dir, "work")):
+        args.extend(["--work", f"{rel_work_dir}/work"])
+    if os.path.isfile(os.path.join(abs_work_dir, "report.md")):
+        args.extend(["--report", f"{rel_work_dir}/report.md"])
+    return args
+
+
 def main() -> None:
     """CLI 진입점. 인자 파싱 후 워크플로우 마무리 4단계를 순서대로 실행한다."""
     parser = argparse.ArgumentParser(
@@ -513,15 +553,31 @@ def main() -> None:
         "Step 3: archive",
     )
 
-    # ── Step 4: .kanban/board.html 갱신 (ticket_number 있을 때만, 비차단) ──
+    # ── Step 4: 티켓 상태 갱신 (ticket_number 있을 때만, 비차단) ──
     if ticket_number:
         target_column = "review" if status == "완료" else "open"
         if abs_work_dir is not None:
             _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4: kanban ticket={ticket_number} column={target_column}")
         run(
             ["python3", KANBAN_PY, "move", ticket_number, target_column],
-            "Step 4: board update",
+            "Step 4: ticket status update",
         )
+
+        # ── Step 4b: 결과 경로 기록 (완료 시만, 비차단) ──
+        if status == "완료" and abs_work_dir is not None:
+            sub_id = _resolve_current_subnumber_id(ticket_number)
+            if sub_id is None:
+                if abs_work_dir is not None:
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: subnumber_id=None ticket={ticket_number}, skipping result update")
+                print(f"[WARN] Step 4b: cannot resolve current subnumber for {ticket_number}", file=sys.stderr)
+            else:
+                rel_work_dir = os.path.relpath(abs_work_dir, PROJECT_ROOT)
+                update_args = _build_result_update_args(abs_work_dir, rel_work_dir)
+                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4B: ticket={ticket_number} sub_id={sub_id} rel_work_dir={rel_work_dir}")
+                run(
+                    ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
+                    "Step 4b: ticket result paths update",
+                )
 
     if status == "완료":
         status_label = f"{C_YELLOW}완료{C_RESET}"

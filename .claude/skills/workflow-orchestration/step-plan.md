@@ -39,7 +39,7 @@ AskUserQuestion(
     header: "Prompt 품질 확인",
     options: [
       { label: "계속 진행", description: "현재 티켓 파일로 planner를 호출합니다" },
-      { label: "prompt 보강 후 재실행", description: "/wf -p로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
+      { label: "prompt 보강 후 재실행", description: "/wf -o로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
     ],
     multiSelect: false
   }]
@@ -56,7 +56,7 @@ AskUserQuestion(
 | **계속 진행** | Step 2a로 진행 |
 | **prompt 보강 후 재실행** | 오케스트레이터 현재 turn 즉시 종료 (FSM 상태 전이 없음) |
 
-> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `/wf -p`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
+> "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `/wf -o`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
 
 ---
 
@@ -87,12 +87,11 @@ workDir: <workDir>
 
 1. **plan_validator.py 자동 실행** — 계획서 구조 검증 (상세: [2a-Post-Validator](#2a-post-validator-plan_validatorpy-자동-실행) 참조)
 2. `flow-step end <registryKey> planSubmit` — PLAN Step 완료 배너 + plan.md 링크 + [OK] 출력 (**1회만 호출**)
-3. **즉시** Step 2b의 AskUserQuestion으로 진행
+3. **즉시** Step 2c(스킬 매핑 검증 루프)로 진행
 
 > **MUST NOT:**
 > - `flow-step end`를 2회 이상 호출
-> - Step 2b 진입 시 `flow-step end`를 "보장을 위해" 재호출
-> - `flow-step end`와 AskUserQuestion을 동일 응답에서 병렬 호출
+> - Step 2c 진입 시 `flow-step end`를 "보장을 위해" 재호출
 
 ### 2a-Post-Validator: plan_validator.py 자동 실행
 
@@ -104,264 +103,79 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 ```
 
 - `"검증 통과"` 출력 → 경고 없음
-- 그 외 출력 → 경고 내용을 Step 2b-3 AskUserQuestion에 포함
+- 그 외 출력 → `[WARN]` 로그로 출력 (비차단, 흐름을 중단하지 않음)
 - 실행 실패 시 → 빈 문자열로 폴백 (검증은 advisory이므로 blocking하지 않음)
 
-## Step 2b: PLAN - Orchestrator User Approval
+## Step 2c: PLAN - Skill Mapping Validation Loop
 
-> planner가 `작성완료`를 반환하면, **오케스트레이터가 직접** AskUserQuestion으로 사용자 최종 승인을 수행합니다.
-> 서브에이전트(planner)는 AskUserQuestion을 호출할 수 없으므로(플랫폼 제약), 승인 절차는 반드시 오케스트레이터가 담당합니다.
+> planner가 `작성완료`를 반환하고 2a-Post가 완료되면, 오케스트레이터는 skill_mapper.py의 스킬 매핑 유효성을 검증합니다.
+> 검증 실패 시 planner를 revise 모드로 재호출하여 스킬 매핑을 수정합니다 (최대 3회).
 
-### 2b-0. Auto-Approve Check
+### 2c-1. skill_mapper.py 실행 및 검증
 
-> INIT Step에서 `$ARGUMENTS`의 `-n` 플래그를 파싱하여 `autoApprove` 변수가 설정됩니다.
-> `-n` 미지정 시 `autoApprove=true` (기본값). `-n` 지정 시 `autoApprove=false`.
-
----
-
-> ### CRITICAL GATE: autoApprove 분기 — 이 게이트를 먼저 평가한다
->
-> **Step 2b-0을 진입하는 즉시 아래 분기를 평가하고, 분기에 따라 2b-3 진입 여부를 결정한다.**
->
-> | autoApprove 값 | 2b-3 실행 여부 | 진행 경로 |
-> |----------------|--------------|----------|
-> | `true` (기본값, 경고 없음) | **MUST NOT 실행** | 2b-1 → 2b-2 → **2b-3 스킵** → 2b-4 승인 자동 진입 |
-> | `false` (`-n` 지정 또는 경고 감지) | 실행 | 2b-1 → 2b-2 → 2b-3 → 2b-4 |
->
-> **`autoApprove=true`이면 2b-3(AskUserQuestion)을 절대 호출하지 않는다.**
-> 2b-3 코드 블록은 `autoApprove=false`인 경우에만 실행된다.
-
----
-
-**Step 1: plan_validator.py 경고 기반 autoApprove 오버라이드**
-
-`autoApprove=true`(기본값)인 경우에도 다음 조건에서 `autoApprove=false`로 오버라이드합니다:
-
-- `validator_output`에 경고 내용이 있는 경우 (빈 문자열 또는 "검증 통과"가 아닌 경우)
-
-오버라이드는 현재 실행 turn에만 적용되며, 다음 실행에서는 원래 기본값(true)이 유지됩니다.
-
-**Step 2: 오버라이드 적용 후 분기**
-
-`autoApprove=true`인 경우 (경고 없는 정상 케이스):
-
-1. 2b-1(.context.json Check/Update)과 2b-2(Slack Notification)는 정상 수행합니다.
-2. **2b-3(AskUserQuestion)을 MUST SKIP** — 2b-4의 "승인" 분기로 자동 진행합니다.
-
-`autoApprove=false`인 경우 (`-n` 지정 또는 경고 감지로 오버라이드된 경우):
-
-- 기존 흐름(2b-1 → 2b-2 → 2b-3 → 2b-4)을 그대로 따릅니다.
-
-### 2b-1. .context.json Check/Update
-
-> **.context.json은 hook 초기화 단계에서 이미 저장되어 있습니다.** PLAN Step에서는 내용 변경이 필요한 경우(제목 변경, 작업 이름 수정 등)에만 업데이트합니다. 변경이 없으면 이 단계를 건너뜁니다.
-
-**Update가 필요한 경우:**
-- agent 필드가 "planner"로 설정되어 있지 않은 경우
-
-> **Note:** `update_state.py context` 모드는 `agent` 필드만 갱신할 수 있습니다. title, workName 등 다른 필드를 변경해야 하는 경우, planner가 `.context.json`에 직접 쓰기를 수행하세요.
-
-**Local .context.json Schema:**
-
-`<workDir>/.context.json` (hook 초기화 단계에서 생성, 이력 보존용):
-```json
-{
-  "title": "<작업 제목>",
-  "workId": "<workId>",
-  "workName": "<작업 이름>",
-  "command": "<command>",
-  "agent": "planner",
-  "created_at": "<KST ISO 타임스탬프>"
-}
-```
-
-> - `workId`는 HHMMSS 6자리 형식 (예: "170327"). `<YYYYMMDD>-<workId>` 형식은 레지스트리 키에서 사용.
-> - `workName`은 hook 초기화 단계에서 title 인자를 기반으로 .context.json에 저장.
-
-**Update Method (agent field, 1 Tool Call):**
+**실행 명령:**
 ```bash
-Bash("flow-update context <registryKey> <agent>")
+skill_mapper_output=$(flow-skill-map <workDir>/plan.md 2>&1)
+skill_mapper_exit=$?
 ```
 
-> **Note:**
-> - `update_state.py context` 모드의 3번째 인자는 에이전트 이름 문자열 (예: "planner", "worker", "reporter"). JSON 문자열을 인자로 받지 않음.
-> - 이 모드는 로컬 `<workDir>/.context.json`의 `agent` 필드만 업데이트.
+**Exit code 분기:**
 
-### 2b-2. Slack Notification (Automatic)
+| Exit Code | 의미 | 동작 |
+|-----------|------|------|
+| `0` | 성공 (스킬 매핑 유효) | WORK 단계로 즉시 진행 |
+| `2` | 검증 실패 (스킬 매핑 무효) | 재시도 루프 진입 (2c-2) |
+| `1` | 스크립트 오류 | `[WARN]` 로그 출력 후 WORK 단계로 강제 진행 (비차단) |
 
-AskUserQuestion 호출 시 `PreToolUse` Hook이 자동으로 Slack 알림을 전송합니다.
+### 2c-2. 재시도 루프 (최대 3회)
 
-- Hook script: `.claude/hooks/pre-tool-use/slack-ask.py` (thin wrapper -> `.claude/scripts/slack/slack_ask.py`)
-- Hook이 디렉터리 스캔으로 활성 워크플로우를 탐색하고 해당 워크플로우의 로컬 .context.json을 읽어 통일 포맷으로 Slack 전송
-- .context.json이 없으면 폴백 포맷 사용
+검증 실패(exit code 2) 시 오케스트레이터는 다음 절차를 반복합니다:
 
-**Slack Notification Format (slack-ask.py):**
+**반복 조건:** `retry_count < 3` AND `skill_mapper_exit == 2`
+
+**각 반복에서 수행하는 절차:**
+
+1. `retry_count` 증가
+2. `[WARN] skill_mapper 검증 실패 (시도 {retry_count}/3): {skill_mapper_output의 stderr}` 로그 출력
+3. planner를 revise 모드로 재호출하여 스킬 매핑 수정 요청:
+
 ```
-<작업 제목>
-- 작업ID: <YYYYMMDD>-<workId>
-- 작업이름: <작업 이름>
-- 명령어: <명령어>
-- 상태: 사용자 입력 대기 중
-```
-
-### 2b-3. AskUserQuestion으로 사용자 승인
-
-> **CRITICAL: `autoApprove=true`일 때 이 섹션(2b-3) 전체를 실행하지 않는다.**
-> **즉시 2b-4의 "승인" 분기로 이동한다. 아래 코드 블록을 포함하여 이 섹션의 어떤 지시도 실행하지 않는다.**
->
-> 이 섹션은 `autoApprove=false`(`-n` 지정 또는 validator 경고 감지)인 경우에만 진입한다.
-
-> **Sequential Execution REQUIRED (Critical):**
-> PLAN 완료 배너(`flow-step end <registryKey> planSubmit`)의 Bash 호출이 **완료된 후에만** AskUserQuestion을 호출해야 합니다.
-> - 반드시 **(1) flow-step end → (2) AskUserQuestion 호출** 순서로 별도 도구 호출 턴에서 실행.
-> - 위반 시 사용자가 계획서 링크를 확인하지 못한 채 승인을 요청받는 UX 결함 발생.
-
-planner가 계획서를 작성 완료하고 `작성완료` 상태를 반환하면, 오케스트레이터가 계획서 파일 경로를 터미널에 출력한 후 AskUserQuestion 도구로 승인/거부 선택지를 제시합니다. 계획 요약은 터미널에 직접 출력하지 않습니다 (사용자가 계획서 파일을 직접 확인).
-
-**경고 유무에 따른 `question` 필드 조건부 분기:**
-
-> `validator_output` 변수는 2a-Post-Validator 단계에서 설정된 값을 사용한다. 경고 0건일 때는 기존 동작을 그대로 유지한다.
-
-**경고 0건 (validator_output이 빈 문자열 또는 "검증 통과"):**
-```markdown
-AskUserQuestion(
-  questions: [{
-    question: "위 계획대로 진행하시겠습니까?",
-    header: "승인 요청",
-    options: [
-      { label: "승인", description: "WORK 단계로 진행합니다" },
-      { label: "수정 요청", description: "계획서 수정 후 재검토합니다" },
-      { label: "중지", description: "워크플로우를 중단합니다" }
-    ],
-    multiSelect: false
-  }]
-)
+Task(subagent_type="planner", prompt="
+command: <command>
+workId: <workId>
+request: <request>
+workDir: <workDir>
+mode: revise
+feedback: 스킬 매핑 검증 실패. 사유: {skill_mapper_stderr}. 계획서의 스킬 매핑을 수정해주세요.
+")
 ```
 
-**경고 1건 이상 (validator_output에 경고 내용이 있는 경우):**
-```markdown
-AskUserQuestion(
-  questions: [{
-    question: "계획서 검증 결과 N건의 경고가 발견되었습니다:\n{validator_output}\n위 계획대로 진행하시겠습니까?",
-    header: "승인 요청",
-    options: [
-      { label: "승인", description: "WORK 단계로 진행합니다" },
-      { label: "수정 요청", description: "계획서 수정 후 재검토합니다" },
-      { label: "중지", description: "워크플로우를 중단합니다" }
-    ],
-    multiSelect: false
-  }]
-)
+4. planner 반환 후 2a-Post(plan_validator + flow-step end) 재실행
+5. skill_mapper.py 재실행하여 검증 결과 확인
+
+**3회 초과 시:**
+
+```
+[WARN] skill_mapper 검증 3회 실패. 현재 스킬 매핑으로 강제 진행합니다.
 ```
 
-> `N`은 경고 건수, `{validator_output}`은 plan_validator.py의 stdout 전문이다.
+경고 로그를 출력하고 WORK 단계로 강제 진행합니다.
 
-> **AskUserQuestion Options Strictly Fixed (REQUIRED):**
-> - 위 3개 옵션(승인/수정 요청/중지)만 허용. 옵션 추가/변경/제거 MUST NOT.
-> - `freeformLabel`, `freeformPlaceholder` 등 자유 입력 필드 사용 MUST NOT.
-> - `multiSelect: false` MUST maintain.
-> - 옵션의 label, description 텍스트를 임의로 변경하지 않음.
-> - `question` 필드만 경고 유무에 따라 조건부로 달라진다. 나머지 필드(`header`, `options`, `multiSelect`)는 두 분기 모두 동일.
+### 2c-3. WORK 단계 진행
 
-### 2b-4. Approval Result Processing
+검증 통과 또는 강제 진행 후, 오케스트레이터는 사용자 입력 없이 즉시 WORK 단계로 진행합니다.
 
-> **CRITICAL: `autoApprove=true`이면 AskUserQuestion 없이 이 섹션의 "승인" 분기를 직접 실행한다.**
-> 2b-3을 거치지 않고 2b-0 게이트에서 직접 이 섹션으로 진입하며, "승인" 행(WORK 단계로 진행)을 즉시 수행한다.
-
-| Selection | Action |
-|-----------|--------|
-| **승인** | WORK 단계로 진행 (status.json step 업데이트는 오케스트레이터가 WORK 전이 시 수행). **MUST NOT:** `.kanban/T-NNN.xml` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신 |
-| **수정 요청** | 사용자가 `.kanban/T-NNN.xml` 티켓에 피드백을 작성한 후 선택. 오케스트레이터가 `reload_prompt.py`를 호출하여 피드백을 `user_prompt.txt`에 반영한 뒤 planner를 재호출하여 계획 재수립, 다시 Step 2b 수행 |
-| **중지** | → [CANCELLED Processing](#cancelled-processing) 섹션으로 이동하여 처리. **MUST NOT:** `.kanban/T-NNN.xml` 읽기, `reload_prompt.py` 호출, `user_prompt.txt` 갱신, **flow-finish 호출**, **flow-claude end 호출** |
-
-> **Ticket Isolation Rule (CRITICAL):**
-> `.kanban/T-NNN.xml` 읽기 및 `reload_prompt.py` 호출은 **오직 "수정 요청" 선택 시에만** 허용됩니다.
-> "승인" 또는 "중지" 선택 후 `.kanban/T-NNN.xml`를 읽으면, 사용자가 다른 워크플로우를 위해 작성한 내용이 현재 워크플로우에 혼입되어 질의 충돌이 발생합니다.
-> - "승인" 시: 티켓 무시, WORK 단계로 즉시 진행
-> - "중지" 시: 티켓 무시, CANCELLED 처리만 수행
-> - "수정 요청" 시: reload_prompt.py 1회 호출 (유일한 티켓 접근 경로)
-
-> **Error Handling:** planner 에이전트 호출이 실패(에러 반환 또는 비정상 종료)한 경우, 최대 3회 재시도합니다. 3회 모두 실패하면 AskUserQuestion으로 사용자에게 상황을 보고하고, 재시도 또는 워크플로우 중단을 선택하도록 요청합니다. 재시도 시 이전 호출과 동일한 파라미터를 사용합니다.
-
-> **"수정 요청" selection handling:**
-> **Precondition:** 아래 3단계 절차는 사용자가 "수정 요청"을 선택한 경우에만 실행합니다. "승인" 또는 "중지" 선택 시 이 절차를 실행하는 것은 MUST NOT입니다.
->
-> 사용자가 `.kanban/T-NNN.xml` 티켓에 피드백을 작성한 후 "수정 요청"을 선택합니다. 오케스트레이터는 다음 3단계 절차를 순서대로 수행합니다:
->
-> **1단계. reload_prompt.py 호출** — 피드백 수신
->
-> 오케스트레이터가 스크립트를 1회 호출하여 사용자 피드백을 수신합니다.
->
-> ```bash
-> # 오케스트레이터 실행 코드
-> feedback=$(Bash("flow-reload <workDir>"))
-> ```
->
-> - 스크립트가 티켓 파일 읽기, user_prompt.txt append, .uploads/ 복사/클리어를 일괄 수행
-> - stdout으로 피드백 전문을 출력
-> - 종료코드 0: 정상 완료 → stdout 내용을 `feedback` 변수에 저장
-> - 종료코드 1: 실패 → 에러 메시지를 사용자에게 알림 후 재시도 또는 중단 선택 요청
-> - stdout에 `[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)`가 포함된 경우: 티켓 파일이 비어있는 상태. 피드백 없이 planner를 재호출하여 자체 판단으로 계획 개선 (feedback 변수를 빈 문자열로 처리)
->
-> **2단계. planner re-call** — 피드백 포함 계획 재수립
->
-> stdout으로 수신한 피드백 내용을 `mode: revise` 프롬프트에 포함하여 planner를 재호출합니다.
->
-> ```
-> Task(subagent_type="planner", prompt="
-> command: <command>
-> workId: <workId>
-> request: <request>
-> workDir: <workDir>
-> mode: revise
-> feedback: <reload_prompt.py stdout>
-> ")
-> ```
->
-> - `feedback` 값이 빈 문자열인 경우(`[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)` 케이스): `feedback` 필드를 생략하거나 빈 값으로 전달. planner가 기존 계획서를 자체 판단으로 개선
-> - planner는 기존 계획서를 기반으로 피드백을 반영한 수정 계획서를 작성하여 `작성완료` 반환
->
-> **3단계. Step 2b repeat** — 재승인 요청
->
-> 재수립된 계획에 대해 다시 Step 2b(사용자 승인 요청)를 반복합니다. 사용자가 "승인"을 선택할 때까지 1~3단계를 반복할 수 있습니다.
->
-> **Note:** `.uploads/` 복사/클리어, `user_prompt.txt` append는 모두 스크립트가 처리하므로 오케스트레이터에서 별도 인라인 절차가 불필요합니다.
-
-### CANCELLED Processing
-
-> **CRITICAL WARNING: 중지 선택 시 DONE 단계를 거치지 않는다.**
->
-> "중지" 선택 시 flow-finish, flow-claude end 를 **절대 수행하지 않는다**.
-> 오케스트레이터가 직접 status 전이(`PLAN` → `CANCELLED`)만 수행한 후 워크플로우를 **즉시 종료**한다.
-> DONE 단계는 정상 완료(승인 → WORK → REPORT → DONE) 경로에서만 진입하는 단계이다.
-
-사용자가 "중지"를 선택하면 오케스트레이터가 `update_state.py`를 호출하여 CANCELLED 상태를 기록합니다.
-
-**Update Method (1 Tool Call):**
-```bash
-# 1. CANCELLED 상태로 전이
-Bash("flow-update status <registryKey> CANCELLED")
-```
-
-**Script behavior:**
-- `<workDir>/status.json`의 `step`을 `"CANCELLED"`로 변경
-- `transitions` 배열에 `{"from": "PLAN", "to": "CANCELLED", "at": "<현재시간ISO>"}` 추가
-- `updated_at`을 현재 시간(ISO 8601, KST)으로 갱신
-**Failure handling:** 스크립트 실패 시 `[WARN]` 경고만 출력하고 exit 0으로 종료. 워크플로우를 정상 진행(중단). status.json은 보조 상태 관리이므로 실패가 워크플로우를 차단하지 않음.
-
-**CANCELLED 후 오케스트레이터 종료 방법 (REQUIRED):**
-
-> status 전이(`update_state.py status`) 호출이 완료되면,
-> 오케스트레이터는 **추가 배너 호출(`flow-step`/`flow-phase`), 에이전트 호출(`reporter`, `worker` 등), 마무리 호출(`flow-finish`, `flow-claude end`)을 일체 수행하지 않고** 현재 turn을 즉시 종료합니다.
-> CANCELLED 처리 후 남은 행위는 없습니다.
+> **MUST NOT:**
+> - 스킬 매핑 검증 후 AskUserQuestion 호출
+> - 사용자 승인 대기
+> - 검증 결과와 무관하게 WORK 진행을 차단
 
 ## Binding Contract Rule (REQUIRED)
 
 > **PLAN 승인 후 계획 변경 불가 원칙**
 >
-> 사용자가 "승인"을 선택한 시점에서 계획서는 Binding Contract가 됩니다.
-> 오케스트레이터는 승인된 계획서의 태스크를 변경, 추가, 제거하지 않습니다.
-> 계획 변경이 필요하면 사용자가 "수정 요청" 선택지를 통해 재계획을 요청해야 합니다.
+> planner가 계획서를 작성 완료한 시점(스킬 검증 통과 포함)에서 계획서는 Binding Contract가 됩니다.
+> 오케스트레이터는 확정된 계획서의 태스크를 변경, 추가, 제거하지 않습니다.
 >
 > **MUST NOT:**
 > - 오케스트레이터가 독자적으로 태스크를 추가/삭제/변경
