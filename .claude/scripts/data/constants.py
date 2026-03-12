@@ -12,6 +12,8 @@
     FSM_TRANSITIONS: FSM 상태 전이 규칙
     DANGER_PATTERNS: 위험 명령어 차단 패턴 목록
     KEEP_COUNT: .workflow/ 디렉터리 유지 최대 갯수 (환경변수 CLAUDE_WORKFLOW_KEEP_COUNT로 오버라이드 가능)
+    CHAIN_SEPARATOR: 체인 command 구분자 (">" 문자)
+    CHAIN_MAX_RETRY: 체인 스테이지 실패 시 최대 재시도 횟수 (환경변수 CLAUDE_CHAIN_MAX_RETRY로 오버라이드 가능)
 """
 
 import os
@@ -92,6 +94,41 @@ FSM_TRANSITIONS = {
 # =============================================================================
 VALID_COMMANDS = {"implement", "review", "research"}
 VALID_MODES = {"full"}
+
+# =============================================================================
+# 체인 command 관련 상수
+# =============================================================================
+CHAIN_SEPARATOR = ">"
+CHAIN_MAX_RETRY = int(os.environ.get("CLAUDE_CHAIN_MAX_RETRY", "2"))
+
+
+def parse_chain_command(raw: str) -> list:
+    """체인 command 문자열을 파싱하여 세그먼트 리스트를 반환한다.
+
+    Args:
+        raw: command 문자열. 단일("implement") 또는 체인("research>implement>review") 형식.
+
+    Returns:
+        유효한 command 세그먼트 리스트. 단일 command도 길이 1 리스트로 반환.
+
+    Raises:
+        ValueError: 유효하지 않은 세그먼트가 포함된 경우.
+
+    Examples:
+        >>> parse_chain_command("implement")
+        ['implement']
+        >>> parse_chain_command("research>implement>review")
+        ['research', 'implement', 'review']
+    """
+    segments = [seg.strip() for seg in raw.split(CHAIN_SEPARATOR)]
+    for seg in segments:
+        if seg not in VALID_COMMANDS:
+            raise ValueError(
+                f"유효하지 않은 command 세그먼트: '{seg}'. "
+                f"허용 값: {sorted(VALID_COMMANDS)}"
+            )
+    return segments
+
 
 # =============================================================================
 # 터미널 step 집합

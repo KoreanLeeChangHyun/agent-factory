@@ -104,6 +104,12 @@ def main() -> None:
     if tool_name not in ("Write", "Edit"):
         sys.exit(0)
 
+    # .claude/.version 파일은 메인 세션에서도 수정 허용
+    tool_input = data.get("tool_input", {})
+    file_path = tool_input.get("file_path", "")
+    if file_path.endswith(".claude/.version"):
+        sys.exit(0)
+
     # TMUX_PANE 환경변수 확인
     tmux_pane = os.environ.get("TMUX_PANE")
     if not tmux_pane:
