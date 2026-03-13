@@ -11,11 +11,12 @@
   status        완료 | 실패
   --workflow-id WF-N 형식 (선택)
 
-5단계:
+6단계:
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
   4. 티켓 상태 갱신          (kanban.py move, ticket_number 있을 때만, 비차단)
+  4c. 체인 감지 및 다음 스테이지 발사 (chain_launcher.py, 완료+체인 존재 시만, 비동기)
   5. tmux 윈도우 백그라운드 지연 kill (TMUX_PANE+T-* 조건 시만, 비차단)
 
 종료 코드:
@@ -43,7 +44,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
-from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
+from data.constants import CHAIN_SEPARATOR, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 from flow.tmux_utils import WINDOW_PREFIX_P
 
 PROJECT_ROOT: str = resolve_project_root()
@@ -67,6 +68,7 @@ HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "hi
 UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
 USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "usage_sync.py")
 KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "kanban.py")
+CHAIN_LAUNCHER: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "chain_launcher.py")
 
 
 def run(
@@ -463,9 +465,9 @@ def _build_result_update_args(abs_work_dir: str, rel_work_dir: str) -> list[str]
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 5단계를 순서대로 실행한다."""
+    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다."""
     parser = argparse.ArgumentParser(
-        description="워크플로우 마무리 처리 (flow-finish 5단계)",
+        description="워크플로우 마무리 처리 (flow-finish 6단계)",
     )
     parser.add_argument("registryKey", help="워크플로우 식별자 (YYYYMMDD-HHMMSS)")
     parser.add_argument("status", choices=["완료", "실패"], help="워크플로우 결과 상태")
@@ -582,7 +584,63 @@ def main() -> None:
                     "Step 4b: ticket result paths update",
                 )
 
+    # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
+    # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.
+    # 현재 command(첫 세그먼트)를 제거한 나머지(remaining)가 있으면
+    # chain_launcher.py를 비동기로 호출하여 다음 스테이지를 발사한다.
+    _chain_launched: bool = False
+    if status == "완료" and ticket_number and abs_work_dir is not None:
+        context_file: str = os.path.join(abs_work_dir, ".context.json")
+        context_data = load_json_file(context_file)
+        full_command: str = ""
+        if isinstance(context_data, dict):
+            full_command = context_data.get("command", "")
+
+        if CHAIN_SEPARATOR in full_command:
+            segments: list[str] = [s.strip() for s in full_command.split(CHAIN_SEPARATOR)]
+            remaining_segments: list[str] = segments[1:]  # 첫 세그먼트(현재 command) 제거
+
+            if remaining_segments:
+                remaining_chain: str = CHAIN_SEPARATOR.join(remaining_segments)
+                report_path: str = os.path.join(abs_work_dir, "report.md")
+
+                if not os.path.isfile(report_path):
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: report.md not found at {report_path}, using workdir as fallback")
+                    report_path = abs_work_dir
+
+                if os.path.isfile(CHAIN_LAUNCHER):
+                    _append_log(
+                        abs_work_dir,
+                        "INFO",
+                        f"FINALIZE_CHAIN: ticket={ticket_number} remaining={remaining_chain} prev_report={report_path}",
+                    )
+                    try:
+                        subprocess.Popen(
+                            [
+                                "python3",
+                                CHAIN_LAUNCHER,
+                                ticket_number,
+                                remaining_chain,
+                                report_path,
+                            ],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                        _chain_launched = True
+                    except Exception as _chain_err:
+                        _append_log(abs_work_dir, "ERROR", f"FINALIZE_CHAIN: launch error={_chain_err}")
+                        print(f"[ERROR] Step 4c: chain_launcher.py 실행 실패: {_chain_err}", file=sys.stderr)
+                else:
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: chain_launcher.py not found at {CHAIN_LAUNCHER}")
+                    print(f"[WARN] Step 4c: chain_launcher.py not found: {CHAIN_LAUNCHER}", file=sys.stderr)
+            else:
+                if abs_work_dir is not None:
+                    _append_log(abs_work_dir, "INFO", "FINALIZE_CHAIN: chain complete (no remaining segments)")
+
     # ── Step 5: tmux 윈도우 백그라운드 지연 kill (비차단) ──
+    # 체인이 발사된 경우, tmux kill은 chain_launcher.py가 이전 윈도우 사망 대기 후
+    # 새 윈도우를 생성하므로 여기서는 기존 로직대로 kill을 진행한다.
     tmux_pane: str | None = os.environ.get("TMUX_PANE")
     if tmux_pane:
         try:

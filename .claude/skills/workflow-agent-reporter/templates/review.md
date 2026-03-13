@@ -5,7 +5,14 @@
 - 명령어: {{command}}
 - 작업명: {{workName}}
 - 작성일: {{date}} (KST)
-- 원본 계획: {{planPath}}
+- 원본 계획: [{{planPath}}]({{planPath}})
+
+## 관련 문서
+
+- 계획서: [plan.md]({{planPath}})
+- 작업 내역서:
+  - [work/W01-태스크명.md]({{workDir}}/work/W01-태스크명.md)
+  - (추가 태스크가 있으면 동일 패턴으로 나열)
 
 ## 요약
 
@@ -35,7 +42,7 @@ flowchart TD
 
 ## 작업 결과
 
-### W01: [태스크명]
+### [W01: 태스크명]({{workDir}}/work/W01-태스크명.md)
 
 **검증 대상**: [대상 설명]
 
@@ -51,7 +58,7 @@ flowchart TD
 
 ---
 
-### W02: [태스크명]
+### [W02: 태스크명]({{workDir}}/work/W02-태스크명.md)
 
 (동일 구조 반복)
 

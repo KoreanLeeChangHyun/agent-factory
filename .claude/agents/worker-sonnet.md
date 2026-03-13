@@ -21,6 +21,7 @@ maxTurns: 50
 - 코드 분석 및 테스트 실행
 - 작업 내역 작성 (`work/WXX-*.md`)
 - 스킬 기반 품질 검증 (lint, type-check 등)
+- 작업 완료 전 자체 리뷰 수행 (ENFORCE_SELF_REVIEW=true 시)
 
 ### 오케스트레이터가 대신 수행하는 행위
 
@@ -42,6 +43,18 @@ maxTurns: 50
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
 > 상세 절차: `workflow-agent-worker/SKILL.md` 참조
+
+## 강제 규칙 참조
+
+아래 환경변수(`.claude.env`)가 `true`일 때 각 강제 규칙이 활성화된다. 상세 지침은 `workflow-agent-worker/SKILL.md` 참조.
+
+| 환경변수 | 역할 |
+|---------|------|
+| `ENFORCE_CSO_PRINCIPLE` | 스킬 description을 트리거 조건만으로 제한 |
+| `ENFORCE_RATIONALIZATION_GUARD` | 작업 완료 전 합리화 방지 테이블 기반 자기검열 |
+| `ENFORCE_VRT` | implement/refactor 산출물에 VRT 4컬럼 테이블 필수 포함 |
+| `ENFORCE_SELF_REVIEW` | 보고 전 완전성·품질·규율·테스트 4축 자체 리뷰 수행 |
+| `ENFORCE_TOKEN_EFFICIENCY` | 스킬 유형별 단어 수 목표값 준수 |
 
 ## 오케스트레이터 반환 형식
 
