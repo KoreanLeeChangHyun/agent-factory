@@ -1,6 +1,6 @@
 ---
 name: management-skill
-description: "Unified management skill for creating and modifying Claude Code skills. Creates or modifies skill packages in .claude/skills/ directory conforming to SKILL.md frontmatter spec. Use for skill lifecycle management: creating, updating, modifying, or deleting skills. Triggers: '스킬 만들어줘', '새 스킬 생성', 'create skill', 'update skill', 'modify skill', '스킬 수정'."
+description: "Unified management skill for creating and modifying Claude Code skills. Creates or modifies skill packages in .claude/skills/ directory conforming to the SKILL.md frontmatter spec. Use when creating a new skill, updating or modifying an existing skill's content or metadata, or deleting an obsolete skill from the local skill library."
 license: Complete terms in LICENSE.txt
 ---
 

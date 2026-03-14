@@ -1,6 +1,6 @@
 ---
 name: review-architecture
-description: "Architecture-specialized code review skill. Detects layer violations, circular dependencies, SOLID principle violations, pattern inconsistencies, and DB schema/API change escalation. Use for structural review: new module/package introduction, API interface changes, dependency structure changes. Triggers: '아키텍처 리뷰', 'architecture review', '설계 리뷰', '구조 리뷰'."
+description: "Architecture-specialized code review skill that detects layer violations, circular dependencies, SOLID principle violations, pattern inconsistencies, and DB schema or API change escalation. Use when introducing a new module or package, reviewing API interface changes, assessing dependency structure changes, or performing a structural design review for any significant codebase modification."
 license: "Apache-2.0"
 ---
 

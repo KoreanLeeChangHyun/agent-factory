@@ -1,6 +1,6 @@
 ---
 name: testing-mutation
-description: "Mutation testing execution and mutation score quality gate skill. Runs incremental mutation testing on changed files, calculates mutation scores, and enforces quality gates for PR integration. Use for test quality verification: validates test suite effectiveness by detecting survived mutants. Triggers: '뮤테이션', 'mutation testing', 'Stryker', 'mutmut', '뮤턴트', 'mutant', '테스트 품질', 'mutation score', 'cargo-mutants'."
+description: "Mutation testing skill that runs incremental mutation testing on changed files using Stryker, mutmut, or cargo-mutants, calculates mutation scores, detects survived mutants, and enforces quality gates for PR integration. Use when verifying test suite effectiveness, measuring mutation score on changed code, or validating that tests can detect real defects rather than just achieving line coverage."
 license: "Apache-2.0"
 ---
 

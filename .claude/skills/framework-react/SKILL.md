@@ -1,6 +1,6 @@
 ---
 name: framework-react
-description: "Provides Bulletproof React architecture-based Feature-Based project structure, Next.js App Router layout, recommended tech stack (Vite, Zustand, React Query, Tailwind), and unidirectional dependency principles. Use for React/Next.js development: project initialization, Feature-Based structure setup, architecture-driven development. Triggers: 'React', 'Next.js', 'nextjs', 'React 프로젝트', '프론트엔드 프레임워크'."
+description: "Provides Bulletproof React architecture-based Feature-Based project structure, Next.js App Router layout, recommended tech stack (Vite, Zustand, React Query, Tailwind), and unidirectional dependency principles. Use when initializing a React or Next.js project, setting up a Feature-Based directory structure, configuring the frontend framework tech stack, or applying architecture-driven development principles."
 license: "Apache-2.0"
 ---
 

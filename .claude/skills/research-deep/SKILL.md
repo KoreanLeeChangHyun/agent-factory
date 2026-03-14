@@ -1,6 +1,6 @@
 ---
 name: research-deep
-description: "Deep codebase exploration skill using context:fork in an isolated Explore agent. Use for deep code exploration tasks: (1) large-scale codebase deep exploration, (2) deep investigation without main context pollution, (3) large-scale exploration with token usage savings, (4) complex dependency tracking and impact analysis. Triggers: '심층 조사', 'deep research', '코드 탐색', '대규모 분석'."
+description: "Deep codebase exploration skill that forks an isolated Explore agent to avoid main context pollution and save token usage. Use when performing large-scale codebase deep exploration, tracing complex dependency chains and impact analysis, or conducting deep investigation that should not contaminate the primary conversation context."
 context: fork
 agent: Explore
 license: "Apache-2.0"

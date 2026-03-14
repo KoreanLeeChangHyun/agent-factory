@@ -1,6 +1,6 @@
 ---
 name: convention-python
-description: ".py 파일 읽기/쓰기 시 무조건 트리거되는 Python 코딩 컨벤션 강제 스킬. PEP 8 네이밍, 전체 타입 힌트, Google 스타일 docstring을 강제한다. OOP 설계 규칙은 convention-oop 스킬과 연계한다. Triggers: '*.py', 'Python', 'python', '.py 파일'."
+description: "Enforces Python coding conventions for .py files, ensuring PEP 8 naming, full type hints, and Google-style docstrings. Use when writing or reviewing Python code, adding type annotations, writing docstrings, or ensuring consistent code style across Python modules."
 license: "Apache-2.0"
 ---
 

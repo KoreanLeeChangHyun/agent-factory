@@ -1,6 +1,6 @@
 ---
 name: research-prompt-engineering
-description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt improvements, or providing prompt writing guidance. Triggers: /wf -o prompt refinement, 'prompt ambiguity analysis', 'improve prompt quality', 'prompt structure guide', 'prompt template'."
+description: "Reference guide for prompt refinement and ambiguity analysis. Provides structured prompt improvement checklists, templates, and Claude Code-specific patterns. Use when analyzing prompt ambiguity, suggesting prompt quality improvements, applying prompt structure guidelines, or producing a revised prompt template for clearer task specification."
 license: "Apache-2.0"
 ---
 

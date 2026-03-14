@@ -1,6 +1,6 @@
 ---
 name: research-parallel
-description: "[WIP] Decomposes complex questions into 3-10 sub-questions and conducts simultaneous investigation via parallel agents (WebSearch, Perplexity, Gemini) to produce credibility-based comprehensive reports. Use for parallel research: multi-perspective comprehensive investigation, technology comparison analysis, market/trend simultaneous collection. Triggers: '병렬 조사', 'parallel', '종합 조사', '다중 에이전트', '동시 조사'."
+description: "[WIP] Decomposes complex questions into 3-10 sub-questions and conducts simultaneous investigation via parallel agents (WebSearch, Perplexity, Gemini) to produce credibility-based comprehensive reports. Use when conducting multi-perspective comprehensive investigation, comparing technologies or options from multiple viewpoints, collecting market and trend data simultaneously, or any research task benefiting from parallel multi-agent coverage."
 license: "Apache-2.0"
 ---
 

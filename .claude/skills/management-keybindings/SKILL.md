@@ -1,6 +1,6 @@
 ---
 name: management-keybindings
-description: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: "rebind ctrl+s", "add a chord shortcut", "change the submit key", "customize keybindings".
+description: Guides customization of Claude Code keyboard shortcuts via ~/.claude/keybindings.json. Use when rebinding keys, adding chord bindings, changing the submit key, or managing any keyboard shortcut configuration for Claude Code.
 license: "Apache-2.0"
 ---
 

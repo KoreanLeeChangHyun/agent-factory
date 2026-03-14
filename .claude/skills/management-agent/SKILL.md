@@ -1,6 +1,6 @@
 ---
 name: management-agent
-description: "Unified management skill for creating and modifying Claude Code agents (sub-agents). Collects model info (sonnet/opus/haiku/inherit) and tool info (Read, Edit, Bash, etc.) from the user. Use for agent lifecycle management: creating, updating, or modifying agents. Triggers: '에이전트 만들어줘', '새 에이전트 생성', '에이전트 수정해줘', '에이전트 업데이트', 'create agent', 'update agent', 'modify agent', '서브에이전트 추가/수정'."
+description: "Unified management skill for creating and modifying Claude Code agents (sub-agents). Collects model info (sonnet/opus/haiku/inherit) and tool info (Read, Edit, Bash, etc.) from the user. Use when creating a new agent, updating or modifying an existing sub-agent, or managing agent lifecycle including model selection, tool configuration, and scope settings."
 license: "Apache-2.0"
 ---
 

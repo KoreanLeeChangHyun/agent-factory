@@ -1,6 +1,6 @@
 ---
 name: research-integrated
-description: "Research skill integrating web search (WebSearch, WebFetch) and codebase exploration (Read, Grep, Glob) into a single workflow. Use for integrated research: combined web info and code analysis investigations, library trends + current code usage simultaneous analysis, external tech vs internal implementation gap analysis. Triggers: '웹+코드 통합', 'integrated research', '통합 조사', '복합 조사'."
+description: "Research skill integrating web search (WebSearch, WebFetch) and codebase exploration (Read, Grep, Glob) into a single workflow. Use when cross-referencing external information with internal code, analyzing library trends alongside current in-codebase usage, identifying gaps between external technology and internal implementation, or conducting any investigation that requires both web and codebase sources simultaneously."
 license: "Apache-2.0"
 ---
 

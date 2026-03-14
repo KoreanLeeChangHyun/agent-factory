@@ -1,6 +1,6 @@
 ---
 name: research-grounding
-description: "[WIP] Source verification and credibility auto-assessment skill. References otrebu/gemini-research pattern. Use for source verification: Google Search grounding-based source verification, JSON structured output, inter-source contradiction detection, forced citation+URL+quote. Triggers: 'source verification', '신뢰도 검증', '출처 평가', 'credibility'."
+description: "[WIP] Source verification and credibility auto-assessment skill using Google Search grounding. Use when verifying source credibility for collected information, detecting contradictions between sources, producing JSON-structured citation output with URL and quoted evidence, or assessing trustworthiness of research inputs."
 license: "Apache-2.0"
 ---
 

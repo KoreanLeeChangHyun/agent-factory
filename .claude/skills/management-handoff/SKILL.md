@@ -1,6 +1,6 @@
 ---
 name: management-handoff
-description: "Auto-generates/manages HANDOFF.md between sessions to ensure context continuity. Automatically summarizes current work status, completed/incomplete items, and next steps. Use for session continuity: (1) handoff document creation before session end, (2) state saving before context compaction, (3) task switching in large-scale work. Triggers: 'handoff', '핸드오프', '세션 저장', '인수인계'."
+description: "Auto-generates/manages HANDOFF.md between sessions to ensure context continuity. Automatically summarizes current work status, completed/incomplete items, and next steps. Use when creating a handoff document before ending a session, saving state before context compaction, or switching tasks in large-scale multi-session work to preserve context across sessions."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---

@@ -1,6 +1,6 @@
 ---
 name: testing-coverage
-description: "Code coverage analysis skill. Measures code coverage using language-appropriate tools, enforces diff coverage gates on changed lines, and suggests tests for uncovered areas. Use for coverage analysis: coverage measurement during implement/refactor, diff coverage gates in PR reviews, uncovered code test suggestions. Triggers: '커버리지', 'coverage', 'diff coverage', '코드 커버리지', '테스트 커버리지'."
+description: "Code coverage analysis skill that measures coverage using language-appropriate tools, enforces diff coverage gates on changed lines, and suggests tests for uncovered areas. Use when measuring test coverage during implementation or refactoring, applying diff coverage gates in PR reviews, or identifying uncovered code paths that need additional test cases."
 license: "Apache-2.0"
 ---
 

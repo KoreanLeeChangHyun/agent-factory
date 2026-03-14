@@ -1,6 +1,6 @@
 ---
 name: devops-docker-compose
-description: "Docker Compose-based local development environment configuration and multi-container orchestration skill. Covers service networking, volume/env-var management, and docker-compose.yml best practices. Use for containerization tasks: (1) local dev environment setup with Docker Compose, (2) multi-container service orchestration, (3) inter-service network configuration, (4) volume and environment variable management, (5) container health checks and dependency ordering. Triggers: 'Docker', 'docker-compose', '컨테이너', 'container', '도커', 'compose', 'multi-container', '멀티컨테이너'."
+description: "Configures Docker Compose-based local development environments and multi-container orchestration. Covers service networking, volume and environment variable management, and docker-compose.yml best practices. Use when setting up a local dev environment with Docker or docker-compose, orchestrating multi-container services, configuring inter-service networking, managing volumes and env vars, or defining container health checks and dependency ordering."
 license: "Apache-2.0"
 ---
 

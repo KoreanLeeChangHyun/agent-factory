@@ -1,6 +1,6 @@
 ---
 name: testing-property-based
-description: "Property-based testing skill. Automatically infers properties from function signatures, selects type-based generators, and generates PBT code using Hypothesis (Python), fast-check (JS/TS), or QuickCheck (Haskell). Use for property-based testing: adding PBT to existing test suites, discovering edge cases beyond example-based tests, stateful testing, shrinking minimal failure inputs. Triggers: 'PBT', 'property-based', '속성 기반 테스트', 'Hypothesis', 'fast-check', '속성 테스트'."
+description: "Property-based testing skill that infers properties from function signatures, selects type-based generators, and generates PBT code using Hypothesis (Python), fast-check (JS/TS), or QuickCheck (Haskell). Use when adding property-based tests to an existing test suite, discovering edge cases that example-based tests miss, performing stateful testing, or automatically shrinking minimal failure inputs."
 license: "Apache-2.0"
 ---
 

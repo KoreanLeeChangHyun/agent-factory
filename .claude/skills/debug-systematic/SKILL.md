@@ -1,6 +1,6 @@
 ---
 name: debug-systematic
-description: "Systematically diagnoses and resolves bugs using a 4-step root cause analysis methodology (symptom collection, hypothesis formation, isolation testing, fix verification). Includes defense-in-depth debugging, condition-based wait patterns, and error handling consistency guide. Use for bug resolution: debugging, error tracing, root cause analysis, error handling pattern design. Triggers: '디버깅', 'debugging', '버그', 'bug', '에러', 'error', 'root-cause', '에러 핸들링', 'exception handling', 'graceful degradation'."
+description: "Systematically diagnoses and resolves bugs using a 4-step root cause analysis methodology covering symptom collection, hypothesis formation, isolation testing, and fix verification. Use when debugging errors, tracing root causes of unexpected behavior, designing error handling and exception patterns, or applying graceful degradation strategies."
 license: "Apache-2.0"
 ---
 

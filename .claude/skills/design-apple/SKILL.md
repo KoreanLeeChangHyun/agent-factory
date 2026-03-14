@@ -1,6 +1,6 @@
 ---
 name: design-apple
-description: Apple Human Interface Guidelines inspired design system for creating sleek, minimalist web interfaces. Use when building Apple-style landing pages, product showcases, or modern web applications with clean aesthetics.
+description: "Provides an Apple Human Interface Guidelines inspired design system for creating sleek, minimalist web interfaces. Use when building Apple-style landing pages, designing product showcase pages, or developing modern web applications that require clean aesthetics and refined visual hierarchy."
 license: MIT
 ---
 

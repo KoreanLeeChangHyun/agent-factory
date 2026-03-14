@@ -1,6 +1,6 @@
 ---
 name: review-frontend
-description: "Frontend-specialized code review skill. Validates React/Vue patterns, state management, accessibility (a11y/WCAG), rendering performance, and component design patterns. Use for frontend review: React/Vue component review, UI change review, frontend performance review. Triggers: '프론트엔드 리뷰', 'frontend review', 'React 리뷰', 'UI 리뷰', '컴포넌트 리뷰'."
+description: "Frontend-specialized code review skill that validates React/Vue component patterns, state management, accessibility (a11y/WCAG compliance), and rendering performance. Use when reviewing frontend code changes, auditing React or Vue components for design pattern violations, assessing UI accessibility, or identifying frontend performance regressions."
 license: "Apache-2.0"
 ---
 

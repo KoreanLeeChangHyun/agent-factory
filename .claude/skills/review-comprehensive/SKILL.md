@@ -1,6 +1,6 @@
 ---
 name: review-comprehensive
-description: "Comprehensive code review skill. Inspects all review domains (code quality, security, architecture, performance, testing) via an integrated checklist and produces a PASS/CONCERNS/ISSUES_FOUND/FAIL 4-level verdict. Use for comprehensive review: after major feature completion, pre-release comprehensive check, final review before merge. Triggers: '종합 리뷰', 'comprehensive review', '전체 리뷰', 'full review'."
+description: "Comprehensive code review skill that inspects all review domains (code quality, security, architecture, performance, testing) via an integrated checklist and produces a PASS/CONCERNS/ISSUES_FOUND/FAIL 4-level verdict. Use when performing a full review after major feature completion, conducting a pre-release comprehensive check, or running a final review before merging into the main branch."
 license: "Apache-2.0"
 ---
 

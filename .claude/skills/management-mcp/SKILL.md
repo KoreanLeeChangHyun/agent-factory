@@ -1,6 +1,6 @@
 ---
 name: management-mcp
-description: "Unified management skill for creating and modifying MCP (Model Context Protocol) servers. Builds LLM external service integration MCP servers through a 4-step workflow (design/implement/test/deploy). Use for MCP server management: creating, modifying, adding tools, updating MCP servers. Triggers: 'MCP', 'MCP 서버', 'create mcp', 'MCP 만들어줘', 'MCP 도구 추가', 'Model Context Protocol'."
+description: "Unified management skill for creating and modifying MCP (Model Context Protocol) servers. Builds LLM external service integration MCP servers through a 4-step workflow (design/implement/test/deploy). Use when creating a new MCP server, modifying an existing server, adding tools to a Model Context Protocol integration, or updating MCP server configuration and deployment."
 license: "Apache-2.0"
 ---
 

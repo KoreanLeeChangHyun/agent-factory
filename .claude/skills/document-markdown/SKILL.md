@@ -1,11 +1,6 @@
 ---
 name: document-markdown
-description: >
-  Markdown(.md) 작성 컨벤션 가이드. 제목 구조, 표, 리스트, 코드블록, 링크/이미지, 인라인 HTML, frontmatter 등
-  .md 파일 작성 시 일관된 포맷을 적용한다.
-  Use when creating or modifying .md files, designing document structure, writing README or reports,
-  authoring tables or checklists, or generating any Markdown document output.
-  Do not use when creating Mermaid diagrams (use design-mermaid-diagrams instead).
+description: "Markdown(.md) 작성 컨벤션 가이드. 제목 구조, 표, 리스트, 코드블록, 링크/이미지, 인라인 HTML, frontmatter 등 .md 파일 작성 시 일관된 포맷을 적용한다. Use when creating or modifying .md files, designing document structure, writing README or reports, authoring tables or checklists, or generating any Markdown document output. Do not use when creating Mermaid diagrams (use design-mermaid-diagrams instead)."
 license: "Apache-2.0"
 ---
 

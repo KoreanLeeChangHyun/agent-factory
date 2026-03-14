@@ -1,6 +1,6 @@
 ---
 name: research-general
-description: "Research skill that delivers systematic reports on technology investigations, topic research, and comparative analysis. Use for research tasks: (1) technology investigation, (2) topic-specific research, (3) invoked via /wf -s command. Triggers: '조사해줘', '리서치', '연구', '알아봐줘', '비교해줘', 'research', 'investigate'."
+description: "Research skill that delivers systematic reports on technology investigations, topic research, and comparative analysis. Use when investigating a technology or tool, researching a specific topic or domain, conducting comparative analysis between options, or producing a structured research report on any subject."
 license: "Apache-2.0"
 ---
 

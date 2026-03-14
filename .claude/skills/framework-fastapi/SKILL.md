@@ -1,6 +1,6 @@
 ---
 name: framework-fastapi
-description: "Provides production-ready FastAPI project structure and best practices including Domain-Driven directory layout, router/schema/service patterns, dependency injection, and async DB integration. Use for FastAPI development: project initialization, structure setup, API endpoint design, production pattern reference. Triggers: 'FastAPI', 'fastapi', 'Python API', 'Python 웹 서버'."
+description: "Provides production-ready FastAPI project structure and best practices including Domain-Driven directory layout, router/schema/service patterns, dependency injection, and async DB integration. Use when initializing a FastAPI project, setting up a Python web server structure, designing API endpoints with Pydantic schemas, or referencing production patterns for FastAPI development."
 license: "Apache-2.0"
 ---
 

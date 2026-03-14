@@ -1,6 +1,6 @@
 ---
 name: management-command
-description: "Unified management skill for creating and modifying Claude Code slash commands. Collects command name, purpose, and scope (project/personal), then creates or modifies .claude/commands/ files. Use for custom command management: creating, updating, or modifying slash commands. Triggers: '명령어 만들어줘', '커맨드 생성', 'create command', 'update command', '슬래시 명령어'."
+description: "Unified management skill for creating and modifying Claude Code slash commands. Collects command name, purpose, and scope (project/personal), then creates or modifies SKILL.md files. Use when creating a new slash command, updating or modifying an existing custom command, or configuring command scope, argument hints, and invocation control settings."
 license: "Apache-2.0"
 ---
 

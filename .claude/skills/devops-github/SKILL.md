@@ -1,6 +1,6 @@
 ---
 name: devops-github
-description: "gh CLI-based GitHub integration skill. Performs commit/push, PR creation/management, issue viewing/creation, branch management, and other GitHub workflows. Use for GitHub operations: pushing work results, PR creation, issue management, branch management. Triggers: 'github', 'push', 'PR', 'pull request', '푸시', '커밋', '이슈'."
+description: "Handles GitHub integration using the gh CLI. Use when committing and pushing work results to GitHub, creating or managing pull requests, viewing or creating issues, or managing branches in a GitHub repository."
 license: "Apache-2.0"
 ---
 
