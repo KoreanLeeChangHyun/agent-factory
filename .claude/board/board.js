@@ -98,7 +98,7 @@
 
   /** 디렉터리 URL에서 .xml 파일 목록을 가져온다. 404나 네트워크 오류 시 빈 배열 반환. */
   function fetchXmlList(dirUrl) {
-    return fetch(dirUrl).then(function (res) {
+    return fetch(dirUrl, { cache: "no-store" }).then(function (res) {
       if (!res.ok) return [];
       return res.text().then(function (html) {
         // 경로 탈출 방지: ../ 포함 항목과 / 시작 항목 제거
@@ -117,13 +117,60 @@
       var doneFiles = results[1].map(function (f) { return "../../.kanban/done/" + f; });
       var allFiles = rootFiles.concat(doneFiles);
       return Promise.all(allFiles.map(function (url) {
-        return fetch(url).then(function (res) {
+        return fetch(url, { cache: "no-store" }).then(function (res) {
           if (!res.ok) return null;
           return res.text().then(function (text) { return parseTicket(text); });
         }).catch(function () { return null; });
       }));
     }).then(function (results) {
       return results.filter(function (t) { return t !== null; });
+    });
+  }
+
+  /**
+   * 변경된 파일명 목록만 선택적으로 fetch하여 TICKETS를 업데이트한다.
+   * @param {string[]} files - 변경된 파일명 배열 (예: ["T-038.xml"])
+   * @returns {Promise<void>}
+   */
+  function fetchTicketsByFiles(files) {
+    return Promise.all(files.map(function (f) {
+      return fetch("../../.kanban/" + f, { cache: "no-store" }).then(function (res) {
+        if (res.ok) {
+          return res.text().then(function (text) {
+            return { file: f, ticket: parseTicket(text) };
+          });
+        }
+        // .kanban/ 에 없으면 done/ 에서 시도
+        return fetch("../../.kanban/done/" + f, { cache: "no-store" }).then(function (res2) {
+          if (res2.ok) {
+            return res2.text().then(function (text) {
+              return { file: f, ticket: parseTicket(text) };
+            });
+          }
+          // 양쪽 모두 404: 삭제된 파일
+          return { file: f, ticket: null };
+        });
+      }).catch(function () {
+        return { file: f, ticket: null };
+      });
+    })).then(function (results) {
+      results.forEach(function (result) {
+        var incoming = result.ticket;
+        if (incoming === null) {
+          // 삭제된 파일: TICKETS에서 파일명으로 해당 티켓 제거
+          var baseName = result.file.replace(/\.xml$/, "");
+          TICKETS = TICKETS.filter(function (t) { return t.number !== baseName; });
+        } else {
+          var idx = TICKETS.findIndex(function (t) { return t.number === incoming.number; });
+          if (idx !== -1) {
+            // 기존 티켓 교체
+            TICKETS[idx] = incoming;
+          } else {
+            // 새 티켓 추가
+            TICKETS.push(incoming);
+          }
+        }
+      });
     });
   }
 
@@ -323,12 +370,25 @@
       link.addEventListener("click", function () {
         var filePath = link.dataset.filepath;
         if (!filePath) return;
-        var url = "../../" + filePath;
+        var url;
+        if (link.dataset.url) {
+          // Use pre-resolved URL set by renderer.link (W01)
+          url = link.dataset.url;
+        } else if (filePath.indexOf(".workflow/") === 0 || filePath.indexOf(".claude/") === 0) {
+          // Project-root-relative path: prepend "../../" to reach project root from board.html
+          url = "../../" + filePath;
+        } else {
+          // Report-relative path (e.g. "work/..."): resolve against current tab's wfFile.url
+          var activeTab = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
+          var baseUrl = activeTab && activeTab.wfFile ? activeTab.wfFile.url : "";
+          url = urlDir(baseUrl) + filePath;
+        }
         openWfFile(filePath, url);
       });
     });
 
     initMermaid();
+    initHighlight();
   }
 
   function renderTicketHtml(ticket) {
@@ -478,7 +538,7 @@
   }
 
   function fetchEntriesFrom(baseHref) {
-    return fetch(baseHref).then(function (res) {
+    return fetch(baseHref, { cache: "no-store" }).then(function (res) {
       if (!res.ok) return [];
       return res.text();
     }).then(function (html) {
@@ -506,20 +566,20 @@
   // Fetch detail for a single entry href
   function fetchEntryDetail(entryHref) {
     var entry = lastSegment(entryHref);
-    return fetch(entryHref).then(function (r) { return r.text(); }).then(function (h2) {
+    return fetch(entryHref, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (h2) {
       var taskLinks = parseDirLinks(h2).dirs.map(function (h) { return entryHref + h; });
       return Promise.all(taskLinks.map(function (taskHref) {
         var task = lastSegment(taskHref);
-        return fetch(taskHref).then(function (r) { return r.text(); }).then(function (h3) {
+        return fetch(taskHref, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (h3) {
           var cmdLinks = parseDirLinks(h3).dirs.map(function (h) { return taskHref + h; });
           return Promise.all(cmdLinks.map(function (cmdHref) {
             var cmd = lastSegment(cmdHref);
             var basePath = cmdHref;
-            return fetch(basePath + "status.json")
+            return fetch(basePath + "status.json", { cache: "no-store" })
               .then(function (r) { return r.ok ? r.json() : null; })
               .then(function (status) {
                 if (!status) return null;
-                return fetch(basePath).then(function (r) { return r.text(); }).then(function (listing) {
+                return fetch(basePath, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (listing) {
                   var parsed = parseDirLinks(listing);
                   var fileNames = parsed.files.map(function (f) { return lastSegment(f); });
                   var hasWork = parsed.dirs.some(function (d) { return lastSegment(d) === "work"; });
@@ -562,7 +622,7 @@
     // Fetch content
     var effectiveIsDir = isDir || url.endsWith("/");
     if (effectiveIsDir) {
-      fetch(url).then(function (r) { return r.text(); }).then(function (html) {
+      fetch(url, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (html) {
         var tab = viewerTabs.find(function (t) { return t.number === tabId; });
         if (tab && tab.wfFile) {
           var parsed = parseDirLinks(html);
@@ -572,7 +632,7 @@
         }
       }).catch(function () {});
     } else {
-      fetch(url).then(function (r) { return r.text(); }).then(function (text) {
+      fetch(url, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (text) {
         var tab = viewerTabs.find(function (t) { return t.number === tabId; });
         if (tab && tab.wfFile) {
           tab.wfFile.content = text;
@@ -836,18 +896,72 @@
       var parsed = JSON.parse(wfFile.content);
       h += renderDirListing(parsed.files, parsed.baseUrl);
     } else if (wfFile.url.endsWith(".md")) {
-      h += '<div class="md-body">' + renderMd(wfFile.content) + '</div>';
+      h += '<div class="md-body">' + renderMd(wfFile.content, wfFile.url) + '</div>';
     } else {
-      h += '<pre class="wf-file-content">' + esc(wfFile.content) + '</pre>';
+      var lang = getHighlightLang(wfFile.url);
+      var lines = wfFile.content.split("\n");
+      var lineCount = lines.length;
+      // Remove trailing empty line produced by split when file ends with newline
+      if (lineCount > 0 && lines[lineCount - 1] === "") {
+        lines = lines.slice(0, lineCount - 1);
+        lineCount = lines.length;
+      }
+      var numWidth = String(lineCount).length;
+      var rows = lines.map(function (line, i) {
+        var num = String(i + 1);
+        while (num.length < numWidth) num = " " + num;
+        return '<span class="code-line-number">' + esc(num) + '</span><span class="code-line-content">' + esc(line) + '</span>';
+      });
+      h += '<div class="code-viewer"><pre><code class="hljs-pending language-' + esc(lang) + '">' + rows.join("\n") + '</code></pre></div>';
     }
     h += '</div>';
     return h;
   }
 
+  // ── Highlight.js Language Mapping ──
+  function getHighlightLang(url) {
+    var LANG_MAP = {
+      ".py":   "python",
+      ".js":   "javascript",
+      ".ts":   "typescript",
+      ".jsx":  "javascript",
+      ".tsx":  "typescript",
+      ".md":   "markdown",
+      ".xml":  "xml",
+      ".sh":   "bash",
+      ".json": "json",
+      ".css":  "css",
+      ".html": "html",
+      ".yml":  "yaml",
+      ".yaml": "yaml"
+    };
+    var m = url && url.match(/(\.[^./?#]+)(?:[?#].*)?$/);
+    if (!m) return "plaintext";
+    return LANG_MAP[m[1].toLowerCase()] || "plaintext";
+  }
+
+  function initHighlight() {
+    var blocks = document.querySelectorAll(".code-viewer code.hljs-pending");
+    blocks.forEach(function (block) {
+      if (block.dataset.highlighted) return;
+      block.dataset.highlighted = "true";
+      block.classList.remove("hljs-pending");
+      if (typeof hljs !== "undefined") {
+        hljs.highlightElement(block);
+      }
+    });
+  }
+
   // ── Markdown Rendering ──
   var mermaidCounter = 0;
 
-  function renderMd(text) {
+  /** Returns the directory portion of a URL (up to and including the last '/'). */
+  function urlDir(url) {
+    if (!url) return "";
+    return url.substring(0, url.lastIndexOf("/") + 1);
+  }
+
+  function renderMd(text, baseUrl) {
     if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
 
     var renderer = new marked.Renderer();
@@ -859,6 +973,28 @@
         return '<div class="mermaid-block" data-mermaid-id="' + id + '">' + esc(code) + '</div>';
       }
       return '<pre class="md-code"><code>' + esc(code) + '</code></pre>';
+    };
+
+    renderer.link = function (opts) {
+      var href = typeof opts === "object" ? opts.href : opts;
+      var title = typeof opts === "object" ? opts.title : arguments[1];
+      var text = typeof opts === "object" ? opts.text : arguments[2];
+      if (!href) return text || "";
+      // External links: render as normal anchor with target="_blank"
+      if (href.indexOf("http://") === 0 || href.indexOf("https://") === 0) {
+        var titleAttr = title ? ' title="' + esc(title) + '"' : "";
+        return '<a href="' + esc(href) + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + (text || esc(href)) + '</a>';
+      }
+      // Internal relative links: convert to md-file-link span
+      var resolvedUrl;
+      if (href.indexOf(".workflow/") === 0 || href.indexOf(".claude/") === 0) {
+        // Project-root-relative path: prepend "../../" to reach project root from board.html
+        resolvedUrl = "../../" + href;
+      } else {
+        // Report-relative path (e.g. "work/..."): resolve against baseUrl directory
+        resolvedUrl = urlDir(baseUrl) + href;
+      }
+      return '<span class="md-file-link" data-filepath="' + esc(href) + '" data-url="' + esc(resolvedUrl) + '">' + (text || esc(href)) + '</span>';
     };
 
     var html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
@@ -987,7 +1123,7 @@
    */
   function fetchDashboardFile(name) {
     var url = "../../.dashboard/." + name + ".md";
-    return fetch(url).then(function (res) {
+    return fetch(url, { cache: "no-store" }).then(function (res) {
       if (!res.ok) return "";
       return res.text();
     }).catch(function () { return ""; });
@@ -1518,12 +1654,18 @@
     renderSkillFreqChart(skillsRows);
   }
 
-  // ── Polling ──
-  var POLL_INTERVAL = 500;
+  // ── SSE / Polling ──
+  var SSE_TIMEOUT = 3000;        // SSE 연결 타임아웃 (ms)
+  var SSE_RETRY_INTERVAL = 30000; // SSE 재시도 간격 (ms)
+  var POLL_INTERVAL = 2000;      // 폴링 간격 (ms)
+
+  var sseConnected = false;
+  var sseGaveUp = false;         // SSE를 포기하고 폴링 모드인지
+  var sseRetryTimerId = null;
+  var pollTimerId = null;
+
   var prevTicketJson = "";
   var prevWfJson = "";
-  var ticketTimerId = null;
-  var workflowTimerId = null;
 
   function ticketJson(tickets) {
     return JSON.stringify(tickets.map(function (t) {
@@ -1532,11 +1674,19 @@
     }));
   }
 
-  function pollTickets() {
-    fetchTickets().then(function (tickets) {
+  // ── 칸반 갱신 (SSE/폴링 공용) ──
+  /**
+   * 칸반을 갱신한다.
+   * @param {string[]} [files] - 변경된 파일명 배열. 있으면 선택적 fetch, 없으면 전체 fetch.
+   */
+  function refreshKanban(files) {
+    var fetchPromise = (files && files.length > 0)
+      ? fetchTicketsByFiles(files).then(function () { return TICKETS; })
+      : fetchTickets().then(function (tickets) { TICKETS = tickets; return TICKETS; });
+
+    fetchPromise.then(function (tickets) {
       var json = ticketJson(tickets);
       if (json !== prevTicketJson) {
-        TICKETS = tickets;
         prevTicketJson = json;
         renderKanban();
         viewerTabs.forEach(function (vt) {
@@ -1548,23 +1698,11 @@
         var activeVt = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
         if (activeVt && activeVt.ticket && activeTab === "viewer") renderViewer();
       }
-      // 탭이 비활성 상태이면 폴링을 중단하고 visibilitychange에서 재개한다
-      if (document.hidden) {
-        ticketTimerId = null;
-        return;
-      }
-      ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
-    }).catch(function () {
-      // 네트워크 오류 시에도 폴링을 재예약한다
-      if (document.hidden) {
-        ticketTimerId = null;
-        return;
-      }
-      ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
     });
   }
 
-  function pollWorkflows() {
+  // ── 워크플로 갱신 (SSE/폴링 공용) ──
+  function refreshWorkflow() {
     fetchWorkflowEntries().then(function (hrefs) {
       var json = JSON.stringify(hrefs);
       if (json !== prevWfJson) {
@@ -1575,20 +1713,108 @@
         wfInitialized = false;
         loadMoreWorkflows();
       }
-      // 탭이 비활성 상태이면 폴링을 중단하고 visibilitychange에서 재개한다
-      if (document.hidden) {
-        workflowTimerId = null;
-        return;
-      }
-      workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
-    }).catch(function () {
-      // 네트워크 오류 시에도 폴링을 재예약한다
-      if (document.hidden) {
-        workflowTimerId = null;
-        return;
-      }
-      workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
     });
+  }
+
+  // ── 대시보드 갱신 (SSE/폴링 공용) ──
+  function refreshDashboard() {
+    fetchAllDashboardFiles().then(function () {
+      if (activeTab === "dashboard") renderDashboard();
+    });
+  }
+
+  // ── SSE ──
+  function initSSE() {
+    if (typeof EventSource === "undefined") {
+      // EventSource 미지원 환경 -> 즉시 폴링 모드
+      startPolling();
+      return;
+    }
+
+    var es = new EventSource("/events");
+    var timeoutId = setTimeout(function () {
+      // 3초 내 onopen 미호출 -> 타임아웃, 폴링 모드로 전환
+      if (!sseConnected) {
+        es.close();
+        startPolling();
+        scheduleSSERetry();
+      }
+    }, SSE_TIMEOUT);
+
+    es.onopen = function () {
+      clearTimeout(timeoutId);
+      sseConnected = true;
+      stopPolling();
+    };
+
+    es.addEventListener("kanban", function () {
+      refreshKanban();
+    });
+
+    es.addEventListener("workflow", function () {
+      refreshWorkflow();
+    });
+
+    es.addEventListener("dashboard", function () {
+      refreshDashboard();
+    });
+
+    es.onerror = function () {
+      sseConnected = false;
+      es.close(); // 명시적으로 닫아서 자동 재연결 방지
+      clearTimeout(timeoutId);
+      startPolling();
+      scheduleSSERetry();
+    };
+  }
+
+  // ── 폴링 ──
+  function startPolling() {
+    if (pollTimerId) return; // 이미 폴링 중
+    sseGaveUp = true;
+    pollChanges();
+  }
+
+  function stopPolling() {
+    if (pollTimerId) {
+      clearTimeout(pollTimerId);
+      pollTimerId = null;
+    }
+    sseGaveUp = false;
+  }
+
+  function pollChanges() {
+    fetch("/poll").then(function (res) {
+      if (!res.ok) throw new Error("poll failed");
+      return res.json();
+    }).then(function (changes) {
+      if (changes.kanban) {
+        refreshKanban(changes.kanban);
+      }
+      if (changes.workflow) {
+        refreshWorkflow();
+      }
+      if (changes.dashboard) {
+        refreshDashboard();
+      }
+    }).catch(function () {
+      // /poll 실패 시 조용히 처리 (콘솔 에러 없음)
+    }).then(function () {
+      // finally 대용 (ES5 호환: Promise.prototype.finally 미지원 환경 대비)
+      if (sseGaveUp && !document.hidden) {
+        pollTimerId = setTimeout(pollChanges, POLL_INTERVAL);
+      } else {
+        pollTimerId = null;
+      }
+    });
+  }
+
+  function scheduleSSERetry() {
+    if (sseRetryTimerId) return; // 이미 재시도 예약됨
+    sseRetryTimerId = setTimeout(function () {
+      sseRetryTimerId = null;
+      initSSE(); // SSE 재시도 (성공하면 onopen에서 폴링 중단)
+    }, SSE_RETRY_INTERVAL);
   }
 
   // ── Init ──
@@ -1609,24 +1835,29 @@
       });
       if (activeTab === "viewer") renderViewer();
     }
-    ticketTimerId = setTimeout(pollTickets, POLL_INTERVAL);
   });
 
   fetchWorkflowEntries().then(function (hrefs) {
     wfEntryHrefs = hrefs;
     prevWfJson = JSON.stringify(hrefs);
     loadMoreWorkflows();
-    workflowTimerId = setTimeout(pollWorkflows, POLL_INTERVAL);
   });
 
-  // 탭 활성화 복귀 시 중단된 폴링을 즉시 재시작한다
+  // SSE 연결 시작 (실패 시 onerror에서 폴백 폴링 자동 재개)
+  initSSE();
+
+  // 탭 활성화 복귀 시 누락된 변경 보상
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
-      if (!ticketTimerId) {
-        pollTickets();
-      }
-      if (!workflowTimerId) {
-        pollWorkflows();
+      if (sseConnected) {
+        // SSE 연결 중일 때도 누락된 이벤트를 보상하기 위해 1회 fetch
+        refreshKanban();
+        refreshWorkflow();
+      } else if (sseGaveUp) {
+        // 폴링 모드: 탭 복귀 시 즉시 한 번 폴링 재개
+        if (!pollTimerId) {
+          pollChanges();
+        }
       }
     }
   });

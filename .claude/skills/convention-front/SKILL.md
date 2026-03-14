@@ -1,6 +1,7 @@
 ---
 name: convention-front
 description: "HTML/CSS/JS/TS 파일 읽기/쓰기 시 트리거되는 프론트엔드 통합 코딩 컨벤션 강제 스킬. HTML 시맨틱/접근성, CSS BEM/프로퍼티 순서, JS/TS camelCase 네이밍/타입 어노테이션/TSDoc 문서화를 강제한다. OOP 설계 규칙은 convention-oop 스킬과 연계한다. Triggers: '*.html', '*.css', '*.js', '*.ts', '*.jsx', '*.tsx', 'HTML', 'CSS', 'JavaScript', 'TypeScript'."
+license: "Apache-2.0"
 ---
 
 # 프론트엔드 통합 코딩 컨벤션

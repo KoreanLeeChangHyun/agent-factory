@@ -1,6 +1,6 @@
 ---
 name: design-strategy
-description: "Decomposes large-scale tasks into multi-workflow milestones, dependency graphs, and execution roadmaps. Performs complexity estimation (T1/T2/T3 tiers), workflow chain design, critical path identification, and risk analysis. Use for strategic planning: multi-workflow strategy, large-scale project roadmap generation, milestone design. Triggers: 'strategy', '전략', '로드맵', 'roadmap', '마일스톤', 'milestone', '워크플로우 체인'."
+description: "Decomposes large-scale tasks into multi-workflow milestones, dependency graphs, and execution roadmaps. Performs complexity estimation (T1/T2/T3 tiers), workflow chain design, critical path identification, and risk analysis. Use when formulating a strategy for large-scale projects, generating a multi-workflow roadmap, designing milestones with measurable completion criteria, or identifying critical paths and inter-workflow dependencies."
 license: "Apache-2.0"
 ---
 

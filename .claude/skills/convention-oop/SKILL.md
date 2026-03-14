@@ -1,6 +1,7 @@
 ---
 name: convention-oop
-description: "Language-agnostic OOP principles and patterns guide covering SOLID 5 principles, GRASP 9 patterns, GoF 23 design patterns, and DDD tactical patterns with Python and JS/TS code examples. Use when writing or reviewing OOP code, applying design patterns, or modeling domain logic. Triggers: 'OOP', 'SOLID', 'GRASP', 'GoF', 'DDD', '디자인 패턴', 'design pattern', '객체지향', 'object-oriented', 'Entity', 'Value Object', 'Aggregate', 'Repository pattern', 'Domain Event'."
+description: "SOLID 5원칙, GRASP 9패턴, GoF 23 디자인 패턴, DDD 전술 패턴을 Python/JS/TS 코드 예시와 함께 제공하는 언어 무관 OOP 원칙·패턴 가이드. OOP 코드 작성·리뷰, 디자인 패턴 적용, 도메인 로직 모델링 시 사용한다. Triggers: 'OOP', 'SOLID', 'GRASP', 'GoF', 'DDD', '디자인 패턴', 'design pattern', '객체지향', 'object-oriented', 'Entity', 'Value Object', 'Aggregate', 'Repository pattern', 'Domain Event'."
+license: "Apache-2.0"
 ---
 
 # OOP Conventions

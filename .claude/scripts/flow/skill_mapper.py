@@ -53,10 +53,10 @@ TOKEN_BUDGET_LIMIT = 50_000
 
 EXTENSION_SKILL_MAP: dict[str, str] = {
     ".py": "convention-python",
-    ".js": "convention-javascript",
-    ".ts": "convention-javascript",
-    ".jsx": "convention-javascript",
-    ".tsx": "convention-javascript",
+    ".js": "convention-front",
+    ".ts": "convention-front",
+    ".jsx": "convention-front",
+    ".tsx": "convention-front",
 }
 
 

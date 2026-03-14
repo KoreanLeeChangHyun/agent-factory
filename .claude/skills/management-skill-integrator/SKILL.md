@@ -1,6 +1,7 @@
 ---
 name: management-skill-integrator
 description: "Automated skill integration pipeline that searches, downloads, converts, and installs external AI skills from SkillsMP marketplace into .claude/skills/ directory. Use for skill discovery and integration: finding external skills, importing marketplace skills, auto-installing agent skills. Triggers: 'skill search', 'skill install', 'find skill', '스킬 찾기', '스킬 설치', '스킬 통합', 'auto integrate'."
+license: "Apache-2.0"
 ---
 
 # Skill Auto Integrator

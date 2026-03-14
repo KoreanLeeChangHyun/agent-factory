@@ -929,6 +929,65 @@ body {
 
 .md-file-link:hover { text-decoration: underline solid; }
 
+/* ── Code Viewer ── */
+.code-viewer {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  overflow: auto;
+  margin: 0;
+}
+
+.code-viewer pre {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.code-viewer code {
+  display: block;
+  padding: 12px 0;
+  background: transparent !important;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.code-viewer .hljs {
+  background: transparent !important;
+}
+
+.code-viewer code .code-line-number,
+.code-viewer code .code-line-content {
+  display: inline;
+}
+
+.code-viewer code {
+  counter-reset: none;
+}
+
+/* Each logical line is rendered as:  <span.code-line-number>N</span><span.code-line-content>...</span>\n */
+.code-line-number {
+  display: inline-block;
+  min-width: 3ch;
+  width: 4ch;
+  padding-right: 12px;
+  padding-left: 12px;
+  color: #858585;
+  border-right: 1px solid #2d2d2d;
+  margin-right: 12px;
+  text-align: right;
+  user-select: none;
+  -webkit-user-select: none;
+  font-style: normal;
+}
+
+.code-line-content {
+  display: inline;
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .dash-cards {

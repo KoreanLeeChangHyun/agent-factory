@@ -2,6 +2,7 @@
 name: workflow-wf-research
 description: "Workflow command skill for wf research. Performs web-search-based research and internal asset analysis. Auto-loads analysis skills based on keywords: SRS, codebase, database, data analysis."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Research Command

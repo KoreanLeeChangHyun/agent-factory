@@ -11,6 +11,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Bash             -> main_branch_guard        (HOOK_MAIN_BRANCH_GUARD, sync)
   Bash             -> kanban_subcommand_guard  (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
   Write|Edit       -> main_session_guard       (HOOK_MAIN_SESSION_GUARD, sync)
+  Task             -> agent_investigation_guard (HOOK_AGENT_INVESTIGATION_GUARD, sync)
 """
 
 from __future__ import annotations
@@ -108,6 +109,16 @@ def main() -> None:
         r = dispatch(
             'HOOK_MAIN_SESSION_GUARD',
             scripts_dir('guards', 'main_session_guard.py'),
+            stdin_data,
+            flags=flags,
+        )
+        sync_results.append(r)
+
+    # --- Task: agent-investigation-guard (sync) ---
+    if tool_name == 'Task':
+        r = dispatch(
+            'HOOK_AGENT_INVESTIGATION_GUARD',
+            scripts_dir('guards', 'agent_investigation_guard.py'),
             stdin_data,
             flags=flags,
         )

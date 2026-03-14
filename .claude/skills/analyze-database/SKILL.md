@@ -1,6 +1,6 @@
 ---
 name: analyze-database
-description: "Database analysis skill. Analyzes schema, table structure, relationships, indexes, and query performance. Use for database analysis tasks: (1) schema structure analysis and ERD generation, (2) table relationship visualization, (3) index and query performance optimization, (4) normalization level and data integrity review. Invoked via /wf -s command; integrates with design-mermaid-diagrams for ERD generation. Triggers: 'DB 분석', 'database', '스키마', 'schema', 'ERD', '테이블 구조', '쿼리 성능'."
+description: "Analyzes database schema, table structure, relationships, indexes, and query performance. Use when reviewing schema structure or generating ERD, visualizing table relationships, identifying index and query performance bottlenecks, or assessing normalization level and data integrity."
 license: "Apache-2.0"
 ---
 

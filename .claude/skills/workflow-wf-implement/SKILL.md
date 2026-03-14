@@ -2,6 +2,7 @@
 name: workflow-wf-implement
 description: "Workflow command skill for wf implement. Handles code implementation, modification, refactoring, architecture design, and asset management (agent/skill/command). Auto-loads keyword-based skills for refactoring, architecture, and manager operations."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Implement Command

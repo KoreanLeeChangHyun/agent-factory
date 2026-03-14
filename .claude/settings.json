@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/flow/board_server.py",
+            "command": "python3 -u .claude/board/board.py",
             "timeout": 5,
             "async": true
           }

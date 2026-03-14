@@ -360,7 +360,7 @@ class InMemoryOrderRepository(OrderRepository):
         return [o for o in self._store.values() if o.customer_id == customer_id]
 ```
 
-### JS/TS — convention-javascript의 `DataRepository<T>` 확장
+### JS/TS — convention-front의 `DataRepository<T>` 확장
 
 ```typescript
 interface OrderRepository {

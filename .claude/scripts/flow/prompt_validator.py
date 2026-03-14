@@ -89,6 +89,81 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
     return None
 
 
+def extract_active_prompt(xml_text: str) -> str:
+    """전체 XML에서 활성 subnumber의 <prompt> 내용을 추출한다.
+
+    <submit> 래퍼 내부에서 active="true" 속성을 가진 <subnumber> 요소를
+    찾아 해당 요소 내부의 <prompt> 태그 내용을 반환한다.
+
+    <submit> 래퍼 또는 active="true" subnumber가 없으면 원본 전체 텍스트를
+    폴백으로 반환하여 하위 호환성을 보장한다.
+
+    Args:
+        xml_text: 전체 티켓 XML 텍스트
+
+    Returns:
+        활성 subnumber의 <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
+    """
+    # Step 1: <submit> 블록 추출
+    submit_content = _extract_tag_content(xml_text, "submit")
+    if submit_content is None:
+        return xml_text
+
+    # Step 2: submit 내부에서 active="true" subnumber 블록 추출
+    # <subnumber> 태그는 속성이 있으므로 _extract_tag_content 직접 사용 불가
+    # 속성 포함 패턴으로 active subnumber 블록 시작 위치를 찾는다
+    active_open_pat = re.compile(
+        r'<subnumber[^>]*\bactive\s*=\s*"true"[^>]*>', re.IGNORECASE
+    )
+    close_pat = re.compile(r'</subnumber>', re.IGNORECASE)
+
+    match = active_open_pat.search(submit_content)
+    if match is None:
+        return xml_text
+
+    # Step 3: active subnumber 블록 전체를 스택 기반으로 추출
+    # (중첩 <subnumber> 가능성에 대비하여 depth 추적)
+    open_any_pat = re.compile(r'<subnumber[^>]*>', re.IGNORECASE)
+
+    events: list[tuple[int, str, int]] = []
+    for m in open_any_pat.finditer(submit_content):
+        events.append((m.start(), "open", m.end()))
+    for m in close_pat.finditer(submit_content):
+        events.append((m.start(), "close", m.end()))
+    events.sort(key=lambda e: e[0])
+
+    depth = 0
+    outer_start: int | None = None
+    outer_end: int | None = None
+    active_start = match.start()
+    found_active = False
+
+    for pos, kind, end_pos in events:
+        if kind == "open":
+            if depth == 0 and pos == active_start:
+                found_active = True
+                outer_start = end_pos
+            depth += 1
+        else:  # close
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and found_active and outer_start is not None:
+                    outer_end = pos
+                    break
+
+    if outer_start is None or outer_end is None:
+        return xml_text
+
+    subnumber_content = submit_content[outer_start:outer_end]
+
+    # Step 4: subnumber 내부의 <prompt> 내용 추출
+    prompt_content = _extract_tag_content(subnumber_content, "prompt")
+    if prompt_content is None:
+        return xml_text
+
+    return prompt_content
+
+
 def _is_valid_content(content: str) -> bool:
     """태그 내용이 유효한지 판별한다.
 

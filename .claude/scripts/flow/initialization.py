@@ -643,7 +643,13 @@ def main() -> None:
             if _spec and _spec.loader:
                 _mod = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
-                _raw: dict[str, Any] = _mod.validate(prompt_content)
+                # 활성 subnumber의 <prompt> 섹션만 추출 (하위 호환: 함수 없으면 전체 XML 전달)
+                _active_prompt: str = (
+                    _mod.extract_active_prompt(prompt_content)
+                    if hasattr(_mod, "extract_active_prompt")
+                    else prompt_content
+                )
+                _raw: dict[str, Any] = _mod.validate(_active_prompt)
                 prompt_quality = {
                     "quality_score": _raw.get("quality_score", 0.0),
                     "has_tags": _raw.get("has_tags", False),
