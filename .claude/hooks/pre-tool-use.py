@@ -10,7 +10,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Bash             -> dangerous_command_guard  (HOOK_DANGEROUS_COMMAND, sync)
   Bash             -> main_branch_guard        (HOOK_MAIN_BRANCH_GUARD, sync)
   Bash             -> kanban_subcommand_guard  (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
-  Write|Edit       -> main_session_guard       (HOOK_MAIN_SESSION_GUARD, sync)
+  Write|Edit|Bash  -> main_session_guard       (HOOK_MAIN_SESSION_GUARD, sync)
   Task             -> agent_investigation_guard (HOOK_AGENT_INVESTIGATION_GUARD, sync)
 """
 
@@ -104,8 +104,8 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # --- Write|Edit: main-session-guard (sync) ---
-    if tool_name in ('Write', 'Edit'):
+    # --- Write|Edit|Bash: main-session-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'Bash'):
         r = dispatch(
             'HOOK_MAIN_SESSION_GUARD',
             scripts_dir('guards', 'main_session_guard.py'),
