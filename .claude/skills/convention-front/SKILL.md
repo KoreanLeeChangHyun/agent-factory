@@ -2,6 +2,7 @@
 name: convention-front
 description: "Enforces frontend coding conventions for HTML, CSS, JavaScript, and TypeScript files. Use when writing or reviewing HTML for semantic markup and accessibility, applying CSS BEM methodology and property ordering, enforcing camelCase naming and type annotations in JS/TS, or ensuring TSDoc documentation standards across .html/.css/.js/.ts/.jsx/.tsx files."
 license: "Apache-2.0"
+user-invocable: false
 ---
 
 # 프론트엔드 통합 코딩 컨벤션

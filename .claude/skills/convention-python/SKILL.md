@@ -2,6 +2,7 @@
 name: convention-python
 description: "Enforces Python coding conventions for .py files, ensuring PEP 8 naming, full type hints, and Google-style docstrings. Use when writing or reviewing Python code, adding type annotations, writing docstrings, or ensuring consistent code style across Python modules."
 license: "Apache-2.0"
+user-invocable: false
 ---
 
 # Python 코딩 컨벤션

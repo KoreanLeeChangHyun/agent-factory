@@ -34,17 +34,17 @@ _WORKFLOW_WINDOW_PREFIX = "P:T-"
 
 # Bash 도구에서 파일을 수정할 수 있는 명령 패턴 (블랙리스트)
 _BASH_FILE_MODIFY_PATTERNS: list[str] = [
-    r"sed\s+-i",                               # sed inplace
-    r"awk\s+.*-i\s+inplace",                   # awk inplace
-    r"(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf 리다이렉트
-    r"tee\s+(-a\s+)?\S",                       # tee 쓰기
-    r"cat\s*<<",                               # heredoc 리다이렉트
-    r"\bcp\s+",                                # 파일 복사
-    r"\bmv\s+",                                # 파일 이동
-    r"python3?\s+(-c\s+|.*\bopen\b.*\bwrite\b)",  # python -c open write
-    r"perl\s+-.*[pi]",                         # perl inplace
-    r"install\s+",                             # install 명령
-    r"dd\s+",                                  # dd 명령
+    r"\bsed\s+-i",                               # sed inplace
+    r"\bawk\s+.*-i\s+inplace",                   # awk inplace
+    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf 리다이렉트
+    r"\btee\s+(-a\s+)?\S",                       # tee 쓰기
+    r"\bcat\s*<<",                               # heredoc 리다이렉트
+    r"\bcp\s+",                                  # 파일 복사
+    r"\bmv\s+",                                  # 파일 이동
+    r"\bpython3?\s+(-c\s+|.*\bopen\b.*\bwrite\b)",  # python -c open write
+    r"\bperl\s+-.*[pi]",                         # perl inplace
+    r"(?:^|[;&|]\s*)\binstall\s+",               # install 명령 (서브커맨드 제외)
+    r"\bdd\s+",                                  # dd 명령
 ]
 
 
@@ -94,22 +94,71 @@ def _get_current_window_name() -> str | None:
     return None
 
 
+def _strip_quoted_args(command: str) -> str:
+    """명령 문자열에서 따옴표로 감싼 영역의 내용을 빈 문자열로 치환한다.
+
+    작은따옴표('...') 및 큰따옴표("...") 내부 텍스트를 제거하여
+    인자 값에 위험 명령어 텍스트가 포함되어도 패턴 매칭 대상에서
+    제외되도록 전처리한다. 이스케이프된 따옴표(\\", \\')는 따옴표
+    종료로 인식하지 않는다.
+
+    Args:
+        command: Bash 도구의 원본 command 문자열
+
+    Returns:
+        따옴표 내부 내용이 제거된 문자열. 따옴표 기호 자체는 유지된다.
+    """
+    # 큰따옴표: 이스케이프된 \" 를 건너뛰고 내용을 빈 문자열로 치환
+    command = re.sub(r'"(?:[^"\\]|\\.)*"', '""', command)
+    # 작은따옴표: 이스케이프된 \' 를 건너뛰고 내용을 빈 문자열로 치환
+    command = re.sub(r"'(?:[^'\\]|\\.)*'", "''", command)
+    return command
+
+
+def _extract_command_positions(command: str) -> list[str]:
+    """명령 문자열을 파이프/체인 구분자로 분할하여 세그먼트 목록을 반환한다.
+
+    따옴표 strip 후의 명령 문자열을 파이프(|), 세미콜론(;), AND(&&),
+    OR(||) 구분자로 분할한다. 각 세그먼트 선행 공백을 제거하여
+    명령어 토큰이 세그먼트 시작 위치에 오도록 한다.
+
+    분할 순서: &&, ||를 먼저 처리하고, 이후 |, ; 순으로 분할한다.
+    단일 | 는 || 와 구별하기 위해 (?<!|)\\|(?!|) 패턴으로 매칭한다.
+
+    Args:
+        command: 따옴표 strip이 완료된 명령 문자열
+
+    Returns:
+        각 세그먼트의 선행 공백이 제거된 문자열 목록.
+        빈 문자열 세그먼트는 제외된다.
+    """
+    # &&, ||, 단일 |, ; 구분자로 분할 (|| 를 | 보다 먼저 처리)
+    parts = re.split(r'&&|\|\||(?<!\|)\|(?!\|)|;', command)
+    return [part.lstrip() for part in parts if part.strip()]
+
+
 def _check_bash_file_modify(command: str) -> None:
     """Bash 명령에서 파일 수정 패턴을 검사하고 매칭 시 차단한다.
 
-    _BASH_FILE_MODIFY_PATTERNS 중 하나라도 매칭되면 _deny()를 호출한다.
+    따옴표로 감싼 인자 영역을 먼저 제거(_strip_quoted_args)한 뒤,
+    파이프/체인 구분자로 세그먼트를 분할(_extract_command_positions)하여
+    각 세그먼트에서 _BASH_FILE_MODIFY_PATTERNS 패턴을 검사한다.
+    하나라도 매칭되면 _deny()를 호출한다.
     매칭되지 않으면 sys.exit(0)으로 통과한다.
 
     Args:
         command: Bash 도구의 command 문자열
     """
-    for pattern in _BASH_FILE_MODIFY_PATTERNS:
-        if re.search(pattern, command):
-            _deny(
-                f"메인 세션에서 Bash를 통한 파일 수정이 차단되었습니다. "
-                f"(매칭 패턴: {pattern}) "
-                "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
-            )
+    stripped = _strip_quoted_args(command)
+    segments = _extract_command_positions(stripped)
+    for segment in segments:
+        for pattern in _BASH_FILE_MODIFY_PATTERNS:
+            if re.search(pattern, segment):
+                _deny(
+                    f"메인 세션에서 Bash를 통한 파일 수정이 차단되었습니다. "
+                    f"(매칭 패턴: {pattern}) "
+                    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
+                )
     # 파일 수정 패턴이 없으면 통과
     sys.exit(0)
 

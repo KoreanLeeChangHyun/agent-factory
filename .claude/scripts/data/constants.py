@@ -102,7 +102,7 @@ CHAIN_SEPARATOR = ">"
 CHAIN_MAX_RETRY = int(os.environ.get("CLAUDE_CHAIN_MAX_RETRY", "2"))
 
 
-def parse_chain_command(raw: str) -> list:
+def parse_chain_command(raw: str) -> list[str]:
     """체인 command 문자열을 파싱하여 세그먼트 리스트를 반환한다.
 
     Args:
@@ -114,11 +114,17 @@ def parse_chain_command(raw: str) -> list:
     Raises:
         ValueError: 유효하지 않은 세그먼트가 포함된 경우.
 
+    Note:
+        중복 command 세그먼트(예: 'implement>implement')를 허용한다.
+        대규모 구현을 여러 사이클로 분할하는 유스케이스를 지원하기 위한 설계 선택이다.
+
     Examples:
         >>> parse_chain_command("implement")
         ['implement']
         >>> parse_chain_command("research>implement>review")
         ['research', 'implement', 'review']
+        >>> parse_chain_command("implement>implement")
+        ['implement', 'implement']
     """
     segments = [seg.strip() for seg in raw.split(CHAIN_SEPARATOR)]
     for seg in segments:

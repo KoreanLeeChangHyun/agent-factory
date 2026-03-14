@@ -273,6 +273,9 @@
   var viewerTabs = [];
   var activeViewerTab = savedState.activeViewerTab || null;
 
+  // ── Code Viewer Store (hybrid rendering + search state) ──
+  var codeViewerStore = {}; // { [viewerId]: { pendingRows: [], allLines: [], nextChunk: 0 } }
+
   function openViewer(ticket) {
     var exists = viewerTabs.find(function (t) { return t.number === ticket.number; });
     if (!exists) {
@@ -385,6 +388,213 @@
         }
         openWfFile(filePath, url);
       });
+    });
+
+    // Bind copy button clicks
+    el.querySelectorAll(".code-copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var viewer = btn.closest(".code-viewer");
+        if (!viewer) return;
+        var lineContents = viewer.querySelectorAll(".code-line-content");
+        var text = Array.prototype.map.call(lineContents, function (span) {
+          return span.textContent;
+        }).join("\n");
+        navigator.clipboard.writeText(text).then(function () {
+          var original = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        }).catch(function () {
+          btn.textContent = "Error";
+          setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+        });
+      });
+    });
+
+    // Bind lazy scroll for large files
+    el.querySelectorAll(".code-viewer").forEach(function (viewer) {
+      var viewerId = viewer.dataset.viewerId;
+      if (!viewerId || !codeViewerStore[viewerId]) return;
+      var store = codeViewerStore[viewerId];
+      if (store.pendingRows.length === 0) return;
+
+      var CHUNK_SIZE = 200;
+      var SCROLL_THRESHOLD = 200;
+
+      function appendNextChunk() {
+        if (store.pendingRows.length === 0) return;
+        var chunk = store.pendingRows.splice(0, CHUNK_SIZE);
+        var code = viewer.querySelector("code");
+        if (!code) return;
+        var frag = document.createDocumentFragment();
+        // Append a newline text node then the chunk HTML
+        var wrapper = document.createElement("span");
+        wrapper.innerHTML = "\n" + chunk.join("\n");
+        while (wrapper.firstChild) {
+          frag.appendChild(wrapper.firstChild);
+        }
+        code.appendChild(frag);
+        if (store.pendingRows.length === 0) {
+          viewer.removeEventListener("scroll", onScroll);
+        }
+      }
+
+      function onScroll() {
+        var distFromBottom = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight;
+        if (distFromBottom < SCROLL_THRESHOLD) {
+          appendNextChunk();
+        }
+      }
+
+      viewer.addEventListener("scroll", onScroll);
+    });
+
+    // Bind code search (Ctrl+F / Cmd+F)
+    el.querySelectorAll(".code-viewer").forEach(function (viewer) {
+      var viewerId = viewer.dataset.viewerId;
+      if (!viewerId || !codeViewerStore[viewerId]) return;
+      var store = codeViewerStore[viewerId];
+      var searchBar = viewer.querySelector(".code-search-bar");
+      var searchInput = viewer.querySelector(".code-search-input");
+      var searchCount = viewer.querySelector(".code-search-count");
+
+      function openSearch() {
+        if (!searchBar) return;
+        searchBar.style.display = "flex";
+        searchInput.focus();
+        searchInput.select();
+      }
+
+      function closeSearch() {
+        if (!searchBar) return;
+        searchBar.style.display = "none";
+        clearSearchHighlights(viewer);
+        store.searchMatches = [];
+        store.searchIndex = -1;
+        if (searchCount) searchCount.textContent = "";
+      }
+
+      function clearSearchHighlights(viewerEl) {
+        viewerEl.querySelectorAll(".code-search-match").forEach(function (mark) {
+          var parent = mark.parentNode;
+          if (!parent) return;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+        viewerEl.querySelectorAll(".code-line-content.code-search-active").forEach(function (span) {
+          span.classList.remove("code-search-active");
+        });
+      }
+
+      function applySearchHighlights(query) {
+        clearSearchHighlights(viewer);
+        store.searchMatches = [];
+        store.searchIndex = -1;
+        if (!query) {
+          if (searchCount) searchCount.textContent = "";
+          return;
+        }
+        var lowerQuery = query.toLowerCase();
+        var lineContents = viewer.querySelectorAll(".code-line-content");
+        lineContents.forEach(function (span) {
+          var text = span.textContent;
+          if (text.toLowerCase().indexOf(lowerQuery) !== -1) {
+            store.searchMatches.push(span);
+            // Wrap matching text portions in <mark>
+            var lowerText = text.toLowerCase();
+            var result = "";
+            var idx = 0;
+            while (idx < text.length) {
+              var found = lowerText.indexOf(lowerQuery, idx);
+              if (found === -1) {
+                result += esc(text.substring(idx));
+                break;
+              }
+              result += esc(text.substring(idx, found));
+              result += '<mark class="code-search-match">' + esc(text.substring(found, found + query.length)) + '</mark>';
+              idx = found + query.length;
+            }
+            span.innerHTML = result;
+          }
+        });
+        if (searchCount) {
+          searchCount.textContent = store.searchMatches.length > 0
+            ? "0/" + store.searchMatches.length
+            : "No results";
+        }
+      }
+
+      function navigateSearch(dir) {
+        if (store.searchMatches.length === 0) return;
+        // Remove active class from current
+        if (store.searchIndex >= 0 && store.searchIndex < store.searchMatches.length) {
+          store.searchMatches[store.searchIndex].classList.remove("code-search-active");
+        }
+        if (dir === "next") {
+          store.searchIndex = (store.searchIndex + 1) % store.searchMatches.length;
+        } else {
+          store.searchIndex = (store.searchIndex - 1 + store.searchMatches.length) % store.searchMatches.length;
+        }
+        var activeSpan = store.searchMatches[store.searchIndex];
+        activeSpan.classList.add("code-search-active");
+        if (searchCount) {
+          searchCount.textContent = (store.searchIndex + 1) + "/" + store.searchMatches.length;
+        }
+        activeSpan.scrollIntoView({ block: "center" });
+      }
+
+      // Ctrl+F / Cmd+F inside viewer
+      viewer.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          openSearch();
+        }
+        if (e.key === "Escape") {
+          closeSearch();
+        }
+      });
+
+      // Make viewer focusable so keydown fires
+      if (!viewer.getAttribute("tabindex")) {
+        viewer.setAttribute("tabindex", "0");
+      }
+
+      // Global Ctrl+F when viewer is the active code viewer
+      viewer.addEventListener("focus", function () {
+        viewer._hasFocus = true;
+      });
+      viewer.addEventListener("blur", function () {
+        viewer._hasFocus = false;
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener("input", function () {
+          applySearchHighlights(searchInput.value);
+        });
+        searchInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            navigateSearch(e.shiftKey ? "prev" : "next");
+          }
+          if (e.key === "Escape") {
+            closeSearch();
+          }
+        });
+      }
+
+      // Nav buttons
+      viewer.querySelectorAll(".code-search-nav-btn").forEach(function (navBtn) {
+        navBtn.addEventListener("click", function () {
+          navigateSearch(navBtn.dataset.dir);
+        });
+      });
+
+      // Close button
+      var closeBtn = viewer.querySelector(".code-search-close-btn");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", function () {
+          closeSearch();
+        });
+      }
     });
 
     initMermaid();
@@ -887,6 +1097,9 @@
     bindWfColResize(el);
   }
 
+  // Counter for generating unique viewer IDs
+  var codeViewerIdCounter = 0;
+
   function renderWfFileView(wfFile) {
     var h = '<div class="tv-container">';
     h += '<div class="tv-header"><h1 class="tv-title">' + esc(wfFile.label) + '</h1></div>';
@@ -912,7 +1125,37 @@
         while (num.length < numWidth) num = " " + num;
         return '<span class="code-line-number">' + esc(num) + '</span><span class="code-line-content">' + esc(line) + '</span>';
       });
-      h += '<div class="code-viewer"><pre><code class="hljs-pending language-' + esc(lang) + '">' + rows.join("\n") + '</code></pre></div>';
+
+      var viewerId = "cv-" + (++codeViewerIdCounter);
+      var INITIAL_LINES = 500;
+      var LARGE_THRESHOLD = 3000;
+      var isLarge = lineCount > LARGE_THRESHOLD;
+      var initialRows = isLarge ? rows.slice(0, INITIAL_LINES) : rows;
+
+      // Store pending rows and original lines for large files and search
+      codeViewerStore[viewerId] = {
+        pendingRows: isLarge ? rows.slice(INITIAL_LINES) : [],
+        allLines: lines,
+        nextChunk: INITIAL_LINES,
+        searchMatches: [],
+        searchIndex: -1
+      };
+
+      var searchBarHtml = '<div class="code-search-bar" style="display:none">'
+        + '<input class="code-search-input" type="text" placeholder="Search..." aria-label="코드 검색" />'
+        + '<span class="code-search-count"></span>'
+        + '<button class="code-search-nav-btn" data-dir="prev" aria-label="이전 결과">&#9650;</button>'
+        + '<button class="code-search-nav-btn" data-dir="next" aria-label="다음 결과">&#9660;</button>'
+        + '<button class="code-search-close-btn" aria-label="검색 닫기">&times;</button>'
+        + '</div>';
+
+      var lazyAttr = isLarge ? ' data-lazy="true"' : '';
+      h += '<div class="code-viewer" data-viewer-id="' + viewerId + '">'
+        + '<button class="code-copy-btn" aria-label="코드 복사">Copy</button>'
+        + searchBarHtml
+        + '<pre><code class="hljs-pending language-' + esc(lang) + '"' + lazyAttr + '>'
+        + initialRows.join("\n")
+        + '</code></pre></div>';
     }
     h += '</div>';
     return h;
@@ -941,7 +1184,7 @@
   }
 
   function initHighlight() {
-    var blocks = document.querySelectorAll(".code-viewer code.hljs-pending");
+    var blocks = document.querySelectorAll(".code-viewer code.hljs-pending, .md-body code.hljs-pending");
     blocks.forEach(function (block) {
       if (block.dataset.highlighted) return;
       block.dataset.highlighted = "true";
@@ -972,7 +1215,8 @@
         var id = "mermaid-" + (++mermaidCounter);
         return '<div class="mermaid-block" data-mermaid-id="' + id + '">' + esc(code) + '</div>';
       }
-      return '<pre class="md-code"><code>' + esc(code) + '</code></pre>';
+      var langClass = lang ? lang : "plaintext";
+      return '<pre class="md-code"><code class="hljs-pending language-' + esc(langClass) + '">' + esc(code) + '</code></pre>';
     };
 
     renderer.link = function (opts) {

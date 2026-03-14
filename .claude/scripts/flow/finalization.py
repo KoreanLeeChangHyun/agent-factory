@@ -615,6 +615,11 @@ def main() -> None:
                         f"FINALIZE_CHAIN: ticket={ticket_number} remaining={remaining_chain} prev_report={report_path}",
                     )
                     try:
+                        _chain_log_path: str = os.path.join(abs_work_dir, "chain_launcher.log")
+                        try:
+                            _chain_log_fh = open(_chain_log_path, "a", encoding="utf-8")
+                        except Exception:
+                            _chain_log_fh = subprocess.DEVNULL  # type: ignore[assignment]
                         subprocess.Popen(
                             [
                                 "python3",
@@ -624,10 +629,11 @@ def main() -> None:
                                 report_path,
                             ],
                             stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
+                            stderr=_chain_log_fh,
                             start_new_session=True,
                         )
                         _chain_launched = True
+                        _append_log(abs_work_dir, "INFO", "FINALIZE_CHAIN: chain_launcher launched successfully")
                     except Exception as _chain_err:
                         _append_log(abs_work_dir, "ERROR", f"FINALIZE_CHAIN: launch error={_chain_err}")
                         print(f"[ERROR] Step 4c: chain_launcher.py 실행 실패: {_chain_err}", file=sys.stderr)

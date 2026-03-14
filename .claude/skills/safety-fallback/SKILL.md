@@ -2,6 +2,7 @@
 name: safety-fallback
 description: "Agent system safety guard, limitation reference, and error recovery strategy guide covering iteration limits and resource protection policies. Use when referencing agent limitations, designing Task failure or error recovery strategies, understanding self-verification criteria, or applying fallback procedures when an agent encounters unexpected errors."
 license: "Apache-2.0"
+user-invocable: false
 ---
 
 # 안전장치 및 Fallback 가이드

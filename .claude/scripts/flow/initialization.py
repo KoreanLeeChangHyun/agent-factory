@@ -413,6 +413,11 @@ def _update_ticket_title(ticket_number: str, title: str) -> None:
 def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str, chain_command: str = "") -> None:
     """.context.json을 작업 디렉터리에 작성한다.
 
+    command 필드는 finalization.py의 체인 추적에 사용되며 전체 체인 문자열을 저장한다.
+    chainCommand 필드는 원본 체인 문자열의 명시적 보존용이며, command와 동일한 값을 중복 저장한다.
+    이 이중 저장은 의도적 설계로, command 필드가 단일 command와 체인 command를 겸용하는 반면
+    chainCommand는 체인 존재 여부를 빈 문자열/비빈 문자열로 즉시 판별할 수 있는 편의 필드이다.
+
     Args:
         abs_work_dir: 작업 디렉터리 절대 경로
         title: 워크플로우 제목 (20자 이내)
@@ -598,6 +603,7 @@ def main() -> None:
     chain_command: str = ""
     effective_command: str = command
     if CHAIN_SEPARATOR in command:
+        segments: list[str] = []  # 정적 분석 possibly unbound 해소용 사전 초기화
         try:
             segments = parse_chain_command(command)
         except ValueError as e:

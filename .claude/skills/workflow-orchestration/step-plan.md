@@ -32,7 +32,22 @@ initialization.py가 `init-result.json`에 기록한 `prompt_quality.quality_sco
 
 `prompt_quality.feedback` 목록을 사용자에게 표시한 후 AskUserQuestion을 호출합니다.
 
+`prompt_quality.missing_tags`에 `constraints` 또는 `criteria`가 포함되어 있으면 `options`에서 "계속 진행" 선택지를 제거하고 "prompt 보강 후 재실행" 선택지만 표시합니다.
+
 ```markdown
+# missing_tags에 constraints 또는 criteria가 포함된 경우
+AskUserQuestion(
+  questions: [{
+    question: "티켓 파일 품질 점수가 낮습니다 (score: {quality_score:.2f}).\n\n개선이 필요한 항목:\n{feedback_lines}\n\nconstraints/criteria는 필수 태그입니다. 보강 후 재실행해야 합니다.",
+    header: "Prompt 품질 확인",
+    options: [
+      { label: "prompt 보강 후 재실행", description: "/wf -o로 티켓 파일을 보강한 뒤 커맨드를 다시 실행합니다" }
+    ],
+    multiSelect: false
+  }]
+)
+
+# missing_tags에 constraints, criteria가 모두 없는 경우 (기존 동작)
 AskUserQuestion(
   questions: [{
     question: "티켓 파일 품질 점수가 낮습니다 (score: {quality_score:.2f}).\n\n개선이 필요한 항목:\n{feedback_lines}\n\n계속 진행하시겠습니까?",
@@ -57,6 +72,10 @@ AskUserQuestion(
 | **prompt 보강 후 재실행** | 오케스트레이터 현재 turn 즉시 종료 (FSM 상태 전이 없음) |
 
 > "prompt 보강 후 재실행" 선택 시: PLAN 이전 단계이므로 FSM 상태 전이를 수행하지 않습니다. 사용자가 `/wf -o`로 티켓 파일을 보강한 뒤 커맨드를 직접 재실행하도록 안내합니다.
+
+**constraints/criteria 누락 시 강제 분기:**
+
+`prompt_quality.missing_tags`에 `constraints` 또는 `criteria`가 포함되면 "계속 진행" 선택지가 제거되므로 사용자는 "prompt 보강 후 재실행"만 선택할 수 있습니다. 이 경우 AskUserQuestion의 question 텍스트에도 `"constraints/criteria는 필수 태그입니다. 보강 후 재실행해야 합니다."` 메시지가 표시됩니다.
 
 ---
 

@@ -2,6 +2,7 @@
 name: convention-oop
 description: "Provides language-agnostic OOP principles and patterns guide covering SOLID, GRASP, GoF design patterns, and DDD tactical patterns with Python/JS/TS code examples. Use when writing or reviewing object-oriented code, applying design patterns, modeling domain logic with Entity/Value Object/Aggregate/Repository patterns, or handling Domain Events."
 license: "Apache-2.0"
+user-invocable: false
 ---
 
 # OOP Conventions

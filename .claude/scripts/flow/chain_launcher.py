@@ -26,6 +26,11 @@ finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
   현재 프로세스(finalization.py)와 독립적으로 동작하여
   현재 tmux 윈도우 종료에 영향받지 않는다.
 
+로그 모델:
+  스크립트 시작 시 _LOG_FILE 경로에 로그 파일을 생성한다. _log() 함수는
+  stderr와 로그 파일 양쪽에 동시 출력하여 독립 프로세스 실행 시에도 로그가 보존된다.
+  로그 파일 열기 실패 시에는 stderr 단독 출력으로 폴백한다.
+
 종료 코드:
   0  성공 (다음 스테이지 발사 완료)
   1  실패 (재시도 소진 또는 복구 불가 에러)
@@ -40,6 +45,7 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
+from typing import IO
 
 # ─── sys.path 보장 ──────────────────────────────────────────────────────────
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
@@ -63,12 +69,43 @@ _PROMPT_POLL_INTERVAL: float = 1.0
 _PROMPT_POLL_MAX: int = 30
 _PROMPT_PATTERN: str = "\u276f"  # ❯
 
+# ─── 로그 파일 설정 ──────────────────────────────────────────────────────────
+_LOG_FILE: str = os.path.join(_PROJECT_ROOT, ".workflow", "chain_launcher.log")
+_log_handle: IO[str] | None = None
+
+
+def _init_log_file() -> None:
+    """로그 파일 핸들을 초기화한다.
+
+    _LOG_FILE 경로에 로그 파일을 append 모드로 열어 _log_handle에 설정한다.
+    부모 디렉터리가 없으면 생성을 시도하고, 실패 시 stderr 단독 출력으로 폴백한다.
+    """
+    global _log_handle
+    try:
+        log_dir = os.path.dirname(_LOG_FILE)
+        if log_dir and not os.path.isdir(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        _log_handle = open(_LOG_FILE, "a", encoding="utf-8")  # noqa: WPS515
+    except Exception as e:
+        print(f"[WARN] chain_launcher: failed to open log file {_LOG_FILE}: {e}", file=sys.stderr, flush=True)
+        _log_handle = None
+
 
 # ─── 로그 유틸 ──────────────────────────────────────────────────────────────
 
 def _log(level: str, message: str) -> None:
-    """stderr에 로그를 출력한다."""
-    print(f"[{level}] chain_launcher: {message}", file=sys.stderr, flush=True)
+    """stderr 및 로그 파일에 로그를 출력한다.
+
+    _log_handle이 초기화되어 있으면 로그 파일에도 동시 기록하여
+    독립 프로세스로 실행될 때에도 로그가 보존된다.
+    """
+    formatted: str = f"[{level}] chain_launcher: {message}"
+    print(formatted, file=sys.stderr, flush=True)
+    if _log_handle is not None:
+        try:
+            print(formatted, file=_log_handle, flush=True)
+        except Exception:
+            pass
 
 
 # ─── tmux 유틸 ──────────────────────────────────────────────────────────────
@@ -96,7 +133,22 @@ def _window_exists(window_name: str) -> bool:
 
 
 def _tmux_window_target(window_name: str) -> str:
-    """콜론 포함 윈도우명을 인덱스 기반 타겟으로 변환한다."""
+    """콜론 포함 윈도우명을 인덱스 기반 타겟으로 변환한다.
+
+    tmux는 콜론(:)을 세션/윈도우 구분자로 사용하므로 콜론 포함 윈도우명을
+    직접 타겟으로 사용하면 올바른 윈도우를 찾지 못한다. 이 함수는 윈도우 인덱스로
+    변환하여 tmux 명령이 올바른 윈도우를 대상으로 하도록 보장한다.
+
+    인덱스 조회에 실패한 경우: 콜론 포함 여부를 검사하여 콜론이 있으면 WARN 로그를
+    남기고 빈 문자열을 반환한다. Caller는 빈 문자열 반환 시 에러 분기를 처리해야 한다.
+    콜론이 없는 경우에는 원본 window_name을 그대로 반환한다 (안전 폴백).
+
+    Args:
+        window_name: 변환할 윈도우 이름 (P:T-NNN 형식)
+
+    Returns:
+        인덱스 문자열, 또는 조회 실패 시 원본 이름(콜론 없음) / 빈 문자열(콜론 있음).
+    """
     try:
         result = _run_tmux("list-windows", "-F", "#{window_index}\t#{window_name}")
         if result.returncode == 0:
@@ -106,6 +158,10 @@ def _tmux_window_target(window_name: str) -> str:
                     return parts[0]
     except Exception:
         pass
+    # 인덱스 조회 실패: 콜론 포함 여부에 따라 안전 처리
+    if ":" in window_name:
+        _log("WARN", f"_tmux_window_target: failed to resolve index for '{window_name}' (contains colon), returning empty string")
+        return ""
     return window_name
 
 
@@ -165,6 +221,9 @@ def _poll_for_prompt(window_name: str) -> bool:
         프롬프트가 감지되면 True, 타임아웃이면 False.
     """
     target = _tmux_window_target(window_name)
+    if not target:
+        _log("ERROR", f"_poll_for_prompt: invalid target for window '{window_name}' (empty string)")
+        return False
     for _ in range(_PROMPT_POLL_MAX):
         try:
             result = _run_tmux("capture-pane", "-t", target, "-p")
@@ -179,6 +238,9 @@ def _poll_for_prompt(window_name: str) -> bool:
 def _send_keys(window_name: str, command: str) -> bool:
     """tmux 윈도우에 명령 키를 전송한다."""
     target = _tmux_window_target(window_name)
+    if not target:
+        _log("ERROR", f"_send_keys: invalid target for window '{window_name}' (empty string)")
+        return False
     try:
         result = _run_tmux("send-keys", "-t", target, command, "Enter")
         return result.returncode == 0
@@ -190,6 +252,9 @@ def _send_keys(window_name: str, command: str) -> bool:
 def _kill_window(window_name: str) -> bool:
     """tmux 윈도우를 종료한다."""
     target = _tmux_window_target(window_name)
+    if not target:
+        _log("WARN", f"_kill_window: invalid target for window '{window_name}' (empty string), skipping kill")
+        return False
     try:
         result = _run_tmux("kill-window", "-t", target)
         return result.returncode == 0
@@ -259,11 +324,14 @@ def launch_next_stage(
 ) -> int:
     """다음 체인 스테이지를 발사한다.
 
+    실패 시 while 루프로 CHAIN_MAX_RETRY 횟수만큼 재시도한다.
+    재귀 호출 없이 루프 구조로 구현되어 재시도 횟수가 크더라도 스택 오버플로우가 발생하지 않는다.
+
     Args:
         ticket_number: T-NNN 형식 티켓 번호
         remaining_chain: 남은 체인 문자열 (예: "implement>review")
         prev_report_path: 이전 스테이지 report.md 절대 경로
-        retry_count: 현재 재시도 횟수
+        retry_count: 시작 재시도 횟수 (기본값 0)
 
     Returns:
         0=성공, 1=실패
@@ -271,110 +339,130 @@ def launch_next_stage(
     window_name = f"{WINDOW_PREFIX_P}{ticket_number}"
     ticket_num_int = _extract_ticket_number_int(ticket_number)
 
-    _log("INFO", f"ticket={ticket_number} remaining={remaining_chain} retry={retry_count}/{CHAIN_MAX_RETRY}")
+    current_retry: int = retry_count
+    while current_retry <= CHAIN_MAX_RETRY:
+        _log("INFO", f"ticket={ticket_number} remaining={remaining_chain} retry={current_retry}/{CHAIN_MAX_RETRY}")
 
-    # ── Step 1: 이전 tmux 윈도우 사망 대기 ──
-    _log("INFO", f"waiting for window {window_name} to die...")
-    _wait_for_window_death(window_name)
+        # ── Step 1: 이전 tmux 윈도우 사망 대기 ──
+        _log("INFO", f"waiting for window {window_name} to die...")
+        window_gone: bool = _wait_for_window_death(window_name)
+        if not window_gone:
+            # 타임아웃 시 강제 kill 후 진행
+            _log("WARN", f"window {window_name} still alive after timeout, force killing")
+            _kill_window(window_name)
+            time.sleep(1)
 
-    # ── Step 2: kanban.py add-subnumber 호출 ──
-    # 이전 subnumber에서 goal/target 복사
-    prev_data = _read_previous_subnumber(ticket_number)
-    goal = prev_data.get("goal", "(체인 자동 생성)")
-    target = prev_data.get("target", "(체인 자동 생성)")
+        # ── Step 2: kanban.py add-subnumber 호출 ──
+        # 이전 subnumber에서 goal/target 복사
+        prev_data = _read_previous_subnumber(ticket_number)
+        goal = prev_data.get("goal", "(체인 자동 생성)")
+        target = prev_data.get("target", "(체인 자동 생성)")
 
-    # context에 이전 스테이지 report 경로 주입
-    context = f"이전 스테이지 report: {prev_report_path}"
+        # context에 이전 스테이지 report 경로 주입
+        context = f"이전 스테이지 report: {prev_report_path}"
 
-    add_cmd = [
-        "python3", KANBAN_PY, "add-subnumber", ticket_number,
-        "--command", remaining_chain,
-        "--goal", goal,
-        "--target", target,
-        "--context", context,
-    ]
+        add_cmd = [
+            "python3", KANBAN_PY, "add-subnumber", ticket_number,
+            "--command", remaining_chain,
+            "--goal", goal,
+            "--target", target,
+            "--context", context,
+        ]
 
-    _log("INFO", f"add-subnumber: command={remaining_chain}")
-    try:
-        result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            _log("ERROR", f"add-subnumber failed: exit {result.returncode} stderr={result.stderr.strip()}")
-            return _handle_retry(ticket_number, remaining_chain, prev_report_path, retry_count)
-        _log("INFO", f"add-subnumber ok: {result.stdout.strip()}")
-    except Exception as e:
-        _log("ERROR", f"add-subnumber exception: {e}")
-        return _handle_retry(ticket_number, remaining_chain, prev_report_path, retry_count)
+        _log("INFO", f"add-subnumber: command={remaining_chain}")
+        try:
+            result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                _log("ERROR", f"add-subnumber failed: exit {result.returncode} stderr={result.stderr.strip()}")
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+            _log("INFO", f"add-subnumber ok: {result.stdout.strip()}")
+        except Exception as e:
+            _log("ERROR", f"add-subnumber exception: {e}")
+            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+            if should_continue:
+                continue
+            break
 
-    # ── Step 3: kanban.py move T-NNN open (티켓을 Open 상태로 되돌림) ──
-    move_cmd = ["python3", KANBAN_PY, "move", ticket_number, "open"]
-    _log("INFO", f"move ticket to open")
-    try:
-        result = subprocess.run(move_cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            # "이미 Open 상태" 같은 경우는 무시
-            _log("WARN", f"move open: exit {result.returncode} stderr={stderr}")
-    except Exception as e:
-        _log("WARN", f"move open exception: {e}")
+        # ── Step 3: kanban.py move T-NNN open (티켓을 Open 상태로 되돌림) ──
+        move_cmd = ["python3", KANBAN_PY, "move", ticket_number, "open"]
+        _log("INFO", "move ticket to open")
+        try:
+            result = subprocess.run(move_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                stderr = result.stderr.strip()
+                # "이미 Open 상태" 같은 경우는 무시
+                _log("WARN", f"move open: exit {result.returncode} stderr={stderr}")
+        except Exception as e:
+            _log("WARN", f"move open exception: {e}")
 
-    # ── Step 4: 새 tmux 윈도우 생성 + 프롬프트 대기 + /wf -s N 전송 ──
-    _log("INFO", f"creating window {window_name}")
+        # ── Step 4: 새 tmux 윈도우 생성 + 프롬프트 대기 + /wf -s N 전송 ──
+        _log("INFO", f"creating window {window_name}")
 
-    if not _create_window(window_name):
-        _log("ERROR", f"window creation failed: {window_name}")
-        return _handle_retry(ticket_number, remaining_chain, prev_report_path, retry_count)
+        if not _create_window(window_name):
+            _log("ERROR", f"window creation failed: {window_name}")
+            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+            if should_continue:
+                continue
+            break
 
-    _log("INFO", f"polling for prompt in {window_name}")
-    if not _poll_for_prompt(window_name):
-        _log("ERROR", f"prompt not detected in {window_name} after {_PROMPT_POLL_MAX}s")
-        _kill_window(window_name)
-        return _handle_retry(ticket_number, remaining_chain, prev_report_path, retry_count)
+        _log("INFO", f"polling for prompt in {window_name}")
+        if not _poll_for_prompt(window_name):
+            _log("ERROR", f"prompt not detected in {window_name} after {_PROMPT_POLL_MAX}s")
+            _kill_window(window_name)
+            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+            if should_continue:
+                continue
+            break
 
-    # /wf -s N 명령 전송
-    wf_command = f"/wf -s {ticket_num_int}"
-    _log("INFO", f"sending command: {wf_command}")
-    if not _send_keys(window_name, wf_command):
-        _log("ERROR", f"send_keys failed for {window_name}")
-        return _handle_retry(ticket_number, remaining_chain, prev_report_path, retry_count)
+        # /wf -s N 명령 전송
+        wf_command = f"/wf -s {ticket_num_int}"
+        _log("INFO", f"sending command: {wf_command}")
+        if not _send_keys(window_name, wf_command):
+            _log("ERROR", f"send_keys failed for {window_name}")
+            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+            if should_continue:
+                continue
+            break
 
-    _log("INFO", f"chain stage launched successfully: ticket={ticket_number} next={remaining_chain}")
-    return 0
+        _log("INFO", f"chain stage launched successfully: ticket={ticket_number} next={remaining_chain}")
+        return 0
+
+    # 루프 탈출: 재시도 소진
+    _log("ERROR", f"max retry exceeded ({CHAIN_MAX_RETRY}), chain aborted: ticket={ticket_number}")
+    _log("ERROR", f"수동으로 다음 스테이지를 시작하려면: /wf -s {ticket_num_int}")
+    return 1
 
 
-def _handle_retry(
-    ticket_number: str,
-    remaining_chain: str,
-    prev_report_path: str,
-    retry_count: int,
-) -> int:
-    """실패 시 재시도를 처리한다.
-
-    CHAIN_MAX_RETRY 횟수만큼 자기 자신을 재귀 호출한다.
+def _increment_retry(current_retry: int, ticket_number: str) -> tuple[int, bool]:
+    """재시도 횟수를 증가시키고, 계속 시도 가능 여부를 반환한다.
 
     Args:
-        ticket_number: T-NNN 형식 티켓 번호
-        remaining_chain: 남은 체인 문자열
-        prev_report_path: 이전 스테이지 report.md 절대 경로
-        retry_count: 현재 재시도 횟수
+        current_retry: 현재 재시도 횟수
+        ticket_number: 로그 출력용 티켓 번호
 
     Returns:
-        0=재시도 성공, 1=재시도 소진
+        (next_retry, should_continue) 튜플.
+        should_continue가 False이면 루프를 탈출해야 한다.
     """
-    next_retry = retry_count + 1
+    next_retry = current_retry + 1
     if next_retry > CHAIN_MAX_RETRY:
-        _log("ERROR", f"max retry exceeded ({CHAIN_MAX_RETRY}), chain aborted: ticket={ticket_number}")
-        return 1
-
+        return next_retry, False
     _log("WARN", f"retrying ({next_retry}/{CHAIN_MAX_RETRY}): ticket={ticket_number}")
     # 재시도 전 잠시 대기 (백오프)
     time.sleep(3)
-    return launch_next_stage(ticket_number, remaining_chain, prev_report_path, next_retry)
+    return next_retry, True
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     """CLI 진입점."""
+    # 로그 파일 초기화: 독립 프로세스 실행 시에도 로그가 파일에 보존된다
+    _init_log_file()
+
     parser = argparse.ArgumentParser(
         prog="chain_launcher",
         description="체인 스테이지 비동기 tmux 발사 스크립트",
