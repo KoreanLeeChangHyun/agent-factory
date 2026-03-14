@@ -28,7 +28,16 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# prompt 패키지 import 경로 설정
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+if _prompt_dir not in sys.path:
+    sys.path.insert(0, _prompt_dir)
+
 from common import read_env
+from messages import (
+    AGENT_INVESTIGATION_MAIN_SESSION_DENIED,
+    AGENT_INVESTIGATION_WINDOW_QUERY_FAILED,
+)
 
 # 워크플로우 세션 윈도우명 접두사
 _WORKFLOW_WINDOW_PREFIX = "P:T-"
@@ -165,30 +174,21 @@ def main() -> None:
     tmux_pane = os.environ.get("TMUX_PANE")
     if not tmux_pane:
         # 비tmux 환경에서는 차단
-        _deny(
-            f"메인 세션에서의 조사 목적 서브에이전트(subagent_type: {subagent_type!r}) 호출이 차단되었습니다. "
-            "워크플로우 세션(tmux P:T-* 윈도우)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
-        )
+        _deny(AGENT_INVESTIGATION_MAIN_SESSION_DENIED.format(subagent_type=repr(subagent_type)))
 
     # tmux 윈도우명 조회
     window_name = _get_current_window_name()
 
     # 윈도우명 조회 실패 시 안전 차단 (보수적 접근)
     if window_name is None:
-        _deny(
-            f"tmux 윈도우명 조회에 실패하여 조사 목적 서브에이전트(subagent_type: {subagent_type!r}) 호출이 차단되었습니다. "
-            "워크플로우 세션(tmux P:T-* 윈도우)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
-        )
+        _deny(AGENT_INVESTIGATION_WINDOW_QUERY_FAILED.format(subagent_type=repr(subagent_type)))
 
     # 워크플로우 세션(P:T-* 접두사)이면 통과
     if window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
         sys.exit(0)
 
     # 메인 세션이면 차단
-    _deny(
-        f"메인 세션에서의 조사 목적 서브에이전트(subagent_type: {subagent_type!r}) 호출이 차단되었습니다. "
-        "워크플로우 세션(tmux P:T-* 윈도우)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
-    )
+    _deny(AGENT_INVESTIGATION_MAIN_SESSION_DENIED.format(subagent_type=repr(subagent_type)))
 
 
 if __name__ == "__main__":

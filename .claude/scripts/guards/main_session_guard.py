@@ -27,7 +27,18 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# prompt 패키지 import 경로 설정
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+if _prompt_dir not in sys.path:
+    sys.path.insert(0, _prompt_dir)
+
 from common import read_env
+from messages import (
+    MAIN_SESSION_BASH_FILE_MODIFY_DENIED,
+    MAIN_SESSION_NO_TMUX_DENIED,
+    MAIN_SESSION_WINDOW_QUERY_FAILED,
+    MAIN_SESSION_WRITE_EDIT_DENIED,
+)
 
 # 워크플로우 세션 윈도우명 접두사
 _WORKFLOW_WINDOW_PREFIX = "P:T-"
@@ -154,11 +165,7 @@ def _check_bash_file_modify(command: str) -> None:
     for segment in segments:
         for pattern in _BASH_FILE_MODIFY_PATTERNS:
             if re.search(pattern, segment):
-                _deny(
-                    f"메인 세션에서 Bash를 통한 파일 수정이 차단되었습니다. "
-                    f"(매칭 패턴: {pattern}) "
-                    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
-                )
+                _deny(MAIN_SESSION_BASH_FILE_MODIFY_DENIED.format(pattern=pattern))
     # 파일 수정 패턴이 없으면 통과
     sys.exit(0)
 
@@ -204,10 +211,7 @@ def main() -> None:
         if tool_name == "Bash":
             command = tool_input.get("command", "")
             _check_bash_file_modify(command)
-        _deny(
-            "비tmux 환경에서의 코드 수정이 차단되었습니다. "
-            "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
-        )
+        _deny(MAIN_SESSION_NO_TMUX_DENIED)
 
     # tmux 윈도우명 조회
     window_name = _get_current_window_name()
@@ -218,10 +222,7 @@ def main() -> None:
         if tool_name == "Bash":
             command = tool_input.get("command", "")
             _check_bash_file_modify(command)
-        _deny(
-            "tmux 윈도우명 조회에 실패하여 코드 수정이 차단되었습니다. "
-            "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
-        )
+        _deny(MAIN_SESSION_WINDOW_QUERY_FAILED)
 
     # 워크플로우 세션(P:T-* 접두사)이면 통과
     if window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
@@ -233,10 +234,7 @@ def main() -> None:
         _check_bash_file_modify(command)
 
     # 메인 세션에서 Write/Edit는 차단
-    _deny(
-        f"메인 세션(윈도우: {window_name})에서의 코드 수정이 차단되었습니다. "
-        "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
-    )
+    _deny(MAIN_SESSION_WRITE_EDIT_DENIED.format(window_name=window_name))
 
 
 if __name__ == "__main__":

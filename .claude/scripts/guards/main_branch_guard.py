@@ -26,7 +26,13 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# prompt 패키지 import 경로 설정
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+if _prompt_dir not in sys.path:
+    sys.path.insert(0, _prompt_dir)
+
 from common import read_env
+from messages import MAIN_BRANCH_COMMIT_DENIED
 
 # main/master 브랜치에서 차단할 git commit 패턴
 _GIT_COMMIT_PATTERN = re.compile(r"\bgit\s+commit\b")
@@ -115,10 +121,7 @@ def main() -> None:
 
     # main/master 브랜치이면 차단
     if branch in _PROTECTED_BRANCHES:
-        _deny(
-            f"main/master 브랜치({branch})에서 직접 커밋이 차단되었습니다. "
-            "피처 브랜치를 생성하여 작업하세요."
-        )
+        _deny(MAIN_BRANCH_COMMIT_DENIED.format(branch=branch))
 
     # 보호 대상 브랜치가 아니면 통과
     sys.exit(0)

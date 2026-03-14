@@ -25,7 +25,13 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# prompt 패키지 import 경로 설정
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+if _prompt_dir not in sys.path:
+    sys.path.insert(0, _prompt_dir)
+
 from common import read_env
+from messages import KANBAN_INVALID_SUBCOMMAND
 
 # flow-kanban 유효 서브커맨드 집합
 VALID_SUBCOMMANDS: frozenset[str] = frozenset({
@@ -109,10 +115,7 @@ def main() -> None:
 
     # 유효하지 않은 서브커맨드 차단
     valid_list = ", ".join(sorted(VALID_SUBCOMMANDS))
-    _deny(
-        f"flow-kanban의 유효하지 않은 서브커맨드 '{subcommand}'가 차단되었습니다. "
-        f"유효한 서브커맨드: {valid_list}"
-    )
+    _deny(KANBAN_INVALID_SUBCOMMAND.format(subcommand=subcommand, valid_list=valid_list))
 
 
 if __name__ == "__main__":

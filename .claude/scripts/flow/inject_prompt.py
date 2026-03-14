@@ -2,13 +2,13 @@
 """session_start_system_prompt.py - SessionStart hook으로 세션별 system-prompt를 자동 주입한다.
 
 tmux 윈도우 이름(P:T-* 여부)으로 메인/워크플로우 세션을 분기하여
-system-prompt.xml(메인용) 또는 system-prompt-wf.xml(워크플로우용)을 stdout으로 출력한다.
+.claude/prompt/system-prompt.xml(메인용) 또는 .claude/prompt/system-prompt-wf.xml(워크플로우용)을 stdout으로 출력한다.
 
 동작:
   - TMUX_PANE 환경변수가 있으면 tmux display-message로 현재 윈도우 이름을 조회한다.
   - TMUX_PANE이 없으면(비tmux 환경) 메인용으로 폴백한다.
-  - 윈도우 이름이 P:T- 접두사로 시작하면 system-prompt-wf.xml을 출력한다.
-  - 그 외(메인 세션)이면 system-prompt.xml을 출력한다.
+  - 윈도우 이름이 P:T- 접두사로 시작하면 .claude/prompt/system-prompt-wf.xml을 출력한다.
+  - 그 외(메인 세션)이면 .claude/prompt/system-prompt.xml을 출력한다.
   - 대상 파일이 존재하지 않으면 에러 없이 exit 0으로 종료한다.
   - 워크플로우 세션에서 활성 티켓(T-NNN)이 감지되면, 매 응답 첫 줄에 [T-NNN] 접두사를
     출력하도록 지시하는 <ticket-prefix> XML 블록을 system-prompt 뒤에 추가로 주입한다.
@@ -72,9 +72,9 @@ def main() -> None:
     project_root = resolve_project_root()
 
     if _is_workflow_session():
-        prompt_file = os.path.join(project_root, ".claude", "system-prompt-wf.xml")
+        prompt_file = os.path.join(project_root, ".claude", "prompt", "system-prompt-wf.xml")
     else:
-        prompt_file = os.path.join(project_root, ".claude", "system-prompt.xml")
+        prompt_file = os.path.join(project_root, ".claude", "prompt", "system-prompt.xml")
 
     # 파일이 없으면 에러 없이 종료
     if not os.path.exists(prompt_file):
