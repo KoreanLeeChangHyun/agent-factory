@@ -24,6 +24,52 @@
       메인 세션은 티켓 관리, 상태 확인, 결과 리뷰 등 조율(orchestration) 역할만 담당해야 한다 (MUST).
     </main-session-policy>
 
+    <rules>
+      DO:
+      - 코드 수정은 반드시 /wf -e 로 티켓 생성/편집 후 /wf -s N 으로 실행한다
+      - 메인 세션은 티켓 관리·상태 확인·결과 리뷰 등 조율 역할만 담당한다
+      - 자연어 요청도 워크플로우 명령으로 변환하여 처리한다 (아래 natural-language-mapping 참조)
+
+      DO NOT:
+      - 메인 세션에서 Write/Edit/Bash 로 코드를 직접 수정 시도하지 않는다 — Hook이 PreToolUse에서 차단하므로 토큰만 낭비된다
+      - 서브에이전트(Task)를 통해 조사·수정을 직접 시도하지 않는다 — 티켓 생성 후 워크플로우로 처리해야 한다
+      - flow-kanban update 등 미등록 서브커맨드를 사용 시도하지 않는다 — Hook이 차단한다
+      - /clear 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook이 자동 재주입한다
+
+      실용적 이유: 위 DO NOT 항목은 Hook이 PreToolUse 단계에서 차단하므로 시도 자체가 토큰 낭비이다.
+      차단-재시도 루프를 방지하려면 처음부터 올바른 경로(/wf 명령어)로 진행하라.
+    </rules>
+
+    <alias-reference>
+      flow-kanban 서브커맨드 (이 외의 서브커맨드 사용 금지):
+      - create &lt;title&gt;
+      - move &lt;ticket&gt; &lt;target&gt;
+      - done &lt;ticket&gt;
+      - delete &lt;ticket&gt;
+      - add-subnumber &lt;ticket&gt; --command &lt;cmd&gt; --goal "&lt;goal&gt;" --target "&lt;target&gt;"
+      - update-title &lt;ticket&gt; &lt;title&gt;
+      - update-subnumber &lt;ticket&gt; --id &lt;N&gt; --workflow &lt;W-NNN&gt;
+      - archive-subnumber &lt;ticket&gt;
+
+      flow-tmux: launch T-NNN '&lt;command&gt;' | cleanup T-NNN
+      flow-claude: start &lt;command&gt; | end &lt;registryKey&gt;
+      flow-update: status &lt;registryKey&gt; &lt;STATUS&gt; | both &lt;registryKey&gt; &lt;agent&gt; &lt;toStep&gt; | task-start &lt;registryKey&gt; W01 W02 | task-status &lt;registryKey&gt; running W01 W02
+      flow-finish: &lt;registryKey&gt; 완료|실패 --ticket-number &lt;T-NNN&gt; [--workflow-id &lt;id&gt;]
+      flow-step: start &lt;registryKey&gt; | end &lt;registryKey&gt; [label]
+      flow-phase: &lt;registryKey&gt; &lt;N&gt;
+      flow-skillmap: &lt;registryKey&gt;
+    </alias-reference>
+
+    <natural-language-mapping>
+      사용자 자연어 요청을 워크플로우 명령으로 변환하는 가이드:
+      - "이거 수정해줘" / "코드 고쳐줘"  →  /wf -e (티켓 생성+편집)  →  /wf -s N (실행)
+      - "분석해줘" / "조사해줘"           →  /wf -e (research 커맨드로 티켓 생성)  →  /wf -s N
+      - "티켓 만들어"                     →  /wf -o (채번만)
+      - "리뷰해줘"                        →  /wf -e (review 커맨드로 티켓 생성)  →  /wf -s N
+      - "완료 처리해줘"                   →  /wf -d N
+      - "티켓 편집해줘" / "내용 바꿔줘"  →  /wf -e N (기존 티켓 편집)
+    </natural-language-mapping>
+
     <workflow-summary>
       워크플로우 시스템 요약:
       - entry-point: /wf 명령어 (단일 진입점)
@@ -35,15 +81,10 @@
         - /wf -d N     : 티켓 종료 (Done)
         - /wf -c N     : 티켓 삭제
       - aliases: flow-* 스크립트 체계 (flow-kanban, flow-tmux, flow-claude 등)
-      - flow-kanban 유효 서브커맨드 (이 외의 서브커맨드는 절대 사용 금지 (MUST NOT). 특히 'update'라는 서브커맨드는 존재하지 않으며 사용 시 hook에 의해 차단된다):
-        - create <title>
-        - move <ticket> <target>
-        - done <ticket>
-        - delete <ticket>
-        - add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>"
-        - update-title <ticket> <title>    ← 제목 변경 시 반드시 이것 사용 (update ✕)
-        - update-subnumber <ticket> --id <N> --workdir <path>
-        - archive-subnumber <ticket>
+      - flow-* alias 필수 매개변수 상세: 위 alias-reference 섹션 참조
+      - flow-kanban 유효 서브커맨드 요약 (상세는 alias-reference 참조. 이 외의 서브커맨드 사용 금지):
+        create | move | done | delete | add-subnumber | update-title | update-subnumber | archive-subnumber
+        (주의: 'update' 서브커맨드는 존재하지 않으며 사용 시 hook에 의해 차단된다)
       - 상세 참조:
         - 명령어 사용법: .claude/commands/wf.md
         - 오케스트레이션 스킬: .claude/skills/workflow-orchestration/

@@ -106,11 +106,11 @@ workDir: <workDir>
 
 1. **plan_validator.py 자동 실행** — 계획서 구조 검증 (상세: [2a-Post-Validator](#2a-post-validator-plan_validatorpy-자동-실행) 참조)
 2. `flow-step end <registryKey> planSubmit` — PLAN Step 완료 배너 + plan.md 링크 + [OK] 출력 (**1회만 호출**)
-3. **즉시** Step 2c(스킬 매핑 검증 루프)로 진행
+3. **즉시** Step 2b(Auto-Approve Gate)로 진행
 
 > **MUST NOT:**
 > - `flow-step end`를 2회 이상 호출
-> - Step 2c 진입 시 `flow-step end`를 "보장을 위해" 재호출
+> - Step 2b 또는 Step 2c 진입 시 `flow-step end`를 "보장을 위해" 재호출
 
 ### 2a-Post-Validator: plan_validator.py 자동 실행
 
@@ -124,6 +124,65 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 - `"검증 통과"` 출력 → 경고 없음
 - 그 외 출력 → `[WARN]` 로그로 출력 (비차단, 흐름을 중단하지 않음)
 - 실행 실패 시 → 빈 문자열로 폴백 (검증은 advisory이므로 blocking하지 않음)
+
+## Step 2b: PLAN - Auto-Approve Gate
+
+> 2a-Post 완료 직후, 오케스트레이터는 `autoApprove` 값에 따라 사용자 승인 절차를 분기합니다.
+> `autoApprove`는 step-init.md Step 1에서 파싱됩니다: `-n` 미지정 시 `true`(기본값), `-n` 지정 시 `false`.
+
+**분기 테이블:**
+
+| `autoApprove` 값 | 동작 |
+|-----------------|------|
+| `true` (기본값, `-n` 미지정) | 사용자 확인 없이 즉시 Step 2c(스킬 매핑 검증 루프)로 진행 |
+| `false` (`-n` 지정) | AskUserQuestion으로 승인/수정/중지 3가지 선택지 제시 |
+
+### 2b-1. autoApprove=true 분기
+
+사용자 확인 없이 즉시 Step 2c로 진행합니다. AskUserQuestion을 호출하지 않습니다.
+
+> **Post-Return Silence Rules**와 정합: 오케스트레이터 SKILL.md L197 "PLAN done → AskUserQuestion Prohibited" 규칙은 `autoApprove=true`(기본값) 상태에서 적용됩니다.
+
+### 2b-2. autoApprove=false 분기
+
+```
+AskUserQuestion(
+  questions: [{
+    question: "계획서가 작성되었습니다. 검토 후 진행 방법을 선택해주세요.",
+    header: "PLAN 검토",
+    options: [
+      { label: "승인", description: "계획서를 승인하고 스킬 매핑 검증(Step 2c)으로 진행합니다" },
+      { label: "수정", description: "티켓 파일에 피드백을 작성한 후 선택하면 planner가 계획을 수정합니다" },
+      { label: "중지", description: "워크플로우를 중단합니다 (CANCELLED 상태 전이)" }
+    ],
+    multiSelect: false
+  }]
+)
+```
+
+**선택 결과 처리:**
+
+| 선택 | 동작 |
+|------|------|
+| **승인** | 즉시 Step 2c로 진행 |
+| **수정** | planner를 revise 모드로 재호출 → 2a-Post 재실행 → Step 2b 재진입 (참조: planner SKILL.md "revise 모드 수신 처리" 섹션) |
+| **중지** | `flow-update status <registryKey> CANCELLED` 실행 후 오케스트레이터 turn 종료 |
+
+> **"수정" 동작 상세:** 사용자가 티켓 파일에 수정 피드백을 작성한 후 "수정"을 선택하면, 오케스트레이터는 아래 의사코드로 planner를 revise 모드로 재호출합니다:
+>
+> ```
+> Task(subagent_type="planner", prompt="
+> command: <command>
+> workId: <workId>
+> request: <request>
+> workDir: <workDir>
+> mode: revise
+> feedback: <사용자가 티켓 파일에 작성한 피드백. 없으면 빈 문자열>
+> ")
+> ```
+>
+> planner 반환 후 2a-Post(plan_validator + flow-step end)를 재실행하고 Step 2b로 다시 진입합니다.
+> planner revise 모드 처리 절차는 `planner SKILL.md의 "revise 모드 수신 처리" 섹션`을 참조하세요.
 
 ## Step 2c: PLAN - Skill Mapping Validation Loop
 
@@ -156,7 +215,7 @@ skill_mapper_exit=$?
 
 1. `retry_count` 증가
 2. `[WARN] skill_mapper 검증 실패 (시도 {retry_count}/3): {skill_mapper_output의 stderr}` 로그 출력
-3. planner를 revise 모드로 재호출하여 스킬 매핑 수정 요청:
+3. planner를 revise 모드로 재호출하여 스킬 매핑 수정 요청 (참조: `planner SKILL.md의 "revise 모드 수신 처리" 섹션`):
 
 ```
 Task(subagent_type="planner", prompt="

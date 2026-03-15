@@ -4,12 +4,12 @@
 오케스트레이터가 직접 호출하는 워크플로우 마무리 5단계 결정론적 스크립트.
 
 사용법:
-  flow-finish <registryKey> <status> [--workflow-id <id>]
+  flow-finish <registryKey> <status> [--ticket-number <T-NNN>]
 
 인자:
-  registryKey   워크플로우 식별자 (YYYYMMDD-HHMMSS)
-  status        완료 | 실패
-  --workflow-id WF-N 형식 (선택)
+  registryKey      워크플로우 식별자 (YYYYMMDD-HHMMSS)
+  status           완료 | 실패
+  --ticket-number  T-NNN 형식 티켓 번호 (선택)
 
 6단계:
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
@@ -441,27 +441,28 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     return None
 
 
-def _build_result_update_args(abs_work_dir: str, rel_work_dir: str) -> list[str]:
-    """존재하는 산출물의 update-subnumber CLI 인자 리스트를 반환한다.
+def _build_result_update_args(abs_work_dir: str) -> list[str]:
+    """status.json의 number 필드를 읽어 update-subnumber CLI 인자 리스트를 반환한다.
 
-    `--workdir`는 항상 포함되며, plan.md/work//report.md 존재 여부에 따라
-    각각 `--plan`/`--work`/`--report` 인자를 선택적으로 추가한다.
+    status.json에서 `number` 필드(W-NNN 형식)를 읽어 `["--workflow", "W-NNN"]`을
+    반환한다. number 필드가 없거나 status.json을 읽지 못하면 빈 리스트를 반환한다
+    (graceful fallback: 기존 워크플로우에 대해 result 갱신 스킵).
 
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
-        rel_work_dir: 프로젝트 루트 기준 상대 경로 (.workflow/...)
 
     Returns:
         kanban.py update-subnumber 호출용 추가 인자 리스트.
+        number 필드가 없으면 빈 리스트.
     """
-    args: list[str] = ["--workdir", rel_work_dir]
-    if os.path.isfile(os.path.join(abs_work_dir, "plan.md")):
-        args.extend(["--plan", f"{rel_work_dir}/plan.md"])
-    if os.path.isdir(os.path.join(abs_work_dir, "work")):
-        args.extend(["--work", f"{rel_work_dir}/work"])
-    if os.path.isfile(os.path.join(abs_work_dir, "report.md")):
-        args.extend(["--report", f"{rel_work_dir}/report.md"])
-    return args
+    status_file = os.path.join(abs_work_dir, "status.json")
+    status_data = load_json_file(status_file)
+    if not isinstance(status_data, dict):
+        return []
+    number = status_data.get("number", "")
+    if not number:
+        return []
+    return ["--workflow", str(number)]
 
 
 def main() -> None:
@@ -568,7 +569,7 @@ def main() -> None:
             "Step 4: ticket status update",
         )
 
-        # ── Step 4b: 결과 경로 기록 (완료 시만, 비차단) ──
+        # ── Step 4b: 결과 워크플로우 번호 기록 (완료 시만, 비차단) ──
         if status == "완료" and abs_work_dir is not None:
             sub_id = _resolve_current_subnumber_id(ticket_number)
             if sub_id is None:
@@ -576,13 +577,15 @@ def main() -> None:
                     _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: subnumber_id=None ticket={ticket_number}, skipping result update")
                 print(f"[WARN] Step 4b: cannot resolve current subnumber for {ticket_number}", file=sys.stderr)
             else:
-                rel_work_dir = os.path.relpath(abs_work_dir, PROJECT_ROOT)
-                update_args = _build_result_update_args(abs_work_dir, rel_work_dir)
-                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4B: ticket={ticket_number} sub_id={sub_id} rel_work_dir={rel_work_dir}")
-                run(
-                    ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
-                    "Step 4b: ticket result paths update",
-                )
+                update_args = _build_result_update_args(abs_work_dir)
+                if not update_args:
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: no workflow number in status.json ticket={ticket_number}, skipping result update")
+                else:
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4B: ticket={ticket_number} sub_id={sub_id} update_args={update_args}")
+                    run(
+                        ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
+                        "Step 4b: ticket result workflow update",
+                    )
 
     # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
     # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.

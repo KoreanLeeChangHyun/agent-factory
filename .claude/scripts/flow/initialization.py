@@ -31,7 +31,7 @@ LLM 호출 없음 (순수 IO).
 생성 파일:
   <workDir>/user_prompt.txt   사용자 원문 요청 보존
   <workDir>/.context.json     작업 메타데이터 (title, workId, command 등)
-  <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions)
+  <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions, number: W-NNN)
   <workDir>/files/            .uploads/ 에서 복사된 첨부 파일 (있을 경우)
 """
 
@@ -58,6 +58,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
+from common import scan_max_workflow_number
 
 
 # ─── 유틸리티 ────────────────────────────────────────────────────────────────
@@ -443,28 +444,33 @@ def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, 
     )
 
 
-def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
+def _write_status(abs_work_dir: str, mode: str, ts: str, workflow_number: str = "") -> None:
     """status.json을 작업 디렉터리에 작성한다.
 
     FSM 초기 상태(NONE)와 현재 세션 ID를 포함한 상태 파일을 생성한다.
+    workflow_number가 지정되면 W-NNN 형식의 number 필드를 함께 기록한다.
 
     Args:
         abs_work_dir: 작업 디렉터리 절대 경로
         mode: 워크플로우 모드 (full 등)
         ts: ISO 8601 형식 타임스탬프 문자열
+        workflow_number: 채번된 워크플로우 번호 (W-NNN 형식). 빈 문자열이면 number 필드 미포함.
     """
     claude_sid: str = os.environ.get("CLAUDE_SESSION_ID", "")
+    status_data: dict[str, Any] = {
+        "step": "NONE",
+        "mode": mode,
+        "session_id": str(uuid.uuid4())[:8],
+        "linked_sessions": [claude_sid] if claude_sid else [],
+        "created_at": ts,
+        "updated_at": ts,
+        "transitions": [],
+    }
+    if workflow_number:
+        status_data["number"] = workflow_number
     _atomic_write_json(
         os.path.join(abs_work_dir, "status.json"),
-        {
-            "step": "NONE",
-            "mode": mode,
-            "session_id": str(uuid.uuid4())[:8],
-            "linked_sessions": [claude_sid] if claude_sid else [],
-            "created_at": ts,
-            "updated_at": ts,
-            "transitions": [],
-        },
+        status_data,
     )
 
 
@@ -499,6 +505,7 @@ def init_workflow(
             promptContent (str): 전달받은 프롬프트 내용
             ticketNumber (str): 연결된 티켓 번호 (없으면 빈 문자열)
             chainCommand (str): 전체 체인 문자열 (없으면 빈 문자열)
+            workflowNumber (str): 채번된 워크플로우 번호 W-NNN 형식
     """
     now: datetime = datetime.now(KST)
     registry_key: str = now.strftime("%Y%m%d-%H%M%S")
@@ -536,10 +543,15 @@ def init_workflow(
     _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
 
     ts: str = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+
+    # 채번: .workflow/ + .workflow/.history/ 스캔으로 max + 1
+    max_num: int = scan_max_workflow_number(_PROJECT_ROOT)
+    workflow_number: str = f"W-{max_num + 1:03d}"
+
     # .context.json의 command 필드: 체인이 있으면 전체 체인 문자열 저장 (finalization.py 체인 추적용)
     context_command: str = chain_command if chain_command else command
     _write_context(abs_work_dir, title, work_id, work_name, context_command, ts, chain_command)
-    _write_status(abs_work_dir, mode, ts)
+    _write_status(abs_work_dir, mode, ts, workflow_number)
 
     # 좀비 워크플로우 정리
     _run_optional_script(
@@ -569,6 +581,7 @@ def init_workflow(
         "promptContent": prompt_content,
         "ticketNumber": ticket_number or "",
         "chainCommand": chain_command,
+        "workflowNumber": workflow_number,
     }
 
 
@@ -665,6 +678,8 @@ def main() -> None:
     except Exception as _pv_err:
         _warn(f"prompt_validator import 실패 (품질 검증 생략): {_pv_err}")
 
+    workflow_number: str = result.get("workflowNumber", "")
+
     init_result: dict[str, Any] = {
         "request": request,
         "workDir": result["workDir"],
@@ -676,6 +691,7 @@ def main() -> None:
         "command": effective_command,
         "mode": mode,
         "ticketNumber": result.get("ticketNumber", ""),
+        "workflowNumber": workflow_number,
     }
     if chain_command:
         init_result["chainCommand"] = chain_command
@@ -687,7 +703,8 @@ def main() -> None:
         init_result,
     )
 
-    print(f"{C_CLAUDE}║ INIT:{C_RESET} {title}", flush=True)
+    number_prefix: str = f" {workflow_number}" if workflow_number else ""
+    print(f"{C_CLAUDE}║ INIT:{C_RESET}{number_prefix} {title}", flush=True)
     print(f"{C_CLAUDE}║{C_RESET} {C_DIM}{result['workDir']}{C_RESET}", flush=True)
 
 

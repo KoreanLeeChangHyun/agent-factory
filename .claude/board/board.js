@@ -176,10 +176,92 @@
 
   // ── UI State Persistence ──
   var LS_KEY = "claude-board-ui";
+  var KANBAN_SORT_LS_KEY = "claude-board-kanban-sort";
+
+  // ── Kanban Sort State ──
+  var kanbanSort = loadKanbanSort();
+
+  function loadKanbanSort() {
+    var defaults = {};
+    COLUMNS.forEach(function (col) {
+      defaults[col.key] = { key: "number", dir: "asc" };
+    });
+    try {
+      var stored = JSON.parse(localStorage.getItem(KANBAN_SORT_LS_KEY));
+      if (stored && typeof stored === "object") {
+        COLUMNS.forEach(function (col) {
+          if (!stored[col.key] || !stored[col.key].key) {
+            stored[col.key] = defaults[col.key];
+          }
+        });
+        return stored;
+      }
+    } catch (e) {}
+    return defaults;
+  }
+
+  function saveKanbanSort() {
+    try { localStorage.setItem(KANBAN_SORT_LS_KEY, JSON.stringify(kanbanSort)); } catch (e) {}
+  }
+
+  // ── Kanban Sort Logic ──
+  function getModifiedDate(t) {
+    // 최신 history/submit의 datetime, 없으면 t.datetime 폴백
+    var candidates = [];
+    if (t.submit && t.submit.datetime) candidates.push(t.submit.datetime);
+    if (t.history && t.history.length > 0) {
+      t.history.forEach(function (h) { if (h.datetime) candidates.push(h.datetime); });
+    }
+    if (candidates.length === 0) return t.datetime || "";
+    return candidates.reduce(function (a, b) { return a > b ? a : b; });
+  }
+
+  function sortTickets(items, sortKey, sortDir) {
+    var dir = sortDir === "desc" ? -1 : 1;
+    return items.slice().sort(function (a, b) {
+      var av, bv, cmp;
+      if (sortKey === "number") {
+        av = a.number || "";
+        bv = b.number || "";
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "created") {
+        av = a.datetime || "";
+        bv = b.datetime || "";
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "modified") {
+        av = getModifiedDate(a);
+        bv = getModifiedDate(b);
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "title") {
+        av = a.title || "";
+        bv = b.title || "";
+        cmp = av.localeCompare(bv, "ko");
+      } else {
+        cmp = 0;
+      }
+      return dir * cmp;
+    });
+  }
+
+  // ── Inline SVG Icons for sort direction ──
+  var SVG_ASC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 2L9 8H1L5 2Z"/></svg>';
+  var SVG_DESC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 8L1 2H9L5 8Z"/></svg>';
+
+  // ── Sort Options ──
+  var SORT_KEYS = [
+    { key: "number",   label: "번호" },
+    { key: "created",  label: "생성일" },
+    { key: "modified", label: "수정일" },
+    { key: "title",    label: "제목" },
+  ];
+  var SORT_DIRS = [
+    { dir: "asc",  label: "오름차순" },
+    { dir: "desc", label: "내림차순" },
+  ];
 
   function saveUI() {
     var openNums = viewerTabs.map(function (t) { return t.number; });
-    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab, tabHistory: tabHistory };
+    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab, tabHistory: tabHistory, forwardHistory: forwardHistory };
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
 
@@ -193,11 +275,21 @@
   var tabs = document.querySelectorAll(".tab");
   var views = document.querySelectorAll(".view");
   var activeTab = savedState.tab || "dashboard";
-  var tabHistory = savedState.tabHistory || [];
+  function migrateTabHistory(history) {
+    return history.map(function (entry) {
+      if (typeof entry === "string") return { tab: entry, viewerTab: null };
+      return entry;
+    });
+  }
+
+  var tabHistory = migrateTabHistory(savedState.tabHistory || []);
+  var forwardHistory = migrateTabHistory(savedState.forwardHistory || []);
 
   function switchTab(target, skipPush) {
-    if (!skipPush && activeTab && !(activeTab === "viewer" && target === "viewer")) {
-      tabHistory.push(activeTab);
+    if (!skipPush && activeTab) {
+      tabHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+      if (tabHistory.length > 100) tabHistory.shift();
+      forwardHistory.length = 0;
     }
     activeTab = target;
     tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
@@ -237,22 +329,55 @@
     var h = '<div class="kanban-board">';
     COLUMNS.forEach(function (col) {
       var items = TICKETS.filter(function (t) { return t.status === col.key; });
+      var colSort = kanbanSort[col.key] || { key: "number", dir: "asc" };
+      var sortedItems = sortTickets(items, colSort.key, colSort.dir);
+      var sortIcon = colSort.dir === "desc" ? SVG_DESC : SVG_ASC;
+
+      // Build dropdown options HTML (2-tier: key section + divider + dir section)
+      var dropHtml = '<div class="col-sort-dropdown" data-col="' + esc(col.key) + '">';
+      SORT_KEYS.forEach(function (opt) {
+        var isActive = (opt.key === colSort.key) ? " active" : "";
+        dropHtml += '<button class="col-sort-option' + isActive + '"'
+          + ' data-col="' + esc(col.key) + '"'
+          + ' data-sort-key="' + esc(opt.key) + '">'
+          + esc(opt.label) + '</button>';
+      });
+      dropHtml += '<div class="col-sort-divider"></div>';
+      SORT_DIRS.forEach(function (opt) {
+        var isActive = (opt.dir === colSort.dir) ? " active" : "";
+        dropHtml += '<button class="col-sort-option' + isActive + '"'
+          + ' data-col="' + esc(col.key) + '"'
+          + ' data-sort-dir="' + esc(opt.dir) + '">'
+          + esc(opt.label) + '</button>';
+      });
+      dropHtml += '</div>';
+
       h += '<div class="column">';
-      h += '<div class="col-header"><span class="col-dot ' + col.dot + '"></span>' + esc(col.label);
-      h += '<span class="col-count">' + items.length + "</span></div>";
+      h += '<div class="col-header">';
+      h += '<span class="col-dot ' + col.dot + '"></span>';
+      h += esc(col.label);
+      h += '<div class="col-sort-wrapper" style="margin-left:auto">';
+      h += '<button class="col-sort-btn" data-col="' + esc(col.key) + '" title="정렬">' + sortIcon + '</button>';
+      h += dropHtml;
+      h += '</div>';
+      h += '<span class="col-count">' + items.length + "</span>";
+      h += "</div>";
       h += '<div class="cards">';
-      if (items.length === 0) {
+      if (sortedItems.length === 0) {
         h += '<div class="empty">No items</div>';
       } else {
-        items.forEach(function (t) {
+        sortedItems.forEach(function (t) {
           var done = col.key === "Done" ? " done" : "";
           h += '<div class="card' + done + '" data-num="' + esc(t.number) + '">';
           h += '<div class="card-title">' + esc(t.title || "(No title)") + "</div>";
           h += '<div class="card-meta">';
+          h += '<span class="card-meta-left">';
           h += '<span class="card-num">' + esc(t.number) + "</span>";
           if (t.submit && t.submit.command) {
             h += badge(t.submit.command, CMD_COLORS[t.submit.command]);
           }
+          h += "</span>";
+          h += '<span class="card-date"><span>' + esc((t.datetime || "").substring(0, 10)) + "</span><span>" + esc((t.datetime || "").substring(11, 16)) + "</span></span>";
           h += "</div></div>";
         });
       }
@@ -260,6 +385,8 @@
     });
     h += "</div>";
     el.innerHTML = h;
+
+    // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
       card.addEventListener("click", function () {
         var num = card.dataset.num;
@@ -267,6 +394,56 @@
         if (ticket) openViewer(ticket);
       });
     });
+
+    // Bind sort button clicks (toggle dropdown)
+    el.querySelectorAll(".col-sort-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var colKey = btn.dataset.col;
+        var dropdown = btn.parentNode.querySelector(".col-sort-dropdown");
+        var isOpen = dropdown.classList.contains("open");
+        // Close all dropdowns first
+        el.querySelectorAll(".col-sort-dropdown.open").forEach(function (d) {
+          d.classList.remove("open");
+        });
+        if (!isOpen) {
+          dropdown.classList.add("open");
+        }
+      });
+    });
+
+    // Bind sort option clicks
+    el.querySelectorAll(".col-sort-option").forEach(function (opt) {
+      opt.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var colKey = opt.dataset.col;
+        var current = kanbanSort[colKey] || { key: "number", dir: "asc" };
+        if (opt.dataset.sortKey && !opt.dataset.sortDir) {
+          // Key button: preserve current dir
+          kanbanSort[colKey] = { key: opt.dataset.sortKey, dir: current.dir };
+        } else if (opt.dataset.sortDir && !opt.dataset.sortKey) {
+          // Dir button: preserve current key
+          kanbanSort[colKey] = { key: current.key, dir: opt.dataset.sortDir };
+        }
+        saveKanbanSort();
+        renderKanban();
+      });
+    });
+
+    // Close dropdowns on outside click (attach once per render; cleaned up on next render via innerHTML reset)
+    var outsideHandler = function (e) {
+      if (!e.target.closest(".col-sort-wrapper")) {
+        el.querySelectorAll(".col-sort-dropdown.open").forEach(function (d) {
+          d.classList.remove("open");
+        });
+      }
+    };
+    document.addEventListener("click", outsideHandler);
+    // Store handler reference on element for cleanup on next renderKanban call
+    if (el._sortOutsideHandler) {
+      document.removeEventListener("click", el._sortOutsideHandler);
+    }
+    el._sortOutsideHandler = outsideHandler;
   }
 
   // ── Viewer Tabs ──
@@ -283,8 +460,8 @@
     } else {
       exists.ticket = ticket;
     }
-    activeViewerTab = ticket.number;
     switchTab("viewer");
+    activeViewerTab = ticket.number;
     renderViewer();
     saveUI();
   }
@@ -304,11 +481,14 @@
 
     // Tab bar
     h += '<div class="vt-bar">';
-    h += '<button class="vt-back-btn" id="vt-back-btn">&#8592; Back</button>';
+    var backDim = tabHistory.length === 0 ? " vt-nav-dim" : "";
+    var fwdDim = forwardHistory.length === 0 ? " vt-nav-dim" : "";
+    h += '<button class="vt-back-btn' + backDim + '" id="vt-back-btn">&lt;</button>';
+    h += '<button class="vt-back-btn' + fwdDim + '" id="vt-fwd-btn">&gt;</button>';
     viewerTabs.forEach(function (t) {
       var ac = t.number === activeViewerTab ? " vt-tab-active" : "";
       h += '<div class="vt-tab' + ac + '" data-num="' + esc(t.number) + '">';
-      var tabLabel = t.wfFile ? t.wfFile.label : t.number;
+      var tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number);
       h += '<span class="vt-tab-label">' + esc(tabLabel) + '</span>';
       h += '<span class="vt-tab-close" data-close="' + esc(t.number) + '">&times;</span>';
       h += '</div>';
@@ -318,7 +498,9 @@
     // Content
     h += '<div class="vt-content">';
     var active = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
-    if (active && active.wfFile) {
+    if (active && active.wfDetail) {
+      h += renderWfDetailView(active.wfDetail);
+    } else if (active && active.wfFile) {
       h += renderWfFileView(active.wfFile);
     } else if (active && active.ticket) {
       h += renderTicketHtml(active.ticket);
@@ -333,6 +515,12 @@
     el.querySelectorAll(".vt-tab").forEach(function (tab) {
       tab.addEventListener("click", function (e) {
         if (e.target.classList.contains("vt-tab-close")) return;
+        var prevViewerTab = activeViewerTab;
+        if (tab.dataset.num !== prevViewerTab) {
+          tabHistory.push({ tab: "viewer", viewerTab: prevViewerTab });
+          if (tabHistory.length > 100) tabHistory.shift();
+          forwardHistory.length = 0;
+        }
         activeViewerTab = tab.dataset.num;
         renderViewer();
         saveUI();
@@ -348,6 +536,15 @@
     // Bind result links
     el.querySelectorAll(".tv-result-link").forEach(function (link) {
       link.addEventListener("click", function () {
+        // Workflow number link: find matching workflow and open detail
+        if (link.dataset.workflow) {
+          var wfNum = link.dataset.workflow;
+          var matchedWf = WORKFLOWS.find(function (w) { return w.number === wfNum; });
+          if (matchedWf) {
+            openWfDetail(matchedWf);
+          }
+          return;
+        }
         var isDir = link.dataset.isdir === "true";
         openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
@@ -360,13 +557,107 @@
       });
     });
 
+    // Bind wfDetail artifact links
+    el.querySelectorAll(".wf-detail-artifact-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var isDir = link.dataset.isdir === "true";
+        openWfFile(link.dataset.label, link.dataset.url, isDir);
+      });
+    });
+
+    // Lazy-load connected ticket for wfDetail views
+    el.querySelectorAll(".wf-detail-ticket-section[data-basepath]").forEach(function (section) {
+      var basePath = section.dataset.basepath;
+      if (!basePath || section.dataset.fetched) return;
+      section.dataset.fetched = "1";
+      fetch(basePath + ".context.json", { cache: "no-store" }).then(function (r) {
+        if (!r.ok) return null;
+        return r.json();
+      }).then(function (ctx) {
+        if (!ctx) return;
+        var ticketNum = ctx.ticketNumber || "";
+        var title = ctx.title || "";
+        var workId = ctx.workId || "";
+        if (!ticketNum && !title && !workId) return;
+        var h = '<div class="tv-section">';
+        h += '<div class="tv-section-title">Context</div>';
+        h += '<div class="wf-detail-info">';
+        if (ticketNum) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value">' + esc(ticketNum) + '</span></div>';
+        if (title) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Title</span><span class="wf-detail-info-value">' + esc(title) + '</span></div>';
+        if (workId) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Work ID</span><span class="wf-detail-info-value">' + esc(workId) + '</span></div>';
+        h += '</div></div>';
+        section.innerHTML = h;
+      }).catch(function () {});
+    });
+
     // Bind back button
     var backBtn = el.querySelector("#vt-back-btn");
     if (backBtn) {
       backBtn.addEventListener("click", function () {
-        switchTab(tabHistory.length > 0 ? tabHistory.pop() : "kanban", true);
+        while (tabHistory.length > 0) {
+          var entry = tabHistory.pop();
+          if (entry && entry.tab === "viewer" && entry.viewerTab) {
+            var stillOpen = viewerTabs.find(function (t) { return t.number === entry.viewerTab; });
+            if (!stillOpen) continue;
+            forwardHistory.push({ tab: "viewer", viewerTab: activeViewerTab });
+            activeViewerTab = entry.viewerTab;
+            renderViewer();
+            saveUI();
+            return;
+          }
+          forwardHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          return;
+        }
+        switchTab("kanban", true);
       });
     }
+
+    // Bind forward button
+    var fwdBtn = el.querySelector("#vt-fwd-btn");
+    if (fwdBtn) {
+      fwdBtn.addEventListener("click", function () {
+        while (forwardHistory.length > 0) {
+          var entry = forwardHistory.pop();
+          if (entry && entry.tab === "viewer" && entry.viewerTab) {
+            var stillOpen = viewerTabs.find(function (t) { return t.number === entry.viewerTab; });
+            if (!stillOpen) continue;
+            tabHistory.push({ tab: "viewer", viewerTab: activeViewerTab });
+            if (tabHistory.length > 100) tabHistory.shift();
+            activeViewerTab = entry.viewerTab;
+            renderViewer();
+            saveUI();
+            return;
+          }
+          tabHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+          if (tabHistory.length > 100) tabHistory.shift();
+          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          return;
+        }
+      });
+    }
+
+    // Bind wfDetail ticket link clicks (Info section Ticket row)
+    el.querySelectorAll(".wf-detail-ticket-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var ticketNum = link.dataset.ticketNum;
+        var ticket = TICKETS.find(function (t) { return t.number === ticketNum; });
+        if (ticket) openViewer(ticket);
+      });
+    });
+
+    // Bind ticket viewer workflow links (Connected Workflows section)
+    el.querySelectorAll(".tv-result-workflow[data-wf-entry]").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var entryKey = link.dataset.wfEntry;
+        var taskKey = link.dataset.wfTask;
+        var cmdKey = link.dataset.wfCmd;
+        var w = WORKFLOWS.find(function (item) {
+          return item.entry === entryKey && item.task === taskKey && item.command === cmdKey;
+        });
+        if (w) openWfDetail(w);
+      });
+    });
 
     // Bind md-file-link clicks
     el.querySelectorAll(".md-file-link").forEach(function (link) {
@@ -632,6 +923,19 @@
       h += "</div>";
     }
 
+    var connectedWfs = findWorkflowsForTicket(ticket);
+    if (connectedWfs.length > 0) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Workflows</div>';
+      h += '<div class="tv-result-links">';
+      connectedWfs.forEach(function (w) {
+        var label = w.number ? w.number + " / " + w.task : w.task;
+        h += '<span class="tv-result-link tv-result-workflow" data-wf-entry="' + esc(w.entry) + '" data-wf-task="' + esc(w.task) + '" data-wf-cmd="' + esc(w.command) + '">' + esc(label) + '</span>';
+      });
+      h += '</div>';
+      h += "</div>";
+    }
+
     if (ticket.history.length > 0) {
       h += '<div class="tv-section">';
       h += '<div class="tv-section-title">History</div>';
@@ -693,8 +997,73 @@
     return h;
   }
 
+  /** Returns the ticket that links to this workflow, or null. */
+  function findTicketForWorkflow(w) {
+    var basePath = w.basePath || "";
+    var wNum = w.number || "";
+    for (var ti = 0; ti < TICKETS.length; ti++) {
+      var ticket = TICKETS[ti];
+      var subnumbers = [];
+      if (ticket.submit) subnumbers.push(ticket.submit);
+      if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
+      for (var si = 0; si < subnumbers.length; si++) {
+        var result = subnumbers[si].result;
+        if (!result) continue;
+        // Match by workflow key (W-NNN)
+        if (result.workflow && wNum && result.workflow === wNum) return ticket;
+        // Match by workdir path
+        if (result.workdir) {
+          var wd = result.workdir;
+          if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+          var normalized = "../../" + wd;
+          if (normalized === basePath) return ticket;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Returns array of workflows linked from any subnumber of a ticket. */
+  function findWorkflowsForTicket(ticket) {
+    var found = [];
+    var subnumbers = [];
+    if (ticket.submit) subnumbers.push(ticket.submit);
+    if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
+    for (var si = 0; si < subnumbers.length; si++) {
+      var result = subnumbers[si].result;
+      if (!result) continue;
+      for (var wi = 0; wi < WORKFLOWS.length; wi++) {
+        var w = WORKFLOWS[wi];
+        var alreadyFound = found.indexOf(w) !== -1;
+        if (alreadyFound) continue;
+        // Match by workflow key (W-NNN)
+        if (result.workflow && w.number && result.workflow === w.number) {
+          found.push(w);
+          continue;
+        }
+        // Match by workdir path
+        if (result.workdir) {
+          var wd = result.workdir;
+          if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+          var normalized = "../../" + wd;
+          if (normalized === (w.basePath || "")) {
+            found.push(w);
+          }
+        }
+      }
+    }
+    return found;
+  }
+
   /** Renders result object keys as clickable links for Viewer tab. */
   function renderResultLinks(result) {
+    // If result contains a workflow number (W-NNN), render as a workflow link
+    if (result.workflow) {
+      var h = '<div class="tv-result-links">';
+      h += '<span class="tv-result-link tv-result-workflow" data-workflow="' + esc(result.workflow) + '">' + esc(result.workflow) + '</span>';
+      h += '</div>';
+      return h;
+    }
     var keys = ["plan", "work", "report"];
     var h = '<div class="tv-result-links">';
     keys.forEach(function (k) {
@@ -703,9 +1072,9 @@
       var isDir = k === "work";
       h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '"' + (isDir ? ' data-isdir="true"' : '') + '>' + esc(k) + '</span>';
     });
-    // render any extra keys not in the standard list
+    // render any extra keys not in the standard list (workdir excluded: shown via Connected Workflows)
     Object.keys(result).forEach(function (k) {
-      if (keys.indexOf(k) === -1) {
+      if (keys.indexOf(k) === -1 && k !== "workdir") {
         var url = "../../" + result[k];
         h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '">' + esc(k) + '</span>';
       }
@@ -802,6 +1171,7 @@
                   return {
                     entry: entry, task: task, command: cmd, basePath: basePath,
                     step: status.step || "NONE",
+                    number: status.number || "",
                     created_at: status.created_at || "",
                     updated_at: status.updated_at || "",
                     transitions: status.transitions || [],
@@ -826,8 +1196,8 @@
     if (!exists) {
       viewerTabs.push({ number: tabId, ticket: null, wfFile: { label: label, url: url, content: null, isDir: isDir || url.endsWith("/") } });
     }
-    activeViewerTab = tabId;
     switchTab("viewer");
+    activeViewerTab = tabId;
     renderViewer();
     // Fetch content
     var effectiveIsDir = isDir || url.endsWith("/");
@@ -890,7 +1260,8 @@
       return w.task.toLowerCase().indexOf(q) !== -1
         || w.command.toLowerCase().indexOf(q) !== -1
         || w.step.toLowerCase().indexOf(q) !== -1
-        || w.entry.indexOf(q) !== -1;
+        || w.entry.indexOf(q) !== -1
+        || (w.number && w.number.toLowerCase().indexOf(q) !== -1);
     });
   }
 
@@ -950,8 +1321,9 @@
     while (tbody.firstChild) {
       list.appendChild(tbody.firstChild);
     }
-    // Bind file links on new rows
+    // Bind file links and row clicks on new rows
     bindWfFileLinks(list);
+    bindWfRowClicks(list);
   }
 
   function attachWfSentinel() {
@@ -967,7 +1339,7 @@
     if (wfLoading) {
       var tr = document.createElement("tr");
       var td = document.createElement("td");
-      td.setAttribute("colspan", "11");
+      td.setAttribute("colspan", "12");
       td.className = "empty";
       td.textContent = "Loading...";
       tr.appendChild(td);
@@ -975,7 +1347,7 @@
     } else if (hasMore) {
       var str = document.createElement("tr");
       var std = document.createElement("td");
-      std.setAttribute("colspan", "11");
+      std.setAttribute("colspan", "12");
       std.className = "wf-load-more";
       std.id = "wf-sentinel";
       std.textContent = "Scroll for more";
@@ -1000,6 +1372,135 @@
         openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
     });
+  }
+
+  function bindWfRowClicks(container) {
+    container.querySelectorAll(".wf-row:not([data-row-bound])").forEach(function (row) {
+      row.setAttribute("data-row-bound", "1");
+      row.addEventListener("click", function (e) {
+        // Do not trigger if the click was on a file indicator link
+        if (e.target.closest(".wf-file-indicator.active")) return;
+        // Do not trigger if the click was on a ticket badge
+        if (e.target.closest(".wf-ticket-badge")) return;
+        var entryKey = row.dataset.entry;
+        var taskKey = row.dataset.task;
+        var cmdKey = row.dataset.cmd;
+        var w = WORKFLOWS.find(function (item) {
+          return item.entry === entryKey && item.task === taskKey && item.command === cmdKey;
+        });
+        if (w) openWfDetail(w);
+      });
+    });
+    // Ticket badge clicks: navigate to the linked ticket
+    container.querySelectorAll(".wf-ticket-badge:not([data-badge-bound])").forEach(function (badge) {
+      badge.setAttribute("data-badge-bound", "1");
+      badge.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var ticketNum = badge.dataset.ticketNum;
+        var ticket = TICKETS.find(function (t) { return t.number === ticketNum; });
+        if (ticket) openViewer(ticket);
+      });
+    });
+  }
+
+  function openWfDetail(w) {
+    var tabId = "wfDetail:" + w.entry + "/" + w.task + "/" + w.command;
+    var label = (w.number || w.entry) + " / " + w.task;
+    var exists = viewerTabs.find(function (t) { return t.number === tabId; });
+    if (!exists) {
+      viewerTabs.push({ number: tabId, ticket: null, wfFile: null, wfDetail: w });
+    } else {
+      exists.wfDetail = w;
+    }
+    switchTab("viewer");
+    activeViewerTab = tabId;
+    renderViewer();
+    saveUI();
+  }
+
+  function renderWfDetailView(w) {
+    var h = '<div class="tv-container wf-detail-container">';
+
+    // Header: number + command + step
+    h += '<div class="tv-header">';
+    h += '<div class="tv-header-top">';
+    if (w.number) {
+      h += '<span class="tv-number">' + esc(w.number) + '</span>';
+    } else {
+      h += '<span class="tv-number wf-number-fallback">' + esc(w.entry) + '</span>';
+    }
+    var stepIsDone = (w.step || "").toUpperCase() === "DONE";
+    var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
+    h += '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + esc(w.step || "NONE") + '</span>';
+    if (w.command) {
+      h += badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" });
+    }
+    h += '</div>';
+    h += '<h1 class="tv-title">' + esc(w.task) + '</h1>';
+    h += '<div class="tv-meta">';
+    h += '<span class="tv-time">' + esc(formatTime(w.created_at)) + '</span>';
+    h += '</div>';
+    h += '</div>';
+
+    // Info section
+    h += '<div class="tv-section">';
+    h += '<div class="tv-section-title">Info</div>';
+    h += '<div class="wf-detail-info">';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Entry</span><span class="wf-detail-info-value">' + esc(w.entry) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Command</span><span class="wf-detail-info-value">' + esc(w.command) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Step</span><span class="wf-detail-info-value">' + esc(w.step || "NONE") + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Created</span><span class="wf-detail-info-value">' + esc(formatTime(w.created_at)) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Updated</span><span class="wf-detail-info-value">' + esc(formatTime(w.updated_at)) + '</span></div>';
+    var infoTicket = findTicketForWorkflow(w);
+    if (infoTicket) {
+      h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + esc(infoTicket.number) + '">' + esc(infoTicket.number) + '</span></span></div>';
+    }
+    h += '</div>';
+    h += '</div>';
+
+    // Transitions timeline
+    if (w.transitions && w.transitions.length > 0) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Transitions</div>';
+      h += '<div class="wf-detail-transitions">';
+      h += '<table class="wf-detail-transition-table">';
+      h += '<thead><tr><th>From</th><th>To</th><th>Time</th></tr></thead>';
+      h += '<tbody>';
+      w.transitions.forEach(function (tr) {
+        h += '<tr>';
+        h += '<td>' + esc(tr.from || "NONE") + '</td>';
+        h += '<td>' + esc(tr.to || "") + '</td>';
+        h += '<td class="wf-detail-transition-time">' + esc(formatTime(tr.at || "")) + '</td>';
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      h += '</div>';
+      h += '</div>';
+    }
+
+    // Artifact links
+    if (w.fileMap) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Artifacts</div>';
+      h += '<div class="wf-detail-artifacts">';
+      WF_FILE_COLS.forEach(function (key) {
+        var info = w.fileMap[key];
+        if (info && info.exists) {
+          var isDir = info.isDir ? ' data-isdir="true"' : '';
+          h += '<span class="wf-detail-artifact-link" data-label="' + esc(w.task + ' / ' + key) + '" data-url="' + esc(info.url) + '"' + isDir + '>' + esc(key) + '</span>';
+        } else {
+          h += '<span class="wf-detail-artifact-absent">' + esc(key) + '</span>';
+        }
+      });
+      h += '</div>';
+      h += '</div>';
+    }
+
+    // Connected ticket (try to fetch .context.json)
+    h += '<div class="wf-detail-ticket-section" data-basepath="' + esc(w.basePath || "") + '"></div>';
+
+    h += '</div>';
+    return h;
   }
 
   function sortWorkflows(list) {
@@ -1029,6 +1530,7 @@
     var sortedFiltered = sortWorkflows(filtered);
     var cols = [
       { key: "step",       label: "상태" },
+      { key: "number",     label: "번호" },
       { key: "command",    label: "명령" },
       { key: "task",       label: "제목" },
       { key: "query",      label: "질의",   nosort: true },
@@ -1063,7 +1565,7 @@
     if (sortedFiltered.length > 0) {
       sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
     } else if (!wfLoading) {
-      h += '<tr><td colspan="11" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
+      h += '<tr><td colspan="12" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
     }
     h += '</tbody></table></div></div>';
 
@@ -1093,6 +1595,7 @@
     });
 
     bindWfFileLinks(el);
+    bindWfRowClicks(el);
     attachWfSentinel();
     bindWfColResize(el);
   }
@@ -1279,13 +1782,31 @@
   var WF_FILE_COLS = ["query", "plan", "work", "report", "summary", "usage", "log"];
 
   function renderWfCard(w) {
-    var h = '<tr class="wf-row">';
+    var h = '<tr class="wf-row" data-entry="' + esc(w.entry) + '" data-task="' + esc(w.task) + '" data-cmd="' + esc(w.command) + '">';
     // step cell
     var stepIsDone = (w.step || "").toUpperCase() === "DONE";
     var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
     var stepText = esc(w.step || "NONE");
     var stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + '</span>';
     h += '<td class="wf-row-step">' + stepBadge + '</td>';
+    // number cell
+    var linkedTicket = findTicketForWorkflow(w);
+    if (w.number) {
+      h += '<td class="wf-row-number"><span class="wf-number-badge">' + esc(w.number) + '</span>';
+      if (linkedTicket) {
+        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
+      }
+      h += '</td>';
+    } else {
+      // Timestamp fallback: extract MMDD-HHMM from entry (format: YYYYMMDD-HHMMSS)
+      var ts = w.entry || "";
+      var fallback = ts.length >= 13 ? ts.substring(4, 8) + '-' + ts.substring(9, 13) : ts;
+      h += '<td class="wf-row-number"><span class="wf-number-fallback">' + esc(fallback) + '</span>';
+      if (linkedTicket) {
+        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
+      }
+      h += '</td>';
+    }
     // command cell
     h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';
     // task cell
