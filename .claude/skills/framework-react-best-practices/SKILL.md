@@ -1,6 +1,6 @@
 ---
 name: framework-react-best-practices
-description: "Provides React/Next.js code-level best practices covering 8 categories with 40+ rules: component design, state management, hook rules, rendering optimization, error boundaries, server components, data fetching. Use for React/Next.js coding: code authoring, performance optimization, hook compliance, server/client component separation, code review. Role distinction: framework-react handles project structure, this skill handles code patterns/performance rules. Triggers: 'React', 'Next.js', '리액트', 'react-performance', '컴포넌트', 'hooks', '리액트 최적화'."
+description: "Provides React/Next.js code-level best practices covering 8 categories with 40+ rules: component design, state management, hook rules, rendering optimization, error boundaries, server components, data fetching. Use when authoring React or Next.js component code, optimizing rendering performance, applying hook compliance rules, separating server and client components, or conducting code review on React codebases. Covers code patterns and performance rules; for project structure use framework-react."
 license: "Apache-2.0"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: debug-static-analysis
-description: "Security deep static analysis skill. Performs OWASP Top 10 full vulnerability scan, dependency vulnerability scanning (npm audit/pip-audit/cargo-audit), secret detection, CSRF/XSS/SQL Injection defense verification, auth/authz logic pattern validation, and CSP configuration guidance. Use for security analysis: security-related code during implement/refactor, security audits, pre-production security checks. Triggers: '보안', 'security', 'OWASP', '취약점', '정적 분석', 'static analysis', 'CodeQL', 'Semgrep', '시크릿 탐지', 'secret detection', '의존성 취약점', 'dependency vulnerability'."
+description: "Performs security-focused static analysis including OWASP Top 10 vulnerability scanning, dependency vulnerability checks via npm audit/pip-audit/cargo-audit, secret detection, and CSRF/XSS/SQL Injection defense verification. Use when conducting security audits, reviewing auth/authz logic patterns, validating CSP configuration, or performing pre-production security checks on implement/refactor changes."
 license: "Apache-2.0"
 ---
 

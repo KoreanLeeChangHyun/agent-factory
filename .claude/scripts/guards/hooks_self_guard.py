@@ -25,7 +25,17 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# prompt 패키지 import 경로 설정
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+if _prompt_dir not in sys.path:
+    sys.path.insert(0, _prompt_dir)
+
 from common import read_env
+from messages import (
+    HOOKS_BYPASS_FILE_DENIED,
+    HOOKS_BASH_MODIFY_DENIED,
+    HOOKS_WRITE_EDIT_DENIED,
+)
 
 # 가드 패턴 로드 (보안 우선: import 실패 시 보수적 폴백)
 try:
@@ -202,15 +212,9 @@ def main() -> None:
 
         # .workflow/bypass 참조 여부에 따라 차단 메시지 분기
         if re.search(r"\.workflow/bypass", bash_cmd):
-            _deny(
-                ".workflow/bypass 파일 생성/수정이 차단되었습니다. "
-                "이 파일은 워크플로우 가드를 우회하는 보안 민감 파일입니다."
-            )
+            _deny(HOOKS_BYPASS_FILE_DENIED)
         else:
-            _deny(
-                "Bash를 통한 hooks 디렉토리 파일 수정이 차단되었습니다. "
-                "사용자의 명시적 수정 요청이 필요합니다."
-            )
+            _deny(HOOKS_BASH_MODIFY_DENIED)
 
     # --- Write / Edit 도구 분기 ---
     file_path = tool_input.get("file_path", "")
@@ -220,10 +224,7 @@ def main() -> None:
     # .workflow/bypass 경로 포함 여부 검사
     if ".workflow/bypass" in file_path:
         # bypass 파일은 환경변수 우회 불가 (무조건 차단)
-        _deny(
-            ".workflow/bypass 파일 생성/수정이 차단되었습니다. "
-            "이 파일은 워크플로우 가드를 우회하는 보안 민감 파일입니다."
-        )
+        _deny(HOOKS_BYPASS_FILE_DENIED)
 
     # .claude/hooks/ 경로 포함 여부 검사
     if ".claude/hooks/" in file_path:
@@ -231,10 +232,7 @@ def main() -> None:
         if hook_edit_allowed in ("true", "1"):
             sys.exit(0)
 
-        _deny(
-            "hooks 디렉토리 파일 수정이 차단되었습니다. "
-            "사용자의 명시적 수정 요청이 필요합니다."
-        )
+        _deny(HOOKS_WRITE_EDIT_DENIED)
 
     # .claude/hooks/ 경로 미매칭 시 통과
     sys.exit(0)

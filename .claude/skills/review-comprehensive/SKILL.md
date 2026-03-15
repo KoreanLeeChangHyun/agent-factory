@@ -1,6 +1,6 @@
 ---
 name: review-comprehensive
-description: "Comprehensive code review skill. Inspects all review domains (code quality, security, architecture, performance, testing) via an integrated checklist and produces a PASS/CONCERNS/ISSUES_FOUND/FAIL 4-level verdict. Use for comprehensive review: after major feature completion, pre-release comprehensive check, final review before merge. Triggers: '종합 리뷰', 'comprehensive review', '전체 리뷰', 'full review'."
+description: "Comprehensive code review skill that inspects all review domains (code quality, security, architecture, performance, testing) via an integrated checklist and produces a PASS/CONCERNS/ISSUES_FOUND/FAIL 4-level verdict. Use when performing a full review after major feature completion, conducting a pre-release comprehensive check, or running a final review before merging into the main branch."
 license: "Apache-2.0"
 ---
 
@@ -30,6 +30,7 @@ license: "Apache-2.0"
 | review-architecture | 심화 | 아키텍처 전문 검사 | 아키텍처 영역 체크리스트 수행 |
 | review-frontend | 심화 | 프론트엔드 전문 검사 | 해당 시 프론트엔드 영역 추가 |
 | review-performance | 심화 | 성능 전문 검사 | 성능 영역 체크리스트 수행 |
+| review-code-review | 파이프라인 | 멀티에이전트 병렬 분석, confidence scoring | 병렬 파이프라인 결과 공급 |
 | **review-comprehensive** | **통합** | **전 영역 오케스트레이션, 통합 판정** | **본 스킬** |
 
 **오케스트레이션 원칙:**
@@ -186,9 +187,89 @@ issues:
     file: "{path}:{line}"
     finding: "{설명}"
     suggested_action: "{수정 방안}"
+    confidence: {0-100}
+    pre_existing: true | false
+    extended_reasoning: |
+      [발견] {이슈를 발견한 경위와 도구/검사 항목}
+      [근거] {해당 코드가 이슈인 이유, 위반하는 원칙/규칙}
+      [대안] {고려한 대안적 해석이나 반론, 왜 기각했는지}
+filtered_issues:
+  - id: "{PREFIX}-{NNN}"
+    severity: critical | important | minor
+    domain: code_quality | security | architecture | performance | testing | requirements
+    file: "{path}:{line}"
+    finding: "{설명}"
+    suggested_action: "{수정 방안}"
+    confidence: {0-100}
+    pre_existing: true | false
+    extended_reasoning: "..."
+    filter_reason: "confidence_below_threshold"
 summary: |
   {1-3문장 종합 평가}
 ```
+
+**신규 필드 설명:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `confidence` | 0-100 | 이슈 신뢰도. 변경 관련성(40), 증거 구체성(30), 교차 검증(30) 합산 |
+| `pre_existing` | boolean | 기존 코드 이슈 여부. git blame + git diff로 판별 |
+| `extended_reasoning` | string | 발견 경위, 판단 근거, 대안 고려 사항의 구조화된 추론 기록 |
+
+**filtered_issues 섹션:**
+
+confidence < threshold(기본 80, REVIEW.md `confidence_threshold`로 오버라이드 가능) 이슈를 별도 기록한다. issues와 동일한 필드 구조를 유지하되 `filter_reason` 필드가 추가된다. filtered_issues에 분류된 이슈도 기록은 보존되며, threshold 조정 시 재분류할 수 있다.
+
+## REVIEW.md 연동
+
+프로젝트 루트의 `REVIEW.md` 파일을 로드하여 리뷰 설정을 적용한다.
+
+**로드 절차:**
+
+1. 프로젝트 루트에서 `REVIEW.md` 파일 탐색
+2. 존재 시 설정 로드 (confidence_threshold, always_check, ignore_patterns, review_focus)
+3. 미존재 시 기본값 사용 (confidence_threshold=80, always_check=없음, ignore_patterns=없음)
+
+**always_check Critical 승격:**
+
+REVIEW.md의 `always_check` 섹션에 정의된 glob 패턴과 이슈 파일 경로를 매칭한다. 매칭 성공 시 해당 이슈의 severity를 Critical로 자동 승격하고, extended_reasoning에 승격 근거를 추가한다.
+
+```
+always_check 패턴: **/auth/**
+이슈 파일: src/auth/login.ts:42
+-> 패턴 매칭 성공 -> severity를 Critical로 승격
+-> extended_reasoning에 "REVIEW.md always_check '**/auth/**' 매칭으로 Critical 승격" 추가
+```
+
+**confidence_threshold 오버라이드 적용 순서:**
+
+1. REVIEW.md의 `confidence_threshold` 값 확인
+2. 값이 존재하고 0-100 범위 내이면 해당 값을 threshold로 사용
+3. 미설정 또는 범위 외이면 기본값 80 적용
+
+## review-code-review 연동
+
+`review-code-review` 스킬의 4단계 파이프라인(병렬 호출 -> 검증 -> 중복제거 -> 랭킹) 결과를 수신하여 통합 판정에 반영한다.
+
+**파이프라인 결과 수신:**
+
+review-code-review의 `pipeline_result`를 수신하면:
+- `pipeline_result.issues`를 본 스킬의 이슈 수집 단계에 직접 반영
+- `pipeline_result.filtered_issues`를 본 스킬의 `filtered_issues` 섹션에 병합
+- confidence, pre_existing, extended_reasoning 필드를 그대로 유지
+
+**통합 판정 반영:**
+
+- 파이프라인에서 수신한 이슈의 severity, confidence를 체크리스트 통과율 산출과 4단계 판정 기준에 반영
+- 교차 검증(cross_validated)이 확인된 이슈는 판정 시 증거 가중치를 높인다
+- pre_existing: true 이슈는 판정에 포함하되, 변경 범위 밖임을 명시하여 후속 조치 우선순위를 낮춘다
+
+**하위 호환 (폴백):**
+
+review-code-review 미사용 시(파이프라인 결과가 없는 경우) 기존 워크플로우로 폴백한다:
+- 본 스킬이 단독으로 6개 영역 체크리스트를 수행
+- confidence, pre_existing, extended_reasoning 필드는 본 스킬이 자체 산정
+- confidence 산정 시 교차 검증 항목(30점)은 단독 실행이므로 0점 처리
 
 ## Critical Rules
 
@@ -208,3 +289,4 @@ summary: |
 | review-architecture | `.claude/skills/review-architecture/SKILL.md` | 아키텍처 영역 전문 체크리스트 수행 |
 | review-frontend | `.claude/skills/review-frontend/SKILL.md` | 프론트엔드 영역 전문 체크리스트 수행 (해당 시) |
 | review-performance | `.claude/skills/review-performance/SKILL.md` | 성능 영역 전문 체크리스트 수행 |
+| review-code-review | `.claude/skills/review-code-review/SKILL.md` | 멀티에이전트 병렬 분석 파이프라인 제공 |

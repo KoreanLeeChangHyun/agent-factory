@@ -1,6 +1,6 @@
 ---
 name: review-security
-description: "Security-specialized code review skill. Performs OWASP Top 10 checklist-based review, secret detection, dependency vulnerability checks, blast radius estimation, and escalation criteria enforcement. Use for security review: security-related code changes, auth/authz module review, external input handling review. Triggers: '보안 리뷰', 'security review', 'OWASP 리뷰', '취약점 리뷰'."
+description: "Security-specialized code review skill that applies OWASP Top 10 checklist, detects secrets, checks dependency vulnerabilities, estimates blast radius, and enforces escalation criteria. Use when reviewing security-related code changes, auditing authentication or authorization modules, or evaluating code that processes external input for injection and vulnerability risks."
 license: "Apache-2.0"
 ---
 

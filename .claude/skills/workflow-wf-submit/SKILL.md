@@ -2,6 +2,7 @@
 name: workflow-wf-submit
 description: "Workflow command skill for wf -s. Submits a ticket and auto-routes to the appropriate workflow (implement/research/review) based on the <command> tag in the ticket XML."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Submit Command (티켓 제출)

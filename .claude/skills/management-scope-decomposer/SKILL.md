@@ -1,6 +1,6 @@
 ---
 name: management-scope-decomposer
-description: "Systematically decomposes large-scale requests into epics (3-7) and stories (5-10/epic) with RICE score-based prioritization (P0-P3). Includes infra epic auto-detection, dependency graph generation, and MECE principle validation. Use for scope planning: large-scale feature decomposition, project scope definition, requirements structuring, priority determination. Triggers: '분해', 'decompose', '에픽', 'epic', '스토리', 'story', '우선순위', 'RICE', '스코프'."
+description: "Systematically decomposes large-scale requests into epics (3-7) and stories (5-10/epic) with RICE score-based prioritization (P0-P3), dependency graph generation, and MECE principle validation. Use when decomposing a large-scale feature or initiative into structured epics and stories, defining project scope and priority with RICE scoring, detecting infra epic requirements, or producing a dependency graph for a complex multi-domain request."
 license: "Apache-2.0"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: design-architect
-description: "System architecture design and UML diagram generation skill. Produces class/sequence/ER/component/deployment/state diagrams as Mermaid (.md) and image (.png) files. Use for system design: architecture diagrams, data model design, system flow visualization. Triggers: '설계해줘', '아키텍처', 'architecture', '다이어그램', 'UML', 'ERD', '시퀀스'."
+description: "Designs system architecture and generates UML diagrams including class, sequence, ER, component, deployment, and state diagrams as Mermaid and image files. Use when creating architecture diagrams, designing data models with ERD, visualizing system flows with sequence or component diagrams, or documenting deployment topology."
 license: "Apache-2.0"
 ---
 

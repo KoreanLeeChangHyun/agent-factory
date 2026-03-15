@@ -1,6 +1,6 @@
 ---
 name: devops-git-config
-description: "Auto-configures git config by reading Git username/email/SSH key settings from .claude.env file. Batch-initializes local Git settings and SSH key paths from environment variables. Use for Git environment setup: Git user configuration, SSH key path setup, Git environment initialization. Triggers: 'git config', 'git 설정', 'Git 사용자 설정', 'git:config'."
+description: "Auto-configures git config by reading Git username, email, and SSH key settings from the .claude.env file. Use when initializing a Git environment, configuring git user identity, setting SSH key paths, or batch-applying local Git settings from environment variables."
 license: "Apache-2.0"
 ---
 

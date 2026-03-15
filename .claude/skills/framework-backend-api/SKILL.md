@@ -1,6 +1,6 @@
 ---
 name: framework-backend-api
-description: "General-purpose backend API design skill covering RESTful conventions, API versioning, error response standards (RFC 7807), auth/authz patterns, rate limiting, and pagination. Use for backend API design and implementation: (1) REST API endpoint design, (2) error response standardization, (3) authentication/authorization pattern selection, (4) rate limiting and pagination implementation, (5) API versioning strategy. Triggers: '백엔드', 'backend', 'REST', 'API 설계', 'api design', '엔드포인트 설계', 'RESTful', 'HTTP API', '백엔드 설계', 'api endpoint'."
+description: "General-purpose backend API design skill covering RESTful conventions, API versioning, error response standards (RFC 7807), auth/authz patterns, rate limiting, and pagination. Use when designing REST API endpoints or HTTP API structure, standardizing error responses, selecting authentication and authorization patterns, implementing rate limiting or pagination, or planning API versioning strategy for backend services."
 license: "Apache-2.0"
 ---
 

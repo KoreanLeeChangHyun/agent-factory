@@ -1,6 +1,6 @@
 ---
 name: design-patterns
-description: "Comprehensive reference guide for 39 patterns: 23 GoF design patterns (creational/structural/behavioral) and 16 modern architecture patterns (MVC, MVVM, Repository, DI, CQRS, Event Sourcing, Microservices, Saga, Circuit Breaker, Clean/Hexagonal Architecture, DDD, etc.). Use for pattern guidance: pattern selection during implementation, pattern application review during refactoring, pattern combination during architecture design, pattern compliance during code review. Triggers: '디자인 패턴', 'design pattern', 'GoF', 'SOLID', '아키텍처 패턴'."
+description: "Comprehensive reference guide for 39 patterns: 23 GoF design patterns (creational/structural/behavioral) and 16 modern architecture patterns (MVC, MVVM, Repository, DI, CQRS, Event Sourcing, Microservices, Saga, Circuit Breaker, Clean/Hexagonal Architecture, DDD, etc.). Use when selecting design patterns or GoF patterns during implementation, applying SOLID principles and architecture patterns during refactoring, combining patterns in system design, or verifying pattern compliance during code review."
 license: "Apache-2.0"
 ---
 

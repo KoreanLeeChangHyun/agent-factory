@@ -1,6 +1,6 @@
 ---
 name: review-code-quality
-description: "Automated code quality inspection skill. Runs ESLint/Prettier/type-check, detects DRY/KISS/YAGNI violations, measures code metrics (cyclomatic complexity, function/file size, nesting depth), and produces a quantitative Code Quality Score. Use for quality assessment: after implement/refactor, before code review, before PR creation. Triggers: '코드 품질', 'code quality', '린트', 'lint', '타입체크', '품질 검사'."
+description: "Automated code quality inspection skill that runs ESLint/Prettier/type-check, detects DRY/KISS/YAGNI violations, measures cyclomatic complexity, function and file size, and nesting depth, and produces a quantitative Code Quality Score. Use when assessing code quality after implement or refactor, before submitting a code review, before PR creation, or when verifying lint and type-check compliance."
 license: "Apache-2.0"
 ---
 

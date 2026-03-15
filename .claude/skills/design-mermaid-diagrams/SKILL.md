@@ -1,6 +1,6 @@
 ---
 name: design-mermaid-diagrams
-description: Create Mermaid diagrams including flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, pie charts, and more. Use when users ask for diagrams, flowcharts, process flows, system architecture, data models, or any visual representation of relationships and workflows. Supports output as Mermaid code (.md), HTML preview, PNG, or SVG images.
+description: Generates Mermaid diagrams covering flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, and pie charts. Use when visualizing system architecture, data models, process flows, or relationship structures, and when output is needed as Mermaid code, HTML preview, PNG, or SVG.
 license: "Apache-2.0"
 ---
 

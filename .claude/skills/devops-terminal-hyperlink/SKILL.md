@@ -1,6 +1,7 @@
 ---
 name: devops-terminal-hyperlink
-description: OSC 8 터미널 하이퍼링크 가이드. 클릭 가능한 파일/URL 링크를 터미널 출력에 삽입하는 방법을 제공한다. Use when: (1) Bash/Python 스크립트에서 클릭 가능한 경로 출력이 필요할 때, (2) 배너/상태줄에 하이퍼링크를 삽입할 때, (3) 터미널 출력에서 파일 경로를 라벨로 표시할 때. Triggers: 'terminal link', 'hyperlink', 'OSC 8', '터미널 링크', '클릭 가능한 경로'.
+description: OSC 8 터미널 하이퍼링크(terminal hyperlink) 가이드. Bash/Python 스크립트에서 클릭 가능한 경로와 URL 링크를 터미널 출력에 삽입하는 방법을 제공한다. Use when adding clickable file paths or hyperlinks to terminal output, embedding OSC 8 links in banners or status lines, or displaying labeled paths with clickable terminal links in scripts.
+license: "Apache-2.0"
 ---
 
 # OSC 8 터미널 하이퍼링크

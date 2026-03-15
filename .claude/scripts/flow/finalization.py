@@ -4,18 +4,19 @@
 오케스트레이터가 직접 호출하는 워크플로우 마무리 5단계 결정론적 스크립트.
 
 사용법:
-  flow-finish <registryKey> <status> [--workflow-id <id>]
+  flow-finish <registryKey> <status> [--ticket-number <T-NNN>]
 
 인자:
-  registryKey   워크플로우 식별자 (YYYYMMDD-HHMMSS)
-  status        완료 | 실패
-  --workflow-id WF-N 형식 (선택)
+  registryKey      워크플로우 식별자 (YYYYMMDD-HHMMSS)
+  status           완료 | 실패
+  --ticket-number  T-NNN 형식 티켓 번호 (선택)
 
-5단계:
+6단계:
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
   4. 티켓 상태 갱신          (kanban.py move, ticket_number 있을 때만, 비차단)
+  4c. 체인 감지 및 다음 스테이지 발사 (chain_launcher.py, 완료+체인 존재 시만, 비동기)
   5. tmux 윈도우 백그라운드 지연 kill (TMUX_PANE+T-* 조건 시만, 비차단)
 
 종료 코드:
@@ -29,6 +30,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -42,7 +44,8 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
-from data.constants import LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
+from data.constants import CHAIN_SEPARATOR, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
+from flow.tmux_utils import WINDOW_PREFIX_P
 
 PROJECT_ROOT: str = resolve_project_root()
 
@@ -65,6 +68,7 @@ HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "hi
 UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "update_state.py")
 USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "sync", "usage_sync.py")
 KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "kanban.py")
+CHAIN_LAUNCHER: str = os.path.join(PROJECT_ROOT, ".claude", "scripts", "flow", "chain_launcher.py")
 
 
 def run(
@@ -437,33 +441,34 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     return None
 
 
-def _build_result_update_args(abs_work_dir: str, rel_work_dir: str) -> list[str]:
-    """존재하는 산출물의 update-subnumber CLI 인자 리스트를 반환한다.
+def _build_result_update_args(abs_work_dir: str) -> list[str]:
+    """status.json의 number 필드를 읽어 update-subnumber CLI 인자 리스트를 반환한다.
 
-    `--workdir`는 항상 포함되며, plan.md/work//report.md 존재 여부에 따라
-    각각 `--plan`/`--work`/`--report` 인자를 선택적으로 추가한다.
+    status.json에서 `number` 필드(W-NNN 형식)를 읽어 `["--workflow", "W-NNN"]`을
+    반환한다. number 필드가 없거나 status.json을 읽지 못하면 빈 리스트를 반환한다
+    (graceful fallback: 기존 워크플로우에 대해 result 갱신 스킵).
 
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
-        rel_work_dir: 프로젝트 루트 기준 상대 경로 (.workflow/...)
 
     Returns:
         kanban.py update-subnumber 호출용 추가 인자 리스트.
+        number 필드가 없으면 빈 리스트.
     """
-    args: list[str] = ["--workdir", rel_work_dir]
-    if os.path.isfile(os.path.join(abs_work_dir, "plan.md")):
-        args.extend(["--plan", f"{rel_work_dir}/plan.md"])
-    if os.path.isdir(os.path.join(abs_work_dir, "work")):
-        args.extend(["--work", f"{rel_work_dir}/work"])
-    if os.path.isfile(os.path.join(abs_work_dir, "report.md")):
-        args.extend(["--report", f"{rel_work_dir}/report.md"])
-    return args
+    status_file = os.path.join(abs_work_dir, "status.json")
+    status_data = load_json_file(status_file)
+    if not isinstance(status_data, dict):
+        return []
+    number = status_data.get("number", "")
+    if not number:
+        return []
+    return ["--workflow", str(number)]
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 5단계를 순서대로 실행한다."""
+    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다."""
     parser = argparse.ArgumentParser(
-        description="워크플로우 마무리 처리 (flow-finish 5단계)",
+        description="워크플로우 마무리 처리 (flow-finish 6단계)",
     )
     parser.add_argument("registryKey", help="워크플로우 식별자 (YYYYMMDD-HHMMSS)")
     parser.add_argument("status", choices=["완료", "실패"], help="워크플로우 결과 상태")
@@ -564,7 +569,7 @@ def main() -> None:
             "Step 4: ticket status update",
         )
 
-        # ── Step 4b: 결과 경로 기록 (완료 시만, 비차단) ──
+        # ── Step 4b: 결과 워크플로우 번호 기록 (완료 시만, 비차단) ──
         if status == "완료" and abs_work_dir is not None:
             sub_id = _resolve_current_subnumber_id(ticket_number)
             if sub_id is None:
@@ -572,15 +577,79 @@ def main() -> None:
                     _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: subnumber_id=None ticket={ticket_number}, skipping result update")
                 print(f"[WARN] Step 4b: cannot resolve current subnumber for {ticket_number}", file=sys.stderr)
             else:
-                rel_work_dir = os.path.relpath(abs_work_dir, PROJECT_ROOT)
-                update_args = _build_result_update_args(abs_work_dir, rel_work_dir)
-                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4B: ticket={ticket_number} sub_id={sub_id} rel_work_dir={rel_work_dir}")
-                run(
-                    ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
-                    "Step 4b: ticket result paths update",
-                )
+                update_args = _build_result_update_args(abs_work_dir)
+                if not update_args:
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: no workflow number in status.json ticket={ticket_number}, skipping result update")
+                else:
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4B: ticket={ticket_number} sub_id={sub_id} update_args={update_args}")
+                    run(
+                        ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
+                        "Step 4b: ticket result workflow update",
+                    )
+
+    # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
+    # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.
+    # 현재 command(첫 세그먼트)를 제거한 나머지(remaining)가 있으면
+    # chain_launcher.py를 비동기로 호출하여 다음 스테이지를 발사한다.
+    _chain_launched: bool = False
+    if status == "완료" and ticket_number and abs_work_dir is not None:
+        context_file: str = os.path.join(abs_work_dir, ".context.json")
+        context_data = load_json_file(context_file)
+        full_command: str = ""
+        if isinstance(context_data, dict):
+            full_command = context_data.get("command", "")
+
+        if CHAIN_SEPARATOR in full_command:
+            segments: list[str] = [s.strip() for s in full_command.split(CHAIN_SEPARATOR)]
+            remaining_segments: list[str] = segments[1:]  # 첫 세그먼트(현재 command) 제거
+
+            if remaining_segments:
+                remaining_chain: str = CHAIN_SEPARATOR.join(remaining_segments)
+                report_path: str = os.path.join(abs_work_dir, "report.md")
+
+                if not os.path.isfile(report_path):
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: report.md not found at {report_path}, using workdir as fallback")
+                    report_path = abs_work_dir
+
+                if os.path.isfile(CHAIN_LAUNCHER):
+                    _append_log(
+                        abs_work_dir,
+                        "INFO",
+                        f"FINALIZE_CHAIN: ticket={ticket_number} remaining={remaining_chain} prev_report={report_path}",
+                    )
+                    try:
+                        _chain_log_path: str = os.path.join(abs_work_dir, "chain_launcher.log")
+                        try:
+                            _chain_log_fh = open(_chain_log_path, "a", encoding="utf-8")
+                        except Exception:
+                            _chain_log_fh = subprocess.DEVNULL  # type: ignore[assignment]
+                        subprocess.Popen(
+                            [
+                                "python3",
+                                CHAIN_LAUNCHER,
+                                ticket_number,
+                                remaining_chain,
+                                report_path,
+                            ],
+                            stdout=subprocess.DEVNULL,
+                            stderr=_chain_log_fh,
+                            start_new_session=True,
+                        )
+                        _chain_launched = True
+                        _append_log(abs_work_dir, "INFO", "FINALIZE_CHAIN: chain_launcher launched successfully")
+                    except Exception as _chain_err:
+                        _append_log(abs_work_dir, "ERROR", f"FINALIZE_CHAIN: launch error={_chain_err}")
+                        print(f"[ERROR] Step 4c: chain_launcher.py 실행 실패: {_chain_err}", file=sys.stderr)
+                else:
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: chain_launcher.py not found at {CHAIN_LAUNCHER}")
+                    print(f"[WARN] Step 4c: chain_launcher.py not found: {CHAIN_LAUNCHER}", file=sys.stderr)
+            else:
+                if abs_work_dir is not None:
+                    _append_log(abs_work_dir, "INFO", "FINALIZE_CHAIN: chain complete (no remaining segments)")
 
     # ── Step 5: tmux 윈도우 백그라운드 지연 kill (비차단) ──
+    # 체인이 발사된 경우, tmux kill은 chain_launcher.py가 이전 윈도우 사망 대기 후
+    # 새 윈도우를 생성하므로 여기서는 기존 로직대로 kill을 진행한다.
     tmux_pane: str | None = os.environ.get("TMUX_PANE")
     if tmux_pane:
         try:
@@ -591,18 +660,21 @@ def main() -> None:
                 timeout=5,
             )
             win_name: str = win_result.stdout.strip()
-            if win_name.startswith("T-"):
+            if win_name.startswith(f"{WINDOW_PREFIX_P}T-"):
                 if abs_work_dir is not None:
                     _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: tmux_cleanup win={win_name} pane={tmux_pane} delay=3s")
+                # TMUX_PANE(%N)을 직접 타겟으로 사용: 콜론 포함 윈도우명의 세션:윈도우 오해석 방지
+                pane_target: str = shlex.quote(tmux_pane)
+                bash_cmd: str = f"sleep 3 && tmux kill-window -t {pane_target}"
                 subprocess.Popen(
-                    ["bash", "-c", f"sleep 3 && tmux kill-window -t {win_name}"],
+                    ["bash", "-c", bash_cmd],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
             else:
                 if abs_work_dir is not None:
-                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: skip tmux_cleanup win={win_name!r} (not T-* prefix)")
+                    _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP5: skip tmux_cleanup win={win_name!r} (not P:T-* prefix)")
         except Exception as _e:
             if abs_work_dir is not None:
                 _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP5: tmux_cleanup error={_e}")

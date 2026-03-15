@@ -1,6 +1,6 @@
 ---
 name: testing-design
-description: "ISTQB v4.0 test design technique-based test case auto-generation skill. Analyzes function signatures and type information to systematically derive test cases using equivalence partitioning (EP), boundary value analysis (BVA), decision table (DT), and state transition (ST) techniques. Use for test design: generating structured test cases from code, improving input domain coverage, identifying edge cases from type signatures. Triggers: '테스트 설계', 'test design', '동치 분할', '경계값', 'equivalence partitioning', 'boundary value', '결정 테이블', 'decision table', '상태 전이', 'state transition'."
+description: "ISTQB v4.0 test design skill that auto-generates test cases by analyzing function signatures and type information using equivalence partitioning (EP), boundary value analysis (BVA), decision table (DT), and state transition (ST) techniques. Use when generating structured test cases from code, improving input domain coverage, or systematically identifying edge cases and boundary conditions from type signatures."
 license: "Apache-2.0"
 ---
 

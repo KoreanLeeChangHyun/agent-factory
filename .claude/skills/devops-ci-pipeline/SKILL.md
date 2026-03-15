@@ -1,6 +1,6 @@
 ---
 name: devops-ci-pipeline
-description: "CI/CD pipeline design and configuration skill. Covers build/test/deploy stage composition, caching strategies, secret management, and monorepo pipeline patterns. Use for pipeline tasks: (1) CI/CD pipeline setup and optimization, (2) build/test/deploy stage design, (3) pipeline caching strategies, (4) secret and environment variable management in CI, (5) monorepo pipeline configuration. Triggers: 'CI/CD', 'pipeline', '파이프라인', '배포', 'deploy', 'CD', 'continuous integration', 'continuous deployment', '빌드 파이프라인', '배포 자동화'."
+description: "Designs and configures CI/CD pipelines covering build/test/deploy stage composition, caching strategies, secret management, and monorepo pipeline patterns. Use when setting up or optimizing a CI/CD pipeline, designing build and deploy stages, configuring pipeline caching, managing secrets and environment variables in continuous integration, or automating deployment for monorepo projects."
 license: "Apache-2.0"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: devops-runtime-contract
-description: "Runtime schema validation code generator. Analyzes existing types/interfaces to auto-derive validation schemas and insert runtime checks at trust boundaries. Supports Zod v4 (TypeScript, primary), beartype (Python), io-ts (TypeScript alternative). Use for runtime validation: API boundary input parsing, config file loading, external data ingestion, environment variable parsing, contract verification. Triggers: '런타임 검증', 'runtime validation', 'Zod', 'beartype', '스키마 검증', 'schema validation', '계약 검증', 'contract'."
+description: "Generates runtime schema validation code by analyzing existing types and interfaces to auto-derive Zod (TypeScript), beartype (Python), or io-ts schemas and insert checks at trust boundaries. Use when adding runtime validation at API boundaries, parsing config files or environment variables, ingesting external data, or verifying contract compliance at system entry points."
 license: "Apache-2.0"
 ---
 

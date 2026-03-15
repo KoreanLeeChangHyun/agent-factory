@@ -1,6 +1,6 @@
 ---
 name: debug-gha-analysis
-description: "Systematically investigates GitHub Actions workflow failures using a 5-step process (info gathering, flake check, breaking commit identification, root cause analysis, existing fix search). Use for CI failure analysis: GHA workflow failure diagnosis, CI build failure debugging, flaky test identification. Triggers: 'GHA', 'GitHub Actions', 'CI', 'CI/CD', 'workflow run', 'build failure', '빌드 실패', 'pipeline'."
+description: "Systematically investigates GitHub Actions workflow failures using a 5-step process of info gathering, flake check, breaking commit identification, root cause analysis, and existing fix search. Use when diagnosing GHA workflow failures, debugging CI/CD pipeline build failures, identifying flaky tests, or tracing the breaking commit in a failing CI run."
 license: "Apache-2.0"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: review-requesting
-description: "Requests code review to verify quality after task completion, major feature implementation, or before merge. Performs checklist-based pre-verification, issue classification (Critical/Important/Minor), and production readiness assessment. Use for quality verification: after task completion, after major features, before merge, after complex bug fixes. Triggers: 'code review', '코드 리뷰', '리뷰 요청', 'review before merge'."
+description: "Requests code review to verify quality after task completion, major feature implementation, or before merge. Performs checklist-based pre-verification, issue classification into Critical/Important/Minor severity levels, and production readiness assessment. Use when requesting a code review after completing a task, finishing a major feature, before merging, or after resolving a complex bug fix."
 license: "Apache-2.0"
 ---
 

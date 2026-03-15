@@ -4,6 +4,7 @@ description: "Workflow command skill for wf -o. Free-form conversational prompt 
 disable-model-invocation: true
 skills:
   - research-prompt-engineering
+license: "Apache-2.0"
 ---
 
 # Prompt Command (자유 대화형 프롬프트 공동 작성)

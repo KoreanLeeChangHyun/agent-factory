@@ -1,6 +1,6 @@
 ---
 name: analyze-codebase
-description: "Codebase analysis skill. Analyzes project structure, architecture, dependencies, and code quality. Use for codebase inspection: (1) project structure analysis, (2) architecture analysis, (3) invoked via /wf -s command. Triggers: '코드베이스', 'codebase', '아키텍처', 'architecture', '코드 구조', '의존성', '모듈'."
+description: "Analyzes project structure, architecture, dependencies, and code quality for codebase inspection. Use when examining codebase architecture, reviewing dependency graphs, analyzing module structure, or assessing overall code quality and project organization."
 license: "Apache-2.0"
 ---
 

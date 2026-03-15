@@ -12,6 +12,8 @@
     FSM_TRANSITIONS: FSM 상태 전이 규칙
     DANGER_PATTERNS: 위험 명령어 차단 패턴 목록
     KEEP_COUNT: .workflow/ 디렉터리 유지 최대 갯수 (환경변수 CLAUDE_WORKFLOW_KEEP_COUNT로 오버라이드 가능)
+    CHAIN_SEPARATOR: 체인 command 구분자 (">" 문자)
+    CHAIN_MAX_RETRY: 체인 스테이지 실패 시 최대 재시도 횟수 (환경변수 CLAUDE_CHAIN_MAX_RETRY로 오버라이드 가능)
 """
 
 import os
@@ -92,6 +94,47 @@ FSM_TRANSITIONS = {
 # =============================================================================
 VALID_COMMANDS = {"implement", "review", "research"}
 VALID_MODES = {"full"}
+
+# =============================================================================
+# 체인 command 관련 상수
+# =============================================================================
+CHAIN_SEPARATOR = ">"
+CHAIN_MAX_RETRY = int(os.environ.get("CLAUDE_CHAIN_MAX_RETRY", "2"))
+
+
+def parse_chain_command(raw: str) -> list[str]:
+    """체인 command 문자열을 파싱하여 세그먼트 리스트를 반환한다.
+
+    Args:
+        raw: command 문자열. 단일("implement") 또는 체인("research>implement>review") 형식.
+
+    Returns:
+        유효한 command 세그먼트 리스트. 단일 command도 길이 1 리스트로 반환.
+
+    Raises:
+        ValueError: 유효하지 않은 세그먼트가 포함된 경우.
+
+    Note:
+        중복 command 세그먼트(예: 'implement>implement')를 허용한다.
+        대규모 구현을 여러 사이클로 분할하는 유스케이스를 지원하기 위한 설계 선택이다.
+
+    Examples:
+        >>> parse_chain_command("implement")
+        ['implement']
+        >>> parse_chain_command("research>implement>review")
+        ['research', 'implement', 'review']
+        >>> parse_chain_command("implement>implement")
+        ['implement', 'implement']
+    """
+    segments = [seg.strip() for seg in raw.split(CHAIN_SEPARATOR)]
+    for seg in segments:
+        if seg not in VALID_COMMANDS:
+            raise ValueError(
+                f"유효하지 않은 command 세그먼트: '{seg}'. "
+                f"허용 값: {sorted(VALID_COMMANDS)}"
+            )
+    return segments
+
 
 # =============================================================================
 # 터미널 step 집합
@@ -189,6 +232,8 @@ DANGER_PATTERNS = [
     {"pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f", "blocked": "git clean -f (추적되지 않는 파일 전체 삭제)", "alternative": "git clean -n으로 드라이런하여 삭제 대상을 먼저 확인하세요."},
     {"pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)", "blocked": "git branch -D main/master (주요 브랜치 강제 삭제)", "alternative": "주요 브랜치 삭제는 매우 위험합니다. 정말 필요한지 재확인하세요."},
     {"pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$", "blocked": "git checkout/restore . (모든 변경사항 되돌리기)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
+    # 참조용: main/master 브랜치 직접 커밋 -- 실제 차단은 main_branch_guard.py가 담당
+    {"pattern": "git\\s+commit", "blocked": "main/master 브랜치에서 직접 커밋 (별도 가드에서 브랜치 검사)", "alternative": "피처 브랜치를 생성하여 작업하세요."},
     {"pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)", "blocked": "DROP TABLE/DATABASE (데이터베이스/테이블 삭제)", "alternative": "백업을 먼저 수행하고, 트랜잭션 내에서 실행하세요."},
     {"pattern": "(sudo\\s+)?chmod\\s+777", "blocked": "chmod 777 (과도한 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
     {"pattern": "(sudo\\s+)?chmod\\s+a\\+rwx", "blocked": "chmod a+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},

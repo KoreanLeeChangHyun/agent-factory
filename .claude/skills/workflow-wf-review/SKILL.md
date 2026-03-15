@@ -2,6 +2,7 @@
 name: workflow-wf-review
 description: "Workflow command skill for wf review. Performs code review with severity-based assessment. Auto-loads keyword-based review skills for security, architecture, frontend, performance, comprehensive, feedback, and PR integration."
 disable-model-invocation: true
+license: "Apache-2.0"
 ---
 
 # Review Command

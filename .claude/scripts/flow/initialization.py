@@ -31,7 +31,7 @@ LLM 호출 없음 (순수 IO).
 생성 파일:
   <workDir>/user_prompt.txt   사용자 원문 요청 보존
   <workDir>/.context.json     작업 메타데이터 (title, workId, command 등)
-  <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions)
+  <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions, number: W-NNN)
   <workDir>/files/            .uploads/ 에서 복사된 첨부 파일 (있을 경우)
 """
 
@@ -57,7 +57,8 @@ _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN
+from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
+from common import scan_max_workflow_number
 
 
 # ─── 유틸리티 ────────────────────────────────────────────────────────────────
@@ -410,52 +411,66 @@ def _update_ticket_title(ticket_number: str, title: str) -> None:
         _warn(f"kanban.py update-title 실행 실패: {e}")
 
 
-def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str) -> None:
+def _write_context(abs_work_dir: str, title: str, work_id: str, work_name: str, command: str, ts: str, chain_command: str = "") -> None:
     """.context.json을 작업 디렉터리에 작성한다.
+
+    command 필드는 finalization.py의 체인 추적에 사용되며 전체 체인 문자열을 저장한다.
+    chainCommand 필드는 원본 체인 문자열의 명시적 보존용이며, command와 동일한 값을 중복 저장한다.
+    이 이중 저장은 의도적 설계로, command 필드가 단일 command와 체인 command를 겸용하는 반면
+    chainCommand는 체인 존재 여부를 빈 문자열/비빈 문자열로 즉시 판별할 수 있는 편의 필드이다.
 
     Args:
         abs_work_dir: 작업 디렉터리 절대 경로
         title: 워크플로우 제목 (20자 이내)
         work_id: 시간 기반 워크 ID (HHMMSS 형식)
         work_name: 파일시스템 안전 작업명
-        command: 실행 명령어 (implement | review | research)
+        command: 실행 명령어 (implement | review | research). 체인의 경우 전체 체인 문자열.
         ts: ISO 8601 형식 타임스탬프 문자열
+        chain_command: 전체 체인 문자열 (예: "research>implement>review"). 단일 command 시 빈 문자열.
     """
+    context: dict[str, Any] = {
+        "title": title,
+        "workId": work_id,
+        "workName": work_name,
+        "command": command,
+        "agent": "orchestrator",
+        "created_at": ts,
+    }
+    if chain_command:
+        context["chainCommand"] = chain_command
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
-        {
-            "title": title,
-            "workId": work_id,
-            "workName": work_name,
-            "command": command,
-            "agent": "orchestrator",
-            "created_at": ts,
-        },
+        context,
     )
 
 
-def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
+def _write_status(abs_work_dir: str, mode: str, ts: str, workflow_number: str = "") -> None:
     """status.json을 작업 디렉터리에 작성한다.
 
     FSM 초기 상태(NONE)와 현재 세션 ID를 포함한 상태 파일을 생성한다.
+    workflow_number가 지정되면 W-NNN 형식의 number 필드를 함께 기록한다.
 
     Args:
         abs_work_dir: 작업 디렉터리 절대 경로
         mode: 워크플로우 모드 (full 등)
         ts: ISO 8601 형식 타임스탬프 문자열
+        workflow_number: 채번된 워크플로우 번호 (W-NNN 형식). 빈 문자열이면 number 필드 미포함.
     """
     claude_sid: str = os.environ.get("CLAUDE_SESSION_ID", "")
+    status_data: dict[str, Any] = {
+        "step": "NONE",
+        "mode": mode,
+        "session_id": str(uuid.uuid4())[:8],
+        "linked_sessions": [claude_sid] if claude_sid else [],
+        "created_at": ts,
+        "updated_at": ts,
+        "transitions": [],
+    }
+    if workflow_number:
+        status_data["number"] = workflow_number
     _atomic_write_json(
         os.path.join(abs_work_dir, "status.json"),
-        {
-            "step": "NONE",
-            "mode": mode,
-            "session_id": str(uuid.uuid4())[:8],
-            "linked_sessions": [claude_sid] if claude_sid else [],
-            "created_at": ts,
-            "updated_at": ts,
-            "transitions": [],
-        },
+        status_data,
     )
 
 
@@ -465,6 +480,7 @@ def init_workflow(
     mode: str,
     prompt_content: str = "",
     ticket_number: str | None = None,
+    chain_command: str = "",
 ) -> dict[str, str]:
     """워크플로우 디렉터리 구조와 메타데이터를 일괄 생성한다.
 
@@ -473,11 +489,12 @@ def init_workflow(
     아카이빙 후처리까지 포함한다.
 
     Args:
-        command: 실행 명령어 (implement | review | research)
+        command: 실행 명령어 (implement | review | research). 체인의 경우 첫 세그먼트.
         title: 워크플로우 제목 (20자 이내)
         mode: 워크플로우 모드 (full)
         prompt_content: 사용자 원문 프롬프트 내용 (기본값 빈 문자열)
         ticket_number: 연결된 티켓 번호 (예: 'T-001'). 있으면 티켓 상태를 갱신한다.
+        chain_command: 전체 체인 문자열 (예: "research>implement>review"). 단일 command 시 빈 문자열.
 
     Returns:
         초기화 결과 딕셔너리:
@@ -487,6 +504,8 @@ def init_workflow(
             workName (str): 파일시스템 안전 작업명
             promptContent (str): 전달받은 프롬프트 내용
             ticketNumber (str): 연결된 티켓 번호 (없으면 빈 문자열)
+            chainCommand (str): 전체 체인 문자열 (없으면 빈 문자열)
+            workflowNumber (str): 채번된 워크플로우 번호 W-NNN 형식
     """
     now: datetime = datetime.now(KST)
     registry_key: str = now.strftime("%Y%m%d-%H%M%S")
@@ -524,8 +543,15 @@ def init_workflow(
     _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
 
     ts: str = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-    _write_context(abs_work_dir, title, work_id, work_name, command, ts)
-    _write_status(abs_work_dir, mode, ts)
+
+    # 채번: .workflow/ + .workflow/.history/ 스캔으로 max + 1
+    max_num: int = scan_max_workflow_number(_PROJECT_ROOT)
+    workflow_number: str = f"W-{max_num + 1:03d}"
+
+    # .context.json의 command 필드: 체인이 있으면 전체 체인 문자열 저장 (finalization.py 체인 추적용)
+    context_command: str = chain_command if chain_command else command
+    _write_context(abs_work_dir, title, work_id, work_name, context_command, ts, chain_command)
+    _write_status(abs_work_dir, mode, ts, workflow_number)
 
     # 좀비 워크플로우 정리
     _run_optional_script(
@@ -554,6 +580,8 @@ def init_workflow(
         "workName": work_name,
         "promptContent": prompt_content,
         "ticketNumber": ticket_number or "",
+        "chainCommand": chain_command,
+        "workflowNumber": workflow_number,
     }
 
 
@@ -584,8 +612,21 @@ def main() -> None:
     else:
         _err(f"사용법: {sys.argv[0]} <command> <title> [mode] [#N]", 2)
 
-    if command not in VALID_COMMANDS:
-        _err(f"Invalid command: '{command}'. Allowed: {', '.join(sorted(VALID_COMMANDS))}", 2)
+    # 체인 command 처리: ">" 구분자가 있으면 체인으로 파싱, 첫 세그먼트를 실행 command로 사용
+    chain_command: str = ""
+    effective_command: str = command
+    if CHAIN_SEPARATOR in command:
+        segments: list[str] = []  # 정적 분석 possibly unbound 해소용 사전 초기화
+        try:
+            segments = parse_chain_command(command)
+        except ValueError as e:
+            _err(f"체인 command 파싱 오류: {e}", 2)
+        chain_command = command  # 전체 체인 문자열 보존 (finalization.py 체인 추적용)
+        effective_command = segments[0]  # 첫 세그먼트만 현재 실행에 사용
+    else:
+        if command not in VALID_COMMANDS:
+            _err(f"Invalid command: '{command}'. Allowed: {', '.join(sorted(VALID_COMMANDS))}", 2)
+
     if mode not in VALID_MODES:
         _err(f"Invalid mode: '{mode}'. Allowed: {', '.join(sorted(VALID_MODES))}", 2)
 
@@ -602,7 +643,7 @@ def main() -> None:
 
     # Step 2: 워크플로우 디렉터리/메타데이터/레지스트리 일괄 생성
     try:
-        result: dict[str, str] = init_workflow(command, title, mode, prompt_content, ticket_number)
+        result: dict[str, str] = init_workflow(effective_command, title, mode, prompt_content, ticket_number, chain_command)
     except Exception as e:
         _err(f"워크플로우 초기화 실패: {e}", 4)
 
@@ -621,7 +662,13 @@ def main() -> None:
             if _spec and _spec.loader:
                 _mod = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
-                _raw: dict[str, Any] = _mod.validate(prompt_content)
+                # 활성 subnumber의 <prompt> 섹션만 추출 (하위 호환: 함수 없으면 전체 XML 전달)
+                _active_prompt: str = (
+                    _mod.extract_active_prompt(prompt_content)
+                    if hasattr(_mod, "extract_active_prompt")
+                    else prompt_content
+                )
+                _raw: dict[str, Any] = _mod.validate(_active_prompt)
                 prompt_quality = {
                     "quality_score": _raw.get("quality_score", 0.0),
                     "has_tags": _raw.get("has_tags", False),
@@ -631,6 +678,8 @@ def main() -> None:
     except Exception as _pv_err:
         _warn(f"prompt_validator import 실패 (품질 검증 생략): {_pv_err}")
 
+    workflow_number: str = result.get("workflowNumber", "")
+
     init_result: dict[str, Any] = {
         "request": request,
         "workDir": result["workDir"],
@@ -639,10 +688,13 @@ def main() -> None:
         "date": date,
         "title": title,
         "workName": result["workName"],
-        "command": command,
+        "command": effective_command,
         "mode": mode,
         "ticketNumber": result.get("ticketNumber", ""),
+        "workflowNumber": workflow_number,
     }
+    if chain_command:
+        init_result["chainCommand"] = chain_command
     if prompt_quality is not None:
         init_result["prompt_quality"] = prompt_quality
 
@@ -651,7 +703,8 @@ def main() -> None:
         init_result,
     )
 
-    print(f"{C_CLAUDE}║ INIT:{C_RESET} {title}", flush=True)
+    number_prefix: str = f" {workflow_number}" if workflow_number else ""
+    print(f"{C_CLAUDE}║ INIT:{C_RESET}{number_prefix} {title}", flush=True)
     print(f"{C_CLAUDE}║{C_RESET} {C_DIM}{result['workDir']}{C_RESET}", flush=True)
 
 

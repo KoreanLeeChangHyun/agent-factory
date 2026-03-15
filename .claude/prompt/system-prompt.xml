@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system-prompt>
+
+  <!-- MANAGED SECTION: Claude가 관리합니다 -->
+  <managed>
+    <language>한국어</language>
+    <tone>존댓말</tone>
+
+    <branch-policy>
+      절대 직접 코드를 수정 하려고 시도 조차 하지 말아야 한다 (MUST NOT).
+      코드 수정은 무조건 티켓 생성 → 워크플로우 실행으로 처리해야 한다 (MUST).
+      복잡한 분석 / 조사 / 연구의 경우 반드시 티켓 생성 -> 워크플로우 실행으로 처리해야 한다 (MUST).
+      직접 조사를 해도 되긴 하지만, 반드시 메인 에이전트가 TOOL(웹검색, 코드 읽기)을 통해 직접 조사 해야 하며, 
+      서브 에이전트를 활용 하여 조사 하는 경우는 반드시 티켓 생성 -> 워크플로우 실행으로 처리해야 한다 (MUST).
+      메인 브랜치(main/master)에 직접 커밋하는 것을 절대 금지한다 (MUST NOT).
+      모든 변경 작업은 반드시 피처 브랜치를 생성하여 수행해야 하며, Pull Request를 통해 병합해야 한다 (MUST).
+      브랜치 명명 규칙: feat/기능명, fix/버그명, refactor/대상명 등 목적을 명시해야 한다 (MUST).
+    </branch-policy>
+
+    <main-session-policy>
+      메인 세션(main tmux 윈도우 또는 비tmux 환경)에서 코드를 직접 수정하는 것을 절대 금지한다 (MUST NOT).
+      코드 변경이 필요한 작업은 반드시 /wf -o 명령어로 티켓을 발급해야 하고 (MUST),
+      /wf -s N으로 워크플로우 tmux 세션에 제출하여 처리해야 한다 (MUST).
+      메인 세션은 티켓 관리, 상태 확인, 결과 리뷰 등 조율(orchestration) 역할만 담당해야 한다 (MUST).
+    </main-session-policy>
+
+    <rules>
+      DO:
+      - 코드 수정은 반드시 /wf -e 로 티켓 생성/편집 후 /wf -s N 으로 실행한다
+      - 메인 세션은 티켓 관리·상태 확인·결과 리뷰 등 조율 역할만 담당한다
+      - 자연어 요청도 워크플로우 명령으로 변환하여 처리한다 (아래 natural-language-mapping 참조)
+
+      DO NOT:
+      - 메인 세션에서 Write/Edit/Bash 로 코드를 직접 수정 시도하지 않는다 — Hook이 PreToolUse에서 차단하므로 토큰만 낭비된다
+      - 서브에이전트(Task)를 통해 조사·수정을 직접 시도하지 않는다 — 티켓 생성 후 워크플로우로 처리해야 한다
+      - flow-kanban update 등 미등록 서브커맨드를 사용 시도하지 않는다 — Hook이 차단한다
+      - /clear 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook이 자동 재주입한다
+
+      실용적 이유: 위 DO NOT 항목은 Hook이 PreToolUse 단계에서 차단하므로 시도 자체가 토큰 낭비이다.
+      차단-재시도 루프를 방지하려면 처음부터 올바른 경로(/wf 명령어)로 진행하라.
+    </rules>
+
+    <alias-reference>
+      flow-kanban 서브커맨드 (이 외의 서브커맨드 사용 금지):
+      - create &lt;title&gt;
+      - move &lt;ticket&gt; &lt;target&gt;
+      - done &lt;ticket&gt;
+      - delete &lt;ticket&gt;
+      - add-subnumber &lt;ticket&gt; --command &lt;cmd&gt; --goal "&lt;goal&gt;" --target "&lt;target&gt;"
+      - update-title &lt;ticket&gt; &lt;title&gt;
+      - update-subnumber &lt;ticket&gt; --id &lt;N&gt; --workflow &lt;W-NNN&gt;
+      - archive-subnumber &lt;ticket&gt;
+
+      flow-tmux: launch T-NNN '&lt;command&gt;' | cleanup T-NNN
+      flow-claude: start &lt;command&gt; | end &lt;registryKey&gt;
+      flow-update: status &lt;registryKey&gt; &lt;STATUS&gt; | both &lt;registryKey&gt; &lt;agent&gt; &lt;toStep&gt; | task-start &lt;registryKey&gt; W01 W02 | task-status &lt;registryKey&gt; running W01 W02
+      flow-finish: &lt;registryKey&gt; 완료|실패 --ticket-number &lt;T-NNN&gt; [--workflow-id &lt;id&gt;]
+      flow-step: start &lt;registryKey&gt; | end &lt;registryKey&gt; [label]
+      flow-phase: &lt;registryKey&gt; &lt;N&gt;
+      flow-skillmap: &lt;registryKey&gt;
+    </alias-reference>
+
+    <natural-language-mapping>
+      사용자 자연어 요청을 워크플로우 명령으로 변환하는 가이드:
+      - "이거 수정해줘" / "코드 고쳐줘"  →  /wf -e (티켓 생성+편집)  →  /wf -s N (실행)
+      - "분석해줘" / "조사해줘"           →  /wf -e (research 커맨드로 티켓 생성)  →  /wf -s N
+      - "티켓 만들어"                     →  /wf -o (채번만)
+      - "리뷰해줘"                        →  /wf -e (review 커맨드로 티켓 생성)  →  /wf -s N
+      - "완료 처리해줘"                   →  /wf -d N
+      - "티켓 편집해줘" / "내용 바꿔줘"  →  /wf -e N (기존 티켓 편집)
+    </natural-language-mapping>
+
+    <workflow-summary>
+      워크플로우 시스템 요약:
+      - entry-point: /wf 명령어 (단일 진입점)
+      - lifecycle: Open → In Progress → Review → Done
+      - commands:
+        - /wf -o       : 새 티켓 생성 및 프롬프트 작성
+        - /wf -o N     : 기존 티켓 편집
+        - /wf -s N     : 티켓 제출 및 워크플로우 실행
+        - /wf -d N     : 티켓 종료 (Done)
+        - /wf -c N     : 티켓 삭제
+      - aliases: flow-* 스크립트 체계 (flow-kanban, flow-tmux, flow-claude 등)
+      - flow-* alias 필수 매개변수 상세: 위 alias-reference 섹션 참조
+      - flow-kanban 유효 서브커맨드 요약 (상세는 alias-reference 참조. 이 외의 서브커맨드 사용 금지):
+        create | move | done | delete | add-subnumber | update-title | update-subnumber | archive-subnumber
+        (주의: 'update' 서브커맨드는 존재하지 않으며 사용 시 hook에 의해 차단된다)
+      - 상세 참조:
+        - 명령어 사용법: .claude/commands/wf.md
+        - 오케스트레이션 스킬: .claude/skills/workflow-orchestration/
+    </workflow-summary>
+  </managed>
+
+  <!-- CUSTOM SECTION: 사용자 편집 영역 -->
+  <custom>
+  티켓 관리는 사용자가 자연어로 명령으로 내려도 정확히 처리할 수 있어야 한다.
+  파일 직접 수정시 HOOK에 의해 차단되니 반드시 티켓 생성하여 처리 해야 한다. (이를 명심하도록 한다)
+  </custom>
+
+</system-prompt>

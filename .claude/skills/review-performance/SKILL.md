@@ -1,6 +1,6 @@
 ---
 name: review-performance
-description: "Performance-specialized code review skill. Validates algorithm complexity, detects N+1 queries, reviews caching strategies, checks index adequacy, and identifies framework-specific performance anti-patterns. Use for performance review: DB query changes, algorithm implementations, caching/index configuration changes. Triggers: '성능 리뷰', 'performance review', '쿼리 리뷰', 'DB 리뷰', 'N+1'."
+description: "Performance-specialized code review skill that validates algorithm complexity, detects N+1 queries, reviews caching strategies, checks index adequacy, and identifies framework-specific performance anti-patterns. Use when reviewing DB query changes, auditing algorithm implementations for complexity issues, or evaluating caching and index configuration changes."
 license: "Apache-2.0"
 ---
 

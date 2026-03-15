@@ -5,7 +5,14 @@
 - 명령어: {{command}}
 - 작업명: {{workName}}
 - 작성일: {{date}} (KST)
-- 원본 계획: {{planPath}}
+- 원본 계획: [{{planPath}}]({{planPath}})
+
+## 관련 문서
+
+- 계획서: [plan.md]({{planPath}})
+- 작업 내역서:
+  <!-- reporter: work/ 디렉터리의 실제 파일을 나열 -->
+  - [work/W01-태스크명.md]({{workDir}}/work/W01-태스크명.md)
 
 ## 요약
 
@@ -67,7 +74,7 @@ flowchart TD
 
 | Phase | 태스크 ID | 설명 | 상태 |
 |-------|-----------|------|------|
-| 1 | W01 | [설명] | 완료 |
+| 1 | [W01]({{workDir}}/work/W01-태스크명.md) | [설명] | 완료 |
 
 ## 참고 자료
 

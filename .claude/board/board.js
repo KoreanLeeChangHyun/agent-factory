@@ -95,45 +95,173 @@
   }
 
   // ── Fetch Tickets ──
-  var MAX_GAP = 10; // 연속 404 허용 횟수
 
+  /** 디렉터리 URL에서 .xml 파일 목록을 가져온다. 404나 네트워크 오류 시 빈 배열 반환. */
+  function fetchXmlList(dirUrl) {
+    return fetch(dirUrl, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return [];
+      return res.text().then(function (html) {
+        // 경로 탈출 방지: ../ 포함 항목과 / 시작 항목 제거
+        return parseDirLinks(html).files.filter(function (f) { return f.endsWith(".xml") && !f.includes("../") && !f.startsWith("/"); });
+      });
+    }).catch(function () { return []; });
+  }
+
+  /** 디렉터리 리스팅 기반 병렬 fetch로 모든 티켓을 수집한다. */
   function fetchTickets() {
-    var tickets = [];
-    function tryFetch(n, misses) {
-      if (misses >= MAX_GAP) return Promise.resolve();
-      var url = "../../.kanban/T-" + String(n).padStart(3, "0") + ".xml";
-      return fetch(url).then(function (res) {
-        if (!res.ok) return tryFetch(n + 1, misses + 1);
-        return res.text().then(function (text) {
-          var t = parseTicket(text);
-          if (t) tickets.push(t);
-          return tryFetch(n + 1, 0);
+    return Promise.all([
+      fetchXmlList("../../.kanban/"),
+      fetchXmlList("../../.kanban/done/"),
+    ]).then(function (results) {
+      var rootFiles = results[0].map(function (f) { return "../../.kanban/" + f; });
+      var doneFiles = results[1].map(function (f) { return "../../.kanban/done/" + f; });
+      var allFiles = rootFiles.concat(doneFiles);
+      return Promise.all(allFiles.map(function (url) {
+        return fetch(url, { cache: "no-store" }).then(function (res) {
+          if (!res.ok) return null;
+          return res.text().then(function (text) { return parseTicket(text); });
+        }).catch(function () { return null; });
+      }));
+    }).then(function (results) {
+      return results.filter(function (t) { return t !== null; });
+    });
+  }
+
+  /**
+   * 변경된 파일명 목록만 선택적으로 fetch하여 TICKETS를 업데이트한다.
+   * @param {string[]} files - 변경된 파일명 배열 (예: ["T-038.xml"])
+   * @returns {Promise<void>}
+   */
+  function fetchTicketsByFiles(files) {
+    return Promise.all(files.map(function (f) {
+      return fetch("../../.kanban/" + f, { cache: "no-store" }).then(function (res) {
+        if (res.ok) {
+          return res.text().then(function (text) {
+            return { file: f, ticket: parseTicket(text) };
+          });
+        }
+        // .kanban/ 에 없으면 done/ 에서 시도
+        return fetch("../../.kanban/done/" + f, { cache: "no-store" }).then(function (res2) {
+          if (res2.ok) {
+            return res2.text().then(function (text) {
+              return { file: f, ticket: parseTicket(text) };
+            });
+          }
+          // 양쪽 모두 404: 삭제된 파일
+          return { file: f, ticket: null };
         });
-      }).catch(function () { return tryFetch(n + 1, misses + 1); });
-    }
-    function tryFetchDone(n, misses) {
-      if (misses >= MAX_GAP) return Promise.resolve();
-      var url = "../../.kanban/done/T-" + String(n).padStart(3, "0") + ".xml";
-      return fetch(url).then(function (res) {
-        if (!res.ok) return tryFetchDone(n + 1, misses + 1);
-        return res.text().then(function (text) {
-          var t = parseTicket(text);
-          if (t) tickets.push(t);
-          return tryFetchDone(n + 1, 0);
-        });
-      }).catch(function () { return tryFetchDone(n + 1, misses + 1); });
-    }
-    return tryFetch(1, 0).then(function () {
-      return tryFetchDone(1, 0);
-    }).then(function () { return tickets; });
+      }).catch(function () {
+        return { file: f, ticket: null };
+      });
+    })).then(function (results) {
+      results.forEach(function (result) {
+        var incoming = result.ticket;
+        if (incoming === null) {
+          // 삭제된 파일: TICKETS에서 파일명으로 해당 티켓 제거
+          var baseName = result.file.replace(/\.xml$/, "");
+          TICKETS = TICKETS.filter(function (t) { return t.number !== baseName; });
+        } else {
+          var idx = TICKETS.findIndex(function (t) { return t.number === incoming.number; });
+          if (idx !== -1) {
+            // 기존 티켓 교체
+            TICKETS[idx] = incoming;
+          } else {
+            // 새 티켓 추가
+            TICKETS.push(incoming);
+          }
+        }
+      });
+    });
   }
 
   // ── UI State Persistence ──
   var LS_KEY = "claude-board-ui";
+  var KANBAN_SORT_LS_KEY = "claude-board-kanban-sort";
+
+  // ── Kanban Sort State ──
+  var kanbanSort = loadKanbanSort();
+
+  function loadKanbanSort() {
+    var defaults = {};
+    COLUMNS.forEach(function (col) {
+      defaults[col.key] = { key: "number", dir: "asc" };
+    });
+    try {
+      var stored = JSON.parse(localStorage.getItem(KANBAN_SORT_LS_KEY));
+      if (stored && typeof stored === "object") {
+        COLUMNS.forEach(function (col) {
+          if (!stored[col.key] || !stored[col.key].key) {
+            stored[col.key] = defaults[col.key];
+          }
+        });
+        return stored;
+      }
+    } catch (e) {}
+    return defaults;
+  }
+
+  function saveKanbanSort() {
+    try { localStorage.setItem(KANBAN_SORT_LS_KEY, JSON.stringify(kanbanSort)); } catch (e) {}
+  }
+
+  // ── Kanban Sort Logic ──
+  function getModifiedDate(t) {
+    // 최신 history/submit의 datetime, 없으면 t.datetime 폴백
+    var candidates = [];
+    if (t.submit && t.submit.datetime) candidates.push(t.submit.datetime);
+    if (t.history && t.history.length > 0) {
+      t.history.forEach(function (h) { if (h.datetime) candidates.push(h.datetime); });
+    }
+    if (candidates.length === 0) return t.datetime || "";
+    return candidates.reduce(function (a, b) { return a > b ? a : b; });
+  }
+
+  function sortTickets(items, sortKey, sortDir) {
+    var dir = sortDir === "desc" ? -1 : 1;
+    return items.slice().sort(function (a, b) {
+      var av, bv, cmp;
+      if (sortKey === "number") {
+        av = a.number || "";
+        bv = b.number || "";
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "created") {
+        av = a.datetime || "";
+        bv = b.datetime || "";
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "modified") {
+        av = getModifiedDate(a);
+        bv = getModifiedDate(b);
+        cmp = av.localeCompare(bv);
+      } else if (sortKey === "title") {
+        av = a.title || "";
+        bv = b.title || "";
+        cmp = av.localeCompare(bv, "ko");
+      } else {
+        cmp = 0;
+      }
+      return dir * cmp;
+    });
+  }
+
+  // ── Inline SVG Icons for sort direction ──
+  var SVG_ASC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 2L9 8H1L5 2Z"/></svg>';
+  var SVG_DESC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 8L1 2H9L5 8Z"/></svg>';
+
+  // ── Sort Options ──
+  var SORT_KEYS = [
+    { key: "number",   label: "번호" },
+    { key: "created",  label: "생성일" },
+    { key: "modified", label: "수정일" },
+    { key: "title",    label: "제목" },
+  ];
+  var SORT_DIRS = [
+    { dir: "asc",  label: "오름차순" },
+    { dir: "desc", label: "내림차순" },
+  ];
 
   function saveUI() {
     var openNums = viewerTabs.map(function (t) { return t.number; });
-    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab };
+    var state = { tab: activeTab, viewerTabs: openNums, activeViewerTab: activeViewerTab, tabHistory: tabHistory, forwardHistory: forwardHistory };
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
 
@@ -146,9 +274,23 @@
   // ── Tab Switching ──
   var tabs = document.querySelectorAll(".tab");
   var views = document.querySelectorAll(".view");
-  var activeTab = savedState.tab || "kanban";
+  var activeTab = savedState.tab || "dashboard";
+  function migrateTabHistory(history) {
+    return history.map(function (entry) {
+      if (typeof entry === "string") return { tab: entry, viewerTab: null };
+      return entry;
+    });
+  }
 
-  function switchTab(target) {
+  var tabHistory = migrateTabHistory(savedState.tabHistory || []);
+  var forwardHistory = migrateTabHistory(savedState.forwardHistory || []);
+
+  function switchTab(target, skipPush) {
+    if (!skipPush && activeTab) {
+      tabHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+      if (tabHistory.length > 100) tabHistory.shift();
+      forwardHistory.length = 0;
+    }
     activeTab = target;
     tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
     views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
@@ -187,22 +329,55 @@
     var h = '<div class="kanban-board">';
     COLUMNS.forEach(function (col) {
       var items = TICKETS.filter(function (t) { return t.status === col.key; });
+      var colSort = kanbanSort[col.key] || { key: "number", dir: "asc" };
+      var sortedItems = sortTickets(items, colSort.key, colSort.dir);
+      var sortIcon = colSort.dir === "desc" ? SVG_DESC : SVG_ASC;
+
+      // Build dropdown options HTML (2-tier: key section + divider + dir section)
+      var dropHtml = '<div class="col-sort-dropdown" data-col="' + esc(col.key) + '">';
+      SORT_KEYS.forEach(function (opt) {
+        var isActive = (opt.key === colSort.key) ? " active" : "";
+        dropHtml += '<button class="col-sort-option' + isActive + '"'
+          + ' data-col="' + esc(col.key) + '"'
+          + ' data-sort-key="' + esc(opt.key) + '">'
+          + esc(opt.label) + '</button>';
+      });
+      dropHtml += '<div class="col-sort-divider"></div>';
+      SORT_DIRS.forEach(function (opt) {
+        var isActive = (opt.dir === colSort.dir) ? " active" : "";
+        dropHtml += '<button class="col-sort-option' + isActive + '"'
+          + ' data-col="' + esc(col.key) + '"'
+          + ' data-sort-dir="' + esc(opt.dir) + '">'
+          + esc(opt.label) + '</button>';
+      });
+      dropHtml += '</div>';
+
       h += '<div class="column">';
-      h += '<div class="col-header"><span class="col-dot ' + col.dot + '"></span>' + esc(col.label);
-      h += '<span class="col-count">' + items.length + "</span></div>";
+      h += '<div class="col-header">';
+      h += '<span class="col-dot ' + col.dot + '"></span>';
+      h += esc(col.label);
+      h += '<div class="col-sort-wrapper" style="margin-left:auto">';
+      h += '<button class="col-sort-btn" data-col="' + esc(col.key) + '" title="정렬">' + sortIcon + '</button>';
+      h += dropHtml;
+      h += '</div>';
+      h += '<span class="col-count">' + items.length + "</span>";
+      h += "</div>";
       h += '<div class="cards">';
-      if (items.length === 0) {
+      if (sortedItems.length === 0) {
         h += '<div class="empty">No items</div>';
       } else {
-        items.forEach(function (t) {
+        sortedItems.forEach(function (t) {
           var done = col.key === "Done" ? " done" : "";
           h += '<div class="card' + done + '" data-num="' + esc(t.number) + '">';
           h += '<div class="card-title">' + esc(t.title || "(No title)") + "</div>";
           h += '<div class="card-meta">';
+          h += '<span class="card-meta-left">';
           h += '<span class="card-num">' + esc(t.number) + "</span>";
           if (t.submit && t.submit.command) {
             h += badge(t.submit.command, CMD_COLORS[t.submit.command]);
           }
+          h += "</span>";
+          h += '<span class="card-date"><span>' + esc((t.datetime || "").substring(0, 10)) + "</span><span>" + esc((t.datetime || "").substring(11, 16)) + "</span></span>";
           h += "</div></div>";
         });
       }
@@ -210,6 +385,8 @@
     });
     h += "</div>";
     el.innerHTML = h;
+
+    // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
       card.addEventListener("click", function () {
         var num = card.dataset.num;
@@ -217,11 +394,64 @@
         if (ticket) openViewer(ticket);
       });
     });
+
+    // Bind sort button clicks (toggle dropdown)
+    el.querySelectorAll(".col-sort-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var colKey = btn.dataset.col;
+        var dropdown = btn.parentNode.querySelector(".col-sort-dropdown");
+        var isOpen = dropdown.classList.contains("open");
+        // Close all dropdowns first
+        el.querySelectorAll(".col-sort-dropdown.open").forEach(function (d) {
+          d.classList.remove("open");
+        });
+        if (!isOpen) {
+          dropdown.classList.add("open");
+        }
+      });
+    });
+
+    // Bind sort option clicks
+    el.querySelectorAll(".col-sort-option").forEach(function (opt) {
+      opt.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var colKey = opt.dataset.col;
+        var current = kanbanSort[colKey] || { key: "number", dir: "asc" };
+        if (opt.dataset.sortKey && !opt.dataset.sortDir) {
+          // Key button: preserve current dir
+          kanbanSort[colKey] = { key: opt.dataset.sortKey, dir: current.dir };
+        } else if (opt.dataset.sortDir && !opt.dataset.sortKey) {
+          // Dir button: preserve current key
+          kanbanSort[colKey] = { key: current.key, dir: opt.dataset.sortDir };
+        }
+        saveKanbanSort();
+        renderKanban();
+      });
+    });
+
+    // Close dropdowns on outside click (attach once per render; cleaned up on next render via innerHTML reset)
+    var outsideHandler = function (e) {
+      if (!e.target.closest(".col-sort-wrapper")) {
+        el.querySelectorAll(".col-sort-dropdown.open").forEach(function (d) {
+          d.classList.remove("open");
+        });
+      }
+    };
+    document.addEventListener("click", outsideHandler);
+    // Store handler reference on element for cleanup on next renderKanban call
+    if (el._sortOutsideHandler) {
+      document.removeEventListener("click", el._sortOutsideHandler);
+    }
+    el._sortOutsideHandler = outsideHandler;
   }
 
   // ── Viewer Tabs ──
   var viewerTabs = [];
   var activeViewerTab = savedState.activeViewerTab || null;
+
+  // ── Code Viewer Store (hybrid rendering + search state) ──
+  var codeViewerStore = {}; // { [viewerId]: { pendingRows: [], allLines: [], nextChunk: 0 } }
 
   function openViewer(ticket) {
     var exists = viewerTabs.find(function (t) { return t.number === ticket.number; });
@@ -230,8 +460,8 @@
     } else {
       exists.ticket = ticket;
     }
-    activeViewerTab = ticket.number;
     switchTab("viewer");
+    activeViewerTab = ticket.number;
     renderViewer();
     saveUI();
   }
@@ -251,10 +481,14 @@
 
     // Tab bar
     h += '<div class="vt-bar">';
+    var backDim = tabHistory.length === 0 ? " vt-nav-dim" : "";
+    var fwdDim = forwardHistory.length === 0 ? " vt-nav-dim" : "";
+    h += '<button class="vt-back-btn' + backDim + '" id="vt-back-btn">&lt;</button>';
+    h += '<button class="vt-back-btn' + fwdDim + '" id="vt-fwd-btn">&gt;</button>';
     viewerTabs.forEach(function (t) {
       var ac = t.number === activeViewerTab ? " vt-tab-active" : "";
       h += '<div class="vt-tab' + ac + '" data-num="' + esc(t.number) + '">';
-      var tabLabel = t.wfFile ? t.wfFile.label : t.number;
+      var tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number);
       h += '<span class="vt-tab-label">' + esc(tabLabel) + '</span>';
       h += '<span class="vt-tab-close" data-close="' + esc(t.number) + '">&times;</span>';
       h += '</div>';
@@ -264,7 +498,9 @@
     // Content
     h += '<div class="vt-content">';
     var active = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
-    if (active && active.wfFile) {
+    if (active && active.wfDetail) {
+      h += renderWfDetailView(active.wfDetail);
+    } else if (active && active.wfFile) {
       h += renderWfFileView(active.wfFile);
     } else if (active && active.ticket) {
       h += renderTicketHtml(active.ticket);
@@ -279,6 +515,12 @@
     el.querySelectorAll(".vt-tab").forEach(function (tab) {
       tab.addEventListener("click", function (e) {
         if (e.target.classList.contains("vt-tab-close")) return;
+        var prevViewerTab = activeViewerTab;
+        if (tab.dataset.num !== prevViewerTab) {
+          tabHistory.push({ tab: "viewer", viewerTab: prevViewerTab });
+          if (tabHistory.length > 100) tabHistory.shift();
+          forwardHistory.length = 0;
+        }
         activeViewerTab = tab.dataset.num;
         renderViewer();
         saveUI();
@@ -294,6 +536,15 @@
     // Bind result links
     el.querySelectorAll(".tv-result-link").forEach(function (link) {
       link.addEventListener("click", function () {
+        // Workflow number link: find matching workflow and open detail
+        if (link.dataset.workflow) {
+          var wfNum = link.dataset.workflow;
+          var matchedWf = WORKFLOWS.find(function (w) { return w.number === wfNum; });
+          if (matchedWf) {
+            openWfDetail(matchedWf);
+          }
+          return;
+        }
         var isDir = link.dataset.isdir === "true";
         openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
@@ -306,7 +557,339 @@
       });
     });
 
+    // Bind wfDetail artifact links
+    el.querySelectorAll(".wf-detail-artifact-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var isDir = link.dataset.isdir === "true";
+        openWfFile(link.dataset.label, link.dataset.url, isDir);
+      });
+    });
+
+    // Lazy-load connected ticket for wfDetail views
+    el.querySelectorAll(".wf-detail-ticket-section[data-basepath]").forEach(function (section) {
+      var basePath = section.dataset.basepath;
+      if (!basePath || section.dataset.fetched) return;
+      section.dataset.fetched = "1";
+      fetch(basePath + ".context.json", { cache: "no-store" }).then(function (r) {
+        if (!r.ok) return null;
+        return r.json();
+      }).then(function (ctx) {
+        if (!ctx) return;
+        var ticketNum = ctx.ticketNumber || "";
+        var title = ctx.title || "";
+        var workId = ctx.workId || "";
+        if (!ticketNum && !title && !workId) return;
+        var h = '<div class="tv-section">';
+        h += '<div class="tv-section-title">Context</div>';
+        h += '<div class="wf-detail-info">';
+        if (ticketNum) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value">' + esc(ticketNum) + '</span></div>';
+        if (title) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Title</span><span class="wf-detail-info-value">' + esc(title) + '</span></div>';
+        if (workId) h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Work ID</span><span class="wf-detail-info-value">' + esc(workId) + '</span></div>';
+        h += '</div></div>';
+        section.innerHTML = h;
+      }).catch(function () {});
+    });
+
+    // Bind back button
+    var backBtn = el.querySelector("#vt-back-btn");
+    if (backBtn) {
+      backBtn.addEventListener("click", function () {
+        while (tabHistory.length > 0) {
+          var entry = tabHistory.pop();
+          if (entry && entry.tab === "viewer" && entry.viewerTab) {
+            var stillOpen = viewerTabs.find(function (t) { return t.number === entry.viewerTab; });
+            if (!stillOpen) continue;
+            forwardHistory.push({ tab: "viewer", viewerTab: activeViewerTab });
+            activeViewerTab = entry.viewerTab;
+            renderViewer();
+            saveUI();
+            return;
+          }
+          forwardHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          return;
+        }
+        switchTab("kanban", true);
+      });
+    }
+
+    // Bind forward button
+    var fwdBtn = el.querySelector("#vt-fwd-btn");
+    if (fwdBtn) {
+      fwdBtn.addEventListener("click", function () {
+        while (forwardHistory.length > 0) {
+          var entry = forwardHistory.pop();
+          if (entry && entry.tab === "viewer" && entry.viewerTab) {
+            var stillOpen = viewerTabs.find(function (t) { return t.number === entry.viewerTab; });
+            if (!stillOpen) continue;
+            tabHistory.push({ tab: "viewer", viewerTab: activeViewerTab });
+            if (tabHistory.length > 100) tabHistory.shift();
+            activeViewerTab = entry.viewerTab;
+            renderViewer();
+            saveUI();
+            return;
+          }
+          tabHistory.push({ tab: activeTab, viewerTab: activeTab === "viewer" ? activeViewerTab : null });
+          if (tabHistory.length > 100) tabHistory.shift();
+          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          return;
+        }
+      });
+    }
+
+    // Bind wfDetail ticket link clicks (Info section Ticket row)
+    el.querySelectorAll(".wf-detail-ticket-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var ticketNum = link.dataset.ticketNum;
+        var ticket = TICKETS.find(function (t) { return t.number === ticketNum; });
+        if (ticket) openViewer(ticket);
+      });
+    });
+
+    // Bind ticket viewer workflow links (Connected Workflows section)
+    el.querySelectorAll(".tv-result-workflow[data-wf-entry]").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var entryKey = link.dataset.wfEntry;
+        var taskKey = link.dataset.wfTask;
+        var cmdKey = link.dataset.wfCmd;
+        var w = WORKFLOWS.find(function (item) {
+          return item.entry === entryKey && item.task === taskKey && item.command === cmdKey;
+        });
+        if (w) openWfDetail(w);
+      });
+    });
+
+    // Bind md-file-link clicks
+    el.querySelectorAll(".md-file-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        var filePath = link.dataset.filepath;
+        if (!filePath) return;
+        var url;
+        if (link.dataset.url) {
+          // Use pre-resolved URL set by renderer.link (W01)
+          url = link.dataset.url;
+        } else if (filePath.indexOf(".workflow/") === 0 || filePath.indexOf(".claude/") === 0) {
+          // Project-root-relative path: prepend "../../" to reach project root from board.html
+          url = "../../" + filePath;
+        } else {
+          // Report-relative path (e.g. "work/..."): resolve against current tab's wfFile.url
+          var activeTab = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
+          var baseUrl = activeTab && activeTab.wfFile ? activeTab.wfFile.url : "";
+          url = urlDir(baseUrl) + filePath;
+        }
+        openWfFile(filePath, url);
+      });
+    });
+
+    // Bind copy button clicks
+    el.querySelectorAll(".code-copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var viewer = btn.closest(".code-viewer");
+        if (!viewer) return;
+        var lineContents = viewer.querySelectorAll(".code-line-content");
+        var text = Array.prototype.map.call(lineContents, function (span) {
+          return span.textContent;
+        }).join("\n");
+        navigator.clipboard.writeText(text).then(function () {
+          var original = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        }).catch(function () {
+          btn.textContent = "Error";
+          setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+        });
+      });
+    });
+
+    // Bind lazy scroll for large files
+    el.querySelectorAll(".code-viewer").forEach(function (viewer) {
+      var viewerId = viewer.dataset.viewerId;
+      if (!viewerId || !codeViewerStore[viewerId]) return;
+      var store = codeViewerStore[viewerId];
+      if (store.pendingRows.length === 0) return;
+
+      var CHUNK_SIZE = 200;
+      var SCROLL_THRESHOLD = 200;
+
+      function appendNextChunk() {
+        if (store.pendingRows.length === 0) return;
+        var chunk = store.pendingRows.splice(0, CHUNK_SIZE);
+        var code = viewer.querySelector("code");
+        if (!code) return;
+        var frag = document.createDocumentFragment();
+        // Append a newline text node then the chunk HTML
+        var wrapper = document.createElement("span");
+        wrapper.innerHTML = "\n" + chunk.join("\n");
+        while (wrapper.firstChild) {
+          frag.appendChild(wrapper.firstChild);
+        }
+        code.appendChild(frag);
+        if (store.pendingRows.length === 0) {
+          viewer.removeEventListener("scroll", onScroll);
+        }
+      }
+
+      function onScroll() {
+        var distFromBottom = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight;
+        if (distFromBottom < SCROLL_THRESHOLD) {
+          appendNextChunk();
+        }
+      }
+
+      viewer.addEventListener("scroll", onScroll);
+    });
+
+    // Bind code search (Ctrl+F / Cmd+F)
+    el.querySelectorAll(".code-viewer").forEach(function (viewer) {
+      var viewerId = viewer.dataset.viewerId;
+      if (!viewerId || !codeViewerStore[viewerId]) return;
+      var store = codeViewerStore[viewerId];
+      var searchBar = viewer.querySelector(".code-search-bar");
+      var searchInput = viewer.querySelector(".code-search-input");
+      var searchCount = viewer.querySelector(".code-search-count");
+
+      function openSearch() {
+        if (!searchBar) return;
+        searchBar.style.display = "flex";
+        searchInput.focus();
+        searchInput.select();
+      }
+
+      function closeSearch() {
+        if (!searchBar) return;
+        searchBar.style.display = "none";
+        clearSearchHighlights(viewer);
+        store.searchMatches = [];
+        store.searchIndex = -1;
+        if (searchCount) searchCount.textContent = "";
+      }
+
+      function clearSearchHighlights(viewerEl) {
+        viewerEl.querySelectorAll(".code-search-match").forEach(function (mark) {
+          var parent = mark.parentNode;
+          if (!parent) return;
+          parent.replaceChild(document.createTextNode(mark.textContent), mark);
+          parent.normalize();
+        });
+        viewerEl.querySelectorAll(".code-line-content.code-search-active").forEach(function (span) {
+          span.classList.remove("code-search-active");
+        });
+      }
+
+      function applySearchHighlights(query) {
+        clearSearchHighlights(viewer);
+        store.searchMatches = [];
+        store.searchIndex = -1;
+        if (!query) {
+          if (searchCount) searchCount.textContent = "";
+          return;
+        }
+        var lowerQuery = query.toLowerCase();
+        var lineContents = viewer.querySelectorAll(".code-line-content");
+        lineContents.forEach(function (span) {
+          var text = span.textContent;
+          if (text.toLowerCase().indexOf(lowerQuery) !== -1) {
+            store.searchMatches.push(span);
+            // Wrap matching text portions in <mark>
+            var lowerText = text.toLowerCase();
+            var result = "";
+            var idx = 0;
+            while (idx < text.length) {
+              var found = lowerText.indexOf(lowerQuery, idx);
+              if (found === -1) {
+                result += esc(text.substring(idx));
+                break;
+              }
+              result += esc(text.substring(idx, found));
+              result += '<mark class="code-search-match">' + esc(text.substring(found, found + query.length)) + '</mark>';
+              idx = found + query.length;
+            }
+            span.innerHTML = result;
+          }
+        });
+        if (searchCount) {
+          searchCount.textContent = store.searchMatches.length > 0
+            ? "0/" + store.searchMatches.length
+            : "No results";
+        }
+      }
+
+      function navigateSearch(dir) {
+        if (store.searchMatches.length === 0) return;
+        // Remove active class from current
+        if (store.searchIndex >= 0 && store.searchIndex < store.searchMatches.length) {
+          store.searchMatches[store.searchIndex].classList.remove("code-search-active");
+        }
+        if (dir === "next") {
+          store.searchIndex = (store.searchIndex + 1) % store.searchMatches.length;
+        } else {
+          store.searchIndex = (store.searchIndex - 1 + store.searchMatches.length) % store.searchMatches.length;
+        }
+        var activeSpan = store.searchMatches[store.searchIndex];
+        activeSpan.classList.add("code-search-active");
+        if (searchCount) {
+          searchCount.textContent = (store.searchIndex + 1) + "/" + store.searchMatches.length;
+        }
+        activeSpan.scrollIntoView({ block: "center" });
+      }
+
+      // Ctrl+F / Cmd+F inside viewer
+      viewer.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          openSearch();
+        }
+        if (e.key === "Escape") {
+          closeSearch();
+        }
+      });
+
+      // Make viewer focusable so keydown fires
+      if (!viewer.getAttribute("tabindex")) {
+        viewer.setAttribute("tabindex", "0");
+      }
+
+      // Global Ctrl+F when viewer is the active code viewer
+      viewer.addEventListener("focus", function () {
+        viewer._hasFocus = true;
+      });
+      viewer.addEventListener("blur", function () {
+        viewer._hasFocus = false;
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener("input", function () {
+          applySearchHighlights(searchInput.value);
+        });
+        searchInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            navigateSearch(e.shiftKey ? "prev" : "next");
+          }
+          if (e.key === "Escape") {
+            closeSearch();
+          }
+        });
+      }
+
+      // Nav buttons
+      viewer.querySelectorAll(".code-search-nav-btn").forEach(function (navBtn) {
+        navBtn.addEventListener("click", function () {
+          navigateSearch(navBtn.dataset.dir);
+        });
+      });
+
+      // Close button
+      var closeBtn = viewer.querySelector(".code-search-close-btn");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", function () {
+          closeSearch();
+        });
+      }
+    });
+
     initMermaid();
+    initHighlight();
   }
 
   function renderTicketHtml(ticket) {
@@ -337,6 +920,19 @@
       h += '<div class="tv-section tv-result-section">';
       h += '<div class="tv-section-title">Result</div>';
       h += renderResultLinks(ticket.submit.result);
+      h += "</div>";
+    }
+
+    var connectedWfs = findWorkflowsForTicket(ticket);
+    if (connectedWfs.length > 0) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Workflows</div>';
+      h += '<div class="tv-result-links">';
+      connectedWfs.forEach(function (w) {
+        var label = w.number ? w.number + " / " + w.task : w.task;
+        h += '<span class="tv-result-link tv-result-workflow" data-wf-entry="' + esc(w.entry) + '" data-wf-task="' + esc(w.task) + '" data-wf-cmd="' + esc(w.command) + '">' + esc(label) + '</span>';
+      });
+      h += '</div>';
       h += "</div>";
     }
 
@@ -401,8 +997,73 @@
     return h;
   }
 
+  /** Returns the ticket that links to this workflow, or null. */
+  function findTicketForWorkflow(w) {
+    var basePath = w.basePath || "";
+    var wNum = w.number || "";
+    for (var ti = 0; ti < TICKETS.length; ti++) {
+      var ticket = TICKETS[ti];
+      var subnumbers = [];
+      if (ticket.submit) subnumbers.push(ticket.submit);
+      if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
+      for (var si = 0; si < subnumbers.length; si++) {
+        var result = subnumbers[si].result;
+        if (!result) continue;
+        // Match by workflow key (W-NNN)
+        if (result.workflow && wNum && result.workflow === wNum) return ticket;
+        // Match by workdir path
+        if (result.workdir) {
+          var wd = result.workdir;
+          if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+          var normalized = "../../" + wd;
+          if (normalized === basePath) return ticket;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Returns array of workflows linked from any subnumber of a ticket. */
+  function findWorkflowsForTicket(ticket) {
+    var found = [];
+    var subnumbers = [];
+    if (ticket.submit) subnumbers.push(ticket.submit);
+    if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
+    for (var si = 0; si < subnumbers.length; si++) {
+      var result = subnumbers[si].result;
+      if (!result) continue;
+      for (var wi = 0; wi < WORKFLOWS.length; wi++) {
+        var w = WORKFLOWS[wi];
+        var alreadyFound = found.indexOf(w) !== -1;
+        if (alreadyFound) continue;
+        // Match by workflow key (W-NNN)
+        if (result.workflow && w.number && result.workflow === w.number) {
+          found.push(w);
+          continue;
+        }
+        // Match by workdir path
+        if (result.workdir) {
+          var wd = result.workdir;
+          if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+          var normalized = "../../" + wd;
+          if (normalized === (w.basePath || "")) {
+            found.push(w);
+          }
+        }
+      }
+    }
+    return found;
+  }
+
   /** Renders result object keys as clickable links for Viewer tab. */
   function renderResultLinks(result) {
+    // If result contains a workflow number (W-NNN), render as a workflow link
+    if (result.workflow) {
+      var h = '<div class="tv-result-links">';
+      h += '<span class="tv-result-link tv-result-workflow" data-workflow="' + esc(result.workflow) + '">' + esc(result.workflow) + '</span>';
+      h += '</div>';
+      return h;
+    }
     var keys = ["plan", "work", "report"];
     var h = '<div class="tv-result-links">';
     keys.forEach(function (k) {
@@ -411,9 +1072,9 @@
       var isDir = k === "work";
       h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '"' + (isDir ? ' data-isdir="true"' : '') + '>' + esc(k) + '</span>';
     });
-    // render any extra keys not in the standard list
+    // render any extra keys not in the standard list (workdir excluded: shown via Connected Workflows)
     Object.keys(result).forEach(function (k) {
-      if (keys.indexOf(k) === -1) {
+      if (keys.indexOf(k) === -1 && k !== "workdir") {
         var url = "../../" + result[k];
         h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '">' + esc(k) + '</span>';
       }
@@ -426,14 +1087,14 @@
   var WORKFLOWS = [];
 
 
-  // Files to show as links in workflow cards
+  // Files to show as indicators in workflow table columns
   var WF_FILES = [
-    { key: "query", file: "user_prompt.txt", label: "query" },
-    { key: "plan", file: "plan.md", label: "plan" },
-    { key: "report", file: "report.md", label: "report" },
-    { key: "summary", file: "summary.txt", label: "summary" },
-    { key: "log", file: "workflow.log", label: "log" },
-    { key: "usage", file: "usage.json", label: "usage" },
+    { key: "query",   file: "user_prompt.txt", label: "query" },
+    { key: "plan",    file: "plan.md",          label: "plan" },
+    { key: "report",  file: "report.md",        label: "report" },
+    { key: "summary", file: "summary.txt",      label: "summary" },
+    { key: "usage",   file: "usage.json",       label: "usage" },
+    { key: "log",     file: "workflow.log",     label: "log" },
   ];
 
   function parseDirLinks(html) {
@@ -456,12 +1117,14 @@
   }
 
   function fetchEntriesFrom(baseHref) {
-    return fetch(baseHref).then(function (res) {
+    return fetch(baseHref, { cache: "no-store" }).then(function (res) {
       if (!res.ok) return [];
       return res.text();
     }).then(function (html) {
       return parseDirLinks(html).dirs.filter(function (h) {
-        return /\/\d{8}-\d{6}\/$/.test(h);
+        return /\d{8}-\d{6}\/$/.test(h);
+      }).map(function (h) {
+        return baseHref + h;
       });
     }).catch(function () { return []; });
   }
@@ -482,40 +1145,37 @@
   // Fetch detail for a single entry href
   function fetchEntryDetail(entryHref) {
     var entry = lastSegment(entryHref);
-    return fetch(entryHref).then(function (r) { return r.text(); }).then(function (h2) {
-      var taskLinks = parseDirLinks(h2).dirs;
+    return fetch(entryHref, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (h2) {
+      var taskLinks = parseDirLinks(h2).dirs.map(function (h) { return entryHref + h; });
       return Promise.all(taskLinks.map(function (taskHref) {
         var task = lastSegment(taskHref);
-        return fetch(taskHref).then(function (r) { return r.text(); }).then(function (h3) {
-          var cmdLinks = parseDirLinks(h3).dirs;
+        return fetch(taskHref, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (h3) {
+          var cmdLinks = parseDirLinks(h3).dirs.map(function (h) { return taskHref + h; });
           return Promise.all(cmdLinks.map(function (cmdHref) {
             var cmd = lastSegment(cmdHref);
             var basePath = cmdHref;
-            return fetch(basePath + "status.json")
+            return fetch(basePath + "status.json", { cache: "no-store" })
               .then(function (r) { return r.ok ? r.json() : null; })
               .then(function (status) {
                 if (!status) return null;
-                return fetch(basePath).then(function (r) { return r.text(); }).then(function (listing) {
+                return fetch(basePath, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (listing) {
                   var parsed = parseDirLinks(listing);
                   var fileNames = parsed.files.map(function (f) { return lastSegment(f); });
-                  var availableFiles = [];
                   var hasWork = parsed.dirs.some(function (d) { return lastSegment(d) === "work"; });
+                  var fileMap = {};
                   WF_FILES.forEach(function (wf) {
-                    if (fileNames.indexOf(wf.file) !== -1) {
-                      availableFiles.push({ label: wf.label, url: basePath + wf.file });
-                    }
-                    // Insert work after plan
-                    if (wf.key === "plan" && hasWork) {
-                      availableFiles.push({ label: "work", url: basePath + "work/", isDir: true });
-                    }
+                    var exists = fileNames.indexOf(wf.file) !== -1;
+                    fileMap[wf.key] = { exists: exists, url: exists ? basePath + wf.file : "" };
                   });
+                  fileMap.work = { exists: hasWork, url: hasWork ? basePath + "work/" : "", isDir: true };
                   return {
                     entry: entry, task: task, command: cmd, basePath: basePath,
                     step: status.step || "NONE",
+                    number: status.number || "",
                     created_at: status.created_at || "",
                     updated_at: status.updated_at || "",
                     transitions: status.transitions || [],
-                    files: availableFiles,
+                    fileMap: fileMap,
                   };
                 });
               }).catch(function () { return null; });
@@ -536,13 +1196,13 @@
     if (!exists) {
       viewerTabs.push({ number: tabId, ticket: null, wfFile: { label: label, url: url, content: null, isDir: isDir || url.endsWith("/") } });
     }
-    activeViewerTab = tabId;
     switchTab("viewer");
+    activeViewerTab = tabId;
     renderViewer();
     // Fetch content
     var effectiveIsDir = isDir || url.endsWith("/");
     if (effectiveIsDir) {
-      fetch(url).then(function (r) { return r.text(); }).then(function (html) {
+      fetch(url, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (html) {
         var tab = viewerTabs.find(function (t) { return t.number === tabId; });
         if (tab && tab.wfFile) {
           var parsed = parseDirLinks(html);
@@ -552,7 +1212,7 @@
         }
       }).catch(function () {});
     } else {
-      fetch(url).then(function (r) { return r.text(); }).then(function (text) {
+      fetch(url, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (text) {
         var tab = viewerTabs.find(function (t) { return t.number === tabId; });
         if (tab && tab.wfFile) {
           tab.wfFile.content = text;
@@ -586,6 +1246,8 @@
   }
 
   var wfSearchQuery = "";
+  var wfSortKey = "updated_at";  // default sort column
+  var wfSortDir = "desc";        // default sort direction
   var wfEntryHrefs = [];   // all entry hrefs (sorted newest first)
   var wfLoadedIndex = 0;   // how many entries have been loaded
   var wfLoading = false;
@@ -598,7 +1260,8 @@
       return w.task.toLowerCase().indexOf(q) !== -1
         || w.command.toLowerCase().indexOf(q) !== -1
         || w.step.toLowerCase().indexOf(q) !== -1
-        || w.entry.indexOf(q) !== -1;
+        || w.entry.indexOf(q) !== -1
+        || (w.number && w.number.toLowerCase().indexOf(q) !== -1);
     });
   }
 
@@ -644,17 +1307,23 @@
     var sentinel = document.getElementById("wf-sentinel");
     if (sentinel) sentinel.remove();
     var loading = list.querySelector(".empty");
-    if (loading) loading.remove();
-    // Append new rows
-    var temp = document.createElement("div");
+    if (loading) {
+      var emptyRow = loading.closest("tr");
+      if (emptyRow) emptyRow.remove(); else loading.remove();
+    }
+    // Append new rows using table wrapper to avoid <tr> auto-lifting by browser
+    var temp = document.createElement("table");
+    var tbody = document.createElement("tbody");
+    temp.appendChild(tbody);
     var h = "";
     items.forEach(function (w) { h += renderWfCard(w); });
-    temp.innerHTML = h;
-    while (temp.firstChild) {
-      list.appendChild(temp.firstChild);
+    tbody.innerHTML = h;
+    while (tbody.firstChild) {
+      list.appendChild(tbody.firstChild);
     }
-    // Bind file links on new rows
+    // Bind file links and row clicks on new rows
     bindWfFileLinks(list);
+    bindWfRowClicks(list);
   }
 
   function attachWfSentinel() {
@@ -663,35 +1332,184 @@
     var hasMore = wfLoadedIndex < wfEntryHrefs.length;
     // Remove old sentinel
     var old = document.getElementById("wf-sentinel");
-    if (old) old.remove();
+    if (old) {
+      var oldRow = old.closest("tr") || old;
+      oldRow.remove();
+    }
     if (wfLoading) {
-      var el = document.createElement("div");
-      el.className = "empty";
-      el.textContent = "Loading...";
-      list.appendChild(el);
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.setAttribute("colspan", "12");
+      td.className = "empty";
+      td.textContent = "Loading...";
+      tr.appendChild(td);
+      list.appendChild(tr);
     } else if (hasMore) {
-      var s = document.createElement("div");
-      s.className = "wf-load-more";
-      s.id = "wf-sentinel";
-      s.textContent = "Scroll for more";
-      list.appendChild(s);
+      var str = document.createElement("tr");
+      var std = document.createElement("td");
+      std.setAttribute("colspan", "12");
+      std.className = "wf-load-more";
+      std.id = "wf-sentinel";
+      std.textContent = "Scroll for more";
+      str.appendChild(std);
+      list.appendChild(str);
       var observer = new IntersectionObserver(function (entries) {
         if (entries[0].isIntersecting) {
           observer.disconnect();
           loadMoreWorkflows();
         }
       });
-      observer.observe(s);
+      observer.observe(std);
     }
   }
 
   function bindWfFileLinks(container) {
-    container.querySelectorAll(".wf-file-link:not([data-bound])").forEach(function (link) {
+    container.querySelectorAll(".wf-file-indicator.active:not([data-bound])").forEach(function (link) {
       link.setAttribute("data-bound", "1");
       link.addEventListener("click", function (e) {
         e.stopPropagation();
-        openWfFile(link.dataset.label, link.dataset.url);
+        var isDir = link.dataset.isdir === "true";
+        openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
+    });
+  }
+
+  function bindWfRowClicks(container) {
+    container.querySelectorAll(".wf-row:not([data-row-bound])").forEach(function (row) {
+      row.setAttribute("data-row-bound", "1");
+      row.addEventListener("click", function (e) {
+        // Do not trigger if the click was on a file indicator link
+        if (e.target.closest(".wf-file-indicator.active")) return;
+        // Do not trigger if the click was on a ticket badge
+        if (e.target.closest(".wf-ticket-badge")) return;
+        var entryKey = row.dataset.entry;
+        var taskKey = row.dataset.task;
+        var cmdKey = row.dataset.cmd;
+        var w = WORKFLOWS.find(function (item) {
+          return item.entry === entryKey && item.task === taskKey && item.command === cmdKey;
+        });
+        if (w) openWfDetail(w);
+      });
+    });
+    // Ticket badge clicks: navigate to the linked ticket
+    container.querySelectorAll(".wf-ticket-badge:not([data-badge-bound])").forEach(function (badge) {
+      badge.setAttribute("data-badge-bound", "1");
+      badge.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var ticketNum = badge.dataset.ticketNum;
+        var ticket = TICKETS.find(function (t) { return t.number === ticketNum; });
+        if (ticket) openViewer(ticket);
+      });
+    });
+  }
+
+  function openWfDetail(w) {
+    var tabId = "wfDetail:" + w.entry + "/" + w.task + "/" + w.command;
+    var label = (w.number || w.entry) + " / " + w.task;
+    var exists = viewerTabs.find(function (t) { return t.number === tabId; });
+    if (!exists) {
+      viewerTabs.push({ number: tabId, ticket: null, wfFile: null, wfDetail: w });
+    } else {
+      exists.wfDetail = w;
+    }
+    switchTab("viewer");
+    activeViewerTab = tabId;
+    renderViewer();
+    saveUI();
+  }
+
+  function renderWfDetailView(w) {
+    var h = '<div class="tv-container wf-detail-container">';
+
+    // Header: number + command + step
+    h += '<div class="tv-header">';
+    h += '<div class="tv-header-top">';
+    if (w.number) {
+      h += '<span class="tv-number">' + esc(w.number) + '</span>';
+    } else {
+      h += '<span class="tv-number wf-number-fallback">' + esc(w.entry) + '</span>';
+    }
+    var stepIsDone = (w.step || "").toUpperCase() === "DONE";
+    var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
+    h += '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + esc(w.step || "NONE") + '</span>';
+    if (w.command) {
+      h += badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" });
+    }
+    h += '</div>';
+    h += '<h1 class="tv-title">' + esc(w.task) + '</h1>';
+    h += '<div class="tv-meta">';
+    h += '<span class="tv-time">' + esc(formatTime(w.created_at)) + '</span>';
+    h += '</div>';
+    h += '</div>';
+
+    // Info section
+    h += '<div class="tv-section">';
+    h += '<div class="tv-section-title">Info</div>';
+    h += '<div class="wf-detail-info">';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Entry</span><span class="wf-detail-info-value">' + esc(w.entry) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Command</span><span class="wf-detail-info-value">' + esc(w.command) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Step</span><span class="wf-detail-info-value">' + esc(w.step || "NONE") + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Created</span><span class="wf-detail-info-value">' + esc(formatTime(w.created_at)) + '</span></div>';
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Updated</span><span class="wf-detail-info-value">' + esc(formatTime(w.updated_at)) + '</span></div>';
+    var infoTicket = findTicketForWorkflow(w);
+    if (infoTicket) {
+      h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + esc(infoTicket.number) + '">' + esc(infoTicket.number) + '</span></span></div>';
+    }
+    h += '</div>';
+    h += '</div>';
+
+    // Transitions timeline
+    if (w.transitions && w.transitions.length > 0) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Transitions</div>';
+      h += '<div class="wf-detail-transitions">';
+      h += '<table class="wf-detail-transition-table">';
+      h += '<thead><tr><th>From</th><th>To</th><th>Time</th></tr></thead>';
+      h += '<tbody>';
+      w.transitions.forEach(function (tr) {
+        h += '<tr>';
+        h += '<td>' + esc(tr.from || "NONE") + '</td>';
+        h += '<td>' + esc(tr.to || "") + '</td>';
+        h += '<td class="wf-detail-transition-time">' + esc(formatTime(tr.at || "")) + '</td>';
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      h += '</div>';
+      h += '</div>';
+    }
+
+    // Artifact links
+    if (w.fileMap) {
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Artifacts</div>';
+      h += '<div class="wf-detail-artifacts">';
+      WF_FILE_COLS.forEach(function (key) {
+        var info = w.fileMap[key];
+        if (info && info.exists) {
+          var isDir = info.isDir ? ' data-isdir="true"' : '';
+          h += '<span class="wf-detail-artifact-link" data-label="' + esc(w.task + ' / ' + key) + '" data-url="' + esc(info.url) + '"' + isDir + '>' + esc(key) + '</span>';
+        } else {
+          h += '<span class="wf-detail-artifact-absent">' + esc(key) + '</span>';
+        }
+      });
+      h += '</div>';
+      h += '</div>';
+    }
+
+    // Connected ticket (try to fetch .context.json)
+    h += '<div class="wf-detail-ticket-section" data-basepath="' + esc(w.basePath || "") + '"></div>';
+
+    h += '</div>';
+    return h;
+  }
+
+  function sortWorkflows(list) {
+    var key = wfSortKey;
+    var dir = wfSortDir === "asc" ? 1 : -1;
+    return list.slice().sort(function (a, b) {
+      var av = (a[key] || "").toString();
+      var bv = (b[key] || "").toString();
+      return dir * av.localeCompare(bv);
     });
   }
 
@@ -708,16 +1526,49 @@
     h += '<span class="wf-search-count">' + filtered.length + (hasMore ? '+' : '') + ' / ' + wfEntryHrefs.length + '</span>';
     h += '</div>';
 
-    // List
-    h += '<div class="wf-list" id="wf-list">';
+    // Table
+    var sortedFiltered = sortWorkflows(filtered);
+    var cols = [
+      { key: "step",       label: "상태" },
+      { key: "number",     label: "번호" },
+      { key: "command",    label: "명령" },
+      { key: "task",       label: "제목" },
+      { key: "query",      label: "질의",   nosort: true },
+      { key: "plan",       label: "계획",    nosort: true },
+      { key: "work",       label: "작업",    nosort: true },
+      { key: "report",     label: "보고",  nosort: true },
+      { key: "summary",    label: "요약", nosort: true },
+      { key: "usage",      label: "사용",   nosort: true },
+      { key: "log",        label: "로그",     nosort: true },
+      { key: "updated_at", label: "일시" },
+    ];
 
-    if (filtered.length > 0) {
-      filtered.forEach(function (w) { h += renderWfCard(w); });
+    h += '<div class="wf-table-wrap"><table class="wf-table">';
+    h += '<thead><tr>';
+    cols.forEach(function (col) {
+      var indicator = "";
+      if (!col.nosort) {
+        if (wfSortKey === col.key) {
+          indicator = wfSortDir === "asc"
+            ? ' <span class="wf-sort-indicator">&#9650;</span>'
+            : ' <span class="wf-sort-indicator">&#9660;</span>';
+        } else {
+          indicator = ' <span class="wf-sort-inactive">&#9650;&#9660;</span>';
+        }
+      }
+      var sortable = col.nosort ? "" : ' class="wf-th-sortable" data-sort-key="' + col.key + '"';
+      h += '<th' + sortable + '>' + col.label + indicator + '</th>';
+    });
+    h += '</tr></thead>';
+
+    h += '<tbody id="wf-list">';
+    if (sortedFiltered.length > 0) {
+      sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
     } else if (!wfLoading) {
-      h += '<div class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</div>';
+      h += '<tr><td colspan="12" class="empty" style="margin-top:32px">' + (wfSearchQuery ? "No results" : "No workflows") + '</td></tr>';
     }
+    h += '</tbody></table></div></div>';
 
-    h += '</div></div>';
     el.innerHTML = h;
 
     // Search input
@@ -729,9 +1580,28 @@
       if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
     });
 
+    // Sort header clicks
+    el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.getAttribute("data-sort-key");
+        if (wfSortKey === key) {
+          wfSortDir = wfSortDir === "asc" ? "desc" : "asc";
+        } else {
+          wfSortKey = key;
+          wfSortDir = "desc";
+        }
+        renderWorkflow();
+      });
+    });
+
     bindWfFileLinks(el);
+    bindWfRowClicks(el);
     attachWfSentinel();
+    bindWfColResize(el);
   }
+
+  // Counter for generating unique viewer IDs
+  var codeViewerIdCounter = 0;
 
   function renderWfFileView(wfFile) {
     var h = '<div class="tv-container">';
@@ -742,18 +1612,102 @@
       var parsed = JSON.parse(wfFile.content);
       h += renderDirListing(parsed.files, parsed.baseUrl);
     } else if (wfFile.url.endsWith(".md")) {
-      h += '<div class="md-body">' + renderMd(wfFile.content) + '</div>';
+      h += '<div class="md-body">' + renderMd(wfFile.content, wfFile.url) + '</div>';
     } else {
-      h += '<pre class="wf-file-content">' + esc(wfFile.content) + '</pre>';
+      var lang = getHighlightLang(wfFile.url);
+      var lines = wfFile.content.split("\n");
+      var lineCount = lines.length;
+      // Remove trailing empty line produced by split when file ends with newline
+      if (lineCount > 0 && lines[lineCount - 1] === "") {
+        lines = lines.slice(0, lineCount - 1);
+        lineCount = lines.length;
+      }
+      var numWidth = String(lineCount).length;
+      var rows = lines.map(function (line, i) {
+        var num = String(i + 1);
+        while (num.length < numWidth) num = " " + num;
+        return '<span class="code-line-number">' + esc(num) + '</span><span class="code-line-content">' + esc(line) + '</span>';
+      });
+
+      var viewerId = "cv-" + (++codeViewerIdCounter);
+      var INITIAL_LINES = 500;
+      var LARGE_THRESHOLD = 3000;
+      var isLarge = lineCount > LARGE_THRESHOLD;
+      var initialRows = isLarge ? rows.slice(0, INITIAL_LINES) : rows;
+
+      // Store pending rows and original lines for large files and search
+      codeViewerStore[viewerId] = {
+        pendingRows: isLarge ? rows.slice(INITIAL_LINES) : [],
+        allLines: lines,
+        nextChunk: INITIAL_LINES,
+        searchMatches: [],
+        searchIndex: -1
+      };
+
+      var searchBarHtml = '<div class="code-search-bar" style="display:none">'
+        + '<input class="code-search-input" type="text" placeholder="Search..." aria-label="코드 검색" />'
+        + '<span class="code-search-count"></span>'
+        + '<button class="code-search-nav-btn" data-dir="prev" aria-label="이전 결과">&#9650;</button>'
+        + '<button class="code-search-nav-btn" data-dir="next" aria-label="다음 결과">&#9660;</button>'
+        + '<button class="code-search-close-btn" aria-label="검색 닫기">&times;</button>'
+        + '</div>';
+
+      var lazyAttr = isLarge ? ' data-lazy="true"' : '';
+      h += '<div class="code-viewer" data-viewer-id="' + viewerId + '">'
+        + '<button class="code-copy-btn" aria-label="코드 복사">Copy</button>'
+        + searchBarHtml
+        + '<pre><code class="hljs-pending language-' + esc(lang) + '"' + lazyAttr + '>'
+        + initialRows.join("\n")
+        + '</code></pre></div>';
     }
     h += '</div>';
     return h;
   }
 
+  // ── Highlight.js Language Mapping ──
+  function getHighlightLang(url) {
+    var LANG_MAP = {
+      ".py":   "python",
+      ".js":   "javascript",
+      ".ts":   "typescript",
+      ".jsx":  "javascript",
+      ".tsx":  "typescript",
+      ".md":   "markdown",
+      ".xml":  "xml",
+      ".sh":   "bash",
+      ".json": "json",
+      ".css":  "css",
+      ".html": "html",
+      ".yml":  "yaml",
+      ".yaml": "yaml"
+    };
+    var m = url && url.match(/(\.[^./?#]+)(?:[?#].*)?$/);
+    if (!m) return "plaintext";
+    return LANG_MAP[m[1].toLowerCase()] || "plaintext";
+  }
+
+  function initHighlight() {
+    var blocks = document.querySelectorAll(".code-viewer code.hljs-pending, .md-body code.hljs-pending");
+    blocks.forEach(function (block) {
+      if (block.dataset.highlighted) return;
+      block.dataset.highlighted = "true";
+      block.classList.remove("hljs-pending");
+      if (typeof hljs !== "undefined") {
+        hljs.highlightElement(block);
+      }
+    });
+  }
+
   // ── Markdown Rendering ──
   var mermaidCounter = 0;
 
-  function renderMd(text) {
+  /** Returns the directory portion of a URL (up to and including the last '/'). */
+  function urlDir(url) {
+    if (!url) return "";
+    return url.substring(0, url.lastIndexOf("/") + 1);
+  }
+
+  function renderMd(text, baseUrl) {
     if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
 
     var renderer = new marked.Renderer();
@@ -764,10 +1718,48 @@
         var id = "mermaid-" + (++mermaidCounter);
         return '<div class="mermaid-block" data-mermaid-id="' + id + '">' + esc(code) + '</div>';
       }
-      return '<pre class="md-code"><code>' + esc(code) + '</code></pre>';
+      var langClass = lang ? lang : "plaintext";
+      return '<pre class="md-code"><code class="hljs-pending language-' + esc(langClass) + '">' + esc(code) + '</code></pre>';
     };
 
-    return marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+    renderer.link = function (opts) {
+      var href = typeof opts === "object" ? opts.href : opts;
+      var title = typeof opts === "object" ? opts.title : arguments[1];
+      var text = typeof opts === "object" ? opts.text : arguments[2];
+      if (!href) return text || "";
+      // External links: render as normal anchor with target="_blank"
+      if (href.indexOf("http://") === 0 || href.indexOf("https://") === 0) {
+        var titleAttr = title ? ' title="' + esc(title) + '"' : "";
+        return '<a href="' + esc(href) + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + (text || esc(href)) + '</a>';
+      }
+      // Internal relative links: convert to md-file-link span
+      var resolvedUrl;
+      if (href.indexOf(".workflow/") === 0 || href.indexOf(".claude/") === 0) {
+        // Project-root-relative path: prepend "../../" to reach project root from board.html
+        resolvedUrl = "../../" + href;
+      } else {
+        // Report-relative path (e.g. "work/..."): resolve against baseUrl directory
+        resolvedUrl = urlDir(baseUrl) + href;
+      }
+      return '<span class="md-file-link" data-filepath="' + esc(href) + '" data-url="' + esc(resolvedUrl) + '">' + (text || esc(href)) + '</span>';
+    };
+
+    var html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+
+    // Post-process: convert file path patterns inside <code> tags to clickable links
+    // Matches: paths with '/' or known file extensions
+    var FILE_EXT_RE = /\.(md|js|ts|jsx|tsx|css|html|json|py|txt|log|xml|sh|yml|yaml|toml|env|csv)$/i;
+    html = html.replace(/<code>([^<]+)<\/code>/g, function (match, inner) {
+      var decoded = inner.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      var isFilePath = decoded.indexOf("/") !== -1 || FILE_EXT_RE.test(decoded.trim());
+      if (isFilePath) {
+        var escaped = esc(decoded.trim());
+        return '<code class="md-file-link" data-filepath="' + escaped + '">' + inner + '</code>';
+      }
+      return match;
+    });
+
+    return html;
   }
 
   function initMermaid() {
@@ -787,46 +1779,123 @@
     });
   }
 
+  var WF_FILE_COLS = ["query", "plan", "work", "report", "summary", "usage", "log"];
+
   function renderWfCard(w) {
-    var h = '<div class="wf-row">';
-    h += '<span class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</span>';
-    h += '<span class="wf-row-title">' + esc(w.task) + '</span>';
-    if (w.files && w.files.length > 0) {
-      h += '<span class="wf-row-files">';
-      w.files.forEach(function (f) {
-        h += '<span class="wf-file-link" data-label="' + esc(w.task + ' / ' + f.label) + '" data-url="' + esc(f.url) + '">' + esc(f.label) + '</span>';
-      });
-      h += '</span>';
+    var h = '<tr class="wf-row" data-entry="' + esc(w.entry) + '" data-task="' + esc(w.task) + '" data-cmd="' + esc(w.command) + '">';
+    // step cell
+    var stepIsDone = (w.step || "").toUpperCase() === "DONE";
+    var stepColors = stepIsDone ? STATUS_COLORS.Done : STATUS_COLORS["In Progress"];
+    var stepText = esc(w.step || "NONE");
+    var stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + '</span>';
+    h += '<td class="wf-row-step">' + stepBadge + '</td>';
+    // number cell
+    var linkedTicket = findTicketForWorkflow(w);
+    if (w.number) {
+      h += '<td class="wf-row-number"><span class="wf-number-badge">' + esc(w.number) + '</span>';
+      if (linkedTicket) {
+        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
+      }
+      h += '</td>';
+    } else {
+      // Timestamp fallback: extract MMDD-HHMM from entry (format: YYYYMMDD-HHMMSS)
+      var ts = w.entry || "";
+      var fallback = ts.length >= 13 ? ts.substring(4, 8) + '-' + ts.substring(9, 13) : ts;
+      h += '<td class="wf-row-number"><span class="wf-number-fallback">' + esc(fallback) + '</span>';
+      if (linkedTicket) {
+        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
+      }
+      h += '</td>';
     }
-    h += '<span class="wf-row-time">' + esc(w.updated_at.substring(0, 16)) + '</span>';
-    h += '</div>';
+    // command cell
+    h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';
+    // task cell
+    h += '<td class="wf-row-title">' + esc(w.task) + '</td>';
+    // file indicator cells (query, plan, work, report, summary, usage, log)
+    WF_FILE_COLS.forEach(function (key) {
+      var info = w.fileMap && w.fileMap[key];
+      if (info && info.exists) {
+        var isDir = info.isDir ? ' data-isdir="true"' : '';
+        h += '<td class="wf-row-file"><span class="wf-file-indicator active" data-label="' + esc(w.task + ' / ' + key) + '" data-url="' + esc(info.url) + '"' + isDir + '>&#9679;</span></td>';
+      } else {
+        h += '<td class="wf-row-file"><span class="wf-file-indicator">&#9675;</span></td>';
+      }
+    });
+    // updated_at cell
+    h += '<td class="wf-row-time">' + esc(w.updated_at.substring(0, 16)) + '</td>';
+    h += '</tr>';
     return h;
   }
 
+  // ── Workflow Column Resize ──
+  function bindWfColResize(container) {
+    var table = container.querySelector(".wf-table");
+    if (!table) return;
+    var ths = table.querySelectorAll("thead th");
+    ths.forEach(function (th, idx) {
+      // Skip last column (no right handle needed on last)
+      if (idx === ths.length - 1) return;
+      var handle = th.querySelector(".wf-col-resize-handle");
+      if (handle) return; // already bound
+      handle = document.createElement("div");
+      handle.className = "wf-col-resize-handle";
+      th.appendChild(handle);
+
+      var startX, startWidth, nextStartWidth, nextTh;
+
+      handle.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        startX = e.clientX;
+        startWidth = th.offsetWidth;
+        nextTh = ths[idx + 1];
+        nextStartWidth = nextTh ? nextTh.offsetWidth : 0;
+
+        // Fix all column widths before dragging
+        ths.forEach(function (t) { t.style.width = t.offsetWidth + "px"; });
+
+        function onMove(ev) {
+          var dx = ev.clientX - startX;
+          var newWidth = Math.max(30, startWidth + dx);
+          th.style.width = newWidth + "px";
+          if (nextTh) {
+            var newNext = Math.max(30, nextStartWidth - dx);
+            nextTh.style.width = newNext + "px";
+          }
+        }
+
+        function onUp() {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        }
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
+  }
+
   // ── Dashboard ──
-  var DASH_PAGE_SIZE = 50;
-  var DASH_FILES = ["usage", "logs", "skills", "history"];
-  var dashData = {};          // { usage: text, logs: text, skills: text, history: text }
+  var DASH_FILES = ["usage", "logs", "skills"];
+  var dashData = {};          // { usage: text, logs: text, skills: text }
   var dashFetched = false;
-  var dashActiveSubtab = "usage";
-  var dashHistoryRows = [];   // parsed history table rows (array of strings)
-  var dashHistoryPage = 0;
+  var dashChartInstances = {}; // { canvasId: Chart } - track instances for destroy-before-recreate
 
   /**
    * Fetches a single dashboard markdown file.
-   * @param {string} name - file name without extension (usage|logs|skills|history)
+   * @param {string} name - file name without extension (usage|logs|skills)
    * @returns {Promise<string>}
    */
   function fetchDashboardFile(name) {
     var url = "../../.dashboard/." + name + ".md";
-    return fetch(url).then(function (res) {
+    return fetch(url, { cache: "no-store" }).then(function (res) {
       if (!res.ok) return "";
       return res.text();
     }).catch(function () { return ""; });
   }
 
   /**
-   * Fetches all four dashboard files in parallel and caches in dashData.
+   * Fetches all dashboard files in parallel and caches in dashData.
    * @returns {Promise<Object>}
    */
   function fetchAllDashboardFiles() {
@@ -957,20 +2026,20 @@
   }
 
   /**
-   * Renders the 4 KPI Summary Cards into #view-dashboard.
-   * @param {Object} stats
+   * Renders the 4 KPI Summary Cards with left accent borders.
+   * @param {Object} stats - KPI stats from computeKpiStats
    * @returns {string} HTML
    */
   function renderDashCards(stats) {
     var cards = [
-      { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time" },
-      { label: "Total Tokens", value: formatTokens(stats.totalTokens), sub: "cumulative" },
-      { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs" },
-      { label: "Top Skill", value: stats.topSkill, sub: "most used" },
+      { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time", accent: "#569cd6" },
+      { label: "Total Tokens", value: formatTokens(stats.totalTokens), sub: "cumulative", accent: "#4ec9b0" },
+      { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs", accent: "#dcdcaa" },
+      { label: "Top Skill", value: stats.topSkill, sub: "most used", accent: "#c586c0" },
     ];
     var h = '<div class="dash-cards">';
     cards.forEach(function (card) {
-      h += '<div class="dash-card">';
+      h += '<div class="dash-card" style="border-left-color:' + card.accent + '">';
       h += '<div class="dash-card-label">' + esc(card.label) + '</div>';
       h += '<div class="dash-card-value">' + esc(card.value) + '</div>';
       h += '<div class="dash-card-sub">' + esc(card.sub) + '</div>';
@@ -1011,45 +2080,264 @@
   }
 
   /**
-   * Renders the History subtab content with pagination.
-   * @param {string} historyText
-   * @param {HTMLElement} contentEl
+   * Destroys an existing Chart instance by canvas ID, if any.
+   * @param {string} canvasId - the id attribute of the canvas element
    */
-  function renderHistoryPage(historyText, contentEl) {
-    if (!dashHistoryRows.length) {
-      dashHistoryRows = parseMdTableRows(historyText || "");
-      // history.md is newest-first, so no sort needed; just reverse for "most recent first"
+  function destroyChart(canvasId) {
+    if (dashChartInstances[canvasId]) {
+      dashChartInstances[canvasId].destroy();
+      delete dashChartInstances[canvasId];
     }
-    var headers = parseMdTableHeader(historyText || "");
-    var totalPages = Math.ceil(dashHistoryRows.length / DASH_PAGE_SIZE);
-    var start = dashHistoryPage * DASH_PAGE_SIZE;
-    var pageRows = dashHistoryRows.slice(start, start + DASH_PAGE_SIZE);
+  }
 
-    var h = renderMdTable(headers, pageRows);
+  /**
+   * Creates a Chart.js instance and tracks it for later cleanup.
+   * @param {string} canvasId - the id attribute of the canvas element
+   * @param {Object} config - Chart.js configuration object
+   * @returns {Object|null} Chart instance or null if canvas not found
+   */
+  function createChart(canvasId, config) {
+    if (typeof Chart === "undefined") return null;
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    destroyChart(canvasId);
+    var instance = new Chart(canvas.getContext("2d"), config);
+    dashChartInstances[canvasId] = instance;
+    return instance;
+  }
 
-    // Pagination
-    if (totalPages > 1) {
-      h += '<div class="dash-pagination">';
-      for (var p = 0; p < totalPages; p++) {
-        var isActive = p === dashHistoryPage ? " active" : "";
-        h += '<button class="dash-page-btn' + isActive + '" data-page="' + p + '">' + (p + 1) + '</button>';
+  /**
+   * Renders token usage bar+line composite chart.
+   * Bar = token total per workflow, Line = same data as line overlay.
+   * @param {Array<Array<string>>} rows - parsed usage table rows
+   */
+  function renderUsageChart(rows) {
+    if (!rows.length) return;
+    // Reverse to chronological order (oldest first)
+    var chronoRows = rows.slice().reverse();
+    var labels = chronoRows.map(function (c) { return c[0] || ""; });
+    var values = chronoRows.map(function (c) { return parseToken(c[c.length - 1] || "0"); });
+
+    createChart("chart-usage", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Tokens",
+            data: values,
+            backgroundColor: "rgba(86,156,214,0.6)",
+            borderColor: "#569cd6",
+            borderWidth: 1,
+            order: 2
+          },
+          {
+            label: "Trend",
+            data: values,
+            type: "line",
+            borderColor: "#4ec9b0",
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            pointRadius: 2,
+            pointBackgroundColor: "#4ec9b0",
+            tension: 0.3,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#cccccc", boxWidth: 12, font: { size: 11 } } }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#858585", font: { size: 10 }, maxRotation: 45 },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          }
+        }
       }
-      h += '</div>';
-    }
+    });
+  }
 
-    contentEl.innerHTML = h;
+  /**
+   * Renders command type pie chart from usage rows.
+   * Aggregates command column (index 3) frequency.
+   * @param {Array<Array<string>>} rows - parsed usage table rows
+   */
+  function renderCommandPieChart(rows) {
+    if (!rows.length) return;
+    var cmdCount = {};
+    rows.forEach(function (cells) {
+      var cmd = (cells[3] || "other").trim().toLowerCase();
+      cmdCount[cmd] = (cmdCount[cmd] || 0) + 1;
+    });
 
-    contentEl.querySelectorAll(".dash-page-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        dashHistoryPage = parseInt(btn.dataset.page, 10);
-        renderHistoryPage(historyText, contentEl);
+    var colorMap = {
+      implement: "#569cd6",
+      review: "#c586c0",
+      research: "#dcdcaa"
+    };
+
+    var labels = Object.keys(cmdCount);
+    var values = labels.map(function (k) { return cmdCount[k]; });
+    var colors = labels.map(function (k) { return colorMap[k] || "#858585"; });
+
+    createChart("chart-command", {
+      type: "pie",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderColor: "#1e1e1e",
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "right",
+            labels: { color: "#cccccc", padding: 12, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Renders WARN/ERROR time series line chart from logs rows.
+   * @param {Array<Array<string>>} rows - parsed logs table rows
+   */
+  function renderWarnErrorChart(rows) {
+    if (!rows.length) return;
+    var chronoRows = rows.slice().reverse();
+    var labels = chronoRows.map(function (c) { return c[0] || ""; });
+    var warns = chronoRows.map(function (c) { return parseInt(c[4] || "0", 10) || 0; });
+    var errors = chronoRows.map(function (c) { return parseInt(c[5] || "0", 10) || 0; });
+
+    createChart("chart-warn-error", {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "WARN",
+            data: warns,
+            borderColor: "#dcdcaa",
+            backgroundColor: "rgba(220,220,170,0.1)",
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#dcdcaa",
+            fill: true,
+            tension: 0.2
+          },
+          {
+            label: "ERROR",
+            data: errors,
+            borderColor: "#f44747",
+            backgroundColor: "rgba(244,71,71,0.1)",
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#f44747",
+            fill: true,
+            tension: 0.2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#cccccc", boxWidth: 12, font: { size: 11 } } }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#858585", font: { size: 10 }, maxRotation: 45 },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Renders skill frequency horizontal bar chart from skills rows.
+   * Shows top 10 most used skills.
+   * @param {Array<Array<string>>} rows - parsed skills table rows
+   */
+  function renderSkillFreqChart(rows) {
+    if (!rows.length) return;
+    var skillCount = {};
+    rows.forEach(function (cells) {
+      var skillList = cells[5] || "";
+      var parts = skillList.split(/<br\s*\/?>/i);
+      parts.forEach(function (part) {
+        var skills = part.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+        skills.forEach(function (s) {
+          skillCount[s] = (skillCount[s] || 0) + 1;
+        });
       });
+    });
+
+    // Sort by count descending, take top 10
+    var sorted = Object.keys(skillCount).sort(function (a, b) {
+      return skillCount[b] - skillCount[a];
+    }).slice(0, 10);
+
+    var labels = sorted;
+    var values = sorted.map(function (k) { return skillCount[k]; });
+
+    createChart("chart-skills", {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Frequency",
+          data: values,
+          backgroundColor: "rgba(197,134,192,0.6)",
+          borderColor: "#c586c0",
+          borderWidth: 1
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { color: "#858585", font: { size: 10 } },
+            grid: { color: "#2d2d2d" }
+          },
+          y: {
+            ticks: { color: "#cccccc", font: { size: 10 } },
+            grid: { display: false }
+          }
+        }
+      }
     });
   }
 
   /**
    * Main Dashboard render entry point.
-   * Fetches data (first time) then renders cards + subtab UI.
+   * Fetches data (first time) then renders KPI cards + chart sections + tables
+   * in a single scrollable page layout.
    */
   function renderDashboard() {
     var el = document.getElementById("view-dashboard");
@@ -1062,61 +2350,85 @@
       return;
     }
 
+    // Set Chart.js dark theme defaults
+    if (typeof Chart !== "undefined") {
+      Chart.defaults.color = "#cccccc";
+      Chart.defaults.borderColor = "#2d2d2d";
+    }
+
     var stats = computeKpiStats(dashData);
     var h = renderDashCards(stats);
 
-    // Subtabs bar
-    var subtabs = ["Usage", "Logs", "Skills", "History"];
-    h += '<div class="dash-subtabs">';
-    subtabs.forEach(function (name) {
-      var key = name.toLowerCase();
-      var isActive = key === dashActiveSubtab ? " active" : "";
-      h += '<button class="dash-subtab' + isActive + '" data-subtab="' + key + '">' + esc(name) + '</button>';
+    // Parse all data
+    var usageHeaders = parseMdTableHeader(dashData.usage || "");
+    var usageRows = parseMdTableRows(dashData.usage || "");
+    var logsHeaders = parseMdTableHeader(dashData.logs || "");
+    var logsRows = parseMdTableRows(dashData.logs || "");
+    var skillsHeaders = parseMdTableHeader(dashData.skills || "");
+    var skillsRows = parseMdTableRows(dashData.skills || "");
+    // Normalize skills column: replace commas with <br> so each skill is on its own line
+    skillsRows.forEach(function (cells) {
+      if (cells[5]) {
+        cells[5] = cells[5].split(/,\s*|<br\s*\/?>/i).filter(Boolean).join("<br>");
+      }
     });
+
+    // ── Charts (all at top) ──
+    h += '<div class="dash-section">';
+    h += '<h3 class="dash-section-title">Charts</h3>';
+    h += '<div class="dash-chart-row">';
+    h += '<div class="dash-chart-container"><canvas id="chart-usage" height="260"></canvas></div>';
+    h += '<div class="dash-chart-container"><canvas id="chart-command" height="260"></canvas></div>';
+    h += '</div>';
+    h += '<div class="dash-chart-row">';
+    h += '<div class="dash-chart-container"><canvas id="chart-warn-error" height="260"></canvas></div>';
+    h += '<div class="dash-chart-container"><canvas id="chart-skills" height="260"></canvas></div>';
+    h += '</div>';
     h += '</div>';
 
-    // Subtab content container
-    h += '<div class="dash-content" id="dash-content"></div>';
+    // ── Tables (bottom, tabbed) ──
+    h += '<div class="dash-section">';
+    h += '<h3 class="dash-section-title">Data</h3>';
+    h += '<div class="dash-table-tabs">';
+    h += '<button class="dash-table-tab active" data-table="usage">Usage</button>';
+    h += '<button class="dash-table-tab" data-table="logs">Logs</button>';
+    h += '<button class="dash-table-tab" data-table="skills">Skills</button>';
+    h += '</div>';
+    h += '<div class="dash-table-panel active" data-table="usage">' + renderMdTable(usageHeaders, usageRows) + '</div>';
+    h += '<div class="dash-table-panel" data-table="logs">' + renderMdTable(logsHeaders, logsRows) + '</div>';
+    h += '<div class="dash-table-panel" data-table="skills">' + renderMdTable(skillsHeaders, skillsRows) + '</div>';
+    h += '</div>';
 
     el.innerHTML = h;
 
-    // Bind subtab clicks
-    el.querySelectorAll(".dash-subtab").forEach(function (btn) {
+    // Wire up table tab switching
+    el.querySelectorAll(".dash-table-tab").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        dashActiveSubtab = btn.dataset.subtab;
-        dashHistoryPage = 0;
-        el.querySelectorAll(".dash-subtab").forEach(function (b) {
-          b.classList.toggle("active", b.dataset.subtab === dashActiveSubtab);
-        });
-        renderDashSubtabContent();
+        var target = btn.getAttribute("data-table");
+        el.querySelectorAll(".dash-table-tab").forEach(function (b) { b.classList.remove("active"); });
+        el.querySelectorAll(".dash-table-panel").forEach(function (p) { p.classList.remove("active"); });
+        btn.classList.add("active");
+        el.querySelector('.dash-table-panel[data-table="' + target + '"]').classList.add("active");
       });
     });
 
-    renderDashSubtabContent();
+    // Render charts after DOM is populated
+    renderUsageChart(usageRows);
+    renderCommandPieChart(usageRows);
+    renderWarnErrorChart(logsRows);
+    renderSkillFreqChart(skillsRows);
   }
 
-  /**
-   * Renders the active subtab content into #dash-content.
-   */
-  function renderDashSubtabContent() {
-    var contentEl = document.getElementById("dash-content");
-    if (!contentEl) return;
+  // ── SSE / Polling ──
+  var SSE_TIMEOUT = 3000;        // SSE 연결 타임아웃 (ms)
+  var SSE_RETRY_INTERVAL = 30000; // SSE 재시도 간격 (ms)
+  var POLL_INTERVAL = 2000;      // 폴링 간격 (ms)
 
-    var key = dashActiveSubtab;
-    var text = dashData[key] || "";
+  var sseConnected = false;
+  var sseGaveUp = false;         // SSE를 포기하고 폴링 모드인지
+  var sseRetryTimerId = null;
+  var pollTimerId = null;
 
-    if (key === "history") {
-      dashHistoryRows = []; // reset to force re-parse on tab switch
-      renderHistoryPage(text, contentEl);
-    } else {
-      var headers = parseMdTableHeader(text);
-      var rows = parseMdTableRows(text);
-      contentEl.innerHTML = renderMdTable(headers, rows);
-    }
-  }
-
-  // ── Polling ──
-  var POLL_INTERVAL = 500;
   var prevTicketJson = "";
   var prevWfJson = "";
 
@@ -1127,11 +2439,19 @@
     }));
   }
 
-  function pollTickets() {
-    fetchTickets().then(function (tickets) {
+  // ── 칸반 갱신 (SSE/폴링 공용) ──
+  /**
+   * 칸반을 갱신한다.
+   * @param {string[]} [files] - 변경된 파일명 배열. 있으면 선택적 fetch, 없으면 전체 fetch.
+   */
+  function refreshKanban(files) {
+    var fetchPromise = (files && files.length > 0)
+      ? fetchTicketsByFiles(files).then(function () { return TICKETS; })
+      : fetchTickets().then(function (tickets) { TICKETS = tickets; return TICKETS; });
+
+    fetchPromise.then(function (tickets) {
       var json = ticketJson(tickets);
       if (json !== prevTicketJson) {
-        TICKETS = tickets;
         prevTicketJson = json;
         renderKanban();
         viewerTabs.forEach(function (vt) {
@@ -1143,11 +2463,11 @@
         var activeVt = viewerTabs.find(function (t) { return t.number === activeViewerTab; });
         if (activeVt && activeVt.ticket && activeTab === "viewer") renderViewer();
       }
-      setTimeout(pollTickets, POLL_INTERVAL);
     });
   }
 
-  function pollWorkflows() {
+  // ── 워크플로 갱신 (SSE/폴링 공용) ──
+  function refreshWorkflow() {
     fetchWorkflowEntries().then(function (hrefs) {
       var json = JSON.stringify(hrefs);
       if (json !== prevWfJson) {
@@ -1158,8 +2478,108 @@
         wfInitialized = false;
         loadMoreWorkflows();
       }
-      setTimeout(pollWorkflows, POLL_INTERVAL);
     });
+  }
+
+  // ── 대시보드 갱신 (SSE/폴링 공용) ──
+  function refreshDashboard() {
+    fetchAllDashboardFiles().then(function () {
+      if (activeTab === "dashboard") renderDashboard();
+    });
+  }
+
+  // ── SSE ──
+  function initSSE() {
+    if (typeof EventSource === "undefined") {
+      // EventSource 미지원 환경 -> 즉시 폴링 모드
+      startPolling();
+      return;
+    }
+
+    var es = new EventSource("/events");
+    var timeoutId = setTimeout(function () {
+      // 3초 내 onopen 미호출 -> 타임아웃, 폴링 모드로 전환
+      if (!sseConnected) {
+        es.close();
+        startPolling();
+        scheduleSSERetry();
+      }
+    }, SSE_TIMEOUT);
+
+    es.onopen = function () {
+      clearTimeout(timeoutId);
+      sseConnected = true;
+      stopPolling();
+    };
+
+    es.addEventListener("kanban", function () {
+      refreshKanban();
+    });
+
+    es.addEventListener("workflow", function () {
+      refreshWorkflow();
+    });
+
+    es.addEventListener("dashboard", function () {
+      refreshDashboard();
+    });
+
+    es.onerror = function () {
+      sseConnected = false;
+      es.close(); // 명시적으로 닫아서 자동 재연결 방지
+      clearTimeout(timeoutId);
+      startPolling();
+      scheduleSSERetry();
+    };
+  }
+
+  // ── 폴링 ──
+  function startPolling() {
+    if (pollTimerId) return; // 이미 폴링 중
+    sseGaveUp = true;
+    pollChanges();
+  }
+
+  function stopPolling() {
+    if (pollTimerId) {
+      clearTimeout(pollTimerId);
+      pollTimerId = null;
+    }
+    sseGaveUp = false;
+  }
+
+  function pollChanges() {
+    fetch("/poll").then(function (res) {
+      if (!res.ok) throw new Error("poll failed");
+      return res.json();
+    }).then(function (changes) {
+      if (changes.kanban) {
+        refreshKanban(changes.kanban);
+      }
+      if (changes.workflow) {
+        refreshWorkflow();
+      }
+      if (changes.dashboard) {
+        refreshDashboard();
+      }
+    }).catch(function () {
+      // /poll 실패 시 조용히 처리 (콘솔 에러 없음)
+    }).then(function () {
+      // finally 대용 (ES5 호환: Promise.prototype.finally 미지원 환경 대비)
+      if (sseGaveUp && !document.hidden) {
+        pollTimerId = setTimeout(pollChanges, POLL_INTERVAL);
+      } else {
+        pollTimerId = null;
+      }
+    });
+  }
+
+  function scheduleSSERetry() {
+    if (sseRetryTimerId) return; // 이미 재시도 예약됨
+    sseRetryTimerId = setTimeout(function () {
+      sseRetryTimerId = null;
+      initSSE(); // SSE 재시도 (성공하면 onopen에서 폴링 중단)
+    }, SSE_RETRY_INTERVAL);
   }
 
   // ── Init ──
@@ -1180,14 +2600,31 @@
       });
       if (activeTab === "viewer") renderViewer();
     }
-    setTimeout(pollTickets, POLL_INTERVAL);
   });
 
   fetchWorkflowEntries().then(function (hrefs) {
     wfEntryHrefs = hrefs;
     prevWfJson = JSON.stringify(hrefs);
     loadMoreWorkflows();
-    setTimeout(pollWorkflows, POLL_INTERVAL);
+  });
+
+  // SSE 연결 시작 (실패 시 onerror에서 폴백 폴링 자동 재개)
+  initSSE();
+
+  // 탭 활성화 복귀 시 누락된 변경 보상
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      if (sseConnected) {
+        // SSE 연결 중일 때도 누락된 이벤트를 보상하기 위해 1회 fetch
+        refreshKanban();
+        refreshWorkflow();
+      } else if (sseGaveUp) {
+        // 폴링 모드: 탭 복귀 시 즉시 한 번 폴링 재개
+        if (!pollTimerId) {
+          pollChanges();
+        }
+      }
+    }
   });
 
   // Pre-fetch dashboard data in background so it's ready on tab switch

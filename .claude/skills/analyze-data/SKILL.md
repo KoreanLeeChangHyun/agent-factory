@@ -1,6 +1,6 @@
 ---
 name: analyze-data
-description: "Data analysis skill. Performs dataset exploration, statistical analysis, visualization, and insight extraction. Use for data analysis tasks: (1) CSV/JSON/Excel dataset exploration and EDA, (2) statistical analysis and distribution checks, (3) data quality inspection (missing values, outliers), (4) insight extraction and visualization. Triggers: '데이터 분석', 'data analysis', 'EDA', '통계', '데이터셋', 'dataset'."
+description: "Performs dataset exploration, statistical analysis, visualization, and insight extraction. Use when conducting EDA on CSV/JSON/Excel datasets, running statistical analysis and distribution checks, inspecting data quality for missing values or outliers, or extracting insights from structured data."
 license: "Apache-2.0"
 ---
 

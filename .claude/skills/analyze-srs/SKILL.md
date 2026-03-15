@@ -1,6 +1,6 @@
 ---
 name: analyze-srs
-description: "Requirements analysis (SRS) skill. Systematically analyzes ambiguous requests to produce a concrete Software Requirements Specification. Use for requirements analysis tasks: (1) clarifying ambiguous requests, (2) goal identification and scope definition, (3) constraint identification and expected deliverables, (4) functional/non-functional requirements classification. Triggers: '요구사항', '명세서', '스펙', 'SRS', 'specification', 'requirement', '기능 정의'."
+description: "Systematically analyzes ambiguous requests to produce a concrete Software Requirements Specification. Use when clarifying vague requirements, defining project goals and scope, identifying constraints and expected deliverables, or classifying functional and non-functional requirements before starting implementation."
 license: "Apache-2.0"
 ---
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 
@@ -18,6 +19,14 @@ from dispatcher import (
     load_env_flags,
     scripts_dir,
 )
+
+_scripts_dir: str = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts')
+)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from flow.tmux_utils import WINDOW_PREFIX_P
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +43,7 @@ def _handle_bash_flow_end(tool_input: dict) -> None:
 
     Conditions required to trigger cleanup:
         1. TMUX_PANE environment variable is set.
-        2. Current tmux window name starts with 'T-'.
+        2. Current tmux window name starts with 'P:T-'.
 
     If any condition is unmet, cleanup is silently skipped (idempotent).
 
@@ -60,13 +69,18 @@ def _handle_bash_flow_end(tool_input: dict) -> None:
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return
 
-    if not window_name.startswith('T-'):
+    if not window_name.startswith(f'{WINDOW_PREFIX_P}T-'):
         return
 
+    # TMUX_PANE(%N)을 직접 타겟으로 사용: 콜론 포함 윈도우명의 세션:윈도우 오해석 방지
+    pane_target: str = shlex.quote(tmux_pane)
+    bash_cmd: str = f'sleep 5 && tmux kill-window -t {pane_target}'
+
     subprocess.Popen(
-        ['nohup', 'bash', '-c', f'sleep 5 && tmux kill-window -t {window_name}'],
+        ['bash', '-c', bash_cmd],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
 
 
