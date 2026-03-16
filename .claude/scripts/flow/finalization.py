@@ -667,6 +667,9 @@ def main() -> None:
                     except Exception as _chain_err:
                         _append_log(abs_work_dir, "ERROR", f"FINALIZE_CHAIN: launch error={_chain_err}")
                         print(f"[ERROR] Step 4c: chain_launcher.py 실행 실패: {_chain_err}", file=sys.stderr)
+                        _ticket_num_str = (ticket_number or "").replace("T-", "").lstrip("0") or "N"
+                        print(f"  수동으로 다음 스테이지를 시작하려면: /wf -s {_ticket_num_str}", file=sys.stderr)
+                        print(f"  남은 체인: {remaining_chain}", file=sys.stderr)
                 else:
                     _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: chain_launcher.py not found at {CHAIN_LAUNCHER}")
                     print(f"[WARN] Step 4c: chain_launcher.py not found: {CHAIN_LAUNCHER}", file=sys.stderr)

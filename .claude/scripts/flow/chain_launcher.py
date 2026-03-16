@@ -340,6 +340,7 @@ def launch_next_stage(
     ticket_num_int = _extract_ticket_number_int(ticket_number)
 
     current_retry: int = retry_count
+    _subnumber_added: bool = False
     while current_retry <= CHAIN_MAX_RETRY:
         _log("INFO", f"ticket={ticket_number} remaining={remaining_chain} retry={current_retry}/{CHAIN_MAX_RETRY}")
 
@@ -353,38 +354,42 @@ def launch_next_stage(
             time.sleep(1)
 
         # ── Step 2: kanban.py add-subnumber 호출 ──
-        # 이전 subnumber에서 goal/target 복사
-        prev_data = _read_previous_subnumber(ticket_number)
-        goal = prev_data.get("goal", "(체인 자동 생성)")
-        target = prev_data.get("target", "(체인 자동 생성)")
+        if not _subnumber_added:
+            # 이전 subnumber에서 goal/target 복사
+            prev_data = _read_previous_subnumber(ticket_number)
+            goal = prev_data.get("goal", "(체인 자동 생성)")
+            target = prev_data.get("target", "(체인 자동 생성)")
 
-        # context에 이전 스테이지 report 경로 주입
-        context = f"이전 스테이지 report: {prev_report_path}"
+            # context에 이전 스테이지 report 경로 주입
+            context = f"이전 스테이지 report: {prev_report_path}"
 
-        add_cmd = [
-            "python3", KANBAN_PY, "add-subnumber", ticket_number,
-            "--command", remaining_chain,
-            "--goal", goal,
-            "--target", target,
-            "--context", context,
-        ]
+            add_cmd = [
+                "python3", KANBAN_PY, "add-subnumber", ticket_number,
+                "--command", remaining_chain,
+                "--goal", goal,
+                "--target", target,
+                "--context", context,
+            ]
 
-        _log("INFO", f"add-subnumber: command={remaining_chain}")
-        try:
-            result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode != 0:
-                _log("ERROR", f"add-subnumber failed: exit {result.returncode} stderr={result.stderr.strip()}")
+            _log("INFO", f"add-subnumber: command={remaining_chain}")
+            try:
+                result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    _log("ERROR", f"add-subnumber failed: exit {result.returncode} stderr={result.stderr.strip()}")
+                    current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                    if should_continue:
+                        continue
+                    break
+                _log("INFO", f"add-subnumber ok: {result.stdout.strip()}")
+                _subnumber_added = True
+            except Exception as e:
+                _log("ERROR", f"add-subnumber exception: {e}")
                 current_retry, should_continue = _increment_retry(current_retry, ticket_number)
                 if should_continue:
                     continue
                 break
-            _log("INFO", f"add-subnumber ok: {result.stdout.strip()}")
-        except Exception as e:
-            _log("ERROR", f"add-subnumber exception: {e}")
-            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
-            if should_continue:
-                continue
-            break
+        else:
+            _log("INFO", "add-subnumber already done, skipping")
 
         # ── Step 3: kanban.py move T-NNN open (티켓을 Open 상태로 되돌림) ──
         move_cmd = ["python3", KANBAN_PY, "move", ticket_number, "open"]

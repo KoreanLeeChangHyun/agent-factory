@@ -4,6 +4,13 @@
 .workflow/ 디렉터리 내 report.md, plan.md 파일에서 마크다운 링크를 추출하고,
 각 링크 대상 파일의 존재 여부를 검증한다.
 
+이 스크립트는 자동 hook에 연결되어 있지 않으며, 수동으로 실행하는 유틸리티입니다.
+워크플로우 완료 후 또는 보고서 작성 후 링크 유효성을 점검할 때 사용합니다.
+
+실행 예시:
+    python3 .claude/scripts/guards/link_validator.py
+    python3 .claude/scripts/guards/link_validator.py --active-only
+
 주요 함수:
     main: 진입점, CLI 인자 파싱 후 검증 수행
     scan_markdown_files: 스캔 대상 마크다운 파일 목록 반환

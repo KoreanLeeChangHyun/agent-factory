@@ -154,7 +154,10 @@ def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
     # 1순위: 환경변수
     env_ticket: str = os.environ.get("TICKET_NUMBER", "").strip()
     if env_ticket:
-        return _normalize_ticket_number(env_ticket)
+        normalized_env = _normalize_ticket_number(env_ticket)
+        if normalized_env is not None:
+            return normalized_env
+        _warn(f"TICKET_NUMBER 환경변수 형식이 올바르지 않습니다: '{env_ticket}'. T-NNN 또는 숫자 형식이어야 합니다. 2순위 인자/3순위 자동선택으로 진행합니다.")
 
     # 2순위: 커맨드 인자
     if ticket_arg:
@@ -349,7 +352,7 @@ def _copy_uploads(abs_work_dir: str) -> None:
             os.unlink(item_path)
 
 
-def _move_ticket_to_in_progress(ticket_number: str) -> None:
+def _move_ticket_to_in_progress(ticket_number: str, abs_work_dir: str = "") -> None:
     """kanban.py를 호출하여 티켓을 Open → In Progress 상태로 이동한다.
 
     kanban.py move 서브커맨드를 subprocess로 실행한다.
@@ -357,6 +360,7 @@ def _move_ticket_to_in_progress(ticket_number: str) -> None:
 
     Args:
         ticket_number: 이동할 티켓 번호 (예: 'T-001')
+        abs_work_dir: 워크플로우 로그 기록용 절대 경로. 비어있으면 로그 기록 생략.
     """
     kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
     if not os.path.isfile(kanban_py_path):
@@ -371,15 +375,19 @@ def _move_ticket_to_in_progress(ticket_number: str) -> None:
             timeout=30,
         )
         if result.returncode != 0:
+            stdout = result.stdout.strip()
             stderr = result.stderr.strip()
-            _warn(f"kanban.py move 실패 (exit {result.returncode}): {stderr}")
+            combined = "\n".join(filter(None, [stdout, stderr]))
+            _warn(f"kanban.py move 실패 (exit {result.returncode}): {combined}")
+            if abs_work_dir:
+                _append_log(abs_work_dir, "WARN", f"kanban.py move 실패 (exit {result.returncode}): {combined}")
     except subprocess.TimeoutExpired:
         _warn("kanban.py move: 타임아웃")
     except Exception as e:
         _warn(f"kanban.py move 실행 실패: {e}")
 
 
-def _update_ticket_title(ticket_number: str, title: str) -> None:
+def _update_ticket_title(ticket_number: str, title: str, abs_work_dir: str = "") -> None:
     """kanban.py를 호출하여 티켓 제목을 갱신한다.
 
     kanban.py update-title 서브커맨드를 subprocess로 실행한다.
@@ -388,6 +396,7 @@ def _update_ticket_title(ticket_number: str, title: str) -> None:
     Args:
         ticket_number: 티켓 번호 (예: 'T-001')
         title: 갱신할 제목 문자열
+        abs_work_dir: 워크플로우 로그 기록용 절대 경로. 비어있으면 로그 기록 생략.
     """
     kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
     if not os.path.isfile(kanban_py_path):
@@ -402,8 +411,12 @@ def _update_ticket_title(ticket_number: str, title: str) -> None:
             timeout=30,
         )
         if result.returncode != 0:
+            stdout = result.stdout.strip()
             stderr = result.stderr.strip()
-            _warn(f"kanban.py update-title 실패 (exit {result.returncode}): {stderr}")
+            combined = "\n".join(filter(None, [stdout, stderr]))
+            _warn(f"kanban.py update-title 실패 (exit {result.returncode}): {combined}")
+            if abs_work_dir:
+                _append_log(abs_work_dir, "WARN", f"kanban.py update-title 실패 (exit {result.returncode}): {combined}")
     except subprocess.TimeoutExpired:
         _warn("kanban.py update-title: 타임아웃")
     except Exception as e:
@@ -542,6 +555,8 @@ def init_workflow(
                 work_dir = candidate_dir
                 abs_work_dir = candidate_abs
                 break
+        else:
+            _err("registryKey 충돌이 99회를 초과했습니다. 중복 워크플로우를 정리하세요.", 4)
 
     _create_work_dir(abs_work_dir)
     _write_user_prompt(abs_work_dir, prompt_content)
@@ -549,8 +564,8 @@ def init_workflow(
 
     # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:
-        _update_ticket_title(ticket_number, title)
-        _move_ticket_to_in_progress(ticket_number)
+        _update_ticket_title(ticket_number, title, abs_work_dir)
+        _move_ticket_to_in_progress(ticket_number, abs_work_dir)
 
     _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
 
@@ -656,7 +671,7 @@ def main() -> None:
         if ticket_arg or os.environ.get("TICKET_NUMBER"):
             _err(f"지정한 티켓 파일을 찾을 수 없거나 비어있습니다. .kanban/ 디렉터리를 확인하세요. ({kanban_dir})", 1)
         else:
-            _err(f".kanban/ 디렉터리에 Open 상태 티켓이 없거나 .kanban/ 디렉터리가 없습니다. ({kanban_dir})", 1)
+            _err(f".kanban/ 디렉터리가 없거나 Open 상태 티켓이 없습니다. 먼저 /wf -o 로 티켓을 생성하세요. ({kanban_dir})", 1)
 
     # Step 2: 워크플로우 디렉터리/메타데이터/레지스트리 일괄 생성
     try:
