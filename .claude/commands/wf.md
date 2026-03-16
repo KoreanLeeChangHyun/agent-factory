@@ -72,7 +72,7 @@ Read 도구로 해당 파일을 로드한 후, 파일의 지침에 따라 절차
 | `-o` (번호 없음) | (없음) | Open | `flow-kanban create "" --command init` + `flow-kanban add-subnumber` (채번+용도선택만, 편집 루프 미진입) |
 | `-e` (번호 없음) | (없음) | Open | `flow-kanban create "" --command init` + `flow-kanban add-subnumber` + 편집 루프 (`-oe`도 동일 동작) |
 | `-o N` | Done | Open (복원) | `mv .kanban/done/T-NNN.xml .kanban/T-NNN.xml` + `flow-kanban move T-NNN open` (내용 표시만, 편집 루프 미진입) |
-| `-o N` | Review/In Progress | Open (자동 복귀) | `flow-kanban move T-NNN open` (내용 표시만, 편집 루프 미진입) |
+| `-o N` | Review/In Progress | Open (선택지에 따라) | 1-B-o-1a 선택지 제시: 열람만 / Open으로 되돌리기 / 취소 (내용 표시만, 편집 루프 미진입) |
 | `-o N` | Open | Open (유지) | — (내용 표시만, 편집 루프 미진입) |
 | `-e N` | Done | Open (복원) | `mv .kanban/done/T-NNN.xml .kanban/T-NNN.xml` + `flow-kanban move T-NNN open` + 편집 루프 (`-oe N`도 동일 동작) |
 | `-e N` | Review/In Progress | Open (자동 복귀) | `flow-kanban move T-NNN open` + 편집 루프 (`-oe N`도 동일 동작) |
@@ -98,7 +98,7 @@ Read 도구로 해당 파일을 로드한 후, 파일의 지침에 따라 절차
 ## 주의사항
 
 1. **단일 진입점**: 티켓 라이프사이클 전체를 `/wf` 하나로 관리합니다. `/wf`가 유일한 티켓 관리 진입점입니다
-2. **자동 Open 복귀**: `-o NNN`, `-e NNN` 또는 `-oe NNN` 플래그로 Review/In Progress 티켓에 접근 시 사용자 확인 없이 Open으로 자동 복귀합니다
+2. **Open 복귀 동작**: `-o NNN`으로 Review/In Progress 티켓에 접근 시 1-B-o-1a 선택지(열람만/Open 복귀/취소)를 제시합니다. `-e NNN` 또는 `-oe NNN`은 사용자 확인 없이 Open으로 자동 복귀합니다
 3. **`<command>` 태그 정책**: `-o`/`-e` 생성 시 설정된 값을 기본 보존하되, `-e NNN`(또는 `-oe NNN`) 편집 시 명시적 변경이 허용됩니다
 4. **Bash 도구 사용**: 칸반 상태 전이 및 파일 이동이 필요한 Step(1-1, 1-B-1, 1-B-2, 2-5, 3-2)에서 허용합니다
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 접두사는 `` `[T-NNN]` : `[WF -플래그]` `` 형식을 사용합니다
