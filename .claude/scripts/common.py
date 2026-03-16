@@ -11,7 +11,6 @@ common.py - 프로젝트 공통 유틸리티.
     load_json_file: JSON 파일 로드 (실패 시 None 반환)
     atomic_write_json: JSON 원자적 쓰기
     scan_active_workflows: 활성 워크플로우 디렉터리 스캔
-    scan_max_workflow_number: .workflow/ + .history/ status.json 스캔으로 최대 W-NNN 번호 반환
     resolve_active_workflow: 현재 활성 워크플로우 컨텍스트 반환
     resolve_work_dir: 단축 키로 workDir 경로 조회
     resolve_abs_work_dir: workDir 절대 경로 변환
@@ -231,50 +230,6 @@ def scan_active_workflows(
             }
 
     return result
-
-
-def scan_max_workflow_number(project_root: str | None = None) -> int:
-    """.workflow/ + .workflow/.history/ 하위의 status.json을 재귀 스캔하여 최대 W-NNN 번호 반환.
-
-    status.json의 `number` 필드(W-NNN 형식)를 파싱하여 최대 숫자를 반환한다.
-    status.json이 없거나 number 필드가 없는 파일은 0으로 처리한다.
-
-    Args:
-        project_root: 프로젝트 루트 경로. None이면 자동 해석.
-
-    Returns:
-        현재 최대 워크플로우 번호 정수. 번호가 없으면 0.
-    """
-    if project_root is None:
-        project_root = resolve_project_root()
-
-    workflow_root = os.path.join(project_root, ".workflow")
-    if not os.path.isdir(workflow_root):
-        return 0
-
-    search_dirs = [workflow_root, os.path.join(workflow_root, ".history")]
-    max_num = 0
-    number_pattern = re.compile(r"^W-(\d+)$", re.IGNORECASE)
-
-    for search_dir in search_dirs:
-        if not os.path.isdir(search_dir):
-            continue
-        for dirpath, _dirnames, filenames in os.walk(search_dir):
-            if "status.json" not in filenames:
-                continue
-            status = load_json_file(os.path.join(dirpath, "status.json"))
-            if not isinstance(status, dict):
-                continue
-            number_val = status.get("number", "")
-            if not number_val:
-                continue
-            m = number_pattern.match(str(number_val).strip())
-            if m:
-                num = int(m.group(1))
-                if num > max_num:
-                    max_num = num
-
-    return max_num
 
 
 def _get_workflow_updated_at(project_root: str, entry: dict[str, str]) -> str:

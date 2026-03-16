@@ -91,7 +91,7 @@ Read 도구로 해당 파일을 로드한 후, 파일의 지침에 따라 절차
 | 티켓 생성 직후 | `-o` 또는 `-e`(또는 `-oe`) | `<current>0</current>` (subnumber 없음) | `flow-kanban create "" --command init` |
 | 워크플로우 정의 | `-o` (채번+용도선택만) | subnumber N 추가(기본값), `<current>N</current>` 갱신 | `flow-kanban add-subnumber T-NNN --command ...` (goal/target 등 빈 값) |
 | 워크플로우 정의 | `-e` 완료 또는 `-e NNN` (또는 `-oe`) | subnumber N 추가, `<current>N</current>` 갱신 | `flow-kanban add-subnumber T-NNN --command ... --goal ... --target ...` |
-| 워크플로우 실행 완료 | `-s` 후처리 | subnumber N에 workflow 번호 기록 | `flow-kanban update-subnumber T-NNN --id N --workflow W-NNN` |
+| 워크플로우 실행 완료 | `-s` 후처리 | subnumber N 갱신 | `flow-kanban update-subnumber T-NNN --id N` |
 | 다음 사이클 시작 | `-e NNN` (추가 사이클, 또는 `-oe NNN`) | subnumber N+1 추가, `<current>N+1</current>` 갱신 | `flow-kanban add-subnumber T-NNN --command ... --goal ... --target ...` |
 | 티켓 종료 | `-d` | 변경 없음 (히스토리 보존) | `flow-kanban done T-NNN` |
 

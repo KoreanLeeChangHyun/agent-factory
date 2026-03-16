@@ -46,15 +46,15 @@
       - move &lt;ticket&gt; &lt;target&gt;
       - done &lt;ticket&gt;
       - delete &lt;ticket&gt;
-      - add-subnumber &lt;ticket&gt; --command &lt;cmd&gt; --goal "&lt;goal&gt;" --target "&lt;target&gt;"
+      - add-subnumber &lt;ticket&gt; --command &lt;cmd&gt; --goal "&lt;goal&gt;" --target "&lt;target&gt;" [--constraints "&lt;constraints&gt;"] [--criteria "&lt;criteria&gt;"] [--context "&lt;context&gt;"] [--workdir &lt;path&gt;] [--result "&lt;text&gt;"]
       - update-title &lt;ticket&gt; &lt;title&gt;
-      - update-subnumber &lt;ticket&gt; --id &lt;N&gt; --workflow &lt;W-NNN&gt;
+      - update-subnumber &lt;ticket&gt; --id &lt;N&gt; [--registrykey &lt;key&gt;] [--plan &lt;path&gt;] [--report &lt;path&gt;] [--workdir &lt;path&gt;]
       - archive-subnumber &lt;ticket&gt;
 
       flow-tmux: launch T-NNN '&lt;command&gt;' | cleanup T-NNN
       flow-claude: start &lt;command&gt; | end &lt;registryKey&gt;
       flow-update: status &lt;registryKey&gt; &lt;STATUS&gt; | both &lt;registryKey&gt; &lt;agent&gt; &lt;toStep&gt; | task-start &lt;registryKey&gt; W01 W02 | task-status &lt;registryKey&gt; running W01 W02
-      flow-finish: &lt;registryKey&gt; 완료|실패 --ticket-number &lt;T-NNN&gt; [--workflow-id &lt;id&gt;]
+      flow-finish: &lt;registryKey&gt; 완료|실패 --ticket-number &lt;T-NNN&gt;
       flow-step: start &lt;registryKey&gt; | end &lt;registryKey&gt; [label]
       flow-phase: &lt;registryKey&gt; &lt;N&gt;
       flow-skillmap: &lt;registryKey&gt;
