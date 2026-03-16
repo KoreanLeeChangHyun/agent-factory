@@ -5,7 +5,7 @@ set -euo pipefail
 # init-claude-workflow.sh
 # Claude Code 워크플로우 환경 자동 초기화 스크립트
 # 지원: Ubuntu 20.04+, macOS 13.0+
-# 의존성: git, curl, python3, tmux
+# 의존성: git, curl, python3, tmux, gh
 # ==============================================================================
 
 # --- 색상 변수 ---
@@ -108,7 +108,7 @@ detect_os() {
 # python3 및 tmux 자동 설치
 # ==============================================================================
 install_dependencies() {
-    print_step "2" "의존성 설치 확인 (python3, tmux)"
+    print_step "2" "의존성 설치 확인 (python3, tmux, gh)"
 
     local missing_deps=()
 
@@ -120,8 +120,12 @@ install_dependencies() {
         missing_deps+=("tmux")
     fi
 
+    if ! command -v gh &>/dev/null; then
+        missing_deps+=("gh")
+    fi
+
     if [ "${#missing_deps[@]}" -eq 0 ]; then
-        print_success "의존성 이미 설치됨 (python3, tmux)"
+        print_success "의존성 이미 설치됨 (python3, tmux, gh)"
         return 0
     fi
 
@@ -134,9 +138,39 @@ install_dependencies() {
                 print_error "apt-get update 실패"
                 return 1
             fi
-            if ! sudo apt-get install -y "${missing_deps[@]}"; then
-                print_error "패키지 설치 실패: ${missing_deps[*]}"
-                return 1
+
+            # gh CLI는 apt 기본 저장소에 없으므로 GitHub 공식 APT 저장소를 먼저 등록
+            if printf '%s\n' "${missing_deps[@]}" | grep -qx 'gh'; then
+                print_info "GitHub CLI 공식 APT 저장소를 등록합니다..."
+                if ! command -v curl &>/dev/null; then
+                    print_error "curl이 없어 gh APT 저장소 등록에 실패했습니다. curl을 먼저 설치하세요."
+                    return 1
+                fi
+                if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+                        | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null \
+                   && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+                   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+                        | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+                   && sudo apt-get update -qq; then
+                    print_success "GitHub CLI APT 저장소 등록 완료"
+                else
+                    print_error "GitHub CLI APT 저장소 등록 실패. gh를 수동으로 설치하세요: https://cli.github.com"
+                    # gh를 missing_deps에서 제외하고 나머지 의존성만 설치
+                    missing_deps=("${missing_deps[@]/gh}")
+                    # 배열 재구성 (빈 원소 제거)
+                    local filtered=()
+                    for dep in "${missing_deps[@]}"; do
+                        [ -n "$dep" ] && filtered+=("$dep")
+                    done
+                    missing_deps=("${filtered[@]}")
+                fi
+            fi
+
+            if [ "${#missing_deps[@]}" -gt 0 ]; then
+                if ! sudo apt-get install -y "${missing_deps[@]}"; then
+                    print_error "패키지 설치 실패: ${missing_deps[*]}"
+                    return 1
+                fi
             fi
             ;;
         macos)
@@ -225,13 +259,29 @@ setup_shell_aliases() {
         print_info "감지된 쉘: $shell_name (bash 설정으로 대체합니다)"
     fi
 
-    # .claude.aliases 파일 생성
-    cat > "$aliases_file" << 'ALIASES_EOF'
-# 이 파일은 init-claude-workflow.sh가 관리합니다. 수동 편집 내용은 스크립트 재실행 시 유실됩니다.
+    # .claude.aliases 파일이 이미 존재하면 스킵 (사용자 설정 보존)
+    if [ -f "$aliases_file" ]; then
+        print_info ".claude.aliases 파일이 이미 존재합니다. 기존 내용을 유지합니다. ($aliases_file)"
+    else
+        # Claude 실행 파일 경로 동적 감지
+        local claude_path
+        claude_path="$(command -v claude 2>/dev/null || echo '')"
+
+        cat > "$aliases_file" << 'ALIASES_EOF'
+# 이 파일은 init-claude-workflow.sh가 생성합니다.
 # Claude Code workflow aliases
 export PATH="$HOME/.local/bin:$PATH"
 
-alias claude='~/.local/bin/claude'
+alias cc='claude --dangerously-skip-permissions'
+alias ccc='claude --dangerously-skip-permissions --continue'
+alias ccv='claude --dangerously-skip-permissions'
+cct() {
+  local i=0 name="main"
+  while tmux has-session -t "$name" 2>/dev/null; do
+    name="main-$((++i))"
+  done
+  tmux new-session -s "$name" "claude --dangerously-skip-permissions"
+}
 
 # flow-* 배너 alias
 alias flow-claude='.claude/scripts/banner/flow_claude_banner.sh'
@@ -252,7 +302,8 @@ alias flow-kanban='python3 .claude/scripts/flow/kanban.py'
 alias flow-tmux='python3 .claude/scripts/flow/tmux_launcher.py'
 ALIASES_EOF
 
-    print_success ".claude.aliases 파일 생성 완료 ($aliases_file)"
+        print_success ".claude.aliases 파일 생성 완료 ($aliases_file)"
+    fi
 
     # 쉘 설정 파일에 source 라인 추가 (중복 확인)
     local source_line="# Claude Code workflow aliases"
@@ -309,6 +360,114 @@ create_directories_and_files() {
 }
 
 # ==============================================================================
+# Step 4.5: .claude/settings.json 생성
+# ==============================================================================
+setup_settings_json() {
+    print_step "4.5" ".claude/settings.json 생성"
+
+    local settings_file=".claude/settings.json"
+
+    if [ -f "$settings_file" ]; then
+        print_info ".claude/settings.json 파일이 이미 존재합니다. 기존 내용을 유지합니다."
+        return 0
+    fi
+
+    if [ ! -d ".claude" ]; then
+        print_info ".claude/ 디렉터리가 없습니다. settings.json 생성을 스킵합니다."
+        return 0
+    fi
+
+    cat > "$settings_file" << 'SETTINGS_EOF'
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 -u .claude/scripts/statusline.py"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/scripts/sync/history_sync.py sync && python3 -u .claude/scripts/sync/history_sync.py archive",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/board/board.py",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/hooks/session-start.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/hooks/pre-tool-use.py",
+            "statusMessage": "pre-tool-use 디스패처 실행 중..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/hooks/subagent-stop.py",
+            "timeout": 10,
+            "statusMessage": "subagent-stop 디스패처 실행 중..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u .claude/hooks/post-tool-use.py",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "post-tool-use 디스패처 실행 중..."
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGS_EOF
+
+    # JSON 유효성 검증
+    if python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$settings_file" 2>/dev/null; then
+        print_success ".claude/settings.json 생성 완료 (JSON 유효성 검증 통과)"
+    else
+        print_error ".claude/settings.json JSON 유효성 검증 실패. 파일을 확인하세요."
+        return 1
+    fi
+}
+
+# ==============================================================================
 # Step 5: .claude.env 템플릿 생성
 # ==============================================================================
 generate_claude_env() {
@@ -322,41 +481,91 @@ generate_claude_env() {
     fi
 
     cat > "$env_file" << 'CLAUDE_ENV_EOF'
-# ==============================================================================
+# =========================================================================================
 # .claude.env — Claude Code 워크플로우 환경 변수
 # 이 파일은 init-claude-workflow.sh가 생성합니다.
+# 형식: KEY=value (표준 .env 문법)
 # 민감한 정보가 포함될 수 있으므로 .gitignore에 등록하세요.
-# ==============================================================================
+# =========================================================================================
 
-# === Slack Integration ===
-# Slack Bot Token (Slack 알림 기능 사용 시 입력)
+# -----------------------------------------------------------------------------------------
+# (1) Slack 연동
+# -----------------------------------------------------------------------------------------
+
+# Slack Bot OAuth Token (xoxb-로 시작)
+# 용도: Claude Code 작업 완료/대기 알림 전송
 CLAUDE_CODE_SLACK_BOT_TOKEN=
-# Slack Channel ID (알림을 받을 채널 ID)
+
+# Slack 채널 ID (C로 시작)
+# 용도: 알림이 전송될 채널 지정
 CLAUDE_CODE_SLACK_CHANNEL_ID=
 
-# === Git Configuration ===
-# Git 커밋 시 사용할 사용자 이름
+# -----------------------------------------------------------------------------------------
+# (2) Git 설정
+# -----------------------------------------------------------------------------------------
+
 CLAUDE_CODE_GIT_USER_NAME=
-# Git 커밋 시 사용할 이메일 주소
 CLAUDE_CODE_GIT_USER_EMAIL=
+CLAUDE_CODE_GITHUB_USERNAME=
+CLAUDE_CODE_SSH_KEY_GITHUB=
 
-# === Hook Flags (ON/OFF) ===
-# 위험 명령어 실행 가드 (dangerous_command_guard.py)
-HOOK_DANGEROUS_COMMAND=ON
-# Hook 스크립트 자체 보호 가드 (hooks_self_guard.py)
-HOOK_HOOKS_SELF_PROTECT=ON
-# 칸반 현재 상태 가드 (kanban_current_guard.py)
-HOOK_KANBAN_CURRENT=ON
-# Slack 승인 요청 Hook (pre-tool-use.py) — 기본값 OFF
-HOOK_SLACK_ASK=OFF
-# 사용량 트래커 (subagent-stop.py)
-HOOK_USAGE_TRACKER=ON
-# 카탈로그 동기화 (post-tool-use.py)
-HOOK_CATALOG_SYNC=ON
+# -----------------------------------------------------------------------------------------
+# (3) Hook 제어 플래그 (HOOK_* 체계)
+# true/false로 각 hook의 활성/비활성을 제어합니다.
+# -----------------------------------------------------------------------------------------
 
-# === Workflow Settings ===
-# .workflow/ 디렉터리 내 워크플로우 보관 개수 (초과 시 오래된 것부터 정리)
+# pre-tool-use hooks
+HOOK_DANGEROUS_COMMAND=false
+HOOK_HOOKS_SELF_PROTECT=false
+HOOK_SLACK_ASK=false
+HOOK_TASK_HISTORY_SYNC=false
+HOOK_AGENT_INVESTIGATION_GUARD=false
+HOOK_MAIN_BRANCH_GUARD=false
+HOOK_MAIN_SESSION_GUARD=false
+HOOK_KANBAN_SUBCOMMAND_GUARD=false
+
+# session-start hooks
+HOOK_SESSION_SYSTEM_PROMPT=true
+
+# stop hooks
+HOOK_WORKFLOW_AUTO_CONTINUE=false
+
+# subagent-stop hooks
+HOOK_USAGE_TRACKER=true
+HOOK_HISTORY_SYNC_TRIGGER=false
+
+# post-tool-use hooks
+HOOK_CATALOG_SYNC=true
+
+# -----------------------------------------------------------------------------------------
+# (4) 강제 규칙 제어 플래그 (ENFORCE_* 체계)
+# true/false로 각 강제 규칙의 활성/비활성을 제어합니다.
+# -----------------------------------------------------------------------------------------
+
+# CSO 원칙 (스킬 description 트리거 조건만으로 제한)
+ENFORCE_CSO_PRINCIPLE=true
+
+# 합리화 방지 테이블 강제
+ENFORCE_RATIONALIZATION_GUARD=true
+
+# Verification Result Table 필수화
+ENFORCE_VRT=true
+
+# Self-Review 체크리스트 강제
+ENFORCE_SELF_REVIEW=true
+
+# 토큰 효율 목표값 강제
+ENFORCE_TOKEN_EFFICIENCY=true
+
+# -----------------------------------------------------------------------------------------
+# (5) 워크플로우 설정
+# -----------------------------------------------------------------------------------------
+
+# .workflow/ 디렉터리에 유지할 최대 워크플로우 수 (기본값: 10)
 CLAUDE_WORKFLOW_KEEP_COUNT=10
+
+# 체인 스테이지 실패 시 최대 재시도 횟수 (기본값: 2)
+CLAUDE_CHAIN_MAX_RETRY=2
 CLAUDE_ENV_EOF
 
     print_success ".claude.env 템플릿 생성 완료 ($env_file)"
@@ -451,6 +660,7 @@ update_gitignore() {
         ".temp/*"
         "temp/"
         ".vscode/"
+        ".dashboard/"
     )
 
     local added=0
@@ -531,6 +741,10 @@ clone_claude_directory() {
     eval "$old_trap"
 
     print_success "임시 클론 디렉터리 정리 완료"
+
+    # .claude/ 내 모든 .sh 파일에 실행 권한 부여
+    find ".claude/" -name '*.sh' -exec chmod +x {} +
+    print_success ".claude/ 내 .sh 파일 chmod +x 완료"
 }
 
 # ==============================================================================
@@ -554,6 +768,14 @@ verify_installation() {
         print_success "tmux 실행 가능 ($(tmux -V 2>/dev/null || echo 'version unknown'))"
     else
         print_error "tmux 명령어를 찾을 수 없습니다"
+        failed=$((failed + 1))
+    fi
+
+    # (b2) gh CLI 실행 가능 여부
+    if command -v gh &>/dev/null; then
+        print_success "gh CLI 실행 가능 ($(gh --version 2>/dev/null | head -1 || echo 'version unknown'))"
+    else
+        print_error "gh 명령어를 찾을 수 없습니다"
         failed=$((failed + 1))
     fi
 
@@ -612,7 +834,7 @@ verify_installation() {
     fi
 
     # (h) .gitignore 필수 항목 등록 확인 (.kanban 기준)
-    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".uploads/" ".kanban/" "CLAUDE.md" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/")
+    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".uploads/" ".kanban/" "CLAUDE.md" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/" ".dashboard/")
     local gitignore_ok=true
     for entry in "${gitignore_entries[@]}"; do
         if ! grep -qxF "$entry" ".gitignore" 2>/dev/null; then
@@ -668,6 +890,7 @@ main() {
     install_dependencies
     clone_claude_directory
     create_directories_and_files
+    setup_settings_json
     generate_claude_env
     migrate_legacy_prompt
     setup_shell_aliases

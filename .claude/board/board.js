@@ -51,7 +51,7 @@
         for (var ri = 0; ri < resultEl.children.length; ri++) {
           var rc = resultEl.children[ri];
           var rt = (rc.textContent || "").trim();
-          if (rt) obj[rc.tagName] = rt;
+          if (rt) obj[rc.tagName.toLowerCase()] = rt;
         }
         return Object.keys(obj).length > 0 ? obj : null;
       })(),
@@ -536,15 +536,6 @@
     // Bind result links
     el.querySelectorAll(".tv-result-link").forEach(function (link) {
       link.addEventListener("click", function () {
-        // Workflow number link: find matching workflow and open detail
-        if (link.dataset.workflow) {
-          var wfNum = link.dataset.workflow;
-          var matchedWf = WORKFLOWS.find(function (w) { return w.number === wfNum; });
-          if (matchedWf) {
-            openWfDetail(matchedWf);
-          }
-          return;
-        }
         var isDir = link.dataset.isdir === "true";
         openWfFile(link.dataset.label, link.dataset.url, isDir);
       });
@@ -716,10 +707,26 @@
         var chunk = store.pendingRows.splice(0, CHUNK_SIZE);
         var code = viewer.querySelector("code");
         if (!code) return;
+        var chunkHtml = "\n" + chunk.join("\n");
+        var lang = store.lang;
+        // Apply syntax highlighting to chunk if hljs is available and language is registered
+        var highlightedHtml = null;
+        if (typeof hljs !== "undefined" && lang && lang !== "plaintext") {
+          try {
+            var result = hljs.highlight(chunkHtml, { language: lang });
+            highlightedHtml = result.value;
+          } catch (e) {
+            highlightedHtml = null;
+          }
+        }
         var frag = document.createDocumentFragment();
-        // Append a newline text node then the chunk HTML
         var wrapper = document.createElement("span");
-        wrapper.innerHTML = "\n" + chunk.join("\n");
+        if (highlightedHtml !== null) {
+          wrapper.innerHTML = highlightedHtml;
+        } else {
+          // Fallback: insert as plain HTML (already escaped in rows)
+          wrapper.innerHTML = chunkHtml;
+        }
         while (wrapper.firstChild) {
           frag.appendChild(wrapper.firstChild);
         }
@@ -788,24 +795,41 @@
         var lineContents = viewer.querySelectorAll(".code-line-content");
         lineContents.forEach(function (span) {
           var text = span.textContent;
-          if (text.toLowerCase().indexOf(lowerQuery) !== -1) {
-            store.searchMatches.push(span);
-            // Wrap matching text portions in <mark>
-            var lowerText = text.toLowerCase();
-            var result = "";
+          if (text.toLowerCase().indexOf(lowerQuery) === -1) return;
+          store.searchMatches.push(span);
+          // Use TreeWalker to traverse text nodes only, preserving hljs token <span> structure
+          var walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT, null, false);
+          var textNodes = [];
+          var node;
+          while ((node = walker.nextNode())) {
+            textNodes.push(node);
+          }
+          textNodes.forEach(function (textNode) {
+            var nodeText = textNode.nodeValue;
+            var lowerNodeText = nodeText.toLowerCase();
             var idx = 0;
-            while (idx < text.length) {
-              var found = lowerText.indexOf(lowerQuery, idx);
+            var found = lowerNodeText.indexOf(lowerQuery, idx);
+            if (found === -1) return;
+            // Split text node and wrap matches with <mark>
+            var parent = textNode.parentNode;
+            var frag = document.createDocumentFragment();
+            while (idx < nodeText.length) {
+              found = lowerNodeText.indexOf(lowerQuery, idx);
               if (found === -1) {
-                result += esc(text.substring(idx));
+                frag.appendChild(document.createTextNode(nodeText.substring(idx)));
                 break;
               }
-              result += esc(text.substring(idx, found));
-              result += '<mark class="code-search-match">' + esc(text.substring(found, found + query.length)) + '</mark>';
+              if (found > idx) {
+                frag.appendChild(document.createTextNode(nodeText.substring(idx, found)));
+              }
+              var mark = document.createElement("mark");
+              mark.className = "code-search-match";
+              mark.appendChild(document.createTextNode(nodeText.substring(found, found + query.length)));
+              frag.appendChild(mark);
               idx = found + query.length;
             }
-            span.innerHTML = result;
-          }
+            parent.replaceChild(frag, textNode);
+          });
         });
         if (searchCount) {
           searchCount.textContent = store.searchMatches.length > 0
@@ -1000,7 +1024,7 @@
   /** Returns the ticket that links to this workflow, or null. */
   function findTicketForWorkflow(w) {
     var basePath = w.basePath || "";
-    var wNum = w.number || "";
+    var entry = w.entry || "";
     for (var ti = 0; ti < TICKETS.length; ti++) {
       var ticket = TICKETS[ti];
       var subnumbers = [];
@@ -1009,14 +1033,16 @@
       for (var si = 0; si < subnumbers.length; si++) {
         var result = subnumbers[si].result;
         if (!result) continue;
-        // Match by workflow key (W-NNN)
-        if (result.workflow && wNum && result.workflow === wNum) return ticket;
-        // Match by workdir path
+        // Match by workdir path (basePath 기반)
         if (result.workdir) {
           var wd = result.workdir;
           if (wd.charAt(wd.length - 1) !== "/") wd += "/";
           var normalized = "../../" + wd;
-          if (normalized === basePath) return ticket;
+          if (decodeURIComponent(normalized) === decodeURIComponent(basePath)) return ticket;
+        }
+        // Fallback: match by registrykey (entry = YYYYMMDD-HHMMSS)
+        if (result.registrykey && entry && result.registrykey === entry) {
+          return ticket;
         }
       }
     }
@@ -1036,19 +1062,19 @@
         var w = WORKFLOWS[wi];
         var alreadyFound = found.indexOf(w) !== -1;
         if (alreadyFound) continue;
-        // Match by workflow key (W-NNN)
-        if (result.workflow && w.number && result.workflow === w.number) {
-          found.push(w);
-          continue;
-        }
-        // Match by workdir path
+        // Match by workdir path (basePath 기반)
         if (result.workdir) {
           var wd = result.workdir;
           if (wd.charAt(wd.length - 1) !== "/") wd += "/";
           var normalized = "../../" + wd;
-          if (normalized === (w.basePath || "")) {
+          if (decodeURIComponent(normalized) === decodeURIComponent(w.basePath || "")) {
             found.push(w);
+            continue;
           }
+        }
+        // Fallback: match by registrykey (entry = YYYYMMDD-HHMMSS)
+        if (result.registrykey && w.entry && result.registrykey === w.entry) {
+          found.push(w);
         }
       }
     }
@@ -1066,16 +1092,23 @@
     }
     var keys = ["plan", "work", "report"];
     var h = '<div class="tv-result-links">';
+    // Render registrykey as plain text identifier (not a clickable link)
+    if (result.registrykey) {
+      h += '<span class="tv-result-id">' + esc(result.registrykey) + '</span>';
+    }
     keys.forEach(function (k) {
       if (!result[k]) return;
-      var url = "../../" + result[k];
+      var url = encodeURI("../../" + result[k]);
       var isDir = k === "work";
       h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '"' + (isDir ? ' data-isdir="true"' : '') + '>' + esc(k) + '</span>';
     });
-    // render any extra keys not in the standard list (workdir excluded: shown via Connected Workflows)
+    // render any extra keys not in the standard list
+    // workdir: shown via Connected Workflows section
+    // registrykey: identifier only, not a file path link (rendered above)
+    var excludedKeys = ["workdir", "registrykey"];
     Object.keys(result).forEach(function (k) {
-      if (keys.indexOf(k) === -1 && k !== "workdir") {
-        var url = "../../" + result[k];
+      if (keys.indexOf(k) === -1 && excludedKeys.indexOf(k) === -1) {
+        var url = encodeURI("../../" + result[k]);
         h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '">' + esc(k) + '</span>';
       }
     });
@@ -1171,7 +1204,6 @@
                   return {
                     entry: entry, task: task, command: cmd, basePath: basePath,
                     step: status.step || "NONE",
-                    number: status.number || "",
                     created_at: status.created_at || "",
                     updated_at: status.updated_at || "",
                     transitions: status.transitions || [],
@@ -1260,8 +1292,7 @@
       return w.task.toLowerCase().indexOf(q) !== -1
         || w.command.toLowerCase().indexOf(q) !== -1
         || w.step.toLowerCase().indexOf(q) !== -1
-        || w.entry.indexOf(q) !== -1
-        || (w.number && w.number.toLowerCase().indexOf(q) !== -1);
+        || w.entry.indexOf(q) !== -1;
     });
   }
 
@@ -1421,11 +1452,12 @@
   function renderWfDetailView(w) {
     var h = '<div class="tv-container wf-detail-container">';
 
-    // Header: number + command + step
+    // Header: linkedTicket 번호 또는 entry fallback + command + step
+    var headerLinkedTicket = findTicketForWorkflow(w);
     h += '<div class="tv-header">';
     h += '<div class="tv-header-top">';
-    if (w.number) {
-      h += '<span class="tv-number">' + esc(w.number) + '</span>';
+    if (headerLinkedTicket) {
+      h += '<span class="tv-number">' + esc(headerLinkedTicket.number) + '</span>';
     } else {
       h += '<span class="tv-number wf-number-fallback">' + esc(w.entry) + '</span>';
     }
@@ -1641,7 +1673,8 @@
         allLines: lines,
         nextChunk: INITIAL_LINES,
         searchMatches: [],
-        searchIndex: -1
+        searchIndex: -1,
+        lang: lang
       };
 
       var searchBarHtml = '<div class="code-search-bar" style="display:none">'
@@ -1692,7 +1725,19 @@
       if (block.dataset.highlighted) return;
       block.dataset.highlighted = "true";
       block.classList.remove("hljs-pending");
-      if (typeof hljs !== "undefined") {
+      if (typeof hljs === "undefined") return;
+      // Extract language from class name (e.g. "language-javascript")
+      var lang = null;
+      var classes = block.className.split(/\s+/);
+      for (var i = 0; i < classes.length; i++) {
+        var m = classes[i].match(/^language-(.+)$/);
+        if (m) {
+          lang = m[1];
+          break;
+        }
+      }
+      // Only highlight if language is registered; skip plaintext and unregistered languages
+      if (lang && lang !== "plaintext" && hljs.getLanguage(lang)) {
         hljs.highlightElement(block);
       }
     });
@@ -1789,23 +1834,15 @@
     var stepText = esc(w.step || "NONE");
     var stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + '</span>';
     h += '<td class="wf-row-step">' + stepBadge + '</td>';
-    // number cell
+    // number cell: linkedTicket이 있으면 T-NNN 배지(클릭으로 티켓 뷰어 이동), 없으면 타임스탬프 fallback
     var linkedTicket = findTicketForWorkflow(w);
-    if (w.number) {
-      h += '<td class="wf-row-number"><span class="wf-number-badge">' + esc(w.number) + '</span>';
-      if (linkedTicket) {
-        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
-      }
-      h += '</td>';
+    if (linkedTicket) {
+      h += '<td class="wf-row-number"><span class="wf-number-badge wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span></td>';
     } else {
       // Timestamp fallback: extract MMDD-HHMM from entry (format: YYYYMMDD-HHMMSS)
       var ts = w.entry || "";
       var fallback = ts.length >= 13 ? ts.substring(4, 8) + '-' + ts.substring(9, 13) : ts;
-      h += '<td class="wf-row-number"><span class="wf-number-fallback">' + esc(fallback) + '</span>';
-      if (linkedTicket) {
-        h += '<span class="wf-ticket-badge" data-ticket-num="' + esc(linkedTicket.number) + '">' + esc(linkedTicket.number) + '</span>';
-      }
-      h += '</td>';
+      h += '<td class="wf-row-number"><span class="wf-number-fallback">' + esc(fallback) + '</span></td>';
     }
     // command cell
     h += '<td class="wf-row-cmd">' + badge(w.command, CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + '</td>';

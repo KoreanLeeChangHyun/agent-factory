@@ -194,11 +194,13 @@ DONE: `flow-finish <registryKey> 완료 --ticket-number <T-NNN>` → `flow-claud
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
 | INIT completed | run initialization.py, extract/retain params, `flow-step start <registryKey>`, status update (NONE->PLAN), planner call | Return summary, progress text, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
-| PLAN done | `flow-step end <registryKey> planSubmit`, 스킬 매핑 검증 루프, WORK 진행 | Plan summary, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
+| PLAN done | `flow-step end <registryKey> planSubmit`, 스킬 매핑 검증 루프, WORK 진행 | Plan summary, **AskUserQuestion**[^1], **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | `flow-phase <registryKey> 0` (MUST FIRST), then Phase 0 skill_mapper.py call, then Phase 1~N | Skipping Phase banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK done | 상태 확인, `flow-step start <registryKey>`, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
 | REPORT done | `flow-update status <key> DONE`, `flow-finish <key> 완료 --ticket-number <T-NNN>`, `flow-claude end <key>` → **flow-claude end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
+
+[^1]: autoApprove=false(`-n` 플래그 지정) 시에는 AskUserQuestion 허용. 상세: step-plan.md "Step 2b: PLAN - Auto-Approve Gate" 섹션 참조
 
 ---
 

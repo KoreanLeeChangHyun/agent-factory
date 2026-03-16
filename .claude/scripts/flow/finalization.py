@@ -442,27 +442,54 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
 
 
 def _build_result_update_args(abs_work_dir: str) -> list[str]:
-    """status.json의 number 필드를 읽어 update-subnumber CLI 인자 리스트를 반환한다.
+    """update-subnumber CLI 추가 인자 리스트를 반환한다.
 
-    status.json에서 `number` 필드(W-NNN 형식)를 읽어 `["--workflow", "W-NNN"]`을
-    반환한다. number 필드가 없거나 status.json을 읽지 못하면 빈 리스트를 반환한다
-    (graceful fallback: 기존 워크플로우에 대해 result 갱신 스킵).
+    abs_work_dir에서 registryKey를 추출하고, plan.md / report.md 존재 여부를
+    확인하여 update-subnumber CLI에 전달할 인자 리스트를 반환한다.
 
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
+            (.workflow/{registryKey}/{workName}/{command} 구조)
 
     Returns:
-        kanban.py update-subnumber 호출용 추가 인자 리스트.
-        number 필드가 없으면 빈 리스트.
+        ["--registrykey", registryKey, "--workdir", workDir상대경로] 에
+        plan.md / report.md가 존재하면 각각 "--plan" / "--report" 인자를 추가한 리스트.
+        registryKey 추출 실패 시 빈 리스트.
     """
-    status_file = os.path.join(abs_work_dir, "status.json")
-    status_data = load_json_file(status_file)
-    if not isinstance(status_data, dict):
+    import re as _re
+
+    # abs_work_dir 에서 YYYYMMDD-HHMMSS 패턴 추출
+    # 경로 형식: .../`.workflow`/{registryKey}/{workName}/{command}
+    _ts_pattern = _re.compile(r"\.workflow[/\\](\d{8}-\d{6}(?:-\d+)?)")
+    _match = _ts_pattern.search(abs_work_dir)
+    if not _match:
         return []
-    number = status_data.get("number", "")
-    if not number:
+
+    registry_key: str = _match.group(1)
+
+    # 상대 workDir: .workflow/{registryKey}/... 이후 부분을 포함한 경로
+    _wf_idx = abs_work_dir.find(".workflow/")
+    if _wf_idx == -1:
+        _wf_idx = abs_work_dir.find(".workflow\\")
+    if _wf_idx == -1:
         return []
-    return ["--workflow", str(number)]
+    work_dir_rel: str = abs_work_dir[_wf_idx:]
+    # 경로 구분자를 슬래시로 통일하고 끝 슬래시 정규화
+    work_dir_rel = work_dir_rel.replace("\\", "/").rstrip("/") + "/"
+
+    args: list[str] = ["--registrykey", registry_key, "--workdir", work_dir_rel]
+
+    plan_abs: str = os.path.join(abs_work_dir, "plan.md")
+    if os.path.isfile(plan_abs):
+        plan_rel: str = work_dir_rel + "plan.md"
+        args += ["--plan", plan_rel]
+
+    report_abs: str = os.path.join(abs_work_dir, "report.md")
+    if os.path.isfile(report_abs):
+        report_rel: str = work_dir_rel + "report.md"
+        args += ["--report", report_rel]
+
+    return args
 
 
 def main() -> None:

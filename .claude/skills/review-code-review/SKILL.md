@@ -106,20 +106,20 @@ Task(review-performance, target_files)   -- 동시 실행 -->  issues_performanc
 
 **정렬 규칙 (우선순위 순):**
 
-1. **REVIEW.md always_check 패턴 매칭**: 이슈 파일이 `always_check` 패턴에 매칭되면 severity를 Critical로 자동 승격
+1. **`../review-comprehensive/REVIEW.md` always_check 패턴 매칭**: 이슈 파일이 `always_check` 패턴에 매칭되면 severity를 Critical로 자동 승격
 2. **Severity 내림차순**: Critical > Important > Minor
 3. **Confidence score 내림차순**: 동일 severity 내에서 confidence가 높은 이슈 우선
 4. **Pre-existing 구분**: pre_existing: false 이슈가 pre_existing: true 이슈보다 우선
 
 **Critical 자동 승격:**
 
-REVIEW.md의 `always_check` 섹션에 정의된 glob 패턴과 이슈 파일 경로를 매칭한다.
+`../review-comprehensive/REVIEW.md`의 `always_check` 섹션에 정의된 glob 패턴과 이슈 파일 경로를 매칭한다.
 
 ```
 always_check 패턴: **/auth/**
 이슈 파일: src/auth/login.ts:42
 -> 패턴 매칭 성공 -> severity를 Critical로 승격
--> extended_reasoning에 승격 근거 추가: "REVIEW.md always_check 패턴 '**/auth/**' 매칭"
+-> extended_reasoning에 승격 근거 추가: "../review-comprehensive/REVIEW.md always_check 패턴 '**/auth/**' 매칭"
 ```
 
 ## Confidence Score 산정 기준
@@ -135,7 +135,7 @@ always_check 패턴: **/auth/**
 
 ### 기본 threshold
 
-- 기본값: 80 (REVIEW.md의 `confidence_threshold`로 오버라이드 가능)
+- 기본값: 80 (`../review-comprehensive/REVIEW.md`의 `confidence_threshold`로 오버라이드 가능)
 - threshold 미만 이슈는 `filtered_issues` 섹션으로 분류
 - filtered_issues도 동일 필드 구조를 유지하되 `filter_reason` 필드 추가
 
@@ -240,7 +240,7 @@ pipeline_result:
 1. **병렬 실행 필수**: Stage 1에서 4개 리뷰 스킬은 반드시 동시에 실행하여 지연을 최소화한다
 2. **git 내장 명령어만 사용**: pre-existing 판별에 외부 도구를 사용하지 않으며, git blame과 git diff만 사용한다
 3. **기존 필드 유지**: issues 항목의 기존 6개 필드(id, severity, domain, file, finding, suggested_action)를 삭제하거나 이름 변경하지 않는다
-4. **threshold 존중**: REVIEW.md에 confidence_threshold가 설정되어 있으면 해당 값을 사용하고, 미설정 시 기본값 80을 적용한다
+4. **threshold 존중**: `../review-comprehensive/REVIEW.md`에 confidence_threshold가 설정되어 있으면 해당 값을 사용하고, 미설정 시 기본값 80을 적용한다
 5. **중복 제거 시 정보 보존**: 병합 시 severity는 최고값, confidence는 최고값을 채택하여 정보가 유실되지 않도록 한다
 
 ## 연관 스킬

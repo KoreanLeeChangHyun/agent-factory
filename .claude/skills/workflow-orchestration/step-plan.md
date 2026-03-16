@@ -141,7 +141,7 @@ validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""
 
 사용자 확인 없이 즉시 Step 2c로 진행합니다. AskUserQuestion을 호출하지 않습니다.
 
-> **Post-Return Silence Rules**와 정합: 오케스트레이터 SKILL.md L197 "PLAN done → AskUserQuestion Prohibited" 규칙은 `autoApprove=true`(기본값) 상태에서 적용됩니다.
+> **Post-Return Silence Rules**와 정합: 오케스트레이터 SKILL.md "Post-Return Silence Rules" 섹션의 "PLAN done" 행에 명시된 AskUserQuestion Prohibited 규칙은 `autoApprove=true`(기본값) 상태에서 적용됩니다.
 
 ### 2b-2. autoApprove=false 분기
 
@@ -165,7 +165,7 @@ AskUserQuestion(
 | 선택 | 동작 |
 |------|------|
 | **승인** | 즉시 Step 2c로 진행 |
-| **수정** | planner를 revise 모드로 재호출 → 2a-Post 재실행 → Step 2b 재진입 (참조: planner SKILL.md "revise 모드 수신 처리" 섹션) |
+| **수정** | planner를 revise 모드로 재호출 → 2a-Post 재실행 → Step 2b 재진입 (참조: `workflow-agent-planner SKILL.md "revise 모드 수신 처리" 섹션`) |
 | **중지** | `flow-update status <registryKey> CANCELLED` 실행 후 오케스트레이터 turn 종료 |
 
 > **"수정" 동작 상세:** 사용자가 티켓 파일에 수정 피드백을 작성한 후 "수정"을 선택하면, 오케스트레이터는 아래 의사코드로 planner를 revise 모드로 재호출합니다:
@@ -177,12 +177,16 @@ AskUserQuestion(
 > request: <request>
 > workDir: <workDir>
 > mode: revise
-> feedback: <사용자가 티켓 파일에 작성한 피드백. 없으면 빈 문자열>
+> feedback: <AskUserQuestion "수정" 선택 시 사용자가 입력한 응답 텍스트. 입력하지 않은 경우 빈 문자열>
 > ")
 > ```
 >
+> **feedback 전달 방법:** AskUserQuestion의 "수정" 선택지에 대한 사용자 응답 텍스트가 feedback 파라미터로 전달됩니다. 사용자가 응답 텍스트를 입력하지 않은 경우 빈 문자열(`""`)을 전달하며, 이때 planner는 `user_prompt.txt`를 재참조하여 자체 판단으로 계획을 개선합니다.
+>
 > planner 반환 후 2a-Post(plan_validator + flow-step end)를 재실행하고 Step 2b로 다시 진입합니다.
-> planner revise 모드 처리 절차는 `planner SKILL.md의 "revise 모드 수신 처리" 섹션`을 참조하세요.
+> planner revise 모드 처리 절차는 `workflow-agent-planner SKILL.md "revise 모드 수신 처리" 섹션`을 참조하세요.
+>
+> **재시도 정책:** Step 2b "수정" 루프는 사용자 주도 루프이므로 재시도 상한 없음. 사용자가 "승인" 또는 "중지"를 선택할 때까지 반복 허용합니다. (Step 2c의 자동 루프 최대 3회 제한과 구별됩니다.)
 
 ## Step 2c: PLAN - Skill Mapping Validation Loop
 
@@ -215,7 +219,7 @@ skill_mapper_exit=$?
 
 1. `retry_count` 증가
 2. `[WARN] skill_mapper 검증 실패 (시도 {retry_count}/3): {skill_mapper_output의 stderr}` 로그 출력
-3. planner를 revise 모드로 재호출하여 스킬 매핑 수정 요청 (참조: `planner SKILL.md의 "revise 모드 수신 처리" 섹션`):
+3. planner를 revise 모드로 재호출하여 스킬 매핑 수정 요청 (참조: `workflow-agent-planner SKILL.md "revise 모드 수신 처리" 섹션`):
 
 ```
 Task(subagent_type="planner", prompt="

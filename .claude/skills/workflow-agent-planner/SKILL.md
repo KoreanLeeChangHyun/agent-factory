@@ -505,16 +505,20 @@ planner가 `mode: revise`로 호출될 때의 처리 절차입니다.
 
 | 트리거 | feedback 내용 | 수정 대상 |
 |--------|-------------|---------|
-| step-plan.md Step 2b "수정" 선택 | 사용자가 티켓 파일에 작성한 피드백 또는 빈 문자열 | 계획서 전반 (사용자 피드백 반영) |
-| step-plan.md Step 2c 스킬 매핑 검증 실패 | `skill_mapper.py` stderr (스킬 미배정/존재하지 않는 스킬명) | 작업 목록 테이블의 `스킬` 컬럼 수정 |
+| step-plan.md "Step 2b: PLAN - Auto-Approve Gate" 섹션 "수정" 선택 | 사용자가 티켓 파일에 작성한 피드백 또는 빈 문자열 | 계획서 전반 (사용자 피드백 반영) |
+| step-plan.md "Step 2c: PLAN - Skill Mapping Validation Loop" 섹션 스킬 매핑 검증 실패 | `skill_mapper.py` stderr (스킬 미배정/존재하지 않는 스킬명) | 작업 목록 테이블의 `스킬` 컬럼 수정 |
 
-> **참조:** 오케스트레이터가 revise 모드를 호출하는 시점과 방식은 `step-plan.md Step 2b` 및 `Step 2c-2`를 참조하세요.
+> **참조:** 오케스트레이터가 revise 모드를 호출하는 시점과 방식은 step-plan.md "Step 2b: PLAN - Auto-Approve Gate" 섹션 및 "Step 2c: PLAN - Skill Mapping Validation Loop" 섹션의 2c-2를 참조하세요.
+
+> **NOTE - 재시도 정책 차이:**
+> - **Step 2b (사용자 주도 루프):** 재시도 상한 없음. 사용자가 "승인" 또는 "중지"를 선택할 때까지 반복 허용.
+> - **Step 2c (자동 루프):** 최대 3회 제한. `skill_mapper.py` 검증 실패 시 자동으로 revise 재호출하며, 3회 초과 시 워크플로우 중단.
 
 ### .context.json 업데이트 및 최종 컨펌
 
 계획서 저장 후 .context.json 업데이트 및 최종 컨펌 절차는 오케스트레이터(workflow-orchestration)가 수행합니다. planner는 계획서 작성까지만 담당합니다.
 
-오케스트레이터는 `autoApprove` 값에 따라 다음과 같이 분기합니다 (상세: `step-plan.md Step 2b` 참조):
+오케스트레이터는 `autoApprove` 값에 따라 다음과 같이 분기합니다 (상세: step-plan.md "Step 2b: PLAN - Auto-Approve Gate" 섹션 참조):
 
 | `autoApprove` 값 | 오케스트레이터 동작 |
 |-----------------|------------------|

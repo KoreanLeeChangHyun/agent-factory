@@ -12,7 +12,7 @@ LLM 호출 없음 (순수 IO).
   python3 kanban.py delete <ticket>
   python3 kanban.py add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>" [--workdir <path>] [--result "<text>"]
   python3 kanban.py update-title <ticket> <title>
-  python3 kanban.py update-subnumber <ticket> --id <N> --workflow <W-NNN>
+  python3 kanban.py update-subnumber <ticket> --id <N>
   python3 kanban.py archive-subnumber <ticket>
 
 서브커맨드:
@@ -23,7 +23,7 @@ LLM 호출 없음 (순수 IO).
   add-subnumber     티켓 XML에 새 subnumber 항목을 추가한다
   archive-subnumber active subnumber를 submit에서 history로 이동한다
   update-title      티켓 제목을 갱신한다
-  update-subnumber  기존 subnumber의 workflow 필드를 갱신한다
+  update-subnumber  기존 subnumber의 result 내부 필드를 갱신한다
 
 티켓 번호 형식:
   T-NNN, NNN, #N 형식을 모두 지원하며 내부적으로 T-NNN으로 정규화한다.
@@ -489,7 +489,7 @@ def _update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any])
         _err(f"subnumber id={subnumber_id}를 찾을 수 없습니다: {filepath}")
 
     # result 래퍼 내부 필드 분류
-    result_inner_fields = {"workflow"}
+    result_inner_fields = {"workflow", "registrykey", "plan", "report", "workdir"}
     result_updates: dict[str, str] = {}
     other_updates: dict[str, str] = {}
 
@@ -870,16 +870,20 @@ def cmd_add_subnumber(
 def cmd_update_subnumber(
     ticket_number: str,
     subnumber_id: int,
-    workflow: str = "",
+    registrykey: str = "",
+    plan: str = "",
+    report: str = "",
+    workdir: str = "",
 ) -> None:
-    """기존 subnumber의 result 내부 workflow 필드를 갱신한다.
-
-    result 래퍼 내부의 workflow(W-NNN 형식)를 갱신한다.
+    """기존 subnumber의 result 내부 필드를 갱신한다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
         subnumber_id: 갱신할 subnumber ID.
-        workflow: 갱신할 워크플로우 번호 (W-NNN 형식, result 내부).
+        registrykey: 워크플로우 registryKey (YYYYMMDD-HHMMSS 형식).
+        plan: plan.md 상대 경로.
+        report: report.md 상대 경로.
+        workdir: 워크플로우 산출물 디렉터리 상대 경로.
 
     Raises:
         SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
@@ -889,11 +893,17 @@ def cmd_update_subnumber(
         _err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
 
     updates: dict[str, Any] = {}
-    if workflow:
-        updates["workflow"] = workflow
+    if registrykey:
+        updates["registrykey"] = registrykey
+    if plan:
+        updates["plan"] = plan
+    if report:
+        updates["report"] = report
+    if workdir:
+        updates["workdir"] = workdir
 
     if not updates:
-        _err("갱신할 필드가 없습니다. --workflow를 지정하세요.", 2)
+        _err("갱신할 필드가 없습니다.", 2)
 
     _update_subnumber(ticket_file, subnumber_id, updates)
     print(f"{ticket_number}: subnumber id={subnumber_id} 갱신됨")
@@ -964,10 +974,13 @@ def _build_parser() -> argparse.ArgumentParser:
     update_alias.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
 
     # update-subnumber 서브커맨드
-    update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 result 내부 workflow 필드를 갱신한다")
+    update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 result 내부 필드를 갱신한다")
     update_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
     update_sub_parser.add_argument("--id", dest="subnumber_id", required=True, type=int, help="갱신할 subnumber ID")
-    update_sub_parser.add_argument("--workflow", default="", help="워크플로우 번호 W-NNN 형식")
+    update_sub_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
+    update_sub_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
+    update_sub_parser.add_argument("--report", default="", help="report.md 상대 경로")
+    update_sub_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
 
     return parser
 
@@ -1046,7 +1059,10 @@ def main() -> None:
         cmd_update_subnumber(
             ticket,
             subnumber_id=args.subnumber_id,
-            workflow=args.workflow,
+            registrykey=args.registrykey,
+            plan=args.plan,
+            report=args.report,
+            workdir=args.workdir,
         )
 
 
