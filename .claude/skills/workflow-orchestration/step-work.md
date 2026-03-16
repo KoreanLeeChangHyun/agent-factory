@@ -28,14 +28,46 @@
 ## Explorer Call Pattern
 
 > **Explorer Agent-Skill Binding**
-> - Agent: `explorer` (model: sonnet, maxTurns: 30)
-> - Skill: `workflow-agent-explorer` (항상 바인딩)
+> - Agent: `explorer` (model: sonnet, maxTurns: 30) — 코드+웹 통합 탐색 (fallback)
+> - Agent: `explorer-file-haiku` (model: haiku, maxTurns: 20) — 코드베이스 단순 탐색 (저비용)
+> - Agent: `explorer-file-sonnet` (model: sonnet, maxTurns: 30) — 코드베이스 심층 분석
+> - Agent: `explorer-web-sonnet` (model: sonnet, maxTurns: 30) — 웹 전용 정보 수집
+> - Skill: `workflow-agent-explorer` (모든 변형에 항상 바인딩)
 > - Task prompt: `command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>`
 
-Explorer는 WORK Step에서 Worker와 동일 레벨로 호출되는 탐색 전용 서브에이전트입니다. Planner가 계획서에서 서브에이전트 타입을 `Explorer`로 지정한 태스크에 대해 호출합니다.
+Explorer는 WORK Step에서 Worker와 동일 레벨로 호출되는 탐색 전용 서브에이전트입니다. Planner가 계획서에서 서브에이전트 타입을 `explorer` 또는 `explorer-file-haiku`, `explorer-file-sonnet`, `explorer-web-sonnet` 중 하나로 지정한 태스크에 대해 호출합니다.
 
-**Explorer 호출 형식:**
+**agentType 허용 값 (6종):**
+- `worker-opus` — 복잡한 코드 생성/리팩토링
+- `worker-sonnet` — 일반 구현/수정
+- `explorer` — 코드+웹 통합 탐색 (fallback)
+- `explorer-file-haiku` — 코드베이스 단순 탐색 (파일 스캔, 패턴 검색)
+- `explorer-file-sonnet` — 코드베이스 심층 분석 (아키텍처, 설계 패턴)
+- `explorer-web-sonnet` — 웹 전용 정보 수집 (기술 문서, API, 외부 서비스)
+
+**Explorer 변형 디스패치 규칙:**
+
+계획서 서브에이전트 컬럼에 지정된 변형에 따라 호출 형식의 `subagent_type`만 변경합니다. Task prompt 형식은 동일합니다.
+
+| 계획서 서브에이전트 컬럼 값 | 호출 시 subagent_type | 탐색 범위 |
+|-------------------------|---------------------|---------|
+| `explorer-file-haiku` | `"explorer-file-haiku"` | 코드베이스 단순 탐색 |
+| `explorer-file-sonnet` | `"explorer-file-sonnet"` | 코드베이스 심층 분석 |
+| `explorer-web-sonnet` | `"explorer-web-sonnet"` | 웹 전용 탐색 |
+| `explorer` | `"explorer"` | 코드+웹 통합 탐색 |
+
+**Explorer 호출 형식 (변형별):**
 ```
+# 코드베이스 단순 탐색 (저비용)
+Task(subagent_type="explorer-file-haiku", prompt="command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>")
+
+# 코드베이스 심층 분석
+Task(subagent_type="explorer-file-sonnet", prompt="command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>")
+
+# 웹 전용 정보 수집
+Task(subagent_type="explorer-web-sonnet", prompt="command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>")
+
+# 코드+웹 통합 탐색 (fallback)
 Task(subagent_type="explorer", prompt="command: <command>, workId: <workId>, taskId: <WXX>, planPath: <planPath>, workDir: <workDir>")
 ```
 
@@ -51,13 +83,13 @@ flow-update task-start <registryKey> <taskId>
 
 **Worker와의 차이점:**
 
-| 항목 | Worker | Explorer |
-|------|--------|----------|
-| 서브에이전트 타입 | `worker-opus` / `worker-sonnet` | `explorer` |
+| 항목 | Worker | Explorer (모든 변형) |
+|------|--------|---------------------|
+| 서브에이전트 타입 | `worker-opus` / `worker-sonnet` | `explorer` / `explorer-file-haiku` / `explorer-file-sonnet` / `explorer-web-sonnet` |
 | 스킬 | workflow-agent-worker + command skills | workflow-agent-explorer |
 | 역할 | 코드 수정/생성, 테스트 실행 | 코드 탐색, 웹 조사, 정보 수집 |
 | Edit 도구 | 보유 | 미보유 (코드 수정 불가) |
-| 모델 | opus / sonnet (태스크 복잡도별) | sonnet (비용-품질 균형) |
+| 모델 | opus / sonnet (태스크 복잡도별) | haiku (file-haiku) / sonnet (그 외) |
 
 **병렬 호출 예시 (Worker + Explorer 혼합):**
 ```bash
@@ -66,7 +98,7 @@ flow-update task-start <registryKey> W01 W02 W03
 ```
 ```
 Task(subagent_type="worker-opus", prompt="command: implement, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>")
-Task(subagent_type="explorer", prompt="command: implement, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
+Task(subagent_type="explorer-file-haiku", prompt="command: implement, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
 Task(subagent_type="worker-sonnet", prompt="command: implement, workId: <workId>, taskId: W03, planPath: <planPath>, workDir: <workDir>")
 ```
 
@@ -84,7 +116,7 @@ WORK Step 진입 후, 오케스트레이터는 `<workDir>/plan.md`를 **1회만*
 | `phase` | Phase 할당 (Phase 0, Phase 1, Phase 2, ...) |
 | `dependencies` | 종속성 (dependency chain) |
 | `parallelism` | 병렬/순차 여부 (parallel/sequential) |
-| `agentType` | 서브에이전트 타입 (worker-opus/worker-sonnet/explorer) |
+| `agentType` | 서브에이전트 타입 (worker-opus/worker-sonnet/explorer/explorer-file-haiku/explorer-file-sonnet/explorer-web-sonnet) |
 | `skills` | 스킬 컬럼 값 (계획서에 명시된 전문화+프로젝트 스킬) |
 
 > **위 6개 필드 외 계획서 내용(작업 설명, 복잡도, 대상 파일 등)은 Worker가 직접 참조합니다. 오케스트레이터 컨텍스트에 보관하지 않습니다.**

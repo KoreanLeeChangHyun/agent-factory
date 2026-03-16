@@ -286,7 +286,7 @@ def main() -> None:
     # -- Board port --
     board_port = ""
     if cwd:
-        port_file = Path(cwd) / ".board.port"
+        port_file = Path(cwd) / ".kanban" / ".board.port"
         try:
             board_port = port_file.read_text(encoding="utf-8").strip()
         except (FileNotFoundError, OSError):

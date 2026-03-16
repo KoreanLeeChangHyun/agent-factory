@@ -37,6 +37,19 @@ from flow.tmux_utils import (  # noqa: E402
     WINDOW_PREFIX_P as _WINDOW_PREFIX_P,
     MAIN_WINDOW_DEFAULT,
 )
+from flow.flow_logger import append_log as _fl_append_log, resolve_work_dir_for_logging as _fl_resolve  # noqa: E402
+
+# ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
+
+def _log(level: str, message: str) -> None:
+    """workflow.log에 로그를 기록한다. abs_work_dir 해석 실패 시 조용히 건너뛴다."""
+    try:
+        work_dir = _fl_resolve()
+        if work_dir:
+            _fl_append_log(work_dir, level, message)
+    except Exception:
+        pass
+
 
 # 폴링 설정
 _POLL_INTERVAL_SECONDS: float = 1.0
@@ -231,6 +244,8 @@ def cmd_launch(ticket_id: str, command: str) -> int:
     Returns:
         exit code: 0=성공(LAUNCH 또는 INLINE), 1=에러
     """
+    _log("INFO", f"tmux_launcher: cmd_launch start ticket_id={ticket_id}")
+
     # 비tmux 환경: 인라인 실행 폴백 신호
     if not _is_in_tmux():
         print("INLINE: 비tmux 환경, 인라인 실행 필요")
@@ -250,6 +265,7 @@ def cmd_launch(ticket_id: str, command: str) -> int:
     if not window_already_exists:
         # 새 윈도우 생성
         if not _create_window(window_name):
+            _log("ERROR", f"tmux_launcher: window creation failed window={window_name}")
             print(f"[ERROR] {window_name} 윈도우 생성 실패", file=sys.stderr)
             return 1
 
@@ -257,6 +273,7 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         if not _poll_for_prompt(window_name):
             # 타임아웃: 윈도우 kill 후 에러 반환
             _kill_window(window_name)
+            _log("ERROR", f"tmux_launcher: prompt not detected in {window_name} after {_POLL_MAX_RETRIES}s, window killed")
             print(
                 f"[ERROR] {window_name} 윈도우에서 {_POLL_MAX_RETRIES}초 내 프롬프트 미감지, 윈도우 종료",
                 file=sys.stderr,
@@ -268,6 +285,7 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         print(f"[ERROR] {window_name} 윈도우에 명령 전송 실패", file=sys.stderr)
         return 1
 
+    _log("INFO", f"tmux_launcher: cmd_launch complete window={window_name}")
     print(f"LAUNCH: {window_name} 윈도우에서 실행 중")
     return 0
 
@@ -283,6 +301,7 @@ def cmd_cleanup(ticket_id: str) -> int:
     Returns:
         exit code: 항상 0 (멱등성 보장)
     """
+    _log("INFO", f"tmux_launcher: cmd_cleanup start ticket_id={ticket_id}")
     window_name = f"{_WINDOW_PREFIX_P}{ticket_id}"
     if _window_exists(window_name):
         _kill_window(window_name)

@@ -26,6 +26,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from data.constants import KST, ZOMBIE_TTL_HOURS, TERMINAL_STEPS, TERMINAL_PHASES
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 _KST = KST
 _TTL_HOURS = ZOMBIE_TTL_HOURS
@@ -101,7 +102,7 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
         return False
 
 
-def _step1_mark_stale(workflow_root: str) -> None:
+def _step1_mark_stale(workflow_root: str) -> int:
     """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환한다.
 
     중첩 구조(.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json)와
@@ -109,9 +110,12 @@ def _step1_mark_stale(workflow_root: str) -> None:
 
     Args:
         workflow_root: .workflow 디렉터리 절대 경로
+
+    Returns:
+        STALE로 전환된 워크플로우 수.
     """
     if not os.path.isdir(workflow_root):
-        return
+        return 0
 
     now = datetime.now(_KST)
     stale_count = 0
@@ -147,6 +151,8 @@ def _step1_mark_stale(workflow_root: str) -> None:
     if stale_count > 0:
         print(f"[INFO] zombie cleanup: {stale_count} workflow(s) marked as STALE", file=sys.stderr)
 
+    return stale_count
+
 
 def main() -> None:
     """CLI 진입점. project_root를 인자로 받아 좀비 워크플로우를 정리한다.
@@ -162,7 +168,14 @@ def main() -> None:
 
     workflow_root = os.path.join(project_root, ".workflow")
 
-    _step1_mark_stale(workflow_root)
+    _log_dir = resolve_work_dir_for_logging(project_root)
+    if _log_dir:
+        append_log(_log_dir, "INFO", "garbage_collect: start")
+
+    stale_count = _step1_mark_stale(workflow_root)
+
+    if _log_dir and stale_count > 0:
+        append_log(_log_dir, "INFO", f"garbage_collect: {stale_count} workflows marked STALE")
 
 
 if __name__ == "__main__":

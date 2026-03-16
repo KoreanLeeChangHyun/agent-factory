@@ -57,6 +57,7 @@ _PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."
 
 from data.constants import CHAIN_MAX_RETRY, CHAIN_SEPARATOR  # noqa: E402
 from flow.tmux_utils import MAIN_WINDOW_DEFAULT, WINDOW_PREFIX_P  # noqa: E402
+from flow.flow_logger import append_log as _fl_append_log  # noqa: E402
 
 # ─── 경로 상수 ──────────────────────────────────────────────────────────────
 KANBAN_PY: str = os.path.join(_SCRIPT_DIR, "kanban.py")
@@ -106,6 +107,45 @@ def _log(level: str, message: str) -> None:
             print(formatted, file=_log_handle, flush=True)
         except Exception:
             pass
+
+
+# ─── workflow.log 헬퍼 ──────────────────────────────────────────────────────
+
+_wf_work_dir: str | None = None  # prev_report_path에서 해석한 abs_work_dir
+
+
+def _init_wf_log(prev_report_path: str) -> None:
+    """prev_report_path의 상위 디렉터리에서 abs_work_dir을 추론하여 _wf_work_dir에 설정한다.
+
+    chain_launcher.py는 finalization.py에서 백그라운드로 실행되므로
+    WORKFLOW_WORK_DIR 환경변수가 없을 수 있다. prev_report_path를 통해
+    abs_work_dir을 직접 추론한다.
+
+    Args:
+        prev_report_path: 이전 스테이지 report.md 절대 경로.
+    """
+    global _wf_work_dir
+    try:
+        # prev_report_path: <abs_work_dir>/report.md
+        candidate = os.path.dirname(os.path.abspath(prev_report_path))
+        if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, "status.json")):
+            _wf_work_dir = candidate
+            return
+        # 1단계 상위 탐색 (report가 서브디렉터리에 있는 경우 폴백)
+        candidate2 = os.path.dirname(candidate)
+        if os.path.isdir(candidate2) and os.path.exists(os.path.join(candidate2, "status.json")):
+            _wf_work_dir = candidate2
+    except Exception:
+        pass
+
+
+def _wf_log(level: str, message: str) -> None:
+    """workflow.log에 추가로 이벤트를 기록한다. 실패 시 조용히 건너뛴다."""
+    try:
+        if _wf_work_dir:
+            _fl_append_log(_wf_work_dir, level, message)
+    except Exception:
+        pass
 
 
 # ─── tmux 유틸 ──────────────────────────────────────────────────────────────
@@ -336,6 +376,7 @@ def launch_next_stage(
     Returns:
         0=성공, 1=실패
     """
+    _wf_log("INFO", f"chain_launcher: launch_next_stage start ticket={ticket_number} remaining={remaining_chain}")
     window_name = f"{WINDOW_PREFIX_P}{ticket_number}"
     ticket_num_int = _extract_ticket_number_int(ticket_number)
 
@@ -408,6 +449,7 @@ def launch_next_stage(
 
         if not _create_window(window_name):
             _log("ERROR", f"window creation failed: {window_name}")
+            _wf_log("ERROR", f"chain_launcher: window creation failed window={window_name}")
             current_retry, should_continue = _increment_retry(current_retry, ticket_number)
             if should_continue:
                 continue
@@ -416,6 +458,7 @@ def launch_next_stage(
         _log("INFO", f"polling for prompt in {window_name}")
         if not _poll_for_prompt(window_name):
             _log("ERROR", f"prompt not detected in {window_name} after {_PROMPT_POLL_MAX}s")
+            _wf_log("ERROR", f"chain_launcher: prompt not detected window={window_name} timeout={_PROMPT_POLL_MAX}s")
             _kill_window(window_name)
             current_retry, should_continue = _increment_retry(current_retry, ticket_number)
             if should_continue:
@@ -433,11 +476,13 @@ def launch_next_stage(
             break
 
         _log("INFO", f"chain stage launched successfully: ticket={ticket_number} next={remaining_chain}")
+        _wf_log("INFO", f"chain_launcher: launch_next_stage complete ticket={ticket_number} next={remaining_chain}")
         return 0
 
     # 루프 탈출: 재시도 소진
     _log("ERROR", f"max retry exceeded ({CHAIN_MAX_RETRY}), chain aborted: ticket={ticket_number}")
     _log("ERROR", f"수동으로 다음 스테이지를 시작하려면: /wf -s {ticket_num_int}")
+    _wf_log("ERROR", f"chain_launcher: launch_next_stage failed max_retry_exceeded ticket={ticket_number}")
     return 1
 
 
@@ -478,6 +523,9 @@ def main() -> None:
     parser.add_argument("--retry-count", type=int, default=0, help="현재 재시도 횟수 (기본값: 0)")
 
     args = parser.parse_args()
+
+    # workflow.log 헬퍼 초기화 (prev_report_path에서 abs_work_dir 추론)
+    _init_wf_log(args.prev_report_path)
 
     exit_code = launch_next_stage(
         ticket_number=args.ticket_number,

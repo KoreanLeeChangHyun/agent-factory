@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Code Workflow</title>
-<link rel="stylesheet" href="board.css">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/kanban.css">
+<link rel="stylesheet" href="css/viewer.css">
+<link rel="stylesheet" href="css/workflow.css">
 </head>
 <body data-server-no-reload>
 
@@ -31,13 +35,12 @@
 <script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script>
 <link id="hljs-theme-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
 <link id="hljs-theme-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" media="(prefers-color-scheme: light)">
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/javascript.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/typescript.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/python.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/css.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/xml.min.js"></script>
-<script>if (typeof hljs !== 'undefined') { hljs.configure({ ignoreUnescapedHTML: true }); }</script>
-<script src="board.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';var loaded=0;langs.forEach(function(lang){var s=document.createElement('script');s.src=base+lang+'.min.js';s.onload=function(){loaded++;if(loaded===langs.length){hljs.configure({ignoreUnescapedHTML:true});}};document.head.appendChild(s);});})();"></script>
+<script src="js/common.js"></script>
+<script src="js/kanban.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/workflow.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/sse.js"></script>
 </body>
 </html>

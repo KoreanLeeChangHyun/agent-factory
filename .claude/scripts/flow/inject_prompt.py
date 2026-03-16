@@ -22,6 +22,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 from common import resolve_project_root
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
 from flow.tmux_utils import (
     get_current_window_name,
     WINDOW_PREFIX_P,
@@ -72,9 +73,15 @@ def main() -> None:
     project_root = resolve_project_root()
 
     if _is_workflow_session():
+        session_type = "workflow"
         prompt_file = os.path.join(project_root, ".claude", "prompt", "system-prompt-wf.xml")
     else:
+        session_type = "main"
         prompt_file = os.path.join(project_root, ".claude", "prompt", "system-prompt.xml")
+
+    _log_dir = resolve_work_dir_for_logging(project_root)
+    if _log_dir:
+        append_log(_log_dir, "INFO", f"inject_prompt: session_type={session_type}")
 
     # 파일이 없으면 에러 없이 종료
     if not os.path.exists(prompt_file):

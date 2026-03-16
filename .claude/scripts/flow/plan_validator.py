@@ -27,6 +27,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root, resolve_work_dir
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 PROJECT_ROOT: str = resolve_project_root()
 
@@ -481,6 +482,11 @@ def validate(plan_path: str) -> list[str]:
     if tasks:
         warnings.extend(validate_skill_coverage(tasks))
 
+    if warnings:
+        _work_dir = resolve_work_dir_for_logging()
+        if _work_dir:
+            append_log(_work_dir, "WARN", f"plan_validator: {len(warnings)} warnings found")
+
     return warnings
 
 
@@ -528,6 +534,10 @@ def main() -> None:
     # 상대 경로를 절대 경로로 변환
     if not os.path.isabs(plan_path):
         plan_path = os.path.join(PROJECT_ROOT, plan_path)
+
+    _work_dir = resolve_work_dir_for_logging()
+    if _work_dir:
+        append_log(_work_dir, "INFO", f"plan_validator: start path={plan_path}")
 
     warnings = validate(plan_path)
 

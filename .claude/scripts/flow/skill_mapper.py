@@ -45,6 +45,28 @@ if _flow_dir not in sys.path:
 from plan_validator import parse_md_table_columns
 
 PROJECT_ROOT = resolve_project_root()
+
+
+# ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
+
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """workflow.log에 이벤트를 기록한다. 실패 시 조용히 건너뛴다."""
+    try:
+        # flow_logger가 존재하면 위임
+        from flow_logger import append_log
+        append_log(abs_work_dir, level, message)
+        return
+    except Exception:
+        pass
+    try:
+        from datetime import timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
 SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
 
@@ -684,6 +706,8 @@ def main():
     ctx = load_json_file(os.path.join(work_dir, ".context.json"))
     command = ctx.get("command", "") if isinstance(ctx, dict) else ""
 
+    _append_log(work_dir, "INFO", f"skill_mapper: start registryKey={registry_key}")
+
     if not command:
         print(f"[ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
         sys.exit(1)
@@ -726,8 +750,11 @@ def main():
     # 5.6. 스킬 매핑 유효성 검증 (exit code 2 = 검증 실패)
     valid, reason = validate_skill_mapping(tasks)
     if not valid:
+        _append_log(work_dir, "WARN", f"skill_mapper: validate_skill_mapping 실패 - {reason.splitlines()[0]}")
         print(reason, file=sys.stderr)
         sys.exit(2)
+
+    _append_log(work_dir, "INFO", f"skill_mapper: complete tasks={len(tasks)} skills={len(all_resolved)}")
 
     # 배너 출력
     rel_path = os.path.relpath(output_path, PROJECT_ROOT)

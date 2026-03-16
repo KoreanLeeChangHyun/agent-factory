@@ -390,7 +390,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self) -> None:
         """CORS 헤더를 추가한 후 헤더를 종료한다."""
-        # SSE, poll 외 요청에도 CORS 헤더 추가 (board.html에서의 fetch 호환)
+        # SSE, poll 외 요청에도 CORS 헤더 추가 (index.html에서의 fetch 호환)
         # /events와 /poll은 각 핸들러에서 직접 CORS 헤더를 추가하므로 제외
         if self.path not in ('/events', '/poll'):
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -424,11 +424,11 @@ def _run_server(project_root: str) -> None:
 
     port = resolve_port(project_root)
 
-    port_file = os.path.join(project_root, '.board.port')
-    url_file = os.path.join(project_root, '.board.url')
+    port_file = os.path.join(project_root, '.kanban', '.board.port')
+    url_file = os.path.join(project_root, '.kanban', '.board.url')
 
     def _cleanup_runtime_files() -> None:
-        """런타임 파일 .board.port와 .board.url을 삭제한다."""
+        """런타임 파일 .kanban/.board.port와 .kanban/.board.url을 삭제한다."""
         for path in (port_file, url_file):
             try:
                 os.remove(path)
@@ -448,7 +448,7 @@ def _run_server(project_root: str) -> None:
     with open(port_file, 'w') as f:
         f.write(str(port))
     with open(url_file, 'w') as f:
-        f.write(f'http://127.0.0.1:{port}/.claude/board/board.html')
+        f.write(f'http://127.0.0.1:{port}/.claude/board/index.html')
 
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:
@@ -473,7 +473,7 @@ def _run_server(project_root: str) -> None:
 def main() -> int:
     """서버를 백그라운드로 시작한다.
 
-    .board.port 파일 존재 여부와 해당 포트 활성 상태로 중복 실행을 방지한다.
+    .kanban/.board.port 파일 존재 여부와 해당 포트 활성 상태로 중복 실행을 방지한다.
 
     Returns:
         종료 코드. 서버가 이미 실행 중이면 0, 성공 시 0.
@@ -482,7 +482,7 @@ def main() -> int:
         os.path.join(os.path.dirname(__file__), '..', '..')
     )
 
-    port_file = os.path.join(project_root, '.board.port')
+    port_file = os.path.join(project_root, '.kanban', '.board.port')
 
     if os.path.exists(port_file):
         try:
@@ -493,7 +493,7 @@ def main() -> int:
                 return 0
             else:
                 # stale 파일: 포트가 비활성 상태이므로 파일 삭제 후 새로 시작
-                url_file = os.path.join(project_root, '.board.url')
+                url_file = os.path.join(project_root, '.kanban', '.board.url')
                 for path in (port_file, url_file):
                     try:
                         os.remove(path)
