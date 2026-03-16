@@ -1,0 +1,129 @@
+/* Claude Code Dashboard - Dashboard Styles */
+/* Extracted from board.css: L74-199 */
+
+/* ── Dashboard ── */
+#view-dashboard {
+  padding: 20px 24px;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+}
+#view-dashboard.active { display: flex; }
+
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.dash-card {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 16px 20px;
+  transition: border-color 0.15s;
+  border-left: 3px solid #569cd6;
+}
+
+.dash-card:hover { border-color: #3c3c3c; border-left-color: inherit; }
+
+.dash-card-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #858585;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.dash-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #e0e0e0;
+  margin-top: 6px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.1;
+}
+
+.dash-card-sub {
+  font-size: 11px;
+  color: #5a5a5a;
+  margin-top: 4px;
+}
+
+/* ── Dashboard Sections ── */
+.dash-section {
+  margin-top: 24px;
+  padding: 0;
+}
+
+.dash-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #2d2d2d;
+}
+
+.dash-chart-container {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.dash-chart-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dash-chart-row .dash-chart-container {
+  margin-bottom: 0;
+}
+
+/* ── Dashboard Table Tabs ── */
+.dash-table-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 0;
+}
+
+.dash-table-tab {
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #858585;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.dash-table-tab:hover { color: #cccccc; }
+.dash-table-tab.active { color: #e0e0e0; border-bottom-color: #569cd6; }
+
+.dash-table-panel {
+  display: none;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 12px;
+}
+
+.dash-table-panel.active { display: block; }

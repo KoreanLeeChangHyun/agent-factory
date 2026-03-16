@@ -28,6 +28,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 PROJECT_ROOT = resolve_project_root()
 CATALOG_FILE = os.path.join(PROJECT_ROOT, ".claude", "skills", "skill-catalog.md")
@@ -335,6 +336,11 @@ def main() -> None:
         sys.exit(0)
 
     query = " ".join(sys.argv[1:])
+
+    _work_dir = resolve_work_dir_for_logging()
+    if _work_dir:
+        append_log(_work_dir, "INFO", f"skill_recommender: query={query[:50]}")
+
     results = recommend(query)
 
     if not results:

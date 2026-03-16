@@ -29,8 +29,10 @@ LLM 호출 없음 (순수 IO).
   T-NNN, NNN, #N 형식을 모두 지원하며 내부적으로 T-NNN으로 정규화한다.
 
 상태 전이 규칙:
-  Open → In Progress → Review → Done (정방향)
+  Open → Submit → In Progress → Review → Done (정방향, /wf -s N 실행 시 Submit 경유)
+  Open → In Progress (직접 전환, 하위 호환)
   모든 상태 → Open (재오픈)
+  Submit → In Progress (flow-init 실행 시 자동 전환)
   --force 플래그로 규칙 무시 가능
 
 종료 코드:
@@ -59,11 +61,79 @@ _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+
+# ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
+
+def _resolve_work_dir_for_logging() -> str | None:
+    """현재 워크플로우의 abs_work_dir을 환경변수 또는 .context.json에서 해석한다.
+
+    해석 불가 시 None을 반환하여 로깅 실패가 스크립트 실행에 영향을 주지 않도록 한다.
+    """
+    try:
+        # flow_logger가 존재하면 위임
+        _flow_dir = os.path.dirname(os.path.abspath(__file__))
+        if _flow_dir not in sys.path:
+            sys.path.insert(0, _flow_dir)
+        from flow_logger import resolve_work_dir_for_logging
+        return resolve_work_dir_for_logging()
+    except Exception:
+        pass
+    try:
+        # 환경변수 WORKFLOW_WORK_DIR 직접 참조
+        work_dir = os.environ.get("WORKFLOW_WORK_DIR", "")
+        if work_dir and os.path.isdir(work_dir):
+            return work_dir
+        # .workflow/ 디렉터리에서 가장 최근 활성 워크플로우 탐색
+        workflow_base = os.path.join(_PROJECT_ROOT, ".workflow")
+        if not os.path.isdir(workflow_base):
+            return None
+        import glob as _glob
+        context_files = _glob.glob(os.path.join(workflow_base, "*", "*", "*", ".context.json"))
+        if not context_files:
+            return None
+        context_files.sort(key=os.path.getmtime, reverse=True)
+        for cf in context_files:
+            candidate = os.path.dirname(cf)
+            if os.path.isdir(candidate):
+                return candidate
+    except Exception:
+        pass
+    return None
+
+
+def _log(level: str, message: str) -> None:
+    """workflow.log에 이벤트를 기록한다. abs_work_dir 해석 실패 시 조용히 건너뛴다."""
+    try:
+        # flow_logger가 존재하면 위임
+        _flow_dir = os.path.dirname(os.path.abspath(__file__))
+        if _flow_dir not in sys.path:
+            sys.path.insert(0, _flow_dir)
+        from flow_logger import append_log, resolve_work_dir_for_logging
+        abs_work_dir = resolve_work_dir_for_logging()
+        if abs_work_dir:
+            append_log(abs_work_dir, level, message)
+        return
+    except Exception:
+        pass
+    try:
+        abs_work_dir = _resolve_work_dir_for_logging()
+        if not abs_work_dir:
+            return
+        from datetime import timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
+
 # ─── 상수 ───────────────────────────────────────────────────────────────────
 
 # 컬럼 이름 매핑: CLI 인자 → 컬럼명
 COLUMN_MAP: dict[str, str] = {
     "open": "Open",
+    "submit": "Submit",
     "progress": "In Progress",
     "review": "Review",
     "done": "Done",
@@ -73,7 +143,8 @@ COLUMN_MAP: dict[str, str] = {
 # Done으로의 이동은 done 서브커맨드(force=True)만 허용.
 # move 커맨드로 Done 직접 이동은 불가 (Review → Done도 done 서브커맨드 사용 필요).
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
-    "Open": ["In Progress"],
+    "Open": ["In Progress", "Submit"],
+    "Submit": ["In Progress", "Open"],
     "In Progress": ["Review", "Open"],
     "Review": ["Open", "In Progress"],
     "Done": ["Open"],
@@ -227,6 +298,12 @@ def _parse_ticket_xml(filepath: str) -> dict[str, Any]:
     else:
         current = int(_text(root, "current", "0"))
 
+    # <editing>은 <metadata> 내부에서 파싱. 없으면 false로 폴백
+    if metadata_elem is not None:
+        editing = _text(metadata_elem, "editing", "false") == "true"
+    else:
+        editing = False
+
     # subnumber를 <submit> 및 <history> 래퍼 내부에서 탐색
     subnumbers: list[dict[str, Any]] = []
     sub_sources: list[ET.Element] = []
@@ -283,6 +360,7 @@ def _parse_ticket_xml(filepath: str) -> dict[str, Any]:
         "status": status,
         "current": current,
         "title": title,
+        "editing": editing,
         "subnumbers": subnumbers,
     }
 
@@ -606,6 +684,7 @@ def _err(msg: str, code: int = 1) -> NoReturn:
         msg: 에러 메시지
         code: 종료 코드 (기본값 1)
     """
+    _log("ERROR", f"kanban.py: ERROR {msg}")
     print(f"에러: {msg}", file=sys.stderr)
     sys.exit(code)
 
@@ -685,6 +764,7 @@ def cmd_create(title: str, command: str) -> None:
 
     suffix = f" ({command})" if command else ""
     print(f"{ticket_number}: {title}{suffix}")
+    _log("INFO", f"kanban.py: create {ticket_number} title={title!r}")
 
 
 def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
@@ -729,6 +809,7 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     _update_ticket_status(ticket_file, target_section)
 
     print(f"{ticket_number}: {current_section} → {target_section}")
+    _log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
 
 
 def cmd_done(ticket_number: str) -> None:
@@ -768,6 +849,7 @@ def cmd_done(ticket_number: str) -> None:
         print(f"파일 이동: {src_rel} → .kanban/done/{dst_filename}")
 
     print(f"{ticket_number}: {current_section} → Done")
+    _log("INFO", f"kanban.py: done {ticket_number} {current_section} → Done")
 
 
 def cmd_delete(ticket_number: str) -> None:
@@ -831,6 +913,41 @@ def cmd_update_title(ticket_number: str, title: str) -> None:
     _write_ticket_xml(ticket_file, root)
 
     print(f"{ticket_number}: 제목 → {title}")
+
+
+def cmd_set_editing(ticket_number: str, value: bool) -> None:
+    """티켓 XML의 <metadata> 내부에 <editing> 요소를 생성(없으면) 또는 갱신한다.
+
+    Args:
+        ticket_number: 티켓 번호 (T-NNN 형식).
+        value: True이면 "true", False이면 "false"로 설정.
+
+    Raises:
+        SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
+    """
+    ticket_file = _find_ticket_file(ticket_number)
+    if ticket_file is None:
+        _err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+
+    try:
+        tree = ET.parse(ticket_file)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        _err(f"티켓 파일 파싱 실패 ({ticket_file}): {e}")
+
+    metadata_elem = root.find("metadata")
+    if metadata_elem is None:
+        metadata_elem = ET.SubElement(root, "metadata")
+
+    editing_elem = metadata_elem.find("editing")
+    if editing_elem is None:
+        editing_elem = ET.SubElement(metadata_elem, "editing")
+    editing_elem.text = "true" if value else "false"
+
+    _write_ticket_xml(ticket_file, root)
+
+    flag_str = "--on" if value else "--off"
+    print(f"{ticket_number}: editing → {editing_elem.text} ({flag_str})")
 
 
 def cmd_add_subnumber(
@@ -1001,6 +1118,13 @@ def _build_parser() -> argparse.ArgumentParser:
     archive_sub_parser = subparsers.add_parser("archive-subnumber", help="active subnumber를 submit에서 history로 이동한다")
     archive_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
 
+    # set-editing 서브커맨드
+    set_editing_parser = subparsers.add_parser("set-editing", help="티켓 XML의 <editing> 플래그를 설정한다")
+    set_editing_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    set_editing_group = set_editing_parser.add_mutually_exclusive_group(required=True)
+    set_editing_group.add_argument("--on", action="store_true", help="편집 중 상태로 설정")
+    set_editing_group.add_argument("--off", action="store_true", help="편집 중 상태 해제")
+
     # update-title 서브커맨드 (update는 update-title의 alias)
     update_title_parser = subparsers.add_parser("update-title", help="티켓 제목을 갱신한다")
     update_title_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
@@ -1035,6 +1159,8 @@ def main() -> None:
     """CLI 진입점. 서브커맨드를 파싱하여 해당 핸들러를 호출한다."""
     parser = _build_parser()
     args = parser.parse_args()
+
+    _log("INFO", f"kanban.py: subcommand={args.subcommand}")
 
     if args.subcommand == "create":
         cmd_create(args.title, args.command)
@@ -1085,6 +1211,12 @@ def main() -> None:
             print(f"{ticket}: active subnumber를 history로 이동했습니다")
         else:
             _err(f"{ticket}: active subnumber가 없습니다")
+
+    elif args.subcommand == "set-editing":
+        ticket = _normalize_ticket_number(args.ticket)
+        if ticket is None:
+            _err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        cmd_set_editing(ticket, args.on)
 
     elif args.subcommand in ("update-title", "update"):
         ticket = _normalize_ticket_number(args.ticket)

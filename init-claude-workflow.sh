@@ -366,7 +366,7 @@ create_directories_and_files() {
     print_step "4" "디렉터리 및 파일 생성"
 
     # 디렉터리 생성 (.kanban 기반)
-    local dirs=(".kanban" ".kanban/done" ".uploads" ".workflow/.history" ".workflow/.temp")
+    local dirs=(".kanban" ".kanban/done" ".workflow/.history" ".workflow/.temp")
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
             mkdir -p "$dir"
@@ -435,7 +435,7 @@ setup_settings_json() {
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/board/board.py",
+            "command": "python3 -u .claude/board/server.py",
             "timeout": 5,
             "async": true
           }
@@ -686,7 +686,6 @@ update_gitignore() {
         ".claude/"
         ".claude.env"
         ".claude.env*"
-        ".uploads/"
         ".kanban/"
         "CLAUDE.md"
         "__pycache__/"
@@ -880,7 +879,7 @@ verify_installation() {
     fi
 
     # (h) .gitignore 필수 항목 등록 확인 (.kanban 기준)
-    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".uploads/" ".kanban/" "CLAUDE.md" ".board.port" ".board.url" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/" ".dashboard/")
+    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".kanban/" "CLAUDE.md" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/" ".dashboard/")
     local gitignore_ok=true
     for entry in "${gitignore_entries[@]}"; do
         if ! grep -qxF "$entry" ".gitignore" 2>/dev/null; then

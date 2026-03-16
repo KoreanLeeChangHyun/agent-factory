@@ -32,7 +32,6 @@ LLM 호출 없음 (순수 IO).
   <workDir>/user_prompt.txt   사용자 원문 요청 보존
   <workDir>/.context.json     작업 메타데이터 (title, workId, command 등)
   <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions)
-  <workDir>/files/            .uploads/ 에서 복사된 첨부 파일 (있을 경우)
 """
 
 from __future__ import annotations
@@ -58,22 +57,10 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
+from flow.flow_logger import append_log as _append_log
 
 
 # ─── 유틸리티 ────────────────────────────────────────────────────────────────
-
-
-def _append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """워크플로우 로그에 이벤트를 기록한다."""
-    try:
-        from datetime import datetime, timezone, timedelta
-        kst = timezone(timedelta(hours=9))
-        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
-        log_path = os.path.join(abs_work_dir, "workflow.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] [{level}] {message}\n")
-    except Exception:
-        pass
 
 
 def _err(msg: str, code: int = 1) -> NoReturn:
@@ -324,34 +311,6 @@ def _write_user_prompt(abs_work_dir: str, prompt_content: str) -> None:
         f.write(prompt_content)
 
 
-def _copy_uploads(abs_work_dir: str) -> None:
-    """.uploads/ 디렉터리의 파일을 <workDir>/files/로 복사 후 원본 삭제.
-
-    .uploads/ 디렉터리가 없거나 비어있으면 아무것도 하지 않는다.
-
-    Args:
-        abs_work_dir: 복사 대상 작업 디렉터리 절대 경로
-    """
-    uploads_dir: str = os.path.join(_PROJECT_ROOT, ".uploads")
-    if not os.path.isdir(uploads_dir) or not os.listdir(uploads_dir):
-        return
-    files_dir: str = os.path.join(abs_work_dir, "files")
-    os.makedirs(files_dir, exist_ok=True)
-    for item in os.listdir(uploads_dir):
-        src: str = os.path.join(uploads_dir, item)
-        dst: str = os.path.join(files_dir, item)
-        if os.path.isdir(src):
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-        else:
-            shutil.copy2(src, dst)
-    for item in os.listdir(uploads_dir):
-        item_path: str = os.path.join(uploads_dir, item)
-        if os.path.isdir(item_path):
-            shutil.rmtree(item_path)
-        else:
-            os.unlink(item_path)
-
-
 def _move_ticket_to_in_progress(ticket_number: str, abs_work_dir: str = "") -> None:
     """kanban.py를 호출하여 티켓을 Open → In Progress 상태로 이동한다.
 
@@ -560,7 +519,6 @@ def init_workflow(
 
     _create_work_dir(abs_work_dir)
     _write_user_prompt(abs_work_dir, prompt_content)
-    _copy_uploads(abs_work_dir)
 
     # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:

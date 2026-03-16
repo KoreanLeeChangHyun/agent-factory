@@ -28,6 +28,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 # ─── 스택 감지 규칙 ───────────────────────────────────────────────────────────
 
@@ -582,8 +583,16 @@ def main() -> None:
         print(f"[ERROR] 디렉터리를 찾을 수 없습니다: {project_root}", file=sys.stderr)
         sys.exit(1)
 
+    _log_dir = resolve_work_dir_for_logging()
+    if _log_dir:
+        append_log(_log_dir, "INFO", f"project_skill_detector: start root={project_root}")
+
     # 스택 감지
     result = detect_project_stack(project_root)
+    stacks_detected: list[str] = result["stacks"]  # type: ignore[assignment]
+
+    if _log_dir:
+        append_log(_log_dir, "INFO", f"project_skill_detector: detected stacks={len(stacks_detected)}")
 
     # 감지 결과 출력
     print(format_detection_result(result))
@@ -606,6 +615,8 @@ def main() -> None:
         with open(skill_path, "w", encoding="utf-8") as f:
             f.write(content)
 
+        if _log_dir:
+            append_log(_log_dir, "INFO", f"project_skill_detector: SKILL.md generated path={skill_path}")
         print(f"\nGenerated: {skill_path}")
 
 

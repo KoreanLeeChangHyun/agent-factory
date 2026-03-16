@@ -15,11 +15,14 @@
 사용자 입력에서 command와 플래그를 파싱합니다.
 
 ```
-/wf -s implement      → command=implement, autoApprove=true
-/wf -s implement -n   → command=implement, autoApprove=false
-/wf -s review         → command=review, autoApprove=true
-/wf -s research       → command=research, autoApprove=true
+/wf -s implement           → command=implement, autoApprove=true
+/wf -s implement -n        → command=implement, autoApprove=false
+/wf -s review              → command=review, autoApprove=true
+/wf -s research            → command=research, autoApprove=true
+/wf -s research>implement  → command=research>implement, autoApprove=true
 ```
+
+> **체인 command**: `wf-submit.md`의 체인 파싱 후 전달받은 전체 문자열(예: `research>implement`)을 그대로 `command` 변수에 보관합니다. initialization.py에는 이 전체 문자열을 그대로 전달합니다.
 
 **`-n` 플래그 파싱:**
 
@@ -48,6 +51,8 @@ python3 .claude/scripts/flow/initialization.py <command> "<title>" #N
 
 `#N`은 `/wf -s N`에서 파싱한 티켓 번호입니다 (예: `#5`). 티켓 번호를 반드시 전달하여 정확한 티켓을 초기화합니다.
 
+> **체인 command 전달 규칙**: `<command>` 인자에 체인 command인 경우 **전체 문자열**(예: `research>implement`)을 그대로 전달해야 합니다. 첫 번째 세그먼트만 전달하면 안 됩니다. initialization.py가 `>` 구분자를 감지하여 첫 세그먼트를 실제 실행 command(`effective_command`)로 사용하고, 전체 문자열을 `.context.json`의 `command` 필드에 기록합니다. 이 전체 문자열이 없으면 finalization.py가 체인 후속 스테이지를 발사할 수 없습니다.
+
 **스크립트 수행 내역:**
 
 | 순서 | 작업 | 생성 파일 |
@@ -55,12 +60,11 @@ python3 .claude/scripts/flow/initialization.py <command> "<title>" #N
 | 1 | 티켓 파일(`.kanban/T-NNN.xml`) 읽기 (XML 전체 내용을 문자열로 읽기. 내부 구조: `<metadata>` / `<submit>` / `<history>` 3래퍼 요소. `<metadata>` 내부에 number/title/datetime/status/current 포함. `<subnumber>` 내부에 `<prompt>` 래퍼가 있으며, `<result>` 내부에 workdir/plan/work/report 하위 요소 포함) | - |
 | 2 | 워크플로우 디렉터리 생성 | `<workDir>/` |
 | 3 | 사용자 원문 요청 보존 (티켓 파일 전체 XML을 그대로 복사) | `<workDir>/user_prompt.txt` |
-| 4 | .uploads/ → files/ 복사 + 클리어 | `<workDir>/files/` (첨부 있을 경우) |
-| 5 | 티켓 XML의 `<metadata>/<status>`를 In Progress로 갱신 (`<metadata>` 래퍼의 `<status>` 필드만 사용) | - |
-| 6 | 작업 메타데이터 생성 | `<workDir>/.context.json` |
-| 7 | FSM 상태 초기화 | `<workDir>/status.json` (step: NONE) |
-| 8 | 좀비 워크플로우 정리 | - |
-| 9 | KEEP_COUNT 초과 시 아카이빙 | - |
+| 4 | 티켓 XML의 `<metadata>/<status>`를 In Progress로 갱신 (`<metadata>` 래퍼의 `<status>` 필드만 사용) | - |
+| 5 | 작업 메타데이터 생성 | `<workDir>/.context.json` |
+| 6 | FSM 상태 초기화 | `<workDir>/status.json` (step: NONE) |
+| 7 | 좀비 워크플로우 정리 | - |
+| 8 | KEEP_COUNT 초과 시 아카이빙 | - |
 
 **stdout:** 배너만 출력 (파싱 불필요). 실패 시 `FAIL` + 비정상 종료 코드.
 

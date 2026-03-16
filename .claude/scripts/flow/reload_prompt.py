@@ -2,7 +2,7 @@
 """reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트.
 
 현재 워크플로우의 티켓 파일(.kanban/T-NNN.xml)에서 피드백을 읽어
-user_prompt.txt에 append하고, .uploads/ 파일 복사를 수행한다.
+user_prompt.txt에 append한다.
 
 티켓 파일은 환경변수 TICKET_NUMBER, .context.json의 ticketNumber 필드,
 또는 .kanban/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
@@ -19,7 +19,6 @@ user_prompt.txt에 append하고, .uploads/ 파일 복사를 수행한다.
 수행 작업 (순서대로):
   1. .kanban/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
   2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
-  3. .uploads/ -> <workDir>/files/ 복사 후 .uploads/ 클리어
 
 출력 (stdout):
   피드백 내용 전문
@@ -30,7 +29,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -42,6 +40,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from data.constants import KST
+from flow.flow_logger import append_log
 
 _KST = KST
 
@@ -171,7 +170,6 @@ def main() -> None:
     수행 작업:
       1. .kanban/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
       2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
-      3. .uploads/ 파일을 <workDir>/files/로 복사 후 .uploads/ 클리어
 
     XML 구조 호환성 주석:
         티켓 파일(.kanban/T-NNN.xml) 전체를 문자열로 읽어 user_prompt.txt에
@@ -194,6 +192,8 @@ def main() -> None:
         print(f"[ERROR] workDir not found: {work_dir}", file=sys.stderr)
         sys.exit(1)
 
+    append_log(abs_work_dir, "INFO", f"reload_prompt: start workDir={work_dir}")
+
     ticket_file = _resolve_ticket_file(abs_work_dir)
 
     # --- Step 1: 티켓 파일 읽기 ---
@@ -203,6 +203,7 @@ def main() -> None:
             feedback = f.read()
 
     if not feedback:
+        append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)")
         print("FAIL", flush=True)
         print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)", flush=True)
         sys.exit(0)
@@ -215,32 +216,7 @@ def main() -> None:
         f.write(f"\n\n--- (수정 피드백, {kst_date}) ---\n\n")
         f.write(feedback)
 
-    # --- Step 3: .uploads/ 파일 처리 ---
-    uploads_dir = os.path.join(_PROJECT_ROOT, ".uploads")
-    if os.path.isdir(uploads_dir) and os.listdir(uploads_dir):
-        files_dir = os.path.join(abs_work_dir, "files")
-        os.makedirs(files_dir, exist_ok=True)
-        for item in os.listdir(uploads_dir):
-            src = os.path.join(uploads_dir, item)
-            dst = os.path.join(files_dir, item)
-            try:
-                if os.path.isdir(src):
-                    shutil.copytree(src, dst, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(src, dst)
-            except Exception:
-                pass
-        # .uploads/ 클리어
-        for item in os.listdir(uploads_dir):
-            item_path = os.path.join(uploads_dir, item)
-            try:
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                else:
-                    os.unlink(item_path)
-            except Exception:
-                pass
-
+    append_log(abs_work_dir, "INFO", "reload_prompt: complete")
     print(feedback, end="", flush=True)
 
 

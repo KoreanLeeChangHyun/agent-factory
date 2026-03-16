@@ -1,0 +1,403 @@
+/* Claude Code Dashboard - Workflow Styles */
+/* Extracted from board.css: L668-913, L950-969, L1236-1368 */
+
+/* ── Workflow ── */
+#view-workflow { padding: 0; }
+#view-workflow.active { display: flex; flex-direction: column; }
+
+.wf-container {
+  width: 100%;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.wf-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2d2d2d;
+  background: #181818;
+  flex-shrink: 0;
+}
+
+.wf-search {
+  flex: 1;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e0e0e0;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.wf-search:focus { border-color: #569cd6; }
+.wf-search::placeholder { color: #5a5a5a; }
+
+.wf-search-count {
+  font-size: 11px;
+  color: #5a5a5a;
+  white-space: nowrap;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.wf-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #181818;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.wf-table th {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #858585;
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.wf-table th:not(.wf-th-sortable) {
+  cursor: default;
+}
+
+.wf-sort-inactive {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #3c3c3c;
+}
+
+/* Active sort column indicator (▲ / ▼) rendered as text node after label */
+.wf-th-sortable {
+  color: #858585;
+}
+
+/* Active sort column: make the indicator text stand out */
+.wf-sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #569cd6;
+}
+
+/* Column widths: STEP | NUMBER | COMMAND | TASK | QUERY..LOG (x7) | UPDATE */
+.wf-table th:nth-child(1)  { width: 70px;  min-width: 50px; }   /* STEP */
+.wf-table th:nth-child(2)  { width: 70px;  min-width: 50px; }   /* NUMBER */
+.wf-table th:nth-child(3)  { width: 80px;  min-width: 60px; }   /* COMMAND */
+.wf-table th:nth-child(4)  { min-width: 120px; }                  /* TASK - auto */
+.wf-table th:nth-child(5)  { width: 48px;  min-width: 36px; }   /* QUERY */
+.wf-table th:nth-child(6)  { width: 48px;  min-width: 36px; }   /* PLAN */
+.wf-table th:nth-child(7)  { width: 48px;  min-width: 36px; }   /* WORK */
+.wf-table th:nth-child(8)  { width: 52px;  min-width: 36px; }   /* REPORT */
+.wf-table th:nth-child(9)  { width: 60px;  min-width: 36px; }   /* SUMMARY */
+.wf-table th:nth-child(10) { width: 48px;  min-width: 36px; }   /* USAGE */
+.wf-table th:nth-child(11) { width: 44px;  min-width: 36px; }   /* LOG */
+.wf-table th:nth-child(12) { width: 130px; min-width: 90px; }   /* UPDATE */
+
+/* Table body scroll wrapper */
+.wf-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* List row */
+.wf-row {
+  border-bottom: 1px solid #2d2d2d;
+  transition: background 0.1s;
+}
+
+.wf-row:hover { background: #252526; }
+
+.wf-row td {
+  padding: 6px 12px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.wf-row { cursor: pointer; }
+
+.wf-row-number {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.wf-number-badge {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #569cd6;
+  background: rgba(86,156,214,0.15);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.wf-number-fallback {
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #5a5a5a;
+}
+
+.wf-row-cmd {
+  text-align: center;
+}
+
+.wf-row-cmd .badge {
+  display: inline-block;
+  width: 72px;
+  text-align: center;
+}
+
+.wf-row-title {
+  color: #e0e0e0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0;
+}
+
+.wf-row-step {
+  text-align: center;
+}
+
+.wf-step-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  width: 48px;
+  text-align: center;
+  display: inline-block;
+}
+
+.wf-row-files {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.wf-file-link {
+  font-size: 10px;
+  color: #7bb8e8;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(86,156,214,0.18);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-file-link:hover {
+  background: rgba(86,156,214,0.35);
+  color: #a0d0ff;
+}
+
+/* ── Workflow File Indicator Cells ── */
+.wf-row-file {
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.wf-file-indicator {
+  font-size: 10px;
+  color: #3c3c3c;
+  cursor: default;
+  display: inline-block;
+}
+
+.wf-file-indicator.active {
+  color: #7bb8e8;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.wf-file-indicator.active:hover {
+  color: #a0d0ff;
+}
+
+/* ── Column Resize Handle ── */
+.wf-col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.wf-col-resize-handle:hover {
+  background: rgba(86,156,214,0.4);
+}
+
+.wf-load-more {
+  text-align: center;
+  padding: 12px;
+  font-size: 11px;
+  color: #5a5a5a;
+}
+
+.wf-file-content {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #cccccc;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+/* ── Workflow Detail View ── */
+.wf-detail-container {
+  max-width: 800px;
+}
+
+.wf-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-detail-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.wf-detail-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #858585;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.wf-detail-info-value {
+  font-size: 13px;
+  color: #cccccc;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-detail-transitions {
+  margin-top: 8px;
+}
+
+.wf-detail-transition-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.wf-detail-transition-table th {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #858585;
+  text-align: left;
+  border-bottom: 1px solid #2d2d2d;
+  background: #252526;
+}
+
+.wf-detail-transition-table td {
+  padding: 6px 10px;
+  color: #cccccc;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.wf-detail-transition-time {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #858585;
+  font-size: 11px;
+}
+
+.wf-detail-artifacts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.wf-detail-artifact-link {
+  font-size: 11px;
+  color: #7bb8e8;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(86,156,214,0.18);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-detail-artifact-link:hover {
+  background: rgba(86,156,214,0.35);
+  color: #a0d0ff;
+}
+
+.wf-detail-artifact-absent {
+  font-size: 11px;
+  color: #3c3c3c;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(133,133,133,0.08);
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+/* Workflow result link in ticket viewer */
+.tv-result-workflow {
+  font-weight: 600;
+}
+
+/* WF table: ticket badge next to workflow number */
+.wf-ticket-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-left: 4px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-ticket-badge:hover {
+  background: rgba(78, 201, 176, 0.3);
+  color: #6ee0c8;
+}
+
+/* WF detail view: ticket link in Info section */
+.wf-detail-ticket-link {
+  color: #4ec9b0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.wf-detail-ticket-link:hover {
+  text-decoration: underline solid;
+}

@@ -28,6 +28,13 @@ import re
 import sys
 import os
 
+# 프로젝트 루트 결정 (flow_logger import를 위해)
+_scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from flow.flow_logger import append_log, resolve_work_dir_for_logging
+
 REQUIRED_TAGS = ["goal", "target", "constraints", "criteria"]
 OPTIONAL_TAGS = ["context", "approach", "scope", "reference"]
 
@@ -299,6 +306,10 @@ def main() -> None:
     if not os.path.isabs(prompt_path):
         prompt_path = os.path.join(os.getcwd(), prompt_path)
 
+    _work_dir = resolve_work_dir_for_logging()
+    if _work_dir:
+        append_log(_work_dir, "INFO", f"prompt_validator: start path={prompt_path}")
+
     try:
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_text = f.read()
@@ -307,6 +318,15 @@ def main() -> None:
         sys.exit(1)
 
     result = validate(prompt_text)
+
+    if result["quality_score"] < 0.5:
+        if _work_dir:
+            append_log(
+                _work_dir,
+                "WARN",
+                f"prompt_validator: quality_score={result['quality_score']:.4f} below 0.5 path={prompt_path}",
+            )
+
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0)
 

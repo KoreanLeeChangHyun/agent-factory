@@ -45,22 +45,10 @@ if _scripts_dir not in sys.path:
 
 from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
 from data.constants import CHAIN_SEPARATOR, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
+from flow.flow_logger import append_log as _append_log
 from flow.tmux_utils import WINDOW_PREFIX_P
 
 PROJECT_ROOT: str = resolve_project_root()
-
-
-def _append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """워크플로우 로그에 이벤트를 기록한다."""
-    try:
-        from datetime import datetime, timezone, timedelta
-        kst = timezone(timedelta(hours=9))
-        ts = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S")
-        log_path = os.path.join(abs_work_dir, "workflow.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] [{level}] {message}\n")
-    except Exception:
-        pass
 
 
 # 스크립트 경로
