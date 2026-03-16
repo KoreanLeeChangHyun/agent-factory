@@ -12,8 +12,11 @@ ThreadingHTTPServer 기반 커스텀 서버로, 정적 파일 서빙과 /events 
 
 from __future__ import annotations
 
+import atexit
+import hashlib
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -26,7 +29,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 # Constants
 # ---------------------------------------------------------------------------
 
-PORT: int = 9977
+PORT_RANGE_START: int = 9900
+PORT_RANGE_END: int = 9999
 WATCH_INTERVAL: float = 1.0
 
 # 감시 대상 경로 -> SSE 이벤트 타입 매핑
@@ -37,6 +41,39 @@ WATCH_DIRS: dict[str, str] = {
     os.path.join('.workflow', '.history'): 'workflow',
     '.dashboard': 'dashboard',
 }
+
+
+# ---------------------------------------------------------------------------
+# Dynamic Port Allocation
+# ---------------------------------------------------------------------------
+
+def resolve_port(project_root: str) -> int:
+    """프로젝트 경로 기반으로 9900~9999 범위에서 사용 가능한 포트를 반환한다.
+
+    프로젝트 경로를 MD5 해싱하여 초기 포트를 결정하고, 충돌 시 순차 탐색한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        사용 가능한 포트 번호 (9900~9999 범위)
+
+    Raises:
+        RuntimeError: 9900~9999 범위의 포트가 모두 사용 중인 경우
+    """
+    range_size = PORT_RANGE_END - PORT_RANGE_START + 1
+    hash_bytes = hashlib.md5(project_root.encode()).digest()
+    hash_int = int.from_bytes(hash_bytes[:4], byteorder='big')
+    start_offset = hash_int % range_size
+
+    for i in range(range_size):
+        port = PORT_RANGE_START + (start_offset + i) % range_size
+        if not is_port_in_use(port):
+            return port
+
+    raise RuntimeError(
+        f"포트 {PORT_RANGE_START}~{PORT_RANGE_END} 범위의 모든 포트가 사용 중입니다."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -385,6 +422,34 @@ def _run_server(project_root: str) -> None:
     """
     os.chdir(project_root)
 
+    port = resolve_port(project_root)
+
+    port_file = os.path.join(project_root, '.board.port')
+    url_file = os.path.join(project_root, '.board.url')
+
+    def _cleanup_runtime_files() -> None:
+        """런타임 파일 .board.port와 .board.url을 삭제한다."""
+        for path in (port_file, url_file):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    def _signal_handler(signum: int, frame: object) -> None:
+        """SIGTERM/SIGINT 수신 시 런타임 파일을 정리하고 종료한다."""
+        _cleanup_runtime_files()
+        sys.exit(0)
+
+    atexit.register(_cleanup_runtime_files)
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+
+    # 런타임 파일 생성
+    with open(port_file, 'w') as f:
+        f.write(str(port))
+    with open(url_file, 'w') as f:
+        f.write(f'http://127.0.0.1:{port}/.claude/board/board.html')
+
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:
         """파일 변경 감지 콜백."""
@@ -396,7 +461,7 @@ def _run_server(project_root: str) -> None:
     watcher_thread.start()
 
     # ThreadingHTTPServer 시작
-    server = ThreadingHTTPServer(('0.0.0.0', PORT), BoardHTTPRequestHandler)
+    server = ThreadingHTTPServer(('0.0.0.0', port), BoardHTTPRequestHandler)
     server.daemon_threads = True
     try:
         server.serve_forever()
@@ -408,15 +473,35 @@ def _run_server(project_root: str) -> None:
 def main() -> int:
     """서버를 백그라운드로 시작한다.
 
-    Returns:
-        종료 코드. 포트가 이미 사용 중이면 0, 성공 시 0.
-    """
-    if is_port_in_use(PORT):
-        return 0
+    .board.port 파일 존재 여부와 해당 포트 활성 상태로 중복 실행을 방지한다.
 
+    Returns:
+        종료 코드. 서버가 이미 실행 중이면 0, 성공 시 0.
+    """
     project_root = os.path.normpath(
         os.path.join(os.path.dirname(__file__), '..', '..')
     )
+
+    port_file = os.path.join(project_root, '.board.port')
+
+    if os.path.exists(port_file):
+        try:
+            with open(port_file) as f:
+                recorded_port = int(f.read().strip())
+            if is_port_in_use(recorded_port):
+                # 서버가 이미 실행 중
+                return 0
+            else:
+                # stale 파일: 포트가 비활성 상태이므로 파일 삭제 후 새로 시작
+                url_file = os.path.join(project_root, '.board.url')
+                for path in (port_file, url_file):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+        except (ValueError, OSError):
+            # 파일 읽기 실패 시 stale 처리
+            pass
 
     # 자신을 --serve 모드로 백그라운드 실행
     subprocess.Popen(

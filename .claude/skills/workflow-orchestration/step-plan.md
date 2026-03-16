@@ -197,7 +197,7 @@ AskUserQuestion(
 
 **실행 명령:**
 ```bash
-skill_mapper_output=$(flow-skill-map <workDir>/plan.md 2>&1)
+skill_mapper_output=$(flow-skillmap <registryKey> 2>&1)
 skill_mapper_exit=$?
 ```
 

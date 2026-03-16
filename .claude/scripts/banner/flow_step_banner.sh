@@ -2,12 +2,13 @@
 # flow_step_banner.sh - 워크플로우 단계 배너 출력
 #
 # 사용법:
-#   flow-step start <registryKey>              # Step 시작 배너 (2줄)
+#   flow-step start <registryKey> [phase]      # Step 시작 배너 (2줄)
 #   flow-step end   <registryKey>              # Step 완료 (3줄: 진행+링크+[ASK])
 #   flow-step end   <registryKey> <label>      # Step 완료 (3줄: 진행+링크+[OK])
 #
 # 예시:
 #   flow-step start 20260301-061849
+#   flow-step start 20260301-061849 PLAN
 #   flow-step end   20260301-061849              # [ASK] 모드
 #   flow-step end   20260301-061849 planSubmit   # [OK] 모드
 
@@ -130,12 +131,17 @@ fi
 # ═══════════════════════════════════════════════════════
 if [[ "$SUBCMD" == "start" ]]; then
     REGISTRY_KEY="${2:-}"
+    PHASE_ARG="${3:-}"
     if [[ -z "$REGISTRY_KEY" ]]; then
-        echo "사용법: flow-step start <registryKey>" >&2
+        echo "사용법: flow-step start <registryKey> [phase]" >&2
         exit 0
     fi
 
-    STEP=$(get_current_phase "$REGISTRY_KEY")
+    if [[ -n "$PHASE_ARG" ]]; then
+        STEP="$PHASE_ARG"
+    else
+        STEP=$(get_current_phase "$REGISTRY_KEY")
+    fi
     COLOR=$(get_color "$STEP")
     PROGRESS=$(get_progress "$STEP" "●")
     DATESTAMP=$(TZ='Asia/Seoul' date '+%Y년 %-m월 %-d일')

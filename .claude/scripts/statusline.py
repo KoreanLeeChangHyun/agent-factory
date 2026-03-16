@@ -283,14 +283,26 @@ def main() -> None:
         elif title:
             workflow_display = f" \033[90m{title}{RESET}"
 
+    # -- Board port --
+    board_port = ""
+    if cwd:
+        port_file = Path(cwd) / ".board.port"
+        try:
+            board_port = port_file.read_text(encoding="utf-8").strip()
+        except (FileNotFoundError, OSError):
+            pass
+
+    port_display = f" port:{board_port}" if board_port else ""
+
     # -- Output --
-    # Format: model [PHASE:agent] title branch ctx:bar +added/-removed
+    # Format: model [PHASE:agent] title branch ctx:bar +added/-removed port:NNNN
     line = (
         f"\033[36m{model}\033[0m"
         f"{workflow_display}"
         f"{branch_display}"
         f" {progress_bar}"
         f" \033[32m+{added}\033[0m/\033[31m-{removed}\033[0m"
+        f"{port_display}"
     )
     print(line)
 

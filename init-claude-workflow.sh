@@ -8,6 +8,10 @@ set -euo pipefail
 # 의존성: git, curl, python3, tmux, gh
 # ==============================================================================
 
+# --- Python 최소 버전 ---
+REQUIRED_PYTHON_MAJOR=3
+REQUIRED_PYTHON_MINOR=10
+
 # --- 색상 변수 ---
 if [ -t 1 ]; then
     GREEN=$'\033[0;32m'
@@ -105,6 +109,34 @@ detect_os() {
 }
 
 # ==============================================================================
+# Python 최소 버전 검증
+# ==============================================================================
+check_python_version() {
+    local current_version
+    current_version="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+
+    if python3 -c "import sys; sys.exit(0 if (sys.version_info.major, sys.version_info.minor) >= ($REQUIRED_PYTHON_MAJOR, $REQUIRED_PYTHON_MINOR) else 1)" 2>/dev/null; then
+        return 0
+    fi
+
+    print_error "Python 버전 미달: 현재 $current_version, 최소 요구 ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+    print_info "Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} 이상으로 업그레이드하세요:"
+    case "${DETECTED_OS:-linux}" in
+        macos)
+            print_info "  brew install python@${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            ;;
+        linux)
+            print_info "  sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt-get update"
+            print_info "  sudo apt-get install python${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            ;;
+        *)
+            print_info "  https://www.python.org/downloads/ 에서 Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+ 를 설치하세요"
+            ;;
+    esac
+    exit 1
+}
+
+# ==============================================================================
 # python3 및 tmux 자동 설치
 # ==============================================================================
 install_dependencies() {
@@ -114,6 +146,8 @@ install_dependencies() {
 
     if ! command -v python3 &>/dev/null; then
         missing_deps+=("python3")
+    else
+        check_python_version
     fi
 
     if ! command -v tmux &>/dev/null; then
@@ -755,9 +789,21 @@ verify_installation() {
 
     local failed=0
 
-    # (a) python3 실행 가능 여부
+    # (a) python3 실행 가능 여부 및 최소 버전 검증
     if command -v python3 &>/dev/null; then
-        print_success "python3 실행 가능 ($(python3 --version 2>&1))"
+        local py_version
+        py_version="$(python3 --version 2>&1)"
+        print_success "python3 실행 가능 ($py_version)"
+
+        # 버전 요구사항 검증
+        if python3 -c "import sys; sys.exit(0 if (sys.version_info.major, sys.version_info.minor) >= ($REQUIRED_PYTHON_MAJOR, $REQUIRED_PYTHON_MINOR) else 1)" 2>/dev/null; then
+            print_success "python3 버전 검증 PASS (>= ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR})"
+        else
+            local current_ver
+            current_ver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+            print_error "python3 버전 검증 FAIL: 현재 ${current_ver}, 최소 요구 ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            failed=$((failed + 1))
+        fi
     else
         print_error "python3 명령어를 찾을 수 없습니다"
         failed=$((failed + 1))
@@ -834,7 +880,7 @@ verify_installation() {
     fi
 
     # (h) .gitignore 필수 항목 등록 확인 (.kanban 기준)
-    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".uploads/" ".kanban/" "CLAUDE.md" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/" ".dashboard/")
+    local gitignore_entries=(".workflow/" ".claude/" ".claude.env" ".claude.env*" ".uploads/" ".kanban/" "CLAUDE.md" ".board.port" ".board.url" "__pycache__/" ".temp/" ".temp/*" "temp/" ".vscode/" ".dashboard/")
     local gitignore_ok=true
     for entry in "${gitignore_entries[@]}"; do
         if ! grep -qxF "$entry" ".gitignore" 2>/dev/null; then
