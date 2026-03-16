@@ -82,7 +82,7 @@ Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
 
 ```bash
 # Step 시작 배너
-flow-step start <registryKey>
+flow-step start <registryKey> [phase]
 
 # Step 완료 배너 (● + 링크 + [OK])
 flow-step end <registryKey> [label]
@@ -193,7 +193,7 @@ DONE: `flow-finish <registryKey> 완료 --ticket-number <T-NNN>` → `flow-claud
 
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
-| INIT completed | run initialization.py, extract/retain params, `flow-step start <registryKey>`, status update (NONE->PLAN), planner call | Return summary, progress text, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
+| INIT completed | run initialization.py, extract/retain params, status update (NONE->PLAN), `flow-step start <registryKey>`, planner call | Return summary, progress text, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
 | PLAN done | `flow-step end <registryKey> planSubmit`, 스킬 매핑 검증 루프, WORK 진행 | Plan summary, **AskUserQuestion**[^1], **내부 추론/분석 텍스트 출력** |
 | WORK Phase start | `flow-phase <registryKey> 0` (MUST FIRST), then Phase 0 skill_mapper.py call, then Phase 1~N | Skipping Phase banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
 | WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |

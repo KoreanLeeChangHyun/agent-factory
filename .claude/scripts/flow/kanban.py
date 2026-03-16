@@ -450,13 +450,15 @@ def _update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any])
     """기존 subnumber의 필드를 갱신한다.
 
     <submit> 및 <history> 래퍼 내부의 subnumber를 모두 탐색한다.
-    <result> 래퍼 내부의 하위 요소(workflow)를 갱신한다.
+    <prompt> 래퍼 내부의 하위 요소(goal, target, constraints, criteria, context)를 갱신한다.
+    <result> 래퍼 내부의 하위 요소(workflow, registrykey, plan, report, workdir)를 갱신한다.
 
     Args:
         filepath: 티켓 파일 경로.
         subnumber_id: 갱신할 subnumber ID.
         updates: 갱신할 필드 딕셔너리.
-            result 내부 필드: workflow (W-NNN 형식)
+            prompt 내부 필드: goal, target, constraints, criteria, context
+            result 내부 필드: workflow, registrykey, plan, report, workdir
 
     Raises:
         SystemExit: 파일 읽기/쓰기 실패 또는 subnumber를 찾지 못한 경우.
@@ -488,16 +490,32 @@ def _update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any])
     if target_sub is None:
         _err(f"subnumber id={subnumber_id}를 찾을 수 없습니다: {filepath}")
 
-    # result 래퍼 내부 필드 분류
+    # prompt / result 래퍼 내부 필드 분류
+    prompt_inner_fields = {"goal", "target", "constraints", "criteria", "context"}
     result_inner_fields = {"workflow", "registrykey", "plan", "report", "workdir"}
+    prompt_updates: dict[str, str] = {}
     result_updates: dict[str, str] = {}
     other_updates: dict[str, str] = {}
 
     for field, value in updates.items():
-        if field in result_inner_fields:
+        if field in prompt_inner_fields:
+            prompt_updates[field] = str(value)
+        elif field in result_inner_fields:
             result_updates[field] = str(value)
         else:
             other_updates[field] = str(value)
+
+    # <prompt> 래퍼 내부 필드 갱신
+    if prompt_updates:
+        prompt_elem = target_sub.find("prompt")
+        if prompt_elem is None:
+            prompt_elem = ET.SubElement(target_sub, "prompt")
+        for field, value in prompt_updates.items():
+            existing = prompt_elem.find(field)
+            if existing is not None:
+                existing.text = value
+            else:
+                ET.SubElement(prompt_elem, field).text = value
 
     # <result> 래퍼 내부 필드 갱신
     if result_updates:
@@ -874,8 +892,13 @@ def cmd_update_subnumber(
     plan: str = "",
     report: str = "",
     workdir: str = "",
+    goal: str = "",
+    target: str = "",
+    constraints: str = "",
+    criteria: str = "",
+    context: str = "",
 ) -> None:
-    """기존 subnumber의 result 내부 필드를 갱신한다.
+    """기존 subnumber의 prompt / result 내부 필드를 갱신한다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -884,6 +907,11 @@ def cmd_update_subnumber(
         plan: plan.md 상대 경로.
         report: report.md 상대 경로.
         workdir: 워크플로우 산출물 디렉터리 상대 경로.
+        goal: 작업 목표.
+        target: 작업 대상.
+        constraints: 제약 조건.
+        criteria: 완료 기준.
+        context: 추가 컨텍스트.
 
     Raises:
         SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
@@ -901,6 +929,16 @@ def cmd_update_subnumber(
         updates["report"] = report
     if workdir:
         updates["workdir"] = workdir
+    if goal:
+        updates["goal"] = goal
+    if target:
+        updates["target"] = target
+    if constraints:
+        updates["constraints"] = constraints
+    if criteria:
+        updates["criteria"] = criteria
+    if context:
+        updates["context"] = context
 
     if not updates:
         _err("갱신할 필드가 없습니다.", 2)
@@ -974,13 +1012,18 @@ def _build_parser() -> argparse.ArgumentParser:
     update_alias.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
 
     # update-subnumber 서브커맨드
-    update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 result 내부 필드를 갱신한다")
+    update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 prompt / result 내부 필드를 갱신한다")
     update_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
     update_sub_parser.add_argument("--id", dest="subnumber_id", required=True, type=int, help="갱신할 subnumber ID")
     update_sub_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
     update_sub_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
     update_sub_parser.add_argument("--report", default="", help="report.md 상대 경로")
     update_sub_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
+    update_sub_parser.add_argument("--goal", default="", help="작업 목표")
+    update_sub_parser.add_argument("--target", default="", help="작업 대상")
+    update_sub_parser.add_argument("--constraints", default="", help="제약 조건")
+    update_sub_parser.add_argument("--criteria", default="", help="완료 기준")
+    update_sub_parser.add_argument("--context", default="", help="추가 컨텍스트")
 
     return parser
 
@@ -1063,6 +1106,11 @@ def main() -> None:
             plan=args.plan,
             report=args.report,
             workdir=args.workdir,
+            goal=args.goal,
+            target=args.target,
+            constraints=args.constraints,
+            criteria=args.criteria,
+            context=args.context,
         )
 
 

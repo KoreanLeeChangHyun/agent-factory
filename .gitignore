@@ -13,6 +13,10 @@
 
 CLAUDE.md
 
+# Board runtime files
+.board.port
+.board.url
+
 # Python cache
 __pycache__/
 
