@@ -4,7 +4,7 @@ description: "일반 구현/수정, 중간 복잡도 작업을 위한 Sonnet 워
 model: sonnet
 tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 skills:
-  - workflow-agent-worker
+  - workflow-agent
 maxTurns: 50
 ---
 # Worker Agent
@@ -42,11 +42,11 @@ maxTurns: 50
 - `mode`: 동작 모드 (선택적)
 - `workDir`: 작업 디렉터리 경로 (세션 링크에 사용)
 
-> 상세 절차: `workflow-agent-worker/SKILL.md` 참조
+> 상세 절차: `workflow-agent/SKILL.md` 참조
 
 ## 강제 규칙 참조
 
-아래 환경변수(`.claude.env`)가 `true`일 때 각 강제 규칙이 활성화된다. 상세 지침은 `workflow-agent-worker/SKILL.md` 참조.
+아래 환경변수(`.claude.env`)가 `true`일 때 각 강제 규칙이 활성화된다. 상세 지침은 `workflow-agent/SKILL.md` 참조.
 
 | 환경변수 | 역할 |
 |---------|------|

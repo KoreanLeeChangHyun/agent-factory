@@ -62,7 +62,7 @@
     Board.state.viewerTabs.forEach(function (t) {
       const ac = t.number === Board.state.activeViewerTab ? " vt-tab-active" : "";
       h += '<div class="vt-tab' + ac + '" data-num="' + esc(t.number) + '">';
-      const tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number);
+      const tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number.replace(/^T-/, ""));
       h += '<span class="vt-tab-label">' + esc(tabLabel) + '</span>';
       h += '<span class="vt-tab-close" data-close="' + esc(t.number) + '">&times;</span>';
       h += '</div>';
@@ -493,7 +493,7 @@
 
     h += '<div class="tv-header">';
     h += '<div class="tv-header-top">';
-    h += '<span class="tv-number">' + esc(ticket.number) + "</span>";
+    h += '<span class="tv-number">' + esc(ticket.number.replace(/^T-/, "")) + "</span>";
     h += badge(ticket.status, sc);
     h += "</div>";
     h += '<h1 class="tv-title">' + esc(ticket.title || "(No title)") + "</h1>";

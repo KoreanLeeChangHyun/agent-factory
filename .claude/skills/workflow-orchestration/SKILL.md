@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> REPORT -> DONE 4-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management. SKILL.md serves as navigation hub; detailed guides are split into step-plan.md ~ step-done.md, common-reference.md."
+description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> REPORT -> DONE 4-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -40,13 +40,13 @@ stateDiagram-v2
 
 | Step | Agent | Skill | Return Status | Artifact (Convention) |
 |-------|-------|-------|--------------|----------------------|
-| PLAN | planner | workflow-agent-planner | `상태: 작성완료` | `<workDir>/plan.md` |
-| WORK | worker | workflow-agent-worker + command skills | `상태: 성공\|부분성공\|실패` | `<workDir>/work/WXX-*.md` |
-| WORK | explorer | workflow-agent-explorer | `상태: 성공\|부분성공\|실패` | `<workDir>/work/WXX-*.md` |
-| WORK | validator | workflow-agent-validator | `상태: 통과\|경고\|실패` | `<workDir>/work/validation-report.md` |
-| REPORT | reporter | workflow-agent-reporter | `상태: 완료\|실패` | `<workDir>/report.md` |
+| PLAN | planner | workflow-agent | `상태: 작성완료` | `<workDir>/plan.md` |
+| WORK | worker | workflow-agent + command skills | `상태: 성공\|부분성공\|실패` | `<workDir>/work/WXX-*.md` |
+| WORK | explorer | workflow-agent | `상태: 성공\|부분성공\|실패` | `<workDir>/work/WXX-*.md` |
+| WORK | validator | workflow-agent | `상태: 통과\|경고\|실패` | `<workDir>/work/validation-report.md` |
+| REPORT | reporter | workflow-agent | `상태: 완료\|실패` | `<workDir>/report.md` |
 
-> **Note on worker agent:** The `worker` agent in the table above encompasses two model variants: `worker-opus` (Claude Opus) and `worker-sonnet` (Claude Sonnet). These variants are used interchangeably based on task complexity and resource constraints, but all follow the same `workflow-agent-worker` skill specification and return status format.
+> **Note on worker agent:** `worker-opus` (Claude Opus) and `worker-sonnet` (Claude Sonnet) variants follow the same `workflow-agent` skill specification and return status format.
 
 ---
 
@@ -58,15 +58,11 @@ stateDiagram-v2
 | review | Code review |
 | research | Research/investigation and internal asset analysis |
 
-Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
-
 ## Input Parameters
 
 - `command`: execution command (implement, review, research)
 
 > `/wf` commands use `$ARGUMENTS` for command detection. User requests are handled via `.kanban/T-NNN.xml` ticket files.
->
-> **Ticket file structure (`.kanban/T-NNN.xml`):** 3-section wrapper layout — `<metadata>` wrapper (number/title/datetime/status/current), `<submit>` wrapper (active subnumbers, active=true), `<history>` wrapper (past subnumbers, active removed). Each `<subnumber>` contains `<command>` directly (outside `<prompt>`) and a `<prompt>` wrapper element enclosing goal/target/constraints/criteria/context fields. The `<result>` element contains workdir/plan/work/report child elements.
 >
 > **SSoT XML structure reference:** See [`references/T-NNN.xml`](references/T-NNN.xml) for the canonical ticket file template.
 
@@ -81,29 +77,18 @@ Commands follow the PLAN -> WORK -> REPORT -> DONE step order.
 배너 출력은 `flow-step`/`flow-phase` shell alias로 수행한다. Bash 도구에서 **alias 이름을 그대로** 호출해야 한다.
 
 ```bash
-# Step 시작 배너
-flow-step start <registryKey> [phase]
-
-# Step 완료 배너 (● + 링크 + [OK])
-flow-step end <registryKey> [label]
-
-# WORK Phase 서브배너
-flow-phase <registryKey> <N>
-
-# 상태 업데이트 + 시각화
-flow-update both <registryKey> <agent> <toStep>
-
-# WORK Phase 0 스킬 매핑
-flow-skillmap <registryKey>
-
-# 워크플로우 마무리 (DONE 전용)
-flow-finish <registryKey> 완료|실패 --ticket-number <T-NNN> [--workflow-id <id>]
-flow-claude end <registryKey>
+flow-step start <registryKey> [phase]     # Step 시작 배너
+flow-step end <registryKey> [label]       # Step 완료 배너 (● + 링크 + [OK])
+flow-phase <registryKey> <N>              # WORK Phase 서브배너
+flow-update both <registryKey> <agent> <toStep>  # 상태 업데이트 + 시각화
+flow-skillmap <registryKey>               # WORK Phase 0 스킬 매핑
+flow-finish <registryKey> 완료|실패 --ticket-number <T-NNN> [--workflow-id <id>]  # 워크플로우 마무리
+flow-claude end <registryKey>             # 워크플로우 종료
 ```
 
-> **CRITICAL**: `flow-step`/`flow-phase`는 `.zshrc`에 등록된 shell alias이다. `bash .claude/scripts/banner/flow_claude_banner.sh` 직접 호출 금지.
+> **CRITICAL**: `flow-step`/`flow-phase`는 `.zshrc`에 등록된 shell alias이다. 직접 스크립트 호출 금지.
 
-> **Banner and State Update Call Isolation Rule**: `flow-step`/`flow-phase`/`flow-update` 호출은 반드시 **개별 Bash 도구 호출**로 실행한다. `&&` 또는 `;`로 체이닝 금지. 단, `update_state.py task-status`/`usage-pending`은 동일 Step 내 일괄 등록이므로 `&&` 체이닝 허용.
+> **Banner and State Update Call Isolation Rule**: `flow-step`/`flow-phase`/`flow-update` 호출은 반드시 **개별 Bash 도구 호출**로 실행한다. `&&` 또는 `;`로 체이닝 금지. 단, `update_state.py task-status`/`usage-pending`은 `&&` 체이닝 허용.
 
 **Call Timing:**
 
@@ -117,113 +102,83 @@ flow-claude end <registryKey>
 | WORK end | `flow-step end <registryKey> workDone` |
 | REPORT start | `flow-step start <registryKey>` |
 | REPORT end | `flow-step end <registryKey> reportDone` |
-| DONE (마무리) | `flow-finish <registryKey> 완료\|실패 --ticket-number <T-NNN> [--workflow-id <id>]` |
+| DONE (마무리) | `flow-finish <registryKey> 완료\|실패 --ticket-number <T-NNN>` |
 | DONE (종료) | `flow-claude end <registryKey>` |
 
 **각 step의 오케스트레이터 호출 순서:**
-1. `flow-update both <key> <agent> <toStep>` — 상태 업데이트
-2. `flow-step start <registryKey>` — 시작 배너
+1. `flow-update both <key> <agent> <toStep>` -- 상태 업데이트
+2. `flow-step start <registryKey>` -- 시작 배너
 3. (에이전트 작업 수행)
-4. `flow-step end <registryKey> [label]` — 완료 배너
+4. `flow-step end <registryKey> [label]` -- 완료 배너
 
-> 위 1~3 각 항목은 **개별 Bash 도구 호출**로 실행한다. 단일 Bash 호출에 합치지 않는다.
+> 위 1~3 각 항목은 **개별 Bash 도구 호출**로 실행한다.
 
-DONE: `flow-finish <registryKey> 완료 --ticket-number <T-NNN>` → `flow-claude end <registryKey>` → terminate. Slack 알림 자동 수행.
-
-**CRITICAL: After `flow-claude end <key>` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool (Bash, Task, Read, Write, Edit, or any other). Do NOT generate any text, summary, confirmation, or status message. The DONE completion banner is the final action of the workflow -- end the turn now. Any post-DONE output is a protocol violation.**
+**CRITICAL: After `flow-claude end <key>` Bash call returns, the orchestrator MUST terminate the current turn immediately. Output ZERO text after DONE banner. Do NOT invoke any further tool. The DONE completion banner is the final action of the workflow.**
 
 ### Workflow Log Protocol
 
 워크플로우 실행 중 `workflow.log` 파일에 구조화된 이벤트를 기록한다. 배너 스크립트와 Python 스크립트가 자동으로 기록하며, 오케스트레이터는 `update_state.py task-status`를 통해 AGENT_DISPATCH/AGENT_RETURN 이벤트를 간접적으로 트리거한다.
 
-#### 로그 파일 포맷
-
-```
-[YYYY-MM-DDTHH:MM:SS] [LEVEL] MESSAGE
-```
-
-- **레벨 종류**: `INFO`, `WARN`, `ERROR`, `AUDIT`
-- **비차단 원칙**: 모든 로깅 코드는 예외 발생 시 `pass`(Python) 또는 `|| true`(Bash) 패턴으로 감싸 로깅 실패가 워크플로우를 중단하지 않음
-- **파일 위치**: `<abs_work_dir>/workflow.log` (initialization.py가 워크플로우 시작 시 빈 파일로 생성)
-
-#### 로그 이벤트 카탈로그
-
-| 이벤트 | 발생 시점 | 레벨 | 메시지 포맷 | 기록 주체 |
-|--------|----------|------|------------|---------|
-| `STEP_START` | `flow-step start` 배너 출력 직후 | INFO | `STEP_START: {STEP}` | flow_step_banner.sh |
-| `STEP_END` | `flow-step end` 배너 출력 직후 | INFO | `STEP_END: {STEP} label={LABEL\|ASK}` | flow_step_banner.sh |
-| `ARTIFACT` | STEP_END 후 산출물 경로가 있을 때 | INFO | `ARTIFACT: {path}` | flow_step_banner.sh |
-| `PHASE_START` | `flow-phase` 배너 출력 직후 | INFO | `PHASE_START: {N} mode={mode} agents={agents} tasks={tasks}` | flow_phase_banner.sh |
-| `WORKFLOW_END` | `flow-claude end` 배너 출력 직후 | INFO | `WORKFLOW_END: {registryKey}` | flow_claude_banner.sh |
-| `AGENT_DISPATCH` | `update_task_status()` task_status=running 시 | INFO | `AGENT_DISPATCH: taskId={task_id}` | update_state.py |
-| `AGENT_RETURN` | `update_task_status()` task_status=completed/failed 시 | INFO | `AGENT_RETURN: taskId={task_id} status={status}` | update_state.py |
-| `USAGE_PENDING` | `usage_pending()` 등록 성공 후 | INFO | `USAGE_PENDING: agentId={agent_id} taskId={task_id}` | update_state.py |
-| `USAGE_RECORDED` | `usage_record()` 기록 성공 후 | INFO | `USAGE_RECORDED: agent={label}` | update_state.py |
-| `SESSION_LINKED` | `link_session()` 연결 성공 후 | INFO | `SESSION_LINKED: sessionId={sessionId} total={count}` | update_state.py |
-| `STATE_BOTH` | `_handle_both()` context+status 동시 성공 후 | INFO | `STATE_BOTH: agent={agent} step={from}->{to}` | update_state.py |
-| `FINALIZE_STEP1` | finalization.py Step 1(status 전이) 실행 전 | INFO | `FINALIZE_STEP1: registryKey={key} toStep={step}` | finalization.py |
-| `FINALIZE_STEP2A` | Step 2 transcript 탐색 결과 | INFO/WARN | `FINALIZE_STEP2A: transcript=found path={p}` / `transcript=not_found` | finalization.py |
-| `FINALIZE_STEP2B` | Step 2 usage-finalize 실행 전 | INFO | `FINALIZE_STEP2B: usage-finalize registryKey={key}` | finalization.py |
-| `FINALIZE_STEP3` | Step 3(아카이빙) 실행 전 | INFO | `FINALIZE_STEP3: archive registryKey={key}` | finalization.py |
-| `FINALIZE_STEP4` | Step 4(kanban 갱신) 실행 전 | INFO | `FINALIZE_STEP4: kanban ticket={n} column={col}` | finalization.py |
-| `FINALIZE_LOGS_MD` | `_update_logs_md()` 성공 후 | INFO | `FINALIZE_LOGS_MD: registryKey={key} warn={n} error={n}` | finalization.py |
-| `Workflow initialized` | initialization.py 완료 후 | INFO | `Workflow initialized: {registryKey}` | initialization.py |
-| `Workflow finalized` | finalization.py Step 1 완료 후 | INFO | `Workflow finalized: {registryKey} ({status})` | finalization.py |
-
-#### 오케스트레이터의 로그 의존 관계
-
-오케스트레이터는 직접 `workflow.log`에 쓰지 않는다. 대신 아래 명령 호출이 내부적으로 로그를 트리거한다:
-
 | 오케스트레이터 호출 | 트리거되는 로그 이벤트 |
 |-----------------|-------------------|
 | `flow-step start <registryKey>` | `STEP_START` |
-| `flow-step end <registryKey> [label]` | `STEP_END` (+ `ARTIFACT` if present) |
+| `flow-step end <registryKey> [label]` | `STEP_END` (+ `ARTIFACT`) |
 | `flow-phase <registryKey> <N>` | `PHASE_START` |
 | `flow-claude end <registryKey>` | `WORKFLOW_END` |
 | `flow-update task-status <key> running <taskId>` | `AGENT_DISPATCH` |
 | `flow-update task-status <key> completed\|failed <taskId>` | `AGENT_RETURN` |
-| `flow-update usage-pending <key> <agents>` | `USAGE_PENDING` (복수 가능) |
+| `flow-update usage-pending <key> <agents>` | `USAGE_PENDING` |
 | `flow-update both <key> <agent> <toStep>` | `STATE_BOTH` |
 
 ---
 
 ### Post-Return Silence Rules
 
-> **적용 범위**: 이 규칙은 해당 Step 완료 후뿐 아니라 **워크플로우 전 구간**에 적용됩니다. 에이전트 호출 전/중/후 모든 시점에서 내부 추론/분석 텍스트 출력은 금지입니다.
+> **적용 범위**: 워크플로우 전 구간에 적용. 에이전트 호출 전/중/후 모든 시점에서 내부 추론/분석 텍스트 출력 금지.
 
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
-| INIT completed | run initialization.py, extract/retain params, status update (NONE->PLAN), `flow-step start <registryKey>`, planner call | Return summary, progress text, **AskUserQuestion**, **내부 추론/분석 텍스트 출력** |
-| PLAN done | `flow-step end <registryKey> planSubmit`, 스킬 매핑 검증 루프, WORK 진행 | Plan summary, **AskUserQuestion**[^1], **내부 추론/분석 텍스트 출력** |
-| WORK Phase start | `flow-phase <registryKey> 0` (MUST FIRST), then Phase 0 skill_mapper.py call, then Phase 1~N | Skipping Phase banner, **Phase 0 스킵 (CRITICAL VIOLATION)**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
-| WORK in progress | Next worker call (parallel/sequential per dependency) | Planner re-call, status rollback, autonomous augmentation, **Phase 0 스킵 후 Phase 1 진행**, **progress/waiting text**, **내부 추론/분석 텍스트 출력** |
-| WORK done | 상태 확인, `flow-step start <registryKey>`, reporter call | Work summary, file listing, **내부 추론/분석 텍스트 출력** |
-| REPORT done | `flow-update status <key> DONE`, `flow-finish <key> 완료 --ticket-number <T-NNN>`, `flow-claude end <key>` → **flow-claude end Bash 결과 수신 즉시 turn 종료. 추가 Bash/Task/텍스트 출력 일체 금지** | Report summary, any post-DONE text, any tool call after DONE banner, **내부 추론/분석 텍스트 출력** |
+| INIT completed | initialization 실행, params 추출/보관, PLAN 진행 | Return summary, **AskUserQuestion**, 내부 추론 텍스트 |
+| PLAN done | `flow-step end`, 스킬 매핑 검증, WORK 진행 | Plan summary, **AskUserQuestion**[^1], 내부 추론 텍스트 |
+| WORK Phase start | `flow-phase 0` (MUST FIRST), Phase 0 -> Phase 1~N | Phase 0 스킵 (**CRITICAL VIOLATION**), progress 텍스트 |
+| WORK in progress | Next worker call (parallel/sequential) | Planner re-call, autonomous augmentation, 내부 추론 텍스트 |
+| WORK done | `flow-step start`, reporter call | Work summary, 내부 추론 텍스트 |
+| REPORT done | `flow-update status DONE`, `flow-finish`, `flow-claude end` -> **turn 즉시 종료** | Report summary, post-DONE text, 추가 도구 호출 |
 
-[^1]: autoApprove=false(`-n` 플래그 지정) 시에는 AskUserQuestion 허용. 상세: step-plan.md "Step 2b: PLAN - Auto-Approve Gate" 섹션 참조
-
----
-
-## Initialization (Orchestrator-driven)
-
-`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 다음을 순차 실행한다 (hook 없음):
-
-1. 사용자 입력에서 command 및 플래그 파싱 (예: `/wf -s implement` → command=implement)
-2. `flow-claude start <command>` — 시작 배너 출력
-3. 티켓 파일을 읽어 20자 이내 한글 제목 생성 (오케스트레이터가 직접 생성, LLM 별도 호출 없음)
-4. `flow-init <command> "<title>" #N` — 워크플로우 디렉터리 생성, status.json 초기화. `#N`은 티켓 번호(예: `#5`). 실패 시 `FAIL` 출력 + 비정상 종료 코드
-5. 종료 코드 0이면 최신 `.workflow/` 디렉터리의 `init-result.json`을 Read하여 workDir 등 값을 도출하고 후속 Phase에서 유지:
-   - init-result.json 키: workDir, registryKey, workId, date, workName, command, title, ticketNumber
-
-After initialization, proceed to PLAN step.
+[^1]: autoApprove=false(`-n` 플래그 지정) 시에는 AskUserQuestion 허용
 
 ---
 
-## Sub-agent Dispatch
+## INIT (Orchestrator-driven)
 
-### PLAN
+`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 순차 실행한다 (hook 없음, LLM 별도 호출 없음):
 
-**Details:** See [step-plan.md](step-plan.md)
+**5-Step 실행 흐름:**
+
+1. **Command/플래그 파싱** -- `/wf -s implement` -> command=implement, autoApprove=true. `-n` 지정 시 autoApprove=false. 체인 command(예: `research>implement`)는 전체 문자열 그대로 보관
+2. **시작 배너** -- `flow-claude start <command>`
+3. **제목 생성** -- 티켓 파일(`.kanban/T-NNN.xml`) 읽어 20자 이내 한글 제목 생성 (오케스트레이터 직접)
+4. **initialization.py 실행** -- `flow-init <command> "<title>" #N`. 실패 시 `FAIL` + 비정상 종료 코드
+5. **init-result.json 파싱** -- 종료 코드 0이면 최신 `.workflow/` 디렉터리의 init-result.json을 Read
+
+**Return Value Retention (후속 단계에 전달):**
+
+| Parameter | Used In | Purpose |
+|-----------|---------|---------|
+| `workDir` | PLAN~DONE | 작업 디렉터리 경로 |
+| `registryKey` | PLAN~DONE | 배너/상태 식별자 |
+| `workId` | PLAN~DONE | 작업 ID (HHMMSS) |
+| `command` | PLAN~DONE | 실행 명령어 |
+| `autoApprove` | PLAN | -n 플래그 여부 |
+| `title`, `ticketNumber` | DONE | flow-finish 인자 |
+
+**종료 코드:** 0=성공, 1=티켓 비어있음, 2=인자 오류, 4=초기화 실패
+
+INIT 완료 후 즉시 PLAN 진행. INIT 결과 요약/출력 MUST NOT.
+
+---
+
+## PLAN (planner Agent)
 
 **Status update:** `flow-update both <registryKey> planner PLAN`
 
@@ -231,24 +186,147 @@ After initialization, proceed to PLAN step.
 Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, request: <request>, workDir: <workDir>")
 ```
 
-planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-validate`를 자동 실행하여 계획서 구조를 검증한 후(advisory, non-blocking) `flow-step end`를 호출하고 스킬 매핑 검증 루프를 수행한 뒤 WORK로 직행한다. 상세: [step-plan.md](step-plan.md) 참조.
+### Prompt Quality Check (Step 2-pre)
 
-### WORK
+> init-result.json에 `prompt_quality` 필드가 없으면 스킵하고 planner 호출로 진행.
 
-**Details:** See [step-work.md](step-work.md)
+| `quality_score` | 동작 |
+|-----------------|------|
+| 필드 없음 / `>= 0.6` | planner 호출로 진행 |
+| `< 0.6` | 피드백 표시 후 AskUserQuestion. `missing_tags`에 constraints/criteria 포함 시 "계속 진행" 선택지 제거 |
 
-**Status update:**
-`flow-update both <registryKey> worker WORK`
+### 2a-Post: planner 반환 후 호출 순서
+
+planner가 `작성완료` 반환 직후:
+1. **plan_validator.py** -- `validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""` (advisory, non-blocking)
+2. **`flow-step end <registryKey> planSubmit`** -- PLAN 완료 배너 (**1회만**)
+3. **즉시** Auto-Approve Gate로 진행
+
+### Auto-Approve Gate (Step 2b)
+
+| `autoApprove` | 동작 |
+|--------------|------|
+| `true` (기본값) | 즉시 스킬 매핑 검증으로 진행 |
+| `false` (`-n`) | AskUserQuestion으로 승인/수정/중지 3선택지 제시. "수정" 시 planner revise 모드 재호출 -> 2a-Post 재실행 -> 재진입 (상한 없음) |
+
+### Skill Mapping Validation Loop (Step 2c)
+
+```bash
+skill_mapper_output=$(flow-skillmap <registryKey> 2>&1)
+skill_mapper_exit=$?
+```
+
+| Exit Code | 동작 |
+|-----------|------|
+| `0` | WORK 즉시 진행 |
+| `2` | planner revise 재호출 -> 재검증 (최대 3회). 3회 초과 시 경고 후 강제 진행 |
+| `1` | `[WARN]` 후 WORK 강제 진행 |
+
+### Binding Contract Rule
+
+PLAN 승인 후 계획서는 Binding Contract. 오케스트레이터가 독자적으로 태스크 추가/삭제/변경 MUST NOT. Worker 반환값 근거 임의 수정 금지.
+
+---
+
+## WORK (worker/explorer Agent)
+
+**Status update:** `flow-update both <registryKey> worker WORK`
 
 **Rules:** Only worker/explorer/validator/reporter calls allowed. MUST NOT re-call planner. MUST NOT reverse step. Execute ONLY plan tasks.
 
-**Worker dispatch patterns:** Phase 0 is NON-NEGOTIABLE (Phase 0 = skill_mapper.py 스크립트가 스킬 매핑 준비, Phase 1+ = skill-map 참조하여 계획서 태스크 실행, 스킬 미발견 시 Worker 자율 결정으로 진행) and MUST execute before any Phase 1~N worker calls. See [step-work.md](step-work.md) for Phase 0 mandatory execution, Phase 1~N task execution, and usage-pending tracking.
+### Plan Reading for Task Dispatch
 
-**Worker return:** 상태만 확인 (성공/부분성공/실패). Details in .workflow/ files.
+WORK 진입 후 `<workDir>/plan.md`를 **1회만** 읽어 최소 6개 필드 추출: `taskId`, `phase`, `dependencies`, `parallelism`, `agentType`, `skills`. 위 6개 외 내용은 Worker가 직접 참조.
 
-### REPORT
+### Phase 0 - Preparation (REQUIRED)
 
-**Details:** See [step-report.md](step-report.md)
+> **CRITICAL: Phase 0 스킵 절대 금지.** Phase 0을 건너뛰고 Phase 1으로 직행하는 것은 프로토콜 위반이다.
+
+```bash
+flow-phase <registryKey> 0
+flow-skillmap <registryKey>
+```
+
+`skill_mapper.py`가 plan.md skills 컬럼 + 명령어 기본 + TF-IDF fallback으로 `skill-map.md` 생성. 실패(exit 1) 시 skill-map.md 없이 Phase 1 진행 (Worker 자율 결정).
+
+### Phase 1~N: Task Execution
+
+계획서 Phase 순서대로 실행. 각 Phase Worker 호출 **직전**에 배너 출력.
+
+**Independent tasks (parallel):**
+```bash
+flow-phase <registryKey> 1
+flow-update task-start <registryKey> W01 W02
+```
+```
+Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, taskId: W01, planPath: <planPath>, workDir: <workDir>, skills: <스킬명>")
+Task(subagent_type="worker-sonnet", prompt="command: <command>, workId: <workId>, taskId: W02, planPath: <planPath>, workDir: <workDir>")
+```
+
+**Dependent tasks (sequential):**
+```bash
+flow-phase <registryKey> 2
+flow-update task-start <registryKey> W04
+```
+```
+Task(subagent_type="worker-opus", prompt="command: <command>, workId: <workId>, taskId: W04, planPath: <planPath>, workDir: <workDir>")
+```
+
+**Explorer agentType (6종):** `worker-opus`, `worker-sonnet`, `explorer`, `explorer-file-haiku`, `explorer-file-sonnet`, `explorer-web-sonnet`. 계획서 서브에이전트 컬럼 값을 `subagent_type`에 그대로 전달.
+
+### Worker/Explorer Return Value Processing
+
+Task 호출 후 **상태만** 확인 (1줄). 나머지는 무시 (.workflow/ 파일에 저장됨). 상태 외 내용 MUST discard.
+
+```bash
+# 반환 직후 task-status 갱신 (다음 Phase 배너 전 필수)
+flow-update task-status <registryKey> <taskId> completed   # 성공/부분성공
+flow-update task-status <registryKey> <taskId> failed      # 실패
+```
+
+### Error Handling (WORK)
+
+| 상황 | 처리 |
+|------|------|
+| 독립 태스크 실패 | 다른 독립 태스크 계속 진행 |
+| 종속 선행 실패 | 해당 종속 체인 중단, 다른 체인 계속 |
+| 실패율 >= 50% | 워크플로우 중단, AskUserQuestion |
+| Worker "실패" | 최대 3회 재호출. 3회 실패 시 해당 태스크 실패 기록 |
+
+### Hooks 수정 태스크 패턴
+
+```bash
+flow-update env <registryKey> set HOOKS_EDIT_ALLOWED 1     # Worker 호출 전
+# ... Worker Task 호출 ...
+flow-update env <registryKey> unset HOOKS_EDIT_ALLOWED     # Worker 완료 후 반드시 해제
+```
+
+### Validator Phase (Phase N+1)
+
+| 명령어 | validator 실행 |
+|--------|---------------|
+| implement / review | 실행 |
+| research | 스킵 |
+
+```bash
+flow-phase <registryKey> <N+1>
+flow-update task-start <registryKey> validator
+```
+```
+Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>")
+```
+
+반환 상태(통과/경고/실패) 모두 정상 진행 (soft blocking). `flow-update task-status <registryKey> validator completed`.
+
+### Post-WORK Flow
+
+```bash
+flow-step end <registryKey> workDone   # WORK 완료 배너 (Validator 완료 후, REPORT 전이 전)
+```
+
+---
+
+## REPORT (reporter Agent)
 
 **Status update:** `flow-update both <registryKey> reporter REPORT`
 
@@ -256,23 +334,32 @@ planner가 `작성완료`를 반환하면, 오케스트레이터는 `flow-valida
 Task(subagent_type="reporter", prompt="command: <command>, workId: <workId>, workDir: <workDir>, workPath: <workDir>/work/")
 ```
 
-### DONE
+reporter가 보고서(`{workDir}/report.md`) + summary.txt 생성. 실패 시 최대 3회 재시도. 3회 모두 실패 시 FAILED 전이.
 
-> **CANCELLED 시 DONE 단계를 거치지 않는다.** DONE은 정상 완료 경로(REPORT 완료 후)에서만 호출된다.
-
-After REPORT completion: update_state.py status -> flow-finish -> flow-claude end -> terminate.
+### Post-REPORT Flow (REPORT -> DONE)
 
 ```bash
-flow-update status <registryKey> DONE
-flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]  # status: "완료" 또는 "실패" 만 허용. --ticket-number 필수
-flow-claude end <registryKey>
+flow-step end <registryKey> reportDone                                          # 1. REPORT 완료 배너
+flow-update status <registryKey> DONE                                           # 2. 상태 전이
+flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]     # 3. 마무리
+flow-claude end <registryKey>                                                   # 4. 종료 배너 -> turn 즉시 종료
 ```
 
 ---
 
-## Common Reference
+## DONE (flow-finish + flow-claude end)
 
-> Sub-agent return formats, state update methods, FSM transition rules, error handling: See [common-reference.md](common-reference.md)
+### flow-finish 5단계
+
+1. **status.json 완료 처리** -- `update_state.py status` (critical, 실패 시 exit 1)
+2. **사용량 확정** -- `update_state.py usage-finalize` (비차단)
+3. **아카이빙** -- `history_sync.py archive` (비차단)
+4. **칸반 갱신** -- `update-kanban.sh` (workflow_id 있을 때만, 비차단)
+5. **tmux cleanup** -- TMUX_PANE + T-* 윈도우 조건 시 3초 지연 후 kill (비차단)
+
+### Post-DONE Silence (REQUIRED)
+
+**`flow-claude end <registryKey>` Bash 결과 수신 즉시 turn 종료. 추가 도구 호출/텍스트 생성 일체 금지. 이것이 워크플로우의 마지막 행위이다.**
 
 ---
 
@@ -282,58 +369,45 @@ flow-claude end <registryKey>
 
 | Action | Description |
 |--------|-------------|
-| Step banner Bash calls | `flow-step start/end` + `flow-phase` (WORK phases) + `flow-finish`/`flow-claude end` (completion) |
+| Step banner Bash calls | `flow-step start/end` + `flow-phase` + `flow-finish`/`flow-claude end` |
 | AskUserQuestion calls | error escalation, user confirmation |
 | State transition | `flow-update both/status/context/task-status/usage-pending/env/link-session/usage/usage-finalize` |
 | Sub-agent return extraction | 상태만 확인 (1줄). 산출물 경로는 컨벤션으로 확정 |
-| 티켓 파일 handling (initialization.py 전용) | initialization.py가 `.kanban/T-NNN.xml` -> user_prompt.txt 복사. 기타 분기에서 티켓 파일 접근 MUST NOT |
-| Workflow finalization | `flow-finish <registryKey> 완료\|실패` — Slack 알림, cleanup |
-| Workflow end | `flow-claude end <registryKey>` — 완료 배너 출력 + 종료 |
-| Post-DONE immediate termination | Zero text output after DONE completion banner |
-
-### Sub-agent-Only Actions
-
-| Agent | Exclusive Actions |
-|-------|-------------------|
-| planner | Plan document authoring (`plan.md`), task decomposition, Phase/dependency design |
-| worker | Source code read/modify/create (Read/Write/Edit), code analysis, test execution, work log authoring (`work/WXX-*.md`) |
-| explorer | Codebase+web exploration, structured exploration result reporting, work log authoring (`work/WXX-*.md`) |
-| validator | Lint/type-check/build verification, validation report authoring (`work/validation-report.md`) |
-| reporter | Final report authoring (`report.md`), work log aggregation |
+| Workflow finalization | `flow-finish` -> `flow-claude end` |
 
 ### Orchestrator Prohibited Actions
 
 | Prohibited Action | Reason |
 |-------------------|--------|
-| Direct source code modification (Write/Edit) | Worker exclusive; orchestrator is sequencing-only |
-| Direct code analysis/review | Worker exclusive; orchestrator must not interpret code |
-| Plan/report/work-log authoring | Respective sub-agent exclusive (planner/reporter/worker) |
-| Sub-agent return interpretation/summary/explanation output | Returns are opaque routing tokens; any interpretation pollutes terminal and inflates context |
-| **내부 추론/분석/사고 과정 텍스트 출력** | Terminal Output Protocol 위반: 사용자는 step 결과만 필요. plan.md 분석 결과, 진행 상황 설명, 판단 근거, 에이전트 호출 전 설명("플래너를 호출하겠습니다" 류) 등 모든 내부 사고 과정의 텍스트 출력 금지. 컨텍스트 낭비 및 터미널 오염 원인 |
-| PLAN 완료 후 티켓 파일 읽기 | PLAN 이후 분기에서 티켓 파일을 읽으면 다른 워크플로우 질의와 충돌 발생. 티켓 파일 접근은 initialization.py 실행으로 한정 |
-| 다른 워크플로우 산출물 읽기 | 현재 워크플로우(`<workDir>`) 외부의 `.workflow/` 파일(다른 워크플로우의 plan.md, report.md, work/*.md 등)을 Read하면 컨텍스트 오염 및 토큰 낭비 발생. 오케스트레이터가 읽을 수 있는 파일은 현재 워크플로우의 workDir 내부로 한정 |
+| Direct source code modification (Write/Edit) | Worker exclusive |
+| Direct code analysis/review | Worker exclusive |
+| Plan/report/work-log authoring | Respective sub-agent exclusive |
+| Sub-agent return interpretation/summary output | Returns are opaque routing tokens |
+| 내부 추론/분석/사고 과정 텍스트 출력 | Terminal Output Protocol 위반 |
+| PLAN 완료 후 티켓 파일 읽기 | initialization.py 실행으로 한정 |
+| 다른 워크플로우 산출물 읽기 | 현재 workDir 내부로 한정 |
 
 ### Orchestrator Allowed Reads
 
-오케스트레이터가 Read 도구로 읽어도 되는 파일은 아래 허용 목록(allowlist)으로 **엄격히** 한정합니다. 이 목록 외의 `.workflow/` 파일은 읽기 금지입니다.
+| 허용 파일 | 용도 |
+|-----------|------|
+| `<workDir>/plan.md` | WORK Step 태스크 디스패치 (1회만) |
 
-| 허용 파일 | 용도 | 필수 근거 |
-|-----------|------|----------|
-| `<workDir>/plan.md` | WORK Step 태스크 디스패치 | 서브에이전트 간 직접 통신 불가(플랫폼 제약)로 오케스트레이터만 taskId/Phase/dependency/parallelism/agentType을 추출하여 디스패치 순서를 결정할 수 있음 |
+> **skill-map.md는 오케스트레이터가 읽지 않는다.** Worker 호출 시 `skillMapPath` 경로만 전달.
 
-> **skill-map.md는 오케스트레이터가 읽지 않습니다.** Phase 0 완료 후 skill-map.md는 Phase 1+ Worker가 직접 읽습니다. 오케스트레이터는 Worker 호출 시 `skillMapPath: <workDir>/work/skill-map.md` 경로만 파라미터로 전달합니다.
-
-Phase 0(준비 단계)에서 생성된 skill-map.md는 Phase 1+(작업 실행 단계)의 Worker가 참조하는 구조이다.
-
-### Platform Constraints Requiring Orchestrator Execution
-
-Certain actions must be performed by the orchestrator due to Claude Code platform limitations, not by design preference.
+### Platform Constraints
 
 | Constraint | Explanation |
 |------------|-------------|
-| AskUserQuestion unavailable in sub-agents | Sub-agents cannot invoke AskUserQuestion (GitHub Issue #12890); all user interaction must route through orchestrator |
-| Sub-agent Bash output not visible to user | Sub-agent terminal output is not displayed to the user; step banners must be called by orchestrator to be visible |
-| No direct sub-agent-to-sub-agent invocation | All dispatch goes through orchestrator; sub-agents cannot call Task to spawn sibling agents |
+| AskUserQuestion unavailable in sub-agents | GitHub Issue #12890 |
+| Sub-agent Bash output not visible to user | Step banners must be called by orchestrator |
+| No direct sub-agent-to-sub-agent invocation | All dispatch through orchestrator |
+
+---
+
+## Common Reference
+
+> Sub-agent return formats, state update methods, FSM transition rules, error handling: See [common-reference.md](common-reference.md)
 
 ---
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -233,11 +234,7 @@ def main() -> None:
 
     # -- Model --
     model = data.get("model", {}).get("display_name", "?")
-
-    # -- Lines added/removed --
-    cost = data.get("cost", {})
-    added = cost.get("total_lines_added", 0)
-    removed = cost.get("total_lines_removed", 0)
+    model = re.sub(r"\s*\(.*?\)", "", model)
 
     # -- Context usage --
     usage_pct, used_tokens, max_tokens = get_context_usage(data)
@@ -295,13 +292,12 @@ def main() -> None:
     port_display = f" port:{board_port}" if board_port else ""
 
     # -- Output --
-    # Format: model [PHASE:agent] title branch ctx:bar +added/-removed port:NNNN
+    # Format: model [PHASE:agent] title branch ctx:bar port:NNNN
     line = (
         f"\033[36m{model}\033[0m"
         f"{workflow_display}"
         f"{branch_display}"
         f" {progress_bar}"
-        f" \033[32m+{added}\033[0m/\033[31m-{removed}\033[0m"
         f"{port_display}"
     )
     print(line)

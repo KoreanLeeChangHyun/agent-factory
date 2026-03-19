@@ -4,7 +4,7 @@ description: "심층 코드 분석 전문 에이전트 (Sonnet)"
 model: sonnet
 tools: Bash, Glob, Grep, Read, Write
 skills:
-  - workflow-agent-explorer
+  - workflow-agent
 maxTurns: 30
 ---
 # Explorer File Sonnet Agent
@@ -62,7 +62,7 @@ maxTurns: 30
 - `skillMapPath`: 스킬맵 경로, `mode`: 동작 모드 (선택적)
 - `workDir`: 작업 디렉터리 경로
 - `registryKey`: 워크플로우 식별자 (YYYYMMDD-HHMMSS)
-> 상세 절차: `workflow-agent-explorer/SKILL.md` 참조
+> 상세 절차: `workflow-agent/reference/explorer.md` 참조
 
 ## 오케스트레이터 반환 형식
 

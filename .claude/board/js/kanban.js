@@ -105,9 +105,6 @@
   const SVG_ASC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 2L9 8H1L5 2Z"/></svg>';
   const SVG_DESC = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 8L1 2H9L5 8Z"/></svg>';
 
-  // ── Inline SVG Icon for ticket mark ──
-  const SVG_TICKET = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M1 3a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1.5a1.5 1.5 0 0 0 0 3V9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7.5a1.5 1.5 0 0 0 0-3V3z"/></svg>';
-
   // ── Sort Options ──
   const SORT_KEYS = [
     { key: "number",   label: "\uBC88\uD638" },
@@ -281,11 +278,10 @@
           const status = getWorkflowStatus(t);
           const dateObj = formatKoreanDate(t.datetime);
           h += '<div class="card' + done + '" data-num="' + esc(t.number) + '">';
-          // 상단: 좌측 그룹(SVG 아이콘 + 티켓번호 + 커맨드배지), 우측 상태라벨
+          // 상단: 좌측 그룹(티켓번호 + 커맨드배지), 우측 상태라벨
           h += '<div class="card-top">';
           h += '<div class="card-top-left">';
-          h += '<span class="card-ticket-icon">' + SVG_TICKET + "</span>";
-          h += '<span class="card-num">' + esc(t.number) + "</span>";
+          h += '<span class="card-num">' + esc(t.number.replace(/^T-/, "")) + "</span>";
           if (t.submit && t.submit.command) {
             h += badge(t.submit.command, CMD_COLORS[t.submit.command]);
           }

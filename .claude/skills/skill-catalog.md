@@ -1,13 +1,13 @@
 # Skill Catalog
 
 > 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 63개 (전문화: 63, 프로젝트: 0)
+> 활성 스킬: 58개 (전문화: 58, 프로젝트: 0)
 
 ## Command Default Mapping
 
 | 명령어 | 자동 로드 스킬 | 용도 |
 |--------|---------------|------|
-| implement | review-code-quality, workflow-system-verification | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
+| implement | review-code-quality, workflow-system | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
 | review | review-requesting, review-code-quality | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
 | research | research-general, research-integrated | 웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 planner LLM 판단으로 조건부 로드 |
 
@@ -73,11 +73,6 @@
 | testing-design | ISTQB v4.0 test design skill that auto-generates test cases by analyzing function signatures and type information using equivalence partitioning (EP), boundary value analysis (BVA), decision table (DT), and state transition (ST) techniques. Use when generating structured test cases from code, improving input domain coverage, or systematically identifying edge cases and boundary conditions from type signatures. |
 | testing-mutation | Mutation testing skill that runs incremental mutation testing on changed files using Stryker, mutmut, or cargo-mutants, calculates mutation scores, detects survived mutants, and enforces quality gates for PR integration. Use when verifying test suite effectiveness, measuring mutation score on changed code, or validating that tests can detect real defects rather than just achieving line coverage. |
 | testing-property-based | Property-based testing skill that infers properties from function signatures, selects type-based generators, and generates PBT code using Hypothesis (Python), fast-check (JS/TS), or QuickCheck (Haskell). Use when adding property-based tests to an existing test suite, discovering edge cases that example-based tests miss, performing stateful testing, or automatically shrinking minimal failure inputs. |
-| workflow-system-hooks-guide | Claude Code Hooks system usage guide and dangerous command blocking. Covers hook events, execution timing, how to add/modify hooks, and safety guard patterns (rm -rf, git reset --hard, git push --force). Use for hook management: hook configuration review, hook addition/modification, PreToolUse hook behavior understanding, dangerous command blocking. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정', 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command'. |
-| workflow-system-report-output | REPORT 단계 산출물(CHANGELOG, 릴리스 노트, PR 요약) 자동 생성 스킬. Git 커밋 히스토리와 브랜치 diff를 분석하여 구조화된 CHANGELOG, 릴리스 노트, PR 제목/본문을 생성한다. Triggers: 'changelog', 'release notes', '변경 이력', '릴리스 노트', 'PR', 'pull request', 'PR 요약', 'PR 생성'. |
-| workflow-system-script-convention | Script naming, placement, and alias registration conventions for the Claude Code workflow system. Covers flow-* alias registration rules, Bash chaining prohibition, naming conventions (flow-* prefix), and script directory placement. Use when creating new scripts, modifying existing scripts, or adding new aliases. Triggers: 'scripts', '스크립트', 'alias', 'aliases', '알리아스', 'flow-', 'flow-*', '배너', 'banner', 'init-claude-workflow', '컨벤션', 'convention'. |
-| workflow-system-statusline | Claude Code CLI bottom status line (StatusLine) configuration skill. Use for StatusLine configuration tasks: (1) registering StatusLine in settings.json, (2) writing/modifying statusline.sh scripts, (3) customizing status line display content. Triggers: 'statusline 설정', '상태줄 설정', 'statusline 수정', 'status line 변경', 'init:statusLine'. |
-| workflow-system-verification | Enforces automated verification before declaring task completion. Requires running verification commands and confirming results before commits, PR creation, or task completion reports. Prevents unsubstantiated completion claims. Use for pre-completion verification: before task completion, before commits/PRs, before claiming success. Triggers: 'Done', 'Complete', '완료', '끝', 'PASS', '통과'. |
 
 ## Project Skills
 

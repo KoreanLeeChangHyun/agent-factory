@@ -1,10 +1,4 @@
----
-name: workflow-system-verification
-description: "Enforces automated verification before declaring task completion. Requires running verification commands and confirming results before commits, PR creation, or task completion reports. Prevents unsubstantiated completion claims. Use for pre-completion verification: before task completion, before commits/PRs, before claiming success. Triggers: 'Done', 'Complete', '완료', '끝', 'PASS', '통과'."
-license: "Apache-2.0"
----
-
-# Verification Before Completion
+# Verification Before Completion (상세)
 
 ## Overview
 
@@ -103,7 +97,7 @@ license: "Apache-2.0"
 
 **컬럼 설명:**
 
-- **주장**: 완료/성공으로 주장하는 내용 (예: "빌드 성공", "테스트 통과")
+- **주장**: 완료/성공으로 주장하는 내용
 - **검증 방법**: 주장을 증명하기 위해 실행한 구체적 명령어
 - **결과**: PASS / FAIL / SKIP (SKIP 사용 시 사유 필수)
 - **증거**: 명령어 출력에서 추출한 구체적 수치 또는 핵심 출력
@@ -178,14 +172,6 @@ implement-review 반복 사이클에서 이전 implement 결과와 현재 결과
 | 린트 에러 | 3 errors | 0 errors | -3 | 개선 |
 | 빌드 시간 | 12s | 45s | +33s | 회귀 |
 | 타입 에러 | 0 errors | 0 errors | 0 | 유지 |
-
-**컬럼 설명:**
-
-- **검증 항목**: 검증 대상 (테스트, 린트, 빌드, 타입 검사 등)
-- **이전 결과**: 직전 implement/review 사이클의 검증 결과 수치
-- **현재 결과**: 이번 implement 후 검증 결과 수치
-- **변화**: 이전 대비 수치 변화량 (양수/음수/0)
-- **판정**: 회귀 / 개선 / 유지 중 하나
 
 **판정 기준:**
 

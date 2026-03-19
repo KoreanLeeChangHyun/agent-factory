@@ -95,13 +95,13 @@ def resolve_skill_file(skill_name: str) -> str:
         COMPACT.md 또는 SKILL.md의 절대 경로.
 
     Raises:
-        경로 순회 시도 시 fallback으로 workflow-agent-worker/SKILL.md 경로 반환.
+        경로 순회 시도 시 fallback으로 workflow-agent/SKILL.md 경로 반환.
     """
     skill_dir = os.path.join(SKILLS_DIR, skill_name)
     skill_dir = os.path.normpath(skill_dir)
     if not skill_dir.startswith(os.path.normpath(SKILLS_DIR)):
         print(f"[WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
-        skill_dir = os.path.join(SKILLS_DIR, "workflow-agent-worker")
+        skill_dir = os.path.join(SKILLS_DIR, "workflow-agent")
         return os.path.join(skill_dir, "SKILL.md")
     compact_path = os.path.join(skill_dir, "COMPACT.md")
     skill_path = os.path.join(skill_dir, "SKILL.md")

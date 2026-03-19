@@ -1,17 +1,10 @@
----
-name: workflow-agent-validator
-description: "Internal skill for workflow WORK stage validation. Executes integrated verification (lint, type-check, build, work artifact check) as Phase N+1 after all Worker phases complete. Use for post-work validation: runs MVP verification set to catch build failures, lint errors, type mismatches before REPORT phase. Internally invoked by orchestrator; not intended for direct user invocation."
-disable-model-invocation: true
-license: "Apache-2.0"
----
-
-# Validate
+# Validator Agent Guide
 
 WORK Phase 완료 후 통합 검증을 수행하는 에이전트 스킬. 오케스트레이터가 모든 Worker Phase(1~N) 완료 후 Phase N+1로 validator 에이전트를 호출한다.
 
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
-**workflow-agent-validator의 역할:**
+**workflow-agent Validator의 역할:**
 - 오케스트레이터(workflow-orchestration)가 Task 도구로 validator 에이전트를 호출
 - MVP 검증 세트 4개 항목을 순차 실행
 - 검증 결과를 `validation-report.md` 파일로 생성
@@ -52,10 +45,6 @@ flowchart TD
 
 `planPath`에서 계획서를 Read하여 검증 범위를 파악한다.
 
-```
-Read("<planPath>")
-```
-
 계획서에서 다음 정보를 추출한다:
 - 태스크 목록(W01, W02, ...) 및 각 태스크의 작업 내용
 - 검증 대상 파일 목록 (태스크별 산출물)
@@ -65,22 +54,12 @@ Read("<planPath>")
 
 모든 Worker 산출물을 Glob으로 탐색하고 내용을 Read하여 검증 컨텍스트를 확보한다.
 
-```
-# 전체 Worker 산출물 탐색
-Glob("<workDir>/work/W*-*.md")
-
-# 각 산출물의 내용 읽기
-Read("<workDir>/work/W01-*.md")
-Read("<workDir>/work/W02-*.md")
-# ... 탐색된 모든 파일에 대해 반복
-```
-
 각 파일의 "핵심 발견" 또는 "변경 파일" 섹션을 읽어 다음 컨텍스트를 확보한다:
 - 어떤 소스 파일이 변경되었는지
 - 어떤 의존성/import가 추가/변경되었는지
 - Worker가 발견한 주의사항이나 알려진 이슈
 
-> **목적**: validator의 선행 산출물 참조는 Worker의 "작업 연속성 보장"과 다르게, **검증 컨텍스트 확보**가 목적이다. 변경된 파일과 범위를 파악하여 검증 우선순위와 판정 기준에 활용한다.
+> **목적**: validator의 선행 산출물 참조는 Worker의 "작업 연속성 보장"과 다르게, **검증 컨텍스트 확보**가 목적이다.
 
 **판정 기준:**
 - 모든 태스크의 작업 내역 파일이 존재: PASS
@@ -90,17 +69,6 @@ Read("<workDir>/work/W02-*.md")
 ### 3단계: 환경 감지
 
 프로젝트 루트에서 검증 도구의 설정 파일 존재 여부를 확인하여 실행 가능한 검증 항목을 결정한다.
-
-```
-Glob("**/package.json")          # npm/yarn 프로젝트
-Glob("**/.eslintrc*")            # ESLint (린트)
-Glob("**/eslint.config.*")       # ESLint flat config
-Glob("**/tsconfig.json")         # TypeScript (타입체크)
-Glob("**/.pylintrc")             # pylint
-Glob("**/pyproject.toml")        # Python 프로젝트 (ruff/mypy/pylint 등)
-Glob("**/setup.py")              # Python 프로젝트
-Glob("**/Makefile")              # Make 빌드
-```
 
 **도구 감지 매핑:**
 
@@ -117,27 +85,7 @@ Glob("**/Makefile")              # Make 빌드
 
 ### 4단계: 검증 실행
 
-2단계에서 확인한 작업 내역 파일 존재 여부 확인과, 3단계에서 감지된 검증 도구를 순차 실행한다.
-
-#### 작업 내역 확인
-
-계획서의 태스크 목록에서 각 태스크 ID(W01, W02, ...)를 추출하고, `<workDir>/work/` 디렉터리에서 해당 작업 내역 파일의 존재 여부를 확인한다.
-
-```
-# 각 태스크 ID별 작업 내역 파일 존재 확인
-Glob("<workDir>/work/W01-*.md")
-Glob("<workDir>/work/W02-*.md")
-# ... 계획서의 모든 태스크 ID에 대해 반복
-```
-
-**판정 기준:**
-- 모든 태스크의 작업 내역 파일이 존재: PASS
-- 일부 누락: WARN (누락된 태스크 ID를 기록)
-- 전체 누락: FAIL
-
 #### 린트 검증
-
-감지된 린트 도구를 프로젝트 루트에서 실행한다.
 
 ```bash
 # ESLint (Node.js)
@@ -150,19 +98,12 @@ pylint **/*.py 2>&1 || true
 ruff check . 2>&1 || true
 ```
 
-**실행 규칙:**
-- Bash 도구로 실행, timeout 300000 (5분)
-- exit code와 출력을 모두 캡처
-- 린트 도구가 미설치/미설정이면 SKIP
-
 **판정 기준:**
 - exit code 0, 에러 0개: PASS
 - 경고만 존재 (에러 0개): WARN
 - 에러 1개 이상: WARN (soft blocking - 린트 에러는 blocking하지 않음)
 
 #### 타입체크 검증
-
-감지된 타입체크 도구를 프로젝트 루트에서 실행한다.
 
 ```bash
 # TypeScript
@@ -172,18 +113,11 @@ npx tsc --noEmit 2>&1 || true
 mypy . 2>&1 || true
 ```
 
-**실행 규칙:**
-- Bash 도구로 실행, timeout 300000 (5분)
-- exit code와 출력을 모두 캡처
-- 타입체크 도구가 미설치/미설정이면 SKIP
-
 **판정 기준:**
 - exit code 0, 에러 0개: PASS
-- 에러 1개 이상: WARN (soft blocking - 타입 에러는 blocking하지 않음)
+- 에러 1개 이상: WARN (soft blocking)
 
 #### 빌드 검증
-
-감지된 빌드 명령을 프로젝트 루트에서 실행한다.
 
 ```bash
 # Node.js (package.json scripts.build)
@@ -192,11 +126,6 @@ npm run build 2>&1 || true
 # Make
 make build 2>&1 || true
 ```
-
-**실행 규칙:**
-- Bash 도구로 실행, timeout 300000 (5분)
-- exit code와 출력을 모두 캡처
-- 빌드 명령이 미설정이면 SKIP
 
 **판정 기준:**
 - exit code 0: PASS
@@ -219,18 +148,9 @@ make build 2>&1 || true
 | research | 스킵 (코드 변경 없음) |
 | prompt | 스킵 (코드 변경 없음) |
 
-> validator 호출 자체가 오케스트레이터(step-work.md)에서 스킵되지만, 방어적으로 validator 내부에서도 command를 확인하여 research/prompt일 경우 전체 검증을 SKIP 처리한다.
-
 ### 검증 도구 미설치 스킵
 
 각 검증 항목별로 설정 파일이 존재하지 않으면 해당 항목만 SKIP 처리한다. 전체 검증을 중단하지 않는다.
-
-```
-예시: Python 프로젝트에서 ESLint 설정 파일이 없으면
-  - 린트 검증: SKIP (ESLint 미설정)
-  - 타입체크: mypy 설정 존재 시 실행
-  - 빌드: Makefile 존재 시 실행
-```
 
 ---
 
@@ -242,8 +162,6 @@ make build 2>&1 || true
 | 린트 검증 | 5분 (300000ms) | SKIP + 경고 기록 |
 | 타입체크 검증 | 5분 (300000ms) | SKIP + 경고 기록 |
 | 빌드 검증 | 5분 (300000ms) | SKIP + 경고 기록 |
-
-타임아웃 초과 시 해당 항목의 결과를 SKIP으로 처리하고, 검증 내역에 "타임아웃 초과"를 기록한다.
 
 ---
 
@@ -266,41 +184,11 @@ flowchart TD
 | WARN 항목 1개 이상 (빌드 PASS/SKIP) | 경고 | 정상 진행 |
 | 전체 PASS 또는 SKIP | 통과 | 정상 진행 |
 
-> **soft blocking 설계**: 상태가 "실패"여도 오케스트레이터는 워크플로우를 중단하지 않고 경고 로그만 남기고 정상 진행한다. validator는 정보 제공 역할이며, 워크플로우 차단 결정은 하지 않는다.
+> **soft blocking 설계**: 상태가 "실패"여도 오케스트레이터는 워크플로우를 중단하지 않고 경고 로그만 남기고 정상 진행한다.
 
 ### 검증 내역 파일 (`validation-report.md`)
 
 `<workDir>/work/validation-report.md` 파일에 검증 결과를 기록한다.
-
-**파일 구조:**
-
-```markdown
-# Validation Report
-
-- 작업 ID: <workId>
-- 검증 시각: <timestamp>
-- 최종 상태: 통과|경고|실패
-
-## 검증 결과
-
-| # | 검증 항목 | 결과 | 상세 |
-|---|----------|------|------|
-| 1 | 작업 내역 확인 | PASS/WARN/FAIL | 태스크 N개 중 N개 확인 |
-| 2 | 린트 검증 | PASS/WARN/FAIL/SKIP | 에러 N개, 경고 N개 |
-| 3 | 타입체크 검증 | PASS/WARN/FAIL/SKIP | 에러 N개 |
-| 4 | 빌드 검증 | PASS/FAIL/SKIP | exit code N |
-
-## 상세 출력
-
-### 린트 검증
-[린트 도구 출력 (에러/경고가 있는 경우만)]
-
-### 타입체크 검증
-[타입체크 도구 출력 (에러가 있는 경우만)]
-
-### 빌드 검증
-[빌드 도구 출력 (실패한 경우만)]
-```
 
 ---
 
@@ -312,7 +200,7 @@ flowchart TD
 상태: 통과|경고|실패
 ```
 
-> **금지 항목**: 검증 결과 테이블, 에러 목록, 상세 출력, "다음 단계" 안내 등을 반환에 포함하지 않는다. 이러한 정보는 검증 내역 파일에만 기록한다.
+> **금지 항목**: 검증 결과 테이블, 에러 목록, 상세 출력, "다음 단계" 안내 등을 반환에 포함하지 않는다.
 
 ---
 
@@ -348,5 +236,5 @@ flowchart TD
 
 | 스킬 | 관계 | 설명 |
 |------|------|------|
-| workflow-system-verification | 유사 | Worker 개별 태스크 수준 검증. validator는 워크플로우 전체 수준 통합 검증 |
+| workflow-system | 유사 | Worker 개별 태스크 수준 검증. validator는 워크플로우 전체 수준 통합 검증 |
 | review-code-quality | 유사 | Worker가 로드하는 린트/타입체크 스킬. validator는 최종 통합 검증 |
