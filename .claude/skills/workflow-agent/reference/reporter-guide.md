@@ -1,17 +1,10 @@
----
-name: workflow-agent-reporter
-description: "Internal skill for workflow REPORT stage. Generates result reports and writes summary.txt after task completion. Use for workflow reporting: aggregates work records from work/ directory to generate report.md, writes 2-line summary.txt. Supports markdown, CSV, Excel, and other formats. Internally invoked by orchestrator; not intended for direct user invocation."
-disable-model-invocation: true
-license: "Apache-2.0"
----
-
-# Report
+# Reporter Agent Guide
 
 작업 완료 후 결과를 정리하여 보고서를 생성하고 summary.txt를 작성하는 스킬.
 
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
-**workflow-agent-reporter 스킬의 책임:**
+**workflow-agent Reporter 스킬의 책임:**
 - REPORT: 작업 결과를 정리하여 보고서 생성
 - summary.txt 생성 (최종 작업 2줄 요약)
 
@@ -67,9 +60,9 @@ workPath: <workDir>/work/
 
 1. **보고서 작성**
    1. command에 해당하는 템플릿 파일을 Read 도구로 로드
-      - 매핑: implement/refactor/build/framework -> `templates/implement.md`, review/analyze -> `templates/review.md`, research -> `templates/research.md`, architect -> `templates/architect.md`
-      - 템플릿 경로: `.claude/skills/workflow-agent-reporter/templates/<템플릿파일>`
-      - placeholder 치환 가이드: `templates/_guide.md` 참조
+      - 매핑: implement/refactor/build/framework -> `templates/report/implement.md`, review/analyze -> `templates/report/review.md`, research -> `templates/report/research.md`, architect -> `templates/report/architect.md`
+      - 템플릿 경로: `.claude/skills/workflow-agent/templates/report/<템플릿파일>`
+      - placeholder 치환 가이드: `templates/report/_guide.md` 참조
    2. 작업 내역(`work/` 디렉터리) 취합 및 분석
    3. 템플릿의 `{{placeholder}}`를 실제 값으로 치환하고, 작업 내역을 기반으로 각 섹션 작성
    4. 보고서 경로를 `{workDir}/report.md`로 확정적 구성 (LLM 추론에 의존하지 않음)
@@ -80,7 +73,7 @@ workPath: <workDir>/work/
    - 1줄: 작업 제목 및 command
    - 2줄: 핵심 결과 요약 (변경 파일 수, 주요 성과 등)
 
-> **Note**: reporter 반환 후, 오케스트레이터가 flow-finish로 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제를 수행하고, flow-claude end로 DONE 배너를 출력합니다. 상세 절차는 `workflow-orchestration/step-done.md`를 참조하세요.
+> **Note**: reporter 반환 후, 오케스트레이터가 flow-finish로 history.md 갱신, status.json 완료 처리, 사용량 확정, 레지스트리 해제를 수행하고, flow-claude end로 DONE 배너를 출력합니다. 상세 절차는 `workflow-orchestration/SKILL.md`의 DONE 섹션을 참조하세요.
 
 ### reporter 출력
 
@@ -134,7 +127,7 @@ flowchart TD
 
 ### 마크다운 보고서 템플릿
 
-command별 보고서 구조가 다르므로, `templates/` 디렉터리에 유형별 템플릿을 분리하여 관리합니다.
+command별 보고서 구조가 다르므로, `templates/report/` 디렉터리에 유형별 템플릿을 분리하여 관리합니다.
 
 **템플릿 사용 절차:**
 
@@ -147,16 +140,16 @@ command별 보고서 구조가 다르므로, `templates/` 디렉터리에 유형
 
 | command | 템플릿 파일 | 보고서 유형 |
 |---------|------------|------------|
-| implement | `templates/implement.md` | 코드 변경형 (문제-해결 구조) |
-| refactor | `templates/implement.md` | 코드 변경형 (개선 전/후 비교) |
-| build | `templates/implement.md` | 코드 변경형 (빌드 결과 중심) |
-| framework | `templates/implement.md` | 코드 변경형 (생성 구조 중심) |
-| review | `templates/review.md` | 검토/분석형 (판정 구조) |
-| analyze | `templates/review.md` | 검토/분석형 (분석 결과 구조) |
-| research | `templates/research.md` | 조사형 (조사-결론 구조) |
-| architect | `templates/architect.md` | 설계형 (아키텍처 구조) |
+| implement | `templates/report/implement.md` | 코드 변경형 (문제-해결 구조) |
+| refactor | `templates/report/implement.md` | 코드 변경형 (개선 전/후 비교) |
+| build | `templates/report/implement.md` | 코드 변경형 (빌드 결과 중심) |
+| framework | `templates/report/implement.md` | 코드 변경형 (생성 구조 중심) |
+| review | `templates/report/review.md` | 검토/분석형 (판정 구조) |
+| analyze | `templates/report/review.md` | 검토/분석형 (분석 결과 구조) |
+| research | `templates/report/research.md` | 조사형 (조사-결론 구조) |
+| architect | `templates/report/architect.md` | 설계형 (아키텍처 구조) |
 
-> **참고**: 템플릿 선택 가이드 및 placeholder 목록은 `templates/_guide.md`를 참조하세요.
+> **참고**: 템플릿 선택 가이드 및 placeholder 목록은 `templates/report/_guide.md`를 참조하세요.
 > 템플릿은 권장 구조이며, 내용에 따라 reporter가 유연하게 조정할 수 있습니다.
 
 ### 변경 파일 테이블 경로 링크 형식
@@ -170,7 +163,7 @@ command별 보고서 구조가 다르므로, `templates/` 디렉터리에 유형
 | 파일 경로 | 변경 유형 | 설명 |
 |----------|----------|------|
 | [`src/components/Login.tsx`](src/components/Login.tsx) | 생성 | 로그인 컴포넌트 |
-| [`.claude/skills/workflow-agent-worker/SKILL.md`](.claude/skills/workflow-agent-worker/SKILL.md) | 수정 | 링크 지침 추가 |
+| [`.claude/skills/workflow-agent/SKILL.md`](.claude/skills/workflow-agent/SKILL.md) | 수정 | 링크 지침 추가 |
 ```
 
 **규칙**:
@@ -219,53 +212,6 @@ wb.save('report.xlsx')
 
 시각화가 필요한 경우, 반드시 `.claude/skills/design-mermaid-diagrams/SKILL.md`를 Read 도구로 로드하여 Mermaid 구문 규칙을 참조한 후 다이어그램을 작성한다.
 
-**다이어그램 유형별 mermaid 예시:**
-
-**작업 흐름도 (flowchart):**
-```mermaid
-flowchart TD
-    A[시작] --> B[처리]
-    B --> C{조건}
-    C -->|Yes| D[완료]
-    C -->|No| E[재시도]
-    E --> B
-```
-
-**시스템 구조 (class diagram):**
-```mermaid
-classDiagram
-    class Module {
-        +String name
-        +process()
-    }
-    class SubModule {
-        +execute()
-    }
-    Module <|-- SubModule
-```
-
-**상태 변화 (state diagram):**
-```mermaid
-stateDiagram-v2
-    [*] --> INIT
-    INIT --> PLAN
-    PLAN --> WORK
-    WORK --> REPORT
-    REPORT --> DONE
-    REPORT --> FAILED
-```
-
-**타임라인 (gantt chart):**
-```mermaid
-gantt
-    title 작업 일정
-    dateFormat YYYY-MM-DD
-    section Phase 1
-        태스크1 :a1, 2026-01-01, 3d
-    section Phase 2
-        태스크2 :b1, after a1, 2d
-```
-
 > **원칙**: 보고서 내 다이어그램은 반드시 mermaid 코드 블록을 사용합니다. ASCII art나 텍스트 화살표를 다이어그램 대용으로 사용하지 않습니다.
 > **방향 필수**: Flowchart 연결선은 반드시 방향 화살표(`-->`, `-.->`, `==>`)를 사용합니다. 방향 없는 연결(`---`, `-.-`, `===`)은 금지합니다.
 
@@ -305,21 +251,6 @@ flowchart TD
 - `workDir`: 오케스트레이터로부터 전달받은 작업 디렉터리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
 - reporter는 `workDir`을 직접 사용하여 보고서 경로를 확정적으로 구성 (LLM 추론으로 경로를 재조합하지 않음)
 
-**예시:**
-```
-.workflow/20260203-143000/로그인기능추가/implement/report.md
-.workflow/20260203-144500/API-리팩토링/refactor/report.md
-.workflow/20260203-150000/코드리뷰/review/report.md
-```
-
-**다중 파일이 필요한 경우 (CSV, Excel 등):**
-```
-.workflow/20260203-143000/로그인기능추가/implement/
-|-- report.md        # 메인 보고서
-|-- summary.csv        # 요약 테이블 (필요시)
-|-- diagram.png        # 시각화 다이어그램 (필요시)
-```
-
 ---
 
 ## Git 커밋
@@ -351,5 +282,5 @@ flowchart TD
 
 | 스킬 | 용도 | 경로 |
 |------|------|------|
-| workflow-system-report-output | Git 커밋 기반 CHANGELOG/릴리스 노트 및 PR 제목/요약 자동 생성 | `.claude/skills/workflow-system-report-output/SKILL.md` |
-| workflow-system-verification | 작업 완료 선언 전 자동 검증 강제 | `.claude/skills/workflow-system-verification/SKILL.md` |
+| workflow-system | Git 커밋 기반 CHANGELOG/릴리스 노트 및 PR 제목/요약 자동 생성 | `.claude/skills/workflow-system/reference/report-output.md` |
+| workflow-system | 작업 완료 선언 전 자동 검증 강제 | `.claude/skills/workflow-system/reference/verification.md` |

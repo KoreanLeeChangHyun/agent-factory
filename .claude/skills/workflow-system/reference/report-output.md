@@ -1,10 +1,4 @@
----
-name: workflow-system-report-output
-description: "REPORT 단계 산출물(CHANGELOG, 릴리스 노트, PR 요약) 자동 생성 스킬. Git 커밋 히스토리와 브랜치 diff를 분석하여 구조화된 CHANGELOG, 릴리스 노트, PR 제목/본문을 생성한다. Triggers: 'changelog', 'release notes', '변경 이력', '릴리스 노트', 'PR', 'pull request', 'PR 요약', 'PR 생성'."
-license: "Apache-2.0"
----
-
-# Report Output Generator
+# Report Output Generator (상세)
 
 REPORT 단계에서 사용하는 산출물 생성 스킬. CHANGELOG/릴리스 노트와 PR 요약을 자동 생성한다.
 
@@ -197,7 +191,7 @@ Generated with [Claude Code](https://claude.com/claude-code)
 
 ## 5. 워크플로우 통합 (REPORT 단계)
 
-이 스킬은 REPORT 단계에서 `workflow-agent-reporter`와 연동하여 동작한다.
+이 스킬은 REPORT 단계에서 `workflow-agent` (reporter)와 연동하여 동작한다.
 
 ### REPORT 단계 흐름
 

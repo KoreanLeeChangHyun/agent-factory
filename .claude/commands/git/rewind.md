@@ -140,9 +140,9 @@ git stash push -m "rewind-backup-$(date +%Y%m%d-%H%M%S)"
 git reset --hard <target>
 ```
 
-**workflow-system-hooks-guide 차단 대응:**
+**workflow-system hooks-guide 차단 대응:**
 
-`git reset --hard`가 workflow-system-hooks-guide의 Dangerous Command Guard에 의해 차단될 수 있습니다. 차단된 경우:
+`git reset --hard`가 workflow-system hooks-guide의 Dangerous Command Guard에 의해 차단될 수 있습니다. 차단된 경우:
 
 1. 사용자에게 안내: "Dangerous Command Guard에 의해 `git reset --hard`가 차단되었습니다."
 2. 대안 제시: "`--mode soft`로 되돌리면 변경사항이 staging area에 보존됩니다. soft 모드로 진행하시겠습니까?"

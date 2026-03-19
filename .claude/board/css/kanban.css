@@ -178,14 +178,6 @@
   min-width: 0;
 }
 
-.card-ticket-icon {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  color: #4ec9b0;
-  opacity: 0.7;
-}
-
 .card-mid {
   flex: 1;
   min-height: 0;

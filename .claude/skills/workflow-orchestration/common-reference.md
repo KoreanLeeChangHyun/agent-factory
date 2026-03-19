@@ -21,7 +21,7 @@
 | **worker-sonnet** | 워커(Sonnet) | WORK Step을 전담하는 서브에이전트. 일반 구현/수정, 중간 복잡도 작업(Tier 2). |
 | **explorer** | 익스플로러 | WORK Step에서 코드베이스+웹 탐색을 전담하는 서브에이전트. Worker와 동일 레벨로 호출되며, 탐색 결과를 구조화된 작업 내역으로 생성. |
 | **orchestrator** | 오케스트레이터 | 워크플로우의 단계 순서(sequencing)와 에이전트 디스패치를 제어하는 최상위 에이전트. Application Service 역할. "메인 에이전트", "부모 에이전트"와 동일한 개념이며, 모든 문서에서 "오케스트레이터"로 통일. |
-| **init** | 이닛 | UserPromptSubmit hook이 initialization.py를 실행하여 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
+| **init** | 이닛 | 오케스트레이터가 flow-init(initialization.py)을 실행하여 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록을 수행. |
 | **planner** | 플래너 | PLAN Step을 전담하는 서브에이전트. 사용자 요청을 분석하여 태스크 분해, 종속성 정의, 실행 계획서(plan.md)를 생성. |
 | **reporter** | 리포터 | REPORT Step을 전담하는 서브에이전트. 작업 내역(work log)을 취합하여 보고서(report.md)를 생성. |
 | **flow-finish** | 플로우 스크립트 피니시 | 오케스트레이터가 직접 호출하는 워크플로우 마무리 스크립트(finalization.py). status 전이, history.md 갱신, 사용량 확정, 아카이빙, kanban 갱신을 수행. |
@@ -43,7 +43,7 @@
 | **report document** | 보고서 | reporter가 REPORT 단계에서 생성하는 결과 문서. `report.md`. |
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
-| **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. 동일 "Step" 용어와 혼동을 피하기 위해 문맥에서 구분되는 개념으로 step-plan.md~step-done.md 파일명에 사용. FSM Step과 1:1 대응. |
+| **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. FSM Step과 1:1 대응. SKILL.md의 INIT/PLAN/WORK/REPORT/DONE 섹션에서 각 Step별 프로토콜을 정의. |
 | **DONE** | (FSM Step/배너 명칭) | 워크플로우 완료를 나타내는 FSM Step이자 배너 명칭. 오케스트레이터가 flow-finish + flow-claude end로 마무리 수행. Agent-Step 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE)에서 사용. |
 | **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, flow-finish(finalization.py)가 읽어서 history.md 갱신에 활용 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/T-NNN.xml` 티켓 전체 XML을 읽어 workDir에 복사 후 상태를 in-progress로 전환. 티켓 파일은 `<metadata>` / `<submit>` / `<history>` 3래퍼 요소 구조를 가지며, `<current>`는 `<metadata>` 래퍼 내부(number/title/datetime/status/current)에 위치함. `<subnumber>` 내부에 `<prompt>` 래퍼(goal/target/constraints/criteria/context 포함)와 `<result>` 래퍼(workdir/plan/work/report 하위 요소)가 있음. **XML 구조 SSoT 레퍼런스:** `.claude/skills/workflow-orchestration/references/T-NNN.xml` |
@@ -60,12 +60,12 @@ flowchart TD
     ORCH -->|"Task(reporter)"| REPORT_A[reporter agent]
     ORCH -->|"flow-finish"| FINISH[finalization.py]
 
-    PLAN_A -->|바인딩| WF_PLAN[workflow-agent-planner]
-    WORK_A -->|정적 바인딩| WF_WORK[workflow-agent-worker]
+    PLAN_A -->|바인딩| WF_PLAN[workflow-agent]
+    WORK_A -->|정적 바인딩| WF_WORK[workflow-agent]
     WORK_A -->|동적 바인딩| CMD_SKILLS[command skills]
-    EXPLORE_A -->|바인딩| WF_EXPLORE[workflow-agent-explorer]
-    VALID_A -->|바인딩| WF_VALID[workflow-agent-validator]
-    REPORT_A -->|바인딩| WF_REPORT[workflow-agent-reporter]
+    EXPLORE_A -->|바인딩| WF_EXPLORE[workflow-agent]
+    VALID_A -->|바인딩| WF_VALID[workflow-agent]
+    REPORT_A -->|바인딩| WF_REPORT[workflow-agent]
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
@@ -99,14 +99,14 @@ flowchart TD
 
 | Agent | Phase | Workflow Skill | Command Skills | Binding |
 |-------|-------|---------------|----------------|---------|
-| planner | PLAN | workflow-agent-planner | - | frontmatter `skills:` |
-| worker-opus | WORK | workflow-agent-worker | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback) | frontmatter `skills:` (workflow-agent-worker) + 런타임 동적 (Tier 2 + Tier 3) |
-| worker-sonnet | WORK | workflow-agent-worker | (worker-opus와 동일) | (worker-opus와 동일) |
-| explorer | WORK | workflow-agent-explorer | - | frontmatter `skills:` |
-| validator | WORK (Phase N+1) | workflow-agent-validator | - | frontmatter `skills:` |
-| reporter (sonnet) | REPORT | workflow-agent-reporter | - | frontmatter `skills:` |
+| planner | PLAN | workflow-agent | - | frontmatter `skills:` |
+| worker-opus | WORK | workflow-agent | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback) | frontmatter `skills:` (workflow-agent) + 런타임 동적 (Tier 2 + Tier 3) |
+| worker-sonnet | WORK | workflow-agent | (worker-opus와 동일) | (worker-opus와 동일) |
+| explorer | WORK | workflow-agent | - | frontmatter `skills:` |
+| validator | WORK (Phase N+1) | workflow-agent | - | frontmatter `skills:` |
+| reporter (sonnet) | REPORT | workflow-agent | - | frontmatter `skills:` |
 
-> **worker의 스킬 동적 로드 (3계층)**: worker는 `workflow-agent-worker` skill만 frontmatter에 선언합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 4단계 우선순위(계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback)로 런타임에 결정됩니다.
+> **worker의 스킬 동적 로드 (3계층)**: worker는 `workflow-agent` skill만 frontmatter에 선언합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 4단계 우선순위(계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback)로 런타임에 결정됩니다.
 
 ## Responsibility Matrix (Main vs Sub-agent)
 

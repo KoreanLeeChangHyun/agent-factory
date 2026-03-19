@@ -25,7 +25,7 @@
     <kanban-cli-reference>
       flow-kanban 유효 서브커맨드 (이 외의 서브커맨드는 존재하지 않음):
         create, move, done, delete,
-        add-subnumber, update-title, update-subnumber, archive-subnumber
+        add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
       "update" 등 미등록 서브커맨드 사용을 절대 금지한다 (MUST NOT). 사용 시 hook에 의해 차단된다.
       제목 변경은 반드시 "update-title" 서브커맨드를 사용해야 한다 (MUST).
     </kanban-cli-reference>

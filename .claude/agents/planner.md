@@ -4,7 +4,7 @@ description: "작업 계획 수립을 수행하는 에이전트"
 model: opus
 tools: Bash, Glob, Grep, Read, Write
 skills:
-  - workflow-agent-planner
+  - workflow-agent
   - design-mermaid-diagrams
 maxTurns: 100
 ---
@@ -40,7 +40,7 @@ maxTurns: 100
 - `mode`: 동작 모드 (선택). `revise`일 때 기존 계획서(`{workDir}/plan.md`)를 읽어 피드백을 반영하여 수정하는 revise 모드로 동작
 - `feedback`: 사용자 피드백 내용 (선택). `mode: revise`일 때 `reload-prompt.sh`가 반환한 피드백 텍스트. 빈 문자열이면 갱신된 `user_prompt.txt`를 참조하여 자체 판단으로 계획 개선
 
-> 상세 절차, 스킬 바인딩, 주의사항, 에러 처리: `workflow-agent-planner/SKILL.md` 참조
+> 상세 절차, 스킬 바인딩, 주의사항, 에러 처리: `workflow-agent/SKILL.md` 참조
 
 ## 오케스트레이터 반환 형식
 

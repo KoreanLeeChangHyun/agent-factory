@@ -1,17 +1,10 @@
----
-name: workflow-agent-explorer
-description: "Internal skill for workflow WORK stage exploration tasks. Executes structured codebase and web exploration when invoked by orchestrator via Task tool as explorer subagent. Use for exploration tasks: handles code search, web research, information gathering, and structured result reporting; produces work/WXX-*.md deliverables without modifying source code. Internally invoked by orchestrator; not intended for direct user invocation."
-disable-model-invocation: true
-license: "Apache-2.0"
----
-
-# Explore
+# Explorer Agent Guide
 
 코드베이스 및 웹 통합 탐색을 위한 전문 에이전트 스킬. 오케스트레이터가 Planner의 계획서에서 서브에이전트 타입을 `Explorer`로 지정한 태스크에 대해 호출한다.
 
 > 이 스킬은 workflow-orchestration 스킬이 관리하는 워크플로우의 한 단계입니다. 전체 워크플로우 구조는 workflow-orchestration 스킬을 참조하세요.
 
-**workflow-agent-explorer의 역할:**
+**workflow-agent Explorer의 역할:**
 - 오케스트레이터(workflow-orchestration)가 Task 도구로 explorer 에이전트를 호출
 - 계획서의 탐색 태스크를 5단계 프로세스로 실행
 - 탐색 결과를 구조화된 작업 내역 파일로 생성
@@ -137,7 +130,7 @@ Glob("<workDir>/work/W02-*.md")
 
 | 스킬명 | 매칭 방식 | 근거 |
 |--------|----------|------|
-| workflow-agent-explorer | frontmatter skills | explorer 에이전트 기본 스킬 |
+| workflow-agent | frontmatter skills | explorer 에이전트 기본 스킬 |
 
 ## 탐색 결과
 
@@ -250,7 +243,7 @@ WORK 단계에서는 사용자에게 절대 질문하지 않는다.
 
 ## Frontmatter 플래그 설명
 
-`disable-model-invocation: true`: Claude의 자동 스킬 호출을 차단하여 워크플로우 순서를 보장합니다. 이 플래그는 workflow-agent-explorer 스킬에만 적용되며 제거하지 마세요.
+`disable-model-invocation: true`: Claude의 자동 스킬 호출을 차단하여 워크플로우 순서를 보장합니다. 이 플래그는 workflow-agent 스킬에만 적용되며 제거하지 마세요.
 
 ---
 
@@ -260,7 +253,7 @@ WORK 단계에서는 사용자에게 절대 질문하지 않는다.
 |------|------|------|
 | research-deep | 격리 컨텍스트 코드 탐색 (Haiku) | `.claude/skills/research-deep/SKILL.md` |
 | research-general | 웹 중심 조사 | `.claude/skills/research-general/SKILL.md` |
-| workflow-agent-worker | Worker 작업 스킬 (작업 내역 규격 참조) | `.claude/skills/workflow-agent-worker/SKILL.md` |
+| workflow-agent | Worker 작업 스킬 (작업 내역 규격 참조) | `.claude/skills/workflow-agent/SKILL.md` |
 
 ## 주의사항
 

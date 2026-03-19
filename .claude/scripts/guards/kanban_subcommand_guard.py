@@ -43,6 +43,7 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "update-title",
     "update-subnumber",
     "archive-subnumber",
+    "set-editing",
 })
 
 # flow-kanban 명령 감지 및 서브커맨드 추출 패턴

@@ -4,7 +4,7 @@ description: "작업 내역 기반 보고서를 생성하는 에이전트"
 model: sonnet
 tools: Bash, Glob, Grep, Read, Write
 skills:
-  - workflow-agent-reporter
+  - workflow-agent
   - design-mermaid-diagrams
 maxTurns: 30
 permissionMode: acceptEdits
@@ -41,7 +41,7 @@ permissionMode: acceptEdits
 
 > **보고서 경로 구성**: `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적으로 구성합니다. workPath에서 역변환하여 경로를 추론하지 마세요.
 
-> 상세 절차 (command별 템플릿 매핑, placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-agent-reporter/SKILL.md`를 참조하세요.
+> 상세 절차 (command별 템플릿 매핑, placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-agent/reference/reporter-guide.md`를 참조하세요.
 
 ## 오케스트레이터 반환 형식 (필수)
 
