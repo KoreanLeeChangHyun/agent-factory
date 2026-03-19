@@ -23,11 +23,21 @@
     </workflow-session-policy>
 
     <kanban-cli-reference>
-      flow-kanban 유효 서브커맨드 (이 외의 서브커맨드는 존재하지 않음):
-        create, move, done, delete,
-        add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
-      "update" 등 미등록 서브커맨드 사용을 절대 금지한다 (MUST NOT). 사용 시 hook에 의해 차단된다.
-      제목 변경은 반드시 "update-title" 서브커맨드를 사용해야 한다 (MUST).
+      flow-kanban 유효 서브커맨드 및 사용 방법 (이 외의 서브커맨드는 존재하지 않음):
+
+      핵심 서브커맨드 사용 예시:
+        flow-kanban create "" --command init
+        flow-kanban create "제목" --command implement
+        flow-kanban move T-001 progress          # target: open | progress | review | done
+        flow-kanban done T-001
+        flow-kanban update-title T-001 "새 제목"  # 제목 변경은 반드시 update-title (update는 존재하지 않음)
+        flow-kanban add-subnumber T-001 --command implement --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
+        flow-kanban update-subnumber T-001 --id 1 --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
+        flow-kanban set-editing T-001 --on        # 편집 상태 설정: --on | --off
+        flow-kanban archive-subnumber T-001 --id 1
+        flow-kanban delete T-001
+
+      제목 변경: update-title / 상태 변경: move / 완료: done
     </kanban-cli-reference>
   </managed>
 

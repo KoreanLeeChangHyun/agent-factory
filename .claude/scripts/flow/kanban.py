@@ -218,7 +218,7 @@ def _write_ticket_xml(filepath: str, root: ET.Element) -> None:
         # \\n 리터럴(2문자)을 실제 개행문자로 변환
         content = content.replace("\\n", "\n")
         # 리스트 패턴 자동 개행: 숫자) 패턴과 대시(-) 패턴 앞에 개행 삽입 (문자열 시작 제외)
-        content = re.sub(r"(?<!^)(?<!\n)(\s*)(\d+\))", r"\n\2", content)
+        content = re.sub(r"(?<!^)(?<!\n)(?<!\()(\s)(\d{1,2}\))", r"\n\2", content)
         content = re.sub(r"(?<!^)(?<!\n)(\s*)(- )", r"\n\2", content)
         if len(content) < _PROMPT_FIELD_INLINE_LIMIT:
             return f"{indent}<{tag}>{content}</{tag}>"

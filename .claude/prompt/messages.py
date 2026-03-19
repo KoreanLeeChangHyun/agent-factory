@@ -59,10 +59,18 @@ AGENT_INVESTIGATION_WINDOW_QUERY_FAILED: str = (
 # =============================================================================
 
 KANBAN_INVALID_SUBCOMMAND: str = (
-    "flow-kanban의 유효하지 않은 서브커맨드 '{subcommand}'가 차단되었습니다. "
-    "유효한 서브커맨드: {valid_list}"
+    "flow-kanban의 유효하지 않은 서브커맨드 '{subcommand}'가 차단되었습니다.\n"
+    "유효한 서브커맨드: {valid_list}\n\n"
+    "올바른 사용 예시:\n"
+    "  flow-kanban move T-001 progress     # target: open|progress|review|done\n"
+    "  flow-kanban update-title T-001 '새 제목'  # 제목 변경\n"
+    "  flow-kanban done T-001\n"
+    "  flow-kanban add-subnumber T-001 --command implement --goal '목표'\n\n"
+    "'{subcommand}' 대신 위 예시를 참고하세요."
 )
-"""플레이스홀더: {subcommand} - 사용된 유효하지 않은 서브커맨드, {valid_list} - 허용 서브커맨드 목록."""
+"""플레이스홀더: {subcommand} - 사용된 유효하지 않은 서브커맨드, {valid_list} - 허용 서브커맨드 목록.
+
+메시지 포맷: 차단 알림 + 유효 서브커맨드 목록 + 올바른 사용 예시(move/update-title/done/add-subnumber) + 수정 안내."""
 
 # =============================================================================
 # hooks_self_guard.py 메시지
