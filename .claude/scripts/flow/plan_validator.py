@@ -5,6 +5,7 @@ plan.md를 입력받아 다음을 검증한다:
 (1) Mermaid 서브그래프에서 Phase별 워커 수 추출, 최대/최소 비율 3배 이상 시 경고
 (2) 작업 목록 테이블에서 워커별 작업 항목 수 파싱, 편차 2 초과 시 경고
 (3) T2(10+) 태스크에서 스킬 1개인 경우 경고
+(4) WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지 (advisory, 비차단)
 
 사용법:
   python3 plan_validator.py <plan_path>
@@ -444,6 +445,170 @@ def validate_skill_coverage(tasks: list[dict[str, Any]]) -> list[str]:
     return warnings
 
 
+def _extract_xml_tag(content: str, tag: str) -> str:
+    """XML 태그 내용을 추출한다.
+
+    Args:
+        content: 검색 대상 문자열
+        tag: 태그 이름 (예: "criteria", "goal", "context")
+
+    Returns:
+        태그 내용 문자열. 태그가 없으면 빈 문자열.
+    """
+    match = re.search(rf"<{tag}>(.*?)</{tag}>", content, re.DOTALL)
+    return match.group(1) if match else ""
+
+
+def _extract_section(content: str, section_names: list[str]) -> str:
+    """plan.md에서 지정된 섹션 이름에 해당하는 섹션 내용을 추출한다.
+
+    ## 헤더로 시작하는 섹션을 탐색하며 다음 ## 헤더까지의 내용을 반환한다.
+
+    Args:
+        content: plan.md 전체 내용 문자열
+        section_names: 탐색할 섹션 이름 목록 (첫 번째 일치 섹션 반환)
+
+    Returns:
+        섹션 내용 문자열. 섹션이 없으면 빈 문자열.
+    """
+    lines = content.split("\n")
+    in_section = False
+    section_lines = []
+
+    for line in lines:
+        if re.match(r"^##\s+", line):
+            if in_section:
+                break
+            header_text = re.sub(r"^##\s+", "", line).strip()
+            if any(name in header_text for name in section_names):
+                in_section = True
+            continue
+
+        if in_section:
+            section_lines.append(line)
+
+    return "\n".join(section_lines)
+
+
+def _normalize_line(line: str) -> str:
+    """공백을 정규화한 행을 반환한다."""
+    return re.sub(r"\s+", " ", line).strip()
+
+
+def _count_consecutive_matches(source_lines: list[str], target_text: str) -> int:
+    """source_lines의 연속 행이 target_text에 포함되는 최대 연속 일치 수를 반환한다.
+
+    공백 정규화 후 문자열 포함 비교(substring match)를 사용한다.
+    빈 행은 비교에서 제외한다.
+
+    Args:
+        source_lines: 비교 기준 행 목록 (XML 태그 내용 등)
+        target_text: 대상 텍스트 (plan.md 섹션 내용)
+
+    Returns:
+        최대 연속 일치 행 수.
+    """
+    target_normalized = _normalize_line(target_text)
+    max_streak = 0
+    current_streak = 0
+
+    for line in source_lines:
+        norm = _normalize_line(line)
+        if not norm:
+            # 빈 행은 연속 카운트를 끊지 않음 (선택적 연속 허용)
+            continue
+        if norm in target_normalized:
+            current_streak += 1
+            max_streak = max(max_streak, current_streak)
+        else:
+            current_streak = 0
+
+    return max_streak
+
+
+def validate_what_how_separation(plan_path: str, user_prompt_path: str) -> list[str]:
+    """WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지.
+
+    user_prompt.txt의 XML 태그 내용이 plan.md의 해당 섹션에 재서술되었는지를
+    문자열 비교로 탐지한다. 모든 경고는 advisory(비차단) 수준이다.
+
+    탐지 룰:
+      - criteria 재서술: <criteria> 원문 3줄 이상 연속 일치 시 경고
+      - goal 재서술: <goal> 원문 핵심 구절(10자 이상) 포함 시 경고
+      - context 원문 복사: <context> 원문 2줄 이상 연속 일치 시 경고
+
+    Args:
+        plan_path: plan.md 파일 경로
+        user_prompt_path: user_prompt.txt 파일 경로
+
+    Returns:
+        advisory 경고 메시지 목록. 이상 없으면 빈 리스트.
+    """
+    warnings = []
+
+    if not os.path.isfile(user_prompt_path):
+        return warnings
+
+    with open(user_prompt_path, "r", encoding="utf-8") as f:
+        prompt_content = f.read()
+
+    with open(plan_path, "r", encoding="utf-8") as f:
+        plan_content = f.read()
+
+    # 룰 1: criteria 재서술 탐지
+    criteria_text = _extract_xml_tag(prompt_content, "criteria")
+    if criteria_text:
+        criteria_section = _extract_section(plan_content, ["기술 검증 기준"])
+        if criteria_section:
+            criteria_lines = [l for l in criteria_text.split("\n") if _normalize_line(l)]
+            match_count = _count_consecutive_matches(criteria_lines, criteria_section)
+            if match_count >= 3:
+                warnings.append(
+                    f"[WHAT/HOW advisory] criteria 재서술 의심: "
+                    f"기술 검증 기준 섹션에 <criteria> 원문과 유사한 내용 {match_count}줄 감지"
+                )
+
+    # 룰 2: goal 재서술 탐지
+    goal_text = _extract_xml_tag(prompt_content, "goal")
+    if goal_text:
+        summary_section = _extract_section(plan_content, ["작업 요약"])
+        if summary_section:
+            summary_normalized = _normalize_line(summary_section)
+            # goal 원문에서 10자 이상 연속 구절 추출 후 포함 여부 확인
+            goal_normalized = _normalize_line(goal_text)
+            found_phrase = False
+            # 슬라이딩 윈도우로 10자 이상 구절 탐지
+            words = goal_normalized.split()
+            for i in range(len(words)):
+                for j in range(i + 2, len(words) + 1):
+                    phrase = " ".join(words[i:j])
+                    if len(phrase) >= 10 and phrase in summary_normalized:
+                        found_phrase = True
+                        break
+                if found_phrase:
+                    break
+            if found_phrase:
+                warnings.append(
+                    "[WHAT/HOW advisory] goal 재서술 의심: "
+                    "작업 요약에 <goal> 원문 구절 포함 감지"
+                )
+
+    # 룰 3: context 원문 블록 복사 탐지
+    context_text = _extract_xml_tag(prompt_content, "context")
+    if context_text:
+        note_section = _extract_section(plan_content, ["비고", "현황 스냅샷"])
+        if note_section:
+            context_lines = [l for l in context_text.split("\n") if _normalize_line(l)]
+            match_count = _count_consecutive_matches(context_lines, note_section)
+            if match_count >= 2:
+                warnings.append(
+                    f"[WHAT/HOW advisory] context 원문 복사 의심: "
+                    f"비고 섹션에 <context> 원문 블록 {match_count}줄 복사 감지"
+                )
+
+    return warnings
+
+
 def validate(plan_path: str) -> list[str]:
     """plan.md를 검증하고 경고 목록을 반환.
 
@@ -482,6 +647,11 @@ def validate(plan_path: str) -> list[str]:
     if tasks:
         warnings.extend(validate_skill_coverage(tasks))
 
+    # 5. WHAT/HOW 분리 검증 (advisory, 비차단)
+    plan_dir = os.path.dirname(plan_path)
+    user_prompt_path = os.path.join(plan_dir, "user_prompt.txt")
+    warnings.extend(validate_what_how_separation(plan_path, user_prompt_path))
+
     if warnings:
         _work_dir = resolve_work_dir_for_logging()
         if _work_dir:
@@ -512,6 +682,7 @@ def print_help() -> None:
     print("  2. 작업 편차: 같은 Phase 내 워커 간 작업 항목 수 편차")
     print("     2 초과 시 경고")
     print("  3. 스킬 부족: T2(10+) 태스크에서 스킬 1개만 배정 시 경고")
+    print("  4. WHAT/HOW 분리: criteria/goal/context 재서술 탐지 (advisory)")
     print()
     print("출력:")
     print("  경고 목록 또는 '검증 통과'")

@@ -39,7 +39,7 @@
 | **banner** | 배너 | 워크플로우 진행 상태를 터미널에 표시하는 시각적 알림. orchestrator가 Step 시작/완료 시 호출. |
 | **task** | 태스크 | 계획서에서 분해된 개별 실행 단위. Worker 또는 Explorer가 수행. |
 | **work log** | 작업 내역 | Worker/Explorer가 태스크 실행 후 생성하는 기록 파일. `work/WXX-*.md` 형식. |
-| **plan document** | 계획서 | planner가 PLAN 단계에서 생성하는 작업 계획 문서. `plan.md`. |
+| **plan document** | 계획서 | planner가 PLAN 단계에서 생성하는 작업 계획 문서. `plan.md`. 기술적 실행 전략(HOW)을 담당하며, 사용자 의도(WHAT)는 user_prompt.txt가 전담한다. |
 | **report document** | 보고서 | reporter가 REPORT 단계에서 생성하는 결과 문서. `report.md`. |
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
@@ -47,6 +47,18 @@
 | **DONE** | (FSM Step/배너 명칭) | 워크플로우 완료를 나타내는 FSM Step이자 배너 명칭. 오케스트레이터가 flow-finish + flow-claude end로 마무리 수행. Agent-Step 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE)에서 사용. |
 | **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, flow-finish(finalization.py)가 읽어서 history.md 갱신에 활용 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/T-NNN.xml` 티켓 전체 XML을 읽어 workDir에 복사 후 상태를 in-progress로 전환. 티켓 파일은 `<metadata>` / `<submit>` / `<history>` 3래퍼 요소 구조를 가지며, `<current>`는 `<metadata>` 래퍼 내부(number/title/datetime/status/current)에 위치함. `<subnumber>` 내부에 `<prompt>` 래퍼(goal/target/constraints/criteria/context 포함)와 `<result>` 래퍼(workdir/plan/work/report 하위 요소)가 있음. **XML 구조 SSoT 레퍼런스:** `.claude/skills/workflow-orchestration/references/T-NNN.xml` |
+
+### WHAT/HOW Bounded Context 용어 구분
+
+| WHAT BC (티켓) | HOW BC (계획서) | 설명 |
+|----------------|----------------|------|
+| criteria (완료 기준) | 기술 검증 기준 | WHAT: 사용자 수준 성공 판정. HOW: 파일명/수치/조건 기반 기술 검증 |
+| goal (목표) | 작업 요약 | WHAT: 사용자 의도/비즈니스 목표. HOW: 기술적 접근 방식과 산출물 |
+| context (맥락) | 현황 스냅샷 | WHAT: 배경 정보 원문. HOW: 코드베이스 탐색 기반 정량적 현황 분석 |
+| 요청 (request) | 사용자 원문 (메타 필드) | 사용자 원문 그대로 보존. plan.md에서 재서술하지 않음 |
+| scope (범위) | 작업 범위 (In/Out-of-Scope) | WHAT: 사용자 정의 범위. HOW: 기술적 해석을 거친 구체적 범위 |
+
+WHAT BC의 용어는 user_prompt.txt(티켓 원문)에서 사용되며, HOW BC의 용어는 plan.md(계획서)에서 사용된다. 동일 개념에 대해 BC별로 다른 용어를 사용하여 역할 경계를 명확히 한다.
 
 ### 에이전트-Step-스킬 관계
 

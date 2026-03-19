@@ -3,7 +3,7 @@
 - 작업 ID: {{workId}}
 - 명령어: {{command}}
 - 작성일: {{date}} (KST)
-- 요청: {{request}}
+- 사용자 원문: {{request}}
 <!-- 선택. 명령어별 기본값과 다를 때만 명시. 기본값: implement/refactor/framework=3, build=2, review/architect/analyze/research=4 -->
 <!-- - 품질 레벨: Level N -->
 
@@ -74,7 +74,7 @@ flowchart TD
 ### Phase 2 (순차)
 - W02: ...
 
-## 완료 기준
+## 기술 검증 기준
 <!-- 권장. 단일 T1 태스크만 있는 매우 단순한 계획인 경우 생략 가능 -->
 <!-- 측정 가능성 원칙: 각 기준에 (1) 정량적 수치("N개 이상", "0건"), (2) 구체적 파일/경로명, (3) 검증 가능한 조건("~형식으로") 중 1개 이상 포함 -->
 <!-- <criteria> 태그 항목을 재서술하지 않는다. 기술적 검증 기준(정량 수치, 파일명, 검증 조건)만 기재한다. 사용자 수준 완료 기준은 user_prompt.txt의 <criteria> 참조로 충족한다 -->
