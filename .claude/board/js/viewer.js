@@ -577,12 +577,14 @@
    */
   function renderPromptFields(prompt) {
     const fields = ["goal", "target", "constraints", "criteria"];
+    /** Escapes HTML and converts newlines to <br> for multi-line field display. */
+    function escField(text) { return esc(text).replace(/\n/g, "<br>"); }
     let h = '<div class="tv-fields">';
     fields.forEach(function (f) {
       if (prompt[f]) {
         h += '<div class="tv-field">';
         h += '<div class="tv-field-label">' + f + "</div>";
-        h += '<div class="tv-field-value">' + esc(prompt[f]) + "</div>";
+        h += '<div class="tv-field-value">' + escField(prompt[f]) + "</div>";
         h += "</div>";
       }
     });
@@ -590,7 +592,7 @@
       if (fields.indexOf(k) === -1) {
         h += '<div class="tv-field">';
         h += '<div class="tv-field-label">' + k + "</div>";
-        h += '<div class="tv-field-value">' + esc(prompt[k]) + "</div>";
+        h += '<div class="tv-field-value">' + escField(prompt[k]) + "</div>";
         h += "</div>";
       }
     });
