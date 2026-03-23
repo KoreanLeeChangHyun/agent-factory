@@ -2,13 +2,13 @@
 """
 kanban.py - 칸반 보드 상태 관리 CLI 스크립트.
 
-XML 티켓 파일(.kanban/T-NNN.xml)을 Single Source of Truth(SSoT)로 사용한다.
+XML 티켓 파일(.kanban/active/T-NNN.xml)을 Single Source of Truth(SSoT)로 사용한다.
 LLM 호출 없음 (순수 IO).
 
 사용법:
   python3 kanban.py create <title>
   python3 kanban.py move <ticket> <target>
-  python3 kanban.py done <ticket>
+  python3 kanban.py done <ticket>        # active/ -> done/ 이동
   python3 kanban.py delete <ticket>
   python3 kanban.py add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>" [--workdir <path>] [--result "<text>"]
   python3 kanban.py update-title <ticket> <title>
@@ -151,6 +151,7 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
 }
 
 _KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".kanban")
+_KANBAN_ACTIVE_DIR: str = os.path.join(_KANBAN_DIR, "active")
 
 
 # ─── XML 헬퍼 ────────────────────────────────────────────────────────────────
@@ -660,7 +661,7 @@ def _update_ticket_status(filepath: str, new_status: str) -> None:
 def _find_ticket_file(ticket_number: str) -> str | None:
     """T-NNN.xml 정확 매칭으로 티켓 파일 경로를 탐색하여 반환한다.
 
-    탐색 순서: .kanban/T-NNN.xml -> .kanban/done/T-NNN.xml
+    탐색 순서: .kanban/active/T-NNN.xml -> .kanban/done/T-NNN.xml -> .kanban/T-NNN.xml (루트 폴백)
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -668,12 +669,16 @@ def _find_ticket_file(ticket_number: str) -> str | None:
     Returns:
         발견된 파일 절대 경로 문자열. 미발견 시 None.
     """
-    primary = os.path.join(_KANBAN_DIR, f"{ticket_number}.xml")
-    if os.path.isfile(primary):
-        return primary
+    active_path = os.path.join(_KANBAN_ACTIVE_DIR, f"{ticket_number}.xml")
+    if os.path.isfile(active_path):
+        return active_path
     done_path = os.path.join(_KANBAN_DIR, "done", f"{ticket_number}.xml")
     if os.path.isfile(done_path):
         return done_path
+    # 루트 폴백: 마이그레이션 미완료 시 안전장치
+    root_path = os.path.join(_KANBAN_DIR, f"{ticket_number}.xml")
+    if os.path.isfile(root_path):
+        return root_path
     return None
 
 
@@ -713,13 +718,15 @@ def _normalize_ticket_number(raw: str) -> str | None:
 
 
 def _get_max_ticket_number() -> int:
-    """Scan .kanban/ and .kanban/done/ XML filenames to find max T-NNN number.
+    """Scan .kanban/active/ and .kanban/done/ XML filenames to find max T-NNN number.
+
+    루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
 
     Returns:
         현재 최대 티켓 번호 정수. 티켓이 없으면 0.
     """
     max_num = 0
-    for d in [_KANBAN_DIR, os.path.join(_KANBAN_DIR, "done")]:
+    for d in [_KANBAN_ACTIVE_DIR, os.path.join(_KANBAN_DIR, "done"), _KANBAN_DIR]:
         if not os.path.isdir(d):
             continue
         for fname in os.listdir(d):
@@ -738,7 +745,7 @@ def cmd_create(title: str, command: str) -> None:
     """새 티켓 XML을 생성한다.
 
     XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 채번 후,
-    .kanban/T-NNN.xml 파일을 생성한다.
+    .kanban/active/T-NNN.xml 파일을 생성한다.
 
     Args:
         title: 티켓 제목. 빈 문자열 허용.
@@ -749,9 +756,9 @@ def cmd_create(title: str, command: str) -> None:
     ticket_number = f"T-{new_num:03d}"
 
     # 파일명: T-NNN.xml 고정
-    ticket_file = os.path.join(_KANBAN_DIR, f"{ticket_number}.xml")
+    ticket_file = os.path.join(_KANBAN_ACTIVE_DIR, f"{ticket_number}.xml")
 
-    os.makedirs(_KANBAN_DIR, exist_ok=True)
+    os.makedirs(_KANBAN_ACTIVE_DIR, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     xml_content = _create_ticket_xml(ticket_number, title, datetime_str)
     try:
@@ -816,7 +823,7 @@ def cmd_done(ticket_number: str) -> None:
     """티켓을 Done으로 변경하고 파일을 .kanban/done/으로 이동한다.
 
     XML의 <status>를 Done으로 갱신하고,
-    .kanban/T-NNN.xml를 .kanban/done/T-NNN.xml로 이동한다.
+    .kanban/active/T-NNN.xml를 .kanban/done/T-NNN.xml로 이동한다.
 
     Args:
         ticket_number: 완료할 티켓 번호 (T-NNN 형식).

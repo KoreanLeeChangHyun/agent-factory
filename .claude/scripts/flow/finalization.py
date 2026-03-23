@@ -403,8 +403,9 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     """티켓 XML에서 현재 활성 subnumber ID를 반환한다.
 
-    `.kanban/T-NNN.xml`을 파싱하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
-    `.kanban/done/T-NNN.xml`도 폴백 탐색한다. 파싱 실패 시 None을 반환한다.
+    `.kanban/active/T-NNN.xml`을 먼저 파싱하고, 없으면 루트(하위 호환 폴백)와
+    `.kanban/done/T-NNN.xml`도 탐색하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
+    파싱 실패 시 None을 반환한다.
 
     Args:
         ticket_number: T-NNN 형식 티켓 번호
@@ -412,7 +413,7 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     Returns:
         현재 subnumber ID (int). 파싱 실패 또는 미존재 시 None.
     """
-    for subdir in ("", "done"):
+    for subdir in ("active", "", "done"):
         path = os.path.join(PROJECT_ROOT, ".kanban", subdir, f"{ticket_number}.xml")
         if not os.path.isfile(path):
             continue
@@ -520,30 +521,29 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
 
-    # ── Step 2: 사용량 확정 (비차단, 성공 시만) ──
-    if status == "완료":
-        # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
-        transcript_path = _find_transcript_path(registry_key)
-        if transcript_path:
-            if abs_work_dir is not None:
-                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2A: transcript=found path={transcript_path}")
-            stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
-            run(
-                ["python3", USAGE_SYNC, "batch"],
-                "Step 2a: usage-sync batch",
-                input_data=stdin_json,
-            )
-        else:
-            if abs_work_dir is not None:
-                _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
-
-        # Step 2b: usage-finalize
+    # ── Step 2: 사용량 확정 (비차단, status 무관) ──
+    # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
+    transcript_path = _find_transcript_path(registry_key)
+    if transcript_path:
         if abs_work_dir is not None:
-            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2B: usage-finalize registryKey={registry_key}")
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2A: transcript=found path={transcript_path}")
+        stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
         run(
-            ["python3", UPDATE_STATE, "usage-finalize", registry_key],
-            "Step 2b: usage-finalize",
+            ["python3", USAGE_SYNC, "batch"],
+            "Step 2a: usage-sync batch",
+            input_data=stdin_json,
         )
+    else:
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
+
+    # Step 2b: usage-finalize
+    if abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2B: usage-finalize registryKey={registry_key}")
+    run(
+        ["python3", UPDATE_STATE, "usage-finalize", registry_key],
+        "Step 2b: usage-finalize",
+    )
 
     # ── Step 5: 로그/스킬 대시보드 갱신 (비차단) ──
     try:

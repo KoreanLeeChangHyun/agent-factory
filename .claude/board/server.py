@@ -5,7 +5,7 @@ ThreadingHTTPServer 기반 커스텀 서버로, 정적 파일 서빙과 /events 
 동시 제공한다. FileWatcher가 감시 대상 디렉터리의 변경을 감지하여 SSE로 푸시한다.
 
 감시 대상:
-    .kanban/, .kanban/done/ -> kanban 이벤트
+    .kanban/active/, .kanban/done/ -> kanban 이벤트
     .workflow/, .workflow/.history/ -> workflow 이벤트
     .dashboard/ -> dashboard 이벤트
 """
@@ -35,7 +35,7 @@ WATCH_INTERVAL: float = 1.0
 
 # 감시 대상 경로 -> SSE 이벤트 타입 매핑
 WATCH_DIRS: dict[str, str] = {
-    '.kanban': 'kanban',
+    os.path.join('.kanban', 'active'): 'kanban',
     os.path.join('.kanban', 'done'): 'kanban',
     '.workflow': 'workflow',
     os.path.join('.workflow', '.history'): 'workflow',

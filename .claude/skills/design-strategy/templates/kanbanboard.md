@@ -27,13 +27,13 @@
     - **상태**: 0/{{wf_total}} 완료
 
   티켓 자동 생성 절차 (마일스톤별 워크플로우 항목):
-    1. roadmap.md의 각 워크플로우 항목마다 .kanban/T-NNN.xml 티켓 파일을 생성한다.
+    1. roadmap.md의 각 워크플로우 항목마다 .kanban/active/T-NNN.xml 티켓 파일을 생성한다.
     2. 티켓 번호(NNN)는 .kanban/ 디렉터리의 XML 파일을 스캔하여 기존 최대 번호 + 1로 자동 채번한다.
-    3. 티켓 파일 경로: .kanban/T-NNN.xml (표준 XML 티켓 형식)
+    3. 티켓 파일 경로: .kanban/active/T-NNN.xml (표준 XML 티켓 형식)
 
   SSOT 원칙:
     - roadmap.md = 계획 정보의 단일 진실 소스 (마일스톤 ID, 명칭, DoD, 워크플로우 체인)
-    - .kanban/T-NNN.xml = 워크플로우별 실행 상태 (XML <status> 요소로 관리)
+    - .kanban/active/T-NNN.xml = 워크플로우별 실행 상태 (XML <status> 요소로 관리)
     - 마일스톤 ID/명/DoD는 roadmap.md에서 그대로 복제
     - 워크플로우 체인의 ID/명/명령어를 마일스톤별로 그룹핑하여 카드에 기록
 

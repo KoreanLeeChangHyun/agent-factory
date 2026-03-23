@@ -2,7 +2,6 @@
 name: workflow-system
 description: "Claude Code workflow system infrastructure skills: hooks system management, report output generation, script naming conventions, CLI status line configuration, and verification before completion. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정', 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command', 'changelog', 'release notes', '변경 이력', '릴리스 노트', 'PR', 'pull request', 'PR 요약', 'scripts', '스크립트', 'alias', 'flow-', 'statusline 설정', '상태줄 설정', 'Done', 'Complete', '완료', '끝', 'PASS', '통과'."
 license: "Apache-2.0"
-disable-model-invocation: true
 ---
 
 # Workflow System

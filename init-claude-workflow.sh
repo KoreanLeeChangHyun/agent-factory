@@ -366,7 +366,7 @@ create_directories_and_files() {
     print_step "4" "디렉터리 및 파일 생성"
 
     # 디렉터리 생성 (.kanban 기반)
-    local dirs=(".kanban" ".kanban/done" ".workflow/.history" ".workflow/.temp")
+    local dirs=(".kanban" ".kanban/active" ".kanban/done" ".workflow/.history" ".workflow/.temp")
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
             mkdir -p "$dir"

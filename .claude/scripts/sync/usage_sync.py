@@ -61,6 +61,11 @@ VALID_AGENT_TYPES: set[str] = {
     "validator", "reporter",
 }
 
+# _pending_workers에서 worker 큐 매핑 대상이 아닌 에이전트 타입
+NON_WORKER_AGENT_TYPES: set[str] = {
+    "validator", "reporter", "planner", "explorer", "orchestrator",
+}
+
 
 def _normalize_agent_type(raw: str) -> str:
     """agent_type 원시 문자열을 VALID_AGENT_TYPES 중 하나로 정규화한다.
@@ -348,8 +353,16 @@ def cmd_track() -> None:
             else:
                 # agent_id가 hex 문자열이어서 pending에 없는 경우:
                 # pending의 값(task_id) 중 아직 workers에 기록되지 않은 첫 번째 task_id를 큐 방식으로 할당
+                # 비-worker 에이전트 타입(validator, reporter 등)은 큐 후보에서 제외
                 assigned_task_id = None
                 for pkey, ptid in list(pending.items()):
+                    if ptid in NON_WORKER_AGENT_TYPES or pkey in NON_WORKER_AGENT_TYPES:
+                        del pending[pkey]
+                        print(
+                            f"[usage-sync] INFO: cmd_track skipped non-worker pending entry '{pkey}' -> '{ptid}'",
+                            file=sys.stderr,
+                        )
+                        continue
                     if ptid not in existing_workers:
                         assigned_task_id = ptid
                         del pending[pkey]
@@ -616,9 +629,21 @@ def cmd_batch() -> None:
             # agent_id가 hex 문자열이고 pending이 {task_id: task_id} 형태인 경우:
             # pending의 값(task_id) 목록과 worker_tokens의 agent_id 목록을 순서대로 매핑.
             # agent_to_task: _pending_workers의 pkey가 실제 agent_id인 경우 직접 매핑
+            # 비-worker 에이전트 타입(validator, reporter 등)은 worker 큐 매핑에서 제외
             agent_to_task: dict[str, str] = {}
+            non_worker_pending_keys: list[str] = []
             for pkey, ptid in pending.items():
+                if pkey in NON_WORKER_AGENT_TYPES or ptid in NON_WORKER_AGENT_TYPES:
+                    non_worker_pending_keys.append(pkey)
+                    print(
+                        f"[usage-sync] INFO: cmd_batch skipped non-worker pending entry '{pkey}' -> '{ptid}'",
+                        file=sys.stderr,
+                    )
+                    continue
                 agent_to_task[pkey] = ptid
+
+            for nw_key in non_worker_pending_keys:
+                del pending[nw_key]
 
             # task_id=task_id 형태의 pending만 unassigned 큐에 추가.
             # agent_id가 hex 문자열일 때 순서대로 매핑하기 위한 폴백 큐.
@@ -646,6 +671,19 @@ def cmd_batch() -> None:
                 if isinstance(existing_workers.get(key), dict) and existing_workers[key].get("method") == "subagent_transcript":
                     skipped_agents.append(f"worker/{key}")
                     continue
+                # 중복 검사: 4개 토큰 필드 시그니처가 동일한 기존 항목이 있으면 스킵
+                _token_fields = ("input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens")
+                existing_entry = existing_workers.get(key)
+                if isinstance(existing_entry, dict):
+                    new_sig = tuple(tokens.get(f, 0) for f in _token_fields)
+                    existing_sig = tuple(existing_entry.get(f, 0) for f in _token_fields)
+                    if new_sig == existing_sig:
+                        print(
+                            f"[usage-sync] INFO: duplicate token signature detected for worker/{key}, skipping",
+                            file=sys.stderr,
+                        )
+                        skipped_agents.append(f"worker/{key}(duplicate)")
+                        continue
                 existing_workers[key] = tokens
 
         # 스킵된 에이전트 목록 로그

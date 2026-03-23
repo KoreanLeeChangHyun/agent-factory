@@ -51,7 +51,7 @@ SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
 
 # 제외 접두사: 워크플로우 전용 스킬
-EXCLUDE_PREFIXES = ("workflow-agent", "workflow-system", "workflow-wf")
+EXCLUDE_PREFIXES = ("workflow-agent", "workflow-wf")
 
 # =============================================================================
 # Command Default Mapping (단일 소스 — 기존 command-skill-map.md에서 통합)

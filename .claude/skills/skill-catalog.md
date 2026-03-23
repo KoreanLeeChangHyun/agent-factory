@@ -1,7 +1,7 @@
 # Skill Catalog
 
 > 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 58개 (전문화: 58, 프로젝트: 0)
+> 활성 스킬: 59개 (전문화: 59, 프로젝트: 0)
 
 ## Command Default Mapping
 
@@ -73,6 +73,7 @@
 | testing-design | ISTQB v4.0 test design skill that auto-generates test cases by analyzing function signatures and type information using equivalence partitioning (EP), boundary value analysis (BVA), decision table (DT), and state transition (ST) techniques. Use when generating structured test cases from code, improving input domain coverage, or systematically identifying edge cases and boundary conditions from type signatures. |
 | testing-mutation | Mutation testing skill that runs incremental mutation testing on changed files using Stryker, mutmut, or cargo-mutants, calculates mutation scores, detects survived mutants, and enforces quality gates for PR integration. Use when verifying test suite effectiveness, measuring mutation score on changed code, or validating that tests can detect real defects rather than just achieving line coverage. |
 | testing-property-based | Property-based testing skill that infers properties from function signatures, selects type-based generators, and generates PBT code using Hypothesis (Python), fast-check (JS/TS), or QuickCheck (Haskell). Use when adding property-based tests to an existing test suite, discovering edge cases that example-based tests miss, performing stateful testing, or automatically shrinking minimal failure inputs. |
+| workflow-system | Claude Code workflow system infrastructure skills: hooks system management, report output generation, script naming conventions, CLI status line configuration, and verification before completion. Triggers: 'hook', '훅', 'PreToolUse', 'PostToolUse', 'Hook 설정', 'rm -rf', 'git reset --hard', 'git push --force', '위험 명령어', 'dangerous command', 'changelog', 'release notes', '변경 이력', '릴리스 노트', 'PR', 'pull request', 'PR 요약', 'scripts', '스크립트', 'alias', 'flow-', 'statusline 설정', '상태줄 설정', 'Done', 'Complete', '완료', '끝', 'PASS', '통과'. |
 
 ## Project Skills
 

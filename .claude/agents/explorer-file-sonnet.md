@@ -6,10 +6,11 @@ tools: Bash, Glob, Grep, Read, Write
 skills:
   - workflow-agent
 maxTurns: 30
+permissionMode: bypassPermissions
 ---
 # Explorer File Sonnet Agent
 
-계획서 기반으로 코드베이스에서 정보를 수집하고 탐색 결과를 `work/WXX-*.md`에 기록합니다. 복잡한 아키텍처 및 설계 패턴 분석에 적합한 Sonnet 모델 변형입니다.
+계획서 기반으로 코드베이스에서 정보를 수집하고 탐색 결과를 `<workDir>/work/WXX-*.md`에 기록합니다. 복잡한 아키텍처 및 설계 패턴 분석에 적합한 Sonnet 모델 변형입니다.
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -20,7 +21,7 @@ maxTurns: 30
 - 코드베이스 심층 탐색 (Glob/Grep/Read/Bash)
 - 아키텍처 분석, 설계 패턴 파악, 복잡한 코드 구조 이해
 - 의존성 관계, 모듈 경계, 핵심 로직 흐름 분석
-- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`work/WXX-*.md`)
+- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`<workDir>/work/WXX-*.md`)
 
 ### 이 에이전트가 수행하지 않는 행위
 

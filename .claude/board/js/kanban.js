@@ -119,15 +119,15 @@
 
   // ── Fetch Tickets ──
 
-  /** Fetches all tickets from .kanban/ and .kanban/done/ directories. */
+  /** Fetches all tickets from .kanban/active/ and .kanban/done/ directories. */
   function fetchTickets() {
     return Promise.all([
-      fetchXmlList("../../.kanban/"),
+      fetchXmlList("../../.kanban/active/"),
       fetchXmlList("../../.kanban/done/"),
     ]).then(function (results) {
-      const rootFiles = results[0].map(function (f) { return "../../.kanban/" + f; });
+      const activeFiles = results[0].map(function (f) { return "../../.kanban/active/" + f; });
       const doneFiles = results[1].map(function (f) { return "../../.kanban/done/" + f; });
-      const allFiles = rootFiles.concat(doneFiles);
+      const allFiles = activeFiles.concat(doneFiles);
       return Promise.all(allFiles.map(function (url) {
         return fetch(url, { cache: "no-store" }).then(function (res) {
           if (!res.ok) return null;
@@ -146,7 +146,7 @@
    */
   function fetchTicketsByFiles(files) {
     return Promise.all(files.map(function (f) {
-      return fetch("../../.kanban/" + f, { cache: "no-store" }).then(function (res) {
+      return fetch("../../.kanban/active/" + f, { cache: "no-store" }).then(function (res) {
         if (res.ok) {
           return res.text().then(function (text) {
             return { file: f, ticket: parseTicket(text) };
