@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from flow.ticket_repository import (
+    add_relation,
     create_ticket_xml,
     find_ticket_file,
     normalize_ticket_number,
@@ -22,6 +23,7 @@ from flow.ticket_repository import (
     add_subnumber,
     update_subnumber,
     move_active_to_history,
+    remove_relation,
     write_ticket_xml,
     parse_ticket_xml,
     err,
@@ -124,12 +126,44 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
 def cmd_done(ticket_number: str) -> None:
     """티켓을 Done으로 변경하고 파일을 .kanban/done/으로 이동한다.
 
+    worktree가 활성화된 경우, 상태 변경/파일 이동 전에 feature 브랜치를
+    develop에 병합한다. 병합 충돌 시 Done 전이를 차단한다.
+
     XML의 <status>를 Done으로 갱신하고,
     .kanban/active/T-NNN.xml를 .kanban/done/T-NNN.xml로 이동한다.
 
     Args:
         ticket_number: 완료할 티켓 번호 (T-NNN 형식).
     """
+    # ── worktree 병합 훅 (티켓 상태 변경/파일 이동 전) ──
+    import sys as _sys
+    try:
+        from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop
+        from flow.branch_strategy import get_feature_branch_for_ticket
+        if is_worktree_enabled():
+            wt_path = get_worktree_path(ticket_number)
+            feat_branch = get_feature_branch_for_ticket(ticket_number)
+            if wt_path or feat_branch:
+                merge_result = merge_to_develop(ticket_number)
+                if not merge_result.success:
+                    if merge_result.conflicts:
+                        print(f"[ERROR] {ticket_number} 병합 충돌 발생. Done 전이를 차단합니다.", flush=True)
+                        print(f"  충돌 파일:", flush=True)
+                        for cf in merge_result.conflicts:
+                            print(f"    - {cf}", flush=True)
+                        print(f"  worktree에서 충돌을 해결한 후 다시 시도하세요.", flush=True)
+                        _sys.exit(1)
+                    else:
+                        # 충돌 외 실패: 경고 출력 후 계속 진행
+                        print(f"[WARN] worktree 병합 실패: {merge_result.error_message}", flush=True)
+                else:
+                    print(f"{ticket_number}: {merge_result.merged_branch} -> develop 병합 완료 ({merge_result.merge_commit[:8]})", flush=True)
+                    log("INFO", f"kanban.py: worktree merge {merge_result.merged_branch} -> develop ({merge_result.merge_commit[:8]})")
+    except ImportError:
+        pass  # worktree 모듈 미설치 시 무시 (하위 호환)
+    except Exception as _wt_err:
+        print(f"[WARN] worktree 병합 처리 중 오류 (계속 진행): {_wt_err}", flush=True)
+
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
         err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
@@ -373,6 +407,122 @@ def cmd_update_subnumber(
     print(f"{ticket_number}: subnumber id={subnumber_id} 갱신됨")
 
 
+# ─── 관계 양방향 매핑 ────────────────────────────────────────────────────────
+# 각 관계 옵션에 대해 (원본에 기록할 타입, 대상에 기록할 역방향 타입)
+_RELATION_PAIRS: dict[str, tuple[str, str]] = {
+    "depends_on": ("depends-on", "blocks"),
+    "derived_from": ("derived-from", "blocks"),
+    "blocks": ("blocks", "depends-on"),
+}
+
+
+def _apply_relation(
+    source_file: str,
+    source_ticket: str,
+    target_ticket: str,
+    option_name: str,
+    *,
+    remove: bool = False,
+) -> None:
+    """단일 관계 옵션에 대해 양방향 관계를 기록하거나 제거한다.
+
+    Args:
+        source_file: 원본 티켓 파일 경로.
+        source_ticket: 원본 티켓 번호 (T-NNN).
+        target_ticket: 대상 티켓 번호 (T-NNN).
+        option_name: 관계 옵션 이름 (depends_on, derived_from, blocks).
+        remove: True이면 관계를 제거한다.
+    """
+    target_file = find_ticket_file(target_ticket)
+    if target_file is None:
+        err(f"대상 티켓 {target_ticket} 파일을 찾을 수 없습니다")
+
+    forward_type, reverse_type = _RELATION_PAIRS[option_name]
+    fn = remove_relation if remove else add_relation
+
+    fn(source_file, forward_type, target_ticket)
+    fn(target_file, reverse_type, source_ticket)
+
+
+def cmd_link(
+    ticket_number: str,
+    depends_on: str = "",
+    derived_from: str = "",
+    blocks: str = "",
+) -> None:
+    """티켓 간 관계를 양방향으로 기록한다.
+
+    각 관계 옵션에 대해 원본 티켓과 대상 티켓 양쪽에 관계를 추가한다.
+    - --depends-on T-MMM: 원본에 depends-on T-MMM + T-MMM에 blocks T-NNN
+    - --derived-from T-MMM: 원본에 derived-from T-MMM + T-MMM에 blocks T-NNN
+    - --blocks T-MMM: 원본에 blocks T-MMM + T-MMM에 depends-on T-NNN
+
+    Args:
+        ticket_number: 원본 티켓 번호 (T-NNN 형식).
+        depends_on: 의존 대상 티켓 번호.
+        derived_from: 파생 원본 티켓 번호.
+        blocks: 차단 대상 티켓 번호.
+    """
+    source_file = find_ticket_file(ticket_number)
+    if source_file is None:
+        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+
+    options = {"depends_on": depends_on, "derived_from": derived_from, "blocks": blocks}
+    applied = []
+
+    for option_name, target in options.items():
+        if not target:
+            continue
+        normalized = normalize_ticket_number(target)
+        if normalized is None:
+            err(f"잘못된 티켓 번호 형식: '{target}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        _apply_relation(source_file, ticket_number, normalized, option_name)
+        forward_type = _RELATION_PAIRS[option_name][0]
+        applied.append(f"{forward_type} {normalized}")
+
+    for desc in applied:
+        print(f"{ticket_number}: {desc} 관계 추가됨")
+    log("INFO", f"kanban.py: link {ticket_number} {', '.join(applied)}")
+
+
+def cmd_unlink(
+    ticket_number: str,
+    depends_on: str = "",
+    derived_from: str = "",
+    blocks: str = "",
+) -> None:
+    """티켓 간 관계를 양방향으로 제거한다.
+
+    cmd_link의 역방향으로 양쪽 XML에서 관계를 제거한다.
+
+    Args:
+        ticket_number: 원본 티켓 번호 (T-NNN 형식).
+        depends_on: 의존 대상 티켓 번호.
+        derived_from: 파생 원본 티켓 번호.
+        blocks: 차단 대상 티켓 번호.
+    """
+    source_file = find_ticket_file(ticket_number)
+    if source_file is None:
+        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+
+    options = {"depends_on": depends_on, "derived_from": derived_from, "blocks": blocks}
+    removed = []
+
+    for option_name, target in options.items():
+        if not target:
+            continue
+        normalized = normalize_ticket_number(target)
+        if normalized is None:
+            err(f"잘못된 티켓 번호 형식: '{target}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        _apply_relation(source_file, ticket_number, normalized, option_name, remove=True)
+        forward_type = _RELATION_PAIRS[option_name][0]
+        removed.append(f"{forward_type} {normalized}")
+
+    for desc in removed:
+        print(f"{ticket_number}: {desc} 관계 제거됨")
+    log("INFO", f"kanban.py: unlink {ticket_number} {', '.join(removed)}")
+
+
 # ─── argparse 설정 ───────────────────────────────────────────────────────────
 
 
@@ -457,6 +607,20 @@ def build_parser() -> argparse.ArgumentParser:
     update_sub_parser.add_argument("--constraints", default="", help="제약 조건")
     update_sub_parser.add_argument("--criteria", default="", help="완료 기준")
     update_sub_parser.add_argument("--context", default="", help="추가 컨텍스트")
+
+    # link 서브커맨드
+    link_parser = subparsers.add_parser("link", help="티켓 간 관계를 양방향으로 기록한다")
+    link_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    link_parser.add_argument("--depends-on", dest="depends_on", default="", help="의존 대상 티켓 번호")
+    link_parser.add_argument("--derived-from", dest="derived_from", default="", help="파생 원본 티켓 번호")
+    link_parser.add_argument("--blocks", default="", help="차단 대상 티켓 번호")
+
+    # unlink 서브커맨드
+    unlink_parser = subparsers.add_parser("unlink", help="티켓 간 관계를 양방향으로 제거한다")
+    unlink_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    unlink_parser.add_argument("--depends-on", dest="depends_on", default="", help="의존 대상 티켓 번호")
+    unlink_parser.add_argument("--derived-from", dest="derived_from", default="", help="파생 원본 티켓 번호")
+    unlink_parser.add_argument("--blocks", default="", help="차단 대상 티켓 번호")
 
     return parser
 
@@ -557,4 +721,30 @@ def dispatch(args: argparse.Namespace) -> None:
             constraints=args.constraints,
             criteria=args.criteria,
             context=args.context,
+        )
+
+    elif args.subcommand == "link":
+        ticket = normalize_ticket_number(args.ticket)
+        if ticket is None:
+            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        if not args.depends_on and not args.derived_from and not args.blocks:
+            err("--depends-on, --derived-from, --blocks 중 최소 1개를 지정해야 합니다.", 2)
+        cmd_link(
+            ticket,
+            depends_on=args.depends_on,
+            derived_from=args.derived_from,
+            blocks=args.blocks,
+        )
+
+    elif args.subcommand == "unlink":
+        ticket = normalize_ticket_number(args.ticket)
+        if ticket is None:
+            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        if not args.depends_on and not args.derived_from and not args.blocks:
+            err("--depends-on, --derived-from, --blocks 중 최소 1개를 지정해야 합니다.", 2)
+        cmd_unlink(
+            ticket,
+            depends_on=args.depends_on,
+            derived_from=args.derived_from,
+            blocks=args.blocks,
         )

@@ -293,6 +293,41 @@ def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
 # ─── Step 2: 워크플로우 초기화 ───────────────────────────────────────────────
 
 
+def _inject_predecessor_context(abs_work_dir: str, ticket_number: str) -> None:
+    """선행 티켓의 report 요약을 user_prompt.txt에 추가한다.
+
+    ticket_repository.get_predecessor_reports()를 호출하여
+    depends-on / derived-from 선행 티켓의 Done report 요약을 추출하고,
+    user_prompt.txt 파일 끝에 context 블록을 append한다.
+
+    Args:
+        abs_work_dir: 작업 디렉터리 절대 경로
+        ticket_number: 현재 티켓 번호 (T-NNN 형식)
+    """
+    try:
+        from flow.ticket_repository import get_predecessor_reports
+        reports = get_predecessor_reports(ticket_number)
+    except Exception as e:
+        _warn(f"선행 티켓 report 조회 실패 (생략): {e}")
+        return
+
+    if not reports:
+        return
+
+    prompt_path = os.path.join(abs_work_dir, "user_prompt.txt")
+    try:
+        lines: list[str] = ["\n\n--- 선행 티켓 컨텍스트 ---"]
+        for r in reports:
+            lines.append(f"[{r['ticket']} {r['type']}] report 요약:")
+            lines.append(r["summary"])
+        lines.append("---")
+        with open(prompt_path, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        _append_log(abs_work_dir, "INFO", f"선행 티켓 context 주입: {[r['ticket'] for r in reports]}")
+    except Exception as e:
+        _warn(f"선행 티켓 context 주입 실패 (생략): {e}")
+
+
 def _create_work_dir(abs_work_dir: str) -> None:
     """워크플로우 디렉터리를 생성한다.
 
@@ -402,6 +437,7 @@ def _write_context(
     chain_command: str = "",
     registry_key: str = "",
     ticket_number: str = "",
+    worktree_meta: dict[str, Any] | None = None,
 ) -> None:
     """.context.json을 작업 디렉터리에 작성한다.
 
@@ -422,6 +458,7 @@ def _write_context(
         chain_command: 전체 체인 문자열 (예: "research>implement>review"). 단일 command 시 빈 문자열.
         registry_key: YYYYMMDD-HHMMSS 형식 전체 registryKey. board.js 양방향 연결용.
         ticket_number: 연결된 티켓 번호 (예: 'T-001'). board.js 양방향 연결용.
+        worktree_meta: worktree 메타데이터 딕셔너리 (선택). 활성화 시 context에 포함.
     """
     context: dict[str, Any] = {
         "title": title,
@@ -437,6 +474,8 @@ def _write_context(
         context["registryKey"] = registry_key
     if ticket_number:
         context["ticketNumber"] = ticket_number
+    if worktree_meta:
+        context["worktree"] = worktree_meta
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
         context,
@@ -530,6 +569,34 @@ def init_workflow(
     _create_work_dir(abs_work_dir)
     _write_user_prompt(abs_work_dir, prompt_content)
 
+    # 선행 티켓 report context 주입 (ticket_number가 있을 때만)
+    if ticket_number:
+        _inject_predecessor_context(abs_work_dir, ticket_number)
+
+    # ── worktree 격리 실행 훅 ──
+    # _create_work_dir() 이후, _move_ticket_to_in_progress() 이전에 삽입
+    worktree_meta: dict[str, Any] | None = None
+    try:
+        from flow.worktree_manager import is_worktree_enabled, create_worktree as _create_wt
+        if is_worktree_enabled():
+            wt_info = _create_wt(ticket_number or "", title)
+            if wt_info is not None:
+                worktree_meta = {
+                    "enabled": True,
+                    "path": os.path.relpath(wt_info.path, _PROJECT_ROOT),
+                    "absPath": wt_info.path,
+                    "featureBranch": wt_info.branch_name,
+                    "baseBranch": wt_info.base_branch,
+                }
+                _append_log(abs_work_dir, "INFO", f"Worktree created: {wt_info.path} (branch: {wt_info.branch_name})")
+            else:
+                _warn("worktree 생성 실패, 비worktree 모드로 계속 진행합니다")
+                _append_log(abs_work_dir, "WARN", "Worktree creation failed, continuing without worktree")
+    except Exception as _wt_err:
+        _warn(f"worktree 모듈 로드/실행 실패 (비worktree 모드로 계속): {_wt_err}")
+        if os.path.isdir(abs_work_dir):
+            _append_log(abs_work_dir, "WARN", f"Worktree module error: {_wt_err}")
+
     # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:
         _update_ticket_title(ticket_number, title, abs_work_dir)
@@ -551,6 +618,7 @@ def init_workflow(
         chain_command,
         registry_key=registry_key,
         ticket_number=ticket_number or "",
+        worktree_meta=worktree_meta,
     )
     _write_status(abs_work_dir, mode, ts)
 
@@ -574,7 +642,7 @@ def init_workflow(
                 ["python3", "{}", "archive", registry_key],
             )
 
-    return {
+    result_dict: dict[str, Any] = {
         "workDir": work_dir,
         "registryKey": registry_key,
         "workId": work_id,
@@ -583,6 +651,10 @@ def init_workflow(
         "ticketNumber": ticket_number or "",
         "chainCommand": chain_command,
     }
+    if worktree_meta:
+        result_dict["worktreePath"] = worktree_meta["path"]
+        result_dict["featureBranch"] = worktree_meta["featureBranch"]
+    return result_dict
 
 
 # ─── main ────────────────────────────────────────────────────────────────────
@@ -694,6 +766,9 @@ def main() -> None:
         init_result["chainCommand"] = chain_command
     if prompt_quality is not None:
         init_result["prompt_quality"] = prompt_quality
+    if result.get("worktreePath"):
+        init_result["worktreePath"] = result["worktreePath"]
+        init_result["featureBranch"] = result.get("featureBranch", "")
 
     _atomic_write_json(
         os.path.join(abs_work_dir, "init-result.json"),

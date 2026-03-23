@@ -190,6 +190,8 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
         xml_str = re.sub(r"(<metadata[ />])", r"<!-- metadata -->\n  \1", xml_str)
     if "<!-- submit -->" not in xml_str:
         xml_str = re.sub(r"(<submit[ />])", r"\n  <!-- submit -->\n  \1", xml_str)
+    if "<!-- relations -->" not in xml_str and "<relations" in xml_str:
+        xml_str = re.sub(r"(<relations[ />])", r"\n  <!-- relations -->\n  \1", xml_str)
     if "<!-- history -->" not in xml_str:
         xml_str = re.sub(r"(<history[ />])", r"\n  <!-- history -->\n  \1", xml_str)
     with open(filepath, "w", encoding="utf-8") as f:
@@ -309,6 +311,16 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
 
             subnumbers.append(sub_data)
 
+    # <relations> 요소 파싱 (하위 호환: 없으면 빈 리스트)
+    relations: list[dict[str, str]] = []
+    relations_elem = root.find("relations")
+    if relations_elem is not None:
+        for rel in relations_elem.findall("relation"):
+            rel_type = rel.get("type", "")
+            rel_ticket = rel.get("ticket", "")
+            if rel_type and rel_ticket:
+                relations.append({"type": rel_type, "ticket": rel_ticket})
+
     return {
         "number": number,
         "status": status,
@@ -316,6 +328,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         "title": title,
         "editing": editing,
         "subnumbers": subnumbers,
+        "relations": relations,
     }
 
 
@@ -578,6 +591,86 @@ def update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any]) 
     write_ticket_xml(filepath, root)
 
 
+# ─── relations 관련 ─────────────────────────────────────────────────────────
+
+
+def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
+    """티켓 XML에 관계(relation) 요소를 추가한다.
+
+    <relations> 요소가 없으면 <metadata> 뒤, <submit> 앞에 새로 생성한다.
+    동일한 type+ticket 조합이 이미 존재하면 중복 추가하지 않는다.
+
+    Args:
+        filepath: 티켓 파일 경로.
+        relation_type: 관계 유형 (depends-on, derived-from, blocks).
+        target_ticket: 대상 티켓 번호 (T-NNN 형식).
+    """
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+
+    relations_elem = root.find("relations")
+
+    # 중복 검사
+    if relations_elem is not None:
+        for rel in relations_elem.findall("relation"):
+            if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
+                return  # 이미 존재하면 스킵
+
+    # <relations> 요소가 없으면 생성
+    if relations_elem is None:
+        relations_elem = ET.Element("relations")
+        # <metadata> 뒤, <submit> 앞에 삽입
+        insert_idx = 0
+        for i, child in enumerate(root):
+            if child.tag == "metadata":
+                insert_idx = i + 1
+                break
+        root.insert(insert_idx, relations_elem)
+
+    # <relation type="..." ticket="..."/> 추가
+    rel_elem = ET.SubElement(relations_elem, "relation")
+    rel_elem.set("type", relation_type)
+    rel_elem.set("ticket", target_ticket)
+
+    write_ticket_xml(filepath, root)
+
+
+def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
+    """티켓 XML에서 관계(relation) 요소를 제거한다.
+
+    해당 type+ticket 조합의 relation 요소를 제거하고,
+    <relations>가 비면 요소 자체도 제거한다.
+
+    Args:
+        filepath: 티켓 파일 경로.
+        relation_type: 관계 유형 (depends-on, derived-from, blocks).
+        target_ticket: 대상 티켓 번호 (T-NNN 형식).
+    """
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+
+    relations_elem = root.find("relations")
+    if relations_elem is None:
+        return  # relations 요소가 없으면 무시
+
+    # 매칭되는 relation 제거
+    for rel in relations_elem.findall("relation"):
+        if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
+            relations_elem.remove(rel)
+
+    # <relations>가 비면 요소 자체 제거
+    if len(relations_elem) == 0:
+        root.remove(relations_elem)
+
+    write_ticket_xml(filepath, root)
+
+
 # ─── 유틸리티 ────────────────────────────────────────────────────────────────
 
 
@@ -626,6 +719,135 @@ def normalize_ticket_number(raw: str) -> str | None:
     if re.match(r"^\d+$", raw):
         return f"T-{int(raw):03d}"
     return None
+
+
+def extract_report_summary(report_path: str) -> str:
+    """report.md에서 핵심 섹션을 추출하여 요약 문자열을 반환한다.
+
+    "## 최종 판정" 또는 "## 판정" 섹션과 "## 이슈" 또는 "## 발견 사항" 섹션을 추출한다.
+    위 섹션이 없으면 report.md 첫 50줄을 fallback으로 사용한다.
+    토큰 절감을 위해 최대 2000자로 제한한다.
+
+    Args:
+        report_path: report.md 파일 절대 경로.
+
+    Returns:
+        추출된 요약 문자열. 파일 읽기 실패 시 빈 문자열.
+    """
+    try:
+        with open(report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+    if not content.strip():
+        return ""
+
+    lines = content.split("\n")
+
+    # 섹션 추출 헬퍼: ## 헤더 시작부터 다음 ## 헤더 직전까지
+    def _extract_section(header_patterns: list[str]) -> str:
+        for pattern in header_patterns:
+            for i, line in enumerate(lines):
+                if line.strip().lower().startswith(f"## {pattern.lower()}"):
+                    section_lines = [lines[i]]
+                    for j in range(i + 1, len(lines)):
+                        if lines[j].strip().startswith("## "):
+                            break
+                        section_lines.append(lines[j])
+                    return "\n".join(section_lines).strip()
+        return ""
+
+    verdict = _extract_section(["최종 판정", "판정"])
+    issues = _extract_section(["이슈", "발견 사항"])
+
+    summary_parts = [p for p in [verdict, issues] if p]
+
+    if summary_parts:
+        summary = "\n\n".join(summary_parts)
+    else:
+        # fallback: 첫 50줄
+        summary = "\n".join(lines[:50]).strip()
+
+    # 2000자 제한
+    if len(summary) > 2000:
+        summary = summary[:2000] + "..."
+
+    return summary
+
+
+def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
+    """선행 티켓의 report 요약을 추출하여 반환한다.
+
+    티켓 XML에서 depends-on 및 derived-from 관계를 찾고,
+    각 선행 티켓이 Done 상태이고 report 파일이 존재하면 요약을 추출한다.
+
+    Args:
+        ticket_number: 현재 티켓 번호 (T-NNN 형식).
+
+    Returns:
+        선행 티켓 report 정보 리스트. 각 항목은
+        {"ticket": "T-NNN", "type": "depends-on", "summary": "..."} 형태.
+        선행 티켓이 없거나 조건 미충족 시 빈 리스트.
+    """
+    ticket_file = find_ticket_file(ticket_number)
+    if not ticket_file:
+        return []
+
+    try:
+        ticket_data = parse_ticket_xml(ticket_file)
+    except SystemExit:
+        return []
+
+    relations = ticket_data.get("relations", [])
+    predecessor_types = {"depends-on", "derived-from"}
+    results: list[dict[str, str]] = []
+
+    for rel in relations:
+        rel_type = rel.get("type", "")
+        rel_ticket = rel.get("ticket", "")
+        if rel_type not in predecessor_types or not rel_ticket:
+            continue
+
+        # 선행 티켓 파일 찾기
+        pred_file = find_ticket_file(rel_ticket)
+        if not pred_file:
+            continue
+
+        try:
+            pred_data = parse_ticket_xml(pred_file)
+        except SystemExit:
+            continue
+
+        # Done이 아니면 스킵
+        if pred_data.get("status", "") != "Done":
+            continue
+
+        # subnumber의 result에서 report 경로 추출 (가장 최근 subnumber 우선)
+        report_path_str = ""
+        for sub in reversed(pred_data.get("subnumbers", [])):
+            result = sub.get("result")
+            if isinstance(result, dict) and result.get("report"):
+                report_path_str = result["report"]
+                break
+
+        if not report_path_str:
+            continue
+
+        # 상대 경로를 절대 경로로 변환
+        abs_report_path = os.path.join(_PROJECT_ROOT, report_path_str)
+        if not os.path.isfile(abs_report_path):
+            continue
+
+        summary = extract_report_summary(abs_report_path)
+        if summary:
+            results.append({
+                "ticket": rel_ticket,
+                "type": rel_type,
+                "summary": summary,
+            })
+
+    return results
 
 
 def get_max_ticket_number() -> int:

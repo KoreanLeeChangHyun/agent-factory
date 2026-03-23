@@ -285,6 +285,9 @@
           if (t.submit && t.submit.command) {
             h += badge(t.submit.command, CMD_COLORS[t.submit.command]);
           }
+          if (t.relations && t.relations.length > 0) {
+            h += '<span class="card-relations-icon">\uD83D\uDD17 ' + t.relations.length + "</span>";
+          }
           h += "</div>";
           if (col.key === "Open") {
             h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";

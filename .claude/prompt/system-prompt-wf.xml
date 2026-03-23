@@ -22,6 +22,32 @@
       - tmux 윈도우는 flow-finish Step 5에서 자동 종료됨 (3초 지연 kill)
     </workflow-session-policy>
 
+    <branch-policy>
+      워크플로우가 관리하는 브랜치:
+        - develop: 로컬 전용 통합 브랜치 (원격 push 금지)
+        - feat/*: feature 브랜치, 로컬 전용 (원격 push 금지)
+
+      사용자 수동 관리 영역:
+        - main, staging: 워크플로우가 절대 수정하지 않음
+
+      격리 실행:
+        - 각 feature 브랜치는 독립 git worktree (.worktrees/feat-T-NNN-*)에서 작업
+        - worktree 경로는 .context.json의 worktreePath 필드에 기록됨
+
+      Done 전이 시 자동 병합:
+        - /wf -d N 실행 시 feature 브랜치를 develop에 --no-ff 병합
+        - 병합 성공 후 worktree 디렉터리와 feature 브랜치 자동 정리
+
+      병합 충돌 처리:
+        - 충돌 발생 시 Done 전이가 차단되고 안내 메시지 출력
+        - worktree 디렉터리에서 직접 충돌 해결 후 git add / git commit
+        - 해결 완료 후 /wf -d N 재실행
+
+      비활성화 조건:
+        - develop 브랜치가 없는 리포지토리는 기존 단일 브랜치 모드로 동작
+        - WORKFLOW_WORKTREE=0 으로 강제 비활성, WORKFLOW_WORKTREE=1 로 강제 활성
+    </branch-policy>
+
     <kanban-cli-reference>
       flow-kanban 유효 서브커맨드 및 사용 방법 (이 외의 서브커맨드는 존재하지 않음):
 

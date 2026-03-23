@@ -520,6 +520,29 @@ def main() -> None:
                         "Step 4b: ticket result workflow update",
                     )
 
+    # ── Step 4wt: worktree 유지 로그 (Review 단계) ──
+    # worktree가 활성화된 경우, Review 상태에서 worktree를 유지하여
+    # 추가 수정 사이클이 가능하도록 한다. 정리는 cmd_done()에서만 수행.
+    if ticket_number and abs_work_dir is not None:
+        try:
+            context_file_wt: str = os.path.join(abs_work_dir, ".context.json")
+            context_wt = load_json_file(context_file_wt)
+            if isinstance(context_wt, dict) and context_wt.get("worktree", {}).get("enabled"):
+                wt_branch = context_wt["worktree"].get("featureBranch", "")
+                wt_path = context_wt["worktree"].get("path", "")
+                _append_log(
+                    abs_work_dir,
+                    "INFO",
+                    f"FINALIZE_STEP4WT: worktree 유지 (Review 단계) branch={wt_branch} path={wt_path}",
+                )
+                print(
+                    f"[INFO] worktree 유지: {wt_branch} (정리는 Done 전이 시 자동 수행)",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        except Exception:
+            pass  # worktree 메타데이터 읽기 실패는 무시
+
     # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
     # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.
     # 현재 command(첫 세그먼트)를 제거한 나머지(remaining)가 있으면

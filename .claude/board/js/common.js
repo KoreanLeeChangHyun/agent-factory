@@ -156,6 +156,17 @@ function parseTicket(text) {
     for (let j = 0; j < hs.length; j++) ticket.history.push(parseSubnumber(hs[j]));
   }
 
+  const relationsEl = root.querySelector("relations");
+  ticket.relations = [];
+  if (relationsEl) {
+    const rels = relationsEl.querySelectorAll("relation");
+    for (let k = 0; k < rels.length; k++) {
+      const type = rels[k].getAttribute("type") || "";
+      const relTicket = rels[k].getAttribute("ticket") || "";
+      if (type && relTicket) ticket.relations.push({ type: type, ticket: relTicket });
+    }
+  }
+
   return ticket;
 }
 

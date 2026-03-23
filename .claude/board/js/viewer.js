@@ -211,6 +211,15 @@
       });
     });
 
+    // Bind relation ticket link clicks
+    el.querySelectorAll(".tv-relation-ticket-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        const ticketNum = link.dataset.ticketNum;
+        const ticket = Board.state.TICKETS.find(function (t) { return t.number === ticketNum; });
+        if (ticket) openViewer(ticket);
+      });
+    });
+
     // Bind ticket viewer workflow links
     el.querySelectorAll(".tv-result-workflow[data-wf-entry]").forEach(function (link) {
       link.addEventListener("click", function () {
@@ -503,6 +512,24 @@
       h += badge(ticket.submit.command, CMD_COLORS[ticket.submit.command]);
     }
     h += "</div></div>";
+
+    if (ticket.relations && ticket.relations.length > 0) {
+      const RELATION_COLORS = {
+        "depends-on":   { bg: "rgba(210,100,0,0.25)",  fg: "#e07820" },
+        "derived-from": { bg: "rgba(150,80,180,0.25)", fg: "#b87de0" },
+        "blocks":       { bg: "rgba(200,50,50,0.25)",  fg: "#e05050" },
+      };
+      h += '<div class="tv-section">';
+      h += '<div class="tv-section-title">Relations</div>';
+      h += '<div class="tv-result-links">';
+      ticket.relations.forEach(function (rel) {
+        const colors = RELATION_COLORS[rel.type] || { bg: "rgba(100,100,100,0.2)", fg: "#aaaaaa" };
+        h += '<span class="badge" style="background:' + colors.bg + ';color:' + colors.fg + '">' + esc(rel.type) + '</span>';
+        h += '<span class="tv-result-link tv-relation-ticket-link" data-ticket-num="' + esc(rel.ticket) + '">' + esc(rel.ticket) + '</span>';
+      });
+      h += "</div>";
+      h += "</div>";
+    }
 
     if (ticket.submit && ticket.submit.prompt) {
       h += '<div class="tv-section">';
