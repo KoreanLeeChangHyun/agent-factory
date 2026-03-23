@@ -37,7 +37,7 @@
         flow-kanban archive-subnumber T-001 --id 1
         flow-kanban delete T-001
 
-      제목 변경: update-title / 상태 변경: move / 완료: done
+      제목 변경: update-title / 상태 변경: move / 종료: done
     </kanban-cli-reference>
   </managed>
 

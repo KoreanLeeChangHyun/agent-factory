@@ -1,5 +1,5 @@
 ---
-description: "티켓 라이프사이클 통합 관리. -o(Open/열람), -e(Edit/편집), -oe(Open+Edit 단축), -s(Submit), -d(Done), -c(Cancel) 6개 플래그로 티켓 생성부터 완료까지 단일 진입점으로 제어합니다. Use when: 티켓 생성, 티켓 편집, 워크플로우 실행, 티켓 종료, 티켓 삭제를 한 번에 처리할 때"
+description: "티켓 라이프사이클 통합 관리. -o(Open/열람), -e(Edit/편집), -oe(Open+Edit 단축), -s(Submit), -d(Done), -c(Cancel) 6개 플래그로 티켓 생성부터 종료까지 단일 진입점으로 제어합니다. Use when: 티켓 생성, 티켓 편집, 워크플로우 실행, 티켓 종료, 티켓 삭제를 한 번에 처리할 때"
 argument-hint: "[-o|-e|-oe|-s|-d|-c] [N] (티켓 라이프사이클 통합 관리)"
 ---
 
@@ -484,7 +484,7 @@ flow-kanban done T-NNN
 
 > `flow-kanban done`은 상태 갱신과 파일 이동(`.kanban/active/T-NNN.xml` -> `.kanban/done/T-NNN.xml`)을 내부적으로 처리합니다.
 
-#### 3-3. 완료 메시지 출력
+#### 3-3. 종료 메시지 출력
 
 ```
 T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .kanban/done/T-NNN.xml)
@@ -521,7 +521,7 @@ flow-tmux launch T-NNN '/wf -c N'
 - **`INLINE:`**: `flow-kanban delete T-NNN` 인라인 실행 후 4-4로 진행
 - **exit code 1**: 에러 메시지 출력 후 종료
 
-#### 4-4. 완료 메시지 출력
+#### 4-4. 삭제 메시지 출력
 
 ```
 T-NNN 티켓이 삭제되었습니다.

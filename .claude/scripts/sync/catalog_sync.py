@@ -35,6 +35,13 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+# flow 모듈 import (skill_state_manager)
+_flow_dir = os.path.join(_scripts_dir, "flow")
+if _flow_dir not in sys.path:
+    sys.path.insert(0, _flow_dir)
+
+from skill_state_manager import is_archived, load_skill_state
+
 from common import (
     C_BOLD,
     C_CYAN,
@@ -134,6 +141,8 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
     project_skills: list[dict[str, str]] = []
     excluded_count = 0
 
+    skill_state = load_skill_state()
+
     if not os.path.isdir(SKILLS_DIR):
         print(f"{C_RED}[ERROR] skills 디렉터리가 존재하지 않습니다: {SKILLS_DIR}{C_RESET}", file=sys.stderr)
         sys.exit(1)
@@ -159,6 +168,11 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
             continue
 
         if any(name.startswith(prefix) for prefix in EXCLUDE_PREFIXES):
+            excluded_count += 1
+            continue
+
+        # 제외 조건 3: archived 스킬
+        if is_archived(name, skill_state):
             excluded_count += 1
             continue
 
