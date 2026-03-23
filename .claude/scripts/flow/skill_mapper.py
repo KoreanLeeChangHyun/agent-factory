@@ -27,7 +27,6 @@ import re
 import shutil
 import sys
 import tempfile
-import time
 from datetime import datetime, timezone, timedelta
 
 # 프로젝트 루트 결정
@@ -35,7 +34,7 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RESET, load_json_file, resolve_abs_work_dir, resolve_project_root
+from common import C_CLAUDE, C_DIM, C_RESET, acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 
 # flow 디렉토리를 sys.path에 추가 (같은 디렉토리 내 모듈 직접 import용)
 _flow_dir = os.path.dirname(os.path.abspath(__file__))
@@ -359,74 +358,6 @@ def write_skill_map(work_dir, tasks):
 
 
 # =============================================================================
-# mkdir 기반 POSIX 잠금 (로컬 헬퍼 - 순환 import 방지)
-# =============================================================================
-
-def _acquire_lock(lock_dir, max_wait=2):
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함."""
-    waited = 0
-    while True:
-        try:
-            os.makedirs(lock_dir)
-            try:
-                with open(os.path.join(lock_dir, "pid"), "w") as f:
-                    f.write(f"{os.getpid()} {time.time()}")
-            except OSError:
-                pass
-            return True
-        except OSError:
-            pid_file = os.path.join(lock_dir, "pid")
-            if os.path.isfile(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        pid_content = f.read().strip()
-                    parts = pid_content.split()
-                    lock_pid = int(parts[0])
-                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
-                    os.kill(lock_pid, 0)
-                    if lock_ts and (time.time() - lock_ts) > max_wait:
-                        try:
-                            with open(pid_file, "r") as f:
-                                recheck = f.read().strip()
-                            if recheck == pid_content:
-                                shutil.rmtree(lock_dir)
-                                waited += 1
-                                continue
-                        except OSError:
-                            pass
-                except (ValueError, ProcessLookupError, OSError):
-                    try:
-                        with open(pid_file, "r") as f:
-                            recheck = f.read().strip()
-                        if recheck == pid_content:
-                            shutil.rmtree(lock_dir)
-                    except OSError:
-                        pass
-                    waited += 1
-                    continue
-                except PermissionError:
-                    pass
-            waited += 1
-            if waited >= max_wait:
-                return False
-            time.sleep(1)
-
-
-def _release_lock(lock_dir):
-    """잠금 해제."""
-    try:
-        pid_file = os.path.join(lock_dir, "pid")
-        if os.path.exists(pid_file):
-            os.unlink(pid_file)
-    except OSError:
-        pass
-    try:
-        os.rmdir(lock_dir)
-    except OSError:
-        pass
-
-
-# =============================================================================
 # .dashboard/.skills.md 갱신
 # =============================================================================
 
@@ -513,7 +444,7 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
 
         # 원자적 쓰기
         os.makedirs(os.path.dirname(skills_md), exist_ok=True)
-        locked = _acquire_lock(lock_dir)
+        locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(skills_md), suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -525,7 +456,7 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
             raise
         finally:
             if locked:
-                _release_lock(lock_dir)
+                release_lock(lock_dir)
 
     except Exception:
         pass

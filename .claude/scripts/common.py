@@ -24,6 +24,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from typing import Any
 
 # -- sys.path 보장: 이 모듈이 직접 실행될 때를 위해 scripts/ 디렉터리 추가 --
@@ -486,3 +487,90 @@ def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
         pass
 
     return default
+
+
+# =============================================================================
+# 파일시스템 잠금 (mkdir 기반 POSIX lock)
+# =============================================================================
+
+
+def acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
+
+    디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
+    프로세스가 종료되었거나 max_wait 초 초과 시 stale lock을 제거하고 재시도한다.
+
+    Args:
+        lock_dir: 잠금 디렉터리 경로.
+        max_wait: 최대 대기 초. 기본값 2.
+
+    Returns:
+        잠금 획득 성공 여부.
+    """
+    waited = 0
+    while True:
+        try:
+            os.makedirs(lock_dir)
+            try:
+                with open(os.path.join(lock_dir, "pid"), "w") as f:
+                    f.write(f"{os.getpid()} {time.time()}")
+            except OSError:
+                pass
+            return True
+        except OSError:
+            pid_file = os.path.join(lock_dir, "pid")
+            if os.path.isfile(pid_file):
+                try:
+                    with open(pid_file, "r") as f:
+                        pid_content = f.read().strip()
+                    parts = pid_content.split()
+                    lock_pid = int(parts[0])
+                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
+                    os.kill(lock_pid, 0)
+                    if lock_ts and (time.time() - lock_ts) > max_wait:
+                        try:
+                            with open(pid_file, "r") as f:
+                                recheck = f.read().strip()
+                            if recheck == pid_content:
+                                shutil.rmtree(lock_dir)
+                                waited += 1
+                                continue
+                        except OSError:
+                            pass
+                except (ValueError, ProcessLookupError, OSError):
+                    try:
+                        with open(pid_file, "r") as f:
+                            recheck = f.read().strip()
+                        if recheck == pid_content:
+                            shutil.rmtree(lock_dir)
+                    except OSError:
+                        pass
+                    waited += 1
+                    continue
+                except PermissionError:
+                    pass
+            waited += 1
+            if waited >= max_wait:
+                return False
+            time.sleep(1)
+
+
+def release_lock(lock_dir: str) -> None:
+    """잠금을 해제한다.
+
+    PID 파일 삭제 후 잠금 디렉터리를 제거한다.
+    파일시스템 오류는 무시한다.
+
+    Args:
+        lock_dir: 해제할 잠금 디렉터리 경로.
+    """
+    try:
+        pid_file = os.path.join(lock_dir, "pid")
+        if os.path.exists(pid_file):
+            os.unlink(pid_file)
+    except OSError:
+        pass
+    try:
+        os.rmdir(lock_dir)
+    except OSError:
+        pass

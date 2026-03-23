@@ -35,7 +35,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import xml.etree.ElementTree as ET
 
 # utils 패키지 import
@@ -43,7 +42,7 @@ _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspat
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
+from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 from data.constants import CHAIN_SEPARATOR, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 from flow.flow_logger import append_log as _append_log
 from flow.tmux_utils import WINDOW_PREFIX_P
@@ -197,87 +196,6 @@ def _find_transcript_path(registry_key: str) -> str | None:
 
 
 
-def _acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
-
-    디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
-    프로세스가 종료되었거나 max_wait 초 초과 시 stale lock을 제거하고 재시도한다.
-
-    Args:
-        lock_dir: 잠금 디렉터리 경로
-        max_wait: 최대 대기 초 (기본값 2)
-
-    Returns:
-        잠금 획득 성공 여부.
-    """
-    waited = 0
-    while True:
-        try:
-            os.makedirs(lock_dir)
-            try:
-                with open(os.path.join(lock_dir, "pid"), "w") as f:
-                    f.write(f"{os.getpid()} {time.time()}")
-            except OSError:
-                pass
-            return True
-        except OSError:
-            pid_file = os.path.join(lock_dir, "pid")
-            if os.path.isfile(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        pid_content = f.read().strip()
-                    parts = pid_content.split()
-                    lock_pid = int(parts[0])
-                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
-                    os.kill(lock_pid, 0)
-                    if lock_ts and (time.time() - lock_ts) > max_wait:
-                        try:
-                            with open(pid_file, "r") as f:
-                                recheck = f.read().strip()
-                            if recheck == pid_content:
-                                shutil.rmtree(lock_dir)
-                                waited += 1
-                                continue
-                        except OSError:
-                            pass
-                except (ValueError, ProcessLookupError, OSError):
-                    try:
-                        with open(pid_file, "r") as f:
-                            recheck = f.read().strip()
-                        if recheck == pid_content:
-                            shutil.rmtree(lock_dir)
-                    except OSError:
-                        pass
-                    waited += 1
-                    continue
-                except PermissionError:
-                    pass
-            waited += 1
-            if waited >= max_wait:
-                return False
-            time.sleep(1)
-
-
-def _release_lock(lock_dir: str) -> None:
-    """잠금을 해제한다.
-
-    PID 파일 삭제 후 잠금 디렉터리를 제거한다.
-    파일시스템 오류는 무시한다.
-
-    Args:
-        lock_dir: 해제할 잠금 디렉터리 경로
-    """
-    try:
-        pid_file = os.path.join(lock_dir, "pid")
-        if os.path.exists(pid_file):
-            os.unlink(pid_file)
-    except OSError:
-        pass
-    try:
-        os.rmdir(lock_dir)
-    except OSError:
-        pass
-
 
 def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
     """.dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다.
@@ -383,7 +301,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 
         # POSIX lock + 원자적 쓰기
         os.makedirs(os.path.dirname(logs_md), exist_ok=True)
-        locked = _acquire_lock(lock_dir)
+        locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(logs_md), suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -395,7 +313,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
             raise
         finally:
             if locked:
-                _release_lock(lock_dir)
+                release_lock(lock_dir)
     except Exception:
         pass
 

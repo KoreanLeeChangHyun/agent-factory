@@ -1,0 +1,11 @@
+<alias-reference>
+      flow-kanban 서브커맨드 (이 외의 서브커맨드 사용 금지):
+        create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
+      flow-tmux: launch, cleanup
+      flow-claude: start, end
+      flow-update: status, both, task-start, task-status
+      flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
+      flow-step: start, end
+      flow-phase: (registryKey N)
+      flow-skillmap: (registryKey)
+    </alias-reference>

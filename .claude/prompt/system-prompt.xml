@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system-prompt>
-
   <!-- MANAGED SECTION: Claude가 관리합니다 -->
   <managed>
     <language>한국어</language>
     <tone>존댓말</tone>
-
     <branch-policy>
       절대 직접 코드를 수정 하려고 시도 조차 하지 말아야 한다 (MUST NOT).
       코드 수정은 무조건 티켓 생성 → 워크플로우 실행으로 처리해야 한다 (MUST).
@@ -40,53 +38,10 @@
       실용적 이유: 위 DO NOT 항목은 Hook이 PreToolUse 단계에서 차단하므로 시도 자체가 토큰 낭비이다.
       차단-재시도 루프를 방지하려면 처음부터 올바른 경로(/wf 명령어)로 진행하라.
     </rules>
-
-    <alias-reference>
-      flow-kanban 서브커맨드 (이 외의 서브커맨드 사용 금지):
-        create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
-      flow-tmux: launch, cleanup
-      flow-claude: start, end
-      flow-update: status, both, task-start, task-status
-      flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
-      flow-step: start, end
-      flow-phase: (registryKey N)
-      flow-skillmap: (registryKey)
-    </alias-reference>
-
-    <natural-language-mapping>
-      사용자 자연어 요청을 워크플로우 명령으로 변환하는 가이드:
-      - "이거 수정해줘" / "코드 고쳐줘"  →  /wf -e (티켓 생성+편집)  →  /wf -s N (실행)
-      - "분석해줘" / "조사해줘"           →  /wf -e (research 커맨드로 티켓 생성)  →  /wf -s N
-      - "티켓 만들어"                     →  /wf -o (채번만)
-      - "리뷰해줘"                        →  /wf -e (review 커맨드로 티켓 생성)  →  /wf -s N
-      - "완료 처리해줘"                   →  /wf -d N
-      - "티켓 편집해줘" / "내용 바꿔줘"  →  /wf -e N (기존 티켓 편집)
-      - (이전 대화에서 goal/target/constraints/criteria 모두 추론 가능)  →  /wf -oe (생성+편집 즉시 처리)
-    </natural-language-mapping>
-
-    <workflow-summary>
-      워크플로우 시스템 요약:
-      - entry-point: /wf 명령어 (단일 진입점)
-      - lifecycle: Open → In Progress → Review → Done
-      - commands:
-        - /wf -o       : 새 티켓 생성 및 프롬프트 작성
-        - /wf -o N     : 기존 티켓 편집
-        - /wf -s N     : 티켓 제출 및 워크플로우 실행
-        - /wf -d N     : 티켓 종료 (Done)
-        - /wf -c N     : 티켓 삭제
-      - aliases: flow-* 스크립트 체계 (flow-kanban, flow-tmux, flow-claude 등)
-      - flow-* alias 필수 매개변수 상세: 위 alias-reference 섹션 참조
-      - flow-kanban 서브커맨드 상세: 위 alias-reference 참조 (유일한 서브커맨드 목록)
-      - 상세 참조:
-        - 명령어 사용법: .claude/commands/wf.md
-        - 오케스트레이션 스킬: .claude/skills/workflow-orchestration/
-    </workflow-summary>
   </managed>
-
   <!-- CUSTOM SECTION: 사용자 편집 영역 -->
   <custom>
   티켓 관리는 사용자가 자연어로 명령으로 내려도 정확히 처리할 수 있어야 한다.
   파일 직접 수정시 HOOK에 의해 차단되니 반드시 티켓 생성하여 처리 해야 한다. (이를 명심하도록 한다)
   </custom>
-
 </system-prompt>
