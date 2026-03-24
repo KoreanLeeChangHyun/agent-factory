@@ -1,11 +1,11 @@
 #!/usr/bin/env -S python3 -u
 """reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트.
 
-현재 워크플로우의 티켓 파일(.kanban/T-NNN.xml)에서 피드백을 읽어
+현재 워크플로우의 티켓 파일(.kanban/active/T-NNN.xml)에서 피드백을 읽어
 user_prompt.txt에 append한다.
 
 티켓 파일은 환경변수 TICKET_NUMBER, .context.json의 ticketNumber 필드,
-또는 .kanban/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
+또는 .kanban/active/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
 
 사용법:
   python3 reload_prompt.py <workDir>
@@ -17,7 +17,7 @@ user_prompt.txt에 append한다.
   TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식)
 
 수행 작업 (순서대로):
-  1. .kanban/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
+  1. .kanban/active/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
   2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
 
 출력 (stdout):
@@ -66,7 +66,7 @@ def _normalize_ticket_number(raw: str) -> str | None:
 def _find_ticket_file_by_number(kanban_dir: Path, ticket_number: str) -> str | None:
     """kanban 디렉터리에서 티켓 번호에 해당하는 파일을 정확 매칭으로 탐색한다.
 
-    루트 파일(T-NNN.xml)을 먼저 탐색하고, 없으면 done 서브디렉터리도 탐색한다.
+    active/ 서브디렉터리를 먼저 탐색하고, done/ 서브디렉터리, 루트 순으로 폴백한다.
 
     Args:
         kanban_dir: .kanban 디렉터리 절대 경로
@@ -75,13 +75,18 @@ def _find_ticket_file_by_number(kanban_dir: Path, ticket_number: str) -> str | N
     Returns:
         찾은 티켓 파일의 절대 경로 문자열. 없으면 None.
     """
-    candidate: Path = kanban_dir / f"{ticket_number}.xml"
-    if candidate.is_file():
-        return str(candidate)
-    # done 서브디렉터리 탐색
+    # 1순위: .kanban/active/T-NNN.xml
+    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
+    if active_candidate.is_file():
+        return str(active_candidate)
+    # 2순위: .kanban/done/T-NNN.xml
     done_candidate: Path = kanban_dir / "done" / f"{ticket_number}.xml"
     if done_candidate.is_file():
         return str(done_candidate)
+    # 3순위 (하위 호환 폴백): .kanban/T-NNN.xml
+    root_candidate: Path = kanban_dir / f"{ticket_number}.xml"
+    if root_candidate.is_file():
+        return str(root_candidate)
     return None
 
 
@@ -91,13 +96,13 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
     탐색 우선순위:
       1. 환경변수 TICKET_NUMBER
       2. .context.json의 ticketNumber 필드
-      3. .kanban/ 디렉터리 XML 파일 직접 스캔 (In Progress 상태 첫 번째 티켓)
+      3. .kanban/active/ 디렉터리 XML 파일 직접 스캔 (In Progress 상태 첫 번째 티켓)
 
     Args:
         abs_work_dir: 현재 워크플로우 디렉터리 절대 경로
 
     Returns:
-        .kanban/T-NNN.xml 절대 경로. 결정 불가능하면 None.
+        .kanban/active/T-NNN.xml 절대 경로. 결정 불가능하면 None.
     """
     kanban_dir: Path = Path(_PROJECT_ROOT) / ".kanban"
 
@@ -122,42 +127,46 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
         except Exception:
             pass
 
-    # 3순위: .kanban/ 디렉터리 XML 직접 스캔 (In Progress 상태 첫 번째 티켓)
+    # 3순위: .kanban/active/ 디렉터리 XML 직접 스캔 (In Progress 상태 첫 번째 티켓)
+    # 하위 호환: active/에 파일이 없으면 .kanban/ 루트도 폴백 스캔
     try:
         import glob as _glob
         import xml.etree.ElementTree as _ET
 
-        xml_files: list[str] = sorted(_glob.glob(str(kanban_dir / "T-*.xml")))
-        for xml_path in xml_files:
-            try:
-                tree = _ET.parse(xml_path)
-                root = tree.getroot()
-                # <metadata> 내부의 <status> 탐색
-                metadata = root.find("metadata")
-                if metadata is None:
-                    status_el = root.find("status")
-                else:
-                    status_el = metadata.find("status")
-                if status_el is not None and (status_el.text or "").strip() == "In Progress":
-                    # <metadata>/<number> 탐색
-                    number_el = (metadata or root).find("number")
-                    if number_el is not None and number_el.text:
-                        normalized = _normalize_ticket_number(number_el.text.strip())
-                        if normalized:
-                            ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
-                            if ticket_path:
-                                return ticket_path
-                    # 파일명에서 번호 추출 (T-NNN.xml)
-                    filename = os.path.basename(xml_path)
-                    m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
-                    if m:
-                        normalized = _normalize_ticket_number(m.group(1))
-                        if normalized:
-                            ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
-                            if ticket_path:
-                                return ticket_path
-            except Exception:
-                continue
+        active_dir = kanban_dir / "active"
+        scan_dirs: list[Path] = [active_dir, kanban_dir]
+        for scan_dir in scan_dirs:
+            xml_files: list[str] = sorted(_glob.glob(str(scan_dir / "T-*.xml")))
+            for xml_path in xml_files:
+                try:
+                    tree = _ET.parse(xml_path)
+                    root = tree.getroot()
+                    # <metadata> 내부의 <status> 탐색
+                    metadata = root.find("metadata")
+                    if metadata is None:
+                        status_el = root.find("status")
+                    else:
+                        status_el = metadata.find("status")
+                    if status_el is not None and (status_el.text or "").strip() == "In Progress":
+                        # <metadata>/<number> 탐색
+                        number_el = (metadata or root).find("number")
+                        if number_el is not None and number_el.text:
+                            normalized = _normalize_ticket_number(number_el.text.strip())
+                            if normalized:
+                                ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
+                                if ticket_path:
+                                    return ticket_path
+                        # 파일명에서 번호 추출 (T-NNN.xml)
+                        filename = os.path.basename(xml_path)
+                        m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
+                        if m:
+                            normalized = _normalize_ticket_number(m.group(1))
+                            if normalized:
+                                ticket_path = _find_ticket_file_by_number(kanban_dir, normalized)
+                                if ticket_path:
+                                    return ticket_path
+                except Exception:
+                    continue
     except Exception:
         pass
 
@@ -168,11 +177,11 @@ def main() -> None:
     """CLI 진입점. workDir 인자를 받아 티켓 피드백 반영 작업을 수행한다.
 
     수행 작업:
-      1. .kanban/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
+      1. .kanban/active/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
       2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
 
     XML 구조 호환성 주석:
-        티켓 파일(.kanban/T-NNN.xml) 전체를 문자열로 읽어 user_prompt.txt에
+        티켓 파일(.kanban/active/T-NNN.xml) 전체를 문자열로 읽어 user_prompt.txt에
         append하므로, 새 XML 구조(<metadata>/<submit>/<history> 래퍼 요소, <prompt>
         래퍼, <result> 구조화)에서도 동작에 영향이 없다. XML 내부 구조를 파싱하거나
         특정 태그를 추출하지 않으므로 코드 변경이 불필요하다.
@@ -203,9 +212,9 @@ def main() -> None:
             feedback = f.read()
 
     if not feedback:
-        append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)")
+        append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/active/T-NNN.xml)")
         print("FAIL", flush=True)
-        print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/T-NNN.xml)", flush=True)
+        print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (.kanban/active/T-NNN.xml)", flush=True)
         sys.exit(0)
 
     # --- Step 2: user_prompt.txt에 피드백 append ---

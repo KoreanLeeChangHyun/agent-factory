@@ -7,7 +7,7 @@ skills:
   - workflow-agent
   - design-mermaid-diagrams
 maxTurns: 30
-permissionMode: acceptEdits
+permissionMode: bypassPermissions
 ---
 # Reporter Agent
 

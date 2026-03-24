@@ -7,6 +7,7 @@ skills:
   - workflow-agent
   - design-mermaid-diagrams
 maxTurns: 100
+permissionMode: bypassPermissions
 ---
 # Planner Agent
 

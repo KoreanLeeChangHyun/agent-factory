@@ -1,0 +1,17 @@
+<workflow-summary>
+      워크플로우 시스템 요약:
+      - entry-point: /wf 명령어 (단일 진입점)
+      - lifecycle: Open → In Progress → Review → Done
+      - commands:
+        - /wf -o       : 새 티켓 생성 및 프롬프트 작성
+        - /wf -o N     : 기존 티켓 편집
+        - /wf -s N     : 티켓 제출 및 워크플로우 실행
+        - /wf -d N     : 티켓 종료 (Done)
+        - /wf -c N     : 티켓 삭제
+      - aliases: flow-* 스크립트 체계 (flow-kanban, flow-tmux, flow-claude 등)
+      - flow-* alias 필수 매개변수 상세: 위 alias-reference 섹션 참조
+      - flow-kanban 서브커맨드 상세: 위 alias-reference 참조 (유일한 서브커맨드 목록)
+      - 상세 참조:
+        - 명령어 사용법: .claude/commands/wf.md
+        - 오케스트레이션 스킬: .claude/skills/workflow-orchestration/
+    </workflow-summary>

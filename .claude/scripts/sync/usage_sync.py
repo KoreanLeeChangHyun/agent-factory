@@ -20,9 +20,7 @@ from __future__ import annotations
 import glob
 import json
 import os
-import shutil
 import sys
-import time
 from typing import Optional
 
 # utils 패키지 import
@@ -31,8 +29,10 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import (
+    acquire_lock,
     atomic_write_json,
     load_json_file,
+    release_lock,
     resolve_project_root,
     scan_active_workflows,
 )
@@ -59,6 +59,11 @@ MAX_JSONL_SIZE = 50 * 1024 * 1024
 VALID_AGENT_TYPES: set[str] = {
     "orchestrator", "planner", "worker", "explorer",
     "validator", "reporter",
+}
+
+# _pending_workers에서 worker 큐 매핑 대상이 아닌 에이전트 타입
+NON_WORKER_AGENT_TYPES: set[str] = {
+    "validator", "reporter", "planner", "explorer", "orchestrator",
 }
 
 
@@ -117,73 +122,6 @@ def _find_work_dir() -> Optional[str]:
             if os.path.isdir(candidate):
                 return candidate
     return None
-
-
-def _acquire_lock(lock_dir: str, max_wait: int = 5) -> bool:
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
-
-    Args:
-        lock_dir: 잠금 디렉터리 경로 (존재하지 않아야 잠금 성공)
-        max_wait: 최대 대기 시간 (초). 초과 시 False 반환.
-
-    Returns:
-        잠금 획득 성공 여부
-    """
-    waited = 0
-    while True:
-        try:
-            os.makedirs(lock_dir)
-            # PID 기록
-            try:
-                with open(os.path.join(lock_dir, "pid"), "w") as f:
-                    f.write(str(os.getpid()))
-            except OSError:
-                pass
-            return True
-        except OSError:
-            # stale lock 감지
-            pid_file = os.path.join(lock_dir, "pid")
-            if os.path.isfile(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        lock_pid = int(f.read().strip())
-                    # 프로세스가 존재하지 않으면 stale lock 제거
-                    os.kill(lock_pid, 0)
-                except (ValueError, ProcessLookupError, OSError):
-                    try:
-                        shutil.rmtree(lock_dir)
-                    except OSError:
-                        pass
-                    continue
-                except PermissionError:
-                    # 프로세스가 살아있지만 kill 권한 없음 → stale lock 아님, 대기
-                    pass
-            waited += 1
-            if waited >= max_wait:
-                print(
-                    f"[usage-sync] WARNING: lock acquisition failed after {max_wait}s: {lock_dir}",
-                    file=sys.stderr,
-                )
-                return False
-            time.sleep(1)
-
-
-def _release_lock(lock_dir: str) -> None:
-    """잠금 해제.
-
-    Args:
-        lock_dir: 잠금 디렉터리 경로
-    """
-    try:
-        pid_file = os.path.join(lock_dir, "pid")
-        if os.path.exists(pid_file):
-            os.unlink(pid_file)
-    except OSError:
-        pass
-    try:
-        os.rmdir(lock_dir)
-    except OSError:
-        pass
 
 
 def _load_usage(usage_file: str) -> dict[str, object]:
@@ -312,7 +250,7 @@ def cmd_track() -> None:
     usage_file = os.path.join(work_dir, "usage.json")
     lock_dir = usage_file + ".lockdir"
 
-    if not _acquire_lock(lock_dir):
+    if not acquire_lock(lock_dir, max_wait=5):
         print(
             f"[usage-sync] WARNING: track lock failed, usage data may be lost for {agent_type}:{agent_id}",
             file=sys.stderr,
@@ -348,8 +286,16 @@ def cmd_track() -> None:
             else:
                 # agent_id가 hex 문자열이어서 pending에 없는 경우:
                 # pending의 값(task_id) 중 아직 workers에 기록되지 않은 첫 번째 task_id를 큐 방식으로 할당
+                # 비-worker 에이전트 타입(validator, reporter 등)은 큐 후보에서 제외
                 assigned_task_id = None
                 for pkey, ptid in list(pending.items()):
+                    if ptid in NON_WORKER_AGENT_TYPES or pkey in NON_WORKER_AGENT_TYPES:
+                        del pending[pkey]
+                        print(
+                            f"[usage-sync] INFO: cmd_track skipped non-worker pending entry '{pkey}' -> '{ptid}'",
+                            file=sys.stderr,
+                        )
+                        continue
                     if ptid not in existing_workers:
                         assigned_task_id = ptid
                         del pending[pkey]
@@ -379,7 +325,7 @@ def cmd_track() -> None:
     except Exception as e:
         print(f"[usage-sync] WARNING: track error: {e}", file=sys.stderr)
     finally:
-        _release_lock(lock_dir)
+        release_lock(lock_dir)
 
 
 # =============================================================================
@@ -555,7 +501,7 @@ def cmd_batch() -> None:
     usage_file = os.path.join(work_dir, "usage.json")
     lock_dir = usage_file + ".lockdir"
 
-    if not _acquire_lock(lock_dir, max_wait=10):
+    if not acquire_lock(lock_dir, max_wait=10):
         print("[usage-sync] WARNING: Could not acquire lock", file=sys.stderr)
         sys.exit(0)
 
@@ -567,7 +513,7 @@ def cmd_batch() -> None:
         agent_files = sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl")))
         if not agent_files:
             print("[usage-sync] No agent JSONL files found", file=sys.stderr)
-            _release_lock(lock_dir)
+            release_lock(lock_dir)
             sys.exit(0)
 
         # 에이전트별 JSONL 파싱 (보완 모드: track으로 수집 완료된 에이전트는 스킵)
@@ -616,9 +562,21 @@ def cmd_batch() -> None:
             # agent_id가 hex 문자열이고 pending이 {task_id: task_id} 형태인 경우:
             # pending의 값(task_id) 목록과 worker_tokens의 agent_id 목록을 순서대로 매핑.
             # agent_to_task: _pending_workers의 pkey가 실제 agent_id인 경우 직접 매핑
+            # 비-worker 에이전트 타입(validator, reporter 등)은 worker 큐 매핑에서 제외
             agent_to_task: dict[str, str] = {}
+            non_worker_pending_keys: list[str] = []
             for pkey, ptid in pending.items():
+                if pkey in NON_WORKER_AGENT_TYPES or ptid in NON_WORKER_AGENT_TYPES:
+                    non_worker_pending_keys.append(pkey)
+                    print(
+                        f"[usage-sync] INFO: cmd_batch skipped non-worker pending entry '{pkey}' -> '{ptid}'",
+                        file=sys.stderr,
+                    )
+                    continue
                 agent_to_task[pkey] = ptid
+
+            for nw_key in non_worker_pending_keys:
+                del pending[nw_key]
 
             # task_id=task_id 형태의 pending만 unassigned 큐에 추가.
             # agent_id가 hex 문자열일 때 순서대로 매핑하기 위한 폴백 큐.
@@ -646,6 +604,19 @@ def cmd_batch() -> None:
                 if isinstance(existing_workers.get(key), dict) and existing_workers[key].get("method") == "subagent_transcript":
                     skipped_agents.append(f"worker/{key}")
                     continue
+                # 중복 검사: 4개 토큰 필드 시그니처가 동일한 기존 항목이 있으면 스킵
+                _token_fields = ("input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens")
+                existing_entry = existing_workers.get(key)
+                if isinstance(existing_entry, dict):
+                    new_sig = tuple(tokens.get(f, 0) for f in _token_fields)
+                    existing_sig = tuple(existing_entry.get(f, 0) for f in _token_fields)
+                    if new_sig == existing_sig:
+                        print(
+                            f"[usage-sync] INFO: duplicate token signature detected for worker/{key}, skipping",
+                            file=sys.stderr,
+                        )
+                        skipped_agents.append(f"worker/{key}(duplicate)")
+                        continue
                 existing_workers[key] = tokens
 
         # 스킵된 에이전트 목록 로그
@@ -671,7 +642,7 @@ def cmd_batch() -> None:
     except Exception as e:
         print(f"[usage-sync] WARNING: batch error: {e}", file=sys.stderr)
     finally:
-        _release_lock(lock_dir)
+        release_lock(lock_dir)
 
 
 # =============================================================================

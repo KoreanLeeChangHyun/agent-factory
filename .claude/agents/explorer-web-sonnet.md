@@ -6,10 +6,11 @@ tools: WebSearch, WebFetch, Write
 skills:
   - workflow-agent
 maxTurns: 30
+permissionMode: bypassPermissions
 ---
 # Explorer Web Sonnet Agent
 
-계획서 기반으로 웹에서 정보를 수집하고 탐색 결과를 `work/WXX-*.md`에 기록합니다. 기술 문서, API 조사, 외부 정보 수집에 특화된 웹 전용 탐색 에이전트입니다.
+계획서 기반으로 웹에서 정보를 수집하고 탐색 결과를 `<workDir>/work/WXX-*.md`에 기록합니다. 기술 문서, API 조사, 외부 정보 수집에 특화된 웹 전용 탐색 에이전트입니다.
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -20,7 +21,7 @@ maxTurns: 30
 - 웹 탐색 (WebSearch/WebFetch)
 - 기술 문서, API 레퍼런스, 외부 라이브러리 정보 수집
 - 최신 기술 동향, 릴리스 노트, 변경 로그 조사
-- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`work/WXX-*.md`)
+- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`<workDir>/work/WXX-*.md`)
 
 ### 이 에이전트가 수행하지 않는 행위
 

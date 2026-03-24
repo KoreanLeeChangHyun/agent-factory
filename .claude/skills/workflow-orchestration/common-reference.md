@@ -46,7 +46,7 @@
 | **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. FSM Step과 1:1 대응. SKILL.md의 INIT/PLAN/WORK/REPORT/DONE 섹션에서 각 Step별 프로토콜을 정의. |
 | **DONE** | (FSM Step/배너 명칭) | 워크플로우 완료를 나타내는 FSM Step이자 배너 명칭. 오케스트레이터가 flow-finish + flow-claude end로 마무리 수행. Agent-Step 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE)에서 사용. |
 | **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, flow-finish(finalization.py)가 읽어서 history.md 갱신에 활용 |
-| **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/T-NNN.xml` 티켓 전체 XML을 읽어 workDir에 복사 후 상태를 in-progress로 전환. 티켓 파일은 `<metadata>` / `<submit>` / `<history>` 3래퍼 요소 구조를 가지며, `<current>`는 `<metadata>` 래퍼 내부(number/title/datetime/status/current)에 위치함. `<subnumber>` 내부에 `<prompt>` 래퍼(goal/target/constraints/criteria/context 포함)와 `<result>` 래퍼(workdir/plan/work/report 하위 요소)가 있음. **XML 구조 SSoT 레퍼런스:** `.claude/skills/workflow-orchestration/references/T-NNN.xml` |
+| **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 `.kanban/active/T-NNN.xml` 티켓 전체 XML을 읽어 workDir에 복사 후 상태를 in-progress로 전환. 티켓 파일은 `<metadata>` / `<submit>` / `<history>` 3래퍼 요소 구조를 가지며, `<current>`는 `<metadata>` 래퍼 내부(number/title/datetime/status/current)에 위치함. `<subnumber>` 내부에 `<prompt>` 래퍼(goal/target/constraints/criteria/context 포함)와 `<result>` 래퍼(workdir/plan/work/report 하위 요소)가 있음. **XML 구조 SSoT 레퍼런스:** `.claude/skills/workflow-orchestration/references/T-NNN.xml` |
 
 ### WHAT/HOW Bounded Context 용어 구분
 
@@ -124,7 +124,7 @@ flowchart TD
 
 | Action | 주체 | 근거 |
 |--------|------|------|
-| AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890) |
+| AskUserQuestion | Main | 플랫폼 제약: 서브에이전트에서 호출 불가 (GitHub Issue #12890). `-n` 수동 확인 모드 전용. 기본 모드에서는 자동 fallback으로 대체됨 |
 | flow-claude/flow-step/flow-phase/flow-update 배너 + flow-init/flow-finish/flow-reload 스크립트 (Phase banner & script Bash calls) | Main | 플랫폼 제약: 서브에이전트 Bash 출력이 사용자 터미널에 미표시. flow-update가 상태 전이 시각화를 전담. 배너 명령은 개별 Bash 호출로 실행 (체이닝 금지). task-start 모드로 통합되어 && 체이닝 불필요 |
 | update_state.py 호출 (transition) | Main + Sub (모드별) | Step 전이(status)는 오케스트레이터 전용. 보조 작업(link-session, usage 기록)은 서브에이전트 허용 |
 | 소스 코드 Read/Write/Edit | Sub (worker) | 역할 분리: 실제 작업(소스 코드 읽기/수정/생성)은 서브에이전트에 위임 |
@@ -219,7 +219,7 @@ flowchart TD
 | usage-* | X | O (Hook) |
 | task-start | O | X |
 
-- 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행 (단, 오케스트레이터의 Step 전이 실패는 예외: AskUserQuestion으로 사용자 확인 필수)
+- 비차단 원칙: 실패 시 경고만 출력, 워크플로우 정상 진행. Step 전이 실패 시: 자동 재시도 3회(1초 간격) + 3회 실패 시 `WORKFLOW_SKIP_GUARD=1` 강제 전이 + AUDIT 로그 기록. `-n` 수동 확인 모드에서만 AskUserQuestion 유지
 
 ## State Management (status.json)
 
@@ -247,6 +247,42 @@ flowchart TD
 | Step error (PLAN/WORK/REPORT) | 최대 3회 재시도 후 에러 보고 |
 | Independent task failure | 다른 독립 태스크는 계속 진행 |
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
-| Total failure rate > 50% | 워크플로우 중단 및 AskUserQuestion으로 사용자 확인 |
-| update_state.py deny/failure (Step 전이 실패) | AskUserQuestion으로 사용자에게 상황 보고 후 재시도/중단 선택 요청 |
+| Total failure rate > 50% | `[WARN]` 로그 기록 후 실패 태스크 skip, 남은 태스크 계속 실행. REPORT 단계에서 실패 태스크 보고 섹션 자동 포함 |
+| update_state.py deny/failure (Step 전이 실패) | 자동 재시도 3회(1초 간격). 3회 실패 시 `WORKFLOW_SKIP_GUARD=1` 강제 전이(`flow-update env` 설정 -> 재호출 -> 즉시 해제). `[AUDIT]` 로그 기록 + 보고서에 FSM 강제 전이 경고 포함. 강제 전이도 실패 시 FAILED 상태 전이 |
 | Workflow cancel/abort (중단/취소) | status 전이를 통해 CANCELLED 상태로 변경. |
+
+### 전이 실패 자동 복구 절차
+
+Step 전이(`update_state.py`) 호출 결과가 "blocked" 또는 "failed"를 포함하는 경우 아래 절차를 순서대로 실행한다.
+
+**1차~3차 재시도 (1초 간격)**
+
+```
+1차 시도: update_state.py 호출 -> 결과 확인
+  -> 성공("allowed"): 정상 진행
+  -> 실패("blocked"/"failed"): 1초 대기 후 2차 시도
+2차 시도: status.json 재로드 후 update_state.py 재호출
+  -> 성공: 정상 진행
+  -> 실패: 1초 대기 후 3차 시도
+3차 시도: status.json 재로드 후 update_state.py 재호출
+  -> 성공: 정상 진행
+  -> 실패: 강제 전이 단계로 진입
+```
+
+**강제 전이 (재시도 3회 소진 후)**
+
+강제 전이는 다음 4가지 조건을 모두 충족해야 한다.
+
+1. **재시도 3회 소진**: 1차~3차 재시도 모두 실패한 경우에만 발동
+2. **즉시 환경변수 해제**: `flow-update env <registryKey> set WORKFLOW_SKIP_GUARD 1` 설정 후 재호출 완료 즉시 `flow-update env <registryKey> unset WORKFLOW_SKIP_GUARD` 해제. 환경변수가 잔류하면 안 됨
+3. **AUDIT 로그 기록**: `[AUDIT]` 레벨로 workflow.log에 전이 대상(fromStep -> toStep), 재시도 횟수, 강제 전이 발동 시각을 기록
+4. **보고서 경고 포함**: 보고서(`report.md`)에 "FSM 강제 전이 경고" 섹션을 자동 포함. 강제 전이 발생 단계, 원인, 발동 시각 명시
+
+**강제 전이 실패 시 CRITICAL 처리**
+
+```
+강제 전이도 실패:
+  -> flow-update both <registryKey> worker FAILED 호출 (FAILED 상태 전이 시도)
+  -> [CRITICAL] 로그 기록: FSM 강제 전이 실패, 워크플로우 복구 불가 상태
+  -> 워크플로우 종료 (이후 단계 실행 불가)
+```

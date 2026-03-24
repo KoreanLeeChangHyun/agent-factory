@@ -6,6 +6,7 @@ tools: Bash, Edit, Glob, Grep, Read, WebFetch, WebSearch, Write
 skills:
   - workflow-agent
 maxTurns: 50
+permissionMode: bypassPermissions
 ---
 # Worker Agent
 
@@ -19,7 +20,7 @@ maxTurns: 50
 
 - 소스 코드 읽기/수정/생성 (Read/Write/Edit)
 - 코드 분석 및 테스트 실행
-- 작업 내역 작성 (`work/WXX-*.md`)
+- 작업 내역 작성 (`<workDir>/work/WXX-*.md`)
 - 스킬 기반 품질 검증 (lint, type-check 등)
 - 작업 완료 전 자체 리뷰 수행 (ENFORCE_SELF_REVIEW=true 시)
 

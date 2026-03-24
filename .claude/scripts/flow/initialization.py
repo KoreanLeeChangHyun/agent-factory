@@ -16,7 +16,7 @@ LLM 호출 없음 (순수 IO).
   #N       티켓 번호 (T-NNN 또는 #NNN 형식, 선택사항)
 
 환경변수:
-  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .kanban/ 디렉터리에서 자동 선택.
+  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .kanban/active/ 디렉터리에서 자동 선택.
 
 출력:
   stdout으로 init-result JSON을 출력한다.
@@ -130,7 +130,7 @@ def _run_optional_script(script_path: str, cmd_template: list[str]) -> None:
 def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
     """티켓 번호를 결정한다.
 
-    환경변수 TICKET_NUMBER → 커맨드 인자 → .kanban/ 디렉터리 자동 선택 순으로 탐색한다.
+    환경변수 TICKET_NUMBER → 커맨드 인자 → .kanban/active/ 디렉터리 자동 선택 순으로 탐색한다.
 
     Args:
         ticket_arg: 커맨드 인자에서 추출된 티켓 번호 문자열 (예: '#1', 'T-001', '1'). 없으면 None.
@@ -152,7 +152,7 @@ def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
         if normalized:
             return normalized
 
-    # 3순위: .kanban/ 디렉터리에서 Open 상태 티켓 자동 선택
+    # 3순위: .kanban/active/ 디렉터리에서 Open 상태 티켓 자동 선택
     return _find_open_ticket_from_kanban()
 
 
@@ -178,10 +178,11 @@ def _normalize_ticket_number(raw: str) -> str | None:
 
 
 def _find_open_ticket_from_kanban() -> str | None:
-    """.kanban/ 디렉터리의 XML 파일을 glob하여 Open 상태 첫 번째 티켓 번호를 반환한다.
+    """.kanban/active/ 디렉터리의 XML 파일을 glob하여 Open 상태 첫 번째 티켓 번호를 반환한다.
 
-    .kanban/*.xml 파일을 알파벳 순으로 탐색하며, <metadata> 내부의
+    .kanban/active/*.xml 파일을 알파벳 순으로 탐색하며, <metadata> 내부의
     <status>Open</status>를 포함하는 첫 번째 티켓 번호를 반환한다.
+    하위 호환: active/ 디렉터리에 파일이 없으면 .kanban/ 루트도 폴백 탐색한다.
 
     Returns:
         'T-NNN' 형식 티켓 번호. 없으면 None.
@@ -193,39 +194,44 @@ def _find_open_ticket_from_kanban() -> str | None:
     if not os.path.isdir(kanban_dir):
         return None
 
-    xml_files: list[str] = sorted(_glob.glob(os.path.join(kanban_dir, "T-*.xml")))
-    for xml_path in xml_files:
-        try:
-            tree = _ET.parse(xml_path)
-            root = tree.getroot()
-            # <metadata> 내부의 <status> 탐색
-            metadata = root.find("metadata")
-            if metadata is None:
-                # 구형 구조: 루트 직하 <status> 탐색
-                status_el = root.find("status")
-            else:
-                status_el = metadata.find("status")
-            if status_el is not None and (status_el.text or "").strip() == "Open":
-                # <metadata>/<number> 탐색
-                number_el = (metadata or root).find("number")
-                if number_el is not None and number_el.text:
-                    normalized = _normalize_ticket_number(number_el.text.strip())
-                    if normalized:
-                        return normalized
-                # 파일명에서 번호 추출 (T-NNN.xml)
-                filename = os.path.basename(xml_path)
-                m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
-                if m:
-                    return _normalize_ticket_number(m.group(1))
-        except Exception:
-            continue
+    # 1순위: .kanban/active/ 디렉터리, 2순위: .kanban/ 루트 (하위 호환 폴백)
+    active_dir: str = os.path.join(kanban_dir, "active")
+    scan_dirs: list[str] = [active_dir, kanban_dir]
+
+    for scan_dir in scan_dirs:
+        xml_files: list[str] = sorted(_glob.glob(os.path.join(scan_dir, "T-*.xml")))
+        for xml_path in xml_files:
+            try:
+                tree = _ET.parse(xml_path)
+                root = tree.getroot()
+                # <metadata> 내부의 <status> 탐색
+                metadata = root.find("metadata")
+                if metadata is None:
+                    # 구형 구조: 루트 직하 <status> 탐색
+                    status_el = root.find("status")
+                else:
+                    status_el = metadata.find("status")
+                if status_el is not None and (status_el.text or "").strip() == "Open":
+                    # <metadata>/<number> 탐색
+                    number_el = (metadata or root).find("number")
+                    if number_el is not None and number_el.text:
+                        normalized = _normalize_ticket_number(number_el.text.strip())
+                        if normalized:
+                            return normalized
+                    # 파일명에서 번호 추출 (T-NNN.xml)
+                    filename = os.path.basename(xml_path)
+                    m = re.match(r"^(T-\d+)\.xml$", filename, re.IGNORECASE)
+                    if m:
+                        return _normalize_ticket_number(m.group(1))
+            except Exception:
+                continue
     return None
 
 
 def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     """kanban 디렉터리에서 티켓 파일을 정확 매칭으로 탐색한다.
 
-    루트 파일(T-NNN.xml)을 먼저 탐색하고, 없으면 done 서브디렉터리도 탐색한다.
+    active/ 서브디렉터리를 먼저 탐색하고, done/ 서브디렉터리, 루트 순으로 폴백한다.
 
     Args:
         kanban_dir: .kanban 디렉터리 절대 경로
@@ -234,21 +240,25 @@ def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     Returns:
         찾은 티켓 파일의 Path 객체. 없으면 None.
     """
-    # 루트 탐색: .kanban/T-NNN.xml
-    candidate: Path = kanban_dir / f"{ticket_number}.xml"
-    if candidate.is_file():
-        return candidate
-    # done 상태 탐색: .kanban/done/T-NNN.xml
+    # 1순위: .kanban/active/T-NNN.xml
+    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
+    if active_candidate.is_file():
+        return active_candidate
+    # 2순위: .kanban/done/T-NNN.xml
     done_candidate: Path = kanban_dir / "done" / f"{ticket_number}.xml"
     if done_candidate.is_file():
         return done_candidate
+    # 3순위 (하위 호환 폴백): .kanban/T-NNN.xml
+    root_candidate: Path = kanban_dir / f"{ticket_number}.xml"
+    if root_candidate.is_file():
+        return root_candidate
     return None
 
 
 def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
     """티켓 파일 내용을 읽어 반환한다.
 
-    티켓 번호를 결정한 후 .kanban/T-NNN.xml 파일을 정확 매칭으로 탐색하여 읽는다.
+    티켓 번호를 결정한 후 .kanban/active/T-NNN.xml 파일을 정확 매칭으로 탐색하여 읽는다.
     파일이 없거나 내용이 비어있으면 None을 반환한다.
 
     XML 구조 호환성 주석:
@@ -281,6 +291,41 @@ def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
 
 
 # ─── Step 2: 워크플로우 초기화 ───────────────────────────────────────────────
+
+
+def _inject_predecessor_context(abs_work_dir: str, ticket_number: str) -> None:
+    """선행 티켓의 report 요약을 user_prompt.txt에 추가한다.
+
+    ticket_repository.get_predecessor_reports()를 호출하여
+    depends-on / derived-from 선행 티켓의 Done report 요약을 추출하고,
+    user_prompt.txt 파일 끝에 context 블록을 append한다.
+
+    Args:
+        abs_work_dir: 작업 디렉터리 절대 경로
+        ticket_number: 현재 티켓 번호 (T-NNN 형식)
+    """
+    try:
+        from flow.ticket_repository import get_predecessor_reports
+        reports = get_predecessor_reports(ticket_number)
+    except Exception as e:
+        _warn(f"선행 티켓 report 조회 실패 (생략): {e}")
+        return
+
+    if not reports:
+        return
+
+    prompt_path = os.path.join(abs_work_dir, "user_prompt.txt")
+    try:
+        lines: list[str] = ["\n\n--- 선행 티켓 컨텍스트 ---"]
+        for r in reports:
+            lines.append(f"[{r['ticket']} {r['type']}] report 요약:")
+            lines.append(r["summary"])
+        lines.append("---")
+        with open(prompt_path, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        _append_log(abs_work_dir, "INFO", f"선행 티켓 context 주입: {[r['ticket'] for r in reports]}")
+    except Exception as e:
+        _warn(f"선행 티켓 context 주입 실패 (생략): {e}")
 
 
 def _create_work_dir(abs_work_dir: str) -> None:
@@ -392,6 +437,7 @@ def _write_context(
     chain_command: str = "",
     registry_key: str = "",
     ticket_number: str = "",
+    worktree_meta: dict[str, Any] | None = None,
 ) -> None:
     """.context.json을 작업 디렉터리에 작성한다.
 
@@ -412,6 +458,7 @@ def _write_context(
         chain_command: 전체 체인 문자열 (예: "research>implement>review"). 단일 command 시 빈 문자열.
         registry_key: YYYYMMDD-HHMMSS 형식 전체 registryKey. board.js 양방향 연결용.
         ticket_number: 연결된 티켓 번호 (예: 'T-001'). board.js 양방향 연결용.
+        worktree_meta: worktree 메타데이터 딕셔너리 (선택). 활성화 시 context에 포함.
     """
     context: dict[str, Any] = {
         "title": title,
@@ -427,6 +474,8 @@ def _write_context(
         context["registryKey"] = registry_key
     if ticket_number:
         context["ticketNumber"] = ticket_number
+    if worktree_meta:
+        context["worktree"] = worktree_meta
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
         context,
@@ -520,6 +569,34 @@ def init_workflow(
     _create_work_dir(abs_work_dir)
     _write_user_prompt(abs_work_dir, prompt_content)
 
+    # 선행 티켓 report context 주입 (ticket_number가 있을 때만)
+    if ticket_number:
+        _inject_predecessor_context(abs_work_dir, ticket_number)
+
+    # ── worktree 격리 실행 훅 ──
+    # _create_work_dir() 이후, _move_ticket_to_in_progress() 이전에 삽입
+    worktree_meta: dict[str, Any] | None = None
+    try:
+        from flow.worktree_manager import is_worktree_enabled, create_worktree as _create_wt
+        if is_worktree_enabled():
+            wt_info = _create_wt(ticket_number or "", title)
+            if wt_info is not None:
+                worktree_meta = {
+                    "enabled": True,
+                    "path": os.path.relpath(wt_info.path, _PROJECT_ROOT),
+                    "absPath": wt_info.path,
+                    "featureBranch": wt_info.branch_name,
+                    "baseBranch": wt_info.base_branch,
+                }
+                _append_log(abs_work_dir, "INFO", f"Worktree created: {wt_info.path} (branch: {wt_info.branch_name})")
+            else:
+                _warn("worktree 생성 실패, 비worktree 모드로 계속 진행합니다")
+                _append_log(abs_work_dir, "WARN", "Worktree creation failed, continuing without worktree")
+    except Exception as _wt_err:
+        _warn(f"worktree 모듈 로드/실행 실패 (비worktree 모드로 계속): {_wt_err}")
+        if os.path.isdir(abs_work_dir):
+            _append_log(abs_work_dir, "WARN", f"Worktree module error: {_wt_err}")
+
     # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:
         _update_ticket_title(ticket_number, title, abs_work_dir)
@@ -541,6 +618,7 @@ def init_workflow(
         chain_command,
         registry_key=registry_key,
         ticket_number=ticket_number or "",
+        worktree_meta=worktree_meta,
     )
     _write_status(abs_work_dir, mode, ts)
 
@@ -564,7 +642,7 @@ def init_workflow(
                 ["python3", "{}", "archive", registry_key],
             )
 
-    return {
+    result_dict: dict[str, Any] = {
         "workDir": work_dir,
         "registryKey": registry_key,
         "workId": work_id,
@@ -573,6 +651,10 @@ def init_workflow(
         "ticketNumber": ticket_number or "",
         "chainCommand": chain_command,
     }
+    if worktree_meta:
+        result_dict["worktreePath"] = worktree_meta["path"]
+        result_dict["featureBranch"] = worktree_meta["featureBranch"]
+    return result_dict
 
 
 # ─── main ────────────────────────────────────────────────────────────────────
@@ -684,6 +766,9 @@ def main() -> None:
         init_result["chainCommand"] = chain_command
     if prompt_quality is not None:
         init_result["prompt_quality"] = prompt_quality
+    if result.get("worktreePath"):
+        init_result["worktreePath"] = result["worktreePath"]
+        init_result["featureBranch"] = result.get("featureBranch", "")
 
     _atomic_write_json(
         os.path.join(abs_work_dir, "init-result.json"),

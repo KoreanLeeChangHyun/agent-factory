@@ -279,7 +279,7 @@ def _print_help() -> None:
     print("  2  인자 오류")
     print()
     print("예시:")
-    print("  python3 prompt_validator.py .kanban/T-NNN.xml")
+    print("  python3 prompt_validator.py .kanban/active/T-NNN.xml")
 
 
 def main() -> None:

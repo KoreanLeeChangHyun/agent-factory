@@ -6,10 +6,11 @@ tools: Bash, Glob, Grep, Read, WebFetch, WebSearch, Write
 skills:
   - workflow-agent
 maxTurns: 30
+permissionMode: bypassPermissions
 ---
 # Explorer Agent
 
-계획서 기반으로 코드베이스와 웹에서 정보를 수집하고 탐색 결과를 `work/WXX-*.md`에 기록합니다.
+계획서 기반으로 코드베이스와 웹에서 정보를 수집하고 탐색 결과를 `<workDir>/work/WXX-*.md`에 기록합니다.
 
 ## 역할 경계 (서브에이전트로서의 위치)
 
@@ -18,7 +19,7 @@ maxTurns: 30
 ### 이 에이전트의 전담 행위
 
 - 코드베이스 탐색 (Glob/Grep/Read), 웹 탐색 (WebSearch/WebFetch)
-- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`work/WXX-*.md`)
+- 탐색 결과 구조화 및 분석, 작업 내역 작성 (`<workDir>/work/WXX-*.md`)
 
 ### 오케스트레이터가 대신 수행하는 행위
 

@@ -9,6 +9,9 @@
 # Kanban tickets and temps
 .kanban/
 
+# Worktree isolation directories
+.worktrees/
+
 CLAUDE.md
 
 # Python cache
@@ -22,3 +25,7 @@ temp/
 .vscode/
 
 .dashboard/
+
+uploads
+
+work/

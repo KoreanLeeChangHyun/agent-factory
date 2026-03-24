@@ -1,0 +1,10 @@
+<natural-language-mapping>
+      사용자 자연어 요청을 워크플로우 명령으로 변환하는 가이드:
+      - "이거 수정해줘" / "코드 고쳐줘"  →  /wf -e (티켓 생성+편집)  →  /wf -s N (실행)
+      - "분석해줘" / "조사해줘"           →  /wf -e (research 커맨드로 티켓 생성)  →  /wf -s N
+      - "티켓 만들어"                     →  /wf -o (채번만)
+      - "리뷰해줘"                        →  /wf -e (review 커맨드로 티켓 생성)  →  /wf -s N
+      - "종료해줘" / "종료 처리해줘"       →  /wf -d N
+      - "티켓 편집해줘" / "내용 바꿔줘"  →  /wf -e N (기존 티켓 편집)
+      - (이전 대화에서 goal/target/constraints/criteria 모두 추론 가능)  →  /wf -oe (생성+편집 즉시 처리)
+    </natural-language-mapping>

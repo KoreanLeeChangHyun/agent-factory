@@ -156,6 +156,17 @@ function parseTicket(text) {
     for (let j = 0; j < hs.length; j++) ticket.history.push(parseSubnumber(hs[j]));
   }
 
+  const relationsEl = root.querySelector("relations");
+  ticket.relations = [];
+  if (relationsEl) {
+    const rels = relationsEl.querySelectorAll("relation");
+    for (let k = 0; k < rels.length; k++) {
+      const type = rels[k].getAttribute("type") || "";
+      const relTicket = rels[k].getAttribute("ticket") || "";
+      if (type && relTicket) ticket.relations.push({ type: type, ticket: relTicket });
+    }
+  }
+
   return ticket;
 }
 
@@ -325,6 +336,21 @@ function renderMd(text, baseUrl) {
   return html;
 }
 
+/** Removes orphan SVG elements inserted by Mermaid into document.body during failed renders. */
+function cleanupMermaidOrphans(id) {
+  // Mermaid v11 may insert a temporary element with id="d<N>" or the render id into body
+  var orphan = document.getElementById(id);
+  if (orphan && orphan !== document.body && !orphan.closest('.mermaid-block')) {
+    orphan.remove();
+  }
+  // Also sweep for any SVG elements directly under body with id starting with "d" followed by digits
+  document.querySelectorAll('body > svg[id], body > div[id]').forEach(function (el) {
+    if (/^d\d+$/.test(el.id)) {
+      el.remove();
+    }
+  });
+}
+
 /** Renders pending Mermaid diagram blocks. */
 function initMermaid() {
   const blocks = document.querySelectorAll(".mermaid-block");
@@ -336,7 +362,9 @@ function initMermaid() {
     if (typeof mermaid !== "undefined") {
       mermaid.render(id, code).then(function (result) {
         block.innerHTML = result.svg;
-      }).catch(function () {
+      }).catch(function (err) {
+        console.warn('[initMermaid] Mermaid render failed for id=' + id + ':', err);
+        cleanupMermaidOrphans(id);
         block.innerHTML = '<pre class="wf-file-content">' + esc(code) + '</pre>';
       });
     }

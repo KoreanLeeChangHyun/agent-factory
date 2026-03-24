@@ -35,7 +35,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import xml.etree.ElementTree as ET
 
 # utils 패키지 import
@@ -43,7 +42,7 @@ _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspat
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, load_json_file, resolve_abs_work_dir, resolve_project_root
+from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 from data.constants import CHAIN_SEPARATOR, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 from flow.flow_logger import append_log as _append_log
 from flow.tmux_utils import WINDOW_PREFIX_P
@@ -197,87 +196,6 @@ def _find_transcript_path(registry_key: str) -> str | None:
 
 
 
-def _acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
-
-    디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
-    프로세스가 종료되었거나 max_wait 초 초과 시 stale lock을 제거하고 재시도한다.
-
-    Args:
-        lock_dir: 잠금 디렉터리 경로
-        max_wait: 최대 대기 초 (기본값 2)
-
-    Returns:
-        잠금 획득 성공 여부.
-    """
-    waited = 0
-    while True:
-        try:
-            os.makedirs(lock_dir)
-            try:
-                with open(os.path.join(lock_dir, "pid"), "w") as f:
-                    f.write(f"{os.getpid()} {time.time()}")
-            except OSError:
-                pass
-            return True
-        except OSError:
-            pid_file = os.path.join(lock_dir, "pid")
-            if os.path.isfile(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        pid_content = f.read().strip()
-                    parts = pid_content.split()
-                    lock_pid = int(parts[0])
-                    lock_ts = float(parts[1]) if len(parts) > 1 else 0
-                    os.kill(lock_pid, 0)
-                    if lock_ts and (time.time() - lock_ts) > max_wait:
-                        try:
-                            with open(pid_file, "r") as f:
-                                recheck = f.read().strip()
-                            if recheck == pid_content:
-                                shutil.rmtree(lock_dir)
-                                waited += 1
-                                continue
-                        except OSError:
-                            pass
-                except (ValueError, ProcessLookupError, OSError):
-                    try:
-                        with open(pid_file, "r") as f:
-                            recheck = f.read().strip()
-                        if recheck == pid_content:
-                            shutil.rmtree(lock_dir)
-                    except OSError:
-                        pass
-                    waited += 1
-                    continue
-                except PermissionError:
-                    pass
-            waited += 1
-            if waited >= max_wait:
-                return False
-            time.sleep(1)
-
-
-def _release_lock(lock_dir: str) -> None:
-    """잠금을 해제한다.
-
-    PID 파일 삭제 후 잠금 디렉터리를 제거한다.
-    파일시스템 오류는 무시한다.
-
-    Args:
-        lock_dir: 해제할 잠금 디렉터리 경로
-    """
-    try:
-        pid_file = os.path.join(lock_dir, "pid")
-        if os.path.exists(pid_file):
-            os.unlink(pid_file)
-    except OSError:
-        pass
-    try:
-        os.rmdir(lock_dir)
-    except OSError:
-        pass
-
 
 def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
     """.dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다.
@@ -383,7 +301,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 
         # POSIX lock + 원자적 쓰기
         os.makedirs(os.path.dirname(logs_md), exist_ok=True)
-        locked = _acquire_lock(lock_dir)
+        locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(logs_md), suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -395,7 +313,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
             raise
         finally:
             if locked:
-                _release_lock(lock_dir)
+                release_lock(lock_dir)
     except Exception:
         pass
 
@@ -403,8 +321,9 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     """티켓 XML에서 현재 활성 subnumber ID를 반환한다.
 
-    `.kanban/T-NNN.xml`을 파싱하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
-    `.kanban/done/T-NNN.xml`도 폴백 탐색한다. 파싱 실패 시 None을 반환한다.
+    `.kanban/active/T-NNN.xml`을 먼저 파싱하고, 없으면 루트(하위 호환 폴백)와
+    `.kanban/done/T-NNN.xml`도 탐색하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
+    파싱 실패 시 None을 반환한다.
 
     Args:
         ticket_number: T-NNN 형식 티켓 번호
@@ -412,7 +331,7 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     Returns:
         현재 subnumber ID (int). 파싱 실패 또는 미존재 시 None.
     """
-    for subdir in ("", "done"):
+    for subdir in ("active", "", "done"):
         path = os.path.join(PROJECT_ROOT, ".kanban", subdir, f"{ticket_number}.xml")
         if not os.path.isfile(path):
             continue
@@ -520,30 +439,29 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
 
-    # ── Step 2: 사용량 확정 (비차단, 성공 시만) ──
-    if status == "완료":
-        # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
-        transcript_path = _find_transcript_path(registry_key)
-        if transcript_path:
-            if abs_work_dir is not None:
-                _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2A: transcript=found path={transcript_path}")
-            stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
-            run(
-                ["python3", USAGE_SYNC, "batch"],
-                "Step 2a: usage-sync batch",
-                input_data=stdin_json,
-            )
-        else:
-            if abs_work_dir is not None:
-                _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
-
-        # Step 2b: usage-finalize
+    # ── Step 2: 사용량 확정 (비차단, status 무관) ──
+    # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)
+    transcript_path = _find_transcript_path(registry_key)
+    if transcript_path:
         if abs_work_dir is not None:
-            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2B: usage-finalize registryKey={registry_key}")
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2A: transcript=found path={transcript_path}")
+        stdin_json = json.dumps({"agent_type": "orchestrator", "agent_transcript_path": transcript_path})
         run(
-            ["python3", UPDATE_STATE, "usage-finalize", registry_key],
-            "Step 2b: usage-finalize",
+            ["python3", USAGE_SYNC, "batch"],
+            "Step 2a: usage-sync batch",
+            input_data=stdin_json,
         )
+    else:
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
+
+    # Step 2b: usage-finalize
+    if abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP2B: usage-finalize registryKey={registry_key}")
+    run(
+        ["python3", UPDATE_STATE, "usage-finalize", registry_key],
+        "Step 2b: usage-finalize",
+    )
 
     # ── Step 5: 로그/스킬 대시보드 갱신 (비차단) ──
     try:
@@ -601,6 +519,29 @@ def main() -> None:
                         ["python3", KANBAN_PY, "update-subnumber", ticket_number, "--id", str(sub_id)] + update_args,
                         "Step 4b: ticket result workflow update",
                     )
+
+    # ── Step 4wt: worktree 유지 로그 (Review 단계) ──
+    # worktree가 활성화된 경우, Review 상태에서 worktree를 유지하여
+    # 추가 수정 사이클이 가능하도록 한다. 정리는 cmd_done()에서만 수행.
+    if ticket_number and abs_work_dir is not None:
+        try:
+            context_file_wt: str = os.path.join(abs_work_dir, ".context.json")
+            context_wt = load_json_file(context_file_wt)
+            if isinstance(context_wt, dict) and context_wt.get("worktree", {}).get("enabled"):
+                wt_branch = context_wt["worktree"].get("featureBranch", "")
+                wt_path = context_wt["worktree"].get("path", "")
+                _append_log(
+                    abs_work_dir,
+                    "INFO",
+                    f"FINALIZE_STEP4WT: worktree 유지 (Review 단계) branch={wt_branch} path={wt_path}",
+                )
+                print(
+                    f"[INFO] worktree 유지: {wt_branch} (정리는 Done 전이 시 자동 수행)",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        except Exception:
+            pass  # worktree 메타데이터 읽기 실패는 무시
 
     # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
     # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.

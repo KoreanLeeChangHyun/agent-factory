@@ -126,11 +126,45 @@ def dispatch(
     return result
 
 
+def _find_workflow_log(log_dir: str | None = None) -> str | None:
+    """활성 워크플로우의 workflow.log 경로를 탐색하여 반환한다.
+
+    Args:
+        log_dir: 명시적 로그 디렉터리 경로. None이면 scan_active_workflows로 자동 탐색.
+
+    Returns:
+        workflow.log 파일의 절대 경로. 찾지 못하면 None.
+    """
+    try:
+        if log_dir is not None:
+            candidate = os.path.join(log_dir, "workflow.log") if not log_dir.endswith("workflow.log") else log_dir
+            if os.path.isfile(candidate) or os.path.isdir(os.path.dirname(candidate)):
+                return candidate
+
+        scripts_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+        if scripts_path not in sys.path:
+            sys.path.insert(0, scripts_path)
+        from common import scan_active_workflows, resolve_project_root  # noqa: PLC0415
+        project_root = resolve_project_root()
+        workflows = scan_active_workflows(project_root=project_root)
+        if workflows:
+            for _key, entry in workflows.items():
+                if isinstance(entry, dict) and "workDir" in entry:
+                    rel = entry["workDir"]
+                    abs_wd = os.path.join(project_root, rel) if not os.path.isabs(rel) else rel
+                    if os.path.isdir(abs_wd):
+                        return os.path.join(abs_wd, "workflow.log")
+    except Exception:
+        pass
+    return None
+
+
 def dispatch_async(
     hook_flag_name: str,
     script_path: str,
     stdin_data: bytes,
     flags: dict[str, bool] | None = None,
+    log_dir: str | None = None,
 ) -> subprocess.Popen | None:
     """Dispatch to an external script asynchronously (fire-and-forget).
 
@@ -139,6 +173,9 @@ def dispatch_async(
         script_path: Absolute path to the target Python script.
         stdin_data: bytes to pass as stdin to the subprocess.
         flags: Pre-loaded flags dict (loads from env if None).
+        log_dir: Optional directory path for workflow.log redirection.
+            If None, the active workflow log is located automatically via
+            scan_active_workflows. Falls back to DEVNULL if no log is found.
 
     Returns:
         subprocess.Popen object, or None if disabled/missing.
@@ -152,12 +189,26 @@ def dispatch_async(
     if not os.path.exists(script_path):
         return None
 
-    proc = subprocess.Popen(
-        [sys.executable, script_path],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    log_path = _find_workflow_log(log_dir)
+    if log_path is not None:
+        try:
+            stderr_target = open(log_path, "a", encoding="utf-8")  # noqa: WPS515
+        except OSError:
+            stderr_target = subprocess.DEVNULL
+    else:
+        stderr_target = subprocess.DEVNULL
+
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, script_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr_target,
+        )
+    finally:
+        if stderr_target is not subprocess.DEVNULL:
+            stderr_target.close()
+
     try:
         proc.stdin.write(stdin_data)
         proc.stdin.close()

@@ -223,11 +223,49 @@ def _wait_for_window_death(window_name: str) -> bool:
     return False
 
 
+def _get_worktree_path() -> str | None:
+    """현재 워크플로우의 worktree 경로를 반환한다.
+
+    다음 순서로 경로를 결정한다:
+    1. WORKFLOW_WORKTREE_PATH 환경변수
+    2. _wf_work_dir에서 해석한 .context.json의 worktree.absPath 필드
+
+    경로가 존재하지 않으면 None을 반환한다.
+
+    Returns:
+        worktree 절대 경로 또는 None.
+    """
+    import json as _json
+
+    # 1순위: 환경변수
+    env_path = os.environ.get("WORKFLOW_WORKTREE_PATH", "").strip()
+    if env_path and os.path.isdir(env_path):
+        return env_path
+
+    # 2순위: _wf_work_dir의 .context.json에서 worktree.absPath 읽기
+    try:
+        if _wf_work_dir:
+            context_path = os.path.join(_wf_work_dir, ".context.json")
+            if os.path.isfile(context_path):
+                with open(context_path, "r", encoding="utf-8") as f:
+                    ctx = _json.load(f)
+                wt_info = ctx.get("worktree")
+                if isinstance(wt_info, dict):
+                    abs_path = wt_info.get("absPath", "")
+                    if abs_path and os.path.isdir(abs_path):
+                        return abs_path
+    except Exception:
+        pass
+
+    return None
+
+
 def _create_window(window_name: str) -> bool:
     """새 tmux 윈도우를 생성하고 claude를 실행한다.
 
     tmux_launcher.py의 _create_window 로직을 재현한다.
     _WF_MAIN_WINDOW 환경변수를 주입하여 메인 윈도우 참조를 전달한다.
+    worktree 경로가 있으면 -c 옵션으로 cwd를 설정한다.
 
     Args:
         window_name: 생성할 윈도우 이름 (P:T-NNN 형식)
@@ -235,16 +273,28 @@ def _create_window(window_name: str) -> bool:
     Returns:
         성공 시 True, 실패 시 False.
     """
+    worktree_path = _get_worktree_path()
+
+    # tmux new-window 기본 인자
+    tmux_args = [
+        "new-window",
+        "-d",
+        "-n",
+        window_name,
+    ]
+
+    # worktree_path가 있으면 -c <worktree_path>로 cwd 설정
+    if worktree_path:
+        tmux_args.extend(["-c", worktree_path])
+
+    tmux_args.extend([
+        "-e",
+        f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
+        "bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'",
+    ])
+
     try:
-        result = _run_tmux(
-            "new-window",
-            "-d",
-            "-n",
-            window_name,
-            "-e",
-            f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
-            "bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'",
-        )
+        result = _run_tmux(*tmux_args)
         return result.returncode == 0
     except Exception as e:
         _log("ERROR", f"create_window failed: {e}")
