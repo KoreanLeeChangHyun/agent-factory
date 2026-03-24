@@ -290,8 +290,19 @@ def _create_window(window_name: str) -> bool:
     tmux_args.extend([
         "-e",
         f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
-        "bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'",
     ])
+
+    # WORKFLOW_WORKTREE_PATH 주입: 워크트리 경로를 세션에 전달한다.
+    # worktree_path_guard.py가 이 환경변수를 우선 참조하여
+    # 메인 리포 경로 수정을 차단하고 워크트리 경로로 안내한다.
+    if worktree_path:
+        tmux_args.extend(["-e", f"WORKFLOW_WORKTREE_PATH={worktree_path}"])
+
+    # WORKFLOW_WORK_DIR 주입
+    if _wf_work_dir:
+        tmux_args.extend(["-e", f"WORKFLOW_WORK_DIR={_wf_work_dir}"])
+
+    tmux_args.append("bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'")
 
     try:
         result = _run_tmux(*tmux_args)
