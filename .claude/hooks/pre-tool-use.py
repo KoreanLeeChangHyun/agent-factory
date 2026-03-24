@@ -23,6 +23,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dispatcher import (
     collect_exit_codes,
+    collect_outputs,
     dispatch,
     dispatch_async,
     load_env_flags,
@@ -62,6 +63,7 @@ def main() -> None:
             scripts_dir('guards', 'hooks_self_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
@@ -81,6 +83,7 @@ def main() -> None:
             scripts_dir('guards', 'dangerous_command_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
@@ -91,6 +94,7 @@ def main() -> None:
             scripts_dir('guards', 'main_branch_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
@@ -101,6 +105,7 @@ def main() -> None:
             scripts_dir('guards', 'kanban_subcommand_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
@@ -111,6 +116,7 @@ def main() -> None:
             scripts_dir('guards', 'main_session_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
@@ -121,11 +127,27 @@ def main() -> None:
             scripts_dir('guards', 'agent_investigation_guard.py'),
             stdin_data,
             flags=flags,
+            capture_output=True,
         )
         sync_results.append(r)
 
-    # Aggregate sync exit codes; first non-zero blocks the tool
-    sys.exit(collect_exit_codes(sync_results))
+    # Collect captured stdout from all sync guard results
+    collected = collect_outputs(sync_results)
+
+    # If any guard emitted a deny JSON, relay it verbatim and exit 0
+    if b'deny' in collected:
+        sys.stdout.buffer.write(collected)
+        sys.exit(0)
+
+    # No guard blocked: emit allow JSON so Claude Code skips confirm prompt
+    allow_payload = {
+        'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse',
+            'permissionDecision': 'allow',
+        }
+    }
+    print(json.dumps(allow_payload))
+    sys.exit(0)
 
 
 if __name__ == '__main__':

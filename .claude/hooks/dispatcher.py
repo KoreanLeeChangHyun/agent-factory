@@ -92,6 +92,7 @@ def dispatch(
     script_path: str,
     stdin_data: bytes,
     flags: dict[str, bool] | None = None,
+    capture_output: bool = False,
 ) -> subprocess.CompletedProcess | None:
     """Dispatch to an external script if the hook is enabled.
 
@@ -100,9 +101,13 @@ def dispatch(
         script_path: Absolute path to the target Python script.
         stdin_data: bytes to pass as stdin to the subprocess.
         flags: Pre-loaded flags dict (loads from env if None).
+        capture_output: If True, capture subprocess stdout/stderr into
+            result.stdout / result.stderr instead of inheriting from parent.
+            Defaults to False (existing behavior: output passes through).
 
     Returns:
         subprocess.CompletedProcess result, or None if disabled/missing.
+        When capture_output=True, result.stdout contains captured bytes.
     """
     if flags is None:
         flags = load_env_flags()
@@ -116,7 +121,7 @@ def dispatch(
     result = subprocess.run(
         [sys.executable, script_path],
         input=stdin_data,
-        capture_output=False,
+        capture_output=capture_output,
     )
     return result
 
@@ -224,3 +229,29 @@ def collect_exit_codes(
         if code != 0:
             return code
     return 0
+
+
+def collect_outputs(
+    results: list[subprocess.CompletedProcess | None],
+) -> bytes:
+    """Concatenate stdout bytes from multiple CompletedProcess results.
+
+    Intended for use after dispatch() calls with capture_output=True.
+    Results that are None or whose .stdout is None are silently skipped.
+
+    Args:
+        results: List of subprocess.CompletedProcess (or None) returned by
+            dispatch() with capture_output=True.
+
+    Returns:
+        Concatenated bytes of all non-None .stdout values.  Returns b'' if
+        no result has captured output.
+    """
+    chunks: list[bytes] = []
+    for r in results:
+        if r is None:
+            continue
+        stdout = getattr(r, 'stdout', None)
+        if stdout:
+            chunks.append(stdout)
+    return b''.join(chunks)
