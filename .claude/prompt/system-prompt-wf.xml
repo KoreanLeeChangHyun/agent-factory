@@ -64,6 +64,22 @@
         flow-kanban delete T-001
 
       제목 변경: update-title / 상태 변경: move / 종료: done
+
+      워크플로우 세션에서 직접 호출되는 스크립트:
+        flow-init command title [mode] [T-NNN]
+          # command: implement|review|research 또는 체인(implement>review)
+          # 출력: init-result JSON (workDir, registryKey, workId, ticketNumber 포함)
+        flow-finish registryKey 완료|실패 [--ticket-number T-NNN]
+          # 6단계 마무리: 상태 전이 → 사용량 확정 → 아카이빙 → 티켓 갱신 → 체인 발사 → tmux 정리
+        flow-update status|both|task-start|task-status registryKey ...
+          # status registryKey toPhase / both registryKey agent toPhase
+          # task-start registryKey W01 W02 / task-status registryKey done W01
+        flow-skillmap registryKey
+          # plan.md 스킬 분석 → work/skill-map.md + work/context/WXX-context.md 생성
+        flow-validate plan_path
+          # plan.md 구조 검증: Phase 편차, 워커 분배, 스킬 배정, WHAT/HOW 분리
+        flow-reload workDir
+          # 티켓 XML 피드백을 user_prompt.txt에 append (workDir: .workflow/YYYYMMDD-HHMMSS/작업명/command)
     </kanban-cli-reference>
   </managed>
 

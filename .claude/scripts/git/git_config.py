@@ -25,7 +25,8 @@ import sys
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
-sys.path.insert(0, _SCRIPTS_DIR)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 from common import read_env
 
