@@ -9,6 +9,7 @@
     KANBAN_*: kanban_subcommand_guard.py 사용 메시지
     HOOKS_*: hooks_self_guard.py 사용 메시지
     MAIN_BRANCH_*: main_branch_guard.py 사용 메시지
+    READONLY_SESSION_*: readonly_session_guard.py 사용 메시지
 """
 
 # =============================================================================
@@ -100,3 +101,17 @@ MAIN_BRANCH_COMMIT_DENIED: str = (
     "피처 브랜치를 생성하여 작업하세요."
 )
 """플레이스홀더: {branch} - 현재 브랜치명."""
+
+# =============================================================================
+# readonly_session_guard.py 메시지
+# =============================================================================
+
+READONLY_SESSION_WRITE_EDIT_DENIED: str = (
+    "research/review 워크플로우 세션에서는 코드 수정(Write/Edit)이 금지되어 있습니다. "
+    "보고서에 수정 방안을 기술하세요."
+)
+
+READONLY_SESSION_BASH_MODIFY_DENIED: str = (
+    "research/review 워크플로우 세션에서는 Bash를 통한 파일 수정이 금지되어 있습니다. "
+    "보고서에 수정 방안을 기술하세요."
+)

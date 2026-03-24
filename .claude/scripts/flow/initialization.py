@@ -575,27 +575,32 @@ def init_workflow(
 
     # ── worktree 격리 실행 훅 ──
     # _create_work_dir() 이후, _move_ticket_to_in_progress() 이전에 삽입
+    # implement command일 때만 워크트리를 생성한다.
+    # research/review는 읽기 전용 워크플로우이므로 워크트리 격리가 불필요하다.
     worktree_meta: dict[str, Any] | None = None
-    try:
-        from flow.worktree_manager import is_worktree_enabled, create_worktree as _create_wt
-        if is_worktree_enabled():
-            wt_info = _create_wt(ticket_number or "", title)
-            if wt_info is not None:
-                worktree_meta = {
-                    "enabled": True,
-                    "path": os.path.relpath(wt_info.path, _PROJECT_ROOT),
-                    "absPath": wt_info.path,
-                    "featureBranch": wt_info.branch_name,
-                    "baseBranch": wt_info.base_branch,
-                }
-                _append_log(abs_work_dir, "INFO", f"Worktree created: {wt_info.path} (branch: {wt_info.branch_name})")
-            else:
-                _warn("worktree 생성 실패, 비worktree 모드로 계속 진행합니다")
-                _append_log(abs_work_dir, "WARN", "Worktree creation failed, continuing without worktree")
-    except Exception as _wt_err:
-        _warn(f"worktree 모듈 로드/실행 실패 (비worktree 모드로 계속): {_wt_err}")
-        if os.path.isdir(abs_work_dir):
-            _append_log(abs_work_dir, "WARN", f"Worktree module error: {_wt_err}")
+    if command == "implement":
+        try:
+            from flow.worktree_manager import is_worktree_enabled, create_worktree as _create_wt
+            if is_worktree_enabled():
+                wt_info = _create_wt(ticket_number or "", title)
+                if wt_info is not None:
+                    worktree_meta = {
+                        "enabled": True,
+                        "path": os.path.relpath(wt_info.path, _PROJECT_ROOT),
+                        "absPath": wt_info.path,
+                        "featureBranch": wt_info.branch_name,
+                        "baseBranch": wt_info.base_branch,
+                    }
+                    _append_log(abs_work_dir, "INFO", f"Worktree created: {wt_info.path} (branch: {wt_info.branch_name})")
+                else:
+                    _warn("worktree 생성 실패, 비worktree 모드로 계속 진행합니다")
+                    _append_log(abs_work_dir, "WARN", "Worktree creation failed, continuing without worktree")
+        except Exception as _wt_err:
+            _warn(f"worktree 모듈 로드/실행 실패 (비worktree 모드로 계속): {_wt_err}")
+            if os.path.isdir(abs_work_dir):
+                _append_log(abs_work_dir, "WARN", f"Worktree module error: {_wt_err}")
+    else:
+        _append_log(abs_work_dir, "INFO", f"Worktree skipped: command={command} (worktree is only created for implement)")
 
     # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
     if ticket_number:

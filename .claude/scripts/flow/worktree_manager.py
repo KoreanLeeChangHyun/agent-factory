@@ -204,6 +204,7 @@ def create_worktree(
     title: str,
     base_branch: str = "develop",
     repo_path: str | None = None,
+    command: str = "implement",
 ) -> WorktreeInfo | None:
     """티켓용 worktree를 생성한다.
 
@@ -215,10 +216,19 @@ def create_worktree(
         title: 티켓 제목.
         base_branch: 기준 브랜치. 기본값 'develop'.
         repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        command: 워크플로우 커맨드. 'implement'가 아니면 생성을 거부한다.
 
     Returns:
         생성된 WorktreeInfo. 실패 시 None + 경고 출력.
     """
+    # command 방어: implement 외에는 worktree 생성을 거부한다
+    if command not in ("implement",):
+        _warn(
+            f"worktree 생성은 implement 워크플로우 전용입니다 "
+            f"(요청된 command: {command})"
+        )
+        return None
+
     # 티켓 번호 정규화
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"

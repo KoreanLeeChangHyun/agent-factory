@@ -52,11 +52,11 @@ stateDiagram-v2
 
 ## Supported Commands
 
-| Command | Description |
-|---------|------------|
-| implement | Feature implementation, refactoring, architecture diagrams |
-| review | Code review |
-| research | Research/investigation and internal asset analysis |
+| Command | Description | Worktree |
+|---------|------------|----------|
+| implement | Feature implementation, refactoring, architecture diagrams | O |
+| review | Code review | X |
+| research | Research/investigation and internal asset analysis | X |
 
 ## Input Parameters
 

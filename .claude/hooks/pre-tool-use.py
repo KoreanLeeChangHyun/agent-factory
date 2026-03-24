@@ -5,13 +5,14 @@ Routes hook logic based on tool_name extracted from stdin JSON.
 Uses dispatcher.py utilities for flag-based conditional execution.
 
 라우팅 테이블:
-  Write|Edit|Bash  -> hooks_self_guard        (HOOK_HOOKS_SELF_PROTECT, sync)
-  AskUserQuestion  -> slack_ask               (HOOK_SLACK_ASK, async)
-  Bash             -> dangerous_command_guard  (HOOK_DANGEROUS_COMMAND, sync)
-  Bash             -> main_branch_guard        (HOOK_MAIN_BRANCH_GUARD, sync)
-  Bash             -> kanban_subcommand_guard  (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
-  Write|Edit|Bash  -> main_session_guard       (HOOK_MAIN_SESSION_GUARD, sync)
-  Task             -> agent_investigation_guard (HOOK_AGENT_INVESTIGATION_GUARD, sync)
+  Write|Edit|Bash  -> hooks_self_guard          (HOOK_HOOKS_SELF_PROTECT, sync)
+  AskUserQuestion  -> slack_ask                 (HOOK_SLACK_ASK, async)
+  Bash             -> dangerous_command_guard    (HOOK_DANGEROUS_COMMAND, sync)
+  Bash             -> main_branch_guard          (HOOK_MAIN_BRANCH_GUARD, sync)
+  Bash             -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
+  Write|Edit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
+  Write|Edit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
+  Task             -> agent_investigation_guard  (HOOK_AGENT_INVESTIGATION_GUARD, sync)
 """
 
 from __future__ import annotations
@@ -114,6 +115,17 @@ def main() -> None:
         r = dispatch(
             'HOOK_MAIN_SESSION_GUARD',
             scripts_dir('guards', 'main_session_guard.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+        sync_results.append(r)
+
+    # --- Write|Edit|Bash: readonly-session-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'Bash'):
+        r = dispatch(
+            'HOOK_READONLY_SESSION_GUARD',
+            scripts_dir('guards', 'readonly_session_guard.py'),
             stdin_data,
             flags=flags,
             capture_output=True,
