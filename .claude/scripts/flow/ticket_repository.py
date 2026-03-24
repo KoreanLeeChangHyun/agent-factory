@@ -497,6 +497,77 @@ def add_subnumber(filepath: str, subnumber_data: dict[str, Any]) -> int:
     return new_id
 
 
+def rollback_subnumber(filepath: str, subnumber_id: int) -> None:
+    """add_subnumber()의 역연산: 지정 subnumber를 제거하고 current를 복원한다.
+
+    <submit> 내에서 subnumber_id를 가진 <subnumber> 요소를 제거하고,
+    <current>를 subnumber_id - 1로 복원한다.
+    직전 subnumber(id == subnumber_id - 1)가 <history>에 존재하면
+    <submit>으로 이동하고 active="true"를 복원한다.
+
+    Args:
+        filepath: 티켓 파일 경로.
+        subnumber_id: 롤백할 subnumber ID.
+
+    Raises:
+        SystemExit: 파일 읽기/쓰기 실패 또는 subnumber를 찾지 못한 경우.
+    """
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+
+    metadata_elem = root.find("metadata")
+    submit_elem = root.find("submit")
+    history_elem = find_history_element(root)
+
+    # <submit> 내에서 대상 subnumber 탐색
+    target_sub: ET.Element | None = None
+    if submit_elem is not None:
+        for sub in submit_elem.findall("subnumber"):
+            if sub.get("id") == str(subnumber_id):
+                target_sub = sub
+                break
+
+    if target_sub is None:
+        err(f"subnumber id={subnumber_id}를 <submit>에서 찾을 수 없습니다: {filepath}")
+
+    # 대상 subnumber 제거
+    if submit_elem is not None:
+        submit_elem.remove(target_sub)
+
+    # <current> 값을 subnumber_id - 1로 복원
+    prev_id = subnumber_id - 1
+    if metadata_elem is not None and metadata_elem.find("current") is not None:
+        current_elem = metadata_elem.find("current")
+    elif submit_elem is not None and submit_elem.find("current") is not None:
+        current_elem = submit_elem.find("current")
+    else:
+        current_elem = root.find("current")
+
+    if current_elem is not None:
+        current_elem.text = str(prev_id)
+
+    # 직전 subnumber(id == prev_id)가 <history>에 존재하면 <submit>으로 복원
+    if prev_id >= 1 and history_elem is not None:
+        prev_sub: ET.Element | None = None
+        for sub in history_elem.findall("subnumber"):
+            if sub.get("id") == str(prev_id):
+                prev_sub = sub
+                break
+
+        if prev_sub is not None and prev_sub.get("active") != "true":
+            history_elem.remove(prev_sub)
+            prev_sub.set("active", "true")
+            if submit_elem is not None:
+                submit_elem.insert(0, prev_sub)
+            else:
+                root.append(prev_sub)
+
+    write_ticket_xml(filepath, root)
+
+
 def update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any]) -> None:
     """기존 subnumber의 필드를 갱신한다.
 

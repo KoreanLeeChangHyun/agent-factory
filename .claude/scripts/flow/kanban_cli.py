@@ -21,6 +21,7 @@ from flow.ticket_repository import (
     normalize_ticket_number,
     get_max_ticket_number,
     add_subnumber,
+    rollback_subnumber,
     update_subnumber,
     move_active_to_history,
     remove_relation,
@@ -36,6 +37,8 @@ from flow.ticket_state import (
     update_ticket_status,
     validate_transition,
 )
+from flow.prompt_validator import validate as prompt_validate, extract_active_prompt
+from data.constants import QUALITY_THRESHOLD
 
 
 # ─── 경로 상수 ───────────────────────────────────────────────────────────────
@@ -303,8 +306,11 @@ def cmd_add_subnumber(
     constraints: str = "",
     criteria: str = "",
     context: str = "",
+    skip_validation: bool = False,
 ) -> None:
     """티켓 XML에 새 subnumber 항목을 추가한다.
+
+    추가 후 품질 검증을 수행하여 QUALITY_THRESHOLD 미만이면 롤백한다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -316,10 +322,13 @@ def cmd_add_subnumber(
         constraints: 제약사항 (선택, 프롬프트 5요소).
         criteria: 완료 기준 (선택, 프롬프트 5요소).
         context: 맥락 정보 (선택, 프롬프트 5요소).
+        skip_validation: True이면 품질 검증을 건너뛴다 (긴급 시 사용).
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
+        SystemExit: 티켓 파일을 찾을 수 없거나, 품질 검증 실패 시.
     """
+    import sys as _sys
+
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
         err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
@@ -343,6 +352,41 @@ def cmd_add_subnumber(
 
     new_id = add_subnumber(ticket_file, subnumber_data)
     print(f"{ticket_number}: subnumber id={new_id} 추가됨")
+
+    # ── 품질 검증 ──────────────────────────────────────────────────────────
+    if skip_validation:
+        return
+
+    try:
+        with open(ticket_file, "r", encoding="utf-8") as f:
+            xml_text = f.read()
+    except OSError as e:
+        _sys.stderr.write(f"[WARN] 품질 검증용 파일 재읽기 실패: {e}\n")
+        return
+
+    prompt_text = extract_active_prompt(xml_text)
+    validation_result = prompt_validate(prompt_text)
+    quality_score = validation_result["quality_score"]
+
+    if quality_score < QUALITY_THRESHOLD:
+        # 품질 미달: 롤백 후 에러 종료
+        rollback_subnumber(ticket_file, new_id)
+        _sys.stderr.write(
+            f"[ERROR] 품질 검증 실패 (score={quality_score:.4f} < threshold={QUALITY_THRESHOLD})\n"
+        )
+        if validation_result["missing_tags"]:
+            _sys.stderr.write(
+                f"  누락 태그: {', '.join(validation_result['missing_tags'])}\n"
+            )
+        if validation_result["empty_tags"]:
+            _sys.stderr.write(
+                f"  빈 태그: {', '.join(validation_result['empty_tags'])}\n"
+            )
+        if validation_result["feedback"]:
+            _sys.stderr.write("  피드백:\n")
+            for fb in validation_result["feedback"]:
+                _sys.stderr.write(f"    - {fb}\n")
+        _sys.exit(1)
 
 
 def cmd_update_subnumber(
@@ -572,6 +616,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_sub_parser.add_argument("--context", default="", help="맥락 정보 (선택, 프롬프트 5요소)")
     add_sub_parser.add_argument("--workdir", default="", help=".workflow/ 산출물 경로 (선택)")
     add_sub_parser.add_argument("--result", default="", help="실행 결과 요약 (선택)")
+    add_sub_parser.add_argument("--skip-validation", action="store_true", default=False, help="품질 검증을 우회한다 (긴급 시 사용)")
 
     # archive-subnumber 서브커맨드
     archive_sub_parser = subparsers.add_parser("archive-subnumber", help="active subnumber를 submit에서 history로 이동한다")
@@ -675,6 +720,7 @@ def dispatch(args: argparse.Namespace) -> None:
             constraints=args.constraints,
             criteria=args.criteria,
             context=args.context,
+            skip_validation=args.skip_validation,
         )
 
     elif args.subcommand == "archive-subnumber":
