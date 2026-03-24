@@ -101,6 +101,11 @@ VALID_MODES = {"full"}
 CHAIN_SEPARATOR = ">"
 CHAIN_MAX_RETRY = int(os.environ.get("CLAUDE_CHAIN_MAX_RETRY", "2"))
 
+# =============================================================================
+# 품질 검증 임계값
+# =============================================================================
+QUALITY_THRESHOLD = 0.6
+
 
 def parse_chain_command(raw: str) -> list[str]:
     """체인 command 문자열을 파싱하여 세그먼트 리스트를 반환한다.
