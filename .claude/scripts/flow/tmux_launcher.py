@@ -196,9 +196,12 @@ def _create_window(window_name: str) -> bool:
         window_name,
     ]
 
-    # worktree_path가 있으면 -c <worktree_path>로 cwd 설정
+    # cwd 설정: worktree_path 우선, 없으면 프로젝트 루트로 고정
     if worktree_path:
         tmux_args.extend(["-c", worktree_path])
+    else:
+        from common import resolve_project_root
+        tmux_args.extend(["-c", resolve_project_root()])
 
     tmux_args.extend([
         "-e",

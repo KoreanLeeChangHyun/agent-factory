@@ -11,6 +11,7 @@
 
 # Worktree isolation directories
 .worktrees/
+.claude/worktrees/
 
 CLAUDE.md
 

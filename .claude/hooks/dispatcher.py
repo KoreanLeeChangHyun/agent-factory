@@ -20,12 +20,36 @@ from typing import Callable
 def _find_project_root() -> str:
     """Find project root by locating .claude directory.
 
+    워크트리에서 실행 시 메인 리포 루트를 반환한다.
+    .claude.env는 메인 리포에만 존재하므로, git-common-dir로 메인 리포를 탐색한다.
+
     Returns:
         Absolute path to the project root directory.
     """
     d = os.path.dirname(os.path.abspath(__file__))
     # .claude/hooks/dispatcher.py -> project root is ../..
-    return os.path.normpath(os.path.join(d, '..', '..'))
+    root = os.path.normpath(os.path.join(d, '..', '..'))
+
+    # 메인 리포이면 그대로 반환
+    if os.path.exists(os.path.join(root, '.claude.env')):
+        return root
+
+    # 워크트리일 수 있음 — git-common-dir로 메인 리포 탐색
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+            capture_output=True, text=True, timeout=5, cwd=root,
+        )
+        if result.returncode == 0:
+            git_common = result.stdout.strip()
+            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            main_root = os.path.dirname(git_common)
+            if os.path.exists(os.path.join(main_root, '.claude.env')):
+                return main_root
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    return root
 
 
 def _env_path() -> str:
