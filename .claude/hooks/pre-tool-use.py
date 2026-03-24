@@ -8,6 +8,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Write|Edit|Bash  -> hooks_self_guard          (HOOK_HOOKS_SELF_PROTECT, sync)
   AskUserQuestion  -> slack_ask                 (HOOK_SLACK_ASK, async)
   Bash             -> dangerous_command_guard    (HOOK_DANGEROUS_COMMAND, sync)
+  Bash             -> direct_path_guard          (HOOK_DIRECT_PATH_GUARD, sync)
   Bash             -> main_branch_guard          (HOOK_MAIN_BRANCH_GUARD, sync)
   Bash             -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
   Write|Edit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
@@ -82,6 +83,17 @@ def main() -> None:
         r = dispatch(
             'HOOK_DANGEROUS_COMMAND',
             scripts_dir('guards', 'dangerous_command_guard.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+        sync_results.append(r)
+
+    # --- Bash: direct-path-guard (sync) ---
+    if tool_name == 'Bash':
+        r = dispatch(
+            'HOOK_DIRECT_PATH_GUARD',
+            scripts_dir('guards', 'direct_path_guard.py'),
             stdin_data,
             flags=flags,
             capture_output=True,

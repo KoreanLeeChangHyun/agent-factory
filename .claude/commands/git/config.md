@@ -27,13 +27,13 @@ argument-hint: "[--global | --local]"
 $ARGUMENTS에 따라 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/git/git_config.py $ARGUMENTS
+flow-gitconfig $ARGUMENTS
 ```
 
 $ARGUMENTS가 없으면 기본값 `--global` 적용:
 
 ```bash
-python3 .claude/scripts/git/git_config.py --global
+flow-gitconfig --global
 ```
 
 ### Step 2. 결과 출력

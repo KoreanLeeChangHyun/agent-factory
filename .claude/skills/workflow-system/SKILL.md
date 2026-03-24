@@ -82,7 +82,13 @@ flow-update task-status <registryKey> running W01 W02 && flow-update usage-pendi
 | `flow-validate-p` | `python3 .claude/scripts/flow/prompt_validator.py` | 프롬프트 유효성 검증 |
 | `flow-recommend` | `python3 .claude/scripts/flow/skill_recommender.py` | 스킬 자동 추천 |
 | `flow-gc` | `python3 .claude/scripts/flow/garbage_collect.py` | 좀비 워크플로우 정리 |
+| `flow-kanban` | `python3 .claude/scripts/flow/kanban.py` | 칸반 보드 관리 |
+| `flow-merge` | `python3 .claude/scripts/flow/merge_pipeline.py` | PR 기반 머지 파이프라인 |
 | `flow-tmux` | `python3 .claude/scripts/flow/tmux_launcher.py` | tmux 윈도우 생성/종료 |
+| `flow-history` | `python3 .claude/scripts/sync/history_sync.py` | 히스토리 동기화 |
+| `flow-catalog` | `python3 .claude/scripts/sync/catalog_sync.py` | 스킬 카탈로그 재생성 |
+| `flow-gitconfig` | `python3 .claude/scripts/git/git_config.py` | Git config 설정 |
+| `flow-detect` | `python3 .claude/scripts/flow/project_skill_detector.py` | 프로젝트 스킬 감지 |
 
 > alias 추가 시 `init-claude-workflow.sh`의 `setup_shell_aliases()` 함수 내 `.claude.aliases` heredoc에 항목을 추가한다.
 

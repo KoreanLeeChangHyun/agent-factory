@@ -10,6 +10,7 @@
     HOOKS_*: hooks_self_guard.py 사용 메시지
     MAIN_BRANCH_*: main_branch_guard.py 사용 메시지
     READONLY_SESSION_*: readonly_session_guard.py 사용 메시지
+    DIRECT_PATH_*: direct_path_guard.py 사용 메시지
 """
 
 # =============================================================================
@@ -115,3 +116,13 @@ READONLY_SESSION_BASH_MODIFY_DENIED: str = (
     "research/review 워크플로우 세션에서는 Bash를 통한 파일 수정이 금지되어 있습니다. "
     "보고서에 수정 방안을 기술하세요."
 )
+
+# =============================================================================
+# direct_path_guard.py 메시지
+# =============================================================================
+
+DIRECT_PATH_CALL_DENIED: str = (
+    "python3 직접 경로 호출이 차단되었습니다.\n"
+    "'{script_name}' 대신 alias '{alias_name}'를 사용하세요."
+)
+"""플레이스홀더: {script_name} - 차단된 스크립트 파일명, {alias_name} - 대체 alias명."""

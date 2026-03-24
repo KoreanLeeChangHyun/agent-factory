@@ -19,7 +19,7 @@ description: "스킬 카탈로그 갱신. .claude/skills/ 디렉터리를 전수
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/sync/catalog_sync.py --dry-run
+flow-catalog --dry-run
 ```
 
 활성 스킬 수, 제외 스킬 수, 예상 파일 크기를 출력합니다.
@@ -30,7 +30,7 @@ python3 .claude/scripts/sync/catalog_sync.py --dry-run
 Bash 도구로 실행:
 
 ```bash
-python3 .claude/scripts/sync/catalog_sync.py
+flow-catalog
 ```
 
 `.claude/skills/skill-catalog.md`를 재생성합니다. 기존 파일이 있으면 덮어씁니다.

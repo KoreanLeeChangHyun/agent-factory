@@ -15,4 +15,12 @@
       flow-validate-p: (prompt_file_path) -- 티켓 XML 품질 검증 (.kanban/active/T-NNN.xml)
       flow-recommend: (task_description) -- TF-IDF 기반 스킬 추천 (상위 3개)
       flow-gc: [project_root] -- TTL 만료 워크플로우 STALE 전환 (flow-init 시 자동 호출)
+      flow-history: sync [--dry-run] [--all], status, archive [registryKey]
+      flow-catalog: [--dry-run]
+      flow-gitconfig: [--global|--local]
+      flow-detect: [프로젝트루트] [--generate]
+      <alias-enforcement>
+        스크립트 호출 시 반드시 위 alias를 사용한다 (MUST).
+        python3 .claude/scripts/... 형태의 직접 경로 호출은 금지한다 (MUST NOT).
+      </alias-enforcement>
     </alias-reference>

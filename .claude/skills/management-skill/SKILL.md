@@ -396,7 +396,7 @@ YAML 프론트매터에 다른 필드는 포함하지 마세요.
 스킬 편집 완료 후 skill-catalog.md를 자동 갱신합니다. Bash 도구로 다음 명령어를 실행하여 frontmatter 변경사항을 카탈로그에 반영합니다.
 
 ```bash
-python3 .claude/scripts/sync/catalog_sync.py
+flow-catalog
 ```
 
 이 단계는 PostToolUse Hook과 함께 이중 안전망을 구성합니다. Hook이 실패하더라도 이 단계에서 카탈로그가 갱신됩니다.
