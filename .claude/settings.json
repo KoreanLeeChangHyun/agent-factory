@@ -1,6 +1,14 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Edit(.claude/scripts/**)",
+      "Edit(.claude/hooks/**)",
+      "Edit(.claude/prompt/**)",
+      "Edit(.claude/docs/**)",
+      "Edit(.claude/init/**)",
+      "Edit(.claude/board/**)"
+    ]
   },
   "statusLine": {
     "type": "command",
