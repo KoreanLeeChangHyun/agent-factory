@@ -192,6 +192,17 @@ flow-kanban move T-NNN review
 
 리포트 템플릿, 주의사항 등 상세 절차는 research-general 스킬(`.claude/skills/research-general/SKILL.md`)을 참조한다.
 
+### 코드 수정 금지 제약
+
+> **WARNING**: 리서치 워크플로우에서 Edit/Write 도구로 소스 코드를 수정하는 행위는 절대 금지된다. research는 보고서만 산출하므로 코드 수정이 불필요하다.
+
+| 구분 | 대상 | 허용 여부 |
+|------|------|----------|
+| 허용 | 보고서 파일(report.md, work/*.md) 읽기/쓰기 | O |
+| 금지 | 소스 코드 파일(.js, .ts, .py, .css, .html 등) 수정 (Edit/Write 도구) | X |
+
+이 제약은 `readonly_session_guard.py` PreToolUse 가드로 기술적으로 강제됨.
+
 ### 출처 검증 기준
 
 | 등급 | 출처 유형 | 날짜 기준 |
@@ -282,6 +293,8 @@ flow-kanban move T-NNN review
 | 금지 | 소스 코드 파일(.js, .ts, .py, .css, .html 등) 수정 (Edit/Write 도구) | X |
 
 코드 수정이 필요한 경우 보고서에 수정 방안을 기술하고 별도 implement 사이클에서 처리한다.
+
+이 제약은 `readonly_session_guard.py` PreToolUse 가드로 기술적으로 강제됨.
 
 ### 심각도 기준
 
