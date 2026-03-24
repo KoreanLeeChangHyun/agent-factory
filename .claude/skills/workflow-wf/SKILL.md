@@ -96,6 +96,8 @@ flow-kanban move T-NNN review
 - 구현이 완료된 티켓을 Review 상태로 전이한다
 - `wf -s implement #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
 
+> **Review 후속 흐름**: Review 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
+
 ### cleanup 절차 (implement/research/review 공통)
 
 워크플로우 완료 시 tmux 윈도우 자동 종료가 이중 안전장치로 동작한다:
@@ -269,6 +271,8 @@ flow-kanban move T-NNN review
 - 연구/분석이 완료된 티켓을 Review 상태로 전이한다
 - `wf -s research #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
 
+> **Review 후속 흐름**: Review 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
+
 ---
 
 ## Review Command
@@ -363,6 +367,52 @@ flow-kanban move T-NNN review
 ```
 
 티켓 파일은 `.kanban/active/T-NNN.xml`이다.
+
+---
+
+## Review Completion Flow
+
+워크플로우 완료 후 Review 상태가 된 티켓의 검토 및 완료 처리 절차.
+
+### 개요
+
+implement/research 워크플로우 완료 시 finalization.py가 티켓을 Review 상태로 전이한다. 이후 사용자가 `/wf -d N`을 실행하면 아래 3-way 분기가 동작한다.
+
+### 분기 흐름
+
+| 분기 | 트리거 | 결과 |
+|------|--------|------|
+| 간단 검토 통과 + 완료 선택 | 검토 항목 전체 OK + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done |
+| 간단 검토 경고 + 완료 선택 | 검토 항목 WARN + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done (경고 무시) |
+| 상세 review 선택 | 사용자 "2" 선택 | review subnumber 추가 -> /wf -s N으로 review 워크플로우 실행 |
+| 취소 | 사용자 "0" 선택 | Review 상태 유지 |
+
+### 간단 검토 항목
+
+| 항목 | 검증 방법 | 판정 기준 |
+|------|----------|----------|
+| 보고서-변경 파일 일치 | report.md 파일 목록 vs git diff --name-only | 불일치 0건 = OK, 1건 이상 = WARN |
+| py_compile | python3 -m py_compile <변경된 .py 파일> | 실패 0건 = OK, 1건 이상 = WARN, .py 파일 없음 = N/A |
+| 보고서 존재 | report.md 파일 존재 확인 | 존재 = OK, 미존재 = WARN |
+
+### merge 실행 조건
+
+> **CRITICAL**: merge는 반드시 사용자의 명시적 "완료" 선택 후에만 실행된다. 워크플로우 완료(DONE 전이) 시점에서는 kanban Review 전이만 수행하고, 커밋/merge/worktree 정리는 수행하지 않는다.
+
+### 상세 review 연계
+
+상세 review 선택 시 기존 review command 워크플로우를 재활용한다:
+1. `flow-kanban add-subnumber T-NNN --command review`로 새 subnumber 추가
+2. 사용자가 `/wf -s N`으로 review 워크플로우 실행
+3. review 완료 후 다시 Review 상태로 돌아옴
+4. 사용자가 `/wf -d N`으로 최종 완료 처리
+
+### 관련 스크립트
+
+| 스크립트 | 역할 |
+|---------|------|
+| flow-merge (merge_pipeline.py) | 커밋 -> merge -> worktree 정리 -> kanban done 파이프라인 |
+| finalization.py | 워크플로우 완료 시 Review 전이 (자동 merge 금지) |
 
 ---
 

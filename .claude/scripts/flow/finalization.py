@@ -15,7 +15,7 @@
   1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
   2. 사용량 확정             (update_state.py usage-finalize, 비차단)
   3. 아카이빙               (history_sync.py archive, 비차단)
-  4. 티켓 상태 갱신          (kanban.py move, ticket_number 있을 때만, 비차단)
+  4. 티켓 상태 갱신          (kanban.py move -> review, ticket_number 있을 때만, 비차단. 자동 merge 금지)
   4c. 체인 감지 및 다음 스테이지 발사 (chain_launcher.py, 완료+체인 존재 시만, 비동기)
   5. tmux 윈도우 백그라운드 지연 kill (TMUX_PANE+T-* 조건 시만, 비차단)
 
@@ -400,7 +400,16 @@ def _build_result_update_args(abs_work_dir: str) -> list[str]:
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다."""
+    """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다.
+
+    6단계:
+      1. status.json 완료 처리   (update_state.py status, 이미 대상 상태면 스킵, 그 외 실패 시 exit 1 — sync 포함)
+      2. 사용량 확정             (update_state.py usage-finalize, 비차단)
+      3. 아카이빙               (history_sync.py archive, 비차단)
+      4. 티켓 상태 갱신          (kanban.py move -> review, ticket_number 있을 때만, 비차단. 자동 merge 금지)
+      4c. 체인 감지 및 다음 스테이지 발사 (chain_launcher.py, 완료+체인 존재 시만, 비동기)
+      5. tmux 윈도우 백그라운드 지연 kill (TMUX_PANE+T-* 조건 시만, 비차단)
+    """
     parser = argparse.ArgumentParser(
         description="워크플로우 마무리 처리 (flow-finish 6단계)",
     )
@@ -520,9 +529,11 @@ def main() -> None:
                         "Step 4b: ticket result workflow update",
                     )
 
-    # ── Step 4wt: worktree 유지 로그 (Review 단계) ──
-    # worktree가 활성화된 경우, Review 상태에서 worktree를 유지하여
-    # 추가 수정 사이클이 가능하도록 한다. 정리는 cmd_done()에서만 수행.
+    # ── Step 4wt: worktree 유지 (Review 단계, merge 금지) ──
+    # worktree가 활성화된 경우, Review 상태에서 worktree를 유지한다.
+    # 자동 커밋/merge/worktree 정리는 이 단계에서 절대 수행하지 않는다.
+    # merge는 사용자의 명시적 완료 지시(/wf -d) 후 flow-merge로만 실행된다.
+    # 정리 파이프라인: /wf -d -> 간단검토 -> 완료선택 -> flow-merge
     if ticket_number and abs_work_dir is not None:
         try:
             context_file_wt: str = os.path.join(abs_work_dir, ".context.json")
@@ -536,7 +547,7 @@ def main() -> None:
                     f"FINALIZE_STEP4WT: worktree 유지 (Review 단계) branch={wt_branch} path={wt_path}",
                 )
                 print(
-                    f"[INFO] worktree 유지: {wt_branch} (정리는 Done 전이 시 자동 수행)",
+                    f"[INFO] worktree 유지: {wt_branch} (merge는 /wf -d 완료 지시 후 실행)",
                     file=sys.stderr,
                     flush=True,
                 )
