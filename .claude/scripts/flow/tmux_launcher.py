@@ -215,6 +215,12 @@ def _create_window(window_name: str) -> bool:
     if work_dir:
         tmux_args.extend(["-e", f"WORKFLOW_WORK_DIR={work_dir}"])
 
+    # WORKFLOW_WORKTREE_PATH 주입: 워크트리 경로를 세션에 전달한다.
+    # worktree_path_guard.py가 이 환경변수를 우선 참조하여
+    # 메인 리포 경로 수정을 차단하고 워크트리 경로로 안내한다.
+    if worktree_path:
+        tmux_args.extend(["-e", f"WORKFLOW_WORKTREE_PATH={worktree_path}"])
+
     # WARNING: bash -lc 문자열에 변수를 직접 삽입하지 마시오 (셸 인젝션 위험)
     tmux_args.append("bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'")
 

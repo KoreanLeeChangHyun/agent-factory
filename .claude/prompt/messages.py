@@ -11,6 +11,7 @@
     MAIN_BRANCH_*: main_branch_guard.py 사용 메시지
     READONLY_SESSION_*: readonly_session_guard.py 사용 메시지
     DIRECT_PATH_*: direct_path_guard.py 사용 메시지
+    WORKTREE_PATH_*: worktree_path_guard.py 사용 메시지
 """
 
 # =============================================================================
@@ -126,3 +127,28 @@ DIRECT_PATH_CALL_DENIED: str = (
     "'{script_name}' 대신 alias '{alias_name}'를 사용하세요."
 )
 """플레이스홀더: {script_name} - 차단된 스크립트 파일명, {alias_name} - 대체 alias명."""
+
+# =============================================================================
+# worktree_path_guard.py 메시지
+# =============================================================================
+
+WORKTREE_PATH_WRITE_EDIT_DENIED: str = (
+    "[워크트리 격리 위반] 메인 리포 경로에 직접 수정할 수 없습니다.\n"
+    "워크트리 경로를 사용하세요: {worktree_path}\n"
+    "현재 파일: {file_path}\n"
+    "워크트리 내 경로: {suggested_path}"
+)
+"""플레이스홀더:
+    {worktree_path}   - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
+    {file_path}       - 차단된 파일 절대경로
+    {suggested_path}  - 워크트리 내 대응 경로 (파일명 기준 추천 경로)
+"""
+
+WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
+    "[워크트리 격리 위반] 메인 리포 경로에서 파일 수정 명령이 감지되었습니다.\n"
+    "워크트리 경로에서 작업하세요: {worktree_path}\n"
+    "cd {worktree_path} 후 명령을 실행하세요."
+)
+"""플레이스홀더:
+    {worktree_path} - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
+"""

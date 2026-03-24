@@ -13,6 +13,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Bash             -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
   Write|Edit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
   Write|Edit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
+  Write|Edit|Bash  -> worktree_path_guard        (HOOK_WORKTREE_PATH_GUARD, sync)
   Task             -> agent_investigation_guard  (HOOK_AGENT_INVESTIGATION_GUARD, sync)
 """
 
@@ -138,6 +139,17 @@ def main() -> None:
         r = dispatch(
             'HOOK_READONLY_SESSION_GUARD',
             scripts_dir('guards', 'readonly_session_guard.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+        sync_results.append(r)
+
+    # --- Write|Edit|Bash: worktree-path-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'Bash'):
+        r = dispatch(
+            'HOOK_WORKTREE_PATH_GUARD',
+            scripts_dir('guards', 'worktree_path_guard.py'),
             stdin_data,
             flags=flags,
             capture_output=True,
