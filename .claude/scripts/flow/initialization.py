@@ -51,10 +51,12 @@ from typing import Any, NoReturn
 # ─── 경로 상수 ───────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
+
+from common import resolve_project_root
+_PROJECT_ROOT: str = resolve_project_root()
 
 from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
 from flow.flow_logger import append_log as _append_log

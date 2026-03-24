@@ -22,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -53,11 +54,49 @@ from data.constants import (  # noqa: E402
 )
 
 
+def _detect_worktree_main_root(base: str) -> str:
+    """워크트리 내부인지 판별하여 메인 프로젝트 루트 반환.
+
+    git rev-parse --git-common-dir로 .git 공통 디렉터리를 얻고,
+    그 부모 디렉터리가 base와 다르면 워크트리 내부로 판정하여
+    메인 리포 루트를 반환합니다.
+
+    Args:
+        base: 후보 프로젝트 루트 경로 (절대 경로).
+
+    Returns:
+        메인 프로젝트 루트 절대 경로. git 실패 또는 워크트리 아니면 base 반환.
+    """
+    # .claude.env가 있으면 이미 메인 리포 루트 — git 호출 불필요
+    if os.path.exists(os.path.join(base, ".claude.env")):
+        return base
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=base,
+        )
+        if result.returncode == 0:
+            git_common = result.stdout.strip()
+            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            main_root = os.path.dirname(git_common)
+            if main_root != base:
+                return main_root
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    return base
+
+
 def resolve_project_root(start_path: str | None = None) -> str:
     """프로젝트 루트 경로 해석.
 
     utils -> scripts -> .claude -> project root 순서로 상위 디렉터리를 탐색하여
-    프로젝트 루트를 결정합니다.
+    프로젝트 루트를 결정합니다. 워크트리 내부에서 호출되더라도 메인 리포의
+    프로젝트 루트를 반환합니다.
 
     Args:
         start_path: 탐색 시작 경로. None이면 이 파일의 위치 기준.
@@ -71,7 +110,7 @@ def resolve_project_root(start_path: str | None = None) -> str:
         # scripts -> .claude -> project root
         scripts_dir = os.path.dirname(os.path.abspath(__file__))
         base = os.path.normpath(os.path.join(scripts_dir, "..", ".."))
-    return base
+    return _detect_worktree_main_root(base)
 
 
 def load_json_file(path: str) -> Any | None:
