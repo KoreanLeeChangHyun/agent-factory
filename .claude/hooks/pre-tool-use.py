@@ -156,6 +156,7 @@ def main() -> None:
         'hookSpecificOutput': {
             'hookEventName': 'PreToolUse',
             'permissionDecision': 'allow',
+            'permissionDecisionReason': '모든 가드를 통과하였습니다.',
         }
     }
     print(json.dumps(allow_payload))
