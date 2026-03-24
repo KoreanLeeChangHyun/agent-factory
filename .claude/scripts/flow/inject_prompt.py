@@ -22,7 +22,9 @@ import glob as glob_module
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+_scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
