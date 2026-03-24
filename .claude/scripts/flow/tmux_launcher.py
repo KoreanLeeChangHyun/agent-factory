@@ -206,9 +206,17 @@ def _create_window(window_name: str) -> bool:
     tmux_args.extend([
         "-e",
         f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
-        # WARNING: bash -lc 문자열에 변수를 직접 삽입하지 마시오 (셸 인젝션 위험)
-        "bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'",
     ])
+
+    # WORKFLOW_WORK_DIR 주입: 현재 워크플로우의 work_dir을 해석하여 세션에 전달한다.
+    # readonly_session_guard.py L121-133에서 이 환경변수를 우선 참조하므로,
+    # 병렬 실행 시 레지스트리 스캔 폴백(최신 워크플로우 선택)으로 인한 오염을 방지한다.
+    work_dir = _fl_resolve()
+    if work_dir:
+        tmux_args.extend(["-e", f"WORKFLOW_WORK_DIR={work_dir}"])
+
+    # WARNING: bash -lc 문자열에 변수를 직접 삽입하지 마시오 (셸 인젝션 위험)
+    tmux_args.append("bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'")
 
     result = _run_tmux(*tmux_args, capture_output=False)
     return result.returncode == 0
