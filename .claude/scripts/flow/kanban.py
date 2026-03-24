@@ -14,6 +14,8 @@ LLM 호출 없음 (순수 IO).
   python3 kanban.py update-subnumber <ticket> --id <N>
   python3 kanban.py archive-subnumber <ticket>
   python3 kanban.py set-editing <ticket> <on|off>
+  python3 kanban.py board
+  python3 kanban.py show <ticket>
 
 비즈니스 로직은 아래 모듈에 위임한다:
   flow.ticket_repository  - XML CRUD, 파일 탐색, 유틸리티
