@@ -41,6 +41,7 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "delete",
     "add-subnumber",
     "update-title",
+    "update",
     "update-subnumber",
     "archive-subnumber",
     "set-editing",

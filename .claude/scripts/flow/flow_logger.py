@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -126,18 +127,48 @@ def _resolve_project_root() -> str:
     """프로젝트 루트 절대 경로를 해석한다.
 
     이 파일 위치(flow/) -> scripts -> .claude -> project root 순으로
-    상위 디렉터리를 탐색합니다.
+    상위 디렉터리를 탐색합니다. 서브에이전트 워크트리(.claude/worktrees/agent-*)
+    에서 실행될 경우 __file__ 기반 4단계 탐색이 워크트리 내부 경로를 반환하므로,
+    git-common-dir 기반으로 메인 리포 루트를 재해석합니다.
 
     Returns:
         프로젝트 루트 절대 경로.
     """
     # flow_logger.py 위치: <project_root>/.claude/scripts/flow/flow_logger.py
+    # 서브에이전트 워크트리 위치:
+    #   <main_root>/.claude/worktrees/agent-*/.claude/scripts/flow/flow_logger.py
     this_file = os.path.abspath(__file__)
     flow_dir = os.path.dirname(this_file)          # .claude/scripts/flow/
     scripts_dir = os.path.dirname(flow_dir)        # .claude/scripts/
     claude_dir = os.path.dirname(scripts_dir)      # .claude/
-    project_root = os.path.dirname(claude_dir)     # <project_root>/
-    return project_root
+    candidate = os.path.dirname(claude_dir)        # <candidate>/
+
+    # .claude.env가 있으면 메인 리포 루트 — 즉시 반환
+    if os.path.exists(os.path.join(candidate, ".claude.env")):
+        return candidate
+
+    # 워크트리 내부일 수 있음 — git-common-dir로 메인 리포 탐색
+    # (dispatcher.py _find_project_root() 와 동일한 패턴)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=candidate,
+        )
+        if result.returncode == 0:
+            git_common = result.stdout.strip()
+            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            main_root = os.path.dirname(git_common)
+            if main_root != candidate and os.path.exists(
+                os.path.join(main_root, ".claude.env")
+            ):
+                return main_root
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    return candidate
 
 
 def _resolve_work_dir_from_key(
@@ -178,7 +209,8 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
 
     .workflow/ 디렉터리에서 터미널 상태(DONE/FAILED/STALE/CANCELLED)가 아닌
     워크플로우를 수집합니다. 단일 활성 워크플로우면 즉시 반환합니다.
-    복수이면 updated_at 기준 최신 항목을 반환합니다.
+    복수이면 CLAUDE_SESSION_ID 환경변수로 세션 소유 워크플로우를 먼저 식별하고,
+    매칭 실패 시에만 updated_at 기준 최신 항목을 반환합니다.
 
     Args:
         project_root: 프로젝트 루트 절대 경로.
@@ -192,7 +224,8 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
 
     _TERMINAL_PHASES = {"DONE", "FAILED", "STALE", "CANCELLED"}
 
-    candidates: list[tuple[str, str]] = []  # (abs_work_dir, updated_at)
+    # (abs_work_dir, updated_at, linked_sessions)
+    candidates: list[tuple[str, str, list]] = []
 
     for entry in sorted(os.listdir(workflow_root)):
         if not _TS_PATTERN.match(entry):
@@ -214,7 +247,7 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
                 if not os.path.exists(status_file):
                     continue
 
-                # status.json에서 phase와 updated_at 읽기
+                # status.json에서 phase, updated_at, linked_sessions 읽기
                 try:
                     with open(status_file, "r", encoding="utf-8") as f:
                         status = json.load(f)
@@ -229,7 +262,10 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
                     continue
 
                 updated_at = status.get("updated_at", "")
-                candidates.append((cmd_path, updated_at))
+                linked_sessions = status.get("linked_sessions", [])
+                if not isinstance(linked_sessions, list):
+                    linked_sessions = []
+                candidates.append((cmd_path, updated_at, linked_sessions))
 
     if not candidates:
         return None
@@ -237,6 +273,22 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
     if len(candidates) == 1:
         return candidates[0][0]
 
-    # updated_at 기준 최신 항목 선택
+    # 복수 후보: CLAUDE_SESSION_ID로 세션 소유 워크플로우를 우선 식별한다.
+    # statusline.py와 동일한 방식으로 linked_sessions 배열을 검사한다.
+    claude_sid = os.environ.get("CLAUDE_SESSION_ID", "").strip()
+    if claude_sid:
+        session_matches = [
+            (cmd_path, updated_at)
+            for cmd_path, updated_at, linked in candidates
+            if claude_sid in linked
+        ]
+        if len(session_matches) == 1:
+            return session_matches[0][0]
+        if len(session_matches) > 1:
+            # 같은 세션에 연결된 복수 후보는 updated_at 기준 최신 선택
+            session_matches.sort(key=lambda x: x[1], reverse=True)
+            return session_matches[0][0]
+
+    # 세션 매칭 실패 시 updated_at 기준 최신 항목으로 폴백
     candidates.sort(key=lambda x: x[1], reverse=True)
     return candidates[0][0]

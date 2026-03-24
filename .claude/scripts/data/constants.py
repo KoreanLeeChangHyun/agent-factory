@@ -237,8 +237,6 @@ DANGER_PATTERNS = [
     {"pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f", "blocked": "git clean -f (추적되지 않는 파일 전체 삭제)", "alternative": "git clean -n으로 드라이런하여 삭제 대상을 먼저 확인하세요."},
     {"pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)", "blocked": "git branch -D main/master (주요 브랜치 강제 삭제)", "alternative": "주요 브랜치 삭제는 매우 위험합니다. 정말 필요한지 재확인하세요."},
     {"pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$", "blocked": "git checkout/restore . (모든 변경사항 되돌리기)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
-    # 참조용: main/master 브랜치 직접 커밋 -- 실제 차단은 main_branch_guard.py가 담당
-    {"pattern": "git\\s+commit", "blocked": "main/master 브랜치에서 직접 커밋 (별도 가드에서 브랜치 검사)", "alternative": "피처 브랜치를 생성하여 작업하세요."},
     {"pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)", "blocked": "DROP TABLE/DATABASE (데이터베이스/테이블 삭제)", "alternative": "백업을 먼저 수행하고, 트랜잭션 내에서 실행하세요."},
     {"pattern": "(sudo\\s+)?chmod\\s+777", "blocked": "chmod 777 (과도한 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
     {"pattern": "(sudo\\s+)?chmod\\s+a\\+rwx", "blocked": "chmod a+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},

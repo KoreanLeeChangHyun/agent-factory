@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any
@@ -45,6 +46,63 @@ from data.constants import QUALITY_THRESHOLD
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+
+
+# ─── tmux 헬퍼 ───────────────────────────────────────────────────────────────
+
+_TMUX_WINDOW_PREFIX: str = "P:"
+
+
+def _tmux_kill_ticket_window(ticket_number: str) -> None:
+    """tmux 세션에서 해당 티켓의 P:T-NNN 윈도우를 종료한다.
+
+    비tmux 환경($TMUX 미설정) 또는 윈도우 미존재 시 조용히 건너뛴다.
+    상태 전이 성공 후에만 호출되어야 한다.
+
+    Args:
+        ticket_number: 티켓 번호 (T-NNN 형식). 윈도우명 P:T-NNN으로 변환됨.
+    """
+    # 비tmux 환경 방어: $TMUX 환경변수 미설정 시 건너뜀
+    if not os.environ.get("TMUX"):
+        return
+
+    window_name = f"{_TMUX_WINDOW_PREFIX}{ticket_number}"
+
+    try:
+        # 윈도우 존재 여부 확인
+        list_result = subprocess.run(
+            ["tmux", "list-windows", "-F", "#W"],
+            capture_output=True,
+            text=True,
+        )
+        if list_result.returncode != 0:
+            return
+        existing_windows = list_result.stdout.strip().splitlines()
+        if window_name not in existing_windows:
+            return
+
+        # 윈도우 인덱스 조회 (P:T-NNN의 콜론이 세션:윈도우로 오해석되는 문제 방지)
+        idx_result = subprocess.run(
+            ["tmux", "list-windows", "-F", "#{window_index}\t#{window_name}"],
+            capture_output=True,
+            text=True,
+        )
+        target = window_name  # 폴백
+        if idx_result.returncode == 0:
+            for line in idx_result.stdout.strip().splitlines():
+                parts = line.split("\t", 1)
+                if len(parts) == 2 and parts[1] == window_name:
+                    target = parts[0]
+                    break
+
+        subprocess.run(
+            ["tmux", "kill-window", "-t", target],
+            capture_output=True,
+        )
+        log("INFO", f"kanban.py: tmux kill-window {window_name}")
+    except Exception:
+        # tmux 오류는 상태 전이와 무관하므로 무시
+        pass
 
 
 # ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
@@ -124,6 +182,12 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
 
     print(f"{ticket_number}: {current_section} → {target_section}")
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
+
+    # Open 전이 시 tmux 윈도우 자동 kill:
+    # Submit 또는 In Progress에서 Open으로 복귀하면 해당 티켓의 P:T-NNN 윈도우를 종료한다.
+    # 상태 전이 성공 후에 실행하므로 전이 실패 시(err() 호출 후 SystemExit) 여기에 도달하지 않는다.
+    if target_section == "Open" and current_section in ("Submit", "In Progress"):
+        _tmux_kill_ticket_window(ticket_number)
 
 
 def cmd_done(ticket_number: str) -> None:
@@ -794,3 +858,6 @@ def dispatch(args: argparse.Namespace) -> None:
             derived_from=args.derived_from,
             blocks=args.blocks,
         )
+
+    else:
+        err(f"알 수 없는 서브커맨드: '{args.subcommand}'", 2)
