@@ -515,6 +515,110 @@ def cmd_update_subnumber(
     print(f"{ticket_number}: subnumber id={subnumber_id} 갱신됨")
 
 
+def cmd_show(ticket_number: str) -> None:
+    """특정 티켓의 상세 정보를 구조화된 텍스트로 출력한다.
+
+    메타데이터, 관계 정보, 활성 subnumber의 프롬프트(goal/target/constraints/
+    criteria/context) 및 result 유무를 순서대로 출력한다.
+
+    Args:
+        ticket_number: 조회할 티켓 번호 (T-NNN 형식).
+
+    Raises:
+        SystemExit: 티켓 파일을 찾을 수 없는 경우.
+    """
+    ticket_file = find_ticket_file(ticket_number)
+    if ticket_file is None:
+        err(f"{ticket_number} 티켓을 찾을 수 없습니다")
+
+    ticket_data = parse_ticket_xml(ticket_file)
+
+    number: str = ticket_data.get("number", ticket_number)
+    title: str = ticket_data.get("title", "")
+    status: str = ticket_data.get("status", "")
+    current: int = ticket_data.get("current", 0)
+    subnumbers: list = ticket_data.get("subnumbers", [])
+    relations: list = ticket_data.get("relations", [])
+
+    # ── 헤더 및 메타데이터 출력 ──────────────────────────────────────────────
+    print(f"## {number}: {title}")
+    print()
+    print("### Metadata")
+    print(f"- Number: {number}")
+    print(f"- Title: {title}")
+    print(f"- Status: {status}")
+    print(f"- Current: {current}")
+
+    # ── 관계 정보 출력 ────────────────────────────────────────────────────────
+    if relations:
+        print()
+        print("### Relations")
+        for rel in relations:
+            rel_type: str = rel.get("type", "")
+            rel_ticket: str = rel.get("ticket", "")
+            print(f"- {rel_type}: {rel_ticket}")
+
+    # ── 활성 subnumber 탐색 ──────────────────────────────────────────────────
+    active_sub: dict | None = None
+    if current > 0:
+        for sub in subnumbers:
+            if sub.get("id") == current:
+                active_sub = sub
+                break
+
+    if active_sub is None:
+        print()
+        print("(활성 프롬프트 없음)")
+        return
+
+    # ── 활성 프롬프트 출력 ───────────────────────────────────────────────────
+    print()
+    print(f"### Active Prompt (subnumber {current})")
+
+    command: str = active_sub.get("command", "")
+    if command:
+        print(f"- Command: {command}")
+
+    goal: str = active_sub.get("goal", "")
+    if goal:
+        print(f"- Goal: {goal.strip()}")
+
+    target: str = active_sub.get("target", "")
+    if target:
+        print(f"- Target: {target.strip()}")
+
+    constraints: str = active_sub.get("constraints", "")
+    if constraints:
+        print(f"- Constraints: {constraints.strip()}")
+
+    criteria: str = active_sub.get("criteria", "")
+    if criteria:
+        print(f"- Criteria: {criteria.strip()}")
+
+    context: str = active_sub.get("context", "")
+    if context:
+        print(f"- Context: {context.strip()}")
+
+    # ── result 정보 출력 ─────────────────────────────────────────────────────
+    print()
+    print("### Result")
+
+    result = active_sub.get("result")
+    if result:
+        print("- Has Result: Yes")
+        if isinstance(result, dict):
+            workdir: str = result.get("workdir", "")
+            if workdir:
+                print(f"- Workdir: {workdir}")
+            report: str = result.get("report", "")
+            if report:
+                print(f"- Report: {report}")
+        else:
+            print(f"- Detail: {result}")
+    else:
+        print("- Has Result: No")
+
+
 # ─── 관계 양방향 매핑 ────────────────────────────────────────────────────────
 # 각 관계 옵션에 대해 (원본에 기록할 타입, 대상에 기록할 역방향 타입)
 _RELATION_PAIRS: dict[str, tuple[str, str]] = {
@@ -631,6 +735,121 @@ def cmd_unlink(
     log("INFO", f"kanban.py: unlink {ticket_number} {', '.join(removed)}")
 
 
+def cmd_board() -> None:
+    """칸반 보드 전체 현황을 마크다운 테이블 형식으로 출력한다.
+
+    .kanban/active/ 디렉터리의 티켓을 status 기준으로 Open/In Progress/Review 칼럼에,
+    .kanban/done/ 디렉터리의 티켓을 Done 칼럼에 그룹핑하여 출력한다.
+    Done 칼럼은 최근 10건만 표시하고 총 건수를 함께 출력한다.
+    각 칼럼에 티켓이 없으면 "(없음)"을 출력한다.
+
+    출력 포맷:
+        ## Kanban Board
+
+        ### Open
+        | Ticket | Title | Command |
+        ...
+
+        ### Done (총 N건, 최근 10건 표시)
+        | Ticket | Title |
+        ...
+    """
+    # ── 칼럼 정의 ────────────────────────────────────────────────────────────
+    COLUMNS = ["Open", "In Progress", "Review", "Done"]
+    grouped: dict[str, list[dict]] = {col: [] for col in COLUMNS}
+
+    # ── active 디렉터리 스캔 ──────────────────────────────────────────────────
+    if os.path.isdir(KANBAN_ACTIVE_DIR):
+        for fname in os.listdir(KANBAN_ACTIVE_DIR):
+            if not (fname.startswith("T-") and fname.endswith(".xml")):
+                continue
+            fpath = os.path.join(KANBAN_ACTIVE_DIR, fname)
+            try:
+                ticket_data = parse_ticket_xml(fpath)
+            except SystemExit:
+                log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
+                continue
+
+            status = ticket_data.get("status", "Open")
+            column = status if status in COLUMNS else "Open"
+
+            # 활성 subnumber 탐색: current 값과 id가 일치하는 subnumber
+            current_id = ticket_data.get("current", 0)
+            active_command = ""
+            for sub in ticket_data.get("subnumbers", []):
+                if sub.get("id") == current_id:
+                    active_command = sub.get("command", "")
+                    break
+
+            grouped[column].append({
+                "number": ticket_data.get("number", ""),
+                "title": ticket_data.get("title", ""),
+                "command": active_command,
+            })
+
+    # ── done 디렉터리 스캔 ───────────────────────────────────────────────────
+    done_dir = os.path.join(KANBAN_DIR, "done")
+    if os.path.isdir(done_dir):
+        for fname in os.listdir(done_dir):
+            if not (fname.startswith("T-") and fname.endswith(".xml")):
+                continue
+            fpath = os.path.join(done_dir, fname)
+            try:
+                ticket_data = parse_ticket_xml(fpath)
+            except SystemExit:
+                log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
+                continue
+
+            grouped["Done"].append({
+                "number": ticket_data.get("number", ""),
+                "title": ticket_data.get("title", ""),
+                "command": "",
+            })
+
+    # ── 번호 기준 정렬 (T-NNN → NNN 숫자 오름차순) ──────────────────────────
+    def _ticket_sort_key(t: dict) -> int:
+        num_str = t.get("number", "T-0").lstrip("T-")
+        return int(num_str) if num_str.isdigit() else 0
+
+    for col in COLUMNS[:-1]:  # Open, In Progress, Review
+        grouped[col].sort(key=_ticket_sort_key)
+
+    # Done은 번호 내림차순(최신 먼저), 최근 10건만 표시
+    grouped["Done"].sort(key=_ticket_sort_key, reverse=True)
+    done_total = len(grouped["Done"])
+    grouped["Done"] = grouped["Done"][:10]
+
+    # ── 출력 ─────────────────────────────────────────────────────────────────
+    print("## Kanban Board")
+
+    for col in COLUMNS[:-1]:  # Open, In Progress, Review
+        print(f"\n### {col}")
+        tickets = grouped[col]
+        if not tickets:
+            print("(없음)")
+        else:
+            print("| Ticket | Title | Command |")
+            print("|--------|-------|---------|")
+            for t in tickets:
+                number = t["number"]
+                title = t["title"]
+                command = t["command"]
+                print(f"| {number}  | {title} | {command} |")
+
+    # Done 칼럼
+    print(f"\n### Done (총 {done_total}건, 최근 10건 표시)")
+    tickets = grouped["Done"]
+    if not tickets:
+        print("(없음)")
+    else:
+        print("| Ticket | Title |")
+        print("|--------|-------|")
+        for t in tickets:
+            number = t["number"]
+            title = t["title"]
+            print(f"| {number}  | {title} |")
+
+
 # ─── argparse 설정 ───────────────────────────────────────────────────────────
 
 
@@ -730,6 +949,13 @@ def build_parser() -> argparse.ArgumentParser:
     unlink_parser.add_argument("--depends-on", dest="depends_on", default="", help="의존 대상 티켓 번호")
     unlink_parser.add_argument("--derived-from", dest="derived_from", default="", help="파생 원본 티켓 번호")
     unlink_parser.add_argument("--blocks", default="", help="차단 대상 티켓 번호")
+
+    # board 서브커맨드
+    subparsers.add_parser("board", help="칸반 보드 전체 현황을 조회한다")
+
+    # show 서브커맨드
+    show_parser = subparsers.add_parser("show", help="특정 티켓의 상세 정보를 조회한다")
+    show_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
 
     return parser
 
@@ -858,6 +1084,15 @@ def dispatch(args: argparse.Namespace) -> None:
             derived_from=args.derived_from,
             blocks=args.blocks,
         )
+
+    elif args.subcommand == "board":
+        cmd_board()
+
+    elif args.subcommand == "show":
+        ticket = normalize_ticket_number(args.ticket)
+        if ticket is None:
+            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        cmd_show(ticket)
 
     else:
         err(f"알 수 없는 서브커맨드: '{args.subcommand}'", 2)
