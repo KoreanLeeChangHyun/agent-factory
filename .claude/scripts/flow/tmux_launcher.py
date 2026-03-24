@@ -317,6 +317,21 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         print(f"INLINE: 재진입 감지 (현재 윈도우: {current_window}), 인라인 실행 필요")
         return 0
 
+    # 워크트리 내부 차단: cwd가 .worktrees/ 패턴을 포함하면 다른 티켓의 launch를 거부한다
+    cwd = os.getcwd()
+    if ".worktrees" + os.sep in cwd or cwd.endswith(".worktrees"):
+        # cwd에서 T-NNN 추출: .worktrees/feat-T-NNN-* 패턴
+        import re as _re
+        _wt_match = _re.search(r"\.worktrees[/\\][^/\\]*feat-(T-\d+)", cwd)
+        cwd_ticket_id = _wt_match.group(1) if _wt_match else None
+        if cwd_ticket_id != ticket_id:
+            _log("WARN", f"tmux_launcher: worktree launch blocked cwd={cwd} ticket_id={ticket_id}")
+            print(
+                f"[ERROR] 워크트리 내부({cwd_ticket_id or 'unknown'})에서 다른 티켓({ticket_id}) launch 차단됨",
+                file=sys.stderr,
+            )
+            return 1
+
     # ticket_id(T-NNN)를 P:T-NNN 형식 윈도우명으로 변환
     window_name = f"{_WINDOW_PREFIX_P}{ticket_id}"
 
