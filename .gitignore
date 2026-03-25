@@ -1,17 +1,11 @@
 
-# Workflow documents
-.workflow/
-
-# Claude Code environment (secrets only)
-.claude.env
-.claude.env*
-
-# Kanban tickets and temps
-.kanban/
-
-# Worktree isolation directories
-.worktrees/
-.claude/worktrees/
+# Workflow runtime (secrets, data, temp)
+.claude.workflow/.env
+.claude.workflow/.env*
+.claude.workflow/workflow/
+.claude.workflow/kanban/
+.claude.workflow/worktrees/
+.claude.workflow/dashboard/
 
 CLAUDE.md
 
@@ -24,8 +18,6 @@ __pycache__/
 temp/
 
 .vscode/
-
-.dashboard/
 
 uploads
 

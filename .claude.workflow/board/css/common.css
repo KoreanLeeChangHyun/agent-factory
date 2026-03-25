@@ -1,0 +1,153 @@
+/* Claude Code Dashboard - Common Styles */
+/* Extracted from board.css: L1-72, L404-413, L971-977, L979-1001, L1370-1390 */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3c3c3c; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4f4f4f; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #1e1e1e;
+  color: #cccccc;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #2d2d2d;
+  background: #181818;
+  flex-shrink: 0;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-right: 32px;
+  white-space: nowrap;
+}
+
+.header-title .accent { color: #569cd6; }
+
+/* ── Header Buttons ── */
+.header-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px 8px;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+  color: #cccccc;
+}
+.header-btn:hover { opacity: 1; }
+.restart-btn { margin-left: auto; font-size: 18px; }
+.restart-btn.restarting { animation: spin 0.8s linear infinite; opacity: 0.8; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Tabs ── */
+.tabs { display: flex; }
+
+.tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #858585;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.tab:hover { color: #cccccc; }
+.tab.active { color: #e0e0e0; border-bottom-color: #569cd6; }
+
+/* ── Main ── */
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.view.active { display: block; }
+
+/* ── Badge ── */
+.badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* ── Empty State ── */
+.empty {
+  font-size: 12px;
+  color: #5a5a5a;
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ── Markdown Body ── */
+.md-body { font-size: 14px; line-height: 1.7; color: #cccccc; }
+.md-body h1 { font-size: 20px; font-weight: 600; color: #e0e0e0; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #2d2d2d; }
+.md-body h2 { font-size: 16px; font-weight: 600; color: #e0e0e0; margin: 20px 0 8px; }
+.md-body h3 { font-size: 14px; font-weight: 600; color: #e0e0e0; margin: 16px 0 6px; }
+.md-body h4 { font-size: 13px; font-weight: 600; color: #e0e0e0; margin: 12px 0 4px; }
+.md-body p { margin: 8px 0; }
+.md-body ul, .md-body ol { margin: 8px 0; padding-left: 24px; }
+.md-body li { margin: 2px 0; }
+.md-body a { color: #569cd6; text-decoration: none; }
+.md-body a:hover { text-decoration: underline; }
+.md-body strong { color: #e0e0e0; }
+.md-body blockquote { border-left: 3px solid #569cd6; padding: 4px 12px; margin: 8px 0; color: #858585; background: #252526; border-radius: 0 4px 4px 0; }
+.md-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+.md-body th, .md-body td { padding: 6px 10px; border: 1px solid #2d2d2d; text-align: left; }
+.md-body th { background: #252526; font-weight: 600; color: #e0e0e0; }
+.md-body hr { border: none; border-top: 1px solid #2d2d2d; margin: 16px 0; }
+.md-body code { background: #252526; padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; color: #ce9178; }
+.md-body pre { margin: 12px 0; }
+.md-code { background: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 6px; padding: 14px 16px; font-size: 12px; line-height: 1.6; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; color: #cccccc; overflow-x: auto; }
+.md-code code { background: none; padding: 0; color: inherit; }
+.mermaid-block { margin: 16px 0; padding: 16px; background: #252526; border: 1px solid #2d2d2d; border-radius: 6px; text-align: center; overflow-x: auto; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .dash-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .tv-container { padding: 20px 16px; }
+  .dash-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}

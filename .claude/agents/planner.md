@@ -17,7 +17,7 @@ permissionMode: bypassPermissions
 
 이 에이전트는 서브에이전트이며 오케스트레이터가 Task 도구로 호출한다.
 
-공통 제약 및 원칙: [`.claude/docs/common-constraints.md`](.claude/docs/common-constraints.md) 참조
+공통 제약 및 원칙: [`.claude.workflow/docs/common-constraints.md`](.claude.workflow/docs/common-constraints.md) 참조
 
 ### 이 에이전트의 전담 행위
 

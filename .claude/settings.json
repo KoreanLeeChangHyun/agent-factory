@@ -2,17 +2,20 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
-      "Edit(.claude/scripts/**)",
-      "Edit(.claude/hooks/**)",
-      "Edit(.claude/prompt/**)",
-      "Edit(.claude/docs/**)",
-      "Edit(.claude/init/**)",
-      "Edit(.claude/board/**)"
+      "Edit(.claude.workflow/scripts/**)",
+      "Edit(.claude.workflow/hooks/**)",
+      "Edit(.claude.workflow/prompt/**)",
+      "Edit(.claude.workflow/docs/**)",
+      "Edit(.claude.workflow/init/**)",
+      "Edit(.claude.workflow/board/**)",
+      "Edit(.claude/skills/**)",
+      "Edit(.claude/agents/**)",
+      "Edit(.claude/commands/**)"
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 -u .claude/scripts/statusline.py"
+    "command": "python3 -u .claude.workflow/scripts/statusline.py"
   },
   "hooks": {
     "SessionStart": [
@@ -21,18 +24,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/scripts/sync/history_sync.py sync && python3 -u .claude/scripts/sync/history_sync.py archive",
+            "command": "python3 -u .claude.workflow/scripts/sync/history_sync.py sync && python3 -u .claude.workflow/scripts/sync/history_sync.py archive",
             "timeout": 30,
             "async": true
           }
         ]
       },
       {
-        "matcher": "startup",
+        "matcher": "startup|resume|compact|clear",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/board/server.py",
+            "command": "python3 -u .claude.workflow/board/server.py",
             "timeout": 5,
             "async": true
           }
@@ -43,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/session-start.py",
+            "command": "python3 -u .claude.workflow/hooks/session-start.py",
             "timeout": 5
           }
         ]
@@ -54,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/pre-tool-use.py",
+            "command": "python3 -u .claude.workflow/hooks/pre-tool-use.py",
             "statusMessage": "pre-tool-use 디스패처 실행 중..."
           }
         ]
@@ -65,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/subagent-stop.py",
+            "command": "python3 -u .claude.workflow/hooks/subagent-stop.py",
             "timeout": 10,
             "statusMessage": "subagent-stop 디스패처 실행 중..."
           }
@@ -77,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u .claude/hooks/post-tool-use.py",
+            "command": "python3 -u .claude.workflow/hooks/post-tool-use.py",
             "timeout": 30,
             "async": true,
             "statusMessage": "post-tool-use 디스패처 실행 중..."

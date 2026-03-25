@@ -1,12 +1,12 @@
 ---
 name: devops-git-config
-description: "Auto-configures git config by reading Git username, email, and SSH key settings from the .claude.env file. Use when initializing a Git environment, configuring git user identity, setting SSH key paths, or batch-applying local Git settings from environment variables."
+description: "Auto-configures git config by reading Git username, email, and SSH key settings from the .claude.workflow/.env file. Use when initializing a Git environment, configuring git user identity, setting SSH key paths, or batch-applying local Git settings from environment variables."
 license: "Apache-2.0"
 ---
 
 # Git Config 스킬
 
-`.claude.env` 파일에서 Git 설정 정보를 읽어 `git config`를 자동으로 설정합니다.
+`.claude.workflow/.env` 파일에서 Git 설정 정보를 읽어 `git config`를 자동으로 설정합니다.
 
 ## 지원 환경변수
 
@@ -21,7 +21,7 @@ license: "Apache-2.0"
 ## .env 파일 형식
 
 ```bash
-# .claude.env (표준 dotenv 형식: KEY=value)
+# .claude.workflow/.env (표준 dotenv 형식: KEY=value)
 CLAUDE_CODE_GIT_USER_NAME=Changhyun Lee
 CLAUDE_CODE_GIT_USER_EMAIL=lwrc01@kusrc.co.kr
 # CLAUDE_CODE_GITHUB_USERNAME=lwrc01_kusrc  # 현재 미사용 - 향후 GitHub API 연동 예정
@@ -48,7 +48,7 @@ CLAUDE_CODE_SSH_KEY_GITHUB=$HOME/.ssh/key-gen/github/git/id_ed25519
 # 경로 설정 (PROJECT_ROOT 기반 절대경로)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ENV_FILE="$PROJECT_ROOT/.claude.env"
+ENV_FILE="$PROJECT_ROOT/.claude.workflow/.env"
 
 # 파일 존재 확인
 if [ ! -f "$ENV_FILE" ]; then
@@ -143,7 +143,7 @@ echo "core.sshCommand: $(git config $SCOPE core.sshCommand 2>/dev/null || echo '
 
 | 오류 | 원인 | 대응 |
 |------|------|------|
-| `.env 파일 미존재` | `.claude.env` 파일 없음 | 에러 메시지 출력 후 중단 |
+| `.env 파일 미존재` | `.claude.workflow/.env` 파일 없음 | 에러 메시지 출력 후 중단 |
 | `CLAUDE_CODE_GIT_USER_NAME 미설정` | 필수 필드 누락 | 에러 메시지 출력 후 중단 |
 | `CLAUDE_CODE_GIT_USER_EMAIL 미설정` | 필수 필드 누락 | 에러 메시지 출력 후 중단 |
 | `SSH 키 파일 미존재` | 경로 오류 | WARNING 출력, SSH 설정 스킵 |
@@ -156,7 +156,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ENV_FILE="$PROJECT_ROOT/.claude.env"
+ENV_FILE="$PROJECT_ROOT/.claude.workflow/.env"
 SCOPE="${1:---global}"
 
 # 1. 파일 존재 확인
@@ -231,7 +231,7 @@ ssh -T git@github.com
 
 ## 공통 유틸리티 (`_env-utils.sh`)
 
-`.claude.env` 파싱 로직은 `_env-utils.sh`에 통합되어 있으며, 다음 3개 스크립트에서 공유합니다:
+`.claude.workflow/.env` 파싱 로직은 `_env-utils.sh`에 통합되어 있으며, 다음 3개 스크립트에서 공유합니다:
 
 - `devops-git-config.sh` - Git config 자동 설정
 - `slack-common.sh` - Slack 공용 함수 라이브러리

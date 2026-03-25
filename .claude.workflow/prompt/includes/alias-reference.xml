@@ -1,0 +1,26 @@
+<alias-reference>
+      flow-kanban 서브커맨드 (이 외의 서브커맨드 사용 금지):
+        create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
+      flow-tmux: launch, cleanup
+      flow-claude: start, end
+      flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env
+      flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
+      flow-step: start, end
+      flow-phase: (registryKey N)
+      flow-skillmap: (registryKey)
+      flow-init: (command title [mode] [T-NNN]) -- command: implement|review|research 또는 체인(implement>review)
+      flow-reload: (workDir) -- 티켓 XML 피드백을 user_prompt.txt에 append
+      flow-skill: archive|activate|list [skill_name] -- 스킬 상태 관리
+      flow-validate: (plan_path) -- plan.md 구조 검증
+      flow-validate-p: (prompt_file_path) -- 티켓 XML 품질 검증 (.claude.workflow/kanban/active/T-NNN.xml)
+      flow-recommend: (task_description) -- TF-IDF 기반 스킬 추천 (상위 3개)
+      flow-gc: [project_root] -- TTL 만료 워크플로우 STALE 전환 (flow-init 시 자동 호출)
+      flow-history: sync [--dry-run] [--all], status, archive [registryKey]
+      flow-catalog: [--dry-run]
+      flow-gitconfig: [--global|--local]
+      flow-detect: [프로젝트루트] [--generate]
+      <alias-enforcement>
+        스크립트 호출 시 반드시 위 alias를 사용한다 (MUST).
+        python3 .claude.workflow/scripts/... 형태의 직접 경로 호출은 금지한다 (MUST NOT).
+      </alias-enforcement>
+    </alias-reference>

@@ -110,7 +110,7 @@ git log -1 --oneline
 
 ## 버전 자동 갱신
 
-커밋 시 `.claude/.version` (SemVer: `MAJOR.MINOR.PATCH`) 파일의 버전 갱신 여부를 판단합니다.
+커밋 시 `.claude.workflow/.version` (SemVer: `MAJOR.MINOR.PATCH`) 파일의 버전 갱신 여부를 판단합니다.
 
 ### 판단 기준
 
@@ -122,11 +122,11 @@ git log -1 --oneline
 ### 절차
 
 1. **Step 1 (변경사항 확인)** 에서 `.claude/` 하위 파일 변경 여부를 확인
-2. `.claude/` 변경이 있으면 `.claude/.version` 의 PATCH를 +1 증가
+2. `.claude/` 변경이 있으면 `.claude.workflow/.version` 의 PATCH를 +1 증가
 3. 증가된 `.version` 파일을 커밋 대상에 포함
 4. **커밋 계획**에 버전 갱신 여부를 표시: `**버전**: 1.0.0 → 1.0.1`
 
-> `.claude/.version` 자체의 변경만 있는 경우(이미 수동 갱신됨)는 추가 증가하지 않습니다.
+> `.claude.workflow/.version` 자체의 변경만 있는 경우(이미 수동 갱신됨)는 추가 증가하지 않습니다.
 
 ## 주의사항
 

@@ -29,7 +29,7 @@
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
 | **registryKey** | 워크플로우 키 | 워크플로우를 전역적으로 식별하는 키. 형식: `YYYYMMDD-HHMMSS`. 디렉터리 스캔으로 workDir를 해석. |
-| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Step 전이를 제어하는 상태 기계. 이중 가드(`.claude/scripts/flow/update_state.py` + `.claude/hooks/pre-tool-use.py`)로 불법 전이를 차단. |
+| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Step 전이를 제어하는 상태 기계. 이중 가드(`.claude.workflow/scripts/flow/update_state.py` + `.claude.workflow/hooks/pre-tool-use.py`)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Step에서 다른 Step으로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)이 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. PLAN->WORK->REPORT->DONE 단일 모드. |
@@ -195,7 +195,7 @@ flowchart TD
 | status | `<registryKey> <toStep>` | status.json step 변경 (fromStep은 status.json에서 자동 읽기) |
 | both | `<registryKey> <agent> <toStep>` | context + status 동시 (권장) |
 | link-session | `<registryKey> <sessionId>` | linked_sessions에 세션 추가 |
-| env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.env 환경변수 설정/해제 |
+| env | `<registryKey> set\|unset <KEY> [VALUE]` | .claude.workflow/.env 환경변수 설정/해제 |
 | usage-pending | `<registryKey> <id1> [id2] ...` | 워커 호출 전 사용량 추적 대기 등록. 복수 ID 지원. agent_id=task_id 자동 매핑. |
 | usage | `<registryKey> <agent_name> <input_tokens> <output_tokens> [cache_creation] [cache_read] [task_id]` | 워커 완료 후 실제 토큰 사용량 기록. agent_name(planner/worker/reporter), 입출력 토큰, 선택적 캐시 정보, 워커 태스크ID(task_id)를 기록. |
 | usage-finalize | `<registryKey>` | 모든 usage 기록을 취합하여 사용량 집계 완료. workflow 마무리 시 호출. |
@@ -235,7 +235,7 @@ flowchart TD
 |-------------|----------|
 | `PLAN -> WORK -> REPORT -> DONE` | PLAN/WORK/REPORT->CANCELLED, PLAN/WORK/REPORT->FAILED, INIT/NONE->{STALE,FAILED,CANCELLED}, TTL->STALE |
 
-불법 전이 시 시스템 가드가 차단. `.claude/scripts/flow/update_state.py`는 전이 미수행(no-op), `.claude/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
+불법 전이 시 시스템 가드가 차단. `.claude.workflow/scripts/flow/update_state.py`는 전이 미수행(no-op), `.claude.workflow/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
 

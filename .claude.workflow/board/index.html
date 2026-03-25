@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Workflow</title>
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/kanban.css">
+<link rel="stylesheet" href="css/viewer.css">
+<link rel="stylesheet" href="css/workflow.css">
+<link rel="stylesheet" href="css/settings.css">
+<link id="hljs-theme-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<link id="hljs-theme-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" media="(prefers-color-scheme: light)">
+</head>
+<body data-server-no-reload style="opacity:0;transition:opacity .15s">
+
+<header class="header">
+  <div class="header-title"><span class="accent">Claude Code</span> Workflow</div>
+  <nav class="tabs">
+    <button class="tab" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="kanban">Kanban</button>
+    <button class="tab" data-view="workflow">Workflow</button>
+    <button class="tab" data-view="viewer">Viewer</button>
+  </nav>
+  <button class="header-btn restart-btn" id="restart-btn" title="Restart Server">&#8635;</button>
+  <button class="header-btn settings-toggle" id="settings-toggle" title="Settings">&#9881;</button>
+</header>
+
+<div class="settings-overlay" id="settings-overlay"></div>
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-header">
+    <h2>Settings</h2>
+    <button class="settings-close" id="settings-close">&times;</button>
+  </div>
+  <div class="settings-body" id="settings-body"></div>
+</div>
+
+<main class="main" id="main">
+  <div class="view" id="view-kanban"></div>
+  <div class="view" id="view-dashboard"></div>
+  <div class="view" id="view-workflow"></div>
+  <div class="view" id="view-viewer"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" async></script>
+<script async src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
+<script async src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';langs.forEach(function(lang){var s=document.createElement('script');s.src=base+lang+'.min.js';s.async=true;s.onload=function(){if(typeof hljs!=='undefined')hljs.configure({ignoreUnescapedHTML:true});};document.head.appendChild(s);});})()"></script>
+<script src="js/common.js"></script>
+<script src="js/kanban.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/workflow.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/sse.js"></script>
+</body>
+</html>

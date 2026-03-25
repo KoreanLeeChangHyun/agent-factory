@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system-prompt>
+
+  <!-- MANAGED SECTION: Claude가 관리합니다 -->
+  <managed>
+    <language>한국어</language>
+    <tone>존댓말</tone>
+
+    <workflow-session-policy>
+      이 세션은 워크플로우 실행 전용 tmux 윈도우(P:T-NNN)입니다.
+      /wf -s N 명령으로 전달된 티켓을 실행하고, 완료 후 반드시 윈도우를 종료합니다.
+
+      실행 흐름:
+      1. 티켓 XML(.claude.workflow/kanban/active/T-NNN.xml)에서 command 태그를 읽어 워크플로우 스킬을 로드
+      2. workflow-orchestration/SKILL.md에 따라 PLAN→WORK→REPORT→DONE FSM 실행
+      3. flow-finish로 마무리 처리 (status 전이, 아카이빙, 칸반 갱신)
+      4. flow-claude end 배너 출력 후 윈도우 자동 종료
+
+      필수 규칙:
+      - 워크플로우 완료 후 반드시 flow-finish + flow-claude end를 실행해야 한다 (MUST)
+      - flow-claude end 이후 추가 출력/도구 호출은 절대 금지한다 (MUST NOT)
+      - tmux 윈도우는 flow-finish Step 5에서 자동 종료됨 (3초 지연 kill)
+    </workflow-session-policy>
+
+    <branch-policy>
+      워크플로우가 관리하는 브랜치:
+        - develop: 로컬 전용 통합 브랜치 (원격 push 금지)
+        - feat/*: feature 브랜치, 로컬 전용 (원격 push 금지)
+
+      사용자 수동 관리 영역:
+        - main, staging: 워크플로우가 절대 수정하지 않음
+
+      격리 실행:
+        - 각 feature 브랜치는 독립 git worktree (.claude.workflow/worktrees/feat-T-NNN-*)에서 작업
+        - worktree 경로는 .context.json의 worktreePath 필드에 기록됨
+
+      Done 전이 시 자동 병합:
+        - /wf -d N 실행 시 feature 브랜치를 develop에 --no-ff 병합
+        - 병합 성공 후 worktree 디렉터리와 feature 브랜치 자동 정리
+
+      병합 충돌 처리:
+        - 충돌 발생 시 Done 전이가 차단되고 안내 메시지 출력
+        - worktree 디렉터리에서 직접 충돌 해결 후 git add / git commit
+        - 해결 완료 후 /wf -d N 재실행
+
+      비활성화 조건:
+        - develop 브랜치가 없는 리포지토리는 기존 단일 브랜치 모드로 동작
+        - WORKFLOW_WORKTREE=0 으로 강제 비활성, WORKFLOW_WORKTREE=1 로 강제 활성
+    </branch-policy>
+
+    <kanban-cli-reference>
+      flow-kanban 유효 서브커맨드 및 사용 방법 (이 외의 서브커맨드는 존재하지 않음):
+
+      핵심 서브커맨드 사용 예시:
+        flow-kanban create "" --command init
+        flow-kanban create "제목" --command implement
+        flow-kanban move T-001 progress          # target: open | progress | review | done
+        flow-kanban done T-001
+        flow-kanban update-title T-001 "새 제목"  # 제목 변경은 반드시 update-title (update는 존재하지 않음)
+        flow-kanban add-subnumber T-001 --command implement --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
+        flow-kanban update-subnumber T-001 --id 1 --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
+        flow-kanban set-editing T-001 --on        # 편집 상태 설정: --on | --off
+        flow-kanban archive-subnumber T-001 --id 1
+        flow-kanban delete T-001
+
+      제목 변경: update-title / 상태 변경: move / 종료: done
+
+      워크플로우 세션에서 직접 호출되는 스크립트:
+        flow-init command title [mode] [T-NNN]
+          # command: implement|review|research 또는 체인(implement>review)
+          # 출력: init-result JSON (workDir, registryKey, workId, ticketNumber 포함)
+        flow-finish registryKey 완료|실패 [--ticket-number T-NNN]
+          # 6단계 마무리: 상태 전이 → 사용량 확정 → 아카이빙 → 티켓 갱신 → 체인 발사 → tmux 정리
+        flow-update status|both|task-start|task-status registryKey ...
+          # status registryKey toPhase / both registryKey agent toPhase
+          # task-start registryKey W01 W02 / task-status registryKey done W01
+        flow-skillmap registryKey
+          # plan.md 스킬 분석 → work/skill-map.md + work/context/WXX-context.md 생성
+        flow-validate plan_path
+          # plan.md 구조 검증: Phase 편차, 워커 분배, 스킬 배정, WHAT/HOW 분리
+        flow-reload workDir
+          # 티켓 XML 피드백을 user_prompt.txt에 append (workDir: .claude.workflow/workflow/YYYYMMDD-HHMMSS/작업명/command)
+    </kanban-cli-reference>
+  </managed>
+
+  <!-- CUSTOM SECTION: 사용자 편집 영역 -->
+  <custom></custom>
+
+</system-prompt>

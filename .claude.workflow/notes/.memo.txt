@@ -1,0 +1,162 @@
+curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init-claude-workflow.sh | bash
+
+
+11) 워크트리 격리 후 dev 브랜치 PR 병합 (
+12) 자연어 인터페이스 (
+13) 한국어 스킬 관리. 심층 분석 결과 — 미구현: 워크트리(코드 0줄), dev 브랜치 병합, my-* 프로젝트 스킬(0개), 스킬 활성화/아카이브 메커니즘, 필수/선택 스킬 분류, 프로젝트 초기화 파이프라인, 한국어 스킬. 개선 필요: update_state.py(55K), kanban.py(1250줄), wf-edit.md(15KB), 잠금 코드 중복, system-prompt.xml 경량화.
+
+상세 로그 남기기.
+
+기존 명령어를 통합하는 새로운 명령어를 생성 하려고 한다.
+wf = workflow 
+
+OPEN -> PROGRESS -> REVIEW -> DONE
+
+wf -o     : 새 티켓 후 Prompt 작성    티켓은 OPEN
+wf -p N   : 티켓 Prompt 작성          티켓은 OPEN
+wf -s N   : 티켓 워크플로우 제출      티켓은 PROGRESS (진행 중) -> REVIEW (진행 완료) 
+wf -d N   : 티켓 종료                 티켓은 DONE
+wf -c N   : 티켓 삭제                 티켓 삭제 보드 에서도 삭제
+
+
+wf -p N   : 티켓 Progress 로 수동 전환 (기본은 워크플로우가 자동 결정)
+wf -r N   : 티켓 Review 로 수동 전환 (기본은 워크플로우가 자동 결정)
+
+
+/home/deus/workspace/claude/.claude/scripts/flow/kanban.py
+
+접근 대신 즉시 전면 제거 여부 결정
+
+● Write(.kanban/open-T-010.txt)                                                                                                                                                                
+  ⎿  Error writing file
+
+명령어:
+prompt -p       : 티켓 생성
+prompt -p #n    : 티켓 OPEN 으로 변경
+cc:<명령어> #N    : 티켓 진행
+prompt -d #N    : 티켓 종료 
+
+티켓 번호:
+open-T-NNN      : 오픈
+progress-T-NNN  : 진행중
+review-T-NNN    : 리뷰 (완료되면 자동으로 리뷰로 이동)
+done-T-NNN      : 완료
+
+a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z
+
+백그라운드 제출
+
+planner -n 옵션 필요성 (어차피 prompt 에서 LLM하고 요구사항 상세를 정의해서 제출 하는데 plan.md 에서 한번더 검토할 필요가 있는지 조사)
+가능하면 프롬프트 작성을 강화하고 planner의 plan.md 작성은 사용자 승인 없이 진행 했으면함.
+
+● Bash(python3 .claude/scripts/flow/kanban.py create "리팩토링" --command implement)                                                                                                                                         
+  ⎿  T-007: 리팩토링 (implement)                             
+                                                                                                                                                                                                                             
+● Write(.kanban/open-T-007.txt)                              
+  ⎿  Error writing file                 
+
+에러 있음.
+
+● Bash(flow-reload 20260309-102610)
+  ⎿  Error: Exit code 1                              
+     [ERROR] workDir not found: 20260309-102610
+                                                                                                                                                                                                      
+● Write(.workflow/20260309-102610/prompt-d-티켓종료/implement/user_prompt.txt)
+  ⎿  Added 6 lines, removed 40 lines                                                                                                                                                                  
+       1 ----                                                                                                                                                                                         
+       2 -id: T-001                                                                                                                                                                                   
+       3 -title: "step-plan.md autoApprove 버그 수정"                                                                                                                                                 
+       4 -status: open                                                                                                                                                                         
+       5 -command: implement                                                                                                                                                                          
+       6 -created: 2026-03-09                                                                                                                                                                  
+       7 ----                                                                                                                                                                                  
+       8 -                                                                                                                                                                                     
+       1  <command>implement</command>
+      10 -<goal>autoApprove=true(기본값)인데도 AskUserQuestion 승인 질문이 나오는 버그 수정 — step-plan.md의 지시문 구조를 개선하여 LLM 오케스트레이터가 autoApprove 스킵 로직을 확실히 따르도 
+         -록 함</goal>                                                                                                                                                                         
+      11 -<target>                                                                                                                                                                             
+      12 -- .claude/skills/workflow-orchestration/step-plan.md (주 수정 대상: 2b-0, 2b-3, 2b-4 섹션)                                                                                           
+      13 -- .claude/skills/workflow-orchestration/SKILL.md (보조: PLAN 디스패치 섹션 강화)                                                                                                     
+      14 -</target>                                                                                                                                                                            
+      15 -<constraints>                                                                                                                                                                        
+      16 -- plan_validator.py 코드 자체는 수정하지 않음 (정상 동작)                                                                                                                            
+      17 -- 기존 -n 역방향 플래그 설계 방향 유지                                                                                                                                               
+      18 -- validator 경고 시 autoApprove=false 오버라이드 로직 유지                                                                                                                           
+      19 -- AskUserQuestion 3옵션(승인/수정 요청/중지) 구조 유지                                                                                                                               
+      20 -</constraints>                                                                                                                                                                       
+      21 -<criteria>                                                                                                                                                                           
+      22 -- -n 없이 /cc:implement 실행 시 AskUserQuestion이 호출되지 않고 자동으로 WORK 단계로 진행                                                                                            
+      23 -- -n 지정 시 기존처럼 AskUserQuestion 3옵션 정상 표시                                                                                                                                
+      24 -- validator 경고 발생 시 autoApprove 오버라이드되어 AskUserQuestion 표시                                                                                                             
+      25 -</criteria>                                                                                                                                                                          
+      26 -<context>                                                                                                                                                                            
+      27 -- 버그 증상: -n 없이 실행해도 승인 질문(AskUserQuestion)이 나옴                                                                                                                      
+      28 -- 근본 원인: step-plan.md의 지시문 구조 문제 (프롬프트 엔지니어링 이슈)                                                                                                              
+      29 -  - 2b-0 autoApprove 스킵 지시: blockquote 보조 설명 수준 (line 193, 249)                                                                                                            
+      30 -  - 2b-3 AskUserQuestion: 전체 코드 블록으로 매우 상세하게 기술 (lines 207-236)                                                                                                      
+      31 -  - LLM이 상세한 코드 블록에 "끌려가서" 스킵 지시를 무시하는 경향                                                                                                                    
+      32 -- 탐색 파일: step-plan.md (전체), step-init.md (파싱 정상), SKILL.md (디스패치 설명), plan_validator.py (코드 정상)                                                                  
+      33 -- 핵심 패턴: 2b-0에서 autoApprove 체크 → true면 2b-3 스킵 → 2b-4 "승인" 분기로 자동 진행                                                                                             
+      34 -- 관련 섹션: step-plan.md 2b-0 (115-137줄), 2b-3 (191-245줄), 2b-4 (247-308줄)                                                                                                       
+      35 -</context>                                                                                                                                                                           
+      36 -<approach>                                                                                                                                                                           
+      37 -1. 2b-0 Auto-Approve Check를 게이트/배리어 패턴으로 재작성 — blockquote가 아닌 주요 지시문으로 승격                                                                                  
+      38 -2. 2b-3, 2b-4 섹션 진입부에 autoApprove=true면 MUST SKIP 강조 (CRITICAL 레벨)                                                                                                        
+      39 -3. SKILL.md PLAN 디스패치 섹션에서 autoApprove 분기를 더 명확하게 기술                                                                                                               
+      40 -4. autoApprove=true 경로와 false 경로를 물리적으로 분리하여 LLM이 혼동할 여지 제거                                                                                                   
+      41 -</approach>                                                                                                                                                                          
+       2 +<goal>cc:prompt 명령어에 -d #N 플래그를 추가하여 티켓을 수동으로 Done 상태로 종료할 수 있도록 구현</goal>                                                                            
+       3 +<target>cc/prompt.md의 Step 0 모드 선택 및 라우팅 규칙, board.md 상태 전이 로직</target>                                                                                             
+       4 +<constraints>기존 -p, -q, #N 플래그 동작에 영향을 주지 않아야 함. board.md의 기존 형식(Open/In Progress/Done 3컬럼, 체크박스 형식) 유지</constraints>                                
+       5 +<criteria>1. `/cc:prompt -d #3` 실행 시 T-003 티켓이 board.md에서 Done 컬럼으로 이동되고 체크박스가 [x]로 변경됨 2. Open 또는 In Progress 어느 컬럼에 있든 Done으로 이동 가능 3. 존재
+         +하지 않는 티켓 번호 지정 시 에러 메시지 출력 4. 티켓 파일(T-NNN.txt) 자체는 삭제하지 않고 보존</criteria>                                                                            
+       6 +<approach>Step 0 옵션 테이블에 `-d` 플래그 추가, 라우팅 규칙에 `-d` 분기 추가, 새로운 Step D(티켓 종료) 섹션 신설. board.md 파싱 후 해당 티켓 항목을 Done 컬럼으로 이동하는 로직을 cc
+         +:prompt.md 내에 기술</approach>                                                                                                                                                      
+       7 +<scope>cc/prompt.md 수정만 대상. Python 스크립트(finalization.py 등) 변경 제외</scope>                                                                                               
+
+● Bash(flow-update both 20260309-102610 planner PLAN)
+  ⎿  ║ STATE: 단계 변경
+     ║ >> NONE -> PLAN                      
+
+
+
+
+해당 부분 갱신 해보셈
+
+워커-<모델> + <에이전트 스킬(필수)> + 전문화 스킬(필수) + 프로젝트 스킬(반필수)
+프로젝트 스킬이 없으면, 어쩔수 없이 선택못함. 
+
+이러면, 워커 에이전트 = 내 프로젝트을 잘 이해하는 전문가 가 될 수 있음.
+다만, 익스플로어, 인덱서, 벨리데이터 전문가는 별도로 존재 고려.
+
+● Bash(validator_output=$(flow-validate .workflow/20260304-044255/Explorer-3종-확장-유용성-조/research/plan.md 2>&1) || validator_output="")                                               
+  ⎿  (No output)                                              
+                                                                                                                                                                                           
+● Bash(echo "$validator_output")                                                                                                                                                           
+  ⎿  (No output)
+
+.workflow/20260304-044255/Explorer-3종-확장-유용성-조/research/report.md
+
+
+
+
+● User answered Claude's questions:                                                                                                                                           
+  ⎿  · 계획서를 검토해 주세요. 진행 방식을 선택해 주세요.
+     ⚠️  Phase 1 워커 간 작업 편차 3 (기준: 2 이내): W01=6개 vs W02=3개 → 수정 요청                                                                                            
+                                                                 
+● Bash(flow-reload 20260304-050708)                                                                                                                                           
+  ⎿  Error: Exit code 1                                                                                                                                                     
+     [ERROR] workDir not found: 20260304-050708                                                                                                                               
+                                                                                                                                                                              
+     [ERROR] workDir not found: 20260304-050708
+
+● Bash(flow-update task-status 20260304-045640 W01 completed && flow-update task-status 20260304-045640 W02 completed)                                                        
+  ⎿  (No output)
+
+
+  ● Bash(skill_mapper_output=$(flow-skillmap 20260323-144306 2>&1); skill_mapper_exit=$?; echo
+      "EXIT: $skill_mapper_exit"; echo "$skill_mapper_output")
+  ⎿  EXIT: 2
+     스킬 매핑 검증 실패:
+       - W01: 존재하지 않는 스킬명 ['workflow-system'] (skill-catalog.md 미등록)
+       - W02: 존재하지 않는 스킬명 ['workflow-system'] (skill-catalog.md 미등록)
