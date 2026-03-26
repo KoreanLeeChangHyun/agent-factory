@@ -22,7 +22,7 @@ from datetime import timezone, timedelta
 
 
 # =============================================================================
-# .env 파일 로더 — 모든 설정값의 단일 소스
+# .settings/.env 파일 로더 — 모든 설정값의 단일 소스
 # =============================================================================
 def _find_project_root() -> str:
     """scripts/data/constants.py 기준으로 프로젝트 루트를 탐색한다."""
@@ -31,7 +31,9 @@ def _find_project_root() -> str:
 
 
 def _load_dotenv() -> dict[str, str]:
-    """.claude.workflow/.env 파일을 파싱하여 key=value dict로 반환한다.
+    """.claude.workflow/.settings(.env 폴백) 파일을 파싱하여 key=value dict로 반환한다.
+
+    .settings를 우선 탐색하고, 없으면 .env로 폴백합니다.
 
     파싱 규칙:
         - '#'으로 시작하는 행은 주석으로 무시한다.
@@ -44,13 +46,15 @@ def _load_dotenv() -> dict[str, str]:
 
     우선순위 (상위가 높음):
         1. os.environ (런타임 환경변수)
-        2. .env 파일 (이 함수가 파싱)
+        2. .settings 파일 (이 함수가 파싱, .env 폴백)
         3. 각 _env()/_env_int()/_env_float() 호출 시 전달하는 default 값
 
     Returns:
         dict[str, str]: KEY -> VALUE 매핑 딕셔너리
     """
-    env_file = os.path.join(_find_project_root(), '.claude.workflow', '.env')
+    cw_dir = os.path.join(_find_project_root(), '.claude.workflow')
+    settings_path = os.path.join(cw_dir, '.settings')
+    env_file = settings_path if os.path.exists(settings_path) else os.path.join(cw_dir, '.env')
     result: dict[str, str] = {}
     if not os.path.exists(env_file):
         return result

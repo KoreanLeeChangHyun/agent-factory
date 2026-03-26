@@ -1,7 +1,11 @@
 #!/usr/bin/env -S python3 -u
 """Git Config 자동 설정 스크립트.
 
-.claude.env에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
+프로젝트 루트의 .claude.env에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
+
+주의: 이 파일에서 참조하는 _ENV_FILE은 프로젝트 루트의 `.claude.env`입니다.
+      워크플로우 설정 파일인 `.claude.workflow/.settings` (또는 `.claude.workflow/.env`)와는
+      별개의 파일이므로 혼동하지 않도록 주의하세요.
 
 주요 함수:
     main: Git 설정 적용 진입점
@@ -10,7 +14,7 @@
   --global  전역 설정 (~/.gitconfig) [기본값]
   --local   로컬 설정 (.git/config)
 
-환경변수 (.claude.env에서 로드):
+환경변수 (프로젝트 루트 .claude.env에서 로드):
   CLAUDE_CODE_GIT_USER_NAME    - Git user.name (필수)
   CLAUDE_CODE_GIT_USER_EMAIL   - Git user.email (필수)
   CLAUDE_CODE_GITHUB_USERNAME  - GitHub 사용자명 (선택)
@@ -31,6 +35,8 @@ if _SCRIPTS_DIR not in sys.path:
 from common import read_env
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+# 프로젝트 루트의 .claude.env — Git 사용자 정보 전용 설정 파일
+# 워크플로우 설정(.claude.workflow/.settings 또는 .claude.workflow/.env)과는 별개의 파일임
 _ENV_FILE = os.path.join(_PROJECT_ROOT, ".claude.env")
 
 
@@ -56,7 +62,7 @@ def _git_config_get(scope: str, key: str) -> str:
 def main() -> None:
     """Git config 자동 설정의 진입점.
 
-    .claude.env에서 환경변수를 읽어 git user.name, user.email,
+    프로젝트 루트의 .claude.env에서 환경변수를 읽어 git user.name, user.email,
     core.sshCommand를 지정된 범위(global/local)에 적용한다.
     변경 전후 상태를 비교하여 출력한다.
 
@@ -77,7 +83,7 @@ def main() -> None:
 
     scope_label = "global" if scope == "--global" else "local"
 
-    # --- .claude.env 파일 확인 ---
+    # --- 프로젝트 루트 .claude.env 파일 확인 ---
     if not os.path.isfile(_ENV_FILE):
         print(f"[ERROR] .claude.env 파일이 존재하지 않습니다: {_ENV_FILE}", file=sys.stderr)
         sys.exit(1)
@@ -91,11 +97,11 @@ def main() -> None:
 
     # --- 필수 환경변수 검증 ---
     if not git_user_name:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_NAME이 .claude.env에 설정되지 않았습니다.", file=sys.stderr)
+        print("[ERROR] CLAUDE_CODE_GIT_USER_NAME이 프로젝트 루트 .claude.env에 설정되지 않았습니다.", file=sys.stderr)
         sys.exit(1)
 
     if not git_user_email:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_EMAIL이 .claude.env에 설정되지 않았습니다.", file=sys.stderr)
+        print("[ERROR] CLAUDE_CODE_GIT_USER_EMAIL이 프로젝트 루트 .claude.env에 설정되지 않았습니다.", file=sys.stderr)
         sys.exit(1)
 
     # --- Before 상태 수집 ---

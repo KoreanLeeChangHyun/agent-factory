@@ -1,5 +1,6 @@
 
 # Workflow runtime (secrets, data, temp)
+.claude.workflow/.settings
 .claude.workflow/.env
 .claude.workflow/.env*
 .claude.workflow/workflow/
