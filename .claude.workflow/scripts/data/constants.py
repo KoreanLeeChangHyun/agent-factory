@@ -324,6 +324,7 @@ DANGER_PATTERNS = [
     {"pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx", "blocked": "chmod ugo+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
     {"pattern": "(sudo\\s+)?mkfs", "blocked": "mkfs (디스크 포맷)", "alternative": "디스크 포맷은 매우 위험합니다. 대상 디바이스를 재확인하세요."},
     {"pattern": "(sudo\\s+)?dd\\s+if=", "blocked": "dd if= (디스크 덮어쓰기)", "alternative": "dd 명령어는 되돌릴 수 없습니다. 대상 디바이스를 재확인하세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+.*\\.claude\\.workflow/kanban", "blocked": "rm -rf .claude.workflow/kanban (칸반 디렉터리 삭제)", "alternative": "칸반 디렉터리는 워크플로우 핵심 데이터입니다. 삭제하지 마세요."},
 ]
 
 # =============================================================================

@@ -17,11 +17,13 @@ from typing import Any, NoReturn
 # ─── 경로 상수 ───────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+from common import resolve_project_root
+
+_PROJECT_ROOT: str = resolve_project_root()
 KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".claude.workflow", "kanban")
 KANBAN_ACTIVE_DIR: str = os.path.join(KANBAN_DIR, "active")
 

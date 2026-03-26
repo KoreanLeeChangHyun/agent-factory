@@ -30,7 +30,7 @@ alias flow-validate-p='python3 .claude.workflow/scripts/flow/prompt_validator.py
 alias flow-recommend='python3 .claude.workflow/scripts/flow/skill_recommender.py'
 alias flow-gc='python3 .claude.workflow/scripts/flow/garbage_collect.py'
 alias flow-kanban='python3 .claude.workflow/scripts/flow/kanban.py'
-alias flow-merge='python3 .claude.workflow/scripts/flow/merge_pipeline.py'
+alias flow-merge='python3 "$(git -C . rev-parse --show-toplevel 2>/dev/null || pwd)/.claude.workflow/scripts/flow/merge_pipeline.py"'
 alias flow-tmux='python3 .claude.workflow/scripts/flow/tmux_launcher.py'
 
 # flow-* sync alias

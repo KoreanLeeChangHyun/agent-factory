@@ -33,6 +33,9 @@ import sys
 
 # ─── sys.path 보장 ────────────────────────────────────────────────────────────
 
+# symlink/상대경로 해석 보정 (worktree 환경 대응)
+__file__ = os.path.realpath(__file__)
+
 _scripts_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 )

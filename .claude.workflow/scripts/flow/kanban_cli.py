@@ -44,8 +44,10 @@ from data.constants import QUALITY_THRESHOLD
 
 # ─── 경로 상수 ───────────────────────────────────────────────────────────────
 
+from common import resolve_project_root
+
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+_PROJECT_ROOT: str = resolve_project_root()
 
 
 # ─── tmux 헬퍼 ───────────────────────────────────────────────────────────────

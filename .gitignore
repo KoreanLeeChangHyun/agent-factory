@@ -3,7 +3,9 @@
 .claude.workflow/.env
 .claude.workflow/.env*
 .claude.workflow/workflow/
-.claude.workflow/kanban/
+.claude.workflow/kanban/**/*.xml
+.claude.workflow/kanban/.memo.txt
+.claude.workflow/kanban/.todo.txt
 .claude.workflow/worktrees/
 .claude.workflow/dashboard/
 
