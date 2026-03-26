@@ -14,7 +14,7 @@ common.py - 프로젝트 공통 유틸리티.
     resolve_active_workflow: 현재 활성 워크플로우 컨텍스트 반환
     resolve_work_dir: 단축 키로 workDir 경로 조회
     resolve_abs_work_dir: workDir 절대 경로 변환
-    read_env: .claude.workflow/.env 환경변수 읽기
+    read_env: .claude.workflow/.settings(.env 폴백) 환경변수 읽기
 """
 from __future__ import annotations
 
@@ -67,8 +67,10 @@ def _detect_worktree_main_root(base: str) -> str:
     Returns:
         메인 프로젝트 루트 절대 경로. git 실패 또는 워크트리 아니면 base 반환.
     """
-    # .claude.workflow/.env가 있으면 이미 메인 리포 루트 — git 호출 불필요
-    if os.path.exists(os.path.join(base, ".claude.workflow", ".env")):
+    # .claude.workflow/.settings 또는 .env가 있으면 이미 메인 리포 루트 — git 호출 불필요
+    cw_dir = os.path.join(base, ".claude.workflow")
+    if os.path.exists(os.path.join(cw_dir, ".settings")) or \
+       os.path.exists(os.path.join(cw_dir, ".env")):
         return base
 
     try:
@@ -472,12 +474,13 @@ def _resolve_env_file(env_file: str | None = None) -> str:
     """env_file 경로를 해석.
 
     None이면 환경변수 또는 프로젝트 루트에서 추론합니다.
+    .settings를 우선 탐색하고, 없으면 .env로 폴백합니다.
 
     Args:
-        env_file: .claude.workflow/.env 파일 경로. None이면 자동 해석.
+        env_file: .claude.workflow/.settings 또는 .env 파일 경로. None이면 자동 해석.
 
     Returns:
-        해석된 env_file 절대 경로 문자열.
+        해석된 env_file 절대 경로 문자열. .settings 우선, .env 폴백.
     """
     if env_file:
         return env_file
@@ -485,11 +488,15 @@ def _resolve_env_file(env_file: str | None = None) -> str:
         return _DEFAULT_ENV_FILE
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.normpath(os.path.join(scripts_dir, "..", ".."))
-    return os.path.join(project_root, ".claude.workflow", ".env")
+    cw_dir = os.path.join(project_root, ".claude.workflow")
+    settings_path = os.path.join(cw_dir, ".settings")
+    if os.path.isfile(settings_path):
+        return settings_path
+    return os.path.join(cw_dir, ".env")
 
 
 def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
-    """.claude.workflow/.env에서 환경변수 읽기.
+    """.claude.workflow/.settings(.env 폴백)에서 환경변수 읽기.
 
     중복 키 방어(첫 번째 매칭), 따옴표 제거, $HOME/~ 확장 포함.
 

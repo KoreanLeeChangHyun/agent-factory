@@ -254,13 +254,24 @@ setup_settings_json() {
     fi
 }
 
-# --- Step 5: .claude.workflow/.env 템플릿 생성 ---
-generate_claude_env() {
-    print_step "5" ".claude.workflow/.env 템플릿 생성"
+# --- Step 5: .claude.workflow/.settings 템플릿 생성 ---
+generate_claude_settings() {
+    print_step "5" ".claude.workflow/.settings 템플릿 생성"
+    local settings_file=".claude.workflow/.settings"
     local env_file=".claude.workflow/.env"
-    [ -f "$env_file" ] && { print_info ".claude.workflow/.env 파일이 이미 존재합니다. 기존 내용을 유지합니다."; return 0; }
-    cp "$TMPL_CLAUDE_ENV" "$env_file"
-    print_success ".claude.workflow/.env 템플릿 생성 완료 ($env_file)"
+    # .settings가 이미 존재하면 스킵
+    if [ -f "$settings_file" ]; then
+        print_info ".claude.workflow/.settings 파일이 이미 존재합니다. 기존 내용을 유지합니다."; return 0
+    fi
+    # .settings가 없고 .env가 있으면 .env를 복사하여 .settings 생성
+    if [ -f "$env_file" ]; then
+        cp "$env_file" "$settings_file"
+        print_success ".claude.workflow/.settings 생성 완료 (.env에서 복사) ($settings_file)"
+        return 0
+    fi
+    # 둘 다 없으면 템플릿에서 생성
+    cp "$TMPL_CLAUDE_ENV" "$settings_file"
+    print_success ".claude.workflow/.settings 템플릿 생성 완료 ($settings_file)"
 }
 
 # --- Step 6: 레거시 .prompt/ 마이그레이션 ---
@@ -372,9 +383,15 @@ verify_installation() {
         fi
     done
     [ "$kanban_ok" = true ] && print_success ".claude.workflow/kanban/, .claude.workflow/kanban/done/ 디렉터리 존재 확인"
-    # (e) .claude.workflow/.env 파일 존재
-    if [ -f ".claude.workflow/.env" ]; then print_success ".claude.workflow/.env 파일 존재 확인"
-    else print_error ".claude.workflow/.env 파일이 없습니다"; failed=$((failed + 1)); fi
+    # (e) .claude.workflow/.settings 또는 .claude.workflow/.env 파일 존재
+    if [ -f ".claude.workflow/.settings" ]; then
+        print_success ".claude.workflow/.settings 파일 존재 확인"
+    elif [ -f ".claude.workflow/.env" ]; then
+        print_success ".claude.workflow/.env 파일 존재 확인 (폴백)"
+    else
+        print_error ".claude.workflow/.settings 및 .claude.workflow/.env 파일이 모두 없습니다"
+        failed=$((failed + 1))
+    fi
     # (f) .claude/ 디렉터리 존재
     if [ -d ".claude" ]; then print_success ".claude/ 디렉터리 존재 확인"
     else print_error ".claude/ 디렉터리가 없습니다"; failed=$((failed + 1)); fi
@@ -427,7 +444,7 @@ main() {
     clone_claude_directory
     create_directories_and_files
     setup_settings_json
-    generate_claude_env
+    generate_claude_settings
     migrate_legacy_prompt
     setup_shell_aliases
     update_gitignore
