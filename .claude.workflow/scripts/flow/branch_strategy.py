@@ -215,8 +215,9 @@ def delete_feature_branch(
 ) -> bool:
     """로컬 feature 브랜치를 삭제한다.
 
-    강제 삭제(-D)를 사용하며, 삭제 실패 시 경고만 출력하고
+    안전 삭제(-d, 미병합 시 보존)를 사용하며, 삭제 실패 시 경고만 출력하고
     False를 반환한다 (프로세스 종료하지 않음).
+    미병합 커밋이 있는 경우 브랜치를 삭제하지 않고 보존한다.
 
     Args:
         branch_name: 삭제할 브랜치명 (예: 'feat/T-001-제목').
@@ -225,9 +226,12 @@ def delete_feature_branch(
     Returns:
         삭제 성공 시 True, 실패 시 False.
     """
-    result = _git("branch", "-D", branch_name, repo_path=repo_path)
+    result = _git("branch", "-d", branch_name, repo_path=repo_path)
     if result.returncode != 0:
-        _warn(f"브랜치 삭제 실패 ({branch_name}): {result.stderr.strip()}")
+        _warn(
+            f"브랜치 삭제 실패 ({branch_name}): {result.stderr.strip()} "
+            f"— 미병합 커밋이 있어 브랜치를 보존합니다."
+        )
         return False
     return True
 

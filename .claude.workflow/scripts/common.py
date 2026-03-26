@@ -533,15 +533,19 @@ def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
 # =============================================================================
 
 
-def acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 포함.
+def acquire_lock(lock_dir: str, max_wait: int = 2, stale_timeout: int = 300) -> bool:
+    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 및 orphan lock 회수 포함.
 
     디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
-    프로세스가 종료되었거나 max_wait 초 초과 시 stale lock을 제거하고 재시도한다.
+    프로세스가 종료되었거나 stale_timeout 초 초과 시 stale lock을 제거하고 재시도한다.
+    pid 파일이 없는 orphan lock은 즉시 회수하여 영구 교착을 방지한다.
 
     Args:
         lock_dir: 잠금 디렉터리 경로.
         max_wait: 최대 대기 초. 기본값 2.
+        stale_timeout: stale lock 판정 임계값(초). 잠금 생성 후 이 시간을 초과하면
+            stale lock으로 간주하여 회수한다. 기본값 300(5분). max_wait와 독립적으로
+            동작하므로 장시간 merge도 정상 잠금으로 유지된다.
 
     Returns:
         잠금 획득 성공 여부.
@@ -558,6 +562,13 @@ def acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
             return True
         except OSError:
             pid_file = os.path.join(lock_dir, "pid")
+            if not os.path.isfile(pid_file):
+                # pid 파일 없는 orphan lock: 즉시 회수 후 재시도
+                try:
+                    shutil.rmtree(lock_dir)
+                except OSError:
+                    pass
+                continue
             if os.path.isfile(pid_file):
                 try:
                     with open(pid_file, "r") as f:
@@ -566,7 +577,7 @@ def acquire_lock(lock_dir: str, max_wait: int = 2) -> bool:
                     lock_pid = int(parts[0])
                     lock_ts = float(parts[1]) if len(parts) > 1 else 0
                     os.kill(lock_pid, 0)
-                    if lock_ts and (time.time() - lock_ts) > max_wait:
+                    if lock_ts and (time.time() - lock_ts) > stale_timeout:
                         try:
                             with open(pid_file, "r") as f:
                                 recheck = f.read().strip()

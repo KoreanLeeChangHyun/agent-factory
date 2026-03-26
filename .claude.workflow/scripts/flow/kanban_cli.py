@@ -208,9 +208,38 @@ def cmd_done(ticket_number: str) -> None:
         from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop
         from flow.branch_strategy import get_feature_branch_for_ticket
         if is_worktree_enabled():
-            wt_path = get_worktree_path(ticket_number)
+            # C-01: dirty worktree 감지 → auto_commit 수행
+            _wt_path = get_worktree_path(ticket_number)
+            if _wt_path:
+                _status = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=_wt_path,
+                    capture_output=True,
+                    text=True,
+                )
+                if _status.stdout.strip():
+                    # 미커밋 변경 존재 → 자동 커밋
+                    _add = subprocess.run(
+                        ["git", "add", "-A"],
+                        cwd=_wt_path,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if _add.returncode != 0:
+                        print(f"[ERROR] auto-commit 실패 (git add): {_add.stderr.strip()}", flush=True)
+                        _sys.exit(1)
+                    _commit = subprocess.run(
+                        ["git", "commit", "-m", f"chore: auto-commit before done ({ticket_number})"],
+                        cwd=_wt_path,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if _commit.returncode != 0:
+                        print(f"[ERROR] auto-commit 실패 (git commit): {_commit.stderr.strip()}", flush=True)
+                        _sys.exit(1)
+                    print(f"[INFO] auto-commit 완료: 미커밋 변경을 커밋하였습니다.", flush=True)
             feat_branch = get_feature_branch_for_ticket(ticket_number)
-            if wt_path or feat_branch:
+            if _wt_path or feat_branch:
                 merge_result = merge_to_develop(ticket_number)
                 if not merge_result.success:
                     if merge_result.conflicts:
