@@ -371,7 +371,7 @@ def merge_to_develop(
     original_branch = _get_current_branch(repo_path)
 
     # 잠금 획득
-    if not acquire_lock(lock_path, max_wait=10):
+    if not acquire_lock(lock_path, max_wait=10, stale_timeout=300):
         return MergeResult(
             success=False,
             error_message="병합 잠금 획득 실패 (다른 병합이 진행 중일 수 있습니다)",
