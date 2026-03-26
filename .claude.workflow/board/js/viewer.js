@@ -242,7 +242,7 @@
         if (link.dataset.url) {
           url = link.dataset.url;
         } else if (filePath.indexOf("workflow/") === 0 || filePath.indexOf(".claude/") === 0) {
-          url = "../" + resolveResultPath(filePath);
+          url = resolveToRoot(filePath);
         } else {
           const activeTab = Board.state.viewerTabs.find(function (t) { return t.number === Board.state.activeViewerTab; });
           const baseUrl = activeTab && activeTab.wfFile ? activeTab.wfFile.url : "";
@@ -648,14 +648,14 @@
     }
     keys.forEach(function (k) {
       if (!result[k]) return;
-      const url = encodeURI("../" + resolveResultPath(result[k]));
+      const url = encodeURI(resolveToRoot(result[k]));
       const isDir = k === "work";
       h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '"' + (isDir ? ' data-isdir="true"' : '') + '>' + esc(k) + '</span>';
     });
     const excludedKeys = ["workdir", "registrykey"];
     Object.keys(result).forEach(function (k) {
       if (keys.indexOf(k) === -1 && excludedKeys.indexOf(k) === -1) {
-        const url = encodeURI("../" + resolveResultPath(result[k]));
+        const url = encodeURI(resolveToRoot(result[k]));
         h += '<span class="tv-result-link" data-label="' + esc(k) + '" data-url="' + esc(url) + '">' + esc(k) + '</span>';
       }
     });

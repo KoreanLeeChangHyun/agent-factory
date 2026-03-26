@@ -33,7 +33,7 @@ _scripts_dir: str = os.path.normpath(
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import acquire_lock, release_lock, resolve_project_root
+from common import acquire_lock, read_env, release_lock, resolve_project_root
 from flow.branch_strategy import (
     create_feature_branch,
     delete_feature_branch,
@@ -188,7 +188,7 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
     Returns:
         worktree 기능 활성화 여부.
     """
-    env_val = os.environ.get("WORKFLOW_WORKTREE")
+    env_val = os.environ.get("WORKFLOW_WORKTREE") or read_env("WORKFLOW_WORKTREE")
     if env_val is not None:
         return env_val.strip() == "1"
 

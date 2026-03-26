@@ -740,6 +740,9 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         # /events와 /poll은 각 핸들러에서 직접 CORS 헤더를 추가하므로 제외
         if self.path not in ('/events', '/poll'):
             self.send_header('Access-Control-Allow-Origin', '*')
+        # JS/CSS 파일 캐시 방지
+        if self.path.endswith(('.js', '.css')):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 
 

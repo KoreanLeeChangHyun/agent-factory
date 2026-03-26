@@ -18,6 +18,7 @@ const {
   parseDirLinks: wfParseDirLinks,
   lastSegment: wfLastSegment,
   resolveResultPath: wfResolveResultPath,
+  projectRoot: wfProjectRoot,
   CMD_COLORS: WF_CMD_COLORS,
   STATUS_COLORS: WF_STATUS_COLORS,
   saveUI: wfSaveUI,
@@ -446,7 +447,7 @@ function renderWfDetailView(w) {
       const info = w.fileMap[key];
       if (info && info.exists) {
         const isDir = info.isDir ? ' data-isdir="true"' : "";
-        h += '<span class="wf-detail-artifact-link" data-label="' + wfEsc(w.task + " / " + key) + '" data-url="' + wfEsc(info.url) + '"' + isDir + ">" + wfEsc(key) + "</span>";
+        h += '<span class="wf-detail-artifact-link" data-label="' + wfEsc(w.task + " / " + key) + '" data-url="' + wfEsc(wfProjectRoot() + info.url) + '"' + isDir + ">" + wfEsc(key) + "</span>";
       } else {
         h += '<span class="wf-detail-artifact-absent">' + wfEsc(key) + "</span>";
       }
@@ -456,7 +457,7 @@ function renderWfDetailView(w) {
   }
 
   // Connected ticket section placeholder
-  h += '<div class="wf-detail-ticket-section" data-basepath="' + wfEsc(w.basePath || "") + '"></div>';
+  h += '<div class="wf-detail-ticket-section" data-basepath="' + wfEsc(wfProjectRoot() + (w.basePath || "")) + '"></div>';
 
   h += "</div>";
   return h;
