@@ -33,7 +33,7 @@ _scripts_dir: str = os.path.normpath(
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import acquire_lock, release_lock, resolve_project_root
+from common import acquire_lock, read_env, release_lock, resolve_project_root
 from flow.branch_strategy import (
     create_feature_branch,
     delete_feature_branch,
@@ -179,8 +179,11 @@ def _info(msg: str) -> None:
 def is_worktree_enabled(repo_path: str | None = None) -> bool:
     """worktree 기능 활성화 여부를 판단한다.
 
-    WORKFLOW_WORKTREE 환경변수가 설정되어 있으면 그 값으로 판단한다
-    (0=비활성, 1=활성). 미설정 시 develop 브랜치 존재 여부로 판단한다.
+    WORKFLOW_WORKTREE 환경변수가 os.environ에 설정되어 있으면 그 값으로
+    판단한다. os.environ에 없으면 .env 파일에서 폴백 읽기를 수행한다.
+    활성화 표현: "1", "true", "yes", "on" -> True.
+    비활성화 표현: "0", "false", "no", "off" -> False.
+    os.environ과 .env 모두 미설정 시 develop 브랜치 존재 여부로 판단한다.
 
     Args:
         repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
@@ -189,8 +192,16 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
         worktree 기능 활성화 여부.
     """
     env_val = os.environ.get("WORKFLOW_WORKTREE")
+    if env_val is None:
+        # os.environ에 없으면 .env 파일에서 폴백 읽기
+        env_val = read_env("WORKFLOW_WORKTREE") or None
+
     if env_val is not None:
-        return env_val.strip() == "1"
+        normalized = env_val.strip().lower()
+        if normalized in ("1", "true", "yes", "on"):
+            return True
+        if normalized in ("0", "false", "no", "off"):
+            return False
 
     # 환경변수 미설정: develop 브랜치 존재 여부
     result = _git(
