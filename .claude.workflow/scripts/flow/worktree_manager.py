@@ -181,8 +181,8 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
 
     WORKFLOW_WORKTREE 환경변수가 os.environ에 설정되어 있으면 그 값으로
     판단한다. os.environ에 없으면 .env 파일에서 폴백 읽기를 수행한다.
-    활성화 표현: "1", "true", "yes", "on" -> True.
-    비활성화 표현: "0", "false", "no", "off" -> False.
+    활성화 표현: "true", "1", "yes", "on" -> True.
+    비활성화 표현: "false", "0", "no", "off" -> False.
     os.environ과 .env 모두 미설정 시 develop 브랜치 존재 여부로 판단한다.
 
     Args:

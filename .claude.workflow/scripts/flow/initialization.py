@@ -683,8 +683,8 @@ def main() -> None:
             remaining_args.append(arg)
 
     if len(remaining_args) >= 2:
-        mode: str = remaining_args[0]
-        title: str = remaining_args[1]
+        title: str = remaining_args[0]
+        mode: str = remaining_args[1]
     elif len(remaining_args) >= 1:
         mode = "full"
         title = remaining_args[0]
@@ -707,7 +707,7 @@ def main() -> None:
             _err(f"Invalid command: '{command}'. Allowed: {', '.join(sorted(VALID_COMMANDS))}", 2)
 
     if mode not in VALID_MODES:
-        _err(f"Invalid mode: '{mode}'. Allowed: {', '.join(sorted(VALID_MODES))}", 2)
+        mode = "full"
 
     # Step 1: 티켓 파일 읽기
     prompt_content: str | None

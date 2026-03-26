@@ -158,7 +158,7 @@ flow-claude end <registryKey>             # 워크플로우 종료
 1. **Command/플래그 파싱** -- `/wf -s implement` -> command=implement, autoApprove=true. `-n` 지정 시 autoApprove=false. 체인 command(예: `research>implement`)는 전체 문자열 그대로 보관
 2. **시작 배너** -- `flow-claude start <command>`
 3. **제목 생성** -- 티켓 파일(`.kanban/active/T-NNN.xml`) 읽어 20자 이내 한글 제목 생성 (오케스트레이터 직접)
-4. **initialization.py 실행** -- `flow-init <command> "<title>" #N`. 실패 시 `FAIL` + 비정상 종료 코드
+4. **initialization.py 실행** -- `flow-init <command> "<title>" [mode] #N`. mode 생략 시 full 기본값. mode는 현재 full만 지원하므로 생략 권장. 실패 시 `FAIL` + 비정상 종료 코드
 5. **init-result.json 파싱** -- 종료 코드 0이면 최신 `.workflow/` 디렉터리의 init-result.json을 Read
 
 **Return Value Retention (후속 단계에 전달):**

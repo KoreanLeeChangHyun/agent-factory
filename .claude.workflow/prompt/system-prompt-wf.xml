@@ -45,7 +45,7 @@
 
       비활성화 조건:
         - develop 브랜치가 없는 리포지토리는 기존 단일 브랜치 모드로 동작
-        - WORKFLOW_WORKTREE=0 으로 강제 비활성, WORKFLOW_WORKTREE=1 로 강제 활성
+        - WORKFLOW_WORKTREE=false 로 강제 비활성, WORKFLOW_WORKTREE=true 로 강제 활성
     </branch-policy>
 
     <kanban-cli-reference>

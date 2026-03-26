@@ -242,3 +242,82 @@
   background: rgba(86, 156, 214, 0.15);
   color: #569cd6;
 }
+
+/* ── Done Column Toggle ── */
+.done-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #858585;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+  margin-left: 4px;
+}
+
+.done-toggle-btn:hover {
+  color: #cccccc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.done-toggle-btn svg {
+  display: block;
+}
+
+/* ── Done Column Collapsed State ── */
+.column.collapsed {
+  flex: none;
+  width: 40px;
+  min-width: 40px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.15s;
+}
+
+.column.collapsed .col-header {
+  display: none;
+}
+
+.column.collapsed .cards {
+  display: none;
+}
+
+.column.collapsed:hover {
+  background: #2a2a2b;
+}
+
+.done-collapsed-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  padding: 16px 0;
+  user-select: none;
+}
+
+.done-collapsed-bar .bar-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: 600;
+  color: #858585;
+  letter-spacing: 0.05em;
+}
+
+.done-collapsed-bar .bar-count {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 10px;
+  color: #606060;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
