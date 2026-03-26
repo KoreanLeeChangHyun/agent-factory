@@ -329,13 +329,21 @@ def remove_worktree(
     wt_path = os.path.join(base_dir, dir_name)
 
     # worktree 잠금 해제 (--lock으로 생성했으므로)
-    _git("worktree", "unlock", wt_path, repo_path=repo_path)
+    unlock_result = _git("worktree", "unlock", wt_path, repo_path=repo_path)
 
     # worktree 제거
     if os.path.isdir(wt_path):
-        result = _git(
-            "worktree", "remove", "--force", wt_path, repo_path=repo_path
-        )
+        if unlock_result.returncode == 0:
+            # unlock 성공: --force 1회 (dirty 상태 강제 처리)
+            result = _git(
+                "worktree", "remove", "--force", wt_path, repo_path=repo_path
+            )
+        else:
+            # unlock 실패: locked 상태 가정, --force --force (locked + dirty 강제 처리)
+            result = _git(
+                "worktree", "remove", "--force", "--force", wt_path,
+                repo_path=repo_path,
+            )
         if result.returncode != 0:
             _warn(f"worktree 제거 실패: {result.stderr.strip()}")
             return False
