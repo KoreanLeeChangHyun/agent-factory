@@ -179,7 +179,7 @@ def main() -> None:
     비tmux 환경에서도 차단한다.
     Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_MAIN_SESSION_GUARD") or read_env("HOOK_MAIN_SESSION_GUARD")
 
     # Hook disable check (false = disabled)

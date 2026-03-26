@@ -464,7 +464,7 @@ def resolve_abs_work_dir(work_dir: str, project_root: str | None = None) -> str:
 
 
 # =============================================================================
-# 환경변수 파싱 (.claude.workflow/.env)
+# 환경변수 파싱 (.claude.workflow/.settings, .env 폴백)
 # =============================================================================
 
 _DEFAULT_ENV_FILE = os.environ.get("ENV_FILE", "")
@@ -503,7 +503,7 @@ def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
     Args:
         key: 환경변수 키 이름.
         default: 키가 없을 때 반환할 기본값.
-        env_file: .claude.workflow/.env 파일 경로. None이면 자동 해석.
+        env_file: .claude.workflow/.settings(.env 폴백) 파일 경로. None이면 자동 해석.
 
     Returns:
         환경변수 값. 파일이 없거나 키가 없으면 default 반환.

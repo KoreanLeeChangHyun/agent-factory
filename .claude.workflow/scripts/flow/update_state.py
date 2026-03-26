@@ -180,7 +180,7 @@ def _handle_usage_regenerate(abs_work_dir: str, local_context: str, status_file:
 
 
 def _handle_env(abs_work_dir: str, local_context: str, status_file: str) -> _HandlerResult:
-    """env 모드: .claude.workflow/.env 환경변수를 set/unset한다."""
+    """env 모드: .claude.workflow/.settings(.env 폴백) 환경변수를 set/unset한다."""
     action: str = sys.argv[3] if len(sys.argv) > 3 else ""
     key: str = sys.argv[4] if len(sys.argv) > 4 else ""
     value: str = sys.argv[5] if len(sys.argv) > 5 else ""

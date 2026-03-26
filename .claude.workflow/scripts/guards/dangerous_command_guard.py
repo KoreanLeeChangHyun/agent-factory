@@ -73,7 +73,7 @@ def main() -> None:
     매칭 시 deny 응답을 출력하여 실행을 차단한다.
     화이트리스트 패턴에 매칭되면 검사를 건너뛴다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_DANGEROUS_COMMAND") or read_env("HOOK_DANGEROUS_COMMAND")
 
     # Hook disable check (false = disabled)

@@ -1,5 +1,5 @@
 ---
-description: .claude.env에서 Git 설정을 읽어 git config를 자동 설정합니다.
+description: .claude.workflow/.settings에서 Git 설정을 읽어 git config를 자동 설정합니다.
 argument-hint: "[--global | --local]"
 ---
 

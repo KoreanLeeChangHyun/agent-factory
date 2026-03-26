@@ -180,10 +180,10 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
     """worktree 기능 활성화 여부를 판단한다.
 
     WORKFLOW_WORKTREE 환경변수가 os.environ에 설정되어 있으면 그 값으로
-    판단한다. os.environ에 없으면 .env 파일에서 폴백 읽기를 수행한다.
+    판단한다. os.environ에 없으면 .settings(.env 폴백) 파일에서 폴백 읽기를 수행한다.
     활성화 표현: "true", "1", "yes", "on" -> True.
     비활성화 표현: "false", "0", "no", "off" -> False.
-    os.environ과 .env 모두 미설정 시 develop 브랜치 존재 여부로 판단한다.
+    os.environ과 .settings/.env 모두 미설정 시 develop 브랜치 존재 여부로 판단한다.
 
     Args:
         repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
@@ -193,7 +193,7 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
     """
     env_val = os.environ.get("WORKFLOW_WORKTREE")
     if env_val is None:
-        # os.environ에 없으면 .env 파일에서 폴백 읽기
+        # os.environ에 없으면 .settings(.env 폴백) 파일에서 폴백 읽기
         env_val = read_env("WORKFLOW_WORKTREE") or None
 
     if env_val is not None:

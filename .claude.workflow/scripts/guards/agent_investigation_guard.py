@@ -139,7 +139,7 @@ def main() -> None:
     메인 세션이면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
     비tmux 환경에서도 차단한다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_AGENT_INVESTIGATION_GUARD") or read_env("HOOK_AGENT_INVESTIGATION_GUARD")
 
     # Hook disable check (false = disabled)

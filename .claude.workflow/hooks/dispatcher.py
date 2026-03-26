@@ -73,7 +73,7 @@ def _env_path() -> str:
 
 
 def load_env_flags(prefix: str = 'HOOK_') -> dict[str, bool]:
-    """Parse .claude.workflow/.env and return HOOK_* flags as a dict.
+    """Parse .claude.workflow/.settings(.env fallback) and return HOOK_* flags as a dict.
 
     Args:
         prefix: Variable name prefix to filter (default: 'HOOK_').

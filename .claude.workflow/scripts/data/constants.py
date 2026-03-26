@@ -92,7 +92,7 @@ _DOTENV = _load_dotenv()
 
 
 def _env(key: str, default: str) -> str:
-    """os.environ > .env > default 우선순위로 값을 반환한다."""
+    """os.environ > .settings/.env > default 우선순위로 값을 반환한다."""
     return os.environ.get(key, _DOTENV.get(key, default))
 
 

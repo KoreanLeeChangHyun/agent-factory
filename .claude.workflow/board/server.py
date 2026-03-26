@@ -32,6 +32,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 PORT_RANGE_START: int = 9900
 PORT_RANGE_END: int = 9999
 WATCH_INTERVAL: float = 1.0
+SERVER_STARTED_AT: str = time.strftime('%Y-%m-%d %H:%M:%S')
+SERVER_PID: int = os.getpid()
 
 # 감시 대상 경로 -> SSE 이벤트 타입 매핑
 WATCH_DIRS: dict[str, str] = {
@@ -328,9 +330,17 @@ WF_DETAIL_FILES: list[dict] = [
 ]
 
 
+def _resolve_settings_file(project_root: str) -> str:
+    """Return .settings if exists, else .env (fallback)."""
+    settings = os.path.join(project_root, '.claude.workflow', '.settings')
+    if os.path.exists(settings):
+        return settings
+    return os.path.join(project_root, '.claude.workflow', '.env')
+
+
 def _parse_env_file(project_root: str) -> list[dict]:
-    """Parse .env into structured sections for the settings UI."""
-    env_file = os.path.join(project_root, '.claude.workflow', '.env')
+    """Parse .settings/.env into structured sections for the settings UI."""
+    env_file = _resolve_settings_file(project_root)
     if not os.path.exists(env_file):
         return []
 
@@ -408,8 +418,8 @@ def _parse_env_file(project_root: str) -> list[dict]:
 
 
 def _update_env_value(project_root: str, key: str, new_value: str) -> bool:
-    """Update a single key's value in .env, preserving structure and comments."""
-    env_file = os.path.join(project_root, '.claude.workflow', '.env')
+    """Update a single key's value in .settings/.env, preserving structure and comments."""
+    env_file = _resolve_settings_file(project_root)
     if not os.path.exists(env_file):
         return False
 
@@ -611,14 +621,13 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.
 
-        응답을 보낸 뒤 짧은 지연 후 새 서버 프로세스를 생성하고
-        현재 프로세스를 종료한다.
+        응답을 보낸 뒤 짧은 지연 후 현재 서버 소켓을 해제하고,
+        새 서버 프로세스를 생성한 뒤 현재 프로세스를 종료한다.
         """
         self._send_json({'ok': True})
 
         def _do_restart() -> None:
             project_root = os.getcwd()
-            # .board.url 삭제하여 새 프로세스가 정상 시작하도록 함
             url_file = os.path.join(
                 project_root, '.claude.workflow', '.board.url',
             )
@@ -626,15 +635,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 os.remove(url_file)
             except OSError:
                 pass
-            # 새 서버 프로세스를 백그라운드로 생성
-            subprocess.Popen(
-                [sys.executable, __file__, '--serve', project_root],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-            # 현재 프로세스 종료
-            os._exit(0)
+            # execv로 프로세스를 교체 — 소켓이 자동 해제되어 포트 충돌 없음
+            os.execv(sys.executable, [sys.executable, __file__, '--serve', project_root])
 
         threading.Timer(0.3, _do_restart).start()
 
@@ -672,6 +674,11 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json([])
                 return
             self._send_json(_workflow_detail(project_root, entry))
+        elif path == '/api/server-info':
+            self._send_json({
+                'pid': SERVER_PID,
+                'started_at': SERVER_STARTED_AT,
+            })
         else:
             self.send_response(404)
             self.end_headers()

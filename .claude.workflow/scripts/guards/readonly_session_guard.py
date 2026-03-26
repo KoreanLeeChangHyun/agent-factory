@@ -233,7 +233,7 @@ def main() -> None:
     비tmux 환경 또는 메인 세션에서는 무조건 통과한다.
     .workflow/ 하위 파일 Write/Edit는 허용한다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_READONLY_SESSION_GUARD") or read_env("HOOK_READONLY_SESSION_GUARD")
 
     # Hook disable check (false/0 = disabled)

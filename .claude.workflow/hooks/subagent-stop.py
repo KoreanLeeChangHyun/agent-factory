@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """SubagentStop event dispatcher.
 
-Dispatches subagent-stop hooks based on HOOK_* flags in .claude.workflow/.env.
+Dispatches subagent-stop hooks based on HOOK_* flags in .claude.workflow/.settings(.env fallback).
 Replaces individual wrapper scripts in .claude.workflow/hooks/subagent-stop/.
 """
 

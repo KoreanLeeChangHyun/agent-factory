@@ -13,7 +13,7 @@
 주요 함수:
     main: Slack 알림 전송 진입점
 
-환경변수 (.claude.workflow/.env에서 로드):
+환경변수 (.claude.workflow/.settings(.env 폴백)에서 로드):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
 

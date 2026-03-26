@@ -26,14 +26,16 @@ C_BOLD='\033[1m'
 C_DIM='\033[2m'
 C_RESET='\033[0m'
 
-# ─── 배너 폭 (.env에서 읽기, 없으면 기본값 60) ───
+# ─── 배너 폭 (.settings 우선, .env 폴백, 없으면 기본값 60) ───
 BANNER_WIDTH=60
-_ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.env"
+_CW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_ENV_FILE="${_CW_DIR}/.settings"
+[[ ! -f "$_ENV_FILE" ]] && _ENV_FILE="${_CW_DIR}/.env"
 if [[ -f "$_ENV_FILE" ]]; then
     _BW=$(grep -E '^CLAUDE_BANNER_WIDTH=' "$_ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2)
     [[ -n "$_BW" ]] && BANNER_WIDTH="$_BW"
 fi
-unset _ENV_FILE _BW
+unset _CW_DIR _ENV_FILE _BW
 
 # ─── phase별 색상 ───
 get_color() {

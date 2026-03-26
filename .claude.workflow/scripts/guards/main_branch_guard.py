@@ -85,7 +85,7 @@ def main() -> None:
     현재 브랜치가 main 또는 master이면 deny 응답을 출력하여 차단한다.
     git 실행 실패 시 안전 통과(exit 0)로 처리한다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_MAIN_BRANCH_GUARD") or read_env("HOOK_MAIN_BRANCH_GUARD")
 
     # Hook disable check (false = disabled)

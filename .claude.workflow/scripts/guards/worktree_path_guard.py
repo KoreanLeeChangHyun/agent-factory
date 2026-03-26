@@ -391,7 +391,7 @@ def main() -> None:
     비tmux 환경, 메인 세션, research/review 세션, 워크트리 없는 세션에서는 통과한다.
     .claude.workflow/ 하위 파일 Write/Edit는 항상 허용한다.
     """
-    # .claude.workflow/.env에서 설정 로드
+    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_WORKTREE_PATH_GUARD") or read_env("HOOK_WORKTREE_PATH_GUARD")
 
     # Hook disable check (false/0 = disabled)
