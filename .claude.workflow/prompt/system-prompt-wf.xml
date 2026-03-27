@@ -58,10 +58,12 @@
         flow-kanban done T-001
         flow-kanban update-title T-001 "새 제목"  # 제목 변경은 반드시 update-title (update는 존재하지 않음)
         flow-kanban add-subnumber T-001 --command implement --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
-        flow-kanban update-subnumber T-001 --id 1 --goal "목표" --target "대상" --constraints "제약" --criteria "기준"
+        flow-kanban update-subnumber T-001 1 --goal "목표" --target "대상" --constraints "제약" --criteria "기준"  # --id 1도 허용
         flow-kanban set-editing T-001 --on        # 편집 상태 설정: --on | --off
-        flow-kanban archive-subnumber T-001 --id 1
+        flow-kanban archive-subnumber T-001                                                                      # active subnumber 자동 탐지
         flow-kanban delete T-001
+        flow-kanban list                              # 전체 목록 (Done 제외)
+        flow-kanban list --status open                # Open 티켓만
 
       제목 변경: update-title / 상태 변경: move / 종료: done
 

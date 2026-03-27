@@ -47,6 +47,9 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "set-editing",
     "link",
     "unlink",
+    "list",   # 티켓 목록 조회
+    "board",  # 칸반 보드 전체 현황 조회
+    "show",   # 특정 티켓 상세 조회
 })
 
 # flow-kanban 명령 감지 및 서브커맨드 추출 패턴

@@ -537,6 +537,9 @@ flow-gc /home/user/project
 | `set-editing` | `flow-kanban set-editing <ticket> <--on\|--off>` | 편집 중 플래그 설정 |
 | `link` | `flow-kanban link <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 기록 |
 | `unlink` | `flow-kanban unlink <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 제거 |
+| `list` | `flow-kanban list [--status <open\|progress\|review\|done>]` | 티켓 목록 한 줄 요약 조회 |
+| `board` | `flow-kanban board` | 칸반 보드 전체 현황 마크다운 테이블 출력 |
+| `show` | `flow-kanban show <ticket>` | 특정 티켓 상세 정보 조회 |
 
 #### 컬럼 키 (`move` 서브커맨드의 `target`)
 

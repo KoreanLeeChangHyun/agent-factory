@@ -883,6 +883,69 @@ def cmd_board() -> None:
             print(f"| {number}  | {title} |")
 
 
+# 상태 키 -> (디렉터리, 표시 상태명) 매핑
+_STATUS_SCAN_MAP: dict[str, tuple[str, str]] = {
+    "open": (KANBAN_OPEN_DIR, "Open"),
+    "progress": (KANBAN_PROGRESS_DIR, "In Progress"),
+    "review": (KANBAN_REVIEW_DIR, "Review"),
+    "done": (KANBAN_DONE_DIR, "Done"),
+}
+
+
+def cmd_list(status_filter: str = "") -> None:
+    """칸반 티켓 목록을 한 줄 요약 형식으로 출력한다.
+
+    --status 옵션으로 특정 상태만 필터링할 수 있다.
+    미지정 시 Done을 제외한 open/progress/review 전체를 출력한다.
+
+    출력 포맷: T-NNN  [상태]  제목 (번호 오름차순)
+
+    Args:
+        status_filter: 상태 필터 키 (open/progress/review/done). 빈 문자열이면 Done 제외 전체.
+    """
+    if status_filter:
+        scan_targets = [_STATUS_SCAN_MAP[status_filter]]
+    else:
+        # 기본: open + progress + review (done 제외)
+        scan_targets = [
+            _STATUS_SCAN_MAP["open"],
+            _STATUS_SCAN_MAP["progress"],
+            _STATUS_SCAN_MAP["review"],
+        ]
+
+    tickets: list[dict[str, str]] = []
+    for scan_dir, status_label in scan_targets:
+        if not os.path.isdir(scan_dir):
+            continue
+        for fname in os.listdir(scan_dir):
+            if not (fname.startswith("T-") and fname.endswith(".xml")):
+                continue
+            fpath = os.path.join(scan_dir, fname)
+            try:
+                ticket_data = parse_ticket_xml(fpath)
+            except SystemExit:
+                continue
+            tickets.append({
+                "number": ticket_data.get("number", ""),
+                "title": ticket_data.get("title", ""),
+                "status": status_label,
+            })
+
+    # 번호 기준 오름차순 정렬 (T-NNN → NNN 숫자 변환)
+    def _sort_key(t: dict[str, str]) -> int:
+        num_str = t.get("number", "T-0").lstrip("T-")
+        return int(num_str) if num_str.isdigit() else 0
+
+    tickets.sort(key=_sort_key)
+
+    if not tickets:
+        print("(티켓 없음)")
+        return
+
+    for t in tickets:
+        print(f"{t['number']}  [{t['status']}]  {t['title']}")
+
+
 # ─── argparse 설정 ───────────────────────────────────────────────────────────
 
 
@@ -958,7 +1021,8 @@ def build_parser() -> argparse.ArgumentParser:
     # update-subnumber 서브커맨드
     update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 prompt / result 내부 필드를 갱신한다")
     update_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_sub_parser.add_argument("--id", dest="subnumber_id", required=True, type=int, help="갱신할 subnumber ID")
+    update_sub_parser.add_argument("subnumber_id_pos", nargs="?", type=int, default=None, help="갱신할 subnumber ID (위치 인자)")
+    update_sub_parser.add_argument("--id", dest="subnumber_id", required=False, type=int, default=None, help="갱신할 subnumber ID (--id 형식)")
     update_sub_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
     update_sub_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
     update_sub_parser.add_argument("--report", default="", help="report.md 상대 경로")
@@ -985,6 +1049,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     # board 서브커맨드
     subparsers.add_parser("board", help="칸반 보드 전체 현황을 조회한다")
+
+    # list 서브커맨드
+    list_parser = subparsers.add_parser("list", help="칸반 티켓 목록을 조회한다")
+    list_parser.add_argument(
+        "--status",
+        choices=["open", "progress", "review", "done"],
+        default="",
+        help="상태 필터 (미지정 시 Done 제외 전체)",
+    )
 
     # show 서브커맨드
     show_parser = subparsers.add_parser("show", help="특정 티켓의 상세 정보를 조회한다")
@@ -1078,9 +1151,12 @@ def dispatch(args: argparse.Namespace) -> None:
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
             err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+        subnumber_id = args.subnumber_id_pos if args.subnumber_id_pos is not None else args.subnumber_id
+        if subnumber_id is None:
+            err("subnumber ID를 지정해야 합니다. 예: flow-kanban update-subnumber T-001 1 또는 --id 1", 2)
         cmd_update_subnumber(
             ticket,
-            subnumber_id=args.subnumber_id,
+            subnumber_id=subnumber_id,
             registrykey=args.registrykey,
             plan=args.plan,
             report=args.report,
@@ -1120,6 +1196,9 @@ def dispatch(args: argparse.Namespace) -> None:
 
     elif args.subcommand == "board":
         cmd_board()
+
+    elif args.subcommand == "list":
+        cmd_list(status_filter=args.status)
 
     elif args.subcommand == "show":
         ticket = normalize_ticket_number(args.ticket)

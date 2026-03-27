@@ -1,24 +1,22 @@
 #!/usr/bin/env -S python3 -u
-"""session_start_system_prompt.py - SessionStart hook으로 세션별 system-prompt를 자동 주입한다.
+"""inject_prompt.py - SessionStart hook으로 워크플로우 세션 전용 system-prompt를 주입한다.
 
-tmux 윈도우 이름(P:T-* 여부)으로 메인/워크플로우 세션을 분기하여
-.claude.workflow/prompt/system-prompt.xml(메인용) 또는 .claude.workflow/prompt/system-prompt-wf.xml(워크플로우용)을 stdout으로 출력한다.
+tmux 윈도우 이름(P:T-* 여부)으로 워크플로우 세션 여부를 판별하여
+.claude.workflow/prompt/system-prompt-wf.xml을 stdout으로 출력한다.
+메인 세션에서는 아무것도 출력하지 않고 즉시 exit 0으로 종료한다.
+(메인 세션 정책은 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.)
 
 동작:
   - TMUX_PANE 환경변수가 있으면 tmux display-message로 현재 윈도우 이름을 조회한다.
-  - TMUX_PANE이 없으면(비tmux 환경) 메인용으로 폴백한다.
   - 윈도우 이름이 P:T- 접두사로 시작하면 .claude.workflow/prompt/system-prompt-wf.xml을 출력한다.
-  - 그 외(메인 세션)이면 .claude.workflow/prompt/system-prompt.xml을 출력한다.
+  - 그 외(메인 세션 또는 비tmux 환경)이면 아무것도 출력하지 않고 exit 0으로 종료한다.
   - 대상 파일이 존재하지 않으면 에러 없이 exit 0으로 종료한다.
-  - 메인 세션에서 .claude.workflow/prompt/includes/ 디렉터리의 모든 .xml 파일을 알파벳 순으로
-    읽어 </managed> 태그 직전에 삽입한다. includes/ 디렉터리가 없거나 비어있으면 건너뛴다.
   - 워크플로우 세션에서 활성 티켓(T-NNN)이 감지되면, 매 응답 첫 줄에 [T-NNN] 접두사를
     출력하도록 지시하는 <ticket-prefix> XML 블록을 system-prompt 뒤에 추가로 주입한다.
 """
 
 from __future__ import annotations
 
-import glob as glob_module
 import os
 import sys
 
@@ -32,36 +30,6 @@ from flow.tmux_utils import (
     get_current_window_name,
     WINDOW_PREFIX_P,
 )
-
-
-def _load_includes(project_root: str) -> str:
-    """includes/ 디렉터리의 모든 .xml 파일을 알파벳 순으로 읽어 합산 반환한다.
-
-    .claude.workflow/prompt/includes/ 디렉터리 내 모든 .xml 파일을 파일명 알파벳 순으로
-    읽어 줄바꿈으로 연결한 문자열을 반환한다. 디렉터리가 없거나 .xml 파일이
-    없으면 빈 문자열을 반환한다.
-
-    Args:
-        project_root: 프로젝트 루트 절대 경로.
-
-    Returns:
-        includes/ 내 .xml 파일 전체 내용을 순서대로 합친 문자열.
-        디렉터리 없음 또는 파일 없음 시 빈 문자열.
-    """
-    includes_dir = os.path.join(project_root, ".claude.workflow", "prompt", "includes")
-    if not os.path.isdir(includes_dir):
-        return ""
-
-    xml_files = sorted(glob_module.glob(os.path.join(includes_dir, "*.xml")))
-    if not xml_files:
-        return ""
-
-    parts: list[str] = []
-    for xml_path in xml_files:
-        with open(xml_path, encoding="utf-8") as f:
-            parts.append(f.read())
-
-    return "\n".join(parts)
 
 
 def _extract_ticket_id() -> str | None:
@@ -104,19 +72,22 @@ def _is_workflow_session() -> bool:
 
 
 def main() -> None:
-    """세션 유형을 판별하고 대응하는 system-prompt XML 파일을 stdout에 출력한다."""
+    """세션 유형을 판별하고 워크플로우 세션일 때만 system-prompt-wf.xml을 stdout에 출력한다.
+
+    메인 세션(워크플로우 세션이 아닌 경우)에서는 아무것도 출력하지 않고 즉시 종료한다.
+    메인 세션 정책은 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.
+    """
     project_root = resolve_project_root()
 
-    if _is_workflow_session():
-        session_type = "workflow"
-        prompt_file = os.path.join(project_root, ".claude.workflow", "prompt", "system-prompt-wf.xml")
-    else:
-        session_type = "main"
-        prompt_file = os.path.join(project_root, ".claude.workflow", "prompt", "system-prompt.xml")
+    if not _is_workflow_session():
+        # 메인 세션 또는 비tmux 환경: 주입할 프롬프트 없음, 즉시 종료
+        sys.exit(0)
+
+    prompt_file = os.path.join(project_root, ".claude.workflow", "prompt", "system-prompt-wf.xml")
 
     _log_dir = resolve_work_dir_for_logging(project_root)
     if _log_dir:
-        append_log(_log_dir, "INFO", f"inject_prompt: session_type={session_type}")
+        append_log(_log_dir, "INFO", "inject_prompt: session_type=workflow")
 
     # 파일이 없으면 에러 없이 종료
     if not os.path.exists(prompt_file):
@@ -124,15 +95,6 @@ def main() -> None:
 
     with open(prompt_file, encoding="utf-8") as f:
         content = f.read()
-
-    # 메인 세션에서만 includes/ 파일을 </managed> 직전에 삽입한다.
-    # 워크플로우 세션에서는 system-prompt-wf.xml을 그대로 유지한다.
-    if session_type == "main":
-        includes_text = _load_includes(project_root)
-        if includes_text:
-            # <managed> 내 다른 섹션과 들여쓰기를 맞추기 위해 각 줄에 4칸 들여쓰기 적용
-            indented = "\n".join("    " + line for line in includes_text.splitlines())
-            content = content.replace("</managed>", "\n" + indented + "\n  </managed>", 1)
 
     ticket_id = _extract_ticket_id()
     if ticket_id:

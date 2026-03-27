@@ -19,7 +19,15 @@
 ## Alias 레퍼런스
 
 ### flow-kanban 서브커맨드 (이 외 사용 금지)
-create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing
+create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing, list, board, show
+
+예시:
+  flow-kanban create "제목" --command implement
+  flow-kanban add-subnumber T-001 --command implement --goal "목표" --target "대상"
+  flow-kanban update-subnumber T-001 1 --goal "목표"   # --id 1도 허용
+  flow-kanban archive-subnumber T-001
+  flow-kanban move T-001 progress
+  flow-kanban done T-001
 
 ### 기타 alias
 - flow-tmux: launch, cleanup

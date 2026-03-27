@@ -1,8 +1,12 @@
 #!/usr/bin/env -S python3 -u
 """Session-start dispatcher.
 
-Dispatches SessionStart hook scripts.
-Uses dispatcher.py utilities for flag-based conditional execution.
+SessionStart hook 스크립트를 디스패치한다.
+dispatcher.py 유틸리티를 사용하여 플래그 기반 조건부 실행을 수행한다.
+
+워크플로우 세션 전용 프롬프트 주입(inject_prompt.py)을 담당한다.
+메인 세션에서는 inject_prompt.py가 아무것도 출력하지 않고 즉시 종료하므로
+시스템 프롬프트는 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.
 """
 
 from __future__ import annotations
@@ -20,17 +24,22 @@ from dispatcher import (
 
 
 def main() -> None:
-    """Dispatch session-start hooks.
+    """SessionStart 훅을 디스패치한다.
 
-    Reads stdin (SessionStart JSON payload) and dispatches
-    the system-prompt injection script. Stdout from the dispatched
-    script passes through for hook system capture.
+    stdin(SessionStart JSON 페이로드)을 읽고 워크플로우 세션 전용
+    프롬프트 주입 스크립트(inject_prompt.py)를 디스패치한다.
+    디스패치된 스크립트의 stdout은 훅 시스템에 그대로 전달된다.
+
+    HOOK_SESSION_SYSTEM_PROMPT 플래그가 false이면 워크플로우 세션에서도
+    프롬프트 주입이 비활성화된다.
     """
     stdin_data = sys.stdin.buffer.read()
     flags = load_env_flags()
     sync_results = []
 
-    # --- system-prompt injection (sync, stdout passthrough) ---
+    # --- 워크플로우 세션 전용 system-prompt-wf.xml 주입 (sync, stdout passthrough) ---
+    # inject_prompt.py가 워크플로우 세션 여부를 판별하여 조건부 출력한다.
+    # 메인 세션에서는 inject_prompt.py가 아무것도 출력하지 않고 즉시 종료한다.
     r = dispatch(
         'HOOK_SESSION_SYSTEM_PROMPT',
         scripts_dir('flow', 'inject_prompt.py'),
