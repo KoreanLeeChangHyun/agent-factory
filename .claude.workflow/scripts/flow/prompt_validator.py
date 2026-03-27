@@ -51,10 +51,9 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
 
     XML 구조 호환성 주석:
         이 함수는 전체 텍스트에서 태그를 검색하므로 <prompt> 래퍼 내부 깊이와
-        무관하게 동작한다. 새 XML 구조에서 <goal>, <target>, <constraints>,
-        <criteria> 태그가 <submit>/<history> 래퍼 → <subnumber> → <prompt> 래퍼
-        내부에 위치하더라도 정규식 패턴이 전체 텍스트를 대상으로 검색하므로
-        정상 매칭된다.
+        무관하게 동작한다. flat 구조(<prompt>가 루트 직하)와 레거시 구조
+        (<submit>/<subnumber>/<prompt> 중첩) 모두에서 정규식 패턴이
+        전체 텍스트를 대상으로 검색하므로 정상 매칭된다.
 
     Args:
         text: 검색할 전체 텍스트
@@ -98,28 +97,45 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
 
 
 def extract_active_prompt(xml_text: str) -> str:
-    """전체 XML에서 활성 subnumber의 <prompt> 내용을 추출한다.
+    """전체 XML에서 <prompt> 내용을 추출한다.
 
-    <submit> 래퍼 내부에서 active="true" 속성을 가진 <subnumber> 요소를
-    찾아 해당 요소 내부의 <prompt> 태그 내용을 반환한다.
+    flat 구조의 티켓 XML에서 루트 직하 <prompt> 태그 내용을 직접 추출한다.
 
-    <submit> 래퍼 또는 active="true" subnumber가 없으면 원본 전체 텍스트를
-    폴백으로 반환하여 하위 호환성을 보장한다.
+    레거시 폴백: <submit> 래퍼가 감지되면 기존 subnumber 구조로 파싱하여
+    active="true" subnumber 내부의 <prompt> 내용을 반환한다 (done 티켓 참조 등).
 
     Args:
         xml_text: 전체 티켓 XML 텍스트
 
     Returns:
-        활성 subnumber의 <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
+        <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
     """
-    # Step 1: <submit> 블록 추출
+    # 레거시 폴백: <submit> 래퍼가 존재하면 기존 subnumber 구조로 파싱
     submit_content = _extract_tag_content(xml_text, "submit")
-    if submit_content is None:
+    if submit_content is not None:
+        return _extract_active_prompt_legacy(xml_text, submit_content)
+
+    # flat 구조: 루트 직하 <prompt> 태그 내용을 직접 추출
+    prompt_content = _extract_tag_content(xml_text, "prompt")
+    if prompt_content is None:
         return xml_text
 
-    # Step 2: submit 내부에서 active="true" subnumber 블록 추출
-    # <subnumber> 태그는 속성이 있으므로 _extract_tag_content 직접 사용 불가
-    # 속성 포함 패턴으로 active subnumber 블록 시작 위치를 찾는다
+    return prompt_content
+
+
+def _extract_active_prompt_legacy(xml_text: str, submit_content: str) -> str:
+    """레거시 subnumber 구조에서 활성 <prompt> 내용을 추출한다.
+
+    <submit> 래퍼 내부에서 active="true" 속성을 가진 <subnumber> 요소를
+    찾아 해당 요소 내부의 <prompt> 태그 내용을 반환한다.
+
+    Args:
+        xml_text: 전체 티켓 XML 텍스트 (폴백 반환용)
+        submit_content: <submit> 태그 내부 텍스트
+
+    Returns:
+        활성 subnumber의 <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
+    """
     active_open_pat = re.compile(
         r'<subnumber[^>]*\bactive\s*=\s*"true"[^>]*>', re.IGNORECASE
     )
@@ -129,8 +145,6 @@ def extract_active_prompt(xml_text: str) -> str:
     if match is None:
         return xml_text
 
-    # Step 3: active subnumber 블록 전체를 스택 기반으로 추출
-    # (중첩 <subnumber> 가능성에 대비하여 depth 추적)
     open_any_pat = re.compile(r'<subnumber[^>]*>', re.IGNORECASE)
 
     events: list[tuple[int, str, int]] = []
@@ -164,7 +178,6 @@ def extract_active_prompt(xml_text: str) -> str:
 
     subnumber_content = submit_content[outer_start:outer_end]
 
-    # Step 4: subnumber 내부의 <prompt> 내용 추출
     prompt_content = _extract_tag_content(subnumber_content, "prompt")
     if prompt_content is None:
         return xml_text

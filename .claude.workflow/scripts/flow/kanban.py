@@ -9,13 +9,15 @@ LLM 호출 없음 (순수 IO).
   python3 kanban.py move <ticket> <target>
   python3 kanban.py done <ticket>
   python3 kanban.py delete <ticket>
-  python3 kanban.py add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>"
   python3 kanban.py update-title <ticket> <title>
-  python3 kanban.py update-subnumber <ticket> --id <N>
-  python3 kanban.py archive-subnumber <ticket>
+  python3 kanban.py update-prompt <ticket> [--command <cmd>] [--goal "<goal>"] [--target "<target>"] ...
+  python3 kanban.py update-result <ticket> [--registrykey <RK>] [--workdir <WD>] [--plan <P>] [--report <R>]
   python3 kanban.py set-editing <ticket> <on|off>
+  python3 kanban.py link <ticket> --derived-from <T-NNN>
+  python3 kanban.py unlink <ticket> --derived-from <T-NNN>
   python3 kanban.py board
   python3 kanban.py show <ticket>
+  python3 kanban.py list [status]
 
 비즈니스 로직은 아래 모듈에 위임한다:
   flow.ticket_repository  - XML CRUD, 파일 탐색, 유틸리티

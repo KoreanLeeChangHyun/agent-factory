@@ -12,7 +12,6 @@ import os
 import subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Any
 
 from flow.ticket_repository import (
     add_relation,
@@ -20,12 +19,10 @@ from flow.ticket_repository import (
     find_ticket_file,
     normalize_ticket_number,
     get_max_ticket_number,
-    add_subnumber,
-    rollback_subnumber,
-    update_subnumber,
-    move_active_to_history,
     move_ticket_to_status_dir,
     remove_relation,
+    update_prompt,
+    update_result,
     write_ticket_xml,
     parse_ticket_xml,
     err,
@@ -42,7 +39,7 @@ from flow.ticket_state import (
     update_ticket_status,
     validate_transition,
 )
-from flow.prompt_validator import validate as prompt_validate, extract_active_prompt
+from flow.prompt_validator import validate as prompt_validate
 from data.constants import QUALITY_THRESHOLD
 
 
@@ -167,7 +164,7 @@ def cmd_create(title: str, command: str) -> None:
 
     os.makedirs(KANBAN_OPEN_DIR, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    xml_content = create_ticket_xml(ticket_number, title, datetime_str)
+    xml_content = create_ticket_xml(ticket_number, title, datetime_str, command=command)
     try:
         with open(ticket_file, "w", encoding="utf-8") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -307,9 +304,6 @@ def cmd_done(ticket_number: str) -> None:
     ticket_data = parse_ticket_xml(ticket_file)
     current_section = ticket_data["status"]
 
-    # active subnumber를 history로 이동 (있는 경우)
-    move_active_to_history(ticket_file)
-
     # XML <status> Done으로 갱신
     update_ticket_status(ticket_file, "Done")
 
@@ -426,29 +420,25 @@ def cmd_set_editing(ticket_number: str, value: bool) -> None:
     print(f"{ticket_number}: editing → {editing_elem.text} ({flag_str})")
 
 
-def cmd_add_subnumber(
+def cmd_update_prompt(
     ticket_number: str,
-    command: str,
-    goal: str,
-    target: str,
-    workdir: str = "",
-    result: str = "",
+    command: str = "",
+    goal: str = "",
+    target: str = "",
     constraints: str = "",
     criteria: str = "",
     context: str = "",
     skip_validation: bool = False,
 ) -> None:
-    """티켓 XML에 새 subnumber 항목을 추가한다.
+    """티켓 XML의 <prompt> 및 <metadata>/<command>를 갱신한다.
 
-    추가 후 품질 검증을 수행하여 QUALITY_THRESHOLD 미만이면 롤백한다.
+    갱신 후 품질 검증을 수행하여 QUALITY_THRESHOLD 미만이면 에러를 출력한다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
         command: 워크플로우 커맨드 (implement, review, research 등).
-        goal: 해당 사이클 목표.
+        goal: 작업 목표.
         target: 대상.
-        workdir: .workflow/ 산출물 경로 (선택).
-        result: 실행 결과 요약 (선택).
         constraints: 제약사항 (선택, 프롬프트 5요소).
         criteria: 완료 기준 (선택, 프롬프트 5요소).
         context: 맥락 정보 (선택, 프롬프트 5요소).
@@ -463,25 +453,25 @@ def cmd_add_subnumber(
     if ticket_file is None:
         err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
 
-    subnumber_data: dict[str, Any] = {
-        "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "command": command,
-        "goal": goal.replace("\\n", "\n"),
-        "target": target.replace("\\n", "\n"),
-    }
+    updates: dict[str, str] = {}
+    if command:
+        updates["command"] = command
+    if goal:
+        updates["goal"] = goal
+    if target:
+        updates["target"] = target
     if constraints:
-        subnumber_data["constraints"] = constraints.replace("\\n", "\n")
+        updates["constraints"] = constraints
     if criteria:
-        subnumber_data["criteria"] = criteria.replace("\\n", "\n")
+        updates["criteria"] = criteria
     if context:
-        subnumber_data["context"] = context.replace("\\n", "\n")
-    if workdir:
-        subnumber_data["workdir"] = workdir
-    if result:
-        subnumber_data["result"] = result
+        updates["context"] = context
 
-    new_id = add_subnumber(ticket_file, subnumber_data)
-    print(f"{ticket_number}: subnumber id={new_id} 추가됨")
+    if not updates:
+        err("갱신할 필드가 없습니다.", 2)
+
+    update_prompt(ticket_file, updates)
+    print(f"{ticket_number}: prompt 갱신됨")
 
     # ── 품질 검증 ──────────────────────────────────────────────────────────
     if skip_validation:
@@ -494,13 +484,18 @@ def cmd_add_subnumber(
         _sys.stderr.write(f"[WARN] 품질 검증용 파일 재읽기 실패: {e}\n")
         return
 
-    prompt_text = extract_active_prompt(xml_text)
+    # flat 구조: <prompt> 태그 내부 텍스트를 직접 추출
+    try:
+        from flow.prompt_validator import extract_active_prompt
+        prompt_text = extract_active_prompt(xml_text)
+    except Exception:
+        # extract_active_prompt 실패 시 검증 건너뜀
+        return
+
     validation_result = prompt_validate(prompt_text)
     quality_score = validation_result["quality_score"]
 
     if quality_score < QUALITY_THRESHOLD:
-        # 품질 미달: 롤백 후 에러 종료
-        rollback_subnumber(ticket_file, new_id)
         _sys.stderr.write(
             f"[ERROR] 품질 검증 실패 (score={quality_score:.4f} < threshold={QUALITY_THRESHOLD})\n"
         )
@@ -519,33 +514,21 @@ def cmd_add_subnumber(
         _sys.exit(1)
 
 
-def cmd_update_subnumber(
+def cmd_update_result(
     ticket_number: str,
-    subnumber_id: int,
     registrykey: str = "",
+    workdir: str = "",
     plan: str = "",
     report: str = "",
-    workdir: str = "",
-    goal: str = "",
-    target: str = "",
-    constraints: str = "",
-    criteria: str = "",
-    context: str = "",
 ) -> None:
-    """기존 subnumber의 prompt / result 내부 필드를 갱신한다.
+    """티켓 XML의 <result> 하위 요소를 갱신한다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
-        subnumber_id: 갱신할 subnumber ID.
         registrykey: 워크플로우 registryKey (YYYYMMDD-HHMMSS 형식).
+        workdir: 워크플로우 산출물 디렉터리 상대 경로.
         plan: plan.md 상대 경로.
         report: report.md 상대 경로.
-        workdir: 워크플로우 산출물 디렉터리 상대 경로.
-        goal: 작업 목표.
-        target: 작업 대상.
-        constraints: 제약 조건.
-        criteria: 완료 기준.
-        context: 추가 컨텍스트.
 
     Raises:
         SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
@@ -554,38 +537,28 @@ def cmd_update_subnumber(
     if ticket_file is None:
         err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
 
-    updates: dict[str, Any] = {}
+    updates: dict[str, str] = {}
     if registrykey:
         updates["registrykey"] = registrykey
+    if workdir:
+        updates["workdir"] = workdir
     if plan:
         updates["plan"] = plan
     if report:
         updates["report"] = report
-    if workdir:
-        updates["workdir"] = workdir
-    if goal:
-        updates["goal"] = goal
-    if target:
-        updates["target"] = target
-    if constraints:
-        updates["constraints"] = constraints
-    if criteria:
-        updates["criteria"] = criteria
-    if context:
-        updates["context"] = context
 
     if not updates:
         err("갱신할 필드가 없습니다.", 2)
 
-    update_subnumber(ticket_file, subnumber_id, updates)
-    print(f"{ticket_number}: subnumber id={subnumber_id} 갱신됨")
+    update_result(ticket_file, updates)
+    print(f"{ticket_number}: result 갱신됨")
 
 
 def cmd_show(ticket_number: str) -> None:
     """특정 티켓의 상세 정보를 구조화된 텍스트로 출력한다.
 
-    메타데이터, 관계 정보, 활성 subnumber의 프롬프트(goal/target/constraints/
-    criteria/context) 및 result 유무를 순서대로 출력한다.
+    메타데이터, 관계 정보, 프롬프트(goal/target/constraints/criteria/context)
+    및 result 정보를 순서대로 출력한다.
 
     Args:
         ticket_number: 조회할 티켓 번호 (T-NNN 형식).
@@ -602,8 +575,9 @@ def cmd_show(ticket_number: str) -> None:
     number: str = ticket_data.get("number", ticket_number)
     title: str = ticket_data.get("title", "")
     status: str = ticket_data.get("status", "")
-    current: int = ticket_data.get("current", 0)
-    subnumbers: list = ticket_data.get("subnumbers", [])
+    command: str = ticket_data.get("command", "")
+    prompt_data: dict = ticket_data.get("prompt", {}) or {}
+    result_data: dict | None = ticket_data.get("result")
     relations: list = ticket_data.get("relations", [])
 
     # ── 헤더 및 메타데이터 출력 ──────────────────────────────────────────────
@@ -613,7 +587,8 @@ def cmd_show(ticket_number: str) -> None:
     print(f"- Number: {number}")
     print(f"- Title: {title}")
     print(f"- Status: {status}")
-    print(f"- Current: {current}")
+    if command:
+        print(f"- Command: {command}")
 
     # ── 관계 정보 출력 ────────────────────────────────────────────────────────
     if relations:
@@ -624,63 +599,57 @@ def cmd_show(ticket_number: str) -> None:
             rel_ticket: str = rel.get("ticket", "")
             print(f"- {rel_type}: {rel_ticket}")
 
-    # ── 활성 subnumber 탐색 ──────────────────────────────────────────────────
-    active_sub: dict | None = None
-    if current > 0:
-        for sub in subnumbers:
-            if sub.get("id") == current:
-                active_sub = sub
-                break
-
-    if active_sub is None:
+    # ── 프롬프트 출력 ────────────────────────────────────────────────────────
+    has_prompt = any(prompt_data.get(k) for k in ("goal", "target", "constraints", "criteria", "context"))
+    if not has_prompt:
         print()
-        print("(활성 프롬프트 없음)")
-        return
+        print("(프롬프트 없음)")
+    else:
+        print()
+        print("### Prompt")
 
-    # ── 활성 프롬프트 출력 ───────────────────────────────────────────────────
-    print()
-    print(f"### Active Prompt (subnumber {current})")
+        goal: str = prompt_data.get("goal", "")
+        if goal:
+            print(f"- Goal: {goal.strip()}")
 
-    command: str = active_sub.get("command", "")
-    if command:
-        print(f"- Command: {command}")
+        target: str = prompt_data.get("target", "")
+        if target:
+            print(f"- Target: {target.strip()}")
 
-    goal: str = active_sub.get("goal", "")
-    if goal:
-        print(f"- Goal: {goal.strip()}")
+        constraints: str = prompt_data.get("constraints", "")
+        if constraints:
+            print(f"- Constraints: {constraints.strip()}")
 
-    target: str = active_sub.get("target", "")
-    if target:
-        print(f"- Target: {target.strip()}")
+        criteria: str = prompt_data.get("criteria", "")
+        if criteria:
+            print(f"- Criteria: {criteria.strip()}")
 
-    constraints: str = active_sub.get("constraints", "")
-    if constraints:
-        print(f"- Constraints: {constraints.strip()}")
-
-    criteria: str = active_sub.get("criteria", "")
-    if criteria:
-        print(f"- Criteria: {criteria.strip()}")
-
-    context: str = active_sub.get("context", "")
-    if context:
-        print(f"- Context: {context.strip()}")
+        context: str = prompt_data.get("context", "")
+        if context:
+            print(f"- Context: {context.strip()}")
 
     # ── result 정보 출력 ─────────────────────────────────────────────────────
     print()
     print("### Result")
 
-    result = active_sub.get("result")
-    if result:
-        print("- Has Result: Yes")
-        if isinstance(result, dict):
-            workdir: str = result.get("workdir", "")
+    if result_data and isinstance(result_data, dict):
+        has_content = any(result_data.get(k) for k in ("registrykey", "workdir", "plan", "report"))
+        if has_content:
+            print("- Has Result: Yes")
+            registrykey: str = result_data.get("registrykey", "")
+            if registrykey:
+                print(f"- RegistryKey: {registrykey}")
+            workdir: str = result_data.get("workdir", "")
             if workdir:
                 print(f"- Workdir: {workdir}")
-            report: str = result.get("report", "")
+            plan: str = result_data.get("plan", "")
+            if plan:
+                print(f"- Plan: {plan}")
+            report: str = result_data.get("report", "")
             if report:
                 print(f"- Report: {report}")
         else:
-            print(f"- Detail: {result}")
+            print("- Has Result: No")
     else:
         print("- Has Result: No")
 
@@ -845,18 +814,10 @@ def cmd_board() -> None:
                 log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
                 continue
 
-            # 활성 subnumber 탐색: current 값과 id가 일치하는 subnumber
-            current_id = ticket_data.get("current", 0)
-            active_command = ""
-            for sub in ticket_data.get("subnumbers", []):
-                if sub.get("id") == current_id:
-                    active_command = sub.get("command", "")
-                    break
-
             grouped[column].append({
                 "number": ticket_data.get("number", ""),
                 "title": ticket_data.get("title", ""),
-                "command": active_command,
+                "command": ticket_data.get("command", ""),
             })
 
     # ── done 디렉터리 스캔 ───────────────────────────────────────────────────
@@ -1022,22 +983,24 @@ def build_parser() -> argparse.ArgumentParser:
     delete_parser = subparsers.add_parser("delete", help="티켓을 삭제한다")
     delete_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
 
-    # add-subnumber 서브커맨드
-    add_sub_parser = subparsers.add_parser("add-subnumber", help="티켓 XML에 새 subnumber 항목을 추가한다")
-    add_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    add_sub_parser.add_argument("--command", required=True, help="워크플로우 커맨드 (implement, review, research 등)")
-    add_sub_parser.add_argument("--goal", required=True, help="해당 사이클 목표")
-    add_sub_parser.add_argument("--target", required=True, help="대상")
-    add_sub_parser.add_argument("--constraints", default="", help="제약사항 (선택, 프롬프트 5요소)")
-    add_sub_parser.add_argument("--criteria", default="", help="완료 기준 (선택, 프롬프트 5요소)")
-    add_sub_parser.add_argument("--context", default="", help="맥락 정보 (선택, 프롬프트 5요소)")
-    add_sub_parser.add_argument("--workdir", default="", help=".claude.workflow/workflow/ 산출물 경로 (선택)")
-    add_sub_parser.add_argument("--result", default="", help="실행 결과 요약 (선택)")
-    add_sub_parser.add_argument("--skip-validation", action="store_true", default=False, help="품질 검증을 우회한다 (긴급 시 사용)")
+    # update-prompt 서브커맨드
+    update_prompt_parser = subparsers.add_parser("update-prompt", help="티켓의 prompt 및 command를 갱신한다")
+    update_prompt_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    update_prompt_parser.add_argument("--command", default="", help="워크플로우 커맨드 (implement, review, research 등)")
+    update_prompt_parser.add_argument("--goal", default="", help="작업 목표")
+    update_prompt_parser.add_argument("--target", default="", help="대상")
+    update_prompt_parser.add_argument("--constraints", default="", help="제약사항 (선택, 프롬프트 5요소)")
+    update_prompt_parser.add_argument("--criteria", default="", help="완료 기준 (선택, 프롬프트 5요소)")
+    update_prompt_parser.add_argument("--context", default="", help="맥락 정보 (선택, 프롬프트 5요소)")
+    update_prompt_parser.add_argument("--skip-validation", action="store_true", default=False, help="품질 검증을 우회한다 (긴급 시 사용)")
 
-    # archive-subnumber 서브커맨드
-    archive_sub_parser = subparsers.add_parser("archive-subnumber", help="active subnumber를 submit에서 history로 이동한다")
-    archive_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # update-result 서브커맨드
+    update_result_parser = subparsers.add_parser("update-result", help="티켓의 result 정보를 갱신한다")
+    update_result_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    update_result_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
+    update_result_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
+    update_result_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
+    update_result_parser.add_argument("--report", default="", help="report.md 상대 경로")
 
     # set-editing 서브커맨드
     set_editing_parser = subparsers.add_parser("set-editing", help="티켓 XML의 <editing> 플래그를 설정한다")
@@ -1055,21 +1018,6 @@ def build_parser() -> argparse.ArgumentParser:
     update_alias.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
     update_alias.add_argument("title", nargs="?", default="", help="새 제목")
     update_alias.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
-
-    # update-subnumber 서브커맨드
-    update_sub_parser = subparsers.add_parser("update-subnumber", help="기존 subnumber의 prompt / result 내부 필드를 갱신한다")
-    update_sub_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_sub_parser.add_argument("subnumber_id_pos", nargs="?", type=int, default=None, help="갱신할 subnumber ID (위치 인자)")
-    update_sub_parser.add_argument("--id", dest="subnumber_id", required=False, type=int, default=None, help="갱신할 subnumber ID (--id 형식)")
-    update_sub_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
-    update_sub_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
-    update_sub_parser.add_argument("--report", default="", help="report.md 상대 경로")
-    update_sub_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
-    update_sub_parser.add_argument("--goal", default="", help="작업 목표")
-    update_sub_parser.add_argument("--target", default="", help="작업 대상")
-    update_sub_parser.add_argument("--constraints", default="", help="제약 조건")
-    update_sub_parser.add_argument("--criteria", default="", help="완료 기준")
-    update_sub_parser.add_argument("--context", default="", help="추가 컨텍스트")
 
     # link 서브커맨드
     link_parser = subparsers.add_parser("link", help="티켓 간 관계를 양방향으로 기록한다")
@@ -1140,35 +1088,32 @@ def dispatch(args: argparse.Namespace) -> None:
             err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
         cmd_delete(ticket)
 
-    elif args.subcommand == "add-subnumber":
+    elif args.subcommand == "update-prompt":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
             err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
-        cmd_add_subnumber(
+        cmd_update_prompt(
             ticket,
             command=args.command,
             goal=args.goal,
             target=args.target,
-            workdir=args.workdir,
-            result=args.result,
             constraints=args.constraints,
             criteria=args.criteria,
             context=args.context,
             skip_validation=args.skip_validation,
         )
 
-    elif args.subcommand == "archive-subnumber":
+    elif args.subcommand == "update-result":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
             err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
-        ticket_file = find_ticket_file(ticket)
-        if ticket_file is None:
-            err(f"{ticket} 티켓 파일을 찾을 수 없습니다")
-        moved = move_active_to_history(ticket_file)
-        if moved:
-            print(f"{ticket}: active subnumber를 history로 이동했습니다")
-        else:
-            err(f"{ticket}: active subnumber가 없습니다")
+        cmd_update_result(
+            ticket,
+            registrykey=args.registrykey,
+            workdir=args.workdir,
+            plan=args.plan,
+            report=args.report,
+        )
 
     elif args.subcommand == "set-editing":
         ticket = normalize_ticket_number(args.ticket)
@@ -1184,27 +1129,6 @@ def dispatch(args: argparse.Namespace) -> None:
         if not title:
             err("제목을 지정해야 합니다. 예: flow-kanban update-title T-001 \"새 제목\"", 2)
         cmd_update_title(ticket, title)
-
-    elif args.subcommand == "update-subnumber":
-        ticket = normalize_ticket_number(args.ticket)
-        if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
-        subnumber_id = args.subnumber_id_pos if args.subnumber_id_pos is not None else args.subnumber_id
-        if subnumber_id is None:
-            err("subnumber ID를 지정해야 합니다. 예: flow-kanban update-subnumber T-001 1 또는 --id 1", 2)
-        cmd_update_subnumber(
-            ticket,
-            subnumber_id=subnumber_id,
-            registrykey=args.registrykey,
-            plan=args.plan,
-            report=args.report,
-            workdir=args.workdir,
-            goal=args.goal,
-            target=args.target,
-            constraints=args.constraints,
-            criteria=args.criteria,
-            context=args.context,
-        )
 
     elif args.subcommand == "link":
         ticket = normalize_ticket_number(args.ticket)

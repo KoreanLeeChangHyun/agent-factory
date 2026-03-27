@@ -130,15 +130,16 @@ def err(msg: str, code: int = 1) -> NoReturn:
 # ─── XML 헬퍼 ────────────────────────────────────────────────────────────────
 
 
-def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "") -> str:
+def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "", command: str = "") -> str:
     """티켓 XML 문자열을 생성하여 반환한다.
 
-    XML은 <metadata>, <submit>, <history> 래퍼 요소로 구분된다.
+    XML은 <metadata>, <prompt>, <result> 요소로 구성되는 flat 구조이다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
         title: 티켓 제목. 빈 문자열 허용.
         datetime_str: 생성 일시 문자열 (YYYY-MM-DD HH:MM:SS 형식). 빈 문자열이면 현재 시간 사용.
+        command: 실행 커맨드 (implement, research 등). 빈 문자열 허용.
 
     Returns:
         UTF-8 XML 선언을 포함한 티켓 XML 문자열.
@@ -152,27 +153,27 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
         title_sub.text = title
     ET.SubElement(metadata_elem, "datetime").text = datetime_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ET.SubElement(metadata_elem, "status").text = "Open"
-    ET.SubElement(metadata_elem, "current").text = "0"
-    # <submit> 래퍼 요소
-    ET.SubElement(root, "submit")
-    # <history> 래퍼 요소 (subnumber가 완료되면 여기 아래로 이동)
-    ET.SubElement(root, "history")
+    if command:
+        ET.SubElement(metadata_elem, "command").text = command
+    # <prompt /> self-closing 요소
+    ET.SubElement(root, "prompt")
+    # <result /> self-closing 요소
+    ET.SubElement(root, "result")
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode", xml_declaration=False)
-    # 섹션 주석 삽입: <metadata>, <submit>, <history> 태그 직전에 주석 추가
-    # self-closing 태그(<submit />, <history />) 및 일반 태그(<submit>, <history>) 모두 처리
+    # 섹션 주석 삽입: <metadata>, <prompt>, <result> 태그 직전에 주석 추가
+    # self-closing 태그(<prompt />, <result />) 및 일반 태그(<prompt>, <result>) 모두 처리
     xml_str = re.sub(r"(<metadata[ />])", r"<!-- metadata -->\n  \1", xml_str)
-    xml_str = re.sub(r"(<submit[ />])", r"\n  <!-- submit -->\n  \1", xml_str)
-    xml_str = re.sub(r"(<history[ />])", r"\n  <!-- history -->\n  \1", xml_str)
+    xml_str = re.sub(r"(<prompt[ />])", r"\n  <!-- prompt -->\n  \1", xml_str)
+    xml_str = re.sub(r"(<result[ />])", r"\n  <!-- result -->\n  \1", xml_str)
     return xml_str
 
 
 def write_ticket_xml(filepath: str, root: ET.Element) -> None:
     """XML Element를 파일에 저장한다.
 
-    <metadata>, <submit>, <history> 래퍼 요소 구조를 유지하고,
-    subnumber 요소 사이에 빈 줄을 삽입하여 가독성을 높인다.
-    prompt, result 래퍼 태그를 포함한 구조에서도 정상 동작한다.
+    <metadata>, <prompt>, <result> flat 구조를 유지하고,
+    prompt 내부 필드 텍스트를 가독성 있게 래핑한다.
 
     Args:
         filepath: 저장할 파일 경로.
@@ -180,8 +181,6 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
     """
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode")
-    # </subnumber> 다음 <subnumber 앞에 빈 줄 삽입
-    xml_str = re.sub(r"(</subnumber>)\s*(<subnumber)", r"\1\n\n      \2", xml_str)
     # prompt 내부 필드 텍스트를 개행+들여쓰기로 래핑하여 가독성 확보 (10자 이상만)
     _PROMPT_FIELD_INLINE_LIMIT = 10
 
@@ -206,16 +205,16 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
         xml_str,
         flags=re.DOTALL,
     )
-    # 섹션 주석 삽입: <metadata>, <submit>, <history> 태그 직전에 주석 추가 (없는 경우에만)
-    # self-closing 태그(<submit />, <history />) 및 일반 태그(<submit>, <history>) 모두 처리
+    # 섹션 주석 삽입: <metadata>, <relations>, <prompt>, <result> 태그 직전에 주석 추가 (없는 경우에만)
+    # self-closing 태그(<prompt />, <result />) 및 일반 태그(<prompt>, <result>) 모두 처리
     if "<!-- metadata -->" not in xml_str:
         xml_str = re.sub(r"(<metadata[ />])", r"<!-- metadata -->\n  \1", xml_str)
-    if "<!-- submit -->" not in xml_str:
-        xml_str = re.sub(r"(<submit[ />])", r"\n  <!-- submit -->\n  \1", xml_str)
     if "<!-- relations -->" not in xml_str and "<relations" in xml_str:
         xml_str = re.sub(r"(<relations[ />])", r"\n  <!-- relations -->\n  \1", xml_str)
-    if "<!-- history -->" not in xml_str:
-        xml_str = re.sub(r"(<history[ />])", r"\n  <!-- history -->\n  \1", xml_str)
+    if "<!-- prompt -->" not in xml_str:
+        xml_str = re.sub(r"(<prompt[ />])", r"\n  <!-- prompt -->\n  \1", xml_str)
+    if "<!-- result -->" not in xml_str:
+        xml_str = re.sub(r"(<result[ />])", r"\n  <!-- result -->\n  \1", xml_str)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         f.write(xml_str)
@@ -225,9 +224,8 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
 def parse_ticket_xml(filepath: str) -> dict[str, Any]:
     """티켓 XML 파일을 파싱하여 딕셔너리로 반환한다.
 
-    <metadata>, <submit>, <history> 래퍼 요소 기반으로 파싱한다.
-    subnumber는 <submit> 및 <history> 래퍼 내부에서 탐색한다.
-    subnumber 내부에 <prompt> 래퍼가 있으면 그 안의 필드를 파싱한다.
+    flat 구조(<metadata>, <prompt>, <result>)를 기본으로 파싱한다.
+    done 디렉터리의 레거시 티켓(<submit>/<subnumber> 또는 <history>/<subnumber> 구조)은 폴백 로직으로 처리한다.
 
     Args:
         filepath: 파싱할 티켓 파일 경로.
@@ -236,9 +234,11 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         파싱된 티켓 정보 딕셔너리:
             - number (str): 티켓 번호
             - status (str): 현재 상태
-            - current (int): 현재 subnumber ID
             - title (str): 티켓 제목
-            - subnumbers (list[dict]): subnumber 목록
+            - command (str): 실행 커맨드
+            - prompt (dict): goal, target, constraints, criteria, context
+            - result (dict | None): registrykey, workdir, plan, report (미실행 시 None)
+            - relations (list[dict]): 관계 목록
 
     Raises:
         SystemExit: 파일 읽기 실패 또는 XML 파싱 오류 시.
@@ -254,86 +254,66 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         child = elem.find(tag)
         return child.text.strip() if child is not None and child.text else default
 
-    # <metadata> 래퍼에서 number/title/datetime/status 파싱
+    # <metadata> 래퍼에서 number/title/datetime/status/command 파싱
     metadata_elem = root.find("metadata")
-    submit_elem = root.find("submit")
-    history_elem = root.find("history")
 
     if metadata_elem is not None:
         number = _text(metadata_elem, "number")
         status = _text(metadata_elem, "status")
         title = _text(metadata_elem, "title")
+        command = _text(metadata_elem, "command")
     else:
         number = _text(root, "number")
         status = _text(root, "status")
         title = _text(root, "title")
+        command = _text(root, "command")
 
-    # <current>는 <metadata> 내부 우선, 없으면 <submit> 폴백, 둘 다 없으면 루트 폴백
-    if metadata_elem is not None and metadata_elem.find("current") is not None:
-        current = int(_text(metadata_elem, "current", "0"))
-    elif submit_elem is not None and submit_elem.find("current") is not None:
-        current = int(_text(submit_elem, "current", "0"))
+    # done 디렉터리 레거시 폴백: <submit>/<subnumber> 또는 <history>/<subnumber> 구조가 감지되면 기존 로직으로 파싱
+    submit_elem = root.find("submit")
+    history_elem = root.find("history")
+    has_legacy_structure = (
+        (submit_elem is not None and submit_elem.find("subnumber") is not None) or
+        (history_elem is not None and history_elem.find("subnumber") is not None)
+    )
+    if has_legacy_structure:
+        return _parse_legacy_ticket(filepath, root, number, status, title, _text)
+
+    # flat 구조: <prompt> 루트 직하에서 5요소 파싱
+    prompt_fields = ("goal", "target", "constraints", "criteria", "context")
+    prompt_data: dict[str, str] = {}
+    prompt_elem = root.find("prompt")
+    if prompt_elem is not None:
+        for field in prompt_fields:
+            prompt_data[field] = _text(prompt_elem, field)
     else:
-        current = int(_text(root, "current", "0"))
+        for field in prompt_fields:
+            prompt_data[field] = ""
 
-    # <editing>은 <metadata> 내부에서 파싱. 없으면 false로 폴백
-    if metadata_elem is not None:
-        editing = _text(metadata_elem, "editing", "false") == "true"
-    else:
-        editing = False
-
-    # subnumber를 <submit> 및 <history> 래퍼 내부에서 탐색
-    subnumbers: list[dict[str, Any]] = []
-    sub_sources: list[ET.Element] = []
-    if submit_elem is not None:
-        sub_sources.append(submit_elem)
-    if history_elem is not None:
-        sub_sources.append(history_elem)
-    if not sub_sources:
-        # 래퍼가 없는 경우 루트에서 직접 탐색
-        sub_sources.append(root)
-
-    for source in sub_sources:
-        for sub in source.findall("subnumber"):
-            sub_id = sub.get("id", "")
-            sub_data: dict[str, Any] = {"id": int(sub_id) if sub_id.isdigit() else 0}
-
-            # <prompt> 래퍼 내부 필드 파싱
-            prompt_elem = sub.find("prompt")
-            if prompt_elem is not None:
-                for prompt_child in prompt_elem:
-                    text = prompt_child.text.strip() if prompt_child.text else ""
-                    sub_data[prompt_child.tag] = text
-
-            # <result> 래퍼 내부 필드 파싱
-            result_elem = sub.find("result")
-            if result_elem is not None and len(result_elem) > 0:
-                # 구조화된 result: 하위 요소(workdir, plan, work, report, workflow)를 개별 파싱
-                result_data: dict[str, str] = {}
-                for result_child in result_elem:
-                    text = result_child.text.strip() if result_child.text else ""
-                    result_data[result_child.tag] = text
-                    # workdir은 subnumber 레벨에도 노출 (하위 호환)
-                    if result_child.tag == "workdir":
-                        sub_data["workdir"] = text
-                    # workflow는 subnumber 레벨에도 노출
-                    if result_child.tag == "workflow":
-                        sub_data["workflow"] = text
-                sub_data["result"] = result_data
-            elif result_elem is not None and result_elem.text:
-                sub_data["result"] = result_elem.text.strip()
-
-            # subnumber 직하 필드 파싱 (prompt/result 밖의 datetime, command 등)
-            for child in sub:
-                tag = child.tag
-                if tag in ("prompt", "result"):
-                    continue  # 이미 위에서 처리
-                text = child.text.strip() if child.text else ""
-                sub_data[tag] = text
-
-            subnumbers.append(sub_data)
+    # flat 구조: <result> 루트 직하에서 하위 요소 파싱
+    result_fields = ("registrykey", "workdir", "plan", "report")
+    result_data: dict[str, str] | None = None
+    result_elem = root.find("result")
+    if result_elem is not None and len(result_elem) > 0:
+        result_data = {}
+        for field in result_fields:
+            result_data[field] = _text(result_elem, field)
 
     # <relations> 요소 파싱 (하위 호환: 없으면 빈 리스트)
+    relations = _parse_relations(root)
+
+    return {
+        "number": number,
+        "status": status,
+        "title": title,
+        "command": command,
+        "prompt": prompt_data,
+        "result": result_data,
+        "relations": relations,
+    }
+
+
+def _parse_relations(root: ET.Element) -> list[dict[str, str]]:
+    """<relations> 요소를 파싱하여 관계 리스트를 반환한다."""
     relations: list[dict[str, str]] = []
     relations_elem = root.find("relations")
     if relations_elem is not None:
@@ -342,270 +322,90 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
             rel_ticket = rel.get("ticket", "")
             if rel_type and rel_ticket:
                 relations.append({"type": rel_type, "ticket": rel_ticket})
+    return relations
+
+
+def _parse_legacy_ticket(
+    filepath: str,
+    root: ET.Element,
+    number: str,
+    status: str,
+    title: str,
+    _text: Any,
+) -> dict[str, Any]:
+    """레거시 <submit>/<subnumber> 구조를 파싱하여 새 flat 형식으로 반환한다.
+
+    done 디렉터리의 기존 티켓과의 하위 호환을 위해 사용된다.
+    """
+    submit_elem = root.find("submit")
+    history_elem = root.find("history")
+
+    # command와 prompt는 가장 최근(가장 큰 id) subnumber에서 추출
+    all_subs: list[ET.Element] = []
+    if submit_elem is not None:
+        all_subs.extend(submit_elem.findall("subnumber"))
+    if history_elem is not None:
+        all_subs.extend(history_elem.findall("subnumber"))
+    if not all_subs:
+        all_subs.extend(root.findall("subnumber"))
+
+    # ID 기준 내림차순 정렬하여 최근 subnumber 우선
+    all_subs.sort(key=lambda s: int(s.get("id", "0")) if s.get("id", "0").isdigit() else 0, reverse=True)
+
+    command = ""
+    prompt_data: dict[str, str] = {"goal": "", "target": "", "constraints": "", "criteria": "", "context": ""}
+    result_data: dict[str, str] | None = None
+
+    if all_subs:
+        latest = all_subs[0]
+        # command: subnumber 직하
+        cmd_elem = latest.find("command")
+        if cmd_elem is not None and cmd_elem.text:
+            command = cmd_elem.text.strip()
+
+        # prompt: subnumber 내부 <prompt> 래퍼
+        prompt_elem = latest.find("prompt")
+        if prompt_elem is not None:
+            for field in ("goal", "target", "constraints", "criteria", "context"):
+                child = prompt_elem.find(field)
+                if child is not None and child.text:
+                    prompt_data[field] = child.text.strip()
+
+        # result: subnumber 내부 <result> 래퍼
+        result_elem = latest.find("result")
+        if result_elem is not None and len(result_elem) > 0:
+            result_data = {}
+            for result_child in result_elem:
+                text = result_child.text.strip() if result_child.text else ""
+                result_data[result_child.tag] = text
+
+    # <relations> 요소 파싱
+    relations = _parse_relations(root)
 
     return {
         "number": number,
         "status": status,
-        "current": current,
         "title": title,
-        "editing": editing,
-        "subnumbers": subnumbers,
+        "command": command,
+        "prompt": prompt_data,
+        "result": result_data,
         "relations": relations,
     }
 
 
-# ─── 히스토리 관련 ────────────────────────────────────────────────────────────
+# ─── prompt/result 갱신 ──────────────────────────────────────────────────────
 
 
-def find_history_element(root: ET.Element) -> ET.Element | None:
-    """<history> 래퍼 요소를 찾아 반환한다.
+def update_prompt(filepath: str, updates: dict[str, str]) -> None:
+    """티켓 XML의 <prompt> 하위 요소와 <metadata>/<command>를 갱신한다.
 
-    Args:
-        root: XML 루트 Element.
-
-    Returns:
-        <history> 래퍼 Element. 없으면 None.
-    """
-    return root.find("history")
-
-
-def move_active_to_history(filepath: str) -> bool:
-    """<submit> 내 active subnumber를 <history>로 이동한다.
-
-    <submit> 래퍼 내에서 active="true" 속성을 가진 subnumber를 찾아
-    active 속성을 제거하고 <history> 래퍼로 이동한 뒤 저장한다.
+    self-closing <prompt /> 태그를 내용 있는 <prompt> 태그로 자동 변환한다.
 
     Args:
         filepath: 티켓 파일 경로.
-
-    Returns:
-        이동 성공 시 True, active subnumber가 없으면 False.
-    """
-    tree = ET.parse(filepath)
-    root = tree.getroot()
-
-    submit_elem = root.find("submit")
-    history_elem = root.find("history")
-
-    if submit_elem is None:
-        return False
-
-    active_sub = None
-    for sub in submit_elem.findall("subnumber"):
-        if sub.get("active") == "true":
-            active_sub = sub
-            break
-
-    if active_sub is None:
-        return False
-
-    del active_sub.attrib["active"]
-    submit_elem.remove(active_sub)
-
-    if history_elem is not None:
-        history_elem.append(active_sub)
-    else:
-        root.append(active_sub)
-
-    write_ticket_xml(filepath, root)
-    return True
-
-
-# ─── subnumber 관련 ──────────────────────────────────────────────────────────
-
-
-def add_subnumber(filepath: str, subnumber_data: dict[str, Any]) -> int:
-    """티켓 XML에 새 subnumber를 추가하고 <current>를 갱신한다.
-
-    신규 subnumber는 <submit> 래퍼 내부(<current> 요소 바로 다음)에 삽입한다.
-    기존 활성 subnumber는 active 속성을 제거하고 <history> 래퍼로 이동한다.
-    프롬프트 5요소는 <prompt> 래퍼 내부에, <command>는 subnumber 직하에 배치한다.
-    <result>는 workflow 하위 요소를 갖는 구조화된 래퍼로 생성한다.
-
-    Args:
-        filepath: 티켓 파일 경로.
-        subnumber_data: 추가할 subnumber 필드 딕셔너리.
-            공통 필드: command, datetime
-            프롬프트 5요소 (prompt 래퍼 내부): goal, target, context, constraints(선택), criteria(선택)
-            결과 필드 (result 래퍼 내부): workflow(선택, W-NNN 형식)
-
-    Returns:
-        새로 추가된 subnumber의 ID (정수).
-
-    Raises:
-        SystemExit: 파일 읽기/쓰기 실패 시.
-    """
-    try:
-        tree = ET.parse(filepath)
-        root = tree.getroot()
-    except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
-
-    metadata_elem = root.find("metadata")
-    submit_elem = root.find("submit")
-    history_elem = find_history_element(root)
-
-    # <current>는 <metadata> 내부 우선, 없으면 <submit> 폴백, 둘 다 없으면 루트 폴백
-    if metadata_elem is not None and metadata_elem.find("current") is not None:
-        current_elem = metadata_elem.find("current")
-    elif submit_elem is not None and submit_elem.find("current") is not None:
-        current_elem = submit_elem.find("current")
-    else:
-        current_elem = root.find("current")
-    current_val = int(current_elem.text.strip()) if current_elem is not None and current_elem.text else 0
-    new_id = current_val + 1
-
-    # 기존 활성 subnumber를 <history> 래퍼로 이동
-    if submit_elem is not None:
-        for existing_sub in submit_elem.findall("subnumber"):
-            if "active" in existing_sub.attrib:
-                del existing_sub.attrib["active"]
-                submit_elem.remove(existing_sub)
-                if history_elem is not None:
-                    history_elem.append(existing_sub)
-                else:
-                    root.append(existing_sub)
-
-    # 신규 subnumber 요소 생성 (active="true" 설정)
-    sub_elem = ET.Element("subnumber")
-    sub_elem.set("id", str(new_id))
-    sub_elem.set("active", "true")
-
-    # datetime 필드 (없으면 현재 시간)
-    dt_str = subnumber_data.get("datetime", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    ET.SubElement(sub_elem, "datetime").text = dt_str
-
-    # command는 subnumber 직하에 배치 (prompt 밖)
-    if "command" in subnumber_data:
-        ET.SubElement(sub_elem, "command").text = str(subnumber_data["command"])
-
-    # <prompt> 래퍼: goal, target, constraints, criteria, context를 내부에 배치
-    prompt_fields = ("goal", "target", "constraints", "criteria", "context")
-    has_prompt_fields = any(subnumber_data.get(f) for f in prompt_fields)
-    if has_prompt_fields:
-        prompt_elem = ET.SubElement(sub_elem, "prompt")
-        for field in prompt_fields:
-            if subnumber_data.get(field):
-                elem = ET.SubElement(prompt_elem, field)
-                text = str(subnumber_data[field]).strip().replace("\\n", "\n")
-                elem.text = text
-
-    # <result> 래퍼: workflow 하위 요소
-    result_fields = ("workflow",)
-    has_result_fields = any(subnumber_data.get(f) for f in result_fields)
-    if has_result_fields:
-        result_elem = ET.SubElement(sub_elem, "result")
-        for field in result_fields:
-            if subnumber_data.get(field):
-                ET.SubElement(result_elem, field).text = str(subnumber_data[field])
-
-    # <submit> 래퍼 내부의 첫 번째 위치에 삽입 (current는 <metadata> 내부로 이동했으므로)
-    if submit_elem is not None:
-        submit_elem.insert(0, sub_elem)
-    else:
-        root.append(sub_elem)
-
-    # <current> 갱신
-    if current_elem is not None:
-        current_elem.text = str(new_id)
-    elif metadata_elem is not None:
-        ET.SubElement(metadata_elem, "current").text = str(new_id)
-    elif submit_elem is not None:
-        ET.SubElement(submit_elem, "current").text = str(new_id)
-    else:
-        ET.SubElement(root, "current").text = str(new_id)
-
-    write_ticket_xml(filepath, root)
-    return new_id
-
-
-def rollback_subnumber(filepath: str, subnumber_id: int) -> None:
-    """add_subnumber()의 역연산: 지정 subnumber를 제거하고 current를 복원한다.
-
-    <submit> 내에서 subnumber_id를 가진 <subnumber> 요소를 제거하고,
-    <current>를 subnumber_id - 1로 복원한다.
-    직전 subnumber(id == subnumber_id - 1)가 <history>에 존재하면
-    <submit>으로 이동하고 active="true"를 복원한다.
-
-    Args:
-        filepath: 티켓 파일 경로.
-        subnumber_id: 롤백할 subnumber ID.
-
-    Raises:
-        SystemExit: 파일 읽기/쓰기 실패 또는 subnumber를 찾지 못한 경우.
-    """
-    try:
-        tree = ET.parse(filepath)
-        root = tree.getroot()
-    except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
-
-    metadata_elem = root.find("metadata")
-    submit_elem = root.find("submit")
-    history_elem = find_history_element(root)
-
-    # <submit> 내에서 대상 subnumber 탐색
-    target_sub: ET.Element | None = None
-    if submit_elem is not None:
-        for sub in submit_elem.findall("subnumber"):
-            if sub.get("id") == str(subnumber_id):
-                target_sub = sub
-                break
-
-    if target_sub is None:
-        err(f"subnumber id={subnumber_id}를 <submit>에서 찾을 수 없습니다: {filepath}")
-
-    # 대상 subnumber 제거
-    if submit_elem is not None:
-        submit_elem.remove(target_sub)
-
-    # <current> 값을 subnumber_id - 1로 복원
-    prev_id = subnumber_id - 1
-    if metadata_elem is not None and metadata_elem.find("current") is not None:
-        current_elem = metadata_elem.find("current")
-    elif submit_elem is not None and submit_elem.find("current") is not None:
-        current_elem = submit_elem.find("current")
-    else:
-        current_elem = root.find("current")
-
-    if current_elem is not None:
-        current_elem.text = str(prev_id)
-
-    # 직전 subnumber(id == prev_id)가 <history>에 존재하면 <submit>으로 복원
-    if prev_id >= 1 and history_elem is not None:
-        prev_sub: ET.Element | None = None
-        for sub in history_elem.findall("subnumber"):
-            if sub.get("id") == str(prev_id):
-                prev_sub = sub
-                break
-
-        if prev_sub is not None and prev_sub.get("active") != "true":
-            history_elem.remove(prev_sub)
-            prev_sub.set("active", "true")
-            if submit_elem is not None:
-                submit_elem.insert(0, prev_sub)
-            else:
-                root.append(prev_sub)
-
-    write_ticket_xml(filepath, root)
-
-
-def update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any]) -> None:
-    """기존 subnumber의 필드를 갱신한다.
-
-    <submit> 및 <history> 래퍼 내부의 subnumber를 모두 탐색한다.
-    <prompt> 래퍼 내부의 하위 요소(goal, target, constraints, criteria, context)를 갱신한다.
-    <result> 래퍼 내부의 하위 요소(workflow, registrykey, plan, report, workdir)를 갱신한다.
-
-    Args:
-        filepath: 티켓 파일 경로.
-        subnumber_id: 갱신할 subnumber ID.
         updates: 갱신할 필드 딕셔너리.
-            prompt 내부 필드: goal, target, constraints, criteria, context
-            result 내부 필드: workflow, registrykey, plan, report, workdir
-
-    Raises:
-        SystemExit: 파일 읽기/쓰기 실패 또는 subnumber를 찾지 못한 경우.
+            - command: <metadata>/<command> 갱신
+            - goal, target, constraints, criteria, context: <prompt> 하위 요소 갱신
     """
     try:
         tree = ET.parse(filepath)
@@ -613,73 +413,74 @@ def update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any]) 
     except (OSError, ET.ParseError) as e:
         err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
 
-    # <submit> 및 <history> 래퍼 내부의 subnumber를 모두 탐색
-    target_sub: ET.Element | None = None
-    for wrapper_tag in ("submit", "history"):
-        wrapper = root.find(wrapper_tag)
-        if wrapper is not None:
-            for sub in wrapper.findall("subnumber"):
-                if sub.get("id") == str(subnumber_id):
-                    target_sub = sub
-                    break
-        if target_sub is not None:
-            break
-    # 래퍼가 없는 경우 루트에서 직접 탐색 (하위 호환)
-    if target_sub is None:
-        for sub in root.findall("subnumber"):
-            if sub.get("id") == str(subnumber_id):
-                target_sub = sub
-                break
+    # <metadata>/<command> 갱신
+    if "command" in updates:
+        metadata_elem = root.find("metadata")
+        if metadata_elem is not None:
+            cmd_elem = metadata_elem.find("command")
+            if cmd_elem is not None:
+                cmd_elem.text = updates["command"]
+            else:
+                ET.SubElement(metadata_elem, "command").text = updates["command"]
 
-    if target_sub is None:
-        err(f"subnumber id={subnumber_id}를 찾을 수 없습니다: {filepath}")
+    # <prompt> 하위 요소 갱신
+    prompt_fields = ("goal", "target", "constraints", "criteria", "context")
+    prompt_updates = {k: v for k, v in updates.items() if k in prompt_fields}
 
-    # prompt / result 래퍼 내부 필드 분류
-    prompt_inner_fields = {"goal", "target", "constraints", "criteria", "context"}
-    result_inner_fields = {"workflow", "registrykey", "plan", "report", "workdir"}
-    prompt_updates: dict[str, str] = {}
-    result_updates: dict[str, str] = {}
-    other_updates: dict[str, str] = {}
-
-    for field, value in updates.items():
-        if field in prompt_inner_fields:
-            prompt_updates[field] = str(value)
-        elif field in result_inner_fields:
-            result_updates[field] = str(value)
-        else:
-            other_updates[field] = str(value)
-
-    # <prompt> 래퍼 내부 필드 갱신
     if prompt_updates:
-        prompt_elem = target_sub.find("prompt")
+        prompt_elem = root.find("prompt")
         if prompt_elem is None:
-            prompt_elem = ET.SubElement(target_sub, "prompt")
+            # <prompt> 요소가 없으면 생성 (metadata 뒤에 삽입)
+            prompt_elem = ET.Element("prompt")
+            insert_idx = 0
+            for i, child in enumerate(root):
+                if child.tag in ("metadata", "relations"):
+                    insert_idx = i + 1
+            root.insert(insert_idx, prompt_elem)
+
         for field, value in prompt_updates.items():
+            # \\n 리터럴을 실제 개행으로 변환
+            text = str(value).strip().replace("\\n", "\n")
             existing = prompt_elem.find(field)
             if existing is not None:
-                existing.text = value
+                existing.text = text
             else:
-                ET.SubElement(prompt_elem, field).text = value
+                ET.SubElement(prompt_elem, field).text = text
 
-    # <result> 래퍼 내부 필드 갱신
+    write_ticket_xml(filepath, root)
+
+
+def update_result(filepath: str, updates: dict[str, str]) -> None:
+    """티켓 XML의 <result> 하위 요소를 갱신한다.
+
+    self-closing <result /> 태그를 내용 있는 <result> 태그로 자동 변환한다.
+
+    Args:
+        filepath: 티켓 파일 경로.
+        updates: 갱신할 필드 딕셔너리.
+            - registrykey, workdir, plan, report: <result> 하위 요소 갱신
+    """
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+
+    result_fields = ("registrykey", "workdir", "plan", "report")
+    result_updates = {k: v for k, v in updates.items() if k in result_fields}
+
     if result_updates:
-        result_elem = target_sub.find("result")
+        result_elem = root.find("result")
         if result_elem is None:
-            result_elem = ET.SubElement(target_sub, "result")
+            # <result> 요소가 없으면 생성 (루트 마지막에 추가)
+            result_elem = ET.SubElement(root, "result")
+
         for field, value in result_updates.items():
             existing = result_elem.find(field)
             if existing is not None:
-                existing.text = value
+                existing.text = str(value)
             else:
-                ET.SubElement(result_elem, field).text = value
-
-    # result 래퍼 외부 필드 갱신
-    for field, value in other_updates.items():
-        existing = target_sub.find(field)
-        if existing is not None:
-            existing.text = value
-        else:
-            ET.SubElement(target_sub, field).text = value
+                ET.SubElement(result_elem, field).text = str(value)
 
     write_ticket_xml(filepath, root)
 
@@ -690,7 +491,7 @@ def update_subnumber(filepath: str, subnumber_id: int, updates: dict[str, Any]) 
 def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
     """티켓 XML에 관계(relation) 요소를 추가한다.
 
-    <relations> 요소가 없으면 <metadata> 뒤, <submit> 앞에 새로 생성한다.
+    <relations> 요소가 없으면 <metadata> 뒤, <prompt> 앞에 새로 생성한다.
     동일한 type+ticket 조합이 이미 존재하면 중복 추가하지 않는다.
 
     Args:
@@ -715,7 +516,7 @@ def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
     # <relations> 요소가 없으면 생성
     if relations_elem is None:
         relations_elem = ET.Element("relations")
-        # <metadata> 뒤, <submit> 앞에 삽입
+        # <metadata> 뒤, <prompt> 앞에 삽입
         insert_idx = 0
         for i, child in enumerate(root):
             if child.tag == "metadata":
@@ -919,13 +720,11 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
         if pred_data.get("status", "") != "Done":
             continue
 
-        # subnumber의 result에서 report 경로 추출 (가장 최근 subnumber 우선)
+        # result dict에서 report 경로 직접 추출
         report_path_str = ""
-        for sub in reversed(pred_data.get("subnumbers", [])):
-            result = sub.get("result")
-            if isinstance(result, dict) and result.get("report"):
-                report_path_str = result["report"]
-                break
+        result = pred_data.get("result")
+        if isinstance(result, dict) and result.get("report"):
+            report_path_str = result["report"]
 
         if not report_path_str:
             continue

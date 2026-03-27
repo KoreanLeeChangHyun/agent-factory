@@ -754,7 +754,7 @@ def main() -> None:
             if _spec and _spec.loader:
                 _mod = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
-                # 활성 subnumber의 <prompt> 섹션만 추출 (하위 호환: 함수 없으면 전체 XML 전달)
+                # 루트 직하 <prompt> 섹션만 추출 (하위 호환: 함수 없으면 전체 XML 전달)
                 _active_prompt: str = (
                     _mod.extract_active_prompt(prompt_content)
                     if hasattr(_mod, "extract_active_prompt")

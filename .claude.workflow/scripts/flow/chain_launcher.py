@@ -2,7 +2,7 @@
 """chain_launcher.py - 체인 스테이지 비동기 tmux 발사 스크립트.
 
 finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
-이전 tmux 윈도우 사망을 대기한 뒤, 다음 subnumber를 생성하고
+이전 tmux 윈도우 사망을 대기한 뒤, 새 티켓을 생성하고
 새 tmux 윈도우에서 `/wf -s N` 명령을 전송한다.
 
 사용법:
@@ -16,10 +16,9 @@ finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
 
 동작 순서:
   1. 이전 tmux 윈도우 사망 대기 (P:T-NNN 윈도우가 사라질 때까지 최대 30초 폴링)
-  2. kanban.py add-subnumber 호출하여 다음 subnumber 자동 생성
-  3. kanban.py move T-NNN open 호출하여 티켓을 Open 상태로 되돌림
-  4. 새 tmux 윈도우 생성 + Claude 프롬프트 대기 + /wf -s N 명령 전송
-  5. 실패 시 CHAIN_MAX_RETRY 횟수만큼 재시도
+  2. kanban.py create로 새 티켓 생성 + kanban.py link로 derived-from 관계 링크 + update-prompt로 prompt 복사
+  3. 새 tmux 윈도우 생성 (P:T-NEW) + Claude 프롬프트 대기 + /wf -s NEW_N 명령 전송
+  4. 실패 시 CHAIN_MAX_RETRY 횟수만큼 재시도
 
 프로세스 모델:
   finalization.py에서 subprocess.Popen(start_new_session=True)로 백그라운드 실행.
@@ -365,11 +364,13 @@ def _kill_window(window_name: str) -> bool:
 
 # ─── 티켓 파싱 유틸 ─────────────────────────────────────────────────────────
 
-def _read_previous_subnumber(ticket_number: str) -> dict[str, str]:
-    """이전 subnumber에서 goal/target을 읽어 반환한다.
+def _read_previous_prompt(ticket_number: str) -> dict[str, str]:
+    """티켓 XML에서 prompt의 goal/target을 읽어 반환한다.
 
-    kanban.py의 XML 파싱을 직접 수행하여
-    현재 active subnumber의 prompt 필드(goal, target)를 추출한다.
+    flat 구조의 티켓 XML에서 루트 직하 <prompt> 요소의
+    <goal>, <target> 필드를 직접 추출한다.
+
+    레거시 폴백: <submit> 래퍼가 존재하면 기존 subnumber 구조로 파싱한다.
 
     Args:
         ticket_number: T-NNN 형식 티켓 번호
@@ -378,7 +379,7 @@ def _read_previous_subnumber(ticket_number: str) -> dict[str, str]:
         goal/target을 포함한 딕셔너리. 파싱 실패 시 빈 딕셔너리.
     """
     result: dict[str, str] = {}
-    for subdir in ("", "done"):
+    for subdir in ("open", "progress", "review", "done"):
         path = os.path.join(KANBAN_DIR, subdir, f"{ticket_number}.xml")
         if not os.path.isfile(path):
             continue
@@ -386,22 +387,32 @@ def _read_previous_subnumber(ticket_number: str) -> dict[str, str]:
             tree = ET.parse(path)
             root = tree.getroot()
 
-            # submit 내 active subnumber에서 prompt 필드 추출
+            # 레거시 폴백: <submit> 래퍼가 존재하면 기존 subnumber 구조로 파싱
             submit_elem = root.find("submit")
-            if submit_elem is None:
-                continue
+            if submit_elem is not None:
+                for sub in submit_elem.findall("subnumber"):
+                    if sub.get("active") == "true":
+                        prompt_elem = sub.find("prompt")
+                        if prompt_elem is not None:
+                            goal_el = prompt_elem.find("goal")
+                            target_el = prompt_elem.find("target")
+                            if goal_el is not None and goal_el.text:
+                                result["goal"] = goal_el.text.strip()
+                            if target_el is not None and target_el.text:
+                                result["target"] = target_el.text.strip()
+                        break
+                return result
 
-            for sub in submit_elem.findall("subnumber"):
-                if sub.get("active") == "true":
-                    prompt_elem = sub.find("prompt")
-                    if prompt_elem is not None:
-                        goal_el = prompt_elem.find("goal")
-                        target_el = prompt_elem.find("target")
-                        if goal_el is not None and goal_el.text:
-                            result["goal"] = goal_el.text.strip()
-                        if target_el is not None and target_el.text:
-                            result["target"] = target_el.text.strip()
-                    break
+            # flat 구조: 루트 직하 <prompt> 요소에서 직접 추출
+            prompt_elem = root.find("prompt")
+            if prompt_elem is not None:
+                goal_el = prompt_elem.find("goal")
+                target_el = prompt_elem.find("target")
+                if goal_el is not None and goal_el.text:
+                    result["goal"] = goal_el.text.strip()
+                if target_el is not None and target_el.text:
+                    result["target"] = target_el.text.strip()
+            return result
         except Exception:
             continue
     return result
@@ -439,10 +450,11 @@ def launch_next_stage(
     """
     _wf_log("INFO", f"chain_launcher: launch_next_stage start ticket={ticket_number} remaining={remaining_chain}")
     window_name = f"{WINDOW_PREFIX_P}{ticket_number}"
-    ticket_num_int = _extract_ticket_number_int(ticket_number)
 
     current_retry: int = retry_count
-    _subnumber_added: bool = False
+    _new_ticket_created: bool = False
+    new_ticket_number: str = ""
+    new_ticket_num_int: str = ""
     while current_retry <= CHAIN_MAX_RETRY:
         _log("INFO", f"ticket={ticket_number} remaining={remaining_chain} retry={current_retry}/{CHAIN_MAX_RETRY}")
 
@@ -455,94 +467,125 @@ def launch_next_stage(
             _kill_window(window_name)
             time.sleep(1)
 
-        # ── Step 2: kanban.py add-subnumber 호출 ──
-        if not _subnumber_added:
-            # 이전 subnumber에서 goal/target 복사
-            prev_data = _read_previous_subnumber(ticket_number)
+        # ── Step 2: 새 티켓 생성 + 관계 링크 + prompt 복사 ──
+        if not _new_ticket_created:
+            # 이전 티켓에서 goal/target 복사
+            prev_data = _read_previous_prompt(ticket_number)
             goal = prev_data.get("goal", "(체인 자동 생성)")
             target = prev_data.get("target", "(체인 자동 생성)")
 
             # context에 이전 스테이지 report 경로 주입
             context = f"이전 스테이지 report: {prev_report_path}"
 
-            add_cmd = [
-                "python3", KANBAN_PY, "add-subnumber", ticket_number,
+            # Step 2a: 새 티켓 생성
+            create_cmd = [
+                "python3", KANBAN_PY, "create", f"[chain] {goal[:40]}",
                 "--command", remaining_chain,
-                "--goal", goal,
-                "--target", target,
-                "--context", context,
             ]
 
-            _log("INFO", f"add-subnumber: command={remaining_chain}")
+            _log("INFO", f"create new ticket: command={remaining_chain}")
             try:
-                result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
+                result = subprocess.run(create_cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode != 0:
-                    _log("ERROR", f"add-subnumber failed: exit {result.returncode} stderr={result.stderr.strip()}")
+                    _log("ERROR", f"create ticket failed: exit {result.returncode} stderr={result.stderr.strip()}")
                     current_retry, should_continue = _increment_retry(current_retry, ticket_number)
                     if should_continue:
                         continue
                     break
-                _log("INFO", f"add-subnumber ok: {result.stdout.strip()}")
-                _subnumber_added = True
+                # stdout에서 새 티켓 번호 파싱: "T-NNN: 제목" 형식
+                stdout_text = result.stdout.strip()
+                _log("INFO", f"create ticket ok: {stdout_text}")
+                ticket_match = re.match(r"(T-\d+):", stdout_text)
+                if not ticket_match:
+                    _log("ERROR", f"failed to parse new ticket number from stdout: {stdout_text}")
+                    current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                    if should_continue:
+                        continue
+                    break
+                new_ticket_number = ticket_match.group(1)
+                new_ticket_num_int = _extract_ticket_number_int(new_ticket_number)
+                _log("INFO", f"new ticket created: {new_ticket_number}")
             except Exception as e:
-                _log("ERROR", f"add-subnumber exception: {e}")
+                _log("ERROR", f"create ticket exception: {e}")
                 current_retry, should_continue = _increment_retry(current_retry, ticket_number)
                 if should_continue:
                     continue
                 break
+
+            # Step 2b: 관계 링크 (derived-from)
+            link_cmd = [
+                "python3", KANBAN_PY, "link", new_ticket_number,
+                "--derived-from", ticket_number,
+            ]
+            _log("INFO", f"link {new_ticket_number} --derived-from {ticket_number}")
+            try:
+                result = subprocess.run(link_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    _log("WARN", f"link failed: exit {result.returncode} stderr={result.stderr.strip()}")
+                    # 링크 실패는 치명적이지 않으므로 계속 진행
+            except Exception as e:
+                _log("WARN", f"link exception: {e}")
+
+            # Step 2c: prompt 복사 (goal, target, context)
+            prompt_cmd = [
+                "python3", KANBAN_PY, "update-prompt", new_ticket_number,
+                "--goal", goal,
+                "--target", target,
+                "--context", context,
+                "--skip-validation",
+            ]
+            _log("INFO", f"update-prompt for {new_ticket_number}")
+            try:
+                result = subprocess.run(prompt_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    _log("WARN", f"update-prompt failed: exit {result.returncode} stderr={result.stderr.strip()}")
+            except Exception as e:
+                _log("WARN", f"update-prompt exception: {e}")
+
+            _new_ticket_created = True
         else:
-            _log("INFO", "add-subnumber already done, skipping")
+            _log("INFO", "new ticket already created, skipping")
 
-        # ── Step 3: kanban.py move T-NNN open (티켓을 Open 상태로 되돌림) ──
-        move_cmd = ["python3", KANBAN_PY, "move", ticket_number, "open"]
-        _log("INFO", "move ticket to open")
-        try:
-            result = subprocess.run(move_cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode != 0:
-                stderr = result.stderr.strip()
-                # "이미 Open 상태" 같은 경우는 무시
-                _log("WARN", f"move open: exit {result.returncode} stderr={stderr}")
-        except Exception as e:
-            _log("WARN", f"move open exception: {e}")
+        # ── Step 3: 새 tmux 윈도우 생성 + 프롬프트 대기 + /wf -s NEW_N 전송 ──
+        new_window_name = f"{WINDOW_PREFIX_P}{new_ticket_number}"
+        _log("INFO", f"creating window {new_window_name}")
 
-        # ── Step 4: 새 tmux 윈도우 생성 + 프롬프트 대기 + /wf -s N 전송 ──
-        _log("INFO", f"creating window {window_name}")
-
-        if not _create_window(window_name):
-            _log("ERROR", f"window creation failed: {window_name}")
-            _wf_log("ERROR", f"chain_launcher: window creation failed window={window_name}")
+        if not _create_window(new_window_name):
+            _log("ERROR", f"window creation failed: {new_window_name}")
+            _wf_log("ERROR", f"chain_launcher: window creation failed window={new_window_name}")
             current_retry, should_continue = _increment_retry(current_retry, ticket_number)
             if should_continue:
                 continue
             break
 
-        _log("INFO", f"polling for prompt in {window_name}")
-        if not _poll_for_prompt(window_name):
-            _log("ERROR", f"prompt not detected in {window_name} after {_PROMPT_POLL_MAX}s")
-            _wf_log("ERROR", f"chain_launcher: prompt not detected window={window_name} timeout={_PROMPT_POLL_MAX}s")
-            _kill_window(window_name)
+        _log("INFO", f"polling for prompt in {new_window_name}")
+        if not _poll_for_prompt(new_window_name):
+            _log("ERROR", f"prompt not detected in {new_window_name} after {_PROMPT_POLL_MAX}s")
+            _wf_log("ERROR", f"chain_launcher: prompt not detected window={new_window_name} timeout={_PROMPT_POLL_MAX}s")
+            _kill_window(new_window_name)
             current_retry, should_continue = _increment_retry(current_retry, ticket_number)
             if should_continue:
                 continue
             break
 
-        # /wf -s N 명령 전송
-        wf_command = f"/wf -s {ticket_num_int}"
+        # /wf -s NEW_N 명령 전송 (새 티켓 번호 사용)
+        wf_command = f"/wf -s {new_ticket_num_int}"
         _log("INFO", f"sending command: {wf_command}")
-        if not _send_keys(window_name, wf_command):
-            _log("ERROR", f"send_keys failed for {window_name}")
+        if not _send_keys(new_window_name, wf_command):
+            _log("ERROR", f"send_keys failed for {new_window_name}")
             current_retry, should_continue = _increment_retry(current_retry, ticket_number)
             if should_continue:
                 continue
             break
 
-        _log("INFO", f"chain stage launched successfully: ticket={ticket_number} next={remaining_chain}")
-        _wf_log("INFO", f"chain_launcher: launch_next_stage complete ticket={ticket_number} next={remaining_chain}")
+        _log("INFO", f"chain stage launched successfully: prev={ticket_number} new={new_ticket_number} next={remaining_chain}")
+        _wf_log("INFO", f"chain_launcher: launch_next_stage complete prev={ticket_number} new={new_ticket_number} next={remaining_chain}")
         return 0
 
     # 루프 탈출: 재시도 소진
+    fallback_num = new_ticket_num_int if new_ticket_num_int else _extract_ticket_number_int(ticket_number)
     _log("ERROR", f"max retry exceeded ({CHAIN_MAX_RETRY}), chain aborted: ticket={ticket_number}")
-    _log("ERROR", f"수동으로 다음 스테이지를 시작하려면: /wf -s {ticket_num_int}")
+    _log("ERROR", f"수동으로 다음 스테이지를 시작하려면: /wf -s {fallback_num}")
     _wf_log("ERROR", f"chain_launcher: launch_next_stage failed max_retry_exceeded ticket={ticket_number}")
     return 1
 
