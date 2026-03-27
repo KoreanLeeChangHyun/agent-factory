@@ -20,7 +20,7 @@
 ### 티켓 운영
 - 자연어 요청도 워크플로우 명령으로 변환하여 처리
 - 파일 직접 수정 시 Hook이 차단하므로 티켓 생성 필수
-- flow-kanban 복수 항목 필드(constraints, criteria 등)는 \n 개행 삽입 (MUST)
+- flow-kanban 복수 항목 필드(goal, target, constraints, criteria, context)는 \n 개행 삽입 (MUST)
 
 ### 메모리 정책
 - CLAUDE.md: 프로젝트 규칙 전용. 세션 상태/메모를 저장하지 않는다 (MUST NOT)

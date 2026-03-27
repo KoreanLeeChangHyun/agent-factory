@@ -197,12 +197,14 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
         if len(content) < _PROMPT_FIELD_INLINE_LIMIT:
             return f"{indent}<{tag}>{content}</{tag}>"
         inner_indent = indent + "  "
-        return f"{indent}<{tag}>\n{inner_indent}{content}\n{indent}</{tag}>"
+        indented_content = content.replace("\n", f"\n{inner_indent}")
+        return f"{indent}<{tag}>\n{inner_indent}{indented_content}\n{indent}</{tag}>"
 
     xml_str = re.sub(
         r"( *)<(goal|target|constraints|criteria|context)>(.+)</\2>",
         _wrap_prompt_field,
         xml_str,
+        flags=re.DOTALL,
     )
     # 섹션 주석 삽입: <metadata>, <submit>, <history> 태그 직전에 주석 추가 (없는 경우에만)
     # self-closing 태그(<submit />, <history />) 및 일반 태그(<submit>, <history>) 모두 처리

@@ -111,6 +111,40 @@ def _tmux_kill_ticket_window(ticket_number: str) -> None:
         pass
 
 
+def _cleanup_worktree_on_leave(ticket_number: str) -> None:
+    """In Progress에서 이탈할 때 연결된 워크트리를 자동 정리한다.
+
+    워크트리 비활성 환경이거나 해당 티켓의 워크트리가 없으면 조용히 건너뛴다.
+    정리 실패 시 경고만 출력하고 예외를 전파하지 않는다 (상태 전이 차단 금지).
+
+    Args:
+        ticket_number: 티켓 번호 (T-NNN 형식).
+    """
+    try:
+        from flow.worktree_manager import (
+            is_worktree_enabled,
+            get_worktree_path,
+            remove_worktree,
+        )
+
+        if not is_worktree_enabled():
+            return
+
+        wt_path = get_worktree_path(ticket_number)
+        if not wt_path:
+            return
+
+        success = remove_worktree(ticket_number, delete_branch=True)
+        if success:
+            log("INFO", f"kanban.py: worktree 자동 정리 완료 ({ticket_number})")
+        else:
+            print(f"[WARN] {ticket_number} 워크트리 정리 실패 (계속 진행)", flush=True)
+    except ImportError:
+        pass  # worktree 모듈 미설치 시 무시 (하위 호환)
+    except Exception as e:
+        print(f"[WARN] {ticket_number} 워크트리 정리 중 오류 (계속 진행): {e}", flush=True)
+
+
 # ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
 
 
@@ -199,6 +233,10 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
 
     print(f"{ticket_number}: {current_section} → {target_section}")
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
+
+    # In Progress에서 이탈 시 워크트리 자동 정리
+    if current_section == "In Progress":
+        _cleanup_worktree_on_leave(ticket_number)
 
     # Open 전이 시 tmux 윈도우 자동 kill:
     # Submit 또는 In Progress에서 Open으로 복귀하면 해당 티켓의 P:T-NNN 윈도우를 종료한다.

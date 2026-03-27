@@ -29,6 +29,15 @@ create, move, done, delete, add-subnumber, update-title, update-subnumber, archi
   flow-kanban move T-001 progress
   flow-kanban done T-001
 
+### XML 필드 개행 컨벤션
+복수 항목 필드(goal, target, constraints, criteria, context)에 여러 항목을 입력할 때는 반드시 `\n` 개행을 삽입한다 (MUST).
+
+- 단일 문장: `--constraints "조건1"` (개행 불필요)
+- 복수 항목: `--constraints "조건1\n조건2\n조건3"` (MUST)
+- 대상 필드: goal, target, constraints, criteria, context 전체
+
+> `\n`이 누락되면 XML 래핑이 실패하여 태그 직후에 텍스트가 붙는 형식 오류가 발생한다.
+
 ### 기타 alias
 - flow-tmux: launch, cleanup
 - flow-claude: start, end
