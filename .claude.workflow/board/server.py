@@ -39,7 +39,7 @@ SERVER_PID: int = os.getpid()
 WATCH_DIRS: dict[str, str] = {
     os.path.join('.claude.workflow', 'kanban', 'open'): 'kanban',
     os.path.join('.claude.workflow', 'kanban', 'progress'): 'kanban',
-    os.path.join('.claude.workflow', 'kanban', 'active'): 'kanban',
+    os.path.join('.claude.workflow', 'kanban', 'review'): 'kanban',
     os.path.join('.claude.workflow', 'kanban', 'done'): 'kanban',
     os.path.join('.claude.workflow', 'workflow'): 'workflow',
     os.path.join('.claude.workflow', 'workflow', '.history'): 'workflow',
@@ -314,7 +314,7 @@ sse_manager: SSEClientManager = SSEClientManager()
 poll_tracker: PollChangeTracker = PollChangeTracker()
 
 
-KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'active', 'done']
+KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'review', 'done']
 WF_BASE: str = os.path.join('.claude.workflow', 'workflow')
 WF_HISTORY: str = os.path.join('.claude.workflow', 'workflow', '.history')
 DASH_BASE: str = os.path.join('.claude.workflow', 'dashboard')

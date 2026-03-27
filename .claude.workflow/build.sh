@@ -375,14 +375,14 @@ verify_installation() {
     _verify_command "gh"   "gh CLI" || failed=$((failed + 1))
     if command -v claude &>/dev/null; then print_success "claude 명령어 실행 가능"
     else print_error "claude 명령어를 찾을 수 없습니다"; failed=$((failed + 1)); fi
-    # (d) .claude.workflow/kanban/, .claude.workflow/kanban/done/ 디렉터리 존재
+    # (d) .claude.workflow/kanban/, .claude.workflow/kanban/{open,progress,review,done}/ 디렉터리 존재
     local kanban_ok=true
-    for dir in ".claude.workflow/kanban" ".claude.workflow/kanban/done"; do
+    for dir in ".claude.workflow/kanban" ".claude.workflow/kanban/open" ".claude.workflow/kanban/progress" ".claude.workflow/kanban/review" ".claude.workflow/kanban/done"; do
         if [ ! -d "$dir" ]; then
             print_error "필수 디렉터리 없음: $dir"; kanban_ok=false; failed=$((failed + 1))
         fi
     done
-    [ "$kanban_ok" = true ] && print_success ".claude.workflow/kanban/, .claude.workflow/kanban/done/ 디렉터리 존재 확인"
+    [ "$kanban_ok" = true ] && print_success ".claude.workflow/kanban/, .claude.workflow/kanban/{open,progress,review,done}/ 디렉터리 존재 확인"
     # (e) .claude.workflow/.settings 또는 .claude.workflow/.env 파일 존재
     if [ -f ".claude.workflow/.settings" ]; then
         print_success ".claude.workflow/.settings 파일 존재 확인"

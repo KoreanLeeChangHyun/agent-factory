@@ -91,7 +91,7 @@ REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
 flow-kanban move T-NNN review
 ```
 
-티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/active/T-NNN.xml`이다.
+티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/open/T-NNN.xml`이다.
 
 - 구현이 완료된 티켓을 Review 상태로 전이한다
 - `wf -s implement #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
@@ -112,7 +112,7 @@ flow-kanban move T-NNN review
 
 > **스킬 의존성**: `research-prompt-engineering` (frontmatter `skills:` 필드에 명시됨)
 
-`.kanban/active/T-NNN.xml` 티켓 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선하는 워크플로우 커맨드 스킬. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어.
+`.kanban/open/T-NNN.xml` 티켓 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선하는 워크플로우 커맨드 스킬. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어.
 
 티켓 파일은 XML 구조를 사용합니다:
 - 루트 요소: `<ticket>`
@@ -266,7 +266,7 @@ REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
 flow-kanban move T-NNN review
 ```
 
-티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/active/T-NNN.xml`이다.
+티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/open/T-NNN.xml`이다.
 
 - 연구/분석이 완료된 티켓을 Review 상태로 전이한다
 - `wf -s research #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
@@ -366,7 +366,7 @@ REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
 flow-kanban move T-NNN review
 ```
 
-티켓 파일은 `.kanban/active/T-NNN.xml`이다.
+티켓 파일은 `.kanban/open/T-NNN.xml`이다.
 
 ---
 
@@ -418,7 +418,7 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 
 ## Submit Command (티켓 제출)
 
-`.kanban/active/T-NNN.xml` 티켓 파일의 `<command>` 태그를 읽어 해당 워크플로우를 자동 실행하는 커맨드 스킬.
+상태별 디렉터리(`.kanban/open/`, `.kanban/progress/`, `.kanban/review/`)의 `T-NNN.xml` 티켓 파일의 `<command>` 태그를 읽어 해당 워크플로우를 자동 실행하는 커맨드 스킬.
 
 상세 실행 절차는 `.claude/commands/wf.md`를 참조한다.
 
@@ -432,8 +432,8 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 
 ### 티켓 파일 처리 규칙
 
-- `#N` 지정 시: `.kanban/active/T-NNN.xml` 정확 매칭으로 티켓 파일 탐색
-- `#N` 미지정 시: `.kanban/active/` 디렉터리의 XML 파일을 스캔하여 Open 상태 티켓을 자동 선택
+- `#N` 지정 시: `.kanban/open/T-NNN.xml`, `.kanban/progress/T-NNN.xml`, `.kanban/review/T-NNN.xml` 순으로 탐색
+- `#N` 미지정 시: `.kanban/open/` 디렉터리의 XML 파일을 스캔하여 Open 상태 티켓을 자동 선택
 - `<current>` 값이 `0` 또는 미존재 시: 에러 출력 후 종료
 - `<command>` 유효 값: `implement`, `research`, `review`
 

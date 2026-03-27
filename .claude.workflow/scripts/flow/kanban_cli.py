@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -25,13 +24,18 @@ from flow.ticket_repository import (
     rollback_subnumber,
     update_subnumber,
     move_active_to_history,
+    move_ticket_to_status_dir,
     remove_relation,
     write_ticket_xml,
     parse_ticket_xml,
     err,
     log,
     KANBAN_DIR,
-    KANBAN_ACTIVE_DIR,
+    KANBAN_OPEN_DIR,
+    KANBAN_PROGRESS_DIR,
+    KANBAN_REVIEW_DIR,
+    KANBAN_DONE_DIR,
+    STATUS_DIR_MAP,
 )
 from flow.ticket_state import (
     COLUMN_MAP,
@@ -114,7 +118,7 @@ def cmd_create(title: str, command: str) -> None:
     """새 티켓 XML을 생성한다.
 
     XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 채번 후,
-    .kanban/active/T-NNN.xml 파일을 생성한다.
+    .kanban/open/T-NNN.xml 파일을 생성한다.
 
     Args:
         title: 티켓 제목. 빈 문자열 허용.
@@ -125,9 +129,9 @@ def cmd_create(title: str, command: str) -> None:
     ticket_number = f"T-{new_num:03d}"
 
     # 파일명: T-NNN.xml 고정
-    ticket_file = os.path.join(KANBAN_ACTIVE_DIR, f"{ticket_number}.xml")
+    ticket_file = os.path.join(KANBAN_OPEN_DIR, f"{ticket_number}.xml")
 
-    os.makedirs(KANBAN_ACTIVE_DIR, exist_ok=True)
+    os.makedirs(KANBAN_OPEN_DIR, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     xml_content = create_ticket_xml(ticket_number, title, datetime_str)
     try:
@@ -182,6 +186,17 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     # XML <status> 갱신
     update_ticket_status(ticket_file, target_section)
 
+    # 상태에 대응하는 디렉터리로 파일 이동
+    try:
+        new_path = move_ticket_to_status_dir(ticket_file, target_section)
+        if new_path != ticket_file:
+            src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
+            dst_rel = os.path.relpath(new_path, _PROJECT_ROOT)
+            print(f"파일 이동: {src_rel} → {dst_rel}")
+        ticket_file = new_path
+    except OSError as e:
+        err(f"티켓 파일 이동 실패: {e}")
+
     print(f"{ticket_number}: {current_section} → {target_section}")
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
 
@@ -199,7 +214,7 @@ def cmd_done(ticket_number: str) -> None:
     develop에 병합한다. 병합 충돌 시 Done 전이를 차단한다.
 
     XML의 <status>를 Done으로 갱신하고,
-    .kanban/active/T-NNN.xml를 .kanban/done/T-NNN.xml로 이동한다.
+    move_ticket_to_status_dir()를 통해 .kanban/done/T-NNN.xml로 이동한다.
 
     Args:
         ticket_number: 완료할 티켓 번호 (T-NNN 형식).
@@ -207,39 +222,24 @@ def cmd_done(ticket_number: str) -> None:
     # ── worktree 병합 훅 (티켓 상태 변경/파일 이동 전) ──
     import sys as _sys
     try:
-        from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop
+        from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop, has_uncommitted_changes
         from flow.branch_strategy import get_feature_branch_for_ticket
         if is_worktree_enabled():
-            # C-01: dirty worktree 감지 → auto_commit 수행
+            # C-01: dirty worktree 감지 → 미커밋 변경 존재 시 거부
             _wt_path = get_worktree_path(ticket_number)
-            if _wt_path:
-                _status = subprocess.run(
+            if _wt_path and has_uncommitted_changes(_wt_path):
+                _porcelain = subprocess.run(
                     ["git", "status", "--porcelain"],
                     cwd=_wt_path,
                     capture_output=True,
                     text=True,
                 )
-                if _status.stdout.strip():
-                    # 미커밋 변경 존재 → 자동 커밋
-                    _add = subprocess.run(
-                        ["git", "add", "-A"],
-                        cwd=_wt_path,
-                        capture_output=True,
-                        text=True,
-                    )
-                    if _add.returncode != 0:
-                        print(f"[ERROR] auto-commit 실패 (git add): {_add.stderr.strip()}", flush=True)
-                        _sys.exit(1)
-                    _commit = subprocess.run(
-                        ["git", "commit", "-m", f"chore: auto-commit before done ({ticket_number})"],
-                        cwd=_wt_path,
-                        capture_output=True,
-                        text=True,
-                    )
-                    if _commit.returncode != 0:
-                        print(f"[ERROR] auto-commit 실패 (git commit): {_commit.stderr.strip()}", flush=True)
-                        _sys.exit(1)
-                    print(f"[INFO] auto-commit 완료: 미커밋 변경을 커밋하였습니다.", flush=True)
+                print(f"[ERROR] 미커밋 변경이 있는 워크트리입니다. Done 전이를 차단합니다.", flush=True)
+                print(f"  미커밋 파일 목록:", flush=True)
+                for _line in _porcelain.stdout.strip().splitlines():
+                    print(f"    {_line}", flush=True)
+                print(f"  flow-merge를 사용하여 정상 경로로 완료하세요.", flush=True)
+                _sys.exit(1)
             feat_branch = get_feature_branch_for_ticket(ticket_number)
             if _wt_path or feat_branch:
                 merge_result = merge_to_develop(ticket_number)
@@ -276,18 +276,15 @@ def cmd_done(ticket_number: str) -> None:
     update_ticket_status(ticket_file, "Done")
 
     # 파일을 kanban/done/T-NNN.xml로 이동
-    done_dir = os.path.join(KANBAN_DIR, "done")
-    dst_filename = f"{ticket_number}.xml"
-    dst_file = os.path.join(done_dir, dst_filename)
-
     if os.path.isfile(ticket_file):
-        os.makedirs(done_dir, exist_ok=True)
         try:
-            shutil.move(ticket_file, dst_file)
+            new_path = move_ticket_to_status_dir(ticket_file, "Done")
+            if new_path != ticket_file:
+                src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
+                dst_rel = os.path.relpath(new_path, _PROJECT_ROOT)
+                print(f"파일 이동: {src_rel} → {dst_rel}")
         except OSError as e:
             err(f"티켓 파일 이동 실패: {e}")
-        src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
-        print(f"파일 이동: {src_rel} → kanban/done/{dst_filename}")
 
     print(f"{ticket_number}: {current_section} → Done")
     log("INFO", f"kanban.py: done {ticket_number} {current_section} → Done")
@@ -769,8 +766,9 @@ def cmd_unlink(
 def cmd_board() -> None:
     """칸반 보드 전체 현황을 마크다운 테이블 형식으로 출력한다.
 
-    .kanban/active/ 디렉터리의 티켓을 status 기준으로 Open/In Progress/Review 칼럼에,
-    .kanban/done/ 디렉터리의 티켓을 Done 칼럼에 그룹핑하여 출력한다.
+    .kanban/open/, .kanban/progress/, .kanban/review/ 디렉터리를 각각 스캔하여
+    Open/In Progress/Review 칼럼에 직접 매핑하고, .kanban/done/ 디렉터리의
+    티켓을 Done 칼럼에 그룹핑하여 출력한다.
     Done 칼럼은 최근 10건만 표시하고 총 건수를 함께 출력한다.
     각 칼럼에 티켓이 없으면 "(없음)"을 출력한다.
 
@@ -789,20 +787,25 @@ def cmd_board() -> None:
     COLUMNS = ["Open", "In Progress", "Review", "Done"]
     grouped: dict[str, list[dict]] = {col: [] for col in COLUMNS}
 
-    # ── active 디렉터리 스캔 ──────────────────────────────────────────────────
-    if os.path.isdir(KANBAN_ACTIVE_DIR):
-        for fname in os.listdir(KANBAN_ACTIVE_DIR):
+    # ── 상태별 디렉터리 스캔 (디렉터리가 SSoT) ────────────────────────────────
+    # 디렉터리 -> 칼럼 매핑: open/ -> Open, progress/ -> In Progress, review/ -> Review
+    _DIR_COLUMN_MAP = [
+        (KANBAN_OPEN_DIR, "Open"),
+        (KANBAN_PROGRESS_DIR, "In Progress"),
+        (KANBAN_REVIEW_DIR, "Review"),
+    ]
+    for scan_dir, column in _DIR_COLUMN_MAP:
+        if not os.path.isdir(scan_dir):
+            continue
+        for fname in os.listdir(scan_dir):
             if not (fname.startswith("T-") and fname.endswith(".xml")):
                 continue
-            fpath = os.path.join(KANBAN_ACTIVE_DIR, fname)
+            fpath = os.path.join(scan_dir, fname)
             try:
                 ticket_data = parse_ticket_xml(fpath)
             except SystemExit:
                 log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
                 continue
-
-            status = ticket_data.get("status", "Open")
-            column = status if status in COLUMNS else "Open"
 
             # 활성 subnumber 탐색: current 값과 id가 일치하는 subnumber
             current_id = ticket_data.get("current", 0)
@@ -819,12 +822,11 @@ def cmd_board() -> None:
             })
 
     # ── done 디렉터리 스캔 ───────────────────────────────────────────────────
-    done_dir = os.path.join(KANBAN_DIR, "done")
-    if os.path.isdir(done_dir):
-        for fname in os.listdir(done_dir):
+    if os.path.isdir(KANBAN_DONE_DIR):
+        for fname in os.listdir(KANBAN_DONE_DIR):
             if not (fname.startswith("T-") and fname.endswith(".xml")):
                 continue
-            fpath = os.path.join(done_dir, fname)
+            fpath = os.path.join(KANBAN_DONE_DIR, fname)
             try:
                 ticket_data = parse_ticket_xml(fpath)
             except SystemExit:

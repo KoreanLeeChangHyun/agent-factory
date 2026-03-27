@@ -1,11 +1,11 @@
 #!/usr/bin/env -S python3 -u
 """reload_prompt.py - 수정 피드백을 워크플로우에 반영하는 스크립트.
 
-현재 워크플로우의 티켓 파일(.kanban/active/T-NNN.xml)에서 피드백을 읽어
+현재 워크플로우의 티켓 파일(kanban/open/ 또는 kanban/progress/ 등 상태별 디렉터리)에서 피드백을 읽어
 user_prompt.txt에 append한다.
 
 티켓 파일은 환경변수 TICKET_NUMBER, .context.json의 ticketNumber 필드,
-또는 .kanban/active/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
+또는 kanban/open/, kanban/progress/, kanban/review/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
 
 사용법:
   python3 reload_prompt.py <workDir>
@@ -17,7 +17,7 @@ user_prompt.txt에 append한다.
   TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식)
 
 수행 작업 (순서대로):
-  1. .kanban/active/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
+  1. kanban/open/ 등 상태별 디렉터리에서 T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
   2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
 
 출력 (stdout):
@@ -66,7 +66,7 @@ def _normalize_ticket_number(raw: str) -> str | None:
 def _find_ticket_file_by_number(kanban_dir: Path, ticket_number: str) -> str | None:
     """kanban 디렉터리에서 티켓 번호에 해당하는 파일을 정확 매칭으로 탐색한다.
 
-    active/ 서브디렉터리를 먼저 탐색하고, done/ 서브디렉터리, 루트 순으로 폴백한다.
+    open/ -> progress/ -> review/ -> done/ -> active/ (폴백) -> 루트 (폴백) 순으로 탐색한다.
 
     Args:
         kanban_dir: .kanban 디렉터리 절대 경로
@@ -75,15 +75,27 @@ def _find_ticket_file_by_number(kanban_dir: Path, ticket_number: str) -> str | N
     Returns:
         찾은 티켓 파일의 절대 경로 문자열. 없으면 None.
     """
-    # 1순위: .kanban/active/T-NNN.xml
-    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
-    if active_candidate.is_file():
-        return str(active_candidate)
-    # 2순위: .kanban/done/T-NNN.xml
+    # 1순위: .kanban/open/T-NNN.xml
+    open_candidate: Path = kanban_dir / "open" / f"{ticket_number}.xml"
+    if open_candidate.is_file():
+        return str(open_candidate)
+    # 2순위: .kanban/progress/T-NNN.xml
+    progress_candidate: Path = kanban_dir / "progress" / f"{ticket_number}.xml"
+    if progress_candidate.is_file():
+        return str(progress_candidate)
+    # 3순위: .kanban/review/T-NNN.xml
+    review_candidate: Path = kanban_dir / "review" / f"{ticket_number}.xml"
+    if review_candidate.is_file():
+        return str(review_candidate)
+    # 4순위: .kanban/done/T-NNN.xml
     done_candidate: Path = kanban_dir / "done" / f"{ticket_number}.xml"
     if done_candidate.is_file():
         return str(done_candidate)
-    # 3순위 (하위 호환 폴백): .kanban/T-NNN.xml
+    # 5순위 (하위 호환 폴백): .kanban/active/T-NNN.xml
+    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
+    if active_candidate.is_file():
+        return str(active_candidate)
+    # 6순위 (하위 호환 폴백): .kanban/T-NNN.xml
     root_candidate: Path = kanban_dir / f"{ticket_number}.xml"
     if root_candidate.is_file():
         return str(root_candidate)
@@ -96,13 +108,14 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
     탐색 우선순위:
       1. 환경변수 TICKET_NUMBER
       2. .context.json의 ticketNumber 필드
-      3. .kanban/active/ 디렉터리 XML 파일 직접 스캔 (In Progress 상태 첫 번째 티켓)
+      3. kanban/progress/ 디렉터리 XML 파일 직접 스캔 (In Progress 상태 첫 번째 티켓)
+         + kanban/open/, kanban/review/ 및 active/ (하위 호환 폴백) 스캔
 
     Args:
         abs_work_dir: 현재 워크플로우 디렉터리 절대 경로
 
     Returns:
-        .kanban/active/T-NNN.xml 절대 경로. 결정 불가능하면 None.
+        티켓 파일 절대 경로. 결정 불가능하면 None.
     """
     kanban_dir: Path = Path(_PROJECT_ROOT) / ".claude.workflow" / "kanban"
 
@@ -127,14 +140,17 @@ def _resolve_ticket_file(abs_work_dir: str) -> str | None:
         except Exception:
             pass
 
-    # 3순위: .kanban/active/ 디렉터리 XML 직접 스캔 (In Progress 상태 첫 번째 티켓)
-    # 하위 호환: active/에 파일이 없으면 .kanban/ 루트도 폴백 스캔
+    # 3순위: 상태별 디렉터리 XML 직접 스캔 (In Progress 상태 첫 번째 티켓)
+    # progress/ 디렉터리를 우선 탐색하고, open/, review/ 및 active/ (하위 호환 폴백), 루트도 스캔
     try:
         import glob as _glob
         import xml.etree.ElementTree as _ET
 
+        progress_dir = kanban_dir / "progress"
+        open_dir = kanban_dir / "open"
+        review_dir = kanban_dir / "review"
         active_dir = kanban_dir / "active"
-        scan_dirs: list[Path] = [active_dir, kanban_dir]
+        scan_dirs: list[Path] = [progress_dir, open_dir, review_dir, active_dir, kanban_dir]
         for scan_dir in scan_dirs:
             xml_files: list[str] = sorted(_glob.glob(str(scan_dir / "T-*.xml")))
             for xml_path in xml_files:
@@ -177,14 +193,14 @@ def main() -> None:
     """CLI 진입점. workDir 인자를 받아 티켓 피드백 반영 작업을 수행한다.
 
     수행 작업:
-      1. .kanban/active/T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
+      1. kanban/open/ 등 상태별 디렉터리에서 T-NNN.xml 읽기 (티켓 미발견 또는 비어있으면 경고 후 종료)
       2. <workDir>/user_prompt.txt에 구분선 + 피드백 append
 
     XML 구조 호환성 주석:
-        티켓 파일(.kanban/active/T-NNN.xml) 전체를 문자열로 읽어 user_prompt.txt에
-        append하므로, 새 XML 구조(<metadata>/<submit>/<history> 래퍼 요소, <prompt>
-        래퍼, <result> 구조화)에서도 동작에 영향이 없다. XML 내부 구조를 파싱하거나
-        특정 태그를 추출하지 않으므로 코드 변경이 불필요하다.
+        티켓 파일(kanban/open/ 또는 kanban/progress/ 등 상태별 디렉터리의 T-NNN.xml) 전체를
+        문자열로 읽어 user_prompt.txt에 append하므로, 새 XML 구조(<metadata>/<submit>/<history>
+        래퍼 요소, <prompt> 래퍼, <result> 구조화)에서도 동작에 영향이 없다. XML 내부 구조를
+        파싱하거나 특정 태그를 추출하지 않으므로 코드 변경이 불필요하다.
 
     Raises:
         SystemExit: 인자 누락(1), workDir 미존재(1), 정상 완료(0).
@@ -212,9 +228,9 @@ def main() -> None:
             feedback = f.read()
 
     if not feedback:
-        append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/active/T-NNN.xml)")
+        append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/open/ 또는 kanban/progress/ 등)")
         print("FAIL", flush=True)
-        print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/active/T-NNN.xml)", flush=True)
+        print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/open/ 또는 kanban/progress/ 등)", flush=True)
         sys.exit(0)
 
     # --- Step 2: user_prompt.txt에 피드백 append ---

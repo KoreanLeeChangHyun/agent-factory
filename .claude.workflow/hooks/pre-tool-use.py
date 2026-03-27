@@ -11,6 +11,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Bash             -> direct_path_guard          (HOOK_DIRECT_PATH_GUARD, sync)
   Bash             -> main_branch_guard          (HOOK_MAIN_BRANCH_GUARD, sync)
   Bash             -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
+  Bash             -> worktree_remove_guard      (HOOK_WORKTREE_REMOVE_GUARD, sync)
   Write|Edit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
   Write|Edit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
   Write|Edit|Bash  -> worktree_path_guard        (HOOK_WORKTREE_PATH_GUARD, sync)
@@ -117,6 +118,17 @@ def main() -> None:
         r = dispatch(
             'HOOK_KANBAN_SUBCOMMAND_GUARD',
             scripts_dir('guards', 'kanban_subcommand_guard.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+        sync_results.append(r)
+
+    # --- Bash: worktree-remove-guard (sync) ---
+    if tool_name == 'Bash':
+        r = dispatch(
+            'HOOK_WORKTREE_REMOVE_GUARD',
+            scripts_dir('guards', 'worktree_remove_guard.py'),
             stdin_data,
             flags=flags,
             capture_output=True,

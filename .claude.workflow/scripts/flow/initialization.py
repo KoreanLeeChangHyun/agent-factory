@@ -16,7 +16,7 @@ LLM 호출 없음 (순수 IO).
   #N       티켓 번호 (T-NNN 또는 #NNN 형식, 선택사항)
 
 환경변수:
-  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 kanban/active/ 디렉터리에서 자동 선택.
+  TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 kanban/open/ 디렉터리에서 자동 선택.
 
 출력:
   stdout으로 init-result JSON을 출력한다.
@@ -132,7 +132,7 @@ def _run_optional_script(script_path: str, cmd_template: list[str]) -> None:
 def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
     """티켓 번호를 결정한다.
 
-    환경변수 TICKET_NUMBER → 커맨드 인자 → .kanban/active/ 디렉터리 자동 선택 순으로 탐색한다.
+    환경변수 TICKET_NUMBER → 커맨드 인자 → .kanban/open/ 디렉터리 자동 선택 순으로 탐색한다.
 
     Args:
         ticket_arg: 커맨드 인자에서 추출된 티켓 번호 문자열 (예: '#1', 'T-001', '1'). 없으면 None.
@@ -154,7 +154,7 @@ def _resolve_ticket_number(ticket_arg: str | None = None) -> str | None:
         if normalized:
             return normalized
 
-    # 3순위: .kanban/active/ 디렉터리에서 Open 상태 티켓 자동 선택
+    # 3순위: .kanban/open/ 디렉터리에서 Open 상태 티켓 자동 선택
     return _find_open_ticket_from_kanban()
 
 
@@ -180,11 +180,11 @@ def _normalize_ticket_number(raw: str) -> str | None:
 
 
 def _find_open_ticket_from_kanban() -> str | None:
-    """.claude.workflow/kanban/active/ 디렉터리의 XML 파일을 glob하여 Open 상태 첫 번째 티켓 번호를 반환한다.
+    """.claude.workflow/kanban/open/ 디렉터리의 XML 파일을 glob하여 Open 상태 첫 번째 티켓 번호를 반환한다.
 
-    .claude.workflow/kanban/active/*.xml 파일을 알파벳 순으로 탐색하며, <metadata> 내부의
+    .claude.workflow/kanban/open/*.xml 파일을 알파벳 순으로 탐색하며, <metadata> 내부의
     <status>Open</status>를 포함하는 첫 번째 티켓 번호를 반환한다.
-    하위 호환: active/ 디렉터리에 파일이 없으면 .claude.workflow/kanban/ 루트도 폴백 탐색한다.
+    하위 호환: open/ 디렉터리에 파일이 없으면 active/ (하위 호환 폴백), kanban/ 루트도 폴백 탐색한다.
 
     Returns:
         'T-NNN' 형식 티켓 번호. 없으면 None.
@@ -196,9 +196,10 @@ def _find_open_ticket_from_kanban() -> str | None:
     if not os.path.isdir(kanban_dir):
         return None
 
-    # 1순위: kanban/active/ 디렉터리, 2순위: kanban/ 루트 (하위 호환 폴백)
+    # 1순위: kanban/open/, 2순위: kanban/active/ (하위 호환 폴백), 3순위: kanban/ 루트 (하위 호환 폴백)
+    open_dir: str = os.path.join(kanban_dir, "open")
     active_dir: str = os.path.join(kanban_dir, "active")
-    scan_dirs: list[str] = [active_dir, kanban_dir]
+    scan_dirs: list[str] = [open_dir, active_dir, kanban_dir]
 
     for scan_dir in scan_dirs:
         xml_files: list[str] = sorted(_glob.glob(os.path.join(scan_dir, "T-*.xml")))
@@ -233,7 +234,7 @@ def _find_open_ticket_from_kanban() -> str | None:
 def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     """kanban 디렉터리에서 티켓 파일을 정확 매칭으로 탐색한다.
 
-    active/ 서브디렉터리를 먼저 탐색하고, done/ 서브디렉터리, 루트 순으로 폴백한다.
+    open/ -> progress/ -> review/ -> done/ -> active/ (폴백) -> 루트 (폴백) 순으로 탐색한다.
 
     Args:
         kanban_dir: .kanban 디렉터리 절대 경로
@@ -242,15 +243,27 @@ def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     Returns:
         찾은 티켓 파일의 Path 객체. 없으면 None.
     """
-    # 1순위: .kanban/active/T-NNN.xml
-    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
-    if active_candidate.is_file():
-        return active_candidate
-    # 2순위: .kanban/done/T-NNN.xml
+    # 1순위: .kanban/open/T-NNN.xml
+    open_candidate: Path = kanban_dir / "open" / f"{ticket_number}.xml"
+    if open_candidate.is_file():
+        return open_candidate
+    # 2순위: .kanban/progress/T-NNN.xml
+    progress_candidate: Path = kanban_dir / "progress" / f"{ticket_number}.xml"
+    if progress_candidate.is_file():
+        return progress_candidate
+    # 3순위: .kanban/review/T-NNN.xml
+    review_candidate: Path = kanban_dir / "review" / f"{ticket_number}.xml"
+    if review_candidate.is_file():
+        return review_candidate
+    # 4순위: .kanban/done/T-NNN.xml
     done_candidate: Path = kanban_dir / "done" / f"{ticket_number}.xml"
     if done_candidate.is_file():
         return done_candidate
-    # 3순위 (하위 호환 폴백): .kanban/T-NNN.xml
+    # 5순위 (하위 호환 폴백): .kanban/active/T-NNN.xml
+    active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
+    if active_candidate.is_file():
+        return active_candidate
+    # 6순위 (하위 호환 폴백): .kanban/T-NNN.xml
     root_candidate: Path = kanban_dir / f"{ticket_number}.xml"
     if root_candidate.is_file():
         return root_candidate
@@ -260,7 +273,7 @@ def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
 def read_prompt(ticket_arg: str | None = None) -> tuple[str | None, str | None]:
     """티켓 파일 내용을 읽어 반환한다.
 
-    티켓 번호를 결정한 후 .kanban/active/T-NNN.xml 파일을 정확 매칭으로 탐색하여 읽는다.
+    티켓 번호를 결정한 후 .kanban/open/ 또는 .kanban/progress/ 등 상태별 디렉터리에서 정확 매칭으로 탐색하여 읽는다.
     파일이 없거나 내용이 비어있으면 None을 반환한다.
 
     XML 구조 호환성 주석:

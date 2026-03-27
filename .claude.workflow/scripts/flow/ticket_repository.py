@@ -1,14 +1,15 @@
 """ticket_repository.py - 칸반 티켓 XML CRUD 및 파일 탐색 모듈.
 
-XML 티켓 파일(.kanban/active/T-NNN.xml)의 생성, 읽기, 갱신, 삭제를
-담당하는 데이터 계층 모듈이다. kanban.py에서 분리되었으며, 순수 IO 작업만
-수행한다.
+XML 티켓 파일(.kanban/{open,progress,review,done}/T-NNN.xml)의 생성, 읽기,
+갱신, 삭제를 담당하는 데이터 계층 모듈이다. kanban.py에서 분리되었으며,
+순수 IO 작업만 수행한다.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import shutil
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -25,7 +26,24 @@ from common import resolve_project_root
 
 _PROJECT_ROOT: str = resolve_project_root()
 KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".claude.workflow", "kanban")
-KANBAN_ACTIVE_DIR: str = os.path.join(KANBAN_DIR, "active")
+
+# ─── 상태별 디렉터리 상수 ─────────────────────────────────────────────────────
+KANBAN_OPEN_DIR: str = os.path.join(KANBAN_DIR, "open")
+KANBAN_PROGRESS_DIR: str = os.path.join(KANBAN_DIR, "progress")
+KANBAN_REVIEW_DIR: str = os.path.join(KANBAN_DIR, "review")
+KANBAN_DONE_DIR: str = os.path.join(KANBAN_DIR, "done")
+
+# 하위 호환: 기존 KANBAN_ACTIVE_DIR를 import하는 코드를 위한 deprecated alias
+KANBAN_ACTIVE_DIR: str = KANBAN_OPEN_DIR
+
+# XML <status> 값 -> 디렉터리 경로 매핑
+STATUS_DIR_MAP: dict[str, str] = {
+    "Open": KANBAN_OPEN_DIR,
+    "Submit": KANBAN_PROGRESS_DIR,
+    "In Progress": KANBAN_PROGRESS_DIR,
+    "Review": KANBAN_REVIEW_DIR,
+    "Done": KANBAN_DONE_DIR,
+}
 
 
 # ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
@@ -750,7 +768,7 @@ def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> No
 def find_ticket_file(ticket_number: str) -> str | None:
     """T-NNN.xml 정확 매칭으로 티켓 파일 경로를 탐색하여 반환한다.
 
-    탐색 순서: .kanban/active/T-NNN.xml -> .kanban/done/T-NNN.xml -> .kanban/T-NNN.xml (루트 폴백)
+    탐색 순서: open/ -> progress/ -> review/ -> done/ -> active/(폴백) -> kanban/(루트 폴백)
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -758,14 +776,17 @@ def find_ticket_file(ticket_number: str) -> str | None:
     Returns:
         발견된 파일 절대 경로 문자열. 미발견 시 None.
     """
-    active_path = os.path.join(KANBAN_ACTIVE_DIR, f"{ticket_number}.xml")
+    filename = f"{ticket_number}.xml"
+    # 상태별 디렉터리 순회
+    for status_dir in [KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR]:
+        candidate = os.path.join(status_dir, filename)
+        if os.path.isfile(candidate):
+            return candidate
+    # 폴백: 마이그레이션 미완료 시 active/ 또는 kanban/ 루트
+    active_path = os.path.join(KANBAN_DIR, "active", filename)
     if os.path.isfile(active_path):
         return active_path
-    done_path = os.path.join(KANBAN_DIR, "done", f"{ticket_number}.xml")
-    if os.path.isfile(done_path):
-        return done_path
-    # 루트 폴백: 마이그레이션 미완료 시 안전장치
-    root_path = os.path.join(KANBAN_DIR, f"{ticket_number}.xml")
+    root_path = os.path.join(KANBAN_DIR, filename)
     if os.path.isfile(root_path):
         return root_path
     return None
@@ -924,7 +945,7 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
 
 
 def get_max_ticket_number() -> int:
-    """Scan .kanban/active/ and .kanban/done/ XML filenames to find max T-NNN number.
+    """Scan .kanban/{open,progress,review,done}/ XML filenames to find max T-NNN number.
 
     루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
 
@@ -932,7 +953,7 @@ def get_max_ticket_number() -> int:
         현재 최대 티켓 번호 정수. 티켓이 없으면 0.
     """
     max_num = 0
-    for d in [KANBAN_ACTIVE_DIR, os.path.join(KANBAN_DIR, "done"), KANBAN_DIR]:
+    for d in [KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR, KANBAN_DIR]:
         if not os.path.isdir(d):
             continue
         for fname in os.listdir(d):
@@ -942,3 +963,36 @@ def get_max_ticket_number() -> int:
                 if num > max_num:
                     max_num = num
     return max_num
+
+
+def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
+    """티켓 파일을 대상 상태에 해당하는 디렉터리로 이동한다.
+
+    STATUS_DIR_MAP에서 대상 디렉터리를 조회하고, 현재 파일이 이미 해당
+    디렉터리에 있으면 이동을 스킵한다 (Submit <-> In Progress 전이 시).
+
+    Args:
+        filepath: 이동할 티켓 파일의 절대 경로.
+        target_status: 대상 상태 문자열 (Open, Submit, In Progress, Review, Done).
+
+    Returns:
+        이동 후 새 파일 경로. 스킵된 경우 원래 경로 반환.
+
+    Raises:
+        ValueError: STATUS_DIR_MAP에 없는 상태 문자열인 경우.
+        OSError: 파일 이동 실패 시.
+    """
+    target_dir = STATUS_DIR_MAP.get(target_status)
+    if target_dir is None:
+        raise ValueError(f"알 수 없는 상태: '{target_status}'. 허용값: {', '.join(STATUS_DIR_MAP.keys())}")
+
+    current_dir = os.path.dirname(filepath)
+    if os.path.normpath(current_dir) == os.path.normpath(target_dir):
+        # 같은 디렉터리 — 이동 불필요 (Submit <-> In Progress 등)
+        return filepath
+
+    os.makedirs(target_dir, exist_ok=True)
+    filename = os.path.basename(filepath)
+    new_path = os.path.join(target_dir, filename)
+    shutil.move(filepath, new_path)
+    return new_path

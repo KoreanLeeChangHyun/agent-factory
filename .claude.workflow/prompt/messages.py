@@ -12,6 +12,7 @@
     READONLY_SESSION_*: readonly_session_guard.py 사용 메시지
     DIRECT_PATH_*: direct_path_guard.py 사용 메시지
     WORKTREE_PATH_*: worktree_path_guard.py 사용 메시지
+    WORKTREE_REMOVE_*: worktree_remove_guard.py 사용 메시지
 """
 
 # =============================================================================
@@ -152,3 +153,11 @@ WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
 """플레이스홀더:
     {worktree_path} - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
 """
+
+# =============================================================================
+# worktree_remove_guard.py 메시지
+# =============================================================================
+
+WORKTREE_REMOVE_UNCOMMITTED_DENIED: str = (
+    "미커밋 변경이 있는 워크트리입니다. flow-merge를 사용하여 정상 경로로 완료하세요."
+)

@@ -321,7 +321,8 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     """티켓 XML에서 현재 활성 subnumber ID를 반환한다.
 
-    `kanban/active/T-NNN.xml`을 먼저 파싱하고, 없으면 루트(하위 호환 폴백)와
+    `kanban/open/`, `kanban/progress/`, `kanban/review/` 순으로 탐색하고,
+    없으면 `kanban/active/` (하위 호환 폴백)와 루트(하위 호환 폴백),
     `kanban/done/T-NNN.xml`도 탐색하여 `<metadata>` > `<current>` 텍스트를 int로 반환한다.
     파싱 실패 시 None을 반환한다.
 
@@ -331,7 +332,7 @@ def _resolve_current_subnumber_id(ticket_number: str) -> int | None:
     Returns:
         현재 subnumber ID (int). 파싱 실패 또는 미존재 시 None.
     """
-    for subdir in ("active", "", "done"):
+    for subdir in ("open", "progress", "review", "active", "", "done"):
         path = os.path.join(PROJECT_ROOT, ".claude.workflow", "kanban", subdir, f"{ticket_number}.xml")
         if not os.path.isfile(path):
             continue
