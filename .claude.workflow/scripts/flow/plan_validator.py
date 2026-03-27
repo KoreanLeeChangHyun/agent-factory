@@ -27,7 +27,7 @@ _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspat
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import resolve_project_root, resolve_work_dir
+from common import resolve_project_root, resolve_work_dir, C_CLAUDE, C_DIM, C_RESET
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 PROJECT_ROOT: str = resolve_project_root()
@@ -713,10 +713,12 @@ def main() -> None:
     warnings = validate(plan_path)
 
     if not warnings:
-        print("검증 통과")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE 검증 통과{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 0건{C_RESET}", flush=True)
         sys.exit(0)
 
-    print(f"[WARN] plan_validator: 경고 {len(warnings)}건 발견:")
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE{C_RESET} [WARN]", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 {len(warnings)}건 발견{C_RESET}", flush=True)
     print()
     for i, warning in enumerate(warnings, 1):
         print(f"  {i}. {warning}")

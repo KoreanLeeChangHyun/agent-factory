@@ -32,6 +32,7 @@ _scripts_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
+from common import C_CLAUDE, C_DIM, C_RESET  # noqa: E402
 from flow.tmux_utils import (  # noqa: E402
     get_current_window_name,
     WINDOW_PREFIX_P as _WINDOW_PREFIX_P,
@@ -315,12 +316,16 @@ def cmd_launch(ticket_id: str, command: str) -> int:
     # 비tmux 환경: 인라인 실행 폴백 신호
     if not _is_in_tmux():
         print("INLINE: 비tmux 환경, 인라인 실행 필요")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}TMUX{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}비tmux 환경, 인라인 실행{C_RESET}", flush=True)
         return 0
 
     # 재진입 감지: 현재 윈도우가 P:T- 로 시작하면 인라인 실행 폴백 신호
     current_window = _get_current_window_name()
     if current_window.startswith(_WINDOW_PREFIX_P + "T-"):
         print(f"INLINE: 재진입 감지 (현재 윈도우: {current_window}), 인라인 실행 필요")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}TMUX{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}재진입 감지 ({current_window}){C_RESET}", flush=True)
         return 0
 
     # 워크트리 내부 차단: cwd가 worktrees/ 패턴을 포함하면 다른 티켓의 launch를 거부한다
@@ -368,6 +373,8 @@ def cmd_launch(ticket_id: str, command: str) -> int:
 
     _log("INFO", f"tmux_launcher: cmd_launch complete window={window_name}")
     print(f"LAUNCH: {window_name} 윈도우에서 실행 중")
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}TMUX{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{window_name} 윈도우에서 실행 중{C_RESET}", flush=True)
     return 0
 
 
@@ -386,7 +393,11 @@ def cmd_cleanup(ticket_id: str) -> int:
     window_name = f"{_WINDOW_PREFIX_P}{ticket_id}"
     if _window_exists(window_name):
         _kill_window(window_name)
-        print(f"{window_name} 윈도우 종료")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}TMUX cleanup{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{window_name} 윈도우 종료{C_RESET}", flush=True)
+    else:
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}TMUX cleanup{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{window_name} 윈도우 없음 (이미 종료됨){C_RESET}", flush=True)
     return 0
 
 

@@ -28,7 +28,7 @@ _SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from common import read_env
+from common import read_env, C_CLAUDE, C_DIM, C_RESET
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 # .claude.workflow/.settings 우선, .env 폴백
@@ -107,6 +107,8 @@ def main() -> None:
     before_ssh = _git_config_get(scope, "core.sshCommand")
 
     # --- 설정 적용 ---
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}GITCONFIG ({scope_label}){C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}user.name={git_user_name}, user.email={git_user_email}{C_RESET}", flush=True)
     print(f"[INFO] Git config ({scope_label}) 설정을 적용합니다...")
 
     subprocess.run(["git", "config", scope, "user.name", git_user_name], check=True, timeout=5)

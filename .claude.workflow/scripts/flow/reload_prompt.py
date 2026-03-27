@@ -39,6 +39,7 @@ _SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+from common import C_CLAUDE, C_DIM, C_RESET
 from data.constants import KST
 from flow.flow_logger import append_log
 
@@ -229,8 +230,9 @@ def main() -> None:
 
     if not feedback:
         append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/open/ 또는 kanban/progress/ 등)")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}RELOAD{C_RESET} [WARN]", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}티켓 파일 미발견{C_RESET}", flush=True)
         print("FAIL", flush=True)
-        print("[WARN] 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/open/ 또는 kanban/progress/ 등)", flush=True)
         sys.exit(0)
 
     # --- Step 2: user_prompt.txt에 피드백 append ---
@@ -242,6 +244,8 @@ def main() -> None:
         f.write(feedback)
 
     append_log(abs_work_dir, "INFO", "reload_prompt: complete")
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}RELOAD{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}피드백 적용 완료{C_RESET}", flush=True)
     print(feedback, end="", flush=True)
 
 

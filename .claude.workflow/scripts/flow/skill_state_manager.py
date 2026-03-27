@@ -37,6 +37,7 @@ if _SCRIPTS_DIR not in sys.path:
 
 from common import (  # noqa: E402
     C_BOLD,
+    C_CLAUDE,
     C_CYAN,
     C_DIM,
     C_GREEN,
@@ -161,12 +162,14 @@ def archive_skill(name: str) -> None:
     state = load_skill_state()
 
     if is_archived(name, state):
-        print(f"{C_YELLOW}[INFO]{C_RESET} '{name}'은(는) 이미 archived 상태입니다.")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_YELLOW}[INFO]{C_RESET} '{name}'은(는) 이미 archived 상태입니다.", flush=True)
         return
 
     state[name] = "archived"
     save_skill_state(state)
-    print(f"{C_GREEN}[OK]{C_RESET} '{name}' -> {C_DIM}archived{C_RESET}")
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_GREEN}[OK]{C_RESET} '{name}' -> {C_DIM}archived{C_RESET}", flush=True)
 
 
 def activate_skill(name: str) -> None:
@@ -189,13 +192,15 @@ def activate_skill(name: str) -> None:
     state = load_skill_state()
 
     if not is_archived(name, state):
-        print(f"{C_YELLOW}[INFO]{C_RESET} '{name}'은(는) 이미 active 상태입니다.")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_YELLOW}[INFO]{C_RESET} '{name}'은(는) 이미 active 상태입니다.", flush=True)
         return
 
     # 키 삭제로 active 기본값 복원
     state.pop(name, None)
     save_skill_state(state)
-    print(f"{C_GREEN}[OK]{C_RESET} '{name}' -> {C_BOLD}active{C_RESET}")
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_GREEN}[OK]{C_RESET} '{name}' -> {C_BOLD}active{C_RESET}", flush=True)
 
 
 def list_skills(filter_mode: str | None = None) -> None:
@@ -208,7 +213,8 @@ def list_skills(filter_mode: str | None = None) -> None:
     """
     all_names = _get_all_skill_names()
     if not all_names:
-        print(f"{C_YELLOW}[INFO]{C_RESET} 스킬이 없습니다.")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_YELLOW}[INFO]{C_RESET} 스킬이 없습니다.", flush=True)
         return
 
     state = load_skill_state()
@@ -222,16 +228,17 @@ def list_skills(filter_mode: str | None = None) -> None:
         else:
             active_names.append(name)
 
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}SKILL list{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}Total: {len(all_names)} skills (active: {len(active_names)}, archived: {len(archived_names)}){C_RESET}", flush=True)
+
     if filter_mode == "archived":
         if not archived_names:
-            print(f"{C_YELLOW}[INFO]{C_RESET} archived 스킬이 없습니다.")
             return
         print(f"{C_BOLD}Archived ({len(archived_names)}){C_RESET}")
         for name in archived_names:
             print(f"  {C_DIM}{name}{C_RESET}")
     elif filter_mode == "active":
         if not active_names:
-            print(f"{C_YELLOW}[INFO]{C_RESET} active 스킬이 없습니다.")
             return
         print(f"{C_BOLD}Active ({len(active_names)}){C_RESET}")
         for name in active_names:
@@ -245,7 +252,6 @@ def list_skills(filter_mode: str | None = None) -> None:
             print(f"\n{C_BOLD}Archived ({len(archived_names)}){C_RESET}")
             for name in archived_names:
                 print(f"  {C_DIM}{name}{C_RESET}")
-        print(f"\n{C_DIM}Total: {len(all_names)} skills{C_RESET}")
 
 
 # ─── CLI 진입점 ───────────────────────────────────────────────────────────────

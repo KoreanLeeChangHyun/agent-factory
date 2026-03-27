@@ -27,7 +27,7 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import resolve_project_root
+from common import resolve_project_root, C_CLAUDE, C_DIM, C_RESET
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 PROJECT_ROOT = resolve_project_root()
@@ -344,9 +344,13 @@ def main() -> None:
     results = recommend(query)
 
     if not results:
-        print("추천 가능한 스킬이 없습니다.")
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}RECOMMEND{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}추천 가능한 스킬이 없습니다.{C_RESET}", flush=True)
         sys.exit(0)
 
+    top_name, top_score = results[0]
+    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}RECOMMEND{C_RESET}", flush=True)
+    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{top_name} (유사도: {top_score:.4f}){C_RESET}", flush=True)
     print(f"태스크: {query}")
     print(f"추천 스킬 (상위 {TOP_K}개):")
     print()

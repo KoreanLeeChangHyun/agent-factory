@@ -44,6 +44,7 @@ from skill_state_manager import is_archived, load_skill_state
 
 from common import (
     C_BOLD,
+    C_CLAUDE,
     C_CYAN,
     C_DIM,
     C_GREEN,
@@ -281,6 +282,8 @@ def main() -> None:
     catalog_size = len(catalog_content.encode("utf-8"))
 
     if dry_run:
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}CATALOG{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}DRY-RUN 활성 스킬 {total}개{C_RESET}", flush=True)
         print(f"{C_CYAN}[DRY-RUN]{C_RESET} 스킬 카탈로그 미리보기")
         print(f"  활성 스킬: {C_BOLD}{total}{C_RESET}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
         print(f"  제외 스킬: {C_DIM}{excluded_count}{C_RESET}개")
@@ -297,6 +300,8 @@ def main() -> None:
             f.write(catalog_content)
 
         actual_size = os.path.getsize(CATALOG_FILE)
+        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}CATALOG{C_RESET}", flush=True)
+        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}활성 스킬 {total}개, {actual_size:,} bytes{C_RESET}", flush=True)
         print(f"{C_GREEN}[OK]{C_RESET} 스킬 카탈로그 생성 완료")
         print(f"  활성 스킬: {C_BOLD}{total}{C_RESET}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
         print(f"  제외 스킬: {C_DIM}{excluded_count}{C_RESET}개")
