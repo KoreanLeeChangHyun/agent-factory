@@ -316,3 +316,45 @@
   color: #606060;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
+
+/* ── Card Chain ── */
+.card-chain {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.chain-stage {
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.chain-stage.done { color: #4ec9b0; }
+.chain-stage.active { color: #dcdcaa; }
+.chain-stage.waiting { color: #606060; }
+
+.chain-sep {
+  color: #606060;
+  font-size: 9px;
+  margin: 0 1px;
+}
+
+/* ── Card Relations ── */
+.card-relations {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.rel-item {
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.rel-derived { color: #569cd6; }
+.rel-depends { color: #dcdcaa; }
+.rel-blocks { color: #c586c0; }

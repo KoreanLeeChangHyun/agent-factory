@@ -206,6 +206,93 @@
   }
 
   /**
+   * 스테이지 이름을 3글자 약어로 변환한다.
+   * @param {string} stage - 스테이지 이름 (예: "research", "implement", "review")
+   * @returns {string} 3글자 약어 (예: "res", "imp", "rev")
+   */
+  function stageAbbr(stage) {
+    const s = stage.trim().toLowerCase();
+    const map = {
+      research: "res",
+      implement: "imp",
+      review: "rev",
+      refactor: "ref",
+      test: "tst",
+      deploy: "dep",
+      design: "des",
+      plan: "pln",
+      fix: "fix",
+      debug: "dbg",
+      analyze: "anl",
+      document: "doc",
+    };
+    return map[s] || s.slice(0, 3);
+  }
+
+  /**
+   * 체인 커맨드 티켓의 스테이지 아이콘 HTML을 생성한다.
+   * @param {Object} ticket - 티켓 객체
+   * @returns {string} card-chain div HTML
+   */
+  function renderChainIcons(ticket) {
+    const stages = ticket.command.split(">").map(function (s) { return s.trim(); }).filter(Boolean);
+    if (stages.length === 0) return "";
+
+    const isDone = ticket.status === "Done";
+    const isActive = ticket.status === "In Progress" || ticket.status === "Review";
+
+    let parts = [];
+    stages.forEach(function (stage, idx) {
+      let stateClass, icon;
+      if (isDone) {
+        stateClass = "done";
+        icon = "\u2713"; // ✓
+      } else if (isActive && idx === 0) {
+        // 현재 실행 중인 스테이지: 첫 번째 스테이지가 진행중
+        stateClass = "active";
+        icon = "\u25CF"; // ●
+      } else if (isActive && idx > 0) {
+        stateClass = "waiting";
+        icon = "\u25CB"; // ○
+      } else {
+        // Open/Submit: 전부 대기
+        stateClass = "waiting";
+        icon = "\u25CB"; // ○
+      }
+      if (idx > 0) {
+        parts.push('<span class="chain-sep">\u203A</span>');
+      }
+      parts.push('<span class="chain-stage ' + stateClass + '">' + icon + " " + stageAbbr(stage) + "</span>");
+    });
+
+    return '<div class="card-chain">' + parts.join("") + "</div>";
+  }
+
+  /**
+   * 관계 링크 HTML을 생성한다.
+   * @param {Object} ticket - 티켓 객체
+   * @returns {string} card-relations div HTML
+   */
+  function renderRelations(ticket) {
+    if (!ticket.relations || ticket.relations.length === 0) return "";
+
+    const typeMap = {
+      "derived-from": { prefix: "\u2190", cssClass: "rel-derived" },   // ←
+      "depends-on":   { prefix: "\u21D0", cssClass: "rel-depends" },   // ⇐
+      "blocks":       { prefix: "\u2192", cssClass: "rel-blocks" },    // →
+    };
+
+    let parts = [];
+    ticket.relations.forEach(function (rel) {
+      const info = typeMap[rel.type] || { prefix: "\u2194", cssClass: "rel-other" };
+      const numStr = rel.target ? rel.target.replace(/^T-/, "") : "?";
+      parts.push('<span class="rel-item ' + info.cssClass + '">' + info.prefix + numStr + "</span>");
+    });
+
+    return '<div class="card-relations">' + parts.join("") + "</div>";
+  }
+
+  /**
    * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
    * status가 "Submit"인 경우 SUBMIT 라벨을 반환한다.
    * 그 외 모든 경우 OPEN 라벨을 반환한다.
@@ -299,9 +386,6 @@
             if (t.command) {
               h += badge(t.command, CMD_COLORS[t.command]);
             }
-            if (t.relations && t.relations.length > 0) {
-              h += '<span class="card-relations-icon">\uD83D\uDD17 ' + t.relations.length + "</span>";
-            }
             h += "</div>";
             if (col.key === "Open") {
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
@@ -309,10 +393,18 @@
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 하단: 날짜/시간 2줄 우측 정렬
+            // 하단: 체인 > 관계 > 날짜/시간 순 우선순위 조건 분기
             h += '<div class="card-bottom">';
-            h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
-            h += '<div class="card-time">' + esc(dateObj.timePart) + "</div>";
+            const hasChain = t.command && t.command.indexOf(">") !== -1;
+            const hasRelations = t.relations && t.relations.length > 0;
+            if (hasChain) {
+              h += renderChainIcons(t);
+            } else if (hasRelations) {
+              h += renderRelations(t);
+            } else {
+              h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
+              h += '<div class="card-time">' + esc(dateObj.timePart) + "</div>";
+            }
             h += "</div>";
             h += "</div>";
           });
