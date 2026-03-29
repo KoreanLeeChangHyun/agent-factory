@@ -19,13 +19,13 @@
 ## Alias 레퍼런스
 
 ### flow-kanban 서브커맨드 (이 외 사용 금지)
-create, move, done, delete, add-subnumber, update-title, update-subnumber, archive-subnumber, set-editing, list, board, show
+create, move, done, delete, update-title, update, update-prompt, update-result, link, unlink, list, board, show
 
 예시:
   flow-kanban create "제목" --command implement
-  flow-kanban add-subnumber T-001 --command implement --goal "목표" --target "대상"
-  flow-kanban update-subnumber T-001 1 --goal "목표"   # --id 1도 허용
-  flow-kanban archive-subnumber T-001
+  flow-kanban update-prompt T-001 --goal "목표" --target "대상"
+  flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"
+  flow-kanban link T-001 --derived-from T-000
   flow-kanban move T-001 progress
   flow-kanban done T-001
 

@@ -87,39 +87,6 @@ Board.util.badge = badge;
 
 // ── XML Ticket Parsing ──
 
-/** Parses a <subnumber> XML element into a data object. */
-function parseSubnumber(el) {
-  let prompt = null;
-  const promptEl = el.querySelector("prompt");
-  if (promptEl) {
-    prompt = {};
-    for (let i = 0; i < promptEl.children.length; i++) {
-      const c = promptEl.children[i];
-      const t = (c.textContent || "").trim();
-      if (t) prompt[c.tagName] = t;
-    }
-    if (Object.keys(prompt).length === 0) prompt = null;
-  }
-  return {
-    id: parseInt(el.getAttribute("id") || "0", 10),
-    active: el.getAttribute("active") === "true",
-    datetime: xmlText(el, "datetime"),
-    command: xmlText(el, "command"),
-    prompt: prompt,
-    result: (function () {
-      const resultEl = el.querySelector("result");
-      if (!resultEl) return null;
-      const obj = {};
-      for (let ri = 0; ri < resultEl.children.length; ri++) {
-        const rc = resultEl.children[ri];
-        const rt = (rc.textContent || "").trim();
-        if (rt) obj[rc.tagName.toLowerCase()] = rt;
-      }
-      return Object.keys(obj).length > 0 ? obj : null;
-    })(),
-  };
-}
-
 /** Parses a ticket XML string into a ticket data object. */
 function parseTicket(text) {
   const doc = new DOMParser().parseFromString(text, "text/xml");
@@ -127,72 +94,84 @@ function parseTicket(text) {
   if (!root) return null;
 
   const meta = root.querySelector("metadata");
-  const ticket = { number: "", title: "", datetime: "", status: "Open", editing: false, current: 0, submit: null, history: [] };
+  const ticket = {
+    number: "", title: "", datetime: "", status: "Open",
+    command: "", prompt: null, result: null,
+    relations: [],
+  };
 
   if (meta) {
     ["number", "title", "datetime", "status"].forEach(function (f) {
       const el = meta.querySelector(f);
       if (el && el.textContent) ticket[f] = el.textContent.trim();
     });
-    const cur = meta.querySelector("current");
-    if (cur && cur.textContent) ticket.current = parseInt(cur.textContent.trim(), 10);
-    const editingEl = meta.querySelector("editing");
-    if (editingEl) ticket.editing = (editingEl.textContent || "").trim() === "true";
+    const cmdEl = meta.querySelector("command");
+    if (cmdEl) ticket.command = (cmdEl.textContent || "").trim();
   }
 
-  const submitEl = root.querySelector("submit");
-  if (submitEl) {
-    const subs = submitEl.querySelectorAll("subnumber");
-    for (let i = 0; i < subs.length; i++) {
-      const p = parseSubnumber(subs[i]);
-      if (p.active) { ticket.submit = p; break; }
+  // Flat structure: <prompt> directly under <ticket>
+  const promptEl = root.querySelector(":scope > prompt");
+  if (promptEl) {
+    var prompt = {};
+    for (var fi = 0; fi < promptEl.children.length; fi++) {
+      var fc = promptEl.children[fi];
+      var ft = (fc.textContent || "").trim();
+      ft = ft.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; }).join("\n");
+      if (ft) prompt[fc.tagName] = ft;
     }
-    if (!ticket.submit && subs.length > 0) ticket.submit = parseSubnumber(subs[subs.length - 1]);
+    if (Object.keys(prompt).length > 0) ticket.prompt = prompt;
   }
 
-  // Flat format: <prompt> and <result> directly under <ticket> (subnumber 제거 후)
-  if (!ticket.submit) {
-    const flatPromptEl = root.querySelector(":scope > prompt");
-    if (flatPromptEl) {
-      var prompt = {};
-      for (var fi = 0; fi < flatPromptEl.children.length; fi++) {
-        var fc = flatPromptEl.children[fi];
-        var ft = (fc.textContent || "").trim();
-        ft = ft.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; }).join("\n");
-        if (ft) prompt[fc.tagName] = ft;
+  // Flat structure: <result> directly under <ticket>
+  const resultEl = root.querySelector(":scope > result");
+  if (resultEl) {
+    var rObj = {};
+    for (var ri = 0; ri < resultEl.children.length; ri++) {
+      var rc = resultEl.children[ri];
+      var rt = (rc.textContent || "").trim();
+      if (rt) rObj[rc.tagName.toLowerCase()] = rt;
+    }
+    if (Object.keys(rObj).length > 0) ticket.result = rObj;
+  }
+
+  // Legacy done ticket fallback (read-only): <submit>/<subnumber> structure
+  if (!ticket.prompt && !ticket.command) {
+    var submitEl = root.querySelector("submit");
+    if (submitEl) {
+      var subs = submitEl.querySelectorAll("subnumber");
+      var activeSub = null;
+      for (var si = 0; si < subs.length; si++) {
+        if (subs[si].getAttribute("active") === "true") { activeSub = subs[si]; break; }
       }
-      if (Object.keys(prompt).length > 0) {
-        var flatResult = null;
-        var flatResultEl = root.querySelector(":scope > result");
-        if (flatResultEl) {
-          var rObj = {};
-          for (var ri = 0; ri < flatResultEl.children.length; ri++) {
-            var rc = flatResultEl.children[ri];
-            var rt = (rc.textContent || "").trim();
-            if (rt) rObj[rc.tagName.toLowerCase()] = rt;
+      if (!activeSub && subs.length > 0) activeSub = subs[subs.length - 1];
+      if (activeSub) {
+        var legacyCmd = (activeSub.querySelector("command") || {}).textContent || "";
+        if (legacyCmd) ticket.command = legacyCmd.trim();
+        var legacyPromptEl = activeSub.querySelector("prompt");
+        if (legacyPromptEl) {
+          var lp = {};
+          for (var lpi = 0; lpi < legacyPromptEl.children.length; lpi++) {
+            var lc = legacyPromptEl.children[lpi];
+            var lt = (lc.textContent || "").trim();
+            if (lt) lp[lc.tagName] = lt;
           }
-          if (Object.keys(rObj).length > 0) flatResult = rObj;
+          if (Object.keys(lp).length > 0) ticket.prompt = lp;
         }
-        ticket.submit = {
-          id: 1,
-          active: true,
-          datetime: ticket.datetime,
-          command: meta ? (function () { var cmdEl = meta.querySelector("command"); return cmdEl ? (cmdEl.textContent || "").trim() : ""; })() : "",
-          prompt: prompt,
-          result: flatResult,
-        };
+        var legacyResultEl = activeSub.querySelector("result");
+        if (legacyResultEl) {
+          var lr = {};
+          for (var lri = 0; lri < legacyResultEl.children.length; lri++) {
+            var lrc = legacyResultEl.children[lri];
+            var lrt = (lrc.textContent || "").trim();
+            if (lrt) lr[lrc.tagName.toLowerCase()] = lrt;
+          }
+          if (Object.keys(lr).length > 0) ticket.result = lr;
+        }
       }
     }
-  }
-
-  const historyEl = root.querySelector("history");
-  if (historyEl) {
-    const hs = historyEl.querySelectorAll("subnumber");
-    for (let j = 0; j < hs.length; j++) ticket.history.push(parseSubnumber(hs[j]));
   }
 
   const relationsEl = root.querySelector("relations");
-  ticket.relations = [];
   if (relationsEl) {
     const rels = relationsEl.querySelectorAll("relation");
     for (let k = 0; k < rels.length; k++) {
@@ -205,7 +184,6 @@ function parseTicket(text) {
   return ticket;
 }
 
-Board.util.parseSubnumber = parseSubnumber;
 Board.util.parseTicket = parseTicket;
 
 // ── Directory / Path Utilities ──

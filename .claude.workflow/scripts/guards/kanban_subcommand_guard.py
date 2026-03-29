@@ -43,7 +43,6 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "update",
     "update-prompt",
     "update-result",
-    "set-editing",
     "link",
     "unlink",
     "list",   # 티켓 목록 조회

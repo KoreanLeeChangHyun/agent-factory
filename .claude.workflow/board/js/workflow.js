@@ -79,63 +79,52 @@ function findTicketForWorkflow(w) {
   const tickets = Board.state.TICKETS;
   for (let ti = 0; ti < tickets.length; ti++) {
     const ticket = tickets[ti];
-    let subnumbers = [];
-    if (ticket.submit) subnumbers.push(ticket.submit);
-    if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
-    for (let si = 0; si < subnumbers.length; si++) {
-      const result = subnumbers[si].result;
-      if (!result) continue;
-      // Match by workdir path (basePath-based)
-      if (result.workdir) {
-        let wd = result.workdir;
-        if (wd.charAt(wd.length - 1) !== "/") wd += "/";
-        const normalized = "../" + wd;
-        const normalizedResolved = "../" + wfResolveResultPath(wd);
-        if (decodeURIComponent(normalized) === decodeURIComponent(basePath)
-            || decodeURIComponent(normalizedResolved) === decodeURIComponent(basePath)) return ticket;
-      }
-      // Fallback: match by registrykey
-      if (result.registrykey && entry && result.registrykey === entry) {
-        return ticket;
-      }
+    const result = ticket.result;
+    if (!result) continue;
+    // Match by workdir path (basePath-based)
+    if (result.workdir) {
+      let wd = result.workdir;
+      if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+      const normalized = "../" + wd;
+      const normalizedResolved = "../" + wfResolveResultPath(wd);
+      if (decodeURIComponent(normalized) === decodeURIComponent(basePath)
+          || decodeURIComponent(normalizedResolved) === decodeURIComponent(basePath)) return ticket;
+    }
+    // Fallback: match by registrykey
+    if (result.registrykey && entry && result.registrykey === entry) {
+      return ticket;
     }
   }
   return null;
 }
 
 /**
- * Returns array of workflows linked from any subnumber of a ticket.
+ * Returns array of workflows linked from a ticket via its result field.
  * @param {Object} ticket - ticket data object
  * @returns {Array} matched workflow items
  */
 function findWorkflowsForTicket(ticket) {
   const found = [];
-  let subnumbers = [];
-  if (ticket.submit) subnumbers.push(ticket.submit);
-  if (ticket.history) subnumbers = subnumbers.concat(ticket.history);
+  const result = ticket.result;
+  if (!result) return found;
   const workflows = Board.state.WORKFLOWS;
-  for (let si = 0; si < subnumbers.length; si++) {
-    const result = subnumbers[si].result;
-    if (!result) continue;
-    for (let wi = 0; wi < workflows.length; wi++) {
-      const w = workflows[wi];
-      if (found.indexOf(w) !== -1) continue;
-      // Match by workdir path
-      if (result.workdir) {
-        let wd = result.workdir;
-        if (wd.charAt(wd.length - 1) !== "/") wd += "/";
-        const normalized = "../" + wd;
-        const normalizedResolved = "../" + wfResolveResultPath(wd);
-        if (decodeURIComponent(normalized) === decodeURIComponent(w.basePath || "")
-            || decodeURIComponent(normalizedResolved) === decodeURIComponent(w.basePath || "")) {
-          found.push(w);
-          continue;
-        }
-      }
-      // Fallback: match by registrykey
-      if (result.registrykey && w.entry && result.registrykey === w.entry) {
+  for (let wi = 0; wi < workflows.length; wi++) {
+    const w = workflows[wi];
+    // Match by workdir path
+    if (result.workdir) {
+      let wd = result.workdir;
+      if (wd.charAt(wd.length - 1) !== "/") wd += "/";
+      const normalized = "../" + wd;
+      const normalizedResolved = "../" + wfResolveResultPath(wd);
+      if (decodeURIComponent(normalized) === decodeURIComponent(w.basePath || "")
+          || decodeURIComponent(normalizedResolved) === decodeURIComponent(w.basePath || "")) {
         found.push(w);
+        continue;
       }
+    }
+    // Fallback: match by registrykey
+    if (result.registrykey && w.entry && result.registrykey === w.entry) {
+      found.push(w);
     }
   }
   return found;

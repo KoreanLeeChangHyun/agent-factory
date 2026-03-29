@@ -530,11 +530,10 @@ flow-gc /home/user/project
 | `move` | `flow-kanban move <ticket> <target> [--force]` | 티켓을 지정 컬럼으로 이동 |
 | `done` | `flow-kanban done <ticket>` | 티켓을 Done으로 이동 + .claude.workflow/kanban/done/으로 파일 이동 |
 | `delete` | `flow-kanban delete <ticket>` | 티켓 삭제 |
-| `add-subnumber` | `flow-kanban add-subnumber <ticket> --command <cmd> --goal "<goal>" --target "<target>" [options]` | subnumber 항목 추가 |
-| `update-subnumber` | `flow-kanban update-subnumber <ticket> --id <N> [options]` | subnumber 필드 갱신 |
-| `archive-subnumber` | `flow-kanban archive-subnumber <ticket>` | active subnumber를 history로 이동 |
 | `update-title` | `flow-kanban update-title <ticket> <title>` | 티켓 제목 갱신 |
-| `set-editing` | `flow-kanban set-editing <ticket> <--on\|--off>` | 편집 중 플래그 설정 |
+| `update` | `flow-kanban update <ticket> [options]` | 티켓 메타데이터 갱신 |
+| `update-prompt` | `flow-kanban update-prompt <ticket> [options]` | 티켓 prompt 필드(goal/target/constraints/criteria/context) 갱신 |
+| `update-result` | `flow-kanban update-result <ticket> [options]` | 티켓 result 필드(registrykey/workdir/plan/report) 갱신 |
 | `link` | `flow-kanban link <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 기록 |
 | `unlink` | `flow-kanban unlink <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 제거 |
 | `list` | `flow-kanban list [--status <open\|progress\|review\|done>]` | 티켓 목록 한 줄 요약 조회 |
@@ -550,27 +549,24 @@ flow-gc /home/user/project
 | `review` | In Review |
 | `done` | Done |
 
-#### `add-subnumber` 인자
+#### `update-prompt` 인자
 
 | 인자 | 필수 | 설명 |
 |------|------|------|
 | `ticket` | 필수 | 티켓 번호 (T-NNN, NNN, #N 형식) |
-| `--command` | 필수 | 워크플로우 커맨드 (implement, review, research 등) |
-| `--goal` | 필수 | 해당 사이클 목표 |
-| `--target` | 필수 | 작업 대상 |
+| `--command` | 선택 | 워크플로우 커맨드 (implement, review, research 등) |
+| `--goal` | 선택 | 목표 |
+| `--target` | 선택 | 작업 대상 |
 | `--constraints` | 선택 | 제약사항 |
 | `--criteria` | 선택 | 완료 기준 |
 | `--context` | 선택 | 맥락 정보 |
-| `--workdir` | 선택 | .claude.workflow/workflow/ 산출물 경로 |
-| `--result` | 선택 | 실행 결과 요약 |
 | `--skip-validation` | 선택 | 품질 검증 우회 (긴급 시 사용) |
 
-#### `update-subnumber` 인자
+#### `update-result` 인자
 
 | 인자 | 필수 | 설명 |
 |------|------|------|
 | `ticket` | 필수 | 티켓 번호 |
-| `--id` | 필수 | 갱신할 subnumber ID (int) |
 | `--registrykey` | 선택 | YYYYMMDD-HHMMSS 형식 registryKey |
 | `--plan` | 선택 | plan.md 상대 경로 |
 | `--report` | 선택 | report.md 상대 경로 |
@@ -584,18 +580,18 @@ flow-kanban move T-169 progress
 flow-kanban move T-169 review
 flow-kanban done T-169
 
-flow-kanban add-subnumber T-169 \
-  --command implement \
+flow-kanban update-prompt T-169 \
   --goal "flow-* 스크립트 사용 가이드 통합" \
-  --target ".claude.workflow/docs/cli-reference.md 신규 생성"
+  --target ".claude.workflow/docs/cli-reference.md 갱신"
 
-flow-kanban update-subnumber T-169 --id 2 \
+flow-kanban update-result T-169 \
   --registrykey 20260325-004729 \
   --plan ".claude.workflow/workflow/20260325-004729/.../plan.md" \
-  --report ".claude.workflow/workflow/20260325-004729/.../report.md"
+  --report ".claude.workflow/workflow/20260325-004729/.../report.md" \
+  --workdir ".claude.workflow/workflow/20260325-004729/.../implement"
 
 flow-kanban link T-169 --depends-on T-165
-flow-kanban set-editing T-169 --on
+flow-kanban link T-169 --derived-from T-168
 ```
 
 ---

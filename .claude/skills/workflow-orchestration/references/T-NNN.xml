@@ -1,66 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ticket>
-  <!-- metadata -->
   <metadata>
     <number>T-NNN</number>
     <title>제목</title>
     <datetime>YYYY-MM-DD hh:mm:ss</datetime>
     <status>상태</status>
-    <current>4</current>
+    <command>명령어</command>
   </metadata>
 
-  <!-- submit -->
-  <submit>
-    <subnumber id="4" active="true">
-    <command>명령어</command>
-    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
-      <prompt>
-        작업에 따라 포맷 다름 ...
-      </prompt>
-      <result>
-        작업 제출 전임으로 존재 하지 않음
-      </result>
-    </subnumber>
-  </submit>
+  <relations>
+    <relation type="derived-from" ticket="T-NNN-1" />
+  </relations>
 
-  <!-- history -->
-  <history>
-    <subnumber id="3">
-    <command>명령어</command>
-    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
-      <prompt>
-        작업에 따라 포맷 다름 ...
-      </prompt>
-      <result>
-        <plan> plan.md 경로 </plan>
-        <work> work 경로 </work>
-        <report> report.md 경로 </report>
-      </result>
-    </subnumber>
-    <subnumber id="2">
-    <command>명령어</command>
-    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
-      <prompt>
-        작업에 따라 포맷 다름 ...
-      </prompt>
-      <result>
-        <plan> plan.md 경로 </plan>
-        <work> work 경로 </work>
-        <report> report.md 경로 </report>
-      </result>
-    </subnumber>
-    <subnumber id="1">
-    <command>명령어</command>
-    <datetime>YYYY-MM-DD hh:mm:ss</datetime>
-      <prompt>
-        작업에 따라 포맷 다름 ...
-      </prompt>
-      <result>
-        <plan> plan.md 경로 </plan>
-        <work> work 경로 </work>
-        <report> report.md 경로 </report>
-      </result>
-    </subnumber>
-  </history>
+  <prompt>
+    <goal>목표</goal>
+    <target>대상</target>
+    <constraints>제약 조건</constraints>
+    <criteria>완료 기준</criteria>
+    <context>배경 맥락</context>
+  </prompt>
 
+  <result />
 </ticket>

@@ -114,12 +114,12 @@ flow-kanban move T-NNN review
 
 `.kanban/open/T-NNN.xml` 티켓 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선하는 워크플로우 커맨드 스킬. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어.
 
-티켓 파일은 XML 구조를 사용합니다:
+티켓 파일은 flat XML 구조를 사용합니다:
 - 루트 요소: `<ticket>`
-- `<metadata>` 래퍼: `<number>`, `<title>`, `<datetime>`, `<status>`, `<current>` (현재 활성 subnumber는 `<current>` 값으로 결정)
-- `<submit>` 래퍼: active subnumber 목록
-- `<history>` 래퍼: 비활성(이전 사이클) subnumber 목록
-- 작업 단위: `<subnumber id="N">` (직하에 `<command>` 태그, `<prompt>` 래퍼 내에 goal/target/constraints/criteria/context)
+- `<metadata>`: `<number>`, `<title>`, `<datetime>`, `<status>`, `<command>`
+- `<relations>`: 티켓 간 관계 링크 (`<relation type="derived-from" ticket="T-NNN" />`)
+- `<prompt>`: 작업 정의 필드 (`<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>`)
+- `<result>`: 실행 결과 (`<registrykey>`, `<workdir>`, `<summary>`) 또는 미실행 시 self-closing `<result />`
 
 상세 실행 절차는 `.claude/commands/wf.md`를 참조한다.
 
@@ -139,9 +139,9 @@ flow-kanban move T-NNN review
 
 ### XML 티켓 처리 규칙
 
-- `<command>` 태그는 `<subnumber id="N">` 직하(자식)에 위치. `<prompt>` 래퍼 밖에 배치됨. 잠금 판정은 XML `<status>` 요소(`Open`/`In Progress`/`Review`)로 판별
-- `<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>` 태그는 subnumber 내부의 `<prompt>` 래퍼 안에 위치
-- 사용자 입력 갱신은 현재 활성 subnumber(`<current>` 값) 내부의 `<prompt>` 래퍼 자식 요소를 대상으로 함
+- `<command>` 태그는 `<metadata>` 직하(자식)에 위치. 잠금 판정은 XML `<status>` 요소(`Open`/`In Progress`/`Review`)로 판별
+- `<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>` 태그는 티켓 루트 직하의 `<prompt>` 래퍼 안에 위치
+- 사용자 입력 갱신은 `<prompt>` 래퍼 자식 요소를 대상으로 함
 - 기존 티켓 편집 시 원시 XML 대신 읽기 쉬운 구조화 형식으로 출력
 
 ### 웹검색/코드탐색 자율 수행
@@ -384,7 +384,7 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 |------|--------|------|
 | 간단 검토 통과 + 완료 선택 | 검토 항목 전체 OK + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done |
 | 간단 검토 경고 + 완료 선택 | 검토 항목 WARN + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done (경고 무시) |
-| 상세 review 선택 | 사용자 "2" 선택 | review subnumber 추가 -> /wf -s N으로 review 워크플로우 실행 |
+| 상세 review 선택 | 사용자 "2" 선택 | 새 review 티켓 생성 + `derived-from` link -> /wf -s N으로 review 워크플로우 실행 |
 | 취소 | 사용자 "0" 선택 | Review 상태 유지 |
 
 ### 간단 검토 항목
@@ -401,11 +401,12 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 
 ### 상세 review 연계
 
-상세 review 선택 시 기존 review command 워크플로우를 재활용한다:
-1. `flow-kanban add-subnumber T-NNN --command review`로 새 subnumber 추가
-2. 사용자가 `/wf -s N`으로 review 워크플로우 실행
-3. review 완료 후 다시 Review 상태로 돌아옴
-4. 사용자가 `/wf -d N`으로 최종 완료 처리
+상세 review 선택 시 새 review 티켓을 생성하여 기존 review command 워크플로우를 재활용한다:
+1. `flow-kanban create "T-NNN review" --command review`로 새 review 티켓 생성
+2. `flow-kanban link T-NEW --derived-from T-NNN`으로 원본 티켓과 관계 설정
+3. 사용자가 `/wf -s NEW`로 review 워크플로우 실행
+4. review 완료 후 원본 티켓은 Review 상태 유지
+5. 사용자가 `/wf -d N`으로 최종 완료 처리
 
 ### 관련 스크립트
 
@@ -434,7 +435,7 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 
 - `#N` 지정 시: `.kanban/open/T-NNN.xml`, `.kanban/progress/T-NNN.xml`, `.kanban/review/T-NNN.xml` 순으로 탐색
 - `#N` 미지정 시: `.kanban/open/` 디렉터리의 XML 파일을 스캔하여 Open 상태 티켓을 자동 선택
-- `<current>` 값이 `0` 또는 미존재 시: 에러 출력 후 종료
+- `<command>` 미존재 또는 빈 값 시: 에러 출력 후 종료
 - `<command>` 유효 값: `implement`, `research`, `review`
 
 ### 비워크플로우 독립 명령어 (submit)
