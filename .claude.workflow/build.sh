@@ -21,9 +21,10 @@ else
 fi
 
 # --- 공통 출력 함수 ---
-print_success() { printf '%s  ✓ %s%s\n' "${GREEN}" "$1" "${NC}"; }
-print_error()   { printf '%s  ✗ %s%s\n' "${RED}"   "$1" "${NC}"; }
-print_info()    { printf '%s  → %s%s\n' "${YELLOW}" "$1" "${NC}"; }
+print_success() { printf '%s  ✓ %s%s\n' "${GREEN}"  "$1" "${NC}"; }
+print_error()   { printf '%s  ✗ %s%s\n' "${RED}"    "$1" "${NC}"; }
+print_warning() { printf '%s  ⚠ %s%s\n' "${YELLOW}" "$1" "${NC}"; }
+print_info()    { printf '%s  → %s%s\n' "${YELLOW}"  "$1" "${NC}"; }
 print_step()    { printf '\n%s[Step %s]%s %s\n' "${GREEN}" "$1" "${NC}" "$2"; }
 
 # --- 쉘 판별 헬퍼 ---
@@ -274,6 +275,120 @@ generate_claude_settings() {
     print_success ".claude.workflow/.settings 템플릿 생성 완료 ($settings_file)"
 }
 
+# --- 마이그레이션 플래그 (Phase 3 검증용) ---
+_MIGRATION_PERFORMED=false
+
+# --- Step 2.5: 레거시 루트 디렉터리 마이그레이션 ---
+# v1 구조의 .kanban/, .dashboard/, .workflow/ 를 .claude.workflow/ 하위로 이동
+migrate_legacy_directories() {
+    print_step "2.5" "레거시 루트 디렉터리 마이그레이션"
+    local legacy_dirs=(".kanban" ".dashboard" ".workflow")
+    local target_dirs=(".claude.workflow/kanban" ".claude.workflow/dashboard" ".claude.workflow/workflow")
+    # 구 디렉터리 존재 여부 확인
+    local found=false
+    for dir in "${legacy_dirs[@]}"; do
+        [ -d "$dir" ] && found=true
+    done
+    if [ "$found" = false ]; then
+        print_info "레거시 루트 디렉터리 없음 (.kanban/, .dashboard/, .workflow/). 마이그레이션 스킵"
+        return 0
+    fi
+    _MIGRATION_PERFORMED=true
+    print_info "레거시 루트 디렉터리가 감지되었습니다. 마이그레이션을 시작합니다..."
+    local i
+    for i in "${!legacy_dirs[@]}"; do
+        local src="${legacy_dirs[$i]}"
+        local dst="${target_dirs[$i]}"
+        if [ ! -d "$src" ]; then
+            print_info "$src 디렉터리 없음, 스킵"
+            continue
+        fi
+        [ ! -d "$dst" ] && mkdir -p "$dst"
+        # cp -rn (no-clobber): 기존 파일 우선 보존
+        if [ "${DETECTED_OS:-linux}" = "macos" ]; then
+            cp -Rn "$src"/ "$dst"/ 2>/dev/null || true
+        else
+            cp -rn "$src"/ "$dst"/ 2>/dev/null || true
+        fi
+        # 원본 삭제
+        if rm -rf "$src"; then
+            print_success "$src → $dst 마이그레이션 완료"
+        else
+            print_error "$src 삭제 실패"
+        fi
+    done
+    print_success "레거시 루트 디렉터리 마이그레이션 완료"
+}
+
+# --- Step 3.5: 레거시 .claude 경로 정리 ---
+# v1의 .claude/scripts/, .claude/hooks/ 삭제 (settings.json 보존)
+cleanup_legacy_claude_paths() {
+    print_step "3.5" "레거시 .claude 경로 정리"
+    local has_legacy=false
+    [ -d ".claude/scripts" ] && has_legacy=true
+    [ -d ".claude/hooks" ]   && has_legacy=true
+    if [ "$has_legacy" = false ]; then
+        print_info "레거시 .claude/scripts/, .claude/hooks/ 없음. 정리 스킵"
+        return 0
+    fi
+    _MIGRATION_PERFORMED=true
+    # settings 백업
+    local tmp_backup
+    tmp_backup="$(mktemp -d)"
+    for sf in "settings.json" "settings.local.json"; do
+        [ -f ".claude/$sf" ] && cp ".claude/$sf" "$tmp_backup/$sf"
+    done
+    # 구 경로 삭제
+    if [ -d ".claude/scripts" ]; then
+        rm -rf ".claude/scripts"
+        print_success ".claude/scripts/ 삭제 완료"
+    fi
+    if [ -d ".claude/hooks" ]; then
+        rm -rf ".claude/hooks"
+        print_success ".claude/hooks/ 삭제 완료"
+    fi
+    # settings 복원
+    for sf in "settings.json" "settings.local.json"; do
+        if [ -f "$tmp_backup/$sf" ]; then
+            cp "$tmp_backup/$sf" ".claude/$sf"
+            print_success ".claude/$sf 복원 완료"
+        fi
+    done
+    rm -rf "$tmp_backup"
+    print_success "레거시 .claude 경로 정리 완료"
+}
+
+# --- Step 3.6: 레거시 alias 경로 갱신 ---
+# ~/.claude.aliases 내 구 경로(.claude/scripts/, .claude/hooks/)를 신 경로로 치환
+update_legacy_aliases() {
+    print_step "3.6" "레거시 alias 경로 갱신"
+    local aliases_file="$HOME/.claude.aliases"
+    if [ ! -f "$aliases_file" ]; then
+        print_info "$aliases_file 파일 없음 (신규 설치). 갱신 스킵"
+        return 0
+    fi
+    local changed=0
+    # .claude/scripts/ → .claude.workflow/scripts/
+    if grep -q '\.claude/scripts/' "$aliases_file" 2>/dev/null; then
+        sed -i.mig-bak 's|\.claude/scripts/|.claude.workflow/scripts/|g' "$aliases_file"
+        changed=$((changed + 1))
+        _MIGRATION_PERFORMED=true
+    fi
+    # .claude/hooks/ → .claude.workflow/hooks/
+    if grep -q '\.claude/hooks/' "$aliases_file" 2>/dev/null; then
+        sed -i.mig-bak 's|\.claude/hooks/|.claude.workflow/hooks/|g' "$aliases_file"
+        changed=$((changed + 1))
+        _MIGRATION_PERFORMED=true
+    fi
+    # macOS sed -i 백업 파일 정리
+    rm -f "${aliases_file}.mig-bak"
+    if [ "$changed" -gt 0 ]; then
+        print_success "alias 경로 치환 완료 (${changed}개 패턴)"
+    else
+        print_info "레거시 경로 패턴 없음. 갱신 불필요"
+    fi
+}
+
 # --- Step 6: 레거시 .prompt/ 마이그레이션 ---
 migrate_legacy_prompt() {
     print_step "6" "레거시 .prompt/ 마이그레이션"
@@ -441,6 +556,33 @@ verify_installation() {
         fi
     done
     [ "$gitignore_ok" = true ] && print_success ".gitignore 필수 항목 모두 등록 확인"
+    # (i) 마이그레이션 검증 (마이그레이션이 수행된 경우에만)
+    if [ "$_MIGRATION_PERFORMED" = true ]; then
+        local mig_warn=0
+        # 구 루트 디렉터리 잔류 확인
+        for legacy_dir in ".kanban" ".dashboard" ".workflow"; do
+            if [ -d "$legacy_dir" ]; then
+                print_warning "레거시 디렉터리가 남아있습니다: ${legacy_dir}/ (수동 확인 필요)"
+                mig_warn=$((mig_warn + 1))
+            fi
+        done
+        # 구 .claude/ 경로 잔류 확인
+        for legacy_path in ".claude/scripts" ".claude/hooks"; do
+            if [ -d "$legacy_path" ]; then
+                print_warning "레거시 경로가 남아있습니다: ${legacy_path}/ (수동 확인 필요)"
+                mig_warn=$((mig_warn + 1))
+            fi
+        done
+        # $HOME/.claude.aliases에 구 경로 패턴 잔류 확인
+        local aliases_mig_file="$HOME/.claude.aliases"
+        if [ -f "$aliases_mig_file" ] && grep -q '\.claude/scripts/' "$aliases_mig_file" 2>/dev/null; then
+            print_warning "\$HOME/.claude.aliases에 구 경로 패턴(.claude/scripts/)이 남아있습니다 (수동 확인 필요)"
+            mig_warn=$((mig_warn + 1))
+        fi
+        if [ "$mig_warn" -eq 0 ]; then
+            print_success "마이그레이션 검증 완료 — 레거시 경로 잔류 없음"
+        fi
+    fi
     # 결과 요약
     echo ""
     if [ "$failed" -eq 0 ]; then
@@ -468,7 +610,10 @@ main() {
     detect_os
     install_claude_code
     install_dependencies
+    migrate_legacy_directories
     clone_claude_directory
+    cleanup_legacy_claude_paths
+    update_legacy_aliases
     create_directories_and_files
     setup_settings_json
     generate_claude_settings

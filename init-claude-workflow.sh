@@ -50,6 +50,16 @@ else
         cp "$SRC/.claude.workflow/build.sh" ".claude.workflow/build.sh"
     fi
     printf '%s  ✓ .claude.workflow/init + build.sh 갱신 완료%s\n' "${GREEN}" "${NC}"
+
+    # 구 버전 디렉터리 감지 (마이그레이션 필요 여부 안내)
+    _legacy_detected=0
+    for _legacy_dir in ".kanban" ".dashboard" ".workflow"; do
+        [ -d "$_legacy_dir" ] && _legacy_detected=1 && break
+    done
+    if [ "$_legacy_detected" -eq 1 ]; then
+        printf '%s  ⚠ 마이그레이션이 필요한 이전 버전이 감지되었습니다 (.kanban/.dashboard/.workflow)%s\n' "${YELLOW}" "${NC}"
+        printf '%s    build.sh가 자동으로 마이그레이션을 수행합니다.%s\n' "${YELLOW}" "${NC}"
+    fi
 fi
 
 # build.sh 실행
