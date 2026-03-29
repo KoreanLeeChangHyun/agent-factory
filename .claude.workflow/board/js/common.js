@@ -150,6 +150,41 @@ function parseTicket(text) {
     if (!ticket.submit && subs.length > 0) ticket.submit = parseSubnumber(subs[subs.length - 1]);
   }
 
+  // Flat format: <prompt> and <result> directly under <ticket> (subnumber 제거 후)
+  if (!ticket.submit) {
+    const flatPromptEl = root.querySelector(":scope > prompt");
+    if (flatPromptEl) {
+      var prompt = {};
+      for (var fi = 0; fi < flatPromptEl.children.length; fi++) {
+        var fc = flatPromptEl.children[fi];
+        var ft = (fc.textContent || "").trim();
+        ft = ft.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; }).join("\n");
+        if (ft) prompt[fc.tagName] = ft;
+      }
+      if (Object.keys(prompt).length > 0) {
+        var flatResult = null;
+        var flatResultEl = root.querySelector(":scope > result");
+        if (flatResultEl) {
+          var rObj = {};
+          for (var ri = 0; ri < flatResultEl.children.length; ri++) {
+            var rc = flatResultEl.children[ri];
+            var rt = (rc.textContent || "").trim();
+            if (rt) rObj[rc.tagName.toLowerCase()] = rt;
+          }
+          if (Object.keys(rObj).length > 0) flatResult = rObj;
+        }
+        ticket.submit = {
+          id: 1,
+          active: true,
+          datetime: ticket.datetime,
+          command: meta ? (function () { var cmdEl = meta.querySelector("command"); return cmdEl ? (cmdEl.textContent || "").trim() : ""; })() : "",
+          prompt: prompt,
+          result: flatResult,
+        };
+      }
+    }
+  }
+
   const historyEl = root.querySelector("history");
   if (historyEl) {
     const hs = historyEl.querySelectorAll("subnumber");
@@ -552,6 +587,7 @@ function switchTab(target, skipPush) {
   views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
   if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
   saveUI();
+  if (Board.util.updateQueryString) Board.util.updateQueryString();
 }
 
 tabs.forEach(function (t) {
@@ -559,6 +595,24 @@ tabs.forEach(function (t) {
 });
 
 Board.util.switchTab = switchTab;
+
+// ── Query String Helpers ──
+
+/** Updates URL query string to reflect current viewer state. */
+function updateQueryString() {
+  var params = new URLSearchParams(window.location.search);
+  if (Board.state.activeTab === "viewer" && Board.state.activeViewerTab) {
+    params.set("tab", "viewer");
+    params.set("ticket", Board.state.activeViewerTab);
+  } else {
+    params.delete("tab");
+    params.delete("ticket");
+  }
+  var qs = params.toString();
+  var url = window.location.pathname + (qs ? "?" + qs : "");
+  history.replaceState(null, "", url);
+}
+Board.util.updateQueryString = updateQueryString;
 
 // ── Fetch Utilities ──
 

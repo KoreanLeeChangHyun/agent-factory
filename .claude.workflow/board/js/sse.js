@@ -199,6 +199,23 @@
   }
 
   // ── Init ──
+  // 쿼리 스트링 우선, localStorage 폴백으로 viewer 상태 복원
+  var qsParams = new URLSearchParams(window.location.search);
+  var qsTab = qsParams.get("tab");
+  var qsTicket = qsParams.get("ticket");
+  var initSavedTabs = (Board.util.loadUI().viewerTabs || []).slice();
+
+  // 쿼리 스트링에 ticket이 있으면 savedTabs에 추가 (중복 방지)
+  if (qsTab === "viewer" && qsTicket) {
+    Board.state.activeTab = "viewer";
+    Board.state.activeViewerTab = qsTicket;
+    if (initSavedTabs.indexOf(qsTicket) === -1) initSavedTabs.push(qsTicket);
+  }
+
+  // switchTab 전에 placeholder로 viewerTabs 복원 (saveUI 덮어쓰기 방지)
+  initSavedTabs.forEach(function (num) {
+    Board.state.viewerTabs.push({ number: num, ticket: null });
+  });
   switchTab(Board.state.activeTab);
   document.body.style.opacity = "";
 
@@ -206,16 +223,17 @@
     Board.state.TICKETS = tickets;
     prevTicketJson = ticketJson(tickets);
     Board.render.renderKanban();
-    const savedState = Board.util.loadUI();
-    const savedTabs = savedState.viewerTabs || [];
-    if (savedTabs.length > 0) {
-      savedTabs.forEach(function (num) {
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-        if (ticket) {
-          const exists = Board.state.viewerTabs.find(function (t) { return t.number === num; });
-          if (!exists) Board.state.viewerTabs.push({ number: num, ticket: ticket });
+    if (initSavedTabs.length > 0) {
+      initSavedTabs.forEach(function (num) {
+        var ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+        var existing = Board.state.viewerTabs.find(function (t) { return t.number === num; });
+        if (ticket && existing) {
+          existing.ticket = ticket;
+        } else if (!ticket && existing) {
+          Board.state.viewerTabs = Board.state.viewerTabs.filter(function (t) { return t.number !== num; });
         }
       });
+      Board.util.saveUI();
       if (Board.state.activeTab === "viewer") Board.render.renderViewer();
     }
   });

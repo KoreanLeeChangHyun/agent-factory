@@ -196,7 +196,10 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
         if len(content) < _PROMPT_FIELD_INLINE_LIMIT:
             return f"{indent}<{tag}>{content}</{tag}>"
         inner_indent = indent + "  "
-        indented_content = content.replace("\n", f"\n{inner_indent}")
+        # 각 줄의 기존 공백을 strip 후 빈 줄 제거, 재인덴트 (ET.indent 중첩 방지)
+        lines = content.split("\n")
+        lines = [line.strip() for line in lines if line.strip()]
+        indented_content = f"\n{inner_indent}".join(lines)
         return f"{indent}<{tag}>\n{inner_indent}{indented_content}\n{indent}</{tag}>"
 
     xml_str = re.sub(

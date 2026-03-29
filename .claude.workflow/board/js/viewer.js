@@ -32,6 +32,7 @@
     Board.state.activeViewerTab = ticket.number;
     renderViewer();
     saveUI();
+    Board.util.updateQueryString();
   }
 
   /** Closes a viewer tab by number and activates the previous tab. */

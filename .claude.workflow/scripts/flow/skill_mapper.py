@@ -99,7 +99,7 @@ def resolve_skill_file(skill_name: str) -> str:
     skill_dir = os.path.join(SKILLS_DIR, skill_name)
     skill_dir = os.path.normpath(skill_dir)
     if not skill_dir.startswith(os.path.normpath(SKILLS_DIR)):
-        print(f"[WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
+        print(f"{C_CLAUDE}║{C_RESET} [WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
         skill_dir = os.path.join(SKILLS_DIR, "workflow-agent")
         return os.path.join(skill_dir, "SKILL.md")
     compact_path = os.path.join(skill_dir, "COMPACT.md")
@@ -138,7 +138,7 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
 
     if total_tokens > TOKEN_BUDGET_LIMIT:
         print(
-            f"[WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
+            f"{C_CLAUDE}║{C_RESET} [WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
             file=sys.stderr,
         )
 
@@ -185,7 +185,7 @@ def parse_plan_tasks(plan_path):
     tasks = []
 
     if not os.path.isfile(plan_path):
-        print(f"[ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"{C_CLAUDE}║{C_RESET} [ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         return tasks
 
     with open(plan_path, "r", encoding="utf-8") as f:
@@ -217,6 +217,23 @@ def parse_plan_tasks(plan_path):
                 "skills": skills,
             }
         )
+
+    # 테이블 파싱 결과가 없으면 헤딩 기반 폴백 파싱 시도
+    if not tasks:
+        heading_pattern = re.compile(r"^#{2,3}\s+(W\d+)[:\s]\s*(.+)", re.MULTILINE)
+        for m in heading_pattern.finditer(content):
+            tasks.append(
+                {
+                    "taskId": m.group(1),
+                    "description": m.group(2).strip(),
+                    "skills": [],
+                }
+            )
+        if tasks:
+            print(
+                f"{C_CLAUDE}║{C_RESET} [WARN] 테이블 미발견, 헤딩 기반 폴백 파싱 사용",
+                file=sys.stderr,
+            )
 
     return tasks
 
@@ -301,7 +318,7 @@ def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
             skills = list(fallback_skills)
         except Exception as e:
             # import 실패 또는 예상치 못한 오류 시 경고 로그 출력, 폴백 체인 정상 진행
-            print(f"[WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
+            print(f"{C_CLAUDE}║{C_RESET} [WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
 
     task["fallback_skills"] = fallback_skills
     return skills
@@ -561,7 +578,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
         생성된 컨텍스트 파일 경로 목록 (생성 성공한 파일만)
     """
     if not os.path.isfile(plan_path):
-        print(f"[WARN] slice_plan_context: plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"{C_CLAUDE}║{C_RESET} [WARN] slice_plan_context: plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         return []
 
     with open(plan_path, "r", encoding="utf-8") as f:
@@ -640,7 +657,7 @@ def main():
     _append_log(work_dir, "INFO", f"skill_mapper: start registryKey={registry_key}")
 
     if not command:
-        print(f"[ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
+        print(f"{C_CLAUDE}║{C_RESET} [ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
         sys.exit(1)
 
     # 1. 카탈로그 파싱
@@ -649,7 +666,7 @@ def main():
     # 2. plan.md 태스크 파싱
     tasks = parse_plan_tasks(plan_path)
     if not tasks:
-        print(f"[WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"{C_CLAUDE}║{C_RESET} [WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         # 빈 skill-map.md라도 생성
         os.makedirs(os.path.join(work_dir, "work"), exist_ok=True)
         with open(os.path.join(work_dir, "work", "skill-map.md"), "w", encoding="utf-8") as f:
