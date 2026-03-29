@@ -15,6 +15,7 @@ from __future__ import annotations
 import atexit
 import hashlib
 import json
+import logging
 import os
 import signal
 import socket
@@ -24,6 +25,8 @@ import threading
 import time
 from collections.abc import Callable
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -258,6 +261,490 @@ class SSEClientManager:
 
 
 # ---------------------------------------------------------------------------
+# Terminal SSE Channel
+# ---------------------------------------------------------------------------
+
+# NDJSON 메시지 타입 -> SSE 이벤트 이름 매핑
+_NDJSON_EVENT_MAP: dict[str, str] = {
+    'text_delta': 'stdout',
+    'input_json_delta': 'stdout',
+    'result': 'result',
+    'system': 'system',
+    'control_request': 'permission',
+    'error': 'error',
+}
+
+
+class TerminalSSEChannel:
+    """터미널 출력 전용 SSE 브로드캐스트 채널.
+
+    SSEClientManager와 동일한 인터페이스로 독립 인스턴스를 생성하여,
+    기존 /events SSE와 간섭 없이 /terminal/events 전용 스트림을 제공한다.
+
+    NDJSON 청크를 SSE 이벤트로 변환하여 연결된 모든 클라이언트에 전송한다.
+
+    Attributes:
+        _clients: 연결된 클라이언트의 wfile 객체 목록
+        _lock: 클라이언트 목록 접근용 Lock
+    """
+
+    def __init__(self) -> None:
+        """초기화한다."""
+        self._clients: list = []
+        self._lock: threading.Lock = threading.Lock()
+
+    def add(self, wfile: object) -> None:
+        """클라이언트를 추가한다.
+
+        Args:
+            wfile: HTTP 핸들러의 wfile (소켓 출력 스트림)
+        """
+        with self._lock:
+            self._clients.append(wfile)
+
+    def remove(self, wfile: object) -> None:
+        """클라이언트를 제거한다.
+
+        Args:
+            wfile: 제거할 클라이언트의 wfile
+        """
+        with self._lock:
+            try:
+                self._clients.remove(wfile)
+            except ValueError:
+                pass
+
+    def broadcast(self, data: dict) -> None:
+        """NDJSON 메시지를 SSE 이벤트로 변환하여 모든 클라이언트에 전송한다.
+
+        메시지 타입에 따라 적절한 SSE 이벤트 이름을 결정한다:
+        - stream_event (text_delta) -> event: stdout
+        - stream_event (input_json_delta) -> event: stdout
+        - result -> event: result
+        - system -> event: system
+        - control_request -> event: permission
+        - 기타 -> event: stdout (기본값)
+
+        전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
+
+        Args:
+            data: 파싱된 NDJSON 메시지 dict
+        """
+        event_name = self._classify_event(data)
+        payload = self._build_payload(data, event_name)
+        json_payload = json.dumps(payload, ensure_ascii=False)
+        message = f"event: {event_name}\ndata: {json_payload}\n\n"
+        encoded = message.encode('utf-8')
+
+        dead_clients: list = []
+        with self._lock:
+            for wfile in self._clients:
+                try:
+                    wfile.write(encoded)
+                    wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    dead_clients.append(wfile)
+
+            for wfile in dead_clients:
+                try:
+                    self._clients.remove(wfile)
+                except ValueError:
+                    pass
+
+    def _classify_event(self, data: dict) -> str:
+        """NDJSON 메시지 타입으로부터 SSE 이벤트 이름을 결정한다.
+
+        Args:
+            data: 파싱된 NDJSON 메시지 dict
+
+        Returns:
+            SSE 이벤트 이름 문자열
+        """
+        msg_type = data.get('type', '')
+
+        if msg_type == 'stream_event':
+            delta_type = (
+                data.get('event', {}).get('delta', {}).get('type', '')
+            )
+            return _NDJSON_EVENT_MAP.get(delta_type, 'stdout')
+
+        if msg_type == 'assistant':
+            return 'stdout'
+
+        return _NDJSON_EVENT_MAP.get(msg_type, 'stdout')
+
+    def _build_payload(self, data: dict, event_name: str) -> dict:
+        """SSE 클라이언트에 보낼 페이로드를 구성한다.
+
+        Args:
+            data: 원본 NDJSON 메시지 dict
+            event_name: 결정된 SSE 이벤트 이름
+
+        Returns:
+            페이로드 dict
+        """
+        if event_name == 'stdout':
+            return self._build_stdout_payload(data)
+        if event_name == 'result':
+            return self._build_result_payload(data)
+        if event_name == 'system':
+            return self._build_system_payload(data)
+        if event_name == 'permission':
+            return {
+                'kind': 'permission',
+                'raw': data,
+            }
+        if event_name == 'error':
+            return {
+                'kind': 'error',
+                'message': data.get('message', 'Unknown error'),
+                'exit_code': data.get('exit_code'),
+                'session_id': data.get('session_id', ''),
+            }
+        # 기본: raw 데이터 전달
+        return {'kind': data.get('type', 'unknown'), 'raw': data}
+
+    def _build_stdout_payload(self, data: dict) -> dict:
+        """stdout 이벤트 페이로드를 구성한다.
+
+        stream_event의 text_delta에서 텍스트 청크를 추출하거나,
+        assistant 메시지에서 전체 텍스트를 추출한다.
+
+        Args:
+            data: 원본 NDJSON 메시지 dict
+
+        Returns:
+            stdout 페이로드 dict
+        """
+        msg_type = data.get('type', '')
+
+        if msg_type == 'stream_event':
+            event = data.get('event', {})
+            delta = event.get('delta', {})
+            delta_type = delta.get('type', '')
+
+            if delta_type == 'text_delta':
+                return {
+                    'kind': 'text_delta',
+                    'chunk': delta.get('text', ''),
+                }
+            if delta_type == 'input_json_delta':
+                return {
+                    'kind': 'input_json_delta',
+                    'chunk': delta.get('partial_json', ''),
+                }
+            # content_block_start, message_start 등 기타 stream_event
+            return {
+                'kind': event.get('type', 'stream_event'),
+                'raw': event,
+            }
+
+        if msg_type == 'assistant':
+            content = data.get('message', {}).get('content', [])
+            text_parts = [
+                block.get('text', '')
+                for block in content
+                if block.get('type') == 'text'
+            ]
+            return {
+                'kind': 'assistant',
+                'text': ''.join(text_parts),
+            }
+
+        return {'kind': msg_type or 'unknown', 'raw': data}
+
+    def _build_result_payload(self, data: dict) -> dict:
+        """result 이벤트 페이로드를 구성한다.
+
+        Args:
+            data: 원본 NDJSON 메시지 dict
+
+        Returns:
+            result 페이로드 dict
+        """
+        return {
+            'kind': 'result',
+            'done': True,
+            'subtype': data.get('subtype', ''),
+            'is_error': data.get('is_error', False),
+            'result': data.get('result', ''),
+            'duration_ms': data.get('duration_ms', 0),
+            'session_id': data.get('session_id', ''),
+            'cost_usd': data.get('total_cost_usd', 0),
+        }
+
+    def _build_system_payload(self, data: dict) -> dict:
+        """system 이벤트 페이로드를 구성한다.
+
+        Args:
+            data: 원본 NDJSON 메시지 dict
+
+        Returns:
+            system 페이로드 dict
+        """
+        return {
+            'kind': 'system',
+            'subtype': data.get('subtype', ''),
+            'session_id': data.get('session_id', ''),
+            'raw': data,
+        }
+
+    @property
+    def client_count(self) -> int:
+        """현재 연결된 클라이언트 수를 반환한다."""
+        with self._lock:
+            return len(self._clients)
+
+
+# ---------------------------------------------------------------------------
+# Claude Process Manager
+# ---------------------------------------------------------------------------
+
+class ClaudeProcess:
+    """Claude CLI 프로세스 생명주기 관리자.
+
+    subprocess.Popen으로 Claude CLI를 실행하고, stdin/stdout을 통한
+    NDJSON 양방향 통신을 관리한다.
+
+    Attributes:
+        _process: subprocess.Popen 인스턴스 (프로세스 시작 전에는 None)
+        _session_id: system/init 메시지에서 추출한 세션 ID
+        _status: 프로세스 상태 (stopped/running/idle)
+        _stdin_lock: stdin 접근 보호 Lock
+        _stdout_thread: stdout 읽기 데몬 스레드
+        _channel: SSE 브로드캐스트 채널
+    """
+
+    def __init__(self, channel: TerminalSSEChannel) -> None:
+        """초기화한다.
+
+        Args:
+            channel: NDJSON 이벤트를 브로드캐스트할 TerminalSSEChannel 인스턴스
+        """
+        self._process: subprocess.Popen | None = None
+        self._session_id: str = ''
+        self._status: str = 'stopped'
+        self._stdin_lock: threading.Lock = threading.Lock()
+        self._stdout_thread: threading.Thread | None = None
+        self._channel: TerminalSSEChannel = channel
+
+    def spawn(self, extra_args: list[str] | None = None) -> dict:
+        """Claude CLI 프로세스를 시작한다.
+
+        이미 실행 중인 프로세스가 있으면 먼저 종료한다.
+
+        Args:
+            extra_args: 추가 CLI 인자 목록 (선택적)
+
+        Returns:
+            시작 결과 dict: {"ok": True/False, "session_id": str, "error": str}
+        """
+        if self._process and self._process.poll() is None:
+            self.kill()
+
+        cmd = [
+            'claude',
+            '--print',
+            '--output-format', 'stream-json',
+            '--input-format', 'stream-json',
+            '--verbose',
+            '-p', '',
+        ]
+        if extra_args:
+            cmd.extend(extra_args)
+
+        try:
+            self._process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except FileNotFoundError:
+            self._status = 'stopped'
+            return {
+                'ok': False,
+                'session_id': '',
+                'error': 'claude CLI not found in PATH',
+            }
+        except OSError as e:
+            self._status = 'stopped'
+            return {
+                'ok': False,
+                'session_id': '',
+                'error': str(e),
+            }
+
+        self._status = 'running'
+        self._session_id = ''
+
+        # stdout 읽기 데몬 스레드 시작
+        self._stdout_thread = threading.Thread(
+            target=self._read_stdout_loop,
+            daemon=True,
+            name='claude-stdout-reader',
+        )
+        self._stdout_thread.start()
+
+        return {
+            'ok': True,
+            'session_id': self._session_id,
+            'error': '',
+        }
+
+    def send_input(self, text: str) -> dict:
+        """사용자 메시지를 Claude CLI stdin에 NDJSON 엔벨로프로 전송한다.
+
+        Args:
+            text: 전송할 사용자 메시지 텍스트
+
+        Returns:
+            전송 결과 dict: {"ok": True/False, "error": str}
+        """
+        if not self._process or self._process.poll() is not None:
+            return {'ok': False, 'error': 'process not running'}
+
+        envelope = {
+            'type': 'user',
+            'message': {
+                'role': 'user',
+                'content': text,
+            },
+        }
+        if self._session_id:
+            envelope['session_id'] = self._session_id
+
+        ndjson_line = json.dumps(envelope, ensure_ascii=False) + '\n'
+
+        with self._stdin_lock:
+            try:
+                self._process.stdin.write(ndjson_line)
+                self._process.stdin.flush()
+            except (BrokenPipeError, OSError) as e:
+                self._status = 'stopped'
+                return {'ok': False, 'error': str(e)}
+
+        return {'ok': True, 'error': ''}
+
+    def kill(self) -> dict:
+        """Claude CLI 프로세스를 종료한다.
+
+        SIGTERM으로 먼저 시도하고, 2초 내 종료되지 않으면 SIGKILL로 강제 종료한다.
+
+        Returns:
+            종료 결과 dict: {"ok": True/False, "error": str}
+        """
+        if not self._process:
+            self._status = 'stopped'
+            return {'ok': True, 'error': ''}
+
+        if self._process.poll() is not None:
+            self._status = 'stopped'
+            self._process = None
+            return {'ok': True, 'error': ''}
+
+        try:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait(timeout=5)
+        except OSError as e:
+            return {'ok': False, 'error': str(e)}
+        finally:
+            self._status = 'stopped'
+            self._process = None
+
+        return {'ok': True, 'error': ''}
+
+    @property
+    def status(self) -> str:
+        """프로세스 상태를 반환한다.
+
+        Returns:
+            "running", "idle", "stopped" 중 하나
+        """
+        if not self._process:
+            return 'stopped'
+        if self._process.poll() is not None:
+            self._status = 'stopped'
+            self._process = None
+            return 'stopped'
+        return self._status
+
+    @property
+    def session_id(self) -> str:
+        """현재 세션 ID를 반환한다."""
+        return self._session_id
+
+    def _read_stdout_loop(self) -> None:
+        """stdout에서 NDJSON 한 줄씩 읽어 파싱하고 SSE 채널로 브로드캐스트한다.
+
+        프로세스 종료 또는 stdout EOF 시 루프를 빠져나온다.
+        데몬 스레드에서 실행된다.
+        """
+        proc = self._process
+        if not proc or not proc.stdout:
+            return
+
+        try:
+            for line in proc.stdout:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    data = json.loads(stripped)
+                except json.JSONDecodeError:
+                    logger.debug('Non-JSON stdout line: %s', stripped[:200])
+                    continue
+
+                # system/init에서 session_id 추출
+                if (
+                    data.get('type') == 'system'
+                    and data.get('subtype') == 'init'
+                ):
+                    self._session_id = data.get('session_id', '')
+
+                # result 수신 시 상태를 idle로 전환
+                if data.get('type') == 'result':
+                    self._status = 'idle'
+
+                self._channel.broadcast(data)
+        except (ValueError, OSError):
+            # 프로세스 종료 시 발생 가능
+            pass
+        finally:
+            # 좀비 프로세스 방지: 명시적으로 wait() 호출
+            try:
+                proc.wait(timeout=5)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+            # 프로세스가 종료된 경우 상태 업데이트
+            if proc.poll() is not None:
+                exit_code = proc.returncode
+                self._status = 'stopped'
+                # 종료 이벤트를 SSE로 알림
+                self._channel.broadcast({
+                    'type': 'system',
+                    'subtype': 'process_exit',
+                    'exit_code': exit_code,
+                    'session_id': self._session_id,
+                })
+                # 비정상 종료 시 에러 이벤트도 전송
+                if exit_code != 0:
+                    self._channel.broadcast({
+                        'type': 'error',
+                        'message': f'Claude process exited with code {exit_code}',
+                        'exit_code': exit_code,
+                        'session_id': self._session_id,
+                    })
+
+
+# ---------------------------------------------------------------------------
 # Poll Change Tracker
 # ---------------------------------------------------------------------------
 
@@ -312,6 +799,10 @@ sse_manager: SSEClientManager = SSEClientManager()
 
 # 모듈 레벨 폴링 변경 추적기 (서버 인스턴스와 공유)
 poll_tracker: PollChangeTracker = PollChangeTracker()
+
+# 모듈 레벨 터미널 SSE 채널 및 Claude 프로세스 매니저
+terminal_sse_channel: TerminalSSEChannel = TerminalSSEChannel()
+claude_process: ClaudeProcess = ClaudeProcess(terminal_sse_channel)
 
 
 KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'review', 'done']
@@ -595,6 +1086,10 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_sse()
         elif self.path == '/poll':
             self._handle_poll()
+        elif self.path == '/terminal/events':
+            self._handle_terminal_sse()
+        elif self.path == '/terminal/status':
+            self._handle_terminal_status()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:
@@ -614,6 +1109,12 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
         elif self.path == '/api/restart':
             self._handle_restart()
+        elif self.path == '/terminal/start':
+            self._handle_terminal_start()
+        elif self.path == '/terminal/input':
+            self._handle_terminal_input()
+        elif self.path == '/terminal/kill':
+            self._handle_terminal_kill()
         else:
             self.send_response(404)
             self.end_headers()
@@ -730,6 +1231,144 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         finally:
             sse_manager.remove(self.wfile)
 
+    # -- Terminal SSE / API handlers -----------------------------------------
+
+    def _handle_terminal_sse(self) -> None:
+        """터미널 전용 SSE 엔드포인트를 처리한다.
+
+        /terminal/events 경로에 대해 TerminalSSEChannel로부터
+        Claude CLI stdout 이벤트를 클라이언트에 스트리밍한다.
+        기존 /events SSE와 완전히 독립된 채널을 사용한다.
+        """
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        # 연결 확인용 초기 주석 전송
+        try:
+            self.wfile.write(b': connected\n\n')
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
+
+        terminal_sse_channel.add(self.wfile)
+        try:
+            while True:
+                time.sleep(1)
+                try:
+                    self.wfile.write(b': heartbeat\n\n')
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    break
+        finally:
+            terminal_sse_channel.remove(self.wfile)
+
+    def _handle_terminal_status(self) -> None:
+        """터미널 상태 조회 엔드포인트를 처리한다.
+
+        GET /terminal/status: Claude 프로세스의 현재 상태를 JSON으로 응답한다.
+        """
+        self._send_json({
+            'status': claude_process.status,
+            'session_id': claude_process.session_id,
+            'clients': terminal_sse_channel.client_count,
+        })
+
+    def _handle_terminal_start(self) -> None:
+        """터미널 세션 시작 엔드포인트를 처리한다.
+
+        POST /terminal/start: Claude CLI 프로세스를 시작한다.
+        요청 본문에 {"args": [...]} 형태로 추가 CLI 인자를 지정할 수 있다.
+        """
+        extra_args = None
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length > 0:
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                extra_args = data.get('args')
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+        result = claude_process.spawn(extra_args)
+        self._send_json(result)
+
+    def _handle_terminal_input(self) -> None:
+        """터미널 입력 전송 엔드포인트를 처리한다.
+
+        POST /terminal/input: 사용자 메시지를 Claude CLI에 전송한다.
+        요청 본문: {"text": "사용자 메시지"}
+
+        프로세스 미시작 시 409 Conflict를 반환한다.
+        """
+        if claude_process.status == 'stopped':
+            self._send_error(409, 'Claude process not running')
+            return
+
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._send_error(400, 'Empty request body')
+            return
+
+        body = self.rfile.read(content_length)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_error(400, 'Invalid JSON')
+            return
+
+        text = data.get('text', '')
+        if not text:
+            self._send_error(400, 'Missing "text" field')
+            return
+
+        result = claude_process.send_input(text)
+        self._send_json(result)
+
+    def _handle_terminal_kill(self) -> None:
+        """터미널 세션 종료 엔드포인트를 처리한다.
+
+        POST /terminal/kill: Claude CLI 프로세스를 종료한다.
+
+        프로세스 미시작 시 409 Conflict를 반환한다.
+        """
+        if claude_process.status == 'stopped':
+            self._send_error(409, 'Claude process not running')
+            return
+
+        result = claude_process.kill()
+        self._send_json(result)
+
+    def _send_error(self, code: int, message: str) -> None:
+        """에러 응답을 JSON 형식으로 전송한다.
+
+        Args:
+            code: HTTP 상태 코드
+            message: 에러 메시지
+        """
+        body = json.dumps(
+            {'ok': False, 'error': message},
+            ensure_ascii=False,
+        ).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:
+        """CORS preflight 요청을 처리한다."""
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Max-Age', '86400')
+        self.end_headers()
+
     def log_message(self, format: str, *args: object) -> None:
         """로그 메시지를 출력한다. SSE 경로만 최소 로깅한다.
 
@@ -737,15 +1376,17 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             format: 로그 포맷 문자열
             *args: 포맷 인자
         """
-        # 정적 파일 요청 로그 억제, SSE 관련만 로깅 (/poll 요청도 억제)
-        if args and isinstance(args[0], str) and '/events' in args[0]:
+        # 정적 파일 요청 로그 억제, SSE/터미널 관련만 로깅 (/poll 요청도 억제)
+        if args and isinstance(args[0], str) and (
+            '/events' in args[0] or '/terminal' in args[0]
+        ):
             super().log_message(format, *args)
 
     def end_headers(self) -> None:
         """CORS 헤더를 추가한 후 헤더를 종료한다."""
-        # SSE, poll 외 요청에도 CORS 헤더 추가 (index.html에서의 fetch 호환)
-        # /events와 /poll은 각 핸들러에서 직접 CORS 헤더를 추가하므로 제외
-        if self.path not in ('/events', '/poll'):
+        # SSE, poll, terminal 외 요청에도 CORS 헤더 추가 (index.html에서의 fetch 호환)
+        # /events, /poll, /terminal/*은 각 핸들러에서 직접 CORS 헤더를 추가하므로 제외
+        if self.path not in ('/events', '/poll') and not self.path.startswith('/terminal/'):
             self.send_header('Access-Control-Allow-Origin', '*')
         # JS/CSS 파일 캐시 방지
         if self.path.endswith(('.js', '.css')):
@@ -790,7 +1431,8 @@ def _run_server(project_root: str) -> None:
             pass
 
     def _signal_handler(signum: int, frame: object) -> None:
-        """SIGTERM/SIGINT 수신 시 런타임 파일을 정리하고 종료한다."""
+        """SIGTERM/SIGINT 수신 시 Claude 프로세스와 런타임 파일을 정리하고 종료한다."""
+        claude_process.kill()
         _cleanup_runtime_files()
         sys.exit(0)
 
@@ -819,6 +1461,7 @@ def _run_server(project_root: str) -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        claude_process.kill()
         watcher.stop()
         server.shutdown()
 
