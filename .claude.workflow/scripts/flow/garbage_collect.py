@@ -5,7 +5,7 @@
   1. .workflow/ 하위에서 TTL(24시간) 만료 + 미완료 status.json을 STALE로 전환
 
 사용법:
-  python3 garbage_collect.py [project_root]
+  flow-gc [project_root]
 
 인자:
   project_root - (선택적) 프로젝트 루트 경로. 미지정 시 스크립트 위치 기준으로 자동 탐지
@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -27,6 +28,7 @@ if _SCRIPTS_DIR not in sys.path:
 
 from common import C_CLAUDE, C_DIM, C_RESET
 from data.constants import KST, ZOMBIE_TTL_HOURS, TERMINAL_STEPS, TERMINAL_PHASES
+from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 _KST = KST
@@ -155,15 +157,31 @@ def _step1_mark_stale(workflow_root: str) -> int:
     return stale_count
 
 
-def main() -> None:
-    """CLI 진입점. project_root를 인자로 받아 좀비 워크플로우를 정리한다.
+def _build_parser() -> argparse.ArgumentParser:
+    """garbage_collect CLI argparse 파서를 생성하여 반환한다."""
+    parser = argparse.ArgumentParser(
+        prog="flow-gc",
+        description="좀비 워크플로우 정리: TTL 만료 + 미완료 status.json을 STALE로 전환",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "project_root",
+        nargs="?",
+        default=None,
+        metavar="project_root",
+        help="프로젝트 루트 경로 (선택적). 미지정 시 스크립트 위치 기준으로 자동 탐지",
+    )
+    return parser
 
-    Args (sys.argv):
-        project_root: (선택적) 프로젝트 루트 경로.
-                      미지정 시 스크립트 위치 기준으로 자동 탐지.
-    """
-    if len(sys.argv) >= 2 and sys.argv[1]:
-        project_root = sys.argv[1]
+
+def main() -> None:
+    """CLI 진입점. project_root를 인자로 받아 좀비 워크플로우를 정리한다."""
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    if args.project_root:
+        project_root = args.project_root
     else:
         project_root = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 

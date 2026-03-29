@@ -8,8 +8,8 @@ plan.md를 입력받아 다음을 검증한다:
 (4) WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지 (advisory, 비차단)
 
 사용법:
-  python3 plan_validator.py <plan_path>
-  python3 plan_validator.py --help
+  flow-validate <plan_path|registryKey>
+  flow-validate --help
 
 출력:
   경고 목록 또는 "검증 통과"
@@ -17,6 +17,7 @@ plan.md를 입력받아 다음을 검증한다:
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
@@ -28,6 +29,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root, resolve_work_dir, C_CLAUDE, C_DIM, C_RESET
+from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 PROJECT_ROOT: str = resolve_project_root()
@@ -660,45 +662,52 @@ def validate(plan_path: str) -> list[str]:
     return warnings
 
 
-def print_help() -> None:
-    """사용법 및 검증 항목 설명을 stdout에 출력한다."""
-    print("plan_validator.py - 계획서(plan.md) 구조 검증")
-    print()
-    print("사용법:")
-    print("  python3 plan_validator.py <plan_path>")
-    print("  python3 plan_validator.py --help")
-    print()
-    print("입력 형식:")
-    print("  1. registryKey (YYYYMMDD-HHMMSS 패턴):")
-    print("     python3 plan_validator.py 20260303-124206")
-    print("  2. workDir 경로:")
-    print("     python3 plan_validator.py .workflow/20260303-124206/plan_validator-경로해석-/implement")
-    print("  3. plan.md 직접 경로:")
-    print("     python3 plan_validator.py .workflow/20260303-124206/.../implement/plan.md")
-    print()
-    print("검증 항목:")
-    print("  1. Phase 균형: Mermaid 서브그래프에서 Phase별 워커 수 추출,")
-    print("     최대/최소 비율 3배 이상 시 경고")
-    print("  2. 작업 편차: 같은 Phase 내 워커 간 작업 항목 수 편차")
-    print("     2 초과 시 경고")
-    print("  3. 스킬 부족: T2(10+) 태스크에서 스킬 1개만 배정 시 경고")
-    print("  4. WHAT/HOW 분리: criteria/goal/context 재서술 탐지 (advisory)")
-    print()
-    print("출력:")
-    print("  경고 목록 또는 '검증 통과'")
+def _build_parser() -> argparse.ArgumentParser:
+    """plan_validator CLI용 ArgumentParser를 생성하여 반환한다."""
+    parser = argparse.ArgumentParser(
+        prog="flow-validate",
+        description="plan.md 구조 검증 — Phase 균형·작업 편차·스킬 부족·WHAT/HOW 분리를 검사한다.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "입력 형식:\n"
+            "  1. registryKey (YYYYMMDD-HHMMSS 패턴):\n"
+            "       flow-validate 20260303-124206\n"
+            "  2. workDir 경로:\n"
+            "       flow-validate .workflow/20260303-124206/작업명/implement\n"
+            "  3. plan.md 직접 경로:\n"
+            "       flow-validate .workflow/20260303-124206/.../implement/plan.md\n"
+            "\n"
+            "검증 항목:\n"
+            "  1. Phase 균형  : Mermaid 서브그래프에서 Phase별 워커 수 추출,\n"
+            "                   최대/최소 비율 3배 이상 시 경고\n"
+            "  2. 작업 편차   : 같은 Phase 내 워커 간 작업 항목 수 편차 2 초과 시 경고\n"
+            "  3. 스킬 부족   : T2(10+) 태스크에서 스킬 1개만 배정 시 경고\n"
+            "  4. WHAT/HOW   : criteria/goal/context 재서술 탐지 (advisory)\n"
+            "\n"
+            + build_common_epilog()
+        ),
+    )
+    parser.add_argument(
+        "plan_path",
+        metavar="plan_path",
+        help=(
+            "검증할 plan.md 경로, workDir 경로, 또는 registryKey "
+            "(YYYYMMDD-HHMMSS 형식)"
+        ),
+    )
+    return parser
 
 
 def main() -> None:
     """CLI 진입점. 인자 파싱 후 plan.md 검증 결과를 출력한다."""
-    if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h"):
-        print_help()
-        sys.exit(0)
+    parser = _build_parser()
+    args = parser.parse_args()
 
-    plan_path: str = sys.argv[1]
+    plan_path: str = args.plan_path
 
     # 3단계 경로 해석 분기
     if not plan_path.endswith(".md"):
-        # (b) .md로 끝나지 않는 경우: registryKey 또는 workDir로 해석
+        # .md로 끝나지 않는 경우: registryKey 또는 workDir로 해석
         resolved_dir: str = resolve_work_dir(plan_path, PROJECT_ROOT)
         plan_path = os.path.join(resolved_dir, "plan.md")
 

@@ -25,6 +25,7 @@ COMMAND_DEFAULTS 상수를 수정하세요.
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
@@ -41,6 +42,7 @@ if _flow_dir not in sys.path:
     sys.path.insert(0, _flow_dir)
 
 from skill_state_manager import is_archived, load_skill_state
+from cli_utils import build_common_epilog
 
 from common import (
     C_BOLD,
@@ -268,7 +270,19 @@ def main() -> None:
     --dry-run 플래그가 있으면 파일을 쓰지 않고 예상 결과만 출력한다.
     종료 코드: 0 성공, 1 실패
     """
-    dry_run = "--dry-run" in sys.argv
+    parser = argparse.ArgumentParser(
+        prog="flow-catalog",
+        description="스킬 카탈로그 생성/갱신 (skill-catalog.md)",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="파일을 쓰지 않고 예상 결과만 출력한다",
+    )
+    args = parser.parse_args()
+    dry_run = args.dry_run
 
     # 스킬 스캔
     global_skills, project_skills, excluded_count = scan_skills()

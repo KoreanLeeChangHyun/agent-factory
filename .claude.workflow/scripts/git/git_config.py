@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
@@ -29,6 +30,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from common import read_env, C_CLAUDE, C_DIM, C_RESET
+from flow.cli_utils import build_common_epilog
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 # .claude.workflow/.settings 우선, .env 폴백
@@ -56,6 +58,42 @@ def _git_config_get(scope: str, key: str) -> str:
         return "(미설정)"
 
 
+def _build_parser() -> argparse.ArgumentParser:
+    """git_config 전용 ArgumentParser를 생성하여 반환한다.
+
+    --global / --local 은 mutually exclusive group으로 구성되며
+    기본값은 --global 이다.
+
+    Returns:
+        구성된 ArgumentParser 인스턴스.
+    """
+    parser = argparse.ArgumentParser(
+        prog="flow-gitconfig",
+        description=(
+            ".claude.workflow/.settings(.env 폴백)에서 Git 설정 정보를 읽어 "
+            "git config를 자동으로 적용합니다."
+        ),
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    scope_group = parser.add_mutually_exclusive_group()
+    scope_group.add_argument(
+        "--global",
+        dest="scope",
+        action="store_const",
+        const="--global",
+        help="전역 설정 (~/.gitconfig) 에 적용합니다 [기본값]",
+    )
+    scope_group.add_argument(
+        "--local",
+        dest="scope",
+        action="store_const",
+        const="--local",
+        help="로컬 설정 (.git/config) 에 적용합니다",
+    )
+    return parser
+
+
 def main() -> None:
     """Git config 자동 설정의 진입점.
 
@@ -67,17 +105,10 @@ def main() -> None:
         SystemExit: 설정 파일 부재, 필수 환경변수 누락, 알 수 없는 옵션 지정 시
     """
     # --- 옵션 파싱 ---
-    scope = "--global"
-    if len(sys.argv) >= 2:
-        if sys.argv[1] == "--global":
-            scope = "--global"
-        elif sys.argv[1] == "--local":
-            scope = "--local"
-        else:
-            print(f"[ERROR] 알 수 없는 옵션: {sys.argv[1]}", file=sys.stderr)
-            print(f"사용법: {sys.argv[0]} [--global|--local]")
-            sys.exit(1)
+    parser = _build_parser()
+    args = parser.parse_args()
 
+    scope = args.scope if args.scope is not None else "--global"
     scope_label = "global" if scope == "--global" else "local"
 
     # --- .settings(.env 폴백) 파일 확인 ---

@@ -46,7 +46,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 - flow-step: start, end
 - flow-phase: (registryKey N)
 - flow-skillmap: (registryKey)
-- flow-init: (command title [mode] [T-NNN])
+- flow-init: (command title [--mode full] [--ticket T-NNN]) — 기존 위치 인자 [mode] [#N]도 하위호환 지원
 - flow-reload: (workDir)
 - flow-skill: archive|activate|list [skill_name]
 - flow-validate: (plan_path)

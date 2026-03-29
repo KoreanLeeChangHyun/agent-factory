@@ -11,11 +11,32 @@
 
 set -euo pipefail
 
+# ─── 도움말 출력 ───
+show_help() {
+    cat <<'EOF'
+사용법: flow-claude <서브커맨드> <인자...>
+
+서브커맨드:
+  start <command>       워크플로우 시작 배너 출력
+  end   <registryKey>   워크플로우 종료 배너 출력
+
+예시:
+  flow-claude start implement
+  flow-claude end 20260228-133000
+EOF
+}
+
 SUBCMD="${1:-}"
 
-if [[ -z "$SUBCMD" ]]; then
-    echo "사용법: flow-claude <start|end> ..." >&2
+# ─── --help / -h 처리 ───
+if [[ "$SUBCMD" == "--help" || "$SUBCMD" == "-h" ]]; then
+    show_help
     exit 0
+fi
+
+if [[ -z "$SUBCMD" ]]; then
+    echo "사용법: flow-claude <start|end> <인자...>" >&2
+    exit 1
 fi
 
 # ═══════════════════════════════════════════════════════
@@ -26,7 +47,7 @@ if [[ "$SUBCMD" == "start" ]]; then
 
     if [[ -z "$COMMAND" ]]; then
         echo "사용법: flow-claude start <command>" >&2
-        exit 0
+        exit 1
     fi
 
     # ─── 자체 색상 정의 (Claude 브랜드 Peach #DE7356) ───
@@ -86,7 +107,7 @@ if [[ "$SUBCMD" == "end" ]]; then
 
     if [[ -z "$REGISTRY_KEY" ]]; then
         echo "사용법: flow-claude end <registryKey>" >&2
-        exit 0
+        exit 1
     fi
 
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -190,4 +211,5 @@ except Exception:
     exit 0
 fi
 
-echo "사용법: flow-claude <start|end> ..." >&2
+echo "사용법: flow-claude <start|end> <인자...>" >&2
+exit 1

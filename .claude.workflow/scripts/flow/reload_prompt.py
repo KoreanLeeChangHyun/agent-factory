@@ -8,7 +8,8 @@ user_prompt.txt에 append한다.
 또는 kanban/open/, kanban/progress/, kanban/review/ 디렉터리의 XML 파일 직접 스캔에서 순서대로 탐색한다.
 
 사용법:
-  python3 reload_prompt.py <workDir>
+  flow-reload <workDir>
+  flow-reload --help
 
 인자:
   workDir - 작업 디렉터리 상대 경로
@@ -26,6 +27,7 @@ user_prompt.txt에 append한다.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -41,6 +43,7 @@ if _SCRIPTS_DIR not in sys.path:
 
 from common import C_CLAUDE, C_DIM, C_RESET
 from data.constants import KST
+from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log
 
 _KST = KST
@@ -204,14 +207,23 @@ def main() -> None:
         파싱하거나 특정 태그를 추출하지 않으므로 코드 변경이 불필요하다.
 
     Raises:
-        SystemExit: 인자 누락(1), workDir 미존재(1), 정상 완료(0).
+        SystemExit: 인자 누락·형식 오류(2, argparse 처리), workDir 미존재(1), 정상 완료(0).
     """
-    # --- 인자 확인 ---
-    if len(sys.argv) < 2:
-        print(f"[ERROR] 사용법: {sys.argv[0]} <workDir>", file=sys.stderr)
-        sys.exit(1)
+    # --- 인자 파싱 ---
+    parser = argparse.ArgumentParser(
+        prog="flow-reload",
+        description="수정 피드백을 워크플로우에 반영하는 스크립트.",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "work_dir",
+        metavar="workDir",
+        help="작업 디렉터리 상대 경로 (예: .claude.workflow/workflow/YYYYMMDD-HHMMSS/...)",
+    )
+    args = parser.parse_args()
 
-    work_dir = sys.argv[1]
+    work_dir = args.work_dir
     abs_work_dir = os.path.join(_PROJECT_ROOT, work_dir)
 
     if not os.path.isdir(abs_work_dir):

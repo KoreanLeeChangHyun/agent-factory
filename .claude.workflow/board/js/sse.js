@@ -38,8 +38,8 @@
    */
   function ticketJson(tickets) {
     return JSON.stringify(tickets.map(function (t) {
-      return { number: t.number, title: t.title, status: t.status, current: t.current,
-               submit: t.submit, history: t.history };
+      return { number: t.number, title: t.title, status: t.status,
+               command: t.command, prompt: t.prompt, result: t.result };
     }));
   }
 

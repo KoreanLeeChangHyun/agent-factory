@@ -74,12 +74,6 @@
    */
   function getModifiedDate(t) {
     const candidates = [];
-    if (t.submit && t.submit.datetime) candidates.push(t.submit.datetime);
-    if (t.history && t.history.length > 0) {
-      t.history.forEach(function (h) {
-        if (h.datetime) candidates.push(h.datetime);
-      });
-    }
     if (candidates.length === 0) return t.datetime || "";
     return candidates.reduce(function (a, b) {
       return a > b ? a : b;
@@ -223,9 +217,6 @@
     if (ticket && ticket.status === "Submit") {
       return { label: "SUBMIT", cssClass: "status-submit" };
     }
-    if (ticket && ticket.editing === true) {
-      return { label: "EDIT", cssClass: "status-edit" };
-    }
     return { label: "OPEN", cssClass: "status-open" };
   }
 
@@ -306,8 +297,8 @@
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
             h += '<span class="card-num">' + esc(t.number.replace(/^T-/, "")) + "</span>";
-            if (t.submit && t.submit.command) {
-              h += badge(t.submit.command, CMD_COLORS[t.submit.command]);
+            if (t.command) {
+              h += badge(t.command, CMD_COLORS[t.command]);
             }
             if (t.relations && t.relations.length > 0) {
               h += '<span class="card-relations-icon">\uD83D\uDD17 ' + t.relations.length + "</span>";

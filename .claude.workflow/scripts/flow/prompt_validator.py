@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -34,6 +35,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RESET
+from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 REQUIRED_TAGS = ["goal", "target", "constraints", "criteria"]
@@ -269,31 +271,35 @@ def validate(prompt_text: str) -> dict[str, object]:
     }
 
 
-def _print_help() -> None:
-    """사용법을 stdout으로 출력한다."""
-    print("prompt_validator.py - 티켓 파일 XML 계약 스펙 검증")
-    print()
-    print("사용법:")
-    print("  python3 prompt_validator.py <prompt_file_path>")
-    print("  python3 prompt_validator.py --help")
-    print()
-    print("검증 항목:")
-    print("  1. 필수 태그 존재: <goal>, <target>, <constraints>, <criteria>")
-    print("  2. 빈 섹션 감지: 내용 없음 / TODO: 패턴 / 10자 미만")
-    print("  3. 품질 점수: (존재 태그/4)*0.6 + (유효 내용/4)*0.4")
-    print("  4. 선택 태그: <context>, <approach>, <scope>, <reference>")
-    print()
-    print("출력 (JSON):")
-    print("  quality_score, has_tags, missing_tags, empty_tags,")
-    print("  optional_tags, feedback")
-    print()
-    print("종료 코드:")
-    print("  0  검증 완료")
-    print("  1  파일 읽기 실패")
-    print("  2  인자 오류")
-    print()
-    print("예시:")
-    print("  python3 prompt_validator.py .claude.workflow/kanban/active/T-NNN.xml")
+def _build_parser() -> argparse.ArgumentParser:
+    """CLI 인자 파서를 생성하여 반환한다.
+
+    Returns:
+        설정된 ArgumentParser 인스턴스.
+    """
+    parser = argparse.ArgumentParser(
+        prog="flow-validate-p",
+        description="티켓 파일 XML 계약 스펙 검증\n\n"
+                    "검증 항목:\n"
+                    "  1. 필수 태그 존재: <goal>, <target>, <constraints>, <criteria>\n"
+                    "  2. 빈 섹션 감지: 내용 없음 / TODO: 패턴 / 10자 미만\n"
+                    "  3. 품질 점수: (존재 태그/4)*0.6 + (유효 내용/4)*0.4\n"
+                    "  4. 선택 태그: <context>, <approach>, <scope>, <reference>\n\n"
+                    "출력 (JSON):\n"
+                    "  quality_score, has_tags, missing_tags, empty_tags,\n"
+                    "  optional_tags, feedback\n\n"
+                    "종료 코드:\n"
+                    "  0  검증 완료\n"
+                    "  1  파일 읽기 실패\n"
+                    "  2  인자 오류",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=build_common_epilog(),
+    )
+    parser.add_argument(
+        "prompt_file_path",
+        help="검증할 티켓 파일 경로 (예: .claude.workflow/kanban/active/T-NNN.xml)",
+    )
+    return parser
 
 
 def main() -> None:
@@ -302,19 +308,10 @@ def main() -> None:
     Raises:
         SystemExit: 인자 오류(2), 파일 읽기 실패(1), 정상 완료(0).
     """
-    if len(sys.argv) < 2:
-        _print_help()
-        sys.exit(2)
+    parser = _build_parser()
+    args = parser.parse_args()
 
-    if sys.argv[1] in ("--help", "-h"):
-        _print_help()
-        sys.exit(0)
-
-    if len(sys.argv) > 2:
-        sys.stderr.write("오류: 인자가 너무 많습니다.\n")
-        sys.exit(2)
-
-    prompt_path = sys.argv[1]
+    prompt_path = args.prompt_file_path
 
     # 상대 경로를 호출 위치 기준 절대 경로로 변환
     if not os.path.isabs(prompt_path):

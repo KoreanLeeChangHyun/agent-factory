@@ -7,13 +7,17 @@ initialization.py - 워크플로우 초기화 스크립트.
 LLM 호출 없음 (순수 IO).
 
 사용법:
-  python3 initialization.py <command> <title> [mode] [#N]
+  python3 initialization.py <command> <title> [--mode full] [--ticket T-NNN]
 
 인자:
-  command  실행 명령어. implement | review | research
-  title    오케스트레이터가 생성한 20자 이내 제목 (단일 인자 시 title로 간주, mode=full 기본값)
-  mode     워크플로우 모드. full (유일 지원 모드). 2인자 시 첫 번째가 mode, 두 번째가 title
-  #N       티켓 번호 (T-NNN 또는 #NNN 형식, 선택사항)
+  command          실행 명령어. implement | review | research (체인: research>implement)
+  title            오케스트레이터가 생성한 20자 이내 제목
+  --mode full      워크플로우 모드 (기본값: full)
+  --ticket T-NNN   연결할 티켓 번호 (T-NNN, NNN, #N 형식)
+
+하위 호환 (deprecated):
+  [mode]   위치 인자로 모드 지정 — --mode 사용 권장
+  [#N]     위치 인자로 티켓 번호 지정 — --ticket 사용 권장
 
 환경변수:
   TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 kanban/open/ 디렉터리에서 자동 선택.
@@ -680,29 +684,83 @@ def init_workflow(
 # ─── main ────────────────────────────────────────────────────────────────────
 
 
+def _parse_args() -> tuple[str, str, str, str | None]:
+    """CLI 인자를 파싱하여 (command, title, mode, ticket_arg)를 반환한다.
+
+    argparse로 --mode / --ticket named 인자를 처리하고,
+    하위 호환을 위해 위치 인자 [mode] [#N] 패턴도 수동 후처리로 인식한다.
+
+    Returns:
+        (command, title, mode, ticket_arg) 튜플.
+        ticket_arg는 T-NNN 형식 또는 None.
+    """
+    import argparse
+    from flow.cli_utils import ticket_type, build_common_epilog, deprecation_warning
+
+    parser = argparse.ArgumentParser(
+        prog="flow-init",
+        description="워크플로우 초기화 스크립트. 작업 디렉터리 생성 및 메타데이터 기록을 수행한다.",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "command",
+        help="실행 명령어 (implement | review | research). 체인 예: research>implement",
+    )
+    parser.add_argument(
+        "title",
+        help="워크플로우 제목 (20자 이내)",
+    )
+    parser.add_argument(
+        "positional_extra",
+        nargs="*",
+        help=argparse.SUPPRESS,  # 하위 호환 위치 인자 [mode] [#N] — 내부 후처리용
+    )
+    parser.add_argument(
+        "--mode",
+        choices=list(VALID_MODES),
+        default=None,
+        help="워크플로우 모드 (기본값: full)",
+    )
+    parser.add_argument(
+        "--ticket",
+        type=ticket_type,
+        default=None,
+        metavar="T-NNN",
+        help="연결할 티켓 번호 (T-NNN, NNN, #N 형식)",
+    )
+
+    args = parser.parse_args()
+
+    command: str = args.command
+    title: str = args.title
+    mode: str = args.mode or "full"
+    ticket_arg: str | None = args.ticket
+
+    # 하위 호환: positional_extra에서 [mode] [#N] 인식
+    for extra in args.positional_extra:
+        if re.match(r"^#\d+$", extra) or re.match(r"^T-\d+$", extra, re.IGNORECASE):
+            if ticket_arg is None:
+                deprecation_warning(
+                    f"위치 인자 '{extra}'로 티켓 번호 지정",
+                    f"--ticket {extra}",
+                )
+                ticket_arg = extra
+        elif extra in VALID_MODES:
+            if args.mode is None:
+                deprecation_warning(
+                    f"위치 인자 '{extra}'로 모드 지정",
+                    f"--mode {extra}",
+                )
+                mode = extra
+        # 인식 불가 추가 위치 인자는 무시
+
+    return command, title, mode, ticket_arg
+
+
 def main() -> None:
     """CLI 진입점. 인자 검증 → 티켓 파일 읽기 → 워크플로우 초기화."""
-    if len(sys.argv) < 3:
-        _err(f"사용법: {sys.argv[0]} <command> <title> [mode] [#N]", 2)
-
-    command: str = sys.argv[1]
-    # 인자에서 #N 패턴 티켓 번호 추출
-    ticket_arg: str | None = None
-    remaining_args: list[str] = []
-    for arg in sys.argv[2:]:
-        if re.match(r"^#\d+$", arg) or re.match(r"^T-\d+$", arg, re.IGNORECASE):
-            ticket_arg = arg
-        else:
-            remaining_args.append(arg)
-
-    if len(remaining_args) >= 2:
-        title: str = remaining_args[0]
-        mode: str = remaining_args[1]
-    elif len(remaining_args) >= 1:
-        mode = "full"
-        title = remaining_args[0]
-    else:
-        _err(f"사용법: {sys.argv[0]} <command> <title> [mode] [#N]", 2)
+    command, title, mode, ticket_arg = _parse_args()
 
     # 체인 command 처리: ">" 구분자가 있으면 체인으로 파싱, 첫 세그먼트를 실행 command로 사용
     chain_command: str = ""

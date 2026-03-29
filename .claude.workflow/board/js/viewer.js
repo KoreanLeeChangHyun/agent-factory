@@ -509,8 +509,8 @@
     h += '<h1 class="tv-title">' + esc(ticket.title || "(No title)") + "</h1>";
     h += '<div class="tv-meta">';
     h += '<span class="tv-time">' + esc(formatTime(ticket.datetime)) + "</span>";
-    if (ticket.submit && ticket.submit.command) {
-      h += badge(ticket.submit.command, CMD_COLORS[ticket.submit.command]);
+    if (ticket.command) {
+      h += badge(ticket.command, CMD_COLORS[ticket.command]);
     }
     h += "</div></div>";
 
@@ -532,17 +532,17 @@
       h += "</div>";
     }
 
-    if (ticket.submit && ticket.submit.prompt) {
+    if (ticket.prompt) {
       h += '<div class="tv-section">';
-      h += '<div class="tv-section-title">Active Prompt <span class="tv-sub-id">#' + ticket.submit.id + "</span></div>";
-      h += renderPromptFields(ticket.submit.prompt);
+      h += '<div class="tv-section-title">Prompt</div>';
+      h += renderPromptFields(ticket.prompt);
       h += "</div>";
     }
 
-    if (ticket.submit && ticket.submit.result) {
+    if (ticket.result) {
       h += '<div class="tv-section tv-result-section">';
       h += '<div class="tv-section-title">Result</div>';
-      h += renderResultLinks(ticket.submit.result);
+      h += renderResultLinks(ticket.result);
       h += "</div>";
     }
 
@@ -559,37 +559,8 @@
       h += "</div>";
     }
 
-    if (ticket.history.length > 0) {
-      h += '<div class="tv-section">';
-      h += '<div class="tv-section-title">History</div>';
-      h += '<div class="timeline">';
-      ticket.history.forEach(function (entry) {
-        const ac = entry.active ? " active" : "";
-        h += '<div class="tl-entry' + ac + '">';
-        h += '<div class="tl-header">';
-        h += '<span class="tl-id">#' + entry.id + "</span>";
-        if (entry.command) h += badge(entry.command, CMD_COLORS[entry.command]);
-        h += '<span class="tl-time">' + esc(formatTime(entry.datetime)) + "</span>";
-        h += "</div>";
-        if (entry.prompt) h += renderPromptFields(entry.prompt);
-        if (entry.result) {
-          if (typeof entry.result === "object") {
-            h += '<div class="tv-result-section">';
-            h += '<div class="tv-field-label">Result</div>';
-            h += renderResultLinks(entry.result);
-            h += "</div>";
-          } else {
-            h += '<div class="tv-field"><div class="tv-field-label">Result</div>';
-            h += '<div class="tv-field-value">' + esc(entry.result) + "</div></div>";
-          }
-        }
-        h += "</div>";
-      });
-      h += "</div></div>";
-    }
-
-    if (!ticket.submit && ticket.history.length === 0) {
-      h += '<div class="empty" style="margin-top:32px">No submit or history data</div>';
+    if (!ticket.prompt && !ticket.result) {
+      h += '<div class="empty" style="margin-top:32px">No prompt or result data</div>';
     }
 
     h += "</div>";

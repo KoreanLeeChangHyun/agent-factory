@@ -110,7 +110,11 @@ function parseTicket(text) {
   }
 
   // Flat structure: <prompt> directly under <ticket>
-  const promptEl = root.querySelector(":scope > prompt");
+  var promptEls = root.getElementsByTagName("prompt");
+  var promptEl = null;
+  for (var pi = 0; pi < promptEls.length; pi++) {
+    if (promptEls[pi].parentNode === root) { promptEl = promptEls[pi]; break; }
+  }
   if (promptEl) {
     var prompt = {};
     for (var fi = 0; fi < promptEl.children.length; fi++) {
@@ -123,7 +127,11 @@ function parseTicket(text) {
   }
 
   // Flat structure: <result> directly under <ticket>
-  const resultEl = root.querySelector(":scope > result");
+  var resultEls = root.getElementsByTagName("result");
+  var resultEl = null;
+  for (var rsi = 0; rsi < resultEls.length; rsi++) {
+    if (resultEls[rsi].parentNode === root) { resultEl = resultEls[rsi]; break; }
+  }
   if (resultEl) {
     var rObj = {};
     for (var ri = 0; ri < resultEl.children.length; ri++) {

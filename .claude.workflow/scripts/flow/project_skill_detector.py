@@ -5,9 +5,9 @@
 분석하여 기술 스택을 식별하고, scope: project 스킬 초안(SKILL.md)을 자동 생성한다.
 
 사용법:
-  python3 project_skill_detector.py [프로젝트루트]
-  python3 project_skill_detector.py [프로젝트루트] --generate
-  python3 project_skill_detector.py --help
+  flow-detect <프로젝트루트>
+  flow-detect <프로젝트루트> --generate
+  flow-detect --help
 
 출력:
   (기본) 감지 결과를 stdout으로 출력
@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -28,6 +29,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import resolve_project_root, C_CLAUDE, C_DIM, C_RESET
+from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 # ─── 스택 감지 규칙 ───────────────────────────────────────────────────────────
@@ -564,20 +566,27 @@ def main() -> None:
     Raises:
         SystemExit: 인자 부족(1), 디렉터리 미존재(1), 정상 완료(0).
     """
-    if len(sys.argv) < 2 or sys.argv[1] == "--help":
-        print("사용법: python3 project_skill_detector.py <프로젝트루트> [--generate]", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("옵션:", file=sys.stderr)
-        print("  <프로젝트루트>  감지할 프로젝트의 루트 디렉터리 경로", file=sys.stderr)
-        print("  --generate      감지 결과를 기반으로 SKILL.md 파일을 실제 생성", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("예시:", file=sys.stderr)
-        print("  python3 project_skill_detector.py .", file=sys.stderr)
-        print("  python3 project_skill_detector.py /path/to/project --generate", file=sys.stderr)
-        sys.exit(0 if sys.argv[1:] == ["--help"] else 1)
+    parser = argparse.ArgumentParser(
+        prog="flow-detect",
+        description="코드베이스 분석 기반 프로젝트 스킬 자동 감지",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "project_root",
+        metavar="프로젝트루트",
+        help="감지할 프로젝트의 루트 디렉터리 경로",
+    )
+    parser.add_argument(
+        "--generate",
+        action="store_true",
+        default=False,
+        help="감지 결과를 기반으로 SKILL.md 파일을 실제 생성",
+    )
 
-    project_root = os.path.abspath(sys.argv[1])
-    generate = "--generate" in sys.argv
+    args = parser.parse_args()
+    project_root = os.path.abspath(args.project_root)
+    generate = args.generate
 
     if not os.path.isdir(project_root):
         print(f"[ERROR] 디렉터리를 찾을 수 없습니다: {project_root}", file=sys.stderr)

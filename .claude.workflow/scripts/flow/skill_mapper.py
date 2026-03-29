@@ -22,6 +22,7 @@ exit code:
 """
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import shutil
@@ -42,6 +43,7 @@ if _flow_dir not in sys.path:
     sys.path.insert(0, _flow_dir)
 
 from plan_validator import parse_md_table_columns
+from cli_utils import registry_key_type, build_common_epilog
 
 PROJECT_ROOT = resolve_project_root()
 
@@ -642,11 +644,21 @@ def slice_plan_context(plan_path, tasks, output_dir):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("사용법: python3 skill_mapper.py <registryKey>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        prog="flow-skillmap",
+        description="plan.md의 태스크 skills 컬럼으로 skill-map.md를 생성한다.",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "registry_key",
+        type=registry_key_type,
+        metavar="registryKey",
+        help="YYYYMMDD-HHMMSS 형식 워크플로우 식별자",
+    )
+    args = parser.parse_args()
 
-    registry_key = sys.argv[1]
+    registry_key = args.registry_key
 
     # registryKey → workDir, plan.md, command 자동 해석
     work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)

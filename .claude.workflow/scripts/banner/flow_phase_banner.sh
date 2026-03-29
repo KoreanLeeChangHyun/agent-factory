@@ -17,13 +17,34 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../data/colors.sh"
 
+# ─── 도움말 출력 ───
+show_help() {
+    cat <<'EOF'
+사용법: flow-phase <registryKey> <N>
+
+인자:
+  registryKey   워크플로우 레지스트리 키 (YYYYMMDD-HHMMSS 형식)
+  N             Phase 번호 (0, 1, 2, ...)
+
+예시:
+  flow-phase 20260301-061849 0
+  flow-phase 20260301-061849 1
+EOF
+}
+
+# ─── --help / -h 처리 ───
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    show_help
+    exit 0
+fi
+
 # ─── 인자 파싱 ───
 REGISTRY_KEY="${1:-}"
 PHASE="${2:-}"
 
 if [[ -z "$REGISTRY_KEY" || -z "$PHASE" ]]; then
     echo "사용법: flow-phase <registryKey> <N>" >&2
-    exit 0
+    exit 1
 fi
 
 COLOR=$(get_color "WORK")

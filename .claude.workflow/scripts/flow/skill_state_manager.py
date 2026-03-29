@@ -14,15 +14,16 @@ catalog_sync.py에서 import하여 아카이브된 스킬을 카탈로그에서 
     is_archived: 아카이브 여부 판별 헬퍼
 
 사용법:
-    python3 skill_state_manager.py archive <skill_name>
-    python3 skill_state_manager.py activate <skill_name>
-    python3 skill_state_manager.py list [--archived | --active]
+    flow-skill archive <skill_name>
+    flow-skill activate <skill_name>
+    flow-skill list [--archived | --active]
 
 종료 코드: 0 성공, 1 실패
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 
@@ -48,6 +49,7 @@ from common import (  # noqa: E402
     load_json_file,
     resolve_project_root,
 )
+from flow.cli_utils import build_common_epilog  # noqa: E402
 
 # ─── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -254,53 +256,80 @@ def list_skills(filter_mode: str | None = None) -> None:
                 print(f"  {C_DIM}{name}{C_RESET}")
 
 
+# ─── argparse 파서 구성 ──────────────────────────────────────────────────────
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """argparse 기반 CLI 파서를 구성하여 반환한다.
+
+    Returns:
+        구성된 ArgumentParser 인스턴스.
+    """
+    parser = argparse.ArgumentParser(
+        prog="flow-skill",
+        description="스킬 활성(active)/아카이브(archived) 상태 관리 CLI",
+        epilog=build_common_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="subcommand", required=True)
+
+    # archive 서브커맨드
+    archive_parser = subparsers.add_parser(
+        "archive",
+        help="스킬을 archived 상태로 전환한다",
+    )
+    archive_parser.add_argument("skill_name", help="아카이브할 스킬명")
+
+    # activate 서브커맨드
+    activate_parser = subparsers.add_parser(
+        "activate",
+        help="스킬을 active 상태로 전환한다",
+    )
+    activate_parser.add_argument("skill_name", help="활성화할 스킬명")
+
+    # list 서브커맨드
+    list_parser = subparsers.add_parser(
+        "list",
+        help="스킬 상태 목록을 조회한다",
+    )
+    list_filter_group = list_parser.add_mutually_exclusive_group()
+    list_filter_group.add_argument(
+        "--archived",
+        action="store_true",
+        default=False,
+        help="archived 상태 스킬만 표시한다",
+    )
+    list_filter_group.add_argument(
+        "--active",
+        action="store_true",
+        default=False,
+        help="active 상태 스킬만 표시한다",
+    )
+
+    return parser
+
+
 # ─── CLI 진입점 ───────────────────────────────────────────────────────────────
 
 
 def main() -> None:
-    """CLI 진입점. 서브커맨드를 파싱하여 해당 핸들러를 호출한다."""
-    if len(sys.argv) < 2:
-        print(
-            f"{C_RED}[ERROR]{C_RESET} 서브커맨드가 필요합니다: archive | activate | list",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    """CLI 진입점. argparse subparsers로 서브커맨드를 파싱하여 해당 핸들러를 호출한다."""
+    parser = build_parser()
+    args = parser.parse_args()
 
-    subcommand = sys.argv[1]
+    if args.subcommand == "archive":
+        archive_skill(args.skill_name)
 
-    if subcommand == "archive":
-        if len(sys.argv) < 3:
-            print(
-                f"{C_RED}[ERROR]{C_RESET} 사용법: skill_state_manager.py archive <skill_name>",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        archive_skill(sys.argv[2])
+    elif args.subcommand == "activate":
+        activate_skill(args.skill_name)
 
-    elif subcommand == "activate":
-        if len(sys.argv) < 3:
-            print(
-                f"{C_RED}[ERROR]{C_RESET} 사용법: skill_state_manager.py activate <skill_name>",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        activate_skill(sys.argv[2])
-
-    elif subcommand == "list":
+    elif args.subcommand == "list":
         filter_mode: str | None = None
-        if "--archived" in sys.argv:
+        if args.archived:
             filter_mode = "archived"
-        elif "--active" in sys.argv:
+        elif args.active:
             filter_mode = "active"
         list_skills(filter_mode)
-
-    else:
-        print(
-            f"{C_RED}[ERROR]{C_RESET} 알 수 없는 서브커맨드: '{subcommand}'",
-            file=sys.stderr,
-        )
-        print(f"  사용 가능: archive, activate, list", file=sys.stderr)
-        sys.exit(1)
 
 
 if __name__ == "__main__":

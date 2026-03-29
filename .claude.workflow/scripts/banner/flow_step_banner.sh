@@ -118,12 +118,35 @@ get_step_desc() {
     esac
 }
 
+# ─── 도움말 출력 ───
+show_help() {
+    cat <<'EOF'
+사용법: flow-step <서브커맨드> <registryKey> [인자...]
+
+서브커맨드:
+  start <registryKey> [phase]   Step 시작 배너 출력
+  end   <registryKey> [label]   Step 완료 배너 출력
+
+예시:
+  flow-step start 20260301-061849
+  flow-step start 20260301-061849 PLAN
+  flow-step end 20260301-061849
+  flow-step end 20260301-061849 planSubmit
+EOF
+}
+
 # ─── 서브커맨드 파싱 ───
 SUBCMD="${1:-}"
 
-if [[ -z "$SUBCMD" ]]; then
-    echo "사용법: flow-step <start|end> <registryKey> [label]" >&2
+# ─── --help / -h 처리 ───
+if [[ "$SUBCMD" == "--help" || "$SUBCMD" == "-h" ]]; then
+    show_help
     exit 0
+fi
+
+if [[ -z "$SUBCMD" ]]; then
+    echo "사용법: flow-step <start|end> <registryKey> [인자...]" >&2
+    exit 1
 fi
 
 # ═══════════════════════════════════════════════════════
@@ -134,7 +157,7 @@ if [[ "$SUBCMD" == "start" ]]; then
     PHASE_ARG="${3:-}"
     if [[ -z "$REGISTRY_KEY" ]]; then
         echo "사용법: flow-step start <registryKey> [phase]" >&2
-        exit 0
+        exit 1
     fi
 
     if [[ -n "$PHASE_ARG" ]]; then
@@ -182,7 +205,7 @@ if [[ "$SUBCMD" == "end" ]]; then
     LABEL="${3:-}"
     if [[ -z "$REGISTRY_KEY" ]]; then
         echo "사용법: flow-step end <registryKey> [label]" >&2
-        exit 0
+        exit 1
     fi
 
     STEP=$(get_current_phase "$REGISTRY_KEY")
@@ -211,4 +234,5 @@ if [[ "$SUBCMD" == "end" ]]; then
     exit 0
 fi
 
-echo "사용법: flow-step <start|end> <registryKey> [label]" >&2
+echo "사용법: flow-step <start|end> <registryKey> [인자...]" >&2
+exit 1
