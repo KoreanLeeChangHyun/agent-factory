@@ -32,7 +32,6 @@ const CMD_COLORS = {
   implement: { bg: "rgba(86,156,214,0.3)", fg: "#7bb8e8" },
   review: { bg: "rgba(197,134,192,0.3)", fg: "#d9a0d6" },
   research: { bg: "rgba(220,220,170,0.3)", fg: "#e8e8b0" },
-  submit: { bg: "rgba(78,201,176,0.3)", fg: "#6ee0c8" },
   prompt: { bg: "rgba(160,160,160,0.2)", fg: "#a0a0a0" },
 };
 

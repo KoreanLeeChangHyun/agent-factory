@@ -68,7 +68,7 @@
   // ── Kanban Sort Logic ──
 
   /**
-   * Returns the most recent datetime from a ticket's history/submit entries.
+   * Returns the most recent datetime from a ticket's datetime field.
    * @param {Object} t - Ticket object
    * @returns {string} Most recent datetime string
    */
@@ -206,9 +206,8 @@
   }
 
   /**
-   * 티켓의 status와 editing 플래그를 기반으로 상태 라벨 정보를 반환한다.
+   * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
    * status가 "Submit"인 경우 SUBMIT 라벨을 반환한다.
-   * editing 플래그가 true인 경우 EDIT 라벨을 반환한다.
    * 그 외 모든 경우 OPEN 라벨을 반환한다.
    * @param {Object} ticket - 티켓 객체
    * @returns {{ label: string, cssClass: string }} 상태 라벨과 CSS 클래스
