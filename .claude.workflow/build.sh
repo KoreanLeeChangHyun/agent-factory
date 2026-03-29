@@ -5,7 +5,7 @@ set -euo pipefail
 
 # --- 상수 로드 ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULTS_CONF="${SCRIPT_DIR}/.claude.workflow/init/defaults.conf"
+DEFAULTS_CONF="${SCRIPT_DIR}/init/defaults.conf"
 if [ ! -f "$DEFAULTS_CONF" ]; then
     echo "ERROR: defaults.conf not found: $DEFAULTS_CONF" >&2
     exit 1
@@ -320,9 +320,9 @@ update_gitignore() {
     else print_success ".gitignore에 ${added}개 항목 추가 완료"; fi
 }
 
-# --- Step 3: .claude 디렉터리 클론 ---
+# --- Step 3: .claude + .claude.workflow 디렉터리 클론 ---
 clone_claude_directory() {
-    print_step "3" ".claude 디렉터리 클론 (원격 저장소)"
+    print_step "3" ".claude + .claude.workflow 디렉터리 클론 (원격 저장소)"
     command -v git &>/dev/null || { print_error "git이 설치되어 있지 않습니다"; return 1; }
     local tmp_dir old_trap
     tmp_dir="$(mktemp -d)"
@@ -330,26 +330,53 @@ clone_claude_directory() {
     trap 'rm -rf "$tmp_dir"' EXIT
     print_info "원격 저장소 클론 중... ($CLAUDE_REPO_URL)"
     if ! git clone --depth 1 "$CLAUDE_REPO_URL" "$tmp_dir/claude-workflow" 2>/dev/null; then
-        print_error "원격 저장소 클론에 실패했습니다. 기존 .claude 디렉터리를 유지합니다."
+        print_error "원격 저장소 클론에 실패했습니다. 기존 디렉터리를 유지합니다."
         rm -rf "$tmp_dir"; eval "$old_trap"; return 1
     fi
+    # .claude 디렉터리 교체
     if [ ! -d "$tmp_dir/claude-workflow/.claude" ]; then
-        print_error "클론된 저장소에 .claude 디렉터리가 없습니다. 기존 .claude 디렉터리를 유지합니다."
+        print_error "클론된 저장소에 .claude 디렉터리가 없습니다."
         rm -rf "$tmp_dir"; eval "$old_trap"; return 1
     fi
-    # 심볼릭 링크 검사 (SEC-005)
-    [ -L ".claude" ] && { print_info ".claude가 심볼릭 링크입니다. 링크를 제거하고 실제 디렉터리로 교체합니다."; rm -f ".claude"; }
+    [ -L ".claude" ] && { print_info ".claude가 심볼릭 링크입니다. 제거합니다."; rm -f ".claude"; }
     rm -rf ".claude.new"
     if ! cp -r "$tmp_dir/claude-workflow/.claude" ".claude.new"; then
-        print_error ".claude 디렉터리 복사에 실패했습니다. 기존 .claude 디렉터리를 유지합니다."
+        print_error ".claude 디렉터리 복사 실패."
         rm -rf ".claude.new" "$tmp_dir"; eval "$old_trap"; return 1
     fi
     rm -rf ".claude"; mv ".claude.new" ".claude"
     print_success ".claude 디렉터리 교체 완료"
+    # .claude.workflow 디렉터리 교체 (kanban, workflow, .settings는 보존)
+    if [ -d "$tmp_dir/claude-workflow/.claude.workflow" ]; then
+        # 사용자 데이터 백업 (kanban, workflow, .settings, .env, .version)
+        local preserve_dirs=("kanban" "workflow" "dashboard")
+        local preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
+        for pd in "${preserve_dirs[@]}"; do
+            [ -d ".claude.workflow/$pd" ] && cp -r ".claude.workflow/$pd" "$tmp_dir/_preserve_$pd"
+        done
+        for pf in "${preserve_files[@]}"; do
+            [ -f ".claude.workflow/$pf" ] && cp ".claude.workflow/$pf" "$tmp_dir/_preserve_$pf"
+        done
+        # 교체
+        rm -rf ".claude.workflow.new"
+        cp -r "$tmp_dir/claude-workflow/.claude.workflow" ".claude.workflow.new"
+        rm -rf ".claude.workflow"; mv ".claude.workflow.new" ".claude.workflow"
+        # 사용자 데이터 복원
+        for pd in "${preserve_dirs[@]}"; do
+            [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf ".claude.workflow/$pd"; mv "$tmp_dir/_preserve_$pd" ".claude.workflow/$pd"; }
+        done
+        for pf in "${preserve_files[@]}"; do
+            [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude.workflow/$pf"
+        done
+        print_success ".claude.workflow 디렉터리 교체 완료 (사용자 데이터 보존)"
+    else
+        print_info "클론된 저장소에 .claude.workflow 디렉터리가 없습니다. 스킵합니다."
+    fi
     rm -rf "$tmp_dir"; eval "$old_trap"
     print_success "임시 클론 디렉터리 정리 완료"
     find ".claude/" -name '*.sh' -exec chmod +x {} +
-    print_success ".claude/ 내 .sh 파일 chmod +x 완료"
+    find ".claude.workflow/" -name '*.sh' -exec chmod +x {} + 2>/dev/null
+    print_success ".sh 파일 chmod +x 완료"
 }
 
 # --- Step 9: 설치 검증 ---
