@@ -10,6 +10,7 @@ worktree 환경에서 feature 브랜치를 develop에 병합하고 정리하는
 파이프라인 단계:
   1. 미커밋 변경사항 감지 및 자동 커밋
   2. feature 브랜치를 develop에 --no-ff 병합
+  2.5. merge anchor 검증 (WORKFLOW_WORKTREE=true 시에만 활성)
   3. worktree unlock + remove (+ feature 브랜치 삭제)
   4. kanban done 처리 (worktree merge hook 중복 방지)
   5. (feature 브랜치 삭제는 3단계에서 처리됨)
@@ -27,9 +28,11 @@ worktree 환경에서 feature 브랜치를 develop에 병합하고 정리하는
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
 # ─── sys.path 보장 ────────────────────────────────────────────────────────────
 
@@ -47,6 +50,12 @@ from common import resolve_project_root
 # ─── 상수 ─────────────────────────────────────────────────────────────────────
 
 _MERGE_APPROVED_ENV: str = "WORKFLOW_MERGE_APPROVED"
+_ANCHOR_FAILURE_LOG: str = os.path.join(
+    ".claude.workflow", "logs", "merge-anchor-failures.log"
+)
+
+# KST (UTC+9)
+_KST = timezone(timedelta(hours=9))
 
 
 # ─── 내부 유틸리티 ────────────────────────────────────────────────────────────
@@ -177,7 +186,7 @@ def _stage1_auto_commit(
 
 def _stage2_merge_to_develop(
     ticket_number: str, dry_run: bool
-) -> bool:
+) -> tuple[bool, str, str]:
     """Stage 2: feature 브랜치를 develop에 --no-ff 병합한다.
 
     worktree_manager.merge_to_develop()를 재사용한다.
@@ -188,7 +197,8 @@ def _stage2_merge_to_develop(
         dry_run: True이면 예상 동작만 출력.
 
     Returns:
-        성공 시 True, 실패 시 False.
+        (success, merge_commit_sha, feature_branch) 튜플.
+        성공 시 (True, sha, branch), 실패 시 (False, "", "").
     """
     _step(2, "feature 브랜치 -> develop 병합")
 
@@ -198,7 +208,7 @@ def _stage2_merge_to_develop(
     branch_name = get_feature_branch_for_ticket(ticket_number)
     if not branch_name:
         _error(f"{ticket_number}에 연결된 feature 브랜치를 찾을 수 없습니다")
-        return False
+        return False, "", ""
 
     print(f"  대상 브랜치: {branch_name}", flush=True)
 
@@ -207,7 +217,7 @@ def _stage2_merge_to_develop(
             f"  [DRY-RUN] git merge --no-ff {branch_name} into develop",
             flush=True,
         )
-        return True
+        return True, "", branch_name
 
     merge_result = merge_to_develop(ticket_number)
     if not merge_result.success:
@@ -222,11 +232,158 @@ def _stage2_merge_to_develop(
             )
         else:
             _error(f"병합 실패: {merge_result.error_message}")
-        return False
+        return False, "", ""
 
     print(
         f"  병합 완료: {merge_result.merged_branch} -> develop "
         f"({merge_result.merge_commit[:8]})",
+        flush=True,
+    )
+    return True, merge_result.merge_commit, merge_result.merged_branch
+
+
+def _handle_anchor_failure(
+    merge_commit: str, feature_branch: str, reason: str
+) -> None:
+    """merge anchor 검증 실패 시 롤백 및 로그 기록을 수행한다.
+
+    현재 HEAD가 merge_commit과 일치하면 git reset --hard HEAD^로 롤백하고,
+    .claude.workflow/logs/merge-anchor-failures.log에 JSONL 형식으로 기록한다.
+
+    Args:
+        merge_commit: 병합 커밋 SHA.
+        feature_branch: feature 브랜치명.
+        reason: 실패 이유.
+    """
+    project_root = resolve_project_root()
+
+    # HEAD가 merge_commit과 일치하는지 확인 후 롤백
+    head_result = _git("rev-parse", "HEAD")
+    if head_result.returncode == 0 and head_result.stdout.strip() == merge_commit:
+        reset_result = _git("reset", "--hard", "HEAD^")
+        if reset_result.returncode == 0:
+            _error(f"anchor 검증 실패로 병합 롤백 완료 (reason: {reason})")
+        else:
+            _error(
+                f"anchor 검증 실패 + 롤백 실패: {reset_result.stderr.strip()}"
+            )
+    else:
+        _error(
+            f"anchor 검증 실패 (HEAD != merge_commit, 롤백 생략): {reason}"
+        )
+
+    # JSONL 로그 기록
+    log_path = os.path.join(project_root, _ANCHOR_FAILURE_LOG)
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        ts = datetime.now(_KST).strftime("%Y-%m-%dT%H:%M:%S")
+        record = {
+            "timestamp": ts,
+            "merge_commit": merge_commit,
+            "feature_branch": feature_branch,
+            "reason": reason,
+        }
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as e:
+        _error(f"anchor failure 로그 기록 실패: {e}")
+
+
+def _stage2_5_verify_merge_anchor(
+    merge_commit: str, feature_branch: str, dry_run: bool
+) -> bool:
+    """Stage 2.5: merge anchor 검증을 수행한다.
+
+    WORKFLOW_WORKTREE=false(기본값)이면 즉시 True를 반환하여 스킵한다.
+    활성화 시 두 가지 검증을 수행한다:
+      1. 병합 커밋의 두 번째 부모(^2) SHA == feature_branch HEAD SHA
+      2. git diff {merge_commit}^2 {merge_commit} 출력이 비어있어야 함
+
+    Args:
+        merge_commit: Stage 2에서 생성된 병합 커밋 SHA.
+        feature_branch: 병합된 feature 브랜치명.
+        dry_run: True이면 예상 동작만 출력.
+
+    Returns:
+        검증 성공(또는 스킵) 시 True, 실패(롤백 완료) 시 False.
+    """
+    _step(2, "merge anchor 검증 (Stage 2.5)")
+
+    from flow.worktree_manager import is_worktree_enabled
+
+    if not is_worktree_enabled():
+        print(
+            "  WORKFLOW_WORKTREE=false — anchor 검증 스킵",
+            flush=True,
+        )
+        return True
+
+    if dry_run:
+        print(
+            f"  [DRY-RUN] merge anchor 검증: {merge_commit[:8]} / {feature_branch}",
+            flush=True,
+        )
+        return True
+
+    if not merge_commit:
+        _error("anchor 검증: merge_commit이 비어있어 검증 불가")
+        return True  # 비차단: 검증 불가 시 통과
+
+    # 검증 1: merge_commit^2 == feature_branch HEAD
+    parent2_result = _git("rev-parse", f"{merge_commit}^2")
+    if parent2_result.returncode != 0:
+        _error(
+            f"anchor 검증 실패: rev-parse {merge_commit[:8]}^2 실패 — "
+            f"{parent2_result.stderr.strip()}"
+        )
+        _handle_anchor_failure(
+            merge_commit, feature_branch, "rev-parse ^2 failed"
+        )
+        return False
+
+    fb_head_result = _git("rev-parse", feature_branch)
+    if fb_head_result.returncode != 0:
+        # feature 브랜치가 이미 삭제된 경우 검증 스킵 (비차단)
+        _info(
+            f"anchor 검증 스킵: feature_branch {feature_branch} 를 찾을 수 없음 "
+            f"(이미 삭제됨)"
+        )
+        return True
+
+    parent2_sha = parent2_result.stdout.strip()
+    fb_head_sha = fb_head_result.stdout.strip()
+
+    if parent2_sha != fb_head_sha:
+        reason = (
+            f"^2 SHA ({parent2_sha[:8]}) != feature HEAD ({fb_head_sha[:8]})"
+        )
+        _error(f"anchor 검증 실패: {reason}")
+        _handle_anchor_failure(merge_commit, feature_branch, reason)
+        return False
+
+    # 검증 2: git diff {merge_commit}^2 {merge_commit} 가 비어있어야 함
+    diff_result = _git(
+        "diff", f"{merge_commit}^2", merge_commit
+    )
+    if diff_result.returncode != 0:
+        _error(
+            f"anchor 검증 실패: git diff 명령 실패 — {diff_result.stderr.strip()}"
+        )
+        _handle_anchor_failure(
+            merge_commit, feature_branch, "git diff command failed"
+        )
+        return False
+
+    if diff_result.stdout.strip():
+        reason = (
+            f"diff {merge_commit[:8]}^2..{merge_commit[:8]} 출력이 비어있지 않음"
+        )
+        _error(f"anchor 검증 실패: {reason}")
+        _handle_anchor_failure(merge_commit, feature_branch, reason)
+        return False
+
+    print(
+        f"  anchor 검증 통과: {merge_commit[:8]} / {feature_branch}",
         flush=True,
     )
     return True
@@ -371,7 +528,14 @@ def run_pipeline(
         print("  worktree 없음 (Stage 1 건너뜀)", flush=True)
 
     # ── Stage 2: feature -> develop 병합 ──
-    if not _stage2_merge_to_develop(ticket_number, dry_run):
+    stage2_success, merge_commit, feature_branch = _stage2_merge_to_develop(
+        ticket_number, dry_run
+    )
+    if not stage2_success:
+        return 1
+
+    # ── Stage 2.5: merge anchor 검증 ──
+    if not _stage2_5_verify_merge_anchor(merge_commit, feature_branch, dry_run):
         return 1
 
     # ── Stage 3: worktree 제거 + branch 삭제 ──

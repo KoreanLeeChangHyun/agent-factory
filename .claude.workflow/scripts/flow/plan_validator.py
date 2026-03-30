@@ -1,5 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""plan_validator.py - 계획서(plan.md) 구조 검증 스크립트.
+"""plan_validator.py - 계획서(plan.md) 및 칸반 티켓 구조 검증 스크립트.
 
 plan.md를 입력받아 다음을 검증한다:
 (1) Mermaid 서브그래프에서 Phase별 워커 수 추출, 최대/최소 비율 3배 이상 시 경고
@@ -7,8 +7,19 @@ plan.md를 입력받아 다음을 검증한다:
 (3) T2(10+) 태스크에서 스킬 1개인 경우 경고
 (4) WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지 (advisory, 비차단)
 
+--mode ticket 시 칸반 티켓 XML 구조 검증을 수행한다:
+(TC-01) 디렉터리 위치 vs XML status 불일치
+(TC-02) derived-from 파생 티켓 미완료 + 원본 done 경고
+(TC-03) 필수 태그 누락 (number/command/prompt)
+(TC-04) command 값 유효성
+(TC-05) goal/target 빈 값 경고
+(TC-06) 복수 항목 필드 개행 누락 경고
+(TC-07) 관계 링크 대상 티켓 존재 여부
+
 사용법:
   flow-validate <plan_path|registryKey>
+  flow-validate --mode ticket
+  flow-validate --mode ticket --ticket T-001
   flow-validate --help
 
 출력:
@@ -21,6 +32,7 @@ import argparse
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from typing import Any
 
 # 프로젝트 루트 결정
@@ -662,11 +674,403 @@ def validate(plan_path: str) -> list[str]:
     return warnings
 
 
+# ---------------------------------------------------------------------------
+# ticket 모드 헬퍼 함수
+# ---------------------------------------------------------------------------
+
+# 디렉터리명 → XML status 값 매핑 (정규화용)
+_DIR_TO_STATUS: dict[str, str] = {
+    "open": "Open",
+    "progress": "In Progress",
+    "review": "Review",
+    "done": "Done",
+}
+
+# 유효한 command 값 (체인 구분자 > 포함 시 각 토큰 검증)
+_VALID_COMMANDS: set[str] = {"implement", "review", "research"}
+
+# 복수 항목 필드 목록 (TC-06 대상)
+_MULTI_FIELDS: list[str] = ["goal", "target", "constraints", "criteria", "context"]
+
+
+def find_kanban_root(project_root: str) -> str:
+    """칸반 루트 디렉터리 경로를 반환한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        .claude.workflow/kanban 절대 경로
+    """
+    return os.path.join(project_root, ".claude.workflow", "kanban")
+
+
+def load_ticket_xml(xml_path: str) -> dict[str, Any]:
+    """티켓 XML 파일을 파싱하여 dict로 반환한다.
+
+    파싱 실패 시 빈 dict를 반환한다.
+
+    Args:
+        xml_path: 티켓 XML 파일 절대 경로
+
+    Returns:
+        {number, title, status, command, goal, target, constraints,
+         criteria, context, relations(list[dict])} 형태의 딕셔너리.
+        파싱 실패 시 빈 dict.
+    """
+    if not os.path.isfile(xml_path):
+        return {}
+
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+    except ET.ParseError:
+        return {}
+
+    def _text(tag: str) -> str:
+        """태그 내부 텍스트를 반환한다. 없으면 빈 문자열."""
+        el = root.find(".//" + tag)
+        return (el.text or "").strip() if el is not None else ""
+
+    relations: list[dict[str, str]] = []
+    for rel in root.findall(".//relations/relation"):
+        rel_type = rel.get("type", "")
+        rel_ticket = rel.get("ticket", "")
+        if rel_type and rel_ticket:
+            relations.append({"type": rel_type, "ticket": rel_ticket})
+
+    return {
+        "number": _text("number"),
+        "title": _text("title"),
+        "status": _text("status"),
+        "command": _text("command"),
+        "goal": _text("goal"),
+        "target": _text("target"),
+        "constraints": _text("constraints"),
+        "criteria": _text("criteria"),
+        "context": _text("context"),
+        "relations": relations,
+        "_path": xml_path,
+    }
+
+
+def build_ticket_location_map(kanban_root: str) -> dict[str, str]:
+    """칸반 루트의 4개 디렉터리를 순회하여 티켓 번호 → 디렉터리 위치 매핑을 반환한다.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로 (.claude.workflow/kanban)
+
+    Returns:
+        {T-NNN: "open"|"progress"|"review"|"done"} 딕셔너리.
+    """
+    location_map: dict[str, str] = {}
+    for dir_name in ("open", "progress", "review", "done"):
+        dir_path = os.path.join(kanban_root, dir_name)
+        if not os.path.isdir(dir_path):
+            continue
+        for fname in os.listdir(dir_path):
+            if not fname.endswith(".xml"):
+                continue
+            ticket_number = fname[:-4]  # 확장자 제거
+            location_map[ticket_number] = dir_name
+    return location_map
+
+
+def extract_relations(ticket_data: dict[str, Any]) -> list[dict[str, str]]:
+    """ticket_data에서 relations 목록을 반환한다.
+
+    Args:
+        ticket_data: load_ticket_xml()이 반환한 딕셔너리
+
+    Returns:
+        [{type, ticket}, ...] 목록.
+    """
+    return ticket_data.get("relations", [])
+
+
+def validate_ticket_status_consistency(
+    kanban_root: str, location_map: dict[str, str]
+) -> list[str]:
+    """TC-01: 디렉터리 위치 vs XML <status> 불일치 검증.
+
+    디렉터리 위치와 XML <status> 값이 불일치하면 경고를 생성한다.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로
+        location_map: build_ticket_location_map() 반환값
+
+    Returns:
+        경고 메시지 목록.
+    """
+    warnings: list[str] = []
+    for ticket_number, dir_name in location_map.items():
+        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
+        data = load_ticket_xml(xml_path)
+        if not data:
+            continue
+        xml_status = data.get("status", "")
+        expected_status = _DIR_TO_STATUS.get(dir_name, "")
+        if expected_status and xml_status and xml_status != expected_status:
+            warnings.append(
+                f"[TC-01] {ticket_number}: 디렉터리({dir_name}) vs XML status({xml_status}) 불일치 "
+                f"(기대값: {expected_status})"
+            )
+    return warnings
+
+
+def validate_derived_ticket_completion(
+    kanban_root: str, location_map: dict[str, str]
+) -> list[str]:
+    """TC-02: derived-from 파생 티켓 미완료 + 원본 done 경고.
+
+    파생 티켓이 done이 아닌 상태에서 원본 티켓이 done에 있으면 경고를 생성한다.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로
+        location_map: build_ticket_location_map() 반환값
+
+    Returns:
+        경고 메시지 목록.
+    """
+    warnings: list[str] = []
+    for ticket_number, dir_name in location_map.items():
+        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
+        data = load_ticket_xml(xml_path)
+        if not data:
+            continue
+        for rel in data.get("relations", []):
+            if rel.get("type") != "derived-from":
+                continue
+            origin_ticket = rel.get("ticket", "")
+            if not origin_ticket:
+                continue
+            origin_dir = location_map.get(origin_ticket, "")
+            if origin_dir == "done" and dir_name != "done":
+                warnings.append(
+                    f"[TC-02] {ticket_number}(파생 티켓)이 미완료({dir_name})인데 "
+                    f"원본 {origin_ticket}이 done 상태임"
+                )
+    return warnings
+
+
+def validate_ticket_xml_fields(
+    ticket_data: dict[str, Any], ticket_number: str, dir_name: str
+) -> list[str]:
+    """TC-03/04/05/06: 단일 티켓 XML 필드 검증.
+
+    TC-03: open/progress/review 티켓에 number/command/prompt 필수 태그 존재
+    TC-04: command 값이 implement|review|research (체인 > 포함)
+    TC-05: open/progress/review 티켓에 goal/target 비어있으면 WARN
+    TC-06: 복수 항목 필드에 \\n 개행 누락 시 WARN (줄 수 대비 개행 비율 기반)
+
+    Args:
+        ticket_data: load_ticket_xml()이 반환한 딕셔너리
+        ticket_number: 티켓 번호 (예: T-001)
+        dir_name: 디렉터리 위치 (open/progress/review/done)
+
+    Returns:
+        경고 메시지 목록.
+    """
+    warnings: list[str] = []
+    is_active = dir_name in ("open", "progress", "review")
+
+    if not is_active:
+        return warnings
+
+    # TC-03: 필수 태그 존재 여부
+    if not ticket_data.get("number"):
+        warnings.append(f"[TC-03] {ticket_number}: <number> 태그 누락 또는 빈 값")
+    if not ticket_data.get("command"):
+        warnings.append(f"[TC-03] {ticket_number}: <command> 태그 누락 또는 빈 값")
+    # prompt 존재 여부: goal 또는 target 중 하나라도 있으면 prompt 블록 존재로 간주
+    has_prompt = bool(ticket_data.get("goal") or ticket_data.get("target"))
+    if not has_prompt:
+        warnings.append(f"[TC-03] {ticket_number}: <prompt> 블록 내 내용 없음")
+
+    # TC-04: command 값 유효성
+    raw_command = ticket_data.get("command", "")
+    if raw_command:
+        # 체인 구분자 > 로 분리 후 각 토큰 검증
+        tokens = [t.strip() for t in raw_command.split(">") if t.strip()]
+        invalid_tokens = [t for t in tokens if t not in _VALID_COMMANDS]
+        if invalid_tokens:
+            warnings.append(
+                f"[TC-04] {ticket_number}: 유효하지 않은 command 값 {invalid_tokens} "
+                f"(허용: {sorted(_VALID_COMMANDS)})"
+            )
+
+    # TC-05: goal/target 빈 값
+    if not ticket_data.get("goal", "").strip():
+        warnings.append(f"[TC-05] {ticket_number}: <goal> 비어있음")
+    if not ticket_data.get("target", "").strip():
+        warnings.append(f"[TC-05] {ticket_number}: <target> 비어있음")
+
+    # TC-06: 복수 항목 필드 개행 누락
+    for field in _MULTI_FIELDS:
+        value = ticket_data.get(field, "")
+        if not value:
+            continue
+        lines = [ln for ln in value.split("\n") if ln.strip()]
+        # 2줄 이상인데 개행 문자(\n)가 없으면 경고
+        # XML 파싱 시 실제 개행은 \n으로 이미 존재하므로,
+        # 원본 텍스트의 실제 줄 수 vs 개행 수로 판단
+        line_count = len(lines)
+        # 2줄 이상이고 실제 줄 수가 1이면 개행 없이 한 줄에 붙여 쓴 것
+        # (XML 파싱 후 stripped 결과로 판단)
+        raw_value = ticket_data.get(field, "")
+        actual_newlines = raw_value.count("\n")
+        if line_count >= 2 and actual_newlines == 0:
+            warnings.append(
+                f"[TC-06] {ticket_number}: <{field}> 복수 항목({line_count}개)에 \\n 개행 누락"
+            )
+
+    return warnings
+
+
+def validate_all_tickets_xml_fields(
+    kanban_root: str, location_map: dict[str, str]
+) -> list[str]:
+    """TC-03~06: 전체 티켓 XML 필드 일괄 검증.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로
+        location_map: build_ticket_location_map() 반환값
+
+    Returns:
+        경고 메시지 목록.
+    """
+    warnings: list[str] = []
+    for ticket_number, dir_name in sorted(location_map.items()):
+        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
+        data = load_ticket_xml(xml_path)
+        if not data:
+            continue
+        warnings.extend(validate_ticket_xml_fields(data, ticket_number, dir_name))
+    return warnings
+
+
+def validate_relation_links(
+    kanban_root: str,
+    location_map: dict[str, str],
+    full_location_map: dict[str, str] | None = None,
+) -> list[str]:
+    """TC-07: 관계 링크 대상 티켓 존재 여부 검증.
+
+    relations에 참조된 티켓이 칸반에 존재하지 않으면 경고를 생성한다.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로
+        location_map: 검증 대상 티켓 맵 (단일 또는 전체)
+        full_location_map: 링크 존재 여부 확인용 전체 티켓 맵.
+            None이면 location_map을 전체 맵으로 사용한다.
+
+    Returns:
+        경고 메시지 목록.
+    """
+    existence_map = full_location_map if full_location_map is not None else location_map
+    warnings: list[str] = []
+    for ticket_number, dir_name in location_map.items():
+        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
+        data = load_ticket_xml(xml_path)
+        if not data:
+            continue
+        for rel in data.get("relations", []):
+            target_ticket = rel.get("ticket", "")
+            if not target_ticket:
+                continue
+            if target_ticket not in existence_map:
+                warnings.append(
+                    f"[TC-07] {ticket_number}: 관계 링크 대상 {target_ticket}({rel.get('type', '')})이 "
+                    f"칸반에 존재하지 않음"
+                )
+    return warnings
+
+
+def validate_tickets(
+    kanban_root: str, single_ticket: str | None = None
+) -> list[str]:
+    """칸반 티켓 전체 또는 단일 티켓을 검증하고 경고 목록을 반환한다.
+
+    TC-01~TC-07 7종 검증 규칙을 순차 실행한다.
+
+    Args:
+        kanban_root: 칸반 루트 절대 경로
+        single_ticket: 단일 티켓 검증 시 티켓 번호 (예: T-001). None이면 전체 검증.
+
+    Returns:
+        경고 메시지 목록.
+    """
+    if not os.path.isdir(kanban_root):
+        return [f"[ERROR] 칸반 루트 디렉터리를 찾을 수 없습니다: {kanban_root}"]
+
+    full_location_map = build_ticket_location_map(kanban_root)
+    if not full_location_map:
+        return ["[WARN] 칸반에서 티켓을 찾을 수 없습니다."]
+
+    # 단일 티켓 모드: TC-01~06은 단일 티켓 맵, TC-07은 전체 맵으로 링크 검증
+    if single_ticket:
+        if single_ticket not in full_location_map:
+            return [f"[ERROR] 티켓 {single_ticket}을 칸반에서 찾을 수 없습니다."]
+        target_map = {single_ticket: full_location_map[single_ticket]}
+    else:
+        target_map = full_location_map
+
+    warnings: list[str] = []
+
+    # TC-01: 디렉터리 vs XML status 불일치
+    warnings.extend(validate_ticket_status_consistency(kanban_root, target_map))
+
+    # TC-02: derived-from 파생 미완료 + 원본 done
+    warnings.extend(validate_derived_ticket_completion(kanban_root, target_map))
+
+    # TC-03~06: XML 필드 검증
+    warnings.extend(validate_all_tickets_xml_fields(kanban_root, target_map))
+
+    # TC-07: 관계 링크 끊김 (TC-07은 전체 location_map 기준으로 존재 여부 확인)
+    warnings.extend(validate_relation_links(kanban_root, target_map, full_location_map))
+
+    return warnings
+
+
+def _print_validate_result(warnings: list[str], mode_label: str) -> None:
+    """검증 결과를 표준 출력 형식으로 출력한다.
+
+    Args:
+        warnings: 경고 메시지 목록
+        mode_label: 모드 레이블 (예: "PLAN", "TICKET")
+    """
+    if not warnings:
+        print(
+            f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-{mode_label} 검증 통과{C_RESET}",
+            flush=True,
+        )
+        print(
+            f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 0건{C_RESET}",
+            flush=True,
+        )
+        return
+
+    print(
+        f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-{mode_label}{C_RESET} [WARN]",
+        flush=True,
+    )
+    print(
+        f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 {len(warnings)}건 발견{C_RESET}",
+        flush=True,
+    )
+    print()
+    for i, warning in enumerate(warnings, 1):
+        print(f"  {i}. {warning}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """plan_validator CLI용 ArgumentParser를 생성하여 반환한다."""
     parser = argparse.ArgumentParser(
         prog="flow-validate",
-        description="plan.md 구조 검증 — Phase 균형·작업 편차·스킬 부족·WHAT/HOW 분리를 검사한다.",
+        description=(
+            "plan.md 구조 검증 — Phase 균형·작업 편차·스킬 부족·WHAT/HOW 분리를 검사한다.\n"
+            "--mode ticket 시 칸반 티켓 XML 구조 검증(TC-01~07)을 수행한다."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "입력 형식:\n"
@@ -676,13 +1080,26 @@ def _build_parser() -> argparse.ArgumentParser:
             "       flow-validate .workflow/20260303-124206/작업명/implement\n"
             "  3. plan.md 직접 경로:\n"
             "       flow-validate .workflow/20260303-124206/.../implement/plan.md\n"
+            "  4. ticket 모드 (전체):\n"
+            "       flow-validate --mode ticket\n"
+            "  5. ticket 모드 (단일):\n"
+            "       flow-validate --mode ticket --ticket T-001\n"
             "\n"
-            "검증 항목:\n"
+            "검증 항목 (plan 모드):\n"
             "  1. Phase 균형  : Mermaid 서브그래프에서 Phase별 워커 수 추출,\n"
             "                   최대/최소 비율 3배 이상 시 경고\n"
             "  2. 작업 편차   : 같은 Phase 내 워커 간 작업 항목 수 편차 2 초과 시 경고\n"
             "  3. 스킬 부족   : T2(10+) 태스크에서 스킬 1개만 배정 시 경고\n"
             "  4. WHAT/HOW   : criteria/goal/context 재서술 탐지 (advisory)\n"
+            "\n"
+            "검증 항목 (ticket 모드):\n"
+            "  TC-01: 디렉터리 위치 vs XML status 불일치\n"
+            "  TC-02: derived-from 파생 미완료 + 원본 done 경고\n"
+            "  TC-03: 필수 태그 누락 (number/command/prompt)\n"
+            "  TC-04: command 값 유효성 (implement|review|research)\n"
+            "  TC-05: goal/target 빈 값 경고\n"
+            "  TC-06: 복수 항목 필드 개행 누락 경고\n"
+            "  TC-07: 관계 링크 대상 티켓 존재 여부\n"
             "\n"
             + build_common_epilog()
         ),
@@ -690,20 +1107,56 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "plan_path",
         metavar="plan_path",
+        nargs="?",
+        default=None,
         help=(
             "검증할 plan.md 경로, workDir 경로, 또는 registryKey "
-            "(YYYYMMDD-HHMMSS 형식)"
+            "(YYYYMMDD-HHMMSS 형식). --mode ticket 시 생략 가능."
         ),
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["plan", "ticket"],
+        default="plan",
+        help="검증 모드 선택: plan(기본값) 또는 ticket",
+    )
+    parser.add_argument(
+        "--ticket",
+        metavar="TICKET_NUMBER",
+        default=None,
+        help="단일 티켓 검증 (--mode ticket 시 사용, 예: T-001)",
     )
     return parser
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 plan.md 검증 결과를 출력한다."""
+    """CLI 진입점. 인자 파싱 후 검증 결과를 출력한다."""
     parser = _build_parser()
     args = parser.parse_args()
 
-    plan_path: str = args.plan_path
+    mode: str = args.mode
+    _work_dir = resolve_work_dir_for_logging()
+
+    # --- ticket 모드 ---
+    if mode == "ticket":
+        if _work_dir:
+            append_log(_work_dir, "INFO", "plan_validator: start mode=ticket")
+        kanban_root = find_kanban_root(PROJECT_ROOT)
+        warnings = validate_tickets(kanban_root, single_ticket=args.ticket)
+        if _work_dir and warnings:
+            append_log(
+                _work_dir,
+                "WARN",
+                f"plan_validator: ticket mode {len(warnings)} warnings found",
+            )
+        _print_validate_result(warnings, "TICKET")
+        sys.exit(0)
+
+    # --- plan 모드 (기본) ---
+    plan_path: str | None = args.plan_path
+    if plan_path is None:
+        parser.error("plan 모드에서는 plan_path 인자가 필요합니다.")
+        return  # unreachable, mypy 대응
 
     # 3단계 경로 해석 분기
     if not plan_path.endswith(".md"):
@@ -715,23 +1168,18 @@ def main() -> None:
     if not os.path.isabs(plan_path):
         plan_path = os.path.join(PROJECT_ROOT, plan_path)
 
-    _work_dir = resolve_work_dir_for_logging()
     if _work_dir:
         append_log(_work_dir, "INFO", f"plan_validator: start path={plan_path}")
 
     warnings = validate(plan_path)
+    if _work_dir and warnings:
+        append_log(
+            _work_dir,
+            "WARN",
+            f"plan_validator: plan mode {len(warnings)} warnings found",
+        )
 
-    if not warnings:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE 검증 통과{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 0건{C_RESET}", flush=True)
-        sys.exit(0)
-
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE{C_RESET} [WARN]", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 {len(warnings)}건 발견{C_RESET}", flush=True)
-    print()
-    for i, warning in enumerate(warnings, 1):
-        print(f"  {i}. {warning}")
-
+    _print_validate_result(warnings, "PLAN")
     sys.exit(0)
 
 

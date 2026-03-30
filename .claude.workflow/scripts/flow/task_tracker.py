@@ -24,6 +24,7 @@ if _scripts_dir not in sys.path:
 from common import atomic_write_json, load_json_file
 from data.constants import KST
 from flow.flow_logger import append_log as _append_log
+from flow.stuck_detector import check_stuck as _check_stuck
 
 
 def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
@@ -77,6 +78,12 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
             _append_log(abs_work_dir_log, "INFO", f"AGENT_DISPATCH: taskId={task_id}")
         elif task_status in {"completed", "failed"}:
             _append_log(abs_work_dir_log, "INFO", f"AGENT_RETURN: taskId={task_id} status={task_status}")
+
+        # P07: stuck 패턴 감지 (비차단 원칙)
+        try:
+            _check_stuck(abs_work_dir_log, task_id, task_status)
+        except Exception:
+            pass
 
         return f"task-status -> {task_id}: {task_status} (updated_at: {now})"
     except Exception as e:

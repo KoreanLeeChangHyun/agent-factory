@@ -68,26 +68,38 @@ NON_WORKER_AGENT_TYPES: set[str] = {
 }
 
 
-def _normalize_agent_type(raw: str) -> str:
+def _normalize_agent_type(raw: str) -> tuple[str, str]:
     """agent_type 원시 문자열을 VALID_AGENT_TYPES 중 하나로 정규화한다.
 
     "worker-opus", "worker-sonnet" 등 모델 접미사가 붙은 타입을
-    정규 타입으로 변환한다. 예외를 발생시키지 않는 순수 문자열 비교 함수.
+    정규 타입과 모델 접미사 튜플로 변환한다.
+    예외를 발생시키지 않는 순수 문자열 비교 함수.
 
     Args:
         raw: 정규화 전 agent_type 문자열
 
     Returns:
-        VALID_AGENT_TYPES에 속하는 정규 타입. 매칭 없으면 원본 raw 반환.
+        (normalized_type, model_suffix) 튜플.
+        - normalized_type: VALID_AGENT_TYPES에 속하는 정규 타입. 매칭 없으면 원본 raw.
+        - model_suffix: 모델 접미사 문자열. 예: "sonnet", "opus". 없으면 빈 문자열.
+
+    Examples:
+        >>> _normalize_agent_type("worker-sonnet")
+        ("worker", "sonnet")
+        >>> _normalize_agent_type("worker")
+        ("worker", "")
+        >>> _normalize_agent_type("orchestrator")
+        ("orchestrator", "")
     """
     if not isinstance(raw, str):
-        return raw
+        return (raw, "")
     if raw in VALID_AGENT_TYPES:
-        return raw
+        return (raw, "")
     for t in VALID_AGENT_TYPES:
         if raw.startswith(t + "-"):
-            return t
-    return raw
+            suffix = raw[len(t) + 1:]
+            return (t, suffix)
+    return (raw, "")
 
 
 # =============================================================================
@@ -271,7 +283,7 @@ def cmd_track() -> None:
     transcript_path = input_data.get("agent_transcript_path", "")
     main_transcript_path = input_data.get("transcript_path", "")
 
-    agent_type = _normalize_agent_type(agent_type)
+    agent_type, model_suffix = _normalize_agent_type(agent_type)
 
     if agent_type not in VALID_AGENT_TYPES:
         sys.exit(0)
@@ -304,6 +316,7 @@ def cmd_track() -> None:
         sys.exit(0)
 
     tokens["method"] = "subagent_transcript"
+    tokens["model"] = model_suffix if model_suffix else "default"
 
     usage_file = os.path.join(work_dir, "usage.json")
     lock_dir = usage_file + ".lockdir"
@@ -524,7 +537,7 @@ def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optio
                     continue
                 if rec.get("type") == "user":
                     slug = rec.get("slug", "")
-                    normalized = _normalize_agent_type(slug)
+                    normalized, _suffix = _normalize_agent_type(slug)
                     if normalized in VALID_AGENT_TYPES:
                         return normalized
                     break
