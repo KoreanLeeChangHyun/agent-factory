@@ -186,7 +186,18 @@
 
 .card-bottom {
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.card-bottom-left {
+  flex-shrink: 0;
+}
+
+.card-bottom-right {
   text-align: right;
+  flex-shrink: 0;
 }
 
 .card-title {
@@ -347,7 +358,6 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  justify-content: flex-end;
 }
 
 .rel-item {

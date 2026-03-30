@@ -285,7 +285,7 @@
     let parts = [];
     ticket.relations.forEach(function (rel) {
       const info = typeMap[rel.type] || { prefix: "\u2194", cssClass: "rel-other" };
-      const numStr = rel.target ? rel.target.replace(/^T-/, "") : "?";
+      const numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
       parts.push('<span class="rel-item ' + info.cssClass + '">' + info.prefix + numStr + "</span>");
     });
 
@@ -393,18 +393,21 @@
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 하단: 체인 > 관계 > 날짜/시간 순 우선순위 조건 분기
+            // 하단: 왼쪽(체인/관계) + 오른쪽(날짜)
             h += '<div class="card-bottom">';
+            h += '<div class="card-bottom-left">';
             const hasChain = t.command && t.command.indexOf(">") !== -1;
             const hasRelations = t.relations && t.relations.length > 0;
             if (hasChain) {
               h += renderChainIcons(t);
             } else if (hasRelations) {
               h += renderRelations(t);
-            } else {
-              h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
-              h += '<div class="card-time">' + esc(dateObj.timePart) + "</div>";
             }
+            h += '</div>';
+            h += '<div class="card-bottom-right">';
+            h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
+            h += '<div class="card-time">' + esc(dateObj.timePart) + "</div>";
+            h += '</div>';
             h += "</div>";
             h += "</div>";
           });
