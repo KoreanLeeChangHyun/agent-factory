@@ -501,6 +501,47 @@ def _write_context(
     )
 
 
+def _find_latest_session_id() -> str:
+    """~/.claude/projects/ 에서 현재 프로젝트의 가장 최근 세션 ID를 반환한다.
+
+    현재 프로젝트 루트 경로를 기반으로 ~/.claude/projects/ 하위에서
+    매핑되는 프로젝트 디렉터리를 찾고, 그 안의 *.jsonl 파일 중
+    가장 최근 수정된 파일의 basename(확장자 제외)을 세션 ID로 반환한다.
+
+    Returns:
+        세션 ID 문자열. 탐색 실패 시 빈 문자열.
+    """
+    try:
+        projects_base: Path = Path.home() / ".claude" / "projects"
+        if not projects_base.is_dir():
+            return ""
+
+        # 프로젝트 루트를 슬래시 → 대시로 변환한 디렉터리명 패턴과 매칭
+        # 예: /home/deus/workspace/claude → -home-deus-workspace-claude
+        project_root_path: Path = Path(_PROJECT_ROOT).resolve()
+        expected_suffix: str = str(project_root_path).replace("/", "-")
+
+        matched_dir: Path | None = None
+        for candidate in projects_base.iterdir():
+            if not candidate.is_dir():
+                continue
+            if candidate.name == expected_suffix or candidate.name.endswith(expected_suffix):
+                matched_dir = candidate
+                break
+
+        if matched_dir is None:
+            return ""
+
+        jsonl_files: list[Path] = list(matched_dir.glob("*.jsonl"))
+        if not jsonl_files:
+            return ""
+
+        latest: Path = max(jsonl_files, key=lambda p: p.stat().st_mtime)
+        return latest.stem
+    except Exception:
+        return ""
+
+
 def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
     """status.json을 작업 디렉터리에 작성한다.
 
@@ -512,6 +553,8 @@ def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
         ts: ISO 8601 형식 타임스탬프 문자열
     """
     claude_sid: str = os.environ.get("CLAUDE_SESSION_ID", "")
+    if not claude_sid:
+        claude_sid = _find_latest_session_id()
     status_data: dict[str, Any] = {
         "step": "NONE",
         "mode": mode,

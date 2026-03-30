@@ -228,6 +228,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
                 log_content = f.read()
             warn_count = log_content.count("[WARN]")
             error_count = log_content.count("[ERROR]")
+            hallu_count = log_content.count("HALLUCINATION_SUSPECT")
             log_size = os.path.getsize(log_path)
             if log_size >= 1024 * 1024:
                 size_str = f"{log_size / (1024 * 1024):.1f}MB"
@@ -238,6 +239,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
         else:
             warn_count = 0
             error_count = 0
+            hallu_count = 0
             size_str = "-"
 
         # 날짜: registryKey에서 MM-DD HH:MM 추출 (YYYYMMDD-HHMMSS)
@@ -263,7 +265,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 
         row = (
             f"| {date_str} | {registry_key} | {title_display} | {command}"
-            f" | {warn_count} | {error_count} | {size_str} | {log_link} |"
+            f" | {warn_count} | {error_count} | {hallu_count} | {size_str} | {log_link} |"
         )
 
         # .logs.md 읽기
@@ -450,15 +452,17 @@ def main() -> None:
             _log_path = os.path.join(abs_work_dir, "workflow.log")
             _warn_count = 0
             _error_count = 0
+            _hallu_count_log = 0
             if os.path.isfile(_log_path):
                 try:
                     with open(_log_path, "r", encoding="utf-8", errors="replace") as _f:
                         _log_content = _f.read()
                     _warn_count = _log_content.count("[WARN]")
                     _error_count = _log_content.count("[ERROR]")
+                    _hallu_count_log = _log_content.count("HALLUCINATION_SUSPECT")
                 except Exception:
                     pass
-            _append_log(abs_work_dir, "INFO", f"FINALIZE_LOGS_MD: registryKey={registry_key} warn={_warn_count} error={_error_count}")
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_LOGS_MD: registryKey={registry_key} warn={_warn_count} error={_error_count} hallu={_hallu_count_log}")
     except Exception:
         pass
 

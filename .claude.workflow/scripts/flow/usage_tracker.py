@@ -31,6 +31,12 @@ from common import (
 )
 from flow.flow_logger import append_log as _append_log
 
+# constants 모듈 import (data 서브패키지 경로 추가)
+_data_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
+if _data_dir not in sys.path:
+    sys.path.insert(0, _data_dir)
+from constants import BUDGET_CEILING, BUDGET_THRESHOLDS, USAGE_HEADER_LINE, USAGE_SEPARATOR_LINE
+
 PROJECT_ROOT: str = resolve_project_root()
 
 
@@ -98,11 +104,63 @@ def _to_k_precise(n: float | int) -> str:
     return "-" if n == 0 else f"{n / 1000:.1f}k"
 
 
+def _get_budget_label(ratio: float) -> str:
+    """ratio(%) 값에 해당하는 예산 임계치 라벨을 반환한다.
+
+    BUDGET_THRESHOLDS의 각 임계치를 내림차순으로 비교하여 해당 구간 라벨을 반환한다.
+    ratio >= 100이면 "CRITICAL", >= 90이면 "HIGH", >= 80이면 "WARN", >= 75이면 "INFO".
+    미달 시 "-" 반환.
+
+    Args:
+        ratio: 예산 사용률 (%) 값
+
+    Returns:
+        해당 구간 라벨 문자열 (예: "CRITICAL", "HIGH", "WARN", "INFO", "-")
+    """
+    for threshold in sorted(BUDGET_THRESHOLDS.keys(), reverse=True):
+        if ratio >= threshold:
+            return BUDGET_THRESHOLDS[threshold]
+    return "-"
+
+
+def _check_budget_threshold(abs_work_dir: str, eff_weighted: float) -> str:
+    """예산 임계치를 확인하여 라벨을 반환하고 필요 시 로그를 기록한다.
+
+    BUDGET_CEILING == 0이면 비활성 상태로 즉시 "-"를 반환한다.
+    임계치 도달 시 workflow.log에 WARN 레벨로 기록하고 stderr에 출력한다.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로 (로그 기록용)
+        eff_weighted: 가중 합산 effective_tokens 값
+
+    Returns:
+        예산 임계치 라벨 문자열 (예: "CRITICAL", "HIGH", "WARN", "INFO", "-")
+    """
+    if BUDGET_CEILING == 0:
+        return "-"
+
+    ratio = (eff_weighted / BUDGET_CEILING) * 100
+    label = _get_budget_label(ratio)
+
+    if label != "-":
+        _append_log(
+            abs_work_dir,
+            "WARN",
+            f"BUDGET_THRESHOLD: {ratio:.1f}% ({label}) eff={eff_weighted:.0f} ceiling={BUDGET_CEILING}",
+        )
+        print(
+            f"[WARN] BUDGET_THRESHOLD: {ratio:.1f}% ({label}) eff={eff_weighted:.0f} ceiling={BUDGET_CEILING}",
+            file=sys.stderr,
+        )
+
+    return label
+
+
 def _update_usage_md(row: str, eff_weighted: float) -> str | None:
     """.claude.workflow/dashboard/.usage.md 파일에 사용량 행을 삽입한다.
 
     Args:
-        row: 삽입할 마크다운 테이블 행 문자열 (11컬럼 스키마)
+        row: 삽입할 마크다운 테이블 행 문자열 (12컬럼 스키마)
         eff_weighted: 가중 합산 effective_tokens (경고 메시지 생성용)
 
     Returns:
@@ -110,8 +168,8 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
     """
     usage_md = os.path.join(PROJECT_ROOT, ".claude.workflow", "dashboard", ".usage.md")
     marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-    header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
-    separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|"
+    header_line = USAGE_HEADER_LINE
+    separator_line = USAGE_SEPARATOR_LINE
 
     content = ""
     if os.path.exists(usage_md):
@@ -121,10 +179,10 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
     if marker not in content:
         content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
 
-    # row 컬럼 수 검증: 11컬럼이 아니면 삽입하지 않음
-    if row.count("|") - 1 != 11:
+    # row 컬럼 수 검증: 12컬럼이 아니면 삽입하지 않음
+    if row.count("|") - 1 != 12:
         print(
-            f"[WARN] usage-finalize: row column count mismatch (expected 11, got {row.count('|') - 1}). row insertion skipped.",
+            f"[WARN] usage-finalize: row column count mismatch (expected 12, got {row.count('|') - 1}). row insertion skipped.",
             file=sys.stderr,
         )
         return f"usage-finalize -> totals: eff={_to_k_precise(eff_weighted)}, usage.md skipped (column mismatch)"
@@ -358,7 +416,10 @@ def usage_finalize(abs_work_dir: str) -> str:
         total_eff = orch_eff + plan_eff + work_eff + exp_eff + val_eff + report_eff
         eff_weighted = totals.get("effective_tokens", total_eff)
 
-        # usage.md 행 생성 (11칼럼 스키마: 날짜|작업ID|제목|명령|ORC|PLN|WRK|EXP|VAL|RPT|합계)
+        # 예산 임계치 확인
+        budget_label = _check_budget_threshold(abs_work_dir, eff_weighted)
+
+        # usage.md 행 생성 (12칼럼 스키마: 날짜|작업ID|제목|명령|ORC|PLN|WRK|EXP|VAL|RPT|합계|예산)
         row = (
             f"| {date_str} "
             f"| {registry_key} "
@@ -370,7 +431,8 @@ def usage_finalize(abs_work_dir: str) -> str:
             f"| {_to_k(exp_eff)} "
             f"| {_to_k(val_eff)} "
             f"| {_to_k(report_eff)} "
-            f"| {_to_k(total_eff)} |"
+            f"| {_to_k(total_eff)} "
+            f"| {budget_label} |"
         )
 
         # .dashboard/.usage.md 갱신
@@ -487,8 +549,8 @@ def usage_regenerate() -> str:
 
         # 마커와 헤더/분리선 정의
         marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
-        header_line = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 |"
-        separator_line = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|"
+        header_line = USAGE_HEADER_LINE
+        separator_line = USAGE_SEPARATOR_LINE
 
         # <details> 아카이브 섹션 추출 및 보존
         archive_section = ""
@@ -513,7 +575,8 @@ def usage_regenerate() -> str:
                 f"| {_to_k(exp_eff)} "
                 f"| {_to_k(val_eff)} "
                 f"| {_to_k(report_eff)} "
-                f"| {_to_k(total_eff)} |"
+                f"| {_to_k(total_eff)} "
+                f"| - |"
             )
             new_rows.append(row)
 

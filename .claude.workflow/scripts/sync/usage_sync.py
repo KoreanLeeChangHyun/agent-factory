@@ -36,6 +36,7 @@ from common import (
     resolve_project_root,
     scan_active_workflows,
 )
+from data.constants import HALLU_TARGET_AGENT_TYPES, HOOK_HALLUCINATION_LOGGER
 
 PROJECT_ROOT = resolve_project_root()
 
@@ -210,6 +211,48 @@ def parse_jsonl_usage(filepath: str) -> Optional[dict[str, int]]:
     return totals
 
 
+def count_tool_use_in_jsonl(filepath: str) -> int:
+    """JSONL 파일에서 assistant 레코드의 tool_use 항목 수를 카운트한다.
+
+    type == "assistant" 레코드의 content 배열 내 type == "tool_use" 항목을 모두 합산한다.
+
+    Args:
+        filepath: JSONL 파일 경로
+
+    Returns:
+        tool_use 항목 총 개수. 파일 없거나 파싱 실패 시 -1 반환 (비차단 원칙).
+    """
+    if not os.path.isfile(filepath):
+        return -1
+
+    count = 0
+    try:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                if rec.get("type") != "assistant":
+                    continue
+
+                content = rec.get("content")
+                if not isinstance(content, list):
+                    continue
+
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "tool_use":
+                        count += 1
+    except Exception:
+        return -1
+
+    return count
+
+
 # =============================================================================
 # track: 개별 에이전트 종료 시 증분 추적
 # =============================================================================
@@ -241,6 +284,21 @@ def cmd_track() -> None:
 
     # JSONL 파싱
     tokens = parse_jsonl_usage(transcript_path)
+
+    # Hallucination 감지: tool_use 0건 && 대상 에이전트 타입 && 로거 활성
+    tool_use_count = count_tool_use_in_jsonl(transcript_path)
+    if (
+        tool_use_count == 0
+        and agent_type in HALLU_TARGET_AGENT_TYPES
+        and HOOK_HALLUCINATION_LOGGER == "true"
+    ):
+        hallu_work_dir = work_dir
+        _append_log(
+            hallu_work_dir,
+            "WARN",
+            f"HALLUCINATION_SUSPECT: agent_type={agent_type} agent_id={agent_id} tool_use_count=0",
+        )
+
     if not tokens:
         print(f"[usage-sync] No valid usage data found in: {transcript_path}", file=sys.stderr)
         sys.exit(0)
