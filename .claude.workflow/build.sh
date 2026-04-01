@@ -192,6 +192,102 @@ install_claude_code() {
     rm -f "$install_script"
 }
 
+# --- 머지 헬퍼: alias/함수 이름 기준 라인 단위 머지 ---
+# 사용법: _merge_aliases <기존파일> <템플릿파일>
+# 기존 파일의 alias/함수명을 추출하고, 템플릿에만 있는 신규 항목을 기존 파일 끝에 추가.
+# 멱등성 보장: 동일 이름이 이미 존재하면 스킵.
+# 에러 시 기존 파일 보존: 임시 파일에 작성 후 교체.
+_merge_aliases() {
+    local existing_file="$1" tmpl_file="$2"
+    [ ! -f "$existing_file" ] || [ ! -f "$tmpl_file" ] && return 1
+
+    # 기존 파일에서 alias 이름 목록과 함수 이름 목록 추출
+    local existing_names
+    existing_names="$(
+        grep -oP 'alias \K[^=]+' "$existing_file" 2>/dev/null | sed "s/'$//"
+        grep -oP '^\w+(?=\(\))' "$existing_file" 2>/dev/null
+    )"
+
+    local tmp_append
+    tmp_append="$(mktemp)" || return 1
+
+    # 템플릿 순회: 신규 alias/함수 블록만 추출
+    local in_func_block=false
+    local func_name="" skip_block=false
+    local line added_count=0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # 여러 줄 함수 블록 시작 감지: name() {
+        if echo "$line" | grep -qP '^\w+\(\)\s*\{'; then
+            func_name="$(echo "$line" | grep -oP '^\w+(?=\(\))')"
+            in_func_block=true
+            if echo "$existing_names" | grep -qx "$func_name"; then
+                skip_block=true
+            else
+                skip_block=false
+                echo "$line" >> "$tmp_append"
+                added_count=$((added_count + 1))
+            fi
+            continue
+        fi
+
+        # 여러 줄 함수 블록 종료 감지: 단독 }
+        if [ "$in_func_block" = true ]; then
+            if [ "$skip_block" = false ]; then
+                echo "$line" >> "$tmp_append"
+            fi
+            if echo "$line" | grep -qP '^\}'; then
+                in_func_block=false
+                func_name=""
+                skip_block=false
+            fi
+            continue
+        fi
+
+        # alias 라인 처리
+        if echo "$line" | grep -qP '^alias '; then
+            local alias_name
+            alias_name="$(echo "$line" | grep -oP 'alias \K[^=]+')"
+            if echo "$existing_names" | grep -qx "$alias_name"; then
+                continue  # 이미 존재 → 스킵
+            fi
+            echo "$line" >> "$tmp_append"
+            added_count=$((added_count + 1))
+            continue
+        fi
+
+        # export PATH 라인 처리 (export로 시작하는 일반 명령문)
+        if echo "$line" | grep -qP '^export '; then
+            if grep -qF "$line" "$existing_file" 2>/dev/null; then
+                continue  # 동일 라인 이미 존재 → 스킵
+            fi
+            echo "$line" >> "$tmp_append"
+            added_count=$((added_count + 1))
+            continue
+        fi
+
+        # 그 외 (주석, 빈 줄 등): 신규 alias/함수 블록의 직전 주석 처리
+        # → 바로 다음에 신규 alias/함수가 오는 경우에만 추가하므로 여기서는 스킵
+        # (필요 시 섹션 주석도 추가하려면 lookahead 필요 — 현재는 단순 구현)
+    done < "$tmpl_file"
+
+    # 신규 항목이 있을 때만 파일에 추가
+    if [ "$added_count" -gt 0 ]; then
+        local tmp_result
+        tmp_result="$(mktemp)" || { rm -f "$tmp_append"; return 1; }
+        cat "$existing_file" > "$tmp_result"
+        echo "" >> "$tmp_result"
+        echo "# === 머지 추가됨 ($(date +%Y%m%d)) ===" >> "$tmp_result"
+        cat "$tmp_append" >> "$tmp_result"
+        mv "$tmp_result" "$existing_file" || { rm -f "$tmp_result" "$tmp_append"; return 1; }
+        print_success ".claude.aliases 머지 완료: ${added_count}개 신규 항목 추가"
+    else
+        print_info ".claude.aliases 이미 최신 상태 (신규 항목 없음)"
+    fi
+    rm -f "$tmp_append"
+    return 0
+}
+
 # --- Step 7: 쉘 aliases 설정 ---
 setup_shell_aliases() {
     print_step "7" "쉘 aliases 설정"
@@ -201,9 +297,9 @@ setup_shell_aliases() {
     if [ "$shell_name" != "zsh" ] && [ "$shell_name" != "bash" ]; then
         print_info "감지된 쉘: $shell_name (bash 설정으로 대체합니다)"
     fi
-    # .claude.aliases 파일이 이미 존재하면 스킵 (사용자 설정 보존)
+    # .claude.aliases 파일이 이미 존재하면 머지 (신규 alias/함수만 추가)
     if [ -f "$aliases_file" ]; then
-        print_info ".claude.aliases 파일이 이미 존재합니다. 기존 내용을 유지합니다. ($aliases_file)"
+        _merge_aliases "$aliases_file" "$TMPL_CLAUDE_ALIASES"
     else
         cp "$TMPL_CLAUDE_ALIASES" "$aliases_file"
         print_success ".claude.aliases 파일 생성 완료 ($aliases_file)"
@@ -241,11 +337,85 @@ create_directories_and_files() {
     fi
 }
 
+# --- 머지 헬퍼: JSON 최상위 키 단위 머지 ---
+# 사용법: _merge_json_keys <기존파일> <템플릿파일>
+# 기존 값 우선, 템플릿에만 있는 신규 최상위 키만 추가.
+# python3 인라인으로 처리. 에러 시 기존 파일 보존.
+_merge_json_keys() {
+    local existing_file="$1" tmpl_file="$2"
+    [ ! -f "$existing_file" ] || [ ! -f "$tmpl_file" ] && return 1
+
+    local tmp_result
+    tmp_result="$(mktemp)" || return 1
+
+    local py_output
+    py_output="$(python3 - "$existing_file" "$tmpl_file" "$tmp_result" <<'PYEOF'
+import json, sys
+
+existing_path, tmpl_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+
+try:
+    with open(existing_path, 'r') as f:
+        existing = json.load(f)
+except Exception as e:
+    print(f"ERROR: 기존 파일 JSON 파싱 실패: {e}", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    with open(tmpl_path, 'r') as f:
+        tmpl = json.load(f)
+except Exception as e:
+    print(f"ERROR: 템플릿 파일 JSON 파싱 실패: {e}", file=sys.stderr)
+    sys.exit(1)
+
+added_keys = []
+for key, value in tmpl.items():
+    if key not in existing:
+        existing[key] = value
+        added_keys.append(key)
+
+with open(out_path, 'w') as f:
+    json.dump(existing, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+
+if added_keys:
+    print(f"ADDED:{','.join(added_keys)}")
+else:
+    print("NOCHANGE")
+PYEOF
+)"
+
+    local py_exit=$?
+    if [ "$py_exit" -ne 0 ]; then
+        rm -f "$tmp_result"
+        print_error "JSON 머지 실패. 기존 파일을 유지합니다."
+        return 1
+    fi
+
+    # 유효성 재검증
+    if ! python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$tmp_result" 2>/dev/null; then
+        rm -f "$tmp_result"
+        print_error "머지 결과 JSON 유효성 검증 실패. 기존 파일을 유지합니다."
+        return 1
+    fi
+
+    mv "$tmp_result" "$existing_file" || { rm -f "$tmp_result"; return 1; }
+
+    if echo "$py_output" | grep -q "^ADDED:"; then
+        local added_keys_str
+        added_keys_str="$(echo "$py_output" | grep "^ADDED:" | sed 's/^ADDED://')"
+        print_success "settings.json 머지 완료: 신규 키 추가 [${added_keys_str}]"
+    else
+        print_info "settings.json 이미 최신 상태 (신규 키 없음)"
+    fi
+    return 0
+}
+
 # --- Step 4.5: .claude/settings.json 생성 ---
 setup_settings_json() {
     print_step "4.5" ".claude/settings.json 생성"
     local settings_file=".claude/settings.json"
-    [ -f "$settings_file" ] && { print_info ".claude/settings.json 파일이 이미 존재합니다. 기존 내용을 유지합니다."; return 0; }
+    [ -f "$settings_file" ] && { _merge_json_keys "$settings_file" "$TMPL_SETTINGS"; return 0; }
     [ ! -d ".claude" ] && { print_info ".claude/ 디렉터리가 없습니다. settings.json 생성을 스킵합니다."; return 0; }
     cp "$TMPL_SETTINGS" "$settings_file"
     if python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$settings_file" 2>/dev/null; then
@@ -255,14 +425,89 @@ setup_settings_json() {
     fi
 }
 
+# --- 머지 헬퍼: KEY=VALUE 키 단위 머지 ---
+# 사용법: _merge_kv_settings <기존파일> <템플릿파일>
+# 기존 KEY 보존, 템플릿에만 있는 신규 KEY(직전 주석 블록 포함) 추가.
+# 멱등성 보장: 동일 KEY가 이미 존재하면 스킵. 에러 시 기존 파일 보존.
+_merge_kv_settings() {
+    local existing_file="$1" tmpl_file="$2"
+    [ ! -f "$existing_file" ] || [ ! -f "$tmpl_file" ] && return 1
+
+    # 기존 파일에서 KEY 목록 추출 (대문자+언더스코어 시작)
+    local existing_keys
+    existing_keys="$(grep -oP '^[A-Z_][A-Z0-9_]+(?==)' "$existing_file" 2>/dev/null)"
+
+    local tmp_append
+    tmp_append="$(mktemp)" || return 1
+
+    # 템플릿 순회: 신규 KEY 블록(직전 주석 + KEY=VALUE) 추출
+    local pending_comments=()
+    local added_count=0
+    local line
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # KEY=VALUE 라인 감지
+        if echo "$line" | grep -qP '^[A-Z_][A-Z0-9_]+='; then
+            local key
+            key="$(echo "$line" | grep -oP '^[A-Z_][A-Z0-9_]+(?==)')"
+            if echo "$existing_keys" | grep -qx "$key"; then
+                # 기존에 존재 → 스킵, 누적 주석 초기화
+                pending_comments=()
+            else
+                # 신규 KEY → 직전 주석 블록 + KEY=VALUE 라인 추가
+                for cmt in "${pending_comments[@]}"; do
+                    echo "$cmt" >> "$tmp_append"
+                done
+                echo "$line" >> "$tmp_append"
+                added_count=$((added_count + 1))
+                pending_comments=()
+            fi
+            continue
+        fi
+
+        # 주석 또는 빈 줄: 다음 KEY를 위해 누적
+        if echo "$line" | grep -qP '^#' || [ -z "$line" ]; then
+            pending_comments+=("$line")
+        else
+            # 그 외 라인 (export 등): 전체 라인 매칭
+            if grep -qF "$line" "$existing_file" 2>/dev/null; then
+                pending_comments=()
+            else
+                for cmt in "${pending_comments[@]}"; do
+                    echo "$cmt" >> "$tmp_append"
+                done
+                echo "$line" >> "$tmp_append"
+                added_count=$((added_count + 1))
+                pending_comments=()
+            fi
+        fi
+    done < "$tmpl_file"
+
+    # 신규 항목이 있을 때만 기존 파일에 추가
+    if [ "$added_count" -gt 0 ]; then
+        local tmp_result
+        tmp_result="$(mktemp)" || { rm -f "$tmp_append"; return 1; }
+        cat "$existing_file" > "$tmp_result"
+        echo "" >> "$tmp_result"
+        echo "# === 머지 추가됨 ($(date +%Y%m%d)) ===" >> "$tmp_result"
+        cat "$tmp_append" >> "$tmp_result"
+        mv "$tmp_result" "$existing_file" || { rm -f "$tmp_result" "$tmp_append"; return 1; }
+        print_success ".settings 머지 완료: ${added_count}개 신규 KEY 추가"
+    else
+        print_info ".settings 이미 최신 상태 (신규 KEY 없음)"
+    fi
+    rm -f "$tmp_append"
+    return 0
+}
+
 # --- Step 5: .claude.workflow/.settings 템플릿 생성 ---
 generate_claude_settings() {
     print_step "5" ".claude.workflow/.settings 템플릿 생성"
     local settings_file=".claude.workflow/.settings"
     local env_file=".claude.workflow/.env"
-    # .settings가 이미 존재하면 스킵
+    # .settings가 이미 존재하면 머지 (신규 KEY만 추가)
     if [ -f "$settings_file" ]; then
-        print_info ".claude.workflow/.settings 파일이 이미 존재합니다. 기존 내용을 유지합니다."; return 0
+        _merge_kv_settings "$settings_file" "$TMPL_CLAUDE_ENV"; return 0
     fi
     # .settings가 없고 .env가 있으면 .env를 복사하여 .settings 생성
     if [ -f "$env_file" ]; then
