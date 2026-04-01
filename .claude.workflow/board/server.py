@@ -462,6 +462,7 @@ class TerminalSSEChannel:
         Returns:
             result 페이로드 dict
         """
+        usage = data.get('usage', {})
         return {
             'kind': 'result',
             'done': True,
@@ -471,6 +472,10 @@ class TerminalSSEChannel:
             'duration_ms': data.get('duration_ms', 0),
             'session_id': data.get('session_id', ''),
             'cost_usd': data.get('total_cost_usd', 0),
+            'input_tokens': usage.get('input_tokens', 0)
+                + usage.get('cache_read_input_tokens', 0)
+                + usage.get('cache_creation_input_tokens', 0),
+            'output_tokens': usage.get('output_tokens', 0),
         }
 
     def _build_system_payload(self, data: dict) -> dict:
@@ -523,6 +528,8 @@ class ClaudeProcess:
         """
         self._process: subprocess.Popen | None = None
         self._session_id: str = ''
+        self._model: str = ''
+        self._permission_mode: str = ''
         self._status: str = 'stopped'
         self._stdin_lock: threading.Lock = threading.Lock()
         self._stdout_thread: threading.Thread | None = None
@@ -556,6 +563,7 @@ class ClaudeProcess:
             'claude',
             '--output-format', 'stream-json',
             '--input-format', 'stream-json',
+            '--include-partial-messages',
             '--verbose',
         ]
         if extra_args:
@@ -598,9 +606,7 @@ class ClaudeProcess:
         )
         self._stdout_thread.start()
 
-        # system/init 이벤트 수신까지 최대 10초 대기
-        # 타임아웃 시에도 프로세스는 유지하고 SSE로 나중에 init 이벤트가 전달됨
-        self._init_event.wait(timeout=10)
+        # init 대기 없이 즉시 응답 — SSE로 init 이벤트가 전달됨
 
         return {
             'ok': True,
@@ -721,6 +727,8 @@ class ClaudeProcess:
                     and data.get('subtype') == 'init'
                 ):
                     self._session_id = data.get('session_id', '')
+                    self._model = data.get('model', '')
+                    self._permission_mode = data.get('permissionMode', '')
                     self._init_event.set()
 
                 # result 수신 시 상태를 idle로 전환
@@ -1195,6 +1203,17 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 'pid': SERVER_PID,
                 'started_at': SERVER_STARTED_AT,
             })
+        elif path == '/api/branch':
+            try:
+                result = subprocess.run(
+                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    capture_output=True, text=True, timeout=3,
+                    cwd=project_root,
+                )
+                branch = result.stdout.strip() if result.returncode == 0 else ''
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                branch = ''
+            self._send_json({'branch': branch})
         else:
             self.send_response(404)
             self.end_headers()
@@ -1289,6 +1308,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({
             'status': claude_process.status,
             'session_id': claude_process.session_id,
+            'model': claude_process._model,
+            'permission_mode': claude_process._permission_mode,
             'clients': terminal_sse_channel.client_count,
         })
 
@@ -1459,10 +1480,11 @@ def _run_server(project_root: str) -> None:
 
     # 런타임 파일 생성 (디렉터리가 없으면 먼저 생성)
     os.makedirs(os.path.dirname(url_file), exist_ok=True)
+    base = f'http://127.0.0.1:{port}/.claude.workflow/board'
     with open(url_file, 'w') as f:
-        f.write(f'http://127.0.0.1:{port}/.claude.workflow/board/index.html')
+        f.write(f'{base}/index.html\n{base}/terminal.html')
     with open(terminal_url_file, 'w') as f:
-        f.write(f'http://127.0.0.1:{port}/.claude.workflow/board/terminal.html')
+        f.write(f'{base}/terminal.html')
 
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:
@@ -1503,12 +1525,13 @@ def main() -> int:
         try:
             from urllib.parse import urlparse
             with open(url_file) as f:
-                recorded_url = f.read().strip()
+                recorded_url = f.read().strip().split('\n')[0]
             recorded_port = urlparse(recorded_url).port
             if recorded_port and is_port_in_use(recorded_port):
                 # 서버가 이미 실행 중 — URL 파일만 갱신
+                base = f'http://127.0.0.1:{recorded_port}/.claude.workflow/board'
                 with open(url_file, 'w') as f:
-                    f.write(f'http://127.0.0.1:{recorded_port}/.claude.workflow/board/index.html')
+                    f.write(f'{base}/index.html\n{base}/terminal.html')
                 return 0
             else:
                 # stale 파일: 포트가 비활성 상태이므로 파일 삭제 후 새로 시작

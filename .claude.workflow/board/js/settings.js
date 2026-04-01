@@ -33,6 +33,40 @@
 
   function render(sections) {
     body.innerHTML = '';
+
+    // Actions section (맨 위)
+    var actions = document.createElement('div');
+    actions.className = 'settings-section';
+    actions.innerHTML = '<div class="settings-section-title">Actions</div>';
+    var restartItem = document.createElement('div');
+    restartItem.className = 'settings-item';
+    restartItem.innerHTML =
+      '<div class="settings-item-info">' +
+        '<div class="settings-item-key">Restart Server</div>' +
+        '<div class="settings-item-label">Board HTTP 서버를 재시작합니다</div>' +
+      '</div>' +
+      '<div class="settings-item-control">' +
+        '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
+      '</div>';
+    actions.appendChild(restartItem);
+    body.appendChild(actions);
+
+    var restartBtn = document.getElementById('settings-restart-btn');
+    if (restartBtn) {
+      restartBtn.addEventListener('click', function () {
+        restartBtn.disabled = true;
+        restartBtn.textContent = 'Restarting...';
+        fetch('/api/restart', { method: 'POST' })
+          .then(function () {
+            setTimeout(function () { location.reload(); }, 1500);
+          })
+          .catch(function () {
+            setTimeout(function () { location.reload(); }, 2000);
+          });
+      });
+    }
+
+    // Settings sections
     sections.forEach(function (sec) {
       var el = document.createElement('div');
       el.className = 'settings-section';

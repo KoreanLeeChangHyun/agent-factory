@@ -617,21 +617,3 @@ function fetchXmlList(dirUrl) {
 
 Board.util.fetchXmlList = fetchXmlList;
 
-// ── Restart Server Button ──
-
-(function () {
-  var btn = document.getElementById("restart-btn");
-  if (!btn) return;
-  btn.addEventListener("click", function () {
-    if (btn.classList.contains("restarting")) return;
-    btn.classList.add("restarting");
-    fetch("/api/restart", { method: "POST" })
-      .then(function () {
-        // 서버가 종료되고 새 프로세스가 뜰 때까지 대기 후 새로고침
-        setTimeout(function () { location.reload(); }, 1500);
-      })
-      .catch(function () {
-        btn.classList.remove("restarting");
-      });
-  });
-})();

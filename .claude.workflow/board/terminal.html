@@ -14,13 +14,13 @@
     height: 100vh;
     overflow: hidden;
     background: #1e1e1e;
+    color-scheme: dark;
   }
   #terminal-standalone {
     height: 100vh;
     display: flex;
     flex-direction: column;
   }
-  /* In standalone mode, .terminal-container fills the full viewport */
   #terminal-standalone .terminal-container {
     height: 100vh;
   }
@@ -31,6 +31,7 @@
 <div id="terminal-standalone"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
 <script src="js/common.js"></script>
 <script src="js/terminal.js"></script>
 <script>

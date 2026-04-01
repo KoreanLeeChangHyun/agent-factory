@@ -286,7 +286,7 @@ def main() -> None:
         url_file = Path(cwd) / ".claude.workflow" / ".board.url"
         try:
             from urllib.parse import urlparse
-            board_url = url_file.read_text(encoding="utf-8").strip()
+            board_url = url_file.read_text(encoding="utf-8").strip().split('\n')[0]
             parsed_port = urlparse(board_url).port
             if parsed_port:
                 board_port = str(parsed_port)

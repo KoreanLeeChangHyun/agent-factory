@@ -50,9 +50,7 @@ body {
   color: #cccccc;
 }
 .header-btn:hover { opacity: 1; }
-.restart-btn { margin-left: auto; font-size: 18px; }
-.restart-btn.restarting { animation: spin 0.8s linear infinite; opacity: 0.8; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.settings-toggle { margin-left: auto; }
 
 /* ── Tabs ── */
 .tabs { display: flex; }

@@ -162,6 +162,31 @@
 .settings-input.saved { border-color: #34c759; }
 .settings-input.error { border-color: #f44747; }
 
+/* ── Action Buttons ── */
+.settings-action-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #569cd6;
+  color: #fff;
+}
+
+.settings-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
   .settings-input { width: 120px; }
 }
