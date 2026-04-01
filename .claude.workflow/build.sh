@@ -465,7 +465,7 @@ clone_claude_directory() {
     if [ -d "$tmp_dir/claude-workflow/.claude.workflow" ]; then
         # 사용자 데이터 백업 (kanban, workflow, .settings, .env, .version)
         local preserve_dirs=("kanban" "workflow" "dashboard")
-        local preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
+        local preserve_files=(".settings" ".env" ".version" ".board.url" ".terminal.url" "build.url")
         for pd in "${preserve_dirs[@]}"; do
             [ -d ".claude.workflow/$pd" ] && cp -r ".claude.workflow/$pd" "$tmp_dir/_preserve_$pd"
         done

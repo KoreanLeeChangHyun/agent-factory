@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Terminal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/terminal.css">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: #1e1e1e;
+  }
+  #terminal-standalone {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  /* In standalone mode, .terminal-container fills the full viewport */
+  #terminal-standalone .terminal-container {
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+
+<div id="terminal-standalone"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="js/common.js"></script>
+<script src="js/terminal.js"></script>
+<script>
+  // Standalone initialization — invoke renderTerminal immediately.
+  // Board namespace and state are already initialized by common.js.
+  // terminal.js detects standalone mode via absence of #view-terminal.
+  (function () {
+    if (Board.render && Board.render.renderTerminal) {
+      Board.render.renderTerminal();
+    }
+  })();
+</script>
+</body>
+</html>

@@ -527,11 +527,14 @@ class ClaudeProcess:
         self._stdin_lock: threading.Lock = threading.Lock()
         self._stdout_thread: threading.Thread | None = None
         self._channel: TerminalSSEChannel = channel
+        self._init_event: threading.Event = threading.Event()
 
     def spawn(self, extra_args: list[str] | None = None) -> dict:
         """Claude CLI 프로세스를 시작한다.
 
         이미 실행 중인 프로세스가 있으면 먼저 종료한다.
+        프로세스 시작 후 system/init SSE 이벤트를 최대 10초까지 대기하여
+        session_id를 응답에 포함한다.
 
         Args:
             extra_args: 추가 CLI 인자 목록 (선택적)
@@ -541,17 +544,24 @@ class ClaudeProcess:
         """
         if self._process and self._process.poll() is None:
             self.kill()
+            self._init_event.clear()
 
+        # 이전 stdout 스레드가 완전히 종료될 때까지 대기
+        if self._stdout_thread and self._stdout_thread.is_alive():
+            self._stdout_thread.join(timeout=3)
+
+        # stdin 대기 모드로 시작: --print와 -p '' 제거
+        # --input-format stream-json만 사용하면 Claude는 stdin에서 NDJSON 입력을 대기한다
         cmd = [
             'claude',
-            '--print',
             '--output-format', 'stream-json',
             '--input-format', 'stream-json',
             '--verbose',
-            '-p', '',
         ]
         if extra_args:
             cmd.extend(extra_args)
+
+        self._init_event.clear()
 
         try:
             self._process = subprocess.Popen(
@@ -587,6 +597,10 @@ class ClaudeProcess:
             name='claude-stdout-reader',
         )
         self._stdout_thread.start()
+
+        # system/init 이벤트 수신까지 최대 10초 대기
+        # 타임아웃 시에도 프로세스는 유지하고 SSE로 나중에 init 이벤트가 전달됨
+        self._init_event.wait(timeout=10)
 
         return {
             'ok': True,
@@ -701,12 +715,13 @@ class ClaudeProcess:
                     logger.debug('Non-JSON stdout line: %s', stripped[:200])
                     continue
 
-                # system/init에서 session_id 추출
+                # system/init에서 session_id 추출 후 init 대기 이벤트 해제
                 if (
                     data.get('type') == 'system'
                     and data.get('subtype') == 'init'
                 ):
                     self._session_id = data.get('session_id', '')
+                    self._init_event.set()
 
                 # result 수신 시 상태를 idle로 전환
                 if data.get('type') == 'result':
@@ -1422,13 +1437,15 @@ def _run_server(project_root: str) -> None:
     port = resolve_port(project_root)
 
     url_file = os.path.join(project_root, '.claude.workflow', '.board.url')
+    terminal_url_file = os.path.join(project_root, '.claude.workflow', '.terminal.url')
 
     def _cleanup_runtime_files() -> None:
-        """런타임 파일 .claude.workflow/.board.url을 삭제한다."""
-        try:
-            os.remove(url_file)
-        except OSError:
-            pass
+        """런타임 파일 .claude.workflow/.board.url, .terminal.url을 삭제한다."""
+        for f in (url_file, terminal_url_file):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
     def _signal_handler(signum: int, frame: object) -> None:
         """SIGTERM/SIGINT 수신 시 Claude 프로세스와 런타임 파일을 정리하고 종료한다."""
@@ -1444,6 +1461,8 @@ def _run_server(project_root: str) -> None:
     os.makedirs(os.path.dirname(url_file), exist_ok=True)
     with open(url_file, 'w') as f:
         f.write(f'http://127.0.0.1:{port}/.claude.workflow/board/index.html')
+    with open(terminal_url_file, 'w') as f:
+        f.write(f'http://127.0.0.1:{port}/.claude.workflow/board/terminal.html')
 
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:

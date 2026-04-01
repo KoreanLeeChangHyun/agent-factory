@@ -167,6 +167,65 @@
   // ── SSE Connection ──
 
   /**
+   * Returns a Promise that resolves when the SSE connection is open.
+   * If the connection is already open, resolves immediately.
+   * Otherwise calls connectSSE() and waits for the open event (timeout: 5s).
+   * @returns {Promise<void>}
+   */
+  function connectSSEReady() {
+    return new Promise(function (resolve, reject) {
+      if (
+        termEventSource &&
+        termEventSource.readyState === EventSource.OPEN
+      ) {
+        resolve();
+        return;
+      }
+
+      // connectSSE() 내부에서 open 이벤트 리스너가 등록되므로,
+      // 여기서는 open 이벤트를 한 번만 감지하는 일회성 리스너를 사전 등록한다
+      var timer = setTimeout(function () {
+        reject(new Error("SSE connection timeout"));
+      }, 5000);
+
+      // connectSSE()를 호출하기 전에 임시 EventSource를 열어 open을 감지한다
+      // connectSSE()가 내부적으로 disconnectSSE()를 호출하여 기존 연결을 교체하므로
+      // 새로운 EventSource 참조를 가져와야 한다
+      connectSSE();
+
+      // connectSSE() 완료 후 생성된 termEventSource에 open 리스너 추가
+      var source = termEventSource;
+      if (!source) {
+        clearTimeout(timer);
+        reject(new Error("SSE source not created"));
+        return;
+      }
+
+      if (source.readyState === EventSource.OPEN) {
+        clearTimeout(timer);
+        resolve();
+        return;
+      }
+
+      function onOpen() {
+        clearTimeout(timer);
+        source.removeEventListener("open", onOpen);
+        resolve();
+      }
+
+      function onError() {
+        clearTimeout(timer);
+        source.removeEventListener("open", onOpen);
+        source.removeEventListener("error", onError);
+        reject(new Error("SSE connection failed"));
+      }
+
+      source.addEventListener("open", onOpen);
+      source.addEventListener("error", onError);
+    });
+  }
+
+  /**
    * Connects to the terminal SSE event stream.
    * Handles stdout, result, system, and permission events.
    */
@@ -351,6 +410,8 @@
 
   /**
    * Starts a new Claude Code session.
+   * Ensures SSE connection is ready before calling /terminal/start so that
+   * the system/init event is never missed.
    */
   function startSession() {
     if (Board.state.termStatus === "running") return;
@@ -363,11 +424,17 @@
     Board.state.termStatus = "running";
     updateControlBar();
 
-    postJson("/terminal/start").then(function (data) {
+    // SSE 연결이 준비된 후에만 /terminal/start를 호출한다.
+    // connectSSEReady()는 이미 연결되어 있으면 즉시 resolve한다.
+    connectSSEReady().then(function () {
+      return postJson("/terminal/start");
+    }).then(function (data) {
       if (data.session_id) {
         Board.state.termSessionId = data.session_id;
+        Board.state.termStatus = "idle";
+        updateControlBar();
       }
-      // Actual status update will come via SSE system/init event
+      // system/init SSE 이벤트로도 상태가 업데이트되므로 중복 처리 무방
     }).catch(function (err) {
       if (term) {
         term.writeln("\x1b[31m[Error] Failed to start session: " + esc(err.message) + "\x1b[0m");
@@ -440,14 +507,32 @@
   // ── Main Render ──
 
   /**
+   * Detects whether running in SPA mode (index.html) or standalone mode (terminal.html).
+   * SPA mode:        document.getElementById("view-terminal") exists
+   * Standalone mode: document.getElementById("terminal-standalone") or <body> fallback
+   * @returns {HTMLElement|null} container element, or null if not available
+   */
+  function getContainer() {
+    var spaEl = document.getElementById("view-terminal");
+    if (spaEl) return spaEl;
+    var standaloneEl = document.getElementById("terminal-standalone");
+    if (standaloneEl) return standaloneEl;
+    return null;
+  }
+
+  /**
    * Main Terminal tab render entry point.
    * On first call, builds the full terminal UI layout, initializes xterm.js
    * and SSE connection. On subsequent calls (tab re-activation), only updates
    * the control bar state without destroying/rebuilding the DOM, so that
    * xterm.js output history is preserved across tab switches.
+   *
+   * Supports dual mode:
+   *  - SPA mode (index.html): renders into #view-terminal
+   *  - Standalone mode (terminal.html): renders into #terminal-standalone
    */
   function renderTerminal() {
-    var el = document.getElementById("view-terminal");
+    var el = getContainer();
     if (!el) return;
 
     // If already initialized and the DOM container still exists, just refresh state
@@ -553,17 +638,23 @@
     termInitialized = false;
   }
 
-  // ── Hook into switchTab ──
-  // Extend switchTab to trigger renderTerminal when Terminal tab is selected
-  var originalSwitchTab = Board.util.switchTab;
-  Board.util.switchTab = function (target, skipPush) {
-    originalSwitchTab(target, skipPush);
-    if (target === "terminal" && Board.render.renderTerminal) {
-      Board.render.renderTerminal();
-    }
-  };
+  // ── Hook into switchTab (SPA mode only) ──
+  // Extend switchTab to trigger renderTerminal when Terminal tab is selected.
+  // In standalone mode (terminal.html), Board.util.switchTab is defined by common.js
+  // but there are no tab buttons — the hook is still safe since querySelectorAll
+  // returns an empty NodeList and switchTab is never called externally.
+  if (Board.util.switchTab) {
+    var originalSwitchTab = Board.util.switchTab;
+    Board.util.switchTab = function (target, skipPush) {
+      originalSwitchTab(target, skipPush);
+      if (target === "terminal" && Board.render.renderTerminal) {
+        Board.render.renderTerminal();
+      }
+    };
+  }
 
   // Also re-bind existing tab click listeners (since common.js binds them before this override)
+  // querySelectorAll returns empty NodeList in standalone mode — forEach is a no-op.
   document.querySelectorAll(".tab").forEach(function (t) {
     t.addEventListener("click", function () {
       if (t.dataset.view === "terminal" && Board.render.renderTerminal) {
