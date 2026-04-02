@@ -23,7 +23,7 @@
   border-radius: 6px;
   padding: 16px 20px;
   transition: border-color 0.15s;
-  border-left: 3px solid #569cd6;
+  border-left: 3px solid #D97757;
 }
 
 .dash-card:hover { border-color: #3c3c3c; border-left-color: inherit; }
@@ -115,7 +115,7 @@
 }
 
 .dash-table-tab:hover { color: #cccccc; }
-.dash-table-tab.active { color: #e0e0e0; border-bottom-color: #569cd6; }
+.dash-table-tab.active { color: #e0e0e0; border-bottom-color: #D97757; }
 
 .dash-table-panel {
   display: none;

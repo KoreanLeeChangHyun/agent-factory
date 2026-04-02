@@ -114,7 +114,7 @@
 .tv-number {
   font-size: 14px;
   font-weight: 700;
-  color: #569cd6;
+  color: #D97757;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
@@ -155,7 +155,7 @@
 }
 
 .tv-sub-id {
-  color: #569cd6;
+  color: #D97757;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
@@ -178,7 +178,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #569cd6;
+  color: #D97757;
   margin-bottom: 4px;
 }
 
@@ -232,7 +232,7 @@
   border-radius: 50%;
 }
 
-.tl-entry.active::before { background: #569cd6; }
+.tl-entry.active::before { background: #D97757; }
 
 .tl-header {
   display: flex;
@@ -268,18 +268,18 @@
 
 .tv-result-link {
   font-size: 11px;
-  color: #7bb8e8;
+  color: #E8956D;
   padding: 2px 8px;
   border-radius: 3px;
-  background: rgba(86,156,214,0.18);
+  background: rgba(217,119,87,0.18);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
 .tv-result-link:hover {
-  background: rgba(86,156,214,0.35);
-  color: #a0d0ff;
+  background: rgba(217,119,87,0.35);
+  color: #F0B08A;
 }
 
 .wf-row-time {
@@ -312,12 +312,12 @@
 }
 
 .dir-file-md {
-  background: rgba(86,156,214,0.18);
-  color: #7bb8e8;
+  background: rgba(217,119,87,0.18);
+  color: #E8956D;
 }
 .dir-file-md:hover {
-  background: rgba(86,156,214,0.35);
-  color: #a0d0ff;
+  background: rgba(217,119,87,0.35);
+  color: #F0B08A;
 }
 
 .dir-file-json {
@@ -349,7 +349,7 @@
 
 /* ── Markdown File Link ── */
 .md-file-link {
-  color: #7bb8e8;
+  color: #E8956D;
   cursor: pointer;
   text-decoration: underline dotted;
 }
@@ -386,9 +386,9 @@
 }
 
 .code-copy-btn:hover {
-  background: rgba(86, 156, 214, 0.2);
-  border-color: #569cd6;
-  color: #569cd6;
+  background: rgba(217, 119, 87, 0.2);
+  border-color: #D97757;
+  color: #D97757;
 }
 
 .code-viewer pre {
@@ -468,7 +468,7 @@
 }
 
 .code-search-input:focus {
-  border-color: #569cd6;
+  border-color: #D97757;
 }
 
 .code-search-count {
@@ -495,9 +495,9 @@
 
 .code-search-nav-btn:hover,
 .code-search-close-btn:hover {
-  background: rgba(86, 156, 214, 0.2);
-  border-color: #569cd6;
-  color: #569cd6;
+  background: rgba(217, 119, 87, 0.2);
+  border-color: #D97757;
+  color: #D97757;
 }
 
 .code-search-close-btn {
@@ -516,10 +516,10 @@
 
 .code-line-content.code-search-active .code-search-match,
 .code-line-content.code-search-active {
-  background: rgba(86, 156, 214, 0.4);
+  background: rgba(217, 119, 87, 0.4);
 }
 
 .code-line-content.code-search-active .code-search-match {
-  background: rgba(86, 156, 214, 0.7);
+  background: rgba(217, 119, 87, 0.7);
   color: #ffffff;
 }

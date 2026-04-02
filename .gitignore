@@ -10,7 +10,6 @@
 .claude.workflow/worktrees/
 .claude.workflow/dashboard/
 .claude.workflow/.board.url
-.claude.workflow/.terminal.url
 
 CLAUDE.md
 

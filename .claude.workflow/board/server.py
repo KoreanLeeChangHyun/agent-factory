@@ -1458,15 +1458,13 @@ def _run_server(project_root: str) -> None:
     port = resolve_port(project_root)
 
     url_file = os.path.join(project_root, '.claude.workflow', '.board.url')
-    terminal_url_file = os.path.join(project_root, '.claude.workflow', '.terminal.url')
 
     def _cleanup_runtime_files() -> None:
-        """런타임 파일 .claude.workflow/.board.url, .terminal.url을 삭제한다."""
-        for f in (url_file, terminal_url_file):
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+        """런타임 파일 .claude.workflow/.board.url을 삭제한다."""
+        try:
+            os.remove(url_file)
+        except OSError:
+            pass
 
     def _signal_handler(signum: int, frame: object) -> None:
         """SIGTERM/SIGINT 수신 시 Claude 프로세스와 런타임 파일을 정리하고 종료한다."""
@@ -1483,8 +1481,6 @@ def _run_server(project_root: str) -> None:
     base = f'http://127.0.0.1:{port}/.claude.workflow/board'
     with open(url_file, 'w') as f:
         f.write(f'{base}/index.html\n{base}/terminal.html')
-    with open(terminal_url_file, 'w') as f:
-        f.write(f'{base}/terminal.html')
 
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:

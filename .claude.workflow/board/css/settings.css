@@ -72,7 +72,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #569cd6;
+  color: #D97757;
   margin-bottom: 8px;
   padding-bottom: 4px;
   border-bottom: 1px solid #2d2d2d;
@@ -158,7 +158,7 @@
   outline: none;
   transition: border-color 0.15s;
 }
-.settings-input:focus { border-color: #569cd6; }
+.settings-input:focus { border-color: #D97757; }
 .settings-input.saved { border-color: #34c759; }
 .settings-input.error { border-color: #f44747; }
 
@@ -178,7 +178,7 @@
 
 .settings-action-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
-  border-color: #569cd6;
+  border-color: #D97757;
   color: #fff;
 }
 

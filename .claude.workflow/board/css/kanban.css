@@ -117,12 +117,12 @@
 }
 
 .col-sort-option:hover {
-  background: rgba(86, 156, 214, 0.15);
+  background: rgba(217, 119, 87, 0.15);
   color: #e0e0e0;
 }
 
 .col-sort-option.active {
-  color: #569cd6;
+  color: #D97757;
   font-weight: 600;
 }
 
@@ -160,7 +160,7 @@
   transition: border-color 0.15s;
 }
 
-.card:hover { border-color: #569cd6; }
+.card:hover { border-color: #D97757; }
 .card.done { opacity: 0.6; }
 
 .card-top {
@@ -245,8 +245,8 @@
 }
 
 .status-submit {
-  background: rgba(86, 156, 214, 0.15);
-  color: #569cd6;
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
 }
 
 /* ── Done Column Toggle ── */
@@ -365,6 +365,6 @@
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-.rel-derived { color: #569cd6; }
+.rel-derived { color: #D97757; }
 .rel-depends { color: #dcdcaa; }
 .rel-blocks { color: #c586c0; }
