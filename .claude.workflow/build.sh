@@ -297,6 +297,13 @@ setup_shell_aliases() {
     if [ "$shell_name" != "zsh" ] && [ "$shell_name" != "bash" ]; then
         print_info "감지된 쉘: $shell_name (bash 설정으로 대체합니다)"
     fi
+    # wrapper 스크립트 실행 권한 부여
+    if ls "$SCRIPT_DIR/bin/flow-"* &>/dev/null 2>&1; then
+        chmod +x "$SCRIPT_DIR/bin/flow-"*
+        print_success "wrapper 스크립트 실행 권한 부여 완료 ($SCRIPT_DIR/bin/flow-*)"
+    else
+        print_info "wrapper 스크립트 없음 ($SCRIPT_DIR/bin/flow-*). chmod 스킵"
+    fi
     # .claude.aliases 파일이 이미 존재하면 머지 (신규 alias/함수만 추가)
     if [ -f "$aliases_file" ]; then
         _merge_aliases "$aliases_file" "$TMPL_CLAUDE_ALIASES"
@@ -605,6 +612,7 @@ cleanup_legacy_claude_paths() {
 
 # --- Step 3.6: 레거시 alias 경로 갱신 ---
 # ~/.claude.aliases 내 구 경로(.claude/scripts/, .claude/hooks/)를 신 경로로 치환
+# 추가: flow-* alias 정의를 제거하고 wrapper PATH 설정으로 대체 (alias → wrapper 마이그레이션)
 update_legacy_aliases() {
     print_step "3.6" "레거시 alias 경로 갱신"
     local aliases_file="$HOME/.claude.aliases"
@@ -627,8 +635,96 @@ update_legacy_aliases() {
     fi
     # macOS sed -i 백업 파일 정리
     rm -f "${aliases_file}.mig-bak"
+
+    # --- flow-* alias → wrapper PATH 마이그레이션 ---
+    # ~/.claude.aliases에 남아있는 'alias flow-xxx=...' 패턴을 감지하여 제거하고
+    # .claude.workflow/bin/ wrapper PATH 설정으로 대체
+    if grep -qP '^alias flow-\w+=' "$aliases_file" 2>/dev/null; then
+        _MIGRATION_PERFORMED=true
+        local flow_alias_count
+        flow_alias_count="$(grep -cP '^alias flow-\w+=' "$aliases_file" 2>/dev/null || echo 0)"
+        print_info "flow-* alias ${flow_alias_count}개 감지됨. wrapper PATH 설정으로 마이그레이션합니다..."
+
+        local tmp_migrated
+        tmp_migrated="$(mktemp)" || return 1
+
+        # flow-* alias 라인 제거 (연속된 flow-* alias 블록의 직전 섹션 주석도 제거)
+        python3 - "$aliases_file" "$tmp_migrated" <<'PYEOF'
+import sys, re
+
+src_path, dst_path = sys.argv[1], sys.argv[2]
+
+with open(src_path, 'r') as f:
+    lines = f.readlines()
+
+# flow-* alias 패턴
+flow_alias_re = re.compile(r'^alias flow-\w+=')
+
+output = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    # flow-* alias 라인은 스킵
+    if flow_alias_re.match(line):
+        i += 1
+        continue
+    # 직전 주석이 flow-* alias 전용 섹션 주석인지 확인
+    # (주석 다음 라인이 flow-* alias이면 해당 주석도 제거)
+    stripped = line.rstrip('\n')
+    if stripped.startswith('#') and i + 1 < len(lines):
+        next_line = lines[i + 1]
+        if flow_alias_re.match(next_line):
+            # 이 주석은 flow-* alias 블록 직전 주석 → 스킵
+            i += 1
+            continue
+    output.append(line)
+    i += 1
+
+# 연속 빈 줄 3개 이상 → 2개로 압축
+result = []
+blank_count = 0
+for line in output:
+    if line.strip() == '':
+        blank_count += 1
+        if blank_count <= 2:
+            result.append(line)
+    else:
+        blank_count = 0
+        result.append(line)
+
+with open(dst_path, 'w') as f:
+    f.writelines(result)
+PYEOF
+
+        if [ $? -ne 0 ]; then
+            print_error "flow-* alias 마이그레이션 Python 처리 실패. 기존 파일 유지."
+            rm -f "$tmp_migrated"
+        else
+            mv "$tmp_migrated" "$aliases_file"
+            changed=$((changed + 1))
+            print_success "flow-* alias ${flow_alias_count}개 제거 완료"
+
+            # wrapper PATH 설정이 이미 존재하는지 확인 후 없으면 추가
+            local wrapper_path_marker=".claude.workflow/bin"
+            if grep -q "$wrapper_path_marker" "$aliases_file" 2>/dev/null; then
+                print_info "wrapper PATH 설정이 이미 존재합니다. 추가 스킵"
+            else
+                cat >> "$aliases_file" <<'WRAPPER_PATH'
+
+# flow-* wrapper (프로젝트별 동적 PATH)
+_cwf_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$_cwf_root" ] && [ -d "$_cwf_root/.claude.workflow/bin" ]; then
+  export PATH="$_cwf_root/.claude.workflow/bin:$PATH"
+fi
+unset _cwf_root
+WRAPPER_PATH
+                print_success "wrapper PATH 설정 추가 완료 (~/.claude.aliases)"
+            fi
+        fi
+    fi
+
     if [ "$changed" -gt 0 ]; then
-        print_success "alias 경로 치환 완료 (${changed}개 패턴)"
+        print_success "alias 경로 갱신 완료 (${changed}개 패턴 처리)"
     else
         print_info "레거시 경로 패턴 없음. 갱신 불필요"
     fi

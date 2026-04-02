@@ -2,6 +2,13 @@
 # Claude Code workflow aliases
 export PATH="$HOME/.local/bin:$PATH"
 
+# flow-* wrapper (프로젝트별 동적 PATH)
+_cwf_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$_cwf_root" ] && [ -d "$_cwf_root/.claude.workflow/bin" ]; then
+  export PATH="$_cwf_root/.claude.workflow/bin:$PATH"
+fi
+unset _cwf_root
+
 alias cc='claude --dangerously-skip-permissions'
 alias ccc='claude --dangerously-skip-permissions --continue'
 alias ccv='claude --dangerously-skip-permissions'
@@ -12,33 +19,3 @@ cct() {
   done
   tmux new-session -s "$name" "claude --dangerously-skip-permissions"
 }
-
-# flow-* 배너 alias
-alias flow-claude='.claude.workflow/scripts/banner/flow_claude_banner.sh'
-alias flow-step='.claude.workflow/scripts/banner/flow_step_banner.sh'
-alias flow-phase='.claude.workflow/scripts/banner/flow_phase_banner.sh'
-
-# flow-* 스크립트 alias
-alias flow-init='python3 .claude.workflow/scripts/flow/initialization.py'
-alias flow-finish='python3 .claude.workflow/scripts/flow/finalization.py'
-alias flow-reload='python3 .claude.workflow/scripts/flow/reload_prompt.py'
-alias flow-update='python3 .claude.workflow/scripts/flow/update_state.py'
-alias flow-skillmap='python3 .claude.workflow/scripts/flow/skill_mapper.py'
-alias flow-skill='python3 .claude.workflow/scripts/flow/skill_state_manager.py'
-alias flow-validate='python3 .claude.workflow/scripts/flow/plan_validator.py'
-alias flow-validate-p='python3 .claude.workflow/scripts/flow/prompt_validator.py'
-alias flow-recommend='python3 .claude.workflow/scripts/flow/skill_recommender.py'
-alias flow-gc='python3 .claude.workflow/scripts/flow/garbage_collect.py'
-alias flow-kanban='python3 .claude.workflow/scripts/flow/kanban.py'
-alias flow-merge='python3 "$(git -C . rev-parse --show-toplevel 2>/dev/null || pwd)/.claude.workflow/scripts/flow/merge_pipeline.py"'
-alias flow-tmux='python3 .claude.workflow/scripts/flow/tmux_launcher.py'
-
-# flow-* sync alias
-alias flow-history='python3 .claude.workflow/scripts/sync/history_sync.py'
-alias flow-catalog='python3 .claude.workflow/scripts/sync/catalog_sync.py'
-
-# flow-* git alias
-alias flow-gitconfig='python3 .claude.workflow/scripts/git/git_config.py'
-
-# flow-* 프로젝트 스킬 감지 alias
-alias flow-detect='python3 .claude.workflow/scripts/flow/project_skill_detector.py'

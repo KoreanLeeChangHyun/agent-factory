@@ -33,20 +33,27 @@ if _prompt_dir not in sys.path:
 from common import read_env
 from messages import DIRECT_PATH_CALL_DENIED
 
-# 직접 경로 호출 감지 패턴
-_DIRECT_PATH_PATTERN = re.compile(r"python3\s+\.claude\.workflow/scripts/")
+# 직접 경로 호출 감지 패턴 (상대경로 + 절대경로 모두 감지)
+_DIRECT_PATH_PATTERN = re.compile(
+    r"python3\s+(?:\.claude\.workflow/scripts/|/[^\s]*\.claude\.workflow/scripts/)"
+)
 
 # 허용 예외 패턴 (settings.json hooks/statusLine 등에서 고정 호출하는 경로)
 _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"python3\s+\.claude\.workflow/hooks/"),              # hook 디스패처 호출
-    re.compile(r"python3\s+\.claude\.workflow/scripts/statusline\.py"),  # statusLine command
-    re.compile(r"python3\s+\.claude\.workflow/board/server\.py"),    # SessionStart board server
+    re.compile(r"python3\s+\.claude\.workflow/hooks/"),              # hook 디스패처 호출 (상대경로)
+    re.compile(r"python3\s+\.claude\.workflow/scripts/statusline\.py"),  # statusLine command (상대경로)
+    re.compile(r"python3\s+\.claude\.workflow/board/server\.py"),    # SessionStart board server (상대경로)
+    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/hooks/"),       # hook 디스패처 호출 (절대경로)
+    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/scripts/statusline\.py"),  # statusLine command (절대경로)
+    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/board/server\.py"),  # SessionStart board server (절대경로)
 ]
 
 # && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴
-# 예: python3 .claude.workflow/hooks/... && python3 .claude.workflow/scripts/sync/history_sync.py ...
+# 예(상대경로): python3 .claude.workflow/hooks/... && python3 .claude.workflow/scripts/sync/history_sync.py ...
+# 예(절대경로): python3 /path/.claude.workflow/hooks/... && python3 /path/.claude.workflow/scripts/sync/history_sync.py ...
 _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
-    r"python3\s+\.claude\.workflow/hooks/\S+\s*&&\s*python3\s+\.claude\.workflow/scripts/sync/history_sync\.py"
+    r"python3\s+(?:\.claude\.workflow/hooks/|/[^\s]*\.claude\.workflow/hooks/)\S*\s*&&\s*"
+    r"python3\s+(?:\.claude\.workflow/scripts/sync/|/[^\s]*\.claude\.workflow/scripts/sync/)history_sync\.py"
 )
 
 # 스크립트 파일명 -> alias 매핑
@@ -70,8 +77,10 @@ ALIAS_MAP: dict[str, str] = {
     "project_skill_detector.py": "flow-detect",
 }
 
-# 스크립트 파일명에서 파일명만 추출하는 패턴
-_SCRIPT_NAME_PATTERN = re.compile(r"python3\s+\.claude\.workflow/scripts/(?:\S+/)?(\S+\.py)")
+# 스크립트 파일명에서 파일명만 추출하는 패턴 (상대경로 + 절대경로 모두 지원)
+_SCRIPT_NAME_PATTERN = re.compile(
+    r"python3\s+(?:\.claude\.workflow/scripts/|/[^\s]*\.claude\.workflow/scripts/)(?:\S+/)?(\S+\.py)"
+)
 
 
 def _deny(reason: str) -> None:
