@@ -336,7 +336,9 @@ flow-update task-start <registryKey> validator
 Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, workDir: <workDir>, planPath: <planPath>")
 ```
 
-반환 상태(통과/경고/실패) 모두 정상 진행 (soft blocking). `flow-update task-status <registryKey> validator completed`.
+반환 상태(통과/경고) 정상 진행. 반환 상태(실패)도 기본적으로 soft blocking이나, **작업내역 전체 누락으로 인한 실패인 경우 Hard blocking**: REPORT 단계 진입을 차단하고 `flow-update status <registryKey> FAILED`로 전이한다. `flow-update task-status <registryKey> validator completed|failed`.
+
+> **판별 기준**: validator가 "실패"를 반환할 때, `validation-report.md`에 "작업내역 전체 누락" 사유가 명시된 경우에만 Hard blocking 처리. 빌드 FAIL 등 다른 사유의 실패는 soft blocking(정상 진행) 유지.
 
 ### Post-WORK Flow
 

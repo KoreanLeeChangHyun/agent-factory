@@ -559,6 +559,12 @@
   color: #c586c0;
   font-weight: 600;
   margin-right: 8px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .terminal-sl-bar {
@@ -627,5 +633,9 @@
   .terminal-btn {
     padding: 3px 8px;
     font-size: 10px;
+  }
+
+  .terminal-sl-branch {
+    max-width: 80px;
   }
 }

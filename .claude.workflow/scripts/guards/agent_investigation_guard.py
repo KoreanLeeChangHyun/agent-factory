@@ -2,9 +2,9 @@
 """메인 세션 조사 목적 서브에이전트 차단 가드 Hook 스크립트.
 
 PreToolUse(Task) 이벤트에서 subagent_type이 조사 목적(Explore, general-purpose)이거나
-허용 목록에 없는 미지정값인 경우, 현재 tmux 윈도우가 워크플로우 세션
-(P:T-* 접두사)이 아닌 메인 세션이면 해당 서브에이전트 호출을 차단한다.
-비tmux 환경(TMUX_PANE 미설정)에서도 차단한다.
+허용 목록에 없는 미지정값인 경우, 현재 세션이 워크플로우 세션이 아니면
+해당 서브에이전트 호출을 차단한다.
+세션 유형은 session_identifier.get_session_type()으로 판별한다.
 
 허용 subagent_type: worker-opus, worker-sonnet, planner, reporter, validator
 
@@ -34,13 +34,10 @@ if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 
 from common import read_env
+from flow.session_identifier import get_session_type
 from messages import (
     AGENT_INVESTIGATION_MAIN_SESSION_DENIED,
-    AGENT_INVESTIGATION_WINDOW_QUERY_FAILED,
 )
-
-# 워크플로우 세션 윈도우명 접두사
-_WORKFLOW_WINDOW_PREFIX = "P:T-"
 
 # 허용된 subagent_type 목록 (워크플로우 전용 서브에이전트)
 _ALLOWED_SUBAGENT_TYPES: frozenset[str] = frozenset({
@@ -67,35 +64,6 @@ def _deny(reason: str) -> None:
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _get_current_window_name() -> str | None:
-    """현재 tmux 윈도우 이름을 반환한다.
-
-    TMUX_PANE 환경변수가 없으면 None을 반환한다.
-    tmux 명령 실행 실패 시에도 None을 반환한다.
-
-    Returns:
-        현재 윈도우명 문자열. 비tmux 환경 또는 실행 실패 시 None.
-    """
-    import subprocess
-
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["tmux", "display-message", "-t", tmux_pane, "-p", "#W"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
-    return None
 
 
 def _extract_subagent_type(tool_input: dict) -> str:
@@ -135,9 +103,9 @@ def main() -> None:
 
     stdin에서 JSON을 읽어 Task 도구 사용 시 subagent_type이 조사 목적
     (Explore, general-purpose)이거나 허용 목록에 없는 미지정값인 경우,
-    현재 세션이 워크플로우 세션(P:T-* 윈도우)인지 확인하고,
-    메인 세션이면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
-    비tmux 환경에서도 차단한다.
+    현재 세션이 워크플로우 세션인지 확인하고,
+    워크플로우 세션이 아니면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
+    세션 유형은 session_identifier.get_session_type()으로 판별한다.
     """
     # .claude.workflow/.settings(.env 폴백)에서 설정 로드
     hook_flag = os.environ.get("HOOK_AGENT_INVESTIGATION_GUARD") or read_env("HOOK_AGENT_INVESTIGATION_GUARD")
@@ -170,24 +138,12 @@ def main() -> None:
         sys.exit(0)
 
     # 허용 목록 외 subagent_type (Explore, general-purpose, 빈값 등)은 차단 후보
-    # TMUX_PANE 환경변수 확인
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        # 비tmux 환경에서는 차단
-        _deny(AGENT_INVESTIGATION_MAIN_SESSION_DENIED.format(subagent_type=repr(subagent_type)))
-
-    # tmux 윈도우명 조회
-    window_name = _get_current_window_name()
-
-    # 윈도우명 조회 실패 시 안전 차단 (보수적 접근)
-    if window_name is None:
-        _deny(AGENT_INVESTIGATION_WINDOW_QUERY_FAILED.format(subagent_type=repr(subagent_type)))
-
-    # 워크플로우 세션(P:T-* 접두사)이면 통과
-    if window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
+    # 세션 유형 판별: workflow이면 통과, 그 외(main, unknown)는 차단
+    session_type = get_session_type()
+    if session_type == "workflow":
         sys.exit(0)
 
-    # 메인 세션이면 차단
+    # 워크플로우 세션이 아니면 차단
     _deny(AGENT_INVESTIGATION_MAIN_SESSION_DENIED.format(subagent_type=repr(subagent_type)))
 
 

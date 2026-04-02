@@ -707,6 +707,14 @@ def main():
     # 5.5. 스킬 매핑 대시보드 갱신 (비차단)
     _update_skills_md(registry_key, command, tasks, all_resolved, token_budget)
 
+    # 5.55. 토큰 예산 초과 WARN 기록
+    if token_budget > TOKEN_BUDGET_LIMIT:
+        _append_log(
+            work_dir,
+            "WARN",
+            f"TOKEN_BUDGET_EXCEEDED: total={token_budget} limit={TOKEN_BUDGET_LIMIT}",
+        )
+
     # 5.6. 스킬 매핑 유효성 검증 (exit code 2 = 검증 실패)
     valid, reason = validate_skill_mapping(tasks)
     if not valid:

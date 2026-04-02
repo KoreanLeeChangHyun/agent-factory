@@ -28,6 +28,7 @@ import re
 import sys
 import tempfile
 import shutil
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -940,6 +941,81 @@ def cmd_status(args: argparse.Namespace) -> int:
 # archive 명령어
 # ============================================================
 
+def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, history_dir: str) -> None:
+    """archive 후 이동된 registryKey를 보유한 티켓 XML의 경로 필드를 .history/ 반영 경로로 갱신.
+
+    kanban 전체 디렉터리(open/progress/review/done)를 스캔하여 <result>/<registrykey>가
+    moved_key와 일치하는 티켓 XML을 찾고, <workdir>/<plan>/<report> 경로 텍스트를
+    .claude.workflow/workflow/.history/{key}/... 형태로 갱신한다.
+
+    Args:
+        moved_key: .history/로 이동된 워크플로우 키 (YYYYMMDD-HHMMSS 형식)
+        workflow_dir: .claude.workflow/workflow/ 디렉터리 절대 경로
+        history_dir: .claude.workflow/workflow/.history/ 디렉터리 절대 경로
+
+    Returns:
+        None. 실패 시 [WARN] 경고를 출력하고 비차단 처리한다.
+    """
+    # workflow_dir = .../PROJECT/.claude.workflow/workflow
+    # workflow_dir 부모 = .../PROJECT/.claude.workflow
+    cw_dir = os.path.dirname(workflow_dir)
+    kanban_dir = os.path.join(cw_dir, "kanban")
+
+    status_dirs = ["open", "progress", "review", "done"]
+
+    # 경로 갱신 함수: .claude.workflow/workflow/{key}/... -> .claude.workflow/workflow/.history/{key}/...
+    def _rewrite_path(text: str) -> str:
+        """workflow/{key}/를 workflow/.history/{key}/に置換."""
+        if not text:
+            return text
+        old_prefix = f".claude.workflow/workflow/{moved_key}/"
+        new_prefix = f".claude.workflow/workflow/.history/{moved_key}/"
+        if old_prefix in text:
+            return text.replace(old_prefix, new_prefix)
+        return text
+
+    for status in status_dirs:
+        status_dir = os.path.join(kanban_dir, status)
+        if not os.path.isdir(status_dir):
+            continue
+        for fname in os.listdir(status_dir):
+            if not fname.endswith(".xml"):
+                continue
+            xml_path = os.path.join(status_dir, fname)
+            ticket_number = fname[:-4]  # T-NNN
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                result_el = root.find("result")
+                if result_el is None:
+                    continue
+                rk_el = result_el.find("registrykey")
+                if rk_el is None or (rk_el.text or "").strip() != moved_key:
+                    continue
+
+                # registrykey 일치 — workdir/plan/report 경로 갱신
+                updated = False
+                for tag in ("workdir", "plan", "report"):
+                    el = result_el.find(tag)
+                    if el is not None and el.text:
+                        new_text = _rewrite_path(el.text.strip())
+                        if new_text != el.text.strip():
+                            el.text = new_text
+                            updated = True
+
+                if updated:
+                    tree.write(xml_path, encoding="unicode", xml_declaration=False)
+                    new_workdir = (result_el.find("workdir") or result_el).text or ""
+                    print(
+                        f"{C_GREEN}[OK]{C_RESET} ticket {ticket_number}: workdir updated to .history/"
+                    )
+            except Exception as exc:
+                print(
+                    f"{C_YELLOW}[WARN]{C_RESET} ticket {ticket_number}: XML workdir 갱신 실패 — {exc}",
+                    file=sys.stderr,
+                )
+
+
 def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
     """활성 워크플로우(완료 상태가 아닌)의 디렉터리 이름 집합을 반환.
 
@@ -1035,6 +1111,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 shutil.move(src, dst)
                 moved += 1
                 print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+                _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
                 print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
@@ -1058,6 +1135,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 shutil.move(src, dst)
                 moved += 1
                 print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+                _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
                 print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)

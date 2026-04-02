@@ -401,6 +401,11 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
     YYYYMMDD-HHMMSS 패턴이 아닌 입력은 그대로 반환.
 
+    탐색 순서:
+      1. .claude.workflow/workflow/<input_key>/ 하위 디렉터리 스캔
+      2. 1차 탐색 실패 시 .claude.workflow/workflow/.history/<input_key>/ 하위 디렉터리 스캔
+      3. 두 탐색 모두 실패 시 ".claude.workflow/workflow/<input_key>" 폴백 반환
+
     Args:
         input_key: 워크플로우 키(YYYYMMDD-HHMMSS) 또는 경로.
         project_root: 프로젝트 루트 경로. None이면 자동 해석.
@@ -414,11 +419,12 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
     if project_root is None:
         project_root = resolve_project_root()
 
-    # 디렉터리 스캔으로 workDir 조회
-    base_dir = os.path.join(project_root, ".claude.workflow", "workflow", input_key)
-    if os.path.isdir(base_dir):
-        for work_name in sorted(os.listdir(base_dir)):
-            wn_path = os.path.join(base_dir, work_name)
+    def _scan_base(base: str, rel_prefix: str) -> str | None:
+        """base 디렉터리 하위에서 status.json이 있는 workDir을 스캔 반환."""
+        if not os.path.isdir(base):
+            return None
+        for work_name in sorted(os.listdir(base)):
+            wn_path = os.path.join(base, work_name)
             if not os.path.isdir(wn_path) or work_name.startswith("."):
                 continue
             for cmd_name in sorted(os.listdir(wn_path)):
@@ -426,7 +432,20 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
                 if not os.path.isdir(cmd_path):
                     continue
                 if os.path.exists(os.path.join(cmd_path, "status.json")):
-                    return os.path.join(".claude.workflow", "workflow", input_key, work_name, cmd_name)
+                    return os.path.join(rel_prefix, work_name, cmd_name)
+        return None
+
+    # 1차 탐색: 활성 workflow 디렉터리
+    base_dir = os.path.join(project_root, ".claude.workflow", "workflow", input_key)
+    result = _scan_base(base_dir, os.path.join(".claude.workflow", "workflow", input_key))
+    if result is not None:
+        return result
+
+    # 2차 탐색: .history/ 아카이브 디렉터리
+    history_base_dir = os.path.join(project_root, ".claude.workflow", "workflow", ".history", input_key)
+    result = _scan_base(history_base_dir, os.path.join(".claude.workflow", "workflow", ".history", input_key))
+    if result is not None:
+        return result
 
     # 폴백
     fallback = f".claude.workflow/workflow/{input_key}"

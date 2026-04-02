@@ -1,8 +1,8 @@
 #!/usr/bin/env -S python3 -u
 """워크트리 경로 격리 가드 Hook 스크립트.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 tmux 윈도우가 워크플로우 세션
-(P:T-* 접두사)이고 활성 워크플로우의 command가 implement이면,
+PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션이고
+활성 워크플로우의 command가 implement이면,
 메인 리포 경로 파일 수정 시도를 차단하고 워크트리 절대경로를 피드백에 포함한다.
 
 Claude Code가 세션 시작 시 프로젝트 루트(메인 리포)를 cwd로 결정하여
@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 
 # utils 패키지 import 경로 설정
@@ -37,13 +36,11 @@ if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 
 from common import load_json_file, read_env, resolve_project_root, scan_active_workflows
+from flow.session_identifier import get_session_type
 from messages import (
     WORKTREE_PATH_BASH_MODIFY_DENIED,
     WORKTREE_PATH_WRITE_EDIT_DENIED,
 )
-
-# 워크플로우 세션 윈도우명 접두사
-_WORKFLOW_WINDOW_PREFIX = "P:T-"
 
 # implement command: 워크트리 격리가 적용되는 command
 _IMPLEMENT_COMMAND = "implement"
@@ -84,33 +81,6 @@ def _deny(reason: str) -> None:
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _get_current_window_name() -> str | None:
-    """현재 tmux 윈도우 이름을 반환한다.
-
-    TMUX_PANE 환경변수가 없으면 None을 반환한다.
-    tmux 명령 실행 실패 시에도 None을 반환한다.
-
-    Returns:
-        현재 윈도우명 문자열. 비tmux 환경 또는 실행 실패 시 None.
-    """
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["tmux", "display-message", "-t", tmux_pane, "-p", "#W"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
-    return None
 
 
 def _get_workflow_command() -> str | None:
@@ -410,20 +380,9 @@ def main() -> None:
     if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
-    # TMUX_PANE 환경변수 확인 -- 비tmux 환경에서는 통과 (이 가드의 관심사 아님)
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        sys.exit(0)
-
-    # tmux 윈도우명 조회
-    window_name = _get_current_window_name()
-
-    # 윈도우명 조회 실패 시 통과 (보수적이되 false positive 방지)
-    if window_name is None:
-        sys.exit(0)
-
-    # 워크플로우 세션(P:T-* 접두사)이 아니면 통과 (메인 세션은 이 가드의 관심사 아님)
-    if not window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
+    # 세션 유형 확인 -- 워크플로우 세션이 아니면 통과 (이 가드의 관심사 아님)
+    session_type = get_session_type()
+    if session_type != "workflow":
         sys.exit(0)
 
     # --- 워크플로우 세션 확인됨, command 판별 ---

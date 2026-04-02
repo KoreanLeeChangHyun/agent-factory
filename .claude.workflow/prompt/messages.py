@@ -22,25 +22,25 @@
 MAIN_SESSION_BASH_FILE_MODIFY_DENIED: str = (
     "메인 세션에서 Bash를 통한 파일 수정이 차단되었습니다. "
     "(매칭 패턴: {pattern}) "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
 )
 """플레이스홀더: {pattern} - 매칭된 Bash 파일 수정 패턴 문자열."""
 
 MAIN_SESSION_NO_TMUX_DENIED: str = (
-    "비tmux 환경에서의 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
+    "비워크플로우 환경에서의 코드 수정이 차단되었습니다. "
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
 )
 
 MAIN_SESSION_WINDOW_QUERY_FAILED: str = (
-    "tmux 윈도우명 조회에 실패하여 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
+    "세션 유형 판별에 실패하여 코드 수정이 차단되었습니다. "
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
 )
 
 MAIN_SESSION_WRITE_EDIT_DENIED: str = (
     "메인 세션(윈도우: {window_name})에서의 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 작업하세요."
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
 )
-"""플레이스홀더: {window_name} - 현재 tmux 윈도우명."""
+"""플레이스홀더: {window_name} - 현재 세션 식별자."""
 
 # =============================================================================
 # agent_investigation_guard.py 메시지
@@ -48,13 +48,13 @@ MAIN_SESSION_WRITE_EDIT_DENIED: str = (
 
 AGENT_INVESTIGATION_MAIN_SESSION_DENIED: str = (
     "메인 세션에서의 조사 목적 서브에이전트(subagent_type: {subagent_type}) 호출이 차단되었습니다. "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
 )
 """플레이스홀더: {subagent_type} - 차단된 서브에이전트 타입 문자열 (repr 포함)."""
 
 AGENT_INVESTIGATION_WINDOW_QUERY_FAILED: str = (
-    "tmux 윈도우명 조회에 실패하여 조사 목적 서브에이전트(subagent_type: {subagent_type}) 호출이 차단되었습니다. "
-    "워크플로우 세션(tmux P:T-* 윈도우)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
+    "세션 유형 판별에 실패하여 조사 목적 서브에이전트(subagent_type: {subagent_type}) 호출이 차단되었습니다. "
+    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
 )
 """플레이스홀더: {subagent_type} - 차단된 서브에이전트 타입 문자열 (repr 포함)."""
 

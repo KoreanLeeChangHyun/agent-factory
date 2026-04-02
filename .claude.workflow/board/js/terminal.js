@@ -337,6 +337,10 @@
         var modeEl = document.getElementById("terminal-sl-mode");
         if (modeEl) modeEl.textContent = data.permission_mode;
       }
+      if (data.branch) {
+        var branchEl = document.getElementById("terminal-sl-branch");
+        if (branchEl) branchEl.textContent = data.branch;
+      }
       updateControlBar();
     }).catch(function () {});
   }
@@ -885,6 +889,15 @@
 
     if (slModel) slModel.textContent = sessionModel;
 
+    // Branch: add git icon prefix if element has content
+    var slBranch = document.getElementById("terminal-sl-branch");
+    if (slBranch) {
+      var branchText = slBranch.textContent.replace(/^\ue0a0\s*/, "").trim();
+      if (branchText && branchText !== "--") {
+        slBranch.textContent = "\ue0a0 " + branchText;
+      }
+    }
+
     // Context progress bar
     var totalTokens = sessionTokens.input + sessionTokens.output;
     var pct = contextWindow > 0 ? Math.min(totalTokens / contextWindow * 100, 100) : 0;
@@ -1003,7 +1016,7 @@
     // Status line
     h += '<div class="terminal-statusline" id="terminal-statusline">';
     h += '<span class="terminal-sl-model" id="terminal-sl-model">--</span>';
-    h += '<span class="terminal-sl-branch" id="terminal-sl-branch"></span>';
+    h += '<span class="terminal-sl-branch" id="terminal-sl-branch">--</span>';
     h += '<span class="terminal-sl-bar" id="terminal-sl-bar"><span class="terminal-sl-bar-track"><span class="terminal-sl-bar-fill" id="terminal-sl-bar-fill" style="width:0%"></span></span><span id="terminal-sl-bar-pct">0%</span></span>';
     h += '<span class="terminal-sl-tokens" id="terminal-sl-tokens">(0/0)</span>';
     h += '<span class="terminal-sl-right">';

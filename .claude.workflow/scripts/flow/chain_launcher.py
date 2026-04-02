@@ -1,9 +1,14 @@
 #!/usr/bin/env -S python3 -u
-"""chain_launcher.py - 체인 스테이지 비동기 tmux 발사 스크립트.
+"""chain_launcher.py - 체인 스테이지 비동기 발사 스크립트.
 
 finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
-이전 tmux 윈도우 사망을 대기한 뒤, 새 티켓을 생성하고
-새 tmux 윈도우에서 `/wf -s N` 명령을 전송한다.
+이전 세션 종료를 대기한 뒤, 새 티켓을 생성하고
+HTTP API 또는 tmux 윈도우를 통해 `/wf -s N` 명령을 전송한다.
+
+실행 경로:
+  - HTTP API 우선: _WF_SERVER_PORT 환경변수 또는 .board.url에서 포트 해석 가능 시
+    POST /terminal/workflow/start + POST /terminal/workflow/input 으로 세션 시작
+  - TMUX 폴백: 서버 포트 미해석 시 기존 tmux 윈도우 생성 방식으로 폴백
 
 사용법:
   python3 chain_launcher.py <ticket_number> <remaining_chain> <prev_report_path> [--retry-count <N>]
@@ -15,15 +20,15 @@ finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
   --retry-count     현재 재시도 횟수 (기본값: 0)
 
 동작 순서:
-  1. 이전 tmux 윈도우 사망 대기 (P:T-NNN 윈도우가 사라질 때까지 최대 30초 폴링)
+  1. 이전 세션 종료 대기 (HTTP: session status 폴링 / TMUX: 윈도우 사망 폴링, 최대 30초)
   2. kanban.py create로 새 티켓 생성 + kanban.py link로 derived-from 관계 링크 + update-prompt로 prompt 복사
-  3. 새 tmux 윈도우 생성 (P:T-NEW) + Claude 프롬프트 대기 + /wf -s NEW_N 명령 전송
+  3. HTTP API로 세션 시작 + 명령 전송 (또는 TMUX 폴백: 윈도우 생성 + 프롬프트 대기 + 키 전송)
   4. 실패 시 CHAIN_MAX_RETRY 횟수만큼 재시도
 
 프로세스 모델:
   finalization.py에서 subprocess.Popen(start_new_session=True)로 백그라운드 실행.
   현재 프로세스(finalization.py)와 독립적으로 동작하여
-  현재 tmux 윈도우 종료에 영향받지 않는다.
+  현재 세션 종료에 영향받지 않는다.
 
 로그 모델:
   스크립트 시작 시 _LOG_FILE 경로에 로그 파일을 생성한다. _log() 함수는
@@ -38,13 +43,17 @@ finalization.py에서 체인 감지 후 호출하는 독립 스크립트.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from typing import IO
+from urllib.parse import urlparse
 
 # ─── sys.path 보장 ──────────────────────────────────────────────────────────
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +64,7 @@ if _SCRIPTS_DIR not in sys.path:
 _PROJECT_ROOT: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 
 from data.constants import CHAIN_MAX_RETRY, CHAIN_SEPARATOR  # noqa: E402
-from flow.tmux_utils import MAIN_WINDOW_DEFAULT, WINDOW_PREFIX_P  # noqa: E402
+from flow.session_identifier import WINDOW_PREFIX_P  # noqa: E402
 from flow.flow_logger import append_log as _fl_append_log  # noqa: E402
 
 # ─── 경로 상수 ──────────────────────────────────────────────────────────────
@@ -63,11 +72,8 @@ KANBAN_PY: str = os.path.join(_SCRIPT_DIR, "kanban.py")
 KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".claude.workflow", "kanban")
 
 # ─── 폴링 설정 ──────────────────────────────────────────────────────────────
-_WINDOW_DEATH_POLL_INTERVAL: float = 1.0
-_WINDOW_DEATH_POLL_MAX: int = 30
-_PROMPT_POLL_INTERVAL: float = 1.0
-_PROMPT_POLL_MAX: int = 30
-_PROMPT_PATTERN: str = "\u276f"  # ❯
+_SESSION_EXIT_POLL_INTERVAL: float = 1.0
+_SESSION_EXIT_POLL_MAX: int = 30
 
 # ─── 로그 파일 설정 ──────────────────────────────────────────────────────────
 _LOG_FILE: str = os.path.join(_PROJECT_ROOT, ".claude.workflow", "workflow", "chain_launcher.log")
@@ -147,10 +153,191 @@ def _wf_log(level: str, message: str) -> None:
         pass
 
 
-# ─── tmux 유틸 ──────────────────────────────────────────────────────────────
+# ─── 서버 포트 해석 ────────────────────────────────────────────────────────
+
+def _resolve_server_port() -> int | None:
+    """`.board.url` 파일 또는 `_WF_SERVER_PORT` 환경변수에서 서버 포트를 추출한다.
+
+    우선순위:
+      1. ``_WF_SERVER_PORT`` 환경변수
+      2. ``.claude.workflow/.board.url`` 파일 첫 줄 URL 파싱
+
+    Returns:
+        포트 번호(int) 또는 None.
+    """
+    # 1) 환경변수 우선
+    env_port = os.environ.get("_WF_SERVER_PORT", "").strip()
+    if env_port:
+        try:
+            return int(env_port)
+        except ValueError:
+            pass
+
+    # 2) .board.url 파일 파싱
+    url_file = os.path.join(_PROJECT_ROOT, ".claude.workflow", ".board.url")
+    if not os.path.isfile(url_file):
+        return None
+
+    try:
+        with open(url_file, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        if not first_line:
+            return None
+        parsed = urlparse(first_line)
+        if parsed.port:
+            return parsed.port
+    except Exception:
+        pass
+
+    return None
+
+
+# ─── HTTP 요청 헬퍼 ────────────────────────────────────────────────────────
+
+def _http_request(
+    method: str,
+    port: int,
+    path: str,
+    body: dict | None = None,
+) -> dict | list | None:
+    """urllib.request 기반 JSON API 호출 래퍼.
+
+    Args:
+        method: HTTP 메서드 ("GET" 또는 "POST").
+        port: 서버 포트 번호.
+        path: 요청 경로 (예: ``/terminal/workflow/start``).
+        body: POST 요청 시 JSON 본문 딕셔너리. GET 시 None.
+
+    Returns:
+        응답 JSON을 파싱한 결과. 오류 시 None.
+    """
+    url = f"http://127.0.0.1:{port}{path}"
+    try:
+        data = None
+        headers: dict[str, str] = {}
+        if method == "POST" and body is not None:
+            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json; charset=utf-8"
+
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        _log("WARN", f"_http_request: {method} {path} HTTP {e.code}")
+        return None
+    except Exception as e:
+        _log("WARN", f"_http_request: {method} {path} error: {e}")
+        return None
+
+
+# ─── 세션 상태 헬퍼 ────────────────────────────────────────────────────────
+
+def _wait_for_session_exit(session_id: str, port: int) -> bool:
+    """워크플로우 세션이 종료될 때까지 최대 30초 폴링한다.
+
+    ``GET /terminal/workflow/status?session_id={id}`` 를 반복 호출하여
+    status=="stopped" 이거나 404 응답이면 세션 종료로 판정한다.
+
+    Args:
+        session_id: 감시할 세션 ID.
+        port: 서버 포트 번호.
+
+    Returns:
+        세션이 종료되면 True, 타임아웃이면 False.
+    """
+    for i in range(_SESSION_EXIT_POLL_MAX):
+        resp = _http_request("GET", port, f"/terminal/workflow/status?session_id={session_id}")
+        if resp is None:
+            # 404 또는 네트워크 오류 → 세션 종료로 판정
+            _log("INFO", f"session {session_id} is gone (after {i}s)")
+            return True
+        if isinstance(resp, dict) and resp.get("status") == "stopped":
+            _log("INFO", f"session {session_id} stopped (after {i}s)")
+            return True
+        time.sleep(_SESSION_EXIT_POLL_INTERVAL)
+    _log("WARN", f"session {session_id} still alive after {_SESSION_EXIT_POLL_MAX}s timeout")
+    return False
+
+
+def _start_workflow_session(port: int, ticket_id: str, command: str) -> str | None:
+    """HTTP API를 통해 새 워크플로우 세션을 시작한다.
+
+    ``POST /terminal/workflow/start`` 단일 호출로 세션을 생성한다.
+
+    Args:
+        port: 서버 포트 번호.
+        ticket_id: 티켓 ID (예: T-001).
+        command: 워크플로우 실행 명령 (예: "/wf -s 1").
+
+    Returns:
+        세션 ID 문자열, 실패 시 None.
+    """
+    resp = _http_request("POST", port, "/terminal/workflow/start", {
+        "ticket": ticket_id,
+        "command": command,
+        "work_dir": "",
+    })
+    if isinstance(resp, dict) and resp.get("ok"):
+        session_id = resp.get("session_id", "")
+        _log("INFO", f"workflow session started: session_id={session_id} ticket={ticket_id}")
+        return session_id if session_id else None
+    if isinstance(resp, dict):
+        _log("ERROR", f"workflow session start failed: {resp.get('error', 'unknown')}")
+    return None
+
+
+def _send_command(port: int, session_id: str, command: str) -> bool:
+    """HTTP API를 통해 워크플로우 세션에 명령을 전송한다.
+
+    ``POST /terminal/workflow/input`` 호출로 stdin에 텍스트를 전송한다.
+
+    Args:
+        port: 서버 포트 번호.
+        session_id: 대상 세션 ID.
+        command: 전송할 명령 문자열.
+
+    Returns:
+        성공 시 True, 실패 시 False.
+    """
+    resp = _http_request("POST", port, "/terminal/workflow/input", {
+        "session_id": session_id,
+        "text": command,
+    })
+    if isinstance(resp, dict) and resp.get("ok"):
+        _log("INFO", f"command sent to session {session_id}: {command}")
+        return True
+    _log("ERROR", f"send_command failed for session {session_id}")
+    return False
+
+
+def _kill_session(port: int, session_id: str) -> bool:
+    """HTTP API를 통해 워크플로우 세션을 종료한다.
+
+    ``POST /terminal/workflow/kill`` 호출로 세션을 강제 종료한다.
+
+    Args:
+        port: 서버 포트 번호.
+        session_id: 종료할 세션 ID.
+
+    Returns:
+        성공 시 True, 실패 시 False.
+    """
+    resp = _http_request("POST", port, "/terminal/workflow/kill", {
+        "session_id": session_id,
+    })
+    if isinstance(resp, dict) and resp.get("ok"):
+        _log("INFO", f"session {session_id} killed")
+        return True
+    _log("WARN", f"session {session_id} kill failed or already gone")
+    return False
+
+
+# ─── TMUX 폴백 유틸 (서버 미기동 시 하위호환) ───────────────────────────────
 
 def _run_tmux(*args: str) -> subprocess.CompletedProcess[str]:
-    """tmux 명령을 실행하고 결과를 반환한다."""
+    """tmux 명령을 실행하고 결과를 반환한다. (폴백 전용)"""
     return subprocess.run(
         ["tmux"] + list(args),
         capture_output=True,
@@ -159,8 +346,8 @@ def _run_tmux(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _window_exists(window_name: str) -> bool:
-    """지정된 이름의 tmux 윈도우가 존재하는지 확인한다."""
+def _tmux_window_exists(window_name: str) -> bool:
+    """지정된 이름의 tmux 윈도우가 존재하는지 확인한다. (폴백 전용)"""
     try:
         result = _run_tmux("list-windows", "-F", "#W")
         if result.returncode != 0:
@@ -172,22 +359,7 @@ def _window_exists(window_name: str) -> bool:
 
 
 def _tmux_window_target(window_name: str) -> str:
-    """콜론 포함 윈도우명을 인덱스 기반 타겟으로 변환한다.
-
-    tmux는 콜론(:)을 세션/윈도우 구분자로 사용하므로 콜론 포함 윈도우명을
-    직접 타겟으로 사용하면 올바른 윈도우를 찾지 못한다. 이 함수는 윈도우 인덱스로
-    변환하여 tmux 명령이 올바른 윈도우를 대상으로 하도록 보장한다.
-
-    인덱스 조회에 실패한 경우: 콜론 포함 여부를 검사하여 콜론이 있으면 WARN 로그를
-    남기고 빈 문자열을 반환한다. Caller는 빈 문자열 반환 시 에러 분기를 처리해야 한다.
-    콜론이 없는 경우에는 원본 window_name을 그대로 반환한다 (안전 폴백).
-
-    Args:
-        window_name: 변환할 윈도우 이름 (P:T-NNN 형식)
-
-    Returns:
-        인덱스 문자열, 또는 조회 실패 시 원본 이름(콜론 없음) / 빈 문자열(콜론 있음).
-    """
+    """콜론 포함 윈도우명을 인덱스 기반 타겟으로 변환한다. (폴백 전용)"""
     try:
         result = _run_tmux("list-windows", "-F", "#{window_index}\t#{window_name}")
         if result.returncode == 0:
@@ -197,29 +369,91 @@ def _tmux_window_target(window_name: str) -> str:
                     return parts[0]
     except Exception:
         pass
-    # 인덱스 조회 실패: 콜론 포함 여부에 따라 안전 처리
     if ":" in window_name:
-        _log("WARN", f"_tmux_window_target: failed to resolve index for '{window_name}' (contains colon), returning empty string")
+        _log("WARN", f"_tmux_window_target: failed to resolve index for '{window_name}', returning empty")
         return ""
     return window_name
 
 
-def _wait_for_window_death(window_name: str) -> bool:
-    """P:T-NNN 윈도우가 사라질 때까지 최대 30초 폴링한다.
-
-    Args:
-        window_name: 감시할 윈도우 이름 (P:T-NNN 형식)
-
-    Returns:
-        윈도우가 사라지면 True, 타임아웃이면 False.
-    """
-    for i in range(_WINDOW_DEATH_POLL_MAX):
-        if not _window_exists(window_name):
+def _tmux_wait_for_window_death(window_name: str) -> bool:
+    """P:T-NNN 윈도우가 사라질 때까지 최대 30초 폴링한다. (폴백 전용)"""
+    for i in range(_SESSION_EXIT_POLL_MAX):
+        if not _tmux_window_exists(window_name):
             _log("INFO", f"window {window_name} is gone (after {i}s)")
             return True
-        time.sleep(_WINDOW_DEATH_POLL_INTERVAL)
-    _log("WARN", f"window {window_name} still exists after {_WINDOW_DEATH_POLL_MAX}s timeout")
+        time.sleep(_SESSION_EXIT_POLL_INTERVAL)
+    _log("WARN", f"window {window_name} still exists after {_SESSION_EXIT_POLL_MAX}s timeout")
     return False
+
+
+def _tmux_kill_window(window_name: str) -> bool:
+    """tmux 윈도우를 종료한다. (폴백 전용)"""
+    target = _tmux_window_target(window_name)
+    if not target:
+        _log("WARN", f"_tmux_kill_window: invalid target for '{window_name}', skipping")
+        return False
+    try:
+        result = _run_tmux("kill-window", "-t", target)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _tmux_create_window(window_name: str) -> bool:
+    """새 tmux 윈도우를 생성하고 claude를 실행한다. (폴백 전용)"""
+    from flow.session_identifier import MAIN_WINDOW_DEFAULT
+
+    worktree_path = _get_worktree_path()
+    tmux_args = ["new-window", "-d", "-n", window_name]
+    if worktree_path:
+        tmux_args.extend(["-c", worktree_path])
+    tmux_args.extend(["-e", f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}"])
+    if worktree_path:
+        tmux_args.extend(["-e", f"WORKFLOW_WORKTREE_PATH={worktree_path}"])
+    if _wf_work_dir:
+        tmux_args.extend(["-e", f"WORKFLOW_WORK_DIR={_wf_work_dir}"])
+    tmux_args.append("bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'")
+
+    try:
+        result = _run_tmux(*tmux_args)
+        return result.returncode == 0
+    except Exception as e:
+        _log("ERROR", f"tmux create_window failed: {e}")
+        return False
+
+
+def _tmux_poll_for_prompt(window_name: str) -> bool:
+    """tmux 윈도우에서 프롬프트 패턴이 나타날 때까지 폴링한다. (폴백 전용)"""
+    _PROMPT_PATTERN = "\u276f"  # ❯
+    _PROMPT_POLL_MAX = 30
+    _PROMPT_POLL_INTERVAL = 1.0
+    target = _tmux_window_target(window_name)
+    if not target:
+        _log("ERROR", f"_tmux_poll_for_prompt: invalid target for '{window_name}'")
+        return False
+    for _ in range(_PROMPT_POLL_MAX):
+        try:
+            result = _run_tmux("capture-pane", "-t", target, "-p")
+            if result.returncode == 0 and _PROMPT_PATTERN in result.stdout:
+                return True
+        except Exception:
+            pass
+        time.sleep(_PROMPT_POLL_INTERVAL)
+    return False
+
+
+def _tmux_send_keys(window_name: str, command: str) -> bool:
+    """tmux 윈도우에 명령 키를 전송한다. (폴백 전용)"""
+    target = _tmux_window_target(window_name)
+    if not target:
+        _log("ERROR", f"_tmux_send_keys: invalid target for '{window_name}'")
+        return False
+    try:
+        result = _run_tmux("send-keys", "-t", target, command, "Enter")
+        return result.returncode == 0
+    except Exception as e:
+        _log("ERROR", f"tmux send_keys failed: {e}")
+        return False
 
 
 def _get_worktree_path() -> str | None:
@@ -257,109 +491,6 @@ def _get_worktree_path() -> str | None:
         pass
 
     return None
-
-
-def _create_window(window_name: str) -> bool:
-    """새 tmux 윈도우를 생성하고 claude를 실행한다.
-
-    tmux_launcher.py의 _create_window 로직을 재현한다.
-    _WF_MAIN_WINDOW 환경변수를 주입하여 메인 윈도우 참조를 전달한다.
-    worktree 경로가 있으면 -c 옵션으로 cwd를 설정한다.
-
-    Args:
-        window_name: 생성할 윈도우 이름 (P:T-NNN 형식)
-
-    Returns:
-        성공 시 True, 실패 시 False.
-    """
-    worktree_path = _get_worktree_path()
-
-    # tmux new-window 기본 인자
-    tmux_args = [
-        "new-window",
-        "-d",
-        "-n",
-        window_name,
-    ]
-
-    # worktree_path가 있으면 -c <worktree_path>로 cwd 설정
-    if worktree_path:
-        tmux_args.extend(["-c", worktree_path])
-
-    tmux_args.extend([
-        "-e",
-        f"_WF_MAIN_WINDOW={os.environ.get('_WF_MAIN_WINDOW', MAIN_WINDOW_DEFAULT)}",
-    ])
-
-    # WORKFLOW_WORKTREE_PATH 주입: 워크트리 경로를 세션에 전달한다.
-    # worktree_path_guard.py가 이 환경변수를 우선 참조하여
-    # 메인 리포 경로 수정을 차단하고 워크트리 경로로 안내한다.
-    if worktree_path:
-        tmux_args.extend(["-e", f"WORKFLOW_WORKTREE_PATH={worktree_path}"])
-
-    # WORKFLOW_WORK_DIR 주입
-    if _wf_work_dir:
-        tmux_args.extend(["-e", f"WORKFLOW_WORK_DIR={_wf_work_dir}"])
-
-    tmux_args.append("bash -lc 'unset CLAUDECODE && claude --dangerously-skip-permissions'")
-
-    try:
-        result = _run_tmux(*tmux_args)
-        return result.returncode == 0
-    except Exception as e:
-        _log("ERROR", f"create_window failed: {e}")
-        return False
-
-
-def _poll_for_prompt(window_name: str) -> bool:
-    """tmux 윈도우에서 프롬프트 패턴이 나타날 때까지 폴링한다.
-
-    Args:
-        window_name: 폴링할 윈도우 이름
-
-    Returns:
-        프롬프트가 감지되면 True, 타임아웃이면 False.
-    """
-    target = _tmux_window_target(window_name)
-    if not target:
-        _log("ERROR", f"_poll_for_prompt: invalid target for window '{window_name}' (empty string)")
-        return False
-    for _ in range(_PROMPT_POLL_MAX):
-        try:
-            result = _run_tmux("capture-pane", "-t", target, "-p")
-            if result.returncode == 0 and _PROMPT_PATTERN in result.stdout:
-                return True
-        except Exception:
-            pass
-        time.sleep(_PROMPT_POLL_INTERVAL)
-    return False
-
-
-def _send_keys(window_name: str, command: str) -> bool:
-    """tmux 윈도우에 명령 키를 전송한다."""
-    target = _tmux_window_target(window_name)
-    if not target:
-        _log("ERROR", f"_send_keys: invalid target for window '{window_name}' (empty string)")
-        return False
-    try:
-        result = _run_tmux("send-keys", "-t", target, command, "Enter")
-        return result.returncode == 0
-    except Exception as e:
-        _log("ERROR", f"send_keys failed: {e}")
-        return False
-
-
-def _kill_window(window_name: str) -> bool:
-    """tmux 윈도우를 종료한다."""
-    target = _tmux_window_target(window_name)
-    if not target:
-        _log("WARN", f"_kill_window: invalid target for window '{window_name}' (empty string), skipping kill")
-        return False
-    try:
-        result = _run_tmux("kill-window", "-t", target)
-        return result.returncode == 0
-    except Exception:
-        return False
 
 
 # ─── 티켓 파싱 유틸 ─────────────────────────────────────────────────────────
@@ -436,8 +567,11 @@ def launch_next_stage(
 ) -> int:
     """다음 체인 스테이지를 발사한다.
 
+    HTTP API 우선 경로와 TMUX 폴백 경로를 지원한다.
+    서버 포트를 해석할 수 있으면 HTTP API 경로로 진행하고,
+    해석 불가 시 기존 tmux 폴백 경로로 진행한다.
+
     실패 시 while 루프로 CHAIN_MAX_RETRY 횟수만큼 재시도한다.
-    재귀 호출 없이 루프 구조로 구현되어 재시도 횟수가 크더라도 스택 오버플로우가 발생하지 않는다.
 
     Args:
         ticket_number: T-NNN 형식 티켓 번호
@@ -449,6 +583,18 @@ def launch_next_stage(
         0=성공, 1=실패
     """
     _wf_log("INFO", f"chain_launcher: launch_next_stage start ticket={ticket_number} remaining={remaining_chain}")
+
+    # 서버 포트 해석: HTTP API 경로 또는 TMUX 폴백 결정
+    port = _resolve_server_port()
+    use_http = port is not None
+
+    if use_http:
+        _log("INFO", f"using HTTP API path (port={port})")
+    else:
+        _log("INFO", "using TMUX fallback path (server port not resolved)")
+
+    # 이전 세션 식별: HTTP 경로에서는 _WF_SESSION_ID 환경변수, TMUX 경로에서는 윈도우명
+    prev_session_id = os.environ.get("_WF_SESSION_ID", "").strip()
     window_name = f"{WINDOW_PREFIX_P}{ticket_number}"
 
     current_retry: int = retry_count
@@ -458,16 +604,24 @@ def launch_next_stage(
     while current_retry <= CHAIN_MAX_RETRY:
         _log("INFO", f"ticket={ticket_number} remaining={remaining_chain} retry={current_retry}/{CHAIN_MAX_RETRY}")
 
-        # ── Step 1: 이전 tmux 윈도우 사망 대기 ──
-        _log("INFO", f"waiting for window {window_name} to die...")
-        window_gone: bool = _wait_for_window_death(window_name)
-        if not window_gone:
-            # 타임아웃 시 강제 kill 후 진행
-            _log("WARN", f"window {window_name} still alive after timeout, force killing")
-            _kill_window(window_name)
-            time.sleep(1)
+        # ── Step 1: 이전 세션 종료 대기 ──
+        if use_http and prev_session_id:
+            _log("INFO", f"waiting for session {prev_session_id} to exit...")
+            session_gone: bool = _wait_for_session_exit(prev_session_id, port)
+            if not session_gone:
+                _log("WARN", f"session {prev_session_id} still alive after timeout, force killing")
+                _kill_session(port, prev_session_id)
+                time.sleep(1)
+        else:
+            # TMUX 폴백: 윈도우 사망 대기
+            _log("INFO", f"waiting for window {window_name} to die...")
+            window_gone: bool = _tmux_wait_for_window_death(window_name)
+            if not window_gone:
+                _log("WARN", f"window {window_name} still alive after timeout, force killing")
+                _tmux_kill_window(window_name)
+                time.sleep(1)
 
-        # ── Step 2: 새 티켓 생성 + 관계 링크 + prompt 복사 ──
+        # ── Step 2: 새 티켓 생성 + 관계 링크 + prompt 복사 (경로 무관, 동일 로직) ──
         if not _new_ticket_created:
             # 이전 티켓에서 goal/target 복사
             prev_data = _read_previous_prompt(ticket_number)
@@ -546,41 +700,68 @@ def launch_next_stage(
         else:
             _log("INFO", "new ticket already created, skipping")
 
-        # ── Step 3: 새 tmux 윈도우 생성 + 프롬프트 대기 + /wf -s NEW_N 전송 ──
-        new_window_name = f"{WINDOW_PREFIX_P}{new_ticket_number}"
-        _log("INFO", f"creating window {new_window_name}")
-
-        if not _create_window(new_window_name):
-            _log("ERROR", f"window creation failed: {new_window_name}")
-            _wf_log("ERROR", f"chain_launcher: window creation failed window={new_window_name}")
-            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
-            if should_continue:
-                continue
-            break
-
-        _log("INFO", f"polling for prompt in {new_window_name}")
-        if not _poll_for_prompt(new_window_name):
-            _log("ERROR", f"prompt not detected in {new_window_name} after {_PROMPT_POLL_MAX}s")
-            _wf_log("ERROR", f"chain_launcher: prompt not detected window={new_window_name} timeout={_PROMPT_POLL_MAX}s")
-            _kill_window(new_window_name)
-            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
-            if should_continue:
-                continue
-            break
-
-        # /wf -s NEW_N 명령 전송 (새 티켓 번호 사용)
+        # ── Step 3: 새 세션 시작 + 명령 전송 ──
         wf_command = f"/wf -s {new_ticket_num_int}"
-        _log("INFO", f"sending command: {wf_command}")
-        if not _send_keys(new_window_name, wf_command):
-            _log("ERROR", f"send_keys failed for {new_window_name}")
-            current_retry, should_continue = _increment_retry(current_retry, ticket_number)
-            if should_continue:
-                continue
-            break
 
-        _log("INFO", f"chain stage launched successfully: prev={ticket_number} new={new_ticket_number} next={remaining_chain}")
-        _wf_log("INFO", f"chain_launcher: launch_next_stage complete prev={ticket_number} new={new_ticket_number} next={remaining_chain}")
-        return 0
+        if use_http:
+            # HTTP API 경로: _start_workflow_session + _send_command
+            _log("INFO", f"starting workflow session for {new_ticket_number} via HTTP API")
+            session_id = _start_workflow_session(port, new_ticket_number, wf_command)
+            if not session_id:
+                _log("ERROR", f"workflow session start failed for {new_ticket_number}")
+                _wf_log("ERROR", f"chain_launcher: http session start failed ticket={new_ticket_number}")
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+
+            _log("INFO", f"session started: {session_id}, sending command: {wf_command}")
+            if not _send_command(port, session_id, wf_command):
+                _log("ERROR", f"send_command failed for session {session_id}")
+                _kill_session(port, session_id)
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+
+            _log("INFO", f"chain stage launched via HTTP: prev={ticket_number} new={new_ticket_number} session={session_id}")
+            _wf_log("INFO", f"chain_launcher: launch_next_stage complete (http) prev={ticket_number} new={new_ticket_number} session={session_id}")
+            return 0
+
+        else:
+            # TMUX 폴백 경로: 기존 윈도우 생성 + 프롬프트 대기 + 키 전송
+            new_window_name = f"{WINDOW_PREFIX_P}{new_ticket_number}"
+            _log("INFO", f"creating tmux window {new_window_name} (fallback)")
+
+            if not _tmux_create_window(new_window_name):
+                _log("ERROR", f"tmux window creation failed: {new_window_name}")
+                _wf_log("ERROR", f"chain_launcher: tmux window creation failed window={new_window_name}")
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+
+            _log("INFO", f"polling for prompt in {new_window_name}")
+            if not _tmux_poll_for_prompt(new_window_name):
+                _log("ERROR", f"prompt not detected in {new_window_name} after timeout")
+                _wf_log("ERROR", f"chain_launcher: prompt not detected window={new_window_name}")
+                _tmux_kill_window(new_window_name)
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+
+            _log("INFO", f"sending command: {wf_command}")
+            if not _tmux_send_keys(new_window_name, wf_command):
+                _log("ERROR", f"tmux send_keys failed for {new_window_name}")
+                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
+                if should_continue:
+                    continue
+                break
+
+            _log("INFO", f"chain stage launched via tmux: prev={ticket_number} new={new_ticket_number}")
+            _wf_log("INFO", f"chain_launcher: launch_next_stage complete (tmux) prev={ticket_number} new={new_ticket_number}")
+            return 0
 
     # 루프 탈출: 재시도 소진
     fallback_num = new_ticket_num_int if new_ticket_num_int else _extract_ticket_number_int(ticket_number)
@@ -619,7 +800,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="chain_launcher",
-        description="체인 스테이지 비동기 tmux 발사 스크립트",
+        description="체인 스테이지 비동기 발사 스크립트 (HTTP API 우선, TMUX 폴백)",
     )
     parser.add_argument("ticket_number", help="T-NNN 형식 티켓 번호")
     parser.add_argument("remaining_chain", help='남은 체인 문자열 (예: "implement>review")')

@@ -1,9 +1,8 @@
 #!/usr/bin/env -S python3 -u
 """research/review 세션 Write/Edit/Bash 차단 가드 Hook 스크립트.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 tmux 윈도우가 워크플로우 세션
-(P:T-* 접두사)이고 활성 워크플로우의 command가 research 또는 review이면
-코드 수정을 차단한다.
+PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션이고
+활성 워크플로우의 command가 research 또는 review이면 코드 수정을 차단한다.
 
 주요 함수:
     main: Hook 진입점, stdin JSON 파싱 후 research/review 세션 Write/Edit/Bash 차단
@@ -19,7 +18,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 
 # utils 패키지 import 경로 설정
@@ -33,13 +31,11 @@ if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 
 from common import load_json_file, read_env, resolve_project_root, scan_active_workflows
+from flow.session_identifier import get_session_type
 from messages import (
     READONLY_SESSION_BASH_MODIFY_DENIED,
     READONLY_SESSION_WRITE_EDIT_DENIED,
 )
-
-# 워크플로우 세션 윈도우명 접두사
-_WORKFLOW_WINDOW_PREFIX = "P:T-"
 
 # 읽기 전용 command 목록 (이 command에서는 코드 수정이 금지됨)
 _READONLY_COMMANDS = ("research", "review")
@@ -78,33 +74,6 @@ def _deny(reason: str) -> None:
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _get_current_window_name() -> str | None:
-    """현재 tmux 윈도우 이름을 반환한다.
-
-    TMUX_PANE 환경변수가 없으면 None을 반환한다.
-    tmux 명령 실행 실패 시에도 None을 반환한다.
-
-    Returns:
-        현재 윈도우명 문자열. 비tmux 환경 또는 실행 실패 시 None.
-    """
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["tmux", "display-message", "-t", tmux_pane, "-p", "#W"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
-    return None
 
 
 def _get_workflow_command() -> str | None:
@@ -227,10 +196,10 @@ def main() -> None:
     """research/review 세션 Write/Edit/Bash 차단 Hook의 진입점.
 
     stdin에서 JSON을 읽어 Write/Edit/Bash 도구 사용 시 현재 세션이
-    워크플로우 세션(P:T-* 윈도우)이고 command가 research/review이면
+    워크플로우 세션이고 command가 research/review이면
     deny 응답을 출력하여 코드 수정을 차단한다.
 
-    비tmux 환경 또는 메인 세션에서는 무조건 통과한다.
+    비워크플로우 세션에서는 무조건 통과한다.
     .workflow/ 하위 파일 Write/Edit는 허용한다.
     """
     # .claude.workflow/.settings(.env 폴백)에서 설정 로드
@@ -252,20 +221,9 @@ def main() -> None:
     if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
-    # TMUX_PANE 환경변수 확인 -- 비tmux 환경에서는 통과 (이 가드의 관심사 아님)
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        sys.exit(0)
-
-    # tmux 윈도우명 조회
-    window_name = _get_current_window_name()
-
-    # 윈도우명 조회 실패 시 통과 (보수적이되 false positive 방지)
-    if window_name is None:
-        sys.exit(0)
-
-    # 워크플로우 세션(P:T-* 접두사)이 아니면 통과 (메인 세션은 이 가드의 관심사 아님)
-    if not window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
+    # 세션 유형 판별 -- 워크플로우 세션이 아니면 통과 (이 가드의 관심사 아님)
+    session_type = get_session_type()
+    if session_type != "workflow":
         sys.exit(0)
 
     # --- 워크플로우 세션 확인됨, command 판별 ---

@@ -26,49 +26,29 @@ if _scripts_dir not in sys.path:
 
 from common import resolve_project_root
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
-from flow.tmux_utils import (
-    get_current_window_name,
-    WINDOW_PREFIX_P,
-)
+from flow.session_identifier import is_workflow_session, get_session_ticket_id
 
 
 def _extract_ticket_id() -> str | None:
-    """현재 tmux 윈도우명에서 활성 티켓 ID(T-NNN)를 추출한다.
+    """현재 세션의 활성 티켓 ID(T-NNN)를 반환한다.
 
-    tmux 윈도우 이름이 "P:T-NNN" 형식인 경우 "T-NNN" 부분을 반환한다.
-    워크플로우 세션이 아니거나 추출에 실패하면 None을 반환한다.
+    session_identifier.get_session_ticket_id()에 위임한다.
 
     Returns:
         티켓 ID 문자열 (예: "T-001"). 워크플로우 세션이 아니거나 추출 실패 시 None.
     """
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return None
-
-    window_name = get_current_window_name()
-    prefix = f"{WINDOW_PREFIX_P}T-"
-    if not window_name.startswith(prefix):
-        return None
-
-    # "P:" 접두사를 제거하여 "T-NNN" 부분만 반환
-    return window_name[len(WINDOW_PREFIX_P):]
+    return get_session_ticket_id()
 
 
 def _is_workflow_session() -> bool:
     """현재 세션이 워크플로우 세션인지 판별한다.
 
-    TMUX_PANE 환경변수가 있으면 tmux 윈도우 이름을 조회하여
-    P:T- 접두사 여부로 판별한다. TMUX_PANE이 없으면 False를 반환한다.
+    session_identifier.is_workflow_session()에 위임한다.
 
     Returns:
-        워크플로우 세션(P:T-* 윈도우)이면 True, 그 외 False.
+        워크플로우 세션이면 True, 그 외 False.
     """
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return False
-
-    window_name = get_current_window_name()
-    return window_name.startswith(f"{WINDOW_PREFIX_P}T-")
+    return is_workflow_session()
 
 
 def main() -> None:

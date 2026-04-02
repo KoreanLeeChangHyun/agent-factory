@@ -9,10 +9,12 @@ user_prompt.txt에 append한다.
 
 사용법:
   flow-reload <workDir>
+  flow-reload <registryKey>
   flow-reload --help
 
 인자:
-  workDir - 작업 디렉터리 상대 경로
+  workDir    - 작업 디렉터리 상대 경로
+  registryKey - YYYYMMDD-HHMMSS 형식의 레지스트리 키 (workDir 자동 해석)
 
 환경변수:
   TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식)
@@ -28,6 +30,7 @@ user_prompt.txt에 append한다.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -47,6 +50,54 @@ from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log
 
 _KST = KST
+_REGISTRY_KEY_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+
+
+def _resolve_workdir_from_registry(registry_key: str) -> tuple[str | None, list[str]]:
+    """registryKey로부터 workDir 절대 경로를 자동 해석한다.
+
+    탐색 순서:
+      1. .claude.workflow/workflow/<registry_key>/ 하위 디렉터리 스캔
+      2. 1차 탐색 실패(디렉터리 미존재) 시 .claude.workflow/workflow/.history/<registry_key>/ 하위 스캔
+
+    Args:
+        registry_key: 'YYYYMMDD-HHMMSS' 형식의 레지스트리 키
+
+    Returns:
+        (resolved_path, candidates) 튜플.
+        - 유일한 경로 발견 시: (절대경로, [절대경로])
+        - 복수 경로 발견 시: (None, [경로1, 경로2, ...])
+        - 디렉터리 미존재 시: (None, [])
+    """
+    def _scan_registry_dir(registry_dir: str) -> list[str]:
+        """registry_dir 하위 workDir 후보 목록을 반환한다."""
+        if not os.path.isdir(registry_dir):
+            return []
+        result: list[str] = []
+        for work_name in os.listdir(registry_dir):
+            work_path = os.path.join(registry_dir, work_name)
+            if not os.path.isdir(work_path):
+                continue
+            for command in os.listdir(work_path):
+                cmd_path = os.path.join(work_path, command)
+                if os.path.isdir(cmd_path):
+                    result.append(cmd_path)
+        return result
+
+    workflow_base = os.path.join(_PROJECT_ROOT, ".claude.workflow", "workflow")
+
+    # 1차 탐색: 활성 workflow 디렉터리
+    registry_dir = os.path.join(workflow_base, registry_key)
+    candidates = _scan_registry_dir(registry_dir)
+
+    # 2차 탐색: .history/ 아카이브 디렉터리
+    if not candidates:
+        history_registry_dir = os.path.join(workflow_base, ".history", registry_key)
+        candidates = _scan_registry_dir(history_registry_dir)
+
+    if len(candidates) == 1:
+        return candidates[0], candidates
+    return None, candidates
 
 
 def _normalize_ticket_number(raw: str) -> str | None:
@@ -219,12 +270,38 @@ def main() -> None:
     parser.add_argument(
         "work_dir",
         metavar="workDir",
-        help="작업 디렉터리 상대 경로 (예: .claude.workflow/workflow/YYYYMMDD-HHMMSS/...)",
+        help=(
+            "작업 디렉터리 상대 경로 또는 registryKey (YYYYMMDD-HHMMSS 형식).\n"
+            "registryKey 형식으로 전달하면 하위 workDir을 자동 해석합니다.\n"
+            "예: .claude.workflow/workflow/YYYYMMDD-HHMMSS/workName/command\n"
+            "    20260403-011117"
+        ),
     )
     args = parser.parse_args()
 
     work_dir = args.work_dir
-    abs_work_dir = os.path.join(_PROJECT_ROOT, work_dir)
+
+    # registryKey 형식 판별 및 자동 해석
+    if _REGISTRY_KEY_PATTERN.match(work_dir):
+        registry_key = work_dir
+        resolved, candidates = _resolve_workdir_from_registry(registry_key)
+        if resolved is None:
+            if not candidates:
+                print(
+                    f"[ERROR] registryKey '{registry_key}'에 해당하는 워크플로우 디렉터리를 찾을 수 없습니다",
+                    file=sys.stderr,
+                )
+            else:
+                paths_str = "\n  - ".join(candidates)
+                print(
+                    f"[ERROR] registryKey '{registry_key}' 하위에 복수 작업 경로가 존재합니다."
+                    f" 전체 경로를 지정하세요:\n  - {paths_str}",
+                    file=sys.stderr,
+                )
+            sys.exit(1)
+        abs_work_dir = resolved
+    else:
+        abs_work_dir = os.path.join(_PROJECT_ROOT, work_dir)
 
     if not os.path.isdir(abs_work_dir):
         print(f"[ERROR] workDir not found: {work_dir}", file=sys.stderr)
@@ -247,6 +324,28 @@ def main() -> None:
         print("FAIL", flush=True)
         sys.exit(0)
 
+    # --- Step 1.5: work/*.md 파일 수집 ---
+    work_context = ""
+    work_dir_path = abs_work_dir + "/work/"
+    if os.path.isdir(work_dir_path):
+        md_files = sorted(glob.glob(work_dir_path + "*.md"))
+        # skill-map.md 제외 (부수 산출물)
+        md_files = [f for f in md_files if os.path.basename(f) != "skill-map.md"]
+        # 최대 5개 제한 (알파벳순 = 작업 순서, 마지막 5개 선택)
+        if len(md_files) > 5:
+            md_files = md_files[-5:]
+        parts: list[str] = []
+        for md_path in md_files:
+            fname = os.path.basename(md_path)
+            try:
+                with open(md_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                parts.append(f"--- work/{fname} ---\n\n{content}")
+            except Exception:
+                continue
+        if parts:
+            work_context = "\n\n".join(parts)
+
     # --- Step 2: user_prompt.txt에 피드백 append ---
     kst_date = datetime.now(_KST).strftime("%Y-%m-%d %H:%M")
     user_prompt_file = os.path.join(abs_work_dir, "user_prompt.txt")
@@ -254,6 +353,9 @@ def main() -> None:
     with open(user_prompt_file, "a", encoding="utf-8") as f:
         f.write(f"\n\n--- (수정 피드백, {kst_date}) ---\n\n")
         f.write(feedback)
+        if work_context:
+            f.write("\n\n--- (작업 내역 컨텍스트) ---\n\n")
+            f.write(work_context)
 
     append_log(abs_work_dir, "INFO", "reload_prompt: complete")
     print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}RELOAD{C_RESET}", flush=True)

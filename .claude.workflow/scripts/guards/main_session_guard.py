@@ -1,10 +1,13 @@
 #!/usr/bin/env -S python3 -u
 """메인 세션 Write/Edit/Bash 차단 가드 Hook 스크립트.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 tmux 윈도우가 워크플로우 세션
-(P:T-* 접두사)이 아닌 메인 세션이면 코드 수정을 차단한다.
-비tmux 환경(TMUX_PANE 미설정)에서도 차단한다.
+PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션
+(_WF_SESSION_TYPE=workflow 또는 P:T-* tmux 윈도우)이 아닌 메인 세션이면
+코드 수정을 차단한다.
+비워크플로우 환경에서도 차단한다.
 Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
+
+세션 식별은 session_identifier.get_session_type()에 위임한다.
 
 주요 함수:
     main: Hook 진입점, stdin JSON 파싱 후 메인 세션 Write/Edit/Bash 차단
@@ -33,15 +36,12 @@ if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 
 from common import read_env
+from flow.session_identifier import get_session_type
 from messages import (
     MAIN_SESSION_BASH_FILE_MODIFY_DENIED,
     MAIN_SESSION_NO_TMUX_DENIED,
-    MAIN_SESSION_WINDOW_QUERY_FAILED,
     MAIN_SESSION_WRITE_EDIT_DENIED,
 )
-
-# 워크플로우 세션 윈도우명 접두사
-_WORKFLOW_WINDOW_PREFIX = "P:T-"
 
 # Bash 도구에서 파일을 수정할 수 있는 명령 패턴 (블랙리스트)
 _BASH_FILE_MODIFY_PATTERNS: list[str] = [
@@ -74,35 +74,6 @@ def _deny(reason: str) -> None:
     }
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
-
-
-def _get_current_window_name() -> str | None:
-    """현재 tmux 윈도우 이름을 반환한다.
-
-    TMUX_PANE 환경변수가 없으면 None을 반환한다.
-    tmux 명령 실행 실패 시에도 None을 반환한다.
-
-    Returns:
-        현재 윈도우명 문자열. 비tmux 환경 또는 실행 실패 시 None.
-    """
-    import subprocess
-
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["tmux", "display-message", "-t", tmux_pane, "-p", "#W"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
-    return None
 
 
 def _strip_quoted_args(command: str) -> str:
@@ -174,9 +145,9 @@ def main() -> None:
     """메인 세션 Write/Edit/Bash 차단 Hook의 진입점.
 
     stdin에서 JSON을 읽어 Write/Edit/Bash 도구 사용 시 현재 세션이
-    워크플로우 세션(P:T-* 윈도우)인지 확인하고,
-    메인 세션이면 deny 응답을 출력하여 코드 수정을 차단한다.
-    비tmux 환경에서도 차단한다.
+    워크플로우 세션인지 확인하고, 메인 세션이면 deny 응답을 출력하여
+    코드 수정을 차단한다.
+    세션 식별은 session_identifier.get_session_type()에 위임한다.
     Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
     """
     # .claude.workflow/.settings(.env 폴백)에서 설정 로드
@@ -204,37 +175,27 @@ def main() -> None:
     if file_path.endswith(".claude.workflow/.version"):
         sys.exit(0)
 
-    # TMUX_PANE 환경변수 확인
-    tmux_pane = os.environ.get("TMUX_PANE")
-    if not tmux_pane:
-        # 비tmux 환경에서는 차단 (Bash는 파일 수정 패턴만 차단)
+    # 세션 유형 판별 (session_identifier에 위임)
+    session_type = get_session_type()
+
+    # 워크플로우 세션이면 통과
+    if session_type == "workflow":
+        sys.exit(0)
+
+    # unknown: 세션 유형 판별 실패 (보수적 차단)
+    if session_type == "unknown":
         if tool_name == "Bash":
             command = tool_input.get("command", "")
             _check_bash_file_modify(command)
         _deny(MAIN_SESSION_NO_TMUX_DENIED)
 
-    # tmux 윈도우명 조회
-    window_name = _get_current_window_name()
-
-    # 윈도우명 조회 실패 시 안전 차단 (보수적 접근)
-    if window_name is None:
-        # Bash는 파일 수정 패턴만 차단
-        if tool_name == "Bash":
-            command = tool_input.get("command", "")
-            _check_bash_file_modify(command)
-        _deny(MAIN_SESSION_WINDOW_QUERY_FAILED)
-
-    # 워크플로우 세션(P:T-* 접두사)이면 통과
-    if window_name.startswith(_WORKFLOW_WINDOW_PREFIX):
-        sys.exit(0)
-
-    # 메인 세션에서 Bash는 파일 수정 패턴만 차단
+    # main 세션: Bash는 파일 수정 패턴만 차단
     if tool_name == "Bash":
         command = tool_input.get("command", "")
         _check_bash_file_modify(command)
 
     # 메인 세션에서 Write/Edit는 차단
-    _deny(MAIN_SESSION_WRITE_EDIT_DENIED.format(window_name=window_name))
+    _deny(MAIN_SESSION_WRITE_EDIT_DENIED.format(window_name=session_type))
 
 
 if __name__ == "__main__":

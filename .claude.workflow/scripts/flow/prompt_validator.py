@@ -35,6 +35,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 from common import C_CLAUDE, C_DIM, C_RESET
+from data.constants import QUALITY_THRESHOLD
 from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
@@ -330,12 +331,12 @@ def main() -> None:
 
     result = validate(prompt_text)
 
-    if result["quality_score"] < 0.5:
+    if result["quality_score"] < QUALITY_THRESHOLD:
         if _work_dir:
             append_log(
                 _work_dir,
                 "WARN",
-                f"prompt_validator: quality_score={result['quality_score']:.4f} below 0.5 path={prompt_path}",
+                f"prompt_validator: quality_score={result['quality_score']:.4f} below {QUALITY_THRESHOLD} path={prompt_path}",
             )
 
     print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-P{C_RESET}", flush=True)

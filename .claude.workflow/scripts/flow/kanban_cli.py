@@ -51,21 +51,94 @@ _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT: str = resolve_project_root()
 
 
-# ─── tmux 헬퍼 ───────────────────────────────────────────────────────────────
+# ─── 세션 헬퍼 ───────────────────────────────────────────────────────────────
+
+import json
+import urllib.request
 
 _TMUX_WINDOW_PREFIX: str = "P:"
 
 
-def _tmux_kill_ticket_window(ticket_number: str) -> None:
-    """tmux 세션에서 해당 티켓의 P:T-NNN 윈도우를 종료한다.
+def _resolve_server_port() -> "int | None":
+    """서버 포트를 해석한다.
 
-    비tmux 환경($TMUX 미설정) 또는 윈도우 미존재 시 조용히 건너뛴다.
+    _WF_SERVER_PORT 환경변수 또는 .claude.workflow/.board.url 파일에서 포트를 추출한다.
+
+    Returns:
+        포트 번호(int) 또는 None (해석 불가 시).
+    """
+    # 1) 환경변수 우선
+    port_env = os.environ.get("_WF_SERVER_PORT")
+    if port_env:
+        try:
+            return int(port_env)
+        except ValueError:
+            pass
+
+    # 2) .board.url 파일 파싱: http://127.0.0.1:PORT/board
+    board_url_path = os.path.join(_PROJECT_ROOT, ".claude.workflow", ".board.url")
+    try:
+        with open(board_url_path, "r", encoding="utf-8") as f:
+            url = f.read().strip()
+        # http://127.0.0.1:PORT/... 형식에서 PORT 추출
+        if "://" in url:
+            host_part = url.split("://", 1)[1]  # 127.0.0.1:PORT/...
+            host_port = host_part.split("/")[0]  # 127.0.0.1:PORT
+            if ":" in host_port:
+                return int(host_port.split(":")[1])
+    except (OSError, ValueError):
+        pass
+
+    return None
+
+
+def _kill_ticket_session(ticket_number: str) -> None:
+    """활성 세션에서 해당 티켓의 워크플로우 세션을 종료한다.
+
+    HTTP API(서버 기동 중)를 통해 세션을 종료하고,
+    서버 미기동 시 tmux kill-window 폴백을 사용한다.
     상태 전이 성공 후에만 호출되어야 한다.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식). 윈도우명 P:T-NNN으로 변환됨.
+        ticket_number: 티켓 번호 (T-NNN 형식).
     """
-    # 비tmux 환경 방어: $TMUX 환경변수 미설정 시 건너뜀
+    port = _resolve_server_port()
+
+    if port is not None:
+        # HTTP API 경로: 세션 목록 조회 후 ticket_id 매칭 세션 kill
+        try:
+            list_url = f"http://127.0.0.1:{port}/terminal/workflow/list"
+            req = urllib.request.Request(list_url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            sessions = data if isinstance(data, list) else data.get("sessions", [])
+            session_id = None
+            for session in sessions:
+                if session.get("ticket_id") == ticket_number or session.get("ticket") == ticket_number:
+                    session_id = session.get("session_id") or session.get("id")
+                    break
+
+            if session_id:
+                kill_url = f"http://127.0.0.1:{port}/terminal/workflow/kill"
+                kill_body = json.dumps({"session_id": session_id}).encode("utf-8")
+                kill_req = urllib.request.Request(
+                    kill_url,
+                    data=kill_body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(kill_req, timeout=5) as kill_resp:
+                    kill_resp.read()
+                log("INFO", f"kanban.py: http kill session_id={session_id} ({ticket_number})")
+            else:
+                log("INFO", f"kanban.py: no active session found for {ticket_number}")
+            return
+        except Exception:
+            # HTTP 오류는 상태 전이와 무관하므로 무시하고 반환
+            return
+
+    # 포트 미해석 시 tmux 폴백 (하위호환)
     if not os.environ.get("TMUX"):
         return
 
@@ -235,11 +308,11 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     if current_section == "In Progress":
         _cleanup_worktree_on_leave(ticket_number)
 
-    # Open 전이 시 tmux 윈도우 자동 kill:
-    # Submit 또는 In Progress에서 Open으로 복귀하면 해당 티켓의 P:T-NNN 윈도우를 종료한다.
+    # Open 전이 시 세션 자동 kill:
+    # Submit 또는 In Progress에서 Open으로 복귀하면 해당 티켓의 활성 세션을 종료한다.
     # 상태 전이 성공 후에 실행하므로 전이 실패 시(err() 호출 후 SystemExit) 여기에 도달하지 않는다.
     if target_section == "Open" and current_section in ("Submit", "In Progress"):
-        _tmux_kill_ticket_window(ticket_number)
+        _kill_ticket_session(ticket_number)
 
 
 def cmd_done(ticket_number: str) -> None:

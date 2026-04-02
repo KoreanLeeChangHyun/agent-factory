@@ -10,7 +10,12 @@
       "Edit(.claude.workflow/board/**)",
       "Edit(.claude/skills/**)",
       "Edit(.claude/agents/**)",
-      "Edit(.claude/commands/**)"
+      "Edit(.claude/commands/**)",
+      "Edit(.claude/rules/**)",
+      "Write(.claude/skills/**)",
+      "Write(.claude/agents/**)",
+      "Write(.claude/commands/**)",
+      "Write(.claude/rules/**)"
     ]
   },
   "statusLine": {

@@ -391,10 +391,10 @@ flow-kanban move T-NNN submit
 #### tmux 환경 분기
 
 ```bash
-flow-tmux launch T-NNN '/wf -s N'
+flow-launcher launch T-NNN '/wf -s N'
 ```
 
-- **`LAUNCH:`**: 복귀 메시지(`T-NNN 워크플로우를 새 tmux 윈도우에서 실행합니다.`) 출력 (이후 로직 미실행)
+- **`LAUNCH:`**: 복귀 메시지(`T-NNN 워크플로우를 새 세션에서 실행합니다.`) 출력 (이후 로직 미실행)
 - **`INLINE:`**: 아래 2-1~2-5 로직을 그대로 실행
 - **exit code 1**: 에러 메시지 출력 후 종료
 
@@ -584,10 +584,10 @@ Glob 도구로 `.claude.workflow/kanban/open/T-NNN.xml`, `.claude.workflow/kanba
 #### 4-3. 삭제 실행
 
 ```bash
-flow-tmux launch T-NNN '/wf -c N'
+flow-launcher launch T-NNN '/wf -c N'
 ```
 
-- **`LAUNCH:`**: 복귀 메시지(`T-NNN 티켓 삭제를 새 tmux 윈도우에서 실행합니다.`) 출력 후 종료
+- **`LAUNCH:`**: 복귀 메시지(`T-NNN 티켓 삭제를 새 세션에서 실행합니다.`) 출력 후 종료
 - **`INLINE:`**: `flow-kanban delete T-NNN` 인라인 실행 후 4-4로 진행
 - **exit code 1**: 에러 메시지 출력 후 종료
 
@@ -611,12 +611,12 @@ T-NNN 티켓이 삭제되었습니다.
 | `-e N` | Done | Open (복원) | `flow-kanban move T-NNN open` (done/ -> open/ 이동 처리는 kanban_cli.py 내부 처리) + 편집 루프 (`-oe N`도 동일 동작) |
 | `-e N` | Review/In Progress | Open (자동 복귀) | `flow-kanban move T-NNN open` + 편집 루프 (`-oe N`도 동일 동작) |
 | `-e N` | Open | Open (유지) | -- (편집 루프 진입, `-oe N`도 동일 동작) |
-| `-s` | Open | In Progress | `flow-tmux launch T-NNN '/wf -s N'` (LAUNCH/INLINE/에러 분기) |
+| `-s` | Open | In Progress | `flow-launcher launch T-NNN '/wf -s N'` (LAUNCH/INLINE/에러 분기) |
 | `-s` (완료 후) | In Progress | Review | `flow-kanban move T-NNN review` (workflow-wf submit 처리) |
 | `-d` | Review | Done (간단검토 후 완료 선택 시) | 간단검토 -> `flow-merge T-NNN --force` |
 | `-d` | Review | Review (상세 review 선택 시) | 새 review 티켓 생성 + `flow-kanban link T-MMM --derived-from T-NNN` |
 | `-d` | Open/In Progress | Done | `flow-kanban done T-NNN` (기존 동작) |
-| `-c` | Any | (삭제) | `flow-tmux launch T-NNN '/wf -c N'` (LAUNCH/INLINE/에러 분기) |
+| `-c` | Any | (삭제) | `flow-launcher launch T-NNN '/wf -c N'` (LAUNCH/INLINE/에러 분기) |
 
 ## 티켓 프롬프트 생명주기
 
@@ -638,7 +638,7 @@ T-NNN 티켓이 삭제되었습니다.
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 접두사는 `` `[T-NNN]` : `[WF -플래그]` `` 형식을 사용합니다
 6. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
 7. **wf 스킬 직접 로드**: `-s` 플래그 실행 시 SlashCommand/Skill 도구가 아닌 Read 도구로 해당 스킬 파일을 직접 로드하여 실행합니다
-8. **독립 세션 실행**: `-s`와 `-c` 플래그는 `flow-tmux launch T-NNN '<command>'`로 새 윈도우 생성+폴링+명령전송을 위임합니다. stdout 접두사로 분기합니다: `LAUNCH:`=새 윈도우에서 실행 중, `INLINE:`=인라인 실행 필요(비tmux 환경 또는 재진입 감지), exit code 1=에러. 워크플로우 완료 시 finalization.py(1차, 3초 지연)와 PostToolUse hook(2차, 5초 지연)가 이중으로 tmux 윈도우를 자동 종료합니다
+8. **독립 세션 실행**: `-s`와 `-c` 플래그는 `flow-launcher launch T-NNN '<command>'`로 HTTP API 기반 세션 시작을 위임합니다. stdout 접두사로 분기합니다: `LAUNCH:`=새 세션에서 실행 중, `INLINE:`=인라인 실행 필요(서버 미기동 또는 재진입 감지), exit code 1=에러. 워크플로우 완료 시 finalization.py(1차, 3초 지연)와 PostToolUse hook(2차, 5초 지연)가 이중으로 HTTP API를 통해 세션을 자동 종료합니다
 9. **constraints/criteria 필수**: `0. 완료` 선택 시 constraints 또는 criteria가 누락이거나 10자 미만이면 완료를 거부하고 루프를 계속합니다. Step 1-4(신규 생성)와 Step 1-B-5(편집 루프, 최초/추가 사이클 양쪽) 모두에 적용됩니다. `-o` 단독 모드에서는 편집 루프에 진입하지 않으므로 이 검증이 적용되지 않습니다
 10. **Review 분기 흐름**: `-d` 플래그 실행 시 Review 상태 티켓은 간단 검토를 먼저 수행합니다. merge는 사용자의 명시적 "완료" 선택 후에만 실행됩니다. Review 이외 상태에서는 기존과 동일하게 즉시 Done 처리됩니다
 11. **품질 검증 (prompt_validator)**: `flow-kanban update-prompt` 호출 시 `prompt_validator.py`가 자동으로 품질 점수를 계산합니다. 검증 대상 태그는 `goal`, `target`, `constraints`, `criteria` 4개이며 공식은 `score = (존재_태그수/4) × 0.6 + (유효_태그수/4) × 0.4`입니다 (유효 = 10자 이상 & `TODO:` 미시작). 임계값은 `QUALITY_THRESHOLD = 0.6`이며 미달 시 프롬프트가 자동 롤백되고 exit code 1로 종료됩니다. `--skip-validation` 플래그를 추가하면 품질 검증을 건너뜁니다. `-o` 모드(채번+용도선택만)와 `-d` 상세 review 생성 시에는 편집 루프를 거치지 않으므로 `--skip-validation`을 사용합니다. `-e` 모드의 편집 루프에서는 constraints/criteria 10자 이상 검증이 선행되므로 품질 검증을 통과할 수 있습니다
