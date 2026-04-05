@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -55,7 +56,9 @@ def _handle_bash_flow_end(tool_input: dict) -> None:
         tool_input: The tool_input dict from the Bash hook payload.
     """
     command: str = tool_input.get('command', '') if isinstance(tool_input, dict) else ''
-    if 'flow-claude end' not in command:
+    # 명령어 시작 위치(줄 시작 또는 ; && || & 뒤)에서만 매칭 —
+    # 주석/문자열 리터럴/heredoc 내부의 'flow-claude end' 오탐 방지
+    if not re.search(r'(?:^|[;&|]\s*)flow-claude\s+end\b', command):
         return
 
     session_id: str | None = os.environ.get('_WF_SESSION_ID')
