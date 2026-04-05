@@ -277,6 +277,27 @@ _NDJSON_EVENT_MAP: dict[str, str] = {
 }
 
 
+def _parse_last_event_id(headers: object) -> int:
+    """HTTP 요청 헤더에서 Last-Event-ID를 파싱한다.
+
+    브라우저 EventSource는 재접속 시 자동으로 마지막 수신 이벤트의 id를
+    Last-Event-ID 헤더에 담아 전송한다.
+
+    Args:
+        headers: HTTP 요청 헤더 객체
+
+    Returns:
+        파싱된 정수 ID. 헤더 없거나 파싱 실패 시 -1.
+    """
+    try:
+        raw = headers.get('Last-Event-ID')
+        if raw is None:
+            return -1
+        return int(str(raw).strip())
+    except (ValueError, AttributeError):
+        return -1
+
+
 class TerminalSSEChannel:
     """터미널 출력 전용 SSE 브로드캐스트 채널.
 
@@ -300,19 +321,24 @@ class TerminalSSEChannel:
         """
         self._clients: list = []
         self._lock: threading.Lock = threading.Lock()
+        # 이벤트를 (seq_id, encoded) 튜플로 저장해 Last-Event-ID 기반 재개 지원
         self._history: collections.deque = collections.deque(maxlen=history_size)
+        self._next_seq: int = 0
         self._persist_path: str | None = persist_path
         self._persist_lock: threading.Lock = threading.Lock()
 
-    def add(self, wfile: object) -> None:
-        """클라이언트를 추가하고, 보관된 히스토리 이벤트를 즉시 재생한다.
+    def add(self, wfile: object, last_event_id: int = -1) -> None:
+        """클라이언트를 추가하고, last_event_id 이후의 히스토리를 재생한다.
 
         Args:
             wfile: HTTP 핸들러의 wfile (소켓 출력 스트림)
+            last_event_id: 클라이언트가 마지막으로 수신한 이벤트 seq_id (-1=전체 재생)
         """
         with self._lock:
             self._clients.append(wfile)
-            for encoded in list(self._history):
+            for seq_id, encoded in list(self._history):
+                if seq_id <= last_event_id:
+                    continue  # 이미 수신한 이벤트는 건너뜀
                 try:
                     wfile.write(encoded)
                     wfile.flush()
@@ -323,6 +349,7 @@ class TerminalSSEChannel:
         """히스토리 버퍼를 비운다. 새 세션 시작 시 이전 이벤트를 제거하기 위함."""
         with self._lock:
             self._history.clear()
+            self._next_seq = 0
 
     def replay_from_history(self, data: dict) -> None:
         """이전에 저장된 이벤트를 히스토리 버퍼에만 복원한다.
@@ -336,8 +363,10 @@ class TerminalSSEChannel:
         event_name = self._classify_event(data)
         payload = self._build_payload(data, event_name)
         json_payload = json.dumps(payload, ensure_ascii=False)
-        message = f"event: {event_name}\ndata: {json_payload}\n\n"
-        self._history.append(message.encode('utf-8'))
+        seq_id = self._next_seq
+        self._next_seq += 1
+        message = f"id: {seq_id}\nevent: {event_name}\ndata: {json_payload}\n\n"
+        self._history.append((seq_id, message.encode('utf-8')))
 
     def remove(self, wfile: object) -> None:
         """클라이언트를 제거한다.
@@ -370,13 +399,16 @@ class TerminalSSEChannel:
         event_name = self._classify_event(data)
         payload = self._build_payload(data, event_name)
         json_payload = json.dumps(payload, ensure_ascii=False)
-        message = f"event: {event_name}\ndata: {json_payload}\n\n"
-        encoded = message.encode('utf-8')
 
         dead_clients: list = []
         with self._lock:
-            # 링 버퍼에 저장 (재접속 시 재생용)
-            self._history.append(encoded)
+            seq_id = self._next_seq
+            self._next_seq += 1
+            # SSE `id:` 필드 → 브라우저가 자동으로 Last-Event-ID 재송신
+            message = f"id: {seq_id}\nevent: {event_name}\ndata: {json_payload}\n\n"
+            encoded = message.encode('utf-8')
+            # 링 버퍼에 (seq_id, encoded) 튜플로 저장
+            self._history.append((seq_id, encoded))
             for wfile in self._clients:
                 try:
                     wfile.write(encoded)
@@ -1633,7 +1665,9 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
 
-        terminal_sse_channel.add(self.wfile)
+        # 재접속 시 Last-Event-ID로 중복 재생 방지
+        last_event_id = _parse_last_event_id(self.headers)
+        terminal_sse_channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:
                 time.sleep(1)
@@ -1945,7 +1979,9 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
 
-        session.channel.add(self.wfile)
+        # 재접속 시 Last-Event-ID로 중복 재생 방지
+        last_event_id = _parse_last_event_id(self.headers)
+        session.channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:
                 time.sleep(1)
