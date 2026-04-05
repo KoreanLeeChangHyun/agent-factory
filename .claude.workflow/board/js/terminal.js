@@ -233,6 +233,31 @@
     initMarked();
   }
 
+  // ── Smart Auto-Scroll ──
+  var SCROLL_NEAR_BOTTOM_THRESHOLD = 100; // px — "하단 근처" 허용 범위
+
+  /**
+   * Returns true if the element's scroll position is within THRESHOLD px of bottom.
+   * Must be called BEFORE appending new content (post-append scrollHeight is larger).
+   * @param {HTMLElement} el
+   * @returns {boolean}
+   */
+  function isNearBottom(el) {
+    if (!el) return true;
+    return (el.scrollHeight - el.scrollTop - el.clientHeight) <= SCROLL_NEAR_BOTTOM_THRESHOLD;
+  }
+
+  /**
+   * Scrolls element to bottom only if it was near the bottom before the append.
+   * @param {HTMLElement} el
+   * @param {boolean} wasNearBottom — snapshot taken before content mutation
+   */
+  function scrollToBottomIfFollowing(el, wasNearBottom) {
+    if (el && wasNearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
   /**
    * Appends an HTML element to the output div and auto-scrolls to bottom.
    * Enforces MAX_OUTPUT_NODES limit by removing oldest children.
@@ -241,13 +266,15 @@
   function appendToOutput(el) {
     if (!outputDiv) return;
 
+    var follow = isNearBottom(outputDiv);
+
     // Enforce node limit
     while (outputDiv.childNodes.length >= MAX_OUTPUT_NODES) {
       outputDiv.removeChild(outputDiv.firstChild);
     }
 
     outputDiv.appendChild(el);
-    outputDiv.scrollTop = outputDiv.scrollHeight;
+    scrollToBottomIfFollowing(outputDiv, follow);
   }
 
   /**
@@ -1595,6 +1622,8 @@
       renderStatusBadge: function (status, msg) {
         if (!isWorkflowMode || !outputDiv) return;
 
+        var follow = isNearBottom(outputDiv);
+
         // Remove any existing badge first
         var existing = outputDiv.querySelector(".wf-status-badge");
         if (existing) existing.parentNode.removeChild(existing);
@@ -1618,7 +1647,7 @@
           '<span class="wf-badge-sub">' + _esc(subText) + '</span>';
 
         outputDiv.appendChild(badge);
-        outputDiv.scrollTop = outputDiv.scrollHeight;
+        scrollToBottomIfFollowing(outputDiv, follow);
       },
 
       /**
@@ -1764,8 +1793,9 @@
     plainLog += text;
     var ta = document.getElementById("terminal-text-output");
     if (ta && textViewActive) {
+      var follow = isNearBottom(ta);
       ta.value = plainLog;
-      ta.scrollTop = ta.scrollHeight;
+      scrollToBottomIfFollowing(ta, follow);
     }
   }
 
