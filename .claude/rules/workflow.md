@@ -40,7 +40,6 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 > `\n`이 누락되면 XML 래핑이 실패하여 태그 직후에 텍스트가 붙는 형식 오류가 발생한다.
 
 ### 기타 alias
-- flow-tmux: launch, cleanup
 - flow-claude: start, end
 - flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env
 - flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)

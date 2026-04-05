@@ -11,6 +11,7 @@
 .claude.workflow/dashboard/
 .claude.workflow/.board.url
 .claude.workflow/.sessions/
+.claude/scheduled_tasks.lock
 
 CLAUDE.md
 

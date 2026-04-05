@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # build.sh — Claude Code 워크플로우 환경 자동 초기화 스크립트
-# 지원: Ubuntu 20.04+, macOS 13.0+ | 의존성: git, curl, python3, tmux, gh
+# 지원: Ubuntu 20.04+, macOS 13.0+ | 의존성: git, curl, python3, gh | 선택: tmux
 
 # --- 상수 로드 ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -128,15 +128,18 @@ _register_gh_apt_repo() {
     && sudo apt-get update -qq
 }
 
-# --- python3 및 tmux 자동 설치 ---
+# --- python3 자동 설치 (tmux는 선택 사항) ---
 install_dependencies() {
-    print_step "2" "의존성 설치 확인 (python3, tmux, gh)"
+    print_step "2" "의존성 설치 확인 (python3, gh)"
     local missing_deps=()
     if ! command -v python3 &>/dev/null; then missing_deps+=("python3"); else check_python_version; fi
-    command -v tmux &>/dev/null || missing_deps+=("tmux")
     command -v gh   &>/dev/null || missing_deps+=("gh")
+    # tmux는 선택 사항 — TMUX_PANE 폴백 경로에서만 사용되므로 필수가 아님
+    if ! command -v tmux &>/dev/null; then
+        print_warning "tmux가 설치되어 있지 않습니다 (선택 사항). tmux 폴백 경로가 비활성화됩니다."
+    fi
     if [ "${#missing_deps[@]}" -eq 0 ]; then
-        print_success "의존성 이미 설치됨 (python3, tmux, gh)"; return 0
+        print_success "의존성 이미 설치됨 (python3, gh)"; return 0
     fi
     print_info "미설치 의존성: ${missing_deps[*]}"
     case "${DETECTED_OS:-linux}" in
@@ -853,8 +856,12 @@ verify_installation() {
     else
         print_error "python3 명령어를 찾을 수 없습니다"; failed=$((failed + 1))
     fi
-    # (b) tmux / gh / claude 검증
-    _verify_command "tmux" "tmux" || failed=$((failed + 1))
+    # (b) gh / claude 검증 (tmux는 선택 사항 — 없어도 실패 아님)
+    if command -v tmux &>/dev/null; then
+        print_success "tmux 실행 가능 (선택 사항, $(tmux -V 2>/dev/null || echo 'version unknown'))"
+    else
+        print_warning "tmux 명령어를 찾을 수 없습니다 (선택 사항 — tmux 폴백 경로만 비활성화됨)"
+    fi
     _verify_command "gh"   "gh CLI" || failed=$((failed + 1))
     if command -v claude &>/dev/null; then print_success "claude 명령어 실행 가능"
     else print_error "claude 명령어를 찾을 수 없습니다"; failed=$((failed + 1)); fi

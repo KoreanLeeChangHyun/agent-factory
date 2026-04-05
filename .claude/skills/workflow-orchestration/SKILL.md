@@ -377,7 +377,7 @@ flow-claude end <registryKey>                                                   
 2. **사용량 확정** -- `update_state.py usage-finalize` (비차단)
 3. **아카이빙** -- `history_sync.py archive` (비차단)
 4. **칸반 갱신** -- `update-kanban.sh` (workflow_id 있을 때만, 비차단)
-5. **tmux cleanup** -- TMUX_PANE + T-* 윈도우 조건 시 3초 지연 후 kill (비차단)
+5. **세션 cleanup** -- TMUX_PANE + T-* 윈도우 조건 시 3초 지연 후 kill (비차단)
 
 ### Post-DONE Silence (REQUIRED)
 

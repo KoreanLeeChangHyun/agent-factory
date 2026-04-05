@@ -21,7 +21,6 @@
 | `flow-recommend` | `flow-recommend <task_description>` | 태스크 설명 문자열 |
 | `flow-gc` | `flow-gc [project_root]` | 없음 (선택적) |
 | `flow-kanban` | `flow-kanban <subcommand> ...` (create/move/done/delete 등) | 서브커맨드 |
-| `flow-tmux` | `flow-tmux launch T-NNN '<command>'` / `flow-tmux cleanup T-NNN` | launch/cleanup 서브커맨드, 티켓 ID |
 
 <!-- SUMMARY_END -->
 
@@ -184,7 +183,7 @@ flow-init "implement>review" "결제 모듈 구현"
 
 - **alias**: `flow-finish`
 - **스크립트**: `.claude.workflow/scripts/flow/finalization.py`
-- **설명**: 워크플로우 마무리 6단계 처리 (상태 전이, 사용량 확정, 아카이빙, 티켓 갱신, 체인 발사, tmux 정리)
+- **설명**: 워크플로우 마무리 6단계 처리 (상태 전이, 사용량 확정, 아카이빙, 티켓 갱신, 체인 발사, 세션 정리)
 
 #### 사용법
 
@@ -596,71 +595,13 @@ flow-kanban link T-169 --derived-from T-168
 
 ---
 
-### flow-tmux
-
-- **alias**: `flow-tmux`
-- **스크립트**: `.claude.workflow/scripts/flow/tmux_launcher.py`
-- **설명**: tmux 윈도우 생성/정리를 담당하는 스크립트. 윈도우명은 `P:T-NNN` 형식
-
-#### 서브커맨드
-
-| 서브커맨드 | 사용법 | 설명 |
-|-----------|-------|------|
-| `launch` | `flow-tmux launch T-NNN '<command>'` | 새 tmux 윈도우 생성 및 명령 전송 |
-| `cleanup` | `flow-tmux cleanup T-NNN` | 지정 티켓의 tmux 윈도우 종료 |
-
-#### 인자
-
-**launch**
-| 인자 | 필수 | 설명 |
-|------|------|------|
-| `T-NNN` | 필수 | 티켓 ID. 내부적으로 `P:T-NNN` 형식 윈도우명으로 변환됨 |
-| `COMMAND` | 필수 | tmux 윈도우에 전송할 명령 문자열 |
-
-**cleanup**
-| 인자 | 필수 | 설명 |
-|------|------|------|
-| `T-NNN` | 필수 | 종료할 티켓 ID. 윈도우가 없으면 멱등적으로 성공 |
-
-#### 환경변수
-
-| 변수 | 설명 |
-|------|------|
-| `TMUX` | tmux 세션 내 실행 여부 확인용. 비설정 시 INLINE 폴백 |
-| `WORKFLOW_WORKTREE_PATH` | worktree 절대 경로. 설정 시 new-window의 cwd로 사용 |
-| `_WF_MAIN_WINDOW` | 메인 윈도우명. new-window 환경변수로 전달됨 |
-
-#### 종료 코드
-
-| 코드 | 의미 |
-|------|------|
-| 0 | 성공 (LAUNCH 또는 INLINE 폴백) |
-| 1 | 에러 (폴링 타임아웃 등) |
-| 2 | 인라인 실행 필요 (비tmux 환경 또는 재진입 감지) |
-
-#### 출력 패턴
-
-- `LAUNCH: P:T-NNN 윈도우에서 실행 중` → 새 윈도우에서 실행
-- `INLINE: ...` → 인라인 실행 필요 (비tmux 또는 재진입)
-
-#### 사용 예시
-
-```bash
-flow-tmux launch T-169 "cc '새 워크플로우 시작'"
-flow-tmux cleanup T-169
-```
-
----
-
 ## 환경변수 의존성 요약
 
 | 환경변수 | 사용 스크립트 | 용도 |
 |---------|------------|------|
 | `TICKET_NUMBER` | flow-init, flow-reload | 티켓 번호 직접 지정 |
-| `TMUX` | flow-tmux | tmux 세션 내 실행 여부 |
-| `TMUX_PANE` | flow-finish | tmux 창 kill 여부 판단 |
-| `WORKFLOW_WORKTREE_PATH` | flow-tmux | worktree cwd 설정 |
-| `_WF_MAIN_WINDOW` | flow-tmux | 메인 윈도우명 전달 |
+| `TMUX_PANE` | flow-finish | 세션 kill 여부 판단 (하위호환 폴백) |
+| `WORKFLOW_WORKTREE_PATH` | flow-launcher | worktree cwd 설정 |
 | `CLAUDE_SESSION_ID` | flow-init | 초기 세션 ID 등록 |
 
 ---

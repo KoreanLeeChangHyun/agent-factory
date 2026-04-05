@@ -70,7 +70,6 @@ ALIAS_MAP: dict[str, str] = {
     "garbage_collect.py": "flow-gc",
     "kanban.py": "flow-kanban",
     "merge_pipeline.py": "flow-merge",
-    "tmux_launcher.py": "flow-tmux",
     "history_sync.py": "flow-history",
     "catalog_sync.py": "flow-catalog",
     "git_config.py": "flow-gitconfig",

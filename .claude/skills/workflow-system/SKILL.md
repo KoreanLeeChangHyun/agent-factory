@@ -84,7 +84,7 @@ flow-update task-status <registryKey> running W01 W02 && flow-update usage-pendi
 | `flow-gc` | `python3 .claude.workflow/scripts/flow/garbage_collect.py` | 좀비 워크플로우 정리 |
 | `flow-kanban` | `python3 .claude.workflow/scripts/flow/kanban.py` | 칸반 보드 관리 |
 | `flow-merge` | `python3 .claude.workflow/scripts/flow/merge_pipeline.py` | PR 기반 머지 파이프라인 |
-| `flow-tmux` | `python3 .claude.workflow/scripts/flow/tmux_launcher.py` | tmux 윈도우 생성/종료 |
+| `flow-launcher` | `.claude.workflow/bin/flow-launcher` | HTTP API 기반 워크플로우 세션 실행 |
 | `flow-history` | `python3 .claude.workflow/scripts/sync/history_sync.py` | 히스토리 동기화 |
 | `flow-catalog` | `python3 .claude.workflow/scripts/sync/catalog_sync.py` | 스킬 카탈로그 재생성 |
 | `flow-gitconfig` | `python3 .claude.workflow/scripts/git/git_config.py` | Git config 설정 |

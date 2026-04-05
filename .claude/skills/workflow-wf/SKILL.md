@@ -100,11 +100,11 @@ flow-kanban move T-NNN review
 
 ### cleanup 절차 (implement/research/review 공통)
 
-워크플로우 완료 시 tmux 윈도우 자동 종료가 이중 안전장치로 동작한다:
+워크플로우 완료 시 세션 자동 종료가 이중 안전장치로 동작한다:
 
-- **1차 (finalization.py Step 5)**: `flow-finish` 실행 시 3초 지연 후 tmux 윈도우를 백그라운드(nohup+sleep)로 kill. `flow-claude end` 배너 출력이 보장된 후 종료
-- **2차 (PostToolUse hook)**: `flow-claude end` Bash 호출 감지 시 5초 지연 후 tmux 윈도우를 추가로 kill. 1차 안전장치 실패 시 보완
-- **비tmux 환경**: `TMUX_PANE` 미설정 시 양쪽 모두 자동 스킵 (멱등성 보장)
+- **1차 (finalization.py Step 5)**: `flow-finish` 실행 시 3초 지연 후 세션을 백그라운드(nohup+sleep)로 종료. `flow-claude end` 배너 출력이 보장된 후 종료
+- **2차 (PostToolUse hook)**: `flow-claude end` Bash 호출 감지 시 5초 지연 후 세션을 추가로 종료. 1차 안전장치 실패 시 보완
+- **비세션 환경**: `TMUX_PANE` 미설정 시 양쪽 모두 자동 스킵 (멱등성 보장)
 
 ---
 

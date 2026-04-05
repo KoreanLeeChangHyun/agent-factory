@@ -7,7 +7,7 @@
     <tone>존댓말</tone>
 
     <workflow-session-policy>
-      이 세션은 워크플로우 실행 전용 tmux 윈도우(P:T-NNN)입니다.
+      이 세션은 워크플로우 실행 전용 워크플로우 세션입니다.
       /wf -s N 명령으로 전달된 티켓을 실행하고, 완료 후 반드시 윈도우를 종료합니다.
 
       실행 흐름:
@@ -19,7 +19,7 @@
       필수 규칙:
       - 워크플로우 완료 후 반드시 flow-finish + flow-claude end를 실행해야 한다 (MUST)
       - flow-claude end 이후 추가 출력/도구 호출은 절대 금지한다 (MUST NOT)
-      - tmux 윈도우는 flow-finish Step 5에서 자동 종료됨 (3초 지연 kill)
+      - 세션은 flow-finish Step 5에서 자동 종료됨 (3초 지연 kill)
     </workflow-session-policy>
 
     <branch-policy>
@@ -72,7 +72,7 @@
           # command: implement|review|research 또는 체인(implement>review)
           # 출력: init-result JSON (workDir, registryKey, workId, ticketNumber 포함)
         flow-finish registryKey 완료|실패 [--ticket-number T-NNN]
-          # 6단계 마무리: 상태 전이 → 사용량 확정 → 아카이빙 → 티켓 갱신 → 체인 발사 → tmux 정리
+          # 6단계 마무리: 상태 전이 → 사용량 확정 → 아카이빙 → 티켓 갱신 → 체인 발사 → 세션 정리
         flow-update status|both|task-start|task-status registryKey ...
           # status registryKey toPhase / both registryKey agent toPhase
           # task-start registryKey W01 W02 / task-status registryKey done W01
