@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Code Terminal</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/terminal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
 <style>
   html, body {
     margin: 0;
@@ -30,8 +30,19 @@
 
 <div id="terminal-standalone"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
+<script>
+(function(){
+  var langs=['javascript','typescript','python','bash','css','xml','json'];
+  var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';
+  langs.forEach(function(lang){
+    var s=document.createElement('script');s.src=base+lang+'.min.js';s.async=true;
+    s.onload=function(){if(typeof hljs!=='undefined')hljs.configure({ignoreUnescapedHTML:true});};
+    document.head.appendChild(s);
+  });
+})();
+</script>
 <script src="js/common.js"></script>
 <script src="js/terminal.js"></script>
 <script>
