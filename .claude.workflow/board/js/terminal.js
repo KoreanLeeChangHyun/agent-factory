@@ -927,6 +927,739 @@
     return util.autoCollapse(htmlContent, rawByteLen, summary);
   };
 
+  // ── WorkflowRenderer: ANSI strip utility ──
+
+  /**
+   * Removes ANSI SGR escape sequences from text.
+   * Banner scripts emit colour codes (e.g. \033[38;2;222;115;86m) that must be
+   * stripped before pattern matching.
+   * @param {string} text - raw text possibly containing ANSI escape codes
+   * @returns {string} text with ANSI codes removed
+   */
+  var ANSI_STRIP_RE = /\x1b\[[0-9;]*m/g;
+  function stripAnsi(text) {
+    return (text || "").replace(ANSI_STRIP_RE, "");
+  }
+
+  // ── WorkflowRenderer namespace ──
+
+  /**
+   * WorkflowRenderer namespace.
+   *
+   * Parses Bash tool_use_result text for workflow banner patterns emitted by
+   * flow-claude, flow-init, flow-step, flow-phase, and flow-finish scripts.
+   * Maintains phaseTimeline state and returns consumed=true when any banner
+   * line is detected, signalling callers to skip normal insertToolResult().
+   *
+   * This module is purely a parser + state machine (no DOM access).
+   * DOM rendering is handled by W03 (renderTimelineBar / renderStatusBadge).
+   *
+   * Only active when isWorkflowMode === true.
+   */
+  var WorkflowRenderer = (function () {
+
+    // ── Pattern constants (W01 design §1.2–1.9) ──
+
+    var P = {
+      // flow-claude start: box top border
+      workflowBoxTop:    /╔[═]+╗/,
+      // flow-claude start: ▶ command line inside box
+      workflowStartCmd:  /║\s+▶\s+(\S+)/,
+      // flow-claude end: [OK] workId · title (command)
+      workflowEnd:       /║\s+\[OK\]\s+(\S+)\s+·\s+(.+?)(?:\s+\((\w+)\))?$/,
+      // flow-claude end: trailing border line of ══ chars
+      endBorder:         /^[═]{10,}$/,
+      // flow-init: INIT title line
+      init:              /║\s+INIT:\s+(.+)$/,
+      // flow-init: workDir line (second line after INIT)
+      initWorkDir:       /║\s+(\.claude\.workflow\/workflow\/[^\s]+)$/,
+      // flow-step start: [● ○ ○] STEP_NAME inside box
+      stepStart:         /║\s+\[●[^\]]*\]\s+(PLAN|WORK|REPORT|DONE)/,
+      // flow-step end: [● ● ○] STEP_NAME - timestamp
+      stepEnd:           /║\s+\[●[^\]]*\]\s+(PLAN|WORK|REPORT|DONE)\s+-\s+(.+)$/,
+      // flow-step end artifact path line
+      artifactLine:      /║\s+(\.claude\.workflow\/workflow\/[^\s]+\.(?:md|json|txt))$/,
+      // flow-step [OK] label
+      stepOk:            /║\s+\[OK\]\s+(\S+)$/,
+      // flow-step [ASK] label
+      stepAsk:           /║\s+\[ASK\]\s+(\S+)$/,
+      // flow-phase: STATE Phase N mode
+      phase:             /║\s+STATE:\s+Phase\s+(\d+)\s+(sequential|parallel)/,
+      // flow-phase: >> agents [taskIds]
+      phaseAgents:       /║\s+>>\s+([^\[]+?)(?:\s+\[([^\]]+)\])?$/,
+      // flow-finish: DONE 완료 or 실패
+      finishDone:        /║\s+DONE:\s+워크플로우\s+(완료|실패)/,
+      // flow-finish: registryKey line
+      finishKey:         /║\s+(\d{8}-\d{6})$/,
+      // FAIL: bare FAIL line (initialization/finalization early exit)
+      fail:              /^FAIL$/
+    };
+
+    // ── Default state (mirrors W01 design §2.2) ──
+
+    var DEFAULT_STATE = {
+      command:      "",
+      workId:       "",
+      title:        "",
+      workDir:      "",
+      currentStep:  "unknown",
+      currentPhase: -1,
+      phases:       [],
+      artifacts:    [],
+      status:       "running",
+      error:        undefined
+    };
+
+    // ── Internal mutable state ──
+
+    /** @type {Object} phaseTimeline state */
+    var _state = {};
+
+    // Parser flags for multi-line banner sequences
+    /** @type {boolean} waiting for initWorkDir line after INIT line */
+    var _pendingInit = false;
+    /** @type {string} title captured from INIT line, awaiting workDir */
+    var _pendingInitTitle = "";
+
+    /** @type {boolean} waiting for artifact/ok/ask lines after stepEnd line */
+    var _pendingStepEnd = false;
+    /** @type {string} step name captured from stepEnd line */
+    var _pendingStepEndName = "";
+    /** @type {string} timestamp captured from stepEnd line */
+    var _pendingStepEndTs = "";
+
+    /** @type {boolean} waiting for phaseAgents line after phase line */
+    var _pendingPhase = false;
+    /** @type {number} phase number captured from phase line */
+    var _pendingPhaseN = -1;
+    /** @type {string} phase mode captured from phase line */
+    var _pendingPhaseMode = "";
+
+    /** @type {boolean} inside a ╔═╗ box (workflow start or step start) */
+    var _inBox = false;
+    /** @type {boolean} box seen ▶ command → confirmed workflow start (not step start) */
+    var _boxHasCmd = false;
+
+    /** @type {boolean} waiting for finishKey line after finishDone */
+    var _pendingFinish = false;
+    /** @type {string} "완료" or "실패" from finishDone */
+    var _pendingFinishResult = "";
+
+    // ── phaseTimeline state management methods ──
+
+    /**
+     * Resets state to defaults and optionally stores command.
+     * Called when a new workflow start banner (╔═╗ + ▶ command) is detected.
+     * @param {string} [command]
+     */
+    function _reset(command) {
+      _state = {
+        command:      command || "",
+        workId:       "",
+        title:        "",
+        workDir:      "",
+        currentStep:  "unknown",
+        currentPhase: -1,
+        phases:       [],
+        artifacts:    [],
+        status:       "running",
+        error:        undefined
+      };
+      _clearParserFlags();
+    }
+
+    /**
+     * Clears all multi-line parser flags.
+     */
+    function _clearParserFlags() {
+      _pendingInit = false;
+      _pendingInitTitle = "";
+      _pendingStepEnd = false;
+      _pendingStepEndName = "";
+      _pendingStepEndTs = "";
+      _pendingPhase = false;
+      _pendingPhaseN = -1;
+      _pendingPhaseMode = "";
+      _inBox = false;
+      _boxHasCmd = false;
+      _pendingFinish = false;
+      _pendingFinishResult = "";
+    }
+
+    /**
+     * Stores INIT title+workDir and sets currentStep to "init".
+     * @param {string} title
+     * @param {string} workDir
+     */
+    function _setInit(title, workDir) {
+      _state.title = title;
+      _state.workDir = workDir;
+      _state.currentStep = "init";
+    }
+
+    /**
+     * Advances currentStep to the given step name (lowercased).
+     * @param {string} stepName - "PLAN"|"WORK"|"REPORT"|"DONE"
+     */
+    function _setStep(stepName) {
+      _state.currentStep = stepName.toLowerCase();
+    }
+
+    /**
+     * Adds a new phase entry to phases[] and updates currentPhase.
+     * @param {number} n - phase number
+     * @param {string} mode - "sequential"|"parallel"
+     * @param {string[]} [agents]
+     * @param {string[]} [taskIds]
+     */
+    function _setPhase(n, mode, agents, taskIds) {
+      _state.phases.push({
+        n:       n,
+        agents:  agents  || [],
+        taskIds: taskIds || [],
+        mode:    mode
+      });
+      _state.currentPhase = n;
+    }
+
+    /**
+     * Adds an artifact entry.
+     * @param {string} path - relative path of the artifact file
+     */
+    function _addArtifact(path) {
+      if (!path) return;
+      var label = path.split("/").pop();
+      var type = "other";
+      if (/plan\.md$/.test(path))   type = "plan";
+      else if (/report\.md$/.test(path)) type = "report";
+      else if (/work\//.test(path)) type = "work";
+      _state.artifacts.push({
+        type:  type,
+        path:  path,
+        at:    new Date().toISOString(),
+        label: label
+      });
+    }
+
+    /**
+     * Updates workId and title from flow-claude end banner.
+     * @param {string} workId
+     * @param {string} title
+     */
+    function _setWorkflowEnd(workId, title) {
+      if (workId) _state.workId = workId;
+      if (title)  _state.title  = title;
+    }
+
+    /**
+     * Marks the workflow as successfully completed.
+     */
+    function _complete() {
+      _state.status      = "done";
+      _state.currentStep = "done";
+    }
+
+    /**
+     * Marks the workflow as failed.
+     * @param {string} [msg]
+     */
+    function _fail(msg) {
+      _state.status      = "failed";
+      _state.currentStep = "failed";
+      _state.error       = msg || "FAIL";
+    }
+
+    // ── Per-line pattern matching functions ──
+
+    /**
+     * Attempts to match and process a single stripped line.
+     * Returns true if the line matched any banner pattern.
+     * @param {string} line - ANSI-stripped, trimmed line
+     * @returns {boolean}
+     */
+    function _parseLine(line) {
+      var m;
+
+      // ── Box-top detection (╔═══╗) ──
+      if (P.workflowBoxTop.test(line)) {
+        _inBox    = true;
+        _boxHasCmd = false;
+        return true;
+      }
+
+      // ── End-border (════) — close any pending stepEnd or workflowEnd scan ──
+      if (P.endBorder.test(line)) {
+        _pendingStepEnd = false;
+        return true;
+      }
+
+      // ── Inside box: ▶ command → workflow start confirmed ──
+      if (_inBox && (m = P.workflowStartCmd.exec(line))) {
+        _boxHasCmd = true;
+        _inBox     = false;
+        _reset(m[1]);
+        return true;
+      }
+
+      // ── Inside box: [● ...] STEP → step start ──
+      if (_inBox && !_boxHasCmd && (m = P.stepStart.exec(line))) {
+        _inBox = false;
+        _setStep(m[1]);
+        return true;
+      }
+
+      // ── Box close line ╚═══╝ (close box state without command) ──
+      if (/╚[═]+╝/.test(line)) {
+        _inBox     = false;
+        _boxHasCmd = false;
+        return true;
+      }
+
+      // ── flow-claude end: [OK] workId · title ──
+      if ((m = P.workflowEnd.exec(line))) {
+        _setWorkflowEnd(m[1], m[2].trim());
+        return true;
+      }
+
+      // ── flow-init: INIT: title ──
+      if ((m = P.init.exec(line))) {
+        _pendingInit      = true;
+        _pendingInitTitle = m[1].trim();
+        // Clear other pending flags to avoid interference
+        _pendingStepEnd = false;
+        _pendingPhase   = false;
+        return true;
+      }
+
+      // ── flow-init: workDir line (follows INIT line) ──
+      if (_pendingInit && (m = P.initWorkDir.exec(line))) {
+        _setInit(_pendingInitTitle, m[1].trim());
+        _pendingInit      = false;
+        _pendingInitTitle = "";
+        return true;
+      }
+
+      // ── flow-step end: [● ● ○] STEP - timestamp ──
+      if ((m = P.stepEnd.exec(line))) {
+        _pendingStepEnd     = true;
+        _pendingStepEndName = m[1];
+        _pendingStepEndTs   = m[2].trim();
+        // Advance step (step end updates currentStep)
+        _setStep(m[1]);
+        return true;
+      }
+
+      // ── Artifact line (follows step end) ──
+      if ((m = P.artifactLine.exec(line))) {
+        _addArtifact(m[1].trim());
+        return true;
+      }
+
+      // ── [OK] / [ASK] result lines (follow step end) ──
+      if (_pendingStepEnd && (P.stepOk.test(line) || P.stepAsk.test(line))) {
+        _pendingStepEnd = false;
+        return true;
+      }
+
+      // ── flow-phase: STATE: Phase N mode ──
+      if ((m = P.phase.exec(line))) {
+        _pendingPhase    = true;
+        _pendingPhaseN   = parseInt(m[1], 10);
+        _pendingPhaseMode = m[2];
+        return true;
+      }
+
+      // ── flow-phase: >> agents [taskIds] ──
+      if (_pendingPhase && (m = P.phaseAgents.exec(line))) {
+        var agentsRaw = m[1].trim();
+        var taskIdsRaw = m[2] ? m[2].trim() : "";
+        var agents  = agentsRaw  ? agentsRaw.split(/[\s,]+/).filter(Boolean) : [];
+        var taskIds = taskIdsRaw ? taskIdsRaw.split(/[\s,]+/).filter(Boolean) : [];
+        _setPhase(_pendingPhaseN, _pendingPhaseMode, agents, taskIds);
+        _pendingPhase     = false;
+        _pendingPhaseN    = -1;
+        _pendingPhaseMode = "";
+        return true;
+      }
+
+      // ── flow-finish: DONE: 워크플로우 완료|실패 ──
+      if ((m = P.finishDone.exec(line))) {
+        _pendingFinish       = true;
+        _pendingFinishResult = m[1]; // "완료" or "실패"
+        return true;
+      }
+
+      // ── flow-finish: registryKey line ──
+      if (_pendingFinish && (m = P.finishKey.exec(line))) {
+        _pendingFinish = false;
+        if (_pendingFinishResult === "완료") {
+          _complete();
+        } else {
+          _fail("워크플로우 실패 (" + m[1] + ")");
+        }
+        _pendingFinishResult = "";
+        return true;
+      }
+
+      // ── FAIL bare line (early exit) ──
+      if (P.fail.test(line)) {
+        _fail("FAIL");
+        return true;
+      }
+
+      return false;
+    }
+
+    // ── Public API ──
+
+    return {
+      /**
+       * phaseTimeline state accessor (read-only reference).
+       * W03 DOM renderer reads this to build the timeline bar.
+       * @type {Object}
+       */
+      get state() { return _state; },
+
+      /**
+       * Pattern constants (exposed for testing).
+       * @type {Object}
+       */
+      patterns: P,
+
+      /**
+       * Processes raw Bash tool_use_result text.
+       * Strips ANSI codes, splits into lines, and runs each through _parseLine().
+       * Returns true if at least one banner pattern was matched.
+       * @param {string} text - raw tool_use_result stdout text
+       * @returns {boolean} true = banner(s) detected, false = no banner found
+       */
+      tap: function (text) {
+        var stripped = stripAnsi(text);
+        var lines    = stripped.split("\n");
+        var consumed = false;
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (line && _parseLine(line)) {
+            consumed = true;
+          }
+        }
+
+        return consumed;
+      },
+
+      /**
+       * Resets the parser to its initial state.
+       * Call before starting a new workflow observation.
+       */
+      reset: function () {
+        _reset();
+      }
+    };
+  })();
+
+  // ── phaseTimeline DOM Renderer (W03) ──
+
+  /**
+   * phaseTimeline: DOM renderer singleton for workflow session timeline bar.
+   *
+   * Reads WorkflowRenderer.state and builds / updates the .wf-timeline-bar
+   * element fixed below the terminal-session-bar.  Also provides
+   * renderStatusBadge() for done/failed overlays and renderArtifactLinks()
+   * to refresh the artifact row.
+   *
+   * Only active when isWorkflowMode === true.
+   * All DOM mutations are guarded by `isWorkflowMode && outputDiv`.
+   */
+  var phaseTimeline = (function () {
+
+    // ── Internal helpers ──
+
+    /**
+     * Returns the .wf-timeline-bar element, creating it (and inserting it
+     * below .terminal-session-bar) if it does not yet exist.
+     * @returns {HTMLElement|null}
+     */
+    function _getOrCreateBar() {
+      var existing = document.getElementById("wf-timeline-bar");
+      if (existing) return existing;
+
+      var sessionBar = document.querySelector(".terminal-session-bar");
+      if (!sessionBar) return null;
+
+      var bar = document.createElement("div");
+      bar.className = "wf-timeline-bar";
+      bar.id = "wf-timeline-bar";
+
+      // Insert immediately after .terminal-session-bar
+      var parent = sessionBar.parentNode;
+      if (parent) {
+        parent.insertBefore(bar, sessionBar.nextSibling);
+      }
+      return bar;
+    }
+
+    /**
+     * HTML-escapes a string for safe attribute / text node insertion.
+     * @param {string} s
+     * @returns {string}
+     */
+    function _esc(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    /**
+     * Builds the HTML for the .wf-steps-row based on current state.
+     * Steps: INIT → PLAN → WORK (Phase N) → REPORT → DONE
+     * @param {Object} st - WorkflowRenderer.state snapshot
+     * @returns {string} HTML fragment
+     */
+    function _buildStepsRowHtml(st) {
+      var steps = ["init", "plan", "work", "report", "done", "failed"];
+      var labels = { init: "INIT", plan: "PLAN", work: "WORK", report: "REPORT", done: "DONE", failed: "FAIL" };
+      var current = st.currentStep || "unknown";
+
+      var orderedSteps = ["init", "plan", "work", "report", "done"];
+      // If failed, append "failed" at end
+      if (current === "failed") {
+        orderedSteps.push("failed");
+      }
+
+      var stepOrder = {};
+      orderedSteps.forEach(function (s, i) { stepOrder[s] = i; });
+      var currentIdx = stepOrder[current];
+
+      var html = '<div class="wf-steps-row">';
+      orderedSteps.forEach(function (step, idx) {
+        // Determine CSS class
+        var cls = "wf-timeline-step";
+        if (step === current) {
+          cls += " active";
+        } else if (currentIdx !== undefined && idx < currentIdx) {
+          cls += " done";
+        } else {
+          cls += " pending";
+        }
+
+        html += '<div class="' + cls + '" data-step="' + _esc(step) + '">';
+        html += _esc(labels[step] || step.toUpperCase());
+
+        // Phase badge for WORK step
+        if (step === "work" && st.currentPhase >= 0) {
+          html += '<span class="wf-phase-badge">Phase ' + _esc(String(st.currentPhase)) + '</span>';
+        }
+
+        html += '</div>';
+
+        // Separator between steps (not after last)
+        if (idx < orderedSteps.length - 1) {
+          html += '<div class="wf-timeline-sep">&rarr;</div>';
+        }
+      });
+      html += '</div>';
+      return html;
+    }
+
+    /**
+     * Builds the HTML for the .wf-meta-row.
+     * @param {Object} st
+     * @returns {string}
+     */
+    function _buildMetaRowHtml(st) {
+      if (!st.command && !st.title) return "";
+      var html = '<div class="wf-meta-row">';
+      if (st.command) {
+        html += '<span class="wf-meta-command">' + _esc(st.command) + '</span>';
+        html += '<span class="wf-meta-sep">&middot;</span>';
+      }
+      if (st.title) {
+        html += '<span class="wf-meta-title">' + _esc(st.title) + '</span>';
+      }
+      if (st.workId) {
+        html += '<span class="wf-meta-id">#' + _esc(st.workId) + '</span>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    /**
+     * Builds the HTML for the .wf-artifacts-row.
+     * @param {Array} artifacts
+     * @returns {string}
+     */
+    function _buildArtifactsRowHtml(artifacts) {
+      if (!artifacts || artifacts.length === 0) return "";
+      var html = '<div class="wf-artifacts-row">';
+      artifacts.forEach(function (a) {
+        html += '<a class="wf-timeline-artifact" data-path="' + _esc(a.path) + '"'
+          + ' href="#" title="' + _esc(a.label) + ' 열기">'
+          + _esc(a.label) + '</a>';
+      });
+      html += '</div>';
+      return html;
+    }
+
+    // ── Public API ──
+
+    return {
+
+      /**
+       * Renders (or re-renders) the .wf-timeline-bar below .terminal-session-bar.
+       * Reads WorkflowRenderer.state for current step, phase, and artifacts.
+       * Guards: isWorkflowMode && outputDiv.
+       */
+      renderTimelineBar: function () {
+        if (!isWorkflowMode || !outputDiv) return;
+
+        var bar = _getOrCreateBar();
+        if (!bar) return;
+
+        var st = WorkflowRenderer.state;
+
+        var html = "";
+        html += _buildMetaRowHtml(st);
+        html += _buildStepsRowHtml(st);
+        html += _buildArtifactsRowHtml(st.artifacts);
+
+        bar.innerHTML = html;
+
+        // Bind artifact link click handlers
+        var links = bar.querySelectorAll(".wf-timeline-artifact[data-path]");
+        for (var i = 0; i < links.length; i++) {
+          (function (link) {
+            link.addEventListener("click", function (e) {
+              e.preventDefault();
+              var path = link.getAttribute("data-path");
+              if (path) {
+                phaseTimeline.openArtifact(path);
+              }
+            });
+          })(links[i]);
+        }
+      },
+
+      /**
+       * Renders or updates the .wf-artifacts-row inside the timeline bar.
+       * Called incrementally when a new artifact is added mid-session.
+       */
+      renderArtifactLinks: function () {
+        if (!isWorkflowMode || !outputDiv) return;
+
+        var bar = document.getElementById("wf-timeline-bar");
+        if (!bar) {
+          // Bar not yet created — fall back to full render
+          phaseTimeline.renderTimelineBar();
+          return;
+        }
+
+        var st = WorkflowRenderer.state;
+
+        // Update or insert artifact row
+        var existingRow = bar.querySelector(".wf-artifacts-row");
+        var newHtml = _buildArtifactsRowHtml(st.artifacts);
+
+        if (newHtml) {
+          if (existingRow) {
+            existingRow.outerHTML = newHtml;
+          } else {
+            bar.insertAdjacentHTML("beforeend", newHtml);
+          }
+          // Re-bind click handlers on the updated row
+          var links = bar.querySelectorAll(".wf-timeline-artifact[data-path]");
+          for (var i = 0; i < links.length; i++) {
+            (function (link) {
+              link.addEventListener("click", function (e) {
+                e.preventDefault();
+                var path = link.getAttribute("data-path");
+                if (path) phaseTimeline.openArtifact(path);
+              });
+            })(links[i]);
+          }
+        } else if (existingRow) {
+          existingRow.parentNode.removeChild(existingRow);
+        }
+      },
+
+      /**
+       * Renders a completion or failure status badge inside .terminal-output.
+       * The badge uses `position: sticky; bottom: 0` so it anchors to the
+       * bottom of the visible output area without covering the timeline bar.
+       *
+       * @param {"ok"|"fail"} status
+       * @param {string} [msg] - optional detail text shown in .wf-badge-sub
+       */
+      renderStatusBadge: function (status, msg) {
+        if (!isWorkflowMode || !outputDiv) return;
+
+        // Remove any existing badge first
+        var existing = outputDiv.querySelector(".wf-status-badge");
+        if (existing) existing.parentNode.removeChild(existing);
+
+        var st = WorkflowRenderer.state;
+        var isOk = (status === "ok");
+
+        var badge = document.createElement("div");
+        badge.className = "wf-status-badge";
+        badge.setAttribute("data-status", isOk ? "ok" : "fail");
+
+        var iconChar = isOk ? "&#10003;" : "&#10005;";
+        var labelText = isOk ? "워크플로우 완료" : "워크플로우 실패";
+        var subText = msg || (isOk
+          ? ("#" + (st.workId || "") + " · " + (st.title || ""))
+          : (st.error || "FAIL"));
+
+        badge.innerHTML =
+          '<span class="wf-badge-icon">' + iconChar + '</span>' +
+          '<span class="wf-badge-text">' + _esc(labelText) + '</span>' +
+          '<span class="wf-badge-sub">' + _esc(subText) + '</span>';
+
+        outputDiv.appendChild(badge);
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+      },
+
+      /**
+       * Full render helper called by WorkflowRenderer.tap() integration (W04).
+       * Runs renderTimelineBar() and, if workflow ended, renderStatusBadge().
+       */
+      render: function () {
+        phaseTimeline.renderTimelineBar();
+
+        var st = WorkflowRenderer.state;
+        if (st.status === "done") {
+          phaseTimeline.renderStatusBadge("ok");
+        } else if (st.status === "failed") {
+          phaseTimeline.renderStatusBadge("fail", st.error);
+        }
+      },
+
+      /**
+       * Opens an artifact file.  Currently opens via
+       * `/api/workflow/artifact?path=<encoded>` in a new tab, falling back to
+       * a simple alert.  W05 will provide the actual server route.
+       * @param {string} path - relative artifact path
+       */
+      openArtifact: function (path) {
+        var url = "/api/workflow/artifact?path=" + encodeURIComponent(path);
+        window.open(url, "_blank");
+      },
+
+      /**
+       * Inserts the .wf-timeline-bar placeholder immediately below
+       * .terminal-session-bar at page initialization time.
+       * Called from renderTerminal() when isWorkflowMode === true.
+       */
+      insertPlaceholder: function () {
+        if (!isWorkflowMode) return;
+        _getOrCreateBar();
+      }
+
+    };
+  })();
+
   // ── Tool Box Renderer ──
 
   /**
@@ -1219,7 +1952,25 @@
           }
 
           if (resultText) {
-            insertToolResult(resultText, false);
+            // W04: WorkflowRenderer tap integration
+            // In workflow mode, try to parse banner patterns first.
+            // If tap() returns true (banner detected), render the timeline and
+            // skip the normal insertToolResult() path to avoid double-rendering.
+            var bannerConsumed = false;
+            if (isWorkflowMode) {
+              try {
+                bannerConsumed = WorkflowRenderer.tap(resultText);
+                if (bannerConsumed) {
+                  phaseTimeline.render();
+                }
+              } catch (tapErr) {
+                // Fallback: if tap/render throws, proceed with normal rendering
+                bannerConsumed = false;
+              }
+            }
+            if (!bannerConsumed) {
+              insertToolResult(resultText, false);
+            }
             appendPlainLog(resultText + "\n");
           }
           if (tr && tr.stderr) {
@@ -1706,6 +2457,11 @@
 
     // Initialize HTML div output container
     initOutputDiv();
+
+    // Workflow mode: insert timeline bar placeholder below session-bar
+    if (isWorkflowMode) {
+      phaseTimeline.insertPlaceholder();
+    }
 
     // Connect SSE if not already connected
     if (!termEventSource) {

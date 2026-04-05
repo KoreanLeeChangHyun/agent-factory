@@ -940,6 +940,8 @@ class WorkflowSession:
         process: Claude CLI 프로세스 관리자 인스턴스
         channel: 터미널 SSE 브로드캐스트 채널 인스턴스
         created_at: 세션 생성 시각 (ISO 형식)
+        current_step: 현재 진행 중인 워크플로우 단계 (예: PLAN, WORK, REPORT)
+        last_artifact: 최근 생성된 산출물 경로 (예: work/W01-design.md)
     """
 
     session_id: str
@@ -949,6 +951,8 @@ class WorkflowSession:
     process: ClaudeProcess = field(repr=False)
     channel: TerminalSSEChannel = field(repr=False)
     created_at: str = field(default_factory=lambda: time.strftime('%Y-%m-%dT%H:%M:%S'))
+    current_step: str = ''
+    last_artifact: str = ''
 
 
 class WorkflowSessionRegistry:
@@ -1591,6 +1595,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             })
         elif path == '/api/branch':
             self._send_json({'branch': _get_git_branch(project_root)})
+        elif path == '/api/workflow/artifact':
+            self._handle_workflow_artifact(qs)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1944,6 +1950,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             'status': session.process.status,
             'created_at': session.created_at,
             'clients': session.channel.client_count,
+            'current_step': session.current_step,
+            'last_artifact': session.last_artifact,
         })
 
     def _handle_workflow_sse(self) -> None:
@@ -2002,6 +2010,108 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         JSON 배열로 응답한다.
         """
         self._send_json(workflow_registry.list_all())
+
+    def _handle_workflow_artifact(self, qs: dict) -> None:
+        """워크플로우 산출물 파일 조회 엔드포인트를 처리한다.
+
+        GET /api/workflow/artifact?session_id=wf-*&path=plan.md
+
+        세션의 work_dir 하위 화이트리스트 파일만 plain text로 반환한다.
+        화이트리스트: plan.md, report.md, work/*.md, skill-mapping.md
+
+        경로 traversal 방지:
+        - ``..`` 포함 경로 즉시 차단
+        - ``os.path.realpath`` 정규화 후 work_dir prefix 검증
+        - 화이트리스트 패턴 불일치 시 403 반환
+
+        응답 헤더: Content-Type: text/markdown; charset=utf-8
+
+        Args:
+            qs: parse_qs 결과 dict (URL 쿼리 파라미터)
+
+        Returns:
+            None (응답 전송 후 종료)
+        """
+        import re as _re
+
+        session_id_list = qs.get('session_id')
+        path_list = qs.get('path')
+
+        if not session_id_list or not path_list:
+            self._send_error(404, 'Missing "session_id" or "path" query parameter')
+            return
+
+        session_id = session_id_list[0]
+        rel_path = path_list[0]
+
+        # 경로 traversal 조기 차단: '..' 포함 즉시 거부
+        if '..' in rel_path:
+            self._send_error(403, 'Path traversal detected')
+            return
+
+        # 세션 조회
+        session = workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        # work_dir 미설정 검증
+        work_dir = session.work_dir
+        if not work_dir:
+            self._send_error(404, 'Session work_dir is not set')
+            return
+
+        # 화이트리스트 패턴 검증
+        _WHITELIST_PATTERNS = [
+            _re.compile(r'^plan\.md$'),
+            _re.compile(r'^report\.md$'),
+            _re.compile(r'^skill-mapping\.md$'),
+            _re.compile(r'^work/[^/]+\.md$'),
+        ]
+        if not any(p.match(rel_path) for p in _WHITELIST_PATTERNS):
+            self._send_error(403, f'Path not in whitelist: {rel_path}')
+            return
+
+        # work_dir realpath 정규화
+        try:
+            real_work_dir = os.path.realpath(work_dir)
+        except (OSError, ValueError):
+            self._send_error(404, 'Invalid work_dir')
+            return
+
+        # 파일 절대 경로 구성 + realpath 정규화
+        candidate = os.path.join(real_work_dir, rel_path)
+        try:
+            real_candidate = os.path.realpath(candidate)
+        except (OSError, ValueError):
+            self._send_error(403, 'Invalid file path')
+            return
+
+        # work_dir prefix 검증 (symlink 우회 방지)
+        if not real_candidate.startswith(real_work_dir + os.sep) and real_candidate != real_work_dir:
+            self._send_error(403, 'Path escapes work_dir boundary')
+            return
+
+        # 파일 읽기
+        if not os.path.isfile(real_candidate):
+            self._send_error(404, f'File not found: {rel_path}')
+            return
+
+        try:
+            with open(real_candidate, encoding='utf-8') as f:
+                content = f.read()
+        except OSError as exc:
+            self._send_error(404, f'Cannot read file: {exc}')
+            return
+
+        body = content.encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/markdown; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _send_error(self, code: int, message: str) -> None:
         """에러 응답을 JSON 형식으로 전송한다.
