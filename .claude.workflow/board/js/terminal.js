@@ -2076,6 +2076,10 @@
           setInputLocked(false);
           updateControlBar();
         } else if (data.subtype === "process_exit") {
+          // spawn()이 이전 프로세스를 kill한 뒤 새 프로세스를 시작하면
+          // 이전 프로세스의 process_exit이 도착한다. startSession()이
+          // 이미 termStatus를 "running"으로 설정한 상태이므로 무시한다.
+          if (Board.state.termStatus === "running") return;
           Board.state.termStatus = "stopped";
           Board.state.termSessionId = null;
           // 세션 종료 시 누적 토큰/비용 리셋

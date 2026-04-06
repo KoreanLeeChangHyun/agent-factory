@@ -21,6 +21,7 @@
   const POLL_INTERVAL = 2000;      // Polling interval (ms)
 
   // ── SSE / Polling State ──
+  let currentES = null;          // Current EventSource instance
   let sseConnected = false;
   let sseGaveUp = false;         // SSE abandoned, polling mode active
   let sseRetryTimerId = null;
@@ -50,11 +51,20 @@
    * @param {string[]} [files] - Changed file names. If provided, selective fetch; otherwise full fetch.
    */
   function refreshKanban(files) {
-    const fetchPromise = (files && files.length > 0)
+    var fetchPromise = (files && files.length > 0)
       ? Board.fetch.fetchTicketsByFiles(files).then(function () { return Board.state.TICKETS; })
-      : Board.fetch.fetchTickets().then(function (tickets) { Board.state.TICKETS = tickets; return Board.state.TICKETS; });
+      : Board.fetch.fetchTickets().then(function (tickets) {
+          // Preserve existing data if fetch returned empty due to error
+          // (fetchTickets catch handler returns [] on failure; skip overwrite if we already have data)
+          if (!tickets || (tickets.length === 0 && Board.state.TICKETS.length > 0)) {
+            return Board.state.TICKETS;
+          }
+          Board.state.TICKETS = tickets;
+          return Board.state.TICKETS;
+        });
 
     fetchPromise.then(function (tickets) {
+      if (!tickets) return; // fetch failed: preserve existing data, skip update
       const json = ticketJson(tickets);
       if (json !== prevTicketJson) {
         prevTicketJson = json;
@@ -107,10 +117,18 @@
       return;
     }
 
+    // Close existing EventSource to prevent duplicate connections
+    if (currentES) {
+      currentES.close();
+      currentES = null;
+    }
+
     const es = new EventSource("/events");
+    currentES = es;
+
     const timeoutId = setTimeout(function () {
       // 3s without onopen -> timeout, switch to polling
-      if (!sseConnected) {
+      if (es.readyState !== EventSource.OPEN) {
         es.close();
         startPolling();
         scheduleSSERetry();
@@ -121,10 +139,19 @@
       clearTimeout(timeoutId);
       sseConnected = true;
       stopPolling();
+      // Compensate for changes missed during polling period
+      refreshKanban();
+      refreshWorkflow();
+      refreshDashboard();
     };
 
-    es.addEventListener("kanban", function () {
-      refreshKanban();
+    es.addEventListener("kanban", function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        refreshKanban(d.files);
+      } catch (_) {
+        refreshKanban();
+      }
     });
 
     es.addEventListener("workflow", function () {

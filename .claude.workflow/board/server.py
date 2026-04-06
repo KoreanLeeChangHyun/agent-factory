@@ -206,12 +206,14 @@ class SSEClientManager:
     Attributes:
         _clients: 연결된 클라이언트의 wfile 객체 목록
         _lock: 클라이언트 목록 접근용 Lock
+        _client_locks: wfile별 per-client Lock 딕셔너리
     """
 
     def __init__(self) -> None:
         """초기화한다."""
         self._clients: list = []
         self._lock: threading.Lock = threading.Lock()
+        self._client_locks: dict = {}
 
     def add(self, wfile: object) -> None:
         """클라이언트를 추가한다.
@@ -221,6 +223,7 @@ class SSEClientManager:
         """
         with self._lock:
             self._clients.append(wfile)
+            self._client_locks[id(wfile)] = threading.Lock()
 
     def remove(self, wfile: object) -> None:
         """클라이언트를 제거한다.
@@ -233,33 +236,61 @@ class SSEClientManager:
                 self._clients.remove(wfile)
             except ValueError:
                 pass
+            self._client_locks.pop(id(wfile), None)
 
-    def broadcast(self, event_type: str) -> None:
+    def get_lock(self, wfile: object) -> threading.Lock | None:
+        """wfile에 대응하는 per-client lock을 반환한다.
+
+        Args:
+            wfile: lock을 획득할 클라이언트의 wfile
+
+        Returns:
+            해당 wfile의 Lock. 클라이언트가 존재하지 않으면 None.
+        """
+        with self._lock:
+            return self._client_locks.get(id(wfile))
+
+    def broadcast(self, event_type: str, files: list | None = None) -> None:
         """모든 클라이언트에 SSE 이벤트를 전송한다.
 
         전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
+        per-client lock으로 heartbeat 루프와의 concurrent write를 방지한다.
 
         Args:
             event_type: SSE 이벤트 타입 (kanban, workflow, dashboard)
+            files: 변경된 파일 목록. kanban 이벤트 시 data 필드에 JSON으로 포함됨.
+                   None이면 타임스탬프 문자열을 data로 전송.
         """
-        timestamp = str(int(time.time()))
-        message = f"event: {event_type}\ndata: {timestamp}\n\n"
+        if files is not None:
+            data = json.dumps({"files": files})
+        else:
+            data = str(int(time.time()))
+        message = f"event: {event_type}\ndata: {data}\n\n"
         encoded = message.encode('utf-8')
 
         dead_clients: list = []
         with self._lock:
-            for wfile in self._clients:
-                try:
+            clients_snapshot = list(self._clients)
+
+        for wfile in clients_snapshot:
+            client_lock = self._client_locks.get(id(wfile))
+            if client_lock is None:
+                continue
+            try:
+                with client_lock:
                     wfile.write(encoded)
                     wfile.flush()
-                except (BrokenPipeError, ConnectionResetError, OSError):
-                    dead_clients.append(wfile)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                dead_clients.append(wfile)
 
-            for wfile in dead_clients:
-                try:
-                    self._clients.remove(wfile)
-                except ValueError:
-                    pass
+        if dead_clients:
+            with self._lock:
+                for wfile in dead_clients:
+                    try:
+                        self._clients.remove(wfile)
+                    except ValueError:
+                        pass
+                    self._client_locks.pop(id(wfile), None)
 
 
 # ---------------------------------------------------------------------------
@@ -1640,9 +1671,13 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             while True:
                 time.sleep(1)
                 # keep-alive 주석 전송으로 연결 상태 확인
+                client_lock = sse_manager.get_lock(self.wfile)
+                if client_lock is None:
+                    break
                 try:
-                    self.wfile.write(b': heartbeat\n\n')
-                    self.wfile.flush()
+                    with client_lock:
+                        self.wfile.write(b': heartbeat\n\n')
+                        self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     break
         finally:
@@ -2231,7 +2266,7 @@ def _run_server(project_root: str) -> None:
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:
         """파일 변경 감지 콜백."""
-        sse_manager.broadcast(event_type)
+        sse_manager.broadcast(event_type, files)
         poll_tracker.add(event_type, files)
 
     watcher = FileWatcher(project_root, on_change)
