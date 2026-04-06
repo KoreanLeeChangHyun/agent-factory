@@ -1605,6 +1605,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_workflow_kill()
         elif self.path == '/terminal/workflow/input':
             self._handle_workflow_input()
+        elif self.path == '/terminal/command':
+            self._handle_terminal_command()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1847,6 +1849,45 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         result = claude_process.kill()
+        self._send_json(result)
+
+    def _handle_terminal_command(self) -> None:
+        """슬래시 명령어 전달 엔드포인트를 처리한다.
+
+        POST /terminal/command: 클라이언트에서 전송한 슬래시 명령어를 Claude CLI stdin에
+        전달한다. 기존 send_input() 메서드를 재사용하여 NDJSON 엔벨로프로 전송한다.
+
+        요청 본문: {"command": "/clear"}
+        선택 필드: "session_id" (현재 미사용, 메인 세션 전용)
+
+        프로세스 미시작 시 409 Conflict를 반환한다.
+        """
+        if claude_process.status == 'stopped':
+            self._send_error(409, 'Claude process not running')
+            return
+
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._send_error(400, 'Empty request body')
+            return
+
+        body = self.rfile.read(content_length)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_error(400, 'Invalid JSON')
+            return
+
+        command = data.get('command', '').strip()
+        if not command:
+            self._send_error(400, 'Missing "command" field')
+            return
+
+        if not command.startswith('/'):
+            self._send_error(400, 'Command must start with "/"')
+            return
+
+        result = claude_process.send_input(command)
         self._send_json(result)
 
     def _handle_terminal_interrupt(self) -> None:

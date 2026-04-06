@@ -386,6 +386,43 @@
   color: #f44747;
 }
 
+/* ── Slash Command Result ── */
+.term-slash-result {
+  color: #9cdcfe;
+  background: #1a2a3a;
+  border-left: 3px solid #569cd6;
+  padding: 8px 12px;
+  margin: 4px 0;
+  font-size: 90%;
+  border-radius: 0 4px 4px 0;
+}
+
+.term-slash-result table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.term-slash-result th {
+  color: #4ec9b0;
+  text-align: left;
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid #2a3a4a;
+  font-weight: bold;
+}
+
+.term-slash-result td {
+  padding: 3px 8px 3px 0;
+  vertical-align: top;
+}
+
+.term-slash-result td:first-child {
+  color: #dcdcaa;
+  white-space: nowrap;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  padding-right: 16px;
+}
+
 /* ── Markdown Rendering ── */
 .term-message h1,
 .term-message h2,
