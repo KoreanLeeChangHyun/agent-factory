@@ -169,7 +169,7 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
     return xml_str
 
 
-def write_ticket_xml(filepath: str, root: ET.Element) -> None:
+def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False) -> None:
     """XML Element를 파일에 저장한다.
 
     <metadata>, <prompt>, <result> flat 구조를 유지하고,
@@ -178,7 +178,18 @@ def write_ticket_xml(filepath: str, root: ET.Element) -> None:
     Args:
         filepath: 저장할 파일 경로.
         root: 저장할 XML 루트 Element.
+        allow_create: True이면 파일이 없어도 새로 생성 허용.
+            False(기본값)이면 파일이 존재하지 않을 때 FileNotFoundError를 raise하여
+            레이스 컨디션으로 인한 빈 파일 생성을 방지한다.
+
+    Raises:
+        FileNotFoundError: allow_create=False이고 filepath가 존재하지 않을 때.
     """
+    # 파일이 존재하지 않으면 쓰기 거부 (빈 파일 생성 방지)
+    if not allow_create and not os.path.isfile(filepath):
+        raise FileNotFoundError(
+            f"쓰기 대상 파일 없음 (다른 세션이 이동했을 수 있음): {filepath}"
+        )
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode")
     # prompt 내부 필드 텍스트를 개행+들여쓰기로 래핑하여 가독성 확보 (10자 이상만)
@@ -795,8 +806,21 @@ def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
         # 같은 디렉터리 — 이동 불필요 (Submit <-> In Progress 등)
         return filepath
 
-    os.makedirs(target_dir, exist_ok=True)
     filename = os.path.basename(filepath)
     new_path = os.path.join(target_dir, filename)
+
+    # 원본 파일이 없으면 이미 다른 세션이 이동한 것
+    if not os.path.isfile(filepath):
+        expected_path = os.path.join(target_dir, filename)
+        if os.path.isfile(expected_path):
+            return expected_path  # 이미 이동 완료
+        raise FileNotFoundError(f"원본 파일 없음: {filepath}")
+
+    # 대상 경로에 이미 동일 파일이 존재하면 원본만 삭제 (멱등성)
+    if os.path.isfile(new_path) and os.path.normpath(filepath) != os.path.normpath(new_path):
+        os.remove(filepath)
+        return new_path
+
+    os.makedirs(target_dir, exist_ok=True)
     shutil.move(filepath, new_path)
     return new_path

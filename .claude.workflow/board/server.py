@@ -545,11 +545,20 @@ class TerminalSSEChannel:
                     'kind': 'input_json_delta',
                     'chunk': delta.get('partial_json', ''),
                 }
-            # content_block_start, message_start 등 기타 stream_event
-            return {
+            # content_block_start, message_start, message_delta 등 기타 stream_event
+            payload = {
                 'kind': event.get('type', 'stream_event'),
                 'raw': event,
             }
+            if 'usage' in event:
+                event_usage = event['usage']
+                payload['usage'] = {
+                    'input_tokens': (event_usage.get('input_tokens', 0)
+                        + event_usage.get('cache_read_input_tokens', 0)
+                        + event_usage.get('cache_creation_input_tokens', 0)),
+                    'output_tokens': event_usage.get('output_tokens', 0),
+                }
+            return payload
 
         if msg_type == 'assistant':
             content = data.get('message', {}).get('content', [])
@@ -558,10 +567,19 @@ class TerminalSSEChannel:
                 for block in content
                 if block.get('type') == 'text'
             ]
-            return {
+            payload = {
                 'kind': 'assistant',
                 'text': ''.join(text_parts),
             }
+            usage = data.get('message', {}).get('usage', {})
+            if usage:
+                payload['usage'] = {
+                    'input_tokens': (usage.get('input_tokens', 0)
+                        + usage.get('cache_read_input_tokens', 0)
+                        + usage.get('cache_creation_input_tokens', 0)),
+                    'output_tokens': usage.get('output_tokens', 0),
+                }
+            return payload
 
         return {'kind': msg_type or 'unknown', 'raw': data}
 
@@ -769,6 +787,32 @@ class ClaudeProcess:
             except (BrokenPipeError, OSError) as e:
                 self._status = 'stopped'
                 return {'ok': False, 'error': str(e)}
+
+        return {'ok': True, 'error': ''}
+
+    def interrupt(self) -> dict:
+        """Claude CLI 프로세스에 SIGINT를 전송하여 현재 응답 생성만 중단한다.
+
+        kill()과 달리 프로세스를 종료하지 않는다. SIGINT를 수신한 Claude CLI는
+        현재 응답 생성을 중단하고 새 입력 대기 상태(idle)로 복귀한다.
+        _status는 변경하지 않는다 — Claude CLI가 result 이벤트를 발행하면
+        _read_stdout_loop에서 idle로 전환된다.
+
+        Returns:
+            결과 dict: {"ok": True/False, "error": str}
+        """
+        if not self._process:
+            return {'ok': False, 'error': 'process not running'}
+
+        if self._process.poll() is not None:
+            self._status = 'stopped'
+            self._process = None
+            return {'ok': False, 'error': 'process not running'}
+
+        try:
+            os.kill(self._process.pid, signal.SIGINT)
+        except OSError as e:
+            return {'ok': False, 'error': str(e)}
 
         return {'ok': True, 'error': ''}
 
@@ -1551,6 +1595,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_terminal_start()
         elif self.path == '/terminal/input':
             self._handle_terminal_input()
+        elif self.path == '/terminal/interrupt':
+            self._handle_terminal_interrupt()
         elif self.path == '/terminal/kill':
             self._handle_terminal_kill()
         elif self.path == '/terminal/workflow/start':
@@ -1801,6 +1847,21 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         result = claude_process.kill()
+        self._send_json(result)
+
+    def _handle_terminal_interrupt(self) -> None:
+        """현재 응답 생성 중단 엔드포인트를 처리한다.
+
+        POST /terminal/interrupt: Claude CLI 프로세스에 SIGINT를 전송한다.
+        프로세스를 종료하지 않고 현재 응답 생성만 중단한다.
+
+        프로세스가 stopped 상태이면 409 Conflict를 반환한다.
+        """
+        if claude_process.status == 'stopped':
+            self._send_error(409, 'Claude process not running')
+            return
+
+        result = claude_process.interrupt()
         self._send_json(result)
 
     # -- Workflow Session API handlers ----------------------------------------

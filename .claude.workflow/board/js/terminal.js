@@ -201,6 +201,10 @@
   var receivedChunks = false;
   /** @type {string} buffer for streaming text to render markdown on completion */
   var textBuffer = "";
+  /** @type {string} buffer for accumulating input_json_delta chunks of the current tool call */
+  var toolInputBuffer = "";
+  /** @type {string|null} tool name of the current tool_use block (set at content_block_start) */
+  var currentToolName = null;
   /** @type {number} accumulated cost for session */
   var sessionCost = 0;
   /** @type {number} total tokens used */
@@ -371,6 +375,46 @@
       );
     }
     return htmlContent;
+  };
+
+  /**
+   * Wraps htmlContent in a line-count-based collapsible <details> block.
+   * Shows a 3-line preview in the summary; full content revealed on expand.
+   * For results with 3 or fewer lines, returns htmlContent unchanged.
+   *
+   * @param {string} htmlContent - already-rendered HTML string
+   * @param {string} rawText - original plain text (used for line counting & preview)
+   * @param {object} [options]
+   * @param {number} [options.previewLines=3] - number of preview lines to show
+   * @param {string} [options.summaryLabel="result"] - label suffix in the summary
+   * @returns {string} HTML string (collapsible or plain)
+   */
+  ToolResultRenderer.util.collapsibleResult = function (htmlContent, rawText, options) {
+    var opts = options || {};
+    var previewLines = opts.previewLines !== undefined ? opts.previewLines : 3;
+    var summaryLabel = opts.summaryLabel !== undefined ? opts.summaryLabel : 'result';
+
+    var text = rawText || '';
+    var lines = text.length === 0 ? [] : text.split('\n');
+    var totalLines = lines.length;
+
+    if (totalLines <= previewLines) {
+      return htmlContent;
+    }
+
+    var extraLines = totalLines - previewLines;
+    var previewText = lines.slice(0, previewLines).join('\n');
+    var escapedPreview = esc(previewText);
+
+    return (
+      '<details class="term-collapsible">' +
+      '<summary>' +
+      '<pre class="term-preview">' + escapedPreview + '</pre>' +
+      '<span class="term-collapsible-count">... (+' + extraLines + ' lines)</span>' +
+      '</summary>' +
+      '<div class="term-collapsible-full">' + htmlContent + '</div>' +
+      '</details>'
+    );
   };
 
   /**
@@ -949,7 +993,19 @@
       }
     }
 
-    // [4] Post-process: wrap in collapsible <details> when oversized
+    // [4] Post-process: collapsible wrapping
+    // Bash + fallbackPlain: use collapsibleResult for line-based preview (3-line threshold).
+    //   collapsibleResult returns htmlContent directly when ≤3 lines,
+    //   or wraps in <details class="term-collapsible"> when >3 lines.
+    //   No outer <details> wrapper exists (term-bash-quote is a plain div),
+    //   so there is no nesting.
+    // All other cases: use byte-threshold autoCollapse
+    if (toolName === 'Bash' && rendererKey === 'fallbackPlain') {
+      return util.collapsibleResult(htmlContent, cleanText, {
+        previewLines: 3,
+        summaryLabel: 'output'
+      });
+    }
     var summary = (toolName || 'tool') + ' result';
     return util.autoCollapse(htmlContent, rawByteLen, summary);
   };
@@ -1692,13 +1748,44 @@
   // ── Tool Box Renderer ──
 
   /**
-   * Creates a collapsible tool use box with <details> + <summary>.
+   * Creates a tool use box.
+   * - Bash: <div class="term-bash-quote"> blockquote style (always open)
+   * - Others: <details class="term-tool-box"> collapsible style
    * @param {string} toolName - name of the tool
-   * @returns {HTMLElement} the <details> element
+   * @returns {HTMLElement} the container element
    */
   function createToolBox(toolName) {
     var icon = TOOL_ICONS[toolName] || DEFAULT_TOOL_ICON;
 
+    // Bash-specific: blockquote (div) style — always visible
+    if (toolName === "Bash") {
+      var container = document.createElement("div");
+      container.className = "term-bash-quote";
+      container.setAttribute("data-tool-name", "Bash");
+
+      var headerDiv = document.createElement("div");
+      headerDiv.className = "term-bash-quote-header";
+      var iconSpan = document.createElement("span");
+      iconSpan.className = "term-bash-quote-icon";
+      iconSpan.textContent = icon + " Bash";
+      headerDiv.appendChild(iconSpan);
+      container.appendChild(headerDiv);
+
+      var cmdDiv = document.createElement("div");
+      cmdDiv.className = "term-bash-quote-cmd";
+      // Will be filled by insertToolResult when toolInputBuffer is parsed
+      container.appendChild(cmdDiv);
+
+      var resultDiv = document.createElement("div");
+      resultDiv.className = "term-tool-result";
+      container.appendChild(resultDiv);
+
+      appendToOutput(container);
+      currentToolBox = container;
+      return container;
+    }
+
+    // All other tools: collapsible <details> style
     var details = document.createElement("details");
     details.className = "term-tool-box";
     // Store tool name for downstream dispatch lookup (insertToolResult)
@@ -1742,6 +1829,29 @@
       resolvedToolName = currentToolBox.getAttribute("data-tool-name") || undefined;
     }
 
+    // Extract command from accumulated toolInputBuffer and update command display
+    // This runs just before rendering so the full JSON is available
+    if (toolInputBuffer) {
+      try {
+        var parsedInput = JSON.parse(toolInputBuffer);
+        var effectiveToolName = resolvedToolName || currentToolName;
+        if (effectiveToolName === "Bash" && parsedInput.command) {
+          // blockquote style: fill .term-bash-quote-cmd row
+          var cmdDiv = currentToolBox.querySelector(".term-bash-quote-cmd");
+          if (cmdDiv) {
+            cmdDiv.textContent = "$ " + parsedInput.command;
+          }
+        }
+      } catch (_e) {
+        // JSON.parse failed — graceful degradation: hide .term-bash-quote-cmd row
+        var cmdDivFallback = currentToolBox.querySelector(".term-bash-quote-cmd");
+        if (cmdDivFallback) {
+          cmdDivFallback.style.display = "none";
+        }
+      }
+      toolInputBuffer = "";
+    }
+
     var html;
     try {
       html = ToolResultRenderer.dispatch(resolvedToolName, text, { isError: !!isError });
@@ -1755,8 +1865,24 @@
     container.innerHTML = html;
     resultDiv.appendChild(container);
 
-    // Keep closed
-    currentToolBox.removeAttribute("open");
+    // open/close control only applies to <details> elements.
+    // term-bash-quote is a <div> (blockquote style) — always visible, no open/close needed.
+    if (currentToolBox.tagName === "DETAILS") {
+      // Bash: open if result is short (<=3 lines), closed if long (>=4 lines)
+      // All other tools: keep closed (existing behavior)
+      var effectiveTool = resolvedToolName || currentToolName;
+      if (effectiveTool === "Bash" && !isError) {
+        var lineCount = (text || "").split("\n").length;
+        if (lineCount <= 3) {
+          currentToolBox.setAttribute("open", "");
+        } else {
+          currentToolBox.removeAttribute("open");
+        }
+      } else {
+        // Keep closed
+        currentToolBox.removeAttribute("open");
+      }
+    }
   }
 
   // ── Thinking Spinner ──
@@ -1945,6 +2071,10 @@
   function connectSSE() {
     disconnectSSE();
 
+    // SSE 재접속 시 히스토리 리플레이로 토큰이 중복 누적되지 않도록 리셋
+    sessionTokens = { input: 0, output: 0 };
+    sessionCost = 0;
+
     termEventSource = new EventSource(endpoints().events);
 
     termEventSource.addEventListener("open", function () {
@@ -1961,9 +2091,15 @@
           textBuffer += data.chunk;
         } else if (data.text && data.kind === "assistant" && !receivedChunks) {
           textBuffer += data.text;
+        } else if (data.kind === "input_json_delta" && typeof data.chunk === "string") {
+          // Accumulate tool input JSON chunks for command extraction at result time
+          toolInputBuffer += data.chunk;
         } else if (data.kind === "content_block_start" && data.raw) {
           var block = data.raw.content_block || {};
           if (block.type === "tool_use" && block.name) {
+            // Reset input buffer and record tool name for upcoming input_json_delta chunks
+            toolInputBuffer = "";
+            currentToolName = block.name;
             createToolBox(block.name);
             appendPlainLog("\n" + (TOOL_ICONS[block.name] || DEFAULT_TOOL_ICON) + " " + block.name + "\n");
           }
@@ -2012,6 +2148,17 @@
             appendPlainLog("[Tool Error]\n");
           }
         }
+
+        // Usage 실시간 갱신 (assistant/message_delta에서 누적)
+        if (data.usage) {
+          if (typeof data.usage.input_tokens === "number") {
+            sessionTokens.input += data.usage.input_tokens;
+          }
+          if (typeof data.usage.output_tokens === "number") {
+            sessionTokens.output += data.usage.output_tokens;
+          }
+          updateStatusLine();
+        }
       } catch (err) {
         // Ignore parse errors
       }
@@ -2022,10 +2169,15 @@
         var data = JSON.parse(e.data);
         if (data.done) {
           stopSpinner();
-          // cost_usd: 세션 누적값 (assign) / tokens: 해당 턴 값 (assign)
+          // cost_usd: 세션 누적값 (assign) — result 이벤트에서만 가용
           if (typeof data.cost_usd === "number") sessionCost = data.cost_usd;
-          if (typeof data.input_tokens === "number") sessionTokens.input = data.input_tokens;
-          if (typeof data.output_tokens === "number") sessionTokens.output = data.output_tokens;
+          // tokens: 워크플로우 세션은 assistant 이벤트에서 이미 누적되므로 result에서는 스킵.
+          // 일반 세션은 assistant usage가 누적되었으면 스킵, 0이면 result 값으로 폴백 (방어적 할당).
+          if (!isWorkflowMode && sessionTokens.input === 0 && sessionTokens.output === 0) {
+            if (typeof data.input_tokens === "number") sessionTokens.input = data.input_tokens;
+            if (typeof data.output_tokens === "number") sessionTokens.output = data.output_tokens;
+          }
+          updateStatusLine();
 
           if (textBuffer) {
             var html = renderMarkdownToHtml(textBuffer);
@@ -2034,6 +2186,9 @@
           }
           textBuffer = "";
           currentToolBox = null;
+          // Clean up tool input accumulator state on response completion
+          toolInputBuffer = "";
+          currentToolName = null;
 
           appendSystemMessage("Response complete");
 
@@ -2213,6 +2368,35 @@
     });
   }
 
+  /**
+   * Interrupts the current response generation by sending SIGINT to the Claude process.
+   * Only available in main session mode (not workflow mode).
+   * On success, transitions UI to idle state without killing the session.
+   */
+  function interruptSession() {
+    if (isWorkflowMode) return;
+    if (Board.state.termStatus !== "running") return;
+
+    postJson("/terminal/interrupt").then(function () {
+      stopSpinner();
+      appendSystemMessage("[Interrupted]");
+      if (textBuffer) {
+        var html = renderMarkdownToHtml(textBuffer);
+        appendHtmlBlock(html, "term-message term-assistant");
+        appendPlainLog("\n" + textBuffer + "\n");
+      }
+      textBuffer = "";
+      currentToolBox = null;
+      toolInputBuffer = "";
+      currentToolName = null;
+      Board.state.termStatus = "idle";
+      setInputLocked(false);
+      updateControlBar();
+    }).catch(function (err) {
+      appendErrorMessage("[Error] Failed to interrupt: " + err.message);
+    });
+  }
+
   // ── Session Management ──
 
   /**
@@ -2244,13 +2428,15 @@
     connectSSEReady().then(function () {
       return postJson("/terminal/start");
     }).then(function (data) {
+      // 초기화 메시지 응답이 완료될 때까지 입력을 잠근다.
+      // idle 전환 + updateControlBar() 전에 lock을 걸어야 입력창이 열리지 않는다.
+      startSpinner();
+      setInputLocked(true);
       if (data.session_id) {
         Board.state.termSessionId = data.session_id;
         Board.state.termStatus = "idle";
         updateControlBar();
       }
-      startSpinner();
-      setInputLocked(true);
       postJson("/terminal/input", { text: "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요." }).catch(function () {});
     }).catch(function (err) {
       appendErrorMessage("[Error] Failed to start session: " + err.message);
@@ -2324,6 +2510,33 @@
     var sessionIdEl = document.getElementById("terminal-session-id");
     if (sessionIdEl) {
       sessionIdEl.textContent = Board.state.termSessionId || '';
+    }
+
+    // Send/Stop button toggle based on termStatus
+    var sendBtn = document.getElementById("terminal-send-btn");
+    if (sendBtn && !isWorkflowMode) {
+      var isRunning = Board.state.termStatus === "running";
+      if (isRunning) {
+        sendBtn.classList.add("is-stop");
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
+        sendBtn.onclick = function (e) { e.stopPropagation(); interruptSession(); };
+      } else {
+        sendBtn.classList.remove("is-stop");
+        sendBtn.disabled = Board.state.termStatus === "stopped";
+        sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+        sendBtn.onclick = function (e) { e.stopPropagation(); sendInput(); };
+      }
+    }
+
+    // Hint text toggle based on termStatus
+    var hintEl = document.querySelector(".terminal-input-hint");
+    if (hintEl) {
+      if (Board.state.termStatus === "running" && !isWorkflowMode) {
+        hintEl.textContent = "ESC 중지";
+      } else {
+        hintEl.textContent = "Enter 전송 · Shift+Enter 줄바꿈";
+      }
     }
 
     // Update status line
@@ -2518,9 +2731,8 @@
     if (killBtn) {
       killBtn.addEventListener("click", killSession);
     }
-    if (sendBtn) {
-      sendBtn.addEventListener("click", sendInput);
-    }
+    // sendBtn click handler is managed dynamically by updateControlBar()
+    // to toggle between sendInput (idle) and interruptSession (running).
 
     // Settings dropdown
     var settingsBtn = document.getElementById("terminal-settings-btn");
@@ -2574,6 +2786,12 @@
 
     // Keyboard shortcuts (document-level, skip when input focused)
     document.addEventListener("keydown", function (e) {
+      // ESC: interrupt current response (runs even when textarea is focused)
+      if (e.key === "Escape" && !isWorkflowMode && Board.state.termStatus === "running") {
+        e.preventDefault();
+        interruptSession();
+        return;
+      }
       if (document.activeElement && document.activeElement.tagName === "TEXTAREA") return;
       // F2 or Ctrl+Shift+C: toggle text view
       if (e.key === "F2" || (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c"))) {

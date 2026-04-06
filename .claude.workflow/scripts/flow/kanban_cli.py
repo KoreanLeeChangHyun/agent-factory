@@ -287,8 +287,40 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
             f"{ticket_number}은 {validation_error}"
         )
 
+    # validate_transition 통과 후, 실제 쓰기 전 파일 존재 재검증 (레이스 컨디션 방어)
+    if not os.path.isfile(ticket_file):
+        # 다른 세션이 이미 파일을 이동했을 수 있음 — 대상 디렉터리에서 재탐색
+        refreshed = find_ticket_file(ticket_number)
+        if refreshed is None:
+            err(f"{ticket_number} 티켓 파일이 이동 중 소실되었습니다 (레이스 컨디션)")
+        # 재탐색된 파일로 상태 재확인
+        refreshed_data = parse_ticket_xml(refreshed)
+        if refreshed_data["status"] == target_section:
+            print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+            return
+        # 다른 상태로 이동된 경우 ticket_file 갱신 후 전이 규칙 재검증
+        ticket_file = refreshed
+        current_section = refreshed_data["status"]
+        validation_error = validate_transition(current_section, target_section, force)
+        if validation_error is not None:
+            if validation_error == "":
+                print(f"{ticket_number}은 이미 {target_section} 상태입니다.")
+                return
+            err(f"{ticket_number}은 {validation_error}")
+
     # XML <status> 갱신
-    update_ticket_status(ticket_file, target_section)
+    try:
+        update_ticket_status(ticket_file, target_section)
+    except FileNotFoundError:
+        # write_ticket_xml이 파일 소실을 감지 — 재탐색 후 멱등성 확인
+        refreshed = find_ticket_file(ticket_number)
+        if refreshed is None:
+            err(f"{ticket_number} 티켓 파일이 상태 갱신 중 소실되었습니다 (레이스 컨디션)")
+        refreshed_data = parse_ticket_xml(refreshed)
+        if refreshed_data["status"] == target_section:
+            print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+            return
+        err(f"{ticket_number} 상태 갱신 중 파일 소실 감지. 현재 상태: {refreshed_data['status']}")
 
     # 상태에 대응하는 디렉터리로 파일 이동
     try:
@@ -298,6 +330,15 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
             dst_rel = os.path.relpath(new_path, _PROJECT_ROOT)
             print(f"파일 이동: {src_rel} → {dst_rel}")
         ticket_file = new_path
+    except FileNotFoundError:
+        # 이동 중 파일 소실 — 이미 이동된 경우 정상 처리
+        refreshed = find_ticket_file(ticket_number)
+        if refreshed is not None:
+            refreshed_data = parse_ticket_xml(refreshed)
+            if refreshed_data["status"] == target_section:
+                print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+                return
+        err(f"{ticket_number} 파일 이동 중 소실 감지")
     except OSError as e:
         err(f"티켓 파일 이동 실패: {e}")
 

@@ -388,6 +388,8 @@ flow-kanban move T-NNN submit
 
 실패(exit code 1) 시 경고 메시지를 출력하되 워크플로우 실행은 계속 진행합니다 (비차단).
 
+> **INLINE 모드 참고**: `flow-launcher`가 `INLINE:` 응답을 반환한 경우, 메인 세션에서 이미 `move submit`이 실행된 상태입니다. `kanban_cli.py`의 멱등성이 보장되므로 재실행해도 빈 파일이 생성되지 않습니다 (T-252).
+
 #### 실행 환경 분기
 
 ```bash

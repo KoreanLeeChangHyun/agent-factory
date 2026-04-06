@@ -5,6 +5,7 @@ Routes hook logic based on tool_name extracted from stdin JSON.
 Uses dispatcher.py utilities for flag-based conditional execution.
 
 라우팅 테이블:
+  Write|Edit       -> rules_auto_approve         (HOOK_RULES_AUTO_APPROVE, sync, fast-path)
   Write|Edit|Bash  -> hooks_self_guard          (HOOK_HOOKS_SELF_PROTECT, sync)
   AskUserQuestion  -> slack_ask                 (HOOK_SLACK_ASK, async)
   Bash             -> dangerous_command_guard    (HOOK_DANGEROUS_COMMAND, sync)
@@ -60,6 +61,22 @@ def main() -> None:
     flags = load_env_flags()
     sync_results = []
     # Other tool_name values (Read, Glob, Grep, WebFetch, etc.) pass through without hook processing
+
+    # --- Write|Edit: rules-auto-approve (sync, fast-path) ---
+    # .claude/rules/ 경로 대상 Write/Edit 요청을 가드 체인 실행 전에 선제 처리한다.
+    # allow 응답이 반환되면 나머지 가드 체인을 스킵하고 즉시 allow 출력 후 종료한다.
+    # 이를 통해 hooks_self_guard, main_session_guard 등이 우발적으로 deny하는 것을 방지한다.
+    if tool_name in ('Write', 'Edit'):
+        r = dispatch(
+            'HOOK_RULES_AUTO_APPROVE',
+            scripts_dir('guards', 'rules_auto_approve.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+        if r is not None and r.stdout and b'allow' in r.stdout:
+            sys.stdout.buffer.write(r.stdout)
+            sys.exit(0)
 
     # --- Write|Edit|Bash: hooks-self-guard (sync) ---
     if tool_name in ('Write', 'Edit', 'Bash'):

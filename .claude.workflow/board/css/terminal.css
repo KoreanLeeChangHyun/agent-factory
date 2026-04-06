@@ -539,6 +539,52 @@
   background: rgba(86, 156, 214, 0.14);
 }
 
+/* ── Bash Blockquote 컨테이너 ── */
+.term-bash-quote {
+  margin: 8px 0;
+  border: 1px solid #3c3c3c;
+  border-left: 3px solid #569cd6;
+  border-radius: 4px;
+  background: #2a2a2e;
+}
+
+.term-bash-quote-header {
+  padding: 8px 12px 4px;
+  color: #dcdcaa;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.term-bash-quote-cmd {
+  padding: 0 12px 6px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  color: #ce9178;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.term-bash-quote-cmd:empty {
+  display: none;
+}
+
+.term-bash-quote .term-tool-result {
+  border-top: 1px solid #3c3c3c;
+  max-height: none;
+}
+
+/* ── Bash 명령어 표시 (summary 내 $ command 텍스트) ── */
+.term-tool-cmd {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  color: #ce9178;
+  white-space: pre-wrap;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
 .term-tool-result {
   padding: 8px 12px;
   border-top: 1px solid #3c3c3c;
@@ -740,6 +786,21 @@
 .terminal-send-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* ── Stop Button (interrupt mode) ── */
+.terminal-send-btn.is-stop {
+  background: #c96442;
+  cursor: pointer;
+}
+
+.terminal-send-btn.is-stop:hover {
+  background: #b8533a;
+  transform: scale(1.05);
+}
+
+.terminal-send-btn.is-stop:active {
+  transform: scale(0.95);
 }
 
 /* ── Loading Spinner (inside input card) ── */
@@ -1078,6 +1139,78 @@
 
 .term-result-collapse > *:not(summary) {
   padding: 6px 10px;
+}
+
+/* ── collapsibleResult: 3줄 미리보기 + 접이식 결과 컨테이너 ── */
+.term-tool-result .term-collapsible {
+  margin: 2px 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+
+.term-tool-result .term-collapsible > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  user-select: none;
+}
+
+.term-tool-result .term-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-preview {
+  margin: 0;
+  padding: 0;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  color: #a0a0a0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: transparent;
+  border: none;
+}
+
+.term-collapsible-count {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: #569cd6;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1.4;
+}
+
+.term-collapsible-count::before {
+  content: '▶';
+  font-size: 8px;
+  color: #569cd6;
+  transition: transform 0.15s;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.term-tool-result .term-collapsible[open] > summary .term-preview,
+.term-tool-result .term-collapsible[open] > summary .term-collapsible-count {
+  display: none;
+}
+
+.term-tool-result .term-collapsible[open] > summary .term-collapsible-count::before {
+  transform: rotate(90deg);
+}
+
+.term-collapsible-full {
+  display: none;
+}
+
+.term-tool-result .term-collapsible[open] .term-collapsible-full {
+  display: block;
 }
 
 /* ── statusBadge: single-line confirmation badge ── */
