@@ -13,7 +13,6 @@
 #   get_color <PHASE>  - phase별 ANSI 색상 코드를 반환
 
 # ─── ANSI 색상 ───
-C_RED='\033[0;31m'
 C_BLUE='\033[0;34m'
 C_GREEN='\033[0;32m'
 C_PURPLE='\033[0;35m'

@@ -35,7 +35,6 @@ _scripts_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RESET  # noqa: E402
 from flow.flow_logger import append_log as _fl_append_log, resolve_work_dir_for_logging as _fl_resolve  # noqa: E402
 
 
@@ -206,22 +205,22 @@ def cmd_launch(ticket_id: str, command: str) -> int:
     port = _resolve_server_port()
     if port is None:
         print("INLINE: 서버 포트 해석 실패, 인라인 실행 필요")
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}.board.url 없음, 인라인 실행{C_RESET}", flush=True)
+        print("║ STATE: HTTP", flush=True)
+        print("║ >> .board.url 없음, 인라인 실행", flush=True)
         return 0
 
     # 2) 서버 상태 확인
     if not _is_server_running(port):
         print("INLINE: 서버 미기동, 인라인 실행 필요")
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}서버 미기동, 인라인 실행{C_RESET}", flush=True)
+        print("║ STATE: HTTP", flush=True)
+        print("║ >> 서버 미기동, 인라인 실행", flush=True)
         return 0
 
     # 3) 재진입 감지: 이미 워크플로우 세션 내부에서 호출된 경우
     if os.environ.get("_WF_SESSION_TYPE") == "workflow":
         print("INLINE: 재진입 감지, 인라인 실행 필요")
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}재진입 감지, 인라인 실행{C_RESET}", flush=True)
+        print("║ STATE: HTTP", flush=True)
+        print("║ >> 재진입 감지, 인라인 실행", flush=True)
         return 0
 
     # 4) POST /terminal/workflow/start
@@ -250,8 +249,8 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         session_id = resp.get("session_id", "unknown")
         _log("INFO", f"http_launcher: cmd_launch complete session_id={session_id}")
         print(f"LAUNCH: {session_id} 실행 중")
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{session_id} 세션에서 실행 중{C_RESET}", flush=True)
+        print("║ STATE: HTTP", flush=True)
+        print(f"║ >> {session_id} 세션에서 실행 중", flush=True)
         return 0
     else:
         error_msg = resp.get("error", "알 수 없는 오류")
@@ -280,14 +279,14 @@ def cmd_cleanup(ticket_id: str) -> int:
     # 1) 서버 포트 해석
     port = _resolve_server_port()
     if port is None:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP cleanup{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}서버 포트 없음, cleanup 건너뜀{C_RESET}", flush=True)
+        print("║ STATE: HTTP cleanup", flush=True)
+        print("║ >> 서버 포트 없음, cleanup 건너뜀", flush=True)
         return 0
 
     # 2) 서버 상태 확인 (미기동 시 조용히 종료)
     if not _is_server_running(port):
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP cleanup{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}서버 미기동, cleanup 건너뜀{C_RESET}", flush=True)
+        print("║ STATE: HTTP cleanup", flush=True)
+        print("║ >> 서버 미기동, cleanup 건너뜀", flush=True)
         return 0
 
     # 3) GET /terminal/workflow/list 로 해당 ticket_id 세션 조회
@@ -295,8 +294,8 @@ def cmd_cleanup(ticket_id: str) -> int:
         sessions = _http_get_json(port, "/terminal/workflow/list")
     except Exception as e:
         _log("WARN", f"http_launcher: list API error during cleanup: {e}")
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP cleanup{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}세션 목록 조회 실패, cleanup 건너뜀{C_RESET}", flush=True)
+        print("║ STATE: HTTP cleanup", flush=True)
+        print("║ >> 세션 목록 조회 실패, cleanup 건너뜀", flush=True)
         return 0
 
     # ticket_id와 매칭되는 세션 찾기
@@ -306,8 +305,8 @@ def cmd_cleanup(ticket_id: str) -> int:
     ]
 
     if not matching_sessions:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP cleanup{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{ticket_id} 세션 없음 (이미 종료됨){C_RESET}", flush=True)
+        print("║ STATE: HTTP cleanup", flush=True)
+        print(f"║ >> {ticket_id} 세션 없음 (이미 종료됨)", flush=True)
         return 0
 
     # 4) 매칭 세션을 POST /terminal/workflow/kill 로 종료
@@ -320,8 +319,8 @@ def cmd_cleanup(ticket_id: str) -> int:
                 "session_id": session_id,
             })
             _log("INFO", f"http_launcher: cleanup killed session_id={session_id}")
-            print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HTTP cleanup{C_RESET}", flush=True)
-            print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{session_id} 세션 종료{C_RESET}", flush=True)
+            print("║ STATE: HTTP cleanup", flush=True)
+            print(f"║ >> {session_id} 세션 종료", flush=True)
         except Exception as e:
             _log("WARN", f"http_launcher: kill API error session_id={session_id}: {e}")
             # 멱등성: kill 실패해도 계속 진행

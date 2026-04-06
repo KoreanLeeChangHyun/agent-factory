@@ -535,100 +535,72 @@
 .term-tool-box {
   margin: 8px 0;
   border: 1px solid #3c3c3c;
-  border-left: 3px solid #569cd6;
   border-radius: 4px;
   background: #2a2a2e;
   overflow: hidden;
 }
 
-.term-tool-box summary {
+.term-tool-header {
   padding: 8px 12px;
   cursor: pointer;
   color: #dcdcaa;
   font-size: 13px;
   font-weight: 600;
   user-select: none;
-  list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
   background: rgba(86, 156, 214, 0.08);
 }
 
-.term-tool-box summary::-webkit-details-marker {
-  display: none;
-}
-
-.term-tool-box summary::before {
-  content: '▶';
-  font-size: 9px;
-  color: #569cd6;
-  opacity: 0.8;
-  transition: transform 0.15s;
-  display: inline-block;
-}
-
-.term-tool-box[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.term-tool-box summary:hover {
+.term-tool-header:hover {
   background: rgba(86, 156, 214, 0.14);
 }
 
-/* ── Bash Blockquote 컨테이너 ── */
-.term-bash-quote {
-  margin: 8px 0;
-  border: 1px solid #3c3c3c;
-  border-left: 3px solid #569cd6;
-  border-radius: 4px;
-  background: #2a2a2e;
+.term-toggle-icon {
+  color: #569cd6;
+  opacity: 0.8;
+  transition: transform 0.15s;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+  flex-shrink: 0;
 }
 
-.term-bash-quote-header {
-  padding: 8px 12px 4px;
-  color: #dcdcaa;
-  font-size: 13px;
-  font-weight: 600;
+.term-toggle-icon.rotated {
+  transform: rotate(90deg);
 }
 
-.term-bash-quote-cmd {
-  padding: 0 12px 6px;
+/* ── 2행: 입력값 표시 ── */
+.term-tool-input {
+  padding: 4px 12px 4px 34px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 12px;
   color: #ce9178;
   white-space: pre-wrap;
   word-break: break-all;
+  border-bottom: 1px solid #3c3c3c;
 }
 
-.term-bash-quote-cmd:empty {
+/* ── 3행: 출력값 표시 ── */
+.term-tool-output {
   display: none;
-}
-
-.term-bash-quote .term-tool-result {
-  border-top: 1px solid #3c3c3c;
-  max-height: none;
-}
-
-/* ── Bash 명령어 표시 (summary 내 $ command 텍스트) ── */
-.term-tool-cmd {
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  padding: 8px 12px;
+  color: #a0a0a0;
   font-size: 12px;
-  font-weight: 400;
-  color: #ce9178;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.5;
   white-space: pre-wrap;
-  word-break: break-all;
-  flex: 1;
-  min-width: 0;
+}
+
+.term-tool-box.open .term-tool-output {
+  display: block;
 }
 
 .term-tool-result {
   padding: 8px 12px;
-  border-top: 1px solid #3c3c3c;
   color: #a0a0a0;
   font-size: 12px;
-  max-height: 300px;
-  overflow-y: auto;
   white-space: pre-wrap;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   line-height: 1.5;
@@ -937,27 +909,6 @@
 .terminal-btn-deny:hover {
   background: rgba(244, 135, 113, 0.22);
   border-color: #f48771;
-}
-
-/* ── Text View (textarea toggle) ── */
-.terminal-text-output {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  padding: 12px;
-  font-size: 13px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #ccc;
-  background: #1e1e1e;
-  border: none;
-  outline: none;
-  resize: none;
-  line-height: 1.6;
-  box-sizing: border-box;
-}
-
-.terminal-text-output::selection {
-  background: rgba(217, 119, 87, 0.3);
 }
 
 /* ── Copy Panel ── */
@@ -1503,8 +1454,6 @@
   line-height: 1.5;
   overflow-x: auto;
   white-space: pre-wrap;
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 /* ── taskStream renderer ── */
@@ -1678,8 +1627,6 @@
   padding: 8px 12px;
   border-top: 1px solid #3c3c3c;
   font-size: 12px;
-  max-height: 300px;
-  overflow-y: auto;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   line-height: 1.5;
 }

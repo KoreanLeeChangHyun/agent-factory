@@ -340,6 +340,7 @@ class TerminalSSEChannel:
     Attributes:
         _clients: 연결된 클라이언트의 wfile 객체 목록
         _lock: 클라이언트 목록 접근용 Lock
+        _client_locks: wfile별 per-client Lock 딕셔너리
         _history: 최근 SSE 이벤트 링 버퍼 (재접속 시 재생용)
     """
 
@@ -352,6 +353,7 @@ class TerminalSSEChannel:
         """
         self._clients: list = []
         self._lock: threading.Lock = threading.Lock()
+        self._client_locks: dict = {}
         # 이벤트를 (seq_id, encoded) 튜플로 저장해 Last-Event-ID 기반 재개 지원
         self._history: collections.deque = collections.deque(maxlen=history_size)
         self._next_seq: int = 0
@@ -367,14 +369,17 @@ class TerminalSSEChannel:
         """
         with self._lock:
             self._clients.append(wfile)
-            for seq_id, encoded in list(self._history):
-                if seq_id <= last_event_id:
-                    continue  # 이미 수신한 이벤트는 건너뜀
-                try:
-                    wfile.write(encoded)
-                    wfile.flush()
-                except (BrokenPipeError, ConnectionResetError, OSError):
-                    break
+            client_lock = threading.Lock()
+            self._client_locks[id(wfile)] = client_lock
+            with client_lock:
+                for seq_id, encoded in list(self._history):
+                    if seq_id <= last_event_id:
+                        continue  # 이미 수신한 이벤트는 건너뜀
+                    try:
+                        wfile.write(encoded)
+                        wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        break
 
     def clear_history(self) -> None:
         """히스토리 버퍼를 비운다. 새 세션 시작 시 이전 이벤트를 제거하기 위함."""
@@ -410,6 +415,19 @@ class TerminalSSEChannel:
                 self._clients.remove(wfile)
             except ValueError:
                 pass
+            self._client_locks.pop(id(wfile), None)
+
+    def get_lock(self, wfile: object) -> threading.Lock | None:
+        """wfile에 대응하는 per-client lock을 반환한다.
+
+        Args:
+            wfile: lock을 획득할 클라이언트의 wfile
+
+        Returns:
+            해당 wfile의 Lock. 클라이언트가 존재하지 않으면 None.
+        """
+        with self._lock:
+            return self._client_locks.get(id(wfile))
 
     def broadcast(self, data: dict) -> None:
         """NDJSON 메시지를 SSE 이벤트로 변환하여 모든 클라이언트에 전송한다.
@@ -440,18 +458,27 @@ class TerminalSSEChannel:
             encoded = message.encode('utf-8')
             # 링 버퍼에 (seq_id, encoded) 튜플로 저장
             self._history.append((seq_id, encoded))
-            for wfile in self._clients:
-                try:
+            clients_snapshot = list(self._clients)
+
+        for wfile in clients_snapshot:
+            client_lock = self._client_locks.get(id(wfile))
+            if client_lock is None:
+                continue
+            try:
+                with client_lock:
                     wfile.write(encoded)
                     wfile.flush()
-                except (BrokenPipeError, ConnectionResetError, OSError):
-                    dead_clients.append(wfile)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                dead_clients.append(wfile)
 
-            for wfile in dead_clients:
-                try:
-                    self._clients.remove(wfile)
-                except ValueError:
-                    pass
+        if dead_clients:
+            with self._lock:
+                for wfile in dead_clients:
+                    try:
+                        self._clients.remove(wfile)
+                    except ValueError:
+                        pass
+                    self._client_locks.pop(id(wfile), None)
 
         # 파일 persist (서버 재시작 시 복원용) - 별도 락 사용
         if self._persist_path is not None:
@@ -719,6 +746,7 @@ class ClaudeProcess:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding='utf-8',
                 bufsize=1,
                 env=proc_env,
             )
@@ -1700,7 +1728,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         연결을 유지하며 FileWatcher의 이벤트를 클라이언트에 스트리밍한다.
         """
         self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('Connection', 'keep-alive')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -1741,7 +1769,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         기존 /events SSE와 완전히 독립된 채널을 사용한다.
         """
         self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('Connection', 'keep-alive')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -1760,9 +1788,13 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         try:
             while True:
                 time.sleep(1)
+                client_lock = terminal_sse_channel.get_lock(self.wfile)
+                if client_lock is None:
+                    break
                 try:
-                    self.wfile.write(b': heartbeat\n\n')
-                    self.wfile.flush()
+                    with client_lock:
+                        self.wfile.write(b': heartbeat\n\n')
+                        self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     break
         finally:
@@ -2111,7 +2143,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('Connection', 'keep-alive')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -2130,9 +2162,13 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         try:
             while True:
                 time.sleep(1)
+                client_lock = session.channel.get_lock(self.wfile)
+                if client_lock is None:
+                    break
                 try:
-                    self.wfile.write(b': heartbeat\n\n')
-                    self.wfile.flush()
+                    with client_lock:
+                        self.wfile.write(b': heartbeat\n\n')
+                        self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     break
         finally:

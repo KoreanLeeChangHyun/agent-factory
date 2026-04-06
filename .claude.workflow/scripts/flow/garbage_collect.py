@@ -26,7 +26,6 @@ _SCRIPTS_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from common import C_CLAUDE, C_DIM, C_RESET
 from data.constants import KST, ZOMBIE_TTL_HOURS, TERMINAL_STEPS, TERMINAL_PHASES
 from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
@@ -197,11 +196,11 @@ def main() -> None:
         append_log(_log_dir, "INFO", f"garbage_collect: {stale_count} workflows marked STALE")
 
     if stale_count > 0:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}GC{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{stale_count}개 정리됨{C_RESET}", flush=True)
+        print("║ STATE: GC", flush=True)
+        print(f"║ >> {stale_count}개 정리됨", flush=True)
     else:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}GC{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}변경 없음{C_RESET}", flush=True)
+        print("║ STATE: GC", flush=True)
+        print("║ >> 변경 없음", flush=True)
 
 
 if __name__ == "__main__":

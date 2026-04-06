@@ -50,12 +50,6 @@ if [[ "$SUBCMD" == "start" ]]; then
         exit 1
     fi
 
-    # ─── 자체 색상 정의 (Claude 브랜드 Peach #DE7356) ───
-    C_ORANGE='\033[38;2;222;115;86m'
-    C_WHITE='\033[0;37m'
-    C_BOLD='\033[1m'
-    C_RESET='\033[0m'
-
     INNER_WIDTH=60
     BORDER=$(printf '═%.0s' $(seq 1 $INNER_WIDTH))
 
@@ -91,10 +85,10 @@ print(' '.join(str(w(s)) for s in strs))
     INFO_PAD=$((INNER_WIDTH - INFO_LEFT_W - INFO_RIGHT_W))
     INFO_SPACES=$(printf '%*s' "$INFO_PAD" '')
 
-    echo -e "${C_ORANGE}╔${BORDER}╗${C_RESET}"
-    echo -e "${C_ORANGE}║${C_RESET}  ${C_BOLD}${C_ORANGE}Claude Code${C_RESET} - Workflow${TITLE_SPACES}${C_WHITE}${TITLE_RIGHT}${C_RESET}${C_ORANGE}║${C_RESET}"
-    echo -e "${C_ORANGE}║${C_RESET}  ${C_ORANGE}▶${C_RESET} ${COMMAND}${INFO_SPACES}${C_WHITE}${INFO_RIGHT}${C_RESET}${C_ORANGE}║${C_RESET}"
-    echo -e "${C_ORANGE}╚${BORDER}╝${C_RESET}"
+    echo "╔${BORDER}╗"
+    echo "║  Claude Code - Workflow${TITLE_SPACES}${TITLE_RIGHT}║"
+    echo "║  ▶ ${COMMAND}${INFO_SPACES}${INFO_RIGHT}║"
+    echo "╚${BORDER}╝"
     # workflow.log 기록은 registryKey 없이 호출되므로 생략 (초기화 직후에는 로그 경로 미확정)
     exit 0
 fi
@@ -173,12 +167,12 @@ except Exception:
 
     CMD_LABEL=""
     if [[ -n "$COMMAND" ]]; then
-        CMD_LABEL=" ${C_DIM}(${COMMAND})${C_RESET}"
+        CMD_LABEL=" (${COMMAND})"
     fi
 
     BORDER=$(printf '═%.0s' $(seq 1 62))
-    echo -e "${C_CLAUDE}║${C_RESET} ${C_YELLOW}${C_BOLD}[OK]${C_RESET} ${C_DIM}${WORK_ID}${C_RESET} · ${TITLE}${CMD_LABEL}"
-    echo -e "${C_CLAUDE}${BORDER}${C_RESET}"
+    echo "║ [OK] ${WORK_ID} · ${TITLE}${CMD_LABEL}"
+    echo "${BORDER}"
 
     # ─── workflow.log 기록 ───
     if [[ -n "$WORK_DIR" ]]; then

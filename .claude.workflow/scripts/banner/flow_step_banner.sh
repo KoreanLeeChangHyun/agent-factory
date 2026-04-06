@@ -47,11 +47,11 @@ get_kr_timestamp() {
 get_progress() {
     local STEP="$1" ICON="$2"
     case "$STEP" in
-        PLAN)     echo "${C_BLUE}${C_BOLD}${ICON}${C_RESET} ${C_GRAY}○ ○${C_RESET}" ;;
-        WORK)     echo "${C_BLUE}${ICON}${C_RESET} ${C_GREEN}${C_BOLD}${ICON}${C_RESET} ${C_GRAY}○${C_RESET}" ;;
-        REPORT)   echo "${C_BLUE}${ICON}${C_RESET} ${C_GREEN}${ICON}${C_RESET} ${C_PURPLE}${C_BOLD}${ICON}${C_RESET}" ;;
-        DONE)     echo "${C_BLUE}${ICON}${C_RESET} ${C_GREEN}${ICON}${C_RESET} ${C_YELLOW}${C_BOLD}${ICON}${C_RESET}" ;;
-        *)        echo "${C_GRAY}○ ○ ○${C_RESET}" ;;
+        PLAN)     echo "${ICON} ○ ○" ;;
+        WORK)     echo "${ICON} ${ICON} ○" ;;
+        REPORT)   echo "${ICON} ${ICON} ${ICON}" ;;
+        DONE)     echo "${ICON} ${ICON} ${ICON}" ;;
+        *)        echo "○ ○ ○" ;;
     esac
 }
 
@@ -165,7 +165,6 @@ if [[ "$SUBCMD" == "start" ]]; then
     else
         STEP=$(get_current_phase "$REGISTRY_KEY")
     fi
-    COLOR=$(get_color "$STEP")
     PROGRESS=$(get_progress "$STEP" "●")
     DATESTAMP=$(TZ='Asia/Seoul' date '+%Y년 %-m월 %-d일')
     TIMESTAMP=$(get_kr_timestamp)
@@ -189,10 +188,10 @@ if [[ "$SUBCMD" == "start" ]]; then
     LINE2_PAD=$(( BANNER_WIDTH - LINE2_LEFT_W - LINE2_RIGHT_W ))
     LINE2_SPACES=$(printf '%*s' "$LINE2_PAD" '')
 
-    echo -e "${C_CLAUDE}╔${BORDER}╗${C_RESET}"
-    echo -e "${C_CLAUDE}║${C_RESET}  ${C_CLAUDE}[${C_RESET}${PROGRESS}${C_CLAUDE}]${C_RESET}  ${COLOR}${C_BOLD}${STEP}${C_RESET}${LINE1_SPACES}${C_WHITE}${LINE1_RIGHT}${C_RESET}${C_CLAUDE}║${C_RESET}"
-    echo -e "${C_CLAUDE}║${C_RESET}  ${C_CLAUDE}▶${C_RESET} ${DESC}${LINE2_SPACES}${C_WHITE}${LINE2_RIGHT}${C_RESET}${C_CLAUDE}║${C_RESET}"
-    echo -e "${C_CLAUDE}╚${BORDER}╝${C_RESET}"
+    echo "╔${BORDER}╗"
+    echo "║  [${PROGRESS}]  ${STEP}${LINE1_SPACES}${LINE1_RIGHT}║"
+    echo "║  ▶ ${DESC}${LINE2_SPACES}${LINE2_RIGHT}║"
+    echo "╚${BORDER}╝"
     _log_event "$REGISTRY_KEY" "INFO" "STEP_START: ${STEP}" || true
     exit 0
 fi
@@ -209,21 +208,20 @@ if [[ "$SUBCMD" == "end" ]]; then
     fi
 
     STEP=$(get_current_phase "$REGISTRY_KEY")
-    COLOR=$(get_color "$STEP")
     PROGRESS=$(get_progress "$STEP" "●")
     TIMESTAMP=$(get_kr_timestamp)
 
-    echo -e "${C_CLAUDE}║${C_RESET} ${C_CLAUDE}[${C_RESET}${PROGRESS}${C_CLAUDE}]${C_RESET}  ${COLOR}${C_BOLD}${STEP}${C_RESET}  ${C_DIM}- ${TIMESTAMP}${C_RESET}"
+    echo "║ [${PROGRESS}]  ${STEP}  - ${TIMESTAMP}"
 
     ARTIFACT_PATH=$(get_artifact_path "$STEP" "$REGISTRY_KEY")
     if [[ -n "$ARTIFACT_PATH" ]]; then
-        echo -e "${C_CLAUDE}║${C_RESET} ${C_DIM}${ARTIFACT_PATH}${C_RESET}"
+        echo "║ ${ARTIFACT_PATH}"
     fi
 
     if [[ -n "$LABEL" ]]; then
-        echo -e "${C_CLAUDE}║${C_RESET} ${C_YELLOW}${C_BOLD}[OK]${C_RESET} ${C_DIM}${LABEL}${C_RESET}"
+        echo "║ [OK] ${LABEL}"
     else
-        echo -e "${C_CLAUDE}║ [ASK]${C_RESET} ${C_DIM}AskUserQuestion${C_RESET}"
+        echo "║ [ASK] AskUserQuestion"
     fi
 
     _LOG_MSG="STEP_END: ${STEP} label=${LABEL:-ASK}"

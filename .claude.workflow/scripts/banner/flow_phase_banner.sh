@@ -47,7 +47,7 @@ if [[ -z "$REGISTRY_KEY" || -z "$PHASE" ]]; then
     exit 1
 fi
 
-COLOR=$(get_color "WORK")
+# COLOR 변수 제거: 출력문에서 더 이상 ANSI 컬러 참조 없음
 
 # ─── workflow.log 이벤트 기록 ───
 _log_event() {
@@ -149,19 +149,19 @@ fi
 
 # ─── 출력 ───
 if [[ "$EXEC_MODE" == "parallel" ]]; then
-    MODE_LABEL="${C_CYAN}parallel${C_RESET}"
+    MODE_LABEL="parallel"
 else
-    MODE_LABEL="${C_DIM}sequential${C_RESET}"
+    MODE_LABEL="sequential"
 fi
 
-echo -e "${C_CLAUDE}║ STATE:${C_RESET} ${C_GREEN}Phase${C_RESET} ${COLOR}${C_BOLD}${PHASE}${C_RESET}  ${MODE_LABEL}"
+echo "║ STATE: Phase ${PHASE}  ${MODE_LABEL}"
 if [[ -n "$AGENTS" && "$AGENTS" != "-" ]]; then
     if [[ -n "$TASKS" ]]; then
-        echo -e "${C_CLAUDE}║${C_RESET} ${C_CLAUDE}>>${C_RESET} ${AGENTS}  ${C_DIM}[${TASKS}]${C_RESET}"
+        echo "║ >> ${AGENTS}  [${TASKS}]"
     else
-        echo -e "${C_CLAUDE}║${C_RESET} ${C_CLAUDE}>>${C_RESET} ${AGENTS}"
+        echo "║ >> ${AGENTS}"
     fi
 else
-    echo -e "${C_CLAUDE}║${C_RESET} ${C_CLAUDE}>>${C_RESET} ${C_DIM}Phase ${PHASE}${C_RESET}"
+    echo "║ >> Phase ${PHASE}"
 fi
 _log_event "$REGISTRY_KEY" "INFO" "PHASE_START: ${PHASE} mode=${EXEC_MODE} agents=${AGENTS:-none} tasks=${TASKS:-none}" || true

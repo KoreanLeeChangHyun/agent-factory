@@ -28,7 +28,7 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import resolve_project_root, C_CLAUDE, C_DIM, C_RESET
+from common import resolve_project_root
 from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
@@ -605,8 +605,8 @@ def main() -> None:
 
     # 감지 결과 출력
     domain_name = result.get("domain_name", "unknown")
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}DETECT{C_RESET}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}domain=project-{domain_name}, stacks={len(stacks_detected)}{C_RESET}", flush=True)
+    print("║ STATE: DETECT", flush=True)
+    print(f"║ >> domain=project-{domain_name}, stacks={len(stacks_detected)}", flush=True)
     print(format_detection_result(result))
 
     # --generate 플래그 시 SKILL.md 파일 생성

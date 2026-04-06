@@ -34,7 +34,6 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RESET
 from data.constants import QUALITY_THRESHOLD
 from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
@@ -339,8 +338,8 @@ def main() -> None:
                 f"prompt_validator: quality_score={result['quality_score']:.4f} below {QUALITY_THRESHOLD} path={prompt_path}",
             )
 
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-P{C_RESET}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}quality_score={result['quality_score']:.4f}{C_RESET}", flush=True)
+    print("║ STATE: VALIDATE-P", flush=True)
+    print(f"║ >> quality_score={result['quality_score']:.4f}", flush=True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0)
 

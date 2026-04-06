@@ -101,11 +101,7 @@ def get_context_usage(data: dict) -> tuple[float, int, int]:
     if not usage or not ctx_size:
         return 0.0, 0, ctx_size or 200_000
 
-    tokens = (
-        usage.get("input_tokens", 0)
-        + usage.get("cache_creation_input_tokens", 0)
-        + usage.get("cache_read_input_tokens", 0)
-    )
+    tokens = usage.get("input_tokens", 0)
 
     pct = tokens * 100 / ctx_size if ctx_size else 0.0
     return pct, tokens, ctx_size
@@ -262,12 +258,17 @@ def main() -> None:
             # Show progress in WORK phase when tasks info is available
             progress = ""
             if phase == "WORK" and tasks:
-                completed = sum(
-                    1 for t in tasks.values()
-                    if isinstance(t, dict) and t.get("status") == "completed"
-                )
-                total = len(tasks)
-                progress = f"{completed}/{total}"
+                worker_tasks = {
+                    k: v for k, v in tasks.items()
+                    if re.match(r'^W\d+', k)
+                }
+                if worker_tasks:
+                    completed = sum(
+                        1 for t in worker_tasks.values()
+                        if isinstance(t, dict) and t.get("status") == "completed"
+                    )
+                    total = len(worker_tasks)
+                    progress = f"{completed}/{total}"
 
             if progress and agent:
                 workflow_display = f" {phase_color}[{phase}:{progress}:{agent}]{RESET} {title}"

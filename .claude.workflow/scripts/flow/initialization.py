@@ -62,7 +62,7 @@ if _SCRIPTS_DIR not in sys.path:
 from common import resolve_project_root
 _PROJECT_ROOT: str = resolve_project_root()
 
-from data.constants import C_CLAUDE, C_DIM, C_RESET, KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
+from data.constants import KST, KEEP_COUNT, VALID_COMMANDS, VALID_MODES, WORK_NAME_MAX_LEN, parse_chain_command, CHAIN_SEPARATOR
 from flow.flow_logger import append_log as _append_log
 
 
@@ -896,8 +896,8 @@ def main() -> None:
         init_result,
     )
 
-    print(f"{C_CLAUDE}║ INIT:{C_RESET} {title}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_DIM}{result['workDir']}{C_RESET}", flush=True)
+    print(f"║ INIT: {title}", flush=True)
+    print(f"║ {result['workDir']}", flush=True)
 
 
 if __name__ == "__main__":

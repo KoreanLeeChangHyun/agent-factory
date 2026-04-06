@@ -40,7 +40,7 @@ _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspat
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import resolve_project_root, resolve_work_dir, C_CLAUDE, C_DIM, C_RESET
+from common import resolve_project_root, resolve_work_dir
 from flow.cli_utils import build_common_epilog
 from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
@@ -1041,21 +1041,21 @@ def _print_validate_result(warnings: list[str], mode_label: str) -> None:
     """
     if not warnings:
         print(
-            f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-{mode_label} 검증 통과{C_RESET}",
+            f"║ STATE: VALIDATE-{mode_label} 검증 통과",
             flush=True,
         )
         print(
-            f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 0건{C_RESET}",
+            "║ >> 경고 0건",
             flush=True,
         )
         return
 
     print(
-        f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}VALIDATE-{mode_label}{C_RESET} [WARN]",
+        f"║ STATE: VALIDATE-{mode_label} [WARN]",
         flush=True,
     )
     print(
-        f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}경고 {len(warnings)}건 발견{C_RESET}",
+        f"║ >> 경고 {len(warnings)}건 발견",
         flush=True,
     )
     print()

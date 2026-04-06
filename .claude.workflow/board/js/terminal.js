@@ -120,22 +120,6 @@
   var SSE_RECONNECT_INTERVAL = 3000;  // SSE reconnect delay (ms)
   var MAX_OUTPUT_NODES = 10000;       // max child nodes in output div
 
-  var TOOL_ICONS = {
-    Bash: "\u2699",       // ⚙
-    Read: "\u25b6",       // ▶
-    Edit: "\u270e",       // ✎
-    Write: "\u270d",      // ✍
-    Grep: "\u2315",       // ⌕
-    Glob: "\u2605",       // ★
-    Agent: "\u2726",      // ✦
-    WebSearch: "\u2301",  // ⌁
-    WebFetch: "\u21e9",   // ⇩
-    Skill: "\u269b",      // ⚛
-    TodoWrite: "\u2611",  // ☑
-    NotebookEdit: "\u2630" // ☰
-  };
-  // Default icon for unknown tools
-  var DEFAULT_TOOL_ICON = "\u25c8"; // ◈
 
   // ── Session dispatcher ──
   // Query param `?session=wf-T-NNN-...` routes all endpoints to the workflow
@@ -994,18 +978,9 @@
     }
 
     // [4] Post-process: collapsible wrapping
-    // Bash + fallbackPlain: use collapsibleResult for line-based preview (3-line threshold).
-    //   collapsibleResult returns htmlContent directly when ≤3 lines,
-    //   or wraps in <details class="term-collapsible"> when >3 lines.
-    //   No outer <details> wrapper exists (term-bash-quote is a plain div),
-    //   so there is no nesting.
-    // All other cases: use byte-threshold autoCollapse
-    if (toolName === 'Bash' && rendererKey === 'fallbackPlain') {
-      return util.collapsibleResult(htmlContent, cleanText, {
-        previewLines: 3,
-        summaryLabel: 'output'
-      });
-    }
+    // 3-row structure (.term-tool-output) handles open/close at the tool-box level;
+    // inner collapsibleResult wrapping is no longer needed for Bash fallbackPlain.
+    // All cases: use byte-threshold autoCollapse (or return plain for small content).
     var summary = (toolName || 'tool') + ' result';
     return util.autoCollapse(htmlContent, rawByteLen, summary);
   };
@@ -1061,7 +1036,7 @@
       // flow-step end: [● ● ○] STEP_NAME - timestamp
       stepEnd:           /║\s+\[●[^\]]*\]\s+(PLAN|WORK|REPORT|DONE)\s+-\s+(.+)$/,
       // flow-step end artifact path line
-      artifactLine:      /║\s+(\.claude\.workflow\/workflow\/[^\s]+\.(?:md|json|txt))$/,
+      artifactLine:      /║\s+(\.claude\.workflow\/workflow\/[^\s]+)$/,
       // flow-step [OK] label
       stepOk:            /║\s+\[OK\]\s+(\S+)$/,
       // flow-step [ASK] label
@@ -1748,80 +1723,78 @@
   // ── Tool Box Renderer ──
 
   /**
-   * Creates a tool use box.
-   * - Bash: <div class="term-bash-quote"> blockquote style (always open)
-   * - Others: <details class="term-tool-box"> collapsible style
+   * Creates a tool use box using a 3-row structure.
+   * Row 1 (.term-tool-header): chevron + tool label (always visible).
+   * Row 2 (.term-tool-input): tool input summary (always visible, filled by insertToolResult).
+   * Row 3 (.term-tool-output): output area, hidden when closed, shown when open (CSS-driven).
    * @param {string} toolName - name of the tool
    * @returns {HTMLElement} the container element
    */
   function createToolBox(toolName) {
-    var icon = TOOL_ICONS[toolName] || DEFAULT_TOOL_ICON;
-
-    // Bash-specific: blockquote (div) style — always visible
-    if (toolName === "Bash") {
-      var container = document.createElement("div");
-      container.className = "term-bash-quote";
-      container.setAttribute("data-tool-name", "Bash");
-
-      var headerDiv = document.createElement("div");
-      headerDiv.className = "term-bash-quote-header";
-      var iconSpan = document.createElement("span");
-      iconSpan.className = "term-bash-quote-icon";
-      iconSpan.textContent = icon + " Bash";
-      headerDiv.appendChild(iconSpan);
-      container.appendChild(headerDiv);
-
-      var cmdDiv = document.createElement("div");
-      cmdDiv.className = "term-bash-quote-cmd";
-      // Will be filled by insertToolResult when toolInputBuffer is parsed
-      container.appendChild(cmdDiv);
-
-      var resultDiv = document.createElement("div");
-      resultDiv.className = "term-tool-result";
-      container.appendChild(resultDiv);
-
-      appendToOutput(container);
-      currentToolBox = container;
-      return container;
-    }
-
-    // All other tools: collapsible <details> style
-    var details = document.createElement("details");
-    details.className = "term-tool-box";
-    // Store tool name for downstream dispatch lookup (insertToolResult)
+    var box = document.createElement("div");
+    box.className = "term-tool-box";
     if (toolName) {
-      details.setAttribute("data-tool-name", toolName);
+      box.setAttribute("data-tool-name", toolName);
     }
 
-    var summary = document.createElement("summary");
-    summary.textContent = icon + " " + toolName;
-    details.appendChild(summary);
+    // Row 1: header (chevron + label)
+    var header = document.createElement("div");
+    header.className = "term-tool-header";
 
-    var resultDiv = document.createElement("div");
-    resultDiv.className = "term-tool-result";
-    details.appendChild(resultDiv);
+    var toggleSpan = document.createElement("span");
+    toggleSpan.className = "term-toggle-icon";
+    toggleSpan.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2.5L7.5 6 4 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    header.appendChild(toggleSpan);
 
-    appendToOutput(details);
-    currentToolBox = details;
+    var labelSpan = document.createElement("span");
+    labelSpan.className = "term-tool-label";
+    labelSpan.textContent = toolName;
+    header.appendChild(labelSpan);
 
-    return details;
+    box.appendChild(header);
+
+    // Row 2: input summary (always visible, filled later by insertToolResult)
+    var inputDiv = document.createElement("div");
+    inputDiv.className = "term-tool-input";
+    box.appendChild(inputDiv);
+
+    // Row 3: output (hidden when closed, visible when open via .open class on box)
+    var outputDiv = document.createElement("div");
+    outputDiv.className = "term-tool-output";
+
+    var fullDiv = document.createElement("div");
+    fullDiv.className = "term-tool-output-full";
+    outputDiv.appendChild(fullDiv);
+
+    box.appendChild(outputDiv);
+
+    // Chevron click: toggle open class on box (CSS drives row-3 visibility)
+    toggleSpan.addEventListener("click", function () {
+      var isOpen = box.classList.toggle("open");
+      toggleSpan.classList.toggle("rotated", isOpen);
+    });
+
+    appendToOutput(box);
+    currentToolBox = box;
+
+    return box;
   }
 
   /**
-   * Inserts tool result text into the current tool box.
-   * Keeps the <details> closed (user can click to expand).
-   * Routes through ToolResultRenderer.dispatch for per-tool rendering.
-   * Backward compatible: the 2-argument form (text, isError) is still supported —
-   * when toolName is omitted, dispatch falls back to fallbackPlain via its
-   * undefined-mapping branch.
+   * Inserts tool result into the current tool box (3-row structure).
+   * Row 2 (.term-tool-input): filled with a human-readable input summary.
+   * Row 3 (.term-tool-output-full): filled with rendered output HTML.
+   * Open/close state of row 3 follows Bash line-count rule:
+   *   <= 3 lines → open, >= 4 lines → closed. All other tools → closed.
+   * Backward compatible: the 2-argument form (text, isError) is still supported.
    * @param {string} text - result text
    * @param {boolean} [isError] - whether this is an error result
    * @param {string} [toolName] - optional tool name (falls back to currentToolBox dataset)
    */
   function insertToolResult(text, isError, toolName) {
     if (!currentToolBox) return;
-    var resultDiv = currentToolBox.querySelector(".term-tool-result");
-    if (!resultDiv) return;
+    var fullDiv = currentToolBox.querySelector(".term-tool-output-full");
+    if (!fullDiv) return;
 
     // Resolve tool name: explicit arg > dataset on current box
     var resolvedToolName = toolName;
@@ -1829,29 +1802,43 @@
       resolvedToolName = currentToolBox.getAttribute("data-tool-name") || undefined;
     }
 
-    // Extract command from accumulated toolInputBuffer and update command display
-    // This runs just before rendering so the full JSON is available
-    if (toolInputBuffer) {
+    // Parse toolInputBuffer → fill Row 2 (.term-tool-input) with input summary
+    var inputDiv = currentToolBox.querySelector(".term-tool-input");
+    if (toolInputBuffer && inputDiv) {
+      var inputSummary = "";
       try {
         var parsedInput = JSON.parse(toolInputBuffer);
         var effectiveToolName = resolvedToolName || currentToolName;
         if (effectiveToolName === "Bash" && parsedInput.command) {
-          // blockquote style: fill .term-bash-quote-cmd row
-          var cmdDiv = currentToolBox.querySelector(".term-bash-quote-cmd");
-          if (cmdDiv) {
-            cmdDiv.textContent = "$ " + parsedInput.command;
+          inputSummary = "$ " + parsedInput.command;
+        } else if ((effectiveToolName === "Read" || effectiveToolName === "Write" || effectiveToolName === "Edit") && parsedInput.file_path) {
+          inputSummary = parsedInput.file_path;
+        } else if (effectiveToolName === "Grep" && parsedInput.pattern) {
+          inputSummary = parsedInput.pattern + (parsedInput.path ? "  " + parsedInput.path : "");
+        } else if (effectiveToolName === "Glob" && parsedInput.pattern) {
+          inputSummary = parsedInput.pattern;
+        } else {
+          // Generic: key: value pairs on one line
+          var pairs = [];
+          var keys = Object.keys(parsedInput);
+          for (var ki = 0; ki < keys.length && ki < 3; ki++) {
+            var v = parsedInput[keys[ki]];
+            if (typeof v === "string") {
+              pairs.push(keys[ki] + ": " + (v.length > 40 ? v.slice(0, 40) + "…" : v));
+            }
           }
+          inputSummary = pairs.join("  ");
         }
       } catch (_e) {
-        // JSON.parse failed — graceful degradation: hide .term-bash-quote-cmd row
-        var cmdDivFallback = currentToolBox.querySelector(".term-bash-quote-cmd");
-        if (cmdDivFallback) {
-          cmdDivFallback.style.display = "none";
-        }
+        inputSummary = "";
       }
+      inputDiv.textContent = inputSummary;
+      toolInputBuffer = "";
+    } else if (toolInputBuffer) {
       toolInputBuffer = "";
     }
 
+    // Render output HTML → fill Row 3 (.term-tool-output-full)
     var html;
     try {
       html = ToolResultRenderer.dispatch(resolvedToolName, text, { isError: !!isError });
@@ -1863,25 +1850,26 @@
     var container = document.createElement("div");
     container.className = isError ? "term-tool-error" : "term-tool-result-rendered";
     container.innerHTML = html;
-    resultDiv.appendChild(container);
+    fullDiv.appendChild(container);
 
-    // open/close control only applies to <details> elements.
-    // term-bash-quote is a <div> (blockquote style) — always visible, no open/close needed.
-    if (currentToolBox.tagName === "DETAILS") {
-      // Bash: open if result is short (<=3 lines), closed if long (>=4 lines)
-      // All other tools: keep closed (existing behavior)
-      var effectiveTool = resolvedToolName || currentToolName;
-      if (effectiveTool === "Bash" && !isError) {
-        var lineCount = (text || "").split("\n").length;
-        if (lineCount <= 3) {
-          currentToolBox.setAttribute("open", "");
-        } else {
-          currentToolBox.removeAttribute("open");
-        }
+    // Open/close control for 3-row structure via .open class on .term-tool-box
+    var effectiveTool = resolvedToolName || currentToolName;
+    var toggleIcon = currentToolBox.querySelector(".term-toggle-icon");
+    if (effectiveTool === "Bash" && !isError) {
+      var lineCount = (text || "").split("\n").length;
+      if (lineCount <= 3) {
+        // Open: show full output, rotate chevron
+        currentToolBox.classList.add("open");
+        if (toggleIcon) toggleIcon.classList.add("rotated");
       } else {
-        // Keep closed
-        currentToolBox.removeAttribute("open");
+        // Closed: show collapsed indicator
+        currentToolBox.classList.remove("open");
+        if (toggleIcon) toggleIcon.classList.remove("rotated");
       }
+    } else {
+      // All other tools: keep closed
+      currentToolBox.classList.remove("open");
+      if (toggleIcon) toggleIcon.classList.remove("rotated");
     }
   }
 
@@ -1906,43 +1894,6 @@
       thinkingEl.parentNode.removeChild(thinkingEl);
     }
     thinkingEl = null;
-  }
-
-  // ── Copy Panel ──
-
-  /** @type {string} plain text log of all terminal output */
-  var plainLog = "";
-  /** @type {boolean} whether textarea view is active */
-  var textViewActive = false;
-
-  function appendPlainLog(text) {
-    plainLog += text;
-    var ta = document.getElementById("terminal-text-output");
-    if (ta && textViewActive) {
-      var follow = isNearBottom(ta);
-      ta.value = plainLog;
-      scrollToBottomIfFollowing(ta, follow);
-    }
-  }
-
-  function toggleTextView() {
-    textViewActive = !textViewActive;
-    var outputEl = document.getElementById("terminal-output");
-    var textEl = document.getElementById("terminal-text-output");
-    var btn = document.getElementById("terminal-copy-btn");
-    if (!outputEl || !textEl) return;
-
-    if (textViewActive) {
-      outputEl.style.display = "none";
-      textEl.style.display = "block";
-      textEl.value = plainLog;
-      textEl.scrollTop = textEl.scrollHeight;
-      if (btn) btn.textContent = "Terminal";
-    } else {
-      outputEl.style.display = "";
-      textEl.style.display = "none";
-      if (btn) btn.textContent = "Text";
-    }
   }
 
   // ── Utility ──
@@ -2101,7 +2052,6 @@
             toolInputBuffer = "";
             currentToolName = block.name;
             createToolBox(block.name);
-            appendPlainLog("\n" + (TOOL_ICONS[block.name] || DEFAULT_TOOL_ICON) + " " + block.name + "\n");
           }
         } else if (data.kind === "user" && data.raw) {
           var tr = data.raw.tool_use_result;
@@ -2137,15 +2087,12 @@
             if (!bannerConsumed) {
               insertToolResult(resultText, false);
             }
-            appendPlainLog(resultText + "\n");
           }
           if (tr && tr.stderr) {
             insertToolResult("[stderr] " + tr.stderr, true);
-            appendPlainLog("[stderr] " + tr.stderr + "\n");
           }
           if (mc && mc[0] && mc[0].is_error) {
             insertToolResult("[Tool Error]", true);
-            appendPlainLog("[Tool Error]\n");
           }
         }
 
@@ -2182,7 +2129,6 @@
           if (textBuffer) {
             var html = renderMarkdownToHtml(textBuffer);
             appendHtmlBlock(html, "term-message term-assistant");
-            appendPlainLog("\n" + textBuffer + "\n");
           }
           textBuffer = "";
           currentToolBox = null;
@@ -2437,7 +2383,6 @@
     div.className = "term-message term-user";
     div.textContent = text;
     appendToOutput(div);
-    appendPlainLog("\n> " + text + "\n");
 
     setInputLocked(true);
     startSpinner();
@@ -2469,7 +2414,6 @@
       if (textBuffer) {
         var html = renderMarkdownToHtml(textBuffer);
         appendHtmlBlock(html, "term-message term-assistant");
-        appendPlainLog("\n" + textBuffer + "\n");
       }
       textBuffer = "";
       currentToolBox = null;
@@ -2558,7 +2502,6 @@
     if (outputDiv) {
       outputDiv.innerHTML = "";
     }
-    plainLog = "";
   }
 
   // ── UI Update ──
@@ -2730,7 +2673,6 @@
     h += '<div class="terminal-session-controls">';
     h += '<button class="terminal-btn terminal-btn-start" id="terminal-start-btn">Start</button>';
     h += '<button class="terminal-btn terminal-btn-kill" id="terminal-kill-btn">Kill</button>';
-    h += '<button class="terminal-btn terminal-btn-copy" id="terminal-copy-btn" title="Toggle text view (F2)">Text</button>';
     h += '<span class="terminal-controls-divider"></span>';
     h += '<button class="terminal-btn terminal-btn-sessions" id="terminal-sessions-btn" title="Workflow sessions">';
     h += '<span id="terminal-sessions-label">Sessions</span>';
@@ -2753,7 +2695,6 @@
 
     // HTML div output area
     h += '<div class="terminal-output" id="terminal-output"></div>';
-    h += '<textarea class="terminal-text-output" id="terminal-text-output" readonly spellcheck="false" style="display:none"></textarea>';
 
     // Input card (Claude-style)
     h += '<div class="terminal-input-card">';
@@ -2850,10 +2791,6 @@
         clearOutput();
       });
     }
-    var copyBtn = document.getElementById("terminal-copy-btn");
-    if (copyBtn) {
-      copyBtn.addEventListener("click", toggleTextView);
-    }
     if (inputEl) {
       inputEl.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -2877,12 +2814,6 @@
         e.preventDefault();
         interruptSession();
         return;
-      }
-      if (document.activeElement && document.activeElement.tagName === "TEXTAREA") return;
-      // F2 or Ctrl+Shift+C: toggle text view
-      if (e.key === "F2" || (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c"))) {
-        e.preventDefault();
-        toggleTextView();
       }
     });
 
