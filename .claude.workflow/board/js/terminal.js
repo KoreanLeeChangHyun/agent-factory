@@ -2217,7 +2217,9 @@
    * the system/init event is never missed.
    */
   function startSession() {
-    if (Board.state.termStatus === "running") return;
+    // updateControlBar()의 startBtn.disabled 조건(termStatus !== "stopped")과 동일한 의도:
+    // stopped 상태일 때만 세션 시작을 허용하여 idle 상태에서의 중복 실행을 차단한다.
+    if (Board.state.termStatus !== "stopped") return;
     if (isWorkflowMode) {
       // Workflow sessions are started by flow-launcher, not by the UI.
       // Just connect SSE to the already-running session.
