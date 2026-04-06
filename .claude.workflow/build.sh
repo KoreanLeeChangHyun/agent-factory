@@ -207,8 +207,8 @@ _merge_aliases() {
     # 기존 파일에서 alias 이름 목록과 함수 이름 목록 추출
     local existing_names
     existing_names="$(
-        grep -oP 'alias \K[^=]+' "$existing_file" 2>/dev/null | sed "s/'$//"
-        grep -oP '^\w+(?=\(\))' "$existing_file" 2>/dev/null
+        sed -n "s/^alias \([^=]*\)=.*/\1/p" "$existing_file" 2>/dev/null | sed "s/'$//"
+        sed -n "s/^\([a-zA-Z_][a-zA-Z0-9_]*\)().*/\1/p" "$existing_file" 2>/dev/null
     )"
 
     local tmp_append
@@ -221,8 +221,8 @@ _merge_aliases() {
 
     while IFS= read -r line || [ -n "$line" ]; do
         # 여러 줄 함수 블록 시작 감지: name() {
-        if echo "$line" | grep -qP '^\w+\(\)\s*\{'; then
-            func_name="$(echo "$line" | grep -oP '^\w+(?=\(\))')"
+        if echo "$line" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{'; then
+            func_name="$(echo "$line" | sed -n 's/^\([a-zA-Z_][a-zA-Z0-9_]*\)().*/\1/p')"
             in_func_block=true
             if echo "$existing_names" | grep -qx "$func_name"; then
                 skip_block=true
@@ -239,7 +239,7 @@ _merge_aliases() {
             if [ "$skip_block" = false ]; then
                 echo "$line" >> "$tmp_append"
             fi
-            if echo "$line" | grep -qP '^\}'; then
+            if echo "$line" | grep -q '^\}'; then
                 in_func_block=false
                 func_name=""
                 skip_block=false
@@ -248,9 +248,9 @@ _merge_aliases() {
         fi
 
         # alias 라인 처리
-        if echo "$line" | grep -qP '^alias '; then
+        if echo "$line" | grep -q '^alias '; then
             local alias_name
-            alias_name="$(echo "$line" | grep -oP 'alias \K[^=]+')"
+            alias_name="$(echo "$line" | sed -n 's/^alias \([^=]*\)=.*/\1/p')"
             if echo "$existing_names" | grep -qx "$alias_name"; then
                 continue  # 이미 존재 → 스킵
             fi
@@ -260,7 +260,7 @@ _merge_aliases() {
         fi
 
         # export PATH 라인 처리 (export로 시작하는 일반 명령문)
-        if echo "$line" | grep -qP '^export '; then
+        if echo "$line" | grep -q '^export '; then
             if grep -qF "$line" "$existing_file" 2>/dev/null; then
                 continue  # 동일 라인 이미 존재 → 스킵
             fi
@@ -445,7 +445,7 @@ _merge_kv_settings() {
 
     # 기존 파일에서 KEY 목록 추출 (대문자+언더스코어 시작)
     local existing_keys
-    existing_keys="$(grep -oP '^[A-Z_][A-Z0-9_]+(?==)' "$existing_file" 2>/dev/null)"
+    existing_keys="$(sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$existing_file" 2>/dev/null)"
 
     local tmp_append
     tmp_append="$(mktemp)" || return 1
@@ -457,9 +457,9 @@ _merge_kv_settings() {
 
     while IFS= read -r line || [ -n "$line" ]; do
         # KEY=VALUE 라인 감지
-        if echo "$line" | grep -qP '^[A-Z_][A-Z0-9_]+='; then
+        if echo "$line" | grep -qE '^[A-Z_][A-Z0-9_]+='; then
             local key
-            key="$(echo "$line" | grep -oP '^[A-Z_][A-Z0-9_]+(?==)')"
+            key="$(echo "$line" | sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p')"
             if echo "$existing_keys" | grep -qx "$key"; then
                 # 기존에 존재 → 스킵, 누적 주석 초기화
                 pending_comments=()
@@ -476,7 +476,7 @@ _merge_kv_settings() {
         fi
 
         # 주석 또는 빈 줄: 다음 KEY를 위해 누적
-        if echo "$line" | grep -qP '^#' || [ -z "$line" ]; then
+        if echo "$line" | grep -q '^#' || [ -z "$line" ]; then
             pending_comments+=("$line")
         else
             # 그 외 라인 (export 등): 전체 라인 매칭
@@ -642,10 +642,10 @@ update_legacy_aliases() {
     # --- flow-* alias → wrapper PATH 마이그레이션 ---
     # ~/.claude.aliases에 남아있는 'alias flow-xxx=...' 패턴을 감지하여 제거하고
     # .claude.workflow/bin/ wrapper PATH 설정으로 대체
-    if grep -qP '^alias flow-\w+=' "$aliases_file" 2>/dev/null; then
+    if grep -qE '^alias flow-[a-zA-Z_][a-zA-Z0-9_-]*=' "$aliases_file" 2>/dev/null; then
         _MIGRATION_PERFORMED=true
         local flow_alias_count
-        flow_alias_count="$(grep -cP '^alias flow-\w+=' "$aliases_file" 2>/dev/null || echo 0)"
+        flow_alias_count="$(grep -cE '^alias flow-[a-zA-Z_][a-zA-Z0-9_-]*=' "$aliases_file" 2>/dev/null || echo 0)"
         print_info "flow-* alias ${flow_alias_count}개 감지됨. wrapper PATH 설정으로 마이그레이션합니다..."
 
         local tmp_migrated
