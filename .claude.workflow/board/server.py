@@ -558,6 +558,7 @@ class TerminalSSEChannel:
                 'request_id': data.get('request_id', ''),
                 'tool_name': req.get('tool_name', ''),
                 'description': req.get('description', ''),
+                'input': req.get('input', {}),
                 'raw': data,
             }
         if event_name == 'error':

@@ -523,6 +523,29 @@ verify_installation() {
     fi
 }
 
+# --- Board URL 생성 ---
+# server.py의 resolve_port()와 동일한 MD5 해시 기반 포트 결정 공식을 사용한다.
+# 충돌 순차 탐색(is_port_in_use)은 서버 미실행 상태이므로 첫 번째 결정적 포트만 사용.
+generate_board_url() {
+    local project_root
+    project_root="$(pwd)"
+    local url_file="${SCRIPT_DIR}/.board.url"
+    local port
+    port="$(python3 -c "
+import hashlib
+project_root = '$project_root'
+PORT_RANGE_START = 9900
+range_size = 100
+hash_bytes = hashlib.md5(project_root.encode()).digest()
+hash_int = int.from_bytes(hash_bytes[:4], byteorder='big')
+port = PORT_RANGE_START + (hash_int % range_size)
+print(port)
+")"
+    local base="http://127.0.0.1:${port}/.claude.workflow/board"
+    printf '%s/index.html\n%s/terminal.html' "${base}" "${base}" > "${url_file}"
+    print_success "Board URL 생성 완료: ${base}/index.html"
+}
+
 # --- main ---
 main() {
     trap 'print_error "초기화가 실패했습니다. 위의 에러 메시지를 확인해 주세요."' EXIT
@@ -543,12 +566,17 @@ main() {
     setup_shell_aliases
     update_gitignore
     verify_installation
+    generate_board_url
     trap - EXIT
     detect_shell_rc
+    local board_url=""
+    local url_file="${SCRIPT_DIR}/.board.url"
+    [ -f "${url_file}" ] && board_url="$(head -1 "${url_file}")"
     echo ""
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     printf '%s  초기화가 완료되었습니다!%s\n' "${GREEN}" "${NC}"
     printf '%s  새 터미널을 열거나 '\''source %s'\''를 실행하세요%s\n' "${GREEN}" "${DETECTED_SHELL_RC}" "${NC}"
+    [ -n "${board_url}" ] && printf '%s  Board:  %s%s\n' "${GREEN}" "${board_url}" "${NC}"
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     echo ""
 }

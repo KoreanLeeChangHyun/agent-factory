@@ -22,7 +22,8 @@ body {
 .header {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
+  padding: 0 20px;
+  height: 48px;
   border-bottom: 1px solid #2d2d2d;
   background: #181818;
   flex-shrink: 0;

@@ -167,6 +167,7 @@
         } else if (data.kind === "content_block_start" && data.raw) {
           var block = data.raw.content_block || {};
           if (block.type === "tool_use" && block.name) {
+            _ctx.flushTextBuffer();
             _ctx.resetToolInputBuffer();
             _ctx.setCurrentToolName(block.name);
             if (_ctx.isWorkflowMode()) {
@@ -176,6 +177,7 @@
             }
           }
         } else if (data.kind === "user" && data.raw) {
+          _ctx.flushTextBuffer();
           var tr = data.raw.tool_use_result;
           var mc = data.raw.message && data.raw.message.content;
           var resultText = "";
@@ -358,6 +360,29 @@
           div.appendChild(descDiv);
         }
 
+        // Collapsible input parameters
+        if (data.input && typeof data.input === "object" && Object.keys(data.input).length > 0) {
+          var inputWrapDiv = document.createElement("div");
+          inputWrapDiv.className = "term-permission-input";
+
+          var inputToggleBtn = document.createElement("button");
+          inputToggleBtn.className = "term-permission-input-toggle";
+          inputToggleBtn.textContent = "▶ Show input parameters";
+
+          var inputContentDiv = document.createElement("div");
+          inputContentDiv.className = "term-permission-input-content";
+          inputContentDiv.textContent = JSON.stringify(data.input, null, 2);
+
+          inputToggleBtn.addEventListener("click", function () {
+            var expanded = inputContentDiv.classList.toggle("expanded");
+            inputToggleBtn.textContent = expanded ? "▼ Hide input parameters" : "▶ Show input parameters";
+          });
+
+          inputWrapDiv.appendChild(inputToggleBtn);
+          inputWrapDiv.appendChild(inputContentDiv);
+          div.appendChild(inputWrapDiv);
+        }
+
         // Action buttons
         var actionsDiv = document.createElement("div");
         actionsDiv.className = "term-permission-actions";
@@ -385,10 +410,11 @@
           }
 
           postJson("/terminal/permission", body).then(function () {
+            actionsDiv.classList.add("resolved");
             var resultDiv = document.createElement("div");
             resultDiv.className = "term-permission-result " + (decision === "allow" ? "allowed" : "denied");
             resultDiv.textContent = decision === "allow" ? "Allowed" : "Denied";
-            div.appendChild(resultDiv);
+            actionsDiv.appendChild(resultDiv);
           }).catch(function (err) {
             var errDiv = document.createElement("div");
             errDiv.className = "term-permission-result denied";
