@@ -69,6 +69,9 @@
       if (json !== prevTicketJson) {
         prevTicketJson = json;
         Board.render.renderKanban();
+        if (Board.state.activeTab === "roadmap" && Board.render.renderRoadmap) {
+          Board.render.renderRoadmap();
+        }
         Board.state.viewerTabs.forEach(function (vt) {
           if (vt.ticket) {
             const fresh = Board.state.TICKETS.find(function (t) { return t.number === vt.number; });
@@ -105,6 +108,13 @@
     Board.fetch.fetchAllDashboardFiles().then(function () {
       if (Board.state.activeTab === "dashboard") Board.render.renderDashboard();
     });
+  }
+
+  // ── Memory Refresh (SSE/Polling shared) ──
+
+  /** Refreshes the memory tab data on external file changes. */
+  function refreshMemory() {
+    if (Board.render.refreshMemory) Board.render.refreshMemory();
   }
 
   // ── SSE ──
@@ -162,6 +172,10 @@
       refreshDashboard();
     });
 
+    es.addEventListener("memory", function () {
+      refreshMemory();
+    });
+
     es.onerror = function () {
       sseConnected = false;
       es.close(); // Explicitly close to prevent auto-reconnect
@@ -203,6 +217,9 @@
       }
       if (changes.dashboard) {
         refreshDashboard();
+      }
+      if (changes.memory) {
+        refreshMemory();
       }
     }).catch(function () {
       // /poll failure: handle silently (no console error)

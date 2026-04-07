@@ -1,0 +1,364 @@
+/* Claude Code Workflow Board - Roadmap View Styles */
+
+/* ── Roadmap View Container ── */
+#view-roadmap {
+  display: none;
+  flex-direction: column;
+  padding: 20px 24px;
+  overflow-y: auto;
+  gap: 16px;
+}
+#view-roadmap.active { display: flex; }
+
+/* ── Toolbar ── */
+.roadmap-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+}
+
+.roadmap-toolbar-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #858585;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.roadmap-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: #3c3c3c;
+  margin: 0 6px;
+}
+
+/* ── Filter Buttons ── */
+.roadmap-filter-btn {
+  padding: 4px 12px;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: transparent;
+  color: #a0a0a0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.roadmap-filter-btn:hover {
+  background: rgba(217, 119, 87, 0.12);
+  border-color: #D97757;
+  color: #e0e0e0;
+}
+.roadmap-filter-btn.active {
+  background: rgba(217, 119, 87, 0.2);
+  border-color: #D97757;
+  color: #D97757;
+  font-weight: 600;
+}
+
+/* ── Layout Direction Toggle ── */
+.roadmap-layout-btn {
+  padding: 4px 12px;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: transparent;
+  color: #a0a0a0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+.roadmap-layout-btn:hover {
+  background: rgba(86, 156, 214, 0.12);
+  border-color: #569cd6;
+  color: #e0e0e0;
+}
+.roadmap-layout-btn.active {
+  background: rgba(86, 156, 214, 0.2);
+  border-color: #569cd6;
+  color: #7bb8e8;
+  font-weight: 600;
+}
+
+/* ── Isolated Nodes Toggle ── */
+.roadmap-isolated-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #858585;
+  font-size: 12px;
+  user-select: none;
+}
+.roadmap-isolated-toggle input[type="checkbox"] {
+  accent-color: #D97757;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+.roadmap-isolated-toggle:hover {
+  color: #a0a0a0;
+}
+
+/* ── Statistics Cards ── */
+.roadmap-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.roadmap-stat-card {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 14px 18px;
+  border-left: 3px solid #D97757;
+  transition: border-color 0.15s;
+}
+.roadmap-stat-card:hover { border-color: #3c3c3c; border-left-color: #D97757; }
+
+.roadmap-stat-card.stat-open    { border-left-color: #4ec9b0; }
+.roadmap-stat-card.stat-progress { border-left-color: #dcdcaa; }
+.roadmap-stat-card.stat-review  { border-left-color: #c586c0; }
+.roadmap-stat-card.stat-done    { border-left-color: #858585; }
+.roadmap-stat-card.stat-relations { border-left-color: #D97757; }
+.roadmap-stat-card.stat-total   { border-left-color: #569cd6; }
+
+.roadmap-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #858585;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.roadmap-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e0e0e0;
+  margin-top: 4px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.1;
+}
+
+.roadmap-stat-sub {
+  font-size: 11px;
+  color: #5a5a5a;
+  margin-top: 2px;
+}
+
+/* ── Graph Container ── */
+.roadmap-graph-container {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 20px;
+  overflow: auto;
+  min-height: 200px;
+  flex: 1;
+}
+
+.roadmap-graph-container svg {
+  display: block;
+  max-width: none;
+  overflow: visible;
+}
+
+/* Mermaid node hover effect */
+.roadmap-graph-container .node {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.roadmap-graph-container .node:hover {
+  opacity: 0.8;
+}
+
+/* ── Legend ── */
+.roadmap-legend {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.roadmap-legend-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #858585;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  align-self: center;
+  margin-right: 4px;
+}
+
+.roadmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a0a0a0;
+}
+
+.roadmap-legend-edge {
+  display: inline-block;
+  width: 36px;
+  height: 2px;
+  border-radius: 1px;
+  position: relative;
+}
+.roadmap-legend-edge::after {
+  content: '▶';
+  position: absolute;
+  right: -6px;
+  top: -7px;
+  font-size: 9px;
+}
+
+.roadmap-legend-edge.edge-depends {
+  border-top: 2px dashed #4ec9b0;
+  background: transparent;
+  color: #4ec9b0;
+}
+.roadmap-legend-edge.edge-depends::after { color: #4ec9b0; }
+
+.roadmap-legend-edge.edge-derived {
+  background: #dcdcaa;
+  color: #dcdcaa;
+}
+.roadmap-legend-edge.edge-derived::after { color: #dcdcaa; }
+
+.roadmap-legend-edge.edge-blocks {
+  background: #f44747;
+  height: 3px;
+  color: #f44747;
+}
+.roadmap-legend-edge.edge-blocks::after { color: #f44747; }
+
+.roadmap-legend-sep {
+  width: 1px;
+  height: 18px;
+  background: #3c3c3c;
+  align-self: center;
+}
+
+/* Node status colors in legend */
+.roadmap-legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 2px solid currentColor;
+  background: #1e1e1e;
+}
+.roadmap-legend-dot.dot-open     { color: #4ec9b0; }
+.roadmap-legend-dot.dot-progress { color: #dcdcaa; }
+.roadmap-legend-dot.dot-review   { color: #c586c0; }
+.roadmap-legend-dot.dot-done     { color: #858585; }
+
+/* ── Empty State ── */
+.roadmap-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 24px;
+  color: #858585;
+  text-align: center;
+}
+
+.roadmap-empty-icon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.roadmap-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #5a5a5a;
+}
+
+.roadmap-empty-desc {
+  font-size: 13px;
+  color: #4a4a4a;
+  max-width: 400px;
+  line-height: 1.6;
+}
+
+.roadmap-empty-hint {
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: #858585;
+}
+
+/* ── Loading State ── */
+.roadmap-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  color: #858585;
+  font-size: 13px;
+}
+
+.roadmap-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #3c3c3c;
+  border-top-color: #D97757;
+  border-radius: 50%;
+  animation: roadmap-spin 0.8s linear infinite;
+}
+
+@keyframes roadmap-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Mermaid Node Status Overrides (via SVG class injection) ── */
+/* These styles target mermaid-rendered SVG elements */
+.roadmap-graph-container .node.open rect,
+.roadmap-graph-container .node.open polygon,
+.roadmap-graph-container .node.open circle {
+  stroke: #4ec9b0 !important;
+  stroke-width: 2px !important;
+}
+
+.roadmap-graph-container .node.progress rect,
+.roadmap-graph-container .node.progress polygon,
+.roadmap-graph-container .node.progress circle {
+  stroke: #dcdcaa !important;
+  stroke-width: 2px !important;
+}
+
+.roadmap-graph-container .node.review rect,
+.roadmap-graph-container .node.review polygon,
+.roadmap-graph-container .node.review circle {
+  stroke: #c586c0 !important;
+  stroke-width: 2px !important;
+}
+
+.roadmap-graph-container .node.done rect,
+.roadmap-graph-container .node.done polygon,
+.roadmap-graph-container .node.done circle {
+  stroke: #858585 !important;
+  stroke-width: 1px !important;
+  opacity: 0.6;
+}

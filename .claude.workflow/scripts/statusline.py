@@ -86,7 +86,8 @@ def create_progress_bar(usage_pct: float, used: int, limit: int) -> str:
 def get_context_usage(data: dict) -> tuple[float, int, int]:
     """Calculate context usage from stdin JSON data.
 
-    Uses the context_window field provided by Claude Code's statusline system.
+    Uses current_usage tokens for the actual count and used_percentage
+    for the percentage, matching the CLI's native display.
 
     Args:
         data: Parsed JSON from stdin.
@@ -96,14 +97,29 @@ def get_context_usage(data: dict) -> tuple[float, int, int]:
     """
     ctx = data.get("context_window", {})
     ctx_size = ctx.get("context_window_size", 0)
+
+    if not ctx_size:
+        return 0.0, 0, 200_000
+
+    # Token count: always from current_usage (actual values, not reverse-calculated)
     usage = ctx.get("current_usage")
+    tokens = 0
+    if usage:
+        tokens = (
+            usage.get("input_tokens", 0)
+            + usage.get("cache_creation_input_tokens", 0)
+            + usage.get("cache_read_input_tokens", 0)
+        )
 
-    if not usage or not ctx_size:
-        return 0.0, 0, ctx_size or 200_000
+    # Percentage: prefer CLI's pre-calculated value, fallback to manual calc
+    pre_pct = ctx.get("used_percentage")
+    if pre_pct is not None:
+        pct = float(pre_pct)
+    elif tokens and ctx_size:
+        pct = tokens * 100 / ctx_size
+    else:
+        pct = 0.0
 
-    tokens = usage.get("input_tokens", 0)
-
-    pct = tokens * 100 / ctx_size if ctx_size else 0.0
     return pct, tokens, ctx_size
 
 

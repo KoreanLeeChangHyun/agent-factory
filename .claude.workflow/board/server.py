@@ -28,6 +28,29 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+from board_data import (
+    KANBAN_DIRS_LIST,
+    WF_BASE,
+    WF_HISTORY,
+    DASH_BASE,
+    DASH_FILES,
+    WF_ENTRY_RE,
+    WF_DETAIL_FILES,
+    _resolve_settings_file,
+    _parse_env_file,
+    _update_env_value,
+    _read_kanban_tickets,
+    _read_dashboard,
+    _list_workflow_entries,
+    _get_git_branch,
+    _workflow_detail,
+    _resolve_memory_dir,
+    _list_memory_files,
+    _read_memory_file,
+    _write_memory_file,
+    _delete_memory_file,
+)
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -529,8 +552,12 @@ class TerminalSSEChannel:
         if event_name == 'system':
             return self._build_system_payload(data)
         if event_name == 'permission':
+            req = data.get('request', {})
             return {
                 'kind': 'permission',
+                'request_id': data.get('request_id', ''),
+                'tool_name': req.get('tool_name', ''),
+                'description': req.get('description', ''),
                 'raw': data,
             }
         if event_name == 'error':
@@ -659,6 +686,46 @@ class TerminalSSEChannel:
 
 
 # ---------------------------------------------------------------------------
+# Image Validation Helper
+# ---------------------------------------------------------------------------
+
+_ALLOWED_MEDIA_TYPES = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+
+
+def _validate_images(images: list) -> str | None:
+    """이미지 목록의 유효성을 검증한다.
+
+    각 항목에 data(문자열)와 허용된 media_type이 존재하는지 확인한다.
+
+    Args:
+        images: 검증할 이미지 항목 목록.
+
+    Returns:
+        유효하지 않을 때 에러 메시지 문자열, 유효하면 None.
+    """
+    if not isinstance(images, list):
+        return 'Invalid "images" field: must be a list'
+
+    for i, img in enumerate(images):
+        if not isinstance(img, dict):
+            return f'Invalid image at index {i}: must be an object'
+
+        data = img.get('data')
+        if not isinstance(data, str) or not data:
+            return f'Invalid image at index {i}: missing or invalid "data" field'
+
+        media_type = img.get('media_type')
+        if media_type not in _ALLOWED_MEDIA_TYPES:
+            allowed = ', '.join(sorted(_ALLOWED_MEDIA_TYPES))
+            return (
+                f'Invalid image at index {i}: '
+                f'"media_type" must be one of [{allowed}], got "{media_type}"'
+            )
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Claude Process Manager
 # ---------------------------------------------------------------------------
 
@@ -784,11 +851,13 @@ class ClaudeProcess:
             'error': '',
         }
 
-    def send_input(self, text: str) -> dict:
+    def send_input(self, text: str, images: list[dict] | None = None) -> dict:
         """사용자 메시지를 Claude CLI stdin에 NDJSON 엔벨로프로 전송한다.
 
         Args:
             text: 전송할 사용자 메시지 텍스트
+            images: 첨부 이미지 목록. 각 항목은 {"data": str, "media_type": str} 형태.
+                    None이면 텍스트 전용 content 문자열로 구성한다.
 
         Returns:
             전송 결과 dict: {"ok": True/False, "error": str}
@@ -796,15 +865,81 @@ class ClaudeProcess:
         if not self._process or self._process.poll() is not None:
             return {'ok': False, 'error': 'process not running'}
 
+        if images is not None:
+            content: str | list = [{'type': 'text', 'text': text}] + [
+                {
+                    'type': 'image',
+                    'source': {
+                        'type': 'base64',
+                        'media_type': img['media_type'],
+                        'data': img['data'],
+                    },
+                }
+                for img in images
+            ]
+        else:
+            content = text
+
         envelope = {
             'type': 'user',
             'message': {
                 'role': 'user',
-                'content': text,
+                'content': content,
             },
         }
         if self._session_id:
             envelope['session_id'] = self._session_id
+
+        ndjson_line = json.dumps(envelope, ensure_ascii=False) + '\n'
+
+        with self._stdin_lock:
+            try:
+                self._process.stdin.write(ndjson_line)
+                self._process.stdin.flush()
+            except (BrokenPipeError, OSError) as e:
+                self._status = 'stopped'
+                return {'ok': False, 'error': str(e)}
+
+        return {'ok': True, 'error': ''}
+
+    def send_permission_response(
+        self,
+        request_id: str,
+        decision: str,
+        session_id: str | None = None,
+    ) -> dict:
+        """permission 요청에 대한 control_response NDJSON을 stdin으로 전송한다.
+
+        Args:
+            request_id: 응답할 control_request의 request_id
+            decision: "allow" 또는 "deny"
+            session_id: 워크플로우 세션 ID (선택적). 지정 시 최상위 session_id 필드 추가.
+
+        Returns:
+            전송 결과 dict: {"ok": True/False, "error": str}
+        """
+        if not self._process or self._process.poll() is not None:
+            return {'ok': False, 'error': 'process not running'}
+
+        if decision == 'allow':
+            response_body = {
+                'subtype': 'success',
+                'request_id': request_id,
+                'response': {},
+            }
+        else:
+            response_body = {
+                'subtype': 'error',
+                'request_id': request_id,
+                'error': 'User denied permission',
+            }
+
+        envelope: dict = {
+            'type': 'control_response',
+            'response': response_body,
+        }
+        if session_id:
+            envelope['session_id'] = session_id
 
         ndjson_line = json.dumps(envelope, ensure_ascii=False) + '\n'
 
@@ -1293,289 +1428,6 @@ class WorkflowSessionRegistry:
 workflow_registry: WorkflowSessionRegistry = WorkflowSessionRegistry()
 
 
-KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'review', 'done']
-WF_BASE: str = os.path.join('.claude.workflow', 'workflow')
-WF_HISTORY: str = os.path.join('.claude.workflow', 'workflow', '.history')
-DASH_BASE: str = os.path.join('.claude.workflow', 'dashboard')
-DASH_FILES: list[str] = ['usage', 'logs', 'skills']
-WF_ENTRY_RE = __import__('re').compile(r'^\d{8}-\d{6}$')
-WF_DETAIL_FILES: list[dict] = [
-    {'key': 'query',   'file': 'user_prompt.txt'},
-    {'key': 'plan',    'file': 'plan.md'},
-    {'key': 'report',  'file': 'report.md'},
-    {'key': 'summary', 'file': 'summary.txt'},
-    {'key': 'usage',   'file': 'usage.json'},
-    {'key': 'log',     'file': 'workflow.log'},
-]
-
-
-def _resolve_settings_file(project_root: str) -> str:
-    """Return .settings if exists, else .env (fallback)."""
-    settings = os.path.join(project_root, '.claude.workflow', '.settings')
-    if os.path.exists(settings):
-        return settings
-    return os.path.join(project_root, '.claude.workflow', '.env')
-
-
-def _parse_env_file(project_root: str) -> list[dict]:
-    """Parse .settings/.env into structured sections for the settings UI."""
-    env_file = _resolve_settings_file(project_root)
-    if not os.path.exists(env_file):
-        return []
-
-    sections: dict[str, list[dict]] = {}
-    section_order: list[str] = []
-    current_section = '기타'
-    pending_comment = ''
-
-    with open(env_file, encoding='utf-8') as f:
-        for line in f:
-            stripped = line.strip()
-
-            # Section header: "# (N) Section Name"
-            if stripped.startswith('# (') and ')' in stripped:
-                current_section = stripped.split(')', 1)[1].strip()
-                if current_section not in sections:
-                    sections[current_section] = []
-                    section_order.append(current_section)
-                pending_comment = ''
-                continue
-
-            if stripped.startswith('# ---'):
-                continue
-
-            if stripped.startswith('#'):
-                text = stripped[1:].strip()
-                if text.startswith('용도:'):
-                    pending_comment = text[3:].strip()
-                continue
-
-            if not stripped or '=' not in stripped:
-                continue
-
-            key, _, rest = stripped.partition('=')
-            key = key.strip()
-
-            # Extract inline comment (2+ spaces before #)
-            value = rest
-            inline_comment = ''
-            m = __import__('re').match(r'^(.*?)\s{2,}#\s*(.*)', rest)
-            if m:
-                value = m.group(1).strip()
-                inline_comment = m.group(2).strip()
-            else:
-                value = rest.strip()
-
-            # Detect type
-            var_type = 'string'
-            if value.lower() in ('true', 'false'):
-                var_type = 'bool'
-            elif value.isdigit():
-                var_type = 'int'
-            else:
-                try:
-                    float(value)
-                    if '.' in value:
-                        var_type = 'float'
-                except ValueError:
-                    pass
-
-            label = inline_comment or pending_comment or ''
-            if current_section not in sections:
-                sections[current_section] = []
-                section_order.append(current_section)
-
-            sections[current_section].append({
-                'key': key,
-                'value': value,
-                'type': var_type,
-                'label': label,
-            })
-            pending_comment = ''
-
-    return [{'section': s, 'vars': sections[s]} for s in section_order]
-
-
-def _update_env_value(project_root: str, key: str, new_value: str) -> bool:
-    """Update a single key's value in .settings/.env, preserving structure and comments."""
-    env_file = _resolve_settings_file(project_root)
-    if not os.path.exists(env_file):
-        return False
-
-    with open(env_file, encoding='utf-8') as f:
-        lines = f.readlines()
-
-    _re = __import__('re')
-    pattern = _re.compile(r'^' + _re.escape(key) + r'=')
-
-    for i, line in enumerate(lines):
-        if not pattern.match(line.strip()):
-            continue
-
-        old_rest = line.strip().split('=', 1)[1]
-        inline_part = ''
-        m = _re.match(r'^(.*?)\s{2,}(#\s*.*)', old_rest)
-        if m:
-            inline_part = m.group(2)
-
-        if inline_part:
-            base = f"{key}={new_value}"
-            pad = max(2, 40 - len(base))
-            lines[i] = base + ' ' * pad + inline_part + '\n'
-        else:
-            lines[i] = f"{key}={new_value}\n"
-        break
-    else:
-        return False
-
-    with open(env_file, 'w', encoding='utf-8') as f:
-        f.writelines(lines)
-    return True
-
-
-def _read_kanban_tickets(
-    project_root: str, files: list[str] | None = None,
-) -> dict[str, str | None]:
-    """kanban 디렉터리에서 XML 티켓을 읽어 {파일명: 내용} dict를 반환한다."""
-    kanban = os.path.join(project_root, '.claude.workflow', 'kanban')
-    result: dict[str, str | None] = {}
-    for d in KANBAN_DIRS_LIST:
-        dp = os.path.join(kanban, d)
-        if not os.path.isdir(dp):
-            continue
-        try:
-            for e in os.scandir(dp):
-                if not e.is_file() or not e.name.endswith('.xml'):
-                    continue
-                if files and e.name not in files:
-                    continue
-                if e.name in result:
-                    continue
-                try:
-                    with open(e.path, encoding='utf-8') as f:
-                        result[e.name] = f.read()
-                except OSError:
-                    result[e.name] = None
-        except OSError:
-            pass
-    if files:
-        for fn in files:
-            if fn not in result:
-                result[fn] = None
-    return result
-
-
-def _read_dashboard(project_root: str) -> dict[str, str]:
-    """dashboard .md 파일 3개를 읽어 반환한다."""
-    base = os.path.join(project_root, DASH_BASE)
-    result: dict[str, str] = {}
-    for name in DASH_FILES:
-        path = os.path.join(base, f'.{name}.md')
-        try:
-            with open(path, encoding='utf-8') as f:
-                result[name] = f.read()
-        except OSError:
-            result[name] = ''
-    return result
-
-
-def _list_workflow_entries(project_root: str) -> list[str]:
-    """workflow + .history 엔트리를 최신순 정렬하여 반환한다."""
-    entries: list[str] = []
-    for rel in (WF_BASE, WF_HISTORY):
-        abs_dir = os.path.join(project_root, rel)
-        if not os.path.isdir(abs_dir):
-            continue
-        prefix = rel + '/'
-        try:
-            for e in os.scandir(abs_dir):
-                if e.is_dir() and WF_ENTRY_RE.match(e.name):
-                    entries.append(prefix + e.name + '/')
-        except OSError:
-            pass
-    entries.sort(key=lambda p: p.rstrip('/').rsplit('/', 1)[-1], reverse=True)
-    return entries
-
-
-def _get_git_branch(project_root: str) -> str:
-    """현재 git 브랜치명을 반환한다.
-
-    git 명령 실행 실패 또는 타임아웃 시 빈 문자열을 반환한다.
-    """
-    try:
-        result = subprocess.run(
-            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-            capture_output=True, text=True, timeout=3,
-            cwd=project_root,
-        )
-        return result.stdout.strip() if result.returncode == 0 else ''
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return ''
-
-
-def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
-    """워크플로우 엔트리 1개의 상세 정보를 반환한다."""
-    entry_name = entry_rel.rstrip('/').rsplit('/', 1)[-1]
-    entry_abs = os.path.join(project_root, entry_rel.strip('/'))
-    if not os.path.isdir(entry_abs):
-        return []
-    items: list[dict] = []
-    try:
-        task_dirs = sorted(
-            (e.name for e in os.scandir(entry_abs) if e.is_dir()),
-        )
-    except OSError:
-        return []
-    for task in task_dirs:
-        task_abs = os.path.join(entry_abs, task)
-        try:
-            cmd_dirs = sorted(
-                (e.name for e in os.scandir(task_abs) if e.is_dir()),
-            )
-        except OSError:
-            continue
-        for cmd in cmd_dirs:
-            cmd_abs = os.path.join(task_abs, cmd)
-            status_path = os.path.join(cmd_abs, 'status.json')
-            if not os.path.isfile(status_path):
-                continue
-            try:
-                with open(status_path, encoding='utf-8') as f:
-                    status = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                continue
-            # basePath: relative URL matching client convention
-            base_path = entry_rel + task + '/' + cmd + '/'
-            # file map
-            file_map: dict = {}
-            for wf in WF_DETAIL_FILES:
-                fp = os.path.join(cmd_abs, wf['file'])
-                exists = os.path.isfile(fp)
-                file_map[wf['key']] = {
-                    'exists': exists,
-                    'url': base_path + wf['file'] if exists else '',
-                }
-            work_dir = os.path.join(cmd_abs, 'work')
-            has_work = os.path.isdir(work_dir)
-            file_map['work'] = {
-                'exists': has_work,
-                'url': base_path + 'work/' if has_work else '',
-                'isDir': True,
-            }
-            items.append({
-                'entry': entry_name,
-                'task': task,
-                'command': cmd,
-                'basePath': base_path,
-                'step': status.get('step', 'NONE'),
-                'created_at': status.get('created_at', ''),
-                'updated_at': status.get('updated_at', ''),
-                'transitions': status.get('transitions', []),
-                'fileMap': file_map,
-            })
-    return items
-
-
 class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
     """Board 전용 HTTP 요청 핸들러.
 
@@ -1635,9 +1487,66 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_workflow_input()
         elif self.path == '/terminal/command':
             self._handle_terminal_command()
+        elif self.path == '/terminal/permission':
+            self._handle_terminal_permission()
+        elif self.path == '/api/memory/file':
+            self._handle_memory_write()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_DELETE(self) -> None:
+        """DELETE 요청을 처리한다."""
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        path = parsed.path
+        qs = parse_qs(parsed.query)
+
+        if path == '/api/memory/file':
+            name = qs.get('name', [None])[0]
+            if not name:
+                self._send_error(400, 'Missing "name" query parameter')
+                return
+            try:
+                self._send_json(
+                    _delete_memory_file(os.getcwd(), name),
+                )
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _handle_memory_write(self) -> None:
+        """메모리 파일 생성/수정 엔드포인트를 처리한다.
+
+        POST /api/memory/file: 요청 본문 {"name": "filename.md", "content": "..."}
+        """
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._send_error(400, 'Empty request body')
+            return
+
+        body = self.rfile.read(content_length)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_error(400, 'Invalid JSON')
+            return
+
+        name = data.get('name', '')
+        content = data.get('content', '')
+        if not name:
+            self._send_error(400, 'Missing "name" field')
+            return
+
+        try:
+            result = _write_memory_file(os.getcwd(), name, content)
+            self._send_json(result)
+        except ValueError as e:
+            self._send_error(400, str(e))
 
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.
@@ -1704,6 +1613,19 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({'branch': _get_git_branch(project_root)})
         elif path == '/api/workflow/artifact':
             self._handle_workflow_artifact(qs)
+        elif path == '/api/memory':
+            self._send_json(_list_memory_files(project_root))
+        elif path == '/api/memory/file':
+            name = qs.get('name', [None])[0]
+            if not name:
+                self._send_error(400, 'Missing "name" query parameter')
+                return
+            try:
+                self._send_json(_read_memory_file(project_root, name))
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
         else:
             self.send_response(404)
             self.end_headers()
@@ -1862,11 +1784,19 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         text = data.get('text', '')
-        if not text:
+        images = data.get('images', None)
+
+        if not text and not images:
             self._send_error(400, 'Missing "text" field')
             return
 
-        result = claude_process.send_input(text)
+        if images is not None:
+            validation_error = _validate_images(images)
+            if validation_error:
+                self._send_error(400, validation_error)
+                return
+
+        result = claude_process.send_input(text, images=images)
         self._send_json(result)
 
     def _handle_terminal_kill(self) -> None:
@@ -1920,6 +1850,50 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         result = claude_process.send_input(command)
+        self._send_json(result)
+
+    def _handle_terminal_permission(self) -> None:
+        """permission 요청에 대한 승인/거부 응답 엔드포인트를 처리한다.
+
+        POST /terminal/permission
+        요청 본문: {"request_id": "...", "decision": "allow"|"deny"}
+        선택 필드: "session_id" (워크플로우 세션용)
+
+        session_id가 있으면 workflow_registry에서 해당 세션의 프로세스를 사용하고,
+        없으면 claude_process(메인 터미널)를 사용한다.
+
+        프로세스 미실행 시 409 Conflict, 잘못된 요청 시 400 Bad Request를 반환한다.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        request_id = data.get('request_id', '').strip()
+        if not request_id:
+            self._send_error(400, 'Missing "request_id" field')
+            return
+
+        decision = data.get('decision', '').strip()
+        if decision not in ('allow', 'deny'):
+            self._send_error(400, '"decision" must be "allow" or "deny"')
+            return
+
+        session_id = data.get('session_id', '').strip() or None
+
+        if session_id:
+            session = workflow_registry.get(session_id)
+            if session is None:
+                self._send_error(404, f'Session not found: {session_id}')
+                return
+            process = session.process
+        else:
+            process = claude_process
+
+        if process.status == 'stopped':
+            self._send_error(409, 'Claude process not running')
+            return
+
+        result = process.send_permission_response(request_id, decision, session_id)
         self._send_json(result)
 
     def _handle_terminal_interrupt(self) -> None:
@@ -2082,16 +2056,24 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         text = data.get('text', '')
-        if not text:
+        images = data.get('images', None)
+
+        if not text and not images:
             self._send_error(400, 'Missing "text" field')
             return
+
+        if images is not None:
+            validation_error = _validate_images(images)
+            if validation_error:
+                self._send_error(400, validation_error)
+                return
 
         session = workflow_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
-        result = session.process.send_input(text)
+        result = session.process.send_input(text, images=images)
         self._send_json(result)
 
     def _handle_workflow_status(self) -> None:
@@ -2308,7 +2290,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         """CORS preflight 요청을 처리한다."""
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.send_header('Access-Control-Max-Age', '86400')
         self.end_headers()
@@ -2400,6 +2382,11 @@ def _run_server(project_root: str) -> None:
     base = f'http://127.0.0.1:{port}/.claude.workflow/board'
     with open(url_file, 'w') as f:
         f.write(f'{base}/index.html\n{base}/terminal.html')
+
+    # Memory 디렉터리를 WATCH_DIRS에 동적 등록 (절대경로 → os.path.join에서 그대로 사용됨)
+    mem_dir = _resolve_memory_dir(project_root)
+    if os.path.isdir(mem_dir):
+        WATCH_DIRS[mem_dir] = 'memory'
 
     # FileWatcher 시작
     def on_change(event_type: str, files: list[str]) -> None:

@@ -195,6 +195,8 @@
   var inputLocked = false;
   /** @type {Array<string>} */
   var inputQueue = [];
+  /** @type {Array<{data: string, media_type: string, name: string}>} */
+  var attachedImages = [];
   /** @type {boolean} */
   var receivedChunks = false;
   /** @type {string} */
@@ -292,6 +294,15 @@
   // ── Tool Box Renderer ──
 
   function createToolBox(toolName) {
+    // 이전 도구 박스가 아직 running이면 done으로 전환
+    if (currentToolBox) {
+      var prevStatus = currentToolBox.querySelector(".term-tool-status");
+      if (prevStatus && prevStatus.classList.contains("running")) {
+        prevStatus.className = "term-tool-status done";
+        prevStatus.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      }
+    }
+
     var box = document.createElement("div");
     box.className = "term-tool-box";
     if (toolName) {
@@ -595,6 +606,68 @@
 
   // ── Input Management ──
 
+  // ── Image Attachment ──
+
+  var ALLOWED_MIME = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+  var MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB
+
+  function renderImagePreview() {
+    var container = document.getElementById("terminal-image-preview");
+    if (!container) return;
+    container.innerHTML = "";
+    attachedImages.forEach(function (img, idx) {
+      var thumb = document.createElement("div");
+      thumb.className = "terminal-image-thumb";
+
+      var imgEl = document.createElement("img");
+      imgEl.src = "data:" + img.media_type + ";base64," + img.data;
+      imgEl.alt = img.name || "image";
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "terminal-image-remove";
+      removeBtn.title = "제거";
+      removeBtn.innerHTML = "\u00D7";
+      removeBtn.addEventListener("click", function () { removeImage(idx); });
+
+      thumb.appendChild(imgEl);
+      thumb.appendChild(removeBtn);
+      container.appendChild(thumb);
+    });
+  }
+
+  function attachImage(file) {
+    if (!file) return;
+    if (ALLOWED_MIME.indexOf(file.type) === -1) {
+      appendErrorMessage("[첨부 오류] 지원하지 않는 형식입니다 (PNG/JPG/GIF/WebP 만 가능)");
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      appendErrorMessage("[첨부 오류] 파일 크기가 20MB를 초과합니다");
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var dataUrl = e.target.result;
+      // data:image/png;base64,XXXX 에서 base64 부분만 추출
+      var base64 = dataUrl.split(",")[1];
+      attachedImages.push({ data: base64, media_type: file.type, name: file.name });
+      renderImagePreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage(index) {
+    attachedImages.splice(index, 1);
+    renderImagePreview();
+  }
+
+  function clearImages() {
+    attachedImages = [];
+    renderImagePreview();
+    var fileInput = document.getElementById("terminal-attach-input");
+    if (fileInput) fileInput.value = "";
+  }
+
   function setInputLocked(locked) {
     inputLocked = locked;
     var input = document.getElementById("terminal-input");
@@ -610,20 +683,25 @@
     if (sendBtn) {
       sendBtn.disabled = Board.state.termStatus === "stopped";
     }
+    var attachBtn = document.getElementById("terminal-attach-btn");
+    if (attachBtn) {
+      attachBtn.disabled = Board.state.termStatus === "stopped";
+    }
   }
 
   function sendInput() {
     var input = document.getElementById("terminal-input");
     if (!input) return;
     var text = input.value.trim();
-    if (!text) return;
+    var hasImages = attachedImages.length > 0;
+    if (!text && !hasImages) return;
     if (Board.state.termStatus === "stopped") return;
 
     input.value = "";
     input.style.height = "auto";
 
-    // Route slash commands (큐에 넣지 않고 즉시 처리)
-    if (text.charAt(0) === "/") {
+    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지 있으면 슬래시 커맨드 미적용
+    if (!hasImages && text.charAt(0) === "/") {
       Board.slashCommands.handle(text, {
         isWorkflowMode: isWorkflowMode,
         appendSystemMessage: appendSystemMessage,
@@ -635,8 +713,8 @@
       return;
     }
 
-    // running 상태(응답 대기 중)이면 큐에 push하고 즉시 리턴
-    if (Board.state.termStatus === "running") {
+    // running 상태(응답 대기 중)이면 큐에 push하고 즉시 리턴 (이미지는 큐 미지원)
+    if (Board.state.termStatus === "running" && !hasImages) {
       inputQueue.push(text);
       var queuedDiv = document.createElement("div");
       queuedDiv.className = "term-message term-user term-user-queued";
@@ -648,8 +726,28 @@
 
     var div = document.createElement("div");
     div.className = "term-message term-user";
-    div.textContent = text;
+    if (text) div.textContent = text;
+    if (hasImages) {
+      var thumbRow = document.createElement("div");
+      thumbRow.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;";
+      attachedImages.forEach(function (img) {
+        var t = document.createElement("img");
+        t.src = "data:" + img.media_type + ";base64," + img.data;
+        t.style.cssText = "width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a;";
+        thumbRow.appendChild(t);
+      });
+      div.appendChild(thumbRow);
+    }
     appendToOutput(div);
+
+    // 전송 payload 구성
+    var payload = { text: text };
+    if (hasImages) {
+      payload.images = attachedImages.map(function (img) {
+        return { data: img.data, media_type: img.media_type };
+      });
+    }
+    clearImages();
 
     setInputLocked(true);
     startSpinner();
@@ -657,7 +755,7 @@
     updateControlBar();
 
     var ep = endpoints();
-    Board.session.postJson(ep.input, ep.inputBody({ text: text })).catch(function (err) {
+    Board.session.postJson(ep.input, ep.inputBody(payload)).catch(function (err) {
       stopSpinner();
       appendErrorMessage("[Error] " + err.message);
       setInputLocked(false);
@@ -1030,13 +1128,19 @@
     h += '<div class="terminal-output" id="terminal-output"></div>';
 
     h += '<div class="terminal-input-card">';
+    h += '<div class="terminal-image-preview" id="terminal-image-preview"></div>';
     h += '<textarea class="terminal-input" id="terminal-input"'
       + ' placeholder="메시지를 입력하세요..." rows="1"'
       + ' autocomplete="off" spellcheck="false"'
       + (Board.state.termStatus === "stopped" ? " disabled" : "")
       + '></textarea>';
     h += '<div class="terminal-input-bottom">';
-    h += '<div class="terminal-input-bottom-left"></div>';
+    h += '<div class="terminal-input-bottom-left">';
+    h += '<button class="terminal-attach-btn" id="terminal-attach-btn" title="이미지 첨부"'
+      + (Board.state.termStatus === "stopped" ? " disabled" : "")
+      + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>';
+    h += '<input type="file" id="terminal-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" multiple>';
+    h += '</div>';
     h += '<div class="terminal-input-bottom-right">';
     h += '<span class="terminal-input-hint">Enter 전송 \u00B7 Shift+Enter 줄바꿈</span>';
     h += '<button class="terminal-send-btn" id="terminal-send-btn"'
@@ -1186,6 +1290,37 @@
       inputEl.addEventListener("input", function () {
         this.style.height = "auto";
         this.style.height = Math.min(this.scrollHeight, 120) + "px";
+      });
+      // 클립보드 이미지 붙여넣기 (Ctrl+V)
+      inputEl.addEventListener("paste", function (e) {
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        var hasImage = false;
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image/") === 0) {
+            hasImage = true;
+            var file = items[i].getAsFile();
+            if (file) attachImage(file);
+          }
+        }
+        if (hasImage) e.preventDefault();
+      });
+    }
+
+    // 첨부 버튼 및 hidden file input 이벤트
+    var attachBtn = document.getElementById("terminal-attach-btn");
+    var attachInput = document.getElementById("terminal-attach-input");
+    if (attachBtn && attachInput) {
+      attachBtn.addEventListener("click", function () {
+        attachInput.click();
+      });
+      attachInput.addEventListener("change", function () {
+        var files = this.files;
+        if (!files) return;
+        for (var i = 0; i < files.length; i++) {
+          attachImage(files[i]);
+        }
+        this.value = "";
       });
     }
 

@@ -171,13 +171,18 @@ FSM_TRANSITIONS = {
         "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
         "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
     },
+    "light": {
+        "INIT": ["WORK", "STALE", "FAILED", "CANCELLED"],
+        "NONE": ["WORK", "STALE", "FAILED", "CANCELLED"],
+        "WORK": ["DONE", "STALE", "FAILED", "CANCELLED"],
+    },
 }
 
 # =============================================================================
 # 유효 명령어/모드 집합
 # =============================================================================
 VALID_COMMANDS = {"implement", "review", "research"}
-VALID_MODES = {"full"}
+VALID_MODES = {"full", "light"}
 
 # =============================================================================
 # 체인 command 관련 상수

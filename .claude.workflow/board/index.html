@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="css/kanban.css">
 <link rel="stylesheet" href="css/viewer.css">
 <link rel="stylesheet" href="css/workflow.css">
+<link rel="stylesheet" href="css/memory.css">
+<link rel="stylesheet" href="css/roadmap.css">
 <link rel="stylesheet" href="css/settings.css">
 <link id="hljs-theme-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
 <link id="hljs-theme-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -22,6 +24,8 @@
     <button class="tab" data-view="kanban">Kanban</button>
     <button class="tab" data-view="workflow">Workflow</button>
     <button class="tab" data-view="viewer">Viewer</button>
+    <button class="tab" data-view="memory">Memory</button>
+    <button class="tab" data-view="roadmap">Roadmap</button>
   </nav>
   <button class="header-btn settings-toggle" id="settings-toggle" title="Settings">&#9881;</button>
 </header>
@@ -40,17 +44,21 @@
   <div class="view" id="view-dashboard"></div>
   <div class="view" id="view-workflow"></div>
   <div class="view" id="view-viewer"></div>
+  <div class="view" id="view-memory"></div>
+  <div class="view" id="view-roadmap"></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" async></script>
 <script async src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
-<script async src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';langs.forEach(function(lang){var s=document.createElement('script');s.src=base+lang+'.min.js';s.async=true;s.onload=function(){if(typeof hljs!=='undefined')hljs.configure({ignoreUnescapedHTML:true});};document.head.appendChild(s);});})()"></script>
+<script async src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';var i=0;function loadNext(){if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';s.onload=loadNext;document.head.appendChild(s);}loadNext();})()"></script>
 <script src="js/common.js"></script>
 <script src="js/kanban.js"></script>
 <script src="js/viewer.js"></script>
 <script src="js/workflow.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/roadmap.js"></script>
+<script src="js/memory.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/sse.js"></script>
 </body>
