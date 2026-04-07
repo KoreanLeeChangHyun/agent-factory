@@ -226,14 +226,14 @@
     if (stages.length === 0) return "";
 
     const isDone = ticket.status === "Done";
-    const isActive = ticket.status === "In Progress" || ticket.status === "Review";
+    const isInProgress = ticket.status === "In Progress";
 
     let parts = [];
     stages.forEach(function (stage, idx) {
       let stateClass;
       if (isDone) {
         stateClass = "done";
-      } else if (isActive && idx === 0) {
+      } else if (isInProgress && idx === 0) {
         stateClass = "active";
       } else {
         stateClass = "waiting";
@@ -367,7 +367,8 @@
             if (t.command && t.command.indexOf(">") !== -1) {
               h += renderChainIcons(t);
             } else if (t.command) {
-              h += badge(t.command, CMD_COLORS[t.command]);
+              var badgeAnim = (t.status === "In Progress") ? "animation:chain-pulse 1.5s ease-in-out infinite" : "";
+              h += badge(t.command, CMD_COLORS[t.command], badgeAnim);
             }
             h += "</div>";
             if (col.key === "Open") {

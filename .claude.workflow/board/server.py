@@ -787,10 +787,11 @@ class ClaudeProcess:
         if self._stdout_thread and self._stdout_thread.is_alive():
             self._stdout_thread.join(timeout=3)
 
-        # stdin 대기 모드로 시작: --print와 -p '' 제거
-        # --input-format stream-json만 사용하면 Claude는 stdin에서 NDJSON 입력을 대기한다
+        # -p(print mode)로 시작: --input-format stream-json은 print mode 전용
+        # 이미지 content block이 정상 전달되려면 -p 플래그가 반드시 필요하다
         cmd = [
             'claude',
+            '-p',
             '--output-format', 'stream-json',
             '--input-format', 'stream-json',
             '--include-partial-messages',
@@ -863,7 +864,18 @@ class ClaudeProcess:
             전송 결과 dict: {"ok": True/False, "error": str}
         """
         if not self._process or self._process.poll() is not None:
-            return {'ok': False, 'error': 'process not running'}
+            # -p 모드에서 result 후 프로세스가 종료된 경우 --resume으로 자동 재시작
+            if self._session_id:
+                resume_args = ['--resume', self._session_id]
+                self._init_event.clear()
+                result = self.spawn(extra_args=resume_args)
+                if not result.get('ok'):
+                    return {'ok': False, 'error': f'respawn failed: {result.get("error", "")}'}
+                # init 이벤트가 완료될 때까지 최대 10초 대기
+                if not self._init_event.wait(timeout=10):
+                    return {'ok': False, 'error': 'respawn init timeout'}
+            else:
+                return {'ok': False, 'error': 'process not running'}
 
         if images is not None:
             content: str | list = [{'type': 'text', 'text': text}] + [
@@ -1080,7 +1092,13 @@ class ClaudeProcess:
             # 프로세스가 종료된 경우 상태 업데이트
             if proc.poll() is not None:
                 exit_code = proc.returncode
-                self._status = 'stopped'
+                # -p 모드에서 result 완료 후 정상 종료(exit_code 0)는
+                # idle 상태로 전환하여 즉시 재입력 가능하게 한다.
+                # 비정상 종료(exit_code != 0)만 stopped로 설정한다.
+                if exit_code == 0:
+                    self._status = 'idle'
+                else:
+                    self._status = 'stopped'
                 # 종료 이벤트를 SSE로 알림
                 self._channel.broadcast({
                     'type': 'system',

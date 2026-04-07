@@ -92,10 +92,10 @@ var CMD_ABBR = {
 Board.util.CMD_ABBR = CMD_ABBR;
 
 /** Renders a colored badge span with 3-letter abbreviation. */
-function badge(text, colors) {
+function badge(text, colors, extraStyle) {
   if (!text || !colors) return "";
   var label = CMD_ABBR[text] || text.substring(0, 3).toUpperCase();
-  return '<span class="badge" style="background:' + colors.bg + ";color:" + colors.fg + '">' + label + "</span>";
+  return '<span class="badge" style="background:' + colors.bg + ";color:" + colors.fg + ";" + (extraStyle || '') + '">' + label + "</span>";
 }
 
 Board.util.esc = esc;
