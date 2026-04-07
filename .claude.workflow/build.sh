@@ -195,102 +195,6 @@ install_claude_code() {
     rm -f "$install_script"
 }
 
-# --- 머지 헬퍼: alias/함수 이름 기준 라인 단위 머지 ---
-# 사용법: _merge_aliases <기존파일> <템플릿파일>
-# 기존 파일의 alias/함수명을 추출하고, 템플릿에만 있는 신규 항목을 기존 파일 끝에 추가.
-# 멱등성 보장: 동일 이름이 이미 존재하면 스킵.
-# 에러 시 기존 파일 보존: 임시 파일에 작성 후 교체.
-_merge_aliases() {
-    local existing_file="$1" tmpl_file="$2"
-    [ ! -f "$existing_file" ] || [ ! -f "$tmpl_file" ] && return 1
-
-    # 기존 파일에서 alias 이름 목록과 함수 이름 목록 추출
-    local existing_names
-    existing_names="$(
-        sed -n "s/^alias \([^=]*\)=.*/\1/p" "$existing_file" 2>/dev/null | sed "s/'$//"
-        sed -n "s/^\([a-zA-Z_][a-zA-Z0-9_]*\)().*/\1/p" "$existing_file" 2>/dev/null
-    )"
-
-    local tmp_append
-    tmp_append="$(mktemp)" || return 1
-
-    # 템플릿 순회: 신규 alias/함수 블록만 추출
-    local in_func_block=false
-    local func_name="" skip_block=false
-    local line added_count=0
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        # 여러 줄 함수 블록 시작 감지: name() {
-        if echo "$line" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{'; then
-            func_name="$(echo "$line" | sed -n 's/^\([a-zA-Z_][a-zA-Z0-9_]*\)().*/\1/p')"
-            in_func_block=true
-            if echo "$existing_names" | grep -qx "$func_name"; then
-                skip_block=true
-            else
-                skip_block=false
-                echo "$line" >> "$tmp_append"
-                added_count=$((added_count + 1))
-            fi
-            continue
-        fi
-
-        # 여러 줄 함수 블록 종료 감지: 단독 }
-        if [ "$in_func_block" = true ]; then
-            if [ "$skip_block" = false ]; then
-                echo "$line" >> "$tmp_append"
-            fi
-            if echo "$line" | grep -q '^\}'; then
-                in_func_block=false
-                func_name=""
-                skip_block=false
-            fi
-            continue
-        fi
-
-        # alias 라인 처리
-        if echo "$line" | grep -q '^alias '; then
-            local alias_name
-            alias_name="$(echo "$line" | sed -n 's/^alias \([^=]*\)=.*/\1/p')"
-            if echo "$existing_names" | grep -qx "$alias_name"; then
-                continue  # 이미 존재 → 스킵
-            fi
-            echo "$line" >> "$tmp_append"
-            added_count=$((added_count + 1))
-            continue
-        fi
-
-        # export PATH 라인 처리 (export로 시작하는 일반 명령문)
-        if echo "$line" | grep -q '^export '; then
-            if grep -qF "$line" "$existing_file" 2>/dev/null; then
-                continue  # 동일 라인 이미 존재 → 스킵
-            fi
-            echo "$line" >> "$tmp_append"
-            added_count=$((added_count + 1))
-            continue
-        fi
-
-        # 그 외 (주석, 빈 줄 등): 신규 alias/함수 블록의 직전 주석 처리
-        # → 바로 다음에 신규 alias/함수가 오는 경우에만 추가하므로 여기서는 스킵
-        # (필요 시 섹션 주석도 추가하려면 lookahead 필요 — 현재는 단순 구현)
-    done < "$tmpl_file"
-
-    # 신규 항목이 있을 때만 파일에 추가
-    if [ "$added_count" -gt 0 ]; then
-        local tmp_result
-        tmp_result="$(mktemp)" || { rm -f "$tmp_append"; return 1; }
-        cat "$existing_file" > "$tmp_result"
-        echo "" >> "$tmp_result"
-        echo "# === 머지 추가됨 ($(date +%Y%m%d)) ===" >> "$tmp_result"
-        cat "$tmp_append" >> "$tmp_result"
-        mv "$tmp_result" "$existing_file" || { rm -f "$tmp_result" "$tmp_append"; return 1; }
-        print_success ".claude.aliases 머지 완료: ${added_count}개 신규 항목 추가"
-    else
-        print_info ".claude.aliases 이미 최신 상태 (신규 항목 없음)"
-    fi
-    rm -f "$tmp_append"
-    return 0
-}
-
 # --- Step 7: 쉘 aliases 설정 ---
 setup_shell_aliases() {
     print_step "7" "쉘 aliases 설정"
@@ -307,13 +211,9 @@ setup_shell_aliases() {
     else
         print_info "wrapper 스크립트 없음 ($SCRIPT_DIR/bin/flow-*). chmod 스킵"
     fi
-    # .claude.aliases 파일이 이미 존재하면 머지 (신규 alias/함수만 추가)
-    if [ -f "$aliases_file" ]; then
-        _merge_aliases "$aliases_file" "$TMPL_CLAUDE_ALIASES"
-    else
-        cp "$TMPL_CLAUDE_ALIASES" "$aliases_file"
-        print_success ".claude.aliases 파일 생성 완료 ($aliases_file)"
-    fi
+    # 템플릿을 항상 덮어씀 (bin/ wrapper PATH 방식으로 완전 전환)
+    cp "$TMPL_CLAUDE_ALIASES" "$aliases_file"
+    print_success ".claude.aliases 설정 완료 ($aliases_file)"
     local source_line="# Claude Code workflow aliases"
     local source_cmd="[ -f \"$aliases_file\" ] && source \"$aliases_file\""
     [ ! -f "$shell_rc" ] && touch "$shell_rc"
@@ -615,7 +515,6 @@ cleanup_legacy_claude_paths() {
 
 # --- Step 3.6: 레거시 alias 경로 갱신 ---
 # ~/.claude.aliases 내 구 경로(.claude/scripts/, .claude/hooks/)를 신 경로로 치환
-# 추가: flow-* alias 정의를 제거하고 wrapper PATH 설정으로 대체 (alias → wrapper 마이그레이션)
 update_legacy_aliases() {
     print_step "3.6" "레거시 alias 경로 갱신"
     local aliases_file="$HOME/.claude.aliases"
@@ -638,93 +537,6 @@ update_legacy_aliases() {
     fi
     # macOS sed -i 백업 파일 정리
     rm -f "${aliases_file}.mig-bak"
-
-    # --- flow-* alias → wrapper PATH 마이그레이션 ---
-    # ~/.claude.aliases에 남아있는 'alias flow-xxx=...' 패턴을 감지하여 제거하고
-    # .claude.workflow/bin/ wrapper PATH 설정으로 대체
-    if grep -qE '^alias flow-[a-zA-Z_][a-zA-Z0-9_-]*=' "$aliases_file" 2>/dev/null; then
-        _MIGRATION_PERFORMED=true
-        local flow_alias_count
-        flow_alias_count="$(grep -cE '^alias flow-[a-zA-Z_][a-zA-Z0-9_-]*=' "$aliases_file" 2>/dev/null || echo 0)"
-        print_info "flow-* alias ${flow_alias_count}개 감지됨. wrapper PATH 설정으로 마이그레이션합니다..."
-
-        local tmp_migrated
-        tmp_migrated="$(mktemp)" || return 1
-
-        # flow-* alias 라인 제거 (연속된 flow-* alias 블록의 직전 섹션 주석도 제거)
-        python3 - "$aliases_file" "$tmp_migrated" <<'PYEOF'
-import sys, re
-
-src_path, dst_path = sys.argv[1], sys.argv[2]
-
-with open(src_path, 'r') as f:
-    lines = f.readlines()
-
-# flow-* alias 패턴
-flow_alias_re = re.compile(r'^alias flow-\w+=')
-
-output = []
-i = 0
-while i < len(lines):
-    line = lines[i]
-    # flow-* alias 라인은 스킵
-    if flow_alias_re.match(line):
-        i += 1
-        continue
-    # 직전 주석이 flow-* alias 전용 섹션 주석인지 확인
-    # (주석 다음 라인이 flow-* alias이면 해당 주석도 제거)
-    stripped = line.rstrip('\n')
-    if stripped.startswith('#') and i + 1 < len(lines):
-        next_line = lines[i + 1]
-        if flow_alias_re.match(next_line):
-            # 이 주석은 flow-* alias 블록 직전 주석 → 스킵
-            i += 1
-            continue
-    output.append(line)
-    i += 1
-
-# 연속 빈 줄 3개 이상 → 2개로 압축
-result = []
-blank_count = 0
-for line in output:
-    if line.strip() == '':
-        blank_count += 1
-        if blank_count <= 2:
-            result.append(line)
-    else:
-        blank_count = 0
-        result.append(line)
-
-with open(dst_path, 'w') as f:
-    f.writelines(result)
-PYEOF
-
-        if [ $? -ne 0 ]; then
-            print_error "flow-* alias 마이그레이션 Python 처리 실패. 기존 파일 유지."
-            rm -f "$tmp_migrated"
-        else
-            mv "$tmp_migrated" "$aliases_file"
-            changed=$((changed + 1))
-            print_success "flow-* alias ${flow_alias_count}개 제거 완료"
-
-            # wrapper PATH 설정이 이미 존재하는지 확인 후 없으면 추가
-            local wrapper_path_marker=".claude.workflow/bin"
-            if grep -q "$wrapper_path_marker" "$aliases_file" 2>/dev/null; then
-                print_info "wrapper PATH 설정이 이미 존재합니다. 추가 스킵"
-            else
-                cat >> "$aliases_file" <<'WRAPPER_PATH'
-
-# flow-* wrapper (프로젝트별 동적 PATH)
-_cwf_root="$(git rev-parse --show-toplevel 2>/dev/null)"
-if [ -n "$_cwf_root" ] && [ -d "$_cwf_root/.claude.workflow/bin" ]; then
-  export PATH="$_cwf_root/.claude.workflow/bin:$PATH"
-fi
-unset _cwf_root
-WRAPPER_PATH
-                print_success "wrapper PATH 설정 추가 완료 (~/.claude.aliases)"
-            fi
-        fi
-    fi
 
     if [ "$changed" -gt 0 ]; then
         print_success "alias 경로 갱신 완료 (${changed}개 패턴 처리)"
