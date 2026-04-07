@@ -195,9 +195,9 @@ install_claude_code() {
     rm -f "$install_script"
 }
 
-# --- Step 7: 쉘 aliases 설정 ---
+# --- Step 6: 쉘 aliases 설정 ---
 setup_shell_aliases() {
-    print_step "7" "쉘 aliases 설정"
+    print_step "6" "쉘 aliases 설정"
     local aliases_file="$HOME/.claude.aliases"
     detect_shell_rc
     local shell_name="$DETECTED_SHELL_NAME" shell_rc="$DETECTED_SHELL_RC"
@@ -225,9 +225,9 @@ setup_shell_aliases() {
     fi
 }
 
-# --- Step 4: 디렉터리 및 파일 생성 ---
+# --- Step 3: 디렉터리 및 파일 생성 ---
 create_directories_and_files() {
-    print_step "4" "디렉터리 및 파일 생성"
+    print_step "3" "디렉터리 및 파일 생성"
     for dir in "${INIT_DIRS[@]}"; do
         if [ ! -d "$dir" ]; then mkdir -p "$dir"; print_success "디렉터리 생성: $dir"
         else print_info "디렉터리 이미 존재: $dir"; fi
@@ -321,9 +321,9 @@ PYEOF
     return 0
 }
 
-# --- Step 4.5: .claude/settings.json 생성 ---
+# --- Step 4: .claude/settings.json 생성 ---
 setup_settings_json() {
-    print_step "4.5" ".claude/settings.json 생성"
+    print_step "4" ".claude/settings.json 생성"
     local settings_file=".claude/settings.json"
     [ -f "$settings_file" ] && { _merge_json_keys "$settings_file" "$TMPL_SETTINGS"; return 0; }
     [ ! -d ".claude" ] && { print_info ".claude/ 디렉터리가 없습니다. settings.json 생성을 스킵합니다."; return 0; }
@@ -410,9 +410,9 @@ _merge_kv_settings() {
     return 0
 }
 
-# --- Step 5: .claude.workflow/.settings 템플릿 생성 ---
+# --- Step 5: .claude.workflow/.settings 생성 ---
 generate_claude_settings() {
-    print_step "5" ".claude.workflow/.settings 템플릿 생성"
+    print_step "5" ".claude.workflow/.settings 생성"
     local settings_file=".claude.workflow/.settings"
     local env_file=".claude.workflow/.env"
     # .settings가 이미 존재하면 머지 (신규 KEY만 추가)
@@ -430,156 +430,9 @@ generate_claude_settings() {
     print_success ".claude.workflow/.settings 템플릿 생성 완료 ($settings_file)"
 }
 
-# --- 마이그레이션 플래그 (Phase 3 검증용) ---
-_MIGRATION_PERFORMED=false
-
-# --- Step 2.5: 레거시 루트 디렉터리 마이그레이션 ---
-# v1 구조의 .kanban/, .dashboard/, .workflow/ 를 .claude.workflow/ 하위로 이동
-migrate_legacy_directories() {
-    print_step "2.5" "레거시 루트 디렉터리 마이그레이션"
-    local legacy_dirs=(".kanban" ".dashboard" ".workflow")
-    local target_dirs=(".claude.workflow/kanban" ".claude.workflow/dashboard" ".claude.workflow/workflow")
-    # 구 디렉터리 존재 여부 확인
-    local found=false
-    for dir in "${legacy_dirs[@]}"; do
-        [ -d "$dir" ] && found=true
-    done
-    if [ "$found" = false ]; then
-        print_info "레거시 루트 디렉터리 없음 (.kanban/, .dashboard/, .workflow/). 마이그레이션 스킵"
-        return 0
-    fi
-    _MIGRATION_PERFORMED=true
-    print_info "레거시 루트 디렉터리가 감지되었습니다. 마이그레이션을 시작합니다..."
-    local i
-    for i in "${!legacy_dirs[@]}"; do
-        local src="${legacy_dirs[$i]}"
-        local dst="${target_dirs[$i]}"
-        if [ ! -d "$src" ]; then
-            print_info "$src 디렉터리 없음, 스킵"
-            continue
-        fi
-        [ ! -d "$dst" ] && mkdir -p "$dst"
-        # cp -rn (no-clobber): 기존 파일 우선 보존
-        if [ "${DETECTED_OS:-linux}" = "macos" ]; then
-            cp -Rn "$src"/ "$dst"/ 2>/dev/null || true
-        else
-            cp -rn "$src"/ "$dst"/ 2>/dev/null || true
-        fi
-        # 원본 삭제
-        if rm -rf "$src"; then
-            print_success "$src → $dst 마이그레이션 완료"
-        else
-            print_error "$src 삭제 실패"
-        fi
-    done
-    print_success "레거시 루트 디렉터리 마이그레이션 완료"
-}
-
-# --- Step 3.5: 레거시 .claude 경로 정리 ---
-# v1의 .claude/scripts/, .claude/hooks/ 삭제 (settings.json 보존)
-cleanup_legacy_claude_paths() {
-    print_step "3.5" "레거시 .claude 경로 정리"
-    local has_legacy=false
-    [ -d ".claude/scripts" ] && has_legacy=true
-    [ -d ".claude/hooks" ]   && has_legacy=true
-    if [ "$has_legacy" = false ]; then
-        print_info "레거시 .claude/scripts/, .claude/hooks/ 없음. 정리 스킵"
-        return 0
-    fi
-    _MIGRATION_PERFORMED=true
-    # settings 백업
-    local tmp_backup
-    tmp_backup="$(mktemp -d)"
-    for sf in "settings.json" "settings.local.json"; do
-        [ -f ".claude/$sf" ] && cp ".claude/$sf" "$tmp_backup/$sf"
-    done
-    # 구 경로 삭제
-    if [ -d ".claude/scripts" ]; then
-        rm -rf ".claude/scripts"
-        print_success ".claude/scripts/ 삭제 완료"
-    fi
-    if [ -d ".claude/hooks" ]; then
-        rm -rf ".claude/hooks"
-        print_success ".claude/hooks/ 삭제 완료"
-    fi
-    # settings 복원
-    for sf in "settings.json" "settings.local.json"; do
-        if [ -f "$tmp_backup/$sf" ]; then
-            cp "$tmp_backup/$sf" ".claude/$sf"
-            print_success ".claude/$sf 복원 완료"
-        fi
-    done
-    rm -rf "$tmp_backup"
-    print_success "레거시 .claude 경로 정리 완료"
-}
-
-# --- Step 3.6: 레거시 alias 경로 갱신 ---
-# ~/.claude.aliases 내 구 경로(.claude/scripts/, .claude/hooks/)를 신 경로로 치환
-update_legacy_aliases() {
-    print_step "3.6" "레거시 alias 경로 갱신"
-    local aliases_file="$HOME/.claude.aliases"
-    if [ ! -f "$aliases_file" ]; then
-        print_info "$aliases_file 파일 없음 (신규 설치). 갱신 스킵"
-        return 0
-    fi
-    local changed=0
-    # .claude/scripts/ → .claude.workflow/scripts/
-    if grep -q '\.claude/scripts/' "$aliases_file" 2>/dev/null; then
-        sed -i.mig-bak 's|\.claude/scripts/|.claude.workflow/scripts/|g' "$aliases_file"
-        changed=$((changed + 1))
-        _MIGRATION_PERFORMED=true
-    fi
-    # .claude/hooks/ → .claude.workflow/hooks/
-    if grep -q '\.claude/hooks/' "$aliases_file" 2>/dev/null; then
-        sed -i.mig-bak 's|\.claude/hooks/|.claude.workflow/hooks/|g' "$aliases_file"
-        changed=$((changed + 1))
-        _MIGRATION_PERFORMED=true
-    fi
-    # macOS sed -i 백업 파일 정리
-    rm -f "${aliases_file}.mig-bak"
-
-    if [ "$changed" -gt 0 ]; then
-        print_success "alias 경로 갱신 완료 (${changed}개 패턴 처리)"
-    else
-        print_info "레거시 경로 패턴 없음. 갱신 불필요"
-    fi
-}
-
-# --- Step 6: 레거시 .prompt/ 마이그레이션 ---
-migrate_legacy_prompt() {
-    print_step "6" "레거시 .prompt/ 마이그레이션"
-    local prompt_dir=".prompt" kanban_dir=".claude.workflow/kanban"
-    if [ ! -d "$prompt_dir" ]; then
-        print_info "레거시 .prompt/ 디렉터리 없음, 마이그레이션 스킵"; return 0
-    fi
-    print_info "레거시 .prompt/ 디렉터리 발견. .claude.workflow/kanban/으로 마이그레이션을 시작합니다..."
-    [ ! -d "$kanban_dir" ] && { mkdir -p "$kanban_dir"; print_success ".claude.workflow/kanban/ 디렉터리 생성"; }
-    if [ -f "$prompt_dir/prompt.txt" ] && [ -s "$prompt_dir/prompt.txt" ]; then
-        { echo ""; echo "# === 마이그레이션된 .prompt/prompt.txt 내용 ($(date +%Y%m%d)) ==="; cat "$prompt_dir/prompt.txt"; } >> "$kanban_dir/.memo.txt"
-        print_success ".prompt/prompt.txt 내용을 .claude.workflow/kanban/.memo.txt에 보존했습니다"
-    fi
-    local copied=0
-    for txt_file in "$prompt_dir"/*.txt; do
-        if [ -f "$txt_file" ]; then
-            local filename
-            filename="$(basename "$txt_file")"
-            if cp "$txt_file" "$kanban_dir/$filename"; then
-                print_success "복사: $txt_file → $kanban_dir/$filename"; copied=$((copied + 1))
-            else
-                print_error "복사 실패: $txt_file"
-            fi
-        fi
-    done
-    if [ "$copied" -eq 0 ]; then print_info ".prompt/ 디렉터리에 .txt 파일이 없습니다"
-    else print_success "${copied}개 파일을 .claude.workflow/kanban/으로 복사 완료"; fi
-    local backup_name=".prompt.bak.$(date +%Y%m%d)"
-    if mv "$prompt_dir" "$backup_name"; then print_success ".prompt/ 디렉터리를 ${backup_name}으로 백업 완료"
-    else print_error ".prompt/ 디렉터리 백업 이름 변경에 실패했습니다"; return 1; fi
-}
-
-# --- Step 8: .gitignore 업데이트 ---
+# --- Step 7: .gitignore 업데이트 ---
 update_gitignore() {
-    print_step "8" ".gitignore 업데이트"
+    print_step "7" ".gitignore 업데이트"
     [ ! -f ".gitignore" ] && { touch ".gitignore"; print_success ".gitignore 파일 생성"; }
     local added=0
     for entry in "${GITIGNORE_ENTRIES[@]}"; do
@@ -591,68 +444,9 @@ update_gitignore() {
     else print_success ".gitignore에 ${added}개 항목 추가 완료"; fi
 }
 
-# --- Step 3: .claude + .claude.workflow 디렉터리 클론 ---
-clone_claude_directory() {
-    print_step "3" ".claude + .claude.workflow 디렉터리 클론 (원격 저장소)"
-    command -v git &>/dev/null || { print_error "git이 설치되어 있지 않습니다"; return 1; }
-    local tmp_dir old_trap
-    tmp_dir="$(mktemp -d)"
-    old_trap="$(trap -p EXIT)"
-    trap 'rm -rf "$tmp_dir"' EXIT
-    print_info "원격 저장소 클론 중... ($CLAUDE_REPO_URL)"
-    if ! git clone --depth 1 "$CLAUDE_REPO_URL" "$tmp_dir/claude-workflow" 2>/dev/null; then
-        print_error "원격 저장소 클론에 실패했습니다. 기존 디렉터리를 유지합니다."
-        rm -rf "$tmp_dir"; eval "$old_trap"; return 1
-    fi
-    # .claude 디렉터리 교체
-    if [ ! -d "$tmp_dir/claude-workflow/.claude" ]; then
-        print_error "클론된 저장소에 .claude 디렉터리가 없습니다."
-        rm -rf "$tmp_dir"; eval "$old_trap"; return 1
-    fi
-    [ -L ".claude" ] && { print_info ".claude가 심볼릭 링크입니다. 제거합니다."; rm -f ".claude"; }
-    rm -rf ".claude.new"
-    if ! cp -r "$tmp_dir/claude-workflow/.claude" ".claude.new"; then
-        print_error ".claude 디렉터리 복사 실패."
-        rm -rf ".claude.new" "$tmp_dir"; eval "$old_trap"; return 1
-    fi
-    rm -rf ".claude"; mv ".claude.new" ".claude"
-    print_success ".claude 디렉터리 교체 완료"
-    # .claude.workflow 디렉터리 교체 (kanban, workflow, .settings는 보존)
-    if [ -d "$tmp_dir/claude-workflow/.claude.workflow" ]; then
-        # 사용자 데이터 백업 (kanban, workflow, .settings, .env, .version)
-        local preserve_dirs=("kanban" "workflow" "dashboard")
-        local preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
-        for pd in "${preserve_dirs[@]}"; do
-            [ -d ".claude.workflow/$pd" ] && cp -r ".claude.workflow/$pd" "$tmp_dir/_preserve_$pd"
-        done
-        for pf in "${preserve_files[@]}"; do
-            [ -f ".claude.workflow/$pf" ] && cp ".claude.workflow/$pf" "$tmp_dir/_preserve_$pf"
-        done
-        # 교체
-        rm -rf ".claude.workflow.new"
-        cp -r "$tmp_dir/claude-workflow/.claude.workflow" ".claude.workflow.new"
-        rm -rf ".claude.workflow"; mv ".claude.workflow.new" ".claude.workflow"
-        # 사용자 데이터 복원
-        for pd in "${preserve_dirs[@]}"; do
-            [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf ".claude.workflow/$pd"; mv "$tmp_dir/_preserve_$pd" ".claude.workflow/$pd"; }
-        done
-        for pf in "${preserve_files[@]}"; do
-            [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude.workflow/$pf"
-        done
-        print_success ".claude.workflow 디렉터리 교체 완료 (사용자 데이터 보존)"
-    else
-        print_info "클론된 저장소에 .claude.workflow 디렉터리가 없습니다. 스킵합니다."
-    fi
-    rm -rf "$tmp_dir"; eval "$old_trap"
-    print_success "임시 클론 디렉터리 정리 완료"
-    find ".claude/" -name '*.sh' -exec chmod +x {} +
-    find ".claude.workflow/" -name '*.sh' -exec chmod +x {} + 2>/dev/null
-    print_success ".sh 파일 chmod +x 완료"
-}
-
-# --- Step 9: 설치 검증 ---
+# --- Step 8: 설치 검증 ---
 verify_installation() {
-    print_step "9" "설치 검증"
+    print_step "8" "설치 검증"
     local failed=0
     # (a) python3 버전 검증
     if command -v python3 &>/dev/null; then
@@ -716,33 +510,6 @@ verify_installation() {
         fi
     done
     [ "$gitignore_ok" = true ] && print_success ".gitignore 필수 항목 모두 등록 확인"
-    # (i) 마이그레이션 검증 (마이그레이션이 수행된 경우에만)
-    if [ "$_MIGRATION_PERFORMED" = true ]; then
-        local mig_warn=0
-        # 구 루트 디렉터리 잔류 확인
-        for legacy_dir in ".kanban" ".dashboard" ".workflow"; do
-            if [ -d "$legacy_dir" ]; then
-                print_warning "레거시 디렉터리가 남아있습니다: ${legacy_dir}/ (수동 확인 필요)"
-                mig_warn=$((mig_warn + 1))
-            fi
-        done
-        # 구 .claude/ 경로 잔류 확인
-        for legacy_path in ".claude/scripts" ".claude/hooks"; do
-            if [ -d "$legacy_path" ]; then
-                print_warning "레거시 경로가 남아있습니다: ${legacy_path}/ (수동 확인 필요)"
-                mig_warn=$((mig_warn + 1))
-            fi
-        done
-        # $HOME/.claude.aliases에 구 경로 패턴 잔류 확인
-        local aliases_mig_file="$HOME/.claude.aliases"
-        if [ -f "$aliases_mig_file" ] && grep -q '\.claude/scripts/' "$aliases_mig_file" 2>/dev/null; then
-            print_warning "\$HOME/.claude.aliases에 구 경로 패턴(.claude/scripts/)이 남아있습니다 (수동 확인 필요)"
-            mig_warn=$((mig_warn + 1))
-        fi
-        if [ "$mig_warn" -eq 0 ]; then
-            print_success "마이그레이션 검증 완료 — 레거시 경로 잔류 없음"
-        fi
-    fi
     # 결과 요약
     echo ""
     if [ "$failed" -eq 0 ]; then
@@ -770,14 +537,9 @@ main() {
     detect_os
     install_claude_code
     install_dependencies
-    migrate_legacy_directories
-    clone_claude_directory
-    cleanup_legacy_claude_paths
-    update_legacy_aliases
     create_directories_and_files
     setup_settings_json
     generate_claude_settings
-    migrate_legacy_prompt
     setup_shell_aliases
     update_gitignore
     verify_installation
