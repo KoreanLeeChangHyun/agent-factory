@@ -73,10 +73,29 @@ function formatTime(dt) {
   return dt ? dt.substring(0, 16) : "";
 }
 
-/** Renders a colored badge span. */
+/** Command name → 3-letter abbreviation map. */
+var CMD_ABBR = {
+  implement: "IMP",
+  research: "RSC",
+  review: "REV",
+  prompt: "PRM",
+  refactor: "REF",
+  test: "TST",
+  deploy: "DEP",
+  design: "DES",
+  plan: "PLN",
+  fix: "FIX",
+  debug: "DBG",
+  analyze: "ANL",
+  document: "DOC",
+};
+Board.util.CMD_ABBR = CMD_ABBR;
+
+/** Renders a colored badge span with 3-letter abbreviation. */
 function badge(text, colors) {
   if (!text || !colors) return "";
-  return '<span class="badge" style="background:' + colors.bg + ";color:" + colors.fg + '">' + esc(text) + "</span>";
+  var label = CMD_ABBR[text] || text.substring(0, 3).toUpperCase();
+  return '<span class="badge" style="background:' + colors.bg + ";color:" + colors.fg + '">' + label + "</span>";
 }
 
 Board.util.esc = esc;

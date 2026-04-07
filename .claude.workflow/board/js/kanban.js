@@ -211,22 +211,9 @@
    * @returns {string} 3글자 약어 (예: "res", "imp", "rev")
    */
   function stageAbbr(stage) {
-    const s = stage.trim().toLowerCase();
-    const map = {
-      research: "res",
-      implement: "imp",
-      review: "rev",
-      refactor: "ref",
-      test: "tst",
-      deploy: "dep",
-      design: "des",
-      plan: "pln",
-      fix: "fix",
-      debug: "dbg",
-      analyze: "anl",
-      document: "doc",
-    };
-    return map[s] || s.slice(0, 3);
+    var abbr = Board.util.CMD_ABBR;
+    var s = stage.trim().toLowerCase();
+    return abbr[s] || s.slice(0, 3).toUpperCase();
   }
 
   /**
@@ -243,26 +230,20 @@
 
     let parts = [];
     stages.forEach(function (stage, idx) {
-      let stateClass, icon;
+      let stateClass;
       if (isDone) {
         stateClass = "done";
-        icon = "\u2713"; // ✓
       } else if (isActive && idx === 0) {
-        // 현재 실행 중인 스테이지: 첫 번째 스테이지가 진행중
         stateClass = "active";
-        icon = "\u25CF"; // ●
-      } else if (isActive && idx > 0) {
-        stateClass = "waiting";
-        icon = "\u25CB"; // ○
       } else {
-        // Open/Submit: 전부 대기
         stateClass = "waiting";
-        icon = "\u25CB"; // ○
       }
       if (idx > 0) {
         parts.push('<span class="chain-sep">\u203A</span>');
       }
-      parts.push('<span class="chain-stage ' + stateClass + '">' + icon + " " + stageAbbr(stage) + "</span>");
+      var colors = CMD_COLORS[stage.trim()] || { bg: "rgba(160,160,160,0.2)", fg: "#888" };
+      var anim = stateClass === "active" ? "animation:chain-pulse 1.5s ease-in-out infinite;" : "";
+      parts.push('<span class="chain-stage ' + stateClass + '" style="background:' + colors.bg + ';color:' + colors.fg + ';' + anim + '">' + stageAbbr(stage) + "</span>");
     });
 
     return '<div class="card-chain">' + parts.join("") + "</div>";
@@ -383,7 +364,9 @@
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
             h += '<span class="card-num">' + esc(t.number.replace(/^T-/, "")) + "</span>";
-            if (t.command) {
+            if (t.command && t.command.indexOf(">") !== -1) {
+              h += renderChainIcons(t);
+            } else if (t.command) {
               h += badge(t.command, CMD_COLORS[t.command]);
             }
             h += "</div>";
@@ -396,11 +379,8 @@
             // 하단: 왼쪽(체인/관계) + 오른쪽(날짜)
             h += '<div class="card-bottom">';
             h += '<div class="card-bottom-left">';
-            const hasChain = t.command && t.command.indexOf(">") !== -1;
             const hasRelations = t.relations && t.relations.length > 0;
-            if (hasChain) {
-              h += renderChainIcons(t);
-            } else if (hasRelations) {
+            if (hasRelations) {
               h += renderRelations(t);
             }
             h += '</div>';

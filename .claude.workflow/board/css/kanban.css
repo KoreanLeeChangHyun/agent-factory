@@ -338,13 +338,20 @@
 }
 
 .chain-stage {
-  font-size: 10px;
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  padding: 1px 5px;
+  border-radius: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-.chain-stage.done { color: #4ec9b0; }
-.chain-stage.active { color: #dcdcaa; }
-.chain-stage.waiting { color: #606060; }
+@keyframes chain-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 
 .chain-sep {
   color: #606060;
