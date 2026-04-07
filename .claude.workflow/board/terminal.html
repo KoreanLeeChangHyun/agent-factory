@@ -34,16 +34,24 @@
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
 <script>
 (function(){
+  if(typeof hljs==='undefined')return;
   var langs=['javascript','typescript','python','bash','css','xml','json'];
   var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';
-  langs.forEach(function(lang){
-    var s=document.createElement('script');s.src=base+lang+'.min.js';s.async=true;
-    s.onload=function(){if(typeof hljs!=='undefined')hljs.configure({ignoreUnescapedHTML:true});};
-    document.head.appendChild(s);
-  });
+  var i=0;
+  function loadNext(){
+    if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}
+    var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';
+    s.onload=loadNext;s.onerror=loadNext;document.head.appendChild(s);
+  }
+  loadNext();
 })();
 </script>
 <script src="js/common.js"></script>
+<script src="js/renderers.js"></script>
+<script src="js/workflow-bar.js"></script>
+<script src="js/slash-commands.js"></script>
+<script src="js/workflow-sessions.js"></script>
+<script src="js/session.js"></script>
 <script src="js/terminal.js"></script>
 <script>
   // Standalone initialization — invoke renderTerminal immediately.

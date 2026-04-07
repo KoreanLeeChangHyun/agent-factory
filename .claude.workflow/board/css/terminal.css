@@ -1,5 +1,9 @@
 /* Claude Code Dashboard - Terminal Styles */
 
+/* ═══════════════════════════════════════════════════════
+   Section 1: Layout — Container / Session Bar / Input Card
+   ═══════════════════════════════════════════════════════ */
+
 /* ── Terminal View Container ── */
 #view-terminal { padding: 0; }
 #view-terminal.active {
@@ -18,14 +22,19 @@
 /* ── Session Control Bar ── */
 .terminal-session-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
+  flex-direction: column;
   background: #181818;
   border-bottom: 1px solid #2a2a2a;
   flex-shrink: 0;
-  min-height: 36px;
   position: relative;
+}
+
+.terminal-session-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  min-height: 36px;
 }
 
 .terminal-session-left {
@@ -34,27 +43,152 @@
   gap: 10px;
 }
 
-.terminal-session-id {
-  font-size: 11px;
+/* ── Session Tab Bar ── */
+.session-tab-bar {
+  display: flex;
+  align-items: stretch;
+  background: #141414;
+  border-top: 1px solid #222;
+  min-height: 28px;
+  overflow: hidden;
+}
+
+.session-tab-list {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.session-tab-list::-webkit-scrollbar {
+  height: 2px;
+}
+
+.session-tab-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-tab-list::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 1px;
+}
+
+.session-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: 12px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #555;
+  color: #777;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  user-select: none;
+  position: relative;
+}
+
+.session-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #bbb;
+}
+
+.session-tab.active {
+  color: #ddd;
+  border-bottom-color: #D97757;
+  background: rgba(217, 119, 87, 0.06);
+}
+
+.session-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.session-tab-dot.running {
+  background: #3fb950;
+  box-shadow: 0 0 4px rgba(63, 185, 80, 0.6);
+}
+
+.session-tab-dot.stopped {
+  background: #555;
+}
+
+.session-tab-label {
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
 }
 
-.terminal-session-controls {
+.session-tab-close {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+
+.session-tab:hover .session-tab-close,
+.session-tab.active .session-tab-close {
+  opacity: 1;
+}
+
+.session-tab-close:hover {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.session-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  background: none;
+  border: none;
+  border-left: 1px solid #222;
+  color: #555;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.session-tab-add:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #aaa;
 }
 
 .terminal-session-id {
   font-size: 10px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
   margin-left: 8px;
+}
+
+.terminal-session-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .terminal-controls-divider {
@@ -136,7 +270,13 @@
   font-size: 12px;
   color: #ccc;
   text-decoration: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
   transition: background 0.1s;
+  box-sizing: border-box;
 }
 .terminal-sessions-item:hover { background: rgba(255, 255, 255, 0.08); }
 .terminal-sessions-item-ticket {
@@ -354,6 +494,10 @@
   background: #555;
 }
 
+/* ═══════════════════════════════════════════════════════
+   Section 2: Message / Output Area
+   ═══════════════════════════════════════════════════════ */
+
 /* ── Message Blocks ── */
 .term-message {
   padding: 4px 0;
@@ -370,6 +514,7 @@
 
 .term-user {
   color: #9cdcfe;
+  white-space: pre-wrap;
 }
 
 .term-user::before {
@@ -531,6 +676,10 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* ═══════════════════════════════════════════════════════
+   Section 3: Tool Box — 3-row structure (header / input / output)
+   ═══════════════════════════════════════════════════════ */
+
 /* ── Tool Use Box ── */
 .term-tool-box {
   margin: 8px 0;
@@ -557,6 +706,27 @@
   background: rgba(86, 156, 214, 0.14);
 }
 
+.term-tool-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.term-tool-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dcdcaa;
+  animation: term-tool-pulse 1s ease-in-out infinite;
+}
+
+@keyframes term-tool-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .term-toggle-icon {
   color: #569cd6;
   opacity: 0.8;
@@ -571,9 +741,17 @@
   transform: rotate(90deg);
 }
 
-/* ── 2행: 입력값 표시 ── */
+/* ── Row 1: Tool name label ── */
+.term-tool-label {
+  flex: 1;
+  color: #dcdcaa;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Row 2: Input value ── */
 .term-tool-input {
-  padding: 4px 12px 4px 34px;
+  padding: 4px 12px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 12px;
   color: #ce9178;
@@ -582,28 +760,47 @@
   border-bottom: 1px solid #3c3c3c;
 }
 
-/* ── 3행: 출력값 표시 ── */
-.term-tool-output {
+.term-tool-input:empty {
   display: none;
-  padding: 8px 12px;
-  color: #a0a0a0;
-  font-size: 12px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  line-height: 1.5;
-  white-space: pre-wrap;
 }
 
-.term-tool-box.open .term-tool-output {
+/* ── Row 3: Output value ── */
+.term-tool-output {
   display: block;
-}
-
-.term-tool-result {
   padding: 8px 12px;
   color: #a0a0a0;
   font-size: 12px;
-  white-space: pre-wrap;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.term-tool-output-preview {
+  max-height: calc(1.5em * 4);
+  overflow: hidden;
+  color: #a0a0a0;
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.term-tool-output-preview:empty {
+  display: none;
+}
+
+.term-tool-output-full {
+  display: none;
+  overflow-x: auto;
+}
+
+.term-tool-box.open .term-tool-output-preview {
+  display: none;
+}
+
+.term-tool-box.open .term-tool-output-full {
+  display: block;
 }
 
 .term-tool-error {
@@ -669,12 +866,15 @@
 /* ── Thinking Spinner ── */
 .term-thinking {
   color: #dcdcaa;
-  padding: 8px 0;
+  padding: 8px 12px;
   font-size: 13px;
   display: flex;
   align-items: center;
   gap: 6px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  background: #1e1e1e;
+  border-top: 1px solid #2a2a2a;
+  flex-shrink: 0;
 }
 
 .term-thinking-dot {
@@ -812,162 +1012,6 @@
   transform: scale(0.95);
 }
 
-/* ── Loading Spinner (inside input card) ── */
-.terminal-spinner {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #c96442;
-}
-
-.terminal-spinner.visible {
-  display: flex;
-}
-
-.terminal-spinner-star {
-  font-size: 16px;
-  display: inline-block;
-  animation: spinner-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes spinner-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-
-.terminal-spinner-text {
-  font-size: 11px;
-  color: #666;
-  font-style: italic;
-}
-
-/* ── Permission Request Banner ── */
-.terminal-permission-bar {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(220, 220, 170, 0.08);
-  border-top: 1px solid rgba(220, 220, 170, 0.25);
-  flex-shrink: 0;
-}
-
-.terminal-permission-bar.visible {
-  display: flex;
-}
-
-.terminal-permission-icon {
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.terminal-permission-text {
-  flex: 1;
-  font-size: 12px;
-  color: #dcdcaa;
-  min-width: 0;
-}
-
-.terminal-permission-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.terminal-btn-allow {
-  padding: 3px 10px;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 600;
-  color: #4ec9b0;
-  background: rgba(78, 201, 176, 0.12);
-  border: 1px solid rgba(78, 201, 176, 0.35);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.terminal-btn-allow:hover {
-  background: rgba(78, 201, 176, 0.25);
-  border-color: #4ec9b0;
-}
-
-.terminal-btn-deny {
-  padding: 3px 10px;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 600;
-  color: #f48771;
-  background: rgba(244, 135, 113, 0.1);
-  border: 1px solid rgba(244, 135, 113, 0.3);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.terminal-btn-deny:hover {
-  background: rgba(244, 135, 113, 0.22);
-  border-color: #f48771;
-}
-
-/* ── Copy Panel ── */
-.terminal-copy-panel {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-}
-
-.terminal-copy-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: #252526;
-  border-bottom: 1px solid #333;
-  font-size: 12px;
-  color: #ccc;
-}
-
-.terminal-copy-hint {
-  font-size: 10px;
-  color: #666;
-}
-
-.terminal-copy-close {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.terminal-copy-close:hover { color: #fff; }
-
-.terminal-copy-textarea {
-  flex: 1;
-  width: 100%;
-  padding: 12px;
-  font-size: 13px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #ccc;
-  background: #1e1e1e;
-  border: none;
-  outline: none;
-  resize: none;
-  line-height: 1.6;
-  box-sizing: border-box;
-}
-
-.terminal-copy-textarea::selection {
-  background: rgba(217, 119, 87, 0.3);
-}
-
 /* ── Status Line ── */
 .terminal-statusline {
   display: flex;
@@ -1015,17 +1059,19 @@
 
 .terminal-sl-bar-track {
   width: 120px;
-  height: 6px;
-  background: #333;
-  border-radius: 3px;
+  height: 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
   overflow: hidden;
+  border: 1px solid #444;
 }
 
 .terminal-sl-bar-fill {
+  display: block;
   height: 100%;
-  background: #D97757;
-  border-radius: 3px;
-  transition: width 0.3s;
+  background: #3fb950;
+  border-radius: 4px;
+  transition: width 0.3s, background-color 0.3s;
 }
 
 .terminal-sl-tokens {
@@ -1046,8 +1092,12 @@
 
 /* ── Responsive ── */
 @media (max-width: 600px) {
-  .terminal-session-bar {
+  .terminal-session-bar-top {
     padding: 4px 8px;
+  }
+
+  .session-tab-label {
+    max-width: 80px;
   }
 
   .terminal-input-card {
@@ -1078,7 +1128,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   Tool Result Renderers (T-244)
+   Section 4: Renderers — 8 tool result renderer styles (T-244)
    ═══════════════════════════════════════════════════════ */
 
 /* ── autoCollapse <details> wrapper ── */
@@ -1129,15 +1179,24 @@
   padding: 6px 10px;
 }
 
+/* ── tool-result-rendered: dispatch output wrapper ── */
+.term-tool-result-rendered {
+  padding: 8px 12px;
+  border-top: 1px solid #3c3c3c;
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.5;
+}
+
 /* ── collapsibleResult: 3줄 미리보기 + 접이식 결과 컨테이너 ── */
-.term-tool-result .term-collapsible {
+.term-tool-result-rendered .term-collapsible {
   margin: 2px 0;
   border: none;
   background: transparent;
   overflow: visible;
 }
 
-.term-tool-result .term-collapsible > summary {
+.term-tool-result-rendered .term-collapsible > summary {
   list-style: none;
   cursor: pointer;
   padding: 0;
@@ -1148,7 +1207,7 @@
   user-select: none;
 }
 
-.term-tool-result .term-collapsible > summary::-webkit-details-marker {
+.term-tool-result-rendered .term-collapsible > summary::-webkit-details-marker {
   display: none;
 }
 
@@ -1184,12 +1243,12 @@
   vertical-align: middle;
 }
 
-.term-tool-result .term-collapsible[open] > summary .term-preview,
-.term-tool-result .term-collapsible[open] > summary .term-collapsible-count {
+.term-tool-result-rendered .term-collapsible[open] > summary .term-preview,
+.term-tool-result-rendered .term-collapsible[open] > summary .term-collapsible-count {
   display: none;
 }
 
-.term-tool-result .term-collapsible[open] > summary .term-collapsible-count::before {
+.term-tool-result-rendered .term-collapsible[open] > summary .term-collapsible-count::before {
   transform: rotate(90deg);
 }
 
@@ -1197,7 +1256,7 @@
   display: none;
 }
 
-.term-tool-result .term-collapsible[open] .term-collapsible-full {
+.term-tool-result-rendered .term-collapsible[open] .term-collapsible-full {
   display: block;
 }
 
@@ -1622,19 +1681,10 @@
   text-decoration: underline;
 }
 
-/* ── tool-result-rendered container (dispatch output wrapper) ── */
-.term-tool-result-rendered {
-  padding: 8px 12px;
-  border-top: 1px solid #3c3c3c;
-  font-size: 12px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  line-height: 1.5;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   wf-* — Workflow Session Timeline Bar (W03, T-245)
+/* ═══════════════════════════════════════════════════════
+   Section 5: Workflow Timeline Bar (wf-* namespace)
    Namespace: wf-*  (분리: terminal-* = 세션바, term-* = T-244 도구 출력)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════ */
 
 /* ── .wf-timeline-bar: fixed container below .terminal-session-bar ── */
 .wf-timeline-bar {
@@ -1832,4 +1882,275 @@
   opacity: 0.75;
   font-size: 10px;
   margin-left: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section 6: Workflow Step Panels (wf-step-panel, wf-tool-card)
+   Namespace: wf-*  (워크플로우 세션 전용 렌더링 컴포넌트)
+   ═══════════════════════════════════════════════════════ */
+
+/* ── .wf-step-panel: step-level grouping container ── */
+.wf-step-panel {
+  margin: 8px 0 4px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.85);
+  border: 1px solid #2e2e2e;
+  overflow: hidden;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.wf-step-panel[data-status="active"] {
+  border-color: #3c3c3c;
+}
+
+.wf-step-panel[data-status="done"] {
+  opacity: 0.7;
+  border-color: #2a2a2a;
+}
+
+/* ── Step-specific left border color ── */
+.wf-step-panel[data-step="unknown"] { border-left: 3px solid #858585; }
+.wf-step-panel[data-step="init"]    { border-left: 3px solid #858585; }
+.wf-step-panel[data-step="plan"]    { border-left: 3px solid #569cd6; }
+.wf-step-panel[data-step="work"]    { border-left: 3px solid #D97757; }
+.wf-step-panel[data-step="report"]  { border-left: 3px solid #c586c0; }
+.wf-step-panel[data-step="done"]    { border-left: 3px solid #4ec9b0; }
+.wf-step-panel[data-step="failed"]  { border-left: 3px solid #f48771; }
+
+/* ── .wf-step-panel-header: step name + status badge row ── */
+.wf-step-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(40, 40, 40, 0.6);
+  border-bottom: 1px solid #2a2a2a;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.wf-step-panel-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.wf-step-panel-name {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #cccccc;
+}
+
+.wf-step-panel-status {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.wf-step-panel-status[data-status="active"] {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+}
+
+.wf-step-panel-status[data-status="done"] {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.10);
+}
+
+/* ── .wf-step-panel-body: tool output container ── */
+.wf-step-panel-body {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-step-panel-body:empty {
+  padding: 0;
+}
+
+/* ── .wf-tool-card: compact tool output card inside step panel ── */
+.wf-tool-card {
+  background: rgba(35, 35, 35, 0.7);
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.wf-tool-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: #999;
+  cursor: default;
+  min-height: 24px;
+}
+
+.wf-tool-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: #666;
+  transition: transform 0.15s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.wf-tool-card-toggle:hover {
+  color: #999;
+}
+
+.wf-tool-card-toggle.rotated {
+  transform: rotate(90deg);
+}
+
+.wf-tool-card-name {
+  font-weight: 600;
+  color: #9cdcfe;
+  flex-shrink: 0;
+}
+
+.wf-tool-card-input {
+  color: #858585;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── .wf-tool-card-body: collapsible output area ── */
+.wf-tool-card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+  border-top: 1px solid transparent;
+}
+
+.wf-tool-card.open .wf-tool-card-body {
+  max-height: 600px;
+  overflow-y: auto;
+  border-top-color: #2a2a2a;
+}
+
+.wf-tool-card-body .wf-tool-result,
+.wf-tool-card-body .wf-tool-error {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.wf-tool-card-body .wf-tool-error {
+  color: #f48771;
+}
+
+/* ── .wf-assistant-block: markdown text inside step panel ── */
+.wf-assistant-block {
+  padding: 6px 10px;
+  color: #cccccc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wf-assistant-block .term-heading {
+  margin: 8px 0 4px;
+}
+
+.wf-assistant-block .term-code-block {
+  margin: 4px 0;
+}
+
+.wf-assistant-block .term-para {
+  margin: 4px 0;
+}
+
+.wf-assistant-block .term-list {
+  margin: 4px 0 4px 16px;
+}
+
+/* ============================================================
+   Permission Request UI
+   ============================================================ */
+
+.term-permission {
+  border-left: 4px solid #D97757;
+  background: rgba(217, 119, 87, 0.08);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 6px;
+}
+
+.term-permission-label {
+  font-weight: bold;
+  color: #D97757;
+}
+
+.term-permission-tool {
+  font-family: monospace;
+  color: #cccccc;
+  font-size: 90%;
+}
+
+.term-permission-desc {
+  color: #999;
+  font-size: 90%;
+  margin-top: 4px;
+}
+
+.term-permission-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.term-permission-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.term-permission-btn.allow {
+  background: #2ea043;
+  color: white;
+}
+
+.term-permission-btn.allow:hover {
+  background: #3fb950;
+}
+
+.term-permission-btn.deny {
+  background: #555;
+  color: #ccc;
+}
+
+.term-permission-btn.deny:hover {
+  background: #666;
+}
+
+.term-permission-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.term-permission-result {
+  margin-top: 6px;
+  font-size: 90%;
+}
+
+.term-permission-result.allowed {
+  color: #3fb950;
+}
+
+.term-permission-result.denied {
+  color: #f85149;
 }
