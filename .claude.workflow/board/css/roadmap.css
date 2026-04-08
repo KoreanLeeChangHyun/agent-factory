@@ -1,14 +1,68 @@
-/* Claude Code Workflow Board - Roadmap View Styles */
+/* Claude Code Workflow Board - Roadmap Panel Styles */
 
-/* ── Roadmap View Container ── */
-#view-roadmap {
-  display: none;
-  flex-direction: column;
-  padding: 20px 24px;
-  overflow-y: auto;
-  gap: 16px;
+/* ── Collapsible Panel (below header) ── */
+.roadmap-panel {
+  background: #252526;
+  border-bottom: 1px solid #2d2d2d;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-#view-roadmap.active { display: flex; }
+.roadmap-panel:hover {
+  background: #2a2a2b;
+}
+.roadmap-panel.open {
+  cursor: default;
+  background: #1e1e1e;
+}
+.roadmap-panel.open:hover {
+  background: #1e1e1e;
+}
+
+/* ── Collapsed Bar (horizontal, like Done column) ── */
+.roadmap-collapsed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  user-select: none;
+}
+.roadmap-panel.open .roadmap-collapsed-bar {
+  display: none;
+}
+
+.roadmap-collapsed-bar .bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #858585;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.roadmap-collapsed-bar .bar-count {
+  font-size: 10px;
+  color: #606060;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.roadmap-panel-content {
+  display: none;
+  padding: 12px 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.roadmap-panel.open .roadmap-panel-content {
+  display: block;
+}
+
+/* ── Roadmap Toggle Button ── */
+.roadmap-toggle {
+  transition: color 0.15s;
+}
+.roadmap-toggle.active {
+  color: #D97757;
+}
 
 /* ── Toolbar ── */
 .roadmap-toolbar {
@@ -18,10 +72,11 @@
   gap: 8px;
   flex-wrap: wrap;
   flex-shrink: 0;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: #252526;
   border: 1px solid #2d2d2d;
   border-radius: 6px;
+  margin-bottom: 10px;
 }
 
 .roadmap-toolbar-label {
@@ -42,12 +97,12 @@
 
 /* ── Filter Buttons ── */
 .roadmap-filter-btn {
-  padding: 4px 12px;
+  padding: 3px 10px;
   border: 1px solid #3c3c3c;
   border-radius: 4px;
   background: transparent;
   color: #a0a0a0;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
@@ -65,12 +120,12 @@
 
 /* ── Layout Direction Toggle ── */
 .roadmap-layout-btn {
-  padding: 4px 12px;
+  padding: 3px 10px;
   border: 1px solid #3c3c3c;
   border-radius: 4px;
   background: transparent;
   color: #a0a0a0;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
@@ -94,65 +149,37 @@
   gap: 6px;
   cursor: pointer;
   color: #858585;
-  font-size: 12px;
+  font-size: 11px;
   user-select: none;
 }
 .roadmap-isolated-toggle input[type="checkbox"] {
   accent-color: #D97757;
   cursor: pointer;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 .roadmap-isolated-toggle:hover {
   color: #a0a0a0;
 }
 
-/* ── Statistics Cards ── */
-.roadmap-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.roadmap-stat-card {
-  background: #252526;
-  border: 1px solid #2d2d2d;
-  border-radius: 6px;
-  padding: 14px 18px;
-  border-left: 3px solid #D97757;
-  transition: border-color 0.15s;
-}
-.roadmap-stat-card:hover { border-color: #3c3c3c; border-left-color: #D97757; }
-
-.roadmap-stat-card.stat-open    { border-left-color: #4ec9b0; }
-.roadmap-stat-card.stat-progress { border-left-color: #dcdcaa; }
-.roadmap-stat-card.stat-review  { border-left-color: #c586c0; }
-.roadmap-stat-card.stat-done    { border-left-color: #858585; }
-.roadmap-stat-card.stat-relations { border-left-color: #D97757; }
-.roadmap-stat-card.stat-total   { border-left-color: #569cd6; }
-
-.roadmap-stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
+/* ── Collapse Button ── */
+.roadmap-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: transparent;
   color: #858585;
-  letter-spacing: 0.5px;
-  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-
-.roadmap-stat-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: #e0e0e0;
-  margin-top: 4px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  line-height: 1.1;
-}
-
-.roadmap-stat-sub {
-  font-size: 11px;
-  color: #5a5a5a;
-  margin-top: 2px;
+.roadmap-collapse-btn:hover {
+  background: rgba(217, 119, 87, 0.12);
+  border-color: #D97757;
+  color: #D97757;
 }
 
 /* ── Graph Container ── */
@@ -160,10 +187,10 @@
   background: #252526;
   border: 1px solid #2d2d2d;
   border-radius: 6px;
-  padding: 20px;
+  padding: 16px;
   overflow: auto;
-  min-height: 200px;
-  flex: 1;
+  min-height: 120px;
+  max-height: 320px;
 }
 
 .roadmap-graph-container svg {
@@ -181,16 +208,17 @@
   opacity: 0.8;
 }
 
-/* ── Legend ── */
+/* ── Legend (inline, compact) ── */
 .roadmap-legend {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: #252526;
   border: 1px solid #2d2d2d;
   border-radius: 6px;
+  margin-top: 10px;
   flex-shrink: 0;
 }
 
@@ -207,14 +235,14 @@
 .roadmap-legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
   color: #a0a0a0;
 }
 
 .roadmap-legend-edge {
   display: inline-block;
-  width: 36px;
+  width: 28px;
   height: 2px;
   border-radius: 1px;
   position: relative;
@@ -224,7 +252,7 @@
   position: absolute;
   right: -6px;
   top: -7px;
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .roadmap-legend-edge.edge-depends {
@@ -249,7 +277,7 @@
 
 .roadmap-legend-sep {
   width: 1px;
-  height: 18px;
+  height: 16px;
   background: #3c3c3c;
   align-self: center;
 }
@@ -257,8 +285,8 @@
 /* Node status colors in legend */
 .roadmap-legend-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 2px;
   border: 2px solid currentColor;
   background: #1e1e1e;
@@ -274,37 +302,37 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 60px 24px;
+  gap: 8px;
+  padding: 30px 24px;
   color: #858585;
   text-align: center;
 }
 
 .roadmap-empty-icon {
-  font-size: 40px;
+  font-size: 28px;
   opacity: 0.4;
 }
 
 .roadmap-empty-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: #5a5a5a;
 }
 
 .roadmap-empty-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: #4a4a4a;
   max-width: 400px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .roadmap-empty-hint {
-  font-size: 12px;
+  font-size: 11px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   background: #252526;
   border: 1px solid #2d2d2d;
   border-radius: 4px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   color: #858585;
 }
 
@@ -314,14 +342,14 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 40px 24px;
+  padding: 30px 24px;
   color: #858585;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .roadmap-loading-spinner {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid #3c3c3c;
   border-top-color: #D97757;
   border-radius: 50%;
@@ -330,35 +358,4 @@
 
 @keyframes roadmap-spin {
   to { transform: rotate(360deg); }
-}
-
-/* ── Mermaid Node Status Overrides (via SVG class injection) ── */
-/* These styles target mermaid-rendered SVG elements */
-.roadmap-graph-container .node.open rect,
-.roadmap-graph-container .node.open polygon,
-.roadmap-graph-container .node.open circle {
-  stroke: #4ec9b0 !important;
-  stroke-width: 2px !important;
-}
-
-.roadmap-graph-container .node.progress rect,
-.roadmap-graph-container .node.progress polygon,
-.roadmap-graph-container .node.progress circle {
-  stroke: #dcdcaa !important;
-  stroke-width: 2px !important;
-}
-
-.roadmap-graph-container .node.review rect,
-.roadmap-graph-container .node.review polygon,
-.roadmap-graph-container .node.review circle {
-  stroke: #c586c0 !important;
-  stroke-width: 2px !important;
-}
-
-.roadmap-graph-container .node.done rect,
-.roadmap-graph-container .node.done polygon,
-.roadmap-graph-container .node.done circle {
-  stroke: #858585 !important;
-  stroke-width: 1px !important;
-  opacity: 0.6;
 }

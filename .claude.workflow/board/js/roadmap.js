@@ -352,6 +352,12 @@
     h += 'Show isolated nodes';
     h += '</label>';
 
+    // Spacer + Collapse button
+    h += '<span style="flex:1"></span>';
+    h += '<button class="roadmap-collapse-btn" id="roadmap-collapse-btn" title="Collapse">';
+    h += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>';
+    h += '</button>';
+
     h += '</div>';
     return h;
   }
@@ -428,11 +434,11 @@
   // ── C. Main Render Function ──
 
   /**
-   * Main render entry point for the Roadmap tab.
+   * Main render entry point for the Roadmap panel.
    * Registered as Board.render.renderRoadmap.
    */
   function renderRoadmap() {
-    var el = document.getElementById("view-roadmap");
+    var el = document.getElementById("roadmap-panel-content");
     if (!el) return;
 
     var tickets = Board.state.TICKETS || [];
@@ -461,16 +467,13 @@
     // Start building HTML
     var h = '';
 
-    // 1. Stats cards
-    h += renderStatsCards(stats);
-
-    // 2. Filter toolbar
+    // 1. Filter toolbar
     h += renderToolbar();
 
-    // 3. Graph container placeholder
+    // 2. Graph container placeholder
     h += '<div class="roadmap-graph-container" id="roadmap-graph"></div>';
 
-    // 4. Legend
+    // 3. Legend
     h += renderLegend();
 
     el.innerHTML = h;
@@ -580,6 +583,14 @@
         renderRoadmap();
       });
     }
+
+    // Collapse button
+    var collapseBtn = container.querySelector("#roadmap-collapse-btn");
+    if (collapseBtn) {
+      collapseBtn.addEventListener("click", function () {
+        toggleRoadmapPanel();
+      });
+    }
   }
 
   /**
@@ -614,6 +625,46 @@
     });
   }
 
+  // ── Panel Toggle ──
+
+  /**
+   * Updates the collapsed bar ticket count.
+   */
+  function updateBarCount() {
+    var countEl = document.getElementById("roadmap-bar-count");
+    if (!countEl) return;
+    var tickets = Board.state.TICKETS || [];
+    var fullGraph = buildDependencyGraph(tickets, { statuses: [], showIsolated: false });
+    var linked = Object.keys(fullGraph.nodes).length;
+    countEl.textContent = linked > 0 ? linked + " linked" : "";
+  }
+
+  /**
+   * Toggles the roadmap panel open/closed.
+   */
+  function toggleRoadmapPanel() {
+    var panel = document.getElementById("roadmap-panel");
+    if (!panel) return;
+
+    var isOpen = panel.classList.toggle("open");
+
+    if (isOpen) {
+      renderRoadmap();
+    } else {
+      updateBarCount();
+    }
+  }
+
+  // Wire collapsed bar click
+  var collapsedBar = document.getElementById("roadmap-collapsed-bar");
+  if (collapsedBar) {
+    collapsedBar.addEventListener("click", toggleRoadmapPanel);
+  }
+
+  // Update bar count periodically (tickets may load async)
+  setTimeout(updateBarCount, 2000);
+
   // ── Register on Board namespace ──
   Board.render.renderRoadmap = renderRoadmap;
+  Board.render.toggleRoadmapPanel = toggleRoadmapPanel;
 })();

@@ -591,7 +591,6 @@ function switchTab(target, skipPush) {
   views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
   if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
   if (target === "memory" && Board.render.renderMemory) Board.render.renderMemory();
-  if (target === "roadmap" && Board.render.renderRoadmap) Board.render.renderRoadmap();
   saveUI();
   if (Board.util.updateQueryString) Board.util.updateQueryString();
 }
