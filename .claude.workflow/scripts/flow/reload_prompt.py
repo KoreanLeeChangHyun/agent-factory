@@ -318,8 +318,8 @@ def main() -> None:
 
     if not feedback:
         append_log(abs_work_dir, "WARN", "reload_prompt: 티켓 파일을 찾을 수 없거나 비어있습니다 (kanban/open/ 또는 kanban/progress/ 등)")
-        print("║ STATE: RELOAD [WARN]", flush=True)
-        print("║ >> 티켓 파일 미발견", flush=True)
+        print("[STATE] RELOAD [WARN]", flush=True)
+        print(">> 티켓 파일 미발견", flush=True)
         print("FAIL", flush=True)
         sys.exit(0)
 
@@ -357,8 +357,8 @@ def main() -> None:
             f.write(work_context)
 
     append_log(abs_work_dir, "INFO", "reload_prompt: complete")
-    print("║ STATE: RELOAD", flush=True)
-    print("║ >> 피드백 적용 완료", flush=True)
+    print("[STATE] RELOAD", flush=True)
+    print(">> 피드백 적용 완료", flush=True)
     print(feedback, end="", flush=True)
 
 

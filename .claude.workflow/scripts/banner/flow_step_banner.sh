@@ -18,16 +18,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../data/colors.sh"
 
-# ─── 한글 표시 폭 계산 ───
-display_width() {
-    local str="$1"
-    python3 -c "
-import unicodedata, sys
-s = sys.argv[1]
-print(sum(2 if unicodedata.east_asian_width(c) in ('W', 'F') else 1 for c in s))
-" "$str" 2>/dev/null || echo "${#str}"
-}
-
 # ─── 한국어 시간 포맷 ───
 get_kr_timestamp() {
     local HOUR MINUTE AMPM
@@ -165,33 +155,9 @@ if [[ "$SUBCMD" == "start" ]]; then
     else
         STEP=$(get_current_phase "$REGISTRY_KEY")
     fi
-    PROGRESS=$(get_progress "$STEP" "●")
-    DATESTAMP=$(TZ='Asia/Seoul' date '+%Y년 %-m월 %-d일')
-    TIMESTAMP=$(get_kr_timestamp)
     DESC=$(get_step_desc "$STEP")
 
-    BORDER=$(printf '═%.0s' $(seq 1 $BANNER_WIDTH))
-
-    # Line 1: [● ● ○]  STEP                    2026년 3월 1일  ║
-    LINE1_LEFT="  [X X X]  ${STEP}"
-    LINE1_RIGHT="${DATESTAMP}  "
-    LINE1_LEFT_W=$(( 2 + 7 + 2 + ${#STEP} ))  # "  " + "[X X X]" + "  " + STEP
-    LINE1_RIGHT_W=$(display_width "$LINE1_RIGHT")
-    LINE1_PAD=$(( BANNER_WIDTH - LINE1_LEFT_W - LINE1_RIGHT_W ))
-    LINE1_SPACES=$(printf '%*s' "$LINE1_PAD" '')
-
-    # Line 2: ▶ 설명                          오후 7시 13분 KST  ║
-    LINE2_LEFT="  ▶ ${DESC}"
-    LINE2_RIGHT="${TIMESTAMP}  "
-    LINE2_LEFT_W=$(display_width "$LINE2_LEFT")
-    LINE2_RIGHT_W=$(display_width "$LINE2_RIGHT")
-    LINE2_PAD=$(( BANNER_WIDTH - LINE2_LEFT_W - LINE2_RIGHT_W ))
-    LINE2_SPACES=$(printf '%*s' "$LINE2_PAD" '')
-
-    echo "╔${BORDER}╗"
-    echo "║  [${PROGRESS}]  ${STEP}${LINE1_SPACES}${LINE1_RIGHT}║"
-    echo "║  ▶ ${DESC}${LINE2_SPACES}${LINE2_RIGHT}║"
-    echo "╚${BORDER}╝"
+    echo "[STEP] ${STEP} - ${DESC}"
     _log_event "$REGISTRY_KEY" "INFO" "STEP_START: ${STEP}" || true
     exit 0
 fi
@@ -211,17 +177,17 @@ if [[ "$SUBCMD" == "end" ]]; then
     PROGRESS=$(get_progress "$STEP" "●")
     TIMESTAMP=$(get_kr_timestamp)
 
-    echo "║ [${PROGRESS}]  ${STEP}  - ${TIMESTAMP}"
+    echo "[STEP] ${STEP} - ${TIMESTAMP}"
 
     ARTIFACT_PATH=$(get_artifact_path "$STEP" "$REGISTRY_KEY")
     if [[ -n "$ARTIFACT_PATH" ]]; then
-        echo "║ ${ARTIFACT_PATH}"
+        echo "${ARTIFACT_PATH}"
     fi
 
     if [[ -n "$LABEL" ]]; then
-        echo "║ [OK] ${LABEL}"
+        echo "[OK] ${LABEL}"
     else
-        echo "║ [ASK] AskUserQuestion"
+        echo "[ASK] AskUserQuestion"
     fi
 
     _LOG_MSG="STEP_END: ${STEP} label=${LABEL:-ASK}"

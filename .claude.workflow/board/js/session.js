@@ -22,6 +22,30 @@
   var termEventSource = null;
   /** @type {number|null} */
   var reconnectTimerId = null;
+  /**
+   * Tracks texts sent via sendInput() to avoid duplicate DOM insertion
+   * when the same text arrives back as a user_input SSE event.
+   * During history replay the set is empty, so all user_input events
+   * are rendered into the DOM as expected.
+   * @type {Set<string>}
+   */
+  var _sentTexts = new Set();
+
+  /**
+   * Tracks the tool_use_id of the most recently started tool invocation.
+   * Updated on each content_block_start event; used by input_json_delta
+   * to route chunks into the correct per-tool input buffer.
+   * @type {string|null}
+   */
+  var _currentToolUseId = null;
+
+  /**
+   * Per-tool_use_id input buffer map.
+   * Parallel tool calls may interleave input_json_delta events, so each
+   * tool_use_id gets its own accumulator instead of a single shared buffer.
+   * @type {Object<string, string>}
+   */
+  var _toolInputMap = {};
 
   // ── Accessor for terminal core state ──
   // These are set by terminal.js core via Board.session._bind()
@@ -68,6 +92,12 @@
       if (!data) return;
       Board.state.termStatus = data.status || "stopped";
       Board.state.termSessionId = data.session_id || null;
+      // last_session_id: W01 서버에서 추가된 필드 (이전/현재 세션 UUID)
+      if (data.last_session_id) {
+        Board.state.termLastSessionId = data.last_session_id;
+      } else if (data.session_id) {
+        Board.state.termLastSessionId = data.session_id || Board.state.termLastSessionId || null;
+      }
       if (data.model) {
         var raw = data.model;
         var ctxMatch = raw.match(/\[(\d+)([mk])\]/i);
@@ -146,6 +176,14 @@
     // Reset tokens on reconnect to avoid duplicate accumulation from history replay
     _ctx.resetTokens();
 
+    // Clear sent-text tracking so that history-replayed user_input events
+    // are rendered into the DOM (they are not duplicates).
+    _sentTexts.clear();
+
+    // Reset parallel-tool tracking state on reconnect
+    _currentToolUseId = null;
+    _toolInputMap = {};
+
     termEventSource = new EventSource(_ctx.endpoints().events);
 
     termEventSource.addEventListener("open", function () {
@@ -163,6 +201,13 @@
         } else if (data.text && data.kind === "assistant" && !_ctx.getReceivedChunks()) {
           _ctx.appendTextBuffer(data.text);
         } else if (data.kind === "input_json_delta" && typeof data.chunk === "string") {
+          // Route input chunk into per-tool_use_id buffer (parallel-safe)
+          if (_currentToolUseId) {
+            if (!_toolInputMap[_currentToolUseId]) {
+              _toolInputMap[_currentToolUseId] = "";
+            }
+            _toolInputMap[_currentToolUseId] += data.chunk;
+          }
           _ctx.appendToolInputBuffer(data.chunk);
         } else if (data.kind === "content_block_start" && data.raw) {
           var block = data.raw.content_block || {};
@@ -170,10 +215,18 @@
             _ctx.flushTextBuffer();
             _ctx.resetToolInputBuffer();
             _ctx.setCurrentToolName(block.name);
+
+            // Track current tool_use_id for input_json_delta routing
+            var toolUseId = block.id || null;
+            _currentToolUseId = toolUseId;
+            if (toolUseId) {
+              _toolInputMap[toolUseId] = "";
+            }
+
             if (_ctx.isWorkflowMode()) {
               _ctx.createWorkflowToolCard(block.name);
             } else {
-              _ctx.createToolBox(block.name);
+              _ctx.createToolBox(block.name, toolUseId);
             }
           }
         } else if (data.kind === "user" && data.raw) {
@@ -182,16 +235,53 @@
           var mc = data.raw.message && data.raw.message.content;
           var resultText = "";
 
+          // Extract tool_use_id from the user event for parallel-safe box matching.
+          // The tool_use_id may appear in:
+          //   - tr.tool_use_id (tool_use_result shorthand)
+          //   - mc[0].tool_use_id (message.content array element)
+          var userToolUseId = null;
+          if (tr && tr.tool_use_id) {
+            userToolUseId = tr.tool_use_id;
+          } else if (mc && mc[0] && mc[0].tool_use_id) {
+            userToolUseId = mc[0].tool_use_id;
+          }
+
+          // Resolve tool name from the matched box's data attribute or currentToolName
+          var userToolName = null;
+          if (userToolUseId) {
+            var map = _ctx.getToolBoxMap ? _ctx.getToolBoxMap() : {};
+            var matchedBox = map[userToolUseId];
+            if (matchedBox && matchedBox.getAttribute) {
+              userToolName = matchedBox.getAttribute("data-tool-name");
+            }
+          }
+
           if (tr) {
             if (tr.stdout) resultText = tr.stdout;
             else if (tr.file && tr.file.content) resultText = tr.file.content;
+            else if (Array.isArray(tr.filenames)) resultText = tr.filenames.join("\n");
             else if (typeof tr.content === "string") resultText = tr.content;
           }
-          if (!resultText && mc && mc[0] && typeof mc[0].content === "string") {
-            resultText = mc[0].content;
+          if (!resultText && mc && mc[0]) {
+            if (typeof mc[0].content === "string") {
+              resultText = mc[0].content;
+            } else if (Array.isArray(mc[0].content)) {
+              resultText = mc[0].content
+                .filter(function(item) { return item && item.type === "text" && item.text; })
+                .map(function(item) { return item.text; })
+                .join("\n");
+            }
           }
 
-          if (resultText) {
+          // Before calling insertToolResult, swap terminal.js's shared toolInputBuffer
+          // to the per-tool_use_id buffer so the correct input is rendered.
+          if (userToolUseId && _toolInputMap[userToolUseId] !== undefined) {
+            _ctx.resetToolInputBuffer();
+            _ctx.appendToolInputBuffer(_toolInputMap[userToolUseId]);
+            delete _toolInputMap[userToolUseId];
+          }
+
+          if (resultText && resultText.trim()) {
             // WorkflowRenderer tap integration
             var bannerConsumed = false;
             if (_ctx.isWorkflowMode()) {
@@ -199,6 +289,7 @@
                 bannerConsumed = Board.WorkflowRenderer.tap(resultText);
                 if (bannerConsumed) {
                   Board.phaseTimeline.render();
+                  _ctx.removeEmptyWorkflowToolCard();
                 }
               } catch (tapErr) {
                 bannerConsumed = false;
@@ -208,25 +299,25 @@
               if (_ctx.isWorkflowMode()) {
                 _ctx.insertWorkflowResult(resultText, false);
               } else {
-                _ctx.insertToolResult(resultText, false);
+                _ctx.insertToolResult(resultText, false, userToolName, userToolUseId);
               }
             }
           } else {
             // Phase 4 fix: remove empty tool box when resultText is falsy
-            _ctx.removeEmptyToolBox();
+            _ctx.removeEmptyToolBox(userToolUseId);
           }
           if (tr && tr.stderr) {
             if (_ctx.isWorkflowMode()) {
               _ctx.insertWorkflowResult("[stderr] " + tr.stderr, true);
             } else {
-              _ctx.insertToolResult("[stderr] " + tr.stderr, true);
+              _ctx.insertToolResult("[stderr] " + tr.stderr, true, userToolName, userToolUseId);
             }
           }
           if (mc && mc[0] && mc[0].is_error) {
             if (_ctx.isWorkflowMode()) {
               _ctx.insertWorkflowResult("[Tool Error]", true);
             } else {
-              _ctx.insertToolResult("[Tool Error]", true);
+              _ctx.insertToolResult("[Tool Error]", true, userToolName, userToolUseId);
             }
           }
         }
@@ -266,6 +357,11 @@
           if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
           _ctx.resetToolInputBuffer();
           _ctx.setCurrentToolName(null);
+
+          // Reset parallel-tool tracking state
+          _currentToolUseId = null;
+          _toolInputMap = {};
+          if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
 
           _ctx.appendSystemMessage("Response complete");
 
@@ -312,7 +408,6 @@
         } else if (data.subtype === "process_exit") {
           if (Board.state.termStatus === "running") return;
           Board.state.termStatus = "stopped";
-          Board.state.termSessionId = null;
           _ctx.resetTokens();
           _ctx.setSessionCost(0);
           _ctx.stopSpinner();
@@ -439,6 +534,28 @@
       }
     });
 
+    termEventSource.addEventListener("user_input", function (e) {
+      try {
+        var data = JSON.parse(e.data);
+        if (!data.text) return;
+
+        // If this text was sent by the local sendInput(), skip DOM insertion
+        // (sendInput already added the element). Remove from Set so that
+        // subsequent identical inputs are not accidentally suppressed.
+        if (_sentTexts.has(data.text)) {
+          _sentTexts.delete(data.text);
+          return;
+        }
+
+        var div = document.createElement("div");
+        div.className = "term-message term-user";
+        div.textContent = data.text;
+        _ctx.appendToOutput(div);
+      } catch (err) {
+        // Ignore parse errors
+      }
+    });
+
     termEventSource.addEventListener("error", function (e) {
       try {
         var data = JSON.parse(e.data);
@@ -446,7 +563,6 @@
         _ctx.stopSpinner();
         _ctx.appendErrorMessage("[Error] " + (data.message || "Process error"));
         Board.state.termStatus = "stopped";
-        Board.state.termSessionId = null;
         _ctx.setInputLocked(false);
         _ctx.updateControlBar();
       } catch (err) {
@@ -483,9 +599,10 @@
 
   // ── Session Management ──
 
-  function startSession() {
+  function startSession(resumeSessionId) {
     if (!_ctx) return;
     if (Board.state.termStatus !== "stopped") return;
+    var isResume = !!resumeSessionId;
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
       _ctx.appendSystemMessage("Connecting to workflow session " + _ctx.getWorkflowSessionId() + "...");
@@ -496,13 +613,14 @@
     }
 
     _ctx.clearOutput();
-    _ctx.appendSystemMessage("Starting session...");
+    _ctx.appendSystemMessage(isResume ? "Resuming session..." : "Starting session...");
 
     Board.state.termStatus = "running";
     _ctx.updateControlBar();
 
     connectSSEReady().then(function () {
-      return postJson("/terminal/start");
+      var startBody = isResume ? { resume_session_id: resumeSessionId } : undefined;
+      return postJson("/terminal/start", startBody);
     }).then(function (data) {
       _ctx.startSpinner();
       _ctx.setInputLocked(true);
@@ -511,7 +629,11 @@
         Board.state.termStatus = "idle";
         _ctx.updateControlBar();
       }
-      postJson("/terminal/input", { text: "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요." }).catch(function () {});
+      if (!isResume) {
+        var initText = "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요.";
+        _sentTexts.add(initText);
+        postJson("/terminal/input", { text: initText }).catch(function () {});
+      }
     }).catch(function (err) {
       _ctx.appendErrorMessage("[Error] Failed to start session: " + err.message);
       Board.state.termStatus = "stopped";
@@ -527,7 +649,6 @@
     postJson(epK.kill, epK.inputBody({})).then(function () {
       _ctx.appendSystemMessage("Session terminated");
       Board.state.termStatus = "stopped";
-      Board.state.termSessionId = null;
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
     }).catch(function (err) {
@@ -550,6 +671,16 @@
     return fetchStatus();
   }
 
+  /**
+   * Record a text that was just sent via sendInput().
+   * When the corresponding user_input SSE event arrives, the handler
+   * will skip DOM insertion to avoid duplicates.
+   * @param {string} text
+   */
+  function markSent(text) {
+    if (text) _sentTexts.add(text);
+  }
+
   // ── Register on Board namespace ──
   Board.session = {
     connectSSE: connectSSE,
@@ -560,6 +691,7 @@
     killSession: killSession,
     fetchStatus: fetchStatus,
     postJson: postJson,
-    _bind: bind
+    _bind: bind,
+    _markSent: markSent
   };
 })();

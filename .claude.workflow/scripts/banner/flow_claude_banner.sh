@@ -50,45 +50,7 @@ if [[ "$SUBCMD" == "start" ]]; then
         exit 1
     fi
 
-    INNER_WIDTH=60
-    BORDER=$(printf '═%.0s' $(seq 1 $INNER_WIDTH))
-
-    DATESTAMP=$(TZ='Asia/Seoul' date '+%Y년 %-m월 %-d일')
-    TITLE_LEFT="  Claude Code - Workflow"
-    TITLE_RIGHT="${DATESTAMP}  "
-
-    HOUR=$(TZ='Asia/Seoul' date '+%-H')
-    MINUTE=$(TZ='Asia/Seoul' date '+%-M')
-    if [[ $HOUR -lt 12 ]]; then
-        AMPM="오전"
-        [[ $HOUR -eq 0 ]] && HOUR=12
-    else
-        AMPM="오후"
-        [[ $HOUR -gt 12 ]] && HOUR=$((HOUR - 12))
-    fi
-    TIMESTAMP="${AMPM} ${HOUR}시 ${MINUTE}분 KST"
-    INFO_LEFT="  ▶ ${COMMAND}"
-    INFO_RIGHT="${TIMESTAMP}  "
-
-    # ─── 한글 표시 폭 계산 (4개 문자열을 단일 Python 호출로 처리) ───
-    read -r TITLE_LEFT_W TITLE_RIGHT_W INFO_LEFT_W INFO_RIGHT_W < <(python3 -c "
-import unicodedata
-def w(s):
-    return len(s) + sum(1 for c in s if unicodedata.east_asian_width(c) in ('W','F'))
-import sys
-strs = sys.argv[1:]
-print(' '.join(str(w(s)) for s in strs))
-" "$TITLE_LEFT" "$TITLE_RIGHT" "$INFO_LEFT" "$INFO_RIGHT" 2>/dev/null || echo "0 0 0 0")
-
-    TITLE_PAD=$((INNER_WIDTH - TITLE_LEFT_W - TITLE_RIGHT_W))
-    TITLE_SPACES=$(printf '%*s' "$TITLE_PAD" '')
-    INFO_PAD=$((INNER_WIDTH - INFO_LEFT_W - INFO_RIGHT_W))
-    INFO_SPACES=$(printf '%*s' "$INFO_PAD" '')
-
-    echo "╔${BORDER}╗"
-    echo "║  Claude Code - Workflow${TITLE_SPACES}${TITLE_RIGHT}║"
-    echo "║  ▶ ${COMMAND}${INFO_SPACES}${INFO_RIGHT}║"
-    echo "╚${BORDER}╝"
+    echo "[WORKFLOW] ${COMMAND}"
     # workflow.log 기록은 registryKey 없이 호출되므로 생략 (초기화 직후에는 로그 경로 미확정)
     exit 0
 fi
@@ -170,9 +132,7 @@ except Exception:
         CMD_LABEL=" (${COMMAND})"
     fi
 
-    BORDER=$(printf '═%.0s' $(seq 1 62))
-    echo "║ [OK] ${WORK_ID} · ${TITLE}${CMD_LABEL}"
-    echo "${BORDER}"
+    echo "[OK] ${WORK_ID} · ${TITLE}${CMD_LABEL}"
 
     # ─── workflow.log 기록 ───
     if [[ -n "$WORK_DIR" ]]; then

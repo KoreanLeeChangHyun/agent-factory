@@ -184,11 +184,14 @@
   Board.state.termConnected = false;
   Board.state.termSessionId = isWorkflowMode ? workflowSessionId : null;
   Board.state.termStatus = isWorkflowMode ? "running" : "stopped";
+  Board.state.termLastSessionId = null;
 
   /** @type {HTMLElement|null} */
   var outputDiv = null;
   /** @type {HTMLElement|null} */
   var currentToolBox = null;
+  /** @type {Object<string, HTMLElement>} toolUseId -> box element */
+  var toolBoxMap = {};
   /** @type {boolean} */
   var termInitialized = false;
   /** @type {boolean} */
@@ -197,6 +200,8 @@
   var inputQueue = [];
   /** @type {Array<{data: string, media_type: string, name: string}>} */
   var attachedImages = [];
+  /** @type {Array<{file: File, name: string, size: number, type: string}>} */
+  var attachedFiles = [];
   /** @type {boolean} */
   var receivedChunks = false;
   /** @type {string} */
@@ -293,7 +298,7 @@
 
   // ── Tool Box Renderer ──
 
-  function createToolBox(toolName) {
+  function createToolBox(toolName, toolUseId) {
     // 이전 도구 박스가 아직 running이면 done으로 전환
     if (currentToolBox) {
       var prevStatus = currentToolBox.querySelector(".term-tool-status");
@@ -301,12 +306,22 @@
         prevStatus.className = "term-tool-status done";
         prevStatus.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
       }
+      // 이전 박스의 출력이 비어있으면 DOM에서 선제 제거
+      var prevFull = currentToolBox.querySelector(".term-tool-output-full");
+      if (prevFull && prevFull.children.length === 0 && !prevFull.textContent.trim()) {
+        currentToolBox.remove();
+        currentToolBox = null;
+      }
     }
 
     var box = document.createElement("div");
     box.className = "term-tool-box";
     if (toolName) {
       box.setAttribute("data-tool-name", toolName);
+    }
+    if (toolUseId) {
+      box.setAttribute("data-tool-use-id", toolUseId);
+      toolBoxMap[toolUseId] = box;
     }
 
     var header = document.createElement("div");
@@ -357,29 +372,136 @@
     return box;
   }
 
-  function removeEmptyToolBox() {
-    if (!currentToolBox) return;
-    var fullDiv = currentToolBox.querySelector(".term-tool-output-full");
-    if (fullDiv && fullDiv.children.length === 0 && !fullDiv.textContent.trim()) {
-      if (currentToolBox.parentNode) {
-        currentToolBox.parentNode.removeChild(currentToolBox);
+  function removeEmptyToolBox(targetToolUseId) {
+    // 특정 toolUseId가 지정된 경우 해당 박스만 정리
+    if (targetToolUseId && toolBoxMap[targetToolUseId]) {
+      var targetBox = toolBoxMap[targetToolUseId];
+      var targetFull = targetBox.querySelector(".term-tool-output-full");
+      if (targetFull && targetFull.children.length === 0 && !targetFull.textContent.trim()) {
+        if (targetBox.parentNode) {
+          targetBox.parentNode.removeChild(targetBox);
+        }
+        delete toolBoxMap[targetToolUseId];
+        if (currentToolBox === targetBox) {
+          currentToolBox = null;
+        }
       }
-      currentToolBox = null;
+    }
+
+    // currentToolBox 정리 (하위 호환)
+    if (currentToolBox) {
+      var fullDiv = currentToolBox.querySelector(".term-tool-output-full");
+      if (fullDiv && fullDiv.children.length === 0 && !fullDiv.textContent.trim()) {
+        if (currentToolBox.parentNode) {
+          currentToolBox.parentNode.removeChild(currentToolBox);
+        }
+        currentToolBox = null;
+      }
+    }
+
+    // toolBoxMap 내 빈 박스 일괄 정리
+    var mapKeys = Object.keys(toolBoxMap);
+    for (var mi = 0; mi < mapKeys.length; mi++) {
+      var mapBox = toolBoxMap[mapKeys[mi]];
+      var mapFull = mapBox.querySelector(".term-tool-output-full");
+      if (mapFull && mapFull.children.length === 0 && !mapFull.textContent.trim()) {
+        if (mapBox.parentNode) {
+          mapBox.parentNode.removeChild(mapBox);
+        }
+        delete toolBoxMap[mapKeys[mi]];
+      }
+    }
+
+    // DOM 직접 순회: toolBoxMap에 등록되지 않은 잔존 빈 박스도 정리
+    if (outputDiv) {
+      var domBoxes = outputDiv.querySelectorAll(".term-tool-box");
+      for (var di = 0; di < domBoxes.length; di++) {
+        var domBox = domBoxes[di];
+        var domFull = domBox.querySelector(".term-tool-output-full");
+        if (domFull && domFull.children.length === 0 && !domFull.textContent.trim()) {
+          var domToolUseId = domBox.getAttribute("data-tool-use-id");
+          if (domBox.parentNode) {
+            domBox.parentNode.removeChild(domBox);
+          }
+          if (domToolUseId && toolBoxMap[domToolUseId]) {
+            delete toolBoxMap[domToolUseId];
+          }
+          if (currentToolBox === domBox) {
+            currentToolBox = null;
+          }
+        }
+      }
+    }
+
+    // 워크플로우 모드 카드도 함께 정리
+    removeEmptyWorkflowToolCard();
+  }
+
+  function removeEmptyWorkflowToolCard() {
+    if (!currentWorkflowToolCard) return;
+    var cardBody = currentWorkflowToolCard.querySelector(".wf-tool-card-body");
+    if (cardBody && cardBody.children.length === 0 && !cardBody.textContent.trim()) {
+      if (currentWorkflowToolCard.parentNode) {
+        currentWorkflowToolCard.parentNode.removeChild(currentWorkflowToolCard);
+      }
+      currentWorkflowToolCard = null;
     }
   }
 
-  function insertToolResult(text, isError, toolName) {
-    if (!currentToolBox) return;
-    if (!text && !isError) { removeEmptyToolBox(); return; }
-    var fullDiv = currentToolBox.querySelector(".term-tool-output-full");
+  function isFlowCommand(commandStr) {
+    return /^flow-/.test((commandStr || '').trim());
+  }
+
+  function _formatFlowCommand(cmdStr) {
+    var raw = (cmdStr || '').replace(/^\$\s*/, '');
+    // Split into base command and --args, respecting quoted strings
+    var parts = [];
+    var base = '';
+    var re = /(--\S+)\s+("(?:[^"\\]|\\.)*"|\S+)/g;
+    var firstArgIdx = raw.search(/\s--/);
+    if (firstArgIdx > 0) {
+      base = raw.substring(0, firstArgIdx).trim();
+    } else {
+      base = raw;
+    }
+    var m;
+    while ((m = re.exec(raw)) !== null) {
+      var key = m[1];
+      var val = m[2].replace(/^"|"$/g, '');
+      parts.push({ key: key, val: val });
+    }
+    if (!parts.length) {
+      return '<span class="flow-cmd-base">' + esc(raw) + '</span>';
+    }
+    var html = '<span class="flow-cmd-base">' + esc(base) + '</span>';
+    for (var i = 0; i < parts.length; i++) {
+      var displayVal = parts[i].val.length > 80
+        ? parts[i].val.substring(0, 80) + '\u2026'
+        : parts[i].val;
+      html += '<div class="flow-cmd-arg">'
+        + '<span class="flow-cmd-key">' + esc(parts[i].key) + '</span> '
+        + '<span class="flow-cmd-val">' + esc(displayVal) + '</span>'
+        + '</div>';
+    }
+    return html;
+  }
+
+  function insertToolResult(text, isError, toolName, toolUseId) {
+    // toolUseId가 있으면 toolBoxMap에서 대상 박스 조회, 없으면 currentToolBox fallback
+    var targetBox = (toolUseId && toolBoxMap[toolUseId]) ? toolBoxMap[toolUseId] : currentToolBox;
+    if (!targetBox) return;
+    if (!text && !isError) { removeEmptyToolBox(toolUseId); return; }
+    var fullDiv = targetBox.querySelector(".term-tool-output-full");
     if (!fullDiv) return;
 
     var resolvedToolName = toolName;
-    if (!resolvedToolName && currentToolBox.getAttribute) {
-      resolvedToolName = currentToolBox.getAttribute("data-tool-name") || undefined;
+    if (!resolvedToolName && targetBox.getAttribute) {
+      resolvedToolName = targetBox.getAttribute("data-tool-name") || undefined;
     }
 
-    var inputDiv = currentToolBox.querySelector(".term-tool-input");
+    var inputDiv = targetBox.querySelector(".term-tool-input");
+    var isFlow = false;
+    var flowCommand = "";
     if (toolInputBuffer && inputDiv) {
       var inputSummary = "";
       try {
@@ -387,6 +509,10 @@
         var effectiveToolName = resolvedToolName || currentToolName;
         if (effectiveToolName === "Bash" && parsedInput.command) {
           inputSummary = "$ " + parsedInput.command;
+          if (isFlowCommand(parsedInput.command)) {
+            isFlow = true;
+            flowCommand = parsedInput.command;
+          }
         } else if ((effectiveToolName === "Read" || effectiveToolName === "Write" || effectiveToolName === "Edit") && parsedInput.file_path) {
           inputSummary = parsedInput.file_path;
         } else if (effectiveToolName === "Grep" && parsedInput.pattern) {
@@ -407,10 +533,22 @@
       } catch (_e) {
         inputSummary = "";
       }
-      inputDiv.textContent = inputSummary;
+      if (isFlow && inputSummary) {
+        inputDiv.innerHTML = _formatFlowCommand(inputSummary);
+      } else {
+        inputDiv.textContent = inputSummary;
+      }
       toolInputBuffer = "";
     } else if (toolInputBuffer) {
       toolInputBuffer = "";
+    }
+
+    if (isFlow) {
+      targetBox.setAttribute("data-flow-cmd", "true");
+      var labelEl = targetBox.querySelector(".term-tool-label");
+      if (labelEl) {
+        labelEl.textContent = "Flow";
+      }
     }
 
     var html;
@@ -426,11 +564,17 @@
     fullDiv.appendChild(container);
 
     var effectiveTool = resolvedToolName || currentToolName;
-    var toggleIcon = currentToolBox.querySelector(".term-toggle-icon");
-    currentToolBox.classList.remove("open");
-    if (toggleIcon) toggleIcon.classList.remove("rotated");
+    var toggleIcon = targetBox.querySelector(".term-toggle-icon");
+    var isFlowBox = targetBox.getAttribute("data-flow-cmd") === "true";
+    if (isFlowBox) {
+      targetBox.classList.add("open");
+      if (toggleIcon) toggleIcon.classList.add("rotated");
+    } else {
+      targetBox.classList.remove("open");
+      if (toggleIcon) toggleIcon.classList.remove("rotated");
+    }
 
-    var statusEl = currentToolBox.querySelector(".term-tool-status");
+    var statusEl = targetBox.querySelector(".term-tool-status");
     if (statusEl) {
       statusEl.className = isError ? "term-tool-status error" : "term-tool-status done";
       statusEl.innerHTML = isError
@@ -438,13 +582,18 @@
         : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     }
 
-    if ((effectiveTool === "Bash" || effectiveTool === "Grep" || effectiveTool === "Read") && !isError) {
-      var previewDiv = currentToolBox.querySelector(".term-tool-output-preview");
+    if (!isError) {
+      var previewDiv = targetBox.querySelector(".term-tool-output-preview");
       if (previewDiv) {
         var lines = (text || "").split("\n");
         var previewLines = lines.slice(0, 4);
         previewDiv.textContent = previewLines.join("\n");
       }
+    }
+
+    // 결과 삽입 완료 후 toolBoxMap에서 해당 항목 제거 (메모리 누수 방지)
+    if (toolUseId && toolBoxMap[toolUseId]) {
+      delete toolBoxMap[toolUseId];
     }
   }
 
@@ -532,6 +681,8 @@
 
     // Populate input summary on the card header
     var inputSpan = card.querySelector(".wf-tool-card-input");
+    var isFlowWf = false;
+    var flowCommandWf = "";
     if (toolInputBuffer && inputSpan && !inputSpan.textContent) {
       var inputSummary = "";
       try {
@@ -539,6 +690,10 @@
         var effectiveToolName = resolvedToolName || currentToolName;
         if (effectiveToolName === "Bash" && parsedInput.command) {
           inputSummary = "$ " + parsedInput.command;
+          if (isFlowCommand(parsedInput.command)) {
+            isFlowWf = true;
+            flowCommandWf = parsedInput.command;
+          }
         } else if ((effectiveToolName === "Read" || effectiveToolName === "Write" || effectiveToolName === "Edit") && parsedInput.file_path) {
           inputSummary = parsedInput.file_path;
         } else if (effectiveToolName === "Grep" && parsedInput.pattern) {
@@ -563,6 +718,17 @@
       toolInputBuffer = "";
     } else if (toolInputBuffer) {
       toolInputBuffer = "";
+    }
+
+    if (isFlowWf) {
+      card.setAttribute("data-flow-cmd", "true");
+      var cardNameEl = card.querySelector(".wf-tool-card-name");
+      if (cardNameEl) {
+        cardNameEl.textContent = "Flow";
+      }
+      var cardToggle = card.querySelector(".wf-tool-card-toggle");
+      card.classList.add("open");
+      if (cardToggle) cardToggle.classList.add("rotated");
     }
 
     var html;
@@ -668,6 +834,145 @@
     if (fileInput) fileInput.value = "";
   }
 
+  /**
+   * 바이트 수를 사람이 읽기 쉬운 단위(B, KB, MB)로 변환하여 반환한다.
+   */
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  /**
+   * 비이미지 파일 프리뷰 카드를 terminal-image-preview 컨테이너에 렌더링한다.
+   * 기존 이미지 썸네일(renderImagePreview)과 동일 컨테이너를 공유하여
+   * 하나의 프리뷰 스트립으로 관리한다.
+   */
+  function renderFilePreview() {
+    var container = document.getElementById("terminal-image-preview");
+    if (!container) return;
+
+    // 기존 파일 카드만 제거하고 이미지 썸네일은 renderImagePreview()가 관리
+    var existingCards = container.querySelectorAll(".terminal-file-card");
+    existingCards.forEach(function (card) { card.parentNode.removeChild(card); });
+
+    attachedFiles.forEach(function (info, idx) {
+      var card = document.createElement("div");
+      card.className = "terminal-file-card";
+      card.setAttribute("data-file-idx", idx);
+
+      // 확장자 라벨
+      var ext = info.name.split(".").pop().toUpperCase().slice(0, 6) || "FILE";
+      var extLabel = document.createElement("div");
+      extLabel.className = "terminal-file-card-ext";
+      extLabel.textContent = ext;
+
+      // 파일명 (ellipsis)
+      var nameLabel = document.createElement("div");
+      nameLabel.className = "terminal-file-card-name";
+      nameLabel.textContent = info.name;
+      nameLabel.title = info.name;
+
+      // 파일 크기
+      var sizeLabel = document.createElement("div");
+      sizeLabel.className = "terminal-file-card-size";
+      sizeLabel.textContent = formatFileSize(info.size);
+
+      // 제거 버튼
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "terminal-image-remove";
+      removeBtn.title = "제거";
+      removeBtn.innerHTML = "\u00D7";
+      removeBtn.addEventListener("click", (function (capturedIdx) {
+        return function () { removeFile(capturedIdx); };
+      })(idx));
+
+      card.appendChild(extLabel);
+      card.appendChild(nameLabel);
+      card.appendChild(sizeLabel);
+      card.appendChild(removeBtn);
+      container.appendChild(card);
+    });
+  }
+
+  function removeFile(index) {
+    var removed = attachedFiles.splice(index, 1);
+    // textarea에서 파일명 제거
+    var targetInput = document.getElementById("terminal-input");
+    if (targetInput && removed.length > 0) {
+      var name = removed[0].name;
+      var re = new RegExp("(?:^|\\n)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=\\n|$)", "g");
+      targetInput.value = targetInput.value.replace(re, "").replace(/^\n/, "").replace(/\n\n+/g, "\n");
+      var evt = document.createEvent("Event");
+      evt.initEvent("input", true, true);
+      targetInput.dispatchEvent(evt);
+    }
+    renderFilePreview();
+  }
+
+  function clearFiles() {
+    attachedFiles = [];
+    renderFilePreview();
+  }
+
+  /**
+   * 문자열이 파일 경로 패턴인지 판별한다.
+   * - Unix 절대 경로: /로 시작, // 제외 (프로토콜 상대 URL)
+   * - Windows 절대 경로: C:\ 등 드라이브 문자
+   * - 여러 줄 경로: 각 줄이 경로 패턴인 경우
+   * - URL(http://, https://) 제외
+   */
+  function isFilePath(text) {
+    if (!text) return false;
+    // URL 제외
+    if (/^https?:\/\//i.test(text.trim())) return false;
+    // 여러 줄인 경우 각 줄을 검사하여 모두 경로 패턴이면 true
+    var lines = text.trim().split(/\r?\n/);
+    var pathLine = /^\/[^\/\s]+\/|^[A-Za-z]:\\/;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line && !pathLine.test(line)) return false;
+    }
+    return pathLine.test(lines[0].trim());
+  }
+
+  /**
+   * textarea의 현재 커서 위치(selectionStart/End)에 텍스트를 삽입한다.
+   */
+  function insertTextAtCursor(textarea, text) {
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var before = textarea.value.substring(0, start);
+    var after = textarea.value.substring(end);
+    textarea.value = before + text + after;
+    var pos = start + text.length;
+    textarea.selectionStart = pos;
+    textarea.selectionEnd = pos;
+    textarea.focus();
+    // input 이벤트를 발생시켜 자동 높이 조정 트리거
+    var evt = document.createEvent("Event");
+    evt.initEvent("input", true, true);
+    textarea.dispatchEvent(evt);
+  }
+
+  /**
+   * .terminal-input-card 내부에 파일명 뱃지를 잠시 표시한다.
+   */
+  function showFileBadge(card, names) {
+    // 기존 뱃지 제거
+    var prev = card.querySelector(".terminal-file-badge");
+    if (prev) prev.parentNode.removeChild(prev);
+
+    var badge = document.createElement("div");
+    badge.className = "terminal-file-badge";
+    badge.textContent = names.join(", ");
+    card.appendChild(badge);
+
+    setTimeout(function () {
+      if (badge.parentNode) badge.parentNode.removeChild(badge);
+    }, 3000);
+  }
+
   function setInputLocked(locked) {
     inputLocked = locked;
     var input = document.getElementById("terminal-input");
@@ -701,7 +1006,8 @@
     input.style.height = "auto";
 
     // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지 있으면 슬래시 커맨드 미적용
-    if (!hasImages && text.charAt(0) === "/") {
+    // isFilePath() 체크: /home/... 등 파일 경로는 슬래시 커맨드로 라우팅하지 않음
+    if (!hasImages && text.charAt(0) === "/" && !isFilePath(text)) {
       Board.slashCommands.handle(text, {
         isWorkflowMode: isWorkflowMode,
         appendSystemMessage: appendSystemMessage,
@@ -748,6 +1054,12 @@
       });
     }
     clearImages();
+    clearFiles();
+
+    // Mark text as locally sent so the user_input SSE echo is skipped
+    if (text && Board.session && Board.session._markSent) {
+      Board.session._markSent(text);
+    }
 
     setInputLocked(true);
     startSpinner();
@@ -772,6 +1084,11 @@
     var nextText = inputQueue.shift();
     updateControlBar();
 
+    // Mark as locally sent to suppress the user_input SSE echo
+    if (nextText && Board.session && Board.session._markSent) {
+      Board.session._markSent(nextText);
+    }
+
     startSpinner();
     Board.state.termStatus = "running";
     updateControlBar();
@@ -794,11 +1111,16 @@
       stopSpinner();
       appendSystemMessage("[Interrupted]");
       if (textBuffer) {
-        var html = renderMarkdownToHtml(textBuffer);
-        appendHtmlBlock(html, "term-message term-assistant");
+        if (Board.WfTicketRenderer && Board.WfTicketRenderer.detect(textBuffer)) {
+          Board.WfTicketRenderer.render(textBuffer);
+        } else {
+          var html = renderMarkdownToHtml(textBuffer);
+          appendHtmlBlock(html, "term-message term-assistant");
+        }
       }
       textBuffer = "";
       currentToolBox = null;
+      toolBoxMap = {};
       toolInputBuffer = "";
       currentToolName = null;
       // 상태 변경 및 입력 잠금 해제는 result SSE 이벤트 핸들러에 위임한다.
@@ -822,17 +1144,31 @@
   function updateControlBar() {
     var startBtn = document.getElementById("terminal-start-btn");
     var killBtn = document.getElementById("terminal-kill-btn");
+    var resumeBtn = document.getElementById("terminal-resume-btn");
     var statusDot = document.getElementById("terminal-status-dot");
     var statusText = document.getElementById("terminal-status-text");
+    var isMainActive = _activeSessionId === "main";
     if (startBtn) {
       // Start 버튼은 main 탭(메인 세션) 활성 시에만 표시한다.
-      var isMainActive = _activeSessionId === "main";
       if (!isMainActive) {
         startBtn.style.display = "none";
       } else {
         startBtn.style.display = "";
         startBtn.disabled = Board.state.termStatus !== "stopped";
       }
+    }
+    if (resumeBtn) {
+      // Resume 버튼은 main 탭 활성 + stopped 상태 + termLastSessionId 존재 시에만 표시한다.
+      var showResume = isMainActive
+        && Board.state.termStatus === "stopped"
+        && !!Board.state.termLastSessionId;
+      resumeBtn.style.display = showResume ? "" : "none";
+    }
+    var browseBtn = document.getElementById("terminal-browse-btn");
+    if (browseBtn) {
+      // Browse 토글 버튼은 main 탭 활성 + stopped 상태일 때만 표시한다.
+      var showBrowse = isMainActive && Board.state.termStatus === "stopped";
+      browseBtn.style.display = showBrowse ? "" : "none";
     }
     if (killBtn) {
       killBtn.disabled = Board.state.termStatus === "stopped";
@@ -928,6 +1264,8 @@
 
   // ── Session Switcher Engine ──
 
+  var MAX_SAVED_NODES = 500;
+
   /**
    * 현재 활성 세션의 상태를 _sessionMap에 저장한다.
    */
@@ -935,11 +1273,20 @@
     var entry = _sessionMap[_activeSessionId];
     if (!entry) return;
 
-    // outputDiv 자식 노드 스냅샷
+    // outputDiv 자식 노드 스냅샷 (최대 MAX_SAVED_NODES개)
     if (outputDiv) {
       entry.outputNodes = [];
       var children = outputDiv.childNodes;
-      for (var i = 0; i < children.length; i++) {
+      var startIdx = 0;
+      var truncated = children.length > MAX_SAVED_NODES;
+      if (truncated) {
+        startIdx = children.length - MAX_SAVED_NODES;
+        var omitEl = document.createElement("div");
+        omitEl.className = "system-message";
+        omitEl.textContent = "(이전 출력 생략)";
+        entry.outputNodes.push(omitEl);
+      }
+      for (var i = startIdx; i < children.length; i++) {
         entry.outputNodes.push(children[i].cloneNode(true));
       }
     }
@@ -1030,11 +1377,12 @@
     // 3. 대상 세션 상태 복원 (outputDiv, 변수)
     _restoreSession(targetSessionId);
 
-    // 4. SSE 재연결: disconnectSSE → connectSSE → fetchStatus
+    // 4. SSE 재연결: disconnectSSE → connectSSEReady → fetchStatus
     if (Board.session) {
       Board.session.disconnectSSE();
-      Board.session.connectSSE();
-      Board.session.fetchStatus();
+      Board.session.connectSSEReady()
+        .then(function () { Board.session.fetchStatus(); })
+        .catch(function () {});
     }
 
     // 5. phase timeline 표시/숨김
@@ -1090,7 +1438,18 @@
       + '</span>';
     h += '</div>';
     h += '<div class="terminal-session-controls">';
+    h += '<div class="terminal-start-group" id="terminal-start-group">';
     h += '<button class="terminal-btn terminal-btn-start" id="terminal-start-btn">Start</button>';
+    h += '<button class="terminal-btn terminal-btn-resume" id="terminal-resume-btn">Resume</button>';
+    h += '<button class="terminal-btn terminal-btn-browse" id="terminal-browse-btn" title="Browse sessions" style="display:none">&#x25BE;</button>';
+    h += '<div class="terminal-browse-dropdown" id="terminal-browse-dropdown">';
+    h += '<button class="terminal-browse-item" id="terminal-browse-new">New Session</button>';
+    h += '<button class="terminal-browse-item" id="terminal-browse-resume-last">Resume Last</button>';
+    h += '<div class="terminal-browse-divider"></div>';
+    h += '<button class="terminal-browse-item" id="terminal-browse-sessions">Browse Sessions...</button>';
+    h += '<div class="terminal-browse-session-list" id="terminal-browse-session-list" style="display:none"></div>';
+    h += '</div>';
+    h += '</div>';
     h += '<button class="terminal-btn terminal-btn-kill" id="terminal-kill-btn">Kill</button>';
     h += '<span class="terminal-controls-divider"></span>';
     h += '<button class="terminal-btn terminal-btn-sessions" id="terminal-sessions-btn" title="Workflow sessions">';
@@ -1187,6 +1546,7 @@
         appendHtmlBlock: appendHtmlBlock,
         createToolBox: createToolBox,
         removeEmptyToolBox: removeEmptyToolBox,
+        removeEmptyWorkflowToolCard: removeEmptyWorkflowToolCard,
         insertToolResult: insertToolResult,
         insertWorkflowResult: insertWorkflowResult,
         createWorkflowToolCard: createWorkflowToolCard,
@@ -1206,8 +1566,12 @@
                 '<div class="wf-assistant-block">' + wfHtml + '</div>'
               );
             } else {
-              var html = renderMarkdownToHtml(textBuffer);
-              appendHtmlBlock(html, "term-message term-assistant");
+              if (Board.WfTicketRenderer && Board.WfTicketRenderer.detect(textBuffer)) {
+                Board.WfTicketRenderer.render(textBuffer);
+              } else {
+                var html = renderMarkdownToHtml(textBuffer);
+                appendHtmlBlock(html, "term-message term-assistant");
+              }
             }
           }
           textBuffer = "";
@@ -1216,6 +1580,8 @@
         resetToolInputBuffer: function () { toolInputBuffer = ""; },
         setCurrentToolName: function (name) { currentToolName = name; },
         clearCurrentToolBox: function () { currentToolBox = null; },
+        getToolBoxMap: function () { return toolBoxMap; },
+        resetToolBoxMap: function () { toolBoxMap = {}; },
         resetTokens: function () { sessionTokens = { input: 0, output: 0 }; sessionCost = 0; },
         setSessionCost: function (v) { sessionCost = v; },
         addInputTokens: function (n) { sessionTokens.input += n; },
@@ -1227,6 +1593,20 @@
         setContextWindow: function (v) { contextWindow = v; },
         drainQueue: drainQueue,
         getInputQueue: function () { return inputQueue; }
+      });
+    }
+
+    // Bind WfTicketRenderer context
+    if (Board.WfTicketRenderer) {
+      Board.WfTicketRenderer.setContext({
+        appendToOutput: appendToOutput || appendHtmlBlock,
+        endpoints: endpoints,
+        renderMarkdownToHtml: renderMarkdownToHtml,
+        setInputLocked: setInputLocked,
+        startSpinner: startSpinner,
+        stopSpinner: stopSpinner,
+        updateControlBar: updateControlBar,
+        appendErrorMessage: appendErrorMessage
       });
     }
 
@@ -1244,8 +1624,116 @@
     if (startBtn) {
       startBtn.addEventListener("click", function () { Board.session.startSession(); });
     }
+    var resumeBtn = document.getElementById("terminal-resume-btn");
+    if (resumeBtn) {
+      resumeBtn.addEventListener("click", function () {
+        Board.session.startSession(Board.state.termLastSessionId);
+      });
+    }
     if (killBtn) {
       killBtn.addEventListener("click", function () { Board.session.killSession(); });
+    }
+
+    // Browse sessions dropdown
+    var browseBtn = document.getElementById("terminal-browse-btn");
+    var browseDropdown = document.getElementById("terminal-browse-dropdown");
+    var browseNewBtn = document.getElementById("terminal-browse-new");
+    var browseResumeLastBtn = document.getElementById("terminal-browse-resume-last");
+    var browseSessionsBtn = document.getElementById("terminal-browse-sessions");
+    var browseSessionList = document.getElementById("terminal-browse-session-list");
+
+    if (browseBtn && browseDropdown) {
+      browseBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        browseDropdown.classList.toggle("visible");
+        if (browseSessionList) {
+          browseSessionList.style.display = "none";
+        }
+      });
+      document.addEventListener("click", function () {
+        browseDropdown.classList.remove("visible");
+        if (browseSessionList) {
+          browseSessionList.style.display = "none";
+        }
+      });
+    }
+
+    if (browseNewBtn) {
+      browseNewBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        browseDropdown.classList.remove("visible");
+        Board.session.startSession();
+      });
+    }
+
+    if (browseResumeLastBtn) {
+      browseResumeLastBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        browseDropdown.classList.remove("visible");
+        if (Board.state.termLastSessionId) {
+          Board.session.startSession(Board.state.termLastSessionId);
+        }
+      });
+    }
+
+    if (browseSessionsBtn && browseSessionList) {
+      browseSessionsBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var isVisible = browseSessionList.style.display !== "none";
+        if (isVisible) {
+          browseSessionList.style.display = "none";
+          return;
+        }
+        browseSessionList.innerHTML = '<div class="terminal-browse-loading">Loading...</div>';
+        browseSessionList.style.display = "block";
+        fetch("/terminal/sessions", { cache: "no-store" }).then(function (res) {
+          if (!res.ok) throw new Error("Failed to fetch sessions");
+          return res.json();
+        }).then(function (sessions) {
+          browseSessionList.innerHTML = "";
+          if (!sessions || sessions.length === 0) {
+            browseSessionList.innerHTML = '<div class="terminal-browse-empty">No sessions found</div>';
+            return;
+          }
+          sessions.forEach(function (s) {
+            var item = document.createElement("button");
+            item.className = "terminal-browse-item terminal-browse-session-item";
+            if (s.is_current) item.className += " current";
+
+            var idSpan = document.createElement("span");
+            idSpan.className = "terminal-browse-session-id";
+            idSpan.textContent = (s.session_id || "").substring(0, 8);
+
+            var timeSpan = document.createElement("span");
+            timeSpan.className = "terminal-browse-session-time";
+            try {
+              var dt = new Date(s.last_active);
+              timeSpan.textContent = dt.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+            } catch (_e) {
+              timeSpan.textContent = s.last_active || "";
+            }
+
+            item.appendChild(idSpan);
+            if (s.is_current) {
+              var currentLabel = document.createElement("span");
+              currentLabel.className = "terminal-browse-current-label";
+              currentLabel.textContent = "(current)";
+              item.appendChild(currentLabel);
+            }
+            item.appendChild(timeSpan);
+
+            item.addEventListener("click", function (e) {
+              e.stopPropagation();
+              browseDropdown.classList.remove("visible");
+              browseSessionList.style.display = "none";
+              Board.session.startSession(s.session_id);
+            });
+            browseSessionList.appendChild(item);
+          });
+        }).catch(function () {
+          browseSessionList.innerHTML = '<div class="terminal-browse-empty">Failed to load sessions</div>';
+        });
+      });
     }
 
     // Settings dropdown
@@ -1291,7 +1779,7 @@
         this.style.height = "auto";
         this.style.height = Math.min(this.scrollHeight, 120) + "px";
       });
-      // 클립보드 이미지 붙여넣기 (Ctrl+V)
+      // 클립보드 이미지 붙여넣기 (Ctrl+V) + 경로 텍스트 붙여넣기
       inputEl.addEventListener("paste", function (e) {
         var items = e.clipboardData && e.clipboardData.items;
         if (!items) return;
@@ -1303,7 +1791,91 @@
             if (file) attachImage(file);
           }
         }
-        if (hasImage) e.preventDefault();
+        if (hasImage) {
+          e.preventDefault();
+          return;
+        }
+        // image/* 가 없으면 text/plain 경로 패턴 확인
+        var text = e.clipboardData.getData("text/plain");
+        if (text && isFilePath(text)) {
+          e.preventDefault();
+          insertTextAtCursor(inputEl, text);
+        }
+        // 경로가 아닌 일반 텍스트는 기본 paste 동작에 위임
+      });
+    }
+
+    // drag/drop 이벤트 핸들러 — .terminal-input-card 요소에 등록
+    var inputCard = el.querySelector(".terminal-input-card");
+    if (inputCard) {
+      var dragEnterCount = 0;
+
+      inputCard.addEventListener("dragenter", function (e) {
+        e.preventDefault();
+        dragEnterCount++;
+        inputCard.classList.add("drag-over");
+        if (!inputCard.querySelector(".terminal-drag-overlay")) {
+          var overlay = document.createElement("div");
+          overlay.className = "terminal-drag-overlay";
+          var label = document.createElement("span");
+          label.textContent = "파일을 여기에 놓으세요";
+          overlay.appendChild(label);
+          inputCard.appendChild(overlay);
+        }
+      });
+
+      inputCard.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        inputCard.classList.add("drag-over");
+      });
+
+      inputCard.addEventListener("dragleave", function (e) {
+        dragEnterCount--;
+        if (dragEnterCount <= 0) {
+          dragEnterCount = 0;
+          inputCard.classList.remove("drag-over");
+          var overlay = inputCard.querySelector(".terminal-drag-overlay");
+          if (overlay) overlay.parentNode.removeChild(overlay);
+        }
+      });
+
+      inputCard.addEventListener("drop", function (e) {
+        e.preventDefault();
+        dragEnterCount = 0;
+        inputCard.classList.remove("drag-over");
+        var overlay = inputCard.querySelector(".terminal-drag-overlay");
+        if (overlay) overlay.parentNode.removeChild(overlay);
+
+        var dt = e.dataTransfer;
+        var targetInput = document.getElementById("terminal-input");
+        if (!targetInput) return;
+
+        // (a) 파일 드롭 — 이미지: attachedImages에 추가 + 썸네일 / 비이미지: 파일 카드 + 파일명 삽입
+        if (dt.files && dt.files.length > 0) {
+          var names = [];
+          for (var fi = 0; fi < dt.files.length; fi++) {
+            var droppedFile = dt.files[fi];
+            names.push(droppedFile.name);
+            if (ALLOWED_MIME.indexOf(droppedFile.type) !== -1) {
+              // 이미지 파일: 기존 attachImage() 경로 재사용 (썸네일 렌더링)
+              attachImage(droppedFile);
+            } else {
+              // 비이미지 파일: attachedFiles에 등록 후 파일 카드 렌더링
+              attachedFiles.push({ file: droppedFile, name: droppedFile.name, size: droppedFile.size, type: droppedFile.type });
+              renderFilePreview();
+              insertTextAtCursor(targetInput, droppedFile.name + (fi < dt.files.length - 1 ? "\n" : ""));
+            }
+          }
+          return;
+        }
+
+        // (b) text/plain 이 경로 패턴이면 textarea에 경로 삽입
+        var dropText = dt.getData("text/plain");
+        if (dropText && isFilePath(dropText)) {
+          insertTextAtCursor(targetInput, dropText);
+          return;
+        }
+        // (c) 둘 다 아니면 무시 (시나리오 C, Chromium CF_HDROP 버그)
       });
     }
 
@@ -1407,7 +1979,7 @@
       var dotClass = status === "running" ? "session-tab-dot running" : "session-tab-dot stopped";
       tab.innerHTML =
         '<span class="' + dotClass + '"></span>' +
-        '<span class="session-tab-label">' + (label || sessionId) + '</span>' +
+        '<span class="session-tab-label">' + esc(label || sessionId) + '</span>' +
         '<button class="session-tab-close" title="Remove tab">' +
         '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>';
@@ -1478,6 +2050,7 @@
     if (Board.session) Board.session.disconnectSSE();
     outputDiv = null;
     currentToolBox = null;
+    toolBoxMap = {};
     thinkingEl = null;
     termInitialized = false;
   }

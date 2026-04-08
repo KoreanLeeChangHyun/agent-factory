@@ -401,6 +401,16 @@
   border-color: rgba(78, 201, 176, 0.5);
 }
 
+.terminal-btn-resume {
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.25);
+}
+
+.terminal-btn-resume:hover:not(:disabled) {
+  background: rgba(217, 119, 87, 0.1);
+  border-color: rgba(217, 119, 87, 0.5);
+}
+
 .terminal-btn-kill {
   color: #f48771;
   border-color: rgba(244, 135, 113, 0.2);
@@ -531,11 +541,11 @@
 .term-slash-result {
   color: #9cdcfe;
   background: #1a2a3a;
-  border-left: 3px solid #569cd6;
+  border: 1px solid #2a3a4a;
   padding: 8px 12px;
   margin: 4px 0;
   font-size: 90%;
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
 }
 
 .term-slash-result table {
@@ -896,11 +906,17 @@
   border-radius: 16px;
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
 }
 
 .terminal-input-card:focus-within {
   border-color: #555;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
+.terminal-input-card.drag-over {
+  border-color: #D97757;
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.3);
 }
 
 .terminal-input {
@@ -1083,6 +1099,89 @@
   color: #fff;
 }
 
+/* ── Drag & Drop Overlay ── */
+.terminal-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(217, 119, 87, 0.08);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.terminal-drag-overlay span {
+  color: #D97757;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminal-file-badge {
+  display: inline-block;
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── File Preview Card (비이미지 파일 프리뷰) ── */
+.terminal-file-card {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 3px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.terminal-file-card-ext {
+  font-size: 9px;
+  font-weight: 700;
+  color: #D97757;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-file-card-name {
+  font-size: 9px;
+  color: #ccc;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.terminal-file-card-size {
+  font-size: 9px;
+  color: #666;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
 /* ── Stop Button (interrupt mode) ── */
 .terminal-send-btn.is-stop {
   background: #c96442;
@@ -1174,6 +1273,130 @@
   display: flex;
   gap: 10px;
   color: #666;
+}
+
+/* ── Browse Sessions Dropdown ── */
+.terminal-start-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.terminal-btn-browse {
+  padding: 4px 7px;
+  font-size: 10px;
+  color: #4ec9b0;
+  border-color: rgba(78, 201, 176, 0.25);
+}
+
+.terminal-btn-browse:hover:not(:disabled) {
+  background: rgba(78, 201, 176, 0.1);
+  border-color: rgba(78, 201, 176, 0.5);
+}
+
+.terminal-browse-dropdown {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-browse-dropdown.visible {
+  display: block;
+}
+
+.terminal-browse-item {
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #ccc;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+  box-sizing: border-box;
+}
+
+.terminal-browse-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.terminal-browse-divider {
+  height: 1px;
+  background: #3c3c3c;
+  margin: 4px 0;
+}
+
+.terminal-browse-loading,
+.terminal-browse-empty {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.terminal-browse-session-list {
+  border-top: 1px solid #3c3c3c;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.terminal-browse-session-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.terminal-browse-session-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 2px;
+}
+
+.terminal-browse-session-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+}
+
+.terminal-browse-session-item.current {
+  background: rgba(217, 119, 87, 0.08);
+}
+
+.terminal-browse-session-item.current:hover {
+  background: rgba(217, 119, 87, 0.15);
+}
+
+.terminal-browse-session-id {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: #ccc;
+  flex-shrink: 0;
+}
+
+.terminal-browse-current-label {
+  font-size: 10px;
+  color: #D97757;
+  font-weight: 600;
+  flex: 1;
+}
+
+.terminal-browse-session-time {
+  font-size: 10px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* ── Responsive ── */
@@ -1732,7 +1955,7 @@
 
 /* ── fallbackPlain renderer ── */
 .term-plain {
-  background: #1e1e1e;
+  background: transparent;
   border: none;
   border-radius: 0;
   padding: 0;
@@ -1994,14 +2217,14 @@
   border-color: #2a2a2a;
 }
 
-/* ── Step-specific left border color ── */
-.wf-step-panel[data-step="unknown"] { border-left: 3px solid #858585; }
-.wf-step-panel[data-step="init"]    { border-left: 3px solid #858585; }
-.wf-step-panel[data-step="plan"]    { border-left: 3px solid #569cd6; }
-.wf-step-panel[data-step="work"]    { border-left: 3px solid #D97757; }
-.wf-step-panel[data-step="report"]  { border-left: 3px solid #c586c0; }
-.wf-step-panel[data-step="done"]    { border-left: 3px solid #4ec9b0; }
-.wf-step-panel[data-step="failed"]  { border-left: 3px solid #f48771; }
+/* ── Step-specific border color ── */
+.wf-step-panel[data-step="unknown"] { border-color: #858585; }
+.wf-step-panel[data-step="init"]    { border-color: #858585; }
+.wf-step-panel[data-step="plan"]    { border-color: #569cd6; }
+.wf-step-panel[data-step="work"]    { border-color: #D97757; }
+.wf-step-panel[data-step="report"]  { border-color: #c586c0; }
+.wf-step-panel[data-step="done"]    { border-color: #4ec9b0; }
+.wf-step-panel[data-step="failed"]  { border-color: #f48771; }
 
 /* ── .wf-step-panel-header: step name + status badge row ── */
 .wf-step-panel-header {
@@ -2165,7 +2388,7 @@
    ============================================================ */
 
 .term-permission {
-  border-left: 4px solid #D97757;
+  border: 1px solid rgba(217, 119, 87, 0.3);
   background: rgba(217, 119, 87, 0.08);
   padding: 12px 16px;
   margin: 8px 0;
@@ -2287,4 +2510,516 @@
 
 .term-permission-actions.resolved .term-permission-btn {
   display: none;
+}
+
+/* ============================================
+   WF Ticket UI
+   ============================================ */
+
+/* 기본 카드 컨테이너 */
+.wf-ticket-block {
+  border: 1px solid rgba(86,156,214,0.3);
+  background: rgba(86,156,214,0.06);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+/* 헤더 영역 */
+.wf-ticket-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 티켓 ID 배지 */
+.wf-ticket-id {
+  font-weight: bold;
+  color: #569cd6;
+  font-family: monospace;
+}
+
+/* WF 플래그 배지 */
+.wf-ticket-flag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(86,156,214,0.15);
+  color: #569cd6;
+  font-size: 85%;
+}
+
+/* 본문 영역 */
+.wf-ticket-body {
+  color: #ccc;
+  line-height: 1.5;
+}
+
+/* 선택지 버튼 컨테이너 */
+.wf-ticket-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 선택지 버튼 */
+.wf-ticket-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  background: #2a2d31;
+  color: #ccc;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.wf-ticket-btn:hover { background: #363a40; }
+.wf-ticket-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 0번 취소/완료 버튼 */
+.wf-ticket-btn.is-cancel {
+  color: #999;
+  border-top: 1px solid #333;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+/* 번호 부분 */
+.wf-ticket-btn .btn-number {
+  font-weight: bold;
+  color: #569cd6;
+  margin-right: 8px;
+}
+
+/* 클릭 후 resolved 상태 */
+.wf-ticket-actions-resolved .wf-ticket-btn { /* 모든 버튼 비활성 */ }
+
+/* 선택된 버튼 하이라이트 */
+.wf-ticket-selected {
+  background: rgba(86,156,214,0.15);
+  border-color: #569cd6;
+}
+
+/* 성공 결과 카드 */
+.wf-status-ok {
+  border-color: rgba(63,185,80,0.4);
+  background: rgba(63,185,80,0.06);
+}
+
+/* 에러 결과 카드 */
+.wf-status-err {
+  border-color: rgba(244,135,113,0.4);
+  background: rgba(244,135,113,0.06);
+}
+
+/* 상태 인라인 배지 */
+.wf-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 85%;
+}
+
+/* 안내 문구 */
+.wf-ticket-hint {
+  color: #666;
+  font-size: 85%;
+  margin-top: 6px;
+}
+
+/* ============================================
+   Section 8: Flow Command Cards (flow-cmd-*)
+   ============================================ */
+
+/* ── .flow-cmd-card: compact card container ── */
+.flow-cmd-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 3px 0;
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.06);
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+  flex-wrap: wrap;
+}
+
+/* ── .flow-cmd-badge: ticket ID badge ── */
+.flow-cmd-badge {
+  font-family: monospace;
+  font-weight: bold;
+  color: #D97757;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.flow-cmd-badge .term-id-link {
+  color: #D97757;
+}
+
+/* ── Transition card ── */
+.flow-cmd-transition-card {
+  background: rgba(217, 119, 87, 0.06);
+  border-color: rgba(217, 119, 87, 0.25);
+}
+.flow-cmd-transition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-cmd-from,
+.flow-cmd-to {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.flow-cmd-arrow {
+  color: #888;
+  font-size: 14px;
+}
+
+/* Status colors */
+.flow-st-open {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+}
+.flow-st-progress {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-st-review {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-st-done {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-st-default {
+  background: rgba(200, 200, 200, 0.1);
+  color: #aaa;
+}
+
+/* ── Create card ── */
+.flow-cmd-create-card {
+  background: rgba(86, 156, 214, 0.06);
+  border-color: rgba(86, 156, 214, 0.25);
+}
+.flow-cmd-title {
+  color: #ccc;
+}
+.flow-cmd-command {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+/* ── Delete card ── */
+.flow-cmd-delete-card {
+  background: rgba(130, 130, 130, 0.06);
+  border-color: rgba(130, 130, 130, 0.25);
+}
+.flow-cmd-deleted {
+  color: #888;
+}
+
+/* ── Update card ── */
+.flow-cmd-update-card {
+  background: rgba(217, 119, 87, 0.06);
+  border-color: rgba(217, 119, 87, 0.2);
+}
+.flow-cmd-update-desc {
+  color: #bbb;
+}
+.flow-cmd-updated {
+  color: #D97757;
+  font-size: 12px;
+}
+
+/* ── Action label (shared) ── */
+.flow-cmd-action {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* ── Launcher card ── */
+.flow-cmd-launcher {
+  background: rgba(217, 119, 87, 0.08);
+  border-color: rgba(217, 119, 87, 0.3);
+}
+.flow-cmd-launcher-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 11px;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+.flow-cmd-launch {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-cmd-inline {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-cmd-launcher-msg {
+  color: #ccc;
+}
+
+/* ── System status card ── */
+.flow-cmd-system {
+  background: rgba(200, 200, 200, 0.04);
+  border-color: rgba(200, 200, 200, 0.15);
+}
+.flow-cmd-system-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 11px;
+  font-family: monospace;
+}
+.flow-sys-init {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+}
+.flow-sys-done {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-sys-state {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-sys-step {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-sys-phase {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-sys-workflow {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-cmd-system-msg {
+  color: #ccc;
+}
+
+/* ── Error card ── */
+.flow-cmd-error {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: rgba(248, 81, 73, 0.35);
+}
+.flow-cmd-error-msg {
+  color: #f85149;
+  font-weight: 500;
+}
+
+/* ── Warning card ── */
+.flow-cmd-warn {
+  background: rgba(210, 170, 60, 0.08);
+  border-color: rgba(210, 170, 60, 0.3);
+}
+.flow-cmd-warn-msg {
+  color: #d2a53c;
+  font-weight: 500;
+}
+
+/* ── Info card (이미 상태) ── */
+.flow-cmd-info {
+  background: rgba(86, 156, 214, 0.06);
+  border-color: rgba(86, 156, 214, 0.2);
+}
+.flow-cmd-info-text {
+  color: #8ab4d9;
+}
+
+/* ── Detail block (>> lines) ── */
+.flow-cmd-detail {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: #999;
+}
+.flow-cmd-detail div {
+  padding: 1px 0;
+}
+
+/* ── Multi-card container ── */
+.flow-cmd-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Plain text fallback inside flow card ── */
+.flow-cmd-plain {
+  color: #aaa;
+  font-size: 13px;
+  padding: 2px 0;
+  font-family: monospace;
+}
+
+/* ── Empty badge ── */
+.flow-cmd-empty {
+  color: #666;
+  font-style: italic;
+}
+
+/* ── Kanban show card ── */
+.flow-cmd-show {
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.04);
+  padding: 10px 14px;
+}
+.flow-cmd-show-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.flow-cmd-show-title {
+  color: #ddd;
+  font-weight: 500;
+}
+.flow-cmd-show-kv {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.flow-cmd-show-key {
+  color: #888;
+  font-weight: 500;
+  min-width: 70px;
+}
+.flow-cmd-show-val {
+  color: #bbb;
+}
+.flow-cmd-show-section {
+  margin-top: 6px;
+}
+.flow-cmd-show-section-label {
+  font-size: 11px;
+  color: #D97757;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.flow-cmd-show-section-body {
+  font-size: 12px;
+  color: #aaa;
+  white-space: pre-wrap;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+/* ── Kanban board card ── */
+.flow-cmd-board {
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.04);
+  padding: 10px 14px;
+}
+.flow-cmd-board-header {
+  font-weight: 600;
+  color: #D97757;
+  font-size: 14px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.flow-cmd-board-col {
+  margin-bottom: 8px;
+}
+.flow-cmd-board-col-name {
+  font-size: 12px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.flow-cmd-board-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.flow-cmd-board-item-title {
+  color: #bbb;
+}
+
+/* ── Flow command tool box overrides ── */
+.term-tool-box[data-flow-cmd] {
+  border-color: rgba(217, 119, 87, 0.25);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-header {
+  background: rgba(217, 119, 87, 0.08);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-header:hover {
+  background: rgba(217, 119, 87, 0.14);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-label {
+  color: #D97757;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.term-tool-box[data-flow-cmd] .term-toggle-icon {
+  color: #D97757;
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-input {
+  display: block;
+  border-bottom: 1px solid rgba(217, 119, 87, 0.15);
+}
+
+/* ── Flow command formatted args ── */
+.flow-cmd-base {
+  display: block;
+  color: #D97757;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.flow-cmd-arg {
+  padding: 1px 0 1px 16px;
+  line-height: 1.5;
+}
+
+.flow-cmd-key {
+  color: #9cdcfe;
+}
+
+.flow-cmd-val {
+  color: #ce9178;
 }

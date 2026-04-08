@@ -196,11 +196,11 @@ def main() -> None:
         append_log(_log_dir, "INFO", f"garbage_collect: {stale_count} workflows marked STALE")
 
     if stale_count > 0:
-        print("║ STATE: GC", flush=True)
-        print(f"║ >> {stale_count}개 정리됨", flush=True)
+        print("[STATE] GC", flush=True)
+        print(f">> {stale_count}개 정리됨", flush=True)
     else:
-        print("║ STATE: GC", flush=True)
-        print("║ >> 변경 없음", flush=True)
+        print("[STATE] GC", flush=True)
+        print(">> 변경 없음", flush=True)
 
 
 if __name__ == "__main__":

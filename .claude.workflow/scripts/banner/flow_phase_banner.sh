@@ -154,14 +154,14 @@ else
     MODE_LABEL="sequential"
 fi
 
-echo "║ STATE: Phase ${PHASE}  ${MODE_LABEL}"
+echo "[PHASE] ${PHASE} ${MODE_LABEL}"
 if [[ -n "$AGENTS" && "$AGENTS" != "-" ]]; then
     if [[ -n "$TASKS" ]]; then
-        echo "║ >> ${AGENTS}  [${TASKS}]"
+        echo ">> ${AGENTS}  [${TASKS}]"
     else
-        echo "║ >> ${AGENTS}"
+        echo ">> ${AGENTS}"
     fi
 else
-    echo "║ >> Phase ${PHASE}"
+    echo ">> Phase ${PHASE}"
 fi
 _log_event "$REGISTRY_KEY" "INFO" "PHASE_START: ${PHASE} mode=${EXEC_MODE} agents=${AGENTS:-none} tasks=${TASKS:-none}" || true

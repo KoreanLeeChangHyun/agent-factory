@@ -896,8 +896,8 @@ def main() -> None:
         init_result,
     )
 
-    print(f"║ INIT: {title}", flush=True)
-    print(f"║ {result['workDir']}", flush=True)
+    print(f"[INIT] {title}", flush=True)
+    print(f"{result['workDir']}", flush=True)
 
 
 if __name__ == "__main__":

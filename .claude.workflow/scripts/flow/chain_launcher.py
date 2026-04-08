@@ -704,21 +704,14 @@ def launch_next_stage(
         wf_command = f"/wf -s {new_ticket_num_int}"
 
         if use_http:
-            # HTTP API 경로: _start_workflow_session + _send_command
+            # HTTP API 경로: _start_workflow_session (server.py가 command를 자동 주입)
+            # _send_command()는 호출하지 않는다 — server.py /terminal/workflow/start 가
+            # spawn 직후 send_input(command)를 실행하므로 여기서 추가 전송하면 이중 전송이 된다.
             _log("INFO", f"starting workflow session for {new_ticket_number} via HTTP API")
             session_id = _start_workflow_session(port, new_ticket_number, wf_command)
             if not session_id:
                 _log("ERROR", f"workflow session start failed for {new_ticket_number}")
                 _wf_log("ERROR", f"chain_launcher: http session start failed ticket={new_ticket_number}")
-                current_retry, should_continue = _increment_retry(current_retry, ticket_number)
-                if should_continue:
-                    continue
-                break
-
-            _log("INFO", f"session started: {session_id}, sending command: {wf_command}")
-            if not _send_command(port, session_id, wf_command):
-                _log("ERROR", f"send_command failed for session {session_id}")
-                _kill_session(port, session_id)
                 current_retry, should_continue = _increment_retry(current_retry, ticket_number)
                 if should_continue:
                     continue

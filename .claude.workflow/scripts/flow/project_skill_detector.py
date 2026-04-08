@@ -605,8 +605,8 @@ def main() -> None:
 
     # 감지 결과 출력
     domain_name = result.get("domain_name", "unknown")
-    print("║ STATE: DETECT", flush=True)
-    print(f"║ >> domain=project-{domain_name}, stacks={len(stacks_detected)}", flush=True)
+    print("[STATE] DETECT", flush=True)
+    print(f">> domain=project-{domain_name}, stacks={len(stacks_detected)}", flush=True)
     print(format_detection_result(result))
 
     # --generate 플래그 시 SKILL.md 파일 생성

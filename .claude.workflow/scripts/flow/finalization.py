@@ -45,7 +45,7 @@ _scripts_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspat
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RED, C_RESET, C_YELLOW, acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
+from common import acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 from data.constants import CHAIN_SEPARATOR, ERROR_THRESHOLD, LOGS_HEADER_LINE, LOGS_SEPARATOR_LINE
 from flow.flow_logger import append_log as _append_log
 from flow.session_identifier import WINDOW_PREFIX_P
@@ -950,10 +950,33 @@ def main() -> None:
     # 현재 command(첫 세그먼트)를 제거한 나머지(remaining)가 있으면
     # chain_launcher.py를 비동기로 호출하여 다음 스테이지를 발사한다.
     _chain_launched: bool = False
-    if status == "완료" and ticket_number and abs_work_dir is not None:
+    if status != "완료":
+        _skip_msg = f"체인 발사 스킵: status가 '완료'가 아님 (status={status})"
+        print(f"[INFO] Step 4c: {_skip_msg}", file=sys.stderr, flush=True)
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_CHAIN: {_skip_msg}")
+    elif not ticket_number:
+        _skip_msg = "체인 발사 스킵: ticket_number 미전달"
+        print(f"[INFO] Step 4c: {_skip_msg}", file=sys.stderr, flush=True)
+        if abs_work_dir is not None:
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_CHAIN: {_skip_msg}")
+    elif abs_work_dir is None:
+        _skip_msg = "체인 발사 스킵: abs_work_dir이 None"
+        print(f"[INFO] Step 4c: {_skip_msg}", file=sys.stderr, flush=True)
+    else:
         context_file: str = os.path.join(abs_work_dir, ".context.json")
         context_data = load_json_file(context_file)
         full_command: str = ""
+        if isinstance(context_data, dict):
+            full_command = context_data.get("command", "")
+
+        if CHAIN_SEPARATOR not in full_command:
+            _append_log(abs_work_dir, "INFO", f"FINALIZE_CHAIN: 체인 감지 안됨: command에 '>' 구분자 없음 (command={full_command!r})")
+
+    if status == "완료" and ticket_number and abs_work_dir is not None:
+        context_file = os.path.join(abs_work_dir, ".context.json")
+        context_data = load_json_file(context_file)
+        full_command = ""
         if isinstance(context_data, dict):
             full_command = context_data.get("command", "")
 
@@ -1079,12 +1102,8 @@ def main() -> None:
             if abs_work_dir is not None:
                 _append_log(abs_work_dir, "INFO", "FINALIZE_STEP5: skip tmux_cleanup (TMUX_PANE not set)")
 
-    if status == "완료":
-        status_label = f"{C_YELLOW}완료{C_RESET}"
-    else:
-        status_label = f"{C_RED}실패{C_RESET}"
-    print(f"{C_CLAUDE}║ DONE:{C_RESET} {C_DIM}워크플로우{C_RESET} {status_label}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_DIM}{registry_key}{C_RESET}", flush=True)
+    print(f"[DONE] 워크플로우 {status}", flush=True)
+    print(f"{registry_key}", flush=True)
     sys.exit(0)
 
 

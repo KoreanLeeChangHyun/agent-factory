@@ -100,7 +100,10 @@ stdout에서 T-NNN을 파싱하고 채번 결과를 출력합니다:
 `0.` 취소 -- 생성하지 않고 종료합니다
 ```
 
-- `1.` 확인: 추론된 용도에 해당하는 command 값으로 `flow-kanban update-prompt T-NNN --command <command값> --goal "<추론된 goal>" --target "<추론된 target>" --skip-validation` 호출 후 1-3으로 진행 (`-o` 모드는 편집 루프 미진입이므로 품질 검증을 건너뜁니다)
+- `1.` 확인: 맥락 충분성에 따라 분기합니다:
+  - **맥락 충분** (constraints/criteria 모두 추론 성공): `flow-kanban update-prompt T-NNN --command <command값> --goal "<추론된 goal>" --target "<추론된 target>" --constraints "<추론된 constraints>" --criteria "<추론된 criteria>" --context "<추론된 context>" --skip-validation` 호출 후 1-3으로 진행
+  - **맥락 부분** (constraints 또는 criteria 추론 불가): `flow-kanban update-prompt T-NNN --command <command값> --goal "<추론된 goal>" --target "<추론된 target>" --skip-validation` 호출 후 1-3으로 진행
+  - (`-o` 모드는 편집 루프 미진입이므로 품질 검증을 건너뜁니다)
 - `2.` 용도 직접 지정: 트랙 B로 전환
 - `0.` 취소: 티켓 생성 없이 종료
 
@@ -133,9 +136,8 @@ T-NNN 티켓이 생성되었습니다. (파일: .claude.workflow/kanban/open/T-N
 
 | 목적 | 커맨드 | 설명 |
 |------|--------|------|
-| 편집+생성 | `/wf -oe N` | 추론된 맥락으로 즉시 편집 루프 진입 <- 권장 |
-| 편집 | `/wf -e N` | 프롬프트 작성 및 내용 편집 |
-| 제출 | `/wf -s N` | <command> 태그에 따라 자동 라우팅 |
+| 편집 | `/wf -e N` | 프롬프트 내용을 추가로 수정합니다 |
+| 제출 | `/wf -s N` | <command> 태그에 따라 자동 라우팅 <- 권장 |
 | 종료 | `/wf -d N` | 티켓을 Done 상태로 종료합니다 |
 
 **맥락 부분 시** (constraints 또는 criteria 추론 불가):

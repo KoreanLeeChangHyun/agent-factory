@@ -138,8 +138,8 @@ def main() -> None:
     before_ssh = _git_config_get(scope, "core.sshCommand")
 
     # --- 설정 적용 ---
-    print(f"║ STATE: GITCONFIG ({scope_label})", flush=True)
-    print(f"║ >> user.name={git_user_name}, user.email={git_user_email}", flush=True)
+    print(f"[STATE] GITCONFIG ({scope_label})", flush=True)
+    print(f">> user.name={git_user_name}, user.email={git_user_email}", flush=True)
     print(f"[INFO] Git config ({scope_label}) 설정을 적용합니다...")
 
     subprocess.run(["git", "config", scope, "user.name", git_user_name], check=True, timeout=5)

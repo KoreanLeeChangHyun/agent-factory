@@ -338,8 +338,8 @@ def main() -> None:
                 f"prompt_validator: quality_score={result['quality_score']:.4f} below {QUALITY_THRESHOLD} path={prompt_path}",
             )
 
-    print("║ STATE: VALIDATE-P", flush=True)
-    print(f"║ >> quality_score={result['quality_score']:.4f}", flush=True)
+    print("[STATE] VALIDATE-P", flush=True)
+    print(f">> quality_score={result['quality_score']:.4f}", flush=True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0)
 

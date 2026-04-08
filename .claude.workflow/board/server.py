@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import atexit
 import collections
+import datetime
 import hashlib
 import json
 import logging
@@ -24,6 +25,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -328,6 +330,7 @@ _NDJSON_EVENT_MAP: dict[str, str] = {
     'system': 'system',
     'control_request': 'permission',
     'error': 'error',
+    'user_input': 'user_input',
 }
 
 
@@ -524,6 +527,9 @@ class TerminalSSEChannel:
         """
         msg_type = data.get('type', '')
 
+        if msg_type == 'user_input':
+            return 'user_input'
+
         if msg_type == 'stream_event':
             delta_type = (
                 data.get('event', {}).get('delta', {}).get('type', '')
@@ -545,6 +551,8 @@ class TerminalSSEChannel:
         Returns:
             페이로드 dict
         """
+        if event_name == 'user_input':
+            return {'text': data.get('text', '')}
         if event_name == 'stdout':
             return self._build_stdout_payload(data)
         if event_name == 'result':
@@ -745,11 +753,12 @@ class ClaudeProcess:
         _channel: SSE 브로드캐스트 채널
     """
 
-    def __init__(self, channel: TerminalSSEChannel) -> None:
+    def __init__(self, channel: TerminalSSEChannel, persist_file: str | None = None) -> None:
         """초기화한다.
 
         Args:
             channel: NDJSON 이벤트를 브로드캐스트할 TerminalSSEChannel 인스턴스
+            persist_file: session_id를 영속화할 파일 경로 (선택적)
         """
         self._process: subprocess.Popen | None = None
         self._session_id: str = ''
@@ -760,6 +769,7 @@ class ClaudeProcess:
         self._stdout_thread: threading.Thread | None = None
         self._channel: TerminalSSEChannel = channel
         self._init_event: threading.Event = threading.Event()
+        self._persist_file: str | None = persist_file
 
     def spawn(
         self,
@@ -797,6 +807,8 @@ class ClaudeProcess:
             '--input-format', 'stream-json',
             '--include-partial-messages',
             '--verbose',
+            '--permission-mode', 'default',
+            '--permission-prompt-tool', 'stdio',
         ]
         if extra_args:
             cmd.extend(extra_args)
@@ -879,7 +891,7 @@ class ClaudeProcess:
                 return {'ok': False, 'error': 'process not running'}
 
         if images is not None:
-            content: str | list = [{'type': 'text', 'text': text}] + [
+            image_blocks = [
                 {
                     'type': 'image',
                     'source': {
@@ -890,6 +902,10 @@ class ClaudeProcess:
                 }
                 for img in images
             ]
+            content: str | list = (
+                [{'type': 'text', 'text': text}] + image_blocks
+                if text else image_blocks
+            )
         else:
             content = text
 
@@ -1073,6 +1089,12 @@ class ClaudeProcess:
                     self._session_id = data.get('session_id', '')
                     self._model = data.get('model', '')
                     self._permission_mode = data.get('permissionMode', '')
+                    if self._persist_file and self._session_id:
+                        try:
+                            with open(self._persist_file, 'w') as _pf:
+                                _pf.write(self._session_id)
+                        except OSError as _e:
+                            logger.debug('session_id persist 실패: %s', _e)
                     self._init_event.set()
 
                 # result 수신 시 상태를 idle로 전환
@@ -1175,7 +1197,10 @@ poll_tracker: PollChangeTracker = PollChangeTracker()
 
 # 모듈 레벨 터미널 SSE 채널 및 Claude 프로세스 매니저
 terminal_sse_channel: TerminalSSEChannel = TerminalSSEChannel()
-claude_process: ClaudeProcess = ClaudeProcess(terminal_sse_channel)
+claude_process: ClaudeProcess = ClaudeProcess(
+    terminal_sse_channel,
+    persist_file=os.path.join(os.getcwd(), '.claude.workflow', '.last-session-id'),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1465,6 +1490,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_terminal_sse()
         elif self.path == '/terminal/status':
             self._handle_terminal_status()
+        elif self.path == '/terminal/sessions':
+            self._handle_terminal_sessions()
         elif self.path.startswith('/terminal/workflow/status'):
             self._handle_workflow_status()
         elif self.path.startswith('/terminal/workflow/events'):
@@ -1750,11 +1777,73 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({
             'status': claude_process.status,
             'session_id': claude_process.session_id,
+            'last_session_id': claude_process.session_id,
             'model': claude_process._model,
             'permission_mode': claude_process._permission_mode,
             'branch': _get_git_branch(project_root),
             'clients': terminal_sse_channel.client_count,
         })
+
+    def _handle_terminal_sessions(self) -> None:
+        """세션 목록 조회 엔드포인트를 처리한다.
+
+        GET /terminal/sessions: ~/.claude/projects/<project-path>/ 디렉터리에서
+        .jsonl 파일을 mtime 기준 내림차순 최대 20개 스캔하여 JSON 배열로 반환한다.
+        파일 내용을 읽지 않고 파일명(UUID)과 stat(mtime)만 활용한다.
+
+        응답 항목:
+            session_id: UUID (파일명에서 추출)
+            last_active: mtime 기반 ISO 8601 형식 시각
+            is_current: 현재 활성 세션과 일치 여부
+        """
+        project_root = os.getcwd()
+
+        # cwd 기반으로 ~/.claude/projects/ 하위 디렉터리 경로 산출
+        # 예: /home/deus/workspace/claude -> -home-deus-workspace-claude
+        home_dir = os.path.expanduser('~')
+        project_slug = project_root.replace('/', '-')
+        sessions_dir = os.path.join(home_dir, '.claude', 'projects', project_slug)
+
+        current_session_id = claude_process.session_id
+
+        entries: list[tuple[float, str]] = []  # (mtime, session_id)
+        try:
+            with os.scandir(sessions_dir) as it:
+                for entry in it:
+                    if not entry.name.endswith('.jsonl'):
+                        continue
+                    stem = entry.name[:-6]  # ".jsonl" 제거
+                    # UUID 형식 검증
+                    try:
+                        uuid.UUID(stem)
+                    except ValueError:
+                        continue
+                    try:
+                        mtime = entry.stat().st_mtime
+                    except OSError:
+                        continue
+                    entries.append((mtime, stem))
+        except OSError as e:
+            logger.debug('세션 디렉터리 스캔 실패: %s', e)
+            self._send_json([])
+            return
+
+        # mtime 내림차순 정렬 후 최대 20개 선택
+        entries.sort(key=lambda x: x[0], reverse=True)
+        entries = entries[:20]
+
+        result = []
+        for mtime, session_id in entries:
+            last_active = datetime.datetime.fromtimestamp(
+                mtime, tz=datetime.timezone.utc
+            ).strftime('%Y-%m-%dT%H:%M:%SZ')
+            result.append({
+                'session_id': session_id,
+                'last_active': last_active,
+                'is_current': session_id == current_session_id,
+            })
+
+        self._send_json(result)
 
     def _handle_terminal_start(self) -> None:
         """터미널 세션 시작 엔드포인트를 처리한다.
@@ -1763,17 +1852,30 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         요청 본문에 {"args": [...]} 형태로 추가 CLI 인자를 지정할 수 있다.
         """
         extra_args = None
+        resume_session_id = None
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length > 0:
             body = self.rfile.read(content_length)
             try:
                 data = json.loads(body)
                 extra_args = data.get('args')
+                resume_session_id = data.get('resume_session_id')
             except (json.JSONDecodeError, AttributeError):
                 pass
 
-        # 새 세션 시작 시 이전 이벤트 히스토리 초기화
-        terminal_sse_channel.clear_history()
+        if resume_session_id:
+            # UUID 형식 검증: 유효하지 않으면 새 세션으로 시작
+            try:
+                uuid.UUID(str(resume_session_id))
+            except ValueError:
+                logger.warning('유효하지 않은 resume_session_id: %s', resume_session_id)
+                resume_session_id = None
+
+        if resume_session_id:
+            extra_args = ['--resume', resume_session_id]
+        else:
+            # 새 세션 시작 시에만 이전 이벤트 히스토리 초기화
+            terminal_sse_channel.clear_history()
 
         result = claude_process.spawn(extra_args)
         self._send_json(result)
@@ -1814,6 +1916,12 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             if validation_error:
                 self._send_error(400, validation_error)
                 return
+
+        # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
+        if text:
+            terminal_sse_channel.broadcast(
+                {'type': 'user_input', 'text': text}
+            )
 
         result = claude_process.send_input(text, images=images)
         self._send_json(result)
@@ -2009,13 +2117,21 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             '_WF_SERVER_PORT': server_port,
         }
 
-        spawn_result = session.process.spawn(env_extras=env_extras)
+        # 워크플로우 세션은 bypassPermissions 모드 유지 (블로킹 방지)
+        spawn_result = session.process.spawn(
+            extra_args=['--permission-mode', 'bypassPermissions'],
+            env_extras=env_extras,
+        )
 
         if not spawn_result.get('ok'):
             # 프로세스 시작 실패 시 레지스트리에서 제거
             workflow_registry.remove(session.session_id)
             self._send_error(500, spawn_result.get('error', 'Failed to start process'))
             return
+
+        # CLI 초기화 완료까지 대기 (spawn 후 init 이벤트 수신 전 명령 유실 방지)
+        if not session.process._init_event.wait(timeout=10):
+            logger.warning("spawn init timeout after 10s, proceeding anyway")
 
         # launcher가 전달한 command를 세션에 자동 주입
         if command:
@@ -2091,6 +2207,12 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
+
+        # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
+        if text:
+            session.channel.broadcast(
+                {'type': 'user_input', 'text': text}
+            )
 
         result = session.process.send_input(text, images=images)
         self._send_json(result)
@@ -2367,6 +2489,19 @@ def _run_server(project_root: str) -> None:
     port = resolve_port(project_root)
 
     url_file = os.path.join(project_root, '.claude.workflow', '.board.url')
+
+    # 터미널 세션 persist 파일 경로를 project_root 기준으로 재설정하고 복원
+    last_session_file = os.path.join(project_root, '.claude.workflow', '.last-session-id')
+    claude_process._persist_file = last_session_file
+    if os.path.isfile(last_session_file):
+        try:
+            with open(last_session_file) as _sf:
+                _saved_id = _sf.read().strip()
+            if _saved_id:
+                claude_process._session_id = _saved_id
+                logger.debug('터미널 session_id 복원: %s', _saved_id)
+        except OSError as _e:
+            logger.debug('session_id 복원 실패: %s', _e)
 
     # 워크플로우 세션 persist 디렉터리 설정 + 디스크에서 복원
     sessions_dir = os.path.join(project_root, '.claude.workflow', '.sessions')

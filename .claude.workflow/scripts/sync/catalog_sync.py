@@ -45,14 +45,6 @@ from skill_state_manager import is_archived, load_skill_state
 from cli_utils import build_common_epilog
 
 from common import (
-    C_BOLD,
-    C_CLAUDE,
-    C_CYAN,
-    C_DIM,
-    C_GREEN,
-    C_RED,
-    C_RESET,
-    C_YELLOW,
     resolve_project_root,
 )
 
@@ -147,7 +139,7 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
     skill_state = load_skill_state()
 
     if not os.path.isdir(SKILLS_DIR):
-        print(f"{C_RED}[ERROR] skills 디렉터리가 존재하지 않습니다: {SKILLS_DIR}{C_RESET}", file=sys.stderr)
+        print(f"[ERROR] skills 디렉터리가 존재하지 않습니다: {SKILLS_DIR}", file=sys.stderr)
         sys.exit(1)
 
     for entry in sorted(os.listdir(SKILLS_DIR)):
@@ -296,15 +288,15 @@ def main() -> None:
     catalog_size = len(catalog_content.encode("utf-8"))
 
     if dry_run:
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}CATALOG{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}DRY-RUN 활성 스킬 {total}개{C_RESET}", flush=True)
-        print(f"{C_CYAN}[DRY-RUN]{C_RESET} 스킬 카탈로그 미리보기")
-        print(f"  활성 스킬: {C_BOLD}{total}{C_RESET}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
-        print(f"  제외 스킬: {C_DIM}{excluded_count}{C_RESET}개")
-        print(f"  예상 크기: {C_BOLD}{catalog_size:,}{C_RESET} bytes")
-        print(f"  대상 파일: {C_DIM}{CATALOG_FILE}{C_RESET}")
+        print("[STATE] CATALOG", flush=True)
+        print(f">> DRY-RUN 활성 스킬 {total}개", flush=True)
+        print("[DRY-RUN] 스킬 카탈로그 미리보기")
+        print(f"  활성 스킬: {total}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
+        print(f"  제외 스킬: {excluded_count}개")
+        print(f"  예상 크기: {catalog_size:,} bytes")
+        print(f"  대상 파일: {CATALOG_FILE}")
         print()
-        print(f"  {C_DIM}실제 생성하려면: python3 .claude.workflow/scripts/sync/catalog_sync.py{C_RESET}")
+        print("  실제 생성하려면: python3 .claude.workflow/scripts/sync/catalog_sync.py")
         print(flush=True)
         sys.exit(0)
 
@@ -314,16 +306,16 @@ def main() -> None:
             f.write(catalog_content)
 
         actual_size = os.path.getsize(CATALOG_FILE)
-        print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}CATALOG{C_RESET}", flush=True)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}활성 스킬 {total}개, {actual_size:,} bytes{C_RESET}", flush=True)
-        print(f"{C_GREEN}[OK]{C_RESET} 스킬 카탈로그 생성 완료")
-        print(f"  활성 스킬: {C_BOLD}{total}{C_RESET}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
-        print(f"  제외 스킬: {C_DIM}{excluded_count}{C_RESET}개")
-        print(f"  파일 크기: {C_BOLD}{actual_size:,}{C_RESET} bytes")
-        print(f"  저장 위치: {C_DIM}{CATALOG_FILE}{C_RESET}")
+        print("[STATE] CATALOG", flush=True)
+        print(f">> 활성 스킬 {total}개, {actual_size:,} bytes", flush=True)
+        print("[OK] 스킬 카탈로그 생성 완료")
+        print(f"  활성 스킬: {total}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
+        print(f"  제외 스킬: {excluded_count}개")
+        print(f"  파일 크기: {actual_size:,} bytes")
+        print(f"  저장 위치: {CATALOG_FILE}")
         print(flush=True)
     except (IOError, OSError) as e:
-        print(f"{C_RED}[ERROR] 카탈로그 파일 쓰기 실패: {e}{C_RESET}", file=sys.stderr)
+        print(f"[ERROR] 카탈로그 파일 쓰기 실패: {e}", file=sys.stderr)
         sys.exit(1)
 
 

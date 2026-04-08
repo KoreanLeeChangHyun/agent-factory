@@ -356,13 +356,13 @@ def main() -> None:
     results = recommend(query)
 
     if not results:
-        print("║ STATE: RECOMMEND", flush=True)
-        print("║ >> 추천 가능한 스킬이 없습니다.", flush=True)
+        print("[STATE] RECOMMEND", flush=True)
+        print(">> 추천 가능한 스킬이 없습니다.", flush=True)
         sys.exit(0)
 
     top_name, top_score = results[0]
-    print("║ STATE: RECOMMEND", flush=True)
-    print(f"║ >> {top_name} (유사도: {top_score:.4f})", flush=True)
+    print("[STATE] RECOMMEND", flush=True)
+    print(f">> {top_name} (유사도: {top_score:.4f})", flush=True)
     print(f"태스크: {query}")
     print(f"추천 스킬 (상위 {TOP_K}개):")
     print()

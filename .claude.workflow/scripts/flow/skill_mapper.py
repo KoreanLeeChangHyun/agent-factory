@@ -35,7 +35,7 @@ _scripts_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__f
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
-from common import C_CLAUDE, C_DIM, C_RESET, acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
+from common import acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 
 # flow 디렉토리를 sys.path에 추가 (같은 디렉토리 내 모듈 직접 import용)
 _flow_dir = os.path.dirname(os.path.abspath(__file__))
@@ -101,7 +101,7 @@ def resolve_skill_file(skill_name: str) -> str:
     skill_dir = os.path.join(SKILLS_DIR, skill_name)
     skill_dir = os.path.normpath(skill_dir)
     if not skill_dir.startswith(os.path.normpath(SKILLS_DIR)):
-        print(f"{C_CLAUDE}║{C_RESET} [WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
+        print(f"[WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
         skill_dir = os.path.join(SKILLS_DIR, "workflow-agent")
         return os.path.join(skill_dir, "SKILL.md")
     compact_path = os.path.join(skill_dir, "COMPACT.md")
@@ -140,7 +140,7 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
 
     if total_tokens > TOKEN_BUDGET_LIMIT:
         print(
-            f"{C_CLAUDE}║{C_RESET} [WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
+            f"[WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
             file=sys.stderr,
         )
 
@@ -187,7 +187,7 @@ def parse_plan_tasks(plan_path):
     tasks = []
 
     if not os.path.isfile(plan_path):
-        print(f"{C_CLAUDE}║{C_RESET} [ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"[ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         return tasks
 
     with open(plan_path, "r", encoding="utf-8") as f:
@@ -233,7 +233,7 @@ def parse_plan_tasks(plan_path):
             )
         if tasks:
             print(
-                f"{C_CLAUDE}║{C_RESET} [WARN] 테이블 미발견, 헤딩 기반 폴백 파싱 사용",
+                "[WARN] 테이블 미발견, 헤딩 기반 폴백 파싱 사용",
                 file=sys.stderr,
             )
 
@@ -320,7 +320,7 @@ def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
             skills = list(fallback_skills)
         except Exception as e:
             # import 실패 또는 예상치 못한 오류 시 경고 로그 출력, 폴백 체인 정상 진행
-            print(f"{C_CLAUDE}║{C_RESET} [WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
+            print(f"[WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
 
     task["fallback_skills"] = fallback_skills
     return skills
@@ -580,7 +580,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
         생성된 컨텍스트 파일 경로 목록 (생성 성공한 파일만)
     """
     if not os.path.isfile(plan_path):
-        print(f"{C_CLAUDE}║{C_RESET} [WARN] slice_plan_context: plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"[WARN] slice_plan_context: plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         return []
 
     with open(plan_path, "r", encoding="utf-8") as f:
@@ -669,7 +669,7 @@ def main():
     _append_log(work_dir, "INFO", f"skill_mapper: start registryKey={registry_key}")
 
     if not command:
-        print(f"{C_CLAUDE}║{C_RESET} [ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
+        print(f"[ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
         sys.exit(1)
 
     # 1. 카탈로그 파싱
@@ -678,7 +678,7 @@ def main():
     # 2. plan.md 태스크 파싱
     tasks = parse_plan_tasks(plan_path)
     if not tasks:
-        print(f"{C_CLAUDE}║{C_RESET} [WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"[WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         # 빈 skill-map.md라도 생성
         os.makedirs(os.path.join(work_dir, "work"), exist_ok=True)
         with open(os.path.join(work_dir, "work", "skill-map.md"), "w", encoding="utf-8") as f:
@@ -726,11 +726,11 @@ def main():
 
     # 배너 출력
     rel_path = os.path.relpath(output_path, PROJECT_ROOT)
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}스킬 매핑{C_RESET}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{rel_path}{C_RESET}", flush=True)
+    print("[STATE] 스킬 매핑", flush=True)
+    print(f">> {rel_path}", flush=True)
     if created_contexts:
         rel_ctx = os.path.relpath(context_dir, PROJECT_ROOT)
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{rel_ctx}/ ({len(created_contexts)}개 컨텍스트 슬라이스){C_RESET}", flush=True)
+        print(f">> {rel_ctx}/ ({len(created_contexts)}개 컨텍스트 슬라이스)", flush=True)
 
 
 if __name__ == "__main__":

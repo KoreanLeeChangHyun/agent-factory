@@ -1041,21 +1041,21 @@ def _print_validate_result(warnings: list[str], mode_label: str) -> None:
     """
     if not warnings:
         print(
-            f"║ STATE: VALIDATE-{mode_label} 검증 통과",
+            f"[STATE] VALIDATE-{mode_label} 검증 통과",
             flush=True,
         )
         print(
-            "║ >> 경고 0건",
+            ">> 경고 0건",
             flush=True,
         )
         return
 
     print(
-        f"║ STATE: VALIDATE-{mode_label} [WARN]",
+        f"[STATE] VALIDATE-{mode_label} [WARN]",
         flush=True,
     )
     print(
-        f"║ >> 경고 {len(warnings)}건 발견",
+        f">> 경고 {len(warnings)}건 발견",
         flush=True,
     )
     print()

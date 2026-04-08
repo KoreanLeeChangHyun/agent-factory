@@ -40,17 +40,9 @@ if _scripts_dir not in sys.path:
 
 try:
     from common import (
-        C_CLAUDE,
-        C_CYAN,
-        C_DIM,
-        C_GREEN,
-        C_RED,
-        C_RESET,
-        C_YELLOW,
         resolve_project_root,
     )
 except ImportError:
-    C_CLAUDE = C_CYAN = C_DIM = C_GREEN = C_RED = C_RESET = C_YELLOW = ""
     def resolve_project_root() -> str:
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -666,8 +658,8 @@ def cmd_sync(args: argparse.Namespace) -> int:
     Returns:
         종료 코드. 0: 성공, 1: 실패
     """
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HISTORY sync{C_RESET}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}sync 시작...{C_RESET}", flush=True)
+    print("[STATE] HISTORY sync", flush=True)
+    print(">> sync 시작...", flush=True)
 
     workflow_dir = args.workflow_dir
     target = args.target
@@ -867,7 +859,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             print(f"    ! {wid} | 삭제됨")
     print(f"  총 행 수: {len(all_rows)}건")
 
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_GREEN}[OK]{C_RESET} sync 완료", flush=True)
+    print(">> [OK] sync 완료", flush=True)
     return 0
 
 
@@ -914,8 +906,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         status_counts[s] = status_counts.get(s, 0) + 1
 
     # 출력
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HISTORY status{C_RESET}", flush=True)
-    print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}workflow: {len(scanned)}개, history: {len(data_rows)}행, 누락: {len(missing_ids)}건{C_RESET}", flush=True)
+    print("[STATE] HISTORY status", flush=True)
+    print(f">> workflow: {len(scanned)}개, history: {len(data_rows)}행, 누락: {len(missing_ids)}건", flush=True)
     print("=== history-sync status ===")
     print(f"  workflow/ 디렉토리 수: {len(scanned)}개")
     print(f"  history.md 행 수:       {len(data_rows)}행")
@@ -1007,11 +999,11 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
                     tree.write(xml_path, encoding="unicode", xml_declaration=False)
                     new_workdir = (result_el.find("workdir") or result_el).text or ""
                     print(
-                        f"{C_GREEN}[OK]{C_RESET} ticket {ticket_number}: workdir updated to .history/"
+                        f"[OK] ticket {ticket_number}: workdir updated to .history/"
                     )
             except Exception as exc:
                 print(
-                    f"{C_YELLOW}[WARN]{C_RESET} ticket {ticket_number}: XML workdir 갱신 실패 — {exc}",
+                    f"[WARN] ticket {ticket_number}: XML workdir 갱신 실패 — {exc}",
                     file=sys.stderr,
                 )
 
@@ -1072,13 +1064,13 @@ def cmd_archive(args: argparse.Namespace) -> int:
     Returns:
         종료 코드. 0: 성공, 1: 일부 실패
     """
-    print(f"{C_CLAUDE}║ STATE:{C_RESET} {C_DIM}HISTORY archive{C_RESET}", flush=True)
+    print("[STATE] HISTORY archive", flush=True)
     current_key = getattr(args, 'registry_key', None)
     workflow_dir = os.path.join(PROJECT_ROOT, ".claude.workflow", "workflow")
     history_dir = os.path.join(workflow_dir, ".history")
 
     if not os.path.isdir(workflow_dir):
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}workflow 디렉터리 없음 — 건너뜀{C_RESET}", flush=True)
+        print(">> workflow 디렉터리 없음 — 건너뜀", flush=True)
         return 0
 
     # [0-9]* 패턴 디렉토리를 역순 정렬
@@ -1089,14 +1081,14 @@ def cmd_archive(args: argparse.Namespace) -> int:
             dirs.append(name)
 
     if not dirs:
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}아카이브 대상 없음{C_RESET}", flush=True)
+        print(">> 아카이브 대상 없음", flush=True)
         return 0
 
     # registry_key가 None이면 활성 워크플로우를 자동 감지하여 제외
     if current_key:
         filtered = [d for d in dirs if d != current_key]
         if len(filtered) < KEEP_COUNT - 1:
-            print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}보존 수량 미만 — 건너뜀{C_RESET}", flush=True)
+            print(">> 보존 수량 미만 — 건너뜀", flush=True)
             return 0
 
         # .history/ 디렉토리 생성
@@ -1110,17 +1102,17 @@ def cmd_archive(args: argparse.Namespace) -> int:
             try:
                 shutil.move(src, dst)
                 moved += 1
-                print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+                print(f"[OK] archived: {target}")
                 _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
-                print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
+                print(f"[WARN] archive failed: {target} (skipping)", file=sys.stderr)
     else:
         active_keys = _detect_active_workflow_keys(workflow_dir)
         filtered = [d for d in dirs if d not in active_keys]
         keep = max(0, KEEP_COUNT - len(active_keys))
         if len(filtered) < keep:
-            print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}보존 수량 미만 — 건너뜀{C_RESET}", flush=True)
+            print(">> 보존 수량 미만 — 건너뜀", flush=True)
             return 0
 
         # .history/ 디렉토리 생성
@@ -1134,16 +1126,16 @@ def cmd_archive(args: argparse.Namespace) -> int:
             try:
                 shutil.move(src, dst)
                 moved += 1
-                print(f"{C_GREEN}[OK]{C_RESET} archived: {target}")
+                print(f"[OK] archived: {target}")
                 _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
-                print(f"{C_YELLOW}[WARN]{C_RESET} archive failed: {target} (skipping)", file=sys.stderr)
+                print(f"[WARN] archive failed: {target} (skipping)", file=sys.stderr)
 
     if moved > 0:
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}{moved}개 디렉터리 아카이브됨{C_RESET}", flush=True)
+        print(f">> {moved}개 디렉터리 아카이브됨", flush=True)
     else:
-        print(f"{C_CLAUDE}║{C_RESET} {C_CLAUDE}>>{C_RESET} {C_DIM}변경 없음{C_RESET}", flush=True)
+        print(">> 변경 없음", flush=True)
 
     if failed > 0:
         print(f"[WARN] {failed} directories failed to archive", file=sys.stderr)
@@ -1191,7 +1183,7 @@ def main() -> int:
         try:
             return cmd_sync(args)
         except Exception as e:
-            print(f"{C_RED}[FAIL]{C_RESET} sync 실패: {e}", file=sys.stderr)
+            print(f"[FAIL] sync 실패: {e}", file=sys.stderr)
             return 1
     elif args.subcmd == "status":
         return cmd_status(args)
@@ -1199,7 +1191,7 @@ def main() -> int:
         try:
             return cmd_archive(args)
         except Exception as e:
-            print(f"{C_RED}[FAIL]{C_RESET} archive 실패: {e}", file=sys.stderr)
+            print(f"[FAIL] archive 실패: {e}", file=sys.stderr)
             return 1
     else:
         parser.print_help()
