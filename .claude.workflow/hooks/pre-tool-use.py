@@ -208,13 +208,11 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # Collect captured stdout from all sync guard results
-    collected = collect_outputs(sync_results)
-
-    # If any guard emitted a deny JSON, relay it verbatim and exit 0
-    if b'deny' in collected:
-        sys.stdout.buffer.write(collected)
-        sys.exit(0)
+    # If any guard emitted a deny JSON, relay the first one and exit 0
+    for r in sync_results:
+        if r is not None and r.stdout and b'deny' in r.stdout:
+            sys.stdout.buffer.write(r.stdout)
+            sys.exit(0)
 
     # No guard blocked: emit allow JSON so Claude Code skips confirm prompt
     allow_payload = {

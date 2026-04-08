@@ -46,6 +46,7 @@ _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"python3\s+/[^\s]*\.claude\.workflow/hooks/"),       # hook 디스패처 호출 (절대경로)
     re.compile(r"python3\s+/[^\s]*\.claude\.workflow/scripts/statusline\.py"),  # statusLine command (절대경로)
     re.compile(r"python3\s+/[^\s]*\.claude\.workflow/board/server\.py"),  # SessionStart board server (절대경로)
+    re.compile(r"python3\s+(?:\.|/[^\s]*)\.claude\.workflow/scripts/claude_edit\.py"),  # .claude 간접 편집 유틸리티
 ]
 
 # && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴
