@@ -53,7 +53,16 @@ def cmd_save(rel_path: str) -> None:
         sys.exit(1)
     os.makedirs(os.path.dirname(src), exist_ok=True)
     shutil.copy2(dst, src)
-    print(f"[SAVE] {dst} → {src}")
+    os.remove(dst)
+    # 빈 상위 디렉터리 정리
+    parent = os.path.dirname(dst)
+    while parent != EDIT_DIR:
+        try:
+            os.rmdir(parent)
+            parent = os.path.dirname(parent)
+        except OSError:
+            break
+    print(f"[SAVE] {dst} → {src} (편집 파일 삭제)")
 
 
 def cmd_diff(rel_path: str) -> None:
