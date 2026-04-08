@@ -23,3 +23,9 @@
 - Edit/Write 직접 수정 불가 — Claude Code hardcoded 보호로 차단됨
 - 절차: `claude_edit.py open <path>` → edit/ 에서 편집 → `claude_edit.py save <path>`
 - 삭제: `claude_edit.py open <path>` 후 edit/ 파일 삭제 → Bash로 원본 rm
+
+## .claude/ 갱신 정책
+- **rules**: `workflow/` = 시스템 (갱신 대상), `project/` = 프로젝트 (보존)
+- **skills**: `my-*` 접두사 = 프로젝트 (보존), 나머지 = 시스템 (갱신 대상)
+- **agents, commands**: 전부 시스템 (갱신 대상)
+- **settings.json**: 프로젝트 (보존)

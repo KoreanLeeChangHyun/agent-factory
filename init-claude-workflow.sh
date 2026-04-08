@@ -31,24 +31,73 @@ printf '%s  ✓ 클론 완료%s\n' "${GREEN}" "${NC}"
 
 SRC="$tmp_dir/claude-workflow"
 
-# --- .claude/ 디렉터리 교체 ---
+# --- git 초기화 + develop 브랜치 ---
+if [ ! -d ".git" ]; then
+    git init -q
+    printf '%s  ✓ git init 완료%s\n' "${GREEN}" "${NC}"
+fi
+current_branch="$(git branch --show-current 2>/dev/null || true)"
+if [ -z "$current_branch" ]; then
+    # 초기 커밋이 없는 경우
+    git checkout -b develop -q 2>/dev/null || true
+    printf '%s  ✓ develop 브랜치 생성%s\n' "${GREEN}" "${NC}"
+elif [ "$current_branch" != "develop" ]; then
+    if ! git show-ref --verify --quiet refs/heads/develop 2>/dev/null; then
+        git branch develop -q
+        printf '%s  ✓ develop 브랜치 생성%s\n' "${GREEN}" "${NC}"
+    fi
+    git checkout develop -q
+    printf '%s  ✓ develop 브랜치로 전환%s\n' "${GREEN}" "${NC}"
+fi
+
+# --- .claude/ 디렉터리 교체 (프로젝트 데이터 보존) ---
 if [ ! -d "$SRC/.claude" ]; then
     printf '%s  ✗ 클론된 저장소에 .claude/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
 [ -L ".claude" ] && { printf '%s  → .claude가 심볼릭 링크입니다. 제거합니다.%s\n' "${YELLOW}" "${NC}"; rm -f ".claude"; }
+
+# 프로젝트 데이터 백업
+claude_preserve_dirs=("rules/project")
+claude_preserve_files=("settings.json" "settings.local.json")
+for cpd in "${claude_preserve_dirs[@]}"; do
+    [ -d ".claude/$cpd" ] && { mkdir -p "$tmp_dir/_claude_preserve_$(dirname "$cpd")"; cp -r ".claude/$cpd" "$tmp_dir/_claude_preserve_$cpd"; }
+done
+for cpf in "${claude_preserve_files[@]}"; do
+    [ -f ".claude/$cpf" ] && cp ".claude/$cpf" "$tmp_dir/_claude_preserve_$cpf"
+done
+# my-* 스킬 백업
+if [ -d ".claude/skills" ]; then
+    for myskill in .claude/skills/my-*/; do
+        [ -d "$myskill" ] && { mkdir -p "$tmp_dir/_claude_preserve_skills"; cp -r "$myskill" "$tmp_dir/_claude_preserve_skills/"; }
+    done
+fi
+
 rm -rf ".claude.new"
 if ! cp -r "$SRC/.claude" ".claude.new"; then
     printf '%s  ✗ .claude 디렉터리 복사 실패%s\n' "${RED}" "${NC}"; exit 1
 fi
 rm -rf ".claude"; mv ".claude.new" ".claude"
-printf '%s  ✓ .claude/ 디렉터리 교체 완료%s\n' "${GREEN}" "${NC}"
+
+# 프로젝트 데이터 복원
+for cpd in "${claude_preserve_dirs[@]}"; do
+    [ -d "$tmp_dir/_claude_preserve_$cpd" ] && { mkdir -p ".claude/$(dirname "$cpd")"; cp -r "$tmp_dir/_claude_preserve_$cpd" ".claude/$cpd"; }
+done
+for cpf in "${claude_preserve_files[@]}"; do
+    [ -f "$tmp_dir/_claude_preserve_$cpf" ] && cp "$tmp_dir/_claude_preserve_$cpf" ".claude/$cpf"
+done
+if [ -d "$tmp_dir/_claude_preserve_skills" ]; then
+    for myskill in "$tmp_dir/_claude_preserve_skills"/my-*/; do
+        [ -d "$myskill" ] && cp -r "$myskill" ".claude/skills/"
+    done
+fi
+printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${GREEN}" "${NC}"
 
 # --- .claude.workflow/ 디렉터리 교체 (사용자 데이터 보존) ---
 if [ ! -d "$SRC/.claude.workflow" ]; then
     printf '%s  ✗ 클론된 저장소에 .claude.workflow/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
 
-preserve_dirs=("kanban" "workflow" "dashboard")
+preserve_dirs=("kanban" "workflow" "dashboard" "edit")
 preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
 
 if [ -d ".claude.workflow" ]; then
@@ -90,3 +139,11 @@ fi
 printf '%s  → build.sh 실행...%s\n' "${YELLOW}" "${NC}"
 echo ""
 bash "$BUILD_SH"
+
+# --- Board 서버 기동 ---
+BOARD_SERVER=".claude.workflow/board/server.py"
+if [ -f "$BOARD_SERVER" ]; then
+    printf '%s  → Board 서버 기동 중...%s\n' "${YELLOW}" "${NC}"
+    python3 "$BOARD_SERVER" &>/dev/null
+    printf '%s  ✓ Board 서버 기동 완료%s\n' "${GREEN}" "${NC}"
+fi
