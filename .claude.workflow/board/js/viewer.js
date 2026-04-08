@@ -508,7 +508,7 @@
     h += "</div>";
     h += '<h1 class="tv-title">' + esc(ticket.title || "(No title)") + "</h1>";
     h += '<div class="tv-meta">';
-    h += '<span class="tv-time">' + esc(formatTime(ticket.datetime)) + "</span>";
+    h += '<span class="tv-time">' + esc(formatTime(ticket.updated || ticket.created)) + "</span>";
     if (ticket.command) {
       h += badge(ticket.command, CMD_COLORS[ticket.command]);
     }

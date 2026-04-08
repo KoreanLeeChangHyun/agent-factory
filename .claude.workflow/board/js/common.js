@@ -113,16 +113,25 @@ function parseTicket(text) {
 
   const meta = root.querySelector("metadata");
   const ticket = {
-    number: "", title: "", datetime: "", status: "Open",
+    number: "", title: "", created: "", updated: "", status: "Open",
     command: "", prompt: null, result: null,
     relations: [],
   };
 
   if (meta) {
-    ["number", "title", "datetime", "status"].forEach(function (f) {
+    ["number", "title", "created", "updated", "status"].forEach(function (f) {
       const el = meta.querySelector(f);
       if (el && el.textContent) ticket[f] = el.textContent.trim();
     });
+    // 레거시 호환: <datetime> → created/updated 폴백
+    if (!ticket.created || !ticket.updated) {
+      var dtEl = meta.querySelector("datetime");
+      if (dtEl && dtEl.textContent) {
+        var dtVal = dtEl.textContent.trim();
+        if (!ticket.created) ticket.created = dtVal;
+        if (!ticket.updated) ticket.updated = dtVal;
+      }
+    }
     const cmdEl = meta.querySelector("command");
     if (cmdEl) ticket.command = (cmdEl.textContent || "").trim();
   }

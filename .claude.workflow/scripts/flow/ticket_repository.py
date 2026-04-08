@@ -151,7 +151,9 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
     title_sub = ET.SubElement(metadata_elem, "title")
     if title:
         title_sub.text = title
-    ET.SubElement(metadata_elem, "datetime").text = datetime_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ET.SubElement(metadata_elem, "created").text = now_str
+    ET.SubElement(metadata_elem, "updated").text = now_str
     ET.SubElement(metadata_elem, "status").text = "Open"
     if command:
         ET.SubElement(metadata_elem, "command").text = command
@@ -190,6 +192,15 @@ def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False
         raise FileNotFoundError(
             f"쓰기 대상 파일 없음 (다른 세션이 이동했을 수 있음): {filepath}"
         )
+    # updated 타임스탬프 자동 갱신
+    metadata_elem = root.find("metadata")
+    if metadata_elem is not None:
+        updated_elem = metadata_elem.find("updated")
+        if updated_elem is not None:
+            updated_elem.text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            # 레거시 호환: updated가 없으면 생성
+            ET.SubElement(metadata_elem, "updated").text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode")
     # prompt 내부 필드 텍스트를 개행+들여쓰기로 래핑하여 가독성 확보 (10자 이상만)

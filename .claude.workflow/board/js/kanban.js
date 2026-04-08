@@ -74,7 +74,7 @@
    */
   function getModifiedDate(t) {
     const candidates = [];
-    if (candidates.length === 0) return t.datetime || "";
+    if (candidates.length === 0) return t.updated || t.created || "";
     return candidates.reduce(function (a, b) {
       return a > b ? a : b;
     });
@@ -96,8 +96,8 @@
         bv = b.number || "";
         cmp = av.localeCompare(bv);
       } else if (sortKey === "created") {
-        av = a.datetime || "";
-        bv = b.datetime || "";
+        av = a.created || "";
+        bv = b.created || "";
         cmp = av.localeCompare(bv);
       } else if (sortKey === "modified") {
         av = getModifiedDate(a);
@@ -358,7 +358,7 @@
           sortedItems.forEach(function (t) {
             const done = col.key === "Done" ? " done" : "";
             const status = getWorkflowStatus(t);
-            const dateObj = formatKoreanDate(t.datetime);
+            const dateObj = formatKoreanDate(t.updated || t.created);
             h += '<div class="card' + done + '" data-num="' + esc(t.number) + '">';
             // 상단: 좌측 그룹(티켓번호 + 커맨드배지), 우측 상태라벨
             h += '<div class="card-top">';
