@@ -38,6 +38,26 @@
     var actions = document.createElement('div');
     actions.className = 'settings-section';
     actions.innerHTML = '<div class="settings-section-title">Actions</div>';
+    var syncItem = document.createElement('div');
+    syncItem.className = 'settings-item';
+    syncItem.innerHTML =
+      '<div class="settings-item-info">' +
+        '<div class="settings-item-title">Sync Latest Workflow</div>' +
+        '<div class="settings-item-label">.claude/ 및 .claude.workflow/를 최신 버전으로 동기화합니다</div>' +
+      '</div>' +
+      '<div class="settings-item-control">' +
+        '<button class="settings-action-btn" id="settings-sync-btn">Sync</button>' +
+      '</div>';
+
+    var syncContainer = document.createElement('div');
+    syncContainer.className = 'settings-sync-container';
+    syncContainer.innerHTML =
+      '<div class="settings-sync-status" id="settings-sync-status" style="display:none"></div>' +
+      '<div class="settings-sync-log" id="settings-sync-log" style="display:none"></div>';
+
+    actions.appendChild(syncItem);
+    actions.appendChild(syncContainer);
+
     var restartItem = document.createElement('div');
     restartItem.className = 'settings-item';
     restartItem.innerHTML =
@@ -62,6 +82,114 @@
           })
           .catch(function () {
             setTimeout(function () { location.reload(); }, 2000);
+          });
+      });
+    }
+
+    var syncBtn = document.getElementById('settings-sync-btn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', function () {
+        if (!confirm('현재 프로젝트의 .claude/ 및 .claude.workflow/를 최신 버전으로 덮어씁니다. 계속할까요?')) {
+          return;
+        }
+
+        var statusEl = document.getElementById('settings-sync-status');
+        var logEl = document.getElementById('settings-sync-log');
+
+        syncBtn.disabled = true;
+        syncBtn.textContent = 'Syncing...';
+        syncContainer.classList.add('active');
+        statusEl.style.display = '';
+        logEl.style.display = '';
+        statusEl.className = 'settings-sync-status starting';
+        statusEl.textContent = '시작';
+        logEl.innerHTML = '';
+
+        function parseSseBuffer(buffer) {
+          var events = [];
+          var blocks = buffer.split('\n\n');
+          var remaining = blocks.pop();
+          blocks.forEach(function (block) {
+            if (!block.trim()) return;
+            var lines = block.split('\n');
+            var evt = {};
+            lines.forEach(function (line) {
+              if (line.indexOf('event: ') === 0) {
+                evt.type = line.slice(7).trim();
+              } else if (line.indexOf('data: ') === 0) {
+                try { evt.data = JSON.parse(line.slice(6)); } catch (e) { evt.data = {}; }
+              }
+            });
+            if (evt.type) events.push(evt);
+          });
+          return { events: events, remaining: remaining };
+        }
+
+        fetch('/api/workflow/sync', { method: 'POST' })
+          .then(function (response) {
+            if (response.status === 409) {
+              statusEl.className = 'settings-sync-status failed';
+              statusEl.textContent = '이미 동기화가 진행 중입니다.';
+              syncBtn.disabled = false;
+              syncBtn.textContent = 'Sync';
+              return;
+            }
+
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
+
+            function read() {
+              return reader.read().then(function (chunk) {
+                if (chunk.done) return;
+                buffer += decoder.decode(chunk.value, { stream: true });
+                var parsed = parseSseBuffer(buffer);
+                buffer = parsed.remaining;
+                parsed.events.forEach(function (evt) {
+                  if (evt.type === 'start') {
+                    statusEl.className = 'settings-sync-status running';
+                    statusEl.textContent = '진행 중';
+                  } else if (evt.type === 'log') {
+                    var line = document.createElement('div');
+                    line.className = 'settings-sync-log-line';
+                    line.innerHTML = esc((evt.data && evt.data.line) || '');
+                    logEl.appendChild(line);
+                    logEl.scrollTop = logEl.scrollHeight;
+                  } else if (evt.type === 'done') {
+                    statusEl.className = 'settings-sync-status done';
+                    statusEl.textContent = '완료 — 서버 재시작 필요';
+                    if (restartBtn) {
+                      restartBtn.classList.add('pulse');
+                      setTimeout(function () { restartBtn.classList.remove('pulse'); }, 3000);
+                    }
+                  } else if (evt.type === 'error') {
+                    statusEl.className = 'settings-sync-status failed';
+                    statusEl.textContent = '실패';
+                    var errLine = document.createElement('div');
+                    errLine.className = 'settings-sync-log-line error';
+                    errLine.innerHTML = esc((evt.data && evt.data.message) || '오류가 발생했습니다.');
+                    logEl.appendChild(errLine);
+                    logEl.scrollTop = logEl.scrollHeight;
+                  }
+                });
+                return read();
+              });
+            }
+
+            return read().finally(function () {
+              syncBtn.disabled = false;
+              syncBtn.textContent = 'Sync';
+            });
+          })
+          .catch(function (err) {
+            statusEl.className = 'settings-sync-status failed';
+            statusEl.textContent = '실패';
+            var errLine = document.createElement('div');
+            errLine.className = 'settings-sync-log-line error';
+            errLine.innerHTML = esc(err && err.message ? err.message : '네트워크 오류가 발생했습니다.');
+            logEl.appendChild(errLine);
+            syncBtn.disabled = false;
+            syncBtn.textContent = 'Sync';
           });
       });
     }

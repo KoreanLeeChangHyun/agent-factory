@@ -1309,7 +1309,7 @@
   border: 1px solid #3c3c3c;
   border-radius: 6px;
   padding: 4px 0;
-  min-width: 180px;
+  min-width: 260px;
   z-index: 200;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
@@ -1335,6 +1335,7 @@
 
 .terminal-browse-item:hover {
   background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
 }
 
 .terminal-browse-divider {
@@ -1344,19 +1345,32 @@
 }
 
 .terminal-browse-loading,
-.terminal-browse-empty {
+.terminal-browse-empty,
+.terminal-browse-error {
   padding: 8px 14px;
   font-size: 11px;
-  color: #666;
   font-style: italic;
 }
 
+.terminal-browse-loading {
+  color: #888;
+}
+
+.terminal-browse-empty {
+  color: #666;
+}
+
+.terminal-browse-error {
+  color: #c97a6b;
+}
+
+/* ── Session list scroll area (20 items ~= 320px) ── */
 .terminal-browse-session-list {
   border-top: 1px solid #3c3c3c;
-  max-height: 200px;
+  max-height: 320px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
+  scrollbar-color: #444 transparent;
 }
 
 .terminal-browse-session-list::-webkit-scrollbar {
@@ -1368,26 +1382,56 @@
   border-radius: 2px;
 }
 
+.terminal-browse-session-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Session item: flex row (id + label + time) ── */
 .terminal-browse-session-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.1s;
+  text-align: left;
+  outline: none;
 }
 
+.terminal-browse-session-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.terminal-browse-session-item:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Active / current session highlight ── */
 .terminal-browse-session-item.current {
-  background: rgba(217, 119, 87, 0.08);
+  background: rgba(217, 119, 87, 0.1);
 }
 
 .terminal-browse-session-item.current:hover {
-  background: rgba(217, 119, 87, 0.15);
+  background: rgba(217, 119, 87, 0.18);
 }
 
+.terminal-browse-session-item.current .terminal-browse-session-id {
+  color: #D97757;
+  font-weight: 600;
+}
+
+/* ── Child elements ── */
 .terminal-browse-session-id {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 11px;
-  color: #ccc;
+  color: #bbb;
   flex-shrink: 0;
+  letter-spacing: 0.02em;
 }
 
 .terminal-browse-current-label {
@@ -1395,14 +1439,18 @@
   color: #D97757;
   font-weight: 600;
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .terminal-browse-session-time {
   font-size: 10px;
-  color: #666;
+  color: #777;
   font-variant-numeric: tabular-nums;
   margin-left: auto;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ── Responsive ── */

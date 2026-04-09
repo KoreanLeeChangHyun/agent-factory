@@ -297,6 +297,46 @@
     appendToOutput(div);
   }
 
+  // ── UI Helpers ──
+
+  function escapeHtml(str) {
+    if (str == null) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function formatRelativeTime(isoString) {
+    if (!isoString) return "";
+    var dt;
+    try {
+      dt = new Date(isoString);
+    } catch (_e) {
+      return String(isoString);
+    }
+    var ts = dt.getTime();
+    if (isNaN(ts)) return String(isoString);
+
+    var diffSec = Math.floor((Date.now() - ts) / 1000);
+    if (diffSec < 0) diffSec = 0;
+    if (diffSec < 60) return "방금 전";
+    var diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return diffMin + "분 전";
+    var diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return diffHour + "시간 전";
+    var diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 7) return diffDay + "일 전";
+    // 7일 이상은 날짜 표기
+    try {
+      return dt.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+    } catch (_e2) {
+      return String(isoString);
+    }
+  }
+
   // ── Tool Box Renderer ──
 
   function createToolBox(toolName, toolUseId) {
@@ -1756,54 +1796,61 @@
           browseSessionList.style.display = "none";
           return;
         }
-        browseSessionList.innerHTML = '<div class="terminal-browse-loading">Loading...</div>';
+        browseSessionList.innerHTML = '<div class="terminal-browse-loading">세션 목록을 불러오는 중...</div>';
         browseSessionList.style.display = "block";
         fetch("/terminal/sessions", { cache: "no-store" }).then(function (res) {
-          if (!res.ok) throw new Error("Failed to fetch sessions");
+          if (!res.ok) throw new Error("HTTP " + res.status);
           return res.json();
         }).then(function (sessions) {
           browseSessionList.innerHTML = "";
           if (!sessions || sessions.length === 0) {
-            browseSessionList.innerHTML = '<div class="terminal-browse-empty">No sessions found</div>';
+            browseSessionList.innerHTML = '<div class="terminal-browse-empty">최근 세션 없음</div>';
             return;
           }
           sessions.forEach(function (s) {
+            var fullId = s.session_id || "";
+            var shortId = fullId.substring(0, 8);
+
             var item = document.createElement("button");
             item.className = "terminal-browse-item terminal-browse-session-item";
             if (s.is_current) item.className += " current";
+            item.setAttribute("title", fullId + (s.is_current ? " (현재 세션)" : ""));
+            item.setAttribute("data-session-id", fullId);
 
             var idSpan = document.createElement("span");
             idSpan.className = "terminal-browse-session-id";
-            idSpan.textContent = (s.session_id || "").substring(0, 8);
+            idSpan.textContent = shortId;
 
             var timeSpan = document.createElement("span");
             timeSpan.className = "terminal-browse-session-time";
+            timeSpan.textContent = formatRelativeTime(s.last_active);
             try {
-              var dt = new Date(s.last_active);
-              timeSpan.textContent = dt.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-            } catch (_e) {
-              timeSpan.textContent = s.last_active || "";
-            }
+              var dtAbs = new Date(s.last_active);
+              if (!isNaN(dtAbs.getTime())) {
+                timeSpan.setAttribute("title", dtAbs.toLocaleString("ko-KR"));
+              }
+            } catch (_eAbs) { /* no-op */ }
 
             item.appendChild(idSpan);
             if (s.is_current) {
               var currentLabel = document.createElement("span");
               currentLabel.className = "terminal-browse-current-label";
-              currentLabel.textContent = "(current)";
+              currentLabel.textContent = "현재";
               item.appendChild(currentLabel);
             }
             item.appendChild(timeSpan);
 
-            item.addEventListener("click", function (e) {
-              e.stopPropagation();
+            item.addEventListener("click", function (ev) {
+              ev.stopPropagation();
               browseDropdown.classList.remove("visible");
               browseSessionList.style.display = "none";
-              Board.session.startSession(s.session_id);
+              Board.session.startSession(fullId);
             });
             browseSessionList.appendChild(item);
           });
-        }).catch(function () {
-          browseSessionList.innerHTML = '<div class="terminal-browse-empty">Failed to load sessions</div>';
+        }).catch(function (err) {
+          var msg = err && err.message ? err.message : "알 수 없는 오류";
+          browseSessionList.innerHTML = '<div class="terminal-browse-error">세션 목록 로드 실패 (' + escapeHtml(msg) + ')</div>';
         });
       });
     }

@@ -716,10 +716,20 @@
 
   // ── Session Management ──
 
+  // UUID v1~v5 느슨한 형식 검증 (하이픈 포함 36자)
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   function startSession(resumeSessionId) {
     if (!_ctx) return;
     if (Board.state.termStatus !== "stopped") return;
     var isResume = !!resumeSessionId;
+
+    // 선제 UUID 검증: resume 요청인데 UUID 형식이 아니면 서버 fallback 대신 즉시 실패 처리
+    if (isResume && !UUID_RE.test(String(resumeSessionId))) {
+      _ctx.appendErrorMessage("[오류] 잘못된 세션 ID 형식입니다: " + String(resumeSessionId).substring(0, 16));
+      return;
+    }
+
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
       _ctx.appendSystemMessage("Connecting to workflow session " + _ctx.getWorkflowSessionId() + "...");
@@ -730,7 +740,11 @@
     }
 
     _ctx.clearOutput();
-    _ctx.appendSystemMessage(isResume ? "Resuming session..." : "Starting session...");
+    if (isResume) {
+      _ctx.appendSystemMessage("세션 재개 중... (" + String(resumeSessionId).substring(0, 8) + ")");
+    } else {
+      _ctx.appendSystemMessage("Starting session...");
+    }
 
     Board.state.termStatus = "running";
     _ctx.updateControlBar();
@@ -741,10 +755,21 @@
     }).then(function (data) {
       _ctx.startSpinner();
       _ctx.setInputLocked(true);
-      if (data.session_id) {
+      if (data && data.session_id) {
         Board.state.termSessionId = data.session_id;
         Board.state.termStatus = "idle";
         _ctx.updateControlBar();
+
+        // 서버가 fallback으로 새 세션을 만들었는지 감지
+        // (server.py는 잘못된 resume_session_id 시 새 세션으로 graceful fallback함)
+        if (isResume && String(data.session_id) !== String(resumeSessionId)) {
+          _ctx.appendSystemMessage(
+            "[안내] 요청한 세션(" + String(resumeSessionId).substring(0, 8) +
+            ")을 재개할 수 없어 새 세션(" + String(data.session_id).substring(0, 8) + ")이 생성되었습니다."
+          );
+        } else if (isResume) {
+          _ctx.appendSystemMessage("세션 " + String(data.session_id).substring(0, 8) + "... 재개됨");
+        }
       }
       if (!isResume) {
         var initText = "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요.";
@@ -752,7 +777,9 @@
         postJson("/terminal/input", { text: initText }).catch(function () {});
       }
     }).catch(function (err) {
-      _ctx.appendErrorMessage("[Error] Failed to start session: " + err.message);
+      var reason = err && err.message ? err.message : "알 수 없는 오류";
+      var prefix = isResume ? "[오류] 세션 재개 실패" : "[Error] Failed to start session";
+      _ctx.appendErrorMessage(prefix + ": " + reason);
       Board.state.termStatus = "stopped";
       _ctx.updateControlBar();
     });
