@@ -125,12 +125,6 @@ else
     printf '%s  ✓ .claude.workflow/ 신규 설치 완료%s\n' "${GREEN}" "${NC}"
 fi
 
-# --- CLAUDE.md 복사 ---
-if [ -f "$SRC/CLAUDE.md" ]; then
-    cp "$SRC/CLAUDE.md" "./CLAUDE.md"
-    printf '%s  ✓ CLAUDE.md 복사 완료%s\n' "${GREEN}" "${NC}"
-fi
-
 # .sh 파일 실행 권한 부여
 find ".claude/" -name '*.sh' -exec chmod +x {} +
 find ".claude.workflow/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
