@@ -82,6 +82,10 @@ EXTENSION_SKILL_MAP: dict[str, str] = {
     ".tsx": "convention-front",
 }
 
+# parse_plan_tasks()의 P1 우선 탐색에 사용하는 섹션명 패턴
+# 매칭 실패 시 section_pattern=None 전체 탐색으로 폴백한다
+SECTION_PATTERNS = r"##\s*(작업\s*목록|태스크\s*목록|Task\s*목록|태스크\s*분해|작업\s*계획)"
+
 
 def resolve_skill_file(skill_name: str) -> str:
     """스킬의 로드 경로를 반환한다.
@@ -199,7 +203,10 @@ def parse_plan_tasks(plan_path):
         "skills": ["스킬", "skill"],
     }
 
-    rows = parse_md_table_columns(content, None, column_keywords)
+    # P1: SECTION_PATTERNS로 우선 탐색, W-prefix 행이 없으면 전체 탐색으로 폴백
+    rows = parse_md_table_columns(content, SECTION_PATTERNS, column_keywords)
+    if not any(re.match(r"^W\d+", r.get("taskId", "")) for r in rows):
+        rows = parse_md_table_columns(content, None, column_keywords)
 
     for row in rows:
         task_id = row.get("taskId", "")
@@ -220,7 +227,7 @@ def parse_plan_tasks(plan_path):
             }
         )
 
-    # 테이블 파싱 결과가 없으면 헤딩 기반 폴백 파싱 시도
+    # 테이블 파싱 결과가 없으면 W-prefix 헤딩 기반 폴백 파싱 시도
     if not tasks:
         heading_pattern = re.compile(r"^#{2,3}\s+(W\d+)[:\s]\s*(.+)", re.MULTILINE)
         for m in heading_pattern.finditer(content):
@@ -234,6 +241,26 @@ def parse_plan_tasks(plan_path):
         if tasks:
             print(
                 "[WARN] 테이블 미발견, 헤딩 기반 폴백 파싱 사용",
+                file=sys.stderr,
+            )
+
+    # P2: W-prefix 헤딩 폴백도 실패하면 Task X.Y 헤딩 폴백 시도 (최후 수단)
+    if not tasks:
+        task_xy_pattern = re.compile(
+            r"^#{2,4}\s+Task\s*\d+[\.\-]\d+[:\s]\s*(.+)",
+            re.MULTILINE | re.IGNORECASE,
+        )
+        for idx, m in enumerate(task_xy_pattern.finditer(content), start=1):
+            tasks.append(
+                {
+                    "taskId": f"W{idx:02d}",
+                    "description": m.group(1).strip(),
+                    "skills": [],
+                }
+            )
+        if tasks:
+            print(
+                "[WARN] Task X.Y 헤딩 폴백 파싱 사용 (스킬 미배정, command defaults 적용)",
                 file=sys.stderr,
             )
 
@@ -517,6 +544,32 @@ def _get_known_skills() -> set[str]:
     return known
 
 
+def _suggest_similar_skills(unknown_skill: str, known_skills: set[str]) -> list[str]:
+    """unknown_skill과 유사한 등록 스킬을 최대 3개 제안한다.
+
+    prefix 매칭 방식: unknown_skill의 첫 번째 '-' 구분 접두사(예: 'workflow-')로
+    known_skills를 필터링하여 최대 3개를 반환한다.
+    prefix 매칭 결과가 없으면 빈 리스트를 반환한다.
+
+    Args:
+        unknown_skill: 미등록 스킬명 (예: 'workflow-unknwon')
+        known_skills: 등록된 스킬명 집합
+
+    Returns:
+        유사 스킬명 목록 (최대 3개). 없으면 빈 리스트.
+    """
+    if not unknown_skill or not known_skills:
+        return []
+
+    parts = unknown_skill.split("-", 1)
+    if len(parts) < 2:
+        return []
+
+    prefix = parts[0] + "-"
+    candidates = sorted(s for s in known_skills if s.startswith(prefix))
+    return candidates[:3]
+
+
 def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
     """태스크 스킬 매핑의 유효성을 검증한다.
 
@@ -544,16 +597,35 @@ def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
 
         # (a) 스킬 미배정 확인
         if not resolved:
-            failures.append(f"  - {task_id}: 스킬 미배정 (resolved 스킬 없음)")
+            failures.append(
+                f"  - {task_id}: [실패 이유] 스킬 미배정 (resolved 스킬 없음)\n"
+                f"    [수정 방법] plan.md의 {task_id} 스킬 컬럼에 skill-catalog.md 등록 스킬을 기재하세요\n"
+                f"    [수정 대상] plan.md의 작업 목록 테이블 스킬 컬럼만 수정 (다른 섹션 변경 금지)"
+            )
             continue
 
         # (b) 존재하지 않는 스킬명 확인 (catalog 파싱 성공 시에만)
         if known_skills:
             unknown = [s for s in resolved if s not in known_skills]
             if unknown:
+                suggestions = []
+                for u in unknown:
+                    suggestions.extend(_suggest_similar_skills(u, known_skills))
+                # 중복 제거 및 최대 3개
+                seen_sugg: list[str] = []
+                for s in suggestions:
+                    if s not in seen_sugg:
+                        seen_sugg.append(s)
+                seen_sugg = seen_sugg[:3]
+
+                sugg_str = (
+                    f"유사 스킬 제안: {seen_sugg}" if seen_sugg else "유사 스킬 없음"
+                )
                 failures.append(
-                    f"  - {task_id}: 존재하지 않는 스킬명 {unknown} "
-                    f"(skill-catalog.md 미등록)"
+                    f"  - {task_id}: [실패 이유] 존재하지 않는 스킬명 {unknown} (skill-catalog.md 미등록)\n"
+                    f"    [수정 방법] plan.md의 스킬 컬럼만 수정. 다른 섹션 변경 금지\n"
+                    f"    [{sugg_str}]\n"
+                    f"    [수정 대상] plan.md의 작업 목록 테이블 스킬 컬럼만 수정 (다른 섹션 변경 금지)"
                 )
 
     if failures:
