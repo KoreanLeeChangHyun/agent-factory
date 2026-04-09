@@ -5,7 +5,7 @@ slack_notify.py, slack_ask.py에서 import하여 사용.
 기존 slack-common.sh의 Python 1:1 포팅.
 
 주요 함수:
-    load_slack_env: .claude.workflow/.settings(.env 폴백)에서 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID 로드
+    load_slack_env: .claude.workflow/.settings에서 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID 로드
     get_agent_emoji: 에이전트별 Slack 이모지 매핑
     extract_json_field: 딕셔너리에서 중첩 키 추출
     build_json_payload: Slack API용 JSON payload 구성
@@ -60,12 +60,12 @@ def log_warn(msg: str) -> None:
 
 def load_slack_env(env_file: str | None = None) -> bool:
     """
-    .claude.workflow/.settings(.env 폴백)에서 Slack 환경변수 로드.
+    .claude.workflow/.settings에서 Slack 환경변수 로드.
 
     설정 후 모듈 변수 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID 사용 가능.
 
     Args:
-        env_file: .claude.workflow/.settings(.env 폴백) 파일 경로 (None이면 자동 해석)
+        env_file: .claude.workflow/.settings 파일 경로 (None이면 자동 해석)
 
     Returns:
         True이면 로드 성공, False이면 필수 환경변수 누락

@@ -24,6 +24,7 @@
     '/cost':    { description: '현재 세션 비용 확인',                type: 'remote',       handler: handleRemoteCommand },
     '/status':  { description: '현재 세션 상태 확인',                type: 'remote',       handler: handleRemoteCommand },
     '/compact': { description: '컨텍스트 압축',                      type: 'remote',       handler: handleRemoteCommand },
+    '/login':   { description: '계정 인증 및 전환',                  type: 'remote',       handler: handleRemoteCommand },
   };
 
   /**

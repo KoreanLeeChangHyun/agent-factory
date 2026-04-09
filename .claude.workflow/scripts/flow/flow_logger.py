@@ -143,10 +143,9 @@ def _resolve_project_root() -> str:
     claude_dir = os.path.dirname(scripts_dir)      # .claude.workflow/
     candidate = os.path.dirname(claude_dir)        # <candidate>/
 
-    # .claude.workflow/.settings 또는 .env가 있으면 메인 리포 루트 — 즉시 반환
+    # .claude.workflow/.settings가 있으면 메인 리포 루트 — 즉시 반환
     cw_dir = os.path.join(candidate, ".claude.workflow")
-    if os.path.exists(os.path.join(cw_dir, ".settings")) or \
-       os.path.exists(os.path.join(cw_dir, ".env")):
+    if os.path.exists(os.path.join(cw_dir, ".settings")):
         return candidate
 
     # 워크트리 내부일 수 있음 — git-common-dir로 메인 리포 탐색
@@ -165,8 +164,7 @@ def _resolve_project_root() -> str:
             main_root = os.path.dirname(git_common)
             main_cw_dir = os.path.join(main_root, ".claude.workflow")
             if main_root != candidate and (
-                os.path.exists(os.path.join(main_cw_dir, ".settings")) or
-                os.path.exists(os.path.join(main_cw_dir, ".env"))
+                os.path.exists(os.path.join(main_cw_dir, ".settings"))
             ):
                 return main_root
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):

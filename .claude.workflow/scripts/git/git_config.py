@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """Git Config 자동 설정 스크립트.
 
-.claude.workflow/.settings(.env 폴백)에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
+.claude.workflow/.settings에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
 
 주요 함수:
     main: Git 설정 적용 진입점
@@ -10,7 +10,7 @@
   --global  전역 설정 (~/.gitconfig) [기본값]
   --local   로컬 설정 (.git/config)
 
-환경변수 (.claude.workflow/.settings(.env 폴백)에서 로드):
+환경변수 (.claude.workflow/.settings에서 로드):
   CLAUDE_CODE_GIT_USER_NAME    - Git user.name (필수)
   CLAUDE_CODE_GIT_USER_EMAIL   - Git user.email (필수)
   CLAUDE_CODE_GITHUB_USERNAME  - GitHub 사용자명 (선택)
@@ -33,10 +33,8 @@ from common import read_env
 from flow.cli_utils import build_common_epilog
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
-# .claude.workflow/.settings 우선, .env 폴백
 _CW_DIR = os.path.join(_PROJECT_ROOT, ".claude.workflow")
-_SETTINGS_FILE = os.path.join(_CW_DIR, ".settings")
-_ENV_FILE = _SETTINGS_FILE if os.path.isfile(_SETTINGS_FILE) else os.path.join(_CW_DIR, ".env")
+_ENV_FILE = os.path.join(_CW_DIR, ".settings")
 
 
 def _git_config_get(scope: str, key: str) -> str:
@@ -70,7 +68,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flow-gitconfig",
         description=(
-            ".claude.workflow/.settings(.env 폴백)에서 Git 설정 정보를 읽어 "
+            ".claude.workflow/.settings에서 Git 설정 정보를 읽어 "
             "git config를 자동으로 적용합니다."
         ),
         epilog=build_common_epilog(),
@@ -97,7 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     """Git config 자동 설정의 진입점.
 
-    .claude.workflow/.settings(.env 폴백)에서 환경변수를 읽어 git user.name, user.email,
+    .claude.workflow/.settings에서 환경변수를 읽어 git user.name, user.email,
     core.sshCommand를 지정된 범위(global/local)에 적용한다.
     변경 전후 상태를 비교하여 출력한다.
 
@@ -111,7 +109,7 @@ def main() -> None:
     scope = args.scope if args.scope is not None else "--global"
     scope_label = "global" if scope == "--global" else "local"
 
-    # --- .settings(.env 폴백) 파일 확인 ---
+    # --- .settings 파일 확인 ---
     if not os.path.isfile(_ENV_FILE):
         print(f"[ERROR] 설정 파일이 존재하지 않습니다: {_ENV_FILE}", file=sys.stderr)
         sys.exit(1)
@@ -125,11 +123,11 @@ def main() -> None:
 
     # --- 필수 환경변수 검증 ---
     if not git_user_name:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_NAME이 .settings(.env 폴백)에 설정되지 않았습니다.", file=sys.stderr)
+        print("[ERROR] CLAUDE_CODE_GIT_USER_NAME이 .settings에 설정되지 않았습니다.", file=sys.stderr)
         sys.exit(1)
 
     if not git_user_email:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_EMAIL이 .settings(.env 폴백)에 설정되지 않았습니다.", file=sys.stderr)
+        print("[ERROR] CLAUDE_CODE_GIT_USER_EMAIL이 .settings에 설정되지 않았습니다.", file=sys.stderr)
         sys.exit(1)
 
     # --- Before 상태 수집 ---

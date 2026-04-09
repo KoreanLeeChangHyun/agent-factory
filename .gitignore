@@ -3,6 +3,7 @@
 .claude.workflow/.settings
 .claude.workflow/.env
 .claude.workflow/.env*
+.claude.workflow/.last-session-id
 .claude.workflow/workflow/
 .claude.workflow/kanban/**/*.xml
 .claude.workflow/kanban/.memo.txt

@@ -150,7 +150,7 @@ def main() -> None:
     세션 식별은 session_identifier.get_session_type()에 위임한다.
     Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_MAIN_SESSION_GUARD") or read_env("HOOK_MAIN_SESSION_GUARD")
 
     # Hook disable check (false = disabled)

@@ -40,6 +40,14 @@
   var _currentToolUseId = null;
 
   /**
+   * Accumulates text_delta chunks between flush points.
+   * Used to call WorkflowRenderer.tap() at flush time in workflow mode,
+   * so that [STATE] banners arriving via text stream are also parsed.
+   * @type {string}
+   */
+  var _pendingTextBuffer = "";
+
+  /**
    * Per-tool_use_id input buffer map.
    * Parallel tool calls may interleave input_json_delta events, so each
    * tool_use_id gets its own accumulator instead of a single shared buffer.
@@ -184,6 +192,9 @@
     _currentToolUseId = null;
     _toolInputMap = {};
 
+    // Reset pending text buffer on reconnect
+    _pendingTextBuffer = "";
+
     termEventSource = new EventSource(_ctx.endpoints().events);
 
     termEventSource.addEventListener("open", function () {
@@ -198,6 +209,10 @@
         if (data.chunk && data.kind === "text_delta") {
           _ctx.setReceivedChunks(true);
           _ctx.appendTextBuffer(data.chunk);
+          // Accumulate for WorkflowRenderer.tap() at flush time
+          if (_ctx.isWorkflowMode()) {
+            _pendingTextBuffer += data.chunk;
+          }
         } else if (data.text && data.kind === "assistant" && !_ctx.getReceivedChunks()) {
           _ctx.appendTextBuffer(data.text);
         } else if (data.kind === "input_json_delta" && typeof data.chunk === "string") {
@@ -212,6 +227,21 @@
         } else if (data.kind === "content_block_start" && data.raw) {
           var block = data.raw.content_block || {};
           if (block.type === "tool_use" && block.name) {
+            // Flush accumulated text_delta chunks through WorkflowRenderer before clearing
+            if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+              try {
+                var flushedText = _pendingTextBuffer;
+                _pendingTextBuffer = "";
+                var textBannerConsumed = Board.WorkflowRenderer.tap(flushedText);
+                if (textBannerConsumed) {
+                  Board.phaseTimeline.render();
+                }
+              } catch (tapFlushErr) {
+                _pendingTextBuffer = "";
+              }
+            } else {
+              _pendingTextBuffer = "";
+            }
             _ctx.flushTextBuffer();
             _ctx.resetToolInputBuffer();
             _ctx.setCurrentToolName(block.name);
@@ -230,6 +260,21 @@
             }
           }
         } else if (data.kind === "user" && data.raw) {
+          // Flush accumulated text_delta chunks through WorkflowRenderer before clearing
+          if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+            try {
+              var userFlushText = _pendingTextBuffer;
+              _pendingTextBuffer = "";
+              var userTextBannerConsumed = Board.WorkflowRenderer.tap(userFlushText);
+              if (userTextBannerConsumed) {
+                Board.phaseTimeline.render();
+              }
+            } catch (userTapErr) {
+              _pendingTextBuffer = "";
+            }
+          } else {
+            _pendingTextBuffer = "";
+          }
           _ctx.flushTextBuffer();
           var tr = data.raw.tool_use_result;
           var mc = data.raw.message && data.raw.message.content;
@@ -350,7 +395,26 @@
           }
           _ctx.updateStatusLine();
 
+          // Flush any remaining text_delta chunks through WorkflowRenderer
+          if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+            try {
+              var resultFlushText = _pendingTextBuffer;
+              _pendingTextBuffer = "";
+              Board.WorkflowRenderer.tap(resultFlushText);
+            } catch (e) {
+              _pendingTextBuffer = "";
+            }
+          } else {
+            _pendingTextBuffer = "";
+          }
           _ctx.flushTextBuffer();
+
+          // In workflow mode, re-render timeline bar to update timers on response complete
+          if (_ctx.isWorkflowMode()) {
+            try {
+              Board.phaseTimeline.render();
+            } catch (renderErr) {}
+          }
 
           _ctx.removeEmptyToolBox();
           _ctx.clearCurrentToolBox();
@@ -406,7 +470,18 @@
           _ctx.setInputLocked(false);
           _ctx.updateControlBar();
         } else if (data.subtype === "process_exit") {
-          if (Board.state.termStatus === "running") return;
+          // running 상태에서도 process_exit를 처리하여 stopped로 전이한다.
+          // (이전 코드는 running 상태에서 early return하여 상태가 고착되는 버그가 있었음)
+          if (Board.state.termStatus === "running") {
+            // running 중 process_exit: result 이벤트와 동일한 UI 정리 수행
+            _ctx.stopSpinner();
+            _ctx.setReceivedChunks(false);
+            _ctx.resetToolInputBuffer();
+            _pendingTextBuffer = "";
+            _ctx.flushTextBuffer();
+            _currentToolUseId = null;
+            _toolInputMap = {};
+          }
           Board.state.termStatus = "stopped";
           _ctx.resetTokens();
           _ctx.setSessionCost(0);
@@ -534,16 +609,58 @@
       }
     });
 
+    termEventSource.addEventListener("skill_listing", function (e) {
+      try {
+        var data = JSON.parse(e.data);
+        var content = data.content || "";
+        var skillCount = data.skillCount != null ? data.skillCount : 0;
+
+        var div = document.createElement("div");
+        div.className = "term-skill-listing";
+
+        var labelSpan = document.createElement("span");
+        labelSpan.className = "term-skill-label";
+        labelSpan.textContent = "[Skills Loaded] " + skillCount + " skills";
+        div.appendChild(labelSpan);
+
+        if (content) {
+          var details = document.createElement("details");
+          details.className = "term-skill-details";
+
+          var summary = document.createElement("summary");
+          summary.className = "term-skill-summary";
+          summary.textContent = "Show skill list";
+          details.appendChild(summary);
+
+          var lines = content.split("\n");
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            var itemDiv = document.createElement("div");
+            itemDiv.className = "term-skill-item";
+            itemDiv.textContent = line;
+            details.appendChild(itemDiv);
+          }
+
+          div.appendChild(details);
+        }
+
+        _ctx.appendToOutput(div);
+      } catch (err) {
+        // Ignore parse errors
+      }
+    });
+
     termEventSource.addEventListener("user_input", function (e) {
       try {
         var data = JSON.parse(e.data);
         if (!data.text) return;
 
         // If this text was sent by the local sendInput(), skip DOM insertion
-        // (sendInput already added the element). Remove from Set so that
-        // subsequent identical inputs are not accidentally suppressed.
+        // (sendInput already added the element). Keep in Set because the
+        // server may echo user_input twice (input handler + CLI NDJSON).
+        // The set is cleared on SSE reconnect, so history replay works.
         if (_sentTexts.has(data.text)) {
-          _sentTexts.delete(data.text);
           return;
         }
 
@@ -641,18 +758,42 @@
     });
   }
 
+  // 중복 kill 호출 방지 플래그
+  var _killingInProgress = false;
+
   function killSession() {
     if (!_ctx) return;
     if (Board.state.termStatus === "stopped") return;
+    // 중복 kill 요청 방지
+    if (_killingInProgress) return;
+    _killingInProgress = true;
 
+    var prevStatus = Board.state.termStatus;
     var epK = _ctx.endpoints();
     postJson(epK.kill, epK.inputBody({})).then(function () {
       _ctx.appendSystemMessage("Session terminated");
       Board.state.termStatus = "stopped";
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
+      // kill 성공 후 SSE 연결 정리: 잔여 이벤트가 상태를 되돌리지 않도록 한다
+      disconnectSSE();
     }).catch(function (err) {
-      _ctx.appendErrorMessage("[Error] Failed to kill session: " + err.message);
+      // 409: 프로세스가 이미 종료된 경우 → stopped로 복구
+      var is409 = err.message && err.message.indexOf("409") !== -1;
+      if (is409) {
+        Board.state.termStatus = "stopped";
+        _ctx.setInputLocked(false);
+        _ctx.updateControlBar();
+        disconnectSSE();
+      } else {
+        // 그 외 에러: 이전 상태로 복구하여 버튼 고착 방지
+        _ctx.appendErrorMessage("[Error] Failed to kill session: " + err.message);
+        Board.state.termStatus = prevStatus;
+        _ctx.setInputLocked(false);
+        _ctx.updateControlBar();
+      }
+    }).finally(function () {
+      _killingInProgress = false;
     });
   }
 

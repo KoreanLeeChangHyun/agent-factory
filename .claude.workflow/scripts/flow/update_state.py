@@ -163,7 +163,7 @@ def _handle_usage_regenerate(args: argparse.Namespace) -> _HandlerResult:
 
 
 def _handle_env(args: argparse.Namespace) -> _HandlerResult:
-    """env 모드: .claude.workflow/.settings(.env 폴백) 환경변수를 set/unset한다."""
+    """env 모드: .claude.workflow/.settings 환경변수를 set/unset한다."""
     resolve_paths(args.registry_key)  # registryKey 유효성 검증용
     value: str = args.value or ""
     env_manage(args.action, args.key, value)
@@ -306,8 +306,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # --- env ---
     p_env = subparsers.add_parser(
         "env",
-        help=".settings(.env 폴백) 환경변수 관리",
-        description="env 모드: .claude.workflow/.settings(.env 폴백) 환경변수를 set/unset한다.",
+        help=".settings 환경변수 관리",
+        description="env 모드: .claude.workflow/.settings 환경변수를 set/unset한다.",
     )
     p_env.add_argument("registry_key", type=registry_key_type, metavar="registryKey", help="YYYYMMDD-HHMMSS 형식 레지스트리 키")
     p_env.add_argument("action", choices=["set", "unset"], help="수행할 동작")

@@ -143,7 +143,7 @@ def main() -> None:
     flow-* alias 사용을 안내하는 deny 응답을 출력하여 차단한다.
     settings.json에서 고정 호출하는 경로는 예외로 허용한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_DIRECT_PATH_GUARD") or read_env("HOOK_DIRECT_PATH_GUARD")
 
     # Hook disable check (미설정 또는 false = disabled)

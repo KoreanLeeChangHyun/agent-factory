@@ -66,7 +66,7 @@ def main() -> None:
     대상으로 할 때 즉시 allow를 반환한다.
     HOOK_RULES_AUTO_APPROVE=false 설정 시 비활성화된다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_RULES_AUTO_APPROVE") or read_env("HOOK_RULES_AUTO_APPROVE")
 
     # Hook disable check (false = disabled)

@@ -37,15 +37,12 @@ WF_DETAIL_FILES: list[dict] = [
 
 
 def _resolve_settings_file(project_root: str) -> str:
-    """Return .settings if exists, else .env (fallback)."""
-    settings = os.path.join(project_root, '.claude.workflow', '.settings')
-    if os.path.exists(settings):
-        return settings
-    return os.path.join(project_root, '.claude.workflow', '.env')
+    """Return .settings path."""
+    return os.path.join(project_root, '.claude.workflow', '.settings')
 
 
 def _parse_env_file(project_root: str) -> list[dict]:
-    """Parse .settings/.env into structured sections for the settings UI."""
+    """Parse .settings into structured sections for the settings UI."""
     env_file = _resolve_settings_file(project_root)
     if not os.path.exists(env_file):
         return []
@@ -124,7 +121,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
 
 
 def _update_env_value(project_root: str, key: str, new_value: str) -> bool:
-    """Update a single key's value in .settings/.env, preserving structure and comments."""
+    """Update a single key's value in .settings, preserving structure and comments."""
     env_file = _resolve_settings_file(project_root)
     if not os.path.exists(env_file):
         return False
@@ -584,3 +581,428 @@ def _validate_memory_filename(filename: str) -> None:
         raise ValueError(f'Invalid filename: {filename}')
     if not _MEMORY_FILENAME_RE.match(filename):
         raise ValueError(f'Invalid filename format: {filename}')
+
+
+# ---------------------------------------------------------------------------
+# Rules helpers (.claude/rules/)
+# ---------------------------------------------------------------------------
+
+# rules 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점 (.md 확장자 필수)
+_RULES_FILENAME_RE = re.compile(r'^[A-Za-z0-9_\-]+\.md$')
+
+# 허용 카테고리
+_RULES_CATEGORIES = {'workflow', 'project'}
+
+# claude_edit.py 스크립트 절대 경로
+_CLAUDE_EDIT_SCRIPT = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', 'scripts', 'claude_edit.py',
+)
+
+
+def _validate_rules_rel_path(rel_path: str) -> tuple[str, str]:
+    """rules 상대 경로를 검증하고 (category, filename) 튜플을 반환한다.
+
+    Args:
+        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+
+    Returns:
+        (category, filename) 튜플
+
+    Raises:
+        ValueError: 경로 형식이 잘못되었거나 허용되지 않는 경우
+    """
+    if '..' in rel_path or '\\' in rel_path:
+        raise ValueError(f'Invalid path: {rel_path}')
+    parts = rel_path.strip('/').split('/')
+    if len(parts) != 2:
+        raise ValueError(f'Path must be category/filename.md format: {rel_path}')
+    category, filename = parts
+    if category not in _RULES_CATEGORIES:
+        raise ValueError(f'Unknown category: {category}. Must be one of {_RULES_CATEGORIES}')
+    if not _RULES_FILENAME_RE.match(filename):
+        raise ValueError(f'Invalid filename format: {filename}')
+    return category, filename
+
+
+def _list_rules_files(project_root: str) -> list[dict]:
+    """'.claude/rules/' 하위 모든 .md 파일을 재귀 탐색하여 목록을 반환한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        [{"name": str, "path": str, "size": int, "mtime": str, "category": str}, ...]
+        'path'는 '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+        'category'는 하위 디렉터리명 (workflow 또는 project)
+    """
+    rules_dir = os.path.join(project_root, '.claude', 'rules')
+    if not os.path.isdir(rules_dir):
+        return []
+
+    files: list[dict] = []
+    try:
+        for category in sorted(os.listdir(rules_dir)):
+            cat_path = os.path.join(rules_dir, category)
+            if not os.path.isdir(cat_path) or category.startswith('.') or category == '__pycache__':
+                continue
+            try:
+                for entry in os.scandir(cat_path):
+                    if not entry.is_file() or not entry.name.endswith('.md'):
+                        continue
+                    if entry.name.startswith('.'):
+                        continue
+                    try:
+                        stat = entry.stat()
+                        files.append({
+                            'name': entry.name,
+                            'path': f'{category}/{entry.name}',
+                            'size': stat.st_size,
+                            'mtime': time.strftime(
+                                '%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime),
+                            ),
+                            'category': category,
+                        })
+                    except OSError:
+                        pass
+            except OSError:
+                continue
+    except OSError:
+        return []
+
+    return files
+
+
+def _read_rules_file(project_root: str, rel_path: str) -> dict:
+    """rules 파일 1개의 내용을 읽어 반환한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+
+    Returns:
+        {"name": str, "path": str, "content": str, "size": int}
+
+    Raises:
+        ValueError: 경로가 보안 검증에 실패한 경우
+        FileNotFoundError: 파일이 존재하지 않는 경우
+    """
+    category, filename = _validate_rules_rel_path(rel_path)
+    filepath = os.path.join(project_root, '.claude', 'rules', category, filename)
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f'Rules file not found: {rel_path}')
+
+    with open(filepath, encoding='utf-8') as f:
+        content = f.read()
+
+    return {
+        'name': filename,
+        'path': rel_path,
+        'content': content,
+        'size': len(content.encode('utf-8')),
+    }
+
+
+def _write_rules_file(
+    project_root: str, rel_path: str, content: str,
+) -> dict:
+    """rules 파일을 생성하거나 수정한다.
+
+    .claude/ 하위 파일이므로 flow-claude-edit (claude_edit.py)를 경유한다.
+    open -> edit/ 파일 수정 -> save 순서로 처리한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+        content: 저장할 파일 내용
+
+    Returns:
+        {"ok": True, "path": str}
+
+    Raises:
+        ValueError: 경로가 보안 검증에 실패한 경우
+        RuntimeError: flow-claude-edit 호출 실패 시
+    """
+    category, filename = _validate_rules_rel_path(rel_path)
+
+    # .claude/rules/category/filename 형식으로 claude_edit에 전달
+    claude_rel_path = f'rules/{rel_path}'
+
+    # 원본이 없을 경우 open이 실패하므로, 신규 파일은 직접 생성 후 save
+    original_path = os.path.join(project_root, '.claude', 'rules', category, filename)
+    edit_dir = os.path.join(project_root, '.claude.workflow', 'edit')
+    edit_path = os.path.join(edit_dir, 'rules', rel_path)
+    script = os.path.normpath(_CLAUDE_EDIT_SCRIPT)
+
+    is_new = not os.path.isfile(original_path)
+
+    if not is_new:
+        # open: .claude/ -> edit/ 복사
+        result = subprocess.run(
+            ['python3', script, 'open', claude_rel_path],
+            capture_output=True, text=True, timeout=10,
+            cwd=project_root,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f'flow-claude-edit open failed: {result.stderr.strip()}')
+
+    # edit/ 파일에 내용 기록
+    os.makedirs(os.path.dirname(edit_path), exist_ok=True)
+    with open(edit_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    # save: edit/ -> .claude/ 덮어쓰기
+    result = subprocess.run(
+        ['python3', script, 'save', claude_rel_path],
+        capture_output=True, text=True, timeout=10,
+        cwd=project_root,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'flow-claude-edit save failed: {result.stderr.strip()}')
+
+    return {'ok': True, 'path': rel_path}
+
+
+def _delete_rules_file(project_root: str, rel_path: str) -> dict:
+    """rules 파일을 삭제한다.
+
+    .claude/ 하위 파일이므로 open 후 edit/ 파일 삭제, 원본 rm 순서로 처리한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+
+    Returns:
+        {"ok": True}
+
+    Raises:
+        ValueError: 경로가 보안 검증에 실패한 경우
+        FileNotFoundError: 파일이 존재하지 않는 경우
+        RuntimeError: flow-claude-edit 호출 실패 시
+    """
+    category, filename = _validate_rules_rel_path(rel_path)
+    original_path = os.path.join(project_root, '.claude', 'rules', category, filename)
+
+    if not os.path.isfile(original_path):
+        raise FileNotFoundError(f'Rules file not found: {rel_path}')
+
+    claude_rel_path = f'rules/{rel_path}'
+    script = os.path.normpath(_CLAUDE_EDIT_SCRIPT)
+    edit_dir = os.path.join(project_root, '.claude.workflow', 'edit')
+    edit_path = os.path.join(edit_dir, 'rules', rel_path)
+
+    # open: .claude/ -> edit/ 복사
+    result = subprocess.run(
+        ['python3', script, 'open', claude_rel_path],
+        capture_output=True, text=True, timeout=10,
+        cwd=project_root,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'flow-claude-edit open failed: {result.stderr.strip()}')
+
+    # edit/ 복사본 삭제
+    if os.path.isfile(edit_path):
+        os.remove(edit_path)
+
+    # 원본 파일 삭제
+    os.remove(original_path)
+
+    return {'ok': True}
+
+
+# ---------------------------------------------------------------------------
+# Prompt helpers (.claude.workflow/prompt/)
+# ---------------------------------------------------------------------------
+
+# prompt 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점
+_PROMPT_FILENAME_RE = re.compile(r'^[A-Za-z0-9_\-\.]+$')
+
+
+def _validate_prompt_filename(filename: str) -> None:
+    """prompt 파일명의 보안 검증을 수행한다.
+
+    Args:
+        filename: 검증할 파일명
+
+    Raises:
+        ValueError: 파일명에 '..' 또는 '/'가 포함되거나 허용 패턴에 맞지 않는 경우
+    """
+    if '..' in filename or '/' in filename or '\\' in filename:
+        raise ValueError(f'Invalid filename: {filename}')
+    if not _PROMPT_FILENAME_RE.match(filename):
+        raise ValueError(f'Invalid filename format: {filename}')
+
+
+def _list_prompt_files(project_root: str) -> list[dict]:
+    """'.claude.workflow/prompt/' 하위 모든 파일 목록을 반환한다.
+
+    숨김 파일과 __pycache__ 디렉터리는 제외한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        [{"name": str, "size": int, "mtime": str}, ...]
+    """
+    prompt_dir = os.path.join(project_root, '.claude.workflow', 'prompt')
+    if not os.path.isdir(prompt_dir):
+        return []
+
+    files: list[dict] = []
+    try:
+        for entry in os.scandir(prompt_dir):
+            if not entry.is_file():
+                continue
+            if entry.name.startswith('.') or entry.name == '__pycache__':
+                continue
+            try:
+                stat = entry.stat()
+                files.append({
+                    'name': entry.name,
+                    'size': stat.st_size,
+                    'mtime': time.strftime(
+                        '%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime),
+                    ),
+                })
+            except OSError:
+                pass
+    except OSError:
+        return []
+
+    files.sort(key=lambda f: f['name'])
+    return files
+
+
+def _read_prompt_file(project_root: str, filename: str) -> dict:
+    """prompt 파일 1개의 내용을 읽어 반환한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        filename: 읽을 파일명
+
+    Returns:
+        {"name": str, "content": str, "size": int}
+
+    Raises:
+        ValueError: 파일명이 보안 검증에 실패한 경우
+        FileNotFoundError: 파일이 존재하지 않는 경우
+    """
+    _validate_prompt_filename(filename)
+    prompt_dir = os.path.join(project_root, '.claude.workflow', 'prompt')
+    filepath = os.path.join(prompt_dir, filename)
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f'Prompt file not found: {filename}')
+
+    with open(filepath, encoding='utf-8') as f:
+        content = f.read()
+
+    return {
+        'name': filename,
+        'content': content,
+        'size': len(content.encode('utf-8')),
+    }
+
+
+def _write_prompt_file(
+    project_root: str, filename: str, content: str,
+) -> dict:
+    """.claude.workflow/prompt/ 파일을 생성하거나 수정한다.
+
+    .claude.workflow/ 하위이므로 직접 쓰기 가능하다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        filename: 저장할 파일명
+        content: 파일 내용
+
+    Returns:
+        {"ok": True, "name": str}
+
+    Raises:
+        ValueError: 파일명이 보안 검증에 실패한 경우
+    """
+    _validate_prompt_filename(filename)
+    prompt_dir = os.path.join(project_root, '.claude.workflow', 'prompt')
+    os.makedirs(prompt_dir, exist_ok=True)
+    filepath = os.path.join(prompt_dir, filename)
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    return {'ok': True, 'name': filename}
+
+
+def _delete_prompt_file(project_root: str, filename: str) -> dict:
+    """.claude.workflow/prompt/ 파일을 삭제한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        filename: 삭제할 파일명
+
+    Returns:
+        {"ok": True}
+
+    Raises:
+        ValueError: 파일명이 보안 검증에 실패한 경우
+        FileNotFoundError: 파일이 존재하지 않는 경우
+    """
+    _validate_prompt_filename(filename)
+    prompt_dir = os.path.join(project_root, '.claude.workflow', 'prompt')
+    filepath = os.path.join(prompt_dir, filename)
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f'Prompt file not found: {filename}')
+
+    os.remove(filepath)
+    return {'ok': True}
+
+
+# ---------------------------------------------------------------------------
+# CLAUDE.md helpers (project root)
+# ---------------------------------------------------------------------------
+
+
+def _read_claude_md(project_root: str) -> dict:
+    """프로젝트 루트의 CLAUDE.md 내용을 읽어 반환한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        {"name": "CLAUDE.md", "content": str, "size": int}
+
+    Raises:
+        FileNotFoundError: CLAUDE.md가 존재하지 않는 경우
+    """
+    filepath = os.path.join(project_root, 'CLAUDE.md')
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError('CLAUDE.md not found in project root')
+
+    with open(filepath, encoding='utf-8') as f:
+        content = f.read()
+
+    return {
+        'name': 'CLAUDE.md',
+        'content': content,
+        'size': len(content.encode('utf-8')),
+    }
+
+
+def _write_claude_md(project_root: str, content: str) -> dict:
+    """프로젝트 루트의 CLAUDE.md를 수정한다.
+
+    CLAUDE.md는 프로젝트 루트에 위치하며 .claude/ 하위가 아니므로 직접 쓰기 가능하다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        content: 저장할 파일 내용
+
+    Returns:
+        {"ok": True}
+    """
+    filepath = os.path.join(project_root, 'CLAUDE.md')
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return {'ok': True}

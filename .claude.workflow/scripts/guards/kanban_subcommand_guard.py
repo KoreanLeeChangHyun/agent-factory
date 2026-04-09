@@ -78,7 +78,7 @@ def main() -> None:
     stdin에서 JSON을 읽어 Bash 도구의 flow-kanban 명령을 감지하고,
     서브커맨드가 유효 집합에 없으면 deny 응답을 출력하여 차단한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_KANBAN_SUBCOMMAND_GUARD") or read_env("HOOK_KANBAN_SUBCOMMAND_GUARD")
 
     # Hook disable check (false = disabled)

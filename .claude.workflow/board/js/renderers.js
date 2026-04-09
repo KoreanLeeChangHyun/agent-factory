@@ -54,6 +54,13 @@
     return cleaned;
   };
 
+  ToolResultRenderer.util.stripRerunTag = function (text) {
+    if (!text) return text;
+    var cleaned = text.replace(/\[rerun: b\d+\]\s*$/gm, "");
+    cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+    return cleaned.trimEnd ? cleaned.trimEnd() : cleaned.replace(/[\s\n]+$/, "");
+  };
+
   ToolResultRenderer.util.autoCollapse = function (htmlContent, rawByteLen, summary) {
     if (rawByteLen > AUTO_COLLAPSE_BYTES) {
       return (
@@ -901,6 +908,9 @@
     var renderers = ToolResultRenderer.renderers;
 
     var cleanText = util.stripLlmMeta(text || '');
+    if (toolName === 'Bash') {
+      cleanText = util.stripRerunTag(cleanText);
+    }
 
     var rawByteLen;
     try {

@@ -1,6 +1,6 @@
 """Dispatcher common utilities for Claude Code hooks.
 
-Provides shared functions for loading .claude.workflow/.settings (or .env fallback)
+Provides shared functions for loading .claude.workflow/.settings
 flags and dispatching hook scripts based on HOOK_* environment variable toggles.
 
 현재 등록된 디스패처:
@@ -21,7 +21,7 @@ def _find_project_root() -> str:
     """Find project root by locating .claude.workflow directory.
 
     워크트리에서 실행 시 메인 리포 루트를 반환한다.
-    .claude.workflow/.settings 또는 .env는 메인 리포에만 존재하므로,
+    .claude.workflow/.settings는 메인 리포에만 존재하므로,
     git-common-dir로 메인 리포를 탐색한다.
 
     Returns:
@@ -31,10 +31,9 @@ def _find_project_root() -> str:
     # .claude.workflow/hooks/dispatcher.py -> project root is ../..
     root = os.path.normpath(os.path.join(d, '..', '..'))
 
-    # 메인 리포이면 그대로 반환 (.settings 또는 .env 존재 확인)
+    # 메인 리포이면 그대로 반환 (.settings 존재 확인)
     cw_dir = os.path.join(root, '.claude.workflow')
-    if os.path.exists(os.path.join(cw_dir, '.settings')) or \
-       os.path.exists(os.path.join(cw_dir, '.env')):
+    if os.path.exists(os.path.join(cw_dir, '.settings')):
         return root
 
     # 워크트리일 수 있음 — git-common-dir로 메인 리포 탐색
@@ -48,8 +47,7 @@ def _find_project_root() -> str:
             # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
             main_root = os.path.dirname(git_common)
             main_cw_dir = os.path.join(main_root, '.claude.workflow')
-            if os.path.exists(os.path.join(main_cw_dir, '.settings')) or \
-               os.path.exists(os.path.join(main_cw_dir, '.env')):
+            if os.path.exists(os.path.join(main_cw_dir, '.settings')):
                 return main_root
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
@@ -58,22 +56,16 @@ def _find_project_root() -> str:
 
 
 def _env_path() -> str:
-    """Return path to the settings file (.settings preferred, .env fallback).
-
-    .settings가 존재하면 해당 경로를 반환하고, 없으면 .env 경로를 반환한다.
+    """Return path to the settings file (.settings).
 
     Returns:
-        Absolute path to .claude.workflow/.settings (or .env fallback).
+        Absolute path to .claude.workflow/.settings.
     """
-    cw_dir = os.path.join(_find_project_root(), '.claude.workflow')
-    settings_path = os.path.join(cw_dir, '.settings')
-    if os.path.exists(settings_path):
-        return settings_path
-    return os.path.join(cw_dir, '.env')
+    return os.path.join(_find_project_root(), '.claude.workflow', '.settings')
 
 
 def load_env_flags(prefix: str = 'HOOK_') -> dict[str, bool]:
-    """Parse .claude.workflow/.settings(.env fallback) and return HOOK_* flags as a dict.
+    """Parse .claude.workflow/.settings and return HOOK_* flags as a dict.
 
     Args:
         prefix: Variable name prefix to filter (default: 'HOOK_').

@@ -6,7 +6,7 @@ PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
 주요 함수:
     main: Slack 알림 전송 진입점
 
-환경변수 (.claude.workflow/.settings(.env 폴백)에서 로드):
+환경변수 (.claude.workflow/.settings에서 로드):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
 
@@ -97,7 +97,7 @@ def main() -> None:
     활성 워크플로우 정보를 식별하여 Slack으로 알림을 전송한다.
     환경변수 로드 실패 시 조용히 종료한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 환경변수 로드
+    # .claude.workflow/.settings에서 환경변수 로드
     if not load_slack_env():
         sys.exit(0)
 

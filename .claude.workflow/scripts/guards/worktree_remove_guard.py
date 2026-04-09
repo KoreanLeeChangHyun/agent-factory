@@ -126,7 +126,7 @@ def main() -> None:
 
     경로 추출 실패, 디렉터리 부재, 미커밋 없음 시에는 통과한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_WORKTREE_REMOVE_GUARD") or read_env("HOOK_WORKTREE_REMOVE_GUARD")
 
     # Hook disable check (false/0 = disabled)

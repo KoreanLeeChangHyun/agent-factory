@@ -107,7 +107,7 @@ def main() -> None:
     워크플로우 세션이 아니면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
     세션 유형은 session_identifier.get_session_type()으로 판별한다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_AGENT_INVESTIGATION_GUARD") or read_env("HOOK_AGENT_INVESTIGATION_GUARD")
 
     # Hook disable check (false = disabled)

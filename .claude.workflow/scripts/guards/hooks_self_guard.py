@@ -170,7 +170,7 @@ def main() -> None:
     HOOKS_EDIT_ALLOWED 환경변수가 설정된 경우 차단을 우회할 수 있다.
     .claude.workflow/workflow/bypass 경로는 환경변수 우회 없이 항상 차단된다.
     """
-    # .claude.workflow/.settings(.env 폴백)에서 설정 로드
+    # .claude.workflow/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_HOOKS_SELF_PROTECT") or read_env("HOOK_HOOKS_SELF_PROTECT")
     hook_edit_allowed = os.environ.get("HOOKS_EDIT_ALLOWED") or read_env("HOOKS_EDIT_ALLOWED")
 

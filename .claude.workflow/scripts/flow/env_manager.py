@@ -1,12 +1,12 @@
 """env_manager.py - 환경변수 관리 모듈.
 
-.claude.workflow/.settings(.env 폴백) 파일의 환경 변수를 set/unset하는 책임을 담당한다.
+.claude.workflow/.settings 파일의 환경 변수를 set/unset하는 책임을 담당한다.
 HOOK_*, GUARD_* 접두사 및 HOOKS_EDIT_ALLOWED 키만 허용하는
 화이트리스트 기반 환경변수 관리를 수행한다.
 
 책임 범위:
-    - .claude.workflow/.settings(.env 폴백) 환경변수 설정 (set)
-    - .claude.workflow/.settings(.env 폴백) 환경변수 해제 (unset)
+    - .claude.workflow/.settings 환경변수 설정 (set)
+    - .claude.workflow/.settings 환경변수 해제 (unset)
     - KEY 화이트리스트 검증
     - 원자적 파일 쓰기
 """
@@ -30,9 +30,9 @@ PROJECT_ROOT: str = resolve_project_root()
 
 
 def env_manage(action: str, key: str, value: str = "") -> str:
-    """.claude.workflow/.settings(.env 폴백) 파일의 환경 변수를 관리한다.
+    """.claude.workflow/.settings 파일의 환경 변수를 관리한다.
 
-    .settings가 존재하면 해당 파일을 수정하고, 없으면 .env를 수정한다.
+    .settings 파일을 수정한다.
 
     Args:
         action: 수행할 동작. 허용값: 'set', 'unset'.
@@ -60,10 +60,8 @@ def env_manage(action: str, key: str, value: str = "") -> str:
         print(f"[WARN] env: 허용되지 않는 KEY입니다: {key} (허용: HOOK_*, GUARD_* 접두사)", file=sys.stderr)
         return "env -> skipped (disallowed key)"
 
-    # .settings 우선, .env 폴백
     cw_dir: str = os.path.join(PROJECT_ROOT, ".claude.workflow")
-    settings_path: str = os.path.join(cw_dir, ".settings")
-    env_file: str = settings_path if os.path.isfile(settings_path) else os.path.join(cw_dir, ".env")
+    env_file: str = os.path.join(cw_dir, ".settings")
     if not os.path.isfile(env_file):
         print(f"[WARN] env: 설정 파일을 찾을 수 없습니다: {env_file}", file=sys.stderr)
         return "env -> skipped (file not found)"

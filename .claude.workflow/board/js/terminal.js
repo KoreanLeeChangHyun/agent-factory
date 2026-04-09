@@ -81,7 +81,8 @@
           var tag = token.ordered ? "ol" : "ul";
           var body = "";
           for (var i = 0; i < token.items.length; i++) {
-            body += '<li>' + token.items[i].text + '</li>';
+            var itemContent = this.parser.parseInline(token.items[i].tokens);
+            body += '<li>' + itemContent + '</li>';
           }
           return '<' + tag + ' class="term-list">' + body + '</' + tag + '>';
         },
@@ -600,6 +601,27 @@
   // ── Workflow Tool Card Renderer ──
 
   /**
+   * Formats elapsed milliseconds into a human-readable duration string.
+   * < 1000ms  → "< 1s"
+   * 1s–59s    → "X.Xs"  (one decimal place)
+   * 60s–59m   → "Xm Ys"
+   * ≥ 60min   → "Xh Ym"
+   * @param {number} ms - elapsed time in milliseconds
+   * @returns {string}
+   */
+  function formatDuration(ms) {
+    if (ms < 1000) return "< 1s";
+    var totalSec = ms / 1000;
+    if (totalSec < 60) return totalSec.toFixed(1) + "s";
+    var totalMin = Math.floor(totalSec / 60);
+    var remSec = Math.floor(totalSec % 60);
+    if (totalMin < 60) return totalMin + "m " + remSec + "s";
+    var hours = Math.floor(totalMin / 60);
+    var remMin = totalMin % 60;
+    return hours + "h " + remMin + "m";
+  }
+
+  /**
    * Creates a compact tool card for workflow step panels.
    * Unlike the full 3-row createToolBox(), this renders:
    *   tool name + input summary (1 line) + collapsible output
@@ -638,7 +660,12 @@
     inputSpan.className = "wf-tool-card-input";
     cardHeader.appendChild(inputSpan);
 
+    var timeSpan = document.createElement("span");
+    timeSpan.className = "wf-tool-card-time";
+    cardHeader.appendChild(timeSpan);
+
     card.appendChild(cardHeader);
+    card.setAttribute("data-start-time", String(Date.now()));
 
     var cardBody = document.createElement("div");
     cardBody.className = "wf-tool-card-body";
@@ -742,6 +769,19 @@
     container.className = isError ? "wf-tool-error" : "wf-tool-result";
     container.innerHTML = html;
     cardBody.appendChild(container);
+
+    // Record elapsed time on the card header
+    var startTimeAttr = card.getAttribute("data-start-time");
+    if (startTimeAttr) {
+      var startTime = parseInt(startTimeAttr, 10);
+      if (!isNaN(startTime)) {
+        var elapsed = Date.now() - startTime;
+        var timeEl = card.querySelector(".wf-tool-card-time");
+        if (timeEl) {
+          timeEl.textContent = formatDuration(elapsed);
+        }
+      }
+    }
   }
 
   /** @type {HTMLElement|null} Current workflow tool card in step panel */
@@ -995,6 +1035,7 @@
   }
 
   function sendInput() {
+    if (isWorkflowMode) return;
     var input = document.getElementById("terminal-input");
     if (!input) return;
     var text = input.value.trim();
@@ -1173,6 +1214,10 @@
     if (killBtn) {
       killBtn.disabled = Board.state.termStatus === "stopped";
     }
+    var loginBtn = document.getElementById("terminal-login");
+    if (loginBtn) {
+      loginBtn.disabled = Board.state.termStatus === "stopped";
+    }
     if (statusDot) {
       statusDot.className = "terminal-status-dot terminal-status-" + Board.state.termStatus;
     }
@@ -1188,25 +1233,41 @@
       sessionIdEl.textContent = Board.state.termSessionId || '';
     }
 
-    var sendBtn = document.getElementById("terminal-send-btn");
-    if (sendBtn && !isWorkflowMode) {
-      var isRunning = Board.state.termStatus === "running";
-      if (isRunning) {
-        sendBtn.classList.add("is-stop");
-        sendBtn.disabled = false;
-        sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
-        sendBtn.onclick = function (e) { e.stopPropagation(); interruptSession(); };
+    var inputCard = document.querySelector(".terminal-input-card");
+    if (inputCard) {
+      if (isWorkflowMode) {
+        inputCard.classList.add("wf-input-hidden");
       } else {
-        sendBtn.classList.remove("is-stop");
-        sendBtn.disabled = Board.state.termStatus === "stopped";
-        sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
-        sendBtn.onclick = function (e) { e.stopPropagation(); sendInput(); };
+        inputCard.classList.remove("wf-input-hidden");
+      }
+    }
+
+    var sendBtn = document.getElementById("terminal-send-btn");
+    if (sendBtn) {
+      if (isWorkflowMode) {
+        sendBtn.style.display = "none";
+      } else {
+        sendBtn.style.display = "";
+        var isRunning = Board.state.termStatus === "running";
+        if (isRunning) {
+          sendBtn.classList.add("is-stop");
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
+          sendBtn.onclick = function (e) { e.stopPropagation(); interruptSession(); };
+        } else {
+          sendBtn.classList.remove("is-stop");
+          sendBtn.disabled = Board.state.termStatus === "stopped";
+          sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+          sendBtn.onclick = function (e) { e.stopPropagation(); sendInput(); };
+        }
       }
     }
 
     var hintEl = document.querySelector(".terminal-input-hint");
     if (hintEl) {
-      if (Board.state.termStatus === "running" && !isWorkflowMode) {
+      if (isWorkflowMode) {
+        hintEl.textContent = "자동 실행 전용";
+      } else if (Board.state.termStatus === "running") {
         var queueLen = inputQueue.length;
         if (queueLen > 0) {
           hintEl.textContent = "ESC 중지 \u00B7 대기 " + queueLen + "개";
@@ -1314,6 +1375,16 @@
     } else {
       workflowSessionId = targetId;
       isWorkflowMode = true;
+    }
+
+    // 입력 카드 표시/숨김 즉각 반영 (updateControlBar 호출 전 동기 처리)
+    var inputCardEl = document.querySelector(".terminal-input-card");
+    if (inputCardEl) {
+      if (isWorkflowMode) {
+        inputCardEl.classList.add("wf-input-hidden");
+      } else {
+        inputCardEl.classList.remove("wf-input-hidden");
+      }
     }
 
     // 상태 변수 복원
@@ -1466,6 +1537,7 @@
     h += '</div>';
     h += '<div class="terminal-settings-dropdown" id="terminal-settings-dropdown">';
     h += '<button class="terminal-settings-item" id="terminal-restart-server">Restart Server</button>';
+    h += '<button class="terminal-settings-item" id="terminal-login">Login</button>';
     h += '<button class="terminal-settings-item" id="terminal-clear-output">Clear Output</button>';
     h += '</div>';
     h += '</div>';
@@ -1759,6 +1831,16 @@
         });
       });
     }
+    var loginBtn = document.getElementById("terminal-login");
+    if (loginBtn) {
+      loginBtn.addEventListener("click", function () {
+        settingsDropdown.classList.remove("visible");
+        if (Board.state.termStatus === "stopped") return;
+        Board.session.postJson("/terminal/command", { command: "/login" }).catch(function (err) {
+          appendErrorMessage("[Error] Login failed: " + err.message);
+        });
+      });
+    }
     var clearBtn = document.getElementById("terminal-clear-output");
     if (clearBtn) {
       clearBtn.addEventListener("click", function () {
@@ -1770,10 +1852,10 @@
       inputEl.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
           e.preventDefault();
-          sendInput();
+          if (!isWorkflowMode) sendInput();
           return;
         }
-        e.stopPropagation();
+        if (e.key !== "Escape") e.stopPropagation();
       });
       inputEl.addEventListener("input", function () {
         this.style.height = "auto";

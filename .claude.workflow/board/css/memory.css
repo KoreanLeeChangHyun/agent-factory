@@ -1,4 +1,4 @@
-/* Memory Tab - 2-column layout: sidebar + editor */
+/* Prompt Tab - 4-area unified management view (Rules | Prompt | CLAUDE.md | Memory) */
 
 /* ── Container ── */
 #view-memory { padding: 0; overflow: hidden; }
@@ -126,6 +126,21 @@
   display: block;
 }
 
+/* ── Resize Handle ── */
+.memory-resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.memory-resize-handle:hover,
+.memory-resize-handle.dragging {
+  background: #D97757;
+}
+
 /* ── Editor ── */
 .memory-editor {
   flex: 1;
@@ -245,6 +260,16 @@
   display: none;
 }
 
+/* ── Prompt Code Viewer (inside preview area) ── */
+.memory-preview .code-viewer {
+  border-radius: 0;
+  border: none;
+  height: 100%;
+  min-height: 100%;
+  overflow: auto;
+  margin: 0;
+}
+
 /* ── Empty State ── */
 .memory-empty {
   display: flex;
@@ -284,6 +309,191 @@
   }
 
   .memory-sidebar {
+    width: 100%;
+    min-width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid #2d2d2d;
+  }
+}
+
+/* ── Prompt Subtab Bar ── */
+.prompt-subtab-bar {
+  display: flex;
+  align-items: center;
+  background: #181818;
+  border-bottom: 1px solid #2d2d2d;
+  flex-shrink: 0;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.prompt-subtab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.prompt-subtab {
+  padding: 9px 16px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  color: #858585;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.prompt-subtab:hover {
+  color: #cccccc;
+}
+
+.prompt-subtab.active {
+  color: #ffffff;
+  border-bottom-color: #D97757;
+}
+
+/* ── View wrapper: subtab-bar + content area ── */
+.prompt-view-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.prompt-subtab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* ── Rules/Prompt Subtab: sidebar layout reuse ── */
+.prompt-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: #181818;
+  border-right: 1px solid #2d2d2d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.prompt-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #2d2d2d;
+  flex-shrink: 0;
+}
+
+.prompt-sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #858585;
+}
+
+.prompt-file-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* ── Rules Category Groups ── */
+.prompt-category-group {
+  margin-bottom: 2px;
+}
+
+.prompt-category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.prompt-category-header:hover {
+  background: #222222;
+}
+
+.prompt-category-icon {
+  font-size: 10px;
+  color: #858585;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  width: 10px;
+  text-align: center;
+}
+
+.prompt-category-group.collapsed .prompt-category-icon {
+  transform: rotate(-90deg);
+}
+
+.prompt-category-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #858585;
+}
+
+.prompt-category-count {
+  font-size: 10px;
+  color: #5a5a5a;
+  margin-left: auto;
+}
+
+.prompt-category-files {
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.prompt-category-group.collapsed .prompt-category-files {
+  max-height: 0 !important;
+}
+
+/* ── Full-width Editor (CLAUDE.md) ── */
+.prompt-full-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1e1e1e;
+  width: 100%;
+}
+
+/* ── Responsive: Prompt Subtab ── */
+@media (max-width: 768px) {
+  .prompt-subtab {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+
+  .prompt-sidebar {
+    width: 200px;
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 600px) {
+  .prompt-subtab-bar {
+    overflow-x: auto;
+  }
+
+  .prompt-subtab-content {
+    flex-direction: column;
+  }
+
+  .prompt-sidebar {
     width: 100%;
     min-width: 100%;
     max-height: 200px;

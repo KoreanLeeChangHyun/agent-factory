@@ -51,6 +51,16 @@ from board_data import (
     _read_memory_file,
     _write_memory_file,
     _delete_memory_file,
+    _list_rules_files,
+    _read_rules_file,
+    _write_rules_file,
+    _delete_rules_file,
+    _list_prompt_files,
+    _read_prompt_file,
+    _write_prompt_file,
+    _delete_prompt_file,
+    _read_claude_md,
+    _write_claude_md,
 )
 
 logger = logging.getLogger(__name__)
@@ -331,6 +341,7 @@ _NDJSON_EVENT_MAP: dict[str, str] = {
     'control_request': 'permission',
     'error': 'error',
     'user_input': 'user_input',
+    'attachment': 'skill_listing',
 }
 
 
@@ -464,6 +475,7 @@ class TerminalSSEChannel:
         - result -> event: result
         - system -> event: system
         - control_request -> event: permission
+        - attachment (skill_listing) -> event: skill_listing
         - 기타 -> event: stdout (기본값)
 
         전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
@@ -539,6 +551,12 @@ class TerminalSSEChannel:
         if msg_type == 'assistant':
             return 'stdout'
 
+        if msg_type == 'attachment':
+            attachment_type = data.get('attachment', {}).get('type', '')
+            if attachment_type == 'skill_listing':
+                return 'skill_listing'
+            return 'stdout'
+
         return _NDJSON_EVENT_MAP.get(msg_type, 'stdout')
 
     def _build_payload(self, data: dict, event_name: str) -> dict:
@@ -553,6 +571,8 @@ class TerminalSSEChannel:
         """
         if event_name == 'user_input':
             return {'text': data.get('text', '')}
+        if event_name == 'skill_listing':
+            return self._build_skill_listing_payload(data)
         if event_name == 'stdout':
             return self._build_stdout_payload(data)
         if event_name == 'result':
@@ -578,6 +598,23 @@ class TerminalSSEChannel:
             }
         # 기본: raw 데이터 전달
         return {'kind': data.get('type', 'unknown'), 'raw': data}
+
+    def _build_skill_listing_payload(self, data: dict) -> dict:
+        """skill_listing 이벤트 페이로드를 구성한다.
+
+        Args:
+            data: 원본 NDJSON 메시지 dict (type == 'attachment')
+
+        Returns:
+            skill_listing 페이로드 dict
+        """
+        attachment = data.get('attachment', {})
+        return {
+            'kind': 'skill_listing',
+            'content': attachment.get('content', ''),
+            'skillCount': attachment.get('skillCount', 0),
+            'isInitial': attachment.get('isInitial', False),
+        }
 
     def _build_stdout_payload(self, data: dict) -> dict:
         """stdout 이벤트 페이로드를 구성한다.
@@ -1537,6 +1574,12 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._handle_terminal_permission()
         elif self.path == '/api/memory/file':
             self._handle_memory_write()
+        elif self.path == '/api/prompt/rules/file':
+            self._handle_rules_write()
+        elif self.path == '/api/prompt/prompt-files/file':
+            self._handle_prompt_write()
+        elif self.path == '/api/prompt/claude-md':
+            self._handle_claude_md_write()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1557,6 +1600,30 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(
                     _delete_memory_file(os.getcwd(), name),
                 )
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+        elif path == '/api/prompt/rules/file':
+            rel_path = qs.get('path', [None])[0]
+            if not rel_path:
+                self._send_error(400, 'Missing "path" query parameter')
+                return
+            try:
+                self._send_json(_delete_rules_file(os.getcwd(), rel_path))
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+            except RuntimeError as e:
+                self._send_error(500, str(e))
+        elif path == '/api/prompt/prompt-files/file':
+            name = qs.get('name', [None])[0]
+            if not name:
+                self._send_error(400, 'Missing "name" query parameter')
+                return
+            try:
+                self._send_json(_delete_prompt_file(os.getcwd(), name))
             except ValueError as e:
                 self._send_error(400, str(e))
             except FileNotFoundError as e:
@@ -1593,6 +1660,67 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(result)
         except ValueError as e:
             self._send_error(400, str(e))
+
+    def _handle_rules_write(self) -> None:
+        """rules 파일 생성/수정 엔드포인트를 처리한다.
+
+        POST /api/prompt/rules/file: 요청 본문 {"path": "category/filename.md", "content": "..."}
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        rel_path = data.get('path', '')
+        content = data.get('content', '')
+        if not rel_path:
+            self._send_error(400, 'Missing "path" field')
+            return
+
+        try:
+            result = _write_rules_file(os.getcwd(), rel_path, content)
+            self._send_json(result)
+        except ValueError as e:
+            self._send_error(400, str(e))
+        except RuntimeError as e:
+            self._send_error(500, str(e))
+
+    def _handle_prompt_write(self) -> None:
+        """prompt 파일 생성/수정 엔드포인트를 처리한다.
+
+        POST /api/prompt/prompt-files/file: 요청 본문 {"name": "filename", "content": "..."}
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        name = data.get('name', '')
+        content = data.get('content', '')
+        if not name:
+            self._send_error(400, 'Missing "name" field')
+            return
+
+        try:
+            result = _write_prompt_file(os.getcwd(), name, content)
+            self._send_json(result)
+        except ValueError as e:
+            self._send_error(400, str(e))
+
+    def _handle_claude_md_write(self) -> None:
+        """CLAUDE.md 수정 엔드포인트를 처리한다.
+
+        POST /api/prompt/claude-md: 요청 본문 {"content": "..."}
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        content = data.get('content')
+        if content is None:
+            self._send_error(400, 'Missing "content" field')
+            return
+
+        result = _write_claude_md(os.getcwd(), content)
+        self._send_json(result)
 
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.
@@ -1670,6 +1798,37 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(_read_memory_file(project_root, name))
             except ValueError as e:
                 self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+        elif path == '/api/prompt/rules':
+            self._send_json(_list_rules_files(project_root))
+        elif path == '/api/prompt/rules/file':
+            rel_path = qs.get('path', [None])[0]
+            if not rel_path:
+                self._send_error(400, 'Missing "path" query parameter')
+                return
+            try:
+                self._send_json(_read_rules_file(project_root, rel_path))
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+        elif path == '/api/prompt/prompt-files':
+            self._send_json(_list_prompt_files(project_root))
+        elif path == '/api/prompt/prompt-files/file':
+            name = qs.get('name', [None])[0]
+            if not name:
+                self._send_error(400, 'Missing "name" query parameter')
+                return
+            try:
+                self._send_json(_read_prompt_file(project_root, name))
+            except ValueError as e:
+                self._send_error(400, str(e))
+            except FileNotFoundError as e:
+                self._send_error(404, str(e))
+        elif path == '/api/prompt/claude-md':
+            try:
+                self._send_json(_read_claude_md(project_root))
             except FileNotFoundError as e:
                 self._send_error(404, str(e))
         else:
