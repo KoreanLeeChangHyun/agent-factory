@@ -37,8 +37,8 @@ if [ ! -d ".git" ]; then
     printf '%s  ✓ git init 완료%s\n' "${GREEN}" "${NC}"
 fi
 current_branch="$(git branch --show-current 2>/dev/null || true)"
-if [ -z "$current_branch" ]; then
-    # 초기 커밋이 없는 경우
+if [ -z "$current_branch" ] || ! git rev-parse HEAD &>/dev/null; then
+    # 초기 커밋이 없는 경우 (브랜치명만 있고 실제 ref 없음)
     git checkout -b develop -q 2>/dev/null || true
     printf '%s  ✓ develop 브랜치 생성%s\n' "${GREEN}" "${NC}"
 elif [ "$current_branch" != "develop" ]; then
