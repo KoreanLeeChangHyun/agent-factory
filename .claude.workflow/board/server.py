@@ -373,6 +373,42 @@ def _parse_last_event_id(headers: object) -> int:
         return -1
 
 
+def _parse_last_event_id_from_query(path: str) -> int:
+    """URL 쿼리 문자열에서 last_event_id 파라미터를 파싱한다.
+
+    EventSource API는 사용자 정의 헤더 주입을 허용하지 않으므로,
+    클라이언트가 재연결 시 이전 이벤트 ID를 헤더 대신 쿼리 파라미터로
+    전달한다. 헤더 값(_parse_last_event_id)과 함께 사용하여 둘 중
+    큰 쪽을 채택한다.
+
+    Args:
+        path: HTTP 요청 경로 (쿼리 포함, 예: ``/terminal/events?last_event_id=42``)
+
+    Returns:
+        파싱된 정수 ID. 파라미터 없거나 파싱 실패 시 -1.
+    """
+    try:
+        if '?' not in path:
+            return -1
+        from urllib.parse import parse_qs
+        qs = parse_qs(path.split('?', 1)[1])
+        raw = qs.get('last_event_id', [None])[0]
+        if raw is None:
+            return -1
+        return int(str(raw).strip())
+    except (ValueError, TypeError, AttributeError):
+        return -1
+
+
+def _resolve_last_event_id(headers: object, path: str) -> int:
+    """헤더와 쿼리 파라미터에서 last_event_id를 해석하여 최대값을 반환한다.
+
+    EventSource는 새 인스턴스 생성 시 Last-Event-ID 헤더를 자동 포함하지 않으므로,
+    명시적 쿼리 파라미터 경로가 주 경로다. 헤더 경로는 폴백이다.
+    """
+    return max(_parse_last_event_id(headers), _parse_last_event_id_from_query(path))
+
+
 class TerminalSSEChannel:
     """터미널 출력 전용 SSE 브로드캐스트 채널.
 
@@ -2022,8 +2058,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
 
-        # 재접속 시 Last-Event-ID로 중복 재생 방지
-        last_event_id = _parse_last_event_id(self.headers)
+        # 재접속 시 last_event_id로 중복 재생 방지 (헤더 + 쿼리 파라미터)
+        last_event_id = _resolve_last_event_id(self.headers, self.path)
         terminal_sse_channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:
@@ -2551,8 +2587,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
 
-        # 재접속 시 Last-Event-ID로 중복 재생 방지
-        last_event_id = _parse_last_event_id(self.headers)
+        # 재접속 시 last_event_id로 중복 재생 방지 (헤더 + 쿼리 파라미터)
+        last_event_id = _resolve_last_event_id(self.headers, self.path)
         session.channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:

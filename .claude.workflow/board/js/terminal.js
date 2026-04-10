@@ -1489,7 +1489,11 @@
     _restoreSession(targetSessionId);
 
     // 4. SSE 재연결: disconnectSSE → connectSSEReady → fetchStatus
+    // 세션이 바뀌면 이전 채널의 last-event-id는 의미 없으므로 리셋
     if (Board.session) {
+      if (Board.session.resetLastEventId) {
+        Board.session.resetLastEventId();
+      }
       Board.session.disconnectSSE();
       Board.session.connectSSEReady()
         .then(function () { Board.session.fetchStatus(); })

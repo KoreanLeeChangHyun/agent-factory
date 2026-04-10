@@ -48,6 +48,25 @@
   var _pendingTextBuffer = "";
 
   /**
+   * Last SSE event id successfully received by the client.
+   * Used on reconnect to request history replay from the next id, avoiding
+   * full-history re-replay that caused panel duplication on tab switch.
+   *
+   * EventSource does not allow setting custom headers, so we pass this
+   * via `last_event_id` URL query parameter. The server accepts either
+   * the native Last-Event-ID header or this query parameter.
+   *
+   * @type {number}
+   */
+  var _lastEventId = -1;
+
+  function _captureEventId(e) {
+    if (!e || e.lastEventId == null) return;
+    var n = parseInt(e.lastEventId, 10);
+    if (!isNaN(n) && n > _lastEventId) _lastEventId = n;
+  }
+
+  /**
    * Per-tool_use_id input buffer map.
    * Parallel tool calls may interleave input_json_delta events, so each
    * tool_use_id gets its own accumulator instead of a single shared buffer.
@@ -195,7 +214,12 @@
     // Reset pending text buffer on reconnect
     _pendingTextBuffer = "";
 
-    termEventSource = new EventSource(_ctx.endpoints().events);
+    // Resume from last received event id to prevent full-history replay on reconnect
+    var eventsUrl = _ctx.endpoints().events;
+    if (_lastEventId >= 0) {
+      eventsUrl += (eventsUrl.indexOf("?") >= 0 ? "&" : "?") + "last_event_id=" + _lastEventId;
+    }
+    termEventSource = new EventSource(eventsUrl);
 
     termEventSource.addEventListener("open", function () {
       Board.state.termConnected = true;
@@ -203,6 +227,7 @@
     });
 
     termEventSource.addEventListener("stdout", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
 
@@ -384,6 +409,7 @@
     });
 
     termEventSource.addEventListener("result", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         if (data.done) {
@@ -445,6 +471,7 @@
     });
 
     termEventSource.addEventListener("system", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         if (data.subtype === "init" && data.session_id) {
@@ -499,6 +526,7 @@
     });
 
     termEventSource.addEventListener("permission", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         var requestId = data.request_id || "";
@@ -610,6 +638,7 @@
     });
 
     termEventSource.addEventListener("skill_listing", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         var content = data.content || "";
@@ -652,6 +681,7 @@
     });
 
     termEventSource.addEventListener("user_input", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         if (!data.text) return;
@@ -674,6 +704,7 @@
     });
 
     termEventSource.addEventListener("error", function (e) {
+      _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
         if (data.exit_code === 143 || data.exit_code === 0) return;
@@ -729,6 +760,10 @@
       _ctx.appendErrorMessage("[오류] 잘못된 세션 ID 형식입니다: " + String(resumeSessionId).substring(0, 16));
       return;
     }
+
+    // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
+    // 이전 채널의 last-event-id는 의미가 없다. 리셋하여 새 히스토리를 받도록 한다.
+    _lastEventId = -1;
 
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
@@ -849,6 +884,15 @@
     if (text) _sentTexts.add(text);
   }
 
+  /**
+   * Reset last-event-id tracker. Call when switching to a different session
+   * or starting a fresh session so that history replay starts from the
+   * beginning of the new channel instead of carrying over an unrelated id.
+   */
+  function resetLastEventId() {
+    _lastEventId = -1;
+  }
+
   // ── Register on Board namespace ──
   Board.session = {
     connectSSE: connectSSE,
@@ -859,6 +903,7 @@
     killSession: killSession,
     fetchStatus: fetchStatus,
     postJson: postJson,
+    resetLastEventId: resetLastEventId,
     _bind: bind,
     _markSent: markSent
   };
