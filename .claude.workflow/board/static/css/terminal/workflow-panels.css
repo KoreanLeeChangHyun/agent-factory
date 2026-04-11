@@ -1,0 +1,1164 @@
+/* ═══════════════════════════════════════════════════════
+   Section 5: Workflow Timeline Bar (wf-* namespace)
+   Namespace: wf-*  (분리: terminal-* = 세션바, term-* = T-244 도구 출력)
+   ═══════════════════════════════════════════════════════ */
+
+/* ── .wf-timeline-bar: fixed container below .terminal-session-bar ── */
+.wf-timeline-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 14px 7px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  font-size: 11px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* ── .wf-meta-row: command · title #workId ── */
+.wf-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #858585;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.wf-meta-command {
+  color: #D97757;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.wf-meta-sep {
+  color: #555;
+}
+
+.wf-meta-title {
+  color: #cccccc;
+}
+
+.wf-meta-id {
+  color: #858585;
+  margin-left: 2px;
+}
+
+/* ── .wf-steps-row: horizontal step node list ── */
+.wf-steps-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wf-steps-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── .wf-timeline-step: individual step node ── */
+.wf-timeline-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+/* Pending (not yet reached) */
+.wf-timeline-step.pending {
+  color: #555;
+  background: transparent;
+  border-color: #3a3a3a;
+}
+
+/* Done (already completed) */
+.wf-timeline-step.done {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.08);
+  border-color: rgba(78, 201, 176, 0.25);
+}
+
+/* Active (current step) — Claude brand orange */
+.wf-timeline-step.active {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+  border-color: rgba(217, 119, 87, 0.40);
+  box-shadow: 0 0 0 1px rgba(217, 119, 87, 0.15);
+}
+
+/* Failed step */
+.wf-timeline-step[data-step="failed"].active {
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.10);
+  border-color: rgba(244, 135, 113, 0.35);
+}
+
+/* ── .wf-phase-badge: Phase N badge inside WORK step ── */
+.wf-phase-badge {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: #c96442;
+  color: #fff;
+  line-height: 14px;
+  vertical-align: middle;
+}
+
+/* ── .wf-step-time: elapsed time badge per step ── */
+.wf-step-time {
+  font-size: 9px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+
+.wf-step-time.active {
+  color: #D97757;
+  opacity: 0.85;
+}
+
+.wf-step-time.done {
+  color: #4ec9b0;
+  opacity: 0.7;
+}
+
+/* ── .wf-timeline-sep: → separator between steps ── */
+.wf-timeline-sep {
+  color: #444;
+  font-size: 10px;
+  padding: 0 1px;
+  flex-shrink: 0;
+}
+
+/* ── .wf-agent-row: agent status row inside WORK step ── */
+.wf-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 10px;
+  color: #858585;
+}
+
+/* ── .wf-agent-badge: individual agent status badge ── */
+.wf-agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.wf-agent-badge.running {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.25);
+}
+
+.wf-agent-badge.completed {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.08);
+  border: 1px solid rgba(78, 201, 176, 0.2);
+}
+
+/* ── .wf-artifacts-row: artifact link row ── */
+.wf-artifacts-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding-top: 3px;
+  border-top: 1px solid #2e2e2e;
+}
+
+/* ── .wf-timeline-artifact: clickable artifact link ── */
+.wf-timeline-artifact {
+  display: inline-block;
+  color: #9cdcfe;
+  text-decoration: none;
+  font-size: 10px;
+  border-bottom: 1px dotted rgba(156, 220, 254, 0.35);
+  transition: color 0.1s, border-color 0.1s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wf-timeline-artifact:hover {
+  color: #b8e4ff;
+  border-bottom-color: rgba(184, 228, 255, 0.6);
+  border-bottom-style: solid;
+}
+
+/* ── .wf-status-badge: completion/failure overlay badge ── */
+.wf-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  position: sticky;
+  bottom: 8px;
+  z-index: 10;
+}
+
+/* OK badge — teal success */
+.wf-status-badge[data-status="ok"] {
+  background: rgba(78, 201, 176, 0.12);
+  border: 1px solid rgba(78, 201, 176, 0.35);
+  color: #4ec9b0;
+}
+
+/* Fail badge — error orange-red */
+.wf-status-badge[data-status="fail"] {
+  background: rgba(244, 135, 113, 0.10);
+  border: 1px solid rgba(244, 135, 113, 0.35);
+  color: #f48771;
+}
+
+.wf-badge-icon {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.wf-badge-text {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.wf-badge-sub {
+  opacity: 0.75;
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section 6: Workflow Step Panels (wf-step-panel, wf-tool-card)
+   Namespace: wf-*  (워크플로우 세션 전용 렌더링 컴포넌트)
+   ═══════════════════════════════════════════════════════ */
+
+/* ── .wf-step-panel: step-level grouping container ── */
+.wf-step-panel {
+  margin: 8px 0 4px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.85);
+  border: 1px solid #2e2e2e;
+  overflow: hidden;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.wf-step-panel[data-status="active"] {
+  border-color: #3c3c3c;
+}
+
+.wf-step-panel[data-status="done"] {
+  opacity: 0.7;
+  border-color: #2a2a2a;
+}
+
+/* ── Step-specific border color ── */
+.wf-step-panel[data-step="unknown"] { border-color: #858585; }
+.wf-step-panel[data-step="init"]    { border-color: #858585; }
+.wf-step-panel[data-step="plan"]    { border-color: #569cd6; }
+.wf-step-panel[data-step="work"]    { border-color: #D97757; }
+.wf-step-panel[data-step="report"]  { border-color: #c586c0; }
+.wf-step-panel[data-step="done"]    { border-color: #4ec9b0; }
+.wf-step-panel[data-step="failed"]  { border-color: #f48771; }
+
+/* ── .wf-step-panel-header: step name + status badge row ── */
+.wf-step-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(40, 40, 40, 0.6);
+  border-bottom: 1px solid #2a2a2a;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.wf-step-panel-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.wf-step-panel-name {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #cccccc;
+}
+
+.wf-step-panel-status {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.wf-step-panel-status[data-status="active"] {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+}
+
+.wf-step-panel-status[data-status="done"] {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.10);
+}
+
+/* ── .wf-step-panel-body: tool output container ── */
+.wf-step-panel-body {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-step-panel-body:empty {
+  padding: 0;
+}
+
+/* ── .wf-tool-card: compact tool output card inside step panel ── */
+.wf-tool-card {
+  background: rgba(35, 35, 35, 0.7);
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.wf-tool-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: #999;
+  cursor: default;
+  min-height: 24px;
+}
+
+.wf-tool-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: #666;
+  transition: transform 0.15s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.wf-tool-card-toggle:hover {
+  color: #999;
+}
+
+.wf-tool-card-toggle.rotated {
+  transform: rotate(90deg);
+}
+
+.wf-tool-card-name {
+  font-weight: 600;
+  color: #9cdcfe;
+  flex-shrink: 0;
+}
+
+.wf-tool-card-input {
+  color: #858585;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── .wf-tool-card-time: execution duration display (right-aligned) ── */
+.wf-tool-card-time {
+  margin-left: auto;
+  font-size: 10px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── .wf-tool-card-body: collapsible output area ── */
+.wf-tool-card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+  border-top: 1px solid transparent;
+}
+
+.wf-tool-card.open .wf-tool-card-body {
+  max-height: 600px;
+  overflow-y: auto;
+  border-top-color: #2a2a2a;
+}
+
+.wf-tool-card-body .wf-tool-result,
+.wf-tool-card-body .wf-tool-error {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.wf-tool-card-body .wf-tool-error {
+  color: #f48771;
+}
+
+/* ── .wf-assistant-block: markdown text inside step panel ── */
+.wf-assistant-block {
+  padding: 6px 10px;
+  color: #cccccc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wf-assistant-block .term-heading {
+  margin: 8px 0 4px;
+}
+
+.wf-assistant-block .term-code-block {
+  margin: 4px 0;
+}
+
+.wf-assistant-block .term-para {
+  margin: 4px 0;
+}
+
+.wf-assistant-block .term-list {
+  margin: 4px 0 4px 16px;
+}
+
+.term-list li {
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+
+.term-list li p,
+.term-message li p,
+.term-md-result li p {
+  margin: 0;
+}
+
+/* ============================================================
+   Permission Request UI
+   ============================================================ */
+
+.term-permission {
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  background: rgba(217, 119, 87, 0.08);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 6px;
+}
+
+.term-permission-label {
+  font-weight: bold;
+  color: #D97757;
+}
+
+.term-permission-tool {
+  font-family: monospace;
+  color: #cccccc;
+  font-size: 90%;
+}
+
+.term-permission-desc {
+  color: #999;
+  font-size: 90%;
+  margin-top: 4px;
+}
+
+.term-permission-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.term-permission-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.term-permission-btn.allow {
+  background: #2ea043;
+  color: white;
+}
+
+.term-permission-btn.allow:hover {
+  background: #3fb950;
+}
+
+.term-permission-btn.deny {
+  background: #555;
+  color: #ccc;
+}
+
+.term-permission-btn.deny:hover {
+  background: #666;
+}
+
+.term-permission-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.term-permission-result {
+  margin-top: 6px;
+  font-size: 90%;
+}
+
+.term-permission-result.allowed {
+  color: #3fb950;
+}
+
+.term-permission-result.denied {
+  color: #f85149;
+}
+
+/* -- permission input collapsible -- */
+
+.term-permission-input {
+  margin-top: 8px;
+}
+
+.term-permission-input-toggle {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.term-permission-input-toggle:hover {
+  color: #ccc;
+}
+
+.term-permission-input-content {
+  display: none;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #aaa;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.term-permission-input-content.expanded {
+  display: block;
+}
+
+/* -- permission resolved state -- */
+
+.term-permission-actions.resolved {
+  opacity: 0.6;
+}
+
+.term-permission-actions.resolved .term-permission-btn {
+  display: none;
+}
+
+/* ============================================
+   WF Ticket UI
+   ============================================ */
+
+/* 기본 카드 컨테이너 */
+.wf-ticket-block {
+  border: 1px solid rgba(86,156,214,0.3);
+  background: rgba(86,156,214,0.06);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+/* 헤더 영역 */
+.wf-ticket-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 티켓 ID 배지 */
+.wf-ticket-id {
+  font-weight: bold;
+  color: #569cd6;
+  font-family: monospace;
+}
+
+/* WF 플래그 배지 */
+.wf-ticket-flag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(86,156,214,0.15);
+  color: #569cd6;
+  font-size: 85%;
+}
+
+/* 본문 영역 */
+.wf-ticket-body {
+  color: #ccc;
+  line-height: 1.5;
+  font-size: 11px;
+}
+
+/* 선택지 버튼 컨테이너 */
+.wf-ticket-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 선택지 버튼 */
+.wf-ticket-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  background: #2a2d31;
+  color: #ccc;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.wf-ticket-btn:hover { background: #363a40; }
+.wf-ticket-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 0번 취소/완료 버튼 */
+.wf-ticket-btn.is-cancel {
+  color: #999;
+  border-top: 1px solid #333;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+/* 번호 부분 */
+.wf-ticket-btn .btn-number {
+  font-weight: bold;
+  color: #569cd6;
+  margin-right: 8px;
+}
+
+/* 클릭 후 resolved 상태 */
+.wf-ticket-actions-resolved .wf-ticket-btn { /* 모든 버튼 비활성 */ }
+
+/* 선택된 버튼 하이라이트 */
+.wf-ticket-selected {
+  background: rgba(86,156,214,0.15);
+  border-color: #569cd6;
+}
+
+/* 성공 결과 카드 */
+.wf-status-ok {
+  border-color: rgba(63,185,80,0.4);
+  background: rgba(63,185,80,0.06);
+}
+
+/* 에러 결과 카드 */
+.wf-status-err {
+  border-color: rgba(244,135,113,0.4);
+  background: rgba(244,135,113,0.06);
+}
+
+/* 상태 인라인 배지 */
+.wf-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 85%;
+}
+
+/* 안내 문구 */
+.wf-ticket-hint {
+  color: #666;
+  font-size: 85%;
+  margin-top: 6px;
+}
+
+/* ============================================
+   Section 8: Flow Command Cards (flow-cmd-*)
+   ============================================ */
+
+/* ── .flow-cmd-card: compact card container ── */
+.flow-cmd-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 3px 0;
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.06);
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+  flex-wrap: wrap;
+}
+
+/* ── .flow-cmd-badge: ticket ID badge ── */
+.flow-cmd-badge {
+  font-family: monospace;
+  font-weight: bold;
+  color: #D97757;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.flow-cmd-badge .term-id-link {
+  color: #D97757;
+}
+
+/* ── Transition card ── */
+.flow-cmd-transition-card {
+  background: rgba(217, 119, 87, 0.06);
+  border-color: rgba(217, 119, 87, 0.25);
+}
+.flow-cmd-transition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-cmd-from,
+.flow-cmd-to {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.flow-cmd-arrow {
+  color: #888;
+  font-size: 14px;
+}
+
+/* Status colors */
+.flow-st-open {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+}
+.flow-st-progress {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-st-review {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-st-done {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-st-default {
+  background: rgba(200, 200, 200, 0.1);
+  color: #aaa;
+}
+
+/* ── Create card ── */
+.flow-cmd-create-card {
+  background: rgba(86, 156, 214, 0.06);
+  border-color: rgba(86, 156, 214, 0.25);
+}
+.flow-cmd-title {
+  color: #ccc;
+}
+.flow-cmd-command {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+/* ── Delete card ── */
+.flow-cmd-delete-card {
+  background: rgba(130, 130, 130, 0.06);
+  border-color: rgba(130, 130, 130, 0.25);
+}
+.flow-cmd-deleted {
+  color: #888;
+}
+
+/* ── Update card ── */
+.flow-cmd-update-card {
+  background: rgba(217, 119, 87, 0.06);
+  border-color: rgba(217, 119, 87, 0.2);
+}
+.flow-cmd-update-desc {
+  color: #bbb;
+}
+.flow-cmd-updated {
+  color: #D97757;
+  font-size: 12px;
+}
+
+/* ── Action label (shared) ── */
+.flow-cmd-action {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* ── Launcher card ── */
+.flow-cmd-launcher {
+  background: rgba(217, 119, 87, 0.08);
+  border-color: rgba(217, 119, 87, 0.3);
+}
+.flow-cmd-launcher-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 11px;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+.flow-cmd-launch {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-cmd-inline {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-cmd-launcher-msg {
+  color: #ccc;
+}
+
+/* ── System status card ── */
+.flow-cmd-system {
+  background: rgba(200, 200, 200, 0.04);
+  border-color: rgba(200, 200, 200, 0.15);
+}
+.flow-cmd-system-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 11px;
+  font-family: monospace;
+}
+.flow-sys-init {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+}
+.flow-sys-done {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+.flow-sys-state {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-sys-step {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-sys-phase {
+  background: rgba(180, 130, 210, 0.15);
+  color: #c89be0;
+}
+.flow-sys-workflow {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+}
+.flow-cmd-system-msg {
+  color: #ccc;
+}
+
+/* ── Error card ── */
+.flow-cmd-error {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: rgba(248, 81, 73, 0.35);
+}
+.flow-cmd-error-msg {
+  color: #f85149;
+  font-weight: 500;
+}
+
+/* ── Warning card ── */
+.flow-cmd-warn {
+  background: rgba(210, 170, 60, 0.08);
+  border-color: rgba(210, 170, 60, 0.3);
+}
+.flow-cmd-warn-msg {
+  color: #d2a53c;
+  font-weight: 500;
+}
+
+/* ── Info card (이미 상태) ── */
+.flow-cmd-info {
+  background: rgba(86, 156, 214, 0.06);
+  border-color: rgba(86, 156, 214, 0.2);
+}
+.flow-cmd-info-text {
+  color: #8ab4d9;
+}
+
+/* ── Detail block (>> lines) ── */
+.flow-cmd-detail {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: #999;
+}
+.flow-cmd-detail div {
+  padding: 1px 0;
+}
+
+/* ── Multi-card container ── */
+.flow-cmd-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Plain text fallback inside flow card ── */
+.flow-cmd-plain {
+  color: #aaa;
+  font-size: 13px;
+  padding: 2px 0;
+  font-family: monospace;
+}
+
+/* ── Empty badge ── */
+.flow-cmd-empty {
+  color: #666;
+  font-style: italic;
+}
+
+/* ── Kanban show card ── */
+.flow-cmd-show {
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.04);
+  padding: 10px 14px;
+}
+.flow-cmd-show-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.flow-cmd-show-title {
+  color: #ddd;
+  font-weight: 500;
+}
+.flow-cmd-show-kv {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.flow-cmd-show-key {
+  color: #888;
+  font-weight: 500;
+  min-width: 70px;
+}
+.flow-cmd-show-val {
+  color: #bbb;
+}
+.flow-cmd-show-section {
+  margin-top: 6px;
+}
+.flow-cmd-show-section-label {
+  font-size: 11px;
+  color: #D97757;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.flow-cmd-show-section-body {
+  font-size: 12px;
+  color: #aaa;
+  white-space: pre-wrap;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+/* ── Kanban board card ── */
+.flow-cmd-board {
+  border: 1px solid rgba(217, 119, 87, 0.2);
+  border-radius: 6px;
+  background: rgba(217, 119, 87, 0.04);
+  padding: 10px 14px;
+}
+.flow-cmd-board-header {
+  font-weight: 600;
+  color: #D97757;
+  font-size: 14px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.flow-cmd-board-col {
+  margin-bottom: 8px;
+}
+.flow-cmd-board-col-name {
+  font-size: 12px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.flow-cmd-board-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.flow-cmd-board-item-title {
+  color: #bbb;
+}
+
+/* ── Flow command tool box overrides ── */
+.term-tool-box[data-flow-cmd] {
+  border-color: rgba(217, 119, 87, 0.25);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-header {
+  background: rgba(217, 119, 87, 0.08);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-header:hover {
+  background: rgba(217, 119, 87, 0.14);
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-label {
+  color: #D97757;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.term-tool-box[data-flow-cmd] .term-toggle-icon {
+  color: #D97757;
+}
+
+.term-tool-box[data-flow-cmd] .term-tool-input {
+  display: block;
+  border-bottom: 1px solid rgba(217, 119, 87, 0.15);
+}
+
+/* ── Flow command formatted args ── */
+.flow-cmd-base {
+  display: block;
+  color: #D97757;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.flow-cmd-arg {
+  padding: 1px 0 1px 16px;
+  line-height: 1.5;
+}
+
+.flow-cmd-key {
+  color: #9cdcfe;
+}
+
+.flow-cmd-val {
+  color: #ce9178;
+}
+
+/* ============================================================
+   Skill Listing UI
+   ============================================================ */
+
+.term-skill-listing {
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.06);
+  padding: 10px 16px;
+  margin: 8px 0;
+  border-radius: 6px;
+}
+
+.term-skill-label {
+  font-weight: bold;
+  color: #58a6ff;
+  font-size: 13px;
+}
+
+.term-skill-details {
+  margin-top: 8px;
+}
+
+.term-skill-summary {
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  outline: none;
+}
+
+.term-skill-summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-skill-summary::before {
+  content: "▶ ";
+  font-size: 10px;
+  color: #666;
+}
+
+.term-skill-details[open] .term-skill-summary::before {
+  content: "▼ ";
+}
+
+.term-skill-summary:hover {
+  color: #aaa;
+}
+
+.term-skill-item {
+  padding: 2px 0 2px 16px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #9cdcfe;
+  line-height: 1.6;
+}
