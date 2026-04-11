@@ -59,11 +59,25 @@
    * @type {number}
    */
   var _lastEventId = -1;
+  /** @type {Object<string, number>} sessionId -> last-event-id */
+  var _lastEventIdBySession = {};
+
+  function _sessionKey() {
+    if (_ctx && _ctx.isWorkflowMode && _ctx.isWorkflowMode()) {
+      return (_ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId()) || "main";
+    }
+    return "main";
+  }
 
   function _captureEventId(e) {
     if (!e || e.lastEventId == null) return;
     var n = parseInt(e.lastEventId, 10);
-    if (!isNaN(n) && n > _lastEventId) _lastEventId = n;
+    if (isNaN(n)) return;
+    if (n > _lastEventId) _lastEventId = n;
+    var key = _sessionKey();
+    if (!(key in _lastEventIdBySession) || n > _lastEventIdBySession[key]) {
+      _lastEventIdBySession[key] = n;
+    }
   }
 
   /**
@@ -891,6 +905,22 @@
    */
   function resetLastEventId() {
     _lastEventId = -1;
+    _lastEventIdBySession = {};
+  }
+
+  /**
+   * Switch the active last-event-id tracker to a specific session.
+   * Used by switchSession() so tab round-trips resume from the last
+   * seen event instead of replaying full history.
+   * @param {string} sessionId
+   */
+  function adoptLastEventIdForSession(sessionId) {
+    var key = sessionId || "main";
+    if (key in _lastEventIdBySession) {
+      _lastEventId = _lastEventIdBySession[key];
+    } else {
+      _lastEventId = -1;
+    }
   }
 
   // ── Register on Board namespace ──
@@ -904,6 +934,7 @@
     fetchStatus: fetchStatus,
     postJson: postJson,
     resetLastEventId: resetLastEventId,
+    adoptLastEventIdForSession: adoptLastEventIdForSession,
     _bind: bind,
     _markSent: markSent
   };

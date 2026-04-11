@@ -26,8 +26,13 @@
 
   // ── Markdown Renderer (marked.js wrapper with fallback) ──
 
+  var _termMermaidCounter = 0;
+  var _markedConfigured = false;
+
   function initMarked() {
     if (typeof marked === "undefined") return;
+    if (_markedConfigured) return;
+    _markedConfigured = true;
 
     marked.use({
       breaks: true,
@@ -36,6 +41,10 @@
         code: function (token) {
           var text = token.text;
           var lang = token.lang;
+          if (lang === "mermaid") {
+            var mid = "term-mermaid-" + (++_termMermaidCounter);
+            return '<div class="mermaid-block" data-mermaid-id="' + mid + '">' + esc(text) + '</div>';
+          }
           var langLabel = lang ? esc(lang) : "code";
           var highlighted = "";
           if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
@@ -101,8 +110,14 @@
 
   function renderMarkdownToHtml(text) {
     if (typeof marked !== "undefined" && marked.parse) {
+      if (!_markedConfigured) initMarked();
       try {
-        return marked.parse(text);
+        var html = marked.parse(text);
+        // Mermaid blocks need post-insert init (DOM not ready until caller appends)
+        if (Board.render && Board.render.initMermaid) {
+          setTimeout(Board.render.initMermaid, 0);
+        }
+        return html;
       } catch (e) {
         // marked.js parse failure -- fallback
       }
@@ -1365,7 +1380,7 @@
 
   // ── Session Switcher Engine ──
 
-  var MAX_SAVED_NODES = 500;
+  var MAX_SAVED_NODES = 5000;
 
   /**
    * 현재 활성 세션의 상태를 _sessionMap에 저장한다.
@@ -1440,6 +1455,20 @@
       inputQueue.push(entry.inputQueue[qi]);
     }
 
+    // Reset shared module-scoped state; otherwise new session events
+    // route to prior session's DOM references (wf panel + tool buffers).
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.reset) {
+      Board.WorkflowRenderer.reset();
+    }
+    stopSpinner();
+    currentToolBox = null;
+    toolBoxMap = {};
+    currentToolName = null;
+    textBuffer = "";
+    toolInputBuffer = "";
+    receivedChunks = false;
+    currentWorkflowToolCard = null;
+
     // outputDiv 복원
     if (outputDiv) {
       outputDiv.innerHTML = "";
@@ -1489,9 +1518,11 @@
     _restoreSession(targetSessionId);
 
     // 4. SSE 재연결: disconnectSSE → connectSSEReady → fetchStatus
-    // 세션이 바뀌면 이전 채널의 last-event-id는 의미 없으므로 리셋
+    // 세션별 last-event-id 트래커를 복원하여 탭 왕복 시 히스토리 중복 재생을 차단
     if (Board.session) {
-      if (Board.session.resetLastEventId) {
+      if (Board.session.adoptLastEventIdForSession) {
+        Board.session.adoptLastEventIdForSession(targetSessionId);
+      } else if (Board.session.resetLastEventId) {
         Board.session.resetLastEventId();
       }
       Board.session.disconnectSSE();
