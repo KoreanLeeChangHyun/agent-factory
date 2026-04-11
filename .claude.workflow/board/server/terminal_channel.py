@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Callable
 
 from ._common import logger
+from .sse_client_manager import _NDJSON_EVENT_MAP
 
 
 def _parse_last_event_id(headers: object) -> int:

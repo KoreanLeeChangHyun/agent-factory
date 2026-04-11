@@ -276,17 +276,11 @@ function urlDir(url) {
   return url.substring(0, url.lastIndexOf("/") + 1);
 }
 
-/**
- * Returns the project root URL path.
- * Board page is at <root>/.claude.workflow/board/index.html.
- * Strips .claude.workflow/board/ from the current path to find the root.
- */
 function projectRoot() {
   var path = window.location.pathname;
   var idx = path.indexOf(".claude.workflow/board/");
   if (idx !== -1) return path.substring(0, idx);
-  // fallback
-  return "../../";
+  return "/";
 }
 
 /**

@@ -10,6 +10,7 @@ from ..state import sse_manager, poll_tracker
 from .._common import (
     SERVER_STARTED_AT,
     SERVER_PID,
+    _parse_env_file,
     _read_kanban_tickets,
     _read_dashboard,
     _list_workflow_entries,

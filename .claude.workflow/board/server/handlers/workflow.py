@@ -9,6 +9,8 @@ import uuid
 
 from ..state import workflow_registry
 from .._common import logger
+from ..terminal_channel import _resolve_last_event_id
+from ..claude_process import _validate_images
 
 
 class WorkflowHandlerMixin:

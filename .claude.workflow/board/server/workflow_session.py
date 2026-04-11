@@ -16,6 +16,7 @@ from .claude_process import ClaudeProcess
 from .terminal_channel import TerminalSSEChannel
 
 
+@dataclass
 class WorkflowSession:
     """워크플로우 세션 하나를 나타내는 데이터 클래스.
 

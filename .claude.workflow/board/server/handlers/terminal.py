@@ -8,7 +8,9 @@ import time
 import uuid
 
 from ..state import terminal_sse_channel, claude_process, workflow_registry
-from .._common import logger
+from .._common import logger, _get_git_branch
+from ..terminal_channel import _resolve_last_event_id
+from ..claude_process import _validate_images
 
 
 class TerminalHandlerMixin:

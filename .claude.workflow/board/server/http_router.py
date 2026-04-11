@@ -6,7 +6,13 @@ import json
 import os
 from http.server import SimpleHTTPRequestHandler
 
-from ._common import logger
+from ._common import (
+    logger,
+    _update_env_value,
+    _delete_memory_file,
+    _delete_rules_file,
+    _delete_prompt_file,
+)
 from .handlers.files import FilesHandlerMixin
 from .handlers.sync import SyncHandlerMixin
 from .handlers.generic import GenericHandlerMixin
@@ -34,7 +40,29 @@ class BoardHTTPRequestHandler(
         static_dir = os.path.join(
             os.getcwd(), '.claude.workflow', 'board', 'static',
         )
+        self._project_root = os.getcwd()
         super().__init__(*args, directory=static_dir, **kwargs)
+
+    def translate_path(self, path: str) -> str:
+        """정적 파일 경로를 해석한다.
+
+        라우팅:
+          - ``/.claude.workflow/board/*`` → ``static/*`` (기존 북마크 호환)
+          - ``/.claude.workflow/*``       → 프로젝트 루트 (워크플로우 산출물)
+          - 그 외                          → ``static/*`` (기본)
+        """
+        from urllib.parse import urlsplit, unquote
+        clean = urlsplit(path).path
+        clean = unquote(clean)
+        legacy = '/.claude.workflow/board/'
+        if clean.startswith(legacy):
+            rel = clean[len(legacy):]
+            return os.path.join(self.directory, rel)
+        wf_prefix = '/.claude.workflow/'
+        if clean.startswith(wf_prefix):
+            rel = clean.lstrip('/')
+            return os.path.join(self._project_root, rel)
+        return super().translate_path(path)
 
     def do_GET(self) -> None:
         """GET 요청을 처리한다."""

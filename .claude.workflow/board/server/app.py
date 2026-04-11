@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import collections
+import hashlib
 import os
 import signal
 import socket
@@ -18,6 +19,7 @@ from ._common import (
     WATCH_INTERVAL,
     WATCH_DIRS,
     logger,
+    _resolve_memory_dir,
 )
 from .http_router import BoardHTTPRequestHandler
 from .sse_client_manager import FileWatcher, SSEClientManager
