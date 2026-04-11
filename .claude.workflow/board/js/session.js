@@ -61,10 +61,7 @@
   var _lastEventId = -1;
   /** @type {Object<string, number>} sessionId -> last-event-id */
   var _lastEventIdBySession = {};
-  /** Consecutive SSE onerror count; reconnect loop aborts when MAX reached. */
-  var _reconnectFailureCount = 0;
-  var MAX_RECONNECT_FAILURES = 5;
-  /** Set true when server sends archived_end; disables future reconnects. */
+  /** Set true when server sends archived_end or fetchStatus 404; disables reconnect. */
   var _sessionArchived = false;
 
   function _sessionKey() {
@@ -266,7 +263,6 @@
     });
 
     termEventSource.addEventListener("open", function () {
-      _reconnectFailureCount = 0;
       Board.state.termConnected = true;
       _ctx.updateControlBar();
     });
@@ -776,16 +772,6 @@
         return;
       }
 
-      _reconnectFailureCount += 1;
-      if (_reconnectFailureCount >= MAX_RECONNECT_FAILURES) {
-        _ctx.appendErrorMessage(
-          "[Error] SSE 재연결 " + MAX_RECONNECT_FAILURES + "회 실패 — 재시도 중단"
-        );
-        Board.state.termStatus = "stopped";
-        _ctx.updateControlBar();
-        return;
-      }
-
       if (!reconnectTimerId) {
         reconnectTimerId = setTimeout(function () {
           reconnectTimerId = null;
@@ -826,7 +812,6 @@
     // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
     // 이전 채널의 last-event-id는 의미가 없다. 리셋하여 새 히스토리를 받도록 한다.
     _lastEventId = -1;
-    _reconnectFailureCount = 0;
     _sessionArchived = false;
 
     if (_ctx.isWorkflowMode()) {
@@ -956,7 +941,6 @@
   function resetLastEventId() {
     _lastEventId = -1;
     _lastEventIdBySession = {};
-    _reconnectFailureCount = 0;
     _sessionArchived = false;
   }
 
@@ -973,7 +957,6 @@
     } else {
       _lastEventId = -1;
     }
-    _reconnectFailureCount = 0;
     _sessionArchived = false;
   }
 
