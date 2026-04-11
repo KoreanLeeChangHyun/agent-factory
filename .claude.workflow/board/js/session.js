@@ -61,6 +61,11 @@
   var _lastEventId = -1;
   /** @type {Object<string, number>} sessionId -> last-event-id */
   var _lastEventIdBySession = {};
+  /** Consecutive SSE onerror count; reconnect loop aborts when MAX reached. */
+  var _reconnectFailureCount = 0;
+  var MAX_RECONNECT_FAILURES = 5;
+  /** Set true when server sends archived_end; disables future reconnects. */
+  var _sessionArchived = false;
 
   function _sessionKey() {
     if (_ctx && _ctx.isWorkflowMode && _ctx.isWorkflowMode()) {
@@ -127,10 +132,22 @@
   function fetchStatus() {
     if (!_ctx) return Promise.resolve();
     return fetch(_ctx.endpoints().status, { cache: "no-store" }).then(function (res) {
+      if (res.status === 404) {
+        _sessionArchived = true;
+        Board.state.termStatus = "missing";
+        Board.state.termConnected = false;
+        _ctx.stopSpinner();
+        _ctx.appendErrorMessage("[Error] 세션을 찾을 수 없습니다. 이미 종료되었거나 정리되었습니다.");
+        _ctx.updateControlBar();
+        return;
+      }
       if (!res.ok) return;
       return res.json();
     }).then(function (data) {
       if (!data) return;
+      if (data.archived) {
+        _sessionArchived = true;
+      }
       Board.state.termStatus = data.status || "stopped";
       Board.state.termSessionId = data.session_id || null;
       // last_session_id: W01 서버에서 추가된 필드 (이전/현재 세션 UUID)
@@ -235,7 +252,21 @@
     }
     termEventSource = new EventSource(eventsUrl);
 
+    termEventSource.addEventListener("archived_end", function (e) {
+      _captureEventId(e);
+      _sessionArchived = true;
+      Board.state.termStatus = "archived";
+      Board.state.termConnected = false;
+      _ctx.appendSystemMessage("[아카이브 세션] 종료된 세션의 히스토리 재생이 완료되었습니다.");
+      _ctx.updateControlBar();
+      if (termEventSource) {
+        termEventSource.close();
+        termEventSource = null;
+      }
+    });
+
     termEventSource.addEventListener("open", function () {
+      _reconnectFailureCount = 0;
       Board.state.termConnected = true;
       _ctx.updateControlBar();
     });
@@ -734,9 +765,26 @@
 
     termEventSource.onerror = function () {
       Board.state.termConnected = false;
-      termEventSource.close();
-      termEventSource = null;
+      if (termEventSource) {
+        termEventSource.close();
+        termEventSource = null;
+      }
       _ctx.updateControlBar();
+
+      if (_sessionArchived) {
+        // Archived session: server closed stream after replay. Do not reconnect.
+        return;
+      }
+
+      _reconnectFailureCount += 1;
+      if (_reconnectFailureCount >= MAX_RECONNECT_FAILURES) {
+        _ctx.appendErrorMessage(
+          "[Error] SSE 재연결 " + MAX_RECONNECT_FAILURES + "회 실패 — 재시도 중단"
+        );
+        Board.state.termStatus = "stopped";
+        _ctx.updateControlBar();
+        return;
+      }
 
       if (!reconnectTimerId) {
         reconnectTimerId = setTimeout(function () {
@@ -778,6 +826,8 @@
     // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
     // 이전 채널의 last-event-id는 의미가 없다. 리셋하여 새 히스토리를 받도록 한다.
     _lastEventId = -1;
+    _reconnectFailureCount = 0;
+    _sessionArchived = false;
 
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
@@ -906,6 +956,8 @@
   function resetLastEventId() {
     _lastEventId = -1;
     _lastEventIdBySession = {};
+    _reconnectFailureCount = 0;
+    _sessionArchived = false;
   }
 
   /**
@@ -921,6 +973,8 @@
     } else {
       _lastEventId = -1;
     }
+    _reconnectFailureCount = 0;
+    _sessionArchived = false;
   }
 
   // ── Register on Board namespace ──

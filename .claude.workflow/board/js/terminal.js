@@ -141,6 +141,11 @@
 
   // URL 쿼리 파라미터에서 읽은 초기 세션 ID (renderTerminal 후 탭 전환에 사용)
   var _initialQuerySession = workflowSessionId;
+  // D5 #5: URL 세션 사전 검증 상태. checked=완료, inFlight=fetch 진행 중
+  var _initialSessionChecked = false;
+  var _initialSessionInFlight = false;
+  // 검증 실패 시 렌더 후 노출할 사용자 메시지
+  var _initialFallbackMessage = null;
 
   // ── Session Switcher State ──
   // 세션별 상태를 저장하는 맵. key = sessionId ("main" 또는 "wf-T-NNN-...")
@@ -1562,6 +1567,38 @@
     var el = getContainer();
     if (!el) return;
 
+    // D5 #5: URL 세션 사전 검증 — 잘못된 세션이면 메인으로 fallback 후 재호출
+    if (_initialQuerySession && !_initialSessionChecked) {
+      if (_initialSessionInFlight) return;
+      _initialSessionInFlight = true;
+      var failedId = _initialQuerySession;
+      fetch(
+        "/terminal/workflow/status?session_id=" + encodeURIComponent(failedId),
+        { cache: "no-store" }
+      )
+        .then(function (res) {
+          if (res.status === 404) {
+            _initialQuerySession = null;
+            workflowSessionId = null;
+            isWorkflowMode = false;
+            _activeSessionId = "main";
+            delete _sessionMap[failedId];
+            Board.state.termSessionId = null;
+            Board.state.termStatus = "stopped";
+            try { history.replaceState(null, "", "terminal.html"); } catch (e) {}
+            _initialFallbackMessage =
+              "[Error] URL 세션 '" + failedId + "'을 찾을 수 없어 메인 세션으로 전환했습니다.";
+          }
+        })
+        .catch(function () { /* network error: 기본 동작 유지 */ })
+        .then(function () {
+          _initialSessionChecked = true;
+          _initialSessionInFlight = false;
+          renderTerminal();
+        });
+      return;
+    }
+
     if (termInitialized && document.getElementById("terminal-output")) {
       updateControlBar();
       return;
@@ -1761,6 +1798,12 @@
     if (Board.session) {
       Board.session.connectSSE();
       Board.session.fetchStatus();
+    }
+
+    // D5 #5: URL 세션 사전 검증 실패 알림 (렌더 후 outputDiv 준비 완료 시점)
+    if (_initialFallbackMessage) {
+      appendErrorMessage(_initialFallbackMessage);
+      _initialFallbackMessage = null;
     }
 
     // Bind event handlers

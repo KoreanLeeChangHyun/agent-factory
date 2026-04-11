@@ -1481,6 +1481,55 @@ class WorkflowSessionRegistry:
                     pass
         return removed
 
+    def load_archived(self, session_id: str) -> 'WorkflowSession | None':
+        """디스크 아카이브에서 완료 세션을 on-demand로 복원한다.
+
+        registry에 없지만 .jsonl 파일이 남아있는 경우 읽기 전용으로 복원한다.
+        process는 status='stopped'로 설정되며 신규 입력은 거부된다. 본 메서드는
+        registry에 세션을 삽입하지 않고, 호출자가 일회성으로 사용한 뒤 참조를 놓는다.
+        """
+        if self._persist_dir is None:
+            return None
+        fpath = self._session_file(session_id)
+        if fpath is None or not os.path.exists(fpath):
+            return None
+        try:
+            with open(fpath, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except OSError:
+            return None
+        if not lines:
+            return None
+        try:
+            first = json.loads(lines[0])
+            meta = first.get('_meta') or {}
+        except (json.JSONDecodeError, ValueError):
+            return None
+        if not meta.get('session_id'):
+            return None
+
+        channel = TerminalSSEChannel(persist_path=None)
+        process = ClaudeProcess(channel)
+        session = WorkflowSession(
+            session_id=meta['session_id'],
+            ticket_id=meta.get('ticket_id', ''),
+            command=meta.get('command', ''),
+            work_dir=meta.get('work_dir', ''),
+            process=process,
+            channel=channel,
+            created_at=meta.get('created_at', time.strftime('%Y-%m-%dT%H:%M:%S')),
+        )
+        for line in lines[1:]:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+                channel.replay_from_history(data)
+            except (json.JSONDecodeError, ValueError):
+                continue
+        return session
+
     def get(self, session_id: str) -> WorkflowSession | None:
         """session_id로 세션을 조회한다.
 
@@ -2531,6 +2580,7 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
         GET /terminal/workflow/status?session_id=wf-T-NNN-...
 
         지정된 세션의 프로세스 상태와 메타데이터를 JSON으로 응답한다.
+        registry에 없어도 .jsonl 아카이브가 있으면 archived 상태로 응답한다.
         """
         session_id = self._parse_query_param('session_id')
         if not session_id:
@@ -2538,18 +2588,23 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
             return
 
         session = workflow_registry.get(session_id)
+        archived = False
         if session is None:
-            self._send_error(404, f'Session not found: {session_id}')
-            return
+            session = workflow_registry.load_archived(session_id)
+            if session is None:
+                self._send_error(404, f'Session not found: {session_id}')
+                return
+            archived = True
 
         self._send_json({
             'session_id': session.session_id,
             'ticket_id': session.ticket_id,
             'command': session.command,
             'work_dir': session.work_dir,
-            'status': session.process.status,
+            'status': 'archived' if archived else session.process.status,
+            'archived': archived,
             'created_at': session.created_at,
-            'clients': session.channel.client_count,
+            'clients': 0 if archived else session.channel.client_count,
             'current_step': session.current_step,
             'last_artifact': session.last_artifact,
         })
@@ -2561,7 +2616,8 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
 
         지정된 세션의 TerminalSSEChannel로부터 Claude CLI stdout 이벤트를
         클라이언트에 스트리밍한다. 기존 /terminal/events SSE와 동일한 패턴을 사용하되,
-        세션별 독립 채널을 통해 멀티플렉싱한다.
+        세션별 독립 채널을 통해 멀티플렉싱한다. registry에 없지만 .jsonl 아카이브가
+        있는 경우 히스토리를 일회성으로 재생한 후 아카이브 종료 시그널로 스트림을 닫는다.
         """
         session_id = self._parse_query_param('session_id')
         if not session_id:
@@ -2570,7 +2626,11 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
 
         session = workflow_registry.get(session_id)
         if session is None:
-            self._send_error(404, f'Session not found: {session_id}')
+            archived_session = workflow_registry.load_archived(session_id)
+            if archived_session is None:
+                self._send_error(404, f'Session not found: {session_id}')
+                return
+            self._stream_archived_session(archived_session)
             return
 
         self.send_response(200)
@@ -2602,6 +2662,35 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
                         self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     break
+        finally:
+            session.channel.remove(self.wfile)
+
+    def _stream_archived_session(self, session: 'WorkflowSession') -> None:
+        """아카이브 세션의 히스토리를 일회성 재생 후 스트림을 종료한다.
+
+        persist .jsonl 파일이 남은 세션에 대해 last_event_id 이후의 이벤트만
+        재생하고, 완료 시그널(archived_end)을 전송한 후 연결을 닫는다.
+        클라이언트는 아카이브 종료 시그널을 받아 재연결 루프를 멈춘다.
+        """
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'close')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        last_event_id = _resolve_last_event_id(self.headers, self.path)
+        try:
+            self.wfile.write(b': archived\n\n')
+            self.wfile.flush()
+            session.channel.add(self.wfile, last_event_id=last_event_id)
+            payload = json.dumps({'archived': True, 'session_id': session.session_id}, ensure_ascii=False)
+            self.wfile.write(
+                f'event: archived_end\ndata: {payload}\n\n'.encode('utf-8')
+            )
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
         finally:
             session.channel.remove(self.wfile)
 
