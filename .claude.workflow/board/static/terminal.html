@@ -6,7 +6,7 @@
 <title>Claude Code Terminal</title>
 <link rel="stylesheet" href="css/core/common.css">
 <link rel="stylesheet" href="css/terminal/terminal.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+<link rel="stylesheet" href="css/vendor/highlight-github-dark.min.css">
 <style>
   html, body {
     margin: 0;
@@ -30,13 +30,13 @@
 
 <div id="terminal-standalone"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
+<script src="js/vendor/marked-15.0.0.min.js"></script>
+<script src="js/vendor/highlight-11.11.1.min.js"></script>
 <script>
 (function(){
   if(typeof hljs==='undefined')return;
   var langs=['javascript','typescript','python','bash','css','xml','json'];
-  var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';
+  var base='js/vendor/highlight-languages/';
   var i=0;
   function loadNext(){
     if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}

@@ -12,8 +12,8 @@
 <link rel="stylesheet" href="css/views/memory.css">
 <link rel="stylesheet" href="css/views/roadmap.css">
 <link rel="stylesheet" href="css/widgets/settings.css">
-<link id="hljs-theme-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
-<link id="hljs-theme-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link id="hljs-theme-dark" rel="stylesheet" href="css/vendor/highlight-github-dark.min.css" media="(prefers-color-scheme: dark)">
+<link id="hljs-theme-light" rel="stylesheet" href="css/vendor/highlight-github.min.css" media="(prefers-color-scheme: light)">
 </head>
 <body data-server-no-reload style="opacity:0;transition:opacity .15s">
 
@@ -54,10 +54,10 @@
   <div class="view" id="view-memory"></div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js" async></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script async src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
-<script async src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/';var i=0;function loadNext(){if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';s.onload=loadNext;document.head.appendChild(s);}loadNext();})()"></script>
+<script src="js/vendor/chart-4.5.0.min.js" async></script>
+<script src="js/vendor/marked-15.0.0.min.js"></script>
+<script async src="js/vendor/mermaid-11.4.1.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
+<script async src="js/vendor/highlight-11.11.1.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='js/vendor/highlight-languages/';var i=0;function loadNext(){if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';s.onload=loadNext;document.head.appendChild(s);}loadNext();})()"></script>
 <script src="js/core/common.js"></script>
 <script src="js/views/kanban.js"></script>
 <script src="js/views/viewer.js"></script>
