@@ -1607,7 +1607,14 @@ class BoardHTTPRequestHandler(SimpleHTTPRequestHandler):
     /events 경로는 SSE 엔드포인트로 처리하고,
     /api/* 경로는 JSON API로 처리하고,
     그 외 경로는 SimpleHTTPRequestHandler의 정적 파일 서빙으로 위임한다.
+    정적 파일은 ``.claude.workflow/board/static`` 디렉터리를 루트로 서빙한다.
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        static_dir = os.path.join(
+            os.getcwd(), '.claude.workflow', 'board', 'static',
+        )
+        super().__init__(*args, directory=static_dir, **kwargs)
 
     def do_GET(self) -> None:
         """GET 요청을 처리한다."""
@@ -2930,7 +2937,7 @@ def _run_server(project_root: str) -> None:
 
     # 런타임 파일 생성 (디렉터리가 없으면 먼저 생성)
     os.makedirs(os.path.dirname(url_file), exist_ok=True)
-    base = f'http://127.0.0.1:{port}/.claude.workflow/board'
+    base = f'http://127.0.0.1:{port}'
     with open(url_file, 'w') as f:
         f.write(f'{base}/index.html\n{base}/terminal.html')
 
@@ -2982,7 +2989,7 @@ def main() -> int:
             recorded_port = urlparse(recorded_url).port
             if recorded_port and is_port_in_use(recorded_port):
                 # 서버가 이미 실행 중 — URL 파일만 갱신
-                base = f'http://127.0.0.1:{recorded_port}/.claude.workflow/board'
+                base = f'http://127.0.0.1:{recorded_port}'
                 with open(url_file, 'w') as f:
                     f.write(f'{base}/index.html\n{base}/terminal.html')
                 return 0
