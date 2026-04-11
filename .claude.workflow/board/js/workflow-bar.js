@@ -115,6 +115,21 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
+      // Re-entry guard: once a workflow is running (command set & past init),
+      // stray [WORKFLOW] tokens in subtool stdout (e.g. flow-update echoes)
+      // must NOT tear down the panel FSM. Only allow a full reset when no
+      // workflow is active or we are still in init.
+      if (_state && _state.command && _state.currentStep && _state.currentStep !== "init") {
+        return;
+      }
+
+      // Preserve any INIT panel already created by _insertToCurrentPanel
+      // fallback before the [WORKFLOW] banner parsed. Otherwise a premature
+      // INIT panel (holding workflow-start assistant text) becomes orphaned
+      // and a second INIT panel is spawned for subsequent tool events.
+      var preservedPanels = _stepPanels;
+      var preserveInit = !!(preservedPanels && preservedPanels.init);
+
       _state = {
         command:      command || "",
         workId:       "",
@@ -136,8 +151,14 @@
         },
         agentStatuses: {}
       };
-      _activeStepPanel = null;
-      _stepPanels = {};
+
+      if (preserveInit) {
+        _stepPanels = { init: preservedPanels.init };
+        _activeStepPanel = preservedPanels.init;
+      } else {
+        _stepPanels = {};
+        _activeStepPanel = null;
+      }
       _clearParserFlags();
     }
 
