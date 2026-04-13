@@ -231,7 +231,7 @@ class WorkflowHandlerMixin:
         session.channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:
-                time.sleep(1)
+                time.sleep(0.25)
                 client_lock = session.channel.get_lock(self.wfile)
                 if client_lock is None:
                     break
@@ -282,6 +282,34 @@ class WorkflowHandlerMixin:
         JSON 배열로 응답한다.
         """
         self._send_json(workflow_registry.list_all())
+
+    def _handle_workflow_step_update(self) -> None:
+        """워크플로우 단계 전이를 통보받아 SSE 이벤트를 발행한다.
+
+        POST /terminal/workflow/step
+        요청 본문: {"session_id": "wf-T-NNN-...", "step": "plan"|"work"|...}
+        선택 필드: "detail": {...} (phase, mode 등 추가 정보)
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        session_id = data.get('session_id', '').strip()
+        step = data.get('step', '').strip()
+        if not session_id or not step:
+            self._send_error(400, 'Missing "session_id" or "step"')
+            return
+
+        session = workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        detail = data.get('detail') or {}
+        detail['trigger'] = 'api'
+        session.current_step = step
+        session.channel.emit_step(step, detail)
+        self._send_json({'ok': True, 'step': step})
 
     def _handle_workflow_artifact(self, qs: dict) -> None:
         """워크플로우 산출물 파일 조회 엔드포인트를 처리한다.

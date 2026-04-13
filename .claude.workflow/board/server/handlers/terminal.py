@@ -43,7 +43,7 @@ class TerminalHandlerMixin:
         terminal_sse_channel.add(self.wfile, last_event_id=last_event_id)
         try:
             while True:
-                time.sleep(1)
+                time.sleep(0.25)
                 client_lock = terminal_sse_channel.get_lock(self.wfile)
                 if client_lock is None:
                     break

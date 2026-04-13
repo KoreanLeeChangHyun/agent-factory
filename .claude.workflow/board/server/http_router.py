@@ -117,6 +117,8 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_kill()
         elif self.path == '/terminal/workflow/input':
             self._handle_workflow_input()
+        elif self.path == '/terminal/workflow/step':
+            self._handle_workflow_step_update()
         elif self.path == '/terminal/command':
             self._handle_terminal_command()
         elif self.path == '/terminal/permission':

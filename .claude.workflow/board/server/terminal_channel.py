@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -14,6 +15,23 @@ from collections.abc import Callable
 
 from ._common import logger
 from .sse_client_manager import _NDJSON_EVENT_MAP
+
+# ---------------------------------------------------------------------------
+# Workflow step detection patterns (stdout banner parsing)
+# ---------------------------------------------------------------------------
+_STEP_PATTERN = re.compile(
+    r'(?:\[STEP\]\s+(PLAN|WORK|REPORT|DONE)'
+    r'|║\s+\[●[^\]]*\]\s+(PLAN|WORK|REPORT|DONE))'
+)
+_INIT_PATTERN = re.compile(r'(?:\[INIT\]\s+|║\s+INIT:\s+)')
+_PHASE_PATTERN = re.compile(
+    r'(?:\[PHASE\]\s+(\d+)\s+(sequential|parallel)'
+    r'|║\s+STATE:\s+Phase\s+(\d+)\s+(sequential|parallel))'
+)
+_FINISH_PATTERN = re.compile(
+    r'(?:\[DONE\]\s+워크플로우\s+(완료|실패)'
+    r'|║\s+DONE:\s+워크플로우\s+(완료|실패))'
+)
 
 
 def _parse_last_event_id(headers: object) -> int:
@@ -103,33 +121,87 @@ class TerminalSSEChannel:
         self._next_seq: int = 0
         self._persist_path: str | None = persist_path
         self._persist_lock: threading.Lock = threading.Lock()
+        # Phase 1: replay 중인 클라이언트 추적 + broadcast 버퍼링
+        self._replaying: set = set()           # id(wfile) of replaying clients
+        self._replay_buffers: dict = {}        # id(wfile) -> list[bytes]
+        # Phase 1: stdout 기반 워크플로우 단계 감지
+        self._step_buffer: str = ''
+        self._current_step: str = ''
+        self.on_step: Callable[[str, dict], None] | None = None
 
     def add(self, wfile: object, last_event_id: int = -1) -> None:
         """클라이언트를 추가하고, last_event_id 이후의 히스토리를 재생한다.
+
+        Phase 1 lock 분리: _lock 은 스냅샷 획득에만 사용하고,
+        히스토리 재생은 lock 밖에서 per-client lock 으로 직렬화한다.
+        재생 중 broadcast 는 per-client 버퍼에 보류 후 재생 완료 시 flush.
 
         Args:
             wfile: HTTP 핸들러의 wfile (소켓 출력 스트림)
             last_event_id: 클라이언트가 마지막으로 수신한 이벤트 seq_id (-1=전체 재생)
         """
+        wfile_id = id(wfile)
         with self._lock:
             self._clients.append(wfile)
             client_lock = threading.Lock()
-            self._client_locks[id(wfile)] = client_lock
-            with client_lock:
-                for seq_id, encoded in list(self._history):
-                    if seq_id <= last_event_id:
-                        continue  # 이미 수신한 이벤트는 건너뜀
-                    try:
-                        wfile.write(encoded)
-                        wfile.flush()
-                    except (BrokenPipeError, ConnectionResetError, OSError):
-                        break
+            self._client_locks[wfile_id] = client_lock
+            self._replaying.add(wfile_id)
+            self._replay_buffers[wfile_id] = []
+            history_snapshot = list(self._history)
+
+        # replay_start 이벤트 전송
+        try:
+            wfile.write(b'event: replay_start\ndata: {}\n\n')
+            wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            self._end_replay(wfile)
+            return
+
+        # lock 밖에서 히스토리 재생 (per-client lock 으로 직렬화)
+        with client_lock:
+            for seq_id, encoded in history_snapshot:
+                if seq_id <= last_event_id:
+                    continue
+                try:
+                    wfile.write(encoded)
+                    wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    break
+
+        # 재생 종료: 버퍼된 broadcast 이벤트를 flush
+        with self._lock:
+            self._replaying.discard(wfile_id)
+            buffered = self._replay_buffers.pop(wfile_id, [])
+
+        with client_lock:
+            for encoded in buffered:
+                try:
+                    wfile.write(encoded)
+                    wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    break
+
+        # replay_end 이벤트 전송
+        try:
+            wfile.write(b'event: replay_end\ndata: {}\n\n')
+            wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+
+    def _end_replay(self, wfile: object) -> None:
+        """replay 상태를 정리한다. add() 중 연결 끊김 시 호출."""
+        wfile_id = id(wfile)
+        with self._lock:
+            self._replaying.discard(wfile_id)
+            self._replay_buffers.pop(wfile_id, None)
 
     def clear_history(self) -> None:
         """히스토리 버퍼를 비운다. 새 세션 시작 시 이전 이벤트를 제거하기 위함."""
         with self._lock:
             self._history.clear()
             self._next_seq = 0
+        self._step_buffer = ''
+        self._current_step = ''
 
     def replay_from_history(self, data: dict) -> None:
         """이전에 저장된 이벤트를 히스토리 버퍼에만 복원한다.
@@ -186,6 +258,7 @@ class TerminalSSEChannel:
         - 기타 -> event: stdout (기본값)
 
         전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
+        replay 중인 클라이언트에게는 per-client 버퍼에 보류한다.
 
         Args:
             data: 파싱된 NDJSON 메시지 dict
@@ -194,19 +267,46 @@ class TerminalSSEChannel:
         payload = self._build_payload(data, event_name)
         json_payload = json.dumps(payload, ensure_ascii=False)
 
+        self._emit_event(event_name, json_payload)
+
+        # 파일 persist (서버 재시작 시 복원용) - 별도 락 사용
+        if self._persist_path is not None:
+            try:
+                line = json.dumps(data, ensure_ascii=False) + '\n'
+                with self._persist_lock:
+                    with open(self._persist_path, 'a', encoding='utf-8') as f:
+                        f.write(line)
+            except (OSError, TypeError):
+                pass  # persist 실패는 세션 동작을 막지 않는다
+
+        # stdout 기반 워크플로우 단계 감지
+        self._detect_step_from_broadcast(event_name, payload)
+
+    def _emit_event(self, event_name: str, json_payload: str) -> None:
+        """SSE 이벤트를 seq_id 부여 → 히스토리 저장 → 전체 클라이언트 전송한다.
+
+        replay 중인 클라이언트에는 per-client 버퍼에 보류한다.
+        """
         dead_clients: list = []
         with self._lock:
             seq_id = self._next_seq
             self._next_seq += 1
-            # SSE `id:` 필드 → 브라우저가 자동으로 Last-Event-ID 재송신
             message = f"id: {seq_id}\nevent: {event_name}\ndata: {json_payload}\n\n"
             encoded = message.encode('utf-8')
-            # 링 버퍼에 (seq_id, encoded) 튜플로 저장
             self._history.append((seq_id, encoded))
             clients_snapshot = list(self._clients)
+            # replay 중인 클라이언트의 버퍼에 적재
+            replaying_snapshot = set(self._replaying)
+            for wfile_id in replaying_snapshot:
+                buf = self._replay_buffers.get(wfile_id)
+                if buf is not None:
+                    buf.append(encoded)
 
         for wfile in clients_snapshot:
-            client_lock = self._client_locks.get(id(wfile))
+            wfile_id = id(wfile)
+            if wfile_id in replaying_snapshot:
+                continue  # 버퍼에 이미 적재됨
+            client_lock = self._client_locks.get(wfile_id)
             if client_lock is None:
                 continue
             try:
@@ -224,16 +324,6 @@ class TerminalSSEChannel:
                     except ValueError:
                         pass
                     self._client_locks.pop(id(wfile), None)
-
-        # 파일 persist (서버 재시작 시 복원용) - 별도 락 사용
-        if self._persist_path is not None:
-            try:
-                line = json.dumps(data, ensure_ascii=False) + '\n'
-                with self._persist_lock:
-                    with open(self._persist_path, 'a', encoding='utf-8') as f:
-                        f.write(line)
-            except (OSError, TypeError):
-                pass  # persist 실패는 세션 동작을 막지 않는다
 
     def _classify_event(self, data: dict) -> str:
         """NDJSON 메시지 타입으로부터 SSE 이벤트 이름을 결정한다.
@@ -436,6 +526,78 @@ class TerminalSSEChannel:
         """현재 연결된 클라이언트 수를 반환한다."""
         with self._lock:
             return len(self._clients)
+
+    @property
+    def current_step(self) -> str:
+        """현재 워크플로우 단계를 반환한다."""
+        return self._current_step
+
+    # ------------------------------------------------------------------
+    # Phase 1: workflow_step SSE event
+    # ------------------------------------------------------------------
+
+    def emit_step(self, step_name: str, detail: dict | None = None) -> None:
+        """workflow_step SSE 이벤트를 발행한다.
+
+        Args:
+            step_name: 단계 이름 (init, plan, work, report, done)
+            detail: 추가 정보 dict (phase, mode, trigger 등)
+        """
+        prev = self._current_step
+        self._current_step = step_name
+        payload: dict = {'step': step_name, 'prev_step': prev}
+        if detail:
+            payload.update(detail)
+        self._emit_event('workflow_step', json.dumps(payload, ensure_ascii=False))
+        if self.on_step:
+            try:
+                self.on_step(step_name, payload)
+            except Exception:
+                pass
+
+    def _detect_step_from_broadcast(self, event_name: str, payload: dict) -> None:
+        """broadcast 된 stdout 이벤트에서 워크플로우 단계 전이를 감지한다."""
+        if event_name != 'stdout':
+            return
+        kind = payload.get('kind', '')
+        if kind == 'text_delta':
+            self._step_buffer += payload.get('chunk', '')
+        elif kind == 'assistant':
+            self._step_buffer += payload.get('text', '')
+        else:
+            return
+        # 개행 단위로 라인을 소비하여 패턴 매칭
+        while '\n' in self._step_buffer:
+            line, self._step_buffer = self._step_buffer.split('\n', 1)
+            self._check_step_line(line.strip())
+
+    def _check_step_line(self, line: str) -> None:
+        """단일 stdout 라인에서 워크플로우 단계 패턴을 검사한다."""
+        if not line:
+            return
+        m = _STEP_PATTERN.search(line)
+        if m:
+            step = (m.group(1) or m.group(2)).lower()
+            self.emit_step(step, {'trigger': 'stdout'})
+            return
+        m = _INIT_PATTERN.search(line)
+        if m:
+            self.emit_step('init', {'trigger': 'stdout'})
+            return
+        m = _PHASE_PATTERN.search(line)
+        if m:
+            phase_num = int(m.group(1) or m.group(3))
+            mode = m.group(2) or m.group(4)
+            self.emit_step(self._current_step, {
+                'trigger': 'stdout',
+                'phase': phase_num,
+                'mode': mode,
+            })
+            return
+        m = _FINISH_PATTERN.search(line)
+        if m:
+            result = 'success' if (m.group(1) or m.group(2)) == '완료' else 'failure'
+            self.emit_step('done', {'trigger': 'stdout', 'result': result})
 
 
 # ---------------------------------------------------------------------------

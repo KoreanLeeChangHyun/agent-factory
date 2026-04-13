@@ -113,6 +113,11 @@ class WorkflowSessionRegistry:
             channel=channel,
         )
 
+        # stdout 기반 단계 감지 시 session.current_step 자동 갱신
+        def _on_step(step_name: str, _payload: dict) -> None:
+            session.current_step = step_name
+        channel.on_step = _on_step
+
         # 메타데이터를 파일 첫 줄에 기록
         if persist_path is not None:
             try:
