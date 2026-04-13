@@ -115,14 +115,6 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
-      // Re-entry guard: once a workflow is running (command set & past init),
-      // stray [WORKFLOW] tokens in subtool stdout (e.g. flow-update echoes)
-      // must NOT tear down the panel FSM. Only allow a full reset when no
-      // workflow is active or we are still in init.
-      if (_state && _state.command && _state.currentStep && _state.currentStep !== "init") {
-        return;
-      }
-
       // Preserve any INIT panel already created by _insertToCurrentPanel
       // fallback before the [WORKFLOW] banner parsed. Otherwise a premature
       // INIT panel (holding workflow-start assistant text) becomes orphaned
@@ -449,10 +441,9 @@
       }
 
       // ── >> FROM -> TO (2-line sequence, line 2) ──
+      // FSM 전이는 workflow_step SSE 이벤트가 담당. 배너만 소비.
       if (_pendingStateChange && (m = P.stateTransition.exec(line))) {
         _pendingStateChange = false;
-        var toStep = m[2];
-        _setStep(toStep);
         return true;
       }
 
@@ -460,7 +451,6 @@
       if ((m = P.taskStatus.exec(line))) {
         var action = m[1];
         var taskId = m[2];
-        var taskSt = m[3] || "";
         if (action === "DISPATCH") {
           _state.agentStatuses[taskId] = "running";
         } else if (action === "RETURN") {
@@ -480,22 +470,22 @@
         return true;
       }
 
+      // [WORKFLOW] command — 배너 소비 + command 캡처만 (FSM _reset 제거)
       if (_inBox && (m = P.workflowStartCmd.exec(line))) {
         _boxHasCmd = true;
         _inBox     = false;
-        _reset(_pick(m));
+        if (!_state.command) _state.command = _pick(m);
         return true;
       }
 
-      // [WORKFLOW] without box — new format
       if (!_inBox && (m = P.workflowStartCmd.exec(line))) {
-        _reset(_pick(m));
+        if (!_state.command) _state.command = _pick(m);
         return true;
       }
 
+      // [STEP] in box — 배너 소비만 (FSM _setStep 제거)
       if (_inBox && !_boxHasCmd && (m = P.stepStart.exec(line))) {
         _inBox = false;
-        _setStep(_pick(m));
         return true;
       }
 
@@ -526,19 +516,17 @@
         return true;
       }
 
-      // stepEnd must be checked before stepStart (stepEnd is more specific)
+      // stepEnd — 배너 소비만 (FSM _setStep 제거)
       if ((m = P.stepEnd.exec(line))) {
         vals = _pickN(m, 2);
         _pendingStepEnd     = true;
         _pendingStepEndName = vals[0];
         _pendingStepEndTs   = (vals[1] || "").trim();
-        _setStep(vals[0]);
         return true;
       }
 
-      // [STEP] without box — new format (stepStart only, not stepEnd)
+      // [STEP] without box — 배너 소비만 (FSM _setStep 제거)
       if (!_inBox && (m = P.stepStart.exec(line))) {
-        _setStep(_pick(m));
         return true;
       }
 
@@ -579,20 +567,15 @@
         return true;
       }
 
+      // finishKey — 배너 소비만 (완료/실패는 workflow_step 'done' 이벤트가 담당)
       if (_pendingFinish && (m = P.finishKey.exec(line))) {
         _pendingFinish = false;
-        var registryKey = _pick(m);
-        if (_pendingFinishResult === "완료") {
-          _complete();
-        } else {
-          _fail("워크플로우 실패 (" + registryKey + ")");
-        }
         _pendingFinishResult = "";
         return true;
       }
 
+      // FAIL — 배너 소비만
       if (P.fail.test(line)) {
-        _fail("FAIL");
         return true;
       }
 
@@ -604,6 +587,37 @@
     return {
       get state() { return _state; },
       patterns: P,
+
+      /**
+       * workflow_step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
+       * 멱등: 동일한 step 이름에 대해 중복 전이를 방지한다.
+       * @param {object} data - {step, prev_step, trigger, phase?, mode?, result?}
+       */
+      handleStepEvent: function (data) {
+        if (!data || !data.step) return;
+        var step = data.step.toLowerCase();
+
+        // done/failed 처리
+        if (step === "done") {
+          if (data.result === "failure") {
+            _fail("워크플로우 실패");
+          } else {
+            _complete();
+          }
+          return;
+        }
+
+        // 멱등: 동일 step + phase 조합이면 no-op (phase 변경은 허용)
+        if (step === _state.currentStep && data.phase === undefined) return;
+
+        // FSM 전이
+        _setStep(step);
+
+        // phase 정보 포함 시 phase 업데이트
+        if (data.phase !== undefined) {
+          _setPhase(data.phase, data.mode || "sequential", [], []);
+        }
+      },
 
       tap: function (text) {
         var stripped = stripAnsi(text);

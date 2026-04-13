@@ -48,6 +48,14 @@
   var _pendingTextBuffer = "";
 
   /**
+   * True while the server is replaying history (between replay_start
+   * and replay_end SSE events). During replay, phaseTimeline renders
+   * are deferred to avoid intermediate DOM thrashing.
+   * @type {boolean}
+   */
+  var _isReplaying = false;
+
+  /**
    * Last SSE event id successfully received by the client.
    * Used on reconnect to request history replay from the next id, avoiding
    * full-history re-replay that caused panel duplication on tab switch.
@@ -239,8 +247,9 @@
     _currentToolUseId = null;
     _toolInputMap = {};
 
-    // Reset pending text buffer on reconnect
+    // Reset pending text buffer and replay flag on reconnect
     _pendingTextBuffer = "";
+    _isReplaying = false;
 
     // Resume from last received event id to prevent full-history replay on reconnect
     var eventsUrl = _ctx.endpoints().events;
@@ -260,6 +269,31 @@
         termEventSource.close();
         termEventSource = null;
       }
+    });
+
+    termEventSource.addEventListener("replay_start", function () {
+      _isReplaying = true;
+    });
+
+    termEventSource.addEventListener("replay_end", function () {
+      _isReplaying = false;
+      // replay 완료 후 타임라인 최종 렌더
+      if (_ctx.isWorkflowMode()) {
+        try { Board.phaseTimeline.render(); } catch (e) {}
+      }
+    });
+
+    termEventSource.addEventListener("workflow_step", function (e) {
+      _captureEventId(e);
+      try {
+        var data = JSON.parse(e.data);
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
+          Board.WorkflowRenderer.handleStepEvent(data);
+        }
+        if (!_isReplaying && _ctx.isWorkflowMode()) {
+          try { Board.phaseTimeline.render(); } catch (re) {}
+        }
+      } catch (err) {}
     });
 
     termEventSource.addEventListener("open", function () {
@@ -299,7 +333,7 @@
                 var flushedText = _pendingTextBuffer;
                 _pendingTextBuffer = "";
                 var textBannerConsumed = Board.WorkflowRenderer.tap(flushedText);
-                if (textBannerConsumed) {
+                if (textBannerConsumed && !_isReplaying) {
                   Board.phaseTimeline.render();
                 }
               } catch (tapFlushErr) {
@@ -332,7 +366,7 @@
               var userFlushText = _pendingTextBuffer;
               _pendingTextBuffer = "";
               var userTextBannerConsumed = Board.WorkflowRenderer.tap(userFlushText);
-              if (userTextBannerConsumed) {
+              if (userTextBannerConsumed && !_isReplaying) {
                 Board.phaseTimeline.render();
               }
             } catch (userTapErr) {
@@ -398,7 +432,7 @@
             if (_ctx.isWorkflowMode()) {
               try {
                 bannerConsumed = Board.WorkflowRenderer.tap(resultText);
-                if (bannerConsumed) {
+                if (bannerConsumed && !_isReplaying) {
                   Board.phaseTimeline.render();
                   _ctx.removeEmptyWorkflowToolCard();
                 }
@@ -477,7 +511,7 @@
           _ctx.flushTextBuffer();
 
           // In workflow mode, re-render timeline bar to update timers on response complete
-          if (_ctx.isWorkflowMode()) {
+          if (_ctx.isWorkflowMode() && !_isReplaying) {
             try {
               Board.phaseTimeline.render();
             } catch (renderErr) {}
