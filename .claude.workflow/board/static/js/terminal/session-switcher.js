@@ -153,11 +153,13 @@
     var prevId = M._activeSessionId;
     M._activeSessionId = targetSessionId;
 
-    // 3. 대상 세션 상태 복원 (M.outputDiv, 변수)
-    M._restoreSession(targetSessionId);
-
-    // 4. SSE 재연결: disconnectSSE → connectSSEReady → fetchStatus
-    // 세션별 last-event-id 트래커를 복원하여 탭 왕복 시 히스토리 중복 재생을 차단
+    // 3. SSE 선행 차단 (T-383 Phase 2 / VUL-1 / S4)
+    // _restoreSession 이전에 disconnectSSE 를 호출하여, 복원 도중 들어오는
+    // prev-session SSE 이벤트가 outputDiv 재구성 중인 DOM 에 들러붙는
+    // race window 를 원천 차단한다.
+    // adoptLastEventIdForSession / resetLastEventId 는 disconnectSSE 와
+    // 논리적으로 묶여 있으므로(세션별 last-event-id 를 먼저 복원한 뒤
+    // 연결을 끊어 from-id 재접속 의미 보존) 번들로 함께 이동시킨다.
     if (Board.session) {
       if (Board.session.adoptLastEventIdForSession) {
         Board.session.adoptLastEventIdForSession(targetSessionId);
@@ -165,18 +167,25 @@
         Board.session.resetLastEventId();
       }
       Board.session.disconnectSSE();
+    }
+
+    // 4. 대상 세션 상태 복원 (M.outputDiv, 변수)
+    M._restoreSession(targetSessionId);
+
+    // 5. SSE 재연결: 복원 완료 후 새 세션 DOM 을 대상으로 연결
+    if (Board.session) {
       Board.session.connectSSEReady()
         .then(function () { Board.session.fetchStatus(); })
         .catch(function () {});
     }
 
-    // 5. phase timeline 표시/숨김
+    // 6. phase timeline 표시/숨김
     var timelineBar = document.getElementById("wf-timeline-bar");
     if (timelineBar) {
       timelineBar.style.display = targetSessionId === "main" ? "none" : "";
     }
 
-    // 6. UI 갱신
+    // 7. UI 갱신
     M.updateControlBar();
 
     // 탭 바가 있으면 활성 탭 업데이트 (W01에서 구현하는 UI 훅)
