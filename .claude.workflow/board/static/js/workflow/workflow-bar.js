@@ -115,13 +115,12 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
-      // Preserve any INIT panel already created by _insertToCurrentPanel
-      // fallback before the [WORKFLOW] banner parsed. Otherwise a premature
-      // INIT panel (holding workflow-start assistant text) becomes orphaned
-      // and a second INIT panel is spawned for subsequent tool events.
-      var preservedPanels = _stepPanels;
-      var preserveInit = !!(preservedPanels && preservedPanels.init);
-
+      // T-383 Phase 3: preserveInit 분기 제거.
+      // preserveInit 경로는 _restoreSession 이 outputDiv 를 cloneNode 로 교체한
+      // 이후에도 _stepPanels.init 이 detach 된 원본 참조를 유지하게 만들어,
+      // 이후 stdout 이벤트가 화면에 보이지 않는 패널에 삽입되는 S1 을 유발했다.
+      // 본 변경 이후에는 reset 시 항상 맵을 완전 비우고, _restoreSession 측에서
+      // _rebuildStepPanelsFromDom(outputDiv) 으로 현재 DOM 에 맞게 맵을 재건한다.
       _state = {
         command:      command || "",
         workId:       "",
@@ -144,14 +143,53 @@
         agentStatuses: {}
       };
 
-      if (preserveInit) {
-        _stepPanels = { init: preservedPanels.init };
-        _activeStepPanel = preservedPanels.init;
-      } else {
-        _stepPanels = {};
-        _activeStepPanel = null;
-      }
+      _stepPanels = {};
+      _activeStepPanel = null;
       _clearParserFlags();
+    }
+
+    /**
+     * outputDiv 내부의 .wf-step-panel 요소를 스캔하여 _stepPanels 맵과
+     * _activeStepPanel 을 현재 DOM 상태와 동기화한다.
+     *
+     * T-383 Phase 3 (VUL-2 / VUL-3 / S1):
+     * _restoreSession 이 outputDiv 를 cloneNode 로 교체한 직후 호출되어,
+     * 이전 세션에서 detach 된 panel 참조를 버리고 현재 DOM 에 실재하는
+     * panel 로 맵을 재구축한다. 맵은 완전 교체 (덮어쓰기) 한다.
+     *
+     * _activeStepPanel 판정 규칙:
+     *  1. data-status="active" 패널 중 맨 마지막에 위치한 패널을 우선 사용
+     *  2. active 패널이 없으면 outputDiv 내 맨 마지막 .wf-step-panel 사용
+     *  3. 아무 패널도 없으면 null
+     *
+     * outputDiv 가 null/undefined 이면 no-op 로 조용히 반환한다.
+     *
+     * @param {HTMLElement} outputDiv - 세션 출력 컨테이너
+     */
+    function _rebuildStepPanelsFromDom(outputDiv) {
+      if (!outputDiv) return;
+
+      var panels = outputDiv.querySelectorAll(".wf-step-panel");
+      var newMap = {};
+      var lastActive = null;
+      var lastAny = null;
+
+      for (var i = 0; i < panels.length; i++) {
+        var panel = panels[i];
+        var stepName = panel.getAttribute("data-step");
+        if (!stepName) continue;
+
+        // 중복 data-step 이 DOM 에 존재하면 나중(뒤) 것이 이긴다.
+        // (VUL-2 의 중복 panel 시나리오에서 최신 DOM 을 우선)
+        newMap[stepName] = panel;
+        lastAny = panel;
+        if (panel.getAttribute("data-status") === "active") {
+          lastActive = panel;
+        }
+      }
+
+      _stepPanels = newMap;
+      _activeStepPanel = lastActive || lastAny;
     }
 
     function _clearParserFlags() {
@@ -636,6 +674,17 @@
 
       reset: function () {
         _reset();
+      },
+
+      /**
+       * Rebuild _stepPanels map and _activeStepPanel from current DOM state.
+       * Call this after replacing outputDiv contents (e.g. session restore)
+       * so that subsequent stdout/workflow_step events target live panels
+       * rather than detached references.
+       * @param {HTMLElement} outputDiv
+       */
+      rebuildStepPanelsFromDom: function (outputDiv) {
+        _rebuildStepPanelsFromDom(outputDiv);
       },
 
       /**

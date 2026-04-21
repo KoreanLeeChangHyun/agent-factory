@@ -127,6 +127,17 @@
           M.appendSystemMessage("Connecting to live stream...");
         }
       }
+
+      // T-383 Phase 3 (VUL-2 / VUL-3 / S1):
+      // outputDiv 를 cloneNode 로 교체한 직후 WorkflowRenderer 의 _stepPanels
+      // 맵을 현재 DOM 과 동기화한다. 그렇지 않으면 WorkflowRenderer.reset() 으로
+      // 비워진 맵 상태로 남아 이후 stdout 이 새 panel 을 중복 생성하거나,
+      // _setStep 이 _getOrCreateStepPanel 경로를 타며 DOM 에 이미 존재하는
+      // 동일 data-step 패널과 중복되는 사고가 발생한다.
+      // connectSSE 이전 시점에 수행하여 첫 이벤트부터 정확한 panel 로 라우팅.
+      if (Board.WorkflowRenderer && Board.WorkflowRenderer.rebuildStepPanelsFromDom) {
+        Board.WorkflowRenderer.rebuildStepPanelsFromDom(M.outputDiv);
+      }
     }
   };
 
