@@ -60,6 +60,16 @@
     };
   };
 
+  // T-383 Phase 1 (VUL-5 / S5): 초기 활성 세션 엔트리를 사전 생성한다.
+  // 과거에는 _sessionMap={} 만 초기화되어 첫 탭 전환 시 _saveCurrentSession 이
+  // !entry 가드로 early return 되어 메인 세션의 outputNodes 가 저장되지 않는
+  // 버그가 발생했다 (탭 왕복 시 "Claude Code Terminal" 초기 메시지 오출력).
+  // URL 쿼리 세션 경로에서 외부가 동일 ID의 엔트리를 먼저 생성하는 경우와의
+  // 충돌을 방지하기 위해 idempotent 체크를 수행한다.
+  if (!M._sessionMap[M._activeSessionId]) {
+    M._sessionMap[M._activeSessionId] = M._createSessionEntry(M._activeSessionId);
+  }
+
   M.endpoints = function() {
     if (M.isWorkflowMode) {
       var sid = encodeURIComponent(M.workflowSessionId);

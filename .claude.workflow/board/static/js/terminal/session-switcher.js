@@ -14,10 +14,19 @@
 
   /**
    * 현재 활성 세션의 상태를 _sessionMap에 저장한다.
+   *
+   * T-383 Phase 1 (VUL-5 / S5): 엔트리 누락 시 early return 하면 outputNodes
+   * 스냅샷이 유실되어 탭 왕복 시 메인 DOM 이 복원되지 않는 회귀가 발생한다.
+   * terminal.js 초기화 블록에서 _activeSessionId 엔트리가 사전 생성되는 것이
+   * 1차 방어선이며, 본 함수는 이중화된 방어선으로서 엔트리가 없으면
+   * _createSessionEntry 로 즉석 생성 후 계속 진행한다 (defensive layering).
    */
   M._saveCurrentSession = function() {
     var entry = M._sessionMap[M._activeSessionId];
-    if (!entry) return;
+    if (!entry) {
+      entry = M._createSessionEntry(M._activeSessionId);
+      M._sessionMap[M._activeSessionId] = entry;
+    }
 
     // M.outputDiv 자식 노드 스냅샷 (최대 MAX_SAVED_NODES개)
     if (M.outputDiv) {
