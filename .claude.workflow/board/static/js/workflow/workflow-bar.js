@@ -271,10 +271,31 @@
     // ── Step Panel DOM management ──
 
     function _getOrCreateStepPanel(stepName) {
+      // T-383 Phase 4 (VUL-4 / S2) invariant:
+      //   _stepPanels[stepName] <-> outputDiv.querySelector(
+      //     '.wf-step-panel[data-step="' + stepName + '"]'
+      //   ) 는 동일한 DOM node 를 참조해야 한다.
+      //   같은 data-step 값을 가진 패널은 outputDiv 내 최대 1 개.
+      //
+      // _restoreSession 이 outputDiv 를 cloneNode 로 교체한 뒤
+      // _rebuildStepPanelsFromDom(outputDiv) 이 호출되지 않은 경로가
+      // 생기더라도 (defensive layering), 맵 miss 시 DOM querySelector
+      // 로 기존 패널을 찾아 맵에 재바인딩함으로써 동일 data-step 패널이
+      // 두 번 appendChild 되는 VUL-4 중복 생성을 차단한다.
       if (_stepPanels[stepName]) return _stepPanels[stepName];
 
       var outputDiv = document.getElementById("terminal-output");
       if (!outputDiv) return null;
+
+      // DOM fallback: Phase 3 의 _rebuildStepPanelsFromDom 과 동일한
+      // querySelector 패턴을 사용해 일관성을 유지한다.
+      var existing = outputDiv.querySelector(
+        '.wf-step-panel[data-step="' + stepName + '"]'
+      );
+      if (existing) {
+        _stepPanels[stepName] = existing;
+        return existing;
+      }
 
       var panel = document.createElement("div");
       panel.className = "wf-step-panel";
