@@ -281,16 +281,36 @@
       if (_ctx.isWorkflowMode()) {
         try { Board.phaseTimeline.render(); } catch (e) {}
       }
+      // T-383 Phase 5 (T5-2): replay 후 최종 상태 수렴.
+      // replay 중 workflow_step 이벤트는 FSM 전이를 수행하지 않고 DOM 재건
+      // 경로에만 의존하므로, replay 종료 시점에 서버 보유 최종 workflow 상태를
+      // REST 로 재조회하여 UI 상태( Board.state 등 )를 보정한다.
+      // 초기 connectSSEReady().then(fetchStatus) 경로와는 시점이 다르다:
+      // 그 호출은 replay 시작 직전이며, 본 호출은 replay 완료 "후" 최종 상태.
+      try { fetchStatus(); } catch (fsErr) {}
     });
 
+    // T-383 Phase 5 (T5-1, T5-3): replay 중 workflow_step 스킵.
+    // 원칙(T-379 Phase 2): workflow_step SSE 가 FSM 전이의 유일한 경로.
+    // 본 게이트는 이 원칙을 위반하지 않는다 — "아직 전이할 시점이 아니다"
+    // 로 해석한다. replay 중에는 DOM 재건( rebuildStepPanelsFromDom )이
+    // _restoreSession 경로에서 수행되므로 UI 상태는 다른 경로로 수렴하며,
+    // 최종 FSM 상태는 replay_end 시 fetchStatus()로 보정된다.
+    // _captureEventId 는 replay 중에도 항상 호출하여 재접속 시 from-id 를
+    // 보장한다(누락 시 히스토리 중복 재생 버그 재발 가능).
     termEventSource.addEventListener("workflow_step", function (e) {
       _captureEventId(e);
+      if (_isReplaying) {
+        // replay 중: FSM 전이( handleStepEvent ) 및 타임라인 렌더 스킵.
+        // 실시간 이벤트 수신 시점에 정상적으로 전이가 수행된다.
+        return;
+      }
       try {
         var data = JSON.parse(e.data);
         if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
           Board.WorkflowRenderer.handleStepEvent(data);
         }
-        if (!_isReplaying && _ctx.isWorkflowMode()) {
+        if (_ctx.isWorkflowMode()) {
           try { Board.phaseTimeline.render(); } catch (re) {}
         }
       } catch (err) {}
