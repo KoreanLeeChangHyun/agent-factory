@@ -56,7 +56,7 @@ function fetchWorkflowEntries() {
 
 /**
  * Fetches detailed info for a single workflow entry via /api/workflow/detail.
- * @param {string} entryHref - relative path of the entry (e.g. ".claude.workflow/workflow/20260325-150854/")
+ * @param {string} entryHref - relative path of the entry (e.g. ".claude-organic/runs/20260325-150854/")
  * @returns {Promise<Array>} flat array of workflow item objects
  */
 function fetchEntryDetail(entryHref) {
