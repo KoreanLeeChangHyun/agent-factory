@@ -11,7 +11,7 @@
 .claude-organic/worktrees/
 .claude-organic/board/data/
 .claude-organic/.board.url
-.claude-organic/.terminal-sessions/
+.claude-organic/.workflow-sessions/
 .claude-organic/staging/
 .claude/scheduled_tasks.lock
 

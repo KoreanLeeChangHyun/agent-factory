@@ -104,7 +104,7 @@ def _run_server(project_root: str) -> None:
             logger.debug('session_id 복원 실패: %s', _e)
 
     # 워크플로우 세션 persist 디렉터리 설정 + 디스크에서 복원
-    sessions_dir = os.path.join(project_root, '.claude-organic', '.sessions')
+    sessions_dir = os.path.join(project_root, '.claude-organic', '.workflow-sessions')
     workflow_registry._persist_dir = sessions_dir
     try:
         os.makedirs(sessions_dir, exist_ok=True)
