@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
   || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-exec bash "$ROOT/.claude-organic/engine/banner/flow_phase_banner.sh" "$@"
+exec bash "$ROOT/.claude-organic/engine/banners/flow_phase_banner.sh" "$@"
