@@ -2,7 +2,7 @@
 set -euo pipefail
 # ==============================================================================
 # init-claude-workflow.sh — 부트스트랩 스크립트
-# 원격 저장소를 1회 클론하여 .claude/ + .claude.workflow/ 를 설치한 뒤 build.sh 실행
+# 원격 저장소를 1회 클론하여 .claude/ + .claude-organic/ 를 설치한 뒤 build.sh 실행
 # 사용법: curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init-claude-workflow.sh | bash
 # ==============================================================================
 
@@ -92,46 +92,46 @@ if [ -d "$tmp_dir/_claude_preserve_skills" ]; then
 fi
 printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${GREEN}" "${NC}"
 
-# --- .claude.workflow/ 디렉터리 교체 (사용자 데이터 보존) ---
-if [ ! -d "$SRC/.claude.workflow" ]; then
-    printf '%s  ✗ 클론된 저장소에 .claude.workflow/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
+# --- .claude-organic/ 디렉터리 교체 (사용자 데이터 보존) ---
+if [ ! -d "$SRC/.claude-organic" ]; then
+    printf '%s  ✗ 클론된 저장소에 .claude-organic/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
 
 preserve_dirs=("kanban" "workflow" "dashboard" "edit")
 preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
 
-if [ -d ".claude.workflow" ]; then
+if [ -d ".claude-organic" ]; then
     # 업데이트 설치: 사용자 데이터 백업 후 교체
     for pd in "${preserve_dirs[@]}"; do
-        [ -d ".claude.workflow/$pd" ] && cp -r ".claude.workflow/$pd" "$tmp_dir/_preserve_$pd"
+        [ -d ".claude-organic/$pd" ] && cp -r ".claude-organic/$pd" "$tmp_dir/_preserve_$pd"
     done
     for pf in "${preserve_files[@]}"; do
-        [ -f ".claude.workflow/$pf" ] && cp ".claude.workflow/$pf" "$tmp_dir/_preserve_$pf"
+        [ -f ".claude-organic/$pf" ] && cp ".claude-organic/$pf" "$tmp_dir/_preserve_$pf"
     done
-    rm -rf ".claude.workflow.new"
-    cp -r "$SRC/.claude.workflow" ".claude.workflow.new"
-    rm -rf ".claude.workflow"; mv ".claude.workflow.new" ".claude.workflow"
+    rm -rf ".claude-organic.new"
+    cp -r "$SRC/.claude-organic" ".claude-organic.new"
+    rm -rf ".claude-organic"; mv ".claude-organic.new" ".claude-organic"
     # 사용자 데이터 복원
     for pd in "${preserve_dirs[@]}"; do
-        [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf ".claude.workflow/$pd"; mv "$tmp_dir/_preserve_$pd" ".claude.workflow/$pd"; }
+        [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf ".claude-organic/$pd"; mv "$tmp_dir/_preserve_$pd" ".claude-organic/$pd"; }
     done
     for pf in "${preserve_files[@]}"; do
-        [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude.workflow/$pf"
+        [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude-organic/$pf"
     done
-    printf '%s  ✓ .claude.workflow/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ .claude-organic/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${GREEN}" "${NC}"
 else
     # 신규 설치: 전체 복사
-    cp -r "$SRC/.claude.workflow" ".claude.workflow"
-    printf '%s  ✓ .claude.workflow/ 신규 설치 완료%s\n' "${GREEN}" "${NC}"
+    cp -r "$SRC/.claude-organic" ".claude-organic"
+    printf '%s  ✓ .claude-organic/ 신규 설치 완료%s\n' "${GREEN}" "${NC}"
 fi
 
 # .sh 파일 실행 권한 부여
 find ".claude/" -name '*.sh' -exec chmod +x {} +
-find ".claude.workflow/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
+find ".claude-organic/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 printf '%s  ✓ .sh 파일 chmod +x 완료%s\n' "${GREEN}" "${NC}"
 
 # build.sh 실행 (클론 인자 없이)
-BUILD_SH=".claude.workflow/build.sh"
+BUILD_SH=".claude-organic/build.sh"
 if [ ! -f "$BUILD_SH" ]; then
     printf '%s  ✗ build.sh를 찾을 수 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
@@ -141,7 +141,7 @@ echo ""
 bash "$BUILD_SH"
 
 # --- Board 서버 기동 ---
-BOARD_SERVER=".claude.workflow/board/server.py"
+BOARD_SERVER=".claude-organic/board/server.py"
 if [ -f "$BOARD_SERVER" ]; then
     printf '%s  → Board 서버 기동 중...%s\n' "${YELLOW}" "${NC}"
     python3 "$BOARD_SERVER" &>/dev/null

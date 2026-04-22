@@ -16,7 +16,7 @@
 - flow-kanban 호출 시 alias-reference에 나열되지 않은 서브커맨드를 사용하지 않는다
 - /clear 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook이 자동 재주입
 - 사용자 발화에 명시되지 않은 행위를 추론하여 수행하지 않는다 — "추가해주세요"는 추가만 의미
-- python3 .claude.workflow/scripts/... 형태로 스크립트를 직접 호출하지 않는다 — flow-* alias 사용
+- python3 .claude-organic/engine/... 형태로 스크립트를 직접 호출하지 않는다 — flow-* alias 사용
 - derived-from 파생 티켓이 미완료(Done 아닌 상태)면 원본 티켓을 Done 처리하지 않는다 — Hook이 차단
 
 > 실용적 이유: Hook 활성 시 DO NOT 항목은 차단되므로 시도 자체가 토큰 낭비. 처음부터 /wf 명령어로 진행할 것.

@@ -75,5 +75,5 @@ user-invocable: false
 
 ## 참고
 - `.claude/settings.json` - Hook 설정 (안전장치 트리거)
-- `.claude.workflow/hooks/` - Hook thin wrapper 디렉터리 (.py), `.claude.workflow/scripts/` - 실제 로직 스크립트 디렉터리 (.py)
+- `.claude-organic/hooks/` - Hook thin wrapper 디렉터리 (.py), `.claude-organic/engine/` - 실제 로직 스크립트 디렉터리 (.py)
 - `workflow-system` 스킬 - Hook 시스템 상세 가이드 (reference/hooks-guide.md)
