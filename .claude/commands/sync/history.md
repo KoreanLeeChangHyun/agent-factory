@@ -1,14 +1,14 @@
 ---
-description: ".claude-organic/workflow/* 작업 내역을 .claude-organic/dashboard/history.md에 동기화합니다."
+description: ".claude-organic/runs/* 작업 내역을 .claude-organic/board/data/history.md에 동기화합니다."
 ---
 
 # Sync Workflow History
 
-`.claude-organic/workflow/` 디렉토리의 작업 내역을 스캔하여 `.claude-organic/dashboard/history.md`에 누락 항목을 추가하고 상태를 업데이트합니다.
+`.claude-organic/runs/` 디렉토리의 작업 내역을 스캔하여 `.claude-organic/board/data/history.md`에 누락 항목을 추가하고 상태를 업데이트합니다.
 
 ## 스크립트
 
-`.claude-organic/scripts/sync/history_sync.py` - 서브커맨드: sync, status
+`.claude-organic/engine/sync/history_sync.py` - 서브커맨드: sync, status
 
 ## 오케스트레이션 흐름
 
@@ -20,7 +20,7 @@ Bash 도구로 실행:
 flow-history status
 ```
 
-`.claude-organic/workflow/` 디렉토리 수, history.md 행 수, 누락 수를 요약 출력합니다.
+`.claude-organic/runs/` 디렉토리 수, history.md 행 수, 누락 수를 요약 출력합니다.
 출력 결과를 사용자에게 표시합니다.
 
 ### Step 2. 동기화 미리보기 (선택적)
@@ -55,7 +55,7 @@ flow-history sync
 |------|------|--------|
 | `--dry-run` | 실제 동기화 없이 변경 사항만 미리보기 | 비활성 |
 | `--all` | 중단 작업(INIT/PLAN 단계) 포함하여 동기화 | 비활성 |
-| `--target PATH` | history.md 파일 경로 지정 | `.claude-organic/dashboard/history.md` |
+| `--target PATH` | history.md 파일 경로 지정 | `.claude-organic/board/data/history.md` |
 | `status` | 동기화 상태 요약만 출력 (sync 대신 사용) | - |
 
 ### $ARGUMENTS 분기

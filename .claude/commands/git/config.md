@@ -16,7 +16,7 @@ argument-hint: "[--global | --local]"
 
 ## 스크립트
 
-`.claude-organic/scripts/git/git_config.py` - 옵션: `[--global|--local]`
+`.claude-organic/engine/git/git_config.py` - 옵션: `[--global|--local]`
 
 ## 오케스트레이션 흐름
 

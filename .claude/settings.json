@@ -2,11 +2,11 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
-      "Edit(.claude-organic/scripts/**)",
+      "Edit(.claude-organic/engine/**)",
       "Edit(.claude-organic/hooks/**)",
-      "Edit(.claude-organic/prompt/**)",
+      "Edit(.claude-organic/prompts/**)",
       "Edit(.claude-organic/docs/**)",
-      "Edit(.claude-organic/init/**)",
+      "Edit(.claude-organic/build-assets/**)",
       "Edit(.claude-organic/board/**)",
       "Edit(.claude/skills/**)",
       "Edit(.claude/agents/**)",
@@ -20,7 +20,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/scripts/statusline.py"
+    "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/statusline.py"
   },
   "hooks": {
     "SessionStart": [
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/scripts/sync/history_sync.py sync && python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/scripts/sync/history_sync.py archive",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/sync/history_sync.py sync && python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/sync/history_sync.py archive",
             "timeout": 30,
             "async": true
           }

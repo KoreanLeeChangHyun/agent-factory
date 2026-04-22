@@ -812,7 +812,7 @@ def _delete_rules_file(project_root: str, rel_path: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Prompt helpers (.claude-organic/prompt/)
+# Prompt helpers (.claude-organic/prompts/)
 # ---------------------------------------------------------------------------
 
 # prompt 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점
@@ -835,7 +835,7 @@ def _validate_prompt_filename(filename: str) -> None:
 
 
 def _list_prompt_files(project_root: str) -> list[dict]:
-    """'.claude-organic/prompt/' 하위 모든 파일 목록을 반환한다.
+    """'.claude-organic/prompts/' 하위 모든 파일 목록을 반환한다.
 
     숨김 파일과 __pycache__ 디렉터리는 제외한다.
 
@@ -908,7 +908,7 @@ def _read_prompt_file(project_root: str, filename: str) -> dict:
 def _write_prompt_file(
     project_root: str, filename: str, content: str,
 ) -> dict:
-    """.claude-organic/prompt/ 파일을 생성하거나 수정한다.
+    """.claude-organic/prompts/ 파일을 생성하거나 수정한다.
 
     .claude-organic/ 하위이므로 직접 쓰기 가능하다.
 
@@ -935,7 +935,7 @@ def _write_prompt_file(
 
 
 def _delete_prompt_file(project_root: str, filename: str) -> dict:
-    """.claude-organic/prompt/ 파일을 삭제한다.
+    """.claude-organic/prompts/ 파일을 삭제한다.
 
     Args:
         project_root: 프로젝트 루트 절대 경로

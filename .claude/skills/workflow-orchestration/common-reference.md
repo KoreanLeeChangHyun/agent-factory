@@ -29,7 +29,7 @@
 | **workDir** | 작업 디렉터리 | 워크플로우의 모든 산출물이 저장되는 디렉터리. 형식: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>` |
 | **workId** | 작업 ID | 워크플로우를 식별하는 6자리 시간 기반 ID. 형식: `HHMMSS` (예: 143000). |
 | **registryKey** | 워크플로우 키 | 워크플로우를 전역적으로 식별하는 키. 형식: `YYYYMMDD-HHMMSS`. 디렉터리 스캔으로 workDir를 해석. |
-| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Step 전이를 제어하는 상태 기계. 이중 가드(`.claude-organic/scripts/flow/update_state.py` + `.claude-organic/hooks/pre-tool-use.py`)로 불법 전이를 차단. |
+| **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Step 전이를 제어하는 상태 기계. 이중 가드(`.claude-organic/engine/flow/update_state.py` + `.claude-organic/hooks/pre-tool-use.py`)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Step에서 다른 Step으로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)이 Aggregate Root 역할. |
 | **mode** | 모드 | 워크플로우 실행 모드. PLAN->WORK->REPORT->DONE 단일 모드. |
@@ -235,7 +235,7 @@ flowchart TD
 |-------------|----------|
 | `PLAN -> WORK -> REPORT -> DONE` | PLAN/WORK/REPORT->CANCELLED, PLAN/WORK/REPORT->FAILED, INIT/NONE->{STALE,FAILED,CANCELLED}, TTL->STALE |
 
-불법 전이 시 시스템 가드가 차단. `.claude-organic/scripts/flow/update_state.py`는 전이 미수행(no-op), `.claude-organic/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
+불법 전이 시 시스템 가드가 차단. `.claude-organic/engine/flow/update_state.py`는 전이 미수행(no-op), `.claude-organic/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
 

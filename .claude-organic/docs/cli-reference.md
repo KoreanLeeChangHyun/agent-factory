@@ -31,7 +31,7 @@
 ### flow-claude
 
 - **alias**: `flow-claude`
-- **스크립트**: `.claude-organic/scripts/banner/flow_claude_banner.sh`
+- **스크립트**: `.claude-organic/engine/banners/flow_claude_banner.sh`
 - **설명**: 워크플로우 시작/종료 배너를 출력하는 셸 스크립트
 
 #### 서브커맨드
@@ -65,7 +65,7 @@ flow-claude end 20260325-004729
 ### flow-step
 
 - **alias**: `flow-step`
-- **스크립트**: `.claude-organic/scripts/banner/flow_step_banner.sh`
+- **스크립트**: `.claude-organic/engine/banners/flow_step_banner.sh`
 - **설명**: PLAN/WORK/REPORT 단계 배너를 출력하는 셸 스크립트
 
 #### 서브커맨드
@@ -103,7 +103,7 @@ flow-step end   20260325-004729 planSubmit
 ### flow-phase
 
 - **alias**: `flow-phase`
-- **스크립트**: `.claude-organic/scripts/banner/flow_phase_banner.sh`
+- **스크립트**: `.claude-organic/engine/banners/flow_phase_banner.sh`
 - **설명**: WORK 단계의 Phase 서브배너를 출력하는 셸 스크립트
 
 #### 사용법
@@ -132,7 +132,7 @@ flow-phase 20260325-004729 2
 ### flow-init
 
 - **alias**: `flow-init`
-- **스크립트**: `.claude-organic/scripts/flow/initialization.py`
+- **스크립트**: `.claude-organic/engine/flow/initialization.py`
 - **설명**: 워크플로우 디렉터리 구조와 메타데이터를 초기화하는 스크립트
 
 #### 사용법
@@ -154,7 +154,7 @@ flow-init <command> <title> [mode] [#N]
 
 | 변수 | 설명 |
 |------|------|
-| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .claude-organic/kanban/active/에서 자동 선택 |
+| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .claude-organic/tickets/active/에서 자동 선택 |
 
 #### 출력 (stdout)
 
@@ -182,7 +182,7 @@ flow-init "implement>review" "결제 모듈 구현"
 ### flow-finish
 
 - **alias**: `flow-finish`
-- **스크립트**: `.claude-organic/scripts/flow/finalization.py`
+- **스크립트**: `.claude-organic/engine/flow/finalization.py`
 - **설명**: 워크플로우 마무리 6단계 처리 (상태 전이, 사용량 확정, 아카이빙, 티켓 갱신, 체인 발사, 세션 정리)
 
 #### 사용법
@@ -219,7 +219,7 @@ flow-finish 20260325-004729 실패 --ticket-number T-169
 ### flow-reload
 
 - **alias**: `flow-reload`
-- **스크립트**: `.claude-organic/scripts/flow/reload_prompt.py`
+- **스크립트**: `.claude-organic/engine/flow/reload_prompt.py`
 - **설명**: 티켓 XML 피드백을 현재 워크플로우의 user_prompt.txt에 append하는 스크립트
 
 #### 사용법
@@ -232,13 +232,13 @@ flow-reload <workDir>
 
 | 인자 | 필수 | 타입 | 설명 |
 |------|------|------|------|
-| `workDir` | 필수 | string | 작업 디렉터리 상대 경로 (예: `.claude-organic/workflow/20260325-004729/작업명/implement`) |
+| `workDir` | 필수 | string | 작업 디렉터리 상대 경로 (예: `.claude-organic/runs/20260325-004729/작업명/implement`) |
 
 #### 환경변수
 
 | 변수 | 설명 |
 |------|------|
-| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN). 미지정 시 .context.json 또는 .claude-organic/kanban/active/ 스캔으로 자동 탐색 |
+| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN). 미지정 시 .context.json 또는 .claude-organic/tickets/active/ 스캔으로 자동 탐색 |
 
 #### 출력 (stdout)
 
@@ -247,7 +247,7 @@ flow-reload <workDir>
 #### 사용 예시
 
 ```bash
-flow-reload .claude-organic/workflow/20260325-004729/로그인-버그-수정/implement
+flow-reload .claude-organic/runs/20260325-004729/로그인-버그-수정/implement
 ```
 
 ---
@@ -255,7 +255,7 @@ flow-reload .claude-organic/workflow/20260325-004729/로그인-버그-수정/imp
 ### flow-update
 
 - **alias**: `flow-update`
-- **스크립트**: `.claude-organic/scripts/flow/update_state.py`
+- **스크립트**: `.claude-organic/engine/flow/update_state.py`
 - **설명**: 워크플로우 상태 일괄 업데이트 라우터 (상태 전이, 사용량 추적, 태스크 관리, 환경변수 관리)
 
 #### 서브커맨드
@@ -299,7 +299,7 @@ flow-update env 20260325-004729 set ENFORCE_SELF_REVIEW true
 ### flow-skillmap
 
 - **alias**: `flow-skillmap`
-- **스크립트**: `.claude-organic/scripts/flow/skill_mapper.py`
+- **스크립트**: `.claude-organic/engine/flow/skill_mapper.py`
 - **설명**: plan.md 태스크의 skills 컬럼을 분석하여 skill-map.md와 태스크별 컨텍스트 슬라이스를 생성하는 Phase 0 스크립트
 
 #### 사용법
@@ -338,7 +338,7 @@ flow-skillmap 20260325-004729
 ### flow-skill
 
 - **alias**: `flow-skill`
-- **스크립트**: `.claude-organic/scripts/flow/skill_state_manager.py`
+- **스크립트**: `.claude-organic/engine/flow/skill_state_manager.py`
 - **설명**: 스킬의 활성(active)/아카이브(archived) 상태를 관리하는 CLI
 
 #### 서브커맨드
@@ -375,7 +375,7 @@ flow-skill list --archived
 ### flow-validate
 
 - **alias**: `flow-validate`
-- **스크립트**: `.claude-organic/scripts/flow/plan_validator.py`
+- **스크립트**: `.claude-organic/engine/flow/plan_validator.py`
 - **설명**: plan.md 구조를 검증하여 Phase 편차, 워커 분배, 스킬 배정, WHAT/HOW 분리를 점검하는 스크립트
 
 #### 사용법
@@ -400,7 +400,7 @@ flow-validate <plan_path>
 #### 사용 예시
 
 ```bash
-flow-validate .claude-organic/workflow/20260325-004729/로그인-버그-수정/implement/plan.md
+flow-validate .claude-organic/runs/20260325-004729/로그인-버그-수정/implement/plan.md
 ```
 
 ---
@@ -408,7 +408,7 @@ flow-validate .claude-organic/workflow/20260325-004729/로그인-버그-수정/i
 ### flow-validate-p
 
 - **alias**: `flow-validate-p`
-- **스크립트**: `.claude-organic/scripts/flow/prompt_validator.py`
+- **스크립트**: `.claude-organic/engine/flow/prompt_validator.py`
 - **설명**: 티켓 XML 파일의 계약 스펙을 검증하고 품질 점수를 산출하는 스크립트
 
 #### 사용법
@@ -421,7 +421,7 @@ flow-validate-p <prompt_file_path>
 
 | 인자 | 필수 | 타입 | 설명 |
 |------|------|------|------|
-| `prompt_file_path` | 필수 | string | 티켓 XML 파일 경로 (.claude-organic/kanban/active/T-NNN.xml) |
+| `prompt_file_path` | 필수 | string | 티켓 XML 파일 경로 (.claude-organic/tickets/active/T-NNN.xml) |
 
 #### 검증 항목
 
@@ -445,7 +445,7 @@ JSON: `quality_score`, `has_tags`, `missing_tags`, `empty_tags`, `optional_tags`
 #### 사용 예시
 
 ```bash
-flow-validate-p .claude-organic/kanban/active/T-169.xml
+flow-validate-p .claude-organic/tickets/active/T-169.xml
 ```
 
 ---
@@ -453,7 +453,7 @@ flow-validate-p .claude-organic/kanban/active/T-169.xml
 ### flow-recommend
 
 - **alias**: `flow-recommend`
-- **스크립트**: `.claude-organic/scripts/flow/skill_recommender.py`
+- **스크립트**: `.claude-organic/engine/flow/skill_recommender.py`
 - **설명**: 태스크 설명을 입력받아 TF-IDF 유사도 기반으로 상위 3개 스킬을 추천하는 스크립트
 
 #### 사용법
@@ -486,7 +486,7 @@ flow-recommend "GitHub Actions CI 빌드 실패 디버깅"
 ### flow-gc
 
 - **alias**: `flow-gc`
-- **스크립트**: `.claude-organic/scripts/flow/garbage_collect.py`
+- **스크립트**: `.claude-organic/engine/flow/garbage_collect.py`
 - **설명**: TTL(24시간) 만료된 미완료 워크플로우를 STALE 상태로 전환하는 좀비 정리 스크립트
 
 #### 사용법
@@ -503,7 +503,7 @@ flow-gc [project_root]
 
 #### 동작
 
-- `.claude-organic/workflow/` 하위에서 TTL 만료 + 미완료(DONE/FAILED/STALE 미해당) status.json을 STALE로 전환
+- `.claude-organic/runs/` 하위에서 TTL 만료 + 미완료(DONE/FAILED/STALE 미해당) status.json을 STALE로 전환
 - flow-init 실행 시 자동으로 호출됨
 
 #### 사용 예시
@@ -518,16 +518,16 @@ flow-gc /home/user/project
 ### flow-kanban
 
 - **alias**: `flow-kanban`
-- **스크립트**: `.claude-organic/scripts/flow/kanban.py`
-- **설명**: 칸반 보드 상태 관리 CLI. XML 티켓 파일(.claude-organic/kanban/active/T-NNN.xml)을 SSoT로 사용
+- **스크립트**: `.claude-organic/engine/flow/kanban.py`
+- **설명**: 칸반 보드 상태 관리 CLI. XML 티켓 파일(.claude-organic/tickets/active/T-NNN.xml)을 SSoT로 사용
 
 #### 서브커맨드
 
 | 서브커맨드 | 사용법 | 설명 |
 |-----------|-------|------|
-| `create` | `flow-kanban create "<title>" [--command <cmd>]` | 새 티켓 생성 (.claude-organic/kanban/active/T-NNN.xml) |
+| `create` | `flow-kanban create "<title>" [--command <cmd>]` | 새 티켓 생성 (.claude-organic/tickets/active/T-NNN.xml) |
 | `move` | `flow-kanban move <ticket> <target> [--force]` | 티켓을 지정 컬럼으로 이동 |
-| `done` | `flow-kanban done <ticket>` | 티켓을 Done으로 이동 + .claude-organic/kanban/done/으로 파일 이동 |
+| `done` | `flow-kanban done <ticket>` | 티켓을 Done으로 이동 + .claude-organic/tickets/done/으로 파일 이동 |
 | `delete` | `flow-kanban delete <ticket>` | 티켓 삭제 |
 | `update-title` | `flow-kanban update-title <ticket> <title>` | 티켓 제목 갱신 |
 | `update` | `flow-kanban update <ticket> [options]` | 티켓 메타데이터 갱신 |
@@ -585,9 +585,9 @@ flow-kanban update-prompt T-169 \
 
 flow-kanban update-result T-169 \
   --registrykey 20260325-004729 \
-  --plan ".claude-organic/workflow/20260325-004729/.../plan.md" \
-  --report ".claude-organic/workflow/20260325-004729/.../report.md" \
-  --workdir ".claude-organic/workflow/20260325-004729/.../implement"
+  --plan ".claude-organic/runs/20260325-004729/.../plan.md" \
+  --report ".claude-organic/runs/20260325-004729/.../report.md" \
+  --workdir ".claude-organic/runs/20260325-004729/.../implement"
 
 flow-kanban link T-169 --depends-on T-165
 flow-kanban link T-169 --derived-from T-168

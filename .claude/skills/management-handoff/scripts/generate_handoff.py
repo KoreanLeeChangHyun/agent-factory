@@ -176,7 +176,7 @@ def generate_handoff(
     project_root = get_project_root()
 
     if workflow_dir is None:
-        workflow_dir = project_root / ".claude-organic" / "workflow"
+        workflow_dir = project_root / ".claude-organic" / "runs"
 
     # 최근 워크플로우 찾기
     recent_work = find_recent_workflow(workflow_dir)
@@ -316,7 +316,7 @@ def main():
         output = args.output
         if output is None:
             project_root = get_project_root()
-            workflow_dir = args.workflow_dir or (project_root / ".claude-organic" / "workflow")
+            workflow_dir = args.workflow_dir or (project_root / ".claude-organic" / "runs")
             recent_work = find_recent_workflow(workflow_dir)
 
             if recent_work:

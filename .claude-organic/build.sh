@@ -10,7 +10,7 @@ if [ ! -f "$DEFAULTS_CONF" ]; then
     echo "ERROR: defaults.conf not found: $DEFAULTS_CONF" >&2
     exit 1
 fi
-# shellcheck source=.claude-organic/init/defaults.conf
+# shellcheck source=.claude-organic/build-assets/defaults.conf
 source "$DEFAULTS_CONF"
 
 # --- 색상 변수 ---
@@ -47,7 +47,7 @@ validate_templates() {
     done
     if [ "${#missing[@]}" -gt 0 ]; then
         print_error "필수 템플릿 파일 부재: ${missing[*]}"
-        print_info "build.sh 실행 전 .claude-organic/init/templates/ 디렉터리를 확인하세요."
+        print_info "build.sh 실행 전 .claude-organic/build-assets/templates/ 디렉터리를 확인하세요."
         exit 1
     fi
 }
@@ -471,14 +471,14 @@ verify_installation() {
     _verify_command "gh"   "gh CLI" || failed=$((failed + 1))
     if command -v claude &>/dev/null; then print_success "claude 명령어 실행 가능"
     else print_error "claude 명령어를 찾을 수 없습니다"; failed=$((failed + 1)); fi
-    # (d) .claude-organic/kanban/, .claude-organic/kanban/{open,progress,review,done}/ 디렉터리 존재
+    # (d) .claude-organic/tickets/, .claude-organic/tickets/{open,progress,review,done}/ 디렉터리 존재
     local kanban_ok=true
-    for dir in ".claude-organic/kanban" ".claude-organic/kanban/open" ".claude-organic/kanban/progress" ".claude-organic/kanban/review" ".claude-organic/kanban/done"; do
+    for dir in ".claude-organic/kanban" ".claude-organic/tickets/open" ".claude-organic/tickets/progress" ".claude-organic/tickets/review" ".claude-organic/tickets/done"; do
         if [ ! -d "$dir" ]; then
             print_error "필수 디렉터리 없음: $dir"; kanban_ok=false; failed=$((failed + 1))
         fi
     done
-    [ "$kanban_ok" = true ] && print_success ".claude-organic/kanban/, .claude-organic/kanban/{open,progress,review,done}/ 디렉터리 존재 확인"
+    [ "$kanban_ok" = true ] && print_success ".claude-organic/tickets/, .claude-organic/tickets/{open,progress,review,done}/ 디렉터리 존재 확인"
     # (e) .claude-organic/.settings 또는 .claude-organic/.env 파일 존재
     if [ -f ".claude-organic/.settings" ]; then
         print_success ".claude-organic/.settings 파일 존재 확인"

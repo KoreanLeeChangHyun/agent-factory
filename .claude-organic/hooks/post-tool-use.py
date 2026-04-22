@@ -21,11 +21,11 @@ from dispatcher import (
     scripts_dir,
 )
 
-_scripts_dir: str = os.path.normpath(
+_engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts')
 )
-if _scripts_dir not in sys.path:
-    sys.path.insert(0, _scripts_dir)
+if _engine_dir not in sys.path:
+    sys.path.insert(0, _engine_dir)
 
 from flow.session_identifier import WINDOW_PREFIX_P
 

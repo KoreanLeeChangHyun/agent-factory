@@ -445,7 +445,7 @@
       '<div class="memory-empty">' +
         '<div class="memory-empty-icon">&#128196;</div>' +
         '<div class="memory-empty-text">No prompt files found</div>' +
-        '<div class="memory-empty-sub">.claude-organic/prompt/ directory is empty.</div>' +
+        '<div class="memory-empty-sub">.claude-organic/prompts/ directory is empty.</div>' +
         '<button class="memory-new-btn" id="prompt-empty-new-btn" style="margin-top:8px">+ Create First File</button>' +
       '</div>'
     );

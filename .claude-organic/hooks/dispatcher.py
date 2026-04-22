@@ -271,10 +271,10 @@ def run_inline(
 
 
 def scripts_dir(*parts: str) -> str:
-    """Return absolute path under .claude-organic/scripts/.
+    """Return absolute path under .claude-organic/engine/.
 
     Args:
-        *parts: Path components after .claude-organic/scripts/.
+        *parts: Path components after .claude-organic/engine/.
 
     Returns:
         Absolute path string.
