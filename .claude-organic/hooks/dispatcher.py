@@ -168,7 +168,7 @@ def _find_workflow_log(log_dir: str | None = None) -> str | None:
             if os.path.isfile(candidate) or os.path.isdir(os.path.dirname(candidate)):
                 return candidate
 
-        scripts_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+        scripts_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'engine'))
         if scripts_path not in sys.path:
             sys.path.insert(0, scripts_path)
         from common import scan_active_workflows, resolve_project_root  # noqa: PLC0415
@@ -280,7 +280,7 @@ def scripts_dir(*parts: str) -> str:
         Absolute path string.
     """
     root = _find_project_root()
-    return os.path.join(root, '.claude-organic', 'scripts', *parts)
+    return os.path.join(root, '.claude-organic', 'engine', *parts)
 
 
 def collect_exit_codes(

@@ -67,13 +67,13 @@ SERVER_PID: int = os.getpid()
 
 # 감시 대상 경로 -> SSE 이벤트 타입 매핑
 WATCH_DIRS: dict[str, str] = {
-    os.path.join('.claude-organic', 'kanban', 'open'): 'kanban',
-    os.path.join('.claude-organic', 'kanban', 'progress'): 'kanban',
-    os.path.join('.claude-organic', 'kanban', 'review'): 'kanban',
-    os.path.join('.claude-organic', 'kanban', 'done'): 'kanban',
-    os.path.join('.claude-organic', 'workflow'): 'workflow',
-    os.path.join('.claude-organic', 'workflow', '.history'): 'workflow',
-    os.path.join('.claude-organic', 'dashboard'): 'dashboard',
+    os.path.join('.claude-organic', 'tickets', 'open'): 'kanban',
+    os.path.join('.claude-organic', 'tickets', 'progress'): 'kanban',
+    os.path.join('.claude-organic', 'tickets', 'review'): 'kanban',
+    os.path.join('.claude-organic', 'tickets', 'done'): 'kanban',
+    os.path.join('.claude-organic', 'runs'): 'workflow',
+    os.path.join('.claude-organic', 'runs', '.history'): 'workflow',
+    os.path.join('.claude-organic', 'board', 'data'): 'dashboard',
 }
 
 # Workflow sync (init-claude-workflow.sh) 부트스트랩 URL과 동시 실행 차단 락

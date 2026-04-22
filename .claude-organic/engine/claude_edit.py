@@ -27,7 +27,7 @@ PROJECT_ROOT = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 )
 CLAUDE_DIR = os.path.join(PROJECT_ROOT, '.claude')
-EDIT_DIR = os.path.join(PROJECT_ROOT, '.claude-organic', 'edit')
+EDIT_DIR = os.path.join(PROJECT_ROOT, '.claude-organic', 'staging')
 
 
 def _resolve(rel_path: str) -> tuple[str, str]:

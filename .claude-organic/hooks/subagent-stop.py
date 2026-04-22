@@ -50,7 +50,7 @@ def main() -> None:
 
     # dispatch_async 호출 직후 활성 워크플로우에 로그 기록 (비차단)
     try:
-        _scripts_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+        _scripts_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'engine'))
         if _scripts_path not in sys.path:
             sys.path.insert(0, _scripts_path)
         from common import scan_active_workflows, resolve_project_root

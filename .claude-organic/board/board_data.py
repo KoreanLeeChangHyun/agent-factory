@@ -17,9 +17,9 @@ import time
 # ---------------------------------------------------------------------------
 
 KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'review', 'done']
-WF_BASE: str = os.path.join('.claude-organic', 'workflow')
-WF_HISTORY: str = os.path.join('.claude-organic', 'workflow', '.history')
-DASH_BASE: str = os.path.join('.claude-organic', 'dashboard')
+WF_BASE: str = os.path.join('.claude-organic', 'runs')
+WF_HISTORY: str = os.path.join('.claude-organic', 'runs', '.history')
+DASH_BASE: str = os.path.join('.claude-organic', 'board', 'data')
 DASH_FILES: list[str] = ['usage', 'logs', 'skills']
 WF_ENTRY_RE = re.compile(r'^\d{8}-\d{6}$')
 WF_DETAIL_FILES: list[dict] = [
@@ -165,7 +165,7 @@ def _read_kanban_tickets(
     project_root: str, files: list[str] | None = None,
 ) -> dict[str, str | None]:
     """kanban 디렉터리에서 XML 티켓을 읽어 {파일명: 내용} dict를 반환한다."""
-    kanban = os.path.join(project_root, '.claude-organic', 'kanban')
+    kanban = os.path.join(project_root, '.claude-organic', 'tickets')
     result: dict[str, str | None] = {}
     for d in KANBAN_DIRS_LIST:
         dp = os.path.join(kanban, d)
@@ -596,7 +596,7 @@ _RULES_CATEGORIES = {'workflow', 'project'}
 # claude_edit.py 스크립트 절대 경로
 _CLAUDE_EDIT_SCRIPT = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '..', 'scripts', 'claude_edit.py',
+    '..', 'engine', 'claude_edit.py',
 )
 
 
@@ -731,7 +731,7 @@ def _write_rules_file(
 
     # 원본이 없을 경우 open이 실패하므로, 신규 파일은 직접 생성 후 save
     original_path = os.path.join(project_root, '.claude', 'rules', category, filename)
-    edit_dir = os.path.join(project_root, '.claude-organic', 'edit')
+    edit_dir = os.path.join(project_root, '.claude-organic', 'staging')
     edit_path = os.path.join(edit_dir, 'rules', rel_path)
     script = os.path.normpath(_CLAUDE_EDIT_SCRIPT)
 
@@ -789,7 +789,7 @@ def _delete_rules_file(project_root: str, rel_path: str) -> dict:
 
     claude_rel_path = f'rules/{rel_path}'
     script = os.path.normpath(_CLAUDE_EDIT_SCRIPT)
-    edit_dir = os.path.join(project_root, '.claude-organic', 'edit')
+    edit_dir = os.path.join(project_root, '.claude-organic', 'staging')
     edit_path = os.path.join(edit_dir, 'rules', rel_path)
 
     # open: .claude/ -> edit/ 복사
@@ -845,7 +845,7 @@ def _list_prompt_files(project_root: str) -> list[dict]:
     Returns:
         [{"name": str, "size": int, "mtime": str}, ...]
     """
-    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompt')
+    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompts')
     if not os.path.isdir(prompt_dir):
         return []
 
@@ -889,7 +889,7 @@ def _read_prompt_file(project_root: str, filename: str) -> dict:
         FileNotFoundError: 파일이 존재하지 않는 경우
     """
     _validate_prompt_filename(filename)
-    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompt')
+    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompts')
     filepath = os.path.join(prompt_dir, filename)
 
     if not os.path.isfile(filepath):
@@ -924,7 +924,7 @@ def _write_prompt_file(
         ValueError: 파일명이 보안 검증에 실패한 경우
     """
     _validate_prompt_filename(filename)
-    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompt')
+    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompts')
     os.makedirs(prompt_dir, exist_ok=True)
     filepath = os.path.join(prompt_dir, filename)
 
@@ -949,7 +949,7 @@ def _delete_prompt_file(project_root: str, filename: str) -> dict:
         FileNotFoundError: 파일이 존재하지 않는 경우
     """
     _validate_prompt_filename(filename)
-    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompt')
+    prompt_dir = os.path.join(project_root, '.claude-organic', 'prompts')
     filepath = os.path.join(prompt_dir, filename)
 
     if not os.path.isfile(filepath):

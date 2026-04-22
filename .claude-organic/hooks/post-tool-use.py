@@ -22,7 +22,7 @@ from dispatcher import (
 )
 
 _engine_dir: str = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts')
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'engine')
 )
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
