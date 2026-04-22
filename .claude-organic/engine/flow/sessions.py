@@ -37,7 +37,7 @@ from flow.cli_utils import build_common_epilog  # noqa: E402
 
 # .claude-organic/ 루트 (.sessions/ 디렉터리의 부모)
 _WF_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", ".."))
-_SESSIONS_DIR = os.path.join(_WF_ROOT, ".sessions")
+_SESSIONS_DIR = os.path.join(_WF_ROOT, ".workflow-sessions")
 _BOARD_URL_FILE = os.path.join(_WF_ROOT, ".board.url")
 
 # HTTP API status 값 → 정규화 상태
