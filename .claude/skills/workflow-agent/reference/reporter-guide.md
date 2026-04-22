@@ -84,7 +84,7 @@ workPath: <workDir>/work/
 
 > **엄격히 준수**: 오케스트레이터에게 반환할 때 반드시 아래 형식만 사용합니다.
 > 이 형식 외의 추가 정보(보고서 내용 요약, 변경 목록, 다음 단계 등)는 절대 포함하지 않습니다.
-> 상세 정보는 보고서 파일(.claude.workflow/workflow/)에 저장되어 있으므로 반환에 포함할 필요가 없습니다.
+> 상세 정보는 보고서 파일(.claude-organic/workflow/)에 저장되어 있으므로 반환에 포함할 필요가 없습니다.
 
 ### 반환 형식
 
@@ -169,9 +169,9 @@ command별 보고서 구조가 다르므로, `templates/report/` 디렉터리에
 **규칙**:
 - 변경 파일 테이블의 파일 경로에만 링크 적용
 - 본문 인라인 경로(`작업 내역` 섹션 등)는 백틱(`` ` ``) 유지
-- 산출물 경로(work/WXX-*.md, report.md 등 .claude.workflow/workflow/ 하위)는 백틱 유지, 링크 미적용
+- 산출물 경로(work/WXX-*.md, report.md 등 .claude-organic/workflow/ 하위)는 백틱 유지, 링크 미적용
 
-**이중 접두사 버그 주의**: 링크 경로에 workDir 접두사를 중복 부여하지 않습니다. 보고서가 `.claude.workflow/workflow/<id>/` 하위에 위치하므로, 파일 경로는 프로젝트 루트 기준 상대 경로를 그대로 사용합니다. `../workflow/../workflow/` 같은 이중 접두사가 발생하면 링크가 깨집니다.
+**이중 접두사 버그 주의**: 링크 경로에 workDir 접두사를 중복 부여하지 않습니다. 보고서가 `.claude-organic/workflow/<id>/` 하위에 위치하므로, 파일 경로는 프로젝트 루트 기준 상대 경로를 그대로 사용합니다. `../workflow/../workflow/` 같은 이중 접두사가 발생하면 링크가 깨집니다.
 
 ### CSV 보고서 템플릿
 

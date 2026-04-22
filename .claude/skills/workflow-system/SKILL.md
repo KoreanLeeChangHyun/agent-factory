@@ -60,39 +60,39 @@ flow-update task-status <registryKey> running W01 W02 && flow-update usage-pendi
 
 #### 4. 위치 규칙
 
-- [ ] 배너 출력 스크립트: `.claude.workflow/scripts/banner/`
-- [ ] 워크플로우 흐름 제어 스크립트: `.claude.workflow/scripts/flow/`
-- [ ] 가드/보안 스크립트: `.claude.workflow/scripts/guards/`
-- [ ] 동기화 스크립트: `.claude.workflow/scripts/sync/`
-- [ ] Hook 디스패처: `.claude.workflow/hooks/` (실제 로직은 `scripts/`에 분리)
+- [ ] 배너 출력 스크립트: `.claude-organic/scripts/banner/`
+- [ ] 워크플로우 흐름 제어 스크립트: `.claude-organic/scripts/flow/`
+- [ ] 가드/보안 스크립트: `.claude-organic/scripts/guards/`
+- [ ] 동기화 스크립트: `.claude-organic/scripts/sync/`
+- [ ] Hook 디스패처: `.claude-organic/hooks/` (실제 로직은 `scripts/`에 분리)
 
 ### 현재 등록된 alias 목록
 
 | alias | 스크립트 경로 | 용도 |
 |-------|-------------|------|
-| `flow-claude` | `.claude.workflow/scripts/banner/flow_claude_banner.sh` | 워크플로우 시작/종료 배너 |
-| `flow-step` | `.claude.workflow/scripts/banner/flow_step_banner.sh` | 스텝 시작/종료 배너 |
-| `flow-phase` | `.claude.workflow/scripts/banner/flow_phase_banner.sh` | WORK 페이즈 배너 |
-| `flow-init` | `python3 .claude.workflow/scripts/flow/initialization.py` | 워크플로우 초기화 |
-| `flow-finish` | `python3 .claude.workflow/scripts/flow/finalization.py` | 워크플로우 마무리 처리 |
-| `flow-reload` | `python3 .claude.workflow/scripts/flow/reload_prompt.py` | 프롬프트 리로드 |
-| `flow-update` | `python3 .claude.workflow/scripts/flow/update_state.py` | 워크플로우 상태 관리 |
-| `flow-skillmap` | `python3 .claude.workflow/scripts/flow/skill_mapper.py` | 태스크별 스킬 매핑 생성 |
-| `flow-validate` | `python3 .claude.workflow/scripts/flow/plan_validator.py` | 계획서 유효성 검증 |
-| `flow-validate-p` | `python3 .claude.workflow/scripts/flow/prompt_validator.py` | 프롬프트 유효성 검증 |
-| `flow-recommend` | `python3 .claude.workflow/scripts/flow/skill_recommender.py` | 스킬 자동 추천 |
-| `flow-gc` | `python3 .claude.workflow/scripts/flow/garbage_collect.py` | 좀비 워크플로우 정리 |
-| `flow-kanban` | `python3 .claude.workflow/scripts/flow/kanban.py` | 칸반 보드 관리 |
-| `flow-merge` | `python3 .claude.workflow/scripts/flow/merge_pipeline.py` | PR 기반 머지 파이프라인 |
-| `flow-launcher` | `.claude.workflow/bin/flow-launcher` | HTTP API 기반 워크플로우 세션 실행 |
-| `flow-history` | `python3 .claude.workflow/scripts/sync/history_sync.py` | 히스토리 동기화 |
-| `flow-catalog` | `python3 .claude.workflow/scripts/sync/catalog_sync.py` | 스킬 카탈로그 재생성 |
-| `flow-gitconfig` | `python3 .claude.workflow/scripts/git/git_config.py` | Git config 설정 |
-| `flow-detect` | `python3 .claude.workflow/scripts/flow/project_skill_detector.py` | 프로젝트 스킬 감지 |
+| `flow-claude` | `.claude-organic/scripts/banner/flow_claude_banner.sh` | 워크플로우 시작/종료 배너 |
+| `flow-step` | `.claude-organic/scripts/banner/flow_step_banner.sh` | 스텝 시작/종료 배너 |
+| `flow-phase` | `.claude-organic/scripts/banner/flow_phase_banner.sh` | WORK 페이즈 배너 |
+| `flow-init` | `python3 .claude-organic/scripts/flow/initialization.py` | 워크플로우 초기화 |
+| `flow-finish` | `python3 .claude-organic/scripts/flow/finalization.py` | 워크플로우 마무리 처리 |
+| `flow-reload` | `python3 .claude-organic/scripts/flow/reload_prompt.py` | 프롬프트 리로드 |
+| `flow-update` | `python3 .claude-organic/scripts/flow/update_state.py` | 워크플로우 상태 관리 |
+| `flow-skillmap` | `python3 .claude-organic/scripts/flow/skill_mapper.py` | 태스크별 스킬 매핑 생성 |
+| `flow-validate` | `python3 .claude-organic/scripts/flow/plan_validator.py` | 계획서 유효성 검증 |
+| `flow-validate-p` | `python3 .claude-organic/scripts/flow/prompt_validator.py` | 프롬프트 유효성 검증 |
+| `flow-recommend` | `python3 .claude-organic/scripts/flow/skill_recommender.py` | 스킬 자동 추천 |
+| `flow-gc` | `python3 .claude-organic/scripts/flow/garbage_collect.py` | 좀비 워크플로우 정리 |
+| `flow-kanban` | `python3 .claude-organic/scripts/flow/kanban.py` | 칸반 보드 관리 |
+| `flow-merge` | `python3 .claude-organic/scripts/flow/merge_pipeline.py` | PR 기반 머지 파이프라인 |
+| `flow-launcher` | `.claude-organic/bin/flow-launcher` | HTTP API 기반 워크플로우 세션 실행 |
+| `flow-history` | `python3 .claude-organic/scripts/sync/history_sync.py` | 히스토리 동기화 |
+| `flow-catalog` | `python3 .claude-organic/scripts/sync/catalog_sync.py` | 스킬 카탈로그 재생성 |
+| `flow-gitconfig` | `python3 .claude-organic/scripts/git/git_config.py` | Git config 설정 |
+| `flow-detect` | `python3 .claude-organic/scripts/flow/project_skill_detector.py` | 프로젝트 스킬 감지 |
 
 > alias 추가 시 `build.sh`의 `setup_shell_aliases()` 함수 내 `.claude.aliases` heredoc에 항목을 추가한다.
 
-**참고**: `build.sh` (alias 등록 위치), `.claude.workflow/scripts/` (실제 로직 스크립트 디렉터리), [reference/hooks-guide.md](reference/hooks-guide.md) (Hook 이벤트와 스크립트 연동 방법)
+**참고**: `build.sh` (alias 등록 위치), `.claude-organic/scripts/` (실제 로직 스크립트 디렉터리), [reference/hooks-guide.md](reference/hooks-guide.md) (Hook 이벤트와 스크립트 연동 방법)
 
 ---
 
@@ -221,7 +221,7 @@ RESET = "\033[0m"
 workflow_display = ""
 current_session = os.environ.get("CLAUDE_SESSION_ID", "")
 if cwd and current_session:
-    workflow_dir = os.path.join(cwd, ".claude.workflow", "workflow")
+    workflow_dir = os.path.join(cwd, ".claude-organic", "workflow")
     try:
         for date_dir in sorted(os.listdir(workflow_dir), reverse=True):
             date_path = os.path.join(workflow_dir, date_dir)
@@ -232,7 +232,7 @@ if cwd and current_session:
                 if not os.path.isdir(name_path):
                     continue
                 for cmd_dir in os.listdir(name_path):
-                    work_dir = os.path.join(".claude.workflow", "workflow", date_dir, name_dir, cmd_dir)
+                    work_dir = os.path.join(".claude-organic", "workflow", date_dir, name_dir, cmd_dir)
                     status_path = os.path.join(cwd, work_dir, "status.json")
                     try:
                         with open(status_path, "r") as sf:

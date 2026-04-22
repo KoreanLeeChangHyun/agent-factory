@@ -1,18 +1,18 @@
 
 # Workflow runtime (secrets, data, temp)
-.claude.workflow/.settings
-.claude.workflow/.env
-.claude.workflow/.env*
-.claude.workflow/.last-session-id
-.claude.workflow/workflow/
-.claude.workflow/kanban/**/*.xml
-.claude.workflow/kanban/.memo.txt
-.claude.workflow/kanban/.todo.txt
-.claude.workflow/worktrees/
-.claude.workflow/dashboard/
-.claude.workflow/.board.url
-.claude.workflow/.sessions/
-.claude.workflow/edit/
+.claude-organic/.settings
+.claude-organic/.env
+.claude-organic/.env*
+.claude-organic/.last-session-id
+.claude-organic/workflow/
+.claude-organic/kanban/**/*.xml
+.claude-organic/kanban/.memo.txt
+.claude-organic/kanban/.todo.txt
+.claude-organic/worktrees/
+.claude-organic/dashboard/
+.claude-organic/.board.url
+.claude-organic/.sessions/
+.claude-organic/edit/
 .claude/scheduled_tasks.lock
 
 CLAUDE.md

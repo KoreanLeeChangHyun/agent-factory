@@ -10,7 +10,7 @@ description: "스킬 카탈로그 갱신. .claude/skills/ 디렉터리를 전수
 
 ## 스크립트
 
-`.claude.workflow/scripts/sync/catalog_sync.py` - 옵션: `[--dry-run]`
+`.claude-organic/scripts/sync/catalog_sync.py` - 옵션: `[--dry-run]`
 
 ## 오케스트레이션 흐름
 
