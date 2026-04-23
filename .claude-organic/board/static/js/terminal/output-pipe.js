@@ -120,14 +120,6 @@
     if (!M.outputDiv) return;
 
     M.outputDiv.innerHTML = "";
-    if (M.isWorkflowMode) {
-      // 워크플로우 모드: "Workflow Session: ..." 시스템 메시지는 탭 바 활성 탭으로 대체.
-      // 스트림 연결 중 메시지만 표시한다.
-      M.appendSystemMessage("Connecting to live stream...");
-    } else {
-      M.appendSystemMessage("Claude Code Terminal");
-      M.appendSystemMessage('Press "Start" to begin a session.');
-    }
 
     M.initMarked();
 
@@ -135,6 +127,169 @@
     if (Board.ToolResultRenderer && Board.ToolResultRenderer.setMarkdownRenderer) {
       Board.ToolResultRenderer.setMarkdownRenderer(M.renderMarkdownToHtml);
     }
+  };
+
+  M._emptyStateShown = false;
+  M._historyLoaded = false;
+
+  M.showEmptyState = function() {
+    // 재로드 시 복원되지 않는 placeholder는 출력하지 않는다.
+    M._emptyStateShown = true;
+  };
+
+  M._historyLastTimestamp = "";
+
+  function _renderThinking(text) {
+    var details = document.createElement("details");
+    details.className = "term-message term-thinking-block";
+    var summary = document.createElement("summary");
+    summary.textContent = "thinking";
+    details.appendChild(summary);
+    var body = document.createElement("div");
+    body.className = "term-thinking-body";
+    body.textContent = text;
+    details.appendChild(body);
+    M.appendToOutput(details);
+  }
+
+  function _renderToolUse(ev) {
+    if (typeof M.createToolBox !== "function") return;
+    M.createToolBox(ev.name || "", ev.tool_use_id || "");
+    M.currentToolName = ev.name || "";
+    if (ev.input && typeof ev.input === "object") {
+      try {
+        M.toolInputBuffer = JSON.stringify(ev.input);
+      } catch (_e) {
+        M.toolInputBuffer = "";
+      }
+    } else {
+      M.toolInputBuffer = "";
+    }
+  }
+
+  function _renderToolResult(ev) {
+    if (typeof M.insertToolResult !== "function") return;
+    var targetBox = ev.tool_use_id && M.toolBoxMap ? M.toolBoxMap[ev.tool_use_id] : null;
+    var toolName = targetBox && targetBox.getAttribute
+      ? (targetBox.getAttribute("data-tool-name") || undefined)
+      : undefined;
+    M.insertToolResult(ev.text || "", !!ev.is_error, toolName, ev.tool_use_id || "");
+    M.toolInputBuffer = "";
+  }
+
+  M.renderHistory = function(events) {
+    if (!M.outputDiv || !events || !events.length) return;
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var kind = ev.kind || "text";
+      if (kind === "text") {
+        var text = ev.text || "";
+        if (!text) continue;
+        if (ev.role === "user") {
+          var userDiv = document.createElement("div");
+          userDiv.className = "term-message term-user";
+          userDiv.textContent = text;
+          M.appendToOutput(userDiv);
+        } else if (ev.role === "assistant") {
+          var html = M.renderMarkdownToHtml(text);
+          M.appendHtmlBlock(html, "term-message term-assistant");
+        }
+      } else if (kind === "thinking") {
+        if (ev.text) _renderThinking(ev.text);
+      } else if (kind === "tool_use") {
+        _renderToolUse(ev);
+      } else if (kind === "tool_result") {
+        _renderToolResult(ev);
+      }
+    }
+  };
+
+  /**
+   * jsonl 에서 복원된 누적 토큰/비용을 in-memory 상태에 반영한다.
+   * 서버 응답의 last_usage / last_cost_usd 는 세션 전체에서 가장 최근 값이므로
+   * set 의미(누적 아님)로 덮어쓴다. 세션 로드/재개/SSE 재연결 시 0 으로
+   * 남아 있는 상태를 재수화하는 역할.
+   *
+   * 가드: 라이브 SSE 이벤트가 이미 토큰을 채워 놓았다면(= 현재 값이 0 이 아님)
+   * 덮어쓰지 않는다. jsonl 은 턴이 끝난 뒤 append 되므로 파일 기반 값이 라이브
+   * 이벤트보다 한 턴 뒤처질 수 있어, 라이브가 항상 최신이다. 첫 로드(=0,0)
+   * 또는 재연결 gap-fill(=동일 값) 경로에서만 실질적으로 반영된다.
+   */
+  function _applyHistoryUsage(data) {
+    if (!data) return;
+    var alreadyLive = (M.sessionTokens.input !== 0 || M.sessionTokens.output !== 0);
+    var changed = false;
+    if (!alreadyLive && data.last_usage && typeof data.last_usage === "object") {
+      if (typeof data.last_usage.input_tokens === "number") {
+        M.sessionTokens.input = data.last_usage.input_tokens;
+        changed = true;
+      }
+      if (typeof data.last_usage.output_tokens === "number") {
+        M.sessionTokens.output = data.last_usage.output_tokens;
+        changed = true;
+      }
+    }
+    if (M.sessionCost === 0 && typeof data.last_cost_usd === "number") {
+      M.sessionCost = data.last_cost_usd;
+      changed = true;
+    }
+    if (changed && typeof M.updateStatusLine === "function") {
+      M.updateStatusLine();
+    }
+  }
+
+  M.loadHistory = function(sessionId) {
+    if (!sessionId || M._historyLoaded || M.isWorkflowMode) return Promise.resolve();
+    M._historyLoaded = true;
+    return fetch("/terminal/history?session_id=" + encodeURIComponent(sessionId), {
+      cache: "no-store"
+    }).then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    }).then(function (data) {
+      if (!data) {
+        M.showEmptyState();
+        return;
+      }
+      // usage/cost 는 events 유무와 무관하게 반영한다.
+      _applyHistoryUsage(data);
+      if (!data.events || !data.events.length) {
+        M.showEmptyState();
+        return;
+      }
+      M.renderHistory(data.events);
+      M._historyLastTimestamp = data.last_timestamp || "";
+    }).catch(function () {
+      // 네트워크 오류 등: 최소한 placeholder라도 보이게
+      M.showEmptyState();
+    });
+  };
+
+  /**
+   * 재연결 gap 보충: 마지막 복원 timestamp 이후의 새 이벤트만 가져와 덧붙인다.
+   * SSE가 라이브만 전달하므로 네트워크 블립 동안 놓친 이벤트는 여기서 메운다.
+   * usage/cost 는 since 와 무관하게 전체 최신값이 실리므로 gap 이 비어 있어도
+   * connectSSE 의 resetTokens() 로 날아간 값을 복구한다.
+   */
+  M.fetchHistorySince = function(sessionId) {
+    if (!sessionId || M.isWorkflowMode) return Promise.resolve();
+    var since = M._historyLastTimestamp || "";
+    // since 가 비어 있으면 초기 로드(loadHistory)가 담당해야 한다.
+    // 여기서 전체 history 를 fetch 하면 loadHistory 결과와 겹쳐 렌더되어
+    // Sessions 드롭다운 resume 직후 대화가 2벌로 찍히는 버그가 발생한다.
+    if (!since) return Promise.resolve();
+    var url = "/terminal/history?session_id=" + encodeURIComponent(sessionId)
+      + "&since=" + encodeURIComponent(since);
+    return fetch(url, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    }).then(function (data) {
+      if (!data) return;
+      _applyHistoryUsage(data);
+      if (!data.events || !data.events.length) return;
+      M.renderHistory(data.events);
+      if (data.last_timestamp) M._historyLastTimestamp = data.last_timestamp;
+    }).catch(function () { /* silent */ });
   };
 
   // ── Smart Auto-Scroll ──

@@ -18,6 +18,8 @@
   var SSE_RECONNECT_INTERVAL = 3000;
 
   // ── Internal state ──
+  /** 세션 스위치/시작 중복 요청 방지 플래그. spawn 응답이 올 때까지 true. */
+  var _startInFlight = false;
   /** @type {EventSource|null} */
   var termEventSource = null;
   /** @type {number|null} */
@@ -139,7 +141,7 @@
     return fetch(_ctx.endpoints().status, { cache: "no-store" }).then(function (res) {
       if (res.status === 404) {
         _sessionArchived = true;
-        Board.state.termStatus = "missing";
+        Board.state.setTermStatus("missing");
         Board.state.termConnected = false;
         _ctx.stopSpinner();
         _ctx.appendErrorMessage("[Error] 세션을 찾을 수 없습니다. 이미 종료되었거나 정리되었습니다.");
@@ -152,9 +154,18 @@
       if (!data) return;
       if (data.archived) {
         _sessionArchived = true;
+        Board.state.setTermStatus("archived");
+      } else {
+        // 서버 응답(stopped/running)과 클라 확장 상태(idle/busy/starting)를 병합.
+        Board.state.reconcileTermStatus(data.status);
       }
-      Board.state.termStatus = data.status || "stopped";
-      Board.state.termSessionId = data.session_id || null;
+      // stopped 상태에서 session_id 를 유지하면 서버가 .last-session-id 에서
+      // 복원한 예전 UUID 가 남고, Start 후 첫 system/init 이벤트가 "세션 교체"
+      // 로 오인되어 clearOutput 으로 방금 입력한 사용자 말풍선이 사라진다.
+      // stopped 면 활성 sid 없음으로 간주하고 null 로 세팅한다.
+      Board.state.termSessionId = (data.status === "stopped")
+        ? null
+        : (data.session_id || null);
       // last_session_id: W01 서버에서 추가된 필드 (이전/현재 세션 UUID)
       if (data.last_session_id) {
         Board.state.termLastSessionId = data.last_session_id;
@@ -236,8 +247,10 @@
     if (!_ctx) return;
     disconnectSSE();
 
-    // Reset tokens on reconnect to avoid duplicate accumulation from history replay
-    _ctx.resetTokens();
+    // 토큰/비용은 assistant 이벤트 수신 시 set 의미로 덮어쓰기 때문에 누적
+    // 위험이 없다. 재연결마다 리셋하면 SSE gap 이 비어 있거나 gap-fill 응답이
+    // 늦을 때 상태가 0 으로 고착되므로 리셋하지 않는다. 세션 전환/재시작/
+    // process_exit 경로는 각자 resetTokens 을 이미 호출한다.
 
     // Clear sent-text tracking so that history-replayed user_input events
     // are rendered into the DOM (they are not duplicates).
@@ -253,17 +266,33 @@
 
     // Resume from last received event id to prevent full-history replay on reconnect
     var eventsUrl = _ctx.endpoints().events;
+    var qsSep = function () { return eventsUrl.indexOf("?") >= 0 ? "&" : "?"; };
+    var termMod = Board._term;
     if (_lastEventId >= 0) {
-      eventsUrl += (eventsUrl.indexOf("?") >= 0 ? "&" : "?") + "last_event_id=" + _lastEventId;
+      eventsUrl += qsSep() + "last_event_id=" + _lastEventId;
+      // SSE 링버퍼 재생에 가장 최근 assistant 이벤트가 포함되지 않을 수 있으므로
+      // REST 로도 최신 usage/cost 를 재수화한다 (empty gap 이어도 서버는 현재
+      // 총계를 돌려준다).
+      if (!_ctx.isWorkflowMode() && termMod && termMod._historyLoaded &&
+          typeof termMod.fetchHistorySince === "function") {
+        termMod.fetchHistorySince(Board.state.termSessionId);
+      }
+    } else if (!_ctx.isWorkflowMode()) {
+      // 메인 세션: REST /terminal/history 가 과거의 권위 있는 출처이므로
+      // SSE 링버퍼 재생은 생략한다. 서버는 replay_start/end 프레임도 보내지 않는다.
+      eventsUrl += qsSep() + "skip_replay=1";
+      // 재연결 (already loaded once) 이면 REST 로 gap 을 보충한다.
+      if (termMod && termMod._historyLoaded && typeof termMod.fetchHistorySince === "function") {
+        termMod.fetchHistorySince(Board.state.termSessionId);
+      }
     }
     termEventSource = new EventSource(eventsUrl);
 
     termEventSource.addEventListener("archived_end", function (e) {
       _captureEventId(e);
       _sessionArchived = true;
-      Board.state.termStatus = "archived";
+      Board.state.setTermStatus("archived");
       Board.state.termConnected = false;
-      _ctx.appendSystemMessage("[아카이브 세션] 종료된 세션의 히스토리 재생이 완료되었습니다.");
       _ctx.updateControlBar();
       if (termEventSource) {
         termEventSource.close();
@@ -548,9 +577,7 @@
           _toolInputMap = {};
           if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
 
-          _ctx.appendSystemMessage("Response complete");
-
-          Board.state.termStatus = "idle";
+          Board.state.setTermStatus("idle");
           _ctx.setReceivedChunks(false);
           _ctx.setInputLocked(false);
           _ctx.updateControlBar();
@@ -570,8 +597,20 @@
       try {
         var data = JSON.parse(e.data);
         if (data.subtype === "init" && data.session_id) {
+          // 서버가 resume_session_id 선반영한 UUID 와 실제 CLI 세션 UUID 가
+          // 다른 케이스 (graceful fallback 등). 이전 UUID 기준으로 REST
+          // 로드된 과거 대화를 버리고 새 UUID 로 다시 로드한다.
+          var prevSid = Board.state.termSessionId;
+          if (prevSid && String(prevSid) !== String(data.session_id)) {
+            _ctx.clearOutput();
+            _resetSessionDerivedState();
+            var termModSwap = Board._term;
+            if (termModSwap && typeof termModSwap.loadHistory === "function") {
+              termModSwap.loadHistory(data.session_id);
+            }
+          }
           Board.state.termSessionId = data.session_id;
-          Board.state.termStatus = "idle";
+          Board.state.setTermStatus("idle");
           if (data.raw && data.raw.model) {
             var rawModel = data.raw.model;
             var ctxMatch = rawModel.match(/\[(\d+)([mk])\]/i);
@@ -588,15 +627,15 @@
             var modeEl = document.getElementById("terminal-sl-mode");
             if (modeEl) modeEl.textContent = data.raw.permissionMode;
           }
-          _ctx.appendSystemMessage("Session started");
           _ctx.setInputLocked(false);
           _ctx.updateControlBar();
         } else if (data.subtype === "process_exit") {
-          // running 상태에서도 process_exit를 처리하여 stopped로 전이한다.
+          // busy/starting/idle 중 어느 상태든 process_exit 은 stopped 로 전이한다.
           // (이전 코드는 running 상태에서 early return하여 상태가 고착되는 버그가 있었음)
-          if (Board.state.termStatus === "running") {
-            // running 중 process_exit: result 이벤트와 동일한 UI 정리 수행
-            _ctx.stopSpinner();
+          var wasActive = Board.state.termStatus === "busy" ||
+                          Board.state.termStatus === "starting";
+          if (wasActive) {
+            // 응답/준비 중 process_exit: result 이벤트와 동일한 UI 정리 수행
             _ctx.setReceivedChunks(false);
             _ctx.resetToolInputBuffer();
             _pendingTextBuffer = "";
@@ -604,7 +643,7 @@
             _currentToolUseId = null;
             _toolInputMap = {};
           }
-          Board.state.termStatus = "stopped";
+          Board.state.setTermStatus("stopped");
           _ctx.resetTokens();
           _ctx.setSessionCost(0);
           _ctx.stopSpinner();
@@ -805,7 +844,7 @@
         if (data.exit_code === 143 || data.exit_code === 0) return;
         _ctx.stopSpinner();
         _ctx.appendErrorMessage("[Error] " + (data.message || "Process error"));
-        Board.state.termStatus = "stopped";
+        Board.state.setTermStatus("stopped");
         _ctx.setInputLocked(false);
         _ctx.updateControlBar();
       } catch (err) {
@@ -852,9 +891,42 @@
   // UUID v1~v5 느슨한 형식 검증 (하이픈 포함 36자)
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+  /**
+   * 세션 스위치/재시작 시 누적된 파생 상태를 전부 초기화한다.
+   * - 모듈 스코프: _pendingTextBuffer, _sentTexts, _currentToolUseId, _toolInputMap, _isReplaying
+   * - M 네임스페이스: thinking spinner, tool-box 매핑, toolInputBuffer, currentToolName, sessionTokens/Cost
+   * - WorkflowRenderer reset (있을 때)
+   * DOM 출력은 호출자가 clearOutput 으로 별도 처리.
+   */
+  function _resetSessionDerivedState() {
+    _pendingTextBuffer = "";
+    _sentTexts.clear();
+    _currentToolUseId = null;
+    _toolInputMap = {};
+    _isReplaying = false;
+    if (_ctx) {
+      _ctx.resetTokens && _ctx.resetTokens();
+      _ctx.setReceivedChunks && _ctx.setReceivedChunks(false);
+    }
+    var termMod = Board._term;
+    if (termMod) {
+      termMod.stopSpinner && termMod.stopSpinner();
+      termMod.currentToolBox = null;
+      termMod.toolBoxMap = {};
+      termMod.currentToolName = null;
+      termMod.toolInputBuffer = "";
+      termMod._historyLoaded = false;
+      termMod._historyLastTimestamp = "";
+    }
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.reset) {
+      Board.WorkflowRenderer.reset();
+    }
+  }
+
   function startSession(resumeSessionId) {
     if (!_ctx) return;
-    if (Board.state.termStatus !== "stopped") return;
+    // 중복 요청 방지: spawn 응답이 올 때까지 추가 클릭 무시.
+    if (_startInFlight) return;
     var isResume = !!resumeSessionId;
 
     // 선제 UUID 검증: resume 요청인데 UUID 형식이 아니면 서버 fallback 대신 즉시 실패 처리
@@ -863,14 +935,35 @@
       return;
     }
 
+    // 이미 활성 세션이 있으면 세션 스위치로 간주하고 연결을 리셋한다.
+    // 서버의 claude_process.spawn() 이 내부에서 기존 프로세스를 kill 하므로
+    // HTTP kill 을 별도로 호출할 필요는 없다.
+    if (Board.state.termStatus !== "stopped") {
+      disconnectSSE();
+      Board.state.setTermStatus("stopped");
+      Board.state.termSessionId = null;
+      _ctx.updateControlBar();
+    }
+
+    // 새 세션(isResume=false) 시작 시 termSessionId 를 명시적으로 비운다.
+    // stopped 상태에서 Start 를 누른 경우 fetchStatus 가 이미 null 로 돌려두지만,
+    // 방어적으로 여기서도 클리어해 system/init 의 "세션 교체" 조건을 원천 차단한다.
+    // isResume 경로는 아래 Line 966 부근에서 resumeSessionId 로 명시 세팅된다.
+    if (!isResume) {
+      Board.state.termSessionId = null;
+    }
+
+    // 파생 상태 전체 리셋 — 이전 세션의 tool-box 매핑 / 텍스트 버퍼가
+    // 새 세션 이벤트 처리에 섞이지 않도록 한다.
+    _resetSessionDerivedState();
+
     // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
-    // 이전 채널의 last-event-id는 의미가 없다. 리셋하여 새 히스토리를 받도록 한다.
+    // 이전 채널의 last-event-id는 의미가 없다.
     _lastEventId = -1;
     _sessionArchived = false;
 
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
-      _ctx.appendSystemMessage("Connecting to workflow session " + _ctx.getWorkflowSessionId() + "...");
       connectSSEReady().catch(function (err) {
         _ctx.appendErrorMessage("[Error] SSE connect failed: " + err.message);
       });
@@ -879,47 +972,47 @@
 
     _ctx.clearOutput();
     if (isResume) {
-      _ctx.appendSystemMessage("세션 재개 중... (" + String(resumeSessionId).substring(0, 8) + ")");
-    } else {
-      _ctx.appendSystemMessage("Starting session...");
+      // 과거 대화를 즉시 UI 에 로드 (Claude CLI spawn 응답을 기다리지 않음).
+      // spawn 은 백그라운드로 진행되며, resume 은 큰 세션에서 10초 이상 걸릴 수
+      // 있으므로 사용자 체감 UX 를 위해 REST /terminal/history 로 먼저 채운다.
+      // 주의: 서버가 graceful fallback 하면 init 이벤트에서 실제 session_id
+      // 가 달리 도착하고, 그때 과거 대화를 재로딩한다 (system/init 리스너 참조).
+      Board.state.termSessionId = resumeSessionId;
+      var termModResume = Board._term;
+      if (termModResume && typeof termModResume.loadHistory === "function") {
+        termModResume.loadHistory(resumeSessionId);
+      }
     }
 
-    Board.state.termStatus = "running";
+    // spawn 요청 ~ init 이벤트 수신 전까지는 "starting". 입력은 아직 비활성.
+    Board.state.setTermStatus("starting");
     _ctx.updateControlBar();
 
+    _startInFlight = true;
     connectSSEReady().then(function () {
       var startBody = isResume ? { resume_session_id: resumeSessionId } : undefined;
       return postJson("/terminal/start", startBody);
     }).then(function (data) {
-      _ctx.startSpinner();
-      _ctx.setInputLocked(true);
+      // spawn 응답 = 프로세스 준비 완료. claude -p 는 첫 stdin 입력 전까지
+      // system/init 이벤트를 emit 하지 않기 때문에 init 대기 대신 여기서
+      // idle 로 전이한다. 입력창/버튼을 즉시 활성화한다.
+      // 스피너는 Claude 가 실제로 응답을 시작할 때 sendInput 경로에서 켠다.
       if (data && data.session_id) {
         Board.state.termSessionId = data.session_id;
-        Board.state.termStatus = "idle";
-        _ctx.updateControlBar();
-
-        // 서버가 fallback으로 새 세션을 만들었는지 감지
-        // (server.py는 잘못된 resume_session_id 시 새 세션으로 graceful fallback함)
-        if (isResume && String(data.session_id) !== String(resumeSessionId)) {
-          _ctx.appendSystemMessage(
-            "[안내] 요청한 세션(" + String(resumeSessionId).substring(0, 8) +
-            ")을 재개할 수 없어 새 세션(" + String(data.session_id).substring(0, 8) + ")이 생성되었습니다."
-          );
-        } else if (isResume) {
-          _ctx.appendSystemMessage("세션 " + String(data.session_id).substring(0, 8) + "... 재개됨");
-        }
       }
-      if (!isResume) {
-        var initText = "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요.";
-        _sentTexts.add(initText);
-        postJson("/terminal/input", { text: initText }).catch(function () {});
-      }
+      Board.state.setTermStatus("idle");
+      _ctx.setInputLocked(false);
+      _ctx.updateControlBar();
     }).catch(function (err) {
       var reason = err && err.message ? err.message : "알 수 없는 오류";
       var prefix = isResume ? "[오류] 세션 재개 실패" : "[Error] Failed to start session";
       _ctx.appendErrorMessage(prefix + ": " + reason);
-      Board.state.termStatus = "stopped";
+      Board.state.setTermStatus("stopped");
       _ctx.updateControlBar();
+    }).then(function () {
+      _startInFlight = false;
+    }, function () {
+      _startInFlight = false;
     });
   }
 
@@ -928,17 +1021,39 @@
 
   function killSession() {
     if (!_ctx) return;
-    if (Board.state.termStatus === "stopped") return;
+    var killable = Board.util.TERM_STATUS_KILLABLE;
+    if (!killable.has(Board.state.termStatus)) return;
     // 중복 kill 요청 방지
     if (_killingInProgress) return;
     _killingInProgress = true;
 
     var prevStatus = Board.state.termStatus;
     var epK = _ctx.endpoints();
+    // Close 시 UI 정리 — process_exit 경로와 동일한 리셋을 수행해
+    // 대화창 / 토큰 / 비용 / 스피너가 stopped 상태에 어색하게 남지 않도록 한다.
+    function _finalizeStoppedUI() {
+      _ctx.stopSpinner();
+      _ctx.clearOutput();
+      _ctx.resetTokens();
+      _ctx.setSessionCost(0);
+      _ctx.setSessionModel("--");
+      _ctx.setReceivedChunks(false);
+      _ctx.resetToolInputBuffer();
+      _pendingTextBuffer = "";
+      _currentToolUseId = null;
+      _toolInputMap = {};
+      if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
+      _ctx.clearCurrentToolBox();
+      if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
+      // permission mode 표시는 DOM 직접 제어 (setSessionModel 같은 상태 저장소 없음)
+      var modeEl = document.getElementById("terminal-sl-mode");
+      if (modeEl) modeEl.textContent = "";
+      Board.state.termSessionId = null;
+    }
     postJson(epK.kill, epK.inputBody({})).then(function () {
-      _ctx.appendSystemMessage("Session terminated");
-      Board.state.termStatus = "stopped";
+      Board.state.setTermStatus("stopped");
       _ctx.setInputLocked(false);
+      _finalizeStoppedUI();
       _ctx.updateControlBar();
       // kill 성공 후 SSE 연결 정리: 잔여 이벤트가 상태를 되돌리지 않도록 한다
       disconnectSSE();
@@ -946,14 +1061,15 @@
       // 409: 프로세스가 이미 종료된 경우 → stopped로 복구
       var is409 = err.message && err.message.indexOf("409") !== -1;
       if (is409) {
-        Board.state.termStatus = "stopped";
+        Board.state.setTermStatus("stopped");
         _ctx.setInputLocked(false);
+        _finalizeStoppedUI();
         _ctx.updateControlBar();
         disconnectSSE();
       } else {
         // 그 외 에러: 이전 상태로 복구하여 버튼 고착 방지
         _ctx.appendErrorMessage("[Error] Failed to kill session: " + err.message);
-        Board.state.termStatus = prevStatus;
+        Board.state.setTermStatus(prevStatus);
         _ctx.setInputLocked(false);
         _ctx.updateControlBar();
       }
