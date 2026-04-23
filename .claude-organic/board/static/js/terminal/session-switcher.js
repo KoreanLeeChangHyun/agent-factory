@@ -85,7 +85,7 @@
     M.sessionCost = entry.cost;
     M.sessionTokens = { input: entry.tokens.input, output: entry.tokens.output };
     M.sessionModel = entry.model;
-    Board.state.termStatus = entry.status;
+    Board.state.setTermStatus(entry.status);
     Board.state.termSessionId = targetId === "main" ? null : targetId;
 
     // M.inputQueue 교체 (참조를 유지하면서 내용만 교체)
@@ -117,16 +117,8 @@
         }
         // 스크롤을 맨 아래로
         M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
-      } else {
-        // 빈 세션: 초기 메시지 출력
-        if (targetId === "main") {
-          M.appendSystemMessage("Claude Code Terminal");
-          M.appendSystemMessage('Press "Start" to begin a session.');
-        } else {
-          // 워크플로우 모드: "Workflow Session: ..." 메시지는 탭 바 활성 탭으로 대체
-          M.appendSystemMessage("Connecting to live stream...");
-        }
       }
+      // 빈 세션: 재로드 시 사라질 placeholder는 찍지 않는다.
 
       // T-383 Phase 3 (VUL-2 / VUL-3 / S1):
       // outputDiv 를 cloneNode 로 교체한 직후 WorkflowRenderer 의 _stepPanels

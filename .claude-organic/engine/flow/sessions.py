@@ -4,7 +4,7 @@
 기능:
   - 현재 실행 중인 워크플로우 세션 목록을 테이블 형태로 출력한다.
   - Board 서버 기동 시 HTTP API(`GET /terminal/workflow/list`)를 우선 사용한다.
-  - 서버 미기동 시 `.sessions/*.jsonl` 파일을 직접 파싱하여 상태를 판별한다.
+  - 서버 미기동 시 `.workflow-sessions/*.jsonl` 파일을 직접 파싱하여 상태를 판별한다.
 
 사용법:
   flow-sessions            # 실행중 세션만 출력
@@ -35,7 +35,7 @@ from flow.cli_utils import build_common_epilog  # noqa: E402
 # 상수 / 경로
 # ---------------------------------------------------------------------------
 
-# .claude-organic/ 루트 (.sessions/ 디렉터리의 부모)
+# .claude-organic/ 루트 (.workflow-sessions/ 디렉터리의 부모)
 _WF_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", ".."))
 _SESSIONS_DIR = os.path.join(_WF_ROOT, ".workflow-sessions")
 _BOARD_URL_FILE = os.path.join(_WF_ROOT, ".board.url")
@@ -169,7 +169,7 @@ def _parse_jsonl_status(filepath: str) -> str:
 
 
 def _fetch_sessions_via_jsonl() -> list[dict]:
-    """`.sessions/` 디렉터리의 JSONL 파일을 파싱하여 세션 목록을 반환한다."""
+    """`.workflow-sessions/` 디렉터리의 JSONL 파일을 파싱하여 세션 목록을 반환한다."""
     if not os.path.isdir(_SESSIONS_DIR):
         return []
 

@@ -35,7 +35,6 @@
    */
   function handleSlashCommand(text, ctx) {
     if (ctx.isWorkflowMode) {
-      ctx.appendSystemMessage("워크플로우 세션에서는 슬래시 명령어를 사용할 수 없습니다.");
       return;
     }
 
@@ -44,7 +43,6 @@
     var entry = SLASH_COMMANDS[cmd];
 
     if (!entry) {
-      ctx.appendSystemMessage("알 수 없는 명령어입니다. /help로 사용 가능한 명령어를 확인하세요.");
       return;
     }
 
@@ -56,12 +54,8 @@
    */
   function handleClear(cmd, args, ctx) {
     ctx.clearOutput();
-    ctx.appendSystemMessage("Context clearing...");
-
-    ctx.postJson("/terminal/command", { command: cmd }).then(function () {
-      ctx.appendSystemMessage("Context cleared.");
-    }).catch(function (err) {
-      ctx.appendSystemMessage("Context cleared (local). Server reset failed: " + err.message);
+    ctx.postJson("/terminal/command", { command: cmd }).catch(function () {
+      /* silent */
     });
   }
 
@@ -83,7 +77,6 @@
    * Handles remote-only slash commands (/cost, /status, /compact).
    */
   function handleRemoteCommand(cmd, args, ctx) {
-    ctx.appendSystemMessage("Sending " + cmd + "...");
     ctx.postJson("/terminal/command", { command: cmd }).catch(function (err) {
       ctx.appendErrorMessage("[Error] " + err.message);
     });

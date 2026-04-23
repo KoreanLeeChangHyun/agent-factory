@@ -12,6 +12,26 @@
 
   M.thinkingEl = null;
 
+  // Claude CLI 의 위트 있는 thinking verb pool 을 본떠 여러 단어를 로테이션한다.
+  // "Thinking..." 하나만 돌면 지루하므로 3~4초 간격으로 라벨을 바꾼다.
+  var THINKING_VERBS = [
+    "Thinking", "Pondering", "Noodling", "Channelling", "Tomfoolering",
+    "Ruminating", "Contemplating", "Brewing", "Cogitating", "Puzzling",
+    "Synthesizing", "Wrangling", "Simmering", "Musing", "Scheming",
+    "Percolating", "Deliberating", "Unravelling",
+  ];
+  var THINKING_ROTATE_MS = 3500;
+
+  function _pickThinkingVerb(prev) {
+    if (THINKING_VERBS.length <= 1) return THINKING_VERBS[0];
+    var next;
+    // 직전과 같은 단어는 피해 단조로움을 줄인다.
+    do {
+      next = THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)];
+    } while (next === prev);
+    return next;
+  }
+
   M.startSpinner = function() {
     if (M.thinkingEl) return;
     if (!M.outputDiv) return;
@@ -19,14 +39,34 @@
     M.thinkingEl = document.createElement("div");
     M.thinkingEl.className = "term-thinking";
     M.thinkingEl.id = "term-thinking-active";
-    M.thinkingEl.innerHTML = '<span class="term-thinking-dot"></span> Thinking...';
+    var dot = document.createElement("span");
+    dot.className = "term-thinking-dot";
+    var label = document.createElement("span");
+    label.className = "term-thinking-label";
+    M.thinkingEl.appendChild(dot);
+    M.thinkingEl.appendChild(document.createTextNode(" "));
+    M.thinkingEl.appendChild(label);
+
+    var currentVerb = _pickThinkingVerb(null);
+    label.textContent = currentVerb + "…";
+    M.thinkingEl._rotator = setInterval(function () {
+      currentVerb = _pickThinkingVerb(currentVerb);
+      label.textContent = currentVerb + "…";
+    }, THINKING_ROTATE_MS);
+
     // M.outputDiv 바로 뒤(input-card 바로 앞)에 삽입하여 하단 고정
     M.outputDiv.parentNode.insertBefore(M.thinkingEl, M.outputDiv.nextSibling);
   };
 
   M.stopSpinner = function() {
-    if (M.thinkingEl && M.thinkingEl.parentNode) {
-      M.thinkingEl.parentNode.removeChild(M.thinkingEl);
+    if (M.thinkingEl) {
+      if (M.thinkingEl._rotator) {
+        clearInterval(M.thinkingEl._rotator);
+        M.thinkingEl._rotator = null;
+      }
+      if (M.thinkingEl.parentNode) {
+        M.thinkingEl.parentNode.removeChild(M.thinkingEl);
+      }
     }
     M.thinkingEl = null;
   };
@@ -239,20 +279,22 @@
     M.inputLocked = locked;
     var input = document.getElementById("terminal-input");
     var sendBtn = document.getElementById("terminal-send-btn");
+    // busy 상태에서도 입력창은 활성 유지 (큐 입력 허용). idle/busy 만 inputtable.
+    // stopped/starting/archived/missing 은 입력 비활성.
+    var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus);
+    var shouldDisable = !inputtable;
     if (input) {
-      // running 상태에서도 입력창은 활성 유지 (큐 입력 허용). stopped 상태에서만 disabled.
-      var shouldDisable = Board.state.termStatus === "stopped";
       input.disabled = shouldDisable;
       if (!shouldDisable) {
         input.focus();
       }
     }
     if (sendBtn) {
-      sendBtn.disabled = Board.state.termStatus === "stopped";
+      sendBtn.disabled = shouldDisable;
     }
     var attachBtn = document.getElementById("terminal-attach-btn");
     if (attachBtn) {
-      attachBtn.disabled = Board.state.termStatus === "stopped";
+      attachBtn.disabled = shouldDisable;
     }
   };
 
@@ -263,7 +305,8 @@
     var text = input.value.trim();
     var hasImages = M.attachedImages.length > 0;
     if (!text && !hasImages) return;
-    if (Board.state.termStatus === "stopped") return;
+    var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
+    if (!inputtable.has(Board.state.termStatus)) return;
 
     input.value = "";
     input.style.height = "auto";
@@ -282,8 +325,8 @@
       return;
     }
 
-    // running 상태(응답 대기 중)이면 큐에 push하고 즉시 리턴 (이미지는 큐 미지원)
-    if (Board.state.termStatus === "running" && !hasImages) {
+    // busy 상태(응답 대기 중)이면 큐에 push하고 즉시 리턴 (이미지는 큐 미지원)
+    if (Board.state.termStatus === "busy" && !hasImages) {
       M.inputQueue.push(text);
       var queuedDiv = document.createElement("div");
       queuedDiv.className = "term-message term-user term-user-queued";
@@ -326,7 +369,7 @@
 
     M.setInputLocked(true);
     M.startSpinner();
-    Board.state.termStatus = "running";
+    Board.state.setTermStatus("busy");
     M.updateControlBar();
 
     var ep = M.endpoints();
@@ -334,7 +377,7 @@
       M.stopSpinner();
       M.appendErrorMessage("[Error] " + err.message);
       M.setInputLocked(false);
-      Board.state.termStatus = "idle";
+      Board.state.setTermStatus("idle");
       M.updateControlBar();
     });
   };
@@ -353,7 +396,7 @@
     }
 
     M.startSpinner();
-    Board.state.termStatus = "running";
+    Board.state.setTermStatus("busy");
     M.updateControlBar();
 
     var ep = M.endpoints();
@@ -361,18 +404,17 @@
       M.stopSpinner();
       M.appendErrorMessage("[Error] " + err.message);
       M.setInputLocked(false);
-      Board.state.termStatus = "idle";
+      Board.state.setTermStatus("idle");
       M.updateControlBar();
     });
   };
 
   M.interruptSession = function() {
     if (M.isWorkflowMode) return;
-    if (Board.state.termStatus !== "running") return;
+    if (Board.state.termStatus !== "busy") return;
 
     Board.session.postJson("/terminal/interrupt").then(function () {
       M.stopSpinner();
-      M.appendSystemMessage("[Interrupted]");
       if (M.textBuffer) {
         if (Board.WfTicketRenderer && Board.WfTicketRenderer.detect(M.textBuffer)) {
           Board.WfTicketRenderer.render(M.textBuffer);

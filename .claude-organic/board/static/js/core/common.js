@@ -20,6 +20,106 @@ Board.util = Board.util || {};
 Board.render = Board.render || {};
 Board.fetch = Board.fetch || {};
 
+// ── Terminal Status State Machine ──
+//
+// 메인 터미널 세션의 수명 주기를 표현하는 enum 과 전이 헬퍼.
+//
+//   stopped   : Claude CLI 프로세스 없음. Start 대기.
+//   starting  : spawn 요청부터 system/init 이벤트 수신 전까지. 입력 비활성.
+//   idle      : Claude 준비 완료. 응답 없음. 입력 가능.
+//   busy      : 사용자 입력 전송 후 result/process_exit 수신 전. 스피너 표시.
+//   archived  : 읽기 전용으로 복원된 과거 세션. 입력 불가.
+//   missing   : 서버가 세션을 못 찾음 (404). 입력 불가.
+//
+// 일반 수명 주기:
+//   stopped -> starting -> idle -> busy -> idle -> ... -> stopped
+//
+// 비정상/복원 경로:
+//   starting -> stopped      (spawn 실패)
+//   busy     -> stopped      (process_exit)
+//   *        -> archived     (archived 로드 시)
+//   *        -> missing      (fetchStatus 404)
+//
+// 라벨(UI 표시용):
+//   stopped=종료됨, starting=준비 중, idle=대기, busy=응답 중,
+//   archived=읽기 전용, missing=세션 없음
+//
+Board.util.TERM_STATUSES = Object.freeze({
+  STOPPED: 'stopped',
+  STARTING: 'starting',
+  IDLE: 'idle',
+  BUSY: 'busy',
+  ARCHIVED: 'archived',
+  MISSING: 'missing',
+});
+
+Board.util.TERM_STATUS_LABELS = Object.freeze({
+  stopped: 'Stopped',
+  starting: 'Starting',
+  idle: 'Idle',
+  busy: 'Busy',
+  archived: 'Archived',
+  missing: 'Missing',
+});
+
+/** Kill 버튼을 눌러 세션을 종료할 수 있는 상태 */
+Board.util.TERM_STATUS_KILLABLE = Object.freeze(
+  new Set(['starting', 'idle', 'busy'])
+);
+
+/** Claude 가 현재 작업 중(스피너 표시)인 상태 */
+Board.util.TERM_STATUS_SPINNING = Object.freeze(new Set(['busy']));
+
+/** 사용자가 새 입력을 보낼 수 있는 상태 */
+Board.util.TERM_STATUS_INPUTTABLE = Object.freeze(
+  new Set(['idle', 'busy'])
+);
+
+/** 서버(`/terminal/status`) 가 권위 있게 판단하는 상태 — 클라 확장 상태는 클라가 관리 */
+var _SERVER_AUTHORITATIVE = Object.freeze(new Set(['stopped']));
+var _CLIENT_EXTENDED = Object.freeze(
+  new Set(['starting', 'idle', 'busy', 'archived', 'missing'])
+);
+
+/**
+ * Sets Board.state.termStatus. 단일 진입점으로 써서 전이 규칙을 일관되게 유지한다.
+ * @param {string} next 새 상태 (TERM_STATUSES 값 중 하나)
+ */
+Board.state.setTermStatus = function (next) {
+  if (typeof next !== 'string') return;
+  Board.state.termStatus = next;
+};
+
+/**
+ * 서버 /terminal/status 응답(stopped/running)을 클라 상태 머신에 병합한다.
+ * - 서버가 stopped 를 반환하면 클라도 stopped 로 전이 (권위).
+ * - 서버가 running 을 반환하고 클라가 확장 상태(starting/idle/busy/archived/missing)에
+ *   있으면 클라 상태를 유지. 그 외엔 idle 로 간주.
+ * archived/missing 은 fetchStatus 404 또는 archived_end 등 별도 경로에서 진입하므로
+ * 여기서 직접 설정하지 않는다.
+ *
+ * @param {string} serverStatus 서버가 보고한 상태 문자열
+ */
+Board.state.reconcileTermStatus = function (serverStatus) {
+  var current = Board.state.termStatus;
+  if (!serverStatus) {
+    Board.state.setTermStatus('stopped');
+    return;
+  }
+  if (serverStatus === 'stopped') {
+    Board.state.setTermStatus('stopped');
+    return;
+  }
+  if (serverStatus === 'running') {
+    // 클라가 이미 확장 상태에 있으면 그대로 유지 (더 정확).
+    if (_CLIENT_EXTENDED.has(current)) return;
+    Board.state.setTermStatus('idle');
+    return;
+  }
+  // 서버가 예상 밖 값을 주면 보수적으로 그대로 반영.
+  Board.state.setTermStatus(serverStatus);
+};
+
 // ── Constants ──
 const COLUMNS = [
   { key: "Open", label: "Open", dot: "dot-open" },

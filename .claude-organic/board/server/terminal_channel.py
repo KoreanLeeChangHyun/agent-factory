@@ -129,25 +129,44 @@ class TerminalSSEChannel:
         self._current_step: str = ''
         self.on_step: Callable[[str, dict], None] | None = None
 
-    def add(self, wfile: object, last_event_id: int = -1) -> None:
+    def add(
+        self,
+        wfile: object,
+        last_event_id: int = -1,
+        skip_replay: bool = False,
+    ) -> None:
         """클라이언트를 추가하고, last_event_id 이후의 히스토리를 재생한다.
 
         Phase 1 lock 분리: _lock 은 스냅샷 획득에만 사용하고,
         히스토리 재생은 lock 밖에서 per-client lock 으로 직렬화한다.
         재생 중 broadcast 는 per-client 버퍼에 보류 후 재생 완료 시 flush.
 
+        ``skip_replay=True`` 는 "이 클라이언트는 과거를 별도 경로
+        (REST /terminal/history) 에서 가져왔으므로 링버퍼 재생이 필요 없다"
+        는 선언이다. 라이브 이벤트만 받도록 replay_start/end 와 히스토리
+        재생을 모두 생략한다. 메인 터미널은 True, 워크플로우 세션은
+        False (기본) 로 호출한다.
+
         Args:
             wfile: HTTP 핸들러의 wfile (소켓 출력 스트림)
             last_event_id: 클라이언트가 마지막으로 수신한 이벤트 seq_id (-1=전체 재생)
+            skip_replay: True 면 링버퍼 재생을 생략하고 라이브 이벤트만 전달
         """
         wfile_id = id(wfile)
         with self._lock:
             self._clients.append(wfile)
             client_lock = threading.Lock()
             self._client_locks[wfile_id] = client_lock
-            self._replaying.add(wfile_id)
-            self._replay_buffers[wfile_id] = []
-            history_snapshot = list(self._history)
+            if skip_replay:
+                history_snapshot: list = []
+            else:
+                self._replaying.add(wfile_id)
+                self._replay_buffers[wfile_id] = []
+                history_snapshot = list(self._history)
+
+        if skip_replay:
+            # 라이브 전용 클라이언트는 replay 프레이밍 자체를 생략한다.
+            return
 
         # replay_start 이벤트 전송
         try:

@@ -70,12 +70,14 @@ class BoardHTTPRequestHandler(
             self._handle_sse()
         elif self.path == '/poll':
             self._handle_poll()
-        elif self.path == '/terminal/events':
+        elif self.path.startswith('/terminal/events'):
             self._handle_terminal_sse()
         elif self.path == '/terminal/status':
             self._handle_terminal_status()
         elif self.path == '/terminal/sessions':
             self._handle_terminal_sessions()
+        elif self.path.startswith('/terminal/history'):
+            self._handle_terminal_history()
         elif self.path.startswith('/terminal/workflow/status'):
             self._handle_workflow_status()
         elif self.path.startswith('/terminal/workflow/events'):

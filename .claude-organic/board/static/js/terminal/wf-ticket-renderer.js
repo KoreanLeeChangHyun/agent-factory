@@ -226,10 +226,10 @@ Board.WfTicketRenderer = (function () {
       _ctx.appendToOutput(userDiv);
     }
 
-    // Lock input, start spinner, set running
+    // Lock input, start spinner, set busy
     if (_ctx && _ctx.setInputLocked)  _ctx.setInputLocked(true);
     if (_ctx && _ctx.startSpinner)    _ctx.startSpinner();
-    Board.state.termStatus = "running";
+    Board.state.setTermStatus("busy");
     if (_ctx && _ctx.updateControlBar) _ctx.updateControlBar();
 
     // Send input via endpoints
@@ -240,7 +240,7 @@ Board.WfTicketRenderer = (function () {
           if (_ctx && _ctx.stopSpinner)        _ctx.stopSpinner();
           if (_ctx && _ctx.appendErrorMessage) _ctx.appendErrorMessage("[Error] " + err.message);
           if (_ctx && _ctx.setInputLocked)     _ctx.setInputLocked(false);
-          Board.state.termStatus = "idle";
+          Board.state.setTermStatus("idle");
           if (_ctx && _ctx.updateControlBar)   _ctx.updateControlBar();
         });
     }

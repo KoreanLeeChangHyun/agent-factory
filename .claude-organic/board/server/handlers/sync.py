@@ -33,8 +33,13 @@ class SyncHandlerMixin:
                 os.remove(url_file)
             except OSError:
                 pass
+            # 서버 진입점은 board/server.py (shim). __file__은 handlers/sync.py이므로
+            # 상대 경로로 엔트리 스크립트를 역산한다.
+            entry_script = os.path.normpath(
+                os.path.join(os.path.dirname(__file__), '..', '..', 'server.py')
+            )
             # execv로 프로세스를 교체 — 소켓이 자동 해제되어 포트 충돌 없음
-            os.execv(sys.executable, [sys.executable, __file__, '--serve', project_root])
+            os.execv(sys.executable, [sys.executable, entry_script, '--serve', project_root])
 
         threading.Timer(0.3, _do_restart).start()
 

@@ -245,7 +245,7 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* ── Workflow Sessions Dropdown ── */
+/* ── Sessions Dropdown (main sessions + tab sync) ── */
 .terminal-sessions-dropdown {
   display: none;
   position: absolute;
@@ -256,8 +256,10 @@
   border: 1px solid #3c3c3c;
   border-radius: 6px;
   padding: 4px 0;
-  min-width: 260px;
-  max-width: 420px;
+  min-width: 420px;
+  width: min(720px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
   z-index: 100;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
@@ -284,7 +286,35 @@
   font-weight: 600;
   min-width: 52px;
 }
-.terminal-sessions-item-label { flex: 1; color: #bbb; }
+.terminal-sessions-item-label {
+  flex: 1;
+  color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-sessions-item-sub {
+  color: #666;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.terminal-sessions-row[data-current="1"] .terminal-sessions-item-label { color: #D97757; font-weight: 600; }
+.terminal-sessions-row[data-last="1"]:not([data-current="1"]) .terminal-sessions-item-label { color: #e0c089; font-weight: 600; }
+.terminal-sessions-row[data-last="1"]:not([data-current="1"]) { background: rgba(217, 119, 87, 0.06); }
+.terminal-sessions-item-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(217, 119, 87, 0.18);
+  color: #D97757;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
 .terminal-sessions-item-status {
   font-size: 10px;
   padding: 2px 6px;
@@ -399,16 +429,6 @@
 .terminal-btn-start:hover:not(:disabled) {
   background: rgba(78, 201, 176, 0.1);
   border-color: rgba(78, 201, 176, 0.5);
-}
-
-.terminal-btn-resume {
-  color: #D97757;
-  border-color: rgba(217, 119, 87, 0.25);
-}
-
-.terminal-btn-resume:hover:not(:disabled) {
-  background: rgba(217, 119, 87, 0.1);
-  border-color: rgba(217, 119, 87, 0.5);
 }
 
 .terminal-btn-kill {
@@ -682,4 +702,39 @@
 
 .term-table tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Restart Loading Overlay ── */
+.terminal-restart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(20, 20, 20, 0.82);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: all;
+}
+
+.terminal-restart-overlay-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(217, 119, 87, 0.25);
+  border-top-color: #D97757;
+  border-radius: 50%;
+  animation: terminal-restart-spin 0.9s linear infinite;
+}
+
+.terminal-restart-overlay-label {
+  color: #D97757;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+@keyframes terminal-restart-spin {
+  to { transform: rotate(360deg); }
 }
