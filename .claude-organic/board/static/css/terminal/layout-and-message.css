@@ -286,9 +286,24 @@
   font-weight: 600;
   min-width: 52px;
 }
-.terminal-sessions-item-label {
+.terminal-sessions-item-body {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.terminal-sessions-item-label {
   color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-sessions-item-meta {
+  color: #666;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

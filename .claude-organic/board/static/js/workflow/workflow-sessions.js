@@ -94,6 +94,13 @@
     } catch (_e) { return ""; }
   }
 
+  function formatSize(bytes) {
+    if (typeof bytes !== "number" || bytes < 0) return "";
+    if (bytes < 1024) return bytes + "B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + "KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + "MB";
+  }
+
   /**
    * Fetches main sessions from /terminal/sessions and renders them into the dropdown.
    */
@@ -129,6 +136,8 @@
         var shortId = sid.substring(0, 8);
         var time = formatHm(s.last_active);
         var title = s.title || shortId;
+        var branch = s.branch || "";
+        var size = formatSize(s.size_bytes);
         var isCurrent = !!s.is_current;
         var isLast = !!s.is_last;
         var rowAttrs = 'data-main-session="1"';
@@ -139,9 +148,15 @@
         if (isLast && !isCurrent) {
           h += '<span class="terminal-sessions-item-badge">last</span>';
         }
+        h += '<div class="terminal-sessions-item-body">';
         h += '<span class="terminal-sessions-item-label">' + esc(title) + '</span>';
-        h += '<span class="terminal-sessions-item-sub">' + esc(shortId) + '</span>';
-        h += '<span class="terminal-sessions-item-time">' + esc(time) + '</span>';
+        var metaParts = [];
+        if (time) metaParts.push(esc(time));
+        if (branch) metaParts.push(esc(branch));
+        if (size) metaParts.push(esc(size));
+        metaParts.push(esc(shortId));
+        h += '<span class="terminal-sessions-item-meta">' + metaParts.join(' · ') + '</span>';
+        h += '</div>';
         h += '</button>';
         h += '</div>';
       });

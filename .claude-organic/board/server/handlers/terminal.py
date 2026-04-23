@@ -159,17 +159,22 @@ _TITLE_MAX_LENGTH = 100
 _TITLE_SCAN_MAX_LINES = 300
 
 
-def _extract_session_title(filepath: str) -> str | None:
-    """jsonl 파일에서 첫 유효 user 메시지 텍스트를 추출한다.
+def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
+    """jsonl 파일에서 (title, branch) 를 한 번의 스캔으로 추출한다.
 
-    - toolUseResult 포함 메시지(툴 결과)는 스킵
+    title: 첫 유효 user 메시지 (필터 규칙은 기존 _extract_session_title 동일)
+    branch: 가장 최근에 등장한 ``gitBranch`` 필드 값 (없으면 빈 문자열)
+
+    - toolUseResult 포함 메시지(툴 결과)는 title 후보에서 스킵
     - 슬래시 명령 래퍼(<command-*>)는 스킵하되 플래그를 세워두고
       그 직후의 `# ` 시작 마크다운은 명령어 .md 본문 주입으로 간주하여 추가 스킵
     - 로컬 커맨드 / 시스템 리마인더 래퍼도 스킵
     - resume 초기화 템플릿 메시지는 스킵
-    - 최대 _TITLE_SCAN_MAX_LINES 라인까지만 검사
-    - 진짜 user 입력이 끝까지 없으면 None 반환 (결과에서 제외 대상)
+    - 최대 _TITLE_SCAN_MAX_LINES 라인까지만 검사 (branch 도 같은 범위에서만 추출)
+    - title 이 끝까지 없으면 (None, branch) 반환 → 호출부에서 결과 제외 판단
     """
+    title: str | None = None
+    branch = ''
     command_context = False
     try:
         with open(filepath, 'r', encoding='utf-8') as fp:
@@ -180,6 +185,15 @@ def _extract_session_title(filepath: str) -> str | None:
                     event = json.loads(line)
                 except (ValueError, json.JSONDecodeError):
                     continue
+
+                # branch: 모든 라인에서 가능한 만큼 갱신 (마지막 등장 값)
+                if isinstance(event.get('gitBranch'), str) and event['gitBranch']:
+                    branch = event['gitBranch']
+
+                if title is not None:
+                    # title 이미 확정 → branch 만 계속 추적
+                    continue
+
                 if event.get('type') != 'user':
                     continue
                 if 'toolUseResult' in event:
@@ -197,12 +211,10 @@ def _extract_session_title(filepath: str) -> str | None:
                 text = text.strip()
                 if not text:
                     continue
-                # 슬래시 명령 래퍼 → 다음 메시지가 명령 .md 본문일 수 있음
                 if text.startswith(('<command-message>', '<command-name>',
                                     '<command-stdout>', '<command-args>')):
                     command_context = True
                     continue
-                # 직전이 명령 래퍼였고 현재가 마크다운 헤더면 .md 본문 주입으로 간주
                 if command_context and text.startswith('# '):
                     continue
                 command_context = False
@@ -210,10 +222,10 @@ def _extract_session_title(filepath: str) -> str | None:
                     continue
                 if text in _TITLE_SKIP_EXACT:
                     continue
-                return text[:_TITLE_MAX_LENGTH]
+                title = text[:_TITLE_MAX_LENGTH]
     except (OSError, IOError) as err:
-        logger.debug('세션 제목 추출 실패 (%s): %s', filepath, err)
-    return None
+        logger.debug('세션 메타 추출 실패 (%s): %s', filepath, err)
+    return title, branch
 
 
 class TerminalHandlerMixin:
@@ -300,6 +312,8 @@ class TerminalHandlerMixin:
             is_last: ``.last-session-id`` 가 가리키는 마지막 세션 여부
                      (stopped 상태에도 유지되는 복원 후보)
             title: 첫 유효 user 메시지 (최대 100자)
+            branch: 세션 jsonl 의 마지막 ``gitBranch`` 값 (없으면 "")
+            size_bytes: jsonl 파일 크기 (바이트)
         """
         project_root = os.getcwd()
 
@@ -317,23 +331,22 @@ class TerminalHandlerMixin:
             last_session_id if claude_process.status != 'stopped' else ''
         )
 
-        entries: list[tuple[float, str, str]] = []  # (mtime, session_id, filepath)
+        entries: list[tuple[float, str, str, int]] = []  # (mtime, session_id, filepath, size)
         try:
             with os.scandir(sessions_dir) as it:
                 for entry in it:
                     if not entry.name.endswith('.jsonl'):
                         continue
                     stem = entry.name[:-6]  # ".jsonl" 제거
-                    # UUID 형식 검증
                     try:
                         uuid.UUID(stem)
                     except ValueError:
                         continue
                     try:
-                        mtime = entry.stat().st_mtime
+                        st = entry.stat()
                     except OSError:
                         continue
-                    entries.append((mtime, stem, entry.path))
+                    entries.append((st.st_mtime, stem, entry.path, st.st_size))
         except OSError as e:
             logger.debug('세션 디렉터리 스캔 실패: %s', e)
             self._send_json([])
@@ -343,8 +356,8 @@ class TerminalHandlerMixin:
         entries.sort(key=lambda x: x[0], reverse=True)
 
         result = []
-        for mtime, session_id, filepath in entries:
-            title = _extract_session_title(filepath)
+        for mtime, session_id, filepath, size_bytes in entries:
+            title, branch = _extract_session_meta(filepath)
             if title is None:
                 # 제목 추출 실패 = 임시/초기화 세션으로 간주하여 제외
                 continue
@@ -357,6 +370,8 @@ class TerminalHandlerMixin:
                 'is_current': bool(current_session_id) and session_id == current_session_id,
                 'is_last': bool(last_session_id) and session_id == last_session_id,
                 'title': title,
+                'branch': branch,
+                'size_bytes': size_bytes,
             })
 
         self._send_json(result)
