@@ -13,14 +13,15 @@
   M.thinkingEl = null;
 
   // Claude CLI 의 위트 있는 thinking verb pool 을 본떠 여러 단어를 로테이션한다.
-  // "Thinking..." 하나만 돌면 지루하므로 3~4초 간격으로 라벨을 바꾼다.
+  // 회전 간격은 7~14초 사이 랜덤 — 고정 주기보다 자연스럽고 산만함을 줄인다.
   var THINKING_VERBS = [
     "Thinking", "Pondering", "Noodling", "Channelling", "Tomfoolering",
     "Ruminating", "Contemplating", "Brewing", "Cogitating", "Puzzling",
     "Synthesizing", "Wrangling", "Simmering", "Musing", "Scheming",
     "Percolating", "Deliberating", "Unravelling",
   ];
-  var THINKING_ROTATE_MS = 3500;
+  var THINKING_ROTATE_MIN_MS = 7000;
+  var THINKING_ROTATE_MAX_MS = 14000;
 
   function _pickThinkingVerb(prev) {
     if (THINKING_VERBS.length <= 1) return THINKING_VERBS[0];
@@ -30,6 +31,10 @@
       next = THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)];
     } while (next === prev);
     return next;
+  }
+
+  function _pickRotateDelay() {
+    return THINKING_ROTATE_MIN_MS + Math.random() * (THINKING_ROTATE_MAX_MS - THINKING_ROTATE_MIN_MS);
   }
 
   M.startSpinner = function() {
@@ -49,10 +54,17 @@
 
     var currentVerb = _pickThinkingVerb(null);
     label.textContent = currentVerb + "…";
-    M.thinkingEl._rotator = setInterval(function () {
-      currentVerb = _pickThinkingVerb(currentVerb);
-      label.textContent = currentVerb + "…";
-    }, THINKING_ROTATE_MS);
+
+    var el = M.thinkingEl;
+    function _scheduleRotate() {
+      el._rotator = setTimeout(function () {
+        if (el !== M.thinkingEl) return;
+        currentVerb = _pickThinkingVerb(currentVerb);
+        label.textContent = currentVerb + "…";
+        _scheduleRotate();
+      }, _pickRotateDelay());
+    }
+    _scheduleRotate();
 
     // M.outputDiv 바로 뒤(input-card 바로 앞)에 삽입하여 하단 고정
     M.outputDiv.parentNode.insertBefore(M.thinkingEl, M.outputDiv.nextSibling);
@@ -61,7 +73,7 @@
   M.stopSpinner = function() {
     if (M.thinkingEl) {
       if (M.thinkingEl._rotator) {
-        clearInterval(M.thinkingEl._rotator);
+        clearTimeout(M.thinkingEl._rotator);
         M.thinkingEl._rotator = null;
       }
       if (M.thinkingEl.parentNode) {
