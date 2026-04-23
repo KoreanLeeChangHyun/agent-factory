@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -231,4 +232,5 @@ _NDJSON_EVENT_MAP: dict[str, str] = {
     'error': 'error',
     'user_input': 'user_input',
     'attachment': 'skill_listing',
+    'rate_limit_event': 'rate_limit',  # T-389: G-2 해소
 }
