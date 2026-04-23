@@ -46,48 +46,38 @@
         },
 
         codespan: function (token) {
-          return '<code class="term-inline-code">' + token.text + '</code>';
+          return '<code class="term-inline-code">' + esc(token.text) + '</code>';
         },
 
         heading: function (token) {
           var depth = token.depth;
-          return '<h' + depth + ' class="term-heading">' + token.text + '</h' + depth + '>';
+          return '<h' + depth + ' class="term-heading">' + this.parser.parseInline(token.tokens) + '</h' + depth + '>';
         },
 
         table: function (token) {
           var header = "";
           for (var i = 0; i < token.header.length; i++) {
-            header += '<th>' + token.header[i].text + '</th>';
+            header += '<th>' + this.parser.parseInline(token.header[i].tokens) + '</th>';
           }
           var body = "";
           for (var r = 0; r < token.rows.length; r++) {
             var row = token.rows[r];
             var cells = "";
             for (var c = 0; c < row.length; c++) {
-              cells += '<td>' + row[c].text + '</td>';
+              cells += '<td>' + this.parser.parseInline(row[c].tokens) + '</td>';
             }
             body += '<tr>' + cells + '</tr>';
           }
           return '<table class="term-table"><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
         },
 
-        list: function (token) {
-          var tag = token.ordered ? "ol" : "ul";
-          var body = "";
-          for (var i = 0; i < token.items.length; i++) {
-            var itemContent = this.parser.parseInline(token.items[i].tokens);
-            body += '<li>' + itemContent + '</li>';
-          }
-          return '<' + tag + ' class="term-list">' + body + '</' + tag + '>';
-        },
-
         paragraph: function (token) {
-          return '<p class="term-para">' + token.text + '</p>';
+          return '<p class="term-para">' + this.parser.parseInline(token.tokens) + '</p>';
         },
 
         link: function (token) {
           var t = token.title ? ' title="' + esc(token.title) + '"' : '';
-          return '<a href="' + esc(token.href) + '"' + t + ' target="_blank" rel="noopener">' + token.text + '</a>';
+          return '<a href="' + esc(token.href) + '"' + t + ' target="_blank" rel="noopener">' + this.parser.parseInline(token.tokens) + '</a>';
         }
       }
     });
@@ -104,7 +94,7 @@
         }
         return html;
       } catch (e) {
-        // marked.js parse failure -- fallback
+        console.error("[md] parse failed:", e);
       }
     }
     return '<pre class="term-fallback">' + esc(text) + '</pre>';
