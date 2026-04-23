@@ -25,7 +25,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  height: 27px;
+  padding: 0 16px;
   user-select: none;
 }
 .roadmap-panel.open .roadmap-collapsed-bar {

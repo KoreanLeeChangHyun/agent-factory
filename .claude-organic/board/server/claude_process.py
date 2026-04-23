@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import datetime
 import json
 import logging
 import os
@@ -88,6 +90,15 @@ class ClaudeProcess:
         self._channel: TerminalSSEChannel = channel
         self._init_event: threading.Event = threading.Event()
         self._persist_file: str | None = persist_file
+        # 현재 스트리밍 중인 assistant 메시지 캐시. Claude CLI 가 jsonl 에는
+        # 메시지 완료 시점에만 flush 하므로, 스트리밍 중 새로고침 시 부분 내용이
+        # 유실되는 것을 막기 위해 stream_event NDJSON 을 누적한다.
+        # 구조는 jsonl 의 assistant 라인과 동일:
+        #   {'type': 'assistant',
+        #    'message': {'role': 'assistant', 'content': [blocks...]},
+        #    'timestamp': '<iso>'}
+        self._in_flight_lock: threading.Lock = threading.Lock()
+        self._in_flight_message: dict | None = None
 
     def spawn(
         self,
@@ -378,6 +389,160 @@ class ClaudeProcess:
         """현재 세션 ID를 반환한다."""
         return self._session_id
 
+    def _track_in_flight(self, data: dict) -> None:
+        """stream_event NDJSON을 누적하여 현재 스트리밍 중인 assistant 메시지 상태를 유지한다.
+
+        jsonl 은 메시지 경계에서만 append 되므로(= Claude CLI 가 message_stop 후에
+        한 줄을 쓴다) 스트리밍 도중 새로고침이 발생하면 미완성 메시지가 어떠한
+        권위 출처에도 남지 않아 UI에서 통째로 사라지는 문제가 있다.
+        이 캐시는 /terminal/history 응답에 병합되어 그 간격을 메꾼다.
+
+        데이터 구조는 jsonl 의 assistant 라인과 동일하게 유지하여 기존
+        _build_render_events() 를 그대로 재사용할 수 있게 한다.
+
+        수명 주기:
+            message_start                → 새 캐시 초기화
+            content_block_start          → blocks 에 빈 block append
+            content_block_delta          → 마지막 block 의 text/thinking/partial_json 누적
+            content_block_stop           → tool_use partial_json 을 input 으로 파싱
+            'assistant'/'user'/'result'  → 캐시 비움 (완성 메시지가 jsonl 에 기록되거나
+                                           턴이 종료됨)
+        """
+        msg_type = data.get('type', '')
+
+        # 완성 메시지가 도착(= jsonl 이 곧 권위 출처가 됨) 또는 턴 종료 → 캐시 해제
+        if msg_type in ('assistant', 'user', 'result'):
+            with self._in_flight_lock:
+                self._in_flight_message = None
+            return
+
+        if msg_type != 'stream_event':
+            return
+
+        event = data.get('event') or {}
+        if not isinstance(event, dict):
+            return
+        ev_type = event.get('type')
+
+        with self._in_flight_lock:
+            if ev_type == 'message_start':
+                timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+                    '%Y-%m-%dT%H:%M:%S.%fZ'
+                )
+                self._in_flight_message = {
+                    'type': 'assistant',
+                    'message': {'role': 'assistant', 'content': []},
+                    'timestamp': timestamp,
+                }
+                return
+
+            # Claude CLI 는 **블록 단위로 `assistant` NDJSON 을 flush** 하므로
+            # 직전 블록 완료 시 `_track_in_flight` 가 캐시를 비운다. 다음 블록이
+            # 시작할 때 `content_block_start` 가 먼저 도착하므로, 여기서 캐시를
+            # 지연 초기화해야 두 번째 이후 블록도 추적 대상이 된다.
+            if ev_type == 'content_block_start' and self._in_flight_message is None:
+                timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+                    '%Y-%m-%dT%H:%M:%S.%fZ'
+                )
+                self._in_flight_message = {
+                    'type': 'assistant',
+                    'message': {'role': 'assistant', 'content': []},
+                    'timestamp': timestamp,
+                }
+
+            if self._in_flight_message is None:
+                return
+
+            blocks = self._in_flight_message['message']['content']
+
+            if ev_type == 'content_block_start':
+                block = event.get('content_block') or {}
+                btype = block.get('type')
+                if btype == 'text':
+                    blocks.append({'type': 'text', 'text': ''})
+                elif btype == 'thinking':
+                    blocks.append({'type': 'thinking', 'thinking': ''})
+                elif btype == 'tool_use':
+                    blocks.append({
+                        'type': 'tool_use',
+                        'id': block.get('id', '') or '',
+                        'name': block.get('name', '') or '',
+                        'input': {},
+                        '_partial_input_json': '',
+                    })
+                return
+
+            if ev_type == 'content_block_delta':
+                if not blocks:
+                    return
+                delta = event.get('delta') or {}
+                dtype = delta.get('type')
+                current = blocks[-1]
+                if dtype == 'text_delta' and current.get('type') == 'text':
+                    current['text'] = (current.get('text') or '') + (delta.get('text') or '')
+                elif dtype == 'thinking_delta' and current.get('type') == 'thinking':
+                    current['thinking'] = (
+                        (current.get('thinking') or '') + (delta.get('thinking') or '')
+                    )
+                elif dtype == 'input_json_delta' and current.get('type') == 'tool_use':
+                    current['_partial_input_json'] = (
+                        (current.get('_partial_input_json') or '')
+                        + (delta.get('partial_json') or '')
+                    )
+                return
+
+            if ev_type == 'content_block_stop':
+                if not blocks:
+                    return
+                current = blocks[-1]
+                if current.get('type') == 'tool_use':
+                    partial = current.pop('_partial_input_json', '') or ''
+                    if partial:
+                        try:
+                            parsed = json.loads(partial)
+                            if isinstance(parsed, dict):
+                                current['input'] = parsed
+                        except json.JSONDecodeError:
+                            # 비정상 부분 JSON — 빈 input 유지
+                            pass
+                return
+
+            # message_delta / message_stop 은 별도 처리 불필요.
+            # message_stop 직후 'assistant' NDJSON 이 도착하여 캐시가 비워진다.
+
+    def get_in_flight_snapshot(self) -> dict | None:
+        """현재 스트리밍 중인 assistant 메시지의 읽기 전용 스냅샷을 반환한다.
+
+        /terminal/history 응답에 포함되어 jsonl 이 아직 flush 하지 못한
+        부분 메시지를 클라이언트에 전달하는 용도다. 반환 구조는 jsonl 의
+        assistant 라인과 동일하여 _build_render_events() 로 바로 전개 가능.
+
+        tool_use 블록의 input 이 아직 스트리밍 중이면 `_partial_input_json`
+        에 누적된 문자열을 별도 필드 `partial_input_json` 으로 노출한다
+        (클라이언트가 tool-box 입력 버퍼에 시딩할 수 있도록).
+        """
+        with self._in_flight_lock:
+            if self._in_flight_message is None:
+                return None
+            snapshot = copy.deepcopy(self._in_flight_message)
+
+        blocks = snapshot.get('message', {}).get('content', [])
+        for block in blocks:
+            if block.get('type') == 'tool_use':
+                partial = block.pop('_partial_input_json', '') or ''
+                if partial:
+                    # content_block_stop 이 오기 전이라 input 이 비어있으면
+                    # 부분 파싱 시도 (실패해도 partial_input_json 을 그대로 노출)
+                    if not block.get('input'):
+                        try:
+                            parsed = json.loads(partial)
+                            if isinstance(parsed, dict):
+                                block['input'] = parsed
+                        except json.JSONDecodeError:
+                            pass
+                    block['partial_input_json'] = partial
+        return snapshot
+
     def _read_stdout_loop(self) -> None:
         """stdout에서 NDJSON 한 줄씩 읽어 파싱하고 SSE 채널로 브로드캐스트한다.
 
@@ -418,6 +583,9 @@ class ClaudeProcess:
                 # result 수신 시 상태를 idle로 전환
                 if data.get('type') == 'result':
                     self._status = 'idle'
+
+                # in-flight 캐시 업데이트 (스트리밍 중 새로고침 시 부분 내용 보존용)
+                self._track_in_flight(data)
 
                 self._channel.broadcast(data)
         except (ValueError, OSError):

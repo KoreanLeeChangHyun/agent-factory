@@ -1130,6 +1130,20 @@
     _sessionArchived = false;
   }
 
+  /**
+   * 재연결/이력 복원 시 in-flight tool_use 블록을 라이브 input_json_delta 경로에
+   * 다시 연결하기 위한 시드 함수. renderHistory 가 in_flight=true 인 tool_use
+   * 이벤트를 만나면 호출한다.
+   *
+   * @param {string} toolUseId
+   * @param {string} partialJson 이미 수신한 input_json 조각(빈 문자열 가능)
+   */
+  function seedInFlightToolUse(toolUseId, partialJson) {
+    if (!toolUseId) return;
+    _currentToolUseId = toolUseId;
+    _toolInputMap[toolUseId] = partialJson || "";
+  }
+
   // ── Register on Board namespace ──
   Board.session = {
     connectSSE: connectSSE,
@@ -1142,6 +1156,7 @@
     postJson: postJson,
     resetLastEventId: resetLastEventId,
     adoptLastEventIdForSession: adoptLastEventIdForSession,
+    seedInFlightToolUse: seedInFlightToolUse,
     _bind: bind,
     _markSent: markSent
   };

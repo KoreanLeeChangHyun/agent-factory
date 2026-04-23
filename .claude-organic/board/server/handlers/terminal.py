@@ -518,6 +518,34 @@ class TerminalHandlerMixin:
             self._send_error(500, 'Failed to read session history')
             return
 
+        # 현재 스트리밍 중인 assistant 메시지를 합친다 (jsonl 에는 아직 없음).
+        # Claude CLI 는 메시지 완료 시점에만 jsonl 에 flush 하므로, 응답 생성
+        # 도중 새로고침 시 부분 내용이 어디에도 없어 UI 에서 통째로 유실된다.
+        # 이 캐시는 그 간격을 메꾼다. 마지막 block 만 `in_flight` 플래그를 달아
+        # 클라이언트가 텍스트 버퍼에 시딩하도록 한다 (DOM 에 완성된 블록으로
+        # 렌더하면 이어지는 live text_delta 가 별도 블록을 만들어 두 조각이 됨).
+        if claude_process.session_id == session_id:
+            in_flight = claude_process.get_in_flight_snapshot()
+            if in_flight:
+                in_flight_ts = in_flight.get('timestamp', '') or ''
+                if not since or (in_flight_ts and in_flight_ts > since):
+                    in_flight_events = _build_render_events(in_flight)
+                    if in_flight_events:
+                        in_flight_events[-1]['in_flight'] = True
+                        # tool_use 가 in-flight 인 경우 partial_input_json 전달
+                        last_block = in_flight.get('message', {}).get('content', [])
+                        if last_block:
+                            last_raw = last_block[-1]
+                            if last_raw.get('type') == 'tool_use' and last_raw.get('partial_input_json'):
+                                in_flight_events[-1]['partial_input_json'] = (
+                                    last_raw['partial_input_json']
+                                )
+                        for ev in in_flight_events:
+                            events.append(ev)
+                            ts = ev.get('timestamp') or ''
+                            if ts and ts > last_timestamp:
+                                last_timestamp = ts
+
         response: dict = {
             'session_id': session_id,
             'last_timestamp': last_timestamp,

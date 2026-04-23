@@ -172,6 +172,37 @@
     for (var i = 0; i < events.length; i++) {
       var ev = events[i];
       var kind = ev.kind || "text";
+      // in_flight 이벤트는 Claude CLI 가 jsonl 에 아직 flush 하지 못한
+      // "현재 스트리밍 중인 블록" 이다. 완성된 블록처럼 DOM 에 추가하면
+      // 이어지는 라이브 text_delta 가 별개 블록을 만들어 응답이 두 조각으로
+      // 쪼개진다. 텍스트/툴은 클라이언트의 "live 스트리밍 버퍼" 에 시딩해서
+      // 다음 delta 가 자연스럽게 이어붙도록 한다.
+      if (ev.in_flight) {
+        if (kind === "text" && ev.role === "assistant") {
+          // 기존 textBuffer 를 교체하지 않고 앞에 붙여 이어받는다.
+          M.textBuffer = (ev.text || "") + (M.textBuffer || "");
+        } else if (kind === "tool_use") {
+          _renderToolUse(ev);
+          if (typeof ev.partial_input_json === "string" && ev.partial_input_json) {
+            // content_block_stop 이 오기 전이라 input 이 부분 JSON 문자열인 경우,
+            // 화면 표시용 버퍼도 partial_json 으로 교체 (유효하지 않은 JSON 이어도
+            // toolInputBuffer 는 렌더링 직전에 문자열 누적으로 처리된다).
+            M.toolInputBuffer = ev.partial_input_json;
+          }
+          if (Board.session && typeof Board.session.seedInFlightToolUse === "function") {
+            Board.session.seedInFlightToolUse(
+              ev.tool_use_id || "",
+              ev.partial_input_json || ""
+            );
+          }
+        } else if (kind === "thinking") {
+          // thinking 은 라이브 스트림에서 렌더되지 않는 블록이므로 그대로 완성된
+          // 형태로 그린다. 이후 assistant NDJSON 이 도착해도 thinking 재렌더가
+          // 없으므로 중복 걱정 없음.
+          if (ev.text) _renderThinking(ev.text);
+        }
+        continue;
+      }
       if (kind === "text") {
         var text = ev.text || "";
         if (!text) continue;
