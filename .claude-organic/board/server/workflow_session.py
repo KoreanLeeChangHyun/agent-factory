@@ -132,8 +132,8 @@ class WorkflowSessionRegistry:
                 }
                 with open(persist_path, 'w', encoding='utf-8') as f:
                     f.write(json.dumps(meta, ensure_ascii=False) + '\n')
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.error("workflow_session[%s]: 메타데이터 persist 쓰기 실패 (%s): %s", session_id, persist_path, exc)
 
         with self._lock:
             self._sessions[session_id] = session
@@ -211,8 +211,8 @@ class WorkflowSessionRegistry:
             if fpath and os.path.exists(fpath):
                 try:
                     os.remove(fpath)
-                except OSError:
-                    pass
+                except OSError as exc:
+                    logger.error("workflow_session[%s]: 세션 파일 삭제 실패 (%s): %s", session_id, fpath, exc)
         return removed
 
     def load_archived(self, session_id: str) -> 'WorkflowSession | None':

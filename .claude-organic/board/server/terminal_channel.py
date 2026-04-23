@@ -231,6 +231,8 @@ class TerminalSSEChannel:
         Args:
             data: 파싱된 NDJSON 메시지 dict
         """
+        if data.get('isMeta') is True:
+            return
         event_name = self._classify_event(data)
         payload = self._build_payload(data, event_name)
         json_payload = json.dumps(payload, ensure_ascii=False)
@@ -282,6 +284,8 @@ class TerminalSSEChannel:
         Args:
             data: 파싱된 NDJSON 메시지 dict
         """
+        if data.get('isMeta') is True:
+            return
         event_name = self._classify_event(data)
         payload = self._build_payload(data, event_name)
         json_payload = json.dumps(payload, ensure_ascii=False)
@@ -295,8 +299,8 @@ class TerminalSSEChannel:
                 with self._persist_lock:
                     with open(self._persist_path, 'a', encoding='utf-8') as f:
                         f.write(line)
-            except (OSError, TypeError):
-                pass  # persist 실패는 세션 동작을 막지 않는다
+            except (OSError, TypeError) as exc:
+                logger.error("terminal_channel: broadcast persist 쓰기 실패 (%s): %s", self._persist_path, exc)
 
         # stdout 기반 워크플로우 단계 감지
         self._detect_step_from_broadcast(event_name, payload)
