@@ -16,7 +16,7 @@ import time
 # Constants
 # ---------------------------------------------------------------------------
 
-KANBAN_DIRS_LIST: list[str] = ['open', 'progress', 'review', 'done']
+KANBAN_DIRS_LIST: list[str] = ['todo', 'open', 'progress', 'review', 'done']
 WF_BASE: str = os.path.join('.claude-organic', 'runs')
 WF_HISTORY: str = os.path.join('.claude-organic', 'runs', '.history')
 DASH_BASE: str = os.path.join('.claude-organic', 'board', 'data')

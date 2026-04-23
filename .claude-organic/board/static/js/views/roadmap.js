@@ -20,13 +20,15 @@
 
   // ── Module State ──
   var filterState = {
-    statuses: [], // empty = all statuses active
+    // To Do 기본 숨김: 초기 활성 상태를 명시 (empty = all 규칙 대신 명시적 4개 사용)
+    statuses: ["open", "progress", "review", "done"],
     direction: "TD",
     showIsolated: false,
   };
 
   // Status key normalization for CSS and Mermaid class names
   var STATUS_CLASS_MAP = {
+    "To Do": "todo",
     "Open": "open",
     "Submit": "open",
     "In Progress": "progress",
@@ -225,6 +227,7 @@
     }
 
     // classDef for status colors
+    lines.push("  classDef todo fill:#1e1e1e,stroke:#6a9fb5,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef open fill:#1e1e1e,stroke:#4ec9b0,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef progress fill:#1e1e1e,stroke:#dcdcaa,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef review fill:#1e1e1e,stroke:#c586c0,stroke-width:2px,color:#e0e0e0");
@@ -253,7 +256,7 @@
   function computeStats(tickets, relatedNumbers) {
     var total = tickets.length;
     var related = relatedNumbers.size;
-    var byStatus = { open: 0, progress: 0, review: 0, done: 0 };
+    var byStatus = { todo: 0, open: 0, progress: 0, review: 0, done: 0 };
     var byRelType = { "depends-on": 0, "derived-from": 0, "blocks": 0 };
 
     for (var i = 0; i < tickets.length; i++) {
@@ -289,6 +292,7 @@
     var cards = [
       { label: "Total Tickets", value: stats.total, cls: "stat-total", sub: "all tickets" },
       { label: "With Relations", value: stats.related, cls: "stat-relations", sub: "linked tickets" },
+      { label: "To Do", value: stats.byStatus.todo, cls: "stat-todo", sub: "backlog" },
       { label: "Open", value: stats.byStatus.open, cls: "stat-open", sub: "open / submit" },
       { label: "In Progress", value: stats.byStatus.progress, cls: "stat-progress", sub: "running" },
       { label: "Review", value: stats.byStatus.review, cls: "stat-review", sub: "awaiting review" },
@@ -314,6 +318,7 @@
    */
   function renderToolbar() {
     var statusFilters = [
+      { key: "todo", label: "To Do" },
       { key: "open", label: "Open" },
       { key: "progress", label: "In Progress" },
       { key: "review", label: "Review" },
@@ -326,10 +331,10 @@
     h += '<span class="roadmap-toolbar-label">Filter</span>';
 
     // Status filter buttons
+    // 명시 배열 방식 (T3.2): filterState.statuses는 항상 활성 상태 목록을 담는다.
     for (var i = 0; i < statusFilters.length; i++) {
       var sf = statusFilters[i];
-      var isActive = filterState.statuses.length === 0 ||
-        filterState.statuses.indexOf(sf.key) !== -1;
+      var isActive = filterState.statuses.indexOf(sf.key) !== -1;
       h += '<button class="roadmap-filter-btn' + (isActive ? " active" : "") + '" data-status="' + sf.key + '">';
       h += esc(sf.label);
       h += '</button>';
@@ -390,6 +395,11 @@
     h += '<span class="roadmap-legend-sep"></span>';
 
     // Node statuses
+    h += '<div class="roadmap-legend-item">';
+    h += '<span class="roadmap-legend-dot dot-todo"></span>';
+    h += '<span>To Do</span>';
+    h += '</div>';
+
     h += '<div class="roadmap-legend-item">';
     h += '<span class="roadmap-legend-dot dot-open"></span>';
     h += '<span>Open</span>';
@@ -553,8 +563,8 @@
             // Add this status to filter
             filterState.statuses.push(status);
           }
-          // If all 4 statuses are selected, reset to empty (= all)
-          if (filterState.statuses.length >= 4) {
+          // If all 5 statuses are selected, reset to empty (= all)
+          if (filterState.statuses.length >= 5) {
             filterState.statuses = [];
           }
         }

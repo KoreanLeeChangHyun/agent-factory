@@ -14,22 +14,30 @@
 (function () {
   const { esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY } = Board.util;
 
-  // ── Done Column Collapsed State ──
-  const DONE_COLLAPSED_LS_KEY = "claude-board-done-collapsed";
+  // ── Column Collapsed State (Done / To Do) ──
+  // 컬럼 키별로 접힘 상태를 독립 저장한다. "Done"은 기존 키를 유지해 사용자 설정
+  // 호환성을 보장하고, 그 외 컬럼(현재 "To Do")은 column-collapsed:<key> 형식.
+  const LEGACY_DONE_LS_KEY = "claude-board-done-collapsed";
+  const COLLAPSIBLE_COLUMNS = new Set(["Done", "To Do"]);
 
-  /** Loads Done column collapsed state from localStorage. Default: false (expanded). */
-  function loadDoneCollapsed() {
+  function columnCollapsedKey(colKey) {
+    if (colKey === "Done") return LEGACY_DONE_LS_KEY;
+    return "claude-board-column-collapsed:" + colKey;
+  }
+
+  /** Loads a column's collapsed state from localStorage. Default: false (expanded). */
+  function loadColumnCollapsed(colKey) {
     try {
-      const stored = localStorage.getItem(DONE_COLLAPSED_LS_KEY);
+      const stored = localStorage.getItem(columnCollapsedKey(colKey));
       if (stored !== null) return stored === "true";
     } catch (e) {}
     return false;
   }
 
-  /** Persists Done column collapsed state to localStorage. */
-  function saveDoneCollapsed(collapsed) {
+  /** Persists a column's collapsed state to localStorage. */
+  function saveColumnCollapsed(colKey, collapsed) {
     try {
-      localStorage.setItem(DONE_COLLAPSED_LS_KEY, String(collapsed));
+      localStorage.setItem(columnCollapsedKey(colKey), String(collapsed));
     } catch (e) {}
   }
 
@@ -275,12 +283,15 @@
 
   /**
    * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
-   * status가 "Submit"인 경우 SUBMIT 라벨을 반환한다.
+   * status가 "To Do"인 경우 TODO 라벨, "Submit"인 경우 SUBMIT 라벨을 반환한다.
    * 그 외 모든 경우 OPEN 라벨을 반환한다.
    * @param {Object} ticket - 티켓 객체
    * @returns {{ label: string, cssClass: string }} 상태 라벨과 CSS 클래스
    */
   function getWorkflowStatus(ticket) {
+    if (ticket && ticket.status === "To Do") {
+      return { label: "TODO", cssClass: "status-todo" };
+    }
     if (ticket && ticket.status === "Submit") {
       return { label: "SUBMIT", cssClass: "status-submit" };
     }
@@ -290,10 +301,10 @@
   /** Renders the kanban board with columns, cards, and sort controls. */
   function renderKanban() {
     const el = document.getElementById("view-kanban");
-    const doneCollapsed = loadDoneCollapsed();
     let h = '<div class="kanban-board">';
     COLUMNS.forEach(function (col) {
       const items = Board.state.TICKETS.filter(function (t) {
+        if (col.key === "To Do") { return t.status === "To Do"; }
         if (col.key === "Open") { return t.status === "Open" || t.status === "Submit"; }
         return t.status === col.key;
       });
@@ -320,21 +331,22 @@
       });
       dropHtml += '</div>';
 
-      // Done 칼럼 토글 버튼 (chevron)
-      const isDone = col.key === "Done";
-      const chevronSvg = isDone
-        ? (doneCollapsed
+      // Done / To Do 컬럼은 접기 토글 지원
+      const isCollapsible = COLLAPSIBLE_COLUMNS.has(col.key);
+      const isCollapsed = isCollapsible && loadColumnCollapsed(col.key);
+      const chevronSvg = isCollapsible
+        ? (isCollapsed
           ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
           : '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>')
         : "";
 
-      const columnCollapsedClass = isDone && doneCollapsed ? " collapsed" : "";
-      h += '<div class="column' + columnCollapsedClass + '">';
+      const columnCollapsedClass = isCollapsed ? " collapsed" : "";
+      h += '<div class="column' + columnCollapsedClass + '" data-col-key="' + esc(col.key) + '">';
 
-      if (isDone && doneCollapsed) {
+      if (isCollapsed) {
         // 접힌 상태: 세로 바 렌더링
-        h += '<div class="done-collapsed-bar">';
-        h += '<span class="bar-label">Done</span>';
+        h += '<div class="column-collapsed-bar" data-col-key="' + esc(col.key) + '">';
+        h += '<span class="bar-label">' + esc(col.label) + '</span>';
         h += '<span class="bar-count">' + items.length + '</span>';
         h += '</div>';
       } else {
@@ -347,8 +359,8 @@
         h += '</div>';
         h += esc(col.label);
         h += '<span class="col-count">' + items.length + "</span>";
-        if (isDone) {
-          h += '<button class="done-toggle-btn" title="\uC811\uAE30">' + chevronSvg + '</button>';
+        if (isCollapsible) {
+          h += '<button class="column-toggle-btn" data-col-key="' + esc(col.key) + '" title="\uC811\uAE30">' + chevronSvg + '</button>';
         }
         h += "</div>";
         h += '<div class="cards">';
@@ -371,7 +383,7 @@
               h += badge(t.command, CMD_COLORS[t.command], badgeAnim);
             }
             h += "</div>";
-            if (col.key === "Open") {
+            if (col.key === "Open" || col.key === "To Do") {
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
             }
             h += "</div>";
@@ -441,25 +453,27 @@
       });
     });
 
-    // Bind Done toggle button click (펼친 상태 → 접기)
-    const doneToggleBtn = el.querySelector(".done-toggle-btn");
-    if (doneToggleBtn) {
-      doneToggleBtn.addEventListener("click", function (e) {
+    // Bind collapse toggle buttons (펼친 상태 → 접기). Done/To Do 공통.
+    el.querySelectorAll(".column-toggle-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
         e.stopPropagation();
-        saveDoneCollapsed(!loadDoneCollapsed());
+        const colKey = btn.dataset.colKey;
+        if (!colKey) return;
+        saveColumnCollapsed(colKey, !loadColumnCollapsed(colKey));
         renderKanban();
       });
-    }
+    });
 
-    // Bind Done collapsed bar click (접힌 상태 → 펼치기)
-    const doneCollapsedBar = el.querySelector(".done-collapsed-bar");
-    if (doneCollapsedBar) {
-      doneCollapsedBar.addEventListener("click", function (e) {
+    // Bind collapsed bar click (접힌 상태 → 펼치기). Done/To Do 공통.
+    el.querySelectorAll(".column-collapsed-bar").forEach(function (bar) {
+      bar.addEventListener("click", function (e) {
         e.stopPropagation();
-        saveDoneCollapsed(false);
+        const colKey = bar.dataset.colKey;
+        if (!colKey) return;
+        saveColumnCollapsed(colKey, false);
         renderKanban();
       });
-    }
+    });
 
     // Close dropdowns on outside click
     const outsideHandler = function (e) {

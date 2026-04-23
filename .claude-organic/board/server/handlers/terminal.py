@@ -71,6 +71,12 @@ def _build_render_events(data: dict) -> list[dict]:
         - timestamp: ISO 8601 (원본 유지)
     """
     timestamp = data.get('timestamp', '') or ''
+    # Claude Code 하네스가 주입한 Skill/command 래퍼 user 메시지는
+    # isMeta=True 로 표시된다. 실제 사용자 입력/tool_result 에는 없는 필드이므로
+    # 이 플래그 하나로 정확히 구분 가능 (SKILL.md 본문이 하늘색 term-user 블록으로
+    # 터미널에 노출되던 버그 원인).
+    if data.get('isMeta') is True:
+        return []
     message = data.get('message') or {}
     if not isinstance(message, dict):
         return []

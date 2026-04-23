@@ -122,6 +122,7 @@ Board.state.reconcileTermStatus = function (serverStatus) {
 
 // ── Constants ──
 const COLUMNS = [
+  { key: "To Do", label: "To Do", dot: "dot-todo" },
   { key: "Open", label: "Open", dot: "dot-open" },
   { key: "In Progress", label: "In Progress", dot: "dot-progress" },
   { key: "Review", label: "Review", dot: "dot-review" },
@@ -136,6 +137,7 @@ const CMD_COLORS = {
 };
 
 const STATUS_COLORS = {
+  "To Do": { bg: "rgba(106,159,181,0.15)", fg: "#6a9fb5" },
   Open: { bg: "rgba(78,201,176,0.15)", fg: "#4ec9b0" },
   Submit: { bg: "rgba(86,156,214,0.15)", fg: "#569cd6" },
   "In Progress": { bg: "rgba(220,220,170,0.15)", fg: "#dcdcaa" },

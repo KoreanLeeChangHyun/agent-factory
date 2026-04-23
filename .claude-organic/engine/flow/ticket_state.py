@@ -15,6 +15,7 @@ from flow.ticket_repository import write_ticket_xml, err
 
 # 컬럼 이름 매핑: CLI 인자 → 컬럼명
 COLUMN_MAP: dict[str, str] = {
+    "todo": "To Do",
     "open": "Open",
     "submit": "Submit",
     "progress": "In Progress",
@@ -25,8 +26,10 @@ COLUMN_MAP: dict[str, str] = {
 # 허용 상태 전이 규칙: 현재 상태 → 허용 대상 목록
 # Done으로의 이동은 done 서브커맨드(force=True)만 허용.
 # move 커맨드로 Done 직접 이동은 불가 (Review → Done도 done 서브커맨드 사용 필요).
+# To Do는 Open과의 양방향 전이만 기본 허용하며, 그 외 상태에서의 복귀는 --force 필요.
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
-    "Open": ["In Progress", "Submit"],
+    "To Do": ["Open"],
+    "Open": ["In Progress", "Submit", "To Do"],
     "Submit": ["In Progress", "Open"],
     "In Progress": ["Review", "Open"],
     "Review": ["Open", "In Progress"],

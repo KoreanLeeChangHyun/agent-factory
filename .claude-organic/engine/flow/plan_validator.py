@@ -680,6 +680,7 @@ def validate(plan_path: str) -> list[str]:
 
 # 디렉터리명 → XML status 값 매핑 (정규화용)
 _DIR_TO_STATUS: dict[str, str] = {
+    "todo": "To Do",
     "open": "Open",
     "progress": "In Progress",
     "review": "Review",
@@ -764,7 +765,7 @@ def build_ticket_location_map(kanban_root: str) -> dict[str, str]:
         {T-NNN: "open"|"progress"|"review"|"done"} 딕셔너리.
     """
     location_map: dict[str, str] = {}
-    for dir_name in ("open", "progress", "review", "done"):
+    for dir_name in ("todo", "open", "progress", "review", "done"):
         dir_path = os.path.join(kanban_root, dir_name)
         if not os.path.isdir(dir_path):
             continue
@@ -872,6 +873,7 @@ def validate_ticket_xml_fields(
         경고 메시지 목록.
     """
     warnings: list[str] = []
+    # todo는 백로그 상태로 prompt 필수 필드 완결 의무 없음 — open/progress/review만 활성 검증 대상
     is_active = dir_name in ("open", "progress", "review")
 
     if not is_active:

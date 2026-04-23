@@ -30,7 +30,7 @@ from common import read_env
 _DONE_PATTERN = re.compile(r"\bflow-kanban\s+done\s+(T-\d{3})\b")
 
 # 칸반 디렉터리
-KANBAN_DIRS = ["open", "progress", "review"]
+KANBAN_DIRS = ["todo", "open", "progress", "review"]
 
 
 def _deny(reason: str) -> None:

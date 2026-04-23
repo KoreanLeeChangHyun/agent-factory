@@ -28,6 +28,7 @@ from flow.ticket_repository import (
     err,
     log,
     KANBAN_DIR,
+    KANBAN_TODO_DIR,
     KANBAN_OPEN_DIR,
     KANBAN_PROGRESS_DIR,
     KANBAN_REVIEW_DIR,
@@ -218,26 +219,48 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
 # ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
 
 
-def cmd_create(title: str, command: str) -> None:
+def cmd_create(title: str, command: str, status: str) -> None:
     """새 티켓 XML을 생성한다.
 
     XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 채번 후,
-    .kanban/open/T-NNN.xml 파일을 생성한다.
+    status 값에 따라 .kanban/todo/ 또는 .kanban/open/ 아래에
+    T-NNN.xml 파일을 생성한다.
 
     Args:
         title: 티켓 제목. 빈 문자열 허용.
         command: 워크플로우 커맨드 (implement, review, research 등). 현재 미사용 (하위 호환용).
+        status: 초기 상태 키 ("todo" | "open"). COLUMN_MAP을 통해 XML <status> 값으로 변환된다.
     """
+    # status 키를 상태명("To Do" / "Open")으로 변환
+    status_label = COLUMN_MAP.get(status)
+    if status_label is None or status not in ("todo", "open"):
+        err(
+            f"잘못된 --status 값: '{status}'. 'todo' 또는 'open' 중 하나를 명시하세요. "
+            f"(예: flow-kanban create \"제목\" --command implement --status todo)",
+            2,
+        )
+
+    # 대상 디렉터리 결정
+    target_dir = KANBAN_TODO_DIR if status == "todo" else KANBAN_OPEN_DIR
+
     max_num = get_max_ticket_number()
     new_num = max_num + 1
     ticket_number = f"T-{new_num:03d}"
 
     # 파일명: T-NNN.xml 고정
-    ticket_file = os.path.join(KANBAN_OPEN_DIR, f"{ticket_number}.xml")
+    ticket_file = os.path.join(target_dir, f"{ticket_number}.xml")
 
-    os.makedirs(KANBAN_OPEN_DIR, exist_ok=True)
+    os.makedirs(target_dir, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     xml_content = create_ticket_xml(ticket_number, title, datetime_str, command=command)
+
+    # XML <status> 태그 값을 status_label로 교체
+    # create_ticket_xml 은 기본적으로 "Open"을 기록하므로, status=="todo"인 경우에만 치환.
+    if status_label != "Open":
+        xml_content = xml_content.replace(
+            "<status>Open</status>", f"<status>{status_label}</status>", 1
+        )
+
     try:
         with open(ticket_file, "w", encoding="utf-8") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -247,8 +270,8 @@ def cmd_create(title: str, command: str) -> None:
         err(f"티켓 파일 생성 실패: {e}")
 
     suffix = f" ({command})" if command else ""
-    print(f"{ticket_number}: {title}{suffix}")
-    log("INFO", f"kanban.py: create {ticket_number} title={title!r}")
+    print(f"{ticket_number}: {title}{suffix} [{status_label}]")
+    log("INFO", f"kanban.py: create {ticket_number} title={title!r} status={status_label!r}")
 
 
 def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
@@ -259,7 +282,7 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
 
     Args:
         ticket_number: 이동할 티켓 번호 (T-NNN 형식).
-        target_key: 대상 컬럼 키 (open/progress/review/done).
+        target_key: 대상 컬럼 키 (todo/open/progress/review/done).
         force: 강제 이동 여부.
 
     Raises:
@@ -887,8 +910,8 @@ def cmd_unlink(
 def cmd_board() -> None:
     """칸반 보드 전체 현황을 마크다운 테이블 형식으로 출력한다.
 
-    .kanban/open/, .kanban/progress/, .kanban/review/ 디렉터리를 각각 스캔하여
-    Open/In Progress/Review 칼럼에 직접 매핑하고, .kanban/done/ 디렉터리의
+    .kanban/todo/, .kanban/open/, .kanban/progress/, .kanban/review/ 디렉터리를 각각 스캔하여
+    To Do/Open/In Progress/Review 칼럼에 직접 매핑하고, .kanban/done/ 디렉터리의
     티켓을 Done 칼럼에 그룹핑하여 출력한다.
     Done 칼럼은 최근 10건만 표시하고 총 건수를 함께 출력한다.
     각 칼럼에 티켓이 없으면 "(없음)"을 출력한다.
@@ -896,7 +919,7 @@ def cmd_board() -> None:
     출력 포맷:
         ## Kanban Board
 
-        ### Open
+        ### To Do
         | Ticket | Title | Command |
         ...
 
@@ -905,12 +928,13 @@ def cmd_board() -> None:
         ...
     """
     # ── 칼럼 정의 ────────────────────────────────────────────────────────────
-    COLUMNS = ["Open", "In Progress", "Review", "Done"]
+    COLUMNS = ["To Do", "Open", "In Progress", "Review", "Done"]
     grouped: dict[str, list[dict]] = {col: [] for col in COLUMNS}
 
     # ── 상태별 디렉터리 스캔 (디렉터리가 SSoT) ────────────────────────────────
-    # 디렉터리 -> 칼럼 매핑: open/ -> Open, progress/ -> In Progress, review/ -> Review
+    # 디렉터리 -> 칼럼 매핑: todo/ -> To Do, open/ -> Open, progress/ -> In Progress, review/ -> Review
     _DIR_COLUMN_MAP = [
+        (KANBAN_TODO_DIR, "To Do"),
         (KANBAN_OPEN_DIR, "Open"),
         (KANBAN_PROGRESS_DIR, "In Progress"),
         (KANBAN_REVIEW_DIR, "Review"),
@@ -957,7 +981,7 @@ def cmd_board() -> None:
         num_str = t.get("number", "T-0").lstrip("T-")
         return int(num_str) if num_str.isdigit() else 0
 
-    for col in COLUMNS[:-1]:  # Open, In Progress, Review
+    for col in COLUMNS[:-1]:  # To Do, Open, In Progress, Review
         grouped[col].sort(key=_ticket_sort_key)
 
     # Done은 번호 내림차순(최신 먼저), 최근 10건만 표시
@@ -968,7 +992,7 @@ def cmd_board() -> None:
     # ── 출력 ─────────────────────────────────────────────────────────────────
     print("## Kanban Board")
 
-    for col in COLUMNS[:-1]:  # Open, In Progress, Review
+    for col in COLUMNS[:-1]:  # To Do, Open, In Progress, Review
         print(f"\n### {col}")
         tickets = grouped[col]
         if not tickets:
@@ -998,6 +1022,7 @@ def cmd_board() -> None:
 
 # 상태 키 -> (디렉터리, 표시 상태명) 매핑
 _STATUS_SCAN_MAP: dict[str, tuple[str, str]] = {
+    "todo": (KANBAN_TODO_DIR, "To Do"),
     "open": (KANBAN_OPEN_DIR, "Open"),
     "progress": (KANBAN_PROGRESS_DIR, "In Progress"),
     "review": (KANBAN_REVIEW_DIR, "Review"),
@@ -1009,17 +1034,21 @@ def cmd_list(status_filter: str = "") -> None:
     """칸반 티켓 목록을 한 줄 요약 형식으로 출력한다.
 
     --status 옵션으로 특정 상태만 필터링할 수 있다.
-    미지정 시 Done을 제외한 open/progress/review 전체를 출력한다.
+    미지정 시 To Do/Done을 제외한 open/progress/review 전체를 출력한다.
+    (To Do는 백로그 성격이므로 기본 노출에서 제외, 명시 요청 시에만 출력한다.)
 
     출력 포맷: T-NNN  [상태]  제목 (번호 오름차순)
 
     Args:
-        status_filter: 상태 필터 키 (open/progress/review/done). 빈 문자열이면 Done 제외 전체.
+        status_filter: 상태 필터 키 (todo/open/progress/review/done).
+            빈 문자열이면 To Do/Done 제외 전체.
     """
     if status_filter:
         scan_targets = [_STATUS_SCAN_MAP[status_filter]]
     else:
-        # 기본: open + progress + review (done 제외)
+        # 기본: open + progress + review (todo, done 제외)
+        # - todo: 백로그 성격이므로 기본 노출 제외 (--status todo 명시 시만 노출)
+        # - done: 완료 티켓은 기본 노출 제외
         scan_targets = [
             _STATUS_SCAN_MAP["open"],
             _STATUS_SCAN_MAP["progress"],
@@ -1078,6 +1107,16 @@ def build_parser() -> argparse.ArgumentParser:
     create_parser = subparsers.add_parser("create", help="새 티켓을 생성한다")
     create_parser.add_argument("title", help="티켓 제목")
     create_parser.add_argument("--command", default="", help="워크플로우 커맨드 (implement, review, research 등)")
+    create_parser.add_argument(
+        "--status",
+        required=True,
+        choices=["todo", "open"],
+        metavar="{todo,open}",
+        help=(
+            "초기 상태 (필수). 'todo'=백로그·미래에 할 일, 'open'=지금 집중 대상. "
+            "예: flow-kanban create \"제목\" --command implement --status todo"
+        ),
+    )
 
     # move 서브커맨드
     move_parser = subparsers.add_parser("move", help="티켓을 지정 컬럼으로 이동한다")
@@ -1085,7 +1124,7 @@ def build_parser() -> argparse.ArgumentParser:
     move_parser.add_argument(
         "target",
         choices=list(COLUMN_MAP.keys()),
-        help="대상 컬럼 (open/progress/review/done)",
+        help="대상 컬럼 (todo/open/progress/review/done)",
     )
     move_parser.add_argument("--force", action="store_true", help="상태 전이 규칙 무시하고 강제 이동")
 
@@ -1154,9 +1193,9 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser("list", help="칸반 티켓 목록을 조회한다")
     list_parser.add_argument(
         "--status",
-        choices=["open", "progress", "review", "done"],
+        choices=["todo", "open", "progress", "review", "done"],
         default="",
-        help="상태 필터 (미지정 시 Done 제외 전체)",
+        help="상태 필터 (미지정 시 To Do/Done 제외 전체)",
     )
 
     # show 서브커맨드
@@ -1182,7 +1221,7 @@ def dispatch(args: argparse.Namespace) -> None:
         SystemExit: 잘못된 티켓 번호 또는 서브커맨드 실행 오류 시.
     """
     if args.subcommand == "create":
-        cmd_create(args.title, args.command)
+        cmd_create(args.title, args.command, args.status)
 
     elif args.subcommand == "move":
         ticket = normalize_ticket_number(args.ticket)

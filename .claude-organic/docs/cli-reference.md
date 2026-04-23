@@ -525,7 +525,7 @@ flow-gc /home/user/project
 
 | 서브커맨드 | 사용법 | 설명 |
 |-----------|-------|------|
-| `create` | `flow-kanban create "<title>" [--command <cmd>]` | 새 티켓 생성 (.claude-organic/tickets/active/T-NNN.xml) |
+| `create` | `flow-kanban create "<title>" [--command <cmd>] [--status <todo\|open>]` | 새 티켓 생성 (.claude-organic/tickets/todo\|open/T-NNN.xml). 기본 상태: open |
 | `move` | `flow-kanban move <ticket> <target> [--force]` | 티켓을 지정 컬럼으로 이동 |
 | `done` | `flow-kanban done <ticket>` | 티켓을 Done으로 이동 + .claude-organic/tickets/done/으로 파일 이동 |
 | `delete` | `flow-kanban delete <ticket>` | 티켓 삭제 |
@@ -535,7 +535,7 @@ flow-gc /home/user/project
 | `update-result` | `flow-kanban update-result <ticket> [options]` | 티켓 result 필드(registrykey/workdir/plan/report) 갱신 |
 | `link` | `flow-kanban link <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 기록 |
 | `unlink` | `flow-kanban unlink <ticket> [--depends-on T-MMM] [--derived-from T-MMM] [--blocks T-MMM]` | 티켓 간 관계 양방향 제거 |
-| `list` | `flow-kanban list [--status <open\|progress\|review\|done>]` | 티켓 목록 한 줄 요약 조회 |
+| `list` | `flow-kanban list [--status <todo\|open\|progress\|review\|done>]` | 티켓 목록 한 줄 요약 조회 |
 | `board` | `flow-kanban board` | 칸반 보드 전체 현황 마크다운 테이블 출력 |
 | `show` | `flow-kanban show <ticket>` | 특정 티켓 상세 정보 조회 |
 
@@ -543,6 +543,7 @@ flow-gc /home/user/project
 
 | 키 | 상태명 |
 |----|--------|
+| `todo` | To Do |
 | `open` | Open |
 | `progress` | In Progress |
 | `review` | In Review |
@@ -574,10 +575,21 @@ flow-gc /home/user/project
 #### 사용 예시
 
 ```bash
+# 티켓 생성 (기본 상태: Open)
 flow-kanban create "로그인 버그 수정" --command implement
+# 티켓 생성 (To Do 상태로 박제)
+flow-kanban create "나중에 할 작업" --command implement --status todo
+
+# 상태 이동
+flow-kanban move T-169 todo       # To Do로 이동 (박제/백로그)
+flow-kanban move T-169 open       # Open으로 이동 (집중 대상)
 flow-kanban move T-169 progress
 flow-kanban move T-169 review
 flow-kanban done T-169
+
+# 목록 조회
+flow-kanban list --status todo    # To Do 티켓만 조회
+flow-kanban list --status open    # Open 티켓만 조회
 
 flow-kanban update-prompt T-169 \
   --goal "flow-* 스크립트 사용 가이드 통합" \

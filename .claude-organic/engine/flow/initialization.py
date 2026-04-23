@@ -238,7 +238,7 @@ def _find_open_ticket_from_kanban() -> str | None:
 def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     """kanban 디렉터리에서 티켓 파일을 정확 매칭으로 탐색한다.
 
-    open/ -> progress/ -> review/ -> done/ -> active/ (폴백) -> 루트 (폴백) 순으로 탐색한다.
+    todo/ -> open/ -> progress/ -> review/ -> done/ -> active/ (폴백) -> 루트 (폴백) 순으로 탐색한다.
 
     Args:
         kanban_dir: .kanban 디렉터리 절대 경로
@@ -247,27 +247,31 @@ def _find_ticket_file(kanban_dir: Path, ticket_number: str) -> Path | None:
     Returns:
         찾은 티켓 파일의 Path 객체. 없으면 None.
     """
-    # 1순위: .kanban/open/T-NNN.xml
+    # 1순위: .kanban/todo/T-NNN.xml
+    todo_candidate: Path = kanban_dir / "todo" / f"{ticket_number}.xml"
+    if todo_candidate.is_file():
+        return todo_candidate
+    # 2순위: .kanban/open/T-NNN.xml
     open_candidate: Path = kanban_dir / "open" / f"{ticket_number}.xml"
     if open_candidate.is_file():
         return open_candidate
-    # 2순위: .kanban/progress/T-NNN.xml
+    # 3순위: .kanban/progress/T-NNN.xml
     progress_candidate: Path = kanban_dir / "progress" / f"{ticket_number}.xml"
     if progress_candidate.is_file():
         return progress_candidate
-    # 3순위: .kanban/review/T-NNN.xml
+    # 4순위: .kanban/review/T-NNN.xml
     review_candidate: Path = kanban_dir / "review" / f"{ticket_number}.xml"
     if review_candidate.is_file():
         return review_candidate
-    # 4순위: .kanban/done/T-NNN.xml
+    # 5순위: .kanban/done/T-NNN.xml
     done_candidate: Path = kanban_dir / "done" / f"{ticket_number}.xml"
     if done_candidate.is_file():
         return done_candidate
-    # 5순위 (하위 호환 폴백): .kanban/active/T-NNN.xml
+    # 7순위 (하위 호환 폴백): .kanban/active/T-NNN.xml
     active_candidate: Path = kanban_dir / "active" / f"{ticket_number}.xml"
     if active_candidate.is_file():
         return active_candidate
-    # 6순위 (하위 호환 폴백): .kanban/T-NNN.xml
+    # 8순위 (하위 호환 폴백): .kanban/T-NNN.xml
     root_candidate: Path = kanban_dir / f"{ticket_number}.xml"
     if root_candidate.is_file():
         return root_candidate

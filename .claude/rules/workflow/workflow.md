@@ -9,6 +9,14 @@
   - 기존 티켓 실행 중 발견된 버그/이슈 → `--derived-from` (파생)
   - 선행 작업이 필요한 경우 → `--depends-on` (의존)
   - 후속 작업을 차단하는 경우 → `--blocks` (차단)
+- 티켓 생성 시 사용자 발화에 시작 상태가 명시되지 않았으면 번호 메뉴로 질의한다 (MUST, T-385 구현 이후)
+  - 질의 형식: `1. To Do (백로그·미래에 할 일) / 2. Open (지금 집중 대상)`
+  - AskUserQuestion 도구는 Board 터미널 미지원 → 텍스트 번호 메뉴로 제시
+  - "박제/나중에/언젠가/백로그" → To Do 추천 (질의 유지)
+  - "지금/바로/이번에/집중" → Open 추천 (질의 유지)
+  - 사용자가 상태를 명시("Open으로 만들어줘" 등)한 경우에만 질의 생략
+- `flow-kanban create` 호출 시 `--status` 플래그를 명시한다 (MUST) — 생략 시 기본 상태로 폴백되어 의도 불명확
+- Claude가 사용자 발화 맥락에 명시된 상태가 부재하면 번호 메뉴로 질의한다: `1. To Do (백로그·미래에 할 일) / 2. Open (지금 집중 대상)`
 
 ## DO NOT
 - PreToolUse Hook 활성 시 직접 수정 시도하지 않는다 — 차단되므로 토큰 낭비
@@ -66,7 +74,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 ## 워크플로우 요약
 - entry-point: /wf 명령어 (단일 진입점)
-- lifecycle: Open → In Progress → Review → Done
+- lifecycle: To Do → Open → In Progress → Review → Done
 - commands:
   - /wf -o: 새 티켓 생성 및 프롬프트 작성
   - /wf -o N: 기존 티켓 편집
@@ -76,11 +84,13 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 - 상세 참조: .claude/commands/wf.md, .claude/skills/workflow-orchestration/
 
 ## 자연어 매핑
-| 자연어 | 워크플로우 명령 |
-|--------|---------------|
-| "이거 수정해줘" / "코드 고쳐줘" | /wf -e → /wf -s N |
-| "분석해줘" / "조사해줘" | /wf -e (research) → /wf -s N |
-| "티켓 만들어" | /wf -o |
-| "리뷰해줘" | /wf -e (review) → /wf -s N |
-| "종료해줘" | /wf -d N |
-| "티켓 편집해줘" | /wf -e N |
+| 자연어 | 워크플로우 명령 | 비고 |
+|--------|---------------|------|
+| "이거 수정해줘" / "코드 고쳐줘" | /wf -e → /wf -s N | - |
+| "분석해줘" / "조사해줘" | /wf -e (research) → /wf -s N | - |
+| "티켓 만들어" | /wf -o | - |
+| "리뷰해줘" | /wf -e (review) → /wf -s N | - |
+| "종료해줘" | /wf -d N | - |
+| "티켓 편집해줘" | /wf -e N | - |
+| "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o (--status todo) | To Do 상태로 생성 (미래 작업) |
+| "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o (--status open) | Open 상태로 생성 (임박 작업) |

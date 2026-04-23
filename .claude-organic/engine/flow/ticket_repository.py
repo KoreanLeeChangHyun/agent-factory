@@ -28,6 +28,7 @@ _PROJECT_ROOT: str = resolve_project_root()
 KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".claude-organic", "tickets")
 
 # ─── 상태별 디렉터리 상수 ─────────────────────────────────────────────────────
+KANBAN_TODO_DIR: str = os.path.join(KANBAN_DIR, "todo")
 KANBAN_OPEN_DIR: str = os.path.join(KANBAN_DIR, "open")
 KANBAN_PROGRESS_DIR: str = os.path.join(KANBAN_DIR, "progress")
 KANBAN_REVIEW_DIR: str = os.path.join(KANBAN_DIR, "review")
@@ -38,6 +39,7 @@ KANBAN_ACTIVE_DIR: str = KANBAN_OPEN_DIR
 
 # XML <status> 값 -> 디렉터리 경로 매핑
 STATUS_DIR_MAP: dict[str, str] = {
+    "To Do": KANBAN_TODO_DIR,
     "Open": KANBAN_OPEN_DIR,
     "Submit": KANBAN_PROGRESS_DIR,
     "In Progress": KANBAN_PROGRESS_DIR,
@@ -596,7 +598,7 @@ def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> No
 def find_ticket_file(ticket_number: str) -> str | None:
     """T-NNN.xml 정확 매칭으로 티켓 파일 경로를 탐색하여 반환한다.
 
-    탐색 순서: open/ -> progress/ -> review/ -> done/ -> active/(폴백) -> kanban/(루트 폴백)
+    탐색 순서: todo/ -> open/ -> progress/ -> review/ -> done/ -> active/(폴백) -> kanban/(루트 폴백)
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -606,7 +608,7 @@ def find_ticket_file(ticket_number: str) -> str | None:
     """
     filename = f"{ticket_number}.xml"
     # 상태별 디렉터리 순회
-    for status_dir in [KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR]:
+    for status_dir in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR]:
         candidate = os.path.join(status_dir, filename)
         if os.path.isfile(candidate):
             return candidate
@@ -771,7 +773,7 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
 
 
 def get_max_ticket_number() -> int:
-    """Scan .kanban/{open,progress,review,done}/ XML filenames to find max T-NNN number.
+    """Scan .kanban/{todo,open,progress,review,done}/ XML filenames to find max T-NNN number.
 
     루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
 
@@ -779,7 +781,7 @@ def get_max_ticket_number() -> int:
         현재 최대 티켓 번호 정수. 티켓이 없으면 0.
     """
     max_num = 0
-    for d in [KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR, KANBAN_DIR]:
+    for d in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR, KANBAN_DIR]:
         if not os.path.isdir(d):
             continue
         for fname in os.listdir(d):
