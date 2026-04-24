@@ -54,11 +54,11 @@ PROJECT_ROOT: str = resolve_project_root()
 
 
 # 스크립트 경로
-HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude-organic", "scripts", "sync", "history_sync.py")
-UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude-organic", "scripts", "flow", "update_state.py")
-USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude-organic", "scripts", "sync", "usage_sync.py")
-KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude-organic", "scripts", "flow", "kanban.py")
-CHAIN_LAUNCHER: str = os.path.join(PROJECT_ROOT, ".claude-organic", "scripts", "flow", "chain_launcher.py")
+HISTORY_SYNC: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "sync", "history_sync.py")
+UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "update_state.py")
+USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "sync", "usage_sync.py")
+KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "kanban.py")
+CHAIN_LAUNCHER: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "chain_launcher.py")
 
 
 def run(
