@@ -409,6 +409,17 @@ class TerminalSSEChannel:
                 'input': req.get('input', {}),
                 'raw': data,
             }
+        if event_name == 'rate_limit':
+            info = data.get('rate_limit_info', {}) or {}
+            return {
+                'kind': 'rate_limit',
+                'status': info.get('status', 'unknown'),
+                'resets_at': info.get('resetsAt'),
+                'rate_limit_type': info.get('rateLimitType', ''),
+                'is_using_overage': bool(info.get('isUsingOverage', False)),
+                'overage_status': info.get('overageStatus', ''),
+                'session_id': data.get('session_id', ''),
+            }
         if event_name == 'error':
             return {
                 'kind': 'error',

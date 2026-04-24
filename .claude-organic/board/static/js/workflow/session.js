@@ -74,6 +74,19 @@
   /** Set true when server sends archived_end or fetchStatus 404; disables reconnect. */
   var _sessionArchived = false;
 
+  /**
+   * rate_limit 배너 단일 인스턴스 참조. 동일 (status, limitType) 연속 수신 시
+   * DOM 재생성 대신 timestamp 만 갱신하기 위한 dedupe 앵커.
+   * @type {HTMLElement|null}
+   */
+  var _rateLimitBanner = null;
+  /**
+   * `allowed` 상태 배너의 5초 자동 dismiss 타이머 핸들.
+   * 새 배너 생성/명시적 dismiss 시 clearTimeout 대상.
+   * @type {number|null}
+   */
+  var _rateLimitDismissTimer = null;
+
   function _sessionKey() {
     if (_ctx && _ctx.isWorkflowMode && _ctx.isWorkflowMode()) {
       return (_ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId()) || "main";
@@ -89,6 +102,161 @@
     var key = _sessionKey();
     if (!(key in _lastEventIdBySession) || n > _lastEventIdBySession[key]) {
       _lastEventIdBySession[key] = n;
+    }
+  }
+
+  // ── rate_limit 배너 헬퍼 (T-389) ──
+  // SVG inline icons (general.md MUST: 외부 아이콘 라이브러리/폰트 금지).
+  // 16x16 단순 path — info: i-circle, warn/danger: !-triangle, dismiss: x.
+  var _RL_ICON_INFO =
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"' +
+    ' xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>' +
+    '<path d="M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
+    '<circle cx="8" cy="4.75" r="0.9" fill="currentColor"/>' +
+    '</svg>';
+  var _RL_ICON_WARN =
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"' +
+    ' xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<path d="M8 1.5 15 14H1L8 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '<path d="M8 6v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
+    '<circle cx="8" cy="11.75" r="0.9" fill="currentColor"/>' +
+    '</svg>';
+  var _RL_ICON_DISMISS =
+    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"' +
+    ' xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor"' +
+    ' stroke-width="1.5" stroke-linecap="round"/>' +
+    '</svg>';
+
+  /**
+   * status → variant(CSS 클래스 suffix) + icon SVG 매핑.
+   * 미지정 status 는 info 로 defensive fallback.
+   */
+  function _rateLimitVariant(status) {
+    if (status === "exceeded") return { variant: "danger", icon: _RL_ICON_WARN };
+    if (status === "allowed_warning") return { variant: "warn", icon: _RL_ICON_WARN };
+    if (status === "allowed") return { variant: "info", icon: _RL_ICON_INFO };
+    return { variant: "info", icon: _RL_ICON_INFO };
+  }
+
+  /**
+   * epoch seconds → ko-KR HH:mm 형식. null/invalid 면 빈 문자열.
+   * @param {number|null} resetsAt epoch seconds
+   * @returns {string}
+   */
+  function _formatResetsAt(resetsAt) {
+    if (resetsAt == null || isNaN(resetsAt)) return "";
+    try {
+      return new Date(resetsAt * 1000).toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /**
+   * detail 라인("limit_type · resets HH:mm") 빌드. 둘 다 비면 빈 문자열.
+   */
+  function _buildRateLimitDetail(limitType, resetsAt) {
+    var parts = [];
+    if (limitType) parts.push(limitType);
+    var t = _formatResetsAt(resetsAt);
+    if (t) parts.push("resets " + t);
+    return parts.join(" · ");
+  }
+
+  /**
+   * rate_limit 배너 DOM 생성. 구조는 plan.md Phase 2 T2-1 스펙 그대로.
+   * @param {string} status
+   * @param {string} limitType
+   * @param {number|null} resetsAt epoch seconds or null
+   * @returns {HTMLElement}
+   */
+  function _buildRateLimitBanner(status, limitType, resetsAt) {
+    var v = _rateLimitVariant(status);
+    var banner = document.createElement("div");
+    banner.className =
+      "term-rate-limit-banner term-rate-limit-banner--" + v.variant;
+    banner.dataset.status = status;
+    banner.dataset.limitType = limitType;
+
+    var iconSpan = document.createElement("span");
+    iconSpan.className = "term-rate-limit-icon";
+    iconSpan.innerHTML = v.icon;
+    banner.appendChild(iconSpan);
+
+    var content = document.createElement("div");
+    content.className = "term-rate-limit-content";
+
+    var title = document.createElement("span");
+    title.className = "term-rate-limit-title";
+    title.textContent = "Rate limit: " + status;
+    content.appendChild(title);
+
+    var detailText = _buildRateLimitDetail(limitType, resetsAt);
+    if (detailText) {
+      var detail = document.createElement("span");
+      detail.className = "term-rate-limit-detail";
+      detail.textContent = detailText;
+      content.appendChild(detail);
+    }
+    banner.appendChild(content);
+
+    var btn = document.createElement("button");
+    btn.className = "term-rate-limit-dismiss";
+    btn.type = "button";
+    btn.setAttribute("aria-label", "닫기");
+    btn.innerHTML = _RL_ICON_DISMISS;
+    btn.addEventListener("click", _dismissRateLimitBanner);
+    banner.appendChild(btn);
+
+    return banner;
+  }
+
+  /**
+   * dedupe 경로에서 기존 배너의 detail 라인만 갱신. title 은 status 가 같으므로 불변.
+   * @param {HTMLElement} banner
+   * @param {string} limitType
+   * @param {number|null} resetsAt
+   */
+  function _updateRateLimitBannerDetail(banner, limitType, resetsAt) {
+    if (!banner) return;
+    var detailText = _buildRateLimitDetail(limitType, resetsAt);
+    var content = banner.querySelector(".term-rate-limit-content");
+    if (!content) return;
+    var detail = content.querySelector(".term-rate-limit-detail");
+    if (detailText) {
+      if (!detail) {
+        detail = document.createElement("span");
+        detail.className = "term-rate-limit-detail";
+        content.appendChild(detail);
+      }
+      detail.textContent = detailText;
+    } else if (detail) {
+      detail.remove();
+    }
+  }
+
+  /**
+   * 활성 배너 제거 + 타이머 정리. idempotent.
+   */
+  function _dismissRateLimitBanner() {
+    if (_rateLimitDismissTimer) {
+      clearTimeout(_rateLimitDismissTimer);
+      _rateLimitDismissTimer = null;
+    }
+    if (_rateLimitBanner) {
+      try {
+        if (_rateLimitBanner.parentNode) {
+          _rateLimitBanner.parentNode.removeChild(_rateLimitBanner);
+        }
+      } catch (err) {
+        // DOM 이 이미 clearOutput 등으로 정리된 경우 무시
+      }
+      _rateLimitBanner = null;
     }
   }
 
@@ -852,6 +1020,49 @@
       }
     });
 
+    // T-389: Claude CLI 의 rate_limit_event 전용 SSE 리스너.
+    // 독립 리스너로 구현하여 기존 stdout 핸들러(L353)와 분리 — TK-4(T-390) 의
+    // stdout 리팩터와 물리적 충돌 회피 (T-386 research G-2 권고).
+    // Server payload shape (terminal_channel._build_payload):
+    //   { kind:"rate_limit", status, resets_at, rate_limit_type,
+    //     is_using_overage, overage_status, session_id }
+    termEventSource.addEventListener("rate_limit", function (e) {
+      _captureEventId(e);
+      try {
+        var data = JSON.parse(e.data);
+        var status = data.status || "unknown";
+        var limitType = data.rate_limit_type || "";
+        var resetsAt = (typeof data.resets_at === "number") ? data.resets_at : null;
+
+        // replay 중에는 DOM 생성을 스킵한다. 복원 시점의 rate_limit 은 과거
+        // 스냅샷이므로 현재 UI 에 잔류시키면 잘못된 정보가 노출될 수 있다.
+        // 라이브 이벤트 수신 시 정상 경로로 배너가 재생성된다.
+        if (_isReplaying) return;
+
+        // dedupe: 동일 (status, limitType) 배너가 이미 떠 있으면 timestamp 만 갱신.
+        if (_rateLimitBanner &&
+            _rateLimitBanner.dataset.status === status &&
+            _rateLimitBanner.dataset.limitType === limitType) {
+          _updateRateLimitBannerDetail(_rateLimitBanner, limitType, resetsAt);
+          return;
+        }
+
+        _dismissRateLimitBanner();
+
+        var banner = _buildRateLimitBanner(status, limitType, resetsAt);
+        _rateLimitBanner = banner;
+        _ctx.appendToOutput(banner);
+
+        // allowed(정보성) 만 자동 dismiss. warning / exceeded / unknown 은 사용자
+        // 수동 dismiss 필요 — reset 시각 확인 기회 확보.
+        if (status === "allowed") {
+          _rateLimitDismissTimer = setTimeout(_dismissRateLimitBanner, 5000);
+        }
+      } catch (err) {
+        // Ignore non-JSON rate_limit events (기존 리스너와 동일 silent ignore)
+      }
+    });
+
     termEventSource.onerror = function () {
       Board.state.termConnected = false;
       if (termEventSource) {
@@ -904,6 +1115,8 @@
     _currentToolUseId = null;
     _toolInputMap = {};
     _isReplaying = false;
+    // T-389: 이전 세션에서 남은 rate_limit 배너/타이머 제거.
+    _dismissRateLimitBanner();
     if (_ctx) {
       _ctx.resetTokens && _ctx.resetTokens();
       _ctx.setReceivedChunks && _ctx.setReceivedChunks(false);
