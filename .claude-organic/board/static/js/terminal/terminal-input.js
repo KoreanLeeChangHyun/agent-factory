@@ -389,6 +389,9 @@
     M.startSpinner();
     Board.state.setTermStatus("busy");
     M.updateControlBar();
+    // 사용자가 엔터로 전송한 순간은 "최신 응답을 보고 싶다"는 명시적 액션.
+    // isNearBottom 판정과 무관하게 사용자 메시지 + 스피너가 보이도록 하단 이동.
+    if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
 
     var ep = M.endpoints();
     Board.session.postJson(ep.input, ep.inputBody(payload)).catch(function (err) {
@@ -416,6 +419,7 @@
     M.startSpinner();
     Board.state.setTermStatus("busy");
     M.updateControlBar();
+    if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
 
     var ep = M.endpoints();
     Board.session.postJson(ep.input, ep.inputBody({ text: nextText })).catch(function (err) {
