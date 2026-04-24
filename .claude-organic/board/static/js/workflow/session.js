@@ -735,8 +735,10 @@
         _toolInputMap = {};
       }
       Board.state.setTermStatus("stopped");
-      _ctx.resetTokens();
-      _ctx.setSessionCost(0);
+      // 토큰/비용은 의도적으로 리셋하지 않는다. 세션 스위치 시 서버가 구 프로세스를
+      // kill 하면서 process_exit 이 먼저 날아오는데, 여기서 0 으로 밀면 뒤이은
+      // loadHistory 가 새 세션의 last_usage 로 채우는 사이에 바가 0% 로 깜박인다.
+      // 사용자가 명시적으로 kill 한 경우엔 _finalizeStoppedUI 가 별도로 리셋한다.
       _ctx.stopSpinner();
       var exitCode = data.exit_code;
       if (exitCode !== 0 && exitCode !== 143 && exitCode !== undefined) {
