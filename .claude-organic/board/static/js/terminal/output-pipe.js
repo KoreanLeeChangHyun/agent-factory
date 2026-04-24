@@ -169,9 +169,11 @@
 
   M.renderHistory = function(events) {
     if (!M.outputDiv || !events || !events.length) return;
+    var sawInFlight = false;
     for (var i = 0; i < events.length; i++) {
       var ev = events[i];
       var kind = ev.kind || "text";
+      if (ev.in_flight) sawInFlight = true;
       // in_flight 이벤트는 Claude CLI 가 jsonl 에 아직 flush 하지 못한
       // "현재 스트리밍 중인 블록" 이다. 완성된 블록처럼 DOM 에 추가하면
       // 이어지는 라이브 text_delta 가 별개 블록을 만들어 응답이 두 조각으로
@@ -222,6 +224,16 @@
       } else if (kind === "tool_result") {
         _renderToolResult(ev);
       }
+    }
+    // in_flight 이벤트를 만났다는 것은 LLM 이 현재 스트리밍 중이라는 뜻.
+    // 새로고침으로 페이지가 재구성된 상태이므로 스피너를 복구하고 termStatus
+    // 를 busy 로 올려 입력 잠금 등 관련 UI 를 재개한다.
+    if (sawInFlight && !M.isWorkflowMode) {
+      if (Board.debugLog) Board.debugLog('renderHistory.inFlightDetected', {
+        events: events.length, termStatus: Board.state.termStatus,
+      });
+      Board.state.setTermStatus("busy");
+      if (M.startSpinner) M.startSpinner();
     }
   };
 

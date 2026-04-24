@@ -99,6 +99,9 @@ class ClaudeProcess:
         #    'timestamp': '<iso>'}
         self._in_flight_lock: threading.Lock = threading.Lock()
         self._in_flight_message: dict | None = None
+        # 사용자 입력 전송 후 result 수신 전 여부. status 엔드포인트가 이 플래그를
+        # 노출하면 새로고침 후에도 클라이언트가 스피너 복구/입력 잠금을 판단할 수 있다.
+        self._awaiting_response: bool = False
 
     def spawn(
         self,
@@ -257,6 +260,9 @@ class ClaudeProcess:
             except (BrokenPipeError, OSError) as e:
                 self._status = 'stopped'
                 return {'ok': False, 'error': str(e)}
+
+        # 입력 전송 성공 → 응답 대기 상태. result 수신 시 해제됨.
+        self._awaiting_response = True
 
         return {'ok': True, 'error': ''}
 
@@ -583,6 +589,7 @@ class ClaudeProcess:
                 # result 수신 시 상태를 idle로 전환
                 if data.get('type') == 'result':
                     self._status = 'idle'
+                    self._awaiting_response = False
 
                 # in-flight 캐시 업데이트 (스트리밍 중 새로고침 시 부분 내용 보존용)
                 self._track_in_flight(data)

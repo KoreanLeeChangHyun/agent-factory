@@ -295,6 +295,10 @@ class TerminalHandlerMixin:
             'permission_mode': claude_process._permission_mode,
             'branch': _get_git_branch(project_root),
             'clients': terminal_sse_channel.client_count,
+            # 새로고침 후 클라이언트가 스피너/입력 잠금 복구를 판단하는 신호.
+            # 사용자 입력 전송 후 result 수신 전까지 True. claude_process._status 만으로는
+            # 생성 중 판정이 불가능 (result 후에도 계속 'idle' 상태로 유지되므로).
+            'awaiting_response': bool(getattr(claude_process, '_awaiting_response', False)),
         })
 
     def _handle_terminal_sessions(self) -> None:

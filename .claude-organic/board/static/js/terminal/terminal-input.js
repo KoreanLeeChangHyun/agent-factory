@@ -38,6 +38,9 @@
   }
 
   M.startSpinner = function() {
+    if (Board.debugLog) Board.debugLog('startSpinner', {
+      thinkingEl: !!M.thinkingEl, outputDiv: !!M.outputDiv, termStatus: Board.state.termStatus,
+    });
     if (M.thinkingEl) return;
     if (!M.outputDiv) return;
 
@@ -71,6 +74,9 @@
   };
 
   M.stopSpinner = function() {
+    if (Board.debugLog) Board.debugLog('stopSpinner', {
+      thinkingEl: !!M.thinkingEl, termStatus: Board.state.termStatus,
+    });
     if (M.thinkingEl) {
       if (M.thinkingEl._rotator) {
         clearTimeout(M.thinkingEl._rotator);

@@ -20,6 +20,53 @@ Board.util = Board.util || {};
 Board.render = Board.render || {};
 Board.fetch = Board.fetch || {};
 
+// ── Debug Logger (localStorage 링버퍼) ──
+//
+// 새로고침을 넘어가며 디버깅이 필요한 경로에 debugLog 를 심는다. 콘솔은
+// 새로고침 시 비워지므로 localStorage 에 최근 300개 이벤트를 보존한다.
+//
+// 사용:
+//   Board.debugLog('tag', {k: v})   — 로그 추가
+//   Board.debugDump()               — 테이블로 출력
+//   Board.debugClear()              — 버퍼 비우기
+
+var _DEBUG_KEY = 'board.debug.log';
+var _DEBUG_MAX = 300;
+
+Board.debugLog = function (tag, data) {
+  try {
+    var raw = localStorage.getItem(_DEBUG_KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) arr = [];
+    arr.push({
+      ts: new Date().toISOString(),
+      tag: String(tag || ''),
+      data: data === undefined ? null : data,
+    });
+    if (arr.length > _DEBUG_MAX) {
+      arr = arr.slice(arr.length - _DEBUG_MAX);
+    }
+    localStorage.setItem(_DEBUG_KEY, JSON.stringify(arr));
+  } catch (e) { /* quota, json 에러 조용히 무시 */ }
+};
+
+Board.debugDump = function () {
+  try {
+    var raw = localStorage.getItem(_DEBUG_KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    if (typeof console !== 'undefined' && console.table) {
+      console.table(arr.map(function (e) {
+        return { ts: e.ts, tag: e.tag, data: JSON.stringify(e.data) };
+      }));
+    }
+    return arr;
+  } catch (e) { return []; }
+};
+
+Board.debugClear = function () {
+  try { localStorage.removeItem(_DEBUG_KEY); } catch (e) {}
+};
+
 // ── Terminal Status State Machine ──
 //
 // 메인 터미널 세션의 수명 주기를 표현하는 enum 과 전이 헬퍼.
@@ -102,22 +149,27 @@ Board.state.setTermStatus = function (next) {
  */
 Board.state.reconcileTermStatus = function (serverStatus) {
   var current = Board.state.termStatus;
+  var result;
   if (!serverStatus) {
     Board.state.setTermStatus('stopped');
-    return;
-  }
-  if (serverStatus === 'stopped') {
+    result = 'stopped(empty)';
+  } else if (serverStatus === 'stopped') {
     Board.state.setTermStatus('stopped');
-    return;
+    result = 'stopped';
+  } else if (serverStatus === 'running') {
+    if (_CLIENT_EXTENDED.has(current)) {
+      result = 'keep(' + current + ')';
+    } else {
+      Board.state.setTermStatus('busy');
+      result = 'busy(from-' + current + ')';
+    }
+  } else {
+    Board.state.setTermStatus(serverStatus);
+    result = 'passthrough(' + serverStatus + ')';
   }
-  if (serverStatus === 'running') {
-    // 클라가 이미 확장 상태에 있으면 그대로 유지 (더 정확).
-    if (_CLIENT_EXTENDED.has(current)) return;
-    Board.state.setTermStatus('idle');
-    return;
-  }
-  // 서버가 예상 밖 값을 주면 보수적으로 그대로 반영.
-  Board.state.setTermStatus(serverStatus);
+  if (Board.debugLog) Board.debugLog('reconcileTermStatus', {
+    server: serverStatus, before: current, after: Board.state.termStatus, result: result,
+  });
 };
 
 // ── Constants ──

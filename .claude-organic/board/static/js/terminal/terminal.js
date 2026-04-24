@@ -150,6 +150,11 @@
   Board.state.termStatus = M.isWorkflowMode ? "idle" : "stopped";
   Board.state.termLastSessionId = null;
 
+  if (Board.debugLog) Board.debugLog('terminal.init', {
+    isWorkflowMode: M.isWorkflowMode, termStatus: Board.state.termStatus,
+    href: location.href,
+  });
+
   // ── Output Clear ──
 
   M.clearOutput = function() {
