@@ -9,18 +9,11 @@
   var M = (Board._term = Board._term || {});
 
   // ── Session Switcher Engine ──
+  //
+  // 세션 전환 시 outputDiv 자식을 cloneNode 로 복제하지 않고 참조를 배열에
+  // 옮긴다. 노드는 detach 후에도 살아있고 이벤트 리스너도 유지되므로,
+  // 복제 비용(O(n×depth))과 delegation 회귀(리스너 유실)에서 자유롭다.
 
-  var MAX_SAVED_NODES = 5000;
-
-  /**
-   * 현재 활성 세션의 상태를 _sessionMap에 저장한다.
-   *
-   * T-383 Phase 1 (VUL-5 / S5): 엔트리 누락 시 early return 하면 outputNodes
-   * 스냅샷이 유실되어 탭 왕복 시 메인 DOM 이 복원되지 않는 회귀가 발생한다.
-   * terminal.js 초기화 블록에서 _activeSessionId 엔트리가 사전 생성되는 것이
-   * 1차 방어선이며, 본 함수는 이중화된 방어선으로서 엔트리가 없으면
-   * _createSessionEntry 로 즉석 생성 후 계속 진행한다 (defensive layering).
-   */
   M._saveCurrentSession = function() {
     var entry = M._sessionMap[M._activeSessionId];
     if (!entry) {
@@ -28,25 +21,15 @@
       M._sessionMap[M._activeSessionId] = entry;
     }
 
-    // M.outputDiv 자식 노드 스냅샷 (최대 MAX_SAVED_NODES개)
     if (M.outputDiv) {
       entry.outputNodes = [];
-      var children = M.outputDiv.childNodes;
-      var startIdx = 0;
-      var truncated = children.length > MAX_SAVED_NODES;
-      if (truncated) {
-        startIdx = children.length - MAX_SAVED_NODES;
-        var omitEl = document.createElement("div");
-        omitEl.className = "system-message";
-        omitEl.textContent = "(이전 출력 생략)";
-        entry.outputNodes.push(omitEl);
-      }
-      for (var i = startIdx; i < children.length; i++) {
-        entry.outputNodes.push(children[i].cloneNode(true));
+      while (M.outputDiv.firstChild) {
+        var node = M.outputDiv.firstChild;
+        M.outputDiv.removeChild(node);
+        entry.outputNodes.push(node);
       }
     }
 
-    // 상태 변수 저장
     entry.cost = M.sessionCost;
     entry.tokens = { input: M.sessionTokens.input, output: M.sessionTokens.output };
     entry.model = M.sessionModel;
@@ -108,25 +91,19 @@
     M.receivedChunks = false;
     M.currentWorkflowToolCard = null;
 
-    // M.outputDiv 복원
     if (M.outputDiv) {
-      M.outputDiv.innerHTML = "";
+      while (M.outputDiv.firstChild) {
+        M.outputDiv.removeChild(M.outputDiv.firstChild);
+      }
       if (entry.outputNodes && entry.outputNodes.length > 0) {
         for (var ni = 0; ni < entry.outputNodes.length; ni++) {
-          M.outputDiv.appendChild(entry.outputNodes[ni].cloneNode(true));
+          M.outputDiv.appendChild(entry.outputNodes[ni]);
         }
-        // 스크롤을 맨 아래로
         M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
       }
-      // 빈 세션: 재로드 시 사라질 placeholder는 찍지 않는다.
 
-      // T-383 Phase 3 (VUL-2 / VUL-3 / S1):
-      // outputDiv 를 cloneNode 로 교체한 직후 WorkflowRenderer 의 _stepPanels
-      // 맵을 현재 DOM 과 동기화한다. 그렇지 않으면 WorkflowRenderer.reset() 으로
-      // 비워진 맵 상태로 남아 이후 stdout 이 새 panel 을 중복 생성하거나,
-      // _setStep 이 _getOrCreateStepPanel 경로를 타며 DOM 에 이미 존재하는
-      // 동일 data-step 패널과 중복되는 사고가 발생한다.
-      // connectSSE 이전 시점에 수행하여 첫 이벤트부터 정확한 panel 로 라우팅.
+      // WorkflowRenderer.reset() 으로 비워진 _stepPanels 맵을 현재 DOM 기준으로
+      // 재구성한다. connectSSE 이전에 수행하여 첫 이벤트부터 정확한 panel 로 라우팅.
       if (Board.WorkflowRenderer && Board.WorkflowRenderer.rebuildStepPanelsFromDom) {
         Board.WorkflowRenderer.rebuildStepPanelsFromDom(M.outputDiv);
       }
