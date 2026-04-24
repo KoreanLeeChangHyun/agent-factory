@@ -280,11 +280,22 @@
       }
       M.renderHistory(data.events);
       M._historyLastTimestamp = data.last_timestamp || "";
+      _scrollOutputToBottomSoon();
     }).catch(function () {
       // 네트워크 오류 등: 최소한 placeholder라도 보이게
       M.showEmptyState();
     });
   };
+
+  function _scrollOutputToBottomSoon() {
+    if (!M.outputDiv) return;
+    // 마크다운/mermaid 비동기 렌더 이후 높이가 확장되므로 두 프레임 뒤 스크롤.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
+      });
+    });
+  }
 
   /**
    * 재연결 gap 보충: 마지막 복원 timestamp 이후의 새 이벤트만 가져와 덧붙인다.

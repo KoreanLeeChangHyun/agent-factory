@@ -9,6 +9,16 @@
  *
  * Depends on: common.js (Board namespace)
  * Registers:  Board.WorkflowRenderer, Board.phaseTimeline
+ *
+ * Board.phaseTimeline public API:
+ *   renderTimelineBar()                — full bar re-render from WorkflowRenderer.state
+ *   renderArtifactLinks()              — incremental artifact row update
+ *   renderStatusBadge(status, msg)     — completion badge (ok|fail)
+ *   renderTaskRow(taskMap)             — task status badge row (session.js _taskStatusMap)
+ *   openArtifact(path)                 — open artifact in new tab
+ *   insertPlaceholder()                — ensure bar container exists
+ *   stopTimer()                        — stop elapsed-time interval
+ *   formatDuration(ms)                 — ms → human-readable string
  */
 "use strict";
 
@@ -751,6 +761,10 @@
     // ── Timer state (module-scoped within phaseTimeline IIFE) ──
     var _timerId = null;
 
+    // ── Task row state (module-scoped within phaseTimeline IIFE) ──
+    /** @type {HTMLElement|null} Cached .wf-task-row element */
+    var _taskRowEl = null;
+
     /**
      * Format milliseconds into a human-readable duration string.
      * < 60s  => "Xs"
@@ -810,6 +824,36 @@
         clearInterval(_timerId);
         _timerId = null;
       }
+    }
+
+    /**
+     * Ensure .wf-task-row element exists as a child of .wf-timeline-bar.
+     * Looks up the bar by id; returns null if bar doesn't exist yet.
+     * Caches the element reference in _taskRowEl.
+     * @returns {HTMLElement|null}
+     */
+    function _ensureTaskRowEl() {
+      var bar = document.getElementById("wf-timeline-bar");
+      if (!bar) {
+        _taskRowEl = null;
+        return null;
+      }
+      // Validate cached reference is still inside bar
+      if (_taskRowEl && bar.contains(_taskRowEl)) {
+        return _taskRowEl;
+      }
+      // Look for existing .wf-task-row inside bar
+      var existing = bar.querySelector(".wf-task-row");
+      if (existing) {
+        _taskRowEl = existing;
+        return _taskRowEl;
+      }
+      // Create and append
+      var row = document.createElement("div");
+      row.className = "wf-task-row";
+      bar.appendChild(row);
+      _taskRowEl = row;
+      return _taskRowEl;
     }
 
     function _getOrCreateBar() {
@@ -995,6 +1039,9 @@
         html += _buildArtifactsRowHtml(st.artifacts);
 
         bar.innerHTML = html;
+        // Invalidate _taskRowEl cache — bar.innerHTML replaced all children.
+        // The next renderTaskRow call will re-create and re-append via _ensureTaskRowEl.
+        _taskRowEl = null;
 
         var links = bar.querySelectorAll(".wf-timeline-artifact[data-path]");
         for (var i = 0; i < links.length; i++) {
@@ -1111,6 +1158,59 @@
        */
       stopTimer: function () {
         _stopTimer();
+      },
+
+      /**
+       * Render task status badges into the .wf-task-row container below the timeline bar.
+       * Called by session.js _flushTaskRender() with the current _taskStatusMap snapshot.
+       *
+       * @param {Object<string, {description:string, status:string, toolName:string, summary:string, updatedAt:number}>} taskMap
+       */
+      renderTaskRow: function (taskMap) {
+        var rowEl = _ensureTaskRowEl();
+        if (!rowEl) return;
+
+        if (!taskMap || Object.keys(taskMap).length === 0) {
+          rowEl.innerHTML = "";
+          return;
+        }
+
+        // Sort by updatedAt descending (most recently updated first), cap at 8
+        var entries = Object.entries(taskMap);
+        entries.sort(function (a, b) {
+          return (b[1].updatedAt || 0) - (a[1].updatedAt || 0);
+        });
+        if (entries.length > 8) {
+          entries = entries.slice(0, 8);
+        }
+
+        var html = "";
+        entries.forEach(function (pair) {
+          var taskId = pair[0];
+          var task = pair[1];
+          var status = task.status || "running";
+          var desc = _esc(task.description || taskId);
+          var tool = _esc(task.toolName || "");
+          var summary = _esc(task.summary || "");
+          var titleAttr = summary ? ' title="' + summary + '"' : "";
+
+          var badgeHtml = '<span class="wf-task-badge ' + _esc(status) + '"' + titleAttr + '>';
+
+          // Pulse dot only for running state
+          if (status === "running") {
+            badgeHtml += '<span class="wf-task-pulse-dot">●</span>';
+          }
+
+          badgeHtml += '<span class="wf-task-desc">' + desc + '</span>';
+          if (tool) {
+            badgeHtml += '<span class="wf-task-tool">' + tool + '</span>';
+          }
+          badgeHtml += '</span>';
+
+          html += badgeHtml;
+        });
+
+        rowEl.innerHTML = html;
       },
 
       /**

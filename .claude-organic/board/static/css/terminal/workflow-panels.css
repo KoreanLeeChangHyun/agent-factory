@@ -179,6 +179,77 @@
   border: 1px solid rgba(78, 201, 176, 0.2);
 }
 
+/* ── .wf-task-row ── */
+
+/* ── .wf-task-row: sub-agent task badge container below timeline bar ── */
+.wf-task-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 10.5px;
+}
+
+.wf-task-row:empty {
+  display: none;
+}
+
+/* ── .wf-task-badge: individual sub-agent task badge ── */
+.wf-task-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-task-desc {
+  color: #cccccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-task-tool {
+  color: #858585;
+  font-size: 90%;
+  flex-shrink: 0;
+}
+
+/* Status variants */
+.wf-task-badge.running {
+  border-color: #D97757;
+  background: rgba(217, 119, 87, 0.10);
+  color: #e0e0e0;
+}
+
+.wf-task-badge.completed {
+  border-color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.08);
+  color: #cccccc;
+}
+
+.wf-task-badge.error {
+  border-color: #f44747;
+  background: rgba(244, 71, 71, 0.10);
+  color: #f0b8b8;
+}
+
+/* running 상태 pulse animation */
+@keyframes wf-task-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.wf-task-badge.running .wf-task-pulse-dot {
+  animation: wf-task-pulse 1.2s ease-in-out infinite;
+}
+
 /* ── .wf-artifacts-row: artifact link row ── */
 .wf-artifacts-row {
   display: flex;

@@ -87,6 +87,21 @@
    */
   var _rateLimitDismissTimer = null;
 
+  // ── task 상태 저장소 (T-390) ──
+  /**
+   * 서브에이전트 task 상태 맵. task_id -> TaskState.
+   * TaskState 필드: description, status("running"|"completed"|"error"),
+   *   toolName, summary, startedAt, updatedAt.
+   * @type {Object<string, {description:string, status:string, toolName:string, summary:string, startedAt:number, updatedAt:number}>}
+   */
+  var _taskStatusMap = {};
+  /**
+   * requestAnimationFrame 토큰. 0 이면 미예약 상태.
+   * 동일 프레임 중복 예약 방지를 위한 가드.
+   * @type {number}
+   */
+  var _taskRenderRafId = 0;
+
   function _sessionKey() {
     if (_ctx && _ctx.isWorkflowMode && _ctx.isWorkflowMode()) {
       return (_ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId()) || "main";
@@ -260,6 +275,49 @@
     }
   }
 
+  // ── task 상태 헬퍼 (T-390) ──
+
+  /**
+   * _taskStatusMap에서 taskId 항목을 생성하거나 patch로 병합한다.
+   * updatedAt 은 항상 Date.now()로 갱신된다.
+   * @param {string} taskId
+   * @param {Object} patch
+   */
+  function _upsertTaskState(taskId, patch) {
+    if (!taskId) return;
+    var existing = _taskStatusMap[taskId] || {
+      description: "",
+      status: "running",
+      toolName: "",
+      summary: "",
+      startedAt: Date.now(),
+      updatedAt: 0
+    };
+    _taskStatusMap[taskId] = Object.assign({}, existing, patch, { updatedAt: Date.now() });
+  }
+
+  /**
+   * rAF를 예약해 _flushTaskRender를 1 프레임에 1회만 호출하도록 coalesce한다.
+   * 이미 예약된 경우 중복 예약하지 않는다.
+   */
+  function _scheduleTaskRender() {
+    if (_taskRenderRafId !== 0) return; // 이미 예약됨 — 스킵
+    _taskRenderRafId = requestAnimationFrame(function () {
+      _taskRenderRafId = 0;
+      _flushTaskRender();
+    });
+  }
+
+  /**
+   * rAF 콜백. 워크플로우 모드일 때만 phaseTimeline.renderTaskRow를 호출한다.
+   */
+  function _flushTaskRender() {
+    if (!_ctx || !_ctx.isWorkflowMode || !_ctx.isWorkflowMode()) return;
+    if (Board.phaseTimeline && typeof Board.phaseTimeline.renderTaskRow === "function") {
+      Board.phaseTimeline.renderTaskRow(_taskStatusMap);
+    }
+  }
+
   /**
    * Per-tool_use_id input buffer map.
    * Parallel tool calls may interleave input_json_delta events, so each
@@ -306,6 +364,9 @@
 
   function fetchStatus() {
     if (!_ctx) return Promise.resolve();
+    if (Board.debugLog) Board.debugLog('fetchStatus.call', {
+      url: _ctx.endpoints().status, termStatus: Board.state.termStatus,
+    });
     return fetch(_ctx.endpoints().status, { cache: "no-store" }).then(function (res) {
       if (res.status === 404) {
         _sessionArchived = true;
@@ -320,12 +381,30 @@
       return res.json();
     }).then(function (data) {
       if (!data) return;
+      if (Board.debugLog) Board.debugLog('fetchStatus.response', {
+        status: data.status, archived: !!data.archived, session_id: data.session_id,
+        awaiting_response: !!data.awaiting_response,
+      });
       if (data.archived) {
         _sessionArchived = true;
         Board.state.setTermStatus("archived");
       } else {
         // 서버 응답(stopped/running)과 클라 확장 상태(idle/busy/starting)를 병합.
         Board.state.reconcileTermStatus(data.status);
+        // 서버의 awaiting_response=true 는 "사용자 입력 전송 후 result 수신 전" 신호.
+        // claude_process._status 는 result 이후 계속 'idle' 이어서 이것만으로는
+        // 스피너 복구가 불가능하므로, 이 플래그를 별도로 확인해 busy 로 올린다.
+        if (data.awaiting_response && !_ctx.isWorkflowMode()) {
+          Board.state.setTermStatus("busy");
+        }
+        // busy 면 스피너 복구 (idempotent).
+        if (Board.state.termStatus === "busy" && !_ctx.isWorkflowMode()) {
+          var termMod = Board._term;
+          if (Board.debugLog) Board.debugLog('fetchStatus.busy-spinner-attempt', {
+            termMod: !!termMod, hasStart: !!(termMod && termMod.startSpinner),
+          });
+          if (termMod && termMod.startSpinner) termMod.startSpinner();
+        }
       }
       // stopped 상태에서 session_id 를 유지하면 서버가 .last-session-id 에서
       // 복원한 예전 UUID 가 남고, Start 후 첫 system/init 이벤트가 "세션 교체"
@@ -360,6 +439,442 @@
       }
       _ctx.updateControlBar();
     }).catch(function () {});
+  }
+
+  // ── SSE Event Handlers (shared between SSE stream and REST history injection) ──
+
+  /**
+   * workflow_step 이벤트 데이터 처리.
+   * _isReplaying 중에는 FSM 전이를 수행하지 않는다 (링버퍼 replay 가드 동일).
+   * REST 이벤트 주입 시에는 _isReplaying=true 상태이므로 DOM 재건 경로만 수행된다.
+   * @param {Object} data 파싱된 이벤트 data 객체
+   */
+  function _onWorkflowStep(data) {
+    if (_isReplaying) {
+      // replay 중: FSM 전이( handleStepEvent ) 및 타임라인 렌더 스킵.
+      return;
+    }
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
+      Board.WorkflowRenderer.handleStepEvent(data);
+    }
+    if (_ctx && _ctx.isWorkflowMode()) {
+      try { Board.phaseTimeline.render(); } catch (re) {}
+    }
+  }
+
+  /**
+   * stdout 이벤트 데이터 처리.
+   * SSE "stdout" 리스너 및 REST 이벤트 주입에서 공유한다.
+   * @param {Object} data 파싱된 이벤트 data 객체
+   */
+  function _onStdout(data) {
+    if (!_ctx) return;
+    if (data.chunk && data.kind === "text_delta") {
+      _ctx.setReceivedChunks(true);
+      _ctx.appendTextBuffer(data.chunk);
+      if (_ctx.isWorkflowMode()) {
+        _pendingTextBuffer += data.chunk;
+      }
+    } else if (data.text && data.kind === "assistant" && !_ctx.getReceivedChunks()) {
+      _ctx.appendTextBuffer(data.text);
+    } else if (data.kind === "input_json_delta" && typeof data.chunk === "string") {
+      if (_currentToolUseId) {
+        if (!_toolInputMap[_currentToolUseId]) {
+          _toolInputMap[_currentToolUseId] = "";
+        }
+        _toolInputMap[_currentToolUseId] += data.chunk;
+      }
+      _ctx.appendToolInputBuffer(data.chunk);
+    } else if (data.kind === "content_block_start" && data.raw) {
+      var block = data.raw.content_block || {};
+      if (block.type === "tool_use" && block.name) {
+        if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+          try {
+            var flushedText = _pendingTextBuffer;
+            _pendingTextBuffer = "";
+            var textBannerConsumed = Board.WorkflowRenderer.tap(flushedText);
+            if (textBannerConsumed && !_isReplaying) {
+              Board.phaseTimeline.render();
+            }
+          } catch (tapFlushErr) {
+            _pendingTextBuffer = "";
+          }
+        } else {
+          _pendingTextBuffer = "";
+        }
+        _ctx.flushTextBuffer();
+        _ctx.resetToolInputBuffer();
+        _ctx.setCurrentToolName(block.name);
+
+        var toolUseId = block.id || null;
+        _currentToolUseId = toolUseId;
+        if (toolUseId) {
+          _toolInputMap[toolUseId] = "";
+        }
+
+        if (_ctx.isWorkflowMode()) {
+          _ctx.createWorkflowToolCard(block.name);
+        } else {
+          _ctx.createToolBox(block.name, toolUseId);
+        }
+      }
+    } else if (data.kind === "user" && data.raw) {
+      if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+        try {
+          var userFlushText = _pendingTextBuffer;
+          _pendingTextBuffer = "";
+          var userTextBannerConsumed = Board.WorkflowRenderer.tap(userFlushText);
+          if (userTextBannerConsumed && !_isReplaying) {
+            Board.phaseTimeline.render();
+          }
+        } catch (userTapErr) {
+          _pendingTextBuffer = "";
+        }
+      } else {
+        _pendingTextBuffer = "";
+      }
+      _ctx.flushTextBuffer();
+      var tr = data.raw.tool_use_result;
+      var mc = data.raw.message && data.raw.message.content;
+      var resultText = "";
+
+      var userToolUseId = null;
+      if (tr && tr.tool_use_id) {
+        userToolUseId = tr.tool_use_id;
+      } else if (mc && mc[0] && mc[0].tool_use_id) {
+        userToolUseId = mc[0].tool_use_id;
+      }
+
+      var userToolName = null;
+      if (userToolUseId) {
+        var map = _ctx.getToolBoxMap ? _ctx.getToolBoxMap() : {};
+        var matchedBox = map[userToolUseId];
+        if (matchedBox && matchedBox.getAttribute) {
+          userToolName = matchedBox.getAttribute("data-tool-name");
+        }
+      }
+
+      if (tr) {
+        if (tr.stdout) resultText = tr.stdout;
+        else if (tr.file && tr.file.content) resultText = tr.file.content;
+        else if (Array.isArray(tr.filenames)) resultText = tr.filenames.join("\n");
+        else if (typeof tr.content === "string") resultText = tr.content;
+      }
+      if (!resultText && mc && mc[0]) {
+        if (typeof mc[0].content === "string") {
+          resultText = mc[0].content;
+        } else if (Array.isArray(mc[0].content)) {
+          resultText = mc[0].content
+            .filter(function(item) { return item && item.type === "text" && item.text; })
+            .map(function(item) { return item.text; })
+            .join("\n");
+        }
+      }
+
+      if (userToolUseId && _toolInputMap[userToolUseId] !== undefined) {
+        _ctx.resetToolInputBuffer();
+        _ctx.appendToolInputBuffer(_toolInputMap[userToolUseId]);
+        delete _toolInputMap[userToolUseId];
+      }
+
+      if (resultText && resultText.trim()) {
+        var bannerConsumed = false;
+        if (_ctx.isWorkflowMode()) {
+          try {
+            bannerConsumed = Board.WorkflowRenderer.tap(resultText);
+            if (bannerConsumed && !_isReplaying) {
+              Board.phaseTimeline.render();
+              _ctx.removeEmptyWorkflowToolCard();
+            }
+          } catch (tapErr) {
+            bannerConsumed = false;
+          }
+        }
+        if (!bannerConsumed) {
+          if (_ctx.isWorkflowMode()) {
+            _ctx.insertWorkflowResult(resultText, false);
+          } else {
+            _ctx.insertToolResult(resultText, false, userToolName, userToolUseId);
+          }
+        }
+      } else {
+        _ctx.removeEmptyToolBox(userToolUseId);
+      }
+      if (tr && tr.stderr) {
+        if (_ctx.isWorkflowMode()) {
+          _ctx.insertWorkflowResult("[stderr] " + tr.stderr, true);
+        } else {
+          _ctx.insertToolResult("[stderr] " + tr.stderr, true, userToolName, userToolUseId);
+        }
+      }
+      if (mc && mc[0] && mc[0].is_error) {
+        if (_ctx.isWorkflowMode()) {
+          _ctx.insertWorkflowResult("[Tool Error]", true);
+        } else {
+          _ctx.insertToolResult("[Tool Error]", true, userToolName, userToolUseId);
+        }
+      }
+    }
+
+    if (data.usage) {
+      if (typeof data.usage.input_tokens === "number") {
+        _ctx.setInputTokens(data.usage.input_tokens);
+      }
+      if (typeof data.usage.output_tokens === "number") {
+        _ctx.setOutputTokens(data.usage.output_tokens);
+      }
+      _ctx.updateStatusLine();
+    }
+  }
+
+  /**
+   * result 이벤트 데이터 처리.
+   * SSE "result" 리스너 및 REST 이벤트 주입에서 공유한다.
+   * @param {Object} data 파싱된 이벤트 data 객체
+   */
+  function _onResult(data) {
+    if (!_ctx) return;
+    if (Board.debugLog) Board.debugLog('_onResult', {
+      done: !!data.done, isReplaying: _isReplaying, termStatus: Board.state.termStatus,
+    });
+    if (data.done) {
+      _ctx.stopSpinner();
+      if (typeof data.cost_usd === "number") _ctx.setSessionCost(data.cost_usd);
+      if (!_ctx.isWorkflowMode() && _ctx.getSessionTokens().input === 0 && _ctx.getSessionTokens().output === 0) {
+        if (typeof data.input_tokens === "number") _ctx.setInputTokens(data.input_tokens);
+        if (typeof data.output_tokens === "number") _ctx.setOutputTokens(data.output_tokens);
+      }
+      _ctx.updateStatusLine();
+
+      if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
+        try {
+          var resultFlushText = _pendingTextBuffer;
+          _pendingTextBuffer = "";
+          Board.WorkflowRenderer.tap(resultFlushText);
+        } catch (e) {
+          _pendingTextBuffer = "";
+        }
+      } else {
+        _pendingTextBuffer = "";
+      }
+      _ctx.flushTextBuffer();
+
+      if (_ctx.isWorkflowMode() && !_isReplaying) {
+        try {
+          Board.phaseTimeline.render();
+        } catch (renderErr) {}
+      }
+
+      _ctx.removeEmptyToolBox();
+      _ctx.clearCurrentToolBox();
+      if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
+      _ctx.resetToolInputBuffer();
+      _ctx.setCurrentToolName(null);
+
+      _currentToolUseId = null;
+      _toolInputMap = {};
+      if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
+
+      Board.state.setTermStatus("idle");
+      _ctx.setReceivedChunks(false);
+      _ctx.setInputLocked(false);
+      _ctx.updateControlBar();
+
+      if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
+        _ctx.drainQueue();
+      }
+    }
+  }
+
+  /**
+   * system 이벤트 데이터 처리.
+   * SSE "system" 리스너 및 REST 이벤트 주입에서 공유한다.
+   * @param {Object} data 파싱된 이벤트 data 객체
+   */
+  function _onSystem(data) {
+    if (!_ctx) return;
+    if (data.subtype === "init" && data.session_id) {
+      var prevSid = Board.state.termSessionId;
+      if (prevSid && String(prevSid) !== String(data.session_id)) {
+        _ctx.clearOutput();
+        _resetSessionDerivedState();
+        var termModSwap = Board._term;
+        if (termModSwap && typeof termModSwap.loadHistory === "function") {
+          termModSwap.loadHistory(data.session_id);
+        }
+      }
+      Board.state.termSessionId = data.session_id;
+      Board.state.setTermStatus("idle");
+      if (data.raw && data.raw.model) {
+        var rawModel = data.raw.model;
+        var ctxMatch = rawModel.match(/\[(\d+)([mk])\]/i);
+        if (ctxMatch) {
+          var ctxNum = parseInt(ctxMatch[1]);
+          _ctx.setContextWindow(ctxMatch[2].toLowerCase() === "m" ? ctxNum * 1000000 : ctxNum * 1000);
+        }
+        var clean = rawModel.replace(/\[.*\]/, "").replace(/^claude-/, "");
+        clean = clean.replace(/-(\d+)-(\d+)/, " $1.$2").replace(/-/g, " ");
+        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+        _ctx.setSessionModel(clean);
+      }
+      if (data.raw && data.raw.permissionMode) {
+        var modeEl = document.getElementById("terminal-sl-mode");
+        if (modeEl) modeEl.textContent = data.raw.permissionMode;
+      }
+      _ctx.setInputLocked(false);
+      _ctx.updateControlBar();
+    } else if (data.subtype === "process_exit") {
+      var wasActive = Board.state.termStatus === "busy" ||
+                      Board.state.termStatus === "starting";
+      if (wasActive) {
+        _ctx.setReceivedChunks(false);
+        _ctx.resetToolInputBuffer();
+        _pendingTextBuffer = "";
+        _ctx.flushTextBuffer();
+        _currentToolUseId = null;
+        _toolInputMap = {};
+      }
+      Board.state.setTermStatus("stopped");
+      _ctx.resetTokens();
+      _ctx.setSessionCost(0);
+      _ctx.stopSpinner();
+      var exitCode = data.exit_code;
+      if (exitCode !== 0 && exitCode !== 143 && exitCode !== undefined) {
+        _ctx.appendErrorMessage("Process exited with code " + exitCode);
+      }
+      _ctx.setInputLocked(false);
+      _ctx.updateControlBar();
+    } else if (
+      data.subtype === "task_started" ||
+      data.subtype === "task_progress" ||
+      data.subtype === "task_notification"
+    ) {
+      if (!_ctx || !_ctx.isWorkflowMode || !_ctx.isWorkflowMode()) return;
+
+      var taskId = data.task_id || (data.tool_use_id || "");
+      if (!taskId) return;
+
+      if (data.subtype === "task_started") {
+        _upsertTaskState(taskId, {
+          description: data.description || "",
+          status: "running",
+          toolName: data.last_tool_name || "",
+          startedAt: Date.now()
+        });
+        _scheduleTaskRender();
+      } else if (data.subtype === "task_progress") {
+        _upsertTaskState(taskId, {
+          description: data.description || "",
+          toolName: data.last_tool_name || ""
+        });
+        _scheduleTaskRender();
+      } else if (data.subtype === "task_notification") {
+        var taskFinalStatus = (data.status === "completed") ? "completed" : "error";
+        _upsertTaskState(taskId, {
+          status: taskFinalStatus,
+          summary: data.summary || ""
+        });
+        _flushTaskRender();
+      }
+    }
+  }
+
+  /**
+   * user_input 이벤트 데이터 처리.
+   * SSE "user_input" 리스너 및 REST 이벤트 주입에서 공유한다.
+   * @param {Object} data 파싱된 이벤트 data 객체
+   */
+  function _onUserInput(data) {
+    if (!_ctx) return;
+    if (!data.text) return;
+    // REST 이벤트 주입(_isReplaying=true) 시에는 _sentTexts 가 비어 있으므로
+    // 항상 DOM 에 렌더링한다. SSE 라이브 수신 시에는 로컬 전송분 중복 방지.
+    if (!_isReplaying && _sentTexts.has(data.text)) {
+      return;
+    }
+    var div = document.createElement("div");
+    div.className = "term-message term-user";
+    div.textContent = data.text;
+    _ctx.appendToOutput(div);
+  }
+
+  /**
+   * REST /terminal/workflow/history 에서 받아온 이벤트 배열을 DOM 에 순차 주입한다.
+   *
+   * - _isReplaying = true 로 설정하여 FSM 전이·rate_limit 배너 등 라이브 전용 경로를 막는다.
+   * - 완료 후 _isReplaying = false 로 복원하고 타임라인 최종 렌더를 수행한다.
+   * - 에러/404 시 console.error 기록 후 resolve (SSE 구독은 계속 진행).
+   *
+   * @param {string} sessionId 워크플로우 세션 ID
+   * @returns {Promise<void>}
+   */
+  function _injectRestHistory(sessionId) {
+    if (!sessionId) return Promise.resolve();
+    var url = "/terminal/workflow/history?session_id=" + encodeURIComponent(sessionId);
+    return fetch(url, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) {
+        console.error("[session] REST history fetch failed: HTTP " + res.status + " for session " + sessionId);
+        return;
+      }
+      return res.json().then(function (payload) {
+        var events = Array.isArray(payload && payload.events) ? payload.events : [];
+        if (!events.length) return;
+
+        // replay 플래그 활성: FSM 전이·rate_limit 배너 등 라이브 전용 경로 차단
+        _isReplaying = true;
+        try {
+          for (var i = 0; i < events.length; i++) {
+            var evt = events[i];
+            var eventType = evt.event || "";
+            var dataObj = evt.data;
+            // data 가 string 이면 파싱 시도 (jsonl 포맷 다양성 대응)
+            if (typeof dataObj === "string") {
+              try { dataObj = JSON.parse(dataObj); } catch (e) { /* keep as string */ }
+            }
+            if (!dataObj || typeof dataObj !== "object") continue;
+            try {
+              if (eventType === "workflow_step") {
+                _onWorkflowStep(dataObj);
+              } else if (eventType === "stdout") {
+                _onStdout(dataObj);
+              } else if (eventType === "result") {
+                _onResult(dataObj);
+              } else if (eventType === "system") {
+                _onSystem(dataObj);
+              } else if (eventType === "user_input") {
+                _onUserInput(dataObj);
+              }
+              // skill_listing, permission, rate_limit 등 라이브 전용 이벤트는
+              // _isReplaying 중에는 렌더하지 않는다 (의도적 skip).
+            } catch (dispatchErr) {
+              console.error("[session] REST history event dispatch error (seq=" + evt.seq + ", type=" + eventType + "):", dispatchErr);
+            }
+          }
+        } finally {
+          _isReplaying = false;
+        }
+
+        // replay 완료 후 타임라인 최종 렌더
+        if (_ctx && _ctx.isWorkflowMode()) {
+          try { Board.phaseTimeline.render(); } catch (e) {}
+        }
+        // REST replay 완료 후 최종 UI 상태 수렴 (fetchStatus)
+        try { fetchStatus(); } catch (fsErr) {}
+        // 새로고침 후 스크롤을 하단으로 이동 (마크다운/mermaid 비동기 렌더 대비 2 프레임 대기)
+        var M = Board && Board._term;
+        if (M && M.outputDiv) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
+            });
+          });
+        }
+      });
+    }).catch(function (err) {
+      console.error("[session] REST history fetch error for session " + sessionId + ":", err);
+      // 에러 시 _isReplaying 잠금 해제 보장
+      _isReplaying = false;
+    });
   }
 
   // ── SSE Connection ──
@@ -453,6 +968,11 @@
       if (termMod && termMod._historyLoaded && typeof termMod.fetchHistorySince === "function") {
         termMod.fetchHistorySince(Board.state.termSessionId);
       }
+    } else {
+      // 워크플로우 세션: 초기 이벤트는 REST /terminal/workflow/history 로 복원하므로
+      // SSE 링버퍼 재생은 항상 생략한다. skip_replay=1 을 명시해 서버 측 replay 경로를
+      // 비활성화한다.
+      eventsUrl += qsSep() + "skip_replay=1";
     }
     termEventSource = new EventSource(eventsUrl);
 
@@ -497,19 +1017,9 @@
     // 보장한다(누락 시 히스토리 중복 재생 버그 재발 가능).
     termEventSource.addEventListener("workflow_step", function (e) {
       _captureEventId(e);
-      if (_isReplaying) {
-        // replay 중: FSM 전이( handleStepEvent ) 및 타임라인 렌더 스킵.
-        // 실시간 이벤트 수신 시점에 정상적으로 전이가 수행된다.
-        return;
-      }
       try {
         var data = JSON.parse(e.data);
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
-          Board.WorkflowRenderer.handleStepEvent(data);
-        }
-        if (_ctx.isWorkflowMode()) {
-          try { Board.phaseTimeline.render(); } catch (re) {}
-        }
+        _onWorkflowStep(data);
       } catch (err) {}
     });
 
@@ -522,179 +1032,7 @@
       _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
-
-        if (data.chunk && data.kind === "text_delta") {
-          _ctx.setReceivedChunks(true);
-          _ctx.appendTextBuffer(data.chunk);
-          // Accumulate for WorkflowRenderer.tap() at flush time
-          if (_ctx.isWorkflowMode()) {
-            _pendingTextBuffer += data.chunk;
-          }
-        } else if (data.text && data.kind === "assistant" && !_ctx.getReceivedChunks()) {
-          _ctx.appendTextBuffer(data.text);
-        } else if (data.kind === "input_json_delta" && typeof data.chunk === "string") {
-          // Route input chunk into per-tool_use_id buffer (parallel-safe)
-          if (_currentToolUseId) {
-            if (!_toolInputMap[_currentToolUseId]) {
-              _toolInputMap[_currentToolUseId] = "";
-            }
-            _toolInputMap[_currentToolUseId] += data.chunk;
-          }
-          _ctx.appendToolInputBuffer(data.chunk);
-        } else if (data.kind === "content_block_start" && data.raw) {
-          var block = data.raw.content_block || {};
-          if (block.type === "tool_use" && block.name) {
-            // Flush accumulated text_delta chunks through WorkflowRenderer before clearing
-            if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
-              try {
-                var flushedText = _pendingTextBuffer;
-                _pendingTextBuffer = "";
-                var textBannerConsumed = Board.WorkflowRenderer.tap(flushedText);
-                if (textBannerConsumed && !_isReplaying) {
-                  Board.phaseTimeline.render();
-                }
-              } catch (tapFlushErr) {
-                _pendingTextBuffer = "";
-              }
-            } else {
-              _pendingTextBuffer = "";
-            }
-            _ctx.flushTextBuffer();
-            _ctx.resetToolInputBuffer();
-            _ctx.setCurrentToolName(block.name);
-
-            // Track current tool_use_id for input_json_delta routing
-            var toolUseId = block.id || null;
-            _currentToolUseId = toolUseId;
-            if (toolUseId) {
-              _toolInputMap[toolUseId] = "";
-            }
-
-            if (_ctx.isWorkflowMode()) {
-              _ctx.createWorkflowToolCard(block.name);
-            } else {
-              _ctx.createToolBox(block.name, toolUseId);
-            }
-          }
-        } else if (data.kind === "user" && data.raw) {
-          // Flush accumulated text_delta chunks through WorkflowRenderer before clearing
-          if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
-            try {
-              var userFlushText = _pendingTextBuffer;
-              _pendingTextBuffer = "";
-              var userTextBannerConsumed = Board.WorkflowRenderer.tap(userFlushText);
-              if (userTextBannerConsumed && !_isReplaying) {
-                Board.phaseTimeline.render();
-              }
-            } catch (userTapErr) {
-              _pendingTextBuffer = "";
-            }
-          } else {
-            _pendingTextBuffer = "";
-          }
-          _ctx.flushTextBuffer();
-          var tr = data.raw.tool_use_result;
-          var mc = data.raw.message && data.raw.message.content;
-          var resultText = "";
-
-          // Extract tool_use_id from the user event for parallel-safe box matching.
-          // The tool_use_id may appear in:
-          //   - tr.tool_use_id (tool_use_result shorthand)
-          //   - mc[0].tool_use_id (message.content array element)
-          var userToolUseId = null;
-          if (tr && tr.tool_use_id) {
-            userToolUseId = tr.tool_use_id;
-          } else if (mc && mc[0] && mc[0].tool_use_id) {
-            userToolUseId = mc[0].tool_use_id;
-          }
-
-          // Resolve tool name from the matched box's data attribute or currentToolName
-          var userToolName = null;
-          if (userToolUseId) {
-            var map = _ctx.getToolBoxMap ? _ctx.getToolBoxMap() : {};
-            var matchedBox = map[userToolUseId];
-            if (matchedBox && matchedBox.getAttribute) {
-              userToolName = matchedBox.getAttribute("data-tool-name");
-            }
-          }
-
-          if (tr) {
-            if (tr.stdout) resultText = tr.stdout;
-            else if (tr.file && tr.file.content) resultText = tr.file.content;
-            else if (Array.isArray(tr.filenames)) resultText = tr.filenames.join("\n");
-            else if (typeof tr.content === "string") resultText = tr.content;
-          }
-          if (!resultText && mc && mc[0]) {
-            if (typeof mc[0].content === "string") {
-              resultText = mc[0].content;
-            } else if (Array.isArray(mc[0].content)) {
-              resultText = mc[0].content
-                .filter(function(item) { return item && item.type === "text" && item.text; })
-                .map(function(item) { return item.text; })
-                .join("\n");
-            }
-          }
-
-          // Before calling insertToolResult, swap terminal.js's shared toolInputBuffer
-          // to the per-tool_use_id buffer so the correct input is rendered.
-          if (userToolUseId && _toolInputMap[userToolUseId] !== undefined) {
-            _ctx.resetToolInputBuffer();
-            _ctx.appendToolInputBuffer(_toolInputMap[userToolUseId]);
-            delete _toolInputMap[userToolUseId];
-          }
-
-          if (resultText && resultText.trim()) {
-            // WorkflowRenderer tap integration
-            var bannerConsumed = false;
-            if (_ctx.isWorkflowMode()) {
-              try {
-                bannerConsumed = Board.WorkflowRenderer.tap(resultText);
-                if (bannerConsumed && !_isReplaying) {
-                  Board.phaseTimeline.render();
-                  _ctx.removeEmptyWorkflowToolCard();
-                }
-              } catch (tapErr) {
-                bannerConsumed = false;
-              }
-            }
-            if (!bannerConsumed) {
-              if (_ctx.isWorkflowMode()) {
-                _ctx.insertWorkflowResult(resultText, false);
-              } else {
-                _ctx.insertToolResult(resultText, false, userToolName, userToolUseId);
-              }
-            }
-          } else {
-            // Phase 4 fix: remove empty tool box when resultText is falsy
-            _ctx.removeEmptyToolBox(userToolUseId);
-          }
-          if (tr && tr.stderr) {
-            if (_ctx.isWorkflowMode()) {
-              _ctx.insertWorkflowResult("[stderr] " + tr.stderr, true);
-            } else {
-              _ctx.insertToolResult("[stderr] " + tr.stderr, true, userToolName, userToolUseId);
-            }
-          }
-          if (mc && mc[0] && mc[0].is_error) {
-            if (_ctx.isWorkflowMode()) {
-              _ctx.insertWorkflowResult("[Tool Error]", true);
-            } else {
-              _ctx.insertToolResult("[Tool Error]", true, userToolName, userToolUseId);
-            }
-          }
-        }
-
-        // Usage realtime update — set (not add): each event carries
-        // the full context usage for that API call, not a delta.
-        if (data.usage) {
-          if (typeof data.usage.input_tokens === "number") {
-            _ctx.setInputTokens(data.usage.input_tokens);
-          }
-          if (typeof data.usage.output_tokens === "number") {
-            _ctx.setOutputTokens(data.usage.output_tokens);
-          }
-          _ctx.updateStatusLine();
-        }
+        _onStdout(data);
       } catch (err) {
         // Ignore parse errors
       }
@@ -704,57 +1042,7 @@
       _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
-        if (data.done) {
-          _ctx.stopSpinner();
-          if (typeof data.cost_usd === "number") _ctx.setSessionCost(data.cost_usd);
-          if (!_ctx.isWorkflowMode() && _ctx.getSessionTokens().input === 0 && _ctx.getSessionTokens().output === 0) {
-            if (typeof data.input_tokens === "number") _ctx.setInputTokens(data.input_tokens);
-            if (typeof data.output_tokens === "number") _ctx.setOutputTokens(data.output_tokens);
-          }
-          _ctx.updateStatusLine();
-
-          // Flush any remaining text_delta chunks through WorkflowRenderer
-          if (_ctx.isWorkflowMode() && _pendingTextBuffer) {
-            try {
-              var resultFlushText = _pendingTextBuffer;
-              _pendingTextBuffer = "";
-              Board.WorkflowRenderer.tap(resultFlushText);
-            } catch (e) {
-              _pendingTextBuffer = "";
-            }
-          } else {
-            _pendingTextBuffer = "";
-          }
-          _ctx.flushTextBuffer();
-
-          // In workflow mode, re-render timeline bar to update timers on response complete
-          if (_ctx.isWorkflowMode() && !_isReplaying) {
-            try {
-              Board.phaseTimeline.render();
-            } catch (renderErr) {}
-          }
-
-          _ctx.removeEmptyToolBox();
-          _ctx.clearCurrentToolBox();
-          if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
-          _ctx.resetToolInputBuffer();
-          _ctx.setCurrentToolName(null);
-
-          // Reset parallel-tool tracking state
-          _currentToolUseId = null;
-          _toolInputMap = {};
-          if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
-
-          Board.state.setTermStatus("idle");
-          _ctx.setReceivedChunks(false);
-          _ctx.setInputLocked(false);
-          _ctx.updateControlBar();
-
-          // 큐에 대기 중인 메시지가 있으면 자동으로 다음 메시지를 전송
-          if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
-            _ctx.drainQueue();
-          }
-        }
+        _onResult(data);
       } catch (err) {
         // Ignore parse errors
       }
@@ -764,64 +1052,7 @@
       _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
-        if (data.subtype === "init" && data.session_id) {
-          // 서버가 resume_session_id 선반영한 UUID 와 실제 CLI 세션 UUID 가
-          // 다른 케이스 (graceful fallback 등). 이전 UUID 기준으로 REST
-          // 로드된 과거 대화를 버리고 새 UUID 로 다시 로드한다.
-          var prevSid = Board.state.termSessionId;
-          if (prevSid && String(prevSid) !== String(data.session_id)) {
-            _ctx.clearOutput();
-            _resetSessionDerivedState();
-            var termModSwap = Board._term;
-            if (termModSwap && typeof termModSwap.loadHistory === "function") {
-              termModSwap.loadHistory(data.session_id);
-            }
-          }
-          Board.state.termSessionId = data.session_id;
-          Board.state.setTermStatus("idle");
-          if (data.raw && data.raw.model) {
-            var rawModel = data.raw.model;
-            var ctxMatch = rawModel.match(/\[(\d+)([mk])\]/i);
-            if (ctxMatch) {
-              var ctxNum = parseInt(ctxMatch[1]);
-              _ctx.setContextWindow(ctxMatch[2].toLowerCase() === "m" ? ctxNum * 1000000 : ctxNum * 1000);
-            }
-            var clean = rawModel.replace(/\[.*\]/, "").replace(/^claude-/, "");
-            clean = clean.replace(/-(\d+)-(\d+)/, " $1.$2").replace(/-/g, " ");
-            clean = clean.charAt(0).toUpperCase() + clean.slice(1);
-            _ctx.setSessionModel(clean);
-          }
-          if (data.raw && data.raw.permissionMode) {
-            var modeEl = document.getElementById("terminal-sl-mode");
-            if (modeEl) modeEl.textContent = data.raw.permissionMode;
-          }
-          _ctx.setInputLocked(false);
-          _ctx.updateControlBar();
-        } else if (data.subtype === "process_exit") {
-          // busy/starting/idle 중 어느 상태든 process_exit 은 stopped 로 전이한다.
-          // (이전 코드는 running 상태에서 early return하여 상태가 고착되는 버그가 있었음)
-          var wasActive = Board.state.termStatus === "busy" ||
-                          Board.state.termStatus === "starting";
-          if (wasActive) {
-            // 응답/준비 중 process_exit: result 이벤트와 동일한 UI 정리 수행
-            _ctx.setReceivedChunks(false);
-            _ctx.resetToolInputBuffer();
-            _pendingTextBuffer = "";
-            _ctx.flushTextBuffer();
-            _currentToolUseId = null;
-            _toolInputMap = {};
-          }
-          Board.state.setTermStatus("stopped");
-          _ctx.resetTokens();
-          _ctx.setSessionCost(0);
-          _ctx.stopSpinner();
-          var exitCode = data.exit_code;
-          if (exitCode !== 0 && exitCode !== 143 && exitCode !== undefined) {
-            _ctx.appendErrorMessage("Process exited with code " + exitCode);
-          }
-          _ctx.setInputLocked(false);
-          _ctx.updateControlBar();
-        }
+        _onSystem(data);
       } catch (err) {
         // Ignore parse errors
       }
@@ -986,20 +1217,8 @@
       _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
-        if (!data.text) return;
-
-        // If this text was sent by the local sendInput(), skip DOM insertion
-        // (sendInput already added the element). Keep in Set because the
-        // server may echo user_input twice (input handler + CLI NDJSON).
-        // The set is cleared on SSE reconnect, so history replay works.
-        if (_sentTexts.has(data.text)) {
-          return;
-        }
-
-        var div = document.createElement("div");
-        div.className = "term-message term-user";
-        div.textContent = data.text;
-        _ctx.appendToOutput(div);
+        // SSE 라이브 수신 경로: _isReplaying=false 이므로 _sentTexts 중복 방지가 동작한다.
+        _onUserInput(data);
       } catch (err) {
         // Ignore parse errors
       }
@@ -1117,6 +1336,12 @@
     _isReplaying = false;
     // T-389: 이전 세션에서 남은 rate_limit 배너/타이머 제거.
     _dismissRateLimitBanner();
+    // T-390: task 상태맵 + rAF 토큰 초기화.
+    _taskStatusMap = {};
+    if (_taskRenderRafId !== 0) {
+      cancelAnimationFrame(_taskRenderRafId);
+      _taskRenderRafId = 0;
+    }
     if (_ctx) {
       _ctx.resetTokens && _ctx.resetTokens();
       _ctx.setReceivedChunks && _ctx.setReceivedChunks(false);
@@ -1177,7 +1402,16 @@
 
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
-      connectSSEReady().catch(function (err) {
+      // 워크플로우 세션 초기 로드:
+      // 1) REST /terminal/workflow/history 로 전체 과거 이벤트를 DOM 에 주입한다.
+      //    (링버퍼 대체 경로 — _isReplaying=true 가드 하에 순서대로 처리)
+      // 2) REST 완료(성공/실패 무관) 후 SSE 구독을 시작한다.
+      //    SSE URL 에는 skip_replay=1 이 부여되므로 링버퍼 재생이 발생하지 않는다.
+      // 3) REST 실패 시 console.error 기록하고 SSE 구독은 계속 진행한다 (무음 폴백).
+      var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
+      _injectRestHistory(wfSessionId).then(function () {
+        return connectSSEReady();
+      }).catch(function (err) {
         _ctx.appendErrorMessage("[Error] SSE connect failed: " + err.message);
       });
       return;
