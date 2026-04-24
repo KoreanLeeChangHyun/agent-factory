@@ -20,20 +20,58 @@ Board.util = Board.util || {};
 Board.render = Board.render || {};
 Board.fetch = Board.fetch || {};
 
-// ── Debug Logger (localStorage 링버퍼) ──
+// ── Debug Logger (gated, localStorage 링버퍼 + 서버 NDJSON) ──
 //
-// 새로고침을 넘어가며 디버깅이 필요한 경로에 debugLog 를 심는다. 콘솔은
-// 새로고침 시 비워지므로 localStorage 에 최근 300개 이벤트를 보존한다.
+// 계측은 코드 전체에 상시 심어두고, 런타임 게이트로 켜고 끈다. 기본값은 OFF —
+// 비활성 시 debugLog 는 즉시 return 하여 오버헤드 없음. 활성화되면 localStorage
+// 에 최근 300개를 보존하고, 서버 /api/debug-log 로도 NDJSON 송출해
+// runs/bg/debug.log 에 적재된다 (새로고침/탭 이동 넘나드는 추적 가능).
 //
 // 사용:
-//   Board.debugLog('tag', {k: v})   — 로그 추가
-//   Board.debugDump()               — 테이블로 출력
-//   Board.debugClear()              — 버퍼 비우기
+//   Board.debug.enable()            — 계측 ON (localStorage 에 영구 저장)
+//   Board.debug.disable()           — 계측 OFF
+//   Board.debug.enabled             — 현재 상태 조회
+//   Board.debug.dump()              — 콘솔 테이블로 출력
+//   Board.debug.clear()             — localStorage 버퍼 비우기
+//   Board.debugLog('tag', {k: v})   — 계측 지점 (항상 호출, 게이트가 판단)
 
 var _DEBUG_KEY = 'board.debug.log';
+var _DEBUG_ENABLED_KEY = 'board.debug.enabled';
 var _DEBUG_MAX = 300;
 
+function _readEnabled() {
+  try { return localStorage.getItem(_DEBUG_ENABLED_KEY) === '1'; } catch (e) { return false; }
+}
+
+Board.debug = {
+  get enabled() { return _readEnabled(); },
+  enable: function () {
+    try { localStorage.setItem(_DEBUG_ENABLED_KEY, '1'); } catch (e) {}
+    if (typeof console !== 'undefined') console.info('[Board.debug] enabled — 이후 이벤트가 localStorage + 서버에 적재됩니다');
+  },
+  disable: function () {
+    try { localStorage.removeItem(_DEBUG_ENABLED_KEY); } catch (e) {}
+    if (typeof console !== 'undefined') console.info('[Board.debug] disabled');
+  },
+  dump: function () {
+    try {
+      var raw = localStorage.getItem(_DEBUG_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (typeof console !== 'undefined' && console.table) {
+        console.table(arr.map(function (e) {
+          return { ts: e.ts, tag: e.tag, data: JSON.stringify(e.data) };
+        }));
+      }
+      return arr;
+    } catch (e) { return []; }
+  },
+  clear: function () {
+    try { localStorage.removeItem(_DEBUG_KEY); } catch (e) {}
+  },
+};
+
 Board.debugLog = function (tag, data) {
+  if (!_readEnabled()) return;
   var entry = {
     ts: new Date().toISOString(),
     tag: String(tag || ''),
@@ -49,35 +87,14 @@ Board.debugLog = function (tag, data) {
     }
     localStorage.setItem(_DEBUG_KEY, JSON.stringify(arr));
   } catch (e) { /* quota, json 에러 조용히 무시 */ }
-  // 서버로도 전송해 main 세션이 파일로 추적 가능하게 한다. 재귀 방지:
-  // tag 가 debug-log.* 면 로컬에만 저장하고 네트워크는 타지 않는다.
-  if (entry.tag.indexOf('debug-log.') !== 0) {
-    try {
-      fetch('/api/debug-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry),
-        keepalive: true,
-      }).catch(function () {});
-    } catch (e) { /* 네트워크 에러 무시 */ }
-  }
-};
-
-Board.debugDump = function () {
   try {
-    var raw = localStorage.getItem(_DEBUG_KEY);
-    var arr = raw ? JSON.parse(raw) : [];
-    if (typeof console !== 'undefined' && console.table) {
-      console.table(arr.map(function (e) {
-        return { ts: e.ts, tag: e.tag, data: JSON.stringify(e.data) };
-      }));
-    }
-    return arr;
-  } catch (e) { return []; }
-};
-
-Board.debugClear = function () {
-  try { localStorage.removeItem(_DEBUG_KEY); } catch (e) {}
+    fetch('/api/debug-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+      keepalive: true,
+    }).catch(function () {});
+  } catch (e) { /* 네트워크 에러 무시 */ }
 };
 
 // ── Terminal Status State Machine ──
