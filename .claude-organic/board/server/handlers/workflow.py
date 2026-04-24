@@ -9,8 +9,12 @@ import uuid
 
 from ..state import workflow_registry
 from .._common import logger
-from ..terminal_channel import _resolve_last_event_id
+from ..terminal_channel import _resolve_last_event_id, TerminalSSEChannel
 from ..claude_process import _validate_images
+
+# REST history 전용 throwaway 채널. _classify_event / _build_payload 는
+# 인스턴스 state 를 사용하지 않으므로 단일 인스턴스 재사용 가능.
+_REST_CLASSIFIER = TerminalSSEChannel()
 
 
 class WorkflowHandlerMixin:
@@ -310,6 +314,93 @@ class WorkflowHandlerMixin:
         session.current_step = step
         session.channel.emit_step(step, detail)
         self._send_json({'ok': True, 'step': step})
+
+    def _handle_workflow_history(self) -> None:
+        """워크플로우 세션 전체 이벤트 이력을 JSON으로 반환한다.
+
+        GET /terminal/workflow/history?session_id=wf-T-NNN-...
+
+        레지스트리에 등록된 세션이면 persist_path, 없으면 archived 복원 경로로
+        jsonl 파일을 읽어 이벤트 배열로 변환한다. _meta 첫 줄은 skip하고,
+        나머지 줄을 {seq, event, data} 형태로 반환한다. 파싱 실패 라인은
+        logger.error 기록 후 skip (전체 실패로 확장 금지).
+
+        응답:
+            {"session_id": ..., "total_count": N, "events": [{seq, event, data}, ...]}
+        """
+        session_id = self._parse_query_param('session_id')
+        if not session_id:
+            self._send_error(400, 'Missing "session_id" query parameter')
+            return
+
+        # jsonl 파일 경로 결정: 등록 세션 우선, 없으면 archived 경로
+        jsonl_path: str | None = None
+
+        session = workflow_registry.get(session_id)
+        if session is not None:
+            # 활성 세션: channel의 persist_path 사용
+            jsonl_path = session.channel._persist_path
+        else:
+            # archived 세션: registry의 _session_file 경로 직접 사용
+            candidate = workflow_registry._session_file(session_id)
+            if candidate and os.path.exists(candidate):
+                jsonl_path = candidate
+
+        if not jsonl_path or not os.path.exists(jsonl_path):
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        events: list[dict] = []
+        seq = 0
+        try:
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        logger.error(
+                            "workflow_history[%s]: jsonl 파싱 실패 (seq=%d): %s — %r",
+                            session_id, seq, exc, line[:120],
+                        )
+                        seq += 1
+                        continue
+
+                    # _meta 첫 줄 skip
+                    if '_meta' in obj:
+                        continue
+
+                    # workflow_step 은 _classify_event 매핑 밖 — 직접 처리
+                    obj_type = obj.get('type', '')
+                    if obj_type == 'workflow_step':
+                        event_type = 'workflow_step'
+                        data_field = {k: v for k, v in obj.items() if k != 'type'}
+                    else:
+                        # SSE live 경로와 동일하게 이벤트 분류 + payload 빌드
+                        event_type = _REST_CLASSIFIER._classify_event(obj)
+                        data_field = _REST_CLASSIFIER._build_payload(obj, event_type)
+
+                    events.append({
+                        'seq': seq,
+                        'event': event_type,
+                        'data': data_field,
+                    })
+                    seq += 1
+        except OSError as exc:
+            logger.error(
+                "workflow_history[%s]: jsonl 파일 읽기 실패 (%s): %s",
+                session_id, jsonl_path, exc,
+            )
+            self._send_error(500, f'Failed to read session history: {exc}')
+            return
+
+        self._send_json({
+            'session_id': session_id,
+            'total_count': len(events),
+            'events': events,
+        })
 
     def _handle_workflow_artifact(self, qs: dict) -> None:
         """워크플로우 산출물 파일 조회 엔드포인트를 처리한다.

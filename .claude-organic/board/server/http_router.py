@@ -84,6 +84,8 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_sse()
         elif self.path == '/terminal/workflow/list':
             self._handle_workflow_list()
+        elif self.path.startswith('/terminal/workflow/history'):
+            self._handle_workflow_history()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:

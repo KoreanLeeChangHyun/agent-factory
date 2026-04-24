@@ -141,12 +141,12 @@ class WorkflowSessionRegistry:
         return session
 
     def load_from_disk(self) -> int:
-        """persist 디렉터리에서 세션을 로드하여 레지스트리를 복원한다.
+        """persist 디렉터리에서 세션 메타데이터를 로드하여 레지스트리를 복원한다.
 
-        각 *.jsonl 파일을 읽어:
-          - 첫 줄의 _meta로 WorkflowSession 객체를 재생성
-          - 나머지 줄의 이벤트들을 채널 히스토리에 복원
-          - process는 새 ClaudeProcess (status='stopped')로 생성
+        각 *.jsonl 파일의 첫 줄 _meta만 읽어 WorkflowSession 객체를 재생성한다.
+        이벤트 데이터는 메모리에 복원하지 않는다 — 재접속 시 클라이언트가
+        REST /workflow/history를 통해 jsonl 파일에서 직접 읽는다.
+        process는 새 ClaudeProcess (status='stopped')로 생성된다.
 
         Returns:
             로드된 세션 개수
@@ -161,13 +161,13 @@ class WorkflowSessionRegistry:
             fpath = os.path.join(self._persist_dir, fname)
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                    first_line = f.readline()
             except OSError:
                 continue
-            if not lines:
+            if not first_line:
                 continue
             try:
-                first = json.loads(lines[0])
+                first = json.loads(first_line)
                 meta = first.get('_meta')
                 if not meta or not meta.get('session_id'):
                     continue
@@ -185,17 +185,6 @@ class WorkflowSessionRegistry:
                 channel=channel,
                 created_at=meta.get('created_at', time.strftime('%Y-%m-%dT%H:%M:%S')),
             )
-
-            # 이벤트 복원 (파일 쓰기 없이 히스토리만)
-            for line in lines[1:]:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    channel.replay_from_history(data)
-                except (json.JSONDecodeError, ValueError):
-                    continue
 
             with self._lock:
                 self._sessions[session.session_id] = session
@@ -216,11 +205,14 @@ class WorkflowSessionRegistry:
         return removed
 
     def load_archived(self, session_id: str) -> 'WorkflowSession | None':
-        """디스크 아카이브에서 완료 세션을 on-demand로 복원한다.
+        """디스크 아카이브에서 완료 세션의 메타데이터를 on-demand로 복원한다.
 
         registry에 없지만 .jsonl 파일이 남아있는 경우 읽기 전용으로 복원한다.
         process는 status='stopped'로 설정되며 신규 입력은 거부된다. 본 메서드는
         registry에 세션을 삽입하지 않고, 호출자가 일회성으로 사용한 뒤 참조를 놓는다.
+
+        이벤트 데이터는 메모리에 복원하지 않는다 — 클라이언트가 REST /workflow/history
+        엔드포인트를 통해 jsonl 파일에서 직접 읽는다.
         """
         if self._persist_dir is None:
             return None
@@ -229,13 +221,13 @@ class WorkflowSessionRegistry:
             return None
         try:
             with open(fpath, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+                first_line = f.readline()
         except OSError:
             return None
-        if not lines:
+        if not first_line:
             return None
         try:
-            first = json.loads(lines[0])
+            first = json.loads(first_line)
             meta = first.get('_meta') or {}
         except (json.JSONDecodeError, ValueError):
             return None
@@ -253,15 +245,6 @@ class WorkflowSessionRegistry:
             channel=channel,
             created_at=meta.get('created_at', time.strftime('%Y-%m-%dT%H:%M:%S')),
         )
-        for line in lines[1:]:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                channel.replay_from_history(data)
-            except (json.JSONDecodeError, ValueError):
-                continue
         return session
 
     def get(self, session_id: str) -> WorkflowSession | None:

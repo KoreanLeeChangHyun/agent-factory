@@ -587,8 +587,7 @@ class TerminalHandlerMixin:
         if resume_session_id:
             extra_args = ['--resume', resume_session_id]
         else:
-            # 새 세션 시작 시에만 이전 이벤트 히스토리 초기화
-            terminal_sse_channel.clear_history()
+            extra_args = []
 
         result = claude_process.spawn(extra_args)
 
