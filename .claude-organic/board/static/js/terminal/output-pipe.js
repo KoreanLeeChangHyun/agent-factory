@@ -117,6 +117,10 @@
     if (Board.ToolResultRenderer && Board.ToolResultRenderer.setMarkdownRenderer) {
       Board.ToolResultRenderer.setMarkdownRenderer(M.renderMarkdownToHtml);
     }
+
+    if (typeof M.setupToolBoxDelegation === "function") {
+      M.setupToolBoxDelegation();
+    }
   };
 
   M._emptyStateShown = false;

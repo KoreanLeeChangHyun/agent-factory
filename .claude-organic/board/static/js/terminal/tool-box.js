@@ -8,6 +8,34 @@
   var esc = Board.util.esc;
   var M = (Board._term = Board._term || {});
 
+  // ── Tool Box Toggle Delegation ──
+  //
+  // 세션 전환 시 session-switcher 가 outputDiv 자식을 cloneNode(true) 로 save/restore
+  // 하는데, cloneNode 는 addEventListener 리스너를 복사하지 않는다. 박스 생성 시점에
+  // 개별 요소에 click 리스너를 붙이면 탭 왕복 1회 이후 토글이 죽는다.
+  //
+  // outputDiv 는 세션 전환에도 재할당되지 않는 안정 노드이므로, 한 번 델리게이션을
+  // 걸어두면 clone 영향에서 자유롭다.
+
+  M.setupToolBoxDelegation = function() {
+    if (M._toolBoxDelegationBound) return;
+    if (!M.outputDiv) return;
+    M.outputDiv.addEventListener("click", function(e) {
+      var toggle = e.target.closest && e.target.closest(".term-toggle-icon, .wf-tool-card-toggle");
+      if (!toggle) return;
+      var container;
+      if (toggle.classList.contains("term-toggle-icon")) {
+        container = toggle.closest(".term-tool-box");
+      } else {
+        container = toggle.closest(".wf-tool-card");
+      }
+      if (!container) return;
+      var isOpen = container.classList.toggle("open");
+      toggle.classList.toggle("rotated", isOpen);
+    });
+    M._toolBoxDelegationBound = true;
+  };
+
   // ── Tool Box Renderer ──
 
   M.createToolBox = function(toolName, toolUseId) {
@@ -73,10 +101,9 @@
 
     box.appendChild(outputArea);
 
-    toggleSpan.addEventListener("click", function () {
-      var isOpen = box.classList.toggle("open");
-      toggleSpan.classList.toggle("rotated", isOpen);
-    });
+    // Toggle handler는 M.setupToolBoxDelegation 의 outputDiv 델리게이션이 담당한다.
+    // 세션 전환 시 cloneNode(true) 로 DOM 이 재주입되면서 inline addEventListener
+    // 가 유실되던 회귀 대응 (T-390 후속).
 
     M.appendToOutput(box);
     M.currentToolBox = box;
@@ -382,11 +409,7 @@
     cardBody.className = "wf-tool-card-body";
     card.appendChild(cardBody);
 
-    // Toggle collapse
-    toggleIcon.addEventListener("click", function () {
-      var isOpen = card.classList.toggle("open");
-      toggleIcon.classList.toggle("rotated", isOpen);
-    });
+    // Toggle handler는 M.setupToolBoxDelegation 델리게이션이 담당
 
     // Append to current step panel
     Board.WorkflowRenderer.appendDomToCurrentPanel(card);
