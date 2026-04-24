@@ -252,9 +252,13 @@
    * 이벤트보다 한 턴 뒤처질 수 있어, 라이브가 항상 최신이다. 첫 로드(=0,0)
    * 또는 재연결 gap-fill(=동일 값) 경로에서만 실질적으로 반영된다.
    */
-  function _applyHistoryUsage(data) {
+  function _applyHistoryUsage(data, force) {
     if (!data) return;
-    var alreadyLive = (M.sessionTokens.input !== 0 || M.sessionTokens.output !== 0);
+    // force=true 는 loadHistory(초기 로드/세션 스위치) 경로. 이전 세션의
+    // 토큰이 visible 하게 남아있어도 jsonl 의 last_usage 로 덮어써야 한다.
+    // force=false(기본) 는 fetchHistorySince(gap-fill) 경로. 라이브 이벤트가
+    // 이미 채운 값을 jsonl 의 이전 턴 값으로 되돌리면 안 되므로 guard.
+    var alreadyLive = !force && (M.sessionTokens.input !== 0 || M.sessionTokens.output !== 0);
     var changed = false;
     if (!alreadyLive && data.last_usage && typeof data.last_usage === "object") {
       if (typeof data.last_usage.input_tokens === "number") {
@@ -289,7 +293,8 @@
         return;
       }
       // usage/cost 는 events 유무와 무관하게 반영한다.
-      _applyHistoryUsage(data);
+      // force=true: 세션 스위치 시 이전 세션의 토큰을 이 세션의 last_usage 로 덮어쓰기.
+      _applyHistoryUsage(data, true);
       if (!data.events || !data.events.length) {
         M.showEmptyState();
         return;

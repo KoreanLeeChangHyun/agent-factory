@@ -34,20 +34,33 @@ var _DEBUG_KEY = 'board.debug.log';
 var _DEBUG_MAX = 300;
 
 Board.debugLog = function (tag, data) {
+  var entry = {
+    ts: new Date().toISOString(),
+    tag: String(tag || ''),
+    data: data === undefined ? null : data,
+  };
   try {
     var raw = localStorage.getItem(_DEBUG_KEY);
     var arr = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(arr)) arr = [];
-    arr.push({
-      ts: new Date().toISOString(),
-      tag: String(tag || ''),
-      data: data === undefined ? null : data,
-    });
+    arr.push(entry);
     if (arr.length > _DEBUG_MAX) {
       arr = arr.slice(arr.length - _DEBUG_MAX);
     }
     localStorage.setItem(_DEBUG_KEY, JSON.stringify(arr));
   } catch (e) { /* quota, json 에러 조용히 무시 */ }
+  // 서버로도 전송해 main 세션이 파일로 추적 가능하게 한다. 재귀 방지:
+  // tag 가 debug-log.* 면 로컬에만 저장하고 네트워크는 타지 않는다.
+  if (entry.tag.indexOf('debug-log.') !== 0) {
+    try {
+      fetch('/api/debug-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) { /* 네트워크 에러 무시 */ }
+  }
 };
 
 Board.debugDump = function () {

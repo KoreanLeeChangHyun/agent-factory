@@ -105,6 +105,8 @@ class BoardHTTPRequestHandler(
                 self.end_headers()
         elif self.path == '/api/restart':
             self._handle_restart()
+        elif self.path == '/api/debug-log':
+            self._handle_debug_log()
         elif self.path == '/api/workflow/sync':
             self._handle_workflow_sync()
         elif self.path == '/terminal/start':

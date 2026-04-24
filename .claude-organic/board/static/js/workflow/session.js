@@ -1343,9 +1343,12 @@
       _taskRenderRafId = 0;
     }
     if (_ctx) {
-      _ctx.resetTokens && _ctx.resetTokens();
       _ctx.setReceivedChunks && _ctx.setReceivedChunks(false);
     }
+    // 토큰 리셋은 맥락에 따라 다름: fresh start 에서는 startSession 이 명시
+    // 호출, resume/session-switch 에서는 loadHistory 의 _applyHistoryUsage
+    // 가 jsonl 의 last_usage 로 덮어씀. 여기서 0 으로 리셋하면 바가 0% 로
+    // 깜박인 뒤 채워지는 플리커 발생 — 의도적으로 제외한다.
     var termMod = Board._term;
     if (termMod) {
       termMod.stopSpinner && termMod.stopSpinner();
@@ -1394,6 +1397,14 @@
     // 파생 상태 전체 리셋 — 이전 세션의 tool-box 매핑 / 텍스트 버퍼가
     // 새 세션 이벤트 처리에 섞이지 않도록 한다.
     _resetSessionDerivedState();
+
+    // fresh start 는 새 대화이므로 명시적으로 토큰을 0 으로 리셋.
+    // resume 은 loadHistory 의 _applyHistoryUsage(force=true) 가 이전 세션의
+    // 누적 토큰을 jsonl 에서 복원하므로 여기서 리셋하지 않는다 — 그렇지 않으면
+    // 바가 0 으로 깜박인 뒤 새 값으로 차는 플리커가 발생.
+    if (!isResume) {
+      _ctx.resetTokens && _ctx.resetTokens();
+    }
 
     // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
     // 이전 채널의 last-event-id는 의미가 없다.

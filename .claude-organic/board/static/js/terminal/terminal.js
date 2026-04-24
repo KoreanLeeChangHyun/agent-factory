@@ -290,6 +290,10 @@
   };
 
   M.updateStatusLine = function() {
+    if (Board.debugLog) Board.debugLog('updateStatusLine', {
+      input: M.sessionTokens.input, output: M.sessionTokens.output,
+      ctxWindow: M.contextWindow, activeSession: M._activeSessionId,
+    });
     var slModel = document.getElementById("terminal-sl-model");
     var slTokens = document.getElementById("terminal-sl-tokens");
     var slCost = document.getElementById("terminal-sl-cost");
@@ -530,11 +534,23 @@
         clearCurrentToolBox: function () { M.currentToolBox = null; },
         getToolBoxMap: function () { return M.toolBoxMap; },
         resetToolBoxMap: function () { M.toolBoxMap = {}; },
-        resetTokens: function () { M.sessionTokens = { input: 0, output: 0 }; M.sessionCost = 0; },
+        resetTokens: function () {
+          if (Board.debugLog) Board.debugLog('resetTokens', {
+            prev: { input: M.sessionTokens.input, output: M.sessionTokens.output },
+            stack: new Error().stack.split('\n').slice(1, 5).join(' | '),
+          });
+          M.sessionTokens = { input: 0, output: 0 };
+          M.sessionCost = 0;
+        },
         setSessionCost: function (v) { M.sessionCost = v; },
         addInputTokens: function (n) { M.sessionTokens.input += n; },
         addOutputTokens: function (n) { M.sessionTokens.output += n; },
-        setInputTokens: function (n) { M.sessionTokens.input = n; },
+        setInputTokens: function (n) {
+          if (Board.debugLog && n !== M.sessionTokens.input) Board.debugLog('setInputTokens', {
+            prev: M.sessionTokens.input, next: n,
+          });
+          M.sessionTokens.input = n;
+        },
         setOutputTokens: function (n) { M.sessionTokens.output = n; },
         getSessionTokens: function () { return M.sessionTokens; },
         setSessionModel: function (v) { M.sessionModel = v; },

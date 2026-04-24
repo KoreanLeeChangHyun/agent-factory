@@ -16,6 +16,33 @@ from .._common import _workflow_sync_lock, _WORKFLOW_SYNC_URL, logger
 class SyncHandlerMixin:
     """Restart and workflow sync handlers."""
 
+    def _handle_debug_log(self) -> None:
+        """클라 debugLog 이벤트를 서버 파일에 적재한다.
+
+        body: {"ts": iso, "tag": str, "data": any}
+        file: .claude-organic/runs/bg/debug.log (ndjson)
+        """
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            entry = json.loads(body) if body else {}
+        except (ValueError, json.JSONDecodeError):
+            self.send_response(400)
+            self.end_headers()
+            return
+        project_root = os.getcwd()
+        log_dir = os.path.join(project_root, '.claude-organic', 'runs', 'bg')
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            with open(os.path.join(log_dir, 'debug.log'), 'a', encoding='utf-8') as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        except OSError as exc:
+            logger.error("debug-log write fail: %s", exc)
+            self.send_response(500)
+            self.end_headers()
+            return
+        self._send_json({'ok': True})
+
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.
 
