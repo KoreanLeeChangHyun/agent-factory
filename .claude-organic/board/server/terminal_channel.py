@@ -378,16 +378,27 @@ class TerminalSSEChannel:
                 'raw': event,
             }
             # usage 위치는 이벤트 타입마다 다르다:
-            #   - message_start: event.message.usage (스트림 시작, input_tokens 반영)
-            #   - message_delta: event.usage (스트림 종료, output_tokens 반영)
+            #   - message_start: event.message.usage (input_tokens + cache_* + output_tokens=1)
+            #   - message_delta: event.usage (output_tokens 만, input 없음)
+            # input 이 없는 이벤트(message_delta)에 0 을 넣어 보내면 클라의
+            # setInputTokens(0) 이 바를 0% 로 깜빡이게 한다. 실제 있는 필드만 전파한다.
             event_usage = event.get('usage') or event.get('message', {}).get('usage')
             if event_usage:
-                payload['usage'] = {
-                    'input_tokens': (event_usage.get('input_tokens', 0)
+                payload_usage: dict = {}
+                has_input = any(
+                    k in event_usage
+                    for k in ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
+                )
+                if has_input:
+                    payload_usage['input_tokens'] = (
+                        event_usage.get('input_tokens', 0)
                         + event_usage.get('cache_read_input_tokens', 0)
-                        + event_usage.get('cache_creation_input_tokens', 0)),
-                    'output_tokens': event_usage.get('output_tokens', 0),
-                }
+                        + event_usage.get('cache_creation_input_tokens', 0)
+                    )
+                if 'output_tokens' in event_usage:
+                    payload_usage['output_tokens'] = event_usage['output_tokens']
+                if payload_usage:
+                    payload['usage'] = payload_usage
             return payload
 
         if msg_type == 'assistant':
