@@ -17,21 +17,31 @@ class SyncHandlerMixin:
     """Restart and workflow sync handlers."""
 
     def _handle_debug_log(self) -> None:
-        """클라 debugLog 이벤트를 서버 파일에 적재한다.
+        """클라 debugLog 이벤트를 서버 파일에 적재한다 (플래그 게이트).
+
+        플래그 파일(.claude-organic/runs/bg/debug.enabled)이 존재할 때만 기록.
+        그렇지 않으면 200 OK 만 돌려주고 바디는 버린다. Claude 가 파일을
+        touch/rm 하여 계측 활성화를 제어한다.
 
         body: {"ts": iso, "tag": str, "data": any}
-        file: .claude-organic/runs/bg/debug.log (ndjson)
+        file: .claude-organic/runs/bg/debug.log (NDJSON)
         """
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length) if content_length else b''
+
+        project_root = os.getcwd()
+        log_dir = os.path.join(project_root, '.claude-organic', 'runs', 'bg')
+        flag_path = os.path.join(log_dir, 'debug.enabled')
+        if not os.path.exists(flag_path):
+            self._send_json({'ok': True, 'logged': False})
+            return
+
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
             entry = json.loads(body) if body else {}
         except (ValueError, json.JSONDecodeError):
             self.send_response(400)
             self.end_headers()
             return
-        project_root = os.getcwd()
-        log_dir = os.path.join(project_root, '.claude-organic', 'runs', 'bg')
         try:
             os.makedirs(log_dir, exist_ok=True)
             with open(os.path.join(log_dir, 'debug.log'), 'a', encoding='utf-8') as f:
@@ -41,7 +51,7 @@ class SyncHandlerMixin:
             self.send_response(500)
             self.end_headers()
             return
-        self._send_json({'ok': True})
+        self._send_json({'ok': True, 'logged': True})
 
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.

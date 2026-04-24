@@ -20,73 +20,25 @@ Board.util = Board.util || {};
 Board.render = Board.render || {};
 Board.fetch = Board.fetch || {};
 
-// ── Debug Logger (gated, localStorage 링버퍼 + 서버 NDJSON) ──
+// ── Debug Logger (server-gated) ──
 //
-// 계측은 코드 전체에 상시 심어두고, 런타임 게이트로 켜고 끈다. 기본값은 OFF —
-// 비활성 시 debugLog 는 즉시 return 하여 오버헤드 없음. 활성화되면 localStorage
-// 에 최근 300개를 보존하고, 서버 /api/debug-log 로도 NDJSON 송출해
-// runs/bg/debug.log 에 적재된다 (새로고침/탭 이동 넘나드는 추적 가능).
+// 계측은 코드 전체에 상시 심어두고, 서버 측 플래그 파일로 활성화를 결정한다.
+// Claude 가 .claude-organic/runs/bg/debug.enabled 파일을 touch/rm 하여 제어.
+// 클라는 항상 /api/debug-log 로 POST — 서버가 플래그 파일을 체크해 파일에
+// 쓸지 버릴지 결정한다. 평소 오버헤드는 fetch 한 번(수 ms) 만 발생.
 //
-// 사용:
-//   Board.debug.enable()            — 계측 ON (localStorage 에 영구 저장)
-//   Board.debug.disable()           — 계측 OFF
-//   Board.debug.enabled             — 현재 상태 조회
-//   Board.debug.dump()              — 콘솔 테이블로 출력
-//   Board.debug.clear()             — localStorage 버퍼 비우기
-//   Board.debugLog('tag', {k: v})   — 계측 지점 (항상 호출, 게이트가 판단)
-
-var _DEBUG_KEY = 'board.debug.log';
-var _DEBUG_ENABLED_KEY = 'board.debug.enabled';
-var _DEBUG_MAX = 300;
-
-function _readEnabled() {
-  try { return localStorage.getItem(_DEBUG_ENABLED_KEY) === '1'; } catch (e) { return false; }
-}
-
-Board.debug = {
-  get enabled() { return _readEnabled(); },
-  enable: function () {
-    try { localStorage.setItem(_DEBUG_ENABLED_KEY, '1'); } catch (e) {}
-    if (typeof console !== 'undefined') console.info('[Board.debug] enabled — 이후 이벤트가 localStorage + 서버에 적재됩니다');
-  },
-  disable: function () {
-    try { localStorage.removeItem(_DEBUG_ENABLED_KEY); } catch (e) {}
-    if (typeof console !== 'undefined') console.info('[Board.debug] disabled');
-  },
-  dump: function () {
-    try {
-      var raw = localStorage.getItem(_DEBUG_KEY);
-      var arr = raw ? JSON.parse(raw) : [];
-      if (typeof console !== 'undefined' && console.table) {
-        console.table(arr.map(function (e) {
-          return { ts: e.ts, tag: e.tag, data: JSON.stringify(e.data) };
-        }));
-      }
-      return arr;
-    } catch (e) { return []; }
-  },
-  clear: function () {
-    try { localStorage.removeItem(_DEBUG_KEY); } catch (e) {}
-  },
-};
+// 진단 흐름:
+//   1. Claude: touch .../runs/bg/debug.enabled (+ 기존 로그 비우기)
+//   2. 사용자: 문제 재현
+//   3. Claude: cat .../runs/bg/debug.log 로 분석
+//   4. Claude: rm .../runs/bg/debug.enabled (비활성화)
 
 Board.debugLog = function (tag, data) {
-  if (!_readEnabled()) return;
   var entry = {
     ts: new Date().toISOString(),
     tag: String(tag || ''),
     data: data === undefined ? null : data,
   };
-  try {
-    var raw = localStorage.getItem(_DEBUG_KEY);
-    var arr = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(arr)) arr = [];
-    arr.push(entry);
-    if (arr.length > _DEBUG_MAX) {
-      arr = arr.slice(arr.length - _DEBUG_MAX);
-    }
-    localStorage.setItem(_DEBUG_KEY, JSON.stringify(arr));
-  } catch (e) { /* quota, json 에러 조용히 무시 */ }
   try {
     fetch('/api/debug-log', {
       method: 'POST',
