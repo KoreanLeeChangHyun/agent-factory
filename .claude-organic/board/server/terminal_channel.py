@@ -377,8 +377,11 @@ class TerminalSSEChannel:
                 'kind': event.get('type', 'stream_event'),
                 'raw': event,
             }
-            if 'usage' in event:
-                event_usage = event['usage']
+            # usage 위치는 이벤트 타입마다 다르다:
+            #   - message_start: event.message.usage (스트림 시작, input_tokens 반영)
+            #   - message_delta: event.usage (스트림 종료, output_tokens 반영)
+            event_usage = event.get('usage') or event.get('message', {}).get('usage')
+            if event_usage:
                 payload['usage'] = {
                     'input_tokens': (event_usage.get('input_tokens', 0)
                         + event_usage.get('cache_read_input_tokens', 0)
