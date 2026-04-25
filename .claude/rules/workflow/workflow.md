@@ -1,5 +1,39 @@
 # 워크플로우 시스템 상세 규칙
 
+## 칸반 상태 흐름
+
+### 5단계 FSM
+
+```
+To Do → Open → In Progress → Review → Done
+```
+
+- **To Do**: 미래에 할 백로그·아이디어 저장소 (박제 공간). 지금 당장 집중하지 않는 작업.
+- **Open**: 지금 집중해야 하는 임박 작업. 워크플로우 실행(`/wf -s N`) 대상.
+- **In Progress**: 워크플로우 실행 중인 상태.
+- **Review**: 워크플로우 완료 후 사용자 리뷰 대기.
+- **Done**: 완료.
+
+### 전이 규칙
+
+| 전이 | 방법 | 비고 |
+|------|------|------|
+| To Do → Open | `flow-kanban move T-NNN open` | 승격 |
+| Open → To Do | `flow-kanban move T-NNN todo` | 강등 |
+| Open → In Progress | `/wf -s N` | 워크플로우 실행 |
+| In Progress → Review | 워크플로우 자동 전이 | |
+| Review → Done | `/wf -d N` | |
+| Review → Open | `/wf -e N` | 재작업 |
+
+### 티켓 생성 규칙
+
+티켓 생성 시 `--status todo` 또는 `--status open` 중 하나를 반드시 명시해야 한다 (MUST). 기본값(미지정)은 에러.
+
+```bash
+flow-kanban create "제목" --command implement --status todo   # 백로그 박제
+flow-kanban create "제목" --command implement --status open   # 즉시 집중 대상
+```
+
 ## DO
 - 코드 수정은 기본적으로 /wf -e 로 티켓 생성/편집 후 /wf -s N 으로 실행
 - 사용자가 직접 수정을 명시 요청한 경우에만 메인 세션에서 직접 수정
@@ -15,32 +49,33 @@
   - "박제/나중에/언젠가/백로그" → To Do 추천 (질의 유지)
   - "지금/바로/이번에/집중" → Open 추천 (질의 유지)
   - 사용자가 상태를 명시("Open으로 만들어줘" 등)한 경우에만 질의 생략
-- `flow-kanban create` 호출 시 `--status` 플래그를 명시한다 (MUST) — 생략 시 기본 상태로 폴백되어 의도 불명확
-- Claude가 사용자 발화 맥락에 명시된 상태가 부재하면 번호 메뉴로 질의한다: `1. To Do (백로그·미래에 할 일) / 2. Open (지금 집중 대상)`
+- `flow-kanban create` 호출 시 `--status` 플래그를 명시한다 (MUST) — 생략 시 에러
 
 ## DO NOT
 - PreToolUse Hook 활성 시 직접 수정 시도하지 않는다 — 차단되므로 토큰 낭비
 - 서브에이전트(Task)를 통해 조사·수정을 직접 시도하지 않는다 — 티켓 생성 후 워크플로우로 처리
-- flow-kanban 호출 시 alias-reference에 나열되지 않은 서브커맨드를 사용하지 않는다
+- flow-kanban 호출 시 bin 레퍼런스에 나열되지 않은 서브커맨드를 사용하지 않는다
 - /clear 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook이 자동 재주입
 - 사용자 발화에 명시되지 않은 행위를 추론하여 수행하지 않는다 — "추가해주세요"는 추가만 의미
-- python3 .claude-organic/engine/... 형태로 스크립트를 직접 호출하지 않는다 — flow-* alias 사용
+- python3 .claude-organic/engine/... 형태로 스크립트를 직접 호출하지 않는다 — `.claude-organic/bin/flow-*` wrapper 사용
 - derived-from 파생 티켓이 미완료(Done 아닌 상태)면 원본 티켓을 Done 처리하지 않는다 — Hook이 차단
 
 > 실용적 이유: Hook 활성 시 DO NOT 항목은 차단되므로 시도 자체가 토큰 낭비. 처음부터 /wf 명령어로 진행할 것.
 
-## Alias 레퍼런스
+## bin wrapper 레퍼런스
+
+`.claude-organic/bin/flow-*` 실행 파일을 직접 호출 (alias 아님). 대화형 zsh 셸은 PATH 등록되어 있을 수 있으나, 비대화형 Bash tool 환경에서는 절대/상대 경로로 호출한다 (MUST).
 
 ### flow-kanban 서브커맨드 (이 외 사용 금지)
 create, move, done, delete, update-title, update, update-prompt, update-result, link, unlink, list, board, show
 
 예시:
-  flow-kanban create "제목" --command implement
-  flow-kanban update-prompt T-001 --goal "목표" --target "대상"
-  flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"
-  flow-kanban link T-001 --derived-from T-000
-  flow-kanban move T-001 progress
-  flow-kanban done T-001
+  .claude-organic/bin/flow-kanban create "제목" --command implement --status open
+  .claude-organic/bin/flow-kanban update-prompt T-001 --goal "목표" --target "대상"
+  .claude-organic/bin/flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"
+  .claude-organic/bin/flow-kanban link T-001 --derived-from T-000
+  .claude-organic/bin/flow-kanban move T-001 progress
+  .claude-organic/bin/flow-kanban done T-001
 
 ### XML 필드 개행 컨벤션
 복수 항목 필드(goal, target, constraints, criteria, context)에 여러 항목을 입력할 때는 반드시 `\n` 개행을 삽입한다 (MUST).
@@ -51,7 +86,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 > `\n`이 누락되면 XML 래핑이 실패하여 태그 직후에 텍스트가 붙는 형식 오류가 발생한다.
 
-### 기타 alias
+### 기타 bin wrapper
 - flow-claude: start, end
 - flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env
 - flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
@@ -70,11 +105,11 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 - flow-gitconfig: [--global|--local]
 - flow-detect: [프로젝트루트] [--generate]
 
-> 스크립트 호출 시 반드시 위 alias를 사용 (MUST). python3 직접 경로 호출 금지 (MUST NOT).
+> 스크립트 호출 시 반드시 위 bin wrapper를 사용 (MUST). python3 직접 경로 호출 금지 (MUST NOT).
 
 ## 워크플로우 요약
 - entry-point: /wf 명령어 (단일 진입점)
-- lifecycle: To Do → Open → In Progress → Review → Done
+- lifecycle: 위 "칸반 상태 흐름" 5단계 FSM 참조
 - commands:
   - /wf -o: 새 티켓 생성 및 프롬프트 작성
   - /wf -o N: 기존 티켓 편집
