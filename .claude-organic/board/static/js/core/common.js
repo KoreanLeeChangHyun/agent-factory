@@ -555,23 +555,33 @@ function cleanupMermaidOrphans(id) {
 
 /** Renders pending Mermaid diagram blocks. */
 function initMermaid() {
+  // mermaid 스크립트는 async 로 로드되므로 첫 호출 시 정의되지 않을 수 있다.
+  // 이 경우 rendered 플래그를 세팅하지 않고 즉시 종료해, 로드 완료 후 재호출
+  // (_mermaidRescanWhenReady) 에서 다시 시도되도록 한다.
+  if (typeof mermaid === "undefined") return;
   const blocks = document.querySelectorAll(".mermaid-block");
   blocks.forEach(function (block) {
-    const id = block.dataset.mermaidId;
     if (block.dataset.rendered) return;
     block.dataset.rendered = "true";
+    const id = block.dataset.mermaidId;
     const code = block.textContent;
-    if (typeof mermaid !== "undefined") {
-      mermaid.render(id, code).then(function (result) {
-        block.innerHTML = result.svg;
-      }).catch(function (err) {
-        console.warn('[initMermaid] Mermaid render failed for id=' + id + ':', err);
-        cleanupMermaidOrphans(id);
-        block.innerHTML = '<pre class="wf-file-content">' + esc(code) + '</pre>';
-      });
-    }
+    mermaid.render(id, code).then(function (result) {
+      block.innerHTML = result.svg;
+    }).catch(function (err) {
+      console.warn('[initMermaid] Mermaid render failed for id=' + id + ':', err);
+      cleanupMermaidOrphans(id);
+      block.innerHTML = '<pre class="wf-file-content">' + esc(code) + '</pre>';
+    });
   });
 }
+
+// async 스크립트 로드 완료 시점에 한 번 더 스캔하여 race window 보충.
+function _mermaidRescanWhenReady() {
+  if (typeof mermaid !== "undefined") { initMermaid(); return; }
+  var script = document.querySelector('script[src*="mermaid"]');
+  if (script) script.addEventListener('load', function () { initMermaid(); }, { once: true });
+}
+_mermaidRescanWhenReady();
 
 Board.render.renderMd = renderMd;
 Board.render.initMermaid = initMermaid;
