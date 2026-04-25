@@ -445,19 +445,16 @@
 
   /**
    * workflow_step 이벤트 데이터 처리.
-   * _isReplaying 중에는 FSM 전이를 수행하지 않는다 (링버퍼 replay 가드 동일).
-   * REST 이벤트 주입 시에는 _isReplaying=true 상태이므로 DOM 재건 경로만 수행된다.
+   * handleStepEvent 는 멱등이라 replay 중에도 호출하여 FSM 상태를 누적해야
+   * 과거 step 시퀀스가 phase timeline 에 반영된다. 라이브 렌더는 replay 종료
+   * 후 _injectRestHistory 가 일괄 호출하므로 replay 중에는 스킵한다.
    * @param {Object} data 파싱된 이벤트 data 객체
    */
   function _onWorkflowStep(data) {
-    if (_isReplaying) {
-      // replay 중: FSM 전이( handleStepEvent ) 및 타임라인 렌더 스킵.
-      return;
-    }
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
       Board.WorkflowRenderer.handleStepEvent(data);
     }
-    if (_ctx && _ctx.isWorkflowMode()) {
+    if (!_isReplaying && _ctx && _ctx.isWorkflowMode()) {
       try { Board.phaseTimeline.render(); } catch (re) {}
     }
   }
