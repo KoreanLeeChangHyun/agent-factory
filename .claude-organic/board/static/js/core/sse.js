@@ -69,8 +69,8 @@
       if (json !== prevTicketJson) {
         prevTicketJson = json;
         Board.render.renderKanban();
-        if (Board.state.activeTab === "roadmap" && Board.render.renderRoadmap) {
-          Board.render.renderRoadmap();
+        if (Board.state.activeTab === "relations" && Board.render.renderRelations) {
+          Board.render.renderRelations();
         }
         Board.state.viewerTabs.forEach(function (vt) {
           if (vt.ticket) {
@@ -115,6 +115,26 @@
   /** Refreshes the memory tab data on external file changes. */
   function refreshMemory() {
     if (Board.render.refreshMemory) Board.render.refreshMemory();
+  }
+
+  // ── Git Branch Refresh (SSE/Polling shared) ──
+
+  /**
+   * Updates the status bar branch indicator from a fresh value.
+   *
+   * SSE git_branch 이벤트는 payload 로 전달된 branch 를 직접 사용하지만,
+   * polling fallback 은 변경 신호만 받기 때문에 /api/branch 를 다시 fetch 한다.
+   *
+   * @param {string|null} branch - SSE payload 의 branch 값. 없으면 fetch.
+   */
+  function refreshBranch(branch) {
+    if (branch) {
+      if (Board.util.setBranchStatusBar) Board.util.setBranchStatusBar(branch);
+      return;
+    }
+    fetch("/api/branch").then(function (r) { return r.json(); }).then(function (d) {
+      if (Board.util.setBranchStatusBar) Board.util.setBranchStatusBar(d.branch);
+    }).catch(function () {});
   }
 
   // ── SSE ──
@@ -176,6 +196,15 @@
       refreshMemory();
     });
 
+    es.addEventListener("git_branch", function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        refreshBranch(d && d.branch);
+      } catch (_) {
+        refreshBranch(null);
+      }
+    });
+
     es.onerror = function () {
       sseConnected = false;
       es.close(); // Explicitly close to prevent auto-reconnect
@@ -220,6 +249,12 @@
       }
       if (changes.memory) {
         refreshMemory();
+      }
+      if (changes.git_branch) {
+        // polling payload 는 [branch] list — 마지막 값을 사용한다
+        var arr = changes.git_branch;
+        var last = (arr && arr.length) ? arr[arr.length - 1] : null;
+        refreshBranch(last);
       }
     }).catch(function () {
       // /poll failure: handle silently (no console error)

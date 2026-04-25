@@ -11,6 +11,7 @@ import uuid
 from collections.abc import Callable
 
 from ._common import WATCH_DIRS, WATCH_INTERVAL, logger
+from board_data import _get_git_branch
 
 
 class FileWatcher:
@@ -118,6 +119,81 @@ class FileWatcher:
 
 
 # ---------------------------------------------------------------------------
+# Git Branch Watcher
+# ---------------------------------------------------------------------------
+
+
+class GitBranchWatcher:
+    """현재 git 브랜치 변경 감시기.
+
+    `.git/HEAD` 파일의 mtime 을 짧은 주기로 폴링하여 변경이 감지될 때만
+    `_get_git_branch()` 로 브랜치명을 재조회하고, 직전 값과 다르면 콜백을 호출한다.
+    HEAD 파일이 바뀌는 순간(checkout/branch 전환)만 git 명령을 실행하므로
+    상시 부하가 거의 없다.
+
+    worktree(`.git` 가 파일인 경우)도 mtime 추적 후 subprocess 폴백으로 정상 동작한다.
+
+    Attributes:
+        _project_root: 프로젝트 루트 절대 경로
+        _on_change: 브랜치 변경 시 호출할 콜백 Callable[[str], None]
+        _running: 감시 루프 실행 플래그
+        _last_branch: 직전 감시한 브랜치명
+        _last_head_mtime: 직전 .git/HEAD 의 mtime
+        _head_path: `.git/HEAD` 절대 경로
+    """
+
+    def __init__(
+        self,
+        project_root: str,
+        on_change: Callable[[str], None],
+    ) -> None:
+        """초기화한다.
+
+        Args:
+            project_root: 프로젝트 루트 절대 경로
+            on_change: 브랜치 변경 시 호출할 콜백, 새 브랜치명을 인자로 받음
+        """
+        self._project_root: str = project_root
+        self._on_change: Callable[[str], None] = on_change
+        self._running: bool = False
+        self._last_branch: str = _get_git_branch(project_root)
+        self._head_path: str = os.path.join(project_root, '.git', 'HEAD')
+        self._last_head_mtime: float = self._read_head_mtime()
+
+    def _read_head_mtime(self) -> float:
+        """.git/HEAD 의 mtime 을 반환한다. 없으면 0.0."""
+        try:
+            return os.stat(self._head_path).st_mtime
+        except OSError:
+            return 0.0
+
+    def run(self) -> None:
+        """감시 루프를 실행한다. daemon 스레드에서 호출된다."""
+        self._running = True
+        while self._running:
+            time.sleep(WATCH_INTERVAL)
+            self._check()
+
+    def stop(self) -> None:
+        """감시 루프를 중지한다."""
+        self._running = False
+
+    def _check(self) -> None:
+        """HEAD mtime 변화 시에만 브랜치를 재조회하고 변경 시 콜백 호출."""
+        mtime = self._read_head_mtime()
+        if mtime == self._last_head_mtime:
+            return
+        self._last_head_mtime = mtime
+        new_branch = _get_git_branch(self._project_root)
+        if new_branch and new_branch != self._last_branch:
+            self._last_branch = new_branch
+            try:
+                self._on_change(new_branch)
+            except Exception:  # noqa: BLE001 — 콜백 실패가 watcher 죽이지 않도록
+                logger.exception('GitBranchWatcher on_change 콜백 실패')
+
+
+# ---------------------------------------------------------------------------
 # SSE Client Manager
 # ---------------------------------------------------------------------------
 
@@ -175,22 +251,30 @@ class SSEClientManager:
         with self._lock:
             return self._client_locks.get(id(wfile))
 
-    def broadcast(self, event_type: str, files: list | None = None) -> None:
+    def broadcast(
+        self,
+        event_type: str,
+        files: list | None = None,
+        data: dict | None = None,
+    ) -> None:
         """모든 클라이언트에 SSE 이벤트를 전송한다.
 
         전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
         per-client lock으로 heartbeat 루프와의 concurrent write를 방지한다.
 
         Args:
-            event_type: SSE 이벤트 타입 (kanban, workflow, dashboard)
+            event_type: SSE 이벤트 타입 (kanban, workflow, dashboard, git_branch 등)
             files: 변경된 파일 목록. kanban 이벤트 시 data 필드에 JSON으로 포함됨.
-                   None이면 타임스탬프 문자열을 data로 전송.
+            data: 임의 payload dict. files 보다 우선 적용됨.
+                  files 와 data 모두 None 이면 타임스탬프 문자열을 data로 전송.
         """
-        if files is not None:
-            data = json.dumps({"files": files})
+        if data is not None:
+            body = json.dumps(data)
+        elif files is not None:
+            body = json.dumps({"files": files})
         else:
-            data = str(int(time.time()))
-        message = f"event: {event_type}\ndata: {data}\n\n"
+            body = str(int(time.time()))
+        message = f"event: {event_type}\ndata: {body}\n\n"
         encoded = message.encode('utf-8')
 
         dead_clients: list = []

@@ -1,26 +1,26 @@
-/* Claude Code Workflow Board - Roadmap Panel Styles */
+/* Claude Code Workflow Board - Relations Panel Styles */
 
 /* ── Collapsible Panel (below header) ── */
-.roadmap-panel {
+.relations-panel {
   background: #252526;
   border-bottom: 1px solid #2d2d2d;
   overflow: hidden;
   cursor: pointer;
   transition: background 0.15s;
 }
-.roadmap-panel:hover {
+.relations-panel:hover {
   background: #2a2a2b;
 }
-.roadmap-panel.open {
+.relations-panel.open {
   cursor: default;
   background: #1e1e1e;
 }
-.roadmap-panel.open:hover {
+.relations-panel.open:hover {
   background: #1e1e1e;
 }
 
 /* ── Collapsed Bar (horizontal, like Done column) ── */
-.roadmap-collapsed-bar {
+.relations-collapsed-bar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,11 +29,11 @@
   padding: 0 16px;
   user-select: none;
 }
-.roadmap-panel.open .roadmap-collapsed-bar {
+.relations-panel.open .relations-collapsed-bar {
   display: none;
 }
 
-.roadmap-collapsed-bar .bar-label {
+.relations-collapsed-bar .bar-label {
   font-size: 11px;
   font-weight: 600;
   color: #858585;
@@ -41,32 +41,32 @@
   text-transform: uppercase;
 }
 
-.roadmap-collapsed-bar .bar-count {
+.relations-collapsed-bar .bar-count {
   font-size: 10px;
   color: #606060;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-.roadmap-panel-content {
+.relations-panel-content {
   display: none;
   padding: 12px 20px;
   overflow-x: auto;
   overflow-y: hidden;
 }
-.roadmap-panel.open .roadmap-panel-content {
+.relations-panel.open .relations-panel-content {
   display: block;
 }
 
-/* ── Roadmap Toggle Button ── */
-.roadmap-toggle {
+/* ── Relations Toggle Button ── */
+.relations-toggle {
   transition: color 0.15s;
 }
-.roadmap-toggle.active {
+.relations-toggle.active {
   color: #D97757;
 }
 
 /* ── Toolbar ── */
-.roadmap-toolbar {
+.relations-toolbar {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -80,7 +80,7 @@
   margin-bottom: 10px;
 }
 
-.roadmap-toolbar-label {
+.relations-toolbar-label {
   font-size: 11px;
   text-transform: uppercase;
   color: #858585;
@@ -89,7 +89,7 @@
   margin-right: 4px;
 }
 
-.roadmap-toolbar-sep {
+.relations-toolbar-sep {
   width: 1px;
   height: 18px;
   background: #3c3c3c;
@@ -97,7 +97,7 @@
 }
 
 /* ── Filter Buttons ── */
-.roadmap-filter-btn {
+.relations-filter-btn {
   padding: 3px 10px;
   border: 1px solid #3c3c3c;
   border-radius: 4px;
@@ -107,12 +107,12 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.roadmap-filter-btn:hover {
+.relations-filter-btn:hover {
   background: rgba(217, 119, 87, 0.12);
   border-color: #D97757;
   color: #e0e0e0;
 }
-.roadmap-filter-btn.active {
+.relations-filter-btn.active {
   background: rgba(217, 119, 87, 0.2);
   border-color: #D97757;
   color: #D97757;
@@ -120,7 +120,7 @@
 }
 
 /* ── Layout Direction Toggle ── */
-.roadmap-layout-btn {
+.relations-layout-btn {
   padding: 3px 10px;
   border: 1px solid #3c3c3c;
   border-radius: 4px;
@@ -131,12 +131,12 @@
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
-.roadmap-layout-btn:hover {
+.relations-layout-btn:hover {
   background: rgba(86, 156, 214, 0.12);
   border-color: #569cd6;
   color: #e0e0e0;
 }
-.roadmap-layout-btn.active {
+.relations-layout-btn.active {
   background: rgba(86, 156, 214, 0.2);
   border-color: #569cd6;
   color: #7bb8e8;
@@ -144,7 +144,7 @@
 }
 
 /* ── Isolated Nodes Toggle ── */
-.roadmap-isolated-toggle {
+.relations-isolated-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -153,18 +153,18 @@
   font-size: 11px;
   user-select: none;
 }
-.roadmap-isolated-toggle input[type="checkbox"] {
+.relations-isolated-toggle input[type="checkbox"] {
   accent-color: #D97757;
   cursor: pointer;
   width: 13px;
   height: 13px;
 }
-.roadmap-isolated-toggle:hover {
+.relations-isolated-toggle:hover {
   color: #a0a0a0;
 }
 
 /* ── Collapse Button ── */
-.roadmap-collapse-btn {
+.relations-collapse-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,14 +177,14 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.roadmap-collapse-btn:hover {
+.relations-collapse-btn:hover {
   background: rgba(217, 119, 87, 0.12);
   border-color: #D97757;
   color: #D97757;
 }
 
 /* ── Graph Container ── */
-.roadmap-graph-container {
+.relations-graph-container {
   background: #252526;
   border: 1px solid #2d2d2d;
   border-radius: 6px;
@@ -194,23 +194,23 @@
   max-height: 320px;
 }
 
-.roadmap-graph-container svg {
+.relations-graph-container svg {
   display: block;
   max-width: none;
   overflow: visible;
 }
 
 /* Mermaid node hover effect */
-.roadmap-graph-container .node {
+.relations-graph-container .node {
   cursor: pointer;
   transition: opacity 0.15s;
 }
-.roadmap-graph-container .node:hover {
+.relations-graph-container .node:hover {
   opacity: 0.8;
 }
 
 /* ── Legend (inline, compact) ── */
-.roadmap-legend {
+.relations-legend {
   display: flex;
   flex-direction: row;
   gap: 14px;
@@ -223,7 +223,7 @@
   flex-shrink: 0;
 }
 
-.roadmap-legend-title {
+.relations-legend-title {
   font-size: 11px;
   text-transform: uppercase;
   color: #858585;
@@ -233,7 +233,7 @@
   margin-right: 4px;
 }
 
-.roadmap-legend-item {
+.relations-legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -241,42 +241,16 @@
   color: #a0a0a0;
 }
 
-.roadmap-legend-edge {
+/* Legend edge SVG — color 는 currentColor 로 주입, 크기는 SVG 자체에서 지정 */
+.relations-legend-edge {
   display: inline-block;
-  width: 28px;
-  height: 2px;
-  border-radius: 1px;
-  position: relative;
+  vertical-align: middle;
 }
-.roadmap-legend-edge::after {
-  content: '▶';
-  position: absolute;
-  right: -6px;
-  top: -7px;
-  font-size: 8px;
-}
+.relations-legend-edge.edge-depends { color: #4ec9b0; }
+.relations-legend-edge.edge-derived { color: #dcdcaa; }
+.relations-legend-edge.edge-blocks  { color: #f44747; }
 
-.roadmap-legend-edge.edge-depends {
-  border-top: 2px dashed #4ec9b0;
-  background: transparent;
-  color: #4ec9b0;
-}
-.roadmap-legend-edge.edge-depends::after { color: #4ec9b0; }
-
-.roadmap-legend-edge.edge-derived {
-  background: #dcdcaa;
-  color: #dcdcaa;
-}
-.roadmap-legend-edge.edge-derived::after { color: #dcdcaa; }
-
-.roadmap-legend-edge.edge-blocks {
-  background: #f44747;
-  height: 3px;
-  color: #f44747;
-}
-.roadmap-legend-edge.edge-blocks::after { color: #f44747; }
-
-.roadmap-legend-sep {
+.relations-legend-sep {
   width: 1px;
   height: 16px;
   background: #3c3c3c;
@@ -284,7 +258,7 @@
 }
 
 /* Node status colors in legend */
-.roadmap-legend-dot {
+.relations-legend-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -292,13 +266,13 @@
   border: 2px solid currentColor;
   background: #1e1e1e;
 }
-.roadmap-legend-dot.dot-open     { color: #4ec9b0; }
-.roadmap-legend-dot.dot-progress { color: #dcdcaa; }
-.roadmap-legend-dot.dot-review   { color: #c586c0; }
-.roadmap-legend-dot.dot-done     { color: #858585; }
+.relations-legend-dot.dot-open     { color: #4ec9b0; }
+.relations-legend-dot.dot-progress { color: #dcdcaa; }
+.relations-legend-dot.dot-review   { color: #c586c0; }
+.relations-legend-dot.dot-done     { color: #858585; }
 
 /* ── Empty State ── */
-.roadmap-empty {
+.relations-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -309,25 +283,29 @@
   text-align: center;
 }
 
-.roadmap-empty-icon {
-  font-size: 28px;
+.relations-empty-icon {
+  display: inline-flex;
+  color: #858585;
   opacity: 0.4;
 }
+.relations-empty-icon svg {
+  display: block;
+}
 
-.roadmap-empty-title {
+.relations-empty-title {
   font-size: 13px;
   font-weight: 600;
   color: #5a5a5a;
 }
 
-.roadmap-empty-desc {
+.relations-empty-desc {
   font-size: 12px;
   color: #4a4a4a;
   max-width: 400px;
   line-height: 1.5;
 }
 
-.roadmap-empty-hint {
+.relations-empty-hint {
   font-size: 11px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   background: #252526;
@@ -338,7 +316,7 @@
 }
 
 /* ── Loading State ── */
-.roadmap-loading {
+.relations-loading {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -348,15 +326,15 @@
   font-size: 12px;
 }
 
-.roadmap-loading-spinner {
+.relations-loading-spinner {
   width: 14px;
   height: 14px;
   border: 2px solid #3c3c3c;
   border-top-color: #D97757;
   border-radius: 50%;
-  animation: roadmap-spin 0.8s linear infinite;
+  animation: relations-spin 0.8s linear infinite;
 }
 
-@keyframes roadmap-spin {
+@keyframes relations-spin {
   to { transform: rotate(360deg); }
 }

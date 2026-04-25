@@ -310,15 +310,9 @@
 
     var slBranch = document.getElementById("terminal-sl-branch");
     if (slBranch) {
-      var branchText = slBranch.textContent.replace(/^\ue0a0\s*/, "").trim();
-      if (!branchText || branchText === "--") branchText = slBranch.textContent.trim();
-      var existingSvg = slBranch.querySelector("svg");
-      if (existingSvg) {
-        branchText = slBranch.textContent.trim();
-        existingSvg.remove();
-      }
+      var branchText = slBranch.textContent.trim();
       if (branchText && branchText !== "--") {
-        slBranch.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 15V9a6 6 0 0 0 6-6h0a6 6 0 0 0 6 6"/></svg>' + branchText;
+        Board.util.setBranchStatusBar(branchText);
       }
     }
 
@@ -936,12 +930,9 @@
       Board.workflowSessions.refresh(M.workflowSessionId, M.isWorkflowMode);
     }, 5000);
 
-    // Fetch branch on load
+    // Fetch branch on load — SSE git_branch 이벤트(core/sse.js)가 후속 갱신을 담당한다.
     fetch("/api/branch").then(function (r) { return r.json(); }).then(function (d) {
-      if (d.branch) {
-        var brEl = document.getElementById("terminal-sl-branch");
-        if (brEl) brEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 15V9a6 6 0 0 0 6-6h0a6 6 0 0 0 6 6"/></svg>' + d.branch;
-      }
+      Board.util.setBranchStatusBar(d.branch);
     }).catch(function () {});
   };
 

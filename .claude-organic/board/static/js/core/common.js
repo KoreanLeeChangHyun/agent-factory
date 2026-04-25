@@ -710,6 +710,23 @@ Board.state.dashChartInstances = {};
 // Kanban sort state
 Board.state.kanbanSort = null; // initialized by kanban.js
 
+// Relations panel state — saveUI/loadUI 로 영속화 (열림/닫힘 + 필터)
+Board.state.relations = (savedState.relations && typeof savedState.relations === "object")
+  ? {
+      filter: {
+        statuses: Array.isArray(savedState.relations.filter && savedState.relations.filter.statuses)
+          ? savedState.relations.filter.statuses
+          : ["open", "progress", "review", "done"],
+        direction: (savedState.relations.filter && savedState.relations.filter.direction) || "TD",
+        showIsolated: !!(savedState.relations.filter && savedState.relations.filter.showIsolated),
+      },
+      panelOpen: !!savedState.relations.panelOpen,
+    }
+  : {
+      filter: { statuses: ["open", "progress", "review", "done"], direction: "TD", showIsolated: false },
+      panelOpen: false,
+    };
+
 // ── UI State Persistence ──
 
 /** Saves current UI state to localStorage. */
@@ -721,6 +738,7 @@ function saveUI() {
     activeViewerTab: Board.state.activeViewerTab,
     tabHistory: Board.state.tabHistory,
     forwardHistory: Board.state.forwardHistory,
+    relations: Board.state.relations,
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
 }
@@ -793,4 +811,28 @@ function fetchXmlList(dirUrl) {
 }
 
 Board.util.fetchXmlList = fetchXmlList;
+
+// ── Branch Status Bar Helper ──
+//
+// 상태바(`#terminal-sl-branch`)에 git 브랜치명과 아이콘 SVG 를 그린다.
+// terminal/workflow 페이지 둘 다, 페이지 로드 시점·SSE git_branch 이벤트·
+// /api/branch fetch 결과 등 어디서든 단일 헬퍼로 갱신한다.
+//
+// 상태바 element 가 없는 페이지(kanban/dashboard 등)에서는 no-op.
+var BRANCH_ICON_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+  + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px">'
+  + '<circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>'
+  + '<path d="M6 15V9a6 6 0 0 0 6-6h0a6 6 0 0 0 6 6"/></svg>';
+
+function setBranchStatusBar(branchName) {
+  if (!branchName) return;
+  var el = document.getElementById("terminal-sl-branch");
+  if (!el) return;
+  el.innerHTML = BRANCH_ICON_SVG + branchName;
+}
+
+Board.util.setBranchStatusBar = setBranchStatusBar;
+Board.util.BRANCH_ICON_SVG = BRANCH_ICON_SVG;
 

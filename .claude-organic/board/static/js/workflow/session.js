@@ -433,10 +433,7 @@
         var modeEl = document.getElementById("terminal-sl-mode");
         if (modeEl) modeEl.textContent = data.permission_mode;
       }
-      if (data.branch) {
-        var branchEl = document.getElementById("terminal-sl-branch");
-        if (branchEl) branchEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 15V9a6 6 0 0 0 6-6h0a6 6 0 0 0 6 6"/></svg>' + data.branch;
-      }
+      Board.util.setBranchStatusBar(data.branch);
       _ctx.updateControlBar();
     }).catch(function () {});
   }

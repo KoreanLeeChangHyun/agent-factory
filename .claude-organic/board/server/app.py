@@ -22,7 +22,7 @@ from ._common import (
     _resolve_memory_dir,
 )
 from .http_router import BoardHTTPRequestHandler
-from .sse_client_manager import FileWatcher, SSEClientManager
+from .sse_client_manager import FileWatcher, GitBranchWatcher, SSEClientManager
 from .terminal_channel import TerminalSSEChannel
 from .claude_process import ClaudeProcess
 from .poll_tracker import PollChangeTracker
@@ -152,6 +152,15 @@ def _run_server(project_root: str) -> None:
     watcher_thread = threading.Thread(target=watcher.run, daemon=True)
     watcher_thread.start()
 
+    # GitBranchWatcher 시작 — `.git/HEAD` 변경 감지 → SSE git_branch 이벤트 push
+    def on_branch_change(branch: str) -> None:
+        sse_manager.broadcast('git_branch', data={'branch': branch})
+        poll_tracker.add('git_branch', [branch])
+
+    git_watcher = GitBranchWatcher(project_root, on_branch_change)
+    git_watcher_thread = threading.Thread(target=git_watcher.run, daemon=True)
+    git_watcher_thread.start()
+
     # ThreadingHTTPServer 시작
     server = ThreadingHTTPServer(('0.0.0.0', port), BoardHTTPRequestHandler)
     server.daemon_threads = True
@@ -160,4 +169,5 @@ def _run_server(project_root: str) -> None:
     except KeyboardInterrupt:
         claude_process.kill()
         watcher.stop()
+        git_watcher.stop()
         server.shutdown()

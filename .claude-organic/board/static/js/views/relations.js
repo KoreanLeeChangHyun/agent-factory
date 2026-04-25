@@ -1,7 +1,7 @@
 /**
- * @module roadmap
+ * @module relations
  *
- * Board SPA roadmap tab module.
+ * Board SPA relations tab module.
  *
  * Builds a dependency graph from ticket relations and renders it as a
  * Mermaid flowchart. Provides status filters, layout direction toggle,
@@ -17,14 +17,12 @@
   var esc = Board.util.esc;
   var COLUMNS = Board.util.COLUMNS;
   var STATUS_COLORS = Board.util.STATUS_COLORS;
+  var saveUI = Board.util.saveUI;
 
   // ── Module State ──
-  var filterState = {
-    // To Do 기본 숨김: 초기 활성 상태를 명시 (empty = all 규칙 대신 명시적 4개 사용)
-    statuses: ["open", "progress", "review", "done"],
-    direction: "TD",
-    showIsolated: false,
-  };
+  // Board.state.relations.filter 와 참조를 공유. property 단위 mutation/할당만 사용하면
+  // saveUI() 호출 시 자동으로 영속화된다.
+  var filterState = Board.state.relations.filter;
 
   // Status key normalization for CSS and Mermaid class names
   var STATUS_CLASS_MAP = {
@@ -248,7 +246,7 @@
   // ── Statistics Computation ──
 
   /**
-   * Computes statistics for the roadmap view.
+   * Computes statistics for the relations view.
    * @param {Array} tickets
    * @param {Set} relatedNumbers
    * @returns {Object}
@@ -299,13 +297,13 @@
       { label: "Done", value: stats.byStatus.done, cls: "stat-done", sub: "completed" },
     ];
 
-    var h = '<div class="roadmap-stats">';
+    var h = '<div class="relations-stats">';
     for (var i = 0; i < cards.length; i++) {
       var c = cards[i];
-      h += '<div class="roadmap-stat-card ' + c.cls + '">';
-      h += '<div class="roadmap-stat-label">' + esc(c.label) + '</div>';
-      h += '<div class="roadmap-stat-value">' + c.value + '</div>';
-      h += '<div class="roadmap-stat-sub">' + esc(c.sub) + '</div>';
+      h += '<div class="relations-stat-card ' + c.cls + '">';
+      h += '<div class="relations-stat-label">' + esc(c.label) + '</div>';
+      h += '<div class="relations-stat-value">' + c.value + '</div>';
+      h += '<div class="relations-stat-sub">' + esc(c.sub) + '</div>';
       h += '</div>';
     }
     h += '</div>';
@@ -325,41 +323,41 @@
       { key: "done", label: "Done" },
     ];
 
-    var h = '<div class="roadmap-toolbar">';
+    var h = '<div class="relations-toolbar">';
 
     // Status filter label
-    h += '<span class="roadmap-toolbar-label">Filter</span>';
+    h += '<span class="relations-toolbar-label">Filter</span>';
 
     // Status filter buttons
     // 명시 배열 방식 (T3.2): filterState.statuses는 항상 활성 상태 목록을 담는다.
     for (var i = 0; i < statusFilters.length; i++) {
       var sf = statusFilters[i];
       var isActive = filterState.statuses.indexOf(sf.key) !== -1;
-      h += '<button class="roadmap-filter-btn' + (isActive ? " active" : "") + '" data-status="' + sf.key + '">';
+      h += '<button class="relations-filter-btn' + (isActive ? " active" : "") + '" data-status="' + sf.key + '">';
       h += esc(sf.label);
       h += '</button>';
     }
 
     // Separator
-    h += '<span class="roadmap-toolbar-sep"></span>';
+    h += '<span class="relations-toolbar-sep"></span>';
 
     // Layout direction toggle
-    h += '<span class="roadmap-toolbar-label">Layout</span>';
-    h += '<button class="roadmap-layout-btn' + (filterState.direction === "TD" ? " active" : "") + '" data-dir="TD">TD</button>';
-    h += '<button class="roadmap-layout-btn' + (filterState.direction === "LR" ? " active" : "") + '" data-dir="LR">LR</button>';
+    h += '<span class="relations-toolbar-label">Layout</span>';
+    h += '<button class="relations-layout-btn' + (filterState.direction === "TD" ? " active" : "") + '" data-dir="TD">TD</button>';
+    h += '<button class="relations-layout-btn' + (filterState.direction === "LR" ? " active" : "") + '" data-dir="LR">LR</button>';
 
     // Separator
-    h += '<span class="roadmap-toolbar-sep"></span>';
+    h += '<span class="relations-toolbar-sep"></span>';
 
     // Isolated nodes toggle
-    h += '<label class="roadmap-isolated-toggle">';
+    h += '<label class="relations-isolated-toggle">';
     h += '<input type="checkbox"' + (filterState.showIsolated ? ' checked' : '') + '>';
     h += 'Show isolated nodes';
     h += '</label>';
 
     // Spacer + Collapse button
     h += '<span style="flex:1"></span>';
-    h += '<button class="roadmap-collapse-btn" id="roadmap-collapse-btn" title="Collapse">';
+    h += '<button class="relations-collapse-btn" id="relations-collapse-btn" title="Collapse">';
     h += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>';
     h += '</button>';
 
@@ -372,51 +370,50 @@
    * @returns {string}
    */
   function renderLegend() {
-    var h = '<div class="roadmap-legend">';
-    h += '<span class="roadmap-legend-title">Legend</span>';
+    var h = '<div class="relations-legend">';
+    h += '<span class="relations-legend-title">Legend</span>';
 
-    // Edge types
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-edge edge-depends"></span>';
-    h += '<span>depends-on</span>';
-    h += '</div>';
+    // Edge types — line + arrowhead 를 한 SVG 로 그린다. 색은 CSS currentColor 로 주입.
+    var depArrow = '<svg class="relations-legend-edge edge-depends" width="36" height="8" viewBox="0 0 36 8" fill="none" aria-hidden="true">'
+      + '<line x1="0" y1="4" x2="26" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>'
+      + '<path d="M26 1 L34 4 L26 7 Z" fill="currentColor"/></svg>';
+    var derArrow = '<svg class="relations-legend-edge edge-derived" width="36" height="8" viewBox="0 0 36 8" fill="none" aria-hidden="true">'
+      + '<line x1="0" y1="4" x2="26" y2="4" stroke="currentColor" stroke-width="2"/>'
+      + '<path d="M26 1 L34 4 L26 7 Z" fill="currentColor"/></svg>';
+    var blkArrow = '<svg class="relations-legend-edge edge-blocks" width="36" height="9" viewBox="0 0 36 9" fill="none" aria-hidden="true">'
+      + '<line x1="0" y1="4.5" x2="26" y2="4.5" stroke="currentColor" stroke-width="3"/>'
+      + '<path d="M26 1 L35 4.5 L26 8 Z" fill="currentColor"/></svg>';
 
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-edge edge-derived"></span>';
-    h += '<span>derived-from</span>';
-    h += '</div>';
-
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-edge edge-blocks"></span>';
-    h += '<span>blocks</span>';
-    h += '</div>';
+    h += '<div class="relations-legend-item">' + depArrow + '<span>depends-on</span></div>';
+    h += '<div class="relations-legend-item">' + derArrow + '<span>derived-from</span></div>';
+    h += '<div class="relations-legend-item">' + blkArrow + '<span>blocks</span></div>';
 
     // Separator
-    h += '<span class="roadmap-legend-sep"></span>';
+    h += '<span class="relations-legend-sep"></span>';
 
     // Node statuses
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-dot dot-todo"></span>';
+    h += '<div class="relations-legend-item">';
+    h += '<span class="relations-legend-dot dot-todo"></span>';
     h += '<span>To Do</span>';
     h += '</div>';
 
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-dot dot-open"></span>';
+    h += '<div class="relations-legend-item">';
+    h += '<span class="relations-legend-dot dot-open"></span>';
     h += '<span>Open</span>';
     h += '</div>';
 
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-dot dot-progress"></span>';
+    h += '<div class="relations-legend-item">';
+    h += '<span class="relations-legend-dot dot-progress"></span>';
     h += '<span>In Progress</span>';
     h += '</div>';
 
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-dot dot-review"></span>';
+    h += '<div class="relations-legend-item">';
+    h += '<span class="relations-legend-dot dot-review"></span>';
     h += '<span>Review</span>';
     h += '</div>';
 
-    h += '<div class="roadmap-legend-item">';
-    h += '<span class="roadmap-legend-dot dot-done"></span>';
+    h += '<div class="relations-legend-item">';
+    h += '<span class="relations-legend-dot dot-done"></span>';
     h += '<span>Done</span>';
     h += '</div>';
 
@@ -429,14 +426,18 @@
    * @returns {string}
    */
   function renderEmptyState() {
-    var h = '<div class="roadmap-empty">';
-    h += '<div class="roadmap-empty-icon">&#128279;</div>';
-    h += '<div class="roadmap-empty-title">No ticket relations found</div>';
-    h += '<div class="roadmap-empty-desc">';
-    h += 'The roadmap visualizes dependencies between tickets. ';
+    var h = '<div class="relations-empty">';
+    h += '<div class="relations-empty-icon" aria-hidden="true">'
+      + '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
+      + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
+      + '</svg></div>';
+    h += '<div class="relations-empty-title">No ticket relations found</div>';
+    h += '<div class="relations-empty-desc">';
+    h += 'The relations visualizes dependencies between tickets. ';
     h += 'Link tickets using the CLI to see them here.';
     h += '</div>';
-    h += '<div class="roadmap-empty-hint">flow-kanban link T-001 --depends-on T-002</div>';
+    h += '<div class="relations-empty-hint">flow-kanban link T-001 --depends-on T-002</div>';
     h += '</div>';
     return h;
   }
@@ -444,55 +445,33 @@
   // ── C. Main Render Function ──
 
   /**
-   * Main render entry point for the Roadmap panel.
-   * Registered as Board.render.renderRoadmap.
+   * 그래프 본체(중앙 graph container)만 채우는 비동기 페이즈.
+   *
+   * toolbar/legend 가 이미 그려진 상태에서 호출되며, graph container 내부만
+   * 교체한다. 그래프 빌드 + Mermaid 렌더가 무거우므로 패널 펼침과 분리해
+   * 사용자 입력 → 시각적 피드백 사이의 지연을 줄인다.
    */
-  function renderRoadmap() {
-    var el = document.getElementById("roadmap-panel-content");
-    if (!el) return;
+  function renderGraphBody() {
+    var graphEl = document.getElementById("relations-graph");
+    if (!graphEl) return;
 
     var tickets = Board.state.TICKETS || [];
 
+    // 티켓 데이터가 아직 도착 전이면 graph 자리만 waiting spinner 유지.
+    // toolbar/legend 는 Phase A 에서 이미 그려져 있으므로 그대로 보존된다.
     if (tickets.length === 0) {
-      el.innerHTML = '<div class="roadmap-loading">' +
-        '<div class="roadmap-loading-spinner"></div>' +
-        '<span>Waiting for ticket data...</span>' +
-        '</div>';
+      graphEl.innerHTML = '<div class="relations-loading">'
+        + '<div class="relations-loading-spinner"></div>'
+        + '<span>Waiting for ticket data...</span>'
+        + '</div>';
       return;
     }
 
-    // Build full graph first (for stats, using all tickets regardless of filter)
-    var fullGraph = buildDependencyGraph(tickets, { statuses: [], showIsolated: true });
-
-    // Compute stats
-    var stats = computeStats(tickets, fullGraph.relatedNumbers);
-
-    // Build filtered graph for display
     var displayOpts = {
       statuses: filterState.statuses,
       showIsolated: filterState.showIsolated,
     };
     var graph = buildDependencyGraph(tickets, displayOpts);
-
-    // Start building HTML
-    var h = '';
-
-    // 1. Filter toolbar
-    h += renderToolbar();
-
-    // 2. Graph container placeholder
-    h += '<div class="roadmap-graph-container" id="roadmap-graph"></div>';
-
-    // 3. Legend
-    h += renderLegend();
-
-    el.innerHTML = h;
-
-    // 5. Wire up event handlers
-    wireEventHandlers(el);
-
-    // 6. Render Mermaid graph
-    var graphEl = document.getElementById("roadmap-graph");
     var nodeKeys = Object.keys(graph.nodes);
 
     if (nodeKeys.length === 0) {
@@ -512,28 +491,53 @@
       return;
     }
 
-    var renderId = "roadmap-" + Date.now();
+    var renderId = "relations-" + Date.now();
 
     mermaid.render(renderId, mermaidCode).then(function (result) {
       graphEl.innerHTML = result.svg;
-
-      // Bind click events on nodes
       bindNodeClickEvents(graphEl, graph.nodes);
     }).catch(function (err) {
-      console.warn("[roadmap] Mermaid render failed:", err);
-      // Cleanup orphan SVG elements
-      if (Board.render.initMermaid) {
-        // Use common.js cleanup pattern
-        var orphan = document.getElementById(renderId);
-        if (orphan && orphan !== document.body) {
-          orphan.remove();
-        }
-        document.querySelectorAll("body > svg[id], body > div[id]").forEach(function (el) {
-          if (/^d\d+$/.test(el.id)) el.remove();
-        });
-      }
+      console.warn("[relations] Mermaid render failed:", err);
+      var orphan = document.getElementById(renderId);
+      if (orphan && orphan !== document.body) orphan.remove();
+      document.querySelectorAll("body > svg[id], body > div[id]").forEach(function (el) {
+        if (/^d\d+$/.test(el.id)) el.remove();
+      });
       graphEl.innerHTML = '<pre class="wf-file-content">' + esc(mermaidCode) + '</pre>';
     });
+  }
+
+  /**
+   * Main render entry point for the Relations panel.
+   * Registered as Board.render.renderRelations.
+   *
+   * 두 페이즈로 분리되어 있다:
+   *   Phase A — toolbar / legend 와 빈 graph container 를 즉시 그린다 (정적, 가벼움).
+   *   Phase B — graph container 안만 setTimeout 으로 비동기 채운다 (Mermaid 렌더, 무거움).
+   * 패널 펼침과 함께 toolbar/legend 가 즉시 보이고, 가운데만 잠깐 spinner 가 돈다.
+   */
+  function renderRelations() {
+    var el = document.getElementById("relations-panel-content");
+    if (!el) return;
+
+    // Phase A: 정적 영역(toolbar + legend) 즉시 동기 렌더. 데이터 비의존이라 티켓
+    // 도착 여부와 무관하게 항상 노출된다. graph 자리에는 spinner 박아둔다.
+    var h = '';
+    h += renderToolbar();
+    h += '<div class="relations-graph-container" id="relations-graph">'
+      + '<div class="relations-loading">'
+      + '<div class="relations-loading-spinner"></div>'
+      + '<span>Loading graph...</span>'
+      + '</div>'
+      + '</div>';
+    h += renderLegend();
+    el.innerHTML = h;
+    wireEventHandlers(el);
+
+    // Phase B: 다음 페인트 이후 그래프 본체 채움.
+    // 150ms — spinner 깜박임/답답함의 균형점. 더 짧으면 Mermaid 렌더 비용에 다시 묶이고
+    // 더 길면 사용자가 답답함을 느낀다.
+    setTimeout(renderGraphBody, 150);
   }
 
   // ── D. Event Handling ──
@@ -544,7 +548,7 @@
    */
   function wireEventHandlers(container) {
     // Status filter buttons
-    var filterBtns = container.querySelectorAll(".roadmap-filter-btn");
+    var filterBtns = container.querySelectorAll(".relations-filter-btn");
     filterBtns.forEach(function (btn) {
       btn.addEventListener("click", function () {
         var status = btn.getAttribute("data-status");
@@ -569,36 +573,39 @@
           }
         }
 
-        renderRoadmap();
+        if (saveUI) saveUI();
+        renderRelations();
       });
     });
 
     // Layout direction toggle
-    var layoutBtns = container.querySelectorAll(".roadmap-layout-btn");
+    var layoutBtns = container.querySelectorAll(".relations-layout-btn");
     layoutBtns.forEach(function (btn) {
       btn.addEventListener("click", function () {
         var dir = btn.getAttribute("data-dir");
         if (filterState.direction !== dir) {
           filterState.direction = dir;
-          renderRoadmap();
+          if (saveUI) saveUI();
+          renderRelations();
         }
       });
     });
 
     // Isolated nodes toggle
-    var isolatedToggle = container.querySelector(".roadmap-isolated-toggle input");
+    var isolatedToggle = container.querySelector(".relations-isolated-toggle input");
     if (isolatedToggle) {
       isolatedToggle.addEventListener("change", function () {
         filterState.showIsolated = isolatedToggle.checked;
-        renderRoadmap();
+        if (saveUI) saveUI();
+        renderRelations();
       });
     }
 
     // Collapse button
-    var collapseBtn = container.querySelector("#roadmap-collapse-btn");
+    var collapseBtn = container.querySelector("#relations-collapse-btn");
     if (collapseBtn) {
       collapseBtn.addEventListener("click", function () {
-        toggleRoadmapPanel();
+        toggleRelationsPanel();
       });
     }
   }
@@ -641,7 +648,7 @@
    * Updates the collapsed bar ticket count.
    */
   function updateBarCount() {
-    var countEl = document.getElementById("roadmap-bar-count");
+    var countEl = document.getElementById("relations-bar-count");
     if (!countEl) return;
     var tickets = Board.state.TICKETS || [];
     var fullGraph = buildDependencyGraph(tickets, { statuses: [], showIsolated: false });
@@ -650,31 +657,52 @@
   }
 
   /**
-   * Toggles the roadmap panel open/closed.
+   * Toggles the relations panel open/closed.
+   *
+   * 펼침 시 toolbar/legend 는 renderRelations 의 Phase A 에서 즉시 그려지고,
+   * 가운데 graph 본체만 Phase B 에서 비동기로 채워진다.
    */
-  function toggleRoadmapPanel() {
-    var panel = document.getElementById("roadmap-panel");
+  function toggleRelationsPanel() {
+    var panel = document.getElementById("relations-panel");
     if (!panel) return;
 
     var isOpen = panel.classList.toggle("open");
+    Board.state.relations.panelOpen = isOpen;
+    if (saveUI) saveUI();
 
     if (isOpen) {
-      renderRoadmap();
+      renderRelations();
     } else {
       updateBarCount();
     }
   }
 
   // Wire collapsed bar click
-  var collapsedBar = document.getElementById("roadmap-collapsed-bar");
+  var collapsedBar = document.getElementById("relations-collapsed-bar");
   if (collapsedBar) {
-    collapsedBar.addEventListener("click", toggleRoadmapPanel);
+    collapsedBar.addEventListener("click", toggleRelationsPanel);
   }
 
-  // Update bar count periodically (tickets may load async)
-  setTimeout(updateBarCount, 2000);
+  // 페이지 로드 시 직전 세션의 panelOpen 상태 복원.
+  // 패널 클래스를 즉시 적용하고 renderRelations 도 즉시 호출한다 — 티켓 데이터가
+  // 아직 없으면 자체 waiting spinner 가 표시되고, 아래 setTimeout 흐름에서 데이터
+  // 도착 후 재호출되어 정상 렌더로 전환된다.
+  if (Board.state.relations.panelOpen) {
+    var initPanel = document.getElementById("relations-panel");
+    if (initPanel) initPanel.classList.add("open");
+    renderRelations();
+  }
+
+  // Update bar count periodically (tickets may load async).
+  // panelOpen 인 경우에는 같은 시점에 본 렌더를 트리거한다.
+  setTimeout(function () {
+    updateBarCount();
+    if (Board.state.relations.panelOpen) {
+      renderRelations();
+    }
+  }, 2000);
 
   // ── Register on Board namespace ──
-  Board.render.renderRoadmap = renderRoadmap;
-  Board.render.toggleRoadmapPanel = toggleRoadmapPanel;
+  Board.render.renderRelations = renderRelations;
+  Board.render.toggleRelationsPanel = toggleRelationsPanel;
 })();
