@@ -1623,6 +1623,7 @@
     resetLastEventId: resetLastEventId,
     adoptLastEventIdForSession: adoptLastEventIdForSession,
     seedInFlightToolUse: seedInFlightToolUse,
+    injectRestHistory: _injectRestHistory,
     _bind: bind,
     _markSent: markSent
   };
