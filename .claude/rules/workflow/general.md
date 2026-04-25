@@ -41,6 +41,19 @@
 - border-left 한쪽 색상 디자인 금지
 - 테마 컬러: 테라코타 오렌지(#D97757)
 
+## PreToolUse Hook 출력 schema (MUST)
+- 통과 시 빈 stdout 금지 (MUST NOT) — `permissionDecision: allow` JSON 을 반드시 출력
+  - 빈 stdout 일 때 SDK 가 외부 경로/WebFetch 등에서 별도 권한 평가를 시도하다 schema 위반 ZodError 발생 (`expected behavior: "allow"|"deny"`)
+- allow JSON 의 `updatedInput` 필드는 **전체 tool_input 을 교체**한다
+  - 입력을 변경하지 않을 거면 필드 자체를 생략 (MUST)
+  - `"updatedInput": {}` 절대 금지 (MUST NOT) — command/file_path/pattern 등 모든 필드가 undefined 되어 모든 도구가 마비됨 (`H.replace undefined`, `Path must be a string`)
+- deny JSON 에 `updatedInput` 넣지 말 것 (SHOULD NOT) — 무시되며 의미상 잘못된 코드
+- 정상 통과 출력 형태:
+  ```json
+  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": "..."}}
+  ```
+- 참고: https://code.claude.com/docs/en/hooks
+
 ## .claude/ 편집 (MUST)
 - `.claude/` 하위 파일의 생성·수정·삭제는 반드시 `flow-claude-edit` 경유 (MUST)
 - `.claude-organic/` 하위 파일은 Edit/Write 직접 수정 가능 (claude_edit 불필요)
