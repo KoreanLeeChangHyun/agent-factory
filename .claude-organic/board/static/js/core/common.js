@@ -555,20 +555,28 @@ function cleanupMermaidOrphans(id) {
 
 /** Renders pending Mermaid diagram blocks. */
 function initMermaid() {
-  // mermaid 스크립트는 async 로 로드되므로 첫 호출 시 정의되지 않을 수 있다.
-  // 이 경우 rendered 플래그를 세팅하지 않고 즉시 종료해, 로드 완료 후 재호출
-  // (_mermaidRescanWhenReady) 에서 다시 시도되도록 한다.
-  if (typeof mermaid === "undefined") return;
-  const blocks = document.querySelectorAll(".mermaid-block");
+  var defined = typeof mermaid !== "undefined";
+  var blocks = document.querySelectorAll(".mermaid-block");
+  if (Board.debugLog) Board.debugLog('initMermaid.call', {
+    defined: defined, blockCount: blocks.length,
+  });
+  if (!defined) return;
   blocks.forEach(function (block) {
     if (block.dataset.rendered) return;
     block.dataset.rendered = "true";
-    const id = block.dataset.mermaidId;
-    const code = block.textContent;
+    var id = block.dataset.mermaidId;
+    var code = block.textContent;
+    if (Board.debugLog) Board.debugLog('initMermaid.render', {
+      id: id, codeHead: code.slice(0, 80),
+    });
     mermaid.render(id, code).then(function (result) {
       block.innerHTML = result.svg;
+      if (Board.debugLog) Board.debugLog('initMermaid.success', { id: id });
     }).catch(function (err) {
       console.warn('[initMermaid] Mermaid render failed for id=' + id + ':', err);
+      if (Board.debugLog) Board.debugLog('initMermaid.fail', {
+        id: id, err: String(err && err.message || err),
+      });
       cleanupMermaidOrphans(id);
       block.innerHTML = '<pre class="wf-file-content">' + esc(code) + '</pre>';
     });
