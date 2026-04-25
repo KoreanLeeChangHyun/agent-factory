@@ -1,0 +1,12 @@
+{
+  "_doc": "디버그 티켓 템플릿. flow-kanban create --debug 호출 시 적용된다. T-900~T-999 영역의 빈 슬롯에 자동 배치되며, 아래 prompt 필드가 기본값으로 채워진다. 실제 검증 시나리오는 flow-kanban update-prompt 로 갱신하라.",
+  "title_prefix": "[DEBUG] ",
+  "command": "implement",
+  "prompt": {
+    "goal": "워크플로우 동작 검증 — 시나리오를 update-prompt 로 명시하라",
+    "target": "검증 대상 파일/모듈을 update-prompt 로 명시하라",
+    "constraints": "단순 검증 목적, 영구 코드 변경 금지\n완료 후 변경사항은 revert 또는 별도 티켓으로 분리\n900번대 슬롯이라 자동 채번에서 제외됨",
+    "criteria": "기대 동작을 update-prompt 로 명시하라\n로그/UI 에서 확인 신호를 명시하라",
+    "context": "디버그 슬롯 (T-900~T-999). 임시 검증용으로 자유롭게 재사용한다."
+  }
+}
