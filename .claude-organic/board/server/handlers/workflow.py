@@ -9,6 +9,7 @@ import uuid
 
 from ..state import workflow_registry
 from .._common import logger
+from ..event_filter import is_user_visible
 from ..terminal_channel import _resolve_last_event_id, TerminalSSEChannel
 from ..claude_process import _validate_images
 
@@ -370,6 +371,10 @@ class WorkflowHandlerMixin:
 
                     # _meta 첫 줄 skip
                     if '_meta' in obj:
+                        continue
+
+                    # 사용자 가시성 정책 적용 (isMeta 등 제외)
+                    if not is_user_visible(obj):
                         continue
 
                     # workflow_step 은 _classify_event 매핑 밖 — 직접 처리

@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Callable
 
 from ._common import logger
+from .event_filter import is_user_visible
 from .sse_client_manager import _NDJSON_EVENT_MAP
 
 # ---------------------------------------------------------------------------
@@ -189,7 +190,7 @@ class TerminalSSEChannel:
         Args:
             data: 파싱된 NDJSON 메시지 dict
         """
-        if data.get('isMeta') is True:
+        if not is_user_visible(data):
             return
         event_name = self._classify_event(data)
         payload = self._build_payload(data, event_name)
