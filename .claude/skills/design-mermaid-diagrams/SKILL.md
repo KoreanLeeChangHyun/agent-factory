@@ -69,6 +69,49 @@ sequenceDiagram
     B-->>A: Response
 ```
 
+#### 한 줄 한 화살표 규칙 (chained arrow 금지)
+
+sequenceDiagram 에서 메시지 한 줄에 화살표는 **반드시 하나만** 사용합니다. 한 줄에 두 개 이상 연결하면 (`A->>B->>C: msg`) 파서가 거부합니다.
+
+**실제 오류 로그:**
+
+```
+Parse error on line N:
+...C->>S->>SSE: stdout (partial_json)
+----------------------^
+Expecting 'TXT', got 'SOLID_ARROW'
+```
+
+**원인 분석:** Mermaid sequenceDiagram 문법은 `Source ARROW Target: Message` 단일 hop 만 인정합니다. 두 번째 화살표(`SOLID_ARROW`)가 메시지 텍스트 위치에서 등장하면 파서가 즉시 중단됩니다. 다이어그램 전체가 fallback `<pre>` 로 raw code 표시되어 의도가 전달되지 않습니다.
+
+| 잘못된 예시 | 올바른 예시 |
+|-------------|-------------|
+| `A->>B->>C: msg` | `A->>B: msg`<br>`B->>C: msg` |
+| `S->>T->>U: forward` | `S->>T: forward`<br>`T->>U: forward` |
+
+화살표 종류(`->>`, `-->>`, `->`, `-->`) 무관하게 동일한 제약이 적용됩니다. `Note over X,Y: ...` (콤마로 구분된 다중 participant 노트) 는 정상이므로 chained 와 혼동하지 마십시오.
+
+**수정 전 (오류):**
+
+```mermaid
+sequenceDiagram
+    participant C as Claude
+    participant S as Server
+    participant SSE as SSE Channel
+    C->>S->>SSE: stdout
+```
+
+**수정 후 (정상):**
+
+```mermaid
+sequenceDiagram
+    participant C as Claude
+    participant S as Server
+    participant SSE as SSE Channel
+    C->>S: stdout
+    S->>SSE: stdout
+```
+
 ### 3. Class Diagram (클래스 다이어그램)
 
 ```mermaid
@@ -287,6 +330,7 @@ flowchart TD
 - [ ] 라벨에 코드 표현식(`func()`, `list[0]`, `a.b()` 등)이 포함된 경우 큰따옴표 래핑 + 괄호류 HTML 엔티티 치환을 병용했는가
 - [ ] 노드 ID에 특수문자가 포함되지 않았는가 (ID는 영문+숫자+언더스코어만 허용)
 - [ ] flowchart 연결선에 방향 화살표(`-->`, `-.->`, `==>`)를 사용했는가 (무방향 `---`, `-.-`, `===` 금지)
+- [ ] sequenceDiagram 메시지 한 줄에 화살표는 한 개만 사용했는가 (chained `A->>B->>C` 금지)
 - [ ] 엣지 라벨에 파이프(`|`) 사용 시 `#124;`로 이스케이프했는가
 - [ ] `\n` 리터럴 대신 `<br>` 또는 Markdown 문자열(`` "`...`" ``)을 사용했는가
 
