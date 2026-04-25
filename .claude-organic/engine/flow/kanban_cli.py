@@ -219,17 +219,18 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
 # ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
 
 
-def cmd_create(title: str, command: str, status: str) -> None:
+def cmd_create(title: str, command: str, status: str, number: str | None = None) -> None:
     """새 티켓 XML을 생성한다.
 
-    XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 채번 후,
-    status 값에 따라 .kanban/todo/ 또는 .kanban/open/ 아래에
-    T-NNN.xml 파일을 생성한다.
+    번호 미지정 시 XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 자동 채번한다.
+    번호 명시 시 정규화 후 동일 번호 충돌을 검사하고, 존재하면 에러로 거부한다.
+    status 값에 따라 .kanban/todo/ 또는 .kanban/open/ 아래에 T-NNN.xml 파일을 생성한다.
 
     Args:
         title: 티켓 제목. 빈 문자열 허용.
         command: 워크플로우 커맨드 (implement, review, research 등). 현재 미사용 (하위 호환용).
         status: 초기 상태 키 ("todo" | "open"). COLUMN_MAP을 통해 XML <status> 값으로 변환된다.
+        number: 명시적 티켓 번호 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번.
     """
     # status 키를 상태명("To Do" / "Open")으로 변환
     status_label = COLUMN_MAP.get(status)
@@ -243,9 +244,25 @@ def cmd_create(title: str, command: str, status: str) -> None:
     # 대상 디렉터리 결정
     target_dir = KANBAN_TODO_DIR if status == "todo" else KANBAN_OPEN_DIR
 
-    max_num = get_max_ticket_number()
-    new_num = max_num + 1
-    ticket_number = f"T-{new_num:03d}"
+    if number is not None:
+        normalized = normalize_ticket_number(number)
+        if normalized is None:
+            err(
+                f"잘못된 --number 값: '{number}'. T-NNN, NNN, #N 형식 중 하나여야 합니다.",
+                2,
+            )
+        ticket_number = normalized
+        existing = find_ticket_file(ticket_number)
+        if existing is not None:
+            err(
+                f"티켓 번호 충돌: {ticket_number} 이미 존재합니다 ({existing}). "
+                f"번호는 유니크해야 합니다.",
+                2,
+            )
+    else:
+        max_num = get_max_ticket_number()
+        new_num = max_num + 1
+        ticket_number = f"T-{new_num:03d}"
 
     # 파일명: T-NNN.xml 고정
     ticket_file = os.path.join(target_dir, f"{ticket_number}.xml")
@@ -1117,6 +1134,14 @@ def build_parser() -> argparse.ArgumentParser:
             "예: flow-kanban create \"제목\" --command implement --status todo"
         ),
     )
+    create_parser.add_argument(
+        "--number",
+        default=None,
+        help=(
+            "티켓 번호 명시 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번. "
+            "동일 번호 존재 시 에러. 예: --number T-000 (디버그/테스트용 고정 슬롯)"
+        ),
+    )
 
     # move 서브커맨드
     move_parser = subparsers.add_parser("move", help="티켓을 지정 컬럼으로 이동한다")
@@ -1221,7 +1246,7 @@ def dispatch(args: argparse.Namespace) -> None:
         SystemExit: 잘못된 티켓 번호 또는 서브커맨드 실행 오류 시.
     """
     if args.subcommand == "create":
-        cmd_create(args.title, args.command, args.status)
+        cmd_create(args.title, args.command, args.status, args.number)
 
     elif args.subcommand == "move":
         ticket = normalize_ticket_number(args.ticket)
