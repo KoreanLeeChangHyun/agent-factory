@@ -450,8 +450,21 @@ class TerminalSSEChannel:
             'output_tokens': usage.get('output_tokens', 0),
         }
 
+    # subtype 별 클라이언트가 top-level 로 접근하는 필드 계약.
+    # 신규 subtype 추가 시 이 표에 명시하지 않으면 클라이언트에서 raw 경유로 접근해야 한다.
+    _SYSTEM_TOP_LEVEL_FIELDS: dict[str, tuple[str, ...]] = {
+        'task_started': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
+        'task_progress': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
+        'task_notification': ('task_id', 'tool_use_id', 'status', 'summary'),
+        'process_exit': ('exit_code',),
+    }
+
     def _build_system_payload(self, data: dict) -> dict:
         """system 이벤트 페이로드를 구성한다.
+
+        subtype 에 따라 클라이언트가 top-level 로 접근하는 필드를
+        ``_SYSTEM_TOP_LEVEL_FIELDS`` 계약에 따라 추출하여 노출한다.
+        클라이언트는 raw 경유 폴백 없이 단순 접근만 수행할 수 있다.
 
         Args:
             data: 원본 NDJSON 메시지 dict
@@ -459,12 +472,17 @@ class TerminalSSEChannel:
         Returns:
             system 페이로드 dict
         """
-        return {
+        subtype = data.get('subtype', '')
+        payload: dict = {
             'kind': 'system',
-            'subtype': data.get('subtype', ''),
+            'subtype': subtype,
             'session_id': data.get('session_id', ''),
             'raw': data,
         }
+        for key in self._SYSTEM_TOP_LEVEL_FIELDS.get(subtype, ()):
+            if key in data:
+                payload[key] = data[key]
+        return payload
 
     @property
     def client_count(self) -> int:
