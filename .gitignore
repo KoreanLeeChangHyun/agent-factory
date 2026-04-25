@@ -13,6 +13,7 @@
 .claude-organic/.board.url
 .claude-organic/.workflow-sessions/
 .claude-organic/staging/
+.claude-organic/.test-logs/
 .claude/scheduled_tasks.lock
 
 CLAUDE.md
