@@ -434,6 +434,9 @@
   M.interruptSession = function() {
     if (M.isWorkflowMode) return;
     if (Board.state.termStatus !== "busy") return;
+    if (M._interruptInFlight) return;
+    M._interruptInFlight = true;
+    M.updateControlBar();
 
     Board.session.postJson("/terminal/interrupt").then(function () {
       M.stopSpinner();
@@ -446,15 +449,33 @@
         }
       }
       M.textBuffer = "";
-      M.currentToolBox = null;
+      // 결과가 도착하지 못한 빈 tool 박스 제거 — toolBoxMap 의 모든 항목 검사.
+      // 결과가 이미 들어간 박스는 removeEmptyToolBox 가 비어있지 않다고 판단해 보존.
+      Object.keys(M.toolBoxMap).forEach(function (tuid) {
+        M.removeEmptyToolBox(tuid);
+      });
       M.toolBoxMap = {};
+      M.currentToolBox = null;
       M.toolInputBuffer = "";
       M.currentToolName = null;
+      // 큐에 push 되어 대기 중이던 메시지를 정리한다 — 사용자 "중지" 의도는
+      // 큐도 포함. 미처리하면 idle 전환 시 drainQueue 가 자동 전송해버린다.
+      if (M.inputQueue && M.inputQueue.length > 0) {
+        M.inputQueue.length = 0;
+        var queuedDoms = M.outputDiv ? M.outputDiv.querySelectorAll(".term-user-queued") : [];
+        for (var i = 0; i < queuedDoms.length; i++) {
+          if (queuedDoms[i].parentNode) queuedDoms[i].parentNode.removeChild(queuedDoms[i]);
+        }
+      }
+      M.updateControlBar();
       // 상태 변경 및 입력 잠금 해제는 result SSE 이벤트 핸들러에 위임한다.
       // SIGINT 후 Claude CLI는 반드시 result 이벤트를 발행하므로 여기서 직접 변경하지 않는다.
       // (직접 변경 시 서버가 아직 running 상태일 때 클라이언트가 idle로 전환되어 409 발생)
+      // _interruptInFlight 는 _onResult 에서 끈다.
     }).catch(function (err) {
       M.appendErrorMessage("[Error] Failed to interrupt: " + err.message);
+      M._interruptInFlight = false;
+      M.updateControlBar();
     });
   };
 

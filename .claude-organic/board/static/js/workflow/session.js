@@ -678,6 +678,9 @@
       Board.state.setTermStatus("idle");
       _ctx.setReceivedChunks(false);
       _ctx.setInputLocked(false);
+      // interrupt 후 result 도착 — 버튼 비활성 플래그 해제.
+      var termMod = Board._term;
+      if (termMod && termMod._interruptInFlight) termMod._interruptInFlight = false;
       _ctx.updateControlBar();
 
       if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
@@ -740,6 +743,9 @@
       // loadHistory 가 새 세션의 last_usage 로 채우는 사이에 바가 0% 로 깜박인다.
       // 사용자가 명시적으로 kill 한 경우엔 _finalizeStoppedUI 가 별도로 리셋한다.
       _ctx.stopSpinner();
+      // process_exit 도 interrupt 응답의 종착점이 될 수 있다 (예: result 없이 종료).
+      var termModExit = Board._term;
+      if (termModExit && termModExit._interruptInFlight) termModExit._interruptInFlight = false;
       var exitCode = data.exit_code;
       if (exitCode !== 0 && exitCode !== 143 && exitCode !== undefined) {
         _ctx.appendErrorMessage("Process exited with code " + exitCode);

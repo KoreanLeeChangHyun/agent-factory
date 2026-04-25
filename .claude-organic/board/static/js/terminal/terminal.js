@@ -248,7 +248,15 @@
         sendBtn.style.display = "none";
       } else {
         sendBtn.style.display = "";
-        if (isBusy) {
+        if (M._interruptInFlight) {
+          // interrupt 후 result 대기 중 — 버튼을 잠시 비활성화하여 재클릭 차단
+          // 및 사용자에게 처리 중임을 시각적으로 알린다. result 도착 시
+          // _onResult 가 플래그를 끄고 updateControlBar 호출.
+          sendBtn.classList.add("is-stop");
+          sendBtn.disabled = true;
+          sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
+          sendBtn.onclick = null;
+        } else if (isBusy) {
           // busy: Claude 응답 중 → interrupt 버튼
           sendBtn.classList.add("is-stop");
           sendBtn.disabled = false;
