@@ -65,7 +65,31 @@ def main() -> None:
     )
     sync_results.append(r)
 
+    # --- Memory GC session trigger (fire-and-forget) ---
+    # MEMORY_GC_AUTO_TRIGGERS 에 'session' 토큰이 있을 때만 발화. wrapper 가 자체 검사.
+    # subprocess.Popen 으로 background 실행 후 즉시 반환 — 세션 시작 지연 없음.
+    _trigger_memory_gc_session()
+
     sys.exit(collect_exit_codes(sync_results))
+
+
+def _trigger_memory_gc_session() -> None:
+    import subprocess
+    project_dir = os.environ.get('CLAUDE_PROJECT_DIR') or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))
+    ).rsplit('/.claude-organic', 1)[0]
+    gc_bin = os.path.join(project_dir, '.claude-organic', 'bin', 'flow-memory-gc')
+    if not os.path.isfile(gc_bin):
+        return
+    try:
+        subprocess.Popen(
+            [gc_bin, 'auto', '--trigger', 'session'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        pass
 
 
 if __name__ == '__main__':

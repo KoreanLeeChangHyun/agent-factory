@@ -137,6 +137,10 @@ class BoardHTTPRequestHandler(
             self._handle_prompt_write()
         elif self.path == '/api/prompt/claude-md':
             self._handle_claude_md_write()
+        elif self.path == '/api/memory/gc/run':
+            self._handle_memory_gc_run()
+        elif self.path == '/api/memory/gc/prune-archive':
+            self._handle_memory_gc_prune()
         else:
             self.send_response(404)
             self.end_headers()

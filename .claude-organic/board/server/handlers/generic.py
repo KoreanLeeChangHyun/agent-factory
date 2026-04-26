@@ -25,6 +25,9 @@ from .._common import (
     _read_prompt_file,
     _read_claude_md,
     _read_roadmap,
+    _memory_gc_status,
+    _memory_gc_run,
+    _memory_gc_prune_archive,
     logger,
 )
 
@@ -111,9 +114,30 @@ class GenericHandlerMixin:
                 self._send_json(_read_claude_md(project_root))
             except FileNotFoundError as e:
                 self._send_error(404, str(e))
+        elif path == '/api/memory/gc/status':
+            self._send_json(_memory_gc_status(project_root))
         else:
             self.send_response(404)
             self.end_headers()
+
+    # ---------------- Memory GC POST handlers ----------------
+
+    def _handle_memory_gc_run(self) -> None:
+        """POST /api/memory/gc/run — body {"dry_run": bool, "with_reflection": bool}"""
+        data = self._read_json_body() or {}
+        dry_run = bool(data.get('dry_run', False))
+        with_reflection = bool(data.get('with_reflection', False))
+        result = _memory_gc_run(
+            os.getcwd(), dry_run=dry_run, with_reflection=with_reflection,
+        )
+        self._send_json(result)
+
+    def _handle_memory_gc_prune(self) -> None:
+        """POST /api/memory/gc/prune-archive — body {"apply": bool}"""
+        data = self._read_json_body() or {}
+        apply = bool(data.get('apply', False))
+        result = _memory_gc_prune_archive(os.getcwd(), apply=apply)
+        self._send_json(result)
 
     def _handle_poll(self) -> None:
         """폴링 엔드포인트를 처리한다.

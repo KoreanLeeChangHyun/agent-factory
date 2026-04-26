@@ -1042,3 +1042,62 @@ def _read_roadmap(project_root: str) -> dict:
     data.setdefault('version', 1)
     data.setdefault('phases', [])
     return data
+
+
+# ---------------------------------------------------------------------------
+# Memory GC (.claude-organic/bin/flow-memory-gc 래퍼 위임)
+# ---------------------------------------------------------------------------
+
+MEMORY_GC_BIN: str = os.path.join('.claude-organic', 'bin', 'flow-memory-gc')
+
+
+def _run_memory_gc(project_root: str, subcmd: str, *args: str, timeout: int = 30) -> dict:
+    """flow-memory-gc 서브커맨드를 호출해 JSON 결과를 반환한다.
+
+    실패 시 {"ok": False, "error": "..."} 형태로 정규화.
+    """
+    bin_path = os.path.join(project_root, MEMORY_GC_BIN)
+    if not os.path.isfile(bin_path):
+        return {'ok': False, 'error': 'flow-memory-gc not found'}
+    cmd = [bin_path, subcmd, *args]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=project_root,
+        )
+    except subprocess.TimeoutExpired:
+        return {'ok': False, 'error': 'timeout'}
+    stdout = (result.stdout or '').strip()
+    stderr = (result.stderr or '').strip()
+    payload: dict = {}
+    if stdout.startswith('{'):
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError:
+            payload = {'raw_stdout': stdout}
+    else:
+        payload = {'raw_stdout': stdout}
+    payload.setdefault('ok', result.returncode == 0)
+    if result.returncode != 0:
+        payload['error'] = stderr or stdout or f'exit {result.returncode}'
+    return payload
+
+
+def _memory_gc_status(project_root: str) -> dict:
+    return _run_memory_gc(project_root, 'status', timeout=15)
+
+
+def _memory_gc_run(project_root: str, *, dry_run: bool, with_reflection: bool) -> dict:
+    args: list[str] = ['--json']
+    if dry_run:
+        args.append('--dry-run')
+    if not with_reflection:
+        args.append('--no-reflection')
+    timeout = 180 if with_reflection else 60
+    return _run_memory_gc(project_root, 'run', *args, timeout=timeout)
+
+
+def _memory_gc_prune_archive(project_root: str, *, apply: bool) -> dict:
+    args: list[str] = []
+    if apply:
+        args.append('--apply')
+    return _run_memory_gc(project_root, 'prune-archive', *args, timeout=30)

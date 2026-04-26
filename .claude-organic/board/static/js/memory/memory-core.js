@@ -475,14 +475,28 @@
     M.fetchMemoryList().then(function (files) {
       Board.state.memoryFiles = files;
 
+      // GC bar + body 2단 column 분리.
+      // prompt-subtab-content 는 row 라 wrapper 안에서 column 흐름을 잡아준다.
+      content.innerHTML =
+        '<div class="memory-vertical-wrap">' +
+          '<div class="memory-gc-host" id="memory-gc-host"></div>' +
+          '<div class="memory-body-host" id="memory-body-host"></div>' +
+        '</div>';
+      var bodyHost = document.getElementById("memory-body-host");
+      var gcHost = document.getElementById("memory-gc-host");
+
+      if (Board.render.renderMemoryGcBar) {
+        Board.render.renderMemoryGcBar(gcHost);
+      }
+
       if (!files || files.length === 0) {
-        content.innerHTML = M.renderMemoryEmptyState();
-        M.bindMemoryEmptyNewBtn(content);
+        bodyHost.innerHTML = M.renderMemoryEmptyState();
+        M.bindMemoryEmptyNewBtn(bodyHost);
         return;
       }
 
-      content.innerHTML = M.renderMemoryLayout();
-      M.bindResizeHandle(content);
+      bodyHost.innerHTML = M.renderMemoryLayout();
+      M.bindResizeHandle(bodyHost);
       M.renderMemorySidebar();
       M.bindMemoryToolbar();
       M.bindMemoryKeyboard();

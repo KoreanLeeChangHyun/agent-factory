@@ -52,6 +52,9 @@ from board_data import (
     _read_claude_md,
     _write_claude_md,
     _read_roadmap,
+    _memory_gc_status,
+    _memory_gc_run,
+    _memory_gc_prune_archive,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +80,10 @@ WATCH_DIRS: dict[str, str] = {
     os.path.join('.claude-organic', 'board', 'data'): 'dashboard',
     os.path.join('.claude-organic', 'roadmap'): 'roadmap',
 }
+
+# 메모리 GC 디렉터리 감시 — 사용자 글로벌 영역, project_root 기준 상대경로 X
+# (server.py 가 watcher 등록 시 절대경로 변환 필요. 일단 SSE 채널만 예약)
+MEMORY_WATCH_EVENT: str = 'memory_gc'
 
 # Workflow sync (init-claude-workflow.sh) 부트스트랩 URL과 동시 실행 차단 락
 _WORKFLOW_SYNC_URL: str = (
