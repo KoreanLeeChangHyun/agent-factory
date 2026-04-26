@@ -1,6 +1,6 @@
 ---
 name: design-mermaid-diagrams
-description: Generates Mermaid diagrams covering flowcharts, sequence diagrams, class diagrams, ER diagrams, state diagrams, Gantt charts, and pie charts. Use when visualizing system architecture, data models, process flows, or relationship structures, and when output is needed as Mermaid code, HTML preview, PNG, or SVG.
+description: "TRIGGER: about to output a ```mermaid code block (any size, even one-line examples). Provides syntax rules for flowchart/sequence/class/ER/state/Gantt/pie diagrams — special character escape (`/`, `<br/>`, `?`, `()` etc. require `[\"...\"]` quoted labels), one-arrow-per-line rule, mermaid 11+ quote handling. SKIP only when no mermaid block is being produced. Direct authoring without this skill frequently triggers parser failure → raw <pre> fallback (intent lost)."
 license: "Apache-2.0"
 ---
 
