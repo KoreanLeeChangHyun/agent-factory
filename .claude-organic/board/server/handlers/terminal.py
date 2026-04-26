@@ -444,6 +444,8 @@ class TerminalHandlerMixin:
         last_usage_ts = ''
         last_cost_usd: float | None = None
         last_cost_ts = ''
+        last_model: str | None = None
+        last_model_ts = ''
         try:
             with open(filepath, 'r', encoding='utf-8') as fp:
                 for line in fp:
@@ -466,6 +468,10 @@ class TerminalHandlerMixin:
                     if msg_type == 'assistant':
                         msg = data.get('message')
                         if isinstance(msg, dict):
+                            model_val = msg.get('model')
+                            if isinstance(model_val, str) and line_ts >= last_model_ts:
+                                last_model = model_val
+                                last_model_ts = line_ts
                             usage = msg.get('usage')
                             if isinstance(usage, dict) and line_ts >= last_usage_ts:
                                 in_raw = usage.get('input_tokens', 0) or 0
@@ -556,6 +562,8 @@ class TerminalHandlerMixin:
             response['last_usage'] = last_usage
         if last_cost_usd is not None:
             response['last_cost_usd'] = last_cost_usd
+        if last_model is not None:
+            response['last_model'] = last_model
 
         self._send_json(response)
 

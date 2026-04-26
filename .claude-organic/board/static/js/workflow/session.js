@@ -362,6 +362,18 @@
     });
   }
 
+  function _applyRawModel(raw) {
+    if (!_ctx || !raw) return;
+    var ctxMatch = raw.match(/\[(\d+)([mk])\]/i);
+    if (ctxMatch) {
+      var ctxNum = parseInt(ctxMatch[1]);
+      _ctx.setContextWindow(ctxMatch[2].toLowerCase() === "m" ? ctxNum * 1000000 : ctxNum * 1000);
+    }
+    var clean = raw.replace(/\[.*\]/, "").replace(/^claude-/, "");
+    clean = clean.replace(/-(\d+)-(\d+)/, " $1.$2").replace(/-/g, " ");
+    _ctx.setSessionModel(clean.charAt(0).toUpperCase() + clean.slice(1));
+  }
+
   function fetchStatus() {
     if (!_ctx) return Promise.resolve();
     if (Board.debugLog) Board.debugLog('fetchStatus.call', {
@@ -420,14 +432,7 @@
         Board.state.termLastSessionId = data.session_id || Board.state.termLastSessionId || null;
       }
       if (data.model) {
-        var raw = data.model;
-        var ctxMatch = raw.match(/\[(\d+)([mk])\]/i);
-        if (ctxMatch) {
-          _ctx.setContextWindow(ctxMatch[2].toLowerCase() === "m" ? parseInt(ctxMatch[1]) * 1000000 : parseInt(ctxMatch[1]) * 1000);
-        }
-        var clean = raw.replace(/\[.*\]/, "").replace(/^claude-/, "");
-        clean = clean.replace(/-(\d+)-(\d+)/, " $1.$2").replace(/-/g, " ");
-        _ctx.setSessionModel(clean.charAt(0).toUpperCase() + clean.slice(1));
+        _applyRawModel(data.model);
       }
       if (data.permission_mode) {
         var modeEl = document.getElementById("terminal-sl-mode");
@@ -703,16 +708,7 @@
       Board.state.termSessionId = data.session_id;
       Board.state.setTermStatus("idle");
       if (data.raw && data.raw.model) {
-        var rawModel = data.raw.model;
-        var ctxMatch = rawModel.match(/\[(\d+)([mk])\]/i);
-        if (ctxMatch) {
-          var ctxNum = parseInt(ctxMatch[1]);
-          _ctx.setContextWindow(ctxMatch[2].toLowerCase() === "m" ? ctxNum * 1000000 : ctxNum * 1000);
-        }
-        var clean = rawModel.replace(/\[.*\]/, "").replace(/^claude-/, "");
-        clean = clean.replace(/-(\d+)-(\d+)/, " $1.$2").replace(/-/g, " ");
-        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
-        _ctx.setSessionModel(clean);
+        _applyRawModel(data.raw.model);
       }
       if (data.raw && data.raw.permissionMode) {
         var modeEl = document.getElementById("terminal-sl-mode");
@@ -1618,6 +1614,7 @@
     adoptLastEventIdForSession: adoptLastEventIdForSession,
     seedInFlightToolUse: seedInFlightToolUse,
     injectRestHistory: _injectRestHistory,
+    applyRawModel: _applyRawModel,
     _bind: bind,
     _markSent: markSent
   };

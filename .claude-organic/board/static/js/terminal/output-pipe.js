@@ -295,6 +295,13 @@
       // usage/cost 는 events 유무와 무관하게 반영한다.
       // force=true: 세션 스위치 시 이전 세션의 토큰을 이 세션의 last_usage 로 덮어쓰기.
       _applyHistoryUsage(data, true);
+      // 세션 메타: jsonl 마지막 assistant 메시지의 model 을 status bar 에 복원.
+      // /terminal/status 가 아닌 /terminal/history 에서 가져오는 이유는,
+      // resume 시 새 spawn 프로세스의 라이브 model 이 아니라 "이 세션이 실제로
+      // 사용한 model" 이 의미적으로 옳기 때문이다.
+      if (data.last_model && Board.session && Board.session.applyRawModel) {
+        Board.session.applyRawModel(data.last_model);
+      }
       if (!data.events || !data.events.length) {
         M.showEmptyState();
         return;
