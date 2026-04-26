@@ -196,6 +196,10 @@
       refreshMemory();
     });
 
+    es.addEventListener("roadmap", function () {
+      if (Board.render.refreshRoadmap) Board.render.refreshRoadmap();
+    });
+
     es.addEventListener("git_branch", function (e) {
       try {
         var d = JSON.parse(e.data);
@@ -249,6 +253,9 @@
       }
       if (changes.memory) {
         refreshMemory();
+      }
+      if (changes.roadmap) {
+        if (Board.render.refreshRoadmap) Board.render.refreshRoadmap();
       }
       if (changes.git_branch) {
         // polling payload 는 [branch] list — 마지막 값을 사용한다

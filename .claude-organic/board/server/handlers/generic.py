@@ -24,6 +24,7 @@ from .._common import (
     _list_prompt_files,
     _read_prompt_file,
     _read_claude_md,
+    _read_roadmap,
     logger,
 )
 
@@ -62,6 +63,8 @@ class GenericHandlerMixin:
             })
         elif path == '/api/branch':
             self._send_json({'branch': _get_git_branch(project_root)})
+        elif path == '/api/roadmap':
+            self._send_json(_read_roadmap(project_root))
         elif path == '/api/workflow/artifact':
             self._handle_workflow_artifact(qs)
         elif path == '/api/memory':

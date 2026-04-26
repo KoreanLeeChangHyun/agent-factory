@@ -9,8 +9,10 @@
   var esc = Board.util.esc;
   var M = (Board._memory = Board._memory || {});
 
-  // ── State: Prompt tab (shared) ──
-  Board.state.promptSubTab = "claudemd"; // "rules" | "prompt" | "claudemd" | "memory"
+  // ── State: Contexts tab (shared) ──
+  // 서브탭: roadmap | rules | memory | prompt
+  // CLAUDE.md 는 Rules 서브탭의 "Project Meta" 카테고리에 편입되어 별도 서브탭이 아니다.
+  Board.state.promptSubTab = "roadmap";
 
   // ── State: Rules sub-tab ──
   Board.state.promptRulesFiles = [];
@@ -83,13 +85,17 @@
       .catch(function () { return []; });
   };
 
+  // CLAUDE.md 가 Rules 사이드바 "Project Meta" 카테고리에 편입되었으므로,
+  // path === "CLAUDE.md" 인 special case 를 fetch/save/delete 시 분기 처리한다.
   M.fetchRulesFile = function(path) {
+    if (path === "CLAUDE.md") return M.fetchClaudeMd();
     return fetch("/api/prompt/rules/file?path=" + encodeURIComponent(path), { cache: "no-store" })
       .then(function (res) { return res.ok ? res.json() : null; })
       .catch(function () { return null; });
   };
 
   M.saveRulesFile = function(path, content) {
+    if (path === "CLAUDE.md") return M.saveClaudeMd(content);
     return fetch("/api/prompt/rules/file", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,6 +105,9 @@
   };
 
   M.deleteRulesFile = function(path) {
+    if (path === "CLAUDE.md") {
+      return Promise.resolve({ ok: false, error: "CLAUDE.md cannot be deleted." });
+    }
     return fetch("/api/prompt/rules/file?path=" + encodeURIComponent(path), { method: "DELETE" })
       .then(function (res) { return res.json(); })
       .catch(function () { return null; });
@@ -168,7 +177,6 @@
     var sub = Board.state.promptSubTab;
     if (sub === "rules") return Board.state.promptRulesDirty;
     if (sub === "prompt") return Board.state.promptPromptDirty;
-    if (sub === "claudemd") return Board.state.promptClaudeMdDirty;
     if (sub === "memory") return Board.state.memoryDirty;
     return false;
   };
@@ -190,7 +198,7 @@
     container.innerHTML =
       '<div class="prompt-view-wrapper">' +
         '<div class="prompt-subtab-bar">' +
-          M.renderSubTabButton("claudemd", "CLAUDE.md") +
+          M.renderSubTabButton("roadmap", "Roadmap") +
           M.renderSubTabButton("rules", "Rules") +
           M.renderSubTabButton("memory", "Memory") +
           M.renderSubTabButton("prompt", "Prompt") +
@@ -241,16 +249,29 @@
   M.resetDirtyState = function(subTab) {
     if (subTab === "rules") Board.state.promptRulesDirty = false;
     else if (subTab === "prompt") Board.state.promptPromptDirty = false;
-    else if (subTab === "claudemd") Board.state.promptClaudeMdDirty = false;
     else if (subTab === "memory") Board.state.memoryDirty = false;
   };
 
   M.renderActiveSubTab = function() {
     var sub = Board.state.promptSubTab;
-    if (sub === "rules") M.renderSubRules();
-    else if (sub === "prompt") M.renderSubPromptFiles();
-    else if (sub === "claudemd") M.renderSubClaudeMd();
+    if (sub === "roadmap") M.renderSubRoadmap();
+    else if (sub === "rules") M.renderSubRules();
     else if (sub === "memory") M.renderSubMemory();
+    else if (sub === "prompt") M.renderSubPromptFiles();
+  };
+
+  // Roadmap 서브탭 — views/roadmap.js 가 등록한 진입점에 위임.
+  M.renderSubRoadmap = function() {
+    var content = document.getElementById("prompt-content");
+    if (!content) return;
+    if (Board.render.renderRoadmapSubtab) {
+      Board.render.renderRoadmapSubtab(content);
+    } else {
+      content.innerHTML = '<div class="memory-empty-icon" aria-hidden="true">'
+        + '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+        + '<path d="M12 2v20M2 12h20"/></svg></div>'
+        + '<p>Roadmap module not loaded.</p>';
+    }
   };
 
   // Compatibility: Board.render.renderMemory = M.renderPrompt

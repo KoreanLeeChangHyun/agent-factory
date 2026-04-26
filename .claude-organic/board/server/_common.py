@@ -51,6 +51,7 @@ from board_data import (
     _delete_prompt_file,
     _read_claude_md,
     _write_claude_md,
+    _read_roadmap,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ WATCH_DIRS: dict[str, str] = {
     os.path.join('.claude-organic', 'runs'): 'workflow',
     os.path.join('.claude-organic', 'runs', '.history'): 'workflow',
     os.path.join('.claude-organic', 'board', 'data'): 'dashboard',
+    os.path.join('.claude-organic', 'roadmap'): 'roadmap',
 }
 
 # Workflow sync (init-claude-workflow.sh) 부트스트랩 URL과 동시 실행 차단 락

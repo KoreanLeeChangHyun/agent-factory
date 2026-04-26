@@ -1,0 +1,369 @@
+/* Claude Code Workflow Board - Roadmap Subtab Styles
+ *
+ * Contexts 탭 (#view-memory > .prompt-view-wrapper > #prompt-content) 의 Roadmap
+ * 서브탭에 사용된다. #prompt-content 가 이미 flex row + overflow:hidden 컨테이너이므로
+ * 본 모듈은 그 자식으로 side / resize-handle / body 를 직접 박는다 (별도 layout wrapper 없음).
+ *
+ * 좌측: Phase 사이드 네비 (Phase + Milestone 트리, 상태 뱃지)
+ * 우측: 선택된 Phase 의 마크다운 본문 + Milestone 카드 그리드
+ */
+
+/* ── Side Navigation ── */
+.roadmap-side {
+  width: 240px;
+  flex-shrink: 0;
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.roadmap-side-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+}
+
+/* ── Resize Handle (Prompt 탭 패턴) ── */
+.roadmap-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+.roadmap-resize-handle:hover,
+.roadmap-resize-handle.dragging {
+  background: #D97757;
+}
+
+.roadmap-side-phase {
+  margin-bottom: 4px;
+}
+
+.roadmap-side-phase-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #d4d4d4;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+.roadmap-side-phase-title:hover {
+  background: rgba(217, 119, 87, 0.08);
+}
+.roadmap-side-phase-title.active {
+  background: rgba(217, 119, 87, 0.18);
+  color: #D97757;
+}
+
+.roadmap-side-phase-progress {
+  margin-left: auto;
+  font-size: 10px;
+  color: #858585;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+.roadmap-side-phase-title.active .roadmap-side-phase-progress {
+  color: #D97757;
+}
+
+.roadmap-side-milestones {
+  list-style: none;
+  margin: 2px 0 6px 18px;
+  padding: 0;
+}
+
+.roadmap-side-milestone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.roadmap-side-milestone:hover {
+  background: rgba(217, 119, 87, 0.06);
+  color: #d4d4d4;
+}
+
+/* ── Body (scrollable content) ── */
+/* #prompt-content (flex row) 의 자식으로 직접 들어가 flex:1 로 우측 영역을 차지한다.
+ * resize handle 옆에 위치 → side(고정) | handle | body(flex:1). */
+.roadmap-body {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.roadmap-body-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #2d2d2d;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.roadmap-body-title-progress {
+  font-size: 11px;
+  font-weight: 400;
+  color: #858585;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+/* Markdown body inside .roadmap-body-md */
+.roadmap-body-md h1,
+.roadmap-body-md h2,
+.roadmap-body-md h3 {
+  color: #e0e0e0;
+  margin-top: 18px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.roadmap-body-md h1 { font-size: 15px; }
+.roadmap-body-md h2 { font-size: 14px; }
+.roadmap-body-md h3 { font-size: 13px; color: #c0c0c0; }
+.roadmap-body-md p {
+  margin: 0 0 10px;
+}
+.roadmap-body-md ul,
+.roadmap-body-md ol {
+  margin: 0 0 10px 18px;
+  padding: 0;
+}
+.roadmap-body-md li { margin-bottom: 3px; }
+.roadmap-body-md code {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.roadmap-body-md pre {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.roadmap-body-md pre code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.roadmap-body-md table {
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: 12px;
+}
+.roadmap-body-md th,
+.roadmap-body-md td {
+  border: 1px solid #2d2d2d;
+  padding: 5px 10px;
+  text-align: left;
+}
+.roadmap-body-md th {
+  background: #1e1e1e;
+  color: #c0c0c0;
+}
+.roadmap-body-md a { color: #4ec9b0; }
+.roadmap-body-md a:hover { text-decoration: underline; }
+
+/* ── Milestone Cards Section (inside body) ── */
+.roadmap-milestones-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #2d2d2d;
+}
+
+.roadmap-milestones-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #858585;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.roadmap-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.roadmap-card {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.roadmap-card:hover {
+  background: #232324;
+  border-color: #3c3c3c;
+}
+.roadmap-card.expanded {
+  background: #232324;
+  border-color: #3c3c3c;
+}
+
+.roadmap-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.roadmap-card-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+  line-height: 1.4;
+}
+
+.roadmap-card-tickets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.roadmap-card-ticket-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  background: rgba(86, 156, 214, 0.18);
+  color: #569cd6;
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.roadmap-card-ticket-chip:hover {
+  background: rgba(86, 156, 214, 0.32);
+}
+
+.roadmap-card-body {
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2d2d2d;
+  font-size: 12px;
+  color: #b0b0b0;
+  line-height: 1.6;
+}
+.roadmap-card.expanded .roadmap-card-body {
+  display: block;
+}
+
+/* ── Status Badges (planned / in-progress / done) ── */
+.roadmap-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  background: transparent;
+  white-space: nowrap;
+}
+.roadmap-badge.status-planned     { color: #6a9fb5; }
+.roadmap-badge.status-in-progress { color: #dcdcaa; }
+.roadmap-badge.status-done        { color: #858585; }
+
+/* Side-nav 의 작은 dot 표시 (트리 인덴트 안의 milestone) */
+.roadmap-side-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.roadmap-side-dot.status-planned     { color: #6a9fb5; }
+.roadmap-side-dot.status-in-progress { color: #dcdcaa; }
+.roadmap-side-dot.status-done        { color: #858585; }
+
+/* ── Loading State ── */
+.roadmap-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 30px 24px;
+  color: #858585;
+  font-size: 12px;
+}
+
+.roadmap-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #3c3c3c;
+  border-top-color: #D97757;
+  border-radius: 50%;
+  animation: roadmap-spin 0.8s linear infinite;
+}
+
+@keyframes roadmap-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Empty State ── */
+.roadmap-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px 24px;
+  color: #858585;
+  text-align: center;
+}
+
+.roadmap-empty-icon {
+  display: inline-flex;
+  color: #858585;
+  opacity: 0.4;
+}
+.roadmap-empty-icon svg {
+  display: block;
+}
+
+.roadmap-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a5a5a;
+}
+
+.roadmap-empty-desc {
+  font-size: 12px;
+  color: #4a4a4a;
+  max-width: 480px;
+  line-height: 1.5;
+}

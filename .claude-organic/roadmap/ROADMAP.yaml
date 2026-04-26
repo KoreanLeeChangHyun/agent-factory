@@ -1,0 +1,624 @@
+version: 1
+
+# claude-workflow (Organic Engineering) — 프로젝트 로드맵
+#
+# 본 파일은 메모리 `project_design_direction.md` (2026-04-23 작성, 357줄) 의 정식 이관처다.
+# 기존 메모리는 archived 표기 후 보존하고, 향후 모든 비전·미구현 항목 갱신은 이 파일에서 한다.
+#
+# 구조:
+#   - phases[]: 큰 영역 (조직/시스템 차원의 한 덩어리)
+#       body: 산문 비전·원칙·메타포 (마크다운 자유)
+#       milestones[]: 그 영역에서 추적해야 할 구체 항목
+#   - milestones[].status: planned | in-progress | done
+#   - milestones[].tickets: 연결된 티켓 ID 목록
+#
+# 편집은 현재는 텍스트 직접 수정. 편집 UI 는 후속 마일스톤 (`uiux.roadmap-editor`).
+
+phases:
+  # ──────────────────────────────────────────────────────────────────────
+  - id: principles
+    title: 시스템 본질·원칙
+    body: |
+      ## 방법론 명칭
+
+      **Organic Engineering** — claude-workflow 가 구현하는 소프트웨어 개발 방법론. 사용자
+      정의 (2026-04-10). 목표는 이 방법이 대세가 될 때까지 지속 개발한다.
+
+      ### 이름의 의미 (유기적 특성)
+
+      - **조직처럼 유기적으로 동작** — 역할 분담, 위임, 보고 체계
+      - **기억이 생물학적 생애주기를 가짐** — 생성(메모라이징)·정리(GC)·승격(장기 기억)
+      - **피드백으로 진화** — 로그·분석·개선의 순환 루프
+      - **컨텍스트 윈도우와 함께 호흡** — 세션별 fresh context, 필요한 것만 선택 로딩
+      - **UI/UX 상시 개선** — 한 번 확정되지 않고 사용하며 다듬어지는 표면
+      - 단순 워크플로우 도구가 아니라 **소프트웨어를 만드는 방식 자체**에 대한 철학
+
+      ## 시스템의 본질
+
+      claude-workflow 는 단순 워크플로우 도구가 아니라, 프로젝트를 잘 이끌어가기 위한 **조직
+      시스템 (Organic Engineering)** 이다.
+
+      - 사용자(클라이언트)가 팀 리더(메인 클로드)와 협업하여 프로젝트를 진행하는 미니 조직
+        을 시뮬레이션한다.
+      - 티켓·워크플로우·서브에이전트·스킬 등 모든 구성 요소는 **조직 운영 메타포** 로 설계된다.
+      - 설계 판단 기준: "실제 조직에서 이 상황을 어떻게 다루나?"
+      - 기술적 편의보다 **조직 원칙의 일관성** 이 우선이다.
+      - 예: "팀 리더는 팀원 일을 직접 하지 않는다" = 메인 클로드 직접 수정 금지 원칙
+      - 예: "클라이언트의 시간은 귀중하다" = 대화 기다림 최소화 원칙
+
+      ## 기본 4-계층 구조
+
+      ```mermaid
+      flowchart TD
+        User["사용자 (클라이언트)"]
+        Main["메인 클로드 (팀 리더)<br/>브레인스토밍 · 티켓 발주 · 조율"]
+        Worker["작업 클로드 (현장 감독)<br/>워크플로우 오케스트레이션 · 팀 리더 보고"]
+        Sub["서브에이전트 (팀원)<br/>설계 / 작업 / 검증 / 보고"]
+        User -->|"칸반 보드 / 메인 터미널 대화"| Main
+        Main -->|"flow-launcher"| Worker
+        Worker -->|"디스패치"| Sub
+      ```
+
+      ## 핵심 원칙
+
+      - 메인 클로드는 **직접 수정하지 않는다** — 티켓화 후 작업 클로드에 위임이 원칙.
+      - 브레인스토밍은 **사람 ↔ 메인 클로드** 사이에서만 이루어지고, 결과물은 티켓으로 구체화.
+      - 작업 클로드는 티켓 프롬프트(goal/target/constraints/criteria/context) 를 계약으로 받아 실행.
+      - **워크플로우의 무게는 티켓 작업량에 비례해야 한다** — 간단한 수정에 무거운 5단계
+        워크플로우를 강제하면 비용·시간 과부하로 사용자가 워크플로우를 우회하게 되고
+        추적성이 무너진다. 작업량 기반 분기는 사용성의 근본 요건이다.
+      - **메인 클로드는 워크플로우 조작 시 Python 스크립트(`flow-*` bin wrapper)** 를 활용한다.
+        SSoT 는 `.claude-organic/engine/flow/*.py`. JS/TS(Board UI) 는 시각화 전용, 상태 변경 권한 없음.
+      - **사용자-팀 리더 대화에서 기다림은 최소화한다** — 무거운 인지 작업은 위임하고 대화는
+        계속 이어가야 한다. (a) 비동기 위임 경로, (b) 결과 복귀 채널, (c) 대화 맥락 병합
+        메커니즘이 필요 — 모두 현재 설계 공백 (`pipeline-gaps` phase 참조).
+
+      ## 위임 경로 검토 (Option 2)
+
+      팀 리더의 위임 대상을 **비서** 와 **현장 감독** 2개 경로로 분리한다.
+
+      - **비서 = 별도 Claude 세션** (서브에이전트 아님)
+        - 현장 감독과 동급 독립 세션이지만 티켓/FSM/워크플로우 오버헤드 없음
+        - 용도: 대화 중 간단한 조사·사실 확인·정보 조회
+        - 결과는 대화에 흡수되는 답변 형태
+      - **현장 감독 = 워크플로우 세션** (기존 작업 클로드)
+        - 티켓 기반, 전체 FSM(PLAN→WORK→REPORT→DONE) 수행
+        - 결과는 아티팩트로 남음
+
+      팀 리더는 요청 성격에 따라 둘 중 하나를 선택한다.
+
+      ## 설계 성숙도 및 수정 태도
+
+      - 워크플로우 뼈대(FSM, 스킬 매핑, 검증 장치, 서브에이전트 역할 분리, 아티팩트 산출
+        의무)는 수개월에 걸쳐 설계된 **성숙 자산** 이다.
+      - **뼈대 자체는 성역이 아니다** — 더 나은 접근이 있다면 근본 재설계도 수용.
+      - 개선 제안 시 기존 구조 개선안과 근본 재설계안을 모두 검토 대상으로 삼고 비용/효과로
+        판단한다. (참고 사례: GSD-2 — prompt framework → standalone CLI 근본 전환으로
+        "heavy orchestration" 문제 해소)
+    milestones: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: workflow-model
+    title: 워크플로우·스킬 모델
+    body: |
+      ## 서브에이전트 4단계 역할 모델
+
+      코딩에 국한되지 않은 범용 작업 라이프사이클이다.
+
+      ```mermaid
+      flowchart LR
+        Plan["설계<br/>planner"]
+        Work["작업<br/>worker / explorer"]
+        Verify["검증<br/>validator"]
+        Report["보고<br/>reporter"]
+        Plan --> Work
+        Work --> Verify
+        Verify --> Report
+      ```
+
+      | 단계 | 역할 | 해당 에이전트 | 주 산출물 |
+      |------|------|--------------|----------|
+      | 설계 | 문제 분해, 계획 수립, 태스크 분할 | planner | `plan.md` |
+      | 작업 | 실제 수행 (실행형/조사형) | worker, explorer | `work/WXX-*.md` |
+      | 검증 | 결과 정합성·품질 확인 | validator | `work/validation-report.md` |
+      | 보고 | 산출물 종합·요약 | reporter | `report.md` |
+
+      worker/explorer 는 작업 단계의 두 형태 — worker 는 실행·구현·편집, explorer 는
+      조사·분석·리서치. 같은 "작업" 단계에 속한다. 4단계는 FSM 의 PLAN→WORK→REPORT→DONE
+      과 대응되며, 도메인 중립적이라 코딩 외 작업(문서/리뷰/기획)에도 동일 적용된다.
+
+      ## 워크플로우 단계 모델 — FSM vs UI 2-관점
+
+      두 관점이 공존한다. 엄밀성이 필요할 때는 FSM, 사용자 가시성을 논할 때는 UI 모델을 사용한다.
+
+      **실행 FSM (workflow-orchestration SKILL, 4단계)**
+
+      ```mermaid
+      stateDiagram-v2
+        [*] --> PLAN
+        PLAN --> WORK
+        WORK --> REPORT
+        REPORT --> DONE
+        DONE --> [*]
+        PLAN --> FAILED
+        WORK --> FAILED
+        REPORT --> FAILED
+        PLAN --> CANCELLED
+        WORK --> CANCELLED
+        REPORT --> CANCELLED
+        PLAN --> STALE
+        WORK --> STALE
+        REPORT --> STALE
+      ```
+
+      **사용자 가시 UI (Board workflow-bar, 5패널)**
+
+      ```mermaid
+      flowchart LR
+        INIT --> PLAN
+        PLAN --> WORK
+        WORK --> REPORT
+        REPORT --> DONE
+      ```
+
+      `workflow-bar.js` 의 `STEP_COLORS` 5종. INIT 은 오케스트레이터 로드 전 `flow-init` 이
+      수행하는 전처리 — 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록 — 으로
+      "세션이 시작되고 있다"는 가시성을 제공한다. INIT 은 UI 전용이며 FSM 의 공식 상태가 아니다.
+
+      ## 스킬 3-type 분류
+
+      워크플로우 전문화 스킬은 **작업자(서브에이전트)에 대한 효과** 에 따라 3가지로 구분된다.
+
+      | 분류 | 효과 | 작업자 관점 | 로드 기준 |
+      |------|------|------------|----------|
+      | 전문화 스킬 | 작업자를 해당 분야의 전문가로 변화 | "나는 이 분야의 전문가다" | 태스크 유형에 따라 선별 로드 |
+      | 지침 스킬 | 작업자가 반드시 따라야 하는 규칙/컨벤션 | "나는 이 규칙을 위반할 수 없다" | 작업 맥락에서 강제 주입 |
+      | 프로젝트 스킬 | 작업자가 해당 프로젝트를 이해하기 위한 지식 | "나는 이 프로젝트를 안다" | 프로젝트 단위로 항상 로드 |
+
+      ### 현재 `.claude/skills/` 접두사와의 매핑 (잠정)
+
+      | 분류 | 해당 접두사 |
+      |------|------------|
+      | 전문화 스킬 | review-*, design-*, framework-*, testing-*, debug-*, analyze-*, research-*, devops-*, management-* |
+      | 지침 스킬 | convention-* |
+      | 프로젝트 스킬 | my-* (접두사 예약, 현재 실제 스킬 없음) |
+
+      ## 도메인 메타포 — 티켓
+
+      티켓 = **작업해야 할 것** (work brief / 작업 명세 / 계약서). 클라이언트가 팀 리더와
+      합의한 작업 요청서. 현재는 프롬프트 5필드(goal/target/constraints/criteria/context) 가
+      계약 조항에 해당. 실행은 작업 클로드에 발주된다.
+
+      ## 워크플로우 실행 전달 경로 (사람 → 메인 → 작업)
+
+      ```mermaid
+      sequenceDiagram
+        actor User as 사람
+        participant Main as 메인 클로드
+        participant Launcher as flow-launcher
+        participant Server as server.py
+        participant Worker as 작업 클로드
+        User->>Main: /wf -s N (메인 터미널)
+        Main->>Launcher: launch T-NNN '/wf -s N'
+        Launcher->>Server: POST /terminal/workflow/start
+        Server->>Worker: subprocess.Popen(claude CLI)
+        Note over Server,Worker: env=_WF_TICKET_ID=T-NNN
+        Worker->>Worker: stdin 으로 /wf -s N 수신
+        Worker->>Worker: wf 스킬 로드 → flow-kanban show T-NNN
+        Worker->>Worker: 티켓 프롬프트 계약 기반 실행
+      ```
+
+      환경변수 주입: `_WF_SESSION_TYPE=workflow`, `_WF_TICKET_ID`, `_WF_SESSION_ID`,
+      `_WF_SERVER_PORT`. 재진입 방지 — `_WF_SESSION_TYPE=workflow` 감지 시 flow-launcher 가
+      INLINE 폴백으로 전환한다.
+    milestones:
+      - id: skill-3type-system
+        title: 스킬 3-type 분류 구조 반영
+        status: planned
+        body: |
+          현재는 접두사 네이밍 컨벤션 수준. 시스템에 구조적으로 반영되어 있지 않다.
+
+          - **분류 체계 미반영**: 3-type 이 스킬 시스템 내부 데이터/매니페스트에 없음
+          - **부여 방식 단일**: `skill_mapper.py` 는 전문화 스킬의 plan.md 기반 매핑만 수행.
+            지침/프로젝트 스킬의 다른 부여 방식이 부재.
+          - **지침 스킬 강제 주입 미설계**: "반드시 따라야 함" 을 구조적으로 보장하는 메커니즘 부재.
+          - **프로젝트 스킬 로드 미설계**: `my-*` 접두사는 현재 갱신 정책 구분용일 뿐, 세션
+            자동 로드 경로 없음.
+          - **관리 도구 부족**: 스킬 등록·분류·검증·활성화/비활성화 통합 관리 CLI/UI 미비.
+        tickets: []
+
+      - id: workload-based-routing
+        title: 작업량 기반 워크플로우 분기 (경량 워크플로우)
+        status: planned
+        body: |
+          현재의 풀 워크플로우(티켓 → phase → task → report) + 워크트리 격리는 작은 수정에는
+          오버헤드. 사용자가 직접 수정을 자주 선택하는 원인 중 하나가 풀 워크플로우의 무거움.
+
+          **방향**: 경량 트랙 도입. 최소 절차로 코드 변경 → 결과 리뷰까지만 돌리는 간이 경로.
+          구체 스펙 미정.
+
+          **선행 조건**:
+          - 풀 워크플로우 + 워크트리 격리 안정화. 현재 `WORKFLOW_WORKTREE=false` 비활성.
+          - 워크트리 전환이 선행되어야 함.
+
+          **설계 제약**:
+          - 티켓 FSM·러너·히스토리 스키마는 경량 모드가 기존 스키마를 공유·서브셋으로 쓸 수
+            있게 설계 유지.
+          - 사용자가 본격 스펙을 꺼내기 전까지 상세 제안하지 않음 (현재 방향 공유 수준).
+        tickets: []
+
+      - id: ticket-form-by-type
+        title: 티켓 양식 업무 유형별 차등화
+        status: planned
+        body: |
+          현재 implement/research/review 모든 티켓이 동일한 5필드 양식을 사용. 조직 메타포로
+          보면 업무 종류마다 계약서 양식이 달라야 자연스럽다.
+
+          | 유형 | 계약서 구조 (예시) |
+          |------|-------------------|
+          | implement | 구현 목표, 수정 대상, 제약, 완료 기준, 컨텍스트 |
+          | research | 연구 질문, 조사 범위, 심도, 보고서 기준 |
+          | review | 리뷰 대상, 리뷰 관점, 포커스, 체크리스트 |
+          | bugfix | 재현 조건, 증상, 기대 동작, 수정 범위 |
+          | refactor | 현재 구조, 목표 구조, 불변 보장, 측정 기준 |
+          | docs | 문서 대상, 독자, 범위, 톤 |
+
+          이 고도화는 "워크플로우 무게 = 티켓 작업량 비례" 원칙과 연결된다. 가벼운 bugfix 는
+          경량 워크플로우, 무거운 refactor 는 전체 FSM 으로 자연스럽게 라우팅 가능.
+        tickets: []
+
+      - id: supervisor-to-leader-report
+        title: 현장 감독 → 팀 리더 보고 체계
+        status: planned
+        body: |
+          워크플로우 완료/실패/중간 상태를 메인 클로드에 구조화된 형태로 보고하는 메커니즘이
+          아직 없다. 현재는 파일시스템(status.json, report.md)과 Board UI 이벤트로만 전달된다.
+
+          요구되는 것:
+          - 작업 클로드 → 메인 클로드 직접 보고 채널
+          - 보고 형식 표준 (요약, 결정, 산출물 링크)
+          - 메인 클로드의 대화 맥락에 흡수되는 형태
+        tickets: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: memory-lifecycle
+    title: 메모리·세션 라이프사이클
+    body: |
+      ## 컨텍스트 / 메모리 / 세션 문제
+
+      3개 축이 동시에 긴장하는 본질적 문제다.
+
+      | 축 | 문제 | 조직 메타포 |
+      |----|------|-------------|
+      | 컨텍스트 | 세션 window 제한, 대화 길어지면 누적 오염 | 팀 리더 머릿속 용량 한계 |
+      | 메모리 | 세션 종료 시 휘발, 내일 다시 시작하면 처음부터 | 조직의 제도적 기억 |
+      | 세션 | 팀 리더/현장 감독/비서가 각기 독립, 서로의 앎을 공유 불가 | 회의 참석자 간 정보 격차 |
+
+      ## 구조화 메모리 로딩 방향 (합의)
+
+      - 규칙(`.claude/rules/`)은 모든 세션에 절대 로드됨 — 불변.
+      - 메모리는 규칙 위에 얹히는 **선택적 로딩 계층** 으로 설계.
+      - 로딩 축: 역할(팀 리더/현장 감독/비서) × 로드 조건(세션 시작, 명시 요청 등) 혼합 방향
+        논의 중.
+
+      ## 메모리 라이프사이클 (방향성)
+
+      ```mermaid
+      flowchart LR
+        subgraph Short["단기 기억"]
+          Memo["메모라이징<br/>주기 스냅샷"]
+          GC["GC<br/>주기 정리"]
+          Discard["폐기"]
+        end
+        subgraph Long["장기 기억"]
+          Skill["프로젝트 스킬<br/>my-* 접두사"]
+        end
+        Memo -->|"승격 파이프라인"| Skill
+        Memo --> GC
+        GC --> Discard
+      ```
+
+      - **메모라이징**: 특정 주기마다 현재 프로젝트 상황·진척률·다음 세션 이어갈 핵심을
+        자동 기록.
+      - **GC**: 특정 주기마다 불필요한 메모라이징을 자동 정리.
+      - **장기 기억화**: 승격 판정 통과 시 프로젝트 스킬(`my-*`)로 전환.
+
+      ## 자동화 경계 (엄격)
+
+      | 영역 | 자동 수정 | 배치 방식 |
+      |------|----------|-----------|
+      | 규칙 | 금지 | 사람이 직접 작성, 엄격 선별 |
+      | 전문가 스킬 | 금지 | 사람이 직접 배치, 엄격 선별 |
+      | 컨벤션 스킬 | 금지 | 사람이 직접 배치, 엄격 선별 |
+      | 메모라이징 | 허용 | 주기적 자동 기록 |
+      | GC | 허용 | 주기적 자동 정리 |
+      | 승격 (메모 → 프로젝트 스킬) | 반자동 | 비서 평가 + 사용자 승인 |
+    milestones:
+      - id: mem-memorize-auto
+        title: 메모라이징 자동화 (주기 스냅샷)
+        status: planned
+        body: |
+          특정 주기/조건에 메모리 파일을 자동 생성한다.
+
+          **결정 필요**:
+          - "특정 %" 의 의미 정의 (컨텍스트 사용률? 시간? 턴수?)
+          - 메모라이징 트리거 (즉시/배치)
+          - 무엇을 저장할지 (대화 요약, 결정 사항, 다음 세션 이어갈 핵심)
+        tickets: []
+
+      - id: mem-gc
+        title: GC 자동 정리
+        status: planned
+        body: |
+          불필요한 메모라이징을 주기적으로 정리한다.
+
+          **결정 필요**:
+          - GC 트리거 (주기? 임계치?)
+          - 정리 대상 판정 규칙 (오래된 것? 참조 안 된 것? 스코어 낮은 것?)
+          - 보존 기간 정책
+
+          **UI 측면**: 현재 메모리 화면에 동기화/GC 버튼 부재. Memory 서브탭에 수동 GC 트리거를
+          먼저 노출하는 것도 선택지.
+        tickets: []
+
+      - id: mem-promotion-pipeline
+        title: 승격 파이프라인 (메모 → 프로젝트 스킬)
+        status: planned
+        body: |
+          ```mermaid
+          flowchart TD
+            Memo["메모라이징"]
+            Q1["Queue 1<br/>승격 판단 대기"]
+            Sec["팀 비서<br/>승격 규칙 평가"]
+            Q2["Queue 2<br/>사용자 확인 대기"]
+            Leader["팀 리더<br/>확인 요청 전달"]
+            User["사용자"]
+            Skill["프로젝트 스킬 승격"]
+            GC["GC"]
+            Memo --> Q1
+            Q1 --> Sec
+            Sec -->|"폐기"| GC
+            Sec -->|"승격 후보"| Q2
+            Q2 --> Leader
+            Leader --> User
+            User -->|"승인"| Skill
+            User -->|"거절"| GC
+            User -->|"무시"| Q2
+          ```
+
+          - **비서의 역할 확장**: 단순 검색뿐 아니라 게이트키퍼(판단·필터링) 역할 포함
+          - **최종 권한은 사용자**: 자동 승격 없음, 사람 승인 필수
+          - **2단계 큐 필요**: 비서 평가 대기 / 사용자 확인 대기
+
+          **결정 필요**:
+          - 큐 저장 위치 및 형식
+          - 승격 규칙 형식 및 저장 위치
+          - 사용자 확인 UX (Board 배지 / 터미널 알림)
+          - 무응답 타임아웃 정책
+          - 프로젝트 스킬 승격 결과 형식 (SKILL.md 자동 생성 여부)
+        tickets: []
+
+      - id: mem-structuring
+        title: 메모리 디렉터리 구조화
+        status: planned
+        body: |
+          현재 21개 메모리 파일이 `~/.claude/projects/.../memory/` 단일 디렉터리에 평탄.
+          파일명 컨벤션도 mixed (snake_case `feedback_*`, kebab-case `user-*`, prefix 없음).
+
+          **방향**:
+          - 카테고리별 서브디렉터리 (`feedback/`, `issue/`, `topic/`, `archive/` 등)
+          - 파일명 컨벤션 통일
+          - 인라인 데이터 (Project Context, 설계 결정사항) 외부 파일화
+          - 라이프사이클 (active/archive) 도입 — GC 자동 정리 진입점
+        tickets: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: pipeline-gaps
+    title: 비동기 위임·결과 복귀
+    body: |
+      "사용자-팀 리더 대화에서 기다림은 최소화한다" 원칙이 성립하려면 다음 3개 메커니즘이
+      모두 필요하다 — 모두 현재 설계 공백.
+
+      1. **비동기 위임 경로** — "이거 조사해둬" 같은 지시로 백그라운드 세션을 띄우고 대화는
+         계속 진행
+      2. **결과 복귀 채널** — 백그라운드 작업 완료 시 팀 리더에게 구조화된 보고가 전달되는
+         메커니즘
+      3. **대화 맥락 병합** — 대화 중간에 도착한 보고 내용을 팀 리더가 현재 대화 흐름에
+         자연스럽게 흡수하는 방식
+
+      "메인 클로드는 직접 수정하지 않는다" 원칙의 확장판이다. 직접 수정 안 한다 → 위임한다
+      → 결과 받는다 → 대화에 녹인다, 의 전체 흐름을 갖춰야 사용자 체감 시간 부담이 줄어든다.
+    milestones:
+      - id: brainstorm-protocol
+        title: 브레인스토밍 → 티켓화 프로토콜
+        status: planned
+        body: |
+          사람 ↔ 메인 클로드 대화를 티켓화로 수렴시키는 명시적 프로토콜이 없다. 현재는 메인
+          세션이 적절히 판단하지만 일관성 보장이 약하다.
+
+          - 티켓 후보 자동 추출
+          - 사용자 확인 후 `/wf -o` 자동 분기
+          - 대화 맥락에서 goal/target/constraints/criteria/context 자동 채움
+        tickets: []
+
+      - id: async-research-delegation
+        title: 비동기 조사 위임
+        status: planned
+        body: |
+          대화 도중 "이거 조사해둬" 같은 지시로 백그라운드 조사 세션을 띄우고 대화는 계속
+          진행하는 경로. 비서(별도 Claude 세션) 메타포의 1차 구현체.
+
+          - 백그라운드 세션 spawn 경로
+          - 진행 상황 가시화
+          - 완료 시 팀 리더에게 알림
+        tickets: []
+
+      - id: result-return-channel
+        title: 결과 복귀 채널
+        status: planned
+        body: |
+          백그라운드 작업(워크플로우 세션 + 비서 세션) 완료 시 팀 리더에게 구조화된 보고가
+          전달되는 메커니즘. `workflow-model.supervisor-to-leader-report` 와 부분 중첩.
+
+          - 보고 도착 큐
+          - 메인 세션에 통지
+          - 사용자에게 가시화
+        tickets: []
+
+      - id: conversation-merge
+        title: 대화 맥락 병합
+        status: planned
+        body: |
+          대화 중간에 도착한 보고 내용을 팀 리더가 현재 대화 흐름에 자연스럽게 흡수하는 방식.
+
+          - 보고 내용 컨텍스트 주입 시점·방식
+          - 사용자 가시성 vs 내부 컨텍스트 분리
+        tickets: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: feedback-loop
+    title: 피드백 루프·로깅
+    body: |
+      **작업 로그 기록 → 분석 → 시스템 개선** 의 순환 구조. 단순 기록이 아니라 시스템 자체를
+      진화시키는 피드백 루프.
+
+      조직 메타포: **성과 회고 + 프로세스 개선** 체계.
+
+      ## 축
+
+      | 축 | 내용 | 조직 메타포 |
+      |----|------|-------------|
+      | 작업 로그 기록 | 모든 워크플로우 실행의 상세 기록 | 업무 일지 / 감사 기록 |
+      | 분석 | 집계·패턴 추출·이상 감지 | 정기 회고 / 성과 분석 |
+      | 시스템 개선 | 분석 결과를 바탕으로 규칙/스킬/워크플로우 조정 | 프로세스 개선 |
+      | 사용량 추적 | 토큰·시간·세션 통계 | 리소스 사용 보고 |
+      | 스킬 사용 분석 | 어떤 전문 스킬이 자주 쓰이는지 | 전문성 수요 분석 |
+      | 스킬 로드 정합성 | 의도한 대로 스킬이 로드되고 있는지 검증 | 전문성 배치 검증 |
+
+      ### 특히 중요한 원칙
+
+      "원하는 방향으로 스킬이 로드되는지" 검증은 단순 통계가 아니라 **설계 의도 vs 실제 동작
+      의 일치 검증** 이다. 스킬 3-type 분류가 도입되면 더 중요해진다 — "이 작업에는 X 스킬이
+      로드되어야 했는데 실제로는 Y 가 로드됐다" 같은 검증이 가능해야 한다.
+
+      ## 현재 상태
+
+      | 기능 | 현재 구현 | 한계 |
+      |------|----------|------|
+      | 작업 로그 | `workflow.log`, `status.json`, `work/*.md` | 집계·분석 도구 없음 |
+      | 사용량 추적 | `usage_tracker.py`, `usage.json` | 수집은 되지만 대시보드 미성숙 |
+      | 스킬 상태 | `skill_state_manager.py`, `skill-catalog.md` | 빈도 추적은 일부 존재 |
+      | 대시보드 | Board UI, `board/data/history.md` | 로그/사용량 통합 뷰 부재 |
+      | 분석 → 개선 루프 | 없음 | 전부 수동 |
+    milestones:
+      - id: log-aggregation
+        title: 로그 집계·분석 도구
+        status: planned
+        body: |
+          기존 자료를 어떻게 쿼리할지. 워크플로우별/스킬별/시간대별 집계.
+        tickets: []
+
+      - id: dashboard-integration
+        title: 대시보드 통합 (로그·사용량·스킬 상태 단일 뷰)
+        status: planned
+        body: |
+          Board Dashboard 를 로그/사용량/스킬 통합 뷰로 확장. 현재는 단편적.
+        tickets: []
+
+      - id: skill-load-integrity
+        title: 스킬 로드 정합성 검증
+        status: planned
+        body: |
+          "이 작업에는 X 스킬이 로드되어야 했는데 실제로는 Y 가 로드됐다" 검증.
+
+          - 의도된 스킬 로드 매핑 명세
+          - 실제 로드 기록과 비교
+          - 불일치 자동 감지·경고
+        tickets: []
+
+      - id: feedback-auto-improvement
+        title: 분석 → 개선 자동 피드백
+        status: planned
+        body: |
+          분석 결과로 시스템 자체를 자동 조정. 예: 스킬 로드 정합성 이상 감지 → 매핑 규칙
+          개선 후보 제안.
+
+          현재는 전부 수동.
+        tickets: []
+
+      - id: kpi-definition
+        title: 사용자에게 보여줄 핵심 지표 정의
+        status: planned
+        body: |
+          진척률·비용·에러율·스킬 적중률 등 어떤 지표를 어떻게 노출할지.
+        tickets: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: uiux
+    title: UI/UX 상시 개선
+    body: |
+      **한 번 확정되는 설계가 아니라 지속적 개선 영역**. 사용자가 시스템을 실사용하며 느끼는
+      마찰을 상시 제거해 가는 과정.
+
+      조직 메타포: 클라이언트 경험 개선.
+
+      설계 방향성에는 "개선 원칙" 만 기재하고, 구체 개선은 티켓 단위로 누적 처리한다.
+      예: Board 터미널, 입력 폼, 렌더링, 애니메이션, 상태 표시, 키보드 조작 등 모든 표면.
+
+      ## 일관 원칙
+
+      - 터미널 출력에 이모지/아이콘 사용 금지
+      - 터미널 외 UI 에서 아이콘은 SVG 직접 생성 (외부 폰트/라이브러리 금지)
+      - 테마: 다크, 테라코타 오렌지 (#D97757)
+      - Mermaid 다이어그램은 design-mermaid-diagrams 스킬 규칙 준수
+    milestones:
+      - id: roadmap-editor
+        title: 로드맵 편집 UI
+        status: planned
+        body: |
+          현재는 ROADMAP.yaml 텍스트 직접 편집. 본 패널에서 inline 편집 가능하도록.
+
+          - phase/milestone 추가·삭제·순서 변경
+          - status 토글 (planned ↔ in-progress ↔ done)
+          - 티켓 connect/disconnect
+          - body 마크다운 편집기 (CLAUDE.md Edit 패턴 동일)
+        tickets: []
+
+      - id: relations-feature-extension
+        title: Relations 패널 기능 확장
+        status: planned
+        body: |
+          현재 Relations 패널은 티켓 의존성 그래프 시각화 + 상태 필터 + 레이아웃 토글 + isolated
+          토글 + 영속화 까지 완료.
+
+          후속 아이디어:
+          - 클릭 시 미니 메타데이터 hover (제목/상태/연결)
+          - milestone 노드 추가 (티켓이 어느 마일스톤 소속인지)
+          - 진척률 히트맵
+        tickets: []
+
+      - id: board-friction-reduction
+        title: Board 마찰 상시 제거
+        status: in-progress
+        body: |
+          사용자가 실사용 중 발견하는 마찰을 티켓 단위로 누적 처리. 영구히 살아있는 milestone.
+
+          예시 (이미 처리됨):
+          - SSE git_branch 자동 갱신 (새로고침 불필요)
+          - Roadmap → Relations 전수 리네임
+          - Relations 패널 영속화·두 페이즈 렌더·SVG 아이콘
+          - 화살표·empty icon 폰트 글리프 → SVG
+        tickets: []
+
+  # ──────────────────────────────────────────────────────────────────────
+  - id: platform
+    title: 플랫폼 제약
+    body: |
+      ## 확정 사항
+
+      - **Claude Code 의존 탈피 계획 없음** — claude-workflow 는 Claude Code 호스트 위에서
+        동작하는 메타 레이어로 유지된다.
+      - 즉 GSD-2 처럼 standalone CLI + 독자 SDK 로 전환하는 방향은 **선택지에서 제외**.
+      - 가져올 아이디어가 있다면 Claude Code 의 기능(훅/스킬/에이전트/슬래시 명령) 범위 안에서
+        구현 가능한 형태로 변형해 수용한다.
+    milestones: []

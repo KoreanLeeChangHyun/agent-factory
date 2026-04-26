@@ -710,6 +710,27 @@ Board.state.dashChartInstances = {};
 // Kanban sort state
 Board.state.kanbanSort = null; // initialized by kanban.js
 
+// Roadmap subtab state — saveUI/loadUI 로 영속화 (활성 phase + 펼친 카드 + 사이드 너비).
+// Contexts 탭(구 Prompt 탭) 의 Roadmap 서브탭이 사용한다 — 별도 패널이 아니므로 panelOpen 없음.
+Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "object")
+  ? {
+      activePhaseId: typeof savedState.roadmap.activePhaseId === "string"
+        ? savedState.roadmap.activePhaseId
+        : null,
+      expandedCardIds: Array.isArray(savedState.roadmap.expandedCardIds)
+        ? savedState.roadmap.expandedCardIds.slice()
+        : [],
+      sideWidth: typeof savedState.roadmap.sideWidth === "number"
+        && savedState.roadmap.sideWidth >= 140 && savedState.roadmap.sideWidth <= 600
+        ? savedState.roadmap.sideWidth
+        : 240,
+    }
+  : {
+      activePhaseId: null,
+      expandedCardIds: [],
+      sideWidth: 240,
+    };
+
 // Relations panel state — saveUI/loadUI 로 영속화 (열림/닫힘 + 필터)
 Board.state.relations = (savedState.relations && typeof savedState.relations === "object")
   ? {
@@ -739,6 +760,7 @@ function saveUI() {
     tabHistory: Board.state.tabHistory,
     forwardHistory: Board.state.forwardHistory,
     relations: Board.state.relations,
+    roadmap: Board.state.roadmap,
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
 }

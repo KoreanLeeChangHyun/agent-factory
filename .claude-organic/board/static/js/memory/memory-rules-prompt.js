@@ -14,13 +14,20 @@
     if (!content) return;
 
     M.fetchRulesList().then(function (files) {
+      files = files || [];
+      // CLAUDE.md 를 "project-meta" special 카테고리 첫 항목으로 prepend.
+      // selectRulesFile / saveRulesFile / deleteRulesFile 가 path === "CLAUDE.md" 분기를 가지므로
+      // 일반 rules 파일과 동일하게 처리된다.
+      files.unshift({
+        path: "CLAUDE.md",
+        name: "CLAUDE.md",
+        category: "project-meta",
+        size: null,
+        mtime: "",
+      });
       Board.state.promptRulesFiles = files;
 
-      if (!files || files.length === 0) {
-        content.innerHTML = M.renderRulesEmptyState();
-        M.bindRulesEmptyNewBtn(content);
-        return;
-      }
+      // CLAUDE.md 만 있는 케이스(.claude/rules/ 비어있음)는 정상 — 빈 상태 표시 안 함.
 
       content.innerHTML = M.renderRulesLayout();
       M.bindResizeHandle(content);
@@ -98,7 +105,12 @@
     }
 
     var html = "";
-    var catOrder = ["workflow", "project"];
+    var catOrder = ["project-meta", "workflow", "project"];
+    var catLabels = {
+      "project-meta": "Project Meta",
+      "workflow": "Workflow",
+      "project": "Project",
+    };
     // Add any remaining categories not in the order
     for (var c in categories) {
       if (catOrder.indexOf(c) === -1) catOrder.push(c);
@@ -109,7 +121,7 @@
       var catFiles = categories[catKey];
       if (!catFiles || catFiles.length === 0) continue;
 
-      var catLabel = catKey.charAt(0).toUpperCase() + catKey.slice(1);
+      var catLabel = catLabels[catKey] || (catKey.charAt(0).toUpperCase() + catKey.slice(1));
       html +=
         '<div class="prompt-category-group" data-category="' + esc(catKey) + '">' +
           '<div class="prompt-category-header">' +
@@ -204,7 +216,8 @@
       }
       if (filenameEl) filenameEl.textContent = data.path || data.name;
       if (saveBtn) saveBtn.disabled = true;
-      if (deleteBtn) deleteBtn.disabled = false;
+      // CLAUDE.md 는 시스템 진입점 파일이라 삭제 차단 — Project Meta 편입 후에도 불변.
+      if (deleteBtn) deleteBtn.disabled = (path === "CLAUDE.md");
       if (previewBtn) { previewBtn.textContent = "Edit"; previewBtn.classList.remove("active"); }
       if (dirtyEl) dirtyEl.classList.remove("visible");
     });

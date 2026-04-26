@@ -1006,3 +1006,39 @@ def _write_claude_md(project_root: str, content: str) -> dict:
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(content)
     return {'ok': True}
+
+
+# ---------------------------------------------------------------------------
+# Roadmap (.claude-organic/roadmap/ROADMAP.yaml)
+# ---------------------------------------------------------------------------
+
+ROADMAP_PATH: str = os.path.join('.claude-organic', 'roadmap', 'ROADMAP.yaml')
+
+
+def _read_roadmap(project_root: str) -> dict:
+    """ROADMAP.yaml 을 읽어 파싱된 dict 를 반환한다.
+
+    파일이 없으면 빈 phases 로 응답해 클라이언트가 "데이터 없음" 을 자연스럽게 표시할 수
+    있게 한다. 파싱 오류는 그대로 전파해 핸들러가 500 으로 응답하도록 둔다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+
+    Returns:
+        {"version": int, "phases": [...]}
+    """
+    import yaml  # 지연 import — PyYAML 미설치 환경에서도 다른 board 기능은 동작
+
+    filepath = os.path.join(project_root, ROADMAP_PATH)
+    if not os.path.isfile(filepath):
+        return {'version': 1, 'phases': []}
+
+    with open(filepath, encoding='utf-8') as f:
+        data = yaml.safe_load(f) or {}
+
+    if not isinstance(data, dict):
+        return {'version': 1, 'phases': []}
+
+    data.setdefault('version', 1)
+    data.setdefault('phases', [])
+    return data
