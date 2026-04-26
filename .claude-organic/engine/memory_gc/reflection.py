@@ -1,7 +1,15 @@
-"""Reflection — 같은 topic 누적 importance >= threshold 시 LLM 합성.
+"""Reflection — LLM-as-clusterer 기반 의미 클러스터링 + LLM 합성.
 
-LLM 호출은 Claude Code CLI 헤드리스 (claude -p ... --output-format json).
+2-step 흐름:
+  1) 모든 메모리의 metadata (name/description/importance/type) 를 LLM 에 보내
+     같은 토픽 그룹으로 묶도록 요청 → cumulative_importance >= threshold 인 클러스터만 채택.
+  2) 각 클러스터의 본문을 포함하여 LLM 에 합성 요청 → 합성본 생성.
+
+LLM 호출은 모두 Claude Code CLI 헤드리스 (claude -p ... --output-format json).
 실패는 silent — 합성 없이 후보만 반환.
+
+이전 버전의 jaccard 기반 find_clusters 는 한국어 짧은 description 에서 임계 0.35 가
+너무 빡빡하여 클러스터 0개 문제를 초래. LLM-as-clusterer 로 의미 기반 판단으로 교체.
 """
 from __future__ import annotations
 
@@ -13,12 +21,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .core import MemoryFile, parse_memory_file, write_memory_file
-from .dedup import _tokens, _jaccard
 from .paths import GCConfig
 
-CLUSTER_OVERLAP: float = 0.35  # dedup 보다 느슨 — 합성은 "관련 메모리" 묶기
 CLAUDE_CLI: str = 'claude'
 HEADLESS_TIMEOUT: int = 90
+CLUSTERING_TIMEOUT: int = 60  # metadata 만 — 합성보다 가벼움
 
 
 @dataclass(frozen=True)
@@ -26,34 +33,70 @@ class ReflectionCluster:
     type: str
     members: list[MemoryFile]
     cumulative_importance: int
+    reason: str = ''
+
+
+def _build_clustering_prompt(items: list[dict], threshold: int) -> str:
+    return (
+        '다음은 메모리 metadata 리스트입니다. 같은 토픽으로 묶을 수 있는 메모리들을 그룹화하세요.\n\n'
+        '규칙:\n'
+        '- 의미적으로 같은 주제·이슈·결정사항을 다루는 메모리들을 한 클러스터로 묶기\n'
+        f'- 각 클러스터의 cumulative_importance (멤버 importance 합) 가 {threshold} 이상인 그룹만 반환\n'
+        '- 단독 메모리(클러스터 크기 1)는 반환하지 말 것\n'
+        '- 한국어/영어 무관, 의미 기반 판단 (어휘 매칭이 아닌 토픽 매칭)\n'
+        '- 무리하게 묶지 말 것 — 확신이 약하면 클러스터 제외\n\n'
+        '응답은 JSON 으로만 (코드펜스 금지):\n'
+        '{"clusters": [{"members": ["filename1.md", "filename2.md", ...], "reason": "그룹 사유 한 줄"}, ...]}\n\n'
+        '## 메모리 metadata\n\n'
+        + json.dumps(items, ensure_ascii=False, indent=2)
+    )
 
 
 def find_clusters(memories: list[MemoryFile], threshold: int) -> list[ReflectionCluster]:
-    """type 별로 토큰 유사도 기반 클러스터링. 누적 importance 가 threshold 이상인 클러스터만 반환."""
-    by_type: dict[str, list[MemoryFile]] = {}
-    for m in memories:
-        by_type.setdefault(m.type, []).append(m)
-    clusters: list[ReflectionCluster] = []
-    for t, items in by_type.items():
-        used: set[Path] = set()
-        for i, anchor in enumerate(items):
-            if anchor.path in used:
-                continue
-            anchor_tokens = _tokens(anchor.description) | _tokens(anchor.name)
-            cluster = [anchor]
-            used.add(anchor.path)
-            for j in range(i + 1, len(items)):
-                cand = items[j]
-                if cand.path in used:
-                    continue
-                cand_tokens = _tokens(cand.description) | _tokens(cand.name)
-                if _jaccard(anchor_tokens, cand_tokens) >= CLUSTER_OVERLAP:
-                    cluster.append(cand)
-                    used.add(cand.path)
-            cum = sum(m.importance for m in cluster)
-            if len(cluster) >= 2 and cum >= threshold:
-                clusters.append(ReflectionCluster(type=t, members=cluster, cumulative_importance=cum))
-    return clusters
+    """LLM-as-clusterer 로 의미 기반 클러스터링.
+
+    metadata 만 한 번의 LLM 호출로 전달하고 그룹화 결과를 받는다.
+    cumulative_importance < threshold 또는 멤버 < 2 인 클러스터는 자체 필터.
+    LLM 호출 실패 시 빈 리스트 반환 (silent).
+    """
+    if not memories:
+        return []
+    items = [
+        {
+            'name': m.path.name,
+            'type': m.type,
+            'importance': m.importance,
+            'description': m.description,
+        }
+        for m in memories
+    ]
+    prompt = _build_clustering_prompt(items, threshold)
+    response = _invoke_claude(prompt, timeout=CLUSTERING_TIMEOUT)
+    if not response or 'clusters' not in response:
+        return []
+
+    by_name: dict[str, MemoryFile] = {m.path.name: m for m in memories}
+    out: list[ReflectionCluster] = []
+    for c in response.get('clusters', []) or []:
+        member_names = c.get('members') or []
+        members = [by_name[n] for n in member_names if n in by_name]
+        if len(members) < 2:
+            continue
+        cum = sum(m.importance for m in members)
+        if cum < threshold:
+            continue
+        # 멤버 type 다수결 (동률은 첫 만난 type)
+        type_counts: dict[str, int] = {}
+        for m in members:
+            type_counts[m.type] = type_counts.get(m.type, 0) + 1
+        cluster_type = max(type_counts.items(), key=lambda kv: kv[1])[0]
+        out.append(ReflectionCluster(
+            type=cluster_type,
+            members=members,
+            cumulative_importance=cum,
+            reason=str(c.get('reason') or ''),
+        ))
+    return out
 
 
 def _build_prompt(cluster: ReflectionCluster) -> str:
@@ -80,7 +123,7 @@ def _build_prompt(cluster: ReflectionCluster) -> str:
     return '\n'.join(lines)
 
 
-def _invoke_claude(prompt: str) -> dict | None:
+def _invoke_claude(prompt: str, *, timeout: int = HEADLESS_TIMEOUT) -> dict | None:
     """Claude Code CLI 헤드리스 호출. 결과 JSON 파싱.
 
     실패 시 None.
@@ -89,7 +132,7 @@ def _invoke_claude(prompt: str) -> dict | None:
            '--allowed-tools', 'Read,Write']
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=HEADLESS_TIMEOUT,
+            cmd, capture_output=True, text=True, timeout=timeout,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None

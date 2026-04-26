@@ -731,6 +731,36 @@ Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "obje
       sideWidth: 240,
     };
 
+// Contexts 탭 통합 상태 — saveUI/loadUI 로 영속화.
+// 사용자 이벤트(서브탭 전환, 파일 선택, sidebar 너비 조정, GC bar 토글) 가 모두 새로고침
+// 후 복원되어야 한다는 정책. 각 서브탭 모듈이 default 하드코드 대신 여기서 읽어간다.
+(function () {
+  var rawCx = (savedState.contexts && typeof savedState.contexts === "object")
+    ? savedState.contexts : {};
+  var ALLOWED_SUBTABS = { roadmap: 1, rules: 1, memory: 1, prompt: 1 };
+  var sub = (typeof rawCx.subTab === "string" && ALLOWED_SUBTABS[rawCx.subTab])
+    ? rawCx.subTab : "roadmap";
+  function _ws(v, def) {
+    if (typeof v === "number" && v >= 140 && v <= 600) return v;
+    return def;
+  }
+  function _sub(o) {
+    o = (o && typeof o === "object") ? o : {};
+    return {
+      activeFile: typeof o.activeFile === "string" ? o.activeFile : null,
+      sidebarWidth: _ws(o.sidebarWidth, 280),
+    };
+  }
+  var memorySub = _sub(rawCx.memory);
+  memorySub.gcExpanded = !!(rawCx.memory && rawCx.memory.gcExpanded);
+  Board.state.contexts = {
+    subTab: sub,
+    memory: memorySub,
+    rules: _sub(rawCx.rules),
+    prompt: _sub(rawCx.prompt),
+  };
+})();
+
 // Relations panel state — saveUI/loadUI 로 영속화 (열림/닫힘 + 필터)
 Board.state.relations = (savedState.relations && typeof savedState.relations === "object")
   ? {
@@ -761,6 +791,7 @@ function saveUI() {
     forwardHistory: Board.state.forwardHistory,
     relations: Board.state.relations,
     roadmap: Board.state.roadmap,
+    contexts: Board.state.contexts,
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
 }

@@ -30,7 +30,7 @@
       // CLAUDE.md 만 있는 케이스(.claude/rules/ 비어있음)는 정상 — 빈 상태 표시 안 함.
 
       content.innerHTML = M.renderRulesLayout();
-      M.bindResizeHandle(content);
+      M.bindResizeHandle(content, "rules");
       M.renderRulesSidebar();
       M.bindRulesToolbar();
       M.bindRulesKeyboard();
@@ -182,6 +182,7 @@
     Board.state.promptRulesActiveFile = path;
     Board.state.promptRulesDirty = false;
     Board.state.promptRulesPreview = true;
+    if (M.persistContexts) M.persistContexts();
 
     // Update sidebar active state
     var list = document.getElementById("rules-file-list");
@@ -310,6 +311,7 @@
       if (result && result.ok) {
         Board.state.promptRulesActiveFile = null;
         Board.state.promptRulesDirty = false;
+        if (M.persistContexts) M.persistContexts();
         M.renderSubRules();
       } else {
         alert("Failed to delete file." + (result && result.error ? " " + result.error : ""));
@@ -347,6 +349,7 @@
       if (result && result.ok) {
         Board.state.promptRulesActiveFile = relPath;
         Board.state.promptRulesDirty = false;
+        if (M.persistContexts) M.persistContexts();
         M.renderSubRules();
       } else {
         alert("Failed to create file." + (result && result.error ? " " + result.error : ""));
@@ -405,7 +408,7 @@
       }
 
       content.innerHTML = M.renderPromptFilesLayout();
-      M.bindResizeHandle(content);
+      M.bindResizeHandle(content, "prompt");
       M.renderPromptFilesSidebar();
       M.bindPromptFilesToolbar();
       M.bindPromptFilesKeyboard();
@@ -508,6 +511,7 @@
     Board.state.promptPromptActiveFile = name;
     Board.state.promptPromptDirty = false;
     Board.state.promptPromptPreview = true;
+    if (M.persistContexts) M.persistContexts();
 
     var list = document.getElementById("prompt-file-list");
     if (list) {
@@ -644,6 +648,7 @@
       if (result && result.ok) {
         Board.state.promptPromptActiveFile = null;
         Board.state.promptPromptDirty = false;
+        if (M.persistContexts) M.persistContexts();
         M.renderSubPromptFiles();
       } else {
         alert("Failed to delete file.");
@@ -669,6 +674,7 @@
       if (result && result.ok) {
         Board.state.promptPromptActiveFile = result.name || filename;
         Board.state.promptPromptDirty = false;
+        if (M.persistContexts) M.persistContexts();
         M.renderSubPromptFiles();
       } else {
         alert("Failed to create file.");

@@ -316,6 +316,11 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
 # 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점 (.md 확장자 필수)
 _MEMORY_FILENAME_RE = re.compile(r'^[A-Za-z0-9_\-]+\.md$')
 
+# Memory GC 마이그레이션 후 1단계 sub-directory 허용 (user/feedback/project/reference/archive)
+_MEMORY_TYPE_DIRS: tuple[str, ...] = ('user', 'feedback', 'project', 'reference')
+_MEMORY_ARCHIVE_DIRS: tuple[str, ...] = ('archive/merged', 'archive/synthesized', 'archive/stale')
+_MEMORY_ALLOWED_SUBDIRS: tuple[str, ...] = _MEMORY_TYPE_DIRS + _MEMORY_ARCHIVE_DIRS
+
 
 def _resolve_memory_dir(project_root: str) -> str:
     """프로젝트 루트에 대응하는 Claude auto memory 디렉터리 경로를 반환한다.
@@ -340,6 +345,10 @@ def _resolve_memory_dir(project_root: str) -> str:
 def _list_memory_files(project_root: str) -> list[dict]:
     """memory 디렉터리의 .md 파일 목록을 반환한다.
 
+    Memory GC 마이그레이션 이후 type 디렉터리(user/feedback/project/reference)와
+    archive 하위(merged/synthesized/stale) 도 함께 스캔한다. 평탄 파일도 호환.
+    name 필드는 mem_dir 기준 상대 path (예: "feedback/feedback_root.md").
+
     MEMORY.md는 isIndex: true로 표시하며, 목록 최상단에 배치한다.
     숨김 파일(. 시작)은 제외한다.
 
@@ -347,7 +356,7 @@ def _list_memory_files(project_root: str) -> list[dict]:
         project_root: 프로젝트 루트 절대 경로
 
     Returns:
-        [{"name": str, "size": int, "mtime": str, "isIndex": bool}, ...]
+        [{"name": str, "size": int, "mtime": str, "isIndex": bool, "category": str}, ...]
         디렉터리 미존재 시 빈 리스트.
     """
     mem_dir = _resolve_memory_dir(project_root)
@@ -355,29 +364,50 @@ def _list_memory_files(project_root: str) -> list[dict]:
         return []
 
     files: list[dict] = []
+
+    def _emit(rel_name: str, abs_path: str, category: str) -> None:
+        try:
+            stat = os.stat(abs_path)
+        except OSError:
+            return
+        files.append({
+            'name': rel_name,
+            'size': stat.st_size,
+            'mtime': time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime),
+            ),
+            'isIndex': rel_name == 'MEMORY.md',
+            'category': category,
+        })
+
+    # 1) 평탄 파일 (MEMORY.md 포함)
     try:
         for entry in os.scandir(mem_dir):
             if not entry.is_file() or not entry.name.endswith('.md'):
                 continue
             if entry.name.startswith('.'):
                 continue
-            try:
-                stat = entry.stat()
-                files.append({
-                    'name': entry.name,
-                    'size': stat.st_size,
-                    'mtime': time.strftime(
-                        '%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime),
-                    ),
-                    'isIndex': entry.name == 'MEMORY.md',
-                })
-            except OSError:
-                pass
+            _emit(entry.name, entry.path, 'flat')
     except OSError:
         return []
 
-    # MEMORY.md를 최상단, 나머지는 이름순 정렬
-    files.sort(key=lambda f: (not f['isIndex'], f['name']))
+    # 2) 1단계 sub-directory (type + archive)
+    for sub in _MEMORY_ALLOWED_SUBDIRS:
+        sub_path = os.path.join(mem_dir, sub)
+        if not os.path.isdir(sub_path):
+            continue
+        try:
+            for entry in os.scandir(sub_path):
+                if not entry.is_file() or not entry.name.endswith('.md'):
+                    continue
+                if entry.name.startswith('.'):
+                    continue
+                _emit(f'{sub}/{entry.name}', entry.path, sub)
+        except OSError:
+            continue
+
+    # MEMORY.md 최상단 → 그 외는 (category, name) 순 정렬
+    files.sort(key=lambda f: (not f['isIndex'], f['category'], f['name']))
     return files
 
 
@@ -435,13 +465,13 @@ def _write_memory_file(
     _validate_memory_filename(filename)
 
     mem_dir = _resolve_memory_dir(project_root)
-    os.makedirs(mem_dir, exist_ok=True)
     filepath = os.path.join(mem_dir, filename)
+    os.makedirs(os.path.dirname(filepath) or mem_dir, exist_ok=True)
 
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(content)
 
-    _sync_memory_index(project_root)
+    _trigger_memory_index_regen(project_root)
     return {'ok': True, 'name': filename}
 
 
@@ -472,7 +502,7 @@ def _delete_memory_file(project_root: str, filename: str) -> dict:
         raise FileNotFoundError(f'Memory file not found: {filename}')
 
     os.remove(filepath)
-    _sync_memory_index(project_root)
+    _trigger_memory_index_regen(project_root)
     return {'ok': True}
 
 
@@ -569,16 +599,26 @@ def _sync_memory_index(project_root: str) -> None:
 def _validate_memory_filename(filename: str) -> None:
     """메모리 파일명의 보안 검증을 수행한다.
 
-    디렉터리 트래버설 공격 및 비정상 파일명을 방지한다.
+    디렉터리 트래버설 공격을 방지하고, 화이트리스트된 1단계 sub-directory
+    (user/feedback/project/reference, archive/{merged,synthesized,stale}) 만 허용한다.
 
     Args:
-        filename: 검증할 파일명
+        filename: 검증할 파일명 또는 sub-path
 
     Raises:
-        ValueError: 파일명에 '..' 또는 '/'가 포함되거나, 허용 패턴에 맞지 않는 경우
+        ValueError: 파일명에 '..', '\\\\' 가 포함되거나 화이트리스트 외 경로,
+                   허용 패턴에 맞지 않는 경우
     """
-    if '..' in filename or '/' in filename or '\\' in filename:
+    if '..' in filename or '\\' in filename:
         raise ValueError(f'Invalid filename: {filename}')
+    if '/' in filename:
+        # 1단계 또는 2단계(archive/x) sub-directory 만 허용
+        head, _, tail = filename.rpartition('/')
+        if head not in _MEMORY_ALLOWED_SUBDIRS:
+            raise ValueError(f'Invalid memory sub-directory: {head}')
+        if not _MEMORY_FILENAME_RE.match(tail):
+            raise ValueError(f'Invalid filename format: {tail}')
+        return
     if not _MEMORY_FILENAME_RE.match(filename):
         raise ValueError(f'Invalid filename format: {filename}')
 
@@ -1101,3 +1141,24 @@ def _memory_gc_prune_archive(project_root: str, *, apply: bool) -> dict:
     if apply:
         args.append('--apply')
     return _run_memory_gc(project_root, 'prune-archive', *args, timeout=30)
+
+
+def _trigger_memory_index_regen(project_root: str) -> None:
+    """memory write/delete 후 인덱스 자동 갱신 — fire-and-forget.
+
+    flow-memory-gc auto --trigger session 호출. 환경변수에 'session' 트리거가
+    포함된 경우에만 발화. 미포함 시 silent skip.
+    """
+    bin_path = os.path.join(project_root, MEMORY_GC_BIN)
+    if not os.path.isfile(bin_path):
+        return
+    try:
+        subprocess.Popen(
+            [bin_path, 'auto', '--trigger', 'session'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            cwd=project_root,
+        )
+    except OSError:
+        pass
