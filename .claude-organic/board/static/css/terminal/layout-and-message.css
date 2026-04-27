@@ -653,9 +653,12 @@
   border: 1px solid #333;
   border-radius: 6px;
   padding: 12px;
-  overflow-x: auto;
   margin: 8px 0;
   line-height: 1.5;
+  /* 가로 스크롤 대신 줄바꿈으로 처리: 들여쓰기/공백은 보존(pre-wrap),
+     긴 토큰(URL/해시 등)은 컨테이너 폭에서 강제로 깨짐(anywhere). */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .term-message pre code {
