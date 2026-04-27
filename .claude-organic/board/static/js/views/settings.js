@@ -69,7 +69,50 @@
         '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
       '</div>';
     actions.appendChild(restartItem);
+
+    var buildUrlItem = document.createElement('div');
+    buildUrlItem.className = 'settings-item';
+    buildUrlItem.innerHTML =
+      '<div class="settings-item-info">' +
+        '<div class="settings-item-key">Build URL</div>' +
+        '<div class="settings-item-label">다른 프로젝트에 워크플로우를 설치하는 부트스트랩 명령을 클립보드에 복사합니다</div>' +
+      '</div>' +
+      '<div class="settings-item-control">' +
+        '<button class="settings-action-btn" id="settings-build-url-btn">Copy</button>' +
+      '</div>';
+    actions.appendChild(buildUrlItem);
     body.appendChild(actions);
+
+    var buildUrlBtn = document.getElementById('settings-build-url-btn');
+    if (buildUrlBtn) {
+      buildUrlBtn.addEventListener('click', function () {
+        if (buildUrlBtn.disabled) return;
+        buildUrlBtn.disabled = true;
+        var originalText = buildUrlBtn.textContent;
+        fetch('/.claude-organic/build.url', { cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) throw new Error('build.url not found');
+            return r.text();
+          })
+          .then(function (text) {
+            return navigator.clipboard.writeText(text.trim());
+          })
+          .then(function () {
+            buildUrlBtn.textContent = 'Copied!';
+            setTimeout(function () {
+              buildUrlBtn.textContent = originalText;
+              buildUrlBtn.disabled = false;
+            }, 1200);
+          })
+          .catch(function () {
+            buildUrlBtn.textContent = 'Failed';
+            setTimeout(function () {
+              buildUrlBtn.textContent = originalText;
+              buildUrlBtn.disabled = false;
+            }, 1500);
+          });
+      });
+    }
 
     var restartBtn = document.getElementById('settings-restart-btn');
     if (restartBtn) {
