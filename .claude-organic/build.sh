@@ -541,7 +541,7 @@ hash_int = int.from_bytes(hash_bytes[:4], byteorder='big')
 port = PORT_RANGE_START + (hash_int % range_size)
 print(port)
 ")"
-    local base="http://127.0.0.1:${port}/.claude-organic/board"
+    local base="http://127.0.0.1:${port}"
     printf '%s/index.html\n%s/terminal.html' "${base}" "${base}" > "${url_file}"
     print_success "Board URL 생성 완료: ${base}/index.html"
 }
