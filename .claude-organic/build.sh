@@ -5,7 +5,7 @@ set -euo pipefail
 
 # --- 상수 로드 ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULTS_CONF="${SCRIPT_DIR}/init/defaults.conf"
+DEFAULTS_CONF="${SCRIPT_DIR}/build-assets/defaults.conf"
 if [ ! -f "$DEFAULTS_CONF" ]; then
     echo "ERROR: defaults.conf not found: $DEFAULTS_CONF" >&2
     exit 1
