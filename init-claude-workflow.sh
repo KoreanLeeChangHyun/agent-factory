@@ -169,6 +169,19 @@ bash "$BUILD_SH"
 # --- Board 서버 기동 (백그라운드 데몬) ---
 BOARD_SERVER=".claude-organic/board/server.py"
 if [ -f "$BOARD_SERVER" ]; then
+    # 기존 좀비 board 서버 감지 → 종료
+    # 서버 자체에 중복 실행 방지 로직이 있어, 좀비가 살아있으면 새 인스턴스가
+    # LISTEN 충돌로 즉시 die → 옛 코드/옛 webroot 가 그대로 유지되는 회귀 차단.
+    if [ -f ".claude-organic/.board.url" ] && command -v lsof &>/dev/null; then
+        OLD_PORT="$(head -1 .claude-organic/.board.url | sed -E 's|.*:([0-9]+)/.*|\1|')"
+        if [ -n "$OLD_PORT" ]; then
+            OLD_PID="$(lsof -tiTCP:"$OLD_PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+            if [ -n "$OLD_PID" ]; then
+                kill "$OLD_PID" 2>/dev/null && sleep 1
+                printf '%s  → 기존 board 서버(PID %s) 종료 후 재기동%s\n' "${YELLOW}" "${OLD_PID}" "${NC}"
+            fi
+        fi
+    fi
     printf '%s  → Board 서버 기동 중...%s\n' "${YELLOW}" "${NC}"
     nohup python3 "$BOARD_SERVER" >/dev/null 2>&1 &
     disown
