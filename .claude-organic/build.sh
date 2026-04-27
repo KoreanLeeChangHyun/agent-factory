@@ -586,7 +586,9 @@ print(port)
 ")"
     local base="http://127.0.0.1:${port}"
     printf '%s/index.html\n%s/terminal.html' "${base}" "${base}" > "${url_file}"
-    print_success "Board URL 생성 완료: ${base}/index.html"
+    print_success "Board URL 생성 완료"
+    printf '    %s%s/index.html%s\n'    "${BOLD_CYAN}" "${base}" "${NC}"
+    printf '    %s%s/terminal.html%s\n' "${BOLD_CYAN}" "${base}" "${NC}"
 }
 
 # --- main ---
