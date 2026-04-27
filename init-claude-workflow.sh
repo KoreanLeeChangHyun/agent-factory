@@ -131,6 +131,31 @@ find ".claude-organic/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 [ -d ".claude-organic/bin" ] && find ".claude-organic/bin" -type f -exec chmod +x {} +
 printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${GREEN}" "${NC}"
 
+# --- .gitignore 자동 등록 ---
+# .claude/ + .claude-organic/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
+# 의 git tracking 에서 제외한다. 본 저장소(또는 fork)에서는 이미 tracking
+# 중이므로 안전하게 skip.
+if git ls-files --error-unmatch .claude > /dev/null 2>&1 || \
+   git ls-files --error-unmatch .claude-organic > /dev/null 2>&1; then
+    printf '%s  → .claude/·.claude-organic/ 이미 tracking 중 — .gitignore 갱신 skip%s\n' "${YELLOW}" "${NC}"
+else
+    GITIGNORE=".gitignore"
+    touch "$GITIGNORE"
+    changed=0
+    for entry in ".claude/" ".claude-organic/"; do
+        if ! grep -qxF "$entry" "$GITIGNORE"; then
+            [ -s "$GITIGNORE" ] && [ "$(tail -c1 "$GITIGNORE")" != $'\n' ] && echo "" >> "$GITIGNORE"
+            echo "$entry" >> "$GITIGNORE"
+            changed=1
+        fi
+    done
+    if [ "$changed" = 1 ]; then
+        printf '%s  ✓ .gitignore 갱신 (.claude/, .claude-organic/)%s\n' "${GREEN}" "${NC}"
+    else
+        printf '%s  ✓ .gitignore 이미 등록됨%s\n' "${GREEN}" "${NC}"
+    fi
+fi
+
 # build.sh 실행 (클론 인자 없이)
 BUILD_SH=".claude-organic/build.sh"
 if [ ! -f "$BUILD_SH" ]; then
