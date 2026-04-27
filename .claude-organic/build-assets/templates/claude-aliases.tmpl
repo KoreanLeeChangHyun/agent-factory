@@ -1,6 +1,6 @@
 # 이 파일은 build.sh가 생성합니다.
 # Claude Code workflow aliases
-# NOTE: flow-* alias 정의 없음 — .claude.workflow/bin/ wrapper PATH만 설정합니다.
+# NOTE: flow-* alias 정의 없음 — .claude-organic/bin/ wrapper PATH만 설정합니다.
 #       flow-* 명령어는 bin/ wrapper 스크립트를 통해 제공됩니다.
 #       Claude Code Bash tool(비대화형)에서는 SessionStart hook의 CLAUDE_ENV_FILE
 #       메커니즘이 PATH를 주입하며, 이 파일은 대화형 shell 환경용 폴백입니다.
@@ -8,15 +8,15 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # flow-* wrapper PATH 설정
 # (1) CLAUDE_PROJECT_DIR 기반 고정 경로 (Claude Code Bash tool 비대화형 환경용)
-if [ -n "$CLAUDE_PROJECT_DIR" ] && [ -d "$CLAUDE_PROJECT_DIR/.claude.workflow/bin" ]; then
-  export PATH="$CLAUDE_PROJECT_DIR/.claude.workflow/bin:$PATH"
+if [ -n "$CLAUDE_PROJECT_DIR" ] && [ -d "$CLAUDE_PROJECT_DIR/.claude-organic/bin" ]; then
+  export PATH="$CLAUDE_PROJECT_DIR/.claude-organic/bin:$PATH"
 fi
 
 # (2) git rev-parse 기반 동적 경로 (대화형 shell 폴백)
 if [ -z "$CLAUDE_PROJECT_DIR" ]; then
   _cwf_root="$(git rev-parse --show-toplevel 2>/dev/null)"
-  if [ -n "$_cwf_root" ] && [ -d "$_cwf_root/.claude.workflow/bin" ]; then
-    export PATH="$_cwf_root/.claude.workflow/bin:$PATH"
+  if [ -n "$_cwf_root" ] && [ -d "$_cwf_root/.claude-organic/bin" ]; then
+    export PATH="$_cwf_root/.claude-organic/bin:$PATH"
   fi
   unset _cwf_root
 fi
