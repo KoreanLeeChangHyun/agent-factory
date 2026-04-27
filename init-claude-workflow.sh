@@ -7,7 +7,7 @@ set -euo pipefail
 # ==============================================================================
 
 REPO_URL="https://github.com/KoreanLeeChangHyun/claude-workflow.git"
-GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; NC=$'\033[0m'
+GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; CYAN=$'\033[0;36m'; NC=$'\033[0m'
 
 echo ""
 printf '%s=================================================%s\n' "${GREEN}" "${NC}"
@@ -27,27 +27,27 @@ printf '%s  → 원격 저장소 클론 중...%s\n' "${YELLOW}" "${NC}"
 if ! git clone --depth 1 "$REPO_URL" "$tmp_dir/claude-workflow" 2>/dev/null; then
     printf '%s  ✗ 원격 저장소 클론 실패%s\n' "${RED}" "${NC}"; exit 1
 fi
-printf '%s  ✓ 클론 완료%s\n' "${GREEN}" "${NC}"
+printf '%s  ✓ 클론 완료%s\n' "${CYAN}" "${NC}"
 
 SRC="$tmp_dir/claude-workflow"
 
 # --- git 초기화 + develop 브랜치 ---
 if [ ! -d ".git" ]; then
     git init -q
-    printf '%s  ✓ git init 완료%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ git init 완료%s\n' "${CYAN}" "${NC}"
 fi
 current_branch="$(git branch --show-current 2>/dev/null || true)"
 if [ -z "$current_branch" ] || ! git rev-parse HEAD &>/dev/null; then
     # 초기 커밋이 없는 경우 (브랜치명만 있고 실제 ref 없음)
     git checkout -b develop -q 2>/dev/null || true
-    printf '%s  ✓ develop 브랜치 생성%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ develop 브랜치 생성%s\n' "${CYAN}" "${NC}"
 elif [ "$current_branch" != "develop" ]; then
     if ! git show-ref --verify --quiet refs/heads/develop 2>/dev/null; then
         git branch develop -q
-        printf '%s  ✓ develop 브랜치 생성%s\n' "${GREEN}" "${NC}"
+        printf '%s  ✓ develop 브랜치 생성%s\n' "${CYAN}" "${NC}"
     fi
     git checkout develop -q
-    printf '%s  ✓ develop 브랜치로 전환%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ develop 브랜치로 전환%s\n' "${CYAN}" "${NC}"
 fi
 
 # --- .claude/ 디렉터리 교체 (프로젝트 데이터 보존) ---
@@ -90,7 +90,7 @@ if [ -d "$tmp_dir/_claude_preserve_skills" ]; then
         [ -d "$myskill" ] && cp -r "$myskill" ".claude/skills/"
     done
 fi
-printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${GREEN}" "${NC}"
+printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${CYAN}" "${NC}"
 
 # --- .claude-organic/ 디렉터리 교체 (사용자 데이터 보존) ---
 if [ ! -d "$SRC/.claude-organic" ]; then
@@ -118,18 +118,18 @@ if [ -d ".claude-organic" ]; then
     for pf in "${preserve_files[@]}"; do
         [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude-organic/$pf"
     done
-    printf '%s  ✓ .claude-organic/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ .claude-organic/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${CYAN}" "${NC}"
 else
     # 신규 설치: 전체 복사
     cp -r "$SRC/.claude-organic" ".claude-organic"
-    printf '%s  ✓ .claude-organic/ 신규 설치 완료%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ .claude-organic/ 신규 설치 완료%s\n' "${CYAN}" "${NC}"
 fi
 
 # 실행 권한 부여 — .sh 파일 + bin wrapper (확장자 없는 flow-* 실행 파일)
 find ".claude/" -name '*.sh' -exec chmod +x {} +
 find ".claude-organic/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 [ -d ".claude-organic/bin" ] && find ".claude-organic/bin" -type f -exec chmod +x {} +
-printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${GREEN}" "${NC}"
+printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${CYAN}" "${NC}"
 
 # --- .gitignore 자동 등록 ---
 # .claude/ + .claude-organic/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
@@ -150,9 +150,9 @@ else
         fi
     done
     if [ "$changed" = 1 ]; then
-        printf '%s  ✓ .gitignore 갱신 (.claude/, .claude-organic/)%s\n' "${GREEN}" "${NC}"
+        printf '%s  ✓ .gitignore 갱신 (.claude/, .claude-organic/)%s\n' "${CYAN}" "${NC}"
     else
-        printf '%s  ✓ .gitignore 이미 등록됨%s\n' "${GREEN}" "${NC}"
+        printf '%s  ✓ .gitignore 이미 등록됨%s\n' "${CYAN}" "${NC}"
     fi
 fi
 
@@ -185,5 +185,5 @@ if [ -f "$BOARD_SERVER" ]; then
     printf '%s  → Board 서버 기동 중...%s\n' "${YELLOW}" "${NC}"
     nohup python3 "$BOARD_SERVER" >/dev/null 2>&1 &
     disown
-    printf '%s  ✓ Board 서버 기동 완료 (백그라운드)%s\n' "${GREEN}" "${NC}"
+    printf '%s  ✓ Board 서버 기동 완료 (백그라운드)%s\n' "${CYAN}" "${NC}"
 fi

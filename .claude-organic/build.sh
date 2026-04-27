@@ -15,13 +15,15 @@ source "$DEFAULTS_CONF"
 
 # --- 색상 변수 ---
 if [ -t 1 ]; then
-    GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; NC=$'\033[0m'
+    GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'
+    CYAN=$'\033[0;36m'; BOLD_CYAN=$'\033[1;36m'; NC=$'\033[0m'
 else
-    GREEN=""; RED=""; YELLOW=""; NC=""
+    GREEN=""; RED=""; YELLOW=""; CYAN=""; BOLD_CYAN=""; NC=""
 fi
 
 # --- 공통 출력 함수 ---
-print_success() { printf '%s  ✓ %s%s\n' "${GREEN}"  "$1" "${NC}"; }
+# 위계: 헤더/구조(GREEN), 성공 ACK(CYAN — 시각 노이즈 감소), 정보(YELLOW), 에러(RED)
+print_success() { printf '%s  ✓ %s%s\n' "${CYAN}"  "$1" "${NC}"; }
 print_error()   { printf '%s  ✗ %s%s\n' "${RED}"    "$1" "${NC}"; }
 print_warning() { printf '%s  ⚠ %s%s\n' "${YELLOW}" "$1" "${NC}"; }
 print_info()    { printf '%s  → %s%s\n' "${YELLOW}"  "$1" "${NC}"; }
@@ -569,14 +571,17 @@ main() {
     generate_board_url
     trap - EXIT
     detect_shell_rc
-    local board_url=""
     local url_file="${SCRIPT_DIR}/.board.url"
-    [ -f "${url_file}" ] && board_url="$(head -1 "${url_file}")"
     echo ""
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     printf '%s  초기화가 완료되었습니다!%s\n' "${GREEN}" "${NC}"
     printf '%s  새 터미널을 열거나 '\''source %s'\''를 실행하세요%s\n' "${GREEN}" "${DETECTED_SHELL_RC}" "${NC}"
-    [ -n "${board_url}" ] && printf '%s  Board:  %s%s\n' "${GREEN}" "${board_url}" "${NC}"
+    if [ -f "${url_file}" ]; then
+        while IFS= read -r _board_line; do
+            [ -z "${_board_line}" ] && continue
+            printf '  Board:  %s%s%s\n' "${BOLD_CYAN}" "${_board_line}" "${NC}"
+        done < "${url_file}"
+    fi
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     echo ""
 }
