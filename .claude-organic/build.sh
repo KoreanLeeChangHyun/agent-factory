@@ -280,6 +280,35 @@ except Exception as e:
     print(f"ERROR: 템플릿 파일 JSON 파싱 실패: {e}", file=sys.stderr)
     sys.exit(1)
 
+# 옛 디렉터리 명칭으로 박힌 hook command 경로를 신규 경로로 정합화한다.
+# 키만 비교해 머지하면 기존 settings.json 의 stale command 가 그대로 남아
+# hook 들이 존재하지 않는 파일을 호출하다 ENOENT 로 차단된다.
+# 사용자가 추가한 다른 키/값은 보존하고 command 필드만 패턴 치환.
+_PATH_FIXES = [
+    (".claude.workflow/scripts/", ".claude-organic/engine/"),
+    (".claude.workflow/", ".claude-organic/"),
+]
+
+stale_fixed = []
+
+def _fix_stale_paths(obj, path=""):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "command" and isinstance(v, str):
+                new = v
+                for old, new_seg in _PATH_FIXES:
+                    new = new.replace(old, new_seg)
+                if new != v:
+                    obj[k] = new
+                    stale_fixed.append(f"{path}/{k}")
+            else:
+                _fix_stale_paths(v, f"{path}/{k}")
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj):
+            _fix_stale_paths(item, f"{path}[{i}]")
+
+_fix_stale_paths(existing)
+
 added_keys = []
 for key, value in tmpl.items():
     if key not in existing:
@@ -292,7 +321,9 @@ with open(out_path, 'w') as f:
 
 if added_keys:
     print(f"ADDED:{','.join(added_keys)}")
-else:
+if stale_fixed:
+    print(f"FIXED:{len(stale_fixed)}")
+if not added_keys and not stale_fixed:
     print("NOCHANGE")
 PYEOF
 )"
@@ -313,10 +344,20 @@ PYEOF
 
     mv "$tmp_result" "$existing_file" || { rm -f "$tmp_result"; return 1; }
 
+    local fixed_count=""
+    if echo "$py_output" | grep -q "^FIXED:"; then
+        fixed_count="$(echo "$py_output" | grep "^FIXED:" | sed 's/^FIXED://')"
+    fi
     if echo "$py_output" | grep -q "^ADDED:"; then
         local added_keys_str
         added_keys_str="$(echo "$py_output" | grep "^ADDED:" | sed 's/^ADDED://')"
-        print_success "settings.json 머지 완료: 신규 키 추가 [${added_keys_str}]"
+        if [ -n "$fixed_count" ]; then
+            print_success "settings.json 머지: 신규 키 [${added_keys_str}] + stale 경로 ${fixed_count}건 정합화"
+        else
+            print_success "settings.json 머지 완료: 신규 키 추가 [${added_keys_str}]"
+        fi
+    elif [ -n "$fixed_count" ]; then
+        print_success "settings.json stale 경로 ${fixed_count}건 정합화 (.claude.workflow/ → .claude-organic/)"
     else
         print_info "settings.json 이미 최신 상태 (신규 키 없음)"
     fi
