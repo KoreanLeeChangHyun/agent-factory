@@ -218,6 +218,10 @@
       } else {
         memoryBtn.style.display = "";
         memoryBtn.disabled = !inputtable;
+        var memHasMsg = !!(M.outputDiv && M.outputDiv.querySelector(".term-message"));
+        memoryBtn.title = memHasMsg
+          ? "메모리 업데이트 (현재 세션 내용을 메모리에 영속화 — Clear 전)"
+          : "메모리 로드 (현재 세션에 MEMORY.md 재인지 요청)";
       }
     }
     var loginBtn = document.getElementById("terminal-login");
@@ -414,10 +418,7 @@
     h += '<div class="terminal-session-controls">';
     h += '<button class="terminal-btn terminal-btn-start" id="terminal-toggle-btn">Start</button>';
     h += '<span class="terminal-controls-divider"></span>';
-    h += '<button class="terminal-btn terminal-btn-memory" id="terminal-memory-btn" title="메모리 로드 (현재 세션에 MEMORY.md 재인지 요청)">';
-    h += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>';
-    h += '<span>Memory</span>';
-    h += '</button>';
+    h += '<button class="terminal-btn terminal-btn-memory" id="terminal-memory-btn" title="메모리 로드 (현재 세션에 MEMORY.md 재인지 요청)">Memory</button>';
     h += '<span class="terminal-controls-divider"></span>';
     h += '<button class="terminal-btn terminal-btn-sessions" id="terminal-sessions-btn" title="Main sessions">';
     h += '<span id="terminal-sessions-label">Sessions</span>';
@@ -818,7 +819,9 @@
 
     M.termInitialized = true;
 
-    // Memory load shortcut: 현재 메인 세션(특히 resume 직후)에 메모리 재인지 요청
+    // Memory shortcut: 세션 상태에 따라 분기
+    //  - 메시지 0 (처음/resume 직후): 메모리 인지 요청
+    //  - 메시지 1+ (중간): 현재 세션 내용 메모리 영속화 (Clear 전 capture)
     var memoryBtn = document.getElementById("terminal-memory-btn");
     if (memoryBtn) {
       memoryBtn.addEventListener("click", function (e) {
@@ -827,7 +830,10 @@
         if (!Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus)) return;
         var input = document.getElementById("terminal-input");
         if (!input) return;
-        input.value = "메모리 로드하세요";
+        var hasMessages = !!(M.outputDiv && M.outputDiv.querySelector(".term-message"));
+        input.value = hasMessages
+          ? "이번 세션의 핵심 내용(결정·학습·이슈·규칙)을 메모리에 영속화해주세요. 적절한 type(user/feedback/project/reference)으로 분류하고, 기존 메모와 중복되면 보강."
+          : "메모리 로드하세요";
         M.sendInput();
       });
     }
