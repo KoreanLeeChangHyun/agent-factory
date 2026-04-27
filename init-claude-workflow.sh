@@ -97,8 +97,8 @@ if [ ! -d "$SRC/.claude-organic" ]; then
     printf '%s  ✗ 클론된 저장소에 .claude-organic/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
 
-preserve_dirs=("kanban" "workflow" "dashboard" "edit")
-preserve_files=(".settings" ".env" ".version" ".board.url" "build.url")
+preserve_dirs=("tickets" "runs" "roadmap" "memo")
+preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-session-id")
 
 if [ -d ".claude-organic" ]; then
     # 업데이트 설치: 사용자 데이터 백업 후 교체
@@ -125,10 +125,11 @@ else
     printf '%s  ✓ .claude-organic/ 신규 설치 완료%s\n' "${GREEN}" "${NC}"
 fi
 
-# .sh 파일 실행 권한 부여
+# 실행 권한 부여 — .sh 파일 + bin wrapper (확장자 없는 flow-* 실행 파일)
 find ".claude/" -name '*.sh' -exec chmod +x {} +
 find ".claude-organic/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
-printf '%s  ✓ .sh 파일 chmod +x 완료%s\n' "${GREEN}" "${NC}"
+[ -d ".claude-organic/bin" ] && find ".claude-organic/bin" -type f -exec chmod +x {} +
+printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${GREEN}" "${NC}"
 
 # build.sh 실행 (클론 인자 없이)
 BUILD_SH=".claude-organic/build.sh"
@@ -140,10 +141,11 @@ printf '%s  → build.sh 실행...%s\n' "${YELLOW}" "${NC}"
 echo ""
 bash "$BUILD_SH"
 
-# --- Board 서버 기동 ---
+# --- Board 서버 기동 (백그라운드 데몬) ---
 BOARD_SERVER=".claude-organic/board/server.py"
 if [ -f "$BOARD_SERVER" ]; then
     printf '%s  → Board 서버 기동 중...%s\n' "${YELLOW}" "${NC}"
-    python3 "$BOARD_SERVER" &>/dev/null
-    printf '%s  ✓ Board 서버 기동 완료%s\n' "${GREEN}" "${NC}"
+    nohup python3 "$BOARD_SERVER" >/dev/null 2>&1 &
+    disown
+    printf '%s  ✓ Board 서버 기동 완료 (백그라운드)%s\n' "${GREEN}" "${NC}"
 fi
