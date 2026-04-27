@@ -705,10 +705,11 @@
           return;
         }
         // image/* 가 없으면 text/plain 경로 패턴 확인
+        // 작은따옴표로 감싸 "/" 로 시작하는 경로가 슬래시 커맨드로 오인되는 것을 차단한다.
         var text = e.clipboardData.getData("text/plain");
         if (text && M.isFilePath(text)) {
           e.preventDefault();
-          M.insertTextAtCursor(inputEl, text);
+          M.insertTextAtCursor(inputEl, "'" + text + "'");
         }
         // 경로가 아닌 일반 텍스트는 기본 paste 동작에 위임
       });
@@ -779,9 +780,10 @@
         }
 
         // (b) text/plain 이 경로 패턴이면 textarea에 경로 삽입
+        // 작은따옴표로 감싸 "/" 로 시작하는 경로가 슬래시 커맨드로 오인되는 것을 차단한다.
         var dropText = dt.getData("text/plain");
         if (dropText && M.isFilePath(dropText)) {
-          M.insertTextAtCursor(targetInput, dropText);
+          M.insertTextAtCursor(targetInput, "'" + dropText + "'");
           return;
         }
         // (c) 둘 다 아니면 무시 (시나리오 C, Chromium CF_HDROP 버그)
