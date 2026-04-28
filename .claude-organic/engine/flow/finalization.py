@@ -737,8 +737,8 @@ def _build_result_update_args(abs_work_dir: str) -> list[str]:
     import re as _re
 
     # abs_work_dir 에서 YYYYMMDD-HHMMSS 패턴 추출
-    # 경로 형식: .../`.workflow`/{registryKey}/{workName}/{command}
-    _ts_pattern = _re.compile(r"\.claude\.workflow[/\\]workflow[/\\](\d{8}-\d{6}(?:-\d+)?)")
+    # 경로 형식: .../.claude-organic/runs/{registryKey}/{workName}/{command}
+    _ts_pattern = _re.compile(r"\.claude-organic[/\\]runs[/\\](\d{8}-\d{6}(?:-\d+)?)")
     _match = _ts_pattern.search(abs_work_dir)
     if not _match:
         return []
@@ -748,7 +748,7 @@ def _build_result_update_args(abs_work_dir: str) -> list[str]:
     # 상대 workDir: .claude-organic/runs/{registryKey}/... 이후 부분을 포함한 경로
     _wf_idx = abs_work_dir.find(".claude-organic/runs/")
     if _wf_idx == -1:
-        _wf_idx = abs_work_dir.find(".claude-organic\\workflow\\")
+        _wf_idx = abs_work_dir.find(".claude-organic\\runs\\")
     if _wf_idx == -1:
         return []
     work_dir_rel: str = abs_work_dir[_wf_idx:]

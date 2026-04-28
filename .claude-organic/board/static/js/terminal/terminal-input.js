@@ -343,14 +343,17 @@
       return;
     }
 
-    // busy 상태(응답 대기 중)이면 큐에 push하고 즉시 리턴 (이미지는 큐 미지원)
-    if (Board.state.termStatus === "busy" && !hasImages) {
-      M.inputQueue.push(text);
-      var queuedDiv = document.createElement("div");
-      queuedDiv.className = "term-message term-user term-user-queued";
-      queuedDiv.textContent = text;
-      M.appendToOutput(queuedDiv);
-      M.updateControlBar();
+    // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지 첨부 포함).
+    // 큐 entry 는 outputDiv 에 미리 echo 하지 않으며, 큐 stack 카드로만 노출된다.
+    if (Board.state.termStatus === "busy") {
+      var imagesSnapshot = hasImages
+        ? M.attachedImages.map(function (img) { return { data: img.data, media_type: img.media_type, name: img.name }; })
+        : null;
+      M.enqueueInput(text, imagesSnapshot);
+      if (hasImages) {
+        M.clearImages();
+        M.clearFiles();
+      }
       return;
     }
 
@@ -385,6 +388,11 @@
       Board.session._markSent(text);
     }
 
+    // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
+    M._lastSentText = text || "";
+    // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
+    try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
+
     M.setInputLocked(true);
     M.startSpinner();
     Board.state.setTermStatus("busy");
@@ -403,32 +411,11 @@
     });
   };
 
+  // drainQueue 는 구형 API (string push 방식). 1:1 모델에서는 commitQueue 로 위임한다.
+  // session.js fallback 경로에서 호출될 수 있으므로 alias 로 보존.
   M.drainQueue = function() {
     if (M.isWorkflowMode) return;
-    if (M.inputQueue.length === 0) return;
-    if (Board.state.termStatus !== "idle") return;
-
-    var nextText = M.inputQueue.shift();
-    M.updateControlBar();
-
-    // Mark as locally sent to suppress the user_input SSE echo
-    if (nextText && Board.session && Board.session._markSent) {
-      Board.session._markSent(nextText);
-    }
-
-    M.startSpinner();
-    Board.state.setTermStatus("busy");
-    M.updateControlBar();
-    if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
-
-    var ep = M.endpoints();
-    Board.session.postJson(ep.input, ep.inputBody({ text: nextText })).catch(function (err) {
-      M.stopSpinner();
-      M.appendErrorMessage("[Error] " + err.message);
-      M.setInputLocked(false);
-      Board.state.setTermStatus("idle");
-      M.updateControlBar();
-    });
+    M.commitQueue();
   };
 
   M.interruptSession = function() {
@@ -436,6 +423,15 @@
     if (Board.state.termStatus !== "busy") return;
     if (M._interruptInFlight) return;
     M._interruptInFlight = true;
+    // [ESC 자동 resume 가드] ESC 직후 도착하는 process_exit 을 인식하기 위한 플래그.
+    // exit_code 가 SDK graceful shutdown 으로 인해 130이 아닐 가능성을 커버한다.
+    // 5초 후 자동 클리어 (사용자가 ESC 후 다른 동작을 한 시점은 이 윈도우 밖).
+    M._recentInterrupt = true;
+    if (M._recentInterruptTimer) clearTimeout(M._recentInterruptTimer);
+    M._recentInterruptTimer = setTimeout(function () {
+      M._recentInterrupt = false;
+      M._recentInterruptTimer = null;
+    }, 5000);
     M.updateControlBar();
 
     Board.session.postJson("/terminal/interrupt").then(function () {
@@ -459,13 +455,31 @@
       M.toolInputBuffer = "";
       M.currentToolName = null;
       // 큐에 push 되어 대기 중이던 메시지를 정리한다 — 사용자 "중지" 의도는
-      // 큐도 포함. 미처리하면 idle 전환 시 drainQueue 가 자동 전송해버린다.
+      // 큐도 포함. 미처리하면 idle 전환 시 advanceTurn 이 자동 전송해버린다.
+      // 1:1 모델: inputQueue 는 단순 평면 배열이므로 length = 0 으로 전체 정리.
+      // DOM echo 를 미리 하지 않으므로 outputDiv 에서 별도 DOM 정리 불필요.
       if (M.inputQueue && M.inputQueue.length > 0) {
         M.inputQueue.length = 0;
-        var queuedDoms = M.outputDiv ? M.outputDiv.querySelectorAll(".term-user-queued") : [];
-        for (var i = 0; i < queuedDoms.length; i++) {
-          if (queuedDoms[i].parentNode) queuedDoms[i].parentNode.removeChild(queuedDoms[i]);
+      }
+      // 큐 stack 카드도 모두 제거 (DOM 정리).
+      var queueStack = document.getElementById("terminal-input-queue");
+      if (queueStack) {
+        while (queueStack.firstChild) queueStack.removeChild(queueStack.firstChild);
+        queueStack.setAttribute("hidden", "");
+      }
+      // [ESC 복원] 직전 보낸 사용자 메시지를 입력창에 자동 복원하여
+      // 사용자가 수정하거나 그대로 다시 보낼 수 있게 한다.
+      // 현재 입력창에 사용자가 이미 다른 텍스트를 타이핑 중인 경우는 보존(덮어쓰기 X).
+      // 또한 localStorage 에도 저장하여 새로고침 후에도 유지한다.
+      if (M._lastSentText) {
+        var inputEl = document.getElementById("terminal-input");
+        if (inputEl && !inputEl.value) {
+          inputEl.value = M._lastSentText;
+          inputEl.style.height = "auto";
+          inputEl.style.height = inputEl.scrollHeight + "px";
         }
+        try { localStorage.setItem("board.term.lastSentText", M._lastSentText); } catch (e) {}
+        M._lastSentText = "";
       }
       M.updateControlBar();
       // 상태 변경 및 입력 잠금 해제는 result SSE 이벤트 핸들러에 위임한다.
@@ -477,6 +491,212 @@
       M._interruptInFlight = false;
       M.updateControlBar();
     });
+  };
+
+  // ── Queue Model ──
+
+  /**
+   * 입력 텍스트를 큐에 추가한다 (1:1 turn 모델).
+   *
+   * - busy 중 추가 입력을 평면 큐에 push 한다.
+   * - 큐 entry 는 메시지 흐름(outputDiv)에 미리 echo 하지 않는다.
+   * - hint 카운트 갱신만 수행(updateControlBar 호출).
+   * - idle commit 타이머 / turn-id 생성 / nextTurn 필드 일체 없음.
+   *
+   * @param {string} text - 추가할 텍스트
+   */
+  /**
+   * 큐 stack 에 entry 카드를 추가한다.
+   * 컨테이너가 hidden 이면 해제. entry 클릭 핸들러로 × 삭제 연결.
+   * 이미지 첨부 entry: 텍스트 없으면 "[이미지 N장]" 라벨, 있으면 텍스트 + 끝에 "[+N장]" 표기.
+   */
+  function _renderQueueCard(entry) {
+    var container = document.getElementById("terminal-input-queue");
+    if (!container) return;
+
+    var imageCount = entry.images ? entry.images.length : 0;
+    var imageLabel = imageCount > 0 ? "[이미지 " + imageCount + "장]" : "";
+    var displayText = entry.text || "";
+    if (displayText && imageCount > 0) {
+      displayText = displayText + " " + imageLabel;
+    } else if (!displayText && imageCount > 0) {
+      displayText = imageLabel;
+    }
+
+    var item = document.createElement("div");
+    item.className = "terminal-queue-item";
+    item.setAttribute("data-entry-id", entry.id);
+    item.title = displayText; // 호버 시 전체 텍스트 노출 (한 줄 ellipsis 보완)
+
+    var textSpan = document.createElement("span");
+    textSpan.className = "terminal-queue-text";
+    textSpan.textContent = displayText;
+
+    var removeBtn = document.createElement("button");
+    removeBtn.className = "terminal-queue-remove";
+    removeBtn.type = "button";
+    removeBtn.title = "큐에서 삭제";
+    removeBtn.innerHTML = "&times;";
+    (function (eid) {
+      removeBtn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (typeof M.removePendingEntry === "function") M.removePendingEntry(eid);
+      });
+    })(entry.id);
+
+    item.appendChild(textSpan);
+    item.appendChild(removeBtn);
+    container.appendChild(item);
+
+    if (container.hasAttribute("hidden")) container.removeAttribute("hidden");
+  }
+
+  /**
+   * 큐 stack 에서 특정 entry 카드를 제거한다. 비면 컨테이너 hidden.
+   */
+  function _removeQueueCard(entryId) {
+    var container = document.getElementById("terminal-input-queue");
+    if (!container) return;
+    var item = container.querySelector('[data-entry-id="' + entryId + '"]');
+    if (item && item.parentNode) item.parentNode.removeChild(item);
+    if (!container.children.length) container.setAttribute("hidden", "");
+  }
+
+  M.enqueueInput = function(text, images) {
+    text = text || "";
+    images = images || null;
+    var hasImages = images && images.length > 0;
+    if (!text && !hasImages) return;
+
+    var entry = {
+      id: "entry-" + Date.now() + "-" + Math.floor(Math.random() * 0x10000).toString(16),
+      text: text,
+      images: hasImages ? images : null,
+      ts: Date.now(),
+      status: "pending"
+    };
+
+    M.inputQueue.push(entry);
+
+    // 큐 stack 에 카드 추가 (입력란 위 오른쪽 정렬 영역).
+    _renderQueueCard(entry);
+
+    // hint 영역 카운트도 갱신한다.
+    M.updateControlBar();
+  };
+
+  /**
+   * 큐 첫 entry 1개를 dequeue → outputDiv 에 echo → send 한다.
+   *
+   * 호출 조건:
+   * (a) idle 상태에서 신규 Enter (terminal.js keydown 핸들러)
+   * (b) busy → idle 전환 시 advanceTurn 이 잔여 큐 처리
+   *
+   * busy 중 호출 시 무시 (advanceTurn 경로로 처리됨).
+   */
+  M.commitQueue = function() {
+    // busy 중이면 commit 무시 — advanceTurn 이 결과 도착 후 처리한다
+    if (Board.state.termStatus === "busy") return;
+
+    // 큐가 비면 nothing to do
+    if (M.inputQueue.length === 0) return;
+
+    // 첫 entry 1개만 dequeue (1 turn = 1 메시지)
+    var entry = M.inputQueue.shift();
+
+    // 큐 stack 에서 해당 카드 제거 (dequeue → 처리 시작 시각 신호)
+    _removeQueueCard(entry.id);
+
+    // 메시지 흐름에 echo (term-message term-user — 텍스트 + 이미지 thumbnail)
+    var div = document.createElement("div");
+    div.className = "term-message term-user";
+    if (entry.text) div.textContent = entry.text;
+    if (entry.images && entry.images.length > 0) {
+      var thumbRow = document.createElement("div");
+      thumbRow.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;";
+      entry.images.forEach(function (img) {
+        var t = document.createElement("img");
+        t.src = "data:" + img.media_type + ";base64," + img.data;
+        t.style.cssText = "width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #3a3a3a;";
+        thumbRow.appendChild(t);
+      });
+      div.appendChild(thumbRow);
+    }
+    if (M.appendToOutput) M.appendToOutput(div);
+
+    // sent 마킹으로 SSE user_input echo 중복 방지 (텍스트만 — 이미지 echo 는 무관)
+    if (entry.text && Board.session && Board.session._markSent) {
+      Board.session._markSent(entry.text);
+    }
+
+    // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
+    M._lastSentText = entry.text || "";
+    // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
+    try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
+
+    M.startSpinner();
+    Board.state.setTermStatus("busy");
+    M.setInputLocked(true);
+    if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
+    M.updateControlBar();
+
+    // payload 구성 — 텍스트 + 이미지 (있으면)
+    var payload = { text: entry.text || "" };
+    if (entry.images && entry.images.length > 0) {
+      payload.images = entry.images.map(function (img) {
+        return { data: img.data, media_type: img.media_type };
+      });
+    }
+
+    var ep = M.endpoints();
+    Board.session.postJson(ep.input, ep.inputBody(payload)).catch(function (err) {
+      M.stopSpinner();
+      M.appendErrorMessage("[Error] " + err.message);
+      M.setInputLocked(false);
+      Board.state.setTermStatus("idle");
+      M.updateControlBar();
+    });
+  };
+
+  /**
+   * 큐에서 pending entry 를 제거한다 (hint 패널 × 버튼 클릭).
+   *
+   * - inputQueue 에서만 제거한다.
+   * - outputDiv DOM 에 미리 echo 되지 않으므로 DOM 조작 불필요.
+   * - hint 패널 rerender 는 updateControlBar 에 위임한다.
+   *
+   * @param {string} entryId - 제거할 entry 의 id
+   */
+  M.removePendingEntry = function(entryId) {
+    M.inputQueue = M.inputQueue.filter(function (e) { return e.id !== entryId; });
+    // 큐 stack 에서 카드 제거 (× 버튼 클릭 시각 반영)
+    _removeQueueCard(entryId);
+    // hint 패널 rerender
+    M.updateControlBar();
+  };
+
+  /**
+   * turn 을 진행한다. result SSE 도착 시 session.js _onResult 가 호출한다.
+   *
+   * 1:1 turn 모델:
+   * - 잔여 큐 entry 가 있으면 commitQueue() 로 즉시 다음 turn 처리
+   * - 없으면 idle 정리(spinner 중지 / 잠금 해제)
+   *
+   * commitQueue 호출 전에 spinner 중지 + idle 상태 전환을 수행한다.
+   * commitQueue 내부에서 다시 busy 로 전환한다.
+   */
+  M.advanceTurn = function() {
+    M.stopSpinner();
+    M.setInputLocked(false);
+    Board.state.setTermStatus("idle");
+
+    if (M.inputQueue.length > 0) {
+      // 잔여 큐 entry 가 있으면 즉시 다음 entry 전송
+      M.commitQueue();
+    } else {
+      // 큐 소진 — idle 정리
+      M.updateControlBar();
+    }
   };
 
 })();

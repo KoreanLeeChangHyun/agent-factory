@@ -109,8 +109,25 @@
   /** @type {boolean} */
   M.inputLocked = false;
 
-  /** @type {Array<string>} */
+  /**
+   * 입력 큐. 각 항목은 pending entry 객체 (1:1 turn 모델 — nextTurn 필드 없음).
+   * @type {Array<{id: string, text: string, ts: number, status: string}>}
+   */
   M.inputQueue = [];
+
+  /**
+   * IME 조합 중 여부 (compositionstart/end 리스너가 관리).
+   * @type {boolean}
+   */
+  M._isComposing = false;
+
+  /**
+   * 직전 send 한 사용자 메시지 텍스트.
+   * ESC 인터럽트 시 입력창에 자동 복원하여 사용자가 수정 후 재전송 가능하게 한다.
+   * sendInput / commitQueue 가 send 직전에 저장하고, interruptSession 이 복원 후 클리어한다.
+   * @type {string}
+   */
+  M._lastSentText = "";
 
   /** @type {Array<{data: string, media_type: string, name: string}>} */
   M.attachedImages = [];
@@ -147,7 +164,14 @@
   Board.state.termSessionId = M.isWorkflowMode ? M.workflowSessionId : null;
   // 워크플로우 모드는 서버 측 채널이 이미 실행 중이라 idle 로 시작한다.
   // 메인 모드는 Start 전이므로 stopped.
-  Board.state.termStatus = M.isWorkflowMode ? "idle" : "stopped";
+  // 단, ESC 인터럽트 직후 새로고침 케이스(localStorage 에 ESC 복원 텍스트가 남음)는
+  // 서버 측 프로세스가 자동 resume 으로 살아있을 가능성이 높으므로 'starting' 으로
+  // 시작해 STOPPED 깜박임을 회피한다. fetchStatus 응답으로 idle/busy 로 보정된다.
+  var _hasPendingEscRestore = false;
+  try { _hasPendingEscRestore = !!localStorage.getItem("board.term.lastSentText"); } catch (e) {}
+  Board.state.termStatus = M.isWorkflowMode
+    ? "idle"
+    : (_hasPendingEscRestore ? "starting" : "stopped");
   Board.state.termLastSessionId = null;
 
   if (Board.debugLog) Board.debugLog('terminal.init', {
@@ -289,9 +313,10 @@
       if (M.isWorkflowMode) {
         hintEl.textContent = "자동 실행 전용";
       } else if (isBusy) {
+        // busy: 큐 카운트 노출 (현재 처리 중인 메시지 포함)
         var queueLen = M.inputQueue.length;
         if (queueLen > 0) {
-          hintEl.textContent = "ESC 중지 \u00B7 대기 " + queueLen + "개";
+          hintEl.textContent = "ESC 중지 \u00B7 큐 " + queueLen + "개 (처리 중\u00B7대기)";
         } else {
           hintEl.textContent = "ESC 중지";
         }
@@ -302,7 +327,8 @@
       } else if (status === "missing") {
         hintEl.textContent = "Session not found";
       } else {
-        hintEl.textContent = "Enter 전송 \u00B7 Shift+Enter 줄바꿈";
+        // idle (큐 = 0): 정상 입력 힌트
+        hintEl.textContent = "Shift+Enter 줄바꿈";
       }
     }
 
@@ -455,6 +481,7 @@
 
     h += '<div class="terminal-output" id="terminal-output"></div>';
 
+    h += '<div class="terminal-input-queue" id="terminal-input-queue" hidden></div>';
     h += '<div class="terminal-input-card">';
     h += '<div class="terminal-image-preview" id="terminal-image-preview"></div>';
     h += '<textarea class="terminal-input" id="terminal-input"'
@@ -470,7 +497,7 @@
     h += '<input type="file" id="terminal-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" multiple>';
     h += '</div>';
     h += '<div class="terminal-input-bottom-right">';
-    h += '<span class="terminal-input-hint">Enter 전송 \u00B7 Shift+Enter 줄바꿈</span>';
+    h += '<span class="terminal-input-hint">Shift+Enter 줄바꿈</span>';
     h += '<button class="terminal-send-btn" id="terminal-send-btn"'
       + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) ? "" : " disabled")
       + '><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>';
@@ -495,6 +522,23 @@
     el.innerHTML = h;
 
     M.initOutputDiv();
+
+    // [ESC 새로고침 복원] localStorage 에 저장된 ESC 직전 메시지가 있으면 입력창에
+    // 자동 채운다 (사용자가 수정/재전송 가능). sendInput/commitQueue 가 send 시점에
+    // localStorage 를 클리어하므로 영구 잔류는 없다.
+    if (!M.isWorkflowMode) {
+      try {
+        var savedText = localStorage.getItem("board.term.lastSentText");
+        if (savedText) {
+          var inputElRestore = document.getElementById("terminal-input");
+          if (inputElRestore) {
+            inputElRestore.value = savedText;
+            inputElRestore.style.height = "auto";
+            inputElRestore.style.height = inputElRestore.scrollHeight + "px";
+          }
+        }
+      } catch (e) {}
+    }
 
     // Workflow mode: insert timeline bar placeholder
     if (M.isWorkflowMode) {
@@ -677,10 +721,28 @@
       });
     }
     if (inputEl) {
+      // IME 조합 중 플래그 — compositionstart/end 이벤트로 관리
+      inputEl.addEventListener("compositionstart", function () {
+        M._isComposing = true;
+      });
+      inputEl.addEventListener("compositionend", function () {
+        M._isComposing = false;
+      });
+
       inputEl.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          // IME 조합 중이면 Enter 를 가로채지 않는다.
+          // e.isComposing: 표준 (Chrome/Firefox/Edge)
+          // M._isComposing: Safari 등 일부 브라우저에서 e.isComposing 이 false 로 빠지는 케이스 대비
+          if (e.isComposing || M._isComposing) return;
+
           e.preventDefault();
-          if (!M.isWorkflowMode) M.sendInput();
+          if (M.isWorkflowMode) return;
+
+          // 모든 분기를 sendInput 으로 통일.
+          // sendInput 내부에서 idle: 즉시 echo + send, busy: enqueueInput (텍스트+이미지)
+          // 으로 분기한다. 이미지 첨부 시도 동일 경로로 큐잉된다.
+          M.sendInput();
           return;
         }
         if (e.key !== "Escape") e.stopPropagation();

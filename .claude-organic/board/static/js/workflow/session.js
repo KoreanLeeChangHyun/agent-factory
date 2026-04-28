@@ -362,6 +362,12 @@
     });
   }
 
+  /**
+   * 서버 model 문자열을 파싱해 컨텍스트 윈도우 크기와 모델 표시명을 설정한다.
+   * 1:1 turn 단순화(W01~W04)와 무관하게 동작한다. 토큰 누적 로직도 이 함수와
+   * 별개의 경로(_onStdout data.usage, _onResult data.*)로 처리되므로
+   * turn 모델 변경의 부수 영향이 없음을 확인 (회귀 검증 항목).
+   */
   function _applyRawModel(raw) {
     if (!_ctx || !raw) return;
     var ctxMatch = raw.match(/\[(\d+)([mk])\]/i);
@@ -677,12 +683,24 @@
       Board.state.setTermStatus("idle");
       _ctx.setReceivedChunks(false);
       _ctx.setInputLocked(false);
-      // interrupt 후 result 도착 — 버튼 비활성 플래그 해제.
+      // interrupt 후 result 도착 — 버튼 비활성 플래그 해제만 수행한다.
+      // [ESC 보존 가드] termSessionId 와 conversation DOM 은 건드리지 않는다.
+      // ESC 인터럽트 후에도 세션 ID 와 대화 히스토리는 그대로 유지되어야 하며,
+      // 새로고침 후 history 복원이 가능해야 한다. 이 경로에서의 상태 변경은
+      // _interruptInFlight 해제에 한정된다 (회귀 방지).
       var termMod = Board._term;
       if (termMod && termMod._interruptInFlight) termMod._interruptInFlight = false;
       _ctx.updateControlBar();
 
-      if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
+      // W04 (1:1 turn 모델): result SSE 도착 = 현재 처리 중이던 1개 turn 완료.
+      // advanceTurn 은 spinner 중지 + idle 전환 후 큐에 잔여 entry 가 있으면
+      // commitQueue() 로 다음 1개 entry 를 즉시 send 한다 (1 turn = 1 메시지).
+      // 큐가 비었으면 idle 정리(updateControlBar)만 수행한다.
+      // advanceTurn 미정의 환경(구버전 polyfill)에서는 drainQueue 로 폴백한다.
+      var termMod2 = Board._term;
+      if (termMod2 && typeof termMod2.advanceTurn === "function") {
+        termMod2.advanceTurn();
+      } else if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
         _ctx.drainQueue();
       }
     }
@@ -697,6 +715,7 @@
     if (!_ctx) return;
     if (data.subtype === "init" && data.session_id) {
       var prevSid = Board.state.termSessionId;
+      var isNewSession = !prevSid || String(prevSid) !== String(data.session_id);
       if (prevSid && String(prevSid) !== String(data.session_id)) {
         _ctx.clearOutput();
         _resetSessionDerivedState();
@@ -706,7 +725,13 @@
         }
       }
       Board.state.termSessionId = data.session_id;
-      Board.state.setTermStatus("idle");
+      // SDK 는 매 user query 마다 system init 을 재발사한다 (session_id 동일).
+      // 따라서 init 도착 = "세션 시작 또는 swap" 일 때만 idle 강제, 같은 세션의
+      // 새 turn 시는 status 보존 (busy 유지). 이전 무조건 idle 강제 시 busy 가
+      // 즉시 풀려 다음 사용자 입력이 idle 분기로 잘못 빠지는 회귀 발생.
+      if (isNewSession) {
+        Board.state.setTermStatus("idle");
+      }
       if (data.raw && data.raw.model) {
         _applyRawModel(data.raw.model);
       }
@@ -714,8 +739,13 @@
         var modeEl = document.getElementById("terminal-sl-mode");
         if (modeEl) modeEl.textContent = data.raw.permissionMode;
       }
-      _ctx.setInputLocked(false);
-      _ctx.updateControlBar();
+      // setInputLocked / updateControlBar 도 새 세션일 때만. 같은 세션 새 turn 시
+      // commitQueue 가 이미 setInputLocked(true) + updateControlBar 호출했으므로
+      // 여기서 false 로 풀면 busy 중 입력 lock 이 즉시 해제되는 회귀.
+      if (isNewSession) {
+        _ctx.setInputLocked(false);
+        _ctx.updateControlBar();
+      }
     } else if (data.subtype === "process_exit") {
       var wasActive = Board.state.termStatus === "busy" ||
                       Board.state.termStatus === "starting";
@@ -727,6 +757,12 @@
         _currentToolUseId = null;
         _toolInputMap = {};
       }
+      // [ESC 보존 가드] process_exit 경로에서 termSessionId 와 clearOutput /
+      // _resetSessionDerivedState 를 호출하지 않는다. ESC 인터럽트(exitCode 130)
+      // 또는 정상 완료(exitCode 0), SIGTERM(exitCode 143) 모두 세션 ID 와
+      // conversation DOM 을 보존해야 한다. 사용자가 새로고침해도 history 가
+      // 복원되어야 하므로 이 경로에서 세션 식별자를 건드리는 것은 회귀다.
+      // 세션 ID null 처리는 오직 killSession() 의 _finalizeStoppedUI 에서만 수행한다.
       Board.state.setTermStatus("stopped");
       // 토큰/비용은 의도적으로 리셋하지 않는다. 세션 스위치 시 서버가 구 프로세스를
       // kill 하면서 process_exit 이 먼저 날아오는데, 여기서 0 으로 밀면 뒤이은
@@ -737,11 +773,46 @@
       var termModExit = Board._term;
       if (termModExit && termModExit._interruptInFlight) termModExit._interruptInFlight = false;
       var exitCode = data.exit_code;
-      if (exitCode !== 0 && exitCode !== 143 && exitCode !== undefined) {
+      // exitCode 0: 정상 종료, 130: SIGINT(ESC 인터럽트), 143: SIGTERM — 에러 메시지 불필요.
+      // 그 외 코드만 에러로 표시한다.
+      if (exitCode !== 0 && exitCode !== 130 && exitCode !== 143 && exitCode !== undefined) {
         _ctx.appendErrorMessage("Process exited with code " + exitCode);
       }
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
+
+      // [ESC 자동 resume] ESC 직후 도착한 process_exit 은 같은 session_id 로
+      // 즉시 재spawn 하여 사용자가 STOPPED 화면 없이 바로 다음 메시지를 이어서
+      // 보낼 수 있게 한다.
+      //
+      // 트리거 조건:
+      // - exitCode 130 (SIGINT 직접) 또는
+      // - _recentInterrupt 플래그 (interruptSession 진입 후 5초 윈도우)
+      //   → SDK 가 SIGINT 받고 graceful shutdown 으로 다른 exit_code 를 반환해도 커버.
+      //
+      // 워크플로우 모드는 자체 라이프사이클이 있으므로 자동 resume 대상 외.
+      var termMod3 = Board._term;
+      var isRecentInterrupt = !!(termMod3 && termMod3._recentInterrupt);
+      var isMainMode = !_ctx.isWorkflowMode || !_ctx.isWorkflowMode();
+      // localStorage 의 ESC 복원 텍스트는 "ESC 시퀀스 진행 중" 의 영속 시그널.
+      // 새로고침으로 메모리 플래그(_recentInterrupt)가 초기화되어도 이 신호로
+      // 자동 resume 을 트리거할 수 있다. 사용자 명시 Kill 시에는 killSession 이
+      // 이 키를 클리어하므로 자동 resume 이 발동하지 않는다.
+      var hasEscRestoreLS = false;
+      try { hasEscRestoreLS = !!localStorage.getItem("board.term.lastSentText"); } catch (e) {}
+      if ((exitCode === 130 || isRecentInterrupt || hasEscRestoreLS)
+          && Board.state.termSessionId
+          && isMainMode) {
+        var sidToResume = Board.state.termSessionId;
+        setTimeout(function () {
+          // race 가드: 사이에 사용자가 명시적으로 다른 동작(killSession,
+          // 세션 스위치 등)을 했으면 자동 resume 을 포기.
+          if (Board.state.termStatus === "stopped"
+              && Board.state.termSessionId === sidToResume) {
+            startSession(sidToResume, { silent: true });
+          }
+        }, 50);
+      }
     } else if (
       data.subtype === "task_started" ||
       data.subtype === "task_progress" ||
@@ -1362,11 +1433,15 @@
     }
   }
 
-  function startSession(resumeSessionId) {
+  function startSession(resumeSessionId, opts) {
     if (!_ctx) return;
     // 중복 요청 방지: spawn 응답이 올 때까지 추가 클릭 무시.
     if (_startInFlight) return;
     var isResume = !!resumeSessionId;
+    // silent: ESC 자동 resume 등 "사용자에게 보이는 대화 보존" 이 필요한 경로 전용.
+    // - clearOutput / loadHistory 를 skip 한다 (DOM 중복/플리커 방지).
+    // - termSessionId 만 보장 세팅, 토큰/SSE 재연결/spawn 흐름은 동일.
+    var silent = !!(opts && opts.silent);
 
     // 선제 UUID 검증: resume 요청인데 UUID 형식이 아니면 서버 fallback 대신 즉시 실패 처리
     if (isResume && !UUID_RE.test(String(resumeSessionId))) {
@@ -1426,17 +1501,27 @@
       return;
     }
 
-    _ctx.clearOutput();
-    if (isResume) {
-      // 과거 대화를 즉시 UI 에 로드 (Claude CLI spawn 응답을 기다리지 않음).
-      // spawn 은 백그라운드로 진행되며, resume 은 큰 세션에서 10초 이상 걸릴 수
-      // 있으므로 사용자 체감 UX 를 위해 REST /terminal/history 로 먼저 채운다.
-      // 주의: 서버가 graceful fallback 하면 init 이벤트에서 실제 session_id
-      // 가 달리 도착하고, 그때 과거 대화를 재로딩한다 (system/init 리스너 참조).
-      Board.state.termSessionId = resumeSessionId;
-      var termModResume = Board._term;
-      if (termModResume && typeof termModResume.loadHistory === "function") {
-        termModResume.loadHistory(resumeSessionId);
+    if (silent) {
+      // silent resume (ESC 자동 복귀): DOM 보존이 핵심.
+      // clearOutput / loadHistory 둘 다 skip 하고 termSessionId 만 보장한다.
+      // 화면의 대화는 인터럽트 직전 상태 그대로이며, spawn 응답 후 idle 로
+      // 전환되면 사용자가 곧바로 다음 메시지를 보낼 수 있다.
+      if (isResume) {
+        Board.state.termSessionId = resumeSessionId;
+      }
+    } else {
+      _ctx.clearOutput();
+      if (isResume) {
+        // 과거 대화를 즉시 UI 에 로드 (Claude CLI spawn 응답을 기다리지 않음).
+        // spawn 은 백그라운드로 진행되며, resume 은 큰 세션에서 10초 이상 걸릴 수
+        // 있으므로 사용자 체감 UX 를 위해 REST /terminal/history 로 먼저 채운다.
+        // 주의: 서버가 graceful fallback 하면 init 이벤트에서 실제 session_id
+        // 가 달리 도착하고, 그때 과거 대화를 재로딩한다 (system/init 리스너 참조).
+        Board.state.termSessionId = resumeSessionId;
+        var termModResume = Board._term;
+        if (termModResume && typeof termModResume.loadHistory === "function") {
+          termModResume.loadHistory(resumeSessionId);
+        }
       }
     }
 
@@ -1482,6 +1567,12 @@
     // 중복 kill 요청 방지
     if (_killingInProgress) return;
     _killingInProgress = true;
+
+    // 사용자 명시 Kill = ESC 자동 resume 시퀀스 종료. localStorage 의 복원 텍스트
+    // 시그널을 클리어하여 process_exit 핸들러가 자동 resume 으로 가지 않게 한다.
+    try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
+    var termModK = Board._term;
+    if (termModK) termModK._recentInterrupt = false;
 
     var prevStatus = Board.state.termStatus;
     var epK = _ctx.endpoints();
@@ -1553,6 +1644,14 @@
    * Record a text that was just sent via sendInput().
    * When the corresponding user_input SSE event arrives, the handler
    * will skip DOM insertion to avoid duplicates.
+   *
+   * 1:1 turn 모델에서도 시맨틱 변경 없음:
+   * - commitQueue 가 1개 entry 를 echo 한 직후 sendInput 경로에서 markSent 호출
+   * - SSE user_input echo 가 되돌아오면 _sentTexts 에 등록된 텍스트이므로 skip
+   * - 이미 DOM 에 노출된 말풍선의 중복 삽입을 방지한다
+   * - history replay(_isReplaying=true) 중에는 _sentTexts 가 비어 있으므로
+   *   모든 user_input 이벤트가 정상 렌더된다 (새로고침 복원 경로 보장)
+   *
    * @param {string} text
    */
   function markSent(text) {
@@ -1590,6 +1689,12 @@
    * 재연결/이력 복원 시 in-flight tool_use 블록을 라이브 input_json_delta 경로에
    * 다시 연결하기 위한 시드 함수. renderHistory 가 in_flight=true 인 tool_use
    * 이벤트를 만나면 호출한다.
+   *
+   * 1:1 turn 단순화 회귀 검증:
+   * - turn-card 그룹화 폐기(W02) 후에도 tool_use 라우팅은 outputDiv 직접 자식으로
+   *   유지되므로 이 함수의 시드 동작에 영향 없음.
+   * - 1개 turn = 1개 메시지 모델에서 in-flight tool 은 단일 turn 내에만 존재하므로
+   *   병렬 tool_use 충돌 가능성도 변경 없음.
    *
    * @param {string} toolUseId
    * @param {string} partialJson 이미 수신한 input_json 조각(빈 문자열 가능)

@@ -139,7 +139,13 @@ Board.state.reconcileTermStatus = function (serverStatus) {
     Board.state.setTermStatus('stopped');
     result = 'stopped';
   } else if (serverStatus === 'running') {
-    if (_CLIENT_EXTENDED.has(current)) {
+    if (current === 'starting') {
+      // starting 은 client-only transient state. 서버가 'running' 을 보고했다는 건
+      // 서버 측 프로세스가 살아있다는 명확한 신호이므로 idle 로 보정해야 한다.
+      // (이후 awaiting_response 처리에서 busy 로 추가 보정될 수 있음)
+      Board.state.setTermStatus('idle');
+      result = 'idle(from-starting)';
+    } else if (_CLIENT_EXTENDED.has(current)) {
       result = 'keep(' + current + ')';
     } else {
       Board.state.setTermStatus('busy');
