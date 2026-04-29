@@ -597,8 +597,51 @@ class TerminalHandlerMixin:
                             if ts and ts > last_timestamp:
                                 last_timestamp = ts
 
+        # SDK 가 ESC 인터럽트 시 jsonl 에 자동으로 추가하는 placeholder user 메시지
+        # "[Request interrupted by user]" 는 사용자가 보낸 메시지가 아니므로 events
+        # 에서 필터링한다. 같은 정보는 sidecar 매칭으로 우리 .interrupted 배지가
+        # 표시하므로 노이즈 발생을 방지한다.
+        events = [
+            ev for ev in events
+            if not (
+                ev.get('role') == 'user'
+                and ev.get('kind') == 'text'
+                and (ev.get('text') or '').strip() == '[Request interrupted by user]'
+            )
+        ]
+
         # turn_id 그룹화: 모든 events(in-flight 포함)에 turn_id 필드 부여
         _assign_turn_ids(events)
+
+        # ESC 인터럽트 sidecar 적용: <session_id>.interrupted.jsonl 의 timestamp
+        # 와 일치하는 user 이벤트에 ``interrupted=true`` 필드를 추가한다.
+        # tool_result 는 user role 이지만 인터럽트 대상 아님 (제외).
+        sidecar_path = filepath.replace('.jsonl', '.interrupted.jsonl')
+        if os.path.isfile(sidecar_path):
+            interrupted_ts: set[str] = set()
+            try:
+                with open(sidecar_path, 'r', encoding='utf-8') as fp:
+                    for line in fp:
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                        try:
+                            rec = json.loads(stripped)
+                        except (ValueError, json.JSONDecodeError):
+                            continue
+                        ts = rec.get('timestamp')
+                        if isinstance(ts, str) and ts:
+                            interrupted_ts.add(ts)
+            except OSError:
+                interrupted_ts = set()
+            if interrupted_ts:
+                for ev in events:
+                    if ev.get('role') != 'user':
+                        continue
+                    if ev.get('kind') == 'tool_result':
+                        continue
+                    if ev.get('timestamp') in interrupted_ts:
+                        ev['interrupted'] = True
 
         # pending_turn 플래그: 마지막 user 이벤트 직후 응답 대기 중인 경우
         # 클라이언트가 turn-card 를 닫지 않고 spinner 를 시드하도록 알린다.

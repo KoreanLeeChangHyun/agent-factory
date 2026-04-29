@@ -219,6 +219,10 @@
           // turn-card user-group 라우팅 폐기.
           var userDiv = document.createElement("div");
           userDiv.className = "term-message term-user";
+          if (ev.timestamp) userDiv.setAttribute("data-timestamp", ev.timestamp);
+          // 서버 history 핸들러가 sidecar 매칭 후 interrupted=true 를 부여한
+          // user 이벤트는 .interrupted 클래스를 부여한다 (CSS 가 우측 "중지됨" 배지 표시).
+          if (ev.interrupted) userDiv.classList.add("interrupted");
           userDiv.textContent = text;
           M.appendToOutput(userDiv);
         } else if (ev.role === "assistant") {

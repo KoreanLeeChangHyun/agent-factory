@@ -457,6 +457,9 @@ class TerminalSSEChannel:
         'task_progress': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
         'task_notification': ('task_id', 'tool_use_id', 'status', 'summary'),
         'process_exit': ('exit_code',),
+        # ESC 인터럽트 시점의 마지막 user 메시지 timestamp 를 클라이언트에 노출.
+        # 클라이언트는 이 timestamp 와 매칭되는 user 말풍선에 .interrupted 마커를 부여.
+        'user_input_interrupted': ('timestamp',),
     }
 
     def _build_system_payload(self, data: dict) -> dict:

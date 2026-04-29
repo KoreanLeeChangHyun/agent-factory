@@ -746,6 +746,27 @@
         _ctx.setInputLocked(false);
         _ctx.updateControlBar();
       }
+    } else if (data.subtype === "user_input_interrupted") {
+      // ESC 인터럽트로 마지막 user 메시지가 중지되었음을 알리는 라이브 시그널.
+      // outputDiv 에서 timestamp 매칭되는 .term-user 또는 가장 최근 .term-user 에
+      // .interrupted 클래스를 부여하여 시각 마커("중지됨" 배지)를 표시한다.
+      var ts = data.timestamp || "";
+      var userMsgs = document.querySelectorAll(".terminal-output .term-user");
+      var target = null;
+      if (ts) {
+        for (var ui = userMsgs.length - 1; ui >= 0; ui--) {
+          if (userMsgs[ui].getAttribute("data-timestamp") === ts) {
+            target = userMsgs[ui];
+            break;
+          }
+        }
+      }
+      if (!target && userMsgs.length > 0) {
+        target = userMsgs[userMsgs.length - 1];
+        // timestamp 매칭 실패해도 라이브 시점엔 마지막 user 가 곧 중지된 메시지.
+        if (ts) target.setAttribute("data-timestamp", ts);
+      }
+      if (target) target.classList.add("interrupted");
     } else if (data.subtype === "process_exit") {
       var wasActive = Board.state.termStatus === "busy" ||
                       Board.state.termStatus === "starting";

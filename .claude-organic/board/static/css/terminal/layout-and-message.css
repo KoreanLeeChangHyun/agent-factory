@@ -578,6 +578,30 @@
   font-size: 90%;
 }
 
+/* ESC 인터럽트로 응답이 중지된 user 메시지 — 우측 모서리에 "중지됨" 배지 부착.
+ * 색상은 테마 컬러(테라코타 #D97757) 기반. */
+.term-user.interrupted {
+  position: relative;
+  padding-right: 64px;
+  opacity: 0.85;
+}
+
+.term-user.interrupted::after {
+  content: "중지됨";
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  border-radius: 3px;
+  line-height: 1.4;
+  pointer-events: none;
+}
 
 .term-system {
   color: #858585;

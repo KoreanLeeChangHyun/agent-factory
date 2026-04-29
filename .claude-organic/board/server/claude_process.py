@@ -325,6 +325,13 @@ class ClaudeProcess:
         _status는 변경하지 않는다 — Claude CLI가 result 이벤트를 발행하면
         _read_stdout_loop에서 idle로 전환된다.
 
+        부가 효과:
+        - SDK jsonl 의 마지막 real user 메시지 timestamp 를 찾아 sidecar 파일
+          (``<session_id>.interrupted.jsonl``)에 append 한다.
+        - SSE 라이브 이벤트 ``system/user_input_interrupted`` 를 broadcast 하여
+          클라이언트가 즉시 user 말풍선에 마커를 표시할 수 있게 한다.
+        - 새로고침 후 history 복원 시 sidecar 가 영속 시그널 역할을 한다.
+
         Returns:
             결과 dict: {"ok": True/False, "error": str}
         """
@@ -336,12 +343,111 @@ class ClaudeProcess:
             self._process = None
             return {'ok': False, 'error': 'process not running'}
 
+        # SIGINT 전 sidecar 기록 + SSE broadcast (SIGINT 후엔 SDK 가 jsonl 을
+        # 추가 flush 할 수 있어 race 가 발생할 여지가 있으므로 SIGINT 직전 시점
+        # 의 jsonl 끝에서 마지막 real user 메시지를 잡는다).
+        last_user_ts = self._record_user_interrupt_to_sidecar()
+        if last_user_ts:
+            try:
+                self._channel.broadcast({
+                    'type': 'system',
+                    'subtype': 'user_input_interrupted',
+                    'timestamp': last_user_ts,
+                    'session_id': self._session_id or '',
+                })
+            except (OSError, TypeError) as exc:
+                logger.error("interrupt: broadcast user_input_interrupted 실패: %s", exc)
+
         try:
             os.kill(self._process.pid, signal.SIGINT)
         except OSError as e:
             return {'ok': False, 'error': str(e)}
 
         return {'ok': True, 'error': ''}
+
+    def _record_user_interrupt_to_sidecar(self) -> str | None:
+        """SDK jsonl 에서 마지막 real user 메시지 timestamp 를 찾아 sidecar 에 append.
+
+        sidecar 파일: ``~/.claude/projects/<slug>/<session_id>.interrupted.jsonl``
+        한 줄당 하나의 인터럽트 기록 ``{"timestamp": "...", "kind": "user_interrupted"}``.
+
+        real user 메시지 = ``type=user`` 이면서 ``content`` 에 text block 이 있는 경우
+        (tool_result 만 있는 user record 는 제외).
+
+        Returns:
+            찾은 timestamp 문자열, 없으면 None.
+        """
+        if not self._session_id:
+            return None
+        project_root = os.getcwd()
+        home_dir = os.path.expanduser('~')
+        project_slug = project_root.replace('/', '-')
+        jsonl_path = os.path.join(
+            home_dir, '.claude', 'projects', project_slug, f'{self._session_id}.jsonl',
+        )
+        sidecar_path = os.path.join(
+            home_dir, '.claude', 'projects', project_slug,
+            f'{self._session_id}.interrupted.jsonl',
+        )
+        if not os.path.isfile(jsonl_path):
+            return None
+
+        last_user_ts: str | None = None
+        try:
+            with open(jsonl_path, 'r', encoding='utf-8') as fp:
+                for line in fp:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        rec = json.loads(stripped)
+                    except (ValueError, json.JSONDecodeError):
+                        continue
+                    if rec.get('type') != 'user':
+                        continue
+                    msg = rec.get('message')
+                    if not isinstance(msg, dict):
+                        continue
+                    content = msg.get('content')
+                    has_text_block = False
+                    text_value = ''
+                    if isinstance(content, str):
+                        has_text_block = bool(content)
+                        text_value = content
+                    elif isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict) and block.get('type') == 'text':
+                                has_text_block = True
+                                text_value = block.get('text') or ''
+                                break
+                    if not has_text_block:
+                        continue
+                    # SDK 가 자동으로 기록하는 placeholder user 메시지는 sidecar
+                    # 매칭 대상이 아니다. 이걸 잡으면 history 필터로 제거된 후
+                    # interrupted 마커가 사라지는 race 회귀가 발생한다.
+                    if text_value.strip() == '[Request interrupted by user]':
+                        continue
+                    ts = rec.get('timestamp', '') or ''
+                    if ts:
+                        last_user_ts = ts
+        except OSError as exc:
+            logger.error("interrupt: jsonl 읽기 실패 (%s): %s", jsonl_path, exc)
+            return None
+
+        if not last_user_ts:
+            return None
+
+        try:
+            with open(sidecar_path, 'a', encoding='utf-8') as fp:
+                fp.write(json.dumps(
+                    {'timestamp': last_user_ts, 'kind': 'user_interrupted'},
+                    ensure_ascii=False,
+                ) + '\n')
+        except OSError as exc:
+            logger.error("interrupt: sidecar 쓰기 실패 (%s): %s", sidecar_path, exc)
+            return None
+
+        return last_user_ts
 
     def kill(self) -> dict:
         """Claude CLI 프로세스를 종료한다.
