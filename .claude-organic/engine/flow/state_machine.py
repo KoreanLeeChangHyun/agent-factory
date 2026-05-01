@@ -235,6 +235,18 @@ def update_status(
             _append_log(abs_work_dir, "WARN", f"status.json read failed: {status_file}")
             return "status -> skipped (read failed)"
 
+        # Idempotent same-step transition: 같은 단계로의 전이는 silent skip.
+        # finalize 중복 호출(DONE→DONE 23회) 등 누적 노이즈를 차단한다.
+        # 로그 분석 (2026-04-29) 에서 DONE→DONE / PLAN→PLAN / WORK→WORK 등
+        # same-step 전이가 ERROR 로그로 누적되던 케이스를 정상 무동작으로 처리.
+        if from_step == to_step:
+            _append_log(
+                abs_work_dir,
+                "INFO",
+                f"FSM idempotent: already at {to_step}, transition skipped.",
+            )
+            return f"status -> idempotent (already at {to_step})"
+
         # FSM 전이 검증
         if skip_guard:
             print(

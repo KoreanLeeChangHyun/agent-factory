@@ -213,18 +213,41 @@ def _read_ticket_status(ticket_id: str) -> str | None:
     return None
 
 
-def _kanban_move_submit(ticket_id: str) -> bool:
-    """``flow-kanban move <ticket_id> submit`` 호출 (멱등).
+def _kanban_move_submit(ticket_id: str, current_status: str | None = None) -> bool:
+    """``flow-kanban move <ticket_id> submit`` 호출 (멱등 + 상태 가드).
 
     /wf -s 정식 흐름에서 메인 세션이 launch 직전에 호출하던 단계를 launcher
     본체가 흡수한다. 이를 통해 launcher 단독 호출 경로(자연어 실행, 외부 스크립트
     등)에서도 칸반-실제 상태 동기화가 구조적으로 보장된다.
 
+    상태별 동작:
+      - Open: move submit 정상 호출
+      - To Do: cmd_launch 가 사전 거부하므로 여기 도달 안 함
+      - Submit / In Progress / Review / Done: skip (이미 Submit 이거나 그 이후
+        단계라 되돌릴 필요 없음). 이 가드가 없으면 kanban_cli 가 거부하면서
+        ``현재 X이므로 Submit으로 이동할 수 없습니다`` ERROR 로그를 남기는
+        회귀가 누적된다 (로그 분석 2026-04-29 에서 11회 발생 패턴 확인).
+
     실패해도 워크플로우 실행은 계속 진행 (비차단, wf.md:459 의 정책과 동일).
 
+    Args:
+        ticket_id: 티켓 ID.
+        current_status: 호출 전 미리 읽어둔 status. None 이면 함수 내부에서 재조회.
+
     Returns:
-        성공 여부 (참고용).
+        실제 move 호출 성공 여부 (skip 도 True 반환 — 호출자가 결과로 분기 안 하도록).
     """
+    if current_status is None:
+        current_status = _read_ticket_status(ticket_id)
+
+    if current_status in ("Submit", "In Progress", "Review", "Done"):
+        _log(
+            "INFO",
+            f"http_launcher: kanban move submit skipped "
+            f"(already {current_status}): {ticket_id}",
+        )
+        return True
+
     wf_root = os.path.dirname(_engine_dir)
     bin_path = os.path.join(wf_root, "bin", "flow-kanban")
     if not os.path.isfile(bin_path):
@@ -313,8 +336,9 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         print(f"[ERROR] {msg}", file=sys.stderr)
         return 1
 
-    # 0-2) 칸반 전이 (멱등). 호출 경로 무관하게 launcher 가 단일 진입점에서 처리.
-    _kanban_move_submit(ticket_id)
+    # 0-2) 칸반 전이 (멱등 + 상태 가드). 호출 경로 무관하게 launcher 가 단일 진입점에서 처리.
+    # current_status 를 한 번 읽고 _kanban_move_submit 에 전달해 race 회피 + 중복 IO 절감.
+    _kanban_move_submit(ticket_id, current_status)
 
     # 0-3) command 정규화: 단순 명령 → /wf -s N 변환.
     command = _normalize_command(ticket_id, command)

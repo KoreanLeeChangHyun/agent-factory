@@ -719,7 +719,9 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
         pass
 
 
-def _build_result_update_args(abs_work_dir: str) -> list[str]:
+def _build_result_update_args(
+    abs_work_dir: str, registry_key: str | None = None,
+) -> list[str]:
     """update-result CLI 추가 인자 리스트를 반환한다.
 
     abs_work_dir에서 registryKey를 추출하고, plan.md / report.md 존재 여부를
@@ -728,22 +730,23 @@ def _build_result_update_args(abs_work_dir: str) -> list[str]:
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
             (.workflow/{registryKey}/{workName}/{command} 구조)
+        registry_key: 호출자(main)가 인자로 받은 registry_key. 명시 전달 시
+            abs_work_dir 정규식 추출 실패에 의존하지 않는다 (2026-04-29 보완).
 
     Returns:
         ["--registrykey", registryKey, "--workdir", workDir상대경로] 에
         plan.md / report.md가 존재하면 각각 "--plan" / "--report" 인자를 추가한 리스트.
-        registryKey 추출 실패 시 빈 리스트.
+        registryKey 추출과 workdir 매칭 모두 실패하면 빈 리스트.
     """
     import re as _re
 
-    # abs_work_dir 에서 YYYYMMDD-HHMMSS 패턴 추출
-    # 경로 형식: .../.claude-organic/runs/{registryKey}/{workName}/{command}
-    _ts_pattern = _re.compile(r"\.claude-organic[/\\]runs[/\\](\d{8}-\d{6}(?:-\d+)?)")
-    _match = _ts_pattern.search(abs_work_dir)
-    if not _match:
-        return []
-
-    registry_key: str = _match.group(1)
+    # registry_key 우선순위: 1) 인자로 받은 명시 값, 2) abs_work_dir 정규식 추출
+    if not registry_key:
+        _ts_pattern = _re.compile(r"\.claude-organic[/\\]runs[/\\](\d{8}-\d{6}(?:-\d+)?)")
+        _match = _ts_pattern.search(abs_work_dir)
+        if not _match:
+            return []
+        registry_key = _match.group(1)
 
     # 상대 workDir: .claude-organic/runs/{registryKey}/... 이후 부분을 포함한 경로
     _wf_idx = abs_work_dir.find(".claude-organic/runs/")
@@ -833,7 +836,11 @@ def main() -> None:
         )
     else:
         if abs_work_dir is not None:
-            _append_log(abs_work_dir, "WARN", "FINALIZE_STEP2A: transcript=not_found")
+            # status=완료 인데 transcript 가 없으면 비정상 (사용량 집계 누락) → WARN 유지.
+            # status=실패 / 짧은 디버그 워크플로우는 transcript 미생성이 정상이므로 INFO 로 강등 —
+            # 로그 분석 (2026-04-29) 에서 102회 누적된 노이즈를 정상/비정상으로 분리한다.
+            _level = "WARN" if status == "완료" else "INFO"
+            _append_log(abs_work_dir, _level, "FINALIZE_STEP2A: transcript=not_found")
 
     # Step 2b: usage-finalize
     if abs_work_dir is not None:
@@ -910,7 +917,9 @@ def main() -> None:
 
         # ── Step 4b: 결과 워크플로우 번호 기록 (완료 시만, 비차단) ──
         if status == "완료" and abs_work_dir is not None:
-            update_args = _build_result_update_args(abs_work_dir)
+            # registry_key 명시 전달로 정규식 매치 실패 케이스 차단 (2026-04-29 보완,
+            # "no workflow number" WARN 21회 누적된 회귀 해결).
+            update_args = _build_result_update_args(abs_work_dir, registry_key=registry_key)
             if not update_args:
                 _append_log(abs_work_dir, "WARN", f"FINALIZE_STEP4B: no workflow number in status.json ticket={ticket_number}, skipping result update")
             else:
