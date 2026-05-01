@@ -1189,7 +1189,12 @@
           var taskId = pair[0];
           var task = pair[1];
           var status = task.status || "running";
-          var desc = _esc(task.description || taskId);
+          // 풀 경로는 ellipsis 로 잘리면 의미가 사라지므로 마지막 segment(basename)
+          // 만 노출. "Reading .claude-organic/board/static/js/foo.js" →
+          // "Reading foo.js". hover title 에는 원본 summary 가 그대로 유지된다.
+          var rawDesc = task.description || taskId;
+          rawDesc = rawDesc.replace(/[\w./-]*\/([\w.-]+)/g, "$1");
+          var desc = _esc(rawDesc);
           var tool = _esc(task.toolName || "");
           var summary = _esc(task.summary || "");
           var titleAttr = summary ? ' title="' + summary + '"' : "";

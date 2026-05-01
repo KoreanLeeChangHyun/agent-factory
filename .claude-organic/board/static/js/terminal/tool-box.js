@@ -404,6 +404,7 @@
 
     card.appendChild(cardHeader);
     card.setAttribute("data-start-time", String(Date.now()));
+    card.setAttribute("data-running", "true");
 
     var cardBody = document.createElement("div");
     cardBody.className = "wf-tool-card-body";
@@ -515,6 +516,23 @@
           timeEl.textContent = M.formatDuration(elapsed);
         }
       }
+    }
+
+    // Result 도착 = tool 실행 완료. 진행 중 펄스 애니메이션을 끈다.
+    card.removeAttribute("data-running");
+
+    // 완료 상태 표시: success / fail. 헤더 우측 시간 옆에 SVG 아이콘 부착.
+    card.setAttribute("data-status", isError ? "fail" : "success");
+    var headerEl = card.querySelector(".wf-tool-card-header");
+    if (headerEl && !headerEl.querySelector(".wf-tool-card-status-icon")) {
+      var statusIcon = document.createElement("span");
+      statusIcon.className = "wf-tool-card-status-icon";
+      if (isError) {
+        statusIcon.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+      } else {
+        statusIcon.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+      headerEl.appendChild(statusIcon);
     }
   };
 

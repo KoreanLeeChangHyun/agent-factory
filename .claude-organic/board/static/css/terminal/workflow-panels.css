@@ -389,9 +389,27 @@
   border-radius: 3px;
 }
 
+@keyframes wf-step-active-pulse {
+  0%, 100% {
+    background: rgba(217, 119, 87, 0.14);
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+  }
+  50% {
+    background: rgba(217, 119, 87, 0.32);
+    box-shadow: 0 0 8px 1px rgba(217, 119, 87, 0.55);
+  }
+}
+
 .wf-step-panel-status[data-status="active"] {
   color: #D97757;
   background: rgba(217, 119, 87, 0.12);
+  animation: wf-step-active-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-step-panel-status[data-status="active"] {
+    animation: none;
+  }
 }
 
 .wf-step-panel-status[data-status="done"] {
@@ -418,6 +436,47 @@
   border-radius: 4px;
   overflow: hidden;
   font-size: 12px;
+}
+
+@keyframes wf-tool-running-pulse {
+  0%, 100% {
+    border-color: #2a2a2a;
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+  }
+  50% {
+    border-color: rgba(217, 119, 87, 0.55);
+    box-shadow: 0 0 6px 0 rgba(217, 119, 87, 0.30);
+  }
+}
+
+.wf-tool-card[data-running="true"] {
+  animation: wf-tool-running-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-tool-card[data-running="true"] {
+    animation: none;
+  }
+}
+
+/* 완료 상태 표시: 헤더 우측 시간 옆 SVG 아이콘 + 실패 시 border 강조. */
+.wf-tool-card-status-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.wf-tool-card[data-status="success"] .wf-tool-card-status-icon {
+  color: #4ec9b0;
+}
+
+.wf-tool-card[data-status="fail"] .wf-tool-card-status-icon {
+  color: #f48771;
+}
+
+.wf-tool-card[data-status="fail"] {
+  border-color: rgba(244, 135, 113, 0.45);
 }
 
 .wf-tool-card-header {
