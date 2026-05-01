@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from .._common import (
     _write_memory_file,
@@ -12,6 +13,8 @@ from .._common import (
     _write_prompt_file,
     _delete_prompt_file,
     _write_claude_md,
+    _write_quick_prompt,
+    _delete_quick_prompt,
     logger,
 )
 
@@ -116,3 +119,41 @@ class FilesHandlerMixin:
 
         result = _write_claude_md(os.getcwd(), content)
         self._send_json(result)
+
+    def _handle_quick_prompt_write(self) -> None:
+        """quick prompt 단건 생성/갱신 엔드포인트.
+
+        POST /api/quick-prompts/item: 요청 본문 {"id": str, "prompt": str, "label"?, "bindTo"?, "description"?}
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        prompt_id = data.get('id', '')
+        if not prompt_id:
+            self._send_error(400, 'Missing "id" field')
+            return
+
+        try:
+            result = _write_quick_prompt(os.getcwd(), prompt_id, data)
+            self._send_json(result)
+        except ValueError as e:
+            self._send_error(400, str(e))
+
+    def _handle_quick_prompt_delete(self) -> None:
+        """quick prompt 단건 삭제 엔드포인트.
+
+        DELETE /api/quick-prompts/item?id=<id>
+        """
+        prompt_id = self._parse_query_param('id')
+        if not prompt_id:
+            self._send_error(400, 'Missing "id" query parameter')
+            return
+
+        try:
+            result = _delete_quick_prompt(os.getcwd(), prompt_id)
+            self._send_json(result)
+        except ValueError as e:
+            self._send_error(400, str(e))
+        except FileNotFoundError as e:
+            self._send_error(404, str(e))

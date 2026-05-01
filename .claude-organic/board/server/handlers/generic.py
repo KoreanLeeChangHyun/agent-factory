@@ -25,6 +25,7 @@ from .._common import (
     _read_prompt_file,
     _read_claude_md,
     _read_roadmap,
+    _read_quick_prompts,
     _memory_gc_status,
     _memory_gc_run,
     _memory_gc_prune_archive,
@@ -114,6 +115,8 @@ class GenericHandlerMixin:
                 self._send_json(_read_claude_md(project_root))
             except FileNotFoundError as e:
                 self._send_error(404, str(e))
+        elif path == '/api/quick-prompts':
+            self._send_json(_read_quick_prompts(project_root))
         elif path == '/api/memory/gc/status':
             self._send_json(_memory_gc_status(project_root))
         else:

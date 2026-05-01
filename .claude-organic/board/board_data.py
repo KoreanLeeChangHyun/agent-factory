@@ -1049,6 +1049,151 @@ def _write_claude_md(project_root: str, content: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Quick Prompts (.claude-organic/board/config/quick-prompts.json)
+# ---------------------------------------------------------------------------
+
+QUICK_PROMPTS_PATH: str = os.path.join(
+    '.claude-organic', 'board', 'config', 'quick-prompts.json',
+)
+
+_QUICK_PROMPT_ID_RE = re.compile(r'^[A-Za-z0-9_\-\.]+$')
+
+
+def _validate_quick_prompt_id(prompt_id: str) -> None:
+    """quick prompt id 의 보안 검증을 수행한다."""
+    if not isinstance(prompt_id, str) or not prompt_id:
+        raise ValueError('Empty quick prompt id')
+    if '..' in prompt_id or '/' in prompt_id or '\\' in prompt_id:
+        raise ValueError(f'Invalid quick prompt id: {prompt_id}')
+    if not _QUICK_PROMPT_ID_RE.match(prompt_id):
+        raise ValueError(f'Invalid quick prompt id format: {prompt_id}')
+
+
+def _quick_prompts_filepath(project_root: str) -> str:
+    return os.path.join(project_root, QUICK_PROMPTS_PATH)
+
+
+def _read_quick_prompts(project_root: str) -> dict:
+    """quick-prompts.json 을 읽어 {version, items} 를 반환한다.
+
+    파일이 없으면 빈 items 로 응답해 클라이언트가 자연스럽게 빈 상태를 표시할 수 있다.
+    """
+    filepath = _quick_prompts_filepath(project_root)
+    if not os.path.isfile(filepath):
+        return {'version': 1, 'items': []}
+
+    try:
+        with open(filepath, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {'version': 1, 'items': []}
+
+    if not isinstance(data, dict):
+        return {'version': 1, 'items': []}
+
+    data.setdefault('version', 1)
+    items = data.get('items')
+    if not isinstance(items, list):
+        items = []
+    data['items'] = items
+    return data
+
+
+def _write_quick_prompt(
+    project_root: str, prompt_id: str, fields: dict,
+) -> dict:
+    """quick prompt 단건을 생성/갱신한다.
+
+    Args:
+        project_root: 프로젝트 루트 절대 경로
+        prompt_id: 갱신 대상 id (없으면 신규 추가)
+        fields: 저장할 필드 (label, prompt, bindTo?, description?)
+
+    Returns:
+        {"ok": True, "id": str, "items": [...]}
+    """
+    _validate_quick_prompt_id(prompt_id)
+    if not isinstance(fields, dict):
+        raise ValueError('fields must be an object')
+
+    prompt = fields.get('prompt')
+    if not isinstance(prompt, str):
+        raise ValueError('"prompt" must be a string')
+
+    label = fields.get('label')
+    if label is not None and not isinstance(label, str):
+        raise ValueError('"label" must be a string')
+
+    bind_to = fields.get('bindTo')
+    if bind_to is not None and not isinstance(bind_to, str):
+        raise ValueError('"bindTo" must be a string')
+
+    description = fields.get('description')
+    if description is not None and not isinstance(description, str):
+        raise ValueError('"description" must be a string')
+
+    data = _read_quick_prompts(project_root)
+    items = data.get('items') or []
+
+    found = False
+    for item in items:
+        if isinstance(item, dict) and item.get('id') == prompt_id:
+            item['prompt'] = prompt
+            if label is not None:
+                item['label'] = label
+            if bind_to is not None:
+                item['bindTo'] = bind_to
+            if description is not None:
+                item['description'] = description
+            found = True
+            break
+
+    if not found:
+        new_item = {'id': prompt_id, 'prompt': prompt}
+        if label is not None:
+            new_item['label'] = label
+        if bind_to is not None:
+            new_item['bindTo'] = bind_to
+        if description is not None:
+            new_item['description'] = description
+        items.append(new_item)
+
+    data['items'] = items
+
+    filepath = _quick_prompts_filepath(project_root)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+
+    return {'ok': True, 'id': prompt_id, 'items': items}
+
+
+def _delete_quick_prompt(project_root: str, prompt_id: str) -> dict:
+    """quick prompt 단건을 삭제한다."""
+    _validate_quick_prompt_id(prompt_id)
+    data = _read_quick_prompts(project_root)
+    items = data.get('items') or []
+
+    new_items = [
+        item for item in items
+        if not (isinstance(item, dict) and item.get('id') == prompt_id)
+    ]
+
+    if len(new_items) == len(items):
+        raise FileNotFoundError(f'Quick prompt not found: {prompt_id}')
+
+    data['items'] = new_items
+    filepath = _quick_prompts_filepath(project_root)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+
+    return {'ok': True, 'id': prompt_id, 'items': new_items}
+
+
+# ---------------------------------------------------------------------------
 # Roadmap (.claude-organic/roadmap/ROADMAP.yaml)
 # ---------------------------------------------------------------------------
 

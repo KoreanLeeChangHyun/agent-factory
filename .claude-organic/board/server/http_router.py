@@ -137,6 +137,8 @@ class BoardHTTPRequestHandler(
             self._handle_prompt_write()
         elif self.path == '/api/prompt/claude-md':
             self._handle_claude_md_write()
+        elif self.path == '/api/quick-prompts/item':
+            self._handle_quick_prompt_write()
         elif self.path == '/api/memory/gc/run':
             self._handle_memory_gc_run()
         elif self.path == '/api/memory/gc/prune-archive':
@@ -189,6 +191,8 @@ class BoardHTTPRequestHandler(
                 self._send_error(400, str(e))
             except FileNotFoundError as e:
                 self._send_error(404, str(e))
+        elif path == '/api/quick-prompts/item':
+            self._handle_quick_prompt_delete()
         else:
             self.send_response(404)
             self.end_headers()

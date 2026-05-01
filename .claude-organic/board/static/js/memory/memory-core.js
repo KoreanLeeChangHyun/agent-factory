@@ -31,6 +31,11 @@
   Board.state.promptPromptPreview = false;
   Board.state.promptPromptOriginalContent = "";
 
+  // ── State: Quick Prompts sub-tab ──
+  Board.state.promptQuickItems = [];
+  Board.state.promptQuickDirtyById = {};
+  Board.state.promptQuickOriginalById = {};
+
   // ── State: CLAUDE.md sub-tab ──
   Board.state.promptClaudeMdContent = "";
   Board.state.promptClaudeMdDirty = false;
@@ -157,6 +162,46 @@
       .catch(function () { return null; });
   };
 
+  // ── Quick Prompts API ──
+
+  M.fetchQuickPrompts = function() {
+    return fetch("/api/quick-prompts", { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : { version: 1, items: [] }; })
+      .catch(function () { return { version: 1, items: [] }; });
+  };
+
+  M.saveQuickPrompt = function(item) {
+    return fetch("/api/quick-prompts/item", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    }).then(function (res) { return res.json(); })
+      .catch(function () { return null; });
+  };
+
+  M.deleteQuickPrompt = function(id) {
+    return fetch("/api/quick-prompts/item?id=" + encodeURIComponent(id), { method: "DELETE" })
+      .then(function (res) { return res.json(); })
+      .catch(function () { return null; });
+  };
+
+  // 메모리 버튼/단축 명령에서 사용하는 lookup 헬퍼.
+  // 매번 fetch 해서 사용자가 방금 편집한 문구가 즉시 반영되도록 한다.
+  M.getQuickPromptText = function(id, fallback) {
+    return M.fetchQuickPrompts().then(function (data) {
+      var items = (data && data.items) || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] && items[i].id === id && typeof items[i].prompt === "string") {
+          return items[i].prompt;
+        }
+      }
+      return fallback;
+    }).catch(function () { return fallback; });
+  };
+
+  Board.fetch.fetchQuickPrompts = M.fetchQuickPrompts;
+  Board.fetch.getQuickPromptText = M.getQuickPromptText;
+
   // ── CLAUDE.md API ──
 
   M.fetchClaudeMd = function() {
@@ -193,6 +238,11 @@
     if (sub === "rules") return Board.state.promptRulesDirty;
     if (sub === "prompt") return Board.state.promptPromptDirty;
     if (sub === "memory") return Board.state.memoryDirty;
+    if (sub === "quick-prompts") {
+      var dirty = Board.state.promptQuickDirtyById || {};
+      for (var k in dirty) { if (dirty[k]) return true; }
+      return false;
+    }
     return false;
   };
 
@@ -216,6 +266,7 @@
           M.renderSubTabButton("roadmap", "Roadmap") +
           M.renderSubTabButton("rules", "Rules") +
           M.renderSubTabButton("memory", "Memory") +
+          M.renderSubTabButton("quick-prompts", "Quick Prompts") +
           M.renderSubTabButton("prompt", "Prompt") +
         '</div>' +
         '<div class="prompt-subtab-content" id="prompt-content"></div>' +
@@ -266,6 +317,7 @@
     if (subTab === "rules") Board.state.promptRulesDirty = false;
     else if (subTab === "prompt") Board.state.promptPromptDirty = false;
     else if (subTab === "memory") Board.state.memoryDirty = false;
+    else if (subTab === "quick-prompts") Board.state.promptQuickDirtyById = {};
   };
 
   M.renderActiveSubTab = function() {
@@ -273,6 +325,7 @@
     if (sub === "roadmap") M.renderSubRoadmap();
     else if (sub === "rules") M.renderSubRules();
     else if (sub === "memory") M.renderSubMemory();
+    else if (sub === "quick-prompts") M.renderSubQuickPrompts();
     else if (sub === "prompt") M.renderSubPromptFiles();
   };
 

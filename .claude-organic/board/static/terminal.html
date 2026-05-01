@@ -61,6 +61,9 @@
 <script src="js/workflow/workflow-sessions.js"></script>
 <script src="js/terminal/wf-ticket-renderer.js"></script>
 <script src="js/workflow/session.js"></script>
+<!-- memory-core: Quick Prompts API 헬퍼 (Board.fetch.getQuickPromptText) 등록.
+     terminal.js 의 Memory 버튼 핸들러가 이 헬퍼를 사용하므로 반드시 terminal.js 이전에 로드. -->
+<script src="js/memory/memory-core.js"></script>
 <script src="js/terminal/terminal.js"></script>
 <script>
   // Standalone initialization — invoke renderTerminal immediately.

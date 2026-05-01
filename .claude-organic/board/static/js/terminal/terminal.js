@@ -882,8 +882,12 @@
     M.termInitialized = true;
 
     // Memory shortcut: 세션 상태에 따라 분기
-    //  - 메시지 0 (처음/resume 직후): 메모리 인지 요청
-    //  - 메시지 1+ (중간): 현재 세션 내용 메모리 영속화 (Clear 전 capture)
+    //  - 메시지 0 (처음/resume 직후): 메모리 인지 요청 (id: memory.load)
+    //  - 메시지 1+ (중간): 현재 세션 내용 메모리 영속화 (id: memory.persist)
+    // 두 문구는 .claude-organic/board/config/quick-prompts.json 에서 사용자가 편집 가능.
+    // fetch 실패 시 기본 폴백 텍스트 사용 — 오프라인이거나 파일 누락 시에도 동작 유지.
+    var FALLBACK_MEMORY_LOAD = "메모리 로드하세요";
+    var FALLBACK_MEMORY_PERSIST = "이번 세션의 핵심 내용(결정·학습·이슈·규칙)을 메모리에 영속화해주세요. 적절한 type(user/feedback/project/reference)으로 분류하고, 기존 메모와 중복되면 보강.";
     var memoryBtn = document.getElementById("terminal-memory-btn");
     if (memoryBtn) {
       memoryBtn.addEventListener("click", function (e) {
@@ -893,10 +897,15 @@
         var input = document.getElementById("terminal-input");
         if (!input) return;
         var hasMessages = !!(M.outputDiv && M.outputDiv.querySelector(".term-message"));
-        input.value = hasMessages
-          ? "이번 세션의 핵심 내용(결정·학습·이슈·규칙)을 메모리에 영속화해주세요. 적절한 type(user/feedback/project/reference)으로 분류하고, 기존 메모와 중복되면 보강."
-          : "메모리 로드하세요";
-        M.sendInput();
+        var promptId = hasMessages ? "memory.persist" : "memory.load";
+        var fallback = hasMessages ? FALLBACK_MEMORY_PERSIST : FALLBACK_MEMORY_LOAD;
+        var lookup = (Board.fetch && Board.fetch.getQuickPromptText)
+          ? Board.fetch.getQuickPromptText(promptId, fallback)
+          : Promise.resolve(fallback);
+        lookup.then(function (text) {
+          input.value = text || fallback;
+          M.sendInput();
+        });
       });
     }
 

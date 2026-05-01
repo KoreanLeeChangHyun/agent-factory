@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "memory.load",
+      "label": "메모리 로드",
+      "prompt": "MEMORY.md의 \"현재 작업\" 섹션과 \"Project Context\"를 기반으로 직전 세션의 미완료 작업과 현재 브랜치 상태를 파악하고, 지금 세션에서 집중할 작업 1-3개를 한국어 bullet으로 정리해주세요.",
+      "bindTo": "terminal.memoryBtn.empty",
+      "description": "터미널 헤더 Memory 버튼 — 빈 세션(메시지 0개)에서 클릭 시 송신"
+    },
+    {
+      "id": "memory.persist",
+      "label": "메모리 영속화",
+      "prompt": "이번 세션의 (1) 완료 — 구체적 함수/파일/커밋 식별자, (2) 미완·이유, (3) 결정·근거, (4) 회피 사항, (5) 사용자 선호 를 메모리에 영속화해주세요. 각 항목은 user/feedback/project/reference 중 하나로 분류하고, importance 1-10 점수와 \"Use when ...\" 형식의 description 을 반드시 포함하세요. 기존 파일과 중복이면 해당 파일을 보강하고 신규 파일은 만들지 마세요.",
+      "bindTo": "terminal.memoryBtn.hasMessages",
+      "description": "터미널 헤더 Memory 버튼 — 메시지가 있는 세션에서 클릭 시 송신"
+    }
+  ]
+}
