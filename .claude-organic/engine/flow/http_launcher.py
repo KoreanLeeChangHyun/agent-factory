@@ -26,6 +26,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -179,6 +181,101 @@ def _http_get_json(port: int, path: str) -> dict | list:
 
 
 # ---------------------------------------------------------------------------
+# 티켓 라이프사이클 헬퍼 (launcher 가 칸반 전이 책임을 흡수)
+# ---------------------------------------------------------------------------
+
+def _read_ticket_status(ticket_id: str) -> str | None:
+    """`.claude-organic/tickets/<status>/<ticket_id>.xml` 에서 status 를 읽는다.
+
+    todo/open/progress/review/done 디렉터리를 순서대로 검색한다.
+
+    Returns:
+        status 문자열 ("To Do", "Open", "In Progress", "Review", "Done") 또는
+        티켓 미발견 시 None.
+    """
+    wf_root = os.path.dirname(_engine_dir)
+    tickets_dir = os.path.join(wf_root, "tickets")
+    if not os.path.isdir(tickets_dir):
+        return None
+    for status_dir in ("todo", "open", "progress", "review", "done"):
+        path = os.path.join(tickets_dir, status_dir, f"{ticket_id}.xml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except OSError:
+            return None
+        m = re.search(r"<status>([^<]+)</status>", content)
+        if m:
+            return m.group(1).strip()
+        return None
+    return None
+
+
+def _kanban_move_submit(ticket_id: str) -> bool:
+    """``flow-kanban move <ticket_id> submit`` 호출 (멱등).
+
+    /wf -s 정식 흐름에서 메인 세션이 launch 직전에 호출하던 단계를 launcher
+    본체가 흡수한다. 이를 통해 launcher 단독 호출 경로(자연어 실행, 외부 스크립트
+    등)에서도 칸반-실제 상태 동기화가 구조적으로 보장된다.
+
+    실패해도 워크플로우 실행은 계속 진행 (비차단, wf.md:459 의 정책과 동일).
+
+    Returns:
+        성공 여부 (참고용).
+    """
+    wf_root = os.path.dirname(_engine_dir)
+    bin_path = os.path.join(wf_root, "bin", "flow-kanban")
+    if not os.path.isfile(bin_path):
+        _log("WARN", f"http_launcher: flow-kanban binary missing: {bin_path}")
+        return False
+    try:
+        result = subprocess.run(
+            [bin_path, "move", ticket_id, "submit"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            _log(
+                "WARN",
+                f"http_launcher: kanban move submit failed (non-blocking): "
+                f"{result.stderr.strip()}",
+            )
+            return False
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        _log("WARN", f"http_launcher: kanban move submit error (non-blocking): {exc}")
+        return False
+
+
+def _normalize_command(ticket_id: str, command: str) -> str:
+    """command 인자가 단순 명령이면 ``/wf -s N`` 형태로 변환한다.
+
+    워크플로우 세션 첫 user 메시지가 정식 진입점(/wf -s) 이 되도록 보장하여
+    워크플로우 세션 안에서 flow-init → step-init 자동 흐름이 트리거되도록 한다.
+
+    - ``implement`` / ``research`` / ``review`` → ``/wf -s N``
+    - ``/wf`` 로 시작하는 형태 → 그대로 (정식 호출자)
+    - 그 외 → 그대로 (호환성)
+
+    Args:
+        ticket_id: 티켓 ID (예: T-902).
+        command: 원본 command 인자.
+
+    Returns:
+        정규화된 command 문자열.
+    """
+    cmd_stripped = command.strip()
+    if cmd_stripped in ("implement", "research", "review"):
+        m = re.search(r"(\d+)", ticket_id)
+        n = m.group(1).lstrip("0") or "0" if m else ticket_id
+        return f"/wf -s {n}"
+    return command
+
+
+# ---------------------------------------------------------------------------
 # launch 서브커맨드
 # ---------------------------------------------------------------------------
 
@@ -187,6 +284,11 @@ def cmd_launch(ticket_id: str, command: str) -> int:
 
     서버 미기동, 포트 해석 실패, 재진입 감지 시에는 INLINE: 신호를 출력하여
     메인 세션에서의 직접 실행을 유도한다.
+
+    티켓 라이프사이클 책임 흡수 (2026-04-29 패치):
+      - 사전 검증: status == "To Do" 면 거부 (정식 /wf -s 흐름과 정합)
+      - 칸반 전이: submit 으로 자동 이동 (멱등) — 단독 호출 경로 desync 차단
+      - command 정규화: implement/research/review → /wf -s N
 
     stdout 메시지로 결과를 전달한다:
       - ``LAUNCH: {session_id} 실행 중`` -> HTTP API 세션 시작 성공
@@ -200,6 +302,22 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         exit code: 0=성공(LAUNCH 또는 INLINE), 1=에러.
     """
     _log("INFO", f"http_launcher: cmd_launch start ticket_id={ticket_id}")
+
+    # 0-1) 티켓 상태 사전 검증: To Do 는 거부.
+    current_status = _read_ticket_status(ticket_id)
+    if current_status == "To Do":
+        msg = (
+            f"{ticket_id} 은 To Do 상태입니다. 먼저 Open 으로 승격 후 다시 제출하세요."
+        )
+        _log("ERROR", f"http_launcher: cmd_launch rejected (To Do): {ticket_id}")
+        print(f"[ERROR] {msg}", file=sys.stderr)
+        return 1
+
+    # 0-2) 칸반 전이 (멱등). 호출 경로 무관하게 launcher 가 단일 진입점에서 처리.
+    _kanban_move_submit(ticket_id)
+
+    # 0-3) command 정규화: 단순 명령 → /wf -s N 변환.
+    command = _normalize_command(ticket_id, command)
 
     # 1) 서버 포트 해석
     port = _resolve_server_port()
