@@ -31,7 +31,7 @@ if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 # prompt 패키지 import 경로 설정
-_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompts"))
 if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 

@@ -59,6 +59,7 @@ UPDATE_STATE: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flo
 USAGE_SYNC: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "sync", "usage_sync.py")
 KANBAN_PY: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "kanban.py")
 CHAIN_LAUNCHER: str = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "chain_launcher.py")
+CHAIN_LAUNCH_WRAPPER: str = os.path.join(PROJECT_ROOT, ".claude-organic", "bin", "flow-chain-launch")
 
 
 def run(
@@ -1001,7 +1002,9 @@ def main() -> None:
                     _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: report.md not found at {report_path}, using workdir as fallback")
                     report_path = abs_work_dir
 
-                if os.path.isfile(CHAIN_LAUNCHER):
+                # bin wrapper 우선 (engine 직접 경로 의존 제거 — engine 역할 매핑
+                # 분석 P2-3, 2026-04-29). wrapper 가 없으면 engine 스크립트로 폴백.
+                if os.path.isfile(CHAIN_LAUNCH_WRAPPER) or os.path.isfile(CHAIN_LAUNCHER):
                     _append_log(
                         abs_work_dir,
                         "INFO",
@@ -1013,14 +1016,23 @@ def main() -> None:
                             _chain_log_fh = open(_chain_log_path, "a", encoding="utf-8")
                         except Exception:
                             _chain_log_fh = subprocess.DEVNULL  # type: ignore[assignment]
-                        subprocess.Popen(
-                            [
+                        if os.path.isfile(CHAIN_LAUNCH_WRAPPER):
+                            _chain_cmd = [
+                                CHAIN_LAUNCH_WRAPPER,
+                                ticket_number,
+                                remaining_chain,
+                                report_path,
+                            ]
+                        else:
+                            _chain_cmd = [
                                 "python3",
                                 CHAIN_LAUNCHER,
                                 ticket_number,
                                 remaining_chain,
                                 report_path,
-                            ],
+                            ]
+                        subprocess.Popen(
+                            _chain_cmd,
                             stdout=subprocess.DEVNULL,
                             stderr=_chain_log_fh,
                             start_new_session=True,
@@ -1034,8 +1046,8 @@ def main() -> None:
                         print(f"  수동으로 다음 스테이지를 시작하려면: /wf -s {_ticket_num_str}", file=sys.stderr)
                         print(f"  남은 체인: {remaining_chain}", file=sys.stderr)
                 else:
-                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: chain_launcher.py not found at {CHAIN_LAUNCHER}")
-                    print(f"[WARN] Step 4c: chain_launcher.py not found: {CHAIN_LAUNCHER}", file=sys.stderr)
+                    _append_log(abs_work_dir, "WARN", f"FINALIZE_CHAIN: chain launcher not found (wrapper={CHAIN_LAUNCH_WRAPPER}, engine={CHAIN_LAUNCHER})")
+                    print(f"[WARN] Step 4c: chain launcher not found (wrapper={CHAIN_LAUNCH_WRAPPER}, engine={CHAIN_LAUNCHER})", file=sys.stderr)
             else:
                 if abs_work_dir is not None:
                     _append_log(abs_work_dir, "INFO", "FINALIZE_CHAIN: chain complete (no remaining segments)")

@@ -47,7 +47,7 @@ def main() -> None:
     # stdout에 아무것도 출력하지 않으므로 system prompt 주입에 영향 없다.
     r = dispatch(
         'HOOK_BIN_PATH_INJECT',
-        scripts_dir('session_start', 'ensure_bin_path.sh'),
+        scripts_dir('hook-handlers', 'ensure_bin_path.sh'),
         stdin_data,
         flags=flags,
         capture_output=True,

@@ -20,7 +20,7 @@ _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__fi
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompt"))
+_prompt_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../prompts"))
 if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 

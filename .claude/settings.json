@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/sync/history_sync.py sync && python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/sync/history_sync.py archive",
+            "command": "$CLAUDE_PROJECT_DIR/.claude-organic/bin/flow-history sync && $CLAUDE_PROJECT_DIR/.claude-organic/bin/flow-history archive",
             "timeout": 30,
             "async": true
           }
