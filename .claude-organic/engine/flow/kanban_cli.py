@@ -478,7 +478,9 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
 
     # In Progress에서 이탈 시 워크트리 자동 정리
-    if current_section == "In Progress":
+    # T-370 정합: Review 전이는 worktree 유지 (cmd_done 의 merge_to_develop 가 정리 진입점).
+    # In Progress → Open(재작업) / To Do(강등) 전이에서만 자동 정리.
+    if current_section == "In Progress" and target_section != "Review":
         _cleanup_worktree_on_leave(ticket_number)
 
     # Open 전이 시 세션 자동 kill:

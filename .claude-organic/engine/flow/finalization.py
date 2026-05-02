@@ -955,6 +955,55 @@ def main() -> None:
         except Exception:
             pass  # worktree 메타데이터 읽기 실패는 무시
 
+    # ── Step 4wt-fb: 비-worktree 모드 originalBranch 복귀 훅 (T-370 C-2) ──
+    # WORKFLOW_WORKTREE=false 또는 worktree 생성 실패로 비-worktree 모드인 경우,
+    # 세션 종료 시 originalBranch로 메인 저장소 HEAD를 복귀시킨다.
+    # 복귀 실패는 raise하지 않고 WARN 로그만 남긴다 (finalization 흐름 비차단).
+    if abs_work_dir is not None:
+        try:
+            context_file_fb: str = os.path.join(abs_work_dir, ".context.json")
+            context_fb = load_json_file(context_file_fb)
+            if isinstance(context_fb, dict):
+                wt_enabled_fb: bool = bool(
+                    context_fb.get("worktree", {}).get("enabled", False)
+                )
+                original_branch_fb: str = context_fb.get("originalBranch", "")
+                if not wt_enabled_fb and original_branch_fb:
+                    restore = subprocess.run(
+                        ["git", "checkout", original_branch_fb],
+                        cwd=PROJECT_ROOT,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if restore.returncode == 0:
+                        _append_log(
+                            abs_work_dir,
+                            "INFO",
+                            f"FINALIZE_BRANCH_RESTORE: HEAD -> {original_branch_fb}",
+                        )
+                    else:
+                        _append_log(
+                            abs_work_dir,
+                            "WARN",
+                            (
+                                f"FINALIZE_BRANCH_RESTORE: failed "
+                                f"(originalBranch={original_branch_fb}, "
+                                f"stderr={restore.stderr.strip()})"
+                            ),
+                        )
+                        print(
+                            f"[WARN] 브랜치 복귀 실패: {original_branch_fb} "
+                            f"(stderr={restore.stderr.strip()})",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+        except Exception as restore_exc:
+            _append_log(
+                abs_work_dir,
+                "WARN",
+                f"FINALIZE_BRANCH_RESTORE: exception {restore_exc}",
+            )
+
     # ── Step 4c: 체인 감지 및 다음 스테이지 발사 (비동기) ──
     # .context.json의 command에 ">" 구분자가 포함되면 체인으로 판별한다.
     # 현재 command(첫 세그먼트)를 제거한 나머지(remaining)가 있으면

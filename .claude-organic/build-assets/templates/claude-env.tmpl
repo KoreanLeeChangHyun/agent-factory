@@ -85,3 +85,9 @@ CLAUDE_WORKFLOW_KEEP_COUNT=10
 
 # 체인 스테이지 실패 시 최대 재시도 횟수 (기본값: 2)
 CLAUDE_CHAIN_MAX_RETRY=2
+
+# git worktree 격리 활성화 (단일 진실 공급원 — T-370 후속)
+# 허용값: true (격리 활성, 권장) / false (비활성, 메인 저장소 직접 작업)
+# 미설정 시: is_worktree_enabled() 가 RuntimeError raise — 추론 폴백 제거됨
+# 사용처: .claude-organic/engine/flow/worktree_manager.py
+WORKFLOW_WORKTREE=true

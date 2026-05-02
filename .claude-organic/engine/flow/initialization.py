@@ -461,6 +461,7 @@ def _write_context(
     registry_key: str = "",
     ticket_number: str = "",
     worktree_meta: dict[str, Any] | None = None,
+    original_branch: str = "",
 ) -> None:
     """.context.json을 작업 디렉터리에 작성한다.
 
@@ -482,6 +483,7 @@ def _write_context(
         registry_key: YYYYMMDD-HHMMSS 형식 전체 registryKey. board.js 양방향 연결용.
         ticket_number: 연결된 티켓 번호 (예: 'T-001'). board.js 양방향 연결용.
         worktree_meta: worktree 메타데이터 딕셔너리 (선택). 활성화 시 context에 포함.
+        original_branch: 세션 시작 시점의 HEAD 브랜치명. 비-worktree 모드 종료 시 복귀 기준 (T-370 C-1).
     """
     context: dict[str, Any] = {
         "title": title,
@@ -499,6 +501,8 @@ def _write_context(
         context["ticketNumber"] = ticket_number
     if worktree_meta:
         context["worktree"] = worktree_meta
+    if original_branch:
+        context["originalBranch"] = original_branch
     _atomic_write_json(
         os.path.join(abs_work_dir, ".context.json"),
         context,
@@ -639,6 +643,17 @@ def init_workflow(
     if ticket_number:
         _inject_predecessor_context(abs_work_dir, ticket_number)
 
+    # ── T-370 C-1: 세션 시작 시 originalBranch 캡처 (비-worktree 모드 복귀 안전망) ──
+    # WORKFLOW_WORKTREE=false 환경에서도 종료 시 메인 저장소 HEAD를 복귀시키기 위해
+    # 세션 시작 시점의 브랜치를 .context.json에 originalBranch로 기록한다.
+    # finalization.py Step 4wt-fb에서 이 값을 읽어 복귀 시도한다.
+    original_branch: str = ""
+    try:
+        from flow.worktree_manager import _get_current_branch
+        original_branch = _get_current_branch()
+    except Exception as _ob_err:
+        _warn(f"originalBranch 캡처 실패 (비치명): {_ob_err}")
+
     # ── worktree 격리 실행 훅 ──
     # _create_work_dir() 이후, _move_ticket_to_in_progress() 이전에 삽입
     # implement command일 때만 워크트리를 생성한다.
@@ -690,6 +705,7 @@ def init_workflow(
         registry_key=registry_key,
         ticket_number=ticket_number or "",
         worktree_meta=worktree_meta,
+        original_branch=original_branch,
     )
     _write_status(abs_work_dir, mode, ts)
 

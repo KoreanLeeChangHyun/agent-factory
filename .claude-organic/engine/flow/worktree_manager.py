@@ -180,35 +180,47 @@ def _info(msg: str) -> None:
 def is_worktree_enabled(repo_path: str | None = None) -> bool:
     """worktree 기능 활성화 여부를 판단한다.
 
-    WORKFLOW_WORKTREE 환경변수가 os.environ에 설정되어 있으면 그 값으로
-    판단한다. os.environ에 없으면 .settings 파일에서 폴백 읽기를 수행한다.
+    .claude-organic/.settings 의 WORKFLOW_WORKTREE 값을 단일 진실 공급원으로 사용한다 (T-370 후속).
+
+    제거된 폴백 경로:
+      - os.environ 의 WORKFLOW_WORKTREE — 환경변수와 .settings 의 이중 진실 공급원으로 인한
+        동기화 회귀를 차단한다.
+      - develop 브랜치 존재 여부 추론 — 단일 진실 공급원 원칙 준수, 추론 동작 일체 제거.
+
+    부트스트랩 보장: build.sh + claude-env.tmpl 이 .settings 에 WORKFLOW_WORKTREE 항목을
+    자동으로 머지한다 (_merge_kv_settings KEY 매칭). 정상 환경에서는 raise 가 발생하지 않는다.
+
     활성화 표현: "true", "1", "yes", "on" -> True.
     비활성화 표현: "false", "0", "no", "off" -> False.
-    os.environ과 .settings 모두 미설정 시 develop 브랜치 존재 여부로 판단한다.
 
     Args:
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        repo_path: git 저장소 경로 (호환성 유지용 — 현재 미사용).
 
     Returns:
         worktree 기능 활성화 여부.
+
+    Raises:
+        RuntimeError: .settings 에 WORKFLOW_WORKTREE 가 미설정이거나 유효하지 않은 값일 때.
     """
-    env_val = os.environ.get("WORKFLOW_WORKTREE")
-    if env_val is None:
-        # os.environ에 없으면 .settings 파일에서 폴백 읽기
-        env_val = read_env("WORKFLOW_WORKTREE") or None
+    # .settings 단일 진실 공급원 (T-370 후속) — 추론 폴백 일체 제거
+    setting_val = read_env("WORKFLOW_WORKTREE") or None
+    if setting_val is None:
+        raise RuntimeError(
+            "WORKFLOW_WORKTREE 가 .claude-organic/.settings 에 설정되어 있지 않습니다. "
+            "단일 진실 공급원 원칙으로 추론 폴백 (환경변수, develop 브랜치 존재 여부) 이 제거되었습니다. "
+            "복구: build.sh 재실행 (템플릿 머지로 자동 보강) 또는 "
+            ".settings 에 'WORKFLOW_WORKTREE=true' 또는 'WORKFLOW_WORKTREE=false' 명시."
+        )
 
-    if env_val is not None:
-        normalized = env_val.strip().lower()
-        if normalized in ("1", "true", "yes", "on"):
-            return True
-        if normalized in ("0", "false", "no", "off"):
-            return False
-
-    # 환경변수 미설정: develop 브랜치 존재 여부
-    result = _git(
-        "rev-parse", "--verify", "refs/heads/develop", repo_path=repo_path
+    normalized = setting_val.strip().lower()
+    if normalized in ("1", "true", "yes", "on"):
+        return True
+    if normalized in ("0", "false", "no", "off"):
+        return False
+    raise RuntimeError(
+        f"WORKFLOW_WORKTREE 값이 유효하지 않습니다 (.settings 값: {setting_val!r}). "
+        "허용값: true / false / 1 / 0 / yes / no / on / off"
     )
-    return result.returncode == 0
 
 
 def create_worktree(
@@ -398,6 +410,28 @@ def merge_to_develop(
     """
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"
+
+    # T-370 B: 비-worktree 모드 차단
+    # WORKFLOW_WORKTREE=false 환경에서 호출되면 메인 저장소 HEAD가
+    # develop으로 이동하는 부작용 (T-365 원인 #2)이 발생하므로 진입 자체를 거부한다.
+    # 사용자에게 수동 merge 명령어를 안내한다.
+    if not is_worktree_enabled(repo_path):
+        _warn(
+            "비-worktree 모드 (WORKFLOW_WORKTREE=false) 에서 merge_to_develop()이 "
+            "호출되었습니다. 메인 저장소 HEAD 오염을 방지하기 위해 차단합니다."
+        )
+        _warn(
+            "수동 merge 절차: "
+            "git checkout develop && "
+            f"git merge --no-ff <feature-branch-of-{ticket_number}>"
+        )
+        return MergeResult(
+            success=False,
+            error_message=(
+                f"비-worktree 모드 — merge_to_develop({ticket_number}) 차단됨. "
+                "WORKFLOW_WORKTREE=true 활성화 또는 수동 merge 필요."
+            ),
+        )
 
     branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
     if not branch_name:
