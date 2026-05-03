@@ -17,7 +17,6 @@ from flow.ticket_repository import write_ticket_xml, err
 COLUMN_MAP: dict[str, str] = {
     "todo": "To Do",
     "open": "Open",
-    "submit": "Submit",
     "progress": "In Progress",
     "review": "Review",
     "done": "Done",
@@ -29,8 +28,7 @@ COLUMN_MAP: dict[str, str] = {
 # To Do는 Open과의 양방향 전이만 기본 허용하며, 그 외 상태에서의 복귀는 --force 필요.
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "To Do": ["Open"],
-    "Open": ["In Progress", "Submit", "To Do"],
-    "Submit": ["In Progress", "Open"],
+    "Open": ["In Progress", "To Do"],
     "In Progress": ["Review", "Open"],
     "Review": ["Open", "In Progress"],
     "Done": ["Open"],

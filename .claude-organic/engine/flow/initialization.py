@@ -382,6 +382,10 @@ def _write_user_prompt(abs_work_dir: str, prompt_content: str) -> None:
 def _move_ticket_to_in_progress(ticket_number: str, abs_work_dir: str = "") -> None:
     """kanban.py를 호출하여 티켓을 Open → In Progress 상태로 이동한다.
 
+    T-399 (Submit 제거) 이후 launcher 가 단일 진입점에서 In Progress 전이를
+    이미 흡수했으므로, 본 함수는 idempotent guard 로 축소되어 fallback 으로만 작동한다.
+    이미 "In Progress"/"Review"/"Done" 상태이면 skip 한다.
+
     kanban.py move 서브커맨드를 subprocess로 실행한다.
     실패 시 경고만 출력하고 계속 진행한다.
 
@@ -392,6 +396,18 @@ def _move_ticket_to_in_progress(ticket_number: str, abs_work_dir: str = "") -> N
     kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
     if not os.path.isfile(kanban_py_path):
         _warn(f"kanban.py를 찾을 수 없습니다: {kanban_py_path}")
+        return
+
+    # ── idempotent guard: 이미 진행 단계 이상이면 skip (launcher 선처리 결과) ──
+    current_status = _read_ticket_status(ticket_number)
+    if current_status in ("In Progress", "Review", "Done"):
+        if abs_work_dir:
+            _append_log(
+                abs_work_dir,
+                "INFO",
+                f"initialization: kanban move progress skipped "
+                f"(already {current_status}): {ticket_number}",
+            )
         return
 
     try:
@@ -412,6 +428,38 @@ def _move_ticket_to_in_progress(ticket_number: str, abs_work_dir: str = "") -> N
         _warn("kanban.py move: 타임아웃")
     except Exception as e:
         _warn(f"kanban.py move 실행 실패: {e}")
+
+
+def _read_ticket_status(ticket_number: str) -> str | None:
+    """티켓 XML 에서 status 를 읽어 반환한다 (idempotent guard 용).
+
+    상태별 디렉터리(todo/open/progress/review/done) 순회로 티켓 XML 위치를 찾고,
+    <status> 요소를 정규식으로 추출한다. 파일 미발견/IO 에러 시 None 반환.
+
+    Args:
+        ticket_number: 티켓 ID (예: T-399).
+
+    Returns:
+        상태 문자열. 조회 실패 시 None.
+    """
+    project_root = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
+    tickets_dir = os.path.join(project_root, "tickets")
+    if not os.path.isdir(tickets_dir):
+        return None
+    for status_dir in ("todo", "open", "progress", "review", "done"):
+        path = os.path.join(tickets_dir, status_dir, f"{ticket_number}.xml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except OSError:
+            return None
+        m = re.search(r"<status>([^<]+)</status>", content)
+        if m:
+            return m.group(1).strip()
+        return None
+    return None
 
 
 def _update_ticket_title(ticket_number: str, title: str, abs_work_dir: str = "") -> None:

@@ -213,20 +213,20 @@ def _read_ticket_status(ticket_id: str) -> str | None:
     return None
 
 
-def _kanban_move_submit(ticket_id: str, current_status: str | None = None) -> bool:
-    """``flow-kanban move <ticket_id> submit`` 호출 (멱등 + 상태 가드).
+def _kanban_move_progress(ticket_id: str, current_status: str | None = None) -> bool:
+    """``flow-kanban move <ticket_id> progress`` 호출 (멱등 + 상태 가드).
 
     /wf -s 정식 흐름에서 메인 세션이 launch 직전에 호출하던 단계를 launcher
     본체가 흡수한다. 이를 통해 launcher 단독 호출 경로(자연어 실행, 외부 스크립트
     등)에서도 칸반-실제 상태 동기화가 구조적으로 보장된다.
 
+    T-399 (Submit 제거) 이후 Open → In Progress 직접 전이로 변경되었다.
+    Submit transient 단계는 시스템에서 제거되었다.
+
     상태별 동작:
-      - Open: move submit 정상 호출
+      - Open: move progress 정상 호출
       - To Do: cmd_launch 가 사전 거부하므로 여기 도달 안 함
-      - Submit / In Progress / Review / Done: skip (이미 Submit 이거나 그 이후
-        단계라 되돌릴 필요 없음). 이 가드가 없으면 kanban_cli 가 거부하면서
-        ``현재 X이므로 Submit으로 이동할 수 없습니다`` ERROR 로그를 남기는
-        회귀가 누적된다 (로그 분석 2026-04-29 에서 11회 발생 패턴 확인).
+      - In Progress / Review / Done: skip (이미 진행 단계 이상이라 되돌릴 필요 없음).
 
     실패해도 워크플로우 실행은 계속 진행 (비차단, wf.md:459 의 정책과 동일).
 
@@ -240,10 +240,10 @@ def _kanban_move_submit(ticket_id: str, current_status: str | None = None) -> bo
     if current_status is None:
         current_status = _read_ticket_status(ticket_id)
 
-    if current_status in ("Submit", "In Progress", "Review", "Done"):
+    if current_status in ("In Progress", "Review", "Done"):
         _log(
             "INFO",
-            f"http_launcher: kanban move submit skipped "
+            f"http_launcher: kanban move progress skipped "
             f"(already {current_status}): {ticket_id}",
         )
         return True
@@ -255,7 +255,7 @@ def _kanban_move_submit(ticket_id: str, current_status: str | None = None) -> bo
         return False
     try:
         result = subprocess.run(
-            [bin_path, "move", ticket_id, "submit"],
+            [bin_path, "move", ticket_id, "progress"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -263,13 +263,13 @@ def _kanban_move_submit(ticket_id: str, current_status: str | None = None) -> bo
         if result.returncode != 0:
             _log(
                 "WARN",
-                f"http_launcher: kanban move submit failed (non-blocking): "
+                f"http_launcher: kanban move progress failed (non-blocking): "
                 f"{result.stderr.strip()}",
             )
             return False
         return True
     except (OSError, subprocess.SubprocessError) as exc:
-        _log("WARN", f"http_launcher: kanban move submit error (non-blocking): {exc}")
+        _log("WARN", f"http_launcher: kanban move progress error (non-blocking): {exc}")
         return False
 
 
@@ -308,9 +308,9 @@ def cmd_launch(ticket_id: str, command: str) -> int:
     서버 미기동, 포트 해석 실패, 재진입 감지 시에는 INLINE: 신호를 출력하여
     메인 세션에서의 직접 실행을 유도한다.
 
-    티켓 라이프사이클 책임 흡수 (2026-04-29 패치):
+    티켓 라이프사이클 책임 흡수 (2026-04-29 패치, T-399 에서 In Progress 직접 전이로 갱신):
       - 사전 검증: status == "To Do" 면 거부 (정식 /wf -s 흐름과 정합)
-      - 칸반 전이: submit 으로 자동 이동 (멱등) — 단독 호출 경로 desync 차단
+      - 칸반 전이: In Progress 로 자동 이동 (멱등) — Submit transient 단계 제거 후 직접 전이
       - command 정규화: implement/research/review → /wf -s N
 
     stdout 메시지로 결과를 전달한다:
@@ -337,8 +337,9 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         return 1
 
     # 0-2) 칸반 전이 (멱등 + 상태 가드). 호출 경로 무관하게 launcher 가 단일 진입점에서 처리.
-    # current_status 를 한 번 읽고 _kanban_move_submit 에 전달해 race 회피 + 중복 IO 절감.
-    _kanban_move_submit(ticket_id, current_status)
+    # current_status 를 한 번 읽고 _kanban_move_progress 에 전달해 race 회피 + 중복 IO 절감.
+    # T-399: Submit transient 제거 후 Open → In Progress 직접 전이.
+    _kanban_move_progress(ticket_id, current_status)
 
     # 0-3) command 정규화: 단순 명령 → /wf -s N 변환.
     command = _normalize_command(ticket_id, command)

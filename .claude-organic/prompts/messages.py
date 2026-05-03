@@ -76,6 +76,14 @@ KANBAN_INVALID_SUBCOMMAND: str = (
 
 메시지 포맷: 차단 알림 + 유효 서브커맨드 목록 + 올바른 사용 예시(move/update-title/done/update-prompt) + 수정 안내."""
 
+KANBAN_SUBMIT_REMOVED: str = (
+    "Submit 단계는 제거되었습니다 (T-399). "
+    "Open 카드를 In Progress 로 직접 이동하려면 board UI 의 DnD + confirm 모달 "
+    "(POST /api/kanban/submit) 또는 /wf -s N 을 사용하세요. "
+    "5단계 FSM (To Do → Open → In Progress → Review → Done) 만 유효합니다."
+)
+"""flow-kanban move T-NNN submit 호출 차단 메시지 (T-399). Submit transient 단계 제거 후 가드용."""
+
 # =============================================================================
 # hooks_self_guard.py 메시지
 # =============================================================================

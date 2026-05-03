@@ -31,7 +31,7 @@ if _prompt_dir not in sys.path:
     sys.path.insert(0, _prompt_dir)
 
 from common import read_env
-from messages import KANBAN_INVALID_SUBCOMMAND
+from messages import KANBAN_INVALID_SUBCOMMAND, KANBAN_SUBMIT_REMOVED
 
 # flow-kanban 유효 서브커맨드 집합
 VALID_SUBCOMMANDS: frozenset[str] = frozenset({
@@ -53,6 +53,10 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
 # flow-kanban 명령 감지 및 서브커맨드 추출 패턴
 # flow-kanban 뒤의 첫 번째 인자를 서브커맨드로 파싱
 _FLOW_KANBAN_PATTERN = re.compile(r"\bflow-kanban\s+([a-zA-Z][\w-]*)")
+
+# T-399: flow-kanban move T-NNN submit 인자 차단 패턴
+# Submit transient 단계가 제거되어 move 의 target 인자로 submit 사용 불가.
+_FLOW_KANBAN_MOVE_SUBMIT_PATTERN = re.compile(r"\bflow-kanban\s+move\s+T-\d+\s+submit\b")
 
 
 def _deny(reason: str) -> None:
@@ -116,6 +120,9 @@ def main() -> None:
 
     # 유효 서브커맨드 검사
     if subcommand in VALID_SUBCOMMANDS:
+        # T-399: move T-NNN submit 인자 패턴 차단 (Submit 단계 제거 후)
+        if subcommand == "move" and _FLOW_KANBAN_MOVE_SUBMIT_PATTERN.search(command):
+            _deny(KANBAN_SUBMIT_REMOVED)
         sys.exit(0)
 
     # 유효하지 않은 서브커맨드 차단

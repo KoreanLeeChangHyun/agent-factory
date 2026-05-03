@@ -250,10 +250,7 @@
   color: #4ec9b0;
 }
 
-.status-submit {
-  background: rgba(217, 119, 87, 0.15);
-  color: #D97757;
-}
+/* T-399: .status-submit 룰 제거됨 (Submit transient 단계 제거). */
 
 /* ── Column Collapse Toggle (Done / To Do) ── */
 .column-toggle-btn {
@@ -400,5 +397,84 @@
   outline: 2px dashed #D97757;
   outline-offset: -2px;
   border-radius: 4px;
+}
+
+/* T-399: In Progress drop hover — 경고 톤 (워크플로우 실행 의식 강조) */
+.cards-droppable[data-col-key="In Progress"].dragover-active {
+  background: rgba(217, 119, 87, 0.16);
+  outline: 2px dashed #D97757;
+  outline-offset: -4px;
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.3);
+}
+
+/* T-399: confirm 모달 (Open → In Progress drop) */
+.submit-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.submit-confirm-dialog {
+  background: #1e1e1e;
+  border: 1px solid rgba(217, 119, 87, 0.5);
+  border-radius: 6px;
+  padding: 20px 22px;
+  max-width: 420px;
+  width: calc(100% - 40px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: #d4d4d4;
+}
+
+.submit-confirm-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #D97757;
+  letter-spacing: 0.02em;
+}
+
+.submit-confirm-body {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #cccccc;
+}
+
+.submit-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.submit-confirm-btn {
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  color: #cccccc;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.submit-confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #555555;
+}
+
+.submit-confirm-btn-confirm {
+  background: rgba(217, 119, 87, 0.18);
+  border-color: #D97757;
+  color: #D97757;
+  font-weight: 600;
+}
+
+.submit-confirm-btn-confirm:hover {
+  background: rgba(217, 119, 87, 0.28);
+  color: #f0a07f;
 }
 

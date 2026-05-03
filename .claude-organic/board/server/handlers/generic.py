@@ -198,6 +198,87 @@ class GenericHandlerMixin:
             'stdout': result.stdout.strip(),
         })
 
+    def _handle_kanban_submit(self) -> None:
+        """POST /api/kanban/submit — body {"ticket": "T-NNN", "command": "implement|research|review"}.
+
+        프론트 DnD Open → In Progress drop confirm 모달의 [실행] 버튼이
+        호출하는 단일 진입점. launcher 가 ① progress 이동 ② command 정규화
+        ③ LLM spawn 을 모두 흡수하므로 핸들러는 위임만 담당한다 (T-399).
+
+        응답: {ok: bool, mode: "launched"|"inline"|"error",
+               session_id?: str, message: str}
+        """
+        import re
+        import subprocess
+
+        data = self._read_json_body() or {}
+        ticket = data.get('ticket', '').strip()
+        command = data.get('command', '').strip()
+
+        # 입력 검증
+        if not ticket or not re.match(r'^T-\d+$', ticket):
+            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            return
+        if command not in ('implement', 'research', 'review'):
+            self._send_error(400, 'Invalid "command" (must be implement/research/review)')
+            return
+
+        # flow-launcher launch 호출 — launcher 가 ① progress 이동 ② command 정규화
+        # ③ LLM spawn 을 모두 처리한다.
+        project_root = os.getcwd()
+        flow_launcher = os.path.join(project_root, '.claude-organic', 'bin', 'flow-launcher')
+        try:
+            result = subprocess.run(
+                [flow_launcher, 'launch', ticket, command],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except subprocess.TimeoutExpired:
+            self._send_error(504, 'flow-launcher launch timed out')
+            return
+        except FileNotFoundError:
+            self._send_error(500, f'flow-launcher not found: {flow_launcher}')
+            return
+
+        if result.returncode != 0:
+            stderr = (result.stderr or result.stdout or '').strip()
+            self._send_error(400, f'flow-launcher launch failed: {stderr}')
+            return
+
+        # stdout prefix 파싱: LAUNCH:/INLINE:
+        stdout = result.stdout.strip()
+        first_line = stdout.split('\n', 1)[0].strip() if stdout else ''
+        if first_line.startswith('LAUNCH:'):
+            # "LAUNCH: <session_id> 실행 중" 형태에서 session_id 추출
+            mode = 'launched'
+            tail = first_line[len('LAUNCH:'):].strip()
+            session_id = tail.split()[0] if tail else ''
+            payload = {
+                'ok': True,
+                'mode': mode,
+                'ticket': ticket,
+                'session_id': session_id,
+                'message': first_line,
+            }
+        elif first_line.startswith('INLINE:'):
+            mode = 'inline'
+            payload = {
+                'ok': True,
+                'mode': mode,
+                'ticket': ticket,
+                'message': first_line,
+            }
+        else:
+            payload = {
+                'ok': True,
+                'mode': 'unknown',
+                'ticket': ticket,
+                'message': first_line or 'no stdout',
+            }
+        self._send_json(payload)
+
     def _handle_poll(self) -> None:
         """폴링 엔드포인트를 처리한다.
 

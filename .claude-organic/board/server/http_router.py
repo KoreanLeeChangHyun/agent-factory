@@ -145,6 +145,8 @@ class BoardHTTPRequestHandler(
             self._handle_memory_gc_prune()
         elif self.path == '/api/kanban/move':
             self._handle_kanban_move()
+        elif self.path == '/api/kanban/submit':
+            self._handle_kanban_submit()
         else:
             self.send_response(404)
             self.end_headers()

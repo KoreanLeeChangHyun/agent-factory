@@ -179,7 +179,6 @@ const CMD_COLORS = {
 const STATUS_COLORS = {
   "To Do": { bg: "rgba(106,159,181,0.15)", fg: "#6a9fb5" },
   Open: { bg: "rgba(78,201,176,0.15)", fg: "#4ec9b0" },
-  Submit: { bg: "rgba(86,156,214,0.15)", fg: "#569cd6" },
   "In Progress": { bg: "rgba(220,220,170,0.15)", fg: "#dcdcaa" },
   Review: { bg: "rgba(197,134,192,0.15)", fg: "#c586c0" },
   Done: { bg: "rgba(133,133,133,0.15)", fg: "#858585" },
@@ -312,6 +311,7 @@ function parseTicket(text) {
   }
 
   // Legacy done ticket fallback (read-only): <submit>/<subnumber> structure
+  // T-399: Submit transient 단계는 시스템에서 제거됨. 본 블록은 과거 done 티켓 표시 호환만 담당.
   if (!ticket.prompt && !ticket.command) {
     var submitEl = root.querySelector("submit");
     if (submitEl) {

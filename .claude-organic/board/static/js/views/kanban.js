@@ -283,8 +283,8 @@
 
   /**
    * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
-   * status가 "To Do"인 경우 TODO 라벨, "Submit"인 경우 SUBMIT 라벨을 반환한다.
-   * 그 외 모든 경우 OPEN 라벨을 반환한다.
+   * status가 "To Do"인 경우 TODO 라벨, 그 외 모든 경우 OPEN 라벨을 반환한다.
+   * T-399: Submit transient 단계 제거됨.
    * @param {Object} ticket - 티켓 객체
    * @returns {{ label: string, cssClass: string }} 상태 라벨과 CSS 클래스
    */
@@ -292,19 +292,97 @@
     if (ticket && ticket.status === "To Do") {
       return { label: "TODO", cssClass: "status-todo" };
     }
-    if (ticket && ticket.status === "Submit") {
-      return { label: "SUBMIT", cssClass: "status-submit" };
-    }
     return { label: "OPEN", cssClass: "status-open" };
   }
 
   /**
-   * 카드 드래그 앤 드랍 핸들러 등록 (To Do ↔ Open 만 허용).
+   * T-399: confirm 모달 표시 — Open → In Progress drop 시 워크플로우 실행 의식 보장.
+   * @param {Object} ticket - 드래그된 티켓 객체 (number, command 포함)
+   * @param {Function} onConfirm - [실행] 클릭 콜백
+   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   */
+  function showSubmitConfirmModal(ticket, onConfirm, onCancel) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "submit-confirm-title");
+
+    const title = document.createElement("h3");
+    title.id = "submit-confirm-title";
+    title.className = "submit-confirm-title";
+    title.textContent = "워크플로우 실행";
+
+    const body = document.createElement("p");
+    body.className = "submit-confirm-body";
+    body.textContent =
+      ticket.number + " 을 In Progress 로 이동하고 워크플로우를 시작합니다. 계속할까요?";
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    cancelBtn.textContent = "취소";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    confirmBtn.textContent = "실행";
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireCancel() {
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+    function fireConfirm() {
+      cleanup();
+      if (typeof onConfirm === "function") onConfirm();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireCancel();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireCancel();
+    });
+    cancelBtn.addEventListener("click", fireCancel);
+    confirmBtn.addEventListener("click", fireConfirm);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
+  }
+
+  /**
+   * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
    *
    * dragstart: 카드에서 ticket 번호 + 출발 컬럼을 dataTransfer 에 저장.
    * dragover: drop 가능한 cards-droppable 영역에서 dragover-active 표시.
-   * drop: POST /api/kanban/move 호출 후 fetchTickets 로 재렌더링.
+   * drop:
+   *   - To Do ↔ Open: POST /api/kanban/move (단순 전이)
+   *   - Open → In Progress: confirm 모달 → POST /api/kanban/submit (워크플로우 실행)
    * dragend: 시각 피드백 클래스 정리.
+   *
+   * In Progress 카드 drag 불가는 의도된 보호 (취소 부수효과 차단).
+   * Review/Done drop 은 차단 (merge/Done 부수효과 보호, /wf -d 로만 가능).
    */
   function bindKanbanDnd(el) {
     let draggedNum = null;
@@ -345,6 +423,54 @@
         if (!draggedNum || !targetCol) return;
         if (targetCol === draggedFrom) return; // 같은 컬럼 내 drop 은 무시 (정렬 미지원)
 
+        // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
+        if (targetCol === "In Progress") {
+          if (draggedFrom !== "Open") {
+            // To Do 등 다른 컬럼에서 직접 In Progress 이동은 차단
+            alert("To Do 카드는 직접 In Progress 로 옮길 수 없습니다. 먼저 Open 으로 이동하세요.");
+            renderKanban();
+            return;
+          }
+          const ticketObj = (Board.state.tickets || []).find(function (t) {
+            return t.number === draggedNum;
+          });
+          if (!ticketObj) {
+            renderKanban();
+            return;
+          }
+          const command = ticketObj.command || "implement";
+          showSubmitConfirmModal(
+            ticketObj,
+            function () {
+              // [실행] 콜백: POST /api/kanban/submit → launcher 호출
+              fetch("/api/kanban/submit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticket: draggedNum, command: command }),
+              }).then(function (res) {
+                if (!res.ok) {
+                  return res.json().then(function (j) {
+                    throw new Error(j.error || res.statusText);
+                  });
+                }
+                return res.json();
+              }).then(function () {
+                fetchTickets().then(function () { renderKanban(); });
+              }).catch(function (err) {
+                console.error("[kanban DnD] submit failed:", err);
+                alert("워크플로우 실행 실패: " + err.message);
+                renderKanban();
+              });
+            },
+            function () {
+              // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+              renderKanban();
+            }
+          );
+          return;
+        }
+
+        // To Do ↔ Open 단순 전이
         const to = (targetCol === "To Do") ? "todo" : "open";
         fetch("/api/kanban/move", {
           method: "POST",
@@ -370,7 +496,7 @@
     COLUMNS.forEach(function (col) {
       const items = Board.state.TICKETS.filter(function (t) {
         if (col.key === "To Do") { return t.status === "To Do"; }
-        if (col.key === "Open") { return t.status === "Open" || t.status === "Submit"; }
+        if (col.key === "Open") { return t.status === "Open"; }
         return t.status === col.key;
       });
       const colSort = kanbanSort[col.key] || { key: "number", dir: "asc" };
@@ -429,7 +555,9 @@
         }
         h += "</div>";
         // DnD drop target: To Do / Open 컬럼만 cards-droppable 클래스 부여
-        const isDroppable = (col.key === "To Do" || col.key === "Open");
+        // T-399: In Progress 도 drop target 으로 추가 (Open → In Progress 만 confirm 모달로 허용).
+        // Review/Done 는 drop 차단 유지 (merge/Done 부수효과 보호, /wf -d 로만 가능).
+        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress");
         const droppableClass = isDroppable ? ' cards-droppable' : '';
         h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
         if (sortedItems.length === 0) {
@@ -439,7 +567,9 @@
             const done = col.key === "Done" ? " done" : "";
             const status = getWorkflowStatus(t);
             const dateObj = formatKoreanDate(t.updated || t.created);
-            // DnD: To Do / Open 컬럼 카드만 draggable (안전 DnD 정책 — 부수 효과 없는 전이만 허용)
+            // DnD: To Do / Open 컬럼 카드만 draggable.
+            // T-399: In Progress 카드 drag 불가는 의도된 보호 (워크플로우 취소 부수효과 차단).
+            // Review/Done 카드도 draggable=false (merge/Done 부수효과 보호).
             const isDraggable = (col.key === "To Do" || col.key === "Open");
             const draggableAttr = isDraggable ? ' draggable="true"' : '';
             const draggableClass = isDraggable ? ' card-draggable' : '';

@@ -484,9 +484,10 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
         _cleanup_worktree_on_leave(ticket_number)
 
     # Open 전이 시 세션 자동 kill:
-    # Submit 또는 In Progress에서 Open으로 복귀하면 해당 티켓의 활성 세션을 종료한다.
+    # In Progress에서 Open으로 복귀하면 해당 티켓의 활성 세션을 종료한다.
+    # T-399: Submit transient 단계 제거, In Progress 만 검사한다.
     # 상태 전이 성공 후에 실행하므로 전이 실패 시(err() 호출 후 SystemExit) 여기에 도달하지 않는다.
-    if target_section == "Open" and current_section in ("Submit", "In Progress"):
+    if target_section == "Open" and current_section == "In Progress":
         _kill_ticket_session(ticket_number)
 
 
