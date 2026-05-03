@@ -298,6 +298,71 @@
     return { label: "OPEN", cssClass: "status-open" };
   }
 
+  /**
+   * 카드 드래그 앤 드랍 핸들러 등록 (To Do ↔ Open 만 허용).
+   *
+   * dragstart: 카드에서 ticket 번호 + 출발 컬럼을 dataTransfer 에 저장.
+   * dragover: drop 가능한 cards-droppable 영역에서 dragover-active 표시.
+   * drop: POST /api/kanban/move 호출 후 fetchTickets 로 재렌더링.
+   * dragend: 시각 피드백 클래스 정리.
+   */
+  function bindKanbanDnd(el) {
+    let draggedNum = null;
+    let draggedFrom = null;
+
+    el.querySelectorAll(".card-draggable").forEach(function (card) {
+      card.addEventListener("dragstart", function (e) {
+        draggedNum = card.dataset.num;
+        draggedFrom = card.dataset.colKey;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", draggedNum);
+        card.classList.add("card-dragging");
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("card-dragging");
+        el.querySelectorAll(".cards-droppable.dragover-active").forEach(function (z) {
+          z.classList.remove("dragover-active");
+        });
+        draggedNum = null;
+        draggedFrom = null;
+      });
+    });
+
+    el.querySelectorAll(".cards-droppable").forEach(function (zone) {
+      zone.addEventListener("dragover", function (e) {
+        if (!draggedNum) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        zone.classList.add("dragover-active");
+      });
+      zone.addEventListener("dragleave", function (e) {
+        if (e.target === zone) zone.classList.remove("dragover-active");
+      });
+      zone.addEventListener("drop", function (e) {
+        e.preventDefault();
+        zone.classList.remove("dragover-active");
+        const targetCol = zone.dataset.colKey;
+        if (!draggedNum || !targetCol) return;
+        if (targetCol === draggedFrom) return; // 같은 컬럼 내 drop 은 무시 (정렬 미지원)
+
+        const to = (targetCol === "To Do") ? "todo" : "open";
+        fetch("/api/kanban/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: draggedNum, to: to }),
+        }).then(function (res) {
+          if (!res.ok) return res.json().then(function (j) { throw new Error(j.error || res.statusText); });
+          return res.json();
+        }).then(function () {
+          fetchTickets().then(function () { renderKanban(); });
+        }).catch(function (err) {
+          console.error("[kanban DnD] move failed:", err);
+          alert("티켓 이동 실패: " + err.message);
+        });
+      });
+    });
+  }
+
   /** Renders the kanban board with columns, cards, and sort controls. */
   function renderKanban() {
     const el = document.getElementById("view-kanban");
@@ -363,7 +428,10 @@
           h += '<button class="column-toggle-btn" data-col-key="' + esc(col.key) + '" title="\uC811\uAE30">' + chevronSvg + '</button>';
         }
         h += "</div>";
-        h += '<div class="cards">';
+        // DnD drop target: To Do / Open 컬럼만 cards-droppable 클래스 부여
+        const isDroppable = (col.key === "To Do" || col.key === "Open");
+        const droppableClass = isDroppable ? ' cards-droppable' : '';
+        h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
         if (sortedItems.length === 0) {
           h += '<div class="empty">No items</div>';
         } else {
@@ -371,7 +439,11 @@
             const done = col.key === "Done" ? " done" : "";
             const status = getWorkflowStatus(t);
             const dateObj = formatKoreanDate(t.updated || t.created);
-            h += '<div class="card' + done + '" data-num="' + esc(t.number) + '">';
+            // DnD: To Do / Open 컬럼 카드만 draggable (안전 DnD 정책 — 부수 효과 없는 전이만 허용)
+            const isDraggable = (col.key === "To Do" || col.key === "Open");
+            const draggableAttr = isDraggable ? ' draggable="true"' : '';
+            const draggableClass = isDraggable ? ' card-draggable' : '';
+            h += '<div class="card' + done + draggableClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
             // 상단: 좌측 그룹(티켓번호 + 커맨드배지), 우측 상태라벨
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
@@ -421,6 +493,10 @@
         if (ticket) Board.render.openViewer(ticket);
       });
     });
+
+    // ── DnD: To Do ↔ Open 카드 드래그 앤 드랍 ──
+    // 안전 DnD 정책: 부수 효과 없는 전이만 허용 (In Progress / Done 은 별도 명령)
+    bindKanbanDnd(el);
 
     // Bind sort button clicks (toggle dropdown)
     el.querySelectorAll(".col-sort-btn").forEach(function (btn) {

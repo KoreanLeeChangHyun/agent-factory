@@ -381,3 +381,24 @@
 .rel-derived { color: #D97757; }
 .rel-depends { color: #dcdcaa; }
 .rel-blocks { color: #c586c0; }
+
+/* ── DnD: To Do ↔ Open 드래그 앤 드랍 (안전 DnD 정책) ── */
+.card-draggable {
+  cursor: grab;
+}
+
+.card-draggable:active {
+  cursor: grabbing;
+}
+
+.card-dragging {
+  opacity: 0.4;
+}
+
+.cards-droppable.dragover-active {
+  background: rgba(217, 119, 87, 0.08);
+  outline: 2px dashed #D97757;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+

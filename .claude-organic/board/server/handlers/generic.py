@@ -142,6 +142,62 @@ class GenericHandlerMixin:
         result = _memory_gc_prune_archive(os.getcwd(), apply=apply)
         self._send_json(result)
 
+    # ---------------- Kanban DnD POST handler ----------------
+
+    def _handle_kanban_move(self) -> None:
+        """POST /api/kanban/move — body {"ticket": "T-NNN", "to": "todo"|"open"}.
+
+        칸반 보드 DnD 로 To Do ↔ Open 전이만 허용한다 (안전 DnD 정책).
+        다른 전이 (In Progress / Review / Done) 는 부수 효과를 동반하므로
+        명시적 명령 (/wf -s, /wf -d) 으로만 가능.
+
+        내부적으로 `flow-kanban move T-NNN <to>` 를 호출하여 FSM 검증 + 파일 이동
+        + 로그 기록까지 위임한다.
+        """
+        import subprocess
+
+        data = self._read_json_body() or {}
+        ticket = data.get('ticket', '').strip()
+        to = data.get('to', '').strip().lower()
+
+        # 입력 검증
+        if not ticket or not ticket.startswith('T-'):
+            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            return
+        if to not in ('todo', 'open'):
+            self._send_error(400, 'DnD allows only To Do ↔ Open transitions ("to" must be "todo" or "open")')
+            return
+
+        # flow-kanban move 호출 (FSM 검증 + 파일 이동 + 로그)
+        project_root = os.getcwd()
+        flow_kanban = os.path.join(project_root, '.claude-organic', 'bin', 'flow-kanban')
+        try:
+            result = subprocess.run(
+                [flow_kanban, 'move', ticket, to],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self._send_error(504, 'flow-kanban move timed out')
+            return
+        except FileNotFoundError:
+            self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+            return
+
+        if result.returncode != 0:
+            stderr = (result.stderr or result.stdout or '').strip()
+            self._send_error(400, f'flow-kanban move failed: {stderr}')
+            return
+
+        self._send_json({
+            'ok': True,
+            'ticket': ticket,
+            'to': to,
+            'stdout': result.stdout.strip(),
+        })
+
     def _handle_poll(self) -> None:
         """폴링 엔드포인트를 처리한다.
 

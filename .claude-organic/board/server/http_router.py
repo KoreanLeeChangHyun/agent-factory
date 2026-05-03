@@ -143,6 +143,8 @@ class BoardHTTPRequestHandler(
             self._handle_memory_gc_run()
         elif self.path == '/api/memory/gc/prune-archive':
             self._handle_memory_gc_prune()
+        elif self.path == '/api/kanban/move':
+            self._handle_kanban_move()
         else:
             self.send_response(404)
             self.end_headers()
