@@ -431,7 +431,7 @@
             renderKanban();
             return;
           }
-          const ticketObj = (Board.state.tickets || []).find(function (t) {
+          const ticketObj = (Board.state.TICKETS || []).find(function (t) {
             return t.number === draggedNum;
           });
           if (!ticketObj) {
@@ -446,7 +446,7 @@
               fetch("/api/kanban/submit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: draggedNum, command: command }),
+                body: JSON.stringify({ ticket: ticketObj.number, command: command }),
               }).then(function (res) {
                 if (!res.ok) {
                   return res.json().then(function (j) {

@@ -157,8 +157,8 @@ class GenericHandlerMixin:
         import subprocess
 
         data = self._read_json_body() or {}
-        ticket = data.get('ticket', '').strip()
-        to = data.get('to', '').strip().lower()
+        ticket = (data.get('ticket') or '').strip()
+        to = (data.get('to') or '').strip().lower()
 
         # 입력 검증
         if not ticket or not ticket.startswith('T-'):
@@ -212,8 +212,8 @@ class GenericHandlerMixin:
         import subprocess
 
         data = self._read_json_body() or {}
-        ticket = data.get('ticket', '').strip()
-        command = data.get('command', '').strip()
+        ticket = (data.get('ticket') or '').strip()
+        command = (data.get('command') or '').strip()
 
         # 입력 검증
         if not ticket or not re.match(r'^T-\d+$', ticket):
