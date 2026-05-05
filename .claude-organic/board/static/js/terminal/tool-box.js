@@ -187,6 +187,71 @@
     }
   };
 
+  // ── Path Compression Helpers ──
+  //
+  // _compressPathLike: 경로 문자열의 디렉터리 prefix를 제거하고 basename만 반환.
+  // lastIndexOf 방식 채택 — 정규식 global replace 시 각 segment가 concatenate되는
+  // 버그(W01-hotfix)를 방지. 한글 파일명 포함 임의 문자 정상 처리.
+  // 입력이 비문자열/falsy 이면 빈 문자열 반환.
+  M._compressPathLike = function(str) {
+    if (typeof str !== "string" || !str) return "";
+    // lastIndexOf 방식: global replace 시 segment가 concatenate 되는 버그 방지.
+    // 정규식 /.*\/([^/]+)$/ 을 사용하면 greedy match로 마지막 segment만 추출.
+    // 한글 파일명(예: 도구-카드-경로-압축)도 정상 처리.
+    var idx = str.lastIndexOf("/");
+    return idx >= 0 ? str.substring(idx + 1) : str;
+  };
+
+  // _buildToolInputSummary: insertToolResult / insertWorkflowResult 양쪽이 공유하는
+  // input summary 빌더. 기존 각 함수의 if/else 사다리를 단일 헬퍼로 추출.
+  // 반환값: { summary, title, isFlow, flowCommand }
+  //   summary  - 카드에 textContent 로 노출할 압축된 짧은 설명
+  //   title    - title/aria-label 속성에 부착할 풀경로 (hover 접근성용)
+  //   isFlow   - Bash flow- 명령어 여부
+  //   flowCommand - isFlow 시 flowCommand 원본 (M._formatFlowCommand 입력용)
+  M._buildToolInputSummary = function(toolName, parsedInput) {
+    var summary = "";
+    var title = "";
+    var isFlow = false;
+    var flowCommand = "";
+
+    if (toolName === "Bash" && parsedInput.command) {
+      summary = "$ " + parsedInput.command;
+      title = summary;
+      if (M.isFlowCommand(parsedInput.command)) {
+        isFlow = true;
+        flowCommand = parsedInput.command;
+      }
+    } else if ((toolName === "Read" || toolName === "Write" || toolName === "Edit") && parsedInput.file_path) {
+      summary = M._compressPathLike(parsedInput.file_path);
+      title = parsedInput.file_path;
+    } else if (toolName === "Grep" && parsedInput.pattern) {
+      // pattern 은 압축 금지 (glob 패턴 `**/*.js` 손상 방지)
+      // path 인자에만 압축 적용
+      var rawPath = parsedInput.path || "";
+      var compressedPath = rawPath ? M._compressPathLike(rawPath) : "";
+      summary = parsedInput.pattern + (compressedPath ? "  " + compressedPath : "");
+      title = parsedInput.pattern + (rawPath ? "  " + rawPath : "");
+    } else if (toolName === "Glob" && parsedInput.pattern) {
+      // pattern 전체가 glob 패턴이므로 압축 적용 금지
+      summary = parsedInput.pattern;
+      title = parsedInput.pattern;
+    } else {
+      var pairs = [];
+      var keys = Object.keys(parsedInput);
+      for (var ki = 0; ki < keys.length && ki < 3; ki++) {
+        var v = parsedInput[keys[ki]];
+        if (typeof v === "string") {
+          pairs.push(keys[ki] + ": " + (v.length > 40 ? v.slice(0, 40) + "…" : v));
+        }
+      }
+      summary = pairs.join("  ");
+      title = summary;
+    }
+
+    return { summary: summary, title: title, isFlow: isFlow, flowCommand: flowCommand };
+  };
+
   M.isFlowCommand = function(commandStr) {
     return /^flow-/.test((commandStr || '').trim());
   };
@@ -243,40 +308,26 @@
     var flowCommand = "";
     if (M.toolInputBuffer && inputDiv) {
       var inputSummary = "";
+      var inputTitle = "";
       try {
         var parsedInput = JSON.parse(M.toolInputBuffer);
         var effectiveToolName = resolvedToolName || M.currentToolName;
-        if (effectiveToolName === "Bash" && parsedInput.command) {
-          inputSummary = "$ " + parsedInput.command;
-          if (M.isFlowCommand(parsedInput.command)) {
-            isFlow = true;
-            flowCommand = parsedInput.command;
-          }
-        } else if ((effectiveToolName === "Read" || effectiveToolName === "Write" || effectiveToolName === "Edit") && parsedInput.file_path) {
-          inputSummary = parsedInput.file_path;
-        } else if (effectiveToolName === "Grep" && parsedInput.pattern) {
-          inputSummary = parsedInput.pattern + (parsedInput.path ? "  " + parsedInput.path : "");
-        } else if (effectiveToolName === "Glob" && parsedInput.pattern) {
-          inputSummary = parsedInput.pattern;
-        } else {
-          var pairs = [];
-          var keys = Object.keys(parsedInput);
-          for (var ki = 0; ki < keys.length && ki < 3; ki++) {
-            var v = parsedInput[keys[ki]];
-            if (typeof v === "string") {
-              pairs.push(keys[ki] + ": " + (v.length > 40 ? v.slice(0, 40) + "\u2026" : v));
-            }
-          }
-          inputSummary = pairs.join("  ");
-        }
+        var built = M._buildToolInputSummary(effectiveToolName, parsedInput);
+        inputSummary = built.summary;
+        inputTitle = built.title;
+        isFlow = built.isFlow;
+        flowCommand = built.flowCommand;
       } catch (_e) {
         inputSummary = "";
+        inputTitle = "";
       }
-      if (isFlow && inputSummary) {
-        inputDiv.innerHTML = M._formatFlowCommand(inputSummary);
+      if (isFlow && flowCommand) {
+        inputDiv.innerHTML = M._formatFlowCommand(flowCommand);
       } else {
         inputDiv.textContent = inputSummary;
       }
+      inputDiv.setAttribute("title", inputTitle || inputSummary);
+      inputDiv.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
       M.toolInputBuffer = "";
@@ -447,36 +498,22 @@
     var flowCommandWf = "";
     if (M.toolInputBuffer && inputSpan && !inputSpan.textContent) {
       var inputSummary = "";
+      var inputTitle = "";
       try {
         var parsedInput = JSON.parse(M.toolInputBuffer);
         var effectiveToolName = resolvedToolName || M.currentToolName;
-        if (effectiveToolName === "Bash" && parsedInput.command) {
-          inputSummary = "$ " + parsedInput.command;
-          if (M.isFlowCommand(parsedInput.command)) {
-            isFlowWf = true;
-            flowCommandWf = parsedInput.command;
-          }
-        } else if ((effectiveToolName === "Read" || effectiveToolName === "Write" || effectiveToolName === "Edit") && parsedInput.file_path) {
-          inputSummary = parsedInput.file_path;
-        } else if (effectiveToolName === "Grep" && parsedInput.pattern) {
-          inputSummary = parsedInput.pattern + (parsedInput.path ? "  " + parsedInput.path : "");
-        } else if (effectiveToolName === "Glob" && parsedInput.pattern) {
-          inputSummary = parsedInput.pattern;
-        } else {
-          var pairs = [];
-          var keys = Object.keys(parsedInput);
-          for (var ki = 0; ki < keys.length && ki < 3; ki++) {
-            var v = parsedInput[keys[ki]];
-            if (typeof v === "string") {
-              pairs.push(keys[ki] + ": " + (v.length > 40 ? v.slice(0, 40) + "\u2026" : v));
-            }
-          }
-          inputSummary = pairs.join("  ");
-        }
+        var built = M._buildToolInputSummary(effectiveToolName, parsedInput);
+        inputSummary = built.summary;
+        inputTitle = built.title;
+        isFlowWf = built.isFlow;
+        flowCommandWf = built.flowCommand;
       } catch (_e) {
         inputSummary = "";
+        inputTitle = "";
       }
       inputSpan.textContent = inputSummary;
+      inputSpan.setAttribute("title", inputTitle || inputSummary);
+      inputSpan.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
       M.toolInputBuffer = "";
