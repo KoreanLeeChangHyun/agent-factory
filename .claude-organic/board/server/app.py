@@ -161,6 +161,35 @@ def _run_server(project_root: str) -> None:
     git_watcher_thread = threading.Thread(target=git_watcher.run, daemon=True)
     git_watcher_thread.start()
 
+    def _zombie_reaper_loop(interval: float = 60.0) -> None:
+        """주기적으로 좀비 자식 프로세스를 reap한다.
+
+        os.waitpid(-1, WNOHANG) 으로 블로킹 없이 이미 종료된 자식 프로세스를
+        60초 주기로 수거한다. daemon=True 스레드로 동작하여 서버 종료 시 즉시 정리됨.
+        """
+        while True:
+            count = 0
+            try:
+                while True:
+                    pid, _status = os.waitpid(-1, os.WNOHANG)
+                    if pid == 0:
+                        break
+                    count += 1
+            except ChildProcessError:
+                # 수거할 자식 프로세스 없음 — 정상 케이스
+                pass
+            if count > 0:
+                logger.info('[zombie-gc] reaped %d child processes', count)
+            time.sleep(interval)
+
+    zombie_gc_thread = threading.Thread(
+        target=_zombie_reaper_loop,
+        name='zombie-gc',
+        daemon=True,
+    )
+    zombie_gc_thread.start()
+    logger.info('[zombie-gc] started — interval=60s')
+
     # ThreadingHTTPServer 시작
     server = ThreadingHTTPServer(('0.0.0.0', port), BoardHTTPRequestHandler)
     server.daemon_threads = True
