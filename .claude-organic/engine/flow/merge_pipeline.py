@@ -332,14 +332,16 @@ def _stage2_5_verify_merge_anchor(
     # 검증 1: merge_commit^2 == feature_branch HEAD
     parent2_result = _git("rev-parse", f"{merge_commit}^2")
     if parent2_result.returncode != 0:
-        _error(
-            f"anchor 검증 실패: rev-parse {merge_commit[:8]}^2 실패 — "
-            f"{parent2_result.stderr.strip()}"
+        # fast-forward 또는 already-up-to-date 케이스 (parent 1개).
+        # develop 에 추가 merge commit 없으므로 anchor 검증 의미 없음 → skip.
+        # T-410: 기존 로직은 이 케이스에서 _handle_anchor_failure → reset HEAD^ 호출하여
+        # develop 의 사전 ahead commit 까지 날리는 data loss 회귀 발생.
+        print(
+            f"  fast-forward / up-to-date — anchor 검증 스킵 "
+            f"(merge_commit {merge_commit[:8]} parent 1개)",
+            flush=True,
         )
-        _handle_anchor_failure(
-            merge_commit, feature_branch, "rev-parse ^2 failed"
-        )
-        return False
+        return True
 
     fb_head_result = _git("rev-parse", feature_branch)
     if fb_head_result.returncode != 0:

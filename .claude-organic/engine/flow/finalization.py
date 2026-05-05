@@ -799,11 +799,62 @@ def main() -> None:
     ticket_number: str | None = args.ticket_number
 
     # ── Step 1: status.json 완료 처리 (critical) ──
+    abs_work_dir: str | None = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
+
+    # 산출물 정합성 검증 (T-409 + T-411): status="완료" 인데 report.md/work/ 빈 산출물이거나
+    # 워크트리에 미커밋 변경(워커 commit 누락)이 있으면 false-success 차단을 위해
+    # status="실패"로 강제 전이. T-403/T-400 케이스의 라이브 회귀 방지.
+    if status == "완료" and abs_work_dir is not None:
+        integrity_failures: list[str] = []
+        _report_abs: str = os.path.join(abs_work_dir, "report.md")
+        if not os.path.isfile(_report_abs):
+            integrity_failures.append("report.md 미생성")
+        elif os.path.getsize(_report_abs) < 100:
+            integrity_failures.append(
+                f"report.md 빈 파일 ({os.path.getsize(_report_abs)} bytes — 1줄 이하)"
+            )
+        _work_subdir: str = os.path.join(abs_work_dir, "work")
+        if os.path.isdir(_work_subdir):
+            _work_files = [f for f in os.listdir(_work_subdir) if f.endswith(".md")]
+            if not _work_files:
+                integrity_failures.append("work/ 디렉터리 빈 (작업 내역서 0건)")
+        else:
+            integrity_failures.append("work/ 디렉터리 미생성")
+
+        # T-411: 워크트리 활성 시 워커 commit 누락 검증
+        if ticket_number:
+            try:
+                from flow.worktree_manager import (
+                    is_worktree_enabled,
+                    get_worktree_path,
+                    has_uncommitted_changes,
+                )
+                if is_worktree_enabled():
+                    _wt_path = get_worktree_path(ticket_number)
+                    if _wt_path and os.path.isdir(_wt_path) and has_uncommitted_changes(_wt_path):
+                        integrity_failures.append(
+                            f"워크트리 미커밋 변경 — 워커 commit 누락 ({_wt_path})"
+                        )
+            except (ImportError, Exception):
+                pass  # worktree 모듈 미설치/오류 시 비차단
+
+        if integrity_failures:
+            _append_log(
+                abs_work_dir, "ERROR",
+                "FINALIZE_INTEGRITY: 산출물 정합성 실패 — status='완료'→'실패' 강제 전이. "
+                f"failures: {'; '.join(integrity_failures)}"
+            )
+            print(
+                "[ERROR] 산출물 정합성 검증 실패 — status를 '실패'로 강제 전이합니다.\n"
+                + "\n".join(f"  - {f}" for f in integrity_failures),
+                file=sys.stderr, flush=True,
+            )
+            status = "실패"
+
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
     # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
     _step1_skip: bool = False
-    abs_work_dir: str | None = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
     if abs_work_dir is not None:
         _status_data = load_json_file(os.path.join(abs_work_dir, "status.json"))
         if _status_data is not None and _status_data.get("step") == to_step:
