@@ -36,26 +36,9 @@ flow-kanban create "제목" --command implement --status open   # 즉시 집중 
 
 ### 번호 영역 정책
 
-| 영역 | 용도 | 채번 방식 |
-|------|------|---------|
-| T-001 ~ T-899 | 일반 작업 티켓 | 자동 채번 (max+1) 또는 `--number` 명시 |
-| T-900 ~ T-999 | 디버그/일회성 검증 예약 | `--debug` 플래그로 자동 슬롯 배정, 또는 `--number 9NN` 명시 |
+티켓 번호는 단일 영역 (T-001 ~ T-NNN). 자동 채번은 `max(전체) + 1`, 또는 `--number` 로 명시. 동일 번호 충돌 시 에러.
 
-- 자동 채번이 T-900 에 도달하면 에러 (디버그 영역 침범 차단). 일반 영역 정리 후 재시도.
-- 디버그 영역은 일회성 검증이 끝나면 `done` 또는 `delete` 로 정리해 다음 슬롯을 비운다.
-
-### 디버그 티켓 (--debug)
-
-```bash
-flow-kanban create "rate-limit 회귀 검증" --status open --debug
-# → T-900~T-999 첫 빈 슬롯 자동 배정
-# → templates/debug-ticket.json 의 prompt 5필드 placeholder 시딩
-# → title 에 "[DEBUG] " prefix 자동 적용
-```
-
-- 템플릿 위치: `.claude-organic/templates/debug-ticket.json` (수정 시 모든 디버그 티켓에 반영)
-- `--debug` 와 `--number` 는 동시 사용 불가
-- 시딩된 prompt 는 placeholder 이므로 실제 검증 시나리오에 맞게 `update-prompt` 로 갈아끼울 것 (MUST)
+> 과거 T-900~T-999 디버그 예약 영역은 폐지됨 (2026-05-05). 일회성 검증 티켓도 일반 영역으로 채번.
 
 ## DO
 - 코드 수정은 기본적으로 /wf -e 로 티켓 생성/편집 후 /wf -s N 으로 실행

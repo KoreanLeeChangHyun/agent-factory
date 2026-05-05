@@ -52,46 +52,6 @@ _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT: str = resolve_project_root()
 
 
-# ─── 디버그 슬롯 정책 ─────────────────────────────────────────────────────────
-# T-900~T-999 는 디버그/일회성 검증용 예약 영역. 자동 채번에서 제외되며,
-# `--debug` 플래그 또는 `--number 9XX` 명시 호출로만 사용한다.
-_DEBUG_RANGE_START: int = 900
-_DEBUG_RANGE_END: int = 999
-_DEBUG_TEMPLATE_PATH: str = os.path.join(
-    _PROJECT_ROOT, ".claude-organic", "templates", "debug-ticket.json"
-)
-
-
-def _get_next_debug_slot() -> "str | None":
-    """T-900~T-999 영역에서 비어있는 첫 슬롯 번호를 반환한다.
-
-    모든 디버그 슬롯이 사용 중이면 None을 반환한다.
-
-    Returns:
-        T-NNN 형식 문자열 또는 None.
-    """
-    for num in range(_DEBUG_RANGE_START, _DEBUG_RANGE_END + 1):
-        candidate = f"T-{num:03d}"
-        if find_ticket_file(candidate) is None:
-            return candidate
-    return None
-
-
-def _load_debug_template() -> dict:
-    """디버그 티켓 템플릿 JSON을 로드한다.
-
-    파일이 없거나 파싱 실패 시 비어있는 dict를 반환하여 호출 측이 폴백할 수 있게 한다.
-
-    Returns:
-        템플릿 dict (title_prefix, command, prompt 키 포함 가능).
-    """
-    try:
-        with open(_DEBUG_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
 # ─── 세션 헬퍼 ───────────────────────────────────────────────────────────────
 
 import json
@@ -264,14 +224,11 @@ def cmd_create(
     command: str,
     status: str,
     number: str | None = None,
-    debug: bool = False,
 ) -> None:
     """새 티켓 XML을 생성한다.
 
     번호 미지정 시 XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 자동 채번한다.
     번호 명시 시 정규화 후 동일 번호 충돌을 검사하고, 존재하면 에러로 거부한다.
-    debug=True 면 T-900~T-999 영역의 빈 슬롯을 자동 배정하고 디버그 템플릿을 적용한다.
-    자동 채번은 T-899 까지만 사용한다 (T-900~T-999 는 디버그 전용 예약 영역).
     status 값에 따라 .kanban/todo/ 또는 .kanban/open/ 아래에 T-NNN.xml 파일을 생성한다.
 
     Args:
@@ -279,7 +236,6 @@ def cmd_create(
         command: 워크플로우 커맨드 (implement, review, research 등). 현재 미사용 (하위 호환용).
         status: 초기 상태 키 ("todo" | "open"). COLUMN_MAP을 통해 XML <status> 값으로 변환된다.
         number: 명시적 티켓 번호 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번.
-        debug: True 이면 디버그 슬롯 자동 배정 및 템플릿 적용. number 와 동시 사용 불가.
     """
     # status 키를 상태명("To Do" / "Open")으로 변환
     status_label = COLUMN_MAP.get(status)
@@ -289,29 +245,6 @@ def cmd_create(
             f"(예: flow-kanban create \"제목\" --command implement --status todo)",
             2,
         )
-
-    # --debug 와 --number 동시 사용 차단
-    if debug and number is not None:
-        err("--debug 와 --number 는 동시 사용할 수 없습니다. 둘 중 하나만 지정하세요.", 2)
-
-    # --debug 처리: 슬롯 자동 배정 + 템플릿 로드
-    debug_template: dict = {}
-    if debug:
-        slot = _get_next_debug_slot()
-        if slot is None:
-            err(
-                f"디버그 슬롯 소진: T-{_DEBUG_RANGE_START}~T-{_DEBUG_RANGE_END} 모두 사용 중입니다. "
-                f"기존 디버그 티켓을 정리한 후 다시 시도하세요.",
-                2,
-            )
-        number = slot
-        debug_template = _load_debug_template()
-        # 템플릿의 title_prefix / command 적용 (사용자 명시 우선)
-        prefix = debug_template.get("title_prefix", "")
-        if prefix and not title.startswith(prefix.strip()):
-            title = f"{prefix}{title}"
-        if not command and debug_template.get("command"):
-            command = debug_template["command"]
 
     # 대상 디렉터리 결정
     target_dir = KANBAN_TODO_DIR if status == "todo" else KANBAN_OPEN_DIR
@@ -334,13 +267,6 @@ def cmd_create(
     else:
         max_num = get_max_ticket_number()
         new_num = max_num + 1
-        # 디버그 영역 진입 차단: 자동 채번이 T-900 에 도달하면 에러로 정책을 알린다.
-        if new_num >= _DEBUG_RANGE_START:
-            err(
-                f"자동 채번이 디버그 영역(T-{_DEBUG_RANGE_START}~T-{_DEBUG_RANGE_END}) 에 도달했습니다. "
-                f"--number 로 일반 영역 번호를 명시하거나, 디버그 슬롯을 정리하세요.",
-                2,
-            )
         ticket_number = f"T-{new_num:03d}"
 
     # 파일명: T-NNN.xml 고정
@@ -364,19 +290,6 @@ def cmd_create(
             f.write("\n")
     except OSError as e:
         err(f"티켓 파일 생성 실패: {e}")
-
-    # --debug 시 템플릿의 prompt 필드를 즉시 시딩한다 (사용자가 update-prompt 로 갈아끼우기 쉽게 placeholder 제공).
-    if debug:
-        prompt_defaults = debug_template.get("prompt", {}) or {}
-        if prompt_defaults:
-            try:
-                update_prompt(
-                    ticket_file,
-                    {k: v for k, v in prompt_defaults.items() if v},
-                )
-            except Exception as exc:
-                # 템플릿 시딩 실패는 티켓 생성 자체를 막지 않는다 (경고만 남긴다).
-                print(f"[WARN] 디버그 템플릿 시딩 실패: {exc}", flush=True)
 
     suffix = f" ({command})" if command else ""
     print(f"{ticket_number}: {title}{suffix} [{status_label}]")
@@ -1233,17 +1146,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--number",
         default=None,
         help=(
-            "티켓 번호 명시 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번 (T-899 까지). "
-            "동일 번호 존재 시 에러. T-900~T-999 는 디버그 예약 영역."
-        ),
-    )
-    create_parser.add_argument(
-        "--debug",
-        action="store_true",
-        help=(
-            "디버그 티켓 생성. T-900~T-999 영역의 빈 슬롯을 자동 배정하고 "
-            ".claude-organic/templates/debug-ticket.json 템플릿을 적용한다. "
-            "--number 와 동시 사용 불가."
+            "티켓 번호 명시 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번. "
+            "동일 번호 존재 시 에러."
         ),
     )
 
@@ -1350,7 +1254,7 @@ def dispatch(args: argparse.Namespace) -> None:
         SystemExit: 잘못된 티켓 번호 또는 서브커맨드 실행 오류 시.
     """
     if args.subcommand == "create":
-        cmd_create(args.title, args.command, args.status, args.number, debug=args.debug)
+        cmd_create(args.title, args.command, args.status, args.number)
 
     elif args.subcommand == "move":
         ticket = normalize_ticket_number(args.ticket)
