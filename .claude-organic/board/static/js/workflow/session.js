@@ -539,15 +539,21 @@
         _pendingTextBuffer = "";
       }
       _ctx.flushTextBuffer();
-      var tr = data.raw.tool_use_result;
+      // [W04/W05 patch] Claude Agent SDK 는 `toolUseResult` (camelCase) 키로 stdout/stderr
+      // 객체를 함께 보낸다. 일부 변형/레거시 페이로드는 `tool_use_result` (snake_case) 일
+      // 수 있어 양쪽 키를 모두 fallback 으로 검사한다. tr 객체 키 구조 자체는 도구별
+      // 동일(stdout / file.content / filenames / content)하므로 회귀 위험 없음.
+      var tr = data.raw.toolUseResult || data.raw.tool_use_result || null;
       var mc = data.raw.message && data.raw.message.content;
       var resultText = "";
 
+      // tool_use_id 추출: camelCase tr (toolUseResult) 객체에는 tool_use_id 필드가 없으므로
+      // mc[0].tool_use_id 를 1순위로, snake_case tr.tool_use_id 를 2순위 (레거시) 로 둔다.
       var userToolUseId = null;
-      if (tr && tr.tool_use_id) {
-        userToolUseId = tr.tool_use_id;
-      } else if (mc && mc[0] && mc[0].tool_use_id) {
+      if (mc && mc[0] && mc[0].tool_use_id) {
         userToolUseId = mc[0].tool_use_id;
+      } else if (tr && tr.tool_use_id) {
+        userToolUseId = tr.tool_use_id;
       }
 
       var userToolName = null;
