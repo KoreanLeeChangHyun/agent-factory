@@ -14,6 +14,9 @@
 .claude-organic/.workflow-sessions/
 .claude-organic/staging/
 .claude-organic/.test-logs/
+.claude-organic/audit/results/
+.claude-organic/audit/T-*-recovery/
+.claude-organic/logs/
 .claude/scheduled_tasks.lock
 
 CLAUDE.md

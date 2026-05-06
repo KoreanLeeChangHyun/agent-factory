@@ -27,6 +27,7 @@ from .terminal_channel import TerminalSSEChannel
 from .claude_process import ClaudeProcess
 from .poll_tracker import PollChangeTracker
 from .workflow_session import WorkflowSessionRegistry
+from .audit_sidecar import review_audit_loop
 from .state import (
     sse_manager,
     poll_tracker,
@@ -189,6 +190,16 @@ def _run_server(project_root: str) -> None:
     )
     zombie_gc_thread.start()
     logger.info('[zombie-gc] started — interval=60s')
+
+    # Audit sidecar 시작 — Review 컬럼 티켓 자동 감사 (T-413 Phase 1).
+    # auditor.py 는 subprocess 로 별도 프로세스 실행되어 격리된다.
+    audit_sidecar_thread = threading.Thread(
+        target=review_audit_loop,
+        name='audit-sidecar',
+        daemon=True,
+    )
+    audit_sidecar_thread.start()
+    logger.info('[audit-sidecar] started — interval=60s')
 
     # ThreadingHTTPServer 시작
     server = ThreadingHTTPServer(('0.0.0.0', port), BoardHTTPRequestHandler)
