@@ -746,8 +746,9 @@
 .term-table td {
   border: 1px solid #3c3c3c;
   padding: 6px 12px;
-  text-align: left;
   color: #ccc;
+  /* text-align 은 JS table 렌더러가 token.align 기반 inline style 로 부여한다.
+     하드코딩 left 를 두면 GFM `:---:` / `---:` 정렬이 모두 무력화된다. */
 }
 
 .term-table th {

@@ -55,16 +55,20 @@
         },
 
         table: function (token) {
+          // GFM `:---:` / `---:` / `:---` align 정보는 token.align[i] 에 'center'/'right'/'left'/null 로 들어온다.
+          var align = token.align || [];
           var header = "";
           for (var i = 0; i < token.header.length; i++) {
-            header += '<th>' + this.parser.parseInline(token.header[i].tokens) + '</th>';
+            var thStyle = align[i] ? ' style="text-align:' + align[i] + '"' : '';
+            header += '<th' + thStyle + '>' + this.parser.parseInline(token.header[i].tokens) + '</th>';
           }
           var body = "";
           for (var r = 0; r < token.rows.length; r++) {
             var row = token.rows[r];
             var cells = "";
             for (var c = 0; c < row.length; c++) {
-              cells += '<td>' + this.parser.parseInline(row[c].tokens) + '</td>';
+              var tdStyle = align[c] ? ' style="text-align:' + align[c] + '"' : '';
+              cells += '<td' + tdStyle + '>' + this.parser.parseInline(row[c].tokens) + '</td>';
             }
             body += '<tr>' + cells + '</tr>';
           }
