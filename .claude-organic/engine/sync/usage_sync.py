@@ -549,24 +549,38 @@ def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optio
 def cmd_batch() -> None:
     """finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 usage.json 최종 정산.
 
-    stdin에서 JSON을 읽어 agent_transcript_path를 파싱하고,
-    subagents/ 디렉터리의 모든 agent-*.jsonl 파일을 파싱하여 usage.json에 기록한다.
+    stdin에서 JSON을 읽어 agent_transcript_path를 파싱한다. 입력 경로가 worker
+    agent JSONL(부모가 ``subagents/``)이면 그 디렉터리를 직접 사용하고, 그렇지
+    않으면(예: finalization.py 가 orchestrator 메인 세션 JSONL 을 넘긴 경우)
+    work_dir → status.json.linked_sessions → 메인 세션 JSONL 옆 ``subagents/`` 로
+    역산하는 폴백 경로를 사용한다.
     track으로 수집 완료된 에이전트는 보완 모드로 스킵한다.
     모든 에러 경로에서 exit 0 (비차단 원칙).
     """
     input_data = _read_stdin_json()
 
     transcript_path = input_data.get("agent_transcript_path", "")
-    if not transcript_path or not os.path.isfile(transcript_path):
-        sys.exit(0)
-
-    subagents_dir = _find_subagents_dir(transcript_path)
-    if not subagents_dir or not os.path.isdir(subagents_dir):
-        print("[usage-sync] subagents directory not found", file=sys.stderr)
-        sys.exit(0)
 
     work_dir = _find_work_dir()
     if not work_dir:
+        sys.exit(0)
+
+    # subagents_dir 결정:
+    #  1) transcript_path 가 worker agent JSONL (부모 == 'subagents/') 이면 직접 사용 (하위호환)
+    #  2) 그 외(메인 세션 JSONL 또는 누락)에는 work_dir 의 status.json.linked_sessions 에서
+    #     메인 세션 JSONL 을 찾아 그 옆의 <session_id>/subagents/ 디렉터리로 역산.
+    subagents_dir: Optional[str] = None
+    if transcript_path and os.path.isfile(transcript_path):
+        subagents_dir = _find_subagents_dir(transcript_path)
+    if not subagents_dir:
+        main_jsonl = _find_main_session_from_status(work_dir)
+        if main_jsonl and main_jsonl.endswith(".jsonl"):
+            session_dir = main_jsonl[: -len(".jsonl")]
+            candidate = os.path.join(session_dir, "subagents")
+            if os.path.isdir(candidate):
+                subagents_dir = candidate
+    if not subagents_dir or not os.path.isdir(subagents_dir):
+        print("[usage-sync] subagents directory not found", file=sys.stderr)
         sys.exit(0)
 
     usage_file = os.path.join(work_dir, "usage.json")
