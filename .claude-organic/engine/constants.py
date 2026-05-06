@@ -16,6 +16,8 @@
     CHAIN_MAX_RETRY: 체인 스테이지 실패 시 최대 재시도 횟수 (환경변수 CLAUDE_CHAIN_MAX_RETRY로 오버라이드 가능)
 """
 
+from __future__ import annotations
+
 import os
 import re
 from datetime import timezone, timedelta
