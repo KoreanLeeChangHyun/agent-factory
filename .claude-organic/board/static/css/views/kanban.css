@@ -179,6 +179,13 @@
   min-width: 0;
 }
 
+.card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .card-mid {
   flex: 1;
   min-height: 0;
@@ -248,6 +255,30 @@
 .status-open {
   background: rgba(78, 201, 176, 0.15);
   color: #4ec9b0;
+}
+
+.card-uncommitted-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(217, 119, 87, 0.20);
+  color: #D97757;
+  border: 1px solid rgba(217, 119, 87, 0.45);
+  cursor: pointer;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.card-uncommitted-badge:hover {
+  background: rgba(217, 119, 87, 0.35);
+  border-color: #D97757;
+}
+
+.card-uncommitted-badge.is-commiting {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 /* T-399: .status-submit 룰 제거됨 (Submit transient 단계 제거). */

@@ -140,6 +140,32 @@
 
   // ── Fetch Tickets ──
 
+  // ── Worktree Uncommitted Cache ──
+  // 카드 우상단 미커밋 인디케이터용. null = not loaded (graceful: 인디케이터 omit).
+  var _worktreeUncommittedMap = null;
+
+  /**
+   * Fetches /api/worktree/uncommitted/all and populates _worktreeUncommittedMap.
+   * Silently degrades on error (map remains null or stale).
+   */
+  function fetchAndCacheWorktreeUncommitted() {
+    return fetch("/api/worktree/uncommitted/all", { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return;
+      return res.json().then(function (list) {
+        if (!Array.isArray(list)) return;
+        var map = new Map();
+        list.forEach(function (item) {
+          if (item && item.ticket && item.uncommitted_count > 0) {
+            map.set(item.ticket, item);
+          }
+        });
+        _worktreeUncommittedMap = map;
+      });
+    }).catch(function () {
+      // worktree mode off / API error — leave map unchanged
+    });
+  }
+
   /** Fetches all tickets via /api/kanban (single request). */
   function fetchTickets() {
     return fetch("/api/kanban", { cache: "no-store" }).then(function (res) {
@@ -154,7 +180,13 @@
         }
       });
       return tickets;
-    }).catch(function () { return []; });
+    }).catch(function () { return []; }).then(function (tickets) {
+      // Co-fetch worktree uncommitted so renderKanban always has fresh data.
+      return fetchAndCacheWorktreeUncommitted().then(
+        function () { return tickets; },
+        function () { return tickets; }
+      );
+    });
   }
 
   /**
@@ -279,6 +311,57 @@
     });
 
     return '<div class="card-relations">' + parts.join("") + "</div>";
+  }
+
+  /**
+   * 미커밋 인디케이터 클릭 시 워크트리 자동 commit 트리거.
+   * @param {HTMLElement} badge - .card-uncommitted-badge 요소
+   */
+  function handleUncommittedBadgeClick(badge) {
+    var ticket = badge.dataset.uncommittedTicket;
+    if (!ticket || badge.classList.contains("is-commiting")) return;
+    badge.classList.add("is-commiting");
+    var origText = badge.textContent;
+    badge.textContent = "...";
+    fetch("/api/kanban/worktree-commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: ticket }),
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        return { ok: res.ok, data: data };
+      });
+    }).then(function (r) {
+      if (r.ok && r.data && r.data.ok) {
+        // 성공 — 카드 갱신 (인디케이터 사라짐 기대)
+        if (_worktreeUncommittedMap) _worktreeUncommittedMap.delete(ticket);
+        Board.render.renderKanban();
+      } else {
+        var msg = (r.data && r.data.error) || "commit 실패";
+        badge.textContent = origText;
+        badge.classList.remove("is-commiting");
+        alert(ticket + " commit 실패: " + msg);
+      }
+    }).catch(function (err) {
+      badge.textContent = origText;
+      badge.classList.remove("is-commiting");
+      alert(ticket + " commit 요청 실패: " + (err && err.message ? err.message : err));
+    });
+  }
+
+  /**
+   * 카드 우상단 미커밋 인디케이터 HTML 을 생성한다.
+   * 워크플로우 회귀(워커 commit 누락) 시 사용자가 클릭으로 즉시 commit.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-422")
+   * @returns {string} span.card-uncommitted-badge HTML 또는 빈 문자열
+   */
+  function renderUncommittedBadge(ticketNum) {
+    if (!_worktreeUncommittedMap) return "";
+    var item = _worktreeUncommittedMap.get(ticketNum);
+    if (!item || item.uncommitted_count <= 0) return "";
+    var label = item.uncommitted_count + "M";
+    var tooltip = "미커밋 " + item.uncommitted_count + "건 — 클릭하면 자동 commit"; // "미커밋 N건 — 클릭하면 자동 commit"
+    return '<span class="card-uncommitted-badge" data-uncommitted-ticket="' + esc(ticketNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
@@ -1777,9 +1860,12 @@
               h += badge(t.command, CMD_COLORS[t.command], badgeAnim);
             }
             h += "</div>";
+            h += '<div class="card-top-right">';
             if (col.key === "Open" || col.key === "To Do") {
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
             }
+            h += renderUncommittedBadge(t.number);
+            h += "</div>";
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
@@ -1809,7 +1895,14 @@
 
     // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
-      card.addEventListener("click", function () {
+      card.addEventListener("click", function (e) {
+        // 우상단 미커밋 인디케이터 클릭은 카드 viewer 가 아닌 commit 액션으로 위임
+        var badge = e.target.closest(".card-uncommitted-badge");
+        if (badge) {
+          e.stopPropagation();
+          handleUncommittedBadgeClick(badge);
+          return;
+        }
         const num = card.dataset.num;
         const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
         if (ticket) Board.render.openViewer(ticket);

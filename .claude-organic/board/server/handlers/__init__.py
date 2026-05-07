@@ -9,6 +9,7 @@ from .kanban import KanbanHandlerMixin
 from .workflow_undo import WorkflowUndoHandlerMixin
 from .metrics import MetricsHandlerMixin
 from .memory_gc import MemoryGcHandlerMixin
+from .worktree_commit import WorktreeCommitHandlerMixin
 
 __all__ = [
     'GenericHandlerMixin',
@@ -20,4 +21,5 @@ __all__ = [
     'WorkflowUndoHandlerMixin',
     'MetricsHandlerMixin',
     'MemoryGcHandlerMixin',
+    'WorktreeCommitHandlerMixin',
 ]

@@ -22,6 +22,7 @@ from .handlers.kanban import KanbanHandlerMixin
 from .handlers.workflow_undo import WorkflowUndoHandlerMixin
 from .handlers.metrics import MetricsHandlerMixin
 from .handlers.memory_gc import MemoryGcHandlerMixin
+from .handlers.worktree_commit import WorktreeCommitHandlerMixin
 
 
 class BoardHTTPRequestHandler(
@@ -31,6 +32,7 @@ class BoardHTTPRequestHandler(
     WorkflowUndoHandlerMixin,
     MetricsHandlerMixin,
     MemoryGcHandlerMixin,
+    WorktreeCommitHandlerMixin,
     FilesHandlerMixin,
     GenericHandlerMixin,
     SyncHandlerMixin,
@@ -161,6 +163,8 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_done()
         elif self.path == '/api/kanban/delete':
             self._handle_kanban_delete()
+        elif self.path == '/api/kanban/worktree-commit':
+            self._handle_worktree_commit()
         elif self.path == '/api/workflow/undo-done':
             self._handle_workflow_undo_done()
         else:
