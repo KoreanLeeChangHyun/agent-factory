@@ -243,36 +243,81 @@ def _stage2_merge_to_develop(
 
 
 def _handle_anchor_failure(
-    merge_commit: str, feature_branch: str, reason: str
+    merge_commit: str,
+    feature_branch: str,
+    reason: str,
+    pre_merge_develop_sha: str = "",
 ) -> None:
     """merge anchor 검증 실패 시 롤백 및 로그 기록을 수행한다.
 
-    현재 HEAD가 merge_commit과 일치하면 git reset --hard HEAD^로 롤백하고,
+    현재 HEAD가 merge_commit과 일치하면 명시적 SHA 리셋(`pre_merge_develop_sha`)
+    또는 fallback 으로 `HEAD^` 리셋을 수행하고,
     .claude-organic/logs/merge-anchor-failures.log에 JSONL 형식으로 기록한다.
 
     Args:
         merge_commit: 병합 커밋 SHA.
         feature_branch: feature 브랜치명.
         reason: 실패 이유.
+        pre_merge_develop_sha: Stage 2 진입 직전 캡처한 develop HEAD SHA.
+            비어있지 않으면 `git reset --hard <pre_merge_develop_sha>` 로
+            명시적 SHA 리셋을 수행한다 (T-403 회귀 방지: develop 의 사전
+            ahead commit 이 자동 보존됨).
+            빈 문자열이면 캡처 실패 fallback 으로 기존 `HEAD^` 상대 경로
+            리셋을 수행하고 경고 로그를 출력한다.
     """
     project_root = resolve_project_root()
 
+    # 포렌식 1: reset 실행 전 develop HEAD 기록
+    head_before_result = _git("rev-parse", "HEAD")
+    head_before = (
+        head_before_result.stdout.strip()
+        if head_before_result.returncode == 0
+        else ""
+    )
+
+    # 롤백 SHA 결정: pre_merge_develop_sha 우선, 미보유 시 HEAD^ fallback
+    if pre_merge_develop_sha:
+        reset_target = pre_merge_develop_sha
+    else:
+        _error(
+            "[ANCHOR] pre_merge_develop_sha 미보유 — 정확한 SHA 미보유, "
+            "상대 reset 수행 (HEAD^ fallback)"
+        )
+        reset_target = "HEAD^"
+
     # HEAD가 merge_commit과 일치하는지 확인 후 롤백
-    head_result = _git("rev-parse", "HEAD")
-    if head_result.returncode == 0 and head_result.stdout.strip() == merge_commit:
-        reset_result = _git("reset", "--hard", "HEAD^")
+    rollback_executed = False
+    rollback_succeeded = False
+    if head_before_result.returncode == 0 and head_before == merge_commit:
+        reset_result = _git("reset", "--hard", reset_target)
+        rollback_executed = True
         if reset_result.returncode == 0:
-            _error(f"anchor 검증 실패로 병합 롤백 완료 (reason: {reason})")
+            rollback_succeeded = True
+            _error(
+                f"anchor 검증 실패로 병합 롤백 완료 "
+                f"(reason: {reason}, reset_target: {reset_target})"
+            )
         else:
             _error(
-                f"anchor 검증 실패 + 롤백 실패: {reset_result.stderr.strip()}"
+                f"anchor 검증 실패 + 롤백 실패 "
+                f"(reset_target: {reset_target}): "
+                f"{reset_result.stderr.strip()}"
             )
     else:
         _error(
             f"anchor 검증 실패 (HEAD != merge_commit, 롤백 생략): {reason}"
         )
 
-    # JSONL 로그 기록
+    # 포렌식 2: reset 실행 후 develop HEAD 기록
+    head_after_result = _git("rev-parse", "HEAD")
+    head_after = (
+        head_after_result.stdout.strip()
+        if head_after_result.returncode == 0
+        else ""
+    )
+
+    # JSONL 로그 기록 — pre_merge_develop_sha / reset_target / head_before /
+    # head_after 모두 명시 (T-403 사고 회복용 포렌식 데이터).
     log_path = os.path.join(project_root, _ANCHOR_FAILURE_LOG)
     try:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -282,6 +327,12 @@ def _handle_anchor_failure(
             "merge_commit": merge_commit,
             "feature_branch": feature_branch,
             "reason": reason,
+            "pre_merge_develop_sha": pre_merge_develop_sha,
+            "reset_target": reset_target,
+            "head_before_reset": head_before,
+            "head_after_reset": head_after,
+            "rollback_executed": rollback_executed,
+            "rollback_succeeded": rollback_succeeded,
         }
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -290,7 +341,10 @@ def _handle_anchor_failure(
 
 
 def _stage2_5_verify_merge_anchor(
-    merge_commit: str, feature_branch: str, dry_run: bool
+    merge_commit: str,
+    feature_branch: str,
+    dry_run: bool,
+    pre_merge_develop_sha: str = "",
 ) -> bool:
     """Stage 2.5: merge anchor 검증을 수행한다.
 
@@ -303,6 +357,11 @@ def _stage2_5_verify_merge_anchor(
         merge_commit: Stage 2에서 생성된 병합 커밋 SHA.
         feature_branch: 병합된 feature 브랜치명.
         dry_run: True이면 예상 동작만 출력.
+        pre_merge_develop_sha: Stage 2 진입 직전 캡처한 develop HEAD SHA.
+            T-410: merge_commit == pre_merge_develop_sha 이면 git merge
+            --no-ff 가 새 commit 을 만들지 않은 already-up-to-date 케이스이므로
+            anchor 검증 자체를 skip 한다 (^2 호출 회피).
+            빈 문자열이면 미캡처 상태로 간주하고 기존 분기를 따른다.
 
     Returns:
         검증 성공(또는 스킵) 시 True, 실패(롤백 완료) 시 False.
@@ -313,14 +372,15 @@ def _stage2_5_verify_merge_anchor(
 
     if not is_worktree_enabled():
         print(
-            "  WORKFLOW_WORKTREE=false — anchor 검증 스킵",
+            "  [ANCHOR] WORKFLOW_WORKTREE=false — anchor 검증 스킵",
             flush=True,
         )
         return True
 
     if dry_run:
         print(
-            f"  [DRY-RUN] merge anchor 검증: {merge_commit[:8]} / {feature_branch}",
+            f"  [ANCHOR] [DRY-RUN] merge anchor 검증: "
+            f"{merge_commit[:8]} / {feature_branch}",
             flush=True,
         )
         return True
@@ -329,6 +389,20 @@ def _stage2_5_verify_merge_anchor(
         _error("anchor 검증: merge_commit이 비어있어 검증 불가")
         return True  # 비차단: 검증 불가 시 통과
 
+    # T-410: already-up-to-date 명시 분기.
+    # `git merge --no-ff` 는 feature 가 develop 의 ancestor 일 때 새 commit 을
+    # 만들지 않고 기존 develop HEAD 를 그대로 반환한다. 이 경우 merge_commit 은
+    # pre_merge_develop_sha 와 동일하며 anchor 검증(^2 비교)은 의미가 없다.
+    # `^2` 호출 자체를 회피하여 fall-through 로 인한 false-fail 가능성을 차단한다.
+    if pre_merge_develop_sha and merge_commit == pre_merge_develop_sha:
+        print(
+            f"  [ANCHOR] already-up-to-date — anchor 검증 스킵 "
+            f"(merge_commit {merge_commit[:8]} == "
+            f"pre_merge_develop_sha {pre_merge_develop_sha[:8]})",
+            flush=True,
+        )
+        return True
+
     # 검증 1: merge_commit^2 == feature_branch HEAD
     parent2_result = _git("rev-parse", f"{merge_commit}^2")
     if parent2_result.returncode != 0:
@@ -336,9 +410,24 @@ def _stage2_5_verify_merge_anchor(
         # develop 에 추가 merge commit 없으므로 anchor 검증 의미 없음 → skip.
         # T-410: 기존 로직은 이 케이스에서 _handle_anchor_failure → reset HEAD^ 호출하여
         # develop 의 사전 ahead commit 까지 날리는 data loss 회귀 발생.
+        # T-410 Task 1.2: pre_merge_develop_sha 비교 결과를 함께 로그에 노출하여
+        # 분기 사유를 구조화한다 (캡처 실패 / SHA mismatch 구분).
+        if not pre_merge_develop_sha:
+            sha_compare = "pre_merge_develop_sha 미캡처"
+        elif merge_commit == pre_merge_develop_sha:
+            # 이 경로는 위 명시 분기에서 이미 처리됐어야 하지만 방어적으로 표기.
+            sha_compare = (
+                f"== pre_merge_develop_sha {pre_merge_develop_sha[:8]} "
+                f"(up-to-date)"
+            )
+        else:
+            sha_compare = (
+                f"!= pre_merge_develop_sha {pre_merge_develop_sha[:8]} "
+                f"(ff merge 추정)"
+            )
         print(
-            f"  fast-forward / up-to-date — anchor 검증 스킵 "
-            f"(merge_commit {merge_commit[:8]} parent 1개)",
+            f"  [ANCHOR] fast-forward / up-to-date — anchor 검증 스킵 "
+            f"(merge_commit {merge_commit[:8]} parent 1개, {sha_compare})",
             flush=True,
         )
         return True
@@ -347,8 +436,8 @@ def _stage2_5_verify_merge_anchor(
     if fb_head_result.returncode != 0:
         # feature 브랜치가 이미 삭제된 경우 검증 스킵 (비차단)
         _info(
-            f"anchor 검증 스킵: feature_branch {feature_branch} 를 찾을 수 없음 "
-            f"(이미 삭제됨)"
+            f"[ANCHOR] anchor 검증 스킵: feature_branch {feature_branch} 를 "
+            f"찾을 수 없음 (이미 삭제됨)"
         )
         return True
 
@@ -359,8 +448,10 @@ def _stage2_5_verify_merge_anchor(
         reason = (
             f"^2 SHA ({parent2_sha[:8]}) != feature HEAD ({fb_head_sha[:8]})"
         )
-        _error(f"anchor 검증 실패: {reason}")
-        _handle_anchor_failure(merge_commit, feature_branch, reason)
+        _error(f"[ANCHOR] anchor 검증 실패: {reason}")
+        _handle_anchor_failure(
+            merge_commit, feature_branch, reason, pre_merge_develop_sha
+        )
         return False
 
     # 검증 2: git diff {merge_commit}^2 {merge_commit} 가 비어있어야 함
@@ -369,10 +460,14 @@ def _stage2_5_verify_merge_anchor(
     )
     if diff_result.returncode != 0:
         _error(
-            f"anchor 검증 실패: git diff 명령 실패 — {diff_result.stderr.strip()}"
+            f"[ANCHOR] anchor 검증 실패: git diff 명령 실패 — "
+            f"{diff_result.stderr.strip()}"
         )
         _handle_anchor_failure(
-            merge_commit, feature_branch, "git diff command failed"
+            merge_commit,
+            feature_branch,
+            "git diff command failed",
+            pre_merge_develop_sha,
         )
         return False
 
@@ -380,12 +475,14 @@ def _stage2_5_verify_merge_anchor(
         reason = (
             f"diff {merge_commit[:8]}^2..{merge_commit[:8]} 출력이 비어있지 않음"
         )
-        _error(f"anchor 검증 실패: {reason}")
-        _handle_anchor_failure(merge_commit, feature_branch, reason)
+        _error(f"[ANCHOR] anchor 검증 실패: {reason}")
+        _handle_anchor_failure(
+            merge_commit, feature_branch, reason, pre_merge_develop_sha
+        )
         return False
 
     print(
-        f"  anchor 검증 통과: {merge_commit[:8]} / {feature_branch}",
+        f"  [ANCHOR] anchor 검증 통과: {merge_commit[:8]} / {feature_branch}",
         flush=True,
     )
     return True
@@ -529,6 +626,21 @@ def run_pipeline(
         _step(1, "미커밋 변경사항 감지 및 자동 커밋")
         print("  worktree 없음 (Stage 1 건너뜀)", flush=True)
 
+    # ── Stage 2 진입 직전: develop HEAD SHA 캡처 (T-410) ──
+    # already-up-to-date / ff 케이스 명시 분기 + 롤백 SHA 명시화에 사용.
+    # develop 브랜치 미존재 또는 rev-parse 실패 시 빈 문자열로 fallback —
+    # _stage2_5_verify_merge_anchor 와 _handle_anchor_failure 모두
+    # backward-compat default("") 로 기존 동작 유지.
+    pre_merge_develop_sha_result = _git("rev-parse", "develop")
+    if pre_merge_develop_sha_result.returncode == 0:
+        pre_merge_develop_sha = pre_merge_develop_sha_result.stdout.strip()
+    else:
+        pre_merge_develop_sha = ""
+        _info(
+            "[ANCHOR] pre_merge_develop_sha 캡처 실패 — develop 브랜치 부재 또는 "
+            f"rev-parse 실패: {pre_merge_develop_sha_result.stderr.strip()}"
+        )
+
     # ── Stage 2: feature -> develop 병합 ──
     stage2_success, merge_commit, feature_branch = _stage2_merge_to_develop(
         ticket_number, dry_run
@@ -537,7 +649,9 @@ def run_pipeline(
         return 1
 
     # ── Stage 2.5: merge anchor 검증 ──
-    if not _stage2_5_verify_merge_anchor(merge_commit, feature_branch, dry_run):
+    if not _stage2_5_verify_merge_anchor(
+        merge_commit, feature_branch, dry_run, pre_merge_develop_sha
+    ):
         return 1
 
     # ── Stage 3: worktree 제거 + branch 삭제 ──
