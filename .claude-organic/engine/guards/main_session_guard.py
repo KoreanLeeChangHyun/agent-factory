@@ -9,6 +9,14 @@ Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
 
 세션 식별은 session_identifier.get_session_type()에 위임한다.
 
+화이트리스트 정책:
+    - .claude-organic/.version: 메인 세션에서도 수정 허용
+    - 사용자 메모리 디렉터리 (~/.claude/projects/<encoded>/memory/**):
+      코드와 무관한 auto memory 영역으로 가드 범위 외.
+      Write/Edit file_path가 메모리 디렉터리 하위이면 즉시 통과.
+      Bash 명령에서 메모리 경로 인자만 대상이고 코드 경로 미포함이면 통과.
+      메모리 경로와 코드 경로 혼재 시 차단 보존(보수적 분기).
+
 주요 함수:
     main: Hook 진입점, stdin JSON 파싱 후 메인 세션 Write/Edit/Bash 차단
 
@@ -57,6 +65,35 @@ _BASH_FILE_MODIFY_PATTERNS: list[str] = [
     r"(?:^|[;&|]\s*)\binstall\s+",               # install 명령 (서브커맨드 제외)
     r"\bdd\s+",                                  # dd 명령
 ]
+
+# 사용자 메모리 디렉터리 패턴: ~/.claude/projects/<encoded>/memory/** 매칭
+# <encoded>는 dash-encoding 형태 (예: -home-deus-workspace-claude)
+_MEMORY_DIR_PATTERN: re.Pattern[str] = re.compile(
+    r"(?:^|/)\.claude/projects/[^/]+/memory(?:/|$)"
+)
+
+# Bash 메모리 화이트리스트 시 차단 유지 대상: 코드 경로 패턴
+_CODE_PATH_PATTERN: re.Pattern[str] = re.compile(
+    r"board/|engine/|hooks/|\.claude-organic/"
+)
+
+
+def _is_memory_path(path: str) -> bool:
+    """파일 경로가 사용자 메모리 디렉터리 하위인지 확인한다.
+
+    ~/.claude/projects/<encoded>/memory/ 또는 그 하위 경로를 매칭한다.
+    os.path.expanduser로 ~ 를 절대경로로 변환한 뒤 패턴 검사한다.
+
+    Args:
+        path: 검사할 파일 경로 (절대경로 또는 ~ 시작 경로)
+
+    Returns:
+        메모리 디렉터리 하위 경로이면 True, 아니면 False.
+    """
+    if not path:
+        return False
+    expanded = os.path.expanduser(path)
+    return bool(_MEMORY_DIR_PATTERN.search(expanded))
 
 
 def _deny(reason: str) -> None:
@@ -175,6 +212,10 @@ def main() -> None:
     if file_path.endswith(".claude-organic/.version"):
         sys.exit(0)
 
+    # 메모리 디렉터리 화이트리스트: Write/Edit 도구에서 메모리 경로 하위이면 즉시 통과
+    if tool_name in ("Write", "Edit") and _is_memory_path(file_path):
+        sys.exit(0)
+
     # 세션 유형 판별 (session_identifier에 위임)
     session_type = get_session_type()
 
@@ -186,12 +227,18 @@ def main() -> None:
     if session_type == "unknown":
         if tool_name == "Bash":
             command = tool_input.get("command", "")
+            # 메모리 경로만 대상이고 코드 경로 미포함이면 통과 (보수적: 혼재 시 차단)
+            if _MEMORY_DIR_PATTERN.search(command) and not _CODE_PATH_PATTERN.search(command):
+                sys.exit(0)
             _check_bash_file_modify(command)
         _deny(MAIN_SESSION_NO_TMUX_DENIED)
 
     # main 세션: Bash는 파일 수정 패턴만 차단
     if tool_name == "Bash":
         command = tool_input.get("command", "")
+        # 메모리 경로만 대상이고 코드 경로 미포함이면 통과 (보수적: 혼재 시 차단)
+        if _MEMORY_DIR_PATTERN.search(command) and not _CODE_PATH_PATTERN.search(command):
+            sys.exit(0)
         _check_bash_file_modify(command)
 
     # 메인 세션에서 Write/Edit는 차단
