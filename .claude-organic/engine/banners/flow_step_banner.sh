@@ -18,6 +18,72 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../data/colors.sh"
 
+# ─── metrics 이벤트 디렉터리 ───
+FLOW_UPDATE_BIN="$(cd "$SCRIPT_DIR/../.." && pwd)/bin/flow-update"
+
+# ─── step timing 임시 파일 헬퍼 ───
+_metrics_step_tmp() {
+    local STEP="$1" WD="$2"
+    echo "${WD}/.metrics_step_start_${STEP}.tmp"
+}
+
+# ─── metrics 이벤트 append (비차단) ───
+_metrics_step_event() {
+    local EVENT_TYPE="$1"
+    local REGISTRY_KEY="$2"
+    shift 2
+    local EXTRA_ARGS=("$@")
+
+    local WD
+    WD="$(REGISTRY_KEY="$REGISTRY_KEY" SCRIPT_DIR="$SCRIPT_DIR" python3 -c "
+import os, sys
+sys.path.insert(0, os.path.normpath(os.path.join(os.environ['SCRIPT_DIR'], '..')))
+from common import resolve_abs_work_dir, resolve_project_root
+root = resolve_project_root()
+wd = resolve_abs_work_dir(os.environ['REGISTRY_KEY'], root)
+print(wd)
+" 2>/dev/null)" || return 0
+
+    [[ -z "$WD" ]] && return 0
+
+    if [[ "$EVENT_TYPE" == "step.start" ]]; then
+        # timestamp 를 임시 파일에 기록
+        local TMP_FILE
+        local STEP_VAL=""
+        for arg in "${EXTRA_ARGS[@]}"; do
+            case "$arg" in --step=*) STEP_VAL="${arg#--step=}" ;; esac
+        done
+        if [[ -n "$STEP_VAL" ]]; then
+            TMP_FILE="$(_metrics_step_tmp "$STEP_VAL" "$WD")"
+            date +%s%3N > "$TMP_FILE" 2>/dev/null || true
+        fi
+    elif [[ "$EVENT_TYPE" == "step.end" ]]; then
+        local STEP_VAL=""
+        for arg in "${EXTRA_ARGS[@]}"; do
+            case "$arg" in --step=*) STEP_VAL="${arg#--step=}" ;; esac
+        done
+        if [[ -n "$STEP_VAL" ]]; then
+            local TMP_FILE="$(_metrics_step_tmp "$STEP_VAL" "$WD")"
+            if [[ -f "$TMP_FILE" ]]; then
+                local START_MS END_MS DURATION_MS
+                START_MS="$(cat "$TMP_FILE" 2>/dev/null || echo 0)"
+                END_MS="$(date +%s%3N)"
+                DURATION_MS=$(( END_MS - START_MS ))
+                rm -f "$TMP_FILE" 2>/dev/null || true
+                EXTRA_ARGS+=("--duration_ms=${DURATION_MS}")
+            else
+                EXTRA_ARGS+=("--duration_ms=null")
+            fi
+        fi
+    fi
+
+    if [[ -x "$FLOW_UPDATE_BIN" ]]; then
+        "$FLOW_UPDATE_BIN" metrics-event "$EVENT_TYPE" \
+            --registry-key="$REGISTRY_KEY" \
+            "${EXTRA_ARGS[@]}" 2>/dev/null || true
+    fi
+}
+
 # ─── 한국어 시간 포맷 ───
 get_kr_timestamp() {
     local HOUR MINUTE AMPM
@@ -159,6 +225,8 @@ if [[ "$SUBCMD" == "start" ]]; then
 
     echo "[STEP] ${STEP} - ${DESC}"
     _log_event "$REGISTRY_KEY" "INFO" "STEP_START: ${STEP}" || true
+    _metrics_step_event "step.start" "$REGISTRY_KEY" \
+        "--step=${STEP}" "--source=banner" || true
     exit 0
 fi
 
@@ -195,6 +263,11 @@ if [[ "$SUBCMD" == "end" ]]; then
     if [[ -n "$ARTIFACT_PATH" ]]; then
         _log_event "$REGISTRY_KEY" "INFO" "ARTIFACT: ${ARTIFACT_PATH}" || true
     fi
+    # metrics: step.end (duration 계산 포함)
+    _OUTCOME="ok"
+    [[ -n "$LABEL" ]] || _OUTCOME="ok"
+    _metrics_step_event "step.end" "$REGISTRY_KEY" \
+        "--step=${STEP}" "--outcome=${_OUTCOME}" "--source=banner" || true
     exit 0
 fi
 

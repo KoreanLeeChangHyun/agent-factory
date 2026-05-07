@@ -49,6 +49,61 @@ fi
 
 # COLOR 변수 제거: 출력문에서 더 이상 ANSI 컬러 참조 없음
 
+# ─── metrics 이벤트 bin 경로 ───
+FLOW_UPDATE_BIN="$(cd "$SCRIPT_DIR/../.." && pwd)/bin/flow-update"
+
+# ─── phase timing 임시 파일 헬퍼 ───
+_metrics_phase_tmp() {
+    local PHASE_IDX="$1" WD="$2"
+    echo "${WD}/.metrics_phase_${PHASE_IDX}_start.tmp"
+}
+
+# ─── metrics phase 이벤트 append (비차단) ───
+_metrics_phase_event() {
+    local EVENT_TYPE="$1"
+    local REGISTRY_KEY="$2"
+    local PHASE_IDX="$3"
+    shift 3
+    local EXTRA_ARGS=("$@")
+
+    local WD
+    WD="$(REGISTRY_KEY="$REGISTRY_KEY" SCRIPT_DIR="$SCRIPT_DIR" python3 -c "
+import os, sys
+sys.path.insert(0, os.path.normpath(os.path.join(os.environ['SCRIPT_DIR'], '..')))
+from common import resolve_abs_work_dir, resolve_project_root
+root = resolve_project_root()
+wd = resolve_abs_work_dir(os.environ['REGISTRY_KEY'], root)
+print(wd)
+" 2>/dev/null)" || return 0
+
+    [[ -z "$WD" ]] && return 0
+
+    if [[ "$EVENT_TYPE" == "phase.start" ]]; then
+        local TMP_FILE
+        TMP_FILE="$(_metrics_phase_tmp "$PHASE_IDX" "$WD")"
+        date +%s%3N > "$TMP_FILE" 2>/dev/null || true
+    elif [[ "$EVENT_TYPE" == "phase.end" ]]; then
+        local TMP_FILE="$(_metrics_phase_tmp "$PHASE_IDX" "$WD")"
+        if [[ -f "$TMP_FILE" ]]; then
+            local START_MS END_MS DURATION_MS
+            START_MS="$(cat "$TMP_FILE" 2>/dev/null || echo 0)"
+            END_MS="$(date +%s%3N)"
+            DURATION_MS=$(( END_MS - START_MS ))
+            rm -f "$TMP_FILE" 2>/dev/null || true
+            EXTRA_ARGS+=("--duration_ms=${DURATION_MS}")
+        else
+            EXTRA_ARGS+=("--duration_ms=null")
+        fi
+    fi
+
+    if [[ -x "$FLOW_UPDATE_BIN" ]]; then
+        "$FLOW_UPDATE_BIN" metrics-event "$EVENT_TYPE" \
+            --registry-key="$REGISTRY_KEY" \
+            "--phase_index=${PHASE_IDX}" \
+            "${EXTRA_ARGS[@]}" 2>/dev/null || true
+    fi
+}
+
 # ─── workflow.log 이벤트 기록 ───
 _log_event() {
     local REGISTRY_KEY="$1" LEVEL="$2" MESSAGE="$3"
@@ -165,3 +220,7 @@ else
     echo ">> Phase ${PHASE}"
 fi
 _log_event "$REGISTRY_KEY" "INFO" "PHASE_START: ${PHASE} mode=${EXEC_MODE} agents=${AGENTS:-none} tasks=${TASKS:-none}" || true
+
+# ─── phase.start metrics 이벤트 (비차단) ───
+# total 은 현재 알 수 없으므로 0 으로 전달 (collector 가 후처리 시 채울 수 있음)
+_metrics_phase_event "phase.start" "$REGISTRY_KEY" "$PHASE" "--total=0" || true

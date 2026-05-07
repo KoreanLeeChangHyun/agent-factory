@@ -264,6 +264,68 @@ def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
         release_lock(lock_dir)
 
 
+def _append_usage_snapshot(
+    abs_work_dir: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_creation: int,
+    cache_read: int,
+    effective: float,
+) -> None:
+    """usage.snapshot 이벤트를 metrics.jsonl에 기록한다.
+
+    모든 예외를 조용히 흡수하여 usage_record 호출에 영향을 주지 않는다.
+    work_dir이 유효하지 않거나 워크플로우 외부 호출 시 silently skip.
+
+    Args:
+        abs_work_dir: 워크 디렉터리 절대 경로.
+        input_tokens: 입력 토큰 수.
+        output_tokens: 출력 토큰 수.
+        cache_creation: 캐시 생성 토큰 수.
+        cache_read: 캐시 읽기 토큰 수.
+        effective: 가중 effective_tokens.
+    """
+    try:
+        if not abs_work_dir or not os.path.isdir(abs_work_dir):
+            return
+
+        # step: status.json 또는 .context.json 에서 현재 단계 추출
+        step = "UNKNOWN"
+        try:
+            status_path = os.path.join(abs_work_dir, "status.json")
+            ctx_path = os.path.join(abs_work_dir, ".context.json")
+            if os.path.isfile(status_path):
+                import json as _json
+                with open(status_path, encoding="utf-8") as f:
+                    st = _json.load(f)
+                if isinstance(st, dict):
+                    step = st.get("step") or st.get("status") or st.get("phase") or "UNKNOWN"
+            elif os.path.isfile(ctx_path):
+                import json as _json
+                with open(ctx_path, encoding="utf-8") as f:
+                    ctx = _json.load(f)
+                if isinstance(ctx, dict):
+                    step = ctx.get("step") or ctx.get("status") or "UNKNOWN"
+        except Exception:  # noqa: BLE001
+            pass
+
+        from flow.metrics import append_event
+        append_event(
+            abs_work_dir,
+            "usage.snapshot",
+            {
+                "step": str(step),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_creation_tokens": cache_creation,
+                "cache_read_tokens": cache_read,
+                "effective_tokens": effective,
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def usage_record(
     abs_work_dir: str,
     agent_name: str,
@@ -308,11 +370,16 @@ def usage_record(
         if "agents" not in data or not isinstance(data.get("agents"), dict):
             data["agents"] = {}
 
+        in_t = int(input_tokens)
+        out_t = int(output_tokens)
+        cc_t = int(cache_creation)
+        cr_t = int(cache_read)
+
         token_data: dict[str, Any] = {
-            "input_tokens": int(input_tokens),
-            "output_tokens": int(output_tokens),
-            "cache_creation_tokens": int(cache_creation),
-            "cache_read_tokens": int(cache_read),
+            "input_tokens": in_t,
+            "output_tokens": out_t,
+            "cache_creation_tokens": cc_t,
+            "cache_read_tokens": cr_t,
             "method": "subagent_transcript",
         }
 
@@ -328,6 +395,11 @@ def usage_record(
         os.makedirs(os.path.dirname(usage_file), exist_ok=True)
         atomic_write_json(usage_file, data)
         _append_log(abs_work_dir, "INFO", f"USAGE_RECORDED: agent={label}")
+
+        # --- metrics: usage.snapshot 이벤트 기록 ---
+        eff = _calc_effective(token_data)
+        _append_usage_snapshot(abs_work_dir, in_t, out_t, cc_t, cr_t, eff)
+
         return f"usage -> {label}: in={input_tokens} out={output_tokens} cc={cache_creation} cr={cache_read}"
     finally:
         release_lock(lock_dir)

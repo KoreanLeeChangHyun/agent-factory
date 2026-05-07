@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -175,6 +176,48 @@ def _info(msg: str) -> None:
     print(f"[INFO] worktree_manager: {msg}", file=sys.stderr)
 
 
+def _append_worktree_io(
+    op: str,
+    duration_ms: int,
+    outcome: str,
+    error_reason: str | None = None,
+) -> None:
+    """worktree.io 이벤트를 metrics.jsonl에 기록한다.
+
+    work_dir 는 WORKFLOW_WORK_DIR 또는 _WF_WORK_DIR 환경변수에서 추출한다.
+    추출 실패 시 (워크플로우 외부 호출 등) silently skip.
+    모든 예외를 조용히 흡수하여 worktree_manager 동작에 영향을 주지 않는다.
+
+    Args:
+        op: 작업 종류 ('create' | 'remove' | 'merge').
+        duration_ms: 작업 소요 시간(ms).
+        outcome: 결과 ('ok' | 'fail').
+        error_reason: 실패 시 예외 메시지 (성공 시 None).
+    """
+    try:
+        work_dir: str | None = None
+        for key in ("WORKFLOW_WORK_DIR", "_WF_WORK_DIR"):
+            val = os.environ.get(key, "").strip()
+            if val and os.path.isdir(val):
+                work_dir = val
+                break
+        if not work_dir:
+            return
+
+        payload: dict = {
+            "op": op,
+            "duration_ms": duration_ms,
+            "outcome": outcome,
+        }
+        if error_reason is not None:
+            payload["error_reason"] = str(error_reason)[:500]
+
+        from flow.metrics import append_event
+        append_event(work_dir, "worktree.io", payload)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # ─── 공개 API ─────────────────────────────────────────────────────────────────
 
 
@@ -246,6 +289,42 @@ def create_worktree(
     Returns:
         생성된 WorktreeInfo. 실패 시 None + 경고 출력.
     """
+    _t0 = time.monotonic()
+    try:
+        result = _create_worktree_impl(
+            ticket_number, title, base_branch, repo_path, command
+        )
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        if result is not None:
+            _append_worktree_io("create", duration_ms, "ok")
+        else:
+            _append_worktree_io("create", duration_ms, "fail")
+        return result
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        _append_worktree_io("create", duration_ms, "fail", str(exc))
+        raise
+
+
+def _create_worktree_impl(
+    ticket_number: str,
+    title: str,
+    base_branch: str = "develop",
+    repo_path: str | None = None,
+    command: str = "implement",
+) -> WorktreeInfo | None:
+    """create_worktree 실제 구현 (metrics timing 래퍼와 분리).
+
+    Args:
+        ticket_number: 티켓 번호 (예: 'T-001').
+        title: 티켓 제목.
+        base_branch: 기준 브랜치. 기본값 'develop'.
+        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        command: 워크플로우 커맨드. 'implement'가 아니면 생성을 거부한다.
+
+    Returns:
+        생성된 WorktreeInfo. 실패 시 None + 경고 출력.
+    """
     # command 방어: implement 외에는 worktree 생성을 거부한다
     if command not in ("implement",):
         _warn(
@@ -291,12 +370,12 @@ def create_worktree(
     os.makedirs(base_dir, exist_ok=True)
 
     # git worktree add --lock
-    result = _git(
+    git_result = _git(
         "worktree", "add", "--lock", wt_path, branch_name,
         repo_path=repo_path,
     )
-    if result.returncode != 0:
-        _warn(f"worktree 생성 실패: {result.stderr.strip()}")
+    if git_result.returncode != 0:
+        _warn(f"worktree 생성 실패: {git_result.stderr.strip()}")
         return None
 
     created_at = datetime.now().isoformat()
@@ -385,6 +464,34 @@ def remove_worktree(
     Returns:
         제거 성공(또는 이미 없음) 시 True, 실패 시 False.
     """
+    _t0 = time.monotonic()
+    try:
+        result = _remove_worktree_impl(ticket_number, delete_branch, repo_path)
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        outcome = "ok" if result else "fail"
+        _append_worktree_io("remove", duration_ms, outcome)
+        return result
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        _append_worktree_io("remove", duration_ms, "fail", str(exc))
+        raise
+
+
+def _remove_worktree_impl(
+    ticket_number: str,
+    delete_branch: bool = True,
+    repo_path: str | None = None,
+) -> bool:
+    """remove_worktree 실제 구현 (metrics timing 래퍼와 분리).
+
+    Args:
+        ticket_number: 티켓 번호 (예: 'T-001').
+        delete_branch: feature 브랜치도 삭제할지 여부. 기본값 True.
+        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+
+    Returns:
+        제거 성공(또는 이미 없음) 시 True, 실패 시 False.
+    """
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"
 
@@ -437,6 +544,32 @@ def merge_to_develop(
     mkdir 기반 잠금으로 동시 병합을 방지하며, 충돌 시 자동으로
     git merge --abort를 수행한다. 병합 성공 후 worktree와
     feature 브랜치를 정리한다.
+
+    Args:
+        ticket_number: 티켓 번호 (예: 'T-001').
+        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+
+    Returns:
+        MergeResult 인스턴스.
+    """
+    _t0 = time.monotonic()
+    try:
+        merge_result = _merge_to_develop_impl(ticket_number, repo_path)
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        outcome = "ok" if merge_result.success else "fail"
+        error_reason = merge_result.error_message if not merge_result.success else None
+        _append_worktree_io("merge", duration_ms, outcome, error_reason)
+        return merge_result
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        _append_worktree_io("merge", duration_ms, "fail", str(exc))
+        raise
+
+
+def _merge_to_develop_impl(
+    ticket_number: str, repo_path: str | None = None
+) -> MergeResult:
+    """merge_to_develop 실제 구현 (metrics timing 래퍼와 분리).
 
     Args:
         ticket_number: 티켓 번호 (예: 'T-001').

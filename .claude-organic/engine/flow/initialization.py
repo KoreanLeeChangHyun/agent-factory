@@ -355,7 +355,7 @@ def _create_work_dir(abs_work_dir: str) -> None:
     """워크플로우 디렉터리를 생성한다.
 
     디렉터리가 이미 존재해도 오류 없이 진행한다.
-    빈 workflow.log 파일을 함께 생성한다.
+    빈 workflow.log 와 빈 metrics.jsonl 파일을 함께 생성한다.
 
     Args:
         abs_work_dir: 생성할 작업 디렉터리 절대 경로
@@ -364,6 +364,11 @@ def _create_work_dir(abs_work_dir: str) -> None:
     # workflow.log 빈 파일 생성
     try:
         open(os.path.join(abs_work_dir, "workflow.log"), "a").close()
+    except Exception:
+        pass
+    # metrics.jsonl 빈 파일 touch (W02: INIT 단계 시작 마커)
+    try:
+        open(os.path.join(abs_work_dir, "metrics.jsonl"), "a").close()
     except Exception:
         pass
 
@@ -789,6 +794,48 @@ def init_workflow(
     if worktree_meta:
         result_dict["worktreePath"] = worktree_meta["path"]
         result_dict["featureBranch"] = worktree_meta["featureBranch"]
+
+    # ── W02: INIT 단계 metrics 이벤트 ──
+    # step.start{INIT} + step.end{INIT} 를 metrics.jsonl 에 append (비차단)
+    try:
+        import time as _time
+        import importlib.util as _ilu
+
+        _metrics_py = os.path.join(_SCRIPTS_DIR, "flow", "metrics.py")
+        if os.path.isfile(_metrics_py):
+            _spec = _ilu.spec_from_file_location("flow.metrics", _metrics_py)
+            if _spec and _spec.loader:
+                _metrics_mod = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
+
+                # INIT start 임시 파일에서 duration 계산 (metrics.jsonl touch 시각 기준)
+                _metrics_jsonl = os.path.join(abs_work_dir, "metrics.jsonl")
+                _init_start_ms = int(os.path.getmtime(_metrics_jsonl) * 1000) if os.path.isfile(_metrics_jsonl) else None
+                _init_end_ms = int(_time.time() * 1000)
+                _duration_ms = (_init_end_ms - _init_start_ms) if _init_start_ms is not None else None
+
+                _metrics_mod.append_event(  # type: ignore[attr-defined]
+                    abs_work_dir,
+                    "step.start",
+                    {"step": "INIT", "source": "fsm"},
+                    ticket=ticket_number,
+                    registry_key=registry_key,
+                )
+                _metrics_mod.append_event(  # type: ignore[attr-defined]
+                    abs_work_dir,
+                    "step.end",
+                    {
+                        "step": "INIT",
+                        "duration_ms": _duration_ms,
+                        "outcome": "ok",
+                        "source": "fsm",
+                    },
+                    ticket=ticket_number,
+                    registry_key=registry_key,
+                )
+    except Exception as _me:
+        _warn(f"metrics INIT events failed (비차단): {_me}")
+
     return result_dict
 
 
