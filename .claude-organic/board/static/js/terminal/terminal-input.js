@@ -235,6 +235,176 @@
     M.renderFilePreview();
   };
 
+  // ── Ticket Attachment ──
+
+  /**
+   * command 코드를 카드 배지 텍스트로 매핑한다.
+   * implement → IMP / research → RSC / review → REV / 기타 → TKT
+   */
+  function _ticketCmdLabel(command) {
+    if (!command) return "TKT";
+    var c = String(command).toLowerCase();
+    if (c === "implement") return "IMP";
+    if (c === "research") return "RSC";
+    if (c === "review") return "REV";
+    return "TKT";
+  }
+
+  /**
+   * workdir 경로의 `runs/YYYYMMDD-HHMMSS/...` 패턴에서 타임스탬프를 추출한다.
+   * 실패 시 null.
+   */
+  function _extractTicketDate(workdir) {
+    if (!workdir) return null;
+    var m = String(workdir).match(/runs\/(\d{8})-(\d{6})/);
+    if (!m) return null;
+    var ymd = m[1]; // YYYYMMDD
+    var hms = m[2]; // HHMMSS
+    var year = parseInt(ymd.slice(0, 4), 10);
+    var month = parseInt(ymd.slice(4, 6), 10);
+    var day = parseInt(ymd.slice(6, 8), 10);
+    var hour = parseInt(hms.slice(0, 2), 10);
+    var minute = parseInt(hms.slice(2, 4), 10);
+    if (!year || !month || !day) return null;
+    var ampm = hour < 12 ? "오전" : "오후";
+    var hour12 = hour % 12;
+    if (hour12 === 0) hour12 = 12;
+    return year + "년 " + month + "월 " + day + "일 / " + ampm + " " + hour12 + "시 " + minute + "분";
+  }
+
+  /**
+   * 첨부된 ticket 카드 프리뷰를 #terminal-image-preview 컨테이너에 렌더링한다.
+   * 이미지/파일 카드와 동일 컨테이너를 공유하여 한 줄 첨부 스트립으로 관리한다.
+   * 기존 ticket 카드 (`[data-ticket-idx]`)만 제거 후 재생성하여 이미지/파일 카드는 유지한다.
+   */
+  M.renderTicketPreview = function() {
+    var container = document.getElementById("terminal-image-preview");
+    if (!container) return;
+
+    var existingCards = container.querySelectorAll("[data-ticket-idx]");
+    existingCards.forEach(function (card) { card.parentNode.removeChild(card); });
+
+    if (!M.attachedTickets) return;
+
+    M.attachedTickets.forEach(function (ticket, idx) {
+      var card = document.createElement("div");
+      card.className = "terminal-ticket-card";
+      card.setAttribute("data-ticket-idx", idx);
+
+      var cmdLabel = _ticketCmdLabel(ticket.command);
+      var cmdEl = document.createElement("div");
+      cmdEl.className = "terminal-ticket-card-cmd";
+      cmdEl.textContent = cmdLabel;
+
+      var bodyEl = document.createElement("div");
+      bodyEl.className = "terminal-ticket-card-body";
+
+      var titleEl = document.createElement("div");
+      titleEl.className = "terminal-ticket-card-title";
+      var numStr = ticket.number || "T-???";
+      var titleText = (ticket.title || "").trim();
+      titleEl.textContent = titleText ? (numStr + " " + titleText) : numStr;
+      titleEl.title = titleEl.textContent;
+
+      var subtitleEl = document.createElement("div");
+      subtitleEl.className = "terminal-ticket-card-subtitle";
+      var subtitle = "";
+      var workdir = ticket.result && ticket.result.workdir;
+      if (workdir) {
+        var dateStr = _extractTicketDate(workdir);
+        if (dateStr) {
+          subtitle = dateStr;
+        } else if (ticket.report) {
+          var lineCount = String(ticket.report).split(/\r?\n/).length;
+          subtitle = "report " + lineCount + "줄";
+        } else {
+          subtitle = "no report";
+        }
+      } else if (ticket.report) {
+        var lc = String(ticket.report).split(/\r?\n/).length;
+        subtitle = "report " + lc + "줄";
+      } else {
+        subtitle = "no report";
+      }
+      subtitleEl.textContent = subtitle;
+      subtitleEl.title = subtitle;
+
+      bodyEl.appendChild(titleEl);
+      bodyEl.appendChild(subtitleEl);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "terminal-image-remove";
+      removeBtn.title = "제거";
+      removeBtn.innerHTML = "×";
+      removeBtn.addEventListener("click", (function (capturedIdx) {
+        return function () { M.removeTicket(capturedIdx); };
+      })(idx));
+
+      card.appendChild(cmdEl);
+      card.appendChild(bodyEl);
+      card.appendChild(removeBtn);
+      container.appendChild(card);
+    });
+  };
+
+  /**
+   * ticket 첨부를 추가한다.
+   * 같은 ticket 번호가 이미 첨부되어 있으면 무시 + appendSystemMessage 안내.
+   *
+   * @param {{number, title, command, prompt, result}} payload - 칸반 카드 ticket 페이로드
+   * @param {string|null} reportText - report.md 본문 (없으면 null)
+   */
+  M.attachTicket = function(payload, reportText) {
+    if (!payload || !payload.number) return;
+    if (!M.attachedTickets) M.attachedTickets = [];
+
+    var dup = M.attachedTickets.some(function (t) { return t.number === payload.number; });
+    if (dup) {
+      if (M.appendSystemMessage) {
+        M.appendSystemMessage("[첨부] " + payload.number + " 이미 첨부됨");
+      }
+      return;
+    }
+
+    M.attachedTickets.push({
+      number: payload.number,
+      title: payload.title || "",
+      command: payload.command || "",
+      prompt: payload.prompt || "",
+      result: payload.result || null,
+      report: reportText || null,
+      addedAt: Date.now()
+    });
+    M.renderTicketPreview();
+  };
+
+  M.removeTicket = function(index) {
+    if (!M.attachedTickets) return;
+    M.attachedTickets.splice(index, 1);
+    M.renderTicketPreview();
+  };
+
+  M.clearTickets = function() {
+    M.attachedTickets = [];
+    M.renderTicketPreview();
+  };
+
+  /**
+   * 첨부된 ticket 들을 send 시 텍스트 prepend 용 마크다운 블록으로 합성한다.
+   * 각 ticket → `## T-NNN [command] 제목\n\n### Prompt\n...\n### Result\n<reportText>\n\n---\n`
+   * 첨부가 없으면 빈 문자열 반환.
+   */
+  function _buildTicketMarkdown() {
+    if (!M.attachedTickets || M.attachedTickets.length === 0) return "";
+    var blocks = M.attachedTickets.map(function (t) {
+      var header = "## " + (t.number || "T-???") + " [" + (t.command || "") + "] " + (t.title || "");
+      var promptBlock = "### Prompt\n" + (t.prompt || "");
+      var resultBlock = "### Result\n" + (t.report || "");
+      return header + "\n\n" + promptBlock + "\n\n" + resultBlock + "\n\n---\n";
+    });
+    return blocks.join("\n");
+  }
+
   /**
    * 문자열이 파일 경로 패턴인지 판별한다.
    * - Unix 절대 경로: /로 시작, // 제외 (프로토콜 상대 URL)
@@ -322,16 +492,17 @@
     if (!input) return;
     var text = input.value.trim();
     var hasImages = M.attachedImages.length > 0;
-    if (!text && !hasImages) return;
+    var hasTickets = M.attachedTickets && M.attachedTickets.length > 0;
+    if (!text && !hasImages && !hasTickets) return;
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
     if (!inputtable.has(Board.state.termStatus)) return;
 
     input.value = "";
     input.style.height = "auto";
 
-    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지 있으면 슬래시 커맨드 미적용
+    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지/티켓 있으면 슬래시 커맨드 미적용
     // M.isFilePath() 체크: /home/... 등 파일 경로는 슬래시 커맨드로 라우팅하지 않음
-    if (!hasImages && text.charAt(0) === "/" && !M.isFilePath(text)) {
+    if (!hasImages && !hasTickets && text.charAt(0) === "/" && !M.isFilePath(text)) {
       Board.slashCommands.handle(text, {
         isWorkflowMode: M.isWorkflowMode,
         appendSystemMessage: M.appendSystemMessage,
@@ -343,23 +514,35 @@
       return;
     }
 
-    // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지 첨부 포함).
+    // 첨부 ticket 들을 마크다운 블록으로 합성하여 텍스트 앞에 prepend 한다.
+    // 첨부가 없으면 빈 문자열 → text 그대로 사용.
+    var attachedMd = hasTickets ? _buildTicketMarkdown() : "";
+    var sendText = text;
+    if (attachedMd) {
+      sendText = text ? (attachedMd + "\n" + text) : attachedMd;
+    }
+
+    // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지/티켓 첨부 포함).
     // 큐 entry 는 outputDiv 에 미리 echo 하지 않으며, 큐 stack 카드로만 노출된다.
     if (Board.state.termStatus === "busy") {
       var imagesSnapshot = hasImages
         ? M.attachedImages.map(function (img) { return { data: img.data, media_type: img.media_type, name: img.name }; })
         : null;
-      M.enqueueInput(text, imagesSnapshot);
+      // 큐 entry 의 text 도 ticket 마크다운 prepend 된 합성 텍스트를 사용한다.
+      M.enqueueInput(sendText, imagesSnapshot);
       if (hasImages) {
         M.clearImages();
         M.clearFiles();
+      }
+      if (hasTickets) {
+        M.clearTickets();
       }
       return;
     }
 
     var div = document.createElement("div");
     div.className = "term-message term-user";
-    if (text) div.textContent = text;
+    if (sendText) div.textContent = sendText;
     if (hasImages) {
       var thumbRow = document.createElement("div");
       thumbRow.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;";
@@ -373,8 +556,8 @@
     }
     M.appendToOutput(div);
 
-    // 전송 payload 구성
-    var payload = { text: text };
+    // 전송 payload 구성 — sendText (= ticket 마크다운 prepend + 사용자 텍스트)
+    var payload = { text: sendText };
     if (hasImages) {
       payload.images = M.attachedImages.map(function (img) {
         return { data: img.data, media_type: img.media_type };
@@ -382,13 +565,16 @@
     }
     M.clearImages();
     M.clearFiles();
+    if (hasTickets) M.clearTickets();
 
-    // Mark text as locally sent so the user_input SSE echo is skipped
-    if (text && Board.session && Board.session._markSent) {
-      Board.session._markSent(text);
+    // Mark sendText as locally sent so the user_input SSE echo is skipped.
+    // payload 와 동일한 텍스트로 mark 해야 echo skip 매칭이 정확하다.
+    if (sendText && Board.session && Board.session._markSent) {
+      Board.session._markSent(sendText);
     }
 
     // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
+    // 복원 대상은 사용자 자유 입력 영역만 — ticket 마크다운은 첨부 카드 자체가 사라진 상태라 복원 의미 없음.
     M._lastSentText = text || "";
     // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
     try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
