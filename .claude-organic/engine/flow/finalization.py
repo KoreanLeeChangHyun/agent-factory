@@ -821,22 +821,44 @@ def main() -> None:
         else:
             integrity_failures.append("work/ 디렉터리 미생성")
 
-        # T-411: 워크트리 활성 시 워커 commit 누락 검증
+        # T-411 AND 조건: 워커 commit 누락 시 워크트리 보존 (사용자 수동 수습 경로)
+        # 미커밋 변경(uncommitted=True) AND feat 브랜치 commit 0 이 동시에 충족될 때만
+        # ERROR 처리한다. commit_count >= 1 이면 정상 진행(일부 커밋 후 산출물 추가 변경),
+        # commit_count == -1 이면 검사 불가(브랜치 미존재 등)이므로 차단하지 않는다.
         if ticket_number:
             try:
                 from flow.worktree_manager import (
-                    is_worktree_enabled,
+                    count_feature_branch_commits,
                     get_worktree_path,
                     has_uncommitted_changes,
+                    is_worktree_enabled,
                 )
+                from flow.branch_strategy import get_feature_branch_for_ticket
                 if is_worktree_enabled():
                     _wt_path = get_worktree_path(ticket_number)
-                    if _wt_path and os.path.isdir(_wt_path) and has_uncommitted_changes(_wt_path):
-                        integrity_failures.append(
-                            f"워크트리 미커밋 변경 — 워커 commit 누락 ({_wt_path})"
+                    if _wt_path and os.path.isdir(_wt_path):
+                        _u = has_uncommitted_changes(_wt_path)
+                        _branch = get_feature_branch_for_ticket(ticket_number)
+                        _c = count_feature_branch_commits(_branch) if _branch else -1
+                        _append_log(
+                            abs_work_dir,
+                            "INFO",
+                            f"FINALIZE_WORKTREE_CHECK: uncommitted={_u} "
+                            f"commit_count={_c} branch={_branch}",
                         )
-            except (ImportError, Exception):
-                pass  # worktree 모듈 미설치/오류 시 비차단
+                        if _u and _c == 0:
+                            integrity_failures.append(
+                                f"워커 commit 누락 — 미커밋 변경 + feat 브랜치 commit 0 "
+                                f"({_wt_path}, branch={_branch})"
+                            )
+            except ImportError:
+                pass  # worktree 모듈 미설치 시 비차단
+            except Exception as e:
+                _append_log(
+                    abs_work_dir,
+                    "WARN",
+                    f"FINALIZE_WORKTREE_CHECK_ERROR: {e}",
+                )
 
         if integrity_failures:
             _append_log(
