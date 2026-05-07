@@ -2046,7 +2046,7 @@
       });
     });
 
-    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" + "채팅에 첨부")
+    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" 단일 옵션)
     el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
