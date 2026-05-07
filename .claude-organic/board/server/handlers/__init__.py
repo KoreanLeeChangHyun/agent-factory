@@ -8,7 +8,6 @@ from .workflow import WorkflowHandlerMixin
 from .kanban import KanbanHandlerMixin
 from .workflow_undo import WorkflowUndoHandlerMixin
 from .metrics import MetricsHandlerMixin
-from .worktree_status import WorktreeStatusHandlerMixin
 from .memory_gc import MemoryGcHandlerMixin
 
 __all__ = [
@@ -20,6 +19,5 @@ __all__ = [
     'KanbanHandlerMixin',
     'WorkflowUndoHandlerMixin',
     'MetricsHandlerMixin',
-    'WorktreeStatusHandlerMixin',
     'MemoryGcHandlerMixin',
 ]

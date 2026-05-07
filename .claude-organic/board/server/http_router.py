@@ -21,7 +21,6 @@ from .handlers.workflow import WorkflowHandlerMixin
 from .handlers.kanban import KanbanHandlerMixin
 from .handlers.workflow_undo import WorkflowUndoHandlerMixin
 from .handlers.metrics import MetricsHandlerMixin
-from .handlers.worktree_status import WorktreeStatusHandlerMixin
 from .handlers.memory_gc import MemoryGcHandlerMixin
 
 
@@ -31,7 +30,6 @@ class BoardHTTPRequestHandler(
     KanbanHandlerMixin,
     WorkflowUndoHandlerMixin,
     MetricsHandlerMixin,
-    WorktreeStatusHandlerMixin,
     MemoryGcHandlerMixin,
     FilesHandlerMixin,
     GenericHandlerMixin,

@@ -125,14 +125,6 @@ class GenericHandlerMixin:
         elif path == '/api/metrics/regression':
             last = self._parse_metrics_last(qs, default=20)
             self._handle_metrics_regression(last)
-        elif path == '/api/worktree/status/all':
-            self._handle_worktree_status_all()
-        elif path == '/api/worktree/status':
-            ticket = qs.get('ticket', [None])[0]
-            if not ticket:
-                self._send_error(400, 'Missing "ticket" query parameter (e.g. ?ticket=T-NNN)')
-                return
-            self._handle_worktree_status(ticket)
         else:
             self.send_response(404)
             self.end_headers()

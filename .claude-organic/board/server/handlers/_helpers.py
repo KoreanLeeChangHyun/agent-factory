@@ -118,19 +118,3 @@ def _import_metrics_cli():
         sys.path.insert(0, engine_dir)
     from flow import metrics_cli  # noqa: WPS433
     return metrics_cli
-
-
-def _import_worktree_status():
-    """worktree_status 모듈을 lazy import 한다.
-
-    engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.worktree_status`` 를
-    import. _import_metrics_cli 패턴과 동일한 방식으로 board 서버 sys.path
-    를 보충한다.
-    """
-    engine_dir = os.path.normpath(
-        os.path.join(os.getcwd(), '.claude-organic', 'engine'),
-    )
-    if engine_dir not in sys.path:
-        sys.path.insert(0, engine_dir)
-    from flow import worktree_status  # noqa: WPS433
-    return worktree_status

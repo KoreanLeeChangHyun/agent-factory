@@ -98,9 +98,6 @@ class TestHandlerMethodsExist(unittest.TestCase):
         '_handle_metrics_run',
         '_handle_metrics_aggregate',
         '_handle_metrics_regression',
-        # WorktreeStatusHandlerMixin
-        '_handle_worktree_status',
-        '_handle_worktree_status_all',
         # MemoryGcHandlerMixin
         '_handle_memory_gc_run',
         '_handle_memory_gc_prune',
@@ -122,9 +119,9 @@ class TestHandlerMethodsExist(unittest.TestCase):
             msg=f'Missing methods on BoardHTTPRequestHandler: {missing}',
         )
 
-    def test_method_count_at_least_16(self):
-        """검사 대상 메서드가 16개 이상임을 확인한다."""
-        self.assertGreaterEqual(len(self.REQUIRED_METHODS), 16)
+    def test_method_count_at_least_14(self):
+        """검사 대상 메서드가 14개 이상임을 확인한다 (워크트리 상태 도구 폐기 후)."""
+        self.assertGreaterEqual(len(self.REQUIRED_METHODS), 14)
 
 
 # ==============================================================================
