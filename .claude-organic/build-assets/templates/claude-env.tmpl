@@ -17,6 +17,9 @@ CLAUDE_CODE_SLACK_BOT_TOKEN=
 # 용도: 알림이 전송될 채널 지정
 CLAUDE_CODE_SLACK_CHANNEL_ID=
 
+# Slack API 엔드포인트 (오버라이드 가능)
+CLAUDE_SLACK_API_URL=https://slack.com/api/chat.postMessage
+
 # -----------------------------------------------------------------------------------------
 # (2) Git 설정
 # -----------------------------------------------------------------------------------------
@@ -42,6 +45,12 @@ HOOK_MAIN_SESSION_GUARD=false
 HOOK_KANBAN_SUBCOMMAND_GUARD=false
 HOOK_READONLY_SESSION_GUARD=false
 HOOK_DIRECT_PATH_GUARD=true
+HOOK_DONE_RELATION_GUARD=true
+HOOK_RULES_AUTO_APPROVE=true
+HOOK_WORKTREE_REMOVE_GUARD=true
+HOOK_WORKTREE_PATH_GUARD=true
+HOOK_HALLUCINATION_LOGGER=true
+HOOKS_EDIT_ALLOWED=
 
 # session-start hooks
 HOOK_SESSION_SYSTEM_PROMPT=true
@@ -91,3 +100,35 @@ CLAUDE_CHAIN_MAX_RETRY=2
 # 미설정 시: is_worktree_enabled() 가 RuntimeError raise — 추론 폴백 제거됨
 # 사용처: .claude-organic/engine/flow/worktree_manager.py
 WORKFLOW_WORKTREE=true
+
+# 프롬프트 품질 임계치 (0.0~1.0). 미달 시 자동 롤백
+CLAUDE_QUALITY_THRESHOLD=0.6
+
+# 워크플로우당 ERROR 카운트 임계치
+CLAUDE_ERROR_THRESHOLD=3
+
+# 세션/워크플로우 stale 판정 (분 단위)
+CLAUDE_STALE_TTL_MINUTES=30
+
+# 좀비 세션 판정 (시간 단위)
+CLAUDE_ZOMBIE_TTL_HOURS=24
+
+# 보고서 TTL (시간 단위)
+CLAUDE_REPORT_TTL_HOURS=1
+
+# 작업 디렉터리 이름 최대 길이
+CLAUDE_WORK_NAME_MAX_LEN=20
+
+# 터미널 배너 너비 (빈 값이면 자동)
+CLAUDE_BANNER_WIDTH=
+
+# -----------------------------------------------------------------------------------------
+# (6) 외부 환경 / Python 요구사항
+# -----------------------------------------------------------------------------------------
+
+# 원격 저장소 URL (오버라이드 가능)
+CLAUDE_REPO_URL=https://github.com/KoreanLeeChangHyun/claude-workflow.git
+
+# Python 최소 버전 (build.sh 검증)
+CLAUDE_REQUIRED_PYTHON_MAJOR=3
+CLAUDE_REQUIRED_PYTHON_MINOR=9
