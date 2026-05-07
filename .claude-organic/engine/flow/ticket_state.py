@@ -28,7 +28,7 @@ COLUMN_MAP: dict[str, str] = {
 # To Do는 Open과의 양방향 전이만 기본 허용하며, 그 외 상태에서의 복귀는 --force 필요.
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "To Do": ["Open"],
-    "Open": ["In Progress", "To Do"],
+    "Open": ["In Progress", "To Do", "Review"],
     "In Progress": ["Review", "Open"],
     "Review": ["Open", "In Progress"],
     "Done": ["Open"],

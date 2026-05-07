@@ -1719,8 +1719,14 @@
           return;
         }
 
-        // To Do ↔ Open 단순 전이
-        const to = (targetCol === "To Do") ? "todo" : "open";
+        // To Do ↔ Open ↔ Review 단순 전이 (Open → Review 직접 이동 포함)
+        const moveToMap = { "To Do": "todo", "Open": "open", "Review": "review" };
+        const to = moveToMap[targetCol];
+        if (!to) {
+          console.error("[kanban DnD] unknown target column:", targetCol);
+          renderKanban();
+          return;
+        }
         fetch("/api/kanban/move", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1806,7 +1812,8 @@
         // DnD drop target: To Do / Open 컬럼만 cards-droppable 클래스 부여
         // T-399: In Progress 도 drop target 으로 추가 (Open → In Progress 만 confirm 모달로 허용).
         // T-906: Done 도 drop target 으로 추가 (Review → Done drop 만 confirm 모달로 허용).
-        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress" || col.key === "Done");
+        // Open → Review 직접 전이 추가: Review 도 drop target.
+        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress" || col.key === "Done" || col.key === "Review");
         const droppableClass = isDroppable ? ' cards-droppable' : '';
         h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
         if (sortedItems.length === 0) {

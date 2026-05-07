@@ -36,7 +36,7 @@ class KanbanHandlerMixin:
         return check_derived_blocked(ticket, kanban_base, _KANBAN_ALL_DIRS)
 
     def _handle_kanban_move(self) -> None:
-        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open 전이만 허용."""
+        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open + Open → Review 전이 허용."""
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
         to = (data.get('to') or '').strip().lower()
@@ -44,8 +44,8 @@ class KanbanHandlerMixin:
         if not ticket or not ticket.startswith('T-'):
             self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
             return
-        if to not in ('todo', 'open'):
-            self._send_error(400, 'DnD allows only To Do ↔ Open transitions ("to" must be "todo" or "open")')
+        if to not in ('todo', 'open', 'review'):
+            self._send_error(400, 'DnD allows only "todo" / "open" / "review" transitions')
             return
 
         project_root = os.getcwd()

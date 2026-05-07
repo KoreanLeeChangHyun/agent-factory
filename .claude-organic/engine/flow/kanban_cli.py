@@ -476,7 +476,7 @@ def cmd_done(ticket_number: str) -> None:
                 print(f"[ERROR] 미커밋 변경이 있는 워크트리입니다. Done 전이를 차단합니다.", flush=True)
                 print(f"  미커밋 파일 목록:", flush=True)
                 for _line in _porcelain.stdout.strip().splitlines():
-                    print(f"    {_line}", flush=True)
+                    print(f"    - {_line.strip()}", flush=True)
                 print(f"  flow-merge를 사용하여 정상 경로로 완료하세요.", flush=True)
                 _sys.exit(1)
             feat_branch = get_feature_branch_for_ticket(ticket_number)
