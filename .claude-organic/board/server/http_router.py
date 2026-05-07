@@ -147,6 +147,8 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_move()
         elif self.path == '/api/kanban/submit':
             self._handle_kanban_submit()
+        elif self.path == '/api/kanban/done':
+            self._handle_kanban_done()
         else:
             self.send_response(404)
             self.end_headers()

@@ -4,7 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
+
+# ---- flow-kanban done 결과 파싱용 정규식 상수 ----
+# 성공 시 stdout 에서 merge 정보 추출: '<branch> -> develop 병합 완료 (<sha8>)'
+_DONE_MERGE_OK_RE = re.compile(
+    r'(.+?)\s*->\s*develop\s+병합\s+완료\s+\(([0-9a-f]{6,})\)',
+)
+# 충돌 헤더 라인 검출: '[ERROR]' 로 시작하는 라인
+_DONE_CONFLICT_HEADER = re.compile(r'^\[ERROR\]')
+# 미커밋 변경 헤더 라인 검출
+_DONE_DIRTY_HEADER = re.compile(r'미커밋\s+파일\s+목록\s*:')
+# 충돌/미커밋 파일 경로 라인: '    - <path>' 패턴
+_DONE_PATH_RE = re.compile(r'^\s+-\s+(.+)$')
 
 from ..state import sse_manager, poll_tracker
 from .._common import (
@@ -278,6 +291,137 @@ class GenericHandlerMixin:
                 'message': first_line or 'no stdout',
             }
         self._send_json(payload)
+
+    def _handle_kanban_done(self) -> None:
+        """POST /api/kanban/done — body {"ticket": "T-NNN"}.
+
+        칸반 보드 DnD Review → Done 전이의 단일 진입점.
+        내부적으로 `flow-kanban done <ticket>` 을 호출하여
+        merge_to_develop + worktree 정리 + 칸반 Done 전이를 위임한다 (T-906).
+
+        성공 응답 (200):
+            {ok: true, ticket, merge_commit, merged_branch, stdout}
+
+        실패 응답 (409):
+            {ok: false, error_kind: 'merge_conflict'|'dirty_worktree'|'other',
+             conflicts: [...], dirty_files: [...], message}
+
+        타임아웃(504) / 실행파일 없음(500) 은 기존 핸들러 패턴과 동일.
+        """
+        import subprocess
+
+        data = self._read_json_body() or {}
+        ticket = (data.get('ticket') or '').strip()
+
+        # 입력 검증 — ^T-\d+$ 형식만 허용
+        if not ticket or not re.match(r'^T-\d+$', ticket):
+            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            return
+
+        # Review 상태 사전 확인 — _read_kanban_tickets 재사용 (가벼운 파일 기반 검사)
+        project_root = os.getcwd()
+        kanban_data = _read_kanban_tickets(project_root)
+        review_tickets = [
+            t.get('number') or t.get('id')
+            for t in kanban_data.get('review', [])
+        ]
+        if ticket not in review_tickets:
+            self._send_error(
+                400,
+                f'{ticket} is not in Review column (current state check failed)',
+            )
+            return
+
+        # flow-kanban done 호출 — merge 시간 고려해 timeout 120초
+        flow_kanban = os.path.join(
+            project_root, '.claude-organic', 'bin', 'flow-kanban',
+        )
+        try:
+            result = subprocess.run(
+                [flow_kanban, 'done', ticket],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            self._send_error(504, 'flow-kanban done timed out (120s)')
+            return
+        except FileNotFoundError:
+            self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+            return
+
+        stdout = result.stdout or ''
+
+        if result.returncode == 0:
+            # 성공 — stdout 에서 merge 정보 추출
+            merge_commit = ''
+            merged_branch = ''
+            for line in stdout.splitlines():
+                m = _DONE_MERGE_OK_RE.search(line)
+                if m:
+                    merged_branch = m.group(1).strip()
+                    merge_commit = m.group(2).strip()
+                    break
+            self._send_json({
+                'ok': True,
+                'ticket': ticket,
+                'merge_commit': merge_commit,
+                'merged_branch': merged_branch,
+                'stdout': stdout.strip(),
+            })
+            return
+
+        # 실패 — stdout 줄 단위 분석으로 error_kind 분류
+        lines = stdout.splitlines()
+        error_kind = 'other'
+        conflicts: list[str] = []
+        dirty_files: list[str] = []
+        error_message = ''
+        in_dirty_block = False
+
+        for line in lines:
+            if _DONE_CONFLICT_HEADER.match(line):
+                error_kind = 'merge_conflict'
+                error_message = line.strip()
+                in_dirty_block = False
+            elif _DONE_DIRTY_HEADER.search(line):
+                error_kind = 'dirty_worktree'
+                in_dirty_block = True
+            elif _DONE_PATH_RE.match(line):
+                path_val = _DONE_PATH_RE.match(line).group(1).strip()
+                if error_kind == 'merge_conflict':
+                    conflicts.append(path_val)
+                elif in_dirty_block:
+                    dirty_files.append(path_val)
+            else:
+                in_dirty_block = False
+                if not error_message and line.strip():
+                    error_message = line.strip()
+
+        stderr_text = (result.stderr or '').strip()
+        if not error_message and stderr_text:
+            error_message = stderr_text
+
+        self._send_json_with_status(409, {
+            'ok': False,
+            'error_kind': error_kind,
+            'conflicts': conflicts,
+            'dirty_files': dirty_files,
+            'message': error_message,
+            'ticket': ticket,
+        })
+
+    def _send_json_with_status(self, status: int, data: object) -> None:
+        """지정한 HTTP 상태 코드로 JSON 응답을 전송한다."""
+        import json as _json
+        body = _json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
 
     def _handle_poll(self) -> None:
         """폴링 엔드포인트를 처리한다.
