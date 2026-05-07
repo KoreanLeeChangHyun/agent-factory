@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -50,6 +51,23 @@ from common import resolve_project_root
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT: str = resolve_project_root()
+
+# ─── 병합 충돌 시그널 패턴 ────────────────────────────────────────────────────
+
+_CONFLICT_SIGNAL_RE: re.Pattern[str] = re.compile(
+    r"(병합\s*충돌|merge\s+conflict|CONFLICT)",
+    re.IGNORECASE,
+)
+"""merge_result.error_message 에서 충돌 신호를 감지하기 위한 정규식.
+
+W05 테스트에서 ``from flow.kanban_cli import _CONFLICT_SIGNAL_RE`` 로 직접 import
+가능하도록 모듈 레벨에 노출한다.
+
+매칭 패턴:
+- ``병합 충돌`` / ``병합충돌`` (한국어, 공백 선택적)
+- ``merge conflict`` / ``Merge Conflict`` 등 (대소문자 무관)
+- ``CONFLICT`` (git stdout 접두사 형식)
+"""
 
 
 # ─── 세션 헬퍼 ───────────────────────────────────────────────────────────────
@@ -462,15 +480,39 @@ def cmd_done(ticket_number: str) -> None:
             if _wt_path or feat_branch:
                 merge_result = merge_to_develop(ticket_number)
                 if not merge_result.success:
-                    if merge_result.conflicts:
+                    # 충돌 판정 이중화:
+                    # (1) merge_result.conflicts 가 비어있지 않음
+                    # (2) error_message 에 충돌 시그널 패턴 포함
+                    # (3) conflicts 에 sentinel "<unknown-conflict>" 가 있음
+                    # 셋 중 하나라도 만족하면 충돌로 간주하여 Done 전이를 차단한다.
+                    _sentinel = "<unknown-conflict>"
+                    _has_conflict_files = bool(merge_result.conflicts)
+                    _has_signal_in_msg = bool(
+                        _CONFLICT_SIGNAL_RE.search(merge_result.error_message or "")
+                    )
+                    _has_sentinel = _sentinel in (merge_result.conflicts or [])
+                    _is_conflict = _has_conflict_files or _has_signal_in_msg or _has_sentinel
+
+                    if _is_conflict:
                         print(f"[ERROR] {ticket_number} 병합 충돌 발생. Done 전이를 차단합니다.", flush=True)
-                        print(f"  충돌 파일:", flush=True)
-                        for cf in merge_result.conflicts:
-                            print(f"    - {cf}", flush=True)
+                        # 충돌 파일 목록 출력 — sentinel 만 있거나 목록이 빈 경우 안내 메시지로 대체
+                        if merge_result.conflicts and not (
+                            len(merge_result.conflicts) == 1 and merge_result.conflicts[0] == _sentinel
+                        ):
+                            print(f"  충돌 파일:", flush=True)
+                            for cf in merge_result.conflicts:
+                                print(f"    - {cf}", flush=True)
+                        else:
+                            print(
+                                f"  (충돌 파일 목록 미상 — error_message 참조)",
+                                flush=True,
+                            )
+                            if merge_result.error_message:
+                                print(f"  error_message: {merge_result.error_message}", flush=True)
                         print(f"  worktree에서 충돌을 해결한 후 다시 시도하세요.", flush=True)
                         _sys.exit(1)
                     else:
-                        # 충돌 외 실패: 경고 출력 후 계속 진행
+                        # 충돌 패턴 검사 false — 단순 실패(예: develop checkout 실패): 경고 출력 후 계속 진행
                         print(f"[WARN] worktree 병합 실패: {merge_result.error_message}", flush=True)
                 else:
                     print(f"{ticket_number}: {merge_result.merged_branch} -> develop 병합 완료 ({merge_result.merge_commit[:8]})", flush=True)

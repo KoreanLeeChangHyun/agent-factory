@@ -481,6 +481,14 @@
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
+    if (kind === "success" && !payload.merge_commit) {
+      console.warn("[showDoneResultModal] success kind with empty merge_commit — converting to error");
+      kind = "error";
+      payload = Object.assign({}, payload, {
+        message: "백엔드 응답 형식 오류 — merge_commit 누락. flow-kanban 출력을 확인하세요."
+      });
+    }
+
     if (kind === "success") {
       title.textContent = "Done 처리 완료";
       const msg = document.createElement("p");

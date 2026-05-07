@@ -557,19 +557,103 @@ def merge_to_develop(
         release_lock(lock_path)
 
 
+_PORCELAIN_CONFLICT_CODES: frozenset[str] = frozenset(
+    {"UU", "AA", "DD", "AU", "UA", "DU", "UD"}
+)
+"""git status --porcelain 의 충돌 코드 집합."""
+
+_SENTINEL_UNKNOWN_CONFLICT: str = "<unknown-conflict>"
+"""두 git 소스가 모두 실패했을 때 반환하는 sentinel 값."""
+
+
+def _parse_porcelain_conflicts(stdout: str) -> list[str]:
+    """``git status --porcelain`` 출력에서 충돌 파일 목록을 파싱한다.
+
+    XY 형식의 porcelain 상태 코드 중 충돌 코드(UU, AA, DD, AU, UA, DU, UD)가
+    포함된 행만 필터링하여 파일 경로를 반환한다.
+
+    Args:
+        stdout: ``git status --porcelain`` 의 표준 출력 문자열.
+
+    Returns:
+        충돌 파일 경로 목록. 충돌 없으면 빈 리스트.
+
+    Examples:
+        >>> _parse_porcelain_conflicts("UU foo.py\\nAA bar.py\\n M baz.py\\n")
+        ['foo.py', 'bar.py']
+    """
+    conflicts: list[str] = []
+    for line in stdout.splitlines():
+        if len(line) < 4:
+            continue
+        # porcelain v1 형식: "XY <path>" (XY = 2자, 공백 1자, 경로)
+        xy = line[:2]
+        path = line[3:].strip()
+        if xy in _PORCELAIN_CONFLICT_CODES and path:
+            conflicts.append(path)
+    return conflicts
+
+
 def _detect_conflicts(repo_path: str | None = None) -> list[str]:
     """병합 충돌 파일 목록을 반환한다.
+
+    두 단계 소스로 충돌 파일을 탐지하며, 모든 소스 실패 시 sentinel을 반환한다.
+
+    | 단계 | 소스 | 조건 |
+    |------|------|------|
+    | 1차  | ``git diff --name-only --diff-filter=U`` | 항상 시도. 결과 비면 2차로 진행 |
+    | 2차  | ``git status --porcelain`` (UU/AA/DD/AU/UA/DU/UD) | 1차 결과가 빈 리스트일 때만 시도 |
+    | sentinel | ``["<unknown-conflict>"]`` | 두 소스 모두 returncode != 0 일 때 반환 |
+
+    1차 소스가 결과를 반환하면 바로 리턴(2차 시도 없음).
+    1차 성공 + 빈 리스트이면 2차 시도. 2차도 성공하면 두 결과의 합집합(중복 제거).
+    1차와 2차 모두 returncode != 0 이면 ``["<unknown-conflict>"]`` sentinel 반환.
+
+    sentinel 의미: 충돌이 발생했지만 파일 목록을 확인할 수 없는 상태.
+    호출자는 ``"<unknown-conflict>" in conflicts`` 로 sentinel을 구분할 수 있다.
 
     Args:
         repo_path: git 저장소 경로.
 
     Returns:
-        충돌 파일 경로 목록.
+        충돌 파일 경로 목록. 모든 git 명령 실패 시 sentinel ``["<unknown-conflict>"]``.
     """
-    result = _git("diff", "--name-only", "--diff-filter=U", repo_path=repo_path)
-    if result.returncode != 0:
-        return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    # 1차 소스: git diff --name-only --diff-filter=U
+    diff_result = _git(
+        "diff", "--name-only", "--diff-filter=U", repo_path=repo_path
+    )
+    diff_ok = diff_result.returncode == 0
+    diff_files: list[str] = []
+    if diff_ok:
+        diff_files = [
+            line.strip()
+            for line in diff_result.stdout.splitlines()
+            if line.strip()
+        ]
+        if diff_files:
+            # 1차 소스에 결과가 있으면 바로 반환
+            return diff_files
+
+    # 2차 소스: git status --porcelain (1차가 빈 리스트이거나 실패했을 때)
+    porcelain_result = _git("status", "--porcelain", repo_path=repo_path)
+    porcelain_ok = porcelain_result.returncode == 0
+
+    if not diff_ok and not porcelain_ok:
+        # 두 소스 모두 실패 → sentinel 반환
+        return [_SENTINEL_UNKNOWN_CONFLICT]
+
+    porcelain_files: list[str] = []
+    if porcelain_ok:
+        porcelain_files = _parse_porcelain_conflicts(porcelain_result.stdout)
+
+    # 합집합 (1차 결과 + 2차 결과, 순서 유지 + 중복 제거)
+    seen: set[str] = set()
+    merged: list[str] = []
+    for f in diff_files + porcelain_files:
+        if f not in seen:
+            seen.add(f)
+            merged.append(f)
+    return merged
 
 
 def list_worktrees(repo_path: str | None = None) -> list[WorktreeInfo]:

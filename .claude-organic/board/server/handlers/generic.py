@@ -18,6 +18,12 @@ _DONE_CONFLICT_HEADER = re.compile(r'^\[ERROR\]')
 _DONE_DIRTY_HEADER = re.compile(r'미커밋\s+파일\s+목록\s*:')
 # 충돌/미커밋 파일 경로 라인: '    - <path>' 패턴
 _DONE_PATH_RE = re.compile(r'^\s+-\s+(.+)$')
+# rc=0 이지만 merge_commit 이 빈 문자열일 때 재판별용:
+# cmd_done 의 '[WARN] worktree 병합 실패: 병합 충돌 발생: ...' 형식 매칭
+_DONE_CONFLICT_WARN_RE = re.compile(
+    r'\[WARN\].*(병합\s*충돌|merge\s+conflict)',
+    re.IGNORECASE,
+)
 
 # ---- flow-undo-done 결과 파싱용 정규식 상수 (T-905 Phase 3) ----
 # 전략 식별: '[undo-done] 전략 1: reset --hard 진행' / '전략 2: revert -m 1 진행'
@@ -55,6 +61,69 @@ from .._common import (
     _memory_gc_prune_archive,
     logger,
 )
+
+
+
+def _classify_done_failure(stdout: str, stderr: str) -> dict:
+    """flow-kanban done 실패(또는 rc=0 + 빈 hash) 시 stdout/stderr 를 분석해 error_kind 를 분류한다.
+
+    반환 dict 구조:
+        {
+            'error_kind': 'merge_conflict' | 'dirty_worktree' | 'other',
+            'conflicts':  list[str],   # 충돌 파일 경로 목록
+            'dirty_files': list[str],  # 미커밋 파일 목록
+            'message':    str,         # 사용자 표시용 에러 메시지
+        }
+
+    우선순위:
+        1. '[ERROR]' 헤더 라인 → merge_conflict (기존 fail 분기 패턴)
+        2. _DONE_CONFLICT_WARN_RE 패턴 → merge_conflict (rc=0 + 빈 hash 보조 판별)
+        3. '미커밋 파일 목록:' 헤더 라인 → dirty_worktree
+        4. 그 외 → other
+    """
+    lines = stdout.splitlines()
+    error_kind = 'other'
+    conflicts: list[str] = []
+    dirty_files: list[str] = []
+    error_message = ''
+    in_dirty_block = False
+
+    for line in lines:
+        if _DONE_CONFLICT_HEADER.match(line):
+            error_kind = 'merge_conflict'
+            error_message = line.strip()
+            in_dirty_block = False
+        elif _DONE_CONFLICT_WARN_RE.search(line):
+            # rc=0 + 빈 hash 케이스: '[WARN] worktree 병합 실패: 병합 충돌 발생: ...' 매칭
+            if error_kind == 'other':
+                error_kind = 'merge_conflict'
+            if not error_message:
+                error_message = line.strip()
+            in_dirty_block = False
+        elif _DONE_DIRTY_HEADER.search(line):
+            error_kind = 'dirty_worktree'
+            in_dirty_block = True
+        elif _DONE_PATH_RE.match(line):
+            path_val = _DONE_PATH_RE.match(line).group(1).strip()
+            if error_kind == 'merge_conflict':
+                conflicts.append(path_val)
+            elif in_dirty_block:
+                dirty_files.append(path_val)
+        else:
+            in_dirty_block = False
+            if not error_message and line.strip():
+                error_message = line.strip()
+
+    stderr_text = stderr.strip()
+    if not error_message and stderr_text:
+        error_message = stderr_text
+
+    return {
+        'error_kind': error_kind,
+        'conflicts': conflicts,
+        'dirty_files': dirty_files,
+        'message': error_message,
+    }
 
 
 class GenericHandlerMixin:
@@ -374,6 +443,32 @@ class GenericHandlerMixin:
                     merged_branch = m.group(1).strip()
                     merge_commit = m.group(2).strip()
                     break
+
+            # rc=0 이지만 merge_commit 이 비어있는 경우 — 충돌 또는 백엔드 응답 형식 오류
+            if not merge_commit:
+                failure = _classify_done_failure(stdout, result.stderr or '')
+                if failure['error_kind'] == 'merge_conflict':
+                    # stdout 에 충돌 시그널이 확인된 경우
+                    self._send_json_with_status(409, {
+                        'ok': False,
+                        'error_kind': 'merge_conflict',
+                        'conflicts': failure['conflicts'],
+                        'dirty_files': failure['dirty_files'],
+                        'message': failure['message'],
+                        'ticket': ticket,
+                    })
+                else:
+                    # 충돌 시그널 없음 — 백엔드 응답 형식 오류
+                    self._send_json_with_status(409, {
+                        'ok': False,
+                        'error_kind': 'other',
+                        'conflicts': [],
+                        'dirty_files': [],
+                        'message': 'merge_commit 누락 — 백엔드 응답 형식 오류',
+                        'ticket': ticket,
+                    })
+                return
+
             self._send_json({
                 'ok': True,
                 'ticket': ticket,
@@ -384,42 +479,13 @@ class GenericHandlerMixin:
             return
 
         # 실패 — stdout 줄 단위 분석으로 error_kind 분류
-        lines = stdout.splitlines()
-        error_kind = 'other'
-        conflicts: list[str] = []
-        dirty_files: list[str] = []
-        error_message = ''
-        in_dirty_block = False
-
-        for line in lines:
-            if _DONE_CONFLICT_HEADER.match(line):
-                error_kind = 'merge_conflict'
-                error_message = line.strip()
-                in_dirty_block = False
-            elif _DONE_DIRTY_HEADER.search(line):
-                error_kind = 'dirty_worktree'
-                in_dirty_block = True
-            elif _DONE_PATH_RE.match(line):
-                path_val = _DONE_PATH_RE.match(line).group(1).strip()
-                if error_kind == 'merge_conflict':
-                    conflicts.append(path_val)
-                elif in_dirty_block:
-                    dirty_files.append(path_val)
-            else:
-                in_dirty_block = False
-                if not error_message and line.strip():
-                    error_message = line.strip()
-
-        stderr_text = (result.stderr or '').strip()
-        if not error_message and stderr_text:
-            error_message = stderr_text
-
+        failure = _classify_done_failure(stdout, result.stderr or '')
         self._send_json_with_status(409, {
             'ok': False,
-            'error_kind': error_kind,
-            'conflicts': conflicts,
-            'dirty_files': dirty_files,
-            'message': error_message,
+            'error_kind': failure['error_kind'],
+            'conflicts': failure['conflicts'],
+            'dirty_files': failure['dirty_files'],
+            'message': failure['message'],
             'ticket': ticket,
         })
 
