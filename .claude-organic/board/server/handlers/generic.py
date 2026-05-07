@@ -318,14 +318,14 @@ class GenericHandlerMixin:
             self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
             return
 
-        # Review 상태 사전 확인 — _read_kanban_tickets 재사용 (가벼운 파일 기반 검사)
+        # Review 상태 사전 확인 — review/ 디렉터리에 티켓 XML 존재 여부로 판별
+        # (T-906 워커가 _read_kanban_tickets 반환 타입 dict[파일명,XML]을 list[dict]로 잘못 가정해
+        # 항상 fail 하던 회귀 수정)
         project_root = os.getcwd()
-        kanban_data = _read_kanban_tickets(project_root)
-        review_tickets = [
-            t.get('number') or t.get('id')
-            for t in kanban_data.get('review', [])
-        ]
-        if ticket not in review_tickets:
+        review_xml = os.path.join(
+            project_root, '.claude-organic', 'tickets', 'review', f'{ticket}.xml',
+        )
+        if not os.path.isfile(review_xml):
             self._send_error(
                 400,
                 f'{ticket} is not in Review column (current state check failed)',
