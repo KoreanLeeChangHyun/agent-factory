@@ -372,17 +372,219 @@
   }
 
   /**
+   * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
+   * @param {Object} ticket - 드래그된 티켓 객체 (number 포함)
+   * @param {Function} onConfirm - [완료 처리] 클릭 콜백
+   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   */
+  function showDoneConfirmModal(ticket, onConfirm, onCancel) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "submit-confirm-title");
+
+    const title = document.createElement("h3");
+    title.id = "submit-confirm-title";
+    title.className = "submit-confirm-title";
+    const ticketNumNode = document.createTextNode(ticket.number + " Done 처리");
+    title.appendChild(ticketNumNode);
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+    const introText = document.createTextNode("이 티켓을 Done 으로 이동하면 다음이 비가역적으로 수행됩니다:");
+    body.appendChild(introText);
+    const ul = document.createElement("ul");
+    const li1 = document.createElement("li");
+    li1.textContent = "feature 브랜치를 develop 에 --no-ff 머지";
+    const li2 = document.createElement("li");
+    li2.textContent = "워크트리 및 feature 브랜치 삭제";
+    ul.appendChild(li1);
+    ul.appendChild(li2);
+    body.appendChild(ul);
+    const continueText = document.createTextNode("계속할까요?");
+    body.appendChild(continueText);
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    cancelBtn.textContent = "취소";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    confirmBtn.textContent = "완료 처리";
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireCancel() {
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+    function fireConfirm() {
+      cleanup();
+      if (typeof onConfirm === "function") onConfirm();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireCancel();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireCancel();
+    });
+    cancelBtn.addEventListener("click", fireCancel);
+    confirmBtn.addEventListener("click", fireConfirm);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
+  }
+
+  /**
+   * T-906: Done 처리 결과 모달.
+   * @param {"success"|"conflict"|"dirty"|"error"} kind - 결과 종류
+   * @param {Object} payload - 결과 데이터 (kind 별 다름)
+   * @param {Function} onClose - 닫기 콜백
+   */
+  function showDoneResultModal(kind, payload, onClose) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "done-result-title");
+
+    const title = document.createElement("h3");
+    title.id = "done-result-title";
+    title.className = "submit-confirm-title";
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    if (kind === "success") {
+      title.textContent = "Done 처리 완료";
+      const msg = document.createElement("p");
+      const ticketStr = (payload.ticket || "") + ": " + (payload.merged_branch || "") + " → develop 병합 완료 (" + (payload.merge_commit || "") + ")";
+      msg.textContent = ticketStr;
+      body.appendChild(msg);
+    } else if (kind === "conflict") {
+      title.textContent = "Done 처리 실패 — 병합 충돌";
+      const ul = document.createElement("ul");
+      const files = (payload.conflicts || []);
+      if (files.length > 0) {
+        files.forEach(function (f) {
+          const li = document.createElement("li");
+          li.textContent = f;
+          ul.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "(충돌 파일 목록 없음)";
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+      const guide = document.createElement("p");
+      guide.textContent = "워크트리에서 충돌을 해결한 뒤 다시 시도하세요.";
+      body.appendChild(guide);
+    } else if (kind === "dirty") {
+      title.textContent = "Done 처리 실패 — 미커밋 변경";
+      const ul = document.createElement("ul");
+      const files = (payload.dirty_files || []);
+      if (files.length > 0) {
+        files.forEach(function (f) {
+          const li = document.createElement("li");
+          li.textContent = f;
+          ul.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "(미커밋 파일 목록 없음)";
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+      const guide = document.createElement("p");
+      guide.textContent = "워크트리에서 변경을 커밋하거나 flow-merge 로 처리한 뒤 다시 시도하세요.";
+      body.appendChild(guide);
+    } else {
+      title.textContent = "Done 처리 실패";
+      const msg = document.createElement("p");
+      msg.textContent = (payload && payload.message) ? payload.message : "알 수 없는 오류가 발생했습니다.";
+      body.appendChild(msg);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    closeBtn.textContent = "확인";
+
+    actions.appendChild(closeBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireClose() {
+      cleanup();
+      if (typeof onClose === "function") onClose();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireClose();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireClose();
+    });
+    closeBtn.addEventListener("click", fireClose);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    closeBtn.focus();
+  }
+
+  /**
    * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
+   * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
    *
    * dragstart: 카드에서 ticket 번호 + 출발 컬럼을 dataTransfer 에 저장.
    * dragover: drop 가능한 cards-droppable 영역에서 dragover-active 표시.
    * drop:
    *   - To Do ↔ Open: POST /api/kanban/move (단순 전이)
    *   - Open → In Progress: confirm 모달 → POST /api/kanban/submit (워크플로우 실행)
+   *   - Review → Done: confirm 모달 → POST /api/kanban/done (cmd_done 위임)
    * dragend: 시각 피드백 클래스 정리.
    *
    * In Progress 카드 drag 불가는 의도된 보호 (취소 부수효과 차단).
-   * Review/Done drop 은 차단 (merge/Done 부수효과 보호, /wf -d 로만 가능).
+   * Review → Done drop 만 confirm 모달로 허용 (T-906).
    */
   function bindKanbanDnd(el) {
     let draggedNum = null;
@@ -424,6 +626,13 @@
         if (targetCol === draggedFrom) return; // 같은 컬럼 내 drop 은 무시 (정렬 미지원)
 
         // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
+        // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
+        if (draggedFrom === "Review" && targetCol !== "Done") {
+          alert("Review 카드는 Done 컬럼으로만 드래그할 수 있습니다.");
+          renderKanban();
+          return;
+        }
+
         if (targetCol === "In Progress") {
           if (draggedFrom !== "Open") {
             // To Do 등 다른 컬럼에서 직접 In Progress 이동은 차단
@@ -460,6 +669,54 @@
                 console.error("[kanban DnD] submit failed:", err);
                 alert("워크플로우 실행 실패: " + err.message);
                 renderKanban();
+              });
+            },
+            function () {
+              // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+              renderKanban();
+            }
+          );
+          return;
+        } else if (targetCol === "Done") {
+          // T-906: Review → Done drop 분기 — Review 카드만 허용 + confirm 모달
+          if (draggedFrom !== "Review") {
+            alert("Review 카드만 Done 으로 드래그할 수 있습니다.");
+            renderKanban();
+            return;
+          }
+          const doneTicketObj = (Board.state.TICKETS || []).find(function (t) {
+            return t.number === draggedNum;
+          });
+          if (!doneTicketObj) {
+            renderKanban();
+            return;
+          }
+          showDoneConfirmModal(
+            doneTicketObj,
+            function () {
+              // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+              fetch("/api/kanban/done", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticket: draggedNum }),
+              }).then(function (res) {
+                return res.json().then(function (body) {
+                  return { res: res, body: body };
+                });
+              }).then(function (r) {
+                if (r.res.ok && r.body.ok) {
+                  showDoneResultModal("success", r.body, function () {
+                    fetchTickets().then(renderKanban);
+                  });
+                } else {
+                  const kind = r.body.error_kind === "merge_conflict" ? "conflict"
+                    : r.body.error_kind === "dirty_worktree" ? "dirty"
+                    : "error";
+                  showDoneResultModal(kind, r.body, function () { renderKanban(); });
+                }
+              }).catch(function (err) {
+                console.error("[kanban DnD] done failed:", err);
+                showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
               });
             },
             function () {
@@ -556,8 +813,8 @@
         h += "</div>";
         // DnD drop target: To Do / Open 컬럼만 cards-droppable 클래스 부여
         // T-399: In Progress 도 drop target 으로 추가 (Open → In Progress 만 confirm 모달로 허용).
-        // Review/Done 는 drop 차단 유지 (merge/Done 부수효과 보호, /wf -d 로만 가능).
-        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress");
+        // T-906: Done 도 drop target 으로 추가 (Review → Done drop 만 confirm 모달로 허용).
+        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress" || col.key === "Done");
         const droppableClass = isDroppable ? ' cards-droppable' : '';
         h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
         if (sortedItems.length === 0) {
@@ -569,8 +826,9 @@
             const dateObj = formatKoreanDate(t.updated || t.created);
             // DnD: To Do / Open 컬럼 카드만 draggable.
             // T-399: In Progress 카드 drag 불가는 의도된 보호 (워크플로우 취소 부수효과 차단).
-            // Review/Done 카드도 draggable=false (merge/Done 부수효과 보호).
-            const isDraggable = (col.key === "To Do" || col.key === "Open");
+            // T-906: Review 카드 draggable 추가 (Review → Done drop 허용).
+            // Done 카드는 draggable=false (부수효과 보호).
+            const isDraggable = (col.key === "To Do" || col.key === "Open" || col.key === "Review");
             const draggableAttr = isDraggable ? ' draggable="true"' : '';
             const draggableClass = isDraggable ? ' card-draggable' : '';
             h += '<div class="card' + done + draggableClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
