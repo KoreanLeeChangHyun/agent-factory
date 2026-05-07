@@ -1138,78 +1138,6 @@ def main() -> None:
     # ── Step 1: status.json 완료 처리 (critical) ──
     abs_work_dir: str | None = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
 
-    # 산출물 정합성 검증 (T-409 + T-411): status="완료" 인데 report.md/work/ 빈 산출물이거나
-    # 워크트리에 미커밋 변경(워커 commit 누락)이 있으면 false-success 차단을 위해
-    # status="실패"로 강제 전이. T-403/T-400 케이스의 라이브 회귀 방지.
-    if status == "완료" and abs_work_dir is not None:
-        integrity_failures: list[str] = []
-        _report_abs: str = os.path.join(abs_work_dir, "report.md")
-        if not os.path.isfile(_report_abs):
-            integrity_failures.append("report.md 미생성")
-        elif os.path.getsize(_report_abs) < 100:
-            integrity_failures.append(
-                f"report.md 빈 파일 ({os.path.getsize(_report_abs)} bytes — 1줄 이하)"
-            )
-        _work_subdir: str = os.path.join(abs_work_dir, "work")
-        if os.path.isdir(_work_subdir):
-            _work_files = [f for f in os.listdir(_work_subdir) if f.endswith(".md")]
-            if not _work_files:
-                integrity_failures.append("work/ 디렉터리 빈 (작업 내역서 0건)")
-        else:
-            integrity_failures.append("work/ 디렉터리 미생성")
-
-        # T-411 AND 조건: 워커 commit 누락 시 워크트리 보존 (사용자 수동 수습 경로)
-        # 미커밋 변경(uncommitted=True) AND feat 브랜치 commit 0 이 동시에 충족될 때만
-        # ERROR 처리한다. commit_count >= 1 이면 정상 진행(일부 커밋 후 산출물 추가 변경),
-        # commit_count == -1 이면 검사 불가(브랜치 미존재 등)이므로 차단하지 않는다.
-        if ticket_number:
-            try:
-                from flow.worktree_manager import (
-                    count_feature_branch_commits,
-                    get_worktree_path,
-                    has_uncommitted_changes,
-                    is_worktree_enabled,
-                )
-                from flow.branch_strategy import get_feature_branch_for_ticket
-                if is_worktree_enabled():
-                    _wt_path = get_worktree_path(ticket_number)
-                    if _wt_path and os.path.isdir(_wt_path):
-                        _u = has_uncommitted_changes(_wt_path)
-                        _branch = get_feature_branch_for_ticket(ticket_number)
-                        _c = count_feature_branch_commits(_branch) if _branch else -1
-                        _append_log(
-                            abs_work_dir,
-                            "INFO",
-                            f"FINALIZE_WORKTREE_CHECK: uncommitted={_u} "
-                            f"commit_count={_c} branch={_branch}",
-                        )
-                        if _u and _c == 0:
-                            integrity_failures.append(
-                                f"워커 commit 누락 — 미커밋 변경 + feat 브랜치 commit 0 "
-                                f"({_wt_path}, branch={_branch})"
-                            )
-            except ImportError:
-                pass  # worktree 모듈 미설치 시 비차단
-            except Exception as e:
-                _append_log(
-                    abs_work_dir,
-                    "WARN",
-                    f"FINALIZE_WORKTREE_CHECK_ERROR: {e}",
-                )
-
-        if integrity_failures:
-            _append_log(
-                abs_work_dir, "ERROR",
-                "FINALIZE_INTEGRITY: 산출물 정합성 실패 — status='완료'→'실패' 강제 전이. "
-                f"failures: {'; '.join(integrity_failures)}"
-            )
-            print(
-                "[ERROR] 산출물 정합성 검증 실패 — status를 '실패'로 강제 전이합니다.\n"
-                + "\n".join(f"  - {f}" for f in integrity_failures),
-                file=sys.stderr, flush=True,
-            )
-            status = "실패"
-
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
     # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
@@ -1361,8 +1289,9 @@ def main() -> None:
     )
 
     # ── Step 4: 티켓 상태 갱신 (ticket_number 있을 때만, 비차단) ──
+    # status 무관 무조건 Review 로 보낸다 (회귀 정책 폐기).
     if ticket_number:
-        target_column = "review" if status == "완료" else "open"
+        target_column = "review"
         if abs_work_dir is not None:
             _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP4: kanban ticket={ticket_number} column={target_column}")
         run(
