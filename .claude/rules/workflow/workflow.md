@@ -27,12 +27,13 @@ To Do → Open → In Progress → Review → Done
 
 ### 티켓 생성 규칙
 
-티켓 생성 시 `--status todo` 또는 `--status open` 중 하나를 반드시 명시해야 한다 (MUST). 기본값(미지정)은 에러.
+티켓은 **무조건 To Do 상태로 생성**한다 (MUST). 사용자가 즉시 집중하려면 칸반 DnD (To Do → Open) 한 번으로 충분하므로 생성 시점 상태 결정·메뉴 질의는 불필요한 낭비.
 
 ```bash
-flow-kanban create "제목" --command implement --status todo   # 백로그 박제
-flow-kanban create "제목" --command implement --status open   # 즉시 집중 대상
+flow-kanban create "제목" --command implement --status todo   # 기본·유일 경로
 ```
+
+> 과거 정책: `--status todo|open` 중 명시 강제 + 미명시 시 번호 메뉴 질의 (MUST) — 폐기 (2026-05-08 사용자 명시 정책 변경). 칸반 DnD 가 동등 작업을 1초 안에 처리하므로 생성 시점 결정 자체가 의미 없음.
 
 ### 번호 영역 정책
 
@@ -49,13 +50,11 @@ flow-kanban create "제목" --command implement --status open   # 즉시 집중 
   - 기존 티켓 실행 중 발견된 버그/이슈 → `--derived-from` (파생)
   - 선행 작업이 필요한 경우 → `--depends-on` (의존)
   - 후속 작업을 차단하는 경우 → `--blocks` (차단)
-- 티켓 생성 시 사용자 발화에 시작 상태가 명시되지 않았으면 번호 메뉴로 질의한다 (MUST, T-385 구현 이후)
-  - 질의 형식: `1. To Do (백로그·미래에 할 일) / 2. Open (지금 집중 대상)`
-  - AskUserQuestion 도구는 Board 터미널 미지원 → 텍스트 번호 메뉴로 제시
-  - "박제/나중에/언젠가/백로그" → To Do 추천 (질의 유지)
-  - "지금/바로/이번에/집중" → Open 추천 (질의 유지)
-  - 사용자가 상태를 명시("Open으로 만들어줘" 등)한 경우에만 질의 생략
-- `flow-kanban create` 호출 시 `--status` 플래그를 명시한다 (MUST) — 생략 시 에러
+- 티켓 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status todo` 로 생성한다. Open 승격은 사용자가 칸반 DnD 로 직접 수행
+- 티켓 생성 전 사용자 요구사항이 모호하면 **인터뷰 식**으로 자연어 질문한다 (MUST). 메뉴 (1=A/2=B) 형태 질의 금지. 한 번에 1~2개씩만 묻고 답을 받아 다음 질문으로 진행
+  - 묻는 대상: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
+  - 묻지 않는 대상: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
+- `flow-kanban create` 호출 시 `--status todo` 명시 (MUST) — 생략 시 에러는 동일하나 기본은 항상 todo
 
 ## DO NOT
 - PreToolUse Hook 활성 시 직접 수정 시도하지 않는다 — 차단되므로 토큰 낭비
@@ -76,7 +75,7 @@ flow-kanban create "제목" --command implement --status open   # 즉시 집중 
 create, move, done, delete, update-title, update, update-prompt, update-result, link, unlink, list, board, show
 
 예시:
-  .claude-organic/bin/flow-kanban create "제목" --command implement --status open
+  .claude-organic/bin/flow-kanban create "제목" --command implement --status todo
   .claude-organic/bin/flow-kanban update-prompt T-001 --goal "목표" --target "대상"
   .claude-organic/bin/flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"
   .claude-organic/bin/flow-kanban link T-001 --derived-from T-000
@@ -133,5 +132,5 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | "리뷰해줘" | /wf -e (review) → /wf -s N | - |
 | "종료해줘" | /wf -d N | - |
 | "티켓 편집해줘" | /wf -e N | - |
-| "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o (--status todo) | To Do 상태로 생성 (미래 작업) |
-| "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o (--status open) | Open 상태로 생성 (임박 작업) |
+| "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o | To Do 자동 (기본·유일 경로) |
+| "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o → DnD | To Do 생성 후 사용자가 칸반 DnD 로 Open 승격 |
