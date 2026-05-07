@@ -58,6 +58,12 @@ _BASH_FILE_MODIFY_PATTERNS: list[str] = [
 # .claude-organic/ 하위 경로 패턴 (보고서/작업 내역 Write/Edit 허용)
 _WORKFLOW_PATH_PATTERN = re.compile(r"[/\\]?\.claude\.workflow[/\\]")
 
+# 사용자 메모리 디렉터리 패턴: ~/.claude/projects/<encoded>/memory/** 매칭
+# main_session_guard.py와 동일한 정책 (research/review 세션에서도 메모리 작성 허용)
+_MEMORY_DIR_PATTERN: re.Pattern[str] = re.compile(
+    r"(?:^|/)\.claude/projects/[^/]+/memory(?:/|$)"
+)
+
 
 def _deny(reason: str) -> None:
     """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
@@ -192,6 +198,24 @@ def _is_workflow_path(file_path: str) -> bool:
     return bool(_WORKFLOW_PATH_PATTERN.search(file_path))
 
 
+def _is_memory_path(path: str) -> bool:
+    """파일 경로가 사용자 메모리 디렉터리 하위인지 확인한다.
+
+    ~/.claude/projects/<encoded>/memory/ 또는 그 하위 경로를 매칭한다.
+    main_session_guard.py와 동일한 로직.
+
+    Args:
+        path: 검사할 파일 경로 (절대경로 또는 ~ 시작 경로)
+
+    Returns:
+        메모리 디렉터리 하위 경로이면 True, 아니면 False.
+    """
+    if not path:
+        return False
+    expanded = os.path.expanduser(path)
+    return bool(_MEMORY_DIR_PATTERN.search(expanded))
+
+
 def main() -> None:
     """research/review 세션 Write/Edit/Bash 차단 Hook의 진입점.
 
@@ -245,10 +269,10 @@ def main() -> None:
 
     tool_input = data.get("tool_input", {})
 
-    # Write/Edit 도구: .workflow/ 하위 파일은 허용 (보고서, 작업 내역)
+    # Write/Edit 도구: .workflow/ 하위 또는 메모리 디렉터리 하위는 허용
     if tool_name in ("Write", "Edit"):
         file_path = tool_input.get("file_path", "")
-        if _is_workflow_path(file_path):
+        if _is_workflow_path(file_path) or _is_memory_path(file_path):
             sys.exit(0)
         _deny(READONLY_SESSION_WRITE_EDIT_DENIED)
 
