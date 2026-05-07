@@ -558,6 +558,23 @@ def main(argv: list[str] | None = None) -> int:
 
     # T2.2 — 사전 검증
     ticket_file = _validate_ticket_done(ticket_id)
+
+    # merge 없는(merge_skipped) 케이스: research/문서 등 워크트리·브랜치 없이
+    # cmd_done 이 단순 파일 이동만 한 티켓. result.merge_commit 비어있음.
+    # reset/revert 전략 + 워크트리 재생성 모두 skip 하고 파일 이동만 수행한다.
+    _ticket_data = parse_ticket_xml(ticket_file)
+    _result = _ticket_data.get("result") or {}
+    if not (_result.get("merge_commit") or "").strip():
+        _log(
+            "merge_commit 없음 — 단순 파일 이동 분기 (research/문서 등 merge 없는 Done 케이스)"
+        )
+        _force_done_to_review(ticket_id, ticket_file)
+        _log(
+            f"칸반 상태: {ticket_id} 는 Review 컬럼으로 복귀했습니다. "
+            "/wf -e 로 Open 강등 또는 직접 수정 후 /wf -d 로 재완료할 수 있습니다."
+        )
+        return 0
+
     merge_commit = _load_merge_commit(ticket_id, ticket_file, force)
 
     # 기존 feature 브랜치 (있다면 anchor 검증에 사용)

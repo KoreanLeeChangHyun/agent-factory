@@ -866,7 +866,7 @@
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
-    if (kind === "success" && !payload.merge_commit) {
+    if (kind === "success" && !payload.merge_commit && !payload.merge_skipped) {
       console.warn("[showDoneResultModal] success kind with empty merge_commit — converting to error");
       kind = "error";
       payload = Object.assign({}, payload, {
@@ -877,7 +877,9 @@
     if (kind === "success") {
       title.textContent = "Done 처리 완료";
       const msg = document.createElement("p");
-      const ticketStr = (payload.ticket || "") + ": " + (payload.merged_branch || "") + " → develop 병합 완료 (" + (payload.merge_commit || "") + ")";
+      const ticketStr = payload.merge_skipped
+        ? (payload.ticket || "") + ": Review → Done (merge 없음 — research/문서 등)"
+        : (payload.ticket || "") + ": " + (payload.merged_branch || "") + " → develop 병합 완료 (" + (payload.merge_commit || "") + ")";
       msg.textContent = ticketStr;
       body.appendChild(msg);
     } else if (kind === "conflict") {
@@ -1635,6 +1637,9 @@
             renderKanban();
             return;
           }
+          // dragend 가 modal 콜백 실행 전 발생해 draggedNum=null 로 reset 되는 회귀 차단:
+          // ticket 번호를 closure 캡처 변수로 보존
+          const capturedNum = draggedNum;
 
           if (draggedFrom === "Open") {
             // T-418: Open → Done 직접 전이 (force=true)
@@ -1642,7 +1647,7 @@
               fetch("/api/kanban/done", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: draggedNum, force: true, force_dirty: forceDirty }),
+                body: JSON.stringify({ ticket: capturedNum, force: true, force_dirty: forceDirty }),
               }).then(function (res) {
                 return res.json().then(function (body) {
                   return { res: res, body: body };
@@ -1684,7 +1689,7 @@
                 fetch("/api/kanban/done", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ ticket: draggedNum }),
+                  body: JSON.stringify({ ticket: capturedNum }),
                 }).then(function (res) {
                   return res.json().then(function (body) {
                     return { res: res, body: body };

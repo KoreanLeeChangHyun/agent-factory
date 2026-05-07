@@ -768,8 +768,29 @@ class GenericHandlerMixin:
                     merge_commit = m.group(2).strip()
                     break
 
-            # rc=0 이지만 merge_commit 이 비어있는 경우 — 충돌 또는 백엔드 응답 형식 오류
+            # rc=0 이지만 merge_commit 이 비어있는 경우 분기:
+            # (1) 충돌 시그널 있음 — merge_conflict
+            # (2) "T-NNN: <prev> → Done" 시그널 있음 — research 등 merge 없는 정상 완료
+            # (3) 둘 다 없음 — 백엔드 응답 형식 오류
             if not merge_commit:
+                done_transition_re = re.compile(
+                    rf'^{re.escape(ticket)}:\s+\S+\s+→\s+Done\b'
+                )
+                merge_skipped = any(
+                    done_transition_re.match(line) for line in stdout.splitlines()
+                )
+                if merge_skipped:
+                    # research 티켓 등 워크트리/브랜치 없는 정상 Done 전이
+                    self._send_json({
+                        'ok': True,
+                        'ticket': ticket,
+                        'merge_commit': '',
+                        'merged_branch': '',
+                        'merge_skipped': True,
+                        'stdout': stdout.strip(),
+                    })
+                    return
+
                 failure = _classify_done_failure(stdout, result.stderr or '')
                 if failure['error_kind'] == 'merge_conflict':
                     # stdout 에 충돌 시그널이 확인된 경우
@@ -940,14 +961,14 @@ class GenericHandlerMixin:
             self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
             return
 
-        # Done 상태 사전 확인 — _read_kanban_tickets 재사용
+        # Done 상태 사전 확인 — done/<T-NNN>.xml 존재 여부로 판별
+        # (T-906 fix 와 동일 패턴 — _read_kanban_tickets 는 dict[파일명, XML]
+        # 반환이므로 list[dict] 가정한 옛 로직은 항상 fail)
         project_root = os.getcwd()
-        kanban_data = _read_kanban_tickets(project_root)
-        done_tickets = [
-            t.get('number') or t.get('id')
-            for t in kanban_data.get('done', [])
-        ]
-        if ticket not in done_tickets:
+        done_xml = os.path.join(
+            project_root, '.claude-organic', 'tickets', 'done', f'{ticket}.xml',
+        )
+        if not os.path.isfile(done_xml):
             self._send_error(
                 400,
                 f'{ticket} is not in Done column (undo-done targets Done tickets only)',
