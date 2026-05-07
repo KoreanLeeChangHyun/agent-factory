@@ -30,9 +30,12 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "To Do": ["Open"],
     "Open": ["In Progress", "To Do", "Review"],
     "In Progress": ["Review", "Open"],
-    "Review": ["Open", "In Progress"],
+    "Review": ["Open"],
     "Done": ["Open"],
 }
+# Review → In Progress 전이는 폐기 (2026-05-08 사용자 명시).
+# Review 단계 가능 액션: (a) Open 으로 재작업 (/wf -e 또는 우클릭 메뉴),
+# (b) 채팅에 첨부하여 후속 분석/구현 티켓 박제, (c) Done 으로 완료(done 서브커맨드).
 
 
 # ─── 상태 전이 검증 ─────────────────────────────────────────────────────────

@@ -1534,6 +1534,185 @@
   }
 
   /**
+   * Review 티켓을 메인 터미널 채팅 입력란에 prefill 한다.
+   * report.md 가 있으면 함께 첨부 + 메인 터미널 탭으로 전환.
+   * 후속 처리(버그 수정 / 구현 티켓 박제 등) 는 사용자 자연어 발화로 진행.
+   *
+   * @param {Object} ticket - Review 카드 티켓 객체
+   */
+  function attachReviewTicketToChat(ticket) {
+    var lines = [];
+    lines.push("## " + ticket.number + " [" + (ticket.command || "") + "] " + (ticket.title || "(제목 없음)"));
+    lines.push("");
+
+    if (ticket.prompt) {
+      lines.push("### Prompt");
+      Object.keys(ticket.prompt).forEach(function (key) {
+        var content = ticket.prompt[key] || "";
+        var contentLines = content.split("\n").filter(function (l) { return l.trim(); });
+        if (contentLines.length === 1) {
+          lines.push("- " + key + ": " + contentLines[0]);
+        } else if (contentLines.length > 1) {
+          lines.push("- " + key + ":");
+          contentLines.forEach(function (l) { lines.push("  " + l); });
+        }
+      });
+      lines.push("");
+    }
+
+    var basePrefill = lines.join("\n");
+    var workdir = (ticket.result && ticket.result.workdir) || "";
+
+    var reportFetch;
+    if (workdir) {
+      // workdir 형식: ".claude-organic/runs/<key>/.../<command>/"
+      // 정적 서빙 경로: "/.claude-organic/runs/..."
+      var reportUrl = "/" + workdir.replace(/^\/+/, "");
+      if (!reportUrl.endsWith("/")) reportUrl += "/";
+      reportUrl += "report.md";
+      reportFetch = fetch(reportUrl, { cache: "no-store" }).then(function (res) {
+        if (!res.ok) return null;
+        return res.text();
+      }).catch(function () { return null; });
+    } else {
+      reportFetch = Promise.resolve(null);
+    }
+
+    reportFetch.then(function (report) {
+      var fullText = basePrefill;
+      if (report) {
+        fullText += "### Result (report.md)\n\n" + report.trim() + "\n\n";
+      }
+      fullText += "---\n\n";  // 사용자 입력 영역 구분선
+
+      // 메인 터미널 탭으로 전환
+      if (Board.util.switchTab) {
+        Board.util.switchTab("terminal");
+      }
+
+      // 입력란 prefill + focus + auto-resize 트리거
+      // setTimeout 으로 탭 전환 + DOM 렌더 후 실행
+      setTimeout(function () {
+        var input = document.getElementById("terminal-input");
+        if (!input) return;
+        input.value = fullText;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+        // caret 을 끝으로
+        try { input.setSelectionRange(fullText.length, fullText.length); } catch (e) {}
+      }, 50);
+    });
+  }
+
+  /**
+   * Review 카드 우클릭 컨텍스트 메뉴.
+   * 옵션: (a) Open 으로 재작업 (POST /api/kanban/move),
+   *       (b) 채팅에 첨부 (메인 터미널 입력란 prefill).
+   * Review → In Progress 전이 폐기 (2026-05-08 사용자 명시).
+   *
+   * @param {MouseEvent} event - contextmenu 이벤트
+   * @param {Object} ticket - Review 카드 티켓 객체
+   */
+  function showReviewCardContextMenu(event, ticket) {
+    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+      if (m.parentNode) m.parentNode.removeChild(m);
+    });
+
+    const menu = document.createElement("div");
+    menu.className = "kanban-card-context-menu";
+    menu.style.position = "fixed";
+    menu.style.zIndex = "10000";
+    menu.style.background = "#252526";
+    menu.style.border = "1px solid #3c3c3c";
+    menu.style.borderRadius = "4px";
+    menu.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.4)";
+    menu.style.minWidth = "180px";
+    menu.style.padding = "4px 0";
+    menu.style.fontSize = "13px";
+
+    function makeMenuItem(text, color) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.style.display = "block";
+      item.style.width = "100%";
+      item.style.padding = "6px 12px";
+      item.style.textAlign = "left";
+      item.style.background = "transparent";
+      item.style.border = "none";
+      item.style.color = color || "#cccccc";
+      item.style.cursor = "pointer";
+      item.style.fontSize = "13px";
+      item.textContent = text;
+      item.addEventListener("mouseenter", function () { item.style.background = "#094771"; });
+      item.addEventListener("mouseleave", function () { item.style.background = "transparent"; });
+      return item;
+    }
+
+    const reopenItem = makeMenuItem("Open 으로 재작업");
+    const attachItem = makeMenuItem("채팅에 첨부");
+
+    function cleanup() {
+      document.removeEventListener("click", outsideHandler, true);
+      document.removeEventListener("keydown", onKey);
+      if (menu.parentNode) menu.parentNode.removeChild(menu);
+    }
+    function outsideHandler(e) { if (!menu.contains(e.target)) cleanup(); }
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); cleanup(); }
+    }
+
+    reopenItem.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cleanup();
+      fetch("/api/kanban/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket: ticket.number, to: "open" }),
+      }).then(function (res) {
+        return res.json().then(function (body) { return { res: res, body: body }; });
+      }).then(function (r) {
+        if (r.res.ok && r.body.ok) {
+          fetchTickets().then(renderKanban);
+        } else {
+          alert("재작업 전이 실패: " + ((r.body && r.body.error) || "알 수 없는 오류"));
+          renderKanban();
+        }
+      }).catch(function (err) {
+        alert("재작업 요청 실패: " + (err && err.message ? err.message : err));
+        renderKanban();
+      });
+    });
+
+    attachItem.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cleanup();
+      attachReviewTicketToChat(ticket);
+    });
+
+    menu.appendChild(reopenItem);
+    menu.appendChild(attachItem);
+    document.body.appendChild(menu);
+
+    const x = event.clientX;
+    const y = event.clientY;
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = (window.innerWidth - rect.width - 8) + "px";
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = (window.innerHeight - rect.height - 8) + "px";
+    }
+
+    setTimeout(function () {
+      document.addEventListener("click", outsideHandler, true);
+      document.addEventListener("keydown", onKey);
+    }, 0);
+  }
+
+  /**
    * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
    * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
    *
@@ -1927,6 +2106,17 @@
         const num = card.dataset.num;
         const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
         if (ticket) showOpenCardContextMenu(e, ticket);
+      });
+    });
+
+    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" + "채팅에 첨부")
+    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+      card.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const num = card.dataset.num;
+        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+        if (ticket) showReviewCardContextMenu(e, ticket);
       });
     });
 
