@@ -22,6 +22,7 @@
   flow-update env <registryKey> <set|unset> <key> [value]
   flow-update task-status <registryKey> <status> <id>...
   flow-update task-start <registryKey> <id>...
+  flow-update metrics-event <event_type> [--key=value ...]
 
 종료 코드:
   항상 0 (비차단 원칙)
@@ -60,7 +61,7 @@ _NO_BANNER: _HandlerResult = (None, None, False)
 _VALID_MODES: frozenset[str] = frozenset({
     "context", "status", "both", "link-session",
     "usage-pending", "usage", "usage-finalize", "usage-regenerate",
-    "env", "task-status", "task-start",
+    "env", "task-status", "task-start", "metrics-event",
 })
 
 
@@ -77,6 +78,69 @@ def resolve_paths(work_dir_arg: str) -> tuple[str, str, str]:
     local_context: str = os.path.join(abs_work_dir, ".context.json")
     status_file: str = os.path.join(abs_work_dir, "status.json")
     return abs_work_dir, local_context, status_file
+
+
+def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None:
+    """FSM 전이 성공 후 step.end{prev} + step.start{next} 를 metrics.jsonl 에 append 한다.
+
+    실패 시 WARN 출력 후 무시한다 (비차단).
+
+    Args:
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로.
+        from_step: 이전 단계 이름 (예: "PLAN").
+        to_step: 다음 단계 이름 (예: "WORK").
+    """
+    try:
+        import importlib.util as _ilu
+        import time as _time
+
+        _metrics_path = os.path.join(_engine_dir, "flow", "metrics.py")
+        if not os.path.isfile(_metrics_path):
+            return
+        _spec = _ilu.spec_from_file_location("flow.metrics", _metrics_path)
+        if _spec is None or _spec.loader is None:
+            return
+        _metrics_mod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
+
+        # duration 계산: step.start 때 기록한 임시 파일 참조
+        _tmp_file = os.path.join(abs_work_dir, f".metrics_step_start_{from_step}.tmp")
+        _duration_ms: object = None
+        if os.path.isfile(_tmp_file):
+            try:
+                _start_ms = int(open(_tmp_file).read().strip())
+                _end_ms = int(_time.time() * 1000)
+                _duration_ms = _end_ms - _start_ms
+                os.remove(_tmp_file)
+            except Exception:
+                _duration_ms = None
+
+        # step.end{prev}
+        _metrics_mod.append_event(  # type: ignore[attr-defined]
+            abs_work_dir,
+            "step.end",
+            {
+                "step": from_step,
+                "duration_ms": _duration_ms,
+                "outcome": "ok",
+                "source": "fsm",
+            },
+        )
+        # step.start{next} + 임시 파일 생성
+        _next_tmp = os.path.join(abs_work_dir, f".metrics_step_start_{to_step}.tmp")
+        try:
+            with open(_next_tmp, "w") as _fp:
+                _fp.write(str(int(_time.time() * 1000)))
+        except Exception:
+            pass
+        _metrics_mod.append_event(  # type: ignore[attr-defined]
+            abs_work_dir,
+            "step.start",
+            {"step": to_step, "source": "fsm"},
+        )
+    except Exception as _exc:
+        import sys as _sys
+        print(f"[WARN] _append_fsm_metrics failed: {_exc}", file=_sys.stderr)
 
 
 def _read_current_step(status_file: str) -> str:
@@ -106,7 +170,11 @@ def _handle_status(args: argparse.Namespace) -> _HandlerResult:
     abs_work_dir, _local_context, status_file = resolve_paths(args.registry_key)
     from_step: str = _read_current_step(status_file)
     result: str = update_status(abs_work_dir, status_file, from_step, args.to_step)
-    return from_step, args.to_step, _check_banner_ok(result)
+    banner_ok = _check_banner_ok(result)
+    # FSM 전이 성공 시 step.end{prev} + step.start{next} metrics append (source: "fsm")
+    if banner_ok and from_step != args.to_step:
+        _append_fsm_metrics(abs_work_dir, from_step, args.to_step)
+    return from_step, args.to_step, banner_ok
 
 
 def _handle_both(args: argparse.Namespace) -> _HandlerResult:
@@ -118,6 +186,9 @@ def _handle_both(args: argparse.Namespace) -> _HandlerResult:
     banner_ok: bool = _check_banner_ok(result)
     if banner_ok:
         _append_log(abs_work_dir, "INFO", f"STATE_BOTH: agent={args.agent} step={from_step}->{args.to_step}")
+        # FSM 전이 성공 시 step.end{prev} + step.start{next} metrics append (source: "fsm")
+        if from_step != args.to_step:
+            _append_fsm_metrics(abs_work_dir, from_step, args.to_step)
     return from_step, args.to_step, banner_ok
 
 
@@ -199,6 +270,101 @@ def _handle_task_status(args: argparse.Namespace) -> _HandlerResult:
         # 레거시 형식: task-status <registryKey> <taskId> <status>
         legacy_status: str = rest[0] if rest else ""
         update_task_status(status_file, status_or_id, legacy_status)
+    return _NO_BANNER
+
+
+def _handle_metrics_event(args: argparse.Namespace) -> _HandlerResult:
+    """metrics-event 모드: metrics.jsonl 에 단일 이벤트를 append 한다.
+
+    banners (flow_step_banner.sh / flow_phase_banner.sh) 가 이 서브커맨드를
+    호출하여 step.start / step.end / phase.start / phase.end 이벤트를 기록한다.
+
+    인자 형식:
+        flow-update metrics-event <event_type> --key1=value1 --key2=value2 ...
+
+    payload 는 --key=value 형태로 전달되며, 숫자 문자열은 float/int 로 자동 변환한다.
+    registry_key 와 work_dir 은 환경변수 또는 .context.json 에서 자동 추출한다.
+
+    비차단: metrics 기록 실패 시 WARN 출력 후 계속 진행한다.
+    """
+    event_type: str = args.event_type
+
+    # --registry-key / --registry_key 는 kwargs 에서 먼저 추출
+    # (REMAINDER 사용으로 named option 이 kwargs 에 섞일 수 있음)
+    raw_kwargs: list[str] = list(args.kwargs or [])
+    registry_key_from_kwargs: str = ""
+    filtered_kwargs: list[str] = []
+    for _kv in raw_kwargs:
+        _k_part = _kv.lstrip("-").partition("=")[0].replace("-", "_")
+        if _k_part in ("registry_key",):
+            _v_part = _kv.partition("=")[2]
+            if _v_part:
+                registry_key_from_kwargs = _v_part
+        else:
+            filtered_kwargs.append(_kv)
+
+    # --key=value 목록을 payload dict 로 변환
+    payload: dict[str, object] = {}
+    for kv in filtered_kwargs:
+        if "=" in kv:
+            k, _, v = kv.partition("=")
+            k = k.lstrip("-")
+            # 숫자 자동 변환: int 우선 → float 시도
+            try:
+                payload[k] = int(v)
+            except ValueError:
+                try:
+                    payload[k] = float(v)
+                except ValueError:
+                    # "true"/"false" → bool 변환
+                    if v.lower() == "true":
+                        payload[k] = True
+                    elif v.lower() == "false":
+                        payload[k] = False
+                    elif v.lower() == "null":
+                        payload[k] = None
+                    else:
+                        payload[k] = v
+
+    # work_dir 결정: 명시 인자 → kwargs 에서 추출한 값 → 환경변수 순
+    registry_key: str = (getattr(args, "registry_key", "") or "").strip()
+    if not registry_key:
+        registry_key = registry_key_from_kwargs
+    if not registry_key:
+        registry_key = os.environ.get("_WF_REGISTRY_KEY", "")
+
+    try:
+        if registry_key:
+            abs_work_dir, _, _ = resolve_paths(registry_key)
+        else:
+            abs_work_dir = os.environ.get("_WF_WORK_DIR", "")
+
+        if not abs_work_dir:
+            print("[WARN] metrics-event: work_dir 결정 불가 (registry_key 미전달)", file=sys.stderr)
+            return _NO_BANNER
+
+        # metrics.py 동적 import (worktree / main 저장소 양쪽 호환)
+        import importlib.util as _ilu
+        _metrics_candidates = [
+            os.path.join(_engine_dir, "flow", "metrics.py"),
+        ]
+        _metrics_mod = None
+        for _mc in _metrics_candidates:
+            if os.path.isfile(_mc):
+                _spec = _ilu.spec_from_file_location("flow.metrics", _mc)
+                if _spec and _spec.loader:
+                    _metrics_mod = _ilu.module_from_spec(_spec)
+                    _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
+                    break
+
+        if _metrics_mod is None:
+            # 정규 import 시도 (sys.path 에 이미 등록된 경우)
+            from flow import metrics as _metrics_mod  # type: ignore[no-redef]
+
+        _metrics_mod.append_event(abs_work_dir, event_type, payload)  # type: ignore[attr-defined]
+    except Exception as exc:
+        print(f"[WARN] metrics-event append failed: {exc}", file=sys.stderr)
+
     return _NO_BANNER
 
 
@@ -340,6 +506,40 @@ def _build_parser() -> argparse.ArgumentParser:
     p_task_start.add_argument("registry_key", type=registry_key_type, metavar="registryKey", help="YYYYMMDD-HHMMSS 형식 레지스트리 키")
     p_task_start.add_argument("ids", nargs="+", metavar="id", help="태스크 ID (복수 가능)")
     p_task_start.set_defaults(handler=_handle_task_start)
+
+    # --- metrics-event ---
+    p_metrics = subparsers.add_parser(
+        "metrics-event",
+        help="metrics.jsonl 에 단일 이벤트 append",
+        description=(
+            "metrics-event 모드: metrics.jsonl 에 이벤트 한 줄을 append 한다.\n\n"
+            "사용법: flow-update metrics-event <event_type> [--key=value ...]\n\n"
+            "예시:\n"
+            "  flow-update metrics-event step.start --step=INIT --source=banner\n"
+            "  flow-update metrics-event phase.start --phase_index=1 --total=2\n\n"
+            "registry_key 는 선택 인자이며, 미전달 시 _WF_REGISTRY_KEY 환경변수를 사용한다."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_metrics.add_argument(
+        "event_type",
+        metavar="event_type",
+        help="11종 카탈로그 중 하나 (step.start, step.end, phase.start, phase.end, ...)",
+    )
+    p_metrics.add_argument(
+        "kwargs",
+        nargs=argparse.REMAINDER,
+        metavar="--key=value",
+        help="payload 키-값 쌍 (--key=value 형식, 복수 가능)",
+    )
+    p_metrics.add_argument(
+        "--registry-key",
+        dest="registry_key",
+        default="",
+        metavar="registryKey",
+        help="YYYYMMDD-HHMMSS 형식 레지스트리 키 (미전달 시 _WF_REGISTRY_KEY 환경변수 사용)",
+    )
+    p_metrics.set_defaults(handler=_handle_metrics_event)
 
     return parser
 

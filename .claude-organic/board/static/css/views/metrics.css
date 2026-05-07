@@ -1,0 +1,277 @@
+/* Claude Code Workflow Board - Metrics Tab (T-400 / W06)
+ *
+ * 4 위젯 카드 그리드:
+ *   1) 단계별 duration line chart
+ *   2) 토큰 사용량 stacked bar
+ *   3) FAILED 비율 bar
+ *   4) Top 회귀 패턴 list
+ *
+ * 디자인 컨벤션:
+ *   - 테마 컬러: 테라코타 #D97757 (강조 1축에만 사용 — 헤더 underline / refresh 버튼 hover)
+ *   - border-left 한쪽 색상 디자인 금지 → 카드 border 는 4면 일관 #2d2d2d
+ *   - 이모지/외부 아이콘 라이브러리 금지
+ */
+
+/* common.css 의 .view / .view.active 가 표시 토글을 담당하므로 여기서는 패딩만 부여.
+   .view.active { display: block } 상속을 깨지 않도록 별도 display 선언 X. */
+#view-metrics {
+  padding: 18px 20px 32px;
+}
+
+/* ── Toolbar ── */
+.metrics-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.metrics-toolbar-title h2 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6e6e6;
+  letter-spacing: 0.2px;
+}
+
+.metrics-toolbar-title h2::after {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 2px;
+  margin-top: 6px;
+  background: #D97757;
+  border-radius: 1px;
+}
+
+.metrics-subtitle {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: #858585;
+  line-height: 1.5;
+}
+
+.metrics-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.metrics-select-label {
+  font-size: 11px;
+  color: #858585;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#metrics-last-select {
+  background: #1e1e1e;
+  color: #e6e6e6;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#metrics-last-select:focus {
+  outline: none;
+  border-color: #D97757;
+}
+
+.metrics-refresh {
+  background: #252526;
+  color: #cccccc;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.metrics-refresh:hover {
+  background: #2d2d2d;
+  border-color: #D97757;
+  color: #D97757;
+}
+
+/* ── Grid ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 작은 화면에서는 1열 */
+@media (max-width: 960px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.metrics-empty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 960px) {
+  .metrics-empty-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Card ── */
+.metrics-card {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.metrics-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.metrics-card-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e6e6e6;
+  letter-spacing: 0.1px;
+}
+
+.metrics-card-hint {
+  font-size: 11px;
+  color: #858585;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metrics-card-body {
+  padding: 12px 14px 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.metrics-chart-wrap {
+  position: relative;
+  height: 260px;
+}
+
+.metrics-card--list .metrics-card-body {
+  padding: 8px 0 8px;
+}
+
+.metrics-card--empty .metrics-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+}
+
+/* ── Empty / Status ── */
+.metrics-empty {
+  font-size: 12px;
+  color: #858585;
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.metrics-status {
+  font-size: 13px;
+  color: #cccccc;
+  padding: 32px 8px;
+  text-align: center;
+}
+
+.metrics-error {
+  display: inline-block;
+  text-align: left;
+  background: rgba(244,135,113,0.08);
+  border: 1px solid rgba(244,135,113,0.4);
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: #f48771;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 600px;
+}
+
+/* ── Regression List ── */
+.metrics-regression-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.metrics-regression-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 200px) 60px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #2d2d2d;
+  font-size: 12px;
+}
+.metrics-regression-row:last-child {
+  border-bottom: none;
+}
+
+.metrics-regression-head {
+  background: #1e1e1e;
+  color: #858585;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 6px 14px;
+}
+
+.metrics-regression-kind {
+  color: #cccccc;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metrics-regression-row.has-count .metrics-regression-kind {
+  color: #D97757;
+  font-weight: 600;
+}
+
+.metrics-regression-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #858585;
+  font-size: 12px;
+}
+.metrics-regression-row.has-count .metrics-regression-count {
+  color: #f48771;
+  font-weight: 600;
+}
+
+.metrics-regression-example {
+  color: #cccccc;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metrics-muted {
+  color: #5a5a5a;
+  font-style: normal;
+}

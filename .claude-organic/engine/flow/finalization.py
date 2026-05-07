@@ -774,6 +774,321 @@ def _build_result_update_args(
     return args
 
 
+# ──────────────────────────────────────────────────────────────────────
+# W04: 회귀 패턴 캡처 (regression.pattern)
+# ──────────────────────────────────────────────────────────────────────
+#
+# DONE 단계 진입 시점에 metrics.jsonl 및 workflow.log 를 분석하여
+# 다음 5종 회귀 패턴을 분류하고 `regression.pattern` 이벤트를 append 한다.
+#
+#   1. worker_false_success
+#      - subagent.end{outcome=ok} 가 1건 이상이고
+#      - 그 subagent.end 이후의 tool.call{tool_name=Edit|Write} 카운트 == 0
+#      → Worker 가 "성공" 상태로 반환했지만 실제 코드 변경이 없는 패턴
+#
+#   2. hook_deny
+#      - tool.deny 카운트 ≥ 1
+#
+#   3. empty_bash_card
+#      - tool.call{tool_name=Bash, bytes_out=0} 카운트 ≥ 1
+#
+#   4. stage_header_leak
+#      - workflow.log 에 "[STEP]" 또는 "[PHASE]" 패턴이 일반 출력 위치에 노출
+#        (간단히 정규식 매칭)
+#
+#   5. other
+#      - 위 4종 0건 + status == "실패" 인 경우 fallback
+#
+# 모든 분류는 try/except 로 보호되어 단일 실패가 전체 캡처를 깨뜨리지 않는다.
+
+
+def _read_metrics_events(metrics_path: str) -> list[dict]:
+    """metrics.jsonl 의 모든 줄을 dict 리스트로 읽는다.
+
+    각 줄은 jsonl 한 줄 = 한 JSON object. 파싱 실패 줄은 silently skip.
+
+    Args:
+        metrics_path: metrics.jsonl 절대 경로
+
+    Returns:
+        파싱 성공한 이벤트 dict 리스트. 파일이 없거나 비어있으면 빈 리스트.
+    """
+    if not os.path.isfile(metrics_path):
+        return []
+    events: list[dict] = []
+    try:
+        with open(metrics_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(obj, dict):
+                    events.append(obj)
+    except Exception:
+        return []
+    return events
+
+
+def _read_log_tail(log_path: str, max_bytes: int = 1024) -> str:
+    """workflow.log 의 마지막 max_bytes 바이트를 텍스트로 읽는다.
+
+    Args:
+        log_path: workflow.log 절대 경로
+        max_bytes: 꼬리에서 읽을 최대 바이트 수 (기본 1KB)
+
+    Returns:
+        디코딩된 꼬리 문자열. 파일이 없으면 빈 문자열.
+    """
+    if not os.path.isfile(log_path):
+        return ""
+    try:
+        size = os.path.getsize(log_path)
+        offset = max(0, size - max_bytes)
+        with open(log_path, "rb") as f:
+            f.seek(offset)
+            data = f.read()
+        return data.decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _detect_worker_false_success(events: list[dict]) -> tuple[bool, str]:
+    """worker_false_success 패턴 검출.
+
+    subagent.end{outcome=ok} 이벤트가 1건 이상이고, 그 이벤트들 중
+    가장 마지막 시점 이후로 tool.call{tool_name=Edit|Write} 카운트가
+    0 이면 True 를 반환한다.
+
+    Args:
+        events: metrics.jsonl 이벤트 리스트 (등장 순서)
+
+    Returns:
+        (탐지 여부, signal_summary 텍스트)
+    """
+    subagent_ok_count: int = 0
+    last_subagent_ok_idx: int = -1
+    for idx, ev in enumerate(events):
+        if ev.get("event_type") != "subagent.end":
+            continue
+        payload = ev.get("payload") or {}
+        if isinstance(payload, dict) and payload.get("outcome") == "ok":
+            subagent_ok_count += 1
+            last_subagent_ok_idx = idx
+
+    if subagent_ok_count == 0:
+        return False, ""
+
+    # 마지막 subagent.end{ok} 이후의 Edit/Write tool.call 카운트
+    edit_write_after: int = 0
+    for ev in events[last_subagent_ok_idx + 1 :]:
+        if ev.get("event_type") != "tool.call":
+            continue
+        payload = ev.get("payload") or {}
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("tool_name") in ("Edit", "Write"):
+            edit_write_after += 1
+
+    if edit_write_after == 0:
+        summary = (
+            f"subagent.end(ok) count={subagent_ok_count}, "
+            f"Edit/Write tool.call after last subagent.end=0"
+        )
+        return True, summary
+    return False, ""
+
+
+def _detect_hook_deny(events: list[dict]) -> tuple[bool, str]:
+    """hook_deny 패턴 검출.
+
+    tool.deny 이벤트가 1건 이상이면 True.
+
+    Args:
+        events: metrics.jsonl 이벤트 리스트
+
+    Returns:
+        (탐지 여부, signal_summary)
+    """
+    deny_count: int = sum(1 for ev in events if ev.get("event_type") == "tool.deny")
+    if deny_count >= 1:
+        # 첫 deny 사유 추출 (signal_summary 가독성용)
+        first_reason: str = ""
+        for ev in events:
+            if ev.get("event_type") == "tool.deny":
+                payload = ev.get("payload") or {}
+                if isinstance(payload, dict):
+                    first_reason = str(payload.get("reason", ""))[:100]
+                break
+        summary = f"tool.deny count={deny_count}"
+        if first_reason:
+            summary += f", first_reason={first_reason!r}"
+        return True, summary
+    return False, ""
+
+
+def _detect_empty_bash_card(events: list[dict]) -> tuple[bool, str]:
+    """empty_bash_card 패턴 검출 (T-402 회귀).
+
+    tool.call{tool_name=Bash, bytes_out=0} 이벤트가 1건 이상이면 True.
+
+    Args:
+        events: metrics.jsonl 이벤트 리스트
+
+    Returns:
+        (탐지 여부, signal_summary)
+    """
+    empty_count: int = 0
+    for ev in events:
+        if ev.get("event_type") != "tool.call":
+            continue
+        payload = ev.get("payload") or {}
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("tool_name") != "Bash":
+            continue
+        if payload.get("bytes_out") == 0:
+            empty_count += 1
+
+    if empty_count >= 1:
+        summary = f"tool.call(Bash, bytes_out=0) count={empty_count}"
+        return True, summary
+    return False, ""
+
+
+def _detect_stage_header_leak(log_tail: str) -> tuple[bool, str]:
+    """stage_header_leak 패턴 검출 (T-403 회귀).
+
+    workflow.log 꼬리에 `[STEP]` 또는 `[PHASE]` 정규식이 매칭되면 True.
+
+    Args:
+        log_tail: workflow.log 의 마지막 꼬리 문자열
+
+    Returns:
+        (탐지 여부, signal_summary)
+    """
+    if not log_tail:
+        return False, ""
+    import re as _re
+
+    # 단순 매칭 — 행 단위로 STEP/PHASE 헤더가 일반 출력 위치에 등장하는 패턴
+    step_count: int = len(_re.findall(r"\[STEP\]", log_tail))
+    phase_count: int = len(_re.findall(r"\[PHASE\]", log_tail))
+    total: int = step_count + phase_count
+    if total >= 1:
+        summary = f"workflow.log tail contains [STEP]={step_count}, [PHASE]={phase_count}"
+        return True, summary
+    return False, ""
+
+
+def _capture_regression_patterns(
+    abs_work_dir: str | None,
+    status: str,
+    safe_metrics_event,
+) -> None:
+    """DONE 단계 진입 시 regression.pattern 5종 분류 휴리스틱 실행.
+
+    metrics.jsonl 과 workflow.log 를 분석하여 5종 회귀 패턴 중 매칭되는
+    모든 종류를 metrics.jsonl 에 append 한다. 분류 결과 0건이어도 정상.
+
+    Args:
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로 (None 가능)
+        status: 워크플로우 결과 상태 ("완료" 또는 "실패")
+        safe_metrics_event: main() 안에서 정의된 비차단 metrics append 래퍼.
+            시그니처 (work_dir, event_type, payload) -> None.
+
+    분류 휴리스틱 (의사코드):
+        events = read(metrics.jsonl)
+        log_tail = read_tail(workflow.log, 1KB)
+        detected = []
+        if subagent.end(ok)≥1 and Edit/Write tool.call after last subagent.end == 0:
+            detected.append("worker_false_success")
+        if tool.deny ≥ 1:
+            detected.append("hook_deny")
+        if tool.call(Bash, bytes_out=0) ≥ 1:
+            detected.append("empty_bash_card")
+        if [STEP]/[PHASE] in log_tail:
+            detected.append("stage_header_leak")
+        if not detected and status == "실패":
+            detected.append("other")
+        for kind in detected:
+            append regression.pattern{kind, signal_summary, last_log_tail}
+    """
+    if abs_work_dir is None:
+        return
+
+    metrics_path: str = os.path.join(abs_work_dir, "metrics.jsonl")
+    log_path: str = os.path.join(abs_work_dir, "workflow.log")
+
+    events: list[dict] = _read_metrics_events(metrics_path)
+    log_tail: str = _read_log_tail(log_path, max_bytes=1024)
+
+    # 5종 검출 휴리스틱 (각각 try/except 보호)
+    detected: list[tuple[str, str]] = []  # [(kind, signal_summary), ...]
+
+    detectors: list[tuple[str, "callable"]] = [
+        ("worker_false_success", lambda: _detect_worker_false_success(events)),
+        ("hook_deny", lambda: _detect_hook_deny(events)),
+        ("empty_bash_card", lambda: _detect_empty_bash_card(events)),
+        ("stage_header_leak", lambda: _detect_stage_header_leak(log_tail)),
+    ]
+    for kind, detector in detectors:
+        try:
+            matched, summary = detector()
+        except Exception as _exc:  # noqa: BLE001
+            print(
+                f"[WARN] regression detector({kind}) failed: {_exc}",
+                file=sys.stderr,
+            )
+            continue
+        if matched:
+            detected.append((kind, summary))
+
+    # other: 위 4종 0건 + status="실패"
+    if not detected and status == "실패":
+        detected.append(
+            (
+                "other",
+                f"no specific pattern matched, status={status}, "
+                f"events={len(events)}, log_tail_bytes={len(log_tail)}",
+            )
+        )
+
+    # 검출 결과 0건이면 정상 (정상 워크플로우 종료) — 아무것도 append 하지 않는다
+    if not detected:
+        try:
+            _append_log(
+                abs_work_dir,
+                "INFO",
+                "FINALIZE_W04_REGRESSION: no pattern detected (clean run)",
+            )
+        except Exception:
+            pass
+        return
+
+    # last_log_tail 은 4KB jsonl 줄 한도를 고려해 500자로 제한
+    truncated_tail: str = log_tail[-500:] if log_tail else ""
+
+    for kind, summary in detected:
+        payload: dict = {
+            "kind": kind,
+            "signal_summary": summary[:500],
+            "last_log_tail": truncated_tail,
+        }
+        safe_metrics_event(abs_work_dir, "regression.pattern", payload)
+        try:
+            _append_log(
+                abs_work_dir,
+                "INFO",
+                f"FINALIZE_W04_REGRESSION: kind={kind} summary={summary[:200]}",
+            )
+        except Exception:
+            pass
+
+
 def main() -> None:
     """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다.
 
@@ -797,6 +1112,28 @@ def main() -> None:
     registry_key: str = args.registryKey
     status: str = args.status
     ticket_number: str | None = args.ticket_number
+
+    # ── W02: metrics 헬퍼 로드 (비차단) ──
+    _metrics_mod = None
+    try:
+        import importlib.util as _ilu
+        _metrics_py = os.path.join(PROJECT_ROOT, ".claude-organic", "engine", "flow", "metrics.py")
+        if os.path.isfile(_metrics_py):
+            _spec = _ilu.spec_from_file_location("flow.metrics", _metrics_py)
+            if _spec and _spec.loader:
+                _metrics_mod = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
+    except Exception as _me:
+        print(f"[WARN] metrics module load failed: {_me}", file=sys.stderr)
+
+    def _safe_metrics_event(work_dir: str | None, event_type: str, payload: dict) -> None:
+        """비차단 metrics append 래퍼."""
+        if _metrics_mod is None or work_dir is None:
+            return
+        try:
+            _metrics_mod.append_event(work_dir, event_type, payload)  # type: ignore[attr-defined]
+        except Exception as _exc:
+            print(f"[WARN] metrics_event({event_type}) failed: {_exc}", file=sys.stderr)
 
     # ── Step 1: status.json 완료 처리 (critical) ──
     abs_work_dir: str | None = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
@@ -886,6 +1223,15 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP1: registryKey={registry_key} toStep={to_step}")
 
+    # ── W02: DONE 단계 진입 step.start metrics (비차단) ──
+    import time as _time_fin
+    _done_start_ms = int(_time_fin.time() * 1000)
+    _safe_metrics_event(
+        abs_work_dir,
+        "step.start",
+        {"step": "DONE", "source": "fsm"},
+    )
+
     if not _step1_skip:
         run(
             ["python3", UPDATE_STATE, "status", registry_key, to_step],
@@ -895,6 +1241,41 @@ def main() -> None:
 
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
+
+    # ── W02: DONE 단계 step.end metrics (비차단) ──
+    _done_end_ms = int(_time_fin.time() * 1000)
+    _done_outcome = "ok" if status == "완료" else "fail"
+    _safe_metrics_event(
+        abs_work_dir,
+        "step.end",
+        {
+            "step": "DONE",
+            "duration_ms": _done_end_ms - _done_start_ms,
+            "outcome": _done_outcome,
+            "source": "fsm",
+        },
+    )
+
+    # ── W04: 회귀 패턴 캡처 (regression.pattern, 비차단) ──
+    # status / metrics.jsonl / workflow.log 분석 후 5종 분류 휴리스틱 적용.
+    # 분류 결과 0건이어도 정상 (워크플로우 정상 종료 시).
+    try:
+        _capture_regression_patterns(
+            abs_work_dir,
+            status,
+            _safe_metrics_event,
+        )
+    except Exception as _w04_exc:
+        # 회귀 분류 실패가 finalization 흐름을 깨뜨리지 않도록 흡수
+        if abs_work_dir is not None:
+            try:
+                _append_log(
+                    abs_work_dir,
+                    "WARN",
+                    f"FINALIZE_W04_REGRESSION: capture failed exc={_w04_exc}",
+                )
+            except Exception:
+                pass
 
     # ── Step 2: 사용량 확정 (비차단, status 무관) ──
     # Step 2a: JSONL 일괄 파싱 (usage_sync.py batch)

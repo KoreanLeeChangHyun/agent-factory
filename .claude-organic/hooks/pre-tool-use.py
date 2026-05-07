@@ -36,6 +36,79 @@ from dispatcher import (
     scripts_dir,
 )
 
+_engine_dir: str = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'engine')
+)
+if _engine_dir not in sys.path:
+    sys.path.insert(0, _engine_dir)
+
+
+# ---------------------------------------------------------------------------
+# metrics 헬퍼
+# ---------------------------------------------------------------------------
+
+def _get_metrics_work_dir() -> str | None:
+    """환경변수에서 metrics 기록용 work_dir을 추출한다.
+
+    WORKFLOW_WORK_DIR 또는 _WF_WORK_DIR 우선순위로 조회하며,
+    유효한 디렉터리 경로일 때만 반환한다. 해석 불가 시 None.
+    """
+    for key in ("WORKFLOW_WORK_DIR", "_WF_WORK_DIR"):
+        val = os.environ.get(key, "").strip()
+        if val and os.path.isdir(val):
+            return val
+    return None
+
+
+def _record_tool_deny_metrics(
+    tool_name: str,
+    tool_use_id: str,
+    reason: str,
+    tool_input: object,
+) -> None:
+    """deny 결정 시 tool.deny 이벤트를 metrics.jsonl에 기록한다.
+
+    hook 자체 동작에 영향을 주지 않기 위해 모든 예외를 조용히 흡수한다.
+    work_dir 추출 실패 시 (워크플로우 외부 호출 등) silently skip.
+
+    Args:
+        tool_name: 도구 이름 (예: Bash, Edit).
+        tool_use_id: 도구 호출 ID (없으면 빈 문자열).
+        reason: deny 사유 문자열.
+        tool_input: 도구 입력 객체 (직렬화 후 첫 500자를 input_summary에 기록).
+    """
+    try:
+        work_dir = _get_metrics_work_dir()
+        if not work_dir:
+            return
+
+        # input_summary: tool_input 직렬화 후 최대 500자
+        input_summary = ''
+        try:
+            if tool_input is not None:
+                raw = (
+                    tool_input
+                    if isinstance(tool_input, str)
+                    else json.dumps(tool_input, ensure_ascii=False)
+                )
+                input_summary = raw[:500]
+        except Exception:  # noqa: BLE001
+            pass
+
+        from flow.metrics import append_event
+        append_event(
+            work_dir,
+            'tool.deny',
+            {
+                'tool_name': tool_name,
+                'tool_use_id': tool_use_id,
+                'reason': reason,
+                'input_summary': input_summary,
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Main dispatcher
@@ -211,6 +284,24 @@ def main() -> None:
     # If any guard emitted a deny JSON, relay the first one and exit 0
     for r in sync_results:
         if r is not None and r.stdout and b'deny' in r.stdout:
+            # --- metrics: tool.deny 이벤트 기록 (deny 결정 시에만) ---
+            try:
+                deny_reason = ''
+                try:
+                    deny_data = json.loads(r.stdout)
+                    hook_out = deny_data.get('hookSpecificOutput', {})
+                    deny_reason = hook_out.get('permissionDecisionReason', '')
+                except Exception:  # noqa: BLE001
+                    pass
+                if not deny_reason:
+                    deny_reason = 'guard denied'
+                tool_use_id_str = payload.get('tool_use_id', '') or ''
+                tool_input_val = payload.get('tool_input')
+                _record_tool_deny_metrics(
+                    tool_name, tool_use_id_str, deny_reason, tool_input_val
+                )
+            except Exception:  # noqa: BLE001
+                pass
             sys.stdout.buffer.write(r.stdout)
             sys.exit(0)
 

@@ -27,6 +27,39 @@ _engine_dir: str = os.path.normpath(
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
+
+# ---------------------------------------------------------------------------
+# metrics 헬퍼
+# ---------------------------------------------------------------------------
+
+def _get_metrics_work_dir() -> str | None:
+    """환경변수에서 metrics 기록용 work_dir을 추출한다.
+
+    WORKFLOW_WORK_DIR 또는 _WF_WORK_DIR 우선순위로 조회하며,
+    유효한 디렉터리 경로일 때만 반환한다. 해석 불가 시 None.
+    """
+    for key in ("WORKFLOW_WORK_DIR", "_WF_WORK_DIR"):
+        val = os.environ.get(key, "").strip()
+        if val and os.path.isdir(val):
+            return val
+    return None
+
+
+def _append_metrics_event(event_type: str, payload: dict) -> None:
+    """metrics.append_event를 try/except 로 감싸 안전하게 호출한다.
+
+    hook 자체 동작에 영향을 주지 않기 위해 모든 예외를 조용히 흡수한다.
+    work_dir 추출 실패 시 (워크플로우 외부 호출 등) silently skip.
+    """
+    try:
+        work_dir = _get_metrics_work_dir()
+        if not work_dir:
+            return
+        from flow.metrics import append_event
+        append_event(work_dir, event_type, payload)
+    except Exception:  # noqa: BLE001
+        pass
+
 from flow.session_identifier import WINDOW_PREFIX_P
 
 
@@ -141,6 +174,10 @@ def main() -> None:
     tool_name = payload.get('tool_name', '')
     tool_input = payload.get('tool_input', {})
 
+    # --- metrics: tool.call 이벤트 기록 (모든 도구 대상) ---
+    # 기존 hook 로직과 독립적으로 수행. 실패해도 hook 동작에 영향 없음.
+    _record_tool_call_metrics(tool_name, payload)
+
     # --- Bash: flow-claude end detection (tmux window cleanup, 2nd safety net) ---
     # Must be placed before the file_path guard because Bash tool has no file_path.
     if tool_name == 'Bash':
@@ -167,6 +204,148 @@ def main() -> None:
 
     # All hooks are async/fire-and-forget, no exit code aggregation needed
     sys.exit(0)
+
+
+def _record_tool_call_metrics(tool_name: str, payload: dict) -> None:
+    """tool.call 이벤트를 metrics.jsonl에 기록한다.
+
+    tool_name 이 'Task' 인 경우 subagent.spawn / subagent.end 도 함께 기록한다.
+    모든 처리는 try/except로 감싸 hook 동작에 영향을 주지 않는다.
+
+    Args:
+        tool_name: 도구 이름 (예: Bash, Read, Edit, Task).
+        payload: PostToolUse 전체 페이로드 dict.
+    """
+    try:
+        tool_use_id: str = payload.get('tool_use_id', '') or ''
+        parent_tool_use_id: str | None = payload.get('parent_tool_use_id') or None
+        duration_ms: int | None = payload.get('duration_ms')
+
+        # duration_ms 가 없으면 tool.call 스키마 필수 필드 누락 → 기록 건너뜀
+        if duration_ms is None:
+            return
+
+        # bytes_in / bytes_out: tool_input/tool_result 직렬화 길이로 추정
+        tool_input = payload.get('tool_input')
+        tool_result = payload.get('tool_result')
+        bytes_in: int | None = None
+        bytes_out: int | None = None
+        try:
+            if tool_input is not None:
+                bytes_in = len(json.dumps(tool_input, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            if tool_result is not None:
+                bytes_out = len(json.dumps(tool_result, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            pass
+
+        tool_call_payload: dict = {
+            'tool_name': tool_name,
+            'tool_use_id': tool_use_id,
+            'duration_ms': int(duration_ms),
+            'allowed': True,
+        }
+        if parent_tool_use_id:
+            tool_call_payload['parent_tool_use_id'] = parent_tool_use_id
+        if bytes_in is not None:
+            tool_call_payload['bytes_in'] = bytes_in
+        if bytes_out is not None:
+            tool_call_payload['bytes_out'] = bytes_out
+
+        _append_metrics_event('tool.call', tool_call_payload)
+
+        # Task 도구인 경우 subagent.spawn + subagent.end 추가 기록
+        if tool_name == 'Task':
+            _record_subagent_metrics(tool_use_id, parent_tool_use_id, duration_ms, payload)
+
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _record_subagent_metrics(
+    tool_use_id: str,
+    parent_tool_use_id: str | None,
+    duration_ms: int,
+    payload: dict,
+) -> None:
+    """Task 도구에 대해 subagent.spawn / subagent.end 이벤트를 기록한다.
+
+    agent_kind 는 tool_input 의 subagent_type 또는 description 앞 단어로 추정한다.
+    stdout_tail 은 tool_result 의 마지막 500자.
+
+    Args:
+        tool_use_id: Task 도구의 tool_use_id.
+        parent_tool_use_id: 부모 tool_use_id (있는 경우).
+        duration_ms: 도구 실행 시간(ms).
+        payload: PostToolUse 전체 페이로드 dict.
+    """
+    try:
+        tool_input = payload.get('tool_input') or {}
+        tool_result = payload.get('tool_result')
+
+        # agent_kind 추정: subagent_type 필드 → description 첫 단어 → 'unknown'
+        agent_kind: str = 'unknown'
+        if isinstance(tool_input, dict):
+            subagent_type = tool_input.get('subagent_type', '')
+            if subagent_type and isinstance(subagent_type, str):
+                agent_kind = subagent_type.strip()
+            else:
+                desc = tool_input.get('description', '')
+                if desc and isinstance(desc, str):
+                    first_word = desc.strip().split()[0] if desc.strip() else 'unknown'
+                    agent_kind = first_word[:64]  # 길이 제한
+
+        # subagent.spawn 기록 (호출 시점 — PostToolUse 에서 소급 기록)
+        spawn_payload: dict = {
+            'agent_kind': agent_kind,
+            'parent_tool_use_id': parent_tool_use_id or '',
+        }
+        # task_index: tool_input 에 명시된 경우
+        if isinstance(tool_input, dict) and 'task_index' in tool_input:
+            spawn_payload['task_index'] = tool_input['task_index']
+        _append_metrics_event('subagent.spawn', spawn_payload)
+
+        # stdout_tail: tool_result 마지막 500자
+        stdout_tail = ''
+        try:
+            if tool_result is not None:
+                result_str = (
+                    tool_result
+                    if isinstance(tool_result, str)
+                    else json.dumps(tool_result, ensure_ascii=False)
+                )
+                stdout_tail = result_str[-500:]
+        except Exception:  # noqa: BLE001
+            pass
+
+        # outcome 추정: tool_result 에 'error' 문자열 포함 여부
+        outcome = 'ok'
+        try:
+            if tool_result is not None:
+                result_str = (
+                    tool_result
+                    if isinstance(tool_result, str)
+                    else json.dumps(tool_result, ensure_ascii=False)
+                )
+                if 'error' in result_str.lower()[:200]:
+                    outcome = 'fail'
+        except Exception:  # noqa: BLE001
+            pass
+
+        # subagent.end 기록
+        end_payload: dict = {
+            'agent_kind': agent_kind,
+            'tool_use_id': tool_use_id,
+            'duration_ms': int(duration_ms),
+            'outcome': outcome,
+            'stdout_tail': stdout_tail,
+        }
+        _append_metrics_event('subagent.end', end_payload)
+
+    except Exception:  # noqa: BLE001
+        pass
 
 
 if __name__ == '__main__':
