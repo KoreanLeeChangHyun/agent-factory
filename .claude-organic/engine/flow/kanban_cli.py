@@ -286,7 +286,10 @@ def cmd_create(
                 2,
             )
     else:
-        max_num = get_max_ticket_number()
+        # 디버그 영역(900-999) 자동 부여 차단 — 2026-05-05 폐지 (workflow.md 번호 영역 정책 / 메모리 룰).
+        # 기존 활성 잔존(T-900/T-901/T-903 등) 보존하되 max 계산에서만 배제하여 자동 채번 잠식 차단.
+        # 명시 `--number` 호출은 위 if 분기에서 처리되므로 영향 없음.
+        max_num = get_max_ticket_number(exclude_debug_range=True)
         new_num = max_num + 1
         ticket_number = f"T-{new_num:03d}"
 

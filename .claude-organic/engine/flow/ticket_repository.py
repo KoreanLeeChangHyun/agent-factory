@@ -47,6 +47,13 @@ STATUS_DIR_MAP: dict[str, str] = {
     "Done": KANBAN_DONE_DIR,
 }
 
+# ─── 디버그 예약 영역 상수 ─────────────────────────────────────────────────────
+# 과거 T-900~T-999 디버그 예약 영역 — 2026-05-05 폐지 (메모리 룰 / workflow.md 참조).
+# 자동 채번 시 이 범위를 제외하기 위한 상수. 명시 --number 호출은 영향 없음 (강제 차단 X).
+# 기존 활성 잔존(T-900/T-901/T-903 등)은 번호 보존.
+DEBUG_RESERVED_RANGE_START: int = 900
+DEBUG_RESERVED_RANGE_END: int = 999
+
 
 # ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
 
@@ -772,10 +779,17 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
     return results
 
 
-def get_max_ticket_number() -> int:
+def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
     """Scan .kanban/{todo,open,progress,review,done}/ XML filenames to find max T-NNN number.
 
     루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
+
+    Args:
+        exclude_debug_range: True 시 과거 디버그 예약 영역(T-900~T-999)을 스캔에서 제외한다.
+            2026-05-05 디버그 영역 폐지(workflow.md "번호 영역 정책" 참조)에 따라 자동 채번 호출
+            (`kanban_cli.py`의 `--number` 미지정 분기)에서만 True 로 사용한다. 기존 활성 잔존
+            (T-900/T-901/T-903 등)이 채번 시 잠식되지 않도록 자동 채번 시 max 계산에서 배제하기
+            위함이다. 명시 `--number` 호출에는 영향이 없으며, 충돌 검사는 별도 경로로 수행된다.
 
     Returns:
         현재 최대 티켓 번호 정수. 티켓이 없으면 0.
@@ -788,6 +802,9 @@ def get_max_ticket_number() -> int:
             m = re.match(r"^T-(\d+)\.xml$", fname)
             if m:
                 num = int(m.group(1))
+                # 디버그 예약 영역(900~999) 스킵 — 2026-05-05 폐지, 자동 채번 잠식 방지.
+                if exclude_debug_range and DEBUG_RESERVED_RANGE_START <= num <= DEBUG_RESERVED_RANGE_END:
+                    continue
                 if num > max_num:
                     max_num = num
     return max_num
