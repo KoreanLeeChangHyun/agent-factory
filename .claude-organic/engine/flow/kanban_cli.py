@@ -186,6 +186,9 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
     """In Progress에서 이탈할 때 연결된 워크트리를 자동 정리한다.
 
     워크트리 비활성 환경이거나 해당 티켓의 워크트리가 없으면 조용히 건너뛴다.
+    미커밋 변경이 있는 경우 데이터 손실을 막기 위해 정리를 skip 하고
+    사용자에게 경로를 명시한다 (T-411: 워커 commit 누락 / finalization 실패 시
+    워크트리 자동 삭제로 인한 작업물 영구 손실 차단).
     정리 실패 시 경고만 출력하고 예외를 전파하지 않는다 (상태 전이 차단 금지).
 
     Args:
@@ -195,6 +198,7 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
         from flow.worktree_manager import (
             is_worktree_enabled,
             get_worktree_path,
+            has_uncommitted_changes,
             remove_worktree,
         )
 
@@ -203,6 +207,23 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
 
         wt_path = get_worktree_path(ticket_number)
         if not wt_path:
+            return
+
+        if has_uncommitted_changes(wt_path):
+            log(
+                "WARN",
+                f"kanban.py: worktree 정리 skip — 미커밋 변경 보존 ({ticket_number}, path={wt_path})",
+            )
+            print(
+                f"[WARN] {ticket_number} 워크트리에 미커밋 변경 있음 — 자동 정리 skip",
+                flush=True,
+            )
+            print(f"[WARN] 경로: {wt_path}", flush=True)
+            print(
+                "[WARN] 검토 후 수동으로 commit / 폐기: "
+                f"`git -C {wt_path} status`",
+                flush=True,
+            )
             return
 
         success = remove_worktree(ticket_number, delete_branch=True)
