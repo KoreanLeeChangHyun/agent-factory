@@ -225,6 +225,16 @@ class GenericHandlerMixin:
             # /api/metrics/regression?last=N — 회귀 패턴 빈도 + 예시
             last = self._parse_metrics_last(qs, default=20)
             self._handle_metrics_regression(last)
+        elif path == '/api/worktree/status/all':
+            # GET /api/worktree/status/all — 전체 워크트리 상태 list
+            self._handle_worktree_status_all()
+        elif path == '/api/worktree/status':
+            # GET /api/worktree/status?ticket=T-NNN — 단일 티켓 워크트리 상태
+            ticket = qs.get('ticket', [None])[0]
+            if not ticket:
+                self._send_error(400, 'Missing "ticket" query parameter (e.g. ?ticket=T-NNN)')
+                return
+            self._handle_worktree_status(ticket)
         else:
             self.send_response(404)
             self.end_headers()
@@ -304,6 +314,52 @@ class GenericHandlerMixin:
         # last 를 결과에 합쳐서 프론트가 호출 컨텍스트를 알 수 있게 한다.
         data = dict(data)
         data['last'] = last
+        self._send_json(data)
+
+    # ---------------- Worktree status handlers (T-419) ----------------
+
+    @staticmethod
+    def _import_worktree_status():
+        """worktree_status 모듈을 lazy import 한다.
+
+        engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.worktree_status`` 를
+        import. _import_metrics_cli 패턴과 동일한 방식으로 board 서버 sys.path
+        를 보충한다.
+        """
+        engine_dir = os.path.normpath(
+            os.path.join(os.getcwd(), '.claude-organic', 'engine'),
+        )
+        if engine_dir not in sys.path:
+            sys.path.insert(0, engine_dir)
+        from flow import worktree_status  # noqa: WPS433
+        return worktree_status
+
+    def _handle_worktree_status(self, ticket: str) -> None:
+        """GET /api/worktree/status?ticket=T-NNN — 단일 티켓 워크트리 상태 응답.
+
+        결과가 None(티켓에 해당하는 워크트리 미존재)이어도 200 + {exists: false} 응답.
+        클라이언트가 exists 필드로 존재 여부를 판단한다.
+        """
+        try:
+            mod = self._import_worktree_status()
+            data = mod.get_worktree_status(ticket)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('worktree_status.single failed: %s', exc)
+            self._send_error(500, f'get_worktree_status failed: {exc}')
+            return
+        if data is None:
+            data = {'ticket': ticket, 'exists': False}
+        self._send_json(data)
+
+    def _handle_worktree_status_all(self) -> None:
+        """GET /api/worktree/status/all — 전체 워크트리 상태 list 응답."""
+        try:
+            mod = self._import_worktree_status()
+            data = mod.get_all_worktree_statuses()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('worktree_status.all failed: %s', exc)
+            self._send_error(500, f'get_all_worktree_statuses failed: {exc}')
+            return
         self._send_json(data)
 
     # ---------------- Memory GC POST handlers ----------------
