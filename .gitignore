@@ -6,16 +6,12 @@
 .claude-organic/.last-session-id
 .claude-organic/runs/
 .claude-organic/tickets/**/*.xml
-.claude-organic/tickets/.memo.txt
-.claude-organic/tickets/.todo.txt
+.claude-organic/memo/
 .claude-organic/worktrees/
 .claude-organic/board/data/
 .claude-organic/.board.url
 .claude-organic/.workflow-sessions/
 .claude-organic/staging/
-.claude-organic/.test-logs/
-.claude-organic/audit/results/
-.claude-organic/audit/T-*-recovery/
 .claude-organic/logs/
 .claude/scheduled_tasks.lock
 
