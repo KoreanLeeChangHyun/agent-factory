@@ -459,6 +459,326 @@
   }
 
   /**
+   * T-418: Open → Done 직접 전이 confirm 모달.
+   *
+   * Review 를 거치지 않고 Done 으로 이동. 워크트리/feature 브랜치 폐기.
+   * "미커밋 변경 폐기 동의" 체크박스 포함. onConfirm 에 force_dirty 값 전달.
+   *
+   * @param {Object} ticket - 드래그된 티켓 객체 (number 포함)
+   * @param {Function} onConfirm - [직접 Done 처리] 클릭 콜백 (force_dirty: bool 인자 전달)
+   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   */
+  function showOpenDoneConfirmModal(ticket, onConfirm, onCancel) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "open-done-confirm-title");
+
+    const title = document.createElement("h3");
+    title.id = "open-done-confirm-title";
+    title.className = "submit-confirm-title";
+    title.appendChild(document.createTextNode(ticket.number + " Open → Done 직접 전이"));
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    const introText = document.createTextNode("Open 단계에서 Review 를 거치지 않고 Done 으로 직접 이동합니다. 다음이 비가역적으로 수행됩니다:");
+    body.appendChild(introText);
+
+    const ul = document.createElement("ul");
+    const li1 = document.createElement("li");
+    li1.textContent = "워크트리 및 feature 브랜치 폐기 (develop 병합 없음)";
+    const li2 = document.createElement("li");
+    li2.textContent = "티켓 상태를 Done 으로 강제 전이";
+    ul.appendChild(li1);
+    ul.appendChild(li2);
+    body.appendChild(ul);
+
+    const dirtyLabel = document.createElement("label");
+    dirtyLabel.style.display = "flex";
+    dirtyLabel.style.alignItems = "center";
+    dirtyLabel.style.gap = "6px";
+    dirtyLabel.style.marginTop = "10px";
+    dirtyLabel.style.fontSize = "12px";
+    dirtyLabel.style.color = "#cccccc";
+    dirtyLabel.style.cursor = "pointer";
+
+    const dirtyCheckbox = document.createElement("input");
+    dirtyCheckbox.type = "checkbox";
+    dirtyCheckbox.id = "open-done-force-dirty";
+    dirtyCheckbox.style.cursor = "pointer";
+
+    const dirtyLabelText = document.createTextNode("미커밋 변경이 있더라도 폐기하고 진행");
+    dirtyLabel.appendChild(dirtyCheckbox);
+    dirtyLabel.appendChild(dirtyLabelText);
+    body.appendChild(dirtyLabel);
+
+    const continueText = document.createElement("p");
+    continueText.style.marginTop = "10px";
+    continueText.appendChild(document.createTextNode("계속할까요?"));
+    body.appendChild(continueText);
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    cancelBtn.textContent = "취소";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    confirmBtn.textContent = "직접 Done 처리";
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireCancel() {
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+    function fireConfirm() {
+      const forceDirty = dirtyCheckbox.checked;
+      cleanup();
+      if (typeof onConfirm === "function") onConfirm(forceDirty);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireCancel();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireCancel();
+    });
+    cancelBtn.addEventListener("click", fireCancel);
+    confirmBtn.addEventListener("click", fireConfirm);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
+  }
+
+  /**
+   * T-418: Open → Done 직접 전이 결과 모달.
+   *
+   * showDoneResultModal 과 달리 merge_commit 없는 성공도 정상 처리.
+   * error_kind='dirty_worktree' 시 "강제 폐기 후 재시도" 버튼 노출.
+   *
+   * @param {"success"|"dirty"|"error"} kind - 결과 종류
+   * @param {Object} payload - 결과 데이터
+   * @param {Function} onClose - 닫기 콜백
+   * @param {Function} onForceDirty - "강제 폐기 후 재시도" 버튼 클릭 콜백 (dirty 시만)
+   */
+  function showOpenDoneResultModal(kind, payload, onClose, onForceDirty) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "open-done-result-title");
+
+    const title = document.createElement("h3");
+    title.id = "open-done-result-title";
+    title.className = "submit-confirm-title";
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    if (kind === "success") {
+      title.textContent = "Open → Done 직접 전이 완료";
+      const msg = document.createElement("p");
+      msg.textContent = (payload.ticket || "") + " 티켓이 Done 으로 이동되었습니다. 워크트리 및 feature 브랜치가 정리되었습니다.";
+      body.appendChild(msg);
+    } else if (kind === "dirty") {
+      title.textContent = "Done 처리 실패 — 미커밋 변경";
+      const ul = document.createElement("ul");
+      const files = (payload.dirty_files || []);
+      if (files.length > 0) {
+        files.forEach(function (f) {
+          const li = document.createElement("li");
+          li.textContent = f;
+          ul.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "(미커밋 파일 목록 없음)";
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+      const guide = document.createElement("p");
+      guide.textContent = "워크트리에 미커밋 변경이 있습니다. 폐기 동의 후 강제 진행하거나 취소하세요.";
+      body.appendChild(guide);
+    } else {
+      title.textContent = "Done 처리 실패";
+      const msg = document.createElement("p");
+      msg.textContent = (payload && payload.message) ? payload.message : "알 수 없는 오류가 발생했습니다.";
+      body.appendChild(msg);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    closeBtn.textContent = kind === "success" ? "확인" : "취소";
+
+    actions.appendChild(closeBtn);
+
+    if (kind === "dirty" && typeof onForceDirty === "function") {
+      const forceBtn = document.createElement("button");
+      forceBtn.type = "button";
+      forceBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+      forceBtn.textContent = "강제 폐기 후 재시도";
+      forceBtn.style.background = "#c0392b";
+      forceBtn.style.borderColor = "#c0392b";
+      forceBtn.addEventListener("click", function () {
+        cleanup();
+        onForceDirty();
+      });
+      actions.appendChild(forceBtn);
+    }
+
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireClose() {
+      cleanup();
+      if (typeof onClose === "function") onClose();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireClose();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireClose();
+    });
+    closeBtn.addEventListener("click", fireClose);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    closeBtn.focus();
+  }
+
+  /**
+   * T-418: 티켓 삭제 confirm 모달.
+   *
+   * 빨간 [삭제] 버튼. POST /api/kanban/delete 호출.
+   * error_kind='derived_blocked' 시 alert 으로 차단 사유 표시.
+   *
+   * @param {Object} ticket - 삭제할 티켓 객체 (number 포함)
+   * @param {Function} onConfirm - [삭제] 클릭 콜백
+   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   */
+  function showDeleteConfirmModal(ticket, onConfirm, onCancel) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "delete-confirm-title");
+
+    const title = document.createElement("h3");
+    title.id = "delete-confirm-title";
+    title.className = "submit-confirm-title";
+    title.appendChild(document.createTextNode(ticket.number + " 티켓 삭제"));
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    const introText = document.createTextNode(ticket.number + " 티켓을 삭제합니다. 이 작업은 되돌릴 수 없습니다.");
+    body.appendChild(introText);
+
+    const ul = document.createElement("ul");
+    const li1 = document.createElement("li");
+    li1.textContent = "워크트리 및 feature 브랜치도 함께 정리됩니다.";
+    const li2 = document.createElement("li");
+    li2.textContent = "파생 티켓(derived-from)이 미완료 상태면 삭제가 차단됩니다.";
+    ul.appendChild(li1);
+    ul.appendChild(li2);
+    body.appendChild(ul);
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    cancelBtn.textContent = "취소";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    deleteBtn.textContent = "삭제";
+    deleteBtn.style.background = "#c0392b";
+    deleteBtn.style.borderColor = "#c0392b";
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(deleteBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireCancel() {
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+    function fireConfirm() {
+      cleanup();
+      if (typeof onConfirm === "function") onConfirm();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireCancel();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireCancel();
+    });
+    cancelBtn.addEventListener("click", fireCancel);
+    deleteBtn.addEventListener("click", fireConfirm);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    deleteBtn.focus();
+  }
+
+  /**
    * T-906: Done 처리 결과 모달.
    * @param {"success"|"conflict"|"dirty"|"error"} kind - 결과 종류
    * @param {Object} payload - 결과 데이터 (kind 별 다름)
@@ -953,6 +1273,182 @@
   }
 
   /**
+   * T-418: Open 카드 컨텍스트 메뉴 (우클릭).
+   *
+   * 메뉴 항목 2개:
+   *   - "Done 으로 완료(직접)" → showOpenDoneConfirmModal 호출
+   *   - "삭제" → showDeleteConfirmModal 호출
+   *
+   * showDoneCardContextMenu 패턴 답습 (T-905).
+   *
+   * @param {MouseEvent} event - contextmenu 이벤트
+   * @param {Object} ticket - Open 카드 티켓 객체
+   */
+  function showOpenCardContextMenu(event, ticket) {
+    // 기존 컨텍스트 메뉴가 열려 있으면 제거
+    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+      if (m.parentNode) m.parentNode.removeChild(m);
+    });
+
+    const menu = document.createElement("div");
+    menu.className = "kanban-card-context-menu";
+    menu.style.position = "fixed";
+    menu.style.zIndex = "10000";
+    menu.style.background = "#252526";
+    menu.style.border = "1px solid #3c3c3c";
+    menu.style.borderRadius = "4px";
+    menu.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.4)";
+    menu.style.minWidth = "180px";
+    menu.style.padding = "4px 0";
+    menu.style.fontSize = "13px";
+
+    function makeMenuItem(text, color) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.style.display = "block";
+      item.style.width = "100%";
+      item.style.padding = "6px 12px";
+      item.style.textAlign = "left";
+      item.style.background = "transparent";
+      item.style.border = "none";
+      item.style.color = color || "#cccccc";
+      item.style.cursor = "pointer";
+      item.style.fontSize = "13px";
+      item.textContent = text;
+      item.addEventListener("mouseenter", function () {
+        item.style.background = "#094771";
+      });
+      item.addEventListener("mouseleave", function () {
+        item.style.background = "transparent";
+      });
+      return item;
+    }
+
+    const doneItem = makeMenuItem("Done 으로 완료(직접)");
+    const deleteItem = makeMenuItem("삭제", "#f48771");
+
+    function cleanup() {
+      document.removeEventListener("click", outsideHandler, true);
+      document.removeEventListener("keydown", onKey);
+      if (menu.parentNode) menu.parentNode.removeChild(menu);
+    }
+    function outsideHandler(e) {
+      if (!menu.contains(e.target)) cleanup();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup();
+      }
+    }
+
+    // "Done 으로 완료(직접)" 클릭 핸들러
+    doneItem.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cleanup();
+      function callOpenDone(forceDirty) {
+        fetch("/api/kanban/done", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: ticket.number, force: true, force_dirty: forceDirty }),
+        }).then(function (res) {
+          return res.json().then(function (body) {
+            return { res: res, body: body };
+          });
+        }).then(function (r) {
+          if (r.res.ok && r.body.ok) {
+            showOpenDoneResultModal("success", r.body, function () {
+              fetchTickets().then(renderKanban);
+            });
+          } else {
+            const kind = r.body.error_kind === "dirty_worktree" ? "dirty" : "error";
+            showOpenDoneResultModal(kind, r.body, function () {
+              renderKanban();
+            }, kind === "dirty" ? function () {
+              callOpenDone(true);
+            } : undefined);
+          }
+        }).catch(function (err) {
+          console.error("[kanban Open contextmenu] open-done failed:", err);
+          showOpenDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+        });
+      }
+      showOpenDoneConfirmModal(
+        ticket,
+        function (forceDirty) {
+          callOpenDone(forceDirty);
+        },
+        function () {
+          // 취소: 아무 것도 안 함
+        }
+      );
+    });
+
+    // "삭제" 클릭 핸들러
+    deleteItem.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cleanup();
+      showDeleteConfirmModal(
+        ticket,
+        function () {
+          fetch("/api/kanban/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticket: ticket.number }),
+          }).then(function (res) {
+            return res.json().then(function (body) {
+              return { res: res, body: body };
+            });
+          }).then(function (r) {
+            if (r.res.ok && r.body.ok) {
+              fetchTickets().then(renderKanban);
+            } else {
+              if (r.body.error_kind === "derived_blocked") {
+                const derivedList = (r.body.derived_tickets || []).join(", ") || "(목록 없음)";
+                alert("삭제 차단: 파생 티켓이 미완료 상태입니다.\n\n미완료 파생 티켓: " + derivedList + "\n\n파생 티켓을 먼저 완료하세요.");
+              } else {
+                alert("삭제 실패: " + ((r.body && r.body.message) || "알 수 없는 오류"));
+              }
+              renderKanban();
+            }
+          }).catch(function (err) {
+            console.error("[kanban Open contextmenu] delete failed:", err);
+            alert("삭제 실패: " + err.message);
+            renderKanban();
+          });
+        },
+        function () {
+          // 취소: 아무 것도 안 함
+        }
+      );
+    });
+
+    menu.appendChild(doneItem);
+    menu.appendChild(deleteItem);
+    document.body.appendChild(menu);
+
+    // 위치 보정: viewport 밖으로 나가지 않도록
+    const x = event.clientX;
+    const y = event.clientY;
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = (window.innerWidth - rect.width - 8) + "px";
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = (window.innerHeight - rect.height - 8) + "px";
+    }
+
+    // 외부 클릭 / ESC 로 닫기
+    setTimeout(function () {
+      document.addEventListener("click", outsideHandler, true);
+      document.addEventListener("keydown", onKey);
+    }, 0);
+  }
+
+  /**
    * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
    * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
    *
@@ -1008,6 +1504,7 @@
 
         // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
         // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
+        // T-418: Open 카드를 Done 이외 컬럼으로 drop 시도 시 기존 To Do ↔ Open 전이 로직으로 처리
         if (draggedFrom === "Review" && targetCol !== "Done") {
           alert("Review 카드는 Done 컬럼으로만 드래그할 수 있습니다.");
           renderKanban();
@@ -1059,9 +1556,10 @@
           );
           return;
         } else if (targetCol === "Done") {
-          // T-906: Review → Done drop 분기 — Review 카드만 허용 + confirm 모달
-          if (draggedFrom !== "Review") {
-            alert("Review 카드만 Done 으로 드래그할 수 있습니다.");
+          // T-906: Review → Done drop 분기
+          // T-418: Open → Done 직접 전이 분기 추가
+          if (draggedFrom !== "Review" && draggedFrom !== "Open") {
+            alert("Review 또는 Open 카드만 Done 으로 드래그할 수 있습니다.");
             renderKanban();
             return;
           }
@@ -1072,39 +1570,82 @@
             renderKanban();
             return;
           }
-          showDoneConfirmModal(
-            doneTicketObj,
-            function () {
-              // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+
+          if (draggedFrom === "Open") {
+            // T-418: Open → Done 직접 전이 (force=true)
+            function callOpenDoneDnd(forceDirty) {
               fetch("/api/kanban/done", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: draggedNum }),
+                body: JSON.stringify({ ticket: draggedNum, force: true, force_dirty: forceDirty }),
               }).then(function (res) {
                 return res.json().then(function (body) {
                   return { res: res, body: body };
                 });
               }).then(function (r) {
                 if (r.res.ok && r.body.ok) {
-                  showDoneResultModal("success", r.body, function () {
+                  showOpenDoneResultModal("success", r.body, function () {
                     fetchTickets().then(renderKanban);
                   });
                 } else {
-                  const kind = r.body.error_kind === "merge_conflict" ? "conflict"
-                    : r.body.error_kind === "dirty_worktree" ? "dirty"
-                    : "error";
-                  showDoneResultModal(kind, r.body, function () { renderKanban(); });
+                  const kind = r.body.error_kind === "dirty_worktree" ? "dirty" : "error";
+                  showOpenDoneResultModal(kind, r.body, function () {
+                    renderKanban();
+                  }, kind === "dirty" ? function () {
+                    callOpenDoneDnd(true);
+                  } : undefined);
                 }
               }).catch(function (err) {
-                console.error("[kanban DnD] done failed:", err);
-                showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+                console.error("[kanban DnD] open-done failed:", err);
+                showOpenDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
               });
-            },
-            function () {
-              // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
-              renderKanban();
             }
-          );
+            showOpenDoneConfirmModal(
+              doneTicketObj,
+              function (forceDirty) {
+                callOpenDoneDnd(forceDirty);
+              },
+              function () {
+                // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+                renderKanban();
+              }
+            );
+          } else {
+            // T-906: Review → Done drop (기존 로직)
+            showDoneConfirmModal(
+              doneTicketObj,
+              function () {
+                // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+                fetch("/api/kanban/done", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ticket: draggedNum }),
+                }).then(function (res) {
+                  return res.json().then(function (body) {
+                    return { res: res, body: body };
+                  });
+                }).then(function (r) {
+                  if (r.res.ok && r.body.ok) {
+                    showDoneResultModal("success", r.body, function () {
+                      fetchTickets().then(renderKanban);
+                    });
+                  } else {
+                    const kind = r.body.error_kind === "merge_conflict" ? "conflict"
+                      : r.body.error_kind === "dirty_worktree" ? "dirty"
+                      : "error";
+                    showDoneResultModal(kind, r.body, function () { renderKanban(); });
+                  }
+                }).catch(function (err) {
+                  console.error("[kanban DnD] done failed:", err);
+                  showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+                });
+              },
+              function () {
+                // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+                renderKanban();
+              }
+            );
+          }
           return;
         }
 
@@ -1273,8 +1814,20 @@
       });
     });
 
+    // T-418: Open 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Done 으로 완료(직접)" + "삭제")
+    el.querySelectorAll('.card[data-col-key="Open"]').forEach(function (card) {
+      card.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const num = card.dataset.num;
+        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+        if (ticket) showOpenCardContextMenu(e, ticket);
+      });
+    });
+
     // ── DnD: To Do ↔ Open 카드 드래그 앤 드랍 ──
     // 안전 DnD 정책: 부수 효과 없는 전이만 허용 (In Progress / Done 은 별도 명령)
+    // T-418: Open → Done 직접 전이도 confirm 모달로 허용 (force=true)
     bindKanbanDnd(el);
 
     // Bind sort button clicks (toggle dropdown)

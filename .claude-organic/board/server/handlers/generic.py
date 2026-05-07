@@ -13,6 +13,12 @@ import time
 _DONE_MERGE_OK_RE = re.compile(
     r'(.+?)\s*->\s*develop\s+병합\s+완료\s+\(([0-9a-f]{6,})\)',
 )
+
+# ---- force done / delete 관련 상수 (T-418) ----
+# 티켓 번호 형식 정규식
+_TICKET_RE = re.compile(r'^T-\d+$')
+# 칸반 전체 디렉터리 목록 (derived-from 가드에서 사용)
+_KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
 # 충돌 헤더 라인 검출: '[ERROR]' 로 시작하는 라인
 _DONE_CONFLICT_HEADER = re.compile(r'^\[ERROR\]')
 # 미커밋 변경 헤더 라인 검출
@@ -462,18 +468,99 @@ class GenericHandlerMixin:
             }
         self._send_json(payload)
 
-    def _handle_kanban_done(self) -> None:
-        """POST /api/kanban/done — body {"ticket": "T-NNN"}.
+    def _get_dirty_files(self, wt_path: str) -> list[str]:
+        """워크트리 경로에서 미커밋 파일 목록을 반환한다.
 
-        칸반 보드 DnD Review → Done 전이의 단일 진입점.
-        내부적으로 `flow-kanban done <ticket>` 을 호출하여
-        merge_to_develop + worktree 정리 + 칸반 Done 전이를 위임한다 (T-906).
+        ``git status --porcelain`` 출력을 파싱하여 파일 경로 목록을 반환한다.
+        경로가 존재하지 않거나 git 명령 실패 시 빈 리스트를 반환한다.
+
+        Args:
+            wt_path: 검사할 worktree 디렉터리 절대경로.
+
+        Returns:
+            미커밋 파일 경로 목록 (상대 경로).
+        """
+        import subprocess
+        try:
+            result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=wt_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return []
+            files = []
+            for line in result.stdout.splitlines():
+                # porcelain 형식: "XY path" 또는 "XY orig -> path"
+                parts = line[3:].split(' -> ')
+                files.append(parts[-1].strip())
+            return files
+        except Exception:
+            return []
+
+    def _check_derived_blocked(self, ticket: str, kanban_base: str) -> list[str]:
+        """ticket 을 derived-from 으로 참조하는 파생 티켓 중 Done 이외 상태인 것을 반환한다.
+
+        done_relation_guard.py 의 _find_derived_tickets + _get_ticket_status 패턴 답습.
+
+        Args:
+            ticket: 원본 티켓 번호 (예: 'T-NNN').
+            kanban_base: .claude-organic/tickets/ 절대경로.
+
+        Returns:
+            Done 이외 상태인 파생 티켓 문자열 목록 (예: ['T-001(Open)', 'T-002(In Progress)']).
+        """
+        import xml.etree.ElementTree as ET
+
+        not_done: list[str] = []
+        for d in _KANBAN_ALL_DIRS:
+            dir_path = os.path.join(kanban_base, d)
+            if not os.path.isdir(dir_path):
+                continue
+            try:
+                for entry in os.scandir(dir_path):
+                    if not entry.is_file() or not entry.name.endswith('.xml'):
+                        continue
+                    try:
+                        tree = ET.parse(entry.path)
+                        for rel in tree.findall('.//relations/relation'):
+                            if (rel.get('type') == 'derived-from'
+                                    and rel.get('ticket') == ticket):
+                                num_el = tree.find('.//metadata/number')
+                                status_el = tree.find('.//metadata/status')
+                                num = (num_el.text or '').strip() if num_el is not None else ''
+                                status = (status_el.text or '').strip() if status_el is not None else ''
+                                if status != 'Done' and num:
+                                    not_done.append(f'{num}({status or "?"})')
+                    except Exception:
+                        continue
+            except OSError:
+                continue
+        return not_done
+
+    def _handle_kanban_done(self) -> None:
+        """POST /api/kanban/done — body {"ticket": "T-NNN", "force": bool, "force_dirty": bool}.
+
+        칸반 보드 DnD 의 단일 진입점.
+
+        force=false (기본): Review → Done 전이.
+            내부적으로 `flow-kanban done <ticket>` 을 호출하여
+            merge_to_develop + worktree 정리 + 칸반 Done 전이를 위임한다 (T-906).
+
+        force=true (T-418 신규): Open → Done 직접 전이.
+            1. open/<ticket>.xml 존재 검증
+            2. dirty 워크트리 가드 (force_dirty=false 면 409 차단)
+            3. flow-kanban move <ticket> done --force 호출
+            4. worktree_manager.remove_worktree 로 워크트리/브랜치 정리
 
         성공 응답 (200):
-            {ok: true, ticket, merge_commit, merged_branch, stdout}
+            Review→Done: {ok: true, ticket, merge_commit, merged_branch, stdout}
+            Open→Done:   {ok: true, ticket, force: true, stdout}
 
         실패 응답 (409):
-            {ok: false, error_kind: 'merge_conflict'|'dirty_worktree'|'other',
+            {ok: false, error_kind: 'merge_conflict'|'dirty_worktree'|'derived_blocked'|'other',
              conflicts: [...], dirty_files: [...], message}
 
         타임아웃(504) / 실행파일 없음(500) 은 기존 핸들러 패턴과 동일.
@@ -482,16 +569,110 @@ class GenericHandlerMixin:
 
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
+        force = bool(data.get('force', False))
+        force_dirty = bool(data.get('force_dirty', False))
 
         # 입력 검증 — ^T-\d+$ 형식만 허용
-        if not ticket or not re.match(r'^T-\d+$', ticket):
+        if not ticket or not _TICKET_RE.match(ticket):
             self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
             return
 
+        project_root = os.getcwd()
+        flow_kanban = os.path.join(
+            project_root, '.claude-organic', 'bin', 'flow-kanban',
+        )
+
+        # ── force=true 분기: Open → Done 직접 전이 (T-418) ──────────────────
+        if force:
+            open_xml = os.path.join(
+                project_root, '.claude-organic', 'tickets', 'open', f'{ticket}.xml',
+            )
+            if not os.path.isfile(open_xml):
+                self._send_error(
+                    400,
+                    f'{ticket} is not in Open column (force done requires Open status)',
+                )
+                return
+
+            # 워크트리 dirty 가드
+            wt_path: str | None = None
+            try:
+                engine_dir = os.path.join(project_root, '.claude-organic', 'engine')
+                if engine_dir not in sys.path:
+                    sys.path.insert(0, engine_dir)
+                from flow import worktree_manager  # noqa: WPS433
+                wt_path = worktree_manager.get_worktree_path(ticket, repo_path=project_root)
+                if wt_path and worktree_manager.has_uncommitted_changes(wt_path):
+                    if not force_dirty:
+                        dirty_files = self._get_dirty_files(wt_path)
+                        self._send_json_with_status(409, {
+                            'ok': False,
+                            'error_kind': 'dirty_worktree',
+                            'conflicts': [],
+                            'dirty_files': dirty_files,
+                            'message': f'{ticket} 워크트리에 미커밋 변경이 있습니다. force_dirty=true 로 재시도하거나 취소하세요.',
+                            'ticket': ticket,
+                        })
+                        return
+            except ImportError:
+                # 워크트리 비활성 환경 — 가드 생략
+                wt_path = None
+
+            # flow-kanban move <ticket> done --force 호출
+            try:
+                result = subprocess.run(
+                    [flow_kanban, 'move', ticket, 'done', '--force'],
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired:
+                self._send_error(504, 'flow-kanban move timed out (30s)')
+                return
+            except FileNotFoundError:
+                self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+                return
+
+            if result.returncode != 0:
+                stderr = (result.stderr or result.stdout or '').strip()
+                self._send_json_with_status(409, {
+                    'ok': False,
+                    'error_kind': 'other',
+                    'conflicts': [],
+                    'dirty_files': [],
+                    'message': stderr or 'flow-kanban move done --force failed',
+                    'ticket': ticket,
+                })
+                return
+
+            # 워크트리 정리 (force=True: lock 해제 후 강제 삭제)
+            worktree_removed = False
+            if wt_path:
+                try:
+                    engine_dir = os.path.join(project_root, '.claude-organic', 'engine')
+                    if engine_dir not in sys.path:
+                        sys.path.insert(0, engine_dir)
+                    from flow import worktree_manager as _wm  # noqa: WPS433
+                    worktree_removed = _wm.remove_worktree(
+                        ticket, delete_branch=True, repo_path=project_root,
+                    )
+                except ImportError:
+                    pass
+
+            self._send_json({
+                'ok': True,
+                'ticket': ticket,
+                'force': True,
+                'worktree_removed': worktree_removed,
+                'stdout': (result.stdout or '').strip(),
+            })
+            return
+
+        # ── force=false 분기: Review → Done 전이 (기존 T-906 로직) ──────────
         # Review 상태 사전 확인 — review/ 디렉터리에 티켓 XML 존재 여부로 판별
         # (T-906 워커가 _read_kanban_tickets 반환 타입 dict[파일명,XML]을 list[dict]로 잘못 가정해
         # 항상 fail 하던 회귀 수정)
-        project_root = os.getcwd()
         review_xml = os.path.join(
             project_root, '.claude-organic', 'tickets', 'review', f'{ticket}.xml',
         )
@@ -503,9 +684,6 @@ class GenericHandlerMixin:
             return
 
         # flow-kanban done 호출 — merge 시간 고려해 timeout 120초
-        flow_kanban = os.path.join(
-            project_root, '.claude-organic', 'bin', 'flow-kanban',
-        )
         try:
             result = subprocess.run(
                 [flow_kanban, 'done', ticket],
@@ -577,6 +755,102 @@ class GenericHandlerMixin:
             'dirty_files': failure['dirty_files'],
             'message': failure['message'],
             'ticket': ticket,
+        })
+
+    def _handle_kanban_delete(self) -> None:
+        r"""POST /api/kanban/delete — body {"ticket": "T-NNN"}.
+
+        Open 카드 우클릭 [삭제] 의 단일 진입점 (T-418).
+
+        1. ^T-\d+$ 형식 검증
+        2. derived-from 가드 — 파생 티켓 중 Done 이외 상태면 409 + error_kind='derived_blocked'
+        3. flow-kanban delete <ticket> 호출
+        4. worktree_manager.remove_worktree 로 워크트리/브랜치 정리 (비활성 환경 silent)
+
+        성공 응답 (200):
+            {ok: true, ticket, stdout, worktree_removed: bool}
+
+        실패 응답 (409):
+            {ok: false, error_kind: 'derived_blocked'|'other', message, blocked_by: [...]}
+
+        타임아웃(504) / 실행파일 없음(500) 은 기존 핸들러 패턴과 동일.
+        """
+        import subprocess
+
+        data = self._read_json_body() or {}
+        ticket = (data.get('ticket') or '').strip()
+
+        # 입력 검증 — ^T-\d+$ 형식만 허용
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            return
+
+        project_root = os.getcwd()
+        kanban_base = os.path.join(project_root, '.claude-organic', 'tickets')
+
+        # derived-from 가드 — 파생 티켓이 Done 이외 상태면 차단
+        not_done = self._check_derived_blocked(ticket, kanban_base)
+        if not_done:
+            self._send_json_with_status(409, {
+                'ok': False,
+                'error_kind': 'derived_blocked',
+                'blocked_by': not_done,
+                'message': (
+                    f'{ticket} 삭제 차단: 파생 티켓 {", ".join(not_done)}이 '
+                    f'아직 완료되지 않았습니다. 파생 티켓 완료 후 삭제하세요.'
+                ),
+                'ticket': ticket,
+            })
+            return
+
+        # flow-kanban delete 호출
+        flow_kanban = os.path.join(
+            project_root, '.claude-organic', 'bin', 'flow-kanban',
+        )
+        try:
+            result = subprocess.run(
+                [flow_kanban, 'delete', ticket],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            self._send_error(504, 'flow-kanban delete timed out (30s)')
+            return
+        except FileNotFoundError:
+            self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+            return
+
+        if result.returncode != 0:
+            stderr = (result.stderr or result.stdout or '').strip()
+            self._send_json_with_status(409, {
+                'ok': False,
+                'error_kind': 'other',
+                'blocked_by': [],
+                'message': stderr or 'flow-kanban delete failed',
+                'ticket': ticket,
+            })
+            return
+
+        # 워크트리 정리 (비활성 환경 silent)
+        worktree_removed = False
+        try:
+            engine_dir = os.path.join(project_root, '.claude-organic', 'engine')
+            if engine_dir not in sys.path:
+                sys.path.insert(0, engine_dir)
+            from flow import worktree_manager as _wm  # noqa: WPS433
+            worktree_removed = _wm.remove_worktree(
+                ticket, delete_branch=True, repo_path=project_root,
+            )
+        except ImportError:
+            pass
+
+        self._send_json({
+            'ok': True,
+            'ticket': ticket,
+            'stdout': (result.stdout or '').strip(),
+            'worktree_removed': worktree_removed,
         })
 
     def _handle_workflow_undo_done(self) -> None:
