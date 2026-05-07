@@ -5,19 +5,19 @@ Routes hook logic based on tool_name extracted from stdin JSON.
 Uses dispatcher.py utilities for flag-based conditional execution.
 
 라우팅 테이블:
-  Write|Edit       -> rules_auto_approve         (HOOK_RULES_AUTO_APPROVE, sync, fast-path)
-  Write|Edit|Bash  -> hooks_self_guard          (HOOK_HOOKS_SELF_PROTECT, sync)
-  AskUserQuestion  -> slack_ask                 (HOOK_SLACK_ASK, async)
-  Bash             -> dangerous_command_guard    (HOOK_DANGEROUS_COMMAND, sync)
-  Bash             -> direct_path_guard          (HOOK_DIRECT_PATH_GUARD, sync)
-  Bash             -> main_branch_guard          (HOOK_MAIN_BRANCH_GUARD, sync)
-  Bash             -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
-  Bash             -> done_relation_guard        (HOOK_DONE_RELATION_GUARD, sync)
-  Bash             -> worktree_remove_guard      (HOOK_WORKTREE_REMOVE_GUARD, sync)
-  Write|Edit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
-  Write|Edit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
-  Write|Edit|Bash  -> worktree_path_guard        (HOOK_WORKTREE_PATH_GUARD, sync)
-  Task             -> agent_investigation_guard  (HOOK_AGENT_INVESTIGATION_GUARD, sync)
+  Write|Edit|MultiEdit|NotebookEdit       -> rules_auto_approve         (HOOK_RULES_AUTO_APPROVE, sync, fast-path)
+  Write|Edit|MultiEdit|NotebookEdit|Bash  -> hooks_self_guard          (HOOK_HOOKS_SELF_PROTECT, sync)
+  AskUserQuestion                         -> slack_ask                 (HOOK_SLACK_ASK, async)
+  Bash                                    -> dangerous_command_guard    (HOOK_DANGEROUS_COMMAND, sync)
+  Bash                                    -> direct_path_guard          (HOOK_DIRECT_PATH_GUARD, sync)
+  Bash                                    -> main_branch_guard          (HOOK_MAIN_BRANCH_GUARD, sync)
+  Bash                                    -> kanban_subcommand_guard    (HOOK_KANBAN_SUBCOMMAND_GUARD, sync)
+  Bash                                    -> done_relation_guard        (HOOK_DONE_RELATION_GUARD, sync)
+  Bash                                    -> worktree_remove_guard      (HOOK_WORKTREE_REMOVE_GUARD, sync)
+  Write|Edit|MultiEdit|NotebookEdit|Bash  -> main_session_guard         (HOOK_MAIN_SESSION_GUARD, sync)
+  Write|Edit|MultiEdit|NotebookEdit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
+  Write|Edit|MultiEdit|NotebookEdit|Bash  -> worktree_path_guard        (HOOK_WORKTREE_PATH_GUARD, sync)
+  Task                                    -> agent_investigation_guard  (HOOK_AGENT_INVESTIGATION_GUARD, sync)
 """
 
 from __future__ import annotations
@@ -62,11 +62,11 @@ def main() -> None:
     sync_results = []
     # Other tool_name values (Read, Glob, Grep, WebFetch, etc.) pass through without hook processing
 
-    # --- Write|Edit: rules-auto-approve (sync, fast-path) ---
-    # .claude/rules/ 경로 대상 Write/Edit 요청을 가드 체인 실행 전에 선제 처리한다.
+    # --- Write|Edit|MultiEdit|NotebookEdit: rules-auto-approve (sync, fast-path) ---
+    # .claude/rules/ 경로 대상 파일 수정 요청을 가드 체인 실행 전에 선제 처리한다.
     # allow 응답이 반환되면 나머지 가드 체인을 스킵하고 즉시 allow 출력 후 종료한다.
     # 이를 통해 hooks_self_guard, main_session_guard 등이 우발적으로 deny하는 것을 방지한다.
-    if tool_name in ('Write', 'Edit'):
+    if tool_name in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
         r = dispatch(
             'HOOK_RULES_AUTO_APPROVE',
             scripts_dir('guards', 'rules_auto_approve.py'),
@@ -78,8 +78,8 @@ def main() -> None:
             sys.stdout.buffer.write(r.stdout)
             sys.exit(0)
 
-    # --- Write|Edit|Bash: hooks-self-guard (sync) ---
-    if tool_name in ('Write', 'Edit', 'Bash'):
+    # --- Write|Edit|MultiEdit|NotebookEdit|Bash: hooks-self-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'):
         r = dispatch(
             'HOOK_HOOKS_SELF_PROTECT',
             scripts_dir('guards', 'hooks_self_guard.py'),
@@ -164,8 +164,8 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # --- Write|Edit|Bash: main-session-guard (sync) ---
-    if tool_name in ('Write', 'Edit', 'Bash'):
+    # --- Write|Edit|MultiEdit|NotebookEdit|Bash: main-session-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'):
         r = dispatch(
             'HOOK_MAIN_SESSION_GUARD',
             scripts_dir('guards', 'main_session_guard.py'),
@@ -175,8 +175,8 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # --- Write|Edit|Bash: readonly-session-guard (sync) ---
-    if tool_name in ('Write', 'Edit', 'Bash'):
+    # --- Write|Edit|MultiEdit|NotebookEdit|Bash: readonly-session-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'):
         r = dispatch(
             'HOOK_READONLY_SESSION_GUARD',
             scripts_dir('guards', 'readonly_session_guard.py'),
@@ -186,8 +186,8 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # --- Write|Edit|Bash: worktree-path-guard (sync) ---
-    if tool_name in ('Write', 'Edit', 'Bash'):
+    # --- Write|Edit|MultiEdit|NotebookEdit|Bash: worktree-path-guard (sync) ---
+    if tool_name in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'):
         r = dispatch(
             'HOOK_WORKTREE_PATH_GUARD',
             scripts_dir('guards', 'worktree_path_guard.py'),

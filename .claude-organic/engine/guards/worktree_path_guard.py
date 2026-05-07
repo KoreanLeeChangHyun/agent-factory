@@ -1,8 +1,8 @@
 #!/usr/bin/env -S python3 -u
 """워크트리 경로 격리 가드 Hook 스크립트.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션이고
-활성 워크플로우의 command가 implement이면,
+PreToolUse(Write|Edit|MultiEdit|NotebookEdit|Bash) 이벤트에서 현재 세션이
+워크플로우 세션이고 활성 워크플로우의 command가 implement이면,
 메인 리포 경로 파일 수정 시도를 차단하고 워크트리 절대경로를 피드백에 포함한다.
 
 Claude Code가 세션 시작 시 프로젝트 루트(메인 리포)를 cwd로 결정하여
@@ -60,9 +60,13 @@ _BASH_FILE_MODIFY_PATTERNS: list[str] = [
     r"\bdd\s+",                                  # dd 명령
 ]
 
-# 항상 허용하는 경로 패턴 (.claude-organic/ 하위 — workflow/, kanban/ 등 포함)
+# 항상 허용하는 경로 패턴 (메인 리포 산출물·sidecar 디렉터리)
+# 주의: 보수적으로 좁게 정의 — `.claude-organic/board/server/`, `.claude-organic/engine/` 같은
+# 소스 코드 경로는 의도적으로 제외 (T-403 회귀 차단 대상).
 _ALWAYS_ALLOWED_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"[/\\]?\.claude\.workflow[/\\]"),
+    re.compile(r"[/\\]\.claude-organic[/\\]runs[/\\]"),
+    re.compile(r"[/\\]\.claude-organic[/\\]board[/\\]sessions[/\\]"),
+    re.compile(r"[/\\]\.claude-organic[/\\](?:catalog|kanban|history|sessions)[/\\]"),
 ]
 
 
@@ -86,15 +90,21 @@ def _deny(reason: str) -> None:
 def _get_workflow_command() -> str | None:
     """활성 워크플로우의 command 필드를 반환한다.
 
-    WORKFLOW_WORK_DIR 환경변수를 먼저 확인하고,
-    없으면 .workflow/ 디렉터리를 스캔하여 가장 최근 .context.json을 읽는다.
+    1. WORKFLOW_COMMAND 환경변수 우선 (워커 spawn 시 launcher가 직접 주입 — race-free).
+    2. WORKFLOW_WORK_DIR 환경변수 → .context.json.
+    3. .workflow/ 디렉터리를 스캔하여 가장 최근 .context.json.
 
     Returns:
         command 문자열. 조회 실패 시 None.
     """
+    # 1. WORKFLOW_COMMAND 환경변수 우선 (디스크 스캔 race 차단)
+    env_command = os.environ.get("WORKFLOW_COMMAND", "").strip()
+    if env_command:
+        return env_command
+
     project_root = resolve_project_root()
 
-    # 1. WORKFLOW_WORK_DIR 환경변수 확인
+    # 2. WORKFLOW_WORK_DIR 환경변수 확인
     env_work_dir = os.environ.get("WORKFLOW_WORK_DIR", "").strip()
     if env_work_dir:
         abs_work_dir = (
@@ -108,7 +118,7 @@ def _get_workflow_command() -> str | None:
             if command:
                 return command
 
-    # 2. .workflow/ 디렉터리 스캔
+    # 3. .workflow/ 디렉터리 스캔
     try:
         registry = scan_active_workflows(project_root=project_root)
         if not registry:
@@ -213,40 +223,54 @@ def _get_worktree_path() -> str | None:
     return None
 
 
-def _is_always_allowed_path(file_path: str) -> bool:
+def _is_always_allowed_path(file_path: str, project_root: str | None = None) -> bool:
     """파일 경로가 항상 허용되는 경로인지 확인한다.
 
-    .claude-organic/ 하위 경로는 항상 허용된다.
+    `_ALWAYS_ALLOWED_PATTERNS`는 메인 리포 산출물·sidecar 디렉터리 패턴이며,
+    상대 경로의 경우 `project_root` 기준으로 절대 경로화한 뒤 매칭한다.
 
     Args:
-        file_path: 검사할 파일 경로
+        file_path: 검사할 파일 경로 (절대 또는 상대)
+        project_root: 메인 리포 절대경로 (상대 경로 정규화에 사용)
 
     Returns:
         항상 허용 경로이면 True.
     """
+    if not os.path.isabs(file_path) and project_root:
+        target = os.path.normpath(os.path.join(project_root, file_path))
+    else:
+        target = os.path.normpath(file_path)
     for pattern in _ALWAYS_ALLOWED_PATTERNS:
-        if pattern.search(file_path):
+        if pattern.search(target):
             return True
     return False
 
 
-def _is_under_worktree(file_path: str, worktree_path: str) -> bool:
+def _is_under_worktree(
+    file_path: str,
+    worktree_path: str,
+    project_root: str | None = None,
+) -> bool:
     """파일 경로가 워크트리 경로 하위인지 확인한다.
+
+    상대 경로면 `project_root` 기준으로 절대 경로화한 뒤 워크트리 prefix와 비교한다.
 
     Args:
         file_path: 검사할 파일 경로 (절대 또는 상대)
         worktree_path: 워크트리 절대경로
+        project_root: 메인 리포 절대경로 (상대 경로 정규화에 사용)
 
     Returns:
         워크트리 하위 경로이면 True.
     """
-    # 절대 경로 정규화
     norm_worktree = os.path.normpath(worktree_path)
-    # file_path가 절대 경로인 경우
     if os.path.isabs(file_path):
         norm_file = os.path.normpath(file_path)
-        return norm_file.startswith(norm_worktree + os.sep) or norm_file == norm_worktree
-    return False
+    elif project_root:
+        norm_file = os.path.normpath(os.path.join(project_root, file_path))
+    else:
+        return False
+    return norm_file.startswith(norm_worktree + os.sep) or norm_file == norm_worktree
 
 
 def _get_suggested_path(file_path: str, project_root: str, worktree_path: str) -> str:
@@ -323,8 +347,11 @@ def _is_bash_file_modify(command: str) -> bool:
 def _bash_targets_main_repo(command: str, project_root: str, worktree_path: str) -> bool:
     """Bash 명령이 메인 리포 경로를 대상으로 파일 수정을 시도하는지 확인한다.
 
-    명령에 메인 리포 절대경로가 포함되어 있고,
-    워크트리 경로 내의 작업이 아닌 경우 메인 리포 타겟으로 판단한다.
+    명령 문자열에서 메인 리포 절대경로의 모든 등장을 검사하고,
+    각 등장이 워크트리 prefix이거나 산출물·sidecar 패턴이면 통과,
+    그 외(메인 소스 경로 직격)는 차단한다. cross-tree copy
+    (`cp /worktree/foo.py /main/.claude-organic/board/server/app.py`)가
+    워크트리 경로 동시 등장으로 우회하는 회귀를 finditer 기반 prefix 검사로 차단한다.
 
     Args:
         command: Bash 도구의 command 문자열
@@ -337,29 +364,29 @@ def _bash_targets_main_repo(command: str, project_root: str, worktree_path: str)
     norm_project = os.path.normpath(project_root)
     norm_worktree = os.path.normpath(worktree_path)
 
-    # 명령에 메인 리포 절대경로가 포함되는지 확인
     if norm_project not in command:
         return False
 
-    # 명령에 워크트리 경로가 포함되어 있으면 워크트리 내 작업으로 허용
-    # (메인 리포 경로가 포함되더라도 워크트리 경로 하위인 경우 통과)
-    if norm_worktree in command:
-        # 세분화: 메인 리포 경로가 워크트리 경로 바깥으로도 사용되는지 확인
-        # 워크트리가 메인 리포 하위에 있으므로, 워크트리 경로가 있으면 허용
-        return False
-
-    return True
+    for match in re.finditer(re.escape(norm_project), command):
+        start = match.start()
+        tail = command[start:]
+        if tail.startswith(norm_worktree):
+            continue  # 워크트리 prefix → 워크트리 내 작업
+        if any(p.search(tail) for p in _ALWAYS_ALLOWED_PATTERNS):
+            continue  # 메인 산출물·sidecar 패턴 → 허용
+        return True  # 메인 소스 경로 직격 → 차단
+    return False
 
 
 def main() -> None:
     """워크트리 경로 격리 가드 Hook의 진입점.
 
-    stdin에서 JSON을 읽어 Write/Edit/Bash 도구 사용 시
+    stdin에서 JSON을 읽어 Write/Edit/MultiEdit/NotebookEdit/Bash 도구 사용 시
     현재 세션이 워크플로우 implement 세션이고 워크트리가 설정된 경우,
     메인 리포 경로 파일 수정을 차단하고 워크트리 경로를 안내한다.
 
     비tmux 환경, 메인 세션, research/review 세션, 워크트리 없는 세션에서는 통과한다.
-    .claude-organic/ 하위 파일 Write/Edit는 항상 허용한다.
+    `_ALWAYS_ALLOWED_PATTERNS` 와 일치하는 산출물·sidecar 경로는 항상 허용한다.
     """
     # .claude-organic/.settings에서 설정 로드
     hook_flag = os.environ.get("HOOK_WORKTREE_PATH_GUARD") or read_env("HOOK_WORKTREE_PATH_GUARD")
@@ -376,8 +403,8 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Write, Edit, Bash가 아니면 통과
-    if tool_name not in ("Write", "Edit", "Bash"):
+    # 검사 대상 도구가 아니면 통과
+    if tool_name not in ("Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"):
         sys.exit(0)
 
     # 세션 유형 확인 -- 워크플로우 세션이 아니면 통과 (이 가드의 관심사 아님)
@@ -389,9 +416,13 @@ def main() -> None:
 
     command = _get_workflow_command()
 
-    # command 조회 실패 시 통과 (false positive 방지)
+    # command 조회 실패 시: WORKFLOW_WORKTREE_PATH가 주입돼 있으면 implement 가정,
+    # 아니면 통과 (false positive 방지)
     if command is None:
-        sys.exit(0)
+        if os.environ.get("WORKFLOW_WORKTREE_PATH", "").strip():
+            command = _IMPLEMENT_COMMAND
+        else:
+            sys.exit(0)
 
     # command 첫 세그먼트 추출 (체인 command 지원: "research>implement" -> "research")
     first_segment = command.split(">")[0].strip()
@@ -413,17 +444,20 @@ def main() -> None:
     project_root = resolve_project_root()
     tool_input = data.get("tool_input", {})
 
-    if tool_name in ("Write", "Edit"):
-        file_path = tool_input.get("file_path", "")
+    if tool_name in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        if tool_name == "NotebookEdit":
+            file_path = tool_input.get("notebook_path", "")
+        else:
+            file_path = tool_input.get("file_path", "")
         if not file_path:
             sys.exit(0)
 
-        # 항상 허용 경로(.claude-organic/)는 통과
-        if _is_always_allowed_path(file_path):
+        # 항상 허용 경로(메인 산출물·sidecar)는 통과
+        if _is_always_allowed_path(file_path, project_root):
             sys.exit(0)
 
         # 워크트리 하위 경로이면 통과
-        if _is_under_worktree(file_path, worktree_path):
+        if _is_under_worktree(file_path, worktree_path, project_root):
             sys.exit(0)
 
         # 상대 경로인 경우: 메인 리포 루트 기준 상대 경로는 통과 불가
