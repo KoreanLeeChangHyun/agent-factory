@@ -46,6 +46,36 @@
   margin-left: 2px;
 }
 
+/* ── .wf-stop-btn: 워크플로우 강제 중지 버튼 (T-904) ── */
+.wf-stop-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.10);
+  border: 1px solid rgba(244, 135, 113, 0.35);
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.wf-stop-btn:hover {
+  background: rgba(244, 135, 113, 0.20);
+  border-color: rgba(244, 135, 113, 0.60);
+}
+
+.wf-stop-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── .wf-steps-row: horizontal step node list ── */
 .wf-steps-row {
   display: flex;
