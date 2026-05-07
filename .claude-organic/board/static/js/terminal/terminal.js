@@ -135,6 +135,14 @@
   /** @type {Array<{file: File, name: string, size: number, type: string}>} */
   M.attachedFiles = [];
 
+  /**
+   * 칸반 카드 → 메인 터미널 DnD 로 첨부된 티켓 도메인.
+   * 이미지/파일 첨부와 동일하게 send 직후 자동 비움 (M.clearTickets).
+   * 각 항목은 dragstart 시 직렬화된 ticket payload + drop 시점에 한 번 fetch 한 report.md 텍스트.
+   * @type {Array<{number: string, title: string, command: string, prompt: any, result: any, report: string|null, addedAt: number}>}
+   */
+  M.attachedTickets = [];
+
   /** @type {boolean} */
   M.receivedChunks = false;
 
@@ -822,6 +830,65 @@
         var dt = e.dataTransfer;
         var targetInput = document.getElementById("terminal-input");
         if (!targetInput) return;
+
+        // (0) 칸반 카드 드롭 — application/x-board-ticket MIME 우선 처리
+        // dragstart 시 kanban.js 가 set 한 ticket JSON 을 파싱하여 첨부 도메인에 등록.
+        // workdir 보유 시 same-origin 으로 report.md 를 한 번 fetch (실패 시 graceful = null).
+        var ticketJson = "";
+        try {
+          ticketJson = dt.getData("application/x-board-ticket");
+        } catch (_e) {
+          ticketJson = "";
+        }
+        if (ticketJson) {
+          var ticketPayload = null;
+          try {
+            ticketPayload = JSON.parse(ticketJson);
+          } catch (_parseErr) {
+            ticketPayload = null;
+          }
+          if (ticketPayload && typeof ticketPayload === "object") {
+            // workdir 추출: result.workdir 우선 (kanban.js dragstart payload 규약)
+            var workdir = "";
+            if (ticketPayload.result && typeof ticketPayload.result === "object" && typeof ticketPayload.result.workdir === "string") {
+              workdir = ticketPayload.result.workdir;
+            }
+
+            // workdir 정규화: 절대 경로 → 그대로, 상대 경로 → "/" 접두 부여
+            // (보드 서버는 same-origin 이므로 origin 기반 경로 사용)
+            var reportUrl = "";
+            if (workdir) {
+              var normalized = workdir;
+              if (normalized.charAt(0) !== "/") {
+                normalized = "/" + normalized;
+              }
+              if (normalized.charAt(normalized.length - 1) !== "/") {
+                normalized = normalized + "/";
+              }
+              reportUrl = normalized + "report.md";
+            }
+
+            // fetch 는 비동기 — 실패/null 모두 graceful (M.attachTicket 호출은 한 번만)
+            if (reportUrl) {
+              fetch(reportUrl, { cache: "no-store" })
+                .then(function (res) {
+                  if (!res || !res.ok) return null;
+                  return res.text();
+                })
+                .catch(function () {
+                  return null;
+                })
+                .then(function (reportText) {
+                  if (typeof M.attachTicket === "function") {
+                    M.attachTicket(ticketPayload, reportText || null);
+                  }
+                });
+            } else if (typeof M.attachTicket === "function") {
+              M.attachTicket(ticketPayload, null);
+            }
+            return;
+          }
+        }
 
         // (a) 파일 드롭 — 이미지: attachedImages에 추가 + 썸네일 / 비이미지: 파일 카드 + 파일명 삽입
         if (dt.files && dt.files.length > 0) {
