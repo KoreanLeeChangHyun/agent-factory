@@ -18,11 +18,21 @@ from .handlers.sync import SyncHandlerMixin
 from .handlers.generic import GenericHandlerMixin
 from .handlers.terminal import TerminalHandlerMixin
 from .handlers.workflow import WorkflowHandlerMixin
+from .handlers.kanban import KanbanHandlerMixin
+from .handlers.workflow_undo import WorkflowUndoHandlerMixin
+from .handlers.metrics import MetricsHandlerMixin
+from .handlers.worktree_status import WorktreeStatusHandlerMixin
+from .handlers.memory_gc import MemoryGcHandlerMixin
 
 
 class BoardHTTPRequestHandler(
     TerminalHandlerMixin,
     WorkflowHandlerMixin,
+    KanbanHandlerMixin,
+    WorkflowUndoHandlerMixin,
+    MetricsHandlerMixin,
+    WorktreeStatusHandlerMixin,
+    MemoryGcHandlerMixin,
     FilesHandlerMixin,
     GenericHandlerMixin,
     SyncHandlerMixin,
@@ -258,6 +268,21 @@ class BoardHTTPRequestHandler(
             return None
 
         return data
+
+    def _send_json_with_status(self, status: int, data: object) -> None:
+        """지정한 HTTP 상태 코드로 JSON 응답을 전송한다.
+
+        Args:
+            status: HTTP 상태 코드
+            data: JSON 직렬화 가능한 응답 본문
+        """
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
 
     def _send_error(self, code: int, message: str) -> None:
         """에러 응답을 JSON 형식으로 전송한다.
