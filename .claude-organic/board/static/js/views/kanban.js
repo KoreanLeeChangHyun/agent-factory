@@ -1534,80 +1534,9 @@
   }
 
   /**
-   * Review 티켓을 메인 터미널 채팅 입력란에 prefill 한다.
-   * report.md 가 있으면 함께 첨부 + 메인 터미널 탭으로 전환.
-   * 후속 처리(버그 수정 / 구현 티켓 박제 등) 는 사용자 자연어 발화로 진행.
-   *
-   * @param {Object} ticket - Review 카드 티켓 객체
-   */
-  function attachReviewTicketToChat(ticket) {
-    var lines = [];
-    lines.push("## " + ticket.number + " [" + (ticket.command || "") + "] " + (ticket.title || "(제목 없음)"));
-    lines.push("");
-
-    if (ticket.prompt) {
-      lines.push("### Prompt");
-      Object.keys(ticket.prompt).forEach(function (key) {
-        var content = ticket.prompt[key] || "";
-        var contentLines = content.split("\n").filter(function (l) { return l.trim(); });
-        if (contentLines.length === 1) {
-          lines.push("- " + key + ": " + contentLines[0]);
-        } else if (contentLines.length > 1) {
-          lines.push("- " + key + ":");
-          contentLines.forEach(function (l) { lines.push("  " + l); });
-        }
-      });
-      lines.push("");
-    }
-
-    var basePrefill = lines.join("\n");
-    var workdir = (ticket.result && ticket.result.workdir) || "";
-
-    var reportFetch;
-    if (workdir) {
-      // workdir 형식: ".claude-organic/runs/<key>/.../<command>/"
-      // 정적 서빙 경로: "/.claude-organic/runs/..."
-      var reportUrl = "/" + workdir.replace(/^\/+/, "");
-      if (!reportUrl.endsWith("/")) reportUrl += "/";
-      reportUrl += "report.md";
-      reportFetch = fetch(reportUrl, { cache: "no-store" }).then(function (res) {
-        if (!res.ok) return null;
-        return res.text();
-      }).catch(function () { return null; });
-    } else {
-      reportFetch = Promise.resolve(null);
-    }
-
-    reportFetch.then(function (report) {
-      var fullText = basePrefill;
-      if (report) {
-        fullText += "### Result (report.md)\n\n" + report.trim() + "\n\n";
-      }
-      fullText += "---\n\n";  // 사용자 입력 영역 구분선
-
-      // 메인 터미널 탭으로 전환
-      if (Board.util.switchTab) {
-        Board.util.switchTab("terminal");
-      }
-
-      // 입력란 prefill + focus + auto-resize 트리거
-      // setTimeout 으로 탭 전환 + DOM 렌더 후 실행
-      setTimeout(function () {
-        var input = document.getElementById("terminal-input");
-        if (!input) return;
-        input.value = fullText;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.focus();
-        // caret 을 끝으로
-        try { input.setSelectionRange(fullText.length, fullText.length); } catch (e) {}
-      }, 50);
-    });
-  }
-
-  /**
    * Review 카드 우클릭 컨텍스트 메뉴.
-   * 옵션: (a) Open 으로 재작업 (POST /api/kanban/move),
-   *       (b) 채팅에 첨부 (메인 터미널 입력란 prefill).
+   * 옵션: (a) Open 으로 재작업 (POST /api/kanban/move).
+   * 채팅 첨부는 DnD 로 일원화 (T-427).
    * Review → In Progress 전이 폐기 (2026-05-08 사용자 명시).
    *
    * @param {MouseEvent} event - contextmenu 이벤트
@@ -1649,7 +1578,6 @@
     }
 
     const reopenItem = makeMenuItem("Open 으로 재작업");
-    const attachItem = makeMenuItem("채팅에 첨부");
 
     function cleanup() {
       document.removeEventListener("click", outsideHandler, true);
@@ -1683,14 +1611,7 @@
       });
     });
 
-    attachItem.addEventListener("click", function (e) {
-      e.stopPropagation();
-      cleanup();
-      attachReviewTicketToChat(ticket);
-    });
-
     menu.appendChild(reopenItem);
-    menu.appendChild(attachItem);
     document.body.appendChild(menu);
 
     const x = event.clientX;
@@ -1737,6 +1658,22 @@
         draggedFrom = card.dataset.colKey;
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", draggedNum);
+        // T-427: ticket JSON 페이로드를 별도 MIME 으로 전달 (터미널 drop 분기 전용)
+        var ticketObj = (Board.state.TICKETS || []).find(function (t) {
+          return t.number === draggedNum;
+        });
+        if (ticketObj) {
+          var payload = {
+            number: ticketObj.number,
+            title: ticketObj.title || "",
+            command: ticketObj.command || "",
+            prompt: ticketObj.prompt || null,
+            result: ticketObj.result || null,
+          };
+          try {
+            e.dataTransfer.setData("application/x-board-ticket", JSON.stringify(payload));
+          } catch (ex) { /* 일부 브라우저 제한 — 무시 */ }
+        }
         card.classList.add("card-dragging");
       });
       card.addEventListener("dragend", function () {
@@ -2109,7 +2046,7 @@
       });
     });
 
-    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" + "채팅에 첨부")
+    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" 단일 옵션)
     el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();

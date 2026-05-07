@@ -1036,3 +1036,86 @@
   color: #f44747;
   background: rgba(244, 71, 71, 0.15);
 }
+
+/* ═══════════════════════════════════════════════════════
+   Section 4: Ticket Attachment Card
+   ───────────────────────────────────────────────────────
+   .terminal-ticket-card        — 가로형 카드 컨테이너 (배지 | 본문 | remove)
+   .terminal-ticket-card-cmd    — 명령어 배지 (RSC / IMP / REV)
+   .terminal-ticket-card-body   — 제목 + 부제 본문 영역
+   재사용: .terminal-image-remove — ✕ 버튼 (별도 정의 불필요)
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Ticket Card Container ── */
+.terminal-ticket-card {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-width: 140px;
+  max-width: 220px;
+  height: 56px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  cursor: default;
+  transition: border-color 0.15s;
+}
+
+.terminal-ticket-card:hover {
+  border-color: #D97757;
+}
+
+/* ── Command Badge (RSC / IMP / REV) ── */
+.terminal-ticket-card-cmd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-width: 26px;
+  background: #D97757;
+  color: #1e1e1e;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.03em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  flex-shrink: 0;
+  padding: 4px 0;
+}
+
+/* ── Body: Title + Subtitle ── */
+.terminal-ticket-card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 26px 6px 8px;
+  gap: 3px;
+}
+
+.terminal-ticket-card-title {
+  font-size: 12px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.terminal-ticket-card-sub {
+  font-size: 9px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
