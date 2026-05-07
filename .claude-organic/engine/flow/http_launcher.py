@@ -376,6 +376,22 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         _log("ERROR", f"http_launcher: start API failed status={e.code} body={error_body}")
         print(f"[ERROR] 워크플로우 세션 시작 실패 (HTTP {e.code}): {error_body}", file=sys.stderr)
         return 1
+    except urllib.error.URLError as e:
+        # T-904: timeout 후 spawn 된 워커가 살아있을 가능성 — best-effort 정리
+        if isinstance(e.reason, TimeoutError) or 'timed out' in str(e).lower():
+            try:
+                _wf_root = os.path.dirname(_engine_dir)
+                _flow_stop_bin = os.path.join(_wf_root, "bin", "flow-stop")
+                subprocess.run(
+                    [_flow_stop_bin, ticket_id, '--by-launcher-timeout', '--json'],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass  # best-effort, 사용자에게 노출하지 않음
+        _log("ERROR", f"http_launcher: start API URL error {e}")
+        print(f"[ERROR] 워크플로우 세션 시작 실패: {e}", file=sys.stderr)
+        return 1
     except Exception as e:
         _log("ERROR", f"http_launcher: start API error {e}")
         print(f"[ERROR] 워크플로우 세션 시작 실패: {e}", file=sys.stderr)

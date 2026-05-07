@@ -121,6 +121,8 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_start()
         elif self.path == '/terminal/workflow/kill':
             self._handle_workflow_kill()
+        elif self.path == '/api/workflow/stop':
+            self._handle_workflow_stop()
         elif self.path == '/terminal/workflow/input':
             self._handle_workflow_input()
         elif self.path == '/terminal/workflow/step':

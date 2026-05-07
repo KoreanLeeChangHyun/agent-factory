@@ -957,6 +957,10 @@
       if (st.workId) {
         html += '<span class="wf-meta-id">#' + _esc(st.workId) + '</span>';
       }
+      // [중지] 버튼 — 진행 중 세션에만 표시 (T-904)
+      if (st.status === "running") {
+        html += '<button class="wf-stop-btn" title="워크플로우 강제 중지">중지</button>';
+      }
       html += '</div>';
       return html;
     }
@@ -1054,6 +1058,61 @@
               }
             });
           })(links[i]);
+        }
+
+        // [중지] 버튼 핸들러 바인딩 (T-904)
+        var stopBtn = bar.querySelector(".wf-stop-btn");
+        if (stopBtn) {
+          stopBtn.addEventListener("click", function () {
+            if (!confirm("이 워크플로우를 강제 중지합니다. 현재 작업은 폐기될 수 있습니다. 계속하시겠습니까?")) {
+              return;
+            }
+            // session_id 와 ticket_id 수집
+            var sessionId = (Board._term && Board._term.workflowSessionId) || null;
+            var ticketId = null;
+            if (sessionId) {
+              // "wf-T-NNN-YYYYMMDD-HHMMSS" → "T-NNN"
+              var m = sessionId.match(/^wf-(T-\d+)/);
+              if (m) ticketId = m[1];
+            }
+            if (!sessionId && !ticketId) {
+              alert("세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.");
+              return;
+            }
+            stopBtn.disabled = true;
+            stopBtn.textContent = "중지 중...";
+            var body = {};
+            if (ticketId) {
+              body.ticket = ticketId;
+            } else {
+              body.session_id = sessionId;
+            }
+            fetch("/api/workflow/stop", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            }).then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            }).then(function (result) {
+              if (!result.ok || !result.data.ok) {
+                var errMsg = (result.data && result.data.errors && result.data.errors[0]) || "알 수 없는 오류";
+                alert("중지 실패: " + errMsg);
+                stopBtn.disabled = false;
+                stopBtn.textContent = "중지";
+                return;
+              }
+              // 탭/카드 동기화 가속
+              if (Board.workflowSessions && typeof Board.workflowSessions.refresh === "function") {
+                Board.workflowSessions.refresh();
+              }
+            }).catch(function (err) {
+              alert("중지 요청 중 오류가 발생했습니다: " + err.message);
+              stopBtn.disabled = false;
+              stopBtn.textContent = "중지";
+            });
+          });
         }
 
         // Timer management: start if there's an active step, stop if done/failed
