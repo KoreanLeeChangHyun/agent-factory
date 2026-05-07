@@ -317,7 +317,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
             prompt_data[field] = ""
 
     # flat 구조: <result> 루트 직하에서 하위 요소 파싱
-    result_fields = ("registrykey", "workdir", "plan", "report")
+    result_fields = ("registrykey", "workdir", "plan", "report", "merge_commit")
     result_data: dict[str, str] | None = None
     result_elem = root.find("result")
     if result_elem is not None and len(result_elem) > 0:
@@ -485,7 +485,7 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
     Args:
         filepath: 티켓 파일 경로.
         updates: 갱신할 필드 딕셔너리.
-            - registrykey, workdir, plan, report: <result> 하위 요소 갱신
+            - registrykey, workdir, plan, report, merge_commit: <result> 하위 요소 갱신
     """
     try:
         tree = ET.parse(filepath)
@@ -493,7 +493,7 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
     except (OSError, ET.ParseError) as e:
         err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
 
-    result_fields = ("registrykey", "workdir", "plan", "report")
+    result_fields = ("registrykey", "workdir", "plan", "report", "merge_commit")
     result_updates = {k: v for k, v in updates.items() if k in result_fields}
 
     if result_updates:

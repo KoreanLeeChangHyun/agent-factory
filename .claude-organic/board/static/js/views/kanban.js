@@ -572,6 +572,379 @@
   }
 
   /**
+   * T-905 Phase 3: Done 카드 우클릭 → "Review 로 롤백" 확인 모달.
+   *
+   * push 전(local-only) / push 후(origin/develop 도달) 분기 안내 + force 옵션 체크박스.
+   * pre-detect: 칸반 result.merge_commit 존재 여부를 사전 점검하여
+   * 누락 시 force 옵션이 필요함을 명시 안내한다.
+   *
+   * @param {Object} ticket - Done 컬럼 카드 티켓 객체 (number/result 포함)
+   * @param {Function} onConfirm - confirm 콜백 (force: bool 인자 전달)
+   * @param {Function} onCancel - 취소/ESC/overlay 콜백
+   */
+  function showUndoDoneConfirmModal(ticket, onConfirm, onCancel) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "undo-done-confirm-title");
+
+    const title = document.createElement("h3");
+    title.id = "undo-done-confirm-title";
+    title.className = "submit-confirm-title";
+    title.appendChild(document.createTextNode(ticket.number + " Review 로 롤백"));
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    const intro = document.createElement("p");
+    intro.textContent = "이 티켓의 Done 처리를 되돌립니다. develop 의 머지 결과를 자동으로 분기 처리합니다:";
+    body.appendChild(intro);
+
+    const ul = document.createElement("ul");
+    const li1 = document.createElement("li");
+    li1.textContent = "push 전(local-only): reset --hard 로 머지 commit 제거";
+    const li2 = document.createElement("li");
+    li2.textContent = "push 후(origin/develop 포함): revert -m 1 로 역방향 commit 추가 (force-push 없음)";
+    const li3 = document.createElement("li");
+    li3.textContent = "feature 브랜치 + 워크트리 재생성 + 칸반 Done → Review 강제 전이";
+    ul.appendChild(li1);
+    ul.appendChild(li2);
+    ul.appendChild(li3);
+    body.appendChild(ul);
+
+    // pre-detect: result.merge_commit 누락 여부
+    const result = ticket.result || {};
+    const hasMergeCommit = !!(result.merge_commit && String(result.merge_commit).trim());
+    if (!hasMergeCommit) {
+      const warn = document.createElement("p");
+      warn.style.color = "#D97757";
+      warn.style.fontWeight = "600";
+      warn.textContent = "주의: 이 티켓에는 merge_commit 정보가 없습니다 (Phase 1 인프라 도입 이전 Done). reflog fallback 을 시도하려면 아래 force 옵션을 활성화하세요.";
+      body.appendChild(warn);
+    }
+
+    // force 옵션 체크박스
+    const forceWrapper = document.createElement("label");
+    forceWrapper.style.display = "flex";
+    forceWrapper.style.alignItems = "center";
+    forceWrapper.style.gap = "8px";
+    forceWrapper.style.marginTop = "10px";
+    forceWrapper.style.cursor = "pointer";
+    const forceCheckbox = document.createElement("input");
+    forceCheckbox.type = "checkbox";
+    forceCheckbox.id = "undo-done-force";
+    if (!hasMergeCommit) {
+      forceCheckbox.checked = true;
+    }
+    const forceLabel = document.createElement("span");
+    forceLabel.textContent = "--force (점유 경고 무시 + reflog fallback 활성화)";
+    forceWrapper.appendChild(forceCheckbox);
+    forceWrapper.appendChild(forceLabel);
+    body.appendChild(forceWrapper);
+
+    const tail = document.createElement("p");
+    tail.style.marginTop = "10px";
+    tail.textContent = "계속할까요?";
+    body.appendChild(tail);
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
+    cancelBtn.textContent = "취소";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    confirmBtn.textContent = "Review 로 롤백";
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireCancel() {
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+    function fireConfirm() {
+      const force = !!forceCheckbox.checked;
+      cleanup();
+      if (typeof onConfirm === "function") onConfirm(force);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireCancel();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireCancel();
+    });
+    cancelBtn.addEventListener("click", fireCancel);
+    confirmBtn.addEventListener("click", fireConfirm);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
+  }
+
+  /**
+   * T-905 Phase 3: undo-done 결과 모달.
+   * showDoneResultModal 패턴 답습.
+   *
+   * @param {"reset_ok"|"revert_ok"|"unknown_ok"|"error"} kind - 결과 종류
+   * @param {Object} payload - 결과 데이터
+   *   - reset_ok / revert_ok: { ticket, strategy, branch, worktree_path, message }
+   *   - error: { ticket, error, message, stderr }
+   * @param {Function} onClose - 닫기 콜백 (성공 시 보드 자동 새로고침에 활용)
+   */
+  function showUndoDoneResultModal(kind, payload, onClose) {
+    const overlay = document.createElement("div");
+    overlay.className = "submit-confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "submit-confirm-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "undo-done-result-title");
+
+    const title = document.createElement("h3");
+    title.id = "undo-done-result-title";
+    title.className = "submit-confirm-title";
+
+    const body = document.createElement("div");
+    body.className = "submit-confirm-body";
+
+    if (kind === "reset_ok" || kind === "revert_ok" || kind === "unknown_ok") {
+      title.textContent = "Review 로 롤백 완료";
+
+      const summary = document.createElement("p");
+      const ticketStr = payload.ticket || "";
+      const strategyStr = payload.strategy
+        ? (payload.strategy === "reset" ? "reset --hard (push 전)" : payload.strategy === "revert" ? "revert -m 1 (push 후)" : payload.strategy)
+        : "?";
+      summary.textContent = ticketStr + " 롤백 완료 — 전략: " + strategyStr;
+      body.appendChild(summary);
+
+      if (payload.branch) {
+        const br = document.createElement("p");
+        br.textContent = "재생성된 feature 브랜치: " + payload.branch;
+        body.appendChild(br);
+      }
+      if (payload.worktree_path) {
+        const wt = document.createElement("p");
+        wt.textContent = "재생성된 워크트리: " + payload.worktree_path;
+        body.appendChild(wt);
+      }
+
+      const guideTitle = document.createElement("p");
+      guideTitle.style.marginTop = "10px";
+      guideTitle.style.fontWeight = "600";
+      guideTitle.textContent = "다음 절차:";
+      body.appendChild(guideTitle);
+      const ol = document.createElement("ol");
+      const liE = document.createElement("li");
+      liE.textContent = "/wf -e " + ticketStr + " 로 티켓을 편집하거나 직접 수정";
+      const liS = document.createElement("li");
+      liS.textContent = "/wf -s " + ticketStr + " 로 워크플로우 재실행";
+      ol.appendChild(liE);
+      ol.appendChild(liS);
+      body.appendChild(ol);
+    } else {
+      title.textContent = "Review 로 롤백 실패";
+      const msg = document.createElement("p");
+      msg.textContent = (payload && (payload.error || payload.message)) || "알 수 없는 오류가 발생했습니다.";
+      body.appendChild(msg);
+
+      if (payload && payload.stderr) {
+        const stderrTitle = document.createElement("p");
+        stderrTitle.style.marginTop = "8px";
+        stderrTitle.style.fontWeight = "600";
+        stderrTitle.textContent = "stderr:";
+        body.appendChild(stderrTitle);
+        const pre = document.createElement("pre");
+        pre.style.maxHeight = "200px";
+        pre.style.overflow = "auto";
+        pre.style.background = "#1e1e1e";
+        pre.style.padding = "8px";
+        pre.style.fontSize = "11px";
+        pre.textContent = payload.stderr;
+        body.appendChild(pre);
+      }
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "submit-confirm-actions";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
+    closeBtn.textContent = "확인";
+
+    actions.appendChild(closeBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(body);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+
+    function cleanup() {
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function fireClose() {
+      cleanup();
+      if (typeof onClose === "function") onClose();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fireClose();
+      }
+    }
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) fireClose();
+    });
+    closeBtn.addEventListener("click", fireClose);
+    document.addEventListener("keydown", onKey);
+
+    document.body.appendChild(overlay);
+    closeBtn.focus();
+  }
+
+  /**
+   * T-905 Phase 3: Done 카드 컨텍스트 메뉴 (우클릭).
+   *
+   * "Review 로 롤백" 단일 항목 노출. 클릭 시 showUndoDoneConfirmModal 호출.
+   * 메뉴는 documentLevel 클릭 또는 ESC 로 닫힌다.
+   *
+   * @param {MouseEvent} event - contextmenu 이벤트
+   * @param {Object} ticket - Done 카드 티켓 객체
+   */
+  function showDoneCardContextMenu(event, ticket) {
+    // 기존 컨텍스트 메뉴가 열려 있으면 제거
+    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+      if (m.parentNode) m.parentNode.removeChild(m);
+    });
+
+    const menu = document.createElement("div");
+    menu.className = "kanban-card-context-menu";
+    menu.style.position = "fixed";
+    menu.style.zIndex = "10000";
+    menu.style.background = "#252526";
+    menu.style.border = "1px solid #3c3c3c";
+    menu.style.borderRadius = "4px";
+    menu.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.4)";
+    menu.style.minWidth = "180px";
+    menu.style.padding = "4px 0";
+    menu.style.fontSize = "13px";
+
+    const item = document.createElement("button");
+    item.type = "button";
+    item.style.display = "block";
+    item.style.width = "100%";
+    item.style.padding = "6px 12px";
+    item.style.textAlign = "left";
+    item.style.background = "transparent";
+    item.style.border = "none";
+    item.style.color = "#cccccc";
+    item.style.cursor = "pointer";
+    item.style.fontSize = "13px";
+    item.textContent = "Review 로 롤백";
+    item.addEventListener("mouseenter", function () {
+      item.style.background = "#094771";
+    });
+    item.addEventListener("mouseleave", function () {
+      item.style.background = "transparent";
+    });
+
+    function cleanup() {
+      document.removeEventListener("click", outsideHandler, true);
+      document.removeEventListener("keydown", onKey);
+      if (menu.parentNode) menu.parentNode.removeChild(menu);
+    }
+    function outsideHandler(e) {
+      if (!menu.contains(e.target)) cleanup();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup();
+      }
+    }
+
+    item.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cleanup();
+      showUndoDoneConfirmModal(
+        ticket,
+        function (force) {
+          // [Review 로 롤백] 콜백
+          fetch("/api/workflow/undo-done", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticket: ticket.number, force: force }),
+          }).then(function (res) {
+            return res.json().then(function (body) {
+              return { res: res, body: body };
+            });
+          }).then(function (r) {
+            if (r.res.ok && r.body.ok) {
+              showUndoDoneResultModal(r.body.kind || "unknown_ok", r.body, function () {
+                fetchTickets().then(renderKanban);
+              });
+            } else {
+              showUndoDoneResultModal("error", r.body || {}, function () { renderKanban(); });
+            }
+          }).catch(function (err) {
+            console.error("[kanban undo-done] failed:", err);
+            showUndoDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+          });
+        },
+        function () {
+          // 취소: 아무 것도 안 함
+        }
+      );
+    });
+
+    menu.appendChild(item);
+    document.body.appendChild(menu);
+
+    // 위치 보정: viewport 밖으로 나가지 않도록
+    const x = event.clientX;
+    const y = event.clientY;
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = (window.innerWidth - rect.width - 8) + "px";
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = (window.innerHeight - rect.height - 8) + "px";
+    }
+
+    // 외부 클릭 / ESC 로 닫기
+    setTimeout(function () {
+      document.addEventListener("click", outsideHandler, true);
+      document.addEventListener("keydown", onKey);
+    }, 0);
+  }
+
+  /**
    * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
    * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
    *
@@ -879,6 +1252,16 @@
         const num = card.dataset.num;
         const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
         if (ticket) Board.render.openViewer(ticket);
+      });
+    });
+
+    // T-905 Phase 3: Done 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Review 로 롤백")
+    el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
+      card.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        const num = card.dataset.num;
+        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+        if (ticket) showDoneCardContextMenu(e, ticket);
       });
     });
 

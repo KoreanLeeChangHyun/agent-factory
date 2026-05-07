@@ -475,6 +475,15 @@ def cmd_done(ticket_number: str) -> None:
                 else:
                     print(f"{ticket_number}: {merge_result.merged_branch} -> develop 병합 완료 ({merge_result.merge_commit[:8]})", flush=True)
                     log("INFO", f"kanban.py: worktree merge {merge_result.merged_branch} -> develop ({merge_result.merge_commit[:8]})")
+                    # T-905: merge_commit SHA 를 result 메타에 저장 (Done 롤백 인프라)
+                    if merge_result.merge_commit:
+                        try:
+                            _ticket_file_for_result = find_ticket_file(ticket_number)
+                            if _ticket_file_for_result is not None:
+                                update_result(_ticket_file_for_result, {"merge_commit": merge_result.merge_commit})
+                                log("INFO", f"kanban.py: result.merge_commit 저장 ({merge_result.merge_commit[:8]})")
+                        except Exception as _ur_err:
+                            print(f"[WARN] result.merge_commit 저장 실패 (계속 진행): {_ur_err}", flush=True)
     except ImportError:
         pass  # worktree 모듈 미설치 시 무시 (하위 호환)
     except Exception as _wt_err:
@@ -703,6 +712,7 @@ def cmd_update_result(
     workdir: str = "",
     plan: str = "",
     report: str = "",
+    merge_commit: str = "",
 ) -> None:
     """티켓 XML의 <result> 하위 요소를 갱신한다.
 
@@ -712,6 +722,7 @@ def cmd_update_result(
         workdir: 워크플로우 산출물 디렉터리 상대 경로.
         plan: plan.md 상대 경로.
         report: report.md 상대 경로.
+        merge_commit: feature -> develop 머지 커밋 SHA (40자 hex).
 
     Raises:
         SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
@@ -729,6 +740,8 @@ def cmd_update_result(
         updates["plan"] = plan
     if report:
         updates["report"] = report
+    if merge_commit:
+        updates["merge_commit"] = merge_commit
 
     if not updates:
         err("갱신할 필드가 없습니다.", 2)
@@ -1208,6 +1221,7 @@ def build_parser() -> argparse.ArgumentParser:
     update_result_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
     update_result_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
     update_result_parser.add_argument("--report", default="", help="report.md 상대 경로")
+    update_result_parser.add_argument("--merge-commit", dest="merge_commit", default="", help="feature -> develop 머지 커밋 SHA")
 
     # set-editing 서브커맨드
     set_editing_parser = subparsers.add_parser("set-editing", help="티켓 XML의 <editing> 플래그를 설정한다")
@@ -1320,6 +1334,7 @@ def dispatch(args: argparse.Namespace) -> None:
             workdir=args.workdir,
             plan=args.plan,
             report=args.report,
+            merge_commit=args.merge_commit,
         )
 
     elif args.subcommand == "set-editing":

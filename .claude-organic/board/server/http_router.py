@@ -149,6 +149,8 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_submit()
         elif self.path == '/api/kanban/done':
             self._handle_kanban_done()
+        elif self.path == '/api/workflow/undo-done':
+            self._handle_workflow_undo_done()
         else:
             self.send_response(404)
             self.end_headers()
