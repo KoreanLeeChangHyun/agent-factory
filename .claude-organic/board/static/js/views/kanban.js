@@ -140,6 +140,31 @@
 
   // ── Fetch Tickets ──
 
+  // ── Worktree Status Cache ──
+  // 1 fetch per renderKanban cycle. null = not yet loaded (graceful: badge omitted).
+  var _worktreeStatusMap = null;
+
+  /**
+   * Fetches /api/worktree/status/all and populates _worktreeStatusMap.
+   * Silently degrades on error (map remains null or stale).
+   * @returns {Promise<void>}
+   */
+  function fetchAndCacheWorktreeStatus() {
+    return fetch("/api/worktree/status/all", { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return;
+      return res.json().then(function (list) {
+        if (!Array.isArray(list)) return;
+        var map = new Map();
+        list.forEach(function (item) {
+          if (item && item.ticket) map.set(item.ticket, item);
+        });
+        _worktreeStatusMap = map;
+      });
+    }).catch(function () {
+      // API unavailable (worktree mode off, etc.) — leave map unchanged
+    });
+  }
+
   /** Fetches all tickets via /api/kanban (single request). */
   function fetchTickets() {
     return fetch("/api/kanban", { cache: "no-store" }).then(function (res) {
@@ -154,7 +179,14 @@
         }
       });
       return tickets;
-    }).catch(function () { return []; });
+    }).catch(function () { return []; }).then(function (tickets) {
+      // Co-fetch worktree status so renderKanban always has fresh data.
+      // fetchAndCacheWorktreeStatus is fire-and-forget w.r.t. error handling.
+      return fetchAndCacheWorktreeStatus().then(
+        function () { return tickets; },
+        function () { return tickets; }
+      );
+    });
   }
 
   /**
@@ -279,6 +311,39 @@
     });
 
     return '<div class="card-relations">' + parts.join("") + "</div>";
+  }
+
+  /**
+   * T-419: 워크트리 상태 배지 HTML을 생성한다.
+   * 작업물이 있는 티켓(uncommitted_count > 0 || feature_commits > 0 || lock)만 표시.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-419")
+   * @returns {string} span.card-worktree-badge HTML 또는 빈 문자열
+   */
+  function renderWorktreeBadge(ticketNum) {
+    if (!_worktreeStatusMap) return "";
+    var st = _worktreeStatusMap.get(ticketNum);
+    if (!st) return "";
+    var hasWork = st.lock || (st.uncommitted_count > 0) || (st.feature_commits > 0);
+    if (!hasWork) return "";
+
+    var parts = [];
+    if (st.lock) {
+      parts.push("wt locked");
+    } else {
+      if (st.uncommitted_count > 0) parts.push("wt " + st.uncommitted_count + "M");
+      if (st.feature_commits > 0) parts.push((parts.length > 0 ? "/ " : "wt ") + st.feature_commits + "c");
+    }
+    var label = parts.join(" ");
+
+    var tooltip = [
+      "branch: " + (st.branch || ""),
+      "head: " + (st.head || ""),
+      "uncommitted: " + (st.uncommitted_count || 0),
+      "commits ahead: " + (st.feature_commits || 0),
+      "locked: " + (!!st.lock),
+    ].join(" | ");
+
+    return '<span class="card-worktree-badge" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
@@ -1778,6 +1843,7 @@
             if (hasRelations) {
               h += renderRelations(t);
             }
+            h += renderWorktreeBadge(t.number);
             h += '</div>';
             h += '<div class="card-bottom-right">';
             h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
