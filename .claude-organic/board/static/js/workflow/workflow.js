@@ -76,12 +76,13 @@ function fetchEntryDetail(entryHref) {
 function findTicketForWorkflow(w) {
   const basePath = w.basePath || "";
   const entry = w.entry || "";
+  const wfTicket = (w.ticketNumber || "").trim();
   const tickets = Board.state.TICKETS;
+  // 1차: 칸반 ticket.result.workdir / registrykey 매칭
   for (let ti = 0; ti < tickets.length; ti++) {
     const ticket = tickets[ti];
     const result = ticket.result;
     if (!result) continue;
-    // Match by workdir path (basePath-based)
     if (result.workdir) {
       let wd = result.workdir;
       if (wd.charAt(wd.length - 1) !== "/") wd += "/";
@@ -90,9 +91,14 @@ function findTicketForWorkflow(w) {
       if (decodeURIComponent(normalized) === decodeURIComponent(basePath)
           || decodeURIComponent(normalizedResolved) === decodeURIComponent(basePath)) return ticket;
     }
-    // Fallback: match by registrykey
     if (result.registrykey && entry && result.registrykey === entry) {
       return ticket;
+    }
+  }
+  // 2차 fallback: 워크플로우 .context.json 의 ticketNumber 로 칸반 lookup
+  if (wfTicket) {
+    for (let ti = 0; ti < tickets.length; ti++) {
+      if (tickets[ti].number === wfTicket) return tickets[ti];
     }
   }
   return null;
