@@ -78,6 +78,7 @@ function findTicketForWorkflow(w) {
   const entry = w.entry || "";
   const wfTicket = (w.ticketNumber || "").trim();
   const tickets = Board.state.TICKETS;
+  if (!Array.isArray(tickets) || tickets.length === 0) return null;
   // 1차: 칸반 ticket.result.workdir / registrykey 매칭
   for (let ti = 0; ti < tickets.length; ti++) {
     const ticket = tickets[ti];
@@ -98,7 +99,8 @@ function findTicketForWorkflow(w) {
   // 2차 fallback: 워크플로우 .context.json 의 ticketNumber 로 칸반 lookup
   if (wfTicket) {
     for (let ti = 0; ti < tickets.length; ti++) {
-      if (tickets[ti].number === wfTicket) return tickets[ti];
+      const tn = (tickets[ti].number || "").trim();
+      if (tn === wfTicket) return tickets[ti];
     }
   }
   return null;
