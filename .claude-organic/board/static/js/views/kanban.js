@@ -516,6 +516,49 @@
   }
 
   /**
+   * T-439: Review 카드 우하단 1-click 완료 액션 핸들러.
+   * showDoneConfirmModal → POST /api/kanban/done → showDoneResultModal 체인을
+   * DnD Review→Done 분기(kanban.js:1791-1826)와 동일한 시그니처로 재사용한다.
+   * @param {Object} ticketObj - 티켓 객체 (number 포함)
+   */
+  function handleReviewDoneAction(ticketObj) {
+    var capturedNum = ticketObj.number;
+    showDoneConfirmModal(
+      ticketObj,
+      function () {
+        // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+        fetch("/api/kanban/done", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: capturedNum }),
+        }).then(function (res) {
+          return res.json().then(function (body) {
+            return { res: res, body: body };
+          });
+        }).then(function (r) {
+          if (r.res.ok && r.body.ok) {
+            showDoneResultModal("success", r.body, function () {
+              fetchTickets().then(renderKanban);
+            });
+          } else {
+            var kind = r.body.error_kind === "merge_conflict" ? "conflict"
+              : r.body.error_kind === "dirty_worktree" ? "dirty"
+              : "error";
+            showDoneResultModal(kind, r.body, function () { renderKanban(); });
+          }
+        }).catch(function (err) {
+          console.error("[kanban card-done-action] done failed:", err);
+          showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+        });
+      },
+      function () {
+        // [취소]/ESC/overlay 콜백: 카드 원위치 유지
+        renderKanban();
+      }
+    );
+  }
+
+  /**
    * T-418: Open → Done 직접 전이 confirm 모달.
    *
    * Review 를 거치지 않고 Done 으로 이동. 워크트리/feature 브랜치 폐기.
@@ -1958,7 +2001,7 @@
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 하단: 왼쪽(체인/관계)
+            // 하단: 왼쪽(체인/관계) + 우측(Review 카드만 완료 액션 아이콘)
             h += '<div class="card-bottom">';
             h += '<div class="card-bottom-left">';
             const hasRelations = t.relations && t.relations.length > 0;
@@ -1966,6 +2009,16 @@
               h += renderRelations(t);
             }
             h += '</div>';
+            // T-439: Review 카드만 우하단 완료 액션 아이콘 노출
+            if (col.key === "Review") {
+              h += '<div class="card-bottom-right">';
+              h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="완료 처리" draggable="false">';
+              h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+              h += '<polyline points="2,7 5.5,10.5 12,3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
+              h += '</svg>';
+              h += '</button>';
+              h += '</div>';
+            }
             h += "</div>";
             h += "</div>";
           });
@@ -1986,6 +2039,15 @@
         if (badge) {
           e.stopPropagation();
           handleUncommittedBadgeClick(badge);
+          return;
+        }
+        // T-439: Review 카드 우하단 완료 액션 버튼 클릭 → handleReviewDoneAction 위임
+        var doneAction = e.target.closest(".card-done-action");
+        if (doneAction) {
+          e.stopPropagation();
+          const num = card.dataset.num;
+          const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+          if (ticket) handleReviewDoneAction(ticket);
           return;
         }
         const num = card.dataset.num;
