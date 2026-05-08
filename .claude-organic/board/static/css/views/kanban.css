@@ -196,10 +196,42 @@
   flex-shrink: 0;
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
 }
 
 .card-bottom-left {
   flex-shrink: 0;
+}
+
+/* T-439: Review 카드 우하단 완료 액션 영역 */
+.card-bottom-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.card-done-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(78, 201, 176, 0.35);
+  border-radius: 4px;
+  color: #4ec9b0;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.card-done-action:hover {
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.55);
+  background: rgba(217, 119, 87, 0.08);
 }
 
 .card-title {
