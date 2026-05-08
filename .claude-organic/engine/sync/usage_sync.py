@@ -507,26 +507,66 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     return None
 
 
-def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optional[str]:
-    """agent-<id>.jsonl의 agent_type을 식별. _agent_map 우선, JSONL 폴백.
+def _resolve_agent_type(
+    agent_filename: str,
+    agent_map: dict[str, str],
+    subagents_dir: Optional[str] = None,
+) -> Optional[str]:
+    """agent-<id>.jsonl의 agent_type을 식별. 다중 폴백 체인 적용.
+
+    폴백 순서:
+      1. _agent_map 매핑 조회 (source=agent_map)
+      2. agent-<id>.meta.json 의 agentType 필드 (source=meta_json)
+      3. JSONL 첫 user 레코드의 slug 키 (source=jsonl_slug)
+      4. JSONL 첫 assistant 레코드의 attributionAgent 키 (source=jsonl_attribution)
+      5. agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값 (source=hex_default)
 
     Args:
         agent_filename: agent JSONL 파일 경로
         agent_map: agent_id -> agent_type 매핑 딕셔너리
+        subagents_dir: subagents/ 디렉터리 경로. None 이면 meta.json 폴백·hex_default 비활성.
 
     Returns:
         식별된 agent_type 문자열. 식별 불가 시 None.
     """
     basename = os.path.basename(agent_filename)
+    agent_id: Optional[str] = None
     if basename.startswith("agent-") and basename.endswith(".jsonl"):
         agent_id = basename[len("agent-"):-len(".jsonl")]
+
+    # 폴백 1: _agent_map 매핑 조회
+    if agent_id:
         mapped = agent_map.get(agent_id)
         if mapped:
+            print(
+                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=agent_map result={mapped}",
+                file=sys.stderr,
+            )
             return mapped
 
-    # 폴백: JSONL의 첫 user 레코드에서 slug로 추정
+    # 폴백 2: agent-<id>.meta.json 의 agentType 필드
+    if agent_id and subagents_dir:
+        meta_path = os.path.join(subagents_dir, f"agent-{agent_id}.meta.json")
+        try:
+            with open(meta_path, "r", encoding="utf-8") as mf:
+                meta = json.load(mf)
+            raw_type = meta.get("agentType", "")
+            if raw_type:
+                normalized, _suffix = _normalize_agent_type(raw_type)
+                if normalized in VALID_AGENT_TYPES:
+                    print(
+                        f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=meta_json result={normalized}",
+                        file=sys.stderr,
+                    )
+                    return normalized
+        except Exception:
+            pass
+
+    # 폴백 3 & 4: JSONL 파싱 (slug → attributionAgent)
     try:
         with open(agent_filename, "r", encoding="utf-8") as f:
+            first_user_done = False
+            attribution_candidate: Optional[str] = None
             for line in f:
                 line = line.strip()
                 if not line:
@@ -535,14 +575,52 @@ def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optio
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if rec.get("type") == "user":
+                rec_type = rec.get("type")
+
+                # 폴백 3: 첫 user 레코드의 slug
+                if rec_type == "user" and not first_user_done:
+                    first_user_done = True
                     slug = rec.get("slug", "")
-                    normalized, _suffix = _normalize_agent_type(slug)
-                    if normalized in VALID_AGENT_TYPES:
-                        return normalized
+                    if slug:
+                        normalized, _suffix = _normalize_agent_type(slug)
+                        if normalized in VALID_AGENT_TYPES:
+                            print(
+                                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=jsonl_slug result={normalized}",
+                                file=sys.stderr,
+                            )
+                            return normalized
+
+                # 폴백 4: assistant 레코드의 attributionAgent
+                if rec_type == "assistant" and attribution_candidate is None:
+                    attr = rec.get("attributionAgent", "")
+                    if attr:
+                        normalized, _suffix = _normalize_agent_type(attr)
+                        if normalized in VALID_AGENT_TYPES:
+                            attribution_candidate = normalized
+
+                # user + attribution 둘 다 처리 완료되면 조기 탈출
+                if first_user_done and attribution_candidate is not None:
                     break
+
+            if attribution_candidate:
+                print(
+                    f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=jsonl_attribution result={attribution_candidate}",
+                    file=sys.stderr,
+                )
+                return attribution_candidate
     except Exception:
         pass
+
+    # 폴백 5: agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값
+    if agent_id and subagents_dir:
+        import re
+        if re.fullmatch(r"[0-9a-f]{10,}", agent_id):
+            print(
+                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=hex_default result=worker",
+                file=sys.stderr,
+            )
+            return "worker"
+
     return None
 
 
@@ -605,7 +683,7 @@ def cmd_batch() -> None:
         worker_tokens: dict[str, dict[str, int]] = {}
         skipped_agents: list[str] = []
         for agent_file in agent_files:
-            a_type = _resolve_agent_type(agent_file, agent_map)
+            a_type = _resolve_agent_type(agent_file, agent_map, subagents_dir=subagents_dir)
             if not a_type:
                 print(
                     f"[usage-sync] WARNING: Could not identify agent_type for {os.path.basename(agent_file)}",
