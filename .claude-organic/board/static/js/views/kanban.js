@@ -340,16 +340,16 @@
 
   /**
    * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
-   * status가 "To Do"인 경우 TODO 라벨, 그 외 모든 경우 OPEN 라벨을 반환한다.
-   * T-399: Submit transient 단계 제거됨.
+   * To Do 카드만 TODO 라벨을 반환한다.
+   * T-399: Submit transient 단계 제거됨. T-445: OPEN 라벨 폐기.
    * @param {Object} ticket - 티켓 객체
-   * @returns {{ label: string, cssClass: string }} 상태 라벨과 CSS 클래스
+   * @returns {{ label: string, cssClass: string } | null} 상태 라벨과 CSS 클래스, 또는 null
    */
   function getWorkflowStatus(ticket) {
     if (ticket && ticket.status === "To Do") {
       return { label: "TODO", cssClass: "status-todo" };
     }
-    return { label: "OPEN", cssClass: "status-open" };
+    return null;
   }
 
   /**
@@ -1993,7 +1993,7 @@
             }
             h += "</div>";
             h += '<div class="card-top-right">';
-            if (col.key === "Open" || col.key === "To Do") {
+            if (col.key === "To Do" && status) {
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
             }
             h += renderUncommittedBadge(t.number);
