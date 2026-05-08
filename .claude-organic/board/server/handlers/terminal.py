@@ -14,6 +14,16 @@ from .._common import logger, _get_git_branch
 from ..event_filter import is_user_visible
 from ..terminal_channel import _resolve_last_event_id
 from ..claude_process import _validate_images
+from .._attachments_persist import AttachmentsSidecar
+
+
+# T-429: jsonl content 배열에 첨부 text 블록 prefix 가 들어가는 경우의 안전
+# 임계값. 사용자가 직접 짧게 ``[첨부 T-001]`` 만 입력하는 경우와 false-positive
+# 충돌을 막기 위해 ``min_attachment_threshold`` 를 적용한다. (envelope 합성
+# 단계에서 prompt + report 본문이 결합되면 통상 1KB 이상이므로 200자는
+# 충분히 보수적인 하한.)
+_ATTACHMENT_BLOCK_PREFIX = '[첨부 T-'
+_ATTACHMENT_BLOCK_MIN_LEN = 200
 
 
 _HISTORY_SKIP_TYPES = frozenset({
@@ -143,16 +153,50 @@ def _build_render_events(data: dict) -> list[dict]:
     if not isinstance(content, list):
         return []
 
+    # T-429: user 메시지 content 배열 처리 정책
+    # ----------------------------------------
+    # T-429 가 도입한 "사용자 메시지 본문 + 첨부 텍스트 블록 분리" 정책에 따라
+    # user role 의 content 가 length >= 2 인 list 인 경우, 첫 번째 text 블록만
+    # user 텍스트 이벤트로 채택하고 그 이후의 첨부 text 블록(``[첨부 T-`` 로
+    # 시작 + 길이 ``_ATTACHMENT_BLOCK_MIN_LEN`` 이상)은 사용자 메시지 렌더에서
+    # 제외한다. 첨부는 sidecar(``<session_id>.attachments.jsonl``)에 별도
+    # 보관되며, ``_handle_terminal_history`` 가 ts 매칭으로 user 이벤트에
+    # ``attachments`` 필드를 부여한다.
+    #
+    # 길이 임계값(_ATTACHMENT_BLOCK_MIN_LEN=200) 은 사용자가 짧게 직접
+    # ``[첨부 T-001]`` 만 입력하는 false-positive 를 막기 위한 보수적 하한이다.
+    # frontend send 시 합성하는 첨부 블록은 prompt + report 본문 포함이므로
+    # 보통 1KB 를 초과한다.
+    skip_attachment_blocks = (
+        role == 'user' and isinstance(content, list) and len(content) >= 2
+    )
+    user_text_emitted = False
+
     for block in content:
         if not isinstance(block, dict):
             continue
         btype = block.get('type')
         if btype == 'text':
-            text = (block.get('text') or '').strip()
+            raw_text = block.get('text') or ''
+            text = raw_text.strip()
             if not text:
                 continue
             if role == 'user' and _is_system_wrapper_text(text):
                 continue
+            if skip_attachment_blocks:
+                if not user_text_emitted:
+                    # 첫 번째 user text 블록 = 사용자 자유 입력
+                    user_text_emitted = True
+                else:
+                    # 두 번째 이후 블록: 첨부 prefix + 길이 임계 충족 시 스킵
+                    if (
+                        text.startswith(_ATTACHMENT_BLOCK_PREFIX)
+                        and len(raw_text) >= _ATTACHMENT_BLOCK_MIN_LEN
+                    ):
+                        continue
+                    # prefix/길이 미충족 시 일반 text 블록으로 그대로 출력
+                    # (사용자가 다중 text 블록을 합법적으로 보낸 케이스
+                    # 회귀 0)
             events.append({
                 'role': role, 'kind': 'text', 'text': text,
                 'timestamp': timestamp,
@@ -643,6 +687,49 @@ class TerminalHandlerMixin:
                     if ev.get('timestamp') in interrupted_ts:
                         ev['interrupted'] = True
 
+        # T-429: attachments sidecar 적용
+        # -----------------------------------------------------------------
+        # ``<session_id>.attachments.jsonl`` 라인을 읽어 user_msg_ts 와 user
+        # 이벤트의 timestamp 를 매칭하여 ``ev['attachments']`` 를 부여한다.
+        # 매칭 전략(graceful 폴백):
+        #   1) 완전 일치
+        #   2) 초 단위 정규화 일치 (``YYYY-MM-DDTHH:MM:SS`` prefix 비교) —
+        #      Claude CLI jsonl ts 와 우리가 broadcast 시 기록한 ts 의
+        #      sub-second 차이를 흡수
+        #   3) 위 둘 다 실패 시 attachments 부재로 처리 (graceful, 회귀 0)
+        #
+        # tool_result 등 user role 외 또는 user role 의 tool_result 는 제외.
+        try:
+            attachments_map = AttachmentsSidecar(session_id).load_map()
+        except Exception as exc:  # noqa: BLE001 — sidecar IO 는 best-effort
+            logger.error('attachments sidecar 로드 실패: %s', exc)
+            attachments_map = {}
+
+        if attachments_map:
+            # 초 단위 정규화 인덱스 (sub-second 차이 매칭용)
+            sec_index: dict[str, list[dict]] = {}
+            for ts_key, atts in attachments_map.items():
+                if isinstance(ts_key, str) and len(ts_key) >= 19:
+                    sec_key = ts_key[:19]  # 'YYYY-MM-DDTHH:MM:SS'
+                    sec_index.setdefault(sec_key, atts)
+
+            for ev in events:
+                if ev.get('role') != 'user':
+                    continue
+                if ev.get('kind') != 'text':
+                    continue
+                ts = ev.get('timestamp') or ''
+                if not ts:
+                    continue
+                # 1) 완전 일치
+                atts = attachments_map.get(ts)
+                if atts is None:
+                    # 2) 초 단위 정규화 일치
+                    if len(ts) >= 19:
+                        atts = sec_index.get(ts[:19])
+                if atts:
+                    ev['attachments'] = atts
+
         # pending_turn 플래그: 마지막 user 이벤트 직후 응답 대기 중인 경우
         # 클라이언트가 turn-card 를 닫지 않고 spinner 를 시드하도록 알린다.
         # in_flight 이벤트가 이미 있는 경우는 클라이언트가 renderHistory 에서
@@ -742,8 +829,18 @@ class TerminalHandlerMixin:
 
         text = data.get('text', '')
         images = data.get('images', None)
+        attachments_raw = data.get('attachments', None)
 
-        if not text and not images:
+        # T-429: 첨부 티켓 메타 파싱. 각 원소는 dict 이며 ``number`` 키가 필수.
+        # 누락된 원소는 무시하여 잘못된 클라이언트가 보낸 데이터로 send 가
+        # 통째로 막히지 않도록 한다 (회귀 가드).
+        attachments: list[dict] = []
+        if isinstance(attachments_raw, list):
+            for att in attachments_raw:
+                if isinstance(att, dict) and 'number' in att:
+                    attachments.append(att)
+
+        if not text and not images and not attachments:
             self._send_error(400, 'Missing "text" field')
             return
 
@@ -753,13 +850,54 @@ class TerminalHandlerMixin:
                 self._send_error(400, validation_error)
                 return
 
-        # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
-        if text:
-            terminal_sse_channel.broadcast(
-                {'type': 'user_input', 'text': text}
-            )
+        # T-429: 사용자 메시지 timestamp 결정
+        # ------------------------------------
+        # Claude CLI 가 stdin 으로 받은 user envelope 을 jsonl 에 flush 할 때
+        # 자체 timestamp 를 부여한다. 우리가 sidecar 에 기록할 ``user_msg_ts``
+        # 와 jsonl ts 가 sub-second 단위까지 정확히 일치하지 않을 수 있으므로
+        # ``_handle_terminal_history`` 의 매칭 단계에서 (a) 완전 일치 → (b)
+        # 초 단위 정규화 매칭 단계로 graceful 폴백한다. 여기서는 broadcast 와
+        # sidecar 에 동일 ts 를 사용하여 frontend 와 새로고침 후 history 의
+        # 일관성을 보장한다.
+        user_msg_ts = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+            .strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+        )
 
-        result = claude_process.send_input(text, images=images)
+        # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
+        # T-429: 첨부 메타는 카드 표시용 필드만(prompt/report 본문 제외) 포함하여
+        # SSE payload 크기를 줄인다. 본문은 sidecar 에서만 보존된다.
+        if text or attachments:
+            broadcast_payload: dict = {
+                'type': 'user_input',
+                'text': text,
+                'timestamp': user_msg_ts,
+            }
+            if attachments:
+                broadcast_payload['attachments'] = [
+                    {
+                        'number': att.get('number'),
+                        'command': att.get('command'),
+                        'title': att.get('title'),
+                    }
+                    for att in attachments
+                ]
+            terminal_sse_channel.broadcast(broadcast_payload)
+
+        result = claude_process.send_input(
+            text, images=images, attachments=attachments or None,
+        )
+
+        # T-429: send 성공 시 첨부 sidecar 에 append.
+        # session_id 미정 또는 첨부 부재 시 AttachmentsSidecar 가 no-op 처리.
+        if attachments and result.get('ok'):
+            try:
+                AttachmentsSidecar(claude_process.session_id or '').append(
+                    user_msg_ts, attachments,
+                )
+            except Exception as exc:  # noqa: BLE001 — sidecar IO 는 best-effort
+                logger.error('attachments sidecar append 실패: %s', exc)
+
         self._send_json(result)
 
     def _handle_terminal_kill(self) -> None:
