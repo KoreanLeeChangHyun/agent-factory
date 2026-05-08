@@ -1151,14 +1151,21 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP1: registryKey={registry_key} toStep={to_step}")
 
-    # ── W02: DONE 단계 진입 step.start metrics (비차단) ──
+    # ── W04(T-435): DONE 단계 진입 step.start metrics (비차단) ──
+    # 이중 emit 제거 (T-435 W04):
+    #   - 정상 경로(_step1_skip=False): update_state.py FSM 전이가 step.start{DONE} emit 담당.
+    #     finalization.py 는 emit하지 않음 (1회 보장).
+    #   - 재진입 경로(_step1_skip=True): update_state.py 미호출이므로 finalization.py 가 직접 emit.
+    # advisory only — 자동 차단/회귀 트리거 없음. T-411 폐기 사례 캐논 (commit 0c970fa) 준수.
     import time as _time_fin
     _done_start_ms = int(_time_fin.time() * 1000)
-    _safe_metrics_event(
-        abs_work_dir,
-        "step.start",
-        {"step": "DONE", "source": "fsm"},
-    )
+    if _step1_skip:
+        # 이미 DONE 상태(재진입) — update_state.py 호출 안 됨, 직접 emit 필요
+        _safe_metrics_event(
+            abs_work_dir,
+            "step.start",
+            {"step": "DONE", "source": "fsm"},
+        )
 
     if not _step1_skip:
         run(
@@ -1170,15 +1177,28 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
 
-    # ── W02: DONE 단계 step.end metrics (비차단) ──
+    # ── W04(T-435): DONE 단계 step.end metrics (비차단) ──
+    # duration_ms 계산:
+    #   - 정상 경로: update_state.py 가 생성한 .metrics_step_start_DONE.tmp 의 타임스탬프 사용
+    #     (FSM 전이 emit 시점이 정확한 step.start 시점). 임시 파일은 step.end emit 후 정리.
+    #   - 재진입 경로: 위에서 직접 emit 직전 기록한 _done_start_ms 사용.
     _done_end_ms = int(_time_fin.time() * 1000)
     _done_outcome = "ok" if status == "완료" else "fail"
+    _start_ms_for_duration: int = _done_start_ms
+    if not _step1_skip and abs_work_dir is not None:
+        _done_tmp = os.path.join(abs_work_dir, ".metrics_step_start_DONE.tmp")
+        if os.path.isfile(_done_tmp):
+            try:
+                _start_ms_for_duration = int(open(_done_tmp).read().strip())
+                os.remove(_done_tmp)
+            except Exception:
+                pass
     _safe_metrics_event(
         abs_work_dir,
         "step.end",
         {
             "step": "DONE",
-            "duration_ms": _done_end_ms - _done_start_ms,
+            "duration_ms": _done_end_ms - _start_ms_for_duration,
             "outcome": _done_outcome,
             "source": "fsm",
         },
