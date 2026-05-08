@@ -150,8 +150,16 @@ function sortWorkflows(list) {
   const key = Board.state.wfSortKey;
   const dir = Board.state.wfSortDir === "asc" ? 1 : -1;
   return list.slice().sort(function (a, b) {
-    const av = (a[key] || "").toString();
-    const bv = (b[key] || "").toString();
+    let av, bv;
+    if (key === "ticket") {
+      const at = findTicketForWorkflow(a);
+      const bt = findTicketForWorkflow(b);
+      av = at ? at.number : "";
+      bv = bt ? bt.number : "";
+    } else {
+      av = (a[key] || "").toString();
+      bv = (b[key] || "").toString();
+    }
     return dir * av.localeCompare(bv);
   });
 }
@@ -206,14 +214,12 @@ function renderWfCard(w) {
   const stepText = wfEsc(w.step || "NONE");
   const stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + "</span>";
   h += '<td class="wf-row-step">' + stepBadge + "</td>";
-  // number cell: linked ticket badge or timestamp fallback
+  // ticket cell: linked ticket badge (룰: 워크플로우는 반드시 티켓에 매핑)
   const linkedTicket = findTicketForWorkflow(w);
   if (linkedTicket) {
     h += '<td class="wf-row-number"><span class="wf-number-badge wf-ticket-badge" data-ticket-num="' + wfEsc(linkedTicket.number) + '">' + wfEsc(linkedTicket.number) + "</span></td>";
   } else {
-    const ts = w.entry || "";
-    const fallback = ts.length >= 13 ? ts.substring(4, 8) + "-" + ts.substring(9, 13) : ts;
-    h += '<td class="wf-row-number"><span class="wf-number-fallback">' + wfEsc(fallback) + "</span></td>";
+    h += '<td class="wf-row-number"><span class="wf-number-fallback" title="티켓 매핑 없음 (룰 위반)">(미연결)</span></td>';
   }
   // command cell
   h += '<td class="wf-row-cmd">' + wfBadge(w.command, WF_CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + "</td>";
@@ -472,7 +478,7 @@ function renderWorkflow() {
   const sortedFiltered = sortWorkflows(filtered);
   const cols = [
     { key: "step",       label: "상태" },
-    { key: "number",     label: "번호" },
+    { key: "ticket",     label: "티켓" },
     { key: "command",    label: "명령" },
     { key: "task",       label: "제목" },
     { key: "query",      label: "질의",   nosort: true },
