@@ -127,6 +127,8 @@ class GenericHandlerMixin:
             self._handle_metrics_regression(last)
         elif path == '/api/worktree/uncommitted/all':
             self._handle_worktree_uncommitted_all()
+        elif path == '/api/kanban/done-verdict':
+            self._handle_kanban_done_verdict()
         else:
             self.send_response(404)
             self.end_headers()

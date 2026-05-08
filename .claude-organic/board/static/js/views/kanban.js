@@ -144,6 +144,11 @@
   // 카드 우상단 미커밋 인디케이터용. null = not loaded (graceful: 인디케이터 omit).
   var _worktreeUncommittedMap = null;
 
+  // ── Done Verdict Cache (T-441) ──
+  // Done 카드 머지 정합성 verdict. key=ticket number, value={verdict,reason,details}.
+  // "pending" 값 = 조회 중. undefined = 미조회.
+  var _doneVerdictMap = {};
+
   /**
    * Fetches /api/worktree/uncommitted/all and populates _worktreeUncommittedMap.
    * Silently degrades on error (map remains null or stale).
@@ -164,6 +169,64 @@
     }).catch(function () {
       // worktree mode off / API error — leave map unchanged
     });
+  }
+
+  /**
+   * T-441: 단일 Done 카드 verdict 조회 (advisory).
+   * 결과를 _doneVerdictMap 에 캐시하고, 로드 완료 시 해당 카드 배지를 DOM 에 패치.
+   * 폴링 없음 — 카드 mount 시 1회 호출.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-441")
+   */
+  function fetchAndRenderVerdict(ticketNum) {
+    // 이미 조회 중이거나 완료된 경우 건너뜀
+    if (_doneVerdictMap[ticketNum] !== undefined) return;
+    _doneVerdictMap[ticketNum] = "pending";
+
+    fetch("/api/kanban/done-verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        _doneVerdictMap[ticketNum] = data;
+        // DOM 패치: 해당 카드의 verdict 배지 교체 (전체 re-render 없이)
+        var badge = document.querySelector(
+          '.card[data-num="' + ticketNum + '"][data-col-key="Done"] .card-done-verdict'
+        );
+        if (badge) {
+          var newBadge = document.createElement("span");
+          _applyVerdictBadge(newBadge, data);
+          badge.parentNode.replaceChild(newBadge, badge);
+        }
+      })
+      .catch(function () {
+        _doneVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: { message: "verdict 조회 실패" } };
+      });
+  }
+
+  /**
+   * T-441: verdict 데이터를 기반으로 badge span 에 상태를 적용한다.
+   * @param {HTMLElement} el - 대상 span 요소
+   * @param {Object} data - verdict 응답 데이터 ({verdict, reason, details})
+   */
+  function _applyVerdictBadge(el, data) {
+    var verdict = data && data.verdict;
+    el.className = "card-done-verdict";
+    if (verdict === "OK") {
+      el.className += " verdict-ok";
+      el.title = "머지 정합성 확인 (develop HEAD == merge commit)";
+      el.innerHTML = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+    } else if (verdict === "FAIL") {
+      var msg = (data.details && data.details.message) || "develop HEAD 가 머지 commit 아님";
+      el.className += " verdict-fail";
+      el.title = "머지 불일치 — " + msg + " (클릭하면 상세 확인)";
+      el.setAttribute("data-verdict-msg", msg);
+      el.innerHTML = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><line x1="2" y1="2" x2="9" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="9" y1="2" x2="2" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    } else {
+      // UNKNOWN / SKIP / pending — 배지 숨김 (공간 낭비 없음)
+      el.className += " verdict-unknown";
+      el.style.display = "none";
+    }
   }
 
   /** Fetches all tickets via /api/kanban (single request). */
@@ -336,6 +399,43 @@
     var label = item.uncommitted_count + "M";
     var tooltip = "미커밋 " + item.uncommitted_count + "건 — 클릭하면 자동 commit"; // "미커밋 N건 — 클릭하면 자동 commit"
     return '<span class="card-uncommitted-badge" data-uncommitted-ticket="' + esc(ticketNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
+  }
+
+  /**
+   * T-441: Done 카드 verdict 배지 HTML 을 생성한다.
+   * 캐시에 결과가 없으면 로딩 중 플레이스홀더를 반환하고 비동기 fetch 트리거.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-441")
+   * @returns {string} span.card-done-verdict HTML 또는 빈 문자열
+   */
+  function renderDoneVerdictBadge(ticketNum) {
+    var data = _doneVerdictMap[ticketNum];
+    if (data === undefined || data === "pending") {
+      // 로딩 중 — 작은 플레이스홀더 (보이지 않음, fetch 완료 후 DOM 패치)
+      return '<span class="card-done-verdict verdict-loading" style="display:none"></span>';
+    }
+    var verdict = data && data.verdict;
+    if (verdict === "OK") {
+      return (
+        '<span class="card-done-verdict verdict-ok" title="머지 정합성 확인 (develop HEAD == merge commit)">'
+        + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+        + '<polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+        + '</svg></span>'
+      );
+    }
+    if (verdict === "FAIL") {
+      var msg = (data.details && data.details.message) || "develop HEAD 가 머지 commit 아님";
+      return (
+        '<span class="card-done-verdict verdict-fail"'
+        + ' title="머지 불일치 — ' + esc(msg) + ' (클릭하면 상세 확인)"'
+        + ' data-verdict-msg="' + esc(msg) + '">'
+        + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+        + '<line x1="2" y1="2" x2="9" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+        + '<line x1="9" y1="2" x2="2" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+        + '</svg></span>'
+      );
+    }
+    // UNKNOWN / SKIP — 배지 숨김
+    return '<span class="card-done-verdict verdict-unknown" style="display:none"></span>';
   }
 
   /**
@@ -1997,6 +2097,10 @@
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
             }
             h += renderUncommittedBadge(t.number);
+            // T-441: Done 카드 verdict 배지 (advisory)
+            if (col.key === "Done") {
+              h += renderDoneVerdictBadge(t.number);
+            }
             h += "</div>";
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
@@ -2050,6 +2154,21 @@
           if (ticket) handleReviewDoneAction(ticket);
           return;
         }
+        // T-441: Done 카드 verdict FAIL 배지 클릭 → 상세 메시지 표시 (advisory)
+        var verdictFail = e.target.closest(".card-done-verdict.verdict-fail");
+        if (verdictFail) {
+          e.stopPropagation();
+          var ticketNum = card.dataset.num;
+          var msg = verdictFail.dataset.verdictMsg || "develop HEAD 가 머지 commit 아님";
+          var verdictData = ticketNum ? _doneVerdictMap[ticketNum] : null;
+          var detail = (verdictData && verdictData.details) || {};
+          var fullMsg = "[T-441 머지 정합성 FAIL]\n\n" + msg;
+          if (detail.develop_head) fullMsg += "\n\ndevelop HEAD : " + detail.develop_head.slice(0, 8);
+          if (detail.merge_commit) fullMsg += "\nmerge commit: " + detail.merge_commit.slice(0, 8);
+          fullMsg += "\n\n이 티켓의 변경분이 develop 에 정상 반영되지 않았을 수 있습니다.\n※ advisory only — 자동 재머지 없음. 수동으로 확인하세요.";
+          alert(fullMsg);
+          return;
+        }
         const num = card.dataset.num;
         const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
         if (ticket) Board.render.openViewer(ticket);
@@ -2064,6 +2183,15 @@
         const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
         if (ticket) showDoneCardContextMenu(e, ticket);
       });
+    });
+
+    // T-441: Done 카드 verdict fetch 트리거 (advisory)
+    el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
+      var num = card.dataset.num;
+      if (num) {
+        // 미조회 카드만 fetch (캐시 히트 시 스킵)
+        fetchAndRenderVerdict(num);
+      }
     });
 
     // T-418: Open 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Done 으로 완료(직접)" + "삭제")

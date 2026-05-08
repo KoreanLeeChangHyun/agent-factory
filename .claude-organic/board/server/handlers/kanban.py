@@ -198,3 +198,166 @@ class KanbanHandlerMixin:
             'stdout': (result.stdout or '').strip(),
             'worktree_removed': worktree_removed,
         })
+
+    def _handle_kanban_done_verdict(self) -> None:
+        """GET /api/kanban/done-verdict?ticket=T-NNN — Done 카드 머지 정합성 advisory verdict.
+
+        T-441: Review→Done DnD 후 develop HEAD == merge commit 정합성 검사.
+        verdict OK:   develop HEAD == merge commit && merge commit parents 에 feature branch tip 포함.
+        verdict FAIL: 위 조건 미충족 (develop HEAD 가 머지 commit 아님 등).
+
+        advisory only — 자동 회귀/강제 전이 없음 (feedback_no_speculative_guards 캐논).
+        """
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        ticket = (qs.get('ticket', [None])[0] or '').strip()
+
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket" query param (T-NNN required)')
+            return
+
+        project_root = os.getcwd()
+
+        # Done 디렉터리에 티켓이 존재하는지 확인 (Done 컬럼 아닌 티켓에는 의미 없음)
+        done_xml = os.path.join(
+            project_root, '.claude-organic', 'tickets', 'done', f'{ticket}.xml',
+        )
+        if not os.path.isfile(done_xml):
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'SKIP',
+                'reason': 'not_done',
+                'details': {'message': f'{ticket} 은 Done 컬럼에 없습니다 — verdict 생략'},
+            })
+            return
+
+        # merge_commit 읽기: tickets/done/<T-NNN>.xml result/merge_commit 필드
+        merge_commit: str | None = None
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(done_xml)
+            root = tree.getroot()
+            result_el = root.find('.//result/merge_commit')
+            if result_el is not None and result_el.text:
+                merge_commit = result_el.text.strip() or None
+        except Exception:
+            merge_commit = None
+
+        if not merge_commit:
+            # merge_commit 메타 누락 — Phase 1 인프라 도입 이전 Done 티켓
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'no_merge_commit_meta',
+                'details': {'message': 'merge_commit 정보 없음 (인프라 도입 이전 Done 티켓)'},
+            })
+            return
+
+        def _git(*args: str) -> 'subprocess.CompletedProcess[str]':
+            return subprocess.run(
+                ['git', *args],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+        # develop HEAD SHA 확인
+        head_result = _git('rev-parse', 'develop')
+        if head_result.returncode != 0:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'git_error',
+                'details': {'message': 'develop HEAD 조회 실패: ' + (head_result.stderr or '').strip()},
+            })
+            return
+        develop_head = head_result.stdout.strip()
+
+        # merge_commit SHA 정규화 (full SHA)
+        mc_result = _git('rev-parse', merge_commit)
+        if mc_result.returncode != 0:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'git_error',
+                'details': {'message': f'merge_commit {merge_commit!r} rev-parse 실패'},
+            })
+            return
+        merge_commit_sha = mc_result.stdout.strip()
+
+        # 조건 1: develop HEAD == merge commit
+        if develop_head != merge_commit_sha:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'FAIL',
+                'reason': 'develop_head_mismatch',
+                'details': {
+                    'message': (
+                        f'develop HEAD 가 머지 commit 아님 — '
+                        f'HEAD={develop_head[:8]}, merge_commit={merge_commit_sha[:8]}'
+                    ),
+                    'develop_head': develop_head,
+                    'merge_commit': merge_commit_sha,
+                },
+            })
+            return
+
+        # 조건 2: merge commit parents에 feature branch tip 포함 여부
+        parents_result = _git('log', merge_commit_sha, '-1', '--format=%P')
+        if parents_result.returncode != 0:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'git_error',
+                'details': {'message': 'merge commit parents 조회 실패'},
+            })
+            return
+        parent_shas = parents_result.stdout.strip().split()
+
+        # feature 브랜치 패턴 (feat/T-NNN-*)
+        feat_branch_result = _git('branch', '--list', f'feat/{ticket}-*')
+        feature_branch_exists = feat_branch_result.returncode == 0 and bool(feat_branch_result.stdout.strip())
+
+        feature_tip_in_parents = False
+        feature_branch_name: str | None = None
+        if feature_branch_exists:
+            branch_name = feat_branch_result.stdout.strip().lstrip('* ').split('\n')[0].strip()
+            feature_branch_name = branch_name
+            feat_tip_result = _git('rev-parse', branch_name)
+            if feat_tip_result.returncode == 0:
+                feat_tip = feat_tip_result.stdout.strip()
+                feature_tip_in_parents = feat_tip in parent_shas
+        else:
+            # 브랜치가 이미 삭제된 경우 — parents가 2개 이상이면 non-ff 머지로 간주 OK
+            feature_tip_in_parents = len(parent_shas) >= 2
+
+        if not feature_tip_in_parents and feature_branch_exists:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'FAIL',
+                'reason': 'feature_tip_not_in_parents',
+                'details': {
+                    'message': (
+                        f'merge commit 의 parent 에 feature 브랜치 tip 이 포함되지 않음 — '
+                        f'branch={feature_branch_name}'
+                    ),
+                    'merge_commit': merge_commit_sha,
+                    'parents': parent_shas,
+                },
+            })
+            return
+
+        # 모든 조건 충족
+        self._send_json({
+            'ticket': ticket,
+            'verdict': 'OK',
+            'reason': 'all_checks_passed',
+            'details': {
+                'message': 'develop HEAD == merge commit, feature branch tip 포함 확인',
+                'develop_head': develop_head,
+                'merge_commit': merge_commit_sha,
+                'parents': parent_shas,
+            },
+        })

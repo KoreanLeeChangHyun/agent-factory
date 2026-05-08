@@ -129,6 +129,170 @@ def _check_merge_approval(force: bool) -> bool:
     return False
 
 
+def _count_commits_ahead(branch: str, base: str = "develop") -> int | None:
+    """`git rev-list base..branch --count` 결과를 반환한다.
+
+    Args:
+        branch: 검사 대상 feature 브랜치명.
+        base: 기준 브랜치명 (기본 develop).
+
+    Returns:
+        commits ahead 개수. 명령 실패(브랜치 부재 등) 시 None.
+    """
+    result = _git("rev-list", f"{base}..{branch}", "--count")
+    if result.returncode != 0:
+        return None
+    raw = result.stdout.strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _branch_exists(branch: str) -> bool:
+    """로컬에 feature 브랜치가 존재하는지 검사한다.
+
+    Args:
+        branch: 검사할 브랜치명.
+
+    Returns:
+        존재하면 True, 없으면 False.
+    """
+    if not branch:
+        return False
+    result = _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}")
+    return result.returncode == 0
+
+
+def _stage1_5_premerge_state_guard(
+    ticket_number: str,
+    worktree_path: str | None,
+    force: bool,
+) -> tuple[bool, str]:
+    """Stage 1.5: 재머지 진입 직전 워크트리/feature 브랜치 상태 가드.
+
+    T-441 회귀 박제: Done 롤백(undo_done) 후 워크트리·feature 브랜치가
+    빈 상태(변경분 없이 재생성됨)이거나 부재인 채로 재머지가 진행되어
+    별건 commit 위에서 anchor 실패 → `reset --hard pre_merge_develop_sha` 가
+    별건 변경분을 함께 reset 하는 회귀가 발생했다(T-440 사례).
+
+    본 가드는 Stage 2(`merge_to_develop`) 진입 전에 다음을 검증한다:
+
+    1. feature 브랜치 부재 → 항상 차단(force 무관). undo_done 직후 재생성
+       단계 누락이거나 워크트리 자체가 없는 케이스.
+    2. feature 브랜치 존재 + commits ahead == 0(빈 브랜치) →
+       force=False: 차단 + 명확한 에러
+       force=True: 차단 + reflog fallback 안내 (자동 트리거 금지)
+    3. 정상(commits ahead > 0) → 통과
+
+    회귀 0 보장:
+      - T-906(Review→Done DnD 정상 경로): 변경분 있는 일반 머지는
+        commits ahead > 0 이므로 통과.
+      - T-905(undo_done reset/revert): undo_done 자체에는 영향 없음.
+        재머지 단계에서만 작동.
+      - 자동 회귀·자동 reflog 적용 금지(feedback_no_speculative_guards
+        2026-05-08 캐논). 사용자 명시 동의 메시지만 노출.
+
+    Args:
+        ticket_number: 티켓 번호 (T-NNN).
+        worktree_path: get_worktree_path 반환값. 부재 시 None.
+        force: --force 옵션 사용 여부.
+
+    Returns:
+        (ok, message) 튜플. ok=True 면 통과, False 면 호출자가 즉시 종료.
+        message 는 stderr 로그 용도(통과 시 빈 문자열).
+    """
+    _step(1, "재머지 상태 가드 (Stage 1.5)")
+
+    # branch_strategy 는 호출 비용이 크므로 lazy import.
+    try:
+        from flow.branch_strategy import get_feature_branch_for_ticket
+    except Exception as exc:  # pragma: no cover - import 경로 비정상
+        _error(f"[GUARD] branch_strategy import 실패: {exc}")
+        return False, "branch_strategy import 실패"
+
+    branch_name = get_feature_branch_for_ticket(ticket_number)
+
+    # ── 1. feature 브랜치 부재 ──
+    if not branch_name or not _branch_exists(branch_name):
+        wt_status = "부재" if not worktree_path else f"존재({worktree_path})"
+        msg = (
+            f"feature 브랜치 부재: ticket={ticket_number} "
+            f"branch={branch_name or '<unresolved>'} worktree={wt_status}"
+        )
+        _error(f"[GUARD] {msg}")
+        if force:
+            print(
+                "  force 모드는 destructive 행위가 가능하므로 사용자 명시 동의가 "
+                "필요합니다.\n"
+                "  복구 옵션 (수동):\n"
+                "    1) `flow-undo-done <T-NNN> --force` 로 워크트리·브랜치 재생성\n"
+                "    2) develop reflog 에서 원본 merge commit SHA 확인:\n"
+                "       git reflog develop --grep-reflog='merge.*' | grep "
+                f"feat/{ticket_number}\n"
+                "    3) 변경분이 담긴 SHA 를 새 브랜치로 cherry-pick 후 재머지",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            print(
+                "  feature 브랜치를 찾을 수 없어 빈 머지를 차단했습니다.\n"
+                "  `flow-undo-done <T-NNN> --force` 로 재생성한 뒤 재시도하세요.",
+                file=sys.stderr,
+                flush=True,
+            )
+        return False, msg
+
+    # ── 2. feature 브랜치 존재 + 빈 브랜치(commits ahead == 0) ──
+    ahead = _count_commits_ahead(branch_name, base="develop")
+    if ahead is None:
+        # rev-list 실패 — develop 부재 등 비정상. 차단.
+        msg = (
+            f"commits ahead 산출 실패: branch={branch_name} base=develop "
+            "(develop 브랜치 부재 또는 rev-list 실패)"
+        )
+        _error(f"[GUARD] {msg}")
+        return False, msg
+
+    if ahead == 0:
+        msg = (
+            f"Empty branch detected: feature '{branch_name}' has no commits "
+            "ahead of develop. Refusing empty merge."
+        )
+        _error(f"[GUARD] {msg}")
+        if force:
+            print(
+                "  force 모드라도 빈 브랜치는 자동 머지하지 않습니다 "
+                "(사용자 명시 동의 캐논).\n"
+                "  복구 옵션 (수동):\n"
+                "    1) develop reflog 에서 원본 merge commit SHA 확인:\n"
+                "       git reflog develop --grep-reflog='merge.*' | grep "
+                f"feat/{ticket_number}\n"
+                "    2) 변경분이 담긴 SHA 를 새 브랜치로 cherry-pick 후 재머지\n"
+                "    3) 또는 `flow-undo-done <T-NNN> --force` 로 워크트리 재생성 후\n"
+                "       작업물을 다시 commit 한 뒤 재머지",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            print(
+                "  빈 브랜치 머지는 회귀(T-440) 재현 위험이 있어 차단합니다.\n"
+                "  워크트리에 변경분을 commit 한 뒤 재시도하세요.",
+                file=sys.stderr,
+                flush=True,
+            )
+        return False, msg
+
+    # ── 3. 정상 통과 ──
+    print(
+        f"  feature 브랜치 정상: {branch_name} ({ahead} commit ahead of develop)",
+        flush=True,
+    )
+    return True, ""
+
+
 def _stage1_auto_commit(
     ticket_number: str, worktree_path: str, dry_run: bool
 ) -> bool:
@@ -285,6 +449,30 @@ def _handle_anchor_failure(
         )
         reset_target = "HEAD^"
 
+    # 포렌식 1.5: reset_target 이 merge commit 의 첫 번째 부모와 일치하는지 검사.
+    # T-441 회귀 박제(T-440 사례): undo_done 후 빈 브랜치 재머지 시점에 develop 위로
+    # 별건 commit(`6efc6ef` revert 등)이 추가된 상태였고, pre_merge_develop_sha 가
+    # 그 별건 commit 으로 캡처되어 `reset --hard <별건 commit>` 이 실행되면서
+    # 머지 직전 develop 상태와 다른 위치로 reset → 변경분 소실 가능성.
+    # parent1 == reset_target 이면 정상 (머지 직전 상태로 되돌림),
+    # 다르면 별건 commit 위에서 캡처된 의심 케이스이므로 경고 로그 강화.
+    # 단, 이 검사는 advisory 만 수행하며 reset 자체를 차단하지 않는다
+    # (자동 강제 정책 도입 금지 캐논).
+    parent1_mismatch = False
+    if reset_target and reset_target != "HEAD^":
+        parent1_result = _git("rev-parse", f"{merge_commit}^1")
+        if parent1_result.returncode == 0:
+            parent1_sha = parent1_result.stdout.strip()
+            if parent1_sha and parent1_sha != reset_target:
+                parent1_mismatch = True
+                _error(
+                    f"[ANCHOR][T-441] 의심 케이스: reset_target "
+                    f"({reset_target[:8]}) != merge_commit^1 "
+                    f"({parent1_sha[:8]}). "
+                    "별건 commit 위에서 pre_merge_develop_sha 가 캡처된 "
+                    "가능성. reset 후 develop 변경분 점검 필요."
+                )
+
     # HEAD가 merge_commit과 일치하는지 확인 후 롤백
     rollback_executed = False
     rollback_succeeded = False
@@ -297,6 +485,11 @@ def _handle_anchor_failure(
                 f"anchor 검증 실패로 병합 롤백 완료 "
                 f"(reason: {reason}, reset_target: {reset_target})"
             )
+            if parent1_mismatch:
+                _error(
+                    "[ANCHOR][T-441] rollback 후 별건 commit 손실 가능 — "
+                    "develop reflog 와 워크트리 변경분을 직접 확인하세요."
+                )
         else:
             _error(
                 f"anchor 검증 실패 + 롤백 실패 "
@@ -333,6 +526,7 @@ def _handle_anchor_failure(
             "head_after_reset": head_after,
             "rollback_executed": rollback_executed,
             "rollback_succeeded": rollback_succeeded,
+            "parent1_mismatch": parent1_mismatch,
         }
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -625,6 +819,21 @@ def run_pipeline(
     else:
         _step(1, "미커밋 변경사항 감지 및 자동 커밋")
         print("  worktree 없음 (Stage 1 건너뜀)", flush=True)
+
+    # ── Stage 1.5: 재머지 상태 가드 (T-441) ──
+    # T-440 회귀(Done 롤백 후 빈 워크트리/브랜치 + 별건 commit reset) 차단.
+    # dry-run 은 실제 머지를 수행하지 않으므로 가드 결과를 advisory 로 표기하고 통과.
+    guard_ok, _guard_msg = _stage1_5_premerge_state_guard(
+        ticket_number, worktree_path, force
+    )
+    if not guard_ok:
+        if dry_run:
+            print(
+                "  [DRY-RUN] 가드 실패 — 실 머지에서는 차단되었을 것 (계속)",
+                flush=True,
+            )
+        else:
+            return 1
 
     # ── Stage 2 진입 직전: develop HEAD SHA 캡처 (T-410) ──
     # already-up-to-date / ff 케이스 명시 분기 + 롤백 SHA 명시화에 사용.
