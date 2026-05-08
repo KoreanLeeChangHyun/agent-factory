@@ -52,9 +52,11 @@ flow-kanban create "제목" --command implement --status todo   # 기본·유일
   - 후속 작업을 차단하는 경우 → `--blocks` (차단)
 - 티켓 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status todo` 로 생성한다. Open 승격은 사용자가 칸반 DnD 로 직접 수행
 - 티켓 생성 전 사용자 요구사항이 모호하면 **인터뷰 식**으로 자연어 질문한다 (MUST). 메뉴 (1=A/2=B) 형태 질의 금지. 한 번에 1~2개씩만 묻고 답을 받아 다음 질문으로 진행
+  - **호출 강제 (MUST)**: 아래 트리거 감지 시 description match 에 의존하지 말고 **즉시 Skill 도구로 `grill-me` 명시 호출**. 본 룰이 호출 강제의 단일 진실 공급원이며, 매 세션 자동 로드되어 호출 누락을 차단한다 (2026-05-08 사용자 명시 강제).
+  - **트리거 키워드**: `티켓 만들어줘`, `/wf -o`, `박제해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화.
   - 묻는 대상: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
   - 묻지 않는 대상: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
-  - 상세 호출 절차 / 트리거 / 묻는 대상·묻지 않는 대상 보충: `.claude/skills/grill-me/SKILL.md` (인터뷰), `.claude/skills/brainstorming/SKILL.md` (컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원이며 SKILL.md 는 reference + 트리거만 보유한다.
+  - 상세 호출 절차 / 예시 / 반례 보충: `.claude/skills/grill-me/SKILL.md` (인터뷰), `.claude/skills/brainstorming/SKILL.md` (컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원이며 SKILL.md 는 reference + 호출 흐름·반례만 보유한다.
 - `flow-kanban create` 호출 시 `--status todo` 명시 (MUST) — 생략 시 에러는 동일하나 기본은 항상 todo
 
 ## DO NOT
