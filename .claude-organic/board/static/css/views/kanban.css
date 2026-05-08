@@ -266,11 +266,6 @@
   color: #6a9fb5;
 }
 
-.status-open {
-  background: rgba(78, 201, 176, 0.15);
-  color: #4ec9b0;
-}
-
 .card-uncommitted-badge {
   font-size: 9px;
   font-weight: 700;
