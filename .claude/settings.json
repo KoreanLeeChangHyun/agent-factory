@@ -92,6 +92,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/user-prompt-submit.py",
+            "timeout": 3,
+            "statusMessage": "user-prompt-submit 디스패처 실행 중..."
+          }
+        ]
+      }
     ]
   }
 }
