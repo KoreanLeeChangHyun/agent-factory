@@ -120,3 +120,61 @@ def emit_commit_advisory(
     )
     # 비차단: append_log는 모든 예외를 조용히 흡수한다
     append_log(abs_work_dir, "WARN", message)
+
+
+def emit_report_advisory(
+    registry_key: str,
+    abs_work_dir: str,
+    report_path: str,
+) -> None:
+    """REPORT 단계 종료 후 report.md 디스크 존재 검증 (advisory only).
+
+    T-447: reporter agent가 'Subagents should return findings as text, not write
+    report files' SDK 정책에 의해 Write 도구가 차단되는 경우 report.md가 디스크에
+    생성되지 않은 채 워크플로우가 정상 완료로 보고되는 회귀를 탐지하기 위한 advisory.
+
+    report.md 파일이 디스크에 존재하지 않을 때만 WARN 로그를 emit한다.
+    파일이 존재하면 아무 작업도 수행하지 않는다 (no-op).
+
+    설계 원칙 (T-411 폐지 사례 참조, commit 0c970fa):
+        advisory only — 강제 전이 / 자동 회귀 / 자동 차단 절대 금지 (MUST NOT).
+        T-411 finalize AND 가드 폐기 사례 인용: 검증 자체가 아니라 자동 강제 전이가
+        문제. 본 함수는 WARN 로그 + metrics 이벤트만 emit한다.
+        사용자 명시 동의 없이 자동 강제 정책 도입 절대 금지.
+
+    사용자 수동 수습 경로 (완전 보존):
+        - 메인 세션에서 work/ 통합하여 report.md 작성 가능
+        - Board UI 1클릭 commit
+        - /wf -e 재작업
+
+    Args:
+        registry_key: 워크플로우 registry key (예: 20260508-191559).
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로. workflow.log 위치.
+        report_path: report.md 파일의 절대 경로.
+    """
+    import os
+
+    # 파일이 존재하면 advisory 불필요 — no-op
+    if os.path.isfile(report_path):
+        return
+
+    message = (
+        f"[ADVISORY] reporter returned without report.md (path={report_path})\n"
+        f"- SDK가 서브에이전트의 Write를 차단했을 가능성 (T-446 사례)\n"
+        f"- 사용자 수동 수습: 메인 세션에서 work/ 통합하여 report.md 작성 가능"
+    )
+    # 비차단: append_log는 모든 예외를 조용히 흡수한다
+    append_log(abs_work_dir, "WARN", message)
+
+    # metrics 이벤트 emit (try/except 비차단 보호)
+    try:
+        from flow.metrics import append_event  # noqa: PLC0415
+
+        payload = {
+            "report_path": report_path,
+            "signal_summary": "reporter returned without report.md disk write",
+        }
+        append_event(abs_work_dir, "report.missing", payload)
+    except Exception:
+        # metrics emit 실패는 advisory 자체를 깨뜨리지 않도록 흡수
+        pass
