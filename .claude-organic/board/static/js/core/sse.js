@@ -72,6 +72,10 @@
         if (Board.state.activeTab === "relations" && Board.render.renderRelations) {
           Board.render.renderRelations();
         }
+        // workflow 탭은 ticket 매핑(findTicketForWorkflow)에 의존 — TICKETS 갱신 시 재렌더
+        if (Board.state.activeTab === "workflow" && Board.render.renderWorkflow) {
+          Board.render.renderWorkflow();
+        }
         Board.state.viewerTabs.forEach(function (vt) {
           if (vt.ticket) {
             const fresh = Board.state.TICKETS.find(function (t) { return t.number === vt.number; });
