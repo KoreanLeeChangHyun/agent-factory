@@ -278,18 +278,45 @@ def test_is_main_session_workflow_env_var_returns_false():
 
 
 def test_is_main_session_runs_path_returns_false():
-    """cwd 에 /.claude-organic/runs/ 가 포함된 경우 False 를 반환해야 한다."""
+    """구 구조 cwd 에 /.claude-organic/runs/ 가 포함된 경우 False 를 반환해야 한다.
+
+    구 구조: runs/<key>/<work_name>/<command>/ (T-448 이전 디렉터리 폴드 전)
+    """
     if not _DISPATCHER_LOADED:
         print("SKIP  _is_main_session test: dispatcher not loaded")
         return
 
+    # 구 구조 (T-448 이전): <key>/<work_name>/<command>/
     runs_cwd = "/home/deus/workspace/claude/.claude-organic/runs/20260508-123456/feat-T-001/implement"
     stdin_data = {"cwd": runs_cwd, "hook_event_name": "UserPromptSubmit"}
     orig = os.environ.pop("_WF_SESSION_TYPE", None)
     try:
         result = _is_main_session(stdin_data)
         assert result is False, (
-            f"_is_main_session should return False for runs/ path, got {result!r}"
+            f"_is_main_session should return False for runs/ path (old structure), got {result!r}"
+        )
+    finally:
+        if orig is not None:
+            os.environ["_WF_SESSION_TYPE"] = orig
+
+
+def test_is_main_session_runs_path_new_structure_returns_false():
+    """새 구조 cwd 에 /.claude-organic/runs/ 가 포함된 경우 False 를 반환해야 한다.
+
+    새 구조: runs/<key>/ 직속 (T-448 디렉터리 폴드 후)
+    """
+    if not _DISPATCHER_LOADED:
+        print("SKIP  _is_main_session test: dispatcher not loaded")
+        return
+
+    # 새 구조 (T-448 이후): <key>/ 직속
+    runs_cwd = "/home/deus/workspace/claude/.claude-organic/runs/20260508-123456"
+    stdin_data = {"cwd": runs_cwd, "hook_event_name": "UserPromptSubmit"}
+    orig = os.environ.pop("_WF_SESSION_TYPE", None)
+    try:
+        result = _is_main_session(stdin_data)
+        assert result is False, (
+            f"_is_main_session should return False for runs/ path (new structure), got {result!r}"
         )
     finally:
         if orig is not None:

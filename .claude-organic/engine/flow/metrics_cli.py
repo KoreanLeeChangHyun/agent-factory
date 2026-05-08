@@ -91,8 +91,12 @@ def _iter_metrics_files(registry_key: str) -> list[Path]:
         존재하는 파일 경로 리스트 (정렬됨). 워크플로우 한 번에는 보통
         1개지만 chain 등 다중 command 시 여러 개일 수 있음.
     """
-    pattern = str(_RUNS_DIR / registry_key / "*" / "*" / "metrics.jsonl")
-    return sorted(Path(p) for p in glob.glob(pattern))
+    # 새 구조 (폴드): <key>/metrics.jsonl
+    pattern_new = str(_RUNS_DIR / registry_key / "metrics.jsonl")
+    # 구 구조 fallback: <key>/<work_name>/<command>/metrics.jsonl
+    pattern_old = str(_RUNS_DIR / registry_key / "*" / "*" / "metrics.jsonl")
+    paths = sorted(set(Path(p) for p in glob.glob(pattern_new) + glob.glob(pattern_old)))
+    return paths
 
 
 def _load_events(paths: Iterable[Path]) -> list[dict[str, Any]]:
