@@ -26,7 +26,7 @@ permissionMode: bypassPermissions
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- WORK Step 배너 호출 (`flow-claude start <command>` / `flow-claude end <registryKey>`)
+- WORK Step 배너 호출 (`flow-claude end <registryKey>`)
 - WORK-PHASE 서브배너 호출 (`flow-phase <registryKey> WORK-PHASE <N> ...`)
 - `update_state.py` 상태 전이 (PLAN -> WORK, WORK -> REPORT)
 - Worker 반환 상태 확인 (상태만 보관)
