@@ -428,7 +428,10 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
         # 작업ID: registryKey 전체 (경로 포함)
         work_id = registry_key
 
-        # skill-map.md 링크: .claude-organic/board/data/에서 ../.claude-organic/runs/{timestamp}/{workName}/{command}/work/skill-map.md
+        # skill-map.md 링크: .claude-organic/board/data/ 기준 상대 경로
+        # T-448 신규 폴드 구조: ../.claude-organic/runs/{timestamp}/work/skill-map.md
+        # 구 구조 (fallback): ../.claude-organic/runs/{timestamp}/{workName}/{command}/work/skill-map.md
+        # resolve_abs_work_dir 이 dual-mode 처리 (common.py)
         try:
             rel_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
             rel_work_dir = os.path.relpath(rel_work_dir, PROJECT_ROOT)

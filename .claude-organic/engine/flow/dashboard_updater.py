@@ -322,54 +322,69 @@ def _update_step_durations() -> None:
                 ts_path = os.path.join(wf_dir, ts_entry)
                 if not os.path.isdir(ts_path):
                     continue
-                for work_name in _safe_listdir(ts_path):
-                    work_path = os.path.join(ts_path, work_name)
-                    if not os.path.isdir(work_path):
+
+                # dual-mode: 새 구조 (T-448 폴드) 우선, 구 구조 fallback
+                # 새 구조: ts_path/status.json 직접 존재
+                # 구 구조: ts_path/<work_name>/<cmd_name>/status.json 중첩
+                def _collect_status_files(ts_path: str) -> "list[str]":
+                    """ts_path 하위에서 status.json 경로 목록을 반환 (dual-mode)."""
+                    new_status = os.path.join(ts_path, "status.json")
+                    if os.path.isfile(new_status):
+                        # 새 구조: ts_path 직속 status.json
+                        return [new_status]
+                    # 구 구조 fallback: ts_path/<work_name>/<cmd_name>/status.json
+                    result = []
+                    for work_name in _safe_listdir(ts_path):
+                        work_path = os.path.join(ts_path, work_name)
+                        if not os.path.isdir(work_path):
+                            continue
+                        for cmd_name in _safe_listdir(work_path):
+                            cmd_path = os.path.join(work_path, cmd_name)
+                            if not os.path.isdir(cmd_path):
+                                continue
+                            sf = os.path.join(cmd_path, "status.json")
+                            if os.path.isfile(sf):
+                                result.append(sf)
+                    return result
+
+                for status_file in _collect_status_files(ts_path):
+                    try:
+                        with open(status_file, "r", encoding="utf-8") as _f:
+                            data = json.load(_f)
+                    except Exception:
                         continue
-                    for cmd_name in _safe_listdir(work_path):
-                        cmd_path = os.path.join(work_path, cmd_name)
-                        if not os.path.isdir(cmd_path):
-                            continue
-                        status_file = os.path.join(cmd_path, "status.json")
-                        if not os.path.isfile(status_file):
-                            continue
-                        try:
-                            with open(status_file, "r", encoding="utf-8") as _f:
-                                data = json.load(_f)
-                        except Exception:
-                            continue
 
-                        if not isinstance(data, dict):
-                            continue
-                        if data.get("step") != "DONE":
-                            continue
+                    if not isinstance(data, dict):
+                        continue
+                    if data.get("step") != "DONE":
+                        continue
 
-                        transitions = data.get("transitions", [])
-                        if not isinstance(transitions, list):
-                            continue
+                    transitions = data.get("transitions", [])
+                    if not isinstance(transitions, list):
+                        continue
 
-                        # transitions 구조: {from, to, at}
-                        # at은 해당 전환이 발생한 시각 (= "to" 단계 진입 시각)
-                        # 각 단계 소요 시간 = 다음 단계 진입 시각 - 현재 단계 진입 시각
-                        # ex) PLAN 소요 = WORK 진입 at - PLAN 진입 at
-                        #     WORK 소요 = REPORT 진입 at - WORK 진입 at
-                        #     REPORT 소요 = DONE 진입 at - REPORT 진입 at
-                        # transitions에서 to: at 맵으로 변환 (각 단계 진입 시각)
-                        at_map: dict[str, str] = {}
-                        for t in transitions:
-                            if isinstance(t, dict) and t.get("to") and t.get("at"):
-                                at_map[t["to"]] = t["at"]
+                    # transitions 구조: {from, to, at}
+                    # at은 해당 전환이 발생한 시각 (= "to" 단계 진입 시각)
+                    # 각 단계 소요 시간 = 다음 단계 진입 시각 - 현재 단계 진입 시각
+                    # ex) PLAN 소요 = WORK 진입 at - PLAN 진입 at
+                    #     WORK 소요 = REPORT 진입 at - WORK 진입 at
+                    #     REPORT 소요 = DONE 진입 at - REPORT 진입 at
+                    # transitions에서 to: at 맵으로 변환 (각 단계 진입 시각)
+                    at_map: dict[str, str] = {}
+                    for t in transitions:
+                        if isinstance(t, dict) and t.get("to") and t.get("at"):
+                            at_map[t["to"]] = t["at"]
 
-                        # 단계 소요 = (다음 단계 진입 시각) - (현재 단계 진입 시각)
-                        step_pairs = [
-                            ("PLAN",   _parse_iso(at_map.get("PLAN", "")),   _parse_iso(at_map.get("WORK", ""))),
-                            ("WORK",   _parse_iso(at_map.get("WORK", "")),   _parse_iso(at_map.get("REPORT", ""))),
-                            ("REPORT", _parse_iso(at_map.get("REPORT", "")), _parse_iso(at_map.get("DONE", ""))),
-                        ]
+                    # 단계 소요 = (다음 단계 진입 시각) - (현재 단계 진입 시각)
+                    step_pairs = [
+                        ("PLAN",   _parse_iso(at_map.get("PLAN", "")),   _parse_iso(at_map.get("WORK", ""))),
+                        ("WORK",   _parse_iso(at_map.get("WORK", "")),   _parse_iso(at_map.get("REPORT", ""))),
+                        ("REPORT", _parse_iso(at_map.get("REPORT", "")), _parse_iso(at_map.get("DONE", ""))),
+                    ]
 
-                        for label, t_start, t_end in step_pairs:
-                            if t_start is not None and t_end is not None and t_end > t_start:
-                                durations[label].append(t_end - t_start)
+                    for label, t_start, t_end in step_pairs:
+                        if t_start is not None and t_end is not None and t_end > t_start:
+                            durations[label].append(t_end - t_start)
 
         # ── 소요 시간 포매팅 ──
         def _fmt_seconds(secs: float) -> str:
