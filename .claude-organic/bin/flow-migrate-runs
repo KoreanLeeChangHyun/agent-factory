@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# T-449 마이그레이션 스크립트 wrapper
+# .history/<key>/<work_name>/<command>/ 폴드 구조를 <key>/ 직속으로 평탄화
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+exec python3 "$ROOT/scripts/migrate_runs_fold.py" "$@"
