@@ -33,9 +33,11 @@
 - 상태 보고 전 `flow-sessions` 조회 필수 — 기억 기반 보고 금지
 - 티켓 관련 발화(티켓 번호 언급 / 티켓 생성·수정·이동·삭제 / 티켓 상태 보고 / "이거/저거/그거" 같은 지시어로 티켓 가리킴) 시 반드시 `flow-kanban show <T-NNN>` 또는 `flow-kanban board` 등으로 **현재 상태를 먼저 조회한 뒤 응답** (MUST). 기억·auto memory·jsonl 헤더(`_meta.ticket_id`)·세션 파일명·로그·이전 응답 결과 등 **칸반 외 보조 단서로 티켓 식별·상태 단정 금지** (MUST NOT) — 칸반이 single source of truth. 칸반은 다른 세션·UI(board DnD)에서도 변경되므로 stale 보조 정보로 사용자 혼선 유발 (실제 사고: 2026-05-07 사용자가 T-408 실행 중인 상황에서 어시스턴트가 03:55 옛 T-400 jsonl 만 보고 "사용자가 T-400 실행 시도"로 단정한 오진단 — 칸반 In Progress 컬럼이 진실. flow-sessions 도 보조용. 칸반 우선)
 - 브랜치 그래프 차이 설명 시 **"앞선다/뒤처진다(ahead/behind)" 표현은 변경 내용(코드/파일)이 있을 때만** 사용 (MUST). PR `--merge` 방식의 자동 생성 merge commit 노드만 차이날 때는 명시적으로 "코드 동일, merge commit 노드만 차이"라고 쓴다 — 변경 내용 있는 것처럼 들려 사용자가 동기화 필요 여부를 오판하는 사례 차단
+- 어시스턴트→사용자 출력에 "박제" 표현 사용 금지 (MUST NOT). 작업 진행 의향을 물을 때는 "티켓 생성 진행할까요" / "룰 추가할까요" / "메모리 등록할까요" 등 구체 작업 어휘로 대체. 단 사용자 발화 트리거 키워드(`박제해줘` 등)는 grill-me 호출 트리거로 그대로 보존 — 양방향 구분 (사용자→어시스턴트 트리거 어휘 보존 / 어시스턴트→사용자 출력 어휘 교체)
 
 ## 메인 세션 제약
 - 서브에이전트(Agent 도구) 사용 금지 (MUST NOT) — 시간이 오래 걸리므로 티켓 생성 후 워크플로우로 처리
+- `AskUserQuestion` 도구 사용 금지 (MUST NOT) — PreToolUse hook 의 `hookSpecificOutput` 신형 schema 와 SDK 측 구형 permission-callback schema(`{behavior, updatedInput, message}`) 불일치로 ZodError 발생, 도구 호출 자체 차단됨 (재현 확인 2026-05-08). 1~4지선다 질의는 텍스트 번호 매기기(1./2./3./4.)로 대체
 - 세션 시작 시 `.claude-organic/.settings`에서 워크플로우 설정 확인 (MUST) — 특히 `WORKFLOW_WORKTREE` 값으로 워크트리 활성 여부 파악
 
 ## 워크플로우 실행
