@@ -196,15 +196,9 @@
   flex-shrink: 0;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
 }
 
 .card-bottom-left {
-  flex-shrink: 0;
-}
-
-.card-bottom-right {
-  text-align: right;
   flex-shrink: 0;
 }
 
@@ -217,18 +211,6 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.card-date {
-  font-size: 10px;
-  color: #888;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-}
-
-.card-time {
-  font-size: 10px;
-  color: #888;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
 .card-num {
