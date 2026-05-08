@@ -149,28 +149,53 @@ flowchart TD
 
 ## Sub-agent Return Formats (REQUIRED)
 
-> **WARNING: 반환값이 1줄을 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
+> **WARNING: 반환값이 규격을 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.**
 >
 > 1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
-> 2. 반환값은 오직 **상태만** 포함 (1줄)
+> 2. 반환값은 규격 라인만 포함 (worker-*/explorer는 2줄, 나머지는 1줄)
 > 3. 경로, 메타정보(N개), 코드, 목록, 테이블, 요약, 마크다운 헤더는 반환에 MUST NOT include
 > 4. 규격 외 내용 1줄이라도 추가 시 시스템 장애 발생
 
 ### Common Rules
 
-- 작업 상세는 `.workflow/` 파일에 기록, 메인에는 **상태 1줄만** 반환 (경로/코드/로그/테이블 MUST NOT)
+- 작업 상세는 `.workflow/` 파일에 기록, 메인에는 **규격 라인만** 반환 (경로/코드/로그/테이블 MUST NOT)
 - 산출물 경로는 컨벤션으로 확정 (아래 Artifact Path Convention 참조). 반환값에 경로를 포함하지 않는다
 - 오케스트레이터: 반환값 수신 후 해석/요약/설명 출력 금지. DONE 배너 Bash 결과 수신 → turn 즉시 종료 (도구 호출 0개, 텍스트 출력 0자). `flow-claude end <registryKey> DONE` 호출 후 어떠한 행위도 하지 않고 turn을 끝내라
 
-### Return Format (All Agents — 1 line)
+### Return Format (All Agents)
 
-| Agent | Return Format |
-|-------|---------------|
-| planner | `상태: 작성완료` |
-| worker-* | `상태: 성공\|부분성공\|실패` |
-| explorer | `상태: 성공\|부분성공\|실패` |
-| validator | `상태: 통과\|경고\|실패` |
-| reporter | `상태: 완료\|실패` |
+worker-*/explorer는 코드 commit 행위를 수행하므로 **2줄** 형식을 사용한다. planner/validator/reporter는 코드 commit을 수행하지 않으므로 **1줄** 유지.
+
+| Agent | Return Format | 라인 수 |
+|-------|---------------|---------|
+| planner | `상태: 작성완료` | 1줄 |
+| worker-* | `상태: 성공\|부분성공\|실패`<br>`커밋: <7~40자 SHA>\|없음` | 2줄 |
+| explorer | `상태: 성공\|부분성공\|실패`<br>`커밋: <7~40자 SHA>\|없음` | 2줄 |
+| validator | `상태: 통과\|경고\|실패` | 1줄 |
+| reporter | `상태: 완료\|실패` | 1줄 |
+
+> SHA는 7자 이상 40자 이하의 git short hash. commit을 수행하지 않은 경우 `없음` 기재.
+
+### 오케스트레이터 파싱 규약 (advisory)
+
+오케스트레이터는 worker-*/explorer 반환값을 아래 규칙으로 파싱한다.
+
+- 1행: 상태 (`상태: 성공|부분성공|실패`)
+- 2행: 커밋 — 정규식 `^커밋:\s*([0-9a-f]{7,40}|없음)\s*$`
+
+**"커밋: 없음" 수신 시 처리 규칙 (MUST NOT 항목)**
+
+- 자동 강제 전이 금지 (MUST NOT)
+- 칸반 자동 회귀 금지 (MUST NOT)
+- 워크플로우 차단 금지 (MUST NOT)
+- status 강제 전이 금지 (MUST NOT)
+
+**"커밋: 없음" 수신 시 허용 행위**
+
+- `[ADVISORY]` 레벨 경고 로그를 workflow.log에 emit (MUST)
+- 사용자 수동 수습 경로 안내 로그 포함 (MUST): `flow-merge --force` / Board UI 1클릭 commit / `/wf -e` 재작업
+
+> 워커 commit 누락은 `flow-merge --force` 파이프라인이 정상 처리 경로다. 오케스트레이터는 상태만 기록하고 자동 개입하지 않는다.
 
 ### Artifact Path Convention
 
@@ -238,6 +263,34 @@ flowchart TD
 불법 전이 시 시스템 가드가 차단. `.claude-organic/engine/flow/update_state.py`는 전이 미수행(no-op), `.claude-organic/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
+
+## Artifact Quality Standards (산출물 품질 기준)
+
+워크플로우 산출물(plan.md, work/WXX-*.md, report.md)의 품질 기준을 정의한다. 모든 기준은 advisory이며, 자동 차단 / 자동 강제 정책은 도입하지 않는다(T-421 메모리 항목 정합성).
+
+### 출처 등급 체계 (implement report.md)
+
+implement / refactor / build / framework 보고서의 사실 주장에 S/A/B/C/D 5등급 출처 체계를 인라인 표기한다. 상세 인라인 표기 규약은 [`reporter-guide.md § 출처 등급 체계`](../../skills/workflow-agent/reference/reporter-guide.md) 참조.
+
+| 등급 | 한줄 설명 |
+|------|----------|
+| S | 공식 SKILL.md 또는 프레임워크 공식 문서 |
+| A | 프로젝트 내부 가이드 (reference/ 디렉터리, common-reference.md 등) |
+| B | 실행 로그 / 워크플로우 산출물 (work/WXX-*.md, status.json, workflow.log) |
+| C | 일반 출처 (외부 블로그, 표준 라이브러리 문서 등) |
+| D | 추론 / 합리적 가정 (출처 미상이나 워커 판단으로 도출된 결론) |
+
+### 가정 사항 근거 필드 (plan.md)
+
+plan.md의 가정 사항 항목에 `[가정]: [근거]` 형식을 권장한다. 상세 근거 예시는 [`planner-guide.md § 재질의 가이드라인`](../../skills/workflow-agent/reference/planner-guide.md) 참조.
+
+근거 필드는 출처 등급(S/A/B/C/D) 또는 trade-off 표현 중 하나 이상을 포함한다(advisory).
+
+### Advisory 정책 명시
+
+- 출처 등급 누락 시 reporter가 경고 로그만 출력하고 보고서를 정상 저장한다.
+- 가정 근거 누락 시 planner 자가 검증 체크리스트가 경고만 출력하고 계획서를 정상 저장한다.
+- 자동 차단 / 자동 강제 전이 / 자동 회귀 정책은 도입하지 않는다. 사용자 명시 동의 없는 가드 추가는 [`general.md`](../../rules/workflow/general.md) "추측 금지" 규칙 위반이다.
 
 ## Error Handling
 

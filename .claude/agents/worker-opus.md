@@ -61,4 +61,5 @@ permissionMode: bypassPermissions
 
 ```
 상태: 성공 | 부분성공 | 실패
+커밋: <7~40자 SHA> | 없음
 ```
