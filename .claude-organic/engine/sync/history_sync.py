@@ -936,7 +936,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, history_dir: str) -> None:
     """archive 후 이동된 registryKey를 보유한 티켓 XML의 경로 필드를 .history/ 반영 경로로 갱신.
 
-    kanban 전체 디렉터리(open/progress/review/done)를 스캔하여 <result>/<registrykey>가
+    tickets 전체 디렉터리(open/progress/review/done)를 스캔하여 <result>/<registrykey>가
     moved_key와 일치하는 티켓 XML을 찾고, <workdir>/<plan>/<report> 경로 텍스트를
     .claude-organic/runs/.history/{key}/... 형태로 갱신한다.
 
@@ -951,7 +951,7 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
     # workflow_dir = .../PROJECT/.claude-organic/workflow
     # workflow_dir 부모 = .../PROJECT/.claude-organic
     cw_dir = os.path.dirname(workflow_dir)
-    kanban_dir = os.path.join(cw_dir, "kanban")
+    tickets_dir = os.path.join(cw_dir, "tickets")
 
     status_dirs = ["open", "progress", "review", "done"]
 
@@ -967,7 +967,7 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
         return text
 
     for status in status_dirs:
-        status_dir = os.path.join(kanban_dir, status)
+        status_dir = os.path.join(tickets_dir, status)
         if not os.path.isdir(status_dir):
             continue
         for fname in os.listdir(status_dir):

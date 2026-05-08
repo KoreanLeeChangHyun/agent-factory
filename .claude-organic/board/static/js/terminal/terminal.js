@@ -869,11 +869,25 @@
             }
 
             // fetch 는 비동기 — 실패/null 모두 graceful (M.attachTicket 호출은 한 번만)
+            // 1차: reportUrl (active 경로) → 404 시 2차 .history/ fallback → 둘 다 실패 시 null
             if (reportUrl) {
+              var historyReportUrl = reportUrl.replace(
+                /(\/runs\/)(?!\.history\/)([0-9]{8}-[0-9]{6}\/)/,
+                "$1.history/$2"
+              );
               fetch(reportUrl, { cache: "no-store" })
                 .then(function (res) {
-                  if (!res || !res.ok) return null;
-                  return res.text();
+                  if (res && res.ok) return res.text();
+                  // 1차 404 (또는 실패) 이고 fallback URL 이 다를 때만 2차 시도
+                  if (res && res.status === 404 && historyReportUrl !== reportUrl) {
+                    return fetch(historyReportUrl, { cache: "no-store" })
+                      .then(function (res2) {
+                        if (!res2 || !res2.ok) return null;
+                        return res2.text();
+                      })
+                      .catch(function () { return null; });
+                  }
+                  return null;
                 })
                 .catch(function () {
                   return null;
