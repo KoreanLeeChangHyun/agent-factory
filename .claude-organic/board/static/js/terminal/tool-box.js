@@ -326,7 +326,8 @@
       } else {
         inputDiv.textContent = inputSummary;
       }
-      inputDiv.setAttribute("title", inputTitle || inputSummary);
+      // OS native hover tooltip 비활성화 (사용자 요청 2026-05-09).
+      // 긴 명령어 전체 보기는 박스 토글 펼침으로 대체. 접근성 위해 aria-label 은 유지.
       inputDiv.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
@@ -512,7 +513,7 @@
         inputTitle = "";
       }
       inputSpan.textContent = inputSummary;
-      inputSpan.setAttribute("title", inputTitle || inputSummary);
+      // OS native hover tooltip 비활성화 (사용자 요청 2026-05-09). aria-label 만 유지.
       inputSpan.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
