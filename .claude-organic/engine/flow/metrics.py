@@ -1,6 +1,6 @@
 """metrics.py - 워크플로우 metrics jsonl writer 인프라.
 
-워크플로우 한 번 실행될 때마다 발생하는 11종 이벤트를 단일 jsonl
+워크플로우 한 번 실행될 때마다 발생하는 12종 이벤트를 단일 jsonl
 파일(`<workDir>/metrics.jsonl`)에 append-only 로 기록한다. 호출 측은
 `MetricsWriter` 클래스 또는 함수형 헬퍼 `append_event()` 둘 중 하나를
 사용한다.
@@ -15,10 +15,10 @@
         - work_dir: 절대 경로
         - payload: dict (event_type 별 필수 키 검증)
 
-11종 event_type 카탈로그:
+12종 event_type 카탈로그:
     step.start, step.end, phase.start, phase.end, tool.call, tool.deny,
     usage.snapshot, subagent.spawn, subagent.end, worktree.io,
-    regression.pattern
+    regression.pattern, report.missing
 
 검증 규칙:
     - event_type 미등록 → ValueError
@@ -61,8 +61,8 @@ LINE_BYTE_LIMIT: int = 4096
 # metrics.jsonl 파일명
 _METRICS_FILENAME: str = "metrics.jsonl"
 
-# 11종 event_type → payload 필수 키 카탈로그
-# plan.md §5 (registryKey 20260505-183053) 정의 기준.
+# 12종 event_type → payload 필수 키 카탈로그
+# plan.md §5 (registryKey 20260505-183053) 정의 기준. T-447로 report.missing 추가.
 _SCHEMA: dict[str, list[str]] = {
     "step.start": ["step", "source"],
     "step.end": ["step", "duration_ms", "outcome", "source"],
@@ -87,6 +87,8 @@ _SCHEMA: dict[str, list[str]] = {
     "subagent.end": ["agent_kind", "tool_use_id", "duration_ms", "outcome"],
     "worktree.io": ["op", "duration_ms", "outcome"],
     "regression.pattern": ["kind", "signal_summary"],
+    # T-447: reporter Write SDK 차단 시 report.md 부재 탐지 (advisory only)
+    "report.missing": ["report_path", "signal_summary"],
 }
 
 
@@ -120,7 +122,7 @@ def schema_for(event_type: str) -> list[str]:
 
 
 def known_event_types() -> list[str]:
-    """등록된 11종 event_type 카탈로그를 정렬해 반환한다.
+    """등록된 12종 event_type 카탈로그를 정렬해 반환한다.
 
     Returns:
         event_type 문자열 리스트 (사전순 정렬).
