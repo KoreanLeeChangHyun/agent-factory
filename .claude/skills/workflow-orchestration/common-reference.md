@@ -146,6 +146,7 @@ flowchart TD
 | **산출물 필수 생성** | 모든 태스크 실행 후 반드시 작업 내역 파일을 생성해야 함.<br><br>- worker-*/explorer: `work/WXX-*.md`<br>- validator: `work/validation-report.md`<br><br>검증 결과 SKIP이거나 실패하더라도 파일은 반드시 생성. | worker-opus<br>worker-sonnet<br>explorer<br>validator |
 | **계획서+스킬 로드 필수** | 모든 워커는 작업 시작 시 다음을 필수 수행해야 함:<br><br>1. planPath에서 계획서(plan.md)를 Read하여 요구사항 파악<br>2. skillMapPath에서 skill-map.md를 Read하여 태스크용 스킬 로드. 또는 skills 파라미터로 전달된 스킬 사용<br><br>참고: explorer는 계획서 스킬 컬럼 및 skills 파라미터만 지원. TF-IDF fallback은 비적용. | worker-opus<br>worker-sonnet<br>explorer<br>(validator은 계획서 로드만) |
 | **선행 산출물 참조 필수** | 종속 태스크(dependencies 컬럼에 선행 ID가 있는 경우) 수행 시 `<workDir>/work/` 경로에서 선행 작업 내역 파일을 반드시 Read해야 함.<br><br>- worker-*/explorer: 작업 연속성 보장 목적<br>- validator: 검증 컨텍스트 확보 목적 (Glob으로 전체 W*-*.md 탐색 후 "핵심 발견" 섹션 참조) | worker-opus<br>worker-sonnet<br>explorer<br>validator (검증 컨텍스트로 활용) |
+| **git commit 의무** | 워크트리에서 코드/문서/설정 변경이 발생한 경우, 작업 내역 파일(`work/WXX-*.md`) 생성 후 종료 직전에 반드시 `git -C <worktree> add -A && git -C <worktree> commit -m "<적절한 메시지>"`로 commit해야 함. commit 누락은 워커 종료 후 워크트리에 미커밋 변경이 남는 회귀(10건+ 반복)를 유발한다. **advisory only — 자동 차단/회귀 트리거 없음**. 누락 시 사용자 수동 수습 경로(`flow-merge --force` / Board UI 1클릭 commit) 그대로 사용 가능. | worker-opus<br>worker-sonnet<br>(explorer/validator: 코드 수정 안 함, 적용 안 됨) |
 
 ## Sub-agent Return Formats (REQUIRED)
 
