@@ -41,7 +41,22 @@ permissionMode: bypassPermissions
 
 > **보고서 경로 구성**: `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적으로 구성합니다. workPath에서 역변환하여 경로를 추론하지 마세요.
 
-> 상세 절차 (command별 템플릿 매핑, placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-agent/reference/reporter-guide.md`를 참조하세요.
+> 상세 절차 (placeholder 목록, 다이어그램 표현 원칙, 선택 섹션 처리)는 `workflow-agent/reference/reporter-guide.md`를 참조하세요.
+
+## command별 템플릿 매핑
+
+| command | 템플릿 | 보고서 유형 |
+|---------|--------|------------|
+| implement / refactor / build / framework | `templates/report/implement.md` | 구현 보고서 |
+| review / analyze | `templates/report/review.md` | 리뷰 보고서 |
+| research | `templates/report/research.md` | 조사 보고서 |
+| architect | `templates/report/architect.md` | 아키텍처 보고서 |
+
+### summary.txt 형식 (2줄 규약)
+
+- 1행: 1줄 요약 (작업 요지, ≤ 80자)
+- 2행: 결과 상태 (완료/실패/부분완료) + 핵심 산출물 1개 경로
+- `flow-finish`가 이 파일을 읽어 `history.md` 갱신에 활용합니다.
 
 ## 오케스트레이터 반환 형식 (필수)
 

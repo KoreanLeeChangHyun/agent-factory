@@ -591,6 +591,11 @@ def main() -> None:
     parser.add_argument("registryKey", help="워크플로우 식별자 (YYYYMMDD-HHMMSS)")
     parser.add_argument("status", choices=["완료", "실패"], help="워크플로우 결과 상태")
     parser.add_argument("--ticket-number", default=None, help="T-NNN 형식 티켓 번호 (선택)")
+    parser.add_argument(
+        "--worker-stdout",
+        default=None,
+        help="워커 반환 stdout (2줄 형식: 상태/커밋). advisory emit에만 사용. 기존 흐름 비차단."
+    )
 
     args = parser.parse_args()
 
@@ -661,6 +666,28 @@ def main() -> None:
 
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
+
+    # ── W06(T-436): 워커 반환 advisory emit (비차단, 자동 강제 전이 0건) ──
+    # --worker-stdout 인자가 있을 때만 파싱 후 commit 누락 시 WARN 로그만 emit한다.
+    # 상태 강제 전이 / kanban move / finalization step skip 절대 금지 (MUST NOT).
+    _worker_stdout: str | None = getattr(args, "worker_stdout", None)
+    if _worker_stdout and abs_work_dir is not None:
+        try:
+            from flow.worker_return_parser import emit_commit_advisory, parse_worker_return
+            _w_status, _w_commit = parse_worker_return(_worker_stdout)
+            if _w_status is not None:
+                emit_commit_advisory(registry_key, abs_work_dir, _w_status, _w_commit)
+        except Exception as _adv_exc:
+            # advisory 실패는 finalization 흐름을 깨뜨리지 않도록 흡수
+            if abs_work_dir is not None:
+                try:
+                    _append_log(
+                        abs_work_dir,
+                        "WARN",
+                        f"FINALIZE_W06_ADVISORY: parse/emit failed exc={_adv_exc}",
+                    )
+                except Exception:
+                    pass
 
     # ── W04(T-435): DONE 단계 step.end metrics (비차단) ──
     # duration_ms 계산:

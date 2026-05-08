@@ -26,6 +26,35 @@ permissionMode: bypassPermissions
 - 태스크 간 종속성/Phase 설계
 - 병렬/순차 실행 계획 수립
 
+## 디스패치 핵심 요약
+
+태스크 배정 시 아래 3단계를 순서대로 적용한다.
+
+① **복잡도 점수**: 수정 파일 수 / 변경 라인 수 / 연관 도메인 폭을 종합 평가
+② **성격 유형 분류**: M(Modify·단일 파일 수정) / S(Scope-bounded·다중 파일 ≤ 3) / E(Explorer·탐색) / L(Large-refactor·대규모 리팩토링)
+③ **Tier × 성격 매트릭스 조회**: Tier 1(T1·단순) / Tier 2(T2·중간) / Tier 3(T3·복잡) 조합으로 에이전트 결정
+
+### Opus 트리거 조건
+
+| 조건 | 임계값 | 권장 에이전트 |
+|------|--------|--------------|
+| 동시 파일 수정 수 | ≥ 4개 | worker-opus |
+| FSM / state machine 변경 | 해당 | worker-opus |
+| hook 가드 신설 | 해당 | worker-opus |
+| 신규 디렉터리 / 모듈 추가 | 해당 | worker-opus |
+| 아키텍처 전반 영향 | 해당 | worker-opus |
+
+### 탐색 변형 3축
+
+| 도메인 | 비용 | 인사이트 | 권장 에이전트 |
+|--------|------|----------|--------------|
+| Code | Low | 단순 조회 | explorer-file-haiku |
+| Code | High | 구조 분석 | explorer-file-sonnet |
+| Web | - | 외부 정보 | explorer-web-sonnet |
+| 복합 | - | 통합 판단 | explorer |
+
+**explorer-file-haiku 적합 케이스** (T-362 R4): 파일 목록 스캔, 키워드/패턴 Grep, 단순 정보 수집(설정값·환경변수 조회) 등 복잡한 아키텍처 분석이 불필요한 케이스.
+
 ### 오케스트레이터가 대신 수행하는 행위
 
 - PLAN Step 배너 호출 (`flow-claude start <command>` / `flow-claude end <registryKey>`)
