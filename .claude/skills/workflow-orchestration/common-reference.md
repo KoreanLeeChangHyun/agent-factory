@@ -239,6 +239,34 @@ flowchart TD
 
 > `mode` 필드가 없는 기존 status.json은 기본값 `full`로 처리 (하위 호환).
 
+## Artifact Quality Standards (산출물 품질 기준)
+
+워크플로우 산출물(plan.md, work/WXX-*.md, report.md)의 품질 기준을 정의한다. 모든 기준은 advisory이며, 자동 차단 / 자동 강제 정책은 도입하지 않는다(T-421 메모리 항목 정합성).
+
+### 출처 등급 체계 (implement report.md)
+
+implement / refactor / build / framework 보고서의 사실 주장에 S/A/B/C/D 5등급 출처 체계를 인라인 표기한다. 상세 인라인 표기 규약은 [`reporter-guide.md § 출처 등급 체계`](../../skills/workflow-agent/reference/reporter-guide.md) 참조.
+
+| 등급 | 한줄 설명 |
+|------|----------|
+| S | 공식 SKILL.md 또는 프레임워크 공식 문서 |
+| A | 프로젝트 내부 가이드 (reference/ 디렉터리, common-reference.md 등) |
+| B | 실행 로그 / 워크플로우 산출물 (work/WXX-*.md, status.json, workflow.log) |
+| C | 일반 출처 (외부 블로그, 표준 라이브러리 문서 등) |
+| D | 추론 / 합리적 가정 (출처 미상이나 워커 판단으로 도출된 결론) |
+
+### 가정 사항 근거 필드 (plan.md)
+
+plan.md의 가정 사항 항목에 `[가정]: [근거]` 형식을 권장한다. 상세 근거 예시는 [`planner-guide.md § 재질의 가이드라인`](../../skills/workflow-agent/reference/planner-guide.md) 참조.
+
+근거 필드는 출처 등급(S/A/B/C/D) 또는 trade-off 표현 중 하나 이상을 포함한다(advisory).
+
+### Advisory 정책 명시
+
+- 출처 등급 누락 시 reporter가 경고 로그만 출력하고 보고서를 정상 저장한다.
+- 가정 근거 누락 시 planner 자가 검증 체크리스트가 경고만 출력하고 계획서를 정상 저장한다.
+- 자동 차단 / 자동 강제 전이 / 자동 회귀 정책은 도입하지 않는다. 사용자 명시 동의 없는 가드 추가는 [`general.md`](../../rules/workflow/general.md) "추측 금지" 규칙 위반이다.
+
 ## Error Handling
 
 | Situation | Action |

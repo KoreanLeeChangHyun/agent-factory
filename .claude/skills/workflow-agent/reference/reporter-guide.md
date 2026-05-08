@@ -152,6 +152,41 @@ command별 보고서 구조가 다르므로, `templates/report/` 디렉터리에
 > **참고**: 템플릿 선택 가이드 및 placeholder 목록은 `templates/report/_guide.md`를 참조하세요.
 > 템플릿은 권장 구조이며, 내용에 따라 reporter가 유연하게 조정할 수 있습니다.
 
+> **NOTE**: implement / refactor / build / framework 보고서는 출처 등급 체계(advisory)를 적용한다. 상세는 아래 `## 출처 등급 체계` 섹션 참조.
+
+---
+
+## 출처 등급 체계 (implement, advisory)
+
+implement / refactor / build / framework 보고서에서 사실 주장의 신뢰도를 나타내기 위해 S/A/B/C/D 5등급 출처 체계를 사용한다. **모든 항목은 advisory(권장)이며 자동 차단 정책은 없다.**
+
+### 5등급 표
+
+| 등급 | 정의 | 예시 인용 대상 | 인라인 표기 권장값 |
+|------|------|--------------|------------------|
+| S | 공식 SKILL.md 또는 프레임워크 공식 문서 | workflow-agent/SKILL.md, planner-guide.md, 공식 API 문서 | `[S: workflow-agent/SKILL.md]` |
+| A | 프로젝트 내부 가이드 (reference/ 디렉터리, common-reference.md 등) | reporter-guide.md, planner-guide.md, common-reference.md | `[A: planner-guide.md]` |
+| B | 실행 로그 / 워크플로우 산출물 (work/WXX-*.md, status.json, workflow.log) | W01-task.md, status.json, workflow.log | `[B: W01-task.md]` |
+| C | 일반 출처 (외부 블로그, 표준 라이브러리 문서, 커뮤니티 자료 등) | MDN Web Docs, Python 공식 문서, Stack Overflow | `[C: MDN]` |
+| D | 추론 / 합리적 가정 (출처 미상이나 워커 판단으로 도출된 결론) | 패턴 분석, trade-off 판단, 추론 결론 | `[D: 추론]` |
+
+### 인라인 표기 규약
+
+- **형식**: `[등급: 출처 식별자]` 형태로 본문 인라인 표기
+  - 예시: "이 동작은 PreToolUse 훅에서 차단된다 `[S: pre-tool-use.py:45]`"
+  - 예시: "reporter-guide.md 기준으로 CSV 형식을 선택했다 `[A: reporter-guide.md]`"
+  - 예시: "W01 작업 내역 기준으로 60줄 추가됨 `[B: W01-reporter-guide.md]`"
+  - 예시: "MDN 기준 fetch API 반환 타입은 Promise이다 `[C: MDN]`"
+  - 예시: "기존 패턴과 일관성을 유지하기 위해 snake_case를 채택했다 `[D: 추론]`"
+- **적용 대상**: implement 보고서의 `## 작업 내역`, `## 검증 결과`, `## 비고` 섹션의 사실 주장
+- **누락 시 동작**: advisory 경고만 출력. 워크플로우 차단 없음.
+
+### Advisory 정책
+
+> **본 등급 체계는 advisory(권장)이며, 누락 시 reporter가 경고 로그만 남기고 정상 진행한다. 자동 차단 / 자동 강제 정책 / 가드 도입은 본 가이드 범위 밖이다.**
+
+---
+
 ### 변경 파일 테이블 경로 링크 형식
 
 보고서의 **변경 파일 목록** 테이블에서 파일 경로는 마크다운 링크 형식으로 작성합니다.
