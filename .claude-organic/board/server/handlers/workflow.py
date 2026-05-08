@@ -563,10 +563,47 @@ class WorkflowHandlerMixin:
             self._send_error(403, 'Path escapes work_dir boundary')
             return
 
-        # 파일 읽기
+        # 파일 읽기 — 1차: work_dir 기준 직접 경로
         if not os.path.isfile(real_candidate):
-            self._send_error(404, f'File not found: {rel_path}')
-            return
+            # 1차 파일 미존재 → .history/ 폴백 시도
+            # work_dir 가 이미 .history/ 를 포함하면 폴백 의미 없음 (skip)
+            _history_candidate = None
+            if '/.history/' not in work_dir:
+                # /runs/<key>/ → /runs/.history/<key>/ 치환
+                archived_work_dir = _re.sub(
+                    r'(/runs/)(?!\.history/)([0-9]{8}-[0-9]{6}/)',
+                    r'\1.history/\2',
+                    work_dir,
+                )
+                # 치환이 실제로 일어났는지 확인 (패턴 불일치 시 동일 문자열 반환)
+                if archived_work_dir != work_dir:
+                    # 화이트리스트 검증은 이미 위에서 통과했으므로 재사용
+                    try:
+                        real_archived_work_dir = os.path.realpath(archived_work_dir)
+                    except (OSError, ValueError):
+                        real_archived_work_dir = None
+
+                    if real_archived_work_dir is not None:
+                        archived_candidate = os.path.join(real_archived_work_dir, rel_path)
+                        try:
+                            real_archived_candidate = os.path.realpath(archived_candidate)
+                        except (OSError, ValueError):
+                            real_archived_candidate = None
+
+                        # prefix 검증 (경로 탈출 방지)
+                        if real_archived_candidate is not None and (
+                            real_archived_candidate.startswith(real_archived_work_dir + os.sep)
+                            or real_archived_candidate == real_archived_work_dir
+                        ):
+                            if os.path.isfile(real_archived_candidate):
+                                _history_candidate = real_archived_candidate
+
+            if _history_candidate is None:
+                self._send_error(404, f'File not found: {rel_path}')
+                return
+
+            # 폴백 경로로 읽기
+            real_candidate = _history_candidate
 
         try:
             with open(real_candidate, encoding='utf-8') as f:
