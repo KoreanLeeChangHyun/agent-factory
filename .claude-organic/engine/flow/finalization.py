@@ -689,6 +689,29 @@ def main() -> None:
                 except Exception:
                     pass
 
+    # ── W03(T-447): REPORT 종료 후 report.md 디스크 존재 advisory (비차단) ──
+    # status="완료"일 때만 호출 (실패 워크플로우는 report.md 부재가 정상이므로 노이즈 회피).
+    # 강제 전이 / kanban move / step skip 절대 금지 (MUST NOT).
+    # T-411 폐지 사례 참조(commit 0c970fa): 검증 자체가 아니라 자동 강제 전이가 문제.
+    if status == "완료" and abs_work_dir is not None:
+        _append_log(abs_work_dir, "INFO", "FINALIZE_REPORT_ADVISORY_START")
+        try:
+            from flow.worker_return_parser import emit_report_advisory  # noqa: PLC0415
+            _report_abs = os.path.join(abs_work_dir, "report.md")
+            emit_report_advisory(registry_key, abs_work_dir, _report_abs)
+        except Exception as _rep_adv_exc:
+            # advisory 실패는 finalization 흐름을 깨뜨리지 않도록 흡수
+            if abs_work_dir is not None:
+                try:
+                    _append_log(
+                        abs_work_dir,
+                        "WARN",
+                        f"FINALIZE_W03_ADVISORY: report.missing check failed exc={_rep_adv_exc}",
+                    )
+                except Exception:
+                    pass
+        _append_log(abs_work_dir, "INFO", "FINALIZE_REPORT_ADVISORY_END")
+
     # ── W04(T-435): DONE 단계 step.end metrics (비차단) ──
     # duration_ms 계산:
     #   - 정상 경로: update_state.py 가 생성한 .metrics_step_start_DONE.tmp 의 타임스탬프 사용
