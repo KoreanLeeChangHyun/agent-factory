@@ -38,9 +38,11 @@ LLM 호출 없음 (순수 IO).
   <workDir>/.context.json     작업 메타데이터 (title, workId, command 등; workName deprecated)
   <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions)
 
-T-448 디렉터리 폴드:
+T-448 디렉터리 폴드 + T-449 마이그레이션 완료:
   workDir = .claude-organic/runs/{registry_key}/  (구: {key}/{work_name}/{command})
-  workName 필드는 후방 호환을 위해 보존하되 deprecated.
+  workName 필드는 worktree 피처 브랜치명(`feat-T-NNN-...`) 용도로만 보존.
+  JSON 스키마 필드(.context.json, init-result.json)의 workName 은 deprecated —
+  board.js 후방 호환 + worktree 브랜치명 파생 용도 외 신규 코드 의존 금지.
 """
 
 from __future__ import annotations
@@ -530,7 +532,8 @@ def _write_context(
 
     registryKey와 ticketNumber 필드는 board.js가 워크플로우↔티켓 양방향 연결에 사용한다.
 
-    T-448 NOTE: workName 필드는 deprecated. 디렉터리 폴드 후 후방 호환용(board.js)으로만 유지한다.
+    T-448/T-449 NOTE: workName 필드는 deprecated. 디렉터리 폴드 + 일괄 마이그레이션
+    이후 worktree 피처 브랜치명 + board.js 후방 호환용으로만 유지된다.
     신규 코드는 title/registryKey 만 사용하고, workName 의존을 추가하지 말 것.
 
     Args:
@@ -1038,9 +1041,9 @@ def main() -> None:
     except Exception as _pv_err:
         _warn(f"prompt_validator import 실패 (품질 검증 생략): {_pv_err}")
 
-    # T-448 NOTE: init-result.json 의 workName 필드는 deprecated.
-    # 디렉터리 폴드(<key>/{work_name}/{command} → <key>) 후 후속 단계 의존성 보존을 위해
-    # 스키마는 유지하되, 신규 코드는 title/registryKey 만 사용할 것.
+    # T-448/T-449 NOTE: init-result.json 의 workName 필드는 deprecated.
+    # 디렉터리 폴드 + 일괄 마이그레이션 이후, worktree 피처 브랜치명 파생 + board.js
+    # 후방 호환을 위해 스키마는 유지한다. 신규 코드는 title/registryKey 만 사용할 것.
     init_result: dict[str, Any] = {
         "request": request,
         "workDir": result["workDir"],
@@ -1048,7 +1051,7 @@ def main() -> None:
         "registryKey": result["registryKey"],
         "date": date,
         "title": title,
-        "workName": result["workName"],  # deprecated (T-448): 후방 호환용, 신규 코드는 사용 금지
+        "workName": result["workName"],  # deprecated (T-448/T-449): 후방 호환용, 신규 코드는 사용 금지
         "command": effective_command,
         "mode": mode,
         "ticketNumber": result.get("ticketNumber", ""),

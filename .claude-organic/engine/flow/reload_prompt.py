@@ -71,27 +71,16 @@ def _resolve_workdir_from_registry(registry_key: str) -> tuple[str | None, list[
     def _scan_registry_dir(registry_dir: str) -> list[str]:
         """registry_dir 하위 workDir 후보 목록을 반환한다.
 
-        1차 (T-448 신규 폴드 구조): registry_dir/status.json 존재 시 registry_dir 자체 반환.
-        2차 fallback (구 중첩 구조): registry_dir/<work_name>/<command>/ 디렉터리 목록 반환.
+        T-449 마이그레이션 이후 폴드 구조 하나만 처리한다:
+        registry_dir/status.json 존재 시 registry_dir 자체를 반환한다.
         """
         if not os.path.isdir(registry_dir):
             return []
 
-        # 1차: 새 구조 (registry_dir/status.json)
         if os.path.exists(os.path.join(registry_dir, "status.json")):
             return [registry_dir]
 
-        # 2차 fallback: 구 중첩 구조
-        result: list[str] = []
-        for work_name in os.listdir(registry_dir):
-            work_path = os.path.join(registry_dir, work_name)
-            if not os.path.isdir(work_path):
-                continue
-            for command in os.listdir(work_path):
-                cmd_path = os.path.join(work_path, command)
-                if os.path.isdir(cmd_path):
-                    result.append(cmd_path)
-        return result
+        return []
 
     workflow_base = os.path.join(_PROJECT_ROOT, ".claude-organic", "runs")
 

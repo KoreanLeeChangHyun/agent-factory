@@ -195,9 +195,8 @@ def scan_active_workflows(
 ) -> dict[str, dict[str, str]]:
     """.claude-organic/runs/ 디렉터리를 스캔하여 워크플로우 목록을 반환.
 
-    .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/ 구조를 순회하며
-    각 워크플로우의 status.json과 .context.json을 읽어 dict 형태로 반환.
-    동일 entry에 복수 워크플로우가 있을 경우 updated_at 최신순으로 결정적 선택.
+    T-449 폴드 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/ 직속에서
+    status.json과 .context.json을 읽어 dict 형태로 반환한다.
 
     Args:
         project_root: 프로젝트 루트 경로. None이면 자동 해석.
@@ -225,50 +224,28 @@ def scan_active_workflows(
         if not os.path.isdir(entry_path):
             continue
 
-        # 중첩 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
-        # 동일 entry에 복수 워크플로우가 있을 경우 updated_at 최신순으로 결정적 선택
-        candidates: list[dict[str, str]] = []
-        for work_name in sorted(os.listdir(entry_path)):
-            wn_path = os.path.join(entry_path, work_name)
-            if not os.path.isdir(wn_path) or work_name.startswith("."):
-                continue
-            for cmd_name in sorted(os.listdir(wn_path)):
-                cmd_path = os.path.join(wn_path, cmd_name)
-                if not os.path.isdir(cmd_path):
-                    continue
+        status_file = os.path.join(entry_path, "status.json")
+        if not os.path.isfile(status_file):
+            continue
+        context_file = os.path.join(entry_path, ".context.json")
 
-                status_file = os.path.join(cmd_path, "status.json")
-                context_file = os.path.join(cmd_path, ".context.json")
+        status = load_json_file(status_file)
+        phase = (status.get("step") or status.get("phase", "NONE")) if isinstance(status, dict) else "NONE"
 
-                status = load_json_file(status_file)
-                phase = (status.get("step") or status.get("phase", "NONE")) if isinstance(status, dict) else "NONE"
+        if not include_terminal and phase in TERMINAL_PHASES:
+            continue
 
-                if not include_terminal and phase in TERMINAL_PHASES:
-                    continue
+        ctx = load_json_file(context_file)
+        title = ctx.get("title", "") if isinstance(ctx, dict) else ""
+        command = ctx.get("command", "") if isinstance(ctx, dict) else ""
 
-                ctx = load_json_file(context_file)
-                title = ctx.get("title", "") if isinstance(ctx, dict) else ""
-                command = ctx.get("command", "") if isinstance(ctx, dict) else ""
-                updated_at = status.get("updated_at", "") if isinstance(status, dict) else ""
-
-                rel_work_dir = os.path.join(".claude-organic", "runs", entry, work_name, cmd_name)
-                candidates.append({
-                    "title": title,
-                    "step": phase,
-                    "workDir": rel_work_dir,
-                    "command": command,
-                    "updated_at": updated_at,
-                })
-
-        if candidates:
-            # updated_at 기준 최신 항목 선택 (결정적 동작 보장)
-            best = max(candidates, key=lambda c: c["updated_at"])
-            result[entry] = {
-                "title": best["title"],
-                "step": best["step"],
-                "workDir": best["workDir"],
-                "command": best["command"],
-            }
+        rel_work_dir = os.path.join(".claude-organic", "runs", entry)
+        result[entry] = {
+            "title": title,
+            "step": phase,
+            "workDir": rel_work_dir,
+            "command": command,
+        }
 
     return result
 
@@ -400,12 +377,10 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
     YYYYMMDD-HHMMSS 패턴이 아닌 입력은 그대로 반환.
 
-    탐색 순서:
-      1. .claude-organic/runs/<input_key>/ 하위 디렉터리 스캔
-         - 1a (T-448 신규 폴드 구조): runs/<input_key>/status.json 존재 시 input_key 자체
-         - 1b (구 중첩 구조 fallback): runs/<input_key>/<work_name>/<cmd_name>/status.json
-      2. 1차 탐색 실패 시 .claude-organic/runs/.history/<input_key>/ 하위 디렉터리 스캔 (동일 dual-mode)
-      3. 두 탐색 모두 실패 시 ".claude-organic/runs/<input_key>" 폴백 반환
+    탐색 순서 (T-449 마이그레이션 이후 폴드 구조 단독):
+      1. .claude-organic/runs/<input_key>/status.json 존재 시 input_key 자체 반환.
+      2. 1차 탐색 실패 시 .claude-organic/runs/.history/<input_key>/status.json 탐색.
+      3. 두 탐색 모두 실패 시 ".claude-organic/runs/<input_key>" 폴백 반환.
 
     Args:
         input_key: 워크플로우 키(YYYYMMDD-HHMMSS) 또는 경로.
@@ -421,29 +396,13 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
         project_root = resolve_project_root()
 
     def _scan_base(base: str, rel_prefix: str) -> str | None:
-        """base 디렉터리 하위에서 status.json이 있는 workDir을 스캔 반환.
-
-        1차 (T-448 신규 폴드 구조): base/status.json 존재 시 rel_prefix 반환.
-        2차 fallback (구 중첩 구조): base/<work_name>/<cmd_name>/status.json 탐색.
-        """
+        """T-448 폴드 구조: base/status.json 존재 시 rel_prefix 반환."""
         if not os.path.isdir(base):
             return None
 
-        # 1차: 새 구조 (base/status.json)
         if os.path.exists(os.path.join(base, "status.json")):
             return rel_prefix
 
-        # 2차 fallback: 구 중첩 구조
-        for work_name in sorted(os.listdir(base)):
-            wn_path = os.path.join(base, work_name)
-            if not os.path.isdir(wn_path) or work_name.startswith("."):
-                continue
-            for cmd_name in sorted(os.listdir(wn_path)):
-                cmd_path = os.path.join(wn_path, cmd_name)
-                if not os.path.isdir(cmd_path):
-                    continue
-                if os.path.exists(os.path.join(cmd_path, "status.json")):
-                    return os.path.join(rel_prefix, work_name, cmd_name)
         return None
 
     # 1차 탐색: 활성 workflow 디렉터리

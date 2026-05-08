@@ -178,9 +178,8 @@ def _resolve_work_dir_from_key(
 ) -> Optional[str]:
     """registryKey로 abs_work_dir을 디렉터리 스캔으로 해석한다.
 
-    1차 (T-448 신규 폴드 구조): .workflow/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환.
-    2차 fallback (구 중첩 구조): .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json
-    을 순회하여 status.json이 존재하는 첫 번째 디렉터리를 반환합니다.
+    T-449 마이그레이션 이후 폴드 구조 하나만 처리한다:
+    .workflow/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환한다.
 
     Args:
         registry_key: YYYYMMDD-HHMMSS 형식 레지스트리 키.
@@ -193,21 +192,8 @@ def _resolve_work_dir_from_key(
     if not os.path.isdir(base_dir):
         return None
 
-    # 1차: 새 구조 (base_dir/status.json)
     if os.path.exists(os.path.join(base_dir, "status.json")):
         return base_dir
-
-    # 2차 fallback: 구 중첩 구조
-    for work_name in sorted(os.listdir(base_dir)):
-        wn_path = os.path.join(base_dir, work_name)
-        if not os.path.isdir(wn_path) or work_name.startswith("."):
-            continue
-        for cmd_name in sorted(os.listdir(wn_path)):
-            cmd_path = os.path.join(wn_path, cmd_name)
-            if not os.path.isdir(cmd_path):
-                continue
-            if os.path.exists(os.path.join(cmd_path, "status.json")):
-                return cmd_path
 
     return None
 
@@ -267,21 +253,9 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if not os.path.isdir(entry_path):
             continue
 
-        # 1차 (T-448 신규 폴드 구조): entry_path/status.json
+        # T-448 폴드 구조: entry_path/status.json
         if os.path.exists(os.path.join(entry_path, "status.json")):
             _collect_candidate(entry_path)
-            continue
-
-        # 2차 fallback (구 중첩 구조): entry_path/<work_name>/<command>/status.json
-        for work_name in sorted(os.listdir(entry_path)):
-            wn_path = os.path.join(entry_path, work_name)
-            if not os.path.isdir(wn_path) or work_name.startswith("."):
-                continue
-            for cmd_name in sorted(os.listdir(wn_path)):
-                cmd_path = os.path.join(wn_path, cmd_name)
-                if not os.path.isdir(cmd_path):
-                    continue
-                _collect_candidate(cmd_path)
 
     if not candidates:
         return None
