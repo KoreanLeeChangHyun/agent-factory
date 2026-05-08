@@ -238,44 +238,14 @@
   // ── Ticket Attachment ──
 
   /**
-   * command 코드를 카드 배지 텍스트로 매핑한다.
-   * implement → IMP / research → RSC / review → REV / 기타 → TKT
-   */
-  function _ticketCmdLabel(command) {
-    if (!command) return "TKT";
-    var c = String(command).toLowerCase();
-    if (c === "implement") return "IMP";
-    if (c === "research") return "RSC";
-    if (c === "review") return "REV";
-    return "TKT";
-  }
-
-  /**
-   * workdir 경로의 `runs/YYYYMMDD-HHMMSS/...` 패턴에서 타임스탬프를 추출한다.
-   * 실패 시 null.
-   */
-  function _extractTicketDate(workdir) {
-    if (!workdir) return null;
-    var m = String(workdir).match(/runs\/(\d{8})-(\d{6})/);
-    if (!m) return null;
-    var ymd = m[1]; // YYYYMMDD
-    var hms = m[2]; // HHMMSS
-    var year = parseInt(ymd.slice(0, 4), 10);
-    var month = parseInt(ymd.slice(4, 6), 10);
-    var day = parseInt(ymd.slice(6, 8), 10);
-    var hour = parseInt(hms.slice(0, 2), 10);
-    var minute = parseInt(hms.slice(2, 4), 10);
-    if (!year || !month || !day) return null;
-    var ampm = hour < 12 ? "오전" : "오후";
-    var hour12 = hour % 12;
-    if (hour12 === 0) hour12 = 12;
-    return year + "년 " + month + "월 " + day + "일 / " + ampm + " " + hour12 + "시 " + minute + "분";
-  }
-
-  /**
    * 첨부된 ticket 카드 프리뷰를 #terminal-image-preview 컨테이너에 렌더링한다.
    * 이미지/파일 카드와 동일 컨테이너를 공유하여 한 줄 첨부 스트립으로 관리한다.
    * 기존 ticket 카드 (`[data-ticket-idx]`)만 제거 후 재생성하여 이미지/파일 카드는 유지한다.
+   *
+   * 카드 DOM 본체는 attachment-card.js 의 단일 진실 공급원 헬퍼
+   * (Board._term.attachmentCard.create) 에 위임하고, 입력 측에서만 필요한
+   * data-ticket-idx 속성과 remove 버튼을 wrapper 패턴으로 추가한다.
+   * 이렇게 하여 메시지 렌더 카드와 입력 측 카드의 룩앤필이 항상 일치한다.
    */
   M.renderTicketPreview = function() {
     var container = document.getElementById("terminal-image-preview");
@@ -286,51 +256,12 @@
 
     if (!M.attachedTickets) return;
 
+    var helper = M.attachmentCard;
+    if (!helper || typeof helper.create !== "function") return;
+
     M.attachedTickets.forEach(function (ticket, idx) {
-      var card = document.createElement("div");
-      card.className = "terminal-ticket-card";
+      var card = helper.create(ticket);
       card.setAttribute("data-ticket-idx", idx);
-
-      var cmdLabel = _ticketCmdLabel(ticket.command);
-      var cmdEl = document.createElement("div");
-      cmdEl.className = "terminal-ticket-card-cmd";
-      cmdEl.textContent = cmdLabel;
-
-      var bodyEl = document.createElement("div");
-      bodyEl.className = "terminal-ticket-card-body";
-
-      var titleEl = document.createElement("div");
-      titleEl.className = "terminal-ticket-card-title";
-      var numStr = ticket.number || "T-???";
-      var titleText = (ticket.title || "").trim();
-      titleEl.textContent = titleText ? (numStr + " " + titleText) : numStr;
-      titleEl.title = titleEl.textContent;
-
-      var subtitleEl = document.createElement("div");
-      subtitleEl.className = "terminal-ticket-card-subtitle";
-      var subtitle = "";
-      var workdir = ticket.result && ticket.result.workdir;
-      if (workdir) {
-        var dateStr = _extractTicketDate(workdir);
-        if (dateStr) {
-          subtitle = dateStr;
-        } else if (ticket.report) {
-          var lineCount = String(ticket.report).split(/\r?\n/).length;
-          subtitle = "report " + lineCount + "줄";
-        } else {
-          subtitle = "no report";
-        }
-      } else if (ticket.report) {
-        var lc = String(ticket.report).split(/\r?\n/).length;
-        subtitle = "report " + lc + "줄";
-      } else {
-        subtitle = "no report";
-      }
-      subtitleEl.textContent = subtitle;
-      subtitleEl.title = subtitle;
-
-      bodyEl.appendChild(titleEl);
-      bodyEl.appendChild(subtitleEl);
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
@@ -340,8 +271,6 @@
         return function () { M.removeTicket(capturedIdx); };
       })(idx));
 
-      card.appendChild(cmdEl);
-      card.appendChild(bodyEl);
       card.appendChild(removeBtn);
       container.appendChild(card);
     });
@@ -390,19 +319,30 @@
   };
 
   /**
-   * 첨부된 ticket 들을 send 시 텍스트 prepend 용 마크다운 블록으로 합성한다.
-   * 각 ticket → `## T-NNN [command] 제목\n\n### Prompt\n...\n### Result\n<reportText>\n\n---\n`
-   * 첨부가 없으면 빈 문자열 반환.
+   * 첨부된 ticket 배열을 backend 전송용 payload 구조로 변환한다.
+   * 본문 prepend 정책 폐기 (T-427 → T-429) — 사용자 메시지 본문은 사용자 텍스트만,
+   * 첨부 본문은 별도 attachments 필드로 전송하여 backend 가 SDK envelope content
+   * 배열에서 user role 의 추가 text 블록으로 결합한다.
+   *
+   * 빈 배열이면 null 반환 (payload 에 attachments 필드 자체를 넣지 않기 위함).
+   *
+   * @param {Array<{number,title,command,prompt,result,report,addedAt}>|undefined} tickets
+   * @returns {Array<{number,command,title,prompt,report,fetched_at}>|null}
    */
-  function _buildTicketMarkdown() {
-    if (!M.attachedTickets || M.attachedTickets.length === 0) return "";
-    var blocks = M.attachedTickets.map(function (t) {
-      var header = "## " + (t.number || "T-???") + " [" + (t.command || "") + "] " + (t.title || "");
-      var promptBlock = "### Prompt\n" + (t.prompt || "");
-      var resultBlock = "### Result\n" + (t.report || "");
-      return header + "\n\n" + promptBlock + "\n\n" + resultBlock + "\n\n---\n";
+  function _buildAttachmentsPayload(tickets) {
+    if (!tickets || tickets.length === 0) return null;
+    return tickets.map(function (t) {
+      return {
+        number: t.number || "",
+        command: t.command || "",
+        title: t.title || "",
+        prompt: t.prompt || "",
+        report: t.report || "",
+        // 첨부 시점(=DnD 후 client 가 ticket 페이로드 + report.md 를 fetch 한 시점)을
+        // 보존해두면 backend / sidecar 가 동일 메시지의 첨부 묶음으로 식별하기 쉬움.
+        fetched_at: t.addedAt || null
+      };
     });
-    return blocks.join("\n");
   }
 
   /**
@@ -514,13 +454,13 @@
       return;
     }
 
-    // 첨부 ticket 들을 마크다운 블록으로 합성하여 텍스트 앞에 prepend 한다.
-    // 첨부가 없으면 빈 문자열 → text 그대로 사용.
-    var attachedMd = hasTickets ? _buildTicketMarkdown() : "";
+    // T-429: 첨부 본문 prepend 정책 폐기 — sendText 는 사용자 텍스트 그대로.
+    // 첨부 ticket 본문은 별도 attachments payload 필드로 전송한다 (backend 가 SDK
+    // envelope 합성 시 user role content 배열에 추가 text 블록으로 결합).
     var sendText = text;
-    if (attachedMd) {
-      sendText = text ? (attachedMd + "\n" + text) : attachedMd;
-    }
+    var attachmentsPayload = hasTickets ? _buildAttachmentsPayload(M.attachedTickets) : null;
+    // outputDiv 카드 렌더용 메타 스냅샷 (ticket clear 전에 보존)
+    var ticketsSnapshot = hasTickets ? M.attachedTickets.slice() : null;
 
     // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지/티켓 첨부 포함).
     // 큐 entry 는 outputDiv 에 미리 echo 하지 않으며, 큐 stack 카드로만 노출된다.
@@ -528,8 +468,8 @@
       var imagesSnapshot = hasImages
         ? M.attachedImages.map(function (img) { return { data: img.data, media_type: img.media_type, name: img.name }; })
         : null;
-      // 큐 entry 의 text 도 ticket 마크다운 prepend 된 합성 텍스트를 사용한다.
-      M.enqueueInput(sendText, imagesSnapshot);
+      // 큐 entry 도 attachments 를 분리 보존 — idle 전환 시 commitQueue 가 동일하게 분리 echo + 분리 전송한다.
+      M.enqueueInput(sendText, imagesSnapshot, attachmentsPayload);
       if (hasImages) {
         M.clearImages();
         M.clearFiles();
@@ -556,25 +496,39 @@
     }
     M.appendToOutput(div);
 
-    // 전송 payload 구성 — sendText (= ticket 마크다운 prepend + 사용자 텍스트)
+    // T-429: 본문 div 와 별개로 첨부 카드 N개를 .term-message-attachments 컨테이너에 추가 echo.
+    // attachment-card.js 의 단일 진실 공급원 헬퍼를 재사용하여 입력 측 카드와 룩앤필 일치.
+    if (ticketsSnapshot && ticketsSnapshot.length > 0 && M.attachmentCard && typeof M.attachmentCard.create === "function") {
+      var attachContainer = document.createElement("div");
+      attachContainer.className = "term-message-attachments";
+      ticketsSnapshot.forEach(function (att) {
+        attachContainer.appendChild(M.attachmentCard.create(att));
+      });
+      M.appendToOutput(attachContainer);
+    }
+
+    // 전송 payload 구성 — text 는 사용자 자유 입력만, 첨부는 별도 attachments 필드.
     var payload = { text: sendText };
     if (hasImages) {
       payload.images = M.attachedImages.map(function (img) {
         return { data: img.data, media_type: img.media_type };
       });
     }
+    if (attachmentsPayload && attachmentsPayload.length > 0) {
+      payload.attachments = attachmentsPayload;
+    }
     M.clearImages();
     M.clearFiles();
     if (hasTickets) M.clearTickets();
 
     // Mark sendText as locally sent so the user_input SSE echo is skipped.
-    // payload 와 동일한 텍스트로 mark 해야 echo skip 매칭이 정확하다.
+    // sendText = text = 사용자 자유 입력 → SSE user_input.text 와 정확히 일치.
     if (sendText && Board.session && Board.session._markSent) {
       Board.session._markSent(sendText);
     }
 
     // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
-    // 복원 대상은 사용자 자유 입력 영역만 — ticket 마크다운은 첨부 카드 자체가 사라진 상태라 복원 의미 없음.
+    // 복원 대상은 사용자 자유 입력 영역만 — 첨부 카드 자체가 사라진 상태라 복원 의미 없음.
     M._lastSentText = text || "";
     // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
     try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
@@ -701,12 +655,16 @@
     if (!container) return;
 
     var imageCount = entry.images ? entry.images.length : 0;
-    var imageLabel = imageCount > 0 ? "[이미지 " + imageCount + "장]" : "";
+    var attachCount = entry.attachments ? entry.attachments.length : 0;
+    var labels = [];
+    if (imageCount > 0) labels.push("[이미지 " + imageCount + "장]");
+    if (attachCount > 0) labels.push("[첨부 " + attachCount + "건]");
+    var labelStr = labels.join(" ");
     var displayText = entry.text || "";
-    if (displayText && imageCount > 0) {
-      displayText = displayText + " " + imageLabel;
-    } else if (!displayText && imageCount > 0) {
-      displayText = imageLabel;
+    if (displayText && labelStr) {
+      displayText = displayText + " " + labelStr;
+    } else if (!displayText && labelStr) {
+      displayText = labelStr;
     }
 
     var item = document.createElement("div");
@@ -748,16 +706,20 @@
     if (!container.children.length) container.setAttribute("hidden", "");
   }
 
-  M.enqueueInput = function(text, images) {
+  M.enqueueInput = function(text, images, attachments) {
     text = text || "";
     images = images || null;
+    // T-429: attachments 도 entry 에 보존 — commitQueue 시 동일하게 분리 echo + 분리 전송.
+    var attachList = (attachments && attachments.length > 0) ? attachments : null;
     var hasImages = images && images.length > 0;
-    if (!text && !hasImages) return;
+    var hasAttachments = !!attachList;
+    if (!text && !hasImages && !hasAttachments) return;
 
     var entry = {
       id: "entry-" + Date.now() + "-" + Math.floor(Math.random() * 0x10000).toString(16),
       text: text,
       images: hasImages ? images : null,
+      attachments: attachList,
       ts: Date.now(),
       status: "pending"
     };
@@ -810,7 +772,17 @@
     }
     if (M.appendToOutput) M.appendToOutput(div);
 
-    // sent 마킹으로 SSE user_input echo 중복 방지 (텍스트만 — 이미지 echo 는 무관)
+    // T-429: 첨부 카드를 별도 컨테이너로 추가 echo (sendInput 직접 경로와 동일한 분리 렌더).
+    if (entry.attachments && entry.attachments.length > 0 && M.attachmentCard && typeof M.attachmentCard.create === "function") {
+      var attachContainer = document.createElement("div");
+      attachContainer.className = "term-message-attachments";
+      entry.attachments.forEach(function (att) {
+        attachContainer.appendChild(M.attachmentCard.create(att));
+      });
+      if (M.appendToOutput) M.appendToOutput(attachContainer);
+    }
+
+    // sent 마킹으로 SSE user_input echo 중복 방지 (텍스트만 — 이미지/첨부 echo 는 무관)
     if (entry.text && Board.session && Board.session._markSent) {
       Board.session._markSent(entry.text);
     }
@@ -826,12 +798,15 @@
     if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
     M.updateControlBar();
 
-    // payload 구성 — 텍스트 + 이미지 (있으면)
+    // payload 구성 — 텍스트 + 이미지 + 첨부 (있으면 각각 분리 필드)
     var payload = { text: entry.text || "" };
     if (entry.images && entry.images.length > 0) {
       payload.images = entry.images.map(function (img) {
         return { data: img.data, media_type: img.media_type };
       });
+    }
+    if (entry.attachments && entry.attachments.length > 0) {
+      payload.attachments = entry.attachments;
     }
 
     var ep = M.endpoints();
