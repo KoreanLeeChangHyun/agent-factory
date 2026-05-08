@@ -145,11 +145,23 @@ function filterWorkflows(list) {
   const query = Board.state.wfSearchQuery;
   if (!query) return list;
   const q = query.toLowerCase();
+  // 티켓 번호 검색 정규화: "T-446" / "t-446" / "446" 모두 지원하기 위해
+  // 입력이 숫자 + 하이픈만으로 구성되면 "T-" prefix 매칭도 허용한다.
+  const qDigit = q.replace(/^t-?/, "");
   return list.filter(function (w) {
-    return w.task.toLowerCase().indexOf(q) !== -1
-      || w.command.toLowerCase().indexOf(q) !== -1
-      || w.step.toLowerCase().indexOf(q) !== -1
-      || w.entry.indexOf(q) !== -1;
+    if (w.task.toLowerCase().indexOf(q) !== -1) return true;
+    if (w.command.toLowerCase().indexOf(q) !== -1) return true;
+    if (w.step.toLowerCase().indexOf(q) !== -1) return true;
+    if (w.entry.indexOf(q) !== -1) return true;
+    // 티켓 번호 매칭: 1차 응답 ticketNumber → 2차 findTicketForWorkflow (workdir/registrykey fallback)
+    const tn = (w.ticketNumber || "").toLowerCase();
+    if (tn && (tn.indexOf(q) !== -1 || (qDigit && tn.indexOf(qDigit) !== -1))) return true;
+    const linked = findTicketForWorkflow(w);
+    if (linked) {
+      const ln = (linked.number || "").toLowerCase();
+      if (ln && (ln.indexOf(q) !== -1 || (qDigit && ln.indexOf(qDigit) !== -1))) return true;
+    }
+    return false;
   });
 }
 
@@ -468,9 +480,74 @@ function renderWfDetailView(w) {
 
 // ── Main Render ──
 
-/** Renders the full workflow tab view with search, sort, table, and pagination. */
+/** Workflow column definitions (단일 진실 공급원). */
+const WF_COLS = [
+  { key: "step",       label: "상태" },
+  { key: "ticket",     label: "티켓" },
+  { key: "command",    label: "명령" },
+  { key: "task",       label: "제목" },
+  { key: "query",      label: "질의",   nosort: true },
+  { key: "plan",       label: "계획",    nosort: true },
+  { key: "work",       label: "작업",    nosort: true },
+  { key: "report",     label: "보고",  nosort: true },
+  { key: "summary",    label: "요약", nosort: true },
+  { key: "usage",      label: "사용",   nosort: true },
+  { key: "log",        label: "로그",     nosort: true },
+  { key: "updated_at", label: "일시" },
+];
+
+/**
+ * 헤더 sort indicator HTML 만 갱신한다 (dom 교체 없이).
+ * sort 상태 변경 시 호출되며 검색바·tbody·스크롤·포커스를 보존한다.
+ */
+function refreshWfSortIndicators(el) {
+  el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
+    const key = th.getAttribute("data-sort-key");
+    let indicator = th.querySelector(".wf-sort-indicator, .wf-sort-inactive");
+    if (!indicator) return;
+    if (Board.state.wfSortKey === key) {
+      indicator.className = "wf-sort-indicator";
+      indicator.innerHTML = Board.state.wfSortDir === "asc" ? "&#9650;" : "&#9660;";
+    } else {
+      indicator.className = "wf-sort-inactive";
+      indicator.innerHTML = "&#9650;&#9660;";
+    }
+  });
+}
+
+/**
+ * tbody 만 다시 그린다 (검색바·헤더·스크롤·포커스 보존).
+ * 검색 입력, 정렬 변경, SSE ticket 변경, race 보정 모두 본 함수만 호출한다.
+ */
+function renderWfTbody() {
+  const list = document.getElementById("wf-list");
+  if (!list) return;
+  const filtered = filterWorkflows(Board.state.WORKFLOWS);
+  const sortedFiltered = sortWorkflows(filtered);
+
+  let h = "";
+  if (sortedFiltered.length > 0) {
+    sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
+  } else if (!Board.state.wfLoading) {
+    h += '<tr><td colspan="12" class="empty" style="margin-top:32px">' + (Board.state.wfSearchQuery ? "No results" : "No workflows") + "</td></tr>";
+  }
+  list.innerHTML = h;
+
+  bindWfFileLinks(list);
+  bindWfRowClicks(list);
+  attachWfSentinel();
+  updateWfStatus();
+}
+
+/** Renders the full workflow tab shell (search, header, empty tbody) — 1회만 호출한다. */
 function renderWorkflow() {
   const el = document.getElementById("view-workflow");
+  // 이미 shell 이 그려져 있으면 tbody 갱신만 한다 (검색바·스크롤·포커스 보존).
+  if (el.querySelector(".wf-search") && el.querySelector("#wf-list")) {
+    refreshWfSortIndicators(el);
+    renderWfTbody();
+    return;
+  }
   const filtered = filterWorkflows(Board.state.WORKFLOWS);
   const hasMore = Board.state.wfLoadedIndex < Board.state.wfEntryHrefs.length;
 
@@ -482,26 +559,10 @@ function renderWorkflow() {
   h += '<span class="wf-search-count">' + filtered.length + (hasMore ? "+" : "") + " / " + Board.state.wfEntryHrefs.length + "</span>";
   h += "</div>";
 
-  // Table
-  const sortedFiltered = sortWorkflows(filtered);
-  const cols = [
-    { key: "step",       label: "상태" },
-    { key: "ticket",     label: "티켓" },
-    { key: "command",    label: "명령" },
-    { key: "task",       label: "제목" },
-    { key: "query",      label: "질의",   nosort: true },
-    { key: "plan",       label: "계획",    nosort: true },
-    { key: "work",       label: "작업",    nosort: true },
-    { key: "report",     label: "보고",  nosort: true },
-    { key: "summary",    label: "요약", nosort: true },
-    { key: "usage",      label: "사용",   nosort: true },
-    { key: "log",        label: "로그",     nosort: true },
-    { key: "updated_at", label: "일시" },
-  ];
-
+  // Table header (tbody 는 비워두고 renderWfTbody 로 채운다)
   h += '<div class="wf-table-wrap"><table class="wf-table">';
   h += "<thead><tr>";
-  cols.forEach(function (col) {
+  WF_COLS.forEach(function (col) {
     let indicator = "";
     if (!col.nosort) {
       if (Board.state.wfSortKey === col.key) {
@@ -516,27 +577,17 @@ function renderWorkflow() {
     h += "<th" + sortable + ">" + col.label + indicator + "</th>";
   });
   h += "</tr></thead>";
-
-  h += '<tbody id="wf-list">';
-  if (sortedFiltered.length > 0) {
-    sortedFiltered.forEach(function (w) { h += renderWfCard(w); });
-  } else if (!Board.state.wfLoading) {
-    h += '<tr><td colspan="12" class="empty" style="margin-top:32px">' + (Board.state.wfSearchQuery ? "No results" : "No workflows") + "</td></tr>";
-  }
-  h += "</tbody></table></div></div>";
+  h += '<tbody id="wf-list"></tbody></table></div></div>';
 
   el.innerHTML = h;
 
-  // Search input
+  // Search input — 검색 시엔 tbody 만 갱신한다 (검색바 input 자체는 살아있음)
   el.querySelector(".wf-search").addEventListener("input", function (e) {
     Board.state.wfSearchQuery = e.target.value;
-    Board.state.wfInitialized = false;
-    renderWorkflow();
-    const input = el.querySelector(".wf-search");
-    if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+    renderWfTbody();
   });
 
-  // Sort header clicks
+  // Sort header clicks — indicator + tbody 만 갱신
   el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
     th.addEventListener("click", function () {
       const key = th.getAttribute("data-sort-key");
@@ -546,14 +597,15 @@ function renderWorkflow() {
         Board.state.wfSortKey = key;
         Board.state.wfSortDir = "desc";
       }
-      renderWorkflow();
+      refreshWfSortIndicators(el);
+      renderWfTbody();
     });
   });
 
-  bindWfFileLinks(el);
-  bindWfRowClicks(el);
-  attachWfSentinel();
   bindWfColResize(el);
+
+  // 첫 tbody 채우기
+  renderWfTbody();
 }
 
 // ── Column Resize ──
@@ -612,6 +664,7 @@ Board.fetch.fetchWorkflowEntries = fetchWorkflowEntries;
 
 // Render
 Board.render.renderWorkflow = renderWorkflow;
+Board.render.renderWfTbody = renderWfTbody;
 Board.render.openWfDetail = openWfDetail;
 Board.render.renderWfDetailView = renderWfDetailView;
 Board.render.findTicketForWorkflow = findTicketForWorkflow;

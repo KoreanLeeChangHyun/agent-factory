@@ -72,9 +72,10 @@
         if (Board.state.activeTab === "relations" && Board.render.renderRelations) {
           Board.render.renderRelations();
         }
-        // workflow 탭은 ticket 매핑(findTicketForWorkflow)에 의존 — TICKETS 갱신 시 재렌더
-        if (Board.state.activeTab === "workflow" && Board.render.renderWorkflow) {
-          Board.render.renderWorkflow();
+        // workflow 탭은 ticket 매핑(findTicketForWorkflow)에 의존 — TICKETS 갱신 시 tbody 만 갱신
+        // (검색바·스크롤·포커스 보존하기 위해 shell 은 안 건드린다)
+        if (Board.state.activeTab === "workflow" && Board.render.renderWfTbody) {
+          Board.render.renderWfTbody();
         }
         Board.state.viewerTabs.forEach(function (vt) {
           if (vt.ticket) {
@@ -316,6 +317,9 @@
     Board.state.TICKETS = tickets;
     prevTicketJson = ticketJson(tickets);
     Board.render.renderKanban();
+    // Race 보정: workflow 첫 렌더가 fetchTickets 완료 전에 끝났으면 TICKETS=[]로 모든 행 미연결 고착.
+    // tbody 만 다시 그려서 ticket 매핑을 채운다 (검색바·스크롤·포커스 보존).
+    if (Board.state.wfInitialized && Board.render.renderWfTbody) Board.render.renderWfTbody();
     if (initSavedTabs.length > 0) {
       initSavedTabs.forEach(function (num) {
         var ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
