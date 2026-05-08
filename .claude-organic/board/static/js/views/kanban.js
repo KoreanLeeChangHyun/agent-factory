@@ -220,32 +220,6 @@
   // ── Kanban Rendering ──
 
   /**
-   * 날짜 문자열을 한국어 형식의 날짜/시간 분리 객체로 변환한다.
-   * @param {string} datetimeStr - "YYYY-MM-DD HH:MM:SS" 형식 날짜 문자열
-   * @returns {{ datePart: string, timePart: string }} 날짜 파트와 시간 파트 객체
-   */
-  function formatKoreanDate(datetimeStr) {
-    if (!datetimeStr) { return { datePart: "", timePart: "" }; }
-    const parts = datetimeStr.split(" ");
-    if (parts.length < 2) { return { datePart: datetimeStr, timePart: "" }; }
-    const dateParts = parts[0].split("-");
-    const timeParts = parts[1].split(":");
-    if (dateParts.length < 3 || timeParts.length < 2) { return { datePart: datetimeStr, timePart: "" }; }
-    const year = parseInt(dateParts[0], 10);
-    const month = parseInt(dateParts[1], 10);
-    const day = parseInt(dateParts[2], 10);
-    const hour24 = parseInt(timeParts[0], 10);
-    const minute = timeParts[1];
-    const ampm = hour24 < 12 ? "\uC624\uC804" : "\uC624\uD6C4"; // 오전/오후
-    let hour12 = hour24 % 12;
-    if (hour12 === 0) { hour12 = 12; }
-    return {
-      datePart: `${year}\uB144 ${month}\uC6D4 ${day}\uC77C`,
-      timePart: `${ampm} ${hour12}\uC2DC ${minute}\uBD84`,
-    };
-  }
-
-  /**
    * 스테이지 이름을 3글자 약어로 변환한다.
    * @param {string} stage - 스테이지 이름 (예: "research", "implement", "review")
    * @returns {string} 3글자 약어 (예: "res", "imp", "rev")
@@ -1956,7 +1930,6 @@
           sortedItems.forEach(function (t) {
             const done = col.key === "Done" ? " done" : "";
             const status = getWorkflowStatus(t);
-            const dateObj = formatKoreanDate(t.updated || t.created);
             // DnD: To Do / Open 컬럼 카드만 draggable.
             // T-399: In Progress 카드 drag 불가는 의도된 보호 (워크플로우 취소 부수효과 차단).
             // T-906: Review 카드 draggable 추가 (Review → Done drop 허용).
@@ -1985,17 +1958,13 @@
             h += "</div>";
             // 중단: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 하단: 왼쪽(체인/관계) + 오른쪽(날짜)
+            // 하단: 왼쪽(체인/관계)
             h += '<div class="card-bottom">';
             h += '<div class="card-bottom-left">';
             const hasRelations = t.relations && t.relations.length > 0;
             if (hasRelations) {
               h += renderRelations(t);
             }
-            h += '</div>';
-            h += '<div class="card-bottom-right">';
-            h += '<div class="card-date">' + esc(dateObj.datePart) + "</div>";
-            h += '<div class="card-time">' + esc(dateObj.timePart) + "</div>";
             h += '</div>';
             h += "</div>";
             h += "</div>";
