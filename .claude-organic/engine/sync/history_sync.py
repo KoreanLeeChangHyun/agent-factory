@@ -4,6 +4,11 @@
 .claude-organic/runs/ 및 .claude-organic/runs/.history/ 디렉토리를 스캔하여 .claude-organic/board/data/.history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
+디렉터리 구조 (T-448 이후 신규 폴드 구조 우선, 구 구조 fallback):
+    신규 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/
+                 status.json, plan.md, work/, report.md, .context.json 직속
+    구 구조 (fallback): .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+
 주요 함수:
     parse_timestamp_from_dir: 디렉터리명에서 날짜/시간 추출
     extract_status_from_json: status.json에서 단계 및 타임스탬프 추출
@@ -390,8 +395,12 @@ def _build_entry(
 def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, object]]:
     """단일 디렉토리를 스캔하여 워크플로우 엔트리 목록을 반환.
 
-    디렉토리 구조: base_dir/<YYYYMMDD-HHMMSS>/<workName>/<command>/
-    command 서브디렉토리가 없고 workName에 직접 파일이 있으면 command="unknown"으로 폴백.
+    T-448 이후 신규 폴드 구조를 우선 탐색하고, 구 구조는 fallback으로 처리한다.
+
+    신규 구조 (우선): base_dir/<YYYYMMDD-HHMMSS>/status.json 직속
+        → entry 1건 생성 (work_name/command는 .context.json에서 읽음)
+    구 구조 (fallback): base_dir/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+        command 서브디렉토리가 없고 workName에 직접 파일이 있으면 command="unknown"으로 폴백.
 
     Args:
         base_dir: 스캔할 기본 디렉터리 절대 경로
@@ -415,7 +424,31 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
         if not os.path.isdir(dir_path):
             continue
 
-        # 중첩 구조 탐색: <YYYYMMDD-HHMMSS>/<workName>/<command>/
+        # T-448 신규 폴드 구조 우선: dir_path/status.json 직속 존재 여부
+        new_status_file = os.path.join(dir_path, "status.json")
+        if os.path.isfile(new_status_file):
+            # 새 구조: .context.json에서 work_name/command 추출
+            context_file = os.path.join(dir_path, ".context.json")
+            work_name = dir_name  # 폴백: dir_name 사용
+            command = "unknown"
+            if os.path.exists(context_file):
+                try:
+                    with open(context_file, "r", encoding="utf-8") as _f:
+                        ctx = json.load(_f)
+                    if isinstance(ctx.get("workName"), str) and ctx["workName"]:
+                        work_name = ctx["workName"]
+                    if isinstance(ctx.get("command"), str) and ctx["command"]:
+                        command = ctx["command"]
+                except Exception:
+                    pass
+            entry = _build_entry(dir_name, work_name, command,
+                                 dir_path, dir_path, rel_prefix)
+            # 새 구조: rel_base는 {rel_prefix}/{dir_name} (중간 디렉터리 없음)
+            entry["rel_base"] = f"{rel_prefix}/{dir_name}"
+            entries.append(entry)
+            continue
+
+        # 구 구조 fallback: 중첩 구조 탐색 <YYYYMMDD-HHMMSS>/<workName>/<command>/
         for work_name in os.listdir(dir_path):
             work_path = os.path.join(dir_path, work_name)
             if not os.path.isdir(work_path):
@@ -448,7 +481,9 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
 def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict[str, object]]:
     """.claude-organic/runs/ 및 .claude-organic/runs/.history/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
 
-    디렉토리 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
+    디렉터리 구조 (T-448 이후 신규 폴드 구조 우선, 구 구조 fallback):
+        신규 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/status.json 직속
+        구 구조 (fallback): .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
     .history/ 하위도 동일 구조로 탐색하며, rel_base를 ../workflow/.history/...로 구성.
 
     workflow/ 엔트리가 .history/ 엔트리보다 우선한다 (같은 work_id인 경우).
@@ -1011,6 +1046,10 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
 def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
     """활성 워크플로우(완료 상태가 아닌)의 디렉터리 이름 집합을 반환.
 
+    T-448 이후 신규 폴드 구조를 우선 탐색하고, 구 구조는 fallback으로 처리한다.
+    신규 구조: dir_path/status.json 직속
+    구 구조 fallback: dir_path/<workName>/<command>/status.json
+
     Args:
         workflow_dir: .claude-organic/runs/ 디렉터리 절대 경로
 
@@ -1028,7 +1067,15 @@ def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
         if not os.path.isdir(dir_path) or not re.match(r"^[0-9]", dir_name):
             continue
 
-        # workName 서브디렉터리 탐색
+        # 신규 폴드 구조 우선: dir_path/status.json 직속 확인
+        new_status_file = os.path.join(dir_path, "status.json")
+        if os.path.exists(new_status_file):
+            phase, _, _ = extract_status_from_json(new_status_file)
+            if phase not in terminal_phases:
+                active_keys.add(dir_name)
+            continue
+
+        # 구 구조 fallback: workName 서브디렉터리 탐색
         for work_name in os.listdir(dir_path):
             work_path = os.path.join(dir_path, work_name)
             if not os.path.isdir(work_path):

@@ -151,16 +151,17 @@ flow-claude end <registryKey>             # 워크플로우 종료
 
 ## INIT (Orchestrator-driven)
 
-`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 command를 직접 파싱하여 순차 실행한다 (hook 없음, LLM 별도 호출 없음):
+`/wf` 슬래시 커맨드 실행 시 오케스트레이터가 단일 명령으로 INIT을 처리한다:
 
-**5-Step 실행 흐름:**
+```bash
+cd "$(flow-init <command> --ticket T-NNN | tail -1)"
+```
 
-1. **Command/플래그 파싱** -- `/wf -s implement` -> command=implement, autoApprove=true. `-n` 지정 시 autoApprove=false. 체인 command(예: `research>implement`)는 전체 문자열 그대로 보관
-2. **시작 배너** -- `flow-claude start <command>`
-3. **제목 생성** -- 티켓 파일(`.kanban/open/T-NNN.xml` 또는 상태별 디렉터리에서 탐색) 읽어 20자 이내 한글 제목 생성 (오케스트레이터 직접)
-4. **initialization.py 실행** -- `flow-init <command> "<title>" [--ticket T-NNN]`. mode는 현재 full만 지원하므로 생략 권장. 기존 위치 인자 형식(`[mode] [#N]`)도 하위호환 지원. 실패 시 `FAIL` + 비정상 종료 코드
-5. **init-result.json 파싱** -- 종료 코드 0이면 최신 `.workflow/` 디렉터리의 init-result.json을 Read
-6. **워크트리 cwd 전환** -- init-result.json의 `worktreePath`가 존재하면 `cd <절대경로>` Bash 실행으로 cwd를 워크트리로 전환 (상태바에 피처 브랜치 표시). `worktreePath`가 없으면 생략
+- command: implement | review | research | (chain)
+- flow-init: 디렉터리 생성 + worktree 생성(implement만) + init-result.json 기록
+- stdout 마지막 줄: worktreePath 절대경로 (또는 빈 줄). 빈 줄이면 cwd 유지
+
+실패 시 `FAIL` + 비정상 종료 코드. INIT 결과 요약/출력 MUST NOT.
 
 **Return Value Retention (후속 단계에 전달):**
 
@@ -172,7 +173,7 @@ flow-claude end <registryKey>             # 워크플로우 종료
 | `command` | PLAN~DONE | 실행 명령어 |
 | `autoApprove` | PLAN | -n 플래그 여부 |
 | `title`, `ticketNumber` | DONE | flow-finish 인자 |
-| `worktreePath` | INIT | 워크트리 절대 경로 (cwd 전환용) |
+| `worktreePath` | INIT | 워크트리 절대경로 (cwd 전환용) |
 
 **종료 코드:** 0=성공, 1=티켓 비어있음, 2=인자 오류, 4=초기화 실패
 
@@ -441,6 +442,6 @@ flow-claude end <registryKey>                                                   
 
 ## Notes
 
-1. On /wf command, orchestrator parses command directly, runs flow-claude start banner then initialization.py, then proceeds to PLAN Step
+1. On /wf command, orchestrator parses command directly, runs flow-init for INIT (single-step `cd "$(flow-init ... | tail -1)"`), then proceeds to PLAN Step
 2. Step order (PLAN -> WORK -> REPORT -> DONE) strictly enforced; WORK cannot ask questions (clarification in PLAN only)
 3. Git commits via `/git:commit` separately; Slack failure does not block workflow

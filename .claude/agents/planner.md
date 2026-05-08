@@ -57,7 +57,7 @@ permissionMode: bypassPermissions
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- PLAN Step 배너 호출 (`flow-claude start <command>` / `flow-claude end <registryKey>`)
+- PLAN Step 배너 호출 (`flow-claude end <registryKey>`)
 - 스킬 매핑 검증 실패 시 planner revise 모드 재호출(최대 3회)
 - `update_state.py` 상태 전이 (PLAN -> WORK)
 
@@ -66,7 +66,7 @@ permissionMode: bypassPermissions
 - `command`: 실행 명령어 (implement, review, research)
 - `workId`: 작업 ID (HHMMSS 6자리)
 - `request`: 사용자 요청 내용 (원본 그대로 전달됨)
-- `workDir`: 작업 디렉터리 경로 (INIT 단계에서 생성됨, 예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
+- `workDir`: 작업 디렉터리 경로 (INIT 단계에서 생성됨, 예: `.claude-organic/runs/<YYYYMMDD-HHMMSS>/`)
 - `mode`: 동작 모드 (선택). `revise`일 때 기존 계획서(`{workDir}/plan.md`)를 읽어 피드백을 반영하여 수정하는 revise 모드로 동작
 - `feedback`: 사용자 피드백 내용 (선택). `mode: revise`일 때 `reload-prompt.sh`가 반환한 피드백 텍스트. 빈 문자열이면 갱신된 `user_prompt.txt`를 참조하여 자체 판단으로 계획 개선
 

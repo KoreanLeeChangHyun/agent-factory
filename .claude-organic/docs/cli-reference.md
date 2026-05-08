@@ -7,10 +7,10 @@
 
 | alias | 핵심 사용법 | 필수 인자 |
 |-------|------------|---------|
-| `flow-claude` | `flow-claude start <command>` / `flow-claude end <registryKey>` | start/end 서브커맨드 |
+| `flow-claude` | `flow-claude end <registryKey>` | end 서브커맨드 |
 | `flow-step` | `flow-step start <registryKey> [phase]` / `flow-step end <registryKey> [label]` | start/end 서브커맨드, registryKey |
 | `flow-phase` | `flow-phase <registryKey> <N>` | registryKey, 페이즈 번호 |
-| `flow-init` | `flow-init <command> <title> [mode] [#N]` | command(implement/review/research), title |
+| `flow-init` | `flow-init <command> --ticket T-NNN` | command(implement/review/research), --ticket |
 | `flow-finish` | `flow-finish <registryKey> <status>` | registryKey, status(완료/실패) |
 | `flow-reload` | `flow-reload <workDir>` | workDir 상대경로 |
 | `flow-update` | `flow-update <subcommand> <registryKey> ...` | 서브커맨드, registryKey |
@@ -32,21 +32,16 @@
 
 - **alias**: `flow-claude`
 - **스크립트**: `.claude-organic/engine/banners/flow_claude_banner.sh`
-- **설명**: 워크플로우 시작/종료 배너를 출력하는 셸 스크립트
+- **설명**: 워크플로우 종료 배너를 출력하는 셸 스크립트
 
 #### 서브커맨드
 
 | 서브커맨드 | 사용법 | 설명 |
 |-----------|-------|------|
-| `start` | `flow-claude start <command>` | 워크플로우 시작 배너 출력 |
+| `start` | `flow-claude start <command>` | **(deprecated)** 워크플로우 시작 배너 출력. T-448 이후 오케스트레이터가 호출하지 않음 |
 | `end` | `flow-claude end <registryKey>` | 워크플로우 종료 배너 + 로그 기록 + Slack 알림 |
 
 #### 인자
-
-**start**
-| 인자 | 필수 | 설명 |
-|------|------|------|
-| `command` | 필수 | 실행 명령어 문자열 (implement, review, research 등) |
 
 **end**
 | 인자 | 필수 | 설명 |
@@ -56,7 +51,6 @@
 #### 사용 예시
 
 ```bash
-flow-claude start implement
 flow-claude end 20260325-004729
 ```
 
@@ -138,27 +132,32 @@ flow-phase 20260325-004729 2
 #### 사용법
 
 ```
-flow-init <command> <title> [mode] [#N]
+flow-init <command> [--ticket T-NNN] [--mode full]
 ```
+
+> 구 형식 `flow-init <command> <title> [mode] [#N]` 은 하위호환으로 동작하나 deprecated.
 
 #### 인자
 
 | 인자 | 필수 | 타입 | 설명 |
 |------|------|------|------|
 | `command` | 필수 | string | 실행 명령어. `implement`, `review`, `research` 또는 체인 (`implement>review`) |
-| `title` | 필수 | string | 20자 이내 워크플로우 제목 |
-| `mode` | 선택 | string | 워크플로우 모드. 현재 `full`만 지원 (기본값: `full`) |
-| `#N` / `T-NNN` | 선택 | string | 티켓 번호. 지정 시 해당 티켓을 사용 |
+| `--ticket` / `T-NNN` | 필수 | string | 티켓 번호. 미지정 시 exit 1 (티켓 없는 워크플로우 미지원) |
+| `title` | 선택 (deprecated) | string | 구 위치 인자. 미지정 시 티켓 XML `<metadata>/<title>`에서 자동 추출 |
+| `--mode` | 선택 | string | 워크플로우 모드. 현재 `full`만 지원 (기본값: `full`) |
 
 #### 환경변수
 
 | 변수 | 설명 |
 |------|------|
-| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 .claude-organic/tickets/active/에서 자동 선택 |
+| `TICKET_NUMBER` | 티켓 번호 (T-NNN 또는 NNN 형식). `--ticket` 인자와 동일 효과 |
+| `CLAUDE_SESSION_ID` | 초기 세션 ID 등록 |
 
 #### 출력 (stdout)
 
-- init-result JSON: `workDir`, `registryKey`, `workId`, `workName`, `ticketNumber`, `chainCommand`
+- 중간 정보 메시지 (stderr)
+- 마지막 줄: `worktreePath` 절대경로 (implement만 해당), 또는 빈 줄 (research/review)
+- `workDir`: `.claude-organic/runs/<YYYYMMDD-HHMMSS>/` 직속 디렉터리 구조
 
 #### 종료 코드
 
@@ -172,9 +171,13 @@ flow-init <command> <title> [mode] [#N]
 #### 사용 예시
 
 ```bash
-flow-init implement "로그인 버그 수정"
-flow-init implement "인증 시스템 개선" full T-012
-flow-init "implement>review" "결제 모듈 구현"
+# 권장 (신규)
+flow-init implement --ticket T-169
+flow-init research --ticket T-169
+cd "$(flow-init implement --ticket T-169 | tail -1)"
+
+# 하위호환 (deprecated, 경고 출력 후 동작)
+flow-init implement "로그인 버그 수정" --ticket T-012
 ```
 
 ---
@@ -232,7 +235,7 @@ flow-reload <workDir>
 
 | 인자 | 필수 | 타입 | 설명 |
 |------|------|------|------|
-| `workDir` | 필수 | string | 작업 디렉터리 상대 경로 (예: `.claude-organic/runs/20260325-004729/작업명/implement`) |
+| `workDir` | 필수 | string | 작업 디렉터리 상대 경로 (예: `.claude-organic/runs/20260325-004729/`) |
 
 #### 환경변수
 
@@ -247,7 +250,7 @@ flow-reload <workDir>
 #### 사용 예시
 
 ```bash
-flow-reload .claude-organic/runs/20260325-004729/로그인-버그-수정/implement
+flow-reload .claude-organic/runs/20260325-004729
 ```
 
 ---
@@ -400,7 +403,7 @@ flow-validate <plan_path>
 #### 사용 예시
 
 ```bash
-flow-validate .claude-organic/runs/20260325-004729/로그인-버그-수정/implement/plan.md
+flow-validate .claude-organic/runs/20260325-004729/plan.md
 ```
 
 ---
@@ -599,7 +602,7 @@ flow-kanban update-result T-169 \
   --registrykey 20260325-004729 \
   --plan ".claude-organic/runs/20260325-004729/.../plan.md" \
   --report ".claude-organic/runs/20260325-004729/.../report.md" \
-  --workdir ".claude-organic/runs/20260325-004729/.../implement"
+  --workdir ".claude-organic/runs/20260325-004729"
 
 flow-kanban link T-169 --depends-on T-165
 flow-kanban link T-169 --derived-from T-168

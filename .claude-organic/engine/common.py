@@ -402,7 +402,9 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
     탐색 순서:
       1. .claude-organic/runs/<input_key>/ 하위 디렉터리 스캔
-      2. 1차 탐색 실패 시 .claude-organic/runs/.history/<input_key>/ 하위 디렉터리 스캔
+         - 1a (T-448 신규 폴드 구조): runs/<input_key>/status.json 존재 시 input_key 자체
+         - 1b (구 중첩 구조 fallback): runs/<input_key>/<work_name>/<cmd_name>/status.json
+      2. 1차 탐색 실패 시 .claude-organic/runs/.history/<input_key>/ 하위 디렉터리 스캔 (동일 dual-mode)
       3. 두 탐색 모두 실패 시 ".claude-organic/runs/<input_key>" 폴백 반환
 
     Args:
@@ -419,9 +421,19 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
         project_root = resolve_project_root()
 
     def _scan_base(base: str, rel_prefix: str) -> str | None:
-        """base 디렉터리 하위에서 status.json이 있는 workDir을 스캔 반환."""
+        """base 디렉터리 하위에서 status.json이 있는 workDir을 스캔 반환.
+
+        1차 (T-448 신규 폴드 구조): base/status.json 존재 시 rel_prefix 반환.
+        2차 fallback (구 중첩 구조): base/<work_name>/<cmd_name>/status.json 탐색.
+        """
         if not os.path.isdir(base):
             return None
+
+        # 1차: 새 구조 (base/status.json)
+        if os.path.exists(os.path.join(base, "status.json")):
+            return rel_prefix
+
+        # 2차 fallback: 구 중첩 구조
         for work_name in sorted(os.listdir(base)):
             wn_path = os.path.join(base, work_name)
             if not os.path.isdir(wn_path) or work_name.startswith("."):

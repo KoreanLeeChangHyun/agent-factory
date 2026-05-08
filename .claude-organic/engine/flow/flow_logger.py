@@ -178,8 +178,9 @@ def _resolve_work_dir_from_key(
 ) -> Optional[str]:
     """registryKey로 abs_work_dir을 디렉터리 스캔으로 해석한다.
 
-    .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/ 구조를 순회하여
-    status.json이 존재하는 첫 번째 디렉터리를 반환합니다.
+    1차 (T-448 신규 폴드 구조): .workflow/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환.
+    2차 fallback (구 중첩 구조): .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json
+    을 순회하여 status.json이 존재하는 첫 번째 디렉터리를 반환합니다.
 
     Args:
         registry_key: YYYYMMDD-HHMMSS 형식 레지스트리 키.
@@ -192,6 +193,11 @@ def _resolve_work_dir_from_key(
     if not os.path.isdir(base_dir):
         return None
 
+    # 1차: 새 구조 (base_dir/status.json)
+    if os.path.exists(os.path.join(base_dir, "status.json")):
+        return base_dir
+
+    # 2차 fallback: 구 중첩 구조
     for work_name in sorted(os.listdir(base_dir)):
         wn_path = os.path.join(base_dir, work_name)
         if not os.path.isdir(wn_path) or work_name.startswith("."):
@@ -229,6 +235,31 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
     # (abs_work_dir, updated_at, linked_sessions)
     candidates: list[tuple[str, str, list]] = []
 
+    def _collect_candidate(cmd_path: str) -> None:
+        """cmd_path/status.json을 읽고 활성 워크플로우면 candidates에 추가."""
+        status_file = os.path.join(cmd_path, "status.json")
+        if not os.path.exists(status_file):
+            return
+
+        try:
+            with open(status_file, "r", encoding="utf-8") as f:
+                status = json.load(f)
+        except Exception:
+            return
+
+        if not isinstance(status, dict):
+            return
+
+        phase = status.get("step") or status.get("phase", "NONE")
+        if phase in _TERMINAL_PHASES:
+            return
+
+        updated_at = status.get("updated_at", "")
+        linked_sessions = status.get("linked_sessions", [])
+        if not isinstance(linked_sessions, list):
+            linked_sessions = []
+        candidates.append((cmd_path, updated_at, linked_sessions))
+
     for entry in sorted(os.listdir(workflow_root)):
         if not _TS_PATTERN.match(entry):
             continue
@@ -236,6 +267,12 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if not os.path.isdir(entry_path):
             continue
 
+        # 1차 (T-448 신규 폴드 구조): entry_path/status.json
+        if os.path.exists(os.path.join(entry_path, "status.json")):
+            _collect_candidate(entry_path)
+            continue
+
+        # 2차 fallback (구 중첩 구조): entry_path/<work_name>/<command>/status.json
         for work_name in sorted(os.listdir(entry_path)):
             wn_path = os.path.join(entry_path, work_name)
             if not os.path.isdir(wn_path) or work_name.startswith("."):
@@ -244,30 +281,7 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
                 cmd_path = os.path.join(wn_path, cmd_name)
                 if not os.path.isdir(cmd_path):
                     continue
-
-                status_file = os.path.join(cmd_path, "status.json")
-                if not os.path.exists(status_file):
-                    continue
-
-                # status.json에서 phase, updated_at, linked_sessions 읽기
-                try:
-                    with open(status_file, "r", encoding="utf-8") as f:
-                        status = json.load(f)
-                except Exception:
-                    continue
-
-                if not isinstance(status, dict):
-                    continue
-
-                phase = status.get("step") or status.get("phase", "NONE")
-                if phase in _TERMINAL_PHASES:
-                    continue
-
-                updated_at = status.get("updated_at", "")
-                linked_sessions = status.get("linked_sessions", [])
-                if not isinstance(linked_sessions, list):
-                    linked_sessions = []
-                candidates.append((cmd_path, updated_at, linked_sessions))
+                _collect_candidate(cmd_path)
 
     if not candidates:
         return None

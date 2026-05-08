@@ -28,7 +28,7 @@ permissionMode: bypassPermissions
 
 ### 오케스트레이터가 대신 수행하는 행위
 
-- REPORT Step 배너 호출 (`flow-claude start <command>` / `flow-claude end <registryKey>`)
+- REPORT Step 배너 호출 (`flow-claude end <registryKey>`)
 - `flow-update` 상태 전이 (WORK -> REPORT)
 - Reporter 반환값 추출 (첫 1줄만 보관)
 
@@ -36,8 +36,8 @@ permissionMode: bypassPermissions
 
 - `command`: 실행 명령어 (implement, review, research)
 - `workId`: 작업 ID (HHMMSS 6자리, 예: "143000")
-- `workDir`: 작업 디렉터리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>`)
-- `workPath`: 작업 내역 디렉터리 경로 (예: `.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/work/`)
+- `workDir`: 작업 디렉터리 경로 (예: `.claude-organic/runs/<YYYYMMDD-HHMMSS>/`)
+- `workPath`: 작업 내역 디렉터리 경로 (예: `.claude-organic/runs/<YYYYMMDD-HHMMSS>/work/`)
 
 > **보고서 경로 구성**: `workDir`을 기반으로 보고서 경로를 `{workDir}/report.md`로 확정적으로 구성합니다. workPath에서 역변환하여 경로를 추론하지 마세요.
 

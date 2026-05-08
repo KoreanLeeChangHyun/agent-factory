@@ -4,7 +4,8 @@
 새 시그니처 (workDir 기반):
     python3 slack_notify.py <workDir> <상태> [보고서경로] [에이전트]
     - workDir이 .claude-organic/ 또는 절대경로(/)로 시작하면 새 방식으로 감지
-    - workDir 형식: .claude-organic/runs/YYYYMMDD-HHMMSS/<workName>/<command>
+    - workDir 형식: .claude-organic/runs/YYYYMMDD-HHMMSS/ (T-448 폴드 후 직속)
+      또는 구 형식: .claude-organic/runs/YYYYMMDD-HHMMSS/<workName>/<command> (하위 호환)
     - .context.json에서 title, workId, workName, command 자동 읽기
 
 기존 시그니처 (하위 호환):

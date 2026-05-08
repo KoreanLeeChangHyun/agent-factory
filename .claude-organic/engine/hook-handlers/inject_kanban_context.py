@@ -189,9 +189,11 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
         return []
 
     sessions: list[dict[str, str]] = []
-    # runs/{registryKey}/{slug}/implement/.context.json 패턴
-    pattern = os.path.join(runs_dir, '*', '*', 'implement', '.context.json')
-    ctx_files = glob.glob(pattern)
+    # 새 구조: runs/{registryKey}/.context.json (폴드)
+    pattern_new = os.path.join(runs_dir, '*', '.context.json')
+    # 구 구조 fallback: runs/{registryKey}/{slug}/implement/.context.json
+    pattern_old = os.path.join(runs_dir, '*', '*', 'implement', '.context.json')
+    ctx_files = glob.glob(pattern_new) + glob.glob(pattern_old)
 
     for ctx_path in ctx_files:
         try:

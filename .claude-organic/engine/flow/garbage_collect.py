@@ -107,8 +107,9 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
 def _step1_mark_stale(workflow_root: str) -> int:
     """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환한다.
 
-    중첩 구조(.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json)와
-    레거시 플랫 구조(.workflow/<id>/status.json)를 모두 지원한다.
+    T-448 폴드 구조(.workflow/<YYYYMMDD-HHMMSS>/status.json)를 우선 처리하고,
+    구 중첩 구조(.workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json)와
+    레거시 플랫 구조(.workflow/<id>/status.json)를 fallback으로 지원한다.
 
     Args:
         workflow_root: .workflow 디렉터리 절대 경로
@@ -127,7 +128,14 @@ def _step1_mark_stale(workflow_root: str) -> int:
         if not os.path.isdir(entry_path) or entry.startswith("."):
             continue
 
-        # 중첩 구조 탐색: .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json
+        # 1차 (T-448 신규 폴드 구조): .workflow/<YYYYMMDD-HHMMSS>/status.json
+        new_status = os.path.join(entry_path, "status.json")
+        if os.path.exists(new_status):
+            if _process_status_file(new_status, entry_path, now):
+                stale_count += 1
+            continue
+
+        # 2차 fallback (구 중첩 구조): .workflow/<YYYYMMDD-HHMMSS>/<workName>/<command>/status.json
         found = False
         for work_name in os.listdir(entry_path):
             wn_path = os.path.join(entry_path, work_name)
@@ -144,11 +152,8 @@ def _step1_mark_stale(workflow_root: str) -> int:
                     found = True
 
         if not found:
-            # 레거시 플랫 구조 호환
-            flat_status = os.path.join(entry_path, "status.json")
-            if os.path.exists(flat_status):
-                if _process_status_file(flat_status, entry_path, now):
-                    stale_count += 1
+            # 3차 (레거시 플랫 구조 호환): 동일하게 entry_path/status.json — 1차에서 이미 처리됨
+            pass
 
     if stale_count > 0:
         print(f"[INFO] zombie cleanup: {stale_count} workflow(s) marked as STALE", file=sys.stderr)

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# flow_claude_banner.sh - 워크플로우 시작/종료 배너 통합
+# flow_claude_banner.sh - 워크플로우 종료 배너
 #
 # 사용법:
-#   flow-claude start <command>
 #   flow-claude end <registryKey>
 #
 # 예시:
-#   flow-claude start implement
 #   flow-claude end 20260228-133000
+#
+# T-448: start 서브커맨드 폐지 (INIT 1-Step 압축 — flow-init 단일 호출로 시작 처리).
 
 set -euo pipefail
 
@@ -17,12 +17,13 @@ show_help() {
 사용법: flow-claude <서브커맨드> <인자...>
 
 서브커맨드:
-  start <command>       워크플로우 시작 배너 출력
   end   <registryKey>   워크플로우 종료 배너 출력
 
 예시:
-  flow-claude start implement
   flow-claude end 20260228-133000
+
+T-448 NOTE:
+  start 서브커맨드는 폐지되었습니다. INIT 단계는 `flow-init` 단일 호출로 처리됩니다.
 EOF
 }
 
@@ -35,23 +36,16 @@ if [[ "$SUBCMD" == "--help" || "$SUBCMD" == "-h" ]]; then
 fi
 
 if [[ -z "$SUBCMD" ]]; then
-    echo "사용법: flow-claude <start|end> <인자...>" >&2
+    echo "사용법: flow-claude <end> <인자...>" >&2
     exit 1
 fi
 
 # ═══════════════════════════════════════════════════════
-# start: flow-claude start <command> <mode>
+# start: T-448 폐지 — deprecated 안내만 출력 (외부 호환)
 # ═══════════════════════════════════════════════════════
 if [[ "$SUBCMD" == "start" ]]; then
-    COMMAND="${2:-}"
-
-    if [[ -z "$COMMAND" ]]; then
-        echo "사용법: flow-claude start <command>" >&2
-        exit 1
-    fi
-
-    echo "[WORKFLOW] ${COMMAND}"
-    # workflow.log 기록은 registryKey 없이 호출되므로 생략 (초기화 직후에는 로그 경로 미확정)
+    echo "[DEPRECATED] flow-claude start 는 T-448 (INIT 1-Step 압축) 으로 폐지되었습니다." >&2
+    echo "[DEPRECATED] INIT 단계는 'flow-init <command> --ticket T-NNN' 단일 호출로 처리됩니다." >&2
     exit 0
 fi
 
@@ -77,7 +71,12 @@ if [[ "$SUBCMD" == "end" ]]; then
     COMMAND=""
 
     BASE_DIR="$PROJECT_ROOT/.claude-organic/runs/$REGISTRY_KEY"
-    if [[ -d "$BASE_DIR" ]]; then
+    # T-448: 새 구조 우선 (BASE_DIR/.context.json 직접 존재) + 구 구조 fallback
+    if [[ -f "$BASE_DIR/.context.json" ]]; then
+        # 1차: 새 구조 — runs/{key}/.context.json
+        WORK_DIR=".claude-organic/runs/$REGISTRY_KEY"
+    elif [[ -d "$BASE_DIR" ]]; then
+        # 2차: 구 구조 fallback — runs/{key}/{work_name}/{command}/.context.json
         for WNAME_DIR in "$BASE_DIR"/*/; do
             [[ -d "$WNAME_DIR" ]] || continue
             for CMD_DIR in "$WNAME_DIR"*/; do
@@ -165,5 +164,5 @@ except Exception:
     exit 0
 fi
 
-echo "사용법: flow-claude <start|end> <인자...>" >&2
+echo "사용법: flow-claude <end> <인자...>" >&2
 exit 1

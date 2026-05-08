@@ -2,16 +2,16 @@
 """
 initialization.py - 워크플로우 초기화 스크립트.
 
-오케스트레이터가 command, mode, title을 인자로 전달하면
+오케스트레이터가 command를 인자로 전달하면 (title은 티켓 XML에서 자동 추출)
 작업 디렉터리 생성 + 메타데이터 기록을 수행한다.
 LLM 호출 없음 (순수 IO).
 
 사용법:
-  python3 initialization.py <command> <title> [--mode full] [--ticket T-NNN]
+  python3 initialization.py <command> [title] [--mode full] [--ticket T-NNN]
 
 인자:
   command          실행 명령어. implement | review | research (체인: research>implement)
-  title            오케스트레이터가 생성한 20자 이내 제목
+  title (optional) 워크플로우 제목 (20자 이내). 미지정 시 티켓 XML <metadata>/<title>에서 자동 추출.
   --mode full      워크플로우 모드 (기본값: full)
   --ticket T-NNN   연결할 티켓 번호 (T-NNN, NNN, #N 형식)
 
@@ -23,8 +23,9 @@ LLM 호출 없음 (순수 IO).
   TICKET_NUMBER  티켓 번호 (T-NNN 또는 NNN 형식). 미지정 시 kanban/open/ 디렉터리에서 자동 선택.
 
 출력:
-  stdout으로 init-result JSON을 출력한다.
-  오케스트레이터는 Bash 실행 결과에서 직접 파싱한다 (Read 불필요).
+  stdout 첫 줄: workDir (프로젝트 루트 상대 경로)
+  stdout 마지막 줄: worktreePath 절대경로 (worktree 미생성 시 빈 줄)
+  오케스트레이터는 `cd "$(flow-init ... | tail -1)"` 형태로 worktree 진입.
 
 종료 코드:
   0  성공
@@ -34,8 +35,12 @@ LLM 호출 없음 (순수 IO).
 
 생성 파일:
   <workDir>/user_prompt.txt   사용자 원문 요청 보존
-  <workDir>/.context.json     작업 메타데이터 (title, workId, command 등)
+  <workDir>/.context.json     작업 메타데이터 (title, workId, command 등; workName deprecated)
   <workDir>/status.json       FSM 상태 (phase: NONE, mode, transitions)
+
+T-448 디렉터리 폴드:
+  workDir = .claude-organic/runs/{registry_key}/  (구: {key}/{work_name}/{command})
+  workName 필드는 후방 호환을 위해 보존하되 deprecated.
 """
 
 from __future__ import annotations
@@ -525,6 +530,9 @@ def _write_context(
 
     registryKey와 ticketNumber 필드는 board.js가 워크플로우↔티켓 양방향 연결에 사용한다.
 
+    T-448 NOTE: workName 필드는 deprecated. 디렉터리 폴드 후 후방 호환용(board.js)으로만 유지한다.
+    신규 코드는 title/registryKey 만 사용하고, workName 의존을 추가하지 말 것.
+
     Args:
         abs_work_dir: 작업 디렉터리 절대 경로
         title: 워크플로우 제목 (20자 이내)
@@ -667,18 +675,21 @@ def init_workflow(
     registry_key: str = now.strftime("%Y%m%d-%H%M%S")
     work_id: str = registry_key.split("-")[1]
 
+    # work_name은 worktree 피처 브랜치명 생성에는 보존하지만 (worktree_manager.py 의존),
+    # work_dir 디렉터리 빌드에서는 T-448 폴드로 사용 폐기.
     work_name: str = _sanitize_work_name(title)
     if not work_name:
         _err(f"Title produced empty workName after sanitization: '{title}'", 4)
 
-    work_dir: str = f".claude-organic/runs/{registry_key}/{work_name}/{command}"
+    # T-448: 디렉터리 폴드 — runs/{key}/{work_name}/{command} → runs/{key}
+    work_dir: str = f".claude-organic/runs/{registry_key}"
     abs_work_dir: str = os.path.join(_PROJECT_ROOT, work_dir)
 
     # registryKey 충돌 방지: 동일 디렉터리가 이미 존재하면 suffix 추가
     if os.path.exists(abs_work_dir):
         for suffix in range(1, 100):
             candidate_key: str = f"{registry_key}-{suffix}"
-            candidate_dir: str = f".claude-organic/runs/{candidate_key}/{work_name}/{command}"
+            candidate_dir: str = f".claude-organic/runs/{candidate_key}"
             candidate_abs: str = os.path.join(_PROJECT_ROOT, candidate_dir)
             if not os.path.exists(candidate_abs):
                 registry_key = candidate_key
@@ -842,14 +853,16 @@ def init_workflow(
 # ─── main ────────────────────────────────────────────────────────────────────
 
 
-def _parse_args() -> tuple[str, str, str, str | None]:
+def _parse_args() -> tuple[str, str | None, str, str | None]:
     """CLI 인자를 파싱하여 (command, title, mode, ticket_arg)를 반환한다.
 
+    T-448: title은 optional이다. 미지정 시 main()에서 티켓 XML <metadata>/<title>로 자동 추출한다.
     argparse로 --mode / --ticket named 인자를 처리하고,
     하위 호환을 위해 위치 인자 [mode] [#N] 패턴도 수동 후처리로 인식한다.
 
     Returns:
         (command, title, mode, ticket_arg) 튜플.
+        title은 명시 시 str, 미지정 시 None (자동 추출 대상).
         ticket_arg는 T-NNN 형식 또는 None.
     """
     import argparse
@@ -867,7 +880,9 @@ def _parse_args() -> tuple[str, str, str, str | None]:
     )
     parser.add_argument(
         "title",
-        help="워크플로우 제목 (20자 이내)",
+        nargs="?",
+        default=None,
+        help="워크플로우 제목 (20자 이내). 미지정 시 티켓 XML <metadata>/<title>에서 자동 추출.",
     )
     parser.add_argument(
         "positional_extra",
@@ -891,7 +906,7 @@ def _parse_args() -> tuple[str, str, str, str | None]:
     args = parser.parse_args()
 
     command: str = args.command
-    title: str = args.title
+    title: str | None = args.title
     mode: str = args.mode or "full"
     ticket_arg: str | None = args.ticket
 
@@ -916,6 +931,40 @@ def _parse_args() -> tuple[str, str, str, str | None]:
     return command, title, mode, ticket_arg
 
 
+def _extract_title_from_ticket_xml(prompt_content: str) -> str:
+    """티켓 XML 컨텐츠에서 <metadata>/<title>을 추출한다.
+
+    T-448: title 미지정 시 자동 추출용. <metadata> 래퍼 안의 <title>을 우선 검색하며,
+    없으면 루트 직하 <title>도 폴백으로 인식. 모두 실패 시 "untitled" 반환.
+
+    Args:
+        prompt_content: 티켓 XML 전체 문자열
+
+    Returns:
+        title 문자열 (20자 이내로 trim). 추출 실패 시 "untitled".
+    """
+    try:
+        import xml.etree.ElementTree as _ET
+        # 티켓 파일은 단일 root 보장이 안 될 수 있으므로 fromstring 시도
+        root = _ET.fromstring(prompt_content)
+        # 1순위: <metadata>/<title>
+        metadata = root.find("metadata")
+        if metadata is not None:
+            title_el = metadata.find("title")
+            if title_el is not None and title_el.text:
+                return title_el.text.strip()[:WORK_NAME_MAX_LEN]
+        # 2순위: 루트 직하 <title>
+        title_el = root.find("title")
+        if title_el is not None and title_el.text:
+            return title_el.text.strip()[:WORK_NAME_MAX_LEN]
+    except Exception:
+        # XML 파싱 실패 시 정규식 폴백
+        m = re.search(r"<title>([^<]+)</title>", prompt_content)
+        if m:
+            return m.group(1).strip()[:WORK_NAME_MAX_LEN]
+    return "untitled"
+
+
 def main() -> None:
     """CLI 진입점. 인자 검증 → 티켓 파일 읽기 → 워크플로우 초기화."""
     command, title, mode, ticket_arg = _parse_args()
@@ -938,16 +987,19 @@ def main() -> None:
     if mode not in VALID_MODES:
         mode = "full"
 
-    # Step 1: 티켓 파일 읽기
+    # Step 1: 티켓 파일 읽기 (T-448: 티켓 없는 ad-hoc 경로 미지원 — 명확한 메시지로 안내)
     prompt_content: str | None
     ticket_number: str | None
     prompt_content, ticket_number = read_prompt(ticket_arg)
     if prompt_content is None:
-        kanban_dir: str = os.path.join(_PROJECT_ROOT, ".claude-organic", "tickets")
-        if ticket_arg or os.environ.get("TICKET_NUMBER"):
-            _err(f"지정한 티켓 파일을 찾을 수 없거나 비어있습니다. kanban/ 디렉터리를 확인하세요. ({kanban_dir})", 1)
-        else:
-            _err(f"kanban/ 디렉터리가 없거나 Open 상태 티켓이 없습니다. 먼저 /wf -o 로 티켓을 생성하세요. ({kanban_dir})", 1)
+        _err(
+            "티켓 없는 워크플로우는 지원되지 않습니다. /wf -o 로 티켓을 먼저 생성하세요.",
+            1,
+        )
+
+    # T-448: title이 미지정이면 티켓 XML에서 자동 추출
+    if title is None or not title.strip():
+        title = _extract_title_from_ticket_xml(prompt_content)
 
     # Step 2: 워크플로우 디렉터리/메타데이터/레지스트리 일괄 생성
     try:
@@ -986,6 +1038,9 @@ def main() -> None:
     except Exception as _pv_err:
         _warn(f"prompt_validator import 실패 (품질 검증 생략): {_pv_err}")
 
+    # T-448 NOTE: init-result.json 의 workName 필드는 deprecated.
+    # 디렉터리 폴드(<key>/{work_name}/{command} → <key>) 후 후속 단계 의존성 보존을 위해
+    # 스키마는 유지하되, 신규 코드는 title/registryKey 만 사용할 것.
     init_result: dict[str, Any] = {
         "request": request,
         "workDir": result["workDir"],
@@ -993,7 +1048,7 @@ def main() -> None:
         "registryKey": result["registryKey"],
         "date": date,
         "title": title,
-        "workName": result["workName"],
+        "workName": result["workName"],  # deprecated (T-448): 후방 호환용, 신규 코드는 사용 금지
         "command": effective_command,
         "mode": mode,
         "ticketNumber": result.get("ticketNumber", ""),
@@ -1011,8 +1066,18 @@ def main() -> None:
         init_result,
     )
 
-    print(f"[INIT] {title}", flush=True)
+    # T-448: stdout 정형화
+    #  - [INIT] {title} 라인은 stderr로 이동 (사용자 가시성 유지)
+    #  - 첫 줄: workDir (프로젝트 루트 상대 경로)
+    #  - 마지막 줄: worktreePath 절대경로 (worktree 미생성 시 빈 줄)
+    #  - 오케스트레이터는 `cd "$(flow-init ... | tail -1)"` 으로 worktree 진입
+    print(f"[INIT] {title}", file=sys.stderr, flush=True)
     print(f"{result['workDir']}", flush=True)
+    worktree_abs_path: str = ""
+    if result.get("worktreePath"):
+        worktree_abs_path = os.path.join(_PROJECT_ROOT, result["worktreePath"])
+    # worktreePath 절대경로 또는 빈 줄 (orchestrator tail -1 채택용)
+    print(worktree_abs_path, flush=True)
 
 
 if __name__ == "__main__":
