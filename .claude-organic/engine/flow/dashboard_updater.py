@@ -323,29 +323,13 @@ def _update_step_durations() -> None:
                 if not os.path.isdir(ts_path):
                     continue
 
-                # dual-mode: 새 구조 (T-448 폴드) 우선, 구 구조 fallback
-                # 새 구조: ts_path/status.json 직접 존재
-                # 구 구조: ts_path/<work_name>/<cmd_name>/status.json 중첩
+                # 폴드 구조: ts_path/status.json 직속
                 def _collect_status_files(ts_path: str) -> "list[str]":
-                    """ts_path 하위에서 status.json 경로 목록을 반환 (dual-mode)."""
+                    """ts_path 직속 status.json 경로 목록을 반환."""
                     new_status = os.path.join(ts_path, "status.json")
                     if os.path.isfile(new_status):
-                        # 새 구조: ts_path 직속 status.json
                         return [new_status]
-                    # 구 구조 fallback: ts_path/<work_name>/<cmd_name>/status.json
-                    result = []
-                    for work_name in _safe_listdir(ts_path):
-                        work_path = os.path.join(ts_path, work_name)
-                        if not os.path.isdir(work_path):
-                            continue
-                        for cmd_name in _safe_listdir(work_path):
-                            cmd_path = os.path.join(work_path, cmd_name)
-                            if not os.path.isdir(cmd_path):
-                                continue
-                            sf = os.path.join(cmd_path, "status.json")
-                            if os.path.isfile(sf):
-                                result.append(sf)
-                    return result
+                    return []
 
                 for status_file in _collect_status_files(ts_path):
                     try:
@@ -495,31 +479,26 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
                 entry_path = os.path.join(search_dir, entry)
                 if not os.path.isdir(entry_path):
                     continue
-                # registryKey 디렉터리 하위에서 status.json 탐색 (workName/command/ 구조)
-                for sub1 in _safe_listdir(entry_path):
-                    sub1_path = os.path.join(entry_path, sub1)
-                    if not os.path.isdir(sub1_path):
+                # 폴드 구조: entry_path/status.json 직속
+                status_path = os.path.join(entry_path, "status.json")
+                if not os.path.isfile(status_path):
+                    continue
+                status_data = load_json_file(status_path)
+                if not isinstance(status_data, dict):
+                    continue
+                tasks = status_data.get("tasks", {})
+                if not isinstance(tasks, dict):
+                    continue
+                for task_info in tasks.values():
+                    if not isinstance(task_info, dict):
                         continue
-                    for sub2 in _safe_listdir(sub1_path):
-                        status_path = os.path.join(sub1_path, sub2, "status.json")
-                        if not os.path.isfile(status_path):
-                            continue
-                        status_data = load_json_file(status_path)
-                        if not isinstance(status_data, dict):
-                            continue
-                        tasks = status_data.get("tasks", {})
-                        if not isinstance(tasks, dict):
-                            continue
-                        for task_info in tasks.values():
-                            if not isinstance(task_info, dict):
-                                continue
-                            task_status = task_info.get("status", "")
-                            if task_status == "completed":
-                                total_count += 1
-                                completed_count += 1
-                            elif task_status == "failed":
-                                total_count += 1
-                                failed_count += 1
+                    task_status = task_info.get("status", "")
+                    if task_status == "completed":
+                        total_count += 1
+                        completed_count += 1
+                    elif task_status == "failed":
+                        total_count += 1
+                        failed_count += 1
 
         if total_count == 0:
             return

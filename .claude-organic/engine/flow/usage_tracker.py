@@ -538,28 +538,16 @@ def usage_regenerate() -> str:
         dirs_to_scan: list[str] = []
 
         def _collect_dirs(base: str, skip_history: bool = False) -> None:
-            """새 구조 우선 + 구 구조 fallback으로 usage.json 위치 디렉터리 수집."""
+            """폴드 구조 단독으로 usage.json 위치 디렉터리 수집."""
             for entry in os.listdir(base):
                 if skip_history and entry == ".history":
                     continue
                 entry_path = os.path.join(base, entry)
                 if not os.path.isdir(entry_path):
                     continue
-                # 새 구조: entry_path/usage.json 존재 → entry_path 자체 추가
+                # 폴드 구조: entry_path/usage.json 존재 → entry_path 자체 추가
                 if os.path.isfile(os.path.join(entry_path, "usage.json")):
                     dirs_to_scan.append(entry_path)
-                else:
-                    # 구 구조 fallback: entry_path/<work_name>/<command>/usage.json 중첩 탐색
-                    for work_name in os.listdir(entry_path):
-                        work_path = os.path.join(entry_path, work_name)
-                        if not os.path.isdir(work_path):
-                            continue
-                        for cmd_name in os.listdir(work_path):
-                            cmd_path = os.path.join(work_path, cmd_name)
-                            if os.path.isdir(cmd_path) and os.path.isfile(
-                                os.path.join(cmd_path, "usage.json")
-                            ):
-                                dirs_to_scan.append(cmd_path)
 
         if os.path.isdir(workflow_base):
             _collect_dirs(workflow_base, skip_history=True)
