@@ -69,9 +69,19 @@ def _resolve_workdir_from_registry(registry_key: str) -> tuple[str | None, list[
         - 디렉터리 미존재 시: (None, [])
     """
     def _scan_registry_dir(registry_dir: str) -> list[str]:
-        """registry_dir 하위 workDir 후보 목록을 반환한다."""
+        """registry_dir 하위 workDir 후보 목록을 반환한다.
+
+        1차 (T-448 신규 폴드 구조): registry_dir/status.json 존재 시 registry_dir 자체 반환.
+        2차 fallback (구 중첩 구조): registry_dir/<work_name>/<command>/ 디렉터리 목록 반환.
+        """
         if not os.path.isdir(registry_dir):
             return []
+
+        # 1차: 새 구조 (registry_dir/status.json)
+        if os.path.exists(os.path.join(registry_dir, "status.json")):
+            return [registry_dir]
+
+        # 2차 fallback: 구 중첩 구조
         result: list[str] = []
         for work_name in os.listdir(registry_dir):
             work_path = os.path.join(registry_dir, work_name)
@@ -272,7 +282,8 @@ def main() -> None:
         help=(
             "작업 디렉터리 상대 경로 또는 registryKey (YYYYMMDD-HHMMSS 형식).\n"
             "registryKey 형식으로 전달하면 하위 workDir을 자동 해석합니다.\n"
-            "예: .claude-organic/runs/YYYYMMDD-HHMMSS/workName/command\n"
+            "예: .claude-organic/runs/YYYYMMDD-HHMMSS  (T-448 신규 폴드 구조)\n"
+            "    .claude-organic/runs/YYYYMMDD-HHMMSS/workName/command  (구 중첩 구조)\n"
             "    20260403-011117"
         ),
     )
