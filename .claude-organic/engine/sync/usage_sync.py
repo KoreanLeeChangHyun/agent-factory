@@ -118,6 +118,148 @@ def _read_stdin_json() -> dict[str, object]:
         sys.exit(0)
 
 
+def _extract_session_id_from_transcript_path(transcript_path: str) -> Optional[str]:
+    """transcript_path(메인 세션 jsonl) basename에서 세션 ID를 추출한다.
+
+    Claude 세션 파일 명명 규칙: <session_id>.jsonl
+    세션 ID는 UUID 형식(8-4-4-4-12 hex)이어야 유효로 판정한다.
+
+    Args:
+        transcript_path: stdin의 transcript_path(=메인 세션 jsonl 경로)
+
+    Returns:
+        추출된 세션 ID 문자열. 파싱 실패 또는 UUID 형식 불일치 시 None.
+    """
+    import re
+    if not transcript_path:
+        return None
+    basename = os.path.basename(transcript_path)
+    if not basename.endswith(".jsonl"):
+        return None
+    candidate = basename[:-6]  # ".jsonl" 제거
+    uuid_pattern = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        re.IGNORECASE,
+    )
+    if uuid_pattern.match(candidate):
+        return candidate
+    return None
+
+
+def _extract_session_id_from_agent_jsonl(agent_transcript_path: str) -> Optional[str]:
+    """agent jsonl 첫 줄 user 레코드의 sessionId 필드를 읽어 세션 ID를 반환한다.
+
+    Args:
+        agent_transcript_path: agent jsonl 파일 경로 (stdin의 agent_transcript_path)
+
+    Returns:
+        추출된 세션 ID 문자열. 읽기 실패 시 None.
+    """
+    if not agent_transcript_path or not os.path.isfile(agent_transcript_path):
+        return None
+    try:
+        with open(agent_transcript_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if record.get("type") == "user":
+                    session_id = record.get("sessionId", "")
+                    if session_id:
+                        return session_id
+    except Exception:
+        pass
+    return None
+
+
+def _call_link_session(status_file: str, session_id: str) -> str:
+    """flow.state_machine.link_session을 동적 import로 호출한다.
+
+    모듈 레벨 순환 import를 피하기 위해 호출 직전 동적 import를 사용한다.
+
+    Args:
+        status_file: status.json 파일 절대 경로
+        session_id: 등록할 세션 ID
+
+    Returns:
+        link_session 반환값 문자열 (added/already linked/skipped/failed).
+    """
+    try:
+        from flow.state_machine import link_session  # noqa: PLC0415
+        result = link_session(status_file, session_id)
+        return result
+    except Exception as e:
+        return f"link-session -> failed (import error: {e})"
+
+
+def _try_link_session_from_stdin(
+    agent_transcript_path: str,
+    main_transcript_path: str,
+) -> None:
+    """stdin 경로에서 세션 ID를 추출하여 status.json linked_sessions에 등록한다.
+
+    work_dir를 _find_work_dir()로 구하고, status.json 경로를 조합한다.
+    VALID_AGENT_TYPES 외 에이전트의 조기 exit 경로에서 호출된다.
+
+    Args:
+        agent_transcript_path: stdin의 agent_transcript_path
+        main_transcript_path: stdin의 transcript_path (메인 세션 jsonl)
+    """
+    work_dir = _find_work_dir()
+    if not work_dir:
+        return
+    status_file = os.path.join(work_dir, "status.json")
+    _link_sessions_from_stdin(status_file, agent_transcript_path, main_transcript_path)
+
+
+def _link_sessions_from_stdin(
+    status_file: str,
+    agent_transcript_path: str,
+    main_transcript_path: str,
+) -> None:
+    """stdin 경로에서 메인 + 워커 세션 ID를 추출해 status.json linked_sessions에 등록한다.
+
+    추출 우선순위:
+      (a) transcript_path basename의 <session_id>.jsonl 패턴 — 메인 세션 ID
+      (b) agent_transcript_path 첫 user 레코드의 sessionId 필드 — 폴백 또는 워커 ID
+
+    두 경로 모두 실패 시 silent skip.
+
+    Args:
+        status_file: status.json 절대 경로 (lock 없이 호출 — state_machine.link_session이 내부에서 atomic_write 처리)
+        agent_transcript_path: stdin의 agent_transcript_path
+        main_transcript_path: stdin의 transcript_path (메인 세션 jsonl)
+    """
+    registered: set[str] = set()
+
+    # (a) transcript_path basename → 메인 세션 ID
+    main_session_id = _extract_session_id_from_transcript_path(main_transcript_path)
+    if main_session_id:
+        result = _call_link_session(status_file, main_session_id)
+        print(f"[usage-sync] cmd_track: link_session result={result}", file=sys.stderr)
+        registered.add(main_session_id)
+
+    # (b) agent jsonl 첫 user 레코드 sessionId → 워커 sessionId (또는 메인 폴백)
+    worker_session_id = _extract_session_id_from_agent_jsonl(agent_transcript_path)
+    if worker_session_id and worker_session_id not in registered:
+        result = _call_link_session(status_file, worker_session_id)
+        print(
+            f"[usage-sync] cmd_track: link_session (worker sessionId) result={result}",
+            file=sys.stderr,
+        )
+        registered.add(worker_session_id)
+
+    if not registered:
+        print(
+            "[usage-sync] cmd_track: link_session skipped (no session_id extracted)",
+            file=sys.stderr,
+        )
+
+
 def _find_work_dir() -> Optional[str]:
     """디렉터리 스캔으로 활성 워크플로우의 workDir을 조회.
 
@@ -286,6 +428,9 @@ def cmd_track() -> None:
     agent_type, model_suffix = _normalize_agent_type(agent_type)
 
     if agent_type not in VALID_AGENT_TYPES:
+        # VALID_AGENT_TYPES 외 에이전트도 link_session 시도 (transcript_path 존재 시)
+        if transcript_path and os.path.isfile(transcript_path):
+            _try_link_session_from_stdin(transcript_path, main_transcript_path)
         sys.exit(0)
     if not transcript_path or not os.path.isfile(transcript_path):
         sys.exit(0)
@@ -340,6 +485,10 @@ def cmd_track() -> None:
         if "_main_transcript" not in usage_data:
             if main_transcript_path and os.path.isfile(main_transcript_path):
                 usage_data["_main_transcript"] = main_transcript_path
+
+        # linked_sessions 등록: 메인 세션 ID + 워커 자체 sessionId (W02)
+        status_file = os.path.join(work_dir, "status.json")
+        _link_sessions_from_stdin(status_file, transcript_path, main_transcript_path)
 
         if agent_type == "worker":
             pending = usage_data.get("_pending_workers", {})
@@ -507,26 +656,66 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     return None
 
 
-def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optional[str]:
-    """agent-<id>.jsonl의 agent_type을 식별. _agent_map 우선, JSONL 폴백.
+def _resolve_agent_type(
+    agent_filename: str,
+    agent_map: dict[str, str],
+    subagents_dir: Optional[str] = None,
+) -> Optional[str]:
+    """agent-<id>.jsonl의 agent_type을 식별. 다중 폴백 체인 적용.
+
+    폴백 순서:
+      1. _agent_map 매핑 조회 (source=agent_map)
+      2. agent-<id>.meta.json 의 agentType 필드 (source=meta_json)
+      3. JSONL 첫 user 레코드의 slug 키 (source=jsonl_slug)
+      4. JSONL 첫 assistant 레코드의 attributionAgent 키 (source=jsonl_attribution)
+      5. agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값 (source=hex_default)
 
     Args:
         agent_filename: agent JSONL 파일 경로
         agent_map: agent_id -> agent_type 매핑 딕셔너리
+        subagents_dir: subagents/ 디렉터리 경로. None 이면 meta.json 폴백·hex_default 비활성.
 
     Returns:
         식별된 agent_type 문자열. 식별 불가 시 None.
     """
     basename = os.path.basename(agent_filename)
+    agent_id: Optional[str] = None
     if basename.startswith("agent-") and basename.endswith(".jsonl"):
         agent_id = basename[len("agent-"):-len(".jsonl")]
+
+    # 폴백 1: _agent_map 매핑 조회
+    if agent_id:
         mapped = agent_map.get(agent_id)
         if mapped:
+            print(
+                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=agent_map result={mapped}",
+                file=sys.stderr,
+            )
             return mapped
 
-    # 폴백: JSONL의 첫 user 레코드에서 slug로 추정
+    # 폴백 2: agent-<id>.meta.json 의 agentType 필드
+    if agent_id and subagents_dir:
+        meta_path = os.path.join(subagents_dir, f"agent-{agent_id}.meta.json")
+        try:
+            with open(meta_path, "r", encoding="utf-8") as mf:
+                meta = json.load(mf)
+            raw_type = meta.get("agentType", "")
+            if raw_type:
+                normalized, _suffix = _normalize_agent_type(raw_type)
+                if normalized in VALID_AGENT_TYPES:
+                    print(
+                        f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=meta_json result={normalized}",
+                        file=sys.stderr,
+                    )
+                    return normalized
+        except Exception:
+            pass
+
+    # 폴백 3 & 4: JSONL 파싱 (slug → attributionAgent)
     try:
         with open(agent_filename, "r", encoding="utf-8") as f:
+            first_user_done = False
+            attribution_candidate: Optional[str] = None
             for line in f:
                 line = line.strip()
                 if not line:
@@ -535,14 +724,52 @@ def _resolve_agent_type(agent_filename: str, agent_map: dict[str, str]) -> Optio
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if rec.get("type") == "user":
+                rec_type = rec.get("type")
+
+                # 폴백 3: 첫 user 레코드의 slug
+                if rec_type == "user" and not first_user_done:
+                    first_user_done = True
                     slug = rec.get("slug", "")
-                    normalized, _suffix = _normalize_agent_type(slug)
-                    if normalized in VALID_AGENT_TYPES:
-                        return normalized
+                    if slug:
+                        normalized, _suffix = _normalize_agent_type(slug)
+                        if normalized in VALID_AGENT_TYPES:
+                            print(
+                                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=jsonl_slug result={normalized}",
+                                file=sys.stderr,
+                            )
+                            return normalized
+
+                # 폴백 4: assistant 레코드의 attributionAgent
+                if rec_type == "assistant" and attribution_candidate is None:
+                    attr = rec.get("attributionAgent", "")
+                    if attr:
+                        normalized, _suffix = _normalize_agent_type(attr)
+                        if normalized in VALID_AGENT_TYPES:
+                            attribution_candidate = normalized
+
+                # user + attribution 둘 다 처리 완료되면 조기 탈출
+                if first_user_done and attribution_candidate is not None:
                     break
+
+            if attribution_candidate:
+                print(
+                    f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=jsonl_attribution result={attribution_candidate}",
+                    file=sys.stderr,
+                )
+                return attribution_candidate
     except Exception:
         pass
+
+    # 폴백 5: agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값
+    if agent_id and subagents_dir:
+        import re
+        if re.fullmatch(r"[0-9a-f]{10,}", agent_id):
+            print(
+                f"[usage-sync] _resolve_agent_type: agent_id={agent_id} source=hex_default result=worker",
+                file=sys.stderr,
+            )
+            return "worker"
+
     return None
 
 
@@ -605,7 +832,7 @@ def cmd_batch() -> None:
         worker_tokens: dict[str, dict[str, int]] = {}
         skipped_agents: list[str] = []
         for agent_file in agent_files:
-            a_type = _resolve_agent_type(agent_file, agent_map)
+            a_type = _resolve_agent_type(agent_file, agent_map, subagents_dir=subagents_dir)
             if not a_type:
                 print(
                     f"[usage-sync] WARNING: Could not identify agent_type for {os.path.basename(agent_file)}",
