@@ -35,8 +35,6 @@ from flow.ticket_repository import (
     KANBAN_REVIEW_DIR,
     KANBAN_DONE_DIR,
     STATUS_DIR_MAP,
-)
-from flow.ticket_state import (
     COLUMN_MAP,
     update_ticket_status,
     validate_transition,

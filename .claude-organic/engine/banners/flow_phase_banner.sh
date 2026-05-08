@@ -223,4 +223,9 @@ _log_event "$REGISTRY_KEY" "INFO" "PHASE_START: ${PHASE} mode=${EXEC_MODE} agent
 
 # ─── phase.start metrics 이벤트 (비차단) ───
 # total 은 현재 알 수 없으므로 0 으로 전달 (collector 가 후처리 시 채울 수 있음)
-_metrics_phase_event "phase.start" "$REGISTRY_KEY" "$PHASE" "--total=0" || true
+# Phase 0 은 skill-mapper sentinel 으로 is_sentinel=true 플래그를 추가로 전달한다
+if [[ "$PHASE" == "0" ]]; then
+    _metrics_phase_event "phase.start" "$REGISTRY_KEY" "$PHASE" "--total=0" "--is_sentinel=true" || true
+else
+    _metrics_phase_event "phase.start" "$REGISTRY_KEY" "$PHASE" "--total=0" || true
+fi
