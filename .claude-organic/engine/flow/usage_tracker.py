@@ -538,14 +538,13 @@ def usage_regenerate() -> str:
         dirs_to_scan: list[str] = []
 
         def _collect_dirs(base: str, skip_history: bool = False) -> None:
-            """폴드 구조 단독으로 usage.json 위치 디렉터리 수집."""
+            """T-448 폴드 구조: usage.json 위치 디렉터리 수집."""
             for entry in os.listdir(base):
                 if skip_history and entry == ".history":
                     continue
                 entry_path = os.path.join(base, entry)
                 if not os.path.isdir(entry_path):
                     continue
-                # 폴드 구조: entry_path/usage.json 존재 → entry_path 자체 추가
                 if os.path.isfile(os.path.join(entry_path, "usage.json")):
                     dirs_to_scan.append(entry_path)
 

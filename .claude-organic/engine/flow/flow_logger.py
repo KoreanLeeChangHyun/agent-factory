@@ -178,7 +178,8 @@ def _resolve_work_dir_from_key(
 ) -> Optional[str]:
     """registryKey로 abs_work_dir을 디렉터리 스캔으로 해석한다.
 
-    폴드 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환.
+    T-449 마이그레이션 이후 폴드 구조 하나만 처리한다:
+    .workflow/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환한다.
 
     Args:
         registry_key: YYYYMMDD-HHMMSS 형식 레지스트리 키.
@@ -252,7 +253,7 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if not os.path.isdir(entry_path):
             continue
 
-        # 폴드 구조: entry_path/status.json
+        # T-448 폴드 구조: entry_path/status.json
         if os.path.exists(os.path.join(entry_path, "status.json")):
             _collect_candidate(entry_path)
 

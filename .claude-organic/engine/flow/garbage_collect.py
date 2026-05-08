@@ -107,7 +107,8 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
 def _step1_mark_stale(workflow_root: str) -> int:
     """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환한다.
 
-    폴드 구조(.workflow/<YYYYMMDD-HHMMSS>/status.json)만 처리한다.
+    T-449 마이그레이션 이후로는 `.workflow/<YYYYMMDD-HHMMSS>/status.json`
+    폴드 구조 하나만 처리한다. 구 중첩 구조 fallback은 제거되었다.
 
     Args:
         workflow_root: .workflow 디렉터리 절대 경로
@@ -126,7 +127,7 @@ def _step1_mark_stale(workflow_root: str) -> int:
         if not os.path.isdir(entry_path) or entry.startswith("."):
             continue
 
-        # 폴드 구조: .workflow/<YYYYMMDD-HHMMSS>/status.json
+        # T-448 폴드 구조: .workflow/<YYYYMMDD-HHMMSS>/status.json
         new_status = os.path.join(entry_path, "status.json")
         if os.path.exists(new_status):
             if _process_status_file(new_status, entry_path, now):

@@ -323,52 +323,47 @@ def _update_step_durations() -> None:
                 if not os.path.isdir(ts_path):
                     continue
 
-                # 폴드 구조: ts_path/status.json 직속
-                def _collect_status_files(ts_path: str) -> "list[str]":
-                    """ts_path 직속 status.json 경로 목록을 반환."""
-                    new_status = os.path.join(ts_path, "status.json")
-                    if os.path.isfile(new_status):
-                        return [new_status]
-                    return []
+                # T-448 폴드 구조: ts_path 직속 status.json만 처리
+                status_file = os.path.join(ts_path, "status.json")
+                if not os.path.isfile(status_file):
+                    continue
+                try:
+                    with open(status_file, "r", encoding="utf-8") as _f:
+                        data = json.load(_f)
+                except Exception:
+                    continue
 
-                for status_file in _collect_status_files(ts_path):
-                    try:
-                        with open(status_file, "r", encoding="utf-8") as _f:
-                            data = json.load(_f)
-                    except Exception:
-                        continue
+                if not isinstance(data, dict):
+                    continue
+                if data.get("step") != "DONE":
+                    continue
 
-                    if not isinstance(data, dict):
-                        continue
-                    if data.get("step") != "DONE":
-                        continue
+                transitions = data.get("transitions", [])
+                if not isinstance(transitions, list):
+                    continue
 
-                    transitions = data.get("transitions", [])
-                    if not isinstance(transitions, list):
-                        continue
+                # transitions 구조: {from, to, at}
+                # at은 해당 전환이 발생한 시각 (= "to" 단계 진입 시각)
+                # 각 단계 소요 시간 = 다음 단계 진입 시각 - 현재 단계 진입 시각
+                # ex) PLAN 소요 = WORK 진입 at - PLAN 진입 at
+                #     WORK 소요 = REPORT 진입 at - WORK 진입 at
+                #     REPORT 소요 = DONE 진입 at - REPORT 진입 at
+                # transitions에서 to: at 맵으로 변환 (각 단계 진입 시각)
+                at_map: dict[str, str] = {}
+                for t in transitions:
+                    if isinstance(t, dict) and t.get("to") and t.get("at"):
+                        at_map[t["to"]] = t["at"]
 
-                    # transitions 구조: {from, to, at}
-                    # at은 해당 전환이 발생한 시각 (= "to" 단계 진입 시각)
-                    # 각 단계 소요 시간 = 다음 단계 진입 시각 - 현재 단계 진입 시각
-                    # ex) PLAN 소요 = WORK 진입 at - PLAN 진입 at
-                    #     WORK 소요 = REPORT 진입 at - WORK 진입 at
-                    #     REPORT 소요 = DONE 진입 at - REPORT 진입 at
-                    # transitions에서 to: at 맵으로 변환 (각 단계 진입 시각)
-                    at_map: dict[str, str] = {}
-                    for t in transitions:
-                        if isinstance(t, dict) and t.get("to") and t.get("at"):
-                            at_map[t["to"]] = t["at"]
+                # 단계 소요 = (다음 단계 진입 시각) - (현재 단계 진입 시각)
+                step_pairs = [
+                    ("PLAN",   _parse_iso(at_map.get("PLAN", "")),   _parse_iso(at_map.get("WORK", ""))),
+                    ("WORK",   _parse_iso(at_map.get("WORK", "")),   _parse_iso(at_map.get("REPORT", ""))),
+                    ("REPORT", _parse_iso(at_map.get("REPORT", "")), _parse_iso(at_map.get("DONE", ""))),
+                ]
 
-                    # 단계 소요 = (다음 단계 진입 시각) - (현재 단계 진입 시각)
-                    step_pairs = [
-                        ("PLAN",   _parse_iso(at_map.get("PLAN", "")),   _parse_iso(at_map.get("WORK", ""))),
-                        ("WORK",   _parse_iso(at_map.get("WORK", "")),   _parse_iso(at_map.get("REPORT", ""))),
-                        ("REPORT", _parse_iso(at_map.get("REPORT", "")), _parse_iso(at_map.get("DONE", ""))),
-                    ]
-
-                    for label, t_start, t_end in step_pairs:
-                        if t_start is not None and t_end is not None and t_end > t_start:
-                            durations[label].append(t_end - t_start)
+                for label, t_start, t_end in step_pairs:
+                    if t_start is not None and t_end is not None and t_end > t_start:
+                        durations[label].append(t_end - t_start)
 
         # ── 소요 시간 포매팅 ──
         def _fmt_seconds(secs: float) -> str:
@@ -474,12 +469,11 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
         for search_dir in search_dirs:
             if not os.path.isdir(search_dir):
                 continue
-            # registryKey 디렉터리 순회 (YYYYMMDD-HHMMSS 패턴)
+            # T-448 폴드 구조: registryKey 디렉터리 직속 status.json 탐색
             for entry in _safe_listdir(search_dir):
                 entry_path = os.path.join(search_dir, entry)
                 if not os.path.isdir(entry_path):
                     continue
-                # 폴드 구조: entry_path/status.json 직속
                 status_path = os.path.join(entry_path, "status.json")
                 if not os.path.isfile(status_path):
                     continue

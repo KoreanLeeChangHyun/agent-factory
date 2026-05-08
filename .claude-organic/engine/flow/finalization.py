@@ -215,7 +215,7 @@ def _build_result_update_args(
 
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
-            (.workflow/{registryKey}/{workName}/{command} 구조)
+            (.workflow/{registryKey}/ 폴드 구조 — T-448/T-449 이후)
         registry_key: 호출자(main)가 인자로 받은 registry_key. 명시 전달 시
             abs_work_dir 정규식 추출 실패에 의존하지 않는다 (2026-04-29 보완).
 
