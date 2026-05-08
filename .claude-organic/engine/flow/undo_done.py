@@ -42,8 +42,8 @@ from flow.ticket_repository import (
     find_ticket_file,
     move_ticket_to_status_dir,
     parse_ticket_xml,
+    update_ticket_status,
 )
-from flow.ticket_state import update_ticket_status
 from flow.worktree_manager import (
     WorktreeInfo,
     create_worktree,
