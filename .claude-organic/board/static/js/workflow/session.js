@@ -885,6 +885,7 @@
     if (!data.text) return;
     // REST 이벤트 주입(_isReplaying=true) 시에는 _sentTexts 가 비어 있으므로
     // 항상 DOM 에 렌더링한다. SSE 라이브 수신 시에는 로컬 전송분 중복 방지.
+    // self-echo skip: 텍스트 + 첨부 카드 전체를 skip (직접 echo 경로에서 이미 그려짐).
     if (!_isReplaying && _sentTexts.has(data.text)) {
       return;
     }
@@ -892,6 +893,19 @@
     div.className = "term-message term-user";
     div.textContent = data.text;
     _ctx.appendToOutput(div);
+    // T-429: attachments 카드 렌더 (REST replay 및 multi-client SSE 경로).
+    // sendInput 직접 echo 경로에서 이미 그린 경우는 위 _sentTexts 체크로 전체 skip됨.
+    if (data.attachments && data.attachments.length > 0) {
+      var termMod = Board && Board._term;
+      if (termMod && termMod.attachmentCard && typeof termMod.attachmentCard.create === "function") {
+        var attachContainer = document.createElement("div");
+        attachContainer.className = "term-message-attachments";
+        data.attachments.forEach(function (att) {
+          attachContainer.appendChild(termMod.attachmentCard.create(att));
+        });
+        _ctx.appendToOutput(attachContainer);
+      }
+    }
   }
 
   /**

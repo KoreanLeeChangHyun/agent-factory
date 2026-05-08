@@ -229,6 +229,18 @@
           if (ev.interrupted) userDiv.classList.add("interrupted");
           userDiv.textContent = text;
           M.appendToOutput(userDiv);
+          // T-429: ev.attachments 가 non-empty array 이면 첨부 카드를 별도 컨테이너에 렌더.
+          // 레거시 메시지 (ev.attachments 없음 또는 빈 배열) 는 기존 경로 그대로 (회귀 0).
+          // ESC 인터럽트 메시지도 userDiv 에 .interrupted 클래스 보존한 채로 카드 추가.
+          if (ev.attachments && ev.attachments.length > 0 &&
+              M.attachmentCard && typeof M.attachmentCard.create === "function") {
+            var attachContainer = document.createElement("div");
+            attachContainer.className = "term-message-attachments";
+            ev.attachments.forEach(function (att) {
+              attachContainer.appendChild(M.attachmentCard.create(att));
+            });
+            M.appendToOutput(attachContainer);
+          }
         } else if (ev.role === "assistant") {
           var html = M.renderMarkdownToHtml(text);
           M.appendHtmlBlock(html, "term-message term-assistant");

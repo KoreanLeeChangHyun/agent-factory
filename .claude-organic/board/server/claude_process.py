@@ -20,6 +20,73 @@ from .terminal_channel import TerminalSSEChannel
 _ALLOWED_MEDIA_TYPES = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
 
 
+def _compose_user_content(
+    text: str,
+    images: list[dict] | None,
+    attachments: list[dict] | None,
+) -> str | list:
+    """사용자 메시지 content 를 합성한다.
+
+    text 블록 → attachment text 블록 → image 블록 순으로 결합하여
+    Claude CLI NDJSON envelope 의 ``content`` 필드에 들어갈 값을 반환한다.
+
+    attachments 와 images 가 모두 None/빈 배열이고 text 가 있으면 단순 문자열을
+    반환하여 기존 text-only 경로와 동일한 envelope 구조를 유지한다.
+
+    Args:
+        text: 사용자 자유 입력 텍스트. 빈 문자열이어도 허용.
+        images: 이미지 블록 목록. 각 항목은 ``{"data": str, "media_type": str}``.
+                None 이면 이미지 없음.
+        attachments: 첨부 티켓 목록. 각 항목은 최소 ``{"number": str}`` 를 포함한 dict.
+                     None 또는 빈 배열이면 첨부 없음.
+
+    Returns:
+        content 필드값: 블록 배열이 필요하면 list[dict], 텍스트 전용이면 str.
+    """
+    # attachment 유효성: list 인지 확인 (None / [] 은 첨부 없음)
+    valid_attachments: list[dict] = []
+    if isinstance(attachments, list):
+        for att in attachments:
+            if isinstance(att, dict) and 'number' in att:
+                valid_attachments.append(att)
+
+    # image_blocks 합성 (기존 로직 그대로)
+    image_blocks: list[dict] = []
+    if isinstance(images, list):
+        image_blocks = [
+            {
+                'type': 'image',
+                'source': {
+                    'type': 'base64',
+                    'media_type': img['media_type'],
+                    'data': img['data'],
+                },
+            }
+            for img in images
+        ]
+
+    # 첨부도 이미지도 없는 경우 → 단순 문자열 (기존 text-only 경로)
+    if not valid_attachments and not image_blocks:
+        return text
+
+    # 배열 합성 필요
+    text_blocks: list[dict] = [{'type': 'text', 'text': text}] if text else []
+
+    attachment_text_blocks: list[dict] = [
+        {
+            'type': 'text',
+            'text': (
+                f"[첨부 {a['number']}] {a.get('title', '')}\n\n"
+                f"## prompt\n{a.get('prompt', '')}\n\n"
+                f"## report\n{a.get('report', '')}"
+            ),
+        }
+        for a in valid_attachments
+    ]
+
+    return text_blocks + attachment_text_blocks + image_blocks
+
+
 def _validate_images(images: list) -> str | None:
     """이미지 목록의 유효성을 검증한다.
 
@@ -197,13 +264,21 @@ class ClaudeProcess:
             'error': '',
         }
 
-    def send_input(self, text: str, images: list[dict] | None = None) -> dict:
+    def send_input(
+        self,
+        text: str,
+        images: list[dict] | None = None,
+        attachments: list[dict] | None = None,
+    ) -> dict:
         """사용자 메시지를 Claude CLI stdin에 NDJSON 엔벨로프로 전송한다.
 
         Args:
             text: 전송할 사용자 메시지 텍스트
             images: 첨부 이미지 목록. 각 항목은 {"data": str, "media_type": str} 형태.
-                    None이면 텍스트 전용 content 문자열로 구성한다.
+                    None이면 이미지 없음.
+            attachments: 첨부 티켓 목록. 각 항목은 최소 {"number": str} 를 포함한 dict.
+                         None 또는 빈 배열이면 첨부 없음.
+                         있는 경우 content 배열에 text 블록으로 합성되어 어시스턴트가 인지한다.
 
         Returns:
             전송 결과 dict: {"ok": True/False, "error": str}
@@ -222,24 +297,7 @@ class ClaudeProcess:
             else:
                 return {'ok': False, 'error': 'process not running'}
 
-        if images is not None:
-            image_blocks = [
-                {
-                    'type': 'image',
-                    'source': {
-                        'type': 'base64',
-                        'media_type': img['media_type'],
-                        'data': img['data'],
-                    },
-                }
-                for img in images
-            ]
-            content: str | list = (
-                [{'type': 'text', 'text': text}] + image_blocks
-                if text else image_blocks
-            )
-        else:
-            content = text
+        content: str | list = _compose_user_content(text, images, attachments)
 
         envelope = {
             'type': 'user',
