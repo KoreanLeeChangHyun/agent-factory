@@ -537,3 +537,43 @@
   color: #f0a07f;
 }
 
+/* T-441: Done 카드 머지 정합성 verdict 배지 (advisory only) */
+.card-done-verdict {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.card-done-verdict.verdict-ok {
+  color: #4ec9b0;
+  opacity: 0.75;
+}
+
+.card-done-verdict.verdict-ok:hover {
+  opacity: 1;
+}
+
+.card-done-verdict.verdict-fail {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.card-done-verdict.verdict-fail:hover {
+  background: rgba(217, 119, 87, 0.22);
+  border-color: #D97757;
+  opacity: 1;
+}
+
+.card-done-verdict.verdict-unknown,
+.card-done-verdict.verdict-loading {
+  display: none;
+}
+
