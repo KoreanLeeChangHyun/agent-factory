@@ -507,10 +507,12 @@ function refreshWfSortIndicators(el) {
     if (!indicator) return;
     if (Board.state.wfSortKey === key) {
       indicator.className = "wf-sort-indicator";
-      indicator.innerHTML = Board.state.wfSortDir === "asc" ? "&#9650;" : "&#9660;";
+      indicator.innerHTML = Board.state.wfSortDir === "asc"
+        ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>'
+        : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
     } else {
       indicator.className = "wf-sort-inactive";
-      indicator.innerHTML = "&#9650;&#9660;";
+      indicator.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 9 12 4 17 9"/><polyline points="7 15 12 20 17 15"/></svg>';
     }
   });
 }
@@ -567,10 +569,10 @@ function renderWorkflow() {
     if (!col.nosort) {
       if (Board.state.wfSortKey === col.key) {
         indicator = Board.state.wfSortDir === "asc"
-          ? ' <span class="wf-sort-indicator">&#9650;</span>'
-          : ' <span class="wf-sort-indicator">&#9660;</span>';
+          ? ' <span class="wf-sort-indicator"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></span>'
+          : ' <span class="wf-sort-indicator"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
       } else {
-        indicator = ' <span class="wf-sort-inactive">&#9650;&#9660;</span>';
+        indicator = ' <span class="wf-sort-inactive"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 9 12 4 17 9"/><polyline points="7 15 12 20 17 15"/></svg></span>';
       }
     }
     const sortable = col.nosort ? "" : ' class="wf-th-sortable" data-sort-key="' + col.key + '"';

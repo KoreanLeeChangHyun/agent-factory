@@ -81,7 +81,7 @@
   M.renderRulesEmptyState = function() {
     return (
       '<div class="memory-empty">' +
-        '<div class="memory-empty-icon">&#128220;</div>' +
+        '<div class="memory-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 0 1-4 0V5a2 2 0 0 0-4 0v3h4"/></svg></div>' +
         '<div class="memory-empty-text">No rules files found</div>' +
         '<div class="memory-empty-sub">.claude/rules/ directory is empty.</div>' +
         '<button class="memory-new-btn" id="rules-empty-new-btn" style="margin-top:8px">+ Create First Rule</button>' +
@@ -125,7 +125,7 @@
       html +=
         '<div class="prompt-category-group" data-category="' + esc(catKey) + '">' +
           '<div class="prompt-category-header">' +
-            '<span class="prompt-category-icon">&#9660;</span>' +
+            '<span class="prompt-category-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>' +
             '<span class="prompt-category-label">' + esc(catLabel) + '</span>' +
             '<span class="prompt-category-count">' + catFiles.length + '</span>' +
           '</div>' +
@@ -140,7 +140,7 @@
 
         html +=
           '<div class="' + classes + '" data-path="' + esc(file.path) + '">' +
-            '<span class="memory-file-item-icon">&#128196;</span>' +
+            '<span class="memory-file-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>' +
             '<div class="memory-file-item-info">' +
               '<div class="memory-file-item-name">' + esc(file.name) + '</div>' +
               '<div class="memory-file-item-meta">' + sizeStr + ' &middot; ' + esc(file.mtime || "") + '</div>' +
@@ -459,7 +459,7 @@
   M.renderPromptFilesEmptyState = function() {
     return (
       '<div class="memory-empty">' +
-        '<div class="memory-empty-icon">&#128196;</div>' +
+        '<div class="memory-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>' +
         '<div class="memory-empty-text">No prompt files found</div>' +
         '<div class="memory-empty-sub">.claude-organic/prompts/ directory is empty.</div>' +
         '<button class="memory-new-btn" id="prompt-empty-new-btn" style="margin-top:8px">+ Create First File</button>' +
@@ -482,7 +482,7 @@
 
       html +=
         '<div class="' + classes + '" data-name="' + esc(f.name) + '">' +
-          '<span class="memory-file-item-icon">&#128196;</span>' +
+          '<span class="memory-file-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>' +
           '<div class="memory-file-item-info">' +
             '<div class="memory-file-item-name">' + esc(f.name) + '</div>' +
             '<div class="memory-file-item-meta">' + sizeStr + ' &middot; ' + esc(f.mtime || "") + '</div>' +
@@ -742,8 +742,8 @@
     var searchBarHtml = '<div class="code-search-bar" style="display:none">'
       + '<input class="code-search-input" type="text" placeholder="Search..." />'
       + '<span class="code-search-count"></span>'
-      + '<button class="code-search-nav-btn" data-dir="prev">&#9650;</button>'
-      + '<button class="code-search-nav-btn" data-dir="next">&#9660;</button>'
+      + '<button class="code-search-nav-btn" data-dir="prev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></button>'
+      + '<button class="code-search-nav-btn" data-dir="next"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>'
       + '<button class="code-search-close-btn">&times;</button>'
       + '</div>';
     return '<div class="code-viewer" data-viewer-id="' + viewerId + '">'

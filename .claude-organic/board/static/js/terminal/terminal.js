@@ -904,6 +904,29 @@
           }
         }
 
+        // (0b) 메모리 카드 드롭 — application/x-board-memory MIME 처리
+        // dragstart 시 memory-core.js 가 set 한 {name, category} JSON 파싱.
+        // 본문은 첨부에 포함하지 않고 (사용자 의도 = 경로만, 어시스턴트가 Read),
+        // attachMemory 가 비동기로 fetchMemoryFile + parseMemoryFrontmatter 수행하여 description 보강.
+        var memoryJson = "";
+        try {
+          memoryJson = dt.getData("application/x-board-memory");
+        } catch (_memErr) {
+          memoryJson = "";
+        }
+        if (memoryJson) {
+          var memPayload = null;
+          try {
+            memPayload = JSON.parse(memoryJson);
+          } catch (_memParseErr) {
+            memPayload = null;
+          }
+          if (memPayload && memPayload.name && typeof M.attachMemory === "function") {
+            M.attachMemory(memPayload);
+            return;
+          }
+        }
+
         // (a) 파일 드롭 — 이미지: attachedImages에 추가 + 썸네일 / 비이미지: 파일 카드 + 파일명 삽입
         if (dt.files && dt.files.length > 0) {
           var names = [];

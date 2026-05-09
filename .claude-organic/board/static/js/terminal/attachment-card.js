@@ -91,18 +91,22 @@
    */
   function create(att) {
     att = att || {};
+    var attType = att.type || "ticket";
 
     var card = document.createElement("div");
     card.className = "terminal-ticket-card";
+    card.setAttribute("data-att-type", attType);
     if (att.number) {
       card.setAttribute("data-ticket-number", att.number);
     }
+    if (attType === "memory" && att.name) {
+      card.setAttribute("data-memory-name", att.name);
+    }
 
-    // Command badge (RSC / IMP / REV / TKT)
-    var cmdLabel = _ticketCmdLabel(att.command);
+    // Badge: ticket = command code (IMP/RSC/REV/TKT) / memory = "MEM"
     var cmdEl = document.createElement("div");
     cmdEl.className = "terminal-ticket-card-cmd";
-    cmdEl.textContent = cmdLabel;
+    cmdEl.textContent = attType === "memory" ? "MEM" : _ticketCmdLabel(att.command);
 
     // Body: title + subtitle
     var bodyEl = document.createElement("div");
@@ -110,15 +114,22 @@
 
     var titleEl = document.createElement("div");
     titleEl.className = "terminal-ticket-card-title";
-    var numStr = att.number || "T-???";
-    var titleText = (att.title || "").trim();
-    titleEl.textContent = titleText ? (numStr + " " + titleText) : numStr;
-    titleEl.title = titleEl.textContent;
+    var titleText;
+    if (attType === "memory") {
+      titleText = att.title || att.name || "memory";
+    } else {
+      var numStr = att.number || "T-???";
+      var ticketTitle = (att.title || "").trim();
+      titleText = ticketTitle ? (numStr + " " + ticketTitle) : numStr;
+    }
+    titleEl.textContent = titleText;
+    titleEl.title = titleText;
 
     var subtitleEl = document.createElement("div");
-    // layout-and-message.css 의 실제 정의 클래스명 사용 (.terminal-ticket-card-sub)
     subtitleEl.className = "terminal-ticket-card-sub";
-    var subtitle = _resolveSubtitle(att);
+    var subtitle = attType === "memory"
+      ? (att.subtitle || att.name || "")
+      : _resolveSubtitle(att);
     subtitleEl.textContent = subtitle;
     subtitleEl.title = subtitle;
 

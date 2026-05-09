@@ -86,7 +86,7 @@
   color: #3c3c3c;
 }
 
-/* Active sort column indicator (▲ / ▼) rendered as text node after label */
+/* Active sort column indicator (chevron SVG) rendered as inline span after label */
 .wf-th-sortable {
   color: #858585;
 }

@@ -91,7 +91,10 @@
     var flash = GC.state.flash;
     var flashHtml = flash
       ? '<span class="memory-gc-flash ' + (flash.kind === 'err' ? 'err' : 'ok') + '">' +
-          (flash.kind === 'err' ? '✕ ' : '✓ ') + Board.util.esc(flash.text) +
+          (flash.kind === 'err'
+            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+            : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>'
+          ) + Board.util.esc(flash.text) +
         '</span>'
       : '';
     container.innerHTML =

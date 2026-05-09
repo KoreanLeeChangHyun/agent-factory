@@ -408,7 +408,7 @@
       if (!data) {
         content.innerHTML =
           '<div class="memory-empty">' +
-            '<div class="memory-empty-icon">&#128221;</div>' +
+            '<div class="memory-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>' +
             '<div class="memory-empty-text">CLAUDE.md not found</div>' +
             '<div class="memory-empty-sub">No CLAUDE.md file in project root.</div>' +
           '</div>';
@@ -631,7 +631,7 @@
   M.renderMemoryEmptyState = function() {
     return (
       '<div class="memory-empty">' +
-        '<div class="memory-empty-icon">&#128221;</div>' +
+        '<div class="memory-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>' +
         '<div class="memory-empty-text">No memory files found</div>' +
         '<div class="memory-empty-sub">Memory directory is empty or does not exist yet.</div>' +
         '<button class="memory-new-btn" id="memory-empty-new-btn" style="margin-top:8px">+ Create First File</button>' +
@@ -672,11 +672,13 @@
     var classes = "memory-file-item";
     if (isActive) classes += " active";
     if (f.isIndex) classes += " is-index";
-    var icon = f.isIndex ? "&#9733;" : "&#128196;";
+    var icon = f.isIndex
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
     var sizeStr = M.formatFileSize(f.size);
     var displayName = f.isIndex ? f.name : _basename(f.name);
     return (
-      '<div class="' + classes + '" data-name="' + esc(f.name) + '">' +
+      '<div class="' + classes + '" data-name="' + esc(f.name) + '" data-category="' + esc(f.category || "") + '" draggable="true">' +
         '<span class="memory-file-item-icon">' + icon + '</span>' +
         '<div class="memory-file-item-info">' +
           '<div class="memory-file-item-name">' + esc(displayName) + '</div>' +
@@ -727,8 +729,39 @@
     var items = list.querySelectorAll(".memory-file-item");
     for (var j = 0; j < items.length; j++) {
       items[j].addEventListener("click", M.onMemoryFileItemClick);
+      items[j].addEventListener("dragstart", M.onMemoryFileItemDragStart);
     }
   };
+
+  // Memory 항목 DnD → terminal-input-card 드롭 시 첨부 chip 으로 등록되는 패턴.
+  // 본문은 dragstart 시점에 fetch 하지 않고 (동기 제약), drop handler 가 비동기로 fetch + parse.
+  M.onMemoryFileItemDragStart = function(e) {
+    var item = e.currentTarget;
+    var name = item.dataset.name;
+    var category = item.dataset.category || "";
+    if (!name) return;
+    var payload = JSON.stringify({ name: name, category: category });
+    try {
+      e.dataTransfer.setData("application/x-board-memory", payload);
+      e.dataTransfer.setData("text/plain", name);
+      e.dataTransfer.effectAllowed = "copy";
+    } catch (_e) { /* graceful */ }
+  };
+
+  // YAML-like frontmatter (--- ... ---) 의 단순 key: value 라인 추출.
+  // description 추출 용도로만 쓰이며, 복잡한 list/nested 구조는 지원하지 않는다.
+  M.parseMemoryFrontmatter = function(content) {
+    if (!content) return {};
+    var m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!m) return {};
+    var meta = {};
+    m[1].split(/\r?\n/).forEach(function (line) {
+      var kv = line.match(/^([a-zA-Z_]+):\s*(.*)$/);
+      if (kv) meta[kv[1]] = kv[2].trim();
+    });
+    return meta;
+  };
+  Board.fetch.parseMemoryFrontmatter = M.parseMemoryFrontmatter;
 
   function _renderMemoryCategoryGroup(cat, catFiles) {
     var label = MEMORY_CATEGORY_LABELS[cat] || cat;

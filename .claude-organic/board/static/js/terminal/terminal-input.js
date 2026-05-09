@@ -318,6 +318,102 @@
     M.renderTicketPreview();
   };
 
+  // ── Memory 첨부 도메인 ──
+  // 메모리 첨부는 본문을 컨텍스트에 인라인하지 않고 (사용자 결정: 경로만 → 어시스턴트가 Read),
+  // sendInput 시점에 사용자 텍스트 앞에 prefix block 으로 path 토큰을 붙이는 방식.
+  // 따라서 backend attachments 필드로 전송하지 않으며 사이드카 영속화도 하지 않는다.
+  M.attachedMemories = M.attachedMemories || [];
+
+  M.renderMemoryPreview = function() {
+    var container = document.getElementById("terminal-image-preview");
+    if (!container) return;
+
+    var existingCards = container.querySelectorAll("[data-memory-idx]");
+    existingCards.forEach(function (card) { card.parentNode.removeChild(card); });
+
+    if (!M.attachedMemories) return;
+
+    var helper = M.attachmentCard;
+    if (!helper || typeof helper.create !== "function") return;
+
+    M.attachedMemories.forEach(function (mem, idx) {
+      var card = helper.create({
+        type: "memory",
+        name: mem.name,
+        category: mem.category,
+        title: mem.description || mem.name,
+        subtitle: mem.name
+      });
+      card.setAttribute("data-memory-idx", idx);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "terminal-image-remove";
+      removeBtn.title = "제거";
+      removeBtn.innerHTML = "×";
+      removeBtn.addEventListener("click", (function (capturedIdx) {
+        return function () { M.removeMemory(capturedIdx); };
+      })(idx));
+
+      card.appendChild(removeBtn);
+      container.appendChild(card);
+    });
+  };
+
+  /**
+   * 메모리 첨부를 추가한다 (drop handler 가 호출).
+   * 같은 name 이 이미 첨부되어 있으면 무시 + appendSystemMessage 안내.
+   * description 은 비동기 fetch 후 보강 (파일이 없거나 frontmatter 가 없는 경우 graceful fallback).
+   *
+   * @param {{name: string, category?: string}} payload
+   */
+  M.attachMemory = function(payload) {
+    if (!payload || !payload.name) return;
+    if (!M.attachedMemories) M.attachedMemories = [];
+
+    var dup = M.attachedMemories.some(function (m) { return m.name === payload.name; });
+    if (dup) {
+      if (M.appendSystemMessage) {
+        M.appendSystemMessage("[첨부] 메모리 " + payload.name + " 이미 첨부됨");
+      }
+      return;
+    }
+
+    var entry = {
+      name: payload.name,
+      category: payload.category || "",
+      description: "",
+      addedAt: Date.now()
+    };
+    M.attachedMemories.push(entry);
+    M.renderMemoryPreview();
+
+    // 비동기 description 보강 (frontmatter parse). 실패/누락은 graceful — chip 라벨이 파일명으로 fallback.
+    var fetchFn = Board.fetch && Board.fetch.fetchMemoryFile;
+    var parseFn = Board.fetch && Board.fetch.parseMemoryFrontmatter;
+    if (typeof fetchFn === "function") {
+      fetchFn(payload.name).then(function (data) {
+        if (!data || !data.content) return;
+        var meta = typeof parseFn === "function" ? parseFn(data.content) : {};
+        var found = M.attachedMemories.find(function (m) { return m.name === payload.name; });
+        if (found) {
+          found.description = meta.description || meta.name || "";
+          M.renderMemoryPreview();
+        }
+      });
+    }
+  };
+
+  M.removeMemory = function(index) {
+    if (!M.attachedMemories) return;
+    M.attachedMemories.splice(index, 1);
+    M.renderMemoryPreview();
+  };
+
+  M.clearMemories = function() {
+    M.attachedMemories = [];
+    M.renderMemoryPreview();
+  };
+
   /**
    * 첨부된 ticket 배열을 backend 전송용 payload 구조로 변환한다.
    * 본문 prepend 정책 폐기 (T-427 → T-429) — 사용자 메시지 본문은 사용자 텍스트만,
@@ -433,16 +529,17 @@
     var text = input.value.trim();
     var hasImages = M.attachedImages.length > 0;
     var hasTickets = M.attachedTickets && M.attachedTickets.length > 0;
-    if (!text && !hasImages && !hasTickets) return;
+    var hasMemories = M.attachedMemories && M.attachedMemories.length > 0;
+    if (!text && !hasImages && !hasTickets && !hasMemories) return;
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
     if (!inputtable.has(Board.state.termStatus)) return;
 
     input.value = "";
     input.style.height = "auto";
 
-    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지/티켓 있으면 슬래시 커맨드 미적용
+    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지/티켓/메모리 있으면 슬래시 커맨드 미적용
     // M.isFilePath() 체크: /home/... 등 파일 경로는 슬래시 커맨드로 라우팅하지 않음
-    if (!hasImages && !hasTickets && text.charAt(0) === "/" && !M.isFilePath(text)) {
+    if (!hasImages && !hasTickets && !hasMemories && text.charAt(0) === "/" && !M.isFilePath(text)) {
       Board.slashCommands.handle(text, {
         isWorkflowMode: M.isWorkflowMode,
         appendSystemMessage: M.appendSystemMessage,
@@ -457,10 +554,22 @@
     // T-429: 첨부 본문 prepend 정책 폐기 — sendText 는 사용자 텍스트 그대로.
     // 첨부 ticket 본문은 별도 attachments payload 필드로 전송한다 (backend 가 SDK
     // envelope 합성 시 user role content 배열에 추가 text 블록으로 결합).
+    //
+    // 메모리 첨부는 path 만 prefix block 으로 본문에 인라인한다 (사용자 결정: 본문 fetch
+    // 없이 어시스턴트가 Read). 따라서 backend attachments 필드에는 추가하지 않는다.
     var sendText = text;
+    if (hasMemories) {
+      var memoryLines = M.attachedMemories.map(function (m) {
+        var label = m.description || m.name;
+        return "- " + label + ": memory/" + m.name;
+      });
+      var prefixBlock = "[참고 메모리]\n" + memoryLines.join("\n");
+      sendText = text ? prefixBlock + "\n\n" + text : prefixBlock;
+    }
     var attachmentsPayload = hasTickets ? _buildAttachmentsPayload(M.attachedTickets) : null;
-    // outputDiv 카드 렌더용 메타 스냅샷 (ticket clear 전에 보존)
+    // outputDiv 카드 렌더용 메타 스냅샷 (ticket/memory clear 전에 보존)
     var ticketsSnapshot = hasTickets ? M.attachedTickets.slice() : null;
+    var memoriesSnapshot = hasMemories ? M.attachedMemories.slice() : null;
 
     // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지/티켓 첨부 포함).
     // 큐 entry 는 outputDiv 에 미리 echo 하지 않으며, 큐 stack 카드로만 노출된다.
@@ -476,6 +585,9 @@
       }
       if (hasTickets) {
         M.clearTickets();
+      }
+      if (hasMemories) {
+        M.clearMemories();
       }
       return;
     }
@@ -498,12 +610,28 @@
 
     // T-429: 본문 div 와 별개로 첨부 카드 N개를 .term-message-attachments 컨테이너에 추가 echo.
     // attachment-card.js 의 단일 진실 공급원 헬퍼를 재사용하여 입력 측 카드와 룩앤필 일치.
-    if (ticketsSnapshot && ticketsSnapshot.length > 0 && M.attachmentCard && typeof M.attachmentCard.create === "function") {
+    // 메모리 첨부도 동일 컨테이너에 type="memory" 로 echo.
+    var hasAttachmentEcho = (ticketsSnapshot && ticketsSnapshot.length > 0)
+      || (memoriesSnapshot && memoriesSnapshot.length > 0);
+    if (hasAttachmentEcho && M.attachmentCard && typeof M.attachmentCard.create === "function") {
       var attachContainer = document.createElement("div");
       attachContainer.className = "term-message-attachments";
-      ticketsSnapshot.forEach(function (att) {
-        attachContainer.appendChild(M.attachmentCard.create(att));
-      });
+      if (ticketsSnapshot) {
+        ticketsSnapshot.forEach(function (att) {
+          attachContainer.appendChild(M.attachmentCard.create(att));
+        });
+      }
+      if (memoriesSnapshot) {
+        memoriesSnapshot.forEach(function (mem) {
+          attachContainer.appendChild(M.attachmentCard.create({
+            type: "memory",
+            name: mem.name,
+            category: mem.category,
+            title: mem.description || mem.name,
+            subtitle: mem.name
+          }));
+        });
+      }
       M.appendToOutput(attachContainer);
     }
 
@@ -520,6 +648,7 @@
     M.clearImages();
     M.clearFiles();
     if (hasTickets) M.clearTickets();
+    if (hasMemories) M.clearMemories();
 
     // Mark sendText as locally sent so the user_input SSE echo is skipped.
     // sendText = text = 사용자 자유 입력 → SSE user_input.text 와 정확히 일치.

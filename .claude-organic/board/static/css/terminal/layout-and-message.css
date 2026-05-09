@@ -1069,7 +1069,7 @@
   border-color: #D97757;
 }
 
-/* ── Command Badge (RSC / IMP / REV) ── */
+/* ── Command Badge (RSC / IMP / REV / MEM) ── */
 .terminal-ticket-card-cmd {
   display: flex;
   align-items: center;
@@ -1087,6 +1087,11 @@
   transform: rotate(180deg);
   flex-shrink: 0;
   padding: 4px 0;
+}
+
+/* 메모리 첨부 카드 — badge 청록 톤으로 ticket 과 시각 구분. */
+.terminal-ticket-card[data-att-type="memory"] .terminal-ticket-card-cmd {
+  background: #4ec9b0;
 }
 
 /* ── Body: Title + Subtitle ── */
