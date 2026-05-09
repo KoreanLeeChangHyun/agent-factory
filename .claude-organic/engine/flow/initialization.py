@@ -474,42 +474,6 @@ def _read_ticket_status(ticket_number: str) -> str | None:
     return None
 
 
-def _update_ticket_title(ticket_number: str, title: str, abs_work_dir: str = "") -> None:
-    """kanban.py를 호출하여 티켓 제목을 갱신한다.
-
-    kanban.py update-title 서브커맨드를 subprocess로 실행한다.
-    실패 시 경고만 출력하고 계속 진행한다.
-
-    Args:
-        ticket_number: 티켓 번호 (예: 'T-001')
-        title: 갱신할 제목 문자열
-        abs_work_dir: 워크플로우 로그 기록용 절대 경로. 비어있으면 로그 기록 생략.
-    """
-    kanban_py_path: str = os.path.join(_SCRIPT_DIR, "kanban.py")
-    if not os.path.isfile(kanban_py_path):
-        _warn(f"kanban.py를 찾을 수 없습니다: {kanban_py_path}")
-        return
-
-    try:
-        result = subprocess.run(
-            ["python3", kanban_py_path, "update-title", ticket_number, title],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
-            combined = "\n".join(filter(None, [stdout, stderr]))
-            _warn(f"kanban.py update-title 실패 (exit {result.returncode}): {combined}")
-            if abs_work_dir:
-                _append_log(abs_work_dir, "WARN", f"kanban.py update-title 실패 (exit {result.returncode}): {combined}")
-    except subprocess.TimeoutExpired:
-        _warn("kanban.py update-title: 타임아웃")
-    except Exception as e:
-        _warn(f"kanban.py update-title 실행 실패: {e}")
-
-
 def _write_context(
     abs_work_dir: str,
     title: str,
@@ -797,9 +761,8 @@ def init_workflow(
     else:
         _append_log(abs_work_dir, "INFO", f"Worktree skipped: command={command} (worktree is only created for implement)")
 
-    # 티켓이 있으면 제목 갱신 + Open → In Progress 이동
+    # 티켓이 있으면 Open → In Progress 이동
     if ticket_number:
-        _update_ticket_title(ticket_number, title, abs_work_dir)
         _move_ticket_to_in_progress(ticket_number, abs_work_dir)
 
     _append_log(abs_work_dir, "INFO", f"Workflow initialized: {command}/{work_name}")
