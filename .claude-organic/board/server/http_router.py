@@ -96,6 +96,8 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_list()
         elif self.path.startswith('/terminal/workflow/history'):
             self._handle_workflow_history()
+        elif self.path == '/api/kanban/branch/active':
+            self._handle_kanban_branch_active()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:
@@ -163,6 +165,8 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_done()
         elif self.path == '/api/kanban/delete':
             self._handle_kanban_delete()
+        elif self.path == '/api/kanban/branch/toggle':
+            self._handle_kanban_branch_toggle()
         elif self.path == '/api/kanban/worktree-commit':
             self._handle_worktree_commit()
         elif self.path == '/api/workflow/undo-done':
