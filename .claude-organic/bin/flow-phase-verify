@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# flow-phase-verify - T-454 VALIDATE 단계 verifier 진입점
+# 사용법: flow-phase-verify <registryKey>
+# 종료 코드:
+#   0 = 통과
+#   1 = 실패 (retry-context.json 자동 기록)
+#   2 = 사용법 오류
+ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
+  || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+exec python3 "$ROOT/.claude-organic/engine/flow/phase_verifier.py" "$@"
