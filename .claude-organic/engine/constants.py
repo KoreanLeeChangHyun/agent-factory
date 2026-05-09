@@ -204,6 +204,39 @@ CHAIN_SEPARATOR = ">"
 CHAIN_MAX_RETRY = _env_int("CLAUDE_CHAIN_MAX_RETRY", 2)
 
 # =============================================================================
+# Phase별 retry 최대 횟수 — T-455: retry/sentinel/flow-fail-record 인프라
+# 기본값 0 = retry 비활성 (회귀 0건 보장). .settings 에서 명시 활성화 시에만 retry 동작.
+# =============================================================================
+WORKFLOW_RETRY_INIT = _env_int("WORKFLOW_RETRY_INIT", 0)        # INIT phase 실패 시 retry 최대 횟수
+WORKFLOW_RETRY_PLAN = _env_int("WORKFLOW_RETRY_PLAN", 0)        # PLAN phase 실패 시 retry 최대 횟수
+WORKFLOW_RETRY_WORK = _env_int("WORKFLOW_RETRY_WORK", 0)        # WORK phase 실패 시 retry 최대 횟수
+WORKFLOW_RETRY_VALIDATE = _env_int("WORKFLOW_RETRY_VALIDATE", 0)  # VALIDATE phase 실패 시 retry 최대 횟수
+WORKFLOW_RETRY_REPORT = _env_int("WORKFLOW_RETRY_REPORT", 0)    # REPORT phase 실패 시 retry 최대 횟수
+WORKFLOW_RETRY_PROMPT_N = _env_int("WORKFLOW_RETRY_PROMPT_N", 3)  # retry-context.json hint_history 배열 cap (LIFO truncate)
+
+# Phase 키로 retry 최대 횟수를 조회하는 매핑 — failure_handler.py 가 활용
+PHASE_RETRY_MAX: dict[str, int] = {
+    "INIT": WORKFLOW_RETRY_INIT,
+    "PLAN": WORKFLOW_RETRY_PLAN,
+    "WORK": WORKFLOW_RETRY_WORK,
+    "VALIDATE": WORKFLOW_RETRY_VALIDATE,
+    "REPORT": WORKFLOW_RETRY_REPORT,
+}
+
+
+def get_phase_retry_max(phase: str) -> int:
+    """Phase 식별자로 해당 phase의 retry 최대 횟수를 반환한다.
+
+    Args:
+        phase: Phase 식별자 (INIT/PLAN/WORK/VALIDATE/REPORT 중 하나).
+
+    Returns:
+        해당 phase의 retry 최대 횟수. 알 수 없는 phase는 0을 반환한다.
+    """
+    return PHASE_RETRY_MAX.get(phase, 0)
+
+
+# =============================================================================
 # 품질 검증 임계값
 # =============================================================================
 QUALITY_THRESHOLD = _env_float("CLAUDE_QUALITY_THRESHOLD", 0.6)

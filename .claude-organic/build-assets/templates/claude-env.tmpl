@@ -122,6 +122,17 @@ CLAUDE_REPORT_TTL_HOURS=1
 # 작업 디렉터리 이름 최대 길이
 CLAUDE_WORK_NAME_MAX_LEN=20
 
+# Phase별 retry 최대 횟수 (기본값 0 = retry 비활성, 회귀 0건 보장)
+# T-455: retry/sentinel/flow-fail-record 인프라. 명시 활성화 시에만 retry 동작.
+WORKFLOW_RETRY_INIT=0
+WORKFLOW_RETRY_PLAN=0
+WORKFLOW_RETRY_WORK=0
+WORKFLOW_RETRY_VALIDATE=0
+WORKFLOW_RETRY_REPORT=0
+
+# retry-context.json hint_history 배열 cap (LIFO truncate, 기본값 3)
+WORKFLOW_RETRY_PROMPT_N=3
+
 # 터미널 배너 너비 (빈 값이면 자동)
 CLAUDE_BANNER_WIDTH=
 

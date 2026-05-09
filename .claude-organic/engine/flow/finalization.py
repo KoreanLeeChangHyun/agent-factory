@@ -22,6 +22,33 @@
 종료 코드:
   0  성공
   1  status.json 전이 실패
+
+## Responsibility Boundary (T-455)
+
+This module handles **termination responsibility** only (DONE / FAILED arrival):
+- Kanban Review transition (kanban.py move -> review)
+- History synchronization (history_sync archive)
+- Session cleanup (TMUX_PANE / HTTP kill)
+- Usage finalization (usage-finalize)
+
+**Failure logic absorption is forbidden (MUST NOT)**:
+Phase failure identification / sentinel creation / retry-context.json update /
+retry eligibility judgment are the sole responsibility of
+`engine/flow/failure_handler.py`. This module does NOT import failure_handler
+functions and does NOT directly access failure data structures.
+
+## T-455 4-step Flow Mapping
+
+| Step | Module | Action |
+|------|--------|--------|
+| 1 | failure_handler.create_sentinel() | Create .workflow-failed sentinel + update retry-context.json |
+| 2 | hooks/subagent-stop.py | Detect sentinel + call flow-fail-record (non-blocking) |
+| 3 | bin/flow-fail-record (-> failure_handler.record_failure) | Idempotent retry-context update |
+| 4 | finalization.py (this module) | On status="실패": kanban move review (existing behavior preserved) |
+
+## Regression Guard (T-411 Canon)
+Automatic forced status transitions / kanban auto-revert / commit-missing
+auto-detection / advisory-only validators MUST NOT be added to this module.
 """
 
 from __future__ import annotations
@@ -851,6 +878,10 @@ def main() -> None:
     )
 
     # ── Step 4: 티켓 상태 갱신 (ticket_number 있을 때만, 비차단) ──
+    # T-455 Step 4: After failure_handler handles sentinel + retry-context (Steps 1-3),
+    # finalization is responsible for termination only. This branch does NOT identify
+    # the failure phase or make retry eligibility judgments — it simply moves the
+    # ticket to the review column regardless of status.
     # status 무관 무조건 Review 로 보낸다 (회귀 정책 폐기).
     if ticket_number:
         target_column = "review"
