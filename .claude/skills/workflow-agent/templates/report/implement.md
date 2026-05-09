@@ -78,3 +78,5 @@ flowchart TD
 ## 비고 (선택)
 
 [특이사항, 주의사항, 후속 작업 권고 등]
+
+<!-- 본 보고서는 final_report (report.md) 형태이며 중간 artifact (work/WXX-*.md) 와 구분됨 -->

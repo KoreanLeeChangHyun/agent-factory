@@ -51,3 +51,20 @@ workDir: .workflow/20260209-143000/로그인기능추가/implement
                    {{workflowId}}   {{workName}}    {{command}}
                    → {{date}} 도출
 ```
+
+## 명명 사전 (T-452 §4 SSoT)
+
+<!-- 보고서 작성 시 아래 영어 식별자와 한국어 짝 어휘를 일관되게 사용한다. -->
+
+| 영어 식별자 | 한국어 짝 어휘 | 사용 위치 |
+|------------|--------------|----------|
+| `workflow_phase` | 워크플로우 단계 | status.json 필드 키; FSM 전이 단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL) |
+| `work_step` | 작업 스텝 | plan.md 태스크 ID (W01, W02…); WORK 내부 단위 작업 |
+| `kanban_status` | 칸반 상태 | 칸반 FSM 5상태 (To Do / Open / In Progress / Review / Done); ticket XML `<status>` |
+| `artifact` | 산출물 | work/WXX-*.md 중간 산출물; 커밋 코드 파일 |
+| `final_report` | 최종 보고서 | report.md (Reporter 산출물); 본 템플릿 기반으로 생성되는 보고서 |
+| `phase_verify` | 단계 검증 | phase_verifier.py; VALIDATE 단계 rule-based 검증 |
+| `ticket_validate` | 티켓 검수 | flow-validate, flow-validate-p; prompt_validator.py; plan_validator.py |
+| `verifier_failure` | 검증기 실패 | VALIDATE 단계 phase_verifier 반환 실패; failure_handler.py |
+| `validator_failure` | 검수 실패 | 티켓 프롬프트/플랜 검수 실패; Review → Open DnD 명시 거부 |
+| `retry_context` | 재시도 컨텍스트 | failure_handler.py; retry-context.json (오케스트레이터 재시도 주입 데이터) |
