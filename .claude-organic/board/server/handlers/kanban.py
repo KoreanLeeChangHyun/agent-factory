@@ -36,7 +36,7 @@ class KanbanHandlerMixin:
         return check_derived_blocked(ticket, kanban_base, _KANBAN_ALL_DIRS)
 
     def _handle_kanban_move(self) -> None:
-        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open + Open → Review 전이 허용."""
+        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open + Open → Review + Review → Open 전이 허용."""
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
         to = (data.get('to') or '').strip().lower()
