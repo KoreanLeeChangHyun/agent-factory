@@ -144,10 +144,18 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
 
 
 def _read_current_step(status_file: str) -> str:
-    """status.json에서 현재 step을 읽어 반환한다."""
+    """status.json에서 현재 step을 읽어 반환한다.
+
+    T-453: workflow_phase 신식 우선 → step 1주기 호환 → phase 더 구식 fallback.
+    state_machine.py:update_status() 의 read 패턴과 정합 유지.
+    """
     _data = load_json_file(status_file) if os.path.isfile(status_file) else None
     if isinstance(_data, dict):
-        return _data.get("step") or _data.get("phase", "NONE")
+        return (
+            _data.get("workflow_phase")   # T-453 신식 (W04 마이그레이션)
+            or _data.get("step")          # 1주기 호환
+            or _data.get("phase", "NONE") # 더 구식 fallback
+        )
     return "NONE"
 
 

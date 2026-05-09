@@ -631,12 +631,19 @@ def main() -> None:
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
     # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
+    # T-453: workflow_phase 신식 우선 → step 1주기 호환 → phase 더 구식 fallback
     _step1_skip: bool = False
     if abs_work_dir is not None:
         _status_data = load_json_file(os.path.join(abs_work_dir, "status.json"))
-        if _status_data is not None and _status_data.get("step") == to_step:
-            print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
-            _step1_skip = True
+        if _status_data is not None:
+            _current_step = (
+                _status_data.get("workflow_phase")
+                or _status_data.get("step")
+                or _status_data.get("phase")
+            )
+            if _current_step == to_step:
+                print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
+                _step1_skip = True
 
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP1: registryKey={registry_key} toStep={to_step}")

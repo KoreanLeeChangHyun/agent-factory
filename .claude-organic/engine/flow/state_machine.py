@@ -260,12 +260,20 @@ def update_status(
                 f"WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}",
             )
         else:
-            current_step = data.get("step") or data.get("phase", "NONE")
+            # T-453: workflow_phase(신식) 우선, step(1주기 호환) → phase(구식) fallback.
+            # 후속 키 마이그레이션이 끝나면 step/phase fallback 은 T-459 에서 제거 예정.
+            current_step = (
+                data.get("workflow_phase")
+                or data.get("step")
+                or data.get("phase", "NONE")
+            )
             workflow_mode = data.get("mode", "full").lower()
 
-            # allowed_targets는 두 검증 모두에서 에러 메시지에 필요하므로 미리 조회
+            # allowed_targets는 두 검증 모두에서 에러 메시지에 필요하므로 미리 조회.
+            # T-453: 알 수 없는 mode 는 multi → full 순으로 fallback (multi 모드 8상태 우선).
             allowed_table = FSM_TRANSITIONS.get(
-                workflow_mode, FSM_TRANSITIONS.get("full", {})
+                workflow_mode,
+                FSM_TRANSITIONS.get("multi", FSM_TRANSITIONS.get("full", {})),
             )
             allowed = allowed_table.get(current_step, [])
 
@@ -314,6 +322,9 @@ def update_status(
         kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
+        # T-453: workflow_phase(신식) + step(1주기 호환) 양쪽 동시 갱신.
+        # step 필드는 후속 키 마이그레이션 완료 후 T-459 에서 제거 예정.
+        data["workflow_phase"] = to_step
         data["step"] = to_step
         data["updated_at"] = now
 
