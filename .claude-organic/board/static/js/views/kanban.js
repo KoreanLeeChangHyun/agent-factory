@@ -1873,6 +1873,21 @@
     });
 
     /**
+     * draggedFrom → targetCol 전이가 허용되는지 판정.
+     * 허용 표:
+     *   To Do  → To Do(reorder) | Open
+     *   Open   → To Do | In Progress | Review | Done
+     *   Review → Done
+     * 그 외 조합은 dragover 단계에서 drop 거부 (브라우저 cursor 가 no-drop 표시).
+     */
+    function isValidDropTarget(fromCol, targetCol) {
+      if (fromCol === "To Do") return targetCol === "To Do" || targetCol === "Open";
+      if (fromCol === "Open") return targetCol === "To Do" || targetCol === "In Progress" || targetCol === "Review" || targetCol === "Done";
+      if (fromCol === "Review") return targetCol === "Done";
+      return false;
+    }
+
+    /**
      * To Do 수동 정렬 모드의 같은 컬럼 reorder dragover 시 삽입 위치 인디케이터 배치.
      * Y 좌표 기준 target index 계산 후 zone 내부에 indicator element 를 insert/move.
      */
@@ -1902,6 +1917,11 @@
     el.querySelectorAll(".cards-droppable").forEach(function (zone) {
       zone.addEventListener("dragover", function (e) {
         if (!draggedNum) return;
+        // 유효하지 않은 전이는 drop 자체 거부 (preventDefault 미호출 → 브라우저가 drop 차단)
+        if (!isValidDropTarget(draggedFrom, zone.dataset.colKey)) {
+          e.dataTransfer.dropEffect = "none";
+          return;
+        }
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         zone.classList.add("dragover-active");
@@ -2090,6 +2110,13 @@
               }
             );
           }
+          return;
+        }
+
+        // To Do 는 Open 으로만 이동 허용 (Review/그 외 차단)
+        if (draggedFrom === "To Do" && targetCol !== "Open") {
+          alert("To Do 카드는 Open 컬럼으로만 드래그할 수 있습니다.");
+          renderKanban();
           return;
         }
 
