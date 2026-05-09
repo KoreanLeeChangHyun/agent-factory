@@ -264,6 +264,8 @@
   color: #6a9fb5;
 }
 
+/* T-457 (Layer 3): 1행 우측 미커밋 표시 라벨 (read-only).
+ * 클릭 트리거는 4행 .card-commit-action 으로 이전됨 — cursor:default + hover 제거. */
 .card-uncommitted-badge {
   font-size: 9px;
   font-weight: 700;
@@ -273,17 +275,52 @@
   background: rgba(217, 119, 87, 0.20);
   color: #D97757;
   border: 1px solid rgba(217, 119, 87, 0.45);
-  cursor: pointer;
+  cursor: default;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  transition: background 0.15s, border-color 0.15s;
+  pointer-events: none;
 }
 
-.card-uncommitted-badge:hover {
-  background: rgba(217, 119, 87, 0.35);
+/* T-457 (Layer 3): failure read-only 라벨.
+ * 색상은 placeholder neutral — 사용자 결정 후 1줄 패치 예정. */
+.card-failure-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  /* placeholder neutral — 사용자 결정 대기 */
+  background: rgba(160, 160, 160, 0.18);
+  color: #b0b0b0;
+  border: 1px solid rgba(160, 160, 160, 0.40);
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  pointer-events: none;
+}
+
+/* T-457 (Layer 3): 4행 commit 액션 버튼 (워크트리 미커밋 자동 commit 진입점).
+ * .card-done-action 과 동일 사이즈(20×20) — 4행 min-height: 22px 안전. */
+.card-commit-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(217, 119, 87, 0.45);
+  border-radius: 4px;
+  color: #D97757;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.card-commit-action:hover {
+  background: rgba(217, 119, 87, 0.15);
   border-color: #D97757;
 }
 
-.card-uncommitted-badge.is-commiting {
+.card-commit-action:disabled,
+.card-commit-action.is-commiting {
   opacity: 0.6;
   cursor: wait;
 }
