@@ -327,6 +327,56 @@
 
 /* T-399: .status-submit 룰 제거됨 (Submit transient 단계 제거). */
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * T-433 Phase 2 — Review 카드 4행 feature 브랜치 토글 버튼.
+ * - 16px SVG (Lucide git-branch, 외부 라이브러리 금지 — 인라인 SVG)
+ * - OFF: 회색 outline (border-only, transparent 배경)
+ * - ON: 테라코타(#D97757) 채움 + 카드 외곽 4방향 box-shadow glow
+ * - border-left 한쪽 색상 금지 (UI 룰) — 카드 glow 는 box-shadow inset/outset 4방향
+ * ───────────────────────────────────────────────────────────────────────── */
+.card-branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(176, 176, 176, 0.45);
+  border-radius: 4px;
+  color: #b0b0b0;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.card-branch-toggle:hover {
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.55);
+  background: rgba(217, 119, 87, 0.08);
+}
+
+.card-branch-toggle.active {
+  background: #D97757;
+  border-color: #D97757;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25);
+}
+
+.card-branch-toggle.active:hover {
+  background: #c66640;
+  border-color: #c66640;
+}
+
+/* 카드 외곽 light glow (4방향 box-shadow — border-left 한쪽 금지 룰 준수).
+ * .has-active-branch 는 Review 카드 .card 에 부여된다. */
+.card.has-active-branch {
+  box-shadow:
+    0 0 0 1px rgba(217, 119, 87, 0.55),
+    0 0 12px 2px rgba(217, 119, 87, 0.22);
+}
+
+
 /* ── Column Collapse Toggle (Done / To Do) ── */
 .column-toggle-btn {
   display: flex;
