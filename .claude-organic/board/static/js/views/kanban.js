@@ -1966,8 +1966,8 @@
         // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
         // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
         // T-418: Open 카드를 Done 이외 컬럼으로 drop 시도 시 기존 To Do ↔ Open 전이 로직으로 처리
-        if (draggedFrom === "Review" && targetCol !== "Done") {
-          alert("Review 카드는 Done 컬럼으로만 드래그할 수 있습니다.");
+        if (draggedFrom === "Review" && targetCol !== "Done" && targetCol !== "Open") {
+          alert("Review 카드는 Done 또는 Open 컬럼으로만 드래그할 수 있습니다.");
           renderKanban();
           return;
         }
