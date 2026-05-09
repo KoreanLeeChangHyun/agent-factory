@@ -74,7 +74,7 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        phase = data.get("step") or data.get("phase", "")
+        phase = data.get("workflow_phase") or data.get("step") or data.get("phase", "")  # legacy status.json (pre-T-459) 호환 read fallback
         if phase in _TERMINAL_PHASES:
             return False
 
@@ -87,7 +87,7 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
 
         if elapsed.total_seconds() > _TTL_HOURS * 3600:
             transition_time = now.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-            data["step"] = "STALE"
+            data["workflow_phase"] = "STALE"
             data["updated_at"] = transition_time
             if "transitions" not in data:
                 data["transitions"] = []

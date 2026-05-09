@@ -637,9 +637,8 @@ def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
     if not claude_sid:
         claude_sid = _find_latest_session_id()
     status_data: dict[str, Any] = {
-        # T-453: workflow_phase 신식 + step 1주기 호환 (T-459 에서 step 제거)
+        # T-459: workflow_phase 단일 키 (step 1주기 호환 제거 완료)
         "workflow_phase": "NONE",
-        "step": "NONE",
         "mode": mode,
         "session_id": str(uuid.uuid4())[:8],
         "linked_sessions": [claude_sid] if claude_sid else [],
