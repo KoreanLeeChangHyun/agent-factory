@@ -142,7 +142,15 @@ def err(msg: str, code: int = 1) -> NoReturn:
 def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "", command: str = "") -> str:
     """티켓 XML 문자열을 생성하여 반환한다.
 
-    XML은 <metadata>, <prompt>, <result> 요소로 구성되는 flat 구조이다.
+    XML은 5개 최상위 요소로 구성되는 flat 구조이다:
+      - <metadata>: 티켓 번호·제목·날짜·상태·커맨드 (필수)
+      - <relations>: 관계 링크 목록 (옵셔널 — 관계 없으면 생략)
+      - <prompt>: 작업 프롬프트 (goal/target/constraints/criteria/context) (필수)
+      - <result>: 워크플로우 실행 결과 (registrykey/workdir/plan/report/merge_commit) (옵셔널 — 미실행 시 self-closing)
+      - <failure>: FAIL 상태 메타데이터 (reason/phase/retry_count/context) (옵셔널 — 정상 완료 시 미존재)
+
+    신규 티켓 생성 시 <failure> 요소는 생성하지 않는다 (failure 미존재 == 정상 상태,
+    T-452 §9.2 옵션 A 참조). <failure> 요소는 update_failure() 호출 시 신규 삽입된다.
 
     Args:
         ticket_number: 티켓 번호 (T-NNN 형식).
@@ -249,6 +257,8 @@ def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False
         xml_str = re.sub(r"(<prompt[ />])", r"\n  <!-- prompt -->\n  \1", xml_str)
     if "<!-- result -->" not in xml_str:
         xml_str = re.sub(r"(<result[ />])", r"\n  <!-- result -->\n  \1", xml_str)
+    if "<!-- failure -->" not in xml_str and "<failure" in xml_str:
+        xml_str = re.sub(r"(<failure[ />])", r"\n  <!-- failure -->\n  \1", xml_str)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         f.write(xml_str)
@@ -332,6 +342,15 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         for field in result_fields:
             result_data[field] = _text(result_elem, field)
 
+    # flat 구조: <failure> 루트 직하에서 하위 요소 파싱 (옵셔널 — FAIL 상태일 때만 존재)
+    failure_fields = ("reason", "phase", "retry_count", "context")
+    failure_data: dict[str, str] | None = None
+    failure_elem = root.find("failure")
+    if failure_elem is not None and len(failure_elem) > 0:
+        failure_data = {}
+        for field in failure_fields:
+            failure_data[field] = _text(failure_elem, field)
+
     # <relations> 요소 파싱 (하위 호환: 없으면 빈 리스트)
     relations = _parse_relations(root)
 
@@ -342,6 +361,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         "command": command,
         "prompt": prompt_data,
         "result": result_data,
+        "failure": failure_data,
         "relations": relations,
     }
 
@@ -423,6 +443,7 @@ def _parse_legacy_ticket(
         "command": command,
         "prompt": prompt_data,
         "result": result_data,
+        "failure": None,
         "relations": relations,
     }
 
@@ -518,6 +539,44 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
 
     write_ticket_xml(filepath, root)
 
+
+def update_failure(filepath: str, updates: dict[str, str]) -> None:
+    """티켓 XML의 <failure> 하위 요소를 갱신한다.
+
+    옵셔널 요소 — FAIL 상태일 때만 호출한다 (T-452 §3.1 failure handling 흐름 참조).
+    <failure> 미존재 시 루트 마지막에 신규 생성한다 (<result> 뒤에 자동 배치).
+
+    Args:
+        filepath: 티켓 파일 경로.
+        updates: 갱신할 필드 딕셔너리.
+            - reason: 실패 사유 식별자 (verifier_failure / validator_failure / sentinel / retry_max 등)
+            - phase: 실패 발생 워크플로우 단계 (INIT / PLAN / WORK / VALIDATE / REPORT)
+            - retry_count: 누적 재시도 횟수 (정수 → 문자열 직렬화)
+            - context: 자유 형식 설명 (multiline 허용)
+    """
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+    except (OSError, ET.ParseError) as e:
+        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+
+    failure_fields = ("reason", "phase", "retry_count", "context")
+    failure_updates = {k: v for k, v in updates.items() if k in failure_fields}
+
+    if failure_updates:
+        failure_elem = root.find("failure")
+        if failure_elem is None:
+            # <failure> 요소가 없으면 생성 (루트 마지막에 추가 — <result> 뒤)
+            failure_elem = ET.SubElement(root, "failure")
+
+        for field, value in failure_updates.items():
+            existing = failure_elem.find(field)
+            if existing is not None:
+                existing.text = str(value)
+            else:
+                ET.SubElement(failure_elem, field).text = str(value)
+
+    write_ticket_xml(filepath, root)
 
 # ─── relations 관련 ─────────────────────────────────────────────────────────
 
