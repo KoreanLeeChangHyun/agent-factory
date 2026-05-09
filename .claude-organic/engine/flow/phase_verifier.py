@@ -502,12 +502,28 @@ def _write_retry_context_on_fail(
         work_dir: 워크플로우 work 디렉터리 절대 경로.
         failure_reason: verify_validate_phase 가 반환한 reason 메시지.
         failed_steps: verifier 가 지적한 워커 ID 목록.
-
-    Note:
-        T-454 W03 에서 구현 예정. W02 에서는 시그니처/docstring 만 정의.
     """
-    # T-454 W03 에서 구현
-    raise NotImplementedError("W03 에서 구현")
+    retry_path = os.path.join(work_dir, "retry-context.json")
+
+    # 기존 파일 read (있으면)
+    existing: dict = {}
+    if os.path.isfile(retry_path):
+        try:
+            with open(retry_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+            if not isinstance(existing, dict):
+                existing = {}
+        except (OSError, json.JSONDecodeError):
+            existing = {}
+
+    # 본 티켓 3필드만 갱신, 나머지 보존
+    existing["last_failure_phase"] = "VALIDATE"
+    existing["last_failure_reason"] = failure_reason
+    existing["failed_work_steps"] = list(failed_steps)
+
+    # write
+    with open(retry_path, "w", encoding="utf-8") as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -546,7 +562,12 @@ def main(argv: list[str] | None = None) -> int:
 
     failed_str = ",".join(failed) if failed else "-"
     print(f"FAIL: {reason} (failed={failed_str})")
-    # W03 에서 _write_retry_context_on_fail 호출 추가 예정 (retry-context.json 부분 기록)
+    # retry-context.json 3필드 기록 (T-454 W03)
+    work_dir = os.path.join(".claude-organic", "runs", registry_key)
+    try:
+        _write_retry_context_on_fail(work_dir, reason, failed)
+    except OSError as exc:
+        print(f"[WARN] retry-context.json 기록 실패: {exc}", file=sys.stderr)
     return 1
 
 
