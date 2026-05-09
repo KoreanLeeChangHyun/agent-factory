@@ -335,7 +335,8 @@ def _update_step_durations() -> None:
 
                 if not isinstance(data, dict):
                     continue
-                if data.get("step") != "DONE":
+                # legacy status.json (pre-T-459) 호환 read fallback
+                if (data.get("workflow_phase") or data.get("step")) != "DONE":
                     continue
 
                 transitions = data.get("transitions", [])

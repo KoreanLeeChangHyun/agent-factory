@@ -658,15 +658,15 @@ def main() -> None:
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
     # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
-    # T-453: workflow_phase 신식 우선 → step 1주기 호환 → phase 더 구식 fallback
+    # T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
     _step1_skip: bool = False
     if abs_work_dir is not None:
         _status_data = load_json_file(os.path.join(abs_work_dir, "status.json"))
         if _status_data is not None:
             _current_step = (
                 _status_data.get("workflow_phase")
-                or _status_data.get("step")
-                or _status_data.get("phase")
+                or _status_data.get("step")   # legacy status.json (pre-T-459) 호환 read fallback
+                or _status_data.get("phase")  # legacy status.json (pre-T-453) 호환 read fallback
             )
             if _current_step == to_step:
                 print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
@@ -685,6 +685,7 @@ def main() -> None:
     _done_start_ms = int(_time_fin.time() * 1000)
     if _step1_skip:
         # 이미 DONE 상태(재진입) — update_state.py 호출 안 됨, 직접 emit 필요
+        # metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC)
         _safe_metrics_event(
             abs_work_dir,
             "step.start",
@@ -762,6 +763,7 @@ def main() -> None:
                 os.remove(_done_tmp)
             except Exception:
                 pass
+    # metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC)
     _safe_metrics_event(
         abs_work_dir,
         "step.end",

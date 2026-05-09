@@ -4,6 +4,8 @@
 
 ### 5단계 FSM
 
+> 이 5단계는 `kanban_status` 도메인이며 워크플로우 8상태(`workflow_phase`: NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL) 와 분리됨.
+
 ```
 To Do → Open → In Progress → Review → Done
 ```
@@ -61,10 +63,10 @@ flow-kanban create "제목" --command implement --status todo   # 기본·유일
   1. **재시도/실패 처리 의미론**: 실패 사유 피드백 루프 / 재시도 범위 / MAX 도달 시 후속 처리
   2. **컴포넌트 간 책임 중복**: 같은 일을 두 곳에서 하지 않는가 / 책임이 비어있는 영역은 없는가
   3. **기존 인프라와의 매핑**: 신설 vs 흡수 vs 폐지 결정점 / 기존 가드·캐논과의 충돌
-  4. **FSM 경계 명시**: 새 phase 가 기존 칸반 FSM 의 어느 단계 안에 있는지 / 회귀 가능성
+  4. **FSM 경계 명시**: 새 `workflow_phase` 가 기존 칸반 FSM(`kanban_status`) 의 어느 단계 안에 있는지 / 회귀 가능성
   5. **비용 vs 가치**: LLM 호출 추가 시 cost / skip 조건 정의 가능성
   6. **다른 모드와의 양립성**: 싱글/멀티/light/full 등 분기와 일관성
-  7. **명명 모호성**: VALIDATE vs verify, REPORT vs report 등 용어 중복으로 혼선 위험
+  7. **명명 모호성**: `phase_verify` (rule-based 단계 검증) vs `ticket_validate` (프롬프트 검수) 등 동음이의어 혼선 위험 — 동의어 페어마다 영어 식별자를 분리해 명명 사전(T-452 §4)에 박제
   - 7축으로 즉시 한 번 훑고 발견된 약점만 짚는다. 사용자가 명시 요청하지 않아도 짚는다 — grill-me 는 사용자가 더 잘 결정할 수 있도록 약점을 드러내는 게 본분.
   - 폐기 사례 (2026-05-09 사용자 명시 정정): 6-phase 워크플로우 설계 공유 받고 mermaid 시각화 + "메모리 등록? 티켓 생성?" 만 묻고 약점 분석 안 함 → 사용자가 "어때요?" 로 캐묻고 나서야 6개 약점 짚음.
 - `flow-kanban create` 호출 시 `--status todo` 명시 (MUST) — 생략 시 에러는 동일하나 기본은 항상 todo
@@ -108,14 +110,14 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 - flow-claude: start, end
 - flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env
 - flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
-- flow-step: start, end
-- flow-phase: (registryKey N)
+- flow-step: start, end  # `work_step` 단위 진입/종료 배너 (WORK 내부 태스크 경계)
+- flow-phase: (registryKey N)  # `workflow_phase` 전이 경계 배너 (INIT/PLAN/WORK/VALIDATE/REPORT)
 - flow-skillmap: (registryKey)
 - flow-init: (command title [--mode full] [--ticket T-NNN]) — 기존 위치 인자 [mode] [#N]도 하위호환 지원
 - flow-reload: (workDir)
 - flow-skill: archive|activate|list [skill_name]
-- flow-validate: (plan_path)
-- flow-validate-p: (prompt_file_path)
+- flow-validate: (plan_path)  # `ticket_validate` 후속 호출 — plan.md 산출물 검증 (`phase_verify`)
+- flow-validate-p: (prompt_file_path)  # `ticket_validate` 본체 — 티켓 XML prompt 필드 완성도 검수
 - flow-recommend: (task_description)
 - flow-gc: [project_root]
 - flow-history: sync [--dry-run] [--all], status, archive [registryKey]

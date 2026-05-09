@@ -260,12 +260,11 @@ def update_status(
                 f"WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}",
             )
         else:
-            # T-453: workflow_phase(신식) 우선, step(1주기 호환) → phase(구식) fallback.
-            # 후속 키 마이그레이션이 끝나면 step/phase fallback 은 T-459 에서 제거 예정.
+            # T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
             current_step = (
                 data.get("workflow_phase")
-                or data.get("step")
-                or data.get("phase", "NONE")
+                or data.get("step")          # legacy status.json (pre-T-459) 호환 read fallback
+                or data.get("phase", "NONE") # legacy status.json (pre-T-453) 호환 read fallback
             )
             workflow_mode = data.get("mode", "full").lower()
 
@@ -322,10 +321,8 @@ def update_status(
         kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
-        # T-453: workflow_phase(신식) + step(1주기 호환) 양쪽 동시 갱신.
-        # step 필드는 후속 키 마이그레이션 완료 후 T-459 에서 제거 예정.
+        # T-459: workflow_phase 단일 키 (step 1주기 호환 제거 완료).
         data["workflow_phase"] = to_step
-        data["step"] = to_step
         data["updated_at"] = now
 
         if "transitions" not in data:

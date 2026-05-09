@@ -87,3 +87,5 @@ flowchart TD
 ## 결론
 
 [종합 판단 및 권고]
+
+<!-- 본 보고서는 final_report (report.md) 형태이며 중간 artifact (work/WXX-*.md) 와 구분됨 -->

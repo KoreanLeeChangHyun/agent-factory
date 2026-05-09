@@ -55,6 +55,7 @@ flowchart TD
 **수행 내용**:
 - [내용 1]
 
+<!-- artifact (워크플로우 산출물) — final_report 와 구분 -->
 **산출물**:
 - `path/to/file` - [설명]
 
@@ -67,3 +68,5 @@ flowchart TD
 ## 비고 (선택)
 
 [특이사항, 향후 고려사항, 확장 방안 등]
+
+<!-- 본 보고서는 final_report (report.md) 형태이며 중간 artifact (work/WXX-*.md) 와 구분됨 -->

@@ -115,7 +115,7 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
             except Exception:
                 _duration_ms = None
 
-        # step.end{prev}
+        # step.end{prev} — metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC)
         _metrics_mod.append_event(  # type: ignore[attr-defined]
             abs_work_dir,
             "step.end",
@@ -133,6 +133,7 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
                 _fp.write(str(int(_time.time() * 1000)))
         except Exception:
             pass
+        # step.start{next} — metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC)
         _metrics_mod.append_event(  # type: ignore[attr-defined]
             abs_work_dir,
             "step.start",
@@ -146,15 +147,15 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
 def _read_current_step(status_file: str) -> str:
     """status.json에서 현재 step을 읽어 반환한다.
 
-    T-453: workflow_phase 신식 우선 → step 1주기 호환 → phase 더 구식 fallback.
+    T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
     state_machine.py:update_status() 의 read 패턴과 정합 유지.
     """
     _data = load_json_file(status_file) if os.path.isfile(status_file) else None
     if isinstance(_data, dict):
         return (
-            _data.get("workflow_phase")   # T-453 신식 (W04 마이그레이션)
-            or _data.get("step")          # 1주기 호환
-            or _data.get("phase", "NONE") # 더 구식 fallback
+            _data.get("workflow_phase")   # T-459 단일 키
+            or _data.get("step")          # legacy status.json (pre-T-459) 호환 read fallback
+            or _data.get("phase", "NONE") # legacy status.json (pre-T-453) 호환 read fallback
         )
     return "NONE"
 
