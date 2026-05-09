@@ -1877,13 +1877,13 @@
      * 허용 표:
      *   To Do  → To Do(reorder) | Open
      *   Open   → To Do | In Progress | Review | Done
-     *   Review → Done
+     *   Review → Done | Open
      * 그 외 조합은 dragover 단계에서 drop 거부 (브라우저 cursor 가 no-drop 표시).
      */
     function isValidDropTarget(fromCol, targetCol) {
       if (fromCol === "To Do") return targetCol === "To Do" || targetCol === "Open";
       if (fromCol === "Open") return targetCol === "To Do" || targetCol === "In Progress" || targetCol === "Review" || targetCol === "Done";
-      if (fromCol === "Review") return targetCol === "Done";
+      if (fromCol === "Review") return targetCol === "Done" || targetCol === "Open";
       return false;
     }
 
