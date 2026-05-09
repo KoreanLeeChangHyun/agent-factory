@@ -302,8 +302,10 @@
     Board.state.activeViewerTab = qsTicket;
     if (initSavedTabs.indexOf(qsTicket) === -1) initSavedTabs.push(qsTicket);
   } else if (qsTab === "metrics") {
-    // ?tab=metrics — Metrics 탭 직링크 진입 (W06)
-    Board.state.activeTab = "metrics";
+    // ?tab=metrics — Metrics 탭 폐지, Dashboard 로 redirect (T-461 Phase 3)
+    Board.state.activeTab = "dashboard";
+    var pathOnly = window.location.pathname;
+    history.replaceState(null, "", pathOnly);
   }
 
   // switchTab 전에 placeholder로 viewerTabs 복원 (saveUI 덮어쓰기 방지)
