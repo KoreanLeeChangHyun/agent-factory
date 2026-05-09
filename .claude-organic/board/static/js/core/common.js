@@ -693,7 +693,7 @@ Board.state.WORKFLOWS = [];
 Board.state.COLUMNS = COLUMNS;
 Board.state.viewerTabs = [];
 Board.state.activeViewerTab = savedState.activeViewerTab || null;
-Board.state.activeTab = savedState.tab || "dashboard";
+Board.state.activeTab = (savedState.tab === "metrics" ? "dashboard" : (savedState.tab || "dashboard"));
 Board.state.tabHistory = migrateTabHistory(savedState.tabHistory || []);
 Board.state.forwardHistory = migrateTabHistory(savedState.forwardHistory || []);
 Board.state.codeViewerStore = {};
@@ -825,7 +825,6 @@ function switchTab(target, skipPush) {
   views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
   if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
   if (target === "memory" && Board.render.renderMemory) Board.render.renderMemory();
-  if (target === "metrics" && Board.render.renderMetrics) Board.render.renderMetrics();
   saveUI();
   if (Board.util.updateQueryString) Board.util.updateQueryString();
 }
@@ -844,9 +843,6 @@ function updateQueryString() {
   if (Board.state.activeTab === "viewer" && Board.state.activeViewerTab) {
     params.set("tab", "viewer");
     params.set("ticket", Board.state.activeViewerTab);
-  } else if (Board.state.activeTab === "metrics") {
-    params.set("tab", "metrics");
-    params.delete("ticket");
   } else {
     params.delete("tab");
     params.delete("ticket");
