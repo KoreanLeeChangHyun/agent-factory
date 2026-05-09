@@ -417,15 +417,16 @@
   }
 
   /**
-   * 미커밋 인디케이터 클릭 시 워크트리 자동 commit 트리거.
-   * @param {HTMLElement} badge - .card-uncommitted-badge 요소
+   * T-457 (Layer 3): 4행 commit 버튼 클릭 시 워크트리 자동 commit 트리거.
+   * 기존 handleUncommittedBadgeClick 의 fetch 로직을 그대로 유지하고,
+   * DOM 조작 대상만 1행 badge → 4행 button 으로 이전.
+   * @param {HTMLButtonElement} btn - .card-commit-action 요소
    */
-  function handleUncommittedBadgeClick(badge) {
-    var ticket = badge.dataset.uncommittedTicket;
-    if (!ticket || badge.classList.contains("is-commiting")) return;
-    badge.classList.add("is-commiting");
-    var origText = badge.textContent;
-    badge.textContent = "...";
+  function handleCommitButtonClick(btn) {
+    var ticket = btn.dataset.commitTicket;
+    if (!ticket || btn.classList.contains("is-commiting")) return;
+    btn.classList.add("is-commiting");
+    btn.disabled = true;
     fetch("/api/kanban/worktree-commit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -436,18 +437,18 @@
       });
     }).then(function (r) {
       if (r.ok && r.data && r.data.ok) {
-        // 성공 — 카드 갱신 (인디케이터 사라짐 기대)
+        // 성공 — 카드 갱신 (commit 버튼 + 1행 badge 둘 다 사라짐 기대)
         if (_worktreeUncommittedMap) _worktreeUncommittedMap.delete(ticket);
         Board.render.renderKanban();
       } else {
         var msg = (r.data && r.data.error) || "commit 실패";
-        badge.textContent = origText;
-        badge.classList.remove("is-commiting");
+        btn.classList.remove("is-commiting");
+        btn.disabled = false;
         alert(ticket + " commit 실패: " + msg);
       }
     }).catch(function (err) {
-      badge.textContent = origText;
-      badge.classList.remove("is-commiting");
+      btn.classList.remove("is-commiting");
+      btn.disabled = false;
       alert(ticket + " commit 요청 실패: " + (err && err.message ? err.message : err));
     });
   }
@@ -465,6 +466,24 @@
     var label = item.uncommitted_count + "M";
     var tooltip = "미커밋 " + item.uncommitted_count + "건 — 클릭하면 자동 commit"; // "미커밋 N건 — 클릭하면 자동 commit"
     return '<span class="card-uncommitted-badge" data-uncommitted-ticket="' + esc(ticketNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
+  }
+
+  /**
+   * T-457 (Layer 3): 카드 1행 우측 failure tag 렌더 헬퍼.
+   * ticket.failure schema (T-NNN-D 도입 예정): { reason, phase, retry_count, context }
+   * 가드: ticket / ticket.failure 가 falsy 면 빈 문자열 반환 (자연스럽게 비표시).
+   * read-only — pointer-events:none (CSS), 클릭 트리거 없음.
+   * 색상은 placeholder neutral (사용자 결정 대기 — 결정 후 1줄 패치 예정).
+   * @param {object} ticket - 카드 티켓 객체
+   * @returns {string} span.card-failure-tag HTML 또는 빈 문자열
+   */
+  function renderFailureTag(ticket) {
+    if (!ticket || !ticket.failure) return "";
+    var reason = ticket.failure.reason || "워크플로우 실패";
+    var phase = ticket.failure.phase || "";
+    var label = "FAIL";
+    var tooltip = phase ? (phase + " 단계 실패 — " + reason) : reason;
+    return '<span class="card-failure-tag" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
@@ -2259,6 +2278,8 @@
               h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
             }
             h += renderUncommittedBadge(t.number);
+            // T-457 (Layer 3): failure tag (ticket.failure 존재 시) — 가드는 헬퍼 내부
+            h += renderFailureTag(t);
             // T-441: Done 카드 verdict 배지 (advisory)
             if (col.key === "Done") {
               h += renderDoneVerdictBadge(t.number);
@@ -2276,6 +2297,22 @@
             h += '</div>';
             // 4행: Action 버튼 (없어도 자리 보존, 카드 높이 일정 유지)
             h += '<div class="card-actions-row">';
+            // T-457 (Layer 3): 미커밋 워크트리 commit 액션 버튼 — 어느 컬럼이든 미커밋 있으면 표시.
+            // flex-end + 좌→우 추가 순서로 commit 이 왼쪽, done 이 가장 우측에 위치.
+            if (_worktreeUncommittedMap) {
+              var uitem = _worktreeUncommittedMap.get(t.number);
+              if (uitem && uitem.uncommitted_count > 0) {
+                var ctip = "미커밋 " + uitem.uncommitted_count + "건 — 클릭하면 자동 commit";
+                h += '<button class="card-commit-action" data-commit-ticket="' + esc(t.number) + '" title="' + esc(ctip) + '" draggable="false">';
+                // SVG (자체 그림 — 외부 라이브러리 금지 룰): commit graph dot 모티프 (원 + 위/아래 짧은 선)
+                h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+                h += '<circle cx="7" cy="7" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none"/>';
+                h += '<line x1="7" y1="0.5" x2="7" y2="4.0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+                h += '<line x1="7" y1="10.0" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+                h += '</svg>';
+                h += '</button>';
+              }
+            }
             if (col.key === "Review") {
               h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="완료 처리" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
@@ -2304,11 +2341,12 @@
     // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
       card.addEventListener("click", function (e) {
-        // 우상단 미커밋 인디케이터 클릭은 카드 viewer 가 아닌 commit 액션으로 위임
-        var badge = e.target.closest(".card-uncommitted-badge");
-        if (badge) {
+        // T-457 (Layer 3): 4행 commit 버튼 클릭 → 워크트리 자동 commit 액션 위임.
+        // (1행 .card-uncommitted-badge 는 read-only 표시 라벨로 변경됨 — 클릭 트리거 없음)
+        var commitBtn = e.target.closest(".card-commit-action");
+        if (commitBtn) {
           e.stopPropagation();
-          handleUncommittedBadgeClick(badge);
+          handleCommitButtonClick(commitBtn);
           return;
         }
         // T-439: Review 카드 우하단 완료 액션 버튼 클릭 → handleReviewDoneAction 위임
