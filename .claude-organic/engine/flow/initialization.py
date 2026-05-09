@@ -614,6 +614,51 @@ def _find_latest_session_id() -> str:
         return ""
 
 
+def _phase_verify_init(
+    abs_work_dir: str,
+    registry_key: str,
+    ticket_number: str | None = None,
+) -> tuple[bool, str]:
+    """INIT phase outcome-based verification — self-reference removed (T-453 / T-452 §10.5).
+
+    Checks 3 axes:
+        1. .context.json exists (abs_work_dir/.context.json)
+        2. runs/<registry_key>/ directory exists
+        3. ticket XML is parseable (.claude-organic/tickets/{open|progress|review|done}/T-NNN.xml)
+           Axis 3 is skipped when ticket_number is None.
+
+    Returns:
+        (ok, reason) — (True, "ok") when all pass; (False, "<reason>") on first failure.
+
+    Non-blocking: callers MUST log WARN and continue without halting the workflow on failure.
+    (T-411 deprecation canon — zero forced auto-revert policy.)
+    """
+    import xml.etree.ElementTree as _ET
+
+    # Axis 1: .context.json existence
+    context_path = os.path.join(abs_work_dir, ".context.json")
+    if not os.path.isfile(context_path):
+        return False, f".context.json missing: {context_path}"
+
+    # Axis 2: runs/<registry_key>/ directory existence
+    runs_dir = os.path.join(_PROJECT_ROOT, ".claude-organic", "runs", registry_key)
+    if not os.path.isdir(runs_dir):
+        return False, f"runs dir missing: {runs_dir}"
+
+    # Axis 3: ticket XML parseable (only when ticket_number provided)
+    if ticket_number:
+        kanban_dir = Path(_PROJECT_ROOT) / ".claude-organic" / "tickets"
+        ticket_path = _find_ticket_file(kanban_dir, ticket_number)
+        if ticket_path is None:
+            return False, f"ticket XML not found for {ticket_number}"
+        try:
+            _ET.parse(str(ticket_path))
+        except _ET.ParseError as e:
+            return False, f"ticket XML parse error: {e}"
+
+    return True, "ok"
+
+
 def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
     """status.json을 작업 디렉터리에 작성한다.
 
@@ -628,6 +673,8 @@ def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
     if not claude_sid:
         claude_sid = _find_latest_session_id()
     status_data: dict[str, Any] = {
+        # T-453: workflow_phase 신식 + step 1주기 호환 (T-459 에서 step 제거)
+        "workflow_phase": "NONE",
         "step": "NONE",
         "mode": mode,
         "session_id": str(uuid.uuid4())[:8],

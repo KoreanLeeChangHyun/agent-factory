@@ -14,6 +14,8 @@
     KEEP_COUNT: .workflow/ 디렉터리 유지 최대 갯수 (환경변수 CLAUDE_WORKFLOW_KEEP_COUNT로 오버라이드 가능)
     CHAIN_SEPARATOR: 체인 command 구분자 (">" 문자)
     CHAIN_MAX_RETRY: 체인 스테이지 실패 시 최대 재시도 횟수 (환경변수 CLAUDE_CHAIN_MAX_RETRY로 오버라이드 가능)
+
+T-453: multi 키 8상태 추가 (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED 별칭).
 """
 
 from __future__ import annotations
@@ -126,6 +128,7 @@ STEP_COLORS = {
     "INIT": C_RED,
     "PLAN": C_BLUE,
     "WORK": C_GREEN,
+    "VALIDATE": C_CYAN,  # T-453: multi 모드 8상태 — WORK→REPORT 사이 검증 단계 (STRATEGY 와 색상 공유, 컨텍스트 분리)
     "REPORT": C_PURPLE,
     "STRATEGY": C_CYAN,
     "DONE": C_YELLOW,
@@ -163,7 +166,17 @@ STATUS_FILENAME = "status.json"
 CONTEXT_FILENAME = ".context.json"
 STOP_BLOCK_COUNTER_FILENAME = ".stop-block-counter"
 BYPASS_FILENAME = "bypass"
+# T-453: multi 키 8상태 추가 (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED 별칭).
+# `full` / `light` 키는 보존 (회귀 0). `multi` 는 멀티 에이전트 전용 — VALIDATE 단계 신설.
 FSM_TRANSITIONS = {
+    "multi": {
+        "NONE": ["INIT", "STALE", "FAILED", "CANCELLED"],
+        "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
+        "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
+        "WORK": ["VALIDATE", "STALE", "FAILED", "CANCELLED"],
+        "VALIDATE": ["REPORT", "WORK", "STALE", "FAILED", "CANCELLED"],
+        "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
+    },
     "full": {
         "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
         "NONE": ["PLAN", "STALE", "FAILED", "CANCELLED"],
@@ -303,6 +316,7 @@ STEP_STATUS_MAP = {
     "REPORT": "진행",
     "STALE": "중단",
     "WORK": "진행",
+    "VALIDATE": "진행",  # T-453: multi 모드 8상태
     "STRATEGY": "진행",
     "PLAN": "진행",
     "INIT": "진행",
