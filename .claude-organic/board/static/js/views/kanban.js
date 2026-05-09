@@ -41,13 +41,79 @@
     } catch (e) {}
   }
 
+  // ── To Do Manual Order ──
+  // To Do 컬럼은 사용자 수동 정렬 (DnD 위치 변경) 지원. 신규 티켓은 항상 최상단 prepend.
+  // 다른 브라우저/기기에서는 동기화되지 않음 (localStorage 한정).
+  const TODO_MANUAL_ORDER_LS_KEY = "kanban_todo_manual_order_v1";
+
+  function loadTodoManualOrder() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(TODO_MANUAL_ORDER_LS_KEY));
+      if (Array.isArray(stored)) return stored;
+    } catch (e) {}
+    return [];
+  }
+
+  function saveTodoManualOrder(order) {
+    try {
+      localStorage.setItem(TODO_MANUAL_ORDER_LS_KEY, JSON.stringify(order));
+    } catch (e) {}
+  }
+
+  /**
+   * 수동 정렬 적용:
+   * - 저장 순서 안의 티켓 = 그 순서대로
+   * - 저장 순서에 없는 티켓 (신규) = 최상단 prepend, 번호 desc 순
+   * - 결과 순서를 다시 저장 (신규 항목이 manual order 에 자동 등록되며 stale 정리)
+   */
+  function applyTodoManualOrder(items) {
+    const stored = loadTodoManualOrder();
+    const indexMap = new Map();
+    stored.forEach(function (num, idx) { indexMap.set(num, idx); });
+
+    const known = [];
+    const unknown = [];
+    items.forEach(function (t) {
+      if (indexMap.has(t.number)) known.push(t);
+      else unknown.push(t);
+    });
+
+    known.sort(function (a, b) {
+      return indexMap.get(a.number) - indexMap.get(b.number);
+    });
+    unknown.sort(function (a, b) {
+      return (b.number || "").localeCompare(a.number || "");
+    });
+
+    const result = unknown.concat(known);
+    const newOrder = result.map(function (t) { return t.number; });
+    const changed = (newOrder.length !== stored.length)
+      || newOrder.some(function (n, i) { return n !== stored[i]; });
+    if (changed) saveTodoManualOrder(newOrder);
+    return result;
+  }
+
+  /** 특정 티켓을 manual order 의 targetIndex 위치로 이동. */
+  function reorderTodoManualOrder(ticketNum, targetIndex) {
+    const stored = loadTodoManualOrder();
+    const filtered = stored.filter(function (n) { return n !== ticketNum; });
+    const clamped = Math.max(0, Math.min(targetIndex, filtered.length));
+    filtered.splice(clamped, 0, ticketNum);
+    saveTodoManualOrder(filtered);
+  }
+
   // ── Kanban Sort State ──
 
   /** Loads persisted kanban sort state from localStorage. */
   function loadKanbanSort() {
     const defaults = {};
     COLUMNS.forEach(function (col) {
-      defaults[col.key] = { key: "number", dir: "asc" };
+      // To Do 는 수동 정렬이 기본값. 나머지는 번호 오름차순.
+      if (col.key === "To Do") {
+        defaults[col.key] = { key: "manual", dir: "asc" };
+      } else {
+        defaults[col.key] = { key: "number", dir: "asc" };
+      }
     });
     try {
       const stored = JSON.parse(localStorage.getItem(KANBAN_SORT_LS_KEY));
@@ -1798,10 +1864,40 @@
         el.querySelectorAll(".cards-droppable.dragover-active").forEach(function (z) {
           z.classList.remove("dragover-active");
         });
+        el.querySelectorAll(".card-drop-indicator").forEach(function (ind) {
+          ind.remove();
+        });
         draggedNum = null;
         draggedFrom = null;
       });
     });
+
+    /**
+     * To Do 수동 정렬 모드의 같은 컬럼 reorder dragover 시 삽입 위치 인디케이터 배치.
+     * Y 좌표 기준 target index 계산 후 zone 내부에 indicator element 를 insert/move.
+     */
+    function placeDropIndicator(zone, clientY) {
+      const cards = Array.from(zone.querySelectorAll('.card[data-num]'))
+        .filter(function (c) { return c.dataset.num !== draggedNum; });
+      let targetIdx = cards.length;
+      for (let i = 0; i < cards.length; i++) {
+        const rect = cards[i].getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) {
+          targetIdx = i;
+          break;
+        }
+      }
+      let indicator = zone.querySelector('.card-drop-indicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'card-drop-indicator';
+      }
+      if (targetIdx >= cards.length) {
+        zone.appendChild(indicator);
+      } else if (cards[targetIdx].previousSibling !== indicator) {
+        zone.insertBefore(indicator, cards[targetIdx]);
+      }
+    }
 
     el.querySelectorAll(".cards-droppable").forEach(function (zone) {
       zone.addEventListener("dragover", function (e) {
@@ -1809,16 +1905,43 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         zone.classList.add("dragover-active");
+        // To Do 수동 정렬 + 같은 컬럼 drag — 삽입 위치 인디케이터 표시
+        if (zone.dataset.colKey === "To Do" && draggedFrom === "To Do"
+            && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
+          placeDropIndicator(zone, e.clientY);
+        }
       });
       zone.addEventListener("dragleave", function (e) {
-        if (e.target === zone) zone.classList.remove("dragover-active");
+        // 진짜로 zone 밖으로 나갈 때만 정리 (자식 element 진입은 무시)
+        if (!e.relatedTarget || !zone.contains(e.relatedTarget)) {
+          zone.classList.remove("dragover-active");
+          const ind = zone.querySelector('.card-drop-indicator');
+          if (ind) ind.remove();
+        }
       });
       zone.addEventListener("drop", function (e) {
         e.preventDefault();
         zone.classList.remove("dragover-active");
         const targetCol = zone.dataset.colKey;
         if (!draggedNum || !targetCol) return;
-        if (targetCol === draggedFrom) return; // 같은 컬럼 내 drop 은 무시 (정렬 미지원)
+        // 같은 컬럼 내 drop: To Do 수동 정렬 모드만 지원, 나머지는 무시
+        if (targetCol === draggedFrom) {
+          if (targetCol === "To Do" && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
+            const cards = Array.from(zone.querySelectorAll('.card[data-num]'))
+              .filter(function (c) { return c.dataset.num !== draggedNum; });
+            let targetIdx = cards.length;
+            for (let i = 0; i < cards.length; i++) {
+              const rect = cards[i].getBoundingClientRect();
+              if (e.clientY < rect.top + rect.height / 2) {
+                targetIdx = i;
+                break;
+              }
+            }
+            reorderTodoManualOrder(draggedNum, targetIdx);
+            renderKanban();
+          }
+          return;
+        }
 
         // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
         // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
@@ -1998,6 +2121,11 @@
   /** Renders the kanban board with columns, cards, and sort controls. */
   function renderKanban() {
     const el = document.getElementById("view-kanban");
+    // 컬럼별 스크롤 위치 캡처 — innerHTML 교체로 잃어버리는 scrollTop 복원용
+    const scrollPositions = {};
+    el.querySelectorAll(".cards[data-col-key]").forEach(function (cards) {
+      scrollPositions[cards.dataset.colKey] = cards.scrollTop;
+    });
     let h = '<div class="kanban-board">';
     COLUMNS.forEach(function (col) {
       const items = Board.state.TICKETS.filter(function (t) {
@@ -2006,12 +2134,19 @@
         return t.status === col.key;
       });
       const colSort = kanbanSort[col.key] || { key: "number", dir: "asc" };
-      const sortedItems = sortTickets(items, colSort.key, colSort.dir);
+      const isManualTodo = (col.key === "To Do" && colSort.key === "manual");
+      const sortedItems = isManualTodo
+        ? applyTodoManualOrder(items)
+        : sortTickets(items, colSort.key, colSort.dir);
       const sortIcon = colSort.dir === "desc" ? SVG_DESC : SVG_ASC;
 
       // Build dropdown options HTML
+      // To Do 컬럼은 "수동" 옵션을 맨 앞에 추가 (수동이 기본 정렬)
       let dropHtml = '<div class="col-sort-dropdown" data-col="' + esc(col.key) + '">';
-      SORT_KEYS.forEach(function (opt) {
+      const sortKeysForCol = (col.key === "To Do")
+        ? [{ key: "manual", label: "수동" }].concat(SORT_KEYS)
+        : SORT_KEYS;
+      sortKeysForCol.forEach(function (opt) {
         const isActive = (opt.key === colSort.key) ? " active" : "";
         dropHtml += '<button class="col-sort-option' + isActive + '"'
           + ' data-col="' + esc(col.key) + '"'
@@ -2103,25 +2238,23 @@
             }
             h += "</div>";
             h += "</div>";
-            // 중단: 제목 (2줄 clamp)
+            // 2행: 제목 (2줄 clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 하단: 왼쪽(체인/관계) + 우측(Review 카드만 완료 액션 아이콘)
-            h += '<div class="card-bottom">';
-            h += '<div class="card-bottom-left">';
+            // 3행: 관계 & 종속 (없어도 자리 보존)
+            h += '<div class="card-relations-row">';
             const hasRelations = t.relations && t.relations.length > 0;
             if (hasRelations) {
               h += renderRelations(t);
             }
             h += '</div>';
-            // T-439: Review 카드만 우하단 완료 액션 아이콘 노출
+            // 4행: Action 버튼 (없어도 자리 보존, 카드 높이 일정 유지)
+            h += '<div class="card-actions-row">';
             if (col.key === "Review") {
-              h += '<div class="card-bottom-right">';
               h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="완료 처리" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<polyline points="2,7 5.5,10.5 12,3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
               h += '</svg>';
               h += '</button>';
-              h += '</div>';
             }
             h += "</div>";
             h += "</div>";
@@ -2134,6 +2267,12 @@
     });
     h += "</div>";
     el.innerHTML = h;
+
+    // 캡처된 컬럼별 scrollTop 복원
+    Object.keys(scrollPositions).forEach(function (colKey) {
+      const cards = el.querySelector('.cards[data-col-key="' + colKey + '"]');
+      if (cards) cards.scrollTop = scrollPositions[colKey];
+    });
 
     // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {

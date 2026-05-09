@@ -149,8 +149,8 @@
 .card {
   display: flex;
   flex-direction: column;
-  height: 95px;
-  min-height: 95px;
+  height: 105px;
+  min-height: 105px;
   flex-shrink: 0;
   overflow: hidden;
   padding: 10px 12px;
@@ -192,24 +192,22 @@
   overflow: hidden;
 }
 
-.card-bottom {
+/* 3행: 관계 & 종속 (없어도 min-height 로 자리 보존) */
+.card-relations-row {
   flex-shrink: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-
-.card-bottom-left {
-  flex-shrink: 0;
-}
-
-/* T-439: Review 카드 우하단 완료 액션 영역 */
-.card-bottom-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  min-height: 14px;
+}
+
+/* 4행: Action 버튼 (없어도 min-height 로 자리 보존, 카드 높이 일정 유지) */
+.card-actions-row {
   flex-shrink: 0;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 22px;
 }
 
 .card-done-action {
@@ -430,6 +428,14 @@
 
 .card-dragging {
   opacity: 0.4;
+}
+
+/* To Do 수동 정렬 reorder 시 삽입 위치 인디케이터 (테라코타 점선) */
+.card-drop-indicator {
+  height: 0;
+  margin: 2px 0;
+  border-top: 2px dashed #D97757;
+  pointer-events: none;
 }
 
 .cards-droppable.dragover-active {
