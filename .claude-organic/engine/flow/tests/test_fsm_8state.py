@@ -44,7 +44,7 @@ def _make_status_dir() -> str:
 # =============================================================================
 
 class TestWorkflowPhaseReadWrite(unittest.TestCase):
-    """Axis 1: status.json must carry both workflow_phase and step after write;
+    """Axis 1: status.json write uses workflow_phase as single key (T-459);
     read fallback priority: workflow_phase > step > phase > 'NONE'."""
 
     def setUp(self) -> None:
@@ -64,15 +64,16 @@ class TestWorkflowPhaseReadWrite(unittest.TestCase):
         })
         update_status(self.workdir, self.status_file, initial_phase, to_step)
 
-    def test_write_creates_both_keys(self) -> None:
-        """After update_status, status.json must have both workflow_phase and step."""
+    def test_write_creates_workflow_phase_key(self) -> None:
+        """After update_status, status.json must have workflow_phase as single key (T-459).
+        step key is no longer written by update_status (1-cycle compat removed)."""
         self._write_and_transition("PLAN", "WORK", mode="multi")
         with open(self.status_file, encoding="utf-8") as f:
             data = json.load(f)
         self.assertIn("workflow_phase", data, "workflow_phase key must exist after write")
-        self.assertIn("step", data, "step key must exist after write (1-cycle compat)")
         self.assertEqual(data["workflow_phase"], "WORK")
-        self.assertEqual(data["step"], "WORK")
+        # T-459: step write removed. Legacy step key may remain from prior status.json
+        # (read fallback still supports step for pre-T-459 files — see test_read_fallback_step_when_no_workflow_phase)
 
     def test_read_fallback_workflow_phase_priority(self) -> None:
         """workflow_phase takes priority over step when both present."""
