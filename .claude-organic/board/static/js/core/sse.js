@@ -220,6 +220,18 @@
       }
     });
 
+    // T-475 Stage 3: launch 비동기화 — LAUNCH_PENDING/STARTED/FAILED 디스패치
+    // 백엔드 _emit_launch_event 가 sse_manager.broadcast('launch', data={event:..., ticket:..., ...}) 로 발화.
+    // kanban 모듈의 handleLaunchEvent 가 launchState 머신을 조작 (addEventListener 중복 금지 §2.4).
+    es.addEventListener("launch", function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        if (Board.kanban && Board.kanban.handleLaunchEvent) {
+          Board.kanban.handleLaunchEvent(d);
+        }
+      } catch (_) { /* malformed payload — silently skip */ }
+    });
+
     es.onerror = function () {
       sseConnected = false;
       es.close(); // Explicitly close to prevent auto-reconnect
@@ -324,6 +336,12 @@
   });
   switchTab(Board.state.activeTab);
   document.body.style.opacity = "";
+
+  // T-475 Stage 3: launch starting 상태 sessionStorage 복원 (fetchTickets 응답 전 호출하여
+  // 첫 renderKanban 시점에 pulse 배지가 즉시 노출되도록 함). grace 잔여 시간 재계산 + 타이머 재시작.
+  if (Board.kanban && Board.kanban.restoreLaunchStateFromStorage) {
+    Board.kanban.restoreLaunchStateFromStorage();
+  }
 
   Board.fetch.fetchTickets().then(function (tickets) {
     Board.state.TICKETS = tickets;

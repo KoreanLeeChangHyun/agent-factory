@@ -7,6 +7,8 @@ import os
 import re
 import sys
 import subprocess
+import threading
+from datetime import datetime, timezone
 
 from ._helpers import _TICKET_RE, _KANBAN_ALL_DIRS
 from ._kanban_done_helpers import (
@@ -14,6 +16,170 @@ from ._kanban_done_helpers import (
     handle_kanban_done_review,
     check_derived_blocked,
 )
+from .._common import logger
+from ..state import sse_manager
+
+
+# ---------------------------------------------------------------------------
+# T-475: launch 비동기화 헬퍼 (Stage 1)
+# ---------------------------------------------------------------------------
+
+# T-475: reader thread 핸들 보관 — daemon thread GC 누수 차단용 약한 참조 set.
+# Popen.communicate 종료 시 thread 자체가 finally 에서 자기 자신을 제거한다.
+_LAUNCH_READER_THREADS: set[threading.Thread] = set()
+_LAUNCH_READER_LOCK: threading.Lock = threading.Lock()
+
+
+def _classify_failure_reason(returncode: int, stderr: str) -> str:
+    """flow-launcher 비정상 종료 사유를 stderr·returncode 패턴으로 분류한다.
+
+    T-450 보고서 §5 reason enum:
+      - to_do_status:        launcher 측 사전 검증 거부 (티켓이 To Do 상태)
+      - http_post_timeout:   H4 urllib timeout=10s (T-904 cleanup 발동)
+      - http_post_error:     H4 urllib 일반 에러 (URLError 등)
+      - workflow_start_error: WorkflowHandler 측 spawn 실패
+      - unknown:             그 외 (returncode=0 인데 LAUNCH:/INLINE: 둘 다 아닌 경우 포함)
+    """
+    if returncode == 0:
+        return 'unknown'
+    err = stderr or ''
+    if 'To Do' in err:
+        return 'to_do_status'
+    if 'urllib timed out' in err or 'timed out' in err:
+        return 'http_post_timeout'
+    if 'urllib' in err:
+        return 'http_post_error'
+    if 'workflow start' in err:
+        return 'workflow_start_error'
+    return 'unknown'
+
+
+def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
+    """LAUNCH_* 이벤트를 SSE broadcast + workflow.log 동시 기록한다.
+
+    SSE event_type='launch' 단일 채널 재사용 (보고서 §5 — 신규 채널 신설 X).
+    payload 의 'event' 필드로 PENDING/STARTED/FAILED 분기 식별.
+
+    Args:
+        event:  'LAUNCH_PENDING' | 'LAUNCH_STARTED' | 'LAUNCH_FAILED'
+        ticket: T-NNN
+        **kwargs: 추가 payload 필드 (command, mode, reason, error_message,
+                  latency_ms, submitted_at, session_id, returncode, elapsed_ms 등)
+    """
+    ts = datetime.now(timezone.utc).isoformat()
+    payload: dict[str, object] = {'event': event, 'ts': ts, 'ticket': ticket}
+    payload.update(kwargs)
+
+    try:
+        sse_manager.broadcast('launch', data=payload)
+    except Exception as exc:  # broadcast 실패가 reader thread 자체를 죽이지 않도록 격리
+        logger.error('launch SSE broadcast failed: event=%s ticket=%s exc=%r',
+                     event, ticket, exc)
+
+    # workflow.log 와 동등한 라인 기록 (T-476 분석 트랙의 단일 진실 공급원).
+    # 별도 파일 신설 X — logger.info 가 board 서버 stderr/log 로 흐른다.
+    try:
+        extra_kv = ' '.join(
+            f'{k}={v!r}' for k, v in kwargs.items()
+            if k not in ('error_message',)  # error_message 는 길이 클 수 있어 별도 라인
+        )
+        logger.info('LAUNCH_EVENT %s ticket=%s %s', event, ticket, extra_kv)
+        if 'error_message' in kwargs and kwargs['error_message']:
+            logger.info('LAUNCH_EVENT %s ticket=%s error_message=%s',
+                        event, ticket, str(kwargs['error_message'])[:500])
+    except Exception:  # 로깅 실패도 무시
+        pass
+
+
+def _launch_reader_loop(
+    proc: subprocess.Popen,
+    ticket: str,
+    command: str,
+    submitted_at: datetime,
+) -> None:
+    """flow-launcher Popen 의 stdout/stderr 를 회수하고 LAUNCH_STARTED/FAILED 를 emit 한다.
+
+    proc.communicate() 로 종료까지 무한 대기. timeout 책임은 launcher 측
+    H4 urllib timeout=10s + T-904 cleanup 단일 진실 공급원에 위임 (보고서 §6).
+
+    finally 블록에서 thread 핸들 set 자체 제거 (GC 누수 차단).
+    """
+    self_thread = threading.current_thread()
+    try:
+        try:
+            stdout, stderr = proc.communicate(timeout=None)
+        except Exception as exc:  # Popen 자체 실패 (드물지만 방어)
+            elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='reader_loop_exception',
+                returncode=None,
+                error_message=repr(exc),
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+            return
+
+        elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+        rc = proc.returncode
+        first_line = ((stdout or '').split('\n', 1)[0]).strip() if stdout else ''
+
+        if rc == 0 and first_line.startswith('LAUNCH:'):
+            tail = first_line[len('LAUNCH:'):].strip()
+            session_id = tail.split()[0] if tail else ''
+            _emit_launch_event(
+                'LAUNCH_STARTED', ticket,
+                session_id=session_id,
+                mode='launched',
+                spawn_duration_ms=elapsed_ms,
+                command=command,
+            )
+        elif rc == 0 and first_line.startswith('INLINE:'):
+            tail = first_line[len('INLINE:'):].strip()
+            _emit_launch_event(
+                'LAUNCH_STARTED', ticket,
+                session_id='',
+                mode='inline',
+                spawn_duration_ms=elapsed_ms,
+                command=command,
+                message=tail,
+            )
+        elif rc == 0:
+            # returncode=0 인데 stdout 패턴이 LAUNCH:/INLINE: 둘 다 아님 — unknown 분류
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='unknown',
+                returncode=0,
+                error_message=(first_line or 'no stdout')[:500],
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+        else:
+            reason = _classify_failure_reason(rc, stderr or '')
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason=reason,
+                returncode=rc,
+                error_message=((stderr or stdout or '').strip())[:500],
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+    except Exception as exc:  # reader 루프 자체 예외 (방어)
+        try:
+            elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='reader_loop_exception',
+                error_message=repr(exc),
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+        except Exception:
+            pass
+    finally:
+        # GC 누수 차단 — 자신을 핸들 set 에서 제거
+        with _LAUNCH_READER_LOCK:
+            _LAUNCH_READER_THREADS.discard(self_thread)
 
 # T-433: backend 코드 변경으로 간주할 glob 패턴 — 매칭 시 needs_restart=true
 # board/server/** + .claude-organic/board/server/** + .claude-organic/engine/** 셋 모두 backend 도메인
@@ -295,7 +461,15 @@ class KanbanHandlerMixin:
         self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
 
     def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 위임, LAUNCH:/INLINE: 파싱."""
+        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 비동기 spawn (T-475 Stage 1).
+
+        T-475 Stage 1 변경:
+          - 동기 ``subprocess.run(timeout=60)`` 제거 → ``Popen`` + reader thread 분리.
+          - 즉시 200 OK ``{ok:True, status:'starting'}`` 반환 (latency p95 < 100ms 목표).
+          - launch 결과는 LAUNCH_PENDING/STARTED/FAILED SSE 이벤트로 비동기 통지.
+          - timeout 단일 진실 공급원 = launcher 측 H4 urllib timeout=10s + T-904 cleanup.
+            본 핸들러 측 timeout 인자 제거 (bridge commit 76907ff 자연 폐기).
+        """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
         command = (data.get('command') or '').strip()
@@ -309,34 +483,52 @@ class KanbanHandlerMixin:
 
         project_root = os.getcwd()
         flow_launcher = os.path.join(project_root, '.claude-organic', 'bin', 'flow-launcher')
+
+        submitted_at = datetime.now(timezone.utc)
+
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 [flow_launcher, 'launch', ticket, command],
-                cwd=project_root, capture_output=True, text=True, timeout=60,
+                cwd=project_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
-        except subprocess.TimeoutExpired:
-            self._send_error(504, 'flow-launcher launch timed out')
-            return
         except FileNotFoundError:
+            # Popen 실패는 spawn 자체 실패 — 비동기 채널 없이 즉시 5xx 반환.
             self._send_error(500, f'flow-launcher not found: {flow_launcher}')
             return
-
-        if result.returncode != 0:
-            self._send_error(400, f'flow-launcher launch failed: {(result.stderr or result.stdout or "").strip()}')
+        except OSError as exc:
+            self._send_error(500, f'flow-launcher Popen failed: {exc!r}')
             return
 
-        stdout = result.stdout.strip()
-        first_line = stdout.split('\n', 1)[0].strip() if stdout else ''
-        if first_line.startswith('LAUNCH:'):
-            tail = first_line[len('LAUNCH:'):].strip()
-            payload = {'ok': True, 'mode': 'launched', 'ticket': ticket,
-                       'session_id': tail.split()[0] if tail else '', 'message': first_line}
-        elif first_line.startswith('INLINE:'):
-            payload = {'ok': True, 'mode': 'inline', 'ticket': ticket, 'message': first_line}
-        else:
-            payload = {'ok': True, 'mode': 'unknown', 'ticket': ticket,
-                       'message': first_line or 'no stdout'}
-        self._send_json(payload)
+        # LAUNCH_PENDING — Popen 직후, HTTP 200 응답 직전.
+        _emit_launch_event(
+            'LAUNCH_PENDING', ticket,
+            command=command,
+            submitted_at=submitted_at.isoformat(),
+        )
+
+        # reader thread spawn — Popen.communicate 무한 대기 후 LAUNCH_STARTED/FAILED emit.
+        reader = threading.Thread(
+            target=_launch_reader_loop,
+            args=(proc, ticket, command, submitted_at),
+            name=f'launch-reader-{ticket}',
+            daemon=True,
+        )
+        with _LAUNCH_READER_LOCK:
+            _LAUNCH_READER_THREADS.add(reader)
+        reader.start()
+
+        # 즉시 200 OK — 클라이언트는 'starting' 상태로 진입, 후속 SSE 대기.
+        # 기존 응답 키 (ok, ticket, command) 유지 + status='starting' 추가 (Stage 3 클라이언트 분기용).
+        self._send_json({
+            'ok': True,
+            'status': 'starting',
+            'ticket': ticket,
+            'command': command,
+            'submitted_at': submitted_at.isoformat(),
+        })
 
     def _handle_kanban_done(self) -> None:
         """POST /api/kanban/done — {"ticket","force","force_dirty"}.

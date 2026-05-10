@@ -17,6 +17,24 @@
   // ── Relations Display ──
   const MAX_VISIBLE_RELATIONS = 5;
 
+  // ── T-475 Stage 3: launch 비동기화 — 클라이언트 상태 머신 ──
+  // idle → submitting → starting → running (LAUNCH_STARTED 수신) | failed (LAUNCH_FAILED / 사용자 선택)
+  //
+  // 사용 흐름:
+  //   1. submit 핸들러: HTTP 200 OK ({status:'starting'}) 응답 직후 launchState 등록 + grace 타이머 시작.
+  //   2. SSE 'launch' 이벤트(handleLaunchEvent): LAUNCH_STARTED → launchState 제거 + 배지 제거,
+  //      LAUNCH_FAILED → launchState 제거 + 실패 모달.
+  //   3. grace 60s 만료(onGraceExpired): 사용자 선택 모달만 표시 — 자동 강제 전이 0건 (constraints 준수).
+  //
+  // 새로고침 복원: sessionStorage('Board.launchState.<ticket>') 에 starting state 저장 →
+  // 페이지 로드 후 restoreLaunchStateFromStorage() 호출로 grace 잔여 시간 재계산하여 타이머 재시작.
+  //
+  // SSE 컨벤션 (my-board-sse-convention §2.4): handleLaunchEvent 는 sse.js 가 단일 listener 로 호출 —
+  // Board.kanban 네임스페이스 노출 (addEventListener 중복 등록 방지).
+  const LAUNCH_GRACE_MS = 60000;             // 60s grace
+  const LAUNCH_STORAGE_PREFIX = "Board.launchState.";
+  const launchState = new Map();              // ticketNum → {state, since, command, sessionId, graceTimer}
+
   // ── Column Collapsed State (Done / To Do) ──
   // 컬럼 키별로 접힘 상태를 독립 저장한다. "Done"은 기존 키를 유지해 사용자 설정
   // 호환성을 보장하고, 그 외 컬럼(현재 "To Do")은 column-collapsed:<key> 형식.
@@ -2446,22 +2464,49 @@
             ticketObj,
             function () {
               // [실행] 콜백: POST /api/kanban/submit → launcher 호출
+              // T-475 Stage 3: 백엔드가 비동기 Popen 으로 즉시 200 OK + {status:'starting'} 응답 →
+              // launchState 등록 + grace 60s 타이머 시작. 실패 모달 트리거 조건 정정 (보고서 §5):
+              //   1) HTTP 4xx/5xx (504 제외) → 모달
+              //   2) HTTP 504 → 미표시 (SSE LAUNCH_FAILED 수신 대기)
+              //   3) network/AbortError → 모달
+              const submitTicket = ticketObj.number;
+              const submitCommand = command;
               fetch("/api/kanban/submit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: ticketObj.number, command: command }),
+                body: JSON.stringify({ ticket: submitTicket, command: submitCommand }),
               }).then(function (res) {
                 if (!res.ok) {
                   return res.json().then(function (j) {
-                    throw new Error(j.error || res.statusText);
+                    throw { kind: "http", status: res.status, body: j };
+                  }, function () {
+                    throw { kind: "http", status: res.status, body: null };
                   });
                 }
                 return res.json();
-              }).then(function () {
+              }).then(function (body) {
+                if (body && body.status === "starting") {
+                  registerLaunchStarting(submitTicket, submitCommand);
+                }
                 fetchTickets().then(function () { renderKanban(); });
               }).catch(function (err) {
                 console.error("[kanban DnD] submit failed:", err);
-                Board.util.showInfoModal("워크플로우 실행 실패", "워크플로우 실행 실패: " + err.message, { severity: "error", onClose: function () { renderKanban(); } });
+                if (err && err.kind === "http") {
+                  // T-475 Stage 3 정정: HTTP 504 단독은 모달 미표시 (SSE LAUNCH_FAILED 대기).
+                  // 본 비동기화 후 504 자체가 사실상 사라지지만, 방어적으로 분기 보존.
+                  if (err.status === 504) {
+                    renderKanban();
+                  } else {
+                    Board.util.showInfoModal("워크플로우 실행 거부",
+                      formatHttpRejectMessage(err.status, err.body),
+                      { severity: "error", onClose: function () { renderKanban(); } });
+                  }
+                } else {
+                  // network / abort / 기타 — 사용자에게 즉시 알림
+                  Board.util.showInfoModal("워크플로우 실행 실패",
+                    "네트워크 오류: " + ((err && err.message) || String(err)),
+                    { severity: "error", onClose: function () { renderKanban(); } });
+                }
               });
             },
             function () {
@@ -2718,6 +2763,8 @@
             h += renderUncommittedBadge(t.number);
             // T-457 (Layer 3): failure tag (ticket.failure 존재 시) — 가드는 헬퍼 내부
             h += renderFailureTag(t);
+            // T-475 Stage 3: launch starting pulse 배지 (submit 직후 ~ LAUNCH_STARTED 수신 전)
+            h += renderLaunchBadge(t.number);
             // T-441: Done 카드 verdict 배지 (advisory)
             if (col.key === "Done") {
               h += renderDoneVerdictBadge(t.number);
@@ -2972,6 +3019,213 @@
     fetchAndApplyActiveBranch();
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // T-475 Stage 3 헬퍼 — launch 비동기화 클라이언트 상태 머신
+  // ──────────────────────────────────────────────────────────────────────
+
+  /**
+   * starting 상태 카드 1행 우측 pulse 배지 HTML.
+   * launchState 에 등록된 ticket 만 'starting' 인 동안 노출.
+   */
+  function renderLaunchBadge(ticketNum) {
+    const cur = launchState.get(ticketNum);
+    if (!cur || cur.state !== "starting") return "";
+    return '<span class="card-launch-badge" title="워크플로우 시작 중…">시작 중</span>';
+  }
+
+  /**
+   * submit HTTP 200 OK ({status:'starting'}) 직후 호출 — launchState 등록 + grace 타이머 시작 +
+   * sessionStorage persist (페이지 새로고침 복원용).
+   */
+  function registerLaunchStarting(ticketNum, command) {
+    // 기존 항목 정리 (재발사 방어)
+    const prev = launchState.get(ticketNum);
+    if (prev && prev.graceTimer) clearTimeout(prev.graceTimer);
+    const since = Date.now();
+    const entry = {
+      state: "starting",
+      since: since,
+      command: command,
+      sessionId: null,
+      graceTimer: setTimeout(function () { onGraceExpired(ticketNum); }, LAUNCH_GRACE_MS),
+    };
+    launchState.set(ticketNum, entry);
+    try {
+      sessionStorage.setItem(
+        LAUNCH_STORAGE_PREFIX + ticketNum,
+        JSON.stringify({ state: "starting", since: since, command: command })
+      );
+    } catch (_) { /* quota / disabled — 동작에는 무영향 */ }
+  }
+
+  /**
+   * SSE 'launch' 이벤트 핸들러 — sse.js 가 단일 진입점으로 호출 (addEventListener 중복 금지).
+   *   data.event ∈ {LAUNCH_PENDING, LAUNCH_STARTED, LAUNCH_FAILED}
+   * LAUNCH_PENDING 은 본 클라이언트가 submit 직후 자체 등록하므로 처리 불필요 (다른 클라 모니터링용).
+   */
+  function handleLaunchEvent(data) {
+    if (!data || !data.ticket) return;
+    const ticketNum = data.ticket;
+    const cur = launchState.get(ticketNum);
+    // 본 클라이언트가 submit 한 카드만 처리 — 다른 탭/브라우저의 submit 은 fetchTickets 로 자연 동기화
+    if (!cur) return;
+
+    if (data.event === "LAUNCH_STARTED") {
+      if (cur.graceTimer) clearTimeout(cur.graceTimer);
+      launchState.set(ticketNum, {
+        state: "running",
+        since: cur.since,
+        command: cur.command,
+        sessionId: data.session_id || "",
+        graceTimer: null,
+      });
+      // running 으로 전이된 직후에는 배지 제거가 목적이므로 즉시 launchState 정리해도 무방.
+      // 단, 디버그/후속 SSE 가능성을 위해 잠시 보존 후 정리 (다음 renderKanban 호출 시 사라짐).
+      launchState.delete(ticketNum);
+      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
+      // 배지 제거 + In Progress 컬럼 정상 표시
+      if (Board.render.renderKanban) Board.render.renderKanban();
+    } else if (data.event === "LAUNCH_FAILED") {
+      if (cur.graceTimer) clearTimeout(cur.graceTimer);
+      launchState.delete(ticketNum);
+      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
+      Board.util.showInfoModal(
+        "워크플로우 실행 실패",
+        formatLaunchFailReason(data.reason, data.error_message),
+        {
+          severity: "error",
+          onClose: function () {
+            if (Board.fetch.fetchTickets && Board.render.renderKanban) {
+              Board.fetch.fetchTickets().then(function () { Board.render.renderKanban(); });
+            }
+          },
+        }
+      );
+    }
+    // LAUNCH_PENDING / 기타 event 는 무시
+  }
+
+  /**
+   * grace 60s 만료 — 자동 강제 전이 X (constraints "자동 강제 정책 금지" / feedback_no_speculative_guards).
+   * 사용자에게 정보 모달만 띄우고, 후속 행동은 사용자 선택. 카드 상태(launchState)는 보존하여
+   * 사용자가 닫은 후에도 SSE 수신 시 정상 처리되도록 한다.
+   */
+  function onGraceExpired(ticketNum) {
+    const cur = launchState.get(ticketNum);
+    if (!cur || cur.state !== "starting") return;
+    Board.util.showInfoModal(
+      "워크플로우 시작 지연",
+      "60초가 경과했지만 워크플로우 시작 신호(LAUNCH_STARTED)가 도착하지 않았습니다.\n\n" +
+      "Board 새로고침 또는 잠시 후 칸반 컬럼에서 상태를 직접 확인하세요. " +
+      "워크플로우가 정상 시작되었다면 In Progress 컬럼에 카드가 보입니다.",
+      { severity: "warning" }
+    );
+  }
+
+  /**
+   * reason enum → 사용자 친화 한국어 메시지.
+   * 백엔드(_classify_failure_reason)와 enum 동기화: to_do_status / http_post_timeout /
+   * http_post_error / workflow_start_error / reader_loop_exception / unknown.
+   */
+  function formatLaunchFailReason(reason, errorMessage) {
+    var label;
+    switch (reason) {
+      case "to_do_status":
+        label = "티켓이 To Do 상태입니다. 먼저 Open 으로 이동한 뒤 다시 시도하세요.";
+        break;
+      case "http_post_timeout":
+        label = "Board 서버가 워크플로우 시작 요청에 응답하지 않았습니다. 서버 상태를 확인하세요.";
+        break;
+      case "http_post_error":
+        label = "Board 서버 통신 중 네트워크 오류가 발생했습니다.";
+        break;
+      case "workflow_start_error":
+        label = "워크플로우 spawn 단계에서 실패했습니다. 워크트리/git 상태를 확인하세요.";
+        break;
+      case "reader_loop_exception":
+        label = "워크플로우 시작 모니터 자체에서 예외가 발생했습니다. Board 서버 로그를 확인하세요.";
+        break;
+      default:
+        label = "알 수 없는 사유로 워크플로우 시작에 실패했습니다.";
+        break;
+    }
+    var detail = (errorMessage || "").toString().trim();
+    if (detail.length > 0) {
+      // 너무 길면 일부 잘라 사용자 모달 가독성 보호 (전체는 board 서버 로그)
+      if (detail.length > 400) detail = detail.slice(0, 400) + "…";
+      return label + "\n\n[상세]\n" + detail;
+    }
+    return label;
+  }
+
+  /**
+   * HTTP 4xx/5xx (504 제외) 응답에 대한 사용자 메시지.
+   * body.error 가 있으면 우선 사용, 없으면 status 만 표기.
+   */
+  function formatHttpRejectMessage(status, body) {
+    var detail = "";
+    if (body && typeof body === "object") {
+      if (body.error) detail = String(body.error);
+      else if (body.message) detail = String(body.message);
+    }
+    var prefix = "HTTP " + status + " — Board 서버가 워크플로우 실행을 거부했습니다.";
+    return detail ? prefix + "\n\n[상세]\n" + detail : prefix;
+  }
+
+  /**
+   * 페이지 로드 직후 sessionStorage 에서 starting 상태 복원.
+   * grace 잔여 시간 재계산 (now - since 기준), 만료 즉시면 onGraceExpired 호출.
+   * Board init 흐름(sse.js)에서 단 1회 호출.
+   */
+  function restoreLaunchStateFromStorage() {
+    var keys = [];
+    try {
+      for (var i = 0; i < sessionStorage.length; i++) {
+        var k = sessionStorage.key(i);
+        if (k && k.indexOf(LAUNCH_STORAGE_PREFIX) === 0) keys.push(k);
+      }
+    } catch (_) { return; }
+
+    keys.forEach(function (key) {
+      var raw;
+      try { raw = sessionStorage.getItem(key); } catch (_) { return; }
+      if (!raw) return;
+      var stored;
+      try { stored = JSON.parse(raw); } catch (_) {
+        try { sessionStorage.removeItem(key); } catch (_) {}
+        return;
+      }
+      if (!stored || stored.state !== "starting") {
+        try { sessionStorage.removeItem(key); } catch (_) {}
+        return;
+      }
+      var ticketNum = key.slice(LAUNCH_STORAGE_PREFIX.length);
+      var since = stored.since || Date.now();
+      var elapsed = Date.now() - since;
+      var remaining = LAUNCH_GRACE_MS - elapsed;
+      if (remaining <= 0) {
+        // 이미 grace 초과 — 등록만 하고 즉시 onGraceExpired
+        launchState.set(ticketNum, {
+          state: "starting",
+          since: since,
+          command: stored.command || "",
+          sessionId: null,
+          graceTimer: null,
+        });
+        // 다음 tick 에 호출하여 모달이 init 흐름을 차단하지 않도록 함
+        setTimeout(function () { onGraceExpired(ticketNum); }, 0);
+      } else {
+        launchState.set(ticketNum, {
+          state: "starting",
+          since: since,
+          command: stored.command || "",
+          sessionId: null,
+          graceTimer: setTimeout(function () { onGraceExpired(ticketNum); }, remaining),
+        });
+      }
+    });
+  }
+
   // ── Register on Board namespace ──
   Board.fetch.fetchTickets = fetchTickets;
   Board.fetch.fetchTicketsByFiles = fetchTicketsByFiles;
@@ -2979,6 +3233,12 @@
   // T-433 Phase 2: SSE git_branch 이벤트 listener 가 호출하는 동기화 entry-point.
   // (sse.js 가 단일 listener — addEventListener 중복 등록 방지 §2.4)
   Board.render.syncActiveBranchFromSSE = syncActiveBranchFromSSE;
+
+  // T-475 Stage 3: SSE 'launch' 이벤트 디스패치 + 페이지 로드 시 복원 entry-point.
+  // (sse.js 단일 listener 가 Board.kanban.handleLaunchEvent 호출 — addEventListener 중복 금지)
+  Board.kanban = Board.kanban || {};
+  Board.kanban.handleLaunchEvent = handleLaunchEvent;
+  Board.kanban.restoreLaunchStateFromStorage = restoreLaunchStateFromStorage;
 
   // T-473: Bind relations popover delegated events once at module init time.
   // bindRelationsPopoverEvents() is idempotent (_relPopoverBound guard),
