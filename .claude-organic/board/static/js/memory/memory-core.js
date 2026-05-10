@@ -647,9 +647,7 @@
     "feedback",
     "project",
     "reference",
-    "archive/merged",
-    "archive/synthesized",
-    "archive/stale",
+    "archive",
   ];
   var MEMORY_CATEGORY_LABELS = {
     "flat": "Uncategorized",
@@ -657,9 +655,7 @@
     "feedback": "Feedback",
     "project": "Project",
     "reference": "Reference",
-    "archive/merged": "Archive · Merged",
-    "archive/synthesized": "Archive · Synthesized",
-    "archive/stale": "Archive · Stale",
+    "archive": "Archive",
   };
 
   function _basename(p) {
@@ -700,6 +696,8 @@
       var f = files[i];
       if (f.isIndex) { indexFile = f; continue; }
       var cat = f.category || "flat";
+      // archive/merged, archive/synthesized, archive/stale → 단일 "archive" 버킷으로 통합
+      if (cat.indexOf("archive/") === 0) cat = "archive";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(f);
     }
@@ -730,6 +728,18 @@
     for (var j = 0; j < items.length; j++) {
       items[j].addEventListener("click", M.onMemoryFileItemClick);
       items[j].addEventListener("dragstart", M.onMemoryFileItemDragStart);
+    }
+
+    // archive 헤더 클릭 → 접힘/펼침 토글
+    var archiveHeader = list.querySelector(".memory-cat-group.is-archive .memory-cat-header");
+    if (archiveHeader) {
+      archiveHeader.addEventListener("click", function() {
+        if (Board.state.contexts && Board.state.contexts.memory) {
+          Board.state.contexts.memory.archiveCollapsed = !Board.state.contexts.memory.archiveCollapsed;
+          Board.util.saveUI();
+          M.renderMemorySidebar();
+        }
+      });
     }
   };
 
@@ -763,11 +773,30 @@
   };
   Board.fetch.parseMemoryFrontmatter = M.parseMemoryFrontmatter;
 
+  // caret SVG: 오른쪽 방향(collapsed) / 아래 방향(expanded)
+  var _CARET_SVG_RIGHT = '<svg class="memory-cat-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  var _CARET_SVG_DOWN  = '<svg class="memory-cat-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
   function _renderMemoryCategoryGroup(cat, catFiles) {
     var label = MEMORY_CATEGORY_LABELS[cat] || cat;
     var inner = "";
     for (var k = 0; k < catFiles.length; k++) {
       inner += _renderMemoryItem(catFiles[k]);
+    }
+    if (cat === "archive") {
+      var collapsed = !!(Board.state.contexts && Board.state.contexts.memory && Board.state.contexts.memory.archiveCollapsed);
+      var groupClass = "memory-cat-group is-archive" + (collapsed ? " collapsed" : "");
+      var caret = collapsed ? _CARET_SVG_RIGHT : _CARET_SVG_DOWN;
+      return (
+        '<div class="' + groupClass + '" data-category="archive">' +
+          '<div class="memory-cat-header">' +
+            caret +
+            '<span class="memory-cat-label">' + esc(label) + '</span>' +
+            '<span class="memory-cat-count">' + catFiles.length + '</span>' +
+          '</div>' +
+          inner +
+        '</div>'
+      );
     }
     return (
       '<div class="memory-cat-group" data-category="' + esc(cat) + '">' +

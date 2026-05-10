@@ -759,6 +759,9 @@ Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "obje
   }
   var memorySub = _sub(rawCx.memory);
   memorySub.gcExpanded = !!(rawCx.memory && rawCx.memory.gcExpanded);
+  memorySub.archiveCollapsed = (rawCx.memory && rawCx.memory.archiveCollapsed != null)
+    ? !!rawCx.memory.archiveCollapsed
+    : true;
   Board.state.contexts = {
     subTab: sub,
     memory: memorySub,
