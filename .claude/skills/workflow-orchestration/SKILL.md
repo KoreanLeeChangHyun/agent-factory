@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestration
-description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> REPORT -> DONE 4-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management."
+description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> VALIDATE -> REPORT -> DONE 5-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
@@ -38,7 +38,7 @@ stateDiagram-v2
 
 | Step Order | Agent Sequence |
 |-------------|----------------|
-| PLAN -> WORK -> REPORT -> DONE | planner -> worker(s)/explorer(s) -> validator -> reporter |
+| PLAN -> WORK -> VALIDATE -> REPORT -> DONE | planner -> worker(s)/explorer(s) -> validator -> reporter |
 
 1. Step order MUST NOT be violated
 2. PLAN 완료 후 스킬 매핑 검증 통과 시 WORK 즉시 진행
@@ -495,5 +495,5 @@ LLM 이 1회 read 로 어느 wrapper 가 차단하고 어느 wrapper 가 advisor
 ## Notes
 
 1. On /wf command, orchestrator parses command directly, runs flow-init for INIT (single-step `cd "$(flow-init ... | tail -1)"`), then proceeds to PLAN Step
-2. Step order (PLAN -> WORK -> REPORT -> DONE) strictly enforced; WORK cannot ask questions (clarification in PLAN only)
+2. Step order (PLAN -> WORK -> VALIDATE -> REPORT -> DONE) strictly enforced; WORK cannot ask questions (clarification in PLAN only)
 3. Git commits via `/git:commit` separately; Slack failure does not block workflow
