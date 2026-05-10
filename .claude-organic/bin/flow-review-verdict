@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# flow-review-verdict - T-463 Review 단계 1차 룰베이스 자동 검증 진입점
+# 사용법: flow-review-verdict <registryKey> [--workdir PATH] [--project-root PATH]
+# 출력: VerdictResult JSON (stdout)
+# 종료 코드: 항상 0 (advisory only)
+ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
+  || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+exec python3 "$ROOT/.claude-organic/engine/flow/review_verdict.py" "$@"
