@@ -588,3 +588,116 @@ class KanbanHandlerMixin:
                 'parents': parent_shas,
             },
         })
+
+    def _handle_kanban_review_verdict(self) -> None:
+        """GET /api/kanban/review-verdict?ticket=T-NNN -- Review 카드 룰베이스 advisory verdict.
+
+        T-463: finalization.py W04 hook 이 생성한 review-verdict.json 을 읽어
+        verdict (PASS / WARN / FAIL / SKIP / UNKNOWN) 를 반환한다.
+
+        advisory only -- kanban move / status 전이 / 자동 회귀 없음.
+        (feedback_no_speculative_guards 캐논 / T-411 commit 0c970fa 폐기 사례)
+        """
+        import json as _json
+        import xml.etree.ElementTree as ET
+        from urllib.parse import urlparse, parse_qs
+        from pathlib import Path
+
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        ticket = (qs.get('ticket', [None])[0] or '').strip()
+
+        if not ticket:
+            self._send_error(400, 'ticket parameter required')
+            return
+        if not _TICKET_RE.match(ticket):
+            self._send_error(400, 'invalid ticket format')
+            return
+
+        project_root = os.getcwd()
+        tickets_base = os.path.join(project_root, '.claude-organic', 'tickets')
+
+        # 1. review/<ticket>.xml 또는 done/<ticket>.xml 탐색
+        ticket_xml_path: str | None = None
+        review_xml = os.path.join(tickets_base, 'review', f'{ticket}.xml')
+        done_xml = os.path.join(tickets_base, 'done', f'{ticket}.xml')
+
+        if os.path.isfile(review_xml):
+            ticket_xml_path = review_xml
+        elif os.path.isfile(done_xml):
+            ticket_xml_path = done_xml
+        else:
+            # todo / open / progress 컬럼 -- Review/Done 이외 -> SKIP
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'SKIP',
+                'reason': 'not_review',
+                'details': {'message': f'{ticket} 은 Review/Done 컬럼에 없습니다'},
+                'violations': [],
+            })
+            return
+
+        # 2. XML 파싱 -> registrykey 추출
+        registry_key: str | None = None
+        try:
+            tree = ET.parse(ticket_xml_path)
+            root = tree.getroot()
+            rk_el = root.find('.//result/registrykey')
+            if rk_el is not None and rk_el.text:
+                registry_key = rk_el.text.strip() or None
+        except Exception:
+            registry_key = None
+
+        if not registry_key:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'no_registry_key',
+                'details': {'message': 'registrykey 정보 없음 (워크플로우 인프라 도입 이전 티켓일 수 있음)'},
+                'violations': [],
+            })
+            return
+
+        # 3. review-verdict.json 읽기
+        # runs/<registry_key> 또는 runs/.history/<registry_key> 탐색
+        runs_base = os.path.join(project_root, '.claude-organic', 'runs')
+        verdict_path: Path | None = None
+        for candidate in (
+            Path(runs_base) / registry_key / 'review-verdict.json',
+            Path(runs_base) / '.history' / registry_key / 'review-verdict.json',
+        ):
+            if candidate.is_file():
+                verdict_path = candidate
+                break
+
+        if verdict_path is None:
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'no_verdict_meta',
+                'details': {
+                    'message': f'review-verdict.json 없음 (registry_key={registry_key})',
+                    'registry_key': registry_key,
+                },
+                'violations': [],
+            })
+            return
+
+        try:
+            verdict_dict = _json.loads(verdict_path.read_text(encoding='utf-8'))
+        except (ValueError, OSError):
+            self._send_json({
+                'ticket': ticket,
+                'verdict': 'UNKNOWN',
+                'reason': 'invalid_verdict_json',
+                'details': {
+                    'message': 'review-verdict.json 파싱 실패',
+                    'registry_key': registry_key,
+                },
+                'violations': [],
+            })
+            return
+
+        # 4. ticket 필드 주입 후 반환
+        verdict_dict['ticket'] = ticket
+        self._send_json(verdict_dict)
