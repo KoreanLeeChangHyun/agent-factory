@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 import sys
@@ -13,6 +14,20 @@ from ._kanban_done_helpers import (
     handle_kanban_done_review,
     check_derived_blocked,
 )
+
+# T-433: backend 코드 변경으로 간주할 glob 패턴 — 매칭 시 needs_restart=true
+# board/server/** + .claude-organic/board/server/** + .claude-organic/engine/** 셋 모두 backend 도메인
+_BACKEND_GLOB_PATTERNS = (
+    'board/server/*',
+    'board/server/**',
+    '.claude-organic/board/server/*',
+    '.claude-organic/board/server/**',
+    '.claude-organic/engine/*',
+    '.claude-organic/engine/**',
+)
+
+# T-433: feature 브랜치 패턴 (feat/T-NNN-*)
+_FEAT_BRANCH_RE = re.compile(r'^feat/(T-\d+)-')
 
 
 class KanbanHandlerMixin:
@@ -30,6 +45,214 @@ class KanbanHandlerMixin:
             return [line[3:].split(' -> ')[-1].strip() for line in r.stdout.splitlines()]
         except Exception:
             return []
+
+    # ------------------------------------------------------------------
+    # T-433: 브랜치 토글 API helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_feat_branch(self, ticket: str, project_root: str) -> str | None:
+        """티켓 번호로 정확한 feat/T-NNN-* 브랜치명을 조회한다.
+
+        ``git worktree list --porcelain`` 출력을 파싱하여 ``refs/heads/feat/T-NNN-*``
+        형태에서 ``feat/T-NNN-*`` 부분만 추출. 워크트리 등록되지 않은 경우 None.
+        """
+        try:
+            r = subprocess.run(
+                ['git', 'worktree', 'list', '--porcelain'],
+                cwd=project_root, capture_output=True, text=True, timeout=10,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+        if r.returncode != 0:
+            return None
+
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if not line.startswith('branch '):
+                continue
+            ref = line[len('branch '):].strip()
+            if ref.startswith('refs/heads/'):
+                ref = ref[len('refs/heads/'):]
+            m = _FEAT_BRANCH_RE.match(ref)
+            if m and m.group(1) == ticket:
+                return ref
+        return None
+
+    def _get_current_branch(self, project_root: str) -> str | None:
+        """메인 working tree 의 현재 HEAD 브랜치명 반환. 실패 시 None."""
+        try:
+            r = subprocess.run(
+                ['git', 'branch', '--show-current'],
+                cwd=project_root, capture_output=True, text=True, timeout=10,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+        if r.returncode != 0:
+            return None
+        return r.stdout.strip() or None
+
+    def _detect_backend_changes(self, branch: str, project_root: str) -> bool:
+        """`git diff --name-only develop..<branch>` 결과에서 backend glob 매칭 여부 반환.
+
+        매칭되면 True (needs_restart=true), 미매칭이면 False.
+        diff 호출 자체가 실패하면 보수적으로 False (UI 측에서 강제 재시작 모달 띄우지 않음).
+        """
+        try:
+            r = subprocess.run(
+                ['git', 'diff', '--name-only', f'develop..{branch}'],
+                cwd=project_root, capture_output=True, text=True, timeout=10,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+        if r.returncode != 0:
+            return False
+        for path in r.stdout.splitlines():
+            path = path.strip()
+            if not path:
+                continue
+            for pat in _BACKEND_GLOB_PATTERNS:
+                if fnmatch.fnmatch(path, pat):
+                    return True
+        return False
+
+    def _git_switch(self, branch: str, project_root: str) -> tuple[bool, str]:
+        """메인 working tree 에서 ``git switch <branch>`` 실행. (ok, stderr_or_msg)."""
+        try:
+            r = subprocess.run(
+                ['git', 'switch', branch],
+                cwd=project_root, capture_output=True, text=True, timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            return False, 'git switch timed out'
+        except FileNotFoundError:
+            return False, 'git not found'
+        if r.returncode != 0:
+            return False, (r.stderr or r.stdout or 'git switch failed').strip()
+        return True, (r.stdout or '').strip()
+
+    def _handle_kanban_branch_toggle(self) -> None:
+        """POST /api/kanban/branch/toggle — Review 카드 feature 브랜치 활성/해제.
+
+        요청: ``{"ticket_number": "T-NNN", "action": "on"|"off"}``
+
+        on:
+          - 메인 working tree dirty 검증 (git status --porcelain) → dirty 면 거부
+          - feat/T-NNN-* 브랜치 매칭 (git worktree list --porcelain)
+          - 메인 working tree 에서 ``git switch <feat 브랜치>``
+          - backend 변경 자동 감지 (git diff develop..feat/T-NNN-* 결과 glob 매칭)
+
+        off:
+          - 메인 working tree dirty 검증 동일
+          - ``git switch develop``
+
+        제약:
+          - 자동 stash / 자동 commit / 자동 reset 절대 금지 (사용자 수동 수습 안내만)
+          - feedback_no_speculative_guards 캐논 준수
+        """
+        data = self._read_json_body() or {}
+        ticket = (data.get('ticket_number') or '').strip()
+        action = (data.get('action') or '').strip().lower()
+
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket_number" (T-NNN required)')
+            return
+        if action not in ('on', 'off'):
+            self._send_error(400, 'Invalid "action" (must be "on" or "off")')
+            return
+
+        project_root = os.getcwd()
+
+        # dirty 검증 — 메인 working tree 기준
+        dirty = self._get_dirty_files(project_root)
+        if dirty:
+            self._send_json({
+                'ok': False,
+                'reason': 'dirty',
+                'files': dirty,
+                'modal_message': (
+                    f'메인 working tree 에 미커밋 변경이 있습니다 ({len(dirty)}개 파일). '
+                    f'브랜치 토글은 자동 stash/commit/reset 을 수행하지 않습니다. '
+                    f'수동으로 commit / stash / reset 후 다시 시도하세요.'
+                ),
+                'ticket': ticket,
+                'action': action,
+            })
+            return
+
+        if action == 'off':
+            ok, msg = self._git_switch('develop', project_root)
+            if not ok:
+                self._send_json({
+                    'ok': False,
+                    'reason': 'git_switch_failed',
+                    'message': msg,
+                    'ticket': ticket,
+                    'action': action,
+                })
+                return
+            self._send_json({
+                'ok': True,
+                'branch': 'develop',
+                'needs_restart': False,
+                'active_ticket': None,
+            })
+            return
+
+        # action == 'on'
+        feat_branch = self._resolve_feat_branch(ticket, project_root)
+        if not feat_branch:
+            self._send_json({
+                'ok': False,
+                'reason': 'feature_branch_not_found',
+                'message': (
+                    f'{ticket} 의 feature 브랜치 (feat/{ticket}-*) 를 찾을 수 없습니다. '
+                    f'워크트리가 등록되어 있는지 확인하세요 (git worktree list).'
+                ),
+                'ticket': ticket,
+                'action': action,
+            })
+            return
+
+        ok, msg = self._git_switch(feat_branch, project_root)
+        if not ok:
+            self._send_json({
+                'ok': False,
+                'reason': 'git_switch_failed',
+                'message': msg,
+                'ticket': ticket,
+                'action': action,
+                'branch': feat_branch,
+            })
+            return
+
+        needs_restart = self._detect_backend_changes(feat_branch, project_root)
+        self._send_json({
+            'ok': True,
+            'branch': feat_branch,
+            'needs_restart': needs_restart,
+            'active_ticket': ticket,
+        })
+
+    def _handle_kanban_branch_active(self) -> None:
+        """GET /api/kanban/branch/active — 현재 메인 working tree HEAD 브랜치 + active_ticket 반환.
+
+        응답: ``{"branch": "feat/T-NNN-...", "active_ticket": "T-NNN"}`` 또는
+              ``{"branch": "develop", "active_ticket": null}``
+
+        frontend 가 페이지 로드 시 active 카드 시각 복원에 사용.
+        """
+        project_root = os.getcwd()
+        branch = self._get_current_branch(project_root)
+        if not branch:
+            self._send_json({'branch': None, 'active_ticket': None})
+            return
+
+        m = _FEAT_BRANCH_RE.match(branch)
+        active_ticket = m.group(1) if m else None
+        self._send_json({
+            'branch': branch,
+            'active_ticket': active_ticket,
+        })
 
     def _check_derived_blocked(self, ticket: str, kanban_base: str) -> list[str]:
         """derived-from 파생 티켓 중 Done 이외 상태인 것 반환 (위임)."""

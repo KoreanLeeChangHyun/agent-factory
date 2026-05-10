@@ -215,6 +215,132 @@
   // "pending" 값 = 조회 중. undefined = 미조회.
   var _doneVerdictMap = {};
 
+  // ── Active Branch Ticket (T-433 Phase 2) ──
+  // 메인 working tree 가 현재 활성화한 feature 브랜치의 ticket 번호 (예: "T-433"). null = develop.
+  // SSOT: backend GET /api/kanban/branch/active 또는 SSE git_branch 이벤트에서 derive.
+  // 한 카드만 active 보장: render 시 모든 Review 카드를 비교해 매칭만 .active 부여.
+  var _activeBranchTicket = null;
+  // 첫 1회 fetch 완료 가드 — 페이지 로드 시 1회 GET 으로 초기 시각 복원.
+  var _activeBranchFetched = false;
+  // T-NNN 추출 정규식 — feat/T-NNN-* 패턴 매칭.
+  var _FEAT_BRANCH_RE = /^feat\/(T-\d+)/;
+
+  /**
+   * 페이지 로드 시 1회 호출되어 _activeBranchTicket 을 초기화한다.
+   * 응답 도착 시 카드 시각만 .active 토글 (전체 re-render 회피 — DOM 직접 패치).
+   */
+  function fetchAndApplyActiveBranch() {
+    if (_activeBranchFetched) return;
+    _activeBranchFetched = true;
+    fetch("/api/kanban/branch/active", { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    }).then(function (data) {
+      var ticket = (data && data.active_ticket) || null;
+      _activeBranchTicket = ticket;
+      applyActiveBranchClassToCards();
+    }).catch(function () {
+      // backend not ready — _activeBranchTicket 은 null 유지 (시각 OFF)
+    });
+  }
+
+  /**
+   * 현재 _activeBranchTicket 값에 맞춰 모든 Review 카드의 .has-active-branch /
+   * 토글 버튼 .active 클래스를 동기화 한다 (전체 re-render 없이 DOM 직접 패치).
+   * - SSE git_branch 이벤트 도착 후 호출
+   * - 토글 클릭 optimistic update 직후 호출
+   */
+  function applyActiveBranchClassToCards() {
+    var cards = document.querySelectorAll('.card[data-col-key="Review"]');
+    cards.forEach(function (card) {
+      var num = card.dataset.num;
+      var btn = card.querySelector(".card-branch-toggle");
+      var isActive = (num && _activeBranchTicket === num);
+      if (isActive) {
+        card.classList.add("has-active-branch");
+        if (btn) btn.classList.add("active");
+      } else {
+        card.classList.remove("has-active-branch");
+        if (btn) btn.classList.remove("active");
+      }
+    });
+  }
+
+  /**
+   * SSE git_branch 이벤트 도착 시 외부에서 호출 (sse.js).
+   * branch 문자열에서 T-NNN 을 추출해 _activeBranchTicket 업데이트 + DOM 패치.
+   * @param {string|null} branch - "feat/T-NNN-..." 또는 "develop" 등
+   */
+  function syncActiveBranchFromSSE(branch) {
+    var ticket = null;
+    if (branch && typeof branch === "string") {
+      var m = _FEAT_BRANCH_RE.exec(branch);
+      if (m) ticket = m[1];
+    }
+    if (ticket === _activeBranchTicket) return; // 변동 없음 — skip
+    _activeBranchTicket = ticket;
+    applyActiveBranchClassToCards();
+  }
+
+  /**
+   * Review 카드 4행 토글 버튼 클릭 핸들러.
+   * - 현재 카드가 active 면 action=off, 아니면 action=on 으로 POST.
+   * - dirty / needs_restart / 실패 응답에 따라 안내 모달 발동 (자동 stash 절대 X).
+   * @param {string} ticketNum - 클릭된 카드의 T-NNN
+   */
+  function handleBranchToggleClick(ticketNum) {
+    if (!ticketNum) return;
+    var action = (_activeBranchTicket === ticketNum) ? "off" : "on";
+    fetch("/api/kanban/branch/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_number: ticketNum, action: action })
+    }).then(function (res) {
+      return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+    }).then(function (r) {
+      var body = r.body || {};
+      if (body.ok === true) {
+        // 성공 — active_ticket 갱신 (서버 응답이 SSOT, optimistic 도 동시 반영)
+        _activeBranchTicket = body.active_ticket || null;
+        applyActiveBranchClassToCards();
+        if (body.needs_restart) {
+          alert(
+            "[브랜치 활성 — backend 변경 감지]\n\n" +
+            "이 feature 브랜치는 board/server/** 변경을 포함합니다.\n" +
+            "board 서버를 재기동해야 변경된 backend 가 정상 동작합니다.\n\n" +
+            "수동으로 board 서버를 재기동한 뒤 페이지를 새로고침하세요.\n" +
+            "(frontend 정적 파일은 자동 갱신 — hard reload 만 수행하면 충분)"
+          );
+        }
+        return;
+      }
+      // 실패 — reason 별 분기
+      var reason = body.reason || "";
+      if (reason === "dirty") {
+        var files = (body.files || []).slice(0, 20);
+        var fileList = files.map(function (f) { return "  - " + f; }).join("\n");
+        var more = (body.files && body.files.length > 20) ? "\n  ... (" + (body.files.length - 20) + "개 더)" : "";
+        var msg = body.modal_message ||
+          ("메인 working tree 에 미커밋 변경이 있습니다.\n" +
+           "수동으로 commit / stash / reset 후 다시 시도하세요.");
+        alert("[브랜치 토글 차단 — dirty]\n\n" + msg + "\n\n변경 파일:\n" + fileList + more);
+        return;
+      }
+      if (reason === "feature_branch_not_found") {
+        alert("[브랜치 토글 실패]\n\n" + (body.message || "feature 브랜치를 찾을 수 없습니다."));
+        return;
+      }
+      if (reason === "git_switch_failed") {
+        alert("[git switch 실패]\n\n" + (body.message || "git switch 가 실패했습니다."));
+        return;
+      }
+      // 기타 알 수 없는 실패
+      alert("[브랜치 토글 실패]\n\n" + (body.message || JSON.stringify(body)));
+    }).catch(function (err) {
+      alert("[브랜치 토글 요청 실패]\n\n" + (err && err.message ? err.message : err));
+    });
+  }
+
   /**
    * Fetches /api/worktree/uncommitted/all and populates _worktreeUncommittedMap.
    * Silently degrades on error (map remains null or stale).
@@ -2261,7 +2387,9 @@
             const isDraggable = (col.key === "To Do" || col.key === "Open" || col.key === "Review");
             const draggableAttr = isDraggable ? ' draggable="true"' : '';
             const draggableClass = isDraggable ? ' card-draggable' : '';
-            h += '<div class="card' + done + draggableClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
+            // T-433 Phase 2: Review 카드에 한해 has-active-branch 클래스 부여 (외곽 glow 시각).
+            const branchActiveClass = (col.key === "Review" && _activeBranchTicket === t.number) ? ' has-active-branch' : '';
+            h += '<div class="card' + done + draggableClass + branchActiveClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
             // 상단: 좌측 그룹(티켓번호 + 커맨드배지), 우측 상태라벨
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
@@ -2314,6 +2442,23 @@
               }
             }
             if (col.key === "Review") {
+              // T-433 Phase 2: feature 브랜치 활성/해제 토글 버튼 (4행 좌측, done 버튼 좌측에 배치).
+              // OFF: 회색 outline / ON: 테라코타 채움 + 카드 외곽 light glow.
+              // 한 카드만 active 보장 — _activeBranchTicket 상태 기준 .active 부여.
+              var isBranchActive = (_activeBranchTicket === t.number);
+              var toggleClass = isBranchActive ? " active" : "";
+              var toggleTip = isBranchActive
+                ? "feature 브랜치 활성 중 — 클릭하면 develop 으로 복귀"
+                : "클릭하면 메인 working tree 를 이 feature 브랜치로 전환";
+              h += '<button class="card-branch-toggle' + toggleClass + '" data-branch-ticket="' + esc(t.number) + '" title="' + esc(toggleTip) + '" draggable="false">';
+              // Lucide git-branch SVG (16px, currentColor) — e749003 어휘 일치
+              h += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+              h += '<line x1="6" y1="3" x2="6" y2="15"/>';
+              h += '<circle cx="18" cy="6" r="3"/>';
+              h += '<circle cx="6" cy="18" r="3"/>';
+              h += '<path d="M18 9a9 9 0 0 1-9 9"/>';
+              h += '</svg>';
+              h += '</button>';
               h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="완료 처리" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<polyline points="2,7 5.5,10.5 12,3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
@@ -2347,6 +2492,14 @@
         if (commitBtn) {
           e.stopPropagation();
           handleCommitButtonClick(commitBtn);
+          return;
+        }
+        // T-433 Phase 2: Review 카드 4행 feature 브랜치 토글 버튼 클릭 → handleBranchToggleClick 위임
+        var branchToggle = e.target.closest(".card-branch-toggle");
+        if (branchToggle) {
+          e.stopPropagation();
+          var bnum = branchToggle.dataset.branchTicket || card.dataset.num;
+          handleBranchToggleClick(bnum);
           return;
         }
         // T-439: Review 카드 우하단 완료 액션 버튼 클릭 → handleReviewDoneAction 위임
@@ -2491,10 +2644,17 @@
       document.removeEventListener("click", el._sortOutsideHandler);
     }
     el._sortOutsideHandler = outsideHandler;
+
+    // T-433 Phase 2: 페이지 로드 시 1회 active branch 초기 fetch (이후 호출은 가드로 무시).
+    // SSE git_branch 이벤트 도착 시 syncActiveBranchFromSSE 가 동기화 담당.
+    fetchAndApplyActiveBranch();
   }
 
   // ── Register on Board namespace ──
   Board.fetch.fetchTickets = fetchTickets;
   Board.fetch.fetchTicketsByFiles = fetchTicketsByFiles;
   Board.render.renderKanban = renderKanban;
+  // T-433 Phase 2: SSE git_branch 이벤트 listener 가 호출하는 동기화 entry-point.
+  // (sse.js 가 단일 listener — addEventListener 중복 등록 방지 §2.4)
+  Board.render.syncActiveBranchFromSSE = syncActiveBranchFromSSE;
 })();

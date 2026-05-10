@@ -206,11 +206,17 @@
     });
 
     es.addEventListener("git_branch", function (e) {
+      var branchVal = null;
       try {
         var d = JSON.parse(e.data);
-        refreshBranch(d && d.branch);
+        branchVal = d && d.branch;
       } catch (_) {
-        refreshBranch(null);
+        branchVal = null;
+      }
+      refreshBranch(branchVal);
+      // T-433 Phase 2: Review 카드 토글 시각 동기화 (kanban 모듈 등록 시에만)
+      if (Board.render.syncActiveBranchFromSSE) {
+        Board.render.syncActiveBranchFromSSE(branchVal);
       }
     });
 
@@ -267,6 +273,10 @@
         var arr = changes.git_branch;
         var last = (arr && arr.length) ? arr[arr.length - 1] : null;
         refreshBranch(last);
+        // T-433 Phase 2: polling fallback 에서도 Review 카드 토글 시각 동기화
+        if (Board.render.syncActiveBranchFromSSE) {
+          Board.render.syncActiveBranchFromSSE(last);
+        }
       }
     }).catch(function () {
       // /poll failure: handle silently (no console error)
