@@ -299,6 +299,74 @@ def _normalize_command(ticket_id: str, command: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# launch 타임아웃 후확인 헬퍼
+# ---------------------------------------------------------------------------
+
+def _handle_launch_timeout(port: int, ticket_id: str, exc: BaseException) -> int:
+    """POST /terminal/workflow/start 타임아웃 후 세션 실재 여부를 후확인한다.
+
+    urlopen이 타임아웃을 일으켰더라도 서버 측에서 세션이 정상 생성된 경우가 있다.
+    GET /terminal/workflow/list 로 ticket_id 매칭 세션을 확인하여:
+      - 매칭 세션 존재 → LAUNCH: <session_id> 실행 중 (초기화 지연) 출력 후 return 0
+      - 매칭 세션 미존재 → T-904 best-effort 정리 후 ERROR exit 1
+      - 후확인 GET 자체 실패 → ERROR exit 1 (폴백)
+
+    Args:
+        port: Board 서버 포트 번호.
+        ticket_id: 런치 요청한 티켓 ID.
+        exc: 타임아웃을 일으킨 예외 인스턴스 (로깅용).
+
+    Returns:
+        exit code: 0=세션 존재 확인, 1=세션 미확인 또는 후확인 실패.
+    """
+    _log("INFO", f"http_launcher: launch timeout, starting post-confirm for {ticket_id}: {exc}")
+
+    # 후확인: GET /terminal/workflow/list
+    try:
+        sessions = _http_get_json(port, "/terminal/workflow/list")
+        matching = [
+            s for s in sessions
+            if isinstance(s, dict) and s.get("ticket_id") == ticket_id
+        ]
+    except Exception as get_exc:
+        _log("ERROR", f"http_launcher: post-confirm list GET failed: {get_exc}")
+        print(
+            f"[ERROR] 워크플로우 세션 시작 실패 (초기화 타임아웃, 후확인 GET 오류)",
+            file=sys.stderr,
+        )
+        return 1
+
+    if matching:
+        # 세션이 실재 — 초기화 지연으로 판단하고 정상 LAUNCH 경로와 동일하게 처리
+        session_id = matching[0].get("session_id", "unknown")
+        _log(
+            "INFO",
+            f"http_launcher: post-confirm found session_id={session_id} "
+            f"ticket_id={ticket_id} (init delay)",
+        )
+        print(f"LAUNCH: {session_id} 실행 중 (초기화 지연)")
+        return 0
+
+    # 세션 미존재 — T-904: timeout 후 spawn된 워커가 살아있을 가능성에 best-effort 정리
+    _log("ERROR", f"http_launcher: post-confirm no session found for {ticket_id}")
+    try:
+        _wf_root = os.path.dirname(_engine_dir)
+        _flow_stop_bin = os.path.join(_wf_root, "bin", "flow-stop")
+        subprocess.run(
+            [_flow_stop_bin, ticket_id, "--by-launcher-timeout", "--json"],
+            capture_output=True,
+            timeout=10,
+        )
+    except Exception:
+        pass  # best-effort, 사용자에게 노출하지 않음
+    print(
+        "[ERROR] 워크플로우 세션 시작 실패 (초기화 타임아웃, 세션 미확인)",
+        file=sys.stderr,
+    )
+    return 1
+
+
+# ---------------------------------------------------------------------------
 # launch 서브커맨드
 # ---------------------------------------------------------------------------
 
@@ -376,19 +444,13 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         _log("ERROR", f"http_launcher: start API failed status={e.code} body={error_body}")
         print(f"[ERROR] 워크플로우 세션 시작 실패 (HTTP {e.code}): {error_body}", file=sys.stderr)
         return 1
+    except TimeoutError as e:
+        # Python 3.10+: socket.timeout == TimeoutError, urlopen이 직접 raise 하는 케이스
+        return _handle_launch_timeout(port, ticket_id, e)
     except urllib.error.URLError as e:
-        # T-904: timeout 후 spawn 된 워커가 살아있을 가능성 — best-effort 정리
-        if isinstance(e.reason, TimeoutError) or 'timed out' in str(e).lower():
-            try:
-                _wf_root = os.path.dirname(_engine_dir)
-                _flow_stop_bin = os.path.join(_wf_root, "bin", "flow-stop")
-                subprocess.run(
-                    [_flow_stop_bin, ticket_id, '--by-launcher-timeout', '--json'],
-                    capture_output=True,
-                    timeout=10,
-                )
-            except Exception:
-                pass  # best-effort, 사용자에게 노출하지 않음
+        # URLError(reason=TimeoutError(...)) 래핑 형태도 흡수
+        if isinstance(e.reason, TimeoutError) or "timed out" in str(e).lower():
+            return _handle_launch_timeout(port, ticket_id, e)
         _log("ERROR", f"http_launcher: start API URL error {e}")
         print(f"[ERROR] 워크플로우 세션 시작 실패: {e}", file=sys.stderr)
         return 1
