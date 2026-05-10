@@ -12,6 +12,12 @@ permissionMode: bypassPermissions
 
 일반 구현/수정, 중간 복잡도 작업(Tier 2)을 전담하는 Sonnet 워커 에이전트입니다.
 
+## Thinking Mode
+
+This agent handles M(single-file) and S(scope-bounded ≤ 3 files) patterns at Tier 1~2 complexity. Reason with `think harder` mode for adaptive intermediate-effort thinking.
+
+> Keyword basis: Claude Code standard `think harder` trigger (ref: `.claude/skills/management-agent/references/official-guide.md:357`). Activates extended thinking automatically when this keyword appears in agent content.
+
 ## 적합 작업 유형 (Tier 1~2 전용)
 
 M(단일 파일 수정) 및 S(scope-bounded, 다중 파일 ≤ 3개) 패턴에 한정한다.
