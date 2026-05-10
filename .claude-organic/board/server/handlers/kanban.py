@@ -7,6 +7,8 @@ import os
 import re
 import sys
 import subprocess
+import threading
+from datetime import datetime, timezone
 
 from ._helpers import _TICKET_RE, _KANBAN_ALL_DIRS
 from ._kanban_done_helpers import (
@@ -14,6 +16,170 @@ from ._kanban_done_helpers import (
     handle_kanban_done_review,
     check_derived_blocked,
 )
+from .._common import logger
+from ..state import sse_manager
+
+
+# ---------------------------------------------------------------------------
+# T-475: launch 비동기화 헬퍼 (Stage 1)
+# ---------------------------------------------------------------------------
+
+# T-475: reader thread 핸들 보관 — daemon thread GC 누수 차단용 약한 참조 set.
+# Popen.communicate 종료 시 thread 자체가 finally 에서 자기 자신을 제거한다.
+_LAUNCH_READER_THREADS: set[threading.Thread] = set()
+_LAUNCH_READER_LOCK: threading.Lock = threading.Lock()
+
+
+def _classify_failure_reason(returncode: int, stderr: str) -> str:
+    """flow-launcher 비정상 종료 사유를 stderr·returncode 패턴으로 분류한다.
+
+    T-450 보고서 §5 reason enum:
+      - to_do_status:        launcher 측 사전 검증 거부 (티켓이 To Do 상태)
+      - http_post_timeout:   H4 urllib timeout=10s (T-904 cleanup 발동)
+      - http_post_error:     H4 urllib 일반 에러 (URLError 등)
+      - workflow_start_error: WorkflowHandler 측 spawn 실패
+      - unknown:             그 외 (returncode=0 인데 LAUNCH:/INLINE: 둘 다 아닌 경우 포함)
+    """
+    if returncode == 0:
+        return 'unknown'
+    err = stderr or ''
+    if 'To Do' in err:
+        return 'to_do_status'
+    if 'urllib timed out' in err or 'timed out' in err:
+        return 'http_post_timeout'
+    if 'urllib' in err:
+        return 'http_post_error'
+    if 'workflow start' in err:
+        return 'workflow_start_error'
+    return 'unknown'
+
+
+def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
+    """LAUNCH_* 이벤트를 SSE broadcast + workflow.log 동시 기록한다.
+
+    SSE event_type='launch' 단일 채널 재사용 (보고서 §5 — 신규 채널 신설 X).
+    payload 의 'event' 필드로 PENDING/STARTED/FAILED 분기 식별.
+
+    Args:
+        event:  'LAUNCH_PENDING' | 'LAUNCH_STARTED' | 'LAUNCH_FAILED'
+        ticket: T-NNN
+        **kwargs: 추가 payload 필드 (command, mode, reason, error_message,
+                  latency_ms, submitted_at, session_id, returncode, elapsed_ms 등)
+    """
+    ts = datetime.now(timezone.utc).isoformat()
+    payload: dict[str, object] = {'event': event, 'ts': ts, 'ticket': ticket}
+    payload.update(kwargs)
+
+    try:
+        sse_manager.broadcast('launch', data=payload)
+    except Exception as exc:  # broadcast 실패가 reader thread 자체를 죽이지 않도록 격리
+        logger.error('launch SSE broadcast failed: event=%s ticket=%s exc=%r',
+                     event, ticket, exc)
+
+    # workflow.log 와 동등한 라인 기록 (T-476 분석 트랙의 단일 진실 공급원).
+    # 별도 파일 신설 X — logger.info 가 board 서버 stderr/log 로 흐른다.
+    try:
+        extra_kv = ' '.join(
+            f'{k}={v!r}' for k, v in kwargs.items()
+            if k not in ('error_message',)  # error_message 는 길이 클 수 있어 별도 라인
+        )
+        logger.info('LAUNCH_EVENT %s ticket=%s %s', event, ticket, extra_kv)
+        if 'error_message' in kwargs and kwargs['error_message']:
+            logger.info('LAUNCH_EVENT %s ticket=%s error_message=%s',
+                        event, ticket, str(kwargs['error_message'])[:500])
+    except Exception:  # 로깅 실패도 무시
+        pass
+
+
+def _launch_reader_loop(
+    proc: subprocess.Popen,
+    ticket: str,
+    command: str,
+    submitted_at: datetime,
+) -> None:
+    """flow-launcher Popen 의 stdout/stderr 를 회수하고 LAUNCH_STARTED/FAILED 를 emit 한다.
+
+    proc.communicate() 로 종료까지 무한 대기. timeout 책임은 launcher 측
+    H4 urllib timeout=10s + T-904 cleanup 단일 진실 공급원에 위임 (보고서 §6).
+
+    finally 블록에서 thread 핸들 set 자체 제거 (GC 누수 차단).
+    """
+    self_thread = threading.current_thread()
+    try:
+        try:
+            stdout, stderr = proc.communicate(timeout=None)
+        except Exception as exc:  # Popen 자체 실패 (드물지만 방어)
+            elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='reader_loop_exception',
+                returncode=None,
+                error_message=repr(exc),
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+            return
+
+        elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+        rc = proc.returncode
+        first_line = ((stdout or '').split('\n', 1)[0]).strip() if stdout else ''
+
+        if rc == 0 and first_line.startswith('LAUNCH:'):
+            tail = first_line[len('LAUNCH:'):].strip()
+            session_id = tail.split()[0] if tail else ''
+            _emit_launch_event(
+                'LAUNCH_STARTED', ticket,
+                session_id=session_id,
+                mode='launched',
+                spawn_duration_ms=elapsed_ms,
+                command=command,
+            )
+        elif rc == 0 and first_line.startswith('INLINE:'):
+            tail = first_line[len('INLINE:'):].strip()
+            _emit_launch_event(
+                'LAUNCH_STARTED', ticket,
+                session_id='',
+                mode='inline',
+                spawn_duration_ms=elapsed_ms,
+                command=command,
+                message=tail,
+            )
+        elif rc == 0:
+            # returncode=0 인데 stdout 패턴이 LAUNCH:/INLINE: 둘 다 아님 — unknown 분류
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='unknown',
+                returncode=0,
+                error_message=(first_line or 'no stdout')[:500],
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+        else:
+            reason = _classify_failure_reason(rc, stderr or '')
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason=reason,
+                returncode=rc,
+                error_message=((stderr or stdout or '').strip())[:500],
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+    except Exception as exc:  # reader 루프 자체 예외 (방어)
+        try:
+            elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='reader_loop_exception',
+                error_message=repr(exc),
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+        except Exception:
+            pass
+    finally:
+        # GC 누수 차단 — 자신을 핸들 set 에서 제거
+        with _LAUNCH_READER_LOCK:
+            _LAUNCH_READER_THREADS.discard(self_thread)
 
 # T-433: backend 코드 변경으로 간주할 glob 패턴 — 매칭 시 needs_restart=true
 # board/server/** + .claude-organic/board/server/** + .claude-organic/engine/** 셋 모두 backend 도메인
@@ -295,7 +461,15 @@ class KanbanHandlerMixin:
         self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
 
     def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 위임, LAUNCH:/INLINE: 파싱."""
+        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 비동기 spawn (T-475 Stage 1).
+
+        T-475 Stage 1 변경:
+          - 동기 ``subprocess.run(timeout=60)`` 제거 → ``Popen`` + reader thread 분리.
+          - 즉시 200 OK ``{ok:True, status:'starting'}`` 반환 (latency p95 < 100ms 목표).
+          - launch 결과는 LAUNCH_PENDING/STARTED/FAILED SSE 이벤트로 비동기 통지.
+          - timeout 단일 진실 공급원 = launcher 측 H4 urllib timeout=10s + T-904 cleanup.
+            본 핸들러 측 timeout 인자 제거 (bridge commit 76907ff 자연 폐기).
+        """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
         command = (data.get('command') or '').strip()
@@ -309,34 +483,52 @@ class KanbanHandlerMixin:
 
         project_root = os.getcwd()
         flow_launcher = os.path.join(project_root, '.claude-organic', 'bin', 'flow-launcher')
+
+        submitted_at = datetime.now(timezone.utc)
+
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 [flow_launcher, 'launch', ticket, command],
-                cwd=project_root, capture_output=True, text=True, timeout=60,
+                cwd=project_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
-        except subprocess.TimeoutExpired:
-            self._send_error(504, 'flow-launcher launch timed out')
-            return
         except FileNotFoundError:
+            # Popen 실패는 spawn 자체 실패 — 비동기 채널 없이 즉시 5xx 반환.
             self._send_error(500, f'flow-launcher not found: {flow_launcher}')
             return
-
-        if result.returncode != 0:
-            self._send_error(400, f'flow-launcher launch failed: {(result.stderr or result.stdout or "").strip()}')
+        except OSError as exc:
+            self._send_error(500, f'flow-launcher Popen failed: {exc!r}')
             return
 
-        stdout = result.stdout.strip()
-        first_line = stdout.split('\n', 1)[0].strip() if stdout else ''
-        if first_line.startswith('LAUNCH:'):
-            tail = first_line[len('LAUNCH:'):].strip()
-            payload = {'ok': True, 'mode': 'launched', 'ticket': ticket,
-                       'session_id': tail.split()[0] if tail else '', 'message': first_line}
-        elif first_line.startswith('INLINE:'):
-            payload = {'ok': True, 'mode': 'inline', 'ticket': ticket, 'message': first_line}
-        else:
-            payload = {'ok': True, 'mode': 'unknown', 'ticket': ticket,
-                       'message': first_line or 'no stdout'}
-        self._send_json(payload)
+        # LAUNCH_PENDING — Popen 직후, HTTP 200 응답 직전.
+        _emit_launch_event(
+            'LAUNCH_PENDING', ticket,
+            command=command,
+            submitted_at=submitted_at.isoformat(),
+        )
+
+        # reader thread spawn — Popen.communicate 무한 대기 후 LAUNCH_STARTED/FAILED emit.
+        reader = threading.Thread(
+            target=_launch_reader_loop,
+            args=(proc, ticket, command, submitted_at),
+            name=f'launch-reader-{ticket}',
+            daemon=True,
+        )
+        with _LAUNCH_READER_LOCK:
+            _LAUNCH_READER_THREADS.add(reader)
+        reader.start()
+
+        # 즉시 200 OK — 클라이언트는 'starting' 상태로 진입, 후속 SSE 대기.
+        # 기존 응답 키 (ok, ticket, command) 유지 + status='starting' 추가 (Stage 3 클라이언트 분기용).
+        self._send_json({
+            'ok': True,
+            'status': 'starting',
+            'ticket': ticket,
+            'command': command,
+            'submitted_at': submitted_at.isoformat(),
+        })
 
     def _handle_kanban_done(self) -> None:
         """POST /api/kanban/done — {"ticket","force","force_dirty"}.
@@ -424,6 +616,154 @@ class KanbanHandlerMixin:
             'ok': True, 'ticket': ticket,
             'stdout': (result.stdout or '').strip(),
             'worktree_removed': worktree_removed,
+        })
+
+    # ------------------------------------------------------------------
+    # T-477: Auditor T3 audit verdict API
+    # ------------------------------------------------------------------
+
+    def _resolve_audit_workdir(self, ticket: str, project_root: str) -> 'str | None':
+        """티켓 번호로 최신 work_dir 경로를 결정한다.
+
+        1순위: tickets/<status>/<T-NNN>.xml 의 <result>/<workdir> 필드 참조
+        2순위: runs/ 디렉터리들을 mtime 역순으로 순회하여 status.json ticket_number 매칭
+
+        Returns None if not found.
+        """
+        import xml.etree.ElementTree as ET
+        import glob as _glob
+
+        tickets_root = os.path.join(project_root, ".claude-organic", "tickets")
+        kanban_dirs = ("todo", "open", "progress", "review", "done")
+
+        # 1순위: XML <result>/<workdir>
+        for kdir in kanban_dirs:
+            xml_path = os.path.join(tickets_root, kdir, f"{ticket}.xml")
+            if not os.path.isfile(xml_path):
+                continue
+            try:
+                tree = ET.parse(xml_path)
+                root_el = tree.getroot()
+                wd_el = root_el.find(".//result/workdir")
+                if wd_el is not None and wd_el.text and wd_el.text.strip():
+                    wd = wd_el.text.strip()
+                    if not os.path.isabs(wd):
+                        wd = os.path.join(project_root, wd)
+                    return wd
+            except Exception:
+                pass
+
+        # 2순위: runs/ 디렉터리 순회 (mtime 역순)
+        runs_root = os.path.join(project_root, ".claude-organic", "runs")
+        if not os.path.isdir(runs_root):
+            return None
+        try:
+            run_dirs = [
+                d for d in _glob.glob(os.path.join(runs_root, "*"))
+                if os.path.isdir(d) and not os.path.basename(d).startswith("_")
+            ]
+            run_dirs.sort(key=lambda d: os.path.getmtime(d), reverse=True)
+        except Exception:
+            return None
+
+        import json as _json
+        for rdir in run_dirs:
+            # status.json ticket_number 필드
+            status_path = os.path.join(rdir, "status.json")
+            if os.path.isfile(status_path):
+                try:
+                    with open(status_path, encoding="utf-8") as f:
+                        sdata = _json.load(f)
+                    if sdata.get("ticket_number") == ticket:
+                        return rdir
+                except Exception:
+                    pass
+
+        return None
+
+    @staticmethod
+    def _compute_combined_verdict(tier1, tier2) -> str:
+        """1차+2차 worst-of 통합 verdict 산출.
+
+        Rules (priority order):
+          1. either overall == FAIL  -> FAIL
+          2. either overall == WARN  -> WARN
+          3. both   overall == PASS  -> PASS
+          4. one None + one PASS     -> PASS
+          5. one None + non-PASS     -> NONE
+          6. both None               -> NONE
+
+        advisory only — 어떤 칸반 전이/차단도 없음.
+        """
+        def _overall(d) -> "str | None":
+            if d is None:
+                return None
+            return (d.get("overall") or "").upper() or None
+
+        o1 = _overall(tier1)
+        o2 = _overall(tier2)
+
+        if o1 == "FAIL" or o2 == "FAIL":
+            return "FAIL"
+        if o1 == "WARN" or o2 == "WARN":
+            return "WARN"
+        if o1 == "PASS" and o2 == "PASS":
+            return "PASS"
+        if (o1 == "PASS" and o2 is None) or (o1 is None and o2 == "PASS"):
+            return "PASS"
+        return "NONE"
+
+    def _handle_kanban_audit_verdict(self) -> None:
+        """GET /api/kanban/audit/verdict?ticket=T-NNN — Auditor T3 advisory verdict 조회.
+
+        W04 runner.py 가 work_dir 루트에 영속한 audit-verdict.json 을 읽어
+        {ticket, tier1, tier2, combined} 를 반환한다.
+
+        파일 미존재 시 {"tier1": null, "tier2": null, "combined": "NONE"} 반환 (404 X).
+        advisory only — 자동 차단/강제 전이/칸반 회귀 없음 (feedback_no_speculative_guards 캐논).
+        """
+        from urllib.parse import urlparse, parse_qs
+        import json as _json
+
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        ticket = (qs.get("ticket", [None])[0] or "").strip()
+
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket" query param (T-NNN required)')
+            return
+
+        _NONE_RESPONSE = {"tier1": None, "tier2": None, "combined": "NONE"}
+
+        project_root = os.getcwd()
+        work_dir = self._resolve_audit_workdir(ticket, project_root)
+        if not work_dir:
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        verdict_path = os.path.join(work_dir, "audit-verdict.json")
+        if not os.path.isfile(verdict_path):
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        try:
+            with open(verdict_path, encoding="utf-8") as f:
+                data = _json.load(f)
+        except Exception:
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        tier1 = data.get("tier1")  # None or dict
+        tier2 = data.get("tier2")  # None or dict
+
+        # Recompute combined (worst-of) — do not trust stored value blindly
+        combined = self._compute_combined_verdict(tier1, tier2)
+
+        self._send_json({
+            "ticket": ticket,
+            "tier1": tier1,
+            "tier2": tier2,
+            "combined": combined,
         })
 
     def _handle_kanban_done_verdict(self) -> None:

@@ -12,6 +12,12 @@ permissionMode: bypassPermissions
 
 복잡한 코드 생성/리팩토링, 아키텍처 변경 등 고복잡도 작업(Tier 3)을 전담하는 Opus 워커 에이전트입니다.
 
+## Thinking Mode
+
+This agent handles complex code generation, architecture changes, and large-scale refactoring (Tier 3). Always reason with `ultrathink` mode to activate extended thinking for high-complexity tasks.
+
+> Keyword basis: Claude Code standard `ultrathink` trigger (ref: `.claude/skills/management-agent/references/official-guide.md:357`). Activates extended thinking automatically when this keyword appears in agent content.
+
 ## 역할 경계 (서브에이전트로서의 위치)
 
 이 에이전트는 서브에이전트이며 오케스트레이터가 Task 도구로 호출한다. 공통 제약: [common-constraints.md](.claude-organic/docs/common-constraints.md) 참조

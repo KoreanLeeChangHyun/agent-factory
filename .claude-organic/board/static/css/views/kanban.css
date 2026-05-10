@@ -296,6 +296,43 @@
   pointer-events: none;
 }
 
+/* T-475 Stage 3: launch 비동기화 — starting 상태 카드의 1행 우측 pulse 배지.
+ * 트리거: 클라이언트 launchState[ticket].state === 'starting' (submit 200 OK 직후 ~ LAUNCH_STARTED SSE 수신 전).
+ * 시각 컨벤션 (reference_workflow_visual_conventions): 테라코타 #D97757 + pulse 1.6s ease-in-out infinite.
+ * border-color + box-shadow 변조 — `.wf-tool-card[data-running="true"]` 와 동일 리듬.
+ * prefers-reduced-motion: reduce 시 정적 색상 fallback (animation: none). */
+.card-launch-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(217, 119, 87, 0.20);
+  color: #D97757;
+  border: 1px solid rgba(217, 119, 87, 0.45);
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  pointer-events: none;
+  animation: card-launch-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes card-launch-pulse {
+  0%, 100% {
+    border-color: rgba(217, 119, 87, 0.45);
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+  }
+  50% {
+    border-color: #D97757;
+    box-shadow: 0 0 4px 1px rgba(217, 119, 87, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-launch-badge {
+    animation: none;
+    border-color: #D97757;
+  }
+}
+
 /* T-457 (Layer 3): 4행 commit 액션 버튼 (워크트리 미커밋 자동 commit 진입점).
  * .card-done-action 과 동일 사이즈(20×20) — 4행 min-height: 22px 안전. */
 .card-commit-action {
@@ -493,6 +530,8 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .rel-item {
@@ -503,6 +542,80 @@
 .rel-derived { color: #D97757; }
 .rel-depends { color: #dcdcaa; }
 .rel-blocks { color: #c586c0; }
+
+/* ── Overflow Chip (+M) ── */
+.rel-overflow-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.4;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: rgba(160, 160, 160, 0.2);
+  color: #cccccc;
+  border: 1px solid rgba(160, 160, 160, 0.3);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* reset button defaults */
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.rel-overflow-chip:hover {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.35);
+}
+
+.rel-overflow-chip:focus-visible {
+  outline: 1px solid rgba(217, 119, 87, 0.6);
+  outline-offset: 1px;
+}
+
+/* ── Relations Popover ── */
+.rel-popover {
+  position: absolute;
+  z-index: 9000;
+  background: #2d2d30;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+  max-width: 280px;
+  pointer-events: auto;
+}
+
+.rel-popover-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rel-popover-item {
+  font-size: 11px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rel-popover-item.rel-derived { color: #D97757; }
+.rel-popover-item.rel-depends { color: #dcdcaa; }
+.rel-popover-item.rel-blocks  { color: #c586c0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rel-popover {
+    transition: none;
+  }
+}
 
 /* ── DnD: To Do ↔ Open 드래그 앤 드랍 (안전 DnD 정책) ── */
 .card-draggable {
@@ -669,7 +782,26 @@
 .card-done-verdict.verdict-loading {
   display: none;
 }
-
+/* T-477: Auditor T3 verdict 배지 (Review 카드 우상단, advisory only)
+ * 형태: 둥근 알약 (border-radius 큼). 위치: card-top-right flexbox 우측 정렬.
+ * T-457 failure tag (우하단 직사각 라벨) 와 위치/형태 분리 — 충돌 없음.
+ */
+.audit-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  cursor: default;
+  pointer-events: auto;
+}
 
 /* T-463: Review 카드 룰베이스 1차 자동 검증 verdict 배지 (advisory only) */
 /* T-441 .card-done-verdict 패턴 동형 — 단, 텍스트 칩 형태 + 4행 actions-row 좌측 배치 */
@@ -731,4 +863,45 @@
 .card-review-verdict.verdict-unknown,
 .card-review-verdict.verdict-loading {
   display: none;          /* SKIP / UNKNOWN / 로딩 — 공간 낭비 없이 숨김 */
+}
+
+.audit-badge.audit-pass {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.45);
+}
+
+.audit-badge.audit-warn {
+  background: rgba(215, 169, 0, 0.15);
+  color: #d7a900;
+  border: 1px solid rgba(215, 169, 0, 0.45);
+}
+
+.audit-badge.audit-fail {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+  border: 1px solid rgba(244, 135, 113, 0.45);
+}
+
+/* 다크/라이트 테마 공통: 배경 alpha 기반이라 양쪽 모두 가독성 유지 */
+@media (prefers-color-scheme: light) {
+  .audit-badge.audit-pass {
+    background: rgba(78, 201, 176, 0.12);
+    color: #2e8e7e;
+    border-color: rgba(78, 201, 176, 0.5);
+  }
+  .audit-badge.audit-warn {
+    background: rgba(215, 169, 0, 0.12);
+    color: #9a7a00;
+    border-color: rgba(215, 169, 0, 0.5);
+  }
+  .audit-badge.audit-fail {
+    background: rgba(244, 135, 113, 0.12);
+    color: #c0543a;
+    border-color: rgba(244, 135, 113, 0.5);
+  }
+}
+
+.audit-badge.audit-loading {
+  display: none;
 }
