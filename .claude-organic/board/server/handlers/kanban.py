@@ -312,7 +312,7 @@ class KanbanHandlerMixin:
         try:
             result = subprocess.run(
                 [flow_launcher, 'launch', ticket, command],
-                cwd=project_root, capture_output=True, text=True, timeout=15,
+                cwd=project_root, capture_output=True, text=True, timeout=60,
             )
         except subprocess.TimeoutExpired:
             self._send_error(504, 'flow-launcher launch timed out')
