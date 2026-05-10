@@ -44,6 +44,7 @@ class WorkflowHandlerMixin:
         프로세스 환경변수에 _WF_SESSION_TYPE, _WF_TICKET_ID, _WF_SESSION_ID,
         _WF_SERVER_PORT를 주입한다.
         """
+        _t0 = time.monotonic()
         data = self._read_json_body()
         if data is None:
             return
@@ -59,6 +60,7 @@ class WorkflowHandlerMixin:
             self._send_error(400, 'Missing "command" field')
             return
 
+        logger.info("spawn init received ticket=%s command=%s", ticket, command)
         session = workflow_registry.create(ticket, command, work_dir)
 
         # 서버 포트 추출
@@ -84,8 +86,13 @@ class WorkflowHandlerMixin:
             return
 
         # CLI 초기화 완료까지 대기 (spawn 후 init 이벤트 수신 전 명령 유실 방지)
-        if not session.process._init_event.wait(timeout=10):
-            logger.warning("spawn init timeout after 10s, proceeding anyway")
+        _init_ok = session.process._init_event.wait(timeout=10)
+        if not _init_ok:
+            _elapsed_ms = int((time.monotonic() - _t0) * 1000)
+            logger.warning("spawn init timeout elapsed=%dms", _elapsed_ms)
+        else:
+            _elapsed_ms = int((time.monotonic() - _t0) * 1000)
+            logger.info("spawn init ok elapsed=%dms", _elapsed_ms)
 
         # launcher가 전달한 command를 세션에 자동 주입
         if command:
