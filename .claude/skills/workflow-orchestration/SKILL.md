@@ -138,7 +138,7 @@ flow-claude end <registryKey>             # 워크플로우 종료
 
 | Step Completed | Allowed Actions | Prohibited |
 |---------------|----------------|------------|
-| INIT completed | initialization 실행, params 추출/보관, PLAN 진행 | Return summary, **AskUserQuestion**, 내부 추론 텍스트 |
+| INIT completed | initialization 실행, params 추출/보관, PLAN 진행 | Return summary, **AskUserQuestion**, 내부 추론 텍스트, ticket Read, init-result.json Read, dependency ls, TodoWrite |
 | PLAN done | `flow-step end`, 스킬 매핑 검증, WORK 진행 | Plan summary, **AskUserQuestion**[^1], 내부 추론 텍스트 |
 | WORK Phase start | `flow-phase 0` (MUST FIRST), Phase 0 -> Phase 1~N | Phase 0 스킵 (**CRITICAL VIOLATION**), progress 텍스트 |
 | WORK in progress | Next worker call (parallel/sequential) | Planner re-call, autonomous augmentation, 내부 추론 텍스트 |
@@ -161,7 +161,7 @@ cd "$(flow-init <command> --ticket T-NNN | tail -1)"
 - flow-init: 디렉터리 생성 + worktree 생성(implement만) + init-result.json 기록
 - stdout 마지막 줄: worktreePath 절대경로 (또는 빈 줄). 빈 줄이면 cwd 유지
 
-실패 시 `FAIL` + 비정상 종료 코드. INIT 결과 요약/출력 MUST NOT.
+실패 시 `FAIL` + 비정상 종료 코드. INIT 결과 요약/출력 MUST NOT — 구체 금지: ticket Read, init-result.json Read, dependency ls, TodoWrite.
 
 **Return Value Retention (후속 단계에 전달):**
 
@@ -423,6 +423,8 @@ flow-claude end <registryKey>                                                   
 | `<workDir>/plan.md` | WORK Step 태스크 디스패치 (1회만) |
 
 > **skill-map.md는 오케스트레이터가 읽지 않는다.** Worker 호출 시 `skillMapPath` 경로만 전달.
+
+> **INIT phase 진입점**: `flow-init` stdout 만 사용 (Read 도구 미사용). `init-result.json` 직접 Read MUST NOT — params 추출은 `flow-init | tail -1` cd 1액션으로 한정.
 
 ### Platform Constraints
 
