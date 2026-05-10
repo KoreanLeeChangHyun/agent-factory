@@ -296,6 +296,43 @@
   pointer-events: none;
 }
 
+/* T-475 Stage 3: launch 비동기화 — starting 상태 카드의 1행 우측 pulse 배지.
+ * 트리거: 클라이언트 launchState[ticket].state === 'starting' (submit 200 OK 직후 ~ LAUNCH_STARTED SSE 수신 전).
+ * 시각 컨벤션 (reference_workflow_visual_conventions): 테라코타 #D97757 + pulse 1.6s ease-in-out infinite.
+ * border-color + box-shadow 변조 — `.wf-tool-card[data-running="true"]` 와 동일 리듬.
+ * prefers-reduced-motion: reduce 시 정적 색상 fallback (animation: none). */
+.card-launch-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(217, 119, 87, 0.20);
+  color: #D97757;
+  border: 1px solid rgba(217, 119, 87, 0.45);
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  pointer-events: none;
+  animation: card-launch-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes card-launch-pulse {
+  0%, 100% {
+    border-color: rgba(217, 119, 87, 0.45);
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+  }
+  50% {
+    border-color: #D97757;
+    box-shadow: 0 0 4px 1px rgba(217, 119, 87, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-launch-badge {
+    animation: none;
+    border-color: #D97757;
+  }
+}
+
 /* T-457 (Layer 3): 4행 commit 액션 버튼 (워크트리 미커밋 자동 commit 진입점).
  * .card-done-action 과 동일 사이즈(20×20) — 4행 min-height: 22px 안전. */
 .card-commit-action {
