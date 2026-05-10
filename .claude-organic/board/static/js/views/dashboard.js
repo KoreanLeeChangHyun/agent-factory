@@ -68,7 +68,7 @@ const METRICS_COLLAPSE_LS_KEY = "wf_metrics_collapsed";
   ms.fetched = !!ms.fetched;
   ms.fetching = !!ms.fetching;
   ms.last = (typeof ms.last === "number" && ms.last > 0) ? ms.last : METRICS_DEFAULT_LAST;
-  ms.data = ms.data || { runs: [], regression: null };
+  ms.data = ms.data || { runs: [], regression: null, launchLatency: null };
   ms.error = ms.error || null;
   ms.chartInstances = ms.chartInstances || {};
   // collapsed 초기값: localStorage 가 명시적으로 '0' 이 아니면 collapsed=true (default true)
@@ -81,13 +81,14 @@ const METRICS_COLLAPSE_LS_KEY = "wf_metrics_collapsed";
 // ── Fetch Functions ──
 
 /**
- * Fetches metrics data from aggregate and regression API endpoints.
+ * Fetches metrics data from aggregate, regression, and launch_latency API endpoints.
  * @param {number} last - number of recent runs to aggregate
- * @returns {Promise<{runs: Array, regression: Object|null}>}
+ * @returns {Promise<{runs: Array, regression: Object|null, launchLatency: Object|null}>}
  */
 function fetchMetrics(last) {
   const aggUrl = "/api/metrics/aggregate?last=" + encodeURIComponent(last);
   const regUrl = "/api/metrics/regression?last=" + encodeURIComponent(last);
+  const launchUrl = "/api/metrics/launch_latency?last=" + encodeURIComponent(last);
   return Promise.all([
     fetch(aggUrl, { cache: "no-store" }).then(function (res) {
       if (!res.ok) throw new Error("aggregate HTTP " + res.status);
@@ -97,10 +98,15 @@ function fetchMetrics(last) {
       if (!res.ok) throw new Error("regression HTTP " + res.status);
       return res.json();
     }),
+    fetch(launchUrl, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) return null;  // graceful — endpoint may 500 if T-475 not deployed
+      return res.json();
+    }).catch(function () { return null; }),
   ]).then(function (results) {
     const runs = (results[0] && results[0].runs) || [];
     const regression = results[1] || null;
-    return { runs: runs, regression: regression };
+    const launchLatency = (results[2] && results[2].ok && results[2].data) ? results[2].data : null;
+    return { runs: runs, regression: regression, launchLatency: launchLatency };
   });
 }
 
@@ -599,6 +605,20 @@ function renderMetricsSection() {
     + '</div><div class="dash-metrics-list-wrap" id="dash-metrics-regression-list"></div></div>';
   h += '</div>';  // grid
 
+  // Launch Latency chart — full-width row below the 2x2 grid
+  h += '<div class="dash-metrics-grid dash-metrics-grid--single">';
+  h += '<div class="dash-metrics-card"><div class="dash-metrics-card-head">'
+    + '<h4>Launch Latency (spawn_duration_ms)</h4>'
+    + '<span class="dash-metrics-hint">p50 / p95 / p99 per run (ms) — activated after T-475 deployment</span>'
+    + '</div>'
+    + '<div id="dash-metrics-launchlatency-placeholder" class="dash-metrics-pending">'
+    + 'T-475 배포 후 LAUNCH_* 이벤트가 누적되면 차트가 활성화됩니다.'
+    + '</div>'
+    + '<div class="dash-metrics-chart-wrap">'
+    + '<canvas id="dash-metrics-launchlatency"></canvas>'
+    + '</div></div>';
+  h += '</div>';  // launch latency grid row
+
   h += '</div>';  // body
   h += '</section>';
   return h;
@@ -822,6 +842,153 @@ function renderRegressionList(regression) {
 }
 
 /**
+ * Renders launch latency line chart (p50/p95/p99) into #dash-metrics-launchlatency canvas.
+ * When no LAUNCH_* events are present (T-475 not yet deployed), the placeholder message
+ * remains visible and the chart renders with empty data (no error thrown).
+ * @param {Object|null} launchLatency - launch_latency API response data field, or null
+ */
+function renderLaunchLatencyCard(launchLatency) {
+  const placeholder = document.getElementById("dash-metrics-launchlatency-placeholder");
+  const dist = (launchLatency && launchLatency.distribution) || {};
+  const perRun = (launchLatency && launchLatency.per_run) || [];
+  const hasData = launchLatency && typeof dist.count === "number" && dist.count > 0;
+
+  // Show/hide placeholder depending on whether data is available
+  if (placeholder) {
+    placeholder.style.display = hasData ? "none" : "";
+  }
+
+  // Build per-run series for p50/p95/p99.
+  // Each perRun entry: { registry_key, events, avg_duration_ms }.
+  // When no per-run breakdown, fall back to global distribution scalars as a single point.
+  var labels, p50data, p95data, p99data;
+
+  if (hasData && perRun.length > 0) {
+    // Use per-run list (oldest first — reverse so chronological left-to-right)
+    const chrono = perRun.slice().reverse();
+    labels = chrono.map(function (r) { return r.registry_key || ""; });
+    // per_run entries only carry avg_duration_ms (scalar); p-value breakdown is global.
+    // Render global p50/p95/p99 as horizontal reference lines by repeating the scalar.
+    const p50 = (typeof dist.p50 === "number") ? dist.p50 : null;
+    const p95 = (typeof dist.p95 === "number") ? dist.p95 : null;
+    const p99 = (typeof dist.p99 === "number") ? dist.p99 : null;
+    p50data = labels.map(function () { return p50; });
+    p95data = labels.map(function () { return p95; });
+    p99data = labels.map(function () { return p99; });
+    // Overlay per-run average as a 4th dataset
+    const avgData = chrono.map(function (r) {
+      return (typeof r.avg_duration_ms === "number") ? Math.round(r.avg_duration_ms) : null;
+    });
+    // Create chart with per-run avg line + global p50/p95/p99 reference lines
+    createMetricsChart("dash-metrics-launchlatency", {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "avg (per run)",
+            data: avgData,
+            borderColor: METRICS_ACCENT,
+            backgroundColor: METRICS_ACCENT,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: METRICS_ACCENT,
+            tension: 0.2,
+            spanGaps: true,
+          },
+          {
+            label: "p50 (global)",
+            data: p50data,
+            borderColor: "#4ec9b0",
+            backgroundColor: "transparent",
+            borderWidth: 1,
+            borderDash: [4, 3],
+            pointRadius: 0,
+            tension: 0,
+            spanGaps: true,
+          },
+          {
+            label: "p95 (global)",
+            data: p95data,
+            borderColor: "#dcdcaa",
+            backgroundColor: "transparent",
+            borderWidth: 1,
+            borderDash: [4, 3],
+            pointRadius: 0,
+            tension: 0,
+            spanGaps: true,
+          },
+          {
+            label: "p99 (global)",
+            data: p99data,
+            borderColor: "#f48771",
+            backgroundColor: "transparent",
+            borderWidth: 1,
+            borderDash: [4, 3],
+            pointRadius: 0,
+            tension: 0,
+            spanGaps: true,
+          },
+        ],
+      },
+      options: _launchLatencyChartOptions(),
+    });
+    return;
+  }
+
+  // No data case: render empty chart (avoids Chart.js error on missing canvas) with null points.
+  // Placeholder message is shown above the canvas.
+  labels = [];
+  createMetricsChart("dash-metrics-launchlatency", {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: "avg (per run)", data: [], borderColor: METRICS_ACCENT, backgroundColor: METRICS_ACCENT, borderWidth: 2, pointRadius: 3, tension: 0.2 },
+        { label: "p50", data: [], borderColor: "#4ec9b0", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
+        { label: "p95", data: [], borderColor: "#dcdcaa", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
+        { label: "p99", data: [], borderColor: "#f48771", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
+      ],
+    },
+    options: _launchLatencyChartOptions(),
+  });
+}
+
+/** Returns shared Chart.js options for the launch latency chart. */
+function _launchLatencyChartOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: "#cccccc", boxWidth: 12, font: { size: 11 } } },
+      tooltip: {
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null || ctx.parsed.y === undefined) return ctx.dataset.label + ": —";
+            return ctx.dataset.label + ": " + ctx.parsed.y + " ms";
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: "#858585", font: { size: 10 }, maxRotation: 45 },
+        grid: { color: "#2d2d2d" },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: "#858585",
+          font: { size: 10 },
+          callback: function (v) { return v + " ms"; },
+        },
+        grid: { color: "#2d2d2d" },
+      },
+    },
+  };
+}
+
+/**
  * Triggers a metrics fetch (idempotent — sets fetching flag, calls renderDashboard on resolve).
  */
 function triggerMetricsFetch() {
@@ -832,6 +999,7 @@ function triggerMetricsFetch() {
   fetchMetrics(ms.last).then(function (data) {
     ms.fetched = true;
     ms.fetching = false;
+    // data = { runs, regression, launchLatency }
     ms.data = data;
     ms.error = null;
     renderDashboard();
@@ -844,7 +1012,7 @@ function triggerMetricsFetch() {
 }
 
 /**
- * Renders all 4 metrics widgets (only when expanded — lazy create).
+ * Renders all 5 metrics widgets (only when expanded — lazy create).
  * Caller must ensure DOM canvases exist (i.e. body is not collapsed).
  */
 function renderAllMetricsWidgets() {
@@ -853,10 +1021,12 @@ function renderAllMetricsWidgets() {
   const data = ms.data || {};
   const runs = data.runs || [];
   const regression = data.regression || null;
+  const launchLatency = data.launchLatency || null;
   renderStepDurationCard(runs);
   renderTokensStackedCard(runs);
   renderFailRatioCard(runs);
   renderRegressionList(regression);
+  renderLaunchLatencyCard(launchLatency);
 }
 
 /**
@@ -923,7 +1093,7 @@ function bindMetricsToolbar() {
       const ms = Board.state.metricsState;
       ms.last = n;
       ms.fetched = false;
-      ms.data = { runs: [], regression: null };
+      ms.data = { runs: [], regression: null, launchLatency: null };
       destroyAllMetricsCharts();
       triggerMetricsFetch();
     });
@@ -934,7 +1104,7 @@ function bindMetricsToolbar() {
     btn.addEventListener("click", function () {
       const ms = Board.state.metricsState;
       ms.fetched = false;
-      ms.data = { runs: [], regression: null };
+      ms.data = { runs: [], regression: null, launchLatency: null };
       destroyAllMetricsCharts();
       triggerMetricsFetch();
     });

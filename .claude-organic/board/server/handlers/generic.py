@@ -125,6 +125,9 @@ class GenericHandlerMixin:
         elif path == '/api/metrics/regression':
             last = self._parse_metrics_last(qs, default=20)
             self._handle_metrics_regression(last)
+        elif path == '/api/metrics/launch_latency':
+            last = self._parse_metrics_last(qs, default=10)
+            self._handle_metrics_launch_latency(last=last)
         elif path == '/api/worktree/uncommitted/all':
             self._handle_worktree_uncommitted_all()
         elif path == '/api/kanban/done-verdict':
