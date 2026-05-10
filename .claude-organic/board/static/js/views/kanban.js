@@ -304,12 +304,13 @@
         _activeBranchTicket = body.active_ticket || null;
         applyActiveBranchClassToCards();
         if (body.needs_restart) {
-          alert(
-            "[브랜치 활성 — backend 변경 감지]\n\n" +
+          Board.util.showInfoModal(
+            "브랜치 활성 — backend 변경 감지",
             "이 feature 브랜치는 board/server/** 변경을 포함합니다.\n" +
             "board 서버를 재기동해야 변경된 backend 가 정상 동작합니다.\n\n" +
             "수동으로 board 서버를 재기동한 뒤 페이지를 새로고침하세요.\n" +
-            "(frontend 정적 파일은 자동 갱신 — hard reload 만 수행하면 충분)"
+            "(frontend 정적 파일은 자동 갱신 — hard reload 만 수행하면 충분)",
+            { severity: "warning" }
           );
         }
         return;
@@ -323,21 +324,41 @@
         var msg = body.modal_message ||
           ("메인 working tree 에 미커밋 변경이 있습니다.\n" +
            "수동으로 commit / stash / reset 후 다시 시도하세요.");
-        alert("[브랜치 토글 차단 — dirty]\n\n" + msg + "\n\n변경 파일:\n" + fileList + more);
+        Board.util.showInfoModal(
+          "브랜치 토글 차단 — dirty",
+          msg + "\n\n변경 파일:\n" + fileList + more,
+          { severity: "warning" }
+        );
         return;
       }
       if (reason === "feature_branch_not_found") {
-        alert("[브랜치 토글 실패]\n\n" + (body.message || "feature 브랜치를 찾을 수 없습니다."));
+        Board.util.showInfoModal(
+          "브랜치 토글 실패",
+          body.message || "feature 브랜치를 찾을 수 없습니다.",
+          { severity: "error" }
+        );
         return;
       }
       if (reason === "git_switch_failed") {
-        alert("[git switch 실패]\n\n" + (body.message || "git switch 가 실패했습니다."));
+        Board.util.showInfoModal(
+          "git switch 실패",
+          body.message || "git switch 가 실패했습니다.",
+          { severity: "warning" }
+        );
         return;
       }
       // 기타 알 수 없는 실패
-      alert("[브랜치 토글 실패]\n\n" + (body.message || JSON.stringify(body)));
+      Board.util.showInfoModal(
+        "브랜치 토글 실패",
+        body.message || JSON.stringify(body),
+        { severity: "error" }
+      );
     }).catch(function (err) {
-      alert("[브랜치 토글 요청 실패]\n\n" + (err && err.message ? err.message : err));
+      Board.util.showInfoModal(
+        "브랜치 토글 요청 실패",
+        (err && err.message) ? err.message : String(err),
+        { severity: "error" }
+      );
     });
   }
 
