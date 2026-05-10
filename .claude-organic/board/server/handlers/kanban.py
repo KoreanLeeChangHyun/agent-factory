@@ -426,6 +426,154 @@ class KanbanHandlerMixin:
             'worktree_removed': worktree_removed,
         })
 
+    # ------------------------------------------------------------------
+    # T-477: Auditor T3 audit verdict API
+    # ------------------------------------------------------------------
+
+    def _resolve_audit_workdir(self, ticket: str, project_root: str) -> 'str | None':
+        """티켓 번호로 최신 work_dir 경로를 결정한다.
+
+        1순위: tickets/<status>/<T-NNN>.xml 의 <result>/<workdir> 필드 참조
+        2순위: runs/ 디렉터리들을 mtime 역순으로 순회하여 status.json ticket_number 매칭
+
+        Returns None if not found.
+        """
+        import xml.etree.ElementTree as ET
+        import glob as _glob
+
+        tickets_root = os.path.join(project_root, ".claude-organic", "tickets")
+        kanban_dirs = ("todo", "open", "progress", "review", "done")
+
+        # 1순위: XML <result>/<workdir>
+        for kdir in kanban_dirs:
+            xml_path = os.path.join(tickets_root, kdir, f"{ticket}.xml")
+            if not os.path.isfile(xml_path):
+                continue
+            try:
+                tree = ET.parse(xml_path)
+                root_el = tree.getroot()
+                wd_el = root_el.find(".//result/workdir")
+                if wd_el is not None and wd_el.text and wd_el.text.strip():
+                    wd = wd_el.text.strip()
+                    if not os.path.isabs(wd):
+                        wd = os.path.join(project_root, wd)
+                    return wd
+            except Exception:
+                pass
+
+        # 2순위: runs/ 디렉터리 순회 (mtime 역순)
+        runs_root = os.path.join(project_root, ".claude-organic", "runs")
+        if not os.path.isdir(runs_root):
+            return None
+        try:
+            run_dirs = [
+                d for d in _glob.glob(os.path.join(runs_root, "*"))
+                if os.path.isdir(d) and not os.path.basename(d).startswith("_")
+            ]
+            run_dirs.sort(key=lambda d: os.path.getmtime(d), reverse=True)
+        except Exception:
+            return None
+
+        import json as _json
+        for rdir in run_dirs:
+            # status.json ticket_number 필드
+            status_path = os.path.join(rdir, "status.json")
+            if os.path.isfile(status_path):
+                try:
+                    with open(status_path, encoding="utf-8") as f:
+                        sdata = _json.load(f)
+                    if sdata.get("ticket_number") == ticket:
+                        return rdir
+                except Exception:
+                    pass
+
+        return None
+
+    @staticmethod
+    def _compute_combined_verdict(tier1, tier2) -> str:
+        """1차+2차 worst-of 통합 verdict 산출.
+
+        Rules (priority order):
+          1. either overall == FAIL  -> FAIL
+          2. either overall == WARN  -> WARN
+          3. both   overall == PASS  -> PASS
+          4. one None + one PASS     -> PASS
+          5. one None + non-PASS     -> NONE
+          6. both None               -> NONE
+
+        advisory only — 어떤 칸반 전이/차단도 없음.
+        """
+        def _overall(d) -> "str | None":
+            if d is None:
+                return None
+            return (d.get("overall") or "").upper() or None
+
+        o1 = _overall(tier1)
+        o2 = _overall(tier2)
+
+        if o1 == "FAIL" or o2 == "FAIL":
+            return "FAIL"
+        if o1 == "WARN" or o2 == "WARN":
+            return "WARN"
+        if o1 == "PASS" and o2 == "PASS":
+            return "PASS"
+        if (o1 == "PASS" and o2 is None) or (o1 is None and o2 == "PASS"):
+            return "PASS"
+        return "NONE"
+
+    def _handle_kanban_audit_verdict(self) -> None:
+        """GET /api/kanban/audit/verdict?ticket=T-NNN — Auditor T3 advisory verdict 조회.
+
+        W04 runner.py 가 work_dir 루트에 영속한 audit-verdict.json 을 읽어
+        {ticket, tier1, tier2, combined} 를 반환한다.
+
+        파일 미존재 시 {"tier1": null, "tier2": null, "combined": "NONE"} 반환 (404 X).
+        advisory only — 자동 차단/강제 전이/칸반 회귀 없음 (feedback_no_speculative_guards 캐논).
+        """
+        from urllib.parse import urlparse, parse_qs
+        import json as _json
+
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        ticket = (qs.get("ticket", [None])[0] or "").strip()
+
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket" query param (T-NNN required)')
+            return
+
+        _NONE_RESPONSE = {"tier1": None, "tier2": None, "combined": "NONE"}
+
+        project_root = os.getcwd()
+        work_dir = self._resolve_audit_workdir(ticket, project_root)
+        if not work_dir:
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        verdict_path = os.path.join(work_dir, "audit-verdict.json")
+        if not os.path.isfile(verdict_path):
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        try:
+            with open(verdict_path, encoding="utf-8") as f:
+                data = _json.load(f)
+        except Exception:
+            self._send_json(_NONE_RESPONSE)
+            return
+
+        tier1 = data.get("tier1")  # None or dict
+        tier2 = data.get("tier2")  # None or dict
+
+        # Recompute combined (worst-of) — do not trust stored value blindly
+        combined = self._compute_combined_verdict(tier1, tier2)
+
+        self._send_json({
+            "ticket": ticket,
+            "tier1": tier1,
+            "tier2": tier2,
+            "combined": combined,
+        })
+
     def _handle_kanban_done_verdict(self) -> None:
         """GET /api/kanban/done-verdict?ticket=T-NNN — Done 카드 머지 정합성 advisory verdict.
 
