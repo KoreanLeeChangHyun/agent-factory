@@ -218,6 +218,11 @@
   // "pending" 값 = 조회 중. undefined = 미조회.
   var _doneVerdictMap = {};
 
+  // ── Audit Verdict Cache (T-477) ──
+  // Review 카드 Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
+  // "pending" = 조회 중. undefined = 미조회.
+  var _auditVerdictMap = {};
+
   // ── Active Branch Ticket (T-433 Phase 2) ──
   // 메인 working tree 가 현재 활성화한 feature 브랜치의 ticket 번호 (예: "T-433"). null = develop.
   // SSOT: backend GET /api/kanban/branch/active 또는 SSE git_branch 이벤트에서 derive.
@@ -443,6 +448,69 @@
       el.className += " verdict-unknown";
       el.style.display = "none";
     }
+  }
+
+  /**
+   * T-477: Auditor T3 audit verdict badge HTML 생성 (renderKanban 내 인라인 호출).
+   * combined === "NONE" 이면 빈 문자열 반환 (DOM 마운트 X).
+   * @param {string} ticketNum - 티켓 번호
+   * @returns {string} span.audit-badge HTML 또는 빈 문자열
+   */
+  function renderAuditBadgeHtml(ticketNum) {
+    var data = _auditVerdictMap[ticketNum];
+    if (!data || data === "pending") {
+      // 로딩 중 또는 미조회 — 자리만 예약 (숨김)
+      return '<span class="audit-badge audit-loading" style="display:none"></span>';
+    }
+    var combined = (data && data.combined) || "NONE";
+    if (combined === "NONE") return "";
+    var cls = "audit-badge";
+    if (combined === "PASS") cls += " audit-pass";
+    else if (combined === "WARN") cls += " audit-warn";
+    else if (combined === "FAIL") cls += " audit-fail";
+    // tooltip: hard_gate_failed 목록 (있으면)
+    var tip = "Auditor T3: " + combined;
+    var hgf = data.tier2 && data.tier2.hard_gate_failed;
+    if (hgf && hgf.length) {
+      tip += " — hard gate FAIL: " + hgf.join(", ");
+    }
+    return '<span class="' + cls + '" title="' + tip.replace(/"/g, "&quot;") + '">' + combined + "</span>";
+  }
+
+  /**
+   * T-477: Review 카드 단일 audit verdict fetch + DOM 배지 패치.
+   * 결과를 _auditVerdictMap 에 캐시. 폴링 없음 — 카드 mount 시 1회.
+   * @param {string} ticketNum - 티켓 번호
+   */
+  function fetchAndRenderAuditVerdict(ticketNum) {
+    if (_auditVerdictMap[ticketNum] !== undefined) return;
+    _auditVerdictMap[ticketNum] = "pending";
+
+    fetch("/api/kanban/audit/verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        _auditVerdictMap[ticketNum] = data;
+        if ((data.combined || "NONE") === "NONE") return; // 배지 미표시
+        // DOM 패치: 해당 Review 카드의 로딩 placeholder 교체
+        var placeholder = document.querySelector(
+          '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .audit-badge'
+        );
+        if (placeholder) {
+          var newHtml = renderAuditBadgeHtml(ticketNum);
+          if (newHtml) {
+            var tmp = document.createElement("span");
+            tmp.innerHTML = newHtml;
+            var newEl = tmp.firstChild;
+            placeholder.parentNode.replaceChild(newEl, placeholder);
+          }
+        }
+      })
+      .catch(function () {
+        _auditVerdictMap[ticketNum] = { tier1: null, tier2: null, combined: "NONE" };
+      });
   }
 
   /** Fetches all tickets via /api/kanban (single request). */
@@ -2654,6 +2722,10 @@
             if (col.key === "Done") {
               h += renderDoneVerdictBadge(t.number);
             }
+            // T-477: Review 카드 Auditor T3 audit 배지 (advisory only)
+            if (col.key === "Review") {
+              h += renderAuditBadgeHtml(t.number);
+            }
             h += "</div>";
             h += "</div>";
             // 2행: 제목 (2줄 clamp)
@@ -2790,6 +2862,14 @@
       if (num) {
         // 미조회 카드만 fetch (캐시 히트 시 스킵)
         fetchAndRenderVerdict(num);
+      }
+    });
+
+    // T-477: Review 카드 audit verdict fetch 트리거 (advisory)
+    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+      var num = card.dataset.num;
+      if (num) {
+        fetchAndRenderAuditVerdict(num);
       }
     });
 

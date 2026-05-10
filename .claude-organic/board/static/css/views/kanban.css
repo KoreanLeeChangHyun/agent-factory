@@ -745,4 +745,64 @@
 .card-done-verdict.verdict-loading {
   display: none;
 }
+/* T-477: Auditor T3 verdict 배지 (Review 카드 우상단, advisory only)
+ * 형태: 둥근 알약 (border-radius 큼). 위치: card-top-right flexbox 우측 정렬.
+ * T-457 failure tag (우하단 직사각 라벨) 와 위치/형태 분리 — 충돌 없음.
+ */
+.audit-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  cursor: default;
+  pointer-events: auto;
+}
 
+.audit-badge.audit-pass {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.45);
+}
+
+.audit-badge.audit-warn {
+  background: rgba(215, 169, 0, 0.15);
+  color: #d7a900;
+  border: 1px solid rgba(215, 169, 0, 0.45);
+}
+
+.audit-badge.audit-fail {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+  border: 1px solid rgba(244, 135, 113, 0.45);
+}
+
+/* 다크/라이트 테마 공통: 배경 alpha 기반이라 양쪽 모두 가독성 유지 */
+@media (prefers-color-scheme: light) {
+  .audit-badge.audit-pass {
+    background: rgba(78, 201, 176, 0.12);
+    color: #2e8e7e;
+    border-color: rgba(78, 201, 176, 0.5);
+  }
+  .audit-badge.audit-warn {
+    background: rgba(215, 169, 0, 0.12);
+    color: #9a7a00;
+    border-color: rgba(215, 169, 0, 0.5);
+  }
+  .audit-badge.audit-fail {
+    background: rgba(244, 135, 113, 0.12);
+    color: #c0543a;
+    border-color: rgba(244, 135, 113, 0.5);
+  }
+}
+
+.audit-badge.audit-loading {
+  display: none;
+}
