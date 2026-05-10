@@ -135,6 +135,7 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
     검증 항목:
         (1) plan.md 의 모든 W## ID 가 work/<ID>-*.md 로 존재.
         (2) git diff --name-only HEAD 파일 수 ≥ 1 (워크트리 기준).
+        (3) WORKFLOW_WORKTREE=true 시 develop..HEAD 커밋 수 ≥ 1 (T-465).
 
     Args:
         work_dir: 워크플로우 work 디렉터리 절대 경로.
@@ -154,6 +155,18 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
     diff_count = _check_git_diff(work_dir)
     if diff_count < 1:
         return (False, "implement: no git diff (워크트리 변경 0건)", [])
+
+    # step 3 (NEW T-465): worktree commits ahead 검증 — WORKFLOW_WORKTREE=true 한정.
+    # T-453/T-457 회귀 패턴(diff>=1 + ahead==0) 차단. ahead == -1 (검사 불가)
+    # 또는 ahead >= 1 (정상) 케이스는 통과시켜 false-positive 를 회피한다.
+    if _is_worktree_enabled_lazy():
+        ahead = _check_commits_ahead(work_dir)
+        if ahead == 0:
+            return (
+                False,
+                "implement: worktree commits ahead = 0 (워커 commit 누락)",
+                [],
+            )
 
     return (True, "ok: implement verifier passed", [])
 
@@ -375,6 +388,61 @@ def _check_git_diff(work_dir: str) -> int:
 
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     return len(lines)
+
+
+def _check_commits_ahead(work_dir: str) -> int:
+    """develop..HEAD 사이의 커밋 수를 반환한다 (T-465 W01).
+
+    워커 commit 누락 회귀(T-453/T-457 패턴) 차단용 신호. 워크트리 격리 환경에서
+    `git diff --name-only HEAD` 는 워크트리 변경 1건 이상 보장해도 develop 대비
+    실제 커밋이 없으면 머지 시점에 변경분이 누락된다.
+
+    Returns:
+        ≥ 1: 정상 (커밋 존재)
+        0: 커밋 누락 신호 — 호출자가 차단해야 함
+        -1: 검사 불가 (브랜치/base 미존재, subprocess 실패, 5초 timeout) —
+            호출자가 차단 없이 통과시켜야 함 (false-positive 회피)
+
+    Args:
+        work_dir: 워크플로우 work 디렉터리 절대 경로.
+    """
+    git_root = _find_git_root(work_dir)
+    if git_root is None:
+        return -1
+    try:
+        proc = subprocess.run(
+            ["git", "-C", git_root, "rev-list", "--count", "develop..HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return -1
+    if proc.returncode != 0:
+        return -1
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return -1
+
+
+def _is_worktree_enabled_lazy() -> bool:
+    """worktree_manager.is_worktree_enabled 를 지연 import 로 호출 (T-465 W01).
+
+    모듈 독립성 보존을 위해 phase_verifier 모듈 상단에서 worktree_manager 를
+    직접 import 하지 않고, 호출 시점에만 lazy import 한다. 실패 시 False 로
+    fallback 하여 기존 검증 흐름은 영향받지 않는다.
+
+    Returns:
+        WORKFLOW_WORKTREE=true 이고 worktree_manager 로드 가능하면 True.
+    """
+    try:
+        from .worktree_manager import is_worktree_enabled
+
+        return is_worktree_enabled()
+    except Exception:
+        return False
 
 
 def _aggregate_md_content(work_dir: str) -> str:
