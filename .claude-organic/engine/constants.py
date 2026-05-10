@@ -21,6 +21,7 @@ T-453: multi 키 8상태 추가 (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=F
 # 명명 사전 (T-452 §4 SSoT)
 #   workflow_phase / work_step / kanban_status / artifact / final_report
 #   phase_verify / ticket_validate / verifier_failure / validator_failure / retry_context
+#   workflow_init / phase_init / phase_update / phase_finish / workflow_finish  # T-467
 # 참조: .claude-organic/runs/20260509-195638/report.md §4 (T-452 보고서)
 
 from __future__ import annotations
