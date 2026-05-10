@@ -187,12 +187,19 @@ def parse_catalog() -> dict[str, list[str]]:
 
 
 def parse_plan_tasks(plan_path):
-    """plan.md에서 태스크 테이블을 파싱하여 taskId, description, skills를 추출."""
+    """plan.md에서 태스크 테이블을 파싱하여 taskId, description, skills를 추출.
+
+    Returns:
+        tuple[list[dict], bool]: (tasks, p4_triggered)
+            tasks        — 파싱된 태스크 목록
+            p4_triggered — P4 폴백(### T# 헤딩) 이 사용된 경우 True
+    """
     tasks = []
+    p4_triggered = False
 
     if not os.path.isfile(plan_path):
         print(f"[ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
-        return tasks
+        return tasks, p4_triggered
 
     with open(plan_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -244,7 +251,7 @@ def parse_plan_tasks(plan_path):
                 file=sys.stderr,
             )
 
-    # P2: W-prefix 헤딩 폴백도 실패하면 Task X.Y 헤딩 폴백 시도 (최후 수단)
+    # P3: W-prefix 헤딩 폴백도 실패하면 Task X.Y 헤딩 폴백 시도
     if not tasks:
         task_xy_pattern = re.compile(
             r"^#{2,4}\s+Task\s*\d+[\.\-]\d+[:\s]\s*(.+)",
@@ -264,7 +271,32 @@ def parse_plan_tasks(plan_path):
                 file=sys.stderr,
             )
 
-    return tasks
+    # P4: ### T# / ### T## 헤딩 폴백 시도 (Planner가 W-prefix 대신 T-prefix를 사용한 경우)
+    # T1 → W01, T01 → W01 형태로 정규화하여 빈 skill-map.md 회귀를 차단한다.
+    if not tasks:
+        t_prefix_pattern = re.compile(
+            r"^#{2,4}\s+T(\d{1,2})[:\s]\s*(.+)",
+            re.MULTILINE,
+        )
+        for m in t_prefix_pattern.finditer(content):
+            n = int(m.group(1))
+            task_id = f"W{n:02d}"
+            tasks.append(
+                {
+                    "taskId": task_id,
+                    "description": m.group(2).strip(),
+                    "skills": [],
+                }
+            )
+        if tasks:
+            p4_triggered = True
+            print(
+                "[WARN] '### T#' 형식 헤딩 폴백 파싱 사용"
+                " (taskId 'T#' → 'W##' 정규화, 스킬 미배정 → command defaults 적용)",
+                file=sys.stderr,
+            )
+
+    return tasks, p4_triggered
 
 
 def deduplicate(skills):
@@ -749,7 +781,9 @@ def main():
     defaults = parse_catalog()
 
     # 2. plan.md 태스크 파싱
-    tasks = parse_plan_tasks(plan_path)
+    tasks, p4_triggered = parse_plan_tasks(plan_path)
+    if p4_triggered:
+        _append_log(work_dir, "WARN", "planner_id_normalized: T# → W## 형식 정규화")
     if not tasks:
         print(f"[WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
         # 빈 skill-map.md라도 생성

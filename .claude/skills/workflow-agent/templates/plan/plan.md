@@ -54,6 +54,7 @@ flowchart TD
 -->
 
 ### WXX: [작업명]
+<!-- 반드시 W01~W99 (zero-padded). T1, Task 1.1 등 다른 형식 금지 -->
 
 <!-- 대상 파일 경로는 기존 파일이면 [`path/to/file`](path/to/file) 링크 형식 사용 가능. 미존재 파일은 `path/to/file` 백틱만 사용 -->
 - 대상 파일: `path/to/file`
