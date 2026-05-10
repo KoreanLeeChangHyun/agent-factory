@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ._helpers import _import_metrics_cli
+from ._helpers import _import_metrics_cli, _import_launch_metrics_cli
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +70,54 @@ class MetricsHandlerMixin:
         data = dict(data)
         data['last'] = last
         self._send_json(data)
+
+    def _handle_metrics_launch_latency(self, last: int = 10) -> None:
+        """GET /api/metrics/launch_latency?last=N — launch spawn_duration_ms 분포 응답.
+
+        workflow.log 의 LAUNCH_START/LAUNCH_OK 이벤트를 파싱해 spawn_duration_ms
+        분포 통계(p50/p95/p99/min/max/mean)와 느린 spawn 목록, per-run 요약을 반환한다.
+
+        T-475 미배포 시에는 LAUNCH_* 이벤트 0건으로 graceful 응답한다.
+        (distribution.count=0, p50/p95/p99/min/max/mean=None)
+        """
+        import subprocess
+        from pathlib import Path
+
+        try:
+            # runs_dir 은 git rev-parse --show-toplevel 기준으로 결정한다.
+            # 실패 시 __file__ 기반 parents[3] 로 fallback 한다.
+            try:
+                root = subprocess.check_output(
+                    ['git', 'rev-parse', '--show-toplevel'],
+                    stderr=subprocess.DEVNULL,
+                ).decode().strip()
+                runs_dir = Path(root) / '.claude-organic' / 'runs'
+            except Exception:  # noqa: BLE001
+                runs_dir = Path(__file__).resolve().parents[3] / '.claude-organic' / 'runs'
+
+            lm_cli = _import_launch_metrics_cli()
+            result = lm_cli.aggregate_recent_launch(last=last, runs_dir=runs_dir)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('metrics.launch_latency failed: %s', exc)
+            self._send_error(500, f'aggregate_recent_launch failed: {exc}')
+            return
+
+        self._send_json({
+            'ok': True,
+            'data': {
+                'last': last,
+                'runs_scanned': result.get('runs_scanned', 0),
+                'events_total': result.get('events_total', 0),
+                'distribution': result.get('distribution', {
+                    'count': 0,
+                    'p50': None,
+                    'p95': None,
+                    'p99': None,
+                    'min': None,
+                    'max': None,
+                    'mean': None,
+                }),
+                'slow_spawns': result.get('slow_spawns', []),
+                'per_run': result.get('per_run', []),
+            },
+        })
