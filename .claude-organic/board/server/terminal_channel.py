@@ -461,7 +461,7 @@ class TerminalSSEChannel:
     # subtype 별 클라이언트가 top-level 로 접근하는 필드 계약.
     # 신규 subtype 추가 시 이 표에 명시하지 않으면 클라이언트에서 raw 경유로 접근해야 한다.
     _SYSTEM_TOP_LEVEL_FIELDS: dict[str, tuple[str, ...]] = {
-        'task_started': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
+        'task_started': ('task_id', 'tool_use_id', 'description', 'last_tool_name', 'task_count', 'task_index'),
         'task_progress': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
         'task_notification': ('task_id', 'tool_use_id', 'status', 'summary'),
         'process_exit': ('exit_code',),
