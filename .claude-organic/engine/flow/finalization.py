@@ -496,6 +496,67 @@ def _detect_stage_header_leak(log_tail: str) -> tuple[bool, str]:
     return False, ""
 
 
+def _detect_worktree_commit_missing(abs_work_dir: str) -> tuple[bool, str]:
+    """워크트리에 변경 >= 1 + commits ahead = 0 패턴 감지 (T-465 advisory detector).
+
+    T-453 / T-457 워커 commit 누락 재현 패턴:
+    - develop..HEAD commits ahead = 0  (커밋 없음)
+    - git diff --name-only HEAD 변경 >= 1  (변경은 있음)
+
+    Args:
+        abs_work_dir: 워크트리 내 절대경로 (work_dir 또는 git 트리 내 경로)
+
+    Returns:
+        (True, detail): 회귀 패턴 감지
+        (False, ""): 정상 또는 검사 불가
+
+    Note:
+        advisory only — status 전이 / kanban move / sentinel 생성 0건.
+        subprocess 직접 호출 (worktree_manager import 금지 — finalization.py 독립성 캐논).
+    """
+    try:
+        # git root 탐지 — abs_work_dir 가 git tree 내부라는 가정
+        proc_root = subprocess.run(
+            ["git", "-C", abs_work_dir, "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if proc_root.returncode != 0:
+            return (False, "")
+        git_root = proc_root.stdout.strip()
+
+        # commits ahead 측정 (develop..HEAD)
+        proc_ahead = subprocess.run(
+            ["git", "-C", git_root, "rev-list", "--count", "develop..HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if proc_ahead.returncode != 0:
+            return (False, "")
+        ahead = int(proc_ahead.stdout.strip())
+        if ahead != 0:
+            return (False, "")
+
+        # 변경 파일 존재 여부 (HEAD 와 비교, staged + unstaged)
+        proc_diff = subprocess.run(
+            ["git", "-C", git_root, "diff", "--name-only", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if proc_diff.returncode != 0:
+            return (False, "")
+        modified = [ln for ln in proc_diff.stdout.splitlines() if ln.strip()]
+        if not modified:
+            return (False, "")
+
+        return (True, f"commits_ahead=0, modified_files={len(modified)}")
+    except (subprocess.TimeoutExpired, ValueError, OSError):
+        return (False, "")
+
+
 def _capture_regression_patterns(
     abs_work_dir: str | None,
     status: str,
@@ -546,6 +607,8 @@ def _capture_regression_patterns(
         ("hook_deny", lambda: _detect_hook_deny(events)),
         ("empty_bash_card", lambda: _detect_empty_bash_card(events)),
         ("stage_header_leak", lambda: _detect_stage_header_leak(log_tail)),
+        # NEW (T-465): 워크트리 commits ahead = 0 + diff >= 1 패턴 (워커 commit 누락)
+        ("worktree_commit_missing", lambda: _detect_worktree_commit_missing(abs_work_dir)),
     ]
     for kind, detector in detectors:
         try:
