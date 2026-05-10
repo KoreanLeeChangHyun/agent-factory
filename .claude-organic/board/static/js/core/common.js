@@ -895,3 +895,142 @@ function setBranchStatusBar(branchName) {
 Board.util.setBranchStatusBar = setBranchStatusBar;
 Board.util.BRANCH_ICON_SVG = BRANCH_ICON_SVG;
 
+// ── Info Modal Helper ──
+//
+// Single-confirm-button informational modal.
+// Replaces native alert() calls throughout the Board UI with an accessible,
+// theme-consistent overlay.
+//
+// Usage:
+//   Board.util.showInfoModal("Title", "Body text", { severity: "warning", onClose: fn });
+//
+// SVG icons per severity:
+//   info    — circle with 'i' indicator (Lucide circle-info style)
+//   warning — triangle alert (Lucide triangle-alert style)
+//   error   — circle with 'x' (Lucide circle-x style)
+
+var _infoModalCounter = 0;
+
+var _INFO_MODAL_ICONS = {
+  info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="12" r="10"/>'
+    + '<line x1="12" y1="16" x2="12" y2="12"/>'
+    + '<line x1="12" y1="8" x2="12.01" y2="8"/>'
+    + '</svg>',
+  warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
+    + '<line x1="12" y1="9" x2="12" y2="13"/>'
+    + '<line x1="12" y1="17" x2="12.01" y2="17"/>'
+    + '</svg>',
+  error: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="12" r="10"/>'
+    + '<line x1="15" y1="9" x2="9" y2="15"/>'
+    + '<line x1="9" y1="9" x2="15" y2="15"/>'
+    + '</svg>',
+};
+
+/**
+ * Displays an informational modal dialog with a single confirm button.
+ *
+ * Replaces native alert() calls throughout the Board UI with an accessible,
+ * theme-consistent overlay. Supports three severity levels (info / warning / error)
+ * with distinct SVG icons. Keyboard (ESC) and overlay-click dismissal are both
+ * supported.
+ *
+ * @param {string} title - Dialog title text (required).
+ * @param {string} body  - Dialog body text (required). Rendered as textContent — no HTML injection.
+ * @param {Object} [options]
+ * @param {Function} [options.onClose]     - Called when the modal is dismissed by any method.
+ * @param {'info'|'warning'|'error'} [options.severity='info'] - Determines icon and modifier class.
+ * @param {string} [options.confirmText='확인'] - Label for the confirm button.
+ */
+function showInfoModal(title, body, options) {
+  var opts = options || {};
+  var severity = (opts.severity === 'warning' || opts.severity === 'error') ? opts.severity : 'info';
+  var confirmText = opts.confirmText || '확인';
+  var onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
+
+  var uid = 'info-modal-title-' + (++_infoModalCounter);
+
+  // ── Build overlay ──
+  var overlay = document.createElement('div');
+  overlay.className = 'info-modal-overlay';
+
+  // ── Build dialog ──
+  var dialog = document.createElement('div');
+  dialog.className = 'info-modal-dialog is-' + severity;
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', uid);
+
+  // ── Icon (static trusted SVG string — no user data interpolated) ──
+  var iconEl = document.createElement('div');
+  iconEl.className = 'info-modal-icon';
+  iconEl.innerHTML = _INFO_MODAL_ICONS[severity];
+
+  // ── Title ──
+  var titleEl = document.createElement('h3');
+  titleEl.className = 'info-modal-title';
+  titleEl.id = uid;
+  titleEl.textContent = title;
+
+  // ── Body ──
+  var bodyEl = document.createElement('p');
+  bodyEl.className = 'info-modal-body';
+  bodyEl.textContent = body;
+
+  // ── Actions ──
+  var actionsEl = document.createElement('div');
+  actionsEl.className = 'info-modal-actions';
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.className = 'info-modal-btn is-' + severity;
+  confirmBtn.textContent = confirmText;
+
+  actionsEl.appendChild(confirmBtn);
+
+  // ── Assemble dialog ──
+  dialog.appendChild(iconEl);
+  dialog.appendChild(titleEl);
+  dialog.appendChild(bodyEl);
+  dialog.appendChild(actionsEl);
+
+  overlay.appendChild(dialog);
+
+  // ── Cleanup function ──
+  function closeModal() {
+    document.removeEventListener('keydown', onKeyDown);
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (onClose) onClose();
+  }
+
+  // ── Event: ESC key ──
+  function onKeyDown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    }
+  }
+  document.addEventListener('keydown', onKeyDown);
+
+  // ── Event: overlay backdrop click (not dialog interior) ──
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  // ── Event: confirm button click ──
+  confirmBtn.addEventListener('click', closeModal);
+
+  // ── Mount + auto-focus confirm button ──
+  document.body.appendChild(overlay);
+  confirmBtn.focus();
+}
+
+Board.util.showInfoModal = showInfoModal;
+
