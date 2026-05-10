@@ -518,7 +518,7 @@
         M.setClaudeMdDirty(false);
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        alert("Failed to save CLAUDE.md.");
+        Board.util.showInfoModal("저장 실패", "Failed to save CLAUDE.md.", { severity: "error" });
       }
     });
   };
@@ -922,7 +922,7 @@
         M.refreshMemoryFileList();
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        alert("Failed to save file.");
+        Board.util.showInfoModal("저장 실패", "Failed to save file.", { severity: "error" });
       }
     });
   };
@@ -939,7 +939,7 @@
         M.persistContexts();
         M.renderSubMemory();
       } else {
-        alert("Failed to delete file.");
+        Board.util.showInfoModal("삭제 실패", "Failed to delete file.", { severity: "error" });
       }
     });
   };
@@ -953,7 +953,7 @@
 
     for (var i = 0; i < Board.state.memoryFiles.length; i++) {
       if (Board.state.memoryFiles[i].name === filename) {
-        alert('File "' + filename + '" already exists.');
+        Board.util.showInfoModal("파일 생성 차단", 'File "' + filename + '" already exists.', { severity: "warning" });
         return;
       }
     }
@@ -965,7 +965,7 @@
         M.persistContexts();
         M.renderSubMemory();
       } else {
-        alert("Failed to create file.");
+        Board.util.showInfoModal("생성 실패", "Failed to create file.", { severity: "error" });
       }
     });
   };
