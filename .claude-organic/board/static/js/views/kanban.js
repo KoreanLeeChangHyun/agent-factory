@@ -2120,8 +2120,16 @@
         if (targetCol === "In Progress") {
           if (draggedFrom !== "Open") {
             // To Do 등 다른 컬럼에서 직접 In Progress 이동은 차단
-            alert("To Do 카드는 직접 In Progress 로 옮길 수 없습니다. 먼저 Open 으로 이동하세요.");
-            renderKanban();
+            Board.util.showInfoModal(
+              "To Do → In Progress 규칙",
+              "To Do 카드는 직접 In Progress 로 옮길 수 없습니다.\n먼저 Open 으로 이동하세요.",
+              {
+                severity: "info",
+                onClose: function () {
+                  renderKanban();
+                }
+              }
+            );
             return;
           }
           const ticketObj = (Board.state.TICKETS || []).find(function (t) {
