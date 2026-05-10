@@ -63,8 +63,13 @@ workDir: .workflow/20260209-143000/로그인기능추가/implement
 | `kanban_status` | 칸반 상태 | 칸반 FSM 5상태 (To Do / Open / In Progress / Review / Done); ticket XML `<status>` |
 | `artifact` | 산출물 | work/WXX-*.md 중간 산출물; 커밋 코드 파일 |
 | `final_report` | 최종 보고서 | report.md (Reporter 산출물); 본 템플릿 기반으로 생성되는 보고서 |
-| `phase_verify` | 단계 검증 | phase_verifier.py; VALIDATE 단계 rule-based 검증 |
-| `ticket_validate` | 티켓 검수 | flow-validate, flow-validate-p; prompt_validator.py; plan_validator.py |
+| `phase_verify` | 단계 검증 | phase_verifier.py; flow-validate; plan_validator.py; VALIDATE 단계 rule-based 검증 |
+| `ticket_validate` | 티켓 검수 | flow-validate-p; prompt_validator.py |
 | `verifier_failure` | 검증기 실패 | VALIDATE 단계 phase_verifier 반환 실패; failure_handler.py |
 | `validator_failure` | 검수 실패 | 티켓 프롬프트/플랜 검수 실패; Review → Open DnD 명시 거부 |
 | `retry_context` | 재시도 컨텍스트 | failure_handler.py; retry-context.json (오케스트레이터 재시도 주입 데이터) |
+| `workflow_init` | 워크플로우 시작 | flow-init 사이클 진입점; initialization.py |
+| `phase_init` | 단계 시작 | flow-phase workflow_phase 진입 배너; phase 시작 신호 |
+| `phase_update` | 단계 진행 갱신 | flow-update status·context 갱신; status.json 필드 |
+| `phase_finish` | 단계 종료 | flow-step end · flow-phase 종료 배너; phase 전이 종료 |
+| `workflow_finish` | 워크플로우 종결 | flow-finish 사이클 종결점; finalization.py |
