@@ -664,6 +664,79 @@ def _capture_regression_patterns(
             pass
 
 
+def _run_audit_hook(
+    abs_work_dir: str,
+    ticket_number: str | None,
+    status: str,
+) -> bool:
+    """Step 4c-AUDIT — Auditor T3 LLM advisory hook (비차단).
+
+    advisory only: verdict 결과가 어떤 칸반 전이/머지 흐름도 차단·강제하지 않는다.
+    호출 실패 시 finalization 흐름 영향 0 — 모든 예외를 try/except 으로 감싸 WARN
+    로그만 남기고 통과한다 (T-411 finalize AND-gate 폐지 캐논 인용).
+
+    Skip 조건 — 아래 중 하나라도 해당하면 hook 자체를 호출하지 않는다 (디스패처가
+    이미 status=='완료'/ticket_number 보장 시 호출):
+      1. ``HOOK_AUDITOR_T3`` 환경변수가 'true' (대소문자 무시) 가 아닌 경우
+      2. ``ticket_number`` 가 falsy (None / 빈 문자열) 인 경우
+      3. ``status`` 가 '완료' 가 아닌 경우 (실패 워크플로우는 LLM 비용 회피)
+
+    Args:
+        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로 (work_dir).
+        ticket_number: 'T-NNN' 티켓 번호 또는 None.
+        status: '완료' 또는 '실패'.
+
+    Returns:
+        True  — hook 이 실행되어 verdict 가 정상 산출된 경우.
+        False — skip 또는 예외로 verdict 가 산출되지 못한 경우.
+                어느 쪽이든 finalize 흐름은 비차단으로 통과한다.
+    """
+    if os.getenv("HOOK_AUDITOR_T3", "false").lower() != "true":
+        return False
+    if not ticket_number or status != "완료":
+        return False
+
+    model: str = os.getenv("AUDITOR_T3_MODEL", "sonnet")
+    effort: str = os.getenv("AUDITOR_T3_EFFORT", "low")
+    _append_log(
+        abs_work_dir,
+        "INFO",
+        f"FINALIZE_STEP4C_AUDIT: ticket={ticket_number} model={model} effort={effort}",
+    )
+
+    try:
+        # Local import — 비차단 캐논 보장 + auditor 패키지 import 실패도 finalize
+        # 흐름에 영향 0. flow.auditor.runner 가 .claude-organic/engine/ 배치 (sys.path
+        # 는 상단에서 등록 완료) 에 있으므로 정상 환경에서는 import 성공.
+        from flow.auditor.runner import run_auditor
+
+        verdict = run_auditor(
+            abs_work_dir,
+            model=model,
+            effort=effort,
+            ticket_id=ticket_number,
+        )
+    except Exception as exc:  # noqa: BLE001 — advisory only, 모든 예외 흡수
+        _append_log(
+            abs_work_dir,
+            "WARN",
+            f"FINALIZE_STEP4C_AUDIT_FAIL: ticket={ticket_number} error={type(exc).__name__}: {exc}",
+        )
+        return False
+
+    _append_log(
+        abs_work_dir,
+        "INFO",
+        (
+            f"FINALIZE_STEP4C_AUDIT_DONE: ticket={ticket_number} "
+            f"verdict={verdict.overall} tokens_in={verdict.tokens_in} "
+            f"tokens_out={verdict.tokens_out} cost_usd={verdict.cost_usd} "
+            f"duration_ms={verdict.duration_ms}"
+        ),
+    )
+    return True
+
+
 def main() -> None:
     """CLI 진입점. 인자 파싱 후 워크플로우 마무리 6단계를 순서대로 실행한다.
 
@@ -970,6 +1043,20 @@ def main() -> None:
                     ["python3", KANBAN_PY, "update-result", ticket_number] + update_args,
                     "Step 4b: ticket result workflow update",
                 )
+
+    # ── Step 4c-AUDIT: Auditor T3 LLM judge advisory hook (비차단) ──
+    # advisory only — verdict 결과가 어떤 칸반 전이/머지 흐름도 차단·강제 X.
+    # 호출 실패 시 finalization 흐름 영향 0 (T-411 finalize AND-gate 폐지 캐논).
+    # 활성화: HOOK_AUDITOR_T3=true (.claude-organic/.settings 또는 .env).
+    if abs_work_dir is not None:
+        try:
+            _run_audit_hook(abs_work_dir, ticket_number, status)
+        except Exception as _audit_exc:  # noqa: BLE001 — 2중 안전망
+            _append_log(
+                abs_work_dir,
+                "WARN",
+                f"FINALIZE_STEP4C_AUDIT_OUTER_FAIL: ticket={ticket_number} error={type(_audit_exc).__name__}: {_audit_exc}",
+            )
 
     # ── Step 4wt: worktree 유지 (Review 단계, merge 금지) ──
     # worktree가 활성화된 경우, Review 상태에서 worktree를 유지한다.
