@@ -14,6 +14,9 @@
 (function () {
   const { esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY } = Board.util;
 
+  // ── Relations Display ──
+  const MAX_VISIBLE_RELATIONS = 5;
+
   // ── T-475 Stage 3: launch 비동기화 — 클라이언트 상태 머신 ──
   // idle → submitting → starting → running (LAUNCH_STARTED 수신) | failed (LAUNCH_FAILED / 사용자 선택)
   //
@@ -232,6 +235,11 @@
   // Done 카드 머지 정합성 verdict. key=ticket number, value={verdict,reason,details}.
   // "pending" 값 = 조회 중. undefined = 미조회.
   var _doneVerdictMap = {};
+
+  // ── Audit Verdict Cache (T-477) ──
+  // Review 카드 Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
+  // "pending" = 조회 중. undefined = 미조회.
+  var _auditVerdictMap = {};
 
   // ── Active Branch Ticket (T-433 Phase 2) ──
   // 메인 working tree 가 현재 활성화한 feature 브랜치의 ticket 번호 (예: "T-433"). null = develop.
@@ -460,6 +468,69 @@
     }
   }
 
+  /**
+   * T-477: Auditor T3 audit verdict badge HTML 생성 (renderKanban 내 인라인 호출).
+   * combined === "NONE" 이면 빈 문자열 반환 (DOM 마운트 X).
+   * @param {string} ticketNum - 티켓 번호
+   * @returns {string} span.audit-badge HTML 또는 빈 문자열
+   */
+  function renderAuditBadgeHtml(ticketNum) {
+    var data = _auditVerdictMap[ticketNum];
+    if (!data || data === "pending") {
+      // 로딩 중 또는 미조회 — 자리만 예약 (숨김)
+      return '<span class="audit-badge audit-loading" style="display:none"></span>';
+    }
+    var combined = (data && data.combined) || "NONE";
+    if (combined === "NONE") return "";
+    var cls = "audit-badge";
+    if (combined === "PASS") cls += " audit-pass";
+    else if (combined === "WARN") cls += " audit-warn";
+    else if (combined === "FAIL") cls += " audit-fail";
+    // tooltip: hard_gate_failed 목록 (있으면)
+    var tip = "Auditor T3: " + combined;
+    var hgf = data.tier2 && data.tier2.hard_gate_failed;
+    if (hgf && hgf.length) {
+      tip += " — hard gate FAIL: " + hgf.join(", ");
+    }
+    return '<span class="' + cls + '" title="' + tip.replace(/"/g, "&quot;") + '">' + combined + "</span>";
+  }
+
+  /**
+   * T-477: Review 카드 단일 audit verdict fetch + DOM 배지 패치.
+   * 결과를 _auditVerdictMap 에 캐시. 폴링 없음 — 카드 mount 시 1회.
+   * @param {string} ticketNum - 티켓 번호
+   */
+  function fetchAndRenderAuditVerdict(ticketNum) {
+    if (_auditVerdictMap[ticketNum] !== undefined) return;
+    _auditVerdictMap[ticketNum] = "pending";
+
+    fetch("/api/kanban/audit/verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        _auditVerdictMap[ticketNum] = data;
+        if ((data.combined || "NONE") === "NONE") return; // 배지 미표시
+        // DOM 패치: 해당 Review 카드의 로딩 placeholder 교체
+        var placeholder = document.querySelector(
+          '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .audit-badge'
+        );
+        if (placeholder) {
+          var newHtml = renderAuditBadgeHtml(ticketNum);
+          if (newHtml) {
+            var tmp = document.createElement("span");
+            tmp.innerHTML = newHtml;
+            var newEl = tmp.firstChild;
+            placeholder.parentNode.replaceChild(newEl, placeholder);
+          }
+        }
+      })
+      .catch(function () {
+        _auditVerdictMap[ticketNum] = { tier1: null, tier2: null, combined: "NONE" };
+      });
+  }
+
   /** Fetches all tickets via /api/kanban (single request). */
   function fetchTickets() {
     return fetch("/api/kanban", { cache: "no-store" }).then(function (res) {
@@ -571,14 +642,229 @@
       "blocks":       { prefix: "\u2192", cssClass: "rel-blocks" },    // →
     };
 
+    const relations = ticket.relations;
+    const visible = relations.length > MAX_VISIBLE_RELATIONS
+      ? relations.slice(0, MAX_VISIBLE_RELATIONS)
+      : relations;
+    const overflow = relations.length > MAX_VISIBLE_RELATIONS
+      ? relations.length - MAX_VISIBLE_RELATIONS
+      : 0;
+
     let parts = [];
-    ticket.relations.forEach(function (rel) {
+    visible.forEach(function (rel) {
       const info = typeMap[rel.type] || { prefix: "\u2194", cssClass: "rel-other" };
       const numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
       parts.push('<span class="rel-item ' + info.cssClass + '">' + info.prefix + numStr + "</span>");
     });
 
+    if (overflow > 0) {
+      const ticketNum = ticket.number || "";
+      const encodedRelations = esc(JSON.stringify(relations));
+      const totalCount = relations.length;
+      parts.push(
+        '<button class="rel-overflow-chip"' +
+        ' data-ticket="' + esc(ticketNum) + '"' +
+        ' data-relations="' + encodedRelations + '"' +
+        ' aria-label="\uad00\uacc4 ' + totalCount + '\uac1c \ubaa8\ub450 \ubcf4\uae30">' +
+        '+' + overflow +
+        '</button>'
+      );
+    }
+
     return '<div class="card-relations">' + parts.join("") + "</div>";
+  }
+
+  // ── Relations Popover ──
+  // Single popover policy: only one #rel-popover-active exists at a time.
+  // Close triggers: ESC key, document overlay click outside popover, hover leave
+  // (card + popover both) with 200ms debounce.
+
+  /** @type {number|null} setTimeout handle for hover-leave debounce */
+  var _relPopoverLeaveTimer = null;
+
+  /** @type {boolean} guard: ensures bindRelationsPopoverEvents runs only once */
+  var _relPopoverBound = false;
+
+  /**
+   * Removes the active relations popover from the DOM, if present.
+   * Also clears any pending hover-leave close timer.
+   */
+  function hideRelationsPopover() {
+    if (_relPopoverLeaveTimer !== null) {
+      clearTimeout(_relPopoverLeaveTimer);
+      _relPopoverLeaveTimer = null;
+    }
+    var existing = document.getElementById("rel-popover-active");
+    if (existing) existing.remove();
+  }
+
+  /**
+   * Creates and positions the relations popover anchored to triggerEl.
+   * Applies viewport boundary flip (top / right-align) when popover would overflow.
+   *
+   * @param {HTMLElement} triggerEl - .rel-overflow-chip element that was activated
+   * @param {Array<{type: string, ticket: string}>} relations - full relations array
+   */
+  function showRelationsPopover(triggerEl, relations) {
+    hideRelationsPopover();
+
+    var typeMap = {
+      "derived-from": { prefix: "←", cssClass: "rel-derived" },  // ←
+      "depends-on":   { prefix: "⇐", cssClass: "rel-depends" },  // ⇐
+      "blocks":       { prefix: "→", cssClass: "rel-blocks" },   // →
+    };
+
+    // Build list HTML — prefix + ticket# + type label per row
+    var listHtml = '<ul class="rel-popover-list" role="list">';
+    relations.forEach(function (rel) {
+      var info = typeMap[rel.type] || { prefix: "↔", cssClass: "rel-other" };
+      var numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
+      var label = rel.type === "derived-from" ? "파생"   // 파생
+        : rel.type === "depends-on" ? "의존"             // 의존
+        : rel.type === "blocks" ? "차단"                 // 차단
+        : esc(rel.type);
+      listHtml += '<li class="rel-popover-item ' + info.cssClass + '">'
+        + '<span class="rel-popover-prefix">' + info.prefix + '</span>'
+        + '<span class="rel-popover-num">T-' + esc(numStr) + '</span>'
+        + '<span class="rel-popover-type">' + label + '</span>'
+        + '</li>';
+    });
+    listHtml += '</ul>';
+
+    var popover = document.createElement("div");
+    popover.id = "rel-popover-active";
+    popover.className = "rel-popover";
+    popover.setAttribute("role", "tooltip");
+    popover.setAttribute("aria-label", "관계 " + relations.length + "개 전체"); // 관계 N개 전체
+    popover.innerHTML = listHtml;
+    document.body.appendChild(popover);
+
+    // Position: left-aligned below trigger; flip right/top if viewport overflow
+    var rect = triggerEl.getBoundingClientRect();
+    var scrollX = window.scrollX || window.pageXOffset;
+    var scrollY = window.scrollY || window.pageYOffset;
+    var vpW = document.documentElement.clientWidth;
+    var vpH = document.documentElement.clientHeight;
+    var popW = popover.offsetWidth;
+    var popH = popover.offsetHeight;
+
+    var left = rect.left + scrollX;
+    var top = rect.bottom + scrollY + 4;
+
+    // Horizontal: right-align to trigger if right edge overflows
+    if (rect.left + popW > vpW) {
+      left = Math.max(0, rect.right + scrollX - popW);
+    }
+
+    // Vertical: show above trigger if not enough space below
+    if (rect.bottom + 4 + popH > vpH) {
+      top = rect.top + scrollY - popH - 4;
+      if (top < scrollY) top = scrollY + 4; // clamp to viewport top
+    }
+
+    popover.style.left = left + "px";
+    popover.style.top = top + "px";
+
+    // Keep-alive: entering popover cancels the hover-leave close timer
+    popover.addEventListener("mouseenter", function () {
+      if (_relPopoverLeaveTimer !== null) {
+        clearTimeout(_relPopoverLeaveTimer);
+        _relPopoverLeaveTimer = null;
+      }
+    });
+    popover.addEventListener("mouseleave", function () {
+      _scheduleRelPopoverClose();
+    });
+
+    // Store trigger for focus restoration on ESC
+    popover._relTriggerEl = triggerEl;
+  }
+
+  /**
+   * Schedules popover close after 200ms debounce.
+   * Cancelled if cursor re-enters the popover or the trigger chip.
+   */
+  function _scheduleRelPopoverClose() {
+    if (_relPopoverLeaveTimer !== null) clearTimeout(_relPopoverLeaveTimer);
+    _relPopoverLeaveTimer = setTimeout(function () {
+      _relPopoverLeaveTimer = null;
+      hideRelationsPopover();
+    }, 200);
+  }
+
+  /**
+   * Binds delegated event listeners for relations popover on document.
+   * Must be called once at module init time (guarded by _relPopoverBound).
+   * Delegates to document so listeners survive kanban re-renders.
+   *
+   * Triggers:
+   *   - click on .rel-overflow-chip → open (toggle: second click closes)
+   *   - mouseenter on .rel-overflow-chip → hover-open
+   *   - mouseleave on .rel-overflow-chip → schedule close (200ms debounce)
+   *   - click outside popover and chip → close
+   *   - ESC key → close + restore focus to trigger
+   */
+  function bindRelationsPopoverEvents() {
+    if (_relPopoverBound) return;
+    _relPopoverBound = true;
+
+    // Click: open/toggle popover (capture phase to intercept before card click handler)
+    document.addEventListener("click", function (e) {
+      var chip = e.target.closest(".rel-overflow-chip");
+      if (chip) {
+        e.stopPropagation();
+        var existing = document.getElementById("rel-popover-active");
+        // Toggle: click on same chip again → close
+        if (existing && existing._relTriggerEl === chip) {
+          hideRelationsPopover();
+          return;
+        }
+        var relStr = chip.dataset.relations;
+        var relations;
+        try { relations = JSON.parse(relStr); } catch (_e) { relations = []; }
+        showRelationsPopover(chip, relations);
+        return;
+      }
+      // Click outside both chip and popover → close
+      var pop = e.target.closest("#rel-popover-active");
+      if (!pop) {
+        hideRelationsPopover();
+      }
+    }, true);
+
+    // Hover open: mouseenter on overflow chip
+    document.addEventListener("mouseenter", function (e) {
+      var chip = e.target.closest(".rel-overflow-chip");
+      if (!chip) return;
+      if (_relPopoverLeaveTimer !== null) {
+        clearTimeout(_relPopoverLeaveTimer);
+        _relPopoverLeaveTimer = null;
+      }
+      var relStr = chip.dataset.relations;
+      var relations;
+      try { relations = JSON.parse(relStr); } catch (_e) { relations = []; }
+      showRelationsPopover(chip, relations);
+    }, true);
+
+    // Hover leave: chip mouseleave → debounce close
+    document.addEventListener("mouseleave", function (e) {
+      var chip = e.target.closest(".rel-overflow-chip");
+      if (chip) {
+        _scheduleRelPopoverClose();
+      }
+    }, true);
+
+    // ESC key → close popover, restore focus to trigger chip
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" || e.key === "Esc") {
+        var pop = document.getElementById("rel-popover-active");
+        if (pop) {
+          var trigger = pop._relTriggerEl;
+          hideRelationsPopover();
+          if (trigger) trigger.focus();
+        }
+      }
+    });
   }
 
   /**
@@ -2358,6 +2644,9 @@
 
   /** Renders the kanban board with columns, cards, and sort controls. */
   function renderKanban() {
+    // Dismiss any stale popover before re-rendering the board DOM
+    hideRelationsPopover();
+
     const el = document.getElementById("view-kanban");
     // 컬럼별 스크롤 위치 캡처 — innerHTML 교체로 잃어버리는 scrollTop 복원용
     const scrollPositions = {};
@@ -2479,6 +2768,10 @@
             // T-441: Done 카드 verdict 배지 (advisory)
             if (col.key === "Done") {
               h += renderDoneVerdictBadge(t.number);
+            }
+            // T-477: Review 카드 Auditor T3 audit 배지 (advisory only)
+            if (col.key === "Review") {
+              h += renderAuditBadgeHtml(t.number);
             }
             h += "</div>";
             h += "</div>";
@@ -2616,6 +2909,14 @@
       if (num) {
         // 미조회 카드만 fetch (캐시 히트 시 스킵)
         fetchAndRenderVerdict(num);
+      }
+    });
+
+    // T-477: Review 카드 audit verdict fetch 트리거 (advisory)
+    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+      var num = card.dataset.num;
+      if (num) {
+        fetchAndRenderAuditVerdict(num);
       }
     });
 
@@ -2938,4 +3239,13 @@
   Board.kanban = Board.kanban || {};
   Board.kanban.handleLaunchEvent = handleLaunchEvent;
   Board.kanban.restoreLaunchStateFromStorage = restoreLaunchStateFromStorage;
+
+  // T-473: Bind relations popover delegated events once at module init time.
+  // bindRelationsPopoverEvents() is idempotent (_relPopoverBound guard),
+  // but we call it once here to ensure listeners are registered before first render.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindRelationsPopoverEvents);
+  } else {
+    bindRelationsPopoverEvents();
+  }
 })();

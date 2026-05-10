@@ -68,6 +68,14 @@ HOOK_CATALOG_SYNC=true
 # user-prompt-submit hooks (메인 세션 칸반/세션 스냅샷 주입)
 HOOK_USER_PROMPT_KANBAN=true
 
+# Auditor T3 — LLM judge advisory layer (T-477).
+# 기본 비활성 (사용자 명시 활성화 필요, 추측 기반 자동 강제 정책 캐논 준수).
+# 활성화 시 finalization.py Step 4c-AUDIT 가 비차단 advisory 로 호출된다 — verdict
+# 결과는 어떤 칸반 전이/머지 흐름도 차단·강제하지 않는다 (T-411 캐논).
+HOOK_AUDITOR_T3=false
+AUDITOR_T3_MODEL=sonnet
+AUDITOR_T3_EFFORT=low
+
 # -----------------------------------------------------------------------------------------
 # (4) 강제 규칙 제어 플래그 (ENFORCE_* 체계)
 # true/false로 각 강제 규칙의 활성/비활성을 제어합니다.

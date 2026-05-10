@@ -13,17 +13,25 @@ Main agent controls workflow sequencing and agent dispatch only.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PLAN
+    [*] --> NONE
+    NONE --> INIT
+    INIT --> PLAN
+    INIT --> FAIL: 초기화 실패
     PLAN --> WORK: 계획 완료
     PLAN --> STALE: TTL 만료
-    WORK --> REPORT
-    WORK --> FAILED: 실패
-    REPORT --> DONE: 성공
-    REPORT --> FAILED: 실패
+    PLAN --> FAIL: 실패
+    WORK --> VALIDATE
+    WORK --> FAIL: 실패
     WORK --> CANCELLED: 중지
     WORK --> STALE: TTL 만료
+    VALIDATE --> REPORT: 통과/경고
+    VALIDATE --> FAIL: 작업내역 전체 누락
+    REPORT --> DONE: 성공
+    REPORT --> FAIL: 실패
     REPORT --> CANCELLED: 중지
     REPORT --> STALE: TTL 만료
+    DONE --> [*]
+    FAIL --> [*]
 ```
 
 ## Step Order
@@ -143,6 +151,7 @@ flow-claude end <registryKey>             # 워크플로우 종료
 | WORK Phase start | `flow-phase 0` (MUST FIRST), Phase 0 -> Phase 1~N | Phase 0 스킵 (**CRITICAL VIOLATION**), progress 텍스트 |
 | WORK in progress | Next worker call (parallel/sequential) | Planner re-call, autonomous augmentation, 내부 추론 텍스트 |
 | WORK done | `flow-step start`, reporter call | Work summary, 내부 추론 텍스트 |
+| VALIDATE done | `flow-phase-verify` 실행, REPORT 진행 (통과/경고 시) | Validation report summary, 내부 추론 텍스트, 자동 회귀 트리거 |
 | REPORT done | `flow-update status DONE`, `flow-finish`, `flow-claude end` -> **turn 즉시 종료** | Report summary, post-DONE text, 추가 도구 호출 |
 
 [^1]: autoApprove=false(`-n` 플래그 지정) 시에만 AskUserQuestion 허용. `-n` 미지정(기본) 시 PLAN~DONE 전 구간 AskUserQuestion 0회
@@ -176,6 +185,10 @@ cd "$(flow-init <command> --ticket T-NNN | tail -1)"
 | `worktreePath` | INIT | 워크트리 절대경로 (cwd 전환용) |
 
 **종료 코드:** 0=성공, 1=티켓 비어있음, 2=인자 오류, 4=초기화 실패
+
+### Init Verification (Advisory)
+
+`_phase_verify_init` (initialization.py:581) 가 init-result.json 생성 후 자동 호출된다. **advisory only** — `quality_score < 0.6` 시 `[WARN]` workflow.log 기록만 수행하며 blocking 0건. PLAN 진입은 정상 진행되고 PLAN Step 2-pre 의 Prompt Quality Check 가 동일 score 를 재사용하여 planner 프롬프트에 품질 경고 블록을 자동 추가한다 (아래 PLAN 섹션 Prompt Quality Check 참조).
 
 INIT 완료 후 즉시 PLAN 진행. INIT 결과 요약/출력 MUST NOT.
 
@@ -222,6 +235,7 @@ Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, requ
 
 planner가 `작성완료` 반환 직후:
 1. **plan_validator.py** -- `validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""` (advisory, non-blocking)
+   > **advisory only**. exit 0 고정 (`|| true` 패턴), 실패해도 WORK 진행. hard gate 는 다음 Step 2c 의 `flow-skillmap` (exit 2 시 planner revise 재호출 최대 3회).
 2. **`flow-step end <registryKey> planSubmit`** -- PLAN 완료 배너 (**1회만**)
 3. **즉시** Auto-Approve Gate로 진행
 
@@ -384,6 +398,8 @@ reporter가 보고서(`{workDir}/report.md`) + summary.txt 생성. 실패 시 `P
 
 > **report.md 존재 advisory (T-447)**: `flow-finish` Step 1(status.json 완료 처리) 직후, `emit_report_advisory`가 `{workDir}/report.md` 디스크 존재 여부를 자동 검증한다. 파일이 없으면 WARN 로그 + `report.missing` metrics 이벤트만 emit. **advisory only** — 강제 전이 / kanban move / 자동 회귀 절대 금지 (T-411 폐지 사례 캐논, commit 0c970fa). WARN 로그가 있어도 `flow-claude end` turn 종료에 영향 없음 (Post-DONE Silence Rules 호환). 사용자 수동 수습 경로 보존: 메인 세션에서 work/ 통합 후 report.md 작성 가능.
 
+> **VALIDATE 단계 산출물 검증 흡수 완료 (T-453)**: T-453 신설 VALIDATE phase 가 산출물 정합성 검증을 hard-gate 로 흡수했다. DONE 시점의 `emit_report_advisory` 는 보조 advisory 만 수행하며 자동 차단 트리거 금지 (T-411 캐논).
+
 ### Post-REPORT Flow (REPORT -> DONE)
 
 ```bash
@@ -452,6 +468,21 @@ flow-claude end <registryKey>                                                   
 | AskUserQuestion unavailable in sub-agents | GitHub Issue #12890 |
 | Sub-agent Bash output not visible to user | Step banners must be called by orchestrator |
 | No direct sub-agent-to-sub-agent invocation | All dispatch through orchestrator |
+
+---
+
+## Verify Wrappers (Advisory vs Hard-Gate)
+
+LLM 이 1회 read 로 어느 wrapper 가 차단하고 어느 wrapper 가 advisory 인지 판별 가능하도록 명문화.
+
+| Phase | Wrapper (call site) | Strength | Failure Action |
+|-------|---------------------|----------|----------------|
+| INIT | `_phase_verify_init` (initialization.py:581) | Advisory | `quality_score < 0.6` 시 `[WARN]` workflow.log 기록만 수행. blocking 0건. planner 호출 정상 진행 |
+| PLAN | `flow-validate` (plan_validator.py 경유) | Advisory | exit 0 고정. 실패해도 WORK 진행. hard gate 는 다음 Step 2c 의 `flow-skillmap` (exit 2 시 planner revise 재호출 최대 3회) |
+| VALIDATE | `flow-phase-verify` | Hard-Gate | validator "실패" + 작업내역 전체 누락 시 REPORT 차단 + `flow-update status FAILED` 전이. 빌드 FAIL 등 다른 사유는 soft (정상 진행) |
+| DONE | `emit_report_advisory` (worker_return_parser.py:125) | Advisory | `report.md` 부재 시 `[WARN]` 로그 + `report.missing` metrics emit. 강제 전이/kanban move/자동 회귀 0건 |
+
+> **T-411 폐기 사례 캐논 (commit 0c970fa)**: 추측 기반 자동 차단/강제 전이/칸반 자동 회귀 정책 절대 도입 금지 (MUST NOT). advisory wrapper 는 WARN 로그 + metrics emit 까지만 수행하며, 사용자 수동 수습 경로를 항상 보존한다. VALIDATE phase 의 hard-gate 도 "작업내역 전체 누락" 단일 조건에 한정.
 
 ---
 
