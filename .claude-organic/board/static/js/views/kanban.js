@@ -591,12 +591,12 @@
         var msg = (r.data && r.data.error) || "commit 실패";
         btn.classList.remove("is-commiting");
         btn.disabled = false;
-        alert(ticket + " commit 실패: " + msg);
+        Board.util.showInfoModal("커밋 실패", ticket + " commit 실패: " + msg, { severity: "error" });
       }
     }).catch(function (err) {
       btn.classList.remove("is-commiting");
       btn.disabled = false;
-      alert(ticket + " commit 요청 실패: " + (err && err.message ? err.message : err));
+      Board.util.showInfoModal("커밋 실패", ticket + " commit 요청 실패: " + (err && err.message ? err.message : err), { severity: "error" });
     });
   }
 
@@ -1839,16 +1839,14 @@
             } else {
               if (r.body.error_kind === "derived_blocked") {
                 const derivedList = (r.body.derived_tickets || []).join(", ") || "(목록 없음)";
-                alert("삭제 차단: 파생 티켓이 미완료 상태입니다.\n\n미완료 파생 티켓: " + derivedList + "\n\n파생 티켓을 먼저 완료하세요.");
+                Board.util.showInfoModal("삭제 차단", "삭제 차단: 파생 티켓이 미완료 상태입니다.\n\n미완료 파생 티켓: " + derivedList + "\n\n파생 티켓을 먼저 완료하세요.", { severity: "warning", onClose: function () { renderKanban(); } });
               } else {
-                alert("삭제 실패: " + ((r.body && r.body.message) || "알 수 없는 오류"));
+                Board.util.showInfoModal("삭제 실패", "삭제 실패: " + ((r.body && r.body.message) || "알 수 없는 오류"), { severity: "error", onClose: function () { renderKanban(); } });
               }
-              renderKanban();
             }
           }).catch(function (err) {
             console.error("[kanban Open contextmenu] delete failed:", err);
-            alert("삭제 실패: " + err.message);
-            renderKanban();
+            Board.util.showInfoModal("삭제 실패", "삭제 실패: " + err.message, { severity: "error", onClose: function () { renderKanban(); } });
           });
         },
         function () {
@@ -1951,12 +1949,10 @@
         if (r.res.ok && r.body.ok) {
           fetchTickets().then(renderKanban);
         } else {
-          alert("재작업 전이 실패: " + ((r.body && r.body.error) || "알 수 없는 오류"));
-          renderKanban();
+          Board.util.showInfoModal("재작업 실패", "재작업 전이 실패: " + ((r.body && r.body.error) || "알 수 없는 오류"), { severity: "error", onClose: function () { renderKanban(); } });
         }
       }).catch(function (err) {
-        alert("재작업 요청 실패: " + (err && err.message ? err.message : err));
-        renderKanban();
+        Board.util.showInfoModal("재작업 실패", "재작업 요청 실패: " + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
       });
     });
 
@@ -2133,8 +2129,7 @@
         // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
         // T-418: Open 카드를 Done 이외 컬럼으로 drop 시도 시 기존 To Do ↔ Open 전이 로직으로 처리
         if (draggedFrom === "Review" && targetCol !== "Done" && targetCol !== "Open") {
-          alert("Review 카드는 Done 또는 Open 컬럼으로만 드래그할 수 있습니다.");
-          renderKanban();
+          Board.util.showInfoModal("DnD 차단", "Review 카드는 Done 또는 Open 컬럼으로만 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
           return;
         }
 
@@ -2180,8 +2175,7 @@
                 fetchTickets().then(function () { renderKanban(); });
               }).catch(function (err) {
                 console.error("[kanban DnD] submit failed:", err);
-                alert("워크플로우 실행 실패: " + err.message);
-                renderKanban();
+                Board.util.showInfoModal("워크플로우 실행 실패", "워크플로우 실행 실패: " + err.message, { severity: "error", onClose: function () { renderKanban(); } });
               });
             },
             function () {
@@ -2194,8 +2188,7 @@
           // T-906: Review → Done drop 분기
           // T-418: Open → Done 직접 전이 분기 추가
           if (draggedFrom !== "Review" && draggedFrom !== "Open") {
-            alert("Review 또는 Open 카드만 Done 으로 드래그할 수 있습니다.");
-            renderKanban();
+            Board.util.showInfoModal("DnD 차단", "Review 또는 Open 카드만 Done 으로 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
             return;
           }
           const doneTicketObj = (Board.state.TICKETS || []).find(function (t) {
@@ -2289,8 +2282,7 @@
 
         // To Do 는 Open 으로만 이동 허용 (Review/그 외 차단)
         if (draggedFrom === "To Do" && targetCol !== "Open") {
-          alert("To Do 카드는 Open 컬럼으로만 드래그할 수 있습니다.");
-          renderKanban();
+          Board.util.showInfoModal("DnD 차단", "To Do 카드는 Open 컬럼으로만 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
           return;
         }
 
@@ -2313,7 +2305,7 @@
           fetchTickets().then(function () { renderKanban(); });
         }).catch(function (err) {
           console.error("[kanban DnD] move failed:", err);
-          alert("티켓 이동 실패: " + err.message);
+          Board.util.showInfoModal("티켓 이동 실패", "티켓 이동 실패: " + err.message, { severity: "error" });
         });
       });
     });
@@ -2548,11 +2540,11 @@
           var msg = verdictFail.dataset.verdictMsg || "develop HEAD 가 머지 commit 아님";
           var verdictData = ticketNum ? _doneVerdictMap[ticketNum] : null;
           var detail = (verdictData && verdictData.details) || {};
-          var fullMsg = "[T-441 머지 정합성 FAIL]\n\n" + msg;
-          if (detail.develop_head) fullMsg += "\n\ndevelop HEAD : " + detail.develop_head.slice(0, 8);
-          if (detail.merge_commit) fullMsg += "\nmerge commit: " + detail.merge_commit.slice(0, 8);
-          fullMsg += "\n\n이 티켓의 변경분이 develop 에 정상 반영되지 않았을 수 있습니다.\n※ advisory only — 자동 재머지 없음. 수동으로 확인하세요.";
-          alert(fullMsg);
+          var bodyMsg = msg;
+          if (detail.develop_head) bodyMsg += "\n\ndevelop HEAD : " + detail.develop_head.slice(0, 8);
+          if (detail.merge_commit) bodyMsg += "\nmerge commit: " + detail.merge_commit.slice(0, 8);
+          bodyMsg += "\n\n이 티켓의 변경분이 develop 에 정상 반영되지 않았을 수 있습니다.\n※ advisory only — 자동 재머지 없음. 수동으로 확인하세요.";
+          Board.util.showInfoModal("머지 정합성 FAIL", bodyMsg, { severity: "warning" });
           return;
         }
         const num = card.dataset.num;

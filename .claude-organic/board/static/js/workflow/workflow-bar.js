@@ -1076,7 +1076,7 @@
               if (m) ticketId = m[1];
             }
             if (!sessionId && !ticketId) {
-              alert("세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.");
+              Board.util.showInfoModal("세션 정보 없음", "세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.", { severity: "warning" });
               return;
             }
             stopBtn.disabled = true;
@@ -1098,7 +1098,7 @@
             }).then(function (result) {
               if (!result.ok || !result.data.ok) {
                 var errMsg = (result.data && result.data.errors && result.data.errors[0]) || "알 수 없는 오류";
-                alert("중지 실패: " + errMsg);
+                Board.util.showInfoModal("중지 실패", "중지 실패: " + errMsg, { severity: "error" });
                 stopBtn.disabled = false;
                 stopBtn.textContent = "중지";
                 return;
@@ -1108,7 +1108,7 @@
                 Board.workflowSessions.refresh();
               }
             }).catch(function (err) {
-              alert("중지 요청 중 오류가 발생했습니다: " + err.message);
+              Board.util.showInfoModal("중지 요청 오류", "중지 요청 중 오류가 발생했습니다: " + err.message, { severity: "error" });
               stopBtn.disabled = false;
               stopBtn.textContent = "중지";
             });

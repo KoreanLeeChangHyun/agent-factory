@@ -188,7 +188,7 @@
         M.setQuickPromptDirty(id, false);
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        alert("Failed to save quick prompt: " + id);
+        Board.util.showInfoModal("저장 실패", "Failed to save quick prompt: " + id, { severity: "error" });
       }
     });
   };
