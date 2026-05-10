@@ -30,6 +30,17 @@ permissionMode: bypassPermissions
 
 태스크 배정 시 아래 3단계를 순서대로 적용한다.
 
+### 모델 라우팅 4계층
+
+단일 진실 공급원: `.claude/skills/workflow-agent/SKILL.md` "에이전트 역할 개요". 본 표는 디스패치 시 빠른 조회용 사본.
+
+| 계층 | 모델 | 사고 강도 | 적용 에이전트 |
+|------|------|----------|---------------|
+| xhigh | opus | ultrathink | planner, worker-opus |
+| high | sonnet | think harder | worker-sonnet |
+| medium | sonnet | (none) | explorer, explorer-file-sonnet, explorer-web-sonnet |
+| low | haiku, sonnet | (none) | explorer-file-haiku, validator, reporter |
+
 ① **복잡도 점수**: 수정 파일 수 / 변경 라인 수 / 연관 도메인 폭을 종합 평가
 ② **성격 유형 분류**: M(Modify·단일 파일 수정) / S(Scope-bounded·다중 파일 ≤ 3) / E(Explorer·탐색) / L(Large-refactor·대규모 리팩토링)
 ③ **Tier × 성격 매트릭스 조회**: Tier 1(T1·단순) / Tier 2(T2·중간) / Tier 3(T3·복잡) 조합으로 에이전트 결정
