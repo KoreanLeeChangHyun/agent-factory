@@ -34,12 +34,12 @@ permissionMode: bypassPermissions
 
 단일 진실 공급원: `.claude/skills/workflow-agent/SKILL.md` "에이전트 역할 개요". 본 표는 디스패치 시 빠른 조회용 사본.
 
-| 계층 | 모델 | 사고 강도 | 적용 에이전트 |
-|------|------|----------|---------------|
-| xhigh | opus | ultrathink | planner, worker-opus |
-| high | sonnet | think harder | worker-sonnet |
-| medium | sonnet | (none) | explorer, explorer-file-sonnet, explorer-web-sonnet |
-| low | haiku, sonnet | (none) | explorer-file-haiku, validator, reporter |
+| 계층 | 복잡도 | 에이전트 | 모델 | 사고 강도 |
+|------|--------|---------|------|----------|
+| xhigh | Tier 3 / 아키텍처·FSM·hook 변경 | planner, worker-opus | opus | ultrathink |
+| high | Tier 2 / 일반 구현·수정 | worker-sonnet | sonnet | think harder |
+| medium | Tier 2 이하 / 탐색·분석 | explorer, explorer-file-sonnet, explorer-web-sonnet | sonnet | (none) |
+| low | Tier 1 / 단순 스캔·검증·보고 | explorer-file-haiku, validator, reporter | haiku, sonnet | (none) |
 
 ① **복잡도 점수**: 수정 파일 수 / 변경 라인 수 / 연관 도메인 폭을 종합 평가
 ② **성격 유형 분류**: M(Modify·단일 파일 수정) / S(Scope-bounded·다중 파일 ≤ 3) / E(Explorer·탐색) / L(Large-refactor·대규모 리팩토링)
