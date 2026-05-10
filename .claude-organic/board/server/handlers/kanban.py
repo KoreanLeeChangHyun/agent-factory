@@ -115,11 +115,15 @@ class KanbanHandlerMixin:
                     return True
         return False
 
-    def _git_switch(self, branch: str, project_root: str) -> tuple[bool, str]:
+    def _git_switch(self, branch: str, project_root: str, ignore_other_worktrees: bool = False) -> tuple[bool, str]:
         """메인 working tree 에서 ``git switch <branch>`` 실행. (ok, stderr_or_msg)."""
+        cmd = ['git', 'switch']
+        if ignore_other_worktrees:
+            cmd.append('--ignore-other-worktrees')
+        cmd.append(branch)
         try:
             r = subprocess.run(
-                ['git', 'switch', branch],
+                cmd,
                 cwd=project_root, capture_output=True, text=True, timeout=10,
             )
         except subprocess.TimeoutExpired:
@@ -213,7 +217,7 @@ class KanbanHandlerMixin:
             })
             return
 
-        ok, msg = self._git_switch(feat_branch, project_root)
+        ok, msg = self._git_switch(feat_branch, project_root, ignore_other_worktrees=True)
         if not ok:
             self._send_json({
                 'ok': False,
