@@ -150,3 +150,88 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | "티켓 편집해줘" | /wf -e N | - |
 | "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o | To Do 자동 (기본·유일 경로) |
 | "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o → DnD | To Do 생성 후 사용자가 칸반 DnD 로 Open 승격 |
+
+## Review 단계 1차 룰베이스 자동 검증 (advisory)
+
+> T-463 박제 (2026-05-10). Review 컬럼 진입 직후 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시한다. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건** (캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa, T-413 commit 1ce3c2d). 사용자는 verdict FAIL 이어도 Review→Done DnD 강행 가능.
+
+### 검증 룰 카탈로그 (13 룰 / 6 카테고리)
+
+#### R-EXIST (산출물 존재, 4룰)
+
+| ID | 룰 | 검사 대상 | 통과 조건 |
+|----|----|---------|----------|
+| R-EXIST-1 | report.md 존재 (hard-fail) | `<work_dir>/report.md` | 파일 존재 + size > 0 |
+| R-EXIST-2 | plan.md 존재 | `<work_dir>/plan.md` | 파일 존재 + size > 0 (research 명령 SKIP) |
+| R-EXIST-3 | status.json 존재 | `<work_dir>/status.json` | 파일 존재 + JSON parse + `workflow_phase` 키 |
+| R-EXIST-4 | metrics.jsonl 존재 | `<work_dir>/metrics.jsonl` | 파일 존재 + 줄 수 ≥ 1 |
+
+#### R-METRIC (metrics.jsonl event_type 발화, 3룰)
+
+| ID | 룰 | 통과 조건 |
+|----|----|----------|
+| R-METRIC-1 | step.start / step.end 페어링 | 5 phase (INIT/PLAN/WORK/REPORT/DONE) start ↔ end 짝 일치 |
+| R-METRIC-2 | step.end DONE outcome (hard-fail) | 마지막 step.end{step=DONE}.outcome == "ok" |
+| R-METRIC-3 | tool.deny 0건 | tool.deny event 0건 (≥1 시 advisory FAIL) |
+
+#### R-GUARD (가드 4종 정합, 3룰)
+
+| ID | 룰 | 통과 조건 |
+|----|----|----------|
+| R-GUARD-1 | worktree 모드 활성 | `.context.json: worktree.enabled == true` |
+| R-GUARD-2 | feature branch 존재 | `.context.json: worktree.featureBranch` 가 `git branch --list` 매칭 |
+| R-GUARD-3 | regression.pattern 0건 | `metrics.jsonl` 의 regression.pattern (5종) 0건 |
+
+> regression.pattern 5종: worker_false_success / hook_deny / empty_bash_card / stage_header_leak / worktree_commit_missing
+
+#### R-PATH (산출물 path 정합, 1룰)
+
+| ID | 룰 | 통과 조건 |
+|----|----|----------|
+| R-PATH-1 | report.md → plan.md 링크 매칭 | report.md 본문 plan.md 토큰 + 실제 plan.md 위치 매칭 (research 외 명령) |
+
+#### R-FSM (FSM 종착점, 1룰)
+
+| ID | 룰 | 통과 조건 |
+|----|----|----------|
+| R-FSM-1 | status.json workflow_phase | workflow_phase ∈ {DONE, FAILED} (Review 진입 직후 finalization 종료) |
+
+#### R-WT (워크트리 변경, 1룰)
+
+| ID | 룰 | 통과 조건 |
+|----|----|----------|
+| R-WT-1 | commits ahead ≥ 1 또는 SKIP | `git rev-list --count develop..HEAD` ≥ 1 (research/review 명령 SKIP) |
+
+### WARN / FAIL 임계 (advisory only)
+
+- **PASS**: 13 룰 위반 0건
+- **WARN**: 1~2 룰 위반 (hard-fail 0건)
+- **FAIL**: 3+ 룰 위반 또는 hard-fail 룰 1건 이상 (R-EXIST-1, R-METRIC-2)
+- **SKIP**: workflow_phase != DONE/FAILED (워크플로우 미종료 시점)
+
+### advisory 보장 8항 (T-463 §10 박제)
+
+본 검증은 다음 지점에서 advisory only 를 보장한다:
+
+1. review_verdict.py — kanban move / status 전이 / sentinel 호출 0건
+2. finalization.py W04 hook 직후 — try/except 흡수 비차단
+3. workflow.md (본 섹션) — advisory only 명시 박제
+4. Board API endpoint — GET only
+5. UI 배지 — tooltip only (클릭 자동 액션 0건)
+6. DnD 핸들러 — verdict 결과로 차단 분기 0건
+7. metrics.jsonl emit — regression.pattern 재사용 (신규 event_type 등록 0건)
+8. W26 validator — 자동 강제 정책 0건 검수표 작성
+
+### 사용자 안내
+
+- verdict FAIL 이어도 Review→Done DnD 강행 가능 — advisory 권고일 뿐 차단 아님
+- 배지 색: PASS=청록 / WARN=앰버 / FAIL=주홍 / SKIP/UNKNOWN=숨김
+- 배지 hover 시 violations 목록 tooltip 표시
+
+### 후속 트랙 (3-tier AI 리뷰 구조)
+
+| Tier | 검증 방식 | 트리거 | 상태 |
+|------|---------|------|------|
+| 1차 | 룰베이스 자동 (본 섹션) | finalization 자동 | T-463 도입 |
+| 2차 | LLM 자동 | finalization 자동 | 별도 티켓 (T-477) |
+| 3차 | 사용자 트리거 외부 cross-review | DnD 또는 명령 | 별도 티켓 (T-416 종속) |
