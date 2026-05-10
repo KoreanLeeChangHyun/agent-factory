@@ -109,15 +109,15 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 ### 기타 bin wrapper
 - flow-claude: start, end
-- flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env
-- flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)
-- flow-step: start, end  # `work_step` 단위 진입/종료 배너 (WORK 내부 태스크 경계)
-- flow-phase: (registryKey N)  # `workflow_phase` 전이 경계 배너 (INIT/PLAN/WORK/VALIDATE/REPORT)
+- flow-update: status, both, task-start, task-status, context, link-session, usage-pending, usage, usage-finalize, env  # `phase_update` 단계 진행 갱신
+- flow-finish: (registryKey 완료|실패 --ticket-number T-NNN)  # `workflow_finish` 사이클 종결점
+- flow-step: start, end  # `work_step` 단위 진입/종료 배너; `phase_finish` 종료 배너 (WORK 내부 태스크 경계)
+- flow-phase: (registryKey N)  # `phase_init` 진입 / `phase_finish` 종료 배너 (`workflow_phase` 전이 경계)
 - flow-skillmap: (registryKey)
-- flow-init: (command title [--mode full] [--ticket T-NNN]) — 기존 위치 인자 [mode] [#N]도 하위호환 지원
+- flow-init: (command title [--mode full] [--ticket T-NNN]) — 기존 위치 인자 [mode] [#N]도 하위호환 지원  # `workflow_init` 사이클 진입점
 - flow-reload: (workDir)
 - flow-skill: archive|activate|list [skill_name]
-- flow-validate: (plan_path)  # `ticket_validate` 후속 호출 — plan.md 산출물 검증 (`phase_verify`)
+- flow-validate: (plan_path)  # `phase_verify` 본체 — plan.md 산출물 단계 검증 (rule-based)
 - flow-validate-p: (prompt_file_path)  # `ticket_validate` 본체 — 티켓 XML prompt 필드 완성도 검수
 - flow-recommend: (task_description)
 - flow-gc: [project_root]
