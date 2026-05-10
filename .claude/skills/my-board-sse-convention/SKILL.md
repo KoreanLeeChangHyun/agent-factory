@@ -1,6 +1,6 @@
 ---
 name: my-board-sse-convention
-description: "TRIGGER: board 자체 SSE 코드(.claude-organic/board/static/js/core/sse.js, .claude-organic/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점 ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched."
+description: "TRIGGER: board 자체 SSE 코드(.claude-organic/board/static/js/core/sse.js, .claude-organic/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. 또는 refreshKanban / refreshWorkflow dom 갱신 폭주 진단 시, renderWorkflow 회귀 / shell vs tbody 분리 문제 시, EventSource 재연결·wfInitialized race 의심 시. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점·is_user_visible SSOT ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched."
 license: "Apache-2.0"
 ---
 
@@ -33,6 +33,30 @@ license: "Apache-2.0"
 | `terminal_*` (`stdout`/`result`/`system`/`permission`/`skill_listing`/`workflow_step`) | terminal_channel 별개 broadcast | NDJSON → SSE 매핑 (`terminal_channel.py:180-186`) | `terminal_sse_channel.broadcast` |
 | `archived_end` (sync 채널) | curl bash 부트스트랩 종료 | `{...}` | `handlers/sync.py:286` |
 
+### 1.1.1 사용자 가시성 정책 (SSOT)
+
+`.claude-organic/board/server/event_filter.py:is_user_visible` 헬퍼가 모든 SSE broadcast 와 REST history replay 의 사용자 가시성 게이트키퍼입니다.
+
+- `isMeta=True` 인 이벤트(Claude Code 하네스가 주입하는 Skill/command 래퍼 user 메시지)는 `False` 반환 → 사용자 채널 제외.
+- 새 SSE 이벤트 타입 추가 시 이 헬퍼의 분기를 갱신하지 않으면 **자동 노출 또는 자동 누락 회귀**가 발생합니다.
+- `terminal_channel.py:broadcast` 와 REST `/terminal/workflow/history` 양쪽에서 동일하게 호출합니다.
+- 사용자 가시성 정책을 변경할 때는 **이 파일 한 곳만** 수정합니다 (단일 진실 공급원).
+
+### 1.1.2 terminal_channel SSE 매핑
+
+`terminal_channel.py:broadcast` 가 NDJSON `event_type` 을 SSE `event_name` 으로 변환합니다 (소스: `terminal_channel.py:180-186`, `sse_client_manager.py:_NDJSON_EVENT_MAP`).
+
+| NDJSON event_type | SSE event_name | is_user_visible | broadcast 위치 |
+| --- | --- | --- | --- |
+| `stream_event` (text_delta / input_json_delta) | `stdout` | True (isMeta 없으면) | `terminal_channel.py:broadcast` |
+| `result` | `result` | True | `terminal_channel.py:broadcast` |
+| `system` | `system` | True (isMeta 없으면) | `terminal_channel.py:broadcast` |
+| `control_request` | `permission` | True | `terminal_channel.py:broadcast` |
+| `attachment` (skill_listing) | `skill_listing` | True | `terminal_channel.py:broadcast` |
+| (직접 emit) | `workflow_step` | True | `terminal_channel.py:emit_step` |
+
+> `_SYSTEM_TOP_LEVEL_FIELDS` 계약 (`.claude-organic/board/server/terminal_channel.py:_SYSTEM_TOP_LEVEL_FIELDS`): `system` 이벤트 subtype 별로 클라이언트가 top-level 로 접근하는 필드를 명시. 신규 subtype 추가 시 이 dict 에 등록하지 않으면 클라이언트는 `raw` 경유로만 접근 가능.
+
 ### 1.2 Broadcast API
 
 `sse_client_manager.py:254` 의 `SSEManager.broadcast(event_type, files=None, data=None)`:
@@ -53,11 +77,24 @@ license: "Apache-2.0"
 ### 1.4 백엔드 반례
 
 - `broadcast(evt, files=[...], data={...})` — files 가 silently 무시됨 (data 우선)
-- 새 `WATCH_DIRS` 항목 추가 후 `pollChanges` (`sse.js:249-270`) 분기 누락
+- 새 `WATCH_DIRS` 항목 추가 후 `pollChanges` (`sse.js:263-303`) 분기 누락
 - broadcast 시 큰 payload 직렬화 실패 → 모든 클라이언트 끊김 (try/except 누락 시)
 - terminal_channel 과 sse_client_manager 두 채널을 같은 wfile 에서 함께 사용 (lock 정책 충돌)
 
 ## 2. 프론트엔드 — SSE 트리거 수신 시 dom 갱신 규약
+
+### 2.0 sse.js 핵심 함수 맵
+
+| 함수명 | 위치 | 책임 | 호출 트리거 |
+| --- | --- | --- | --- |
+| `initSSE` | `sse.js:148` | EventSource 연결 초기화, 실패 시 polling fallback + scheduleSSERetry | 앱 초기화 1회 + scheduleSSERetry 콜백 |
+| `pollChanges` | `sse.js:263` | `/poll` 단일 요청 후 다음 폴 예약 | startPolling() 최초 호출, 자기 재귀 |
+| `scheduleSSERetry` | `sse.js:306` | 30초 후 initSSE 재시도 예약 (중복 방지 가드 내장) | onerror / initSSE timeout |
+| `refreshKanban` | `sse.js:53` | 칸반 데이터 fetch + prevTicketJson 가드 + renderKanban | SSE `kanban` 이벤트 / polling / onopen |
+| `refreshWorkflow` | `sse.js:95` | 워크플로우 목록 fetch + prevWfJson 가드 + loadMoreWorkflows | SSE `workflow` 이벤트 / polling / onopen |
+| `refreshMemory` | `sse.js:121` | Board.render.refreshMemory 위임 | SSE `memory` 이벤트 / polling |
+| `refreshDashboard` | `sse.js:112` | 대시보드 파일 전체 fetch + activeTab 조건부 render | SSE `dashboard` 이벤트 / polling / onopen |
+| `refreshRoadmap` | (Board.render 위임) | Board.render.refreshRoadmap 위임 | SSE `roadmap` 이벤트 / polling |
 
 ### 2.1 핵심 패턴: shell vs tbody 분리 (MUST)
 
@@ -160,7 +197,7 @@ fetchA.then(function (a) {
 
 - 페이지 로드 직후 비어있는 매핑(예: 모든 행 "(미연결)") 고착 → race 의심
 - DevTools Network 에서 fetch 끝 시각 비교 → 늦은 fetch 의 콜백 누락 확인
-- 1.4 패턴으로 늦은 fetch 콜백에 ready 가드 + tbody 재호출 추가
+- 2.6 패턴으로 늦은 fetch 콜백에 ready 가드 + tbody 재호출 추가
 - `wfInitialized`·`bInitialized` 같은 플래그가 SSOT — 중간에 false 로 토글 금지
 
 ### 3.3 EventSource 재연결
@@ -184,20 +221,21 @@ fetchA.then(function (a) {
 
 ## 4. 반례 (절대 하지 말 것)
 
-- `el.innerHTML = h` 로 검색바·헤더 포함 dom 통째 재구성 → focus·스크롤·selection 폭주 reset
-- prevJson 가드 누락 → SSE 이벤트마다 무한 재렌더 → 검색·스크롤 frozen
-- `es.onerror` 후 `es.close()` 호출 안 함 → 브라우저 자동 재연결 무한 루프
-- shell 갱신마다 `addEventListener` 등록 → 메모리 누수 + 동일 이벤트 중복 발사
+- `el.innerHTML = h` 로 검색바·헤더 포함 dom 통째 재구성 → focus·스크롤·selection 폭주 reset (innerHTML 통째 교체)
+- prevJson 가드 누락 → SSE 이벤트마다 무한 재렌더 → 검색·스크롤 frozen (prevJson 가드 누락)
+- `es.onerror` 후 `es.close()` 호출 안 함 → 브라우저 자동 재연결 무한 루프 (무한 SSE 재연결)
+- shell 갱신마다 `addEventListener` 등록 → 메모리 누수 + 동일 이벤트 중복 발사 (addEventListener 중복 등록)
 - IntersectionObserver disconnect 누락 → 페이지네이션 무한 트리거
 - `WATCH_DIRS` 에 이벤트 타입 추가하면서 프론트 핸들러(`es.addEventListener` + `pollChanges` 분기) 미등록
 - `broadcast(evt, files=[...], data={...})` 동시 지정 → files 가 silently 무시됨
+- `wfInitialized` 플래그를 중간에 false 로 토글 → race 경쟁 재발 (wfInitialized race)
 - 사용자 명시 동의 없이 자동 강제 정책·가드 도입 (auto memory `feedback_no_speculative_guards_2026-05-08` 캐논)
 - 사용자 명시 동의 없이 board 서버 재기동 (auto memory `feedback_server_restart_consent` 캐논)
 - 본 컨벤션 정의를 다른 룰 문서(`workflow.md`, `general.md`)에 복붙 — cross-reference 만 (단일 진실 공급원)
 
-## 5. 학습 사례 (2026-05-09)
+## 5. 학습 사례
 
-### renderWorkflow 폭주 + race 보정
+### renderWorkflow 폭주 + race 보정 (2026-05-09)
 
 - **증상**: Workflow 탭 모든 행 `(미연결)` + 검색 input 클릭 시 포커스 안 잡힘 + 스크롤 frozen
 - **원인 1 (race)**: `fetchTickets`(~344ms, XML 379개 파싱)가 `fetchWorkflowEntries`+50개 detail(~50ms)보다 늦어, `Board.state.TICKETS=[]` 인 상태로 첫 워크플로우 렌더 → 모든 행 미연결 고착. `fetchTickets` 콜백이 `renderKanban` 만 호출하고 `renderWorkflow` 미호출이라 영구 고착.
@@ -206,7 +244,7 @@ fetchA.then(function (a) {
   1. `renderWorkflow` → shell + `renderWfTbody` 분리 (`workflow.js`)
   2. `refreshWfSortIndicators(el)` — sort 화살표만 교체 (dom 교체 없이)
   3. SSE/race/input/sort 모두 `renderWfTbody` 호출 → tbody 만 교체, shell 보존
-  4. `fetchTickets` 콜백(`sse.js:315`)에 `wfInitialized` 가드 + `renderWfTbody` 호출 추가 (race 보정)
+  4. `fetchTickets` 콜백(`sse.js:352`)에 `wfInitialized` 가드 + `renderWfTbody` 호출 추가 (race 보정)
 - **관련 commits**: `0a66457`(SSE 트리거 추가), `7ff9066`(cache buster + trim 가드), `95221cb`(ticketNumber 응답), `c855c40`(티켓 컬럼 룰 강화), `ad8d9bd`(신구조 fold 우선) + 본 세션 패치(shell/tbody 분리 + race 보정)
 
 ## 6. 출처 / Cross-reference
