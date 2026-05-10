@@ -493,6 +493,8 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .rel-item {
@@ -503,6 +505,80 @@
 .rel-derived { color: #D97757; }
 .rel-depends { color: #dcdcaa; }
 .rel-blocks { color: #c586c0; }
+
+/* ── Overflow Chip (+M) ── */
+.rel-overflow-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.4;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: rgba(160, 160, 160, 0.2);
+  color: #cccccc;
+  border: 1px solid rgba(160, 160, 160, 0.3);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* reset button defaults */
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.rel-overflow-chip:hover {
+  background: rgba(217, 119, 87, 0.15);
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.35);
+}
+
+.rel-overflow-chip:focus-visible {
+  outline: 1px solid rgba(217, 119, 87, 0.6);
+  outline-offset: 1px;
+}
+
+/* ── Relations Popover ── */
+.rel-popover {
+  position: absolute;
+  z-index: 9000;
+  background: #2d2d30;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+  max-width: 280px;
+  pointer-events: auto;
+}
+
+.rel-popover-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rel-popover-item {
+  font-size: 11px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rel-popover-item.rel-derived { color: #D97757; }
+.rel-popover-item.rel-depends { color: #dcdcaa; }
+.rel-popover-item.rel-blocks  { color: #c586c0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rel-popover {
+    transition: none;
+  }
+}
 
 /* ── DnD: To Do ↔ Open 드래그 앤 드랍 (안전 DnD 정책) ── */
 .card-draggable {
