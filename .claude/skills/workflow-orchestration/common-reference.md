@@ -13,7 +13,7 @@
 
 | 용어 (영문) | 한글 표기 | 정의 |
 |-------------|----------|------|
-| **Step** | 스텝 | 워크플로우의 실행 단위. PLAN, WORK, REPORT, DONE, FAILED, CANCELLED, STALE 중 하나. |
+| **Step** | 스텝 | 워크플로우의 실행 단위. PLAN, WORK, VALIDATE, REPORT, DONE, FAILED, CANCELLED, STALE 중 하나. |
 | **command** | 명령어 | 사용자가 실행하는 작업 유형. implement, review, research 중 하나. |
 | **agent** | 에이전트 | 특정 Step을 전담하는 실행 주체. planner, worker, explorer, reporter 4개와 orchestrator로 구성. |
 | **sub-agent** | 서브에이전트 | orchestrator가 Task 도구로 호출하는 하위 에이전트. planner, worker, explorer, reporter가 해당. sub-agent 간 직접 호출은 금지. |
@@ -32,7 +32,7 @@
 | **FSM** | 유한 상태 기계 | Finite State Machine. 워크플로우의 Step 전이를 제어하는 상태 기계. 이중 가드(`.claude-organic/engine/flow/update_state.py` + `.claude-organic/hooks/pre-tool-use.py`)로 불법 전이를 차단. |
 | **transition** | 전이 | FSM에서 한 Step에서 다른 Step으로의 상태 변경. status.json의 transitions 배열에 이벤트 시퀀스로 기록됨. |
 | **Aggregate** | 애그리거트 | DDD 전술적 설계 패턴. 워크플로우 시스템에서 status.json(워크플로우 상태)이 Aggregate Root 역할. |
-| **mode** | 모드 | 워크플로우 실행 모드. PLAN->WORK->REPORT->DONE 단일 모드. |
+| **mode** | 모드 | 워크플로우 실행 모드. PLAN->WORK->VALIDATE->REPORT->DONE 단일 모드. |
 | **skill-map** | 스킬 맵 | Phase 0에서 생성되는 태스크별 command skill 매핑 결과. `<workDir>/work/skill-map.md`에 저장. Worker는 매핑 테이블에서 스킬 목록을 확인하고 필요한 스킬의 지침을 직접 로드. |
 | **Phase 0** | 준비 단계 | WORK Step 시작 시 1개 worker가 수행하는 준비 작업. 계획서에서 명시된 작업을 수행하기 위해 필요한 스킬을 `.claude/skills/` 디렉터리에서 탐색하고 `skill-map.md`로 매핑하는 단계. work 디렉터리 생성 및 skill-map 작성. 모든 워크플로우에서 필수 실행. |
 | **Phase 1+** | 작업 실행 단계 | Phase 0 완료 후 skill-map.md를 참조하여 계획서의 태스크를 Phase 순서대로 실행하는 단계. 각 Worker가 skill-map.md 매핑 테이블에서 스킬 목록을 확인하고, 해당 스킬의 COMPACT.md/SKILL.md를 직접 Read하여 작업 수행. skill-map.md가 없으면 Worker 자율 결정으로 진행. |
@@ -43,7 +43,7 @@
 | **report document** | 보고서 | reporter가 REPORT 단계에서 생성하는 결과 문서. `report.md`. |
 | **usage-pending** | 사용량 대기 등록 | Worker 호출 전 토큰 사용량 추적을 위해 등록하는 상태. |
 | **artifact** | 산출물 | 워크플로우 실행 과정에서 생성되는 파일. 계획서, 보고서, 작업 내역 등. |
-| **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. FSM Step과 1:1 대응. SKILL.md의 INIT/PLAN/WORK/REPORT/DONE 섹션에서 각 Step별 프로토콜을 정의. |
+| **Workflow Step** | 워크플로우 스텝 | 오케스트레이터 절차 순서. FSM Step과 1:1 대응. SKILL.md의 INIT/PLAN/WORK/VALIDATE/REPORT/DONE 섹션에서 각 Step별 프로토콜을 정의. |
 | **DONE** | (FSM Step/배너 명칭) | 워크플로우 완료를 나타내는 FSM Step이자 배너 명칭. 오케스트레이터가 flow-finish + flow-claude end로 마무리 수행. Agent-Step 매핑 테이블, Step 헤딩(DONE), 배너(Workflow <registryKey> DONE)에서 사용. |
 | **summary.txt** | 요약 파일 | reporter 에이전트가 생성하고, flow-finish(finalization.py)가 읽어서 history.md 갱신에 활용 |
 | **user_prompt.txt** | 사용자 프롬프트 파일 | 사용자 요청 원문 파일. `<workDir>/user_prompt.txt`에 저장. initialization.py가 상태별 디렉터리(`.kanban/open/`, `.kanban/progress/`, `.kanban/review/`)에서 `T-NNN.xml` 티켓 전체 XML을 읽어 workDir에 복사 후 상태를 in-progress로 전환. 티켓 파일은 `<metadata>` / `<relations>` / `<prompt>` / `<result>` 4요소 flat 구조를 가진다. `<metadata>`에 number/title/datetime/status/command가 위치하고, `<relations>`에 ticket 간 관계 링크가 위치하며, `<prompt>`에 goal/target/constraints/criteria/context가 위치하고, `<result>`에 workdir/registrykey 등 실행 결과가 위치한다. **XML 구조 SSoT 레퍼런스:** `.claude/skills/workflow-orchestration/references/T-NNN.xml` |
@@ -81,7 +81,7 @@ flowchart TD
 ```
 
 - **orchestrator**: 에이전트를 직접 호출하는 유일한 주체. 에이전트 간 직접 호출 금지.
-- **에이전트-Step 1:1 매핑**: 각 에이전트는 특정 Step을 전담 (planner=PLAN, skill_mapper.py=WORK Phase 0, worker/explorer=WORK Phase 1~N, validator=WORK Phase N+1, reporter=REPORT). DONE은 오케스트레이터가 flow-finish로 직접 처리.
+- **에이전트-Step 1:1 매핑**: 각 에이전트는 특정 Step을 전담 (planner=PLAN, skill_mapper.py=WORK Phase 0, worker/explorer=WORK Phase 1~N, validator=VALIDATE phase 전담, reporter=REPORT). DONE은 오케스트레이터가 flow-finish로 직접 처리.
 - **스킬 바인딩 이중 구조**: workflow skill은 frontmatter로 정적 바인딩, command skill은 skill-catalog.md로 동적 바인딩 (worker 전용).
 - **역할 경계 원칙**: 오케스트레이터는 조율(sequencing, dispatch, state management)만 수행하고 실제 작업(파일 수정, 계획서/보고서 작성)은 서브에이전트에 위임한다. 단, 플랫폼 제약 행위는 오케스트레이터가 직접 수행한다.
 
@@ -115,7 +115,7 @@ flowchart TD
 | worker-opus | WORK | workflow-agent | 전문화 스킬(Tier 2) + 프로젝트 스킬(Tier 3) 동적 로드 (계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback) | frontmatter `skills:` (workflow-agent) + 런타임 동적 (Tier 2 + Tier 3) |
 | worker-sonnet | WORK | workflow-agent | (worker-opus와 동일) | (worker-opus와 동일) |
 | explorer | WORK | workflow-agent | - | frontmatter `skills:` |
-| validator | WORK (Phase N+1) | workflow-agent | - | frontmatter `skills:` |
+| validator | VALIDATE | workflow-agent | - | frontmatter `skills:` |
 | reporter (sonnet) | REPORT | workflow-agent | - | frontmatter `skills:` |
 
 > **worker의 스킬 동적 로드 (3계층)**: worker는 `workflow-agent` skill만 frontmatter에 선언합니다. 전문화 스킬(Tier 2)과 프로젝트 스킬(Tier 3)은 4단계 우선순위(계획서 명시 > skills 파라미터 > 명령어 기본 매핑 > TF-IDF fallback)로 런타임에 결정됩니다.
@@ -229,7 +229,7 @@ worker-*/explorer는 코드 commit 행위를 수행하므로 **2줄** 형식을 
 | task-status | `<registryKey> <status> <id1> [id2] ...` 또는 `<registryKey> <taskId> <status>` (레거시) | 태스크 상태 갱신. 복수 ID 지원 (신규). 레거시 단일 ID 형식도 자동 감지. |
 
 - registryKey: `YYYYMMDD-HHMMSS` 형식. hook 초기화 출력에서 직접 사용 가능. 구성: `date + "-" + workId`. 전체 workDir 경로도 하위 호환.
-- agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet 공통), REPORT=`reporter`
+- agent 값: PLAN=`planner`, WORK=`worker` (worker-opus/sonnet 공통), VALIDATE=`validator`, REPORT=`reporter`
 
 > **Note:** 상태 전이 시각화는 `flow-update` 배너(shell alias)가 전담한다. `flow-update` 호출 시 "이전 상태 -> 현재 상태" 형식으로 ANSI 색상 강조 출력된다(fromStep은 status.json에서 자동 읽기). 그 후 `flow-step start`를 호출하여 시작 배너를 출력한다. (WORK-PHASE에서는 flow-update 스킵) task-start 모드는 task-status + usage-pending을 통합하므로 개별 호출이 불필요. 각각 개별 Bash 도구 호출로 실행하며, `&&`/`;` 체이닝은 불필요.
 
@@ -259,7 +259,7 @@ worker-*/explorer는 코드 commit 행위를 수행하므로 **2줄** 형식을 
 
 | Normal Flow | Branches |
 |-------------|----------|
-| `PLAN -> WORK -> REPORT -> DONE` | PLAN/WORK/REPORT->CANCELLED, PLAN/WORK/REPORT->FAILED, INIT/NONE->{STALE,FAILED,CANCELLED}, TTL->STALE |
+| `PLAN -> WORK -> VALIDATE -> REPORT -> DONE` | PLAN/WORK/VALIDATE/REPORT->CANCELLED, PLAN/WORK/VALIDATE/REPORT->FAILED, INIT/NONE->{STALE,FAILED,CANCELLED}, TTL->STALE |
 
 불법 전이 시 시스템 가드가 차단. `.claude-organic/engine/flow/update_state.py`는 전이 미수행(no-op), `.claude-organic/hooks/pre-tool-use.py`는 도구 호출 deny. 비상 시 WORKFLOW_SKIP_GUARD=1로 우회 가능.
 
@@ -298,7 +298,7 @@ plan.md의 가정 사항 항목에 `[가정]: [근거]` 형식을 권장한다. 
 | Situation | Action |
 |-----------|--------|
 | Hook initialization error | 최대 3회 재시도 (경고 로그 출력) |
-| Step error (PLAN/WORK/REPORT) | 최대 3회 재시도 후 에러 보고 |
+| Step error (PLAN/WORK/VALIDATE/REPORT) | 최대 3회 재시도 후 에러 보고 |
 | Independent task failure | 다른 독립 태스크는 계속 진행 |
 | Dependent task blocker failure | 해당 종속 체인 중단, 다른 체인 계속 |
 | Total failure rate > 50% | `[WARN]` 로그 기록 후 실패 태스크 skip, 남은 태스크 계속 실행. REPORT 단계에서 실패 태스크 보고 섹션 자동 포함 |
