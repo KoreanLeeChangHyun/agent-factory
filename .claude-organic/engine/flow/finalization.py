@@ -49,6 +49,14 @@ functions and does NOT directly access failure data structures.
 ## Regression Guard (T-411 Canon)
 Automatic forced status transitions / kanban auto-revert / commit-missing
 auto-detection / advisory-only validators MUST NOT be added to this module.
+
+T-463 Review 단계 1차 룰베이스 자동 검증 (advisory only) 추가:
+- W04 회귀 패턴 캡처 직후 호출, Step 4 kanban move 이전
+- review-verdict.json 작성 + WARN/FAIL 시 regression.pattern 재사용 emit
+- kanban move / status 전이 / sentinel 호출 0건 (advisory only 캐논 준수)
+- 비차단 try/except 흡수 — finalization 흐름에 영향 없음
+- T-411 폐기 (commit 0c970fa) 캐논 준수: 자동 강제 전이 0건
+- T-413 폐기 (commit 1ce3c2d) 캐논 준수: 사이드카 X / 흐름 안 통합
 """
 
 from __future__ import annotations
@@ -855,6 +863,59 @@ def main() -> None:
                     abs_work_dir,
                     "WARN",
                     f"FINALIZE_W04_REGRESSION: capture failed exc={_w04_exc}",
+                )
+            except Exception:
+                pass
+
+    # ── W04-RV(T-463): Review 단계 1차 룰베이스 자동 검증 (advisory only) ──
+    # 캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa,
+    #       T-413 commit 1ce3c2d (Auditor 사이드카 폐지).
+    # advisory only — kanban move / status 전이 / sentinel 호출 0건 보장. 비차단 try/except.
+    # 본 hook 은 review-verdict.json 작성과 advisory metrics emit 만 수행하며, finalization
+    # 흐름의 어떤 결정에도 영향을 주지 않는다. WARN/FAIL 도 자동 차단 0건 (사용자 DnD 강행 자유).
+    # 호출 시점: W04 회귀 패턴 캡처 직후, Step 4 kanban move review (L945) 직전.
+    # 이유: Board API 가 review-verdict.json 을 읽으려면 Review 컬럼 진입 전 파일이 존재해야 함.
+    if status == "완료" and ticket_number and abs_work_dir is not None:
+        try:
+            from flow.review_verdict import compute_review_verdict
+            _rv_result = compute_review_verdict(registry_key)
+            _rv_dict = _rv_result.to_dict()
+            _rv_path = os.path.join(abs_work_dir, "review-verdict.json")
+            with open(_rv_path, "w", encoding="utf-8") as _rv_f:
+                json.dump(_rv_dict, _rv_f, ensure_ascii=False, indent=2)
+            try:
+                _append_log(
+                    abs_work_dir,
+                    "INFO",
+                    f"FINALIZE_W04_RV: verdict={_rv_dict.get('verdict')} "
+                    f"violations={len(_rv_dict.get('violations', []))}",
+                )
+            except Exception:
+                pass
+            # advisory metrics emit: WARN/FAIL 만 emit (PASS 는 노이즈 회피).
+            # 신규 event_type 등록 0건 — 기존 regression.pattern 재사용 (kind 식별자만 신규).
+            _verdict_str = _rv_dict.get("verdict")
+            if _verdict_str in ("WARN", "FAIL"):
+                _kind_map = {
+                    "WARN": "review_verdict_warn",
+                    "FAIL": "review_verdict_fail",
+                }
+                _summary = (_rv_dict.get("reason") or "")[:500]
+                _safe_metrics_event(
+                    abs_work_dir,
+                    "regression.pattern",
+                    {
+                        "kind": _kind_map[_verdict_str],
+                        "signal_summary": _summary,
+                    },
+                )
+        except Exception as _rv_exc:
+            # 비차단: review verdict 실패해도 finalization 흐름 진행
+            try:
+                _append_log(
+                    abs_work_dir,
+                    "WARN",
+                    f"FINALIZE_W04_RV: review_verdict failed exc={_rv_exc}",
                 )
             except Exception:
                 pass
