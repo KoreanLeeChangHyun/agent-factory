@@ -14,6 +14,9 @@
 (function () {
   const { esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY } = Board.util;
 
+  // ── Relations Display ──
+  const MAX_VISIBLE_RELATIONS = 5;
+
   // ── Column Collapsed State (Done / To Do) ──
   // 컬럼 키별로 접힘 상태를 독립 저장한다. "Done"은 기존 키를 유지해 사용자 설정
   // 호환성을 보장하고, 그 외 컬럼(현재 "To Do")은 column-collapsed:<key> 형식.
@@ -553,12 +556,34 @@
       "blocks":       { prefix: "\u2192", cssClass: "rel-blocks" },    // →
     };
 
+    const relations = ticket.relations;
+    const visible = relations.length > MAX_VISIBLE_RELATIONS
+      ? relations.slice(0, MAX_VISIBLE_RELATIONS)
+      : relations;
+    const overflow = relations.length > MAX_VISIBLE_RELATIONS
+      ? relations.length - MAX_VISIBLE_RELATIONS
+      : 0;
+
     let parts = [];
-    ticket.relations.forEach(function (rel) {
+    visible.forEach(function (rel) {
       const info = typeMap[rel.type] || { prefix: "\u2194", cssClass: "rel-other" };
       const numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
       parts.push('<span class="rel-item ' + info.cssClass + '">' + info.prefix + numStr + "</span>");
     });
+
+    if (overflow > 0) {
+      const ticketNum = ticket.number || "";
+      const encodedRelations = esc(JSON.stringify(relations));
+      const totalCount = relations.length;
+      parts.push(
+        '<button class="rel-overflow-chip"' +
+        ' data-ticket="' + esc(ticketNum) + '"' +
+        ' data-relations="' + encodedRelations + '"' +
+        ' aria-label="\uad00\uacc4 ' + totalCount + '\uac1c \ubaa8\ub450 \ubcf4\uae30">' +
+        '+' + overflow +
+        '</button>'
+      );
+    }
 
     return '<div class="card-relations">' + parts.join("") + "</div>";
   }
