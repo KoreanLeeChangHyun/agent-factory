@@ -236,6 +236,15 @@
   // "pending" 값 = 조회 중. undefined = 미조회.
   var _doneVerdictMap = {};
 
+  // ── Review Verdict Cache (T-463) ──
+  // Review 카드 룰베이스 1차 자동 검증 verdict (advisory only).
+  // key=ticket number, value={verdict, reason, details, violations}.
+  // verdict 값: PASS / WARN / FAIL / SKIP / UNKNOWN.
+  // "pending" 값 = 조회 중. undefined = 미조회.
+  // 캐논: feedback_no_speculative_guards_2026-05-08, T-411 0c970fa, T-413 1ce3c2d.
+  // 자동 강제 전이 / 강제 회귀 / 강제 차단 0건 — 사용자가 verdict FAIL 이어도 Review→Done DnD 강행 가능.
+  var _reviewVerdictMap = {};
+
   // ── Audit Verdict Cache (T-477) ──
   // Review 카드 Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
   // "pending" = 조회 중. undefined = 미조회.
@@ -469,6 +478,39 @@
   }
 
   /**
+   * T-463: 단일 Review 카드 verdict 조회 (advisory only).
+   * 결과를 _reviewVerdictMap 에 캐시하고, 로드 완료 시 해당 카드 배지를 DOM 에 패치.
+   * 폴링 없음 — 카드 mount 시 1회 호출.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-463")
+   */
+  function fetchAndRenderReviewVerdict(ticketNum) {
+    // 이미 조회 중이거나 완료된 경우 건너뜀
+    if (_reviewVerdictMap[ticketNum] !== undefined) return;
+    _reviewVerdictMap[ticketNum] = "pending";
+
+    fetch("/api/kanban/review-verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        _reviewVerdictMap[ticketNum] = data;
+        // DOM 패치: 해당 카드의 verdict 배지 교체 (전체 re-render 없이)
+        var badge = document.querySelector(
+          '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .card-review-verdict'
+        );
+        if (badge) {
+          var newBadge = document.createElement("span");
+          _applyReviewVerdictBadge(newBadge, data);
+          badge.parentNode.replaceChild(newBadge, badge);
+        }
+      })
+      .catch(function () {
+        _reviewVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: {}, violations: [] };
+      });
+  }
+
+  /**
    * T-477: Auditor T3 audit verdict badge HTML 생성 (renderKanban 내 인라인 호출).
    * combined === "NONE" 이면 빈 문자열 반환 (DOM 마운트 X).
    * @param {string} ticketNum - 티켓 번호
@@ -477,7 +519,6 @@
   function renderAuditBadgeHtml(ticketNum) {
     var data = _auditVerdictMap[ticketNum];
     if (!data || data === "pending") {
-      // 로딩 중 또는 미조회 — 자리만 예약 (숨김)
       return '<span class="audit-badge audit-loading" style="display:none"></span>';
     }
     var combined = (data && data.combined) || "NONE";
@@ -486,7 +527,6 @@
     if (combined === "PASS") cls += " audit-pass";
     else if (combined === "WARN") cls += " audit-warn";
     else if (combined === "FAIL") cls += " audit-fail";
-    // tooltip: hard_gate_failed 목록 (있으면)
     var tip = "Auditor T3: " + combined;
     var hgf = data.tier2 && data.tier2.hard_gate_failed;
     if (hgf && hgf.length) {
@@ -511,8 +551,7 @@
       })
       .then(function (data) {
         _auditVerdictMap[ticketNum] = data;
-        if ((data.combined || "NONE") === "NONE") return; // 배지 미표시
-        // DOM 패치: 해당 Review 카드의 로딩 placeholder 교체
+        if ((data.combined || "NONE") === "NONE") return;
         var placeholder = document.querySelector(
           '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .audit-badge'
         );
@@ -529,6 +568,90 @@
       .catch(function () {
         _auditVerdictMap[ticketNum] = { tier1: null, tier2: null, combined: "NONE" };
       });
+  }
+
+  /**
+   * T-463: review verdict 데이터를 기반으로 badge span 에 상태를 적용한다.
+   * - PASS / WARN / FAIL — 텍스트 칩 표시 (verdict-pass / verdict-warn / verdict-fail)
+   * - SKIP / UNKNOWN / pending — 배지 숨김 (display:none)
+   * - tooltip = violations 목록 + "advisory only — Done 이동 자유" 안내 (cursor:help)
+   * - 클릭 자동 액션 0건 (advisory only 캐논)
+   * @param {HTMLElement} el - 대상 span 요소
+   * @param {Object} data - verdict 응답 데이터 ({verdict, reason, details, violations})
+   */
+  function _applyReviewVerdictBadge(el, data) {
+    var verdict = data && data.verdict;
+    el.className = "card-review-verdict";
+    // margin-right:auto 인라인 보존 — 4행 actions-row 좌측 고정 + 우측 토글/done 버튼 분리
+    el.style.marginRight = "auto";
+    if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
+      // SKIP / UNKNOWN / 알 수 없는 값 — 배지 숨김
+      el.className += " verdict-unknown";
+      el.style.display = "none";
+      return;
+    }
+    el.className += " verdict-" + verdict.toLowerCase();
+    el.textContent = verdict;
+    // tooltip: violations 목록 또는 reason 만 표시 + advisory 안내
+    var violations = (data && data.violations) || [];
+    var lines = [];
+    if (violations.length > 0) {
+      violations.forEach(function (v) {
+        var rid = v.rule_id || "?";
+        var sev = v.severity ? ("(" + v.severity + ")") : "";
+        var msg = v.message || "";
+        lines.push("[" + rid + "]" + sev + " " + msg);
+      });
+    } else {
+      var reason = (data && data.reason) || "ok";
+      lines.push(verdict + " (" + reason + ")");
+    }
+    var tooltip = lines.join("\n") + "\n\nadvisory only — Done 이동 자유";
+    el.setAttribute("data-verdict-msg", tooltip);
+    el.setAttribute("title", tooltip);
+  }
+
+  /**
+   * T-463: Review 카드 verdict 배지 HTML 을 생성한다.
+   * 캐시에 결과가 없으면 로딩 중 플레이스홀더를 반환하고, 비동기 fetch 완료 시 DOM 패치된다.
+   * 4행 card-actions-row 의 첫 번째 자식으로 삽입되어 margin-right:auto 로 우측 토글과 분리된다.
+   * @param {string} ticketNum - 티켓 번호 (예: "T-463")
+   * @returns {string} span.card-review-verdict HTML
+   */
+  function renderReviewVerdictBadge(ticketNum) {
+    var data = _reviewVerdictMap[ticketNum];
+    if (data === undefined || data === "pending") {
+      // 로딩 중 — 보이지 않는 플레이스홀더. fetch 완료 후 _applyReviewVerdictBadge 가 DOM 패치.
+      return '<span class="card-review-verdict verdict-loading" style="display:none;margin-right:auto"></span>';
+    }
+    var verdict = data && data.verdict;
+    if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
+      // SKIP / UNKNOWN / 알 수 없는 값 — 배지 숨김
+      return '<span class="card-review-verdict verdict-unknown" style="display:none;margin-right:auto"></span>';
+    }
+    var violations = (data && data.violations) || [];
+    var lines = [];
+    if (violations.length > 0) {
+      violations.forEach(function (v) {
+        var rid = v.rule_id || "?";
+        var sev = v.severity ? ("(" + v.severity + ")") : "";
+        var msg = v.message || "";
+        lines.push("[" + rid + "]" + sev + " " + msg);
+      });
+    } else {
+      var reason = (data && data.reason) || "ok";
+      lines.push(verdict + " (" + reason + ")");
+    }
+    var tooltip = lines.join("\n") + "\n\nadvisory only — Done 이동 자유";
+    var cls = "verdict-" + verdict.toLowerCase();
+    return (
+      '<span class="card-review-verdict ' + cls + '"'
+      + ' style="margin-right:auto"'
+      + ' title="' + esc(tooltip) + '"'
+      + ' data-verdict-msg="' + esc(tooltip) + '">'
+      + esc(verdict)
+      + '</span>'
+    );
   }
 
   /** Fetches all tickets via /api/kanban (single request). */
@@ -2786,6 +2909,12 @@
             h += '</div>';
             // 4행: Action 버튼 (없어도 자리 보존, 카드 높이 일정 유지)
             h += '<div class="card-actions-row">';
+            // T-463: Review 카드 verdict 배지 (advisory only).
+            // 4행 actions-row 첫 자식 + margin-right:auto 로 좌측 고정, 우측 commit/branch-toggle/done 과 분리.
+            // verdict 결과로 자동 차단 / 강제 전이 0건 — 사용자 강행 자유.
+            if (col.key === "Review") {
+              h += renderReviewVerdictBadge(t.number);
+            }
             // T-457 (Layer 3): 미커밋 워크트리 commit 액션 버튼 — 어느 컬럼이든 미커밋 있으면 표시.
             // flex-end + 좌→우 추가 순서로 commit 이 왼쪽, done 이 가장 우측에 위치.
             if (_worktreeUncommittedMap) {
@@ -2909,6 +3038,15 @@
       if (num) {
         // 미조회 카드만 fetch (캐시 히트 시 스킵)
         fetchAndRenderVerdict(num);
+      }
+    });
+
+    // T-463: Review 카드 verdict fetch 트리거 (advisory only)
+    // 카드 mount 시 1회 호출 (폴링 없음). 캐시 히트 시 스킵 — _reviewVerdictMap 가드.
+    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+      var num = card.dataset.num;
+      if (num) {
+        fetchAndRenderReviewVerdict(num);
       }
     });
 

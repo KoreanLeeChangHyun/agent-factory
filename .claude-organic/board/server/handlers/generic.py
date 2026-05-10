@@ -130,6 +130,8 @@ class GenericHandlerMixin:
             self._handle_metrics_launch_latency(last=last)
         elif path == '/api/worktree/uncommitted/all':
             self._handle_worktree_uncommitted_all()
+        elif path == '/api/kanban/review-verdict':
+            self._handle_kanban_review_verdict()
         elif path == '/api/kanban/audit/verdict':
             self._handle_kanban_audit_verdict()
         elif path == '/api/kanban/done-verdict':

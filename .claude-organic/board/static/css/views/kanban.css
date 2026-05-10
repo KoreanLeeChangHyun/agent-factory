@@ -803,6 +803,68 @@
   pointer-events: auto;
 }
 
+/* T-463: Review 카드 룰베이스 1차 자동 검증 verdict 배지 (advisory only) */
+/* T-441 .card-done-verdict 패턴 동형 — 단, 텍스트 칩 형태 + 4행 actions-row 좌측 배치 */
+/* T-457 failure tag 와 시각 어휘 분리: failure tag = 1행 우측 회색 read-only / verdict = 4행 좌측 칩 색상 + cursor:help interactive */
+.card-review-verdict {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  cursor: help;          /* tooltip 안내 — 클릭 자동 액션 0건 */
+  user-select: none;
+  transition: opacity 0.15s;
+}
+
+.card-review-verdict.verdict-pass {
+  color: #4ec9b0;        /* 청록 — done verdict-ok 와 동일 톤 */
+  background: rgba(78, 201, 176, 0.10);
+  border: 1px solid rgba(78, 201, 176, 0.40);
+  opacity: 0.85;
+}
+
+.card-review-verdict.verdict-pass:hover {
+  opacity: 1;
+}
+
+.card-review-verdict.verdict-warn {
+  color: #d97706;        /* 앰버 */
+  background: rgba(217, 119, 6, 0.10);
+  border: 1px solid rgba(217, 119, 6, 0.40);
+  opacity: 0.9;
+}
+
+.card-review-verdict.verdict-warn:hover {
+  background: rgba(217, 119, 6, 0.20);
+  border-color: #d97706;
+  opacity: 1;
+}
+
+.card-review-verdict.verdict-fail {
+  color: #f48771;        /* 주홍 — 시각 강조 (T-441 done verdict-fail 테라코타 #D97757 와 다른 톤) */
+  background: rgba(244, 135, 113, 0.12);
+  border: 1px solid rgba(244, 135, 113, 0.45);
+  opacity: 0.9;
+}
+
+.card-review-verdict.verdict-fail:hover {
+  background: rgba(244, 135, 113, 0.22);
+  border-color: #f48771;
+  opacity: 1;
+}
+
+.card-review-verdict.verdict-skip,
+.card-review-verdict.verdict-unknown,
+.card-review-verdict.verdict-loading {
+  display: none;          /* SKIP / UNKNOWN / 로딩 — 공간 낭비 없이 숨김 */
+}
+
 .audit-badge.audit-pass {
   background: rgba(78, 201, 176, 0.15);
   color: #4ec9b0;
