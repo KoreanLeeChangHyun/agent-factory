@@ -235,3 +235,79 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | 1차 | 룰베이스 자동 (본 섹션) | finalization 자동 | T-463 도입 |
 | 2차 | LLM 자동 | finalization 자동 | 별도 티켓 (T-477) |
 | 3차 | 사용자 트리거 외부 cross-review | DnD 또는 명령 | 별도 티켓 (T-416 종속) |
+
+## 워크플로우 데이터 정합성 룰 (MUST)
+
+> 사용자 명시 (2026-05-09): "워크플로우는 반드시 티켓이랑 연결 되어 있어야 하며 티켓의 이름이 워크플로우 제목임. 그리고 질의, 계획, 작업, 보고, 요약, 사용, 로그 정보가 모두 있어야함."
+
+워크플로우 1건은 다음 두 조건을 모두 만족해야 한다 (MUST):
+
+### (1) 티켓 연결 필수
+- `.context.json` 의 `ticketNumber` 필드가 비어있지 않고 칸반에 실존해야 한다
+- 워크플로우 제목(title) = 티켓 제목과 동일
+
+### (2) 7대 산출물 필수
+각 워크플로우 디렉터리(`<key>/`) 직속에 다음 파일/디렉터리가 모두 존재해야 한다:
+
+| 종류 | 파일/디렉터리 | 생성 단계 |
+|------|-------------|----------|
+| 질의 | `user_prompt.txt` | initialization |
+| 계획 | `plan.md` | PLAN |
+| 작업 | `work/` (디렉터리) | WORK |
+| 보고 | `report.md` | REPORT |
+| 요약 | `summary.txt` | DONE |
+| 사용 | `usage.json` | DONE |
+| 로그 | `workflow.log` | 전체 |
+
+### How to apply
+- 마이그레이션 스크립트·정합성 검증·`flow-history sync` 도구는 위 두 조건을 검증 항목으로 포함
+- 옛 워크플로우 cleanup 시 룰 위반 케이스 (티켓 미연결 + 산출물 누락) 는 자동 폐기가 아니라 **사용자 결정 받기**
+- `_legacy_` 보존 디렉터리는 자체로 7대 산출물을 가지면 별개 워크플로우로 간주, 새 registryKey 발급 후 분리. 산출물 누락 시 폐기 후보
+- 새 워크플로우 finalize 시점에 7대 산출물 검증 advisory hook 추가 가능 (T-447 REPORT advisory 와 동일 패턴)
+- 룰 위반은 advisory only — 자동 강제 차단·status 강제 전이 도입 금지 (general.md "추측 금지" 참조)
+
+## Research 워크플로우 품질 룰 (MUST)
+
+> 사용자 명시 (2026-04-29): "Research 는 품질이 메인보다 안좋으면 안 되는거 알죠?"
+
+Research 워크플로우 (`/wf -s N` command=research) 산출물 품질은 **메인 세션이 직접 조사했을 때 이상**이어야 한다. 미달 시 워크플로우 자체가 무의미.
+
+### Why
+- 워크플로우의 본질 = 메인 세션 컨텍스트를 분리해 더 깊은 조사 + 토큰 절약
+- 결과 품질이 메인 이하 → 컨텍스트 분리의 비용 (별도 세션 spawn / report wiring / kanban 전이 / finalize 등) 정당화 불가
+- 메인 세션을 능가하지 못하면 사용자가 직접 메인에서 묻는 게 더 빠르고 정확 → 워크플로우 사용 의미 자체가 사라짐
+
+### How to apply
+- research workflow 결과 (report.md) 를 받으면 "메인 세션이 직접 조사했을 가상 결과" 와 비교 평가
+- 미달 신호 발견 시 즉시 보완 후보로 분류:
+  - **출력 깊이**: 메인이라면 더 깊이 본 곳을 얕게 끝냄 (코드 인용 부족, 사례 1~2건만)
+  - **도구 사용 누락**: 메인이 grep+read+glob 조합으로 잡을 패턴을 놓침
+  - **컨텍스트 누락**: 메모리/CLAUDE.md/관련 메모를 충분히 인지 못함
+  - **결과 정형성 부족**: table/우선순위/근거 인용 없이 산문만
+  - **메타 인지 부재**: "더 봐야 할 곳" / "확신도" 등 자가 평가 없음
+- 보완 위치 후보:
+  - `.claude/skills/workflow-orchestration/SKILL.md` research 모드 prompt
+  - research 워크플로우 phase/step 구조 (plan → work → report 의 work 깊이)
+  - 도구 권한 / 컨텍스트 주입 (memory injection, CLAUDE.md 인지)
+  - report.md 정형 템플릿
+- 평가 시 구체 비교 항목: 깊이 / 정확성 / 도구 활용 / 컨텍스트 인지 / 결과 정형성 / 메타 인지
+
+## Hook 가드 derived-from 우회 경로 (MUST)
+
+`flow-kanban done T-NNN` 호출 시 Hook 가드가 평가하는 derived-from 자식 상태는 **그 호출 시점의 칸반 상태**다. Done 처리 후 추가로 link 한 자식은 가드 대상이 아니다.
+
+### Why
+- 룰: derived-from 파생 티켓 미완료 (Done 아닌 상태) 시 원본 Done 차단 (DO NOT 섹션의 derived-from 룰)
+- 가드는 unlink 가능. unlink → done → relink 시퀀스로 정상 우회 가능 (관계 추적성 유지)
+- 사례 (2026-05-10):
+  - T-450 / T-460 / T-426 / T-428 / T-901 — 사용자가 먼저 Done 처리 → 그 후 후속 implement 티켓 등록 + `--derived-from` link → 가드 통과 (Done 시점에 자식 0건)
+  - T-406 — 어시스턴트가 후속 3건 (T-477/T-478/T-479) 먼저 등록 + link → Done 시도 → **가드 차단** (자식 To Do 3건). 우회 시퀀스로 해소
+
+### How to apply
+- **권장 순서 (research → implement)**: research 티켓 Review 진입 → 사용자 검토 → research Done **먼저** → 후속 implement 티켓 등록 + `--derived-from research` link
+- **이미 link 된 후 Done 차단 시 우회 시퀀스**:
+  1. `flow-kanban unlink T-자식 --derived-from T-부모` (자식 모두 반복)
+  2. `flow-kanban done T-부모`
+  3. `flow-kanban link T-자식 --derived-from T-부모` (관계 복원)
+- Done 후 link 는 부모의 Relations 에 `blocks T-자식` 형태로 표시 (양방향 reverse)
+- **가드 우회를 위해 derived-from 을 영구 제거하지 말 것** — 관계 추적성 손실
