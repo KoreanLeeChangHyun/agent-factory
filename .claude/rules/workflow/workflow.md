@@ -150,6 +150,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | "티켓 편집해줘" | /wf -e N | - |
 | "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o | To Do 자동 (기본·유일 경로) |
 | "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o → DnD | To Do 생성 후 사용자가 칸반 DnD 로 Open 승격 |
+| "데브루프 고정" / "데브루프에 올려" / "데브루프 동기화" / "올리자" | develop ff merge + origin push | "데브루프" = develop branch. 현재 작업 브랜치 → develop ff → `origin develop` push. non-FF 면 사용자 옵션 묻기. main 머지는 별도 release 결정 |
 
 ## Review 단계 1차 룰베이스 자동 검증 (advisory)
 
@@ -311,3 +312,70 @@ Research 워크플로우 (`/wf -s N` command=research) 산출물 품질은 **메
   3. `flow-kanban link T-자식 --derived-from T-부모` (관계 복원)
 - Done 후 link 는 부모의 Relations 에 `blocks T-자식` 형태로 표시 (양방향 reverse)
 - **가드 우회를 위해 derived-from 을 영구 제거하지 말 것** — 관계 추적성 손실
+
+## 워크플로우 모드 (싱글 vs 멀티 binary)
+
+> 2026-05-08 결정 — 풀/경량/싱글 3꼭지 후보 중 싱글 vs 멀티 2꼭지 채택. 멀티 내부 phase/worker 수는 매개변수화하여 auto_router 신호로 자동 분기.
+
+### 모드 정의
+
+| 모드 | 서브에이전트 | 단계 구성 |
+|------|------------|---------|
+| **싱글** | 0개 (메인 세션 단독) | 계획 + 작업 + 보고서 단일 컨텍스트 |
+| **멀티** (자동 분기) | planner + worker(s) + reporter | phase=1 (semi-light) ~ phase=N (full) |
+
+### 채택 근거
+- 본질 차이 = 서브에이전트 spawn 여부 (binary)
+- 경량 멀티 vs 풀 멀티는 phase/worker N 매개변수화 (스펙트럼) — 명시 모드 분리 가치 ↓
+- 사용자 결정 부담 최소 (1회 binary 선택 + 자동 분기 + override 보존)
+
+### 자동 분기 신호 (auto_router)
+멀티 내부 phase 자동 결정 — 8신호 2단계 결정 트리. fallback = 풀 모드. 사용자 override 보존.
+
+### How to apply
+- OPEN 카드 UI: 싱글 vs 멀티 binary 토글 + auto_router 자동 분기 + 사용자 명시 override 보존
+- 자동 가드 X — auto_router 폴백 = 풀 모드, 사용자 override 보존 (general.md "추측 금지" 참조)
+- 사용자 명시 동의 게이트: T-A (auto_router 결정 함수) / T-F (사용자 override `--mode` CLI)
+- 살아있는 기능 보존 (풀 멀티 모드 그대로 유지)
+
+## 동시 발사 race 정리 절차 (workflow regression cleanup)
+
+워크플로우 동시 발사 (15초 간격 등) 로 인한 registryKey 충돌 회귀 시 정리 절차.
+
+### 회귀 증상
+- `.claude-organic/runs/<key>.corrupted-T-NNN-overlap/` 디렉터리 생성
+- 오케스트레이터 자가 정정 시도 → permission_denied (직접 path 가드)
+- 워커 commit 0건 — 워크트리 ahead=0
+- session jsonl 에 다른 티켓 컨텍스트 교차 오염 (`BOARD_STEP_NOTIFY: ticket=T-다른`)
+- `process_exit code 143` (SIGTERM) — active session 탭에서 빠짐
+- `result subtype=success` 와 `terminal_reason=completed` — 그러나 작업 0건
+
+### 정리 5단계
+
+```bash
+WORKTREE=".claude-organic/worktrees/feat-T-NNN-..."
+
+# 1. 워크트리 unlock + force remove
+git worktree unlock "$WORKTREE"
+git worktree remove --force "$WORKTREE"
+
+# 2. feature branch 삭제 (워커 commit 0건이라 안전)
+git branch -D "feat/T-NNN-..."
+
+# 3. runs/ corrupted 디렉터리 삭제
+rm -rf .claude-organic/runs/<key1>
+rm -rf .claude-organic/runs/<key2>
+rm -rf .claude-organic/runs/<key3>.corrupted-T-NNN-overlap
+
+# 4. 칸반 In Progress → Open
+.claude-organic/bin/flow-kanban move T-NNN open
+
+# 5. 세션 jsonl 보존
+# .claude-organic/.workflow-sessions/wf-T-NNN-*.jsonl 은 회귀 분석 자료로 유지
+```
+
+### 운영 시 주의
+- 워크플로우 동시 발사는 registryKey race condition 위험 — 시간차를 두거나 한 번에 하나씩 발사 권장
+- `.corrupted-T-NNN-overlap` 디렉터리 패턴이 보이면 본 회귀와 동일 origin
+- `flow-merge --force` 정상 경로인 워커 commit 누락 패턴과 **다름** — 본 회귀는 워크트리 변경 자체가 0건이라 머지할 게 없음 → 정리 + Open 회귀 후 재실행이 정답
+- launch 비동기화 본 구현 후 root cause 해소 가능성 (별 트랙)
