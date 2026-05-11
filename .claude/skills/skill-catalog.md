@@ -1,7 +1,7 @@
 # Skill Catalog
 
 > 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 61개 (전문화: 61, 프로젝트: 0)
+> 활성 스킬: 62개 (전문화: 62, 프로젝트: 0)
 
 ## Command Default Mapping
 
@@ -52,6 +52,7 @@
 | management-scope-decomposer | Systematically decomposes large-scale requests into epics (3-7) and stories (5-10/epic) with RICE score-based prioritization (P0-P3), dependency graph generation, and MECE principle validation. Use when decomposing a large-scale feature or initiative into structured epics and stories, defining project scope and priority with RICE scoring, detecting infra epic requirements, or producing a dependency graph for a complex multi-domain request. |
 | management-skill | Unified management skill for creating and modifying Claude Code skills. Creates or modifies skill packages in .claude/skills/ directory conforming to the SKILL.md frontmatter spec. Use when creating a new skill, updating or modifying an existing skill's content or metadata, or deleting an obsolete skill from the local skill library. |
 | management-skill-integrator | Automated skill integration pipeline that searches, downloads, converts, and installs external AI skills from SkillsMP marketplace into .claude/skills/ directory. Use when searching for and installing external skills, importing marketplace skills into the local agent, auto-integrating a discovered skill package, or finding an appropriate skill to add to the current workflow. |
+| my-board-sse-convention | TRIGGER: board 자체 SSE 코드(.claude-organic/board/static/js/core/sse.js, .claude-organic/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점 ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched. |
 | reference-anthropic-sdk | Anthropic Python/TypeScript Client SDK 및 Claude Agent SDK 레퍼런스. 설치, 클라이언트 초기화, Messages API, 스트리밍, Tool Use, 에러 처리, Agent SDK(query, ClaudeAgentOptions, 도구, 훅, 서브에이전트, 세션, MCP)의 코드 예시와 공식문서 링크를 제공한다. Use when: Anthropic SDK 설치법·API 사용법을 확인할 때, Agent SDK로 에이전트를 구현할 때, 스트리밍·Tool Use·에러 처리 패턴을 참조할 때 |
 | reference-claude-api | Reference skill for Anthropic Claude API. Use when implementing or debugging Claude API integrations: Messages API parameters, Tool Use schema and flow, Streaming SSE events, Extended Thinking, Prompt Caching, model selection, and error handling. |
 | reference-claude-code | Use when you need Claude Code configuration reference: hooks event types and JSON schemas, settings.json keys and their types, built-in slash commands, CLI flags, keybindings, MCP integration, skills/agents frontmatter, or any Claude Code-specific API/behavior details. |
