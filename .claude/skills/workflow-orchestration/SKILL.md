@@ -188,7 +188,7 @@ cd "$(flow-init <command> --ticket T-NNN | tail -1)"
 
 ### Init Verification (Advisory)
 
-`_phase_verify_init` (initialization.py:581) 가 init-result.json 생성 후 자동 호출된다. **advisory only** — `quality_score < 0.6` 시 `[WARN]` workflow.log 기록만 수행하며 blocking 0건. PLAN 진입은 정상 진행되고 PLAN Step 2-pre 의 Prompt Quality Check 가 동일 score 를 재사용하여 planner 프롬프트에 품질 경고 블록을 자동 추가한다 (아래 PLAN 섹션 Prompt Quality Check 참조).
+`_phase_verify_init` (initialization.py:581) 가 init-result.json 생성 후 자동 호출된다. **advisory only** — `quality_score < 0.6` 시 `[WARN]` workflow.log 기록만 수행하며 blocking 0건. PLAN 진입은 정상 진행된다.
 
 INIT 완료 후 즉시 PLAN 진행. INIT 결과 요약/출력 MUST NOT.
 
@@ -203,33 +203,6 @@ Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, requ
 ```
 
 > **research 명령어 시 추가 컨텍스트**: command가 `research`인 경우, planner는 계획서에 "작업 범위" 섹션(In-Scope / Out-of-Scope)을 필수 포함한다. 조사 대상 범위를 명확히 구분하여 워커가 범위 이탈 없이 조사를 수행할 수 있도록 한다.
-
-### Prompt Quality Check (Step 2-pre)
-
-> init-result.json에 `prompt_quality` 필드가 없으면 스킵하고 planner 호출로 진행.
-
-| `quality_score` | 동작 |
-|-----------------|------|
-| 필드 없음 / `>= 0.6` | planner 호출로 진행 |
-| `< 0.6` | `[WARN]` workflow.log에 기록 + planner 프롬프트에 품질 경고 블록 추가 후 정상 진행. 보고서에 품질 경고 섹션 자동 포함 |
-
-**quality_score < 0.6 자동 fallback 절차:**
-
-1. `[WARN]` workflow.log에 기록: `quality_score` 값, `missing_tags` 목록, `feedback` 내용
-2. planner 호출 프롬프트 말미에 아래 품질 경고 블록을 추가 (누락 태그 명시 + 가정 사항 기술 지시)
-3. planner 정상 호출 (중단 없음). `missing_tags`에 `constraints`/`criteria` 포함 여부와 무관하게 동일 처리
-
-**planner 프롬프트에 추가되는 품질 경고 블록:**
-
-```
-[품질 경고] 사용자 프롬프트의 quality_score가 {score}입니다.
-누락 태그: {missing_tags}
-비어있는 태그: {empty_tags}
-피드백: {feedback_list}
-
-지침: 누락/부족한 정보에 대해 합리적인 가정(assumption)을 수립하고,
-계획서 "가정 사항" 섹션에 명시하세요. 가정에 기반한 작업임을 표시하세요.
-```
 
 ### 2a-Post: planner 반환 후 호출 순서
 

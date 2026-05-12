@@ -95,7 +95,7 @@
 
 | Phase | 범위 | 원자 커밋 |
 |---|---|---|
-| **P0 (본 문서)** | 인벤토리 + rename map 박제 | 1 |
+| **P0 (본 문서)** | 인벤토리 + rename map 티켓 생성 | 1 |
 | **P1** | 루트 `.claude.workflow/` → `.claude-organic/` **git mv만** + `.claude/settings.json` + `init-claude-workflow.sh` + `.claude/rules/*`에 포함된 리터럴 치환. 내부 디렉터리 구조는 미변경 | 1 |
 | **P2** | 내부 디렉터리 rename (scripts→engine, kanban→tickets 등) + bin/* wrapper 경로 갱신 + Python import 치환 (`from data.constants` → `from constants`, `_scripts_dir` → `_engine_dir`) | 2 (디렉터리 rename / import 치환) |
 | **P3** | 스모크 — bin/flow-* 22개, Board 기동, 세션, hook 4개. 회귀 시 보정 | 1 |
@@ -127,5 +127,5 @@
 - [ ] Phase 1 착수
 
 ## 참고 커밋
-- `6178aad docs: T-379 Board 전면 리팩토링 플랜 박제` — Phase 분할 전략 참고
+- `6178aad docs: T-379 Board 전면 리팩토링 플랜 티켓 생성` — Phase 분할 전략 참고
 - `d6b6ac6 refactor(T-379): Phase 0-1 static/ 구조 생성` — git mv 패턴 참고
