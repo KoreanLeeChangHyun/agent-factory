@@ -511,7 +511,7 @@ def _write_context(
         registry_key: YYYYMMDD-HHMMSS 형식 전체 registryKey. board.js 양방향 연결용.
         ticket_number: 연결된 티켓 번호 (예: 'T-001'). board.js 양방향 연결용.
         worktree_meta: worktree 메타데이터 딕셔너리 (선택). 활성화 시 context에 포함.
-        original_branch: 세션 시작 시점의 HEAD 브랜치명. 비-worktree 모드 종료 시 복귀 기준 (T-370 C-1).
+        original_branch: 세션 시작 시점의 HEAD 브랜치명. 비-worktree 모드 종료 시 복귀 기준.
     """
     context: dict[str, Any] = {
         "title": title,
@@ -583,7 +583,7 @@ def _phase_verify_init(
     registry_key: str,
     ticket_number: str | None = None,
 ) -> tuple[bool, str]:
-    """INIT phase outcome-based verification — self-reference removed (T-453 / T-452 §10.5).
+    """INIT phase outcome-based verification — self-reference removed.
 
     Checks 3 axes:
         1. .context.json exists (abs_work_dir/.context.json)
@@ -595,7 +595,7 @@ def _phase_verify_init(
         (ok, reason) — (True, "ok") when all pass; (False, "<reason>") on first failure.
 
     Non-blocking: callers MUST log WARN and continue without halting the workflow on failure.
-    (T-411 deprecation canon — zero forced auto-revert policy.)
+
     """
     import xml.etree.ElementTree as _ET
 
@@ -637,7 +637,6 @@ def _write_status(abs_work_dir: str, mode: str, ts: str) -> None:
     if not claude_sid:
         claude_sid = _find_latest_session_id()
     status_data: dict[str, Any] = {
-        # T-459: workflow_phase 단일 키 (step 1주기 호환 제거 완료)
         "workflow_phase": "NONE",
         "mode": mode,
         "session_id": str(uuid.uuid4())[:8],
@@ -689,12 +688,10 @@ def init_workflow(
     work_id: str = registry_key.split("-")[1]
 
     # work_name은 worktree 피처 브랜치명 생성에는 보존하지만 (worktree_manager.py 의존),
-    # work_dir 디렉터리 빌드에서는 T-448 폴드로 사용 폐기.
     work_name: str = _sanitize_work_name(title)
     if not work_name:
         _err(f"Title produced empty workName after sanitization: '{title}'", 4)
 
-    # T-448: 디렉터리 폴드 — runs/{key}/{work_name}/{command} → runs/{key}
     work_dir: str = f".claude-organic/runs/{registry_key}"
     abs_work_dir: str = os.path.join(_PROJECT_ROOT, work_dir)
 
@@ -720,7 +717,6 @@ def init_workflow(
     if ticket_number:
         _inject_predecessor_context(abs_work_dir, ticket_number)
 
-    # ── T-370 C-1: 세션 시작 시 originalBranch 캡처 (비-worktree 모드 복귀 안전망) ──
     # WORKFLOW_WORKTREE=false 환경에서도 종료 시 메인 저장소 HEAD를 복귀시키기 위해
     # 세션 시작 시점의 브랜치를 .context.json에 originalBranch로 기록한다.
     # finalization.py Step 4wt-fb에서 이 값을 읽어 복귀 시도한다.
@@ -999,7 +995,6 @@ def main() -> None:
     if mode not in VALID_MODES:
         mode = "full"
 
-    # Step 1: 티켓 파일 읽기 (T-448: 티켓 없는 ad-hoc 경로 미지원 — 명확한 메시지로 안내)
     prompt_content: str | None
     ticket_number: str | None
     prompt_content, ticket_number = read_prompt(ticket_arg)
@@ -1009,7 +1004,6 @@ def main() -> None:
             1,
         )
 
-    # T-448: title이 미지정이면 티켓 XML에서 자동 추출
     if title is None or not title.strip():
         title = _extract_title_from_ticket_xml(prompt_content)
 
@@ -1050,7 +1044,6 @@ def main() -> None:
     except Exception as _pv_err:
         _warn(f"prompt_validator import 실패 (품질 검증 생략): {_pv_err}")
 
-    # T-448/T-449 NOTE: init-result.json 의 workName 필드는 deprecated.
     # 디렉터리 폴드 + 일괄 마이그레이션 이후, worktree 피처 브랜치명 파생 + board.js
     # 후방 호환을 위해 스키마는 유지한다. 신규 코드는 title/registryKey 만 사용할 것.
     init_result: dict[str, Any] = {
@@ -1060,7 +1053,7 @@ def main() -> None:
         "registryKey": result["registryKey"],
         "date": date,
         "title": title,
-        "workName": result["workName"],  # deprecated (T-448/T-449): 후방 호환용, 신규 코드는 사용 금지
+        "workName": result["workName"],  # deprecated: 후방 호환용, 신규 코드는 사용 금지
         "command": effective_command,
         "mode": mode,
         "ticketNumber": result.get("ticketNumber", ""),
@@ -1078,7 +1071,6 @@ def main() -> None:
         init_result,
     )
 
-    # T-448: stdout 정형화
     #  - [INIT] {title} 라인은 stderr로 이동 (사용자 가시성 유지)
     #  - 첫 줄: workDir (프로젝트 루트 상대 경로)
     #  - 마지막 줄: worktreePath 절대경로 (worktree 미생성 시 빈 줄)

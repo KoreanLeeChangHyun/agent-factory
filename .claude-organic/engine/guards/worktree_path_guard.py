@@ -62,7 +62,6 @@ _BASH_FILE_MODIFY_PATTERNS: list[str] = [
 
 # 항상 허용하는 경로 패턴 (메인 리포 산출물·sidecar 디렉터리)
 # 주의: 보수적으로 좁게 정의 — `.claude-organic/board/server/`, `.claude-organic/engine/` 같은
-# 소스 코드 경로는 의도적으로 제외 (T-403 회귀 차단 대상).
 _ALWAYS_ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"[/\\]\.claude-organic[/\\]runs[/\\]"),
     re.compile(r"[/\\]\.claude-organic[/\\]board[/\\]sessions[/\\]"),

@@ -299,14 +299,12 @@ def _append_usage_snapshot(
                 with open(status_path, encoding="utf-8") as f:
                     st = _json.load(f)
                 if isinstance(st, dict):
-                    # legacy status.json (pre-T-459) 호환 read fallback: workflow_phase > step > status > phase
                     step = st.get("workflow_phase") or st.get("step") or st.get("status") or st.get("phase") or "UNKNOWN"
             elif os.path.isfile(ctx_path):
                 import json as _json
                 with open(ctx_path, encoding="utf-8") as f:
                     ctx = _json.load(f)
                 if isinstance(ctx, dict):
-                    # legacy status.json (pre-T-459) 호환 read fallback
                     step = ctx.get("workflow_phase") or ctx.get("step") or ctx.get("status") or "UNKNOWN"
         except Exception:  # noqa: BLE001
             pass

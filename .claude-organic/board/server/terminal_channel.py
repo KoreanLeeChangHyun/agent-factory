@@ -287,7 +287,6 @@ class TerminalSSEChannel:
             페이로드 dict
         """
         if event_name == 'user_input':
-            # T-429: attachments (카드 표시용 메타만 — number/command/title) 와
             # timestamp 를 함께 전달하여 frontend 가 카드 렌더 및 self-echo guard 에 활용.
             payload: dict = {'text': data.get('text', '')}
             if data.get('timestamp'):

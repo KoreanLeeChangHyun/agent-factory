@@ -236,7 +236,7 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if not isinstance(status, dict):
             return
 
-        phase = status.get("workflow_phase") or status.get("step") or status.get("phase", "NONE")  # legacy status.json (pre-T-459) 호환 read fallback
+        phase = status.get("workflow_phase") or status.get("step") or status.get("phase", "NONE")  # legacy status.json (pre
         if phase in _TERMINAL_PHASES:
             return
 
@@ -253,7 +253,6 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if not os.path.isdir(entry_path):
             continue
 
-        # T-448 폴드 구조: entry_path/status.json
         if os.path.exists(os.path.join(entry_path, "status.json")):
             _collect_candidate(entry_path)
 

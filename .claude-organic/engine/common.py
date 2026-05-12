@@ -377,7 +377,7 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
     YYYYMMDD-HHMMSS 패턴이 아닌 입력은 그대로 반환.
 
-    탐색 순서 (T-449 마이그레이션 이후 폴드 구조 단독):
+    탐색 순서:
       1. .claude-organic/runs/<input_key>/status.json 존재 시 input_key 자체 반환.
       2. 1차 탐색 실패 시 .claude-organic/runs/.history/<input_key>/status.json 탐색.
       3. 두 탐색 모두 실패 시 ".claude-organic/runs/<input_key>" 폴백 반환.

@@ -1,4 +1,4 @@
-"""Workflow undo-done handler (T-905 Phase 3)."""
+"""Workflow undo-done handler."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from ._helpers import (
 
 
 class WorkflowUndoHandlerMixin:
-    """Workflow undo-done handler (T-905 Phase 3).
+    """Workflow undo-done handler.
 
     Done 처리된 워크플로우를 Review 단계로 자동 롤백하는 POST 핸들러.
     내부적으로 flow-undo-done 을 호출한다.
@@ -24,7 +24,7 @@ class WorkflowUndoHandlerMixin:
     def _handle_workflow_undo_done(self) -> None:
         """POST /api/workflow/undo-done — body {"ticket": "T-NNN", "force": bool}.
 
-        Done 처리된 워크플로우를 Review 단계로 자동 롤백한다 (T-905 Phase 3).
+        Done 처리된 워크플로우를 Review 단계로 자동 롤백한다.
 
         내부적으로 `flow-undo-done T-NNN [--force]` 를 호출하여
         develop reset/revert + feature 브랜치 + worktree 재생성 + 칸반 force 전이
@@ -51,7 +51,6 @@ class WorkflowUndoHandlerMixin:
             return
 
         # Done 상태 사전 확인 — done/<T-NNN>.xml 존재 여부로 판별
-        # (T-906 fix 와 동일 패턴 — _read_kanban_tickets 는 dict[파일명, XML]
         # 반환이므로 list[dict] 가정한 옛 로직은 항상 fail)
         project_root = os.getcwd()
         done_xml = os.path.join(

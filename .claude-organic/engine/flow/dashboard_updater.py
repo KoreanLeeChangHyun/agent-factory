@@ -323,7 +323,6 @@ def _update_step_durations() -> None:
                 if not os.path.isdir(ts_path):
                     continue
 
-                # T-448 폴드 구조: ts_path 직속 status.json만 처리
                 status_file = os.path.join(ts_path, "status.json")
                 if not os.path.isfile(status_file):
                     continue
@@ -335,7 +334,6 @@ def _update_step_durations() -> None:
 
                 if not isinstance(data, dict):
                     continue
-                # legacy status.json (pre-T-459) 호환 read fallback
                 if (data.get("workflow_phase") or data.get("step")) != "DONE":
                     continue
 
@@ -470,7 +468,6 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
         for search_dir in search_dirs:
             if not os.path.isdir(search_dir):
                 continue
-            # T-448 폴드 구조: registryKey 디렉터리 직속 status.json 탐색
             for entry in _safe_listdir(search_dir):
                 entry_path = os.path.join(search_dir, entry)
                 if not os.path.isdir(entry_path):

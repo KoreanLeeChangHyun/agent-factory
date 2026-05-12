@@ -5,16 +5,16 @@ and is the single source of truth for ``audit-verdict.json`` structure.
 
 Canon references
 ----------------
-- T-413 (Done, commit 1ce3c2d): Auditor sidecar abolished.
+
   Rule: NO sidecar background process. Auditor runs integrated inside the
   workflow finalization flow (Step 4c-AUDIT), never as a standalone daemon.
 
-- T-454 (Done): ``phase_verifier.py`` LLM-call-zero rule.
+
   Rule: ``engine/flow/phase_verifier.py`` must remain rule-based only
   (0 LLM calls). This module (``auditor/``) is the designated home for all
   LLM judge calls — kept strictly separate from ``phase_verifier.py``.
 
-- T-411 (Done, commit 0c970fa): finalize AND-gate abolished.
+
   Rule: Advisory only. Verdict results MUST NOT block or force any kanban
   transition, merge pipeline, or workflow phase transition. Zero forced
   transitions, zero auto-revert, zero auto-block.

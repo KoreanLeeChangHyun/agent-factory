@@ -17,8 +17,6 @@ from ..claude_process import _validate_images
 from .._attachments_persist import AttachmentsSidecar
 
 
-# T-429: jsonl content 배열에 첨부 text 블록 prefix 가 들어가는 경우의 안전
-# 임계값. 사용자가 직접 짧게 ``[첨부 T-001]`` 만 입력하는 경우와 false-positive
 # 충돌을 막기 위해 ``min_attachment_threshold`` 를 적용한다. (envelope 합성
 # 단계에서 prompt + report 본문이 결합되면 통상 1KB 이상이므로 200자는
 # 충분히 보수적인 하한.)
@@ -153,9 +151,7 @@ def _build_render_events(data: dict) -> list[dict]:
     if not isinstance(content, list):
         return []
 
-    # T-429: user 메시지 content 배열 처리 정책
     # ----------------------------------------
-    # T-429 가 도입한 "사용자 메시지 본문 + 첨부 텍스트 블록 분리" 정책에 따라
     # user role 의 content 가 length >= 2 인 list 인 경우, 첫 번째 text 블록만
     # user 텍스트 이벤트로 채택하고 그 이후의 첨부 text 블록(``[첨부 T-`` 로
     # 시작 + 길이 ``_ATTACHMENT_BLOCK_MIN_LEN`` 이상)은 사용자 메시지 렌더에서
@@ -164,7 +160,6 @@ def _build_render_events(data: dict) -> list[dict]:
     # ``attachments`` 필드를 부여한다.
     #
     # 길이 임계값(_ATTACHMENT_BLOCK_MIN_LEN=200) 은 사용자가 짧게 직접
-    # ``[첨부 T-001]`` 만 입력하는 false-positive 를 막기 위한 보수적 하한이다.
     # frontend send 시 합성하는 첨부 블록은 prompt + report 본문 포함이므로
     # 보통 1KB 를 초과한다.
     skip_attachment_blocks = (
@@ -693,7 +688,6 @@ class TerminalHandlerMixin:
                     if ev.get('timestamp') in interrupted_ts:
                         ev['interrupted'] = True
 
-        # T-429: attachments sidecar 적용
         # -----------------------------------------------------------------
         # ``<session_id>.attachments.jsonl`` 라인을 읽어 user_msg_ts 와 user
         # 이벤트의 timestamp 를 매칭하여 ``ev['attachments']`` 를 부여한다.
@@ -858,7 +852,6 @@ class TerminalHandlerMixin:
         images = data.get('images', None)
         attachments_raw = data.get('attachments', None)
 
-        # T-429: 첨부 티켓 메타 파싱. 각 원소는 dict 이며 ``number`` 키가 필수.
         # 누락된 원소는 무시하여 잘못된 클라이언트가 보낸 데이터로 send 가
         # 통째로 막히지 않도록 한다 (회귀 가드).
         attachments: list[dict] = []
@@ -877,7 +870,6 @@ class TerminalHandlerMixin:
                 self._send_error(400, validation_error)
                 return
 
-        # T-429: 사용자 메시지 timestamp 결정
         # ------------------------------------
         # Claude CLI 가 stdin 으로 받은 user envelope 을 jsonl 에 flush 할 때
         # 자체 timestamp 를 부여한다. 우리가 sidecar 에 기록할 ``user_msg_ts``
@@ -892,7 +884,6 @@ class TerminalHandlerMixin:
         )
 
         # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
-        # T-429: 첨부 메타는 카드 표시용 필드만(prompt/report 본문 제외) 포함하여
         # SSE payload 크기를 줄인다. 본문은 sidecar 에서만 보존된다.
         if text or attachments:
             broadcast_payload: dict = {
@@ -915,7 +906,6 @@ class TerminalHandlerMixin:
             text, images=images, attachments=attachments or None,
         )
 
-        # T-429: send 성공 시 첨부 sidecar 에 append.
         # session_id 미정 또는 첨부 부재 시 AttachmentsSidecar 가 no-op 처리.
         if attachments and result.get('ok'):
             try:

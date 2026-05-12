@@ -581,9 +581,7 @@ def _merge_to_develop_impl(
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"
 
-    # T-370 B: 비-worktree 모드 차단
     # WORKFLOW_WORKTREE=false 환경에서 호출되면 메인 저장소 HEAD가
-    # develop으로 이동하는 부작용 (T-365 원인 #2)이 발생하므로 진입 자체를 거부한다.
     # 사용자에게 수동 merge 명령어를 안내한다.
     if not is_worktree_enabled(repo_path):
         _warn(

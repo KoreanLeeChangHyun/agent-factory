@@ -173,10 +173,10 @@ def _stage1_5_premerge_state_guard(
 ) -> tuple[bool, str]:
     """Stage 1.5: 재머지 진입 직전 워크트리/feature 브랜치 상태 가드.
 
-    T-441 회귀 박제: Done 롤백(undo_done) 후 워크트리·feature 브랜치가
+    회귀 차단: Done 롤백(undo_done) 후 워크트리·feature 브랜치가
     빈 상태(변경분 없이 재생성됨)이거나 부재인 채로 재머지가 진행되어
     별건 commit 위에서 anchor 실패 → `reset --hard pre_merge_develop_sha` 가
-    별건 변경분을 함께 reset 하는 회귀가 발생했다(T-440 사례).
+    별건 변경분을 함께 reset 하는 회귀가 발생했다.
 
     본 가드는 Stage 2(`merge_to_develop`) 진입 전에 다음을 검증한다:
 
@@ -188,9 +188,9 @@ def _stage1_5_premerge_state_guard(
     3. 정상(commits ahead > 0) → 통과
 
     회귀 0 보장:
-      - T-906(Review→Done DnD 정상 경로): 변경분 있는 일반 머지는
+
         commits ahead > 0 이므로 통과.
-      - T-905(undo_done reset/revert): undo_done 자체에는 영향 없음.
+
         재머지 단계에서만 작동.
       - 자동 회귀·자동 reflog 적용 금지(feedback_no_speculative_guards
         2026-05-08 캐논). 사용자 명시 동의 메시지만 노출.
@@ -278,7 +278,7 @@ def _stage1_5_premerge_state_guard(
             )
         else:
             print(
-                "  빈 브랜치 머지는 회귀(T-440) 재현 위험이 있어 차단합니다.\n"
+                "  빈 브랜치 머지는 회귀 재현 위험이 있어 차단합니다.\n"
                 "  워크트리에 변경분을 commit 한 뒤 재시도하세요.",
                 file=sys.stderr,
                 flush=True,
@@ -450,7 +450,6 @@ def _handle_anchor_failure(
         reset_target = "HEAD^"
 
     # 포렌식 1.5: reset_target 이 merge commit 의 첫 번째 부모와 일치하는지 검사.
-    # T-441 회귀 박제(T-440 사례): undo_done 후 빈 브랜치 재머지 시점에 develop 위로
     # 별건 commit(`6efc6ef` revert 등)이 추가된 상태였고, pre_merge_develop_sha 가
     # 그 별건 commit 으로 캡처되어 `reset --hard <별건 commit>` 이 실행되면서
     # 머지 직전 develop 상태와 다른 위치로 reset → 변경분 소실 가능성.
@@ -510,7 +509,6 @@ def _handle_anchor_failure(
     )
 
     # JSONL 로그 기록 — pre_merge_develop_sha / reset_target / head_before /
-    # head_after 모두 명시 (T-403 사고 회복용 포렌식 데이터).
     log_path = os.path.join(project_root, _ANCHOR_FAILURE_LOG)
     try:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -583,7 +581,6 @@ def _stage2_5_verify_merge_anchor(
         _error("anchor 검증: merge_commit이 비어있어 검증 불가")
         return True  # 비차단: 검증 불가 시 통과
 
-    # T-410: already-up-to-date 명시 분기.
     # `git merge --no-ff` 는 feature 가 develop 의 ancestor 일 때 새 commit 을
     # 만들지 않고 기존 develop HEAD 를 그대로 반환한다. 이 경우 merge_commit 은
     # pre_merge_develop_sha 와 동일하며 anchor 검증(^2 비교)은 의미가 없다.
@@ -602,9 +599,7 @@ def _stage2_5_verify_merge_anchor(
     if parent2_result.returncode != 0:
         # fast-forward 또는 already-up-to-date 케이스 (parent 1개).
         # develop 에 추가 merge commit 없으므로 anchor 검증 의미 없음 → skip.
-        # T-410: 기존 로직은 이 케이스에서 _handle_anchor_failure → reset HEAD^ 호출하여
         # develop 의 사전 ahead commit 까지 날리는 data loss 회귀 발생.
-        # T-410 Task 1.2: pre_merge_develop_sha 비교 결과를 함께 로그에 노출하여
         # 분기 사유를 구조화한다 (캡처 실패 / SHA mismatch 구분).
         if not pre_merge_develop_sha:
             sha_compare = "pre_merge_develop_sha 미캡처"
@@ -820,8 +815,6 @@ def run_pipeline(
         _step(1, "미커밋 변경사항 감지 및 자동 커밋")
         print("  worktree 없음 (Stage 1 건너뜀)", flush=True)
 
-    # ── Stage 1.5: 재머지 상태 가드 (T-441) ──
-    # T-440 회귀(Done 롤백 후 빈 워크트리/브랜치 + 별건 commit reset) 차단.
     # dry-run 은 실제 머지를 수행하지 않으므로 가드 결과를 advisory 로 표기하고 통과.
     guard_ok, _guard_msg = _stage1_5_premerge_state_guard(
         ticket_number, worktree_path, force
@@ -835,7 +828,6 @@ def run_pipeline(
         else:
             return 1
 
-    # ── Stage 2 진입 직전: develop HEAD SHA 캡처 (T-410) ──
     # already-up-to-date / ff 케이스 명시 분기 + 롤백 SHA 명시화에 사용.
     # develop 브랜치 미존재 또는 rev-parse 실패 시 빈 문자열로 fallback —
     # _stage2_5_verify_merge_anchor 와 _handle_anchor_failure 모두

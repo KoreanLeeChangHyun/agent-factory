@@ -276,7 +276,6 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
         }
         return file_map
 
-    # 1차 (T-449 fold): <key>/status.json 직속
     direct_status = os.path.join(entry_abs, 'status.json')
     if os.path.isfile(direct_status):
         try:

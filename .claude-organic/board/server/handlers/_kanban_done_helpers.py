@@ -1,4 +1,4 @@
-"""Internal helpers for _handle_kanban_done sub-branches (T-424 모듈화)."""
+"""Internal helpers for _handle_kanban_done sub-branches."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from ._helpers import (
 
 def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
                               project_root: str, flow_kanban: str) -> None:
-    """force=True 분기: Open → Done 직접 전이 (T-418).
+    """force=True 분기: Open → Done 직접 전이.
 
     1. open/<ticket>.xml 존재 검증
     2. dirty 워크트리 가드 (force_dirty=false 면 409 차단)
@@ -111,14 +111,13 @@ def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
 
 def handle_kanban_done_review(handler, ticket: str,
                                project_root: str, flow_kanban: str) -> None:
-    """force=False 분기: Review → Done 전이 (T-906 로직).
+    """force=False 분기: Review → Done 전이.
 
     1. review/<ticket>.xml 존재 검증 (os.path.isfile — dict→list 회귀 fix)
     2. flow-kanban done <ticket> 호출
     3. stdout 파싱 — merge_commit / merge_skipped / error_kind 분류
     """
     # Review 상태 사전 확인 — review/ 디렉터리에 티켓 XML 존재 여부로 판별
-    # (T-906 워커가 _read_kanban_tickets 반환 타입 dict→list 잘못 가정 회귀 수정)
     review_xml = os.path.join(
         project_root, '.claude-organic', 'tickets', 'review', f'{ticket}.xml',
     )
