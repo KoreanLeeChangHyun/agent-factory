@@ -39,6 +39,7 @@ from _common import (  # noqa: E402
     find_active_workflow,
     get_ticket_id_from_env,
     is_orchestration_enabled,
+    is_workflow_session,
     log_workflow_event,
     run_wrapper,
 )
@@ -60,6 +61,9 @@ def _detect_outcome(tool_result: object) -> str:
 
 def main() -> int:
     if not is_orchestration_enabled():
+        return 0
+
+    if not is_workflow_session():
         return 0
 
     try:

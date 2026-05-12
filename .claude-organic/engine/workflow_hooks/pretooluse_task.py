@@ -43,6 +43,7 @@ from _common import (  # noqa: E402
     find_active_workflow,
     get_ticket_id_from_env,
     is_orchestration_enabled,
+    is_workflow_session,
     log_workflow_event,
     mark_phase_zero_done,
     phase_zero_done,
@@ -104,6 +105,10 @@ def _handle_reporter(key: str, work_dir_abs: str, phase: str) -> None:
 def main() -> int:
     if not is_orchestration_enabled():
         emit_allow("HOOK_WORKFLOW_ORCHESTRATION 비활성 — 통과.")
+        return 0
+
+    if not is_workflow_session():
+        emit_allow("워크플로우 세션 아님 — 통과 (메인 세션 hook 사이드 이펙트 차단).")
         return 0
 
     try:
