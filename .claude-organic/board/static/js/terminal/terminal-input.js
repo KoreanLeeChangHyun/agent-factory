@@ -749,19 +749,9 @@
       M.currentToolBox = null;
       M.toolInputBuffer = "";
       M.currentToolName = null;
-      // 큐에 push 되어 대기 중이던 메시지를 정리한다 — 사용자 "중지" 의도는
-      // 큐도 포함. 미처리하면 idle 전환 시 advanceTurn 이 자동 전송해버린다.
-      // 1:1 모델: inputQueue 는 단순 평면 배열이므로 length = 0 으로 전체 정리.
-      // DOM echo 를 미리 하지 않으므로 outputDiv 에서 별도 DOM 정리 불필요.
-      if (M.inputQueue && M.inputQueue.length > 0) {
-        M.inputQueue.length = 0;
-      }
-      // 큐 stack 카드도 모두 제거 (DOM 정리).
-      var queueStack = document.getElementById("terminal-input-queue");
-      if (queueStack) {
-        while (queueStack.firstChild) queueStack.removeChild(queueStack.firstChild);
-        queueStack.setAttribute("hidden", "");
-      }
+      // [큐 보존 정책] ESC 는 현재 응답(A) 만 중지하고 대기 중인 큐(B, C ...)는
+      // 보존한다. idle 전환 후 advanceTurn 이 큐 다음 항목을 자동 send 한다
+      // (Claude CLI 와 동일 동작). 큐 폐기는 큐 카드 × 버튼으로 사용자가 직접 결정.
       // [ESC 복원] 직전 보낸 사용자 메시지를 입력창에 자동 복원하여
       // 사용자가 수정하거나 그대로 다시 보낼 수 있게 한다.
       // 입력창에 사용자가 이미 새 텍스트를 타이핑 중이면 보존하면서 앞에 공백 한 칸
