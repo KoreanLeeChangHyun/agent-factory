@@ -20,6 +20,13 @@
       - 워크플로우 완료 후 반드시 flow-finish + flow-claude end를 실행해야 한다 (MUST)
       - flow-claude end 이후 추가 출력/도구 호출은 절대 금지한다 (MUST NOT)
       - 세션은 flow-finish Step 5에서 자동 종료됨 (3초 지연 kill)
+
+      Hook 흡수 모드 (T-483, HOOK_WORKFLOW_ORCHESTRATION=true 시 활성):
+      - 오케스트레이터는 INIT(cd "$(flow-init ... | tail -1)") + Task × N + DONE(flow-update status DONE + flow-finish + flow-claude end) 만 명시 호출한다 (MUST)
+      - 그 사이의 결정론 wrapper(flow-update both / flow-step start / flow-phase / flow-skillmap / flow-update task-start / flow-update task-status / flow-validate) 는 PreToolUse[Task] / PostToolUse[Task] hook 이 자동 호출한다 (MUST NOT 명시 호출 — 중복 transition 유발)
+      - 워크플로우 세션 시작 시 ticket XML / init-result.json / status.json / user_prompt.txt 등 산출물을 직접 Read / cat / ls 하지 말 것 (MUST NOT). INIT 결과 요약/출력 금지 캐논
+      - 다른 워크플로우의 산출물(runs/<다른 키>/) 을 읽지 말 것 (MUST NOT). 현재 workDir 내부로 한정
+      - 상세 규약은 .claude/skills/workflow-orchestration/SKILL.md (Hook Absorption Contract 섹션)
     </workflow-session-policy>
 
     <branch-policy>
