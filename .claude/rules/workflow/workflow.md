@@ -10,7 +10,7 @@
 To Do → Open → In Progress → Review → Done
 ```
 
-- **To Do**: 미래에 할 백로그·아이디어 저장소 (박제 공간). 지금 당장 집중하지 않는 작업.
+- **To Do**: 미래에 할 백로그·아이디어 저장소 (티켓 생성 공간). 지금 당장 집중하지 않는 작업.
 - **Open**: 지금 집중해야 하는 임박 작업. 워크플로우 실행(`/wf -s N`) 대상.
 - **In Progress**: 워크플로우 실행 중인 상태.
 - **Review**: 워크플로우 완료 후 보고서 검토 + 카드 4행 토글로 feature 브랜치 활성화 → 사용자 직접 테스트 + 사용자 리뷰. (토글 ON: feature 브랜치로 git switch, OFF: develop 복귀)
@@ -55,7 +55,7 @@ flow-kanban create "제목" --command implement --status todo   # 기본·유일
 - 티켓 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status todo` 로 생성한다. Open 승격은 사용자가 칸반 DnD 로 직접 수행
 - 티켓 생성 전 사용자 요구사항이 모호하면 **인터뷰 식**으로 자연어 질문한다 (MUST). 메뉴 (1=A/2=B) 형태 질의 금지. 한 번에 1~2개씩만 묻고 답을 받아 다음 질문으로 진행
   - **호출 강제 (MUST)**: 아래 트리거 감지 시 description match 에 의존하지 말고 **즉시 Skill 도구로 `grill-me` 명시 호출**. 본 룰이 호출 강제의 단일 진실 공급원이며, 매 세션 자동 로드되어 호출 누락을 차단한다 (2026-05-08 사용자 명시 강제).
-  - **트리거 키워드**: `티켓 만들어줘`, `/wf -o`, `박제해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화.
+  - **트리거 키워드**: `티켓 만들어줘`, `/wf -o`, `티켓 생성해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화.
   - 묻는 대상: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
   - 묻지 않는 대상: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
   - 상세 호출 절차 / 예시 / 반례 보충: `.claude/skills/grill-me/SKILL.md` (인터뷰), `.claude/skills/brainstorming/SKILL.md` (컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원이며 SKILL.md 는 reference + 호출 흐름·반례만 보유한다.
@@ -66,11 +66,11 @@ flow-kanban create "제목" --command implement --status todo   # 기본·유일
   4. **FSM 경계 명시**: 새 `workflow_phase` 가 기존 칸반 FSM(`kanban_status`) 의 어느 단계 안에 있는지 / 회귀 가능성
   5. **비용 vs 가치**: LLM 호출 추가 시 cost / skip 조건 정의 가능성
   6. **다른 모드와의 양립성**: 싱글/멀티/light/full 등 분기와 일관성
-  7. **명명 모호성**: `phase_verify` (rule-based 단계 검증) vs `ticket_validate` (프롬프트 검수) 등 동음이의어 혼선 위험 — 동의어 페어마다 영어 식별자를 분리해 명명 사전(T-452 §4)에 박제
+  7. **명명 모호성**: `phase_verify` (rule-based 단계 검증) vs `ticket_validate` (프롬프트 검수) 등 동음이의어 혼선 위험 — 동의어 페어마다 영어 식별자를 분리해 명명 사전(T-452 §4)에 티켓 생성
   - 7축으로 즉시 한 번 훑고 발견된 약점만 짚는다. 사용자가 명시 요청하지 않아도 짚는다 — grill-me 는 사용자가 더 잘 결정할 수 있도록 약점을 드러내는 게 본분.
   - 폐기 사례 (2026-05-09 사용자 명시 정정): 6-phase 워크플로우 설계 공유 받고 mermaid 시각화 + "메모리 등록? 티켓 생성?" 만 묻고 약점 분석 안 함 → 사용자가 "어때요?" 로 캐묻고 나서야 6개 약점 짚음.
 - `flow-kanban create` 호출 시 `--status todo` 명시 (MUST) — 생략 시 에러는 동일하나 기본은 항상 todo
-- 메인 클로드가 develop 브랜치에 직접 commit하지 않는다 (MUST NOT) — 워크플로우 회귀 진단·복구 등 즉각 차단 케이스라도 fix/... 또는 hotfix/... 별도 브랜치 경유를 권장 (SHOULD). 머지 시 `--no-ff` 권장 (워크플로우 머지 그래프 정합). 즉흥 브랜치 OK — 티켓 채번 없이 `fix/short-desc` 형태 브랜치 바로 생성 가능. (T-433 박제 2026-05-10)
+- 메인 클로드가 develop 브랜치에 직접 commit하지 않는다 (MUST NOT) — 워크플로우 회귀 진단·복구 등 즉각 차단 케이스라도 fix/... 또는 hotfix/... 별도 브랜치 경유를 권장 (SHOULD). 머지 시 `--no-ff` 권장 (워크플로우 머지 그래프 정합). 즉흥 브랜치 OK — 티켓 채번 없이 `fix/short-desc` 형태 브랜치 바로 생성 가능. (T-433 티켓 생성 2026-05-10)
 
 ## DO NOT
 - PreToolUse Hook 활성 시 직접 수정 시도하지 않는다 — 차단되므로 토큰 낭비
@@ -148,13 +148,13 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | "리뷰해줘" | /wf -e (review) → /wf -s N | - |
 | "종료해줘" | /wf -d N | - |
 | "티켓 편집해줘" | /wf -e N | - |
-| "박제해줘" / "나중에" / "언젠가" / "백로그" | /wf -o | To Do 자동 (기본·유일 경로) |
+| "티켓 생성해줘" / "나중에" / "언젠가" / "백로그" | /wf -o | To Do 자동 (기본·유일 경로) |
 | "지금 집중" / "바로 해야 함" / "이번에 하자" | /wf -o → DnD | To Do 생성 후 사용자가 칸반 DnD 로 Open 승격 |
 | "데브루프 고정" / "데브루프에 올려" / "데브루프 동기화" / "올리자" | develop ff merge + origin push | "데브루프" = develop branch. 현재 작업 브랜치 → develop ff → `origin develop` push. non-FF 면 사용자 옵션 묻기. main 머지는 별도 release 결정 |
 
 ## Review 단계 1차 룰베이스 자동 검증 (advisory)
 
-> T-463 박제 (2026-05-10). Review 컬럼 진입 직후 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시한다. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건** (캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa, T-413 commit 1ce3c2d). 사용자는 verdict FAIL 이어도 Review→Done DnD 강행 가능.
+> T-463 티켓 생성 (2026-05-10). Review 컬럼 진입 직후 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시한다. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건** (캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa, T-413 commit 1ce3c2d). 사용자는 verdict FAIL 이어도 Review→Done DnD 강행 가능.
 
 ### 검증 룰 카탈로그 (13 룰 / 6 카테고리)
 
@@ -210,13 +210,13 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 - **FAIL**: 3+ 룰 위반 또는 hard-fail 룰 1건 이상 (R-EXIST-1, R-METRIC-2)
 - **SKIP**: workflow_phase != DONE/FAILED (워크플로우 미종료 시점)
 
-### advisory 보장 8항 (T-463 §10 박제)
+### advisory 보장 8항 (T-463 §10 티켓 생성)
 
 본 검증은 다음 지점에서 advisory only 를 보장한다:
 
 1. review_verdict.py — kanban move / status 전이 / sentinel 호출 0건
 2. finalization.py W04 hook 직후 — try/except 흡수 비차단
-3. workflow.md (본 섹션) — advisory only 명시 박제
+3. workflow.md (본 섹션) — advisory only 명시 티켓 생성
 4. Board API endpoint — GET only
 5. UI 배지 — tooltip only (클릭 자동 액션 0건)
 6. DnD 핸들러 — verdict 결과로 차단 분기 0건

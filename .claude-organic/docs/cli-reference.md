@@ -580,11 +580,11 @@ flow-gc /home/user/project
 ```bash
 # 티켓 생성 (기본 상태: Open)
 flow-kanban create "로그인 버그 수정" --command implement
-# 티켓 생성 (To Do 상태로 박제)
+# 티켓 생성 (To Do 상태로 티켓 생성)
 flow-kanban create "나중에 할 작업" --command implement --status todo
 
 # 상태 이동
-flow-kanban move T-169 todo       # To Do로 이동 (박제/백로그)
+flow-kanban move T-169 todo       # To Do로 이동 (티켓 생성/백로그)
 flow-kanban move T-169 open       # Open으로 이동 (집중 대상)
 flow-kanban move T-169 progress
 flow-kanban move T-169 review

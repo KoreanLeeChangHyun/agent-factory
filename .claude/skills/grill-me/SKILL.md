@@ -1,18 +1,18 @@
 ---
 name: grill-me
-description: "사용자 요구사항이 모호하거나 새 티켓을 박제하기 직전 의도를 캐물어 명확화해야 할 때 호출. 트리거: '티켓 만들어줘', '/wf -o', '박제해줘', 'grill me', '캐물어줘', '제대로 물어봐', '인터뷰해줘', 작업 범위·산출물·제약·우선순위가 모호한 요구사항 발화. 한 번에 1~2개 자연어 질문으로 좁혀가며, 도구로 답할 수 있는 것은 사용자에게 묻지 않는다."
+description: "사용자 요구사항이 모호하거나 새 티켓을 생성하기 직전 의도를 캐물어 명확화해야 할 때 호출. 트리거: '티켓 만들어줘', '/wf -o', '티켓 생성해줘', 'grill me', '캐물어줘', '제대로 물어봐', '인터뷰해줘', 작업 범위·산출물·제약·우선순위가 모호한 요구사항 발화. 한 번에 1~2개 자연어 질문으로 좁혀가며, 도구로 답할 수 있는 것은 사용자에게 묻지 않는다."
 license: "MIT (derived)"
 ---
 
 # grill-me
 
-새 티켓을 박제하기 직전, 사용자의 모호한 요구사항을 인터뷰 식 자연어 질문으로 캐물어 명확화하는 스킬입니다. 외부 `grill-me` (MIT, Matt Pocock 2026)의 컨셉을 본 프로젝트 톤(한국어/존댓말, 도구 우선, 자동 강제 금지)으로 재작성했습니다.
+새 티켓을 생성하기 직전, 사용자의 모호한 요구사항을 인터뷰 식 자연어 질문으로 캐물어 명확화하는 스킬입니다. 외부 `grill-me` (MIT, Matt Pocock 2026)의 컨셉을 본 프로젝트 톤(한국어/존댓말, 도구 우선, 자동 강제 금지)으로 재작성했습니다.
 
 > **룰 정의의 단일 진실 공급원**: 인터뷰 룰의 정의는 `.claude/rules/workflow/workflow.md` (28~57행, 티켓 생성 규칙 + DO 인터뷰 룰)가 보유합니다. 본 스킬은 정의를 복붙하지 않고 트리거·호출 흐름·예시·반례만 보유합니다.
 
 ## 1. 사용 시기
 
-- 사용자가 "티켓 만들어줘", "/wf -o", "박제해줘", "grill me", "캐물어줘", "제대로 물어봐", "인터뷰해줘" 등으로 명시 호출한 경우.
+- 사용자가 "티켓 만들어줘", "/wf -o", "티켓 생성해줘", "grill me", "캐물어줘", "제대로 물어봐", "인터뷰해줘" 등으로 명시 호출한 경우.
 - 사용자가 코드 수정·조사·검토를 요청했으나 작업 범위·산출물 형태·제약·우선순위 가운데 하나라도 모호한 경우.
 - 기존 티켓을 편집(`/wf -o N`)하기 직전 요구사항이 흐릿한 경우.
 
@@ -21,7 +21,7 @@ license: "MIT (derived)"
 1. **도구 우선 조회** — 답을 사용자에게 묻기 전, 본 프로젝트 도구로 알 수 있는지 먼저 확인합니다 (아래 5절).
 2. **자연어 인터뷰** — 도구로 답이 안 나오는 결정점만 한 번에 1~2개씩 자연어로 질문합니다. 답을 받은 뒤 다음 질문으로 진행합니다.
 3. **추천 1안 제시** — 충분한 답이 모이면 사용자에게 근본 1안을 우선 제시합니다 (auto memory `synthesis_user_interaction_canon` 캐논). 2-3 접근법 강제 금지.
-4. **티켓 박제** — 합의되면 `flow-kanban create "제목" --command <implement|research|review> --status todo` 로 박제합니다. Open 승격은 사용자가 칸반 DnD 로 직접 수행합니다.
+4. **티켓 생성** — 합의되면 `flow-kanban create "제목" --command <implement|research|review> --status todo` 로 티켓 생성합니다. Open 승격은 사용자가 칸반 DnD 로 직접 수행합니다.
 
 ## 3. 묻는 대상
 
@@ -63,7 +63,7 @@ license: "MIT (derived)"
 ## 7. 출처
 
 - 외부 원본: `/home/deus/workspace/claude/.repo/skills/skills/productivity/grill-me/SKILL.md` — MIT (Matt Pocock, 2026).
-- 변경 요약: 한국어/존댓말로 재작성 / 외부의 "explore the codebase instead" 권고를 본 프로젝트 도구(`flow-kanban`·`git worktree`·auto memory·board live)로 매핑 / `.claude/rules/workflow/workflow.md` 인터뷰 룰을 단일 진실 공급원으로 cross-reference / 추천 1안 우선·자동 강제 금지·메뉴 질의 금지 등 본 프로젝트 캐논 반영 / 티켓 박제 단계(`flow-kanban create --status todo`)를 호출 흐름 마지막 단계로 추가.
+- 변경 요약: 한국어/존댓말로 재작성 / 외부의 "explore the codebase instead" 권고를 본 프로젝트 도구(`flow-kanban`·`git worktree`·auto memory·board live)로 매핑 / `.claude/rules/workflow/workflow.md` 인터뷰 룰을 단일 진실 공급원으로 cross-reference / 추천 1안 우선·자동 강제 금지·메뉴 질의 금지 등 본 프로젝트 캐논 반영 / 티켓 생성 단계(`flow-kanban create --status todo`)를 호출 흐름 마지막 단계로 추가.
 
 ## 8. 시스템 스킬 분류
 
