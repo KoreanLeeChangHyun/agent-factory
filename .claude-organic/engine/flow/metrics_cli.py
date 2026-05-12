@@ -73,7 +73,7 @@ _REGRESSION_KINDS: tuple[str, ...] = (
 )
 
 # 단계 표시 순서 (가나다순 대신 의미적 흐름순)
-_STEP_ORDER: tuple[str, ...] = ("INIT", "PLAN", "WORK", "REPORT", "DONE")
+_STEP_ORDER: tuple[str, ...] = ("INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE")
 
 
 # ---------------------------------------------------------------------------

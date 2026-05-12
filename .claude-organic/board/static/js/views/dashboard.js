@@ -36,12 +36,13 @@ const DASH_FILES = ["usage", "logs", "skills"];
 
 // ── Workflow Metrics Constants (테라코타 강조 1축) ──
 const METRICS_DEFAULT_LAST = 20;
-const METRICS_STEP_ORDER = ["INIT", "PLAN", "WORK", "REPORT", "DONE"];
+const METRICS_STEP_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 const METRICS_ACCENT = "#D97757";
 const METRICS_STEP_COLORS = {
   INIT:   "#4ec9b0",  // 청록
   PLAN:   "#dcdcaa",  // 노랑
   WORK:   METRICS_ACCENT,  // 테라코타 (가장 핵심 단계)
+  VALIDATE: "#9cdcfe",  // 하늘 (work 직후 검증)
   REPORT: "#c586c0",  // 보라
   DONE:   "#858585",  // 회색
 };
