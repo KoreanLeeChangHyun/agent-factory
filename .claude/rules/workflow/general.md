@@ -198,6 +198,8 @@ working tree modified 잔재 폐기 권장 시, 동일 변경이 다른 곳 (워
 - `.claude-organic/` 하위 파일은 Edit/Write 직접 수정 가능 (claude_edit 불필요)
 - Edit/Write 직접 수정 불가 — Claude Code hardcoded 보호로 차단됨
 - 절차: `flow-claude-edit open <path>` → edit/ 에서 편집 → `flow-claude-edit save <path>`
+- 신규 생성: `flow-claude-edit new <path>` → edit/ 에 빈 파일 생성 → Edit 도구로 작성 → `flow-claude-edit save <path>` (원본 미존재면 .claude/ 하위 자동 mkdir)
+- 원본이 이미 존재하는 파일은 `new` 호출이 차단되므로 기존 파일 수정은 `open` 사용
 - 삭제: `flow-claude-edit open <path>` 후 edit/ 파일 삭제 → Bash로 원본 rm
 - 경로: `.claude/` 접두사 제외하고 전달 (예: `flow-claude-edit open rules/workflow/general.md`)
 

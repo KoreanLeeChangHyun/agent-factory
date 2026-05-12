@@ -99,7 +99,7 @@ preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-se
 - `.claude/` 하위는 `flow-claude-edit open/save` 경유 (정식 경로)
 - Edit/Write 도구만 차단 → Bash `sed -i` 같은 간접 수정은 차단되지 않음 (대량 경로 치환에 활용 가능)
 - `.claude-organic/` 하위는 직접 Edit 가능 (차단 대상 아님)
-- 신규 파일: `flow-claude-edit open` 차단 (T-363) → staging path 에 직접 Write 후 `flow-claude-edit save` 호출하면 .claude/ 로 복사됨
+- 신규 파일: `flow-claude-edit new <path>` 호출 → edit/<path> 빈 파일 생성 → Edit 도구로 작성 → `flow-claude-edit save <path>` 호출 시 .claude/ 로 승격
 
 ## 잔존 위험 점검 포인트
 
