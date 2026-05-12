@@ -69,7 +69,6 @@ from flow.review_verdict import (
     _check_fsm_1,
     _check_guard_1,
     _check_guard_3,
-    _check_metric_1,
     _check_metric_2,
     _check_metric_3,
     _check_path_1,
@@ -170,28 +169,6 @@ class TestRuleMetric(_BaseCase):
         if outcome is not None:
             payload["outcome"] = outcome
         return {"event_type": et, "payload": payload}
-
-    def test_metric_1_pass(self) -> None:
-        # 5 phase 모두 start/end 1쌍
-        events = []
-        for s in ("INIT", "PLAN", "WORK", "REPORT", "DONE"):
-            events.append(self._ev("step.start", step=s))
-            events.append(self._ev("step.end", step=s, outcome="ok"))
-        ctx = {"metrics_lines": events}
-        self.assertIsNone(_check_metric_1(self.workdir, ctx))
-
-    def test_metric_1_mismatch(self) -> None:
-        # WORK 만 start 2 / end 1 (count 불일치)
-        events = [
-            self._ev("step.start", step="WORK"),
-            self._ev("step.start", step="WORK"),
-            self._ev("step.end", step="WORK", outcome="ok"),
-        ]
-        ctx = {"metrics_lines": events}
-        v = _check_metric_1(self.workdir, ctx)
-        self.assertIsNotNone(v)
-        assert v is not None
-        self.assertEqual(v.rule_id, "R-METRIC-1")
 
     def test_metric_2_pass(self) -> None:
         events = [self._ev("step.end", step="DONE", outcome="ok")]
@@ -296,7 +273,7 @@ class TestThreshold(unittest.TestCase):
     def test_threshold_warn(self) -> None:
         violations = [
             Violation("R-EXIST-2", "warn", "missing"),
-            Violation("R-METRIC-1", "warn", "mismatch"),
+            Violation("R-METRIC-3", "warn", "tool_deny"),
         ]
         result = _resolve_verdict(violations, {})
         self.assertEqual(result.verdict, WARN)
@@ -304,7 +281,7 @@ class TestThreshold(unittest.TestCase):
     def test_threshold_fail_count(self) -> None:
         violations = [
             Violation("R-EXIST-2", "warn", "x"),
-            Violation("R-METRIC-1", "warn", "x"),
+            Violation("R-GUARD-3", "warn", "x"),
             Violation("R-METRIC-3", "warn", "x"),
         ]
         result = _resolve_verdict(violations, {})

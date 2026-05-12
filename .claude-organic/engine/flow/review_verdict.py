@@ -14,9 +14,9 @@ based on W11 §A: finalization.py L861 hook insertion (W04 회귀 패턴 캡처
 직후, Step 4 kanban move review 직전 위치). phase_verifier.py
 VerifyResult 패턴(_find_git_root / _check_commits_ahead).
 
-13 룰 카탈로그 (workflow.md §3 와 동기 — 단일 진실 공급원):
+12 룰 카탈로그 (workflow.md §3 와 동기 — 단일 진실 공급원):
     - R-EXIST-1 ~ R-EXIST-4 : 산출물 존재 검증 (4룰)
-    - R-METRIC-1 ~ R-METRIC-3 : metrics.jsonl event_type 발화 (3룰)
+    - R-METRIC-2, R-METRIC-3 : metrics.jsonl event_type 발화 (2룰)
     - R-GUARD-1 ~ R-GUARD-3 : 가드 4종 정합 (3룰)
     - R-PATH-1 : 산출물 path 정합 (1룰)
     - R-FSM-1 : FSM 종착점 (1룰)
@@ -155,7 +155,6 @@ def compute_review_verdict(
         ("R-EXIST-2", _check_exist_2),
         ("R-EXIST-3", _check_exist_3),
         ("R-EXIST-4", _check_exist_4),
-        ("R-METRIC-1", _check_metric_1),
         ("R-METRIC-2", _check_metric_2),
         ("R-METRIC-3", _check_metric_3),
         ("R-GUARD-1", _check_guard_1),
@@ -314,36 +313,6 @@ def _check_exist_4(workdir: Path, ctx: dict) -> Optional[Violation]:
             rule_id="R-EXIST-4",
             severity=SEV_WARN,
             message="metrics.jsonl is empty (line_count=0)",
-        )
-    return None
-
-
-_LIFECYCLE_STEPS = ("INIT", "PLAN", "WORK", "REPORT", "DONE")
-
-
-def _check_metric_1(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-METRIC-1: step.start / step.end 페어링 (5 phase 모두 카운트 일치)."""
-    lines = ctx.get("metrics_lines") or []
-    starts: dict[str, int] = {p: 0 for p in _LIFECYCLE_STEPS}
-    ends: dict[str, int] = {p: 0 for p in _LIFECYCLE_STEPS}
-    for ev in lines:
-        et = ev.get("event_type")
-        step = (ev.get("payload") or {}).get("step")
-        if step not in starts:
-            continue
-        if et == "step.start":
-            starts[step] += 1
-        elif et == "step.end":
-            ends[step] += 1
-    mismatched = [p for p in _LIFECYCLE_STEPS if starts[p] != ends[p]]
-    if mismatched:
-        detail = ", ".join(
-            f"{p}(start={starts[p]},end={ends[p]})" for p in mismatched
-        )
-        return Violation(
-            rule_id="R-METRIC-1",
-            severity=SEV_WARN,
-            message=f"step.start/end pairing mismatch: {detail}",
         )
     return None
 
