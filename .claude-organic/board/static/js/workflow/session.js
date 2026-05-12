@@ -703,8 +703,21 @@
       // commitQueue() 로 다음 1개 entry 를 즉시 send 한다 (1 turn = 1 메시지).
       // 큐가 비었으면 idle 정리(updateControlBar)만 수행한다.
       // advanceTurn 미정의 환경(구버전 polyfill)에서는 drainQueue 로 폴백한다.
+      //
+      // [ESC race 가드] _recentInterrupt 윈도우에서는 advanceTurn 을 skip 한다.
+      // 직후 도착할 process_exit + autoResume 흐름이 큐 처리를 담당하며,
+      // 여기서 commit 하면 죽어가는 process 로 큐 entry 가 send 되어 응답을
+      // 받지 못하는 회귀 발생 (2026-05-13 fix).
       var termMod2 = Board._term;
-      if (termMod2 && typeof termMod2.advanceTurn === "function") {
+      var skipAdvanceForInterrupt = !!(termMod2 && termMod2._recentInterrupt);
+      if (Board.debugLog) Board.debugLog('onResult.advanceTurnDecision', {
+        hasAdvance: !!(termMod2 && typeof termMod2.advanceTurn === 'function'),
+        recentInterrupt: !!(termMod2 && termMod2._recentInterrupt),
+        skip: skipAdvanceForInterrupt,
+      });
+      if (skipAdvanceForInterrupt) {
+        // skip — startSession.setIdle 의 autoResume 완료 시점에서 commitQueue.
+      } else if (termMod2 && typeof termMod2.advanceTurn === "function") {
         termMod2.advanceTurn();
       } else if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
         _ctx.drainQueue();
@@ -1628,11 +1641,28 @@
         termStatusBefore: Board.state.termStatus,
         inAutoResume: !!Board.state._inAutoResume,
       });
+      var wasInAutoResume = !!Board.state._inAutoResume;
       Board.state.setTermStatus("idle");
       // ESC autoResume 윈도우 종료 — 정상 idle 도달했으므로 플래그 해제.
       Board.state._inAutoResume = false;
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
+      // [ESC race 가드 후속] _onResult 의 advanceTurn 이 _recentInterrupt 윈도우에서
+      // skip 됐으므로, 새 process spawn 완료(setIdle) 시점에 큐 잔여를 처리한다.
+      // wasInAutoResume=true 인 경우만 발사 — 정상 신규 start 흐름은 사용자가 send
+      // 명시로 큐 처리.
+      if (wasInAutoResume) {
+        var termModResume = Board._term;
+        var queueSize = (termModResume && termModResume.inputQueue)
+          ? termModResume.inputQueue.length : 0;
+        if (Board.debugLog) Board.debugLog('startSession.setIdle.advanceTurnAfterResume', {
+          queueSize: queueSize,
+          hasAdvance: !!(termModResume && typeof termModResume.advanceTurn === 'function'),
+        });
+        if (termModResume && typeof termModResume.advanceTurn === 'function') {
+          termModResume.advanceTurn();
+        }
+      }
     }).catch(function (err) {
       var reason = err && err.message ? err.message : "알 수 없는 오류";
       var prefix = isResume ? "[오류] 세션 재개 실패" : "[Error] Failed to start session";
