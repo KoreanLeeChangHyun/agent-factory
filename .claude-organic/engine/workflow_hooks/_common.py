@@ -275,6 +275,37 @@ def emit_allow(reason: str = "워크플로우 hook 통과.") -> None:
     sys.stdout.flush()
 
 
+def emit_deny(reason: str) -> None:
+    """PreToolUse deny JSON 을 stdout 에 출력한다.
+
+    general.md PreToolUse Hook 출력 schema MUST 룰 정합 — updatedInput 필드 미포함.
+    """
+    payload = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+    sys.stdout.flush()
+
+
+def format_hook_fail_alert(fails: list[dict]) -> str:
+    """hook_fails 잔재를 LLM 가시 안내 문자열로 정형한다."""
+    lines = [
+        "[WORKFLOW HOOK FAIL RESIDUE] 직전 PreToolUse/PostToolUse hook 에서 결정론 wrapper 호출이 "
+        f"{len(fails)}건 실패했습니다. status.json.hook_fails[] 참고. 본 deny 는 1회 통보용 —"
+        " 같은 Task 를 재호출하면 통과합니다 (잔재 비움).",
+    ]
+    for f in fails[-5:]:
+        lines.append(
+            f"  - phase={f.get('phase')} exit={f.get('exit_code')} "
+            f"cmd={(f.get('command') or '')[:160]} stderr={(f.get('stderr') or '')[:160]}"
+        )
+    return "\n".join(lines)
+
+
 def log_workflow_event(work_dir_abs: str, message: str) -> None:
     """workflow.log 에 한 줄을 기록한다."""
     try:
