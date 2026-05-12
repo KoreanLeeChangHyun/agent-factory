@@ -91,7 +91,6 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
         return "task-status -> failed"
 
 
-# ─── stuck 패턴 감지 (T-438 δ 리팩 P1, ex-stuck_detector.py) ───
 
 
 class StuckDetector:

@@ -271,7 +271,7 @@ def main() -> None:
         help=(
             "작업 디렉터리 상대 경로 또는 registryKey (YYYYMMDD-HHMMSS 형식).\n"
             "registryKey 형식으로 전달하면 하위 workDir을 자동 해석합니다.\n"
-            "예: .claude-organic/runs/YYYYMMDD-HHMMSS  (T-448 신규 폴드 구조)\n"
+            "예: .claude-organic/runs/YYYYMMDD-HHMMSS\n"
             "    .claude-organic/runs/YYYYMMDD-HHMMSS/workName/command  (구 중첩 구조)\n"
             "    20260403-011117"
         ),

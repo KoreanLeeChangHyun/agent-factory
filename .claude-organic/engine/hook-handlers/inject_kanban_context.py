@@ -290,11 +290,11 @@ def _format_context(
         - Open: 1건, In Progress: 1건, Review: 6건 / To Do: 41건, Done: 358건
 
         ### Open / In Progress 상세
-        - T-415 [Open] 워커 session 추적 누락
-        - T-414 [In Progress] UserPromptSubmit hook 도입
+
+
 
         ### 활성 세션
-        - T-414 implement (13:30)
+
     """
     counts = kanban.get("counts", {})
     details = kanban.get("details", [])

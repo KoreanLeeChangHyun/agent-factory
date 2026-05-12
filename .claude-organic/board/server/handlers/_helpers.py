@@ -1,4 +1,4 @@
-"""Shared helpers for handler mixins (T-424 모듈화)."""
+"""Shared helpers for handler mixins."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ _DONE_MERGE_OK_RE = re.compile(
     r'(.+?)\s*->\s*develop\s+병합\s+완료\s+\(([0-9a-f]{6,})\)',
 )
 
-# ---- force done / delete 관련 상수 (T-418) ----
 # 티켓 번호 형식 정규식
 _TICKET_RE = re.compile(r'^T-\d+$')
 # 칸반 전체 디렉터리 목록 (derived-from 가드에서 사용)
@@ -30,7 +29,6 @@ _DONE_CONFLICT_WARN_RE = re.compile(
     re.IGNORECASE,
 )
 
-# ---- flow-undo-done 결과 파싱용 정규식 상수 (T-905 Phase 3) ----
 # 전략 식별: '[undo-done] 전략 1: reset --hard 진행' / '전략 2: revert -m 1 진행'
 _UNDO_STRATEGY_RESET = re.compile(r'\[undo-done\]\s+전략\s+1\s*:\s*reset')
 _UNDO_STRATEGY_REVERT = re.compile(r'\[undo-done\]\s+전략\s+2\s*:\s*revert')

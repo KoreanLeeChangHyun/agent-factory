@@ -303,7 +303,6 @@ def cmd_create(
             )
     else:
         # 디버그 영역(900-999) 자동 부여 차단 — 2026-05-05 폐지 (workflow.md 번호 영역 정책 / 메모리 룰).
-        # 기존 활성 잔존(T-900/T-901/T-903 등) 보존하되 max 계산에서만 배제하여 자동 채번 잠식 차단.
         # 명시 `--number` 호출은 위 if 분기에서 처리되므로 영향 없음.
         max_num = get_max_ticket_number(exclude_debug_range=True)
         new_num = max_num + 1
@@ -431,14 +430,12 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
 
     # In Progress에서 이탈 시 워크트리 자동 정리
-    # T-370 정합: Review 전이는 worktree 유지 (cmd_done 의 merge_to_develop 가 정리 진입점).
     # In Progress → Open(재작업) / To Do(강등) 전이에서만 자동 정리.
     if current_section == "In Progress" and target_section != "Review":
         _cleanup_worktree_on_leave(ticket_number)
 
     # Open 전이 시 세션 자동 kill:
     # In Progress에서 Open으로 복귀하면 해당 티켓의 활성 세션을 종료한다.
-    # T-399: Submit transient 단계 제거, In Progress 만 검사한다.
     # 상태 전이 성공 후에 실행하므로 전이 실패 시(err() 호출 후 SystemExit) 여기에 도달하지 않는다.
     if target_section == "Open" and current_section == "In Progress":
         _kill_ticket_session(ticket_number)
@@ -518,7 +515,6 @@ def cmd_done(ticket_number: str) -> None:
                 else:
                     print(f"{ticket_number}: {merge_result.merged_branch} -> develop 병합 완료 ({merge_result.merge_commit[:8]})", flush=True)
                     log("INFO", f"kanban.py: worktree merge {merge_result.merged_branch} -> develop ({merge_result.merge_commit[:8]})")
-                    # T-905: merge_commit SHA 를 result 메타에 저장 (Done 롤백 인프라)
                     if merge_result.merge_commit:
                         try:
                             _ticket_file_for_result = find_ticket_file(ticket_number)

@@ -12,7 +12,7 @@ workflow phase transitions, blocks merges, or wraps a guard around any
 finalization step.  The output ``overall`` string is purely informational —
 how it is rendered (Board badge, log line, etc.) is the caller's concern.
 
-Decision-rule order (T-406 §8 Table)
+Decision-rule order
 -------------------------------------
 1. **Command filter** — When ``command`` is not one of
    ``{"implement", "refactor", "build"}``, the AT-12 (Migration regression
@@ -47,10 +47,10 @@ Public API
 
 Reference
 ---------
-- T-406 §8 Table — ``.claude-organic/runs/.history/20260505-175528/report.md``
+
   lines 234–253.
-- T-411 (Done, commit 0c970fa) — finalize AND-gate abolition canon.
-- T-413 (Done, commit 1ce3c2d) — auditor sidecar abolition canon.
+
+
 """
 
 from __future__ import annotations

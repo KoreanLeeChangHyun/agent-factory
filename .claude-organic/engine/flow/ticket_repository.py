@@ -48,9 +48,7 @@ STATUS_DIR_MAP: dict[str, str] = {
 }
 
 # ─── 디버그 예약 영역 상수 ─────────────────────────────────────────────────────
-# 과거 T-900~T-999 디버그 예약 영역 — 2026-05-05 폐지 (메모리 룰 / workflow.md 참조).
 # 자동 채번 시 이 범위를 제외하기 위한 상수. 명시 --number 호출은 영향 없음 (강제 차단 X).
-# 기존 활성 잔존(T-900/T-901/T-903 등)은 번호 보존.
 DEBUG_RESERVED_RANGE_START: int = 900
 DEBUG_RESERVED_RANGE_END: int = 999
 
@@ -543,7 +541,7 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
 def update_failure(filepath: str, updates: dict[str, str]) -> None:
     """티켓 XML의 <failure> 하위 요소를 갱신한다.
 
-    옵셔널 요소 — FAIL 상태일 때만 호출한다 (T-452 §3.1 failure handling 흐름 참조).
+    옵셔널 요소 — FAIL 상태일 때만 호출한다.
     <failure> 미존재 시 루트 마지막에 신규 생성한다 (<result> 뒤에 자동 배치).
 
     Args:
@@ -844,10 +842,10 @@ def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
     루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
 
     Args:
-        exclude_debug_range: True 시 과거 디버그 예약 영역(T-900~T-999)을 스캔에서 제외한다.
+        exclude_debug_range: True 시 과거 디버그 예약 영역을 스캔에서 제외한다.
             2026-05-05 디버그 영역 폐지(workflow.md "번호 영역 정책" 참조)에 따라 자동 채번 호출
             (`kanban_cli.py`의 `--number` 미지정 분기)에서만 True 로 사용한다. 기존 활성 잔존
-            (T-900/T-901/T-903 등)이 채번 시 잠식되지 않도록 자동 채번 시 max 계산에서 배제하기
+이 채번 시 잠식되지 않도록 자동 채번 시 max 계산에서 배제하기
             위함이다. 명시 `--number` 호출에는 영향이 없으며, 충돌 검사는 별도 경로로 수행된다.
 
     Returns:
@@ -915,7 +913,6 @@ def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
     return new_path
 
 
-# ─── 상태 전이 규칙 및 갱신 (T-438 δ 리팩 P1, ex-ticket_state.py) ───────────
 
 # 컬럼 이름 매핑: CLI 인자 → 컬럼명
 COLUMN_MAP: dict[str, str] = {
@@ -939,7 +936,7 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
 }
 # Review → In Progress 전이는 폐기 (2026-05-08 사용자 명시).
 # Review 단계 가능 액션: (a) Open 으로 재작업 (/wf -e 또는 우클릭 메뉴),
-# (b) 채팅에 첨부하여 후속 분석/구현 티켓 박제, (c) Done 으로 완료(done 서브커맨드).
+# (b) 채팅에 첨부하여 후속 분석/구현 티켓 생성, (c) Done 으로 완료(done 서브커맨드).
 
 
 def validate_transition(current_status: str, target_section: str, force: bool = False) -> str | None:

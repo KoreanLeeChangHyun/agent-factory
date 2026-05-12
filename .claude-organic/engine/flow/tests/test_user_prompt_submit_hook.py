@@ -129,9 +129,9 @@ def test_collect_kanban_summary_counts_and_details():
             ("T-004", "리뷰 티켓 D", "Review"),
         ],
         "todo": [
-            ("T-005", "박제 티켓 E", "To Do"),
-            ("T-006", "박제 티켓 F", "To Do"),
-            ("T-007", "박제 티켓 G", "To Do"),
+            ("T-005", "샘플 티켓 E", "To Do"),
+            ("T-006", "샘플 티켓 F", "To Do"),
+            ("T-007", "샘플 티켓 G", "To Do"),
         ],
         "done": [
             ("T-008", "완료 티켓 H", "Done"),

@@ -62,7 +62,6 @@ LINE_BYTE_LIMIT: int = 4096
 _METRICS_FILENAME: str = "metrics.jsonl"
 
 # 12종 event_type → payload 필수 키 카탈로그
-# plan.md §5 (registryKey 20260505-183053) 정의 기준. T-447로 report.missing 추가.
 # NOTE: metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC — 별도 마이그레이션 트랙).
 _SCHEMA: dict[str, list[str]] = {
     "step.start": ["step", "source"],
@@ -88,7 +87,6 @@ _SCHEMA: dict[str, list[str]] = {
     "subagent.end": ["agent_kind", "tool_use_id", "duration_ms", "outcome"],
     "worktree.io": ["op", "duration_ms", "outcome"],
     "regression.pattern": ["kind", "signal_summary"],
-    # T-447: reporter Write SDK 차단 시 report.md 부재 탐지 (advisory only)
     "report.missing": ["report_path", "signal_summary"],
 }
 

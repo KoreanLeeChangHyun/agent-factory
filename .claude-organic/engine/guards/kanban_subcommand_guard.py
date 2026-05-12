@@ -54,7 +54,6 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
 # flow-kanban 뒤의 첫 번째 인자를 서브커맨드로 파싱
 _FLOW_KANBAN_PATTERN = re.compile(r"\bflow-kanban\s+([a-zA-Z][\w-]*)")
 
-# T-399: flow-kanban move T-NNN submit 인자 차단 패턴
 # Submit transient 단계가 제거되어 move 의 target 인자로 submit 사용 불가.
 _FLOW_KANBAN_MOVE_SUBMIT_PATTERN = re.compile(r"\bflow-kanban\s+move\s+T-\d+\s+submit\b")
 
@@ -120,7 +119,6 @@ def main() -> None:
 
     # 유효 서브커맨드 검사
     if subcommand in VALID_SUBCOMMANDS:
-        # T-399: move T-NNN submit 인자 패턴 차단 (Submit 단계 제거 후)
         if subcommand == "move" and _FLOW_KANBAN_MOVE_SUBMIT_PATTERN.search(command):
             _deny(KANBAN_SUBMIT_REMOVED)
         sys.exit(0)

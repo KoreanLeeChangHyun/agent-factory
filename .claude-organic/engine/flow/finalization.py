@@ -23,7 +23,6 @@
   0  성공
   1  status.json 전이 실패
 
-## Responsibility Boundary (T-455)
 
 This module handles **termination responsibility** only (DONE / FAILED arrival):
 - Kanban Review transition (kanban.py move -> review)
@@ -37,7 +36,6 @@ retry eligibility judgment are the sole responsibility of
 `engine/flow/failure_handler.py`. This module does NOT import failure_handler
 functions and does NOT directly access failure data structures.
 
-## T-455 4-step Flow Mapping
 
 | Step | Module | Action |
 |------|--------|--------|
@@ -46,7 +44,6 @@ functions and does NOT directly access failure data structures.
 | 3 | bin/flow-fail-record (-> failure_handler.record_failure) | Idempotent retry-context update |
 | 4 | finalization.py (this module) | On status="실패": kanban move review (existing behavior preserved) |
 
-## Regression Guard (T-411 Canon)
 Automatic forced status transitions / kanban auto-revert / commit-missing
 auto-detection / advisory-only validators MUST NOT be added to this module.
 
@@ -55,8 +52,8 @@ T-463 Review 단계 1차 룰베이스 자동 검증 (advisory only) 추가:
 - review-verdict.json 작성 + WARN/FAIL 시 regression.pattern 재사용 emit
 - kanban move / status 전이 / sentinel 호출 0건 (advisory only 캐논 준수)
 - 비차단 try/except 흡수 — finalization 흐름에 영향 없음
-- T-411 폐기 (commit 0c970fa) 캐논 준수: 자동 강제 전이 0건
-- T-413 폐기 (commit 1ce3c2d) 캐논 준수: 사이드카 X / 흐름 안 통합
+
+
 """
 
 from __future__ import annotations
@@ -250,7 +247,7 @@ def _build_result_update_args(
 
     Args:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
-            (.workflow/{registryKey}/ 폴드 구조 — T-448/T-449 이후)
+            (.workflow/{registryKey}/ 폴드 구조
         registry_key: 호출자(main)가 인자로 받은 registry_key. 명시 전달 시
             abs_work_dir 정규식 추출 실패에 의존하지 않는다 (2026-04-29 보완).
 
@@ -451,7 +448,7 @@ def _detect_hook_deny(events: list[dict]) -> tuple[bool, str]:
 
 
 def _detect_empty_bash_card(events: list[dict]) -> tuple[bool, str]:
-    """empty_bash_card 패턴 검출 (T-402 회귀).
+    """empty_bash_card 패턴 검출.
 
     tool.call{tool_name=Bash, bytes_out=0} 이벤트가 1건 이상이면 True.
 
@@ -480,7 +477,7 @@ def _detect_empty_bash_card(events: list[dict]) -> tuple[bool, str]:
 
 
 def _detect_stage_header_leak(log_tail: str) -> tuple[bool, str]:
-    """stage_header_leak 패턴 검출 (T-403 회귀).
+    """stage_header_leak 패턴 검출.
 
     workflow.log 꼬리에 `[STEP]` 또는 `[PHASE]` 정규식이 매칭되면 True.
 
@@ -505,7 +502,7 @@ def _detect_stage_header_leak(log_tail: str) -> tuple[bool, str]:
 
 
 def _detect_worktree_commit_missing(abs_work_dir: str) -> tuple[bool, str]:
-    """워크트리에 변경 >= 1 + commits ahead = 0 패턴 감지 (T-465 advisory detector).
+    """워크트리에 변경 >= 1 + commits ahead = 0 패턴 감지.
 
     T-453 / T-457 워커 commit 누락 재현 패턴:
     - develop..HEAD commits ahead = 0  (커밋 없음)
@@ -615,7 +612,6 @@ def _capture_regression_patterns(
         ("hook_deny", lambda: _detect_hook_deny(events)),
         ("empty_bash_card", lambda: _detect_empty_bash_card(events)),
         ("stage_header_leak", lambda: _detect_stage_header_leak(log_tail)),
-        # NEW (T-465): 워크트리 commits ahead = 0 + diff >= 1 패턴 (워커 commit 누락)
         ("worktree_commit_missing", lambda: _detect_worktree_commit_missing(abs_work_dir)),
     ]
     for kind, detector in detectors:
@@ -681,7 +677,7 @@ def _run_audit_hook(
 
     advisory only: verdict 결과가 어떤 칸반 전이/머지 흐름도 차단·강제하지 않는다.
     호출 실패 시 finalization 흐름 영향 0 — 모든 예외를 try/except 으로 감싸 WARN
-    로그만 남기고 통과한다 (T-411 finalize AND-gate 폐지 캐논 인용).
+    로그만 남기고 통과한다.
 
     Skip 조건 — 아래 중 하나라도 해당하면 hook 자체를 호출하지 않는다 (디스패처가
     이미 status=='완료'/ticket_number 보장 시 호출):
@@ -802,15 +798,14 @@ def main() -> None:
     to_step: str = "DONE" if status == "완료" else "FAILED"
 
     # 이중 전이 방어: 이미 대상 상태이면 run() 호출 스킵
-    # T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
     _step1_skip: bool = False
     if abs_work_dir is not None:
         _status_data = load_json_file(os.path.join(abs_work_dir, "status.json"))
         if _status_data is not None:
             _current_step = (
                 _status_data.get("workflow_phase")
-                or _status_data.get("step")   # legacy status.json (pre-T-459) 호환 read fallback
-                or _status_data.get("phase")  # legacy status.json (pre-T-453) 호환 read fallback
+                or _status_data.get("step")   # legacy status.json (pre
+                or _status_data.get("phase")  # legacy status.json (pre
             )
             if _current_step == to_step:
                 print(f"[INFO] Step 1: already {to_step}, skipping status transition", file=sys.stderr, flush=True)
@@ -819,12 +814,9 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"FINALIZE_STEP1: registryKey={registry_key} toStep={to_step}")
 
-    # ── W04(T-435): DONE 단계 진입 step.start metrics (비차단) ──
-    # 이중 emit 제거 (T-435 W04):
     #   - 정상 경로(_step1_skip=False): update_state.py FSM 전이가 step.start{DONE} emit 담당.
     #     finalization.py 는 emit하지 않음 (1회 보장).
     #   - 재진입 경로(_step1_skip=True): update_state.py 미호출이므로 finalization.py 가 직접 emit.
-    # advisory only — 자동 차단/회귀 트리거 없음. T-411 폐기 사례 캐논 (commit 0c970fa) 준수.
     import time as _time_fin
     _done_start_ms = int(_time_fin.time() * 1000)
     if _step1_skip:
@@ -846,7 +838,6 @@ def main() -> None:
     if abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", f"Workflow finalized: {registry_key} ({status})")
 
-    # ── W06(T-436): 워커 반환 advisory emit (비차단, 자동 강제 전이 0건) ──
     # --worker-stdout 인자가 있을 때만 파싱 후 commit 누락 시 WARN 로그만 emit한다.
     # 상태 강제 전이 / kanban move / finalization step skip 절대 금지 (MUST NOT).
     _worker_stdout: str | None = getattr(args, "worker_stdout", None)
@@ -868,10 +859,8 @@ def main() -> None:
                 except Exception:
                     pass
 
-    # ── W03(T-447): REPORT 종료 후 report.md 디스크 존재 advisory (비차단) ──
     # status="완료"일 때만 호출 (실패 워크플로우는 report.md 부재가 정상이므로 노이즈 회피).
     # 강제 전이 / kanban move / step skip 절대 금지 (MUST NOT).
-    # T-411 폐지 사례 참조(commit 0c970fa): 검증 자체가 아니라 자동 강제 전이가 문제.
     if status == "완료" and abs_work_dir is not None:
         _append_log(abs_work_dir, "INFO", "FINALIZE_REPORT_ADVISORY_START")
         try:
@@ -891,7 +880,6 @@ def main() -> None:
                     pass
         _append_log(abs_work_dir, "INFO", "FINALIZE_REPORT_ADVISORY_END")
 
-    # ── W04(T-435): DONE 단계 step.end metrics (비차단) ──
     # duration_ms 계산:
     #   - 정상 경로: update_state.py 가 생성한 .metrics_step_start_DONE.tmp 의 타임스탬프 사용
     #     (FSM 전이 emit 시점이 정확한 step.start 시점). 임시 파일은 step.end emit 후 정리.
@@ -940,9 +928,6 @@ def main() -> None:
             except Exception:
                 pass
 
-    # ── W04-RV(T-463): Review 단계 1차 룰베이스 자동 검증 (advisory only) ──
-    # 캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa,
-    #       T-413 commit 1ce3c2d (Auditor 사이드카 폐지).
     # advisory only — kanban move / status 전이 / sentinel 호출 0건 보장. 비차단 try/except.
     # 본 hook 은 review-verdict.json 작성과 advisory metrics emit 만 수행하며, finalization
     # 흐름의 어떤 결정에도 영향을 주지 않는다. WARN/FAIL 도 자동 차단 0건 (사용자 DnD 강행 자유).
@@ -1077,7 +1062,6 @@ def main() -> None:
     )
 
     # ── Step 4: 티켓 상태 갱신 (ticket_number 있을 때만, 비차단) ──
-    # T-455 Step 4: After failure_handler handles sentinel + retry-context (Steps 1-3),
     # finalization is responsible for termination only. This branch does NOT identify
     # the failure phase or make retry eligibility judgments — it simply moves the
     # ticket to the review column regardless of status.
@@ -1107,7 +1091,6 @@ def main() -> None:
 
     # ── Step 4c-AUDIT: Auditor T3 LLM judge advisory hook (비차단) ──
     # advisory only — verdict 결과가 어떤 칸반 전이/머지 흐름도 차단·강제 X.
-    # 호출 실패 시 finalization 흐름 영향 0 (T-411 finalize AND-gate 폐지 캐논).
     # 활성화: HOOK_AUDITOR_T3=true (.claude-organic/.settings 또는 .env).
     if abs_work_dir is not None:
         try:
@@ -1144,7 +1127,6 @@ def main() -> None:
         except Exception:
             pass  # worktree 메타데이터 읽기 실패는 무시
 
-    # ── Step 4wt-fb: 비-worktree 모드 originalBranch 복귀 훅 (T-370 C-2) ──
     # WORKFLOW_WORKTREE=false 또는 worktree 생성 실패로 비-worktree 모드인 경우,
     # 세션 종료 시 originalBranch로 메인 저장소 HEAD를 복귀시킨다.
     # 복귀 실패는 raise하지 않고 WARN 로그만 남긴다 (finalization 흐름 비차단).

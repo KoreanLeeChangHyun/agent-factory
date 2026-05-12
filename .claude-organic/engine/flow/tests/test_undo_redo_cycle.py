@@ -3,7 +3,7 @@
 W05 본격 통합 회귀 테스트. W03 가 추가한 단위 가드(`_stage1_5_premerge_state_guard`)
 를 더 큰 사이클(Done 롤백 → 워크트리 재생성 → 재머지) 안에서 검증한다.
 
-회귀 박제 (T-440 사례, 2026-05-08):
+회귀 차단 (T-440 사례, 2026-05-08):
   1. flow-merge 가 feat/T-440 을 develop 에 정상 머지 (51555f3)
   2. undo_done.py:_strategy_reset 이 develop 을 51555f3^ (= ba74608) 로 reset
   3. 워크트리/feature 브랜치 재생성됐으나 변경분 없음 (빈 브랜치)
@@ -261,7 +261,7 @@ class TestScenario1NormalPath(_CycleTestBase):
 class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
     """S2 — force=True + 워크트리/브랜치 부재.
 
-    회귀 박제: T-440 사례에서 사용자가 빈 워크트리·브랜치 상태로 재머지 시도 시
+    회귀 차단: T-440 사례에서 사용자가 빈 워크트리·브랜치 상태로 재머지 시도 시
     가드가 차단하지 않으면 빈 머지 + reset --hard 별건 commit 위치로 손실 발생.
     W03 정책: force=True 라도 자동 트리거 금지 + reflog fallback 안내만 노출.
 
@@ -389,7 +389,7 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
 class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
     """S4 — undo_done push 전 reset 전략 (`_strategy_reset` 동등 동작).
 
-    회귀 박제: undo_done.py:396 의 `git reset --hard <merge_commit>^` 가
+    회귀 차단: undo_done.py:396 의 `git reset --hard <merge_commit>^` 가
     별건 commit 손실 0 인지 검증.
 
     시나리오:
@@ -522,7 +522,7 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
 class TestScenario6T440RegressionBlocked(_CycleTestBase):
     """S6 — T-440 회귀 시나리오 차단 (Stage 1.5) + advisory 발동.
 
-    회귀 박제 (T-440 사례, 2026-05-08):
+    회귀 차단 (T-440 사례, 2026-05-08):
       - undo_done 직후 빈 워크트리/브랜치 상태에서 develop 위에 별건 revert
         commit 이 추가됨
       - flow-merge 가 그 위에서 빈 브랜치를 머지 시도 → anchor 실패 →

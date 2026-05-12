@@ -260,16 +260,14 @@ def update_status(
                 f"WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}",
             )
         else:
-            # T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
             current_step = (
                 data.get("workflow_phase")
-                or data.get("step")          # legacy status.json (pre-T-459) 호환 read fallback
-                or data.get("phase", "NONE") # legacy status.json (pre-T-453) 호환 read fallback
+                or data.get("step")          # legacy status.json (pre
+                or data.get("phase", "NONE") # legacy status.json (pre
             )
             workflow_mode = data.get("mode", "full").lower()
 
             # allowed_targets는 두 검증 모두에서 에러 메시지에 필요하므로 미리 조회.
-            # T-453: 알 수 없는 mode 는 multi → full 순으로 fallback (multi 모드 8상태 우선).
             allowed_table = FSM_TRANSITIONS.get(
                 workflow_mode,
                 FSM_TRANSITIONS.get("multi", FSM_TRANSITIONS.get("full", {})),
@@ -321,7 +319,6 @@ def update_status(
         kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
-        # T-459: workflow_phase 단일 키 (step 1주기 호환 제거 완료).
         data["workflow_phase"] = to_step
         data["updated_at"] = now
 

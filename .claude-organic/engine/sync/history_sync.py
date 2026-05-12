@@ -4,7 +4,7 @@
 .claude-organic/runs/ 및 .claude-organic/runs/.history/ 디렉토리를 스캔하여 .claude-organic/board/data/.history.md와 비교하고,
 누락 항목을 추가하거나 상태 변경 항목을 업데이트한다.
 
-디렉터리 구조 (T-448 이후 신규 폴드 구조 우선, 구 구조 fallback):
+디렉터리 구조:
     신규 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/
                  status.json, plan.md, work/, report.md, .context.json 직속
     구 구조 (fallback): .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
@@ -424,7 +424,6 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
         if not os.path.isdir(dir_path):
             continue
 
-        # T-448 신규 폴드 구조 우선: dir_path/status.json 직속 존재 여부
         new_status_file = os.path.join(dir_path, "status.json")
         if os.path.isfile(new_status_file):
             # 새 구조: .context.json에서 work_name/command 추출
@@ -481,7 +480,7 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
 def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> list[dict[str, object]]:
     """.claude-organic/runs/ 및 .claude-organic/runs/.history/ 디렉토리를 스캔하여 각 작업의 메타정보를 추출.
 
-    디렉터리 구조 (T-448 이후 신규 폴드 구조 우선, 구 구조 fallback):
+    디렉터리 구조:
         신규 구조: .claude-organic/runs/<YYYYMMDD-HHMMSS>/status.json 직속
         구 구조 (fallback): .claude-organic/runs/<YYYYMMDD-HHMMSS>/<workName>/<command>/
     .history/ 하위도 동일 구조로 탐색하며, rel_base를 ../workflow/.history/...로 구성.

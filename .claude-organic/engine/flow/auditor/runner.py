@@ -9,18 +9,18 @@ per-call cost/duration, and persists the combined Tier-2 result to
 
 Canon references (must be preserved by every code path here)
 ------------------------------------------------------------
-- T-413 (Done, commit 1ce3c2d) — Auditor sidecar abolished.
+
   Rule: NO sidecar background process.  The auditor runs synchronously inside
   the workflow finalization flow (called from ``finalization.py`` Step 4c).
   This module never spawns daemons, never writes to a queue, never schedules
   itself.  Each call is one-shot and returns to the caller.
 
-- T-454 (Done) — ``phase_verifier.py`` LLM-call-zero rule.
+
   Rule: ``engine/flow/phase_verifier.py`` MUST remain rule-based only
   (0 LLM calls).  All LLM judge calls live here, kept strictly separate.
   No import of phase_verifier or use of its decision functions in this file.
 
-- T-411 (Done, commit 0c970fa) — finalize AND-gate abolished.
+
   Rule: Advisory only.  The verdict produced here MUST NOT block, gate, or
   force any kanban transition / merge pipeline / workflow phase change.  The
   caller (Step 4c-AUDIT) wraps this entry point in ``try/except`` and logs
@@ -614,7 +614,6 @@ def _persist_verdict(work_dir: Path, verdict: AuditVerdict) -> None:
     """
     target = work_dir / "audit-verdict.json"
 
-    # Read existing data (preserves tier1 from a future T-463 run).
     existing: dict[str, Any]
     if target.is_file():
         try:

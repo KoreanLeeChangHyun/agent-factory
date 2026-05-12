@@ -147,15 +147,15 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
 def _read_current_step(status_file: str) -> str:
     """status.json에서 현재 step을 읽어 반환한다.
 
-    T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre-T-459) 호환 read fallback.
+    T-459: workflow_phase 단일 키. step/phase 는 legacy status.json (pre
     state_machine.py:update_status() 의 read 패턴과 정합 유지.
     """
     _data = load_json_file(status_file) if os.path.isfile(status_file) else None
     if isinstance(_data, dict):
         return (
-            _data.get("workflow_phase")   # T-459 단일 키
-            or _data.get("step")          # legacy status.json (pre-T-459) 호환 read fallback
-            or _data.get("phase", "NONE") # legacy status.json (pre-T-453) 호환 read fallback
+            _data.get("workflow_phase")  # 단일 키
+            or _data.get("step")          # legacy status.json (pre
+            or _data.get("phase", "NONE") # legacy status.json (pre
         )
     return "NONE"
 

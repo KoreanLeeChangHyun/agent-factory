@@ -1,18 +1,18 @@
 #!/usr/bin/env -S python3 -u
-"""phase_verifier.py — VALIDATE 단계 rule-based 검증 엔진 (T-454).
+"""phase_verifier.py — VALIDATE 단계 rule-based 검증 엔진.
 
 본 모듈은 LLM 호출 0건. 룰베이스 IO 검증만 수행한다.
 호출 진입점: bin/flow-phase-verify (registryKey 1인자).
 
 T-452 §1.1 / §2.4 / §10.1 / §10.6 사양 정합.
 
-VALIDATE 단계 책임 (T-452 §1.1):
+VALIDATE 단계 책임:
     - WORK 직후 / REPORT 직전에 끼는 단계.
     - 산출물 정합성을 룰베이스 검증한다 (LLM 호출 0건).
     - 입력: work/WXX-*.md, plan.md
     - 산출물: verifier 결과 + retry-context.json (실패 시)
 
-command 별 검증 분기 (T-452 §2.4):
+command 별 검증 분기:
     - implement / refactor / build → _verify_implement_like
         (1) plan.md 의 모든 W## ID 가 work/<ID>-*.md 로 존재
         (2) git diff --name-only HEAD 파일 수 ≥ 1
@@ -135,7 +135,7 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
     검증 항목:
         (1) plan.md 의 모든 W## ID 가 work/<ID>-*.md 로 존재.
         (2) git diff --name-only HEAD 파일 수 ≥ 1 (워크트리 기준).
-        (3) WORKFLOW_WORKTREE=true 시 develop..HEAD 커밋 수 ≥ 1 (T-465).
+        (3) WORKFLOW_WORKTREE=true 시 develop..HEAD 커밋 수 ≥ 1.
 
     Args:
         work_dir: 워크플로우 work 디렉터리 절대 경로.
@@ -156,8 +156,6 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
     if diff_count < 1:
         return (False, "implement: no git diff (워크트리 변경 0건)", [])
 
-    # step 3 (NEW T-465): worktree commits ahead 검증 — WORKFLOW_WORKTREE=true 한정.
-    # T-453/T-457 회귀 패턴(diff>=1 + ahead==0) 차단. ahead == -1 (검사 불가)
     # 또는 ahead >= 1 (정상) 케이스는 통과시켜 false-positive 를 회피한다.
     if _is_worktree_enabled_lazy():
         ahead = _check_commits_ahead(work_dir)
@@ -391,9 +389,9 @@ def _check_git_diff(work_dir: str) -> int:
 
 
 def _check_commits_ahead(work_dir: str) -> int:
-    """develop..HEAD 사이의 커밋 수를 반환한다 (T-465 W01).
+    """develop..HEAD 사이의 커밋 수를 반환한다.
 
-    워커 commit 누락 회귀(T-453/T-457 패턴) 차단용 신호. 워크트리 격리 환경에서
+    워커 commit 누락 회귀 차단용 신호. 워크트리 격리 환경에서
     `git diff --name-only HEAD` 는 워크트리 변경 1건 이상 보장해도 develop 대비
     실제 커밋이 없으면 머지 시점에 변경분이 누락된다.
 
@@ -428,7 +426,7 @@ def _check_commits_ahead(work_dir: str) -> int:
 
 
 def _is_worktree_enabled_lazy() -> bool:
-    """worktree_manager.is_worktree_enabled 를 지연 import 로 호출 (T-465 W01).
+    """worktree_manager.is_worktree_enabled 를 지연 import 로 호출.
 
     모듈 독립성 보존을 위해 phase_verifier 모듈 상단에서 worktree_manager 를
     직접 import 하지 않고, 호출 시점에만 lazy import 한다. 실패 시 False 로
@@ -556,7 +554,7 @@ def _write_retry_context_on_fail(
     failure_reason: str,
     failed_steps: list[str],
 ) -> None:
-    """retry-context.json 의 3개 필드를 기록한다 (T-454 scope).
+    """retry-context.json 의 3개 필드를 기록한다.
 
     필드:
         - last_failure_phase: "VALIDATE" 고정.
@@ -630,7 +628,6 @@ def main(argv: list[str] | None = None) -> int:
 
     failed_str = ",".join(failed) if failed else "-"
     print(f"FAIL: {reason} (failed={failed_str})")
-    # retry-context.json 3필드 기록 (T-454 W03)
     work_dir = os.path.join(".claude-organic", "runs", registry_key)
     try:
         _write_retry_context_on_fail(work_dir, reason, failed)

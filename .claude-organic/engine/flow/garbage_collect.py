@@ -74,7 +74,7 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
         with open(status_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        phase = data.get("workflow_phase") or data.get("step") or data.get("phase", "")  # legacy status.json (pre-T-459) 호환 read fallback
+        phase = data.get("workflow_phase") or data.get("step") or data.get("phase", "")  # legacy status.json (pre
         if phase in _TERMINAL_PHASES:
             return False
 
@@ -127,7 +127,6 @@ def _step1_mark_stale(workflow_root: str) -> int:
         if not os.path.isdir(entry_path) or entry.startswith("."):
             continue
 
-        # T-448 폴드 구조: .workflow/<YYYYMMDD-HHMMSS>/status.json
         new_status = os.path.join(entry_path, "status.json")
         if os.path.exists(new_status):
             if _process_status_file(new_status, entry_path, now):

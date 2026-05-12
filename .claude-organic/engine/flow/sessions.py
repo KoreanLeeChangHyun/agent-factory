@@ -140,7 +140,7 @@ def _parse_jsonl_status(filepath: str) -> str:
       - 종료 마커 존재 + 이전에 `result.subtype == "success"` → 완료
       - 종료 마커 존재 + result 없음 또는 success가 아님 → 실패
 
-    Note (T-904 W02):
+    Note:
       `flow-stop` 으로 강제 중지된 세션은 `subtype == "process_exit"` 마커가
       기본이며, 일부 구현은 `subtype == "stopped_by_flow_stop"` 형태도 사용한다.
       두 마커 모두 즉시 "완료" 분기로 인식한다 (HTTP API 가 미반영해도 jsonl
@@ -162,7 +162,6 @@ def _parse_jsonl_status(filepath: str) -> str:
                 continue
             subtype = event.get("subtype", "")
             etype = event.get("type", "")
-            # process_exit 또는 stopped_by_flow_stop 모두 종료 마커로 인식 (T-904)
             if subtype in ("process_exit", "stopped_by_flow_stop"):
                 has_process_exit = True
             if etype == "result" and subtype == "success":

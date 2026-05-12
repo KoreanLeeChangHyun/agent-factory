@@ -1,5 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""stop.py - 워크플로우 강제 중지 진입점 (T-904).
+"""stop.py - 워크플로우 강제 중지 진입점.
 
 이 모듈은 Board UI [중지] 버튼 / CLI `flow-stop` / launcher timeout fallback
 세 진입점이 모두 호출하는 단일 함수 `stop_workflow()` 를 제공한다.
@@ -403,7 +403,7 @@ def _append_process_exit_marker(
 ) -> tuple[bool, str | None]:
     """jsonl 파일에 `process_exit` 마커를 append 한다.
 
-    마커 형식 (T-400 수동 정리 패턴 답습 + plan.md W02 명세):
+    마커 형식:
       ```json
       {"type": "system", "subtype": "process_exit", "stopped_by": "flow-stop",
        "timestamp": "<iso8601>", "killed_pids": [...], "exit_signal": "SIGTERM|SIGKILL"}

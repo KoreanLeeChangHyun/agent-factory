@@ -134,16 +134,16 @@ def _is_server_running(port: int) -> bool:
 def _http_post_json(port: int, path: str, data: dict) -> dict:
     """서버에 JSON POST 요청을 전송하고 응답을 dict로 반환한다.
 
-    launch timeout 단일 진실 공급원 (T-475 비동기화 후):
+    launch timeout 단일 진실 공급원:
         본 함수의 H4 ``urlopen(..., timeout=10)`` 이 launch 경로의 유일한 timeout 이며,
         timeout 도달 시 ``urllib.error.URLError`` (또는 ``socket.timeout``) 가 raise 되어
         ``cmd_launch`` 의 ``except urllib.error.URLError`` 블록이 ``_handle_launch_timeout``
-        (T-904 cleanup) 으로 분기시킨다.
+ 으로 분기시킨다.
         board 측 ``kanban.py`` 는 ``_handle_kanban_submit`` 가 ``subprocess.Popen`` 으로
         fire-and-forget 하므로 timeout 인자가 없다 (Phase 1 W01 산출물 참조).
 
     폐기된 bridge:
-        commit ``76907ff`` (T-450 §10) 이 한시적으로 ``kanban.py`` 의
+        commit ``76907ff`` 이 한시적으로 ``kanban.py`` 의
         ``subprocess.run(..., timeout=60)`` 인자를 15→60s 로 늘려 launch 미초기화 사례를
         완화했으나, T-475 Phase 1 에서 ``Popen`` 전환과 함께 자연 폐기되었다.
         kanban.py:467 docstring 1건만 변경 이력 기록용으로 잔존하며 실제 인자 인용 0건.
@@ -170,7 +170,6 @@ def _http_post_json(port: int, path: str, data: dict) -> dict:
         method="POST",
     )
     # H4: launch 경로 single source of truth — timeout=10s
-    # (T-475 이후 board kanban.py 측은 timeout 인자 없음, fire-and-forget Popen)
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -327,7 +326,7 @@ def _handle_launch_timeout(port: int, ticket_id: str, exc: BaseException) -> int
       - 매칭 세션 미존재 → T-904 best-effort 정리 후 ERROR exit 1
       - 후확인 GET 자체 실패 → ERROR exit 1 (폴백)
 
-    launch 정리 단일 진입점 (T-475 비동기화 후):
+    launch 정리 단일 진입점:
         본 분기는 ``_http_post_json`` 의 H4 ``urlopen(..., timeout=10)`` 에서
         ``urllib.error.URLError`` / ``socket.timeout`` 발생 시 ``cmd_launch`` 가
         호출한다. T-475 Phase 1 에서 board 측 ``kanban.py`` 가 ``subprocess.Popen``
@@ -373,7 +372,6 @@ def _handle_launch_timeout(port: int, ticket_id: str, exc: BaseException) -> int
         print(f"LAUNCH: {session_id} 실행 중 (초기화 지연)")
         return 0
 
-    # 세션 미존재 — T-904: timeout 후 spawn된 워커가 살아있을 가능성에 best-effort 정리
     _log("ERROR", f"http_launcher: post-confirm no session found for {ticket_id}")
     try:
         _wf_root = os.path.dirname(_engine_dir)
@@ -432,7 +430,6 @@ def cmd_launch(ticket_id: str, command: str) -> int:
 
     # 0-2) 칸반 전이 (멱등 + 상태 가드). 호출 경로 무관하게 launcher 가 단일 진입점에서 처리.
     # current_status 를 한 번 읽고 _kanban_move_progress 에 전달해 race 회피 + 중복 IO 절감.
-    # T-399: Submit transient 제거 후 Open → In Progress 직접 전이.
     _kanban_move_progress(ticket_id, current_status)
 
     # 0-3) command 정규화: 단순 명령 → /wf -s N 변환.

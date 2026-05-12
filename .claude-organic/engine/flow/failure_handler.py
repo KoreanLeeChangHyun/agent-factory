@@ -21,7 +21,7 @@ T-455: retry/sentinel/flow-fail-record 인프라.
 회귀 0건 보장 (MUST):
   - 모든 함수는 비차단. 예외 발생 시 stderr WARN 로그만 출력하고 호출자 흐름 차단 0건
   - sentinel/recorded 마커는 단방향 (생성만, 삭제 안 함). 정리는 finalization 영역
-  - T-411 폐기 사례 캐논 준수 — 자동 status 강제 전이 / 칸반 자동 회귀 / commit
+
     누락 자동 검출 로직 절대 추가 금지
 
 CLI 사용법:
@@ -559,7 +559,7 @@ def _cli_record(args: argparse.Namespace) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="failure_handler.py",
-        description="워크플로우 phase 실패 처리 단일 진실 공급원 (T-455)",
+        description="워크플로우 phase 실패 처리 단일 진실 공급원",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

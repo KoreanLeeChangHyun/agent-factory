@@ -21,10 +21,8 @@ from ..state import sse_manager
 
 
 # ---------------------------------------------------------------------------
-# T-475: launch 비동기화 헬퍼 (Stage 1)
 # ---------------------------------------------------------------------------
 
-# T-475: reader thread 핸들 보관 — daemon thread GC 누수 차단용 약한 참조 set.
 # Popen.communicate 종료 시 thread 자체가 finally 에서 자기 자신을 제거한다.
 _LAUNCH_READER_THREADS: set[threading.Thread] = set()
 _LAUNCH_READER_LOCK: threading.Lock = threading.Lock()
@@ -35,7 +33,7 @@ def _classify_failure_reason(returncode: int, stderr: str) -> str:
 
     T-450 보고서 §5 reason enum:
       - to_do_status:        launcher 측 사전 검증 거부 (티켓이 To Do 상태)
-      - http_post_timeout:   H4 urllib timeout=10s (T-904 cleanup 발동)
+      - http_post_timeout:   H4 urllib timeout=10s
       - http_post_error:     H4 urllib 일반 에러 (URLError 등)
       - workflow_start_error: WorkflowHandler 측 spawn 실패
       - unknown:             그 외 (returncode=0 인데 LAUNCH:/INLINE: 둘 다 아닌 경우 포함)
@@ -76,7 +74,6 @@ def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
         logger.error('launch SSE broadcast failed: event=%s ticket=%s exc=%r',
                      event, ticket, exc)
 
-    # workflow.log 와 동등한 라인 기록 (T-476 분석 트랙의 단일 진실 공급원).
     # 별도 파일 신설 X — logger.info 가 board 서버 stderr/log 로 흐른다.
     try:
         extra_kv = ' '.join(
@@ -181,7 +178,6 @@ def _launch_reader_loop(
         with _LAUNCH_READER_LOCK:
             _LAUNCH_READER_THREADS.discard(self_thread)
 
-# T-433: backend 코드 변경으로 간주할 glob 패턴 — 매칭 시 needs_restart=true
 # board/server/** + .claude-organic/board/server/** + .claude-organic/engine/** 셋 모두 backend 도메인
 _BACKEND_GLOB_PATTERNS = (
     'board/server/*',
@@ -192,7 +188,6 @@ _BACKEND_GLOB_PATTERNS = (
     '.claude-organic/engine/**',
 )
 
-# T-433: feature 브랜치 패턴 (feat/T-NNN-*)
 _FEAT_BRANCH_RE = re.compile(r'^feat/(T-\d+)-')
 
 
@@ -213,7 +208,6 @@ class KanbanHandlerMixin:
             return []
 
     # ------------------------------------------------------------------
-    # T-433: 브랜치 토글 API helpers
     # ------------------------------------------------------------------
 
     def _resolve_feat_branch(self, ticket: str, project_root: str) -> str | None:
@@ -461,7 +455,7 @@ class KanbanHandlerMixin:
         self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
 
     def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 비동기 spawn (T-475 Stage 1).
+        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 비동기 spawn.
 
         T-475 Stage 1 변경:
           - 동기 ``subprocess.run(timeout=60)`` 제거 → ``Popen`` + reader thread 분리.
@@ -533,8 +527,8 @@ class KanbanHandlerMixin:
     def _handle_kanban_done(self) -> None:
         """POST /api/kanban/done — {"ticket","force","force_dirty"}.
 
-        force=false: Review → Done (T-906 dict→list fix, merge_skipped 분기).
-        force=true:  Open → Done (T-418, dirty 워크트리 가드).
+        force=false: Review → Done.
+        force=true:  Open → Done.
         세부 로직은 _kanban_done_helpers.py 위임.
         """
         data = self._read_json_body() or {}
@@ -555,7 +549,7 @@ class KanbanHandlerMixin:
             handle_kanban_done_review(self, ticket, project_root, flow_kanban)
 
     def _handle_kanban_delete(self) -> None:
-        """POST /api/kanban/delete — {"ticket"}: derived-from 가드 + delete + worktree 정리 (T-418)."""
+        """POST /api/kanban/delete — {"ticket"}: derived-from 가드 + delete + worktree 정리."""
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
 
@@ -619,7 +613,6 @@ class KanbanHandlerMixin:
         })
 
     # ------------------------------------------------------------------
-    # T-477: Auditor T3 audit verdict API
     # ------------------------------------------------------------------
 
     def _resolve_audit_workdir(self, ticket: str, project_root: str) -> 'str | None':

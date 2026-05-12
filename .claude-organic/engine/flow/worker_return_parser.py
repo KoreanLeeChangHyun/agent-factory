@@ -136,7 +136,7 @@ def emit_report_advisory(
     report.md 파일이 디스크에 존재하지 않을 때만 WARN 로그를 emit한다.
     파일이 존재하면 아무 작업도 수행하지 않는다 (no-op).
 
-    설계 원칙 (T-411 폐지 사례 참조, commit 0c970fa):
+    설계 원칙:
         advisory only — 강제 전이 / 자동 회귀 / 자동 차단 절대 금지 (MUST NOT).
         T-411 finalize AND 가드 폐기 사례 인용: 검증 자체가 아니라 자동 강제 전이가
         문제. 본 함수는 WARN 로그 + metrics 이벤트만 emit한다.
@@ -160,7 +160,7 @@ def emit_report_advisory(
 
     message = (
         f"[ADVISORY] reporter returned without report.md (path={report_path})\n"
-        f"- SDK가 서브에이전트의 Write를 차단했을 가능성 (T-446 사례)\n"
+        f"- SDK가 서브에이전트의 Write를 차단했을 가능성\n"
         f"- 사용자 수동 수습: 메인 세션에서 work/ 통합하여 report.md 작성 가능"
     )
     # 비차단: append_log는 모든 예외를 조용히 흡수한다

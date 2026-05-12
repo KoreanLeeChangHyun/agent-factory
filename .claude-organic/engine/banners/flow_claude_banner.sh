@@ -7,7 +7,6 @@
 # 예시:
 #   flow-claude end 20260228-133000
 #
-# T-448: start 서브커맨드 폐지 (INIT 1-Step 압축 — flow-init 단일 호출로 시작 처리).
 
 set -euo pipefail
 
@@ -41,7 +40,7 @@ if [[ -z "$SUBCMD" ]]; then
 fi
 
 # ═══════════════════════════════════════════════════════
-# start: T-448 폐지 — deprecated 안내만 출력 (외부 호환)
+# start: deprecated 안내만 출력 (외부 호환)
 # ═══════════════════════════════════════════════════════
 if [[ "$SUBCMD" == "start" ]]; then
     echo "[DEPRECATED] flow-claude start 는 T-448 (INIT 1-Step 압축) 으로 폐지되었습니다." >&2
@@ -71,7 +70,7 @@ if [[ "$SUBCMD" == "end" ]]; then
     COMMAND=""
 
     BASE_DIR="$PROJECT_ROOT/.claude-organic/runs/$REGISTRY_KEY"
-    # T-448: 새 구조 우선 (BASE_DIR/.context.json 직접 존재) + 구 구조 fallback
+    # 새 구조 우선 (BASE_DIR/.context.json 직접 존재) + 구 구조 fallback
     if [[ -f "$BASE_DIR/.context.json" ]]; then
         # 1차: 새 구조 — runs/{key}/.context.json
         WORK_DIR=".claude-organic/runs/$REGISTRY_KEY"

@@ -8,7 +8,7 @@ Test cases:
   (b) test_parse_heading_w_prefix     — P2: ### W01: heading
   (c) test_parse_heading_task_xy      — P3: ### Task 1.1: heading (auto-numbered W01)
   (d) test_parse_heading_t_prefix_normalized — P4: ### T1: heading -> W01 normalization
-  (e) test_t378_smoke_regression      — T-378: ### T1~T5 five-task plan.md
+  (e) test_t378_smoke_regression
 """
 from __future__ import annotations
 
@@ -170,7 +170,6 @@ class TestParsePlanTasks(unittest.TestCase):
         self.assertIn("WARN", stderr_output)
         self.assertIn("T#", stderr_output)
 
-    # ── (e) T-378 smoke regression ───────────────────────────────────────────
 
     def test_t378_smoke_regression(self):
         """T-378: five-task plan.md using ### T1~T5 headings must parse to W01~W05.
@@ -179,7 +178,6 @@ class TestParsePlanTasks(unittest.TestCase):
         producing an empty skill-map.md.
         """
         content = """\
-# T-378 Smoke Plan
 
 ## 작업 목록
 
