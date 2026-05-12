@@ -764,12 +764,14 @@
       }
       // [ESC 복원] 직전 보낸 사용자 메시지를 입력창에 자동 복원하여
       // 사용자가 수정하거나 그대로 다시 보낼 수 있게 한다.
-      // 현재 입력창에 사용자가 이미 다른 텍스트를 타이핑 중인 경우는 보존(덮어쓰기 X).
-      // 또한 localStorage 에도 저장하여 새로고침 후에도 유지한다.
+      // 입력창에 사용자가 이미 새 텍스트를 타이핑 중이면 보존하면서 앞에 공백 한 칸
+      // 띄워 prepend (덮어쓰지 않음). localStorage 에도 저장하여 새로고침 후 유지.
       if (M._lastSentText) {
         var inputEl = document.getElementById("terminal-input");
-        if (inputEl && !inputEl.value) {
-          inputEl.value = M._lastSentText;
+        if (inputEl) {
+          inputEl.value = inputEl.value
+            ? M._lastSentText + " " + inputEl.value
+            : M._lastSentText;
           inputEl.style.height = "auto";
           inputEl.style.height = inputEl.scrollHeight + "px";
         }
