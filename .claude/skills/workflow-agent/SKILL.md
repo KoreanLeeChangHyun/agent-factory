@@ -13,13 +13,21 @@ license: "Apache-2.0"
 
 ## 에이전트 역할 개요
 
-| 에이전트 | 단계 | 역할 | 상세 가이드 |
-|---------|------|------|-----------|
-| Planner | PLAN | 작업 분석, 종속성 파악, 병렬 실행 계획 수립 | `reference/planner-guide.md` |
-| Worker | WORK | 할당받은 작업을 독립적으로 실행 (코드 수정/생성) | `reference/worker-guide.md` |
-| Explorer | WORK | 코드베이스 및 웹 통합 탐색 (코드 수정 불가) | `reference/explorer.md` |
-| Validator | WORK (Phase N+1) | 통합 검증 (린트, 타입체크, 빌드) | `reference/validator-guide.md` |
-| Reporter | REPORT | 작업 결과 보고서 생성 및 summary.txt 작성 | `reference/reporter-guide.md` |
+### Model Routing Matrix
+
+| 에이전트 | 단계 | 역할 | Model | Thinking | 상세 가이드 |
+|---------|------|------|-------|----------|-----------|
+| Planner | PLAN | 작업 분석, 종속성 파악, 병렬 실행 계획 수립 | opus | ultrathink | `reference/planner-guide.md` |
+| worker-opus | WORK | 복잡도 Tier 3 이상 작업 독립 실행 (FSM·hook·아키텍처) | opus | ultrathink | `reference/worker-guide.md` |
+| worker-sonnet | WORK | 복잡도 Tier 2 작업 독립 실행 (일반 구현/수정) | sonnet | think harder | `reference/worker-guide.md` |
+| explorer-file-haiku | WORK | 파일 스캔, 패턴 검색, 단순 정보 수집 | haiku | - | `reference/explorer.md` |
+| explorer-file-sonnet | WORK | 의존성 분석, 설계 패턴 식별 (구조 분석) | sonnet | - | `reference/explorer.md` |
+| explorer-web-sonnet | WORK | API 문서, 외부 서비스 조사 (웹 탐색) | sonnet | - | `reference/explorer.md` |
+| explorer | WORK | 코드+웹 통합 탐색 (fallback) | sonnet | - | `reference/explorer.md` |
+| Validator | WORK (Phase N+1) | 통합 검증 (린트, 타입체크, 빌드) | sonnet | - | `reference/validator-guide.md` |
+| Reporter | REPORT | 작업 결과 보고서 생성 및 summary.txt 작성 | sonnet | - | `reference/reporter-guide.md` |
+
+> 4계층 분류: xhigh(opus, ultrathink) / high(sonnet, think harder) / medium(sonnet, -) / low(sonnet·haiku, -)
 
 ## 공통 원칙
 
