@@ -66,6 +66,79 @@ def _board_url_path() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Hook 활성 진입 가드 (T-483)
+# ---------------------------------------------------------------------------
+
+def _check_workflow_hook_active() -> tuple[bool, str]:
+    """워크플로우 hook 인프라가 활성 상태인지 검증한다.
+
+    검증 항목:
+      1. .claude/settings.json 의 PreToolUse / PostToolUse 디스패처 등록 여부
+         (pre-tool-use.py / post-tool-use.py 가 command 경로에 포함)
+      2. .claude-organic/.settings 의 HOOK_WORKFLOW_ORCHESTRATION=true 플래그
+
+    Returns:
+        (ok, reason): ok=True 시 reason="", ok=False 시 reason 에 미활성 사유.
+    """
+    # _engine_dir == .claude-organic/engine → 두 단계 위가 프로젝트 루트.
+    project_root = os.path.dirname(os.path.dirname(_engine_dir))
+    settings_path = os.path.join(project_root, ".claude", "settings.json")
+    organic_settings = os.path.join(project_root, ".claude-organic", ".settings")
+
+    if not os.path.isfile(settings_path):
+        return False, ".claude/settings.json 파일이 없습니다."
+
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:  # noqa: BLE001
+        return False, f".claude/settings.json 파싱 실패: {e}"
+
+    hooks = data.get("hooks", {}) or {}
+    pre_hooks = hooks.get("PreToolUse", []) or []
+    post_hooks = hooks.get("PostToolUse", []) or []
+
+    def _has_dispatcher(entries: list, suffix: str) -> bool:
+        for grp in entries:
+            for h in (grp or {}).get("hooks", []) or []:
+                cmd = (h or {}).get("command", "")
+                if suffix in cmd:
+                    return True
+        return False
+
+    if not _has_dispatcher(pre_hooks, "pre-tool-use.py"):
+        return False, ".claude/settings.json 의 PreToolUse 에 pre-tool-use.py 디스패처가 등록되지 않았습니다."
+    if not _has_dispatcher(post_hooks, "post-tool-use.py"):
+        return False, ".claude/settings.json 의 PostToolUse 에 post-tool-use.py 디스패처가 등록되지 않았습니다."
+
+    if not os.path.isfile(organic_settings):
+        return False, ".claude-organic/.settings 파일이 없습니다."
+
+    try:
+        with open(organic_settings, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception as e:  # noqa: BLE001
+        return False, f".claude-organic/.settings 읽기 실패: {e}"
+
+    flag_active = False
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() != "HOOK_WORKFLOW_ORCHESTRATION":
+            continue
+        if value.strip().lower() in ("true", "1", "yes", "on"):
+            flag_active = True
+        break
+
+    if not flag_active:
+        return False, "HOOK_WORKFLOW_ORCHESTRATION 플래그가 비활성입니다 (.claude-organic/.settings)."
+
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
 # 서버 포트 해석
 # ---------------------------------------------------------------------------
 
@@ -417,6 +490,20 @@ def cmd_launch(ticket_id: str, command: str) -> int:
         exit code: 0=성공(LAUNCH 또는 INLINE), 1=에러.
     """
     _log("INFO", f"http_launcher: cmd_launch start ticket_id={ticket_id}")
+
+    # 0-0) hook 활성 진입 가드 (T-483): 인프라 정합성 검증.
+    # PreToolUse/PostToolUse 디스패처 미등록 또는 HOOK_WORKFLOW_ORCHESTRATION 비활성 시 거부.
+    hook_ok, hook_reason = _check_workflow_hook_active()
+    if not hook_ok:
+        msg = (
+            f"워크플로우 hook 인프라 미활성: {hook_reason} "
+            "워크플로우 진입을 거부합니다. "
+            ".claude/settings.json 의 PreToolUse/PostToolUse 디스패처 등록과 "
+            ".claude-organic/.settings 의 HOOK_WORKFLOW_ORCHESTRATION=true 를 확인하세요."
+        )
+        _log("ERROR", f"http_launcher: hook guard rejected: {hook_reason}")
+        print(f"[ERROR] {msg}", file=sys.stderr)
+        return 1
 
     # 0-1) 티켓 상태 사전 검증: To Do 는 거부.
     current_status = _read_ticket_status(ticket_id)

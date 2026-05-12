@@ -65,6 +65,17 @@ def main() -> None:
     )
     sync_results.append(r)
 
+    # --- Workflow orchestration context inject (sync, stdout passthrough) ---
+    # HOOK_WORKFLOW_ORCHESTRATION=true + 워크플로우 세션일 때 active workflow
+    # phase / hook_fails 잔재를 stdout 에 inject. 메인 세션 / 비활성 시 no-op.
+    r = dispatch(
+        'HOOK_WORKFLOW_ORCHESTRATION',
+        scripts_dir('workflow_hooks', 'session_start.py'),
+        stdin_data,
+        flags=flags,
+    )
+    sync_results.append(r)
+
     # --- Memory GC session trigger (fire-and-forget) ---
     # MEMORY_GC_AUTO_TRIGGERS 에 'session' 토큰이 있을 때만 발화. wrapper 가 자체 검사.
     # subprocess.Popen 으로 background 실행 후 즉시 반환 — 세션 시작 지연 없음.
