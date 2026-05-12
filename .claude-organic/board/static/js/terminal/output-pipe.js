@@ -176,6 +176,11 @@
   }
 
   M.renderHistory = function(events) {
+    if (Board.debugLog) Board.debugLog('renderHistory.entry', {
+      events: events ? events.length : 0,
+      hasOutputDiv: !!M.outputDiv,
+      termStatus: Board.state.termStatus,
+    });
     if (!M.outputDiv || !events || !events.length) return;
     var sawInFlight = false;
 
@@ -306,6 +311,12 @@
   }
 
   M.loadHistory = function(sessionId) {
+    if (Board.debugLog) Board.debugLog('loadHistory.entry', {
+      sessionId: sessionId || null,
+      historyLoaded: !!M._historyLoaded,
+      isWorkflowMode: !!M.isWorkflowMode,
+      termStatus: Board.state.termStatus,
+    });
     if (!sessionId || M._historyLoaded || M.isWorkflowMode) return Promise.resolve();
     M._historyLoaded = true;
     return fetch("/terminal/history?session_id=" + encodeURIComponent(sessionId), {
@@ -314,6 +325,23 @@
       if (!res.ok) return null;
       return res.json();
     }).then(function (data) {
+      if (Board.debugLog) Board.debugLog('loadHistory.response', {
+        hasData: !!data,
+        events: data && data.events ? data.events.length : 0,
+        pendingTurn: !!(data && data.pending_turn),
+        lastTimestamp: (data && data.last_timestamp) || null,
+        lastEventKinds: data && data.events
+          ? data.events.slice(-3).map(function (e) {
+              return {
+                kind: e.kind || 'text',
+                role: e.role || null,
+                inFlight: !!e.in_flight,
+                interrupted: !!e.interrupted,
+                textSample: e.text ? String(e.text).slice(0, 60) : null,
+              };
+            })
+          : [],
+      });
       if (!data) {
         M.showEmptyState();
         return;
@@ -338,6 +366,10 @@
       // turn-card 를 닫지 않고 spinner 를 활성화한다.
       // (in_flight 이 있는 경우는 renderHistory 내부의 sawInFlight 분기가 처리)
       if (data.pending_turn && !M.isWorkflowMode) {
+        if (Board.debugLog) Board.debugLog('loadHistory.pendingTurnDetected', {
+          events: data.events ? data.events.length : 0,
+          termStatusBefore: Board.state.termStatus,
+        });
         Board.state.setTermStatus("busy");
         if (M.startSpinner) M.startSpinner();
       }

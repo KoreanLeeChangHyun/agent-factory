@@ -10,7 +10,7 @@ import uuid
 from urllib.parse import parse_qs, urlparse
 
 from ..state import terminal_sse_channel, claude_process, workflow_registry
-from .._common import logger, _get_git_branch
+from .._common import logger, _get_git_branch, server_debug_log
 from ..event_filter import is_user_visible
 from ..terminal_channel import _resolve_last_event_id
 from ..claude_process import _validate_images
@@ -372,6 +372,12 @@ class TerminalHandlerMixin:
         GET /terminal/status: Claude 프로세스의 현재 상태를 JSON으로 응답한다.
         """
         project_root = os.getcwd()
+        awaiting = bool(getattr(claude_process, '_awaiting_response', False))
+        server_debug_log('status.response', {
+            'status': claude_process.status,
+            'session_id': claude_process.session_id,
+            'awaiting_response': awaiting,
+        })
         self._send_json({
             'status': claude_process.status,
             'session_id': claude_process.session_id,
@@ -383,7 +389,7 @@ class TerminalHandlerMixin:
             # 새로고침 후 클라이언트가 스피너/입력 잠금 복구를 판단하는 신호.
             # 사용자 입력 전송 후 result 수신 전까지 True. claude_process._status 만으로는
             # 생성 중 판정이 불가능 (result 후에도 계속 'idle' 상태로 유지되므로).
-            'awaiting_response': bool(getattr(claude_process, '_awaiting_response', False)),
+            'awaiting_response': awaiting,
         })
 
     def _handle_terminal_sessions(self) -> None:
@@ -735,13 +741,34 @@ class TerminalHandlerMixin:
         # in_flight 이벤트가 이미 있는 경우는 클라이언트가 renderHistory 에서
         # sawInFlight 로 처리하므로 pending_turn 은 in_flight 없는 경우 보완책.
         pending_turn = False
-        if claude_process.session_id == session_id:
+        last_ev_for_log = events[-1] if events else None
+        sid_match = claude_process.session_id == session_id
+        awaiting_for_log = bool(getattr(claude_process, '_awaiting_response', False))
+        if sid_match:
             if getattr(claude_process, '_awaiting_response', False):
                 # 마지막 이벤트가 user 이고 in_flight 이벤트가 없는 경우
                 if events and not events[-1].get('in_flight'):
                     last_ev = events[-1]
-                    if last_ev.get('role') == 'user' and last_ev.get('kind') != 'tool_result':
+                    # ESC 로 중지된 user 이벤트(interrupted=true)는 미해결 turn 아님.
+                    # 방어 보강: _awaiting_response 가 진정한 False 로 떨어지지 못한
+                    # 시나리오에서도 interrupted 마지막 user 이벤트는 pending_turn 진입 차단.
+                    if (last_ev.get('role') == 'user'
+                            and last_ev.get('kind') != 'tool_result'
+                            and not last_ev.get('interrupted')):
                         pending_turn = True
+        server_debug_log('history.pending_turn_eval', {
+            'session_id': session_id,
+            'sid_match': sid_match,
+            'awaiting_response': awaiting_for_log,
+            'events_count': len(events) if events else 0,
+            'last_ev': {
+                'role': last_ev_for_log.get('role') if last_ev_for_log else None,
+                'kind': last_ev_for_log.get('kind') if last_ev_for_log else None,
+                'in_flight': bool(last_ev_for_log.get('in_flight')) if last_ev_for_log else None,
+                'interrupted': bool(last_ev_for_log.get('interrupted')) if last_ev_for_log else None,
+            } if last_ev_for_log else None,
+            'pending_turn_result': pending_turn,
+        })
 
         response: dict = {
             'session_id': session_id,
