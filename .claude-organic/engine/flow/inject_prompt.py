@@ -1,18 +1,15 @@
 #!/usr/bin/env -S python3 -u
 """inject_prompt.py - SessionStart hook으로 워크플로우 세션 전용 system-prompt를 주입한다.
 
-tmux 윈도우 이름(P:T-* 여부)으로 워크플로우 세션 여부를 판별하여
-.claude-organic/prompts/system-prompt-wf.xml을 stdout으로 출력한다.
-메인 세션에서는 아무것도 출력하지 않고 즉시 exit 0으로 종료한다.
-(메인 세션 정책은 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.)
+T-483 (2026-05-13): system-prompt-wf.xml 폐기 + SKILL.md 직접 inject 로 통합.
+워크플로우 세션의 system prompt = .claude/skills/workflow-orchestration/SKILL.md
+(frontmatter 제거 후 본문). 워크플로우 엔진 실행에 필요한 SKILL.md 가 이미 매
+세션 로드되어야 하므로 단일 진실 공급원으로 통합.
 
 동작:
-  - TMUX_PANE 환경변수가 있으면 tmux display-message로 현재 윈도우 이름을 조회한다.
-  - 윈도우 이름이 P:T- 접두사로 시작하면 .claude-organic/prompts/system-prompt-wf.xml을 출력한다.
-  - 그 외(메인 세션 또는 비tmux 환경)이면 아무것도 출력하지 않고 exit 0으로 종료한다.
-  - 대상 파일이 존재하지 않으면 에러 없이 exit 0으로 종료한다.
-  - 워크플로우 세션에서 활성 티켓(T-NNN)이 감지되면, 매 응답 첫 줄에 [T-NNN] 접두사를
-    출력하도록 지시하는 <ticket-prefix> XML 블록을 system-prompt 뒤에 추가로 주입한다.
+  - 워크플로우 세션 판별 (session_identifier.is_workflow_session) → 아닌 경우 즉시 종료
+  - .claude/skills/workflow-orchestration/SKILL.md 본문(frontmatter 제거) 을 stdout 출력
+  - 활성 티켓(T-NNN) 감지 시 <ticket-prefix> XML 블록 추가 inject
 """
 
 from __future__ import annotations
@@ -51,8 +48,22 @@ def _is_workflow_session() -> bool:
     return is_workflow_session()
 
 
+def _strip_frontmatter(content: str) -> str:
+    """SKILL.md 의 YAML frontmatter (--- ... ---) 를 제거하고 본문만 반환한다.
+
+    frontmatter 가 없으면 원본 그대로 반환.
+    """
+    if not content.startswith("---\n"):
+        return content
+    # 두 번째 '---' 위치 탐색
+    end_idx = content.find("\n---\n", 4)
+    if end_idx == -1:
+        return content
+    return content[end_idx + 5 :].lstrip()
+
+
 def main() -> None:
-    """세션 유형을 판별하고 워크플로우 세션일 때만 system-prompt-wf.xml을 stdout에 출력한다.
+    """세션 유형을 판별하고 워크플로우 세션일 때만 SKILL.md 본문을 stdout에 출력한다.
 
     메인 세션(워크플로우 세션이 아닌 경우)에서는 아무것도 출력하지 않고 즉시 종료한다.
     메인 세션 정책은 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.
@@ -60,21 +71,22 @@ def main() -> None:
     project_root = resolve_project_root()
 
     if not _is_workflow_session():
-        # 메인 세션 또는 비tmux 환경: 주입할 프롬프트 없음, 즉시 종료
         sys.exit(0)
 
-    prompt_file = os.path.join(project_root, ".claude-organic", "prompts", "system-prompt-wf.xml")
+    skill_file = os.path.join(
+        project_root, ".claude", "skills", "workflow-orchestration", "SKILL.md"
+    )
 
     _log_dir = resolve_work_dir_for_logging(project_root)
     if _log_dir:
-        append_log(_log_dir, "INFO", "inject_prompt: session_type=workflow")
+        append_log(_log_dir, "INFO", "inject_prompt: session_type=workflow source=SKILL.md")
 
-    # 파일이 없으면 에러 없이 종료
-    if not os.path.exists(prompt_file):
+    if not os.path.exists(skill_file):
         sys.exit(0)
 
-    with open(prompt_file, encoding="utf-8") as f:
-        content = f.read()
+    with open(skill_file, encoding="utf-8") as f:
+        raw = f.read()
+    content = _strip_frontmatter(raw)
 
     ticket_id = _extract_ticket_id()
     if ticket_id:
