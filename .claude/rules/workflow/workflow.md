@@ -156,7 +156,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 > T-463 티켓 생성 (2026-05-10). Review 컬럼 진입 직후 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시한다. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건** (캐논: feedback_no_speculative_guards_2026-05-08, T-411 commit 0c970fa, T-413 commit 1ce3c2d). 사용자는 verdict FAIL 이어도 Review→Done DnD 강행 가능.
 
-### 검증 룰 카탈로그 (13 룰 / 6 카테고리)
+### 검증 룰 카탈로그 (12 룰 / 6 카테고리)
 
 #### R-EXIST (산출물 존재, 4룰)
 
@@ -167,13 +167,14 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 | R-EXIST-3 | status.json 존재 | `<work_dir>/status.json` | 파일 존재 + JSON parse + `workflow_phase` 키 |
 | R-EXIST-4 | metrics.jsonl 존재 | `<work_dir>/metrics.jsonl` | 파일 존재 + 줄 수 ≥ 1 |
 
-#### R-METRIC (metrics.jsonl event_type 발화, 3룰)
+#### R-METRIC (metrics.jsonl event_type 발화, 2룰)
 
 | ID | 룰 | 통과 조건 |
 |----|----|----------|
-| R-METRIC-1 | step.start / step.end 페어링 | 5 phase (INIT/PLAN/WORK/REPORT/DONE) start ↔ end 짝 일치 |
 | R-METRIC-2 | step.end DONE outcome (hard-fail) | 마지막 step.end{step=DONE}.outcome == "ok" |
 | R-METRIC-3 | tool.deny 0건 | tool.deny event 0건 (≥1 시 advisory FAIL) |
+
+> R-METRIC-1 (step.start/end 페어링) 폐지: phase 종료 배너 3종(planSubmit/workDone/reportDone) 폐지에 따라 step.start/end pairing 의존성이 사라졌으며, 동일 phase 종료 검증을 R-FSM-1 (workflow_phase ∈ {DONE, FAILED}) 이 이미 수행하여 중복.
 
 #### R-GUARD (가드 4종 정합, 3룰)
 
@@ -205,7 +206,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 ### WARN / FAIL 임계 (advisory only)
 
-- **PASS**: 13 룰 위반 0건
+- **PASS**: 12 룰 위반 0건
 - **WARN**: 1~2 룰 위반 (hard-fail 0건)
 - **FAIL**: 3+ 룰 위반 또는 hard-fail 룰 1건 이상 (R-EXIST-1, R-METRIC-2)
 - **SKIP**: workflow_phase != DONE/FAILED (워크플로우 미종료 시점)

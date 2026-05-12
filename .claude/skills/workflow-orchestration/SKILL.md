@@ -103,21 +103,19 @@ flow-claude end <registryKey>             # 워크플로우 종료
 | Timing | Banner Command |
 |--------|---------------|
 | PLAN start | `flow-step start <registryKey>` |
-| PLAN end | `flow-step end <registryKey> planSubmit` |
 | WORK start | `flow-step start <registryKey>` |
 | WORK Phase 0~N | `flow-phase <registryKey> <N>` |
 | WORK Phase N+1 (validator) | `flow-phase <registryKey> <N+1>` |
-| WORK end | `flow-step end <registryKey> workDone` |
 | REPORT start | `flow-step start <registryKey>` |
-| REPORT end | `flow-step end <registryKey> reportDone` |
 | DONE (마무리) | `flow-finish <registryKey> 완료\|실패 --ticket-number <T-NNN>` |
 | DONE (종료) | `flow-claude end <registryKey>` |
+
+> **Phase 종료 배너 폐지**: `flow-step end planSubmit/workDone/reportDone` 3종은 `flow-update status` 전이가 이미 동일 정보(phase 종료)를 status.json `transitions[]` + workflow.log 에 기록하므로 폐지. R-METRIC-1 룰도 같이 폐지 (R-FSM-1 과 검증 중복).
 
 **각 step의 오케스트레이터 호출 순서:**
 1. `flow-update both <key> <agent> <toStep>` -- 상태 업데이트
 2. `flow-step start <registryKey>` -- 시작 배너
 3. (에이전트 작업 수행)
-4. `flow-step end <registryKey> [label]` -- 완료 배너
 
 > 위 1~3 각 항목은 **개별 Bash 도구 호출**로 실행한다.
 
@@ -209,8 +207,7 @@ Task(subagent_type="planner", prompt="command: <command>, workId: <workId>, requ
 planner가 `작성완료` 반환 직후:
 1. **plan_validator.py** -- `validator_output=$(flow-validate <workDir>/plan.md 2>&1) || validator_output=""` (advisory, non-blocking)
    > **advisory only**. exit 0 고정 (`|| true` 패턴), 실패해도 WORK 진행. hard gate 는 다음 Step 2c 의 `flow-skillmap` (exit 2 시 planner revise 재호출 최대 3회).
-2. **`flow-step end <registryKey> planSubmit`** -- PLAN 완료 배너 (**1회만**)
-3. **즉시** Auto-Approve Gate로 진행
+2. **즉시** Auto-Approve Gate로 진행
 
 ### Auto-Approve Gate (Step 2b)
 
@@ -351,9 +348,7 @@ Task(subagent_type="validator", prompt="command: <command>, workId: <workId>, wo
 
 ### Post-WORK Flow
 
-```bash
-flow-step end <registryKey> workDone   # WORK 완료 배너 (Validator 완료 후, REPORT 전이 전)
-```
+Validator 완료 후 즉시 REPORT 상태 전이 (`flow-update both <key> reporter REPORT`). WORK 완료 배너 폐지.
 
 ---
 
@@ -376,10 +371,9 @@ reporter가 보고서(`{workDir}/report.md`) + summary.txt 생성. 실패 시 `P
 ### Post-REPORT Flow (REPORT -> DONE)
 
 ```bash
-flow-step end <registryKey> reportDone                                          # 1. REPORT 완료 배너
-flow-update status <registryKey> DONE                                           # 2. 상태 전이
-flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]     # 3. 마무리
-flow-claude end <registryKey>                                                   # 4. 종료 배너 -> turn 즉시 종료
+flow-update status <registryKey> DONE                                           # 1. 상태 전이
+flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]     # 2. 마무리
+flow-claude end <registryKey>                                                   # 3. 종료 배너 -> turn 즉시 종료
 ```
 
 ---
