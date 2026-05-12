@@ -536,13 +536,17 @@
     // [ESC 새로고침 복원] localStorage 에 저장된 ESC 직전 메시지가 있으면 입력창에
     // 자동 채운다 (사용자가 수정/재전송 가능). sendInput/commitQueue 가 send 시점에
     // localStorage 를 클리어하므로 영구 잔류는 없다.
+    // 입력창에 기존 텍스트가 있으면 (브라우저 form 자동 복원 등) 보존하면서
+    // 앞에 공백 한 칸 띄워 prepend.
     if (!M.isWorkflowMode) {
       try {
         var savedText = localStorage.getItem("board.term.lastSentText");
         if (savedText) {
           var inputElRestore = document.getElementById("terminal-input");
           if (inputElRestore) {
-            inputElRestore.value = savedText;
+            inputElRestore.value = inputElRestore.value
+              ? savedText + " " + inputElRestore.value
+              : savedText;
             inputElRestore.style.height = "auto";
             inputElRestore.style.height = inputElRestore.scrollHeight + "px";
           }
