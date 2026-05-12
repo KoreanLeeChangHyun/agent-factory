@@ -176,13 +176,14 @@ class TestMultiModeTransitions(unittest.TestCase):
 # Axis 3: light / full mode regression = 0
 # =============================================================================
 
-# Snapshot of FSM_TRANSITIONS before T-453 (W02 baseline, from W02 report).
-# multi key is new; full and light must remain exactly as before.
+# Post-2026-05-13 사용자 명시 정정 (Full = 멀티 모드).
+# full 키는 multi 와 동일 — VALIDATE 단계 포함. light 는 별 트랙 (보류).
 _EXPECTED_FULL = {
+    "NONE": ["INIT", "STALE", "FAILED", "CANCELLED"],
     "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
-    "NONE": ["PLAN", "STALE", "FAILED", "CANCELLED"],
     "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
-    "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
+    "WORK": ["VALIDATE", "STALE", "FAILED", "CANCELLED"],
+    "VALIDATE": ["REPORT", "WORK", "STALE", "FAILED", "CANCELLED"],
     "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
 }
 
@@ -231,11 +232,16 @@ class TestModeRegressionZero(unittest.TestCase):
             FSM_TRANSITIONS["multi"].get("VALIDATE", []),
         )
 
-    def test_full_work_includes_report_direct(self) -> None:
-        """full.WORK must still include REPORT directly (no VALIDATE step)."""
+    def test_full_work_requires_validate(self) -> None:
+        """full.WORK must transition to VALIDATE (Full = 멀티 모드, 사용자 명시 정정 2026-05-13)."""
         self.assertIn(
+            "VALIDATE",
+            FSM_TRANSITIONS["full"].get("WORK", []),
+        )
+        self.assertNotIn(
             "REPORT",
             FSM_TRANSITIONS["full"].get("WORK", []),
+            "REPORT must not be directly reachable from WORK in full mode (Full=multi)",
         )
 
 

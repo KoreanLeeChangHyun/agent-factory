@@ -170,7 +170,8 @@ STATUS_FILENAME = "status.json"
 CONTEXT_FILENAME = ".context.json"
 STOP_BLOCK_COUNTER_FILENAME = ".stop-block-counter"
 BYPASS_FILENAME = "bypass"
-# `full` / `light` 키는 보존 (회귀 0). `multi` 는 멀티 에이전트 전용 — VALIDATE 단계 신설.
+# `full` == `multi` (멀티 에이전트 + VALIDATE 단계 포함, 사용자 명시 정정 2026-05-13).
+# `light` 는 별 트랙 (보류 — 사용자 명시 동의 없음).
 FSM_TRANSITIONS = {
     "multi": {
         "NONE": ["INIT", "STALE", "FAILED", "CANCELLED"],
@@ -181,10 +182,11 @@ FSM_TRANSITIONS = {
         "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
     },
     "full": {
+        "NONE": ["INIT", "STALE", "FAILED", "CANCELLED"],
         "INIT": ["PLAN", "STALE", "FAILED", "CANCELLED"],
-        "NONE": ["PLAN", "STALE", "FAILED", "CANCELLED"],
         "PLAN": ["WORK", "STALE", "FAILED", "CANCELLED"],
-        "WORK": ["REPORT", "STALE", "FAILED", "CANCELLED"],
+        "WORK": ["VALIDATE", "STALE", "FAILED", "CANCELLED"],
+        "VALIDATE": ["REPORT", "WORK", "STALE", "FAILED", "CANCELLED"],
         "REPORT": ["DONE", "STALE", "FAILED", "CANCELLED"],
     },
     "light": {

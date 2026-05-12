@@ -883,10 +883,10 @@
     }
 
     function _buildStepsRowHtml(st) {
-      var labels = { init: "INIT", plan: "PLAN", work: "WORK", report: "REPORT", done: "DONE", failed: "FAIL" };
+      var labels = { init: "INIT", plan: "PLAN", work: "WORK", validate: "VALIDATE", report: "REPORT", done: "DONE", failed: "FAIL" };
       var current = st.currentStep || "init";
 
-      var orderedSteps = ["init", "plan", "work", "report", "done"];
+      var orderedSteps = ["init", "plan", "work", "validate", "report", "done"];
       if (current === "failed") {
         orderedSteps.push("failed");
       }
@@ -990,7 +990,7 @@
       if (!st.phases || st.phases.length === 0) return "";
 
       var current = st.currentStep || "init";
-      var stepOrder = { init: 0, plan: 1, work: 2, report: 3, done: 4 };
+      var stepOrder = { init: 0, plan: 1, work: 2, validate: 3, report: 4, done: 5 };
       var currentIdx = stepOrder[current];
 
       // Show agent row when WORK is active or already completed (idx >= 2)
