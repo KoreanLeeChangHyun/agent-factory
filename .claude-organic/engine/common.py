@@ -230,7 +230,17 @@ def scan_active_workflows(
         context_file = os.path.join(entry_path, ".context.json")
 
         status = load_json_file(status_file)
-        phase = (status.get("step") or status.get("phase", "NONE")) if isinstance(status, dict) else "NONE"
+        # T-483 정합: status.json 의 phase 키는 `workflow_phase` (T-453 신설 8상태).
+        # 옛 키 `step` / `phase` 도 하위호환 폴백.
+        if isinstance(status, dict):
+            phase = (
+                status.get("workflow_phase")
+                or status.get("step")
+                or status.get("phase")
+                or "NONE"
+            )
+        else:
+            phase = "NONE"
 
         if not include_terminal and phase in TERMINAL_PHASES:
             continue

@@ -59,6 +59,10 @@ def find_active_workflow(ticket_id: str | None) -> tuple[str, str, dict] | tuple
 
     ticket_id 가 주어지면 .context.json 의 ticketNumber 와 매칭되는 항목 우선.
     매칭이 없거나 ticket_id 가 None 이면 updated_at 최신순으로 첫 active 항목 반환.
+
+    TERMINAL 안전망 (T-483 정정): scan_active_workflows 의 phase 키 매핑 회귀와
+    무관하게, workflow_phase 키로 직접 재확인하여 TERMINAL_PHASES_LOCAL
+    (DONE/FAILED/STALE/CANCELLED) 항목은 폴백·매칭 양쪽에서 제외한다.
     """
     try:
         root = project_root()
@@ -74,6 +78,9 @@ def find_active_workflow(ticket_id: str | None) -> tuple[str, str, dict] | tuple
             ctx_path = os.path.join(abs_wd, ".context.json")
             status = load_json_file(status_path) or {}
             ctx = load_json_file(ctx_path) or {}
+            # TERMINAL 직접 재확인 — scan_active_workflows 옛 키 매핑 회귀 안전망.
+            if current_phase(status) in TERMINAL_PHASES_LOCAL:
+                continue
             candidates.append((key, abs_wd, status, ctx))
 
         if ticket_id:
