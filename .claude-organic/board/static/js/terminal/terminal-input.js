@@ -505,8 +505,22 @@
     var sendBtn = document.getElementById("terminal-send-btn");
     // busy 상태에서도 입력창은 활성 유지 (큐 입력 허용). idle/busy 만 inputtable.
     // stopped/starting/archived/missing 은 입력 비활성.
-    var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus);
+    // 예외: ESC autoResume 윈도우 (_inAutoResume) 중에는 stopped/starting 가 짧게
+    // 노출되어도 input.disabled 를 유지하지 않는다 — 입력창 깜빡 회피.
+    var inAutoResume = !!Board.state._inAutoResume;
+    var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus)
+        || inAutoResume;
     var shouldDisable = !inputtable;
+    var prevDisabled = input ? input.disabled : null;
+    if (Board.debugLog) Board.debugLog('setInputLocked', {
+      locked: locked,
+      termStatus: Board.state.termStatus,
+      inAutoResume: inAutoResume,
+      inputtable: inputtable,
+      shouldDisable: shouldDisable,
+      prevDisabled: prevDisabled,
+      willChange: prevDisabled !== shouldDisable,
+    });
     if (input) {
       input.disabled = shouldDisable;
       if (!shouldDisable) {
@@ -530,9 +544,21 @@
     var hasImages = M.attachedImages.length > 0;
     var hasTickets = M.attachedTickets && M.attachedTickets.length > 0;
     var hasMemories = M.attachedMemories && M.attachedMemories.length > 0;
+    if (Board.debugLog) Board.debugLog('sendInput.entry', {
+      termStatus: Board.state.termStatus,
+      textLen: text.length,
+      hasImages: hasImages,
+      hasTickets: hasTickets,
+      hasMemories: hasMemories,
+      queueSize: M.inputQueue ? M.inputQueue.length : 0,
+      willQueue: Board.state.termStatus === "busy",
+    });
     if (!text && !hasImages && !hasTickets && !hasMemories) return;
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
-    if (!inputtable.has(Board.state.termStatus)) return;
+    // _inAutoResume 윈도우 중에는 stopped/starting 도 send 허용 — process 새 spawn 후
+    // 즉시 idle 도착하므로 짧은 race 안에서도 사용자 send 시도 가능.
+    // (race 시 server 측 send_input 가드가 처리)
+    if (!inputtable.has(Board.state.termStatus) && !Board.state._inAutoResume) return;
 
     input.value = "";
     input.style.height = "auto";
@@ -842,6 +868,13 @@
     var attachList = (attachments && attachments.length > 0) ? attachments : null;
     var hasImages = images && images.length > 0;
     var hasAttachments = !!attachList;
+    if (Board.debugLog) Board.debugLog('enqueueInput.entry', {
+      termStatus: Board.state.termStatus,
+      textLen: text.length,
+      hasImages: hasImages,
+      hasAttachments: hasAttachments,
+      queueSizeBefore: M.inputQueue ? M.inputQueue.length : 0,
+    });
     if (!text && !hasImages && !hasAttachments) return;
 
     var entry = {
@@ -872,6 +905,10 @@
    * busy 중 호출 시 무시 (advanceTurn 경로로 처리됨).
    */
   M.commitQueue = function() {
+    if (Board.debugLog) Board.debugLog('commitQueue.entry', {
+      termStatus: Board.state.termStatus,
+      queueSize: M.inputQueue ? M.inputQueue.length : 0,
+    });
     // busy 중이면 commit 무시 — advanceTurn 이 결과 도착 후 처리한다
     if (Board.state.termStatus === "busy") return;
 

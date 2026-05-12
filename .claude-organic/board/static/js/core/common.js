@@ -119,6 +119,11 @@ Board.state.setTermStatus = function (next) {
   Board.state.termStatus = next;
 };
 
+// ESC autoResume 윈도우 — process_exit + willAutoResume 진입부터 startSession.setIdle 까지.
+// 이 윈도우 동안엔 termStatus 가 stopped → starting 으로 짧게 전이되지만 setInputLocked
+// 가 input.disabled 를 true 로 만들지 않는다. 입력창 깜빡 (~500ms) 회피 목적.
+Board.state._inAutoResume = false;
+
 /**
  * 서버 /terminal/status 응답(stopped/running)을 클라 상태 머신에 병합한다.
  * - 서버가 stopped 를 반환하면 클라도 stopped 로 전이 (권위).

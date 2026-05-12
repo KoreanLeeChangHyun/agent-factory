@@ -722,6 +722,12 @@
     if (data.subtype === "init" && data.session_id) {
       var prevSid = Board.state.termSessionId;
       var isNewSession = !prevSid || String(prevSid) !== String(data.session_id);
+      if (Board.debugLog) Board.debugLog('system.init', {
+        prevSid: prevSid || null,
+        newSid: data.session_id,
+        isNewSession: isNewSession,
+        termStatusBefore: Board.state.termStatus,
+      });
       if (prevSid && String(prevSid) !== String(data.session_id)) {
         _ctx.clearOutput();
         _resetSessionDerivedState();
@@ -774,6 +780,11 @@
       }
       if (target) target.classList.add("interrupted");
     } else if (data.subtype === "process_exit") {
+      if (Board.debugLog) Board.debugLog('processExit.entry', {
+        exitCode: data.exit_code,
+        termStatusBefore: Board.state.termStatus,
+        sessionId: data.session_id || null,
+      });
       var wasActive = Board.state.termStatus === "busy" ||
                       Board.state.termStatus === "starting";
       if (wasActive) {
@@ -790,6 +801,9 @@
       // conversation DOM 을 보존해야 한다. 사용자가 새로고침해도 history 가
       // 복원되어야 하므로 이 경로에서 세션 식별자를 건드리는 것은 회귀다.
       // 세션 ID null 처리는 오직 killSession() 의 _finalizeStoppedUI 에서만 수행한다.
+      if (Board.debugLog) Board.debugLog('processExit.setStopped', {
+        termStatusBefore: Board.state.termStatus,
+      });
       Board.state.setTermStatus("stopped");
       // 토큰/비용은 의도적으로 리셋하지 않는다. 세션 스위치 시 서버가 구 프로세스를
       // kill 하면서 process_exit 이 먼저 날아오는데, 여기서 0 으로 밀면 뒤이은
@@ -805,8 +819,6 @@
       if (exitCode !== 0 && exitCode !== 130 && exitCode !== 143 && exitCode !== undefined) {
         _ctx.appendErrorMessage("Process exited with code " + exitCode);
       }
-      _ctx.setInputLocked(false);
-      _ctx.updateControlBar();
 
       // [ESC 자동 resume] ESC 직후 도착한 process_exit 은 같은 session_id 로
       // 즉시 재spawn 하여 사용자가 STOPPED 화면 없이 바로 다음 메시지를 이어서
@@ -827,13 +839,38 @@
       // 이 키를 클리어하므로 자동 resume 이 발동하지 않는다.
       var hasEscRestoreLS = false;
       try { hasEscRestoreLS = !!localStorage.getItem("board.term.lastSentText"); } catch (e) {}
-      if ((exitCode === 130 || isRecentInterrupt || hasEscRestoreLS)
-          && Board.state.termSessionId
-          && isMainMode) {
+      var willAutoResume = (exitCode === 130 || isRecentInterrupt || hasEscRestoreLS)
+          && Board.state.termSessionId && isMainMode;
+      if (Board.debugLog) Board.debugLog('processExit.autoResumeDecision', {
+        exitCode: exitCode,
+        isRecentInterrupt: isRecentInterrupt,
+        hasEscRestoreLS: hasEscRestoreLS,
+        sid: Board.state.termSessionId || null,
+        isMainMode: !!isMainMode,
+        willAutoResume: !!willAutoResume,
+      });
+      // willAutoResume 분기에서는 _inAutoResume 플래그를 켠다.
+      // 이 플래그가 켜져 있는 동안 setInputLocked 의 inputtable 판정이
+      // stopped/starting 도 허용으로 처리 → input.disabled 유지 없음 → 깜빡 0.
+      // startSession.setIdle 도착 시점에 끈다.
+      if (willAutoResume) {
+        Board.state._inAutoResume = true;
+      } else {
+        _ctx.setInputLocked(false);
+      }
+      _ctx.updateControlBar();
+      if (willAutoResume) {
         var sidToResume = Board.state.termSessionId;
         setTimeout(function () {
           // race 가드: 사이에 사용자가 명시적으로 다른 동작(killSession,
           // 세션 스위치 등)을 했으면 자동 resume 을 포기.
+          if (Board.debugLog) Board.debugLog('processExit.autoResumeFire', {
+            termStatus: Board.state.termStatus,
+            sidNow: Board.state.termSessionId || null,
+            sidToResume: sidToResume,
+            willFire: Board.state.termStatus === "stopped"
+              && Board.state.termSessionId === sidToResume,
+          });
           if (Board.state.termStatus === "stopped"
               && Board.state.termSessionId === sidToResume) {
             startSession(sidToResume, { silent: true });
@@ -1567,6 +1604,11 @@
     }
 
     // spawn 요청 ~ init 이벤트 수신 전까지는 "starting". 입력은 아직 비활성.
+    if (Board.debugLog) Board.debugLog('startSession.setStarting', {
+      isResume: !!isResume,
+      silent: !!silent,
+      termStatusBefore: Board.state.termStatus,
+    });
     Board.state.setTermStatus("starting");
     _ctx.updateControlBar();
 
@@ -1582,13 +1624,21 @@
       if (data && data.session_id) {
         Board.state.termSessionId = data.session_id;
       }
+      if (Board.debugLog) Board.debugLog('startSession.setIdle', {
+        termStatusBefore: Board.state.termStatus,
+        inAutoResume: !!Board.state._inAutoResume,
+      });
       Board.state.setTermStatus("idle");
+      // ESC autoResume 윈도우 종료 — 정상 idle 도달했으므로 플래그 해제.
+      Board.state._inAutoResume = false;
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
     }).catch(function (err) {
       var reason = err && err.message ? err.message : "알 수 없는 오류";
       var prefix = isResume ? "[오류] 세션 재개 실패" : "[Error] Failed to start session";
       _ctx.appendErrorMessage(prefix + ": " + reason);
+      // autoResume 도중 실패 시 _inAutoResume leak 방지.
+      Board.state._inAutoResume = false;
       Board.state.setTermStatus("stopped");
       _ctx.updateControlBar();
     }).then(function () {
@@ -1638,6 +1688,8 @@
       if (modeEl) modeEl.textContent = "";
       Board.state.termSessionId = null;
     }
+    // 사용자 명시 kill → autoResume 윈도우 즉시 해제 (잔존 플래그 방지).
+    Board.state._inAutoResume = false;
     postJson(epK.kill, epK.inputBody({})).then(function () {
       Board.state.setTermStatus("stopped");
       _ctx.setInputLocked(false);

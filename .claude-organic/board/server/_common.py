@@ -94,3 +94,26 @@ _WORKFLOW_SYNC_URL: str = (
     'claude-workflow/main/init-claude-workflow.sh'
 )
 _workflow_sync_lock: threading.Lock = threading.Lock()
+
+
+# ── Server-side debug logger ──
+# 클라이언트 Board.debugLog 와 동일 파일/형식. 플래그 파일이 존재할 때만 append.
+def server_debug_log(tag: str, data: object) -> None:
+    """서버 측 진단 로그를 .claude-organic/runs/bg/debug.log 에 append.
+
+    플래그 파일 .claude-organic/runs/bg/debug.enabled 가 존재할 때만 기록.
+    클라이언트 debugLog 와 같은 NDJSON 형식. 평소 오버헤드는 os.path.exists 한 번.
+    """
+    try:
+        log_dir = os.path.join(os.getcwd(), '.claude-organic', 'runs', 'bg')
+        if not os.path.exists(os.path.join(log_dir, 'debug.enabled')):
+            return
+        entry = {
+            'ts': datetime.datetime.utcnow().isoformat() + 'Z',
+            'tag': 'server.' + str(tag),
+            'data': data,
+        }
+        with open(os.path.join(log_dir, 'debug.log'), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
+    except (OSError, TypeError, ValueError):
+        pass

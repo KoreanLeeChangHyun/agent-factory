@@ -218,7 +218,9 @@
     var isMainActive = M._activeSessionId === "main";
     var status = Board.state.termStatus;
     var killable = Board.util.TERM_STATUS_KILLABLE.has(status);
-    var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(status);
+    // _inAutoResume 윈도우 중에는 stopped/starting 도 입력 가능 — 입력창 깜빡 회피.
+    var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(status)
+        || !!Board.state._inAutoResume;
     var isStopped = status === "stopped";
     var isBusy = status === "busy";
     if (toggleBtn) {
@@ -656,6 +658,10 @@
         statusPromise.then(function () {
           var sid = Board.state.termSessionId;
           var status = Board.state.termStatus;
+          if (Board.debugLog) Board.debugLog('terminal.init.statusReady', {
+            sid: sid || null, status: status,
+            willLoadHistory: !!(sid && status && status !== "stopped"),
+          });
           if (sid && status && status !== "stopped") {
             M.loadHistory(sid);
           } else {

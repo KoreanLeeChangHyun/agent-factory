@@ -13,7 +13,7 @@ import threading
 import time
 import uuid
 
-from ._common import logger
+from ._common import logger, server_debug_log
 from .terminal_channel import TerminalSSEChannel
 
 
@@ -189,6 +189,19 @@ class ClaudeProcess:
         Returns:
             시작 결과 dict: {"ok": True/False, "session_id": str, "error": str}
         """
+        server_debug_log('spawn.entry', {
+            'awaiting_response': self._awaiting_response,
+            'status': self._status,
+            'session_id': self._session_id,
+            'has_process': bool(self._process),
+            'process_alive': bool(self._process and self._process.poll() is None),
+        })
+        # 새 프로세스 시작 = 이전 미해결 turn 무효.
+        # ESC 흐름에서 result 못 받고 process 가 종료된 경우 _awaiting_response 가
+        # True 인 채로 남아 새 spawn 인스턴스로 carry over → 새로고침 시 status 응답에
+        # awaiting_response=true 가 잘못 노출되어 클라가 busy 로 진입하는 회귀.
+        # spawn 진입 시점에 강제 리셋.
+        self._awaiting_response = False
         if self._process and self._process.poll() is None:
             self.kill()
             self._init_event.clear()
@@ -320,6 +333,11 @@ class ClaudeProcess:
                 return {'ok': False, 'error': str(e)}
 
         # 입력 전송 성공 → 응답 대기 상태. result 수신 시 해제됨.
+        server_debug_log('awaiting_response.set_true', {
+            'reason': 'send_input',
+            'session_id': self._session_id,
+            'prev': self._awaiting_response,
+        })
         self._awaiting_response = True
 
         return {'ok': True, 'error': ''}
@@ -752,6 +770,12 @@ class ClaudeProcess:
 
                 # result 수신 시 상태를 idle로 전환
                 if data.get('type') == 'result':
+                    server_debug_log('awaiting_response.set_false', {
+                        'reason': 'result',
+                        'session_id': self._session_id,
+                        'prev': self._awaiting_response,
+                        'subtype': data.get('subtype'),
+                    })
                     self._status = 'idle'
                     self._awaiting_response = False
 
@@ -772,6 +796,16 @@ class ClaudeProcess:
             # 프로세스가 종료된 경우 상태 업데이트
             if proc.poll() is not None:
                 exit_code = proc.returncode
+                server_debug_log('process_exit', {
+                    'exit_code': exit_code,
+                    'session_id': self._session_id,
+                    'awaiting_response_at_exit': self._awaiting_response,
+                    'status_before': self._status,
+                })
+                # process 종료 = 미해결 turn 자체가 종결.
+                # ESC 흐름에서 SDK 가 result 보내기 전에 종료될 수 있으므로
+                # process 종료 경로에서도 명시 리셋. 새로고침 시 stale 노출 방지.
+                self._awaiting_response = False
                 # -p 모드에서 result 완료 후 정상 종료(exit_code 0)는
                 # idle 상태로 전환하여 즉시 재입력 가능하게 한다.
                 # 비정상 종료(exit_code != 0)만 stopped로 설정한다.
