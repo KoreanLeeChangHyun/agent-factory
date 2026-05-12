@@ -153,8 +153,14 @@ Board.state.reconcileTermStatus = function (serverStatus) {
     } else if (_CLIENT_EXTENDED.has(current)) {
       result = 'keep(' + current + ')';
     } else {
-      Board.state.setTermStatus('busy');
-      result = 'busy(from-' + current + ')';
+      // current 가 stopped 등 비확장 상태인데 서버가 running 보고:
+      // 프로세스는 살아있지만 응답 진행 중인지 여부는 awaiting_response 가 권위.
+      // 여기서는 idle 로만 보정하고, busy 승격은 fetchStatus 의
+      // `if (data.awaiting_response)` 분기가 단독 책임진다.
+      // (과거 'busy(from-stopped)' 룰은 새로고침 시 awaiting_response=false 임에도
+      // 스피너를 무한 회전시키는 회귀 원인이었음 — 2026-05-13 fix)
+      Board.state.setTermStatus('idle');
+      result = 'idle(from-' + current + ')';
     }
   } else {
     Board.state.setTermStatus(serverStatus);
