@@ -52,7 +52,35 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 | review | Code review | X |
 | research | Research/investigation and internal asset analysis | X |
 
-> 사용자 요청은 `.kanban/open/T-NNN.xml` 티켓 파일을 통해 전달된다. XML 구조는 [`references/T-NNN.xml`](references/T-NNN.xml) 참조.
+> 사용자 요청은 `.claude-organic/tickets/{open,progress,review,done}/T-NNN.xml` 티켓 파일을 통해 전달된다. XML 구조는 [`references/T-NNN.xml`](references/T-NNN.xml) 참조.
+
+---
+
+## Workflow Session Policy
+
+이 세션은 워크플로우 실행 전용 워크플로우 세션이다. `/wf -s N` 명령으로 전달된 티켓을 실행하고, 완료 후 윈도우를 자동 종료한다.
+
+- 언어: 한국어 / 톤: 존댓말
+- 본 SKILL.md 는 SessionStart hook 으로 워크플로우 세션의 system prompt 로 직접 inject 된다 (T-483 이후)
+- workflow_phase FSM: NONE → INIT → PLAN → WORK → VALIDATE → REPORT → DONE
+- 완료 후 반드시 `flow-finish` + `flow-claude end` 를 실행해야 한다 (MUST)
+- `flow-claude end` 이후 추가 출력/도구 호출 절대 금지 (MUST NOT)
+- 세션은 `flow-finish` Step 5 에서 자동 종료된다 (3초 지연 kill)
+
+---
+
+## Branch & Worktree Policy
+
+워크플로우 엔진이 관리하는 git 브랜치 / worktree 정책.
+
+| 영역 | 정책 |
+|------|------|
+| 관리 브랜치 | `develop` 로컬 통합 + `feat/*` feature 브랜치 (둘 다 로컬 전용, 원격 push 워크플로우가 안 함) |
+| 사용자 수동 영역 | `main`, `staging` — 워크플로우가 절대 수정 X |
+| 격리 실행 | 각 feature 브랜치는 독립 git worktree (`.claude-organic/worktrees/feat-T-NNN-*`) 에서 작업. worktree 경로는 `.context.json.worktreePath` 기록 |
+| Done 자동 머지 | `/wf -d N` 실행 시 feature 브랜치를 develop 에 `--no-ff` 머지 후 worktree + 브랜치 정리 |
+| 머지 충돌 | 발생 시 Done 전이 차단 + 안내 출력. worktree 디렉터리에서 충돌 해결 후 `git add`/`commit` → `/wf -d N` 재실행 |
+| 비활성 조건 | `develop` 브랜치 부재 시 단일 브랜치 모드 / `WORKFLOW_WORKTREE=false` 강제 비활성 / `WORKFLOW_WORKTREE=true` 강제 활성 |
 
 ---
 
