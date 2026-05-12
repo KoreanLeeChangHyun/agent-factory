@@ -52,6 +52,14 @@ HOOK_WORKTREE_PATH_GUARD=true
 HOOK_HALLUCINATION_LOGGER=true
 HOOKS_EDIT_ALLOWED=
 
+# T-483: 워크플로우 결정론 단계 자동 흡수.
+# true 시 .claude-organic/engine/workflow_hooks/ 의 SessionStart/PreToolUse[Task]/
+# PostToolUse[Task] hook 이 flow-update both / flow-step start / flow-phase /
+# flow-skillmap / flow-update task-start|task-status / flow-validate 를 자동 호출한다.
+# 오케스트레이터는 INIT + Task × N + DONE (flow-finish/flow-claude end) 만 명시 호출.
+# false 시 기존 동작 (오케스트레이터가 모든 wrapper 명시 호출).
+HOOK_WORKFLOW_ORCHESTRATION=true
+
 # session-start hooks
 HOOK_SESSION_SYSTEM_PROMPT=true
 

@@ -18,6 +18,7 @@ Uses dispatcher.py utilities for flag-based conditional execution.
   Write|Edit|MultiEdit|NotebookEdit|Bash  -> readonly_session_guard     (HOOK_READONLY_SESSION_GUARD, sync)
   Write|Edit|MultiEdit|NotebookEdit|Bash  -> worktree_path_guard        (HOOK_WORKTREE_PATH_GUARD, sync)
   Task                                    -> agent_investigation_guard  (HOOK_AGENT_INVESTIGATION_GUARD, sync)
+  Task                                    -> workflow_pretooluse_task   (HOOK_WORKFLOW_ORCHESTRATION, sync, allow-emitting)
 """
 
 from __future__ import annotations
@@ -281,6 +282,23 @@ def main() -> None:
         )
         sync_results.append(r)
 
+    # --- Task: workflow-orchestration absorption (sync, allow-emitting) ---
+    # subagent_type ∈ {planner, worker-*, explorer-*, validator, reporter} 시
+    # 결정론 wrapper(flow-update both / flow-step start / flow-phase /
+    # flow-skillmap / flow-update task-start) 를 자동 흡수한다.
+    # 본 hook 은 allow JSON 만 emit — deny 발화 없음.
+    # HOOK_WORKFLOW_ORCHESTRATION 플래그 자체는 디스패처에서 활성 (기본 true) +
+    # hook 안에서 두 번째 게이트(.settings 명시 true) 로 통제.
+    workflow_pretooluse_result = None
+    if tool_name == 'Task':
+        workflow_pretooluse_result = dispatch(
+            'HOOK_WORKFLOW_ORCHESTRATION',
+            scripts_dir('workflow_hooks', 'pretooluse_task.py'),
+            stdin_data,
+            flags=flags,
+            capture_output=True,
+        )
+
     # If any guard emitted a deny JSON, relay the first one and exit 0
     for r in sync_results:
         if r is not None and r.stdout and b'deny' in r.stdout:
@@ -304,6 +322,16 @@ def main() -> None:
                 pass
             sys.stdout.buffer.write(r.stdout)
             sys.exit(0)
+
+    # If workflow_pretooluse_task emitted an allow JSON, relay it (preserves
+    # absorption-aware permissionDecisionReason). Otherwise emit the default.
+    if (
+        workflow_pretooluse_result is not None
+        and workflow_pretooluse_result.stdout
+        and b'allow' in workflow_pretooluse_result.stdout
+    ):
+        sys.stdout.buffer.write(workflow_pretooluse_result.stdout)
+        sys.exit(0)
 
     # No guard blocked: emit allow JSON so Claude Code skips confirm prompt
     allow_payload = {
