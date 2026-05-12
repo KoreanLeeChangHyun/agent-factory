@@ -38,15 +38,18 @@ from _common import (  # noqa: E402
     bin_path,
     current_phase,
     emit_allow,
+    emit_deny,
     extract_subagent_type,
     extract_task_meta,
     find_active_workflow,
+    format_hook_fail_alert,
     get_ticket_id_from_env,
     is_orchestration_enabled,
     is_workflow_session,
     log_workflow_event,
     mark_phase_zero_done,
     phase_zero_done,
+    pop_hook_fails,
     run_wrapper,
 )
 
@@ -132,6 +135,19 @@ def main() -> int:
     key, work_dir_abs, status = find_active_workflow(ticket_id)
     if not key or not work_dir_abs:
         emit_allow("active workflow 미탐지 — 통과.")
+        return 0
+
+    # hook_fails 잔재 즉시 가시화 (약점 4축 #1, T-483):
+    # 직전 PreToolUse/PostToolUse hook 에서 wrapper 호출이 실패했으면
+    # 본 PreToolUse 가 deny 1회 발화 + 잔재 비움. LLM 은 deny reason 으로
+    # 즉시 인지 → 재시도 시 잔재 빈 상태이므로 정상 진행.
+    fails = pop_hook_fails(work_dir_abs)
+    if fails:
+        log_workflow_event(
+            work_dir_abs,
+            f"HOOK[Pre,Task={subagent_type}] hook_fails 잔재 {len(fails)}건 deny 통보 (1회)",
+        )
+        emit_deny(format_hook_fail_alert(fails))
         return 0
 
     phase = current_phase(status)

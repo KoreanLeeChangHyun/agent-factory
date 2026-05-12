@@ -311,9 +311,12 @@ flow-claude end <registryKey>
 
 ## Hook Failure Recovery (T-483)
 
-hook 이 결정론 wrapper 호출 시 실패하면 `status.json` 의 `hook_fails[]` 배열에 자동 기록된다. 다음 SessionStart 시 `workflow_session_start.py` hook 이 이 잔재를 stdout 으로 inject 하여 LLM 에 노출. 사용자/LLM 이 수동 정정 (해당 wrapper 직접 호출) 가능.
+hook 이 결정론 wrapper 호출 시 실패하면 `status.json` 의 `hook_fails[]` 배열에 자동 기록되며 두 단계로 LLM 에 노출된다:
 
-advisory only — hook 실패가 워크플로우 전이를 차단하지 않는다.
+1. **즉시 가시성 (다음 PreToolUse[Task])**: 다음 Task 호출 시 `pretooluse_task.py` 가 `hook_fails` 잔재를 검출하면 **deny + reason (`[WORKFLOW HOOK FAIL RESIDUE] ...`) 1회 발화** 후 잔재 비움. LLM 은 deny 메시지로 즉시 인지. **같은 Task 를 재호출하면 잔재 빈 상태이므로 정상 진행** (1턴 지연만, 영구 차단 X).
+2. **세션 컨텍스트 (SessionStart)**: 워크플로우 세션의 다음 SessionStart 시 `workflow_session_start.py` 가 `hook_fails` 잔재를 system context 로 stdout inject. resume/compact/clear 시점에 노출.
+
+advisory only — hook 실패가 워크플로우 전이를 영구 차단하지 않는다 (1회 deny 후 재시도 통과). 잔재 정보는 SessionStart inject 와 workflow.log 에 보존되어 사용자/LLM 수동 정정 가능.
 
 ---
 
