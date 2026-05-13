@@ -235,13 +235,17 @@ def is_workflow_session() -> bool:
 
 
 def is_orchestration_enabled() -> bool:
-    """HOOK_WORKFLOW_ORCHESTRATION 플래그 활성 여부."""
+    """HOOK_WORKFLOW_ORCHESTRATION 플래그 활성 여부.
+
+    `hooks/dispatcher.is_enabled` 의 default=True 와 일치시켜 .settings 명시
+    누락 시에도 활성으로 통일한다 (T-483 정합화). env 명시 시 env 우선.
+    """
     val = os.environ.get("HOOK_WORKFLOW_ORCHESTRATION", "").strip().lower()
     if val in ("true", "1", "yes", "on"):
         return True
     if val in ("false", "0", "no", "off"):
         return False
-    return _read_settings_flag("HOOK_WORKFLOW_ORCHESTRATION", default=False)
+    return _read_settings_flag("HOOK_WORKFLOW_ORCHESTRATION", default=True)
 
 
 def _read_settings_flag(key: str, default: bool) -> bool:
