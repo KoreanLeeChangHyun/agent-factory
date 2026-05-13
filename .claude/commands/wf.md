@@ -448,23 +448,15 @@ T-NNN 티켓이 업데이트되었습니다.
 
 ### 티켓 제출 및 워크플로우 실행
 
-> **칸반 전이**: Open -> **Submit** -> **In Progress** (Submit 전환은 즉시, In Progress 전환은 flow-init 실행 시)
-
-#### 칸반 상태 전환
-
-```bash
-flow-kanban move T-NNN submit
-```
-
-실패(exit code 1) 시 경고 메시지를 출력하되 워크플로우 실행은 계속 진행합니다 (비차단).
-
-> **INLINE 모드 참고**: `flow-launcher`가 `INLINE:` 응답을 반환한 경우, 메인 세션에서 이미 `move submit`이 실행된 상태입니다. `kanban_cli.py`의 멱등성이 보장되므로 재실행해도 빈 파일이 생성되지 않습니다 (T-252).
+> **칸반 전이**: Open -> **In Progress** (`flow-launcher launch` 호출 시 자동으로 progress 이동). T-399 에서 transient `Submit` 단계는 폐지됨.
 
 #### 실행 환경 분기
 
 ```bash
 flow-launcher launch T-NNN '/wf -s N'
 ```
+
+`flow-launcher` 가 내부적으로 `flow-kanban move T-NNN progress` 를 수행 후 board 측 `_handle_kanban_submit` 으로 비동기 spawn 한다. **메인 세션에서 직접 `flow-kanban move T-NNN submit` 호출 금지 — submit target 자체가 폐지되었고 kanban_subcommand_guard 가 차단한다.**
 
 - **`LAUNCH:`**: 복귀 메시지(`T-NNN 워크플로우를 새 세션에서 실행합니다.`) 출력 (이후 로직 미실행)
 - **`INLINE:`**: 아래 2-1~2-5 로직을 그대로 실행
@@ -700,7 +692,7 @@ T-NNN 티켓이 삭제되었습니다.
 | `-e N` | Open | Open (유지) | -- (편집 루프 진입, `-oe N`도 동일 동작) |
 | `-s` | To Do | (에러 종료) | "먼저 /wf -e N으로 Open 승격 후 다시 제출" 안내 출력 후 종료 |
 | `-s` | Open | In Progress | `flow-launcher launch T-NNN '/wf -s N'` (LAUNCH/INLINE/에러 분기) |
-| `-s` (완료 후) | In Progress | Review | `flow-kanban move T-NNN review` (workflow-wf submit 처리) |
+| `-s` (완료 후) | In Progress | Review | `flow-kanban move T-NNN review` (workflow finalize 단계에서 자동 처리) |
 | `-d` | Review | Done (간단검토 후 완료 선택 시) | 간단검토 -> `flow-merge T-NNN --force`. **Done = 머지 + 사용자 직접 테스트 통과 후의 진짜 종결** |
 | `-d` | Review | Review (상세 review 선택 시) | 새 review 티켓 생성 + `flow-kanban link T-MMM --derived-from T-NNN` |
 | `-d` | To Do/Open/In Progress | Done | `flow-kanban done T-NNN` (기존 동작) |
