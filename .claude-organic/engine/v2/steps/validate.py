@@ -1,10 +1,12 @@
-"""VALIDATE Step — claude -p 1 spawn → validate-report.md (advisory)."""
+"""VALIDATE Step — claude -p 1 spawn → validate-report.md (advisory) + driver 룰베이스 12룰 재검증."""
 
 from __future__ import annotations
 
 from .._common import WorkflowContext, load_prompt, write_context
+from .._emitter import emit
 from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
+from .._validate import evaluate_12_rules, save_verdict_report
 from .._verify import verify_validate_md
 
 
@@ -35,4 +37,15 @@ def validate_step(ctx: WorkflowContext) -> None:
         session_id=session_id,
         verify=lambda: verify_validate_md(ctx.validate_report_md_path()),
         artifact_path=ctx.validate_report_md_path(),
+    )
+    # SPEC.md §7.1 — driver 룰베이스 12룰 재검증 (advisory only)
+    report = evaluate_12_rules(ctx)
+    save_verdict_report(ctx, report)
+    emit(
+        ctx,
+        "validate.verdict",
+        verdict=report.verdict,
+        violation_count=report.violation_count(),
+        has_hard_fail=report.has_hard_fail(),
+        ticket=ctx.ticket_no,
     )

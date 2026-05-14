@@ -95,6 +95,9 @@ class WorkflowContext:
     def validate_report_md_path(self) -> Path:
         return self.work_dir / "validate-report.md"
 
+    def validate_rules_json_path(self) -> Path:
+        return self.work_dir / "validate-rules.json"
+
     def report_md_path(self) -> Path:
         return self.work_dir / "report.md"
 
