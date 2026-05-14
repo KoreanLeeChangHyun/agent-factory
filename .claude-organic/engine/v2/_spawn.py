@@ -4,11 +4,18 @@ SPEC.md §8 — Step 마다 1 subprocess. cwd=work_dir, --append-system-prompt,
 --session-id, --resume <session_id> 재시도 지원.
 
 본 모듈은 subprocess.run wrapper 만 제공. 재시도 loop 는 _retry.py.
+
+회귀 fix (Phase 2-A 검토 회귀 4건):
+- session_id 는 claude CLI `--session-id <uuid>` 규약상 UUID 필수
+- logical_name (`wf-T489-PLAN`) 은 디버그/로그 인용용으로 분리
+- --permission-mode 명시 (non-interactive `-p` 모드 권한 차단 회피)
+- --add-dir 으로 work_dir 도구 접근 허용 (cwd 보강)
 """
 
 from __future__ import annotations
 
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +23,7 @@ from ._common import STEP_TIMEOUT_BY_STEP
 
 
 CLAUDE_BIN = "claude"
+DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 
 @dataclass
@@ -28,10 +36,15 @@ class SpawnResult:
     timed_out: bool = False
 
 
-def session_id_for(ticket_no: str, step: str, phase_id: str | None = None) -> str:
-    """SPEC.md §8.2 — session_id 명명 규약.
+def new_session_uuid() -> str:
+    """claude `--session-id <uuid>` 용 UUID4 — 새 세션 1개당 1개 생성."""
+    return str(uuid.uuid4())
 
-    예: "wf-T489-PLAN", "wf-T489-WORK-P1".
+
+def logical_session_name(ticket_no: str, step: str, phase_id: str | None = None) -> str:
+    """디버그/로그 인용용 logical name. claude 에 전달하지 않음.
+
+    예: "wf-T489-PLAN", "wf-T489-WORK-P1". ctx.session_ids 의 key 로 사용.
     """
     base = f"wf-{ticket_no.replace('-', '')}-{step}"
     if phase_id is not None:
@@ -48,13 +61,17 @@ def spawn_claude(
     step: str,
     resume: bool = False,
     timeout: int | None = None,
+    permission_mode: str = DEFAULT_PERMISSION_MODE,
+    add_dirs: tuple[Path, ...] = (),
 ) -> SpawnResult:
     """claude -p subprocess 발사.
 
     - cwd=work_dir 로 산출물 작성 위치 지정 (SPEC.md §8.4)
     - --append-system-prompt 로 Step 별 system prompt 주입 (10KB 이하)
-    - prompt_body 는 stdin 으로 전달 (SDK cap 회피)
-    - resume=True 시 --resume 옵션 추가 (재시도)
+    - --session-id <uuid> 또는 --resume <uuid>
+    - --permission-mode <mode> 명시 (default: bypassPermissions)
+    - --add-dir <path> 으로 도구 접근 허용 디렉터리 추가
+    - prompt_body 는 stdin 으로 전달
     """
     effective_timeout = timeout if timeout is not None else STEP_TIMEOUT_BY_STEP.get(step, 600)
     cmd = [CLAUDE_BIN, "-p"]
@@ -64,6 +81,10 @@ def spawn_claude(
         cmd += ["--session-id", session_id]
     if system_prompt:
         cmd += ["--append-system-prompt", system_prompt]
+    cmd += ["--permission-mode", permission_mode]
+    # cwd 자체도 명시적으로 추가 — claude 가 cwd 외 경로 접근 허용
+    for d in (cwd, *add_dirs):
+        cmd += ["--add-dir", str(d)]
     try:
         result = subprocess.run(
             cmd,
@@ -97,8 +118,10 @@ def spawn_claude_resume(
     cwd: Path,
     step: str,
     timeout: int | None = None,
+    permission_mode: str = DEFAULT_PERMISSION_MODE,
+    add_dirs: tuple[Path, ...] = (),
 ) -> SpawnResult:
-    """SPEC.md §6.3 — 같은 session_id 로 이어가기."""
+    """SPEC.md §6.3 — 같은 session_id (UUID) 로 이어가기."""
     return spawn_claude(
         prompt_body=prompt_body,
         session_id=session_id,
@@ -107,4 +130,6 @@ def spawn_claude_resume(
         step=step,
         resume=True,
         timeout=timeout,
+        permission_mode=permission_mode,
+        add_dirs=add_dirs,
     )
