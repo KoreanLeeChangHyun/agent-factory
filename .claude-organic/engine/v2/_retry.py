@@ -13,6 +13,7 @@ from ._common import (
     N_MAX_BY_STEP,
     WorkflowContext,
     append_log,
+    load_template,
 )
 from ._emitter import step_end, step_start
 from ._spawn import SpawnResult, spawn_claude, spawn_claude_resume
@@ -22,18 +23,10 @@ from ._verify import VerifyResult
 VerifyFn = Callable[[], VerifyResult]
 
 
-RETRY_PROMPT_TEMPLATE = """직전 산출물 검증 실패. 누락/오류 항목:
-{missing_items}
-
-위 항목만 채워서 다시 작성. 다른 영역 수정 금지.
-산출물 경로: {artifact_path}
-"""
-
-
 def render_retry_prompt(missing: list[str], artifact_path: Path) -> str:
-    """SPEC.md §6.2 — driver template fill. LLM 호출 X."""
+    """SPEC.md §6.2 — driver template fill (templates/retry_prompt.txt). LLM 호출 X."""
     items = "\n".join(f"- {m}" for m in missing) if missing else "- (산출물 누락)"
-    return RETRY_PROMPT_TEMPLATE.format(
+    return load_template("retry_prompt.txt").format(
         missing_items=items,
         artifact_path=str(artifact_path),
     )

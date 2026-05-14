@@ -1,0 +1,6 @@
+Workflow v2 finalize
+ticket={ticket_no}
+registry_key={registry_key}
+command={command}
+mode={mode}
+finalized_at={finalized_at}

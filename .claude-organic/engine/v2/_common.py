@@ -17,10 +17,25 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 RUNS_DIR = PROJECT_ROOT / ".claude-organic" / "runs"
 KANBAN_BIN = PROJECT_ROOT / ".claude-organic" / "bin" / "flow-kanban"
+ENGINE_V2_DIR = Path(__file__).resolve().parent
+PROMPTS_DIR = ENGINE_V2_DIR / "prompts"
+TEMPLATES_DIR = ENGINE_V2_DIR / "templates"
 
 
 WORKFLOW_STEPS = ("NONE", "INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE", "FAILED")
 TERMINAL_STEPS = ("DONE", "FAILED")
+
+
+def load_prompt(name: str) -> str:
+    """SPEC.md §8.3 — Step 별 system prompt 외부화 (10KB 이하 정합)."""
+    path = PROMPTS_DIR / f"{name}.txt"
+    return path.read_text(encoding="utf-8")
+
+
+def load_template(name: str) -> str:
+    """driver fill template (retry_prompt / summary / failure)."""
+    path = TEMPLATES_DIR / name
+    return path.read_text(encoding="utf-8")
 
 
 # SPEC.md §3.4 — Step 별 재시도 한도

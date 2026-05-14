@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# v2 workflow driver wrapper (T-489 / SPEC.md §12.1)
+# 호출: flow-wf submit T-NNN [--step PLAN]
+ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
+  || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+subcmd="${1:-}"
+shift || true
+case "$subcmd" in
+  submit)
+    cd "$ROOT" || exit 1
+    exec env PYTHONPATH="$ROOT/.claude-organic:$PYTHONPATH" \
+      python3 -m engine.v2.driver "$@"
+    ;;
+  *)
+    cat <<EOF
+flow-wf — v2 workflow driver (T-489)
+usage:
+  flow-wf submit T-NNN [--step STEP]   # driver 1 사이클 발사
+  flow-wf submit T-NNN --step PLAN     # 디버그: 특정 Step 까지만
+EOF
+    exit 2
+    ;;
+esac
