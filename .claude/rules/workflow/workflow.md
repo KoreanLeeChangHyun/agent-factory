@@ -1,10 +1,15 @@
 # 워크플로우 시스템 상세 규칙
 
+> **v2 명세 SSOT**: `.claude-organic/engine/v2/SPEC.md` (T-489 도입). 본 문서와 SPEC.md 충돌 시 SPEC.md 우선.
+> v2 는 b69645a base 에서 prototype 구축 중 (Phase 1~3). v1 운영 가이드는 v2 검증 완료까지 보존하되, 어휘 충돌 영역만 점진 정정.
+> **어휘 정정 (v2 → 본 문서 적용 완료)**: `workflow_phase` → `workflow_step` (워크플로우 6단계), `work_step` → `work_phase` (WORK 내부 sub-단계). v1 phase/step 정반대 매핑.
+> **v2 핵심**: driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개). 메인 세션 오케스트레이터 폐지. file-based pipeline (산출물 통째 inject, LLM 요약 X).
+
 ## 칸반 상태 흐름
 
 ### 5단계 FSM
 
-> 이 5단계는 `kanban_status` 도메인이며 워크플로우 8상태(`workflow_phase`: NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL) 와 분리됨.
+> 이 5단계는 `kanban_status` 도메인이며 워크플로우 8상태(`workflow_step`: NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED) 와 분리됨. (v2 어휘 — `workflow_phase` 는 v1 옛 어휘, T-489 에서 정정)
 
 ```
 To Do → Open → In Progress → Review → Done
