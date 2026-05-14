@@ -40,7 +40,7 @@ from ._emitter import (
     workflow_finish,
 )
 from ._retry import spawn_with_retry
-from ._spawn import session_id_for
+from ._spawn import logical_session_name, new_session_uuid
 from ._verify import (
     Phase,
     parse_plan_frontmatter,
@@ -117,8 +117,9 @@ def plan_step(ctx: WorkflowContext) -> None:
         f"위 티켓의 작업을 phase 단위로 분해해 plan.md (frontmatter + body) 를 "
         f"`{ctx.plan_md_path()}` 에 작성하세요."
     )
-    session_id = session_id_for(ctx.ticket_no, "PLAN")
-    ctx.session_ids["PLAN"] = session_id
+    session_id = new_session_uuid()
+    logical = logical_session_name(ctx.ticket_no, "PLAN")
+    ctx.session_ids[logical] = session_id
     write_context(ctx)
     spawn_with_retry(
         ctx,
@@ -164,8 +165,9 @@ def work_step(ctx: WorkflowContext) -> None:
                 f"본 Phase: {phase.id} — {phase.title}\n"
                 f"산출물: `{ctx.work_dir_phase_md(phase.id)}` 에 작성."
             )
-            session_id = session_id_for(ctx.ticket_no, "WORK", phase.id)
-            ctx.session_ids[f"WORK-{phase.id}"] = session_id
+            session_id = new_session_uuid()
+            logical = logical_session_name(ctx.ticket_no, "WORK", phase.id)
+            ctx.session_ids[logical] = session_id
             write_context(ctx)
             v, _, _ = spawn_with_retry(
                 ctx,
@@ -189,8 +191,9 @@ def work_step(ctx: WorkflowContext) -> None:
             f"{phase_list_text}\n\n"
             f"각 Phase 산출물을 `work/<id>.md` 에 작성. 모두 작성한 뒤 종료."
         )
-        session_id = session_id_for(ctx.ticket_no, "WORK")
-        ctx.session_ids["WORK"] = session_id
+        session_id = new_session_uuid()
+        logical = logical_session_name(ctx.ticket_no, "WORK")
+        ctx.session_ids[logical] = session_id
         write_context(ctx)
         artifact_paths = [ctx.work_dir_phase_md(p.id) for p in phases]
         spawn_with_retry(
@@ -221,13 +224,15 @@ def validate_step(ctx: WorkflowContext) -> None:
     if work_dir.exists():
         for md in sorted(work_dir.glob("*.md")):
             work_blocks.append(f"### work/{md.name}\n\n{md.read_text(encoding='utf-8')}\n")
+    joined_work = "\n".join(work_blocks) if work_blocks else "(work/ 비어있음)"
     initial_prompt = (
         f"plan.md (통째):\n{plan_body}\n\n"
-        f"work/*.md (모두 통째):\n{'\\n'.join(work_blocks)}\n\n"
+        f"work/*.md (모두 통째):\n{joined_work}\n\n"
         f"12 룰 advisory 평가 + 추가 quality 검증을 `{ctx.validate_report_md_path()}` 에 작성."
     )
-    session_id = session_id_for(ctx.ticket_no, "VALIDATE")
-    ctx.session_ids["VALIDATE"] = session_id
+    session_id = new_session_uuid()
+    logical = logical_session_name(ctx.ticket_no, "VALIDATE")
+    ctx.session_ids[logical] = session_id
     write_context(ctx)
     spawn_with_retry(
         ctx,
@@ -248,6 +253,7 @@ def report_step(ctx: WorkflowContext) -> None:
     if work_dir.exists():
         for md in sorted(work_dir.glob("*.md")):
             work_blocks.append(f"### work/{md.name}\n\n{md.read_text(encoding='utf-8')}\n")
+    joined_work = "\n".join(work_blocks) if work_blocks else "(work/ 비어있음)"
     validate_body = (
         ctx.validate_report_md_path().read_text(encoding="utf-8")
         if ctx.validate_report_md_path().exists()
@@ -255,13 +261,14 @@ def report_step(ctx: WorkflowContext) -> None:
     )
     initial_prompt = (
         f"plan.md:\n{plan_body}\n\n"
-        f"work/*.md:\n{'\\n'.join(work_blocks)}\n\n"
+        f"work/*.md:\n{joined_work}\n\n"
         f"validate-report.md:\n{validate_body}\n\n"
         f"위를 통째 종합한 report.md 를 `{ctx.report_md_path()}` 에 작성. "
         f"본문에 'plan.md' 토큰 포함 필수."
     )
-    session_id = session_id_for(ctx.ticket_no, "REPORT")
-    ctx.session_ids["REPORT"] = session_id
+    session_id = new_session_uuid()
+    logical = logical_session_name(ctx.ticket_no, "REPORT")
+    ctx.session_ids[logical] = session_id
     write_context(ctx)
     spawn_with_retry(
         ctx,
