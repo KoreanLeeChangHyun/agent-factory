@@ -95,8 +95,13 @@ def init_step(ticket_no: str) -> WorkflowContext:
         mode="multi",
         current_step="INIT",
     )
-    # 티켓 prompt → user_prompt.txt
+    # 티켓 prompt → user_prompt.txt (ticket 존재 가드 #7)
     ticket_dump = kanban_show(ticket_no)
+    if not ticket_dump or "Number:" not in ticket_dump:
+        sys.stderr.write(
+            f"[driver] ticket {ticket_no} not found in kanban — aborting INIT\n"
+        )
+        raise SystemExit(2)
     ctx.user_prompt_path().write_text(ticket_dump, encoding="utf-8")
     # 초기 status.json + .context.json
     write_status(ctx, {"workflow_step": "INIT", "transitions": []})
@@ -145,12 +150,17 @@ def _load_plan(ctx: WorkflowContext) -> list[Phase]:
     return ordered
 
 
-def work_step(ctx: WorkflowContext) -> None:
-    """WORK — Phase loop. plan.md 의 spawn_mode 에 따라 in_place / subprocess."""
+def work_step(ctx: WorkflowContext) -> bool:
+    """WORK — Phase loop. plan.md 의 spawn_mode 에 따라 in_place / subprocess.
+
+    Returns:
+        True = 정상 진행 / False = phases empty 또는 topo 실패로 fail_step 처리됨.
+    """
     phases = _load_plan(ctx)
     if not phases:
-        # plan.md 회귀 — driver 가 PLAN 재시도로 못 살린 case (이미 step_end fail emit 됨)
-        return
+        # #6 — plan.md phases 비어있거나 circular dep 등 topo 실패. fail_step 명시 호출.
+        fail_step(ctx, "plan.md phases empty or topo sort failed")
+        return False
     has_subprocess_mode = any(p.spawn_mode == "subprocess" for p in phases)
     plan_body = ctx.plan_md_path().read_text(encoding="utf-8")
 
@@ -205,6 +215,7 @@ def work_step(ctx: WorkflowContext) -> None:
             verify=lambda: verify_work_set(artifact_paths),
             artifact_path=ctx.work_dir / "work",
         )
+    return True
 
 
 def _load_deps_block(ctx: WorkflowContext, phase: Phase) -> str:
@@ -343,8 +354,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.step == "PLAN":
             return 0
 
-        # WORK
-        work_step(ctx)
+        # WORK (#6 — phases empty/topo fail 시 fail_step 이미 호출됨)
+        if not work_step(ctx):
+            return 2
         update_step(ctx, "WORK", "VALIDATE")
         if args.step == "WORK":
             return 0
