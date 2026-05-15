@@ -191,6 +191,59 @@ _BACKEND_GLOB_PATTERNS = (
 _FEAT_BRANCH_RE = re.compile(r'^feat/(T-\d+)-')
 
 
+def _v2_driver_reader_loop(
+    proc: subprocess.Popen,
+    ticket: str,
+    command: str,
+    submitted_at: datetime,
+) -> None:
+    """v2 driver subprocess 종료 시 rc != 0 일 때만 LAUNCH_FAILED emit.
+
+    v1 _launch_reader_loop 와 다름:
+      - LAUNCH_STARTED 발사 X (submit handler 가 Popen 직후 즉시 발사)
+      - rc == 0 (정상 완료) 는 driver 자체 SSE (workflow.finish) 가 처리
+      - rc != 0 (crash) 만 LAUNCH_FAILED 발사 (회귀 검출)
+
+    finally 블록에서 thread 핸들 set 자체 제거 (GC 누수 차단).
+    """
+    self_thread = threading.current_thread()
+    try:
+        try:
+            stdout, stderr = proc.communicate(timeout=None)
+        except Exception as exc:
+            elapsed_ms = int(
+                (datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000
+            )
+            _emit_launch_event(
+                'LAUNCH_FAILED', ticket,
+                reason='reader_loop_exception',
+                returncode=None,
+                error_message=repr(exc),
+                elapsed_ms=elapsed_ms,
+                command=command,
+            )
+            return
+
+        rc = proc.returncode
+        if rc == 0:
+            return  # 정상 완료 — driver workflow.finish SSE 가 처리
+
+        elapsed_ms = int(
+            (datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000
+        )
+        _emit_launch_event(
+            'LAUNCH_FAILED', ticket,
+            reason='driver_nonzero_exit',
+            returncode=rc,
+            error_message=(stderr or '')[:500],
+            elapsed_ms=elapsed_ms,
+            command=command,
+        )
+    finally:
+        with _LAUNCH_READER_LOCK:
+            _LAUNCH_READER_THREADS.discard(self_thread)
+
+
 class KanbanHandlerMixin:
     """Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes."""
 
@@ -455,14 +508,16 @@ class KanbanHandlerMixin:
         self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
 
     def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: flow-launcher 비동기 spawn.
+        """POST /api/kanban/submit — {"ticket","command"}: v2 driver 비동기 spawn.
 
-        T-475 Stage 1 변경:
-          - 동기 ``subprocess.run(timeout=60)`` 제거 → ``Popen`` + reader thread 분리.
-          - 즉시 200 OK ``{ok:True, status:'starting'}`` 반환 (latency p95 < 100ms 목표).
-          - launch 결과는 LAUNCH_PENDING/STARTED/FAILED SSE 이벤트로 비동기 통지.
-          - timeout 단일 진실 공급원 = launcher 측 H4 urllib timeout=10s + T-904 cleanup.
-            본 핸들러 측 timeout 인자 제거 (bridge commit 76907ff 자연 폐기).
+        Stage 3-B (T-489) 변경:
+          - flow-launcher (v1) → flow-wf submit (v2 driver) 라우팅 교체.
+          - V2_BOARD_POST=true env 자동 주입 — driver 가 board /api/v2/wf-event POST.
+          - LAUNCH_PENDING + LAUNCH_STARTED 모두 Popen 직후 즉시 발사 (v2 driver
+            는 사이클 끝까지 살아있음 — v1 의 "HTTP POST 후 즉시 종료" 의미론과
+            다름. spawn 성공 = 사이클 진입 보장).
+          - reader thread = driver rc != 0 일 때만 LAUNCH_FAILED 발사 (회귀 검출).
+          - 즉시 200 OK ``{ok:True, status:'starting'}`` 반환 (latency p95 < 100ms).
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
@@ -476,24 +531,28 @@ class KanbanHandlerMixin:
             return
 
         project_root = os.getcwd()
-        flow_launcher = os.path.join(project_root, '.claude-organic', 'bin', 'flow-launcher')
+        flow_wf = os.path.join(project_root, '.claude-organic', 'bin', 'flow-wf')
 
         submitted_at = datetime.now(timezone.utc)
 
+        # V2_BOARD_POST=true 자동 주입 — driver 가 board /api/v2/wf-event POST.
+        env = dict(os.environ)
+        env['V2_BOARD_POST'] = 'true'
+
         try:
             proc = subprocess.Popen(
-                [flow_launcher, 'launch', ticket, command],
+                [flow_wf, 'submit', ticket],
                 cwd=project_root,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env=env,
                 text=True,
             )
         except FileNotFoundError:
-            # Popen 실패는 spawn 자체 실패 — 비동기 채널 없이 즉시 5xx 반환.
-            self._send_error(500, f'flow-launcher not found: {flow_launcher}')
+            self._send_error(500, f'flow-wf not found: {flow_wf}')
             return
         except OSError as exc:
-            self._send_error(500, f'flow-launcher Popen failed: {exc!r}')
+            self._send_error(500, f'flow-wf Popen failed: {exc!r}')
             return
 
         # LAUNCH_PENDING — Popen 직후, HTTP 200 응답 직전.
@@ -503,11 +562,24 @@ class KanbanHandlerMixin:
             submitted_at=submitted_at.isoformat(),
         )
 
-        # reader thread spawn — Popen.communicate 무한 대기 후 LAUNCH_STARTED/FAILED emit.
+        # LAUNCH_STARTED — v2 driver spawn 성공 = 사이클 진입 보장. 정확한
+        # session_id 는 driver 가 곧이어 발사하는 session.start SSE 가 전달.
+        spawn_elapsed_ms = int(
+            (datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000
+        )
+        _emit_launch_event(
+            'LAUNCH_STARTED', ticket,
+            session_id='',
+            mode='v2',
+            spawn_duration_ms=spawn_elapsed_ms,
+            command=command,
+        )
+
+        # reader thread — driver 비정상 종료 시 LAUNCH_FAILED emit (회귀 검출).
         reader = threading.Thread(
-            target=_launch_reader_loop,
+            target=_v2_driver_reader_loop,
             args=(proc, ticket, command, submitted_at),
-            name=f'launch-reader-{ticket}',
+            name=f'v2-driver-reader-{ticket}',
             daemon=True,
         )
         with _LAUNCH_READER_LOCK:
