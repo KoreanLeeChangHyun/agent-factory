@@ -304,7 +304,9 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'task': work_name,
                 'command': command,
                 'basePath': entry_rel,
-                'step': status.get('step', 'NONE'),
+                # v2 driver 는 status.json 에 `workflow_step` 키 사용 (SPEC §2 어휘 정정).
+                # 옛 v1 사이클의 `step` 키도 fallback 지원. 둘 다 없으면 'NONE'.
+                'step': status.get('workflow_step', status.get('step', 'NONE')),
                 'created_at': status.get('created_at', ''),
                 'updated_at': status.get('updated_at', ''),
                 'transitions': status.get('transitions', []),
@@ -356,7 +358,9 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'task': task,
                 'command': cmd,
                 'basePath': base_path,
-                'step': status.get('step', 'NONE'),
+                # v2 driver 는 status.json 에 `workflow_step` 키 사용 (SPEC §2 어휘 정정).
+                # 옛 v1 사이클의 `step` 키도 fallback 지원. 둘 다 없으면 'NONE'.
+                'step': status.get('workflow_step', status.get('step', 'NONE')),
                 'created_at': status.get('created_at', ''),
                 'updated_at': status.get('updated_at', ''),
                 'transitions': status.get('transitions', []),
