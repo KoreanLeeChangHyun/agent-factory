@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .._common import WorkflowContext, load_prompt, write_context
+from .._common import WorkflowContext, append_log, load_prompt, write_context
 from .._emitter import phase_end, phase_start
 from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
@@ -49,6 +49,16 @@ def work_step(ctx: WorkflowContext) -> bool:
     has_subprocess_mode = any(p.spawn_mode == "subprocess" for p in phases)
     plan_body = ctx.plan_md_path().read_text(encoding="utf-8")
     work_system_prompt = load_prompt("work")
+
+    # 요구사항 ③: Phase 단위 진행 가시화 (in_place 모드라도 plan 의 Phase 리스트 로그)
+    mode_label = "subprocess (격리)" if has_subprocess_mode else "in_place (단일 spawn)"
+    append_log(ctx, f"[WORK] {len(phases)} Phase 진행 시작 (spawn_mode={mode_label})")
+    for p in phases:
+        append_log(
+            ctx,
+            f"[WORK] Phase {p.id}: {p.title} "
+            f"(deps={p.deps}, spawn_mode={p.spawn_mode})",
+        )
 
     if has_subprocess_mode:
         for phase in phases:
@@ -99,4 +109,13 @@ def work_step(ctx: WorkflowContext) -> bool:
             verify=lambda: verify_work_set(artifact_paths),
             artifact_path=ctx.work_dir / "work",
         )
+        # 요구사항 ③: in_place 모드 Phase 산출물 결과를 phase 별로 로그
+        for p in phases:
+            artifact = ctx.work_dir_phase_md(p.id)
+            ok = artifact.is_file() and artifact.stat().st_size > 0
+            append_log(
+                ctx,
+                f"[WORK] Phase {p.id} 산출물 {'OK' if ok else 'MISS'} "
+                f"({artifact.relative_to(ctx.work_dir)})",
+            )
     return True
