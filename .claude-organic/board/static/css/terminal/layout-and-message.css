@@ -572,17 +572,24 @@
   font-size: 90%;
 }
 
+/* user 입력 메시지 — 테라코타 톤 다운 박스로 감싸 assistant 메시지와 시각 구분.
+ * board.md §2 (큐 stack UI 카드 색) + §3 (user 말풍선) + §6 (테라코타 #D97757) 캐논 정합.
+ * 박스 디자인 회귀 차단 — 메모리 박제 [[feedback-board-user-message-box-canon]]. */
 .term-user {
   color: #9cdcfe;
   white-space: pre-wrap;
   font-size: 90%;
+  background: rgba(217, 119, 87, 0.10);
+  border: 1px solid rgba(217, 119, 87, 0.40);
+  border-radius: 6px;
+  padding: 8px 12px;
 }
 
 /* ESC 인터럽트로 응답이 중지된 user 메시지 — 우측 모서리에 "중지됨" 배지 부착.
  * 색상은 테마 컬러(테라코타 #D97757) 기반. */
 .term-user.interrupted {
   position: relative;
-  padding-right: 64px;
+  padding-right: 64px;  /* "중지됨" 배지 자리 확보. base padding 8/12 위에 right 만 override. */
   opacity: 0.85;
 }
 
