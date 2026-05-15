@@ -60,7 +60,9 @@ def test_hard_fail_rules_canon() -> None:
 
 
 def test_all_pass(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    # Stage 3-D 정합: command=implement 면 feature_branch 필수.
+    # 테스트에서는 worktree 분기 우회 위해 command=research 로 PASS 시나리오 구성.
+    ctx = _make_ctx(tmp_path, command="research")
     _setup_passing_artifacts(ctx)
     report = evaluate_12_rules(ctx)
     assert report.verdict == "PASS", f"expected PASS, got {report.verdict}: {report.rules}"
@@ -180,12 +182,24 @@ def test_r_wt_1_review_skip(tmp_path: Path) -> None:
     assert rule.skip
 
 
-def test_r_guard_1_skip_worktreeless(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+def test_r_guard_1_skip_research(tmp_path: Path) -> None:
+    """Stage 3-D 정합: research → R-GUARD-1 SKIP."""
+    ctx = _make_ctx(tmp_path, command="research")
     _setup_passing_artifacts(ctx)
     report = evaluate_12_rules(ctx)
     rule = next(r for r in report.rules if r.rule_id == "R-GUARD-1")
     assert rule.skip
+
+
+def test_r_guard_1_implement_no_branch_fail(tmp_path: Path) -> None:
+    """Stage 3-D 정합: implement + feature_branch=None → R-GUARD-1 FAIL."""
+    ctx = _make_ctx(tmp_path, command="implement")
+    _setup_passing_artifacts(ctx)
+    assert ctx.feature_branch is None
+    report = evaluate_12_rules(ctx)
+    rule = next(r for r in report.rules if r.rule_id == "R-GUARD-1")
+    assert not rule.ok
+    assert "implement" in rule.detail
 
 
 def test_r_guard_2_no_feature_branch_skip(tmp_path: Path) -> None:
@@ -199,8 +213,8 @@ def test_r_guard_2_no_feature_branch_skip(tmp_path: Path) -> None:
 
 
 def test_verdict_warn_with_one_violation(tmp_path: Path) -> None:
-    """1 위반 + hard-fail 0건 → WARN."""
-    ctx = _make_ctx(tmp_path)
+    """1 위반 + hard-fail 0건 → WARN. Stage 3-D 정합: research 베이스로 PASS 시나리오 구성."""
+    ctx = _make_ctx(tmp_path, command="research")
     _setup_passing_artifacts(ctx)
     # 1 룰만 깨뜨림 — R-METRIC-3 (tool.deny)
     with ctx.metrics_jsonl_path().open("a", encoding="utf-8") as fh:
@@ -225,7 +239,8 @@ def test_verdict_fail_with_three_violations(tmp_path: Path) -> None:
 
 
 def test_save_verdict_report_schema(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    # Stage 3-D 정합: research 베이스로 PASS schema 검증
+    ctx = _make_ctx(tmp_path, command="research")
     _setup_passing_artifacts(ctx)
     report = evaluate_12_rules(ctx)
     out_path = save_verdict_report(ctx, report)
