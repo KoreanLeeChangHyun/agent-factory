@@ -177,6 +177,11 @@ class WorkflowSessionRegistry:
             session.current_step = step_name
         channel.on_step = _on_step
 
+        # Stage 3-B — frontend syncWorkflowTabs 가 status==='running' 인 세션만
+        # 탭에 노출. v2 driver subprocess 는 board side 가 spawn 안 했으나
+        # 사이클 진행 중에는 'running' 으로 표시되어야 사용자 인지 가능.
+        process.set_external_status('running')
+
         if persist_path is not None:
             try:
                 meta = {

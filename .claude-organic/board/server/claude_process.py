@@ -152,6 +152,10 @@ class ClaudeProcess:
         self._model: str = ''
         self._permission_mode: str = ''
         self._status: str = 'stopped'
+        # Stage 3-B — v2 driver subprocess 가 외부에서 돌고 있는 경우 status override.
+        # None 이면 일반 ClaudeProcess (self._process 추적). 'running'/'stopped' set 시
+        # status property 가 우선 반환 (board side 가 process 직접 spawn 안 한 모드).
+        self._external_status: str | None = None
         self._stdin_lock: threading.Lock = threading.Lock()
         self._stdout_thread: threading.Thread | None = None
         self._channel: TerminalSSEChannel = channel
@@ -561,9 +565,14 @@ class ClaudeProcess:
     def status(self) -> str:
         """프로세스 상태를 반환한다.
 
+        Stage 3-B — `_external_status` set 시 (v2 driver subprocess external 모드)
+        그 값을 우선 반환. 그 외 v1 spawn 인프라 그대로.
+
         Returns:
             "running", "idle", "stopped" 중 하나
         """
+        if self._external_status is not None:
+            return self._external_status
         if not self._process:
             return 'stopped'
         if self._process.poll() is not None:
@@ -571,6 +580,16 @@ class ClaudeProcess:
             self._process = None
             return 'stopped'
         return self._status
+
+    def set_external_status(self, status: str) -> None:
+        """Stage 3-B — v2 driver external session 의 status 명시 set.
+
+        v1 spawn 인프라는 ``self._process.poll()`` 로 자동 stopped 감지하지만,
+        v2 driver subprocess 는 외부에서 돌고 있어 board side 가 추적 불가.
+        endpoint /api/v2/wf-event 가 session.start 시 'running', workflow.finish
+        시 'stopped' 로 set 한다.
+        """
+        self._external_status = status
 
     @property
     def session_id(self) -> str:

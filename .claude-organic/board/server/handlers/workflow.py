@@ -697,6 +697,9 @@ class WorkflowHandlerMixin:
             terminal_step = 'DONE' if outcome == 'ok' else 'FAILED'
             session.current_step = terminal_step
             session.channel.emit_step(terminal_step, detail)
+            # Stage 3-B — v2 driver subprocess 종료 → external status stopped.
+            # frontend syncWorkflowTabs 가 running 외 세션 탭 제거 처리.
+            session.process.set_external_status('stopped')
         else:
             session.channel.broadcast({'event': event, 'payload': detail})
 
