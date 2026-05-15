@@ -7,6 +7,7 @@ LLM 호출 없음. 룰베이스 결정만.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -38,8 +39,9 @@ def load_template(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-# SPEC.md §3.4 — Step 별 재시도 한도
-N_MAX_BY_STEP: dict[str, int] = {
+# SPEC.md §3.4 — Step 별 재시도 한도 (기본값)
+# .claude-organic/.settings 의 V2_RETRY_<STEP> 환경 변수로 override 가능.
+_N_MAX_DEFAULT: dict[str, int] = {
     "INIT": 0,
     "PLAN": 2,
     "WORK": 3,
@@ -47,6 +49,49 @@ N_MAX_BY_STEP: dict[str, int] = {
     "REPORT": 2,
     "DONE": 0,
 }
+
+
+def _load_settings() -> dict[str, str]:
+    """`.claude-organic/.settings` (KEY=value, # 주석) 을 dict 로 읽는다.
+
+    파일 미존재·파싱 실패는 silent skip — driver 가 기본값으로 동작 보장.
+    """
+    settings_path = PROJECT_ROOT / ".claude-organic" / ".settings"
+    if not settings_path.is_file():
+        return {}
+    result: dict[str, str] = {}
+    try:
+        for raw in settings_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            result[key.strip()] = value.strip()
+    except (OSError, UnicodeDecodeError):
+        return {}
+    return result
+
+
+def get_n_max(step: str) -> int:
+    """Step 별 재시도 한도 반환. `V2_RETRY_<STEP>` env override 우선.
+
+    우선순위: os.environ > .settings > _N_MAX_DEFAULT > 0.
+    """
+    env_key = f"V2_RETRY_{step.upper()}"
+    raw = os.environ.get(env_key) or _load_settings().get(env_key)
+    if raw is not None:
+        try:
+            v = int(raw)
+            if v >= 0:
+                return v
+        except ValueError:
+            pass
+    return _N_MAX_DEFAULT.get(step, 0)
+
+
+# 하위 호환 — 옛 코드의 N_MAX_BY_STEP.get(step, 0) 호출 보존 (env override 미반영).
+# 신규 코드는 get_n_max(step) 사용 권장.
+N_MAX_BY_STEP = _N_MAX_DEFAULT
 
 
 # SPEC.md §8.1 — Step 별 timeout (초)
