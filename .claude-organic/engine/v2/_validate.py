@@ -192,17 +192,24 @@ def _r_fsm_terminal(ctx: WorkflowContext) -> RuleResult:
 
 
 def _r_wt_commits_ahead(ctx: WorkflowContext) -> RuleResult:
-    """R-WT-1: T-486 Phase 2b 에서 hard-fail 승격.
+    """R-WT-1 (T-489 Stage 3-D): command 별 분기.
 
-    v2 prototype 은 worktree 없이 develop 에서 직접 작업 — feature_branch
-    설정 시에만 실측 검증, 아니면 SKIP.
+    SPEC.md §9.1.1 — implement 만 hard-fail, research/review 는 SKIP.
+    feature_branch 미설정 시도 SKIP (driver init_step 가 command=implement
+    에 한해 worktree 생성 + feature_branch 채움).
     """
-    if not ctx.feature_branch:
+    if ctx.command in ("research", "review"):
         return RuleResult(
             "R-WT-1",
             True,
-            detail="v2 worktree-less prototype",
+            detail=f"{ctx.command} SKIP (worktree-less 허용)",
             skip=True,
+        )
+    if not ctx.feature_branch:
+        return RuleResult(
+            "R-WT-1",
+            False,
+            detail="command=implement 인데 feature_branch 없음 — driver init_step 회귀",
         )
     result = subprocess.run(
         ["git", "rev-list", "--count", f"develop..{ctx.feature_branch}"],
@@ -244,9 +251,30 @@ def evaluate_12_rules(ctx: WorkflowContext) -> VerdictReport:
     rules.append(_r_metric_no_tool_deny(ctx))
 
     # R-GUARD
-    rules.append(
-        RuleResult("R-GUARD-1", True, detail="v2 worktree-less prototype", skip=True),
-    )
+    # R-GUARD-1: worktree 모드 활성. implement 면 ctx.feature_branch 존재로 판정,
+    # research/review 면 SKIP (워크트리-less 허용).
+    if ctx.command in ("research", "review"):
+        rules.append(
+            RuleResult(
+                "R-GUARD-1",
+                True,
+                detail=f"{ctx.command} SKIP (worktree-less 허용)",
+                skip=True,
+            ),
+        )
+    else:
+        ok_wt = bool(ctx.feature_branch)
+        rules.append(
+            RuleResult(
+                "R-GUARD-1",
+                ok_wt,
+                detail=(
+                    f"worktree active (feature_branch={ctx.feature_branch})"
+                    if ok_wt
+                    else "implement 인데 worktree 미활성 — driver init_step 회귀"
+                ),
+            ),
+        )
     rules.append(_r_feature_branch(ctx))
     rules.append(_r_no_regression_pattern(ctx))
 
