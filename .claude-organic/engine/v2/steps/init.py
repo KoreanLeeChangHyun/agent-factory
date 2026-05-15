@@ -56,7 +56,10 @@ def _maybe_create_worktree(
     if command != "implement":
         return None, None
     # v1 인프라 재사용 (SPEC.md §11.3 보존 영역)
-    from flow.worktree_manager import create_worktree  # noqa: E402
+    # flow-wf wrapper 의 PYTHONPATH=.claude-organic 환경 안에서는 fully-qualified
+    # path (engine.flow) 만 import 가능. cwd=.claude-organic/engine 가정의 짧은
+    # `from flow.worktree_manager` 는 ImportError (다른 v1 호출자와 환경 차이).
+    from engine.flow.worktree_manager import create_worktree  # noqa: E402
 
     info = create_worktree(ticket_no, title, command=command)
     if info is None:
