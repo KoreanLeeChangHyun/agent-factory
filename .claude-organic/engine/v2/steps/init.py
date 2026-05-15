@@ -106,6 +106,8 @@ def init_step(ticket_no: str) -> WorkflowContext:
         mode="multi",
         current_step="INIT",
         feature_branch=feature_branch,
+        worktree_path=worktree_path,
+        title=title,
     )
     ctx.user_prompt_path().write_text(ticket_dump, encoding="utf-8")
     write_status(ctx, {"workflow_step": "INIT", "transitions": []})

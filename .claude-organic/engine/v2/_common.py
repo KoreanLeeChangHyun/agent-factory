@@ -117,6 +117,8 @@ class WorkflowContext:
     mode: str = "multi"                     # single | multi (plan.md frontmatter 가 최종 결정)
     current_step: str = "NONE"
     feature_branch: str | None = None       # 워크트리 가드 (T-411 잔존, 보존)
+    worktree_path: Path | None = None       # SPEC §9.1.1 (Stage 3-D) + §0.1 (Stage 3-E auto_commit)
+    title: str = ""                         # 티켓 제목 (auto_commit 메시지 template 용)
     session_ids: dict[str, str] = field(default_factory=dict)  # Step|Phase → session_id
 
     def status_json_path(self) -> Path:
@@ -222,6 +224,8 @@ def write_context(ctx: WorkflowContext) -> None:
         "command": ctx.command,
         "mode": ctx.mode,
         "feature_branch": ctx.feature_branch,
+        "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else None,
+        "title": ctx.title,
         "session_ids": dict(ctx.session_ids),
         "engine_version": "v2",
     }
@@ -265,3 +269,63 @@ def append_log(ctx: WorkflowContext, line: str) -> None:
     ts = datetime.now().isoformat(timespec="seconds")
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(f"[{ts}] {line}\n")
+
+
+def auto_commit(ctx: WorkflowContext) -> int:
+    """SPEC §0.1 (Stage 3-E) — worker 산출물 결정론 commit.
+
+    WORK Step 종료 직후 driver 가 호출. LLM 위임 0건.
+
+    동작:
+      1. ctx.worktree_path 가 None (worktree-less 또는 init 회귀) → skip, return 0
+      2. `git -C <wt> add -A` — worker 산출물 + work/*.md 모두 stage
+      3. `git -C <wt> diff --cached --quiet` — 변경 0건이면 returncode 0 → skip, return 0
+      4. 결정론 메시지 template 으로 `git -C <wt> commit -m <msg>` → returncode 반환
+
+    메시지 template: "feat(<ticket>): <title> [v2 driver auto-commit]"
+    """
+    if ctx.worktree_path is None:
+        append_log(ctx, "[AUTO-COMMIT] worktree-less — skip")
+        return 0
+    wt = str(ctx.worktree_path)
+    if not Path(wt).is_dir():
+        append_log(ctx, f"[AUTO-COMMIT] worktree path 미존재 ({wt}) — skip")
+        return 0
+    # 1. add -A
+    add = subprocess.run(
+        ["git", "-C", wt, "add", "-A"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if add.returncode != 0:
+        append_log(ctx, f"[AUTO-COMMIT] git add 실패 rc={add.returncode}: {add.stderr.strip()[:200]}")
+        return add.returncode
+    # 2. staged 변경 detect
+    diff = subprocess.run(
+        ["git", "-C", wt, "diff", "--cached", "--quiet"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if diff.returncode == 0:
+        append_log(ctx, "[AUTO-COMMIT] staged 변경 0건 — skip")
+        return 0
+    # 3. commit 메시지 결정론 template
+    title = ctx.title or "(no title)"
+    msg = f"feat({ctx.ticket_no}): {title} [v2 driver auto-commit]"
+    commit = subprocess.run(
+        ["git", "-C", wt, "commit", "-m", msg],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if commit.returncode != 0:
+        append_log(
+            ctx,
+            f"[AUTO-COMMIT] git commit 실패 rc={commit.returncode}: "
+            f"{commit.stderr.strip()[:200]}",
+        )
+        return commit.returncode
+    append_log(ctx, f"[AUTO-COMMIT] commit OK — {msg}")
+    return 0

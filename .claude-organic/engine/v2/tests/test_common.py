@@ -127,6 +127,8 @@ def test_update_step_invalid_target(tmp_path: Path) -> None:
 def test_context_io_roundtrip(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     ctx.feature_branch = "feat/T-489"
+    ctx.worktree_path = Path("/tmp/wt/feat-T-489")
+    ctx.title = "샘플 티켓 제목"
     ctx.session_ids["wf-T489-PLAN"] = "abc-uuid"
     write_context(ctx)
     payload = read_context(ctx)
@@ -134,7 +136,20 @@ def test_context_io_roundtrip(tmp_path: Path) -> None:
     assert payload["ticket_no"] == "T-489"
     assert payload["engine_version"] == "v2"
     assert payload["feature_branch"] == "feat/T-489"
+    assert payload["worktree_path"] == "/tmp/wt/feat-T-489"
+    assert payload["title"] == "샘플 티켓 제목"
     assert payload["session_ids"]["wf-T489-PLAN"] == "abc-uuid"
+
+
+def test_context_io_worktree_less(tmp_path: Path) -> None:
+    """worktree_path=None → JSON 직렬화 시 null."""
+    ctx = _make_ctx(tmp_path)
+    ctx.feature_branch = None
+    write_context(ctx)
+    payload = read_context(ctx)
+    assert payload["worktree_path"] is None
+    assert payload["feature_branch"] is None
+    assert payload["title"] == ""
 
 
 def test_make_work_dir_creates_work_subdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
