@@ -282,22 +282,9 @@ def main() -> None:
         )
         sync_results.append(r)
 
-    # --- Task: workflow-orchestration absorption (sync, allow-emitting) ---
-    # subagent_type ∈ {planner, worker-*, explorer-*, validator, reporter} 시
-    # 결정론 wrapper(flow-update both / flow-step start / flow-phase /
-    # flow-skillmap / flow-update task-start) 를 자동 흡수한다.
-    # 본 hook 은 allow JSON 만 emit — deny 발화 없음.
-    # HOOK_WORKFLOW_ORCHESTRATION 플래그 자체는 디스패처에서 활성 (기본 true) +
-    # hook 안에서 두 번째 게이트(.settings 명시 true) 로 통제.
+    # T-489 Stage 3-C: workflow_hooks/ 폐기 — v2 driver 는 hook 의존 X.
+    # 옛 Task subagent 분기는 SDK Task 자체 폐기로 dead. 본 영역 제거.
     workflow_pretooluse_result = None
-    if tool_name == 'Task':
-        workflow_pretooluse_result = dispatch(
-            'HOOK_WORKFLOW_ORCHESTRATION',
-            scripts_dir('workflow_hooks', 'pretooluse_task.py'),
-            stdin_data,
-            flags=flags,
-            capture_output=True,
-        )
 
     # If any guard emitted a deny JSON, relay the first one and exit 0
     for r in sync_results:

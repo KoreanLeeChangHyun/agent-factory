@@ -184,17 +184,9 @@ def main() -> None:
         _handle_bash_flow_end(tool_input)
         sys.exit(0)
 
-    # --- Task: workflow-orchestration absorption (async, fire-and-forget) ---
-    # subagent_type ∈ workflow set 시 결정론 wrapper(flow-validate,
-    # flow-update task-status) 를 비동기 실행한다. Task 호출은 file_path 없음.
+    # T-489 Stage 3-C: workflow_hooks/ 폐기 — v2 driver 는 hook 의존 X.
+    # 옛 Task subagent post-hook 분기는 SDK Task 자체 폐기로 dead.
     if tool_name == 'Task':
-        flags = load_env_flags()
-        dispatch_async(
-            'HOOK_WORKFLOW_ORCHESTRATION',
-            scripts_dir('workflow_hooks', 'posttooluse_task.py'),
-            stdin_data,
-            flags=flags,
-        )
         sys.exit(0)
 
     file_path = tool_input.get('file_path', '') if isinstance(tool_input, dict) else ''
