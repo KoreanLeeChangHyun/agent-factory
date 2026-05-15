@@ -120,6 +120,7 @@ class WorkflowContext:
     worktree_path: Path | None = None       # SPEC §9.1.1 (Stage 3-D) + §0.1 (Stage 3-E auto_commit)
     title: str = ""                         # 티켓 제목 (auto_commit 메시지 template 용)
     session_ids: dict[str, str] = field(default_factory=dict)  # Step|Phase → session_id
+    wf_session_id: str | None = None        # Stage 3-B — board side workflow_registry 매핑 ID
 
     def status_json_path(self) -> Path:
         return self.work_dir / "status.json"
@@ -227,6 +228,7 @@ def write_context(ctx: WorkflowContext) -> None:
         "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else None,
         "title": ctx.title,
         "session_ids": dict(ctx.session_ids),
+        "wf_session_id": ctx.wf_session_id,
         "engine_version": "v2",
     }
     ctx.context_json_path().write_text(

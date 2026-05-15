@@ -2,20 +2,85 @@
 
 SPEC.md §12.3 — driver 가 stdout NDJSON emit → Board 서버 SSE.
 동시에 metrics.jsonl 에 append (회귀 분석 자료).
+
+Stage 3-B — board HTTP push (env `V2_BOARD_POST=true` gate).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
+import threading
+import urllib.parse
+import urllib.request
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from ._common import WorkflowContext
+from ._common import PROJECT_ROOT, WorkflowContext
 
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+_BOARD_URL_PATH = PROJECT_ROOT / ".claude-organic" / ".board.url"
+
+
+def _board_post_enabled() -> bool:
+    """Stage 3-B — env flag gate. 미설정/false 시 driver 흐름 영향 0."""
+    raw = os.environ.get("V2_BOARD_POST", "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def _read_board_base() -> str | None:
+    """`.board.url` 첫 줄에서 scheme://host:port 추출. 미존재 시 None."""
+    if not _BOARD_URL_PATH.is_file():
+        return None
+    try:
+        for line in _BOARD_URL_PATH.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parsed = urllib.parse.urlsplit(line)
+            if parsed.scheme and parsed.netloc:
+                return f"{parsed.scheme}://{parsed.netloc}"
+    except OSError:
+        return None
+    return None
+
+
+def _post_to_board(session_id: str, event: str, payload: dict[str, Any]) -> None:
+    """fire-and-forget POST `/api/v2/wf-event`.
+
+    실패 silent skip — driver 흐름 영향 0 (네트워크 오류 / board 미기동 / endpoint 404).
+    timeout 1s 로 driver subprocess 지연 차단.
+    """
+    if not _board_post_enabled():
+        return
+    base = _read_board_base()
+    if base is None:
+        return
+
+    body = json.dumps(
+        {"session_id": session_id, "event": event, "payload": payload},
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    def _send() -> None:
+        try:
+            req = urllib.request.Request(
+                f"{base}/api/v2/wf-event",
+                data=body,
+                method="POST",
+                headers={"Content-Type": "application/json; charset=utf-8"},
+            )
+            urllib.request.urlopen(req, timeout=1.0).read()
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
@@ -32,6 +97,27 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
+        if ctx.wf_session_id:
+            _post_to_board(ctx.wf_session_id, event, record)
+
+
+def session_start(ctx: WorkflowContext) -> None:
+    """Stage 3-B — board lazy session create trigger.
+
+    INIT Step 진입 시 driver 가 발급한 `wf_session_id` 로 board side
+    workflow_registry 등록을 1회 발사. 등록 외 비용 0.
+    """
+    if not ctx.wf_session_id:
+        return
+    payload = {
+        "event": "session.start",
+        "ts": _now_iso(),
+        "ticket": ctx.ticket_no,
+        "command": ctx.command,
+        "work_dir": str(ctx.work_dir),
+        "title": ctx.title,
+    }
+    _post_to_board(ctx.wf_session_id, "session.start", payload)
 
 
 def step_start(ctx: WorkflowContext, step: str, **extra: Any) -> None:

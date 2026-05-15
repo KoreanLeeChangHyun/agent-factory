@@ -22,7 +22,7 @@ from .._common import (
     write_context,
     write_status,
 )
-from .._emitter import step_end, step_start
+from .._emitter import session_start, step_end, step_start
 
 
 _VALID_COMMANDS = {"implement", "research", "review"}
@@ -98,6 +98,9 @@ def init_step(ticket_no: str) -> WorkflowContext:
     else:
         work_dir = make_work_dir(registry_key)
 
+    # Stage 3-B — board side workflow_registry 매핑 ID. driver 측 자체 발급으로
+    # 결정론 유지 (registry_key 가 이미 timestamp 형식이라 충돌 0).
+    wf_session_id = f"wf-{ticket_no}-{registry_key}"
     ctx = WorkflowContext(
         ticket_no=ticket_no,
         registry_key=registry_key,
@@ -108,6 +111,7 @@ def init_step(ticket_no: str) -> WorkflowContext:
         feature_branch=feature_branch,
         worktree_path=worktree_path,
         title=title,
+        wf_session_id=wf_session_id,
     )
     ctx.user_prompt_path().write_text(ticket_dump, encoding="utf-8")
     write_status(ctx, {"workflow_step": "INIT", "transitions": []})
@@ -117,6 +121,7 @@ def init_step(ticket_no: str) -> WorkflowContext:
         f"INIT — registry_key={registry_key}, ticket={ticket_no}, "
         f"command={command}, feature_branch={feature_branch or '(none)'}",
     )
+    session_start(ctx)  # Stage 3-B board lazy create (V2_BOARD_POST 미설정 시 skip)
     step_start(ctx, "INIT")
     kanban_move(ticket_no, "progress")
     step_end(ctx, "INIT", outcome="ok")

@@ -135,6 +135,8 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_kill()
         elif self.path == '/api/workflow/stop':
             self._handle_workflow_stop()
+        elif self.path == '/api/v2/wf-event':
+            self._handle_v2_wf_event()
         elif self.path == '/terminal/workflow/input':
             self._handle_workflow_input()
         elif self.path == '/terminal/workflow/step':
