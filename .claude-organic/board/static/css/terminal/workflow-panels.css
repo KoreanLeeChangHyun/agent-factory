@@ -135,6 +135,14 @@
   border-color: rgba(244, 135, 113, 0.35);
 }
 
+/* VALIDATE step (v2 6단계) — amber 톤으로 테라코타와 구분 */
+.wf-timeline-step[data-step="validate"].active {
+  color: #dca74a;
+  background: rgba(220, 167, 74, 0.12);
+  border-color: rgba(220, 167, 74, 0.40);
+  box-shadow: 0 0 0 1px rgba(220, 167, 74, 0.15);
+}
+
 /* ── .wf-phase-badge: Phase N badge inside WORK step ── */
 .wf-phase-badge {
   display: inline-block;
@@ -384,6 +392,7 @@
 .wf-step-panel[data-step="init"]    { border-color: #858585; }
 .wf-step-panel[data-step="plan"]    { border-color: #569cd6; }
 .wf-step-panel[data-step="work"]    { border-color: #D97757; }
+.wf-step-panel[data-step="validate"] { border-color: #dca74a; }
 .wf-step-panel[data-step="report"]  { border-color: #c586c0; }
 .wf-step-panel[data-step="done"]    { border-color: #4ec9b0; }
 .wf-step-panel[data-step="failed"]  { border-color: #f48771; }

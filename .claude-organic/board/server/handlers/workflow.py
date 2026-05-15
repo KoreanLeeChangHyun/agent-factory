@@ -627,3 +627,77 @@ class WorkflowHandlerMixin:
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    # ------------------------------------------------------------------
+    # Stage 3-B — v2 driver subprocess event ingest
+    # ------------------------------------------------------------------
+
+    def _handle_v2_wf_event(self) -> None:
+        """v2 driver 가 발사한 워크플로우 이벤트를 board SSE 로 위임한다.
+
+        POST /api/v2/wf-event
+        요청 본문: {"session_id": str, "event": str, "payload": dict}
+
+        이벤트 종류:
+          - session.start: workflow_registry.create_external (lazy register)
+          - step.start | step.end: emit_step(STEP_NAME, detail)
+          - phase.start | phase.end: emit_step("WORK", detail) — phase sub-단계 표시
+          - workflow.finish: emit_step(outcome=='ok' ? "DONE" : "FAILED", detail)
+          - 기타 (regression.pattern / tool.deny): broadcast raw
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        session_id = (data.get('session_id') or '').strip()
+        event = (data.get('event') or '').strip()
+        payload = data.get('payload') or {}
+        if not session_id or not event:
+            self._send_error(400, 'Missing "session_id" or "event"')
+            return
+        if not isinstance(payload, dict):
+            self._send_error(400, '"payload" must be a dict')
+            return
+
+        if event == 'session.start':
+            ticket = (payload.get('ticket') or '').strip()
+            command = (payload.get('command') or '').strip()
+            work_dir = (payload.get('work_dir') or '').strip()
+            if not ticket:
+                self._send_error(400, 'session.start: missing "ticket"')
+                return
+            workflow_registry.create_external(
+                session_id=session_id,
+                ticket_id=ticket,
+                command=command,
+                work_dir=work_dir,
+            )
+            self._send_json({'ok': True, 'session_id': session_id})
+            return
+
+        session = workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        detail = {k: v for k, v in payload.items() if k != 'event'}
+        detail['trigger'] = f'v2:{event}'
+
+        if event in ('step.start', 'step.end'):
+            step = (payload.get('step') or '').strip().upper()
+            if not step:
+                self._send_error(400, f'{event}: missing "step"')
+                return
+            session.current_step = step
+            session.channel.emit_step(step, detail)
+        elif event in ('phase.start', 'phase.end'):
+            session.channel.emit_step('WORK', detail)
+        elif event == 'workflow.finish':
+            outcome = (payload.get('outcome') or '').strip().lower()
+            terminal_step = 'DONE' if outcome == 'ok' else 'FAILED'
+            session.current_step = terminal_step
+            session.channel.emit_step(terminal_step, detail)
+        else:
+            session.channel.broadcast({'event': event, 'payload': detail})
+
+        self._send_json({'ok': True, 'event': event})
