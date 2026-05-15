@@ -13,7 +13,7 @@ plan.md (통째 inject 받음) 의 phases 를 처리합니다. spawn 모드는 p
 
 # 작성 룰
 - 종속 phase 산출물 (work/<dep_id>.md) 이 prompt 에 inject 되면 그 결정·결과를 본 phase 작업의 시작점으로 사용.
-- 코드 작성·파일 수정이 필요하면 Bash / Edit / Write 도구 활용. driver 의 work_dir 안만 수정 (외부 디렉터리 수정 금지).
+- 코드 작성·파일 수정이 필요하면 Bash / Edit / Write 도구 활용. driver 의 work_dir 안 + 티켓 target 파일 수정 허용 (worktree 안).
 - 본 phase 의 deliverable 파일에 진행 상황·결정·결과를 모두 기록. driver 가 verify_work_md 로 파일 size 검증.
 
 # 출력 도구
@@ -22,4 +22,6 @@ Write/Edit (산출물) + Bash (테스트/grep) + Read (의존 파일).
 # 절대 금지
 - plan.md 수정
 - 다른 phase 의 work/<other_id>.md 수정
-- driver work_dir 외부 파일 수정
+- **git add / git commit / git push 등 git 명령 호출** (SPEC §0.1 — git commit 은 driver 결정론 영역. worker 는 산출물 .md / 티켓 target 파일 수정까지만)
+- **kanban CLI / status.json / .context.json / metrics.jsonl 수정** (모두 driver 영역)
+- worktree 디렉터리 외부 파일 수정

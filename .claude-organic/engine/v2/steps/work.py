@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from .._common import WorkflowContext, append_log, load_prompt, write_context
+from .._common import (
+    WorkflowContext,
+    append_log,
+    auto_commit,
+    load_prompt,
+    write_context,
+)
 from .._emitter import phase_end, phase_start
 from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
@@ -118,4 +124,7 @@ def work_step(ctx: WorkflowContext) -> bool:
                 f"[WORK] Phase {p.id} 산출물 {'OK' if ok else 'MISS'} "
                 f"({artifact.relative_to(ctx.work_dir)})",
             )
+    # SPEC §0.1 (Stage 3-E) — worker 산출물 결정론 commit (변경 0건 skip).
+    # LLM 위임 0건. git commit = driver 결정론 영역.
+    auto_commit(ctx)
     return True

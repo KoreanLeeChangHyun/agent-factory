@@ -25,7 +25,9 @@ def validate_step(ctx: WorkflowContext) -> None:
     initial_prompt = (
         f"plan.md (통째):\n{plan_body}\n\n"
         f"work/*.md (모두 통째):\n{joined_work}\n\n"
-        f"12 룰 advisory 평가 + 추가 quality 검증을 `{ctx.validate_report_md_path()}` 에 작성."
+        f"**Quality 평가 자연어** 만 (phase 분해 적정성 / deliverable 완성도 / deps 흐름 일관성 / 종합 자연어)\n"
+        f"`{ctx.validate_report_md_path()}` 에 작성. **12룰 평가·verdict 산출 금지 (SPEC §0.1)** — "
+        f"driver 가 DONE 단계에서 `validate-rules.json` SSOT 결정론 산출."
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "VALIDATE")
