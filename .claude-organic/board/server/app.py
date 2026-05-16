@@ -33,6 +33,7 @@ from .state import (
     terminal_sse_channel,
     claude_process,
     workflow_registry,
+    v2_workflow_registry,
 )
 
 
@@ -113,6 +114,17 @@ def _run_server(project_root: str) -> None:
     loaded_count = workflow_registry.load_from_disk()
     if loaded_count > 0:
         print(f'[workflow_registry] {loaded_count}개 세션 복원 완료', file=sys.stderr)
+
+    # v2 워크플로우 세션 persist 디렉터리 (v1 과 분리)
+    v2_sessions_dir = os.path.join(project_root, '.claude-organic', '.workflow-sessions-v2')
+    v2_workflow_registry._persist_dir = v2_sessions_dir
+    try:
+        os.makedirs(v2_sessions_dir, exist_ok=True)
+    except OSError:
+        pass
+    v2_loaded = v2_workflow_registry.load_from_disk()
+    if v2_loaded > 0:
+        print(f'[v2_workflow_registry] {v2_loaded}개 세션 복원 완료', file=sys.stderr)
 
     def _cleanup_runtime_files() -> None:
         """런타임 파일 .claude-organic/.board.url을 삭제한다."""

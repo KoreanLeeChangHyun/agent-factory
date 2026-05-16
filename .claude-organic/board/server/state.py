@@ -9,6 +9,7 @@ from .poll_tracker import PollChangeTracker
 from .terminal_channel import TerminalSSEChannel
 from .claude_process import ClaudeProcess
 from .workflow_session import WorkflowSessionRegistry
+from .v2_workflow_session import V2WorkflowSessionRegistry
 
 # 모듈 레벨 SSE 클라이언트 매니저 (서버 인스턴스와 공유)
 sse_manager: SSEClientManager = SSEClientManager()
@@ -23,5 +24,6 @@ claude_process: ClaudeProcess = ClaudeProcess(
     persist_file=os.path.join(os.getcwd(), '.claude-organic', '.last-session-id'),
 )
 
-# 모듈 레벨 워크플로우 세션 레지스트리
+# 모듈 레벨 워크플로우 세션 레지스트리 (v1 + v2 이원화)
 workflow_registry: WorkflowSessionRegistry = WorkflowSessionRegistry()
+v2_workflow_registry: V2WorkflowSessionRegistry = V2WorkflowSessionRegistry()
