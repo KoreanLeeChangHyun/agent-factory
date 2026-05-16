@@ -2586,14 +2586,13 @@
           showSubmitConfirmModal(
             ticketObj,
             function () {
-              // [실행] 콜백: POST /api/kanban/submit → launcher 호출
-              // T-475 Stage 3: 백엔드가 비동기 Popen 으로 즉시 200 OK + {status:'starting'} 응답 →
-              // launchState 등록 + grace 60s 타이머 시작. 실패 모달 트리거 조건 정정 (보고서 §5):
-              //   1) HTTP 4xx/5xx (504 제외) → 모달
-              //   2) HTTP 504 → 미표시 (SSE LAUNCH_FAILED 수신 대기)
-              //   3) network/AbortError → 모달
+              // [실행] 콜백: POST /api/kanban/submit → driver 호출
+              // Stage 3-B race fix: registerLaunchStarting 을 fetch *직전* 에 호출하여
+              // SSE LAUNCH_STARTED 가 HTTP 응답보다 빠르게 도착해도 누락되지 않도록 보장.
+              // 실패 시 cleanupLaunchState 로 즉시 정리 (stuck 회귀 차단).
               const submitTicket = ticketObj.number;
               const submitCommand = command;
+              registerLaunchStarting(submitTicket, submitCommand);
               fetch("/api/kanban/submit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2608,11 +2607,13 @@
                 }
                 return res.json();
               }).then(function (body) {
-                if (body && body.status === "starting") {
-                  registerLaunchStarting(submitTicket, submitCommand);
+                if (!body || body.status !== "starting") {
+                  // 비정상 응답 — launchState 정리 (등록은 fetch 직전 완료)
+                  cleanupLaunchState(submitTicket);
                 }
                 fetchTickets().then(function () { renderKanban(); });
               }).catch(function (err) {
+                cleanupLaunchState(submitTicket);
                 console.error("[kanban DnD] submit failed:", err);
                 if (err && err.kind === "http") {
                   // T-475 Stage 3 정정: HTTP 504 단독은 모달 미표시 (SSE LAUNCH_FAILED 대기).
@@ -3172,8 +3173,27 @@
   }
 
   /**
+   * launchState + sessionStorage cleanup 단일 진입점.
+   * grace timer 클리어 + Map 삭제 + storage 삭제 + (옵션) renderKanban.
+   * stuck 회귀 차단을 위한 공통 정리 헬퍼.
+   */
+  function cleanupLaunchState(ticketNum, opts) {
+    const cur = launchState.get(ticketNum);
+    if (cur && cur.graceTimer) clearTimeout(cur.graceTimer);
+    launchState.delete(ticketNum);
+    try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
+    if (opts && opts.render && Board.render && Board.render.renderKanban) {
+      Board.render.renderKanban();
+    }
+  }
+
+  /**
    * submit HTTP 200 OK ({status:'starting'}) 직후 호출 — launchState 등록 + grace 타이머 시작 +
    * sessionStorage persist (페이지 새로고침 복원용).
+   *
+   * SSE race 차단을 위해 submit fetch 호출 *직전* 에 호출되어야 한다.
+   * SSE LAUNCH_STARTED 가 HTTP 응답보다 빠르게 도착해도 handleLaunchEvent 가
+   * launchState 를 찾도록 보장 (이전 회귀: fetch.then() 후 호출 → SSE 누락).
    */
   function registerLaunchStarting(ticketNum, command) {
     // 기존 항목 정리 (재발사 방어)
@@ -3244,19 +3264,28 @@
   }
 
   /**
-   * grace 60s 만료 — 자동 강제 전이 X (constraints "자동 강제 정책 금지" / feedback_no_speculative_guards).
-   * 사용자에게 정보 모달만 띄우고, 후속 행동은 사용자 선택. 카드 상태(launchState)는 보존하여
-   * 사용자가 닫은 후에도 SSE 수신 시 정상 처리되도록 한다.
+   * grace 60s 만료 — Stage 3-B fix:
+   * 모달 표시 + launchState/sessionStorage 자동 cleanup (stuck 회귀 차단).
+   *
+   * 변경 이전: launchState 보존 → 사용자 "확인" 후에도 "시작 중" 배지 영구 잔존
+   * + 새로고침 시 sessionStorage 복원 → 영구 stuck. 의도는 "SSE 늦게 와도 처리"
+   * 였으나, 60s 안에 SSE 안 오면 실패 간주가 자연 — 자동 cleanup 으로 정정.
    */
   function onGraceExpired(ticketNum) {
     const cur = launchState.get(ticketNum);
     if (!cur || cur.state !== "starting") return;
+    cleanupLaunchState(ticketNum);
     Board.util.showInfoModal(
       "워크플로우 시작 지연",
       "60초가 경과했지만 워크플로우 시작 신호(LAUNCH_STARTED)가 도착하지 않았습니다.\n\n" +
       "Board 새로고침 또는 잠시 후 칸반 컬럼에서 상태를 직접 확인하세요. " +
       "워크플로우가 정상 시작되었다면 In Progress 컬럼에 카드가 보입니다.",
-      { severity: "warning" }
+      {
+        severity: "warning",
+        onClose: function () {
+          if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
+        },
+      }
     );
   }
 
@@ -3342,16 +3371,11 @@
       var elapsed = Date.now() - since;
       var remaining = LAUNCH_GRACE_MS - elapsed;
       if (remaining <= 0) {
-        // 이미 grace 초과 — 등록만 하고 즉시 onGraceExpired
-        launchState.set(ticketNum, {
-          state: "starting",
-          since: since,
-          command: stored.command || "",
-          sessionId: null,
-          graceTimer: null,
-        });
-        // 다음 tick 에 호출하여 모달이 init 흐름을 차단하지 않도록 함
-        setTimeout(function () { onGraceExpired(ticketNum); }, 0);
+        // 이미 grace 만료된 stuck — Stage 3-B fix: 자연 cleanup (modal 표시 X).
+        // 페이지 새로고침 시점에 SSE 가 별도 매핑 (workflow_step / launch event) 으로
+        // 카드 상태를 정확히 표시하므로 본 sessionStorage 잔재만 정리하면 충분.
+        try { sessionStorage.removeItem(key); } catch (_) {}
+        return;
       } else {
         launchState.set(ticketNum, {
           state: "starting",
