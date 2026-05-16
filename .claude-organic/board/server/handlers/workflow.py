@@ -635,10 +635,22 @@ class WorkflowHandlerMixin:
     def _handle_v2_wf_event(self) -> None:
         """v2 driver 가 발사한 워크플로우 이벤트를 board SSE 로 위임한다.
 
+        DEPRECATED (Phase 1, T-495):
+          본 단일 endpoint 는 의미별 endpoint 로 분해됨. driver 가 새 endpoint 로
+          마이그레이션 완료 시점에 호출자 0건이 되면 본 핸들러 통째 제거 가능.
+
+          신 endpoint (handlers/v2_workflow.py):
+            POST /api/v2/sessions                       — 세션 명시 등록
+            POST /api/v2/sessions/<id>/step             — Step 전이
+            POST /api/v2/sessions/<id>/stdout           — stdout chunk
+            POST /api/v2/sessions/<id>/phase            — WORK 내부 phase
+            POST /api/v2/sessions/<id>/finish           — 사이클 종결
+            GET  /api/v2/sessions[...]                  — 목록 / 상세 / SSE / 산출물
+
         POST /api/v2/wf-event
         요청 본문: {"session_id": str, "event": str, "payload": dict}
 
-        이벤트 종류:
+        이벤트 종류 (옛 hybrid 봉합 매핑):
           - session.start: workflow_registry.create_external (lazy register)
           - step.start | step.end: emit_step(STEP_NAME, detail)
           - phase.start | phase.end: emit_step("WORK", detail) — phase sub-단계 표시
