@@ -3237,6 +3237,17 @@
         sessionId: data.session_id || "",
         graceTimer: null,
       });
+      // T-495 P2 — v2 driver 라면 session_id 를 Board.v2Workflow 의 known set 에
+      // 즉시 등록하여 후속 session-switcher / workflow-sessions 가 v2 분기를
+      // 인식하도록 한다. mode=v2 가 명시되거나 session_id 가 wf- prefix 면 v2 추정.
+      if (data.session_id && Board.v2Workflow && Board.v2Workflow.registerKnown
+          && (data.mode === "v2" || data.session_id.indexOf("wf-") === 0)) {
+        Board.v2Workflow.registerKnown(data.session_id);
+        // workflow-sessions 즉시 refresh — 탭 바에 v2 탭 표시
+        if (Board.workflowSessions && Board.workflowSessions.refresh) {
+          try { Board.workflowSessions.refresh(); } catch (_) {}
+        }
+      }
       // running 으로 전이된 직후에는 배지 제거가 목적이므로 즉시 launchState 정리해도 무방.
       // 단, 디버그/후속 SSE 가능성을 위해 잠시 보존 후 정리 (다음 renderKanban 호출 시 사라짐).
       launchState.delete(ticketNum);

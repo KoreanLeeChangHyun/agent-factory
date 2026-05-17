@@ -15,12 +15,32 @@ from ._common import (
     get_n_max,
     load_template,
 )
-from ._emitter import step_end, step_start
+from ._emitter import step_end, step_start, stdout_chunk
 from ._spawn import SpawnResult, spawn_claude, spawn_claude_resume
 from ._verify import VerifyResult
 
 
 VerifyFn = Callable[[], VerifyResult]
+
+
+def _make_stdout_forwarder(ctx: WorkflowContext) -> Callable[[dict], None]:
+    """spawn on_line 콜백 — NDJSON line 마다 board /stdout 으로 forward.
+
+    T-495 P1 — claude -p stream-json line 을 의미별 endpoint 로 보낸다.
+    text 는 assistant message.content[].text join. 다른 type 은 빈 문자열로 보내고
+    raw 만 frontend 분기 렌더에 활용 (text_delta / tool_use / result 등).
+    """
+
+    def _on_line(obj: dict) -> None:
+        text = ""
+        if obj.get("type") == "assistant":
+            msg = obj.get("message") or {}
+            for blk in msg.get("content") or []:
+                if isinstance(blk, dict) and blk.get("type") == "text":
+                    text += str(blk.get("text", ""))
+        stdout_chunk(ctx, text, raw=obj)
+
+    return _on_line
 
 
 def render_retry_prompt(missing: list[str], artifact_path: Path) -> str:
@@ -58,12 +78,15 @@ def spawn_with_retry(
         f"prompt_chars={len(initial_prompt)})",
     )
 
+    forwarder = _make_stdout_forwarder(ctx)
+
     spawn_result = spawn_claude(
         prompt_body=initial_prompt,
         session_id=session_id,
         system_prompt=system_prompt,
         cwd=ctx.work_dir,
         step=step,
+        on_line=forwarder,
     )
     _log_spawn_result(ctx, step, spawn_result, attempt=0)
     verify_result = verify()
@@ -82,6 +105,7 @@ def spawn_with_retry(
             system_prompt=system_prompt,
             cwd=ctx.work_dir,
             step=step,
+            on_line=forwarder,
         )
         _log_spawn_result(ctx, step, spawn_result, attempt=retry_count)
         verify_result = verify()

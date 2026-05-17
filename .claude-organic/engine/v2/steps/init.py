@@ -3,10 +3,15 @@
 SPEC.md §9.1.1 (Stage 3-D): command 별 worktree 분기.
 - implement → git worktree add + feature_branch 생성 (v1 worktree_manager 재사용)
 - research|review → develop 직접 (worktree-less 허용)
+
+T-495 P2: V2_REGISTRY_KEY env 우선 — board kanban submit 핸들러가
+session_id 를 사전 발급할 수 있도록 registry_key 결정론을 외부에서 주입
+가능하게 한다. env 미설정 시 기존 new_registry_key() 동작 보존.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,7 +27,7 @@ from .._common import (
     write_context,
     write_status,
 )
-from .._emitter import session_start, step_end, step_start
+from .._emitter import session_create, step_end, step_start
 
 
 _VALID_COMMANDS = {"implement", "research", "review"}
@@ -88,7 +93,12 @@ def init_step(ticket_no: str) -> WorkflowContext:
     command, title = _parse_ticket_meta(ticket_dump)
     feature_branch, worktree_path = _maybe_create_worktree(ticket_no, title, command)
 
-    registry_key = new_registry_key()
+    # T-495 P2 — V2_REGISTRY_KEY env 우선 사용. board 가 사전 발급한 키를
+    # 받으면 backend 의 v2_workflow_registry 와 driver 의 work_dir 경로가
+    # 1:1 정합되어, frontend 가 LAUNCH_STARTED 직후 v2 탭을 즉시 띄울 수 있다.
+    # env 형식: "YYYYMMDD-HHMMSS" 또는 "YYYYMMDD-HHMMSS-NNN" 등 v1 호환 timestamp.
+    env_key = (os.environ.get("V2_REGISTRY_KEY") or "").strip()
+    registry_key = env_key if env_key else new_registry_key()
     # work_dir 위치: worktree 있으면 그 안, 없으면 메인 .claude-organic/runs/
     if worktree_path is not None:
         runs_root = worktree_path / ".claude-organic" / "runs"
@@ -121,8 +131,10 @@ def init_step(ticket_no: str) -> WorkflowContext:
         f"INIT — registry_key={registry_key}, ticket={ticket_no}, "
         f"command={command}, feature_branch={feature_branch or '(none)'}",
     )
-    session_start(ctx)  # Stage 3-B board lazy create (V2_BOARD_POST 미설정 시 skip)
-    step_start(ctx, "INIT")
+    # T-495 P1 — session 명시 등록 (POST /api/v2/sessions). lazy create 폐기.
+    # V2_BOARD_POST 미설정 시 silent skip — driver 흐름 영향 0.
+    session_create(ctx)
+    step_start(ctx, "INIT", prev_step="NONE")
     kanban_move(ticket_no, "progress")
     step_end(ctx, "INIT", outcome="ok")
     update_step(ctx, "INIT", "PLAN")

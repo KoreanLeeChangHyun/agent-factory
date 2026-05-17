@@ -156,16 +156,28 @@
     // 워크플로우 세션은 SSE 구독 전에 REST /terminal/workflow/history 로 과거
     // 이벤트를 먼저 주입한다 (T-391 링버퍼 제거 이후 표준 경로). 메인 세션은
     // _restoreSession 에서 복원되므로 별도 history 주입이 필요 없다.
+    //
+    // T-495 P2 — v2 driver session 은 별도 진입점 (Board.session.startV2Session)
+    // 으로 분기. v1 SSE 채널 (/terminal/workflow/events) 과 격리.
     if (Board.session) {
       var isWfTarget = targetSessionId !== "main" &&
         targetSessionId.indexOf("wf-") === 0;
-      var historyChain = isWfTarget && Board.session.injectRestHistory
-        ? Board.session.injectRestHistory(targetSessionId)
-        : Promise.resolve();
-      historyChain
-        .then(function () { return Board.session.connectSSEReady(); })
-        .then(function () { Board.session.fetchStatus(); })
-        .catch(function () {});
+      var isV2Target = isWfTarget &&
+        Board.v2Workflow && Board.v2Workflow.isV2SessionId &&
+        Board.v2Workflow.isV2SessionId(targetSessionId);
+
+      if (isV2Target && Board.session.startV2Session) {
+        // v2 분기: Board.v2Workflow.subscribe 단일 진입점.
+        Board.session.startV2Session(targetSessionId);
+      } else {
+        var historyChain = isWfTarget && Board.session.injectRestHistory
+          ? Board.session.injectRestHistory(targetSessionId)
+          : Promise.resolve();
+        historyChain
+          .then(function () { return Board.session.connectSSEReady(); })
+          .then(function () { Board.session.fetchStatus(); })
+          .catch(function () {});
+      }
     }
 
     // 6. phase timeline 표시/숨김

@@ -103,20 +103,30 @@ class V2WorkflowSSEChannel:
                     self.session_id, self._persist_path, exc,
                 )
 
-    def emit_step(self, step: str, phase: str = '', prev_step: str = '') -> None:
+    def emit_step(
+        self, step: str, phase: str = '', prev_step: str = '',
+        extras: dict | None = None,
+    ) -> None:
         """workflow_step 이벤트 발화 — Step 전이.
 
         Args:
             step: 새 Step (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED)
             phase: WORK 내부 sub-phase (P1, P2, ...). 없으면 빈 문자열
             prev_step: 직전 Step (frontend FSM 검증용)
+            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
+                fixed key (session_id/step/phase/prev_step) 는 보호됨.
         """
-        self.broadcast('workflow_step', {
+        payload = {
             'session_id': self.session_id,
             'step': step,
             'phase': phase,
             'prev_step': prev_step,
-        })
+        }
+        if extras:
+            for k, v in extras.items():
+                if k not in payload:
+                    payload[k] = v
+        self.broadcast('workflow_step', payload)
 
     def emit_stdout(self, text: str, raw: dict | None = None) -> None:
         """workflow_stdout 이벤트 발화 — claude -p stdout NDJSON chunk.
@@ -133,31 +143,49 @@ class V2WorkflowSSEChannel:
             payload['raw'] = raw
         self.broadcast('workflow_stdout', payload)
 
-    def emit_phase(self, phase: str, action: str = 'start') -> None:
+    def emit_phase(
+        self, phase: str, action: str = 'start',
+        extras: dict | None = None,
+    ) -> None:
         """workflow_phase 이벤트 발화 — WORK 내부 phase 전이.
 
         Args:
             phase: P1, P2, ...
             action: start | end
+            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
         """
-        self.broadcast('workflow_phase', {
+        payload = {
             'session_id': self.session_id,
             'phase': phase,
             'action': action,
-        })
+        }
+        if extras:
+            for k, v in extras.items():
+                if k not in payload:
+                    payload[k] = v
+        self.broadcast('workflow_phase', payload)
 
-    def emit_finish(self, outcome: str, summary: str = '') -> None:
+    def emit_finish(
+        self, outcome: str, summary: str = '',
+        extras: dict | None = None,
+    ) -> None:
         """workflow_finish 이벤트 발화 — 사이클 종결.
 
         Args:
             outcome: ok | fail
             summary: 종결 사유 / 한 줄 요약
+            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
         """
-        self.broadcast('workflow_finish', {
+        payload = {
             'session_id': self.session_id,
             'outcome': outcome,
             'summary': summary,
-        })
+        }
+        if extras:
+            for k, v in extras.items():
+                if k not in payload:
+                    payload[k] = v
+        self.broadcast('workflow_finish', payload)
 
     def _emit_event(self, event_name: str, json_payload: str) -> None:
         """SSE 이벤트를 seq_id 부여 후 모든 클라이언트에 전송한다."""
