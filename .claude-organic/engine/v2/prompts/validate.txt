@@ -39,3 +39,4 @@ Write (산출물) + Read (plan.md / work/*.md).
 - 산출물 외 파일 수정
 - kanban CLI / status.json / metrics.jsonl 수정 (driver 영역)
 - git 명령 호출 (driver 영역)
+- **production board API endpoint 직접 호출** — wiring 검증은 단위 테스트 (`pytest`, `tempfile`) 만. naming guard `is_fake_session_id` 가 403 차단 (T-495 회귀 사례)

@@ -25,3 +25,4 @@ Write/Edit (산출물) + Bash (테스트/grep) + Read (의존 파일).
 - **git add / git commit / git push 등 git 명령 호출** (SPEC §0.1 — git commit 은 driver 결정론 영역. worker 는 산출물 .md / 티켓 target 파일 수정까지만)
 - **kanban CLI / status.json / .context.json / metrics.jsonl 수정** (모두 driver 영역)
 - worktree 디렉터리 외부 파일 수정
+- **production board API endpoint (예: POST /api/v2/sessions, /api/v2/sessions/<id>/{step,stdout,phase,finish}) 에 fake/test session 으로 curl 직접 호출 금지** — backend wiring 검증은 단위 테스트 (`pytest`, `tempfile`/`tmp_path` 픽스처) 만 사용. production endpoint 호출 시 `.workflow-sessions-v2/` 오염 → naming guard `is_fake_session_id` 가 403 차단 (T-495 회귀 사례 2026-05-17)
