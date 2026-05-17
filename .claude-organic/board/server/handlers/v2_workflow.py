@@ -286,7 +286,9 @@ class V2WorkflowHandlerMixin:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
-        session.channel.emit_step(step, phase=phase, prev_step=prev_step)
+        # T-495 P3 — forward-compatible extras (verdict/commit/retry 등) 통과
+        extras = self._v2_collect_extras(data, exclude={'step', 'phase', 'prev_step'})
+        session.channel.emit_step(step, phase=phase, prev_step=prev_step, extras=extras)
         self._send_json({'ok': True, 'step': step, 'phase': phase})
 
     def _v2_handle_session_stdout(self, session_id: str) -> None:
@@ -343,7 +345,9 @@ class V2WorkflowHandlerMixin:
         else:
             v2_workflow_registry.update_step(session_id, session.current_step, '')
 
-        session.channel.emit_phase(phase, action=action)
+        # T-495 P3 — forward-compatible extras
+        extras = self._v2_collect_extras(data, exclude={'phase', 'action'})
+        session.channel.emit_phase(phase, action=action, extras=extras)
         self._send_json({'ok': True, 'phase': phase, 'action': action})
 
     def _v2_handle_session_finish(self, session_id: str) -> None:
@@ -370,5 +374,20 @@ class V2WorkflowHandlerMixin:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
-        session.channel.emit_finish(outcome, summary=summary)
+        # T-495 P3 — forward-compatible extras (verdict/commit/retry)
+        extras = self._v2_collect_extras(data, exclude={'outcome', 'summary'})
+        session.channel.emit_finish(outcome, summary=summary, extras=extras)
         self._send_json({'ok': True, 'outcome': outcome, 'terminal_step': terminal_step})
+
+    @staticmethod
+    def _v2_collect_extras(data: dict, exclude: set[str]) -> dict | None:
+        """T-495 P3 — frontend forward-compatible 메타 키 추출.
+
+        body 의 fixed 키 (step/phase/prev_step/outcome/summary/action) 외
+        모든 키를 extras 로 추림. driver 가 verdict/commit_hash/retry/regression
+        을 보내면 SSE payload 에 그대로 통과.
+        """
+        if not isinstance(data, dict):
+            return None
+        extras = {k: v for k, v in data.items() if k not in exclude}
+        return extras or None

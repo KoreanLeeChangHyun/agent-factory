@@ -60,6 +60,12 @@
 <script src="js/terminal/session-switcher.js"></script>
 <script src="js/workflow/workflow-bar.js"></script>
 <script src="js/core/slash-commands.js"></script>
+<!-- T-495 P2 — v2 driver subprocess 전용 REST/SSE client (Board.v2Workflow).
+     반드시 workflow-sessions.js / session.js 보다 먼저 로드 (의존 측에서 Board.v2Workflow.* 호출). -->
+<script src="js/workflow/v2-workflow.js"></script>
+<!-- T-495 P3 — v2 산출물/로그/metrics viewer (Board.v2Viewer).
+     v2-workflow.js 의 artifactUrl / fetchArtifact 에 의존. -->
+<script src="js/workflow/v2-viewer.js"></script>
 <script src="js/workflow/workflow-sessions.js"></script>
 <script src="js/terminal/wf-ticket-renderer.js"></script>
 <script src="js/workflow/session.js"></script>

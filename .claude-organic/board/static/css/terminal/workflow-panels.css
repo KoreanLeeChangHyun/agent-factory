@@ -1331,3 +1331,373 @@
   color: #9cdcfe;
   line-height: 1.6;
 }
+
+/* ═══════════════════════════════════════════════════════
+   Section 7: T-495 P3 — v2 stdout NDJSON branch rendering
+   Namespace: wf-v2-*  (workflow v2 전용 카드/배지)
+   ═══════════════════════════════════════════════════════ */
+
+/* stdout text 라인 (assistant 본문) */
+.wf-v2-stdout-line {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 1px 4px;
+}
+
+/* tool_use 카드 — name + summary */
+.wf-v2-tool-use {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 7px;
+  background: rgba(86, 156, 214, 0.07);
+  border-left: 2px solid rgba(86, 156, 214, 0.45);
+  border-radius: 2px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  margin: 2px 0;
+}
+
+.wf-v2-tool-name {
+  color: #569cd6;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.wf-v2-tool-summary {
+  color: #b8d4f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* result 메타 카드 */
+.wf-v2-result-meta {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 10.5px;
+  padding: 3px 7px;
+  margin: 3px 0;
+  border-radius: 2px;
+  color: #b8c5d0;
+  background: rgba(78, 201, 176, 0.06);
+  border-left: 2px solid rgba(78, 201, 176, 0.40);
+}
+
+.wf-v2-result-meta[data-status="fail"] {
+  background: rgba(244, 135, 113, 0.07);
+  border-left-color: rgba(244, 135, 113, 0.45);
+  color: #f0b8b8;
+}
+
+.wf-v2-result-label {
+  color: #4ec9b0;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.wf-v2-result-meta[data-status="fail"] .wf-v2-result-label {
+  color: #f48771;
+}
+
+/* system init 카드 */
+.wf-v2-system-init {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 10.5px;
+  padding: 3px 7px;
+  margin: 2px 0;
+  color: #858585;
+  background: rgba(133, 133, 133, 0.06);
+  border-left: 2px solid rgba(133, 133, 133, 0.30);
+  border-radius: 2px;
+}
+
+.wf-v2-system-label {
+  color: #9cdcfe;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* warning (rate_limit) / regression 마커 */
+.wf-v2-warning,
+.wf-v2-regression {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 10.5px;
+  padding: 3px 7px;
+  margin: 3px 0;
+  border-radius: 2px;
+  background: rgba(220, 167, 74, 0.10);
+  border-left: 2px solid rgba(220, 167, 74, 0.50);
+  color: #dcb368;
+}
+
+.wf-v2-regression {
+  background: rgba(244, 135, 113, 0.12);
+  border-left-color: rgba(244, 135, 113, 0.55);
+  color: #f48771;
+  font-weight: 600;
+}
+
+.wf-v2-warning-label,
+.wf-v2-regression-label {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section 8: T-495 P3 — phase sub-bar (WORK 내부 P1/P2/P3)
+   ═══════════════════════════════════════════════════════ */
+
+.wf-phase-subbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  color: #858585;
+}
+
+.wf-phase-subbar-label {
+  color: #D97757;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0 6px 0 2px;
+  font-size: 9px;
+}
+
+.wf-phase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.wf-phase-chip.pending {
+  color: #555;
+  border-color: #2e2e2e;
+  background: transparent;
+}
+
+.wf-phase-chip.done {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.10);
+  border-color: rgba(78, 201, 176, 0.30);
+}
+
+.wf-phase-chip.active {
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.14);
+  border-color: rgba(217, 119, 87, 0.45);
+  box-shadow: 0 0 0 1px rgba(217, 119, 87, 0.15);
+}
+
+.wf-phase-sep {
+  color: #444;
+  font-size: 9px;
+  padding: 0 1px;
+  flex-shrink: 0;
+}
+
+.wf-phase-time {
+  font-size: 9px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  margin-left: 2px;
+}
+
+.wf-phase-time.active {
+  color: #D97757;
+}
+
+.wf-phase-time.done {
+  color: #4ec9b0;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section 9: T-495 P3 — meta badges (verdict / commit / retry / regression)
+   ═══════════════════════════════════════════════════════ */
+
+.wf-v2-verdict-badge,
+.wf-v2-commit-badge,
+.wf-v2-retry-badge,
+.wf-v2-regression-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.wf-v2-verdict-badge.pass {
+  color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.12);
+  border: 1px solid rgba(78, 201, 176, 0.40);
+}
+
+.wf-v2-verdict-badge.warn {
+  color: #dcb368;
+  background: rgba(220, 167, 74, 0.12);
+  border: 1px solid rgba(220, 167, 74, 0.40);
+}
+
+.wf-v2-verdict-badge.fail {
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.12);
+  border: 1px solid rgba(244, 135, 113, 0.45);
+}
+
+.wf-v2-verdict-badge.skip {
+  color: #858585;
+  background: rgba(133, 133, 133, 0.08);
+  border: 1px solid rgba(133, 133, 133, 0.30);
+}
+
+.wf-v2-commit-badge {
+  color: #9cdcfe;
+  background: rgba(156, 220, 254, 0.10);
+  border: 1px solid rgba(156, 220, 254, 0.30);
+}
+
+.wf-v2-retry-badge {
+  color: #c586c0;
+  background: rgba(197, 134, 192, 0.10);
+  border: 1px solid rgba(197, 134, 192, 0.30);
+}
+
+.wf-v2-regression-badge {
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.12);
+  border: 1px solid rgba(244, 135, 113, 0.45);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section 10: T-495 P3 — viewer overlay (artifact / log / metrics)
+   ═══════════════════════════════════════════════════════ */
+
+.wf-v2-viewer-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin-left: 4px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-decoration: none;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  color: #9cdcfe;
+  background: rgba(156, 220, 254, 0.08);
+  border: 1px solid rgba(156, 220, 254, 0.25);
+  cursor: pointer;
+}
+
+.wf-v2-viewer-btn:hover {
+  background: rgba(156, 220, 254, 0.16);
+  border-color: rgba(156, 220, 254, 0.50);
+}
+
+.wf-v2-viewer {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(820px, 70vw);
+  height: min(520px, 65vh);
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+}
+
+.wf-v2-viewer.hidden {
+  display: none;
+}
+
+.wf-v2-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  border-radius: 6px 6px 0 0;
+  font-size: 11px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.wf-v2-viewer-title {
+  font-weight: 700;
+  color: #D97757;
+  flex: 0 0 auto;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-v2-viewer-meta {
+  color: #858585;
+  flex: 1 1 auto;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-v2-viewer-refresh,
+.wf-v2-viewer-newtab,
+.wf-v2-viewer-close {
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.wf-v2-viewer-refresh:hover,
+.wf-v2-viewer-newtab:hover,
+.wf-v2-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #5a5a5a;
+}
+
+.wf-v2-viewer-close:hover {
+  color: #f48771;
+  border-color: rgba(244, 135, 113, 0.45);
+}
+
+.wf-v2-viewer-body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d4d4d4;
+  white-space: pre;
+  background: #1e1e1e;
+  border-radius: 0 0 6px 6px;
+}

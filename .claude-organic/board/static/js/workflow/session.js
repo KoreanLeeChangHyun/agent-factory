@@ -1037,6 +1037,332 @@
     });
   }
 
+  // ── T-495 P2 — v2 driver session 진입점 ──
+
+  /** @type {{close: function, sessionId: string}|null} 현재 활성 v2 구독 핸들 */
+  var _v2Subscription = null;
+
+  /**
+   * v2 driver session 시작 / 재진입.
+   *
+   * 1) /api/v2/sessions/<id> 상세 fetch → 현재 step/phase 복원
+   * 2) Board.v2Workflow.subscribe 로 4 종 이벤트 핸들 등록
+   *    - workflow_step → WorkflowRenderer.handleV2StepEvent + phaseTimeline.render
+   *    - workflow_stdout → _onV2Stdout (text/raw 분기 렌더)
+   *    - workflow_phase → WorkflowRenderer.handleV2PhaseEvent
+   *    - workflow_finish → WorkflowRenderer.handleV2FinishEvent + 배지 표시
+   *
+   * v1 SSE handler (stdout/result/system) 는 호출하지 않음 — 이벤트 이름이 다름.
+   *
+   * @param {string} sessionId
+   */
+  function _startV2WorkflowSession(sessionId) {
+    if (!sessionId) return;
+
+    // 기존 v2 구독 정리
+    if (_v2Subscription) {
+      try { _v2Subscription.close(); } catch (_) {}
+      _v2Subscription = null;
+    }
+
+    // 1) 상세 fetch — 진입 시점의 step/phase 복원 (멱등)
+    if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
+      Board.v2Workflow.fetchSession(sessionId).then(function (detail) {
+        if (!detail) return;
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
+          // current_step 을 시작점으로 FSM 동기화
+          Board.WorkflowRenderer.handleV2StepEvent({
+            session_id: detail.session_id,
+            step: detail.current_step,
+            phase: detail.current_phase,
+            prev_step: "",
+          });
+        }
+        if (Board.phaseTimeline && Board.phaseTimeline.render) {
+          try { Board.phaseTimeline.render(); } catch (_) {}
+        }
+      });
+    }
+
+    // 2) SSE 구독
+    if (!Board.v2Workflow || !Board.v2Workflow.subscribe) {
+      _ctx.appendErrorMessage(
+        "[Error] Board.v2Workflow 미로드 — terminal.html script 누락 확인 필요"
+      );
+      return;
+    }
+
+    _v2Subscription = Board.v2Workflow.subscribe(sessionId, {
+      onOpen: function () {
+        Board.state.termConnected = true;
+        Board.state.setTermStatus("running");
+        _ctx.updateControlBar();
+      },
+      onStep: function (data) {
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
+          Board.WorkflowRenderer.handleV2StepEvent(data);
+        }
+        if (Board.phaseTimeline && Board.phaseTimeline.render) {
+          try { Board.phaseTimeline.render(); } catch (_) {}
+        }
+      },
+      onStdout: function (data) {
+        _onV2Stdout(data);
+      },
+      onPhase: function (data) {
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2PhaseEvent) {
+          Board.WorkflowRenderer.handleV2PhaseEvent(data);
+        }
+        if (Board.phaseTimeline && Board.phaseTimeline.render) {
+          try { Board.phaseTimeline.render(); } catch (_) {}
+        }
+      },
+      onFinish: function (data) {
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2FinishEvent) {
+          Board.WorkflowRenderer.handleV2FinishEvent(data);
+        }
+        if (Board.phaseTimeline && Board.phaseTimeline.renderStatusBadge) {
+          Board.phaseTimeline.renderStatusBadge(
+            data && data.outcome === "ok" ? "ok" : "fail",
+            data && data.summary
+          );
+        }
+        if (Board.phaseTimeline && Board.phaseTimeline.stopTimer) {
+          try { Board.phaseTimeline.stopTimer(); } catch (_) {}
+        }
+        Board.state.setTermStatus("idle");
+        _ctx.updateControlBar();
+      },
+      onError: function (err) {
+        Board.state.termConnected = false;
+        _ctx.updateControlBar();
+        if (Board.debugLog) Board.debugLog("v2.sse.error", {
+          sessionId: sessionId,
+          message: err && err.message,
+        });
+      },
+    });
+  }
+
+  /**
+   * v2 workflow_stdout 이벤트 처리 (T-495 P3 — NDJSON 분기 렌더).
+   * payload: { session_id, text, raw? }
+   *
+   * raw.type 별 분기 (가시성 8축 #3):
+   *   - assistant: content[] 순회 → text 블록 누적 + tool_use 블록 카드화
+   *   - tool_use:  도구 이름 + input 1줄 요약 카드
+   *   - result:    subtype/duration_ms/usage/terminal_reason 메타 카드
+   *   - system:    init 메타 (model/cwd/tools count) 1회 표시
+   *   - rate_limit_event: warning 마커
+   *   - 그 외 text only: stdout line 누적
+   *
+   * regression.pattern 5종 / tool.deny 가 stdout 본문에 흘러오면
+   * 즉시 error/warning 마커 카드 표시 (가시성 #4 보조).
+   *
+   * @param {Object} data
+   */
+  function _onV2Stdout(data) {
+    if (!data) return;
+    var text = data.text || "";
+    var raw = data.raw || null;
+
+    if (!raw || typeof raw !== "object") {
+      if (text) {
+        _v2DetectAndMarkRegression(text);
+        _v2AppendStdoutText(text);
+      }
+      return;
+    }
+
+    var rawType = raw.type || "";
+
+    if (rawType === "assistant") {
+      _v2RenderAssistant(raw, text);
+    } else if (rawType === "tool_use") {
+      _v2RenderToolUse(raw);
+    } else if (rawType === "result") {
+      _v2RenderResult(raw);
+    } else if (rawType === "system") {
+      _v2RenderSystemInit(raw);
+    } else if (rawType === "rate_limit_event") {
+      _v2RenderWarning("rate_limit", raw);
+    } else if (text) {
+      _v2DetectAndMarkRegression(text);
+      _v2AppendStdoutText(text);
+    }
+  }
+
+  /**
+   * assistant NDJSON line 렌더. content[] 순회하여 text 블록은 누적,
+   * tool_use 블록은 카드로 표시.
+   */
+  function _v2RenderAssistant(raw, textJoined) {
+    var msg = raw && raw.message;
+    var content = msg && Array.isArray(msg.content) ? msg.content : null;
+    if (!content) {
+      if (textJoined) _v2AppendStdoutText(textJoined);
+      return;
+    }
+    for (var i = 0; i < content.length; i++) {
+      var blk = content[i];
+      if (!blk || typeof blk !== "object") continue;
+      if (blk.type === "text" && blk.text) {
+        _v2DetectAndMarkRegression(blk.text);
+        _v2AppendStdoutText(blk.text);
+      } else if (blk.type === "tool_use") {
+        _v2RenderToolUse(blk);
+      }
+    }
+  }
+
+  /**
+   * tool_use 카드 렌더 — name + input 1줄 요약.
+   * Bash 의 경우 command, Read/Edit 는 file_path, Grep 은 pattern 우선.
+   */
+  function _v2RenderToolUse(blk) {
+    if (!blk) return;
+    var name = blk.name || "tool";
+    var input = blk.input || {};
+    var summary = "";
+    if (typeof input.command === "string") summary = input.command;
+    else if (typeof input.file_path === "string") summary = input.file_path;
+    else if (typeof input.pattern === "string") summary = input.pattern;
+    else if (typeof input.prompt === "string") summary = input.prompt;
+    else summary = JSON.stringify(input).slice(0, 140);
+
+    if (summary.length > 220) summary = summary.slice(0, 217) + "…";
+
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.insertToCurrentPanel) {
+      try {
+        var html = '<div class="wf-v2-tool-use">'
+          + '<span class="wf-v2-tool-name">' + Board.util.esc(name) + '</span>'
+          + '<span class="wf-v2-tool-summary">' + Board.util.esc(summary) + '</span>'
+          + '</div>';
+        Board.WorkflowRenderer.insertToCurrentPanel(html);
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * result NDJSON 카드 — subtype + duration_ms + usage(in/out) + terminal_reason.
+   */
+  function _v2RenderResult(raw) {
+    if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
+    var subtype = raw.subtype || "";
+    var parts = [];
+    if (subtype) parts.push(subtype);
+    if (raw.duration_ms != null) parts.push(raw.duration_ms + "ms");
+    if (raw.usage && typeof raw.usage === "object") {
+      var u = raw.usage;
+      var inTok = u.input_tokens != null ? u.input_tokens : null;
+      var outTok = u.output_tokens != null ? u.output_tokens : null;
+      if (inTok != null || outTok != null) {
+        parts.push("in=" + (inTok || 0) + " out=" + (outTok || 0));
+      }
+    }
+    if (raw.terminal_reason) parts.push(raw.terminal_reason);
+    var statusClass = subtype === "success" ? "ok" : "fail";
+    try {
+      Board.WorkflowRenderer.insertToCurrentPanel(
+        '<div class="wf-v2-result-meta" data-status="' + Board.util.esc(statusClass) + '">'
+          + '<span class="wf-v2-result-label">[result]</span> '
+          + Board.util.esc(parts.join(" · "))
+          + '</div>'
+      );
+    } catch (_) {}
+  }
+
+  /** system init 1줄 요약 카드 — model/cwd/tools count. */
+  function _v2RenderSystemInit(raw) {
+    if (raw.subtype !== "init") return;
+    if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
+    var pieces = [];
+    if (raw.model) pieces.push("model=" + raw.model);
+    if (raw.cwd) pieces.push("cwd=" + (raw.cwd.split("/").slice(-2).join("/") || raw.cwd));
+    if (Array.isArray(raw.tools)) pieces.push("tools=" + raw.tools.length);
+    try {
+      Board.WorkflowRenderer.insertToCurrentPanel(
+        '<div class="wf-v2-system-init">'
+          + '<span class="wf-v2-system-label">[init]</span> '
+          + Board.util.esc(pieces.join(" · "))
+          + '</div>'
+      );
+    } catch (_) {}
+  }
+
+  /** rate_limit 등 stream-level warning 마커. */
+  function _v2RenderWarning(kind, raw) {
+    if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
+    var summary = "";
+    try { summary = JSON.stringify(raw).slice(0, 200); } catch (_) {}
+    try {
+      Board.WorkflowRenderer.insertToCurrentPanel(
+        '<div class="wf-v2-warning" data-kind="' + Board.util.esc(kind) + '">'
+          + '<span class="wf-v2-warning-label">[' + Board.util.esc(kind) + ']</span> '
+          + Board.util.esc(summary)
+          + '</div>'
+      );
+    } catch (_) {}
+  }
+
+  /**
+   * regression.pattern 5종 / tool.deny / hook deny 키워드를 stdout text 에서 즉시 감지.
+   * 발견 시 step 카드에 error/warning 마커 카드 추가.
+   * 5종 = worker_false_success / hook_deny / empty_bash_card /
+   *       stage_header_leak / worktree_commit_missing
+   */
+  var V2_REGRESSION_PATTERNS = [
+    { re: /worker_false_success/i,      label: "worker_false_success" },
+    { re: /hook_deny|hookSpecificOutput.*deny/i, label: "hook_deny" },
+    { re: /empty_bash_card/i,           label: "empty_bash_card" },
+    { re: /stage_header_leak/i,         label: "stage_header_leak" },
+    { re: /worktree_commit_missing/i,   label: "worktree_commit_missing" },
+    { re: /\btool\.deny\b/i,            label: "tool.deny" }
+  ];
+
+  function _v2DetectAndMarkRegression(text) {
+    if (!text || !Board.WorkflowRenderer
+        || !Board.WorkflowRenderer.insertToCurrentPanel) return;
+    for (var i = 0; i < V2_REGRESSION_PATTERNS.length; i++) {
+      var p = V2_REGRESSION_PATTERNS[i];
+      if (p.re.test(text)) {
+        try {
+          Board.WorkflowRenderer.insertToCurrentPanel(
+            '<div class="wf-v2-regression" data-pattern="' + Board.util.esc(p.label) + '">'
+              + '<span class="wf-v2-regression-label">[regression]</span> '
+              + Board.util.esc(p.label)
+              + '</div>'
+          );
+        } catch (_) {}
+        break;
+      }
+    }
+  }
+
+  /**
+   * stdout text 를 현재 활성 step 카드 본문에 append.
+   */
+  function _v2AppendStdoutText(text) {
+    if (!text) return;
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.insertToCurrentPanel) {
+      try {
+        var html = '<div class="wf-v2-stdout-line">'
+          + Board.util.esc(text) + '</div>';
+        Board.WorkflowRenderer.insertToCurrentPanel(html);
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * v2 구독을 명시 종료 (세션 스위치 시 호출).
+   */
+  function _disconnectV2() {
+    if (_v2Subscription) {
+      try { _v2Subscription.close(); } catch (_) {}
+      _v2Subscription = null;
+    }
+  }
+
   // ── SSE Connection ──
 
   function connectSSEReady() {
@@ -1473,6 +1799,8 @@
       termEventSource.close();
       termEventSource = null;
     }
+    // T-495 P2 — v2 구독도 함께 정리 (세션 스위치 race 차단)
+    _disconnectV2();
     Board.state.termConnected = false;
   }
 
@@ -1577,13 +1905,22 @@
 
     if (_ctx.isWorkflowMode()) {
       _ctx.clearOutput();
-      // 워크플로우 세션 초기 로드:
+      var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
+
+      // T-495 P2 — v2 driver 세션이면 Board.v2Workflow.subscribe 단일 진입점 사용.
+      // v1 의 /terminal/workflow/history + /terminal/workflow/events 흐름과 분리.
+      if (Board.v2Workflow && Board.v2Workflow.isV2SessionId &&
+          Board.v2Workflow.isV2SessionId(wfSessionId)) {
+        _startV2WorkflowSession(wfSessionId);
+        return;
+      }
+
+      // 워크플로우 세션 초기 로드 (v1):
       // 1) REST /terminal/workflow/history 로 전체 과거 이벤트를 DOM 에 주입한다.
       //    (링버퍼 대체 경로 — _isReplaying=true 가드 하에 순서대로 처리)
       // 2) REST 완료(성공/실패 무관) 후 SSE 구독을 시작한다.
       //    SSE URL 에는 skip_replay=1 이 부여되므로 링버퍼 재생이 발생하지 않는다.
       // 3) REST 실패 시 console.error 기록하고 SSE 구독은 계속 진행한다 (무음 폴백).
-      var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
       _injectRestHistory(wfSessionId).then(function () {
         return connectSSEReady();
       }).catch(function (err) {
@@ -1843,6 +2180,9 @@
     seedInFlightToolUse: seedInFlightToolUse,
     injectRestHistory: _injectRestHistory,
     applyRawModel: _applyRawModel,
+    // T-495 P2 — v2 driver session 진입점 (외부 호출용)
+    startV2Session: _startV2WorkflowSession,
+    disconnectV2: _disconnectV2,
     _bind: bind,
     _markSent: markSent
   };

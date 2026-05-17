@@ -27,16 +27,51 @@
   }
 
   /**
-   * Syncs the session tab bar with /terminal/workflow/list.
+   * Syncs the session tab bar with v1 /terminal/workflow/list + v2 /api/v2/sessions.
    * Running sessions appear as tabs; stopped sessions are removed (except the active tab).
+   *
+   * T-495 P2 — v2 driver 세션도 함께 sync. 두 source 의 union 으로 탭 빌드.
+   * v2 sessions 의 status 매핑: idle/running → running, completed/failed → stopped.
+   * known v2 session_id 는 Board.v2Workflow 에도 등록하여 후속 subscribe 분기 가능.
+   *
    * @param {string|null} currentWorkflowSessionId - current workflow session ID
    * @param {boolean} isWorkflowMode - whether in workflow mode
    */
   function syncWorkflowTabs(currentWorkflowSessionId, isWorkflowMode) {
-    fetch("/terminal/workflow/list", { cache: "no-store" }).then(function (r) {
-      return r.json();
-    }).then(function (sessions) {
-      sessions = Array.isArray(sessions) ? sessions : [];
+    var v1Promise = fetch("/terminal/workflow/list", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (s) { return Array.isArray(s) ? s : []; })
+      .catch(function () { return []; });
+
+    var v2Promise = (Board.v2Workflow && Board.v2Workflow.fetchSessions)
+      ? Board.v2Workflow.fetchSessions().then(function (sessions) {
+          // backend v2 schema → tab-friendly normalised shape
+          return sessions.map(function (s) {
+            var st = (s.status === "running" || s.status === "idle")
+              ? "running" : "stopped";
+            // v2 known set 에 등록 — 분기 판정 (Board.v2Workflow.isV2SessionId) 즉시 가능
+            if (Board.v2Workflow && Board.v2Workflow.registerKnown) {
+              Board.v2Workflow.registerKnown(s.session_id);
+            }
+            return {
+              session_id: s.session_id,
+              ticket_id: s.ticket_id,
+              status: st,
+              engine: "v2",
+            };
+          });
+        })
+      : Promise.resolve([]);
+
+    Promise.all([v1Promise, v2Promise]).then(function (pair) {
+      var v1Sessions = pair[0];
+      var v2Sessions = pair[1];
+
+      // v1 + v2 union — session_id 중복 제거 (v2 우선, backend 가 권위)
+      var byId = {};
+      v1Sessions.forEach(function (s) { byId[s.session_id] = s; });
+      v2Sessions.forEach(function (s) { byId[s.session_id] = s; });
+      var sessions = Object.keys(byId).map(function (k) { return byId[k]; });
 
       var running = sessions.filter(function (s) { return s.status === "running"; });
       var stopped = sessions.filter(function (s) { return s.status !== "running"; });
@@ -77,7 +112,7 @@
           }
         }
       });
-    }).catch(function () {});
+    });
   }
 
   /**

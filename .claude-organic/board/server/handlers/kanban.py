@@ -510,14 +510,18 @@ class KanbanHandlerMixin:
     def _handle_kanban_submit(self) -> None:
         """POST /api/kanban/submit — {"ticket","command"}: v2 driver 비동기 spawn.
 
-        Stage 3-B (T-489) 변경:
+        Stage 3-B (T-489) + T-495 P2 변경:
           - flow-launcher (v1) → flow-wf submit (v2 driver) 라우팅 교체.
-          - V2_BOARD_POST=true env 자동 주입 — driver 가 board /api/v2/wf-event POST.
+          - V2_BOARD_POST=true env 자동 주입 — driver 가 board /api/v2/sessions/<id>/* POST.
+          - V2_REGISTRY_KEY env 사전 발급 — backend 가 session_id 를 미리 할당하여
+            LAUNCH_STARTED 가 정확한 wf-T-NNN-<key> 를 캐리. driver 는 이 env 를
+            우선 사용 (steps/init.py) 하므로 work_dir 경로와 backend 의 session_id
+            가 100% 정합.
           - LAUNCH_PENDING + LAUNCH_STARTED 모두 Popen 직후 즉시 발사 (v2 driver
             는 사이클 끝까지 살아있음 — v1 의 "HTTP POST 후 즉시 종료" 의미론과
             다름. spawn 성공 = 사이클 진입 보장).
           - reader thread = driver rc != 0 일 때만 LAUNCH_FAILED 발사 (회귀 검출).
-          - 즉시 200 OK ``{ok:True, status:'starting'}`` 반환 (latency p95 < 100ms).
+          - 즉시 200 OK ``{ok:True, status:'starting', session_id}`` 반환 (latency p95 < 100ms).
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
@@ -535,9 +539,16 @@ class KanbanHandlerMixin:
 
         submitted_at = datetime.now(timezone.utc)
 
-        # V2_BOARD_POST=true 자동 주입 — driver 가 board /api/v2/wf-event POST.
+        # T-495 P2 — registry_key + session_id 사전 발급.
+        # driver init.py 가 V2_REGISTRY_KEY 우선 사용. session_id 는 driver 의
+        # 결정론 (f"wf-{ticket}-{registry_key}") 과 동일 형식을 유지.
+        registry_key = submitted_at.strftime('%Y%m%d-%H%M%S')
+        v2_session_id = f'wf-{ticket}-{registry_key}'
+
+        # V2_BOARD_POST + V2_REGISTRY_KEY 자동 주입.
         env = dict(os.environ)
         env['V2_BOARD_POST'] = 'true'
+        env['V2_REGISTRY_KEY'] = registry_key
 
         try:
             proc = subprocess.Popen(
@@ -560,16 +571,17 @@ class KanbanHandlerMixin:
             'LAUNCH_PENDING', ticket,
             command=command,
             submitted_at=submitted_at.isoformat(),
+            session_id=v2_session_id,
         )
 
-        # LAUNCH_STARTED — v2 driver spawn 성공 = 사이클 진입 보장. 정확한
-        # session_id 는 driver 가 곧이어 발사하는 session.start SSE 가 전달.
+        # LAUNCH_STARTED — v2 driver spawn 성공 = 사이클 진입 보장.
+        # session_id 가 사전 발급된 정확한 값. frontend 는 이 시점에 v2 탭을 즉시 add 가능.
         spawn_elapsed_ms = int(
             (datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000
         )
         _emit_launch_event(
             'LAUNCH_STARTED', ticket,
-            session_id='',
+            session_id=v2_session_id,
             mode='v2',
             spawn_duration_ms=spawn_elapsed_ms,
             command=command,
@@ -587,13 +599,14 @@ class KanbanHandlerMixin:
         reader.start()
 
         # 즉시 200 OK — 클라이언트는 'starting' 상태로 진입, 후속 SSE 대기.
-        # 기존 응답 키 (ok, ticket, command) 유지 + status='starting' 추가 (Stage 3 클라이언트 분기용).
+        # 기존 응답 키 (ok, ticket, command) 유지 + status='starting' + session_id 추가.
         self._send_json({
             'ok': True,
             'status': 'starting',
             'ticket': ticket,
             'command': command,
             'submitted_at': submitted_at.isoformat(),
+            'session_id': v2_session_id,
         })
 
     def _handle_kanban_done(self) -> None:
