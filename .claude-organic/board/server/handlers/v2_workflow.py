@@ -252,13 +252,18 @@ class V2WorkflowHandlerMixin:
             self._send_error(400, 'Missing "session_id" / "ticket_id" / "command"')
             return
 
-        session = v2_workflow_registry.create(
-            session_id=session_id,
-            ticket_id=ticket_id,
-            command=command,
-            work_dir=work_dir,
-            worktree_path=worktree_path,
-        )
+        try:
+            session = v2_workflow_registry.create(
+                session_id=session_id,
+                ticket_id=ticket_id,
+                command=command,
+                work_dir=work_dir,
+                worktree_path=worktree_path,
+            )
+        except ValueError as exc:
+            # fake/test session_id pattern 차단 (T-495 production endpoint 오염 회귀 차단)
+            self._send_error(403, str(exc))
+            return
         self._send_json({
             'ok': True,
             'session_id': session.session_id,

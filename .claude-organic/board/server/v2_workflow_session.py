@@ -22,6 +22,25 @@ if TYPE_CHECKING:
     from .v2_sse_channel import V2WorkflowSSEChannel
 
 
+# fake/test session_id 패턴 — production registry 등록 + persist 차단.
+# T-495 cycle 에서 P2/P3 worker 가 production endpoint 에 직접 curl 호출하여
+# `.workflow-sessions-v2/` 가 오염된 회귀 (2026-05-17) 후 추가.
+_FAKE_SESSION_PATTERNS: tuple[str, ...] = (
+    '-test', '-smoke', '-fake', '-mock',
+    'test-', 'smoke-', 'fake-', 'mock-',
+)
+
+
+def is_fake_session_id(session_id: str) -> bool:
+    """session_id 가 fake/test 패턴이면 True.
+
+    production driver 발급 session_id 는 `wf-T-NNN-<uuid>` 형식으로 본 패턴과
+    충돌 안 함. 일치 시 registry 등록 거부 + persist skip.
+    """
+    lower = session_id.lower()
+    return any(pat in lower for pat in _FAKE_SESSION_PATTERNS)
+
+
 @dataclass
 class V2WorkflowSession:
     """v2 driver subprocess 가 발급한 워크플로우 세션 메타.
@@ -117,6 +136,17 @@ class V2WorkflowSessionRegistry:
         Returns:
             등록된 V2WorkflowSession 인스턴스
         """
+        if is_fake_session_id(session_id):
+            logger.warning(
+                "v2_workflow_session: fake/test session_id pattern detected (%s) — "
+                "registry 등록 거부 + persist skip (T-495 production endpoint 오염 차단)",
+                session_id,
+            )
+            raise ValueError(
+                f"Session ID matches fake/test pattern: {session_id}. "
+                f"Production endpoint 에 fake session 등록 금지 — 단위 테스트 (tempfile) 사용."
+            )
+
         with self._lock:
             existing = self._sessions.get(session_id)
             if existing is not None:

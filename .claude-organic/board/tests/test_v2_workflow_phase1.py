@@ -159,6 +159,39 @@ class TestV2WorkflowSessionRegistry(unittest.TestCase):
         self.assertEqual(s.ticket_id, 'T-014')
         self.assertEqual(s.status, 'completed')
 
+    def test_is_fake_session_id_helper(self):
+        from board.server.v2_workflow_session import is_fake_session_id
+        # fake/test 패턴 매칭
+        self.assertTrue(is_fake_session_id('wf-T-495-test-p2'))
+        self.assertTrue(is_fake_session_id('wf-T-495-p3-extras-test-749148'))
+        self.assertTrue(is_fake_session_id('wf-smoke-001'))
+        self.assertTrue(is_fake_session_id('wf-fake-X'))
+        self.assertTrue(is_fake_session_id('wf-T-001-MOCK-x'))  # 대소문자 무관
+        # 정상 production session_id (uuid 형식) 통과
+        self.assertFalse(is_fake_session_id('wf-T-495-123e4567-e89b-12d3-a456-426614174000'))
+        self.assertFalse(is_fake_session_id('wf-T-001-a'))
+
+    def test_create_rejects_fake_session_id(self):
+        # fake 패턴 4종 모두 ValueError 발생 + persist 안 됨
+        for sid in ('wf-T-001-test', 'wf-smoke-002', 'wf-fake-003', 'wf-mock-004'):
+            with self.assertRaises(ValueError) as ctx:
+                self.reg.create(sid, 'T-001', 'implement', '/tmp/w1')
+            self.assertIn('fake/test pattern', str(ctx.exception))
+            # registry 등록 안 됨
+            self.assertIsNone(self.reg.get(sid))
+            # persist 파일 안 생성
+            fpath = os.path.join(self.tmpdir, f'{sid}.jsonl')
+            self.assertFalse(os.path.exists(fpath))
+
+    def test_create_allows_production_session_id(self):
+        # production uuid 패턴은 정상 등록
+        s = self.reg.create(
+            'wf-T-001-123e4567-e89b-12d3-a456-426614174000',
+            'T-001', 'implement', '/tmp/w1'
+        )
+        self.assertIsNotNone(s)
+        self.assertEqual(s.ticket_id, 'T-001')
+
 
 # ==============================================================================
 # T02 — V2WorkflowSSEChannel broadcast + persist
