@@ -1,0 +1,249 @@
+/*
+ * step-overlay.css — T-505 P3
+ *
+ * Step 6박스 (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) +
+ * WORK 박스 안 Phase sub-패널의 시각 캐논.
+ *
+ * 시각 캐논 (board.md §6):
+ *   - terracotta #D97757 = 진행 중 (running) 테마색
+ *   - cyan #4ec9b0     = success
+ *   - 주홍 #f48771      = fail
+ *   - pulse 1.6s ease-in-out infinite (board.md §6 변조 주기)
+ *   - prefers-reduced-motion: reduce 접근성 가드 필수
+ *
+ * 컨테이너 selector 규약 (T-505 P1 §4.3):
+ *   [data-wf-step="<STEP_ID>"]
+ *     └─ .wf-step-body
+ *          ├─ [data-wf-stdout]
+ *          └─ [data-wf-phase="<PHASE_ID>"]
+ *               └─ [data-wf-stdout]
+ */
+
+/* ── 컨테이너 ── */
+
+.wf-step-overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  color: #cccccc;
+}
+
+/* ── Step 박스 ── */
+
+.wf-step {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: #252525;
+  overflow: hidden;
+  transition: border-color 200ms ease-in-out;
+}
+
+.wf-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #2d2d2d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wf-step-id {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  min-width: 64px;
+}
+
+.wf-step-status {
+  font-size: 11px;
+  color: #858585;
+  flex: 1;
+}
+
+.wf-step-toggle {
+  width: 14px;
+  height: 14px;
+  color: #858585;
+  transition: transform 180ms ease-in-out;
+}
+
+.wf-step.expanded .wf-step-toggle {
+  transform: rotate(90deg);
+}
+
+.wf-step-body {
+  display: none;
+  padding: 8px 10px;
+  border-top: 1px solid #3c3c3c;
+  background: #1e1e1e;
+}
+
+.wf-step.expanded .wf-step-body {
+  display: block;
+}
+
+.wf-step.collapsed .wf-step-body {
+  display: none;
+}
+
+/* ── 상태별 색상 ── */
+
+.wf-step.pending {
+  border-color: #3c3c3c;
+}
+.wf-step.pending .wf-step-id { color: #858585; }
+
+.wf-step.running {
+  border-color: #D97757;
+  animation: wf-step-pulse 1.6s ease-in-out infinite;
+}
+.wf-step.running .wf-step-id { color: #D97757; }
+
+.wf-step.done {
+  border-color: #4ec9b0;
+}
+.wf-step.done .wf-step-id { color: #4ec9b0; }
+
+.wf-step.fail {
+  border-color: #f48771;
+  border-width: 2px;
+}
+.wf-step.fail .wf-step-id { color: #f48771; }
+
+/* ── 표시 SVG (inline) ── */
+
+.wf-step-icon-ok {
+  color: #4ec9b0;
+  width: 14px;
+  height: 14px;
+}
+
+.wf-step-icon-fail {
+  color: #f48771;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Phase sub-패널 (WORK 안) ── */
+
+.wf-phase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wf-phase {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2d2d2d;
+  border-radius: 3px;
+  background: #1a1a1a;
+}
+
+.wf-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+}
+
+.wf-phase-id {
+  font-weight: 600;
+  min-width: 32px;
+  color: #858585;
+}
+
+.wf-phase-title {
+  flex: 1;
+  color: #cccccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-phase-body {
+  display: none;
+  padding: 6px 8px;
+  border-top: 1px solid #2d2d2d;
+}
+
+.wf-phase.expanded .wf-phase-body {
+  display: block;
+}
+
+.wf-phase.collapsed .wf-phase-body {
+  display: none;
+}
+
+.wf-phase.running {
+  border-color: #D97757;
+  animation: wf-phase-pulse 1.6s ease-in-out infinite;
+}
+.wf-phase.running .wf-phase-id { color: #D97757; }
+
+.wf-phase.done {
+  border-color: #4ec9b0;
+}
+.wf-phase.done .wf-phase-id { color: #4ec9b0; }
+
+.wf-phase.fail {
+  border-color: #f48771;
+}
+.wf-phase.fail .wf-phase-id { color: #f48771; }
+
+/* ── stdout 영역 (메인 session.js NDJSON 분기 렌더 target) ── */
+
+[data-wf-stdout] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: "Menlo", "Monaco", "Consolas", monospace;
+  font-size: 11px;
+  color: #cccccc;
+  min-height: 16px;
+}
+
+/* ── pulse keyframes (board.md §6 — 1.6s breathing) ── */
+
+@keyframes wf-step-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+    border-color: #D97757;
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25);
+    border-color: #e08a6e;
+  }
+}
+
+@keyframes wf-phase-pulse {
+  0%, 100% {
+    background: #1a1a1a;
+    border-color: #D97757;
+  }
+  50% {
+    background: #221b18;
+    border-color: #e08a6e;
+  }
+}
+
+/* ── 접근성 가드 (MUST — board.md §6) ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-step.running,
+  .wf-phase.running {
+    animation: none;
+  }
+  .wf-step-toggle {
+    transition: none;
+  }
+}

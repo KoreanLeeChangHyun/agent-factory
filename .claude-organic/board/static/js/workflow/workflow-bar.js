@@ -3,9 +3,13 @@
  *
  * WorkflowRenderer (banner parser + state machine) and phaseTimeline (DOM renderer).
  *
- * Parses Bash tool_use_result text for workflow banner patterns emitted by
+ * Parses Bash command result text for workflow banner patterns emitted by
  * flow-claude, flow-init, flow-step, flow-phase, and flow-finish scripts.
  * phaseTimeline renders the timeline bar DOM below .terminal-session-bar.
+ *
+ * T-505 P4 — stdout / tool card 렌더 영역은 step-overlay.js (Step/Phase
+ * 위계) + v2-stdout-bridge.js (workflow_stdout forward) 가 책임진다.
+ * 본 모듈은 banner parser + state machine + timeline bar 까지만 유지.
  *
  * Depends on: common.js (Board namespace)
  * Registers:  Board.WorkflowRenderer, Board.phaseTimeline
