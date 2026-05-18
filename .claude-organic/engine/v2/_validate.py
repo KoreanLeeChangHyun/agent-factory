@@ -1,21 +1,23 @@
-"""v2 advisory 12룰 룰베이스 평가 — driver 결정론 재검증.
+"""v2 advisory 14+룰 룰베이스 평가 — driver 결정론 재검증.
 
-SPEC.md §9 (12룰 캐논) + §9.1 (verdict 판정) + §7.1 (driver 룰베이스 재검증).
+SPEC.md §9 (14+룰 캐논, T-503 확장) + §9.1 (verdict 판정) + §7.1 (driver 룰베이스 재검증).
 LLM 호출 없음.
 
-12 룰 (6 카테고리):
+14 룰 (7 카테고리, T-503 확장):
   R-EXIST-1  report.md 존재             (hard-fail)
   R-EXIST-2  plan.md 존재 (research SKIP)
   R-EXIST-3  status.json + workflow_step 키
   R-EXIST-4  metrics.jsonl ≥ 1 줄
   R-METRIC-2 step.end DONE outcome==ok  (hard-fail)
   R-METRIC-3 tool.deny 0건
-  R-GUARD-1  worktree 모드 (v2 prototype = SKIP)
+  R-GUARD-1  worktree 모드 (research/review SKIP)
   R-GUARD-2  feature branch 존재
   R-GUARD-3  regression.pattern 0건
   R-PATH-1   report.md → plan.md 토큰 (research SKIP)
   R-FSM-1    workflow_step ∈ {DONE, FAILED}
   R-WT-1     commits ahead ≥ 1 (research/review SKIP, hard-fail)
+  R-CODE-1   pytest 통과 (research/review SKIP, hard-fail)  # T-503
+  R-CODE-2   ruff clean / counts==0 (research/review SKIP, advisory FAIL)  # T-503
 """
 
 from __future__ import annotations
@@ -27,9 +29,10 @@ from pathlib import Path
 from typing import Iterable
 
 from ._common import PROJECT_ROOT, WorkflowContext
+from . import _verify_code
 
 
-HARD_FAIL_RULES = ("R-EXIST-1", "R-METRIC-2", "R-WT-1")
+HARD_FAIL_RULES = ("R-EXIST-1", "R-METRIC-2", "R-WT-1", "R-CODE-1")
 
 
 @dataclass
@@ -191,6 +194,115 @@ def _r_fsm_terminal(ctx: WorkflowContext) -> RuleResult:
     return RuleResult("R-FSM-1", True, detail=f"workflow_step={step}")
 
 
+def _r_code_pytest(ctx: WorkflowContext) -> RuleResult:
+    """R-CODE-1 (T-503): pytest 통과 hard-fail (implement 한정).
+
+    SPEC.md §9 R-CODE-1.
+    입력: `validate/code.json` 의 `tools` 안에 `tool=pytest` 항목.
+    통과 조건: `status ∈ {ok, skip}`. `fail` 이면 hard-fail.
+    research/review → 호출자가 SKIP 처리 (evaluate_rules 에서 분기).
+    code.json 미존재 / pytest 항목 미존재 → SKIP (graceful).
+    """
+    payload = _verify_code.read_code_json(ctx)
+    if not payload:
+        return RuleResult(
+            "R-CODE-1",
+            True,
+            detail="validate/code.json missing — SKIP (driver _verify_code 호출 회귀)",
+            skip=True,
+        )
+    if payload.get("command_skip"):
+        return RuleResult(
+            "R-CODE-1",
+            True,
+            detail=f"command_skip ({payload.get('skip_reason', '')}) — SKIP",
+            skip=True,
+        )
+    entry = _verify_code.tool_result(payload, "pytest")
+    if entry is None:
+        return RuleResult(
+            "R-CODE-1",
+            True,
+            detail="pytest entry missing in code.json — SKIP",
+            skip=True,
+        )
+    status = entry.get("status", "skip")
+    if status == "skip":
+        return RuleResult(
+            "R-CODE-1",
+            True,
+            detail=f"pytest skip ({entry.get('reason', '')})",
+            skip=True,
+        )
+    if status == "ok":
+        counts = entry.get("counts", {})
+        passed = counts.get("passed", 0)
+        return RuleResult("R-CODE-1", True, detail=f"pytest passed={passed}")
+    # status == "fail" (또는 알 수 없는 값)
+    counts = entry.get("counts", {})
+    failed = counts.get("failed", 0) + counts.get("errors", 0)
+    head = entry.get("head_diagnostics", [])
+    head_str = "; ".join(head[:3]) if head else ""
+    return RuleResult(
+        "R-CODE-1",
+        False,
+        detail=f"pytest failed={failed} head=[{head_str}]"[:200],
+    )
+
+
+def _r_code_lint(ctx: WorkflowContext) -> RuleResult:
+    """R-CODE-2 (T-503): lint clean advisory FAIL (implement 한정).
+
+    SPEC.md §9 R-CODE-2.
+    입력: `validate/code.json` 의 `tools` 안에 `tool=ruff` 항목.
+    통과 조건: `status ∈ {ok, skip}` 또는 `counts.diagnostics == 0`.
+    위반 시 advisory FAIL (hard-fail 아님).
+    """
+    payload = _verify_code.read_code_json(ctx)
+    if not payload:
+        return RuleResult(
+            "R-CODE-2",
+            True,
+            detail="validate/code.json missing — SKIP",
+            skip=True,
+        )
+    if payload.get("command_skip"):
+        return RuleResult(
+            "R-CODE-2",
+            True,
+            detail="command_skip — SKIP",
+            skip=True,
+        )
+    entry = _verify_code.tool_result(payload, "ruff")
+    if entry is None:
+        return RuleResult(
+            "R-CODE-2",
+            True,
+            detail="ruff entry missing in code.json — SKIP",
+            skip=True,
+        )
+    status = entry.get("status", "skip")
+    if status == "skip":
+        return RuleResult(
+            "R-CODE-2",
+            True,
+            detail=f"ruff skip ({entry.get('reason', '')})",
+            skip=True,
+        )
+    counts = entry.get("counts", {})
+    diag_count = counts.get("diagnostics", 0)
+    if status == "ok" or diag_count == 0:
+        return RuleResult("R-CODE-2", True, detail="ruff clean")
+    # status == "fail" + diag_count > 0
+    head = entry.get("head_diagnostics", [])
+    head_str = "; ".join(head[:2]) if head else ""
+    return RuleResult(
+        "R-CODE-2",
+        False,
+        detail=f"ruff diagnostics={diag_count} head=[{head_str}]"[:200],
+    )
+
+
 def _r_wt_commits_ahead(ctx: WorkflowContext) -> RuleResult:
     """R-WT-1 (T-489 Stage 3-D): command 별 분기.
 
@@ -233,8 +345,12 @@ def _r_wt_commits_ahead(ctx: WorkflowContext) -> RuleResult:
 # -------- 12룰 통합 평가 --------
 
 
-def evaluate_12_rules(ctx: WorkflowContext) -> VerdictReport:
-    """SPEC.md §9 12룰 advisory 평가. driver 룰베이스 결정론."""
+def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
+    """SPEC.md §9 14+룰 advisory 평가. driver 룰베이스 결정론.
+
+    T-503 — 12룰 → 14+룰 확장 (R-CODE-1 / R-CODE-2 신설). 함수명 정정
+    (evaluate_12_rules → evaluate_rules). 옛 이름은 backward compat alias 로 보존.
+    """
     rules: list[RuleResult] = []
 
     # R-EXIST
@@ -295,7 +411,25 @@ def evaluate_12_rules(ctx: WorkflowContext) -> VerdictReport:
     else:
         rules.append(_r_wt_commits_ahead(ctx))
 
+    # R-CODE (T-503) — implement 한정. research/review SKIP.
+    if ctx.command in ("research", "review"):
+        rules.append(
+            RuleResult("R-CODE-1", True, detail=f"{ctx.command} SKIP", skip=True),
+        )
+        rules.append(
+            RuleResult("R-CODE-2", True, detail=f"{ctx.command} SKIP", skip=True),
+        )
+    else:
+        rules.append(_r_code_pytest(ctx))
+        rules.append(_r_code_lint(ctx))
+
     return _compute_verdict(rules)
+
+
+# Backward-compat alias — 옛 함수명 보존. driver done_step 의 호출 경로 유지.
+def evaluate_12_rules(ctx: WorkflowContext) -> VerdictReport:
+    """T-503 이전 함수명. `evaluate_rules` 로 위임. 옛 호출자 보존."""
+    return evaluate_rules(ctx)
 
 
 def _compute_verdict(rules: list[RuleResult]) -> VerdictReport:

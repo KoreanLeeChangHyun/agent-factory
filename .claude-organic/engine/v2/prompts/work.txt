@@ -8,21 +8,46 @@ plan.md (통째 inject 받음) 의 phases 를 처리합니다. spawn 모드는 p
 - subprocess (격리): driver 가 phase 마다 별 subprocess. 본 spawn 은 단일 phase 만 처리.
 
 # 산출물
-- 경로: prompt 본문에 명시된 work/<phase_id>.md 절대 경로
+- 경로 (T-503 nesting): prompt 본문에 명시된 work/<phase_id>/W<n>.md 절대 경로. workers=1 기본 → W1.md.
+- 경로 (backward compat): work/<phase_id>.md flat 도 인식. 단 신규 plan 은 nested 권장 (SPEC §3.2.1).
 - 형식: Markdown 자유 산문. 단 산출물에 핵심 내용 (코드 / 결정 / 발견) 모두 작성.
 
 # 작성 룰
-- 종속 phase 산출물 (work/<dep_id>.md) 이 prompt 에 inject 되면 그 결정·결과를 본 phase 작업의 시작점으로 사용.
+- 종속 phase 산출물 (work/<dep_id>/W1.md 또는 work/<dep_id>.md) 이 prompt 에 inject 되면 그 결정·결과를 본 phase 작업의 시작점으로 사용.
 - 코드 작성·파일 수정이 필요하면 Bash / Edit / Write 도구 활용. driver 의 work_dir 안 + 티켓 target 파일 수정 허용 (worktree 안).
 - 본 phase 의 deliverable 파일에 진행 상황·결정·결과를 모두 기록. driver 가 verify_work_md 로 파일 size 검증.
+
+# TDD 사이클 (command=implement 한정, T-503 — SPEC.md §0.1.2)
+plan.md frontmatter 의 각 phase 에 `acceptance_criteria: list[str]` 가 명시되어 있으면 (implement command), 각 criterion 을 다음 사이클로 처리한다:
+
+1. **Red** — 실패 테스트 작성. acceptance_criteria 항목을 검증하는 테스트 (pytest assertion / 파일 존재 / subprocess returncode / import) 를 먼저 작성. 본 시점에서는 테스트가 fail 해야 한다 (구현 미존재).
+2. **Green** — 통과하도록 최소 구현. 테스트가 PASS 할 때까지 코드 수정. 다른 영역 수정 금지 (YAGNI).
+3. **Refactor** — 정리. 중복 제거, 명명 통일, 주석 정리. 테스트 PASS 유지.
+
+work/<phase_id>/W<n>.md 에는 각 acceptance_criterion 별로 Red→Green→Refactor 단계의 결정·결과를 박제. driver `_verify_code.py` 가 후행으로 pytest -q + ruff check + mypy 호출 → R-CODE-1 (pytest 통과 hard-fail) + R-CODE-2 (lint clean advisory) 룰 평가.
+
+research / review command 에서는 TDD 사이클 미적용. 단 acceptance_criteria 가 명시되어 있으면 위 룰을 참고할 수 있다.
+
+# TDD 사이클 예시 (in_place 모드 단일 phase, command=implement)
+
+```
+acceptance_criteria:
+  - "engine/v2/_verify_code.py 신설 + import 가능"
+  - "pytest engine/v2/tests/test_verify_code.py 통과"
+```
+
+1. Red — `tests/test_verify_code.py` 에 `from engine.v2._verify_code import run` 테스트 작성 → `ImportError` 로 fail.
+2. Green — `engine/v2/_verify_code.py` 에 `def run(ctx): ...` 신설 → 테스트 PASS.
+3. Refactor — type hint 정리, docstring 추가, 중복 제거.
 
 # 출력 도구
 Write/Edit (산출물) + Bash (테스트/grep) + Read (의존 파일).
 
 # 절대 금지
 - plan.md 수정
-- 다른 phase 의 work/<other_id>.md 수정
+- 다른 phase 의 work/<other_id>/W<n>.md (또는 flat work/<other_id>.md) 수정
 - **git add / git commit / git push 등 git 명령 호출** (SPEC §0.1 — git commit 은 driver 결정론 영역. worker 는 산출물 .md / 티켓 target 파일 수정까지만)
-- **kanban CLI / status.json / .context.json / metrics.jsonl 수정** (모두 driver 영역)
+- **kanban CLI / status.json / .context.json / metadata.json / metrics.jsonl 수정** (모두 driver 영역)
+- **validate/ 디렉터리 수정** (driver `_validate.py` + `_verify_code.py` 영역. VALIDATE Step 의 LLM 도 `validate/report.md` 만 작성 — code.json / rules.json 작성 금지)
 - worktree 디렉터리 외부 파일 수정
 - **production board API endpoint (예: POST /api/v2/sessions, /api/v2/sessions/<id>/{step,stdout,phase,finish}) 에 fake/test session 으로 curl 직접 호출 금지** — backend wiring 검증은 단위 테스트 (`pytest`, `tempfile`/`tmp_path` 픽스처) 만 사용. production endpoint 호출 시 `.workflow-sessions-v2/` 오염 → naming guard `is_fake_session_id` 가 403 차단 (T-495 회귀 사례 2026-05-17)
