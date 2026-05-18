@@ -216,12 +216,22 @@
       _state.currentStep = "init";
     }
 
-    function _setStep(stepName) {
+    /**
+     * T-508 — step 전이 + step elapsed ts 기록.
+     *
+     * @param {string} stepName
+     * @param {{startTsMs?: number}} [opts]
+     *   startTsMs: 외부 (backend GET / SSE event) 에서 받은 step 진입 epoch ms.
+     *     미지정 시 Date.now() fallback (v1 분기 / 종래 동작 유지).
+     *     replay 가드: 기존 start 값이 null 이거나 새 값이 더 크면 덮어쓰기.
+     *     기존 값보다 과거 ts 가 들어오면 무시 (음수 elapsed / 점프 차단).
+     */
+    function _setStep(stepName, opts) {
       var prevStep = _state.currentStep;
       var newStep = stepName.toLowerCase();
+      var externalTs = opts && typeof opts.startTsMs === "number" ? opts.startTsMs : null;
+      var now = externalTs != null ? externalTs : Date.now();
 
-      // Record timestamps for step transitions
-      var now = Date.now();
       if (_state.stepTimestamps) {
         // End previous step if not yet ended
         if (prevStep && prevStep !== newStep && _state.stepTimestamps[prevStep]) {
@@ -229,9 +239,17 @@
             _state.stepTimestamps[prevStep].end = now;
           }
         }
-        // Start new step if not yet started
-        if (_state.stepTimestamps[newStep] && !_state.stepTimestamps[newStep].start) {
-          _state.stepTimestamps[newStep].start = now;
+        // Start new step — 외부 ts replay 가드
+        var ts = _state.stepTimestamps[newStep];
+        if (ts) {
+          if (externalTs != null) {
+            // 외부 ts: 기존 값이 null 이거나 새 값이 더 크면 덮어쓰기
+            if (ts.start == null || externalTs > ts.start) {
+              ts.start = externalTs;
+            }
+          } else if (!ts.start) {
+            ts.start = now;
+          }
         }
       }
 
@@ -254,12 +272,158 @@
       _activeStepPanel = _getOrCreateStepPanel(_state.currentStep);
     }
 
-    function _setPhase(n, mode, agents, taskIds) {
-      var now = Date.now();
-      // 이전 phase 의 end 기록 (T-495 P3 — phase sub-bar elapsed 시각화)
+    // ── T-508 — v2 elapsed ts persist (localStorage fallback) ──
+    var V2_STATE_STORAGE_PREFIX = "wf_v2_state_";
+
+    /**
+     * 현재 활성 v2 session id 추출 (Board._term.workflowSessionId).
+     * 실패 시 null — storage 호출자가 skip.
+     */
+    function _v2SessionId() {
+      try {
+        var sid = Board._term && Board._term.workflowSessionId;
+        if (sid && Board.v2Workflow && Board.v2Workflow.isV2SessionId
+            && Board.v2Workflow.isV2SessionId(sid)) {
+          return sid;
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    /**
+     * _state 의 step/phase ts 만 추출해 localStorage 에 write.
+     * v2 session 활성 시에만. v1 분기 영향 없음.
+     */
+    function _persistV2State() {
+      var sid = _v2SessionId();
+      if (!sid) return;
+      try {
+        var snap = {
+          stepTimestamps: _state.stepTimestamps || null,
+          phases: _state.phases ? _state.phases.map(function (p) {
+            return { n: p.n, start: p.start || null, end: p.end || null, mode: p.mode || "" };
+          }) : [],
+          cycleStartTs: _state.cycleStartTs || null,
+          currentStep: _state.currentStep || null,
+          currentPhase: typeof _state.currentPhase === "number" ? _state.currentPhase : -1
+        };
+        window.localStorage.setItem(
+          V2_STATE_STORAGE_PREFIX + sid,
+          JSON.stringify(snap)
+        );
+      } catch (_) {}
+    }
+
+    /**
+     * localStorage 에서 _state 의 step/phase ts 를 복원.
+     * backend GET 응답이 도착하기 전 새로고침 직후 첫 render 에 사용.
+     * 가드: 기존 _state 값이 더 새로우면 storage 값 무시 (덮어쓰기 차단).
+     */
+    function _restoreV2State() {
+      var sid = _v2SessionId();
+      if (!sid) return false;
+      try {
+        var raw = window.localStorage.getItem(V2_STATE_STORAGE_PREFIX + sid);
+        if (!raw) return false;
+        var snap = JSON.parse(raw);
+        if (!snap || typeof snap !== "object") return false;
+
+        // stepTimestamps 복원 — 기존 값이 더 새로우면 그대로
+        if (snap.stepTimestamps && _state.stepTimestamps) {
+          var steps = Object.keys(_state.stepTimestamps);
+          for (var i = 0; i < steps.length; i++) {
+            var s = steps[i];
+            var existing = _state.stepTimestamps[s];
+            var stored = snap.stepTimestamps[s];
+            if (!stored || !existing) continue;
+            if (stored.start && (!existing.start || stored.start < existing.start)) {
+              existing.start = stored.start;
+            }
+            if (stored.end && (!existing.end || stored.end > existing.end)) {
+              existing.end = stored.end;
+            }
+          }
+        }
+
+        // phases 복원 — 기존 phases 가 비어있을 때만 (race 없음을 가정)
+        if (Array.isArray(snap.phases) && snap.phases.length > 0
+            && (!_state.phases || _state.phases.length === 0)) {
+          _state.phases = snap.phases.map(function (p) {
+            return {
+              n: p.n,
+              agents: [],
+              taskIds: [],
+              mode: p.mode || "sequential",
+              start: p.start || null,
+              end: p.end || null
+            };
+          });
+          if (typeof snap.currentPhase === "number") {
+            _state.currentPhase = snap.currentPhase;
+          }
+        }
+
+        if (snap.cycleStartTs && !_state.cycleStartTs) {
+          _state.cycleStartTs = snap.cycleStartTs;
+        }
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    /**
+     * T-495 P3 — workflow_step/phase/finish payload 의 extras 키
+     * (verdict/commit/commit_hash/retry/regression) 를 _state 에 흡수.
+     *
+     * driver 가 forward-compatible payload 로 보내면 즉시 _state.v2Meta
+     * 에 누적되며, renderTimelineBar 의 _buildMetaRowHtml 가 배지로 표시.
+     *
+     * 가시성 8축 #4 (verdict) / #5 (commit) / #6 (retry) 충족.
+     */
+    function _absorbV2Extras(data) {
+      if (!data || typeof data !== "object") return;
+      if (!_state.v2Meta) _state.v2Meta = {};
+      var m = _state.v2Meta;
+      // verdict — PASS/WARN/FAIL/SKIP (advisory)
+      if (data.verdict) m.verdict = String(data.verdict).toUpperCase();
+      if (data.verdict_violations != null) m.verdictViolations = data.verdict_violations;
+      // auto_commit hash — driver auto_commit emit
+      if (data.commit) m.commit = String(data.commit);
+      if (data.commit_hash) m.commit = String(data.commit_hash);
+      // retry — rule-based retry counter
+      if (data.retry != null) m.retry = data.retry;
+      // regression.pattern (5종) — advisory marker
+      if (data.regression) {
+        if (!m.regression) m.regression = [];
+        m.regression.push(String(data.regression));
+      }
+    }
+
+    /**
+     * T-508 — phase 진입 + phase elapsed ts 기록.
+     *
+     * @param {number} n - phase 번호
+     * @param {string} mode
+     * @param {string[]} agents
+     * @param {string[]} taskIds
+     * @param {{startTsMs?: number}} [opts]
+     *   startTsMs: 외부 (backend GET / SSE event) 에서 받은 phase 진입 epoch ms.
+     *     미지정 시 Date.now() fallback. 동일 phase n 멱등 — 기존 _state.phases
+     *     맨 끝 항목의 n 과 같으면 push skip (replay 시 중복 push 차단).
+     */
+    function _setPhase(n, mode, agents, taskIds, opts) {
+      var externalTs = opts && typeof opts.startTsMs === "number" ? opts.startTsMs : null;
+      var now = externalTs != null ? externalTs : Date.now();
+
+      // 멱등 가드: 마지막 phase 가 동일 n 이면 push skip (replay)
       if (_state.phases && _state.phases.length > 0) {
-        var prev = _state.phases[_state.phases.length - 1];
-        if (prev && !prev.end) prev.end = now;
+        var tail = _state.phases[_state.phases.length - 1];
+        if (tail && tail.n === n) {
+          _state.currentPhase = n;
+          return;
+        }
+        if (tail && !tail.end) tail.end = now;
       }
       _state.phases.push({
         n:       n,
@@ -658,7 +822,126 @@
       patterns: P,
 
       /**
-       * step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
+       * T-495 P2 — v2 driver 의 workflow_step 이벤트 처리.
+       * v2 payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
+       *
+       * v1 handleStepEvent 와 차이:
+       *  - v2 는 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE) + VALIDATE 추가
+       *  - phase 는 WORK 내부 sub-단계 (P1/P2/...)
+       *  - 멱등 보장
+       */
+      handleV2StepEvent: function (data) {
+        if (!data || !data.step) return;
+        var stepUp = String(data.step).toUpperCase();
+        var step = stepUp.toLowerCase();
+
+        // T-495 P3 — extras (verdict/commit/retry) 통과 시 _state 에 누적
+        _absorbV2Extras(data);
+
+        // T-508 — backend epoch sec → frontend epoch ms 변환 + cycle_start 누적
+        var stepOpts;
+        if (typeof data.step_ts === "number" && data.step_ts > 0) {
+          stepOpts = { startTsMs: Math.round(data.step_ts * 1000) };
+        }
+        if (typeof data.cycle_start_ts === "number" && data.cycle_start_ts > 0) {
+          var cycleMs = Math.round(data.cycle_start_ts * 1000);
+          if (!_state.cycleStartTs || cycleMs < _state.cycleStartTs) {
+            _state.cycleStartTs = cycleMs;
+          }
+        }
+
+        // 종결 step 매핑 (DONE/FAILED → fsm 종결 처리)
+        if (stepUp === "DONE") {
+          _complete();
+          _persistV2State();
+          return;
+        }
+        if (stepUp === "FAILED") {
+          _fail("워크플로우 실패");
+          _persistV2State();
+          return;
+        }
+
+        // 6 step 정합성 (INIT/PLAN/WORK/VALIDATE/REPORT)
+        if (!{ none:1, init:1, plan:1, work:1, validate:1, report:1 }[step]) {
+          return;
+        }
+
+        // phase 만 바뀐 경우 (같은 step + 새 phase) 도 허용
+        var samePhase = (data.phase || "") === (_state.currentPhase >= 0
+          ? "P" + _state.currentPhase : "");
+        if (step === _state.currentStep && samePhase) {
+          // 같은 step + phase 라도 외부 ts 갱신은 흡수
+          if (stepOpts && _state.stepTimestamps && _state.stepTimestamps[step]) {
+            var ts = _state.stepTimestamps[step];
+            if (ts.start == null || stepOpts.startTsMs > ts.start) {
+              ts.start = stepOpts.startTsMs;
+            }
+          }
+          _persistV2State();
+          return;
+        }
+
+        _setStep(step, stepOpts);
+
+        // WORK + phase (P1/P2/...) 진입 시 phase 누적 기록
+        if (step === "work" && data.phase) {
+          var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
+          if (!isNaN(phaseNum)) {
+            _setPhase(phaseNum, "sequential", [], [], stepOpts);
+          }
+        }
+
+        _persistV2State();
+      },
+
+      /**
+       * T-495 P2 — v2 workflow_phase 이벤트 처리.
+       * payload: { session_id, phase: "P1"|"P2"..., action: "start"|"end" }
+       */
+      handleV2PhaseEvent: function (data) {
+        if (!data || !data.phase) return;
+        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry/regression
+        var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
+        if (isNaN(phaseNum)) return;
+
+        // T-508 — backend epoch sec → frontend epoch ms
+        var phaseOpts;
+        if (typeof data.step_ts === "number" && data.step_ts > 0) {
+          phaseOpts = { startTsMs: Math.round(data.step_ts * 1000) };
+        }
+
+        if (data.action === "start") {
+          _setPhase(phaseNum, "sequential", [], [], phaseOpts);
+        } else if (data.action === "end") {
+          // phase end — 직전 phase end 기록 (timer 정지 트리거)
+          var endTs = phaseOpts ? phaseOpts.startTsMs : Date.now();
+          if (_state.phases && _state.phases.length > 0) {
+            var last = _state.phases[_state.phases.length - 1];
+            if (last && last.n === phaseNum && !last.end) {
+              last.end = endTs;
+            }
+          }
+        }
+        _persistV2State();
+      },
+
+      /**
+       * T-495 P2 — v2 workflow_finish 이벤트 처리.
+       * payload: { session_id, outcome: "ok"|"fail", summary }
+       */
+      handleV2FinishEvent: function (data) {
+        if (!data) return;
+        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry
+        if (data.outcome === "ok") {
+          _complete();
+        } else {
+          _fail(data.summary || "워크플로우 실패");
+        }
+      },
+
+      /**
+       * workflow_step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
        * 멱등: 동일한 step 이름에 대해 중복 전이를 방지한다.
        * @param {object} data - {step, prev_step, trigger, phase?, mode?, result?}
        */
@@ -750,6 +1033,23 @@
        */
       getActiveStepPanel: function () {
         return _activeStepPanel;
+      },
+
+      /**
+       * T-508 — localStorage 에 저장된 v2 ts 를 _state 에 복원.
+       * session.js 의 _startV2WorkflowSession 진입 시 fetchSession 전 호출.
+       * @returns {boolean} 복원 성공 여부 (key 미존재 / parse 실패 시 false)
+       */
+      restoreV2State: function () {
+        return _restoreV2State();
+      },
+
+      /**
+       * T-508 — 현재 _state 의 step/phase ts 를 localStorage 에 write.
+       * 외부 (session.js) 에서 수동 트리거 가능. 평소엔 handleV2*Event 자동 호출.
+       */
+      persistV2State: function () {
+        _persistV2State();
       }
     };
   })();

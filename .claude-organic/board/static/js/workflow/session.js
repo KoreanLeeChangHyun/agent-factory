@@ -1074,10 +1074,30 @@
       try { Board.stepOverlay.subscribe(sessionId); } catch (_) {}
     }
 
+    // T-508 — localStorage fallback 으로 step/phase ts 우선 복원 (fetchSession 전).
+    // 새로고침 직후 backend GET 응답 도착 전 첫 render 가 0 elapsed 로 깜빡이는
+    // 회귀 차단. fetchSession 응답이 도착하면 더 새로운 ts 로 덮어쓰기 (가드 내장).
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.restoreV2State) {
+      try { Board.WorkflowRenderer.restoreV2State(); } catch (_) {}
+    }
+
     // 1) 상세 fetch — 진입 시점의 step/phase 복원 (멱등)
     if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
       Board.v2Workflow.fetchSession(sessionId).then(function (detail) {
         if (!detail) return;
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
+          // T-508 — backend 응답의 cycle_start_ts / step_ts 를 payload 에 명시 전달.
+          // workflow-bar.js handleV2StepEvent 가 ts 를 흡수해 _state.stepTimestamps
+          // 의 start 를 외부 ts 로 세팅 (Date.now() fallback 차단).
+          Board.WorkflowRenderer.handleV2StepEvent({
+            session_id: detail.session_id,
+            step: detail.current_step,
+            phase: detail.current_phase,
+            prev_step: "",
+            cycle_start_ts: detail.cycle_start_ts,
+            step_ts: detail.step_ts,
+          });
+        }
         if (Board.phaseTimeline && Board.phaseTimeline.render) {
           try { Board.phaseTimeline.render(); } catch (_) {}
         }
