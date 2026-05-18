@@ -25,6 +25,7 @@ from .._common import (
     new_registry_key,
     update_step,
     write_context,
+    write_metadata,
     write_status,
 )
 from .._emitter import session_create, step_end, step_start
@@ -126,6 +127,7 @@ def init_step(ticket_no: str) -> WorkflowContext:
     ctx.user_prompt_path().write_text(ticket_dump, encoding="utf-8")
     write_status(ctx, {"workflow_step": "INIT", "transitions": []})
     write_context(ctx)
+    write_metadata(ctx)
     append_log(
         ctx,
         f"INIT — registry_key={registry_key}, ticket={ticket_no}, "

@@ -38,10 +38,11 @@ def _load_plan(ctx: WorkflowContext) -> list[Phase]:
 def _load_deps_block(ctx: WorkflowContext, phase: Phase) -> str:
     blocks: list[str] = []
     for dep_id in phase.deps:
-        dep_path = ctx.work_dir_phase_md(dep_id)
+        dep_path = ctx.work_phase_md_resolved(dep_id)
         if dep_path.exists():
+            rel = dep_path.relative_to(ctx.work_dir)
             blocks.append(
-                f"### work/{dep_id}.md\n\n{dep_path.read_text(encoding='utf-8')}\n"
+                f"### {rel.as_posix()}\n\n{dep_path.read_text(encoding='utf-8')}\n"
             )
     return "\n".join(blocks) if blocks else "(종속 없음)"
 
@@ -74,7 +75,8 @@ def work_step(ctx: WorkflowContext) -> bool:
                 f"plan.md (통째):\n{plan_body}\n\n"
                 f"종속 Phase 산출물:\n{dep_blocks}\n\n"
                 f"본 Phase: {phase.id} — {phase.title}\n"
-                f"산출물: `{ctx.work_dir_phase_md(phase.id)}` 에 작성."
+                f"산출물: `{ctx.work_phase_w_md(phase.id, 1)}` (nested) 또는 "
+                f"`{ctx.work_dir_phase_md(phase.id)}` (flat backward compat) 에 작성."
             )
             session_id = new_session_uuid()
             logical = logical_session_name(ctx.ticket_no, "WORK", phase.id)
@@ -86,8 +88,8 @@ def work_step(ctx: WorkflowContext) -> bool:
                 initial_prompt=initial_prompt,
                 system_prompt=work_system_prompt,
                 session_id=session_id,
-                verify=lambda p=phase: verify_work_md(ctx.work_dir_phase_md(p.id)),
-                artifact_path=ctx.work_dir_phase_md(phase.id),
+                verify=lambda p=phase: verify_work_md(ctx.work_phase_md_resolved(p.id)),
+                artifact_path=ctx.work_phase_md_resolved(phase.id),
             )
             phase_end(ctx, phase.id, outcome="ok" if v.ok else "fail")
     else:
@@ -99,13 +101,15 @@ def work_step(ctx: WorkflowContext) -> bool:
             f"plan.md (통째):\n{plan_body}\n\n"
             f"본 1 subprocess 안에서 다음 Phase 들을 topological 순서대로 처리:\n"
             f"{phase_list_text}\n\n"
-            f"각 Phase 산출물을 `work/<id>.md` 에 작성. 모두 작성한 뒤 종료."
+            f"각 Phase 산출물을 plan.md frontmatter 의 deliverable 경로에 작성 "
+            f"(권장: `work/<id>/W1.md` nested / 허용: `work/<id>.md` flat). "
+            f"모두 작성한 뒤 종료."
         )
         session_id = new_session_uuid()
         logical = logical_session_name(ctx.ticket_no, "WORK")
         ctx.session_ids[logical] = session_id
         write_context(ctx)
-        artifact_paths = [ctx.work_dir_phase_md(p.id) for p in phases]
+        artifact_paths = [ctx.work_phase_md_resolved(p.id) for p in phases]
         spawn_with_retry(
             ctx,
             step="WORK",
@@ -117,7 +121,7 @@ def work_step(ctx: WorkflowContext) -> bool:
         )
         # 요구사항 ③: in_place 모드 Phase 산출물 결과를 phase 별로 로그
         for p in phases:
-            artifact = ctx.work_dir_phase_md(p.id)
+            artifact = ctx.work_phase_md_resolved(p.id)
             ok = artifact.is_file() and artifact.stat().st_size > 0
             append_log(
                 ctx,

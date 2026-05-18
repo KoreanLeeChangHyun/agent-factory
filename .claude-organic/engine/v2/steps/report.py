@@ -13,9 +13,10 @@ def report_step(ctx: WorkflowContext) -> None:
     work_blocks: list[str] = []
     work_dir = ctx.work_dir / "work"
     if work_dir.exists():
-        for md in sorted(work_dir.glob("*.md")):
+        for md in sorted(work_dir.glob("**/*.md")):
+            rel = md.relative_to(work_dir)
             work_blocks.append(
-                f"### work/{md.name}\n\n{md.read_text(encoding='utf-8')}\n"
+                f"### work/{rel.as_posix()}\n\n{md.read_text(encoding='utf-8')}\n"
             )
     joined_work = "\n".join(work_blocks) if work_blocks else "(work/ 비어있음)"
     validate_body = (
@@ -25,13 +26,14 @@ def report_step(ctx: WorkflowContext) -> None:
     )
     initial_prompt = (
         f"plan.md:\n{plan_body}\n\n"
-        f"work/*.md:\n{joined_work}\n\n"
+        f"work/**/*.md:\n{joined_work}\n\n"
         f"validate-report.md (LLM Quality 평가 자연어):\n{validate_body}\n\n"
         f"위를 통째 종합한 report.md 를 `{ctx.report_md_path()}` 에 작성. "
         f"본문에 'plan.md' 토큰 포함 필수. "
-        f"**12룰 verdict (PASS/WARN/FAIL/SKIP) 산출·재평가 금지 (SPEC §0.1)** — "
-        f"driver 가 DONE 단계에서 `validate-rules.json` SSOT 결정론 산출. "
-        f"필요 시 '12룰 verdict 는 driver validate-rules.json 참조' 1줄 안내만."
+        f"**14+룰 verdict (PASS/WARN/FAIL/SKIP) 산출·재평가·코드 검증(pytest/lint) 금지 (SPEC §0.1)** — "
+        f"driver 가 DONE 단계에서 `validate/rules.json` SSOT 결정론 산출 + "
+        f"VALIDATE 단계에서 `validate/code.json` 산출. "
+        f"필요 시 '14+룰 verdict 는 driver validate/rules.json 참조' 1줄 안내만."
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "REPORT")
