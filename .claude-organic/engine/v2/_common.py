@@ -94,6 +94,51 @@ def get_n_max(step: str) -> int:
 N_MAX_BY_STEP = _N_MAX_DEFAULT
 
 
+# T-506 P1 — 병렬 spawn 한계 / SPEC §3.4 신규
+_MAX_PARALLEL_DEFAULT = 4
+
+# T-506 P4 — 실패 처리 정책 / SPEC §3.4 신규
+_FAIL_POLICY_DEFAULT = "fail_fast"
+_FAIL_POLICY_VALID = ("fail_fast", "fail_tolerant")
+
+
+def get_max_parallel() -> int:
+    """T-506 P1 — 같은 topo level 동시 spawn 한계 반환.
+
+    우선순위: os.environ.V2_MAX_PARALLEL > .settings.V2_MAX_PARALLEL > 4.
+    음수 / 0 / 비숫자 입력 시 default 4 fallback (graceful).
+    """
+    raw = os.environ.get("V2_MAX_PARALLEL")
+    if raw is None:
+        raw = _load_settings().get("V2_MAX_PARALLEL")
+    if raw is None:
+        return _MAX_PARALLEL_DEFAULT
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return _MAX_PARALLEL_DEFAULT
+    if v <= 0:
+        return _MAX_PARALLEL_DEFAULT
+    return v
+
+
+def get_fail_policy() -> str:
+    """T-506 P4 — 병렬 spawn 실패 처리 정책 반환.
+
+    우선순위: os.environ.V2_FAIL_POLICY > .settings.V2_FAIL_POLICY > 'fail_fast'.
+    유효값: 'fail_fast' | 'fail_tolerant'. 그 외 입력 시 default 'fail_fast'.
+    """
+    raw = os.environ.get("V2_FAIL_POLICY")
+    if raw is None:
+        raw = _load_settings().get("V2_FAIL_POLICY")
+    if raw is None:
+        return _FAIL_POLICY_DEFAULT
+    value = str(raw).strip().lower()
+    if value in _FAIL_POLICY_VALID:
+        return value
+    return _FAIL_POLICY_DEFAULT
+
+
 # SPEC.md §8.1 — Step 별 timeout (초)
 STEP_TIMEOUT_BY_STEP: dict[str, int] = {
     "PLAN": 300,        # 5min

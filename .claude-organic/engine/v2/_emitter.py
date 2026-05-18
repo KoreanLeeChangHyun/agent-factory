@@ -35,6 +35,10 @@ def _now_iso() -> str:
 
 _BOARD_URL_PATH = PROJECT_ROOT / ".claude-organic" / ".board.url"
 
+# T-506 P7 — metrics.jsonl 다중 thread emit 시 line 원자성 보장.
+# 짧은 line 의 OS append (O_APPEND) 는 보통 원자성이지만, 명시 lock 으로 line drop 0 보장.
+_METRICS_APPEND_LOCK = threading.Lock()
+
 
 def _board_post_enabled() -> bool:
     """env flag gate. 미설정/false 시 driver 흐름 영향 0."""
@@ -101,16 +105,20 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
     """NDJSON line — stdout + metrics.jsonl append (ctx 있을 때만).
 
     board POST 는 본 함수가 하지 않음 (의미별 helper 가 endpoint 호출).
+
+    T-506 P7 — 다중 thread 가 동시 emit 시 line drop 0 보장.
+    `_METRICS_APPEND_LOCK` 으로 file open + write 구간 직렬화.
     """
     record = {"event": event, "ts": _now_iso(), **payload}
     line = json.dumps(record, ensure_ascii=False)
-    sys.stdout.write(line + "\n")
-    sys.stdout.flush()
-    if ctx is not None:
-        path = ctx.metrics_jsonl_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
+    with _METRICS_APPEND_LOCK:
+        sys.stdout.write(line + "\n")
+        sys.stdout.flush()
+        if ctx is not None:
+            path = ctx.metrics_jsonl_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -193,9 +201,34 @@ def stdout_chunk(
     )
 
 
-def phase_start(ctx: WorkflowContext, phase_id: str, **extra: Any) -> None:
-    """WORK 내부 phase 시작 — metrics.jsonl + board POST /phase action=start."""
-    emit(ctx, "phase.start", step="WORK", phase=phase_id, ticket=ctx.ticket_no, **extra)
+def phase_start(
+    ctx: WorkflowContext,
+    phase_id: str,
+    *,
+    session_id: str = "",
+    worker_index: int = 0,
+    **extra: Any,
+) -> None:
+    """WORK 내부 phase 시작 — metrics.jsonl + board POST /phase action=start.
+
+    T-506 P7 — `session_id` / `worker_index` payload 박제 (UI/UX 가 같은 level 동시
+    진행 시각화 + phase × worker 매트릭스 디스플레이 용).
+    backend Phase 1 endpoint `/api/v2/sessions/<id>/phase` 본문은 호환 보존 —
+    추가 필드는 metrics.jsonl 측만 박제.
+    """
+    payload: dict[str, Any] = dict(extra)
+    if session_id:
+        payload["session_id"] = session_id
+    if worker_index:
+        payload["worker_index"] = worker_index
+    emit(
+        ctx,
+        "phase.start",
+        step="WORK",
+        phase=phase_id,
+        ticket=ctx.ticket_no,
+        **payload,
+    )
     if ctx.wf_session_id:
         _post_to_board(
             f"/api/v2/sessions/{ctx.wf_session_id}/phase",
@@ -208,9 +241,19 @@ def phase_end(
     phase_id: str,
     *,
     outcome: str,
+    session_id: str = "",
+    worker_index: int = 0,
     **extra: Any,
 ) -> None:
-    """WORK 내부 phase 종료 — metrics.jsonl + board POST /phase action=end."""
+    """WORK 내부 phase 종료 — metrics.jsonl + board POST /phase action=end.
+
+    T-506 P7 — `session_id` / `worker_index` payload 박제. backend body 호환 보존.
+    """
+    payload: dict[str, Any] = dict(extra)
+    if session_id:
+        payload["session_id"] = session_id
+    if worker_index:
+        payload["worker_index"] = worker_index
     emit(
         ctx,
         "phase.end",
@@ -218,7 +261,7 @@ def phase_end(
         phase=phase_id,
         ticket=ctx.ticket_no,
         outcome=outcome,
-        **extra,
+        **payload,
     )
     if ctx.wf_session_id:
         _post_to_board(
