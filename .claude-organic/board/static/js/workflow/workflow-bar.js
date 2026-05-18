@@ -7,9 +7,9 @@
  * flow-claude, flow-init, flow-step, flow-phase, and flow-finish scripts.
  * phaseTimeline renders the timeline bar DOM below .terminal-session-bar.
  *
- * T-505 P4 — stdout / tool card 렌더 영역은 step-overlay.js (Step/Phase
- * 위계) + v2-stdout-bridge.js (workflow_stdout forward) 가 책임진다.
- * 본 모듈은 banner parser + state machine + timeline bar 까지만 유지.
+ * T-507 — stdout / Step·Phase 위계 / 산출물 viewer 는 step-overlay.js +
+ * session.js 가 책임진다. 본 모듈은 banner parser + state machine +
+ * timeline bar (steps row / task row / artifacts row) 까지만 유지.
  *
  * Depends on: common.js (Board namespace)
  * Registers:  Board.WorkflowRenderer, Board.phaseTimeline
@@ -70,7 +70,7 @@
       init:     "#858585",
       plan:     "#569cd6",
       work:     "#D97757",
-      validate: "#dcdcaa",  /* T-495 P2 — v2 추가 step (12룰 검증) */
+      validate: "#dcdcaa",  /* 12룰 검증 step */
       report:   "#c586c0",
       done:     "#4ec9b0",
       failed:   "#f48771"
@@ -131,12 +131,8 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
-      // T-383 Phase 3: preserveInit 분기 제거.
-      // preserveInit 경로는 _restoreSession 이 outputDiv 를 cloneNode 로 교체한
-      // 이후에도 _stepPanels.init 이 detach 된 원본 참조를 유지하게 만들어,
-      // 이후 stdout 이벤트가 화면에 보이지 않는 패널에 삽입되는 S1 을 유발했다.
-      // 본 변경 이후에는 reset 시 항상 맵을 완전 비우고, _restoreSession 측에서
-      // _rebuildStepPanelsFromDom(outputDiv) 으로 현재 DOM 에 맞게 맵을 재건한다.
+      // T-383 Phase 3: reset 시 _stepPanels 맵을 비우고 _restoreSession 측에서
+      // _rebuildStepPanelsFromDom 으로 현재 DOM 에 맞게 맵을 재건한다.
       _state = {
         command:      command || "",
         workId:       "",
@@ -153,7 +149,7 @@
           init:     { start: null, end: null },
           plan:     { start: null, end: null },
           work:     { start: null, end: null },
-          validate: { start: null, end: null }, /* T-495 P2 */
+          validate: { start: null, end: null },
           report:   { start: null, end: null },
           done:     { start: null, end: null }
         },
@@ -166,22 +162,11 @@
     }
 
     /**
-     * outputDiv 내부의 .wf-step-panel 요소를 스캔하여 _stepPanels 맵과
-     * _activeStepPanel 을 현재 DOM 상태와 동기화한다.
+     * outputDiv 의 .wf-step-panel 을 스캔하여 _stepPanels 맵과 _activeStepPanel
+     * 을 현재 DOM 과 동기화. _restoreSession 이 outputDiv 를 cloneNode 로
+     * 교체한 직후 호출된다. 판정 규칙: active 마지막 → 마지막 panel → null.
      *
-     * T-383 Phase 3 (VUL-2 / VUL-3 / S1):
-     * _restoreSession 이 outputDiv 를 cloneNode 로 교체한 직후 호출되어,
-     * 이전 세션에서 detach 된 panel 참조를 버리고 현재 DOM 에 실재하는
-     * panel 로 맵을 재구축한다. 맵은 완전 교체 (덮어쓰기) 한다.
-     *
-     * _activeStepPanel 판정 규칙:
-     *  1. data-status="active" 패널 중 맨 마지막에 위치한 패널을 우선 사용
-     *  2. active 패널이 없으면 outputDiv 내 맨 마지막 .wf-step-panel 사용
-     *  3. 아무 패널도 없으면 null
-     *
-     * outputDiv 가 null/undefined 이면 no-op 로 조용히 반환한다.
-     *
-     * @param {HTMLElement} outputDiv - 세션 출력 컨테이너
+     * @param {HTMLElement} outputDiv
      */
     function _rebuildStepPanelsFromDom(outputDiv) {
       if (!outputDiv) return;
@@ -267,34 +252,6 @@
 
       // Create or activate panel for new step
       _activeStepPanel = _getOrCreateStepPanel(_state.currentStep);
-    }
-
-    /**
-     * T-495 P3 — workflow_step/phase/finish payload 의 extras 키
-     * (verdict/commit/commit_hash/retry/regression) 를 _state 에 흡수.
-     *
-     * driver 가 forward-compatible payload 로 보내면 즉시 _state.v2Meta
-     * 에 누적되며, renderTimelineBar 의 _buildMetaRowHtml 가 배지로 표시.
-     *
-     * 가시성 8축 #4 (verdict) / #5 (commit) / #6 (retry) 충족.
-     */
-    function _absorbV2Extras(data) {
-      if (!data || typeof data !== "object") return;
-      if (!_state.v2Meta) _state.v2Meta = {};
-      var m = _state.v2Meta;
-      // verdict — PASS/WARN/FAIL/SKIP (advisory)
-      if (data.verdict) m.verdict = String(data.verdict).toUpperCase();
-      if (data.verdict_violations != null) m.verdictViolations = data.verdict_violations;
-      // auto_commit hash — driver auto_commit emit
-      if (data.commit) m.commit = String(data.commit);
-      if (data.commit_hash) m.commit = String(data.commit_hash);
-      // retry — rule-based retry counter
-      if (data.retry != null) m.retry = data.retry;
-      // regression.pattern (5종) — advisory marker
-      if (data.regression) {
-        if (!m.regression) m.regression = [];
-        m.regression.push(String(data.regression));
-      }
     }
 
     function _setPhase(n, mode, agents, taskIds) {
@@ -553,7 +510,7 @@
       }
 
       // ── >> FROM -> TO (2-line sequence, line 2) ──
-      // FSM 전이는 workflow_step SSE 이벤트가 담당. 배너만 소비.
+      // FSM 전이는 step SSE 이벤트가 담당. 배너만 소비.
       if (_pendingStateChange && (m = P.stateTransition.exec(line))) {
         _pendingStateChange = false;
         return true;
@@ -679,7 +636,7 @@
         return true;
       }
 
-      // finishKey — 배너 소비만 (완료/실패는 workflow_step 'done' 이벤트가 담당)
+      // finishKey — 배너 소비만 (완료/실패는 step 'done' 이벤트가 담당)
       if (_pendingFinish && (m = P.finishKey.exec(line))) {
         _pendingFinish = false;
         _pendingFinishResult = "";
@@ -701,91 +658,7 @@
       patterns: P,
 
       /**
-       * T-495 P2 — v2 driver 의 workflow_step 이벤트 처리.
-       * v2 payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
-       *
-       * v1 handleStepEvent 와 차이:
-       *  - v2 는 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE) + VALIDATE 추가
-       *  - phase 는 WORK 내부 sub-단계 (P1/P2/...)
-       *  - 멱등 보장
-       */
-      handleV2StepEvent: function (data) {
-        if (!data || !data.step) return;
-        var stepUp = String(data.step).toUpperCase();
-        var step = stepUp.toLowerCase();
-
-        // T-495 P3 — extras (verdict/commit/retry) 통과 시 _state 에 누적
-        _absorbV2Extras(data);
-
-        // 종결 step 매핑 (DONE/FAILED → fsm 종결 처리)
-        if (stepUp === "DONE") {
-          _complete();
-          return;
-        }
-        if (stepUp === "FAILED") {
-          _fail("워크플로우 실패");
-          return;
-        }
-
-        // 6 step 정합성 (INIT/PLAN/WORK/VALIDATE/REPORT)
-        if (!{ none:1, init:1, plan:1, work:1, validate:1, report:1 }[step]) {
-          return;
-        }
-
-        // phase 만 바뀐 경우 (같은 step + 새 phase) 도 허용
-        var samePhase = (data.phase || "") === (_state.currentPhase >= 0
-          ? "P" + _state.currentPhase : "");
-        if (step === _state.currentStep && samePhase) return;
-
-        _setStep(step);
-
-        // WORK + phase (P1/P2/...) 진입 시 phase 누적 기록
-        if (step === "work" && data.phase) {
-          var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
-          if (!isNaN(phaseNum)) {
-            _setPhase(phaseNum, "sequential", [], []);
-          }
-        }
-      },
-
-      /**
-       * T-495 P2 — v2 workflow_phase 이벤트 처리.
-       * payload: { session_id, phase: "P1"|"P2"..., action: "start"|"end" }
-       */
-      handleV2PhaseEvent: function (data) {
-        if (!data || !data.phase) return;
-        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry/regression
-        var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
-        if (isNaN(phaseNum)) return;
-        if (data.action === "start") {
-          _setPhase(phaseNum, "sequential", [], []);
-        } else if (data.action === "end") {
-          // phase end — 직전 phase end 기록 (timer 정지 트리거)
-          if (_state.phases && _state.phases.length > 0) {
-            var last = _state.phases[_state.phases.length - 1];
-            if (last && last.n === phaseNum && !last.end) {
-              last.end = Date.now();
-            }
-          }
-        }
-      },
-
-      /**
-       * T-495 P2 — v2 workflow_finish 이벤트 처리.
-       * payload: { session_id, outcome: "ok"|"fail", summary }
-       */
-      handleV2FinishEvent: function (data) {
-        if (!data) return;
-        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry
-        if (data.outcome === "ok") {
-          _complete();
-        } else {
-          _fail(data.summary || "워크플로우 실패");
-        }
-      },
-
-      /**
-       * workflow_step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
+       * step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
        * 멱등: 동일한 step 이름에 대해 중복 전이를 방지한다.
        * @param {object} data - {step, prev_step, trigger, phase?, mode?, result?}
        */
@@ -837,8 +710,8 @@
       /**
        * Rebuild _stepPanels map and _activeStepPanel from current DOM state.
        * Call this after replacing outputDiv contents (e.g. session restore)
-       * so that subsequent stdout/workflow_step events target live panels
-       * rather than detached references.
+       * so that subsequent step events target live panels rather than
+       * detached references.
        * @param {HTMLElement} outputDiv
        */
       rebuildStepPanelsFromDom: function (outputDiv) {
@@ -1009,27 +882,11 @@
         .replace(/"/g, "&quot;");
     }
 
-    /**
-     * T-495 P3 — v1 의 절대 경로 path 에서 v2 work_dir 기준 상대 경로 추출.
-     * 패턴 예: ".claude-organic/runs/<key>/plan.md" → "plan.md"
-     *          ".claude-organic/runs/<key>/work/P1.md" → "work/P1.md"
-     * 매칭 실패 시 path 그대로 반환 (backend artifact endpoint 가 reject).
-     */
-    function _extractV2RelPath(path) {
-      if (!path) return "";
-      var m = path.match(/\.claude-organic\/runs\/[^/]+\/(.+)$/);
-      if (m) return m[1];
-      // legacy fallback (옛 workflow 디렉터리)
-      var m2 = path.match(/\.claude\.workflow\/workflow\/[^/]+\/(.+)$/);
-      if (m2) return m2[1];
-      return path;
-    }
-
     function _buildStepsRowHtml(st) {
       var labels = { init: "INIT", plan: "PLAN", work: "WORK", validate: "VALIDATE", report: "REPORT", done: "DONE", failed: "FAIL" };
       var current = st.currentStep || "init";
 
-      // T-495 P2 — v2 driver 의 6단계 + DONE (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
+      // 6단계 + DONE (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
       var orderedSteps = ["init", "plan", "work", "validate", "report", "done"];
       if (current === "failed") {
         orderedSteps.push("failed");
@@ -1089,7 +946,7 @@
     }
 
     function _buildMetaRowHtml(st) {
-      if (!st.command && !st.title && !st.v2Meta) return "";
+      if (!st.command && !st.title) return "";
       var html = '<div class="wf-meta-row">';
       if (st.command) {
         html += '<span class="wf-meta-command">' + _esc(st.command) + '</span>';
@@ -1102,33 +959,6 @@
         html += '<span class="wf-meta-id">#' + _esc(st.workId) + '</span>';
       }
 
-      // T-495 P3 — v2 메타 배지 (verdict / commit / retry / regression)
-      // 가시성 8축 #4/#5/#6/#7
-      var m = st.v2Meta;
-      if (m && m.verdict) {
-        var v = m.verdict;
-        var vcls = "wf-v2-verdict-badge " + v.toLowerCase();
-        var vtitle = m.verdictViolations != null
-          ? "12룰 violations: " + m.verdictViolations
-          : "12룰 advisory verdict";
-        html += '<span class="' + vcls + '" title="' + _esc(vtitle) + '">'
-          + 'verdict=' + _esc(v) + '</span>';
-      }
-      if (m && m.commit) {
-        var commitShort = m.commit.length > 7 ? m.commit.slice(0, 7) : m.commit;
-        html += '<span class="wf-v2-commit-badge" title="auto_commit ' + _esc(m.commit) + '">'
-          + 'commit=' + _esc(commitShort) + '</span>';
-      }
-      if (m && m.retry != null && m.retry > 0) {
-        html += '<span class="wf-v2-retry-badge" title="rule-based retry count">'
-          + 'retry=' + _esc(String(m.retry)) + '</span>';
-      }
-      if (m && m.regression && m.regression.length > 0) {
-        html += '<span class="wf-v2-regression-badge"'
-          + ' title="regression.pattern: ' + _esc(m.regression.join(", ")) + '">'
-          + 'regression=' + _esc(String(m.regression.length)) + '</span>';
-      }
-
       // [중지] 버튼 — 진행 중 세션에만 표시 (T-904)
       if (st.status === "running") {
         html += '<button class="wf-stop-btn" title="워크플로우 강제 중지">중지</button>';
@@ -1138,92 +968,15 @@
     }
 
     function _buildArtifactsRowHtml(artifacts) {
-      // T-495 P3 — v2 session 활성 시 항상 log/metrics 버튼 표시
-      var v2Active = false;
-      try {
-        var sid = Board._term && Board._term.workflowSessionId;
-        if (sid && Board.v2Workflow && Board.v2Workflow.isV2SessionId
-            && Board.v2Workflow.isV2SessionId(sid)) {
-          v2Active = true;
-        }
-      } catch (_) {}
-
-      var hasArtifacts = artifacts && artifacts.length > 0;
-      if (!hasArtifacts && !v2Active) return "";
-
+      if (!artifacts || artifacts.length === 0) return "";
       var seen = {};
       var html = '<div class="wf-artifacts-row">';
-      if (hasArtifacts) {
-        artifacts.forEach(function (a) {
-          if (seen[a.path]) return;
-          seen[a.path] = true;
-          html += '<a class="wf-timeline-artifact" data-path="' + _esc(a.path) + '"'
-            + ' href="#" title="' + _esc(a.label) + ' 열기">'
-            + _esc(a.label) + '</a>';
-        });
-      }
-      if (v2Active) {
-        html += '<a class="wf-v2-viewer-btn" data-kind="log" href="#"'
-          + ' title="workflow.log tail viewer">log</a>';
-        html += '<a class="wf-v2-viewer-btn" data-kind="metrics" href="#"'
-          + ' title="metrics.jsonl stream viewer">metrics</a>';
-      }
-      html += '</div>';
-      return html;
-    }
-
-    /**
-     * Build the WORK phase sub-bar HTML (T-495 P3 — 가시성 #2).
-     *
-     * v2 driver 의 WORK step 안 P1/P2/P3 phase 진행 상태를 시각화.
-     * WORK step active 또는 done 일 때만 표시. 누적 phases 배열 (집합)
-     * 을 그대로 순회. expected 총 phase 수는 알 수 없으므로 진입한 phase
-     * 만 칩으로 표시 — currentPhase 는 active, 이전은 done.
-     *
-     * v1 의 _buildAgentStatusHtml 와 별도로, agents 가 없는 v2 의 phase 표시
-     * 전용. agents/taskIds 가 비어있을 때만 그린다 (v1 phase 와 격리).
-     */
-    function _buildPhaseSubBarHtml(st) {
-      if (!st.phases || st.phases.length === 0) return "";
-
-      // v1 phase (agents 있음) 와 격리 — v2 phase 는 agents 없음.
-      var isV2 = true;
-      for (var k = 0; k < st.phases.length; k++) {
-        var p = st.phases[k];
-        if (p && p.agents && p.agents.length > 0) { isV2 = false; break; }
-      }
-      if (!isV2) return "";
-
-      var current = st.currentStep || "init";
-      var stepOrder = { init: 0, plan: 1, work: 2, validate: 3, report: 4, done: 5 };
-      var idx = stepOrder[current];
-      if (idx === undefined || idx < 2) return ""; // WORK 도달 전엔 숨김
-
-      var html = '<div class="wf-phase-subbar">';
-      html += '<span class="wf-phase-subbar-label">WORK</span>';
-      st.phases.forEach(function (ph, i) {
-        var n = ph.n;
-        var phaseState;
-        if (st.currentStep === "work" && n === st.currentPhase) {
-          phaseState = "active";
-        } else if (st.currentStep !== "work" || n < st.currentPhase) {
-          phaseState = "done";
-        } else {
-          phaseState = "pending";
-        }
-        html += '<div class="wf-phase-chip ' + phaseState + '" data-phase="' + n + '">';
-        html += 'P' + n;
-        if (ph.start && phaseState === "done" && ph.end) {
-          html += '<span class="wf-phase-time done">'
-            + _formatDuration(ph.end - ph.start) + '</span>';
-        } else if (ph.start && phaseState === "active") {
-          html += '<span class="wf-phase-time active" data-start="' + ph.start + '">'
-            + _formatDuration(Date.now() - ph.start) + '</span>';
-        }
-        html += '</div>';
-        if (i < st.phases.length - 1) {
-          html += '<div class="wf-phase-sep">&rarr;</div>';
-        }
+      artifacts.forEach(function (a) {
+        if (seen[a.path]) return;
+        seen[a.path] = true;
+        html += '<a class="wf-timeline-artifact" data-path="' + _esc(a.path) + '"'
+          + ' href="#" title="' + _esc(a.label) + ' 열기">'
+          + _esc(a.label) + '</a>';
       });
       html += '</div>';
       return html;
@@ -1239,7 +992,7 @@
       if (!st.phases || st.phases.length === 0) return "";
 
       var current = st.currentStep || "init";
-      // T-495 P2 — v2 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
+      // 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
       var stepOrder = { init: 0, plan: 1, work: 2, validate: 3, report: 4, done: 5 };
       var currentIdx = stepOrder[current];
 
@@ -1289,7 +1042,6 @@
         var html = "";
         html += _buildMetaRowHtml(st);
         html += _buildStepsRowHtml(st);
-        html += _buildPhaseSubBarHtml(st);       // T-495 P3 — 가시성 #2
         html += _buildAgentStatusHtml(st);
         html += _buildArtifactsRowHtml(st.artifacts);
 
@@ -1309,19 +1061,6 @@
               }
             });
           })(links[i]);
-        }
-
-        // T-495 P3 — v2 viewer 진입 버튼 (log / metrics)
-        var viewerBtns = bar.querySelectorAll(".wf-v2-viewer-btn[data-kind]");
-        for (var vi = 0; vi < viewerBtns.length; vi++) {
-          (function (btn) {
-            btn.addEventListener("click", function (e) {
-              e.preventDefault();
-              var kind = btn.getAttribute("data-kind");
-              if (kind === "log") phaseTimeline.openLogTail();
-              else if (kind === "metrics") phaseTimeline.openMetricsTail();
-            });
-          })(viewerBtns[vi]);
         }
 
         // [중지] 버튼 핸들러 바인딩 (T-904)
@@ -1468,40 +1207,8 @@
       },
 
       openArtifact: function (path) {
-        // T-495 P3 — v2 session 활성 시 v2-viewer 로 위임
-        var v2Sid = (Board._term && Board._term.workflowSessionId) || null;
-        if (v2Sid && Board.v2Workflow && Board.v2Workflow.isV2SessionId
-            && Board.v2Workflow.isV2SessionId(v2Sid)
-            && Board.v2Viewer && Board.v2Viewer.openArtifact) {
-          // v2 path 는 work_dir 기준 상대 경로. v1 의 절대경로 path 에서
-          // work_dir 부분을 잘라낼 수 있으면 잘라내고, 아니면 path 끝부분 사용.
-          var rel = _extractV2RelPath(path);
-          Board.v2Viewer.openArtifact(v2Sid, rel);
-          return;
-        }
         var url = "/api/workflow/artifact?path=" + encodeURIComponent(path);
         window.open(url, "_blank");
-      },
-
-      /**
-       * T-495 P3 — workflow.log tail viewer 진입.
-       * 현재 활성 v2 session 의 workflow.log 를 polling 으로 표시.
-       */
-      openLogTail: function () {
-        var v2Sid = (Board._term && Board._term.workflowSessionId) || null;
-        if (v2Sid && Board.v2Viewer && Board.v2Viewer.openLogTail) {
-          Board.v2Viewer.openLogTail(v2Sid);
-        }
-      },
-
-      /**
-       * T-495 P3 — metrics.jsonl stream viewer 진입.
-       */
-      openMetricsTail: function () {
-        var v2Sid = (Board._term && Board._term.workflowSessionId) || null;
-        if (v2Sid && Board.v2Viewer && Board.v2Viewer.openMetricsTail) {
-          Board.v2Viewer.openMetricsTail(v2Sid);
-        }
       },
 
       insertPlaceholder: function () {

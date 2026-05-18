@@ -65,15 +65,9 @@
 <!-- T-495 P2 — v2 driver subprocess 전용 REST/SSE client (Board.v2Workflow).
      반드시 workflow-sessions.js / session.js 보다 먼저 로드 (의존 측에서 Board.v2Workflow.* 호출). -->
 <script src="js/workflow/v2-workflow.js"></script>
-<!-- T-495 P3 — v2 산출물/로그/metrics viewer (Board.v2Viewer).
-     v2-workflow.js 의 artifactUrl / fetchArtifact 에 의존. -->
-<script src="js/workflow/v2-viewer.js"></script>
 <!-- T-505 P3 — Board.stepOverlay (Step 6박스 + Phase sub-패널 위계).
      Board.v2Workflow.subscribe 에 의존하므로 v2-workflow.js 뒤에 로드. -->
 <script src="js/workflow/step-overlay.js"></script>
-<!-- T-505 P2 — Board.v2StdoutBridge (workflow_stdout → Board.stepOverlay.handleStdout forward).
-     v2-workflow.js + step-overlay.js 둘 다 뒤에 로드. -->
-<script src="js/workflow/v2-stdout-bridge.js"></script>
 <script src="js/workflow/workflow-sessions.js"></script>
 <script src="js/terminal/wf-ticket-renderer.js"></script>
 <script src="js/workflow/session.js"></script>

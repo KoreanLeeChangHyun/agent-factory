@@ -1037,7 +1037,7 @@
     });
   }
 
-  // ── T-495 P2 — v2 driver session 진입점 ──
+  // ── v2 driver session 진입점 ──
 
   /** @type {{close: function, sessionId: string}|null} 현재 활성 v2 구독 핸들 */
   var _v2Subscription = null;
@@ -1045,14 +1045,18 @@
   /**
    * v2 driver session 시작 / 재진입.
    *
-   * 1) /api/v2/sessions/<id> 상세 fetch → 현재 step/phase 복원
-   * 2) Board.v2Workflow.subscribe 로 4 종 이벤트 핸들 등록
-   *    - workflow_step → WorkflowRenderer.handleV2StepEvent + phaseTimeline.render
-   *    - workflow_stdout → _onV2Stdout (text/raw 분기 렌더)
-   *    - workflow_phase → WorkflowRenderer.handleV2PhaseEvent
-   *    - workflow_finish → WorkflowRenderer.handleV2FinishEvent + 배지 표시
+   * Board.v2Workflow.subscribe 로 4종 SSE 이벤트 핸들 직접 등록 (T-507 P3
+   * 에서 옛 v2-stdout-bridge.js 우회 모듈 폐기 → session.js 단일 흡수점).
    *
-   * v1 SSE handler (stdout/result/system) 는 호출하지 않음 — 이벤트 이름이 다름.
+   *   workflow_step   → Board.stepOverlay (Step/Phase 위계 + 종결 처리)
+   *   workflow_stdout → _onV2Stdout (text/raw 분기 렌더)
+   *                     + Board.stepOverlay.handleStdout (Step/Phase 안 stdout 컨테이너 forward)
+   *   workflow_phase  → Board.stepOverlay
+   *   workflow_finish → Board.stepOverlay + 워크플로우 종결 UI
+   *
+   * Step/Phase 위계 렌더는 Board.stepOverlay.subscribe 가 독립 구독으로 처리.
+   * session.js 는 stdout 본문 처리 + termStatus / controlBar 라이프사이클
+   * + stepOverlay.handleStdout forward 까지 책임진다.
    *
    * @param {string} sessionId
    */
@@ -1065,19 +1069,15 @@
       _v2Subscription = null;
     }
 
+    // Step/Phase 위계 별 구독 — stepOverlay 가 자체 _stepMap 머신 유지
+    if (Board.stepOverlay && typeof Board.stepOverlay.subscribe === "function") {
+      try { Board.stepOverlay.subscribe(sessionId); } catch (_) {}
+    }
+
     // 1) 상세 fetch — 진입 시점의 step/phase 복원 (멱등)
     if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
       Board.v2Workflow.fetchSession(sessionId).then(function (detail) {
         if (!detail) return;
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
-          // current_step 을 시작점으로 FSM 동기화
-          Board.WorkflowRenderer.handleV2StepEvent({
-            session_id: detail.session_id,
-            step: detail.current_step,
-            phase: detail.current_phase,
-            prev_step: "",
-          });
-        }
         if (Board.phaseTimeline && Board.phaseTimeline.render) {
           try { Board.phaseTimeline.render(); } catch (_) {}
         }
@@ -1099,28 +1099,30 @@
         _ctx.updateControlBar();
       },
       onStep: function (data) {
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
-          Board.WorkflowRenderer.handleV2StepEvent(data);
-        }
+        // Step/Phase 위계 갱신은 Board.stepOverlay 가 별 구독으로 처리.
+        // session.js 는 timeline-bar 만 멱등 재렌더.
         if (Board.phaseTimeline && Board.phaseTimeline.render) {
           try { Board.phaseTimeline.render(); } catch (_) {}
         }
       },
       onStdout: function (data) {
         _onV2Stdout(data);
+        // T-507 P3 — 옛 v2-stdout-bridge.js 의 forward 책임 흡수.
+        // step-overlay 가 현재 활성 Step/Phase 의 stdout 컨테이너에 렌더.
+        if (Board.stepOverlay && typeof Board.stepOverlay.handleStdout === "function") {
+          try { Board.stepOverlay.handleStdout(data); } catch (err) {
+            if (Board.debugLog) Board.debugLog("v2.stdout.forward.error", {
+              sessionId: sessionId, message: err && err.message
+            });
+          }
+        }
       },
       onPhase: function (data) {
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2PhaseEvent) {
-          Board.WorkflowRenderer.handleV2PhaseEvent(data);
-        }
         if (Board.phaseTimeline && Board.phaseTimeline.render) {
           try { Board.phaseTimeline.render(); } catch (_) {}
         }
       },
       onFinish: function (data) {
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2FinishEvent) {
-          Board.WorkflowRenderer.handleV2FinishEvent(data);
-        }
         if (Board.phaseTimeline && Board.phaseTimeline.renderStatusBadge) {
           Board.phaseTimeline.renderStatusBadge(
             data && data.outcome === "ok" ? "ok" : "fail",
@@ -1355,11 +1357,15 @@
 
   /**
    * v2 구독을 명시 종료 (세션 스위치 시 호출).
+   * Board.stepOverlay 의 독립 구독도 함께 정리.
    */
   function _disconnectV2() {
     if (_v2Subscription) {
       try { _v2Subscription.close(); } catch (_) {}
       _v2Subscription = null;
+    }
+    if (Board.stepOverlay && typeof Board.stepOverlay.disconnect === "function") {
+      try { Board.stepOverlay.disconnect(); } catch (_) {}
     }
   }
 
