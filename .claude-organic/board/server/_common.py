@@ -20,6 +20,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+# board_data 는 sibling 모듈 (`.claude-organic/board/board_data.py`). 본 파일을
+# `board.server` 패키지 경로로 import 한 환경에서도 bare `from board_data import`
+# 가 통하도록 board/ 디렉터리를 sys.path 에 자체 부트스트랩.
+_BOARD_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BOARD_PKG_DIR not in sys.path:
+    sys.path.insert(0, _BOARD_PKG_DIR)
+
 from board_data import (
     KANBAN_DIRS_LIST,
     WF_BASE,
