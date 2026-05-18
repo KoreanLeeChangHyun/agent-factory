@@ -1,17 +1,32 @@
-"""v2 verify — 룰베이스 산출물 검증 + plan.md frontmatter parser + topo sort.
+"""v2 verify — 룰베이스 산출물 검증 (T-504 cutover).
 
-SPEC.md §3.3 (Step 전이 게이트) + §5 (plan.md 구조화) + §6.1 (verify_plan_md).
+SPEC.md §3.3 (Step 전이 게이트) + §6.1 (verify_plan_artifacts) + §9.3 (3 형식 분리).
 LLM 호출 없음. 결정론적 검증만.
 
-frontmatter parser 는 PyYAML 미의존 단순 구현 (3개 키 정도만 다루므로 충분).
+T-504 cutover: 옛 `parse_plan_frontmatter` (YAML frontmatter parser) + 단순 YAML
+helper 들 (`_extract_frontmatter` / `_parse_yaml_simple` / `_coerce_scalar`) 통째 폐기.
+PLAN 산출은 `plan/plan.json` (JSON SSOT) + `plan/plan.md` (자연어 본문) 으로 분리되며,
+`Phase` / `topo_sort` 는 `engine.v2.core.plan_loader` 가 단일 출처.
+
+T-504 신설:
+- `verify_plan_artifacts(ctx)` — plan/plan.json + plan/plan.md 양쪽 존재 + JSON parse
+- `verify_report_html(ctx, ...)` — report.html size + plan/plan.md 토큰 인용
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+# T-504 — Phase / topo_sort 는 core.plan_loader SSOT 에서 re-export.
+from .core.plan_loader import (  # noqa: F401  (re-export for backward compat callers)
+    Phase,
+    Plan,
+    PlanLoaderError,
+    parse_plan_json,
+    topo_sort,
+)
 
 
 @dataclass
@@ -26,26 +41,6 @@ class VerifyResult:
             ok=self.ok and other.ok,
             missing=[*self.missing, *other.missing],
         )
-
-
-@dataclass
-class Phase:
-    """plan.md frontmatter 의 phases[] 1개."""
-
-    id: str
-    title: str
-    deps: list[str] = field(default_factory=list)
-    deliverable: str = ""
-    spawn_mode: str = "in_place"   # in_place | subprocess
-
-
-@dataclass
-class PlanFrontmatter:
-    schema_version: int
-    ticket: str
-    command: str
-    mode: str
-    phases: list[Phase]
 
 
 def verify_artifact(
@@ -69,165 +64,26 @@ def verify_artifact(
     return VerifyResult(not missing, missing)
 
 
-def _extract_frontmatter(text: str) -> tuple[str, str]:
-    """YAML frontmatter block + body 분리.
+def verify_plan_artifacts(
+    plan_json_path: Path,
+    plan_md_path: Path,
+) -> VerifyResult:
+    """T-504 — PLAN 산출물 (plan/plan.json + plan/plan.md) 검증.
 
-    형식: `---\n<yaml>\n---\n<body>`. frontmatter 없으면 ("", text) 반환.
+    1. 두 파일 모두 존재 + size > 0
+    2. plan.json 이 `parse_plan_json` 통과 (스키마·deps·acceptance_criteria·topo)
     """
-    if not text.startswith("---"):
-        return "", text
-    end = text.find("\n---", 3)
-    if end == -1:
-        return "", text
-    frontmatter = text[3:end].lstrip("\n")
-    body = text[end + 4 :].lstrip("\n")
-    return frontmatter, body
-
-
-def _parse_yaml_simple(block: str) -> dict:
-    """단순 YAML parser — schema_version/ticket/command/mode/phases 만 지원.
-
-    PyYAML 의존 회피. 본 prototype 의 plan.md frontmatter 만 다룬다.
-    들여쓰기 2-space, list-of-dict, 단순 scalar 만 지원.
-    """
-    lines = block.splitlines()
-    result: dict = {}
-    current_key: str | None = None
-    current_list: list[dict] | None = None
-    current_item: dict | None = None
-
-    for raw in lines:
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        indent = len(raw) - len(raw.lstrip())
-        stripped = raw.lstrip()
-
-        if indent == 0:
-            # top-level key
-            if ":" not in stripped:
-                continue
-            key, _, val = stripped.partition(":")
-            key = key.strip()
-            val = val.strip()
-            current_key = key
-            if val == "" or val == "|":
-                # nested (list or block)
-                result[key] = []
-                current_list = result[key]
-                current_item = None
-            else:
-                # scalar
-                result[key] = _coerce_scalar(val)
-                current_list = None
-                current_item = None
-        elif current_list is not None and stripped.startswith("- "):
-            # list item — start new dict
-            current_item = {}
-            current_list.append(current_item)
-            rest = stripped[2:].strip()
-            if rest and ":" in rest:
-                k, _, v = rest.partition(":")
-                current_item[k.strip()] = _coerce_scalar(v.strip())
-        elif current_item is not None and ":" in stripped:
-            k, _, v = stripped.partition(":")
-            current_item[k.strip()] = _coerce_scalar(v.strip())
-    return result
-
-
-def _coerce_scalar(val: str) -> object:
-    if val == "":
-        return ""
-    # quoted string
-    if (val.startswith('"') and val.endswith('"')) or (
-        val.startswith("'") and val.endswith("'")
-    ):
-        return val[1:-1]
-    # inline list `[a, b]`
-    if val.startswith("[") and val.endswith("]"):
-        inner = val[1:-1].strip()
-        if not inner:
-            return []
-        return [_coerce_scalar(p.strip()) for p in inner.split(",")]
-    # int
-    if re.fullmatch(r"-?\d+", val):
-        return int(val)
-    return val
-
-
-def parse_plan_frontmatter(text: str) -> PlanFrontmatter | None:
-    """plan.md 본문에서 frontmatter parse. 실패 시 None."""
-    block, _ = _extract_frontmatter(text)
-    if not block:
-        return None
-    raw = _parse_yaml_simple(block)
-    if "phases" not in raw or not isinstance(raw.get("phases"), list):
-        return None
-    phases: list[Phase] = []
-    for item in raw["phases"]:
-        if not isinstance(item, dict) or "id" not in item:
-            continue
-        deps = item.get("deps") or []
-        if not isinstance(deps, list):
-            deps = []
-        phases.append(
-            Phase(
-                id=str(item["id"]),
-                title=str(item.get("title", "")),
-                deps=[str(d) for d in deps],
-                deliverable=str(item.get("deliverable", "")),
-                spawn_mode=str(item.get("spawn_mode", "in_place")),
-            )
-        )
-    return PlanFrontmatter(
-        schema_version=int(raw.get("schema_version", 1)),
-        ticket=str(raw.get("ticket", "")),
-        command=str(raw.get("command", "implement")),
-        mode=str(raw.get("mode", "multi")),
-        phases=phases,
-    )
-
-
-def topo_sort(phases: list[Phase]) -> list[Phase] | None:
-    """deps DAG topological sort. circular dep 발견 시 None."""
-    by_id = {p.id: p for p in phases}
-    in_degree = {p.id: 0 for p in phases}
-    edges: dict[str, list[str]] = {p.id: [] for p in phases}
-    for p in phases:
-        for dep in p.deps:
-            if dep not in by_id:
-                return None  # unknown dep
-            edges[dep].append(p.id)
-            in_degree[p.id] += 1
-    queue = [pid for pid, deg in in_degree.items() if deg == 0]
-    sorted_ids: list[str] = []
-    while queue:
-        pid = queue.pop(0)
-        sorted_ids.append(pid)
-        for nxt in edges[pid]:
-            in_degree[nxt] -= 1
-            if in_degree[nxt] == 0:
-                queue.append(nxt)
-    if len(sorted_ids) != len(phases):
-        return None  # circular
-    return [by_id[pid] for pid in sorted_ids]
-
-
-def verify_plan_md(path: Path) -> VerifyResult:
-    """SPEC.md §6.1 verify_plan_md — file + size + frontmatter + phases + deps DAG."""
-    r = verify_artifact(path, min_size=20)
-    if not r.ok:
-        return r
-    text = path.read_text(encoding="utf-8", errors="replace")
-    fm = parse_plan_frontmatter(text)
     missing: list[str] = []
-    if fm is None:
-        missing.append("plan.md frontmatter parse failed")
+    json_res = verify_artifact(plan_json_path, min_size=20)
+    md_res = verify_artifact(plan_md_path, min_size=20)
+    missing.extend(json_res.missing)
+    missing.extend(md_res.missing)
+    if not json_res.ok:
         return VerifyResult(False, missing)
-    if not fm.phases:
-        missing.append("plan.md 'phases' list is empty")
-    sorted_phases = topo_sort(fm.phases) if fm.phases else None
-    if fm.phases and sorted_phases is None:
-        missing.append("plan.md phases has circular or unknown deps")
+    try:
+        parse_plan_json(plan_json_path)
+    except PlanLoaderError as exc:
+        missing.append(f"plan.json schema error: {exc}")
     return VerifyResult(not missing, missing)
 
 
@@ -251,8 +107,16 @@ def verify_validate_md(path: Path) -> VerifyResult:
     )
 
 
-def verify_report_md(path: Path, plan_md_path: Path) -> VerifyResult:
-    """report.md — file + plan.md 파일명 토큰 매칭 (R-PATH-1 본체)."""
+def verify_report_html(path: Path, plan_md_path: Path) -> VerifyResult:
+    """T-504 — REPORT 산출물 `report.html` 검증.
+
+    1. file exists + size > 50
+    2. 본문에 `plan.md` 토큰 인용 (R-PATH-1 정합 — driver 가 plan ↔ report 링크 확인)
+       — `plan/plan.md` 또는 `plan.md` 부분 매칭으로 충분.
+
+    T-504 cutover — 옛 `verify_report_md` 통째 폐기 (Markdown 산출 자체가 사라짐).
+    호출자는 본 함수로 일괄 마이그레이션.
+    """
     return verify_artifact(
         path,
         min_size=50,

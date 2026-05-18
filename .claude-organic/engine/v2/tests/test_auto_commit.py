@@ -15,7 +15,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import pytest
 
 from engine.v2._common import WorkflowContext, auto_commit
 

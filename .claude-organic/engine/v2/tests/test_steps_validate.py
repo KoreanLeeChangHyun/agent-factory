@@ -16,7 +16,9 @@ from engine.v2.steps import validate as validate_mod
 def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
     work_dir = tmp_path / "runs" / "20260518-000000"
     (work_dir / "work").mkdir(parents=True, exist_ok=True)
-    (work_dir / "plan.md").write_text("plan body\n", encoding="utf-8")
+    # T-504 cutover — plan/plan.md (nested) 사전 fixture
+    (work_dir / "plan").mkdir(parents=True, exist_ok=True)
+    (work_dir / "plan" / "plan.md").write_text("plan body\n", encoding="utf-8")
     ctx = WorkflowContext(
         ticket_no="T-999",
         registry_key="20260518-000000",
