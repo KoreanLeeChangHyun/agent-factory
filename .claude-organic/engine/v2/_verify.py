@@ -98,6 +98,15 @@ def verify_work_set(paths: Iterable[Path]) -> VerifyResult:
     return result
 
 
+def verify_work_md_multi(paths: Iterable[Path]) -> VerifyResult:
+    """T-506 P6 — workers > 1 phase 의 N worker 산출물 모두 검증.
+
+    각 W<n>.md 가 exist + size >= 20. 하나라도 누락 시 fail.
+    `verify_work_set` 의 명시 alias — 호출 의도 명료화 (phase 안 N worker).
+    """
+    return verify_work_set(paths)
+
+
 def verify_validate_md(path: Path) -> VerifyResult:
     """validate-report.md — file + verdict 토큰 1개 이상 포함."""
     return verify_artifact(

@@ -25,6 +25,8 @@ from engine.v2._common import (
     TERMINAL_STEPS,
     WORKFLOW_STEPS,
     WorkflowContext,
+    get_fail_policy,
+    get_max_parallel,
     load_prompt,
     load_template,
     make_work_dir,
@@ -318,3 +320,80 @@ def test_read_metadata_present(tmp_path: Path) -> None:
     payload = read_metadata(ctx)
     assert payload["workflow_step"] == "DONE"
     assert payload["finalized_at"] == "2026-05-18T00:00:00"
+
+
+# -------- T-506 P1 / P4 — max_parallel + fail_policy --------
+
+
+def test_max_parallel_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P1 — env 미설정 + .settings 미정의 → default 4."""
+    monkeypatch.delenv("V2_MAX_PARALLEL", raising=False)
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_max_parallel() == 4
+
+
+def test_max_parallel_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P1 — V2_MAX_PARALLEL env 우선 override."""
+    monkeypatch.setenv("V2_MAX_PARALLEL", "8")
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_max_parallel() == 8
+
+
+def test_max_parallel_settings_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P1 — env 미설정 시 .settings 가 default 보다 우선."""
+    monkeypatch.delenv("V2_MAX_PARALLEL", raising=False)
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {"V2_MAX_PARALLEL": "6"})
+    assert get_max_parallel() == 6
+
+
+def test_max_parallel_env_beats_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P1 — env > .settings 우선순위."""
+    monkeypatch.setenv("V2_MAX_PARALLEL", "12")
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {"V2_MAX_PARALLEL": "3"})
+    assert get_max_parallel() == 12
+
+
+@pytest.mark.parametrize("bogus", ["-1", "0", "abc", "", "1.5"])
+def test_max_parallel_bogus_input_fallback(
+    bogus: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-506 P1 — 음수 / 0 / 비숫자 / 소수 → default 4."""
+    monkeypatch.setenv("V2_MAX_PARALLEL", bogus)
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_max_parallel() == 4
+
+
+def test_fail_policy_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P4 — env 미설정 → 'fail_fast'."""
+    monkeypatch.delenv("V2_FAIL_POLICY", raising=False)
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_fail_policy() == "fail_fast"
+
+
+def test_fail_policy_env_fail_tolerant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P4 — V2_FAIL_POLICY=fail_tolerant override."""
+    monkeypatch.setenv("V2_FAIL_POLICY", "fail_tolerant")
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_fail_policy() == "fail_tolerant"
+
+
+def test_fail_policy_env_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("V2_FAIL_POLICY", "fail_fast")
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_fail_policy() == "fail_fast"
+
+
+def test_fail_policy_invalid_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-506 P4 — 알 수 없는 값 → default 'fail_fast'."""
+    monkeypatch.setenv("V2_FAIL_POLICY", "garbage")
+    from engine.v2 import _common
+    monkeypatch.setattr(_common, "_load_settings", lambda: {})
+    assert get_fail_policy() == "fail_fast"

@@ -195,3 +195,91 @@ def test_session_start_alias_calls_session_create(ctx, monkeypatch):
     emitter.session_start(ctx)
     assert len(calls) == 1
     assert calls[0][0] == "/api/v2/sessions"
+
+
+# ---------------------------------------------------------------------------
+# T-506 P7 — phase_start/end 다중 session 박제 + thread-safe append
+# ---------------------------------------------------------------------------
+
+
+def test_phase_start_session_id_payload(ctx, monkeypatch):
+    """T-506 P7 — phase_start 가 session_id + worker_index payload 박제."""
+    _capture_posts(monkeypatch)
+    emitter.phase_start(ctx, "P1", session_id="abc-uuid", worker_index=2)
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[-1])
+    assert record["event"] == "phase.start"
+    assert record["phase"] == "P1"
+    assert record["session_id"] == "abc-uuid"
+    assert record["worker_index"] == 2
+
+
+def test_phase_end_session_id_payload(ctx, monkeypatch):
+    """T-506 P7 — phase_end 도 session_id + worker_index payload 박제."""
+    _capture_posts(monkeypatch)
+    emitter.phase_end(ctx, "P1", outcome="ok", session_id="xyz-uuid", worker_index=3)
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[-1])
+    assert record["event"] == "phase.end"
+    assert record["session_id"] == "xyz-uuid"
+    assert record["worker_index"] == 3
+
+
+def test_phase_start_omits_empty_session_id(ctx, monkeypatch):
+    """기존 호출자 시그니처 호환 — session_id="" / worker_index=0 default → payload 미포함."""
+    _capture_posts(monkeypatch)
+    emitter.phase_start(ctx, "P1", spawn_mode="in_place")
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[-1])
+    assert "session_id" not in record
+    assert "worker_index" not in record
+    assert record["spawn_mode"] == "in_place"
+
+
+def test_emit_multi_thread_no_line_drop(ctx):
+    """T-506 P7 — 10 thread × 30 emit = 300 line 모두 metrics.jsonl 박제."""
+    import threading
+
+    N_THREADS = 10
+    PER_THREAD = 30
+
+    def worker(tid: int) -> None:
+        for i in range(PER_THREAD):
+            emitter.emit(
+                ctx,
+                "test.event",
+                tid=tid,
+                seq=i,
+                ticket=ctx.ticket_no,
+            )
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(N_THREADS)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    assert len(lines) == N_THREADS * PER_THREAD, (
+        f"line drop: expected {N_THREADS * PER_THREAD}, got {len(lines)}"
+    )
+    # 각 line 이 valid JSON + event=test.event
+    parsed = [json.loads(line) for line in lines]
+    assert all(r["event"] == "test.event" for r in parsed)
+    # 각 (tid, seq) 쌍이 정확히 1번씩 등장
+    pairs = {(r["tid"], r["seq"]) for r in parsed}
+    assert len(pairs) == N_THREADS * PER_THREAD
+
+
+def test_phase_start_session_ids_list(ctx, monkeypatch):
+    """T-506 P7 — workers > 1 phase 의 session_ids list payload 박제."""
+    _capture_posts(monkeypatch)
+    emitter.phase_end(
+        ctx,
+        "P1",
+        outcome="ok",
+        session_ids=["a-uuid", "b-uuid", "c-uuid"],
+    )
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[-1])
+    assert record["session_ids"] == ["a-uuid", "b-uuid", "c-uuid"]

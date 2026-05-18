@@ -217,3 +217,47 @@ def topo_sort(phases: list[Phase]) -> list[Phase] | None:
     if len(sorted_ids) != len(phases):
         return None
     return [by_id[pid] for pid in sorted_ids]
+
+
+def topo_levels(phases: list[Phase]) -> list[list[Phase]]:
+    """T-506 P2 — Kahn 확장. phase 들을 topological level 별로 묶어 반환.
+
+    level k 의 phase 는 deps 가 가리키는 phase 중 최대 level 이 k-1.
+    deps=[] phase 는 level 0. driver 가 같은 level 동시 spawn → 모든 phase
+    완료 후 다음 level 진입하는 패턴에 사용.
+
+    Returns:
+        `[[level_0_phases], [level_1_phases], ...]`. 같은 level 안 phase 순서는
+        입력 phase 리스트의 순서 보존 (deterministic).
+        순환 의존 또는 unknown dep 시 빈 list 반환 (parse_plan_json 이 선검증).
+    """
+    if not phases:
+        return []
+    by_id = {p.id: p for p in phases}
+    # unknown dep 검출 — 순환이 아니어도 안전 차단
+    for p in phases:
+        for d in p.deps:
+            if d not in by_id:
+                return []
+    level_of: dict[str, int] = {}
+    # 반복적 해소 — deps level 이 모두 확정된 phase 부터 처리
+    remaining = list(phases)
+    while remaining:
+        progressed = False
+        next_remaining: list[Phase] = []
+        for p in remaining:
+            if all(d in level_of for d in p.deps):
+                dep_max = max((level_of[d] for d in p.deps), default=-1)
+                level_of[p.id] = dep_max + 1
+                progressed = True
+            else:
+                next_remaining.append(p)
+        if not progressed:
+            # 순환 의존 — 남아있는 phase 가 서로를 가리킴
+            return []
+        remaining = next_remaining
+    max_level = max(level_of.values())
+    levels: list[list[Phase]] = [[] for _ in range(max_level + 1)]
+    for p in phases:  # 입력 순서 보존
+        levels[level_of[p.id]].append(p)
+    return levels
