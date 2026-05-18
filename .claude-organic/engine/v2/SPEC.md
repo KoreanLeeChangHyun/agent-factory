@@ -11,12 +11,34 @@
 > v2 = **driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개)**.
 > 모든 상태 변경·결정·제어 흐름은 driver. claude -p 는 산출물 파일만 작성한다.
 
-### 0.1 책임 분담 캐논 (사용자 명시 2026-05-15)
+### 0.1 책임 분담 캐논 (사용자 명시 2026-05-15, T-503 확장 2026-05-18)
 
-> **driver = 12룰 + git commit + kanban 전이 + FSM** (전부 결정론)
-> **LLM = 산출물 .md 본문 작성** (plan/work/quality평가/report 의 **자연어 부분만**)
+> **driver = 14+룰 평가 + 코드 결정론 검증 (pytest/lint) + git commit + kanban 전이 + FSM** (전부 결정론)
+> **LLM = 산출물 .md 본문 작성** (plan/work/validate 자연어 평가/report 의 **자연어 부분만**)
 
-12룰 평가·verdict 산출·git commit·kanban 전이·FSM 전이를 LLM 에게 위임하는 모든 prompt 영역은 **룰 위반**. driver 결정론 영역으로 회복한다.
+14+룰 평가·코드 결정론 검증 (pytest -q / ruff / mypy)·verdict 산출·git commit·kanban 전이·FSM 전이를 LLM 에게 위임하는 모든 prompt 영역은 **룰 위반**. driver 결정론 영역으로 회복한다.
+
+### 0.1.1 검증 2축 분리 (T-503)
+
+> v2 의 검증은 **2 축**으로 명확히 분리된다. 동일 'VALIDATE' 라는 어휘 안에 자연어 평가와 결정론 검증이 섞이는 v1·v2 초기 회귀를 차단한다.
+
+| 축 | 주체 | 산출물 | 형식 | 본문 |
+|----|------|--------|------|------|
+| **자연어 보고서 평가 (LLM)** | claude -p (VALIDATE Step) | `validate/report.md` | Markdown | phase 분해 적정성 / deliverable 완성도 / deps 흐름 / 종합 평가 |
+| **결정론 룰 평가 (driver)** | driver `_validate.py` | `validate/rules.json` | JSON | 14+룰 PASS/WARN/FAIL/SKIP 박제 + violation count + hard_fail |
+| **결정론 코드 검증 (driver, implement 한정)** | driver `_verify_code.py` | `validate/code.json` | JSON | pytest -q + ruff check + mypy 의 status/counts/head_diagnostics |
+
+LLM 은 코드 검증·룰 평가·verdict 산출 책임 X. driver 는 자연어 평가 책임 X. 양 축은 같은 `validate/` 디렉터리 산하에 분리 박제.
+
+### 0.1.2 TDD 강제 (implement 한정)
+
+> implement command 한정 — PLAN 단계의 acceptance_criteria 의무 + WORK 단계의 Red→Green→Refactor 사이클 prompt 강제. driver 측 R-CODE-1/2 룰로 후행 검증.
+
+- **PLAN**: `plan.md` frontmatter 의 각 phase 에 `acceptance_criteria` 키 (list[str]) 명시 (criteria 충족 여부가 결정론 검증 가능한 형태 — pytest assertion / 파일 존재 / 명령 종료코드 등).
+- **WORK**: acceptance_criteria 1 항목당 (1) 실패하는 테스트 작성 (Red) → (2) 통과하도록 구현 (Green) → (3) 정리 (Refactor) 순으로 처리.
+- **검증**: driver `_verify_code.py` 가 worktree 안에서 pytest -q 호출 → `validate/code.json` 산출 → `_validate.py` 의 R-CODE-1 (pytest 통과 hard-fail) / R-CODE-2 (lint clean advisory) 평가.
+
+research / review command 에서는 TDD 미적용 (코드 변경 동반 X). `_verify_code.py` 자체 SKIP.
 
 ---
 
@@ -74,17 +96,41 @@ NONE → INIT → PLAN → WORK → VALIDATE → REPORT → DONE
                                                 FAILED (재시도 N회 초과 시)
 ```
 
-### 3.2 Step 별 책임
+### 3.2 Step 별 책임 (T-503 산출물 6 영역 캐논)
 
 | Step | 주체 | LLM 호출 | 산출물 | 핵심 책임 |
 |------|------|---------|--------|----------|
-| INIT | driver (in-process) | X | `.context.json` / 초기 `status.json` | 티켓 prompt 파싱, work_dir 생성, kanban Open→In Progress |
-| PLAN | driver → claude -p | 1 spawn | `plan.md` (YAML frontmatter + body) | 작업 분해, Phase·worker·deps 명세 |
-| WORK | driver → claude -p | 1 spawn (Phase loop 내부) | `work/<phase_id>.md` × N | Phase 별 산출물 작성, 종속 그래프 따라 진행 |
-| VALIDATE | driver → claude -p | 1 spawn | `validate-report.md` | **Quality 평가 자연어만** (phase 분해 적정성 / deliverable 완성도 / deps 흐름). 12룰 평가는 driver 결정론 (§0.1 캐논) |
+| INIT | driver (in-process) | X | `metadata.json` (초기) / `workflow.log` (append 시작) | 티켓 prompt 파싱, work_dir 생성, kanban Open→In Progress |
+| PLAN | driver → claude -p | 1 spawn | `plan.md` (YAML frontmatter + body) | 작업 분해, Phase·worker·deps·acceptance_criteria 명세 |
+| WORK | driver → claude -p | 1 spawn (Phase loop 내부) | `work/<phase_id>/W<n>.md` × N (디렉터리 nesting) | Phase 별 산출물 작성, 종속 그래프 따라 진행, TDD Red→Green→Refactor (implement) |
+| VALIDATE | driver → claude -p + driver | 1 spawn (LLM) + driver in-process | `validate/report.md` (LLM) + `validate/rules.json` (driver) + `validate/code.json` (driver, implement 한정) | **Quality 평가 자연어만 (LLM)** — phase 분해 적정성 / deliverable 완성도. **14+룰 평가·코드 결정론 검증 (driver)** — pytest/ruff/mypy + R-CODE-1/2 (§0.1.1 캐논) |
 | REPORT | driver → claude -p | 1 spawn | `report.md` | plan + work + validate 통째 종합 |
-| DONE | driver (in-process) | X | `summary.txt` / `usage.json` / finalize | kanban In Progress→Review, 회귀 metric emit |
-| FAILED | driver (in-process) | X | `failure.md` | 재시도 N회 초과 또는 hard-fail 룰 위반 시 fail-fast |
+| DONE | driver (in-process) | X | `metadata.json` (finalize 흡수 — summary/usage/finalized_at) | kanban In Progress→Review, 회귀 metric emit |
+| FAILED | driver (in-process) | X | `metadata.json` (failure 필드 흡수) | 재시도 N회 초과 또는 hard-fail 룰 위반 시 fail-fast |
+
+#### 3.2.1 산출물 6 영역 캐논 (T-503 도달 목표)
+
+| # | 산출물 | 작성 주체 | 형식 |
+|---|--------|----------|------|
+| 1 | `metadata.json` | driver | JSON (옛 `.context.json` + `status.json` + `summary.txt` + `failure.md` 흡수) |
+| 2 | `workflow.log` | driver | 텍스트 누적 로그 |
+| 3 | `plan.md` | PLAN LLM | YAML frontmatter + Markdown body |
+| 4 | `work/<phase>/W<n>.md` | WORK LLM | Markdown (디렉터리 nesting — 모든 phase 일관) |
+| 5 | `report.md` | REPORT LLM | Markdown |
+| 6 | `validate/` 디렉터리 | driver + VALIDATE LLM | `rules.json` (driver 14+룰) + `report.md` (LLM 자연어 보고서 검증) + `code.json` (driver pytest/lint, implement 한정) |
+
+#### 3.2.2 폐기 산출물 (T-503 마이그레이션)
+
+| 파일 | 사유 | 흡수처 |
+|------|------|--------|
+| `user_prompt.txt` | 티켓 prompt 가 SSOT | (티켓 본문) |
+| `summary.txt` | report.md 가 자연어 보고서 SSOT | `report.md` |
+| `.context.json` + `status.json` | 산출물 통합 정합 | `metadata.json` |
+| `failure.md` | 단일 JSON 필드로 충분 | `metadata.json.failure` |
+| `validate-report.md` (flat) | `validate/` 디렉터리 nesting | `validate/report.md` |
+| `validate-rules.json` (flat) | `validate/` 디렉터리 nesting | `validate/rules.json` |
+
+> **마이그레이션 순서 (T-503)**: 신규 cycle 만 새 경로 적용. 소급 변환은 별 트랙. driver path helper 는 양쪽 경로 (flat + nested) 둘 다 resolveable 하게 hold 후 cycle 안정 시 flat 폐기.
 
 ### 3.3 Step 전이 게이트
 
@@ -156,11 +202,11 @@ context window 한도 (200K tokens) 가까이 가면? → Phase 분할로 work/ 
 
 ## 5. plan.md 구조화 명세
 
-### 5.1 형식 (YAML frontmatter + markdown body)
+### 5.1 형식 (YAML frontmatter + markdown body, T-503 확장)
 
 ```yaml
 ---
-schema_version: 1
+schema_version: 2                # T-503 — acceptance_criteria/workers 필드 도입
 ticket: T-NNN
 command: implement
 mode: multi          # single | multi
@@ -168,18 +214,30 @@ phases:
   - id: P1
     title: "core/_common 신설"
     deps: []
-    deliverable: work/P1.md
-    spawn_mode: in_place      # default — claude -p subprocess 1개 안에서 순차 처리
+    deliverable: work/P1/W1.md   # T-503 — 디렉터리 nesting (모든 phase 일관)
+    spawn_mode: in_place         # default — claude -p subprocess 1개 안에서 순차 처리
+    workers: 1                   # T-503 — 본 phase 안에서 spawn 할 worker 수 (default 1)
+    acceptance_criteria:         # T-503 — implement 한정 의무, 결정론 검증 가능 형태
+      - "engine/v2/_common.py 신설 + import 가능"
+      - "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재"
+      - "pytest engine/v2/tests/test_common.py 통과"
   - id: P2
     title: "core/_emitter 신설"
     deps: [P1]
-    deliverable: work/P2.md
+    deliverable: work/P2/W1.md
     spawn_mode: in_place
+    workers: 1
+    acceptance_criteria:
+      - "engine/v2/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처"
+      - "pytest engine/v2/tests/test_emitter.py 통과"
   - id: P3
     title: "격리 필요 worker (DB write 등)"
     deps: [P1, P2]
-    deliverable: work/P3.md
-    spawn_mode: subprocess    # 예외 격리 — 별도 claude -p subprocess
+    deliverable: work/P3/W1.md
+    spawn_mode: subprocess       # 예외 격리 — 별도 claude -p subprocess
+    workers: 1
+    acceptance_criteria:
+      - "DB 마이그레이션 스크립트 신설 + dry-run 통과"
 ---
 
 # Plan 본문 (LLM 자유 산문 — driver 파싱 영역 X)
@@ -200,6 +258,9 @@ phases:
 - `deps` 의 ID 가 phases list 안에 존재해야 함 (룰베이스 validation)
 - topological sort 로 실행 순서 결정 (circular dep 발견 시 PLAN 재시도)
 - `spawn_mode` 기본값 `in_place`
+- **`acceptance_criteria` 필수 (command=implement 한정, T-503)**: list[str], 1+ 항목. 누락 시 PLAN 재시도 trigger. research/review 는 미적용.
+- `workers` 기본값 `1` (T-503). 2+ 면 본 phase 안에서 driver 가 N 개 subprocess 병렬 spawn (별 트랙 — 본 cycle 미구현, schema 만 박제).
+- `deliverable` 권장 형식: `work/<id>/W1.md` (T-503 디렉터리 nesting). `work/<id>.md` flat 형식도 backward compat 으로 일정 기간 허용.
 
 ### 5.3 spawn_mode 의미
 
@@ -266,8 +327,10 @@ LLM 이 재시도 prompt 를 만들지 않는다. driver 의 `_render_retry_prom
 | **worker 산출물 git commit** (Stage 3-E 신설) | **driver `auto_commit(ctx)`** — WORK 종료 직후 결정론 `git -C <worktree> add -A` + `git commit -m "<template>"`. 변경 0건 skip. LLM 위임 금지 (§0.1) |
 | **재시도 prompt 생성** | **template fill: "누락 = {missing}, 다시 작성"** |
 | 재시도 결정 | `retry_count < N and verify_fail` → resume |
-| VALIDATE LLM Quality 평가 | claude -p — `validate-report.md` 자연어 산출 (phase 분해 적정성 / deliverable 완성도 / deps 흐름). **12룰 평가·verdict 산출 책임 X (§0.1)** |
-| **12룰 평가 + verdict 산출** | **driver `evaluate_12_rules` + `save_verdict_report` (validate-rules.json)** — DONE 단계 finalize 안에서 호출 (REPORT 완료 + step.end DONE 기록 후가 정합 시점, T-490 회귀 정정 §9.2). **LLM 위임 0건 (§0.1)** |
+| VALIDATE LLM Quality 평가 | claude -p — `validate/report.md` 자연어 산출 (phase 분해 적정성 / deliverable 완성도 / deps 흐름). **14+룰 평가·코드 검증·verdict 산출 책임 X (§0.1)** |
+| **14+룰 평가 + verdict 산출** | **driver `evaluate_rules` + `save_verdict_report` (validate/rules.json)** — DONE 단계 finalize 안에서 호출 (REPORT 완료 + step.end DONE 기록 후가 정합 시점, T-490 회귀 정정 §9.2). **LLM 위임 0건 (§0.1)** |
+| **코드 결정론 검증 (pytest/ruff/mypy)** | **driver `_verify_code.py` (T-503)** — `validate/code.json` 산출. implement 한정 (research/review SKIP). 도구 미설치 / 설정 부재 → graceful SKIP. |
+| **R-CODE-1 + R-CODE-2 평가** | **driver `_validate.py` (T-503)** — `validate/code.json` 의 `tool: pytest` / `tool: ruff` 결과를 룰베이스 평가. R-CODE-1 = pytest 통과 hard-fail / R-CODE-2 = lint clean advisory. |
 | REPORT reporter subagent | `subprocess.run(["claude","-p",...])` |
 | report.md 종합 | verify + size match (통째 inject 검증) |
 | finalize (summary + usage) | `summary.txt` template + `usage.json` aggregate |
@@ -393,31 +456,35 @@ claude -p subprocess 의 `cwd` = `ctx.work_dir` (= `.claude-organic/runs/<key>/`
 
 ---
 
-## 9. VALIDATE 12룰 캐논 (rule-based)
+## 9. VALIDATE 14+룰 캐논 (rule-based, T-503 확장)
 
-T-463 (이미 v1 에서 박제, v2 도 그대로 흡수). 단 일부 룰 명칭은 `workflow_step` 어휘로 정정.
+T-463 12룰 (이미 v1 에서 박제) + T-503 신설 R-CODE-1/2. 단 일부 룰 명칭은 `workflow_step` 어휘로 정정.
 
-| 카테고리 | ID | 룰 | hard-fail? |
-|---------|----|----|----------|
-| R-EXIST | R-EXIST-1 | report.md 존재 | YES |
-| R-EXIST | R-EXIST-2 | plan.md 존재 (research SKIP) | NO |
-| R-EXIST | R-EXIST-3 | status.json 존재 + `workflow_step` 키 | NO |
-| R-EXIST | R-EXIST-4 | metrics.jsonl 존재 ≥ 1 줄 | NO |
-| R-METRIC | R-METRIC-2 | 마지막 step.end{step=DONE}.outcome == "ok" | YES |
-| R-METRIC | R-METRIC-3 | tool.deny 0건 | NO |
-| R-GUARD | R-GUARD-1 | worktree 모드 활성 | NO |
-| R-GUARD | R-GUARD-2 | feature branch 존재 | NO |
-| R-GUARD | R-GUARD-3 | regression.pattern 0건 | NO |
-| R-PATH | R-PATH-1 | report.md → plan.md 링크 매칭 (research 외) | NO |
-| R-FSM | R-FSM-1 | status.json `workflow_step` ∈ {DONE, FAILED} | NO |
-| R-WT | R-WT-1 | commits ahead ≥ 1 (command=implement) 또는 SKIP (command ∈ {research,review}) | YES (command=implement 한정 hard-fail) |
+| 카테고리 | ID | 룰 | hard-fail? | command 분기 |
+|---------|----|----|----------|-------------|
+| R-EXIST | R-EXIST-1 | report.md 존재 | YES | 전체 |
+| R-EXIST | R-EXIST-2 | plan.md 존재 (research SKIP) | NO | research SKIP |
+| R-EXIST | R-EXIST-3 | status.json 존재 + `workflow_step` 키 | NO | 전체 |
+| R-EXIST | R-EXIST-4 | metrics.jsonl 존재 ≥ 1 줄 | NO | 전체 |
+| R-METRIC | R-METRIC-2 | 마지막 step.end{step=DONE}.outcome == "ok" | YES | 전체 |
+| R-METRIC | R-METRIC-3 | tool.deny 0건 | NO | 전체 |
+| R-GUARD | R-GUARD-1 | worktree 모드 활성 | NO | research/review SKIP |
+| R-GUARD | R-GUARD-2 | feature branch 존재 | NO | feature_branch 없으면 SKIP |
+| R-GUARD | R-GUARD-3 | regression.pattern 0건 | NO | 전체 |
+| R-PATH | R-PATH-1 | report.md → plan.md 링크 매칭 (research 외) | NO | research SKIP |
+| R-FSM | R-FSM-1 | status.json `workflow_step` ∈ {DONE, FAILED} | NO | 전체 |
+| R-WT | R-WT-1 | commits ahead ≥ 1 (command=implement) 또는 SKIP | YES (implement 한정) | research/review SKIP |
+| **R-CODE** | **R-CODE-1** | **pytest 통과 (`validate/code.json` 의 tool=pytest, status ∈ {ok, skip})** | **YES (implement 한정)** | **research/review SKIP** |
+| **R-CODE** | **R-CODE-2** | **lint clean (`validate/code.json` 의 tool=ruff, status ∈ {ok, skip} 또는 counts==0)** | **NO (advisory FAIL)** | **research/review SKIP** |
 
-### 9.1 verdict 판정 (advisory only)
+### 9.1 verdict 판정 (advisory only, T-503 임계 재계산)
 
-- PASS: 12 룰 위반 0건
+- PASS: 14+ 룰 위반 0건
 - WARN: 1~2 룰 위반 (hard-fail 0건)
 - FAIL: 3+ 룰 위반 또는 hard-fail 1건 이상
 - SKIP: `workflow_step` ∉ {DONE, FAILED}
+
+> **임계 재계산 (T-503)**: 12룰 → 14+룰 확장 후에도 WARN 1~2 / FAIL 3+ 임계는 동일. hard-fail rules = `R-EXIST-1` + `R-METRIC-2` + `R-WT-1` + `R-CODE-1` 4 종.
 
 verdict FAIL 이어도 Review→Done DnD 강행 가능 (advisory only). 자동 가드·자동 회귀 0건.
 
@@ -435,18 +502,32 @@ driver `init_step` 안에서 `worktree_manager.create_worktree(ticket_no, title,
 
 ### 9.2 평가 시기 (DONE 단계)
 
-driver 룰베이스 `evaluate_12_rules` 호출은 **DONE Step 안**에서 수행 (`done_step` 함수 내부, `step_end DONE outcome=ok` 기록 후 + `update_step(_, "DONE")` 후 + `kanban_move review` 전).
+driver 룰베이스 `evaluate_rules` (T-503 — 옛 `evaluate_12_rules`) 호출은 **DONE Step 안**에서 수행 (`done_step` 함수 내부, `step_end DONE outcome=ok` 기록 후 + `update_step(_, "DONE")` 후 + `kanban_move review` 전).
 
 이유:
 - R-EXIST-1 (`report.md` 존재) — REPORT 단계 완료 후에야 정합
 - R-METRIC-2 (`step.end DONE outcome=ok`) — DONE step.end 기록 후에야 정합
 - R-FSM-1 (`workflow_step ∈ {DONE, FAILED}`) — `update_step("DONE")` 후에야 정합
+- R-CODE-1/2 — `validate/code.json` 산출 후 (VALIDATE Step 안에서 driver 가 `_verify_code.py` 호출 → DONE 단계에서 R-CODE 룰 평가)
 
-VALIDATE Step 의 `validate_step` 함수는 `claude -p (advisory)` 만 호출하여 `validate-report.md` 자유 산문 작성. driver 룰베이스 평가는 본 단계 미수행.
+VALIDATE Step 의 `validate_step` 함수는 (1) `claude -p (advisory)` 1 spawn 으로 `validate/report.md` 자유 산문 작성 + (2) driver 가 `_verify_code.run(ctx)` 호출 → `validate/code.json` 산출 (implement 한정). driver 14+룰 평가는 본 단계 미수행 — DONE 단계로 지연.
 
-산출물 분리:
-- `validate-report.md` = claude -p (LLM) 의 advisory 자유 산문 (VALIDATE 단계)
-- `validate-rules.json` = driver 의 룰베이스 결정론 평가 (DONE 단계)
+### 9.3 산출물 분리 캐논 (T-503 — 3 형식 분리)
+
+> 사용자 명시 (2026-05-18): 산출물 형식은 **3 영역으로 분리**되며 각 영역은 단일 책임을 갖는다.
+
+| 형식 | 영역 | 책임 |
+|------|------|------|
+| **JSON** | `metadata.json` / `validate/rules.json` / `validate/code.json` / `usage.json` | driver 결정론 평가·메타데이터·코드 검증 결과. 기계 가독 우선. |
+| **Markdown (자연어)** | `plan.md` / `work/<phase>/W<n>.md` / `validate/report.md` / `report.md` | LLM 자연어 산출. 사람 가독 + LLM 다음 Step inject 가독. |
+| **HTML 렌더 (viewer 책임)** | T-502 board UI viewer | JSON 과 Markdown 을 합성해 사용자 가독 카드/탭 렌더. 본 트랙 비범위 — 별 트랙. |
+
+위 3 영역 외 형식 (예: CSV / YAML / 옛 `summary.txt` / 옛 `failure.md` / 옛 `validate/code.md`) 은 도입 금지. 사람 가독은 board UI viewer 책임으로 명확히 분리.
+
+산출물별 매핑:
+- `validate/report.md` = claude -p (LLM) 의 advisory 자연어 평가 (VALIDATE 단계, T-503 디렉터리 nesting)
+- `validate/rules.json` = driver 의 룰베이스 결정론 평가 (DONE 단계, T-503 디렉터리 nesting)
+- `validate/code.json` = driver `_verify_code.py` 의 결정론 코드 검증 (VALIDATE 단계 안 driver 호출, T-503 신설)
 
 ---
 
@@ -642,3 +723,4 @@ Stage 3-E (§0.1 책임 분담 캐논 박제) 의 작동은 본 T-494 같은 단
 | 2026-05-15 | §7.1 + §9.2 — driver 룰베이스 12룰 재검증 시기를 VALIDATE → DONE 단계로 정정 | T-490 Phase 3 검증 회귀 발견 (VALIDATE 시점에 evaluate 호출 시 report.md / step.end DONE 미생성으로 거짓 FAIL 3건 = R-EXIST-1 / R-METRIC-2 / R-PATH-1) |
 | 2026-05-15 | §9.1.1 — command 별 worktree 분기 정책 도입 (Stage 3-D) | T-489 Stage 3-D — implement 의무 / research·review worktree-less / R-WT-1 SKIP 정합 (commit e73dfc1 + 79bf36d) |
 | 2026-05-15 | §0.1 책임 분담 캐논 신설 (Stage 3-E) — driver=12룰+commit+kanban+FSM 결정론 / LLM=자연어 산출만. §3.2 / §7.1 / §7.2 정합 | T-493 smoke 에서 LLM verdict (WARN) ≡ driver verdict (FAIL) 충돌 발견. validate.txt 가 LLM 에게 12룰 평가시키고 verdict 산출시킨 룰 위반 + work.txt 의 git commit 누락. 사용자 명시 캐논 박제 (commit ? + ?) |
+| 2026-05-18 | T-503 — §0.1 / §0.1.1 / §0.1.2 / §3.2 / §3.2.1 / §3.2.2 / §5.1 / §5.2 / §7.1 / §9 / §9.2 / §9.3 갱신 — 12룰 → 14+룰 (R-CODE-1/2), 산출물 6 영역 + 폐기 5 파일, 검증 2축 분리 (자연어 보고서 LLM / 결정론 코드 driver), TDD 강제 (acceptance_criteria + Red→Green→Refactor) | 사용자 명시 캐논 확장 (산출물 정합화 + 검증 2축 분리 + TDD prompt 강제). 본 cycle 자체는 옛 driver 처리 — R-CODE 는 다음 cycle 적용. |

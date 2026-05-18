@@ -138,13 +138,53 @@ class WorkflowContext:
         return self.work_dir / "plan.md"
 
     def work_dir_phase_md(self, phase_id: str) -> Path:
+        """flat 경로 — backward compat (T-503 마이그레이션 hold 기간)."""
         return self.work_dir / "work" / f"{phase_id}.md"
 
+    def work_phase_dir(self, phase_id: str) -> Path:
+        """T-503 디렉터리 nesting — work/<phase>/."""
+        return self.work_dir / "work" / phase_id
+
+    def work_phase_w_md(self, phase_id: str, worker_idx: int = 1) -> Path:
+        """T-503 디렉터리 nesting — work/<phase>/W<n>.md (workers ≥ 1)."""
+        return self.work_phase_dir(phase_id) / f"W{worker_idx}.md"
+
+    def work_phase_md_resolved(self, phase_id: str) -> Path:
+        """T-503 — flat 과 nested 경로 양쪽을 시도, 존재하는 쪽 반환.
+
+        우선순위: nested (work/<phase>/W1.md) > flat (work/<phase>.md). 양쪽 모두 미존재 시 nested 기본 경로 반환 (write-target 으로 사용 가능).
+        """
+        nested = self.work_phase_w_md(phase_id, 1)
+        if nested.exists():
+            return nested
+        flat = self.work_dir_phase_md(phase_id)
+        if flat.exists():
+            return flat
+        return nested
+
+    def validate_dir(self) -> Path:
+        """T-503 — validate/ 디렉터리."""
+        return self.work_dir / "validate"
+
     def validate_report_md_path(self) -> Path:
+        """validate-report.md — flat (backward compat, T-503 마이그레이션 hold)."""
         return self.work_dir / "validate-report.md"
 
+    def validate_report_md_nested_path(self) -> Path:
+        """T-503 — validate/report.md (디렉터리 nesting)."""
+        return self.validate_dir() / "report.md"
+
     def validate_rules_json_path(self) -> Path:
+        """validate-rules.json — flat (backward compat, T-503 마이그레이션 hold)."""
         return self.work_dir / "validate-rules.json"
+
+    def validate_rules_json_nested_path(self) -> Path:
+        """T-503 — validate/rules.json (디렉터리 nesting)."""
+        return self.validate_dir() / "rules.json"
+
+    def validate_code_json_path(self) -> Path:
+        """T-503 신설 — validate/code.json (driver `_verify_code.py` 산출, implement 한정)."""
+        return self.validate_dir() / "code.json"
 
     def report_md_path(self) -> Path:
         return self.work_dir / "report.md"
@@ -160,6 +200,10 @@ class WorkflowContext:
 
     def failure_md_path(self) -> Path:
         return self.work_dir / "failure.md"
+
+    def metadata_json_path(self) -> Path:
+        """T-503 — metadata.json (옛 .context.json + status.json + summary.txt + failure 흡수)."""
+        return self.work_dir / "metadata.json"
 
 
 def new_registry_key(now: datetime | None = None) -> str:
@@ -271,6 +315,74 @@ def append_log(ctx: WorkflowContext, line: str) -> None:
     ts = datetime.now().isoformat(timespec="seconds")
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(f"[{ts}] {line}\n")
+
+
+def write_metadata(
+    ctx: WorkflowContext,
+    *,
+    finalized_at: str | None = None,
+    failure_reason: str | None = None,
+) -> Path:
+    """T-503 — `metadata.json` 통합 writer.
+
+    옛 산출물 4 파일 (`.context.json` + `status.json` + `summary.txt` + `failure.md`)
+    을 단일 JSON 으로 통합 박제. 신규 cycle 만 본 함수 호출. driver writer 1 곳에서 일관 산출.
+
+    스키마:
+        {
+          "schema_version": 1,
+          "ticket_no": "T-NNN",
+          "registry_key": "...",
+          "command": "implement",
+          "mode": "multi",
+          "feature_branch": "feat/...",
+          "worktree_path": "...",
+          "title": "...",
+          "wf_session_id": "...",
+          "engine_version": "v2",
+          "session_ids": {"wf-T-PLAN": "...", ...},
+          "workflow_step": "DONE",
+          "transitions": [{"from":"INIT","to":"PLAN","ts":"..."}, ...],
+          "finalized_at": "2026-05-18T...",   # DONE 단계에서만 채움 (옛 summary.txt 대체)
+          "failure": {"reason": "...", "ts": "..."} | null,  # FAILED 단계만 (옛 failure.md 대체)
+        }
+    """
+    status = read_status(ctx)
+    payload = {
+        "schema_version": 1,
+        "ticket_no": ctx.ticket_no,
+        "registry_key": ctx.registry_key,
+        "command": ctx.command,
+        "mode": ctx.mode,
+        "feature_branch": ctx.feature_branch,
+        "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else None,
+        "title": ctx.title,
+        "wf_session_id": ctx.wf_session_id,
+        "engine_version": "v2",
+        "session_ids": dict(ctx.session_ids),
+        "workflow_step": status.get("workflow_step", ctx.current_step),
+        "transitions": status.get("transitions", []),
+        "finalized_at": finalized_at,
+        "failure": (
+            {"reason": failure_reason, "ts": datetime.now().isoformat(timespec="seconds")}
+            if failure_reason
+            else None
+        ),
+    }
+    path = ctx.metadata_json_path()
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return path
+
+
+def read_metadata(ctx: WorkflowContext) -> dict[str, Any]:
+    """T-503 — `metadata.json` reader. 미존재 시 `{}` 반환."""
+    path = ctx.metadata_json_path()
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def auto_commit(ctx: WorkflowContext) -> int:

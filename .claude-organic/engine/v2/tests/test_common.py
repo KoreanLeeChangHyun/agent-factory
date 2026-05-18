@@ -30,9 +30,11 @@ from engine.v2._common import (
     make_work_dir,
     new_registry_key,
     read_context,
+    read_metadata,
     read_status,
     update_step,
     write_context,
+    write_metadata,
     write_status,
 )
 
@@ -180,3 +182,135 @@ def test_prompts_and_templates_dir_exist() -> None:
     assert TEMPLATES_DIR.exists()
     assert (PROMPTS_DIR / "plan.txt").exists()
     assert (TEMPLATES_DIR / "retry_prompt.txt").exists()
+
+
+# -------- T-503 신설 path helpers --------
+
+
+def test_work_phase_dir(tmp_path: Path) -> None:
+    """T-503 — work_phase_dir(phase_id) → work/<phase>/ 디렉터리 path."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.work_phase_dir("P1") == tmp_path / "work" / "P1"
+    assert ctx.work_phase_dir("P42") == tmp_path / "work" / "P42"
+
+
+def test_work_phase_w_md(tmp_path: Path) -> None:
+    """T-503 — work_phase_w_md(phase_id, worker_idx) → work/<phase>/W<n>.md."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.work_phase_w_md("P1") == tmp_path / "work" / "P1" / "W1.md"
+    assert ctx.work_phase_w_md("P1", 1) == tmp_path / "work" / "P1" / "W1.md"
+    assert ctx.work_phase_w_md("P2", 3) == tmp_path / "work" / "P2" / "W3.md"
+
+
+def test_work_phase_md_resolved_nested_priority(tmp_path: Path) -> None:
+    """T-503 — nested 존재 시 nested 우선."""
+    ctx = _make_ctx(tmp_path)
+    nested = ctx.work_phase_w_md("P1", 1)
+    flat = ctx.work_dir_phase_md("P1")
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("nested", encoding="utf-8")
+    flat.parent.mkdir(parents=True, exist_ok=True)
+    flat.write_text("flat", encoding="utf-8")
+    resolved = ctx.work_phase_md_resolved("P1")
+    assert resolved == nested
+
+
+def test_work_phase_md_resolved_flat_fallback(tmp_path: Path) -> None:
+    """T-503 — nested 미존재 + flat 존재 → flat fallback."""
+    ctx = _make_ctx(tmp_path)
+    flat = ctx.work_dir_phase_md("P1")
+    flat.parent.mkdir(parents=True, exist_ok=True)
+    flat.write_text("flat", encoding="utf-8")
+    resolved = ctx.work_phase_md_resolved("P1")
+    assert resolved == flat
+
+
+def test_work_phase_md_resolved_neither_returns_nested_default(tmp_path: Path) -> None:
+    """T-503 — 양쪽 미존재 → nested 기본 경로 반환 (write-target 으로 사용 가능)."""
+    ctx = _make_ctx(tmp_path)
+    resolved = ctx.work_phase_md_resolved("P1")
+    assert resolved == ctx.work_phase_w_md("P1", 1)
+    assert not resolved.exists()
+
+
+def test_validate_dir(tmp_path: Path) -> None:
+    """T-503 — validate/ 디렉터리 path."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.validate_dir() == tmp_path / "validate"
+
+
+def test_validate_nested_paths(tmp_path: Path) -> None:
+    """T-503 — validate/report.md / validate/rules.json / validate/code.json."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.validate_report_md_nested_path() == tmp_path / "validate" / "report.md"
+    assert ctx.validate_rules_json_nested_path() == tmp_path / "validate" / "rules.json"
+    assert ctx.validate_code_json_path() == tmp_path / "validate" / "code.json"
+
+
+def test_flat_paths_preserved_for_backward_compat(tmp_path: Path) -> None:
+    """T-503 — 옛 flat path helpers (`validate-report.md` 등) 보존 (backward compat)."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.validate_report_md_path() == tmp_path / "validate-report.md"
+    assert ctx.validate_rules_json_path() == tmp_path / "validate-rules.json"
+    assert ctx.failure_md_path() == tmp_path / "failure.md"
+    assert ctx.summary_txt_path() == tmp_path / "summary.txt"
+
+
+def test_metadata_json_path(tmp_path: Path) -> None:
+    """T-503 — metadata.json path."""
+    ctx = _make_ctx(tmp_path)
+    assert ctx.metadata_json_path() == tmp_path / "metadata.json"
+
+
+# -------- T-503 write_metadata / read_metadata --------
+
+
+def test_write_metadata_basic(tmp_path: Path) -> None:
+    """T-503 — metadata.json 통합 writer. 옛 4 파일 (.context.json + status.json + summary.txt + failure.md) 흡수."""
+    ctx = _make_ctx(tmp_path)
+    ctx.feature_branch = "feat/T-503"
+    ctx.title = "T-503 시범"
+    ctx.session_ids["wf-T503-PLAN"] = "uuid-1"
+    write_status(ctx, {"workflow_step": "DONE", "transitions": [{"from": "INIT", "to": "PLAN"}]})
+    path = write_metadata(ctx, finalized_at="2026-05-18T23:59:59")
+    assert path == ctx.metadata_json_path()
+    assert path.exists()
+    import json as _json
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert payload["ticket_no"] == "T-489"
+    assert payload["feature_branch"] == "feat/T-503"
+    assert payload["title"] == "T-503 시범"
+    assert payload["session_ids"]["wf-T503-PLAN"] == "uuid-1"
+    assert payload["workflow_step"] == "DONE"
+    assert len(payload["transitions"]) == 1
+    assert payload["finalized_at"] == "2026-05-18T23:59:59"
+    assert payload["failure"] is None
+
+
+def test_write_metadata_failure(tmp_path: Path) -> None:
+    """T-503 — failure_reason 박제 시 failure 필드에 reason + ts."""
+    ctx = _make_ctx(tmp_path)
+    write_status(ctx, {"workflow_step": "FAILED", "transitions": []})
+    path = write_metadata(ctx, failure_reason="plan.md not produced after retries")
+    import json as _json
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    assert payload["workflow_step"] == "FAILED"
+    assert payload["failure"]["reason"] == "plan.md not produced after retries"
+    assert "ts" in payload["failure"]
+
+
+def test_read_metadata_missing(tmp_path: Path) -> None:
+    """T-503 — metadata.json 미존재 시 `{}` 반환."""
+    ctx = _make_ctx(tmp_path)
+    assert read_metadata(ctx) == {}
+
+
+def test_read_metadata_present(tmp_path: Path) -> None:
+    """T-503 — metadata.json 존재 시 dict 반환."""
+    ctx = _make_ctx(tmp_path)
+    write_status(ctx, {"workflow_step": "DONE", "transitions": []})
+    write_metadata(ctx, finalized_at="2026-05-18T00:00:00")
+    payload = read_metadata(ctx)
+    assert payload["workflow_step"] == "DONE"
+    assert payload["finalized_at"] == "2026-05-18T00:00:00"
