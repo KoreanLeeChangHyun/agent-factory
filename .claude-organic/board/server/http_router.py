@@ -139,11 +139,6 @@ class BoardHTTPRequestHandler(
             self._handle_workflow_kill()
         elif self.path == '/api/workflow/stop':
             self._handle_workflow_stop()
-        elif self.path == '/api/v2/wf-event':
-            # DEPRECATED (Phase 1, T-495): /api/v2/sessions/<id>/{step,stdout,phase,finish}
-            # 의미별 endpoint 로 분해됨. 본 단일 endpoint 는 driver 가 새 endpoint 로
-            # 마이그레이션 완료 시점에 자연 사라짐 (호출자 0 → 무사용).
-            self._handle_v2_wf_event()
         elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_post():
             return
         elif self.path == '/terminal/workflow/input':

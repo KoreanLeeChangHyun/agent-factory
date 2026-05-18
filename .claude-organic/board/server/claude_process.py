@@ -582,12 +582,15 @@ class ClaudeProcess:
         return self._status
 
     def set_external_status(self, status: str) -> None:
-        """Stage 3-B — v2 driver external session 의 status 명시 set.
+        """v2 driver external session 의 status 명시 set.
 
         v1 spawn 인프라는 ``self._process.poll()`` 로 자동 stopped 감지하지만,
-        v2 driver subprocess 는 외부에서 돌고 있어 board side 가 추적 불가.
-        endpoint /api/v2/wf-event 가 session.start 시 'running', workflow.finish
-        시 'stopped' 로 set 한다.
+        외부에서 돌고 있는 process 의 status 는 board side 가 추적 불가하므로
+        호출자가 명시 set 한다.
+
+        T-498 (2026-05-18) 시점에 본 메서드의 호출자는 0건 — v1 hybrid 봉합
+        경로 (`/api/v2/wf-event` + `workflow_registry.create_external`) 가 통째
+        제거되며 함께 dead code 가 되었다. 후속 트랙에서 method 자체 제거 검토.
         """
         self._external_status = status
 
