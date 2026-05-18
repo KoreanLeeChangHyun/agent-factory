@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import subprocess
 
-from ._helpers import (
-    _TICKET_RE,
+from ._handler_common import _TICKET_RE
+from ._kanban_done_re import (
     _UNDO_ERROR_RE,
     _UNDO_STRATEGY_RESET,
     _UNDO_STRATEGY_REVERT,
