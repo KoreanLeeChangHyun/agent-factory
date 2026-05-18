@@ -15,7 +15,25 @@ from pathlib import Path
 from typing import Any
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+def _resolve_project_root() -> Path:
+    """git common dir 의 부모 = 메인 워크트리 root. 워크트리에서 호출돼도 메인 측을 가리킨다."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        git_common = Path(result.stdout.strip())
+        if not git_common.is_absolute():
+            git_common = (Path(__file__).resolve().parent / git_common).resolve()
+        return git_common.parent
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return Path(__file__).resolve().parents[3]
+
+
+PROJECT_ROOT = _resolve_project_root()
 RUNS_DIR = PROJECT_ROOT / ".claude-organic" / "runs"
 KANBAN_BIN = PROJECT_ROOT / ".claude-organic" / "bin" / "flow-kanban"
 ENGINE_V2_DIR = Path(__file__).resolve().parent
