@@ -4,28 +4,36 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from .._common import WorkflowContext, kanban_move, load_template, update_step
+from .._common import (
+    WorkflowContext,
+    kanban_move,
+    load_template,
+    update_step,
+    write_metadata,
+)
 from .._emitter import emit, regression, step_end, step_start, workflow_finish
 from .._validate import evaluate_12_rules, save_verdict_report
 
 
 def done_step(ctx: WorkflowContext) -> None:
-    """DONE — summary.txt + usage.json + driver 룰베이스 12룰 재검증 + kanban move review.
+    """DONE — summary.txt + usage.json + metadata.json + driver 14+룰 재검증 + kanban move review.
 
     SPEC.md §7.1 매핑 표 의 'driver 룰베이스 재검증' 은 본 단계에서 수행 — REPORT
     완료 + step.end DONE 기록 후가 정합 시점. update_step(_, "DONE") 은 main 의
     update_step("REPORT", "DONE") 가 이미 수행하므로 본 함수는 중복 호출하지 않음.
     """
     step_start(ctx, "DONE")
+    finalized_at = datetime.now().isoformat(timespec="seconds")
     summary_text = load_template("summary.txt").format(
         ticket_no=ctx.ticket_no,
         registry_key=ctx.registry_key,
         command=ctx.command,
         mode=ctx.mode,
-        finalized_at=datetime.now().isoformat(timespec="seconds"),
+        finalized_at=finalized_at,
     )
     ctx.summary_txt_path().write_text(summary_text, encoding="utf-8")
     ctx.usage_json_path().write_text("{}\n", encoding="utf-8")
+    write_metadata(ctx, finalized_at=finalized_at)
     step_end(ctx, "DONE", outcome="ok")
     # 12룰 재검증 (REPORT 완료 + step.end DONE 기록 후 — workflow_step 이미 DONE)
     verdict_report = evaluate_12_rules(ctx)
@@ -51,6 +59,7 @@ def fail_step(ctx: WorkflowContext, reason: str) -> None:
         ts=datetime.now().isoformat(timespec="seconds"),
     )
     ctx.failure_md_path().write_text(failure_body, encoding="utf-8")
+    write_metadata(ctx, failure_reason=reason)
     regression(ctx, "workflow_step_failed", reason=reason)
     workflow_finish(ctx, outcome="fail", verdict="FAIL")
     update_step(ctx, ctx.current_step, "FAILED", note=reason)

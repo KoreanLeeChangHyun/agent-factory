@@ -447,7 +447,10 @@ def _compute_verdict(rules: list[RuleResult]) -> VerdictReport:
 
 
 def save_verdict_report(ctx: WorkflowContext, report: VerdictReport) -> Path:
-    """validate-rules.json 산출 — driver 평가 결과 박제."""
+    """validate-rules.json 산출 — driver 평가 결과 박제.
+
+    T-503 — flat (옛, backward compat) + nested (`validate/rules.json`) 동시 작성.
+    """
     payload = {
         "schema_version": 1,
         "verdict": report.verdict,
@@ -464,9 +467,10 @@ def save_verdict_report(ctx: WorkflowContext, report: VerdictReport) -> Path:
             for r in report.rules
         ],
     }
-    path = ctx.work_dir / "validate-rules.json"
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2)
+    path = ctx.validate_rules_json_path()
+    path.write_text(serialized, encoding="utf-8")
+    nested = ctx.validate_rules_json_nested_path()
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text(serialized, encoding="utf-8")
     return path

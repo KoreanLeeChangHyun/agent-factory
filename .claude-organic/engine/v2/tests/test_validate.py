@@ -265,6 +265,19 @@ def test_save_verdict_report_schema(tmp_path: Path) -> None:
     assert rule_ids == expected
 
 
+def test_save_verdict_report_writes_nested_mirror(tmp_path: Path) -> None:
+    """T-503 wire-up — validate/rules.json (nested) 도 동시 작성."""
+    ctx = _make_ctx(tmp_path, command="research")
+    _setup_passing_artifacts(ctx)
+    report = evaluate_12_rules(ctx)
+    save_verdict_report(ctx, report)
+    flat = ctx.validate_rules_json_path()
+    nested = ctx.validate_rules_json_nested_path()
+    assert flat.exists()
+    assert nested.exists()
+    assert flat.read_text(encoding="utf-8") == nested.read_text(encoding="utf-8")
+
+
 def test_verdict_report_helpers() -> None:
     rules = [
         RuleResult("R-EXIST-1", False, "report.md missing"),  # hard-fail
