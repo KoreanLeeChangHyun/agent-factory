@@ -24,7 +24,6 @@ import threading
 import urllib.parse
 import urllib.request
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from ._common import PROJECT_ROOT, WorkflowContext

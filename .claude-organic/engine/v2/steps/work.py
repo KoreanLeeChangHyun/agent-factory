@@ -1,4 +1,8 @@
-"""WORK Step — Phase loop. spawn_mode 에 따라 in_place / subprocess."""
+"""WORK Step — Phase loop. spawn_mode 에 따라 in_place / subprocess.
+
+T-504 cutover — `plan/plan.json` (SSOT) 를 parse_plan_json 으로 로딩.
+plan body inject 는 `plan/plan.md` (자연어 본문) 사용.
+"""
 
 from __future__ import annotations
 
@@ -14,24 +18,24 @@ from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
 from .._verify import (
     Phase,
-    parse_plan_frontmatter,
-    topo_sort,
     verify_work_md,
     verify_work_set,
 )
+from ..core.plan_loader import PlanLoaderError, parse_plan_json, topo_sort
 from .done import fail_step
 
 
 def _load_plan(ctx: WorkflowContext) -> list[Phase]:
-    text = ctx.plan_md_path().read_text(encoding="utf-8")
-    fm = parse_plan_frontmatter(text)
-    if fm is None or not fm.phases:
+    """`plan/plan.json` 을 읽어 topo 정렬된 Phase 리스트 반환. 실패 시 []."""
+    try:
+        plan = parse_plan_json(ctx.plan_json_path())
+    except PlanLoaderError:
         return []
-    ordered = topo_sort(fm.phases)
+    ordered = topo_sort(plan.phases)
     if ordered is None:
         return []
-    ctx.mode = fm.mode
-    ctx.command = fm.command
+    ctx.mode = plan.mode
+    ctx.command = plan.command
     return ordered
 
 
@@ -47,17 +51,24 @@ def _load_deps_block(ctx: WorkflowContext, phase: Phase) -> str:
     return "\n".join(blocks) if blocks else "(종속 없음)"
 
 
+def _read_plan_body(ctx: WorkflowContext) -> str:
+    """`plan/plan.md` (자연어 본문) 읽기. 미존재 시 빈 문자열 — driver retry 가 처리."""
+    md_path = ctx.plan_md_path()
+    if not md_path.exists():
+        return ""
+    return md_path.read_text(encoding="utf-8")
+
+
 def work_step(ctx: WorkflowContext) -> bool:
     """Returns: True 정상 / False phases empty 또는 topo 실패 (fail_step 처리됨)."""
     phases = _load_plan(ctx)
     if not phases:
-        fail_step(ctx, "plan.md phases empty or topo sort failed")
+        fail_step(ctx, "plan.json phases empty or topo sort failed")
         return False
     has_subprocess_mode = any(p.spawn_mode == "subprocess" for p in phases)
-    plan_body = ctx.plan_md_path().read_text(encoding="utf-8")
+    plan_body = _read_plan_body(ctx)
     work_system_prompt = load_prompt("work")
 
-    # 요구사항 ③: Phase 단위 진행 가시화 (in_place 모드라도 plan 의 Phase 리스트 로그)
     mode_label = "subprocess (격리)" if has_subprocess_mode else "in_place (단일 spawn)"
     append_log(ctx, f"[WORK] {len(phases)} Phase 진행 시작 (spawn_mode={mode_label})")
     for p in phases:
@@ -101,7 +112,7 @@ def work_step(ctx: WorkflowContext) -> bool:
             f"plan.md (통째):\n{plan_body}\n\n"
             f"본 1 subprocess 안에서 다음 Phase 들을 topological 순서대로 처리:\n"
             f"{phase_list_text}\n\n"
-            f"각 Phase 산출물을 plan.md frontmatter 의 deliverable 경로에 작성 "
+            f"각 Phase 산출물을 plan.json frontmatter 의 deliverable 경로에 작성 "
             f"(권장: `work/<id>/W1.md` nested / 허용: `work/<id>.md` flat). "
             f"모두 작성한 뒤 종료."
         )
@@ -119,7 +130,6 @@ def work_step(ctx: WorkflowContext) -> bool:
             verify=lambda: verify_work_set(artifact_paths),
             artifact_path=ctx.work_dir / "work",
         )
-        # 요구사항 ③: in_place 모드 Phase 산출물 결과를 phase 별로 로그
         for p in phases:
             artifact = ctx.work_phase_md_resolved(p.id)
             ok = artifact.is_file() and artifact.stat().st_size > 0
@@ -129,6 +139,5 @@ def work_step(ctx: WorkflowContext) -> bool:
                 f"({artifact.relative_to(ctx.work_dir)})",
             )
     # SPEC §0.1 (Stage 3-E) — worker 산출물 결정론 commit (변경 0건 skip).
-    # LLM 위임 0건. git commit = driver 결정론 영역.
     auto_commit(ctx)
     return True

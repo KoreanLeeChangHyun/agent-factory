@@ -101,34 +101,48 @@ NONE → INIT → PLAN → WORK → VALIDATE → REPORT → DONE
 | Step | 주체 | LLM 호출 | 산출물 | 핵심 책임 |
 |------|------|---------|--------|----------|
 | INIT | driver (in-process) | X | `metadata.json` (초기) / `workflow.log` (append 시작) | 티켓 prompt 파싱, work_dir 생성, kanban Open→In Progress |
-| PLAN | driver → claude -p | 1 spawn | `plan.md` (YAML frontmatter + body) | 작업 분해, Phase·worker·deps·acceptance_criteria 명세 |
+| PLAN | driver → claude -p | 1 spawn | `plan/plan.json` (driver=JSON SSOT) + `plan/plan.md` (LLM↔LLM=md 자연어 본문) | 작업 분해, Phase·worker·deps·acceptance_criteria 명세 (T-504 분리) |
 | WORK | driver → claude -p | 1 spawn (Phase loop 내부) | `work/<phase_id>/W<n>.md` × N (디렉터리 nesting) | Phase 별 산출물 작성, 종속 그래프 따라 진행, TDD Red→Green→Refactor (implement) |
 | VALIDATE | driver → claude -p + driver | 1 spawn (LLM) + driver in-process | `validate/report.md` (LLM) + `validate/rules.json` (driver) + `validate/code.json` (driver, implement 한정) | **Quality 평가 자연어만 (LLM)** — phase 분해 적정성 / deliverable 완성도. **14+룰 평가·코드 결정론 검증 (driver)** — pytest/ruff/mypy + R-CODE-1/2 (§0.1.1 캐논) |
-| REPORT | driver → claude -p | 1 spawn | `report.md` | plan + work + validate 통째 종합 |
+| REPORT | driver → claude -p | 1 spawn | `report.html` (사람=HTML, template + placeholder 4종) | plan + work + validate 통째 종합, T-504 cutover |
 | DONE | driver (in-process) | X | `metadata.json` (finalize 흡수 — summary/usage/finalized_at) | kanban In Progress→Review, 회귀 metric emit |
 | FAILED | driver (in-process) | X | `metadata.json` (failure 필드 흡수) | 재시도 N회 초과 또는 hard-fail 룰 위반 시 fail-fast |
 
-#### 3.2.1 산출물 6 영역 캐논 (T-503 도달 목표)
+#### 3.2.0 산출물 형식 결정 캐논 SSOT (T-504, 사용자 명시 2026-05-18)
+
+> **누가 읽나 → 형식 결정**. 본 룰이 모든 산출물 형식 결정의 단일 근거.
+
+| 소비자 | 형식 | 이유 |
+|--------|------|------|
+| **driver (기계)** | **driver=JSON** | json.loads + dataclass 검증 결정론. YAML 자작 파서 회피. |
+| **LLM ↔ LLM** | **LLM↔LLM=md** | LLM 친화. WORK / VALIDATE / REPORT LLM 이 전 단계 산출물을 통째 inject 받음. |
+| **사람 (사용자)** | **사람=HTML** | TOC / 코드 하이라이트 / mermaid 인라인 / terracotta 톤. Board 터미널 + 브라우저에서 직접 가독. |
+
+본 룰 외 형식 (CSV / YAML / 옛 `summary.txt` / 옛 `failure.md` / 옛 `validate/code.md`) 은 도입 금지. §3.2.1 의 영역별 형식 결정은 본 SSOT 에서 자동 도출.
+
+#### 3.2.1 산출물 6 영역 캐논 (T-504 갱신)
 
 | # | 산출물 | 작성 주체 | 형식 |
 |---|--------|----------|------|
 | 1 | `metadata.json` | driver | JSON (옛 `.context.json` + `status.json` + `summary.txt` + `failure.md` 흡수) |
 | 2 | `workflow.log` | driver | 텍스트 누적 로그 |
-| 3 | `plan.md` | PLAN LLM | YAML frontmatter + Markdown body |
+| 3 | **`plan/plan.json` + `plan/plan.md`** | PLAN LLM | JSON (driver 결정론 파싱 SSOT) + Markdown (LLM 자연어 본문) — T-504 분리 |
 | 4 | `work/<phase>/W<n>.md` | WORK LLM | Markdown (디렉터리 nesting — 모든 phase 일관) |
-| 5 | `report.md` | REPORT LLM | Markdown |
+| 5 | **`report.html`** | REPORT LLM | **HTML (template `templates/report.html` + placeholder 4종)** — T-504 cutover |
 | 6 | `validate/` 디렉터리 | driver + VALIDATE LLM | `rules.json` (driver 14+룰) + `report.md` (LLM 자연어 보고서 검증) + `code.json` (driver pytest/lint, implement 한정) |
 
-#### 3.2.2 폐기 산출물 (T-503 마이그레이션)
+#### 3.2.2 폐기 산출물 (T-503 + T-504 마이그레이션)
 
 | 파일 | 사유 | 흡수처 |
 |------|------|--------|
 | `user_prompt.txt` | 티켓 prompt 가 SSOT | (티켓 본문) |
-| `summary.txt` | report.md 가 자연어 보고서 SSOT | `report.md` |
+| `summary.txt` | report.html 가 자연어 보고서 SSOT | `report.html` |
 | `.context.json` + `status.json` | 산출물 통합 정합 | `metadata.json` |
 | `failure.md` | 단일 JSON 필드로 충분 | `metadata.json.failure` |
 | `validate-report.md` (flat) | `validate/` 디렉터리 nesting | `validate/report.md` |
 | `validate-rules.json` (flat) | `validate/` 디렉터리 nesting | `validate/rules.json` |
+| **`plan.md` (root, YAML frontmatter)** | T-504 — driver=JSON 분리 | `plan/plan.json` (SSOT) + `plan/plan.md` (자연어 본문) |
+| **`report.md` (Markdown)** | T-504 — 사람=HTML 캐논 | `report.html` (template + placeholder) |
 
 > **마이그레이션 순서 (T-503)**: 신규 cycle 만 새 경로 적용. 소급 변환은 별 트랙. driver path helper 는 양쪽 경로 (flat + nested) 둘 다 resolveable 하게 hold 후 cycle 안정 시 flat 폐기.
 
@@ -151,7 +165,7 @@ FAIL (재시도 = N_max) → Step FAILED → 사이클 종결
 | Step | N_max | 비고 |
 |------|-------|------|
 | INIT | 0 | driver in-process, 재시도 의미 없음 |
-| PLAN | 2 | 산출물 단순 (plan.md 1 파일), 단순 보정 가능 |
+| PLAN | 2 | 산출물 2 파일 (plan/plan.json + plan/plan.md), T-504 분리 후에도 단순 보정 가능 |
 | WORK | 3 | Phase 단위 재시도 (Phase 별로 독립) |
 | VALIDATE | 1 | advisory 평가, 재시도 가치 낮음 |
 | REPORT | 2 | 종합 작성 (입력은 통째 보존, 재작성만) |
@@ -165,19 +179,21 @@ FAIL (재시도 = N_max) → Step FAILED → 사이클 종결
 
 ```
 .claude-organic/runs/<registryKey>/
-├── .context.json          # 사이클 메타 (driver write)
-├── status.json            # workflow_step 전이 로그 (driver write)
+├── metadata.json          # 사이클 메타 (driver write, T-503 — 옛 .context/status/summary/failure 흡수)
 ├── metrics.jsonl          # event stream (driver append, NDJSON)
 ├── user_prompt.txt        # INIT 단계 티켓 prompt 인용
-├── plan.md                # PLAN 산출
-├── work/
-│   ├── P1.md              # WORK Phase 1 산출
-│   ├── P2.md              # WORK Phase 2 산출
+├── plan/                  # PLAN 산출 (T-504 — 디렉터리 nesting)
+│   ├── plan.json          #   driver=JSON SSOT (driver 결정론 파싱 대상)
+│   └── plan.md            #   LLM↔LLM=md (자연어 본문, WORK/VALIDATE/REPORT inject)
+├── work/                  # WORK 산출
+│   ├── P1/W1.md           #   nested (T-503 권장)
+│   ├── P2/W1.md
 │   └── ...
-├── validate-report.md     # VALIDATE 산출
-├── report.md              # REPORT 산출
-├── summary.txt            # DONE 산출
-├── usage.json             # DONE 산출 (token usage 집계)
+├── validate/              # VALIDATE 산출 (T-503 — nesting)
+│   ├── report.md          #   LLM Quality 평가 자연어
+│   ├── rules.json         #   driver 14+룰 평가 결과
+│   └── code.json          #   driver pytest/ruff/mypy (implement 한정)
+├── report.html            # REPORT 산출 (T-504 — 사람=HTML, template + placeholder)
 └── workflow.log           # driver stdout/stderr append
 ```
 
@@ -186,10 +202,10 @@ FAIL (재시도 = N_max) → Step FAILED → 사이클 종결
 | Step | prompt 본문에 통째 inject 되는 파일 |
 |------|----------------------------------|
 | INIT | (없음 — driver in-process) |
-| PLAN | `.context.json` + 티켓 prompt (XML 5필드) |
-| WORK | `.context.json` + `plan.md` (통째) + 종속 work/`<deps>`.md (선택) |
-| VALIDATE | `.context.json` + `plan.md` (통째) + `work/*.md` (모두 통째) |
-| REPORT | `.context.json` + `plan.md` + `work/*.md` + `validate-report.md` (모두 통째) |
+| PLAN | `metadata.json` (초기) + 티켓 prompt (XML 5필드) |
+| WORK | `metadata.json` + `plan/plan.md` (자연어 본문 통째) + 종속 work/`<deps>`.md (선택) |
+| VALIDATE | `metadata.json` + `plan/plan.md` (통째) + `work/**/*.md` (모두 통째) |
+| REPORT | `metadata.json` + `plan/plan.md` + `work/**/*.md` + `validate/report.md` + `templates/report.html` (모두 통째) |
 | DONE | (없음 — driver in-process) |
 
 ### 4.3 통째 주입 vs 요약 (LLM lossy 압축 회피)
@@ -200,67 +216,78 @@ context window 한도 (200K tokens) 가까이 가면? → Phase 분할로 work/ 
 
 ---
 
-## 5. plan.md 구조화 명세
+## 5. plan/ 디렉터리 구조화 명세 (T-504 cutover)
 
-### 5.1 형식 (YAML frontmatter + markdown body, T-503 확장)
+### 5.1 산출물 2 파일 분리 (driver=JSON / LLM↔LLM=md)
 
-```yaml
----
-schema_version: 2                # T-503 — acceptance_criteria/workers 필드 도입
-ticket: T-NNN
-command: implement
-mode: multi          # single | multi
-phases:
-  - id: P1
-    title: "core/_common 신설"
-    deps: []
-    deliverable: work/P1/W1.md   # T-503 — 디렉터리 nesting (모든 phase 일관)
-    spawn_mode: in_place         # default — claude -p subprocess 1개 안에서 순차 처리
-    workers: 1                   # T-503 — 본 phase 안에서 spawn 할 worker 수 (default 1)
-    acceptance_criteria:         # T-503 — implement 한정 의무, 결정론 검증 가능 형태
-      - "engine/v2/_common.py 신설 + import 가능"
-      - "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재"
-      - "pytest engine/v2/tests/test_common.py 통과"
-  - id: P2
-    title: "core/_emitter 신설"
-    deps: [P1]
-    deliverable: work/P2/W1.md
-    spawn_mode: in_place
-    workers: 1
-    acceptance_criteria:
-      - "engine/v2/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처"
-      - "pytest engine/v2/tests/test_emitter.py 통과"
-  - id: P3
-    title: "격리 필요 worker (DB write 등)"
-    deps: [P1, P2]
-    deliverable: work/P3/W1.md
-    spawn_mode: subprocess       # 예외 격리 — 별도 claude -p subprocess
-    workers: 1
-    acceptance_criteria:
-      - "DB 마이그레이션 스크립트 신설 + dry-run 통과"
----
+T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
 
-# Plan 본문 (LLM 자유 산문 — driver 파싱 영역 X)
+- **`plan/plan.json`** — driver 결정론 파싱 대상 (SSOT). schema_version / ticket / command / mode / phases.
+- **`plan/plan.md`** — WORK / VALIDATE / REPORT LLM 인계용 자연어 본문 (배경 / 결정 / 다이어그램 등).
 
-## 배경
-...
+옛 root `plan.md` (YAML frontmatter + body) 통째 폐기 — backward compat 0건.
 
-## 접근
-...
+### 5.1.1 plan/plan.json 스키마 (JSON, driver SSOT)
 
-## Phase 별 상세
-...
+```json
+{
+  "schema_version": 2,
+  "ticket": "T-NNN",
+  "command": "implement",
+  "mode": "multi",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "core/_common 신설",
+      "deps": [],
+      "deliverable": "work/P1/W1.md",
+      "spawn_mode": "in_place",
+      "workers": 1,
+      "acceptance_criteria": [
+        "engine/v2/_common.py 신설 + import 가능",
+        "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재",
+        "pytest engine/v2/tests/test_common.py 통과"
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "core/_emitter 신설",
+      "deps": ["P1"],
+      "deliverable": "work/P2/W1.md",
+      "spawn_mode": "in_place",
+      "workers": 1,
+      "acceptance_criteria": [
+        "engine/v2/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처",
+        "pytest engine/v2/tests/test_emitter.py 통과"
+      ]
+    }
+  ]
+}
 ```
 
-### 5.2 driver 의 frontmatter 파싱
+### 5.1.2 plan/plan.md 본문 (Markdown, LLM↔LLM 자연어)
 
-- `phases` 필수, list 비어있으면 PLAN 재시도 trigger
-- `deps` 의 ID 가 phases list 안에 존재해야 함 (룰베이스 validation)
-- topological sort 로 실행 순서 결정 (circular dep 발견 시 PLAN 재시도)
+driver 가 파싱하지 않음. WORK / VALIDATE / REPORT LLM 이 통째 inject 받음.
+권장 구조:
+1. `## 캐논 SSOT` — 본 plan 의 단일 룰 / 결정 / 표
+2. `## 결정` — backward compat / cutover / 스키마 분기 결정
+3. `## 산출물 매핑` — §3.2.1 6 영역 표 인용
+4. `## phase 분해 토폴로지` — mermaid 또는 ASCII
+5. `## 각 phase 상세` — 신설 파일 / 폐기 / 마이그레이션
+6. `## 위험 영역 + 회피`
+7. `## 후속 트랙`
+
+### 5.2 driver `parse_plan_json` 검증 (core/plan_loader.py)
+
+- `phases` 필수, list 비어있으면 `PlanLoaderError` → PLAN 재시도 trigger
+- `deps` 의 ID 가 phases list 안에 존재해야 함 (unknown → error)
+- `deps` 가 자기 자신 참조 금지 (self → error)
+- Phase id unique (duplicate → error)
+- topological sort 로 실행 순서 결정 (circular dep → error)
 - `spawn_mode` 기본값 `in_place`
-- **`acceptance_criteria` 필수 (command=implement 한정, T-503)**: list[str], 1+ 항목. 누락 시 PLAN 재시도 trigger. research/review 는 미적용.
-- `workers` 기본값 `1` (T-503). 2+ 면 본 phase 안에서 driver 가 N 개 subprocess 병렬 spawn (별 트랙 — 본 cycle 미구현, schema 만 박제).
-- `deliverable` 권장 형식: `work/<id>/W1.md` (T-503 디렉터리 nesting). `work/<id>.md` flat 형식도 backward compat 으로 일정 기간 허용.
+- **`acceptance_criteria` 필수 (command=implement 한정, T-503)**: list[str], 1+ 항목. 빈 list 시 PLAN 재시도 trigger. research/review 는 미적용.
+- `workers` 기본값 `1` (T-503). 2+ 는 별 트랙 (driver 미구현, schema 만 박제).
+- `deliverable` 권장 형식: `work/<id>/W1.md` (T-503 디렉터리 nesting). `work/<id>.md` flat 도 backward compat.
 
 ### 5.3 spawn_mode 의미
 
@@ -724,3 +751,4 @@ Stage 3-E (§0.1 책임 분담 캐논 박제) 의 작동은 본 T-494 같은 단
 | 2026-05-15 | §9.1.1 — command 별 worktree 분기 정책 도입 (Stage 3-D) | T-489 Stage 3-D — implement 의무 / research·review worktree-less / R-WT-1 SKIP 정합 (commit e73dfc1 + 79bf36d) |
 | 2026-05-15 | §0.1 책임 분담 캐논 신설 (Stage 3-E) — driver=12룰+commit+kanban+FSM 결정론 / LLM=자연어 산출만. §3.2 / §7.1 / §7.2 정합 | T-493 smoke 에서 LLM verdict (WARN) ≡ driver verdict (FAIL) 충돌 발견. validate.txt 가 LLM 에게 12룰 평가시키고 verdict 산출시킨 룰 위반 + work.txt 의 git commit 누락. 사용자 명시 캐논 박제 (commit ? + ?) |
 | 2026-05-18 | T-503 — §0.1 / §0.1.1 / §0.1.2 / §3.2 / §3.2.1 / §3.2.2 / §5.1 / §5.2 / §7.1 / §9 / §9.2 / §9.3 갱신 — 12룰 → 14+룰 (R-CODE-1/2), 산출물 6 영역 + 폐기 5 파일, 검증 2축 분리 (자연어 보고서 LLM / 결정론 코드 driver), TDD 강제 (acceptance_criteria + Red→Green→Refactor) | 사용자 명시 캐논 확장 (산출물 정합화 + 검증 2축 분리 + TDD prompt 강제). 본 cycle 자체는 옛 driver 처리 — R-CODE 는 다음 cycle 적용. |
+| 2026-05-19 | T-504 — §3.2.0 (형식 결정 캐논 SSOT) / §3.2.1 / §3.2.2 / §3.2 Step 책임 / §3.4 PLAN N_max / §4.1 디렉터리 / §4.2 prompt 주입 매트릭스 / §5 plan/ 디렉터리 구조화 (5.1 / 5.1.1 JSON 스키마 / 5.1.2 plan.md 본문 / 5.2 driver parse_plan_json) 갱신 — 산출물 형식 캐논 SSOT 박제 (driver=JSON / LLM↔LLM=md / 사람=HTML). 옛 root `plan.md` (YAML) + 옛 `report.md` (Markdown) cutover 폐기. 신설 `plan/plan.json` + `plan/plan.md` + `report.html` (template + placeholder). | 사용자 명시 (2026-05-18) "누가 읽나 → 형식 결정" 단일 룰. T-489 cutover 정책 일관 — backward compat shim 0건. 본 cycle 의 P1~P6 가 driver `parse_plan_json` + `core/plan_loader.py` + `templates/report.html` + 검증 함수 (`verify_plan_artifacts` / `verify_report_html`) + prompts (plan.txt / report.txt) 통째 마이그레이션. |

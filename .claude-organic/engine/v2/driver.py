@@ -42,8 +42,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         plan_step(ctx)
-        if not ctx.plan_md_path().exists():
-            fail_step(ctx, "plan.md not produced after retries")
+        if not ctx.plan_json_path().exists() or not ctx.plan_md_path().exists():
+            fail_step(ctx, "plan/plan.json or plan/plan.md not produced after retries")
             return 2
         update_step(ctx, "PLAN", "WORK")
         if args.step == "PLAN":
@@ -61,8 +61,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         report_step(ctx)
-        if not ctx.report_md_path().exists():
-            fail_step(ctx, "report.md not produced after retries")
+        if not ctx.report_html_path().exists():
+            fail_step(ctx, "report.html not produced after retries")
             return 2
         update_step(ctx, "REPORT", "DONE")
         if args.step == "REPORT":

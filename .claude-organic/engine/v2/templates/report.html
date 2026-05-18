@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <style>
+    :root {
+      --color-terracotta: #D97757;
+      --color-success: #4ec9b0;
+      --color-fail: #f48771;
+      --color-fg: #1e1e1e;
+      --color-fg-dim: #555;
+      --color-bg: #fdfcfb;
+      --color-card: #ffffff;
+      --color-border: rgba(217, 119, 87, 0.18);
+      --color-code-bg: #f4efeb;
+      --radius: 6px;
+      --gap: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      color: var(--color-fg);
+      background: var(--color-bg);
+      line-height: 1.55;
+      font-size: 14.5px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+    nav.toc {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 24px 18px;
+      border-right: 1px solid var(--color-border);
+      background: var(--color-card);
+    }
+    nav.toc h2 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--color-terracotta);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    nav.toc ol { padding-left: 18px; margin: 0; }
+    nav.toc li { margin-bottom: 6px; }
+    nav.toc a {
+      color: var(--color-fg-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    nav.toc a:hover { color: var(--color-terracotta); }
+    main {
+      padding: 32px 40px;
+      max-width: 960px;
+    }
+    h1, h2, h3 {
+      color: var(--color-terracotta);
+      margin-top: 1.6em;
+      margin-bottom: 0.6em;
+    }
+    h1 { font-size: 1.7em; border-bottom: 2px solid var(--color-border); padding-bottom: 8px; }
+    h2 { font-size: 1.3em; }
+    h3 { font-size: 1.1em; color: var(--color-fg); }
+    p { margin: 0.6em 0; }
+    a { color: var(--color-terracotta); }
+    code {
+      font-family: var(--font-mono);
+      background: var(--color-code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--color-code-bg);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      line-height: 1.45;
+      border: 1px solid var(--color-border);
+    }
+    pre code { background: transparent; padding: 0; }
+    table {
+      border-collapse: collapse;
+      margin: 1em 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid var(--color-border);
+      padding: 6px 10px;
+      text-align: left;
+    }
+    th { background: var(--color-code-bg); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.78em;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge.pass { background: var(--color-success); color: white; }
+    .badge.fail { background: var(--color-fail); color: white; }
+    .badge.warn { background: var(--color-terracotta); color: white; }
+    .badge.active {
+      background: rgba(217, 119, 87, 0.18);
+      color: var(--color-terracotta);
+      animation: heading-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes heading-pulse {
+      0%, 100% { opacity: 0.65; }
+      50%      { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .badge.active { animation: none; opacity: 1; }
+    }
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--color-border); }
+      main { padding: 20px; }
+    }
+    pre.mermaid {
+      background: transparent;
+      border: 1px dashed var(--color-border);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#summary">요약</a></li>
+        <li><a href="#plan">plan 인용</a></li>
+        <li><a href="#work">work 산출</a></li>
+        <li><a href="#quality">Quality 평가</a></li>
+        <li><a href="#conclusion">결론</a></li>
+      </ol>
+    </nav>
+    <main>
+      <h1>{{title}}</h1>
+      <section id="summary">
+        <h2>요약</h2>
+        {{summary}}
+      </section>
+      <section id="plan">
+        <h2>plan 인용</h2>
+        <p>본 사이클의 plan 자연어 본문은 <a href="plan/plan.md">{{plan_md_link}}</a>
+          (plan.md) 를 참조. 결정론 schema 는 <code>plan/plan.json</code>.</p>
+      </section>
+      <section id="work">
+        <h2>work 산출</h2>
+        {{phase_sections}}
+      </section>
+      <section id="quality">
+        <h2>Quality 평가</h2>
+        <p>VALIDATE 단계 LLM 자연어 평가 (<code>validate/report.md</code>) 인용.</p>
+      </section>
+      <section id="conclusion">
+        <h2>결론</h2>
+        <p>본 사이클 결과 + 후속 트랙은 위 요약 + Quality 평가 참조.
+          14+룰 verdict 는 driver <code>validate/rules.json</code> SSOT 를 별도 참조.</p>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) { window.mermaid.initialize({ startOnLoad: true, theme: 'neutral' }); }
+  </script>
+</body>
+</html>

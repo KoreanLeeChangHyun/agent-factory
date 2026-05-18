@@ -134,8 +134,17 @@ class WorkflowContext:
     def workflow_log_path(self) -> Path:
         return self.work_dir / "workflow.log"
 
+    def plan_dir(self) -> Path:
+        """T-504 — `plan/` 디렉터리 (PLAN 산출물 영역)."""
+        return self.work_dir / "plan"
+
     def plan_md_path(self) -> Path:
-        return self.work_dir / "plan.md"
+        """T-504 cutover — `plan/plan.md` (LLM↔LLM 자연어 본문, 옛 root plan.md 폐기)."""
+        return self.plan_dir() / "plan.md"
+
+    def plan_json_path(self) -> Path:
+        """T-504 신설 — `plan/plan.json` (driver 결정론 파싱 대상, SSOT)."""
+        return self.plan_dir() / "plan.json"
 
     def work_dir_phase_md(self, phase_id: str) -> Path:
         """flat 경로 — backward compat (T-503 마이그레이션 hold 기간)."""
@@ -187,7 +196,15 @@ class WorkflowContext:
         return self.validate_dir() / "code.json"
 
     def report_md_path(self) -> Path:
-        return self.work_dir / "report.md"
+        """T-504 cutover — `report.html` (사람 가독, 옛 report.md 폐기).
+
+        함수명은 backward compat alias (REPORT step + R-EXIST-1 호출자 보존).
+        """
+        return self.work_dir / "report.html"
+
+    def report_html_path(self) -> Path:
+        """T-504 — `report.html` 명시 경로 (사람 가독, HTML template + placeholder)."""
+        return self.work_dir / "report.html"
 
     def user_prompt_path(self) -> Path:
         return self.work_dir / "user_prompt.txt"

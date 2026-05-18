@@ -39,13 +39,14 @@ def _make_ctx(tmp_path: Path, command: str = "implement") -> WorkflowContext:
 
 def _setup_passing_artifacts(ctx: WorkflowContext) -> None:
     """모든 룰 PASS 시나리오 — verdict=PASS 기대."""
-    # R-EXIST-1: report.md
+    # R-EXIST-1: report.html (T-504 cutover)
     ctx.report_md_path().write_text(
-        "## summary\n본 사이클은 plan.md 의 결정에 따라 진행.\n" * 3,
+        "<html><body>본 사이클은 plan.md 의 결정에 따라 진행.</body></html>\n" * 3,
         encoding="utf-8",
     )
-    # R-EXIST-2: plan.md
-    ctx.plan_md_path().write_text("---\nticket: T-1\n---\n\n# body\n", encoding="utf-8")
+    # R-EXIST-2: plan/plan.md (T-504 cutover — nested 경로)
+    ctx.plan_dir().mkdir(parents=True, exist_ok=True)
+    ctx.plan_md_path().write_text("# plan body\nT-504 자연어 본문\n", encoding="utf-8")
     # R-EXIST-3: status.json + workflow_step
     write_status(ctx, {"workflow_step": "DONE", "transitions": []})
     # R-EXIST-4 + R-METRIC-2: metrics.jsonl 에 step.end DONE outcome=ok
@@ -141,7 +142,7 @@ def test_r_guard_3_regression_pattern(tmp_path: Path) -> None:
 def test_r_path_1_report_missing_token(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     _setup_passing_artifacts(ctx)
-    # report.md 에서 plan.md 토큰 제거
+    # report.html 에서 plan.md 토큰 제거
     ctx.report_md_path().write_text("body without the token " * 10, encoding="utf-8")
     report = evaluate_12_rules(ctx)
     rule = next(r for r in report.rules if r.rule_id == "R-PATH-1")
@@ -233,7 +234,7 @@ def test_verdict_fail_with_three_violations(tmp_path: Path) -> None:
     with ctx.metrics_jsonl_path().open("a", encoding="utf-8") as fh:
         fh.write('{"event":"tool.deny","tool":"A"}\n')
         fh.write('{"event":"regression.pattern","pattern":"X"}\n')
-    # report.md 의 plan.md 토큰도 제거
+    # report.html 의 plan.md 토큰도 제거
     ctx.report_md_path().write_text("body without token " * 10, encoding="utf-8")
     report = evaluate_12_rules(ctx)
     assert report.violation_count() >= 3

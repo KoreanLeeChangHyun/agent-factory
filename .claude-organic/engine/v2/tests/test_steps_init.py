@@ -10,13 +10,9 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 
-import pytest
 
 from engine.v2.steps.init import _maybe_create_worktree, _parse_ticket_meta
-from engine.v2 import steps as _steps_pkg
 from engine.v2.steps import init as init_mod
 
 
@@ -188,8 +184,6 @@ def test_init_step_uses_v2_registry_key_env(monkeypatch, tmp_path):
 def test_init_step_falls_back_to_new_registry_key_when_env_missing(monkeypatch, tmp_path):
     """V2_REGISTRY_KEY env 미설정 시 new_registry_key() 정상 호출."""
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
-
-    captured = {}
 
     def fake_kanban_show(ticket_no):
         return (
