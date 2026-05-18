@@ -14,6 +14,8 @@
 <link rel="stylesheet" href="css/views/roadmap.css">
 <link rel="stylesheet" href="css/views/relations.css">
 <link rel="stylesheet" href="css/widgets/settings.css">
+<!-- T-505 P3 — Step 6박스 + Phase sub-패널 위계 오버레이 CSS. -->
+<link rel="stylesheet" href="css/workflow/step-overlay.css">
 <link id="hljs-theme-dark" rel="stylesheet" href="css/vendor/highlight-github-dark.min.css" media="(prefers-color-scheme: dark)">
 <link id="hljs-theme-light" rel="stylesheet" href="css/vendor/highlight-github.min.css" media="(prefers-color-scheme: light)">
 </head>
@@ -68,6 +70,11 @@
 <script src="js/workflow/v2-workflow.js"></script>
 <!-- T-495 P3 — Board.v2Viewer (artifact / log / metrics viewer) -->
 <script src="js/workflow/v2-viewer.js"></script>
+<!-- T-505 P3 — Board.stepOverlay (Step 6박스 + Phase sub-패널 위계).
+     Board.v2Workflow.subscribe 의존 → v2-workflow.js 뒤에 로드. -->
+<script src="js/workflow/step-overlay.js"></script>
+<!-- T-505 P2 — Board.v2StdoutBridge (workflow_stdout → Board.stepOverlay.handleStdout). -->
+<script src="js/workflow/v2-stdout-bridge.js"></script>
 <script src="js/views/dashboard.js"></script>
 <script src="js/views/roadmap.js"></script>
 <script src="js/views/relations.js"></script>
