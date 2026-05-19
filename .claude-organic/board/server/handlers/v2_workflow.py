@@ -5,6 +5,7 @@ v1 `/api/v2/wf-event` 단일 endpoint 는 의미별 endpoint 로 분해됨:
   GET  /api/v2/sessions                       — 전체 세션 목록
   GET  /api/v2/sessions/<id>                  — 세션 상세 (step / phase / artifacts / ts)
   GET  /api/v2/sessions/<id>/events           — SSE 구독 (per-session client fan-out)
+  GET  /api/v2/sessions/<id>/history          — persist NDJSON 이벤트 통째 (T-513 P1)
   POST /api/v2/sessions/<id>/step             — Step 전이 통보 (workflow_step 발화)
   POST /api/v2/sessions/<id>/stdout           — claude -p stdout chunk forward
   POST /api/v2/sessions/<id>/phase            — WORK 내부 phase 통보
@@ -16,6 +17,7 @@ ClaudeProcess 의존 0건. v1 workflow.py handler 와 별도.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -67,6 +69,10 @@ class V2WorkflowHandlerMixin:
 
         if sub == 'events':
             self._v2_handle_session_events(session_id)
+            return True
+
+        if sub == 'history':
+            self._v2_handle_session_history(session_id)
             return True
 
         if sub.startswith('artifacts/'):
@@ -262,6 +268,61 @@ class V2WorkflowHandlerMixin:
                     break
         finally:
             session.channel.remove(self.wfile)
+
+    @api_endpoint("W2", "history")
+    def _v2_handle_session_history(self, session_id: str) -> None:
+        """GET /api/v2/sessions/<id>/history — persist NDJSON 이벤트 통째 반환.
+
+        T-513 P1 — 결정점 #2 채택, REST history V2 endpoint 신설. 재접속 시
+        클라이언트가 라이브 SSE 등록 전 과거 이벤트를 일괄 적재. SSE replay
+        링버퍼 사용 X — REST 단일 출처 (board.md §1.1 Terminal SSE replay 정책
+        정합).
+
+        method: GET
+        url: /api/v2/sessions/<id>/history
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_history
+        request: path {session_id: str}
+        response_ok: {session_id, total_count, events: [{ts, event, payload}]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 404
+        auth: none (local-only)
+        side_effects: read NDJSON persist file (no registry mutation)
+        sse_events: none
+        """
+        session = v2_workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        persist_path = session.channel.persist_path
+        events: list = []
+        if persist_path and os.path.isfile(persist_path):
+            try:
+                with open(persist_path, 'r', encoding='utf-8') as f:
+                    for raw_line in f:
+                        line = raw_line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        # _meta 라인 (첫 줄) 건너뛰기 — events 만 반환
+                        if isinstance(rec, dict) and '_meta' in rec:
+                            continue
+                        events.append(rec)
+            except OSError as exc:
+                logger.error(
+                    'v2 history read failed (%s): %s', persist_path, exc,
+                )
+                # graceful — 빈 events 로 반환
+
+        self._send_json({
+            'session_id': session_id,
+            'total_count': len(events),
+            'events': events,
+        })
 
     @api_endpoint("W2", "artifact_get")
     def _v2_handle_session_artifact(self, session_id: str, artifact_rel: str) -> None:

@@ -13,19 +13,16 @@
   var M = (Board._term = Board._term || {});
 
   // ── Session dispatcher ──
-  M.workflowSessionId = (function () {
-    try {
-      var p = new URLSearchParams(window.location.search);
-      var s = p.get("session");
-      if (s && s !== "main" && s.indexOf("wf-") === 0) return s;
-    } catch (e) {}
-    return null;
-  })();
+  // T-513 P3 — V1 메인 터미널 워크플로우 모드 폐기 (결정점 #1 + #5).
+  // 옛 URL `?session=wf-...` 진입점 단절 — 메인 터미널은 메인 모드만 활성.
+  // V2 워크플로우는 별도 워크플로우 탭 (v2-workflow.js) 으로 진입.
+  M.workflowSessionId = null;
 
-  M.isWorkflowMode = M.workflowSessionId !== null;
+  M.isWorkflowMode = false;
 
-  // URL 쿼리 파라미터에서 읽은 초기 세션 ID (M.renderTerminal 후 탭 전환에 사용)
-  M._initialQuerySession = M.workflowSessionId;
+  // 옛 V1 워크플로우 모드 URL 쿼리 진입점은 폐기 — 본 변수는 null 고정으로
+  // line ~1134 의 `if (M._initialQuerySession)` 분기가 dead 화됨.
+  M._initialQuerySession = null;
 
   // D5 #5: URL 세션 사전 검증 상태. checked=완료, inFlight=fetch 진행 중
   M._initialSessionChecked = false;
@@ -1047,8 +1044,14 @@
           e.stopPropagation();
           var closeTab = closeBtn.closest(".session-tab");
           if (closeTab && closeTab.dataset.session !== "main") {
+            var closedSid = closeTab.dataset.session;
             var wasActive = closeTab.classList.contains("active");
             closeTab.parentNode.removeChild(closeTab);
+            // T-516 — localStorage 단일 출처에서도 ID 제거. 닫기 = DOM + 영속 동시.
+            // 새로고침 시 부활 회귀 0 (사용자 명시 닫기만 라이프사이클 종결).
+            if (closedSid && Board.workflowTabStorage && Board.workflowTabStorage.remove) {
+              Board.workflowTabStorage.remove(closedSid);
+            }
             if (wasActive) {
               var mainTab = sessionTabList.querySelector('[data-session="main"]');
               if (mainTab) mainTab.classList.add("active");
@@ -1144,6 +1147,33 @@
       try {
         history.replaceState(null, "", "terminal.html");
       } catch (e) {}
+    }
+
+    // T-516 — localStorage 단일 출처에서 워크플로우 탭 복원.
+    // 메인 탭은 헬퍼 add 차단 + 본 흐름 우회 (M._initialQuerySession 도 중복 skip).
+    // 서버 registry 에 없는 ID 는 'stopped' (회색) 으로 표시 — 닫기 버튼으로만 제거.
+    if (Board.workflowTabStorage && Board.workflowTabStorage.get) {
+      var storedIds = Board.workflowTabStorage.get();
+      storedIds.forEach(function (sid) {
+        if (!sid || sid === "main") return;
+        if (sid === M._initialQuerySession) return; // 위 분기에서 이미 추가됨
+        if (Board.sessionSwitcher.addTab) {
+          var label = sid.replace(/^wf-/, "").replace(/-\d+$/, "");
+          Board.sessionSwitcher.addTab(sid, label, "stopped");
+        }
+        // 비동기 status 합성 — /api/v2/sessions/<id> 응답 status 로 dot 갱신.
+        // 응답 누락 / 네트워크 실패 / 404 = 'stopped' 회색 (사용자 명시 결정).
+        if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
+          Board.v2Workflow.fetchSession(sid).then(function (meta) {
+            if (!meta) return; // 404 / null → stopped 유지
+            var st = (meta.status === "running" || meta.status === "idle")
+              ? "running" : "stopped";
+            if (Board.sessionSwitcher.setTabStatus) {
+              Board.sessionSwitcher.setTabStatus(sid, st);
+            }
+          }).catch(function () { /* 네트워크 실패 → stopped 유지 */ });
+        }
+      });
     }
 
     Board.workflowSessions.refresh(M.workflowSessionId, M.isWorkflowMode);

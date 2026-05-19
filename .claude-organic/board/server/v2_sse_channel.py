@@ -45,11 +45,21 @@ class V2WorkflowSSEChannel:
         self._persist_path: str | None = persist_path
         self._persist_lock: threading.Lock = threading.Lock()
 
+    @property
+    def persist_path(self) -> str | None:
+        """NDJSON persist 파일 절대 경로 (persist 비활성 시 None).
+
+        T-513 P1 — `GET /api/v2/sessions/<id>/history` endpoint 가 본 경로를
+        read 하여 과거 이벤트를 일괄 반환한다 (REST 단일 출처 정책 정합).
+        """
+        return self._persist_path
+
     def add(self, wfile: object) -> None:
         """SSE 클라이언트를 라이브 스트림에 등록한다.
 
-        replay 는 별도 endpoint (GET /api/v2/sessions/<id>) 가 NDJSON 파일에서 read.
-        본 메서드는 신규 클라이언트만 등록하여 이후 라이브 이벤트 수신.
+        replay 는 별도 endpoint (GET /api/v2/sessions/<id>/history) 가 NDJSON
+        파일에서 read. 본 메서드는 신규 클라이언트만 등록하여 이후 라이브
+        이벤트 수신.
         """
         with self._lock:
             self._clients.append(wfile)

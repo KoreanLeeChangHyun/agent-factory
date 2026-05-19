@@ -168,7 +168,7 @@
           return { events: events, remaining: remaining };
         }
 
-        fetch('/api/workflow/sync', { method: 'POST' })
+        fetch('/api/settings/workflow-sync', { method: 'POST' })
           .then(function (response) {
             if (response.status === 409) {
               statusEl.className = 'settings-sync-status failed';

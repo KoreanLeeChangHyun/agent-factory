@@ -1,4 +1,10 @@
-"""Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes."""
+"""Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes.
+
+T-513 P2 — `_handle_kanban_undo_done` / `_handle_kanban_workflow_entries` /
+`_handle_kanban_workflow_detail` 흡수 (옛 V1 undo / generic 분기 / list+entries+detail
+도메인 이전). V1 endpoint 본체 + alias 라우팅은 P5 에서 일괄 폐기 — 본 mixin 이
+KANBAN 도메인 단일 진입점.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +22,18 @@ from ._kanban_done_helpers import (
     handle_kanban_done_review,
     check_derived_blocked,
 )
-from .._common import api_endpoint, logger
+from ._kanban_done_re import (
+    _UNDO_ERROR_RE,
+    _UNDO_STRATEGY_RESET,
+    _UNDO_STRATEGY_REVERT,
+    _UNDO_WORKTREE_RE,
+)
+from .._common import (
+    _list_workflow_entries,
+    _workflow_detail,
+    api_endpoint,
+    logger,
+)
 from ..state import sse_manager
 from ..v2_launcher import (
     _LAUNCH_READER_LOCK,
@@ -1143,3 +1160,174 @@ class KanbanHandlerMixin:
         # 4. ticket 필드 주입 후 반환
         verdict_dict['ticket'] = ticket
         self._send_json(verdict_dict)
+
+    # ------------------------------------------------------------------
+    # T-513 P2 — 도메인 이전 흡수 endpoint (undo-done + workflow-entries + workflow-detail)
+    # ------------------------------------------------------------------
+
+    @api_endpoint("KANBAN", "undo_done")
+    def _handle_kanban_undo_done(self) -> None:
+        """POST /api/kanban/undo-done — Done 처리된 워크플로우를 Review 로 롤백.
+
+        T-513 P2 — 옛 V1 undo handler 를 kanban 도메인으로 이전. flow-undo-done
+        호출 + 칸반 force 전이는 본질 kanban 작업이라 KANBAN 도메인 정합.
+
+        method: POST
+        url: /api/kanban/undo-done
+        domain: KANBAN
+        handler: KanbanHandlerMixin._handle_kanban_undo_done
+        request: body {ticket: T-NNN, force?: bool}
+        response_ok: {ok: true, kind, ticket, strategy, branch, worktree_path, stdout, message}
+        response_error: {ok: false, kind: error, ticket, error, stdout, stderr}
+        status_codes: 200, 400, 409, 500, 504
+        auth: none (local-only) — user-triggered
+        side_effects: develop reset/revert + worktree recreate + kanban force move
+        sse_events: kanban_update (via FileWatcher)
+        """
+        data = self._read_json_body() or {}
+        ticket = (data.get('ticket') or '').strip()
+        force = bool(data.get('force', False))
+
+        if not ticket or not _TICKET_RE.match(ticket):
+            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            return
+
+        project_root = os.getcwd()
+        done_xml = os.path.join(
+            project_root, '.claude-organic', 'tickets', 'done', f'{ticket}.xml',
+        )
+        if not os.path.isfile(done_xml):
+            self._send_error(
+                400,
+                f'{ticket} is not in Done column (undo-done targets Done tickets only)',
+            )
+            return
+
+        flow_undo_done = os.path.join(
+            project_root, '.claude-organic', 'bin', 'flow-undo-done',
+        )
+        cmd_args = [flow_undo_done, ticket]
+        if force:
+            cmd_args.append('--force')
+        try:
+            result = subprocess.run(
+                cmd_args,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except subprocess.TimeoutExpired:
+            self._send_error(504, 'flow-undo-done timed out (180s)')
+            return
+        except FileNotFoundError:
+            self._send_error(500, f'flow-undo-done not found: {flow_undo_done}')
+            return
+
+        stdout = result.stdout or ''
+        stderr = result.stderr or ''
+        all_lines = stdout.splitlines() + stderr.splitlines()
+
+        strategy = ''
+        worktree_path = ''
+        branch = ''
+        error_message = ''
+
+        for line in all_lines:
+            if not strategy and _UNDO_STRATEGY_RESET.search(line):
+                strategy = 'reset'
+            elif not strategy and _UNDO_STRATEGY_REVERT.search(line):
+                strategy = 'revert'
+            wt_match = _UNDO_WORKTREE_RE.search(line)
+            if wt_match:
+                worktree_path = wt_match.group(1).strip()
+                branch = wt_match.group(2).strip()
+            err_match = _UNDO_ERROR_RE.search(line)
+            if err_match and not error_message:
+                error_message = err_match.group(1).strip()
+
+        if result.returncode == 0:
+            kind = (
+                'reset_ok' if strategy == 'reset'
+                else 'revert_ok' if strategy == 'revert'
+                else 'unknown_ok'
+            )
+            self._send_json({
+                'ok': True,
+                'kind': kind,
+                'ticket': ticket,
+                'strategy': strategy,
+                'branch': branch,
+                'worktree_path': worktree_path,
+                'message': f'{ticket} 롤백 완료 (전략: {strategy or "?"})',
+                'stdout': stdout.strip(),
+            })
+            return
+
+        if not error_message:
+            for line in reversed(stderr.splitlines()):
+                stripped = line.strip()
+                if stripped:
+                    error_message = stripped
+                    break
+        if not error_message:
+            error_message = f'flow-undo-done exited with code {result.returncode}'
+
+        self._send_json_with_status(409, {
+            'ok': False,
+            'kind': 'error',
+            'ticket': ticket,
+            'error': error_message,
+            'message': error_message,
+            'stdout': stdout.strip(),
+            'stderr': stderr.strip(),
+        })
+
+    @api_endpoint("KANBAN", "workflow_entries")
+    def _handle_kanban_workflow_entries(self) -> None:
+        """GET /api/kanban/workflow-entries — 워크플로우 entries 목록 (runs/<key>/).
+
+        T-513 P2 — handlers/generic.py 의 옛 워크플로우 entries inline 분기를
+        kanban 도메인으로 이전. 워크플로우 entries 는 칸반 카드 측면 정보로
+        소비되므로 KANBAN 도메인 정합.
+
+        method: GET
+        url: /api/kanban/workflow-entries
+        domain: KANBAN
+        handler: KanbanHandlerMixin._handle_kanban_workflow_entries
+        request: query none
+        response_ok: [{registry_key, ticket_id, command, status, ts, ...}]
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: read .claude-organic/runs/ filesystem
+        sse_events: none
+        """
+        project_root = os.getcwd()
+        self._send_json(_list_workflow_entries(project_root))
+
+    @api_endpoint("KANBAN", "workflow_detail")
+    def _handle_kanban_workflow_detail(self) -> None:
+        """GET /api/kanban/workflow-detail?entry=<key> — 워크플로우 entry 상세.
+
+        T-513 P2 — handlers/generic.py 의 옛 워크플로우 detail inline 분기를
+        kanban 도메인으로 이전. entry query 가 비었으면 빈 배열 반환.
+
+        method: GET
+        url: /api/kanban/workflow-detail
+        domain: KANBAN
+        handler: KanbanHandlerMixin._handle_kanban_workflow_detail
+        request: query {entry: str (registry_key)}
+        response_ok: [...]
+        response_error: n/a (always 200, 빈 entry 시 빈 배열)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: read .claude-organic/runs/<entry>/ filesystem
+        sse_events: none
+        """
+        entry = self._parse_query_param('entry')
+        if not entry:
+            self._send_json([])
+            return
+        project_root = os.getcwd()
+        self._send_json(_workflow_detail(project_root, entry))

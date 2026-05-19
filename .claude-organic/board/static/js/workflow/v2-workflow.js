@@ -8,6 +8,7 @@
  *   GET  /api/v2/sessions                       — list
  *   GET  /api/v2/sessions/<id>                  — detail (current_step / phase / artifacts / ts)
  *   GET  /api/v2/sessions/<id>/events           — SSE 구독 (per-session)
+ *   GET  /api/v2/sessions/<id>/history          — persist NDJSON 이벤트 (REST 단일 출처)
  *   GET  /api/v2/sessions/<id>/artifacts/<rel>  — 산출물 read
  *
  * SSE event 이름 (v1 'stdout'/'result'/'system' 과 분리):
@@ -139,6 +140,26 @@
   function artifactUrl(sessionId, relPath) {
     return "/api/v2/sessions/" + encodeURIComponent(sessionId)
       + "/artifacts/" + relPath.split("/").map(encodeURIComponent).join("/");
+  }
+
+  /**
+   * T-513 P3 — REST 단일 출처 history loader.
+   *
+   * 재연결 시 SSE 라이브 등록 전 과거 이벤트를 일괄 적재한다. SSE 링버퍼 replay 는
+   * 사용하지 않고 REST GET /api/v2/sessions/<id>/history 가 단일 출처
+   * (T-497 결정점 정합). 응답 schema: {session_id, total_count,
+   * events: [{ts, event, payload}]}. 404/네트워크 에러 시 빈 배열 반환.
+   *
+   * @param {string} sessionId
+   * @returns {Promise<Array<{ts:number,event:string,payload:object}>>}
+   */
+  function fetchHistory(sessionId) {
+    if (!sessionId) return Promise.resolve([]);
+    var url = "/api/v2/sessions/" + encodeURIComponent(sessionId) + "/history";
+    return _fetchJson(url).then(function (data) {
+      if (!data || !Array.isArray(data.events)) return [];
+      return data.events;
+    });
   }
 
   // ── SSE 구독 ──
@@ -300,6 +321,7 @@
     fetchSession: fetchSession,
     fetchArtifact: fetchArtifact,
     artifactUrl: artifactUrl,
+    fetchHistory: fetchHistory,
     // SSE
     subscribe: subscribe,
     // 상수 노출 (테스트 / 디버그 용)

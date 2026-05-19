@@ -65,6 +65,9 @@
 <!-- T-321 — markdown renderer pure helpers (UMD). common.js 직전 로드 의무 (Board.util.* 등록). -->
 <script src="js/core/renderer-helpers.js"></script>
 <script src="js/core/common.js"></script>
+<!-- T-516 — 워크플로우 탭 localStorage 단일 출처 (Board.workflowTabStorage).
+     kanban.js handleLaunchEvent + submit fetch 응답이 Board.workflowTabStorage.add 호출 → kanban.js 보다 먼저 로드. -->
+<script src="js/workflow/workflow-tab-storage.js"></script>
 <script src="js/views/kanban.js?v=20260509-dragblock"></script>
 <script src="js/views/viewer.js"></script>
 <script src="js/workflow/workflow.js?v=20260509-split"></script>

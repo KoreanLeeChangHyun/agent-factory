@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# T-513 P4 — v2 driver entry 재배선.
+# 옛 본문: engine/flow/http_launcher.py (V1 launcher) → P5 일괄 폐기.
+# 신규: engine/v2/driver.py (engine.v2.driver) 호출. `flow-wf submit T-NNN` 과 동등
+# (subcommand 없이 driver 인자 직접 전달).
 ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
   || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-exec python3 "$ROOT/.claude-organic/engine/flow/http_launcher.py" "$@"
+cd "$ROOT" || exit 1
+exec env PYTHONPATH="$ROOT/.claude-organic:$PYTHONPATH" \
+  python3 -m engine.v2.driver "$@"

@@ -2121,7 +2121,7 @@
         ticket,
         function (force) {
           // [Review 로 롤백] 콜백
-          fetch("/api/workflow/undo-done", {
+          fetch("/api/kanban/undo-done", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ticket: ticket.number, force: force }),
@@ -2648,6 +2648,11 @@
                 if (!body || body.status !== "starting") {
                   // 비정상 응답 — launchState 정리 (등록은 fetch 직전 완료)
                   cleanupLaunchState(submitTicket);
+                } else if (body.session_id && Board.workflowTabStorage
+                           && Board.workflowTabStorage.add) {
+                  // T-516 — submit 응답 body.session_id 도 localStorage 영속화.
+                  // launch SSE LAUNCH_STARTED 핸들러와 OR 조건 — 헬퍼 dedupe 안전.
+                  Board.workflowTabStorage.add(body.session_id);
                 }
                 fetchTickets().then(function () { renderKanban(); });
               }).catch(function (err) {
@@ -3300,6 +3305,11 @@
         if (Board.workflowSessions && Board.workflowSessions.refresh) {
           try { Board.workflowSessions.refresh(); } catch (_) {}
         }
+      }
+      // T-516 — 워크플로우 ID 를 localStorage 단일 출처에 영속화.
+      // 헬퍼가 dedupe 처리하므로 submit 응답 add 호출과 양립 안전 (OR 조건).
+      if (data.session_id && Board.workflowTabStorage && Board.workflowTabStorage.add) {
+        Board.workflowTabStorage.add(data.session_id);
       }
       // running 으로 전이된 직후에는 배지 제거가 목적이므로 즉시 launchState 정리해도 무방.
       // 단, 디버그/후속 SSE 가능성을 위해 잠시 보존 후 정리 (다음 renderKanban 호출 시 사라짐).
