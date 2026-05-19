@@ -112,37 +112,11 @@ var _CLIENT_EXTENDED = Object.freeze(
 
 /**
  * Sets Board.state.termStatus. 단일 진입점으로 써서 전이 규칙을 일관되게 유지한다.
- *
- * T-384 P2: 'stopped' 분기에서 세션 파생 상태 invariant 5종을 일괄 리셋한다.
- * 호출자가 setter 직후에 동일 리셋을 수동으로 반복하지 않아도 되도록 setter
- * 가 유일한 진입점이 되어, 누락에 의한 잔존 상태 회귀를 구조적으로 차단한다.
- *
- * 흡수 범위 (순수 상태 invariant 만):
- *   - Board.state.termSessionId = null
- *   - Board._term._historyLoaded = false
- *   - Board._term._historyLastTimestamp = ''
- *   - Board.state._inAutoResume = false
- *
- * 회피 범위 (DOM 부수효과):
- *   - clearOutput / stopSpinner / resetTokens / setSessionCost / setSessionModel
- *     같은 termMod 의 DOM 청소는 setter 가 떠맡지 않는다. 호출자가 의도를
- *     예측 가능하게 유지하기 위해 P4 SessionLifecycle.finalizeStopped 단일점
- *     에 응집한다.
- *
  * @param {string} next 새 상태 (TERM_STATUSES 값 중 하나)
  */
 Board.state.setTermStatus = function (next) {
   if (typeof next !== 'string') return;
   Board.state.termStatus = next;
-  if (next === 'stopped') {
-    Board.state.termSessionId = null;
-    Board.state._inAutoResume = false;
-    var termMod = Board._term;
-    if (termMod) {
-      termMod._historyLoaded = false;
-      termMod._historyLastTimestamp = '';
-    }
-  }
 };
 
 // ESC autoResume 윈도우 — process_exit + willAutoResume 진입부터 startSession.setIdle 까지.
