@@ -61,6 +61,46 @@ const METRICS_REGRESSION_KINDS = [
 ];
 const METRICS_COLLAPSE_LS_KEY = "wf_metrics_collapsed";
 
+// ── T-462 Phase 4-A: 6-tier Pace Color 수식 ──
+// claude-usage-tracker (Swift/SwiftUI) §5.4 의 projected-usage tier 함수를 advisory-only
+// 시각 표시용 헬퍼로 이식. 자동 강제 / 자동 전이 / 임계값 차단 0건 — 단순 분류 함수.
+// elapsedFraction < 0.03 (3% noise floor) → null 반환 (호출자가 표시 생략 결정).
+// 매핑 CSS 변수: --pace-comfortable / --pace-on-track / --pace-warming / --pace-pressing
+//             / --pace-critical / --pace-runaway  (dashboard.css :root 정의)
+const PACE_TIER_THRESHOLDS = [
+  { max: 0.5, name: "comfortable", cssVar: "--pace-comfortable" },
+  { max: 0.8, name: "on-track",    cssVar: "--pace-on-track" },
+  { max: 1.0, name: "warming",     cssVar: "--pace-warming" },
+  { max: 1.5, name: "pressing",    cssVar: "--pace-pressing" },
+  { max: 2.0, name: "critical",    cssVar: "--pace-critical" },
+];
+const PACE_TIER_RUNAWAY = { name: "runaway", cssVar: "--pace-runaway" };
+
+/**
+ * Computes the 6-tier pace tier for advisory-only color display.
+ * @param {number} usedPercentage - tokens used as % of budget (0–100+)
+ * @param {number} elapsedFraction - fraction of session window elapsed (0.0–1.0)
+ * @returns {{name: string, cssVar: string, projected: number}|null}
+ *   - null when elapsedFraction < 0.03 (noise floor — projection unreliable).
+ *   - Otherwise the matching tier + raw projected value for tooltip rendering.
+ */
+function computePaceTier(usedPercentage, elapsedFraction) {
+  if (typeof usedPercentage !== "number" || typeof elapsedFraction !== "number") return null;
+  if (!isFinite(usedPercentage) || !isFinite(elapsedFraction)) return null;
+  if (elapsedFraction < 0.03) return null;
+  const projected = (usedPercentage / 100.0) / elapsedFraction;
+  for (let i = 0; i < PACE_TIER_THRESHOLDS.length; i++) {
+    if (projected < PACE_TIER_THRESHOLDS[i].max) {
+      return {
+        name: PACE_TIER_THRESHOLDS[i].name,
+        cssVar: PACE_TIER_THRESHOLDS[i].cssVar,
+        projected: projected,
+      };
+    }
+  }
+  return { name: PACE_TIER_RUNAWAY.name, cssVar: PACE_TIER_RUNAWAY.cssVar, projected: projected };
+}
+
 // ── Workflow Metrics State (Board.state.metricsState 네임스페이스) ──
 // 모듈 클로저 대신 Board.state 로 승격하여 다른 모듈에서도 검사 가능.
 // W01 의 dashMetrics{Fetched,Data,Last,Error,ChartInstances} 5개 키를 흡수한다.
@@ -78,6 +118,325 @@ const METRICS_COLLAPSE_LS_KEY = "wf_metrics_collapsed";
   ms.collapsed = stored !== "0";
   Board.state.metricsState = ms;
 })();
+
+// ── T-462 Phase 4-B: SVG progress bar + time marker overlay ──
+// usage-tracker §4-B 의 진행 바 + 현재 시각 marker overlay 컴포넌트를 SVG 로 직접
+// 이식. 외부 아이콘 라이브러리 / 폰트 0건. 자동 동작 0건 — render 함수는 명시 호출만.
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * Builds an inline SVG progress bar with an optional time-marker overlay.
+ * Caller passes a container DOM element which is replaced with the SVG.
+ * @param {HTMLElement} container - DOM element to render into (innerHTML replaced)
+ * @param {number} percent - 0~100 progress percentage
+ * @param {string|null} tier - pace tier name from computePaceTier (e.g. "warming")
+ *   or null/undefined to use the default accent color. When provided, fill is set to
+ *   `var(--pace-<tier>)` so CSS variable wins.
+ */
+function renderProgressBar(container, percent, tier) {
+  if (!container) return;
+  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+  const fillColor = tier ? "var(--pace-" + tier + ")" : "var(--pace-on-track)";
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 100 8");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "8");
+  svg.setAttribute("role", "progressbar");
+  svg.setAttribute("aria-valuemin", "0");
+  svg.setAttribute("aria-valuemax", "100");
+  svg.setAttribute("aria-valuenow", String(Math.round(pct)));
+  svg.classList.add("pace-progress-bar");
+  if (tier) svg.classList.add("pace-progress-bar--" + tier);
+
+  // Background track
+  const track = document.createElementNS(SVG_NS, "rect");
+  track.setAttribute("x", "0");
+  track.setAttribute("y", "0");
+  track.setAttribute("width", "100");
+  track.setAttribute("height", "8");
+  track.setAttribute("rx", "2");
+  track.setAttribute("ry", "2");
+  track.setAttribute("fill", "#2d2d2d");
+  svg.appendChild(track);
+
+  // Filled portion
+  const fill = document.createElementNS(SVG_NS, "rect");
+  fill.setAttribute("x", "0");
+  fill.setAttribute("y", "0");
+  fill.setAttribute("width", String(pct));
+  fill.setAttribute("height", "8");
+  fill.setAttribute("rx", "2");
+  fill.setAttribute("ry", "2");
+  fill.setAttribute("fill", fillColor);
+  svg.appendChild(fill);
+
+  // Replace container content with the new SVG
+  container.innerHTML = "";
+  container.appendChild(svg);
+  return svg;
+}
+
+/**
+ * Overlays a current-time marker (1px vertical line) on a previously-rendered
+ * progress bar SVG. Position is `fraction` (0.0~1.0) along the bar.
+ * Idempotent — replaces any existing marker (.pace-time-marker) in the SVG.
+ * @param {HTMLElement} container - the same container used by renderProgressBar
+ * @param {number} fraction - 0.0~1.0 elapsed-time fraction
+ */
+function renderTimeMarker(container, fraction) {
+  if (!container) return;
+  const svg = container.querySelector("svg.pace-progress-bar");
+  if (!svg) return;
+  const frac = Math.max(0, Math.min(1, Number(fraction) || 0));
+  const x = frac * 100;
+
+  // Remove old marker (idempotent)
+  const old = svg.querySelector(".pace-time-marker");
+  if (old) old.parentNode.removeChild(old);
+
+  const marker = document.createElementNS(SVG_NS, "line");
+  marker.classList.add("pace-time-marker");
+  marker.setAttribute("x1", String(x));
+  marker.setAttribute("x2", String(x));
+  marker.setAttribute("y1", "-1");
+  marker.setAttribute("y2", "9");
+  marker.setAttribute("stroke", "#e0e0e0");
+  marker.setAttribute("stroke-width", "0.6");
+  marker.setAttribute("stroke-linecap", "round");
+  svg.appendChild(marker);
+  return marker;
+}
+
+// ── T-462 Phase 4-C: status banner (error / stale / ok) ──
+// usage-tracker §4-C 의 상태 배너 (네트워크 끊김 / SSE stale / 정상) 컨셉 이식.
+// SSE 재연결 로직은 core/sse.js 에 이미 있으므로 본 함수는 *표시 전용*. advisory only.
+
+/**
+ * Renders a status banner inside the given container. Idempotent —
+ * existing `.status-banner` is replaced.
+ * @param {HTMLElement} container - host element (innerHTML 대신 prepend / replace 사용)
+ * @param {string} state - one of "error" | "stale" | "ok"
+ * @param {string} message - human-readable status message
+ */
+function renderStatusBanner(container, state, message) {
+  if (!container) return;
+  const validStates = ["error", "stale", "ok"];
+  const s = validStates.indexOf(state) >= 0 ? state : "ok";
+  // Remove previous banner (idempotent — caller may call repeatedly on SSE events)
+  const old = container.querySelector(":scope > .status-banner");
+  if (old) old.parentNode.removeChild(old);
+
+  const banner = document.createElement("div");
+  banner.classList.add("status-banner");
+  banner.classList.add("status-banner--" + s);
+  banner.setAttribute("role", s === "error" ? "alert" : "status");
+
+  const dot = document.createElement("span");
+  dot.classList.add("status-banner__dot");
+  banner.appendChild(dot);
+
+  const text = document.createElement("span");
+  text.classList.add("status-banner__text");
+  text.textContent = String(message || "");
+  banner.appendChild(text);
+
+  // Prepend so banner is at top of container
+  if (container.firstChild) container.insertBefore(banner, container.firstChild);
+  else container.appendChild(banner);
+  return banner;
+}
+
+// ── T-462 Phase 4-D: accordion expand/collapse rows (P8) ──
+// usage-tracker 의 expandable row 컴포넌트를 dashboard 표시용으로 이식. 표시 토글만 —
+// 자동 펼침 / 자동 접힘 / 자동 행 추가 0건. 호출자가 click handler 로 명시 호출.
+
+/**
+ * Toggles the open state of an accordion row.
+ * Idempotent — adds `is-open` class when closed, removes when open.
+ * Updates aria-expanded on the row's header (button[role=button]) if present.
+ * @param {HTMLElement} rowElement - element carrying `.accordion__row` (or descendant button)
+ */
+function toggleAccordion(rowElement) {
+  if (!rowElement) return;
+  // Accept either the row container or a child header — climb to the row.
+  let row = rowElement;
+  if (!row.classList.contains("accordion__row")) {
+    row = rowElement.closest(".accordion__row");
+  }
+  if (!row) return;
+  const isOpen = row.classList.toggle("is-open");
+  const header = row.querySelector(".accordion__header");
+  if (header) header.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  const detail = row.querySelector(".accordion__detail");
+  if (detail) {
+    if (isOpen) detail.removeAttribute("hidden");
+    else detail.setAttribute("hidden", "");
+  }
+  return isOpen;
+}
+
+// ── T-462 Phase 4-E: CombinedUsageChart 시간 윈도우 + 네비게이션 ──
+// usage-tracker §4-E 의 시간 윈도우 (5h / 24h / 7d / 30d) + prev/current/next 네비게이션을
+// chart-usage (Chart.js bar+line composite) 에 advisory-only 표시로 이식.
+// 서버 변경 0건 — 기존 usage rows 를 클라이언트 측에서 timestamp 분기로 필터링.
+// 자동 polling / 자동 윈도우 변경 / 자동 차단 0건.
+
+const USAGE_CHART_WINDOWS = ["5h", "24h", "7d", "30d"];
+const USAGE_CHART_WINDOW_MS = {
+  "5h":  5 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d":  7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+};
+
+// Per-window state — 호출자가 window 와 anchor (시점 슬라이딩) 를 외부에서 변경.
+// anchor=Date.now() 가 default — navigateUsageChart('prev') 시 anchor 가 window 만큼 후퇴.
+(function initUsageChartState() {
+  const s = Board.state.usageChartState || {};
+  if (USAGE_CHART_WINDOWS.indexOf(s.window) < 0) s.window = "24h";
+  if (typeof s.anchorMs !== "number" || !isFinite(s.anchorMs)) s.anchorMs = Date.now();
+  Board.state.usageChartState = s;
+})();
+
+/**
+ * Parses a usage row's first cell (registry_key like "20260519-053240") to epoch ms.
+ * Tolerant — returns NaN on malformed input.
+ * @param {string} key - registry_key style YYYYMMDD-HHMMSS
+ * @returns {number} epoch ms or NaN
+ */
+function _parseRegistryKeyMs(key) {
+  if (typeof key !== "string") return NaN;
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/.exec(key.trim());
+  if (!m) return NaN;
+  // Local-time interpretation (board runs in user's TZ).
+  const d = new Date(
+    parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10),
+    parseInt(m[4], 10), parseInt(m[5], 10), parseInt(m[6], 10)
+  );
+  return d.getTime();
+}
+
+/**
+ * Filters usage rows to those falling within [anchor - windowMs, anchor].
+ * @param {Array<Array<string>>} rows - usage table rows (chronological recent-first)
+ * @param {string} windowStr - "5h" | "24h" | "7d" | "30d"
+ * @param {number} anchorMs - epoch-ms anchor (rightmost edge of window)
+ * @returns {Array<Array<string>>} filtered rows in original order
+ */
+function filterUsageRowsByWindow(rows, windowStr, anchorMs) {
+  const windowMs = USAGE_CHART_WINDOW_MS[windowStr];
+  if (!windowMs || !Array.isArray(rows)) return rows || [];
+  const minMs = anchorMs - windowMs;
+  return rows.filter(function (cells) {
+    const t = _parseRegistryKeyMs(cells[0] || "");
+    if (!isFinite(t)) return false;
+    return t >= minMs && t <= anchorMs;
+  });
+}
+
+/**
+ * Changes the active usage chart window and re-renders the chart with filtered rows.
+ * advisory-only — caller dispatches; no automatic switching.
+ * @param {string} windowStr - one of USAGE_CHART_WINDOWS
+ */
+function setUsageChartWindow(windowStr) {
+  if (USAGE_CHART_WINDOWS.indexOf(windowStr) < 0) return;
+  const s = Board.state.usageChartState;
+  s.window = windowStr;
+  // Reset anchor to "now" on window change — typical UX is "show latest in this scale".
+  s.anchorMs = Date.now();
+  _rerenderUsageChartForWindow();
+}
+
+/**
+ * Moves the usage-chart anchor by one window-stride in the requested direction.
+ * @param {string} direction - one of "prev" | "current" | "next"
+ */
+function navigateUsageChart(direction) {
+  const s = Board.state.usageChartState;
+  const windowMs = USAGE_CHART_WINDOW_MS[s.window] || USAGE_CHART_WINDOW_MS["24h"];
+  if (direction === "prev") {
+    s.anchorMs = s.anchorMs - windowMs;
+  } else if (direction === "next") {
+    s.anchorMs = Math.min(Date.now(), s.anchorMs + windowMs);
+  } else if (direction === "current") {
+    s.anchorMs = Date.now();
+  } else {
+    return;
+  }
+  _rerenderUsageChartForWindow();
+}
+
+/**
+ * Re-renders chart-usage with the currently configured window + anchor.
+ * Uses cached dashData.usage rows (no network roundtrip).
+ */
+function _rerenderUsageChartForWindow() {
+  const data = Board.state.dashData || {};
+  const allRows = dashParseMdTableRows(data.usage || "");
+  const s = Board.state.usageChartState;
+  const filtered = filterUsageRowsByWindow(allRows, s.window, s.anchorMs);
+  renderUsageChart(filtered);
+}
+
+// ── T-462 Phase 4-F: Empty State 컴포넌트 표준화 (C6) ──
+// usage-tracker §4-F 의 empty-state 패턴 (icon + title + description) 을 표준화.
+// SVG icon 직접 생성 — 외부 라이브러리 0건. 자동 retry / auto-dismiss 0건.
+
+/**
+ * Default inline SVG used when caller does not provide a custom icon.
+ * Lucide-style "inbox" — viewBox 24x24, stroke=currentColor, stroke-width=2.
+ */
+function _defaultEmptyStateIcon() {
+  return ''
+    + '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"'
+    + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>'
+    + '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>'
+    + '</svg>';
+}
+
+/**
+ * Renders a standardized empty state inside the container. Replaces existing content.
+ * @param {HTMLElement} container - host element (innerHTML replaced)
+ * @param {Object} [opts]
+ * @param {string} [opts.icon] - inline SVG markup; defaults to the lucide-inbox icon
+ * @param {string} [opts.title] - heading text
+ * @param {string} [opts.description] - body text
+ */
+function renderEmptyState(container, opts) {
+  if (!container) return;
+  const o = opts || {};
+  const iconSvg = (typeof o.icon === "string" && o.icon.trim()) ? o.icon : _defaultEmptyStateIcon();
+  const title = String(o.title || "No data");
+  const description = String(o.description || "");
+
+  const wrap = document.createElement("div");
+  wrap.className = "empty-state";
+
+  const iconEl = document.createElement("div");
+  iconEl.className = "empty-state__icon";
+  iconEl.innerHTML = iconSvg;  // SVG markup is generated by caller or by _defaultEmptyStateIcon
+  wrap.appendChild(iconEl);
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "empty-state__title";
+  titleEl.textContent = title;
+  wrap.appendChild(titleEl);
+
+  if (description) {
+    const descEl = document.createElement("div");
+    descEl.className = "empty-state__description";
+    descEl.textContent = description;
+    wrap.appendChild(descEl);
+  }
+
+  container.innerHTML = "";
+  container.appendChild(wrap);
+  return wrap;
+}
 
 // ── Fetch Functions ──
 
@@ -1221,3 +1580,24 @@ function renderDashboard() {
 Board.fetch.fetchAllDashboardFiles = fetchAllDashboardFiles;
 Board.fetch.fetchMetrics = fetchMetrics;
 Board.render.renderDashboard = renderDashboard;
+
+// T-462 Phase 4-A — pace tier helper exposed for other modules + ad-hoc usage.
+Board.computePaceTier = computePaceTier;
+
+// T-462 Phase 4-B — SVG progress bar + time marker (advisory display).
+Board.render.renderProgressBar = renderProgressBar;
+Board.render.renderTimeMarker = renderTimeMarker;
+
+// T-462 Phase 4-C — status banner (advisory display, SSE reconnect 로직은 core/sse.js 재사용).
+Board.render.renderStatusBanner = renderStatusBanner;
+
+// T-462 Phase 4-D — accordion expand/collapse toggle (명시 호출만, 자동 펼침 0).
+Board.toggleAccordion = toggleAccordion;
+
+// T-462 Phase 4-E — CombinedUsageChart 시간 윈도우 + 네비게이션 (advisory).
+Board.setUsageChartWindow = setUsageChartWindow;
+Board.navigateUsageChart = navigateUsageChart;
+Board.filterUsageRowsByWindow = filterUsageRowsByWindow;
+
+// T-462 Phase 4-F — Empty State 컴포넌트 (advisory display 표준화).
+Board.render.renderEmptyState = renderEmptyState;
