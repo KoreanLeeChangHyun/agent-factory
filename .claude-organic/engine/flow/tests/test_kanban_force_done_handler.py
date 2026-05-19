@@ -27,38 +27,41 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-# generic.py 경로 계산: tests/ → engine/ → .claude-organic/ → board/server/handlers/
+# handlers/ 경로 계산: tests/ → engine/ → .claude-organic/ → board/server/handlers/
 _WORKTREE_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
-_GENERIC_PY = _WORKTREE_ROOT / ".claude-organic" / "board" / "server" / "handlers" / "generic.py"
+_HANDLERS_DIR = _WORKTREE_ROOT / ".claude-organic" / "board" / "server" / "handlers"
+_GENERIC_PY = _HANDLERS_DIR / "generic.py"
+_HANDLER_COMMON_PY = _HANDLERS_DIR / "_handler_common.py"
+_KANBAN_DONE_RE_PY = _HANDLERS_DIR / "_kanban_done_re.py"
 
 
 # ─── 격리 로드 헬퍼 ──────────────────────────────────────────────────────────
 
 
 def _load_generic_helpers() -> dict:
-    """generic.py 에서 패키지 의존성 없는 헬퍼들을 격리 추출한다.
+    """generic.py + _handler_common.py + _kanban_done_re.py 에서 헬퍼들을 격리 추출한다.
 
-    board/server 패키지 상대 import 를 우회하기 위해:
-    1. 'from ..state import ...' 직전까지의 헤더(정규식 상수 + 독립 함수) 추출
-    2. _classify_done_failure, _get_dirty_files, _check_derived_blocked,
-       GenericHandlerMixin 클래스(force/delete 분기) 소스를 exec 로 실행
+    T-499 위계 재정리 후 심볼은 다음 3 모듈에 분산되어 있다:
+      * _handler_common.py — _TICKET_RE / _KANBAN_ALL_DIRS / _import_*_cli (standalone)
+      * _kanban_done_re.py — _classify_done_failure + _DONE_* / _UNDO_* 정규식 (standalone)
+      * generic.py         — GenericHandlerMixin 클래스 (board/server 패키지 상대 import 포함)
+
+    board/server 패키지 상대 import 를 우회하기 위해 standalone 2 모듈은 파일 전체를,
+    generic.py 는 'from ..state import ...' 직전 헤더 + GenericHandlerMixin 클래스 영역만
+    exec 로 합쳐 단일 네임스페이스에 적재한다.
 
     Returns:
-        {'_classify_done_failure', '_get_dirty_files', '_check_derived_blocked',
-         'GenericHandlerMixin', '_TICKET_RE', '_KANBAN_ALL_DIRS'} 가 포함된 네임스페이스 dict.
+        {'_classify_done_failure', '_TICKET_RE', '_KANBAN_ALL_DIRS',
+         'GenericHandlerMixin', ...} 가 포함된 네임스페이스 dict.
     """
+    common_src = _HANDLER_COMMON_PY.read_text(encoding="utf-8")
+    re_src = _KANBAN_DONE_RE_PY.read_text(encoding="utf-8")
     src = _GENERIC_PY.read_text(encoding="utf-8")
 
-    # 패키지 의존 import 시작 지점까지만 포함 (헤더 영역)
+    # generic.py — 패키지 의존 import 시작 지점까지 헤더 + GenericHandlerMixin 클래스
     cut = src.find("from ..state import")
     header = src[:cut]
-
-    # _classify_done_failure 함수 소스 추출 (class GenericHandlerMixin 직전까지)
-    func_start = src.find("def _classify_done_failure(")
     class_start = src.find("\nclass GenericHandlerMixin")
-    standalone_funcs = src[func_start:class_start]
-
-    # GenericHandlerMixin 클래스 전체 추출 (파일 끝까지)
     class_src = src[class_start:]
 
     # 실행 네임스페이스에 필요한 모듈 사전 주입
@@ -72,11 +75,14 @@ def _load_generic_helpers() -> dict:
         "io": io,
     }
 
-    # 1단계: 헤더 + standalone 함수
-    exec(header + "\n" + standalone_funcs, ns)  # noqa: S102
+    # 1단계: _handler_common (_TICKET_RE / _KANBAN_ALL_DIRS / _import_*_cli)
+    exec(common_src, ns)  # noqa: S102
 
-    # 2단계: GenericHandlerMixin 클래스
-    # 클래스 내부에서 logger / _read_kanban_tickets 등을 참조할 수 있으므로 stub 주입
+    # 2단계: _kanban_done_re (_classify_done_failure + 정규식)
+    exec(re_src, ns)  # noqa: S102
+
+    # 3단계: generic.py 헤더 + GenericHandlerMixin 클래스
+    exec(header, ns)  # noqa: S102
     ns.setdefault("logger", MagicMock())
     ns.setdefault("_read_kanban_tickets", MagicMock(return_value={}))
     ns.setdefault("sse_manager", MagicMock())

@@ -4,42 +4,31 @@
   T6: _classify_done_failure — stdout 에 '[WARN] worktree 병합 실패: 병합 충돌 발생: ...'
       포함 시 error_kind='merge_conflict' + conflicts 리스트에 충돌 파일명 반영
 
-generic.py 는 board/server 패키지 내부 상대 import (from ..state ...) 를 포함하므로
-모듈 전체 import 가 불가하다. 대신 파일 상단의 독립 가능한 부분(정규식 상수 + 함수 정의)을
-exec 로 격리 실행하여 _classify_done_failure 를 추출한다.
+_kanban_done_re.py (T-499) 는 패키지 상대 import 없는 standalone 모듈이라 파일 전체를
+exec 로 격리 실행해 _classify_done_failure 를 추출한다.
 """
 
 from __future__ import annotations
 
-import re
-import sys
 import unittest
 from pathlib import Path
 
-# generic.py 경로 계산: tests/ → engine/ → .claude-organic/ → board/server/handlers/
+# _kanban_done_re.py 경로 계산: tests/ → engine/ → .claude-organic/ → board/server/handlers/
 _WORKTREE_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
-_GENERIC_PY = _WORKTREE_ROOT / ".claude-organic" / "board" / "server" / "handlers" / "generic.py"
+_KANBAN_DONE_RE_PY = (
+    _WORKTREE_ROOT / ".claude-organic" / "board" / "server" / "handlers" / "_kanban_done_re.py"
+)
 
 
 def _load_classify_done_failure():
-    """generic.py 에서 _classify_done_failure 와 관련 정규식 상수를 격리 추출한다.
+    """_kanban_done_re.py 의 _classify_done_failure 를 격리 추출한다.
 
-    board/server 패키지 상대 import 를 우회하기 위해 파일 상단(from ..state 이전)과
-    _classify_done_failure 함수 정의 부분만 exec 로 실행한다.
+    본 모듈은 ``re`` 만 import 하는 standalone 모듈이라 파일 전체를 exec 로
+    그대로 실행해도 안전하다.
     """
-    src = _GENERIC_PY.read_text(encoding="utf-8")
-
-    # 패키지 의존 import 시작 지점까지만 포함
-    cut = src.find("from ..state import")
-    header = src[:cut]
-
-    # _classify_done_failure 함수 소스 추출 (class GenericHandlerMixin 직전까지)
-    func_start = src.find("def _classify_done_failure(")
-    func_end = src.find("\nclass GenericHandlerMixin")
-    func_src = src[func_start:func_end]
-
+    src = _KANBAN_DONE_RE_PY.read_text(encoding="utf-8")
     ns: dict = {}
-    exec(header + "\n" + func_src, ns)  # noqa: S102
+    exec(src, ns)  # noqa: S102
     return ns["_classify_done_failure"]
 
 

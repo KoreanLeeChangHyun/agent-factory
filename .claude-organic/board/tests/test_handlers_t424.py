@@ -50,11 +50,13 @@ class TestImportSmoke(unittest.TestCase):
             self.fail(f'ImportError: {exc}')
 
     def test_import_helpers_constants(self):
-        """_helpers 모듈의 정규식 상수 11개 import 성공."""
-        from board.server.handlers._helpers import (
-            _DONE_MERGE_OK_RE,
+        """_kanban_done_re + _handler_common 모듈의 정규식 상수 11개 import 성공."""
+        from board.server.handlers._handler_common import (
             _TICKET_RE,
             _KANBAN_ALL_DIRS,
+        )
+        from board.server.handlers._kanban_done_re import (
+            _DONE_MERGE_OK_RE,
             _DONE_CONFLICT_HEADER,
             _DONE_DIRTY_HEADER,
             _DONE_PATH_RE,
@@ -136,7 +138,7 @@ class TestRegexPatterns(unittest.TestCase):
     """_helpers 정규식 패턴이 의도한 입력을 캡처하는지 검증."""
 
     def setUp(self):
-        from board.server.handlers._helpers import (
+        from board.server.handlers._kanban_done_re import (
             _DONE_MERGE_OK_RE,
             _DONE_CONFLICT_WARN_RE,
             _UNDO_WORKTREE_RE,
@@ -200,7 +202,7 @@ class TestMergeSkippedBranch(unittest.TestCase):
 
     def test_classify_done_failure_returns_other_for_empty(self):
         """빈 stdout/stderr 시 error_kind='other' 반환."""
-        from board.server.handlers._helpers import _classify_done_failure
+        from board.server.handlers._kanban_done_re import _classify_done_failure
         result = _classify_done_failure('', '')
         self.assertEqual(result['error_kind'], 'other')
         self.assertEqual(result['conflicts'], [])
@@ -208,7 +210,7 @@ class TestMergeSkippedBranch(unittest.TestCase):
 
     def test_classify_done_failure_detects_conflict_header(self):
         """'[ERROR] ...' 헤더가 있는 stdout → error_kind='merge_conflict'."""
-        from board.server.handlers._helpers import _classify_done_failure
+        from board.server.handlers._kanban_done_re import _classify_done_failure
         stdout = '[ERROR] merge conflict in src/foo.py\n    - src/foo.py\n'
         result = _classify_done_failure(stdout, '')
         self.assertEqual(result['error_kind'], 'merge_conflict')
@@ -216,7 +218,7 @@ class TestMergeSkippedBranch(unittest.TestCase):
 
     def test_classify_done_failure_detects_dirty_worktree(self):
         """'미커밋 파일 목록:' 헤더가 있는 stdout → error_kind='dirty_worktree'."""
-        from board.server.handlers._helpers import _classify_done_failure
+        from board.server.handlers._kanban_done_re import _classify_done_failure
         stdout = '미커밋 파일 목록 :\n    - src/bar.py\n'
         result = _classify_done_failure(stdout, '')
         self.assertEqual(result['error_kind'], 'dirty_worktree')
@@ -351,7 +353,7 @@ class TestUndoDoneStderrParsing(unittest.TestCase):
 
     def test_undo_error_re_captures_multiword_message(self):
         """'[undo-done] ERROR: T-424 복구 실패: git reset failed' 전체 메시지 캡처."""
-        from board.server.handlers._helpers import _UNDO_ERROR_RE
+        from board.server.handlers._kanban_done_re import _UNDO_ERROR_RE
         line = '[undo-done] ERROR: T-424 복구 실패: git reset failed'
         m = _UNDO_ERROR_RE.search(line)
         self.assertIsNotNone(m)

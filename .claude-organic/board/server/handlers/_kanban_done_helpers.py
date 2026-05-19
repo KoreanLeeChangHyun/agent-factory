@@ -7,7 +7,7 @@ import re
 import sys
 import subprocess
 
-from ._helpers import (
+from ._kanban_done_re import (
     _classify_done_failure,
     _DONE_MERGE_OK_RE,
 )
