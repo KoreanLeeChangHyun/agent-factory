@@ -362,6 +362,35 @@
   cursor: wait;
 }
 
+/* In Progress 카드 4행 워크플로우 중지 버튼 (POST /api/workflow/stop).
+ * 주홍 #f48771 (fail 색) — stop 의미와 어울림. 20×20 — 4행 min-height: 22px 안전. */
+.card-stop-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(244, 135, 113, 0.45);
+  border-radius: 4px;
+  color: #f48771;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.card-stop-action:hover {
+  background: rgba(244, 135, 113, 0.15);
+  border-color: #f48771;
+}
+
+.card-stop-action:disabled,
+.card-stop-action.is-stopping {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 /* T-399: .status-submit 룰 제거됨 (Submit transient 단계 제거). */
 
 /* ─────────────────────────────────────────────────────────────────────────

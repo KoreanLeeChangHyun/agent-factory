@@ -1,10 +1,12 @@
 /**
  * @module workflow-sessions
  *
- * Terminal sessions dropdown + workflow tab bar synchronization.
+ * Terminal sessions dropdown — main sessions from /terminal/sessions (title + UUID).
  *
- * - Tab bar: synced with /terminal/workflow/list (running/stopped workflow sessions)
- * - Dropdown content: main sessions from /terminal/sessions (title + UUID)
+ * T-516 — 워크플로우 탭 동기화 책임은 본 모듈에서 제거됨. 클라이언트 측 단일
+ * 출처는 localStorage (Board.workflowTabStorage) — terminal.js init 의 render
+ * 흐름 + kanban.js 의 LAUNCH_STARTED add 가 라이프사이클을 담당한다. 닫기
+ * 버튼만이 유일한 종결 트리거.
  *
  * Depends on: common.js (Board namespace), session.js (Board.session)
  * Registers:  Board.workflowSessions
@@ -24,95 +26,6 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sid, purge: true }),
     }).then(function () { refresh(); });
-  }
-
-  /**
-   * Syncs the session tab bar with v1 /terminal/workflow/list + v2 /api/v2/sessions.
-   * Running sessions appear as tabs; stopped sessions are removed (except the active tab).
-   *
-   * T-495 P2 — v2 driver 세션도 함께 sync. 두 source 의 union 으로 탭 빌드.
-   * v2 sessions 의 status 매핑: idle/running → running, completed/failed → stopped.
-   * known v2 session_id 는 Board.v2Workflow 에도 등록하여 후속 subscribe 분기 가능.
-   *
-   * @param {string|null} currentWorkflowSessionId - current workflow session ID
-   * @param {boolean} isWorkflowMode - whether in workflow mode
-   */
-  function syncWorkflowTabs(currentWorkflowSessionId, isWorkflowMode) {
-    var v1Promise = fetch("/terminal/workflow/list", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (s) { return Array.isArray(s) ? s : []; })
-      .catch(function () { return []; });
-
-    var v2Promise = (Board.v2Workflow && Board.v2Workflow.fetchSessions)
-      ? Board.v2Workflow.fetchSessions().then(function (sessions) {
-          // backend v2 schema → tab-friendly normalised shape
-          return sessions.map(function (s) {
-            var st = (s.status === "running" || s.status === "idle")
-              ? "running" : "stopped";
-            // v2 known set 에 등록 — 분기 판정 (Board.v2Workflow.isV2SessionId) 즉시 가능
-            if (Board.v2Workflow && Board.v2Workflow.registerKnown) {
-              Board.v2Workflow.registerKnown(s.session_id);
-            }
-            return {
-              session_id: s.session_id,
-              ticket_id: s.ticket_id,
-              status: st,
-              engine: "v2",
-            };
-          });
-        })
-      : Promise.resolve([]);
-
-    Promise.all([v1Promise, v2Promise]).then(function (pair) {
-      var v1Sessions = pair[0];
-      var v2Sessions = pair[1];
-
-      // v1 + v2 union — session_id 중복 제거 (v2 우선, backend 가 권위)
-      var byId = {};
-      v1Sessions.forEach(function (s) { byId[s.session_id] = s; });
-      v2Sessions.forEach(function (s) { byId[s.session_id] = s; });
-      var sessions = Object.keys(byId).map(function (k) { return byId[k]; });
-
-      var running = sessions.filter(function (s) { return s.status === "running"; });
-      var stopped = sessions.filter(function (s) { return s.status !== "running"; });
-
-      if (!Board.sessionSwitcher) return;
-
-      // running 세션 → 탭 바에 없으면 추가
-      running.forEach(function (s) {
-        if (s.session_id === "main") return;
-        if (Board.sessionSwitcher.addSession) {
-          Board.sessionSwitcher.addSession(s.session_id, { status: "running" });
-        }
-        if (Board.sessionSwitcher.addTab) {
-          var label = (s.ticket_id || s.session_id).replace(/^wf-/, "");
-          Board.sessionSwitcher.addTab(s.session_id, label, "running");
-        }
-        if (Board.sessionSwitcher.setTabStatus) {
-          Board.sessionSwitcher.setTabStatus(s.session_id, "running");
-        }
-      });
-
-      // stopped 세션 → 비활성 탭은 제거, 활성 탭은 상태만 업데이트
-      stopped.forEach(function (s) {
-        if (s.session_id === "main") return;
-        var currentActive = Board.sessionSwitcher.getCurrentSession
-          ? Board.sessionSwitcher.getCurrentSession()
-          : null;
-        if (s.session_id === currentActive) {
-          if (Board.sessionSwitcher.setTabStatus) {
-            Board.sessionSwitcher.setTabStatus(s.session_id, "stopped");
-          }
-        } else {
-          if (Board.sessionSwitcher.removeTab) {
-            Board.sessionSwitcher.removeTab(s.session_id);
-          }
-          if (Board.sessionSwitcher.removeSession) {
-            Board.sessionSwitcher.removeSession(s.session_id);
-          }
-        }
-      });
-    });
   }
 
   /**
@@ -216,18 +129,21 @@
   }
 
   /**
-   * Combined refresh: sync workflow tabs + render main sessions in dropdown.
-   * Maintains the original Board.workflowSessions.refresh() callsite signature.
+   * Main sessions dropdown refresh.
+   *
+   * T-516 — 워크플로우 탭 sync 분기는 폐기. 본 함수는 드롭다운 갱신만 담당.
+   * 매개변수는 callsite 시그니처 호환 유지용 (호출자 수정 회피).
+   *
+   * @param {string|null} _currentWorkflowSessionId - 미사용 (호환 유지)
+   * @param {boolean} _isWorkflowMode - 미사용 (호환 유지)
    */
-  function refresh(currentWorkflowSessionId, isWorkflowMode) {
-    syncWorkflowTabs(currentWorkflowSessionId, isWorkflowMode);
+  function refresh(_currentWorkflowSessionId, _isWorkflowMode) {
     renderMainSessionsDropdown();
   }
 
   // ── Register on Board namespace ──
   Board.workflowSessions = {
     refresh: refresh,
-    syncTabs: syncWorkflowTabs,
     renderDropdown: renderMainSessionsDropdown,
     purge: purgeSession,
   };

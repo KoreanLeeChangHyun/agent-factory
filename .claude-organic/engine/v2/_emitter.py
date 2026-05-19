@@ -112,8 +112,13 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
     record = {"event": event, "ts": _now_iso(), **payload}
     line = json.dumps(record, ensure_ascii=False)
     with _METRICS_APPEND_LOCK:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
+        except BrokenPipeError:
+            # T-518 — driver subprocess stdout pipe 가 끊긴 경우 graceful skip.
+            # 다른 OSError 는 전파 (진단 정보 손실 방지).
+            return
         if ctx is not None:
             path = ctx.metrics_jsonl_path()
             path.parent.mkdir(parents=True, exist_ok=True)
