@@ -1028,6 +1028,44 @@
   }
 
   /**
+   * In Progress 카드 4행 stop 버튼 클릭 — POST /api/workflow/stop 으로 워크플로우 4축 정리 요청.
+   * confirm 안전판 1회 → fetch → 성공 시 renderKanban / 실패 시 showInfoModal.
+   */
+  function handleStopButtonClick(btn) {
+    var ticket = btn.dataset.stopTicket;
+    if (!ticket || btn.classList.contains("is-stopping")) return;
+    var msg = ticket + " 워크플로우를 중지합니다.\n프로세스/jsonl/칸반/워크트리 4축이 정리됩니다.\n\n계속할까요?";
+    if (!window.confirm(msg)) return;
+    btn.classList.add("is-stopping");
+    btn.disabled = true;
+    fetch("/api/workflow/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: ticket }),
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        return { status: res.status, ok: res.ok, data: data };
+      }).catch(function () {
+        return { status: res.status, ok: res.ok, data: null };
+      });
+    }).then(function (r) {
+      btn.classList.remove("is-stopping");
+      btn.disabled = false;
+      if (r.ok && r.data && r.data.ok !== false) {
+        if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
+      } else {
+        var errs = (r.data && r.data.errors) || [];
+        var errMsg = errs.length ? errs.join("\n") : ("HTTP " + r.status);
+        Board.util.showInfoModal("워크플로우 중지 실패", ticket + " 중지 실패: " + errMsg, { severity: "error" });
+      }
+    }).catch(function (err) {
+      btn.classList.remove("is-stopping");
+      btn.disabled = false;
+      Board.util.showInfoModal("워크플로우 중지 실패", ticket + " 중지 요청 오류: " + (err && err.message ? err.message : err), { severity: "error" });
+    });
+  }
+
+  /**
    * 카드 우상단 미커밋 인디케이터 HTML 을 생성한다.
    * 워크플로우 회귀(워커 commit 누락) 시 사용자가 클릭으로 즉시 commit.
    * @param {string} ticketNum - 티켓 번호 (예: "T-422")
@@ -2932,6 +2970,14 @@
                 h += '</button>';
               }
             }
+            // In Progress 카드: 워크플로우 중지 버튼 (POST /api/workflow/stop) — 4축 (프로세스/jsonl/칸반/워크트리) 통합 정리.
+            if (col.key === "In Progress") {
+              h += '<button class="card-stop-action" data-stop-ticket="' + esc(t.number) + '" title="워크플로우 중지 (프로세스/jsonl/칸반/워크트리 4축 정리)" draggable="false">';
+              h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+              h += '<rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.6" fill="currentColor"/>';
+              h += '</svg>';
+              h += '</button>';
+            }
             if (col.key === "Review") {
               // T-433 Phase 2: feature 브랜치 활성/해제 토글 버튼 (4행 좌측, done 버튼 좌측에 배치).
               // OFF: 회색 outline / ON: 테라코타 채움 + 카드 외곽 light glow.
@@ -2983,6 +3029,13 @@
         if (commitBtn) {
           e.stopPropagation();
           handleCommitButtonClick(commitBtn);
+          return;
+        }
+        // In Progress 카드 4행 워크플로우 중지 버튼 → handleStopButtonClick 위임
+        var stopBtn = e.target.closest(".card-stop-action");
+        if (stopBtn) {
+          e.stopPropagation();
+          handleStopButtonClick(stopBtn);
           return;
         }
         // T-433 Phase 2: Review 카드 4행 feature 브랜치 토글 버튼 클릭 → handleBranchToggleClick 위임
@@ -3286,18 +3339,7 @@
     const cur = launchState.get(ticketNum);
     if (!cur || cur.state !== "starting") return;
     cleanupLaunchState(ticketNum);
-    Board.util.showInfoModal(
-      "워크플로우 시작 지연",
-      "60초가 경과했지만 워크플로우 시작 신호(LAUNCH_STARTED)가 도착하지 않았습니다.\n\n" +
-      "Board 새로고침 또는 잠시 후 칸반 컬럼에서 상태를 직접 확인하세요. " +
-      "워크플로우가 정상 시작되었다면 In Progress 컬럼에 카드가 보입니다.",
-      {
-        severity: "warning",
-        onClose: function () {
-          if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
-        },
-      }
-    );
+    if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
   }
 
   /**
