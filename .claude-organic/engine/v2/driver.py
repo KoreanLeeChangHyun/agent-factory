@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+import traceback
+from datetime import datetime
 
 from ._common import update_step
 from .steps import (
@@ -71,6 +73,18 @@ def main(argv: list[str] | None = None) -> int:
         done_step(ctx)
         return 0
     except Exception as exc:
+        # T-518 — traceback 박제. work_dir 결정 가능하면 failure.md, 불가 시
+        # workflow.log fallback (init_step 은 try 밖이라 본 분기는 항상 ctx 정의됨).
+        try:
+            (ctx.work_dir / "failure.md").write_text(
+                f"# driver failure\n\n"
+                f"- ts: {datetime.now().isoformat(timespec='seconds')}\n"
+                f"- exception: `{exc!r}`\n\n"
+                f"```\n{traceback.format_exc()}```\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
         fail_step(ctx, f"unhandled exception: {exc!r}")
         return 3
 

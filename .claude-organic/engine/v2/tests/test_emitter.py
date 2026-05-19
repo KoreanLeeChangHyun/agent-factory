@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -269,6 +270,60 @@ def test_emit_multi_thread_no_line_drop(ctx):
     # 각 (tid, seq) 쌍이 정확히 1번씩 등장
     pairs = {(r["tid"], r["seq"]) for r in parsed}
     assert len(pairs) == N_THREADS * PER_THREAD
+
+
+# ---------------------------------------------------------------------------
+# T-518 — emit() BrokenPipeError graceful skip
+# ---------------------------------------------------------------------------
+
+
+class _BrokenStdout:
+    """sys.stdout 대체용 — write 시 BrokenPipeError raise."""
+
+    def write(self, data: str) -> int:  # noqa: ARG002
+        raise BrokenPipeError("EPIPE")
+
+    def flush(self) -> None:
+        pass
+
+
+class _OSErrorStdout:
+    """sys.stdout 대체용 — write 시 일반 OSError raise (BrokenPipe 외)."""
+
+    def write(self, data: str) -> int:  # noqa: ARG002
+        raise OSError(28, "ENOSPC")
+
+    def flush(self) -> None:
+        pass
+
+
+def test_emit_broken_pipe_returns_silently(ctx, monkeypatch):
+    """T-518 — sys.stdout.write 가 BrokenPipeError 를 raise 해도 예외 전파 안 함.
+
+    Root cause (T-514 P6 §1): driver subprocess stdout pipe 가 끊긴 상황. emit()
+    의 BrokenPipeError 미catch 가 driver 사망의 단일 origin 이었음.
+    """
+    monkeypatch.setattr(sys, "stdout", _BrokenStdout())
+    # graceful return — 예외 전파 0
+    emitter.emit(ctx, "test.event", payload="x")
+
+
+def test_emit_normal_writes_to_stdout(ctx, capsys):
+    """T-518 — 정상 path 의 stdout 출력 보존 (BrokenPipe catch 가 회귀 없음)."""
+    emitter.emit(ctx, "test.event", payload="x")
+    captured = capsys.readouterr()
+    assert '"event": "test.event"' in captured.out
+    assert '"payload": "x"' in captured.out
+    # metrics.jsonl 박제도 정상
+    lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
+    assert any(json.loads(line)["event"] == "test.event" for line in lines)
+
+
+def test_emit_other_oserror_propagates(ctx, monkeypatch):
+    """T-518 — BrokenPipeError 만 swallow; 다른 OSError 는 전파 (진단 정보 손실 방지)."""
+    monkeypatch.setattr(sys, "stdout", _OSErrorStdout())
+    with pytest.raises(OSError):
+        emitter.emit(ctx, "test.event", payload="x")
 
 
 def test_phase_start_session_ids_list(ctx, monkeypatch):
