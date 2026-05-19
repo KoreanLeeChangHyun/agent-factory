@@ -310,76 +310,6 @@
     }
   }
 
-  M.loadHistory = function(sessionId) {
-    if (Board.debugLog) Board.debugLog('loadHistory.entry', {
-      sessionId: sessionId || null,
-      historyLoaded: !!M._historyLoaded,
-      isWorkflowMode: !!M.isWorkflowMode,
-      termStatus: Board.state.termStatus,
-    });
-    if (!sessionId || M._historyLoaded || M.isWorkflowMode) return Promise.resolve();
-    M._historyLoaded = true;
-    return fetch("/terminal/history?session_id=" + encodeURIComponent(sessionId), {
-      cache: "no-store"
-    }).then(function (res) {
-      if (!res.ok) return null;
-      return res.json();
-    }).then(function (data) {
-      if (Board.debugLog) Board.debugLog('loadHistory.response', {
-        hasData: !!data,
-        events: data && data.events ? data.events.length : 0,
-        pendingTurn: !!(data && data.pending_turn),
-        lastTimestamp: (data && data.last_timestamp) || null,
-        lastEventKinds: data && data.events
-          ? data.events.slice(-3).map(function (e) {
-              return {
-                kind: e.kind || 'text',
-                role: e.role || null,
-                inFlight: !!e.in_flight,
-                interrupted: !!e.interrupted,
-                textSample: e.text ? String(e.text).slice(0, 60) : null,
-              };
-            })
-          : [],
-      });
-      if (!data) {
-        M.showEmptyState();
-        return;
-      }
-      // usage/cost 는 events 유무와 무관하게 반영한다.
-      // force=true: 세션 스위치 시 이전 세션의 토큰을 이 세션의 last_usage 로 덮어쓰기.
-      _applyHistoryUsage(data, true);
-      // 세션 메타: jsonl 마지막 assistant 메시지의 model 을 status bar 에 복원.
-      // /terminal/status 가 아닌 /terminal/history 에서 가져오는 이유는,
-      // resume 시 새 spawn 프로세스의 라이브 model 이 아니라 "이 세션이 실제로
-      // 사용한 model" 이 의미적으로 옳기 때문이다.
-      if (data.last_model && Board.session && Board.session.applyRawModel) {
-        Board.session.applyRawModel(data.last_model);
-      }
-      if (!data.events || !data.events.length) {
-        M.showEmptyState();
-        return;
-      }
-      M.renderHistory(data.events);
-      M._historyLastTimestamp = data.last_timestamp || "";
-      // pending_turn: 마지막 user 이벤트 직후 응답 대기 중이나 아직 in_flight 없음.
-      // turn-card 를 닫지 않고 spinner 를 활성화한다.
-      // (in_flight 이 있는 경우는 renderHistory 내부의 sawInFlight 분기가 처리)
-      if (data.pending_turn && !M.isWorkflowMode) {
-        if (Board.debugLog) Board.debugLog('loadHistory.pendingTurnDetected', {
-          events: data.events ? data.events.length : 0,
-          termStatusBefore: Board.state.termStatus,
-        });
-        Board.state.setTermStatus("busy");
-        if (M.startSpinner) M.startSpinner();
-      }
-      _scrollOutputToBottomSoon();
-    }).catch(function () {
-      // 네트워크 오류 등: 최소한 placeholder라도 보이게
-      M.showEmptyState();
-    });
-  };
-
   function _scrollOutputToBottomSoon() {
     if (!M.outputDiv) return;
     // 마크다운/mermaid 비동기 렌더 이후 높이가 확장되므로 두 프레임 뒤 스크롤.
@@ -390,19 +320,91 @@
     });
   }
 
-  /**
-   * 재연결 gap 보충: 마지막 복원 timestamp 이후의 새 이벤트만 가져와 덧붙인다.
-   * SSE가 라이브만 전달하므로 네트워크 블립 동안 놓친 이벤트는 여기서 메운다.
-   * usage/cost 는 since 와 무관하게 전체 최신값이 실리므로 gap 이 비어 있어도
-   * connectSSE 의 resetTokens() 로 날아간 값을 복구한다.
-   */
-  M.fetchHistorySince = function(sessionId) {
+  // ── T-384 P3: HistoryLoader 단일 진입점 ─────────────────────────────────
+  //
+  // 옛 흐름: 호출자가 직접 `M._historyLoaded` 값을 읽고
+  //   if (!historyLoaded) M.loadHistory(sid);
+  //   else                M.fetchHistorySince(sid);
+  // 두 분기를 골라 호출. 호출자별로 가드 누락 / 분기 오류 회귀가 잦았다.
+  //
+  // 새 흐름: 호출자는 ``HistoryLoader.load(sid)`` 한 곳만 호출. 분기는 로더
+  // 내부에서 ``_historyLoaded`` + ``_historyLastTimestamp`` 두 플래그로 결정.
+  //
+  // | 조건                                          | 동작 |
+  // |---|---|
+  // | ``!sid`` 또는 ``M.isWorkflowMode``            | skip (Promise.resolve) |
+  // | ``!_historyLoaded``                           | initial full load |
+  // | ``_historyLoaded && _historyLastTimestamp``   | gap-fill (since) |
+  // | ``_historyLoaded && !_historyLastTimestamp``  | skip (멱등 안전망) |
+  //
+  // 옛 함수 ``M.loadHistory`` / ``M.fetchHistorySince`` 는 wrapper 로 보존하여
+  // 외부 호출자 (없을 것으로 추정되지만 방어적) backward compat 을 유지한다.
+  var HistoryLoader = {};
+
+  HistoryLoader.load = function (sessionId) {
+    if (Board.debugLog) Board.debugLog('HistoryLoader.load.entry', {
+      sessionId: sessionId || null,
+      historyLoaded: !!M._historyLoaded,
+      historyLastTimestamp: M._historyLastTimestamp || '',
+      isWorkflowMode: !!M.isWorkflowMode,
+      termStatus: Board.state.termStatus,
+    });
     if (!sessionId || M.isWorkflowMode) return Promise.resolve();
-    var since = M._historyLastTimestamp || "";
-    // since 가 비어 있으면 초기 로드(loadHistory)가 담당해야 한다.
-    // 여기서 전체 history 를 fetch 하면 loadHistory 결과와 겹쳐 렌더되어
-    // Sessions 드롭다운 resume 직후 대화가 2벌로 찍히는 버그가 발생한다.
+    if (!M._historyLoaded) {
+      return _initialLoad(sessionId);
+    }
+    var since = M._historyLastTimestamp || '';
     if (!since) return Promise.resolve();
+    return _gapFill(sessionId, since);
+  };
+
+  function _initialLoad(sessionId) {
+    M._historyLoaded = true;
+    return fetch("/terminal/history?session_id=" + encodeURIComponent(sessionId), {
+      cache: "no-store"
+    }).then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    }).then(function (data) {
+      if (Board.debugLog) Board.debugLog('HistoryLoader.initial.response', {
+        hasData: !!data,
+        events: data && data.events ? data.events.length : 0,
+        pendingTurn: !!(data && data.pending_turn),
+        lastTimestamp: (data && data.last_timestamp) || null,
+      });
+      if (!data) {
+        M.showEmptyState();
+        return;
+      }
+      // usage/cost 는 events 유무와 무관하게 반영한다.
+      // force=true: 세션 스위치 시 이전 세션의 토큰을 이 세션의 last_usage 로 덮어쓰기.
+      _applyHistoryUsage(data, true);
+      // 세션 메타: jsonl 마지막 assistant 메시지의 model 을 status bar 에 복원.
+      if (data.last_model && Board.session && Board.session.applyRawModel) {
+        Board.session.applyRawModel(data.last_model);
+      }
+      if (!data.events || !data.events.length) {
+        M.showEmptyState();
+        return;
+      }
+      M.renderHistory(data.events);
+      M._historyLastTimestamp = data.last_timestamp || "";
+      // pending_turn: 마지막 user 이벤트 직후 응답 대기 중이나 아직 in_flight 없음.
+      if (data.pending_turn && !M.isWorkflowMode) {
+        if (Board.debugLog) Board.debugLog('HistoryLoader.initial.pendingTurnDetected', {
+          events: data.events ? data.events.length : 0,
+          termStatusBefore: Board.state.termStatus,
+        });
+        Board.state.setTermStatus("busy");
+        if (M.startSpinner) M.startSpinner();
+      }
+      _scrollOutputToBottomSoon();
+    }).catch(function () {
+      M.showEmptyState();
+    });
+  }
+
+  function _gapFill(sessionId, since) {
     var url = "/terminal/history?session_id=" + encodeURIComponent(sessionId)
       + "&since=" + encodeURIComponent(since);
     return fetch(url, { cache: "no-store" }).then(function (res) {
@@ -415,6 +417,20 @@
       M.renderHistory(data.events);
       if (data.last_timestamp) M._historyLastTimestamp = data.last_timestamp;
     }).catch(function () { /* silent */ });
+  }
+
+  // HistoryLoader 를 M 네임스페이스에 노출 — 외부 호출자가 단일 진입점 호출.
+  M.HistoryLoader = HistoryLoader;
+
+  // ── Legacy wrappers (backward compat) ────────────────────────────────
+  // 옛 호출자가 남아 있어도 회귀하지 않도록 wrapper 만 유지한다. wrapper 본문은
+  // HistoryLoader.load 를 그대로 위임한다. 호출자 측 분기 책임이 모두 로더로
+  // 이전됐으므로 wrapper 의 의미는 "어떤 분기든 로더가 알아서 처리".
+  M.loadHistory = function (sessionId) {
+    return HistoryLoader.load(sessionId);
+  };
+  M.fetchHistorySince = function (sessionId) {
+    return HistoryLoader.load(sessionId);
   };
 
   // ── Smart Auto-Scroll ──
