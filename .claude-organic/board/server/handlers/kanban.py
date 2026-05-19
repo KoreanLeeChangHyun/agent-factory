@@ -16,7 +16,7 @@ from ._kanban_done_helpers import (
     handle_kanban_done_review,
     check_derived_blocked,
 )
-from .._common import logger
+from .._common import api_endpoint, logger
 from ..state import sse_manager
 from ..v2_launcher import (
     _LAUNCH_READER_LOCK,
@@ -30,7 +30,9 @@ from ..v2_launcher import (
 
 
 def _classify_failure_reason(returncode: int, stderr: str) -> str:
-    """flow-launcher 비정상 종료 사유를 stderr·returncode 패턴으로 분류한다.
+    """internal helper — not exposed as endpoint.
+
+    flow-launcher 비정상 종료 사유를 stderr·returncode 패턴으로 분류한다.
 
     T-450 보고서 §5 reason enum:
       - to_do_status:        launcher 측 사전 검증 거부 (티켓이 To Do 상태)
@@ -54,7 +56,9 @@ def _classify_failure_reason(returncode: int, stderr: str) -> str:
 
 
 def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
-    """LAUNCH_* 이벤트를 SSE broadcast + workflow.log 동시 기록한다.
+    """internal helper — not exposed as endpoint.
+
+    LAUNCH_* 이벤트를 SSE broadcast + workflow.log 동시 기록한다.
 
     SSE event_type='launch' 단일 채널 재사용 (보고서 §5 — 신규 채널 신설 X).
     payload 의 'event' 필드로 PENDING/STARTED/FAILED 분기 식별.
@@ -95,7 +99,9 @@ def _launch_reader_loop(
     command: str,
     submitted_at: datetime,
 ) -> None:
-    """flow-launcher Popen 의 stdout/stderr 를 회수하고 LAUNCH_STARTED/FAILED 를 emit 한다.
+    """internal helper — not exposed as endpoint.
+
+    flow-launcher Popen 의 stdout/stderr 를 회수하고 LAUNCH_STARTED/FAILED 를 emit 한다.
 
     proc.communicate() 로 종료까지 무한 대기. timeout 책임은 launcher 측
     H4 urllib timeout=10s + T-904 cleanup 단일 진실 공급원에 위임 (보고서 §6).
@@ -196,7 +202,10 @@ class KanbanHandlerMixin:
     """Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes."""
 
     def _get_dirty_files(self, wt_path: str) -> list[str]:
-        """워크트리 미커밋 파일 목록 반환 (git status --porcelain 파싱)."""
+        """internal helper — not exposed as endpoint.
+
+        워크트리 미커밋 파일 목록 반환 (git status --porcelain 파싱).
+        """
         try:
             r = subprocess.run(
                 ['git', 'status', '--porcelain'],
@@ -212,7 +221,9 @@ class KanbanHandlerMixin:
     # ------------------------------------------------------------------
 
     def _resolve_feat_branch(self, ticket: str, project_root: str) -> str | None:
-        """티켓 번호로 정확한 feat/T-NNN-* 브랜치명을 조회한다.
+        """internal helper — not exposed as endpoint.
+
+        티켓 번호로 정확한 feat/T-NNN-* 브랜치명을 조회한다.
 
         ``git worktree list --porcelain`` 출력을 파싱하여 ``refs/heads/feat/T-NNN-*``
         형태에서 ``feat/T-NNN-*`` 부분만 추출. 워크트리 등록되지 않은 경우 None.
@@ -240,7 +251,10 @@ class KanbanHandlerMixin:
         return None
 
     def _get_current_branch(self, project_root: str) -> str | None:
-        """메인 working tree 의 현재 HEAD 브랜치명 반환. 실패 시 None."""
+        """internal helper — not exposed as endpoint.
+
+        메인 working tree 의 현재 HEAD 브랜치명 반환. 실패 시 None.
+        """
         try:
             r = subprocess.run(
                 ['git', 'branch', '--show-current'],
@@ -253,7 +267,9 @@ class KanbanHandlerMixin:
         return r.stdout.strip() or None
 
     def _detect_backend_changes(self, branch: str, project_root: str) -> bool:
-        """`git diff --name-only develop..<branch>` 결과에서 backend glob 매칭 여부 반환.
+        """internal helper — not exposed as endpoint.
+
+        `git diff --name-only develop..<branch>` 결과에서 backend glob 매칭 여부 반환.
 
         매칭되면 True (needs_restart=true), 미매칭이면 False.
         diff 호출 자체가 실패하면 보수적으로 False (UI 측에서 강제 재시작 모달 띄우지 않음).
@@ -277,7 +293,10 @@ class KanbanHandlerMixin:
         return False
 
     def _git_switch(self, branch: str, project_root: str, ignore_other_worktrees: bool = False) -> tuple[bool, str]:
-        """메인 working tree 에서 ``git switch <branch>`` 실행. (ok, stderr_or_msg)."""
+        """internal helper — not exposed as endpoint.
+
+        메인 working tree 에서 ``git switch <branch>`` 실행. (ok, stderr_or_msg).
+        """
         cmd = ['git', 'switch']
         if ignore_other_worktrees:
             cmd.append('--ignore-other-worktrees')
@@ -295,6 +314,7 @@ class KanbanHandlerMixin:
             return False, (r.stderr or r.stdout or 'git switch failed').strip()
         return True, (r.stdout or '').strip()
 
+    @api_endpoint("K", "branch_toggle")
     def _handle_kanban_branch_toggle(self) -> None:
         """POST /api/kanban/branch/toggle — Review 카드 feature 브랜치 활성/해제.
 
@@ -313,6 +333,18 @@ class KanbanHandlerMixin:
         제약:
           - 자동 stash / 자동 commit / 자동 reset 절대 금지 (사용자 수동 수습 안내만)
           - feedback_no_speculative_guards 캐논 준수
+
+        method: POST
+        url: /api/kanban/branch/toggle
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_branch_toggle
+        request: body {ticket_number: str, action: on|off}
+        response_ok: {ok: true, branch: str, needs_restart: bool}
+        response_error: {ok: false, error: str, dirty_files?: list}
+        status_codes: 200, 400, 409
+        auth: none (local-only) — user-triggered
+        side_effects: `git switch` in main working tree
+        sse_events: git_branch (via GitBranchWatcher)
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket_number') or '').strip()
@@ -398,6 +430,7 @@ class KanbanHandlerMixin:
             'active_ticket': ticket,
         })
 
+    @api_endpoint("K", "branch_active")
     def _handle_kanban_branch_active(self) -> None:
         """GET /api/kanban/branch/active — 현재 메인 working tree HEAD 브랜치 + active_ticket 반환.
 
@@ -405,6 +438,18 @@ class KanbanHandlerMixin:
               ``{"branch": "develop", "active_ticket": null}``
 
         frontend 가 페이지 로드 시 active 카드 시각 복원에 사용.
+
+        method: GET
+        url: /api/kanban/branch/active
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_branch_active
+        request: query none
+        response_ok: {branch: str|null, active_ticket: T-NNN|null}
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: spawn `git branch --show-current`
+        sse_events: none
         """
         project_root = os.getcwd()
         branch = self._get_current_branch(project_root)
@@ -420,11 +465,28 @@ class KanbanHandlerMixin:
         })
 
     def _check_derived_blocked(self, ticket: str, kanban_base: str) -> list[str]:
-        """derived-from 파생 티켓 중 Done 이외 상태인 것 반환 (위임)."""
+        """internal helper — not exposed as endpoint.
+
+        derived-from 파생 티켓 중 Done 이외 상태인 것 반환 (위임).
+        """
         return check_derived_blocked(ticket, kanban_base, _KANBAN_ALL_DIRS)
 
+    @api_endpoint("K", "move")
     def _handle_kanban_move(self) -> None:
-        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open + Open → Review + Review → Open 전이 허용."""
+        """POST /api/kanban/move — {"ticket","to"}: To Do ↔ Open + Open → Review + Review → Open 전이 허용.
+
+        method: POST
+        url: /api/kanban/move
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_move
+        request: body {ticket: T-NNN, to: todo|open|review}
+        response_ok: {ok: true, ticket, to, stdout: str}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 500, 504
+        auth: none (local-only)
+        side_effects: flow-kanban move subprocess
+        sse_events: kanban_update (via FileWatcher)
+        """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
         to = (data.get('to') or '').strip().lower()
@@ -455,6 +517,7 @@ class KanbanHandlerMixin:
             return
         self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
 
+    @api_endpoint("K", "submit")
     def _handle_kanban_submit(self) -> None:
         """POST /api/kanban/submit — {"ticket","command"}: v2 driver 비동기 spawn.
 
@@ -468,6 +531,18 @@ class KanbanHandlerMixin:
           - reader thread = driver rc != 0 일 때만 LAUNCH_FAILED 발사.
           - 응답 키 ``{ok, status:'starting', ticket, command, submitted_at, session_id}``
             완전 보존 (회귀 0건).
+
+        method: POST
+        url: /api/kanban/submit
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_submit
+        request: body {ticket: T-NNN, command: implement|research|review}
+        response_ok: {ok: true, status: starting, ticket, command, submitted_at, session_id}
+        response_error: {ok: false, error: str, error_kind?: str}
+        status_codes: 200, 400, 500
+        auth: none (local-only)
+        side_effects: spawn v2 driver subprocess, kanban Open → In Progress
+        sse_events: launch (LAUNCH_PENDING, LAUNCH_STARTED), kanban_update
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
@@ -488,12 +563,25 @@ class KanbanHandlerMixin:
             return
         self._send_json(result)
 
+    @api_endpoint("K", "done")
     def _handle_kanban_done(self) -> None:
         """POST /api/kanban/done — {"ticket","force","force_dirty"}.
 
         force=false: Review → Done.
         force=true:  Open → Done.
         세부 로직은 _kanban_done_helpers.py 위임.
+
+        method: POST
+        url: /api/kanban/done
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_done
+        request: body {ticket: T-NNN, force?: bool, force_dirty?: bool}
+        response_ok: {ok: true, ticket, merge_commit?, message}
+        response_error: {ok: false, error: str, blocked_derived?: list}
+        status_codes: 200, 400, 409, 500, 504
+        auth: none (local-only) — user-triggered
+        side_effects: flow-merge subprocess (commit + worktree cleanup + kanban move)
+        sse_events: kanban_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
@@ -512,8 +600,22 @@ class KanbanHandlerMixin:
         else:
             handle_kanban_done_review(self, ticket, project_root, flow_kanban)
 
+    @api_endpoint("K", "delete")
     def _handle_kanban_delete(self) -> None:
-        """POST /api/kanban/delete — {"ticket"}: derived-from 가드 + delete + worktree 정리."""
+        """POST /api/kanban/delete — {"ticket"}: derived-from 가드 + delete + worktree 정리.
+
+        method: POST
+        url: /api/kanban/delete
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_delete
+        request: body {ticket: T-NNN}
+        response_ok: {ok: true, ticket, stdout, worktree_removed: bool}
+        response_error: {ok: false, error_kind: derived_blocked|other, blocked_by, message}
+        status_codes: 200, 400, 409, 500, 504
+        auth: none (local-only) — user-triggered
+        side_effects: flow-kanban delete + worktree_manager.remove_worktree
+        sse_events: kanban_update (via FileWatcher)
+        """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()
 
@@ -580,7 +682,9 @@ class KanbanHandlerMixin:
     # ------------------------------------------------------------------
 
     def _resolve_audit_workdir(self, ticket: str, project_root: str) -> 'str | None':
-        """티켓 번호로 최신 work_dir 경로를 결정한다.
+        """internal helper — not exposed as endpoint.
+
+        티켓 번호로 최신 work_dir 경로를 결정한다.
 
         1순위: tickets/<status>/<T-NNN>.xml 의 <result>/<workdir> 필드 참조
         2순위: runs/ 디렉터리들을 mtime 역순으로 순회하여 status.json ticket_number 매칭
@@ -640,7 +744,9 @@ class KanbanHandlerMixin:
 
     @staticmethod
     def _compute_combined_verdict(tier1, tier2) -> str:
-        """1차+2차 worst-of 통합 verdict 산출.
+        """internal helper — not exposed as endpoint.
+
+        1차+2차 worst-of 통합 verdict 산출.
 
         Rules (priority order):
           1. either overall == FAIL  -> FAIL
@@ -670,6 +776,7 @@ class KanbanHandlerMixin:
             return "PASS"
         return "NONE"
 
+    @api_endpoint("K", "audit_verdict")
     def _handle_kanban_audit_verdict(self) -> None:
         """GET /api/kanban/audit/verdict?ticket=T-NNN — Auditor T3 advisory verdict 조회.
 
@@ -678,6 +785,18 @@ class KanbanHandlerMixin:
 
         파일 미존재 시 {"tier1": null, "tier2": null, "combined": "NONE"} 반환 (404 X).
         advisory only — 자동 차단/강제 전이/칸반 회귀 없음 (feedback_no_speculative_guards 캐논).
+
+        method: GET
+        url: /api/kanban/audit/verdict
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_audit_verdict
+        request: query {ticket: T-NNN}
+        response_ok: {ticket, tier1: dict|null, tier2: dict|null, combined: PASS|WARN|FAIL|NONE}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400
+        auth: none (local-only)
+        side_effects: read audit-verdict.json from work_dir
+        sse_events: none
         """
         from urllib.parse import urlparse, parse_qs
         import json as _json
@@ -723,6 +842,7 @@ class KanbanHandlerMixin:
             "combined": combined,
         })
 
+    @api_endpoint("K", "done_verdict")
     def _handle_kanban_done_verdict(self) -> None:
         """GET /api/kanban/done-verdict?ticket=T-NNN — Done 카드 머지 정합성 advisory verdict.
 
@@ -731,6 +851,18 @@ class KanbanHandlerMixin:
         verdict FAIL: 위 조건 미충족 (develop HEAD 가 머지 commit 아님 등).
 
         advisory only — 자동 회귀/강제 전이 없음 (feedback_no_speculative_guards 캐논).
+
+        method: GET
+        url: /api/kanban/done-verdict
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_done_verdict
+        request: query {ticket: T-NNN}
+        response_ok: {ticket, verdict: OK|FAIL|NONE, details: dict}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400
+        auth: none (local-only)
+        side_effects: spawn git rev-parse / git log --merges
+        sse_events: none
         """
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
@@ -886,6 +1018,7 @@ class KanbanHandlerMixin:
             },
         })
 
+    @api_endpoint("K", "review_verdict")
     def _handle_kanban_review_verdict(self) -> None:
         """GET /api/kanban/review-verdict?ticket=T-NNN -- Review 카드 룰베이스 advisory verdict.
 
@@ -894,6 +1027,18 @@ class KanbanHandlerMixin:
 
         advisory only -- kanban move / status 전이 / 자동 회귀 없음.
         (feedback_no_speculative_guards 캐논 / T-411 commit 0c970fa 폐기 사례)
+
+        method: GET
+        url: /api/kanban/review-verdict
+        domain: K
+        handler: KanbanHandlerMixin._handle_kanban_review_verdict
+        request: query {ticket: T-NNN}
+        response_ok: {ticket, verdict: PASS|WARN|FAIL|SKIP|UNKNOWN, violations: list}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400
+        auth: none (local-only)
+        side_effects: read review-verdict.json from work_dir
+        sse_events: none
         """
         import json as _json
         import xml.etree.ElementTree as ET

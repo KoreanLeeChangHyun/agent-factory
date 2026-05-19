@@ -6,13 +6,16 @@ import json
 import os
 import sys
 import time
-import uuid
+from typing import TYPE_CHECKING
 
 from ..state import workflow_registry
-from .._common import logger
+from .._common import api_endpoint, logger
 from ..event_filter import is_user_visible
 from ..terminal_channel import _resolve_last_event_id, TerminalSSEChannel
 from ..claude_process import _validate_images
+
+if TYPE_CHECKING:
+    from ..workflow_session import WorkflowSession
 
 # engine/ 디렉터리를 sys.path 에 추가하여 `from flow.stop import stop_workflow` 가
 # board/server 환경에서도 동작하도록 한다.
@@ -34,6 +37,7 @@ _REST_CLASSIFIER = TerminalSSEChannel()
 class WorkflowHandlerMixin:
     """Workflow session HTTP endpoints."""
 
+    @api_endpoint("W1", "start")
     def _handle_workflow_start(self) -> None:
         """워크플로우 세션 시작 엔드포인트를 처리한다.
 
@@ -43,6 +47,18 @@ class WorkflowHandlerMixin:
         워크플로우 레지스트리에 새 세션을 생성하고, Claude CLI 프로세스를 시작한다.
         프로세스 환경변수에 _WF_SESSION_TYPE, _WF_TICKET_ID, _WF_SESSION_ID,
         _WF_SERVER_PORT를 주입한다.
+
+        method: POST
+        url: /terminal/workflow/start
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_start
+        request: body {ticket: T-NNN, command: str, work_dir: str}
+        response_ok: {ok: true, session_id: str, ticket, command}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 500
+        auth: none (local-only)
+        side_effects: spawn Claude CLI subprocess + workflow_registry.create
+        sse_events: workflow_update (via FileWatcher); workflow_step (via terminal_channel)
         """
         _t0 = time.monotonic()
         data = self._read_json_body()
@@ -103,6 +119,7 @@ class WorkflowHandlerMixin:
             'session_id': session.session_id,
         })
 
+    @api_endpoint("W1", "kill")
     def _handle_workflow_kill(self) -> None:
         """워크플로우 세션 프로세스를 종료한다. (세션 메타와 SSE 이력은 유지)
 
@@ -112,6 +129,18 @@ class WorkflowHandlerMixin:
 
         기본 동작: 프로세스만 kill, 세션/채널은 레지스트리에 남겨 SSE 재접속 시
         이력 재생이 가능하도록 유지한다. 명시적 purge 요청 시에만 완전 제거한다.
+
+        method: POST
+        url: /terminal/workflow/kill
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_kill
+        request: body {session_id: str, purge?: bool}
+        response_ok: {ok: true, purged: bool}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only)
+        side_effects: kill Claude CLI subprocess (SIGTERM)
+        sse_events: process_exit (via terminal_channel system event)
         """
         data = self._read_json_body()
         if data is None:
@@ -134,6 +163,7 @@ class WorkflowHandlerMixin:
 
         self._send_json({'ok': True, 'purged': purge})
 
+    @api_endpoint("W1", "input")
     def _handle_workflow_input(self) -> None:
         """워크플로우 세션 입력 전송 엔드포인트를 처리한다.
 
@@ -141,6 +171,18 @@ class WorkflowHandlerMixin:
         요청 본문: {"session_id": "wf-T-NNN-...", "text": "사용자 메시지"}
 
         지정된 세션의 Claude CLI 프로세스에 사용자 메시지를 전송한다.
+
+        method: POST
+        url: /terminal/workflow/input
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_input
+        request: body {session_id: str, text?: str, images?: list}
+        response_ok: {ok: true, ...send_input result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only)
+        side_effects: feed text/images to Claude CLI stdin
+        sse_events: user_input (via terminal_channel)
         """
         data = self._read_json_body()
         if data is None:
@@ -178,6 +220,7 @@ class WorkflowHandlerMixin:
         result = session.process.send_input(text, images=images)
         self._send_json(result)
 
+    @api_endpoint("W1", "status")
     def _handle_workflow_status(self) -> None:
         """워크플로우 세션 상태 조회 엔드포인트를 처리한다.
 
@@ -185,6 +228,18 @@ class WorkflowHandlerMixin:
 
         지정된 세션의 프로세스 상태와 메타데이터를 JSON으로 응답한다.
         registry에 없어도 .jsonl 아카이브가 있으면 archived 상태로 응답한다.
+
+        method: GET
+        url: /terminal/workflow/status
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_status
+        request: query {session_id: str}
+        response_ok: {session_id, ticket_id, command, work_dir, status, archived, ...}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only)
+        side_effects: read workflow_registry / load archived jsonl
+        sse_events: none
         """
         session_id = self._parse_query_param('session_id')
         if not session_id:
@@ -213,6 +268,7 @@ class WorkflowHandlerMixin:
             'last_artifact': session.last_artifact,
         })
 
+    @api_endpoint("W1", "sse")
     def _handle_workflow_sse(self) -> None:
         """워크플로우 세션 전용 SSE 엔드포인트를 처리한다.
 
@@ -222,6 +278,18 @@ class WorkflowHandlerMixin:
         클라이언트에 스트리밍한다. 기존 /terminal/events SSE와 동일한 패턴을 사용하되,
         세션별 독립 채널을 통해 멀티플렉싱한다. registry에 없지만 .jsonl 아카이브가
         있는 경우 히스토리를 일회성으로 재생한 후 아카이브 종료 시그널로 스트림을 닫는다.
+
+        method: GET
+        url: /terminal/workflow/events
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_sse
+        request: query {session_id: str}
+        response_ok: text/event-stream (TerminalSSEChannel events)
+        response_error: 404 (session not found)
+        status_codes: 200, 404
+        auth: none (local-only)
+        side_effects: register self.wfile to session.channel
+        sse_events: stdout, result, system, permission, user_input, error, workflow_step (per board.md §1.1)
         """
         session_id = self._parse_query_param('session_id')
         if not session_id:
@@ -270,7 +338,9 @@ class WorkflowHandlerMixin:
             session.channel.remove(self.wfile)
 
     def _stream_archived_session(self, session: 'WorkflowSession') -> None:
-        """아카이브 세션의 히스토리를 일회성 재생 후 스트림을 종료한다.
+        """internal helper — not exposed as endpoint.
+
+        아카이브 세션의 히스토리를 일회성 재생 후 스트림을 종료한다.
 
         persist .jsonl 파일이 남은 세션에 대해 last_event_id 이후의 이벤트만
         재생하고, 완료 시그널(archived_end)을 전송한 후 연결을 닫는다.
@@ -298,6 +368,7 @@ class WorkflowHandlerMixin:
         finally:
             session.channel.remove(self.wfile)
 
+    @api_endpoint("W1", "list")
     def _handle_workflow_list(self) -> None:
         """워크플로우 세션 목록 조회 엔드포인트를 처리한다.
 
@@ -305,15 +376,40 @@ class WorkflowHandlerMixin:
 
         현재 레지스트리에 등록된 모든 워크플로우 세션의 메타데이터를
         JSON 배열로 응답한다.
+
+        method: GET
+        url: /terminal/workflow/list
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_list
+        request: query none
+        response_ok: [{session_id, ticket_id, command, ...}]
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: read workflow_registry snapshot
+        sse_events: none
         """
         self._send_json(workflow_registry.list_all())
 
+    @api_endpoint("W1", "step_update")
     def _handle_workflow_step_update(self) -> None:
         """워크플로우 단계 전이를 통보받아 SSE 이벤트를 발행한다.
 
         POST /terminal/workflow/step
         요청 본문: {"session_id": "wf-T-NNN-...", "step": "plan"|"work"|...}
         선택 필드: "detail": {...} (phase, mode 등 추가 정보)
+
+        method: POST
+        url: /terminal/workflow/step
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_step_update
+        request: body {session_id: str, step: str, detail?: dict}
+        response_ok: {ok: true, step: str}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only)
+        side_effects: terminal_channel.emit_step
+        sse_events: workflow_step (TerminalSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -336,6 +432,7 @@ class WorkflowHandlerMixin:
         session.channel.emit_step(step, detail)
         self._send_json({'ok': True, 'step': step})
 
+    @api_endpoint("W1", "history")
     def _handle_workflow_history(self) -> None:
         """워크플로우 세션 전체 이벤트 이력을 JSON으로 반환한다.
 
@@ -348,6 +445,18 @@ class WorkflowHandlerMixin:
 
         응답:
             {"session_id": ..., "total_count": N, "events": [{seq, event, data}, ...]}
+
+        method: GET
+        url: /terminal/workflow/history
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_history
+        request: query {session_id: str}
+        response_ok: {session_id, total_count: int, events: [{seq, event, data}]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404, 500
+        auth: none (local-only)
+        side_effects: read session jsonl persist file
+        sse_events: none
         """
         session_id = self._parse_query_param('session_id')
         if not session_id:
@@ -427,6 +536,7 @@ class WorkflowHandlerMixin:
             'events': events,
         })
 
+    @api_endpoint("W1", "stop")
     def _handle_workflow_stop(self) -> None:
         """워크플로우를 강제 중지하고 4축(프로세스/jsonl/칸반/워크트리)을 정리한다.
 
@@ -438,6 +548,18 @@ class WorkflowHandlerMixin:
         - 기존 /terminal/workflow/kill 은 프로세스만 kill; 본 엔드포인트는 4축 통합 정리.
         - in-process import: from flow.stop import stop_workflow 직접 호출
           (subprocess 경유 없이 동일 프로세스에서 jsonl/칸반/워크트리 정리).
+
+        method: POST
+        url: /api/workflow/stop
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_stop
+        request: body {ticket?: T-NNN, session_id?: str}
+        response_ok: {ok: true, ticket, session_id, killed: bool, errors: []}
+        response_error: {ok: false, errors: [str]}
+        status_codes: 200, 400, 404, 500
+        auth: none (local-only) — user-triggered
+        side_effects: kill subprocess + jsonl/kanban/worktree cleanup (4축 통합)
+        sse_events: kanban_update + workflow_update (via FileWatcher)
         """
         data = self._read_json_body()
         if data is None:
@@ -489,6 +611,7 @@ class WorkflowHandlerMixin:
         # 정상 응답 (ok=True 또는 부분 성공) → 200
         self._send_json(result)
 
+    @api_endpoint("W1", "artifact")
     def _handle_workflow_artifact(self, qs: dict) -> None:
         """워크플로우 산출물 파일 조회 엔드포인트를 처리한다.
 
@@ -509,6 +632,18 @@ class WorkflowHandlerMixin:
 
         Returns:
             None (응답 전송 후 종료)
+
+        method: GET
+        url: /api/workflow/artifact
+        domain: W1
+        handler: WorkflowHandlerMixin._handle_workflow_artifact
+        request: query {session_id: str, path: str (whitelisted)}
+        response_ok: text/markdown body
+        response_error: {ok: false, error: str}
+        status_codes: 200, 403, 404
+        auth: none (local-only)
+        side_effects: read whitelisted artifact from work_dir
+        sse_events: none
         """
         import re as _re
 

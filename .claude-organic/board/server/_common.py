@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-import atexit
-import collections
 import datetime
-import hashlib
+import functools
 import json
 import logging
 import os
-import signal
-import socket
-import subprocess
 import sys
 import threading
 import time
-import uuid
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 # board_data 는 sibling 모듈 (`.claude-organic/board/board_data.py`). 본 파일을
 # `board.server` 패키지 경로로 import 한 환경에서도 bare `from board_data import`
@@ -27,7 +20,10 @@ _BOARD_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _BOARD_PKG_DIR not in sys.path:
     sys.path.insert(0, _BOARD_PKG_DIR)
 
-from board_data import (
+# noqa: E402 — sys.path 부트스트랩 이후에 import 필요.
+# noqa: F401 — 본 _common.py 는 board_data 의 식별자를 handlers/* 가 재import 하는
+# hub 역할. _common.py 내부에서 직접 사용 안 해도 export 의무.
+from board_data import (  # noqa: E402, F401
     KANBAN_DIRS_LIST,
     WF_BASE,
     WF_HISTORY,
@@ -66,6 +62,7 @@ from board_data import (
     _memory_gc_run,
     _memory_gc_prune_archive,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -124,3 +121,59 @@ def server_debug_log(tag: str, data: object) -> None:
             f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
     except (OSError, TypeError, ValueError):
         pass
+
+
+# ---------------------------------------------------------------------------
+# @api_endpoint decorator (T-511 P2)
+# ---------------------------------------------------------------------------
+# Board BE 의 모든 endpoint handler method 가 동일 디버그 tag 컨벤션으로
+# debug.log 에 entry/exit/error 라인을 발화하도록 강제하는 표준 helper.
+#
+# 사용:
+#     @api_endpoint("K", "move")
+#     def _handle_kanban_move(self) -> None:
+#         """...docstring 11 필드..."""
+#         ...
+#
+# 발화 tag 형식 (project_board_api_spec.md §3):
+#     api.<domain>.<verb>.entry  — 진입 직후
+#     api.<domain>.<verb>.exit   — 정상 반환 직후
+#     api.<domain>.<verb>.error  — 예외 발생 (예외는 그대로 재발생)
+#
+# server_debug_log 가 'server.' prefix 자동 부착 → 최종 NDJSON tag 는
+# `server.api.<domain>.<verb>.<phase>` 가 된다.
+#
+# 오버헤드:
+#   debug.enabled 플래그 부재 시 server_debug_log 가 즉시 return —
+#   decorator 추가 비용은 functools.wraps 호출 + 빈 try/except 한 겹.
+def api_endpoint(domain: str, verb: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Board BE endpoint handler method 표준 decorator.
+
+    Args:
+        domain: 도메인 코드 (project_board_api_spec.md §2 의 11종).
+                K, W1, W2, T, M, PR, MET, WTC, MGC, SYS, INF.
+        verb: 동사/명사 (list, get, save, delete, move, submit, done, …).
+
+    Returns:
+        decorated 함수. entry/exit/error 3 phase 의 debug.log 라인을 발화한다.
+
+    예시 tag:
+        api.K.move.entry / api.K.move.exit / api.K.move.error
+    """
+    base_tag = f"api.{domain}.{verb}"
+
+    def _decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(func)
+        def _wrapped(*args: Any, **kwargs: Any) -> Any:
+            server_debug_log(base_tag + '.entry', {'args_count': len(args), 'kwargs_keys': list(kwargs.keys())})
+            try:
+                result = func(*args, **kwargs)
+            except Exception as exc:
+                server_debug_log(base_tag + '.error', {'type': type(exc).__name__, 'msg': str(exc)})
+                raise
+            server_debug_log(base_tag + '.exit', {'result_type': type(result).__name__})
+            return result
+
+        return _wrapped
+
+    return _decorator

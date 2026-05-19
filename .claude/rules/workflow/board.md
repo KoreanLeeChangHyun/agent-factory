@@ -48,10 +48,14 @@ v2 driver subprocess 가 호출하는 의미별 endpoint (`POST /api/v2/sessions
 | 이벤트 | 용도 | 발사 진입점 |
 |--------|------|------------|
 | kanban_update / workflow_update / dashboard_update | 해당 디렉터리 파일 변경 알림 (SPA 측 fetch 트리거) | `FileWatcher` 콜백 (`app.py`) |
+| memory_update | 메모리 디렉터리 (`.claude/.../memory/`) 파일 변경 알림 (T-511 P6 보충) | `FileWatcher` 콜백 (memory 디렉터리 watch) |
+| roadmap_update | roadmap.yaml 변경 알림 (T-511 P6 보충) | `FileWatcher` 콜백 (`.claude-organic/roadmap/` watch) |
 | git_branch | 현재 git 브랜치 변경 알림 | `GitBranchWatcher` 콜백 (`app.py`) |
 | launch | 워크플로우 spawn 알림 | (handlers/kanban DnD submit 등) |
 
 §1.1 / §1.2 와는 별개 계약. 본 채널에 새 이벤트 추가 시 §1.3 표 갱신.
+
+> 사용자 결정 #8 (T-511): `memory_update` / `roadmap_update` 는 본 채널에 등록되어 있으나 (memory/rules/prompt + roadmap 디렉터리 watch) 본 표에서 누락 → T-511 P6 에서 보충. handler 측 SSE event 발사 (예: `/api/memory/file` POST 후 FileWatcher 가 자동 발사) 도 본 표에 정합 갱신 의무.
 
 ### 1.4 3 채널 책임 경계 (T-497 결정 — 보존)
 

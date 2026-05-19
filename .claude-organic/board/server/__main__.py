@@ -6,7 +6,6 @@ import os
 import subprocess
 import sys
 
-from ._common import logger
 from .app import _run_server, is_port_in_use
 
 

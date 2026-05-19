@@ -10,7 +10,7 @@ import uuid
 from urllib.parse import parse_qs, urlparse
 
 from ..state import terminal_sse_channel, claude_process, workflow_registry
-from .._common import logger, _get_git_branch, server_debug_log
+from .._common import api_endpoint, logger, _get_git_branch, server_debug_log
 from ..event_filter import is_user_visible
 from ..terminal_channel import _resolve_last_event_id
 from ..claude_process import _validate_images
@@ -31,7 +31,9 @@ _HISTORY_SKIP_TYPES = frozenset({
 
 
 def _assign_turn_ids(events: list[dict]) -> list[dict]:
-    """시간순 render events 배열에 turn_id 필드를 부여하고 그대로 반환한다.
+    """internal helper — not exposed as endpoint.
+
+    시간순 render events 배열에 turn_id 필드를 부여하고 그대로 반환한다.
 
     1:1 단순화 규칙 (1 user 이벤트 = 1 turn):
     - user 이벤트가 등장할 때마다 무조건 새 turn_id 를 시작한다.
@@ -62,7 +64,7 @@ def _assign_turn_ids(events: list[dict]) -> list[dict]:
         if is_real_user:
             # 새 user 이벤트 = 무조건 새 turn (gap 임계값 무관)
             # timestamp 없는 레거시 레코드는 극히 드물지만 fallback 처리
-            current_turn_id = f"hist-{ts}" if ts else f"hist-orphan"
+            current_turn_id = f"hist-{ts}" if ts else "hist-orphan"
 
         # current_turn_id 가 없으면 fallback: orphan assistant 이벤트
         # (첫 이벤트가 assistant 인 엣지 케이스)
@@ -75,7 +77,9 @@ def _assign_turn_ids(events: list[dict]) -> list[dict]:
 
 
 def _extract_tool_result_text(content: object) -> str:
-    """tool_result content에서 평문 텍스트만 추출한다.
+    """internal helper — not exposed as endpoint.
+
+    tool_result content에서 평문 텍스트만 추출한다.
 
     content는 (a) 문자열 또는 (b) [{type:text|image, ...}, ...] 배열.
     image 블록은 제외한다.
@@ -97,7 +101,10 @@ def _extract_tool_result_text(content: object) -> str:
 
 
 def _is_system_wrapper_text(text: str) -> bool:
-    """슬래시 커맨드 래퍼, system-reminder 등 히스토리에서 숨겨야 할 user 메시지를 판별한다."""
+    """internal helper — not exposed as endpoint.
+
+    슬래시 커맨드 래퍼, system-reminder 등 히스토리에서 숨겨야 할 user 메시지를 판별한다.
+    """
     stripped = text.lstrip()
     if stripped.startswith(_TITLE_SKIP_PREFIXES):
         return True
@@ -107,7 +114,9 @@ def _is_system_wrapper_text(text: str) -> bool:
 
 
 def _build_render_events(data: dict) -> list[dict]:
-    """jsonl 라인 한 줄을 0~N개의 렌더 이벤트로 전개한다.
+    """internal helper — not exposed as endpoint.
+
+    jsonl 라인 한 줄을 0~N개의 렌더 이벤트로 전개한다.
 
     하나의 assistant 메시지가 thinking + text + tool_use 여러 블록을 포함할 수
     있으므로 블록 수만큼의 이벤트를 반환한다. 빈 텍스트, 시스템 래퍼 user
@@ -240,7 +249,9 @@ _TITLE_SCAN_MAX_LINES = 300
 
 
 def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
-    """jsonl 파일에서 (title, branch) 를 한 번의 스캔으로 추출한다.
+    """internal helper — not exposed as endpoint.
+
+    jsonl 파일에서 (title, branch) 를 한 번의 스캔으로 추출한다.
 
     title: 첫 유효 user 메시지 (필터 규칙은 기존 _extract_session_title 동일)
     branch: 가장 최근에 등장한 ``gitBranch`` 필드 값 (없으면 빈 문자열)
@@ -311,12 +322,25 @@ def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
 class TerminalHandlerMixin:
     """Terminal main-session HTTP endpoints."""
 
+    @api_endpoint("T", "sse")
     def _handle_terminal_sse(self) -> None:
         """터미널 전용 SSE 엔드포인트를 처리한다.
 
         /terminal/events 경로에 대해 TerminalSSEChannel로부터
         Claude CLI stdout 이벤트를 클라이언트에 스트리밍한다.
         기존 /events SSE와 완전히 독립된 채널을 사용한다.
+
+        method: GET
+        url: /terminal/events
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_sse
+        request: query {last_event_id?: int, skip_replay?: bool}
+        response_ok: text/event-stream (TerminalSSEChannel)
+        response_error: n/a (HTTP keep-alive stream)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: register self.wfile to terminal_sse_channel
+        sse_events: stdout, result, system, permission, user_input, error, skill_listing, rate_limit, workflow_step (board.md §1.1)
         """
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
@@ -361,10 +385,23 @@ class TerminalHandlerMixin:
         finally:
             terminal_sse_channel.remove(self.wfile)
 
+    @api_endpoint("T", "status")
     def _handle_terminal_status(self) -> None:
         """터미널 상태 조회 엔드포인트를 처리한다.
 
         GET /terminal/status: Claude 프로세스의 현재 상태를 JSON으로 응답한다.
+
+        method: GET
+        url: /terminal/status
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_status
+        request: query none
+        response_ok: {status, session_id, model, permission_mode, branch, clients, awaiting_response}
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: read claude_process snapshot
+        sse_events: none
         """
         project_root = os.getcwd()
         awaiting = bool(getattr(claude_process, '_awaiting_response', False))
@@ -387,6 +424,7 @@ class TerminalHandlerMixin:
             'awaiting_response': awaiting,
         })
 
+    @api_endpoint("T", "sessions")
     def _handle_terminal_sessions(self) -> None:
         """세션 목록 조회 엔드포인트를 처리한다.
 
@@ -404,6 +442,18 @@ class TerminalHandlerMixin:
             title: 첫 유효 user 메시지 (최대 100자)
             branch: 세션 jsonl 의 마지막 ``gitBranch`` 값 (없으면 "")
             size_bytes: jsonl 파일 크기 (바이트)
+
+        method: GET
+        url: /terminal/sessions
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_sessions
+        request: query none
+        response_ok: [{session_id, last_active, is_current, is_last, title, branch, size_bytes}]
+        response_error: n/a (always 200; missing dir → empty list)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: scandir ~/.claude/projects/<slug>/, parse jsonl headers
+        sse_events: none
         """
         project_root = os.getcwd()
 
@@ -466,12 +516,25 @@ class TerminalHandlerMixin:
 
         self._send_json(result)
 
+    @api_endpoint("T", "history")
     def _handle_terminal_history(self) -> None:
         """세션 대화 히스토리 조회 엔드포인트를 처리한다.
 
         GET /terminal/history?session_id=<uuid>[&since=<iso-timestamp>]:
         ``~/.claude/projects/<project-slug>/<session_id>.jsonl`` 파일을 읽어
         렌더 이벤트 배열로 반환한다.
+
+        method: GET
+        url: /terminal/history
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_history
+        request: query {session_id: str, since?: iso8601}
+        response_ok: {session_id, events: [{role, kind, text, timestamp, turn_id, ...}]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404, 500
+        auth: none (local-only)
+        side_effects: read session jsonl file
+        sse_events: none
 
         jsonl 이벤트를 text / thinking / tool_use / tool_result 4종 kind로
         전개하여 SSE 라이브와 동일한 입도로 복원한다. ``since`` 가 주어지면
@@ -780,11 +843,24 @@ class TerminalHandlerMixin:
 
         self._send_json(response)
 
+    @api_endpoint("T", "start")
     def _handle_terminal_start(self) -> None:
         """터미널 세션 시작 엔드포인트를 처리한다.
 
         POST /terminal/start: Claude CLI 프로세스를 시작한다.
         요청 본문에 {"args": [...]} 형태로 추가 CLI 인자를 지정할 수 있다.
+
+        method: POST
+        url: /terminal/start
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_start
+        request: body {args?: list[str], resume_session_id?: uuid}
+        response_ok: {ok: true, session_id: uuid}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 409
+        auth: none (local-only)
+        side_effects: spawn Claude CLI subprocess (`claude` binary)
+        sse_events: system init (via TerminalSSEChannel)
         """
         extra_args = None
         resume_session_id = None
@@ -824,6 +900,7 @@ class TerminalHandlerMixin:
 
         self._send_json(result)
 
+    @api_endpoint("T", "input")
     def _handle_terminal_input(self) -> None:
         """터미널 입력 전송 엔드포인트를 처리한다.
 
@@ -831,6 +908,18 @@ class TerminalHandlerMixin:
         요청 본문: {"text": "사용자 메시지"}
 
         프로세스 미시작 시 409 Conflict를 반환한다.
+
+        method: POST
+        url: /terminal/input
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_input
+        request: body {text?: str, images?: list, attachments?: list}
+        response_ok: {ok: true, ...send_input result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 409
+        auth: none (local-only)
+        side_effects: feed NDJSON envelope to Claude CLI stdin + sidecar append
+        sse_events: user_input (TerminalSSEChannel)
         """
         if claude_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
@@ -917,12 +1006,25 @@ class TerminalHandlerMixin:
 
         self._send_json(result)
 
+    @api_endpoint("T", "kill")
     def _handle_terminal_kill(self) -> None:
         """터미널 세션 종료 엔드포인트를 처리한다.
 
         POST /terminal/kill: Claude CLI 프로세스를 종료한다.
 
         프로세스 미시작 시 409 Conflict를 반환한다.
+
+        method: POST
+        url: /terminal/kill
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_kill
+        request: body none
+        response_ok: {ok: true, ...kill result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 409
+        auth: none (local-only) — user-triggered
+        side_effects: SIGTERM Claude CLI subprocess
+        sse_events: process_exit (TerminalSSEChannel system event)
         """
         if claude_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
@@ -931,6 +1033,7 @@ class TerminalHandlerMixin:
         result = claude_process.kill()
         self._send_json(result)
 
+    @api_endpoint("T", "command")
     def _handle_terminal_command(self) -> None:
         """슬래시 명령어 전달 엔드포인트를 처리한다.
 
@@ -941,6 +1044,18 @@ class TerminalHandlerMixin:
         선택 필드: "session_id" (현재 미사용, 메인 세션 전용)
 
         프로세스 미시작 시 409 Conflict를 반환한다.
+
+        method: POST
+        url: /terminal/command
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_command
+        request: body {command: str (starts with /)}
+        response_ok: {ok: true, ...send_input result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 409
+        auth: none (local-only)
+        side_effects: feed slash command to Claude CLI stdin
+        sse_events: stdout / result (downstream Claude output)
         """
         if claude_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
@@ -970,6 +1085,7 @@ class TerminalHandlerMixin:
         result = claude_process.send_input(command)
         self._send_json(result)
 
+    @api_endpoint("T", "permission")
     def _handle_terminal_permission(self) -> None:
         """permission 요청에 대한 승인/거부 응답 엔드포인트를 처리한다.
 
@@ -981,6 +1097,18 @@ class TerminalHandlerMixin:
         없으면 claude_process(메인 터미널)를 사용한다.
 
         프로세스 미실행 시 409 Conflict, 잘못된 요청 시 400 Bad Request를 반환한다.
+
+        method: POST
+        url: /terminal/permission
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_permission
+        request: body {request_id: str, decision: allow|deny, session_id?: str}
+        response_ok: {ok: true, ...response result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404, 409
+        auth: none (local-only)
+        side_effects: forward control_response to Claude CLI subprocess
+        sse_events: none (closes pending permission prompt)
         """
         data = self._read_json_body()
         if data is None:
@@ -1014,6 +1142,7 @@ class TerminalHandlerMixin:
         result = process.send_permission_response(request_id, decision, session_id)
         self._send_json(result)
 
+    @api_endpoint("T", "interrupt")
     def _handle_terminal_interrupt(self) -> None:
         """현재 응답 생성 중단 엔드포인트를 처리한다.
 
@@ -1028,6 +1157,18 @@ class TerminalHandlerMixin:
           jsonl 에서 그대로 복원할 수 있다.
 
         프로세스가 stopped 상태이면 409 Conflict를 반환한다.
+
+        method: POST
+        url: /terminal/interrupt
+        domain: T
+        handler: TerminalHandlerMixin._handle_terminal_interrupt
+        request: body none
+        response_ok: {ok: true, ...interrupt result}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 409
+        auth: none (local-only) — ESC key trigger
+        side_effects: SIGINT to Claude CLI subprocess (session preserved)
+        sse_events: system (subtype=user_input_interrupted)
         """
         if claude_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')

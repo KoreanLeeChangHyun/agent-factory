@@ -8,23 +8,28 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 
-from .._common import _workflow_sync_lock, _WORKFLOW_SYNC_URL, logger
+from .._common import _workflow_sync_lock, _WORKFLOW_SYNC_URL, api_endpoint, logger
 
 
 class SyncHandlerMixin:
     """Restart and workflow sync handlers."""
 
+    @api_endpoint("SYS", "debug_log")
     def _handle_debug_log(self) -> None:
         """클라 debugLog 이벤트를 서버 파일에 적재한다 (플래그 게이트).
 
-        플래그 파일(.claude-organic/runs/bg/debug.enabled)이 존재할 때만 기록.
-        그렇지 않으면 200 OK 만 돌려주고 바디는 버린다. Claude 가 파일을
-        touch/rm 하여 계측 활성화를 제어한다.
-
-        body: {"ts": iso, "tag": str, "data": any}
-        file: .claude-organic/runs/bg/debug.log (NDJSON)
+        method: POST
+        url: /api/debug-log
+        domain: SYS
+        handler: SyncHandlerMixin._handle_debug_log
+        request: body {ts: iso, tag: str, data: any}
+        response_ok: {ok: true, logged: bool}
+        response_error: 400 (invalid JSON) / 500 (IO error)
+        status_codes: 200, 400, 500
+        auth: none (local-only)
+        side_effects: append NDJSON to .claude-organic/runs/bg/debug.log (gated by debug.enabled flag)
+        sse_events: none
         """
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length else b''
@@ -53,11 +58,21 @@ class SyncHandlerMixin:
             return
         self._send_json({'ok': True, 'logged': True})
 
+    @api_endpoint("SYS", "restart")
     def _handle_restart(self) -> None:
         """서버 재시작 요청을 처리한다.
 
-        응답을 보낸 뒤 짧은 지연 후 현재 서버 소켓을 해제하고,
-        새 서버 프로세스를 생성한 뒤 현재 프로세스를 종료한다.
+        method: POST
+        url: /api/restart
+        domain: SYS
+        handler: SyncHandlerMixin._handle_restart
+        request: body none
+        response_ok: {ok: true}
+        response_error: n/a (always succeeds before exec)
+        status_codes: 200
+        auth: none (local-only) — user-triggered
+        side_effects: remove .board.url, execv new server process
+        sse_events: none
         """
         self._send_json({'ok': True})
 
@@ -80,15 +95,21 @@ class SyncHandlerMixin:
 
         threading.Timer(0.3, _do_restart).start()
 
+    @api_endpoint("W1", "sync")
     def _handle_workflow_sync(self) -> None:
         """POST /api/workflow/sync — init-claude-workflow.sh 실행을 SSE로 스트리밍한다.
 
-        동시 실행은 ``_workflow_sync_lock``으로 차단한다. 락 획득 실패 시 409를
-        반환하며, SSE 스트림을 시작하지 않는다. 락 획득 성공 시 SSE 헤더를 내보낸
-        뒤 ``curl ... | bash`` 서브프로세스의 stdout을 라인 단위로 ``event: log``
-        프레임으로 푸시하고, 종료 코드에 따라 ``event: done`` 또는
-        ``event: error``를 마지막으로 보낸다. 클라이언트 disconnect
-        (BrokenPipeError 등) 시 서브프로세스를 terminate한다.
+        method: POST
+        url: /api/workflow/sync
+        domain: W1
+        handler: SyncHandlerMixin._handle_workflow_sync
+        request: body none (URL fixed = _WORKFLOW_SYNC_URL)
+        response_ok: text/event-stream (start / log / done events)
+        response_error: 409 (already running), error event in stream
+        status_codes: 200, 409
+        auth: none (local-only) — user-triggered
+        side_effects: spawn `curl | bash` subprocess; acquire _workflow_sync_lock
+        sse_events: SSE inline events (start/log/done/error) — separate from board SSE channels
         """
         if not _workflow_sync_lock.acquire(blocking=False):
             self._send_error(409, 'Sync already in progress')

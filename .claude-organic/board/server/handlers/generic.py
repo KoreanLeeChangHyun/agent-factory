@@ -10,13 +10,13 @@ from ..state import sse_manager, poll_tracker
 from .._common import (
     SERVER_STARTED_AT,
     SERVER_PID,
+    api_endpoint,
     _parse_env_file,
     _read_kanban_tickets,
     _read_dashboard,
     _list_workflow_entries,
     _get_git_branch,
     _workflow_detail,
-    _resolve_memory_dir,
     _list_memory_files,
     _read_memory_file,
     _list_rules_files,
@@ -33,8 +33,39 @@ from .._common import (
 class GenericHandlerMixin:
     """Kanban / dashboard / workflow / memory / rules / prompt API + SSE."""
 
+    def _handle_api_delete(self) -> None:
+        """internal helper — not exposed as endpoint.
+
+        T-511 P4 — /api/* DELETE 라우팅 dispatcher. 4 DELETE endpoint 를
+        mixin handler 메서드 (_handle_memory_delete / _handle_rules_delete /
+        _handle_prompt_delete / _handle_quick_prompt_delete) 로 위임.
+
+        http_router.py do_DELETE 의 inline 분기 폐지 후 본 dispatcher 가 단일
+        라우팅 진입점. handler 메서드는 query/path 파싱 + 에러 응답 위임 패턴
+        보존.
+        """
+        from urllib.parse import urlparse
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == '/api/memory/file':
+            self._handle_memory_delete()
+        elif path == '/api/prompt/rules/file':
+            self._handle_rules_delete()
+        elif path == '/api/prompt/prompt-files/file':
+            self._handle_prompt_delete()
+        elif path == '/api/quick-prompts/item':
+            self._handle_quick_prompt_delete()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def _handle_api(self) -> None:
-        """API 요청을 라우팅한다."""
+        """internal helper — not exposed as endpoint.
+
+        /api/* GET 라우팅 dispatcher. 각 URL → 본 메서드 안에서 분기 후
+        inline (board_data 함수 직접 호출) 또는 mixin handler (_handle_*) 위임.
+        """
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
         path = parsed.path
@@ -140,8 +171,22 @@ class GenericHandlerMixin:
             self.send_response(404)
             self.end_headers()
 
+    @api_endpoint("SYS", "poll")
     def _handle_poll(self) -> None:
-        """폴링 엔드포인트를 처리한다."""
+        """폴링 엔드포인트를 처리한다.
+
+        method: GET
+        url: /poll
+        domain: SYS
+        handler: GenericHandlerMixin._handle_poll
+        request: query none
+        response_ok: {changes: [str, ...]}
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: poll_tracker.flush()
+        sse_events: none
+        """
         changes = poll_tracker.flush()
         body = json.dumps(changes).encode("utf-8")
         self.send_response(200)
@@ -151,8 +196,22 @@ class GenericHandlerMixin:
         self.end_headers()
         self.wfile.write(body)
 
+    @api_endpoint("SYS", "sse")
     def _handle_sse(self) -> None:
-        """SSE 엔드포인트를 처리한다."""
+        """SSE 엔드포인트를 처리한다.
+
+        method: GET
+        url: /events
+        domain: SYS
+        handler: GenericHandlerMixin._handle_sse
+        request: query none (long-lived connection)
+        response_ok: text/event-stream (kanban_update / workflow_update / dashboard_update / memory_update / roadmap_update / launch / git_branch)
+        response_error: n/a (HTTP keep-alive stream)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: sse_manager.add(self.wfile); heartbeat thread
+        sse_events: emit-only channel — see board.md §1.3
+        """
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
