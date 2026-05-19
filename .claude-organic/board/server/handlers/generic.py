@@ -14,9 +14,7 @@ from .._common import (
     _parse_env_file,
     _read_kanban_tickets,
     _read_dashboard,
-    _list_workflow_entries,
     _get_git_branch,
-    _workflow_detail,
     _list_memory_files,
     _read_memory_file,
     _list_rules_files,
@@ -80,14 +78,9 @@ class GenericHandlerMixin:
             self._send_json(_read_kanban_tickets(project_root, files))
         elif path == '/api/dashboard':
             self._send_json(_read_dashboard(project_root))
-        elif path == '/api/workflow/entries':
-            self._send_json(_list_workflow_entries(project_root))
-        elif path == '/api/workflow/detail':
-            entry = qs.get('entry', [None])[0]
-            if not entry:
-                self._send_json([])
-                return
-            self._send_json(_workflow_detail(project_root, entry))
+        # T-513 P2 — 옛 워크플로우 entries/detail inline 분기는 KANBAN 도메인 이전
+        # (KanbanHandlerMixin._handle_kanban_workflow_{entries,detail}). 본 _handle_api
+        # 안 inline 분기는 dead — http_router do_GET 가 직접 위임.
         elif path == '/api/server-info':
             self._send_json({
                 'pid': SERVER_PID,

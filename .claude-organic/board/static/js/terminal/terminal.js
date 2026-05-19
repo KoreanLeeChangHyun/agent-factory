@@ -13,19 +13,16 @@
   var M = (Board._term = Board._term || {});
 
   // ── Session dispatcher ──
-  M.workflowSessionId = (function () {
-    try {
-      var p = new URLSearchParams(window.location.search);
-      var s = p.get("session");
-      if (s && s !== "main" && s.indexOf("wf-") === 0) return s;
-    } catch (e) {}
-    return null;
-  })();
+  // T-513 P3 — V1 메인 터미널 워크플로우 모드 폐기 (결정점 #1 + #5).
+  // 옛 URL `?session=wf-...` 진입점 단절 — 메인 터미널은 메인 모드만 활성.
+  // V2 워크플로우는 별도 워크플로우 탭 (v2-workflow.js) 으로 진입.
+  M.workflowSessionId = null;
 
-  M.isWorkflowMode = M.workflowSessionId !== null;
+  M.isWorkflowMode = false;
 
-  // URL 쿼리 파라미터에서 읽은 초기 세션 ID (M.renderTerminal 후 탭 전환에 사용)
-  M._initialQuerySession = M.workflowSessionId;
+  // 옛 V1 워크플로우 모드 URL 쿼리 진입점은 폐기 — 본 변수는 null 고정으로
+  // line ~1134 의 `if (M._initialQuerySession)` 분기가 dead 화됨.
+  M._initialQuerySession = null;
 
   // D5 #5: URL 세션 사전 검증 상태. checked=완료, inFlight=fetch 진행 중
   M._initialSessionChecked = false;

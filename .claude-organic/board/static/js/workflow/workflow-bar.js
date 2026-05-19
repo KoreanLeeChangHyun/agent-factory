@@ -1382,39 +1382,13 @@
               Board.util.showInfoModal("세션 정보 없음", "세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.", { severity: "warning" });
               return;
             }
-            stopBtn.disabled = true;
-            stopBtn.textContent = "중지 중...";
-            var body = {};
-            if (ticketId) {
-              body.ticket = ticketId;
-            } else {
-              body.session_id = sessionId;
-            }
-            fetch("/api/workflow/stop", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
-            }).then(function (res) {
-              return res.json().then(function (data) {
-                return { ok: res.ok, data: data };
-              });
-            }).then(function (result) {
-              if (!result.ok || !result.data.ok) {
-                var errMsg = (result.data && result.data.errors && result.data.errors[0]) || "알 수 없는 오류";
-                Board.util.showInfoModal("중지 실패", "중지 실패: " + errMsg, { severity: "error" });
-                stopBtn.disabled = false;
-                stopBtn.textContent = "중지";
-                return;
-              }
-              // 탭/카드 동기화 가속
-              if (Board.workflowSessions && typeof Board.workflowSessions.refresh === "function") {
-                Board.workflowSessions.refresh();
-              }
-            }).catch(function (err) {
-              Board.util.showInfoModal("중지 요청 오류", "중지 요청 중 오류가 발생했습니다: " + err.message, { severity: "error" });
-              stopBtn.disabled = false;
-              stopBtn.textContent = "중지";
-            });
+            // T-513 P5 — V1 /api/workflow/stop endpoint 폐기. V2 ticket-based
+            // stop endpoint 신설은 별 후속 트랙. 본 stop 버튼은 일시 비활성 안내.
+            Board.util.showInfoModal(
+              "중지 미지원",
+              "V2 워크플로우 중지 기능은 별 트랙 endpoint 신설 후 복원됩니다 (T-513 P5 결정). 현 시점에서는 메인 터미널의 ESC 또는 driver subprocess 직접 종료를 사용하세요.",
+              { severity: "warning" }
+            );
           });
         }
 

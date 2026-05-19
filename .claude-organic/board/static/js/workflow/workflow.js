@@ -43,24 +43,24 @@ const WF_PAGE_SIZE = 50;
 // ── Fetch Functions ──
 
 /**
- * Fetches workflow entry list via /api/workflow/entries (single request).
+ * Fetches workflow entry list via /api/kanban/workflow-entries (T-513 P3 — kanban 도메인 이전).
  * Returns sorted hrefs (newest first), no detail fetched yet.
  * @returns {Promise<string[]>}
  */
 function fetchWorkflowEntries() {
-  return fetch("/api/workflow/entries", { cache: "no-store" }).then(function (res) {
+  return fetch("/api/kanban/workflow-entries", { cache: "no-store" }).then(function (res) {
     if (!res.ok) return [];
     return res.json();
   }).catch(function () { return []; });
 }
 
 /**
- * Fetches detailed info for a single workflow entry via /api/workflow/detail.
+ * Fetches detailed info for a single workflow entry via /api/kanban/workflow-detail (T-513 P3).
  * @param {string} entryHref - relative path of the entry (e.g. ".claude-organic/runs/20260325-150854/")
  * @returns {Promise<Array>} flat array of workflow item objects
  */
 function fetchEntryDetail(entryHref) {
-  return fetch("/api/workflow/detail?entry=" + encodeURIComponent(entryHref), { cache: "no-store" }).then(function (res) {
+  return fetch("/api/kanban/workflow-detail?entry=" + encodeURIComponent(entryHref), { cache: "no-store" }).then(function (res) {
     if (!res.ok) return [];
     return res.json();
   }).catch(function () { return []; });

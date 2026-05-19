@@ -2083,7 +2083,7 @@
         ticket,
         function (force) {
           // [Review 로 롤백] 콜백
-          fetch("/api/workflow/undo-done", {
+          fetch("/api/kanban/undo-done", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ticket: ticket.number, force: force }),

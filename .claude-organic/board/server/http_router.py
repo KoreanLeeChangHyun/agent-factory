@@ -9,24 +9,24 @@ from http.server import SimpleHTTPRequestHandler
 from ._common import _update_env_value
 from .handlers.files import FilesHandlerMixin
 from .handlers.sync import SyncHandlerMixin
+from .handlers.settings import SettingsHandlerMixin
 from .handlers.generic import GenericHandlerMixin
 from .handlers.terminal import TerminalHandlerMixin
-from .handlers.workflow import WorkflowHandlerMixin
 from .handlers.v2_workflow import V2WorkflowHandlerMixin
 from .handlers.kanban import KanbanHandlerMixin
-from .handlers.workflow_undo import WorkflowUndoHandlerMixin
 from .handlers.metrics import MetricsHandlerMixin
 from .handlers.memory_gc import MemoryGcHandlerMixin
 from .handlers.worktree_commit import WorktreeCommitHandlerMixin
 from .handlers.ops_endpoints import OpsHandlerMixin
 
 
+# T-513 P5 — V1 워크플로우 엔진 일괄 폐기. WorkflowHandlerMixin +
+# WorkflowUndoHandlerMixin 제거. V2 단일화 (V2WorkflowHandlerMixin +
+# kanban undo-done 흡수 + settings workflow-sync 흡수).
 class BoardHTTPRequestHandler(
     TerminalHandlerMixin,
-    WorkflowHandlerMixin,
     V2WorkflowHandlerMixin,
     KanbanHandlerMixin,
-    WorkflowUndoHandlerMixin,
     MetricsHandlerMixin,
     MemoryGcHandlerMixin,
     WorktreeCommitHandlerMixin,
@@ -34,6 +34,7 @@ class BoardHTTPRequestHandler(
     FilesHandlerMixin,
     GenericHandlerMixin,
     SyncHandlerMixin,
+    SettingsHandlerMixin,
     SimpleHTTPRequestHandler,
 ):
     """Board 전용 HTTP 요청 핸들러.
@@ -86,20 +87,17 @@ class BoardHTTPRequestHandler(
             self._handle_terminal_sessions()
         elif self.path.startswith('/terminal/history'):
             self._handle_terminal_history()
-        elif self.path.startswith('/terminal/workflow/status'):
-            self._handle_workflow_status()
-        elif self.path.startswith('/terminal/workflow/events'):
-            self._handle_workflow_sse()
-        elif self.path == '/terminal/workflow/list':
-            self._handle_workflow_list()
-        elif self.path.startswith('/terminal/workflow/history'):
-            self._handle_workflow_history()
         elif self.path == '/api/kanban/branch/active':
             self._handle_kanban_branch_active()
         elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_get():
             return
         elif self.path == '/api/ops/sse-status':
             self._handle_ops_sse_status()
+        # T-513 P5 — kanban 도메인 단일화 (V1 워크플로우 alias 일괄 폐기).
+        elif self.path == '/api/kanban/workflow-entries':
+            self._handle_kanban_workflow_entries()
+        elif self.path.startswith('/api/kanban/workflow-detail'):
+            self._handle_kanban_workflow_detail()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:
@@ -121,8 +119,9 @@ class BoardHTTPRequestHandler(
             self._handle_restart()
         elif self.path == '/api/debug-log':
             self._handle_debug_log()
-        elif self.path == '/api/workflow/sync':
-            self._handle_workflow_sync()
+        # T-513 P5 — settings 도메인 단일화 (V1 sync alias 일괄 폐기).
+        elif self.path == '/api/settings/workflow-sync':
+            self._handle_settings_workflow_sync()
         elif self.path == '/terminal/start':
             self._handle_terminal_start()
         elif self.path == '/terminal/input':
@@ -131,18 +130,8 @@ class BoardHTTPRequestHandler(
             self._handle_terminal_interrupt()
         elif self.path == '/terminal/kill':
             self._handle_terminal_kill()
-        elif self.path == '/terminal/workflow/start':
-            self._handle_workflow_start()
-        elif self.path == '/terminal/workflow/kill':
-            self._handle_workflow_kill()
-        elif self.path == '/api/workflow/stop':
-            self._handle_workflow_stop()
         elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_post():
             return
-        elif self.path == '/terminal/workflow/input':
-            self._handle_workflow_input()
-        elif self.path == '/terminal/workflow/step':
-            self._handle_workflow_step_update()
         elif self.path == '/terminal/command':
             self._handle_terminal_command()
         elif self.path == '/terminal/permission':
@@ -173,8 +162,9 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_branch_toggle()
         elif self.path == '/api/kanban/worktree-commit':
             self._handle_worktree_commit()
-        elif self.path == '/api/workflow/undo-done':
-            self._handle_workflow_undo_done()
+        # T-513 P5 — kanban 도메인 단일화 (V1 undo-done alias 일괄 폐기).
+        elif self.path == '/api/kanban/undo-done':
+            self._handle_kanban_undo_done()
         elif self.path == '/api/ops/zombie-reap':
             self._handle_ops_zombie_reap()
         elif self.path == '/api/ops/debug-toggle':
