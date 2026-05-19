@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import atexit
-import collections
 import hashlib
 import os
 import signal
@@ -16,21 +15,15 @@ from http.server import ThreadingHTTPServer
 from ._common import (
     PORT_RANGE_START,
     PORT_RANGE_END,
-    WATCH_INTERVAL,
     WATCH_DIRS,
     logger,
     _resolve_memory_dir,
 )
 from .http_router import BoardHTTPRequestHandler
-from .sse_client_manager import FileWatcher, GitBranchWatcher, SSEClientManager
-from .terminal_channel import TerminalSSEChannel
-from .claude_process import ClaudeProcess
-from .poll_tracker import PollChangeTracker
-from .workflow_session import WorkflowSessionRegistry
+from .sse_client_manager import FileWatcher, GitBranchWatcher
 from .state import (
     sse_manager,
     poll_tracker,
-    terminal_sse_channel,
     claude_process,
     workflow_registry,
     v2_workflow_registry,

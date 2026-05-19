@@ -5,13 +5,10 @@ from __future__ import annotations
 import copy
 import datetime
 import json
-import logging
 import os
 import signal
 import subprocess
 import threading
-import time
-import uuid
 
 from ._common import logger, server_debug_log
 from .terminal_channel import TerminalSSEChannel

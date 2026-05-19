@@ -35,7 +35,9 @@ _UNDO_ERROR_RE = re.compile(r'\[undo-done\]\s+ERROR\s*:\s*(.+)')
 
 
 def _classify_done_failure(stdout: str, stderr: str) -> dict:
-    """flow-kanban done 실패(또는 rc=0 + 빈 hash) 시 stdout/stderr 를 분석해 error_kind 를 분류한다.
+    """internal helper — not exposed as endpoint.
+
+    flow-kanban done 실패(또는 rc=0 + 빈 hash) 시 stdout/stderr 를 분석해 error_kind 를 분류한다.
 
     반환 dict 구조:
         {

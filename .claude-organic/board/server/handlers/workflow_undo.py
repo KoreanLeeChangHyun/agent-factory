@@ -12,6 +12,7 @@ from ._kanban_done_re import (
     _UNDO_STRATEGY_REVERT,
     _UNDO_WORKTREE_RE,
 )
+from .._common import api_endpoint
 
 
 class WorkflowUndoHandlerMixin:
@@ -21,10 +22,9 @@ class WorkflowUndoHandlerMixin:
     내부적으로 flow-undo-done 을 호출한다.
     """
 
+    @api_endpoint("W1", "undo_done")
     def _handle_workflow_undo_done(self) -> None:
-        """POST /api/workflow/undo-done — body {"ticket": "T-NNN", "force": bool}.
-
-        Done 처리된 워크플로우를 Review 단계로 자동 롤백한다.
+        """POST /api/workflow/undo-done — Done 처리된 워크플로우를 Review 로 롤백.
 
         내부적으로 `flow-undo-done T-NNN [--force]` 를 호출하여
         develop reset/revert + feature 브랜치 + worktree 재생성 + 칸반 force 전이
@@ -40,6 +40,18 @@ class WorkflowUndoHandlerMixin:
             {ok: false, kind: 'error', error: <message>, ticket, stdout, stderr}
 
         타임아웃(504) / 실행파일 없음(500) 패턴은 _handle_kanban_done 답습.
+
+        method: POST
+        url: /api/workflow/undo-done
+        domain: W1
+        handler: WorkflowUndoHandlerMixin._handle_workflow_undo_done
+        request: body {ticket: T-NNN, force?: bool}
+        response_ok: {ok: true, kind, ticket, strategy, branch, worktree_path, stdout, message}
+        response_error: {ok: false, kind: error, ticket, error, stdout, stderr}
+        status_codes: 200, 400, 409, 500, 504
+        auth: none (local-only) — user-triggered
+        side_effects: develop reset/revert + worktree recreate + kanban force move
+        sse_events: kanban_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
         ticket = (data.get('ticket') or '').strip()

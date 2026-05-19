@@ -6,13 +6,7 @@ import json
 import os
 from http.server import SimpleHTTPRequestHandler
 
-from ._common import (
-    logger,
-    _update_env_value,
-    _delete_memory_file,
-    _delete_rules_file,
-    _delete_prompt_file,
-)
+from ._common import _update_env_value
 from .handlers.files import FilesHandlerMixin
 from .handlers.sync import SyncHandlerMixin
 from .handlers.generic import GenericHandlerMixin
@@ -24,6 +18,7 @@ from .handlers.workflow_undo import WorkflowUndoHandlerMixin
 from .handlers.metrics import MetricsHandlerMixin
 from .handlers.memory_gc import MemoryGcHandlerMixin
 from .handlers.worktree_commit import WorktreeCommitHandlerMixin
+from .handlers.ops_endpoints import OpsHandlerMixin
 
 
 class BoardHTTPRequestHandler(
@@ -35,6 +30,7 @@ class BoardHTTPRequestHandler(
     MetricsHandlerMixin,
     MemoryGcHandlerMixin,
     WorktreeCommitHandlerMixin,
+    OpsHandlerMixin,
     FilesHandlerMixin,
     GenericHandlerMixin,
     SyncHandlerMixin,
@@ -102,6 +98,8 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_branch_active()
         elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_get():
             return
+        elif self.path == '/api/ops/sse-status':
+            self._handle_ops_sse_status()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:
@@ -177,59 +175,38 @@ class BoardHTTPRequestHandler(
             self._handle_worktree_commit()
         elif self.path == '/api/workflow/undo-done':
             self._handle_workflow_undo_done()
+        elif self.path == '/api/ops/zombie-reap':
+            self._handle_ops_zombie_reap()
+        elif self.path == '/api/ops/debug-toggle':
+            self._handle_ops_debug_toggle()
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_DELETE(self) -> None:
-        """DELETE 요청을 처리한다."""
-        from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(self.path)
-        path = parsed.path
-        qs = parse_qs(parsed.query)
+        """DELETE 요청을 처리한다.
 
-        if path == '/api/memory/file':
-            name = qs.get('name', [None])[0]
-            if not name:
-                self._send_error(400, 'Missing "name" query parameter')
-                return
-            try:
-                self._send_json(
-                    _delete_memory_file(os.getcwd(), name),
-                )
-            except ValueError as e:
-                self._send_error(400, str(e))
-            except FileNotFoundError as e:
-                self._send_error(404, str(e))
-        elif path == '/api/prompt/rules/file':
-            rel_path = qs.get('path', [None])[0]
-            if not rel_path:
-                self._send_error(400, 'Missing "path" query parameter')
-                return
-            try:
-                self._send_json(_delete_rules_file(os.getcwd(), rel_path))
-            except ValueError as e:
-                self._send_error(400, str(e))
-            except FileNotFoundError as e:
-                self._send_error(404, str(e))
-            except RuntimeError as e:
-                self._send_error(500, str(e))
-        elif path == '/api/prompt/prompt-files/file':
-            name = qs.get('name', [None])[0]
-            if not name:
-                self._send_error(400, 'Missing "name" query parameter')
-                return
-            try:
-                self._send_json(_delete_prompt_file(os.getcwd(), name))
-            except ValueError as e:
-                self._send_error(400, str(e))
-            except FileNotFoundError as e:
-                self._send_error(404, str(e))
-        elif path == '/api/quick-prompts/item':
-            self._handle_quick_prompt_delete()
-        else:
-            self.send_response(404)
-            self.end_headers()
+        T-511 P4 — DELETE 분기 4건을 generic.py `_handle_api_delete` dispatcher
+        에 위임 (inline 로직 X). v2 세션 DELETE 는 `_v2_dispatch_delete` 위임.
+        """
+        if self.path.startswith('/api/v2/sessions') and self._v2_dispatch_delete():
+            return
+        if self.path.startswith('/api/'):
+            self._handle_api_delete()
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_PATCH(self) -> None:
+        """PATCH 요청을 처리한다.
+
+        T-511 P4 — v2 세션 status 강제 갱신 (debug/recovery).
+        본 메서드는 SimpleHTTPRequestHandler 의 기본에는 없으므로 신설.
+        """
+        if self.path.startswith('/api/v2/sessions') and self._v2_dispatch_patch():
+            return
+        self.send_response(404)
+        self.end_headers()
 
     def _send_json(self, data: object) -> None:
         """JSON 응답을 전송한다."""
@@ -318,7 +295,7 @@ class BoardHTTPRequestHandler(
         """CORS preflight 요청을 처리한다."""
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.send_header('Access-Control-Max-Age', '86400')
         self.end_headers()

@@ -16,13 +16,12 @@ ClaudeProcess 의존 0건. v1 workflow.py handler 와 별도.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import time
 from urllib.parse import unquote, urlparse
 
-from .._common import logger
+from .._common import api_endpoint, logger
 from ..state import v2_workflow_registry
 
 
@@ -44,7 +43,10 @@ class V2WorkflowHandlerMixin:
     # ------------------------------------------------------------------
 
     def _v2_dispatch_get(self) -> bool:
-        """GET /api/v2/sessions[...] 라우팅. 처리되면 True 반환."""
+        """internal helper — not exposed as endpoint.
+
+        GET /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
+        """
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -75,7 +77,10 @@ class V2WorkflowHandlerMixin:
         return False
 
     def _v2_dispatch_post(self) -> bool:
-        """POST /api/v2/sessions[...] 라우팅. 처리되면 True 반환."""
+        """internal helper — not exposed as endpoint.
+
+        POST /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
+        """
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -102,6 +107,52 @@ class V2WorkflowHandlerMixin:
         if sub == 'finish':
             self._v2_handle_session_finish(session_id)
             return True
+        if sub == 'artifacts':
+            self._v2_handle_session_post_artifacts(session_id)
+            return True
+
+        return False
+
+    def _v2_dispatch_delete(self) -> bool:
+        """internal helper — not exposed as endpoint.
+
+        DELETE /api/v2/sessions/<id> 라우팅. 처리되면 True 반환.
+        """
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        match = _SESSION_PATH_RE.match(path)
+        if match is None:
+            return False
+
+        session_id = unquote(match.group('session_id'))
+        sub = match.group('sub')
+
+        # /api/v2/sessions/<id> (sub=None) — 세션 삭제
+        if sub is None:
+            self._v2_handle_session_delete(session_id)
+            return True
+
+        return False
+
+    def _v2_dispatch_patch(self) -> bool:
+        """internal helper — not exposed as endpoint.
+
+        PATCH /api/v2/sessions/<id>/status 라우팅. 처리되면 True 반환.
+        """
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        match = _SESSION_PATH_RE.match(path)
+        if match is None:
+            return False
+
+        session_id = unquote(match.group('session_id'))
+        sub = match.group('sub')
+
+        if sub == 'status':
+            self._v2_handle_session_patch_status(session_id)
+            return True
 
         return False
 
@@ -109,12 +160,40 @@ class V2WorkflowHandlerMixin:
     # GET endpoint
     # ------------------------------------------------------------------
 
+    @api_endpoint("W2", "list")
     def _v2_handle_sessions_list(self) -> None:
-        """GET /api/v2/sessions — 전체 세션 목록 (메타 dict 배열)."""
+        """GET /api/v2/sessions — 전체 세션 목록 (메타 dict 배열).
+
+        method: GET
+        url: /api/v2/sessions
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_sessions_list
+        request: query none
+        response_ok: [{session_id, ticket_id, command, current_step, ...}]
+        response_error: n/a (always 200)
+        status_codes: 200
+        auth: none (local-only)
+        side_effects: read v2_workflow_registry (in-memory snapshot)
+        sse_events: none
+        """
         self._send_json(v2_workflow_registry.list_all())
 
+    @api_endpoint("W2", "detail")
     def _v2_handle_session_detail(self, session_id: str) -> None:
-        """GET /api/v2/sessions/<id> — 세션 상세 (current_step / phase / artifacts / ts)."""
+        """GET /api/v2/sessions/<id> — 세션 상세 (current_step / phase / artifacts / ts).
+
+        method: GET
+        url: /api/v2/sessions/<id>
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_detail
+        request: path {session_id: str}
+        response_ok: {session_id, ticket_id, command, current_step, current_phase, artifacts, ts}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 404
+        auth: none (local-only)
+        side_effects: read v2_workflow_registry
+        sse_events: none
+        """
         session = v2_workflow_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
@@ -134,8 +213,22 @@ class V2WorkflowHandlerMixin:
             'created_at': session.created_at,
         })
 
+    @api_endpoint("W2", "events")
     def _v2_handle_session_events(self, session_id: str) -> None:
-        """GET /api/v2/sessions/<id>/events — SSE 구독 (per-session)."""
+        """GET /api/v2/sessions/<id>/events — SSE 구독 (per-session).
+
+        method: GET
+        url: /api/v2/sessions/<id>/events
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_events
+        request: path {session_id: str}
+        response_ok: text/event-stream (workflow_step / workflow_stdout / workflow_phase / workflow_finish)
+        response_error: 404 (session not found)
+        status_codes: 200, 404
+        auth: none (local-only)
+        side_effects: register self.wfile to session.channel
+        sse_events: V2WorkflowSSEChannel events (board.md §1.2)
+        """
         session = v2_workflow_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
@@ -170,10 +263,23 @@ class V2WorkflowHandlerMixin:
         finally:
             session.channel.remove(self.wfile)
 
+    @api_endpoint("W2", "artifact_get")
     def _v2_handle_session_artifact(self, session_id: str, artifact_rel: str) -> None:
         """GET /api/v2/sessions/<id>/artifacts/<rel> — 산출물 파일 read.
 
         work_dir 기준 상대 경로. path traversal 방지 (.. 차단).
+
+        method: GET
+        url: /api/v2/sessions/<id>/artifacts/<rel>
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_artifact
+        request: path {session_id, artifact_rel}
+        response_ok: file content (Content-Type by extension)
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404, 500
+        auth: none (local-only)
+        side_effects: read from work_dir filesystem
+        sse_events: none
         """
         session = v2_workflow_registry.get(session_id)
         if session is None:
@@ -216,7 +322,10 @@ class V2WorkflowHandlerMixin:
 
     @staticmethod
     def _guess_content_type(rel_path: str) -> str:
-        """확장자 기반 content-type 추측."""
+        """internal helper — not exposed as endpoint.
+
+        확장자 기반 content-type 추측.
+        """
         lower = rel_path.lower()
         if lower.endswith('.md'):
             return 'text/markdown; charset=utf-8'
@@ -232,11 +341,24 @@ class V2WorkflowHandlerMixin:
     # POST endpoint
     # ------------------------------------------------------------------
 
+    @api_endpoint("W2", "create")
     def _v2_handle_session_create(self) -> None:
         """POST /api/v2/sessions — 세션 명시 등록.
 
         본문: {session_id, ticket_id, command, work_dir, worktree_path?}
         동일 session_id 재호출 시 기존 반환 (idempotent).
+
+        method: POST
+        url: /api/v2/sessions
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_create
+        request: body {session_id, ticket_id, command, work_dir, worktree_path?}
+        response_ok: {ok: true, session_id, created_at}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 403
+        auth: none (local-only) — naming guard rejects fake/test session_id (403)
+        side_effects: v2_workflow_registry.create + new V2WorkflowSession instance
+        sse_events: none (subsequent step/stdout/phase/finish events emit via per-session channel)
         """
         data = self._read_json_body()
         if data is None:
@@ -270,10 +392,23 @@ class V2WorkflowHandlerMixin:
             'created_at': session.created_at,
         })
 
+    @api_endpoint("W2", "step")
     def _v2_handle_session_step(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/step — Step 전이.
 
         본문: {step: NONE|INIT|PLAN|WORK|VALIDATE|REPORT|DONE|FAILED, phase?: str, prev_step?: str}
+
+        method: POST
+        url: /api/v2/sessions/<id>/step
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_step
+        request: body {step: str, phase?: str, prev_step?: str, ...extras}
+        response_ok: {ok: true, step, phase}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only) — driver subprocess only
+        side_effects: v2_workflow_registry.update_step + session.channel.emit_step
+        sse_events: workflow_step (V2WorkflowSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -296,10 +431,23 @@ class V2WorkflowHandlerMixin:
         session.channel.emit_step(step, phase=phase, prev_step=prev_step, extras=extras)
         self._send_json({'ok': True, 'step': step, 'phase': phase})
 
+    @api_endpoint("W2", "stdout")
     def _v2_handle_session_stdout(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/stdout — claude -p stdout chunk forward.
 
         본문: {text: str, raw?: dict}
+
+        method: POST
+        url: /api/v2/sessions/<id>/stdout
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_stdout
+        request: body {text: str, raw?: dict}
+        response_ok: {ok: true}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only) — driver subprocess only
+        side_effects: session.channel.emit_stdout (broadcast to per-session SSE clients)
+        sse_events: workflow_stdout (V2WorkflowSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -322,10 +470,23 @@ class V2WorkflowHandlerMixin:
         session.channel.emit_stdout(text, raw=raw)
         self._send_json({'ok': True})
 
+    @api_endpoint("W2", "phase")
     def _v2_handle_session_phase(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/phase — WORK 내부 phase 전이.
 
         본문: {phase: str, action: start|end}
+
+        method: POST
+        url: /api/v2/sessions/<id>/phase
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_phase
+        request: body {phase: str, action: start|end, ...extras}
+        response_ok: {ok: true, phase, action}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only) — driver subprocess only
+        side_effects: v2_workflow_registry.update_step (phase 갱신) + session.channel.emit_phase
+        sse_events: workflow_phase (V2WorkflowSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -355,10 +516,23 @@ class V2WorkflowHandlerMixin:
         session.channel.emit_phase(phase, action=action, extras=extras)
         self._send_json({'ok': True, 'phase': phase, 'action': action})
 
+    @api_endpoint("W2", "finish")
     def _v2_handle_session_finish(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/finish — 사이클 종결.
 
         본문: {outcome: ok|fail, summary?: str}
+
+        method: POST
+        url: /api/v2/sessions/<id>/finish
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_finish
+        request: body {outcome: ok|fail, summary?: str, ...extras}
+        response_ok: {ok: true, outcome, terminal_step}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only) — driver subprocess only
+        side_effects: v2_workflow_registry.update_step (terminal DONE|FAILED) + session.channel.emit_finish
+        sse_events: workflow_finish (V2WorkflowSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -386,7 +560,9 @@ class V2WorkflowHandlerMixin:
 
     @staticmethod
     def _v2_collect_extras(data: dict, exclude: set[str]) -> dict | None:
-        """T-495 P3 — frontend forward-compatible 메타 키 추출.
+        """internal helper — not exposed as endpoint.
+
+        T-495 P3 — frontend forward-compatible 메타 키 추출.
 
         body 의 fixed 키 (step/phase/prev_step/outcome/summary/action) 외
         모든 키를 extras 로 추림. driver 가 verdict/commit_hash/retry/regression
@@ -396,3 +572,186 @@ class V2WorkflowHandlerMixin:
             return None
         extras = {k: v for k, v in data.items() if k not in exclude}
         return extras or None
+
+    # ------------------------------------------------------------------
+    # T-511 P4 — DELETE / PATCH / POST artifacts (신설 3 endpoint)
+    # ------------------------------------------------------------------
+
+    @api_endpoint("W2", "delete")
+    def _v2_handle_session_delete(self, session_id: str) -> None:
+        """DELETE /api/v2/sessions/<id> — 세션 강제 종료 + work_dir 폐기.
+
+        본 endpoint 는 디버그/회복 용. 사용자 명시 호출만 사용 권장.
+        force 쿼리 파라미터로 work_dir 디렉터리도 함께 삭제 가능.
+
+        method: DELETE
+        url: /api/v2/sessions/<id>
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_delete
+        request: query {force?: 1|0}
+        response_ok: {ok: true, session_id, removed: bool, work_dir_removed: bool}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 404, 500
+        auth: none (local-only) — debug/recovery use
+        side_effects: v2_workflow_registry.purge + optional work_dir rmtree
+        sse_events: none (channel closed on session purge)
+        """
+        session = v2_workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        # force=1 시 work_dir 디렉터리도 삭제
+        force_raw = self._parse_query_param('force')
+        force = force_raw in ('1', 'true', 'True')
+
+        work_dir = session.work_dir
+        work_dir_removed = False
+        if force and work_dir and os.path.isdir(work_dir):
+            try:
+                import shutil
+                shutil.rmtree(work_dir)
+                work_dir_removed = True
+            except OSError as exc:
+                logger.error('v2 session delete: rmtree %s failed: %s', work_dir, exc)
+                self._send_error(500, f'rmtree failed: {exc}')
+                return
+
+        removed = v2_workflow_registry.purge(session_id) if hasattr(
+            v2_workflow_registry, 'purge'
+        ) else v2_workflow_registry.remove(session_id)
+
+        self._send_json({
+            'ok': True,
+            'session_id': session_id,
+            'removed': bool(removed),
+            'work_dir_removed': work_dir_removed,
+        })
+
+    @api_endpoint("W2", "patch_status")
+    def _v2_handle_session_patch_status(self, session_id: str) -> None:
+        """PATCH /api/v2/sessions/<id>/status — step/phase 강제 갱신.
+
+        디버그/회복 용. driver 가 비정상 종료 후 사용자가 수동 보정하거나,
+        외부 도구가 세션 상태를 강제로 다른 step 으로 이동시킬 때 사용.
+
+        method: PATCH
+        url: /api/v2/sessions/<id>/status
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_patch_status
+        request: body {step?: str, phase?: str}
+        response_ok: {ok: true, session_id, step, phase}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404
+        auth: none (local-only) — debug/recovery use
+        side_effects: v2_workflow_registry.update_step (no SSE emit)
+        sse_events: none (silent patch — 사용자 수동 보정 경로)
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        session = v2_workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        step = (data.get('step') or session.current_step or '').strip().upper()
+        phase = data.get('phase')
+        if phase is None:
+            phase = session.current_phase or ''
+        if not isinstance(phase, str):
+            self._send_error(400, '"phase" must be a string')
+            return
+
+        if not step:
+            self._send_error(400, 'Missing "step" (current_step is also empty)')
+            return
+
+        updated = v2_workflow_registry.update_step(session_id, step, phase)
+        if updated is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        self._send_json({
+            'ok': True,
+            'session_id': session_id,
+            'step': step,
+            'phase': phase,
+        })
+
+    @api_endpoint("W2", "post_artifacts")
+    def _v2_handle_session_post_artifacts(self, session_id: str) -> None:
+        """POST /api/v2/sessions/<id>/artifacts — 산출물 강제 주입.
+
+        외부 도구가 work_dir 안에 산출물 파일을 강제 주입할 수 있는 경로.
+        본 endpoint 는 재시도 / 수동 보정 용. path traversal 차단.
+
+        method: POST
+        url: /api/v2/sessions/<id>/artifacts
+        domain: W2
+        handler: V2WorkflowHandlerMixin._v2_handle_session_post_artifacts
+        request: body {path: str (relative), content: str}
+        response_ok: {ok: true, session_id, path, bytes_written: int}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 404, 500
+        auth: none (local-only) — recovery use
+        side_effects: write file under session.work_dir (path traversal blocked)
+        sse_events: none
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+
+        session = v2_workflow_registry.get(session_id)
+        if session is None:
+            self._send_error(404, f'Session not found: {session_id}')
+            return
+
+        rel_path = (data.get('path') or '').strip()
+        content = data.get('content', '')
+        if not rel_path:
+            self._send_error(400, 'Missing "path"')
+            return
+        if not isinstance(content, str):
+            self._send_error(400, '"content" must be a string')
+            return
+        if '..' in rel_path.split('/') or rel_path.startswith('/'):
+            self._send_error(400, 'Invalid path (.. or absolute blocked)')
+            return
+
+        if not session.work_dir:
+            self._send_error(400, 'Session has no work_dir')
+            return
+
+        target = os.path.normpath(os.path.join(session.work_dir, rel_path))
+        work_dir_norm = os.path.normpath(session.work_dir)
+        if not target.startswith(work_dir_norm + os.sep) and target != work_dir_norm:
+            self._send_error(400, 'Artifact path escapes work_dir')
+            return
+
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except OSError as exc:
+            logger.error('v2 artifact write failed: %s', exc)
+            self._send_error(500, f'Write failed: {exc}')
+            return
+
+        # session.artifacts 메타데이터 갱신 (있다면)
+        try:
+            if hasattr(session, 'artifacts') and isinstance(session.artifacts, dict):
+                session.artifacts[rel_path] = {
+                    'size': len(content.encode('utf-8')),
+                    'updated_at': time.time(),
+                }
+        except Exception:  # noqa: BLE001 — metadata 실패가 endpoint 자체 실패 유발 X
+            pass
+
+        self._send_json({
+            'ok': True,
+            'session_id': session_id,
+            'path': rel_path,
+            'bytes_written': len(content.encode('utf-8')),
+        })

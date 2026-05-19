@@ -13,7 +13,9 @@ _KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
 
 
 def _import_metrics_cli():
-    """metrics_cli 모듈을 lazy import 한다.
+    """internal helper — not exposed as endpoint.
+
+    metrics_cli 모듈을 lazy import 한다.
 
     engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.metrics_cli`` 를
     import. board 서버의 sys.path 에는 board/ 만 등록되어 있으므로
@@ -29,7 +31,9 @@ def _import_metrics_cli():
 
 
 def _import_launch_metrics_cli():
-    """launch_metrics_cli 모듈을 lazy import 한다.
+    """internal helper — not exposed as endpoint.
+
+    launch_metrics_cli 모듈을 lazy import 한다.
 
     engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.launch_metrics_cli`` 를
     import. _import_metrics_cli 와 동일한 패턴으로 엔진 import 가

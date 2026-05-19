@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from ._handler_common import _import_metrics_cli, _import_launch_metrics_cli
+from .._common import api_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,9 @@ class MetricsHandlerMixin:
 
     @staticmethod
     def _parse_metrics_last(qs: dict, default: int) -> int:
-        """쿼리스트링 last 파라미터를 안전하게 정수로 파싱한다.
+        """internal helper — not exposed as endpoint.
 
+        쿼리스트링 last 파라미터를 안전하게 정수로 파싱한다.
         음수/0/비정수는 default 로 보정한다 (잘못된 입력에 graceful 처리).
         """
         raw = (qs.get('last') or [None])[0]
@@ -27,8 +29,22 @@ class MetricsHandlerMixin:
             return default
         return v if v > 0 else default
 
+    @api_endpoint("MET", "run")
     def _handle_metrics_run(self, registry_key: str) -> None:
-        """GET /api/metrics/run/<registryKey> — 단일 워크플로우 집계 결과 응답."""
+        """GET /api/metrics/run/<registryKey> — 단일 워크플로우 집계 결과 응답.
+
+        method: GET
+        url: /api/metrics/run/<registry_key>
+        domain: MET
+        handler: MetricsHandlerMixin._handle_metrics_run
+        request: path {registry_key: str (YYYYMMDD-HHMMSS)}
+        response_ok: {registry_key, summary, events: [...]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 400, 500
+        auth: none (local-only)
+        side_effects: read .claude-organic/runs/<key>/metrics.jsonl
+        sse_events: none
+        """
         if not registry_key or len(registry_key) != 15 or registry_key[8] != '-':
             self._send_error(400, 'Invalid registryKey (expected YYYYMMDD-HHMMSS)')
             return
@@ -41,8 +57,22 @@ class MetricsHandlerMixin:
             return
         self._send_json(data)
 
+    @api_endpoint("MET", "aggregate")
     def _handle_metrics_aggregate(self, last: int) -> None:
-        """GET /api/metrics/aggregate?last=N — 최근 N개 run summary list 응답."""
+        """GET /api/metrics/aggregate?last=N — 최근 N개 run summary list 응답.
+
+        method: GET
+        url: /api/metrics/aggregate
+        domain: MET
+        handler: MetricsHandlerMixin._handle_metrics_aggregate
+        request: query {last: int (default 20)}
+        response_ok: {last: int, count: int, runs: [{...}]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 500
+        auth: none (local-only)
+        side_effects: scan .claude-organic/runs/ recent N dirs
+        sse_events: none
+        """
         try:
             cli = _import_metrics_cli()
             data = cli.aggregate_recent(last)
@@ -57,8 +87,22 @@ class MetricsHandlerMixin:
             'runs': data,
         })
 
+    @api_endpoint("MET", "regression")
     def _handle_metrics_regression(self, last: int) -> None:
-        """GET /api/metrics/regression?last=N — 회귀 패턴 빈도 + 예시 응답."""
+        """GET /api/metrics/regression?last=N — 회귀 패턴 빈도 + 예시 응답.
+
+        method: GET
+        url: /api/metrics/regression
+        domain: MET
+        handler: MetricsHandlerMixin._handle_metrics_regression
+        request: query {last: int (default 20)}
+        response_ok: {last: int, patterns: {<pattern>: count}, examples: [...]}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 500
+        auth: none (local-only)
+        side_effects: scan metrics.jsonl for regression.pattern events
+        sse_events: none
+        """
         try:
             cli = _import_metrics_cli()
             data = cli.regression_counts(last)
@@ -71,6 +115,7 @@ class MetricsHandlerMixin:
         data['last'] = last
         self._send_json(data)
 
+    @api_endpoint("MET", "launch_latency")
     def _handle_metrics_launch_latency(self, last: int = 10) -> None:
         """GET /api/metrics/launch_latency?last=N — launch spawn_duration_ms 분포 응답.
 
@@ -79,6 +124,18 @@ class MetricsHandlerMixin:
 
         T-475 미배포 시에는 LAUNCH_* 이벤트 0건으로 graceful 응답한다.
         (distribution.count=0, p50/p95/p99/min/max/mean=None)
+
+        method: GET
+        url: /api/metrics/launch_latency
+        domain: MET
+        handler: MetricsHandlerMixin._handle_metrics_launch_latency
+        request: query {last: int (default 10)}
+        response_ok: {ok: true, data: {last, runs_scanned, events_total, distribution, slow_spawns, per_run}}
+        response_error: {ok: false, error: str}
+        status_codes: 200, 500
+        auth: none (local-only)
+        side_effects: scan workflow.log files for LAUNCH_* events
+        sse_events: none
         """
         import subprocess
         from pathlib import Path

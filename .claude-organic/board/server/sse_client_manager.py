@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import threading
 import time
-import uuid
 from collections.abc import Callable
 
 from ._common import WATCH_DIRS, WATCH_INTERVAL, logger
