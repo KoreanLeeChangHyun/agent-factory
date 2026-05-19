@@ -509,6 +509,12 @@ let mermaidCounter = 0;
 function renderMd(text, baseUrl) {
   if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
 
+  // T-321 P1 — flow-kanban XML 필드 (--constraints "조건1\n조건2") 등에서 유입되는
+  // 리터럴 백슬래시-n 2글자를 실제 개행으로 치환 (code fence / 인라인 backtick 내부는 보존).
+  if (Board.util && Board.util.unescapeLiteralNewlines) {
+    text = Board.util.unescapeLiteralNewlines(text);
+  }
+
   const renderer = new marked.Renderer();
   renderer.code = function (opts) {
     const code = typeof opts === "object" ? opts.text : opts;
@@ -540,6 +546,13 @@ function renderMd(text, baseUrl) {
   };
 
   let html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+
+  // T-321 P2 — 인접 <ol> 블록 (텍스트 단락이 끼지 않은 경우) 을 단일 <ol> 로 병합.
+  // 비순차/0-시작 번호 (예: 5.6.7. / 1.2.0.) 가 marked 의 단일 ol 출력에서는 이미 한 부모 안에 있지만,
+  // 사용자 입력 변형 (드물게 marked 가 분리하는 케이스) 에서도 동일 들여쓰기를 보장하기 위한 idempotent 후처리.
+  if (Board.util && Board.util.mergeAdjacentOrderedLists) {
+    html = Board.util.mergeAdjacentOrderedLists(html);
+  }
 
   const FILE_EXT_RE = /\.(md|js|ts|jsx|tsx|css|html|json|py|txt|log|xml|sh|yml|yaml|toml|env|csv)$/i;
   html = html.replace(/<code>([^<]+)<\/code>/g, function (match, inner) {
