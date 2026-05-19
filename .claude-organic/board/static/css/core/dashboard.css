@@ -4,6 +4,269 @@
    .metrics-* 클래스를 .dash-metrics-* prefix 로 변경하여 병합. collapse transition
    추가. metrics.css 는 Phase 3 까지 보존 (위험 분리). */
 
+/* ── T-462 Phase 4-A: 6-tier Pace Color tokens ──
+   claude-usage-tracker (Swift/SwiftUI) 의 projected-usage 6-tier 컬러 스케일을
+   advisory-only 표시 토큰으로 이식. computePaceTier(usedPercent, elapsedFraction)
+   결과 문자열을 클래스/CSS 변수 ref 로 매핑하여 카드/배지/진행 바 색에 반영한다.
+   자동 강제 / 자동 차단 / 자동 전이 0건 — 시각 advisory 용도. */
+:root {
+  --pace-comfortable: #4ec9b0;  /* green — projected < 0.5 */
+  --pace-on-track:    #2ec4b6;  /* teal  — projected < 0.8 */
+  --pace-warming:     #dcdcaa;  /* yellow — projected < 1.0 */
+  --pace-pressing:    #D97757;  /* orange (terracotta theme) — projected < 1.5 */
+  --pace-critical:    #f48771;  /* red — projected < 2.0 */
+  --pace-runaway:     #c586c0;  /* purple — projected >= 2.0 */
+}
+
+/* ── T-462 Phase 4-B: progress bar + time marker (SVG) ──
+   renderProgressBar / renderTimeMarker (dashboard.js) 가 생성하는 SVG 의 컨테이너
+   레이아웃 토큰. SVG 자체의 fill/stroke 는 인라인 속성 + var(--pace-*) 로 처리되므로
+   본 블록은 컨테이너 wrapper / overflow / hover 강조만 담당한다. */
+.pace-progress {
+  display: block;
+  width: 100%;
+  min-height: 8px;
+  position: relative;
+}
+.pace-progress-bar {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: 2px;
+  overflow: visible;  /* time marker line extends past bar */
+}
+.pace-time-marker {
+  pointer-events: none;
+}
+
+/* ── T-462 Phase 4-C: status banner (error / stale / ok) ──
+   renderStatusBanner 산출 마크업. border-left 한쪽 색상 디자인 금지(general.md) 준수 —
+   border 는 4면 균등 + dot indicator 로 상태 구분. */
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 6px;
+  border: 1px solid #2d2d2d;
+  background: #1f1f20;
+  color: #cccccc;
+}
+
+.status-banner__dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ec9b0;
+}
+
+.status-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-banner--ok {
+  border-color: rgba(78, 201, 176, 0.4);
+  background: rgba(78, 201, 176, 0.08);
+  color: #4ec9b0;
+}
+.status-banner--ok .status-banner__dot { background: #4ec9b0; }
+
+.status-banner--stale {
+  border-color: rgba(220, 220, 170, 0.4);
+  background: rgba(220, 220, 170, 0.08);
+  color: #dcdcaa;
+}
+.status-banner--stale .status-banner__dot {
+  background: #dcdcaa;
+  animation: status-banner-pulse 1.6s ease-in-out infinite;
+}
+
+.status-banner--error {
+  border-color: rgba(244, 135, 113, 0.45);
+  background: rgba(244, 135, 113, 0.10);
+  color: #f48771;
+}
+.status-banner--error .status-banner__dot {
+  background: #f48771;
+  animation: status-banner-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes status-banner-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-banner__dot { animation: none; }
+}
+
+/* ── T-462 Phase 4-D: accordion 확장/축소 행 ──
+   toggleAccordion (dashboard.js) 가 토글하는 .is-open 클래스에 따라 detail 행 표시.
+   transition 은 max-height 가 아니라 단순 display 토글 + opacity 페이드 ― 회피 가능
+   사용자에 한해. prefers-reduced-motion 시 페이드도 즉시 변경. */
+.accordion {
+  display: block;
+  width: 100%;
+}
+
+.accordion__row {
+  border-bottom: 1px solid #2d2d2d;
+}
+.accordion__row:last-child { border-bottom: none; }
+
+.accordion__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: transparent;
+  color: #cccccc;
+  font-size: 12px;
+  user-select: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.accordion__header:hover { background: rgba(217, 119, 87, 0.06); }
+.accordion__header:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.5);
+  border-radius: 3px;
+}
+
+.accordion__caret {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  color: #858585;
+  transition: transform 0.15s ease-out, color 0.15s;
+  flex: 0 0 12px;
+}
+.accordion__row.is-open .accordion__caret {
+  transform: rotate(90deg);
+  color: #D97757;
+}
+
+.accordion__detail {
+  padding: 8px 14px 12px 32px;
+  font-size: 12px;
+  color: #cccccc;
+  background: #1f1f20;
+  opacity: 1;
+  transition: opacity 0.15s ease-out;
+}
+.accordion__detail[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion__caret,
+  .accordion__detail {
+    transition: none;
+  }
+}
+
+/* ── T-462 Phase 4-E: usage chart 시간 윈도우 + 네비게이션 toolbar ──
+   setUsageChartWindow / navigateUsageChart 의 UI 부속. 호출자 (renderDashboard 또는
+   별도 wiring) 가 .usage-chart-toolbar 마크업을 chart-usage 위에 삽입하여 사용.
+   본 룰은 토글 버튼 그룹 + nav 버튼 그룹 + active 강조만 담당. */
+.usage-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #858585;
+}
+
+.usage-chart-toolbar__windows,
+.usage-chart-toolbar__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.usage-chart-toolbar__btn {
+  background: #1e1e1e;
+  color: #cccccc;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.usage-chart-toolbar__btn:hover {
+  background: #2d2d2d;
+  border-color: #D97757;
+  color: #D97757;
+}
+.usage-chart-toolbar__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.5);
+}
+
+.usage-chart-toolbar__btn.is-active {
+  background: rgba(217, 119, 87, 0.12);
+  border-color: #D97757;
+  color: #D97757;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-chart-toolbar__btn { transition: none; }
+}
+
+/* ── T-462 Phase 4-F: Empty State 컴포넌트 표준화 ──
+   renderEmptyState 산출 마크업. icon SVG → title → description 3행 수직 정렬.
+   외부 아이콘 라이브러리 0건 — SVG 는 caller 또는 _defaultEmptyStateIcon 이 직접 생성. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+  color: #858585;
+}
+
+.empty-state__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #5a5a5a;
+  margin-bottom: 4px;
+}
+
+.empty-state__icon svg {
+  display: block;
+}
+
+.empty-state__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cccccc;
+  letter-spacing: 0.1px;
+}
+
+.empty-state__description {
+  font-size: 11px;
+  color: #858585;
+  line-height: 1.5;
+  max-width: 360px;
+}
+
 /* ── Dashboard ── */
 #view-dashboard {
   padding: 20px 24px;
