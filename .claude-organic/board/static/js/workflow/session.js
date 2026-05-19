@@ -745,8 +745,10 @@
         _ctx.clearOutput();
         _resetSessionDerivedState();
         var termModSwap = Board._term;
-        if (termModSwap && typeof termModSwap.loadHistory === "function") {
-          termModSwap.loadHistory(data.session_id);
+        // T-384 P3: HistoryLoader.load 가 initial / gap-fill / skip 분기를
+        // 내부에서 자동 결정. 호출자 측 분기 책임 제거.
+        if (termModSwap && termModSwap.HistoryLoader) {
+          termModSwap.HistoryLoader.load(data.session_id);
         }
       }
       Board.state.termSessionId = data.session_id;
@@ -1468,17 +1470,18 @@
       // SSE 링버퍼 재생에 가장 최근 assistant 이벤트가 포함되지 않을 수 있으므로
       // REST 로도 최신 usage/cost 를 재수화한다 (empty gap 이어도 서버는 현재
       // 총계를 돌려준다).
-      if (!_ctx.isWorkflowMode() && termMod && termMod._historyLoaded &&
-          typeof termMod.fetchHistorySince === "function") {
-        termMod.fetchHistorySince(Board.state.termSessionId);
+      // T-384 P3: HistoryLoader.load 가 _historyLoaded 미세팅 시 initial,
+      // 세팅된 경우 gap-fill 로 자동 분기 — 호출자는 단일 진입점만 호출.
+      if (!_ctx.isWorkflowMode() && termMod && termMod.HistoryLoader) {
+        termMod.HistoryLoader.load(Board.state.termSessionId);
       }
     } else if (!_ctx.isWorkflowMode()) {
       // 메인 세션: REST /terminal/history 가 과거의 권위 있는 출처이므로
       // SSE 링버퍼 재생은 생략한다. 서버는 replay_start/end 프레임도 보내지 않는다.
       eventsUrl += qsSep() + "skip_replay=1";
       // 재연결 (already loaded once) 이면 REST 로 gap 을 보충한다.
-      if (termMod && termMod._historyLoaded && typeof termMod.fetchHistorySince === "function") {
-        termMod.fetchHistorySince(Board.state.termSessionId);
+      if (termMod && termMod.HistoryLoader) {
+        termMod.HistoryLoader.load(Board.state.termSessionId);
       }
     } else {
       // 워크플로우 세션: 초기 이벤트는 REST /terminal/workflow/history 로 복원하므로
@@ -1882,18 +1885,19 @@
     // 이미 활성 세션이 있으면 세션 스위치로 간주하고 연결을 리셋한다.
     // 서버의 claude_process.spawn() 이 내부에서 기존 프로세스를 kill 하므로
     // HTTP kill 을 별도로 호출할 필요는 없다.
+    // T-384 P2: setTermStatus('stopped') 가 세션 ID + autoResume + history flags
+    // invariant 를 흡수하므로 호출 직후 수동 리셋이 불필요.
     if (Board.state.termStatus !== "stopped") {
       disconnectSSE();
       Board.state.setTermStatus("stopped");
-      Board.state.termSessionId = null;
       _ctx.updateControlBar();
     }
 
-    // 새 세션(isResume=false) 시작 시 termSessionId 를 명시적으로 비운다.
-    // stopped 상태에서 Start 를 누른 경우 fetchStatus 가 이미 null 로 돌려두지만,
-    // 방어적으로 여기서도 클리어해 system/init 의 "세션 교체" 조건을 원천 차단한다.
-    // isResume 경로는 아래 Line 966 부근에서 resumeSessionId 로 명시 세팅된다.
-    if (!isResume) {
+    // 새 세션(isResume=false) 시작 시 termSessionId 가 비어 있어야 system/init 의
+    // "세션 교체" 조건을 원천 차단한다.
+    // T-384 P2: 위 setTermStatus('stopped') 분기를 거치면 setter 가 이미 null 로
+    // 만든다. 그 분기를 거치지 않는 경로 (이미 stopped 였던 경우) 에서만 방어적 리셋.
+    if (!isResume && Board.state.termSessionId !== null) {
       Board.state.termSessionId = null;
     }
 
@@ -1958,8 +1962,10 @@
         // 가 달리 도착하고, 그때 과거 대화를 재로딩한다 (system/init 리스너 참조).
         Board.state.termSessionId = resumeSessionId;
         var termModResume = Board._term;
-        if (termModResume && typeof termModResume.loadHistory === "function") {
-          termModResume.loadHistory(resumeSessionId);
+        // T-384 P3: HistoryLoader.load 가 분기 결정 — _historyLoaded false 이므로
+        // initial full load 로 진입.
+        if (termModResume && termModResume.HistoryLoader) {
+          termModResume.HistoryLoader.load(resumeSessionId);
         }
       }
     }
@@ -2029,6 +2035,36 @@
   // 중복 kill 호출 방지 플래그
   var _killingInProgress = false;
 
+  // T-384 P4: Close 시 UI 정리의 단일 진입점.
+  //
+  // process_exit / killSession 양쪽 경로에서 stopped 상태로 떨어질 때 DOM
+  // 컨텍스트 (대화창 / 토큰 / 비용 / 스피너 / tool-box 매핑) 를 일괄 청소한다.
+  // 옛 흐름은 killSession 본문 안 nested 함수였으나, SessionLifecycle.finalizeStopped
+  // facade 에서도 호출 가능하도록 IIFE 모듈 스코프로 끌어냈다 (closure 의 변수
+  // _pendingTextBuffer / _currentToolUseId / _toolInputMap / _ctx 는 모두
+  // IIFE 안에 있으므로 모듈 스코프 함수가 그대로 접근 가능 — 의미 변경 0).
+  //
+  // 세션 ID 비움 (`termSessionId = null`) + history flag 리셋은 setTermStatus
+  // ('stopped') 분기 invariant 가 담당 (P2). 본 함수는 DOM 부수효과만 책임진다.
+  function _finalizeStoppedUI() {
+    _ctx.stopSpinner();
+    _ctx.clearOutput();
+    _ctx.resetTokens();
+    _ctx.setSessionCost(0);
+    _ctx.setSessionModel("--");
+    _ctx.setReceivedChunks(false);
+    _ctx.resetToolInputBuffer();
+    _pendingTextBuffer = "";
+    _currentToolUseId = null;
+    _toolInputMap = {};
+    if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
+    _ctx.clearCurrentToolBox();
+    if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
+    // permission mode 표시는 DOM 직접 제어 (setSessionModel 같은 상태 저장소 없음)
+    var modeEl = document.getElementById("terminal-sl-mode");
+    if (modeEl) modeEl.textContent = "";
+  }
+
   function killSession() {
     if (!_ctx) return;
     var killable = Board.util.TERM_STATUS_KILLABLE;
@@ -2045,27 +2081,6 @@
 
     var prevStatus = Board.state.termStatus;
     var epK = _ctx.endpoints();
-    // Close 시 UI 정리 — process_exit 경로와 동일한 리셋을 수행해
-    // 대화창 / 토큰 / 비용 / 스피너가 stopped 상태에 어색하게 남지 않도록 한다.
-    function _finalizeStoppedUI() {
-      _ctx.stopSpinner();
-      _ctx.clearOutput();
-      _ctx.resetTokens();
-      _ctx.setSessionCost(0);
-      _ctx.setSessionModel("--");
-      _ctx.setReceivedChunks(false);
-      _ctx.resetToolInputBuffer();
-      _pendingTextBuffer = "";
-      _currentToolUseId = null;
-      _toolInputMap = {};
-      if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
-      _ctx.clearCurrentToolBox();
-      if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
-      // permission mode 표시는 DOM 직접 제어 (setSessionModel 같은 상태 저장소 없음)
-      var modeEl = document.getElementById("terminal-sl-mode");
-      if (modeEl) modeEl.textContent = "";
-      Board.state.termSessionId = null;
-    }
     // 사용자 명시 kill → autoResume 윈도우 즉시 해제 (잔존 플래그 방지).
     Board.state._inAutoResume = false;
     postJson(epK.kill, epK.inputBody({})).then(function () {
@@ -2176,6 +2191,53 @@
     _toolInputMap[toolUseId] = partialJson || "";
   }
 
+  // ── T-384 P4: SessionLifecycle facade (Criterion A) ──────────────────
+  //
+  // 옛 흐름: ``startSession`` / ``killSession`` / ``_finalizeStoppedUI`` /
+  // system init 이벤트 핸들러가 같은 IIFE 안에서 서로 떨어진 위치에 있어 한
+  // 사이클의 라이프 주기 흐름을 한 곳에서 파악하기 어려웠다.
+  //
+  // 새 흐름: 5 메서드 facade 가 진입점을 응집한다. 본문은 옛 함수들을 그대로
+  // 위임 호출하는 thin layer — 의미 변경 0, 응집도 ↑.
+  //
+  // | 메서드 | 책임 | 위임 대상 |
+  // |---|---|---|
+  // | ``start(opts)`` | 신규 / resume / silent resume 진입점 | ``startSession`` |
+  // | ``kill()`` | 사용자 명시 종료 진입점 | ``killSession`` |
+  // | ``finalizeStopped()`` | DOM 청소 단일점 | ``_finalizeStoppedUI`` |
+  // | ``onInit(sid)`` | system/init 이벤트 수신 시 history load 진입점 | (자체 본문) |
+  // | ``_dispatch()`` | 라이프 전이 시 공통 청소 | ``_resetSessionDerivedState`` |
+  //
+  // 외부 API ``Board.session.startSession`` / ``killSession`` 시그니처는
+  // 1:1 보존 — 본 facade 는 추가 진입점이지 기존 진입점을 대체하지 않는다.
+  var SessionLifecycle = {};
+
+  SessionLifecycle.start = function (opts) {
+    opts = opts || {};
+    return startSession(opts.resume || undefined, { silent: !!opts.silent });
+  };
+
+  SessionLifecycle.kill = function () {
+    return killSession();
+  };
+
+  SessionLifecycle.finalizeStopped = function () {
+    _finalizeStoppedUI();
+  };
+
+  SessionLifecycle.onInit = function (sid) {
+    if (!sid) return;
+    Board.state.termSessionId = sid;
+    var termMod = Board._term;
+    if (termMod && termMod.HistoryLoader) {
+      termMod.HistoryLoader.load(sid);
+    }
+  };
+
+  SessionLifecycle._dispatch = function () {
+    _resetSessionDerivedState();
+  };
+
   // ── Register on Board namespace ──
   Board.session = {
     connectSSE: connectSSE,
@@ -2194,6 +2256,9 @@
     // T-495 P2 — v2 driver session 진입점 (외부 호출용)
     startV2Session: _startV2WorkflowSession,
     disconnectV2: _disconnectV2,
+    // T-384 P4 — SessionLifecycle facade (응집된 5 메서드 진입점). 옛 startSession
+    // / killSession 도 그대로 보존 — 외부 호출부 0 수정.
+    lifecycle: SessionLifecycle,
     _bind: bind,
     _markSent: markSent
   };

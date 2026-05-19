@@ -667,7 +667,8 @@
             willLoadHistory: !!(sid && status && status !== "stopped"),
           });
           if (sid && status && status !== "stopped") {
-            M.loadHistory(sid);
+            // T-384 P3: HistoryLoader.load 단일 진입점.
+            M.HistoryLoader.load(sid);
           } else {
             M.showEmptyState();
           }
