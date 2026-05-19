@@ -100,14 +100,14 @@ def init_step(ticket_no: str) -> WorkflowContext:
     # env 형식: "YYYYMMDD-HHMMSS" 또는 "YYYYMMDD-HHMMSS-NNN" 등 v1 호환 timestamp.
     env_key = (os.environ.get("V2_REGISTRY_KEY") or "").strip()
     registry_key = env_key if env_key else new_registry_key()
-    # work_dir 위치: worktree 있으면 그 안, 없으면 메인 .claude-organic/runs/
-    if worktree_path is not None:
-        runs_root = worktree_path / ".claude-organic" / "runs"
-        runs_root.mkdir(parents=True, exist_ok=True)
-        work_dir = runs_root / registry_key
-        work_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        work_dir = make_work_dir(registry_key)
+    # T-509 — work_dir 는 항상 메인 측 (PROJECT_ROOT 기준 RUNS_DIR / <key>).
+    # worktree_path 가 있어도 분기하지 않는다 — a473334 이후 PROJECT_ROOT 는
+    # git common-dir 의 부모 (메인 워크트리 root) 를 가리키므로, worktree 안쪽
+    # .claude-organic/runs/ 에 산출물을 박으면 finalization R-EXIST / history
+    # sync / SSE FileWatcher 인덱스가 모두 메인 측만 보는 SSOT 와 어긋난다.
+    # worktree 자체는 ctx.worktree_path 로 보존 — auto_commit / verify_code 가
+    # 워크트리 cwd 에서 git add/commit 하는 의미는 그대로 유지된다.
+    work_dir = make_work_dir(registry_key)
 
     # Stage 3-B — board side workflow_registry 매핑 ID. driver 측 자체 발급으로
     # 결정론 유지 (registry_key 가 이미 timestamp 형식이라 충돌 0).
