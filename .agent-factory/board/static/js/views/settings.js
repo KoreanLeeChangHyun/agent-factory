@@ -83,6 +83,23 @@
     actions.appendChild(buildUrlItem);
     body.appendChild(actions);
 
+    var provider = document.createElement('div');
+    provider.className = 'settings-section settings-provider';
+    provider.innerHTML =
+      '<div class="settings-section-title">Provider</div>' +
+      '<div class="settings-item">' +
+        '<div class="settings-item-info">' +
+          '<div class="settings-item-key">Active adapter</div>' +
+          '<div class="settings-item-label">Provider-specific naming is isolated to adapter details.</div>' +
+        '</div>' +
+        '<div class="settings-item-control"><span class="settings-provider-pill">ClaudeAdapter</span></div>' +
+      '</div>' +
+      '<details class="settings-adapter-details">' +
+        '<summary>ClaudeAdapter details</summary>' +
+        '<div class="settings-adapter-body">Board process integration uses local Claude Code hooks and .agent-factory runtime paths.</div>' +
+      '</details>';
+    body.appendChild(provider);
+
     var buildUrlBtn = document.getElementById('settings-build-url-btn');
     if (buildUrlBtn) {
       buildUrlBtn.addEventListener('click', function () {

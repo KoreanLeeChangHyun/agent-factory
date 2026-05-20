@@ -172,12 +172,49 @@ Board.state.reconcileTermStatus = function (serverStatus) {
 };
 
 // ── Constants ──
+const PRODUCT_LABELS = {
+  appTitle: "Agent Factory",
+  workRequest: "WorkRequest",
+  workRequests: "WorkRequests",
+  run: "Run",
+  runs: "Runs",
+  verification: "Verification",
+  reports: "Reports",
+  settings: "Settings",
+};
+
+const STATUS_LABELS = {
+  "To Do": "Draft",
+  Open: "Accepted",
+  "In Progress": "Executing",
+  Review: "Verifying",
+  Done: "Complete",
+};
+
+const STEP_LABELS = {
+  INIT: "Initialize",
+  PLAN: "Plan",
+  WORK: "Execute",
+  VALIDATE: "Verify",
+  REPORT: "Report",
+  DONE: "Complete",
+  FAILED: "Failed",
+  NONE: "None",
+};
+
+const COMMAND_LABELS = {
+  implement: "Execute",
+  research: "Research",
+  review: "Review",
+  prompt: "Prompt",
+};
+
 const COLUMNS = [
-  { key: "To Do", label: "To Do", dot: "dot-todo" },
-  { key: "Open", label: "Open", dot: "dot-open" },
-  { key: "In Progress", label: "In Progress", dot: "dot-progress" },
-  { key: "Review", label: "Review", dot: "dot-review" },
-  { key: "Done", label: "Done", dot: "dot-done" },
+  { key: "To Do", label: STATUS_LABELS["To Do"], dot: "dot-todo" },
+  { key: "Open", label: STATUS_LABELS.Open, dot: "dot-open" },
+  { key: "In Progress", label: STATUS_LABELS["In Progress"], dot: "dot-progress" },
+  { key: "Review", label: STATUS_LABELS.Review, dot: "dot-review" },
+  { key: "Done", label: STATUS_LABELS.Done, dot: "dot-done" },
 ];
 
 const CMD_COLORS = {
@@ -202,6 +239,10 @@ const KANBAN_SORT_LS_KEY = "claude-board-kanban-sort";
 Board.util.COLUMNS = COLUMNS;
 Board.util.CMD_COLORS = CMD_COLORS;
 Board.util.STATUS_COLORS = STATUS_COLORS;
+Board.util.PRODUCT_LABELS = PRODUCT_LABELS;
+Board.util.STATUS_LABELS = STATUS_LABELS;
+Board.util.STEP_LABELS = STEP_LABELS;
+Board.util.COMMAND_LABELS = COMMAND_LABELS;
 Board.util.LS_KEY = LS_KEY;
 Board.util.KANBAN_SORT_LS_KEY = KANBAN_SORT_LS_KEY;
 
@@ -223,6 +264,19 @@ function xmlText(el, tag) {
 /** Formats a datetime string to YYYY-MM-DD HH:MM. */
 function formatTime(dt) {
   return dt ? dt.substring(0, 16) : "";
+}
+
+function statusLabel(status) {
+  return STATUS_LABELS[status] || status || "";
+}
+
+function stepLabel(step) {
+  var key = String(step || "NONE").toUpperCase();
+  return STEP_LABELS[key] || key;
+}
+
+function commandLabel(command) {
+  return COMMAND_LABELS[command] || command || "";
 }
 
 /** Command name → 3-letter abbreviation map. */
@@ -253,6 +307,9 @@ function badge(text, colors, extraStyle) {
 Board.util.esc = esc;
 Board.util.xmlText = xmlText;
 Board.util.formatTime = formatTime;
+Board.util.statusLabel = statusLabel;
+Board.util.stepLabel = stepLabel;
+Board.util.commandLabel = commandLabel;
 Board.util.badge = badge;
 
 // ── XML Ticket Parsing ──
@@ -1060,4 +1117,3 @@ function showInfoModal(title, body, options) {
 }
 
 Board.util.showInfoModal = showInfoModal;
-

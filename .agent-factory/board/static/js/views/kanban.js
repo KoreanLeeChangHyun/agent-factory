@@ -12,7 +12,10 @@
 "use strict";
 
 (function () {
-  const { esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY } = Board.util;
+  const {
+    esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY,
+    PRODUCT_LABELS,
+  } = Board.util;
 
   // ── Relations Display ──
   const MAX_VISIBLE_RELATIONS = 5;
@@ -66,6 +69,7 @@
   // To Do 컬럼은 사용자 수동 정렬 (DnD 위치 변경) 지원. 신규 티켓은 항상 최상단 prepend.
   // 다른 브라우저/기기에서는 동기화되지 않음 (localStorage 한정).
   const TODO_MANUAL_ORDER_LS_KEY = "kanban_todo_manual_order_v1";
+  const WR_FORM_STATE_KEY = "agent-factory-workrequest-form-expanded";
 
   function loadTodoManualOrder() {
     try {
@@ -112,6 +116,102 @@
       || newOrder.some(function (n, i) { return n !== stored[i]; });
     if (changed) saveTodoManualOrder(newOrder);
     return result;
+  }
+
+  function loadWorkRequestFormExpanded() {
+    try { return localStorage.getItem(WR_FORM_STATE_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function saveWorkRequestFormExpanded(expanded) {
+    try { localStorage.setItem(WR_FORM_STATE_KEY, expanded ? "1" : "0"); } catch (e) {}
+  }
+
+  function collectWorkRequestPayload(form, action) {
+    return {
+      action: action,
+      ticket: (form.querySelector('[name="ticket"]') || {}).value || "",
+      title: (form.querySelector('[name="title"]') || {}).value || "",
+      command: (form.querySelector('[name="command"]') || {}).value || "implement",
+      status: (form.querySelector('[name="status"]') || {}).value || "todo",
+      goal: (form.querySelector('[name="goal"]') || {}).value || "",
+      target: (form.querySelector('[name="target"]') || {}).value || "",
+      constraints: (form.querySelector('[name="constraints"]') || {}).value || "",
+      criteria: (form.querySelector('[name="criteria"]') || {}).value || "",
+      context: (form.querySelector('[name="context"]') || {}).value || "",
+    };
+  }
+
+  function setWorkRequestFormStatus(root, kind, message) {
+    var status = root.querySelector(".wr-author-status");
+    if (!status) return;
+    status.className = "wr-author-status " + (kind || "");
+    status.textContent = message || "";
+  }
+
+  function submitWorkRequest(root, action) {
+    var form = root.querySelector(".wr-author-form");
+    if (!form) return;
+    var payload = collectWorkRequestPayload(form, action);
+    var buttons = root.querySelectorAll(".wr-author-actions button");
+    buttons.forEach(function (btn) { btn.disabled = true; });
+    setWorkRequestFormStatus(root, "running", action === "create" ? "Creating..." : action === "accept" ? "Accepting..." : "Refining...");
+    fetch("/api/kanban/workrequest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        return { ok: res.ok, body: body };
+      });
+    }).then(function (r) {
+      if (!r.ok || !r.body.ok) {
+        throw new Error((r.body && (r.body.error || r.body.message)) || "WorkRequest update failed");
+      }
+      setWorkRequestFormStatus(root, "ok", r.body.ticket ? r.body.ticket + " updated" : "Updated");
+      if (action === "create") {
+        form.reset();
+        var command = form.querySelector('[name="command"]');
+        if (command) command.value = "implement";
+      }
+      return fetchTickets().then(renderKanban);
+    }).catch(function (err) {
+      setWorkRequestFormStatus(root, "error", err && err.message ? err.message : "Request failed");
+    }).finally(function () {
+      buttons.forEach(function (btn) { btn.disabled = false; });
+    });
+  }
+
+  function renderWorkRequestAuthoring() {
+    var expanded = loadWorkRequestFormExpanded();
+    return ''
+      + '<section class="wr-author' + (expanded ? ' expanded' : '') + '">'
+      + '<div class="wr-author-head">'
+      + '<div><div class="wr-author-title">' + esc(PRODUCT_LABELS.workRequest) + ' authoring</div>'
+      + '<div class="wr-author-meta">Create, refine, and accept requests before execution.</div></div>'
+      + '<button class="wr-author-toggle" type="button">' + (expanded ? 'Hide' : 'Author') + '</button>'
+      + '</div>'
+      + '<form class="wr-author-form">'
+      + '<div class="wr-author-grid wr-author-grid-top">'
+      + '<label>Existing ID<input name="ticket" placeholder="T-520"></label>'
+      + '<label>Title<input name="title" placeholder="Short request title"></label>'
+      + '<label>Mode<select name="command"><option value="implement">Execute</option><option value="research">Research</option><option value="review">Review</option></select></label>'
+      + '<label>Initial state<select name="status"><option value="todo">Draft</option><option value="open">Accepted</option></select></label>'
+      + '</div>'
+      + '<div class="wr-author-grid wr-author-grid-fields">'
+      + '<label>Goal<textarea name="goal" rows="2"></textarea></label>'
+      + '<label>Target<textarea name="target" rows="2"></textarea></label>'
+      + '<label>Criteria<textarea name="criteria" rows="2"></textarea></label>'
+      + '<label>Constraints<textarea name="constraints" rows="2"></textarea></label>'
+      + '<label class="wr-author-wide">Context<textarea name="context" rows="2"></textarea></label>'
+      + '</div>'
+      + '<div class="wr-author-actions">'
+      + '<span class="wr-author-status"></span>'
+      + '<button type="button" data-wr-action="create">Create</button>'
+      + '<button type="button" data-wr-action="refine">Refine</button>'
+      + '<button type="button" data-wr-action="accept">Accept</button>'
+      + '</div>'
+      + '</form>'
+      + '</section>';
   }
 
   /** 특정 티켓을 manual order 의 targetIndex 위치로 이동. */
@@ -2820,7 +2920,8 @@
     el.querySelectorAll(".cards[data-col-key]").forEach(function (cards) {
       scrollPositions[cards.dataset.colKey] = cards.scrollTop;
     });
-    let h = '<div class="kanban-board">';
+    let h = renderWorkRequestAuthoring();
+    h += '<div class="kanban-board">';
     COLUMNS.forEach(function (col) {
       const items = Board.state.TICKETS.filter(function (t) {
         if (col.key === "To Do") { return t.status === "To Do"; }
@@ -2925,7 +3026,7 @@
             h += "</div>";
             h += '<div class="card-top-right">';
             if (col.key === "To Do" && status) {
-              h += '<span class="card-status ' + status.cssClass + '">' + status.label + "</span>";
+              h += '<span class="card-status ' + status.cssClass + '">' + esc(status.label) + "</span>";
             }
             h += renderUncommittedBadge(t.number);
             // T-457 (Layer 3): failure tag (ticket.failure 존재 시) — 가드는 헬퍼 내부
@@ -3018,6 +3119,23 @@
     });
     h += "</div>";
     el.innerHTML = h;
+
+    var wrAuthor = el.querySelector(".wr-author");
+    if (wrAuthor) {
+      var toggle = wrAuthor.querySelector(".wr-author-toggle");
+      if (toggle) {
+        toggle.addEventListener("click", function () {
+          var next = !wrAuthor.classList.contains("expanded");
+          saveWorkRequestFormExpanded(next);
+          renderKanban();
+        });
+      }
+      wrAuthor.querySelectorAll("[data-wr-action]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          submitWorkRequest(wrAuthor, btn.dataset.wrAction);
+        });
+      });
+    }
 
     // 캡처된 컬럼별 scrollTop 복원
     Object.keys(scrollPositions).forEach(function (colKey) {

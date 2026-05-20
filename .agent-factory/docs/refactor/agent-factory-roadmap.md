@@ -368,7 +368,7 @@ python3 -m pytest tests/adapters/llm tests/application/llm tests/application/orc
 
 ### M8: Board UI/UX Redesign
 
-Status: planned
+Status: in-progress
 
 Purpose:
 
@@ -384,12 +384,12 @@ Target areas:
 
 Tasks:
 
-- rename UI language: Ticket -> WorkRequest, Work -> Execute, Validate -> Verify, Done -> Complete
-- build WorkRequest authoring/refinement view
-- build six-stage run timeline
-- show adapter/provider status
-- show verification verdicts with clear actions
-- connect report review to completion
+- [x] rename top-level UI language: Ticket -> WorkRequest, Work -> Execute, Validate -> Verify, Done -> Complete
+- [x] build WorkRequest authoring/refinement/acceptance surface backed by existing `flow-kanban`
+- [x] build six-stage run timeline in run detail view
+- [x] show adapter/provider status in Settings, with provider-specific terms isolated to adapter details
+- [ ] show verification verdicts with clearer retry/close actions
+- [ ] connect report review more explicitly to completion
 
 Acceptance criteria:
 

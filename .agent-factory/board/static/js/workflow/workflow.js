@@ -21,6 +21,9 @@ const {
   projectRoot: wfProjectRoot,
   CMD_COLORS: WF_CMD_COLORS,
   STATUS_COLORS: WF_STATUS_COLORS,
+  STEP_LABELS: WF_STEP_LABELS,
+  stepLabel: wfStepLabel,
+  commandLabel: wfCommandLabel,
   saveUI: wfSaveUI,
   switchTab: wfSwitchTab,
 } = Board.util;
@@ -39,6 +42,7 @@ const WF_FILES = [
 
 const WF_FILE_COLS = ["query", "plan", "work", "report", "summary", "usage", "log"];
 const WF_PAGE_SIZE = 50;
+const RUN_STAGE_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 
 // ── Fetch Functions ──
 
@@ -231,7 +235,7 @@ function renderWfCard(w) {
   // step cell
   const stepIsDone = (w.step || "").toUpperCase() === "DONE";
   const stepColors = stepIsDone ? WF_STATUS_COLORS.Done : WF_STATUS_COLORS["In Progress"];
-  const stepText = wfEsc(w.step || "NONE");
+  const stepText = wfEsc(wfStepLabel(w.step || "NONE"));
   const stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + "</span>";
   h += '<td class="wf-row-step">' + stepBadge + "</td>";
   // ticket cell: linked ticket badge (룰: 워크플로우는 반드시 티켓에 매핑)
@@ -258,6 +262,33 @@ function renderWfCard(w) {
   // updated_at cell
   h += '<td class="wf-row-time">' + wfEsc(w.updated_at.substring(0, 16)) + "</td>";
   h += "</tr>";
+  return h;
+}
+
+function normalizeRunStep(step) {
+  var key = String(step || "NONE").toUpperCase();
+  if (key === "VALIDATE") return "VALIDATE";
+  if (RUN_STAGE_ORDER.indexOf(key) >= 0) return key;
+  return key === "FAILED" ? "FAILED" : "NONE";
+}
+
+function renderRunTimeline(w) {
+  var current = normalizeRunStep(w.step);
+  var currentIndex = RUN_STAGE_ORDER.indexOf(current);
+  var terminalFailed = current === "FAILED";
+  var h = '<div class="run-timeline" aria-label="Run stage timeline">';
+  RUN_STAGE_ORDER.forEach(function (stage, idx) {
+    var cls = "pending";
+    if (current === "DONE") cls = "done";
+    else if (terminalFailed && idx === Math.max(0, currentIndex)) cls = "failed";
+    else if (currentIndex >= 0 && idx < currentIndex) cls = "done";
+    else if (currentIndex >= 0 && idx === currentIndex) cls = "running";
+    h += '<div class="run-stage ' + cls + '">';
+    h += '<span class="run-stage-dot"></span>';
+    h += '<span class="run-stage-label">' + wfEsc(WF_STEP_LABELS[stage] || stage) + '</span>';
+    h += '</div>';
+  });
+  h += '</div>';
   return h;
 }
 
@@ -406,7 +437,7 @@ function renderWfDetailView(w) {
   }
   const stepIsDone = (w.step || "").toUpperCase() === "DONE";
   const stepColors = stepIsDone ? WF_STATUS_COLORS.Done : WF_STATUS_COLORS["In Progress"];
-  h += '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + wfEsc(w.step || "NONE") + "</span>";
+  h += '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + wfEsc(wfStepLabel(w.step || "NONE")) + "</span>";
   if (w.command) {
     h += wfBadge(w.command, WF_CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" });
   }
@@ -416,19 +447,20 @@ function renderWfDetailView(w) {
   h += '<span class="tv-time">' + wfEsc(wfFormatTime(w.created_at)) + "</span>";
   h += "</div>";
   h += "</div>";
+  h += renderRunTimeline(w);
 
   // Info section
   h += '<div class="tv-section">';
-  h += '<div class="tv-section-title">Info</div>';
+  h += '<div class="tv-section-title">Run Info</div>';
   h += '<div class="wf-detail-info">';
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Entry</span><span class="wf-detail-info-value">' + wfEsc(w.entry) + "</span></div>";
-  h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Command</span><span class="wf-detail-info-value">' + wfEsc(w.command) + "</span></div>";
-  h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Step</span><span class="wf-detail-info-value">' + wfEsc(w.step || "NONE") + "</span></div>";
+  h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Mode</span><span class="wf-detail-info-value">' + wfEsc(wfCommandLabel(w.command) || w.command) + "</span></div>";
+  h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Stage</span><span class="wf-detail-info-value">' + wfEsc(wfStepLabel(w.step || "NONE")) + "</span></div>";
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Created</span><span class="wf-detail-info-value">' + wfEsc(wfFormatTime(w.created_at)) + "</span></div>";
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Updated</span><span class="wf-detail-info-value">' + wfEsc(wfFormatTime(w.updated_at)) + "</span></div>";
   const infoTicket = findTicketForWorkflow(w);
   if (infoTicket) {
-    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + wfEsc(infoTicket.number) + '">' + wfEsc(infoTicket.number) + "</span></span></div>";
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">WorkRequest</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + wfEsc(infoTicket.number) + '">' + wfEsc(infoTicket.number) + "</span></span></div>";
   }
   h += "</div>";
   h += "</div>";
@@ -436,15 +468,15 @@ function renderWfDetailView(w) {
   // Transitions timeline
   if (w.transitions && w.transitions.length > 0) {
     h += '<div class="tv-section">';
-    h += '<div class="tv-section-title">Transitions</div>';
+    h += '<div class="tv-section-title">Stage History</div>';
     h += '<div class="wf-detail-transitions">';
     h += '<table class="wf-detail-transition-table">';
     h += "<thead><tr><th>From</th><th>To</th><th>Time</th></tr></thead>";
     h += "<tbody>";
     w.transitions.forEach(function (tr) {
       h += "<tr>";
-      h += "<td>" + wfEsc(tr.from || "NONE") + "</td>";
-      h += "<td>" + wfEsc(tr.to || "") + "</td>";
+      h += "<td>" + wfEsc(wfStepLabel(tr.from || "NONE")) + "</td>";
+      h += "<td>" + wfEsc(wfStepLabel(tr.to || "")) + "</td>";
       h += '<td class="wf-detail-transition-time">' + wfEsc(wfFormatTime(tr.at || "")) + "</td>";
       h += "</tr>";
     });
@@ -456,7 +488,7 @@ function renderWfDetailView(w) {
   // Artifact links
   if (w.fileMap) {
     h += '<div class="tv-section">';
-    h += '<div class="tv-section-title">Artifacts</div>';
+    h += '<div class="tv-section-title">Report Artifacts</div>';
     h += '<div class="wf-detail-artifacts">';
     WF_FILE_COLS.forEach(function (key) {
       const info = w.fileMap[key];
@@ -482,13 +514,13 @@ function renderWfDetailView(w) {
 
 /** Workflow column definitions (단일 진실 공급원). */
 const WF_COLS = [
-  { key: "step",       label: "상태" },
-  { key: "ticket",     label: "티켓" },
-  { key: "command",    label: "명령" },
+  { key: "step",       label: "Stage" },
+  { key: "ticket",     label: "WorkRequest" },
+  { key: "command",    label: "Mode" },
   { key: "task",       label: "제목" },
   { key: "query",      label: "질의",   nosort: true },
   { key: "plan",       label: "계획",    nosort: true },
-  { key: "work",       label: "작업",    nosort: true },
+  { key: "work",       label: "실행",    nosort: true },
   { key: "report",     label: "보고",  nosort: true },
   { key: "summary",    label: "요약", nosort: true },
   { key: "usage",      label: "사용",   nosort: true },
@@ -557,7 +589,7 @@ function renderWorkflow() {
 
   // Search bar
   h += '<div class="wf-search-bar">';
-  h += '<input class="wf-search" type="text" placeholder="Search workflows..." value="' + wfEsc(Board.state.wfSearchQuery) + '">';
+  h += '<input class="wf-search" type="text" placeholder="Search runs..." value="' + wfEsc(Board.state.wfSearchQuery) + '">';
   h += '<span class="wf-search-count">' + filtered.length + (hasMore ? "+" : "") + " / " + Board.state.wfEntryHrefs.length + "</span>";
   h += "</div>";
 

@@ -1331,3 +1331,117 @@ class KanbanHandlerMixin:
             return
         project_root = os.getcwd()
         self._send_json(_workflow_detail(project_root, entry))
+    @api_endpoint("K", "workrequest")
+    def _handle_kanban_workrequest(self) -> None:
+        """POST /api/kanban/workrequest — WorkRequest create/refine/accept facade.
+
+        The storage model still uses ticket XML and ``flow-kanban``. This endpoint
+        gives the Board UI an M8 product-language API without changing existing
+        workflow contracts.
+        """
+        data = self._read_json_body() or {}
+        action = (data.get('action') or '').strip().lower()
+        project_root = os.getcwd()
+        flow_kanban = os.path.join(project_root, '.agent-factory', 'bin', 'flow-kanban')
+
+        def _run(args: list[str], timeout: int = 15) -> subprocess.CompletedProcess[str] | None:
+            try:
+                return subprocess.run(
+                    [flow_kanban] + args,
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+            except subprocess.TimeoutExpired:
+                self._send_error(504, 'flow-kanban timed out')
+                return None
+            except FileNotFoundError:
+                self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+                return None
+
+        def _send_run_error(result: subprocess.CompletedProcess[str]) -> None:
+            self._send_error(400, (result.stderr or result.stdout or 'flow-kanban failed').strip())
+
+        if action == 'create':
+            title = (data.get('title') or '').strip()
+            command = (data.get('command') or 'implement').strip()
+            status = (data.get('status') or 'todo').strip().lower()
+            if not title:
+                self._send_error(400, 'Missing "title"')
+                return
+            if command not in ('implement', 'research', 'review'):
+                self._send_error(400, 'Invalid "command"')
+                return
+            if status not in ('todo', 'open'):
+                self._send_error(400, 'Invalid "status"')
+                return
+
+            result = _run(['create', title, '--command', command, '--status', status])
+            if result is None:
+                return
+            if result.returncode != 0:
+                _send_run_error(result)
+                return
+            match = re.search(r'\b(T-\d+)\b', result.stdout or '')
+            ticket = match.group(1) if match else ''
+
+            prompt_args = []
+            for field in ('goal', 'target', 'constraints', 'criteria', 'context'):
+                value = (data.get(field) or '').strip()
+                if value:
+                    prompt_args.extend([f'--{field}', value])
+            if ticket and prompt_args:
+                update = _run(['update-prompt', ticket, '--command', command, '--skip-validation'] + prompt_args)
+                if update is None:
+                    return
+                if update.returncode != 0:
+                    _send_run_error(update)
+                    return
+
+            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            return
+
+        if action == 'refine':
+            ticket = (data.get('ticket') or '').strip()
+            command = (data.get('command') or '').strip()
+            if not ticket or not _TICKET_RE.match(ticket):
+                self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+                return
+            args = ['update-prompt', ticket, '--skip-validation']
+            if command:
+                if command not in ('implement', 'research', 'review'):
+                    self._send_error(400, 'Invalid "command"')
+                    return
+                args.extend(['--command', command])
+            for field in ('goal', 'target', 'constraints', 'criteria', 'context'):
+                value = (data.get(field) or '').strip()
+                if value:
+                    args.extend([f'--{field}', value])
+            if len(args) == 3:
+                self._send_error(400, 'No refinement fields supplied')
+                return
+            result = _run(args)
+            if result is None:
+                return
+            if result.returncode != 0:
+                _send_run_error(result)
+                return
+            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            return
+
+        if action == 'accept':
+            ticket = (data.get('ticket') or '').strip()
+            if not ticket or not _TICKET_RE.match(ticket):
+                self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+                return
+            result = _run(['move', ticket, 'open'])
+            if result is None:
+                return
+            if result.returncode != 0:
+                _send_run_error(result)
+                return
+            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            return
+
+        self._send_error(400, 'Invalid "action" (create/refine/accept)')

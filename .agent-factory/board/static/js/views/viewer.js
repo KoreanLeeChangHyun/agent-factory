@@ -12,8 +12,8 @@
 "use strict";
 
 (function () {
-  const { esc, badge, formatTime, CMD_COLORS, STATUS_COLORS, saveUI, switchTab, parseDirLinks,
-          resolveResultPath, urlDir, getHighlightLang } = Board.util;
+  const { esc, formatTime, CMD_COLORS, STATUS_COLORS, saveUI, switchTab, parseDirLinks,
+          resolveResultPath, urlDir, getHighlightLang, statusLabel, commandLabel } = Board.util;
 
   // ── Viewer Tab Management ──
 
@@ -504,13 +504,14 @@
     h += '<div class="tv-header">';
     h += '<div class="tv-header-top">';
     h += '<span class="tv-number">' + esc(ticket.number.replace(/^T-/, "")) + "</span>";
-    h += badge(ticket.status, sc);
+    h += '<span class="badge" style="background:' + sc.bg + ';color:' + sc.fg + '">' + esc(statusLabel(ticket.status)) + '</span>';
     h += "</div>";
     h += '<h1 class="tv-title">' + esc(ticket.title || "(No title)") + "</h1>";
     h += '<div class="tv-meta">';
     h += '<span class="tv-time">' + esc(formatTime(ticket.updated || ticket.created)) + "</span>";
     if (ticket.command) {
-      h += badge(ticket.command, CMD_COLORS[ticket.command]);
+      const cc = CMD_COLORS[ticket.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" };
+      h += '<span class="badge" style="background:' + cc.bg + ';color:' + cc.fg + '">' + esc(commandLabel(ticket.command) || ticket.command) + '</span>';
     }
     h += "</div></div>";
 
@@ -534,14 +535,14 @@
 
     if (ticket.prompt) {
       h += '<div class="tv-section">';
-      h += '<div class="tv-section-title">Prompt</div>';
+      h += '<div class="tv-section-title">Request Contract</div>';
       h += renderPromptFields(ticket.prompt);
       h += "</div>";
     }
 
     if (ticket.result) {
       h += '<div class="tv-section tv-result-section">';
-      h += '<div class="tv-section-title">Result</div>';
+      h += '<div class="tv-section-title">Report</div>';
       h += renderResultLinks(ticket.result);
       h += "</div>";
     }
@@ -549,7 +550,7 @@
     const connectedWfs = Board.render.findWorkflowsForTicket(ticket);
     if (connectedWfs.length > 0) {
       h += '<div class="tv-section">';
-      h += '<div class="tv-section-title">Workflows</div>';
+      h += '<div class="tv-section-title">Runs</div>';
       h += '<div class="tv-result-links">';
       connectedWfs.forEach(function (w) {
         const label = w.number ? w.number + " / " + w.task : w.task;
@@ -560,7 +561,7 @@
     }
 
     if (!ticket.prompt && !ticket.result) {
-      h += '<div class="empty" style="margin-top:32px">No prompt or result data</div>';
+      h += '<div class="empty" style="margin-top:32px">No request contract or report data</div>';
     }
 
     h += "</div>";
