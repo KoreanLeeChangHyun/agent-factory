@@ -125,8 +125,8 @@ them. Avoid churn that only changes spelling.
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
 | Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` | `core/worktrees`, `adapters/git` | partially aligned |
-| Kanban CLI/service | `engine/flow/kanban*.py` | `application`/`apps/cli` + adapters | not aligned |
-| Board API | `board/server/handlers` | `engine/apps/board_api` or thin board handlers | not aligned |
+| Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
+| Board API | `board/server/handlers`, `engine/application/kanban` | `engine/apps/board_api` or thin board handlers | partially aligned |
 | Board web | `board/static` | `board/web` | not aligned |
 | Hooks | top-level `hooks/`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | not aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
@@ -381,15 +381,27 @@ Acceptance:
 
 ### M17: Kanban And Board API Boundary
 
+Status: complete
+
 Goal:
 
 Make board handlers thin and move kanban service decisions behind application
 or adapter boundaries.
 
+Completed slice:
+
+- added `engine/application/kanban/done_result.py`
+- moved `flow-kanban done` failure classification out of board handlers
+- moved `flow-undo-done` stdout regex ownership out of board handlers
+- kept `board/server/handlers/_kanban_done_re.py` as a compatibility export
+  module
+- kept HTTP handlers and subprocess calls in place for this slice
+
 Acceptance:
 
 - `flow-kanban` smoke passes
 - board API contracts pass
+- full pytest passes
 
 ### M18: Hooks Boundary
 

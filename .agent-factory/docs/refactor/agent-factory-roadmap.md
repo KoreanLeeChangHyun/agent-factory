@@ -667,12 +667,51 @@ python3 -m pytest tests/domain/worktrees tests/adapters/git tests/adapters/v2/te
 python3 -m pytest  # 370 passed, 2 skipped
 ```
 
+### M17: Kanban And Board API Boundary
+
+Status: complete
+
+Purpose:
+
+Start thinning board kanban handlers by moving command-output decision logic into
+the application layer while leaving HTTP handlers and subprocess execution
+stable.
+
+Tasks:
+
+- [x] add `engine/application/kanban`
+- [x] move `flow-kanban done` failure classification into
+      `engine/application/kanban/done_result.py`
+- [x] move `flow-undo-done` stdout regex ownership into the same application
+      service
+- [x] keep `board/server/handlers/_kanban_done_re.py` as a compatibility export
+      module for existing board helper imports
+- [x] add focused application tests for done/undo output parsing
+- [x] keep `flow-kanban` and board API contracts stable
+
+Acceptance criteria:
+
+- kanban done/undo parsing is covered outside board handlers
+- board handler imports remain compatible
+- board API contract tests pass
+- `flow-kanban list` passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/kanban tests/contracts/board_api tests/architecture/test_boundaries.py  # 78 passed, 2 skipped
+python3 -m pytest engine/flow/tests/test_kanban_done_handler.py  # 5 passed
+.agent-factory/bin/flow-kanban list  # exit 0
+python3 -m pytest  # 375 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17
 ```
 
 Hard dependencies:
