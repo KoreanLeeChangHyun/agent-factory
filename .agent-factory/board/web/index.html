@@ -52,32 +52,6 @@ body {
   background: var(--bg);
 }
 
-.pane-label {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  right: 10px;
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 9px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: rgba(24, 24, 24, 0.88);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-  text-decoration: none;
-  backdrop-filter: blur(8px);
-}
-
-.pane-label:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 iframe {
   display: block;
   width: 100%;
@@ -149,12 +123,10 @@ iframe {
 <body>
 <main class="combined-shell" id="combined-shell">
   <section class="combined-pane" aria-label="Agent Factory Console">
-    <a class="pane-label" href="terminal.html" target="_blank" rel="noopener">Console</a>
     <iframe src="terminal.html" title="Agent Factory Console"></iframe>
   </section>
   <div class="split-divider" id="split-divider" role="separator" aria-label="Resize panes" aria-orientation="vertical" tabindex="0"></div>
   <section class="combined-pane" aria-label="Agent Factory Board">
-    <a class="pane-label" href="board.html" target="_blank" rel="noopener">Board</a>
     <iframe src="board.html" title="Agent Factory Board"></iframe>
   </section>
 </main>
