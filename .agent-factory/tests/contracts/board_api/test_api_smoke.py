@@ -21,6 +21,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
+_BOARD_API_APP_DIR = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api"
 _FE_JS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "web" / "js"
 _BOARD_MD = _REPO_ROOT / ".claude" / "rules" / "workflow" / "board.md"
 
@@ -30,18 +31,19 @@ _BOARD_MD = _REPO_ROOT / ".claude" / "rules" / "workflow" / "board.md"
 # ---------------------------------------------------------------------------
 
 def _collect_handler_methods() -> set[str]:
-    """handlers/ 하위 모든 `_handle_*` / `_v2_handle_*` 메서드 이름 수집."""
+    """Collect all board API `_handle_*` / `_v2_handle_*` method names."""
     methods: set[str] = set()
-    for p in _HANDLERS_DIR.glob("*.py"):
-        if p.name.startswith("__"):
-            continue
-        tree = ast.parse(p.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                for item in node.body:
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if item.name.startswith("_handle_") or item.name.startswith("_v2_handle_"):
-                            methods.add(item.name)
+    for directory in (_HANDLERS_DIR, _BOARD_API_APP_DIR):
+        for p in directory.glob("*.py"):
+            if p.name.startswith("__"):
+                continue
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    for item in node.body:
+                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if item.name.startswith("_handle_") or item.name.startswith("_v2_handle_"):
+                                methods.add(item.name)
     return methods
 
 

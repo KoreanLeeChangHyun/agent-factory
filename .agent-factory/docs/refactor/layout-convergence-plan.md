@@ -870,10 +870,34 @@ Acceptance:
 - relocated skill mapper tests pass
 - full pytest passes
 
+### M37: Memory GC Board API App Handler
+
+Status: complete
+
+Goal:
+
+Continue moving board API handler implementations into `engine/apps/board_api`
+with a small, low-risk endpoint group.
+
+Completed slice:
+
+- moved Memory GC Board API handler implementation to
+  `engine/apps/board_api/memory_gc.py`
+- kept `board/server/handlers/memory_gc.py` as a compatibility export
+- updated board API static analysis to scan app-boundary handlers as well as
+  legacy board handler modules
+- added focused Memory GC board API app tests
+
+Acceptance:
+
+- Memory GC board API app tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 740 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 742 passed, 2 skipped, 6 subtests passed
 ```
