@@ -32,6 +32,7 @@ Current high-level runtime layout:
     application/
       orchestration/
     adapters/
+      hooks/
       kanban/
       llm/
     v2/
@@ -128,7 +129,7 @@ them. Avoid churn that only changes spelling.
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `board/server/handlers`, `engine/application/kanban` | `engine/apps/board_api` or thin board handlers | partially aligned |
 | Board web | `board/static` | `board/web` | not aligned |
-| Hooks | top-level `hooks/`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | not aligned |
+| Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
 | Legacy tests | excluded roots under `engine/*/tests`, `board/tests` | delete/rewrite under `tests/` | not aligned |
 
@@ -430,11 +431,21 @@ Acceptance:
 
 ### M19: Hooks Boundary
 
-Status: pending
+Status: complete
 
 Goal:
 
 Clarify top-level hooks as app entrypoints and guards as hook adapters.
+
+Completed slice:
+
+- added `engine/adapters/hooks/dispatcher.py` for shared Claude Code hook
+  dispatcher behavior
+- kept `.agent-factory/hooks/dispatcher.py` as a compatibility wrapper for
+  existing hook entrypoint imports
+- kept top-level hook entry files stable for Claude Code settings
+- added adapter tests for hook flag parsing, path resolution, dispatch
+  aggregation, and wrapper exports
 
 Acceptance:
 
@@ -458,5 +469,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 378 passed, 2 skipped
+python3 -m pytest  # 384 passed, 2 skipped
 ```

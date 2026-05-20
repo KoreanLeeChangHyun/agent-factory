@@ -743,12 +743,46 @@ python3 -m pytest board/tests/test_v2_workflow_phase1.py  # 28 passed
 python3 -m pytest  # 378 passed, 2 skipped
 ```
 
+### M19: Hooks Boundary
+
+Status: complete
+
+Purpose:
+
+Clarify `.agent-factory/hooks` as stable Claude Code entrypoint scripts while
+moving shared hook dispatcher behavior into the adapter layer.
+
+Tasks:
+
+- [x] add `engine/adapters/hooks/dispatcher.py`
+- [x] keep `.agent-factory/hooks/dispatcher.py` as a compatibility export
+      module for current hook entrypoint imports
+- [x] preserve top-level hook script paths for Claude Code settings
+- [x] cover hook flag parsing, script path resolution, dispatch result
+      aggregation, and wrapper exports with adapter tests
+
+Acceptance criteria:
+
+- hook dispatcher adapter tests pass
+- architecture boundary tests pass
+- top-level pre-tool-use hook smoke passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/adapters/hooks/test_dispatcher.py  # 6 passed
+printf '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}}' | python3 .agent-factory/hooks/pre-tool-use.py  # exit 0
+python3 -m pytest tests/architecture/test_boundaries.py  # 2 passed
+python3 -m pytest  # 384 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19
 ```
 
 Hard dependencies:
