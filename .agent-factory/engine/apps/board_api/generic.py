@@ -19,12 +19,14 @@ from board.server._common import (
     _read_memory_file,
     _list_rules_files,
     _read_rules_file,
-    _list_prompt_files,
-    _read_prompt_file,
     _read_claude_md,
     _read_roadmap,
-    _read_quick_prompts,
     _memory_gc_status,
+)
+from engine.apps.board_api.prompt_store import (
+    _list_prompt_files,
+    _read_prompt_file,
+    _read_quick_prompts,
 )
 
 

@@ -11,11 +11,13 @@ from board.server._common import (
     _delete_memory_file,
     _write_rules_file,
     _delete_rules_file,
-    _write_prompt_file,
-    _delete_prompt_file,
     _write_claude_md,
-    _write_quick_prompt,
+)
+from engine.apps.board_api.prompt_store import (
+    _delete_prompt_file,
     _delete_quick_prompt,
+    _write_prompt_file,
+    _write_quick_prompt,
 )
 
 
