@@ -47,7 +47,7 @@
 .session-tab-bar {
   display: flex;
   align-items: stretch;
-  background: #15181b;
+  background: var(--af-surface);
   border-top: 1px solid var(--af-border-soft);
   min-height: 28px;
   overflow: hidden;
@@ -93,7 +93,7 @@
 }
 
 .session-tab:hover {
-  background: rgba(231, 226, 216, 0.06);
+  background: var(--af-hover);
   color: var(--af-text-muted);
 }
 
@@ -113,7 +113,7 @@
 
 .session-tab-dot.running {
   background: var(--af-success);
-  box-shadow: 0 0 4px rgba(111, 159, 122, 0.6);
+  box-shadow: 0 0 4px var(--af-success-soft);
 }
 
 .session-tab-dot.stopped {
@@ -133,7 +133,7 @@
   justify-content: center;
   background: none;
   border: none;
-  color: #555;
+  color: var(--af-text-subtle);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -149,8 +149,8 @@
 }
 
 .session-tab-close:hover {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: var(--af-error-soft);
+  color: var(--af-error);
 }
 
 .session-tab-add {
@@ -161,8 +161,8 @@
   min-width: 28px;
   background: none;
   border: none;
-  border-left: 1px solid #222;
-  color: #555;
+  border-left: 1px solid var(--af-border-soft);
+  color: var(--af-text-subtle);
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
@@ -170,14 +170,14 @@
 }
 
 .session-tab-add:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #aaa;
+  background: var(--af-hover);
+  color: var(--af-text-muted);
 }
 
 .terminal-session-id {
   font-size: 10px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #555;
+  color: var(--af-text-subtle);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -194,17 +194,17 @@
 .terminal-controls-divider {
   width: 1px;
   height: 16px;
-  background: #333;
+  background: var(--af-border);
   margin: 0 4px;
 }
 
 .terminal-btn-settings {
-  color: #666;
+  color: var(--af-text-subtle);
   padding: 4px 6px;
 }
 
 .terminal-btn-settings:hover:not(:disabled) {
-  color: #aaa;
+  color: var(--af-text-muted);
 }
 
 /* ── Settings Dropdown ── */
@@ -214,8 +214,8 @@
   right: 12px;
   top: 100%;
   margin-top: 4px;
-  background: #252526;
-  border: 1px solid #3c3c3c;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   padding: 4px 0;
   min-width: 160px;
@@ -233,7 +233,7 @@
   padding: 7px 14px;
   font-size: 12px;
   font-family: inherit;
-  color: #ccc;
+  color: var(--af-text);
   background: none;
   border: none;
   text-align: left;
@@ -242,7 +242,7 @@
 }
 
 .terminal-settings-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--af-hover-strong);
 }
 
 /* ── Sessions Dropdown (main sessions + tab sync) ── */
@@ -252,8 +252,8 @@
   right: 60px;
   top: 100%;
   margin-top: 4px;
-  background: #252526;
-  border: 1px solid #3c3c3c;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   padding: 4px 0;
   min-width: 420px;
@@ -270,7 +270,7 @@
   gap: 8px;
   padding: 7px 14px;
   font-size: 12px;
-  color: #ccc;
+  color: var(--af-text);
   text-decoration: none;
   background: none;
   border: none;
@@ -280,9 +280,9 @@
   transition: background 0.1s;
   box-sizing: border-box;
 }
-.terminal-sessions-item:hover { background: rgba(255, 255, 255, 0.08); }
+.terminal-sessions-item:hover { background: var(--af-hover-strong); }
 .terminal-sessions-item-ticket {
-  color: #D97757;
+  color: var(--af-primary);
   font-weight: 600;
   min-width: 52px;
 }
@@ -294,13 +294,13 @@
   gap: 2px;
 }
 .terminal-sessions-item-label {
-  color: #ddd;
+  color: var(--af-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .terminal-sessions-item-meta {
-  color: #666;
+  color: var(--af-text-subtle);
   font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
@@ -309,21 +309,21 @@
   white-space: nowrap;
 }
 .terminal-sessions-item-sub {
-  color: #666;
+  color: var(--af-text-subtle);
   font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
-.terminal-sessions-row[data-current="1"] .terminal-sessions-item-label { color: #D97757; font-weight: 600; }
-.terminal-sessions-row[data-last="1"]:not([data-current="1"]) .terminal-sessions-item-label { color: #e0c089; font-weight: 600; }
-.terminal-sessions-row[data-last="1"]:not([data-current="1"]) { background: rgba(217, 119, 87, 0.06); }
+.terminal-sessions-row[data-current="1"] .terminal-sessions-item-label { color: var(--af-primary); font-weight: 600; }
+.terminal-sessions-row[data-last="1"]:not([data-current="1"]) .terminal-sessions-item-label { color: var(--af-warning); font-weight: 600; }
+.terminal-sessions-row[data-last="1"]:not([data-current="1"]) { background: var(--af-primary-soft); }
 .terminal-sessions-item-badge {
   font-size: 9px;
   padding: 1px 6px;
   border-radius: 3px;
-  background: rgba(217, 119, 87, 0.18);
-  color: #D97757;
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -334,23 +334,23 @@
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #888;
+  background: var(--af-hover-strong);
+  color: var(--af-text-muted);
 }
 .terminal-sessions-item-status[data-status="running"] {
-  background: rgba(217, 119, 87, 0.18);
-  color: var(--af-primary, #D97757);
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
 }
-.terminal-sessions-item-status[data-status="stopped"] { background: rgba(229, 62, 62, 0.25); color: #fc8181; }
+.terminal-sessions-item-status[data-status="stopped"] { background: var(--af-error-soft); color: var(--af-error); }
 .terminal-sessions-empty {
   padding: 10px 14px;
   font-size: 12px;
-  color: #666;
+  color: var(--af-text-subtle);
   font-style: italic;
 }
 .terminal-sessions-count {
-  background: #D97757;
-  color: #fff;
+  background: var(--af-primary);
+  color: var(--af-inverse);
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
@@ -365,12 +365,12 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
+  color: var(--af-text-subtle);
   font-weight: 600;
 }
 .terminal-sessions-divider {
   height: 1px;
-  background: #3c3c3c;
+  background: var(--af-border);
   margin: 4px 0;
 }
 .terminal-sessions-row { display: flex; align-items: center; }
@@ -379,15 +379,15 @@
 .terminal-sessions-row[data-status="stopped"]:hover .terminal-sessions-item { opacity: 0.85; }
 .terminal-sessions-item-time {
   font-size: 10px;
-  color: #666;
+  color: var(--af-text-subtle);
   font-variant-numeric: tabular-nums;
 }
-.terminal-sessions-main { font-size: 11px; color: #888; }
-.terminal-sessions-main:hover { color: #ccc; }
+.terminal-sessions-main { font-size: 11px; color: var(--af-text-muted); }
+.terminal-sessions-main:hover { color: var(--af-text); }
 .terminal-sessions-purge {
   background: none;
   border: none;
-  color: #666;
+  color: var(--af-text-subtle);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -397,13 +397,13 @@
   transition: background 0.1s, color 0.1s;
 }
 .terminal-sessions-purge:hover {
-  background: rgba(229, 62, 62, 0.2);
-  color: #fc8181;
+  background: var(--af-error-soft);
+  color: var(--af-error);
 }
 .terminal-sessions-clear-all {
   background: none;
-  border: 1px solid #3c3c3c;
-  color: #888;
+  border: 1px solid var(--af-border);
+  color: var(--af-text-muted);
   font-size: 9px;
   padding: 2px 6px;
   border-radius: 3px;
@@ -411,7 +411,7 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.terminal-sessions-clear-all:hover { border-color: #fc8181; color: #fc8181; }
+.terminal-sessions-clear-all:hover { border-color: var(--af-error); color: var(--af-error); }
 
 /* ── Terminal Buttons ── */
 .terminal-btn {
@@ -423,15 +423,15 @@
   font-family: inherit;
   font-weight: 500;
   padding: 4px 12px;
-  color: #999;
+  color: var(--af-text-muted);
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
 .terminal-btn:hover:not(:disabled) {
-  color: #ccc;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: #3c3c3c;
+  color: var(--af-text);
+  background: var(--af-hover);
+  border-color: var(--af-border);
 }
 
 .terminal-btn:disabled {
@@ -440,37 +440,37 @@
 }
 
 .terminal-btn-start {
-  color: var(--af-primary, #D97757);
-  border-color: rgba(217, 119, 87, 0.32);
+  color: var(--af-primary);
+  border-color: var(--af-primary-soft);
 }
 
 .terminal-btn-start:hover:not(:disabled) {
-  background: rgba(217, 119, 87, 0.1);
-  border-color: rgba(217, 119, 87, 0.5);
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary-soft);
 }
 
 .terminal-btn-kill {
-  color: #f48771;
-  border-color: rgba(244, 135, 113, 0.2);
+  color: var(--af-error);
+  border-color: var(--af-error-soft);
 }
 
 .terminal-btn-kill:hover:not(:disabled) {
-  background: rgba(244, 135, 113, 0.1);
-  border-color: rgba(244, 135, 113, 0.4);
+  background: var(--af-error-soft);
+  border-color: var(--af-error-soft);
 }
 
 .terminal-btn-memory {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #b48a72;
-  border-color: rgba(217, 119, 87, 0.2);
+  color: var(--af-code);
+  border-color: var(--af-primary-soft);
 }
 
 .terminal-btn-memory:hover:not(:disabled) {
-  color: #D97757;
-  background: rgba(217, 119, 87, 0.1);
-  border-color: rgba(217, 119, 87, 0.4);
+  color: var(--af-primary);
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary-soft);
 }
 
 /* ── Status Indicator ── */
@@ -479,7 +479,7 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #858585;
+  color: var(--af-text-muted);
   white-space: nowrap;
 }
 
@@ -487,42 +487,42 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #555;
+  background: var(--af-text-subtle);
   flex-shrink: 0;
   transition: background 0.2s, box-shadow 0.2s;
 }
 
 .terminal-status[data-state="running"] .terminal-status-dot {
-  background: var(--af-primary, #D97757);
-  box-shadow: 0 0 6px rgba(217, 119, 87, 0.6);
+  background: var(--af-primary);
+  box-shadow: 0 0 6px var(--af-primary-soft);
   animation: terminal-pulse 1.5s ease-in-out infinite;
 }
 
 .terminal-status[data-state="idle"] .terminal-status-dot {
-  background: #dcdcaa;
-  box-shadow: 0 0 4px rgba(220, 220, 170, 0.3);
+  background: var(--af-primary);
+  box-shadow: 0 0 4px var(--af-primary-soft);
 }
 
 .terminal-status[data-state="stopped"] .terminal-status-dot {
-  background: #555;
+  background: var(--af-text-subtle);
 }
 
 .terminal-status[data-state="error"] .terminal-status-dot {
-  background: #f48771;
-  box-shadow: 0 0 4px rgba(244, 135, 113, 0.5);
+  background: var(--af-error);
+  box-shadow: 0 0 4px var(--af-error-soft);
 }
 
 .terminal-status-text {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #666;
+  color: var(--af-text-subtle);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.terminal-status[data-state="running"] .terminal-status-text { color: var(--af-primary, #D97757); }
-.terminal-status[data-state="idle"] .terminal-status-text { color: #dcdcaa; }
-.terminal-status[data-state="error"] .terminal-status-text { color: #f48771; }
+.terminal-status[data-state="running"] .terminal-status-text { color: var(--af-primary); }
+.terminal-status[data-state="idle"] .terminal-status-text { color: var(--af-primary); }
+.terminal-status[data-state="error"] .terminal-status-text { color: var(--af-error); }
 
 @keyframes terminal-pulse {
   0%, 100% { opacity: 1; }
@@ -534,7 +534,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: #1e1e1e;
+  background: var(--af-bg);
   padding: 8px 12px;
   position: relative;
 }
@@ -548,12 +548,12 @@
 }
 
 .terminal-output::-webkit-scrollbar-thumb {
-  background: #3c3c3c;
+  background: var(--af-border);
   border-radius: 4px;
 }
 
 .terminal-output::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--af-text-subtle);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -571,25 +571,25 @@
 }
 
 .term-assistant {
-  color: #ccc;
+  color: var(--af-text);
   font-size: 90%;
 }
 
 /* user input message — terracotta tone down box wrapped assistant message and visual separator.
- * board.md §2 (Quack UI Card Color) + §3 (user Spiral) + §6 (Teraconta #D97757) Conclusion.
+ * board.md §2 (Quack UI Card Color) + §3 (user Spiral) + §6 (Teraconta var(--af-primary)) Conclusion.
  * Box Design Regression — Memory Remittance [[feedback-board-user-message-box-canon]]]. */
 .term-user {
-  color: #9cdcfe;
+  color: var(--af-info);
   white-space: pre-wrap;
   font-size: 90%;
-  background: rgba(217, 119, 87, 0.10);
-  border: 1px solid rgba(217, 119, 87, 0.40);
+  background: var(--af-primary-soft);
+  border: 1px solid var(--af-primary-soft);
   border-radius: 6px;
   padding: 8px 12px;
 }
 
 /* User messages that stopped responses to ESC interflow — attaching "About Us" badges to the right corner.
- * The color is based on the theme color (terracotta #D97757). */
+ * The color is based on the theme color (terracotta var(--af-primary)). */
 .term-user.interrupted {
   position: relative;
   padding-right: 64px;  /* "About Us" base padding 8/12 right override. */
@@ -605,28 +605,28 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #D97757;
-  background: rgba(217, 119, 87, 0.12);
-  border: 1px solid rgba(217, 119, 87, 0.4);
+  color: var(--af-primary);
+  background: var(--af-primary-soft);
+  border: 1px solid var(--af-primary-soft);
   border-radius: 3px;
   line-height: 1.4;
   pointer-events: none;
 }
 
 .term-system {
-  color: #858585;
+  color: var(--af-text-muted);
   font-size: 90%;
 }
 
 .term-error {
-  color: #f44747;
+  color: var(--af-error);
 }
 
 /* ── Slash Command Result ── */
 .term-slash-result {
-  color: #9cdcfe;
-  background: #1a2a3a;
-  border: 1px solid #2a3a4a;
+  color: var(--af-info);
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   padding: 8px 12px;
   margin: 4px 0;
   font-size: 90%;
@@ -640,10 +640,10 @@
 }
 
 .term-slash-result th {
-  color: var(--af-primary, #D97757);
+  color: var(--af-primary);
   text-align: left;
   padding: 3px 8px 3px 0;
-  border-bottom: 1px solid #2a3a4a;
+  border-bottom: 1px solid var(--af-border);
   font-weight: bold;
 }
 
@@ -653,7 +653,7 @@
 }
 
 .term-slash-result td:first-child {
-  color: #dcdcaa;
+  color: var(--af-warning);
   white-space: nowrap;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   padding-right: 16px;
@@ -663,7 +663,7 @@
 .term-message h1,
 .term-message h2,
 .term-message h3 {
-  color: var(--af-primary, #D97757);
+  color: var(--af-primary);
   font-weight: bold;
   margin: 12px 0 6px;
   line-height: 1.4;
@@ -674,17 +674,17 @@
 .term-message h3 { font-size: 1.0em; }
 
 .term-message code {
-  background: #2d2d2d;
+  background: var(--af-border);
   padding: 2px 6px;
   border-radius: 3px;
-  color: #9cdcfe;
+  color: var(--af-info);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 0.92em;
 }
 
 .term-message pre {
-  background: #252526;
-  border: 1px solid #333;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   padding: 12px;
   margin: 8px 0;
@@ -699,7 +699,7 @@
   background: none;
   padding: 0;
   border-radius: 0;
-  color: #ccc;
+  color: var(--af-text);
   font-size: 1em;
 }
 
@@ -718,29 +718,29 @@
 
 .term-message li {
   margin-bottom: 2px;
-  color: #ccc;
+  color: var(--af-text);
 }
 
 .term-message strong {
   font-weight: 700;
-  color: #e8e8e8;
+  color: var(--af-text);
 }
 
 .term-message em {
   font-style: italic;
-  color: #d7ba7d;
+  color: var(--af-warning);
 }
 
 .term-message blockquote {
-  border-left: 3px solid #555;
+  border-left: 3px solid var(--af-text-subtle);
   margin: 6px 0;
   padding: 2px 12px;
-  color: #888;
+  color: var(--af-text-muted);
 }
 
 .term-message hr {
   border: none;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--af-border);
   margin: 10px 0;
 }
 
@@ -754,17 +754,17 @@
 
 .term-table th,
 .term-table td {
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   padding: 6px 12px;
-  color: #ccc;
+  color: var(--af-text);
   /* text-align is given by JS table renderer token.align based inline style.
      Hardcoding left disables all GFM `:---:` / `---:` alignments. */
 }
 
 .term-table th {
-  background: #2a2a2a;
+  background: var(--af-border);
   font-weight: 600;
-  color: #dcdcaa;
+  color: var(--af-warning);
 }
 
 .term-table tr:nth-child(even) td {
@@ -776,7 +776,7 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(20, 20, 20, 0.82);
+  background: rgba(13, 17, 23, 0.82);
   backdrop-filter: blur(3px);
   display: flex;
   flex-direction: column;
@@ -789,14 +789,14 @@
 .terminal-restart-overlay-spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid rgba(217, 119, 87, 0.25);
-  border-top-color: #D97757;
+  border: 3px solid var(--af-primary-soft);
+  border-top-color: var(--af-primary);
   border-radius: 50%;
   animation: terminal-restart-spin 0.9s linear infinite;
 }
 
 .terminal-restart-overlay-label {
-  color: #D97757;
+  color: var(--af-primary);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.3px;
@@ -818,29 +818,29 @@
   gap: 10px;
   padding: 10px 12px;
   margin: 6px 0;
-  border: 1px solid #2a3a4a;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
-  background: #1a2a3a;
+  background: var(--af-surface-raised);
   font-size: 90%;
   animation: term-rate-limit-fade-in 200ms ease-out;
 }
 
 .term-rate-limit-banner--info {
-  border-color: #2a3a4a;
-  background: #1a2a3a;
-  color: #858585;
+  border-color: var(--af-border);
+  background: var(--af-surface-raised);
+  color: var(--af-text-muted);
 }
 
 .term-rate-limit-banner--warn {
-  border-color: #D97757;
-  background: rgba(217, 119, 87, 0.08);
-  color: #ccc;
+  border-color: var(--af-primary);
+  background: var(--af-primary-soft);
+  color: var(--af-text);
 }
 
 .term-rate-limit-banner--danger {
-  border-color: #f44747;
-  background: rgba(244, 71, 71, 0.08);
-  color: #ccc;
+  border-color: var(--af-error);
+  background: var(--af-error-soft);
+  color: var(--af-text);
 }
 
 .term-rate-limit-icon {
@@ -850,15 +850,15 @@
 }
 
 .term-rate-limit-banner--info .term-rate-limit-icon {
-  color: #5e9bff;
+  color: var(--af-info);
 }
 
 .term-rate-limit-banner--warn .term-rate-limit-icon {
-  color: #D97757;
+  color: var(--af-primary);
 }
 
 .term-rate-limit-banner--danger .term-rate-limit-icon {
-  color: #f44747;
+  color: var(--af-error);
 }
 
 .term-rate-limit-content {
@@ -869,19 +869,19 @@
 }
 
 .term-rate-limit-title {
-  color: #e0e0e0;
+  color: var(--af-text);
   font-weight: 600;
 }
 
 .term-rate-limit-detail {
-  color: #858585;
+  color: var(--af-text-muted);
   font-size: 85%;
 }
 
 .term-rate-limit-dismiss {
   background: transparent;
   border: none;
-  color: #858585;
+  color: var(--af-text-muted);
   cursor: pointer;
   padding: 0;
   width: 16px;
@@ -889,7 +889,7 @@
 }
 
 .term-rate-limit-dismiss:hover {
-  color: #e0e0e0;
+  color: var(--af-text);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -907,7 +907,7 @@
 */
 .terminal-input-hint .queue-count {
   font-weight: 600;
-  color: #D97757;
+  color: var(--af-primary);
 }
 
 /* ── Cue Entry Unbreakable Panel ──
@@ -920,8 +920,8 @@
   bottom: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #1e1e1e;
-  outline: 1px solid #3a3a3a;
+  background: var(--af-bg);
+  outline: 1px solid var(--af-border);
   border-radius: 4px;
   padding: 4px 0;
   z-index: 10;
@@ -939,12 +939,12 @@
   justify-content: space-between;
   padding: 4px 10px;
   font-size: 12px;
-  color: #aaa;
+  color: var(--af-text-muted);
   gap: 6px;
 }
 
 .terminal-queue-pending-entry:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--af-hover);
 }
 
 .terminal-queue-pending-entry .entry-text {
@@ -956,7 +956,7 @@
 
 /* ── × Delete Button ──
    Prevent text area invasion with 16x16, flex-shrink: 0.
-   hover: error red (#f44747) — Delete action semantic color.
+   hover: error red (var(--af-error)) — Delete action semantic color.
    This button is hidden for in-flight entries to prevent misinterpretation of cancellation.
 */
 .terminal-queue-pending-remove {
@@ -968,7 +968,7 @@
   flex-shrink: 0;
   background: none;
   border: none;
-  color: #555;
+  color: var(--af-text-subtle);
   cursor: pointer;
   padding: 0;
   border-radius: 3px;
@@ -978,8 +978,8 @@
 }
 
 .terminal-queue-pending-remove:hover {
-  color: #f44747;
-  background: rgba(244, 71, 71, 0.15);
+  color: var(--af-error);
+  background: var(--af-error-soft);
 }
 
 /* During processing (in-flight) entry × button hide — preventing cancellation possible */
@@ -1009,12 +1009,12 @@
   gap: 6px;
   max-width: 30%;
   padding: 2px 8px;
-  background: rgba(217, 119, 87, 0.12);
-  outline: 1px solid rgba(217, 119, 87, 0.55);
+  background: var(--af-primary-soft);
+  outline: 1px solid var(--af-primary-soft);
   border-radius: 4px;
   font-size: 11px;
   line-height: 1.6;
-  color: #ddd;
+  color: var(--af-text);
 }
 
 .terminal-queue-text {
@@ -1033,7 +1033,7 @@
   flex-shrink: 0;
   background: none;
   border: none;
-  color: #888;
+  color: var(--af-text-muted);
   cursor: pointer;
   padding: 0;
   border-radius: 3px;
@@ -1043,8 +1043,8 @@
 }
 
 .terminal-queue-remove:hover {
-  color: #f44747;
-  background: rgba(244, 71, 71, 0.15);
+  color: var(--af-error);
+  background: var(--af-error-soft);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1066,8 +1066,8 @@
   max-width: 220px;
   height: 56px;
   border-radius: 8px;
-  border: 1px solid #3a3a3a;
-  background: #2a2a2a;
+  border: 1px solid var(--af-border);
+  background: var(--af-border);
   overflow: hidden;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -1076,7 +1076,7 @@
 }
 
 .terminal-ticket-card:hover {
-  border-color: #D97757;
+  border-color: var(--af-primary);
 }
 
 /* ── Command Badge (RSC / IMP / REV / MEM) ── */
@@ -1086,8 +1086,8 @@
   justify-content: center;
   width: 26px;
   min-width: 26px;
-  background: #D97757;
-  color: #1e1e1e;
+  background: var(--af-primary);
+  color: var(--af-bg);
   font-size: 9px;
   font-weight: 700;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
@@ -1101,7 +1101,7 @@
 
 /* Memory Attachment Card — Ticket and visual separators with the dealer tone. */
 .terminal-ticket-card[data-att-type="memory"] .terminal-ticket-card-cmd {
-  background: var(--af-primary, #D97757);
+  background: var(--af-primary);
 }
 
 /* ── Body: Title + Subtitle ── */
@@ -1118,7 +1118,7 @@
 .terminal-ticket-card-title {
   font-size: 12px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #ccc;
+  color: var(--af-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1128,7 +1128,7 @@
 .terminal-ticket-card-sub {
   font-size: 9px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #666;
+  color: var(--af-text-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

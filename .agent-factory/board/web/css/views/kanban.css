@@ -11,8 +11,8 @@
 
 .wr-author {
   flex-shrink: 0;
-  background: #202020;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
 }
 
@@ -28,12 +28,12 @@
 .wr-author-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--af-text);
 }
 
 .wr-author-meta {
   font-size: 11px;
-  color: #858585;
+  color: var(--af-text-muted);
   margin-top: 2px;
 }
 
@@ -41,10 +41,10 @@
 .wr-author-actions button {
   height: 28px;
   padding: 0 12px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
-  background: rgba(255,255,255,0.05);
-  color: #cccccc;
+  background: var(--af-hover);
+  color: var(--af-text);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -52,8 +52,8 @@
 
 .wr-author-toggle:hover,
 .wr-author-actions button:hover:not(:disabled) {
-  border-color: #D97757;
-  color: #ffffff;
+  border-color: var(--af-primary);
+  color: var(--af-inverse);
 }
 
 .wr-author-actions button:disabled {
@@ -64,7 +64,7 @@
 .wr-author-form {
   display: none;
   padding: 0 12px 12px;
-  border-top: 1px solid #2d2d2d;
+  border-top: 1px solid var(--af-border);
 }
 
 .wr-author.expanded .wr-author-form {
@@ -94,17 +94,17 @@
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #858585;
+  color: var(--af-text-muted);
 }
 
 .wr-author input,
 .wr-author select,
 .wr-author textarea {
   width: 100%;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
-  background: #181818;
-  color: #e0e0e0;
+  background: var(--af-surface);
+  color: var(--af-text);
   font: inherit;
   font-size: 12px;
   padding: 6px 8px;
@@ -119,7 +119,7 @@
 .wr-author input:focus,
 .wr-author select:focus,
 .wr-author textarea:focus {
-  border-color: #D97757;
+  border-color: var(--af-primary);
 }
 
 .wr-author-wide {
@@ -137,12 +137,12 @@
 .wr-author-status {
   margin-right: auto;
   font-size: 12px;
-  color: #858585;
+  color: var(--af-text-muted);
 }
 
-.wr-author-status.ok { color: #4ec9b0; }
-.wr-author-status.error { color: #f48771; }
-.wr-author-status.running { color: #D97757; }
+.wr-author-status.ok { color: var(--af-primary); }
+.wr-author-status.error { color: var(--af-error); }
+.wr-author-status.running { color: var(--af-primary); }
 
 .kanban-board {
   display: flex;
@@ -154,8 +154,8 @@
 .column {
   flex: 1;
   min-width: 0;
-  background: #252526;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -166,10 +166,10 @@
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  border-bottom: 1px solid #2d2d2d;
+  border-bottom: 1px solid var(--af-border);
   font-size: 12px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--af-text);
   flex-shrink: 0;
 }
 
@@ -180,14 +180,14 @@
   flex-shrink: 0;
 }
 
-.dot-todo { background: #6a9fb5; }
-.dot-open { background: #4ec9b0; }
-.dot-progress { background: #dcdcaa; }
-.dot-review { background: #c586c0; }
-.dot-done { background: #858585; }
+.dot-todo { background: var(--af-primary); }
+.dot-open { background: var(--af-primary); }
+.dot-progress { background: var(--af-primary); }
+.dot-review { background: var(--af-primary); }
+.dot-done { background: var(--af-text-muted); }
 
 .col-count {
-  color: #858585;
+  color: var(--af-text-muted);
   font-weight: 400;
   margin-left: auto;
 }
@@ -203,7 +203,7 @@
   border: none;
   border-radius: 3px;
   cursor: pointer;
-  color: #858585;
+  color: var(--af-text-muted);
   padding: 0;
   flex-shrink: 0;
   transition: color 0.15s, background 0.15s;
@@ -211,8 +211,8 @@
 }
 
 .col-sort-btn:hover {
-  color: #cccccc;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--af-text);
+  background: var(--af-hover);
 }
 
 .col-sort-btn svg {
@@ -231,8 +231,8 @@
   top: calc(100% + 4px);
   left: 0;
   z-index: 100;
-  background: #252526;
-  border: 1px solid #3c3c3c;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 5px;
   min-width: 130px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
@@ -249,7 +249,7 @@
   padding: 6px 12px;
   font-size: 12px;
   font-family: inherit;
-  color: #cccccc;
+  color: var(--af-text);
   background: none;
   border: none;
   cursor: pointer;
@@ -259,18 +259,18 @@
 }
 
 .col-sort-option:hover {
-  background: rgba(217, 119, 87, 0.15);
-  color: #e0e0e0;
+  background: var(--af-primary-soft);
+  color: var(--af-text);
 }
 
 .col-sort-option.active {
-  color: #D97757;
+  color: var(--af-primary);
   font-weight: 600;
 }
 
 .col-sort-divider {
   height: 1px;
-  background: #3c3c3c;
+  background: var(--af-border);
   margin: 4px 0;
 }
 
@@ -295,14 +295,14 @@
   flex-shrink: 0;
   overflow: hidden;
   padding: 10px 12px;
-  background: #1e1e1e;
-  border: 1px solid #2d2d2d;
+  background: var(--af-bg);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
 
-.card:hover { border-color: #D97757; }
+.card:hover { border-color: var(--af-primary); }
 .card.done { opacity: 0.6; }
 
 .card-top {
@@ -359,25 +359,25 @@
   height: 20px;
   padding: 0;
   background: transparent;
-  border: 1px solid rgba(78, 201, 176, 0.35);
+  border: 1px solid var(--af-primary-soft);
   border-radius: 4px;
-  color: #4ec9b0;
+  color: var(--af-primary);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
 
 .card-done-action:hover {
-  color: #D97757;
-  border-color: rgba(217, 119, 87, 0.55);
-  background: rgba(217, 119, 87, 0.08);
+  color: var(--af-primary);
+  border-color: var(--af-primary-soft);
+  background: var(--af-primary-soft);
 }
 
 .card-title {
   font-size: 11px;
   font-weight: 500;
   line-height: 1.4;
-  color: #e0e0e0;
+  color: var(--af-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -387,7 +387,7 @@
 .card-num {
   font-size: 12px;
   font-weight: 600;
-  color: #4ec9b0;
+  color: var(--af-primary);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
@@ -401,8 +401,8 @@
 }
 
 .status-todo {
-  background: rgba(106, 159, 181, 0.15);
-  color: #6a9fb5;
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
 }
 
 /* T-457 (Layer 3): One-on-the-clock mark label (read-only).
@@ -413,9 +413,9 @@
   padding: 1px 5px;
   border-radius: 3px;
   white-space: nowrap;
-  background: rgba(217, 119, 87, 0.20);
-  color: #D97757;
-  border: 1px solid rgba(217, 119, 87, 0.45);
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
+  border: 1px solid var(--af-primary-soft);
   cursor: default;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   pointer-events: none;
@@ -430,16 +430,16 @@
   border-radius: 3px;
   white-space: nowrap;
   /* placeholder neutral — user decides standby */
-  background: rgba(160, 160, 160, 0.18);
-  color: #b0b0b0;
-  border: 1px solid rgba(160, 160, 160, 0.40);
+  background: var(--af-hover-strong);
+  color: var(--af-text-muted);
+  border: 1px solid var(--af-hover-strong);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   pointer-events: none;
 }
 
 /* T-475 Stage 3: launch asynchronousization — starting the right-hand pulse of the status card.
  * Trigger: client launchState[ticket].state === 'starting' (submit 200 OK right after ~ LAUNCH STARTED SSE before receiving).
- * Reference workflow visual conventions: Terracotta #D97757 + pulse 1.6s ease-in-out infinite.
+ * Reference workflow visual conventions: Terracotta var(--af-primary) + pulse 1.6s ease-in-out infinite.
  * border-color + box-shadow modulation — `.wf-tool-card[data-running="true"]` Same rhythm.
  * prefers-reduced-motion: reduce the static color fallback (animation: none). */
 .card-launch-badge {
@@ -448,9 +448,9 @@
   padding: 1px 5px;
   border-radius: 3px;
   white-space: nowrap;
-  background: rgba(217, 119, 87, 0.20);
-  color: #D97757;
-  border: 1px solid rgba(217, 119, 87, 0.45);
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
+  border: 1px solid var(--af-primary-soft);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   pointer-events: none;
   animation: card-launch-pulse 1.6s ease-in-out infinite;
@@ -458,19 +458,19 @@
 
 @keyframes card-launch-pulse {
   0%, 100% {
-    border-color: rgba(217, 119, 87, 0.45);
-    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+    border-color: var(--af-primary-soft);
+    box-shadow: 0 0 0 0 rgba(0, 122, 204, 0);
   }
   50% {
-    border-color: #D97757;
-    box-shadow: 0 0 4px 1px rgba(217, 119, 87, 0.45);
+    border-color: var(--af-primary);
+    box-shadow: 0 0 4px 1px var(--af-primary-soft);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card-launch-badge {
     animation: none;
-    border-color: #D97757;
+    border-color: var(--af-primary);
   }
 }
 
@@ -484,17 +484,17 @@
   height: 20px;
   padding: 0;
   background: transparent;
-  border: 1px solid rgba(217, 119, 87, 0.45);
+  border: 1px solid var(--af-primary-soft);
   border-radius: 4px;
-  color: #D97757;
+  color: var(--af-primary);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
 
 .card-commit-action:hover {
-  background: rgba(217, 119, 87, 0.15);
-  border-color: #D97757;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
 }
 
 .card-commit-action:disabled,
@@ -504,7 +504,7 @@
 }
 
 /* In Progress card 4 workflow stop button (POST /api/workflow/stop).
- * #f48771 (fail color) — stop meaning and shadow. 20×20 — 4 min-height: 22px Safety. */
+ * var(--af-error) (fail color) — stop meaning and shadow. 20×20 — 4 min-height: 22px Safety. */
 .card-stop-action {
   display: inline-flex;
   align-items: center;
@@ -513,17 +513,17 @@
   height: 20px;
   padding: 0;
   background: transparent;
-  border: 1px solid rgba(244, 135, 113, 0.45);
+  border: 1px solid var(--af-error-soft);
   border-radius: 4px;
-  color: #f48771;
+  color: var(--af-error);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
 
 .card-stop-action:hover {
-  background: rgba(244, 135, 113, 0.15);
-  border-color: #f48771;
+  background: var(--af-error-soft);
+  border-color: var(--af-error);
 }
 
 .card-stop-action:disabled,
@@ -538,7 +538,7 @@
  * T-433 Phase 2 — Review Card 4 feature Brand Match Toggle Button.
  * - 16px SVG (Lucide git-branch, external library ban — inline SVG)
  * - OFF: Grey outline (border-only, transparent background)
- * - ON: Terracotta(#D97757) 4 way box-shadow glow
+ * - ON: Terracotta(var(--af-primary)) 4 way box-shadow glow
  * - border-left one-color ban (UI rule) — card glow is box-shadow inset/outset 4-way
  * ───────────────────────────────────────────────────────────────────────── */
 .card-branch-toggle {
@@ -549,38 +549,38 @@
   height: 20px;
   padding: 0;
   background: transparent;
-  border: 1px solid rgba(176, 176, 176, 0.45);
+  border: 1px solid var(--af-hover-strong);
   border-radius: 4px;
-  color: #b0b0b0;
+  color: var(--af-text-muted);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
 }
 
 .card-branch-toggle:hover {
-  color: #D97757;
-  border-color: rgba(217, 119, 87, 0.55);
-  background: rgba(217, 119, 87, 0.08);
+  color: var(--af-primary);
+  border-color: var(--af-primary-soft);
+  background: var(--af-primary-soft);
 }
 
 .card-branch-toggle.active {
-  background: #D97757;
-  border-color: #D97757;
-  color: #ffffff;
-  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25);
+  background: var(--af-primary);
+  border-color: var(--af-primary);
+  color: var(--af-inverse);
+  box-shadow: 0 0 0 2px var(--af-primary-soft);
 }
 
 .card-branch-toggle.active:hover {
-  background: #c66640;
-  border-color: #c66640;
+  background: var(--af-primary);
+  border-color: var(--af-primary);
 }
 
 /* Card external light glow (4-way box-shadow — border-left compliance with one ban.)
  * . has-active-branch is granted to the Review Card .card. */
 .card.has-active-branch {
   box-shadow:
-    0 0 0 1px rgba(217, 119, 87, 0.55),
-    0 0 12px 2px rgba(217, 119, 87, 0.22);
+    0 0 0 1px var(--af-primary-soft),
+    0 0 12px 2px var(--af-primary-soft);
 }
 
 
@@ -595,7 +595,7 @@
   border: none;
   border-radius: 3px;
   cursor: pointer;
-  color: #858585;
+  color: var(--af-text-muted);
   padding: 0;
   flex-shrink: 0;
   transition: color 0.15s, background 0.15s;
@@ -603,8 +603,8 @@
 }
 
 .column-toggle-btn:hover {
-  color: #cccccc;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--af-text);
+  background: var(--af-hover);
 }
 
 .column-toggle-btn svg {
@@ -630,7 +630,7 @@
 }
 
 .column.collapsed:hover {
-  background: #2a2a2b;
+  background: var(--af-surface-raised);
 }
 
 .column-collapsed-bar {
@@ -650,7 +650,7 @@
   transform: rotate(180deg);
   font-size: 11px;
   font-weight: 600;
-  color: #858585;
+  color: var(--af-text-muted);
   letter-spacing: 0.05em;
 }
 
@@ -659,7 +659,7 @@
   text-orientation: mixed;
   transform: rotate(180deg);
   font-size: 10px;
-  color: #606060;
+  color: var(--af-text-subtle);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
@@ -689,7 +689,7 @@
 }
 
 .chain-sep {
-  color: #606060;
+  color: var(--af-text-subtle);
   font-size: 9px;
   margin: 0 1px;
 }
@@ -709,9 +709,9 @@
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-.rel-derived { color: #D97757; }
-.rel-depends { color: #dcdcaa; }
-.rel-blocks { color: #c586c0; }
+.rel-derived { color: var(--af-primary); }
+.rel-depends { color: var(--af-primary); }
+.rel-blocks { color: var(--af-primary); }
 
 /* ── Overflow Chip (+M) ── */
 .rel-overflow-chip {
@@ -722,9 +722,9 @@
   line-height: 1.4;
   padding: 1px 4px;
   border-radius: 8px;
-  background: rgba(160, 160, 160, 0.2);
-  color: #cccccc;
-  border: 1px solid rgba(160, 160, 160, 0.3);
+  background: var(--af-hover-strong);
+  color: var(--af-text);
+  border: 1px solid var(--af-hover-strong);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -735,13 +735,13 @@
 }
 
 .rel-overflow-chip:hover {
-  background: rgba(217, 119, 87, 0.15);
-  color: #D97757;
-  border-color: rgba(217, 119, 87, 0.35);
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
+  border-color: var(--af-primary-soft);
 }
 
 .rel-overflow-chip:focus-visible {
-  outline: 1px solid rgba(217, 119, 87, 0.6);
+  outline: 1px solid var(--af-primary-soft);
   outline-offset: 1px;
 }
 
@@ -749,8 +749,8 @@
 .rel-popover {
   position: absolute;
   z-index: 9000;
-  background: #2d2d30;
-  border: 1px solid #404040;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 4px;
   padding: 8px 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -777,9 +777,9 @@
   text-overflow: ellipsis;
 }
 
-.rel-popover-item.rel-derived { color: #D97757; }
-.rel-popover-item.rel-depends { color: #dcdcaa; }
-.rel-popover-item.rel-blocks  { color: #c586c0; }
+.rel-popover-item.rel-derived { color: var(--af-primary); }
+.rel-popover-item.rel-depends { color: var(--af-primary); }
+.rel-popover-item.rel-blocks  { color: var(--af-primary); }
 
 @media (prefers-reduced-motion: reduce) {
   .rel-popover {
@@ -804,31 +804,31 @@
 .card-drop-indicator {
   height: 0;
   margin: 2px 0;
-  border-top: 2px dashed #D97757;
+  border-top: 2px dashed var(--af-primary);
   pointer-events: none;
 }
 
 .cards-droppable.dragover-active {
-  background: rgba(217, 119, 87, 0.08);
-  outline: 2px dashed #D97757;
+  background: var(--af-primary-soft);
+  outline: 2px dashed var(--af-primary);
   outline-offset: -2px;
   border-radius: 4px;
 }
 
 /* T-399: In Progress drop hover — warning tone (workflow execution consciousness) */
 .cards-droppable[data-col-key="In Progress"].dragover-active {
-  background: rgba(217, 119, 87, 0.16);
-  outline: 2px dashed #D97757;
+  background: var(--af-primary-soft);
+  outline: 2px dashed var(--af-primary);
   outline-offset: -4px;
-  box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.3);
+  box-shadow: inset 0 0 0 1px var(--af-primary-soft);
 }
 
 /* T-906: Done drop hover — consciousness highlight (box-shadow enhancement) */
 .cards-droppable[data-col-key="Done"].dragover-active {
-  background: rgba(217, 119, 87, 0.16);
-  outline: 2px dashed #D97757;
+  background: var(--af-primary-soft);
+  outline: 2px dashed var(--af-primary);
   outline-offset: -4px;
-  box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.45);
+  box-shadow: inset 0 0 0 1px var(--af-primary-soft);
 }
 
 /* T-399: Confirm Modal (Open → In Progress drop) */
@@ -843,21 +843,21 @@
 }
 
 .submit-confirm-dialog {
-  background: #1e1e1e;
-  border: 1px solid rgba(217, 119, 87, 0.5);
+  background: var(--af-bg);
+  border: 1px solid var(--af-primary-soft);
   border-radius: 6px;
   padding: 20px 22px;
   max-width: 420px;
   width: calc(100% - 40px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  color: #d4d4d4;
+  box-shadow: 0 8px 24px var(--af-overlay);
+  color: var(--af-text);
 }
 
 .submit-confirm-title {
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #D97757;
+  color: var(--af-primary);
   letter-spacing: 0.02em;
 }
 
@@ -865,7 +865,7 @@
   margin: 0 0 18px;
   font-size: 13px;
   line-height: 1.55;
-  color: #cccccc;
+  color: var(--af-text);
 }
 
 /* T-906: The resulting crash/measure file list style */
@@ -876,7 +876,7 @@
 
 .submit-confirm-body ul li {
   margin: 3px 0;
-  color: #f48771;
+  color: var(--af-error);
 }
 
 .submit-confirm-actions {
@@ -887,9 +887,9 @@
 
 .submit-confirm-btn {
   background: transparent;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
-  color: #cccccc;
+  color: var(--af-text);
   padding: 6px 14px;
   font-size: 12px;
   cursor: pointer;
@@ -897,20 +897,20 @@
 }
 
 .submit-confirm-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: #555555;
+  background: var(--af-hover);
+  border-color: var(--af-border);
 }
 
 .submit-confirm-btn-confirm {
-  background: rgba(217, 119, 87, 0.18);
-  border-color: #D97757;
-  color: #D97757;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-primary);
   font-weight: 600;
 }
 
 .submit-confirm-btn-confirm:hover {
-  background: rgba(217, 119, 87, 0.28);
-  color: #f0a07f;
+  background: var(--af-primary-soft);
+  color: var(--af-code);
 }
 
 /* T-441: Done Card Merchandise Verdict Badge (advisory only) */
@@ -926,7 +926,7 @@
 }
 
 .card-done-verdict.verdict-ok {
-  color: #4ec9b0;
+  color: var(--af-primary);
   opacity: 0.75;
 }
 
@@ -935,16 +935,16 @@
 }
 
 .card-done-verdict.verdict-fail {
-  color: #D97757;
-  background: rgba(217, 119, 87, 0.12);
-  border: 1px solid rgba(217, 119, 87, 0.4);
+  color: var(--af-primary);
+  background: var(--af-primary-soft);
+  border: 1px solid var(--af-primary-soft);
   cursor: pointer;
   opacity: 0.9;
 }
 
 .card-done-verdict.verdict-fail:hover {
-  background: rgba(217, 119, 87, 0.22);
-  border-color: #D97757;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
   opacity: 1;
 }
 
@@ -993,9 +993,9 @@
 }
 
 .card-review-verdict.verdict-pass {
-  color: #4ec9b0;        /* Bluerock — same tone as done verdict-ok */
-  background: rgba(78, 201, 176, 0.10);
-  border: 1px solid rgba(78, 201, 176, 0.40);
+  color: var(--af-primary);        /* Bluerock — same tone as done verdict-ok */
+  background: var(--af-primary-soft);
+  border: 1px solid var(--af-primary-soft);
   opacity: 0.85;
 }
 
@@ -1004,28 +1004,28 @@
 }
 
 .card-review-verdict.verdict-warn {
-  color: #d97706;        /* Amber */
-  background: rgba(217, 119, 6, 0.10);
-  border: 1px solid rgba(217, 119, 6, 0.40);
+  color: var(--af-warning);        /* Amber */
+  background: var(--af-warning-soft);
+  border: 1px solid var(--af-warning-soft);
   opacity: 0.9;
 }
 
 .card-review-verdict.verdict-warn:hover {
-  background: rgba(217, 119, 6, 0.20);
-  border-color: #d97706;
+  background: var(--af-warning-soft);
+  border-color: var(--af-warning);
   opacity: 1;
 }
 
 .card-review-verdict.verdict-fail {
-  color: #f48771;        /* Jhong — Vision highlight */
-  background: rgba(244, 135, 113, 0.12);
-  border: 1px solid rgba(244, 135, 113, 0.45);
+  color: var(--af-error);        /* Jhong — Vision highlight */
+  background: var(--af-error-soft);
+  border: 1px solid var(--af-error-soft);
   opacity: 0.9;
 }
 
 .card-review-verdict.verdict-fail:hover {
-  background: rgba(244, 135, 113, 0.22);
-  border-color: #f48771;
+  background: var(--af-error-soft);
+  border-color: var(--af-error);
   opacity: 1;
 }
 
@@ -1036,39 +1036,39 @@
 }
 
 .audit-badge.audit-pass {
-  background: rgba(78, 201, 176, 0.15);
-  color: #4ec9b0;
-  border: 1px solid rgba(78, 201, 176, 0.45);
+  background: var(--af-primary-soft);
+  color: var(--af-primary);
+  border: 1px solid var(--af-primary-soft);
 }
 
 .audit-badge.audit-warn {
-  background: rgba(215, 169, 0, 0.15);
-  color: #d7a900;
-  border: 1px solid rgba(215, 169, 0, 0.45);
+  background: var(--af-warning-soft);
+  color: var(--af-warning);
+  border: 1px solid var(--af-warning-soft);
 }
 
 .audit-badge.audit-fail {
-  background: rgba(244, 135, 113, 0.15);
-  color: #f48771;
-  border: 1px solid rgba(244, 135, 113, 0.45);
+  background: var(--af-error-soft);
+  color: var(--af-error);
+  border: 1px solid var(--af-error-soft);
 }
 
 /* Dark/Light Theme Common: Background alpha-based, both keep toxicity */
 @media (prefers-color-scheme: light) {
   .audit-badge.audit-pass {
-    background: rgba(78, 201, 176, 0.12);
-    color: #2e8e7e;
-    border-color: rgba(78, 201, 176, 0.5);
+    background: var(--af-primary-soft);
+    color: var(--af-success);
+    border-color: var(--af-primary-soft);
   }
   .audit-badge.audit-warn {
-    background: rgba(215, 169, 0, 0.12);
-    color: #9a7a00;
-    border-color: rgba(215, 169, 0, 0.5);
+    background: var(--af-warning-soft);
+    color: var(--af-warning);
+    border-color: var(--af-warning-soft);
   }
   .audit-badge.audit-fail {
-    background: rgba(244, 135, 113, 0.12);
-    color: #c0543a;
-    border-color: rgba(244, 135, 113, 0.5);
+    background: var(--af-error-soft);
+    color: var(--af-error);
+    border-color: var(--af-error-soft);
   }
 }
 

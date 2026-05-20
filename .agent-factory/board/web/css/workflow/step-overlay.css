@@ -5,9 +5,9 @@
  * WORK box in Phase sub-panel.
  *
  * Visual Canon (board.md §6):
- *   - terracotta #D97757 = Running theme
- *   - cyan #4ec9b0     = success
- *   #f48771
+ *   - terracotta var(--af-primary) = Running theme
+ *   - cyan var(--af-primary)     = success
+ *   var(--af-error)
  *   - Pulse 1.6s ease-in-out infinite (board.md §6 modulation cycle)
  *   - prefers-reduced-motion: reduce accessibility guard required
  *
@@ -28,7 +28,7 @@
   padding: 8px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
-  color: #cccccc;
+  color: var(--af-text);
 }
 
 /* ── Stepbox ── */
@@ -36,9 +36,9 @@
 .wf-step {
   display: flex;
   flex-direction: column;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
-  background: #252525;
+  background: var(--af-surface-raised);
   overflow: hidden;
   transition: border-color 200ms ease-in-out;
 }
@@ -48,7 +48,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #2d2d2d;
+  background: var(--af-border);
   cursor: pointer;
   user-select: none;
 }
@@ -61,14 +61,14 @@
 
 .wf-step-status {
   font-size: 11px;
-  color: #858585;
+  color: var(--af-text-muted);
   flex: 1;
 }
 
 .wf-step-toggle {
   width: 14px;
   height: 14px;
-  color: #858585;
+  color: var(--af-text-muted);
   transition: transform 180ms ease-in-out;
 }
 
@@ -79,8 +79,8 @@
 .wf-step-body {
   display: none;
   padding: 8px 10px;
-  border-top: 1px solid #3c3c3c;
-  background: #1e1e1e;
+  border-top: 1px solid var(--af-border);
+  background: var(--af-bg);
 }
 
 .wf-step.expanded .wf-step-body {
@@ -94,37 +94,37 @@
 /* ── Color per condition */
 
 .wf-step.pending {
-  border-color: #3c3c3c;
+  border-color: var(--af-border);
 }
-.wf-step.pending .wf-step-id { color: #858585; }
+.wf-step.pending .wf-step-id { color: var(--af-text-muted); }
 
 .wf-step.running {
-  border-color: #D97757;
+  border-color: var(--af-primary);
   animation: wf-step-pulse 1.6s ease-in-out infinite;
 }
-.wf-step.running .wf-step-id { color: #D97757; }
+.wf-step.running .wf-step-id { color: var(--af-primary); }
 
 .wf-step.done {
-  border-color: #4ec9b0;
+  border-color: var(--af-primary);
 }
-.wf-step.done .wf-step-id { color: #4ec9b0; }
+.wf-step.done .wf-step-id { color: var(--af-primary); }
 
 .wf-step.fail {
-  border-color: #f48771;
+  border-color: var(--af-error);
   border-width: 2px;
 }
-.wf-step.fail .wf-step-id { color: #f48771; }
+.wf-step.fail .wf-step-id { color: var(--af-error); }
 
 /* ── Show SVG (inline) */
 
 .wf-step-icon-ok {
-  color: #4ec9b0;
+  color: var(--af-primary);
   width: 14px;
   height: 14px;
 }
 
 .wf-step-icon-fail {
-  color: #f48771;
+  color: var(--af-error);
   width: 14px;
   height: 14px;
 }
@@ -141,9 +141,9 @@
 .wf-phase {
   display: flex;
   flex-direction: column;
-  border: 1px solid #2d2d2d;
+  border: 1px solid var(--af-border);
   border-radius: 3px;
-  background: #1a1a1a;
+  background: var(--af-surface);
 }
 
 .wf-phase-header {
@@ -159,12 +159,12 @@
 .wf-phase-id {
   font-weight: 600;
   min-width: 32px;
-  color: #858585;
+  color: var(--af-text-muted);
 }
 
 .wf-phase-title {
   flex: 1;
-  color: #cccccc;
+  color: var(--af-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -173,7 +173,7 @@
 .wf-phase-body {
   display: none;
   padding: 6px 8px;
-  border-top: 1px solid #2d2d2d;
+  border-top: 1px solid var(--af-border);
 }
 
 .wf-phase.expanded .wf-phase-body {
@@ -185,20 +185,20 @@
 }
 
 .wf-phase.running {
-  border-color: #D97757;
+  border-color: var(--af-primary);
   animation: wf-phase-pulse 1.6s ease-in-out infinite;
 }
-.wf-phase.running .wf-phase-id { color: #D97757; }
+.wf-phase.running .wf-phase-id { color: var(--af-primary); }
 
 .wf-phase.done {
-  border-color: #4ec9b0;
+  border-color: var(--af-primary);
 }
-.wf-phase.done .wf-phase-id { color: #4ec9b0; }
+.wf-phase.done .wf-phase-id { color: var(--af-primary); }
 
 .wf-phase.fail {
-  border-color: #f48771;
+  border-color: var(--af-error);
 }
-.wf-phase.fail .wf-phase-id { color: #f48771; }
+.wf-phase.fail .wf-phase-id { color: var(--af-error); }
 
 /* ── stdout area (Main session.js NDJSON quarter renderer target) ── */
 
@@ -208,7 +208,7 @@
   gap: 4px;
   font-family: "Menlo", "Monaco", "Consolas", monospace;
   font-size: 11px;
-  color: #cccccc;
+  color: var(--af-text);
   min-height: 16px;
 }
 
@@ -216,23 +216,23 @@
 
 @keyframes wf-step-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
-    border-color: #D97757;
+    box-shadow: 0 0 0 0 rgba(0, 122, 204, 0);
+    border-color: var(--af-primary);
   }
   50% {
-    box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25);
-    border-color: #e08a6e;
+    box-shadow: 0 0 0 2px var(--af-primary-soft);
+    border-color: var(--af-code);
   }
 }
 
 @keyframes wf-phase-pulse {
   0%, 100% {
-    background: #1a1a1a;
-    border-color: #D97757;
+    background: var(--af-surface);
+    border-color: var(--af-primary);
   }
   50% {
-    background: #221b18;
-    border-color: #e08a6e;
+    background: var(--af-surface-raised);
+    border-color: var(--af-code);
   }
 }
 

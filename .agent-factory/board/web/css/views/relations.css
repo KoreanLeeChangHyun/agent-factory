@@ -2,21 +2,21 @@
 
 /* ── Collapsible Panel (below header) ── */
 .relations-panel {
-  background: #252526;
-  border-bottom: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border-bottom: 1px solid var(--af-border);
   overflow: hidden;
   cursor: pointer;
   transition: background 0.15s;
 }
 .relations-panel:hover {
-  background: #2a2a2b;
+  background: var(--af-surface-raised);
 }
 .relations-panel.open {
   cursor: default;
-  background: #1e1e1e;
+  background: var(--af-bg);
 }
 .relations-panel.open:hover {
-  background: #1e1e1e;
+  background: var(--af-bg);
 }
 
 /* ── Collapsed Bar (horizontal, like Done column) ── */
@@ -36,14 +36,14 @@
 .relations-collapsed-bar .bar-label {
   font-size: 11px;
   font-weight: 600;
-  color: #858585;
+  color: var(--af-text-muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .relations-collapsed-bar .bar-count {
   font-size: 10px;
-  color: #606060;
+  color: var(--af-text-subtle);
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
@@ -62,7 +62,7 @@
   transition: color 0.15s;
 }
 .relations-toggle.active {
-  color: #D97757;
+  color: var(--af-primary);
 }
 
 /* ── Toolbar ── */
@@ -74,8 +74,8 @@
   flex-wrap: wrap;
   flex-shrink: 0;
   padding: 8px 12px;
-  background: #252526;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   margin-bottom: 10px;
 }
@@ -83,7 +83,7 @@
 .relations-toolbar-label {
   font-size: 11px;
   text-transform: uppercase;
-  color: #858585;
+  color: var(--af-text-muted);
   letter-spacing: 0.5px;
   font-weight: 600;
   margin-right: 4px;
@@ -92,54 +92,54 @@
 .relations-toolbar-sep {
   width: 1px;
   height: 18px;
-  background: #3c3c3c;
+  background: var(--af-border);
   margin: 0 6px;
 }
 
 /* ── Filter Buttons ── */
 .relations-filter-btn {
   padding: 3px 10px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
   background: transparent;
-  color: #a0a0a0;
+  color: var(--af-text-muted);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .relations-filter-btn:hover {
-  background: rgba(217, 119, 87, 0.12);
-  border-color: #D97757;
-  color: #e0e0e0;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-text);
 }
 .relations-filter-btn.active {
-  background: rgba(217, 119, 87, 0.2);
-  border-color: #D97757;
-  color: #D97757;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-primary);
   font-weight: 600;
 }
 
 /* ── Layout Direction Toggle ── */
 .relations-layout-btn {
   padding: 3px 10px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
   background: transparent;
-  color: #a0a0a0;
+  color: var(--af-text-muted);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 .relations-layout-btn:hover {
-  background: rgba(86, 156, 214, 0.12);
-  border-color: #569cd6;
-  color: #e0e0e0;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-text);
 }
 .relations-layout-btn.active {
-  background: rgba(86, 156, 214, 0.2);
-  border-color: #569cd6;
-  color: #7bb8e8;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-info);
   font-weight: 600;
 }
 
@@ -149,18 +149,18 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  color: #858585;
+  color: var(--af-text-muted);
   font-size: 11px;
   user-select: none;
 }
 .relations-isolated-toggle input[type="checkbox"] {
-  accent-color: #D97757;
+  accent-color: var(--af-primary);
   cursor: pointer;
   width: 13px;
   height: 13px;
 }
 .relations-isolated-toggle:hover {
-  color: #a0a0a0;
+  color: var(--af-text-muted);
 }
 
 /* ── Collapse Button ── */
@@ -170,23 +170,23 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--af-border);
   border-radius: 4px;
   background: transparent;
-  color: #858585;
+  color: var(--af-text-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .relations-collapse-btn:hover {
-  background: rgba(217, 119, 87, 0.12);
-  border-color: #D97757;
-  color: #D97757;
+  background: var(--af-primary-soft);
+  border-color: var(--af-primary);
+  color: var(--af-primary);
 }
 
 /* ── Graph Container ── */
 .relations-graph-container {
-  background: #252526;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   padding: 16px;
   overflow: auto;
@@ -216,8 +216,8 @@
   gap: 14px;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: #252526;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 6px;
   margin-top: 10px;
   flex-shrink: 0;
@@ -226,7 +226,7 @@
 .relations-legend-title {
   font-size: 11px;
   text-transform: uppercase;
-  color: #858585;
+  color: var(--af-text-muted);
   letter-spacing: 0.5px;
   font-weight: 600;
   align-self: center;
@@ -238,7 +238,7 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--af-text-muted);
 }
 
 /* Legend edge SVG — color is injection with currentColor, size is specified in SVG itself */
@@ -246,14 +246,14 @@
   display: inline-block;
   vertical-align: middle;
 }
-.relations-legend-edge.edge-depends { color: #4ec9b0; }
-.relations-legend-edge.edge-derived { color: #dcdcaa; }
-.relations-legend-edge.edge-blocks  { color: #f44747; }
+.relations-legend-edge.edge-depends { color: var(--af-primary); }
+.relations-legend-edge.edge-derived { color: var(--af-primary); }
+.relations-legend-edge.edge-blocks  { color: var(--af-error); }
 
 .relations-legend-sep {
   width: 1px;
   height: 16px;
-  background: #3c3c3c;
+  background: var(--af-border);
   align-self: center;
 }
 
@@ -264,12 +264,12 @@
   height: 8px;
   border-radius: 2px;
   border: 2px solid currentColor;
-  background: #1e1e1e;
+  background: var(--af-bg);
 }
-.relations-legend-dot.dot-open     { color: #4ec9b0; }
-.relations-legend-dot.dot-progress { color: #dcdcaa; }
-.relations-legend-dot.dot-review   { color: #c586c0; }
-.relations-legend-dot.dot-done     { color: #858585; }
+.relations-legend-dot.dot-open     { color: var(--af-primary); }
+.relations-legend-dot.dot-progress { color: var(--af-primary); }
+.relations-legend-dot.dot-review   { color: var(--af-primary); }
+.relations-legend-dot.dot-done     { color: var(--af-text-muted); }
 
 /* ── Empty State ── */
 .relations-empty {
@@ -279,13 +279,13 @@
   justify-content: center;
   gap: 8px;
   padding: 30px 24px;
-  color: #858585;
+  color: var(--af-text-muted);
   text-align: center;
 }
 
 .relations-empty-icon {
   display: inline-flex;
-  color: #858585;
+  color: var(--af-text-muted);
   opacity: 0.4;
 }
 .relations-empty-icon svg {
@@ -295,12 +295,12 @@
 .relations-empty-title {
   font-size: 13px;
   font-weight: 600;
-  color: #5a5a5a;
+  color: var(--af-text-subtle);
 }
 
 .relations-empty-desc {
   font-size: 12px;
-  color: #4a4a4a;
+  color: var(--af-text-subtle);
   max-width: 400px;
   line-height: 1.5;
 }
@@ -308,11 +308,11 @@
 .relations-empty-hint {
   font-size: 11px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  background: #252526;
-  border: 1px solid #2d2d2d;
+  background: var(--af-surface-raised);
+  border: 1px solid var(--af-border);
   border-radius: 4px;
   padding: 4px 10px;
-  color: #858585;
+  color: var(--af-text-muted);
 }
 
 /* ── Loading State ── */
@@ -322,15 +322,15 @@
   justify-content: center;
   gap: 10px;
   padding: 30px 24px;
-  color: #858585;
+  color: var(--af-text-muted);
   font-size: 12px;
 }
 
 .relations-loading-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid #3c3c3c;
-  border-top-color: #D97757;
+  border: 2px solid var(--af-border);
+  border-top-color: var(--af-primary);
   border-radius: 50%;
   animation: relations-spin 0.8s linear infinite;
 }

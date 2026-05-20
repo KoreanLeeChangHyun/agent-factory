@@ -7,12 +7,12 @@
 <style>
 :root {
   color-scheme: dark;
-  --bg: #111315;
-  --border: #2a2f33;
-  --bar: #1a1d20;
-  --text: #e7e2d8;
-  --muted: #9b968e;
-  --accent: #d97757;
+  --bg: #1E1E1E;
+  --border: #2D2D2D;
+  --bar: #181818;
+  --text: #CCCCCC;
+  --muted: #858585;
+  --accent: #007ACC;
   --console-width: 42%;
   --divider-width: 8px;
 }
@@ -61,9 +61,9 @@ body {
   align-items: center;
   height: 24px;
   padding: 0 9px;
-  border: 1px solid rgba(155, 150, 142, .24);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: rgba(26, 29, 32, .86);
+  background: rgba(24, 24, 24, 0.88);
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
@@ -74,7 +74,7 @@ body {
 }
 
 .pane-label:hover {
-  border-color: rgba(217, 119, 87, .55);
+  border-color: var(--accent);
   color: var(--accent);
 }
 
@@ -108,7 +108,7 @@ iframe {
   width: 2px;
   height: 42px;
   border-radius: 2px;
-  background: rgba(155, 150, 142, .45);
+  background: #5A5A5A;
   transform: translate(-50%, -50%);
 }
 

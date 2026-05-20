@@ -4,26 +4,37 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --af-bg: #111315;
-  --af-surface: #1A1D20;
-  --af-surface-raised: #202428;
-  --af-border: #2A2F33;
-  --af-border-soft: #24292D;
-  --af-text: #E7E2D8;
-  --af-text-muted: #9B968E;
-  --af-text-subtle: #6F6A63;
-  --af-primary: #D97757;
-  --af-primary-soft: rgba(217, 119, 87, 0.12);
-  --af-success: #6F9F7A;
-  --af-warning: #C9A45C;
-  --af-error: #C8645A;
-  --af-code: #D9A078;
+  --af-bg: #1E1E1E;
+  --af-surface: #181818;
+  --af-surface-raised: #252526;
+  --af-border: #2D2D2D;
+  --af-border-soft: #333333;
+  --af-text: #CCCCCC;
+  --af-text-muted: #858585;
+  --af-text-subtle: #5A5A5A;
+  --af-primary: #007ACC;
+  --af-primary-soft: rgba(0, 122, 204, 0.16);
+  --af-success: #4EC9B0;
+  --af-success-soft: rgba(78, 201, 176, 0.16);
+  --af-warning: #DCDCAA;
+  --af-warning-soft: rgba(220, 220, 170, 0.16);
+  --af-error: #F48771;
+  --af-error-soft: rgba(244, 135, 113, 0.16);
+  --af-info: #9CDCFE;
+  --af-info-soft: rgba(156, 220, 254, 0.16);
+  --af-accent: #C586C0;
+  --af-accent-soft: rgba(197, 134, 192, 0.16);
+  --af-code: #CE9178;
+  --af-inverse: #FFFFFF;
+  --af-overlay: rgba(0, 0, 0, 0.48);
+  --af-hover: rgba(255, 255, 255, 0.06);
+  --af-hover-strong: rgba(255, 255, 255, 0.1);
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--af-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3A4146; }
+::-webkit-scrollbar-thumb:hover { background: var(--af-border); }
 
 html, body { height: 100%; overflow: hidden; }
 
