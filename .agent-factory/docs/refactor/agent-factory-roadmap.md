@@ -712,14 +712,15 @@ Status: complete
 
 Purpose:
 
-Stop using the root-level V2 workflow session cache and make V2 history follow
-the run-local artifact model.
+Stop using root-level workflow session caches and make V2 history follow the
+run-local artifact model.
 
 Tasks:
 
 - [x] move default V2 workflow event persistence to
       `runs/<registry>/workflow-events.jsonl`
 - [x] stop board startup from creating `.agent-factory/.workflow-sessions-v2`
+- [x] stop board startup from creating `.agent-factory/.workflow-sessions`
 - [x] keep explicit `persist_dir` support for tests and legacy registry
       construction
 - [x] keep V2 history endpoint behavior backed by `session.channel.persist_path`
@@ -729,6 +730,7 @@ Tasks:
 Acceptance criteria:
 
 - new V2 sessions do not require `.agent-factory/.workflow-sessions-v2`
+- board startup does not recreate root `.workflow-sessions*` directories
 - V2 history endpoint tests still pass
 - V2 workflow session registry tests still pass
 - canonical tests pass
@@ -736,9 +738,9 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_api_smoke.py  # 20 passed, 2 skipped
+python3 -m pytest tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_api_smoke.py  # 21 passed, 2 skipped
 python3 -m pytest board/tests/test_v2_workflow_phase1.py  # 28 passed
-python3 -m pytest  # 377 passed, 2 skipped
+python3 -m pytest  # 378 passed, 2 skipped
 ```
 
 ## Execution Order

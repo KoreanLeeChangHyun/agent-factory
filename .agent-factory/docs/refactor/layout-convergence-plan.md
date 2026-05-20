@@ -409,13 +409,14 @@ Status: complete
 
 Goal:
 
-Remove the root-level V2 workflow session cache from the active runtime path.
+Remove root-level workflow session caches from the active runtime path.
 
 Completed slice:
 
 - changed default V2 workflow event persistence to
   `runs/<registry>/workflow-events.jsonl`
 - stopped board startup from creating `.agent-factory/.workflow-sessions-v2`
+- stopped board startup from creating `.agent-factory/.workflow-sessions`
 - kept explicit `persist_dir` support for tests and legacy registry
   construction
 - kept V2 history endpoint behavior backed by `session.channel.persist_path`
@@ -457,5 +458,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 377 passed, 2 skipped
+python3 -m pytest  # 378 passed, 2 skipped
 ```

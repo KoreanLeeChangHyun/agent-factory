@@ -97,16 +97,8 @@ def _run_server(project_root: str) -> None:
         except OSError as _e:
             logger.debug('session_id 복원 실패: %s', _e)
 
-    # 워크플로우 세션 persist 디렉터리 설정 + 디스크에서 복원
-    sessions_dir = os.path.join(project_root, '.agent-factory', '.workflow-sessions')
-    workflow_registry._persist_dir = sessions_dir
-    try:
-        os.makedirs(sessions_dir, exist_ok=True)
-    except OSError:
-        pass
-    loaded_count = workflow_registry.load_from_disk()
-    if loaded_count > 0:
-        print(f'[workflow_registry] {loaded_count}개 세션 복원 완료', file=sys.stderr)
+    # Legacy V1 workflow session cache is no longer created on startup.
+    workflow_registry._persist_dir = None
 
     # v2 workflow history is persisted per run under work_dir/workflow-events.jsonl.
     # The old root-level V2 session cache is no longer created on startup.

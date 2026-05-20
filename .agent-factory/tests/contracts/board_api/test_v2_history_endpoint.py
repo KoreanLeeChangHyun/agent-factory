@@ -152,3 +152,17 @@ def test_board_startup_does_not_create_v2_workflow_sessions_root() -> None:
 
     assert "os.makedirs(v2_sessions_dir" not in app_src
     assert ".workflow-sessions-v2" not in app_src
+
+
+def test_board_startup_does_not_create_v1_workflow_sessions_root() -> None:
+    """The board app no longer initializes the old V1 workflow session cache."""
+    app_src = (
+        Path(__file__).resolve().parents[3].parent
+        / ".agent-factory"
+        / "board"
+        / "server"
+        / "app.py"
+    ).read_text(encoding="utf-8")
+
+    assert "workflow_registry.load_from_disk()" not in app_src
+    assert ".workflow-sessions" not in app_src
