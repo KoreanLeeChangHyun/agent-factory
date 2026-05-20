@@ -6,7 +6,9 @@ import hashlib
 
 from engine.apps.board_api.runtime import (
     board_url_file_path,
+    read_board_url_port,
     reap_zombie_children,
+    refresh_existing_board_url,
     remove_board_url_file,
     resolve_port,
     write_board_url_file,
@@ -57,6 +59,30 @@ def test_write_and_remove_board_url_file(tmp_path) -> None:
     remove_board_url_file(str(tmp_path))
 
     assert not path.exists()
+
+
+def test_read_and_refresh_existing_board_url(tmp_path) -> None:
+    write_board_url_file(str(tmp_path), 9912)
+
+    assert read_board_url_port(str(tmp_path)) == 9912
+
+    refresh_existing_board_url(str(tmp_path), 9913)
+
+    assert read_board_url_port(str(tmp_path)) == 9913
+    assert board_url_file_path(str(tmp_path)).read_text(encoding="utf-8").splitlines() == [
+        "http://127.0.0.1:9913/index.html",
+        "http://127.0.0.1:9913/terminal.html",
+    ]
+
+
+def test_read_board_url_port_returns_none_for_missing_or_invalid_file(tmp_path) -> None:
+    assert read_board_url_port(str(tmp_path)) is None
+
+    path = board_url_file_path(str(tmp_path))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("://bad-url", encoding="utf-8")
+
+    assert read_board_url_port(str(tmp_path)) is None
 
 
 def test_reap_zombie_children_counts_until_no_child_status() -> None:

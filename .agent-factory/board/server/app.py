@@ -14,11 +14,12 @@ from ._common import (
     PORT_RANGE_START,
     PORT_RANGE_END,
     WATCH_DIRS,
+    WATCH_INTERVAL,
     logger,
     _resolve_memory_dir,
+    _get_git_branch,
 )
 from .http_router import BoardHTTPRequestHandler
-from .sse_client_manager import FileWatcher, GitBranchWatcher
 from .state import (
     sse_manager,
     poll_tracker,
@@ -34,6 +35,7 @@ from engine.apps.board_api.runtime import (
     resolve_port as _resolve_board_port,
     write_board_url_file,
 )
+from engine.adapters.board.watchers import FileWatcher, GitBranchWatcher
 
 
 def resolve_port(project_root: str) -> int:
@@ -114,7 +116,12 @@ def _run_server(project_root: str) -> None:
         sse_manager.broadcast(event_type, files)
         poll_tracker.add(event_type, files)
 
-    watcher = FileWatcher(project_root, on_change)
+    watcher = FileWatcher(
+        project_root,
+        on_change,
+        watch_dirs=WATCH_DIRS,
+        interval=WATCH_INTERVAL,
+    )
     watcher_thread = threading.Thread(target=watcher.run, daemon=True)
     watcher_thread.start()
 
@@ -123,7 +130,13 @@ def _run_server(project_root: str) -> None:
         sse_manager.broadcast('git_branch', data={'branch': branch})
         poll_tracker.add('git_branch', [branch])
 
-    git_watcher = GitBranchWatcher(project_root, on_branch_change)
+    git_watcher = GitBranchWatcher(
+        project_root,
+        on_branch_change,
+        get_branch=_get_git_branch,
+        interval=WATCH_INTERVAL,
+        logger=logger,
+    )
     git_watcher_thread = threading.Thread(target=git_watcher.run, daemon=True)
     git_watcher_thread.start()
 

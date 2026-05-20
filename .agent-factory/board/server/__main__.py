@@ -6,7 +6,13 @@ import os
 import subprocess
 import sys
 
-from .app import _run_server, is_port_in_use
+from .app import _run_server
+from engine.apps.board_api.runtime import (
+    is_port_in_use,
+    read_board_url_port,
+    refresh_existing_board_url,
+    remove_board_url_file,
+)
 
 
 # 이 스크립트가 백그라운드로 재기동될 때 호출할 안정된 경로 (shim).
@@ -27,29 +33,14 @@ def main() -> int:
         os.path.join(os.path.dirname(__file__), '..', '..', '..')
     )
 
-    url_file = os.path.join(project_root, '.agent-factory', '.board.url')
-
-    if os.path.exists(url_file):
-        try:
-            from urllib.parse import urlparse
-            with open(url_file) as f:
-                recorded_url = f.read().strip().split('\n')[0]
-            recorded_port = urlparse(recorded_url).port
-            if recorded_port and is_port_in_use(recorded_port):
-                # 서버가 이미 실행 중 — URL 파일만 갱신
-                base = f'http://127.0.0.1:{recorded_port}'
-                with open(url_file, 'w') as f:
-                    f.write(f'{base}/index.html\n{base}/terminal.html')
-                return 0
-            else:
-                # stale 파일: 포트가 비활성 상태이므로 파일 삭제 후 새로 시작
-                try:
-                    os.remove(url_file)
-                except OSError:
-                    pass
-        except (ValueError, OSError):
-            # 파일 읽기 실패 시 stale 처리
-            pass
+    recorded_port = read_board_url_port(project_root)
+    if recorded_port and is_port_in_use(recorded_port):
+        # 서버가 이미 실행 중 — URL 파일만 갱신
+        refresh_existing_board_url(project_root, recorded_port)
+        return 0
+    if recorded_port is not None:
+        # stale 파일: 포트가 비활성 상태이므로 파일 삭제 후 새로 시작
+        remove_board_url_file(project_root)
 
     # 자신을 --serve 모드로 백그라운드 실행 (shim 경로 사용)
     subprocess.Popen(

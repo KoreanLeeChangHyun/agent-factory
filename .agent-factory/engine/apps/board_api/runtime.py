@@ -8,6 +8,7 @@ import socket
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 def is_port_in_use(port: int) -> bool:
@@ -50,6 +51,25 @@ def write_board_url_file(project_root: str, port: int) -> str:
     return base
 
 
+def read_board_url_port(project_root: str) -> int | None:
+    """Return the port recorded in `.board.url`, or None when unavailable."""
+    try:
+        recorded_url = board_url_file_path(project_root).read_text(
+            encoding="utf-8",
+        ).strip().split("\n")[0]
+    except OSError:
+        return None
+    try:
+        return urlparse(recorded_url).port
+    except ValueError:
+        return None
+
+
+def refresh_existing_board_url(project_root: str, port: int) -> None:
+    """Rewrite `.board.url` for an already-running board server."""
+    write_board_url_file(project_root, port)
+
+
 def remove_board_url_file(project_root: str) -> None:
     try:
         board_url_file_path(project_root).unlink()
@@ -80,7 +100,9 @@ __all__ = [
     "board_url_file_path",
     "is_port_in_use",
     "log_reaped_zombies",
+    "read_board_url_port",
     "reap_zombie_children",
+    "refresh_existing_board_url",
     "remove_board_url_file",
     "resolve_port",
     "write_board_url_file",
