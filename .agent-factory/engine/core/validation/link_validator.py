@@ -47,13 +47,13 @@ _PROJECT_ROOT_PREFIXES: tuple[str, ...] = (".agent-factory/", ".claude/")
 def _find_project_root() -> Path:
     """프로젝트 루트 디렉터리를 찾아 반환한다.
 
-    이 스크립트는 .agent-factory/engine/guards/ 하위에 위치하므로,
-    3단계 상위 디렉터리가 프로젝트 루트이다.
+    이 스크립트는 .agent-factory/engine/core/validation/ 하위에 위치하므로,
+    4단계 상위 디렉터리가 프로젝트 루트이다.
 
     Returns:
         프로젝트 루트 Path 객체.
     """
-    return Path(__file__).resolve().parent.parent.parent.parent
+    return Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def scan_markdown_files(

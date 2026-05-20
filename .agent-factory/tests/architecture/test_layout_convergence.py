@@ -73,3 +73,11 @@ def test_legacy_flow_project_skill_detector_source_is_removed() -> None:
     assert not (
         repo_root / ".agent-factory" / "engine" / "flow" / "project_skill_detector.py"
     ).exists()
+
+
+def test_legacy_guard_link_validator_source_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (
+        repo_root / ".agent-factory" / "engine" / "guards" / "link_validator.py"
+    ).exists()

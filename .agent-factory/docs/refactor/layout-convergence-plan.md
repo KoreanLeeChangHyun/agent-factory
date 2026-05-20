@@ -1519,10 +1519,36 @@ Acceptance:
 - direct path guard tests pass
 - full pytest passes
 
+### M64: Move Link Validator Into Core Validation
+
+Status: complete
+
+Goal:
+
+Move the standalone report/plan link validator out of hook guards and into the
+core validation boundary.
+
+Completed slice:
+
+- moved `engine/guards/link_validator.py` to
+  `engine/core/validation/link_validator.py`
+- updated project-root resolution for the new location
+- updated tests to import the canonical core validation module
+- added focused link validator placement tests
+- extended layout convergence tests to prevent the legacy guard path from
+  returning
+
+Acceptance:
+
+- link validator tests pass
+- runtime cleanup contract tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 820 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 822 passed, 2 skipped, 6 subtests passed
 ```

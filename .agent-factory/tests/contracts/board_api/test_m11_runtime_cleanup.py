@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from engine.guards import link_validator
+from engine.core.validation import link_validator
 
 
 ROOT = Path(__file__).resolve().parents[3]
