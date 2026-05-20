@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""마크다운 파일 링크 유효성 검사 스크립트.
+"""마크다운/HTML 파일 링크 유효성 검사 스크립트.
 
-.agent-factory/runs/ 디렉터리 내 report.md, plan.md 파일에서 마크다운 링크를 추출하고,
-각 링크 대상 파일의 존재 여부를 검증한다.
+.agent-factory/runs/ 디렉터리 내 report.html, plan.md 파일에서 링크를 추출하고,
+각 내부 링크 대상 파일의 존재 여부를 검증한다.
 
 이 스크립트는 자동 hook에 연결되어 있지 않으며, 수동으로 실행하는 유틸리티입니다.
 워크플로우 완료 후 또는 보고서 작성 후 링크 유효성을 점검할 때 사용합니다.
@@ -30,6 +30,9 @@ from pathlib import Path
 
 # 마크다운 링크 패턴: [text](path)
 _MD_LINK_PATTERN: re.Pattern[str] = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
+
+# HTML href 패턴: href="path" / href='path'
+_HTML_HREF_PATTERN: re.Pattern[str] = re.compile(r"""href=["']([^"']+)["']""", re.IGNORECASE)
 
 # 외부 링크 접두사
 _EXTERNAL_PREFIXES: tuple[str, ...] = ("http://", "https://")
@@ -59,7 +62,7 @@ def scan_markdown_files(
 ) -> list[Path]:
     """검증 대상 마크다운 파일 목록을 반환한다.
 
-    .agent-factory/runs/ 디렉터리 하위의 report.md, plan.md 파일을 수집한다.
+    .agent-factory/runs/ 디렉터리 하위의 report.html, plan.md 파일을 수집한다.
     active_only=True이면 .agent-factory/runs/.history/는 제외한다.
 
     Args:
@@ -73,7 +76,7 @@ def scan_markdown_files(
     if not workflow_dir.exists():
         return []
 
-    target_filenames: set[str] = {"report.md", "plan.md"}
+    target_filenames: set[str] = {"report.html", "plan.md"}
     result: list[Path] = []
 
     # 활성 워크플로우 스캔 (.workflow/ 직접 하위, .history/ 제외)
@@ -81,23 +84,23 @@ def scan_markdown_files(
         if entry.name == ".history":
             continue
         if entry.is_dir():
-            for md_file in entry.rglob("*.md"):
-                if md_file.name in target_filenames:
-                    result.append(md_file)
+            for link_file in entry.rglob("*"):
+                if link_file.is_file() and link_file.name in target_filenames:
+                    result.append(link_file)
 
     # 히스토리 스캔 (active_only=False 일 때)
     if not active_only:
         history_dir = workflow_dir / ".history"
         if history_dir.exists():
-            for md_file in history_dir.rglob("*.md"):
-                if md_file.name in target_filenames:
-                    result.append(md_file)
+            for link_file in history_dir.rglob("*"):
+                if link_file.is_file() and link_file.name in target_filenames:
+                    result.append(link_file)
 
     return sorted(result)
 
 
 def extract_links(content: str) -> list[str]:
-    """마크다운 텍스트에서 링크 경로(href) 목록을 추출한다.
+    """마크다운/HTML 텍스트에서 링크 경로(href) 목록을 추출한다.
 
     Args:
         content: 마크다운 파일 텍스트 내용.
@@ -105,9 +108,9 @@ def extract_links(content: str) -> list[str]:
     Returns:
         추출된 링크 href 문자열 목록.
     """
-    matches = _MD_LINK_PATTERN.findall(content)
-    # (text, href) 튜플에서 href만 추출
-    return [href for _text, href in matches]
+    md_matches = [href for _text, href in _MD_LINK_PATTERN.findall(content)]
+    html_matches = _HTML_HREF_PATTERN.findall(content)
+    return md_matches + html_matches
 
 
 def _is_skip_link(href: str) -> bool:
@@ -121,6 +124,10 @@ def _is_skip_link(href: str) -> bool:
     Returns:
         스킵 대상이면 True, 검증 대상이면 False.
     """
+    # 문서 내부 앵커 스킵
+    if href.startswith("#"):
+        return True
+
     # 외부 링크 스킵
     for prefix in _EXTERNAL_PREFIXES:
         if href.startswith(prefix):

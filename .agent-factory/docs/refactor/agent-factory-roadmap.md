@@ -132,7 +132,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest  # 350 passed, 2 skipped
+python3 -m pytest  # 355 passed, 2 skipped
 ```
 
 ### M1: Test Consolidation
@@ -172,7 +172,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest  # 350 passed, 2 skipped
+python3 -m pytest  # 355 passed, 2 skipped
 ```
 
 ### M2: Runtime Root Rename
@@ -205,7 +205,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest                         # 350 passed, 2 skipped
+python3 -m pytest                         # 355 passed, 2 skipped
 bash .agent-factory/build.sh              # all verification items passed
 .agent-factory/bin/flow-wf --help         # exit 0
 .agent-factory/bin/flow-kanban list       # exit 0
@@ -238,7 +238,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest  # 350 passed, 2 skipped
+python3 -m pytest  # 355 passed, 2 skipped
 ```
 
 ### M4: Workflow Model
@@ -449,9 +449,42 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest                         # 350 passed, 2 skipped
+python3 -m pytest                         # 355 passed, 2 skipped
 .agent-factory/bin/flow-wf --help         # exit 0
 .agent-factory/bin/flow-kanban list       # exit 0
+```
+
+### M11: Runtime Contract Hardening
+
+Status: complete
+
+Purpose:
+
+Close the remaining active-runtime contract drift after M10.
+
+Tasks:
+
+- [x] update direct-path guard detection to the current `.agent-factory/engine`
+      layout
+- [x] remove removed V1 wrapper suggestions from direct-path guard alias mapping
+- [x] make link validation scan canonical `report.html` artifacts
+- [x] teach link validation to ignore HTML fragment-only anchors
+- [x] add focused contracts for the M11 runtime cleanup behavior
+
+Acceptance criteria:
+
+- direct `python3 .agent-factory/engine/...` calls are denied with a live
+  `flow-*` wrapper suggestion when one exists
+- removed wrappers such as `flow-init`, `flow-finish`, `flow-reload`, and
+  `flow-recommend` are not recommended by active guards
+- report artifact link validation targets `report.html`, not `report.md`
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_m11_runtime_cleanup.py  # 5 passed
+python3 -m pytest                                                        # 355 passed, 2 skipped
 ```
 
 ## Execution Order
@@ -459,7 +492,7 @@ python3 -m pytest                         # 350 passed, 2 skipped
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11
 ```
 
 Hard dependencies:

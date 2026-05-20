@@ -35,39 +35,35 @@ from messages import DIRECT_PATH_CALL_DENIED
 
 # 직접 경로 호출 감지 패턴 (상대경로 + 절대경로 모두 감지)
 _DIRECT_PATH_PATTERN = re.compile(
-    r"python3\s+(?:\.claude\.workflow/scripts/|/[^\s]*\.claude\.workflow/scripts/)"
+    r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
+    r"(?:\.agent-factory/engine/|/[^\s]*\.agent-factory/engine/)"
 )
 
 # 허용 예외 패턴 (settings.json hooks/statusLine 등에서 고정 호출하는 경로)
 _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"python3\s+\.claude\.workflow/hooks/"),              # hook 디스패처 호출 (상대경로)
-    re.compile(r"python3\s+\.claude\.workflow/scripts/statusline\.py"),  # statusLine command (상대경로)
-    re.compile(r"python3\s+\.claude\.workflow/board/server\.py"),    # SessionStart board server (상대경로)
-    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/hooks/"),       # hook 디스패처 호출 (절대경로)
-    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/scripts/statusline\.py"),  # statusLine command (절대경로)
-    re.compile(r"python3\s+/[^\s]*\.claude\.workflow/board/server\.py"),  # SessionStart board server (절대경로)
-    re.compile(r"python3\s+(?:\.|/[^\s]*)\.claude\.workflow/scripts/claude_edit\.py"),  # .claude 간접 편집 유틸리티
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/"),
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/statusline\.py"),
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)board/server\.py"),
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/claude_edit\.py"),
 ]
 
 # && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴
 # 예(상대경로): python3 .agent-factory/hooks/... && python3 .agent-factory/engine/sync/history_sync.py ...
 # 예(절대경로): python3 /path/.agent-factory/hooks/... && python3 /path/.agent-factory/engine/sync/history_sync.py ...
 _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
-    r"python3\s+(?:\.claude\.workflow/hooks/|/[^\s]*\.claude\.workflow/hooks/)\S*\s*&&\s*"
-    r"python3\s+(?:\.claude\.workflow/scripts/sync/|/[^\s]*\.claude\.workflow/scripts/sync/)history_sync\.py"
+    r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
+    r"(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/\S*\s*&&\s*"
+    r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
+    r"(?:\.agent-factory/engine/sync/|/[^\s]*\.agent-factory/engine/sync/)history_sync\.py"
 )
 
 # 스크립트 파일명 -> alias 매핑
 ALIAS_MAP: dict[str, str] = {
-    "initialization.py": "flow-init",
-    "finalization.py": "flow-finish",
-    "reload_prompt.py": "flow-reload",
     "update_state.py": "flow-update",
     "skill_mapper.py": "flow-skillmap",
     "skill_state_manager.py": "flow-skill",
     "plan_validator.py": "flow-validate",
     "prompt_validator.py": "flow-validate-p",
-    "skill_recommender.py": "flow-recommend",
     "garbage_collect.py": "flow-gc",
     "kanban.py": "flow-kanban",
     "merge_pipeline.py": "flow-merge",
@@ -79,7 +75,8 @@ ALIAS_MAP: dict[str, str] = {
 
 # 스크립트 파일명에서 파일명만 추출하는 패턴 (상대경로 + 절대경로 모두 지원)
 _SCRIPT_NAME_PATTERN = re.compile(
-    r"python3\s+(?:\.claude\.workflow/scripts/|/[^\s]*\.claude\.workflow/scripts/)(?:\S+/)?(\S+\.py)"
+    r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
+    r"(?:\.agent-factory/engine/|/[^\s]*\.agent-factory/engine/)(?:\S+/)?(\S+\.py)"
 )
 
 
