@@ -487,12 +487,42 @@ python3 -m pytest tests/contracts/board_api/test_m11_runtime_cleanup.py  # 5 pas
 python3 -m pytest                                                        # 355 passed, 2 skipped
 ```
 
+### M12: Layout Audit And Freeze
+
+Status: complete
+
+Purpose:
+
+Reset the directory refactor plan against the actual M0-M11 codebase before
+moving more files.
+
+Tasks:
+
+- [x] document current source layout
+- [x] compare current layout with the target DDD layout
+- [x] define early freeze list for wrappers, hooks, board assets, and runtime data
+- [x] identify first safe move candidates
+- [x] defer high-coupling moves until lower-risk boundaries are extracted
+
+Acceptance criteria:
+
+- no source files are moved in M12
+- future milestones have a risk-ordered move sequence
+- docs point to the M12 convergence plan
+- canonical tests remain green
+
+Current verification:
+
+```text
+python3 -m pytest  # 355 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12
 ```
 
 Hard dependencies:

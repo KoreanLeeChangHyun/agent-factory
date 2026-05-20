@@ -20,6 +20,8 @@ execution, verification, reporting, board services, and provider adapters.
   replacement strategy.
 - [Domain directory restructure](refactor/domain-directory-restructure.md):
   planned source layout.
+- [Layout convergence plan](refactor/layout-convergence-plan.md): current
+  M12+ source move sequence and freeze list.
 - [Runtime root rename](refactor/runtime-root-rename.md): historical migration
   from `.claude-organic` to `.agent-factory`.
 
