@@ -34,7 +34,7 @@ const {
 const WF_FILES = [
   { key: "query",   file: "user_prompt.txt", label: "query" },
   { key: "plan",    file: "plan.md",         label: "plan" },
-  { key: "report",  file: "report.md",       label: "report" },
+  { key: "report",  file: "report.html",     label: "report" },
   { key: "summary", file: "summary.txt",     label: "summary" },
   { key: "usage",   file: "usage.json",      label: "usage" },
   { key: "log",     file: "workflow.log",     label: "log" },

@@ -1,5 +1,9 @@
 # V1 Removal Inventory
 
+Status: archived migration record. This file is not active implementation
+guidance. Current operator commands are documented in
+[`../cli-reference.md`](../cli-reference.md).
+
 ## Policy
 
 V1 is removed, not preserved. Compatibility shims are allowed only when V2

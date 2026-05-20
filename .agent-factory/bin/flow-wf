@@ -6,6 +6,15 @@ ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
 subcmd="${1:-}"
 shift || true
 case "$subcmd" in
+  -h|--help|help)
+    cat <<EOF
+flow-wf — v2 workflow driver (T-489)
+usage:
+  flow-wf submit T-NNN [--step STEP]   # driver 1 cycle
+  flow-wf submit T-NNN --step PLAN     # debug: stop at a specific step
+EOF
+    exit 0
+    ;;
   submit)
     cd "$ROOT" || exit 1
     exec env PYTHONPATH="$ROOT/.agent-factory:$PYTHONPATH" \

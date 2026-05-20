@@ -135,7 +135,7 @@
   /**
    * 칸반 카드 → 메인 터미널 DnD 로 첨부된 티켓 도메인.
    * 이미지/파일 첨부와 동일하게 send 직후 자동 비움 (M.clearTickets).
-   * 각 항목은 dragstart 시 직렬화된 ticket payload + drop 시점에 한 번 fetch 한 report.md 텍스트.
+   * 각 항목은 dragstart 시 직렬화된 ticket payload + drop 시점에 한 번 fetch 한 report.html 텍스트.
    * @type {Array<{number: string, title: string, command: string, prompt: any, result: any, report: string|null, addedAt: number}>}
    */
   M.attachedTickets = [];
@@ -840,7 +840,7 @@
 
         // (0) 칸반 카드 드롭 — application/x-board-ticket MIME 우선 처리
         // dragstart 시 kanban.js 가 set 한 ticket JSON 을 파싱하여 첨부 도메인에 등록.
-        // workdir 보유 시 same-origin 으로 report.md 를 한 번 fetch (실패 시 graceful = null).
+        // workdir 보유 시 same-origin 으로 report.html 를 한 번 fetch (실패 시 graceful = null).
         var ticketJson = "";
         try {
           ticketJson = dt.getData("application/x-board-ticket");
@@ -872,7 +872,7 @@
               if (normalized.charAt(normalized.length - 1) !== "/") {
                 normalized = normalized + "/";
               }
-              reportUrl = normalized + "report.md";
+              reportUrl = normalized + "report.html";
             }
 
             // fetch 는 비동기 — 실패/null 모두 graceful (M.attachTicket 호출은 한 번만)

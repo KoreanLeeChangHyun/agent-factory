@@ -106,7 +106,7 @@ Key screens:
 
 ### M0: Baseline And Safety Rails
 
-Status: in progress
+Status: done
 
 Purpose:
 
@@ -132,7 +132,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-321 passed, 2 skipped
+python3 -m pytest  # 350 passed, 2 skipped
 ```
 
 ### M1: Test Consolidation
@@ -172,7 +172,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-321 passed, 2 skipped
+python3 -m pytest  # 350 passed, 2 skipped
 ```
 
 ### M2: Runtime Root Rename
@@ -205,9 +205,9 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest                         # 321 passed, 2 skipped
+python3 -m pytest                         # 350 passed, 2 skipped
 bash .agent-factory/build.sh              # all verification items passed
-.agent-factory/bin/flow-wf submit --help  # exit 0
+.agent-factory/bin/flow-wf --help         # exit 0
 .agent-factory/bin/flow-kanban list       # exit 0
 curl -I $(head -1 .agent-factory/.board.url)  # HTTP 200
 ```
@@ -238,7 +238,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest  # 328 passed, 2 skipped
+python3 -m pytest  # 350 passed, 2 skipped
 ```
 
 ### M4: Workflow Model
@@ -388,8 +388,8 @@ Tasks:
 - [x] build WorkRequest authoring/refinement/acceptance surface backed by existing `flow-kanban`
 - [x] build six-stage run timeline in run detail view
 - [x] show adapter/provider status in Settings, with provider-specific terms isolated to adapter details
-- [ ] show verification verdicts with clearer retry/close actions
-- [ ] connect report review more explicitly to completion
+- [x] show verification verdicts with clearer retry/close actions
+- [x] connect report review more explicitly to completion
 
 Acceptance criteria:
 
@@ -424,7 +424,7 @@ Acceptance criteria:
 
 ### M10: Cleanup And Hardening
 
-Status: planned
+Status: complete
 
 Purpose:
 
@@ -432,12 +432,12 @@ Remove migration leftovers and make the factory maintainable.
 
 Tasks:
 
-- delete V1 compatibility shims
-- delete stale docs and wrappers
-- remove old Claude-centric naming from core
-- add architecture boundary checks
-- add docs index for `.agent-factory`
-- add release/migration notes
+- [x] delete V1 compatibility shims
+- [x] delete stale docs and wrappers
+- [x] remove old Claude-centric naming from core
+- [x] add architecture boundary checks
+- [x] add docs index for `.agent-factory`
+- [x] add release/migration notes
 
 Acceptance criteria:
 
@@ -445,6 +445,14 @@ Acceptance criteria:
 - no core module imports board handlers, subprocess, or provider-specific code
 - docs describe `.agent-factory`, not `claude-workflow`
 - canonical tests and smoke tests pass
+
+Current verification:
+
+```text
+python3 -m pytest                         # 350 passed, 2 skipped
+.agent-factory/bin/flow-wf --help         # exit 0
+.agent-factory/bin/flow-kanban list       # exit 0
+```
 
 ## Execution Order
 

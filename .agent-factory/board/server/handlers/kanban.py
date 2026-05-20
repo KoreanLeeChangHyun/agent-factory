@@ -1338,6 +1338,18 @@ class KanbanHandlerMixin:
         The storage model still uses ticket XML and ``flow-kanban``. This endpoint
         gives the Board UI an M8 product-language API without changing existing
         workflow contracts.
+
+        method: POST
+        url: /api/kanban/workrequest
+        domain: KANBAN
+        handler: KanbanHandlerMixin._handle_kanban_workrequest
+        request: JSON {action, title?, command?, status?, ticket?, fields?}
+        response_ok: WorkRequest facade payload or command output
+        response_error: JSON error for invalid input, missing command, or timeout
+        status_codes: 200, 400, 500, 504
+        auth: none (local-only)
+        side_effects: may create or update .agent-factory/tickets XML via flow-kanban
+        sse_events: none
         """
         data = self._read_json_body() or {}
         action = (data.get('action') or '').strip().lower()

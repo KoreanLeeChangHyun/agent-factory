@@ -281,7 +281,7 @@
    * 같은 ticket 번호가 이미 첨부되어 있으면 무시 + appendSystemMessage 안내.
    *
    * @param {{number, title, command, prompt, result}} payload - 칸반 카드 ticket 페이로드
-   * @param {string|null} reportText - report.md 본문 (없으면 null)
+   * @param {string|null} reportText - report.html 본문 (없으면 null)
    */
   M.attachTicket = function(payload, reportText) {
     if (!payload || !payload.number) return;
@@ -434,7 +434,7 @@
         title: t.title || "",
         prompt: t.prompt || "",
         report: t.report || "",
-        // 첨부 시점(=DnD 후 client 가 ticket 페이로드 + report.md 를 fetch 한 시점)을
+        // 첨부 시점(=DnD 후 client 가 ticket 페이로드 + report.html 를 fetch 한 시점)을
         // 보존해두면 backend / sidecar 가 동일 메시지의 첨부 묶음으로 식별하기 쉬움.
         fetched_at: t.addedAt || null
       };

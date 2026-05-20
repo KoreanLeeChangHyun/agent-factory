@@ -25,7 +25,7 @@ WF_ENTRY_RE = re.compile(r'^\d{8}-\d{6}$')
 WF_DETAIL_FILES: list[dict] = [
     {'key': 'query',   'file': 'user_prompt.txt'},
     {'key': 'plan',    'file': 'plan.md'},
-    {'key': 'report',  'file': 'report.md'},
+    {'key': 'report',  'file': 'report.html'},
     {'key': 'summary', 'file': 'summary.txt'},
     {'key': 'usage',   'file': 'usage.json'},
     {'key': 'log',     'file': 'workflow.log'},

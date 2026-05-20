@@ -579,7 +579,7 @@
       var label = path.split("/").pop();
       var type = "other";
       if (/plan\.md$/.test(path))   type = "plan";
-      else if (/report\.md$/.test(path)) type = "report";
+      else if (/report\.(html|md)$/.test(path)) type = "report";
       else if (/work\//.test(path)) type = "work";
       _state.artifacts.push({
         type:  type,
