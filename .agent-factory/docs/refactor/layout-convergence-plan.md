@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
-| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` | `core/worktrees`, `adapters/git` | partially aligned |
+| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` compatibility wrapper | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `engine/apps/board_api` with `board/server/handlers` compatibility exports | `engine/apps/board_api` or thin board handlers | aligned |
 | Board web | `board/web` | `board/web` | aligned |
@@ -1193,10 +1193,33 @@ Acceptance:
 - board API handler/router and V2 launch contract tests pass
 - full pytest passes
 
+### M51: Git Config Adapter Placement
+
+Status: complete
+
+Goal:
+
+Move the Git config CLI implementation into the Git adapter boundary.
+
+Completed slice:
+
+- moved `engine/git/git_config.py` implementation to
+  `engine/adapters/git/config.py`
+- kept `engine/git/git_config.py` as a compatibility wrapper
+- updated `bin/flow-gitconfig` to execute the adapter implementation directly
+- adjusted adapter-local path resolution for `.agent-factory/.settings`
+- added focused Git config adapter tests
+
+Acceptance:
+
+- Git config adapter tests pass
+- `flow-gitconfig --help` works from the repo root
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 799 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 801 passed, 2 skipped, 6 subtests passed
 ```
