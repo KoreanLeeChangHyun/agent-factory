@@ -2,7 +2,7 @@
 set -euo pipefail
 # ==============================================================================
 # init-claude-workflow.sh — 부트스트랩 스크립트
-# 원격 저장소를 1회 클론하여 .claude/ + .agent-factory/ 를 설치한 뒤 build.sh 실행
+# 원격 저장소를 1회 클론하여 .claude/ + .codex/ + .agent-factory/ 를 설치한 뒤 build.sh 실행
 # 사용법: curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init-claude-workflow.sh | bash
 # ==============================================================================
 
@@ -11,7 +11,7 @@ GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; CYAN=$'\033[0;36m'
 
 echo ""
 printf '%s=================================================%s\n' "${GREEN}" "${NC}"
-printf '%s  Claude Code 워크플로우 부트스트랩%s\n' "${GREEN}" "${NC}"
+printf '%s  Claude/Codex 워크플로우 부트스트랩%s\n' "${GREEN}" "${NC}"
 printf '%s=================================================%s\n' "${GREEN}" "${NC}"
 
 # 사전 의존성 확인
@@ -92,6 +92,47 @@ if [ -d "$tmp_dir/_claude_preserve_skills" ]; then
 fi
 printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${CYAN}" "${NC}"
 
+# --- .codex/ 디렉터리 교체 (프로젝트 데이터 보존) ---
+if [ -d "$SRC/.codex" ]; then
+    [ -L ".codex" ] && { printf '%s  → .codex가 심볼릭 링크입니다. 제거합니다.%s\n' "${YELLOW}" "${NC}"; rm -f ".codex"; }
+
+    codex_preserve_dirs=("rules/project")
+    codex_preserve_files=("config.toml" "settings.json" "settings.local.json")
+    for cpd in "${codex_preserve_dirs[@]}"; do
+        [ -d ".codex/$cpd" ] && { mkdir -p "$tmp_dir/_codex_preserve_$(dirname "$cpd")"; cp -r ".codex/$cpd" "$tmp_dir/_codex_preserve_$cpd"; }
+    done
+    for cpf in "${codex_preserve_files[@]}"; do
+        [ -f ".codex/$cpf" ] && cp ".codex/$cpf" "$tmp_dir/_codex_preserve_$cpf"
+    done
+    if [ -d ".codex/skills" ]; then
+        for myskill in .codex/skills/my-*/; do
+            [ -d "$myskill" ] && { mkdir -p "$tmp_dir/_codex_preserve_skills"; cp -r "$myskill" "$tmp_dir/_codex_preserve_skills/"; }
+        done
+    fi
+
+    rm -rf ".codex.new"
+    if ! cp -r "$SRC/.codex" ".codex.new"; then
+        printf '%s  ✗ .codex 디렉터리 복사 실패%s\n' "${RED}" "${NC}"; exit 1
+    fi
+    rm -rf ".codex"; mv ".codex.new" ".codex"
+
+    for cpd in "${codex_preserve_dirs[@]}"; do
+        [ -d "$tmp_dir/_codex_preserve_$cpd" ] && { mkdir -p ".codex/$(dirname "$cpd")"; cp -r "$tmp_dir/_codex_preserve_$cpd" ".codex/$cpd"; }
+    done
+    for cpf in "${codex_preserve_files[@]}"; do
+        [ -f "$tmp_dir/_codex_preserve_$cpf" ] && cp "$tmp_dir/_codex_preserve_$cpf" ".codex/$cpf"
+    done
+    if [ -d "$tmp_dir/_codex_preserve_skills" ]; then
+        mkdir -p ".codex/skills"
+        for myskill in "$tmp_dir/_codex_preserve_skills"/my-*/; do
+            [ -d "$myskill" ] && cp -r "$myskill" ".codex/skills/"
+        done
+    fi
+    printf '%s  ✓ .codex/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${CYAN}" "${NC}"
+else
+    printf '%s  → 클론된 저장소에 .codex/ 가 없어 Codex 설정 설치를 건너뜁니다%s\n' "${YELLOW}" "${NC}"
+fi
+
 # --- .agent-factory/ 디렉터리 교체 (사용자 데이터 보존) ---
 if [ ! -d "$SRC/.agent-factory" ]; then
     printf '%s  ✗ 클론된 저장소에 .agent-factory/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
@@ -139,22 +180,24 @@ fi
 
 # 실행 권한 부여 — .sh 파일 + bin wrapper (확장자 없는 flow-* 실행 파일)
 find ".claude/" -name '*.sh' -exec chmod +x {} +
+[ -d ".codex" ] && find ".codex/" -name '*.sh' -exec chmod +x {} +
 find ".agent-factory/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 [ -d ".agent-factory/bin" ] && find ".agent-factory/bin" -type f -exec chmod +x {} +
 printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${CYAN}" "${NC}"
 
 # --- .gitignore 자동 등록 ---
-# .claude/ + .agent-factory/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
+# .claude/ + .codex/ + .agent-factory/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
 # 의 git tracking 에서 제외한다. 본 저장소(또는 fork)에서는 이미 tracking
 # 중이므로 안전하게 skip.
 if git ls-files --error-unmatch .claude > /dev/null 2>&1 || \
+   git ls-files --error-unmatch .codex > /dev/null 2>&1 || \
    git ls-files --error-unmatch .agent-factory > /dev/null 2>&1; then
-    printf '%s  → .claude/·.agent-factory/ 이미 tracking 중 — .gitignore 갱신 skip%s\n' "${YELLOW}" "${NC}"
+    printf '%s  → .claude/·.codex/·.agent-factory/ 이미 tracking 중 — .gitignore 갱신 skip%s\n' "${YELLOW}" "${NC}"
 else
     GITIGNORE=".gitignore"
     touch "$GITIGNORE"
     changed=0
-    for entry in ".claude/" ".agent-factory/"; do
+    for entry in ".claude/" ".codex/" ".agent-factory/"; do
         if ! grep -qxF "$entry" "$GITIGNORE"; then
             [ -s "$GITIGNORE" ] && [ "$(tail -c1 "$GITIGNORE")" != $'\n' ] && echo "" >> "$GITIGNORE"
             echo "$entry" >> "$GITIGNORE"
@@ -162,7 +205,7 @@ else
         fi
     done
     if [ "$changed" = 1 ]; then
-        printf '%s  ✓ .gitignore 갱신 (.claude/, .agent-factory/)%s\n' "${CYAN}" "${NC}"
+        printf '%s  ✓ .gitignore 갱신 (.claude/, .codex/, .agent-factory/)%s\n' "${CYAN}" "${NC}"
     else
         printf '%s  ✓ .gitignore 이미 등록됨%s\n' "${CYAN}" "${NC}"
     fi
