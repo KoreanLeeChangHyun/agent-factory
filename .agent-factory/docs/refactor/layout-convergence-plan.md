@@ -776,10 +776,34 @@ Acceptance:
 - top-level `subagent-stop.py` smoke passes
 - full pytest passes
 
+### M33: PreToolUse Hook App Entrypoint
+
+Status: complete
+
+Goal:
+
+Complete the current top-level hook thinning pass by moving PreToolUse guard
+dispatch into `engine/apps/hooks`.
+
+Completed slice:
+
+- added `engine/apps/hooks/pre_tool_use.py`
+- moved PreToolUse allow/deny routing, async Slack dispatch, guard ordering, and
+  deny metrics recording behind the hook app entrypoint
+- kept `.agent-factory/hooks/pre-tool-use.py` as a compatibility wrapper
+- preserved `_record_tool_deny_metrics` re-export for compatibility
+- added focused PreToolUse app tests
+
+Acceptance:
+
+- PreToolUse app and adapter hook tests pass
+- top-level `pre-tool-use.py` smoke passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 727 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 731 passed, 2 skipped, 6 subtests passed
 ```

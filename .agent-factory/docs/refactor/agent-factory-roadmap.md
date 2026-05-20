@@ -1194,12 +1194,46 @@ printf '{"hook_event_name":"SubagentStop"}' | python3 .agent-factory/hooks/subag
 python3 -m pytest  # 727 passed, 2 skipped, 6 subtests passed
 ```
 
+### M33: PreToolUse Hook App Entrypoint
+
+Status: complete
+
+Purpose:
+
+Move PreToolUse guard-chain implementation into the hook app boundary while
+keeping the stable top-level Claude Code hook path intact.
+
+Tasks:
+
+- [x] add `engine/apps/hooks/pre_tool_use.py`
+- [x] move Write/Edit rules auto-approve fast path behind the app entrypoint
+- [x] move sync guard dispatch ordering behind the app entrypoint
+- [x] move AskUserQuestion async Slack dispatch behind the app entrypoint
+- [x] preserve deny stdout passthrough and deny metrics recording
+- [x] keep `.agent-factory/hooks/pre-tool-use.py` as a compatibility wrapper
+- [x] add focused PreToolUse app tests
+
+Acceptance criteria:
+
+- PreToolUse app tests pass
+- existing PreToolUse adapter tests pass
+- top-level PreToolUse hook smoke passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_pre_tool_use.py tests/adapters/hooks/test_pretooluse_schema.py tests/adapters/hooks/test_pretooluse_regression.py tests/adapters/hooks/test_pretooluse_dotclaude_path.py  # 21 passed, 6 subtests passed
+printf '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}}' | python3 .agent-factory/hooks/pre-tool-use.py  # exit 0, allow JSON
+python3 -m pytest  # 731 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33
 ```
 
 Hard dependencies:
