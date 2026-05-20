@@ -13,6 +13,7 @@ from .service import (
     StageResult,
     StageScheduler,
 )
+from .llm_handler import LLMStageHandler, StagePrompt
 from .retry import RetryPolicy
 from .scheduler import SequentialStageScheduler
 
@@ -20,6 +21,7 @@ __all__ = [
     "ArtifactRecord",
     "ArtifactStore",
     "LifecycleEvent",
+    "LLMStageHandler",
     "ManifestStore",
     "OrchestrationFailed",
     "OrchestrationService",
@@ -28,7 +30,7 @@ __all__ = [
     "SequentialStageScheduler",
     "StageExecution",
     "StageHandler",
+    "StagePrompt",
     "StageResult",
     "StageScheduler",
 ]
-

@@ -311,7 +311,7 @@ python3 -m pytest tests/application/orchestration tests/domain/workflows tests/d
 
 ### M6: LLMAdapter Foundation
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -330,6 +330,12 @@ Acceptance criteria:
 - application tests run with `FakeAdapter`
 - no application service imports provider-specific adapter implementations
 - existing Claude behavior still works through `ClaudeAdapter`
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/llm tests/application/orchestration tests/adapters/llm
+```
 
 ### M7: Codex Main Brain
 
