@@ -22,7 +22,7 @@ import textwrap
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 _AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_TEST_DIR, "..", "..", ".."))
 _SCRIPTS_DIR = os.path.join(_AGENT_FACTORY_ROOT, "engine")
-_HOOK_HANDLERS_DIR = os.path.join(_SCRIPTS_DIR, "hook-handlers")
+_HOOK_HANDLERS_DIR = os.path.join(_SCRIPTS_DIR, "apps", "hooks")
 
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)

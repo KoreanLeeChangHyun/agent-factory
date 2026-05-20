@@ -29,7 +29,7 @@ def test_session_start_run_dispatches_expected_scripts(monkeypatch) -> None:
     assert calls == [
         (
             "HOOK_BIN_PATH_INJECT",
-            "/agent/engine/hook-handlers/ensure_bin_path.sh",
+            "/agent/engine/apps/hooks/ensure_bin_path.sh",
             b'{"hook_event_name":"SessionStart"}',
             True,
         ),

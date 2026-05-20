@@ -28,10 +28,10 @@ def main() -> None:
     project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
     if not project_dir:
         # CLAUDE_PROJECT_DIR이 없으면 hooks 디렉터리 기준으로 추론
-        # ensure_bin_path.sh는 .agent-factory/engine/hook-handlers/ 에 위치
+        # ensure_bin_path.sh는 .agent-factory/engine/apps/hooks/ 에 위치
         # 따라서 ../../../../ = project root
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_dir = os.path.normpath(os.path.join(script_dir, '..', '..', '..'))
+        project_dir = os.path.normpath(os.path.join(script_dir, '..', '..', '..', '..'))
 
     bin_dir = os.path.join(project_dir, '.agent-factory', 'bin')
     if not os.path.isdir(bin_dir):

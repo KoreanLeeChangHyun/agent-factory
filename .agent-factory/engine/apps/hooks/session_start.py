@@ -22,7 +22,7 @@ def run(stdin_data: bytes) -> int:
 
     r = dispatch(
         "HOOK_BIN_PATH_INJECT",
-        scripts_dir("hook-handlers", "ensure_bin_path.sh"),
+        scripts_dir("apps", "hooks", "ensure_bin_path.sh"),
         stdin_data,
         flags=flags,
         capture_output=True,

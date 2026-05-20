@@ -50,8 +50,8 @@ COLUMN_LABELS: dict[str, str] = {
 def _find_project_root() -> str:
     """dispatcher.py 와 동일 로직: git-common-dir 로 메인 리포 루트 탐색."""
     d = os.path.dirname(os.path.abspath(__file__))
-    # .agent-factory/engine/hook-handlers/ → project root = ../../..
-    root = os.path.normpath(os.path.join(d, '..', '..', '..'))
+    # .agent-factory/engine/apps/hooks/ → project root = ../../../..
+    root = os.path.normpath(os.path.join(d, '..', '..', '..', '..'))
 
     # 메인 리포이면 그대로 반환 (.settings 존재 확인)
     if os.path.exists(os.path.join(root, '.agent-factory', '.settings')):

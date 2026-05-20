@@ -135,7 +135,7 @@ them. Avoid churn that only changes spelling.
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `engine/apps/board_api` with `board/server/handlers` compatibility exports | `engine/apps/board_api` or thin board handlers | aligned |
 | Board web | `board/web` | `board/web` | aligned |
-| Hooks | top-level `hooks/`, `engine/apps/hooks`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
+| Hooks | top-level `hooks/`, `engine/apps/hooks`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | mostly aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
 | Legacy tests | canonical `tests/` root | `tests/` | aligned |
 
@@ -1239,10 +1239,37 @@ Acceptance:
 - layout convergence architecture test passes
 - full pytest passes
 
+### M53: Move Hook Helper Scripts Into Hook Apps
+
+Status: complete
+
+Goal:
+
+Remove the legacy `engine/hook-handlers` source directory by moving its helper
+scripts into `engine/apps/hooks`.
+
+Completed slice:
+
+- moved `ensure_bin_path.sh` to `engine/apps/hooks/ensure_bin_path.sh`
+- moved `inject_kanban_context.py` to
+  `engine/apps/hooks/inject_kanban_context.py`
+- updated SessionStart and UserPromptSubmit dispatch paths
+- adjusted helper path calculations for the new app location
+- updated hook tests to load and assert the app-boundary helper paths
+- extended layout convergence tests to prevent the legacy source paths from
+  returning
+
+Acceptance:
+
+- hook app tests pass
+- UserPromptSubmit context tests pass
+- layout convergence architecture test passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 801 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 802 passed, 2 skipped, 6 subtests passed
 ```

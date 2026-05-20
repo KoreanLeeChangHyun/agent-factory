@@ -45,7 +45,7 @@ def test_user_prompt_submit_run_dispatches_context_for_main_session(monkeypatch)
     assert calls == [
         (
             "HOOK_USER_PROMPT_KANBAN",
-            "/agent/engine/hook-handlers/inject_kanban_context.py",
+            "/agent/engine/apps/hooks/inject_kanban_context.py",
             stdin_raw,
             True,
         )

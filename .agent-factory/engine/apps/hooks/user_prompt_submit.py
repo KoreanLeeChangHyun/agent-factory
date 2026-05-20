@@ -120,7 +120,7 @@ def run(stdin_raw: bytes) -> tuple[int, bytes]:
             return 0, b""
 
         flags = load_env_flags()
-        target_script = scripts_dir("hook-handlers", "inject_kanban_context.py")
+        target_script = scripts_dir("apps", "hooks", "inject_kanban_context.py")
         _debug_log(f"[user-prompt-submit] dispatching to {target_script!r}")
 
         result = dispatch(

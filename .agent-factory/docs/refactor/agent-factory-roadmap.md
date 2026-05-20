@@ -1813,12 +1813,46 @@ python3 -m pytest tests/adapters/git/test_config.py tests/adapters/git/test_cli.
 python3 -m pytest  # 801 passed, 2 skipped, 6 subtests passed
 ```
 
+### M53: Move Hook Helper Scripts Into Hook Apps
+
+Status: complete
+
+Purpose:
+
+Remove the legacy `engine/hook-handlers` source directory by moving its helper
+scripts into `engine/apps/hooks`.
+
+Tasks:
+
+- [x] move `ensure_bin_path.sh` to `engine/apps/hooks/ensure_bin_path.sh`
+- [x] move `inject_kanban_context.py` to
+      `engine/apps/hooks/inject_kanban_context.py`
+- [x] update SessionStart and UserPromptSubmit dispatch paths
+- [x] adjust helper path calculations for the new app location
+- [x] update hook tests to load and assert the app-boundary helper paths
+- [x] extend layout convergence tests to prevent the legacy source paths from
+      returning
+
+Acceptance criteria:
+
+- hook app tests pass
+- UserPromptSubmit context tests pass
+- layout convergence architecture test passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_session_start.py tests/application/apps/test_hooks_user_prompt_submit.py tests/application/flow/test_user_prompt_submit_hook.py tests/adapters/hooks/test_dispatcher.py tests/architecture/test_layout_convergence.py  # 23 passed
+python3 -m pytest  # 802 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53
 ```
 
 Hard dependencies:
