@@ -1143,10 +1143,33 @@ Acceptance:
 - board API docstring/decorator and handler/router contract tests pass
 - full pytest passes
 
+### M49: Kanban Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move Kanban REST endpoint handlers into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Kanban handler implementation to `engine/apps/board_api/kanban.py`
+- kept `board/server/handlers/kanban.py` as a compatibility export
+- preserved the `_emit_launch_event` lazy import path used by `v2_launcher`
+- updated Kanban handler imports to use absolute board server dependencies
+- added focused Kanban board API app tests
+
+Acceptance:
+
+- Kanban board API app tests pass
+- Kanban workrequest/audit/done regression tests pass
+- board API docstring/decorator and handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 794 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 798 passed, 2 skipped, 6 subtests passed
 ```

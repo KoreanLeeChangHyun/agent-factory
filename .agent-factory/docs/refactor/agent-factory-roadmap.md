@@ -1686,12 +1686,44 @@ python3 -m pytest tests/application/apps/test_board_api_terminal.py tests/contra
 python3 -m pytest  # 794 passed, 2 skipped, 6 subtests passed
 ```
 
+### M49: Kanban Board API App Handler
+
+Status: complete
+
+Purpose:
+
+Move Kanban REST Board API handlers into `engine/apps/board_api` while
+preserving existing board handler import paths.
+
+Tasks:
+
+- [x] move Kanban handler implementation to `engine/apps/board_api/kanban.py`
+- [x] keep `board/server/handlers/kanban.py` as a compatibility export
+- [x] preserve the `_emit_launch_event` lazy import path used by `v2_launcher`
+- [x] update Kanban handler imports to use absolute board server dependencies
+- [x] add focused Kanban board API app tests
+
+Acceptance criteria:
+
+- Kanban board API app tests pass
+- Kanban workrequest/audit/done regression tests pass
+- board API docstring/decorator contract tests pass
+- board API handler/router contract tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_board_api_kanban.py tests/contracts/board_api/test_m8_workrequest_handler.py tests/contracts/board_api/test_kanban_audit_verdict.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_api_smoke.py  # 98 passed, 2 skipped
+python3 -m pytest  # 798 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49
 ```
 
 Hard dependencies:
