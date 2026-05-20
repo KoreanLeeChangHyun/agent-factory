@@ -70,6 +70,7 @@ ALIAS_MAP: dict[str, str] = {
     "history_sync.py": "flow-history",
     "catalog_sync.py": "flow-catalog",
     "git_config.py": "flow-gitconfig",
+    "project_detector.py": "flow-detect",
     "project_skill_detector.py": "flow-detect",
 }
 

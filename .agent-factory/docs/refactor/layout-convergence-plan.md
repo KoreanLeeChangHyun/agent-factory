@@ -28,6 +28,7 @@ Current high-level runtime layout:
   engine/
     core/
       ports/
+      skills/
       work_requests/
       workflows/
     application/
@@ -1490,10 +1491,38 @@ Acceptance:
 - sync adapter tests pass
 - full pytest passes
 
+### M63: Move Project Skill Detector Into Core Skills
+
+Status: complete
+
+Goal:
+
+Move project skill detection out of `engine/flow` and into the target
+`engine/core/skills` boundary.
+
+Completed slice:
+
+- moved `engine/flow/project_skill_detector.py` to
+  `engine/core/skills/project_detector.py`
+- added `engine/core/skills/__init__.py`
+- updated `bin/flow-detect` to execute the core skills implementation
+- removed flow runtime imports from the core skills implementation
+- updated direct path guard alias coverage for the new filename
+- added focused project detector placement tests
+- extended layout convergence tests to prevent the legacy flow source from
+  returning
+
+Acceptance:
+
+- `flow-detect --help` executes from the repo root
+- project detector placement tests pass
+- direct path guard tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 817 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 820 passed, 2 skipped, 6 subtests passed
 ```

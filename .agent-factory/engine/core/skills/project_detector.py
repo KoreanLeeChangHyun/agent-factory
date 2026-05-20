@@ -23,14 +23,22 @@ import re
 import sys
 from datetime import datetime
 
-# 프로젝트 루트 결정
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-from common import resolve_project_root
-from flow.cli_utils import build_common_epilog
-from flow.flow_logger import append_log, resolve_work_dir_for_logging
+from engine.common import resolve_project_root
+
+
+def _build_common_epilog() -> str:
+    """Return CLI help footer without depending on flow runtime modules."""
+    return (
+        "워크플로우 버전: 2.1.25\n"
+        "문서: .agent-factory/docs/ 또는 .claude/rules/workflow.md 참조\n"
+        "티켓 관리: flow-kanban <서브커맨드> --help"
+    )
 
 # ─── 스택 감지 규칙 ───────────────────────────────────────────────────────────
 
@@ -569,7 +577,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="flow-detect",
         description="코드베이스 분석 기반 프로젝트 스킬 자동 감지",
-        epilog=build_common_epilog(),
+        epilog=_build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -592,16 +600,9 @@ def main() -> None:
         print(f"[ERROR] 디렉터리를 찾을 수 없습니다: {project_root}", file=sys.stderr)
         sys.exit(1)
 
-    _log_dir = resolve_work_dir_for_logging()
-    if _log_dir:
-        append_log(_log_dir, "INFO", f"project_skill_detector: start root={project_root}")
-
     # 스택 감지
     result = detect_project_stack(project_root)
     stacks_detected: list[str] = result["stacks"]  # type: ignore[assignment]
-
-    if _log_dir:
-        append_log(_log_dir, "INFO", f"project_skill_detector: detected stacks={len(stacks_detected)}")
 
     # 감지 결과 출력
     domain_name = result.get("domain_name", "unknown")
@@ -627,8 +628,6 @@ def main() -> None:
         with open(skill_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        if _log_dir:
-            append_log(_log_dir, "INFO", f"project_skill_detector: SKILL.md generated path={skill_path}")
         print(f"\nGenerated: {skill_path}")
 
 
