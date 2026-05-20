@@ -281,7 +281,7 @@ python3 -m pytest tests/domain/workflows tests/application/v2/test_common.py
 
 ### M5: Orchestration And Harness Engineering
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -302,6 +302,12 @@ Acceptance criteria:
 - orchestration executes six stages in order
 - retry and fail policy are tested without real LLM calls
 - artifacts are indexed in a run manifest
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/orchestration tests/domain/workflows tests/domain/work_requests
+```
 
 ### M6: LLMAdapter Foundation
 
