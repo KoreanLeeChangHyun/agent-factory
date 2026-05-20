@@ -11,10 +11,10 @@ from urllib.parse import parse_qs, urlparse
 
 from board.server.state import terminal_sse_channel, claude_process, workflow_registry
 from board.server._common import api_endpoint, logger, _get_git_branch, server_debug_log
-from board.server.event_filter import is_user_visible
+from board.server.channels.event_filter import is_user_visible
 from board.server.terminal_channel import _resolve_last_event_id
 from board.server.claude_process import _validate_images
-from board.server._attachments_persist import AttachmentsSidecar
+from board.server.artifacts.attachments_persist import AttachmentsSidecar
 
 
 # 충돌을 막기 위해 ``min_attachment_threshold`` 를 적용한다. (envelope 합성

@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable
 
 from board.server._common import logger
-from board.server.event_filter import is_user_visible
+from board.server.channels.event_filter import is_user_visible
 from .sse_client_manager import _NDJSON_EVENT_MAP
 
 # ---------------------------------------------------------------------------
