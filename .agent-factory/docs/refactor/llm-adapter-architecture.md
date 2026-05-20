@@ -151,7 +151,7 @@ avoid real LLM calls.
 Suggested `.agent-factory/.settings` keys:
 
 ```text
-AGENT_FACTORY_LLM_PROVIDER=claude
+AGENT_FACTORY_LLM_PROVIDER=codex
 AGENT_FACTORY_LLM_TIMEOUT_PLAN=300
 AGENT_FACTORY_LLM_TIMEOUT_WORK=1800
 AGENT_FACTORY_LLM_TIMEOUT_VALIDATE=180
@@ -164,8 +164,24 @@ Provider-specific keys stay namespaced:
 CLAUDE_BIN=claude
 CLAUDE_PERMISSION_MODE=bypassPermissions
 CODEX_BIN=codex
+CODEX_MODEL=
+CODEX_PROFILE=
+CODEX_SANDBOX=workspace-write
+CODEX_APPROVAL_POLICY=never
 GEMINI_BIN=gemini
 ```
+
+Codex runtime constraints:
+
+- Codex runs through `codex exec` in non-interactive mode.
+- Prompts are passed on stdin with `-`; the adapter enables `--json` and maps
+  JSONL stdout events to `LLMEvent`.
+- `system_prompt` is prepended to the user prompt because Codex CLI does not
+  expose the same `--append-system-prompt` contract as Claude.
+- Default sandbox is `workspace-write` and default approval policy is `never`
+  so controlled workflow runs do not block on interactive approval.
+- Application services must depend on `LLMAdapter`; provider selection belongs
+  to `engine.adapters.llm.factory`.
 
 ## Dependency Rule
 

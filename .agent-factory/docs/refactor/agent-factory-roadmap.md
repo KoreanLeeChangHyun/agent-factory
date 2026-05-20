@@ -339,7 +339,7 @@ python3 -m pytest tests/application/llm tests/application/orchestration tests/ad
 
 ### M7: Codex Main Brain
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -359,6 +359,12 @@ Acceptance criteria:
 - Codex can run at least PLAN or REPORT in a controlled smoke
 - FakeAdapter remains the default in unit/application tests
 - Claude is no longer hard-coded in orchestration
+
+Current verification:
+
+```text
+python3 -m pytest tests/adapters/llm tests/application/llm tests/application/orchestration
+```
 
 ### M8: Board UI/UX Redesign
 

@@ -45,6 +45,7 @@ class LLMResult:
     session_id: str = ""
     terminal_reason: str = ""
     events: list[LLMEvent] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 EventHandler = Callable[[LLMEvent], None]
@@ -82,4 +83,3 @@ class FakeAdapter:
             if on_event is not None:
                 on_event(event)
         return result
-
