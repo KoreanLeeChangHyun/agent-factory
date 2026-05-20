@@ -938,10 +938,32 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M40: Ops Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move the operator diagnostics/recovery endpoints into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Ops handler implementation to `engine/apps/board_api/ops_endpoints.py`
+- kept `board/server/handlers/ops_endpoints.py` as a compatibility export
+- updated Ops endpoint contract tests to inspect the app-boundary handler
+- added focused Ops board API app tests
+
+Acceptance:
+
+- Ops board API app tests pass
+- Ops endpoint contract tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 746 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 748 passed, 2 skipped, 6 subtests passed
 ```

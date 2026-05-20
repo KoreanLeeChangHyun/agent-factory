@@ -18,11 +18,16 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
+_BOARD_API_APP_DIR = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api"
 _HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
 
 
 def _find_ops_file() -> Path | None:
-    candidates = [_HANDLERS_DIR / "ops_endpoints.py", _HANDLERS_DIR / "system.py"]
+    candidates = [
+        _BOARD_API_APP_DIR / "ops_endpoints.py",
+        _HANDLERS_DIR / "ops_endpoints.py",
+        _HANDLERS_DIR / "system.py",
+    ]
     for p in candidates:
         if p.exists():
             return p
