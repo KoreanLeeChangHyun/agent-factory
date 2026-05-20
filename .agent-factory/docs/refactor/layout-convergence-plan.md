@@ -1005,10 +1005,31 @@ Acceptance:
 - board API docstring/decorator and handler/router contract tests pass
 - full pytest passes
 
+### M43: Files Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move memory/rules/prompt file write/delete endpoints into
+`engine/apps/board_api`.
+
+Completed slice:
+
+- moved Files handler implementation to `engine/apps/board_api/files.py`
+- kept `board/server/handlers/files.py` as a compatibility export
+- added focused Files board API app tests
+
+Acceptance:
+
+- Files board API app tests pass
+- board API docstring/decorator and handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 767 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 771 passed, 2 skipped, 6 subtests passed
 ```
