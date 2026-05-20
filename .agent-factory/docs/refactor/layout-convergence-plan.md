@@ -1266,10 +1266,28 @@ Acceptance:
 - layout convergence architecture test passes
 - full pytest passes
 
+### M54: Remove Legacy Engine Data Symlink
+
+Status: complete
+
+Goal:
+
+Remove the unused legacy `engine/data/colors.sh` tracked symlink.
+
+Completed slice:
+
+- removed the broken `engine/data/colors.sh` symlink
+- added a layout convergence architecture check preventing it from returning
+
+Acceptance:
+
+- layout convergence architecture test passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 802 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 803 passed, 2 skipped, 6 subtests passed
 ```
