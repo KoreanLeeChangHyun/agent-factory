@@ -42,12 +42,12 @@ class BoardHTTPRequestHandler(
     /events 경로는 SSE 엔드포인트로 처리하고,
     /api/* 경로는 JSON API로 처리하고,
     그 외 경로는 SimpleHTTPRequestHandler의 정적 파일 서빙으로 위임한다.
-    정적 파일은 ``.agent-factory/board/static`` 디렉터리를 루트로 서빙한다.
+    정적 파일은 ``.agent-factory/board/web`` 디렉터리를 루트로 서빙한다.
     """
 
     def __init__(self, *args, **kwargs) -> None:
         static_dir = os.path.join(
-            os.getcwd(), '.agent-factory', 'board', 'static',
+            os.getcwd(), '.agent-factory', 'board', 'web',
         )
         self._project_root = os.getcwd()
         super().__init__(*args, directory=static_dir, **kwargs)
@@ -56,9 +56,10 @@ class BoardHTTPRequestHandler(
         """정적 파일 경로를 해석한다.
 
         라우팅:
-          - ``/.agent-factory/board/*`` → ``static/*`` (기존 북마크 호환)
+          - ``/.agent-factory/board/*`` → ``web/*`` (기존 북마크 호환)
+          - ``/.agent-factory/board/static/*`` → ``web/*`` (옛 static URL 호환)
           - ``/.agent-factory/*``       → 프로젝트 루트 (워크플로우 산출물)
-          - 그 외                          → ``static/*`` (기본)
+          - 그 외                          → ``web/*`` (기본)
         """
         from urllib.parse import urlsplit, unquote
         clean = urlsplit(path).path
@@ -66,6 +67,8 @@ class BoardHTTPRequestHandler(
         legacy = '/.agent-factory/board/'
         if clean.startswith(legacy):
             rel = clean[len(legacy):]
+            if rel.startswith('static/'):
+                rel = rel[len('static/'):]
             return os.path.join(self.directory, rel)
         wf_prefix = '/.agent-factory/'
         if clean.startswith(wf_prefix):

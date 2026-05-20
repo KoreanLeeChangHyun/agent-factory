@@ -17,7 +17,7 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _V2_WORKFLOW_JS = (
-    _REPO_ROOT / ".agent-factory" / "board" / "static" / "js" / "workflow"
+    _REPO_ROOT / ".agent-factory" / "board" / "web" / "js" / "workflow"
     / "v2-workflow.js"
 )
 

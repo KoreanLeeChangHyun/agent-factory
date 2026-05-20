@@ -35,8 +35,8 @@ These files still mention V1 or old entrypoints:
 | `.agent-factory/docs/cli-reference.md` | replace with V2 `flow-wf` and current `flow-*` wrappers |
 | `.claude/commands/wf.md` | remove residual V1 notes after V2 command behavior is documented |
 | `.agent-factory/build-assets/templates/claude-env.tmpl` | remove old `flow-init/flow-step/flow-finish` lifecycle comments |
-| `.agent-factory/board/static/js/workflow/workflow-bar.js` | remove V1 wording once UI contract is V2-only |
-| `.agent-factory/board/static/js/workflow/session.js` | remove V1 history/session comments after route cleanup |
+| `.agent-factory/board/web/js/workflow/workflow-bar.js` | remove V1 wording once UI contract is V2-only |
+| `.agent-factory/board/web/js/workflow/session.js` | remove V1 history/session comments after route cleanup |
 
 ## Shared Code That May Stay Temporarily
 

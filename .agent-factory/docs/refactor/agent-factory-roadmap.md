@@ -1261,12 +1261,43 @@ python3 -m pytest tests/application/apps/test_board_api_observability.py tests/c
 python3 -m pytest  # 733 passed, 2 skipped, 6 subtests passed
 ```
 
+### M35: Board Web Directory Move
+
+Status: complete
+
+Purpose:
+
+Move the board frontend asset tree from `board/static` to the target
+`board/web` directory while preserving legacy URL compatibility.
+
+Tasks:
+
+- [x] move `board/static` files into `board/web`
+- [x] update `BoardHTTPRequestHandler` static root to `board/web`
+- [x] preserve `/.agent-factory/board/static/*` URL translation
+- [x] update tests that directly read board frontend files
+- [x] add board web static path contract tests
+- [x] update refactor docs for the new active board web path
+
+Acceptance criteria:
+
+- board web path contract tests pass
+- board API smoke tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_board_web_static_path.py tests/contracts/board_api/test_api_smoke.py  # 5 passed, 2 skipped
+python3 -m pytest  # 735 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35
 ```
 
 Hard dependencies:

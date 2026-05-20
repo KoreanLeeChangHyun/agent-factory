@@ -1526,7 +1526,7 @@
           var task = pair[1];
           var status = task.status || "running";
           // 풀 경로는 ellipsis 로 잘리면 의미가 사라지므로 마지막 segment(basename)
-          // 만 노출. "Reading .agent-factory/board/static/js/foo.js" →
+          // 만 노출. "Reading .agent-factory/board/web/js/foo.js" →
           // "Reading foo.js". hover title 에는 원본 summary 가 그대로 유지된다.
           var rawDesc = task.description || taskId;
           rawDesc = rawDesc.replace(/[\w./-]*\/([\w.-]+)/g, "$1");

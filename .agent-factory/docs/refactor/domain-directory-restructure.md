@@ -7,7 +7,7 @@ The current code is organized mostly by historical location:
 - `engine/v2`
 - `engine/flow`
 - `board/server`
-- `board/static`
+- `board/web`
 - `hooks`
 
 That layout hides the real domains. The target layout should make the harness
@@ -72,12 +72,12 @@ and acceptance criteria to enter the absolute workflow.
 | Worktree/Git | `engine/flow/worktree_manager.py`, `engine/flow/merge_pipeline.py`, `engine/flow/undo_done.py`, `engine/git/git_config.py`, `board/server/handlers/worktree_commit.py` | Feature branches, commits, merge/undo workflows |
 | Events/Sessions | `engine/v2/_emitter.py`, `board/server/v2_workflow_session.py`, `board/server/v2_sse_channel.py`, `board/server/sse_client_manager.py`, `board/server/poll_tracker.py` | Workflow sessions, event streams, SSE fan-out |
 | Board API | `board/server/http_router.py`, `board/server/handlers/*` | HTTP routing and JSON contracts |
-| Terminal | `board/server/claude_process.py`, `board/server/terminal_channel.py`, `board/server/handlers/terminal.py`, `board/static/js/terminal/*` | Interactive terminal process and UI |
+| Terminal | `board/server/claude_process.py`, `board/server/terminal_channel.py`, `board/server/handlers/terminal.py`, `board/web/js/terminal/*` | Interactive terminal process and UI |
 | Hooks | `hooks/*.py`, `engine/hook-handlers/*`, `engine/guards/*` | Claude Code hook payloads, guards, prompt injection |
-| Memory | `engine/memory_gc/*`, `board/server/handlers/memory_gc.py`, `board/static/js/memory/*` | Memory pruning, reflection, UI |
+| Memory | `engine/memory_gc/*`, `board/server/handlers/memory_gc.py`, `board/web/js/memory/*` | Memory pruning, reflection, UI |
 | Settings/Sync | `engine/flow/env_manager.py`, `engine/sync/*`, `board/server/handlers/settings.py`, `board/server/handlers/sync.py` | Runtime settings, dashboard sync |
 | Skills/Project Detection | `engine/flow/project_skill_detector.py`, `engine/flow/skill_*.py`, `engine/flow/inject_prompt.py` | Skill activation and prompt context |
-| Metrics/History | `engine/flow/metrics*.py`, `engine/flow/usage_tracker.py`, `board/server/handlers/metrics.py`, `board/static/js/views/_deprecated/metrics.js` | Metrics JSONL, usage/history surfaces |
+| Metrics/History | `engine/flow/metrics*.py`, `engine/flow/usage_tracker.py`, `board/server/handlers/metrics.py`, `board/web/js/views/_deprecated/metrics.js` | Metrics JSONL, usage/history surfaces |
 
 ## Target Layout
 
@@ -277,7 +277,7 @@ and acceptance criteria to enter the absolute workflow.
 | `board/server/claude_process.py` | `engine/adapters/claude/terminal.py` |
 | `board/server/terminal_channel.py` | `engine/apps/board_api/terminal_channel.py` initially, then adapter |
 | `board/server/handlers/terminal.py` | `engine/apps/board_api/handlers/terminal.py` |
-| `board/static/js/terminal/*` | `board/web/terminal/*` |
+| `board/web/js/terminal/*` | `board/web/terminal/*` |
 
 ### Hooks And Guards
 

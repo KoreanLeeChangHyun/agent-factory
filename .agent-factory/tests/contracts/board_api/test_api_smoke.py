@@ -3,7 +3,7 @@
 검증:
   - handler 메서드와 http_router.py 라우팅이 정합 (URL → handler 매칭)
   - alias route 보존 (기존 URL 변경 0건)
-  - FE 호출부 변경 0건 (`.agent-factory/board/static/js/` git diff stat)
+  - FE 호출부 변경 0건 (`.agent-factory/board/web/js/` git diff stat)
   - board.md §1.3 의 `memory_update` / `roadmap_update` 보충 매칭
 
 production endpoint 직접 호출 금지 (board.md §0.1 절대 금지 — fake/test session
@@ -21,7 +21,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
-_FE_JS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "static" / "js"
+_FE_JS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "web" / "js"
 _BOARD_MD = _REPO_ROOT / ".claude" / "rules" / "workflow" / "board.md"
 
 

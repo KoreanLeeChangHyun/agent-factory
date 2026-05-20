@@ -22,7 +22,7 @@ Current high-level runtime layout:
   board/
     server/
       handlers/
-    static/
+    web/
       css/
       js/
   engine/
@@ -65,7 +65,8 @@ Current important facts:
 - `engine/flow` still owns many active CLI, kanban, worktree, metrics, and
   skill utilities.
 - `board/server` still owns HTTP handlers and board session/event glue.
-- `board/static` is still the active web UI.
+- `board/web` is the active web UI; old `/.agent-factory/board/static/*` URLs
+  are translated for compatibility.
 - top-level `hooks/` is still the active Claude Code hook entry surface.
 
 ## Target Shape
@@ -131,7 +132,7 @@ them. Avoid churn that only changes spelling.
 | Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `board/server/handlers`, `engine/application/kanban` | `engine/apps/board_api` or thin board handlers | partially aligned |
-| Board web | `board/static` | `board/web` | not aligned |
+| Board web | `board/web` | `board/web` | aligned |
 | Hooks | top-level `hooks/`, `engine/apps/hooks`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
 | Legacy tests | canonical `tests/` root | `tests/` | aligned |
@@ -154,7 +155,7 @@ Do not move these in early layout milestones:
 
 - `.agent-factory/bin/*`: wrappers are the operator contract.
 - `.agent-factory/hooks/*`: Claude Code settings point here directly.
-- `.agent-factory/board/static/*`: web UI asset paths are coupled to the board.
+- `.agent-factory/board/web/*`: web UI asset paths are coupled to the board.
 - `.agent-factory/board/server/http_router.py`: route stability matters.
 - `.agent-factory/engine/v2/driver.py`: keep as the active `flow-wf` entry until
   the services underneath it have moved.
@@ -825,10 +826,33 @@ Acceptance:
 - existing `api_endpoint` contract tests pass through `_common.py`
 - full pytest passes
 
+### M35: Board Web Directory Move
+
+Status: complete
+
+Goal:
+
+Align the board frontend asset tree with the target `board/web` layout.
+
+Completed slice:
+
+- moved board frontend assets from `board/static` to `board/web`
+- updated `BoardHTTPRequestHandler` to serve `board/web`
+- preserved old `/.agent-factory/board/static/*` URL compatibility in
+  `translate_path`
+- updated frontend path contract tests and refactor docs
+- added board web static path contract tests
+
+Acceptance:
+
+- board web path contract tests pass
+- board API smoke tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 733 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 735 passed, 2 skipped, 6 subtests passed
 ```
