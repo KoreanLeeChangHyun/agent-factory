@@ -1,10 +1,10 @@
-"""ProductionLineSession + ProductionLineSessionRegistry — production-line subprocess 전용 세션 모델.
+"""ProductionLineSession + ProductionLineSessionRegistry — production-line subprocess
 
-v1 WorkflowSession 과 분리된 별도 데이터 모델. ClaudeProcess 의존 0건.
-SSE fan-out 은 ProductionLineSSEChannel 이 담당 (TerminalSSEChannel 과 분리).
+v1 WorkflowSession and separate separate data models. 0 ClaudeProcess dependence.
+SSE fan-out is part of ProductionLineSSEChannel (TerminalSSEChannel and separated).
 
-driver subprocess 가 발급한 session_id 로 board 측이 명시 등록한다
-(POST /api/v2/sessions). lazy create 인프라는 폐기 — 모든 진입은 명시 POST.
+Registered the board side as session id issued by driver subprocess
+(POST /api/v2/sessions). lazy create infrastructure is closed — all entry is express POST.
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from .production_line_sse_channel import ProductionLineSSEChannel
 
 
-# fake/test session_id 패턴 — production registry 등록 + persist 차단.
-# T-495 cycle 에서 P2/P3 worker 가 production endpoint 에 직접 curl 호출하여
-# `.workflow-sessions-v2/` 가 오염된 회귀 (2026-05-17) 후 추가.
+# fake/test session id pattern — production registry registration + persist blocking.
+# T-495 cycle in P2/P3 worker call curl directly to production endpoint
+# News added after workflow-sessions-v2/` is contaminated revolving (2026-05-17).
 _FAKE_SESSION_PATTERNS: tuple[str, ...] = (
     '-test', '-smoke', '-fake', '-mock',
     'test-', 'smoke-', 'fake-', 'mock-',
@@ -32,10 +32,10 @@ _FAKE_SESSION_PATTERNS: tuple[str, ...] = (
 
 
 def is_fake_session_id(session_id: str) -> bool:
-    """session_id 가 fake/test 패턴이면 True.
+    """session id is fake/test pattern if true.
 
-    production driver 발급 session_id 는 `wf-T-NNN-<uuid>` 형식으로 본 패턴과
-    충돌 안 함. 일치 시 registry 등록 거부 + persist skip.
+    production driver issuance session id with pattern in the format `wf-T-NNN-<uuid>
+    Not a collision. + persist skip.
     """
     lower = session_id.lower()
     return any(pat in lower for pat in _FAKE_SESSION_PATTERNS)
@@ -43,29 +43,29 @@ def is_fake_session_id(session_id: str) -> bool:
 
 @dataclass
 class ProductionLineSession:
-    """production-line subprocess 가 발급한 워크플로우 세션 메타.
+    """production-line subprocess is issued workflow session meta.
 
-    v1 WorkflowSession 과 다른 점:
-    - ClaudeProcess 필드 제거 (driver subprocess 가 외부 process 로 실행)
-    - status / current_step / current_phase / cycle_start_ts / step_ts 자체 보유
-      (frontend 카운터 + 탭 가시성용)
-    - artifacts dict 자체 보유 (생성된 산출물 경로 + size)
-    - channel 은 ProductionLineSSEChannel 인스턴스 (TerminalSSEChannel 과 분리)
+    V1 WorkflowSession And Other Point:
+    - Remove ClaudeProcess field (driver subprocess runs external process)
+    - status / current step / current phase / cycle start ts / step ts
+      (frontend counter + tab visibility)
+    - artifacts dict self-retention (generated output path + size)
+    - channel is ProductionLineSSEChannel instance (TerminalSSEChannel and separated)
 
     Attributes:
-        session_id: driver 발급 세션 ID (wf-T-NNN-<uuid>)
-        ticket_id: 칸반 티켓 ID (T-NNN)
+        session id: driver issue session ID (wf-T-NNN-<uuid>)
+        Ticket ID (T-NNN)
         command: implement / research / review
-        work_dir: runs/<registryKey>/ 절대 경로
-        worktree_path: implement 전용 worktree 절대 경로 (없으면 빈 문자열)
+        work dir: run/<registryKey>/ absolute path
+        worktree path: execution-only worktree absolute path (no empty string)
         status: idle | running | completed | failed
         current_step: NONE | INIT | PLAN | WORK | VALIDATE | REPORT | DONE | FAILED
-        current_phase: WORK 내부 sub-phase (P1, P2, ... 없으면 빈 문자열)
-        cycle_start_ts: 사이클 시작 epoch (frontend 사이클 누적 카운터)
-        step_ts: 현재 step 진입 epoch (frontend step elapsed)
-        artifacts: 산출물 경로 → 메타 dict (size, mtime)
-        channel: ProductionLineSSEChannel 인스턴스
-        created_at: ISO 시각
+        current phase: WORK internal sub-phase (P1, P2, ... Without empty string)
+        cycle start ts: cycle start epoch (frontend cycle accumulator counter)
+        step ts: Current step entry epoch (frontend step elapsed)
+        artifacts: output path → meta dict (size, mtime)
+        channel: ProductionLineSSEChannel instance
+        created at: ISO Vision
     """
 
     session_id: str
@@ -84,20 +84,20 @@ class ProductionLineSession:
 
 
 class ProductionLineSessionRegistry:
-    """production-line 세션 레지스트리.
+    """production-line session registry.
 
-    thread-safe 하게 세션을 생성·조회·삭제한다.
-    v1 WorkflowSessionRegistry 와 별도 (workflow_registry / production_line_registry 이원화).
+    thread-safe to generate session, check/delete.
+    v1 WorkflowSessionRegistry with separate (workflow registry / production line registry release).
 
-    기본 persist 위치는 각 run 의 `workflow-events.jsonl` 이다.
-    `persist_dir` 는 테스트와 legacy 복원 경로용 호환 옵션으로만 사용한다.
+    The default persist position is `workflow-events.jsonl` of each run.
+    `persist dir` is used only for testing and backward restoration routes.
     """
 
     def __init__(self, persist_dir: str | None = None) -> None:
-        """초기화한다.
+        """Add to cart
 
         Args:
-            persist_dir: 세션 jsonl 을 저장할 디렉터리. None 이면 persist 비활성.
+            persist dir: directory to save session jsonl. None Integrity persist.
         """
         self._sessions: dict[str, ProductionLineSession] = {}
         self._lock: threading.Lock = threading.Lock()
@@ -109,7 +109,7 @@ class ProductionLineSessionRegistry:
                 self._persist_dir = None
 
     def _session_file(self, session_id: str, work_dir: str = '') -> str | None:
-        """세션 NDJSON 파일 경로를 반환한다."""
+        """Returns the session NDJSON file path."""
         if self._persist_dir is not None:
             return os.path.join(self._persist_dir, f'{session_id}.jsonl')
         if not work_dir:
@@ -124,30 +124,30 @@ class ProductionLineSessionRegistry:
         work_dir: str,
         worktree_path: str = '',
     ) -> ProductionLineSession:
-        """driver 가 발급한 session_id 로 세션을 명시 등록한다.
+        """Registered the session with session id issued by driver.
 
-        동일 session_id 로 재호출 시 기존 세션 반환 (idempotent).
-        v1 create_external 의 lazy create 와 달리 명시 POST /api/v2/sessions 진입점.
+        The same session id returns an existing session (idempotent) when reissuing.
+        Unlike lazy create v1 create external POST /api/v2/sessions entry point.
 
         Args:
-            session_id: driver 발급 세션 ID (wf-T-NNN-<uuid>)
+            session id: driver issue session ID (wf-T-NNN-<uuid>)
             ticket_id: T-NNN
             command: implement / research / review
-            work_dir: runs/<registryKey>/ 절대 경로
-            worktree_path: implement 전용 worktree 절대 경로 (research/review 시 빈 문자열)
+            work dir: run/<registryKey>/ absolute path
+            worktree path: execution-only worktree absolute path (bin strings when research/review)
 
         Returns:
-            등록된 ProductionLineSession 인스턴스
+            Registered ProductionLineSession instance
         """
         if is_fake_session_id(session_id):
             logger.warning(
                 "production_line_session: fake/test session_id pattern detected (%s) — "
-                "registry 등록 거부 + persist skip (T-495 production endpoint 오염 차단)",
+                "+ persist skip (T-495 production endpoint contamination block)",
                 session_id,
             )
             raise ValueError(
                 f"Session ID matches fake/test pattern: {session_id}. "
-                f"Production endpoint 에 fake session 등록 금지 — 단위 테스트 (tempfile) 사용."
+                f"Production endpoint to fake session registration ban — using the unit test (tempfile)."
             )
 
         with self._lock:
@@ -156,7 +156,7 @@ class ProductionLineSessionRegistry:
                 return existing
 
         persist_path = self._session_file(session_id, work_dir)
-        # circular import 회피 — 런타임 import
+        # return import
         from .production_line_sse_channel import ProductionLineSSEChannel
         channel = ProductionLineSSEChannel(session_id=session_id, persist_path=persist_path)
 
@@ -187,7 +187,7 @@ class ProductionLineSessionRegistry:
                     f.write(json.dumps(meta, ensure_ascii=False) + '\n')
             except OSError as exc:
                 logger.error(
-                    "production_line_session[%s]: meta persist 실패 (%s): %s",
+                    "production line session[%s]: meta persist fail (%s): %s",
                     session_id, persist_path, exc,
                 )
 
@@ -197,12 +197,12 @@ class ProductionLineSessionRegistry:
         return session
 
     def get(self, session_id: str) -> ProductionLineSession | None:
-        """session_id 로 세션을 조회한다."""
+        """session id"""
         with self._lock:
             return self._sessions.get(session_id)
 
     def get_by_ticket(self, ticket_id: str) -> ProductionLineSession | None:
-        """티켓 ID 로 세션을 조회한다 (동일 티켓 다수 시 첫 매칭)."""
+        """Check the session with the ticket ID (first matching at multiple times)."""
         with self._lock:
             for session in self._sessions.values():
                 if session.ticket_id == ticket_id:
@@ -210,7 +210,7 @@ class ProductionLineSessionRegistry:
             return None
 
     def remove(self, session_id: str) -> bool:
-        """세션을 레지스트리에서 제거한다 (디스크 보존)."""
+        """Remove session from the registry (disk retention)."""
         with self._lock:
             if session_id in self._sessions:
                 del self._sessions[session_id]
@@ -218,7 +218,7 @@ class ProductionLineSessionRegistry:
             return False
 
     def purge(self, session_id: str) -> bool:
-        """세션을 레지스트리 + 디스크에서 완전히 제거한다."""
+        """Completely remove session from the registry + disk."""
         session = self.get(session_id)
         persist_path = session.channel.persist_path if session is not None else None
         removed = self.remove(session_id)
@@ -230,16 +230,16 @@ class ProductionLineSessionRegistry:
                     os.remove(persist_path)
                 except OSError as exc:
                     logger.error(
-                        "production_line_session[%s]: 파일 삭제 실패 (%s): %s",
+                        "production line session[%s]: Delete file failed (%s): %s",
                         session_id, persist_path, exc,
                     )
         return removed
 
     def list_all(self) -> list[dict]:
-        """전체 세션 목록을 dict 리스트로 반환한다.
+        """Returns the full session list to dict list.
 
         Returns:
-            세션 메타 dict 리스트. 키: session_id, ticket_id, command, work_dir,
+            Session meta dict list. key: session id, ticket id, command, work dir,
             worktree_path, status, current_step, current_phase, cycle_start_ts,
             step_ts, created_at
         """
@@ -267,12 +267,12 @@ class ProductionLineSessionRegistry:
         step: str,
         phase: str = '',
     ) -> ProductionLineSession | None:
-        """current_step + current_phase + step_ts 를 thread-safe 갱신한다.
+        """current step + current phase + step ts thread-safe update.
 
-        status 자동 매핑:
+        status Automatic map:
         - DONE → completed
         - FAILED → failed
-        - 그 외 → running (idle 진입은 명시 set_status 로만)
+        News Other → running (idle entry)
         """
         with self._lock:
             session = self._sessions.get(session_id)
@@ -290,7 +290,7 @@ class ProductionLineSessionRegistry:
             return session
 
     def set_status(self, session_id: str, status: str) -> ProductionLineSession | None:
-        """status 를 명시 set 한다 (예: 외부 종결 신호)."""
+        """set status (e.g. external closing signal)."""
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -304,7 +304,7 @@ class ProductionLineSessionRegistry:
         path: str,
         size: int = 0,
     ) -> ProductionLineSession | None:
-        """산출물 메타를 등록한다 (path → {size, mtime})."""
+        """Registered output meta (path → {size, mtime})."""
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -316,14 +316,14 @@ class ProductionLineSessionRegistry:
             return session
 
     def load_from_disk(self) -> int:
-        """persist 디렉터리에서 세션 메타를 로드하여 레지스트리를 복원한다.
+        """Restores registries by loading session meta in persist directory.
 
-        v1 load_from_disk 와 같은 패턴 — 첫 줄 _meta 만 읽어 세션 객체 재생성.
-        이벤트 데이터는 메모리에 복원 안 함 (재접속 시 클라이언트가 NDJSON 파일 직접 read).
-        status='completed' 또는 'failed' 로 복원 (server 재기동 시 진행 중인 세션은 의미 없음).
+        pattern like v1 load from disk — first line  meta only read session object playback.
+        Event data should not be restored to memory (read client directly in NDJSON file when redirected).
+        restore status='completed' or 'failed' (the session in progress in the server reboot is not meaningful).
 
         Returns:
-            로드된 세션 개수
+            Load more
         """
         if self._persist_dir is None or not os.path.isdir(self._persist_dir):
             return 0

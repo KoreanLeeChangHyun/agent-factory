@@ -1,41 +1,41 @@
-# 서브에이전트 공통 제약 및 원칙
+# SubAgent Common Pharmaceuticals and Principles
 
-모든 서브에이전트에 공통으로 적용되는 제약과 원칙을 정의합니다.
+We define the pharmaceutical and principle that applies to all subagents.
 
-## 서브에이전트 공통 제약
+## SubAgent Common Pharmaceutical
 
-| 제약 | 설명 |
+| Pharmaceutical | Description |
 |------|------|
-| AskUserQuestion 호출 불가 | 서브에이전트는 사용자에게 직접 질문할 수 없음 (GitHub Issue #12890). 사용자 확인이 필요한 경우 오케스트레이터가 수행 |
-| Bash 출력 비표시 | 서브에이전트 내부의 Bash 호출 결과는 사용자 터미널에 표시되지 않음. Step 배너 등 사용자 가시 출력은 오케스트레이터가 호출 |
-| 다른 서브에이전트 직접 호출 불가 | Task 도구를 사용한 에이전트 호출은 오케스트레이터만 수행 가능. 서브에이전트 간 직접 호출 불가 |
+| AskUserQuestion cannot be called | Sub-Action cannot be directly asked to the user (GitHub Issue #12890). If you need a user check, the orchestra is performed |
+| Bash output notice | Bash call results inside subagents are not displayed on the user terminal. Step banner, etc. User visibility output is called Ocurator |
+| Other sub-agents cannot be called directly | The agent call using Task tool is only available for Orchestra. No direct call between sub-agents |
 
-## 터미널 출력 원칙
+## Terminal output principle
 
-> **핵심: 내부 분석/사고 과정을 터미널에 출력하지 않는다. 결과만 출력한다.**
+> **Core: Internal analysis/accounting process does not output to the terminal. outputs only. Hotel
 
-- 코드 분석 과정, 구현 방법 검토, 판단 근거 등 내부 사고를 텍스트로 출력하지 않는다
-- "~를 살펴보겠습니다", "~를 구현합니다" 류의 진행 상황 설명을 출력하지 않는다
-- 허용되는 출력: 반환 형식(규격 반환값), 에러 메시지
-- 작업 내역/보고서 파일 경로는 완료 배너를 통해 오케스트레이터가 터미널에 출력 (에이전트 자신이 직접 출력하지 않음)
-- 도구 호출(Read, Write, Edit, Bash 등)은 자유롭게 사용하되, 도구 호출 전후에 불필요한 설명을 붙이지 않는다
+- Code analysis process, implementation method review, judgment based on internal thinking, etc.
+- "I'm going to look at", "to implement" does not output the progress of the flow
+- Allowed output: return format (standard return value), error message
+- Task history/Report file path is completed through the banner of the Ocurator outputs to the terminal (not directly output)
+- The tool call (Read, Write, Edit, Bash, etc.) is free to use, and does not attach any unnecessary explanation before the tool call
 
-## 반환 원칙
+## Return Principle
 
-> **경고**: 반환값이 규격(1줄)을 초과하면 오케스트레이터 컨텍스트가 폭증하여 시스템 장애가 발생합니다.
+>**Registration**: If the return value exceeds the standard (1 line), the Occurator context will be invalid and the system failure will occur.
 
-1. 모든 작업 결과는 `.workflow/` 파일에 기록 완료 후 반환
-2. 반환값은 오직 **상태만** 포함 (1줄)
-3. 코드, 목록, 테이블, 요약, 마크다운 헤더, 경로, 메타정보(N개)는 반환에 절대 포함 금지
-4. 규격 외 내용 1줄이라도 추가 시 시스템 장애 발생
+1. FAQ All job results are returned after recording in `.workflow/` file
+2. FAQ Return value only ** status only** included (1 line)
+3. FAQs Code, List, Table, Summary, Markdown Header, Path, MetaInfo (N), Prohibition of Absolute Inclusion on Return
+4. FAQs System failure when adding one line or other line
 
-## 에러 처리
+## Error processing
 
-| 에러 | 처리 |
+| Error | Processing |
 |------|------|
-| 파일 읽기/쓰기 실패 | 최대 3회 재시도 |
-| 불명확한 요구사항 | 계획서 재확인 후 최선의 판단, 근거를 작업 내역에 기록 |
-| 판단 불가 | 오케스트레이터에게 에러 보고 |
+| Read / Write failed | Maximum 3 Retry |
+| Unclear Requirements | Records of the best judgment after reconfirming the scheme and work history |
+|Not judged | Error report to the orchestra |
 
-**재시도 정책**: 최대 3회, 각 시도 간 1초 대기
-**실패 시**: 오케스트레이터에게 상세 에러 메시지와 함께 보고
+**Review Policy**: Up to 3 times, 1 second waiting for each attempt
+**SILPA CITY**: Reports with detailed error messages to the Orchestra

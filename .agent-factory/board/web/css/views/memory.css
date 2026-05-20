@@ -503,8 +503,8 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Memory Subtab — GC bar (상단) + body (하단 row 레이아웃)
- * prompt-subtab-content 는 row 흐름이라 wrapper 1개로 column 을 만든다.
+ * Memory Subtab — GC bar (top) + body (bottom row layout)
+ * prompt-subtab-content creates columns with one row flow wrapper.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .memory-vertical-wrap {
@@ -693,7 +693,7 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Memory Sidebar — 카테고리 그루핑 (Memory GC type 디렉터리)
+ * Memory Sidebar — Catalog (Memory GC type directory)
  * ───────────────────────────────────────────────────────────────────────── */
 
 .memory-cat-group {
@@ -743,12 +743,12 @@
   opacity: 0.7;
 }
 
-/* archive 그룹 접힘 시 파일 항목 숨김 */
+/* hide file when folded archive group */
 .memory-cat-group.is-archive.collapsed .memory-file-item {
   display: none;
 }
 
-/* caret 아이콘 — collapsed: 오른쪽(▶), expanded: 아래(▼) */
+/* caret icon — collapsed: right(▶), expanded: below(▼) */
 .memory-cat-caret {
   flex-shrink: 0;
   margin-right: 4px;

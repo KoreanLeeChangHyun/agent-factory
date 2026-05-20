@@ -447,7 +447,7 @@
   font-size: 12px;
 }
 
-/* ── File Preview Card (비이미지 파일 프리뷰) ── */
+/* ── File Preview Card ── */
 .terminal-file-card {
   position: relative;
   width: 56px;

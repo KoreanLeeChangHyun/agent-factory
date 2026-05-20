@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
    Section 5: Workflow Timeline Bar (wf-* namespace)
-   Namespace: wf-*  (분리: terminal-* = 세션바, term-* = T-244 도구 출력)
+   Namespace: wf-*  (Note: terminal-* = session bar, term-* = T-244 tool output)
    ═══════════════════════════════════════════════════════ */
 
 /* ── .wf-timeline-bar: fixed container below .terminal-session-bar ── */
@@ -46,7 +46,7 @@
   margin-left: 2px;
 }
 
-/* ── .wf-stop-btn: 워크플로우 강제 중지 버튼 (T-904) ── */
+/* . . wf-stop-btn: Workflow forced stop button (T-904) */
 .wf-stop-btn {
   display: inline-flex;
   align-items: center;
@@ -135,7 +135,7 @@
   border-color: rgba(244, 135, 113, 0.35);
 }
 
-/* VALIDATE step (production-line 6단계) — amber 톤으로 테라코타와 구분 */
+/* VALIDATE step (production-line 6 steps) — terracotta with amber tones */
 .wf-timeline-step[data-step="validate"].active {
   color: #dca74a;
   background: rgba(220, 167, 74, 0.12);
@@ -278,7 +278,7 @@
   color: #f0b8b8;
 }
 
-/* running 상태 pulse animation */
+/* running status pulse animation */
 @keyframes wf-task-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
@@ -365,7 +365,7 @@
 
 /* ═══════════════════════════════════════════════════════
    Section 6: Workflow Step Panels (wf-step-panel, wf-tool-card)
-   Namespace: wf-*  (워크플로우 세션 전용 렌더링 컴포넌트)
+   Namespace: wf-*  (Workflow Session Only Rendering Components)
    ═══════════════════════════════════════════════════════ */
 
 /* ── .wf-step-panel: step-level grouping container ── */
@@ -498,7 +498,7 @@
   }
 }
 
-/* 완료 상태 표시: 헤더 우측 시간 옆 SVG 아이콘 + 실패 시 border 강조. */
+/* Complete status display: SVG icon next to header right time + border highlighting when failed. */
 .wf-tool-card-status-icon {
   display: inline-flex;
   align-items: center;
@@ -766,7 +766,7 @@
    WF Ticket UI
    ============================================ */
 
-/* 기본 카드 컨테이너 */
+/* Standard Card Container */
 .wf-ticket-block {
   border: 1px solid rgba(86,156,214,0.3);
   background: rgba(86,156,214,0.06);
@@ -775,7 +775,7 @@
   border-radius: 4px;
 }
 
-/* 헤더 영역 */
+/* Header Area */
 .wf-ticket-header {
   display: flex;
   align-items: center;
@@ -783,14 +783,14 @@
   margin-bottom: 8px;
 }
 
-/* 티켓 ID 배지 */
+/* Ticket ID badge */
 .wf-ticket-id {
   font-weight: bold;
   color: #569cd6;
   font-family: monospace;
 }
 
-/* WF 플래그 배지 */
+/* WF Flagship */
 .wf-ticket-flag {
   display: inline-block;
   padding: 1px 6px;
@@ -800,14 +800,14 @@
   font-size: 85%;
 }
 
-/* 본문 영역 */
+/* Address
 .wf-ticket-body {
   color: #ccc;
   line-height: 1.5;
   font-size: 11px;
 }
 
-/* 선택지 버튼 컨테이너 */
+/* Optional button container */
 .wf-ticket-menu {
   display: flex;
   flex-direction: column;
@@ -815,7 +815,7 @@
   margin-top: 10px;
 }
 
-/* 선택지 버튼 */
+/* Select button */
 .wf-ticket-btn {
   border: none;
   border-radius: 4px;
@@ -830,7 +830,7 @@
 .wf-ticket-btn:hover { background: #363a40; }
 .wf-ticket-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* 0번 취소/완료 버튼 */
+/* 0 Cancel/Finished Button */
 .wf-ticket-btn.is-cancel {
   color: #999;
   border-top: 1px solid #333;
@@ -838,35 +838,35 @@
   padding-top: 12px;
 }
 
-/* 번호 부분 */
+/* Number Part */
 .wf-ticket-btn .btn-number {
   font-weight: bold;
   color: #569cd6;
   margin-right: 8px;
 }
 
-/* 클릭 후 resolved 상태 */
-.wf-ticket-actions-resolved .wf-ticket-btn { /* 모든 버튼 비활성 */ }
+/* Fixd status after click */
+.wf-ticket-actions-resolved .wf-ticket-btn { /* All buttons inactive */ }
 
-/* 선택된 버튼 하이라이트 */
+/* Select Button Highlight */
 .wf-ticket-selected {
   background: rgba(86,156,214,0.15);
   border-color: #569cd6;
 }
 
-/* 성공 결과 카드 */
+/* Success Result Card */
 .wf-status-ok {
   border-color: rgba(63,185,80,0.4);
   background: rgba(63,185,80,0.06);
 }
 
-/* 에러 결과 카드 */
+/* Error Result Card */
 .wf-status-err {
   border-color: rgba(244,135,113,0.4);
   background: rgba(244,135,113,0.06);
 }
 
-/* 상태 인라인 배지 */
+/* Status Inline Badge */
 .wf-status-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -874,7 +874,7 @@
   font-size: 85%;
 }
 
-/* 안내 문구 */
+/* Reservation
 .wf-ticket-hint {
   color: #666;
   font-size: 85%;
@@ -1092,7 +1092,7 @@
   font-weight: 500;
 }
 
-/* ── Info card (이미 상태) ── */
+/* ── Info card (image) */
 .flow-cmd-info {
   background: rgba(86, 156, 214, 0.06);
   border-color: rgba(86, 156, 214, 0.2);
@@ -1334,10 +1334,10 @@
 
 /* ═══════════════════════════════════════════════════════
    Section 7: T-495 P3 — production-line stdout NDJSON branch rendering
-   Namespace: wf-production-line-*  (production-line workflow 전용 카드/배지)
+   Namespace: wf-production-line-*  (production-line workflow only card / paper)
    ═══════════════════════════════════════════════════════ */
 
-/* stdout text 라인 (assistant 본문) */
+/* stdout text line (assistant body) */
 .wf-production-line-stdout-line {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 11px;
@@ -1348,7 +1348,7 @@
   padding: 1px 4px;
 }
 
-/* tool_use 카드 — name + summary */
+/* name + summary */
 .wf-production-line-tool-use {
   display: flex;
   gap: 6px;
@@ -1375,7 +1375,7 @@
   white-space: nowrap;
 }
 
-/* result 메타 카드 */
+/* result meta card */
 .wf-production-line-result-meta {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 10.5px;
@@ -1403,7 +1403,7 @@
   color: #f48771;
 }
 
-/* system init 카드 */
+/* system init card */
 .wf-production-line-system-init {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 10.5px;
@@ -1421,7 +1421,7 @@
   margin-right: 4px;
 }
 
-/* warning (rate_limit) / regression 마커 */
+/* alert(rate limit) / regression marker */
 .wf-production-line-warning,
 .wf-production-line-regression {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;

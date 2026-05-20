@@ -1,7 +1,7 @@
-"""Board 데이터 읽기/유틸 모듈.
+"""Board Data Reading/Utilization Modules.
 
-server.py에서 분리된 데이터 접근 함수와 관련 상수를 제공한다.
-BoardHTTPRequestHandler._handle_api() 및 관련 핸들러에서 직접 import하여 사용한다.
+server.py provides a separate data access function and related constant.
+BoardHTTPRequestHandler. handle api()
 """
 
 from __future__ import annotations
@@ -58,28 +58,28 @@ from engine.apps.board_api.prompt_store import (
 # Memory helpers
 # ---------------------------------------------------------------------------
 
-# 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점 (.md 확장자 필수)
+# Allowed file name patterns: alphabet, number, hyphen, underscore, dot (.md extension required)
 _MEMORY_FILENAME_RE = re.compile(r'^[A-Za-z0-9_\-]+\.md$')
 
-# Memory GC 마이그레이션 후 1단계 sub-directory 허용 (user/feedback/project/reference/archive)
+# Allow step 1 sub-directory after Memory GC migration (user/feedback/project/reference/archive)
 _MEMORY_TYPE_DIRS: tuple[str, ...] = ('user', 'feedback', 'project', 'reference')
 _MEMORY_ARCHIVE_DIRS: tuple[str, ...] = ('archive/merged', 'archive/synthesized', 'archive/stale')
 _MEMORY_ALLOWED_SUBDIRS: tuple[str, ...] = _MEMORY_TYPE_DIRS + _MEMORY_ARCHIVE_DIRS
 
 
 def _resolve_memory_dir(project_root: str) -> str:
-    """프로젝트 루트에 대응하는 Claude auto memory 디렉터리 경로를 반환한다.
+    """return the Claude auto memory directory path to the project route.
 
-    경로 규칙: ~/.claude/projects/-{project_root_with_slash_to_dash}/memory/
-    예: /home/deus/workspace/claude -> ~/.claude/projects/-home-deus-workspace-claude/memory/
+    Path rules: ~/. slash to dash}/memory/
+    /home-deus-workspace-claude/memory/
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
-        memory 디렉터리 절대 경로
+        memory directory absolute path
     """
-    # project_root의 선행 / 제거 후 / -> - 치환
+    # Preceding/removing project_root/->-replacement
     normalized = project_root.lstrip('/').replace('/', '-')
     return os.path.join(
         os.path.expanduser('~'), '.claude', 'projects',
@@ -88,21 +88,21 @@ def _resolve_memory_dir(project_root: str) -> str:
 
 
 def _list_memory_files(project_root: str) -> list[dict]:
-    """memory 디렉터리의 .md 파일 목록을 반환한다.
+    """returns the .md file list of memory directories.
 
-    Memory GC 마이그레이션 이후 type 디렉터리(user/feedback/project/reference)와
-    archive 하위(merged/synthesized/stale) 도 함께 스캔한다. 평탄 파일도 호환.
-    name 필드는 mem_dir 기준 상대 path (예: "feedback/feedback_root.md").
+    type directory (user/feedback/project/reference) and
+    Scan the archive sub(merged/synthesized/stale) as well. Default file is also compatible.
+    name field is mem dir standard relative path (e.g. "feedback/feedback root.md").
 
-    MEMORY.md는 isIndex: true로 표시하며, 목록 최상단에 배치한다.
-    숨김 파일(. 시작)은 제외한다.
+    MEMORY.md isIndex: true, and is placed in the top of the list.
+    Search file(.) Start) is excluded.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
         [{"name": str, "size": int, "mtime": str, "isIndex": bool, "category": str}, ...]
-        디렉터리 미존재 시 빈 리스트.
+        Director Lee Min-Joon
     """
     mem_dir = _resolve_memory_dir(project_root)
     if not os.path.isdir(mem_dir):
@@ -125,7 +125,7 @@ def _list_memory_files(project_root: str) -> list[dict]:
             'category': category,
         })
 
-    # 1) 평탄 파일 (MEMORY.md 포함)
+    # 1) Flattened files (including MEMORY.md)
     try:
         for entry in os.scandir(mem_dir):
             if not entry.is_file() or not entry.name.endswith('.md'):
@@ -136,7 +136,7 @@ def _list_memory_files(project_root: str) -> list[dict]:
     except OSError:
         return []
 
-    # 2) 1단계 sub-directory (type + archive)
+    # 2) Step 1 sub-directory (type + archive)
     for sub in _MEMORY_ALLOWED_SUBDIRS:
         sub_path = os.path.join(mem_dir, sub)
         if not os.path.isdir(sub_path):
@@ -151,24 +151,24 @@ def _list_memory_files(project_root: str) -> list[dict]:
         except OSError:
             continue
 
-    # MEMORY.md 최상단 → 그 외는 (category, name) 순 정렬
+    # MEMORY.md at the top → Others are sorted by (category, name)
     files.sort(key=lambda f: (not f['isIndex'], f['category'], f['name']))
     return files
 
 
 def _read_memory_file(project_root: str, filename: str) -> dict:
-    """memory 파일 1개의 내용을 읽어 반환한다.
+    """return to read 1 memory file.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        filename: 읽을 파일명 (확장자 포함)
+        project root: Project route absolute path
+        filename: read filename (including specifier)
 
     Returns:
         {"name": str, "content": str, "size": int}
 
     Raises:
-        ValueError: 파일명이 보안 검증에 실패한 경우
-        FileNotFoundError: 파일이 존재하지 않는 경우
+        ValueError: If filename fails to validate security
+        FileNotFoundError: If the file does not exist
     """
     _validate_memory_filename(filename)
     mem_dir = _resolve_memory_dir(project_root)
@@ -190,20 +190,20 @@ def _read_memory_file(project_root: str, filename: str) -> dict:
 def _write_memory_file(
     project_root: str, filename: str, content: str,
 ) -> dict:
-    """memory 파일을 생성하거나 수정한다.
+    """Create or edit memory files.
 
-    .md 확장자가 없으면 자동으로 붙인다. 저장 후 인덱스 동기화를 수행한다.
+    . If there is no md extension, it will be automatically attached. Perform index sync after storage.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        filename: 저장할 파일명
-        content: 파일 내용
+        project root: Project route absolute path
+        filename:
+        content: Content
 
     Returns:
         {"ok": True, "name": str}
 
     Raises:
-        ValueError: 파일명이 보안 검증에 실패한 경우
+        ValueError: If filename fails to validate security
     """
     if not filename.endswith('.md'):
         filename += '.md'
@@ -221,20 +221,20 @@ def _write_memory_file(
 
 
 def _delete_memory_file(project_root: str, filename: str) -> dict:
-    """memory 파일을 삭제한다.
+    """Delete memory files.
 
-    MEMORY.md(인덱스 파일)는 삭제할 수 없다. 삭제 후 인덱스 동기화를 수행한다.
+    MEMORY.md cannot be deleted. Perform index synchronization after deletion.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        filename: 삭제할 파일명
+        project root: Project route absolute path
+        filename:
 
     Returns:
         {"ok": True}
 
     Raises:
-        ValueError: 파일명이 보안 검증에 실패하거나 MEMORY.md인 경우
-        FileNotFoundError: 파일이 존재하지 않는 경우
+        ValueError: If filename fails to validate security or MEMORY.md
+        FileNotFoundError: If the file does not exist
     """
     _validate_memory_filename(filename)
     if filename == 'MEMORY.md':
@@ -252,15 +252,15 @@ def _delete_memory_file(project_root: str, filename: str) -> dict:
 
 
 def _sync_memory_index(project_root: str) -> None:
-    """MEMORY.md의 Topic Files 섹션을 디렉터리 실제 파일과 동기화한다.
+    """Sync the Topic Files section of MEMORY.md with the directory real file.
 
-    - Topic Files 섹션에만 있고 디렉터리에 없는 항목: 제거
-    - 디렉터리에만 있고 Topic Files에 없는 .md 파일: 추가
-    - 기존 항목의 설명 텍스트(" -- 설명")는 보존
-    - MEMORY.md 자체와 숨김 파일은 인덱스 대상에서 제외
+    - Topic Files section only and no directory items: removal
+    - .md file without directory and Topic Files: Added
+    - The description text of the existing item ("--Description") preserved
+    - MEMORY.md self and hidden files excluded from index target
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
     """
     mem_dir = _resolve_memory_dir(project_root)
     index_path = os.path.join(mem_dir, 'MEMORY.md')
@@ -268,7 +268,7 @@ def _sync_memory_index(project_root: str) -> None:
     if not os.path.isfile(index_path):
         return
 
-    # 디렉터리의 실제 .md 파일 목록 (MEMORY.md, 숨김 파일 제외)
+    # List of actual .md files in the directory (excluding MEMORY.md, hidden files)
     actual_files: set[str] = set()
     try:
         for entry in os.scandir(mem_dir):
@@ -280,11 +280,11 @@ def _sync_memory_index(project_root: str) -> None:
     except OSError:
         return
 
-    # MEMORY.md 읽기
+    # Read MEMORY.md
     with open(index_path, encoding='utf-8') as f:
         lines = f.readlines()
 
-    # Topic Files 섹션 찾기
+    # Find the Topic Files section
     topic_start = -1
     topic_end = len(lines)
     for i, line in enumerate(lines):
@@ -296,11 +296,11 @@ def _sync_memory_index(project_root: str) -> None:
             break
 
     if topic_start < 0:
-        # Topic Files 섹션이 없으면 동기화 생략
+        # Skip synchronization if Topic Files section does not exist
         return
 
-    # 기존 Topic Files 항목 파싱: {filename: "전체 라인 텍스트"}
-    # 형식: - [filename.md](filename.md) — 설명
+    # Parse existing Topic Files items: {filename: "full line text"}
+    # Format: - [filename.md](filename.md) — Description
     topic_line_re = re.compile(
         r'^- \[([^\]]+)\]\([^)]+\)(.*)',
     )
@@ -310,28 +310,28 @@ def _sync_memory_index(project_root: str) -> None:
         m = topic_line_re.match(lines[i].strip())
         if m:
             fname = m.group(1)
-            desc = m.group(2)  # " — 설명" 또는 빈 문자열
+            desc = m.group(2)  # "- explanation" or empty string
             existing[fname] = desc
 
-    # 동기화: 실제 파일과 비교
-    # 1) 삭제된 파일 제거
+    # Sync: Compare to actual file
+    # 1) Remove deleted files
     synced: dict[str, str] = {
         fname: desc for fname, desc in existing.items()
         if fname in actual_files
     }
-    # 2) 새로 추가된 파일 삽입 (설명 없음)
+    # 2) Insert newly added file (no description)
     for fname in sorted(actual_files):
         if fname not in synced:
             synced[fname] = ''
 
-    # 새 Topic Files 섹션 라인 구성
+    # New Topic Files section line configuration
     new_topic_lines: list[str] = []
     for fname in sorted(synced.keys()):
         desc = synced[fname]
         new_topic_lines.append(f'- [{fname}]({fname}){desc}\n')
 
-    # 원본 라인 재구성
-    # topic_start 라인(## Topic Files)은 유지, 그 다음 빈 줄 + 항목 + 빈 줄
+    # Reconstruct the original line
+    # Keep topic_start line (## Topic Files), then blank line + item + blank line
     before = lines[:topic_start + 1]
     after = lines[topic_end:]
 
@@ -342,22 +342,22 @@ def _sync_memory_index(project_root: str) -> None:
 
 
 def _validate_memory_filename(filename: str) -> None:
-    """메모리 파일명의 보안 검증을 수행한다.
+    """Perform security verification of memory filename.
 
-    디렉터리 트래버설 공격을 방지하고, 화이트리스트된 1단계 sub-directory
-    (user/feedback/project/reference, archive/{merged,synthesized,stale}) 만 허용한다.
+    Prevents directory attacks, sub-directory whitelisted
+    (user/feedback/project/reference, archive/{merged,synthesized,stale})
 
     Args:
-        filename: 검증할 파일명 또는 sub-path
+        filename: filename or sub-path to validate
 
     Raises:
-        ValueError: 파일명에 '..', '\\\\' 가 포함되거나 화이트리스트 외 경로,
-                   허용 패턴에 맞지 않는 경우
+        ValueError: '..' in the filename, '\\\\' contains or whitelists,
+                   If you do not meet the acceptable pattern
     """
     if '..' in filename or '\\' in filename:
         raise ValueError(f'Invalid filename: {filename}')
     if '/' in filename:
-        # 1단계 또는 2단계(archive/x) sub-directory 만 허용
+        # Only 1st or 2nd level (archive/x) sub-directories are allowed.
         head, _, tail = filename.rpartition('/')
         if head not in _MEMORY_ALLOWED_SUBDIRS:
             raise ValueError(f'Invalid memory sub-directory: {head}')
@@ -372,13 +372,13 @@ def _validate_memory_filename(filename: str) -> None:
 # Rules helpers (.claude/rules/)
 # ---------------------------------------------------------------------------
 
-# rules 파일명 허용 패턴: 알파벳, 숫자, 하이픈, 언더스코어, 점 (.md 확장자 필수)
+# rules Allowed file name patterns: alphabet, number, hyphen, underscore, dot (.md extension required)
 _RULES_FILENAME_RE = re.compile(r'^[A-Za-z0-9_\-]+\.md$')
 
-# 허용 카테고리
+# Allowed categories
 _RULES_CATEGORIES = {'workflow', 'project'}
 
-# claude_edit.py 스크립트 절대 경로
+# claude_edit.py script absolute path
 _CLAUDE_EDIT_SCRIPT = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '..', 'engine', 'claude_edit.py',
@@ -386,16 +386,16 @@ _CLAUDE_EDIT_SCRIPT = os.path.join(
 
 
 def _validate_rules_rel_path(rel_path: str) -> tuple[str, str]:
-    """rules 상대 경로를 검증하고 (category, filename) 튜플을 반환한다.
+    """Verify the relative path and return (category, filename) tuple.
 
     Args:
-        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+        rel path: '.claude/rules/' reference path (e.g. 'workflow/general.md')
 
     Returns:
-        (category, filename) 튜플
+        (category, filename)
 
     Raises:
-        ValueError: 경로 형식이 잘못되었거나 허용되지 않는 경우
+        ValueError: If the path format is wrong or not allowed
     """
     if '..' in rel_path or '\\' in rel_path:
         raise ValueError(f'Invalid path: {rel_path}')
@@ -411,15 +411,15 @@ def _validate_rules_rel_path(rel_path: str) -> tuple[str, str]:
 
 
 def _list_rules_files(project_root: str) -> list[dict]:
-    """'.claude/rules/' 하위 모든 .md 파일을 재귀 탐색하여 목록을 반환한다.
+    """returns the list by recurring all .md files under '.claude/rules/'.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
         [{"name": str, "path": str, "size": int, "mtime": str, "category": str}, ...]
-        'path'는 '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
-        'category'는 하위 디렉터리명 (workflow 또는 project)
+        'path' is '.claude/rules/' based relative path (e.g. 'workflowgene/ral.md')
+        'category' is a subdirectory name (workflow or project)
     """
     rules_dir = os.path.join(project_root, '.claude', 'rules')
     if not os.path.isdir(rules_dir):
@@ -459,18 +459,18 @@ def _list_rules_files(project_root: str) -> list[dict]:
 
 
 def _read_rules_file(project_root: str, rel_path: str) -> dict:
-    """rules 파일 1개의 내용을 읽어 반환한다.
+    """Returns the contents of the rules file.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+        project root: Project route absolute path
+        rel path: '.claude/rules/' reference path (e.g. 'workflow/general.md')
 
     Returns:
         {"name": str, "path": str, "content": str, "size": int}
 
     Raises:
-        ValueError: 경로가 보안 검증에 실패한 경우
-        FileNotFoundError: 파일이 존재하지 않는 경우
+        ValueError: If the path fails to validate security
+        FileNotFoundError: If the file does not exist
     """
     category, filename = _validate_rules_rel_path(rel_path)
     filepath = os.path.join(project_root, '.claude', 'rules', category, filename)
@@ -492,29 +492,29 @@ def _read_rules_file(project_root: str, rel_path: str) -> dict:
 def _write_rules_file(
     project_root: str, rel_path: str, content: str,
 ) -> dict:
-    """rules 파일을 생성하거나 수정한다.
+    """Create or edit the rules file.
 
-    .claude/ 하위 파일이므로 flow-claude-edit (claude_edit.py)를 경유한다.
-    open -> edit/ 파일 수정 -> save 순서로 처리한다.
+    . Since claude/ sub-files, it is enforced by flow-claude-edit (claude edit.py).
+    open -> edit/ modify the file -> save in order.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
-        content: 저장할 파일 내용
+        project root: Project route absolute path
+        rel path: '.claude/rules/' reference path (e.g. 'workflow/general.md')
+        content: save file content
 
     Returns:
         {"ok": True, "path": str}
 
     Raises:
-        ValueError: 경로가 보안 검증에 실패한 경우
-        RuntimeError: flow-claude-edit 호출 실패 시
+        ValueError: If the path fails to validate security
+        RuntimeError: When the flow-claude-edit call failed
     """
     category, filename = _validate_rules_rel_path(rel_path)
 
-    # .claude/rules/category/filename 형식으로 claude_edit에 전달
+    # Pass to claude_edit in the format .claude/rules/category/filename
     claude_rel_path = f'rules/{rel_path}'
 
-    # 원본이 없을 경우 open이 실패하므로, 신규 파일은 직접 생성 후 save
+    # Since open fails if there is no original, create a new file directly and then save it.
     original_path = os.path.join(project_root, '.claude', 'rules', category, filename)
     edit_dir = os.path.join(project_root, '.agent-factory', 'staging')
     edit_path = os.path.join(edit_dir, 'rules', rel_path)
@@ -523,7 +523,7 @@ def _write_rules_file(
     is_new = not os.path.isfile(original_path)
 
     if not is_new:
-        # open: .claude/ -> edit/ 복사
+        # open: .claude/ -> edit/ Copy
         result = subprocess.run(
             ['python3', script, 'open', claude_rel_path],
             capture_output=True, text=True, timeout=10,
@@ -532,12 +532,12 @@ def _write_rules_file(
         if result.returncode != 0:
             raise RuntimeError(f'flow-claude-edit open failed: {result.stderr.strip()}')
 
-    # edit/ 파일에 내용 기록
+    # edit/ Write content to file
     os.makedirs(os.path.dirname(edit_path), exist_ok=True)
     with open(edit_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
-    # save: edit/ -> .claude/ 덮어쓰기
+    # save: edit/ -> overwrite .claude/
     result = subprocess.run(
         ['python3', script, 'save', claude_rel_path],
         capture_output=True, text=True, timeout=10,
@@ -550,21 +550,21 @@ def _write_rules_file(
 
 
 def _delete_rules_file(project_root: str, rel_path: str) -> dict:
-    """rules 파일을 삭제한다.
+    """Delete the rules file.
 
-    .claude/ 하위 파일이므로 open 후 edit/ 파일 삭제, 원본 rm 순서로 처리한다.
+    . Since the claude/ sub-file is open, edit/ delete files, the original rm will be processed in order.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        rel_path: '.claude/rules/' 기준 상대 경로 (예: 'workflow/general.md')
+        project root: Project route absolute path
+        rel path: '.claude/rules/' reference path (e.g. 'workflow/general.md')
 
     Returns:
         {"ok": True}
 
     Raises:
-        ValueError: 경로가 보안 검증에 실패한 경우
-        FileNotFoundError: 파일이 존재하지 않는 경우
-        RuntimeError: flow-claude-edit 호출 실패 시
+        ValueError: If the path fails to validate security
+        FileNotFoundError: If the file does not exist
+        RuntimeError: When the flow-claude-edit call failed
     """
     category, filename = _validate_rules_rel_path(rel_path)
     original_path = os.path.join(project_root, '.claude', 'rules', category, filename)
@@ -577,7 +577,7 @@ def _delete_rules_file(project_root: str, rel_path: str) -> dict:
     edit_dir = os.path.join(project_root, '.agent-factory', 'staging')
     edit_path = os.path.join(edit_dir, 'rules', rel_path)
 
-    # open: .claude/ -> edit/ 복사
+    # open: .claude/ -> edit/ Copy
     result = subprocess.run(
         ['python3', script, 'open', claude_rel_path],
         capture_output=True, text=True, timeout=10,
@@ -586,11 +586,11 @@ def _delete_rules_file(project_root: str, rel_path: str) -> dict:
     if result.returncode != 0:
         raise RuntimeError(f'flow-claude-edit open failed: {result.stderr.strip()}')
 
-    # edit/ 복사본 삭제
+    # edit/delete copy
     if os.path.isfile(edit_path):
         os.remove(edit_path)
 
-    # 원본 파일 삭제
+    # Delete original file
     os.remove(original_path)
 
     return {'ok': True}
@@ -602,16 +602,16 @@ def _delete_rules_file(project_root: str, rel_path: str) -> dict:
 
 
 def _read_claude_md(project_root: str) -> dict:
-    """프로젝트 루트의 CLAUDE.md 내용을 읽어 반환한다.
+    """Returns the CLAUDE.md contents of the project route.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
         {"name": "CLAUDE.md", "content": str, "size": int}
 
     Raises:
-        FileNotFoundError: CLAUDE.md가 존재하지 않는 경우
+        FileNotFoundError: If CLAUDE.md does not exist
     """
     filepath = os.path.join(project_root, 'CLAUDE.md')
     if not os.path.isfile(filepath):
@@ -628,13 +628,13 @@ def _read_claude_md(project_root: str) -> dict:
 
 
 def _write_claude_md(project_root: str, content: str) -> dict:
-    """프로젝트 루트의 CLAUDE.md를 수정한다.
+    """modify CLAUDE.md in project root.
 
-    CLAUDE.md는 프로젝트 루트에 위치하며 .claude/ 하위가 아니므로 직접 쓰기 가능하다.
+    CLAUDE.md is located in the project route and is not .claude/ sub, so you can write it directly.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        content: 저장할 파일 내용
+        project root: Project route absolute path
+        content: save file content
 
     Returns:
         {"ok": True}
@@ -653,18 +653,18 @@ ROADMAP_PATH: str = os.path.join('.agent-factory', 'roadmap', 'ROADMAP.yaml')
 
 
 def _read_roadmap(project_root: str) -> dict:
-    """ROADMAP.yaml 을 읽어 파싱된 dict 를 반환한다.
+    """return dict that read ROADMAP.yaml.
 
-    파일이 없으면 빈 phases 로 응답해 클라이언트가 "데이터 없음" 을 자연스럽게 표시할 수
-    있게 한다. 파싱 오류는 그대로 전파해 핸들러가 500 으로 응답하도록 둔다.
+    If you don't have a file, you can respond to an empty phases and display the client "no data" naturally
+    About Us The parsing error is that the handler responds to 500.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
         {"version": int, "phases": [...]}
     """
-    import yaml  # 지연 import — PyYAML 미설치 환경에서도 다른 board 기능은 동작
+    import yaml  # Delayed import — Other board functions work even in environments where PyYAML is not installed
 
     filepath = os.path.join(project_root, ROADMAP_PATH)
     if not os.path.isfile(filepath):
@@ -682,16 +682,16 @@ def _read_roadmap(project_root: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Memory GC (.agent-factory/bin/flow-memory-gc 래퍼 위임)
+# Memory GC (.agent-factory/bin/flow-memory-gc wrapper delegate)
 # ---------------------------------------------------------------------------
 
 MEMORY_GC_BIN: str = os.path.join('.agent-factory', 'bin', 'flow-memory-gc')
 
 
 def _run_memory_gc(project_root: str, subcmd: str, *args: str, timeout: int = 30) -> dict:
-    """flow-memory-gc 서브커맨드를 호출해 JSON 결과를 반환한다.
+    """returns JSON results by calling flow-memory-gc subdirection.
 
-    실패 시 {"ok": False, "error": "..."} 형태로 정규화.
+    When failure {"ok": False, "error": "..."} Normalization in form.
     """
     bin_path = os.path.join(project_root, MEMORY_GC_BIN)
     if not os.path.isfile(bin_path):
@@ -741,10 +741,10 @@ def _memory_gc_prune_archive(project_root: str, *, apply: bool) -> dict:
 
 
 def _trigger_memory_index_regen(project_root: str) -> None:
-    """memory write/delete 후 인덱스 자동 갱신 — fire-and-forget.
+    """memory write/delete after index auto update — fire-and-forget.
 
-    flow-memory-gc auto --trigger session 호출. 환경변수에 'session' 트리거가
-    포함된 경우에만 발화. 미포함 시 silent skip.
+    flow-memory-gc auto --trigger session call. 'session' trigger
+    saturation only if included. skip to main content
     """
     bin_path = os.path.join(project_root, MEMORY_GC_BIN)
     if not os.path.isfile(bin_path):

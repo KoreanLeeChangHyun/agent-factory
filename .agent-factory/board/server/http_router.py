@@ -20,9 +20,9 @@ from engine.apps.board_api.worktree_commit import WorktreeCommitHandlerMixin
 from engine.apps.board_api.ops_endpoints import OpsHandlerMixin
 
 
-# T-513 P5 — V1 워크플로우 엔진 일괄 폐기. WorkflowHandlerMixin +
-# WorkflowUndoHandlerMixin 제거. Production line 단일화
-# (kanban undo-done 흡수 + settings workflow-sync 흡수).
+# T-513 P5 — V1 workflow engine batch disposal. WorkflowHandlerMixin +
+# WorkflowUndoHandlerMixin Removal. Production Line
+# (kanban undo-done absorption + settings workflow-sync absorption).
 class BoardHTTPRequestHandler(
     TerminalHandlerMixin,
     ProductionLineWorkflowHandlerMixin,
@@ -37,12 +37,12 @@ class BoardHTTPRequestHandler(
     SettingsHandlerMixin,
     SimpleHTTPRequestHandler,
 ):
-    """Board 전용 HTTP 요청 핸들러.
+    """Board-only HTTP request handler.
 
-    /events 경로는 SSE 엔드포인트로 처리하고,
-    /api/* 경로는 JSON API로 처리하고,
-    그 외 경로는 SimpleHTTPRequestHandler의 정적 파일 서빙으로 위임한다.
-    정적 파일은 ``.agent-factory/board/web`` 디렉터리를 루트로 서빙한다.
+    /events path is handled with SSE endpoint,
+    /api/* path is handled with JSON API,
+    Other paths are entrusted with the static file serving of SimpleHTTPRequestHandler.
+    static files are called ``.agent-factory/board/web` directory.
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -53,13 +53,13 @@ class BoardHTTPRequestHandler(
         super().__init__(*args, directory=static_dir, **kwargs)
 
     def translate_path(self, path: str) -> str:
-        """정적 파일 경로를 해석한다.
+        """Default file path.
 
-        라우팅:
-          - ``/.agent-factory/board/*`` → ``web/*`` (기존 북마크 호환)
-          - ``/.agent-factory/board/static/*`` → ``web/*`` (옛 static URL 호환)
-          - ``/.agent-factory/*``       → 프로젝트 루트 (워크플로우 산출물)
-          - 그 외                          → ``web/*`` (기본)
+        Tag:
+          - ``/.agent-factory/board/*` → ``web/*`
+          - ``/.agent-factory/board/static/*`
+          - ``/.agent-factory/*` → Project route (workflow output)
+          - Other → ``web/*` (default)
         """
         from urllib.parse import urlsplit, unquote
         clean = urlsplit(path).path
@@ -77,7 +77,7 @@ class BoardHTTPRequestHandler(
         return super().translate_path(path)
 
     def do_GET(self) -> None:
-        """GET 요청을 처리한다."""
+        """handle GET requests."""
         if self.path == '/events':
             self._handle_sse()
         elif self.path == '/poll':
@@ -96,7 +96,7 @@ class BoardHTTPRequestHandler(
             return
         elif self.path == '/api/ops/sse-status':
             self._handle_ops_sse_status()
-        # T-513 P5 — kanban 도메인 단일화 (V1 워크플로우 alias 일괄 폐기).
+        # T-513 P5 — kanban domain singleization (V1 workflow alias batch waste).
         elif self.path == '/api/kanban/workflow-entries':
             self._handle_kanban_workflow_entries()
         elif self.path.startswith('/api/kanban/workflow-detail'):
@@ -107,7 +107,7 @@ class BoardHTTPRequestHandler(
             super().do_GET()
 
     def do_POST(self) -> None:
-        """POST 요청을 처리한다."""
+        """POST request."""
         if self.path == '/api/env':
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
@@ -122,7 +122,7 @@ class BoardHTTPRequestHandler(
             self._handle_restart()
         elif self.path == '/api/debug-log':
             self._handle_debug_log()
-        # T-513 P5 — settings 도메인 단일화 (V1 sync alias 일괄 폐기).
+        # T-513 P5 — settings domain singleization (V1 sync alias batch disposal).
         elif self.path == '/api/settings/workflow-sync':
             self._handle_settings_workflow_sync()
         elif self.path == '/terminal/start':
@@ -167,7 +167,7 @@ class BoardHTTPRequestHandler(
             self._handle_kanban_branch_toggle()
         elif self.path == '/api/kanban/worktree-commit':
             self._handle_worktree_commit()
-        # T-513 P5 — kanban 도메인 단일화 (V1 undo-done alias 일괄 폐기).
+        # T-513 P5 — kanban domain singleization (V1 undo-done alias batch disposal).
         elif self.path == '/api/kanban/undo-done':
             self._handle_kanban_undo_done()
         elif self.path == '/api/ops/zombie-reap':
@@ -179,10 +179,10 @@ class BoardHTTPRequestHandler(
             self.end_headers()
 
     def do_DELETE(self) -> None:
-        """DELETE 요청을 처리한다.
+        """DELETE request.
 
-        T-511 P4 — DELETE 분기 4건을 generic.py `_handle_api_delete` dispatcher
-        에 위임 (inline 로직 X). production-line 세션 DELETE 는 `_production_line_dispatch_delete` 위임.
+        T-511 P4 — DELETE Quarter 4 generic.py ` handle api delete` dispatcher
+        Inlinelogic X). Production-line Session DELETE is named ' production line dispatch delete'.
         """
         if self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_delete():
             return
@@ -193,10 +193,10 @@ class BoardHTTPRequestHandler(
         self.end_headers()
 
     def do_PATCH(self) -> None:
-        """PATCH 요청을 처리한다.
+        """PATCH requests.
 
-        T-511 P4 — production-line 세션 status 강제 갱신 (debug/recovery).
-        본 메서드는 SimpleHTTPRequestHandler 의 기본에는 없으므로 신설.
+        T-511 P4 — production-line session status forced update (debug/recovery).
+        This method is not the default of SimpleHTTPRequestHandler.
         """
         if self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_patch():
             return
@@ -204,7 +204,7 @@ class BoardHTTPRequestHandler(
         self.end_headers()
 
     def _send_json(self, data: object) -> None:
-        """JSON 응답을 전송한다."""
+        """JSON response."""
         body = json.dumps(data, ensure_ascii=False).encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -214,13 +214,13 @@ class BoardHTTPRequestHandler(
         self.wfile.write(body)
 
     def _parse_query_param(self, key: str) -> str | None:
-        """URL 쿼리 파라미터에서 지정한 키의 값을 추출한다.
+        """Extract the value of the specified key in the URL query parameter.
 
         Args:
-            key: 추출할 쿼리 파라미터 키
+            key: query parameter key to extract
 
         Returns:
-            파라미터 값 문자열. 존재하지 않으면 None.
+            parameter value string. None.
         """
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
@@ -228,12 +228,12 @@ class BoardHTTPRequestHandler(
         return values[0] if values else None
 
     def _read_json_body(self) -> dict | None:
-        """POST 요청의 JSON 본문을 파싱하여 반환한다.
+        """returns the JSON body of the POST request.
 
-        파싱 실패 시 400 에러를 전송하고 None을 반환한다.
+        When parsing fails to send 400 error and return None.
 
         Returns:
-            파싱된 dict. 실패 시 None.
+            dict. None.
         """
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
@@ -254,11 +254,11 @@ class BoardHTTPRequestHandler(
         return data
 
     def _send_json_with_status(self, status: int, data: object) -> None:
-        """지정한 HTTP 상태 코드로 JSON 응답을 전송한다.
+        """Sends JSON responses with specified HTTP status code.
 
         Args:
-            status: HTTP 상태 코드
-            data: JSON 직렬화 가능한 응답 본문
+            status: HTTP status code
+            data: JSON serialized response body
         """
         body = json.dumps(data, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
@@ -269,11 +269,11 @@ class BoardHTTPRequestHandler(
         self.wfile.write(body)
 
     def _send_error(self, code: int, message: str) -> None:
-        """에러 응답을 JSON 형식으로 전송한다.
+        """Send an error response to JSON format.
 
         Args:
-            code: HTTP 상태 코드
-            message: 에러 메시지
+            code: HTTP status code
+            message: error message
         """
         body = json.dumps(
             {'ok': False, 'error': message},
@@ -287,7 +287,7 @@ class BoardHTTPRequestHandler(
         self.wfile.write(body)
 
     def do_OPTIONS(self) -> None:
-        """CORS preflight 요청을 처리한다."""
+        """CORS preflight request."""
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS')
@@ -296,25 +296,25 @@ class BoardHTTPRequestHandler(
         self.end_headers()
 
     def log_message(self, format: str, *args: object) -> None:
-        """로그 메시지를 출력한다. SSE 경로만 최소 로깅한다.
+        """output log messages. Only SSE routes are logging at least.
 
         Args:
-            format: 로그 포맷 문자열
-            *args: 포맷 인자
+            format: log format string
+            *args: format factor
         """
-        # 정적 파일 요청 로그 억제, SSE/터미널 관련만 로깅 (/poll 요청도 억제)
+        # static file request log suppression, SSE/Terminal only logging (/poll request suppression)
         if args and isinstance(args[0], str) and (
             '/events' in args[0] or '/terminal' in args[0]
         ):
             super().log_message(format, *args)
 
     def end_headers(self) -> None:
-        """CORS 헤더를 추가한 후 헤더를 종료한다."""
-        # SSE, poll, terminal 외 요청에도 CORS 헤더 추가 (index.html에서의 fetch 호환)
-        # /events, /poll, /terminal/*은 각 핸들러에서 직접 CORS 헤더를 추가하므로 제외
+        """Add CORS header and exit header."""
+        # Add CORS header to request such as SSE, poll, terminal (fetch compatible in index.html)
+        # /events, /poll, /terminal/* adds CORS header directly from each handler except
         if self.path not in ('/events', '/poll') and not self.path.startswith('/terminal/'):
             self.send_header('Access-Control-Allow-Origin', '*')
-        # JS/CSS 파일 캐시 방지
+        # JS/CSS File Cache Prevention
         if self.path.endswith(('.js', '.css')):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()

@@ -1,25 +1,25 @@
-"""production-line launcher — `flow-wf submit` subprocess spawn + reader thread 책임 모듈.
+"""production-line launcher — `flow-wf submission` subprocess spawn + reader thread charge module.
 
-T-500: kanban.py `_handle_kanban_submit` 본체에서 분리. handler 는 입력 validation +
-`spawn_production_line()` 위임 + JSON 응답만 담당하고, 본 모듈이 Popen / env 주입 /
-LAUNCH_PENDING + LAUNCH_STARTED 발사 / reader thread spawn 을 통째 담당한다.
+T-500: separated from the kanban.py ` handle kanban submit` body. handler input validation +
+`spawn production line()` commission + JSON response only, and this module is Popen / env injection /
+LAUNCH PENDING + LAUNCH STARTED LAUNCH / reader thread spawn
 
-규약 (책임 분담):
+Terms and Conditions:
   - `spawn_production_line(ticket, command) -> dict`:
-      * 입력 validation 없음 (호출자 책임).
-      * registry_key + session_id 사전 발급.
-      * V2_BOARD_POST=true + V2_REGISTRY_KEY 자동 주입.
+      * No input validation (reporter responsibility).
+      * registry key + session id pre-issued.
+      * V2 BOARD POST=true + V2 REGISTRY KEY automatic injection.
       * `flow-wf submit <ticket>` Popen.
-      * LAUNCH_PENDING + LAUNCH_STARTED 발사.
-      * reader thread spawn + `_LAUNCH_READER_THREADS` 등록.
-      * 반환: `{ok, status, ticket, command, submitted_at, session_id}` (성공) /
-              `{ok: False, error_kind, message}` (실패).
+      * LAUNCH PENDING + LAUNCH STARTED Launch.
+      * thread spawn + ` LAUNCH READER THREADS` registered.
+      * Return: `{ok, status, ticket, command, submission at, session id}` (Property) /
+              `{ok: False, error kind, message}` (fail).
   - `_production_line_reader_loop(proc, ticket, command, submitted_at)`:
-      * `proc.communicate()` 대기.
-      * rc != 0 일 때만 LAUNCH_FAILED 발사 (rc == 0 은 driver workflow.finish SSE 가 처리).
-      * finally 에서 thread 자기 자신을 `_LAUNCH_READER_THREADS` 에서 제거.
+      * `proc.communicate` wait.
+      * rc != 0 LAUNCH FAILED LAUNCH(rc == 0 silver driver workflow.finish SSE processing).
+      *Remove thread itself from ` LAUNCH READER THREADS`.
 
-원래 위치: handlers/kanban.py:194-244 + 510-610 (T-500 이전).
+Original Position: handlers/kanban.py:194-244 + 510-610 (T-500 before).
 """
 
 from __future__ import annotations
@@ -30,46 +30,46 @@ import threading
 from datetime import datetime, timezone
 
 
-# Popen.communicate 종료 시 thread 자체가 finally 에서 자기 자신을 제거한다.
-# v1 `_launch_reader_loop` (kanban.py) 도 동일 set 을 공유한다 — kanban.py 에서
+# When Popen.communicate ends thread itself removes itself from finally.
+# v1 ` launch reader loop` (kanban.py) share the same set — in kanban.py
 # `from board.server.production_line_launcher import _LAUNCH_READER_THREADS, _LAUNCH_READER_LOCK`
-# 로 import 한다.
+# import.
 _LAUNCH_READER_THREADS: set[threading.Thread] = set()
 _LAUNCH_READER_LOCK: threading.Lock = threading.Lock()
 
 
 def _now_utc() -> datetime:
-    """`datetime.now(timezone.utc)` thin wrapper — 테스트에서 monkeypatch 진입점."""
+    """`datetime.now(timezone.utc)` thin wrapper — enter the monkeypatch in the test."""
     return datetime.now(timezone.utc)
 
 
 def _emit_launch_event_safe(event: str, ticket: str, **kwargs: object) -> None:
     """`engine.apps.board_api.kanban._emit_launch_event` lazy import wrapper.
 
-    Module top-level import 로 circular import 위험을 차단 (board API kanban
-    이 본 모듈을 module top 에서 import). emit 자체가 broadcast 실패를 흡수.
+    Module top-level import kanban
+    import module top. emits itself absorbs broadcasting failure.
     """
     try:
         from engine.apps.board_api.kanban import _emit_launch_event
-    except ImportError:  # 방어적 — 본 import 실패는 환경 문제
+    except ImportError:  # Defending — this import failure is an environmental problem
         return
     _emit_launch_event(event, ticket, **kwargs)
 
 
 def spawn_production_line(ticket: str, command: str) -> dict:
-    """`flow-wf submit <ticket>` subprocess spawn + LAUNCH_PENDING/STARTED 발사.
+    """'flow-wf submission <ticket>` subprocess spawn + LAUNCH PENDING/STARTED launch.
 
-    호출자 (kanban handler) 는 ticket / command validation 만 사전 수행하고
-    본 함수를 호출한 뒤 반환 dict 를 그대로 `_send_json` 에 전달하면 된다.
+    kanban handler is only pre-programmed for ticket / command validation
+    If you call this function, you can send the return dict to ` send json`.
 
     Args:
         ticket: T-NNN
         command: implement|research|review
 
     Returns:
-        성공: `{"ok": True, "status": "starting", "ticket", "command",
+        success: `{"ok": true, "status": "starting", "ticket", "command",
                 "submitted_at": <iso>, "session_id": <wf-T-NNN-key>}`
-        실패: `{"ok": False, "error_kind": "flow_wf_not_found"|"popen_failed",
+        failed: `{"ok": False, "error kind": "flow wf not found",
                 "message": <str>}`
     """
     project_root = os.getcwd()
@@ -105,7 +105,7 @@ def spawn_production_line(ticket: str, command: str) -> dict:
             'message': f'flow-wf Popen failed: {exc!r}',
         }
 
-    # LAUNCH_PENDING — Popen 직후, HTTP 200 응답 직전.
+    # LAUNCH PENDING — right after Popen, HTTP 200 responses.
     _emit_launch_event_safe(
         'LAUNCH_PENDING', ticket,
         command=command,
@@ -113,7 +113,7 @@ def spawn_production_line(ticket: str, command: str) -> dict:
         session_id=production_line_session_id,
     )
 
-    # LAUNCH_STARTED — production-line spawn 성공 = 사이클 진입 보장.
+    # LAUNCH STARTED — production-line spawn success = cycle entry guarantee.
     spawn_elapsed_ms = int(
         (_now_utc() - submitted_at).total_seconds() * 1000
     )
@@ -125,7 +125,7 @@ def spawn_production_line(ticket: str, command: str) -> dict:
         command=command,
     )
 
-    # reader thread — driver 비정상 종료 시 LAUNCH_FAILED emit (회귀 검출).
+    # reader thread — LAUNCH FAILED emit (regression detection) when driver abnormal termination.
     reader = threading.Thread(
         target=_production_line_reader_loop,
         args=(proc, ticket, command, submitted_at),
@@ -152,14 +152,14 @@ def _production_line_reader_loop(
     command: str,
     submitted_at: datetime,
 ) -> None:
-    """production-line subprocess 종료 시 rc != 0 일 때만 LAUNCH_FAILED emit.
+    """rc != 0 when LAUNCH FAILED emitter when finished production-line subprocess.
 
-    v1 `_launch_reader_loop` (kanban.py) 와 다름:
-      - LAUNCH_STARTED 발사 X (submit handler 가 Popen 직후 즉시 발사).
-      - rc == 0 (정상 완료) 는 driver 자체 SSE (workflow.finish) 가 처리.
-      - rc != 0 (crash) 만 LAUNCH_FAILED 발사 (회귀 검출).
+    v1 ` launch reader loop` (kanban.py) and difference:
+      - LAUNCH STARTED Launch X (submit handler launches immediately after Popen).
+      - rc == 0 (normal completion) is handled by the driver itself SSE (workflow.finish).
+      - rc != 0 (crash) Only LAUNCH FAILED Launch (regression detection).
 
-    finally 블록에서 thread 핸들 set 자체 제거 (GC 누수 차단).
+    Remove thread handle set itself from the last block (GC leak protection).
     """
     self_thread = threading.current_thread()
     try:
@@ -181,7 +181,7 @@ def _production_line_reader_loop(
 
         rc = proc.returncode
         if rc == 0:
-            return  # 정상 완료 — driver workflow.finish SSE 가 처리.
+            return  # Normal finished — driver workflow.finish SSE is processed.
 
         elapsed_ms = int(
             (_now_utc() - submitted_at).total_seconds() * 1000

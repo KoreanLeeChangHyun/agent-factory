@@ -1,18 +1,18 @@
 /* Claude Code Workflow Board - Metrics Tab (T-400 / W06)
  *
- * 4 위젯 카드 그리드:
- *   1) 단계별 duration line chart
- *   2) 토큰 사용량 stacked bar
- *   3) FAILED 비율 bar
- *   4) Top 회귀 패턴 list
+ * 4 Widget Card Grid:
+ *   1) step by step chart
+ *   2) Token usage stacked bar
+ *   3) FAILED rate bar
+ *   4) Top regression pattern list
  *
- * 디자인 컨벤션:
- *   - 테마 컬러: 테라코타 #D97757 (강조 1축에만 사용 — 헤더 underline / refresh 버튼 hover)
- *   - border-left 한쪽 색상 디자인 금지 → 카드 border 는 4면 일관 #2d2d2d
- *   - 이모지/외부 아이콘 라이브러리 금지
+ * 담당자: Mr. Jerry Jiang
+ *   - Theme color: terracotta #D97757 (used only in the first axis — header underline / refresh button hover)
+ *   - border-left one-color design ban → Card border is 4 sides consistent #2d2d
+ *   - Imoji/External icon library ban
  */
 
-/* common.css 의 .view / .view.active 가 표시 토글을 담당하므로 여기서는 패딩만 부여.
+/* .view / .view.active in common.css is responsible for display toggles, so it only grants padding.
    .view.active { display: block } 상속을 깨지 않도록 별도 display 선언 X. */
 #view-metrics {
   padding: 18px 20px 32px;
@@ -106,7 +106,7 @@
   gap: 16px;
 }
 
-/* 작은 화면에서는 1열 */
+/* 1 in a small screen */
 @media (max-width: 960px) {
   .metrics-grid {
     grid-template-columns: 1fr;

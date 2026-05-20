@@ -39,18 +39,18 @@ from engine.adapters.board.watchers import FileWatcher, GitBranchWatcher
 
 
 def resolve_port(project_root: str) -> int:
-    """프로젝트 경로 기반으로 9900~9999 범위에서 사용 가능한 포트를 반환한다.
+    """Returns available ports in the range of 9900~9999 based on project path.
 
-    프로젝트 경로를 MD5 해싱하여 초기 포트를 결정하고, 충돌 시 순차 탐색한다.
+    The project path is MD5, which determines the initial port and navigates the sequential when collision.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
-        사용 가능한 포트 번호 (9900~9999 범위)
+        Available port number (9900~9999 range)
 
     Raises:
-        RuntimeError: 9900~9999 범위의 포트가 모두 사용 중인 경우
+        RuntimeError: 9900~9999 ports in the range are all used
     """
     return _resolve_board_port(
         project_root,
@@ -60,16 +60,16 @@ def resolve_port(project_root: str) -> int:
 
 
 def _run_server(project_root: str) -> None:
-    """서버를 실행한다. 포크된 자식 프로세스에서 호출된다.
+    """Run the server. Called in the forked child process.
 
     Args:
-        project_root: 정적 파일 서빙의 루트 디렉터리
+        project root: root directory of static file serving
     """
     os.chdir(project_root)
 
     port = resolve_port(project_root)
 
-    # 터미널 세션 persist 파일 경로를 project_root 기준으로 재설정하고 복원
+    # Reset and restore terminal session persist file path based on project root
     last_session_file = os.path.join(project_root, '.agent-factory', '.last-session-id')
     claude_process._persist_file = last_session_file
     if os.path.isfile(last_session_file):
@@ -78,9 +78,9 @@ def _run_server(project_root: str) -> None:
                 _saved_id = _sf.read().strip()
             if _saved_id:
                 claude_process._session_id = _saved_id
-                logger.debug('터미널 session_id 복원: %s', _saved_id)
+                logger.debug('Terminal session id Restore: %s', _saved_id)
         except OSError as _e:
-            logger.debug('session_id 복원 실패: %s', _e)
+            logger.debug('session id restore failed: %s', _e)
 
     # Legacy V1 workflow session cache is no longer created on startup.
     workflow_registry._persist_dir = None
@@ -90,11 +90,11 @@ def _run_server(project_root: str) -> None:
     production_line_registry._persist_dir = None
 
     def _cleanup_runtime_files() -> None:
-        """런타임 파일 .agent-factory/.board.url을 삭제한다."""
+        """.agent-factory/.board.url"""
         remove_board_url_file(project_root)
 
     def _signal_handler(signum: int, frame: object) -> None:
-        """SIGTERM/SIGINT 수신 시 Claude 프로세스와 런타임 파일을 정리하고 종료한다."""
+        """When receiving SIGTERM/SIGINT, clean and exit Claude process and runtime files."""
         claude_process.kill()
         _cleanup_runtime_files()
         sys.exit(0)
@@ -105,14 +105,14 @@ def _run_server(project_root: str) -> None:
 
     write_board_url_file(project_root, port)
 
-    # Memory 디렉터리를 WATCH_DIRS에 동적 등록 (절대경로 → os.path.join에서 그대로 사용됨)
+    # Registered Dynamic to WATCH DIRS for Memory Directories (Used as in the section → os.path.join)
     mem_dir = _resolve_memory_dir(project_root)
     if os.path.isdir(mem_dir):
         WATCH_DIRS[mem_dir] = 'memory'
 
-    # FileWatcher 시작
+    # FileWatcher
     def on_change(event_type: str, files: list[str]) -> None:
-        """파일 변경 감지 콜백."""
+        """File change detection callback."""
         sse_manager.broadcast(event_type, files)
         poll_tracker.add(event_type, files)
 
@@ -125,7 +125,7 @@ def _run_server(project_root: str) -> None:
     watcher_thread = threading.Thread(target=watcher.run, daemon=True)
     watcher_thread.start()
 
-    # GitBranchWatcher 시작 — `.git/HEAD` 변경 감지 → SSE git_branch 이벤트 push
+    # GitBranchWatcher starts — ‘.git/HEAD’ changes detection → SSE git branch event push
     def on_branch_change(branch: str) -> None:
         sse_manager.broadcast('git_branch', data={'branch': branch})
         poll_tracker.add('git_branch', [branch])
@@ -141,10 +141,10 @@ def _run_server(project_root: str) -> None:
     git_watcher_thread.start()
 
     def _zombie_reaper_loop(interval: float = 60.0) -> None:
-        """주기적으로 좀비 자식 프로세스를 reap한다.
+        """Reap a regular zombie child process.
 
-        os.waitpid(-1, WNOHANG) 으로 블로킹 없이 이미 종료된 자식 프로세스를
-        60초 주기로 수거한다. daemon=True 스레드로 동작하여 서버 종료 시 즉시 정리됨.
+        os.waitpid(-1, WNOHANG) is a child-friendly process that already ends without blunting
+        60 seconds The daemon=True thread works and is immediately cleaned when the server ends.
         """
         while True:
             log_reaped_zombies(reap_zombie_children(), logger)
@@ -158,7 +158,7 @@ def _run_server(project_root: str) -> None:
     zombie_gc_thread.start()
     logger.info('[zombie-gc] started — interval=60s')
 
-    # ThreadingHTTPServer 시작
+    # Start ThreadingHTTPServer
     server = ThreadingHTTPServer(('0.0.0.0', port), BoardHTTPRequestHandler)
     server.daemon_threads = True
     try:

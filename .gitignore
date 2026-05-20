@@ -23,7 +23,6 @@ __pycache__/
 .pytest_cache/
 
 # Codex project-local runtime state
-.codex/
 .codex/auth.json
 .codex/history.jsonl
 .codex/installation_id

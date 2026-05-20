@@ -1,17 +1,17 @@
 /*
  * step-overlay.css — T-505 P3
  *
- * Step 6박스 (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) +
- * WORK 박스 안 Phase sub-패널의 시각 캐논.
+ * Step 6 (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) +
+ * WORK box in Phase sub-panel.
  *
- * 시각 캐논 (board.md §6):
- *   - terracotta #D97757 = 진행 중 (running) 테마색
+ * Visual Canon (board.md §6):
+ *   - terracotta #D97757 = Running theme
  *   - cyan #4ec9b0     = success
- *   - 주홍 #f48771      = fail
- *   - pulse 1.6s ease-in-out infinite (board.md §6 변조 주기)
- *   - prefers-reduced-motion: reduce 접근성 가드 필수
+ *   #f48771
+ *   - Pulse 1.6s ease-in-out infinite (board.md §6 modulation cycle)
+ *   - prefers-reduced-motion: reduce accessibility guard required
  *
- * 컨테이너 selector 규약 (T-505 P1 §4.3):
+ * Container selector norm (T-505 P1 §4.3):
  *   [data-wf-step="<STEP_ID>"]
  *     └─ .wf-step-body
  *          ├─ [data-wf-stdout]
@@ -19,7 +19,7 @@
  *               └─ [data-wf-stdout]
  */
 
-/* ── 컨테이너 ── */
+/* ── Container ── */
 
 .wf-step-overlay {
   display: flex;
@@ -31,7 +31,7 @@
   color: #cccccc;
 }
 
-/* ── Step 박스 ── */
+/* ── Stepbox ── */
 
 .wf-step {
   display: flex;
@@ -91,7 +91,7 @@
   display: none;
 }
 
-/* ── 상태별 색상 ── */
+/* ── Color per condition */
 
 .wf-step.pending {
   border-color: #3c3c3c;
@@ -115,7 +115,7 @@
 }
 .wf-step.fail .wf-step-id { color: #f48771; }
 
-/* ── 표시 SVG (inline) ── */
+/* ── Show SVG (inline) */
 
 .wf-step-icon-ok {
   color: #4ec9b0;
@@ -129,7 +129,7 @@
   height: 14px;
 }
 
-/* ── Phase sub-패널 (WORK 안) ── */
+/* ── Phase sub-panel (WORK) */
 
 .wf-phase-list {
   display: flex;
@@ -200,7 +200,7 @@
 }
 .wf-phase.fail .wf-phase-id { color: #f48771; }
 
-/* ── stdout 영역 (메인 session.js NDJSON 분기 렌더 target) ── */
+/* ── stdout area (Main session.js NDJSON quarter renderer target) ── */
 
 [data-wf-stdout] {
   display: flex;
@@ -236,7 +236,7 @@
   }
 }
 
-/* ── 접근성 가드 (MUST — board.md §6) ── */
+/* ── Accessibility Guard (MUST — board.md §6) ── */
 
 @media (prefers-reduced-motion: reduce) {
   .wf-step.running,

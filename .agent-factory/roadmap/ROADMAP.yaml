@@ -1,30 +1,30 @@
 version: 1
 
-# claude-workflow (Organic Engineering) — 프로젝트 로드맵
+# Configurator (Organic Engineering) — Project Roadmap
 #
-# 본 파일은 메모리 `project_design_direction.md` (2026-04-23 작성, 357줄) 의 정식 이관처다.
-# 기존 메모리는 archived 표기 후 보존하고, 향후 모든 비전·미구현 항목 갱신은 이 파일에서 한다.
+# This file is a set of memory `project design direction.md` (2026-04-23, 357 lines).
+# The existing memory will be preserved after the archived notation, and will update all the vision and beauty of the future.
 #
-# 구조:
-#   - phases[]: 큰 영역 (조직/시스템 차원의 한 덩어리)
-#       body: 산문 비전·원칙·메타포 (마크다운 자유)
-#       milestones[]: 그 영역에서 추적해야 할 구체 항목
+# Tag:
+#   - phases[]: a large area (one lump of tissue/system dimensions)
+#       body: Shandong Vision·Round·Metapo (markable free)
+#       Miletones[]: specific items that should be tracked in that area
 #   - milestones[].status: planned | in-progress | done
-#   - milestones[].tickets: 연결된 티켓 ID 목록
+#   - Miletones[].tickets: linked ticket ID list
 #
-# 편집은 현재는 텍스트 직접 수정. 편집 UI 는 후속 마일스톤 (`uiux.roadmap-editor`).
+# Editing is currently correct text directly. The editorial UI is the follow-up milestone (`uiux.roadmap-editor`).
 
 phases:
   # ──────────────────────────────────────────────────────────────────────
   - id: principles
     title: 시스템 본질·원칙
     body: |
-      ## 방법론 명칭
+      ## Methodology Name
 
       **Organic Engineering** — claude-workflow 가 구현하는 소프트웨어 개발 방법론. 사용자
       정의 (2026-04-10). 목표는 이 방법이 대세가 될 때까지 지속 개발한다.
 
-      ### 이름의 의미 (유기적 특성)
+      ### The meaning of the name (variable characteristics)
 
       - **조직처럼 유기적으로 동작** — 역할 분담, 위임, 보고 체계
       - **기억이 생물학적 생애주기를 가짐** — 생성(메모라이징)·정리(GC)·승격(장기 기억)
@@ -33,7 +33,7 @@ phases:
       - **UI/UX 상시 개선** — 한 번 확정되지 않고 사용하며 다듬어지는 표면
       - 단순 워크플로우 도구가 아니라 **소프트웨어를 만드는 방식 자체**에 대한 철학
 
-      ## 시스템의 본질
+      ## The essence of system
 
       claude-workflow 는 단순 워크플로우 도구가 아니라, 프로젝트를 잘 이끌어가기 위한 **조직
       시스템 (Organic Engineering)** 이다.
@@ -41,25 +41,25 @@ phases:
       - 사용자(클라이언트)가 팀 리더(메인 클로드)와 협업하여 프로젝트를 진행하는 미니 조직
         을 시뮬레이션한다.
       - 티켓·워크플로우·서브에이전트·스킬 등 모든 구성 요소는 **조직 운영 메타포** 로 설계된다.
-      - 설계 판단 기준: "실제 조직에서 이 상황을 어떻게 다루나?"
+      - 설계 판단 기준: "How to deal with this situation in real organization?"
       - 기술적 편의보다 **조직 원칙의 일관성** 이 우선이다.
-      - 예: "팀 리더는 팀원 일을 직접 하지 않는다" = 메인 클로드 직접 수정 금지 원칙
-      - 예: "클라이언트의 시간은 귀중하다" = 대화 기다림 최소화 원칙
+      - 예: "Team leader doesn’t work directly" = 메인 클로드 직접 수정 금지 원칙
+      - 예: "The time of the client is precious" = 대화 기다림 최소화 원칙
 
-      ## 기본 4-계층 구조
+      ## Basic 4-story structure
 
       ```mermaid
       flowchart TD
-        User["사용자 (클라이언트)"]
-        Main["메인 클로드 (팀 리더)<br/>브레인스토밍 · 티켓 발주 · 조율"]
-        Worker["작업 클로드 (현장 감독)<br/>워크플로우 오케스트레이션 · 팀 리더 보고"]
-        Sub["서브에이전트 (팀원)<br/>설계 / 작업 / 검증 / 보고"]
-        User -->|"칸반 보드 / 메인 터미널 대화"| Main
+        User["User (Client)"]
+        Main["Main Clod (Team Leader)<br/>Brainstopping and ticketing / Tuning"]
+        Worker["Work Clad (President Director)<br/>Workflow Orchestration · Team Leader Report"]
+        Sub["Sub-Action <br/> Design / Job / Verification / Report"]
+        User -->|"Kanban Board / Main Terminal"| Main
         Main -->|"flow-launcher"| Worker
-        Worker -->|"디스패치"| Sub
+        Worker -->|"Dental"| Sub
       ```
 
-      ## 핵심 원칙
+      ## Core Principles
 
       - 메인 클로드는 **직접 수정하지 않는다** — 티켓화 후 작업 클로드에 위임이 원칙.
       - 브레인스토밍은 **사람 ↔ 메인 클로드** 사이에서만 이루어지고, 결과물은 티켓으로 구체화.
@@ -73,7 +73,7 @@ phases:
         계속 이어가야 한다. (a) 비동기 위임 경로, (b) 결과 복귀 채널, (c) 대화 맥락 병합
         메커니즘이 필요 — 모두 현재 설계 공백 (`pipeline-gaps` phase 참조).
 
-      ## 위임 경로 검토 (Option 2)
+      ## Commission Path Review (Option 2)
 
       팀 리더의 위임 대상을 **비서** 와 **현장 감독** 2개 경로로 분리한다.
 
@@ -87,7 +87,7 @@ phases:
 
       팀 리더는 요청 성격에 따라 둘 중 하나를 선택한다.
 
-      ## 설계 성숙도 및 수정 태도
+      ## Design maturity and correction attitude
 
       - 워크플로우 뼈대(FSM, 스킬 매핑, 검증 장치, 서브에이전트 역할 분리, 아티팩트 산출
         의무)는 수개월에 걸쳐 설계된 **성숙 자산** 이다.
@@ -101,16 +101,16 @@ phases:
   - id: workflow-model
     title: 워크플로우·스킬 모델
     body: |
-      ## 서브에이전트 4단계 역할 모델
+      ## SubAgent 4 Stage Role Model
 
       코딩에 국한되지 않은 범용 작업 라이프사이클이다.
 
       ```mermaid
       flowchart LR
-        Plan["설계<br/>planner"]
-        Work["작업<br/>worker / explorer"]
-        Verify["검증<br/>validator"]
-        Report["보고<br/>reporter"]
+        Plan["<br/>planner"]
+        Work["<br>worker / explorer"]
+        Verify["Verification<br/>validator"]
+        Report["REPORTER"]
         Plan --> Work
         Work --> Verify
         Verify --> Report
@@ -124,10 +124,10 @@ phases:
       | 보고 | 산출물 종합·요약 | reporter | `report.md` |
 
       worker/explorer 는 작업 단계의 두 형태 — worker 는 실행·구현·편집, explorer 는
-      조사·분석·리서치. 같은 "작업" 단계에 속한다. 4단계는 FSM 의 PLAN→WORK→REPORT→DONE
+      조사·분석·리서치. 같은 "Work" 단계에 속한다. 4단계는 FSM 의 PLAN→WORK→REPORT→DONE
       과 대응되며, 도메인 중립적이라 코딩 외 작업(문서/리뷰/기획)에도 동일 적용된다.
 
-      ## 워크플로우 단계 모델 — FSM vs UI 2-관점
+      ## Workflow Stage Model — FSM vs UI 2-Point
 
       두 관점이 공존한다. 엄밀성이 필요할 때는 FSM, 사용자 가시성을 논할 때는 UI 모델을 사용한다.
 
@@ -163,19 +163,19 @@ phases:
 
       `workflow-bar.js` 의 `STEP_COLORS` 5종. INIT 은 오케스트레이터 로드 전 `flow-init` 이
       수행하는 전처리 — 워크플로우 디렉터리 생성, status.json 초기화, 레지스트리 등록 — 으로
-      "세션이 시작되고 있다"는 가시성을 제공한다. INIT 은 UI 전용이며 FSM 의 공식 상태가 아니다.
+      "Sessions are started"는 가시성을 제공한다. INIT 은 UI 전용이며 FSM 의 공식 상태가 아니다.
 
-      ## 스킬 3-type 분류
+      ## Skill 3-type Classification
 
       워크플로우 전문화 스킬은 **작업자(서브에이전트)에 대한 효과** 에 따라 3가지로 구분된다.
 
       | 분류 | 효과 | 작업자 관점 | 로드 기준 |
       |------|------|------------|----------|
-      | 전문화 스킬 | 작업자를 해당 분야의 전문가로 변화 | "나는 이 분야의 전문가다" | 태스크 유형에 따라 선별 로드 |
-      | 지침 스킬 | 작업자가 반드시 따라야 하는 규칙/컨벤션 | "나는 이 규칙을 위반할 수 없다" | 작업 맥락에서 강제 주입 |
-      | 프로젝트 스킬 | 작업자가 해당 프로젝트를 이해하기 위한 지식 | "나는 이 프로젝트를 안다" | 프로젝트 단위로 항상 로드 |
+      | 전문화 스킬 | 작업자를 해당 분야의 전문가로 변화 | "I'm a professional in this field" | 태스크 유형에 따라 선별 로드 |
+      | 지침 스킬 | 작업자가 반드시 따라야 하는 규칙/컨벤션 | "I cannot violate this rule" | 작업 맥락에서 강제 주입 |
+      | 프로젝트 스킬 | 작업자가 해당 프로젝트를 이해하기 위한 지식 | "I know this project" | 프로젝트 단위로 항상 로드 |
 
-      ### 현재 `.claude/skills/` 접두사와의 매핑 (잠정)
+      ### Current `.claude/skills/` Mapping with Dockers (Fixed)
 
       | 분류 | 해당 접두사 |
       |------|------------|
@@ -183,13 +183,13 @@ phases:
       | 지침 스킬 | convention-* |
       | 프로젝트 스킬 | my-* (접두사 예약, 현재 실제 스킬 없음) |
 
-      ## 도메인 메타포 — 티켓
+      ## Domain Metapot — Tickets
 
       티켓 = **작업해야 할 것** (work brief / 작업 명세 / 계약서). 클라이언트가 팀 리더와
       합의한 작업 요청서. 현재는 프롬프트 5필드(goal/target/constraints/criteria/context) 가
       계약 조항에 해당. 실행은 작업 클로드에 발주된다.
 
-      ## 워크플로우 실행 전달 경로 (사람 → 메인 → 작업)
+      ## Run workflow route (man → main → work)
 
       ```mermaid
       sequenceDiagram
@@ -221,7 +221,7 @@ phases:
           - **분류 체계 미반영**: 3-type 이 스킬 시스템 내부 데이터/매니페스트에 없음
           - **부여 방식 단일**: `skill_mapper.py` 는 전문화 스킬의 plan.md 기반 매핑만 수행.
             지침/프로젝트 스킬의 다른 부여 방식이 부재.
-          - **지침 스킬 강제 주입 미설계**: "반드시 따라야 함" 을 구조적으로 보장하는 메커니즘 부재.
+          - **지침 스킬 강제 주입 미설계**: "{{if price varies}}from {{/if}}" 을 구조적으로 보장하는 메커니즘 부재.
           - **프로젝트 스킬 로드 미설계**: `my-*` 접두사는 현재 갱신 정책 구분용일 뿐, 세션
             자동 로드 경로 없음.
           - **관리 도구 부족**: 스킬 등록·분류·검증·활성화/비활성화 통합 관리 CLI/UI 미비.
@@ -263,7 +263,7 @@ phases:
           | refactor | 현재 구조, 목표 구조, 불변 보장, 측정 기준 |
           | docs | 문서 대상, 독자, 범위, 톤 |
 
-          이 고도화는 "워크플로우 무게 = 티켓 작업량 비례" 원칙과 연결된다. 가벼운 bugfix 는
+          이 고도화는 "Workflow Weight = Ticket Duty Free" 원칙과 연결된다. 가벼운 bugfix 는
           경량 워크플로우, 무거운 refactor 는 전체 FSM 으로 자연스럽게 라우팅 가능.
         tickets: []
 
@@ -284,7 +284,7 @@ phases:
   - id: memory-lifecycle
     title: 메모리·세션 라이프사이클
     body: |
-      ## 컨텍스트 / 메모리 / 세션 문제
+      ## context / memory / session problem
 
       3개 축이 동시에 긴장하는 본질적 문제다.
 
@@ -294,26 +294,26 @@ phases:
       | 메모리 | 세션 종료 시 휘발, 내일 다시 시작하면 처음부터 | 조직의 제도적 기억 |
       | 세션 | 팀 리더/현장 감독/비서가 각기 독립, 서로의 앎을 공유 불가 | 회의 참석자 간 정보 격차 |
 
-      ## 구조화 메모리 로딩 방향 (합의)
+      ## Structured memory loading direction (total)
 
       - 규칙(`.claude/rules/`)은 모든 세션에 절대 로드됨 — 불변.
       - 메모리는 규칙 위에 얹히는 **선택적 로딩 계층** 으로 설계.
       - 로딩 축: 역할(팀 리더/현장 감독/비서) × 로드 조건(세션 시작, 명시 요청 등) 혼합 방향
         논의 중.
 
-      ## 메모리 라이프사이클 (방향성)
+      ## Memory Lifecycle (directional)
 
       ```mermaid
       flowchart LR
-        subgraph Short["단기 기억"]
-          Memo["메모라이징<br/>주기 스냅샷"]
-          GC["GC<br/>주기 정리"]
-          Discard["폐기"]
+        subgraph Short["About Us"]
+          Memo["<br/> cycle snapshot"]
+          GC["GC<br/>"]
+          Discard["Mobile Site"]
         end
-        subgraph Long["장기 기억"]
-          Skill["프로젝트 스킬<br/>my-* 접두사"]
+        subgraph Long["Size"]
+          Skill["Project Skills<br/>my-* Dock"]
         end
-        Memo -->|"승격 파이프라인"| Skill
+        Memo -->|"Scots Gaelic"| Skill
         Memo --> GC
         GC --> Discard
       ```
@@ -323,7 +323,7 @@ phases:
       - **GC**: 특정 주기마다 불필요한 메모라이징을 자동 정리.
       - **장기 기억화**: 승격 판정 통과 시 프로젝트 스킬(`my-*`)로 전환.
 
-      ## 자동화 경계 (엄격)
+      ## Automated Bounds (Thickness)
 
       | 영역 | 자동 수정 | 배치 방식 |
       |------|----------|-----------|
@@ -341,7 +341,7 @@ phases:
           특정 주기/조건에 메모리 파일을 자동 생성한다.
 
           **결정 필요**:
-          - "특정 %" 의 의미 정의 (컨텍스트 사용률? 시간? 턴수?)
+          - "Specific %" 의 의미 정의 (컨텍스트 사용률? 시간? 턴수?)
           - 메모라이징 트리거 (즉시/배치)
           - 무엇을 저장할지 (대화 요약, 결정 사항, 다음 세션 이어갈 핵심)
         tickets: []
@@ -367,23 +367,23 @@ phases:
         body: |
           ```mermaid
           flowchart TD
-            Memo["메모라이징"]
-            Q1["Queue 1<br/>승격 판단 대기"]
-            Sec["팀 비서<br/>승격 규칙 평가"]
-            Q2["Queue 2<br/>사용자 확인 대기"]
-            Leader["팀 리더<br/>확인 요청 전달"]
-            User["사용자"]
-            Skill["프로젝트 스킬 승격"]
+            Memo["Scots Gaelic"]
+            Q1["Queue 1<br/>Received"]
+            Sec["Team secretary<br/>Rating rules evaluation"]
+            Q2["Queue 2<br/>User check waiting"]
+            Leader["Team Leader<br/>Receive request"]
+            User["Scots Gaelic"]
+            Skill["Skip to content"]
             GC["GC"]
             Memo --> Q1
             Q1 --> Sec
-            Sec -->|"폐기"| GC
-            Sec -->|"승격 후보"| Q2
+            Sec -->|"Mobile Site"| GC
+            Sec -->|"Sponsors"| Q2
             Q2 --> Leader
             Leader --> User
-            User -->|"승인"| Skill
-            User -->|"거절"| GC
-            User -->|"무시"| Q2
+            User -->|"Notice"| Skill
+            User -->|"About Us"| GC
+            User -->|"About Us"| Q2
           ```
 
           - **비서의 역할 확장**: 단순 검색뿐 아니라 게이트키퍼(판단·필터링) 역할 포함
@@ -416,17 +416,17 @@ phases:
   - id: pipeline-gaps
     title: 비동기 위임·결과 복귀
     body: |
-      "사용자-팀 리더 대화에서 기다림은 최소화한다" 원칙이 성립하려면 다음 3개 메커니즘이
+      "In the user-team leader conversation, we minimize" 원칙이 성립하려면 다음 3개 메커니즘이
       모두 필요하다 — 모두 현재 설계 공백.
 
-      1. **비동기 위임 경로** — "이거 조사해둬" 같은 지시로 백그라운드 세션을 띄우고 대화는
+      1. **비동기 위임 경로** — "{{ data.filesizeHumanReadable }}" 같은 지시로 백그라운드 세션을 띄우고 대화는
          계속 진행
       2. **결과 복귀 채널** — 백그라운드 작업 완료 시 팀 리더에게 구조화된 보고가 전달되는
          메커니즘
       3. **대화 맥락 병합** — 대화 중간에 도착한 보고 내용을 팀 리더가 현재 대화 흐름에
          자연스럽게 흡수하는 방식
 
-      "메인 클로드는 직접 수정하지 않는다" 원칙의 확장판이다. 직접 수정 안 한다 → 위임한다
+      "The main closure does not directly modify" 원칙의 확장판이다. 직접 수정 안 한다 → 위임한다
       → 결과 받는다 → 대화에 녹인다, 의 전체 흐름을 갖춰야 사용자 체감 시간 부담이 줄어든다.
     milestones:
       - id: brainstorm-protocol
@@ -445,7 +445,7 @@ phases:
         title: 비동기 조사 위임
         status: planned
         body: |
-          대화 도중 "이거 조사해둬" 같은 지시로 백그라운드 조사 세션을 띄우고 대화는 계속
+          대화 도중 "{{ data.filesizeHumanReadable }}" 같은 지시로 백그라운드 조사 세션을 띄우고 대화는 계속
           진행하는 경로. 비서(별도 Claude 세션) 메타포의 1차 구현체.
 
           - 백그라운드 세션 spawn 경로
@@ -484,7 +484,7 @@ phases:
 
       조직 메타포: **성과 회고 + 프로세스 개선** 체계.
 
-      ## 축
+      #News
 
       | 축 | 내용 | 조직 메타포 |
       |----|------|-------------|
@@ -495,13 +495,13 @@ phases:
       | 스킬 사용 분석 | 어떤 전문 스킬이 자주 쓰이는지 | 전문성 수요 분석 |
       | 스킬 로드 정합성 | 의도한 대로 스킬이 로드되고 있는지 검증 | 전문성 배치 검증 |
 
-      ### 특히 중요한 원칙
+      ### Especially important principles
 
-      "원하는 방향으로 스킬이 로드되는지" 검증은 단순 통계가 아니라 **설계 의도 vs 실제 동작
+      "If you want to know what you want," 검증은 단순 통계가 아니라 **설계 의도 vs 실제 동작
       의 일치 검증** 이다. 스킬 3-type 분류가 도입되면 더 중요해진다 — "이 작업에는 X 스킬이
       로드되어야 했는데 실제로는 Y 가 로드됐다" 같은 검증이 가능해야 한다.
 
-      ## 현재 상태
+      ## Current Status
 
       | 기능 | 현재 구현 | 한계 |
       |------|----------|------|
@@ -529,7 +529,7 @@ phases:
         title: 스킬 로드 정합성 검증
         status: planned
         body: |
-          "이 작업에는 X 스킬이 로드되어야 했는데 실제로는 Y 가 로드됐다" 검증.
+          "This work had to load X skill, and actually Y was loaded" 검증.
 
           - 의도된 스킬 로드 매핑 명세
           - 실제 로드 기록과 비교
@@ -562,10 +562,10 @@ phases:
 
       조직 메타포: 클라이언트 경험 개선.
 
-      설계 방향성에는 "개선 원칙" 만 기재하고, 구체 개선은 티켓 단위로 누적 처리한다.
+      설계 방향성에는 "About Us" 만 기재하고, 구체 개선은 티켓 단위로 누적 처리한다.
       예: Board 터미널, 입력 폼, 렌더링, 애니메이션, 상태 표시, 키보드 조작 등 모든 표면.
 
-      ## 일관 원칙
+      #News
 
       - 터미널 출력에 이모지/아이콘 사용 금지
       - 터미널 외 UI 에서 아이콘은 SVG 직접 생성 (외부 폰트/라이브러리 금지)
@@ -614,7 +614,7 @@ phases:
   - id: platform
     title: 플랫폼 제약
     body: |
-      ## 확정 사항
+      ## Notice
 
       - **Claude Code 의존 탈피 계획 없음** — claude-workflow 는 Claude Code 호스트 위에서
         동작하는 메타 레이어로 유지된다.

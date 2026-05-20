@@ -333,7 +333,7 @@
   overflow: hidden;
 }
 
-/* 3행: 관계 & 종속 (없어도 min-height 로 자리 보존) */
+/* 3: Relationship & Dependence (preserved seat with no min-height) */
 .card-relations-row {
   flex-shrink: 0;
   display: flex;
@@ -341,7 +341,7 @@
   min-height: 14px;
 }
 
-/* 4행: Action 버튼 (없어도 min-height 로 자리 보존, 카드 높이 일정 유지) */
+/* 4: Action button (no minimum min-height) */
 .card-actions-row {
   flex-shrink: 0;
   display: flex;
@@ -405,8 +405,8 @@
   color: #6a9fb5;
 }
 
-/* T-457 (Layer 3): 1행 우측 미커밋 표시 라벨 (read-only).
- * 클릭 트리거는 4행 .card-commit-action 으로 이전됨 — cursor:default + hover 제거. */
+/* T-457 (Layer 3): One-on-the-clock mark label (read-only).
+ * Click Trigger has been transferred to .card-commit-action for four times — cursor:default + hover removal. */
 .card-uncommitted-badge {
   font-size: 9px;
   font-weight: 700;
@@ -421,15 +421,15 @@
   pointer-events: none;
 }
 
-/* T-457 (Layer 3): failure read-only 라벨.
- * 색상은 placeholder neutral — 사용자 결정 후 1줄 패치 예정. */
+/* T-457 (Layer 3): failure read-only label.
+ * The color is placeholder neutral — scheduled to patch one line after the user decides. */
 .card-failure-tag {
   font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 3px;
   white-space: nowrap;
-  /* placeholder neutral — 사용자 결정 대기 */
+  /* placeholder neutral — user decides standby */
   background: rgba(160, 160, 160, 0.18);
   color: #b0b0b0;
   border: 1px solid rgba(160, 160, 160, 0.40);
@@ -437,11 +437,11 @@
   pointer-events: none;
 }
 
-/* T-475 Stage 3: launch 비동기화 — starting 상태 카드의 1행 우측 pulse 배지.
- * 트리거: 클라이언트 launchState[ticket].state === 'starting' (submit 200 OK 직후 ~ LAUNCH_STARTED SSE 수신 전).
- * 시각 컨벤션 (reference_workflow_visual_conventions): 테라코타 #D97757 + pulse 1.6s ease-in-out infinite.
- * border-color + box-shadow 변조 — `.wf-tool-card[data-running="true"]` 와 동일 리듬.
- * prefers-reduced-motion: reduce 시 정적 색상 fallback (animation: none). */
+/* T-475 Stage 3: launch asynchronousization — starting the right-hand pulse of the status card.
+ * Trigger: client launchState[ticket].state === 'starting' (submit 200 OK right after ~ LAUNCH STARTED SSE before receiving).
+ * Reference workflow visual conventions: Terracotta #D97757 + pulse 1.6s ease-in-out infinite.
+ * border-color + box-shadow modulation — `.wf-tool-card[data-running="true"]` Same rhythm.
+ * prefers-reduced-motion: reduce the static color fallback (animation: none). */
 .card-launch-badge {
   font-size: 9px;
   font-weight: 700;
@@ -474,8 +474,8 @@
   }
 }
 
-/* T-457 (Layer 3): 4행 commit 액션 버튼 (워크트리 미커밋 자동 commit 진입점).
- * .card-done-action 과 동일 사이즈(20×20) — 4행 min-height: 22px 안전. */
+/* T-457 (Layer 3): 4th Commit Action Button (Ttree Micommit Auto Commit Entry Point).
+ * . Same size as card-done-action (20×20) — 4 lines min-height: 22px safety. */
 .card-commit-action {
   display: inline-flex;
   align-items: center;
@@ -503,8 +503,8 @@
   cursor: wait;
 }
 
-/* In Progress 카드 4행 워크플로우 중지 버튼 (POST /api/workflow/stop).
- * 주홍 #f48771 (fail 색) — stop 의미와 어울림. 20×20 — 4행 min-height: 22px 안전. */
+/* In Progress card 4 workflow stop button (POST /api/workflow/stop).
+ * #f48771 (fail color) — stop meaning and shadow. 20×20 — 4 min-height: 22px Safety. */
 .card-stop-action {
   display: inline-flex;
   align-items: center;
@@ -532,14 +532,14 @@
   cursor: wait;
 }
 
-/* T-399: .status-submit 룰 제거됨 (Submit transient 단계 제거). */
+/* T-399: .status-submit removed (Submit transient step removal). */
 
 /* ─────────────────────────────────────────────────────────────────────────
- * T-433 Phase 2 — Review 카드 4행 feature 브랜치 토글 버튼.
- * - 16px SVG (Lucide git-branch, 외부 라이브러리 금지 — 인라인 SVG)
- * - OFF: 회색 outline (border-only, transparent 배경)
- * - ON: 테라코타(#D97757) 채움 + 카드 외곽 4방향 box-shadow glow
- * - border-left 한쪽 색상 금지 (UI 룰) — 카드 glow 는 box-shadow inset/outset 4방향
+ * T-433 Phase 2 — Review Card 4 feature Brand Match Toggle Button.
+ * - 16px SVG (Lucide git-branch, external library ban — inline SVG)
+ * - OFF: Grey outline (border-only, transparent background)
+ * - ON: Terracotta(#D97757) 4 way box-shadow glow
+ * - border-left one-color ban (UI rule) — card glow is box-shadow inset/outset 4-way
  * ───────────────────────────────────────────────────────────────────────── */
 .card-branch-toggle {
   display: inline-flex;
@@ -575,8 +575,8 @@
   border-color: #c66640;
 }
 
-/* 카드 외곽 light glow (4방향 box-shadow — border-left 한쪽 금지 룰 준수).
- * .has-active-branch 는 Review 카드 .card 에 부여된다. */
+/* Card external light glow (4-way box-shadow — border-left compliance with one ban.)
+ * . has-active-branch is granted to the Review Card .card. */
 .card.has-active-branch {
   box-shadow:
     0 0 0 1px rgba(217, 119, 87, 0.55),
@@ -787,7 +787,7 @@
   }
 }
 
-/* ── DnD: To Do ↔ Open 드래그 앤 드랍 (안전 DnD 정책) ── */
+/* ── DnD: To Do ↔ Open Drag & Drop (Safe DnD Policy) ── */
 .card-draggable {
   cursor: grab;
 }
@@ -800,7 +800,7 @@
   opacity: 0.4;
 }
 
-/* To Do 수동 정렬 reorder 시 삽입 위치 인디케이터 (테라코타 점선) */
+/* To Do manual alignment reorder insert position indicator (terracotta line) */
 .card-drop-indicator {
   height: 0;
   margin: 2px 0;
@@ -815,7 +815,7 @@
   border-radius: 4px;
 }
 
-/* T-399: In Progress drop hover — 경고 톤 (워크플로우 실행 의식 강조) */
+/* T-399: In Progress drop hover — warning tone (workflow execution consciousness) */
 .cards-droppable[data-col-key="In Progress"].dragover-active {
   background: rgba(217, 119, 87, 0.16);
   outline: 2px dashed #D97757;
@@ -823,7 +823,7 @@
   box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.3);
 }
 
-/* T-906: Done drop hover — 비가역 처리 의식 강조 (box-shadow 강화) */
+/* T-906: Done drop hover — consciousness highlight (box-shadow enhancement) */
 .cards-droppable[data-col-key="Done"].dragover-active {
   background: rgba(217, 119, 87, 0.16);
   outline: 2px dashed #D97757;
@@ -831,7 +831,7 @@
   box-shadow: inset 0 0 0 1px rgba(217, 119, 87, 0.45);
 }
 
-/* T-399: confirm 모달 (Open → In Progress drop) */
+/* T-399: Confirm Modal (Open → In Progress drop) */
 .submit-confirm-overlay {
   position: fixed;
   inset: 0;
@@ -868,7 +868,7 @@
   color: #cccccc;
 }
 
-/* T-906: 결과 모달 내 충돌/미커밋 파일 목록 스타일 */
+/* T-906: The resulting crash/measure file list style */
 .submit-confirm-body ul {
   margin: 8px 0 0;
   padding-left: 18px;
@@ -913,7 +913,7 @@
   color: #f0a07f;
 }
 
-/* T-441: Done 카드 머지 정합성 verdict 배지 (advisory only) */
+/* T-441: Done Card Merchandise Verdict Badge (advisory only) */
 .card-done-verdict {
   display: inline-flex;
   align-items: center;
@@ -952,9 +952,9 @@
 .card-done-verdict.verdict-loading {
   display: none;
 }
-/* T-477: Auditor T3 verdict 배지 (Review 카드 우상단, advisory only)
- * 형태: 둥근 알약 (border-radius 큼). 위치: card-top-right flexbox 우측 정렬.
- * T-457 failure tag (우하단 직사각 라벨) 와 위치/형태 분리 — 충돌 없음.
+/* T-477: Auditor T3 verdict Badge (Review Card Velvet, Advisory only)
+ * Form: Round Pills (border-radius as). location: card-top-right flexbox right alignment.
+ * T-457 failure tag (right-right label) and position/type separation — No collision.
  */
 .audit-badge {
   display: inline-flex;
@@ -973,9 +973,9 @@
   pointer-events: auto;
 }
 
-/* T-463: Review 카드 룰베이스 1차 자동 검증 verdict 배지 (advisory only) */
-/* T-441 .card-done-verdict 패턴 동형 — 단, 텍스트 칩 형태 + 4행 actions-row 좌측 배치 */
-/* T-457 failure tag 와 시각 어휘 분리: failure tag = 1행 우측 회색 read-only / verdict = 4행 좌측 칩 색상 + cursor:help interactive */
+/* T-463: Review Card Rule Base Primary Automatic Verdict Badge (advisory only) */
+/* T-441 .card-done-verdict Pattern Dynamic — Single, Text Chip Mode + 4-row Action-row Left Batch */
+/* T-457 failure tag and visual vocabulary separated: failure tag = 1 line right grey read-only / verdict = 4 line left chip color + cursor:help interactive */
 .card-review-verdict {
   display: inline-flex;
   align-items: center;
@@ -987,13 +987,13 @@
   flex-shrink: 0;
   letter-spacing: 0.04em;
   font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
-  cursor: help;          /* tooltip 안내 — 클릭 자동 액션 0건 */
+  cursor: help;          /* tooltip guide — click auto action 0 */
   user-select: none;
   transition: opacity 0.15s;
 }
 
 .card-review-verdict.verdict-pass {
-  color: #4ec9b0;        /* 청록 — done verdict-ok 와 동일 톤 */
+  color: #4ec9b0;        /* Bluerock — same tone as done verdict-ok */
   background: rgba(78, 201, 176, 0.10);
   border: 1px solid rgba(78, 201, 176, 0.40);
   opacity: 0.85;
@@ -1017,7 +1017,7 @@
 }
 
 .card-review-verdict.verdict-fail {
-  color: #f48771;        /* 주홍 — 시각 강조 */
+  color: #f48771;        /* Jhong — Vision highlight */
   background: rgba(244, 135, 113, 0.12);
   border: 1px solid rgba(244, 135, 113, 0.45);
   opacity: 0.9;
@@ -1032,7 +1032,7 @@
 .card-review-verdict.verdict-skip,
 .card-review-verdict.verdict-unknown,
 .card-review-verdict.verdict-loading {
-  display: none;          /* SKIP / UNKNOWN / 로딩 — 공간 낭비 없이 숨김 */
+  display: none;          /* SKIP / UNKNOWN / Loading — hidden without space waste */
 }
 
 .audit-badge.audit-pass {
@@ -1053,7 +1053,7 @@
   border: 1px solid rgba(244, 135, 113, 0.45);
 }
 
-/* 다크/라이트 테마 공통: 배경 alpha 기반이라 양쪽 모두 가독성 유지 */
+/* Dark/Light Theme Common: Background alpha-based, both keep toxicity */
 @media (prefers-color-scheme: light) {
   .audit-badge.audit-pass {
     background: rgba(78, 201, 176, 0.12);

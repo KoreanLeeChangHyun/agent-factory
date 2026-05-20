@@ -13,7 +13,7 @@ DASH_FILES: list[str] = ['usage', 'logs', 'skills']
 def _read_kanban_tickets(
     project_root: str, files: list[str] | None = None,
 ) -> dict[str, str | None]:
-    """kanban 디렉터리에서 XML 티켓을 읽어 {파일명: 내용} dict를 반환한다."""
+    """Read the XML ticket in the kanban directory and return the dict."""
     kanban = os.path.join(project_root, '.agent-factory', 'tickets')
     result: dict[str, str | None] = {}
     for d in KANBAN_DIRS_LIST:

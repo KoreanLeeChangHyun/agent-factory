@@ -1,20 +1,20 @@
 #!/usr/bin/env -S python3 -u
 """
-common.py - 프로젝트 공통 유틸리티.
+common.py - project common utility.
 
-프로젝트 루트 경로 해석, ANSI 색상 코드, JSON 원자적 쓰기,
-디렉터리 스캔 기반 워크플로우 조회, 환경변수 파싱 등
-전역적으로 사용되는 공통 기능을 제공합니다.
+project route interpretation, ANSI color code, JSON atomic writing,
+Copyright (C) 2018. All Rights Reserved.
+We provide a common feature that is used globally.
 
-주요 함수:
-    resolve_project_root: 프로젝트 루트 절대 경로 해석
-    load_json_file: JSON 파일 로드 (실패 시 None 반환)
-    atomic_write_json: JSON 원자적 쓰기
-    scan_active_workflows: 활성 워크플로우 디렉터리 스캔
-    resolve_active_workflow: 현재 활성 워크플로우 컨텍스트 반환
-    resolve_work_dir: 단축 키로 workDir 경로 조회
-    resolve_abs_work_dir: workDir 절대 경로 변환
-    read_env: .agent-factory/.settings 환경변수 읽기
+Tag:
+    resolve project root: project route absolute path interpretation
+    load json file: JSON file load (unless returns when missing)
+    atomic write json: JSON atomic writing
+    Scan active workflows: Active Workflow Directory Scan
+    resolve active workflow: Current active workflow context return
+    resolve work dir: shortcut key to view workDir paths
+    resolve abs work dir: workDir absolute path conversion
+    read env: .agent-factory/.settings environment variable read
 """
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ import tempfile
 import time
 from typing import Any
 
-# -- sys.path 보장: 이 모듈이 직접 실행될 때를 위해 scripts/ 디렉터리 추가 --
+# -- sys.path Warranty: Added scripts/ directory for when this module is running directly --
 _engine_dir = os.path.dirname(os.path.abspath(__file__))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 # =============================================================================
-# 상수를 data.constants에서 import (re-export하여 하위 호환성 보장)
+# import from data.constants (re-export to lower compatibility)
 # =============================================================================
 from constants import (  # noqa: E402
     C_RED,
@@ -49,25 +49,25 @@ from constants import (  # noqa: E402
     C_DIM,
     C_RESET,
     STEP_COLORS,
-    PHASE_COLORS,  # 하위 호환 re-export
+    PHASE_COLORS,  # Re-export
     TS_PATTERN,
 )
 
 
 def _detect_worktree_main_root(base: str) -> str:
-    """워크트리 내부인지 판별하여 메인 프로젝트 루트 반환.
+    """Return to the main project route in accordance with the work tree.
 
-    git rev-parse --git-common-dir로 .git 공통 디렉터리를 얻고,
-    그 부모 디렉터리가 base와 다르면 워크트리 내부로 판정하여
-    메인 리포 루트를 반환합니다.
+    git rev-parse --git-common-dir
+    If the parent directory is different from the base, it is judged inside the work tree.
+    returns the main repository root.
 
     Args:
-        base: 후보 프로젝트 루트 경로 (절대 경로).
+        base: Candidate project route (end route).
 
     Returns:
-        메인 프로젝트 루트 절대 경로. git 실패 또는 워크트리 아니면 base 반환.
+        Main project route absolute path. git failure or worktree or base return.
     """
-    # .agent-factory/.settings가 있으면 이미 메인 리포 루트 — git 호출 불필요
+    # . If you have agent-factory/.settings, you already need to call git
     cw_dir = os.path.join(base, ".agent-factory")
     if os.path.exists(os.path.join(cw_dir, ".settings")):
         return base
@@ -82,7 +82,7 @@ def _detect_worktree_main_root(base: str) -> str:
         )
         if result.returncode == 0:
             git_common = result.stdout.strip()
-            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            # git-common-dir points the main repository .git directory
             main_root = os.path.dirname(git_common)
             if main_root != base:
                 return main_root
@@ -93,17 +93,17 @@ def _detect_worktree_main_root(base: str) -> str:
 
 
 def resolve_project_root(start_path: str | None = None) -> str:
-    """프로젝트 루트 경로 해석.
+    """Project route interpretation.
 
-    utils -> scripts -> .claude -> project root 순서로 상위 디렉터리를 탐색하여
-    프로젝트 루트를 결정합니다. 워크트리 내부에서 호출되더라도 메인 리포의
-    프로젝트 루트를 반환합니다.
+    utils -> scripts -> .claude -> navigate the top directory in the project root order
+    We will determine the project route. The main repo even if it is called inside worktree
+    <# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #>
 
     Args:
-        start_path: 탐색 시작 경로. None이면 이 파일의 위치 기준.
+        start path: navigation start path. If None, the location of this file.
 
     Returns:
-        프로젝트 루트 절대 경로.
+        Skip to main content
     """
     if start_path:
         base = os.path.abspath(start_path)
@@ -115,13 +115,13 @@ def resolve_project_root(start_path: str | None = None) -> str:
 
 
 def load_json_file(path: str) -> Any | None:
-    """JSON 파일 로드. 실패 시 None 반환.
+    """Load JSON file. None returns when failed.
 
     Args:
-        path: JSON 파일 경로.
+        path: JSON file path.
 
     Returns:
-        파싱된 JSON 데이터. 파일이 없거나 파싱 실패 시 None.
+        parsed JSON data. None if there is no file or parsing failure.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -131,17 +131,17 @@ def load_json_file(path: str) -> Any | None:
 
 
 def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
-    """JSON 원자적 쓰기 (임시 파일 + mv).
+    """JSON atomic writing (temp file + mv).
 
-    임시 파일에 JSON을 쓰고 원자적으로 대상 경로로 이동합니다.
+    Write JSON in a temporary file and moves to the target path at all times.
 
     Args:
-        path: 쓰기 대상 파일 경로.
-        data: JSON 직렬화 가능한 데이터.
-        indent: JSON 들여쓰기 수준. 기본값 2.
+        path: write target file path.
+        data: JSON serialized data.
+        indent: JSON indent level. Default 2.
 
     Raises:
-        Exception: 쓰기 실패 시. 임시 파일은 자동 정리.
+        Exception: When writing fails. Send your inquiry directly to us
     """
     dir_name = os.path.dirname(path)
     os.makedirs(dir_name, exist_ok=True)
@@ -159,33 +159,33 @@ def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
 
 
 def extract_registry_key(work_dir: str) -> str:
-    """workDir 경로에서 YYYYMMDD-HHMMSS 형식의 레지스트리 키 추출.
+    """The registry key extraction in YYYMMDD-HMMSS format in the workDir path.
 
-    중첩 구조: .../<YYYYMMDD-HHMMSS>/<workName>/<command>
-    레거시 플랫 구조: .../<YYYYMMDD-HHMMSS>
+    Tag: /<YYYYMMDD-HMMSS>/<workName>/<command>
+    Legacy Flat Frame: ... /<YYYYMMDD-HMMSS>
 
     Args:
-        work_dir: 워크플로우 디렉터리 경로.
+        work dir: workflow directory path.
 
     Returns:
-        YYYYMMDD-HHMMSS 형식 키. 패턴 미매칭 시 basename 반환.
+        YYYYMMDD-HMMSS format key. return basename when pattern matches.
     """
     basename = os.path.basename(work_dir)
     if TS_PATTERN.match(basename):
         return basename
 
-    # 중첩 구조: basename=<command>, parent=<workName>, grandparent=<YYYYMMDD-HHMMSS>
+    # nest structure: basename=<command>, parent=<workName>, grandparent=<YYYYMMDD-HMMSS>
     grandparent = os.path.basename(os.path.dirname(os.path.dirname(work_dir)))
     if TS_PATTERN.match(grandparent):
         return grandparent
 
-    # 폴백: 경로에서 YYYYMMDD-HHMMSS 패턴 탐색
+    # Poly bag: YYYMMDD-HMMSS pattern navigation on the path
     parts = work_dir.replace(os.sep, "/").split("/")
     for part in parts:
         if TS_PATTERN.match(part):
             return part
 
-    # 최후 폴백
+    # Knitwear
     return basename
 
 
@@ -193,19 +193,19 @@ def scan_active_workflows(
     project_root: str | None = None,
     include_terminal: bool = False,
 ) -> dict[str, dict[str, str]]:
-    """.agent-factory/runs/ 디렉터리를 스캔하여 워크플로우 목록을 반환.
+    """. Scan the agent-factory/runs/ directory to return the workflow list.
 
-    T-449 폴드 구조: .agent-factory/runs/<YYYYMMDD-HHMMSS>/ 직속에서
-    status.json과 .context.json을 읽어 dict 형태로 반환한다.
+    T-449 Pole Structure: .agent-factory/runs/<YYYYMMDD-HMMSS>/ In Straight
+    return status.json and .context.json in dict format.
 
     Args:
-        project_root: 프로젝트 루트 경로. None이면 자동 해석.
-        include_terminal: True이면 DONE/FAILED/STALE/CANCELLED도 포함.
+        project root: project route. Automatic interpretation if None.
+        include terminal: Includes True DONE/FAILED/STALE/CANCELLED.
 
     Returns:
-        registryKey를 키로 하는 딕셔너리.
-        각 값은 {"title", "step", "workDir", "command"} 형식.
-        활성 워크플로우가 없으면 빈 딕셔너리.
+        딕셔너리   볶음밥헌터
+        Each value is {"title", "step", "workDir", "command"} format.
+        If you don’t have an active workflow, you’ll be blank.
     """
     if project_root is None:
         project_root = resolve_project_root()
@@ -230,8 +230,8 @@ def scan_active_workflows(
         context_file = os.path.join(entry_path, ".context.json")
 
         status = load_json_file(status_file)
-        # T-483 정합: status.json 의 phase 키는 `workflow_phase` (T-453 신설 8상태).
-        # 옛 키 `step` / `phase` 도 하위호환 폴백.
+        # T-483 Settlement: status.json's phase key is `workflow phase` (T-453 New).
+        # The old key `step` / `phase` subhormonal foldback.
         if isinstance(status, dict):
             phase = (
                 status.get("workflow_phase")
@@ -261,14 +261,14 @@ def scan_active_workflows(
 
 
 def _get_workflow_updated_at(project_root: str, entry: dict[str, str]) -> str:
-    """워크플로우 status.json에서 updated_at 읽기.
+    """read updated at in workflow status.json.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로.
-        entry: workDir 키를 포함하는 워크플로우 엔트리 딕셔너리.
+        project root: project route absolute path.
+        entry: workflow entries containing workDir keys.
 
     Returns:
-        updated_at 문자열. status.json이 없거나 키가 없으면 빈 문자열.
+        updated at string. empty string without status.json or key.
     """
     work_dir = entry.get("workDir", "")
     abs_wd = (
@@ -286,14 +286,14 @@ def _select_by_most_recent(
     candidates: list[tuple[str, dict[str, str]]],
     project_root: str,
 ) -> tuple[str | None, dict[str, str] | None]:
-    """updated_at 기준 가장 최근 워크플로우 선택.
+    """The most recent workflow selection based on updated at.
 
     Args:
-        candidates: (registryKey, entry) 튜플 목록.
-        project_root: 프로젝트 루트 절대 경로.
+        candidates: (registryKey, entry) tuple list.
+        project root: project route absolute path.
 
     Returns:
-        (registryKey, entry) 튜플. 후보가 없으면 (None, None).
+        (registryKey, entry) tuple. No candidate (None, None).
     """
     with_time: list[tuple[str, dict[str, str], str]] = []
     for key, entry in candidates:
@@ -306,17 +306,17 @@ def _select_by_most_recent(
 
 
 def resolve_active_workflow(project_root: str | None = None) -> dict[str, str] | None:
-    """디렉터리 스캔으로 활성 워크플로우를 식별하여 컨텍스트 반환.
+    """Query return by identifying active workflows with directory scanning.
 
-    단일 워크플로우이면 즉시 선택, 복수이면 PLAN 단계 우선,
-    동일 조건이면 updated_at 최신순으로 선택.
+    If single workflow, select immediately, revenge PLAN step first,
+    If the same condition is updated at, select as the latest.
 
     Args:
-        project_root: 프로젝트 루트 경로. None이면 자동 해석.
+        project root: project route. Automatic interpretation if None.
 
     Returns:
-        활성 워크플로우 컨텍스트 딕셔너리 {"title", "workId", "workName",
-        "command", "agent", "step"}. 활성 워크플로우가 없으면 None.
+        Active workflow context idiaries {"title", "workId", "workName",
+        "command", "agent", "step"}. None without an active workflow.
     """
     if project_root is None:
         project_root = resolve_project_root()
@@ -348,7 +348,7 @@ def resolve_active_workflow(project_root: str | None = None) -> dict[str, str] |
     if not selected_entry:
         return None
 
-    # .context.json 로드
+    # . context.json load
     work_dir = selected_entry.get("workDir", "")
     abs_work_dir = (
         os.path.join(project_root, work_dir)
@@ -368,7 +368,7 @@ def resolve_active_workflow(project_root: str | None = None) -> dict[str, str] |
     if not (title and work_id and command):
         return None
 
-    # status.json에서 step 읽기
+    # read step in status.json
     status = load_json_file(os.path.join(abs_work_dir, "status.json"))
     phase = (status.get("step") or status.get("phase", "")) if status else ""
 
@@ -383,21 +383,21 @@ def resolve_active_workflow(project_root: str | None = None) -> dict[str, str] |
 
 
 def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
-    """YYYYMMDD-HHMMSS 단축 형식 키로 workDir 디렉터리 스캔 조회.
+    """YYYYMMDD-HMMSS short format key to workDir directory scan view.
 
-    YYYYMMDD-HHMMSS 패턴이 아닌 입력은 그대로 반환.
+    YYYYMMDD-HMMSS not pattern input is returned.
 
-    탐색 순서:
-      1. .agent-factory/runs/<input_key>/status.json 존재 시 input_key 자체 반환.
-      2. 1차 탐색 실패 시 .agent-factory/runs/.history/<input_key>/status.json 탐색.
-      3. 두 탐색 모두 실패 시 ".agent-factory/runs/<input_key>" 폴백 반환.
+    Tag:
+      1. .agent-factory/runs/<input key>/status.json
+      2. FAQ .agent-factory/runs/.history/<input key>/status.json
+      3. FAQs ".agent-factory/runs/<input key>" returns poly bag when both navigation fails.
 
     Args:
-        input_key: 워크플로우 키(YYYYMMDD-HHMMSS) 또는 경로.
-        project_root: 프로젝트 루트 경로. None이면 자동 해석.
+        input key: workflow key (YYYYMMDD-HMMSS) or path.
+        project root: project route. Automatic interpretation if None.
 
     Returns:
-        해석된 workDir 상대 경로. 스캔 실패 시 ".agent-factory/runs/<input_key>" 폴백.
+        interpreted workDir relative path. ".agent-factory/runs/<input key>" foldback when scanning failed.
     """
     if not TS_PATTERN.match(input_key):
         return input_key
@@ -406,7 +406,7 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
         project_root = resolve_project_root()
 
     def _scan_base(base: str, rel_prefix: str) -> str | None:
-        """T-448 폴드 구조: base/status.json 존재 시 rel_prefix 반환."""
+        """T-448 pod structure: return rel prefix when the base/status.json exists."""
         if not os.path.isdir(base):
             return None
 
@@ -415,19 +415,19 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
         return None
 
-    # 1차 탐색: 활성 workflow 디렉터리
+    # Primary navigation: Active workflow directory
     base_dir = os.path.join(project_root, ".agent-factory", "runs", input_key)
     result = _scan_base(base_dir, os.path.join(".agent-factory", "runs", input_key))
     if result is not None:
         return result
 
-    # 2차 탐색: .history/ 아카이브 디렉터리
+    # 2nd navigation: .history/ archive directory
     history_base_dir = os.path.join(project_root, ".agent-factory", "runs", ".history", input_key)
     result = _scan_base(history_base_dir, os.path.join(".agent-factory", "runs", ".history", input_key))
     if result is not None:
         return result
 
-    # 폴백
+    # Paul White
     fallback = f".agent-factory/runs/{input_key}"
     print(
         f"[WARN] directory scan failed for {input_key}, falling back to {fallback}",
@@ -437,47 +437,47 @@ def resolve_work_dir(input_key: str, project_root: str | None = None) -> str:
 
 
 def resolve_abs_work_dir(work_dir: str, project_root: str | None = None) -> str:
-    """workDir를 절대 경로로 변환.
+    """Convert workDir to absolute paths.
 
-    YYYYMMDD-HHMMSS 단축 형식이면 디렉터리 스캔으로 조회 후 절대 경로로 변환.
-    상대 경로이면 project_root 기준으로 절대 경로 구성.
+    YYYYMMDD-HMMSS shortcode format converts to absolute path after searching with directory scanning.
+    Configuring the absolute path based on project root.
 
     Args:
-        work_dir: 워크플로우 디렉터리 경로. 단축/상대/절대 형식 모두 허용.
-        project_root: 프로젝트 루트 경로. None이면 자동 해석.
+        work dir: workflow directory path. Short-term/horizontal formats are accepted.
+        project root: project route. Automatic interpretation if None.
 
     Returns:
-        절대 경로 문자열.
+        absolute path string.
     """
     if project_root is None:
         project_root = resolve_project_root()
 
-    # 단축 형식 해석
+    # Skip to content
     if TS_PATTERN.match(work_dir):
         work_dir = resolve_work_dir(work_dir, project_root)
 
-    # 절대 경로 구성
+    # Skip to content
     if os.path.isabs(work_dir):
         return work_dir
     return os.path.join(project_root, work_dir)
 
 
 # =============================================================================
-# 환경변수 파싱 (.agent-factory/.settings)
+# Environmental Modulation (.agent-factory/.settings)
 # =============================================================================
 
 _DEFAULT_ENV_FILE = os.environ.get("ENV_FILE", "")
 
 
 def _resolve_env_file(env_file: str | None = None) -> str:
-    """env_file 경로를 해석.
+    """interpret the env file path.
 
-    None이면 환경변수 또는 프로젝트 루트에서 추론합니다.
+    If none, you will be enrolled in the environment variable or project route.
     Args:
-        env_file: .agent-factory/.settings 파일 경로. None이면 자동 해석.
+        env file: .agent-factory/.settings file path. Automatic interpretation if None.
 
     Returns:
-        해석된 env_file 절대 경로 문자열.
+        interpreted env file absolute path string.
     """
     if env_file:
         return env_file
@@ -489,17 +489,17 @@ def _resolve_env_file(env_file: str | None = None) -> str:
 
 
 def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
-    """.agent-factory/.settings에서 환경변수 읽기.
+    """. Read environment variables in agent-factory/.settings.
 
-    중복 키 방어(첫 번째 매칭), 따옴표 제거, $HOME/~ 확장 포함.
+    Duplicate key defense (first matching), eliminating quotes, including $HOME/~ extensions.
 
     Args:
-        key: 환경변수 키 이름.
-        default: 키가 없을 때 반환할 기본값.
-        env_file: .agent-factory/.settings 파일 경로. None이면 자동 해석.
+        key: environment variable key name.
+        default: The default to return when the key is not.
+        env file: .agent-factory/.settings file path. Automatic interpretation if None.
 
     Returns:
-        환경변수 값. 파일이 없거나 키가 없으면 default 반환.
+        Environment variable value. If there is no file or no key, the default return.
     """
     resolved = _resolve_env_file(env_file)
     if not resolved or not os.path.isfile(resolved):
@@ -529,26 +529,26 @@ def read_env(key: str, default: str = "", env_file: str | None = None) -> str:
 
 
 # =============================================================================
-# 파일시스템 잠금 (mkdir 기반 POSIX lock)
+# Filesystem Lock (mkdir-based POSIX lock)
 # =============================================================================
 
 
 def acquire_lock(lock_dir: str, max_wait: int = 2, stale_timeout: int = 300) -> bool:
-    """mkdir 기반 POSIX 잠금 획득. stale lock 감지 및 orphan lock 회수 포함.
+    """Mkdir-based POSIX lock. Includes stale lock detection and orphan lock recovery.
 
-    디렉터리 생성으로 잠금을 획득하며, PID 파일로 소유자를 기록한다.
-    프로세스가 종료되었거나 stale_timeout 초 초과 시 stale lock을 제거하고 재시도한다.
-    pid 파일이 없는 orphan lock은 즉시 회수하여 영구 교착을 방지한다.
+    Create a directory and record the owner as a PID file.
+    The process is terminated or removed and retry stale locks when exceeding stale timeout seconds.
+    orphan lock without pid file immediately recovers and prevents permanent contact.
 
     Args:
-        lock_dir: 잠금 디렉터리 경로.
-        max_wait: 최대 대기 초. 기본값 2.
-        stale_timeout: stale lock 판정 임계값(초). 잠금 생성 후 이 시간을 초과하면
-            stale lock으로 간주하여 회수한다. 기본값 300(5분). max_wait와 독립적으로
-            동작하므로 장시간 merge도 정상 잠금으로 유지된다.
+        lock dir: Lock directory path.
+        max wait: maximum wait seconds. Default 2.
+        stale timeout: stale lock equation value(sec). Exceed this time after creating a lock
+            returns to be considered as stale lock. default 300 (5 minutes). Independently with max wait
+            so long time merge is also maintained with normal lock.
 
     Returns:
-        잠금 획득 성공 여부.
+        Whether it’s a lock acquisition success.
     """
     waited = 0
     while True:
@@ -563,7 +563,7 @@ def acquire_lock(lock_dir: str, max_wait: int = 2, stale_timeout: int = 300) -> 
         except OSError:
             pid_file = os.path.join(lock_dir, "pid")
             if not os.path.isfile(pid_file):
-                # pid 파일 없는 orphan lock: 즉시 회수 후 재시도
+                # orphan lock without pid file: retry immediately after recovery
                 try:
                     shutil.rmtree(lock_dir)
                 except OSError:
@@ -606,13 +606,13 @@ def acquire_lock(lock_dir: str, max_wait: int = 2, stale_timeout: int = 300) -> 
 
 
 def release_lock(lock_dir: str) -> None:
-    """잠금을 해제한다.
+    """Unlock.
 
-    PID 파일 삭제 후 잠금 디렉터리를 제거한다.
-    파일시스템 오류는 무시한다.
+    Remove the lock directory after removing the PID file.
+    The filesystem error is ignored.
 
     Args:
-        lock_dir: 해제할 잠금 디렉터리 경로.
+        lock dir: Unlock directory path.
     """
     try:
         pid_file = os.path.join(lock_dir, "pid")

@@ -133,7 +133,7 @@ stdout에서 T-NNN을 파싱하고 채번 결과를 출력합니다:
 - `2.` 용도 직접 지정: 트랙 B로 전환
 - `0.` 취소: 티켓 생성 없이 종료
 
-**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/prompts/prompt.txt`를 읽어 메뉴 항목을 로드한 뒤 출력합니다:
+**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/board/config/prompt-files/prompt.txt`를 읽어 메뉴 항목을 로드한 뒤 출력합니다:
 
 ```
 `[T-NNN]` : `[WF -o]` 어떤 목적의 티켓을 생성할까요?
@@ -302,7 +302,7 @@ Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 �
 - `2.` 용도 직접 지정: 트랙 B로 전환
 - `0.` 취소: 티켓 생성 없이 종료
 
-**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/prompts/prompt.txt`를 읽어 메뉴 항목을 로드합니다.
+**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/board/config/prompt-files/prompt.txt`를 읽어 메뉴 항목을 로드합니다.
 
 **용도->command 매핑**: 연구=`research`, 구현/버그수정/리팩토링/아키텍처설계=`implement`, 리뷰=`review`
 

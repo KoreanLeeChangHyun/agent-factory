@@ -21,7 +21,7 @@ WF_DETAIL_FILES: list[dict] = [
 
 
 def _list_workflow_entries(project_root: str) -> list[str]:
-    """workflow + .history 엔트리를 최신순 정렬하여 반환한다."""
+    """return the workflow + .history entry to the latest order."""
     entries: list[str] = []
     for rel in (WF_BASE, WF_HISTORY):
         abs_dir = os.path.join(project_root, rel)
@@ -39,9 +39,9 @@ def _list_workflow_entries(project_root: str) -> list[str]:
 
 
 def _get_git_branch(project_root: str) -> str:
-    """현재 git 브랜치명을 반환한다.
+    """returns the current git brand name.
 
-    git 명령 실행 실패 또는 타임아웃 시 빈 문자열을 반환한다.
+    git command returns empty strings when failed or timeout.
     """
     try:
         result = subprocess.run(
@@ -55,10 +55,10 @@ def _get_git_branch(project_root: str) -> str:
 
 
 def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
-    """워크플로우 엔트리 1개의 상세 정보를 반환한다.
+    """Workflow Entries returns one details.
 
-    T-449 fold 구조 우선: ``<key>/status.json`` 직속.
-    옛 nested 구조 fallback: ``<key>/<task>/<cmd>/status.json`` (_legacy_ 등 보존).
+    T-449 fold structure priority: ``<key>/status.json` direct.
+    old nested structure fallback: ``<key>/<task>/<cmd>/status.json` (containing legacy  etc).
     """
     entry_name = entry_rel.rstrip('/').rsplit('/', 1)[-1]
     entry_abs = os.path.join(project_root, entry_rel.strip('/'))
@@ -112,8 +112,8 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'task': work_name,
                 'command': command,
                 'basePath': entry_rel,
-                # production-line은 status.json 에 `workflow_step` 키 사용 (SPEC §2 어휘 정정).
-                # 옛 v1 사이클의 `step` 키도 fallback 지원. 둘 다 없으면 'NONE'.
+                # production-line uses status.json to `workflow step` key (SPEC §2 vocabulary correction).
+                # Supports the old v1 cycle 'step' keyway fallback. 'NONE' without both.
                 'step': status.get('workflow_step', status.get('step', 'NONE')),
                 'created_at': status.get('created_at', ''),
                 'updated_at': status.get('updated_at', ''),
@@ -123,7 +123,7 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'title': title,
             })
 
-    # 2차 fallback (옛 nested): <key>/<task>/<cmd>/status.json (_legacy_ 보존)
+    # 2nd fallback: <key>/<task>/<cmd>/status.json ( legacy  preserve)
     try:
         task_dirs = sorted(
             e.name for e in os.scandir(entry_abs)
@@ -166,8 +166,8 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'task': task,
                 'command': cmd,
                 'basePath': base_path,
-                # production-line은 status.json 에 `workflow_step` 키 사용 (SPEC §2 어휘 정정).
-                # 옛 v1 사이클의 `step` 키도 fallback 지원. 둘 다 없으면 'NONE'.
+                # production-line uses status.json to `workflow step` key (SPEC §2 vocabulary correction).
+                # Supports the old v1 cycle 'step' keyway fallback. 'NONE' without both.
                 'step': status.get('workflow_step', status.get('step', 'NONE')),
                 'created_at': status.get('created_at', ''),
                 'updated_at': status.get('updated_at', ''),

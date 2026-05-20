@@ -1,11 +1,11 @@
 /* Agent Factory Workflow Board - Roadmap Subtab Styles
  *
- * Contexts 탭 (#view-memory > .prompt-view-wrapper > #prompt-content) 의 Roadmap
- * 서브탭에 사용된다. #prompt-content 가 이미 flex row + overflow:hidden 컨테이너이므로
- * 본 모듈은 그 자식으로 side / resize-handle / body 를 직접 박는다 (별도 layout wrapper 없음).
+ * .prompt-view-wrapper
+ * It is used for subtabs. #prompt-content is already a flex row + overflow:hidden container
+ * This module directly sets the side / resize-handle / body into its own (no layout wrapper).
  *
- * 좌측: Phase 사이드 네비 (Phase + Milestone 트리, 상태 뱃지)
- * 우측: 선택된 Phase 의 마크다운 본문 + Milestone 카드 그리드
+ * Left: Phase Side Navigation (Phase + Milestone Tree, State Voyage)
+ * Right: Markdown body of Phase selected + Milestone card grid
  */
 
 /* ── Side Navigation ── */
@@ -27,7 +27,7 @@
   padding: 8px 6px;
 }
 
-/* ── Resize Handle (Prompt 탭 패턴) ── */
+/* ── Resize Handle (Prompt Tab Pattern) ── */
 .roadmap-resize-handle {
   width: 4px;
   flex-shrink: 0;
@@ -96,8 +96,8 @@
 }
 
 /* ── Body (scrollable content) ── */
-/* #prompt-content (flex row) 의 자식으로 직접 들어가 flex:1 로 우측 영역을 차지한다.
- * resize handle 옆에 위치 → side(고정) | handle | body(flex:1). */
+/* #prompt-content (flex row), enter directly to flex:1, occupy the right area.
+ * <# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #> */
 .roadmap-body {
   flex: 1;
   min-width: 0;
@@ -297,7 +297,7 @@
 .roadmap-badge.status-in-progress { color: #dcdcaa; }
 .roadmap-badge.status-done        { color: #858585; }
 
-/* Side-nav 의 작은 dot 표시 (트리 인덴트 안의 milestone) */
+/* Small dot display of Side-nav (Tree Indent Miletone) */
 .roadmap-side-dot {
   display: inline-block;
   width: 6px;

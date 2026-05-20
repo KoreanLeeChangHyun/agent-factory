@@ -1,4 +1,4 @@
-"""TerminalSSEChannel — terminal per-session SSE (링버퍼 제거, REST /workflow/history 경유)."""
+"""TerminalSSEChannel — terminal per-session SSE (Remove REST /workflow/history)."""
 
 from __future__ import annotations
 
@@ -24,22 +24,22 @@ _PHASE_PATTERN = re.compile(
     r'|║\s+STATE:\s+Phase\s+(\d+)\s+(sequential|parallel))'
 )
 _FINISH_PATTERN = re.compile(
-    r'(?:\[DONE\]\s+워크플로우\s+(완료|실패)'
-    r'|║\s+DONE:\s+워크플로우\s+(완료|실패))'
+    r'News :\\[DONE\\]\\s+Workflow\\s+(Finished)'
+    r'|\\s+DONE:\\s+Workflow\\s+(Finished)'
 )
 
 
 def _parse_last_event_id(headers: object) -> int:
-    """HTTP 요청 헤더에서 Last-Event-ID를 파싱한다.
+    """parse Last-Event-ID in the HTTP request header.
 
-    브라우저 EventSource는 재접속 시 자동으로 마지막 수신 이벤트의 id를
-    Last-Event-ID 헤더에 담아 전송한다.
+    Browser EventSource automatically receives the ID of the last reception event when redirected
+    send to Last-Event-ID header.
 
     Args:
-        headers: HTTP 요청 헤더 객체
+        headers: HTTP request header objects
 
     Returns:
-        파싱된 정수 ID. 헤더 없거나 파싱 실패 시 -1.
+        Integer ID. -1 when there is no header or parsing failure.
     """
     try:
         raw = headers.get('Last-Event-ID')
@@ -51,18 +51,18 @@ def _parse_last_event_id(headers: object) -> int:
 
 
 def _parse_last_event_id_from_query(path: str) -> int:
-    """URL 쿼리 문자열에서 last_event_id 파라미터를 파싱한다.
+    """parse the last event id parameter in the URL query string.
 
-    EventSource API는 사용자 정의 헤더 주입을 허용하지 않으므로,
-    클라이언트가 재연결 시 이전 이벤트 ID를 헤더 대신 쿼리 파라미터로
-    전달한다. 헤더 값(_parse_last_event_id)과 함께 사용하여 둘 중
-    큰 쪽을 채택한다.
+    EventSource API does not allow custom header injections,
+    If the client reconnects the previous event ID to the query parameter instead of header
+    Send header values( parse last event id)
+    Adopt big side.
 
     Args:
-        path: HTTP 요청 경로 (쿼리 포함, 예: ``/terminal/events?last_event_id=42``)
+        path: HTTP request path (include quarry, example: ``/terminal/events?last event id=42`)
 
     Returns:
-        파싱된 정수 ID. 파라미터 없거나 파싱 실패 시 -1.
+        Integer ID. -1 when there is no parameter or parsing failure.
     """
     try:
         if '?' not in path:
@@ -78,35 +78,35 @@ def _parse_last_event_id_from_query(path: str) -> int:
 
 
 def _resolve_last_event_id(headers: object, path: str) -> int:
-    """헤더와 쿼리 파라미터에서 last_event_id를 해석하여 최대값을 반환한다.
+    """returns the maximum value by interpreting last event id in header and query parameters.
 
-    EventSource는 새 인스턴스 생성 시 Last-Event-ID 헤더를 자동 포함하지 않으므로,
-    명시적 쿼리 파라미터 경로가 주 경로다. 헤더 경로는 폴백이다.
+    EventSource does not include the Last-Event-ID header when creating a new instance,
+    The explicit query parameter path is the main path. The header path is a poly bag.
     """
     return max(_parse_last_event_id(headers), _parse_last_event_id_from_query(path))
 
 
 class TerminalSSEChannel:
-    """터미널 출력 전용 SSE 브로드캐스트 채널.
+    """SSE broadcast channel dedicated to terminal output.
 
-    SSEClientManager와 동일한 인터페이스로 독립 인스턴스를 생성하여,
-    기존 /events SSE와 간섭 없이 /terminal/events 전용 스트림을 제공한다.
+    Create an independent instance with the same interface as SSEClientManager,
+    Provides /terminal/events-only streams without interfering with existing /events SSE.
 
-    NDJSON 청크를 SSE 이벤트로 변환하여 연결된 모든 클라이언트에 전송한다.
-    링버퍼(deque)는 제거되었으며, 재접속 시 과거 이벤트는 REST /workflow/history
-    엔드포인트를 통해 jsonl 파일에서 복원한다.
+    NDJSON Cheongk converts to SSE events to send it to all client connected.
+    REST /workflow/history
+    Restore jsonl files via endpoint.
 
     Attributes:
-        _clients: 연결된 클라이언트의 wfile 객체 목록
-        _lock: 클라이언트 목록 접근용 Lock
-        _client_locks: wfile별 per-client Lock 딕셔너리
+        clients: list of wfile objects associated
+        lock: Client List Approach Lock
+        client locks: per-client Lock Dix
     """
 
     def __init__(self, persist_path: str | None = None) -> None:
-        """초기화한다.
+        """Add to cart
 
         Args:
-            persist_path: 이벤트를 저장할 JSONL 파일 경로. None이면 persist 비활성.
+            persist path: JSONL file path to save event. If None persist inactive.
         """
         self._clients: list = []
         self._lock: threading.Lock = threading.Lock()
@@ -114,7 +114,7 @@ class TerminalSSEChannel:
         self._next_seq: int = 0
         self._persist_path: str | None = persist_path
         self._persist_lock: threading.Lock = threading.Lock()
-        # stdout 기반 워크플로우 단계 감지
+        # stdout based workflow step detection
         self._step_buffer: str = ''
         self._current_step: str = ''
         self.on_step: Callable[[str, dict], None] | None = None
@@ -125,29 +125,29 @@ class TerminalSSEChannel:
         last_event_id: int = -1,
         skip_replay: bool = False,
     ) -> None:
-        """클라이언트를 라이브 이벤트 스트림에 추가한다.
+        """Add client to live event stream.
 
-        링버퍼 재생 경로는 제거되었다. 과거 이벤트 복원은 REST /workflow/history
-        엔드포인트를 통해 jsonl 파일에서 수행하며, 이 메서드는 신규 SSE 클라이언트를
-        등록하여 이후 발행되는 라이브 이벤트만 수신하게 한다.
+        Ring Buffer play path was removed. REST /workflow/history
+        executed in jsonl file via endpoint and this method is done in the new SSE client
+        We only accept live events issued after registration.
 
-        ``skip_replay`` 파라미터는 하위호환을 위해 시그니처상 유지하나 동작에 영향 없음.
-        ``last_event_id`` 파라미터 또한 유지하나 현재 미사용.
+        The ``skip replay` parameter keeps the signature for subcontract and does not affect the operation.
+        `last event id` parameter is also maintained and is currently unused.
 
         Args:
-            wfile: HTTP 핸들러의 wfile (소켓 출력 스트림)
-            last_event_id: (미사용, 하위호환 유지)
-            skip_replay: (미사용, 하위호환 유지)
+            wfile: HTTP handler wfile (socket output stream)
+            last event id:
+            skip replay:
         """
         with self._lock:
             self._clients.append(wfile)
             self._client_locks[id(wfile)] = threading.Lock()
 
     def remove(self, wfile: object) -> None:
-        """클라이언트를 제거한다.
+        """Remove the client.
 
         Args:
-            wfile: 제거할 클라이언트의 wfile
+            wfile: wfile of client to remove
         """
         with self._lock:
             try:
@@ -157,33 +157,33 @@ class TerminalSSEChannel:
             self._client_locks.pop(id(wfile), None)
 
     def get_lock(self, wfile: object) -> threading.Lock | None:
-        """wfile에 대응하는 per-client lock을 반환한다.
+        """returns per-client lock to wfile.
 
         Args:
-            wfile: lock을 획득할 클라이언트의 wfile
+            wfile: client wfile to acquire lock
 
         Returns:
-            해당 wfile의 Lock. 클라이언트가 존재하지 않으면 None.
+            Lock of the wfile. None if the client does not exist.
         """
         with self._lock:
             return self._client_locks.get(id(wfile))
 
     def broadcast(self, data: dict) -> None:
-        """NDJSON 메시지를 SSE 이벤트로 변환하여 모든 클라이언트에 전송한다.
+        """NDJSON messages are converted to SSE events to send them to all clients.
 
-        메시지 타입에 따라 적절한 SSE 이벤트 이름을 결정한다:
+        Determine the appropriate SSE event name according to the message type NEWS
         - stream_event (text_delta) -> event: stdout
         - stream_event (input_json_delta) -> event: stdout
         - result -> event: result
         - system -> event: system
         - control_request -> event: permission
         - attachment (skill_listing) -> event: skill_listing
-        - 기타 -> event: stdout (기본값)
+        - Other -> event: stdout (default)
 
-        전송 실패한 클라이언트(연결 끊김)는 목록에서 제거한다.
+        The client fails to send (connect break) will be removed from the list.
 
         Args:
-            data: 파싱된 NDJSON 메시지 dict
+            data: dirching NDJSON messages
         """
         if not is_user_visible(data):
             return
@@ -193,7 +193,7 @@ class TerminalSSEChannel:
 
         self._emit_event(event_name, json_payload)
 
-        # 파일 persist (서버 재시작 시 복원용) - 별도 락 사용
+        # file persist (restore when server restart) - use separate lock
         if self._persist_path is not None:
             try:
                 line = json.dumps(data, ensure_ascii=False) + '\n'
@@ -201,15 +201,15 @@ class TerminalSSEChannel:
                     with open(self._persist_path, 'a', encoding='utf-8') as f:
                         f.write(line)
             except (OSError, TypeError) as exc:
-                logger.error("terminal_channel: broadcast persist 쓰기 실패 (%s): %s", self._persist_path, exc)
+                logger.error("terminal channel: %s", self._persist_path, exc)
 
-        # stdout 기반 워크플로우 단계 감지
+        # stdout based workflow step detection
         self._detect_step_from_broadcast(event_name, payload)
 
     def _emit_event(self, event_name: str, json_payload: str) -> None:
-        """SSE 이벤트를 seq_id 부여 후 연결된 모든 클라이언트에 전송한다.
+        """Send SSE event to all client connected after seq id authorization.
 
-        링버퍼 저장 및 replay 버퍼링 로직은 제거되었다.
+        Ring Buffer storage and replay buffering logic was removed.
         """
         dead_clients: list = []
         with self._lock:
@@ -241,13 +241,13 @@ class TerminalSSEChannel:
                     self._client_locks.pop(id(wfile), None)
 
     def _classify_event(self, data: dict) -> str:
-        """NDJSON 메시지 타입으로부터 SSE 이벤트 이름을 결정한다.
+        """Set the SSE event name from the NDJSON message type.
 
         Args:
-            data: 파싱된 NDJSON 메시지 dict
+            data: dirching NDJSON messages
 
         Returns:
-            SSE 이벤트 이름 문자열
+            SSE Event Name String
         """
         msg_type = data.get('type', '')
 
@@ -272,17 +272,17 @@ class TerminalSSEChannel:
         return _NDJSON_EVENT_MAP.get(msg_type, 'stdout')
 
     def _build_payload(self, data: dict, event_name: str) -> dict:
-        """SSE 클라이언트에 보낼 페이로드를 구성한다.
+        """SSE configures the payload to the client.
 
         Args:
-            data: 원본 NDJSON 메시지 dict
-            event_name: 결정된 SSE 이벤트 이름
+            data: original NDJSON message dict
+            event name: Crystal SSE Event Name
 
         Returns:
-            페이로드 dict
+            Doc
         """
         if event_name == 'user_input':
-            # timestamp 를 함께 전달하여 frontend 가 카드 렌더 및 self-echo guard 에 활용.
+            # timetamp is delivered together and frontend is used in cardender and self-echo guard.
             payload: dict = {'text': data.get('text', '')}
             if data.get('timestamp'):
                 payload['timestamp'] = data['timestamp']
@@ -326,17 +326,17 @@ class TerminalSSEChannel:
                 'exit_code': data.get('exit_code'),
                 'session_id': data.get('session_id', ''),
             }
-        # 기본: raw 데이터 전달
+        # Raw data delivery
         return {'kind': data.get('type', 'unknown'), 'raw': data}
 
     def _build_skill_listing_payload(self, data: dict) -> dict:
-        """skill_listing 이벤트 페이로드를 구성한다.
+        """Configuring the skill listing event payload.
 
         Args:
-            data: 원본 NDJSON 메시지 dict (type == 'attachment')
+            data: original NDJSON message dict (type == 'attachment')
 
         Returns:
-            skill_listing 페이로드 dict
+            Skill listing Payload dict
         """
         attachment = data.get('attachment', {})
         return {
@@ -347,16 +347,16 @@ class TerminalSSEChannel:
         }
 
     def _build_stdout_payload(self, data: dict) -> dict:
-        """stdout 이벤트 페이로드를 구성한다.
+        """Configuring the stdout event payload.
 
-        stream_event의 text_delta에서 텍스트 청크를 추출하거나,
-        assistant 메시지에서 전체 텍스트를 추출한다.
+        stream event text delta,
+        Recovers the entire text from the assistant message.
 
         Args:
-            data: 원본 NDJSON 메시지 dict
+            data: original NDJSON message dict
 
         Returns:
-            stdout 페이로드 dict
+            Stdout Payload dict
         """
         msg_type = data.get('type', '')
 
@@ -375,16 +375,16 @@ class TerminalSSEChannel:
                     'kind': 'input_json_delta',
                     'chunk': delta.get('partial_json', ''),
                 }
-            # content_block_start, message_start, message_delta 등 기타 stream_event
+            # content block start, message start, message delta, etc.
             payload = {
                 'kind': event.get('type', 'stream_event'),
                 'raw': event,
             }
-            # usage 위치는 이벤트 타입마다 다르다:
+            # Usage Location is different from event type NEWS
             #   - message_start: event.message.usage (input_tokens + cache_* + output_tokens=1)
-            #   - message_delta: event.usage (output_tokens 만, input 없음)
-            # input 이 없는 이벤트(message_delta)에 0 을 넣어 보내면 클라의
-            # setInputTokens(0) 이 바를 0% 로 깜빡이게 한다. 실제 있는 필드만 전파한다.
+            #   - message delta: event.usage (output tokens only, no input)
+            # input 0 in the event(message delta) without send
+            # setInputTokens(0) = 0% We use cookies to give you the best experience on our website.
             event_usage = event.get('usage') or event.get('message', {}).get('usage')
             if event_usage:
                 payload_usage: dict = {}
@@ -428,13 +428,13 @@ class TerminalSSEChannel:
         return {'kind': msg_type or 'unknown', 'raw': data}
 
     def _build_result_payload(self, data: dict) -> dict:
-        """result 이벤트 페이로드를 구성한다.
+        """result Compose event payload.
 
         Args:
-            data: 원본 NDJSON 메시지 dict
+            data: original NDJSON message dict
 
         Returns:
-            result 페이로드 dict
+            result payload dict
         """
         usage = data.get('usage', {})
         return {
@@ -452,30 +452,30 @@ class TerminalSSEChannel:
             'output_tokens': usage.get('output_tokens', 0),
         }
 
-    # subtype 별 클라이언트가 top-level 로 접근하는 필드 계약.
-    # 신규 subtype 추가 시 이 표에 명시하지 않으면 클라이언트에서 raw 경유로 접근해야 한다.
+    # subtype field contract where client approaches to top-level.
+    # If you do not specify this table for new subtypes, you must access raw oil from the client.
     _SYSTEM_TOP_LEVEL_FIELDS: dict[str, tuple[str, ...]] = {
         'task_started': ('task_id', 'tool_use_id', 'description', 'last_tool_name', 'task_count', 'task_index'),
         'task_progress': ('task_id', 'tool_use_id', 'description', 'last_tool_name'),
         'task_notification': ('task_id', 'tool_use_id', 'status', 'summary'),
         'process_exit': ('exit_code',),
-        # ESC 인터럽트 시점의 마지막 user 메시지 timestamp 를 클라이언트에 노출.
-        # 클라이언트는 이 timestamp 와 매칭되는 user 말풍선에 .interrupted 마커를 부여.
+        # The last user message timestamp of the ESC interflow point is exposed to the client.
+        # The client grants .interrupted markers to this timestamp and the matching user.
         'user_input_interrupted': ('timestamp',),
     }
 
     def _build_system_payload(self, data: dict) -> dict:
-        """system 이벤트 페이로드를 구성한다.
+        """Configuring system event payload.
 
-        subtype 에 따라 클라이언트가 top-level 로 접근하는 필드를
-        ``_SYSTEM_TOP_LEVEL_FIELDS`` 계약에 따라 추출하여 노출한다.
-        클라이언트는 raw 경유 폴백 없이 단순 접근만 수행할 수 있다.
+        subtype the field where the client approaches to top-level
+        ' SYSTEM TOP LEVEL FIELDS'
+        Clients can only perform simple approaches without raw crude.
 
         Args:
-            data: 원본 NDJSON 메시지 dict
+            data: original NDJSON message dict
 
         Returns:
-            system 페이로드 dict
+            system dict
         """
         subtype = data.get('subtype', '')
         payload: dict = {
@@ -491,13 +491,13 @@ class TerminalSSEChannel:
 
     @property
     def client_count(self) -> int:
-        """현재 연결된 클라이언트 수를 반환한다."""
+        """Returns the number of client currently connected."""
         with self._lock:
             return len(self._clients)
 
     @property
     def current_step(self) -> str:
-        """현재 워크플로우 단계를 반환한다."""
+        """return the current workflow step."""
         return self._current_step
 
     # ------------------------------------------------------------------
@@ -505,13 +505,13 @@ class TerminalSSEChannel:
     # ------------------------------------------------------------------
 
     def emit_step(self, step_name: str, detail: dict | None = None) -> None:
-        """workflow_step SSE 이벤트를 발행하고 jsonl 파일에 기록한다.
+        """publish workflow step SSE events and record jsonl files.
 
-        broadcast()를 거치지 않으므로 jsonl 기록을 직접 수행한다.
+        jsonl jsonl
 
         Args:
-            step_name: 단계 이름 (init, plan, work, report, done)
-            detail: 추가 정보 dict (phase, mode, trigger 등)
+            step name: stage name (init, plan, work, report, done)
+            detail: Additional information dict (phase, mode, trigger, etc.)
         """
         prev = self._current_step
         self._current_step = step_name
@@ -520,7 +520,7 @@ class TerminalSSEChannel:
             payload.update(detail)
         self._emit_event('workflow_step', json.dumps(payload, ensure_ascii=False))
 
-        # jsonl 기록 (broadcast 미경유이므로 직접 persist)
+        # jsonl recording (broadcast mirror)
         if self._persist_path is not None:
             try:
                 record = {'type': 'workflow_step', 'step': step_name, 'prev_step': prev}
@@ -531,7 +531,7 @@ class TerminalSSEChannel:
                     with open(self._persist_path, 'a', encoding='utf-8') as f:
                         f.write(line)
             except (OSError, TypeError) as exc:
-                logger.error("terminal_channel: emit_step persist 쓰기 실패 (%s): %s", self._persist_path, exc)
+                logger.error("terminal channel: emit step persist write failed (%s): %s", self._persist_path, exc)
 
         if self.on_step:
             try:
@@ -540,7 +540,7 @@ class TerminalSSEChannel:
                 pass
 
     def _detect_step_from_broadcast(self, event_name: str, payload: dict) -> None:
-        """broadcast 된 stdout 이벤트에서 워크플로우 단계 전이를 감지한다."""
+        """Detects workflow stage transitions in the broadcast stdout event."""
         if event_name != 'stdout':
             return
         kind = payload.get('kind', '')
@@ -550,13 +550,13 @@ class TerminalSSEChannel:
             self._step_buffer += payload.get('text', '')
         else:
             return
-        # 개행 단위로 라인을 소비하여 패턴 매칭
+        # Contains a line with a running unit, pattern matching
         while '\n' in self._step_buffer:
             line, self._step_buffer = self._step_buffer.split('\n', 1)
             self._check_step_line(line.strip())
 
     def _check_step_line(self, line: str) -> None:
-        """단일 stdout 라인에서 워크플로우 단계 패턴을 검사한다."""
+        """Check the workflow stage pattern in a single stdout line."""
         if not line:
             return
         m = _STEP_PATTERN.search(line)
@@ -580,7 +580,7 @@ class TerminalSSEChannel:
             return
         m = _FINISH_PATTERN.search(line)
         if m:
-            result = 'success' if (m.group(1) or m.group(2)) == '완료' else 'failure'
+            result = 'success' if (m.group(1) or m.group(2)) == 'Application' else 'failure'
             self.emit_step('done', {'trigger': 'stdout', 'result': result})
 
 

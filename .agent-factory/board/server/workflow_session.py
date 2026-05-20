@@ -15,21 +15,21 @@ from .terminal_channel import TerminalSSEChannel
 
 @dataclass
 class WorkflowSession:
-    """워크플로우 세션 하나를 나타내는 데이터 클래스.
+    """Data class indicating one of the workflow sessions.
 
-    각 워크플로우 티켓 실행은 독립된 ClaudeProcess와 TerminalSSEChannel을
-    가지며, session_id로 식별된다.
+    Each workflow ticket runs an independent ClaudeProcess and TerminalSSEChannel
+    is identified as session id.
 
     Attributes:
-        session_id: 세션 고유 ID (형식: wf-T-NNN-timestamp)
-        ticket_id: 칸반 티켓 ID (예: T-238)
-        command: 실행 명령어 (implement, review, research 등)
-        work_dir: 작업 디렉터리 절대 경로
-        process: Claude CLI 프로세스 관리자 인스턴스
-        channel: 터미널 SSE 브로드캐스트 채널 인스턴스
-        created_at: 세션 생성 시각 (ISO 형식)
-        current_step: 현재 진행 중인 워크플로우 단계 (예: PLAN, WORK, REPORT)
-        last_artifact: 최근 생성된 산출물 경로 (예: work/W01-design.md)
+        session id: Session Original ID (Type: wf-T-NNN-timestamp)
+        ticket id: Kanban ticket ID (e.g. T-238)
+        command: execution command (implement, review, research, etc.)
+        work dir: task directory absolute path
+        process: Claude CLI process manager instance
+        channel: terminal SSE broadcast channel instance
+        created at: Session creation time (ISO format)
+        current step: current workflow stage (e.g. PLAN, WORK, REPORT)
+        last artifact: Recently generated output path (e.g. work/W01-design.md)
     """
 
     session_id: str
@@ -44,21 +44,21 @@ class WorkflowSession:
 
 
 class WorkflowSessionRegistry:
-    """다중 워크플로우 세션 레지스트리.
+    """Multi-Workflow Session Registry.
 
-    thread-safe하게 워크플로우 세션을 생성·조회·삭제한다.
-    각 세션은 독립된 ClaudeProcess + TerminalSSEChannel 쌍을 보유한다.
+    thread-safe creates a workflow session.
+    Each session holds an independent ClaudeProcess + TerminalSSEChannel pair.
 
     Attributes:
-        _sessions: session_id -> WorkflowSession 매핑
-        _lock: thread-safe 접근용 Lock
+        sessions: session id -> WorkflowSession map
+        lock: Lock for thread-safe access
     """
 
     def __init__(self, persist_dir: str | None = None) -> None:
-        """초기화한다.
+        """Add to cart
 
         Args:
-            persist_dir: 세션을 저장할 디렉터리. None이면 persist 비활성.
+            persist dir: Directory to save session. If None persist inactive.
         """
         self._sessions: dict[str, WorkflowSession] = {}
         self._lock: threading.Lock = threading.Lock()
@@ -70,7 +70,7 @@ class WorkflowSessionRegistry:
                 self._persist_dir = None
 
     def _session_file(self, session_id: str) -> str | None:
-        """세션 이벤트 파일 경로를 반환한다."""
+        """Returns the session event file path."""
         if self._persist_dir is None:
             return None
         return os.path.join(self._persist_dir, f'{session_id}.jsonl')
@@ -81,18 +81,18 @@ class WorkflowSessionRegistry:
         command: str,
         work_dir: str,
     ) -> WorkflowSession:
-        """새 워크플로우 세션을 생성한다.
+        """Create a new workflow session.
 
-        독립된 TerminalSSEChannel과 ClaudeProcess 인스턴스를 할당하고,
-        session_id를 생성하여 레지스트리에 등록한다.
+        allocates independent terminalSSEChannel and ClaudeProcess instances,
+        Create session id to register in the registry.
 
         Args:
-            ticket_id: 칸반 티켓 ID (예: T-238)
-            command: 실행 명령어 (implement, review, research 등)
-            work_dir: 작업 디렉터리 절대 경로
+            ticket id: Kanban ticket ID (e.g. T-238)
+            command: execution command (implement, review, research, etc.)
+            work dir: task directory absolute path
 
         Returns:
-            생성된 WorkflowSession 인스턴스
+            Created WorkflowSession instance
         """
         timestamp = time.strftime('%Y%m%d-%H%M%S')
         session_id = f'wf-{ticket_id}-{timestamp}'
@@ -110,12 +110,12 @@ class WorkflowSessionRegistry:
             channel=channel,
         )
 
-        # stdout 기반 단계 감지 시 session.current_step 자동 갱신
+        # session.current step auto update when stdout-based step detection
         def _on_step(step_name: str, _payload: dict) -> None:
             session.current_step = step_name
         channel.on_step = _on_step
 
-        # 메타데이터를 파일 첫 줄에 기록
+        # Metadata to the file first line
         if persist_path is not None:
             try:
                 meta = {
@@ -130,7 +130,7 @@ class WorkflowSessionRegistry:
                 with open(persist_path, 'w', encoding='utf-8') as f:
                     f.write(json.dumps(meta, ensure_ascii=False) + '\n')
             except OSError as exc:
-                logger.error("workflow_session[%s]: 메타데이터 persist 쓰기 실패 (%s): %s", session_id, persist_path, exc)
+                logger.error("workflow session[%s]: metadata persist write failed (%s): %s", session_id, persist_path, exc)
 
         with self._lock:
             self._sessions[session_id] = session
@@ -138,15 +138,15 @@ class WorkflowSessionRegistry:
         return session
 
     def load_from_disk(self) -> int:
-        """persist 디렉터리에서 세션 메타데이터를 로드하여 레지스트리를 복원한다.
+        """Restores registries by loading session metadata in persist directory.
 
-        각 *.jsonl 파일의 첫 줄 _meta만 읽어 WorkflowSession 객체를 재생성한다.
-        이벤트 데이터는 메모리에 복원하지 않는다 — 재접속 시 클라이언트가
-        REST /workflow/history를 통해 jsonl 파일에서 직접 읽는다.
-        process는 새 ClaudeProcess (status='stopped')로 생성된다.
+        The first line of each *.jsonl file  meta only reads the WorkflowSession object.
+        Event data is not restored in memory — Clients are redirected
+        read directly from jsonl file via REST /workflow/history.
+        process is created with new ClaudeProcess (status='stopped').
 
         Returns:
-            로드된 세션 개수
+            Load more
         """
         if self._persist_dir is None or not os.path.isdir(self._persist_dir):
             return 0
@@ -190,7 +190,7 @@ class WorkflowSessionRegistry:
         return loaded
 
     def purge(self, session_id: str) -> bool:
-        """세션을 레지스트리와 디스크에서 완전히 제거한다."""
+        """Remove session completely from the registry and disk."""
         removed = self.remove(session_id)
         if removed and self._persist_dir is not None:
             fpath = self._session_file(session_id)
@@ -198,18 +198,18 @@ class WorkflowSessionRegistry:
                 try:
                     os.remove(fpath)
                 except OSError as exc:
-                    logger.error("workflow_session[%s]: 세션 파일 삭제 실패 (%s): %s", session_id, fpath, exc)
+                    logger.error("workflow session[%s]: Delete session files failed (%s): %s", session_id, fpath, exc)
         return removed
 
     def load_archived(self, session_id: str) -> 'WorkflowSession | None':
-        """디스크 아카이브에서 완료 세션의 메타데이터를 on-demand로 복원한다.
+        """Restore the metadata of the session completed in the disk archive to on-demand.
 
-        registry에 없지만 .jsonl 파일이 남아있는 경우 읽기 전용으로 복원한다.
-        process는 status='stopped'로 설정되며 신규 입력은 거부된다. 본 메서드는
-        registry에 세션을 삽입하지 않고, 호출자가 일회성으로 사용한 뒤 참조를 놓는다.
+        .jsonl .jsonl .jsonl .
+        process is set to status='stopped' and new inputs are denied. This method is
+        Without inserting a session to registry, the caller uses it as a one-time basis and sets the reference.
 
-        이벤트 데이터는 메모리에 복원하지 않는다 — 클라이언트가 REST /workflow/history
-        엔드포인트를 통해 jsonl 파일에서 직접 읽는다.
+        Event data does not restore to memory — client REST /workflow/history
+        read directly from jsonl file via endpoint.
         """
         if self._persist_dir is None:
             return None
@@ -245,27 +245,27 @@ class WorkflowSessionRegistry:
         return session
 
     def get(self, session_id: str) -> WorkflowSession | None:
-        """session_id로 세션을 조회한다.
+        """session id
 
         Args:
-            session_id: 조회할 세션 ID
+            session id: Session ID to view
 
         Returns:
-            WorkflowSession 인스턴스. 존재하지 않으면 None.
+            WorkflowSession instance. None.
         """
         with self._lock:
             return self._sessions.get(session_id)
 
     def remove(self, session_id: str) -> bool:
-        """세션을 레지스트리에서 제거한다.
+        """Remove session from the registry.
 
-        프로세스 종료는 호출자가 별도로 처리해야 한다.
+        The end of the process should be handled separately.
 
         Args:
-            session_id: 제거할 세션 ID
+            session id: Session ID to remove
 
         Returns:
-            제거 성공 시 True, 세션이 존재하지 않으면 False.
+            True, if the session does not exist, False.
         """
         with self._lock:
             if session_id in self._sessions:
@@ -274,10 +274,10 @@ class WorkflowSessionRegistry:
             return False
 
     def list_all(self) -> list[dict]:
-        """전체 세션 목록을 dict 리스트로 반환한다.
+        """Returns the full session list to dict list.
 
         Returns:
-            세션 메타데이터 dict 리스트. 각 dict 키:
+            Session metadata dict list. Angle dict key:
             session_id, ticket_id, command, work_dir, status, created_at
         """
         with self._lock:
@@ -294,15 +294,15 @@ class WorkflowSessionRegistry:
             ]
 
     def get_by_ticket(self, ticket_id: str) -> WorkflowSession | None:
-        """티켓 ID로 세션을 조회한다.
+        """Check the session with the ticket ID.
 
-        동일 티켓에 여러 세션이 있을 경우 첫 번째 매칭을 반환한다.
+        If there are multiple sessions in the same ticket, return the first matching.
 
         Args:
-            ticket_id: 조회할 티켓 ID (예: T-238)
+            Ticket ID: T-238)
 
         Returns:
-            WorkflowSession 인스턴스. 존재하지 않으면 None.
+            WorkflowSession instance. None.
         """
         with self._lock:
             for session in self._sessions.values():
@@ -311,4 +311,4 @@ class WorkflowSessionRegistry:
             return None
 
 
-# 모듈 레벨 워크플로우 세션 레지스트리 싱글톤
+# Module Level Workflow Session Registry Singleton

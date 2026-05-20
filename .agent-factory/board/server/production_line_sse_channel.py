@@ -1,11 +1,11 @@
 """ProductionLineSSEChannel — per-session NDJSON broadcast + jsonl persist.
 
-v1 TerminalSSEChannel 과 분리된 production-line 전용 SSE 채널.
-한 ProductionLineSession 당 하나의 채널 인스턴스가 할당된다.
+v1 TerminalSSEChannel and separated production-line only SSE channels.
+One channel instance per ProductionLineSession is assigned.
 
-driver 가 의미별 endpoint (`/step`, `/stdout`, `/phase`, `/finish`) 를 호출하므로
-broadcast 자체는 단순 forward — 의미 분류 (text_delta / tool_use 등) 는
-프론트엔드 측 분기로 위임한다.
+call endpoint(`/step`, `/stdout`, `/phase`, `/finish`)
+The broadcast itself is simple forward — meaning classification (text delta / tool use, etc.)
+The front-end side branch is commissioned.
 """
 
 from __future__ import annotations
@@ -18,24 +18,24 @@ from ._common import logger
 
 
 class ProductionLineSSEChannel:
-    """production-line 전용 SSE 채널 — per-session client fan-out.
+    """SSE channel for production-line — per-session client fan-out.
 
     Attributes:
-        session_id: 소유 세션 ID (wf-T-NNN-<uuid>)
-        _clients: 연결된 SSE 클라이언트 wfile 목록
-        _lock: 클라이언트 목록 접근 Lock
-        _client_locks: wfile 별 per-client Lock
-        _next_seq: SSE id 시퀀스
-        _persist_path: NDJSON 파일 경로 (None 이면 persist 비활성)
-        _persist_lock: 파일 write Lock
+        session id: possession session ID (wf-T-NNN-<uuid>)
+        clients: SSE client wfile list connected
+        lock: Client List Access Lock
+        client locks: per-client Lock by wfile
+        next seq: SSE id sequence
+        persist path: NDJSON file path (None tooth persist inert)
+        persist lock
     """
 
     def __init__(self, session_id: str, persist_path: str | None = None) -> None:
-        """초기화한다.
+        """Add to cart
 
         Args:
-            session_id: 소유 세션 ID
-            persist_path: NDJSON 파일 경로 (None 이면 persist 비활성)
+            session id: possession session ID
+            persist path: NDJSON file path (None side persist inactive)
         """
         self.session_id: str = session_id
         self._clients: list = []
@@ -47,26 +47,26 @@ class ProductionLineSSEChannel:
 
     @property
     def persist_path(self) -> str | None:
-        """NDJSON persist 파일 절대 경로 (persist 비활성 시 None).
+        """NDJSON persist file absolute path (perist inactive None).
 
-        T-513 P1 — `GET /api/v2/sessions/<id>/history` endpoint 가 본 경로를
-        read 하여 과거 이벤트를 일괄 반환한다 (REST 단일 출처 정책 정합).
+        T-513 P1 — `GET /api/v2/sessions/<id>/history` endpoint
+        read returns past events (REST Single Source Policy Completion).
         """
         return self._persist_path
 
     def add(self, wfile: object) -> None:
-        """SSE 클라이언트를 라이브 스트림에 등록한다.
+        """Registered SSE client to live stream.
 
-        replay 는 별도 endpoint (GET /api/v2/sessions/<id>/history) 가 NDJSON
-        파일에서 read. 본 메서드는 신규 클라이언트만 등록하여 이후 라이브
-        이벤트 수신.
+        replay is separate endpoint (GET /api/v2/sessions/<id>/history) with NDJSON
+        read in the file. This method only registers a new client and then live
+        Get in touch
         """
         with self._lock:
             self._clients.append(wfile)
             self._client_locks[id(wfile)] = threading.Lock()
 
     def remove(self, wfile: object) -> None:
-        """클라이언트를 제거한다."""
+        """Remove the client."""
         with self._lock:
             try:
                 self._clients.remove(wfile)
@@ -75,21 +75,21 @@ class ProductionLineSSEChannel:
             self._client_locks.pop(id(wfile), None)
 
     def get_lock(self, wfile: object) -> threading.Lock | None:
-        """wfile per-client lock 을 반환한다."""
+        """return wfile per-client lock."""
         with self._lock:
             return self._client_locks.get(id(wfile))
 
     def client_count(self) -> int:
-        """현재 연결된 클라이언트 수를 반환한다 (테스트용)."""
+        """returns the number of clients currently connected (for testing)."""
         with self._lock:
             return len(self._clients)
 
     def broadcast(self, event_name: str, payload: dict) -> None:
-        """SSE 이벤트를 전송 + NDJSON 파일 persist 한다.
+        """Send SSE Event + NDJSON file persist.
 
         Args:
-            event_name: SSE event 이름 (예: workflow_step, workflow_stdout)
-            payload: 이벤트 페이로드 dict (JSON 직렬화 가능)
+            event name: SSE event name (e.g. workflow step, workflow stdout)
+            payload: event payload dict (JSON serialization possible)
         """
         json_payload = json.dumps(payload, ensure_ascii=False)
         self._emit_event(event_name, json_payload)
@@ -109,7 +109,7 @@ class ProductionLineSSEChannel:
                         f.write(line)
             except (OSError, TypeError) as exc:
                 logger.error(
-                    "production_line_sse_channel[%s]: persist 쓰기 실패 (%s): %s",
+                    "production line sse channel[%s]: persist write failed (%s): %s",
                     self.session_id, self._persist_path, exc,
                 )
 
@@ -117,14 +117,14 @@ class ProductionLineSSEChannel:
         self, step: str, phase: str = '', prev_step: str = '',
         extras: dict | None = None,
     ) -> None:
-        """workflow_step 이벤트 발화 — Step 전이.
+        """workflow step event saturation — step ahead.
 
         Args:
-            step: 새 Step (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED)
-            phase: WORK 내부 sub-phase (P1, P2, ...). 없으면 빈 문자열
-            prev_step: 직전 Step (frontend FSM 검증용)
-            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
-                fixed key (session_id/step/phase/prev_step) 는 보호됨.
+            Step: New Step (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED)
+            phase: WORK internal sub-phase (P1, P2, ...). Without empty string
+            prev step: Direct Step (frontend FSM verification)
+            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
+                Fixed key (session id/step/phase/prev step) is protected.
         """
         payload = {
             'session_id': self.session_id,
@@ -139,11 +139,11 @@ class ProductionLineSSEChannel:
         self.broadcast('workflow_step', payload)
 
     def emit_stdout(self, text: str, raw: dict | None = None) -> None:
-        """workflow_stdout 이벤트 발화 — claude -p stdout NDJSON chunk.
+        """workflow stdout event saturation — claude -p stdout NDJSON chunk.
 
         Args:
-            text: 텍스트 chunk (frontend 빠른 path)
-            raw: 원본 NDJSON dict (frontend 분기 렌더 필요 시)
+            text: text chunk (frontend fast path)
+            raw: original NDJSON dict (frontend quarter renderer required)
         """
         payload = {
             'session_id': self.session_id,
@@ -157,12 +157,12 @@ class ProductionLineSSEChannel:
         self, phase: str, action: str = 'start',
         extras: dict | None = None,
     ) -> None:
-        """workflow_phase 이벤트 발화 — WORK 내부 phase 전이.
+        """workflow phase event saturation — WORK internal phase transformation.
 
         Args:
             phase: P1, P2, ...
             action: start | end
-            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
+            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
         """
         payload = {
             'session_id': self.session_id,
@@ -179,12 +179,12 @@ class ProductionLineSSEChannel:
         self, outcome: str, summary: str = '',
         extras: dict | None = None,
     ) -> None:
-        """workflow_finish 이벤트 발화 — 사이클 종결.
+        """workflow finish event saturation — cycle closing.
 
         Args:
             outcome: ok | fail
-            summary: 종결 사유 / 한 줄 요약
-            extras: T-495 P3 — verdict/commit/retry 등 forward-compatible 메타.
+            summary: ending oil / one line summary
+            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
         """
         payload = {
             'session_id': self.session_id,
@@ -198,7 +198,7 @@ class ProductionLineSSEChannel:
         self.broadcast('workflow_finish', payload)
 
     def _emit_event(self, event_name: str, json_payload: str) -> None:
-        """SSE 이벤트를 seq_id 부여 후 모든 클라이언트에 전송한다."""
+        """Send SSE event to all client after seq id authorization."""
         dead_clients: list = []
         with self._lock:
             seq_id = self._next_seq

@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 import sys
 
-# .agent-factory/ 디렉터리를 import 경로에 추가 (board.* 및 engine.* 접근용)
+# Add the .agent-factory/ directory to the import path (for accessing board.* and engine.*)
 _BOARD_DIR = os.path.dirname(os.path.abspath(__file__))
 _AGENT_FACTORY_DIR = os.path.dirname(_BOARD_DIR)
 if _AGENT_FACTORY_DIR not in sys.path:

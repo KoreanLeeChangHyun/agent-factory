@@ -59,7 +59,7 @@
   line-height: 1.5;
 }
 
-/* ── collapsibleResult: 3줄 미리보기 + 접이식 결과 컨테이너 ── */
+/* ── collapsibleResult: 3-row preview + foldable result container */
 .term-tool-result-rendered .term-collapsible {
   margin: 2px 0;
   border: none;

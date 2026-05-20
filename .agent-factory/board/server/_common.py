@@ -8,8 +8,8 @@ import os
 import threading
 import time
 
-# noqa: F401 — 본 _common.py 는 factory_data 의 식별자를 handlers/* 가 재import 하는
-# hub 역할. _common.py 내부에서 직접 사용 안 해도 export 의무.
+# noqa: F401 — Pattern  common.py handlers/* reimport identifiers of factory data
+# hub role.  common.py direct use in internally export duty.
 from board.factory_data import (  # noqa: F401
     KANBAN_DIRS_LIST,
     WF_BASE,
@@ -68,7 +68,7 @@ WATCH_INTERVAL: float = 1.0
 SERVER_STARTED_AT: str = time.strftime('%Y-%m-%d %H:%M:%S')
 SERVER_PID: int = os.getpid()
 
-# 감시 대상 경로 -> SSE 이벤트 타입 매핑
+# Monitoring Target Path -> SSE Event Type Mapping
 WATCH_DIRS: dict[str, str] = {
     os.path.join('.agent-factory', 'tickets', 'open'): 'kanban',
     os.path.join('.agent-factory', 'tickets', 'progress'): 'kanban',
@@ -80,11 +80,11 @@ WATCH_DIRS: dict[str, str] = {
     os.path.join('.agent-factory', 'roadmap'): 'roadmap',
 }
 
-# 메모리 GC 디렉터리 감시 — 사용자 글로벌 영역, project_root 기준 상대경로 X
-# (server.py 가 watcher 등록 시 절대경로 변환 필요. 일단 SSE 채널만 예약)
+# Memory GC Directory Guard — User Global Area, Project root Standard Relative View X
+# (server.py need to convert to absolute view when watcher registration. Once SSE Channel Only Reservation)
 MEMORY_WATCH_EVENT: str = 'memory_gc'
 
-# Workflow sync (init-claude-workflow.sh) 부트스트랩 URL과 동시 실행 차단 락
+# Workflow sync (init-claude-workflow.sh) Bootstrap URL and simultaneous run lock
 _WORKFLOW_SYNC_URL: str = (
     'https://raw.githubusercontent.com/KoreanLeeChangHyun/'
     'claude-workflow/main/init-claude-workflow.sh'

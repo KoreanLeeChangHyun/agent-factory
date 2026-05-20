@@ -572,9 +572,9 @@
   font-size: 90%;
 }
 
-/* user 입력 메시지 — 테라코타 톤 다운 박스로 감싸 assistant 메시지와 시각 구분.
- * board.md §2 (큐 stack UI 카드 색) + §3 (user 말풍선) + §6 (테라코타 #D97757) 캐논 정합.
- * 박스 디자인 회귀 차단 — 메모리 박제 [[feedback-board-user-message-box-canon]]. */
+/* user input message — terracotta tone down box wrapped assistant message and visual separator.
+ * board.md §2 (Quack UI Card Color) + §3 (user Spiral) + §6 (Teraconta #D97757) Conclusion.
+ * Box Design Regression — Memory Remittance [[feedback-board-user-message-box-canon]]]. */
 .term-user {
   color: #9cdcfe;
   white-space: pre-wrap;
@@ -585,16 +585,16 @@
   padding: 8px 12px;
 }
 
-/* ESC 인터럽트로 응답이 중지된 user 메시지 — 우측 모서리에 "중지됨" 배지 부착.
- * 색상은 테마 컬러(테라코타 #D97757) 기반. */
+/* User messages that stopped responses to ESC interflow — attaching "About Us" badges to the right corner.
+ * The color is based on the theme color (terracotta #D97757). */
 .term-user.interrupted {
   position: relative;
-  padding-right: 64px;  /* "중지됨" 배지 자리 확보. base padding 8/12 위에 right 만 override. */
+  padding-right: 64px;  /* "About Us" base padding 8/12 right override. */
   opacity: 0.85;
 }
 
 .term-user.interrupted::after {
-  content: "중지됨";
+  content: "About Us";
   position: absolute;
   top: 0;
   right: 0;
@@ -686,7 +686,7 @@
   padding: 12px;
   margin: 8px 0;
   line-height: 1.5;
-  /* 가로 스크롤 대신 줄바꿈으로 처리: 들여쓰기/공백은 보존(pre-wrap),
+  /* Handling instead of horizontal scroll: pre-wrap,
      긴 토큰(URL/해시 등)은 컨테이너 폭에서 강제로 깨짐(anywhere). */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -754,7 +754,7 @@
   border: 1px solid #3c3c3c;
   padding: 6px 12px;
   color: #ccc;
-  /* text-align 은 JS table 렌더러가 token.align 기반 inline style 로 부여한다.
+  /* text-align is given by JS table renderer token.align based inline style.
      하드코딩 left 를 두면 GFM `:---:` / `---:` 정렬이 모두 무력화된다. */
 }
 
@@ -898,7 +898,7 @@
    .terminal-queue-pending-remove — entry row × 삭제 버튼
    ═══════════════════════════════════════════════════════ */
 
-/* ── Queue Count 강조 (hint 텍스트 안 카운트 span) ──
+/* ── Queue Count emphasis (hint text inner count span) ──
    busy + 큐 ≥ 1 상태에서 카운트 숫자를 테라코타 오렌지로 강조.
    hint 전체 색상이 아닌 숫자 span 만 강조하여 시각 계층 최소화.
 */
@@ -907,7 +907,7 @@
   color: #D97757;
 }
 
-/* ── 큐 Entry 펼침 패널 ──
+/* ── Cue Entry Unbreakable Panel ──
    hint 라인 바로 위, .terminal-input-card 기준 absolute 배치.
    입력 카드 톤과 일관된 어두운 배경 + outline 테두리.
    border-left 한쪽 색상 디자인 금지 정책 준수 — outline 방식 채택.
@@ -951,7 +951,7 @@
   text-overflow: ellipsis;
 }
 
-/* ── × 삭제 버튼 ──
+/* ── × Delete Button ──
    16x16, flex-shrink: 0 으로 텍스트 영역 침범 방지.
    hover: 에러 레드(#f44747) — 삭제 행위 의미론적 색상.
    처리 중(in-flight) entry 에는 이 버튼을 숨겨 취소 오인 방지.
@@ -979,12 +979,12 @@
   background: rgba(244, 71, 71, 0.15);
 }
 
-/* 처리 중(in-flight) entry × 버튼 숨김 — 취소 가능으로 오인 방지 */
+/* During processing (in-flight) entry × button hide — preventing cancellation possible */
 .terminal-queue-pending-entry.in-flight .terminal-queue-pending-remove {
   display: none;
 }
 
-/* ── 입력란 큐 stack (입력 카드 외부, 카드 바로 위, 오른쪽 정렬) ──
+/* ── Input field queue stack (output card, right upper, right alignment) 
    busy 중 사용자가 보낸 추가 메시지를 카드로 stack.
    각 카드는 텍스트 한 줄 ellipsis + × 삭제 버튼.
    메시지가 길어 잘리면 호버 시 OS tooltip(title 속성)으로 전체 노출.
@@ -1096,7 +1096,7 @@
   padding: 4px 0;
 }
 
-/* 메모리 첨부 카드 — badge 청록 톤으로 ticket 과 시각 구분. */
+/* Memory Attachment Card — Ticket and visual separators with the dealer tone. */
 .terminal-ticket-card[data-att-type="memory"] .terminal-ticket-card-cmd {
   background: #4ec9b0;
 }
@@ -1132,7 +1132,7 @@
   line-height: 1.3;
 }
 
-/* ── 메시지 렌더 첨부 카드 컨테이너 ──
+/* ── Message Wrender Attachment Card Container ──
    outputDiv 내 사용자 메시지(.term-message.term-user) 아래에 위치하는
    첨부 카드 나열 영역. 다중 카드는 flex-wrap 으로 줄바꿈 처리.
    .terminal-ticket-card 클래스는 변경 없이 그대로 재사용 (CSS 변경 없음).

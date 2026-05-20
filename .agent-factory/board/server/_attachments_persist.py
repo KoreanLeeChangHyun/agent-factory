@@ -1,34 +1,34 @@
-"""사용자 메시지에 결합된 첨부 티켓 메타를 jsonl sidecar 로 영속화한다.
+"""jsonl sidecar
 
-T-429 의 정책에 따라 사용자 메시지 본문(jsonl content) 은 짧은 텍스트만
-유지하고, 첨부 티켓 카드는 별도 sidecar 파일로 분리하여 보존한다.
+jsonl content is only short text according to T-429 policy
+Keep and the attached ticket card will be preserved by separate sidecar files.
 
-파일 경로
+File path
 ---------
 ``~/.claude/projects/<project-slug>/<session_id>.attachments.jsonl``
 
-- ``project-slug`` 결정은 ``handlers/terminal.py`` 와 ``claude_process.py`` 의
-  기존 sidecar 패턴(``os.getcwd().replace('/', '-')``) 을 답습한다.
+- ``project-slug``` ``handlers/terminal.py` and ``claude process.py``
+  the existing sidecar pattern (`os.getcwd().replace('/', '-')`).
 
-라인 형식
+Line Type
 ---------
 ``{"user_msg_ts": "<iso>", "attachments": [{number, command, title,
 prompt, report, fetched_at}, ...]}``
 
-- 빈 attachments 는 append 자체를 skip 하여 노이즈/회귀를 방지한다.
-- 한 줄 = 한 user 메시지 첨부 묶음. 시간순 append-only.
+- blank attachments will skip the append itself to prevent noise/turns.
+- One line = one user message attached string. timeline append-only.
 
-graceful 폴백
+Graceful Folly
 -------------
-- 파일 부재 시 ``load_map()`` 은 빈 dict 를 반환한다.
-- 파싱 실패 라인은 무시한다.
-- IO 오류는 logger 에 기록하고 파이프라인을 중단시키지 않는다.
+- When file deletion, `load map()` returns empty dict.
+- The parsing failure line ignores.
+- IO error is recorded on logger and does not interrupt the pipeline.
 
-session_id 미정 시
+session id
 ------------------
-- ``session_id`` 가 빈 문자열인 경우 append/load 모두 no-op 처리한다.
-  (워크플로우 외 시점이나 ``/terminal/start`` 직후 init 이벤트가 도착하지
-  않은 짧은 구간에서 호출되는 보호용 분기)
+- If `session id` is empty string, append/load will handle no-op.
+  (Init event after workflow or terminal/start`)
+  Unlike short sections, the protection branch is called.
 """
 
 from __future__ import annotations
@@ -40,11 +40,11 @@ from ._common import logger
 
 
 class AttachmentsSidecar:
-    """``<session_id>.attachments.jsonl`` append/load 헬퍼.
+    """``<session id>.attachments.jsonl` append/load helper.
 
-    interrupted sidecar 패턴(``claude_process._record_user_interrupt_to_sidecar``)
-    을 답습하여 동일한 ``~/.claude/projects/<slug>/<session_id>.<kind>.jsonl``
-    경로 컨벤션을 유지한다.
+    interrupt to sidecar`
+    <% if (imgObj.width >= imgObj.height) { %> <kind>.jsonl`
+    Toggle navigation
     """
 
     SIDECAR_SUFFIX = '.attachments.jsonl'
@@ -53,13 +53,13 @@ class AttachmentsSidecar:
         self.session_id = (session_id or '').strip()
         self._path = self._resolve_path()
 
-    # 경로 -------------------------------------------------------------
+    # Path ------------------------------------------------
 
     def _resolve_path(self) -> str:
-        """sidecar 파일 절대 경로를 산출한다.
+        """output the sidecar file absolute path.
 
-        session_id 가 비어 있으면 빈 문자열을 반환하고, 호출부는 모든
-        IO 를 no-op 으로 처리한다.
+        if session id is empty, return the empty string, and all call calls are empty
+        IO to no-op.
         """
         if not self.session_id:
             return ''
@@ -73,25 +73,25 @@ class AttachmentsSidecar:
 
     @property
     def path(self) -> str:
-        """sidecar 파일 경로 (테스트/디버그용 노출)."""
+        """sidecar file path (test/debug exposure)."""
         return self._path
 
     # write ------------------------------------------------------------
 
     def append(self, user_msg_ts: str, attachments: list[dict]) -> None:
-        """user 메시지 1건의 첨부 묶음을 sidecar 에 append 한다.
+        """user message is append to sidecar
 
-        - ``attachments`` 가 빈 배열/None 이면 no-op (파일 자체를 만들지 않음).
-        - ``user_msg_ts`` 는 사용자 메시지의 ISO timestamp 문자열.
-        - 디렉터리 부재 시 자동 생성한다 (interrupted sidecar 와 동일한 디렉터리).
-        - IO 오류는 로깅 후 swallow (호출부에 예외를 던지지 않음).
+        - `attachments` is empty array/None, no-op (not creating file itself).
+        - ``user msg ts` is the ISO timestamp string of user messages.
+        - Automatically generates a directory (such as interrupted sidecar).
+        - IO error swallow after logging (not throwing exceptions to export).
         """
         if not self._path:
             return
         if not attachments or not isinstance(attachments, list):
             return
-        # number 키가 없는 dict 는 무시 (claude_process._compose_user_content
-        # 의 검증과 동일한 정책).
+        # number Keyless dict ignore (claude process. compose user content)
+        # The same policy as validation.
         valid: list[dict] = []
         for att in attachments:
             if isinstance(att, dict) and 'number' in att:
@@ -107,7 +107,7 @@ class AttachmentsSidecar:
             os.makedirs(os.path.dirname(self._path), exist_ok=True)
         except OSError as exc:
             logger.error(
-                'attachments sidecar: 디렉터리 생성 실패 (%s): %s',
+                'attachments sidecar: directory generate failed (%s): %s',
                 self._path, exc,
             )
             return
@@ -116,18 +116,18 @@ class AttachmentsSidecar:
                 fp.write(json.dumps(record, ensure_ascii=False) + '\n')
         except OSError as exc:
             logger.error(
-                'attachments sidecar: 쓰기 실패 (%s): %s', self._path, exc,
+                'Attachs sidecar: failed to write (%s): %s', self._path, exc,
             )
 
     # read -------------------------------------------------------------
 
     def load_map(self) -> dict[str, list[dict]]:
-        """sidecar 라인을 모두 읽어 ``user_msg_ts → attachments`` 맵을 만든다.
+        """[user msg ts → attachments]
 
-        같은 ``user_msg_ts`` 가 여러 번 등장하면 마지막 라인이 우선한다
-        (append-only 정책상 거의 발생하지 않는 케이스).
+        If the same `user msg ts` appeared multiple times, the last line is priority
+        (append-only case that the policy does not occur almost).
 
-        파일 부재/파싱 실패 시 graceful 하게 빈 dict 를 반환한다.
+        return graceful to empty dict when file corruption/pasing failure.
         """
         if not self._path or not os.path.isfile(self._path):
             return {}
@@ -154,7 +154,7 @@ class AttachmentsSidecar:
                     result[ts] = atts
         except OSError as exc:
             logger.error(
-                'attachments sidecar: 읽기 실패 (%s): %s', self._path, exc,
+                'attachments sidecar: read failed (%s): %s', self._path, exc,
             )
             return {}
         return result

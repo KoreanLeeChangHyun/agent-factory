@@ -1,7 +1,7 @@
 /* Agent Factory Dashboard - Dashboard Styles */
 /* Extracted from board.css: L74-199 */
-/* T-461 Phase 2: Workflow Metrics 섹션(.dash-metrics-*) 통합 — metrics.css 의
-   .metrics-* 클래스를 .dash-metrics-* prefix 로 변경하여 병합. collapse transition
+/* T-461 Phase 2: Workflow Metrics section (.dash-metrics-*) integration — metrics.css
+   .metrics-* .dash-metrics-* .dash-metrics teen
    추가. metrics.css 는 Phase 3 까지 보존 (위험 분리). */
 
 /* ── T-462 Phase 4-A: 6-tier Pace Color tokens ──
@@ -20,7 +20,7 @@
 
 /* ── T-462 Phase 4-B: progress bar + time marker (SVG) ──
    renderProgressBar / renderTimeMarker (dashboard.js) 가 생성하는 SVG 의 컨테이너
-   레이아웃 토큰. SVG 자체의 fill/stroke 는 인라인 속성 + var(--pace-*) 로 처리되므로
+   레이아웃 토큰. SVG 자체의 fill/stroke 는 인라인 속성 + var(--pace-*) As processed
    본 블록은 컨테이너 wrapper / overflow / hover 강조만 담당한다. */
 .pace-progress {
   display: block;
@@ -105,7 +105,7 @@
   .status-banner__dot { animation: none; }
 }
 
-/* ── T-462 Phase 4-D: accordion 확장/축소 행 ──
+/* ── T-462 Phase 4-D: accordion extension/conjugate row ──
    toggleAccordion (dashboard.js) 가 토글하는 .is-open 클래스에 따라 detail 행 표시.
    transition 은 max-height 가 아니라 단순 display 토글 + opacity 페이드 ― 회피 가능
    사용자에 한해. prefers-reduced-motion 시 페이드도 즉시 변경. */
@@ -173,7 +173,7 @@
   }
 }
 
-/* ── T-462 Phase 4-E: usage chart 시간 윈도우 + 네비게이션 toolbar ──
+/* ── T-462 Phase 4-E: usage time chart window + navigation toolbar ──
    setUsageChartWindow / navigateUsageChart 의 UI 부속. 호출자 (renderDashboard 또는
    별도 wiring) 가 .usage-chart-toolbar 마크업을 chart-usage 위에 삽입하여 사용.
    본 룰은 토글 버튼 그룹 + nav 버튼 그룹 + active 강조만 담당. */
@@ -225,7 +225,7 @@
   .usage-chart-toolbar__btn { transition: none; }
 }
 
-/* ── T-462 Phase 4-F: Empty State 컴포넌트 표준화 ──
+/* ── T-462 Phase 4-F: Standardized Empty State Components ──
    renderEmptyState 산출 마크업. icon SVG → title → description 3행 수직 정렬.
    외부 아이콘 라이브러리 0건 — SVG 는 caller 또는 _defaultEmptyStateIcon 이 직접 생성. */
 .empty-state {
@@ -395,7 +395,7 @@
 .dash-table-panel.active { display: block; }
 
 /* ── Workflow Metrics Section (T-461 Phase 2) ──
-   metrics.css 의 .metrics-* 클래스를 .dash-metrics-* prefix 로 병합. */
+   metrics.css 의 .metrics-* .dash-metrics-* merge with prefix. */
 
 /* Section header is the collapse toggle (clickable + keyboard accessible) */
 .dash-metrics-header {

@@ -22,32 +22,32 @@ def _compose_user_content(
     images: list[dict] | None,
     attachments: list[dict] | None,
 ) -> str | list:
-    """사용자 메시지 content 를 합성한다.
+    """Create a user message content.
 
-    text 블록 → attachment text 블록 → image 블록 순으로 결합하여
-    Claude CLI NDJSON envelope 의 ``content`` 필드에 들어갈 값을 반환한다.
+    text block → text block → image block
+    returns the value to the Claude CLI NDJSON Envelope's `content` field.
 
-    attachments 와 images 가 모두 None/빈 배열이고 text 가 있으면 단순 문자열을
-    반환하여 기존 text-only 경로와 동일한 envelope 구조를 유지한다.
+    attachments and images are all None/bin arrays and text if simple strings
+    returns to maintain the same envelope structure as the existing text-only path.
 
     Args:
-        text: 사용자 자유 입력 텍스트. 빈 문자열이어도 허용.
-        images: 이미지 블록 목록. 각 항목은 ``{"data": str, "media_type": str}``.
-                None 이면 이미지 없음.
-        attachments: 첨부 티켓 목록. 각 항목은 최소 ``{"number": str}`` 를 포함한 dict.
-                     None 또는 빈 배열이면 첨부 없음.
+        text: user free input text. Allows empty strings.
+        images: List of image blocks. Each item ``{"data": str, "media type": str}`.
+                None No images.
+        attachments: list of attachment tickets. Each item contains a minimum ``{"number": dict.
+                     None or empty arrangements are not attached.
 
     Returns:
-        content 필드값: 블록 배열이 필요하면 list[dict], 텍스트 전용이면 str.
+        content field value: list[dict], str if you need block array.
     """
-    # attachment 유효성: list 인지 확인 (None / [] 은 첨부 없음)
+    # Attach validity: list check (None / [] is not attached)
     valid_attachments: list[dict] = []
     if isinstance(attachments, list):
         for att in attachments:
             if isinstance(att, dict) and 'number' in att:
                 valid_attachments.append(att)
 
-    # image_blocks 합성 (기존 로직 그대로)
+    # image blocks synthesized (external logic)
     image_blocks: list[dict] = []
     if isinstance(images, list):
         image_blocks = [
@@ -62,18 +62,18 @@ def _compose_user_content(
             for img in images
         ]
 
-    # 첨부도 이미지도 없는 경우 → 단순 문자열 (기존 text-only 경로)
+    # If you do not have an attachment image → Simple string (external text-only path)
     if not valid_attachments and not image_blocks:
         return text
 
-    # 배열 합성 필요
+    # 담당자: Mr. Jerry Jiang
     text_blocks: list[dict] = [{'type': 'text', 'text': text}] if text else []
 
     attachment_text_blocks: list[dict] = [
         {
             'type': 'text',
             'text': (
-                f"[첨부 {a['number']}] {a.get('title', '')}\n\n"
+                f"[Field 0    ]   FIELD 1   \\n\\n"
                 f"## prompt\n{a.get('prompt', '')}\n\n"
                 f"## report\n{a.get('report', '')}"
             ),
@@ -85,15 +85,15 @@ def _compose_user_content(
 
 
 def _validate_images(images: list) -> str | None:
-    """이미지 목록의 유효성을 검증한다.
+    """Verify the validity of the image list.
 
-    각 항목에 data(문자열)와 허용된 media_type이 존재하는지 확인한다.
+    Check if data (chart) and allowed media type exists in each item.
 
     Args:
-        images: 검증할 이미지 항목 목록.
+        images: List of image items to validate.
 
     Returns:
-        유효하지 않을 때 에러 메시지 문자열, 유효하면 None.
+        Error message string when not valid, if valid, None.
     """
     if not isinstance(images, list):
         return 'Invalid "images" field: must be a list'
@@ -123,52 +123,52 @@ def _validate_images(images: list) -> str | None:
 
 
 class ClaudeProcess:
-    """Claude CLI 프로세스 생명주기 관리자.
+    """Claude CLI Process Lifecycle Manager.
 
-    subprocess.Popen으로 Claude CLI를 실행하고, stdin/stdout을 통한
-    NDJSON 양방향 통신을 관리한다.
+    execute Claude CLI with subprocess.Popen, through stdin/stdout
+    NDJSON manages two-way communication.
 
     Attributes:
-        _process: subprocess.Popen 인스턴스 (프로세스 시작 전에는 None)
-        _session_id: system/init 메시지에서 추출한 세션 ID
-        _status: 프로세스 상태 (stopped/running/idle)
-        _stdin_lock: stdin 접근 보호 Lock
-        _stdout_thread: stdout 읽기 데몬 스레드
-        _channel: SSE 브로드캐스트 채널
+        process: subprocess.Popen instances (unless before the procedure starts)
+        session id: Session ID extracted from system/init message
+        status: Process Status (stopped/running/idle)
+        stdin lock: stdin access protection lock
+        stdout thread: stdout read daemon thread
+        channel: SSE broadcast channel
     """
 
     def __init__(self, channel: TerminalSSEChannel, persist_file: str | None = None) -> None:
-        """초기화한다.
+        """Add to cart
 
         Args:
-            channel: NDJSON 이벤트를 브로드캐스트할 TerminalSSEChannel 인스턴스
-            persist_file: session_id를 영속화할 파일 경로 (선택적)
+            channel: TerminalSSEChannel instance to broadcast NDJSON events
+            persist file: session id file path (optional)
         """
         self._process: subprocess.Popen | None = None
         self._session_id: str = ''
         self._model: str = ''
         self._permission_mode: str = ''
         self._status: str = 'stopped'
-        # Stage 3-B — production-line subprocess 가 외부에서 돌고 있는 경우 status override.
-        # None 이면 일반 ClaudeProcess (self._process 추적). 'running'/'stopped' set 시
-        # status property 가 우선 반환 (board side 가 process 직접 spawn 안 한 모드).
+        # Stage 3-B — production-line subprocess returns outside status override.
+        # None General ClaudeProcess (self. process tracking). 'running'/'stopped' set time
+        # status property returns first (board side is process direct spawn mode).
         self._external_status: str | None = None
         self._stdin_lock: threading.Lock = threading.Lock()
         self._stdout_thread: threading.Thread | None = None
         self._channel: TerminalSSEChannel = channel
         self._init_event: threading.Event = threading.Event()
         self._persist_file: str | None = persist_file
-        # 현재 스트리밍 중인 assistant 메시지 캐시. Claude CLI 가 jsonl 에는
-        # 메시지 완료 시점에만 flush 하므로, 스트리밍 중 새로고침 시 부분 내용이
-        # 유실되는 것을 막기 위해 stream_event NDJSON 을 누적한다.
-        # 구조는 jsonl 의 assistant 라인과 동일:
+        # Currently streaming assistant message cache. jsonl with Claude CLI
+        # Flushing only at the time of message completion, so part content is refreshed during streaming.
+        # null stream event NDJSON to prevent silence.
+        # The structure is the same as the assistant line of jsonl:
         #   {'type': 'assistant',
         #    'message': {'role': 'assistant', 'content': [blocks...]},
         #    'timestamp': '<iso>'}
         self._in_flight_lock: threading.Lock = threading.Lock()
         self._in_flight_message: dict | None = None
-        # 사용자 입력 전송 후 result 수신 전 여부. status 엔드포인트가 이 플래그를
-        # 노출하면 새로고침 후에도 클라이언트가 스피너 복구/입력 잠금을 판단할 수 있다.
+        # If the user inputs the result before receiving it. status endpoints this flag
+        # When exposed, the client can judge the spinner recovery/input lock even after a new one.
         self._awaiting_response: bool = False
 
     def spawn(
@@ -176,19 +176,19 @@ class ClaudeProcess:
         extra_args: list[str] | None = None,
         env_extras: dict[str, str] | None = None,
     ) -> dict:
-        """Claude CLI 프로세스를 시작한다.
+        """Claude CLI
 
-        이미 실행 중인 프로세스가 있으면 먼저 종료한다.
-        프로세스 시작 후 system/init SSE 이벤트를 최대 10초까지 대기하여
-        session_id를 응답에 포함한다.
+        If you already have a process running, it will end first.
+        System/init SSE event up to 10 seconds after the process begins
+        include session id in response.
 
         Args:
-            extra_args: 추가 CLI 인자 목록 (선택적)
-            env_extras: 자식 프로세스에 주입할 추가 환경변수 dict (선택적).
-                        예: {"_WF_SESSION_TYPE": "workflow", "_WF_TICKET_ID": "T-238"}
+            extra args: additional CLI argument list (optional)
+            env extras: Added environment variable dict (optional) to be injected into a child process.
+                        Example: {" WF SESSION TYPE": "workflow", " WF TICKET ID": "T-238"}
 
         Returns:
-            시작 결과 dict: {"ok": True/False, "session_id": str, "error": str}
+            dict: {"ok": true/False, "session id": str, "error": str}
         """
         server_debug_log('spawn.entry', {
             'awaiting_response': self._awaiting_response,
@@ -197,22 +197,22 @@ class ClaudeProcess:
             'has_process': bool(self._process),
             'process_alive': bool(self._process and self._process.poll() is None),
         })
-        # 새 프로세스 시작 = 이전 미해결 turn 무효.
-        # ESC 흐름에서 result 못 받고 process 가 종료된 경우 _awaiting_response 가
-        # True 인 채로 남아 새 spawn 인스턴스로 carry over → 새로고침 시 status 응답에
-        # awaiting_response=true 가 잘못 노출되어 클라가 busy 로 진입하는 회귀.
-        # spawn 진입 시점에 강제 리셋.
+        # New Process Start = Previous Unsolved Turn Invalid.
+        # if the result failed in the ESC stream and the process ends  awaiting response is
+        # The new spawn instance that remains true to carry over → status response in a new
+        # awaiting response=true is wrong exposed to the clover to enter busy.
+        # Forced reset at the point of entering the spawn.
         self._awaiting_response = False
         if self._process and self._process.poll() is None:
             self.kill()
             self._init_event.clear()
 
-        # 이전 stdout 스레드가 완전히 종료될 때까지 대기
+        # Previous stdout thread wait until completely terminated
         if self._stdout_thread and self._stdout_thread.is_alive():
             self._stdout_thread.join(timeout=3)
 
-        # -p(print mode)로 시작: --input-format stream-json은 print mode 전용
-        # 이미지 content block이 정상 전달되려면 -p 플래그가 반드시 필요하다
+        # --input-format stream-json
+        # -p flag is required to send image content block to normal
         cmd = [
             'claude',
             '-p',
@@ -228,7 +228,7 @@ class ClaudeProcess:
 
         self._init_event.clear()
 
-        # env_extras가 지정되면 현재 환경에 추가 환경변수를 병합
+        # env extras merges additional environment variables in the current environment
         proc_env = None
         if env_extras:
             proc_env = {**os.environ, **env_extras}
@@ -262,7 +262,7 @@ class ClaudeProcess:
         self._status = 'running'
         self._session_id = ''
 
-        # stdout 읽기 데몬 스레드 시작
+        # stdout read daemon thread start
         self._stdout_thread = threading.Thread(
             target=self._read_stdout_loop,
             daemon=True,
@@ -270,7 +270,7 @@ class ClaudeProcess:
         )
         self._stdout_thread.start()
 
-        # init 대기 없이 즉시 응답 — SSE로 init 이벤트가 전달됨
+        # response immediately without init wait — delivered init event to SSE
 
         return {
             'ok': True,
@@ -284,28 +284,28 @@ class ClaudeProcess:
         images: list[dict] | None = None,
         attachments: list[dict] | None = None,
     ) -> dict:
-        """사용자 메시지를 Claude CLI stdin에 NDJSON 엔벨로프로 전송한다.
+        """Send a user message to Claude CLI stdin to NDJSON Endopro.
 
         Args:
-            text: 전송할 사용자 메시지 텍스트
-            images: 첨부 이미지 목록. 각 항목은 {"data": str, "media_type": str} 형태.
-                    None이면 이미지 없음.
-            attachments: 첨부 티켓 목록. 각 항목은 최소 {"number": str} 를 포함한 dict.
-                         None 또는 빈 배열이면 첨부 없음.
-                         있는 경우 content 배열에 text 블록으로 합성되어 어시스턴트가 인지한다.
+            text: user message text to send
+            images: List of attachments. {"data": str, "media type": str} form.
+                    None
+            attachments: list of attachment tickets. Each item contains a minimum {"number": str} dict.
+                         None or empty arrangements are not attached.
+                         if content array is synthesized as text block, which is cognitive.
 
         Returns:
-            전송 결과 dict: {"ok": True/False, "error": str}
+            dict: {"ok": true/False, "error": str}
         """
         if not self._process or self._process.poll() is not None:
-            # -p 모드에서 result 후 프로세스가 종료된 경우 --resume으로 자동 재시작
+            # --resume
             if self._session_id:
                 resume_args = ['--resume', self._session_id]
                 self._init_event.clear()
                 result = self.spawn(extra_args=resume_args)
                 if not result.get('ok'):
                     return {'ok': False, 'error': f'respawn failed: {result.get("error", "")}'}
-                # init 이벤트가 완료될 때까지 최대 10초 대기
+                # Up to 10 seconds waiting until the init event is completed
                 if not self._init_event.wait(timeout=10):
                     return {'ok': False, 'error': 'respawn init timeout'}
             else:
@@ -333,7 +333,7 @@ class ClaudeProcess:
                 self._status = 'stopped'
                 return {'ok': False, 'error': str(e)}
 
-        # 입력 전송 성공 → 응답 대기 상태. result 수신 시 해제됨.
+        # Input transmission success → response standby status. result Unsubscribe
         server_debug_log('awaiting_response.set_true', {
             'reason': 'send_input',
             'session_id': self._session_id,
@@ -349,15 +349,15 @@ class ClaudeProcess:
         decision: str,
         session_id: str | None = None,
     ) -> dict:
-        """permission 요청에 대한 control_response NDJSON을 stdin으로 전송한다.
+        """permission to send control response NDJSON to stdin
 
         Args:
-            request_id: 응답할 control_request의 request_id
-            decision: "allow" 또는 "deny"
-            session_id: 워크플로우 세션 ID (선택적). 지정 시 최상위 session_id 필드 추가.
+            request id: control request request id to respond
+            "allow" or "deny"
+            session id: Workflow Session ID (optional). Add the top-level session id field when specified.
 
         Returns:
-            전송 결과 dict: {"ok": True/False, "error": str}
+            dict: {"ok": true/False, "error": str}
         """
         if not self._process or self._process.poll() is not None:
             return {'ok': False, 'error': 'process not running'}
@@ -395,22 +395,22 @@ class ClaudeProcess:
         return {'ok': True, 'error': ''}
 
     def interrupt(self) -> dict:
-        """Claude CLI 프로세스에 SIGINT를 전송하여 현재 응답 생성만 중단한다.
+        """Send SIGINT to the Claude CLI process to stop current response generation.
 
-        kill()과 달리 프로세스를 종료하지 않는다. SIGINT를 수신한 Claude CLI는
-        현재 응답 생성을 중단하고 새 입력 대기 상태(idle)로 복귀한다.
-        _status는 변경하지 않는다 — Claude CLI가 result 이벤트를 발행하면
-        _read_stdout_loop에서 idle로 전환된다.
+        Unlike kill(), the process does not end. Claude CLI received by SIGINT
+        Stops the current response generation and returns to a new input atmospheric state (idle).
+        status does not change — if Claude CLI issues a result event
+        read stdout loop to idle
 
-        부가 효과:
-        - SDK jsonl 의 마지막 real user 메시지 timestamp 를 찾아 sidecar 파일
-          (``<session_id>.interrupted.jsonl``)에 append 한다.
-        - SSE 라이브 이벤트 ``system/user_input_interrupted`` 를 broadcast 하여
-          클라이언트가 즉시 user 말풍선에 마커를 표시할 수 있게 한다.
-        - 새로고침 후 history 복원 시 sidecar 가 영속 시그널 역할을 한다.
+        Price:
+        - Find the last real user message timestamp of SDK jsonl and sidecar file
+          (`<session id>.interrupted.jsonl`)
+        - SSE Live event ``system/user input interrupted` ``
+          The client can immediately display the marker on the user ending line.
+        - After the refreshing call, sidecar will act as a permanent signal when the history is restored.
 
         Returns:
-            결과 dict: {"ok": True/False, "error": str}
+            result dict: {"ok": true/False, "error": str}
         """
         if not self._process:
             return {'ok': False, 'error': 'process not running'}
@@ -420,9 +420,9 @@ class ClaudeProcess:
             self._process = None
             return {'ok': False, 'error': 'process not running'}
 
-        # SIGINT 전 sidecar 기록 + SSE broadcast (SIGINT 후엔 SDK 가 jsonl 을
-        # 추가 flush 할 수 있어 race 가 발생할 여지가 있으므로 SIGINT 직전 시점
-        # 의 jsonl 끝에서 마지막 real user 메시지를 잡는다).
+        # SIGINT Pre-sidecar record + SSE broadcast (SIGINT hood SDK jsonl)
+        # You can add flush to the race, so at the SIGINT position
+        # jsonl end of the last real user message).
         last_user_ts = self._record_user_interrupt_to_sidecar()
         if last_user_ts:
             try:
@@ -433,7 +433,7 @@ class ClaudeProcess:
                     'session_id': self._session_id or '',
                 })
             except (OSError, TypeError) as exc:
-                logger.error("interrupt: broadcast user_input_interrupted 실패: %s", exc)
+                logger.error("interrupted: %s", exc)
 
         try:
             os.kill(self._process.pid, signal.SIGINT)
@@ -443,16 +443,16 @@ class ClaudeProcess:
         return {'ok': True, 'error': ''}
 
     def _record_user_interrupt_to_sidecar(self) -> str | None:
-        """SDK jsonl 에서 마지막 real user 메시지 timestamp 를 찾아 sidecar 에 append.
+        """The last real user message timetamp in SDK jsonl and append on sidecar.
 
-        sidecar 파일: ``~/.claude/projects/<slug>/<session_id>.interrupted.jsonl``
-        한 줄당 하나의 인터럽트 기록 ``{"timestamp": "...", "kind": "user_interrupted"}``.
+        sidecar file: ``~/.claude/projects/<slug>/<session id>.interrupted.jsonl`
+        One interflow record per line ``{"timestamp": "...", "kind": "user interrupted"}`.
 
-        real user 메시지 = ``type=user`` 이면서 ``content`` 에 text block 이 있는 경우
-        (tool_result 만 있는 user record 는 제외).
+        real user message = ``type=user` and text block in ``content`
+        (except user records only intool result).
 
         Returns:
-            찾은 timestamp 문자열, 없으면 None.
+            If you find timestamp string, None.
         """
         if not self._session_id:
             return None
@@ -499,16 +499,16 @@ class ClaudeProcess:
                                 break
                     if not has_text_block:
                         continue
-                    # SDK 가 자동으로 기록하는 placeholder user 메시지는 sidecar
-                    # 매칭 대상이 아니다. 이걸 잡으면 history 필터로 제거된 후
-                    # interrupted 마커가 사라지는 race 회귀가 발생한다.
+                    # placeholder user messages that are automatically recorded by the SDK sidecar
+                    # No matching target. If you caught this, it is removed with the history filter
+                    # stoped marker causes the race revolving.
                     if text_value.strip() == '[Request interrupted by user]':
                         continue
                     ts = rec.get('timestamp', '') or ''
                     if ts:
                         last_user_ts = ts
         except OSError as exc:
-            logger.error("interrupt: jsonl 읽기 실패 (%s): %s", jsonl_path, exc)
+            logger.error("interrupt: jsonl failed to read (%s): %s", jsonl_path, exc)
             return None
 
         if not last_user_ts:
@@ -521,18 +521,18 @@ class ClaudeProcess:
                     ensure_ascii=False,
                 ) + '\n')
         except OSError as exc:
-            logger.error("interrupt: sidecar 쓰기 실패 (%s): %s", sidecar_path, exc)
+            logger.error("interrupt: sidecar write failed (%s): %s", sidecar_path, exc)
             return None
 
         return last_user_ts
 
     def kill(self) -> dict:
-        """Claude CLI 프로세스를 종료한다.
+        """terminate the Claude CLI process.
 
-        SIGTERM으로 먼저 시도하고, 2초 내 종료되지 않으면 SIGKILL로 강제 종료한다.
+        First attempt to SIGTERM, and endangered with SIGKILL if it fails within 2 seconds.
 
         Returns:
-            종료 결과 dict: {"ok": True/False, "error": str}
+            dict: {"ok": true/False, "error": str}
         """
         if not self._process:
             self._status = 'stopped'
@@ -560,13 +560,13 @@ class ClaudeProcess:
 
     @property
     def status(self) -> str:
-        """프로세스 상태를 반환한다.
+        """return the process status.
 
-        Stage 3-B — `_external_status` set 시 (production-line subprocess external 모드)
-        그 값을 우선 반환. 그 외 v1 spawn 인프라 그대로.
+        Stage 3-B — ` external status` set (production-line subprocess external mode)
+        returns that value first. v1 spawn infrastructure.
 
         Returns:
-            "running", "idle", "stopped" 중 하나
+            "running", "idle", "stopped"
         """
         if self._external_status is not None:
             return self._external_status
@@ -579,45 +579,45 @@ class ClaudeProcess:
         return self._status
 
     def set_external_status(self, status: str) -> None:
-        """production-line external session 의 status 명시 set.
+        """set.
 
-        v1 spawn 인프라는 ``self._process.poll()`` 로 자동 stopped 감지하지만,
-        외부에서 돌고 있는 process 의 status 는 board side 가 추적 불가하므로
-        호출자가 명시 set 한다.
+        v1 spawn infrastructure detects auto stopping with 'self. process.poll()' but
+        the status of the process from outside is not tracked by the board side
+        The caller is set.
 
-        T-498 (2026-05-18) 시점에 본 메서드의 호출자는 0건 — v1 hybrid 봉합
-        경로 (`/api/v2/wf-event` + `workflow_registry.create_external`) 가 통째
-        제거되며 함께 dead code 가 되었다. 후속 트랙에서 method 자체 제거 검토.
+        T-498 (2026-05-18) The caller of this method is 0 — v1 hybrid suture
+        path(`/api/v2/wf-event` + `workflow registry.create external`) is the
+        . . . . . . Removing method itself from follow-up tracks.
         """
         self._external_status = status
 
     @property
     def session_id(self) -> str:
-        """현재 세션 ID를 반환한다."""
+        """returns the current session ID."""
         return self._session_id
 
     def _track_in_flight(self, data: dict) -> None:
-        """stream_event NDJSON을 누적하여 현재 스트리밍 중인 assistant 메시지 상태를 유지한다.
+        """stream event NDJSON keeps the current streaming assistant message status.
 
-        jsonl 은 메시지 경계에서만 append 되므로(= Claude CLI 가 message_stop 후에
-        한 줄을 쓴다) 스트리밍 도중 새로고침이 발생하면 미완성 메시지가 어떠한
-        권위 출처에도 남지 않아 UI에서 통째로 사라지는 문제가 있다.
-        이 캐시는 /terminal/history 응답에 병합되어 그 간격을 메꾼다.
+        jsonl is only append to message bounds(= Claude CLI is message stop after
+        If you have a new call during a single line), you will be asked to send an unfinished message
+        There is a problem that disappears from the UI that does not leave the authority source.
+        This cache is merged to /terminal/history response and migrate that interval.
 
-        데이터 구조는 jsonl 의 assistant 라인과 동일하게 유지하여 기존
-        _build_render_events() 를 그대로 재사용할 수 있게 한다.
+        The data structure remains the same as the jsonl’s assistant line
+        build render events()
 
-        수명 주기:
-            message_start                → 새 캐시 초기화
-            content_block_start          → blocks 에 빈 block append
-            content_block_delta          → 마지막 block 의 text/thinking/partial_json 누적
-            content_block_stop           → tool_use partial_json 을 input 으로 파싱
-            'assistant'/'user'/'result'  → 캐시 비움 (완성 메시지가 jsonl 에 기록되거나
-                                           턴이 종료됨)
+        Price:
+            message start → reset new cache
+            content block start → block empty block append
+            text/thinking/partial json
+            content block stop → tool use partial json to input
+            'assistant'/'user'/'result' → cache rain (complete message is recorded in jsonl or
+                                           Closed
         """
         msg_type = data.get('type', '')
 
-        # 완성 메시지가 도착(= jsonl 이 곧 권위 출처가 됨) 또는 턴 종료 → 캐시 해제
+        # Complete message arrives (= jsonl is soon become an authoritative source) or turn ends → unchecked
         if msg_type in ('assistant', 'user', 'result'):
             with self._in_flight_lock:
                 self._in_flight_message = None
@@ -643,10 +643,10 @@ class ClaudeProcess:
                 }
                 return
 
-            # Claude CLI 는 **블록 단위로 `assistant` NDJSON 을 flush** 하므로
-            # 직전 블록 완료 시 `_track_in_flight` 가 캐시를 비운다. 다음 블록이
-            # 시작할 때 `content_block_start` 가 먼저 도착하므로, 여기서 캐시를
-            # 지연 초기화해야 두 번째 이후 블록도 추적 대상이 된다.
+            # Claude CLI Flush**
+            # ` track in flight` returns the cache when the block is completed. Next Block
+            # When starting, `content block start` arrives first, so here’s cache
+            # After the second delay, the block will be tracked.
             if ev_type == 'content_block_start' and self._in_flight_message is None:
                 timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
                     '%Y-%m-%dT%H:%M:%S.%fZ'
@@ -710,23 +710,23 @@ class ClaudeProcess:
                             if isinstance(parsed, dict):
                                 current['input'] = parsed
                         except json.JSONDecodeError:
-                            # 비정상 부분 JSON — 빈 input 유지
+                            # Unfair JSON — Keeping empty input
                             pass
                 return
 
-            # message_delta / message_stop 은 별도 처리 불필요.
-            # message_stop 직후 'assistant' NDJSON 이 도착하여 캐시가 비워진다.
+            # message delta / message stop is not processed separately.
+            # after message stop 'assistant' NDJSON arrives and the cache is empty.
 
     def get_in_flight_snapshot(self) -> dict | None:
-        """현재 스트리밍 중인 assistant 메시지의 읽기 전용 스냅샷을 반환한다.
+        """returns the read-only snapshot of the assistant message currently streaming.
 
-        /terminal/history 응답에 포함되어 jsonl 이 아직 flush 하지 못한
-        부분 메시지를 클라이언트에 전달하는 용도다. 반환 구조는 jsonl 의
-        assistant 라인과 동일하여 _build_render_events() 로 바로 전개 가능.
+        /terminal/history included in the response jsonl has not yet flush
+        Uses to send part messages to clients. return structure of jsonl
+        build render events()
 
-        tool_use 블록의 input 이 아직 스트리밍 중이면 `_partial_input_json`
-        에 누적된 문자열을 별도 필드 `partial_input_json` 으로 노출한다
-        (클라이언트가 tool-box 입력 버퍼에 시딩할 수 있도록).
+        if the input of the tool use block is still streaming, ` partial input json`
+        exposes a cumulative string to a separate field `partial input json`
+        (To allow the client to finish the tool-box input buffer).
         """
         with self._in_flight_lock:
             if self._in_flight_message is None:
@@ -738,8 +738,8 @@ class ClaudeProcess:
             if block.get('type') == 'tool_use':
                 partial = block.pop('_partial_input_json', '') or ''
                 if partial:
-                    # content_block_stop 이 오기 전이라 input 이 비어있으면
-                    # 부분 파싱 시도 (실패해도 partial_input_json 을 그대로 노출)
+                    # content block stop
+                    # attempt to parsing (expanded as partial input json)
                     if not block.get('input'):
                         try:
                             parsed = json.loads(partial)
@@ -751,10 +751,10 @@ class ClaudeProcess:
         return snapshot
 
     def _read_stdout_loop(self) -> None:
-        """stdout에서 NDJSON 한 줄씩 읽어 파싱하고 SSE 채널로 브로드캐스트한다.
+        """NDJSON reads one line in stdout and broadcasts to SSE channels.
 
-        프로세스 종료 또는 stdout EOF 시 루프를 빠져나온다.
-        데몬 스레드에서 실행된다.
+        exit the process or stdout EOF loop.
+        Run in the daemon thread.
         """
         proc = self._process
         if not proc or not proc.stdout:
@@ -771,7 +771,7 @@ class ClaudeProcess:
                     logger.debug('Non-JSON stdout line: %s', stripped[:200])
                     continue
 
-                # system/init에서 session_id 추출 후 init 대기 이벤트 해제
+                # init wait event after extracting session id from system/init
                 if (
                     data.get('type') == 'system'
                     and data.get('subtype') == 'init'
@@ -784,10 +784,10 @@ class ClaudeProcess:
                             with open(self._persist_file, 'w') as _pf:
                                 _pf.write(self._session_id)
                         except OSError as _e:
-                            logger.debug('session_id persist 실패: %s', _e)
+                            logger.debug('session id persist fail: %s', _e)
                     self._init_event.set()
 
-                # result 수신 시 상태를 idle로 전환
+                # result Convert status to idle
                 if data.get('type') == 'result':
                     server_debug_log('awaiting_response.set_false', {
                         'reason': 'result',
@@ -798,21 +798,21 @@ class ClaudeProcess:
                     self._status = 'idle'
                     self._awaiting_response = False
 
-                # in-flight 캐시 업데이트 (스트리밍 중 새로고침 시 부분 내용 보존용)
+                # in-flight cache update (for preserving part contents during the refreshing moment)
                 self._track_in_flight(data)
 
                 self._channel.broadcast(data)
         except (ValueError, OSError):
-            # 프로세스 종료 시 발생 가능
+            # You can use the following:
             pass
         finally:
-            # 좀비 프로세스 방지: 명시적으로 wait() 호출
+            # Zombie Process Prevention: Explicitly call wait()
             try:
                 proc.wait(timeout=5)
             except (subprocess.TimeoutExpired, OSError):
                 pass
 
-            # 프로세스가 종료된 경우 상태 업데이트
+            # If the process ends, the status update
             if proc.poll() is not None:
                 exit_code = proc.returncode
                 server_debug_log('process_exit', {
@@ -821,25 +821,25 @@ class ClaudeProcess:
                     'awaiting_response_at_exit': self._awaiting_response,
                     'status_before': self._status,
                 })
-                # process 종료 = 미해결 turn 자체가 종결.
-                # ESC 흐름에서 SDK 가 result 보내기 전에 종료될 수 있으므로
-                # process 종료 경로에서도 명시 리셋. 새로고침 시 stale 노출 방지.
+                # process termination = unsolved turn itself ends.
+                # Since SDKs can end before sending result in the ESC stream
+                # In the process end path, specify reset. Prevent stale exposure when refreshing.
                 self._awaiting_response = False
-                # -p 모드에서 result 완료 후 정상 종료(exit_code 0)는
-                # idle 상태로 전환하여 즉시 재입력 가능하게 한다.
-                # 비정상 종료(exit_code != 0)만 stopped로 설정한다.
+                # -exit code 0
+                # Convert idle status to enable instant re-enter.
+                # Set the default exit (exit code != 0) only to stop.
                 if exit_code == 0:
                     self._status = 'idle'
                 else:
                     self._status = 'stopped'
-                # 종료 이벤트를 SSE로 알림
+                # SSE
                 self._channel.broadcast({
                     'type': 'system',
                     'subtype': 'process_exit',
                     'exit_code': exit_code,
                     'session_id': self._session_id,
                 })
-                # 비정상 종료 시 에러 이벤트도 전송
+                # Please contact us for further details.
                 if exit_code != 0:
                     self._channel.broadcast({
                         'type': 'error',

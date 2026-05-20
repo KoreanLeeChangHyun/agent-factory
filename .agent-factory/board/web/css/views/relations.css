@@ -241,7 +241,7 @@
   color: #a0a0a0;
 }
 
-/* Legend edge SVG — color 는 currentColor 로 주입, 크기는 SVG 자체에서 지정 */
+/* Legend edge SVG — color is injection with currentColor, size is specified in SVG itself */
 .relations-legend-edge {
   display: inline-block;
   vertical-align: middle;

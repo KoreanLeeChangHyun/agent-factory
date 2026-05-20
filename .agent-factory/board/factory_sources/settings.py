@@ -19,7 +19,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
 
     sections: dict[str, list[dict]] = {}
     section_order: list[str] = []
-    current_section = '기타'
+    current_section = 'More'
     pending_comment = ''
 
     with open(env_file, encoding='utf-8') as f:
@@ -40,7 +40,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
 
             if stripped.startswith('#'):
                 text = stripped[1:].strip()
-                if text.startswith('용도:'):
+                if text.startswith('Material:'):
                     pending_comment = text[3:].strip()
                 continue
 

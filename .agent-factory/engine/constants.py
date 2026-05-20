@@ -1,21 +1,21 @@
-"""constants.py - 프로젝트 공통 상수 및 정적 데이터 통합 모듈.
+"""constants.py - project common constant and static data integration module.
 
-.agent-factory/engine/ 하위 스크립트에서 공통 사용하는 상수, 패턴, 매핑을 한 곳에 정의합니다.
-이 모듈은 순수 상수만 정의하며, 다른 모듈을 import하지 않는 leaf 모듈입니다.
+. defines common use constants, patterns, mappings in agent-factory/engine/ subscripts.
+This module is a leaf module that does not import any other module.
 
-주요 상수:
-    C_RED, C_BLUE, ..., C_RESET: ANSI 색상 코드
-    STEP_COLORS: step별 색상 매핑
-    TS_PATTERN: YYYYMMDD-HHMMSS 타임스탬프 정규식
-    KST: KST 타임존 (UTC+9)
-    TERMINAL_STEPS: 종료 상태 집합
-    FSM_TRANSITIONS: FSM 상태 전이 규칙
-    DANGER_PATTERNS: 위험 명령어 차단 패턴 목록
-    KEEP_COUNT: .workflow/ 디렉터리 유지 최대 갯수 (환경변수 CLAUDE_WORKFLOW_KEEP_COUNT로 오버라이드 가능)
-    CHAIN_SEPARATOR: 체인 command 구분자 (">" 문자)
-    CHAIN_MAX_RETRY: 체인 스테이지 실패 시 최대 재시도 횟수 (환경변수 CLAUDE_CHAIN_MAX_RETRY로 오버라이드 가능)
+Price:
+    C RED, C BLUE, ..., C RESET: ANSI Color Code
+    STEP COLORS: Color mapping by step
+    TS PATTERN: YYYMMDD-HMMSS timestamp regular expression
+    KST: KST Time Zone (UTC+9)
+    TERMINAL STEPS: Termination status assembly
+    FSM TRANSITIONS: FSM status pre-registration rules
+    DANGER PATTERNS: List of risk command blocking patterns
+    KEEP COUNT: .workflow/ directory retaining maximum number (environmental variable CLAUDE WORKFLOW KEEP COUNT)
+    CHAIN SEPARATOR: Chain command separator (">" character)
+    CHAIN MAX RETRY: The maximum number of reciprocating times when the chain stage fails (can override the environment variable CLAUDE CHAIN MAX RETRY)
 
-T-453: multi 키 8상태 추가 (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED 별칭).
+T-453: Multi-key 8 status (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED alias).
 """
 
 #   workflow_phase / work_step / kanban_status / artifact / final_report
@@ -29,33 +29,33 @@ from datetime import timezone, timedelta
 
 
 # =============================================================================
-# .settings 파일 로더 — 모든 설정값의 단일 소스
+# . settings file loader — a single source of all settings
 # =============================================================================
 def _find_project_root() -> str:
-    """scripts/data/constants.py 기준으로 프로젝트 루트를 탐색한다."""
+    """Scripts/data/constants.py"""
     d = os.path.dirname(os.path.abspath(__file__))
     return os.path.normpath(os.path.join(d, '..', '..', '..'))
 
 
 def _load_dotenv() -> dict[str, str]:
-    """.agent-factory/.settings 파일을 파싱하여 key=value dict로 반환한다.
+    """. parse the agent-factory/.settings file and return it to key=value dict.
 
-    파싱 규칙:
-        - '#'으로 시작하는 행은 주석으로 무시한다.
-        - 빈 행은 건너뛴다.
-        - '='가 없는 행은 유효한 KEY=VALUE 형식이 아니므로 건너뛴다.
-        - '=' 기준 좌측이 KEY, 우측이 VALUE이다 (partition 사용으로 VALUE 안의 '='은 보존).
-        - VALUE 우측의 인라인 주석(' # ...')을 제거한다.
-          단, 따옴표로 감싼 값(예: KEY="val # not comment")은 '#'을 주석으로 취급하지 않는다.
-        - KEY와 VALUE 양쪽 공백을 strip한다.
+    Packaging:
+        - The line starting with '#' is ignored by the tin.
+        - blank rows.
+        - '=' is not a valid KEY=VALUE format, so it is skipd.
+        - The left side of the '=' is KEY, and the right side is VALUE (the '=' in VALUE as partition is preserved).
+        - Remove the inline tin('#...') on the right side of VALUE.
+          However, the value that is deprecated as a quote (e.g. KEY="val # not comment") will not be handled as a comment.
+        - Strip both KEY and VALUE.
 
-    우선순위 (상위가 높음):
-        1. os.environ (런타임 환경변수)
-        2. .settings 파일 (이 함수가 파싱)
-        3. 각 _env()/_env_int()/_env_float() 호출 시 전달하는 default 값
+    Priority (high above):
+        1. FAQ os.environ (runtime environment variable)
+        2. .settings file (This function parsing)
+        3. FAQs default value for each  env()/ env int()/ env float() call
 
     Returns:
-        dict[str, str]: KEY -> VALUE 매핑 딕셔너리
+        dict[str, str]: KEY -> VALUE mapping
     """
     cw_dir = os.path.join(_find_project_root(), '.agent-factory')
     settings_path = os.path.join(cw_dir, '.settings')
@@ -66,28 +66,28 @@ def _load_dotenv() -> dict[str, str]:
     with open(env_file, encoding='utf-8') as f:
         for line in f:
             line = line.strip()
-            # 빈 행 또는 '#'으로 시작하는 전체 주석 행은 건너뛴다
+            # The entire tin line begins with empty rows or '#' crosses
             if not line or line.startswith('#'):
                 continue
-            # '='가 없으면 유효한 KEY=VALUE 형식이 아니므로 건너뛴다
+            # KEY=VALUE
             if '=' not in line:
                 continue
-            # partition은 첫 번째 '='만 분리하므로 VALUE 안의 '='은 보존된다
-            # 예: KEY=a=b=c → key="KEY", value="a=b=c"
+            # The partition is separated only the first '=', so the '=' in VALUE is preserved
+            # Example: KEY=a=b=c → key="", value="a=b=c"
             key, _, value = line.partition('=')
             value = value.strip()
-            # 인라인 주석 제거: 따옴표로 감싸지 않은 VALUE의 ' # ...' 패턴을 제거한다
-            # 예: 30  # 비활성 판정 시간 → 30
-            # 예: "hello # world"      → hello # world (따옴표 내부는 보존)
+            # Inline tin removal: Remove the '#...' pattern of VALUE that is not wrapped with a quote
+            # Example: 30# Inert Fixing Time → 30
+            # Example: "hello # world" → hello # world (preserved inside a quote)
             if value and not (value.startswith('"') and value.endswith('"')) \
                       and not (value.startswith("'") and value.endswith("'")):
-                # ' #' 패턴으로 분리하여 주석 부분을 제거한다
-                # 공백 없는 '#'(예: C#code, color=#fff)은 값의 일부로 보존한다
+                # Remove the tin part by separating the '#' pattern
+                # "#" without spaces (e.g. C#code, color=#fff) preserves as part of the value
                 comment_idx = value.find(' #')
                 if comment_idx != -1:
                     value = value[:comment_idx].rstrip()
             else:
-                # 따옴표로 감싼 값은 양쪽 따옴표만 벗긴다
+                # The value that is depressed with a quote is only double quotes
                 value = value[1:-1]
             result[key.strip()] = value
     return result
@@ -97,7 +97,7 @@ _DOTENV = _load_dotenv()
 
 
 def _env(key: str, default: str) -> str:
-    """os.environ > .settings > default 우선순위로 값을 반환한다."""
+    """os.environ > .settings > returns the value to default priority."""
     return os.environ.get(key, _DOTENV.get(key, default))
 
 
@@ -110,7 +110,7 @@ def _env_float(key: str, default: float) -> float:
 
 
 # =============================================================================
-# ANSI 색상 코드 상수
+# ANSI Color Code constant
 # =============================================================================
 C_RED = "\033[0;31m"
 C_BLUE = "\033[0;34m"
@@ -125,13 +125,13 @@ C_DIM = "\033[2m"
 C_RESET = "\033[0m"
 
 # =============================================================================
-# Step별 색상 매핑
+# Color Mapping by Step
 # =============================================================================
 STEP_COLORS = {
     "INIT": C_RED,
     "PLAN": C_BLUE,
     "WORK": C_GREEN,
-    "VALIDATE": C_CYAN,  # multi 모드 — WORK→REPORT 사이 검증 단계 (STRATEGY 와 색상 공유, 컨텍스트 분리)
+    "VALIDATE": C_CYAN,  # multi mode — WORK→REPORT validation stage (STRATEGY and color sharing, context separation)
     "REPORT": C_PURPLE,
     "STRATEGY": C_CYAN,
     "DONE": C_YELLOW,
@@ -140,21 +140,21 @@ STEP_COLORS = {
     "CANCELLED": C_GRAY,
 }
 
-# 하위 호환 별칭
+# {{ data.filesizeHumanReadable }}
 PHASE_COLORS = STEP_COLORS
 
 # =============================================================================
-# YYYYMMDD-HHMMSS 패턴 정규식
+# YYYYMMDD-HMMSS pattern regular expression
 # =============================================================================
 TS_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 
 # =============================================================================
-# KST 타임존 (UTC+9)
+# KST Time Zone (UTC+9)
 # =============================================================================
 KST = timezone(timedelta(hours=9))
 
 # =============================================================================
-# 공통 타임아웃/제한값
+# {{ data.filesizeHumanReadable }}
 # =============================================================================
 STALE_TTL_MINUTES = _env_int("CLAUDE_STALE_TTL_MINUTES", 30)
 ZOMBIE_TTL_HOURS = _env_int("CLAUDE_ZOMBIE_TTL_HOURS", 24)
@@ -163,15 +163,15 @@ KEEP_COUNT = _env_int("CLAUDE_WORKFLOW_KEEP_COUNT", 10)
 WORK_NAME_MAX_LEN = _env_int("CLAUDE_WORK_NAME_MAX_LEN", 20)
 
 # =============================================================================
-# 터미널 파일명 상수
-#   - kanban_status (To Do/Open/In Progress/Review/Done) 와 workflow_phase (INIT..DONE) 는 별개 도메인
+# Terminal filename
+#   - kanban status (To Do/Open/In Progress/Review/Done) and workflow phase (INIT.DONE)
 # =============================================================================
 STATUS_FILENAME = "status.json"
 CONTEXT_FILENAME = ".context.json"
 STOP_BLOCK_COUNTER_FILENAME = ".stop-block-counter"
 BYPASS_FILENAME = "bypass"
-# `full` == `multi` (멀티 에이전트 + VALIDATE 단계 포함, 사용자 명시 정정 2026-05-13).
-# `light` 는 별 트랙 (보류 — 사용자 명시 동의 없음).
+# `full` == `multi` (including multi agent + VALIDATE stage, user explicit 2026-05-13).
+# `light` is a star track (boil — no user express consent).
 FSM_TRANSITIONS = {
     "multi": {
         "NONE": ["INIT", "STALE", "FAILED", "CANCELLED"],
@@ -197,30 +197,30 @@ FSM_TRANSITIONS = {
 }
 
 # =============================================================================
-# 유효 명령어/모드 집합
+# Active command/mode assembly
 # =============================================================================
 VALID_COMMANDS = {"implement", "review", "research"}
 VALID_MODES = {"full", "light"}
 
 # =============================================================================
-# 체인 command 관련 상수
+# Chain command
 # =============================================================================
 CHAIN_SEPARATOR = ">"
 CHAIN_MAX_RETRY = _env_int("CLAUDE_CHAIN_MAX_RETRY", 2)
 
 # =============================================================================
-# 기본값 0 = retry 비활성 (회귀 0건 보장). .settings 에서 명시 활성화 시에만 retry 동작.
-#   retry_context = failure_handler.py 가 생성하는 retry-context.json 데이터 구조
-#   각 WORKFLOW_RETRY_<PHASE> 값은 retry_context.max_retries 에 해당하는 phase별 상한
+# Default 0 = retry inactive (Return 0 guarantee). .settings only retry operations when explicitly activated.
+#   retry context = failure handler.py retry-context.json data structure
+#   WORKFLOW RETRY <PHASE> value is equivalent to retry context.max retries
 # =============================================================================
-WORKFLOW_RETRY_INIT = _env_int("WORKFLOW_RETRY_INIT", 0)        # retry_context: INIT workflow_phase 실패 시 retry 최대 횟수
-WORKFLOW_RETRY_PLAN = _env_int("WORKFLOW_RETRY_PLAN", 0)        # retry_context: PLAN workflow_phase 실패 시 retry 최대 횟수
-WORKFLOW_RETRY_WORK = _env_int("WORKFLOW_RETRY_WORK", 0)        # retry_context: WORK workflow_phase 실패 시 retry 최대 횟수
-WORKFLOW_RETRY_VALIDATE = _env_int("WORKFLOW_RETRY_VALIDATE", 0)  # retry_context: VALIDATE workflow_phase 실패 시 retry 최대 횟수
-WORKFLOW_RETRY_REPORT = _env_int("WORKFLOW_RETRY_REPORT", 0)    # retry_context: REPORT workflow_phase 실패 시 retry 최대 횟수
-WORKFLOW_RETRY_PROMPT_N = _env_int("WORKFLOW_RETRY_PROMPT_N", 3)  # retry_context: hint_history 배열 cap (LIFO truncate)
+WORKFLOW_RETRY_INIT = _env_int("WORKFLOW_RETRY_INIT", 0)        # retry context: INIT workflow phase maximum retry count when failed
+WORKFLOW_RETRY_PLAN = _env_int("WORKFLOW_RETRY_PLAN", 0)        # retry context: maximum retry count when PLAN workflow phase failed
+WORKFLOW_RETRY_WORK = _env_int("WORKFLOW_RETRY_WORK", 0)        # retry context: WORK workflow phase maximum retry count when failed
+WORKFLOW_RETRY_VALIDATE = _env_int("WORKFLOW_RETRY_VALIDATE", 0)  # retry context: VALIDATE workflow phase maximum retry count when failed
+WORKFLOW_RETRY_REPORT = _env_int("WORKFLOW_RETRY_REPORT", 0)    # retry context: REPORT workflow phase maximum retry count when failed
+WORKFLOW_RETRY_PROMPT_N = _env_int("WORKFLOW_RETRY_PROMPT_N", 3)  # retry context: hint history array cap (LIFO truncate)
 
-# workflow_phase 키로 retry 최대 횟수를 조회하는 매핑 — failure_handler.py 가 활용
+# mapping retry maximum number of workflow phase keys — failure handler.py
 PHASE_RETRY_MAX: dict[str, int] = {
     "INIT": WORKFLOW_RETRY_INIT,
     "PLAN": WORKFLOW_RETRY_PLAN,
@@ -231,58 +231,58 @@ PHASE_RETRY_MAX: dict[str, int] = {
 
 
 def get_phase_retry_max(phase: str) -> int:
-    """workflow_phase 식별자로 해당 phase의 retry 최대 횟수를 반환한다.
+    """returns the maximum retry of the phase as a workflow phase identifier.
 
-    명명 사전: `phase` 인자는 workflow_phase 도메인의 식별자이며,
-    반환값은 retry_context 컨텍스트에서 max_retries 상한으로 사용된다.
+    Name Dictionary: The `phase` argument is the identifier of the workflow phase domain,
+    The return value is used in retry context context to max retries.
 
     Args:
-        phase: workflow_phase 식별자 (INIT/PLAN/WORK/VALIDATE/REPORT 중 하나).
+        phase: workflow phase identifier (INIT/PLAN/WORK/VALIDATE/REPORT).
 
     Returns:
-        해당 workflow_phase의 retry 최대 횟수. 알 수 없는 phase는 0을 반환한다.
+        maximum retry of workflow phase. Unknown phase returns 0.
     """
     return PHASE_RETRY_MAX.get(phase, 0)
 
 
 # =============================================================================
-# 품질 검증 임계값
+# Quality verification threshold
 # =============================================================================
 QUALITY_THRESHOLD = _env_float("CLAUDE_QUALITY_THRESHOLD", 0.6)
 
 # =============================================================================
-# 예산 임계치 알림 설정
+# Configuring a bidder
 # =============================================================================
-BUDGET_CEILING = _env_int("BUDGET_CEILING", 0)  # 0이면 비활성
+BUDGET_CEILING = _env_int("BUDGET_CEILING", 0)  # 0Reactive
 BUDGET_THRESHOLDS: dict[int, str] = {75: "INFO", 80: "WARN", 90: "HIGH", 100: "CRITICAL"}
 
 # =============================================================================
-# Hallucination 로깅 설정
+# Hallucination logging settings
 # =============================================================================
 HOOK_HALLUCINATION_LOGGER = _env("HOOK_HALLUCINATION_LOGGER", "true")
 HALLU_TARGET_AGENT_TYPES: set[str] = {"worker", "explorer"}
 
 # =============================================================================
-# ERROR 임계치 알림 설정
+# ERROR Settlement Notification
 # =============================================================================
-ERROR_THRESHOLD = _env_int("CLAUDE_ERROR_THRESHOLD", 3)  # 워크플로우당 ERROR 카운트 임계치
+ERROR_THRESHOLD = _env_int("CLAUDE_ERROR_THRESHOLD", 3)  # ERROR count threshold for workflow
 
 
 def parse_chain_command(raw: str) -> list[str]:
-    """체인 command 문자열을 파싱하여 세그먼트 리스트를 반환한다.
+    """parsing the chain command string to return the segment list.
 
     Args:
-        raw: command 문자열. 단일("implement") 또는 체인("research>implement>review") 형식.
+        raw: command string. Single ("implement") or chain ("research>implement>review") format.
 
     Returns:
-        유효한 command 세그먼트 리스트. 단일 command도 길이 1 리스트로 반환.
+        Available command segment list. Single command returns to the length 1 list.
 
     Raises:
-        ValueError: 유효하지 않은 세그먼트가 포함된 경우.
+        ValueError: In case of unavailable segments.
 
     Note:
-        중복 command 세그먼트(예: 'implement>implement')를 허용한다.
-        대규모 구현을 여러 사이클로 분할하는 유스케이스를 지원하기 위한 설계 선택이다.
+        Allows duplicate command segment (e.g. 'implement>implement').
+        We use cookies to ensure that we give you the best experience on our website. If you continue to use this site we will assume that you are happy with it.Ok
 
     Examples:
         >>> parse_chain_command("implement")
@@ -296,40 +296,40 @@ def parse_chain_command(raw: str) -> list[str]:
     for seg in segments:
         if seg not in VALID_COMMANDS:
             raise ValueError(
-                f"유효하지 않은 command 세그먼트: '{seg}'. "
-                f"허용 값: {sorted(VALID_COMMANDS)}"
+                f"Invalid command segment: '   FIELD 0 '."
+                f"Permissible Value:   FIELD 0  "
             )
     return segments
 
 
 # =============================================================================
-# 터미널 step 집합
+# Terminal step assembly
 # =============================================================================
 TERMINAL_STEPS = {"DONE", "FAILED", "STALE", "CANCELLED"}
 
-# 하위 호환 별칭
+# {{ data.filesizeHumanReadable }}
 TERMINAL_PHASES = TERMINAL_STEPS
 
 # =============================================================================
-# 바이트 단위 상수
+# Home
 # =============================================================================
 BYTES_GB = 1073741824
 BYTES_MB = 1048576
 BYTES_KB = 1024
 
 # =============================================================================
-# 외부 API URL
+# External API URL
 # =============================================================================
 SLACK_API_URL = _env("CLAUDE_SLACK_API_URL", "https://slack.com/api/chat.postMessage")
 
 # =============================================================================
-# 동기화 관련 상수
+# Log In
 # =============================================================================
 CODE_SYNC_REMOTE_REPO = _env("CLAUDE_REPO_URL", "https://github.com/KoreanLeeChangHyun/claude-workflow.git")
 STALE_TTL_SECONDS = STALE_TTL_MINUTES * 60
 
 # =============================================================================
-# Slack 에이전트별 이모지 매핑
+# Mapping moji by Slack Agent
 # =============================================================================
 SLACK_EMOJI_MAP = {
     "init": ":large_orange_circle:",
@@ -339,40 +339,40 @@ SLACK_EMOJI_MAP = {
 }
 
 # =============================================================================
-# 히스토리 테이블 헤더/구분선
+# Scots Gaelic
 # =============================================================================
-HEADER_LINE = "| 날짜 | 작업ID | 제목 & 내용 | 명령어 | 상태 | 질의 | 파일 | 계획 | 작업 | 보고 |"
+HEADER_LINE = "| Date | WorkID | Title & Contents | Instruction | Status | Quality | File | Planning | Work | Report |"
 SEPARATOR_LINE = "|------|--------|------------|--------|------|------|------|------|------|------|"
-SKILLS_HEADER_LINE = "| 날짜 | 작업ID | 명령어 | 태스크수 | 고유스킬수 | 스킬 목록 | fallback | 토큰초과 |"
+SKILLS_HEADER_LINE = "| Date | WorkID | Command | TSK | Original Skills | Skill List | fallback | Token sec |"
 SKILLS_SEPARATOR_LINE = "|------|--------|--------|---------|----------|----------|---------|---------|"
-LOGS_HEADER_LINE = "| 날짜 | 작업ID | 제목 | 명령 | WARN | ERROR | HALLU | ART | 크기 | 로그 |"
+LOGS_HEADER_LINE = "| Date | WorkID | Title | Command | WARN | ERROR | HALLU | ART | Size | Log |"
 LOGS_SEPARATOR_LINE = "|------|--------|------|------|------|-------|------|-----|------|------|"
-USAGE_HEADER_LINE = "| 날짜 | 작업ID | 제목 | 명령 | ORC | PLN | WRK | EXP | VAL | RPT | 합계 | 예산 |"
+USAGE_HEADER_LINE = "| Date | Work ID | Title | Order | ORC | PLN | WRK | EXP | VAL | RPT | Total | Budget |"
 USAGE_SEPARATOR_LINE = "|------|--------|------|------|-----|-----|-----|-----|-----|-----|------|------|"
 
 # =============================================================================
-# Step → 한글 상태 텍스트 매핑
+# Step → One-Step Text Mapping
 # =============================================================================
 STEP_STATUS_MAP = {
-    "DONE": "완료",
-    "REPORT": "진행",
-    "STALE": "중단",
-    "WORK": "진행",
-    "VALIDATE": "진행",  # multi 모드
-    "STRATEGY": "진행",
-    "PLAN": "진행",
-    "INIT": "진행",
-    "CANCELLED": "중단",
-    "FAILED": "중단",
-    "UNKNOWN": "불명",
-    "NONE": "불명",
+    "DONE": "Application",
+    "REPORT": "Venue",
+    "STALE": "Home",
+    "WORK": "Venue",
+    "VALIDATE": "Venue",  # Multi Mode
+    "STRATEGY": "Venue",
+    "PLAN": "Venue",
+    "INIT": "Venue",
+    "CANCELLED": "Home",
+    "FAILED": "Home",
+    "UNKNOWN": "Home",
+    "NONE": "Home",
 }
 
-# 하위 호환 별칭
+# {{ data.filesizeHumanReadable }}
 PHASE_STATUS_MAP = STEP_STATUS_MAP
 
 # =============================================================================
-# 위험 명령어 화이트리스트 (허용 패턴)
+# Hazard Command Whitelist (Herbal Pattern)
 # =============================================================================
 DANGER_WHITELIST = [
     {"pattern": "rm\\s+-r[f]?\\s+/tmp/", "note": None},
@@ -383,36 +383,36 @@ DANGER_WHITELIST = [
 ]
 
 # =============================================================================
-# 위험 명령어 차단 패턴
+# Dangerous command blocking pattern
 # =============================================================================
 DANGER_PATTERNS = [
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+/\\s*$", "blocked": "rm -rf / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+(-f|--force)\\s+/\\s*$", "blocked": "rm --recursive --force / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+(-f|--force)\\s+--recursive\\s+/\\s*$", "blocked": "rm --force --recursive / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+/\\s*$", "blocked": "rm --recursive / (루트 디렉토리 삭제)", "alternative": "특정 경로를 지정하거나 rm -ri로 대화형 삭제를 사용하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+~", "blocked": "rm -rf ~ (홈 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+~", "blocked": "rm --recursive ~ (홈 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\.\\s*$", "blocked": "rm -rf . (현재 디렉토리 전체 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\.\\s*$", "blocked": "rm --recursive . (현재 디렉토리 삭제)", "alternative": "특정 파일/디렉토리를 지정하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\*", "blocked": "rm -rf * (와일드카드 전체 삭제)", "alternative": "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\*", "blocked": "rm --recursive * (와일드카드 삭제)", "alternative": "특정 파일/디렉토리를 지정하거나 ls로 목록을 먼저 확인하세요."},
-    {"pattern": "(sudo\\s+)?git\\s+reset\\s+--hard", "blocked": "git reset --hard (커밋되지 않은 변경사항 전체 삭제)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
-    {"pattern": "(sudo\\s+)?git\\s+push\\s+(--force|-f)", "blocked": "git push --force (원격 히스토리 덮어쓰기)", "alternative": "git push --force-with-lease를 사용하세요."},
-    {"pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f", "blocked": "git clean -f (추적되지 않는 파일 전체 삭제)", "alternative": "git clean -n으로 드라이런하여 삭제 대상을 먼저 확인하세요."},
-    {"pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)", "blocked": "git branch -D main/master (주요 브랜치 강제 삭제)", "alternative": "주요 브랜치 삭제는 매우 위험합니다. 정말 필요한지 재확인하세요."},
-    {"pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$", "blocked": "git checkout/restore . (모든 변경사항 되돌리기)", "alternative": "git stash로 변경사항을 임시 저장하세요."},
-    {"pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)", "blocked": "DROP TABLE/DATABASE (데이터베이스/테이블 삭제)", "alternative": "백업을 먼저 수행하고, 트랜잭션 내에서 실행하세요."},
-    {"pattern": "(sudo\\s+)?chmod\\s+777", "blocked": "chmod 777 (과도한 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
-    {"pattern": "(sudo\\s+)?chmod\\s+a\\+rwx", "blocked": "chmod a+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
-    {"pattern": "(sudo\\s+)?chmod\\s+o\\+w", "blocked": "chmod o+w (기타 사용자에게 쓰기 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
-    {"pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx", "blocked": "chmod ugo+rwx (전체 사용자에게 모든 권한 부여)", "alternative": "chmod 755 또는 필요한 최소 권한만 부여하세요."},
-    {"pattern": "(sudo\\s+)?mkfs", "blocked": "mkfs (디스크 포맷)", "alternative": "디스크 포맷은 매우 위험합니다. 대상 디바이스를 재확인하세요."},
-    {"pattern": "(sudo\\s+)?dd\\s+if=", "blocked": "dd if= (디스크 덮어쓰기)", "alternative": "dd 명령어는 되돌릴 수 없습니다. 대상 디바이스를 재확인하세요."},
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+.*\\.claude\\.workflow/kanban", "blocked": "rm -rf .agent-factory/kanban (칸반 디렉터리 삭제)", "alternative": "칸반 디렉터리는 워크플로우 핵심 데이터입니다. 삭제하지 마세요."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+/\\s*$", "blocked": "rm -rf / (Remove root directory)", "alternative": "Specify a specific path or use a rm -ri-to-do dialog box."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+(-f|--force)\\s+/\\s*$", "blocked": "rm --recursive --force / (delete root directory)", "alternative": "Specify a specific path or use a rm -ri-to-do dialog box."},
+    {"pattern": "(sudo\\s+)?rm\\s+(-f|--force)\\s+--recursive\\s+/\\s*$", "blocked": "rm --force --recursive / (delete root directory)", "alternative": "Specify a specific path or use a rm -ri-to-do dialog box."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive\\s+/\\s*$", "blocked": "rm --recursive / (delete root directory)", "alternative": "Specify a specific path or use a rm -ri-to-do dialog box."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+~", "blocked": "rm -rf", "alternative": "Specifies a specific file / directory."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+~", "blocked": "rm --recursive ~ (Restore home directory)", "alternative": "Specifies a specific file / directory."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\.\\s*$", "blocked": "rm -rf . (current directory full deletion)", "alternative": "Specifies a specific file / directory."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\.\\s*$", "blocked": "rm --recursive . (currently delete directory)", "alternative": "Specifies a specific file / directory."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+\\*", "blocked": "rm -rf * (Remove the wildcard)", "alternative": "Specifies a specific file / directory or checks the list as ls first."},
+    {"pattern": "(sudo\\s+)?rm\\s+--recursive(\\s+--force)?\\s+\\*", "blocked": "rm --recursive * (delete wildcard)", "alternative": "Specifies a specific file / directory or checks the list as ls first."},
+    {"pattern": "(sudo\\s+)?git\\s+reset\\s+--hard", "blocked": "git reset --hard", "alternative": "git stash"},
+    {"pattern": "(sudo\\s+)?git\\s+push\\s+(--force|-f)", "blocked": "git push --force", "alternative": "git push --force-with-lease"},
+    {"pattern": "(sudo\\s+)?git\\s+clean\\s+-[fd]*f", "blocked": "git clean -f (delete the files that aren't added)", "alternative": "git clean -n"},
+    {"pattern": "(sudo\\s+)?git\\s+branch\\s+-D\\s+(main|master)", "blocked": "git branch -D main/master", "alternative": "The main branch deletion is very dangerous. Please check if you need it."},
+    {"pattern": "(sudo\\s+)?git\\s+(checkout|restore)\\s+\\.\\s*$", "blocked": "git checkout/restore . (Return all changes)", "alternative": "git stash"},
+    {"pattern": "(?i)(sudo\\s+)?DROP\\s+(TABLE|DATABASE)", "blocked": "DROP TABLE/DATABASE", "alternative": "Perform backups first and run within the transaction."},
+    {"pattern": "(sudo\\s+)?chmod\\s+777", "blocked": "chmod 777", "alternative": "chmod 755"},
+    {"pattern": "(sudo\\s+)?chmod\\s+a\\+rwx", "blocked": "chmod a+rwx", "alternative": "chmod 755"},
+    {"pattern": "(sudo\\s+)?chmod\\s+o\\+w", "blocked": "chmod o+w", "alternative": "chmod 755"},
+    {"pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx", "blocked": "chmod ugo+rwx", "alternative": "chmod 755"},
+    {"pattern": "(sudo\\s+)?mkfs", "blocked": "mkfs (desk format)", "alternative": "Disk format is very dangerous. Please check the target device."},
+    {"pattern": "(sudo\\s+)?dd\\s+if=", "blocked": "dd if=", "alternative": "dd command cannot be returned. Please check the target device."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+.*\\.claude\\.workflow/kanban", "blocked": "rm -rf .agent-factory/kanban (delete directory)", "alternative": "The Kanban Director is a workflow core data. Do not delete it."},
 ]
 
 # =============================================================================
-# hooks 자기보호 가드: 읽기 전용 명령어 패턴
+# hooks self-protection guard: read-only command pattern
 # =============================================================================
 GUARD_READONLY_PATTERNS = [
     "^\\s*git\\s", "^\\s*python3?\\s", "^\\s*node\\s", "^\\s*cat\\s",
@@ -428,7 +428,7 @@ GUARD_READONLY_PATTERNS = [
 ]
 
 # =============================================================================
-# hooks 자기보호 가드: 수정 명령어 패턴
+# Hooks Self-Protection Guard: Fixed command pattern
 # =============================================================================
 GUARD_MODIFY_PATTERNS = [
     "sed\\s+.*-i", "sed\\s+-i", "\\bcp\\b", "\\bmv\\b",
@@ -440,7 +440,7 @@ GUARD_MODIFY_PATTERNS = [
 ]
 
 # =============================================================================
-# hooks 자기보호 가드: 보호 경로 패턴
+# Hooks Self Protection Guard: Protection Path Pattern
 # =============================================================================
 GUARD_PROTECTED_PATH_PATTERNS = [
     "\\.agent-factory/hooks/",
@@ -448,7 +448,7 @@ GUARD_PROTECTED_PATH_PATTERNS = [
 ]
 
 # =============================================================================
-# hooks 자기보호 가드: 인라인 쓰기 패턴
+# Hooks Self-Protection Guard: Inline Writing Pattern
 # =============================================================================
 GUARD_INLINE_WRITE_PATTERNS = [
     "open\\s*\\(", "write\\s*\\(", "writeFile", "writeFileSync",

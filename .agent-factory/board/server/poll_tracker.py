@@ -6,27 +6,27 @@ import threading
 
 
 class PollChangeTracker:
-    """폴링 클라이언트를 위한 변경 이벤트 축적기.
+    """Change event accumulator for polling clients.
 
-    마지막 폴링 이후 변경된 이벤트 타입별 파일명을 dict로 축적한다.
-    flush() 호출 시 축적된 변경 내역을 반환하고 초기화한다.
+    After the last polling, the filename will be accumulated by dict.
+    returns and initializes accumulated changes when calling flush().
 
     Attributes:
-        _changes: 이벤트 타입 -> 변경 파일명 set 매핑
-        _lock: thread-safe 접근용 Lock
+        changes: Event type -> Change filename set map
+        lock: Lock for thread-safe access
     """
 
     def __init__(self) -> None:
-        """초기화한다."""
+        """Add to cart"""
         self._changes: dict[str, set[str]] = {}
         self._lock: threading.Lock = threading.Lock()
 
     def add(self, event_type: str, files: list[str]) -> None:
-        """변경 이벤트 타입과 파일명 목록을 추가한다.
+        """Add a change event type and filename list.
 
         Args:
-            event_type: 추가할 이벤트 타입 (kanban, workflow, dashboard)
-            files: 변경된 파일명 목록
+            event type: event type(kanban, workflow, dashboard)
+            files: List of changed filenames
         """
         with self._lock:
             if event_type not in self._changes:
@@ -34,12 +34,12 @@ class PollChangeTracker:
             self._changes[event_type].update(files)
 
     def flush(self) -> dict[str, list[str]]:
-        """축적된 변경 이벤트를 반환하고 초기화한다.
+        """Returns and resets accumulated changes events.
 
         Returns:
-            이벤트 타입별 변경 파일명 목록 dict.
-            예: {"kanban": ["T-038.xml"], "workflow": ["state.json"]}
-            변경 없으면 빈 dict.
+            Change filename list by event type dict.
+            Example: {"kanban": ["T-038.xml"], "workflow": ["state.json"]}
+            empty dict without changing.
         """
         with self._lock:
             result = {k: list(v) for k, v in self._changes.items()}

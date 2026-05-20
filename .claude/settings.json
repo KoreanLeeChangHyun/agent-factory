@@ -4,7 +4,6 @@
     "allow": [
       "Edit(.agent-factory/engine/**)",
       "Edit(.agent-factory/hooks/**)",
-      "Edit(.agent-factory/prompts/**)",
       "Edit(.agent-factory/docs/**)",
       "Edit(.agent-factory/build-assets/**)",
       "Edit(.agent-factory/board/**)",
