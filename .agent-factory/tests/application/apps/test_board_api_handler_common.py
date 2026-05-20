@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from board.server.handlers import _handler_common as compat
 from engine.apps.board_api import handler_common
 
@@ -17,3 +19,12 @@ def test_ticket_regex_and_kanban_dirs() -> None:
     assert handler_common._TICKET_RE.match("T-424")
     assert not handler_common._TICKET_RE.match("X-424")
     assert "done" in handler_common._KANBAN_ALL_DIRS
+
+
+def test_board_server_shim_adds_agent_factory_import_root() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    shim = repo_root / ".agent-factory" / "board" / "server.py"
+
+    text = shim.read_text(encoding="utf-8")
+    assert "_AGENT_FACTORY_DIR = os.path.dirname(_BOARD_DIR)" in text
+    assert "sys.path.insert(0, _AGENT_FACTORY_DIR)" in text

@@ -1648,10 +1648,31 @@ Acceptance:
 - architecture boundary tests pass
 - full pytest passes
 
+### M69: Align Board Shim Import Root With Engine Apps
+
+Status: complete
+
+Goal:
+
+Ensure direct `board/server.py` execution can import `.agent-factory/engine`
+packages after board API helpers started loading app-boundary modules.
+
+Completed slice:
+
+- added `.agent-factory` to the board server shim import path
+- added focused board shim bootstrap coverage
+
+Acceptance:
+
+- board API helper tests pass
+- metrics app placement tests pass
+- layout convergence tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 835 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 836 passed, 2 skipped, 6 subtests passed
 ```
