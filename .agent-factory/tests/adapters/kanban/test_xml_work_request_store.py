@@ -5,6 +5,8 @@ from pathlib import Path
 from engine.adapters.kanban import XmlWorkRequestStore
 from engine.core.work_requests import (
     AcceptanceCriteria,
+    OuroborosEntry,
+    OuroborosPhase,
     RiskNote,
     WorkRequest,
     WorkRequestRef,
@@ -31,6 +33,9 @@ def test_xml_store_loads_existing_ticket_as_work_request(tmp_path: Path) -> None
     <criteria>- round-trip passes
 - can start workflow</criteria>
   </prompt>
+  <ouroboros_history>
+    <entry phase="CLARIFY" created_at="2026-05-21T00:00:00+00:00">Checked missing fields</entry>
+  </ouroboros_history>
 </ticket>
 """,
         encoding="utf-8",
@@ -46,6 +51,7 @@ def test_xml_store_loads_existing_ticket_as_work_request(tmp_path: Path) -> None
         "round-trip passes",
         "can start workflow",
     ]
+    assert [entry.phase for entry in request.ouroboros_history] == [OuroborosPhase.CLARIFY]
     assert request.start_workflow_run().ticket_arg == "T-123"
 
 
@@ -59,6 +65,13 @@ def test_xml_store_round_trips_work_request_to_existing_ticket_layout(tmp_path: 
         acceptance_criteria=[AcceptanceCriteria("load after save returns same fields")],
         non_goals=["rename ticket files"],
         risk_notes=[RiskNote("board terminology is migrated gradually", severity="low")],
+        ouroboros_history=[
+            OuroborosEntry(
+                phase=OuroborosPhase.REWRITE,
+                text="Rewrote WorkRequest into executable fields",
+                created_at="2026-05-21T00:00:00+00:00",
+            )
+        ],
         status=WorkRequestStatus.OPEN,
         command="research",
     )
@@ -73,6 +86,7 @@ def test_xml_store_round_trips_work_request_to_existing_ticket_layout(tmp_path: 
     assert loaded.context == request.context
     assert loaded.non_goals == request.non_goals
     assert [r.text for r in loaded.risk_notes] == ["board terminology is migrated gradually"]
+    assert [entry.phase for entry in loaded.ouroboros_history] == [OuroborosPhase.REWRITE]
 
 
 def test_xml_store_moves_file_when_status_changes(tmp_path: Path) -> None:
@@ -90,4 +104,3 @@ def test_xml_store_moves_file_when_status_changes(tmp_path: Path) -> None:
 
     assert not (tmp_path / "open" / "T-125.xml").exists()
     assert (tmp_path / "progress" / "T-125.xml").is_file()
-

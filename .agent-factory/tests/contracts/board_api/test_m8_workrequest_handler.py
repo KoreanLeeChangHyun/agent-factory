@@ -79,6 +79,49 @@ class TestM8WorkRequestHandler(unittest.TestCase):
         self.assertEqual(h._sent_json["action"], "accept")
         self.assertEqual(run.call_args.args[0][1:], ["move", "T-520", "open"])
 
+    def test_accept_records_ouroboros_history_when_ticket_exists(self):
+        h = _handler({"action": "accept", "ticket": "T-520"})
+
+        def fake_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, 0, stdout="T-520: To Do -> Open", stderr="")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tickets = Path(tmpdir) / ".agent-factory" / "tickets" / "todo"
+            tickets.mkdir(parents=True)
+            (tickets / "T-520.xml").write_text(
+                """<?xml version="1.0" encoding="UTF-8"?>
+<ticket>
+  <metadata>
+    <number>T-520</number>
+    <title>Accept sample</title>
+    <status>To Do</status>
+    <command>implement</command>
+  </metadata>
+  <prompt>
+    <goal>Accept the request</goal>
+    <criteria>- history is recorded</criteria>
+  </prompt>
+</ticket>
+""",
+                encoding="utf-8",
+            )
+            with patch("os.getcwd", return_value=tmpdir), patch("subprocess.run", side_effect=fake_run):
+                h._handle_kanban_workrequest()
+
+            from engine.adapters.kanban import XmlWorkRequestStore
+            from engine.core.work_requests import OuroborosPhase, WorkRequestRef
+
+            request = XmlWorkRequestStore(Path(tmpdir) / ".agent-factory" / "tickets").get(
+                WorkRequestRef.parse("T-520")
+            )
+
+        self.assertIsNone(h._sent_error)
+        self.assertTrue(h._sent_json["ouroborosRecorded"])
+        self.assertEqual(
+            [entry.phase for entry in request.ouroboros_history],
+            [OuroborosPhase.CLARIFY, OuroborosPhase.CRITIQUE, OuroborosPhase.ACCEPT],
+        )
+
     def test_invalid_action_returns_400(self):
         h = _handler({"action": "bogus"})
         h._handle_kanban_workrequest()

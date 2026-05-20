@@ -7,6 +7,24 @@ argument-hint: "[-o|-e|-oe|-s|-d|-c] [N] (티켓 라이프사이클 통합 관�
 
 티켓 라이프사이클 전체를 단일 진입점으로 관리합니다. `-o`(Open/채번+용도선택만), `-e`(Edit/편집), `-oe`(Open+Edit 단축 별칭), `-s`(Submit), `-d`(Done), `-c`(Cancel/삭제) 6개 플래그로 생성부터 종료까지 제어합니다.
 
+## WorkRequest Ouroboros 작성 원칙
+
+WorkRequest 작성은 실행 전 계약을 고정하는 단계입니다. `-e`, `-oe`, Board WorkRequest API의 create/refine/accept 흐름은 아래 우로보로스 루프를 기준으로 판단하고, 가능한 경우 티켓 XML의 `<ouroboros_history>`에 단계 기록을 남깁니다.
+
+```text
+DRAFT -> CLARIFY -> CRITIQUE -> REWRITE -> ACCEPT
+```
+
+| 단계 | 적용 기준 |
+|------|----------|
+| DRAFT | 사용자 요청, 제목, command, 초기 상태를 있는 그대로 채번합니다 |
+| CLARIFY | goal/target/constraints/criteria/context 중 누락되거나 안전하게 추론 가능한 항목을 식별합니다 |
+| CRITIQUE | 모호한 대상, 검증 불가능한 기준, 범위 확장 위험, 숨은 의존성을 점검합니다 |
+| REWRITE | `flow-kanban update-prompt`로 실행 가능한 prompt 필드를 갱신합니다 |
+| ACCEPT | goal/target/constraints/criteria가 실행과 검증에 충분할 때 Open 상태로 받아들입니다 |
+
+질문은 누락 필드를 안전하게 추론할 수 없을 때만 합니다. 추론한 제약, 가정, 위험은 `context` 또는 `constraints`에 명시합니다.
+
 ## Step 0. 플래그 파싱 및 라우팅
 
 `$ARGUMENTS`에서 플래그와 티켓 번호를 파싱하여 실행 흐름을 결정합니다.

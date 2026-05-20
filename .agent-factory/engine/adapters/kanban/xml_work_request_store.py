@@ -12,6 +12,7 @@ from engine.core.work_requests.domain import (
     WorkRequestRef,
     WorkRequestStatus,
 )
+from engine.core.work_requests.ouroboros import OuroborosEntry, OuroborosPhase
 from engine.core.work_requests.repository import WorkRequestStore
 
 
@@ -88,6 +89,7 @@ class XmlWorkRequestStore(WorkRequestStore):
             for line in _split_lines(_child_text(prompt, "risk_notes"))
         ]
         non_goals = _split_lines(_child_text(prompt, "non_goals"))
+        ouroboros_history = _parse_ouroboros_history(root)
 
         return WorkRequest(
             ref=ref,
@@ -100,6 +102,7 @@ class XmlWorkRequestStore(WorkRequestStore):
             risk_notes=risk_notes,
             status=status,
             command=command,
+            ouroboros_history=ouroboros_history,
         )
 
     def _write_model(self, root: ET.Element, request: WorkRequest) -> None:
@@ -120,6 +123,17 @@ class XmlWorkRequestStore(WorkRequestStore):
         )
         _set_child_text(prompt, "non_goals", "\n".join(request.non_goals))
         _set_child_text(prompt, "risk_notes", "\n".join(r.text for r in request.risk_notes))
+
+        history = _ensure_child(root, "ouroboros_history")
+        history.clear()
+        for item in request.ouroboros_history:
+            entry = _coerce_ouroboros_entry(item)
+            node = ET.SubElement(
+                history,
+                "entry",
+                {"phase": entry.phase.value, "created_at": entry.created_at},
+            )
+            node.text = entry.text
 
 
 def _child_text(elem: ET.Element | None, tag: str) -> str:
@@ -143,3 +157,28 @@ def _set_child_text(elem: ET.Element, tag: str, value: str) -> None:
 
 def _split_lines(value: str) -> list[str]:
     return [line.strip(" -\t") for line in value.splitlines() if line.strip(" -\t")]
+
+
+def _parse_ouroboros_history(root: ET.Element) -> list[OuroborosEntry]:
+    history = root.find("ouroboros_history")
+    if history is None:
+        return []
+    entries: list[OuroborosEntry] = []
+    for node in history.findall("entry"):
+        phase = OuroborosPhase((node.get("phase") or "").strip())
+        created_at = (node.get("created_at") or "").strip()
+        text = node.text or ""
+        entries.append(OuroborosEntry(phase=phase, text=text, created_at=created_at))
+    return entries
+
+
+def _coerce_ouroboros_entry(item: object) -> OuroborosEntry:
+    if isinstance(item, OuroborosEntry):
+        return item
+    if isinstance(item, dict):
+        return OuroborosEntry(
+            phase=OuroborosPhase(str(item.get("phase") or "")),
+            text=str(item.get("text") or ""),
+            created_at=str(item.get("created_at") or ""),
+        )
+    raise TypeError(f"invalid ouroboros history entry: {item!r}")

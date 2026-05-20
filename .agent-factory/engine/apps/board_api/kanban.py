@@ -15,7 +15,9 @@ import sys
 import subprocess
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
+from engine.adapters.kanban import XmlWorkRequestStore
 from engine.apps.board_api.handler_common import _TICKET_RE, _KANBAN_ALL_DIRS
 from engine.apps.board_api.kanban_done_helpers import (
     handle_kanban_done_force,
@@ -39,6 +41,12 @@ from board.server.production_line_launcher import (
     _LAUNCH_READER_LOCK,
     _LAUNCH_READER_THREADS,
     spawn_production_line,
+)
+from engine.core.work_requests import (
+    OuroborosEntry,
+    OuroborosPhase,
+    OuroborosState,
+    WorkRequestRef,
 )
 
 
@@ -108,6 +116,96 @@ def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
                         event, ticket, str(kwargs['error_message'])[:500])
     except Exception:  # 로깅 실패도 무시
         pass
+
+
+def _record_workrequest_ouroboros(
+    project_root: str,
+    ticket: str,
+    action: str,
+    text: str,
+) -> bool:
+    """internal helper — persist authoring-loop history after facade success."""
+
+    try:
+        store = XmlWorkRequestStore(Path(project_root) / ".agent-factory" / "tickets")
+        request = store.get(WorkRequestRef.parse(ticket))
+        entries = _ouroboros_entries_for_action(request.ouroboros_history, action, text)
+        if not entries:
+            return True
+        request.ouroboros_history.extend(entries)
+        store.save(request)
+        return True
+    except (FileNotFoundError, TypeError, ValueError) as exc:
+        logger.debug("Could not record WorkRequest Ouroboros history for %s: %s", ticket, exc)
+        return False
+
+
+def _ouroboros_entries_for_action(
+    history: list[object],
+    action: str,
+    text: str,
+) -> list[OuroborosEntry]:
+    """internal helper — build Ouroboros history entries for one action."""
+    current = _last_ouroboros_phase(history)
+    if action == "create":
+        if history or current is not OuroborosPhase.DRAFT:
+            return []
+        return [OuroborosEntry(phase=OuroborosPhase.DRAFT, text=text)]
+
+    entries: list[OuroborosEntry] = []
+    if action == "refine" and current is OuroborosPhase.ACCEPT:
+        entries.append(
+            OuroborosEntry(
+                phase=OuroborosPhase.DRAFT,
+                text="Reopened accepted WorkRequest for another refinement loop.",
+            )
+        )
+        current = OuroborosPhase.DRAFT
+
+    state = OuroborosState(current=current)
+    if action == "refine":
+        _advance_to_rewrite(state, text)
+    elif action == "accept":
+        if state.current is OuroborosPhase.ACCEPT:
+            return []
+        _advance_to_accept(state, text)
+    else:
+        return []
+    entries.extend(state.history)
+    return entries
+
+
+def _last_ouroboros_phase(history: list[object]) -> OuroborosPhase:
+    """internal helper — return the last persisted Ouroboros phase."""
+    for entry in reversed(history):
+        phase = getattr(entry, "phase", None)
+        if isinstance(phase, OuroborosPhase):
+            return phase
+        if isinstance(phase, str) and phase:
+            return OuroborosPhase(phase)
+    return OuroborosPhase.DRAFT
+
+
+def _advance_to_rewrite(state: OuroborosState, text: str) -> None:
+    """internal helper — advance an authoring state to REWRITE."""
+    if state.current is OuroborosPhase.REWRITE:
+        state.advance(OuroborosPhase.CLARIFY, "Started another refinement pass.")
+    if state.current is OuroborosPhase.DRAFT:
+        state.advance(OuroborosPhase.CLARIFY, "Captured WorkRequest fields for refinement.")
+    if state.current is OuroborosPhase.CLARIFY:
+        state.advance(OuroborosPhase.CRITIQUE, "Checked ambiguity, criteria, constraints, and target.")
+    if state.current is OuroborosPhase.CRITIQUE:
+        state.advance(OuroborosPhase.REWRITE, text)
+
+
+def _advance_to_accept(state: OuroborosState, text: str) -> None:
+    """internal helper — advance an authoring state to ACCEPT."""
+    if state.current is OuroborosPhase.DRAFT:
+        state.advance(OuroborosPhase.CLARIFY, "Captured minimum fields before acceptance.")
+    if state.current is OuroborosPhase.CLARIFY:
+        state.advance(OuroborosPhase.CRITIQUE, "Checked WorkRequest quality before acceptance.")
+    if state.current in (OuroborosPhase.CRITIQUE, OuroborosPhase.REWRITE):
+        state.advance(OuroborosPhase.ACCEPT, text)
 
 
 def _launch_reader_loop(
@@ -1411,7 +1509,21 @@ class KanbanHandlerMixin:
                     _send_run_error(update)
                     return
 
-            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            recorded = False
+            if ticket:
+                recorded = _record_workrequest_ouroboros(
+                    project_root,
+                    ticket,
+                    action,
+                    f"Created WorkRequest draft: {title}",
+                )
+            self._send_json({
+                'ok': True,
+                'action': action,
+                'ticket': ticket,
+                'stdout': result.stdout.strip(),
+                'ouroborosRecorded': recorded,
+            })
             return
 
         if action == 'refine':
@@ -1439,7 +1551,19 @@ class KanbanHandlerMixin:
             if result.returncode != 0:
                 _send_run_error(result)
                 return
-            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            recorded = _record_workrequest_ouroboros(
+                project_root,
+                ticket,
+                action,
+                "Rewrote WorkRequest prompt fields through Board refinement.",
+            )
+            self._send_json({
+                'ok': True,
+                'action': action,
+                'ticket': ticket,
+                'stdout': result.stdout.strip(),
+                'ouroborosRecorded': recorded,
+            })
             return
 
         if action == 'accept':
@@ -1453,7 +1577,19 @@ class KanbanHandlerMixin:
             if result.returncode != 0:
                 _send_run_error(result)
                 return
-            self._send_json({'ok': True, 'action': action, 'ticket': ticket, 'stdout': result.stdout.strip()})
+            recorded = _record_workrequest_ouroboros(
+                project_root,
+                ticket,
+                action,
+                "Accepted WorkRequest for workflow execution.",
+            )
+            self._send_json({
+                'ok': True,
+                'action': action,
+                'ticket': ticket,
+                'stdout': result.stdout.strip(),
+                'ouroborosRecorded': recorded,
+            })
             return
 
         self._send_error(400, 'Invalid "action" (create/refine/accept)')
