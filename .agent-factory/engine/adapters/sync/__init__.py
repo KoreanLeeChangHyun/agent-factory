@@ -1,0 +1,1 @@
+"""Sync adapter scripts."""

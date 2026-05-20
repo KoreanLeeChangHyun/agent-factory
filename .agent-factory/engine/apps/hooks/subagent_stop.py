@@ -136,7 +136,7 @@ def run(stdin_data: bytes) -> int:
 
     dispatch_async(
         "HOOK_USAGE_TRACKER",
-        scripts_dir("sync", "usage_sync.py"),
+        scripts_dir("adapters", "sync", "usage_sync.py"),
         stdin_data,
         flags=flags,
     )

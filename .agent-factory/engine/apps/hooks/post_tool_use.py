@@ -134,7 +134,7 @@ def run(stdin_data: bytes) -> int:
         if ".claude/skills/" in file_path and file_path.endswith("/SKILL.md"):
             dispatch_async(
                 "HOOK_CATALOG_SYNC",
-                scripts_dir("sync", "catalog_sync.py"),
+                scripts_dir("adapters", "sync", "catalog_sync.py"),
                 stdin_data,
                 flags=flags,
             )

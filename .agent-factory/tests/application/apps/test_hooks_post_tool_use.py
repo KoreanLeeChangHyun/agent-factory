@@ -50,7 +50,7 @@ def test_post_tool_use_run_dispatches_skill_catalog_sync(monkeypatch) -> None:
     assert calls == [
         (
             "HOOK_CATALOG_SYNC",
-            "/agent/engine/sync/catalog_sync.py",
+            "/agent/engine/adapters/sync/catalog_sync.py",
             stdin_data,
             {"HOOK_CATALOG_SYNC": True},
         )

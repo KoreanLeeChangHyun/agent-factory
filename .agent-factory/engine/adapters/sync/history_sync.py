@@ -38,26 +38,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# utils 패키지 import
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
 try:
-    from common import (
+    from engine.common import (
         resolve_project_root,
     )
 except ImportError:
     def resolve_project_root() -> str:
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from constants import STALE_TTL_SECONDS, KEEP_COUNT
+from engine.constants import STALE_TTL_SECONDS, KEEP_COUNT
 
 # ============================================================
 # 상수 (Phase-상태 매핑)
 # ============================================================
 
-from constants import HEADER_LINE, SEPARATOR_LINE, STEP_STATUS_MAP
+from engine.constants import HEADER_LINE, SEPARATOR_LINE, STEP_STATUS_MAP
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 EXPECTED_CELL_COUNT = 12

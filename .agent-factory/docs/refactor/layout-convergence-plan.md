@@ -1391,10 +1391,40 @@ Acceptance:
 - PreToolUse dispatch tests pass
 - full pytest passes
 
+### M59: Move Sync Scripts Into Adapter Boundary
+
+Status: complete
+
+Goal:
+
+Move sync helper scripts out of the engine root and into
+`engine/adapters/sync`.
+
+Completed slice:
+
+- moved `engine/sync/catalog_sync.py` to
+  `engine/adapters/sync/catalog_sync.py`
+- moved `engine/sync/history_sync.py` to
+  `engine/adapters/sync/history_sync.py`
+- moved `engine/sync/usage_sync.py` to `engine/adapters/sync/usage_sync.py`
+- added `engine/adapters/sync/__init__.py`
+- updated PostToolUse and SubagentStop dispatch paths
+- updated sync scripts to import through `engine.*` from the adapter location
+- updated chained history-sync guard compatibility for the new path
+- added focused sync adapter placement tests
+- extended layout convergence tests to prevent legacy sync paths from returning
+
+Acceptance:
+
+- sync adapter placement tests pass
+- hook app dispatch tests pass
+- sync scripts execute from the repo root
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 811 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 813 passed, 2 skipped, 6 subtests passed
 ```

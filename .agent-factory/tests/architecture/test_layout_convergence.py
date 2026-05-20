@@ -44,3 +44,12 @@ def test_legacy_engine_slack_sources_are_removed() -> None:
     assert not (legacy_dir / "slack_ask.py").exists()
     assert not (legacy_dir / "slack_notify.py").exists()
     assert not (legacy_dir / "slack_common.py").exists()
+
+
+def test_legacy_engine_sync_sources_are_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    legacy_dir = repo_root / ".agent-factory" / "engine" / "sync"
+    assert not (legacy_dir / "catalog_sync.py").exists()
+    assert not (legacy_dir / "history_sync.py").exists()
+    assert not (legacy_dir / "usage_sync.py").exists()

@@ -48,13 +48,13 @@ _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 # && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴
-# 예(상대경로): python3 .agent-factory/hooks/... && python3 .agent-factory/engine/sync/history_sync.py ...
-# 예(절대경로): python3 /path/.agent-factory/hooks/... && python3 /path/.agent-factory/engine/sync/history_sync.py ...
+# 예(상대경로): python3 .agent-factory/hooks/... && python3 .agent-factory/engine/adapters/sync/history_sync.py ...
+# 예(절대경로): python3 /path/.agent-factory/hooks/... && python3 /path/.agent-factory/engine/adapters/sync/history_sync.py ...
 _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
     r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
     r"(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/\S*\s*&&\s*"
     r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
-    r"(?:\.agent-factory/engine/sync/|/[^\s]*\.agent-factory/engine/sync/)history_sync\.py"
+    r"(?:\.agent-factory/engine/(?:adapters/)?sync/|/[^\s]*\.agent-factory/engine/(?:adapters/)?sync/)history_sync\.py"
 )
 
 # 스크립트 파일명 -> alias 매핑

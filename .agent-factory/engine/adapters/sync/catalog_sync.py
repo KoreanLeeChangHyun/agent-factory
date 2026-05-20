@@ -31,20 +31,16 @@ import re
 import sys
 from typing import Optional
 
-# utils 패키지 import
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-# flow 모듈 import (skill_state_manager)
-_flow_dir = os.path.join(_engine_dir, "flow")
-if _flow_dir not in sys.path:
-    sys.path.insert(0, _flow_dir)
+from engine.flow.skill_state_manager import is_archived, load_skill_state
+from engine.flow.cli_utils import build_common_epilog
 
-from skill_state_manager import is_archived, load_skill_state
-from cli_utils import build_common_epilog
-
-from common import (
+from engine.common import (
     resolve_project_root,
 )
 

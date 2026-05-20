@@ -2009,12 +2009,54 @@ python3 -m pytest tests/adapters/slack/test_slack_adapter_imports.py tests/appli
 python3 -m pytest  # 811 passed, 2 skipped, 6 subtests passed
 ```
 
+### M59: Move Sync Scripts Into Adapter Boundary
+
+Status: complete
+
+Purpose:
+
+Move sync helper scripts out of the engine root and into
+`engine/adapters/sync`.
+
+Tasks:
+
+- [x] move `engine/sync/catalog_sync.py` to
+      `engine/adapters/sync/catalog_sync.py`
+- [x] move `engine/sync/history_sync.py` to
+      `engine/adapters/sync/history_sync.py`
+- [x] move `engine/sync/usage_sync.py` to
+      `engine/adapters/sync/usage_sync.py`
+- [x] add `engine/adapters/sync/__init__.py`
+- [x] update PostToolUse and SubagentStop dispatch paths
+- [x] update sync scripts to import through `engine.*` from the adapter location
+- [x] update chained history-sync guard compatibility for the new path
+- [x] add focused sync adapter placement tests
+- [x] extend layout convergence tests to prevent legacy sync paths from
+      returning
+
+Acceptance criteria:
+
+- sync adapter placement tests pass
+- hook app dispatch tests pass
+- sync scripts execute from the repo root
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/adapters/sync/test_sync_adapter_imports.py tests/application/apps/test_hooks_post_tool_use.py tests/application/apps/test_hooks_subagent_stop.py tests/adapters/hooks/test_pretooluse_regression.py tests/architecture/test_layout_convergence.py  # 17 passed
+python3 .agent-factory/engine/adapters/sync/catalog_sync.py --help  # exits 0
+python3 .agent-factory/engine/adapters/sync/history_sync.py --help  # exits 0
+python3 .agent-factory/engine/adapters/sync/usage_sync.py  # exits 0
+python3 -m pytest  # 813 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59
 ```
 
 Hard dependencies:

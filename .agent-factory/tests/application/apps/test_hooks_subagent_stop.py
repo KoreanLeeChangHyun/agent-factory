@@ -25,7 +25,7 @@ def test_subagent_stop_run_dispatches_usage_tracker(monkeypatch) -> None:
     assert calls == [
         (
             "HOOK_USAGE_TRACKER",
-            "/agent/engine/sync/usage_sync.py",
+            "/agent/engine/adapters/sync/usage_sync.py",
             stdin_data,
             {"HOOK_USAGE_TRACKER": True},
         )

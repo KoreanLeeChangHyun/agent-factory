@@ -23,12 +23,13 @@ import os
 import sys
 from typing import Optional
 
-# utils 패키지 import
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-from common import (
+from engine.common import (
     acquire_lock,
     atomic_write_json,
     load_json_file,
@@ -36,7 +37,7 @@ from common import (
     resolve_project_root,
     scan_active_workflows,
 )
-from constants import HALLU_TARGET_AGENT_TYPES, HOOK_HALLUCINATION_LOGGER
+from engine.constants import HALLU_TARGET_AGENT_TYPES, HOOK_HALLUCINATION_LOGGER
 
 PROJECT_ROOT = resolve_project_root()
 
