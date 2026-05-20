@@ -118,3 +118,37 @@ def test_v2_history_ndjson_read_end_to_end() -> None:
         assert events[1]['payload']['step'] == 'PLAN'
         assert events[2]['event'] == 'workflow_finish'
         assert events[2]['payload']['outcome'] == 'ok'
+
+
+def test_v2_session_default_persist_path_is_run_local() -> None:
+    """No global .workflow-sessions-v2 dir is needed for V2 history."""
+    from board.server.v2_workflow_session import V2WorkflowSessionRegistry
+
+    with tempfile.TemporaryDirectory() as td:
+        reg = V2WorkflowSessionRegistry()
+        sid = 'wf-T-517-abc12345-6789-4abc-9def-0123456789ab'
+        session = reg.create(
+            session_id=sid,
+            ticket_id='T-517',
+            command='implement',
+            work_dir=td,
+        )
+
+        assert session.channel.persist_path == str(
+            Path(td) / 'workflow-events.jsonl'
+        )
+        assert Path(session.channel.persist_path).exists()
+
+
+def test_board_startup_does_not_create_v2_workflow_sessions_root() -> None:
+    """The board app no longer initializes the old .workflow-sessions-v2 cache."""
+    app_src = (
+        Path(__file__).resolve().parents[3].parent
+        / ".agent-factory"
+        / "board"
+        / "server"
+        / "app.py"
+    ).read_text(encoding="utf-8")
+
+    assert "os.makedirs(v2_sessions_dir" not in app_src
+    assert ".workflow-sessions-v2" not in app_src

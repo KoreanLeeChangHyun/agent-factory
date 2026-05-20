@@ -89,7 +89,8 @@ class V2WorkflowSessionRegistry:
     thread-safe 하게 세션을 생성·조회·삭제한다.
     v1 WorkflowSessionRegistry 와 별도 (workflow_registry / v2_workflow_registry 이원화).
 
-    persist 디렉터리는 `.agent-factory/.workflow-sessions-v2/` (v1 과 분리).
+    기본 persist 위치는 각 run 의 `workflow-events.jsonl` 이다.
+    `persist_dir` 는 테스트와 legacy 복원 경로용 호환 옵션으로만 사용한다.
     """
 
     def __init__(self, persist_dir: str | None = None) -> None:
@@ -107,11 +108,13 @@ class V2WorkflowSessionRegistry:
             except OSError:
                 self._persist_dir = None
 
-    def _session_file(self, session_id: str) -> str | None:
+    def _session_file(self, session_id: str, work_dir: str = '') -> str | None:
         """세션 NDJSON 파일 경로를 반환한다."""
-        if self._persist_dir is None:
+        if self._persist_dir is not None:
+            return os.path.join(self._persist_dir, f'{session_id}.jsonl')
+        if not work_dir:
             return None
-        return os.path.join(self._persist_dir, f'{session_id}.jsonl')
+        return os.path.join(work_dir, 'workflow-events.jsonl')
 
     def create(
         self,
@@ -152,7 +155,7 @@ class V2WorkflowSessionRegistry:
             if existing is not None:
                 return existing
 
-        persist_path = self._session_file(session_id)
+        persist_path = self._session_file(session_id, work_dir)
         # circular import 회피 — 런타임 import
         from .v2_sse_channel import V2WorkflowSSEChannel
         channel = V2WorkflowSSEChannel(session_id=session_id, persist_path=persist_path)
@@ -168,6 +171,7 @@ class V2WorkflowSessionRegistry:
 
         if persist_path is not None:
             try:
+                os.makedirs(os.path.dirname(persist_path), exist_ok=True)
                 meta = {
                     '_meta': {
                         'session_id': session_id,
@@ -215,16 +219,19 @@ class V2WorkflowSessionRegistry:
 
     def purge(self, session_id: str) -> bool:
         """세션을 레지스트리 + 디스크에서 완전히 제거한다."""
+        session = self.get(session_id)
+        persist_path = session.channel.persist_path if session is not None else None
         removed = self.remove(session_id)
-        if removed and self._persist_dir is not None:
-            fpath = self._session_file(session_id)
-            if fpath and os.path.exists(fpath):
+        if removed:
+            if self._persist_dir is not None:
+                persist_path = self._session_file(session_id)
+            if persist_path and os.path.exists(persist_path):
                 try:
-                    os.remove(fpath)
+                    os.remove(persist_path)
                 except OSError as exc:
                     logger.error(
                         "v2_workflow_session[%s]: 파일 삭제 실패 (%s): %s",
-                        session_id, fpath, exc,
+                        session_id, persist_path, exc,
                     )
         return removed
 

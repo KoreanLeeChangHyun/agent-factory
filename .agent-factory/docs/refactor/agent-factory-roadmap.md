@@ -706,12 +706,47 @@ python3 -m pytest engine/flow/tests/test_kanban_done_handler.py  # 5 passed
 python3 -m pytest  # 375 passed, 2 skipped
 ```
 
+### M18: Workflow Session Persist Cleanup
+
+Status: complete
+
+Purpose:
+
+Stop using the root-level V2 workflow session cache and make V2 history follow
+the run-local artifact model.
+
+Tasks:
+
+- [x] move default V2 workflow event persistence to
+      `runs/<registry>/workflow-events.jsonl`
+- [x] stop board startup from creating `.agent-factory/.workflow-sessions-v2`
+- [x] keep explicit `persist_dir` support for tests and legacy registry
+      construction
+- [x] keep V2 history endpoint behavior backed by `session.channel.persist_path`
+- [x] ignore `.agent-factory/.workflow-sessions-v2/` if old local data exists
+- [x] add contract coverage for run-local V2 history persistence
+
+Acceptance criteria:
+
+- new V2 sessions do not require `.agent-factory/.workflow-sessions-v2`
+- V2 history endpoint tests still pass
+- V2 workflow session registry tests still pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_api_smoke.py  # 20 passed, 2 skipped
+python3 -m pytest board/tests/test_v2_workflow_phase1.py  # 28 passed
+python3 -m pytest  # 377 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18
 ```
 
 Hard dependencies:

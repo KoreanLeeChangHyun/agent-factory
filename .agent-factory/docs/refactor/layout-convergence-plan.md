@@ -154,7 +154,7 @@ Do not move these in early layout milestones:
 - `.agent-factory/board/server/http_router.py`: route stability matters.
 - `.agent-factory/engine/v2/driver.py`: keep as the active `flow-wf` entry until
   the services underneath it have moved.
-- `.agent-factory/runs`, `.agent-factory/tickets`, `.workflow-sessions*`,
+- `.agent-factory/runs`, `.agent-factory/tickets`,
   `.agent-factory/staging`: runtime data, not source layout.
 
 ## First Safe Move Candidates
@@ -403,7 +403,33 @@ Acceptance:
 - board API contracts pass
 - full pytest passes
 
-### M18: Hooks Boundary
+### M18: Workflow Session Persist Cleanup
+
+Status: complete
+
+Goal:
+
+Remove the root-level V2 workflow session cache from the active runtime path.
+
+Completed slice:
+
+- changed default V2 workflow event persistence to
+  `runs/<registry>/workflow-events.jsonl`
+- stopped board startup from creating `.agent-factory/.workflow-sessions-v2`
+- kept explicit `persist_dir` support for tests and legacy registry
+  construction
+- kept V2 history endpoint behavior backed by `session.channel.persist_path`
+- added `.agent-factory/.workflow-sessions-v2/` to `.gitignore`
+
+Acceptance:
+
+- V2 history endpoint tests pass
+- V2 workflow session registry tests pass
+- full pytest passes
+
+### M19: Hooks Boundary
+
+Status: pending
 
 Goal:
 
@@ -414,7 +440,7 @@ Acceptance:
 - hook regression tests pass
 - Claude Code settings continue to point to stable entry files
 
-### M19: Naming And Rebranding
+### M20: Naming And Rebranding
 
 Goal:
 
@@ -431,5 +457,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 366 passed, 2 skipped
+python3 -m pytest  # 377 passed, 2 skipped
 ```

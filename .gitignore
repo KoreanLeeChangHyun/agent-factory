@@ -11,6 +11,7 @@
 .agent-factory/board/data/
 .agent-factory/.board.url
 .agent-factory/.workflow-sessions/
+.agent-factory/.workflow-sessions-v2/
 .agent-factory/staging/
 .agent-factory/logs/
 .claude/scheduled_tasks.lock
