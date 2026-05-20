@@ -1,0 +1,2 @@
+"""Git adapter gateways."""
+

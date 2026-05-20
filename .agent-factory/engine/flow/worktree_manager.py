@@ -33,8 +33,20 @@ from datetime import datetime
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 )
+_agent_factory_dir: str = os.path.dirname(_engine_dir)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
+
+from engine.adapters.git.cli import run_git
+from engine.core.worktrees.paths import (
+    merge_lock_path,
+    normalize_ticket_number,
+    worktree_dir_name,
+    worktree_path_for_branch,
+    worktrees_base_dir,
+)
 
 from common import acquire_lock, read_env, release_lock, resolve_project_root
 from flow.branch_strategy import (
@@ -43,12 +55,6 @@ from flow.branch_strategy import (
     ensure_develop_branch,
     get_feature_branch_for_ticket,
 )
-
-# ─── 상수 ─────────────────────────────────────────────────────────────────────
-
-_WORKTREES_DIR_NAME: str = os.path.join(".agent-factory", "worktrees")
-_MERGE_LOCK_NAME: str = "worktree-merge.lockdir"
-
 
 # ─── 데이터 클래스 ────────────────────────────────────────────────────────────
 
@@ -107,8 +113,7 @@ def _git(
         CompletedProcess 인스턴스.
     """
     cwd = repo_path or resolve_project_root()
-    cmd = ["git", "-C", cwd] + list(args)
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return run_git(*args, repo_path=cwd, timeout=30)
 
 
 def _get_project_root(repo_path: str | None = None) -> str:
@@ -122,8 +127,7 @@ def _worktrees_base_dir(repo_path: str | None = None) -> str:
     Returns:
         프로젝트 루트 아래 .worktrees/ 절대 경로.
     """
-    root = _get_project_root(repo_path)
-    return os.path.join(root, _WORKTREES_DIR_NAME)
+    return str(worktrees_base_dir(_get_project_root(repo_path)))
 
 
 def _merge_lock_path(repo_path: str | None = None) -> str:
@@ -132,8 +136,7 @@ def _merge_lock_path(repo_path: str | None = None) -> str:
     Returns:
         .git/worktree-merge.lockdir 절대 경로.
     """
-    root = _get_project_root(repo_path)
-    return os.path.join(root, ".git", _MERGE_LOCK_NAME)
+    return str(merge_lock_path(_get_project_root(repo_path)))
 
 
 def _worktree_dir_name(branch_name: str) -> str:
@@ -147,7 +150,7 @@ def _worktree_dir_name(branch_name: str) -> str:
     Returns:
         디렉터리명 (슬래시 없음).
     """
-    return branch_name.replace("/", "-")
+    return worktree_dir_name(branch_name)
 
 
 def _get_current_branch(repo_path: str | None = None) -> str:
@@ -334,8 +337,7 @@ def _create_worktree_impl(
         return None
 
     # 티켓 번호 정규화
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    ticket_number = normalize_ticket_number(ticket_number)
 
     # develop 브랜치 확보
     if not ensure_develop_branch(repo_path):
@@ -351,9 +353,8 @@ def _create_worktree_impl(
         return None
 
     # worktree 디렉터리 경로
-    dir_name = _worktree_dir_name(branch_name)
     base_dir = _worktrees_base_dir(repo_path)
-    wt_path = os.path.join(base_dir, dir_name)
+    wt_path = str(worktree_path_for_branch(_get_project_root(repo_path), branch_name))
 
     # 이미 존재하는 worktree 확인
     if os.path.isdir(wt_path):
@@ -492,17 +493,14 @@ def _remove_worktree_impl(
     Returns:
         제거 성공(또는 이미 없음) 시 True, 실패 시 False.
     """
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    ticket_number = normalize_ticket_number(ticket_number)
 
     branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
     if not branch_name:
         # feature 브랜치가 없으면 worktree도 없을 것이므로 성공 처리
         return True
 
-    dir_name = _worktree_dir_name(branch_name)
-    base_dir = _worktrees_base_dir(repo_path)
-    wt_path = os.path.join(base_dir, dir_name)
+    wt_path = str(worktree_path_for_branch(_get_project_root(repo_path), branch_name))
 
     # worktree 잠금 해제 (--lock으로 생성했으므로)
     unlock_result = _git("worktree", "unlock", wt_path, repo_path=repo_path)
@@ -578,8 +576,7 @@ def _merge_to_develop_impl(
     Returns:
         MergeResult 인스턴스.
     """
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    ticket_number = normalize_ticket_number(ticket_number)
 
     # WORKFLOW_WORKTREE=false 환경에서 호출되면 메인 저장소 HEAD가
     # 사용자에게 수동 merge 명령어를 안내한다.
@@ -886,8 +883,7 @@ def get_worktree_path(
     Returns:
         worktree 절대 경로 또는 None.
     """
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    ticket_number = normalize_ticket_number(ticket_number)
 
     # 활성 worktree 목록에서 검색
     for wt in list_worktrees(repo_path):
@@ -897,8 +893,9 @@ def get_worktree_path(
     # 목록에 없으면 feature 브랜치명으로 경로 추론
     branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
     if branch_name:
-        dir_name = _worktree_dir_name(branch_name)
-        candidate = os.path.join(_worktrees_base_dir(repo_path), dir_name)
+        candidate = str(
+            worktree_path_for_branch(_get_project_root(repo_path), branch_name)
+        )
         if os.path.isdir(candidate):
             return candidate
 

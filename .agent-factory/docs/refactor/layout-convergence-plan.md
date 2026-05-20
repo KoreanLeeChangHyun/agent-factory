@@ -124,7 +124,7 @@ them. Avoid churn that only changes spelling.
 | Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
-| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/git` | `core/worktrees`, `adapters/git` | not aligned |
+| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py` | `application`/`apps/cli` + adapters | not aligned |
 | Board API | `board/server/handlers` | `engine/apps/board_api` or thin board handlers | not aligned |
 | Board web | `board/static` | `board/web` | not aligned |
@@ -355,14 +355,29 @@ Acceptance:
 
 ### M16: Worktree/Git Boundary
 
+Status: complete
+
 Goal:
 
 Separate git subprocess gateways from worktree domain decisions.
 
+Completed slice:
+
+- added `engine/adapters/git/cli.py` for git subprocess execution
+- added `engine/core/worktrees/paths.py` for pure ticket/path/lock rules
+- routed `flow.worktree_manager._git` through the git adapter
+- updated worktree path construction to use core worktree rules
+- kept `flow.worktree_manager._git` as the legacy patch point for existing
+  tests and callers
+- kept `flow-merge` and `flow-kanban` wrapper behavior stable
+
 Acceptance:
 
-- merge/undo/worktree tests pass
-- board done/undo contracts pass
+- canonical worktree/git boundary tests pass
+- board API smoke contracts pass
+- `flow-merge --help` passes
+- `flow-kanban list` passes
+- full pytest passes
 
 ### M17: Kanban And Board API Boundary
 

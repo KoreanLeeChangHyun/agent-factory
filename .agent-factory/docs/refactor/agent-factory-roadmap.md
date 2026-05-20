@@ -628,12 +628,51 @@ python3 -m pytest tests/application/reporting tests/adapters/v2/test_report_html
 python3 -m pytest  # 366 passed, 2 skipped
 ```
 
+### M16: Worktree/Git Boundary
+
+Status: complete
+
+Purpose:
+
+Start separating git subprocess gateways from worktree domain decisions without
+moving the active `flow-*` CLI contracts.
+
+Tasks:
+
+- [x] add `engine/adapters/git` as the git subprocess gateway
+- [x] route `flow.worktree_manager._git` through the git adapter while keeping
+      the old patchable helper for compatibility
+- [x] add `engine/core/worktrees` for pure ticket, branch, path, and lock-path
+      rules
+- [x] update `worktree_manager` to use core worktree rules for ticket
+      normalization and worktree path construction
+- [x] keep `flow-merge` and `flow-kanban` wrappers stable
+- [x] add focused adapter/domain tests for the new boundary
+
+Acceptance criteria:
+
+- git subprocess invocation is isolated behind `engine.adapters.git`
+- worktree path decisions are covered in `engine.core.worktrees`
+- existing worktree manager callers and patch-based tests can still use
+  `flow.worktree_manager._git`
+- `flow-merge --help` and `flow-kanban list` still run
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/domain/worktrees tests/adapters/git tests/adapters/v2/test_init_work_dir.py tests/application/v2/test_steps_init.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 25 passed, 2 skipped
+.agent-factory/bin/flow-merge --help  # exit 0
+.agent-factory/bin/flow-kanban list   # exit 0
+python3 -m pytest  # 370 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16
 ```
 
 Hard dependencies:
