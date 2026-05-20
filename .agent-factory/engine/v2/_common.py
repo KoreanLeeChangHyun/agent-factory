@@ -14,6 +14,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from engine.core.workflows import (
+    V2_STEP_TO_STAGE,
+    assert_valid_stage_transition,
+    canonicalize_v2_step,
+    stage_from_v2_step,
+)
+
 
 def _resolve_project_root() -> Path:
     """git common dir 의 부모 = 메인 워크트리 root. 워크트리에서 호출돼도 메인 측을 가리킨다."""
@@ -41,7 +48,7 @@ PROMPTS_DIR = ENGINE_V2_DIR / "prompts"
 TEMPLATES_DIR = ENGINE_V2_DIR / "templates"
 
 
-WORKFLOW_STEPS = ("NONE", "INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE", "FAILED")
+WORKFLOW_STEPS = tuple(V2_STEP_TO_STAGE)
 TERMINAL_STEPS = ("DONE", "FAILED")
 
 
@@ -302,7 +309,10 @@ def read_status(ctx: WorkflowContext) -> dict[str, Any]:
     path = ctx.status_json_path()
     if not path.exists():
         return {"workflow_step": "NONE", "transitions": []}
-    return json.loads(path.read_text(encoding="utf-8"))
+    status = json.loads(path.read_text(encoding="utf-8"))
+    if "workflow_step" not in status and "workflow_stage" in status:
+        status["workflow_step"] = canonicalize_v2_step(str(status["workflow_stage"]))
+    return status
 
 
 def write_status(ctx: WorkflowContext, status: dict[str, Any]) -> None:
@@ -317,14 +327,23 @@ def update_step(ctx: WorkflowContext, prev: str, nxt: str, *, note: str = "") ->
 
     SPEC.md §3.3 — driver 가 룰베이스로 전이 결정.
     """
-    if nxt not in WORKFLOW_STEPS:
-        raise ValueError(f"unknown step: {nxt}")
+    prev = canonicalize_v2_step(prev)
+    nxt = canonicalize_v2_step(nxt)
+    prev_stage = stage_from_v2_step(prev)
+    next_stage = stage_from_v2_step(nxt)
+    if prev != "NONE":
+        assert_valid_stage_transition(prev_stage, next_stage)
+    elif nxt not in {"INIT", "PLAN", "FAILED"}:
+        raise ValueError("illegal workflow step transition NONE -> " + nxt)
     status = read_status(ctx)
     status["workflow_step"] = nxt
+    status["workflow_stage"] = next_stage.value
     status.setdefault("transitions", []).append(
         {
             "from": prev,
             "to": nxt,
+            "from_stage": prev_stage.value,
+            "to_stage": next_stage.value,
             "ts": datetime.now().isoformat(timespec="seconds"),
             "note": note,
         }

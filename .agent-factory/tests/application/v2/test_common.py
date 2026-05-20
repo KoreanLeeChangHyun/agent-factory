@@ -132,6 +132,14 @@ def test_update_step_invalid_target(tmp_path: Path) -> None:
         update_step(ctx, "NONE", "BOGUS_STEP")
 
 
+def test_update_step_rejects_reordered_workflow_steps(tmp_path: Path) -> None:
+    ctx = _make_ctx(tmp_path)
+    write_status(ctx, {"workflow_step": "PLAN", "transitions": []})
+
+    with pytest.raises(ValueError, match="illegal workflow transition"):
+        update_step(ctx, "PLAN", "REPORT")
+
+
 def test_context_io_roundtrip(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     ctx.feature_branch = "feat/T-489"

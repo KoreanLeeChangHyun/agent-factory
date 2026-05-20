@@ -243,7 +243,7 @@ python3 -m pytest  # 328 passed, 2 skipped
 
 ### M4: Workflow Model
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -272,6 +272,12 @@ Acceptance criteria:
 - domain tests prove the six-stage order is enforced
 - orchestration cannot reorder stages
 - V2 status files can still be read during migration
+
+Current verification:
+
+```text
+python3 -m pytest tests/domain/workflows tests/application/v2/test_common.py
+```
 
 ### M5: Orchestration And Harness Engineering
 
