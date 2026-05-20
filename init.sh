@@ -80,7 +80,11 @@ rm -rf ".claude"; mv ".claude.new" ".claude"
 
 # 프로젝트 데이터 복원
 for cpd in "${claude_preserve_dirs[@]}"; do
-    [ -d "$tmp_dir/_claude_preserve_$cpd" ] && { mkdir -p ".claude/$(dirname "$cpd")"; cp -r "$tmp_dir/_claude_preserve_$cpd" ".claude/$cpd"; }
+    if [ -d "$tmp_dir/_claude_preserve_$cpd" ]; then
+        rm -rf ".claude/$cpd"
+        mkdir -p ".claude/$(dirname "$cpd")"
+        cp -a "$tmp_dir/_claude_preserve_$cpd" ".claude/$cpd"
+    fi
 done
 for cpf in "${claude_preserve_files[@]}"; do
     [ -f "$tmp_dir/_claude_preserve_$cpf" ] && cp "$tmp_dir/_claude_preserve_$cpf" ".claude/$cpf"
@@ -117,7 +121,11 @@ if [ -d "$SRC/.codex" ]; then
     rm -rf ".codex"; mv ".codex.new" ".codex"
 
     for cpd in "${codex_preserve_dirs[@]}"; do
-        [ -d "$tmp_dir/_codex_preserve_$cpd" ] && { mkdir -p ".codex/$(dirname "$cpd")"; cp -r "$tmp_dir/_codex_preserve_$cpd" ".codex/$cpd"; }
+        if [ -d "$tmp_dir/_codex_preserve_$cpd" ]; then
+            rm -rf ".codex/$cpd"
+            mkdir -p ".codex/$(dirname "$cpd")"
+            cp -a "$tmp_dir/_codex_preserve_$cpd" ".codex/$cpd"
+        fi
     done
     for cpf in "${codex_preserve_files[@]}"; do
         [ -f "$tmp_dir/_codex_preserve_$cpf" ] && cp "$tmp_dir/_codex_preserve_$cpf" ".codex/$cpf"
