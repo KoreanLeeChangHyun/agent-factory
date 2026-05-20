@@ -1,6 +1,6 @@
-"""v2 workflow engine — driver script + claude -p subprocess pipeline.
+"""Compatibility package for the Agent Factory production line.
 
-See engine/v2/SPEC.md (SSOT) for design canon.
+Runtime implementation moved to ``engine.apps.production_line``.
 """
 
 __version__ = "2.0.0"

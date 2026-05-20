@@ -1,22 +1,8 @@
-"""Compatibility exports for V2 plan loading."""
+"""Compatibility alias for ``engine.apps.production_line.core.plan_loader``."""
 
 from __future__ import annotations
 
-from engine.core.planning.loader import (
-    Phase,
-    Plan,
-    PlanLoaderError,
-    parse_plan_json,
-    topo_levels,
-    topo_sort,
-)
+import sys
+from importlib import import_module
 
-__all__ = [
-    "Phase",
-    "Plan",
-    "PlanLoaderError",
-    "parse_plan_json",
-    "topo_levels",
-    "topo_sort",
-]
-
+sys.modules[__name__] = import_module("engine.apps.production_line.core.plan_loader")
