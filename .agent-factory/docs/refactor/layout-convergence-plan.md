@@ -1696,10 +1696,36 @@ Acceptance:
 - architecture boundary tests pass
 - full pytest passes
 
+### M71: Move Settings Env Manager Into Filesystem Adapter
+
+Status: complete
+
+Goal:
+
+Move `.agent-factory/.settings` mutation logic out of `engine/flow` and into the
+filesystem adapter boundary.
+
+Completed slice:
+
+- moved `engine/flow/env_manager.py` to `engine/adapters/filesystem/settings.py`
+- added `engine/adapters/filesystem/__init__.py`
+- updated `engine/flow/update_state.py` to import the filesystem settings
+  adapter
+- added focused filesystem settings adapter tests
+- extended layout convergence tests to prevent the legacy flow env manager
+  source from returning
+
+Acceptance:
+
+- `update_state.py --help` executes from the repo root
+- filesystem settings adapter tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 838 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 841 passed, 2 skipped, 6 subtests passed
 ```

@@ -1,4 +1,4 @@
-"""env_manager.py - 환경변수 관리 모듈.
+"""settings.py - 환경변수 설정 파일 관리 어댑터.
 
 .agent-factory/.settings 파일의 환경 변수를 set/unset하는 책임을 담당한다.
 HOOK_*, GUARD_* 접두사 및 HOOKS_EDIT_ALLOWED 키만 허용하는
@@ -17,9 +17,9 @@ import shutil
 import sys
 import tempfile
 
-# scripts 디렉터리를 sys.path에 추가하여 common, data 패키지 import 허용
+# engine 디렉터리를 sys.path에 추가하여 common 모듈 import 허용
 _engine_dir: str = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)

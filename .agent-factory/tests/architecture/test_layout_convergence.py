@@ -107,3 +107,11 @@ def test_legacy_flow_usage_tracker_source_is_removed() -> None:
     assert not (
         repo_root / ".agent-factory" / "engine" / "flow" / "usage_tracker.py"
     ).exists()
+
+
+def test_legacy_flow_env_manager_source_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (
+        repo_root / ".agent-factory" / "engine" / "flow" / "env_manager.py"
+    ).exists()
