@@ -1125,12 +1125,47 @@ printf '{"hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{},"too
 python3 -m pytest  # 722 passed, 2 skipped, 6 subtests passed
 ```
 
+### M31: UserPromptSubmit Hook App Entrypoint
+
+Status: complete
+
+Purpose:
+
+Move UserPromptSubmit implementation into the hook app boundary while keeping
+the stable Claude Code hook path intact.
+
+Tasks:
+
+- [x] add `engine/apps/hooks/user_prompt_submit.py`
+- [x] move main-session guard logic behind the app entrypoint
+- [x] move dispatcher invocation and stdout passthrough behind the app entrypoint
+- [x] preserve graceful empty-output behavior for workflow sessions and
+      dispatcher import failures
+- [x] keep `.agent-factory/hooks/user-prompt-submit.py` as a compatibility
+      wrapper
+- [x] add focused UserPromptSubmit app tests
+
+Acceptance criteria:
+
+- UserPromptSubmit app tests pass
+- existing UserPromptSubmit flow tests pass
+- top-level UserPromptSubmit hook smoke passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_user_prompt_submit.py tests/application/flow/test_user_prompt_submit_hook.py  # 15 passed
+printf '{"hook_event_name":"UserPromptSubmit","cwd":"/home/deus/workspace/claude/.agent-factory/runs/20260508-123456"}' | python3 .agent-factory/hooks/user-prompt-submit.py  # exit 0, empty stdout
+python3 -m pytest  # 725 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31
 ```
 
 Hard dependencies:

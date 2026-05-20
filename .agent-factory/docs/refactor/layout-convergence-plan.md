@@ -728,10 +728,34 @@ Acceptance:
 - top-level `post-tool-use.py` smoke passes
 - full pytest passes
 
+### M31: UserPromptSubmit Hook App Entrypoint
+
+Status: complete
+
+Goal:
+
+Continue top-level hook thinning by moving UserPromptSubmit behavior into the
+`engine/apps/hooks` boundary.
+
+Completed slice:
+
+- added `engine/apps/hooks/user_prompt_submit.py`
+- moved main-session guard, dispatcher invocation, debug logging, and stdout
+  passthrough behind the hook app entrypoint
+- kept `.agent-factory/hooks/user-prompt-submit.py` as a compatibility wrapper
+- preserved `_is_main_session` re-export for existing tests and compatibility
+- added focused UserPromptSubmit app tests
+
+Acceptance:
+
+- UserPromptSubmit app and existing flow hook tests pass
+- top-level `user-prompt-submit.py` workflow-session smoke passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 722 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 725 passed, 2 skipped, 6 subtests passed
 ```
