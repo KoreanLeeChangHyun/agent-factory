@@ -1573,10 +1573,31 @@ Acceptance:
 - architecture boundary tests pass
 - full pytest passes
 
+### M66: Align Flow History Wrapper With Sync Adapter
+
+Status: complete
+
+Goal:
+
+Update the `flow-history` CLI wrapper after history sync moved to
+`engine/adapters/sync`.
+
+Completed slice:
+
+- updated `bin/flow-history` to execute
+  `engine/adapters/sync/history_sync.py`
+- added wrapper path regression coverage
+
+Acceptance:
+
+- `flow-history --help` executes from the repo root
+- sync adapter tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 825 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 826 passed, 2 skipped, 6 subtests passed
 ```
