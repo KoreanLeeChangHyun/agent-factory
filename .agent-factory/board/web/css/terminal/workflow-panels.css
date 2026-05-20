@@ -135,7 +135,7 @@
   border-color: rgba(244, 135, 113, 0.35);
 }
 
-/* VALIDATE step (v2 6단계) — amber 톤으로 테라코타와 구분 */
+/* VALIDATE step (production-line 6단계) — amber 톤으로 테라코타와 구분 */
 .wf-timeline-step[data-step="validate"].active {
   color: #dca74a;
   background: rgba(220, 167, 74, 0.12);
@@ -1333,12 +1333,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   Section 7: T-495 P3 — v2 stdout NDJSON branch rendering
-   Namespace: wf-v2-*  (workflow v2 전용 카드/배지)
+   Section 7: T-495 P3 — production-line stdout NDJSON branch rendering
+   Namespace: wf-production-line-*  (production-line workflow 전용 카드/배지)
    ═══════════════════════════════════════════════════════ */
 
 /* stdout text 라인 (assistant 본문) */
-.wf-v2-stdout-line {
+.wf-production-line-stdout-line {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 11px;
   line-height: 1.45;
@@ -1349,7 +1349,7 @@
 }
 
 /* tool_use 카드 — name + summary */
-.wf-v2-tool-use {
+.wf-production-line-tool-use {
   display: flex;
   gap: 6px;
   align-items: baseline;
@@ -1362,13 +1362,13 @@
   margin: 2px 0;
 }
 
-.wf-v2-tool-name {
+.wf-production-line-tool-name {
   color: #569cd6;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-.wf-v2-tool-summary {
+.wf-production-line-tool-summary {
   color: #b8d4f0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1376,7 +1376,7 @@
 }
 
 /* result 메타 카드 */
-.wf-v2-result-meta {
+.wf-production-line-result-meta {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 10.5px;
   padding: 3px 7px;
@@ -1387,24 +1387,24 @@
   border-left: 2px solid rgba(78, 201, 176, 0.40);
 }
 
-.wf-v2-result-meta[data-status="fail"] {
+.wf-production-line-result-meta[data-status="fail"] {
   background: rgba(244, 135, 113, 0.07);
   border-left-color: rgba(244, 135, 113, 0.45);
   color: #f0b8b8;
 }
 
-.wf-v2-result-label {
+.wf-production-line-result-label {
   color: #4ec9b0;
   font-weight: 600;
   margin-right: 4px;
 }
 
-.wf-v2-result-meta[data-status="fail"] .wf-v2-result-label {
+.wf-production-line-result-meta[data-status="fail"] .wf-production-line-result-label {
   color: #f48771;
 }
 
 /* system init 카드 */
-.wf-v2-system-init {
+.wf-production-line-system-init {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 10.5px;
   padding: 3px 7px;
@@ -1415,15 +1415,15 @@
   border-radius: 2px;
 }
 
-.wf-v2-system-label {
+.wf-production-line-system-label {
   color: #9cdcfe;
   font-weight: 600;
   margin-right: 4px;
 }
 
 /* warning (rate_limit) / regression 마커 */
-.wf-v2-warning,
-.wf-v2-regression {
+.wf-production-line-warning,
+.wf-production-line-regression {
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
   font-size: 10.5px;
   padding: 3px 7px;
@@ -1434,15 +1434,15 @@
   color: #dcb368;
 }
 
-.wf-v2-regression {
+.wf-production-line-regression {
   background: rgba(244, 135, 113, 0.12);
   border-left-color: rgba(244, 135, 113, 0.55);
   color: #f48771;
   font-weight: 600;
 }
 
-.wf-v2-warning-label,
-.wf-v2-regression-label {
+.wf-production-line-warning-label,
+.wf-production-line-regression-label {
   font-weight: 700;
   margin-right: 4px;
 }
@@ -1528,10 +1528,10 @@
    Section 9: T-495 P3 — meta badges (verdict / commit / retry / regression)
    ═══════════════════════════════════════════════════════ */
 
-.wf-v2-verdict-badge,
-.wf-v2-commit-badge,
-.wf-v2-retry-badge,
-.wf-v2-regression-badge {
+.wf-production-line-verdict-badge,
+.wf-production-line-commit-badge,
+.wf-production-line-retry-badge,
+.wf-production-line-regression-badge {
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
@@ -1544,43 +1544,43 @@
   white-space: nowrap;
 }
 
-.wf-v2-verdict-badge.pass {
+.wf-production-line-verdict-badge.pass {
   color: #4ec9b0;
   background: rgba(78, 201, 176, 0.12);
   border: 1px solid rgba(78, 201, 176, 0.40);
 }
 
-.wf-v2-verdict-badge.warn {
+.wf-production-line-verdict-badge.warn {
   color: #dcb368;
   background: rgba(220, 167, 74, 0.12);
   border: 1px solid rgba(220, 167, 74, 0.40);
 }
 
-.wf-v2-verdict-badge.fail {
+.wf-production-line-verdict-badge.fail {
   color: #f48771;
   background: rgba(244, 135, 113, 0.12);
   border: 1px solid rgba(244, 135, 113, 0.45);
 }
 
-.wf-v2-verdict-badge.skip {
+.wf-production-line-verdict-badge.skip {
   color: #858585;
   background: rgba(133, 133, 133, 0.08);
   border: 1px solid rgba(133, 133, 133, 0.30);
 }
 
-.wf-v2-commit-badge {
+.wf-production-line-commit-badge {
   color: #9cdcfe;
   background: rgba(156, 220, 254, 0.10);
   border: 1px solid rgba(156, 220, 254, 0.30);
 }
 
-.wf-v2-retry-badge {
+.wf-production-line-retry-badge {
   color: #c586c0;
   background: rgba(197, 134, 192, 0.10);
   border: 1px solid rgba(197, 134, 192, 0.30);
 }
 
-.wf-v2-regression-badge {
+.wf-production-line-regression-badge {
   color: #f48771;
   background: rgba(244, 135, 113, 0.12);
   border: 1px solid rgba(244, 135, 113, 0.45);
@@ -1590,7 +1590,7 @@
    Section 10: T-495 P3 — viewer overlay (artifact / log / metrics)
    ═══════════════════════════════════════════════════════ */
 
-.wf-v2-viewer-btn {
+.wf-production-line-viewer-btn {
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
@@ -1606,12 +1606,12 @@
   cursor: pointer;
 }
 
-.wf-v2-viewer-btn:hover {
+.wf-production-line-viewer-btn:hover {
   background: rgba(156, 220, 254, 0.16);
   border-color: rgba(156, 220, 254, 0.50);
 }
 
-.wf-v2-viewer {
+.wf-production-line-viewer {
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -1627,11 +1627,11 @@
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-.wf-v2-viewer.hidden {
+.wf-production-line-viewer.hidden {
   display: none;
 }
 
-.wf-v2-viewer-header {
+.wf-production-line-viewer-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1644,7 +1644,7 @@
   flex-shrink: 0;
 }
 
-.wf-v2-viewer-title {
+.wf-production-line-viewer-title {
   font-weight: 700;
   color: #D97757;
   flex: 0 0 auto;
@@ -1654,7 +1654,7 @@
   white-space: nowrap;
 }
 
-.wf-v2-viewer-meta {
+.wf-production-line-viewer-meta {
   color: #858585;
   flex: 1 1 auto;
   font-size: 10px;
@@ -1663,9 +1663,9 @@
   white-space: nowrap;
 }
 
-.wf-v2-viewer-refresh,
-.wf-v2-viewer-newtab,
-.wf-v2-viewer-close {
+.wf-production-line-viewer-refresh,
+.wf-production-line-viewer-newtab,
+.wf-production-line-viewer-close {
   background: transparent;
   border: 1px solid #3c3c3c;
   color: #cccccc;
@@ -1677,19 +1677,19 @@
   line-height: 1.4;
 }
 
-.wf-v2-viewer-refresh:hover,
-.wf-v2-viewer-newtab:hover,
-.wf-v2-viewer-close:hover {
+.wf-production-line-viewer-refresh:hover,
+.wf-production-line-viewer-newtab:hover,
+.wf-production-line-viewer-close:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: #5a5a5a;
 }
 
-.wf-v2-viewer-close:hover {
+.wf-production-line-viewer-close:hover {
   color: #f48771;
   border-color: rgba(244, 135, 113, 0.45);
 }
 
-.wf-v2-viewer-body {
+.wf-production-line-viewer-body {
   flex: 1 1 auto;
   margin: 0;
   padding: 10px 12px;

@@ -1,7 +1,7 @@
-"""V2WorkflowSSEChannel — per-session NDJSON broadcast + jsonl persist.
+"""ProductionLineSSEChannel — per-session NDJSON broadcast + jsonl persist.
 
-v1 TerminalSSEChannel 과 분리된 v2 driver 전용 SSE 채널.
-한 V2WorkflowSession 당 하나의 채널 인스턴스가 할당된다.
+v1 TerminalSSEChannel 과 분리된 production-line 전용 SSE 채널.
+한 ProductionLineSession 당 하나의 채널 인스턴스가 할당된다.
 
 driver 가 의미별 endpoint (`/step`, `/stdout`, `/phase`, `/finish`) 를 호출하므로
 broadcast 자체는 단순 forward — 의미 분류 (text_delta / tool_use 등) 는
@@ -17,8 +17,8 @@ import time
 from ._common import logger
 
 
-class V2WorkflowSSEChannel:
-    """v2 driver 전용 SSE 채널 — per-session client fan-out.
+class ProductionLineSSEChannel:
+    """production-line 전용 SSE 채널 — per-session client fan-out.
 
     Attributes:
         session_id: 소유 세션 ID (wf-T-NNN-<uuid>)
@@ -109,7 +109,7 @@ class V2WorkflowSSEChannel:
                         f.write(line)
             except (OSError, TypeError) as exc:
                 logger.error(
-                    "v2_sse_channel[%s]: persist 쓰기 실패 (%s): %s",
+                    "production_line_sse_channel[%s]: persist 쓰기 실패 (%s): %s",
                     self.session_id, self._persist_path, exc,
                 )
 

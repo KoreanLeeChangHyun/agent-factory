@@ -1037,19 +1037,19 @@
     });
   }
 
-  // ── v2 driver session 진입점 ──
+  // ── production-line session 진입점 ──
 
-  /** @type {{close: function, sessionId: string}|null} 현재 활성 v2 구독 핸들 */
-  var _v2Subscription = null;
+  /** @type {{close: function, sessionId: string}|null} 현재 활성 production-line 구독 핸들 */
+  var _productionLineSubscription = null;
 
   /**
-   * v2 driver session 시작 / 재진입.
+   * production-line session 시작 / 재진입.
    *
-   * Board.v2Workflow.subscribe 로 4종 SSE 이벤트 핸들 직접 등록 (T-507 P3
-   * 에서 옛 v2-stdout-bridge.js 우회 모듈 폐기 → session.js 단일 흡수점).
+   * Board.productionLineWorkflow.subscribe 로 4종 SSE 이벤트 핸들 직접 등록 (T-507 P3
+   * 에서 옛 production-line-stdout-bridge.js 우회 모듈 폐기 → session.js 단일 흡수점).
    *
    *   workflow_step   → Board.stepOverlay (Step/Phase 위계 + 종결 처리)
-   *   workflow_stdout → _onV2Stdout (text/raw 분기 렌더)
+   *   workflow_stdout → _onProductionLineStdout (text/raw 분기 렌더)
    *                     + Board.stepOverlay.handleStdout (Step/Phase 안 stdout 컨테이너 forward)
    *   workflow_phase  → Board.stepOverlay
    *   workflow_finish → Board.stepOverlay + 워크플로우 종결 UI
@@ -1060,13 +1060,13 @@
    *
    * @param {string} sessionId
    */
-  function _startV2WorkflowSession(sessionId) {
+  function _startProductionLineWorkflowSession(sessionId) {
     if (!sessionId) return;
 
-    // 기존 v2 구독 정리
-    if (_v2Subscription) {
-      try { _v2Subscription.close(); } catch (_) {}
-      _v2Subscription = null;
+    // 기존 production-line 구독 정리
+    if (_productionLineSubscription) {
+      try { _productionLineSubscription.close(); } catch (_) {}
+      _productionLineSubscription = null;
     }
 
     // Step/Phase 위계 별 구독 — stepOverlay 가 자체 _stepMap 머신 유지
@@ -1077,19 +1077,19 @@
     // T-508 — localStorage fallback 으로 step/phase ts 우선 복원 (fetchSession 전).
     // 새로고침 직후 backend GET 응답 도착 전 첫 render 가 0 elapsed 로 깜빡이는
     // 회귀 차단. fetchSession 응답이 도착하면 더 새로운 ts 로 덮어쓰기 (가드 내장).
-    if (Board.WorkflowRenderer && Board.WorkflowRenderer.restoreV2State) {
-      try { Board.WorkflowRenderer.restoreV2State(); } catch (_) {}
+    if (Board.WorkflowRenderer && Board.WorkflowRenderer.restoreProductionLineState) {
+      try { Board.WorkflowRenderer.restoreProductionLineState(); } catch (_) {}
     }
 
     // 1) 상세 fetch — 진입 시점의 step/phase 복원 (멱등)
-    if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
-      Board.v2Workflow.fetchSession(sessionId).then(function (detail) {
+    if (Board.productionLineWorkflow && Board.productionLineWorkflow.fetchSession) {
+      Board.productionLineWorkflow.fetchSession(sessionId).then(function (detail) {
         if (!detail) return;
-        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleV2StepEvent) {
+        if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleProductionLineStepEvent) {
           // T-508 — backend 응답의 cycle_start_ts / step_ts 를 payload 에 명시 전달.
-          // workflow-bar.js handleV2StepEvent 가 ts 를 흡수해 _state.stepTimestamps
+          // workflow-bar.js handleProductionLineStepEvent 가 ts 를 흡수해 _state.stepTimestamps
           // 의 start 를 외부 ts 로 세팅 (Date.now() fallback 차단).
-          Board.WorkflowRenderer.handleV2StepEvent({
+          Board.WorkflowRenderer.handleProductionLineStepEvent({
             session_id: detail.session_id,
             step: detail.current_step,
             phase: detail.current_phase,
@@ -1105,14 +1105,14 @@
     }
 
     // 2) SSE 구독
-    if (!Board.v2Workflow || !Board.v2Workflow.subscribe) {
+    if (!Board.productionLineWorkflow || !Board.productionLineWorkflow.subscribe) {
       _ctx.appendErrorMessage(
-        "[Error] Board.v2Workflow 미로드 — terminal.html script 누락 확인 필요"
+        "[Error] Board.productionLineWorkflow 미로드 — terminal.html script 누락 확인 필요"
       );
       return;
     }
 
-    _v2Subscription = Board.v2Workflow.subscribe(sessionId, {
+    _productionLineSubscription = Board.productionLineWorkflow.subscribe(sessionId, {
       onOpen: function () {
         Board.state.termConnected = true;
         Board.state.setTermStatus("running");
@@ -1126,12 +1126,12 @@
         }
       },
       onStdout: function (data) {
-        _onV2Stdout(data);
-        // T-507 P3 — 옛 v2-stdout-bridge.js 의 forward 책임 흡수.
+        _onProductionLineStdout(data);
+        // T-507 P3 — 옛 production-line-stdout-bridge.js 의 forward 책임 흡수.
         // step-overlay 가 현재 활성 Step/Phase 의 stdout 컨테이너에 렌더.
         if (Board.stepOverlay && typeof Board.stepOverlay.handleStdout === "function") {
           try { Board.stepOverlay.handleStdout(data); } catch (err) {
-            if (Board.debugLog) Board.debugLog("v2.stdout.forward.error", {
+            if (Board.debugLog) Board.debugLog("production_line.stdout.forward.error", {
               sessionId: sessionId, message: err && err.message
             });
           }
@@ -1158,7 +1158,7 @@
       onError: function (err) {
         Board.state.termConnected = false;
         _ctx.updateControlBar();
-        if (Board.debugLog) Board.debugLog("v2.sse.error", {
+        if (Board.debugLog) Board.debugLog("production_line.sse.error", {
           sessionId: sessionId,
           message: err && err.message,
         });
@@ -1167,7 +1167,7 @@
   }
 
   /**
-   * v2 workflow_stdout 이벤트 처리 (T-495 P3 — NDJSON 분기 렌더).
+   * production-line workflow_stdout 이벤트 처리 (T-495 P3 — NDJSON 분기 렌더).
    * payload: { session_id, text, raw? }
    *
    * raw.type 별 분기 (가시성 8축 #3):
@@ -1183,15 +1183,15 @@
    *
    * @param {Object} data
    */
-  function _onV2Stdout(data) {
+  function _onProductionLineStdout(data) {
     if (!data) return;
     var text = data.text || "";
     var raw = data.raw || null;
 
     if (!raw || typeof raw !== "object") {
       if (text) {
-        _v2DetectAndMarkRegression(text);
-        _v2AppendStdoutText(text);
+        _productionLineDetectAndMarkRegression(text);
+        _productionLineAppendStdoutText(text);
       }
       return;
     }
@@ -1199,18 +1199,18 @@
     var rawType = raw.type || "";
 
     if (rawType === "assistant") {
-      _v2RenderAssistant(raw, text);
+      _productionLineRenderAssistant(raw, text);
     } else if (rawType === "tool_use") {
-      _v2RenderToolUse(raw);
+      _productionLineRenderToolUse(raw);
     } else if (rawType === "result") {
-      _v2RenderResult(raw);
+      _productionLineRenderResult(raw);
     } else if (rawType === "system") {
-      _v2RenderSystemInit(raw);
+      _productionLineRenderSystemInit(raw);
     } else if (rawType === "rate_limit_event") {
-      _v2RenderWarning("rate_limit", raw);
+      _productionLineRenderWarning("rate_limit", raw);
     } else if (text) {
-      _v2DetectAndMarkRegression(text);
-      _v2AppendStdoutText(text);
+      _productionLineDetectAndMarkRegression(text);
+      _productionLineAppendStdoutText(text);
     }
   }
 
@@ -1218,21 +1218,21 @@
    * assistant NDJSON line 렌더. content[] 순회하여 text 블록은 누적,
    * tool_use 블록은 카드로 표시.
    */
-  function _v2RenderAssistant(raw, textJoined) {
+  function _productionLineRenderAssistant(raw, textJoined) {
     var msg = raw && raw.message;
     var content = msg && Array.isArray(msg.content) ? msg.content : null;
     if (!content) {
-      if (textJoined) _v2AppendStdoutText(textJoined);
+      if (textJoined) _productionLineAppendStdoutText(textJoined);
       return;
     }
     for (var i = 0; i < content.length; i++) {
       var blk = content[i];
       if (!blk || typeof blk !== "object") continue;
       if (blk.type === "text" && blk.text) {
-        _v2DetectAndMarkRegression(blk.text);
-        _v2AppendStdoutText(blk.text);
+        _productionLineDetectAndMarkRegression(blk.text);
+        _productionLineAppendStdoutText(blk.text);
       } else if (blk.type === "tool_use") {
-        _v2RenderToolUse(blk);
+        _productionLineRenderToolUse(blk);
       }
     }
   }
@@ -1241,7 +1241,7 @@
    * tool_use 카드 렌더 — name + input 1줄 요약.
    * Bash 의 경우 command, Read/Edit 는 file_path, Grep 은 pattern 우선.
    */
-  function _v2RenderToolUse(blk) {
+  function _productionLineRenderToolUse(blk) {
     if (!blk) return;
     var name = blk.name || "tool";
     var input = blk.input || {};
@@ -1256,9 +1256,9 @@
 
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.insertToCurrentPanel) {
       try {
-        var html = '<div class="wf-v2-tool-use">'
-          + '<span class="wf-v2-tool-name">' + Board.util.esc(name) + '</span>'
-          + '<span class="wf-v2-tool-summary">' + Board.util.esc(summary) + '</span>'
+        var html = '<div class="wf-production-line-tool-use">'
+          + '<span class="wf-production-line-tool-name">' + Board.util.esc(name) + '</span>'
+          + '<span class="wf-production-line-tool-summary">' + Board.util.esc(summary) + '</span>'
           + '</div>';
         Board.WorkflowRenderer.insertToCurrentPanel(html);
       } catch (_) {}
@@ -1268,7 +1268,7 @@
   /**
    * result NDJSON 카드 — subtype + duration_ms + usage(in/out) + terminal_reason.
    */
-  function _v2RenderResult(raw) {
+  function _productionLineRenderResult(raw) {
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
     var subtype = raw.subtype || "";
     var parts = [];
@@ -1286,8 +1286,8 @@
     var statusClass = subtype === "success" ? "ok" : "fail";
     try {
       Board.WorkflowRenderer.insertToCurrentPanel(
-        '<div class="wf-v2-result-meta" data-status="' + Board.util.esc(statusClass) + '">'
-          + '<span class="wf-v2-result-label">[result]</span> '
+        '<div class="wf-production-line-result-meta" data-status="' + Board.util.esc(statusClass) + '">'
+          + '<span class="wf-production-line-result-label">[result]</span> '
           + Board.util.esc(parts.join(" · "))
           + '</div>'
       );
@@ -1295,7 +1295,7 @@
   }
 
   /** system init 1줄 요약 카드 — model/cwd/tools count. */
-  function _v2RenderSystemInit(raw) {
+  function _productionLineRenderSystemInit(raw) {
     if (raw.subtype !== "init") return;
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
     var pieces = [];
@@ -1304,8 +1304,8 @@
     if (Array.isArray(raw.tools)) pieces.push("tools=" + raw.tools.length);
     try {
       Board.WorkflowRenderer.insertToCurrentPanel(
-        '<div class="wf-v2-system-init">'
-          + '<span class="wf-v2-system-label">[init]</span> '
+        '<div class="wf-production-line-system-init">'
+          + '<span class="wf-production-line-system-label">[init]</span> '
           + Board.util.esc(pieces.join(" · "))
           + '</div>'
       );
@@ -1313,14 +1313,14 @@
   }
 
   /** rate_limit 등 stream-level warning 마커. */
-  function _v2RenderWarning(kind, raw) {
+  function _productionLineRenderWarning(kind, raw) {
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
     var summary = "";
     try { summary = JSON.stringify(raw).slice(0, 200); } catch (_) {}
     try {
       Board.WorkflowRenderer.insertToCurrentPanel(
-        '<div class="wf-v2-warning" data-kind="' + Board.util.esc(kind) + '">'
-          + '<span class="wf-v2-warning-label">[' + Board.util.esc(kind) + ']</span> '
+        '<div class="wf-production-line-warning" data-kind="' + Board.util.esc(kind) + '">'
+          + '<span class="wf-production-line-warning-label">[' + Board.util.esc(kind) + ']</span> '
           + Board.util.esc(summary)
           + '</div>'
       );
@@ -1333,7 +1333,7 @@
    * 5종 = worker_false_success / hook_deny / empty_bash_card /
    *       stage_header_leak / worktree_commit_missing
    */
-  var V2_REGRESSION_PATTERNS = [
+  var PRODUCTION_LINE_REGRESSION_PATTERNS = [
     { re: /worker_false_success/i,      label: "worker_false_success" },
     { re: /hook_deny|hookSpecificOutput.*deny/i, label: "hook_deny" },
     { re: /empty_bash_card/i,           label: "empty_bash_card" },
@@ -1342,16 +1342,16 @@
     { re: /\btool\.deny\b/i,            label: "tool.deny" }
   ];
 
-  function _v2DetectAndMarkRegression(text) {
+  function _productionLineDetectAndMarkRegression(text) {
     if (!text || !Board.WorkflowRenderer
         || !Board.WorkflowRenderer.insertToCurrentPanel) return;
-    for (var i = 0; i < V2_REGRESSION_PATTERNS.length; i++) {
-      var p = V2_REGRESSION_PATTERNS[i];
+    for (var i = 0; i < PRODUCTION_LINE_REGRESSION_PATTERNS.length; i++) {
+      var p = PRODUCTION_LINE_REGRESSION_PATTERNS[i];
       if (p.re.test(text)) {
         try {
           Board.WorkflowRenderer.insertToCurrentPanel(
-            '<div class="wf-v2-regression" data-pattern="' + Board.util.esc(p.label) + '">'
-              + '<span class="wf-v2-regression-label">[regression]</span> '
+            '<div class="wf-production-line-regression" data-pattern="' + Board.util.esc(p.label) + '">'
+              + '<span class="wf-production-line-regression-label">[regression]</span> '
               + Board.util.esc(p.label)
               + '</div>'
           );
@@ -1364,11 +1364,11 @@
   /**
    * stdout text 를 현재 활성 step 카드 본문에 append.
    */
-  function _v2AppendStdoutText(text) {
+  function _productionLineAppendStdoutText(text) {
     if (!text) return;
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.insertToCurrentPanel) {
       try {
-        var html = '<div class="wf-v2-stdout-line">'
+        var html = '<div class="wf-production-line-stdout-line">'
           + Board.util.esc(text) + '</div>';
         Board.WorkflowRenderer.insertToCurrentPanel(html);
       } catch (_) {}
@@ -1376,13 +1376,13 @@
   }
 
   /**
-   * v2 구독을 명시 종료 (세션 스위치 시 호출).
+   * production-line 구독을 명시 종료 (세션 스위치 시 호출).
    * Board.stepOverlay 의 독립 구독도 함께 정리.
    */
-  function _disconnectV2() {
-    if (_v2Subscription) {
-      try { _v2Subscription.close(); } catch (_) {}
-      _v2Subscription = null;
+  function _disconnectProductionLine() {
+    if (_productionLineSubscription) {
+      try { _productionLineSubscription.close(); } catch (_) {}
+      _productionLineSubscription = null;
     }
     if (Board.stepOverlay && typeof Board.stepOverlay.disconnect === "function") {
       try { Board.stepOverlay.disconnect(); } catch (_) {}
@@ -1810,8 +1810,8 @@
       termEventSource.close();
       termEventSource = null;
     }
-    // T-495 P2 — v2 구독도 함께 정리 (세션 스위치 race 차단)
-    _disconnectV2();
+    // T-495 P2 — production-line 구독도 함께 정리 (세션 스위치 race 차단)
+    _disconnectProductionLine();
     Board.state.termConnected = false;
   }
 
@@ -1918,11 +1918,11 @@
       _ctx.clearOutput();
       var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
 
-      // T-495 P2 — v2 driver 세션이면 Board.v2Workflow.subscribe 단일 진입점 사용.
+      // T-495 P2 — production-line 세션이면 Board.productionLineWorkflow.subscribe 단일 진입점 사용.
       // v1 의 /terminal/workflow/history + /terminal/workflow/events 흐름과 분리.
-      if (Board.v2Workflow && Board.v2Workflow.isV2SessionId &&
-          Board.v2Workflow.isV2SessionId(wfSessionId)) {
-        _startV2WorkflowSession(wfSessionId);
+      if (Board.productionLineWorkflow && Board.productionLineWorkflow.isProductionLineSessionId &&
+          Board.productionLineWorkflow.isProductionLineSessionId(wfSessionId)) {
+        _startProductionLineWorkflowSession(wfSessionId);
         return;
       }
 
@@ -2191,9 +2191,9 @@
     seedInFlightToolUse: seedInFlightToolUse,
     injectRestHistory: _injectRestHistory,
     applyRawModel: _applyRawModel,
-    // T-495 P2 — v2 driver session 진입점 (외부 호출용)
-    startV2Session: _startV2WorkflowSession,
-    disconnectV2: _disconnectV2,
+    // T-495 P2 — production-line session 진입점 (외부 호출용)
+    startProductionLineSession: _startProductionLineWorkflowSession,
+    disconnectProductionLine: _disconnectProductionLine,
     _bind: bind,
     _markSent: markSent
   };

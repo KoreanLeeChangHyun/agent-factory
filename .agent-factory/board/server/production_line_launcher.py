@@ -1,11 +1,11 @@
-"""v2 driver launcher — `flow-wf submit` subprocess spawn + reader thread 책임 모듈.
+"""production-line launcher — `flow-wf submit` subprocess spawn + reader thread 책임 모듈.
 
 T-500: kanban.py `_handle_kanban_submit` 본체에서 분리. handler 는 입력 validation +
-`spawn_v2_driver()` 위임 + JSON 응답만 담당하고, 본 모듈이 Popen / env 주입 /
+`spawn_production_line()` 위임 + JSON 응답만 담당하고, 본 모듈이 Popen / env 주입 /
 LAUNCH_PENDING + LAUNCH_STARTED 발사 / reader thread spawn 을 통째 담당한다.
 
 규약 (책임 분담):
-  - `spawn_v2_driver(ticket, command) -> dict`:
+  - `spawn_production_line(ticket, command) -> dict`:
       * 입력 validation 없음 (호출자 책임).
       * registry_key + session_id 사전 발급.
       * V2_BOARD_POST=true + V2_REGISTRY_KEY 자동 주입.
@@ -14,7 +14,7 @@ LAUNCH_PENDING + LAUNCH_STARTED 발사 / reader thread spawn 을 통째 담당�
       * reader thread spawn + `_LAUNCH_READER_THREADS` 등록.
       * 반환: `{ok, status, ticket, command, submitted_at, session_id}` (성공) /
               `{ok: False, error_kind, message}` (실패).
-  - `_v2_driver_reader_loop(proc, ticket, command, submitted_at)`:
+  - `_production_line_reader_loop(proc, ticket, command, submitted_at)`:
       * `proc.communicate()` 대기.
       * rc != 0 일 때만 LAUNCH_FAILED 발사 (rc == 0 은 driver workflow.finish SSE 가 처리).
       * finally 에서 thread 자기 자신을 `_LAUNCH_READER_THREADS` 에서 제거.
@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 # Popen.communicate 종료 시 thread 자체가 finally 에서 자기 자신을 제거한다.
 # v1 `_launch_reader_loop` (kanban.py) 도 동일 set 을 공유한다 — kanban.py 에서
-# `from board.server.v2_launcher import _LAUNCH_READER_THREADS, _LAUNCH_READER_LOCK`
+# `from board.server.production_line_launcher import _LAUNCH_READER_THREADS, _LAUNCH_READER_LOCK`
 # 로 import 한다.
 _LAUNCH_READER_THREADS: set[threading.Thread] = set()
 _LAUNCH_READER_LOCK: threading.Lock = threading.Lock()
@@ -56,7 +56,7 @@ def _emit_launch_event_safe(event: str, ticket: str, **kwargs: object) -> None:
     _emit_launch_event(event, ticket, **kwargs)
 
 
-def spawn_v2_driver(ticket: str, command: str) -> dict:
+def spawn_production_line(ticket: str, command: str) -> dict:
     """`flow-wf submit <ticket>` subprocess spawn + LAUNCH_PENDING/STARTED 발사.
 
     호출자 (kanban handler) 는 ticket / command validation 만 사전 수행하고
@@ -77,7 +77,7 @@ def spawn_v2_driver(ticket: str, command: str) -> dict:
 
     submitted_at = _now_utc()
     registry_key = submitted_at.strftime('%Y%m%d-%H%M%S')
-    v2_session_id = f'wf-{ticket}-{registry_key}'
+    production_line_session_id = f'wf-{ticket}-{registry_key}'
 
     env = dict(os.environ)
     env['V2_BOARD_POST'] = 'true'
@@ -110,26 +110,26 @@ def spawn_v2_driver(ticket: str, command: str) -> dict:
         'LAUNCH_PENDING', ticket,
         command=command,
         submitted_at=submitted_at.isoformat(),
-        session_id=v2_session_id,
+        session_id=production_line_session_id,
     )
 
-    # LAUNCH_STARTED — v2 driver spawn 성공 = 사이클 진입 보장.
+    # LAUNCH_STARTED — production-line spawn 성공 = 사이클 진입 보장.
     spawn_elapsed_ms = int(
         (_now_utc() - submitted_at).total_seconds() * 1000
     )
     _emit_launch_event_safe(
         'LAUNCH_STARTED', ticket,
-        session_id=v2_session_id,
-        mode='v2',
+        session_id=production_line_session_id,
+        mode='production_line',
         spawn_duration_ms=spawn_elapsed_ms,
         command=command,
     )
 
     # reader thread — driver 비정상 종료 시 LAUNCH_FAILED emit (회귀 검출).
     reader = threading.Thread(
-        target=_v2_driver_reader_loop,
+        target=_production_line_reader_loop,
         args=(proc, ticket, command, submitted_at),
-        name=f'v2-driver-reader-{ticket}',
+        name=f'production-line-reader-{ticket}',
         daemon=True,
     )
     with _LAUNCH_READER_LOCK:
@@ -142,17 +142,17 @@ def spawn_v2_driver(ticket: str, command: str) -> dict:
         'ticket': ticket,
         'command': command,
         'submitted_at': submitted_at.isoformat(),
-        'session_id': v2_session_id,
+        'session_id': production_line_session_id,
     }
 
 
-def _v2_driver_reader_loop(
+def _production_line_reader_loop(
     proc: subprocess.Popen,
     ticket: str,
     command: str,
     submitted_at: datetime,
 ) -> None:
-    """v2 driver subprocess 종료 시 rc != 0 일 때만 LAUNCH_FAILED emit.
+    """production-line subprocess 종료 시 rc != 0 일 때만 LAUNCH_FAILED emit.
 
     v1 `_launch_reader_loop` (kanban.py) 와 다름:
       - LAUNCH_STARTED 발사 X (submit handler 가 Popen 직후 즉시 발사).

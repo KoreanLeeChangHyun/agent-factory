@@ -10,7 +10,7 @@
  *
  * 책임 분리:
  *   - 본 모듈: Step/Phase 위계 DOM + fold/expand 자동 룰 + 상태 머신
- *   - v2-stdout-bridge: workflow_stdout 이벤트 → 본 모듈 handleStdout 으로 forward
+ *   - production-line-stdout-bridge: workflow_stdout 이벤트 → 본 모듈 handleStdout 으로 forward
  *   - session.js (무수정): 메인 터미널 stdout 렌더 (본 cycle 에서 미관여)
  *
  * 데이터 모델 (T-505 P1 §4):
@@ -33,7 +33,7 @@
  * SPEC §0.1 (LLM 자율 영역 비노출):
  *   spawn_mode / workers / acceptance_criteria 필드는 UI 비표시.
  *
- * Depends on: common.js (Board namespace), v2-workflow.js (subscribe API)
+ * Depends on: common.js (Board namespace), production-line-workflow.js (subscribe API)
  * Registers:  Board.stepOverlay
  */
 "use strict";
@@ -397,7 +397,7 @@
   }
 
   /**
-   * v2-stdout-bridge 가 호출하는 진입점. payload.raw 가 SDK NDJSON 1줄.
+   * production-line-stdout-bridge 가 호출하는 진입점. payload.raw 가 SDK NDJSON 1줄.
    * 현재 진행 중인 Step/Phase 의 [data-wf-stdout] 컨테이너에 stdout chunk
    * 또는 tool_use 카드 1줄을 append.
    *
@@ -472,18 +472,18 @@
   // ── SSE 구독 진입점 ──
 
   /**
-   * step / phase / finish 이벤트 구독. stdout 은 v2-stdout-bridge 가 forward.
+   * step / phase / finish 이벤트 구독. stdout 은 production-line-stdout-bridge 가 forward.
    *
    * @param {string} sessionId
    * @returns {boolean}
    */
   function subscribe(sessionId) {
     if (!sessionId) return false;
-    if (!Board.v2Workflow || typeof Board.v2Workflow.subscribe !== "function") return false;
+    if (!Board.productionLineWorkflow || typeof Board.productionLineWorkflow.subscribe !== "function") return false;
     if (_subscription && _activeSessionId === sessionId) return true;
     disconnect();
     _activeSessionId = sessionId;
-    _subscription = Board.v2Workflow.subscribe(sessionId, {
+    _subscription = Board.productionLineWorkflow.subscribe(sessionId, {
       onStep: _onStep,
       onPhase: _onPhase,
       onFinish: _onFinish

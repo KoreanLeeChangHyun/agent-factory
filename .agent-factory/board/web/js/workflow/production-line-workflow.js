@@ -1,9 +1,9 @@
 /**
- * @module v2-workflow
+ * @module production-line-workflow
  *
- * Board.v2Workflow — T-495 P2 frontend client for v2 driver subprocess.
+ * Board.productionLineWorkflow — T-495 P2 frontend client for production-line subprocess.
  *
- * v1 의 /terminal/workflow/events 단일 SSE 채널과 분리된 v2 전용 client.
+ * v1 의 /terminal/workflow/events 단일 SSE 채널과 분리된 production-line 전용 client.
  * backend 의 7 endpoint 와 1:1 매핑:
  *   GET  /api/v2/sessions                       — list
  *   GET  /api/v2/sessions/<id>                  — detail (current_step / phase / artifacts / ts)
@@ -18,14 +18,14 @@
  *   workflow_finish  — 사이클 종결
  *
  * Depends on: common.js (Board namespace)
- * Registers:  Board.v2Workflow
+ * Registers:  Board.productionLineWorkflow
  *
  * 공개 API:
  *   fetchSessions()                  → Promise<Array<sessionMeta>>
  *   fetchSession(sessionId)          → Promise<sessionDetail|null>
  *   fetchArtifact(sessionId, relPath) → Promise<string|null>
  *   subscribe(sessionId, handlers)   → { close, sessionId }
- *   isV2SessionId(sessionId)         → boolean
+ *   isProductionLineSessionId(sessionId)         → boolean
  *
  * handlers 매개변수 shape (모두 optional):
  *   {
@@ -43,8 +43,8 @@
 
   // ── 상수 ──
 
-  /** v2 session_id 패턴 — `wf-T-NNN-<registry_key>`. v1 도 같은 prefix 라 backend 가 권위. */
-  var V2_SESSION_PREFIX = "wf-";
+  /** production-line session_id 패턴 — `wf-T-NNN-<registry_key>`. v1 도 같은 prefix 라 backend 가 권위. */
+  var PRODUCTION_LINE_SESSION_PREFIX = "wf-";
 
   /** SSE 재연결 간격 (ms) — v1 session.js 와 동일. */
   var SSE_RECONNECT_INTERVAL = 3000;
@@ -62,7 +62,7 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     }).catch(function (err) {
-      console.error("[v2-workflow] fetch failed:", url, err);
+      console.error("[production-line-workflow] fetch failed:", url, err);
       return null;
     });
   }
@@ -78,7 +78,7 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.text();
     }).catch(function (err) {
-      console.error("[v2-workflow] fetch text failed:", url, err);
+      console.error("[production-line-workflow] fetch text failed:", url, err);
       return null;
     });
   }
@@ -91,7 +91,7 @@
     try {
       return JSON.parse(raw);
     } catch (err) {
-      console.error("[v2-workflow] SSE parse error:", err, raw);
+      console.error("[production-line-workflow] SSE parse error:", err, raw);
       return null;
     }
   }
@@ -99,7 +99,7 @@
   // ── REST API ──
 
   /**
-   * 전체 v2 세션 목록을 반환한다.
+   * 전체 production-line 세션 목록을 반환한다.
    * @returns {Promise<Array<{session_id, ticket_id, command, work_dir, worktree_path, status, current_step, current_phase, cycle_start_ts, step_ts, created_at}>>}
    */
   function fetchSessions() {
@@ -109,7 +109,7 @@
   }
 
   /**
-   * 단일 v2 세션의 상세 정보를 반환한다. 404 → null.
+   * 단일 production-line 세션의 상세 정보를 반환한다. 404 → null.
    * @param {string} sessionId
    * @returns {Promise<object|null>}
    */
@@ -165,7 +165,7 @@
   // ── SSE 구독 ──
 
   /**
-   * v2 driver 의 per-session SSE 스트림을 구독한다.
+   * production-line 의 per-session SSE 스트림을 구독한다.
    *
    * 단일 진입점 — handler 콜백으로 4 종 이벤트 분기 (workflow_step / stdout /
    * phase / finish). reconnect 는 EventSource 기본 동작에 위임 + 명시적 close 가능.
@@ -269,20 +269,20 @@
   // ── 분기 판정 ──
 
   /**
-   * sessionId 가 v2 backend 에 등록되어 있는지 캐시-우선 판정.
+   * sessionId 가 production-line backend 에 등록되어 있는지 캐시-우선 판정.
    * 즉시 사용을 위한 동기 helper — known set 에 없으면 false 반환.
    * 비동기 확인은 fetchSession 으로.
    *
    * @param {string} sessionId
    * @returns {boolean}
    */
-  function isV2SessionId(sessionId) {
+  function isProductionLineSessionId(sessionId) {
     if (!sessionId || typeof sessionId !== "string") return false;
     return _knownSessions.has(sessionId);
   }
 
   /**
-   * 외부 호출자가 backend 응답에서 알게 된 v2 session_id 를 등록한다.
+   * 외부 호출자가 backend 응답에서 알게 된 production-line session_id 를 등록한다.
    * (예: LAUNCH_STARTED 이벤트 payload, /api/v2/sessions 응답 등)
    * @param {string} sessionId
    */
@@ -293,7 +293,7 @@
   }
 
   /**
-   * 알려진 v2 세션 목록을 한번 동기화 (페이지 로드 시 호출 권장).
+   * 알려진 production-line 세션 목록을 한번 동기화 (페이지 로드 시 호출 권장).
    * @returns {Promise<Set<string>>}
    */
   function syncKnownSessions() {
@@ -307,13 +307,13 @@
 
   // ── 내부 상태 ──
 
-  /** @type {Set<string>} backend 에 등록된 v2 session_id 캐시 */
+  /** @type {Set<string>} backend 에 등록된 production-line session_id 캐시 */
   var _knownSessions = new Set();
 
   // ── Register on Board namespace ──
-  Board.v2Workflow = {
+  Board.productionLineWorkflow = {
     // 분기 판정
-    isV2SessionId: isV2SessionId,
+    isProductionLineSessionId: isProductionLineSessionId,
     registerKnown: registerKnown,
     syncKnownSessions: syncKnownSessions,
     // REST
@@ -325,14 +325,14 @@
     // SSE
     subscribe: subscribe,
     // 상수 노출 (테스트 / 디버그 용)
-    _V2_SESSION_PREFIX: V2_SESSION_PREFIX,
+    _PRODUCTION_LINE_SESSION_PREFIX: PRODUCTION_LINE_SESSION_PREFIX,
   };
 
   // 페이지 로드 시 known 캐시를 backend 와 한 번 동기화.
   // standalone (terminal.html) 에서는 본 모듈을 로드한 직후 즉시 동기화한다.
   if (typeof window !== "undefined") {
     syncKnownSessions().catch(function (err) {
-      console.error("[v2-workflow] initial sync failed:", err);
+      console.error("[production-line-workflow] initial sync failed:", err);
     });
   }
 })();

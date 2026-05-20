@@ -92,7 +92,7 @@ class BoardHTTPRequestHandler(
             self._handle_terminal_history()
         elif self.path == '/api/kanban/branch/active':
             self._handle_kanban_branch_active()
-        elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_get():
+        elif self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_get():
             return
         elif self.path == '/api/ops/sse-status':
             self._handle_ops_sse_status()
@@ -133,7 +133,7 @@ class BoardHTTPRequestHandler(
             self._handle_terminal_interrupt()
         elif self.path == '/terminal/kill':
             self._handle_terminal_kill()
-        elif self.path.startswith('/api/v2/sessions') and self._v2_dispatch_post():
+        elif self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_post():
             return
         elif self.path == '/terminal/command':
             self._handle_terminal_command()
@@ -182,9 +182,9 @@ class BoardHTTPRequestHandler(
         """DELETE 요청을 처리한다.
 
         T-511 P4 — DELETE 분기 4건을 generic.py `_handle_api_delete` dispatcher
-        에 위임 (inline 로직 X). v2 세션 DELETE 는 `_v2_dispatch_delete` 위임.
+        에 위임 (inline 로직 X). production-line 세션 DELETE 는 `_production_line_dispatch_delete` 위임.
         """
-        if self.path.startswith('/api/v2/sessions') and self._v2_dispatch_delete():
+        if self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_delete():
             return
         if self.path.startswith('/api/'):
             self._handle_api_delete()
@@ -195,10 +195,10 @@ class BoardHTTPRequestHandler(
     def do_PATCH(self) -> None:
         """PATCH 요청을 처리한다.
 
-        T-511 P4 — v2 세션 status 강제 갱신 (debug/recovery).
+        T-511 P4 — production-line 세션 status 강제 갱신 (debug/recovery).
         본 메서드는 SimpleHTTPRequestHandler 의 기본에는 없으므로 신설.
         """
-        if self.path.startswith('/api/v2/sessions') and self._v2_dispatch_patch():
+        if self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_patch():
             return
         self.send_response(404)
         self.end_headers()

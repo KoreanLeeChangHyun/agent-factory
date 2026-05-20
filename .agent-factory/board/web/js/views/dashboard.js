@@ -3,7 +3,7 @@
  *
  * Board SPA dashboard tab module.
  *
- * Handles dashboard data fetching from .dashboard/ markdown files,
+ * Handles dashboard data fetching from board/data JSON files,
  * KPI stats computation, Chart.js chart rendering (usage, command pie,
  * warn/error, skill frequency), and data table rendering with tabs.
  *
@@ -375,7 +375,7 @@ function navigateUsageChart(direction) {
  */
 function _rerenderUsageChartForWindow() {
   const data = Board.state.dashData || {};
-  const allRows = dashParseMdTableRows(data.usage || "");
+  const allRows = dashboardRows(data, "usage");
   const s = Board.state.usageChartState;
   const filtered = filterUsageRowsByWindow(allRows, s.window, s.anchorMs);
   renderUsageChart(filtered);
@@ -479,10 +479,43 @@ function fetchAllDashboardFiles() {
     if (!res.ok) return Board.state.dashData;
     return res.json();
   }).then(function (data) {
-    DASH_FILES.forEach(function (name) { Board.state.dashData[name] = data[name] || ""; });
+    DASH_FILES.forEach(function (name) {
+      Board.state.dashData[name] = normalizeDashboardTable(data[name]);
+    });
     Board.state.dashFetched = true;
     return Board.state.dashData;
   }).catch(function () { return Board.state.dashData; });
+}
+
+/**
+ * Normalizes dashboard table payloads.
+ * Canonical shape is { headers: Array<string>, rows: Array<Array<string>> }.
+ * String input is accepted only as a legacy Markdown fallback.
+ */
+function normalizeDashboardTable(payload) {
+  if (typeof payload === "string") {
+    return {
+      headers: dashParseMdTableHeader(payload),
+      rows: dashParseMdTableRows(payload),
+      source: "legacy-md",
+    };
+  }
+  if (!payload || typeof payload !== "object") {
+    return { headers: [], rows: [], source: "empty" };
+  }
+  return {
+    headers: Array.isArray(payload.headers) ? payload.headers : [],
+    rows: Array.isArray(payload.rows) ? payload.rows : [],
+    source: payload.source || "json",
+  };
+}
+
+function dashboardRows(data, name) {
+  return normalizeDashboardTable((data || {})[name]).rows;
+}
+
+function dashboardHeaders(data, name) {
+  return normalizeDashboardTable((data || {})[name]).headers;
 }
 
 // ── KPI Stats ──
@@ -493,8 +526,7 @@ function fetchAllDashboardFiles() {
  * @returns {Object} stats with totalWorkflows, totalTokens, warnErrors, topSkill
  */
 function computeKpiStats(data) {
-  // usage.md: count rows, sum last column (total tokens)
-  const usageRows = dashParseMdTableRows(data.usage || "");
+  const usageRows = dashboardRows(data, "usage");
   const totalWorkflows = usageRows.length;
   let totalTokens = 0;
   usageRows.forEach(function (cells) {
@@ -502,8 +534,7 @@ function computeKpiStats(data) {
     totalTokens += dashParseToken(last);
   });
 
-  // logs.md: count non-zero WARN (col 4) and ERROR (col 5)
-  const logsRows = dashParseMdTableRows(data.logs || "");
+  const logsRows = dashboardRows(data, "logs");
   let warnErrors = 0;
   logsRows.forEach(function (cells) {
     const warn = parseInt(cells[4] || "0", 10) || 0;
@@ -511,8 +542,7 @@ function computeKpiStats(data) {
     warnErrors += warn + error;
   });
 
-  // skills.md: count skill occurrences, find top skill
-  const skillsRows = dashParseMdTableRows(data.skills || "");
+  const skillsRows = dashboardRows(data, "skills");
   const skillCount = {};
   skillsRows.forEach(function (cells) {
     const skillList = cells[5] || "";
@@ -1499,12 +1529,12 @@ function renderDashboard() {
   let h = renderDashCards(stats);
 
   // Parse all data
-  const usageHeaders = dashParseMdTableHeader(Board.state.dashData.usage || "");
-  const usageRows = dashParseMdTableRows(Board.state.dashData.usage || "");
-  const logsHeaders = dashParseMdTableHeader(Board.state.dashData.logs || "");
-  const logsRows = dashParseMdTableRows(Board.state.dashData.logs || "");
-  const skillsHeaders = dashParseMdTableHeader(Board.state.dashData.skills || "");
-  const skillsRows = dashParseMdTableRows(Board.state.dashData.skills || "");
+  const usageHeaders = dashboardHeaders(Board.state.dashData, "usage");
+  const usageRows = dashboardRows(Board.state.dashData, "usage");
+  const logsHeaders = dashboardHeaders(Board.state.dashData, "logs");
+  const logsRows = dashboardRows(Board.state.dashData, "logs");
+  const skillsHeaders = dashboardHeaders(Board.state.dashData, "skills");
+  const skillsRows = dashboardRows(Board.state.dashData, "skills");
   // Normalize skills column: replace commas with <br> so each skill is on its own line
   skillsRows.forEach(function (cells) {
     if (cells[5]) {

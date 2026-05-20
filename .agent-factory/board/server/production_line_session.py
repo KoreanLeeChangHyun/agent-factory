@@ -1,7 +1,7 @@
-"""V2WorkflowSession + V2WorkflowSessionRegistry — v2 driver subprocess 전용 세션 모델.
+"""ProductionLineSession + ProductionLineSessionRegistry — production-line subprocess 전용 세션 모델.
 
 v1 WorkflowSession 과 분리된 별도 데이터 모델. ClaudeProcess 의존 0건.
-SSE fan-out 은 V2WorkflowSSEChannel 이 담당 (TerminalSSEChannel 과 분리).
+SSE fan-out 은 ProductionLineSSEChannel 이 담당 (TerminalSSEChannel 과 분리).
 
 driver subprocess 가 발급한 session_id 로 board 측이 명시 등록한다
 (POST /api/v2/sessions). lazy create 인프라는 폐기 — 모든 진입은 명시 POST.
@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from ._common import logger
 
 if TYPE_CHECKING:
-    from .v2_sse_channel import V2WorkflowSSEChannel
+    from .production_line_sse_channel import ProductionLineSSEChannel
 
 
 # fake/test session_id 패턴 — production registry 등록 + persist 차단.
@@ -42,15 +42,15 @@ def is_fake_session_id(session_id: str) -> bool:
 
 
 @dataclass
-class V2WorkflowSession:
-    """v2 driver subprocess 가 발급한 워크플로우 세션 메타.
+class ProductionLineSession:
+    """production-line subprocess 가 발급한 워크플로우 세션 메타.
 
     v1 WorkflowSession 과 다른 점:
     - ClaudeProcess 필드 제거 (driver subprocess 가 외부 process 로 실행)
     - status / current_step / current_phase / cycle_start_ts / step_ts 자체 보유
       (frontend 카운터 + 탭 가시성용)
     - artifacts dict 자체 보유 (생성된 산출물 경로 + size)
-    - channel 은 V2WorkflowSSEChannel 인스턴스 (TerminalSSEChannel 과 분리)
+    - channel 은 ProductionLineSSEChannel 인스턴스 (TerminalSSEChannel 과 분리)
 
     Attributes:
         session_id: driver 발급 세션 ID (wf-T-NNN-<uuid>)
@@ -64,7 +64,7 @@ class V2WorkflowSession:
         cycle_start_ts: 사이클 시작 epoch (frontend 사이클 누적 카운터)
         step_ts: 현재 step 진입 epoch (frontend step elapsed)
         artifacts: 산출물 경로 → 메타 dict (size, mtime)
-        channel: V2WorkflowSSEChannel 인스턴스
+        channel: ProductionLineSSEChannel 인스턴스
         created_at: ISO 시각
     """
 
@@ -72,7 +72,7 @@ class V2WorkflowSession:
     ticket_id: str
     command: str
     work_dir: str
-    channel: 'V2WorkflowSSEChannel' = field(repr=False)
+    channel: 'ProductionLineSSEChannel' = field(repr=False)
     worktree_path: str = ''
     status: str = 'idle'
     current_step: str = 'NONE'
@@ -83,11 +83,11 @@ class V2WorkflowSession:
     created_at: str = field(default_factory=lambda: time.strftime('%Y-%m-%dT%H:%M:%S'))
 
 
-class V2WorkflowSessionRegistry:
-    """v2 driver 세션 레지스트리.
+class ProductionLineSessionRegistry:
+    """production-line 세션 레지스트리.
 
     thread-safe 하게 세션을 생성·조회·삭제한다.
-    v1 WorkflowSessionRegistry 와 별도 (workflow_registry / v2_workflow_registry 이원화).
+    v1 WorkflowSessionRegistry 와 별도 (workflow_registry / production_line_registry 이원화).
 
     기본 persist 위치는 각 run 의 `workflow-events.jsonl` 이다.
     `persist_dir` 는 테스트와 legacy 복원 경로용 호환 옵션으로만 사용한다.
@@ -99,7 +99,7 @@ class V2WorkflowSessionRegistry:
         Args:
             persist_dir: 세션 jsonl 을 저장할 디렉터리. None 이면 persist 비활성.
         """
-        self._sessions: dict[str, V2WorkflowSession] = {}
+        self._sessions: dict[str, ProductionLineSession] = {}
         self._lock: threading.Lock = threading.Lock()
         self._persist_dir: str | None = persist_dir
         if self._persist_dir is not None:
@@ -123,7 +123,7 @@ class V2WorkflowSessionRegistry:
         command: str,
         work_dir: str,
         worktree_path: str = '',
-    ) -> V2WorkflowSession:
+    ) -> ProductionLineSession:
         """driver 가 발급한 session_id 로 세션을 명시 등록한다.
 
         동일 session_id 로 재호출 시 기존 세션 반환 (idempotent).
@@ -137,11 +137,11 @@ class V2WorkflowSessionRegistry:
             worktree_path: implement 전용 worktree 절대 경로 (research/review 시 빈 문자열)
 
         Returns:
-            등록된 V2WorkflowSession 인스턴스
+            등록된 ProductionLineSession 인스턴스
         """
         if is_fake_session_id(session_id):
             logger.warning(
-                "v2_workflow_session: fake/test session_id pattern detected (%s) — "
+                "production_line_session: fake/test session_id pattern detected (%s) — "
                 "registry 등록 거부 + persist skip (T-495 production endpoint 오염 차단)",
                 session_id,
             )
@@ -157,10 +157,10 @@ class V2WorkflowSessionRegistry:
 
         persist_path = self._session_file(session_id, work_dir)
         # circular import 회피 — 런타임 import
-        from .v2_sse_channel import V2WorkflowSSEChannel
-        channel = V2WorkflowSSEChannel(session_id=session_id, persist_path=persist_path)
+        from .production_line_sse_channel import ProductionLineSSEChannel
+        channel = ProductionLineSSEChannel(session_id=session_id, persist_path=persist_path)
 
-        session = V2WorkflowSession(
+        session = ProductionLineSession(
             session_id=session_id,
             ticket_id=ticket_id,
             command=command,
@@ -187,7 +187,7 @@ class V2WorkflowSessionRegistry:
                     f.write(json.dumps(meta, ensure_ascii=False) + '\n')
             except OSError as exc:
                 logger.error(
-                    "v2_workflow_session[%s]: meta persist 실패 (%s): %s",
+                    "production_line_session[%s]: meta persist 실패 (%s): %s",
                     session_id, persist_path, exc,
                 )
 
@@ -196,12 +196,12 @@ class V2WorkflowSessionRegistry:
 
         return session
 
-    def get(self, session_id: str) -> V2WorkflowSession | None:
+    def get(self, session_id: str) -> ProductionLineSession | None:
         """session_id 로 세션을 조회한다."""
         with self._lock:
             return self._sessions.get(session_id)
 
-    def get_by_ticket(self, ticket_id: str) -> V2WorkflowSession | None:
+    def get_by_ticket(self, ticket_id: str) -> ProductionLineSession | None:
         """티켓 ID 로 세션을 조회한다 (동일 티켓 다수 시 첫 매칭)."""
         with self._lock:
             for session in self._sessions.values():
@@ -230,7 +230,7 @@ class V2WorkflowSessionRegistry:
                     os.remove(persist_path)
                 except OSError as exc:
                     logger.error(
-                        "v2_workflow_session[%s]: 파일 삭제 실패 (%s): %s",
+                        "production_line_session[%s]: 파일 삭제 실패 (%s): %s",
                         session_id, persist_path, exc,
                     )
         return removed
@@ -266,7 +266,7 @@ class V2WorkflowSessionRegistry:
         session_id: str,
         step: str,
         phase: str = '',
-    ) -> V2WorkflowSession | None:
+    ) -> ProductionLineSession | None:
         """current_step + current_phase + step_ts 를 thread-safe 갱신한다.
 
         status 자동 매핑:
@@ -289,7 +289,7 @@ class V2WorkflowSessionRegistry:
                 session.status = 'running'
             return session
 
-    def set_status(self, session_id: str, status: str) -> V2WorkflowSession | None:
+    def set_status(self, session_id: str, status: str) -> ProductionLineSession | None:
         """status 를 명시 set 한다 (예: 외부 종결 신호)."""
         with self._lock:
             session = self._sessions.get(session_id)
@@ -303,7 +303,7 @@ class V2WorkflowSessionRegistry:
         session_id: str,
         path: str,
         size: int = 0,
-    ) -> V2WorkflowSession | None:
+    ) -> ProductionLineSession | None:
         """산출물 메타를 등록한다 (path → {size, mtime})."""
         with self._lock:
             session = self._sessions.get(session_id)
@@ -328,7 +328,7 @@ class V2WorkflowSessionRegistry:
         if self._persist_dir is None or not os.path.isdir(self._persist_dir):
             return 0
 
-        from .v2_sse_channel import V2WorkflowSSEChannel
+        from .production_line_sse_channel import ProductionLineSSEChannel
         loaded = 0
         for fname in sorted(os.listdir(self._persist_dir)):
             if not fname.endswith('.jsonl'):
@@ -350,8 +350,8 @@ class V2WorkflowSessionRegistry:
                 continue
 
             session_id = meta['session_id']
-            channel = V2WorkflowSSEChannel(session_id=session_id, persist_path=fpath)
-            session = V2WorkflowSession(
+            channel = ProductionLineSSEChannel(session_id=session_id, persist_path=fpath)
+            session = ProductionLineSession(
                 session_id=session_id,
                 ticket_id=meta.get('ticket_id', ''),
                 command=meta.get('command', ''),

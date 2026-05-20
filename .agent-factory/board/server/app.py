@@ -26,7 +26,7 @@ from .state import (
     poll_tracker,
     claude_process,
     workflow_registry,
-    v2_workflow_registry,
+    production_line_registry,
 )
 
 
@@ -100,9 +100,9 @@ def _run_server(project_root: str) -> None:
     # Legacy V1 workflow session cache is no longer created on startup.
     workflow_registry._persist_dir = None
 
-    # v2 workflow history is persisted per run under work_dir/workflow-events.jsonl.
+    # production-line workflow history is persisted per run under work_dir/workflow-events.jsonl.
     # The old root-level V2 session cache is no longer created on startup.
-    v2_workflow_registry._persist_dir = None
+    production_line_registry._persist_dir = None
 
     def _cleanup_runtime_files() -> None:
         """런타임 파일 .agent-factory/.board.url을 삭제한다."""

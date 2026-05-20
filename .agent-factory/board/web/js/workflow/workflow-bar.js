@@ -272,18 +272,18 @@
       _activeStepPanel = _getOrCreateStepPanel(_state.currentStep);
     }
 
-    // ── T-508 — v2 elapsed ts persist (localStorage fallback) ──
-    var V2_STATE_STORAGE_PREFIX = "wf_v2_state_";
+    // ── T-508 — production-line elapsed ts persist (localStorage fallback) ──
+    var PRODUCTION_LINE_STATE_STORAGE_PREFIX = "wf_production_line_state_";
 
     /**
-     * 현재 활성 v2 session id 추출 (Board._term.workflowSessionId).
+     * 현재 활성 production-line session id 추출 (Board._term.workflowSessionId).
      * 실패 시 null — storage 호출자가 skip.
      */
-    function _v2SessionId() {
+    function _productionLineSessionId() {
       try {
         var sid = Board._term && Board._term.workflowSessionId;
-        if (sid && Board.v2Workflow && Board.v2Workflow.isV2SessionId
-            && Board.v2Workflow.isV2SessionId(sid)) {
+        if (sid && Board.productionLineWorkflow && Board.productionLineWorkflow.isProductionLineSessionId
+            && Board.productionLineWorkflow.isProductionLineSessionId(sid)) {
           return sid;
         }
       } catch (_) {}
@@ -292,10 +292,10 @@
 
     /**
      * _state 의 step/phase ts 만 추출해 localStorage 에 write.
-     * v2 session 활성 시에만. v1 분기 영향 없음.
+     * production-line session 활성 시에만. v1 분기 영향 없음.
      */
-    function _persistV2State() {
-      var sid = _v2SessionId();
+    function _persistProductionLineState() {
+      var sid = _productionLineSessionId();
       if (!sid) return;
       try {
         var snap = {
@@ -308,7 +308,7 @@
           currentPhase: typeof _state.currentPhase === "number" ? _state.currentPhase : -1
         };
         window.localStorage.setItem(
-          V2_STATE_STORAGE_PREFIX + sid,
+          PRODUCTION_LINE_STATE_STORAGE_PREFIX + sid,
           JSON.stringify(snap)
         );
       } catch (_) {}
@@ -319,11 +319,11 @@
      * backend GET 응답이 도착하기 전 새로고침 직후 첫 render 에 사용.
      * 가드: 기존 _state 값이 더 새로우면 storage 값 무시 (덮어쓰기 차단).
      */
-    function _restoreV2State() {
-      var sid = _v2SessionId();
+    function _restoreProductionLineState() {
+      var sid = _productionLineSessionId();
       if (!sid) return false;
       try {
-        var raw = window.localStorage.getItem(V2_STATE_STORAGE_PREFIX + sid);
+        var raw = window.localStorage.getItem(PRODUCTION_LINE_STATE_STORAGE_PREFIX + sid);
         if (!raw) return false;
         var snap = JSON.parse(raw);
         if (!snap || typeof snap !== "object") return false;
@@ -381,7 +381,7 @@
      *
      * 가시성 8축 #4 (verdict) / #5 (commit) / #6 (retry) 충족.
      */
-    function _absorbV2Extras(data) {
+    function _absorbProductionLineExtras(data) {
       if (!data || typeof data !== "object") return;
       if (!_state.v2Meta) _state.v2Meta = {};
       var m = _state.v2Meta;
@@ -822,21 +822,21 @@
       patterns: P,
 
       /**
-       * T-495 P2 — v2 driver 의 workflow_step 이벤트 처리.
-       * v2 payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
+       * T-495 P2 — production-line 의 workflow_step 이벤트 처리.
+       * production-line payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
        *
        * v1 handleStepEvent 와 차이:
-       *  - v2 는 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE) + VALIDATE 추가
+       *  - production-line is 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE) + VALIDATE 추가
        *  - phase 는 WORK 내부 sub-단계 (P1/P2/...)
        *  - 멱등 보장
        */
-      handleV2StepEvent: function (data) {
+      handleProductionLineStepEvent: function (data) {
         if (!data || !data.step) return;
         var stepUp = String(data.step).toUpperCase();
         var step = stepUp.toLowerCase();
 
         // T-495 P3 — extras (verdict/commit/retry) 통과 시 _state 에 누적
-        _absorbV2Extras(data);
+        _absorbProductionLineExtras(data);
 
         // T-508 — backend epoch sec → frontend epoch ms 변환 + cycle_start 누적
         var stepOpts;
@@ -853,12 +853,12 @@
         // 종결 step 매핑 (DONE/FAILED → fsm 종결 처리)
         if (stepUp === "DONE") {
           _complete();
-          _persistV2State();
+          _persistProductionLineState();
           return;
         }
         if (stepUp === "FAILED") {
           _fail("워크플로우 실패");
-          _persistV2State();
+          _persistProductionLineState();
           return;
         }
 
@@ -878,7 +878,7 @@
               ts.start = stepOpts.startTsMs;
             }
           }
-          _persistV2State();
+          _persistProductionLineState();
           return;
         }
 
@@ -892,16 +892,16 @@
           }
         }
 
-        _persistV2State();
+        _persistProductionLineState();
       },
 
       /**
-       * T-495 P2 — v2 workflow_phase 이벤트 처리.
+       * T-495 P2 — production-line workflow_phase 이벤트 처리.
        * payload: { session_id, phase: "P1"|"P2"..., action: "start"|"end" }
        */
-      handleV2PhaseEvent: function (data) {
+      handleProductionLinePhaseEvent: function (data) {
         if (!data || !data.phase) return;
-        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry/regression
+        _absorbProductionLineExtras(data);  // T-495 P3 — verdict/commit/retry/regression
         var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
         if (isNaN(phaseNum)) return;
 
@@ -923,16 +923,16 @@
             }
           }
         }
-        _persistV2State();
+        _persistProductionLineState();
       },
 
       /**
-       * T-495 P2 — v2 workflow_finish 이벤트 처리.
+       * T-495 P2 — production-line workflow_finish 이벤트 처리.
        * payload: { session_id, outcome: "ok"|"fail", summary }
        */
-      handleV2FinishEvent: function (data) {
+      handleProductionLineFinishEvent: function (data) {
         if (!data) return;
-        _absorbV2Extras(data);  // T-495 P3 — verdict/commit/retry
+        _absorbProductionLineExtras(data);  // T-495 P3 — verdict/commit/retry
         if (data.outcome === "ok") {
           _complete();
         } else {
@@ -1036,20 +1036,20 @@
       },
 
       /**
-       * T-508 — localStorage 에 저장된 v2 ts 를 _state 에 복원.
-       * session.js 의 _startV2WorkflowSession 진입 시 fetchSession 전 호출.
+       * T-508 — localStorage 에 저장된 production-line ts 를 _state 에 복원.
+       * session.js 의 _startProductionLineWorkflowSession 진입 시 fetchSession 전 호출.
        * @returns {boolean} 복원 성공 여부 (key 미존재 / parse 실패 시 false)
        */
-      restoreV2State: function () {
-        return _restoreV2State();
+      restoreProductionLineState: function () {
+        return _restoreProductionLineState();
       },
 
       /**
        * T-508 — 현재 _state 의 step/phase ts 를 localStorage 에 write.
-       * 외부 (session.js) 에서 수동 트리거 가능. 평소엔 handleV2*Event 자동 호출.
+       * 외부 (session.js) 에서 수동 트리거 가능. 평소엔 handleProductionLine*Event 자동 호출.
        */
-      persistV2State: function () {
-        _persistV2State();
+      persistProductionLineState: function () {
+        _persistProductionLineState();
       }
     };
   })();
@@ -1382,11 +1382,11 @@
               Board.util.showInfoModal("세션 정보 없음", "세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.", { severity: "warning" });
               return;
             }
-            // T-513 P5 — V1 /api/workflow/stop endpoint 폐기. V2 ticket-based
+            // T-513 P5 — V1 /api/workflow/stop endpoint 폐기. Production-line ticket-based
             // stop endpoint 신설은 별 후속 트랙. 본 stop 버튼은 일시 비활성 안내.
             Board.util.showInfoModal(
               "중지 미지원",
-              "V2 워크플로우 중지 기능은 별 트랙 endpoint 신설 후 복원됩니다 (T-513 P5 결정). 현 시점에서는 메인 터미널의 ESC 또는 driver subprocess 직접 종료를 사용하세요.",
+              "Production-line 워크플로우 중지 기능은 별 트랙 endpoint 신설 후 복원됩니다 (T-513 P5 결정). 현 시점에서는 메인 터미널의 ESC 또는 subprocess 직접 종료를 사용하세요.",
               { severity: "warning" }
             );
           });

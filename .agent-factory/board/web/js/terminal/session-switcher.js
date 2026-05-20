@@ -157,18 +157,18 @@
     // 이벤트를 먼저 주입한다 (T-391 링버퍼 제거 이후 표준 경로). 메인 세션은
     // _restoreSession 에서 복원되므로 별도 history 주입이 필요 없다.
     //
-    // T-495 P2 — v2 driver session 은 별도 진입점 (Board.session.startV2Session)
+    // T-495 P2 — production-line session 은 별도 진입점 (Board.session.startProductionLineSession)
     // 으로 분기. v1 SSE 채널 (/terminal/workflow/events) 과 격리.
     if (Board.session) {
       var isWfTarget = targetSessionId !== "main" &&
         targetSessionId.indexOf("wf-") === 0;
-      var isV2Target = isWfTarget &&
-        Board.v2Workflow && Board.v2Workflow.isV2SessionId &&
-        Board.v2Workflow.isV2SessionId(targetSessionId);
+      var isProductionLineTarget = isWfTarget &&
+        Board.productionLineWorkflow && Board.productionLineWorkflow.isProductionLineSessionId &&
+        Board.productionLineWorkflow.isProductionLineSessionId(targetSessionId);
 
-      if (isV2Target && Board.session.startV2Session) {
-        // v2 분기: Board.v2Workflow.subscribe 단일 진입점.
-        Board.session.startV2Session(targetSessionId);
+      if (isProductionLineTarget && Board.session.startProductionLineSession) {
+        // production-line 분기: Board.productionLineWorkflow.subscribe 단일 진입점.
+        Board.session.startProductionLineSession(targetSessionId);
       } else {
         var historyChain = isWfTarget && Board.session.injectRestHistory
           ? Board.session.injectRestHistory(targetSessionId)

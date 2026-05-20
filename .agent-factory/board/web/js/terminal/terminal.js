@@ -15,7 +15,7 @@
   // ── Session dispatcher ──
   // T-513 P3 — V1 메인 터미널 워크플로우 모드 폐기 (결정점 #1 + #5).
   // 옛 URL `?session=wf-...` 진입점 단절 — 메인 터미널은 메인 모드만 활성.
-  // V2 워크플로우는 별도 워크플로우 탭 (v2-workflow.js) 으로 진입.
+  // Production-line workflow 는 별도 워크플로우 탭 (production-line-workflow.js) 으로 진입.
   M.workflowSessionId = null;
 
   M.isWorkflowMode = false;
@@ -1163,8 +1163,8 @@
         }
         // 비동기 status 합성 — /api/v2/sessions/<id> 응답 status 로 dot 갱신.
         // 응답 누락 / 네트워크 실패 / 404 = 'stopped' 회색 (사용자 명시 결정).
-        if (Board.v2Workflow && Board.v2Workflow.fetchSession) {
-          Board.v2Workflow.fetchSession(sid).then(function (meta) {
+        if (Board.productionLineWorkflow && Board.productionLineWorkflow.fetchSession) {
+          Board.productionLineWorkflow.fetchSession(sid).then(function (meta) {
             if (!meta) return; // 404 / null → stopped 유지
             var st = (meta.status === "running" || meta.status === "idle")
               ? "running" : "stopped";

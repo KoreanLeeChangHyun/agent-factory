@@ -7,10 +7,7 @@ from engine.apps.board_api.production_line_workflow import (
     _SESSION_PATH_RE,
 )
 
-V2WorkflowHandlerMixin = ProductionLineWorkflowHandlerMixin
-
 __all__ = [
     "ProductionLineWorkflowHandlerMixin",
     "_SESSION_PATH_RE",
-    "V2WorkflowHandlerMixin",
 ]
