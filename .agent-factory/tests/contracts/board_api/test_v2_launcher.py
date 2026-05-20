@@ -16,16 +16,16 @@ import threading
 import time
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # sys.path setup — board package at <worktree>/.agent-factory/board
-_WORKTREE_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', '..'),
-)
-_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, '.agent-factory'))
+_AGENT_FACTORY_ROOT = Path(__file__).resolve().parents[3]
+_WORKTREE_ROOT = _AGENT_FACTORY_ROOT.parent
 for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+    _path = str(_p)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 
 # ==============================================================================

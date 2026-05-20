@@ -16,16 +16,16 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 # sys.path — `.agent-factory/` (board.server.* 절대 import 용)
-_WORKTREE_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', '..'),
-)
-_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, '.agent-factory'))
-_BOARD_ROOT = os.path.join(_AGENT_FACTORY_ROOT, 'board')
+_AGENT_FACTORY_ROOT = Path(__file__).resolve().parents[3]
+_WORKTREE_ROOT = _AGENT_FACTORY_ROOT.parent
+_BOARD_ROOT = _AGENT_FACTORY_ROOT / "board"
 for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT, _BOARD_ROOT):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+    _path = str(_p)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 
 # ==============================================================================

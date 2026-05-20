@@ -16,16 +16,18 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 # sys.path setup
 # board package is at <worktree>/.agent-factory/board
 # For 'import board.server...' to work, .agent-factory must be in sys.path
-_WORKTREE_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, ".agent-factory"))
+_AGENT_FACTORY_ROOT = Path(__file__).resolve().parents[3]
+_WORKTREE_ROOT = _AGENT_FACTORY_ROOT.parent
 for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+    _path = str(_p)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 
 class TestComputeCombinedVerdict(unittest.TestCase):

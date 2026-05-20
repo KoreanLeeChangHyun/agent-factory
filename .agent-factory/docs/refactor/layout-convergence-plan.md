@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Board web | `board/static` | `board/web` | not aligned |
 | Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
-| Legacy tests | excluded roots under `engine/flow/tests`, `board/tests` | delete/rewrite under `tests/` | partially aligned |
+| Legacy tests | excluded roots under `engine/flow/tests`, stale `board/tests` | delete/rewrite under `tests/` | partially aligned |
 
 ## Move Policy
 
@@ -502,10 +502,35 @@ Acceptance:
 - migrated V2 verdict tests pass from the canonical tree
 - full pytest includes the migrated tests and passes
 
+### M22: Board Green Test Migration
+
+Status: complete
+
+Goal:
+
+Move green board contract tests out of the legacy `board/tests` package into
+the canonical board API contract tree.
+
+Completed slice:
+
+- moved V2 launcher tests to `tests/contracts/board_api`
+- moved kanban audit verdict tests to `tests/contracts/board_api`
+- moved V2 workflow phase 1 tests to `tests/contracts/board_api`
+- moved M8 WorkRequest facade handler tests to `tests/contracts/board_api`
+- left stale `board/tests/test_handlers_t424.py` quarantined because it still
+  expects the removed `workflow_undo` handler
+
+Acceptance:
+
+- migrated board tests pass from canonical paths
+- full pytest includes the migrated board tests and passes
+- `board/tests` remains quarantined until the stale T-424 test is rewritten or
+  deleted
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 430 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 493 passed, 2 skipped, 6 subtests passed
 ```

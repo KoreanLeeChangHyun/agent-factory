@@ -843,12 +843,42 @@ python3 -m pytest tests/adapters/hooks tests/application/v2/test_m9_verdict.py  
 python3 -m pytest  # 430 passed, 2 skipped, 6 subtests passed
 ```
 
+### M22: Board Green Test Migration
+
+Status: complete
+
+Purpose:
+
+Reduce the remaining legacy board test quarantine by moving green board API and
+workflow tests into `tests/contracts/board_api`.
+
+Tasks:
+
+- [x] move V2 launcher tests to canonical board API contracts
+- [x] move kanban audit verdict tests to canonical board API contracts
+- [x] move V2 workflow phase 1 tests to canonical board API contracts
+- [x] move M8 WorkRequest facade handler tests to canonical board API contracts
+- [x] keep stale T-424 handler tests quarantined until rewritten or deleted
+
+Acceptance criteria:
+
+- migrated board tests pass from canonical paths
+- canonical tests pass with the migrated board tests included
+- `board/tests` quarantine remains only for stale handler coverage
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_v2_launcher.py tests/contracts/board_api/test_kanban_audit_verdict.py tests/contracts/board_api/test_v2_workflow_phase1.py tests/contracts/board_api/test_m8_workrequest_handler.py  # 63 passed
+python3 -m pytest  # 493 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22
 ```
 
 Hard dependencies:

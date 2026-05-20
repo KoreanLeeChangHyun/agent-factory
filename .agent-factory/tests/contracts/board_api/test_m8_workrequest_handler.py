@@ -7,13 +7,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-_WORKTREE_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-_AGENT_FACTORY = os.path.normpath(os.path.join(_WORKTREE_ROOT, ".agent-factory"))
+_AGENT_FACTORY = Path(__file__).resolve().parents[3]
+_WORKTREE_ROOT = _AGENT_FACTORY.parent
 for _p in (_WORKTREE_ROOT, _AGENT_FACTORY):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+    _path = str(_p)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 
 def _handler(body: dict):
