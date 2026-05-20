@@ -2,7 +2,7 @@
 
 T-504 cutover: 옛 `parse_plan_frontmatter` / `_extract_frontmatter` / `verify_plan_md`
 대상 테스트는 폐기. 신규 PLAN 산출물 (plan/plan.json + plan/plan.md) 검증은
-`verify_plan_artifacts` + `engine.v2.core.plan_loader.parse_plan_json` 으로 분리.
+`verify_plan_artifacts` + `engine.core.planning.loader.parse_plan_json` 으로 분리.
 
 대상:
   - verify_artifact (file exist + size + must_contain)
@@ -167,7 +167,7 @@ def test_verify_work_md_size(tmp_path: Path) -> None:
 
 
 def test_phase_topo_sort_re_export() -> None:
-    """T-504 — Phase / topo_sort 는 core.plan_loader SSOT 에서 re-export."""
+    """T-504 — Phase / topo_sort 는 core planning SSOT 에서 re-export."""
     phases = [
         Phase(id="C", title="", deps=["A", "B"]),
         Phase(id="A", title="", deps=[]),

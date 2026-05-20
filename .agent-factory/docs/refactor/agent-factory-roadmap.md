@@ -558,12 +558,48 @@ python3 -m pytest tests/domain/validation tests/domain/planning tests/domain/v2/
 python3 -m pytest  # 361 passed, 2 skipped
 ```
 
+### M14: Planning Loader Extraction
+
+Status: complete
+
+Purpose:
+
+Finish the planning-loader portion that M13 pulled forward for architecture
+reasons, and make `engine/core/planning` the canonical home for plan parsing
+and topology rules.
+
+Tasks:
+
+- [x] migrate plan parser tests from `tests/domain/v2` to
+      `tests/domain/planning`
+- [x] migrate topology-level tests from `tests/domain/v2` to
+      `tests/domain/planning`
+- [x] update the V2 WORK step to import planning rules from
+      `engine.core.planning.loader`
+- [x] keep `engine/v2/core/plan_loader.py` as a compatibility export surface
+- [x] add focused V2 compatibility tests for the old plan loader path
+
+Acceptance criteria:
+
+- core planning tests cover parse and topology behavior
+- active runtime code prefers `engine.core.planning.loader`
+- legacy `engine.v2.core.plan_loader` imports still resolve to the core objects
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/domain/planning tests/domain/v2/test_plan_loader_compat.py tests/domain/v2/test_verify.py tests/application/v2/test_steps_work.py tests/architecture/test_boundaries.py  # 57 passed
+python3 -m pytest  # 363 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14
 ```
 
 Hard dependencies:

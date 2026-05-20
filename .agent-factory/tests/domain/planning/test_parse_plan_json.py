@@ -1,6 +1,6 @@
-"""test_parse_plan_json.py — T-504 P1 (TDD Red→Green→Refactor).
+"""Tests for the core plan.json loader.
 
-대상: `engine.v2.core.plan_loader` 모듈의 `parse_plan_json` (JSON SSOT 파서).
+대상: `engine.core.planning.loader` 모듈의 `parse_plan_json` (JSON SSOT 파서).
 
 T-504 캐논 SSOT (driver = JSON / LLM↔LLM = md / 사람 = HTML) 에 따라
 PLAN LLM 은 `plan/plan.json` + `plan/plan.md` 두 파일을 동시 산출하며,
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from engine.v2.core.plan_loader import (
+from engine.core.planning.loader import (
     Phase,
     Plan,
     PlanLoaderError,

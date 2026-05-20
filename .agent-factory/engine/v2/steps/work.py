@@ -12,6 +12,13 @@ from __future__ import annotations
 
 import threading
 
+from engine.core.planning.loader import (
+    PlanLoaderError,
+    parse_plan_json,
+    topo_levels,
+    topo_sort,
+)
+
 from .._common import (
     WorkflowContext,
     append_log,
@@ -32,7 +39,6 @@ from .._verify import (
     verify_work_md_multi,
     verify_work_set,
 )
-from ..core.plan_loader import PlanLoaderError, parse_plan_json, topo_levels, topo_sort
 from .done import fail_step
 
 

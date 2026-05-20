@@ -302,22 +302,28 @@ Acceptance:
 
 ### M14: Planning Loader Extraction
 
-Status: partially complete
+Status: complete
 
 Goal:
 
 Move plan loading/parsing into `engine/core/planning`.
 
-Remaining scope:
+Completed slice:
 
-- migrate canonical plan loader tests from V2 naming into `tests/domain/planning`
-- update runtime imports to prefer `engine.core.planning.loader`
-- leave V2 compatibility imports only for legacy callers
+- migrated canonical plan parser tests from `tests/domain/v2` to
+  `tests/domain/planning`
+- migrated topology-level tests from `tests/domain/v2` to
+  `tests/domain/planning`
+- updated V2 WORK step to import from `engine.core.planning.loader`
+- left `engine/v2/core/plan_loader.py` as a compatibility export module
+- added focused V2 compatibility coverage for the old import path
 
 Acceptance:
 
 - plan parsing/topology tests pass
 - V2 PLAN step tests pass
+- V2 WORK step tests pass
+- architecture boundary tests pass
 - full pytest passes
 
 ### M15: Reporting Service Extraction
@@ -384,5 +390,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 361 passed, 2 skipped
+python3 -m pytest  # 363 passed, 2 skipped
 ```

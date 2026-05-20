@@ -1,6 +1,6 @@
-"""test_topo_levels.py — T-506 P2.
+"""Tests for topological planning levels.
 
-`engine.v2.core.plan_loader.topo_levels` 가 Kahn 알고리즘 확장으로 phase 들을
+`engine.core.planning.loader.topo_levels` 가 Kahn 알고리즘 확장으로 phase 들을
 [level_0_phases, level_1_phases, ...] 형태로 반환.
 
 driver 가 같은 level 동시 spawn → 다음 level 진입 패턴에 사용.
@@ -8,7 +8,7 @@ driver 가 같은 level 동시 spawn → 다음 level 진입 패턴에 사용.
 
 from __future__ import annotations
 
-from engine.v2.core.plan_loader import Phase, topo_levels
+from engine.core.planning.loader import Phase, topo_levels
 
 
 def _phase(pid: str, deps: list[str] | None = None) -> Phase:
