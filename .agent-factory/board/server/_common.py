@@ -8,9 +8,9 @@ import os
 import threading
 import time
 
-# noqa: F401 — 본 _common.py 는 board_data 의 식별자를 handlers/* 가 재import 하는
+# noqa: F401 — 본 _common.py 는 factory_data 의 식별자를 handlers/* 가 재import 하는
 # hub 역할. _common.py 내부에서 직접 사용 안 해도 export 의무.
-from board.board_data import (  # noqa: F401
+from board.factory_data import (  # noqa: F401
     KANBAN_DIRS_LIST,
     WF_BASE,
     WF_HISTORY,

@@ -8,7 +8,7 @@ import threading
 import time
 from collections.abc import Callable
 
-from board.board_data import _get_git_branch
+from board.factory_data import _get_git_branch
 
 from ._common import WATCH_DIRS, WATCH_INTERVAL, logger
 
