@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
-| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` compatibility wrapper | `core/worktrees`, `adapters/git` | partially aligned |
+| Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees` | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `engine/apps/board_api` with `board/server/handlers` compatibility exports | `engine/apps/board_api` or thin board handlers | aligned |
 | Board web | `board/web` | `board/web` | aligned |
@@ -1214,6 +1214,29 @@ Acceptance:
 
 - Git config adapter tests pass
 - `flow-gitconfig --help` works from the repo root
+- full pytest passes
+
+### M52: Remove Legacy Engine Git Wrapper
+
+Status: complete
+
+Goal:
+
+Remove the last tracked `engine/git` source after `flow-gitconfig` moved to the
+Git adapter boundary.
+
+Completed slice:
+
+- removed the temporary `engine/git/git_config.py` compatibility wrapper
+- updated Git config adapter tests to use the canonical adapter module only
+- added an architecture check that prevents the legacy source path from
+  returning
+- updated Worktree/Git gap analysis to remove `engine/git`
+
+Acceptance:
+
+- Git config adapter tests pass
+- layout convergence architecture test passes
 - full pytest passes
 
 ## Verification Baseline
