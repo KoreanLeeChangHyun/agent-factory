@@ -82,7 +82,7 @@
 - `bin/flow-*` (22개 wrapper)
 - `scripts/**/*.py` (~50 파일, `.claude.workflow` 리터럴 포함 파일 ~20건)
 - `hooks/*.py` (5개)
-- `prompt/messages.py`
+- `engine/guards/messages.py`
 - `board/**` (Python + JS + CSS)
 
 ### `init-claude-workflow.sh` (루트)

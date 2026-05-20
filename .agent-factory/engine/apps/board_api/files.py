@@ -173,7 +173,7 @@ class FilesHandlerMixin:
         response_error: {ok: false, error: str}
         status_codes: 200, 400
         auth: none (local-only)
-        side_effects: write to prompts directory
+        side_effects: write to board config prompt-files directory
         sse_events: none
         """
         data = self._read_json_body()

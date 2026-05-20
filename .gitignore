@@ -20,6 +20,23 @@ CLAUDE.md
 
 # Python cache
 __pycache__/
+.pytest_cache/
+
+# Codex project-local runtime state
+.codex/
+.codex/auth.json
+.codex/history.jsonl
+.codex/installation_id
+.codex/models_cache.json
+.codex/cache/
+.codex/log/
+.codex/logs*.sqlite*
+.codex/memories/
+.codex/sessions/
+.codex/shell_snapshots/
+.codex/state*.sqlite*
+.codex/tmp/
+.codex/.tmp/
 
 .temp/*
 .temp/
