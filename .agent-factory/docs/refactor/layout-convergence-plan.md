@@ -894,10 +894,33 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M38: Sync Board API App Handler
+
+Status: complete
+
+Goal:
+
+Continue moving Board API handler implementations from `board/server/handlers`
+into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Sync handler implementation to `engine/apps/board_api/sync.py`
+- kept `board/server/handlers/sync.py` as a compatibility export
+- updated restart entrypoint resolution to use the project root instead of the
+  moved module path
+- added focused Sync board API app tests
+
+Acceptance:
+
+- Sync board API app tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 742 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 744 passed, 2 skipped, 6 subtests passed
 ```
