@@ -214,7 +214,7 @@ curl -I $(head -1 .agent-factory/.board.url)  # HTTP 200
 
 ### M3: WorkRequest Domain
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -234,6 +234,12 @@ Acceptance criteria:
 - WorkRequest can round-trip through existing ticket storage
 - accepted WorkRequest can start a WorkflowRun
 - old `TicketRef` terminology is absent from new core code
+
+Current verification:
+
+```text
+python3 -m pytest  # 328 passed, 2 skipped
+```
 
 ### M4: Workflow Model
 
