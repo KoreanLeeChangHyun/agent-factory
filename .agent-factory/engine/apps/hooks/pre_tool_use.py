@@ -137,7 +137,7 @@ def run(stdin_data: bytes) -> tuple[int, bytes]:
     if tool_name == "AskUserQuestion":
         dispatch_async(
             "HOOK_SLACK_ASK",
-            scripts_dir("slack", "slack_ask.py"),
+            scripts_dir("adapters", "slack", "slack_ask.py"),
             stdin_data,
             flags=flags,
         )

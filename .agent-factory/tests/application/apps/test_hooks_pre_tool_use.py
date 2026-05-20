@@ -86,7 +86,7 @@ def test_pre_tool_use_run_dispatches_slack_ask_async(monkeypatch) -> None:
     assert calls == [
         (
             "HOOK_SLACK_ASK",
-            "/agent/engine/slack/slack_ask.py",
+            "/agent/engine/adapters/slack/slack_ask.py",
             stdin_data,
             {"HOOK_SLACK_ASK": True},
         )

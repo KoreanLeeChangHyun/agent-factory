@@ -29,13 +29,12 @@ import os
 import sys
 from typing import Any
 
-# utils 패키지 import를 위한 경로 설정
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-_engine_dir = os.path.normpath(os.path.join(_script_dir, ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(os.path.join(_script_dir, "..", "..", ".."))
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-from slack.slack_common import (
+from engine.adapters.slack.slack_common import (
     build_json_payload,
     extract_json_field,
     get_agent_emoji,
@@ -43,7 +42,7 @@ from slack.slack_common import (
     log_warn,
     send_slack_message,
 )
-from common import (
+from engine.common import (
     resolve_active_workflow,
     resolve_project_root,
 )

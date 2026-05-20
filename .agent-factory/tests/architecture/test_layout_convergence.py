@@ -35,3 +35,12 @@ def test_legacy_engine_statusline_source_is_removed() -> None:
     repo_root = Path(__file__).resolve().parents[3]
 
     assert not (repo_root / ".agent-factory" / "engine" / "statusline.py").exists()
+
+
+def test_legacy_engine_slack_sources_are_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    legacy_dir = repo_root / ".agent-factory" / "engine" / "slack"
+    assert not (legacy_dir / "slack_ask.py").exists()
+    assert not (legacy_dir / "slack_notify.py").exists()
+    assert not (legacy_dir / "slack_common.py").exists()

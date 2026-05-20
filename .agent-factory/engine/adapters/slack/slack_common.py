@@ -28,9 +28,9 @@ _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__fi
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-from constants import SLACK_API_URL, SLACK_EMOJI_MAP
+from engine.constants import SLACK_API_URL, SLACK_EMOJI_MAP
 
-from common import read_env
+from engine.common import read_env
 
 _EMOJI_MAP: dict[str, str] = SLACK_EMOJI_MAP
 

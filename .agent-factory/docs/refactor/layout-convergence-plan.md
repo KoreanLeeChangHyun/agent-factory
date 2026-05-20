@@ -1362,10 +1362,39 @@ Acceptance:
 - direct path guard tests pass
 - full pytest passes
 
+### M58: Move Slack Integration Into Adapter Boundary
+
+Status: complete
+
+Goal:
+
+Move Slack integration scripts out of the engine root and into
+`engine/adapters/slack`.
+
+Completed slice:
+
+- moved `engine/slack/slack_ask.py` to `engine/adapters/slack/slack_ask.py`
+- moved `engine/slack/slack_notify.py` to
+  `engine/adapters/slack/slack_notify.py`
+- moved `engine/slack/slack_common.py` to
+  `engine/adapters/slack/slack_common.py`
+- added `engine/adapters/slack/__init__.py`
+- updated PreToolUse Slack dispatch to use the adapter path
+- updated Slack scripts to import through `engine.adapters.slack`
+- added focused Slack adapter placement tests
+- extended layout convergence tests to prevent legacy Slack paths from
+  returning
+
+Acceptance:
+
+- Slack adapter placement tests pass
+- PreToolUse dispatch tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 809 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 811 passed, 2 skipped, 6 subtests passed
 ```

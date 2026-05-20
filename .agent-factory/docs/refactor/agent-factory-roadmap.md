@@ -1972,12 +1972,49 @@ python3 -u .agent-factory/engine/apps/hooks/statusline.py  # exits 0 with sample
 python3 -m pytest  # 809 passed, 2 skipped, 6 subtests passed
 ```
 
+### M58: Move Slack Integration Into Adapter Boundary
+
+Status: complete
+
+Purpose:
+
+Move Slack integration scripts out of the engine root and into
+`engine/adapters/slack`.
+
+Tasks:
+
+- [x] move `engine/slack/slack_ask.py` to
+      `engine/adapters/slack/slack_ask.py`
+- [x] move `engine/slack/slack_notify.py` to
+      `engine/adapters/slack/slack_notify.py`
+- [x] move `engine/slack/slack_common.py` to
+      `engine/adapters/slack/slack_common.py`
+- [x] add `engine/adapters/slack/__init__.py`
+- [x] update PreToolUse Slack dispatch to use the adapter path
+- [x] update Slack scripts to import through `engine.adapters.slack`
+- [x] add focused Slack adapter placement tests
+- [x] extend layout convergence tests to prevent legacy Slack paths from
+      returning
+
+Acceptance criteria:
+
+- Slack adapter placement tests pass
+- PreToolUse dispatch tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/adapters/slack/test_slack_adapter_imports.py tests/application/apps/test_hooks_pre_tool_use.py tests/adapters/hooks/test_pretooluse_regression.py tests/architecture/test_layout_convergence.py  # 13 passed
+python3 -m pytest  # 811 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58
 ```
 
 Hard dependencies:
