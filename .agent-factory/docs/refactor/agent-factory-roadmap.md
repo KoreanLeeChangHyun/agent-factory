@@ -2451,12 +2451,49 @@ python3 -m pytest tests/adapters/filesystem/test_settings.py tests/architecture/
 python3 -m pytest  # 841 passed, 2 skipped, 6 subtests passed
 ```
 
+### M72: Move Prompt Validator Into Core Validation
+
+Status: complete
+
+Purpose:
+
+Move ticket prompt XML validation out of `engine/flow` and into the core
+validation boundary.
+
+Tasks:
+
+- [x] move `engine/flow/prompt_validator.py` to
+      `engine/core/validation/prompt_validator.py`
+- [x] update `bin/flow-validate-p` to execute the core validation
+      implementation
+- [x] update `kanban_cli.py` prompt validation imports to use the core module
+- [x] remove flow runtime imports from the core prompt validator
+- [x] add focused prompt validator tests
+- [x] extend layout convergence tests to prevent the legacy flow prompt
+      validator source from returning
+
+Acceptance criteria:
+
+- `flow-validate-p --help` executes from the repo root
+- kanban CLI imports the core prompt validator
+- prompt validator tests pass
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+.agent-factory/bin/flow-validate-p --help  # exits 0
+python3 -m pytest tests/domain/validation/test_prompt_validator.py tests/architecture/test_layout_convergence.py tests/architecture/test_boundaries.py  # 21 passed
+python3 -m pytest  # 844 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67 -> M68 -> M69 -> M70 -> M71
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67 -> M68 -> M69 -> M70 -> M71 -> M72
 ```
 
 Hard dependencies:

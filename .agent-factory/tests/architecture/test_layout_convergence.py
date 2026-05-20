@@ -115,3 +115,11 @@ def test_legacy_flow_env_manager_source_is_removed() -> None:
     assert not (
         repo_root / ".agent-factory" / "engine" / "flow" / "env_manager.py"
     ).exists()
+
+
+def test_legacy_flow_prompt_validator_source_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (
+        repo_root / ".agent-factory" / "engine" / "flow" / "prompt_validator.py"
+    ).exists()

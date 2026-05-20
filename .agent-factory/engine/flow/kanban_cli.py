@@ -39,7 +39,7 @@ from flow.ticket_repository import (
     update_ticket_status,
     validate_transition,
 )
-from flow.prompt_validator import validate as prompt_validate
+from core.validation.prompt_validator import validate as prompt_validate
 from constants import QUALITY_THRESHOLD
 
 
@@ -717,7 +717,7 @@ def cmd_update_prompt(
 
     # flat 구조: <prompt> 태그 내부 텍스트를 직접 추출
     try:
-        from flow.prompt_validator import extract_active_prompt
+        from core.validation.prompt_validator import extract_active_prompt
         prompt_text = extract_active_prompt(xml_text)
     except Exception:
         # extract_active_prompt 실패 시 검증 건너뜀

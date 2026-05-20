@@ -1722,10 +1722,38 @@ Acceptance:
 - architecture boundary tests pass
 - full pytest passes
 
+### M72: Move Prompt Validator Into Core Validation
+
+Status: complete
+
+Goal:
+
+Move ticket prompt XML validation out of `engine/flow` and into the core
+validation boundary.
+
+Completed slice:
+
+- moved `engine/flow/prompt_validator.py` to
+  `engine/core/validation/prompt_validator.py`
+- updated `bin/flow-validate-p` to execute the core validation implementation
+- updated `kanban_cli.py` prompt validation imports to use the core module
+- removed flow runtime imports from the core prompt validator
+- added focused prompt validator tests
+- extended layout convergence tests to prevent the legacy flow prompt validator
+  source from returning
+
+Acceptance:
+
+- `flow-validate-p --help` executes from the repo root
+- kanban CLI imports the core prompt validator
+- prompt validator tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 841 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 844 passed, 2 skipped, 6 subtests passed
 ```

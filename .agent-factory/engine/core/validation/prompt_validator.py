@@ -25,24 +25,50 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
-import os
+from datetime import datetime, timedelta, timezone
 
-# 프로젝트 루트 결정 (flow_logger import를 위해)
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+# 프로젝트 루트 결정
+_engine_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 from constants import QUALITY_THRESHOLD
-from flow.cli_utils import build_common_epilog
-from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 REQUIRED_TAGS = ["goal", "target", "constraints", "criteria"]
 OPTIONAL_TAGS = ["context", "approach", "scope", "reference"]
+_KST = timezone(timedelta(hours=9))
 
 # TODO 패턴: "TODO:" 로 시작하거나 전체가 TODO 텍스트만인 경우
 _TODO_PATTERN = re.compile(r"^\s*TODO\s*:", re.IGNORECASE)
+
+
+def build_common_epilog() -> str:
+    """Return the common CLI footer without importing flow runtime helpers."""
+    return "Agent Factory CLI"
+
+
+def append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """Append workflow log entries without coupling core validation to flow."""
+    try:
+        ts = datetime.now(_KST).strftime("%Y-%m-%dT%H:%M:%S")
+        with open(os.path.join(abs_work_dir, "workflow.log"), "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
+
+
+def resolve_work_dir_for_logging() -> str | None:
+    """Resolve workflow work dir from environment when available."""
+    for key in ("WORKFLOW_WORK_DIR", "_WF_WORK_DIR"):
+        work_dir = os.environ.get(key, "").strip()
+        if work_dir and os.path.isdir(work_dir):
+            return work_dir
+    return None
 
 
 def _extract_tag_content(text: str, tag: str) -> str | None:
