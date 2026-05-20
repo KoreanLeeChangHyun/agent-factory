@@ -255,10 +255,6 @@
           : "Memory Load (MMEMORY.md Re-Case request to current session)";
       }
     }
-    var loginBtn = document.getElementById("terminal-login");
-    if (loginBtn) {
-      loginBtn.disabled = !inputtable;
-    }
     if (statusDot) {
       statusDot.className = "terminal-status-dot terminal-status-" + status;
     }
@@ -458,17 +454,6 @@
     h += '<span class="terminal-sessions-count" id="terminal-sessions-count" style="display:none"></span>';
     h += '</button>';
     h += '<div class="terminal-sessions-dropdown" id="terminal-sessions-dropdown"></div>';
-    h += '<span class="terminal-controls-divider"></span>';
-    h += '<button class="terminal-btn terminal-btn-settings" id="terminal-settings-btn" title="Settings">';
-    h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">';
-    h += '<circle cx="12" cy="12" r="3"/>';
-    h += '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>';
-    h += '</svg></button>';
-    h += '</div>';
-    h += '<div class="terminal-settings-dropdown" id="terminal-settings-dropdown">';
-    h += '<button class="terminal-settings-item" id="terminal-restart-server">Restart Server</button>';
-    h += '<button class="terminal-settings-item" id="terminal-login">Login</button>';
-    h += '<button class="terminal-settings-item" id="terminal-clear-output">Clear Output</button>';
     h += '</div>';
     h += '</div>';
 
@@ -694,47 +679,6 @@
       });
     }
 
-    // Settings dropdown
-    var settingsBtn = document.getElementById("terminal-settings-btn");
-    var settingsDropdown = document.getElementById("terminal-settings-dropdown");
-    if (settingsBtn && settingsDropdown) {
-      settingsBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        settingsDropdown.classList.toggle("visible");
-      });
-      document.addEventListener("click", function () {
-        settingsDropdown.classList.remove("visible");
-      });
-    }
-    var restartBtn = document.getElementById("terminal-restart-server");
-    if (restartBtn) {
-      restartBtn.addEventListener("click", function () {
-        settingsDropdown.classList.remove("visible");
-        M.showRestartOverlay();
-        Board.session.postJson("/api/restart").then(function () {
-          setTimeout(function () { location.reload(); }, 1500);
-        }).catch(function () {
-          setTimeout(function () { location.reload(); }, 2000);
-        });
-      });
-    }
-    var loginBtn = document.getElementById("terminal-login");
-    if (loginBtn) {
-      loginBtn.addEventListener("click", function () {
-        settingsDropdown.classList.remove("visible");
-        if (!Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus)) return;
-        Board.session.postJson("/terminal/command", { command: "/login" }).catch(function (err) {
-          M.appendErrorMessage("[Error] Login failed: " + err.message);
-        });
-      });
-    }
-    var clearBtn = document.getElementById("terminal-clear-output");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", function () {
-        settingsDropdown.classList.remove("visible");
-        M.clearOutput();
-      });
-    }
     if (inputEl) {
       // The flag during the IME combination — managed by the compositionstart/end event
       inputEl.addEventListener("compositionstart", function () {

@@ -2,6 +2,66 @@
   var panel = document.getElementById('settings-panel');
   var overlay = document.getElementById('settings-overlay');
   var body = document.getElementById('settings-body');
+  var ENV_DESCRIPTIONS = {
+    CLAUDE_CODE_SLACK_BOT_TOKEN: 'Slack Bot OAuth token used to send task notifications. Leave empty to disable Slack notifications.',
+    CLAUDE_CODE_SLACK_CHANNEL_ID: 'Slack channel ID where Agent Factory notifications are posted.',
+    CLAUDE_SLACK_API_URL: 'Slack chat.postMessage endpoint. Change only when using a compatible proxy.',
+    CLAUDE_CODE_GIT_USER_NAME: 'Git author name used by Agent Factory automation.',
+    CLAUDE_CODE_GIT_USER_EMAIL: 'Git author email used by Agent Factory automation.',
+    CLAUDE_CODE_GITHUB_USERNAME: 'GitHub username used for repository and identity-related automation.',
+    CLAUDE_CODE_SSH_KEY_GITHUB: 'SSH private key path for GitHub operations, when a custom key is required.',
+    HOOK_DANGEROUS_COMMAND: 'Blocks or warns on dangerous shell commands before tool execution.',
+    HOOK_HOOKS_SELF_PROTECT: 'Protects Agent Factory hook files from accidental modification.',
+    HOOK_SLACK_ASK: 'Routes selected approval/ask events through Slack integration.',
+    HOOK_TASK_HISTORY_SYNC: 'Synchronizes task history during tool execution.',
+    HOOK_AGENT_INVESTIGATION_GUARD: 'Requires stronger investigation before agent or sub-agent related changes.',
+    HOOK_MAIN_BRANCH_GUARD: 'Prevents unsafe work directly on the main branch.',
+    HOOK_MAIN_SESSION_GUARD: 'Guards actions that should only run from the main session.',
+    HOOK_KANBAN_SUBCOMMAND_GUARD: 'Guards direct Kanban subcommands that bypass the intended workflow.',
+    HOOK_READONLY_SESSION_GUARD: 'Prevents writes from read-only or archived sessions.',
+    HOOK_DIRECT_PATH_GUARD: 'Blocks direct script paths when the supported Agent Factory command should be used.',
+    HOOK_DONE_RELATION_GUARD: 'Checks ticket relation consistency when moving work to Done.',
+    HOOK_RULES_AUTO_APPROVE: 'Allows rules-related operations to be auto-approved when safe.',
+    HOOK_WORKTREE_REMOVE_GUARD: 'Protects workflow worktrees from unsafe removal.',
+    HOOK_WORKTREE_PATH_GUARD: 'Ensures workflow worktree paths stay inside the expected Agent Factory area.',
+    HOOK_HALLUCINATION_LOGGER: 'Records suspected hallucination or unsupported-claim events for review.',
+    HOOKS_EDIT_ALLOWED: 'Optional allowlist for hook editing. Leave empty unless you need scoped hook changes.',
+    HOOK_WORKFLOW_ORCHESTRATION: 'Enables Agent Factory workflow orchestration around ticket execution.',
+    HOOK_SESSION_SYSTEM_PROMPT: 'Injects the Agent Factory system prompt context at session start.',
+    HOOK_WORKFLOW_AUTO_CONTINUE: 'Allows workflow automation to continue after stop events.',
+    HOOK_USAGE_TRACKER: 'Tracks usage metadata after sub-agent sessions stop.',
+    HOOK_HISTORY_SYNC_TRIGGER: 'Triggers history synchronization when sub-agent sessions stop.',
+    HOOK_CATALOG_SYNC: 'Synchronizes catalog metadata after tool execution.',
+    HOOK_USER_PROMPT_KANBAN: 'Injects Kanban and session snapshot context into main user prompts.',
+    HOOK_AUDITOR_T3: 'Enables the non-blocking LLM audit advisory layer.',
+    AUDITOR_T3_MODEL: 'Model name used by the audit advisory layer.',
+    AUDITOR_T3_EFFORT: 'Reasoning effort used by the audit advisory layer.',
+    ENFORCE_CSO_PRINCIPLE: 'Enforces skill trigger discipline based on skill descriptions.',
+    ENFORCE_RATIONALIZATION_GUARD: 'Requires anti-rationalization checks in relevant workflow outputs.',
+    ENFORCE_VRT: 'Requires Verification Result Table output where applicable.',
+    ENFORCE_SELF_REVIEW: 'Requires self-review checklist output where applicable.',
+    ENFORCE_TOKEN_EFFICIENCY: 'Enforces token-efficiency guidance in workflow behavior.',
+    CLAUDE_WORKFLOW_KEEP_COUNT: 'Maximum number of workflow run records retained under .agent-factory/runs.',
+    CLAUDE_CHAIN_MAX_RETRY: 'Maximum retry count when a chain stage fails.',
+    WORKFLOW_WORKTREE: 'Enables isolated git worktrees for workflow execution.',
+    CLAUDE_QUALITY_THRESHOLD: 'Prompt quality threshold from 0.0 to 1.0 for workflow quality checks.',
+    CLAUDE_ERROR_THRESHOLD: 'Error count threshold before workflow health is considered degraded.',
+    CLAUDE_STALE_TTL_MINUTES: 'Minutes before a session or workflow is considered stale.',
+    CLAUDE_ZOMBIE_TTL_HOURS: 'Hours before an abandoned session is treated as zombie state.',
+    CLAUDE_REPORT_TTL_HOURS: 'Hours before generated report data is considered expired.',
+    CLAUDE_WORK_NAME_MAX_LEN: 'Maximum generated working directory name length.',
+    WORKFLOW_RETRY_INIT: 'Retry count for the init phase.',
+    WORKFLOW_RETRY_PLAN: 'Retry count for the plan phase.',
+    WORKFLOW_RETRY_WORK: 'Retry count for the work phase.',
+    WORKFLOW_RETRY_VALIDATE: 'Retry count for the validate phase.',
+    WORKFLOW_RETRY_REPORT: 'Retry count for the report phase.',
+    WORKFLOW_RETRY_PROMPT_N: 'Maximum retry-context hint history entries retained.',
+    CLAUDE_BANNER_WIDTH: 'Terminal banner width. Leave empty to auto-detect terminal width.',
+    CLAUDE_REPO_URL: 'Remote Agent Factory repository URL used by sync/bootstrap.',
+    CLAUDE_REQUIRED_PYTHON_MAJOR: 'Required Python major version checked by bootstrap.',
+    CLAUDE_REQUIRED_PYTHON_MINOR: 'Required Python minor version checked by bootstrap.',
+    HOOK_WORKTREE_PATH: 'Current workflow worktree path, usually maintained by Agent Factory automatically.'
+  };
 
   document.getElementById('settings-toggle').addEventListener('click', open);
   document.getElementById('settings-close').addEventListener('click', close);
@@ -69,6 +129,18 @@
         '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
       '</div>';
     actions.appendChild(restartItem);
+
+    var loginItem = document.createElement('div');
+    loginItem.className = 'settings-item';
+    loginItem.innerHTML =
+      '<div class="settings-item-info">' +
+        '<div class="settings-item-key">Login</div>' +
+        '<div class="settings-item-label">Send /login to the active Console session.</div>' +
+      '</div>' +
+      '<div class="settings-item-control">' +
+        '<button class="settings-action-btn" id="settings-login-btn">Login</button>' +
+      '</div>';
+    actions.appendChild(loginItem);
 
     var buildUrlItem = document.createElement('div');
     buildUrlItem.className = 'settings-item';
@@ -254,6 +326,32 @@
       });
     }
 
+    var loginBtn = document.getElementById('settings-login-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', function () {
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Sending...';
+        fetch('/terminal/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: '/login' }),
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error('Login command failed');
+            loginBtn.textContent = 'Sent';
+          })
+          .catch(function () {
+            loginBtn.textContent = 'Failed';
+          })
+          .finally(function () {
+            setTimeout(function () {
+              loginBtn.textContent = 'Login';
+              loginBtn.disabled = false;
+            }, 1200);
+          });
+      });
+    }
+
     // Settings sections
     sections.forEach(function (sec) {
       var el = document.createElement('div');
@@ -270,8 +368,9 @@
 
     var info = document.createElement('div');
     info.className = 'settings-item-info';
+    var label = ENV_DESCRIPTIONS[v.key] || v.label || 'No description available yet.';
     info.innerHTML = '<div class="settings-item-key">' + esc(v.key) + '</div>' +
-      (v.label ? '<div class="settings-item-label">' + esc(v.label) + '</div>' : '');
+      '<div class="settings-item-label">' + esc(label) + '</div>';
 
     var ctrl = document.createElement('div');
     ctrl.className = 'settings-item-control';

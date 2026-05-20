@@ -20,7 +20,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
     sections: dict[str, list[dict]] = {}
     section_order: list[str] = []
     current_section = 'More'
-    pending_comment = ''
+    pending_comments: list[str] = []
 
     with open(env_file, encoding='utf-8') as f:
         for line in f:
@@ -32,7 +32,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
                 if current_section not in sections:
                     sections[current_section] = []
                     section_order.append(current_section)
-                pending_comment = ''
+                pending_comments = []
                 continue
 
             if stripped.startswith('# ---'):
@@ -40,8 +40,13 @@ def _parse_env_file(project_root: str) -> list[dict]:
 
             if stripped.startswith('#'):
                 text = stripped[1:].strip()
+                if not text:
+                    continue
+                if text.startswith('===') or set(text) <= {'-', '='}:
+                    continue
                 if text.startswith('Material:'):
-                    pending_comment = text[3:].strip()
+                    text = text[len('Material:'):].strip()
+                pending_comments.append(text)
                 continue
 
             if not stripped or '=' not in stripped:
@@ -74,7 +79,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
                 except ValueError:
                     pass
 
-            label = inline_comment or pending_comment or ''
+            label = inline_comment or ' '.join(pending_comments[-3:]) or ''
             if current_section not in sections:
                 sections[current_section] = []
                 section_order.append(current_section)
@@ -85,7 +90,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
                 'type': var_type,
                 'label': label,
             })
-            pending_comment = ''
+            pending_comments = []
 
     return [{'section': s, 'vars': sections[s]} for s in section_order]
 

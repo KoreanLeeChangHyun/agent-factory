@@ -198,53 +198,6 @@
   margin: 0 4px;
 }
 
-.terminal-btn-settings {
-  color: var(--af-text-subtle);
-  padding: 4px 6px;
-}
-
-.terminal-btn-settings:hover:not(:disabled) {
-  color: var(--af-text-muted);
-}
-
-/* ── Settings Dropdown ── */
-.terminal-settings-dropdown {
-  display: none;
-  position: absolute;
-  right: 12px;
-  top: 100%;
-  margin-top: 4px;
-  background: var(--af-surface-raised);
-  border: 1px solid var(--af-border);
-  border-radius: 6px;
-  padding: 4px 0;
-  min-width: 160px;
-  z-index: 100;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
-
-.terminal-settings-dropdown.visible {
-  display: block;
-}
-
-.terminal-settings-item {
-  display: block;
-  width: 100%;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--af-text);
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.terminal-settings-item:hover {
-  background: var(--af-hover-strong);
-}
-
 /* ── Sessions Dropdown (main sessions + tab sync) ── */
 .terminal-sessions-dropdown {
   display: none;

@@ -30,6 +30,7 @@
   transition: transform 0.25s ease;
   display: flex;
   flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 .settings-panel.open { transform: translateX(0); }
 
@@ -95,9 +96,11 @@
 .settings-item:last-child { border-bottom: none; }
 
 .settings-item-info { flex: 1; min-width: 0; }
-.settings-item-key {
+.settings-item-key,
+.settings-item-title {
   font-size: 12px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-family: inherit;
+  font-weight: 600;
   color: var(--af-text);
   white-space: nowrap;
   overflow: hidden;
@@ -154,7 +157,7 @@
   background: var(--af-surface-raised);
   color: var(--af-text);
   font-size: 12px;
-  font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
 }
