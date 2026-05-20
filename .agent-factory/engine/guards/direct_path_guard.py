@@ -44,7 +44,7 @@ _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/"),
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/statusline\.py"),
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)board/server\.py"),
-    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/claude_edit\.py"),
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/(?:apps/cli/)?claude_edit\.py"),
 ]
 
 # && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴

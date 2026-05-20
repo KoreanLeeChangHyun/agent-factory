@@ -29,7 +29,7 @@ import subprocess
 import sys
 
 PROJECT_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..')
 )
 CLAUDE_DIR = os.path.join(PROJECT_ROOT, '.claude')
 EDIT_DIR = os.path.join(PROJECT_ROOT, '.agent-factory', 'staging')

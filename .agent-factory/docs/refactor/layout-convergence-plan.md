@@ -1309,10 +1309,37 @@ Acceptance:
 - LLM adapter and orchestration tests pass
 - full pytest passes
 
+### M56: Move Claude Edit CLI Into Apps
+
+Status: complete
+
+Goal:
+
+Move the `flow-claude-edit` implementation out of the engine root and into the
+CLI app boundary.
+
+Completed slice:
+
+- moved `engine/claude_edit.py` to `engine/apps/cli/claude_edit.py`
+- updated `bin/flow-claude-edit` to execute the app CLI implementation
+- adjusted project path resolution for the new CLI location
+- updated direct path guard coverage to block direct execution of the new
+  implementation path
+- added focused CLI placement tests
+- extended layout convergence tests to prevent the legacy root source from
+  returning
+
+Acceptance:
+
+- CLI placement tests pass
+- direct path guard tests pass
+- `flow-claude-edit` executes from the repo root
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 805 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 807 passed, 2 skipped, 6 subtests passed
 ```
