@@ -131,7 +131,7 @@ def test_v2_dispatch_patch_method_exists() -> None:
 def test_generic_delete_dispatch_handler() -> None:
     """generic.py 에 DELETE 분기 dispatch 가 _handle_memory_delete / _handle_rules_delete /
     _handle_prompt_delete / _handle_quick_prompt_delete 4 handler 위임."""
-    generic_py = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers" / "generic.py"
+    generic_py = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "generic.py"
     src = generic_py.read_text(encoding="utf-8")
     # _handle_api_delete dispatcher 존재
     assert "_handle_api_delete" in src, (

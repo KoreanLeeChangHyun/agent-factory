@@ -1026,10 +1026,32 @@ Acceptance:
 - board API docstring/decorator and handler/router contract tests pass
 - full pytest passes
 
+### M44: Generic Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move generic API dispatch, poll, and SSE handlers into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Generic handler implementation to `engine/apps/board_api/generic.py`
+- kept `board/server/handlers/generic.py` as a compatibility export
+- updated direct static contract coverage to inspect the app-boundary generic
+  handler
+- added focused Generic board API app tests
+
+Acceptance:
+
+- Generic board API app tests pass
+- board API docstring/decorator and handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 771 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 775 passed, 2 skipped, 6 subtests passed
 ```

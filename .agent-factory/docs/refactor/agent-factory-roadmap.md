@@ -1528,12 +1528,43 @@ python3 -m pytest tests/application/apps/test_board_api_files.py tests/contracts
 python3 -m pytest  # 771 passed, 2 skipped, 6 subtests passed
 ```
 
+### M44: Generic Board API App Handler
+
+Status: complete
+
+Purpose:
+
+Move generic API dispatch, poll, and SSE Board API handlers into
+`engine/apps/board_api` while preserving the existing board handler import path.
+
+Tasks:
+
+- [x] move Generic handler implementation to `engine/apps/board_api/generic.py`
+- [x] keep `board/server/handlers/generic.py` as a compatibility export
+- [x] update direct static contract coverage to inspect app-boundary generic
+      handler
+- [x] add focused Generic board API app tests
+
+Acceptance criteria:
+
+- Generic board API app tests pass
+- board API docstring/decorator contract tests pass
+- board API handler/router contract tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_board_api_generic.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_v2_endpoints.py  # 74 passed, 2 skipped
+python3 -m pytest  # 775 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44
 ```
 
 Hard dependencies:
