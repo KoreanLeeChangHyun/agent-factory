@@ -6,7 +6,7 @@
 
 모듈 분할:
     state_machine.py: 상태 전이, 컨텍스트 갱신, 세션 링크
-    usage_tracker.py: 사용량 추적, 정산, .usage.md 관리
+    core.metrics.usage: 사용량 추적, 정산, .usage.md 관리
     task_tracker.py: 태스크 상태 관리
     env_manager.py: 환경변수 관리
 
@@ -43,7 +43,7 @@ from common import STEP_COLORS, load_json_file, resolve_abs_work_dir, resolve_pr
 from flow.cli_utils import build_common_epilog, deprecation_warning, registry_key_type  # noqa: E402
 from flow.flow_logger import append_log as _append_log  # noqa: E402
 from flow.state_machine import _print_state_banner, update_context, update_status, link_session  # noqa: E402
-from flow.usage_tracker import usage_pending, usage_record, usage_finalize, usage_regenerate  # noqa: E402
+from core.metrics.usage import usage_pending, usage_record, usage_finalize, usage_regenerate  # noqa: E402
 from flow.task_tracker import update_task_status  # noqa: E402
 from flow.env_manager import env_manage  # noqa: E402
 

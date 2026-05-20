@@ -99,3 +99,11 @@ def test_legacy_flow_metrics_sources_are_removed() -> None:
     legacy_dir = repo_root / ".agent-factory" / "engine" / "flow"
     assert not (legacy_dir / "metrics.py").exists()
     assert not (legacy_dir / "metrics_cli.py").exists()
+
+
+def test_legacy_flow_usage_tracker_source_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (
+        repo_root / ".agent-factory" / "engine" / "flow" / "usage_tracker.py"
+    ).exists()

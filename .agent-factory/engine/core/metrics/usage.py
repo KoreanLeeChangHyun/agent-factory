@@ -14,10 +14,13 @@ import os
 import shutil
 import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 # utils 패키지 import
-_engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+_engine_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
@@ -29,15 +32,21 @@ from common import (
     release_lock,
     resolve_project_root,
 )
-from flow.flow_logger import append_log as _append_log
-
-# constants 모듈 import (data 서브패키지 경로 추가)
-_data_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
-if _data_dir not in sys.path:
-    sys.path.insert(0, _data_dir)
 from constants import BUDGET_CEILING, BUDGET_THRESHOLDS, USAGE_HEADER_LINE, USAGE_SEPARATOR_LINE
 
 PROJECT_ROOT: str = resolve_project_root()
+_KST = timezone(timedelta(hours=9))
+
+
+def _append_log(abs_work_dir: str, level: str, message: str) -> None:
+    """Append a workflow log entry without coupling core metrics to flow runtime."""
+    try:
+        ts = datetime.now(_KST).strftime("%Y-%m-%dT%H:%M:%S")
+        log_path = os.path.join(abs_work_dir, "workflow.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{level}] {message}\n")
+    except Exception:
+        pass
 
 
 def _calc_effective(d: dict[str, Any]) -> float:
@@ -309,7 +318,7 @@ def _append_usage_snapshot(
         except Exception:  # noqa: BLE001
             pass
 
-        from engine.core.metrics import append_event
+        from . import append_event
         append_event(
             abs_work_dir,
             "usage.snapshot",

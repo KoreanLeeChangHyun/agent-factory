@@ -2379,12 +2379,49 @@ python3 -m pytest tests/application/apps/test_board_api_handler_common.py tests/
 python3 -m pytest  # 836 passed, 2 skipped, 6 subtests passed
 ```
 
+### M70: Move Usage Tracking Into Core Metrics
+
+Status: complete
+
+Purpose:
+
+Move usage JSON accounting and `usage.snapshot` emission out of `engine/flow`
+and into the core metrics boundary.
+
+Tasks:
+
+- [x] move `engine/flow/usage_tracker.py` to `engine/core/metrics/usage.py`
+- [x] export usage helpers from `engine/core/metrics`
+- [x] update `engine/flow/update_state.py` to import the core metrics usage
+      module
+- [x] remove the flow runtime logger dependency from core usage tracking
+- [x] add focused usage tracking tests
+- [x] extend layout convergence tests to prevent the legacy flow usage tracker
+      source from returning
+
+Acceptance criteria:
+
+- `update_state.py --help` executes from the repo root
+- usage tracking tests pass
+- metrics placement tests pass
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 .agent-factory/engine/flow/update_state.py --help  # exits 0
+python3 -m pytest tests/domain/metrics/test_usage.py tests/domain/metrics/test_events.py tests/application/apps/test_metrics_cli.py tests/architecture/test_layout_convergence.py tests/architecture/test_boundaries.py  # 21 passed
+python3 -m pytest tests/application/apps/test_hooks_subagent_stop.py tests/architecture/test_boundaries.py  # 4 passed
+python3 -m pytest  # 838 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67 -> M68 -> M69
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67 -> M68 -> M69 -> M70
 ```
 
 Hard dependencies:

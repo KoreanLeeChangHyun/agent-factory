@@ -1669,10 +1669,37 @@ Acceptance:
 - layout convergence tests pass
 - full pytest passes
 
+### M70: Move Usage Tracking Into Core Metrics
+
+Status: complete
+
+Goal:
+
+Move usage JSON accounting and `usage.snapshot` emission out of `engine/flow`
+and into the core metrics boundary.
+
+Completed slice:
+
+- moved `engine/flow/usage_tracker.py` to `engine/core/metrics/usage.py`
+- exported usage helpers from `engine/core/metrics`
+- updated `engine/flow/update_state.py` to import the core metrics usage module
+- removed the flow runtime logger dependency from core usage tracking
+- added focused usage tracking tests
+- extended layout convergence tests to prevent the legacy flow usage tracker
+  source from returning
+
+Acceptance:
+
+- `update_state.py --help` executes from the repo root
+- usage tracking tests pass
+- metrics placement tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 836 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 838 passed, 2 skipped, 6 subtests passed
 ```
