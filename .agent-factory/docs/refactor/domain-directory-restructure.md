@@ -4,7 +4,7 @@
 
 The current code is organized mostly by historical location:
 
-- `engine/v2`
+- `engine/apps/production_line`
 - `engine/flow`
 - `board/server`
 - `board/web`
@@ -32,7 +32,7 @@ Korean labels:
 
 This order is not an orchestration choice. It is the domain model.
 
-`DONE` in the current V2 code maps to the target `COMPLETE` stage. Runtime
+`DONE` in the current Production-line code maps to the target `COMPLETE` stage. Runtime
 lifecycle events such as `INIT`, `FAILED`, cancellation, retry, parallel
 execution, and provider selection belong to orchestration/application code, not
 to the workflow stage model.
@@ -61,16 +61,16 @@ and acceptance criteria to enter the absolute workflow.
 | Domain | Current Files | Responsibility |
 |---|---|---|
 | Work Request | `engine/flow/ticket_repository.py`, `engine/flow/kanban*.py`, `board/server/handlers/kanban.py`, `board/board_data.py` | 작업 요청서, Ouroboros refinement, kanban/request state |
-| Workflow Model | `engine/v2/_common.py`, `engine/v2/driver.py`, `engine/v2/steps/*` | Absolute stage model, run metadata, stage transition invariants |
-| Orchestration | `engine/v2/driver.py`, `engine/v2/steps/*`, `engine/v2/_retry.py`, `engine/v2/_parallel.py` | Runtime coordination, retry, adapter invocation, lifecycle events |
-| Planning | `engine/v2/core/plan_loader.py`, `engine/v2/steps/plan.py`, `engine/v2/prompts/plan.txt` | Plan schema, phase graph, PLAN generation |
-| Work Execution | `engine/v2/steps/work.py`, `engine/v2/_parallel.py`, `engine/v2/_retry.py` | Phase scheduling, worker execution, retries |
-| LLM Runtime | `engine/v2/_spawn.py` | Claude subprocess execution, session IDs, stream parsing |
-| Validation | `engine/v2/_verify.py`, `engine/v2/_verify_code.py`, `engine/v2/_validate.py`, `engine/v2/steps/validate.py` | Artifact checks, code checks, verdict rules |
-| Reporting | `engine/v2/steps/report.py`, `engine/v2/templates/report.html` | REPORT artifact generation |
+| Workflow Model | `engine/apps/production_line/_common.py`, `engine/apps/production_line/driver.py`, `engine/apps/production_line/steps/*` | Absolute stage model, run metadata, stage transition invariants |
+| Orchestration | `engine/apps/production_line/driver.py`, `engine/apps/production_line/steps/*`, `engine/apps/production_line/_retry.py`, `engine/apps/production_line/_parallel.py` | Runtime coordination, retry, adapter invocation, lifecycle events |
+| Planning | `engine/apps/production_line/core/plan_loader.py`, `engine/apps/production_line/steps/plan.py`, `engine/apps/production_line/prompts/plan.txt` | Plan schema, phase graph, PLAN generation |
+| Work Execution | `engine/apps/production_line/steps/work.py`, `engine/apps/production_line/_parallel.py`, `engine/apps/production_line/_retry.py` | Phase scheduling, worker execution, retries |
+| LLM Runtime | `engine/apps/production_line/_spawn.py` | Claude subprocess execution, session IDs, stream parsing |
+| Validation | `engine/apps/production_line/_verify.py`, `engine/apps/production_line/_verify_code.py`, `engine/apps/production_line/_validate.py`, `engine/apps/production_line/steps/validate.py` | Artifact checks, code checks, verdict rules |
+| Reporting | `engine/apps/production_line/steps/report.py`, `engine/apps/production_line/templates/report.html` | REPORT artifact generation |
 | Kanban | `engine/flow/kanban*.py`, `board/server/handlers/kanban.py`, `board/board_data.py` | Request board state and board-facing operations |
 | Worktree/Git | `engine/flow/worktree_manager.py`, `engine/flow/merge_pipeline.py`, `engine/flow/undo_done.py`, `engine/git/git_config.py`, `board/server/handlers/worktree_commit.py` | Feature branches, commits, merge/undo workflows |
-| Events/Sessions | `engine/v2/_emitter.py`, `board/server/v2_workflow_session.py`, `board/server/v2_sse_channel.py`, `board/server/sse_client_manager.py`, `board/server/poll_tracker.py` | Workflow sessions, event streams, SSE fan-out |
+| Events/Sessions | `engine/apps/production_line/_emitter.py`, `board/server/production_line_workflow_session.py`, `board/server/production_line_sse_channel.py`, `board/server/sse_client_manager.py`, `board/server/poll_tracker.py` | Workflow sessions, event streams, SSE fan-out |
 | Board API | `board/server/http_router.py`, `board/server/handlers/*` | HTTP routing and JSON contracts |
 | Terminal | `board/server/claude_process.py`, `board/server/terminal_channel.py`, `board/server/handlers/terminal.py`, `board/web/js/terminal/*` | Interactive terminal process and UI |
 | Hooks | `hooks/*.py`, `engine/hook-handlers/*`, `engine/guards/*` | Claude Code hook payloads, guards, prompt injection |
@@ -191,45 +191,45 @@ and acceptance criteria to enter the absolute workflow.
 
 | Current | Target |
 |---|---|
-| `engine/v2/_common.py::WorkflowContext` | `engine/core/workflow/domain.py` |
-| V2 step names `INIT/PLAN/WORK/VALIDATE/REPORT/DONE` | target model `PREPARE/PLAN/EXECUTE/VERIFY/REPORT/COMPLETE` plus lifecycle events |
-| `engine/v2/_common.py::read_status/write_status/update_step` | `engine/core/workflow/run_store.py` initially, then filesystem adapter |
-| `engine/v2/driver.py` | `engine/core/orchestration/service.py` plus `engine/apps/workflow_cli.py` |
-| `engine/v2/steps/init.py` | `engine/core/orchestration/lifecycle.py` and `PREPARE` service |
-| `engine/v2/steps/done.py` | `engine/core/orchestration/lifecycle.py` |
+| `engine/apps/production_line/_common.py::WorkflowContext` | `engine/core/workflow/domain.py` |
+| Production-line step names `INIT/PLAN/WORK/VALIDATE/REPORT/DONE` | target model `PREPARE/PLAN/EXECUTE/VERIFY/REPORT/COMPLETE` plus lifecycle events |
+| `engine/apps/production_line/_common.py::read_status/write_status/update_step` | `engine/core/workflow/run_store.py` initially, then filesystem adapter |
+| `engine/apps/production_line/driver.py` | `engine/core/orchestration/service.py` plus `engine/apps/workflow_cli.py` |
+| `engine/apps/production_line/steps/init.py` | `engine/core/orchestration/lifecycle.py` and `PREPARE` service |
+| `engine/apps/production_line/steps/done.py` | `engine/core/orchestration/lifecycle.py` |
 
 ### Planning
 
 | Current | Target |
 |---|---|
-| `engine/v2/core/plan_loader.py` | `engine/core/planning/loader.py` and `domain.py` |
-| `engine/v2/steps/plan.py` | `engine/core/planning/service.py` |
-| `engine/v2/prompts/plan.txt` | `engine/core/planning/prompts/plan.txt` or prompt adapter |
+| `engine/apps/production_line/core/plan_loader.py` | `engine/core/planning/loader.py` and `domain.py` |
+| `engine/apps/production_line/steps/plan.py` | `engine/core/planning/service.py` |
+| `engine/apps/production_line/prompts/plan.txt` | `engine/core/planning/prompts/plan.txt` or prompt adapter |
 
 ### Execution
 
 | Current | Target |
 |---|---|
-| `engine/v2/steps/work.py` | `engine/core/orchestration/scheduler.py` plus `engine/core/execution/result.py` |
-| `engine/v2/_parallel.py` | `engine/core/orchestration/scheduler.py` |
-| `engine/v2/_retry.py` | `engine/core/orchestration/retry.py` |
-| `engine/v2/_spawn.py` | `engine/adapters/llm/claude.py` behind `ports/llm_adapter.py` |
+| `engine/apps/production_line/steps/work.py` | `engine/core/orchestration/scheduler.py` plus `engine/core/execution/result.py` |
+| `engine/apps/production_line/_parallel.py` | `engine/core/orchestration/scheduler.py` |
+| `engine/apps/production_line/_retry.py` | `engine/core/orchestration/retry.py` |
+| `engine/apps/production_line/_spawn.py` | `engine/adapters/llm/claude.py` behind `ports/llm_adapter.py` |
 
 ### Validation
 
 | Current | Target |
 |---|---|
-| `engine/v2/_verify.py` | `engine/core/validation/artifact_rules.py` |
-| `engine/v2/_verify_code.py` | split: `engine/core/validation/code_checks.py` + tool adapter |
-| `engine/v2/_validate.py` | `engine/core/validation/verdict.py` |
-| `engine/v2/steps/validate.py` | `engine/core/validation/service.py` |
+| `engine/apps/production_line/_verify.py` | `engine/core/validation/artifact_rules.py` |
+| `engine/apps/production_line/_verify_code.py` | split: `engine/core/validation/code_checks.py` + tool adapter |
+| `engine/apps/production_line/_validate.py` | `engine/core/validation/verdict.py` |
+| `engine/apps/production_line/steps/validate.py` | `engine/core/validation/service.py` |
 
 ### Reporting
 
 | Current | Target |
 |---|---|
-| `engine/v2/steps/report.py` | `engine/core/reporting/service.py` |
-| `engine/v2/templates/report.html` | `engine/core/reporting/templates/report.html` |
+| `engine/apps/production_line/steps/report.py` | `engine/core/reporting/service.py` |
+| `engine/apps/production_line/templates/report.html` | `engine/core/reporting/templates/report.html` |
 
 ### Work Requests And Kanban
 
@@ -255,9 +255,9 @@ and acceptance criteria to enter the absolute workflow.
 
 | Current | Target |
 |---|---|
-| `engine/v2/_emitter.py` | `engine/core/events/emitter.py` with board adapter |
-| `board/server/v2_workflow_session.py` | `engine/core/events/session.py` plus filesystem adapter |
-| `board/server/v2_sse_channel.py` | `engine/adapters/board/sse.py` |
+| `engine/apps/production_line/_emitter.py` | `engine/core/events/emitter.py` with board adapter |
+| `board/server/production_line_workflow_session.py` | `engine/core/events/session.py` plus filesystem adapter |
+| `board/server/production_line_sse_channel.py` | `engine/adapters/board/sse.py` |
 | `board/server/sse_client_manager.py` | `engine/adapters/board/sse.py` |
 | `board/server/poll_tracker.py` | `engine/adapters/board/polling.py` |
 
@@ -312,7 +312,7 @@ board/web/
     sse.js
     renderer-helpers.js
   workflow/
-    v2-workflow.js
+    production-line-workflow.js
     workflow-bar.js
     workflow-sessions.js
     step-overlay.js
@@ -394,10 +394,10 @@ are migrated together.
 M1 completed the first real restructuring batch:
 
 1. Created the canonical top-level tests directory under the runtime root.
-2. Moved green V2 tests into:
-   - `tests/domain/v2`
-   - `tests/application/v2`
-   - `tests/adapters/v2`
+2. Moved green Production-line tests into:
+   - `tests/domain/production_line`
+   - `tests/application/production_line`
+   - `tests/adapters/production_line`
 3. Moved board server tests to `tests/contracts/board_api`.
 4. Removed old `tests/__init__.py` files from the moved roots.
 5. Updated `pytest.ini` to use only `tests`.

@@ -41,7 +41,7 @@ Current high-level runtime layout:
       board_api/
       cli/
       hooks/
-    v2/
+    production-line/
       core/
       prompts/
       steps/
@@ -64,7 +64,7 @@ Current important facts:
 
 - `tests/` is the canonical test root.
 - `engine/core`, `engine/application`, and `engine/adapters` already exist.
-- `engine/v2` remains the active workflow driver/runtime implementation.
+- `engine/apps/production_line` remains the active workflow driver/runtime implementation.
 - `engine/flow` still owns many active CLI, kanban, worktree, metrics, and
   skill utilities.
 - `board/server` owns the HTTP router plus board session/event glue; handler
@@ -129,10 +129,10 @@ them. Avoid churn that only changes spelling.
 | Orchestration app | `engine/application/orchestration` | same | aligned |
 | LLM adapters | `engine/adapters/llm` | same | aligned |
 | Kanban store adapter | `engine/adapters/kanban` | same | aligned |
-| V2 driver | `engine/apps/cli`, `engine/v2` | `engine/apps/cli` + application/core services | partially aligned |
-| Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
-| Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
-| Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
+| Production-line driver | `engine/apps/cli`, `engine/apps/production_line` | `engine/apps/cli` + application/core services | partially aligned |
+| Planning | `engine/apps/production_line/core`, `engine/apps/production_line/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
+| Validation | `engine/apps/production_line/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
+| Reporting | `engine/apps/production_line/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
 | Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees` | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `engine/apps/board_api` with `board/server/handlers` compatibility exports | `engine/apps/board_api` or thin board handlers | aligned |
@@ -161,7 +161,7 @@ Do not move these in early layout milestones:
 - `.agent-factory/hooks/*`: Claude Code settings point here directly.
 - `.agent-factory/board/web/*`: web UI asset paths are coupled to the board.
 - `.agent-factory/board/server/http_router.py`: route stability matters.
-- `.agent-factory/engine/v2/driver.py`: keep as the active `flow-wf` entry until
+- `.agent-factory/engine/apps/production_line/driver.py`: keep as the active `flow-wf` entry until
   the services underneath it have moved.
 - `.agent-factory/runs`, `.agent-factory/tickets`,
   `.agent-factory/staging`: runtime data, not source layout.
@@ -172,10 +172,10 @@ Do not move these in early layout milestones:
 
 Current:
 
-- `engine/v2/_verify.py`
-- `engine/v2/_verify_code.py`
-- `engine/v2/_validate.py`
-- `engine/v2/_verdict.py`
+- `engine/apps/production_line/_verify.py`
+- `engine/apps/production_line/_verify_code.py`
+- `engine/apps/production_line/_validate.py`
+- `engine/apps/production_line/_verdict.py`
 
 Target:
 
@@ -191,18 +191,18 @@ Why first:
 
 Risk:
 
-- V2 step modules import these helpers directly.
+- Production-line step modules import these helpers directly.
 
 Mitigation:
 
 - Move pure logic first.
-- Leave `engine/v2/_*.py` compatibility modules that re-export moved functions.
+- Leave `engine/apps/production_line/_*.py` compatibility modules that re-export moved functions.
 
 ### Candidate B: Planning Loader
 
 Current:
 
-- `engine/v2/core/plan_loader.py`
+- `engine/apps/production_line/core/plan_loader.py`
 
 Target:
 
@@ -215,11 +215,11 @@ Why:
 
 Risk:
 
-- V2 path assumptions.
+- Production-line path assumptions.
 
 Mitigation:
 
-- Keep V2 import wrapper initially.
+- Keep Production-line import wrapper initially.
 
 ### Candidate C: Worktree/Git Adapter
 
@@ -256,7 +256,7 @@ Mitigation:
 | Board static -> board/web | mostly cosmetic until route/assets are stabilized |
 | Hooks -> engine/apps/hooks | Claude Code settings point to top-level files |
 | `engine/flow/kanban*.py` | kanban CLI, XML storage, board state, and DnD flows are intertwined |
-| Full `engine/v2/driver.py` move | must wait until validation/planning/reporting services are extracted |
+| Full `engine/apps/production_line/driver.py` move | must wait until validation/planning/reporting services are extracted |
 
 ## Proposed Milestones
 
@@ -285,17 +285,17 @@ Status: complete
 Goal:
 
 Move pure validation/verdict logic into `engine/core/validation` while keeping
-V2 compatibility imports.
+Production-line compatibility imports.
 
 Completed slice:
 
 - created `engine/core/validation/artifact_rules.py`
-- moved deterministic artifact checks from `engine/v2/_verify.py`
-- kept `engine/v2/_verify.py` as a V2 compatibility export module
+- moved deterministic artifact checks from `engine/apps/production_line/_verify.py`
+- kept `engine/apps/production_line/_verify.py` as a Production-line compatibility export module
 - created `engine/core/planning/loader.py`
-- moved the pure planning loader from `engine/v2/core/plan_loader.py` because
-  core validation needs plan schema validation without a core-to-V2 import
-- kept `engine/v2/core/plan_loader.py` as a V2 compatibility export module
+- moved the pure planning loader from `engine/apps/production_line/core/plan_loader.py` because
+  core validation needs plan schema validation without a core-to-Production-line import
+- kept `engine/apps/production_line/core/plan_loader.py` as a Production-line compatibility export module
 - deferred `_verify_code.py`, `_validate.py`, and `_verdict.py` because they
   still depend on subprocess, runtime context, and verdict artifact writing
 
@@ -303,9 +303,9 @@ Acceptance:
 
 - `tests/domain/validation/test_artifact_rules.py` passes
 - `tests/domain/planning/test_loader.py` passes
-- `tests/domain/v2/test_validate.py` passes
-- `tests/domain/v2/test_verify.py` passes
-- `tests/application/v2/test_steps_validate.py` passes
+- `tests/domain/production_line/test_validate.py` passes
+- `tests/domain/production_line/test_verify.py` passes
+- `tests/application/production_line/test_steps_validate.py` passes
 - `tests/architecture/test_boundaries.py` passes
 - full pytest passes
 
@@ -319,19 +319,19 @@ Move plan loading/parsing into `engine/core/planning`.
 
 Completed slice:
 
-- migrated canonical plan parser tests from `tests/domain/v2` to
+- migrated canonical plan parser tests from `tests/domain/production_line` to
   `tests/domain/planning`
-- migrated topology-level tests from `tests/domain/v2` to
+- migrated topology-level tests from `tests/domain/production_line` to
   `tests/domain/planning`
-- updated V2 WORK step to import from `engine.core.planning.loader`
-- left `engine/v2/core/plan_loader.py` as a compatibility export module
-- added focused V2 compatibility coverage for the old import path
+- updated Production-line WORK step to import from `engine.core.planning.loader`
+- left `engine/apps/production_line/core/plan_loader.py` as a compatibility export module
+- added focused Production-line compatibility coverage for the old import path
 
 Acceptance:
 
 - plan parsing/topology tests pass
-- V2 PLAN step tests pass
-- V2 WORK step tests pass
+- Production-line PLAN step tests pass
+- Production-line WORK step tests pass
 - architecture boundary tests pass
 - full pytest passes
 
@@ -349,10 +349,10 @@ Completed slice:
 - moved `report.html` template ownership to `engine/core/reporting/templates`
 - added `engine/core/reporting/templates.py`
 - added `engine/application/reporting/prompt.py`
-- updated V2 REPORT step to delegate deterministic prompt construction
-- kept V2 runtime orchestration, retry, verification, and manifest writing in
+- updated Production-line REPORT step to delegate deterministic prompt construction
+- kept Production-line runtime orchestration, retry, verification, and manifest writing in
   place
-- kept `engine.v2._common.load_template("report.html")` compatibility
+- kept `engine.apps.production_line._common.load_template("report.html")` compatibility
 
 Acceptance:
 
@@ -422,19 +422,19 @@ Remove root-level workflow session caches from the active runtime path.
 
 Completed slice:
 
-- changed default V2 workflow event persistence to
+- changed default Production-line workflow event persistence to
   `runs/<registry>/workflow-events.jsonl`
-- stopped board startup from creating `.agent-factory/.workflow-sessions-v2`
+- stopped board startup from creating `.agent-factory/.workflow-sessions-production-line`
 - stopped board startup from creating `.agent-factory/.workflow-sessions`
 - kept explicit `persist_dir` support for tests and legacy registry
   construction
-- kept V2 history endpoint behavior backed by `session.channel.persist_path`
-- added `.agent-factory/.workflow-sessions-v2/` to `.gitignore`
+- kept Production-line history endpoint behavior backed by `session.channel.persist_path`
+- added `.agent-factory/.workflow-sessions-production-line/` to `.gitignore`
 
 Acceptance:
 
-- V2 history endpoint tests pass
-- V2 workflow session registry tests pass
+- Production-line history endpoint tests pass
+- Production-line workflow session registry tests pass
 - full pytest passes
 
 ### M19: Hooks Boundary
@@ -486,20 +486,20 @@ Acceptance:
 - provider-specific Claude names remain only in adapters or `.claude/`
   integration surfaces
 
-### M21: Hook And V2 Legacy Test Migration
+### M21: Hook And Production-line Legacy Test Migration
 
 Status: complete
 
 Goal:
 
-Move green hook, guard, and V2 verdict tests out of legacy excluded roots into
+Move green hook, guard, and Production-line verdict tests out of legacy excluded roots into
 the canonical `tests/` tree.
 
 Completed slice:
 
 - moved `engine/guards/tests` guard coverage to `tests/adapters/hooks`
 - moved `engine/tests/hooks` PreToolUse coverage to `tests/adapters/hooks`
-- moved `engine/tests/test_v2_m9_verdict.py` to `tests/application/v2`
+- moved `engine/tests/test_production_line_m9_verdict.py` to `tests/application/production_line`
 - removed empty legacy test package markers under `engine/guards/tests` and
   `engine/tests`
 - removed `engine/guards/tests` and `engine/tests` from pytest quarantine
@@ -507,7 +507,7 @@ Completed slice:
 Acceptance:
 
 - migrated hook/guard tests pass from the canonical tree
-- migrated V2 verdict tests pass from the canonical tree
+- migrated Production-line verdict tests pass from the canonical tree
 - full pytest includes the migrated tests and passes
 
 ### M22: Board Green Test Migration
@@ -521,9 +521,9 @@ the canonical board API contract tree.
 
 Completed slice:
 
-- moved V2 launcher tests to `tests/contracts/board_api`
+- moved Production-line launcher tests to `tests/contracts/board_api`
 - moved kanban audit verdict tests to `tests/contracts/board_api`
-- moved V2 workflow phase 1 tests to `tests/contracts/board_api`
+- moved Production-line workflow phase 1 tests to `tests/contracts/board_api`
 - moved M8 WorkRequest facade handler tests to `tests/contracts/board_api`
 - left stale `board/tests/test_handlers_t424.py` quarantined because it still
   expects the removed `workflow_undo` handler
@@ -672,19 +672,19 @@ Status: complete
 Goal:
 
 Introduce the target `engine/apps/cli` boundary for the workflow CLI without
-moving the active V2 driver internals.
+moving the active Production-line driver internals.
 
 Completed slice:
 
 - added `engine/apps/cli/flow_wf.py` as the app-layer workflow CLI entrypoint
-- kept `engine.v2.driver` as the active driver implementation
+- kept `engine.apps.production_line.driver` as the active driver implementation
 - rewired `flow-wf submit` and `flow-launcher` to call
   `engine.apps.cli.flow_wf`
 - added focused delegation coverage for the new CLI app entrypoint
 
 Acceptance:
 
-- CLI app entrypoint delegates to the current V2 driver
+- CLI app entrypoint delegates to the current Production-line driver
 - `flow-wf --help` still works
 - full pytest passes
 
@@ -1075,26 +1075,26 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
-### M46: V2 Workflow Board API App Handler
+### M46: Production-line Workflow Board API App Handler
 
 Status: complete
 
 Goal:
 
-Move V2 workflow REST/SSE endpoint handlers into `engine/apps/board_api`.
+Move Production-line workflow REST/SSE endpoint handlers into `engine/apps/board_api`.
 
 Completed slice:
 
-- moved V2 Workflow handler implementation to
-  `engine/apps/board_api/v2_workflow.py`
-- kept `board/server/handlers/v2_workflow.py` as a compatibility export
-- updated V2 workflow static contract tests to inspect the app-boundary handler
-- added focused V2 Workflow board API app tests
+- moved Production-line Workflow handler implementation to
+  `engine/apps/board_api/production_line_workflow.py`
+- kept `board/server/handlers/production_line_workflow.py` as a compatibility export
+- updated Production-line workflow static contract tests to inspect the app-boundary handler
+- added focused Production-line Workflow board API app tests
 
 Acceptance:
 
-- V2 Workflow board API app tests pass
-- V2 workflow endpoint contract tests pass
+- Production-line Workflow board API app tests pass
+- Production-line workflow endpoint contract tests pass
 - board API handler/router contract tests pass
 - full pytest passes
 
@@ -1159,7 +1159,7 @@ Completed slice:
 
 - moved Kanban handler implementation to `engine/apps/board_api/kanban.py`
 - kept `board/server/handlers/kanban.py` as a compatibility export
-- preserved the `_emit_launch_event` lazy import path used by `v2_launcher`
+- preserved the `_emit_launch_event` lazy import path used by `production_line_launcher`
 - updated Kanban handler imports to use absolute board server dependencies
 - added focused Kanban board API app tests
 
@@ -1183,7 +1183,7 @@ Completed slice:
 
 - updated `board/server/http_router.py` to compose app-boundary Board API mixins
   directly
-- updated `board/server/v2_launcher.py` to lazy import Kanban launch events from
+- updated `board/server/production_line_launcher.py` to lazy import Kanban launch events from
   `engine.apps.board_api.kanban`
 - kept `board/server/handlers` as compatibility exports for older import paths
 - added focused router import boundary tests
@@ -1192,7 +1192,7 @@ Completed slice:
 Acceptance:
 
 - router import boundary tests pass
-- board API handler/router and V2 launch contract tests pass
+- board API handler/router and Production-line launch contract tests pass
 - full pytest passes
 
 ### M51: Git Config Adapter Placement

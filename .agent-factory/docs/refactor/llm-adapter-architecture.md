@@ -77,7 +77,7 @@ Streaming can be added without changing the core contract by either:
 - passing an optional event sink to `run`, or
 - returning collected `LLMEvent` values in `LLMResult`.
 
-The current V2 behavior already collects stream-json lines, so the first
+The current Production-line behavior already collects stream-json lines, so the first
 migration can preserve collected events and add live forwarding later.
 
 ## Provider Adapters
@@ -86,7 +86,7 @@ migration can preserve collected events and add live forwarding later.
 
 Current source:
 
-- `engine/v2/_spawn.py`
+- `engine/apps/production_line/_spawn.py`
 
 Target:
 
@@ -210,7 +210,7 @@ board handler -> provider CLI
 
 - Add `LLMAdapter`, `LLMRequest`, `LLMResult`, `LLMEvent` types.
 - Wrap existing `spawn_claude` with `ClaudeAdapter`.
-- Keep `engine/v2/_spawn.py` as a compatibility shim only during the phase.
+- Keep `engine/apps/production_line/_spawn.py` as a compatibility shim only during the phase.
 - Tests should still pass.
 
 ### Phase L1: Application Injection

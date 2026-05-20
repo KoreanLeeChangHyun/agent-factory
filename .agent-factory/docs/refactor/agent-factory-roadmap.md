@@ -157,7 +157,7 @@ tests/
 Tasks:
 
 - create canonical `tests/` root
-- move green `engine/v2/tests` into domain/application/adapter buckets
+- move green `engine/apps/production_line tests` into domain/application/adapter buckets
 - move `board/server/tests` into `tests/contracts/board_api`
 - delete or rewrite V1-only tests
 - remove stale `tests/__init__.py` package roots
@@ -247,7 +247,7 @@ Status: done
 
 Purpose:
 
-Extract the absolute workflow model from V2 runtime code.
+Extract the absolute workflow model from Production-line runtime code.
 
 Target stages:
 
@@ -259,24 +259,24 @@ Tasks:
 
 - add `WorkflowStage` enum
 - add transition rules
-- map V2 names:
+- map Production-line names:
   - `INIT` -> lifecycle / prepare runtime
   - `WORK` -> `EXECUTE`
   - `VALIDATE` -> `VERIFY`
   - `DONE` -> `COMPLETE`
 - add `WorkflowRun` domain model
-- keep existing V2 behavior through compatibility mapping
+- keep existing Production-line behavior through compatibility mapping
 
 Acceptance criteria:
 
 - domain tests prove the six-stage order is enforced
 - orchestration cannot reorder stages
-- V2 status files can still be read during migration
+- Production-line status files can still be read during migration
 
 Current verification:
 
 ```text
-python3 -m pytest tests/domain/workflows tests/application/v2/test_common.py
+python3 -m pytest tests/domain/workflows tests/application/production_line/test_common.py
 ```
 
 ### M5: Orchestration And Harness Engineering
@@ -524,37 +524,37 @@ Status: complete
 Purpose:
 
 Start the post-M12 layout convergence by moving pure deterministic validation
-rules out of the active V2 runtime package. The pure planning loader was moved
+rules out of the active Production-line runtime package. The pure planning loader was moved
 with this slice because core validation validates `plan.json` schema and the
-architecture boundary forbids core modules from importing V2 runtime modules.
+architecture boundary forbids core modules from importing Production-line runtime modules.
 
 Tasks:
 
 - [x] create `engine/core/validation`
 - [x] move artifact validation rules into
       `engine/core/validation/artifact_rules.py`
-- [x] keep `engine/v2/_verify.py` as a compatibility export surface
+- [x] keep `engine/apps/production_line/_verify.py` as a compatibility export surface
 - [x] move pure plan loading into `engine/core/planning/loader.py`
-- [x] keep `engine/v2/core/plan_loader.py` as a compatibility export surface
+- [x] keep `engine/apps/production_line/core/plan_loader.py` as a compatibility export surface
 - [x] add direct domain coverage for the new core validation module
 - [x] add direct domain coverage for the new core planning loader
 - [x] leave coupled code checks, verdict writing, and validate-step orchestration
-      in V2 for later slices
+      in Production-line for later slices
 
 Acceptance criteria:
 
-- core validation artifact rules can be imported without using the V2 `_verify`
+- core validation artifact rules can be imported without using the Production-line `_verify`
   module
-- existing V2 `_verify` imports continue to work
-- existing V2 `core.plan_loader` imports continue to work
+- existing Production-line `_verify` imports continue to work
+- existing Production-line `core.plan_loader` imports continue to work
 - PLAN, WORK, VALIDATE, REPORT artifact checks keep existing behavior
-- core architecture tests still forbid core-to-V2 imports
+- core architecture tests still forbid core-to-Production-line imports
 - canonical tests pass
 
 Current verification:
 
 ```text
-python3 -m pytest tests/domain/validation tests/domain/planning tests/domain/v2/test_parse_plan_json.py tests/domain/v2/test_topo_levels.py tests/domain/v2/test_verify.py tests/adapters/v2/test_report_html_verify.py tests/application/v2/test_steps_work.py tests/application/v2/test_steps_validate.py tests/architecture/test_boundaries.py  # 72 passed
+python3 -m pytest tests/domain/validation tests/domain/planning tests/domain/production_line/test_parse_plan_json.py tests/domain/production_line/test_topo_levels.py tests/domain/production_line/test_verify.py tests/adapters/production_line/test_report_html_verify.py tests/application/production_line/test_steps_work.py tests/application/production_line/test_steps_validate.py tests/architecture/test_boundaries.py  # 72 passed
 python3 -m pytest  # 361 passed, 2 skipped
 ```
 
@@ -570,27 +570,27 @@ and topology rules.
 
 Tasks:
 
-- [x] migrate plan parser tests from `tests/domain/v2` to
+- [x] migrate plan parser tests from `tests/domain/production_line` to
       `tests/domain/planning`
-- [x] migrate topology-level tests from `tests/domain/v2` to
+- [x] migrate topology-level tests from `tests/domain/production_line` to
       `tests/domain/planning`
-- [x] update the V2 WORK step to import planning rules from
+- [x] update the Production-line WORK step to import planning rules from
       `engine.core.planning.loader`
-- [x] keep `engine/v2/core/plan_loader.py` as a compatibility export surface
-- [x] add focused V2 compatibility tests for the old plan loader path
+- [x] keep `engine/apps/production_line/core/plan_loader.py` as a compatibility export surface
+- [x] add focused Production-line compatibility tests for the old plan loader path
 
 Acceptance criteria:
 
 - core planning tests cover parse and topology behavior
 - active runtime code prefers `engine.core.planning.loader`
-- legacy `engine.v2.core.plan_loader` imports still resolve to the core objects
+- legacy `engine.core.planning.loader` imports still resolve to the core objects
 - architecture boundary tests pass
 - canonical tests pass
 
 Current verification:
 
 ```text
-python3 -m pytest tests/domain/planning tests/domain/v2/test_plan_loader_compat.py tests/domain/v2/test_verify.py tests/application/v2/test_steps_work.py tests/architecture/test_boundaries.py  # 57 passed
+python3 -m pytest tests/domain/planning tests/domain/production_line/test_plan_loader_compat.py tests/domain/production_line/test_verify.py tests/application/production_line/test_steps_work.py tests/architecture/test_boundaries.py  # 57 passed
 python3 -m pytest  # 363 passed, 2 skipped
 ```
 
@@ -601,22 +601,22 @@ Status: complete
 Purpose:
 
 Move report template ownership and deterministic REPORT prompt construction out
-of the V2 runtime step while keeping the active REPORT driver stable.
+of the Production-line runtime step while keeping the active REPORT driver stable.
 
 Tasks:
 
 - [x] move `report.html` template ownership to `engine/core/reporting`
-- [x] keep `engine.v2._common.load_template("report.html")` compatibility
+- [x] keep `engine.apps.production_line._common.load_template("report.html")` compatibility
 - [x] add `engine/application/reporting` prompt construction
-- [x] update the V2 REPORT step to use the reporting application service
-- [x] keep V2 responsible for runtime file reads, session setup, retry, spawn,
+- [x] update the Production-line REPORT step to use the reporting application service
+- [x] keep Production-line responsible for runtime file reads, session setup, retry, spawn,
       verification, and manifest writing
 - [x] add focused tests for core template loading and REPORT prompt construction
 
 Acceptance criteria:
 
 - report HTML template tests pass from the core reporting location
-- REPORT prompt construction is covered without V2 runtime imports
+- REPORT prompt construction is covered without Production-line runtime imports
 - board workflow report artifact contracts continue to pass
 - architecture boundary tests pass
 - canonical tests pass
@@ -624,7 +624,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest tests/application/reporting tests/adapters/v2/test_report_html_verify.py tests/domain/validation/test_artifact_rules.py tests/application/v2/test_steps_done.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 24 passed
+python3 -m pytest tests/application/reporting tests/adapters/production_line/test_report_html_verify.py tests/domain/validation/test_artifact_rules.py tests/application/production_line/test_steps_done.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 24 passed
 python3 -m pytest  # 366 passed, 2 skipped
 ```
 
@@ -661,7 +661,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest tests/domain/worktrees tests/adapters/git tests/adapters/v2/test_init_work_dir.py tests/application/v2/test_steps_init.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 25 passed, 2 skipped
+python3 -m pytest tests/domain/worktrees tests/adapters/git tests/adapters/production_line/test_init_work_dir.py tests/application/production_line/test_steps_init.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 25 passed, 2 skipped
 .agent-factory/bin/flow-merge --help  # exit 0
 .agent-factory/bin/flow-kanban list   # exit 0
 python3 -m pytest  # 370 passed, 2 skipped
@@ -712,34 +712,34 @@ Status: complete
 
 Purpose:
 
-Stop using root-level workflow session caches and make V2 history follow the
+Stop using root-level workflow session caches and make Production-line history follow the
 run-local artifact model.
 
 Tasks:
 
-- [x] move default V2 workflow event persistence to
+- [x] move default Production-line workflow event persistence to
       `runs/<registry>/workflow-events.jsonl`
-- [x] stop board startup from creating `.agent-factory/.workflow-sessions-v2`
+- [x] stop board startup from creating `.agent-factory/.workflow-sessions-production-line`
 - [x] stop board startup from creating `.agent-factory/.workflow-sessions`
 - [x] keep explicit `persist_dir` support for tests and legacy registry
       construction
-- [x] keep V2 history endpoint behavior backed by `session.channel.persist_path`
-- [x] ignore `.agent-factory/.workflow-sessions-v2/` if old local data exists
-- [x] add contract coverage for run-local V2 history persistence
+- [x] keep Production-line history endpoint behavior backed by `session.channel.persist_path`
+- [x] ignore `.agent-factory/.workflow-sessions-production-line/` if old local data exists
+- [x] add contract coverage for run-local Production-line history persistence
 
 Acceptance criteria:
 
-- new V2 sessions do not require `.agent-factory/.workflow-sessions-v2`
+- new Production-line sessions do not require `.agent-factory/.workflow-sessions-production-line`
 - board startup does not recreate root `.workflow-sessions*` directories
-- V2 history endpoint tests still pass
-- V2 workflow session registry tests still pass
+- Production-line history endpoint tests still pass
+- Production-line workflow session registry tests still pass
 - canonical tests pass
 
 Current verification:
 
 ```text
-python3 -m pytest tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_api_smoke.py  # 21 passed, 2 skipped
-python3 -m pytest board/tests/test_v2_workflow_phase1.py  # 28 passed
+python3 -m pytest tests/contracts/board_api/test_production_line_history_endpoint.py tests/contracts/board_api/test_production_line_endpoints.py tests/contracts/board_api/test_api_smoke.py  # 21 passed, 2 skipped
+python3 -m pytest board/tests/test_production_line_workflow_phase1.py  # 28 passed
 python3 -m pytest  # 378 passed, 2 skipped
 ```
 
@@ -808,38 +808,38 @@ Current verification:
 
 ```text
 python3 -m pytest tests/contracts/board_api/test_api_endpoint_helper.py  # 5 passed
-python3 -m pytest board/tests/test_v2_launcher.py board/tests/test_kanban_audit_verdict.py board/tests/test_v2_workflow_phase1.py  # 60 passed
+python3 -m pytest board/tests/test_production_line_launcher.py board/tests/test_kanban_audit_verdict.py board/tests/test_production_line_workflow_phase1.py  # 60 passed
 python3 -m pytest  # 384 passed, 2 skipped
 ```
 
-### M21: Hook And V2 Legacy Test Migration
+### M21: Hook And Production-line Legacy Test Migration
 
 Status: complete
 
 Purpose:
 
-Reduce the legacy test quarantine by moving green hook, guard, and V2 verdict
+Reduce the legacy test quarantine by moving green hook, guard, and Production-line verdict
 coverage into the canonical `tests/` tree.
 
 Tasks:
 
 - [x] move `engine/guards/tests` coverage into `tests/adapters/hooks`
 - [x] move `engine/tests/hooks` PreToolUse coverage into `tests/adapters/hooks`
-- [x] move `engine/tests/test_v2_m9_verdict.py` into `tests/application/v2`
+- [x] move `engine/tests/test_production_line_m9_verdict.py` into `tests/application/production_line`
 - [x] remove now-empty legacy test package markers
 - [x] remove `engine/guards/tests` and `engine/tests` from pytest quarantine
 
 Acceptance criteria:
 
 - migrated hook/guard tests pass from canonical test paths
-- migrated V2 verdict tests pass from canonical test paths
+- migrated Production-line verdict tests pass from canonical test paths
 - canonical tests pass with the migrated tests included
 
 Current verification:
 
 ```text
 python3 -m pytest tests/adapters/hooks  # 47 passed, 6 subtests passed
-python3 -m pytest tests/adapters/hooks tests/application/v2/test_m9_verdict.py  # 52 passed, 6 subtests passed
+python3 -m pytest tests/adapters/hooks tests/application/production_line/test_m9_verdict.py  # 52 passed, 6 subtests passed
 python3 -m pytest  # 430 passed, 2 skipped, 6 subtests passed
 ```
 
@@ -854,9 +854,9 @@ workflow tests into `tests/contracts/board_api`.
 
 Tasks:
 
-- [x] move V2 launcher tests to canonical board API contracts
+- [x] move Production-line launcher tests to canonical board API contracts
 - [x] move kanban audit verdict tests to canonical board API contracts
-- [x] move V2 workflow phase 1 tests to canonical board API contracts
+- [x] move Production-line workflow phase 1 tests to canonical board API contracts
 - [x] move M8 WorkRequest facade handler tests to canonical board API contracts
 - [x] keep stale T-424 handler tests quarantined until rewritten or deleted
 
@@ -869,7 +869,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest tests/contracts/board_api/test_v2_launcher.py tests/contracts/board_api/test_kanban_audit_verdict.py tests/contracts/board_api/test_v2_workflow_phase1.py tests/contracts/board_api/test_m8_workrequest_handler.py  # 63 passed
+python3 -m pytest tests/contracts/board_api/test_production_line_launcher.py tests/contracts/board_api/test_kanban_audit_verdict.py tests/contracts/board_api/test_production_line_workflow_phase1.py tests/contracts/board_api/test_m8_workrequest_handler.py  # 63 passed
 python3 -m pytest  # 493 passed, 2 skipped, 6 subtests passed
 ```
 
@@ -1037,19 +1037,19 @@ Status: complete
 Purpose:
 
 Create the target `engine/apps/cli` entrypoint boundary while keeping the active
-V2 driver implementation stable.
+Production-line driver implementation stable.
 
 Tasks:
 
 - [x] add `engine/apps/cli/flow_wf.py`
-- [x] delegate the app entrypoint to `engine.v2.driver.main`
+- [x] delegate the app entrypoint to `engine.apps.production_line.driver.main`
 - [x] rewire `flow-wf submit` to call `engine.apps.cli.flow_wf`
 - [x] rewire `flow-launcher` to call `engine.apps.cli.flow_wf`
 - [x] add focused delegation tests
 
 Acceptance criteria:
 
-- app entrypoint delegates to the current V2 driver
+- app entrypoint delegates to the current Production-line driver
 - `flow-wf --help` still works
 - canonical tests pass
 
@@ -1555,7 +1555,7 @@ Acceptance criteria:
 Current verification:
 
 ```text
-python3 -m pytest tests/application/apps/test_board_api_generic.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_v2_endpoints.py  # 74 passed, 2 skipped
+python3 -m pytest tests/application/apps/test_board_api_generic.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_api_smoke.py tests/contracts/board_api/test_production_line_endpoints.py  # 74 passed, 2 skipped
 python3 -m pytest  # 775 passed, 2 skipped, 6 subtests passed
 ```
 
@@ -1589,34 +1589,34 @@ python3 -m pytest tests/application/apps/test_board_api_handler_common.py tests/
 python3 -m pytest  # 779 passed, 2 skipped, 6 subtests passed
 ```
 
-### M46: V2 Workflow Board API App Handler
+### M46: Production-line Workflow Board API App Handler
 
 Status: complete
 
 Purpose:
 
-Move V2 workflow REST/SSE Board API handlers into `engine/apps/board_api` while
+Move Production-line workflow REST/SSE Board API handlers into `engine/apps/board_api` while
 preserving the existing board handler import path.
 
 Tasks:
 
-- [x] move V2 Workflow handler implementation to
-      `engine/apps/board_api/v2_workflow.py`
-- [x] keep `board/server/handlers/v2_workflow.py` as a compatibility export
-- [x] update V2 workflow static contract tests to inspect app-boundary handler
-- [x] add focused V2 Workflow board API app tests
+- [x] move Production-line Workflow handler implementation to
+      `engine/apps/board_api/production_line_workflow.py`
+- [x] keep `board/server/handlers/production_line_workflow.py` as a compatibility export
+- [x] update Production-line workflow static contract tests to inspect app-boundary handler
+- [x] add focused Production-line Workflow board API app tests
 
 Acceptance criteria:
 
-- V2 Workflow board API app tests pass
-- V2 workflow endpoint contract tests pass
+- Production-line Workflow board API app tests pass
+- Production-line workflow endpoint contract tests pass
 - board API handler/router contract tests pass
 - canonical tests pass
 
 Current verification:
 
 ```text
-python3 -m pytest tests/application/apps/test_board_api_v2_workflow.py tests/contracts/board_api/test_v2_workflow_phase1.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_api_smoke.py  # 104 passed, 2 skipped
+python3 -m pytest tests/application/apps/test_board_api_production_line_workflow.py tests/contracts/board_api/test_production_line_workflow_phase1.py tests/contracts/board_api/test_production_line_endpoints.py tests/contracts/board_api/test_production_line_history_endpoint.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_api_smoke.py  # 104 passed, 2 skipped
 python3 -m pytest  # 784 passed, 2 skipped, 6 subtests passed
 ```
 
@@ -1699,7 +1699,7 @@ Tasks:
 
 - [x] move Kanban handler implementation to `engine/apps/board_api/kanban.py`
 - [x] keep `board/server/handlers/kanban.py` as a compatibility export
-- [x] preserve the `_emit_launch_event` lazy import path used by `v2_launcher`
+- [x] preserve the `_emit_launch_event` lazy import path used by `production_line_launcher`
 - [x] update Kanban handler imports to use absolute board server dependencies
 - [x] add focused Kanban board API app tests
 
@@ -1731,7 +1731,7 @@ Tasks:
 
 - [x] update `board/server/http_router.py` to compose app-boundary Board API
       mixins directly
-- [x] update `board/server/v2_launcher.py` to lazy import Kanban launch events
+- [x] update `board/server/production_line_launcher.py` to lazy import Kanban launch events
       from `engine.apps.board_api.kanban`
 - [x] keep `board/server/handlers` as compatibility exports for older import
       paths
@@ -1742,13 +1742,13 @@ Acceptance criteria:
 
 - router import boundary tests pass
 - board API handler/router contract tests pass
-- V2 launch contract tests pass
+- Production-line launch contract tests pass
 - canonical tests pass
 
 Current verification:
 
 ```text
-python3 -m pytest tests/application/apps/test_board_api_router_imports.py tests/application/apps/test_board_api_kanban.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_v2_workflow_phase1.py tests/contracts/board_api/test_api_smoke.py  # 45 passed, 2 skipped
+python3 -m pytest tests/application/apps/test_board_api_router_imports.py tests/application/apps/test_board_api_kanban.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_production_line_workflow_phase1.py tests/contracts/board_api/test_api_smoke.py  # 45 passed, 2 skipped
 python3 -m pytest  # 799 passed, 2 skipped, 6 subtests passed
 ```
 
