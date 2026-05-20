@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import os
 
-from .sse_client_manager import SSEClientManager
-from .poll_tracker import PollChangeTracker
-from .terminal_channel import TerminalSSEChannel
-from .claude_process import ClaudeProcess
-from .workflow_session import WorkflowSessionRegistry
-from .production_line_session import ProductionLineSessionRegistry
+from .channels.sse_client_manager import SSEClientManager
+from .sessions.poll_tracker import PollChangeTracker
+from .channels.terminal_channel import TerminalSSEChannel
+from .processes.claude_process import ClaudeProcess
+from .sessions.workflow_session import WorkflowSessionRegistry
+from .sessions.production_line_session import ProductionLineSessionRegistry
 
 # Module Level SSE Client Manager (Share with Server instances)
 sse_manager: SSEClientManager = SSEClientManager()
