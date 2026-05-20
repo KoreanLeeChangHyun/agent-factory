@@ -17,12 +17,12 @@ import threading
 from datetime import datetime, timezone
 
 from engine.apps.board_api.handler_common import _TICKET_RE, _KANBAN_ALL_DIRS
-from ._kanban_done_helpers import (
+from engine.apps.board_api.kanban_done_helpers import (
     handle_kanban_done_force,
     handle_kanban_done_review,
     check_derived_blocked,
 )
-from ._kanban_done_re import (
+from engine.apps.board_api.kanban_done_re import (
     _UNDO_ERROR_RE,
     _UNDO_STRATEGY_RESET,
     _UNDO_STRATEGY_REVERT,

@@ -4,32 +4,20 @@
   T6: _classify_done_failure — stdout 에 '[WARN] worktree 병합 실패: 병합 충돌 발생: ...'
       포함 시 error_kind='merge_conflict' + conflicts 리스트에 충돌 파일명 반영
 
-_kanban_done_re.py (T-499) 는 패키지 상대 import 없는 standalone 모듈이라 파일 전체를
-exec 로 격리 실행해 _classify_done_failure 를 추출한다.
+kanban_done_re.py (T-499) 는 Board API 앱 경계의 compatibility export 이므로
+모듈 import 로 _classify_done_failure 를 추출한다.
 """
 
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
-
-# _kanban_done_re.py 경로 계산: tests/ → engine/ → .agent-factory/ → board/server/handlers/
-_WORKTREE_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
-_KANBAN_DONE_RE_PY = (
-    _WORKTREE_ROOT / ".agent-factory" / "board" / "server" / "handlers" / "_kanban_done_re.py"
-)
 
 
 def _load_classify_done_failure():
-    """_kanban_done_re.py 의 _classify_done_failure 를 격리 추출한다.
+    """Board API 앱 경계의 _classify_done_failure 를 추출한다."""
+    from engine.apps.board_api.kanban_done_re import _classify_done_failure
 
-    본 모듈은 ``re`` 만 import 하는 standalone 모듈이라 파일 전체를 exec 로
-    그대로 실행해도 안전하다.
-    """
-    src = _KANBAN_DONE_RE_PY.read_text(encoding="utf-8")
-    ns: dict = {}
-    exec(src, ns)  # noqa: S102
-    return ns["_classify_done_failure"]
+    return _classify_done_failure
 
 
 # 모듈 로드 시점에 함수를 추출한다 (테스트 메서드마다 재실행 방지)

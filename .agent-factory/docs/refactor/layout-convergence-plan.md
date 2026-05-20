@@ -1094,10 +1094,37 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M47: Kanban Done Board API App Helpers
+
+Status: complete
+
+Goal:
+
+Move Kanban done helper implementation and done/undo parsing compatibility
+exports into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Kanban done helper implementation to
+  `engine/apps/board_api/kanban_done_helpers.py`
+- moved Kanban done/undo parsing compatibility exports to
+  `engine/apps/board_api/kanban_done_re.py`
+- kept `board/server/handlers/_kanban_done_helpers.py` and
+  `board/server/handlers/_kanban_done_re.py` as compatibility exports
+- updated Kanban handler imports to use the app-boundary helpers
+- updated focused tests to patch and inspect the app-boundary modules
+
+Acceptance:
+
+- Kanban done helper app tests pass
+- Kanban done handler regression tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 784 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 790 passed, 2 skipped, 6 subtests passed
 ```

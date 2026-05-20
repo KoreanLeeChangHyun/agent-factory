@@ -106,10 +106,10 @@ def _make_done_handler():
 
 
 def test_review_xml_missing_returns_400_for_done_review() -> None:
-    from board.server.handlers._kanban_done_helpers import handle_kanban_done_review
+    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_review
 
     handler = _make_done_handler()
-    with patch("board.server.handlers._kanban_done_helpers.os.path.isfile", return_value=False):
+    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=False):
         handle_kanban_done_review(handler, "T-424", "/fake/root", "/fake/flow-kanban")
 
     handler._send_error.assert_called_once()
@@ -118,7 +118,7 @@ def test_review_xml_missing_returns_400_for_done_review() -> None:
 
 
 def test_review_xml_present_invokes_flow_kanban_done() -> None:
-    from board.server.handlers._kanban_done_helpers import handle_kanban_done_review
+    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_review
 
     handler = _make_done_handler()
     result = subprocess.CompletedProcess(
@@ -127,8 +127,8 @@ def test_review_xml_present_invokes_flow_kanban_done() -> None:
         stdout="feat/T-424-branch -> develop 병합 완료 (ab12cd34)\n",
         stderr="",
     )
-    with patch("board.server.handlers._kanban_done_helpers.os.path.isfile", return_value=True), patch(
-        "board.server.handlers._kanban_done_helpers.subprocess.run",
+    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=True), patch(
+        "engine.apps.board_api.kanban_done_helpers.subprocess.run",
         return_value=result,
     ) as run:
         handle_kanban_done_review(handler, "T-424", "/fake/root", "/fake/flow-kanban")
@@ -224,10 +224,10 @@ def test_kanban_undo_done_parses_success_stdout(tmp_path: Path) -> None:
 
 
 def test_force_done_open_xml_missing_returns_400() -> None:
-    from board.server.handlers._kanban_done_helpers import handle_kanban_done_force
+    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_force
 
     handler = _make_done_handler()
-    with patch("board.server.handlers._kanban_done_helpers.os.path.isfile", return_value=False):
+    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=False):
         handle_kanban_done_force(handler, "T-424", False, "/fake/root", "/fake/flow-kanban")
 
     handler._send_error.assert_called_once()
@@ -236,7 +236,7 @@ def test_force_done_open_xml_missing_returns_400() -> None:
 
 
 def test_force_done_dirty_guard_returns_409() -> None:
-    from board.server.handlers._kanban_done_helpers import handle_kanban_done_force
+    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_force
 
     handler = _make_done_handler()
     handler._get_dirty_files = MagicMock(return_value=["src/foo.py"])
@@ -244,7 +244,7 @@ def test_force_done_dirty_guard_returns_409() -> None:
     worktree_manager.get_worktree_path.return_value = "/fake/wt"
     worktree_manager.has_uncommitted_changes.return_value = True
 
-    with patch("board.server.handlers._kanban_done_helpers.os.path.isfile", return_value=True), patch.dict(
+    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=True), patch.dict(
         sys.modules,
         {"flow": types.SimpleNamespace(worktree_manager=worktree_manager)},
     ):
