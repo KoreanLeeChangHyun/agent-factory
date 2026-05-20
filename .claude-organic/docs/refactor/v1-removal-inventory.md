@@ -13,12 +13,12 @@ These tests currently describe removed V1 modules or old wrappers:
 |---|---|---|
 | `engine/flow/tests/test_failure_handler.py` | imports removed `flow.failure_handler` | delete or rewrite for V2 failure handling |
 | `engine/flow/tests/test_fsm_8state.py` | imports removed `flow.initialization` | rewrite against `engine.v2._common.update_step` |
-| `engine/flow/tests/test_http_launcher_timeout.py` | imports removed `flow.http_launcher` | delete; V2 launcher tests live under board/server and engine/v2 |
+| `engine/flow/tests/test_http_launcher_timeout.py` | imports removed `flow.http_launcher` | delete; V2 launcher tests live under `tests/contracts/board_api` and `tests/adapters/v2` |
 | `engine/flow/tests/test_sessions_status.py` | imports removed `flow.sessions` | rewrite against V2 session registry |
 | `engine/flow/tests/test_stop.py` | imports removed `flow.stop` | rewrite against V2 session finish/delete behavior |
 | `engine/flow/tests/test_phase_verifier.py` | expects missing `bin/flow-phase-verify` | delete wrapper expectation or migrate to V2 validation tests |
 | `board/tests/test_handlers_t424.py` | references removed `workflow_undo` handler | rewrite against `/api/kanban/undo-done` |
-| `board/tests/test_v2_*` | package import collision under old `board/tests` | move into `board/server/tests` or remove duplicate package layout |
+| `board/tests/test_v2_*` | package import collision under old `board/tests` | rewrite into canonical `tests/contracts/board_api` if still relevant, or remove duplicate package layout |
 | `engine/guards/tests/*` | package import collision under old test root | move into canonical test tree if still relevant |
 | `engine/tests/hooks/*` | package import collision under old test root | move into canonical hook adapter tests |
 

@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _V2_WORKFLOW_JS = (
     _REPO_ROOT / ".claude-organic" / "board" / "static" / "js" / "workflow"
     / "v2-workflow.js"

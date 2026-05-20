@@ -33,10 +33,10 @@ research / review command 에서는 TDD 사이클 미적용. 단 acceptance_crit
 ```
 acceptance_criteria:
   - "engine/v2/_verify_code.py 신설 + import 가능"
-  - "pytest engine/v2/tests/test_verify_code.py 통과"
+  - "pytest tests/adapters/v2/test_verify_code.py 통과"
 ```
 
-1. Red — `tests/test_verify_code.py` 에 `from engine.v2._verify_code import run` 테스트 작성 → `ImportError` 로 fail.
+1. Red — `tests/adapters/v2/test_verify_code.py` 에 `from engine.v2._verify_code import run` 테스트 작성 → `ImportError` 로 fail.
 2. Green — `engine/v2/_verify_code.py` 에 `def run(ctx): ...` 신설 → 테스트 PASS.
 3. Refactor — type hint 정리, docstring 추가, 중복 제거.
 

@@ -33,7 +33,7 @@
       "workers": 1,
       "acceptance_criteria": [
         "engine/v2/_common.py 신설 + import 가능",
-        "pytest engine/v2/tests/test_common.py 통과"
+        "pytest tests/application/v2/test_common.py 통과"
       ]
     },
     {
@@ -43,7 +43,7 @@
       "deliverable": "work/P2/W1.md",
       "spawn_mode": "in_place",
       "workers": 1,
-      "acceptance_criteria": ["pytest engine/v2/tests/test_emitter.py 통과"]
+      "acceptance_criteria": ["pytest tests/adapters/v2/test_emitter.py 통과"]
     }
   ]
 }

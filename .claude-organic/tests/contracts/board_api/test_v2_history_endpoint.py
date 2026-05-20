@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _V2_HANDLER = _REPO_ROOT / ".claude-organic" / "board" / "server" / "handlers" / "v2_workflow.py"
 
 

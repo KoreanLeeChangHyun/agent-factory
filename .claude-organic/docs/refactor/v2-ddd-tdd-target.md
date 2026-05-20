@@ -44,30 +44,34 @@ Run from `.claude-organic/`:
 python3 -m pytest
 ```
 
-The default pytest scope is intentionally limited to:
+The default pytest scope is intentionally limited to the canonical root:
 
-- `engine/v2/tests`
-- `board/server/tests`
+- `tests/`
 
-Stale V1 tests are excluded from default collection. They should be deleted,
-rewritten against V2, or moved into migration notes before the large file move.
+Stale V1 tests are excluded from default collection in `pytest.ini`. They
+should be deleted or rewritten against V2 before any source directory move.
 
 ## Test Layout Policy
 
-Current test directories are scattered across multiple package roots. This is a
-known source of `tests.*` import collisions and weak ownership.
+Green V2 and board API tests now live under one canonical root. Older scattered
+roots remain excluded until they are deleted or rewritten.
 
-Current scattered roots:
+Canonical roots:
 
-- `engine/v2/tests`
-- `board/server/tests`
+- `tests/domain/v2`
+- `tests/application/v2`
+- `tests/adapters/v2`
+- `tests/contracts/board_api`
+
+Excluded legacy roots:
+
 - `board/tests`
 - `engine/flow/tests`
+- `engine/flow/auditor/tests`
 - `engine/guards/tests`
 - `engine/tests/hooks`
-- `engine/core/tests` cache remnants only
 
-Target layout:
+Target layout remains:
 
 ```text
 tests/
@@ -82,10 +86,10 @@ Mapping:
 
 | Current area | Target area |
 |---|---|
-| `engine/v2/tests/test_common.py` | `tests/domain` or `tests/application` after split |
-| `engine/v2/tests/test_steps_*.py` | `tests/application` |
-| `engine/v2/tests/test_verify*.py` | `tests/domain` for pure rules, `tests/adapters` for tool execution |
-| `board/server/tests` | `tests/contracts/board_api` |
+| V2 pure rules and plan loading | `tests/domain/v2` |
+| V2 workflow/application behavior | `tests/application/v2` |
+| V2 subprocess, git, template, and tool adapters | `tests/adapters/v2` |
+| board API contracts | `tests/contracts/board_api` |
 | hook tests | `tests/adapters/hooks` |
 | git/worktree tests | `tests/adapters/git` |
 | stale V1 tests | delete or rewrite before moving |

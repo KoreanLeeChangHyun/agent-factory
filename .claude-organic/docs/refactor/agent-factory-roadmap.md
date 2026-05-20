@@ -137,7 +137,7 @@ Current verification:
 
 ### M1: Test Consolidation
 
-Status: planned
+Status: done
 
 Purpose:
 
@@ -168,6 +168,12 @@ Acceptance criteria:
 - no pytest import collision
 - `python3 -m pytest` passes
 - old scattered test roots are gone or explicitly excluded with deletion notes
+
+Current verification:
+
+```text
+321 passed, 2 skipped
+```
 
 ### M2: Runtime Root Rename
 
@@ -428,4 +434,3 @@ Start with M1:
 5. run canonical tests
 
 Do not rename `.claude-organic` or move source files until M1 is done.
-

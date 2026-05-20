@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HANDLERS_DIR = _REPO_ROOT / ".claude-organic" / "board" / "server" / "handlers"
 _HTTP_ROUTER = _REPO_ROOT / ".claude-organic" / "board" / "server" / "http_router.py"
 

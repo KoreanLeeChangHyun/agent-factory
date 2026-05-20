@@ -391,17 +391,16 @@ are migrated together.
 
 ## First Concrete Batch
 
-The first real restructuring batch should be:
+M1 completed the first real restructuring batch:
 
-1. Create the canonical top-level tests directory under the runtime root.
-2. Move `engine/v2/tests` to:
-   - `tests/domain/planning`
-   - `tests/application/workflow`
-   - `tests/application/validation`
-   - `tests/adapters/claude`
-3. Move `board/server/tests` to `tests/contracts/board_api`.
-4. Remove old `tests/__init__.py` files.
-5. Update `pytest.ini` to use only `tests`.
-6. Run canonical tests.
+1. Created the canonical top-level tests directory under the runtime root.
+2. Moved green V2 tests into:
+   - `tests/domain/v2`
+   - `tests/application/v2`
+   - `tests/adapters/v2`
+3. Moved board server tests to `tests/contracts/board_api`.
+4. Removed old `tests/__init__.py` files from the moved roots.
+5. Updated `pytest.ini` to use only `tests`.
+6. Verified canonical tests with `python3 -m pytest`.
 
 Only after this batch should source files start moving.

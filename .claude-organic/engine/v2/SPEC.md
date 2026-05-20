@@ -263,7 +263,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "acceptance_criteria": [
         "engine/v2/_common.py 신설 + import 가능",
         "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재",
-        "pytest engine/v2/tests/test_common.py 통과"
+        "pytest tests/application/v2/test_common.py 통과"
       ]
     },
     {
@@ -275,7 +275,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "workers": 1,
       "acceptance_criteria": [
         "engine/v2/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처",
-        "pytest engine/v2/tests/test_emitter.py 통과"
+        "pytest tests/adapters/v2/test_emitter.py 통과"
       ]
     }
   ]
