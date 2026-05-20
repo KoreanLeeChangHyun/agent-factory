@@ -23,6 +23,10 @@ _BOARD_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BOARD_DIR not in sys.path:
     sys.path.insert(0, _BOARD_DIR)
 
+_AGENT_FACTORY_DIR = os.path.dirname(_BOARD_DIR)
+if _AGENT_FACTORY_DIR not in sys.path:
+    sys.path.insert(0, _AGENT_FACTORY_DIR)
+
 from server.__main__ import main  # noqa: E402
 from server.app import _run_server  # noqa: E402
 
