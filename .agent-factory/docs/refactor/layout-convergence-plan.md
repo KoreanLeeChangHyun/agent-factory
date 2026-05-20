@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Board web | `board/static` | `board/web` | not aligned |
 | Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
-| Legacy tests | excluded roots under `engine/flow/tests`, stale `board/tests` | delete/rewrite under `tests/` | partially aligned |
+| Legacy tests | excluded roots under `engine/flow/tests` | delete/rewrite under `tests/` | partially aligned |
 
 ## Move Policy
 
@@ -527,10 +527,37 @@ Acceptance:
 - `board/tests` remains quarantined until the stale T-424 test is rewritten or
   deleted
 
+### M23: Board Handler Test Rewrite
+
+Status: complete
+
+Goal:
+
+Remove the remaining `board/tests` quarantine by rewriting stale T-424 handler
+coverage against current kanban-domain endpoints.
+
+Completed slice:
+
+- rewrote the old T-424 handler regression test under
+  `tests/contracts/board_api`
+- replaced removed `workflow_undo` expectations with
+  `KanbanHandlerMixin._handle_kanban_undo_done` coverage
+- kept done/undo regex, done failure classification, review XML precondition,
+  undo stderr parsing, undo success parsing, and force-done dirty guard
+  coverage
+- removed `board/tests/__init__.py`
+- removed `board/tests` from pytest quarantine
+
+Acceptance:
+
+- rewritten T-424 board handler tests pass from canonical paths
+- full pytest includes board handler coverage and passes
+- no tracked files remain under `board/tests`
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 493 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 504 passed, 2 skipped, 6 subtests passed
 ```

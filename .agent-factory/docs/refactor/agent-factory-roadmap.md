@@ -873,12 +873,45 @@ python3 -m pytest tests/contracts/board_api/test_v2_launcher.py tests/contracts/
 python3 -m pytest  # 493 passed, 2 skipped, 6 subtests passed
 ```
 
+### M23: Board Handler Test Rewrite
+
+Status: complete
+
+Purpose:
+
+Remove the remaining `board/tests` quarantine by rewriting stale T-424 handler
+coverage for the current kanban-domain undo endpoint.
+
+Tasks:
+
+- [x] move T-424 handler coverage into `tests/contracts/board_api`
+- [x] replace removed `workflow_undo` expectations with
+      `KanbanHandlerMixin._handle_kanban_undo_done`
+- [x] preserve done/undo regex and done failure classification coverage
+- [x] preserve review XML, undo stderr, undo success, and force-done dirty
+      guard coverage
+- [x] remove the old `board/tests` package marker
+- [x] remove `board/tests` from pytest quarantine
+
+Acceptance criteria:
+
+- rewritten board handler tests pass from canonical paths
+- canonical tests pass with the rewritten handler tests included
+- no tracked files remain under `board/tests`
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_handlers_t424.py  # 11 passed
+python3 -m pytest  # 504 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23
 ```
 
 Hard dependencies:
