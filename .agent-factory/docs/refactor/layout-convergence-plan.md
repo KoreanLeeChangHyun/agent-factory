@@ -637,6 +637,26 @@ Acceptance:
 - full pytest includes migrated current flow tests and passes
 - no tracked files remain under legacy flow test roots
 
+### M27: Test Quarantine Removal
+
+Status: complete
+
+Goal:
+
+Remove the final pytest quarantine entry now that all tracked legacy test roots
+are empty or gone.
+
+Completed slice:
+
+- removed `board/server/tests` from `pytest.ini` quarantine
+- removed stale untracked legacy test cache directories from the workspace
+- confirmed no tracked files remain under legacy test roots
+
+Acceptance:
+
+- canonical pytest still passes
+- `pytest.ini` no longer carries stale legacy test quarantine entries
+
 ## Verification Baseline
 
 Current baseline:

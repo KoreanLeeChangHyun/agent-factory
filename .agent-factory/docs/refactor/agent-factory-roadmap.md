@@ -1004,12 +1004,38 @@ python3 -m pytest tests/application/flow/test_merge_conflict_detection.py tests/
 python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
 ```
 
+### M27: Test Quarantine Removal
+
+Status: complete
+
+Purpose:
+
+Remove the final pytest quarantine entry after legacy test roots were emptied.
+
+Tasks:
+
+- [x] remove `board/server/tests` from `pytest.ini` quarantine
+- [x] remove stale untracked legacy test cache directories from the workspace
+- [x] confirm no tracked files remain under legacy test roots
+
+Acceptance criteria:
+
+- canonical tests pass
+- `pytest.ini` has no stale legacy test quarantine entries
+- legacy test roots have no tracked files
+
+Current verification:
+
+```text
+python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27
 ```
 
 Hard dependencies:
