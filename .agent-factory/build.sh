@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-# build.sh — Claude Code workflow environment auto-initialization script
+# build.sh — Agent Factory environment auto-initialization script
 # Supports: Ubuntu 20.04+, macOS 13.0+ | Dependencies: git, curl, python3, gh | Select: tmux
 
 # --- load constant ---
@@ -216,7 +216,7 @@ setup_shell_aliases() {
     # Always overwrite the template (completely switch to bin/wrapper PATH method)
     cp "$TMPL_CLAUDE_ALIASES" "$aliases_file"
     print_success ".claude.aliases setup complete ($aliases_file)"
-    local source_line="# Claude Code workflow aliases"
+    local source_line="# Agent Factory aliases"
     local source_cmd="[ -f \"$aliases_file\" ] && source \"$aliases_file\""
     [ ! -f "$shell_rc" ] && touch "$shell_rc"
     if grep -q ".claude.aliases" "$shell_rc" 2>/dev/null; then
@@ -596,7 +596,7 @@ main() {
     trap 'print_error "Initialization failed. Please check the error message above."' EXIT
     echo ""
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
-    printf '%s Initialize Claude Code workflow environment%s\\n' "${GREEN}" "${NC}"
+    printf '%s Initialize Agent Factory environment%s\\n' "${GREEN}" "${NC}"
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     command -v git  &>/dev/null || { print_error "git is not installed. Please install git first.";  exit 1; }
     command -v curl &>/dev/null || { print_error "curl is not installed. Please install curl first."; exit 1; }
@@ -618,7 +618,7 @@ main() {
     echo ""
     printf '%s=================================================%s\n' "${GREEN}" "${NC}"
     printf '%s Initialization completed!%s\\n' "${GREEN}" "${NC}"
-    printf '%s opens a new terminal or'\''source %s'\''를 실행하세요%s\n' "${GREEN}" "${DETECTED_SHELL_RC}" "${NC}"
+    printf '%s Open a new terminal or run '\''source %s'\''%s\n' "${GREEN}" "${DETECTED_SHELL_RC}" "${NC}"
     if [ -f "${url_file}" ]; then
         while IFS= read -r _board_line; do
             [ -z "${_board_line}" ] && continue

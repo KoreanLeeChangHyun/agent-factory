@@ -84,9 +84,9 @@ WATCH_DIRS: dict[str, str] = {
 # (server.py need to convert to absolute view when watcher registration. Once SSE Channel Only Reservation)
 MEMORY_WATCH_EVENT: str = 'memory_gc'
 
-# Workflow sync (init-claude-workflow.sh) Bootstrap URL and simultaneous run lock
+# Agent Factory sync (init.sh) bootstrap URL and simultaneous run lock
 _WORKFLOW_SYNC_URL: str = (
     'https://raw.githubusercontent.com/KoreanLeeChangHyun/'
-    'claude-workflow/main/init-claude-workflow.sh'
+    'claude-workflow/main/init.sh'
 )
 _workflow_sync_lock: threading.Lock = threading.Lock()

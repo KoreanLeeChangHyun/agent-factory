@@ -63,7 +63,7 @@
     restartItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-key">Restart Server</div>' +
-        '<div class="settings-item-label">Restart theBoard HTTP server</div>' +
+        '<div class="settings-item-label">Restart the Board HTTP server</div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
@@ -75,7 +75,7 @@
     buildUrlItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-key">Build URL</div>' +
-        '<div class="settings-item-label"> Copy the Bootstrap command to install workflow in other projects to the clipboard< /div>' +
+        '<div class="settings-item-label">Copy the Agent Factory bootstrap command for other projects.</div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-build-url-btn">Copy</button>' +

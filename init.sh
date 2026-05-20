@@ -159,7 +159,7 @@ if [ ! -d "$RUNTIME_DIR" ] && [ -d "$OLD_RUNTIME_DIR" ]; then
 fi
 
 preserve_dirs=("tickets" "runs" "roadmap" "memo" "worktrees" "board/data" "logs" "staging")
-preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-session-id")
+preserve_files=(".settings" ".env" ".version" ".board.url" ".last-session-id")
 
 if [ -d "$RUNTIME_DIR" ]; then
     # 업데이트 설치: 사용자 데이터 백업 후 교체

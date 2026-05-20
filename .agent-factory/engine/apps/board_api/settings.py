@@ -1,9 +1,9 @@
-"""SettingsHandlerMixin — 시스템 부트스트랩/설정 도메인 endpoint.
+"""SettingsHandlerMixin — Agent Factory bootstrap/settings domain endpoint.
 
-T-513 P2 — sync.py 의 옛 핸들러를 본 모듈로 이전. v1 워크플로우
-엔진 폐기 (T-513) 후 본 endpoint 는 워크플로우 분기가 아닌 시스템 부트스트랩
-(`init-claude-workflow.sh` 다운로드/실행) 책임 — 도메인 SETTINGS 정합. 호출
-경로는 `/api/settings/workflow-sync` 단일.
+T-513 P2 — Moved the old handler in sync.py to this module. v1 workflow
+engine retirement (T-513) made this endpoint an Agent Factory bootstrap path,
+not a workflow branch. It downloads/runs `init.sh` through the fixed
+`/api/settings/workflow-sync` route.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ class SettingsHandlerMixin:
 
     @api_endpoint("SETTINGS", "workflow_sync")
     def _handle_settings_workflow_sync(self) -> None:
-        """POST /api/settings/workflow-sync — init-claude-workflow.sh 실행 SSE 스트림.
+        """POST /api/settings/workflow-sync — init.sh runs SSE stream.
 
-        T-513 P2 — sync.py 의 `_handle_workflow_sync` 를 settings 도메인으로 이전.
-        본 endpoint 는 v1 워크플로우 엔진 sync 가 아니라 시스템 부트스트랩 (워크
-        플로우 인프라 install/upgrade) 책임.
+        T-513 P2 — Move `_handle_workflow_sync` in sync.py to the settings domain.
+        This endpoint is not a v1 workflow engine sync; it is responsible for
+        Agent Factory infrastructure install/upgrade.
 
         method: POST
         url: /api/settings/workflow-sync
