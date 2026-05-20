@@ -14,7 +14,7 @@ import json
 import threading
 import time
 
-from board.server._common import logger
+from board.server.support.common import logger
 
 
 class ProductionLineSSEChannel:

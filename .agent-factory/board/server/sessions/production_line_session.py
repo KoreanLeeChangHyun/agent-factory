@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from board.server._common import logger
+from board.server.support.common import logger
 
 if TYPE_CHECKING:
     from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel

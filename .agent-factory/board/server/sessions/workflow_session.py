@@ -8,7 +8,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from board.server._common import logger
+from board.server.support.common import logger
 from board.server.processes.claude_process import ClaudeProcess
 from board.server.channels.terminal_channel import TerminalSSEChannel
 

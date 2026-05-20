@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from .app import _run_server
+from .runtime.app import _run_server
 from engine.apps.board_api.runtime import (
     is_port_in_use,
     read_board_url_port,

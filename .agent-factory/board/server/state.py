@@ -1,29 +1,9 @@
-"""Module-level singletons shared across handlers."""
+"""Compatibility module alias for board server runtime state."""
 
 from __future__ import annotations
 
-import os
+import sys
+from importlib import import_module
 
-from .channels.sse_client_manager import SSEClientManager
-from .sessions.poll_tracker import PollChangeTracker
-from .channels.terminal_channel import TerminalSSEChannel
-from .processes.claude_process import ClaudeProcess
-from .sessions.workflow_session import WorkflowSessionRegistry
-from .sessions.production_line_session import ProductionLineSessionRegistry
-
-# Module Level SSE Client Manager (Share with Server instances)
-sse_manager: SSEClientManager = SSEClientManager()
-
-# Module level polling change tracker (shared with server instances)
-poll_tracker: PollChangeTracker = PollChangeTracker()
-
-# Module Level Terminal SSE Channel and Claude Process Manager
-terminal_sse_channel: TerminalSSEChannel = TerminalSSEChannel()
-claude_process: ClaudeProcess = ClaudeProcess(
-    terminal_sse_channel,
-    persist_file=os.path.join(os.getcwd(), '.agent-factory', '.last-session-id'),
-)
-
-# Module Level Workflow Session Registry
-workflow_registry: WorkflowSessionRegistry = WorkflowSessionRegistry()
-production_line_registry: ProductionLineSessionRegistry = ProductionLineSessionRegistry()
+_module = import_module("board.server.runtime.state")
+sys.modules[__name__] = _module

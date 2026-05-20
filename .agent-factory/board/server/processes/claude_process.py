@@ -10,7 +10,7 @@ import signal
 import subprocess
 import threading
 
-from board.server._common import logger, server_debug_log
+from board.server.support.common import logger, server_debug_log
 from board.server.channels.terminal_channel import TerminalSSEChannel
 
 
