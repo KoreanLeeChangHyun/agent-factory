@@ -25,7 +25,7 @@ TODAY = lambda: dt.date.today().isoformat()  # noqa: E731
 
 @dataclass
 class MemoryFile:
-    path: Path                      # 절대 경로
+    path: Path                      # absolute path
     name: str                       # frontmatter.name
     description: str
     type: str                       # user|feedback|project|reference
@@ -38,7 +38,7 @@ class MemoryFile:
 
     @property
     def relative(self) -> str:
-        """memory_dir 기준 상대 경로 (인덱스 링크용)."""
+        """Relative path relative to memory_dir (for index links)."""
         return self.path.name if self.path.parent.name in ('memory', '') else (
             f'{self.path.parent.name}/{self.path.name}'
         )
@@ -167,7 +167,7 @@ def scan_memories(cfg: GCConfig, *, include_archive: bool = False) -> list[Memor
     if not cfg.memory_dir.is_dir():
         return out
     seen: set[Path] = set()
-    # type 디렉터리 우선 스캔
+    # scan type directory first
     for t in TYPE_DIRS:
         d = cfg.type_dir(t)
         if not d.is_dir():
@@ -177,7 +177,7 @@ def scan_memories(cfg: GCConfig, *, include_archive: bool = False) -> list[Memor
             if mem is not None:
                 out.append(mem)
                 seen.add(p.resolve())
-    # 마이그레이션 전 평탄 파일도 수집 (MEMORY.md 제외)
+    # Also collect flat files before migration (except MEMORY.md)
     for p in sorted(cfg.memory_dir.glob('*.md')):
         if p.name == 'MEMORY.md' or p.resolve() in seen:
             continue
@@ -197,7 +197,7 @@ def scan_memories(cfg: GCConfig, *, include_archive: bool = False) -> list[Memor
 
 
 # ---------------------------------------------------------------------------
-# 인덱스 재생성
+# Regenerate index
 # ---------------------------------------------------------------------------
 
 CATEGORY_ORDER: tuple[tuple[str, str], ...] = (
@@ -229,7 +229,7 @@ def regenerate_index(cfg: GCConfig, memories: list[MemoryFile]) -> None:
     파일이 없거나 마커가 없으면 헤더 + 자동 영역만으로 새로 작성.
     """
     by_type: dict[str, list[MemoryFile]] = {t: [] for t, _ in CATEGORY_ORDER}
-    # importance·last_accessed 기준 내림 정렬
+    # Sort descending by importance·last_accessed
     for m in sorted(memories, key=lambda x: (-x.importance, x.last_accessed or ''), reverse=False):
         if m.type in by_type:
             by_type[m.type].append(m)
@@ -248,13 +248,13 @@ def regenerate_index(cfg: GCConfig, memories: list[MemoryFile]) -> None:
             + after.lstrip()
         )
     else:
-        header = '# Memory\n\n> 인덱스의 자동 영역은 `flow-memory-gc run` 이 갱신합니다.\n> 마커 외부에 추가한 메모는 보존됩니다.\n\n'
+        header = '# Memory \n \n > The automatic area of ​​the index is updated by `flow-memory-gc run`. \n > Notes added outside the marker will be preserved. \n \n'
         manual_keep = ''
         if existing:
-            # 기존 MEMORY.md 가 있지만 마커가 없으면 → 기존 본문을 Manual Notes 로 보존
+            # If there is an existing MEMORY.md but no marker → preserve the existing text as Manual Notes
             stripped = existing.lstrip()
             if stripped.startswith('# '):
-                # 첫 헤더 이후 본문만 보존
+                # Keep only the body text after the first header
                 stripped = stripped.split('\n', 1)[1] if '\n' in stripped else ''
             manual_keep = '\n\n## Manual Notes\n\n' + stripped.strip() + '\n'
         new_text = (

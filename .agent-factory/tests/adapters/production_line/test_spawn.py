@@ -1,12 +1,12 @@
-"""test_spawn.py — _spawn.py 단위 테스트.
+"""test spawn.py —  spawn.py module testing.
 
-대상:
-  - new_session_uuid (UUID4 형식)
-  - logical_session_name 명명 규약
-  - spawn_claude cmd 구성 검증 (subprocess.Popen mock)
-  - DEFAULT_PERMISSION_MODE 상수
+Price:
+  - new session uuid (UUID4 format)
+  - logical session name Name
+  - spawn claude cmd configuration verification (subprocess.Popen mock)
+  DEFAULT PERMISSION MODE constant
   - SpawnResult dataclass
-  - T-495 P1 — stream-json NDJSON line parsing + on_line callback + text 누적
+  News T-495 P1 — stream-json NDJSON line parsing + on line callback + text
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from engine.apps.production_line._spawn import (
 
 
 def _make_popen_mock(stdout_lines: list[str], stderr: str = "", returncode: int = 0):
-    """subprocess.Popen 의 in-memory mock factory.
+    """subprocess.Popen
 
-    stdout 은 iter-able (readline 루프 호환), stdin 은 dummy, wait 은 returncode.
+    stdout is iter-able (readline loop compatible), stdin is dummy, wait is returncode.
     """
     mock_proc = MagicMock()
     mock_proc.stdin = MagicMock()
@@ -75,7 +75,7 @@ def test_default_permission_mode() -> None:
 
 
 def test_spawn_claude_cmd_construction(tmp_path: Path) -> None:
-    """Popen 호출 시 cmd 가 SPEC §8 + T-495 P1 stream-json 정합."""
+    """When Popen call cmd is SPEC §8 + T-495 P1 stream-json fixation."""
     captured_cmd: list[str] = []
 
     def fake_popen(cmd, **kwargs):
@@ -93,7 +93,7 @@ def test_spawn_claude_cmd_construction(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert captured_cmd[0] == "claude"
     assert captured_cmd[1] == "-p"
-    # T-495 P1 — stream-json + verbose 필수
+    # T-495 P1 — stream-json + verbose required
     assert "--output-format" in captured_cmd
     assert "stream-json" in captured_cmd
     assert "--verbose" in captured_cmd
@@ -108,7 +108,7 @@ def test_spawn_claude_cmd_construction(tmp_path: Path) -> None:
 
 
 def test_spawn_claude_resume_cmd(tmp_path: Path) -> None:
-    """resume=True 시 --session-id 가 아닌 --resume 옵션 사용."""
+    """return=True --session-id --resume option use."""
     captured_cmd: list[str] = []
 
     def fake_popen(cmd, **kwargs):
@@ -128,15 +128,15 @@ def test_spawn_claude_resume_cmd(tmp_path: Path) -> None:
 
 
 def test_spawn_claude_timeout_captured(tmp_path: Path) -> None:
-    """deadline 초과 (monotonic 진행 시 시뮬레이션) → timed_out=True, rc=-1.
+    """timed out=True, rc=-1.
 
-    Popen 모드에서 timeout 시뮬레이션은 wait 이 TimeoutExpired 던지게.
+    Timeout simulation in Popen mode throws wait this TimeoutExpired.
     """
     import subprocess
 
     def fake_popen(cmd, **kwargs):
         proc = _make_popen_mock(stdout_lines=[], returncode=0)
-        # wait 이 TimeoutExpired 만들어 spawn 측에서 kill + timed_out 진입
+        # wait This timeoutExpired makes kill + timed out from spawn side
         proc.wait = MagicMock(side_effect=subprocess.TimeoutExpired(cmd=cmd, timeout=1))
         return proc
 
@@ -156,18 +156,18 @@ def test_spawn_result_dataclass() -> None:
     r = SpawnResult(returncode=0, stdout="hi", stderr="")
     assert r.returncode == 0
     assert not r.timed_out
-    # 신규 필드 default
+    # New field default
     assert r.ndjson_lines == []
     assert r.terminal_reason == ""
 
 
 # ---------------------------------------------------------------------------
-# T-495 P1 — stream-json NDJSON line 처리
+# T-495 P1 — stream-json NDJSON line processing
 # ---------------------------------------------------------------------------
 
 
 def test_extract_assistant_text_joins_blocks() -> None:
-    """assistant message.content[].text 만 join."""
+    """text.content.text"""
     obj = {
         "type": "assistant",
         "message": {
@@ -188,7 +188,7 @@ def test_extract_assistant_text_skips_non_assistant() -> None:
 
 
 def test_spawn_parses_ndjson_lines(tmp_path: Path) -> None:
-    """stream-json line 들이 ndjson_lines 에 누적되고 assistant.text 가 stdout 으로."""
+    """stream-json line is cumulative in ndjson lines and assistant.text is stdout."""
     lines = [
         json.dumps({"type": "system", "subtype": "init", "session_id": "s1"}),
         json.dumps({"type": "assistant", "message": {"content": [
@@ -220,7 +220,7 @@ def test_spawn_parses_ndjson_lines(tmp_path: Path) -> None:
 
 
 def test_spawn_on_line_callback_invoked(tmp_path: Path) -> None:
-    """on_line(obj) 콜백이 NDJSON line 마다 호출."""
+    """on line(obj) Callback to NDJSON line."""
     lines = [
         json.dumps({"type": "assistant", "message": {"content": [
             {"type": "text", "text": "x"}
@@ -248,7 +248,7 @@ def test_spawn_on_line_callback_invoked(tmp_path: Path) -> None:
 
 
 def test_spawn_on_line_callback_exception_silent(tmp_path: Path) -> None:
-    """on_line 콜백 예외는 silent 흡수 — driver 흐름 영향 0."""
+    """on line callback exception silent absorption — driver flow impact 0."""
     lines = [
         json.dumps({"type": "assistant", "message": {"content": [
             {"type": "text", "text": "y"}
@@ -276,12 +276,12 @@ def test_spawn_on_line_callback_exception_silent(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout == "y"
-    # 콜백은 매 line 마다 호출 (2건)
+    # Callback calls every line (2 cases)
     assert call_count["n"] == 2
 
 
 def test_spawn_skips_invalid_json_lines(tmp_path: Path) -> None:
-    """JSONDecodeError line 은 silent skip (noise 무시)."""
+    """JSONDecodeError line is silent skip (noise ignore)."""
     lines = [
         "garbage non-json line",
         "",
@@ -306,4 +306,4 @@ def test_spawn_skips_invalid_json_lines(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout == "ok"
-    assert len(result.ndjson_lines) == 2  # garbage 2건 skip
+    assert len(result.ndjson_lines) == 2  # Skip to content

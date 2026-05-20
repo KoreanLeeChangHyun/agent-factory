@@ -17,8 +17,8 @@ COMMAND_DEFAULTS 상수를 수정하세요.
     main: CLI 진입점
 
 사용법:
-    python3 .agent-factory/engine/sync/catalog_sync.py              # 카탈로그 생성/갱신
-    python3 .agent-factory/engine/sync/catalog_sync.py --dry-run     # 미리보기 (파일 쓰기 없음)
+    python3 .agent-factory/engine/sync/catalog_sync.py              # Create/Update Catalog
+    python3 .agent-factory/engine/sync/catalog_sync.py --dry-run     # Preview (no file writing)
 
 종료 코드: 0 성공, 1 실패
 """
@@ -48,17 +48,17 @@ PROJECT_ROOT = resolve_project_root()
 SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
 
-# 제외 접두사: 워크플로우 전용 스킬
+# Excluded prefixes: Workflow-specific skills
 EXCLUDE_PREFIXES = ("workflow-agent", "workflow-wf")
 
 # =============================================================================
-# Command Default Mapping (단일 소스 — 기존 command-skill-map.md에서 통합)
-# 매핑 변경 시 이 상수를 수정하세요.
+# Command Default Mapping (single source — integrated from existing command-skill-map.md)
+# Modify this constant when changing mappings.
 # =============================================================================
 COMMAND_DEFAULTS: list[tuple[str, str, str]] = [
-    ("implement", "review-code-quality, workflow-system", "코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드"),
-    ("review", "review-requesting, review-code-quality", "리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드"),
-    ("research", "research-general, research-integrated", "웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 planner LLM 판단으로 조건부 로드"),
+    ("implement", "review-code-quality, workflow-system", "Code quality checks (including Generator-Critic loops), verification before completion (including incremental verification). Conditional loading of manager skills when detecting asset management keywords"),
+    ("review", "review-requesting, review-code-quality", "Apply review checklist + quantitative quality check. Conditional loading of expert review skills when security/architecture/frontend/performance keywords are detected"),
+    ("research", "research-general, research-integrated", "Web research (research-general) + research-integrated. Supports cross-validation and source evaluation with references/ guide. Automatically loads parallel/verification skills for each keyword. Conditional loading of analyze-* skills when analysis keyword is detected. Code exploration (research-deep) is conditionally loaded based on planner LLM judgment"),
 ]
 
 
@@ -79,34 +79,34 @@ def parse_frontmatter(filepath: str) -> Optional[dict[str, object]]:
     except (IOError, OSError):
         return None
 
-    # frontmatter 추출 (--- ... ---)
+    # extract frontmatter (--- ... ---)
     match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
     if not match:
         return None
 
     fm_text = match.group(1)
 
-    # name 파싱
+    # name parsing
     name_match = re.search(r'^name:\s*"?([^"\n]+)"?\s*$', fm_text, re.MULTILINE)
     if name_match:
         result["name"] = name_match.group(1).strip()
 
-    # description 파싱 (따옴표 내 문자열)
+    # Parsing description (string within quotes)
     desc_match = re.search(r'^description:\s*"((?:[^"\\]|\\.)*)"', fm_text, re.MULTILINE)
     if desc_match:
         result["description"] = desc_match.group(1).strip()
     else:
-        # 따옴표 없는 description
+        # description without quotes
         desc_match2 = re.search(r'^description:\s*(.+)$', fm_text, re.MULTILINE)
         if desc_match2:
             result["description"] = desc_match2.group(1).strip()
 
-    # disable-model-invocation 파싱
+    # disable-model-invocation parsing
     dmi_match = re.search(r'^disable-model-invocation:\s*(true|false)', fm_text, re.MULTILINE)
     if dmi_match:
         result["disable-model-invocation"] = dmi_match.group(1).lower() == "true"
 
-    # scope 파싱 (global 기본값)
+    # scope parsing (global default)
     scope_match = re.search(r'^scope:\s*(\S+)', fm_text, re.MULTILINE)
     if scope_match:
         result["scope"] = scope_match.group(1).strip().lower()
@@ -135,7 +135,7 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
     skill_state = load_skill_state()
 
     if not os.path.isdir(SKILLS_DIR):
-        print(f"[ERROR] skills 디렉터리가 존재하지 않습니다: {SKILLS_DIR}", file=sys.stderr)
+        print(f"[ERROR] skills directory does not exist: {SKILLS_DIR}", file=sys.stderr)
         sys.exit(1)
 
     for entry in sorted(os.listdir(SKILLS_DIR)):
@@ -153,7 +153,7 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
 
         name = fm["name"] or entry
 
-        # 제외 조건: disable-model-invocation: true 또는 워크플로우 접두사
+        # Exclusion conditions: disable-model-invocation: true or workflow prefix
         if fm["disable-model-invocation"]:
             excluded_count += 1
             continue
@@ -162,17 +162,17 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
             excluded_count += 1
             continue
 
-        # 제외 조건 3: archived 스킬
+        # Exclusion 3: Archived Skills
         if is_archived(name, skill_state):
             excluded_count += 1
             continue
 
         skill_entry: dict[str, str] = {
             "name": str(name),
-            "description": str(fm["description"] or "(설명 없음)"),
+            "description": str(fm["description"] or "(no description)"),
         }
 
-        # scope에 따라 분류
+        # Classified according to scope
         if fm.get("scope") == "project":
             project_skills.append(skill_entry)
         else:
@@ -188,7 +188,7 @@ def build_command_default_mapping() -> str:
         마크다운 테이블 형식의 명령어-스킬 매핑 문자열 (개행 문자 포함)
     """
     lines = []
-    lines.append("| 명령어 | 자동 로드 스킬 | 용도 |")
+    lines.append("| command | Autoload Skill | Use |")
     lines.append("|--------|---------------|------|")
     for cmd, skills, desc in COMMAND_DEFAULTS:
         lines.append(f"| {cmd} | {skills} | {desc} |")
@@ -215,8 +215,8 @@ def generate_catalog(
 
     lines.append("# Skill Catalog")
     lines.append("")
-    lines.append("> 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.")
-    lines.append(f"> 활성 스킬: {total}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
+    lines.append("> This file is automatically created by `catalog_sync.py`. Please do not edit it yourself.")
+    lines.append(f"> Active Skills: {total} (Specialization: {len(global_skills)}, Project: {len(project_skills)})")
     lines.append("")
 
     # Section 1: Command Default Mapping
@@ -225,28 +225,28 @@ def generate_catalog(
     lines.append(command_mapping.rstrip())
     lines.append("")
 
-    # Section 2: Skill Descriptions (전문화 스킬)
+    # Section 2: Skill Descriptions (Specialization Skills)
     lines.append("## Skill Descriptions")
     lines.append("")
-    lines.append("| 스킬명 | description |")
+    lines.append("| Skill name | description |")
     lines.append("|--------|-------------|")
     for skill in global_skills:
-        # description 내 파이프 문자 이스케이프
+        # description escaping my pipe character
         desc = skill["description"].replace("|", "\\|")
         lines.append(f"| {skill['name']} | {desc} |")
     lines.append("")
 
-    # Section 3: Project Skills (프로젝트 스킬)
+    # Section 3: Project Skills
     lines.append("## Project Skills")
     lines.append("")
     if project_skills:
-        lines.append("| 스킬명 | description |")
+        lines.append("| Skill name | description |")
         lines.append("|--------|-------------|")
         for skill in project_skills:
             desc = skill["description"].replace("|", "\\|")
             lines.append(f"| {skill['name']} | {desc} |")
     else:
-        lines.append("(프로젝트 스킬 없음)")
+        lines.append("(No project skills)")
     lines.append("")
 
     return "\n".join(lines)
@@ -260,58 +260,58 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(
         prog="flow-catalog",
-        description="스킬 카탈로그 생성/갱신 (skill-catalog.md)",
+        description="Create/update skill catalog (skill-catalog.md)",
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="파일을 쓰지 않고 예상 결과만 출력한다",
+        help="Prints only expected results without writing a file",
     )
     args = parser.parse_args()
     dry_run = args.dry_run
 
-    # 스킬 스캔
+    # Skill Scan
     global_skills, project_skills, excluded_count = scan_skills()
     total = len(global_skills) + len(project_skills)
 
-    # 매핑 테이블 생성 (내장 데이터에서)
+    # Create mapping table (from embedded data)
     command_mapping = build_command_default_mapping()
 
-    # 카탈로그 생성
+    # Create catalog
     catalog_content = generate_catalog(global_skills, project_skills, command_mapping)
     catalog_size = len(catalog_content.encode("utf-8"))
 
     if dry_run:
         print("[STATE] CATALOG", flush=True)
-        print(f">> DRY-RUN 활성 스킬 {total}개", flush=True)
-        print("[DRY-RUN] 스킬 카탈로그 미리보기")
-        print(f"  활성 스킬: {total}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
-        print(f"  제외 스킬: {excluded_count}개")
-        print(f"  예상 크기: {catalog_size:,} bytes")
-        print(f"  대상 파일: {CATALOG_FILE}")
+        print(f">> DRY-RUN active skills {total}", flush=True)
+        print("[DRY-RUN] Skill Catalog Preview")
+        print(f"Active Skills: {total} (Specialization: {len(global_skills)}, Project: {len(project_skills)})")
+        print(f"Excluded skills: {excluded_count}")
+        print(f"Expected size: {catalog_size:,} bytes")
+        print(f"Target file: {CATALOG_FILE}")
         print()
-        print("  실제 생성하려면: python3 .agent-factory/engine/sync/catalog_sync.py")
+        print("To actually create it: python3 .agent-factory/engine/sync/catalog_sync.py")
         print(flush=True)
         sys.exit(0)
 
-    # 파일 쓰기
+    # write file
     try:
         with open(CATALOG_FILE, "w", encoding="utf-8") as f:
             f.write(catalog_content)
 
         actual_size = os.path.getsize(CATALOG_FILE)
         print("[STATE] CATALOG", flush=True)
-        print(f">> 활성 스킬 {total}개, {actual_size:,} bytes", flush=True)
-        print("[OK] 스킬 카탈로그 생성 완료")
-        print(f"  활성 스킬: {total}개 (전문화: {len(global_skills)}, 프로젝트: {len(project_skills)})")
-        print(f"  제외 스킬: {excluded_count}개")
-        print(f"  파일 크기: {actual_size:,} bytes")
-        print(f"  저장 위치: {CATALOG_FILE}")
+        print(f">> {total} active skills, {actual_size:,} bytes", flush=True)
+        print("[OK] Skill catalog creation completed")
+        print(f"Active Skills: {total} (Specialization: {len(global_skills)}, Project: {len(project_skills)})")
+        print(f"Excluded skills: {excluded_count}")
+        print(f"File size: {actual_size:,} bytes")
+        print(f"Save location: {CATALOG_FILE}")
         print(flush=True)
     except (IOError, OSError) as e:
-        print(f"[ERROR] 카탈로그 파일 쓰기 실패: {e}", file=sys.stderr)
+        print(f"[ERROR] Failed to write catalog file: {e}", file=sys.stderr)
         sys.exit(1)
 
 

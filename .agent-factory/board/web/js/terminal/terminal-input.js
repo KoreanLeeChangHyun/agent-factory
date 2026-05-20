@@ -12,8 +12,8 @@
 
   M.thinkingEl = null;
 
-  // Claude CLI 의 위트 있는 thinking verb pool 을 본떠 여러 단어를 로테이션한다.
-  // 회전 간격은 7~14초 사이 랜덤 — 고정 주기보다 자연스럽고 산만함을 줄인다.
+  // Claude CLI's witching thinking verb pool is a different word.
+  // The rotation interval is between 7 to 14 seconds, and the random is more natural than the fixed cycle.
   var THINKING_VERBS = [
     "Thinking", "Pondering", "Noodling", "Channelling", "Tomfoolering",
     "Ruminating", "Contemplating", "Brewing", "Cogitating", "Puzzling",
@@ -26,7 +26,7 @@
   function _pickThinkingVerb(prev) {
     if (THINKING_VERBS.length <= 1) return THINKING_VERBS[0];
     var next;
-    // 직전과 같은 단어는 피해 단조로움을 줄인다.
+    // The word like the right is to reduce the damage forging.
     do {
       next = THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)];
     } while (next === prev);
@@ -69,7 +69,7 @@
     }
     _scheduleRotate();
 
-    // M.outputDiv 바로 뒤(input-card 바로 앞)에 삽입하여 하단 고정
+    // Insert the M.outputDiv right back (input-card right front) to fix the bottom
     M.outputDiv.parentNode.insertBefore(M.thinkingEl, M.outputDiv.nextSibling);
   };
 
@@ -111,7 +111,7 @@
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
-      removeBtn.title = "제거";
+      removeBtn.title = "About Us";
       removeBtn.innerHTML = "\u00D7";
       removeBtn.addEventListener("click", function () { M.removeImage(idx); });
 
@@ -124,17 +124,17 @@
   M.attachImage = function(file) {
     if (!file) return;
     if (ALLOWED_MIME.indexOf(file.type) === -1) {
-      M.appendErrorMessage("[첨부 오류] 지원하지 않는 형식입니다 (PNG/JPG/GIF/WebP 만 가능)");
+      M.appendErrorMessage("[Additional Error] Not supported format (PNG/JPG/GIF/WebP only available)");
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      M.appendErrorMessage("[첨부 오류] 파일 크기가 20MB를 초과합니다");
+      M.appendErrorMessage("[Adder Error] File size exceeds 20MB");
       return;
     }
     var reader = new FileReader();
     reader.onload = function (e) {
       var dataUrl = e.target.result;
-      // data:image/png;base64,XXXX 에서 base64 부분만 추출
+      // data:image/png;base64,XXXX to base64
       var base64 = dataUrl.split(",")[1];
       M.attachedImages.push({ data: base64, media_type: file.type, name: file.name });
       M.renderImagePreview();
@@ -155,7 +155,7 @@
   };
 
   /**
-   * 바이트 수를 사람이 읽기 쉬운 단위(B, KB, MB)로 변환하여 반환한다.
+   * The number of bytes is returned by converting to readable units (B, KB, MB).
    */
   M.formatFileSize = function(bytes) {
     if (bytes < 1024) return bytes + " B";
@@ -164,15 +164,15 @@
   };
 
   /**
-   * 비이미지 파일 프리뷰 카드를 terminal-image-preview 컨테이너에 렌더링한다.
-   * 기존 이미지 썸네일(M.renderImagePreview)과 동일 컨테이너를 공유하여
-   * 하나의 프리뷰 스트립으로 관리한다.
+   * Render asynchronous file preview card to terminal-image-preview container.
+   * Sharing the same container with the existing image thumbnail (M.renderImagePreview)
+   * Manage one view strip.
    */
   M.renderFilePreview = function() {
     var container = document.getElementById("terminal-image-preview");
     if (!container) return;
 
-    // 기존 파일 카드만 제거하고 이미지 썸네일은 M.renderImagePreview()가 관리
+    // M.renderImagePreview()
     var existingCards = container.querySelectorAll(".terminal-file-card");
     existingCards.forEach(function (card) { card.parentNode.removeChild(card); });
 
@@ -181,27 +181,27 @@
       card.className = "terminal-file-card";
       card.setAttribute("data-file-idx", idx);
 
-      // 확장자 라벨
+      // Scots Gaelic
       var ext = info.name.split(".").pop().toUpperCase().slice(0, 6) || "FILE";
       var extLabel = document.createElement("div");
       extLabel.className = "terminal-file-card-ext";
       extLabel.textContent = ext;
 
-      // 파일명 (ellipsis)
+      // ellipsis
       var nameLabel = document.createElement("div");
       nameLabel.className = "terminal-file-card-name";
       nameLabel.textContent = info.name;
       nameLabel.title = info.name;
 
-      // 파일 크기
+      // File Size
       var sizeLabel = document.createElement("div");
       sizeLabel.className = "terminal-file-card-size";
       sizeLabel.textContent = M.formatFileSize(info.size);
 
-      // 제거 버튼
+      // Remove button
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
-      removeBtn.title = "제거";
+      removeBtn.title = "About Us";
       removeBtn.innerHTML = "\u00D7";
       removeBtn.addEventListener("click", (function (capturedIdx) {
         return function () { M.removeFile(capturedIdx); };
@@ -217,7 +217,7 @@
 
   M.removeFile = function(index) {
     var removed = M.attachedFiles.splice(index, 1);
-    // textarea에서 파일명 제거
+    // Remove filename from textarea
     var targetInput = document.getElementById("terminal-input");
     if (targetInput && removed.length > 0) {
       var name = removed[0].name;
@@ -238,14 +238,14 @@
   // ── Ticket Attachment ──
 
   /**
-   * 첨부된 ticket 카드 프리뷰를 #terminal-image-preview 컨테이너에 렌더링한다.
-   * 이미지/파일 카드와 동일 컨테이너를 공유하여 한 줄 첨부 스트립으로 관리한다.
-   * 기존 ticket 카드 (`[data-ticket-idx]`)만 제거 후 재생성하여 이미지/파일 카드는 유지한다.
+   * #terminal-image-preview
+   * Share the same container with the image/file card to manage it with one line attachment strip.
+   * Only the existing ticket card (`[data-ticket-idx]`), the image/file card is maintained.
    *
-   * 카드 DOM 본체는 attachment-card.js 의 단일 진실 공급원 헬퍼
-   * (Board._term.attachmentCard.create) 에 위임하고, 입력 측에서만 필요한
-   * data-ticket-idx 속성과 remove 버튼을 wrapper 패턴으로 추가한다.
-   * 이렇게 하여 메시지 렌더 카드와 입력 측 카드의 룩앤필이 항상 일치한다.
+   * The Card DOM body is a single truth source helper of-card.js
+   * (Board. term.attachmentCard.create)
+   * add the data-ticket-idx property and remove button to the wrapper pattern.
+   * This will always match the message renderer card and the look&fill of the input side card.
    */
   M.renderTicketPreview = function() {
     var container = document.getElementById("terminal-image-preview");
@@ -265,7 +265,7 @@
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
-      removeBtn.title = "제거";
+      removeBtn.title = "About Us";
       removeBtn.innerHTML = "×";
       removeBtn.addEventListener("click", (function (capturedIdx) {
         return function () { M.removeTicket(capturedIdx); };
@@ -277,11 +277,11 @@
   };
 
   /**
-   * ticket 첨부를 추가한다.
-   * 같은 ticket 번호가 이미 첨부되어 있으면 무시 + appendSystemMessage 안내.
+   * Add ticket attachment.
+   * If the same ticket number is already attached, ignore + appendSystemMessage.
    *
-   * @param {{number, title, command, prompt, result}} payload - 칸반 카드 ticket 페이로드
-   * @param {string|null} reportText - report.html 본문 (없으면 null)
+   * @param {{number, title, command, prompt, result}} payload
+   * @param {string null} reportText - report.html
    */
   M.attachTicket = function(payload, reportText) {
     if (!payload || !payload.number) return;
@@ -290,7 +290,7 @@
     var dup = M.attachedTickets.some(function (t) { return t.number === payload.number; });
     if (dup) {
       if (M.appendSystemMessage) {
-        M.appendSystemMessage("[첨부] " + payload.number + " 이미 첨부됨");
+        M.appendSystemMessage("NEWS" + payload.number + "{{ data.filesizeHumanReadable }}");
       }
       return;
     }
@@ -318,10 +318,10 @@
     M.renderTicketPreview();
   };
 
-  // ── Memory 첨부 도메인 ──
-  // 메모리 첨부는 본문을 컨텍스트에 인라인하지 않고 (사용자 결정: 경로만 → 어시스턴트가 Read),
-  // sendInput 시점에 사용자 텍스트 앞에 prefix block 으로 path 토큰을 붙이는 방식.
-  // 따라서 backend attachments 필드로 전송하지 않으며 사이드카 영속화도 하지 않는다.
+  // ── Memory
+  // Memory attachments do not inline the body to context (user-determined: path only → astont read),
+  // How to attach a path token to prefix block before the user text at the sendInput point.
+  // So do not send backends field and do not print sidecar.
   M.attachedMemories = M.attachedMemories || [];
 
   M.renderMemoryPreview = function() {
@@ -348,7 +348,7 @@
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
-      removeBtn.title = "제거";
+      removeBtn.title = "About Us";
       removeBtn.innerHTML = "×";
       removeBtn.addEventListener("click", (function (capturedIdx) {
         return function () { M.removeMemory(capturedIdx); };
@@ -360,9 +360,9 @@
   };
 
   /**
-   * 메모리 첨부를 추가한다 (drop handler 가 호출).
-   * 같은 name 이 이미 첨부되어 있으면 무시 + appendSystemMessage 안내.
-   * description 은 비동기 fetch 후 보강 (파일이 없거나 frontmatter 가 없는 경우 graceful fallback).
+   * Add memory attachment (drop handler calls).
+   * If the same name is already attached, ignore + appendSystemMessage.
+   * description reinforcement after asynchronous fetch (if there is no file or the frontmatter is not graceful fallback).
    *
    * @param {{name: string, category?: string}} payload
    */
@@ -373,7 +373,7 @@
     var dup = M.attachedMemories.some(function (m) { return m.name === payload.name; });
     if (dup) {
       if (M.appendSystemMessage) {
-        M.appendSystemMessage("[첨부] 메모리 " + payload.name + " 이미 첨부됨");
+        M.appendSystemMessage("[Additional] Memory" + payload.name + "{{ data.filesizeHumanReadable }}");
       }
       return;
     }
@@ -387,7 +387,7 @@
     M.attachedMemories.push(entry);
     M.renderMemoryPreview();
 
-    // 비동기 description 보강 (frontmatter parse). 실패/누락은 graceful — chip 라벨이 파일명으로 fallback.
+    // Reinforce asynchronous description (frontmatter parse). Failure/never graceful — fallback with the chip label filename.
     var fetchFn = Board.fetch && Board.fetch.fetchMemoryFile;
     var parseFn = Board.fetch && Board.fetch.parseMemoryFrontmatter;
     if (typeof fetchFn === "function") {
@@ -415,12 +415,12 @@
   };
 
   /**
-   * 첨부된 ticket 배열을 backend 전송용 payload 구조로 변환한다.
-   * 본문 prepend 정책 폐기 (T-427 → T-429) — 사용자 메시지 본문은 사용자 텍스트만,
-   * 첨부 본문은 별도 attachments 필드로 전송하여 backend 가 SDK envelope content
-   * 배열에서 user role 의 추가 text 블록으로 결합한다.
+   * Convert the attached ticket arrangement to the payload structure for backend transmission.
+   * Text prepend policy pulmonary (T-427 → T-429) — User message text only,
+   * SDK Encoding content
+   * Combines the user role in the array with additional text blocks.
    *
-   * 빈 배열이면 null 반환 (payload 에 attachments 필드 자체를 넣지 않기 위함).
+   * null return null return (payload tos attachment field not insert).
    *
    * @param {Array<{number,title,command,prompt,result,report,addedAt}>|undefined} tickets
    * @returns {Array<{number,command,title,prompt,report,fetched_at}>|null}
@@ -434,25 +434,25 @@
         title: t.title || "",
         prompt: t.prompt || "",
         report: t.report || "",
-        // 첨부 시점(=DnD 후 client 가 ticket 페이로드 + report.html 를 fetch 한 시점)을
-        // 보존해두면 backend / sidecar 가 동일 메시지의 첨부 묶음으로 식별하기 쉬움.
+        // When attaching(=DnD after client is fetched the ticket payload + report.html)
+        // Backend / sidecar is easy to identify with the same message string.
         fetched_at: t.addedAt || null
       };
     });
   }
 
   /**
-   * 문자열이 파일 경로 패턴인지 판별한다.
-   * - Unix 절대 경로: /로 시작, // 제외 (프로토콜 상대 URL)
-   * - Windows 절대 경로: C:\ 등 드라이브 문자
-   * - 여러 줄 경로: 각 줄이 경로 패턴인 경우
-   * - URL(http://, https://) 제외
+   * Specifies that the string is a file path pattern.
+   * - Unix absolute path: / start, // except (Protocol relative URL)
+   * - Windows absolute path: C:\ drive letter
+   * - Multiple line paths: if each line is a path pattern
+   * - URL (http://, https://) excluded
    */
   M.isFilePath = function(text) {
     if (!text) return false;
-    // URL 제외
+    // URL
     if (/^https?:\/\//i.test(text.trim())) return false;
-    // 여러 줄인 경우 각 줄을 검사하여 모두 경로 패턴이면 true
+    // If multiple lines check each line and all path patterns are true
     var lines = text.trim().split(/\r?\n/);
     var pathLine = /^\/[^\/\s]+\/|^[A-Za-z]:\\/;
     for (var i = 0; i < lines.length; i++) {
@@ -463,7 +463,7 @@
   };
 
   /**
-   * textarea의 현재 커서 위치(selectionStart/End)에 텍스트를 삽입한다.
+   * Insert text in the current cursor position of textarea(selectionStart/End).
    */
   M.insertTextAtCursor = function(textarea, text) {
     var start = textarea.selectionStart;
@@ -475,17 +475,17 @@
     textarea.selectionStart = pos;
     textarea.selectionEnd = pos;
     textarea.focus();
-    // input 이벤트를 발생시켜 자동 높이 조정 트리거
+    // Automatic height adjustment trigger by generating input event
     var evt = document.createEvent("Event");
     evt.initEvent("input", true, true);
     textarea.dispatchEvent(evt);
   };
 
   /**
-   * .terminal-input-card 내부에 파일명 뱃지를 잠시 표시한다.
+   * . terminal-input-card
    */
   M.showFileBadge = function(card, names) {
-    // 기존 뱃지 제거
+    // Home
     var prev = card.querySelector(".terminal-file-badge");
     if (prev) prev.parentNode.removeChild(prev);
 
@@ -503,10 +503,10 @@
     M.inputLocked = locked;
     var input = document.getElementById("terminal-input");
     var sendBtn = document.getElementById("terminal-send-btn");
-    // busy 상태에서도 입력창은 활성 유지 (큐 입력 허용). idle/busy 만 inputtable.
-    // stopped/starting/archived/missing 은 입력 비활성.
-    // 예외: ESC autoResume 윈도우 (_inAutoResume) 중에는 stopped/starting 가 짧게
-    // 노출되어도 input.disabled 를 유지하지 않는다 — 입력창 깜빡 회피.
+    // In a busy state, the input window is active (allows to queue input). idle/busy only inputtable.
+    // stopped/starting/archived/missing silver input inert.
+    // exception: ESC autoResume Windows ( inAutoResume) stopped/starting is short
+    // It does not maintain input.disabled even exposed — input window flashes.
     var inAutoResume = !!Board.state._inAutoResume;
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus)
         || inAutoResume;
@@ -555,16 +555,16 @@
     });
     if (!text && !hasImages && !hasTickets && !hasMemories) return;
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
-    // _inAutoResume 윈도우 중에는 stopped/starting 도 send 허용 — process 새 spawn 후
-    // 즉시 idle 도착하므로 짧은 race 안에서도 사용자 send 시도 가능.
-    // (race 시 server 측 send_input 가드가 처리)
+    // inAutoResume Allows stop/starting even send during Windows — after process new spawn
+    // Instant idle arrives so you can try to send user even in short races.
+    // (for server-side send input guard processing at race)
     if (!inputtable.has(Board.state.termStatus) && !Board.state._inAutoResume) return;
 
     input.value = "";
     input.style.height = "auto";
 
-    // Route slash commands (큐에 넣지 않고 즉시 처리) — 이미지/티켓/메모리 있으면 슬래시 커맨드 미적용
-    // M.isFilePath() 체크: /home/... 등 파일 경로는 슬래시 커맨드로 라우팅하지 않음
+    // Route slash commands (to process immediately without putting on the order) — Slash commands for the future if images/Tickets/Memory
+    // M.isFilePath() check: /home/... The file path is not routed as a slash command
     if (!hasImages && !hasTickets && !hasMemories && text.charAt(0) === "/" && !M.isFilePath(text)) {
       Board.slashCommands.handle(text, {
         isWorkflowMode: M.isWorkflowMode,
@@ -577,33 +577,33 @@
       return;
     }
 
-    // T-429: 첨부 본문 prepend 정책 폐기 — sendText 는 사용자 텍스트 그대로.
-    // 첨부 ticket 본문은 별도 attachments payload 필드로 전송한다 (backend 가 SDK
-    // envelope 합성 시 user role content 배열에 추가 text 블록으로 결합).
+    // T-429: Attachment body prepend policy closure — sendText is user text intact.
+    // Attached ticket body sends to separates payload field (backend is SDK)
+    // When the user role content array is combined with additional text blocks.
     //
-    // 메모리 첨부는 path 만 prefix block 으로 본문에 인라인한다 (사용자 결정: 본문 fetch
-    // 없이 어시스턴트가 Read). 따라서 backend attachments 필드에는 추가하지 않는다.
+    // memory attachments inline the body with the path only prefix block (user crystal: body fetch
+    // Without a Assistant Read). so does not add to backends field.
     var sendText = text;
     if (hasMemories) {
       var memoryLines = M.attachedMemories.map(function (m) {
         var label = m.description || m.name;
         return "- " + label + ": memory/" + m.name;
       });
-      var prefixBlock = "[참고 메모리]\n" + memoryLines.join("\n");
+      var prefixBlock = "[Note Memory]\\n" + memoryLines.join("\n");
       sendText = text ? prefixBlock + "\n\n" + text : prefixBlock;
     }
     var attachmentsPayload = hasTickets ? _buildAttachmentsPayload(M.attachedTickets) : null;
-    // outputDiv 카드 렌더용 메타 스냅샷 (ticket/memory clear 전에 보존)
+    // meta snapshot for outputDiv card renderer (preserved before ticket/memory clear)
     var ticketsSnapshot = hasTickets ? M.attachedTickets.slice() : null;
     var memoriesSnapshot = hasMemories ? M.attachedMemories.slice() : null;
 
-    // busy 상태(응답 대기 중)이면 enqueueInput 으로 라우팅 (이미지/티켓 첨부 포함).
-    // 큐 entry 는 outputDiv 에 미리 echo 하지 않으며, 큐 stack 카드로만 노출된다.
+    // If you have a busy status (with response wait), you can route it to enqueueInput (with image/ticket).
+    // cue entry is not pre-echo in outputDiv, and only exposure to cue stack cards.
     if (Board.state.termStatus === "busy") {
       var imagesSnapshot = hasImages
         ? M.attachedImages.map(function (img) { return { data: img.data, media_type: img.media_type, name: img.name }; })
         : null;
-      // 큐 entry 도 attachments 를 분리 보존 — idle 전환 시 commitQueue 가 동일하게 분리 echo + 분리 전송한다.
+      // CommitQueueue is the same as the commitQueueue to the idle transition.
       M.enqueueInput(sendText, imagesSnapshot, attachmentsPayload);
       if (hasImages) {
         M.clearImages();
@@ -634,9 +634,9 @@
     }
     M.appendToOutput(div);
 
-    // T-429: 본문 div 와 별개로 첨부 카드 N개를 .term-message-attachments 컨테이너에 추가 echo.
-    // attachment-card.js 의 단일 진실 공급원 헬퍼를 재사용하여 입력 측 카드와 룩앤필 일치.
-    // 메모리 첨부도 동일 컨테이너에 type="memory" 로 echo.
+    // T-429: Added echo to .term-message-attachments container with div and alias.
+    // Attach-card.js reuses a single true source heaper to match the input side card and the look&pilot.
+    // echo by type="memory" in the same container as memory attachment.
     var hasAttachmentEcho = (ticketsSnapshot && ticketsSnapshot.length > 0)
       || (memoriesSnapshot && memoriesSnapshot.length > 0);
     if (hasAttachmentEcho && M.attachmentCard && typeof M.attachmentCard.create === "function") {
@@ -661,7 +661,7 @@
       M.appendToOutput(attachContainer);
     }
 
-    // 전송 payload 구성 — text 는 사용자 자유 입력만, 첨부는 별도 attachments 필드.
+    // Transfer payload configuration — text is user free input, attachments are attached to the attachments field.
     var payload = { text: sendText };
     if (hasImages) {
       payload.images = M.attachedImages.map(function (img) {
@@ -677,23 +677,23 @@
     if (hasMemories) M.clearMemories();
 
     // Mark sendText as locally sent so the user_input SSE echo is skipped.
-    // sendText = text = 사용자 자유 입력 → SSE user_input.text 와 정확히 일치.
+    // sendText = text = user free input → SSE user input.text matches exactly.
     if (sendText && Board.session && Board.session._markSent) {
       Board.session._markSent(sendText);
     }
 
-    // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
-    // 복원 대상은 사용자 자유 입력 영역만 — 첨부 카드 자체가 사라진 상태라 복원 의미 없음.
+    // ESC INTERFLOW SHIELD SHIELD SHIELD SHIELD
+    // Restoration target is only a user-friendly input area — no means that the attachment card itself disappears.
     M._lastSentText = text || "";
-    // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
+    // Since we sent a new message, localStorage's ESC restore text is clear.
     try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
 
     M.setInputLocked(true);
     M.startSpinner();
     Board.state.setTermStatus("busy");
     M.updateControlBar();
-    // 사용자가 엔터로 전송한 순간은 "최신 응답을 보고 싶다"는 명시적 액션.
-    // isNearBottom 판정과 무관하게 사용자 메시지 + 스피너가 보이도록 하단 이동.
+    // "I want to see the latest response"
+    // isNearBottom static and unparalleled user messages + go to the bottom to see the spinner.
     if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
 
     var ep = M.endpoints();
@@ -706,8 +706,8 @@
     });
   };
 
-  // drainQueue 는 구형 API (string push 방식). 1:1 모델에서는 commitQueue 로 위임한다.
-  // session.js fallback 경로에서 호출될 수 있으므로 alias 로 보존.
+  // drainQueueue is the old API (string push method). In the 1:1 model, commitQueue.
+  // session.js fallback can be called in the path, so preserved by alias.
   M.drainQueue = function() {
     if (M.isWorkflowMode) return;
     M.commitQueue();
@@ -718,9 +718,9 @@
     if (Board.state.termStatus !== "busy") return;
     if (M._interruptInFlight) return;
     M._interruptInFlight = true;
-    // [ESC 자동 resume 가드] ESC 직후 도착하는 process_exit 을 인식하기 위한 플래그.
-    // exit_code 가 SDK graceful shutdown 으로 인해 130이 아닐 가능성을 커버한다.
-    // 5초 후 자동 클리어 (사용자가 ESC 후 다른 동작을 한 시점은 이 윈도우 밖).
+    // [ESC Automatic Guard] The flag to recognize the process exit that arrives immediately after ESC.
+    // exit code will cover the possibility not 130 due to SDK graceful shutdown.
+    // Auto clear after 5 seconds (the user has another action after ESC).
     M._recentInterrupt = true;
     if (M._recentInterruptTimer) clearTimeout(M._recentInterruptTimer);
     M._recentInterruptTimer = setTimeout(function () {
@@ -740,8 +740,8 @@
         }
       }
       M.textBuffer = "";
-      // 결과가 도착하지 못한 빈 tool 박스 제거 — toolBoxMap 의 모든 항목 검사.
-      // 결과가 이미 들어간 박스는 removeEmptyToolBox 가 비어있지 않다고 판단해 보존.
+      // Remove empty toolboxes that did not arrive — check all items in toolBoxMap.
+      // If the result is already entered the box, removeEmptyToolBox is not empty and preserved.
       Object.keys(M.toolBoxMap).forEach(function (tuid) {
         M.removeEmptyToolBox(tuid);
       });
@@ -749,13 +749,13 @@
       M.currentToolBox = null;
       M.toolInputBuffer = "";
       M.currentToolName = null;
-      // [큐 보존 정책] ESC 는 현재 응답(A) 만 중지하고 대기 중인 큐(B, C ...)는
-      // 보존한다. idle 전환 후 advanceTurn 이 큐 다음 항목을 자동 send 한다
-      // (Claude CLI 와 동일 동작). 큐 폐기는 큐 카드 × 버튼으로 사용자가 직접 결정.
-      // [ESC 복원] 직전 보낸 사용자 메시지를 입력창에 자동 복원하여
-      // 사용자가 수정하거나 그대로 다시 보낼 수 있게 한다.
-      // 입력창에 사용자가 이미 새 텍스트를 타이핑 중이면 보존하면서 앞에 공백 한 칸
-      // 띄워 prepend (덮어쓰지 않음). localStorage 에도 저장하여 새로고침 후 유지.
+      // [Quantity Preservation Policy] ESC is currently stopped response(A) and waited cue(B, C...)
+      // Notice idle transition after advanceTurn will send the following items automatically
+      // (the same action as the Claude CLI). The queue is determined by the user directly with the queue card × button.
+      // [ESC Restoration] Automatically restore user messages sent to the input window
+      // The user can edit or send it back.
+      // In the input window, if the user already typing a new text, it can be blank before preserving
+      // prepend (not over). Save localStorage even and keep after a new one.
       if (M._lastSentText) {
         var inputEl = document.getElementById("terminal-input");
         if (inputEl) {
@@ -769,10 +769,10 @@
         M._lastSentText = "";
       }
       M.updateControlBar();
-      // 상태 변경 및 입력 잠금 해제는 result SSE 이벤트 핸들러에 위임한다.
-      // SIGINT 후 Claude CLI는 반드시 result 이벤트를 발행하므로 여기서 직접 변경하지 않는다.
-      // (직접 변경 시 서버가 아직 running 상태일 때 클라이언트가 idle로 전환되어 409 발생)
-      // _interruptInFlight 는 _onResult 에서 끈다.
+      // Change the status and unlock the result SSE event handler.
+      // The Claude CLI after SIGINT must be issued a result event, so it does not change directly here.
+      // (When the server is still running, the client switched to idle and 409 occurrences)
+      // interruptInFlight  onResult
     }).catch(function (err) {
       M.appendErrorMessage("[Error] Failed to interrupt: " + err.message);
       M._interruptInFlight = false;
@@ -783,19 +783,19 @@
   // ── Queue Model ──
 
   /**
-   * 입력 텍스트를 큐에 추가한다 (1:1 turn 모델).
+   * Add the input text to the queue (1:1 turn model).
    *
-   * - busy 중 추가 입력을 평면 큐에 push 한다.
-   * - 큐 entry 는 메시지 흐름(outputDiv)에 미리 echo 하지 않는다.
-   * - hint 카운트 갱신만 수행(updateControlBar 호출).
-   * - idle commit 타이머 / turn-id 생성 / nextTurn 필드 일체 없음.
+   * - Push the extra input during busy to the flat queue.
+   * - Cue entry is not pre-echo in message flow.
+   * - Perform only hint count update (updateControlBar call).
+   * - idle commit timer / turn-id generation / nextTurn field no object.
    *
-   * @param {string} text - 추가할 텍스트
+   * @param {string} text - Add text
    */
   /**
-   * 큐 stack 에 entry 카드를 추가한다.
-   * 컨테이너가 hidden 이면 해제. entry 클릭 핸들러로 × 삭제 연결.
-   * 이미지 첨부 entry: 텍스트 없으면 "[이미지 N장]" 라벨, 있으면 텍스트 + 끝에 "[+N장]" 표기.
+   * Add the entry card to the queue stack.
+   * The container is hidden. × Deleted connection with entry click handler.
+   * Image attachment entry: "[Emiji N]" label, if text + end "[+N]" notation.
    */
   function _renderQueueCard(entry) {
     var container = document.getElementById("terminal-input-queue");
@@ -804,8 +804,8 @@
     var imageCount = entry.images ? entry.images.length : 0;
     var attachCount = entry.attachments ? entry.attachments.length : 0;
     var labels = [];
-    if (imageCount > 0) labels.push("[이미지 " + imageCount + "장]");
-    if (attachCount > 0) labels.push("[첨부 " + attachCount + "건]");
+    if (imageCount > 0) labels.push("NEWS" + imageCount + "News");
+    if (attachCount > 0) labels.push("NEWS" + attachCount + "Notice");
     var labelStr = labels.join(" ");
     var displayText = entry.text || "";
     if (displayText && labelStr) {
@@ -817,7 +817,7 @@
     var item = document.createElement("div");
     item.className = "terminal-queue-item";
     item.setAttribute("data-entry-id", entry.id);
-    item.title = displayText; // 호버 시 전체 텍스트 노출 (한 줄 ellipsis 보완)
+    item.title = displayText; // Full text exposure to hover (one line ellipsis complement)
 
     var textSpan = document.createElement("span");
     textSpan.className = "terminal-queue-text";
@@ -826,7 +826,7 @@
     var removeBtn = document.createElement("button");
     removeBtn.className = "terminal-queue-remove";
     removeBtn.type = "button";
-    removeBtn.title = "큐에서 삭제";
+    removeBtn.title = "Remove from queue";
     removeBtn.innerHTML = "&times;";
     (function (eid) {
       removeBtn.addEventListener("click", function (ev) {
@@ -843,7 +843,7 @@
   }
 
   /**
-   * 큐 stack 에서 특정 entry 카드를 제거한다. 비면 컨테이너 hidden.
+   * Removes certain entry cards from cue stack. Default Container hidden.
    */
   function _removeQueueCard(entryId) {
     var container = document.getElementById("terminal-input-queue");
@@ -856,7 +856,7 @@
   M.enqueueInput = function(text, images, attachments) {
     text = text || "";
     images = images || null;
-    // T-429: attachments 도 entry 에 보존 — commitQueue 시 동일하게 분리 echo + 분리 전송.
+    // T-429: Retention to attachments — echo + separating transmission equally when commitQueueue.
     var attachList = (attachments && attachments.length > 0) ? attachments : null;
     var hasImages = images && images.length > 0;
     var hasAttachments = !!attachList;
@@ -880,40 +880,40 @@
 
     M.inputQueue.push(entry);
 
-    // 큐 stack 에 카드 추가 (입력란 위 오른쪽 정렬 영역).
+    // Add card to queue stack (input right alignment area above).
     _renderQueueCard(entry);
 
-    // hint 영역 카운트도 갱신한다.
+    // hint area count also update.
     M.updateControlBar();
   };
 
   /**
-   * 큐 첫 entry 1개를 dequeue → outputDiv 에 echo → send 한다.
+   * dequeue → outputDiv
    *
-   * 호출 조건:
-   * (a) idle 상태에서 신규 Enter (terminal.js keydown 핸들러)
-   * (b) busy → idle 전환 시 advanceTurn 이 잔여 큐 처리
+   * Tag:
+   * (a) Enter new in idle condition (terminal.js keydown handler)
+   * (b) busy → idle transition during advanceTurn this residual queue processing
    *
-   * busy 중 호출 시 무시 (advanceTurn 경로로 처리됨).
+   * ignored when calling busy (processed as an advanceTurn path).
    */
   M.commitQueue = function() {
     if (Board.debugLog) Board.debugLog('commitQueue.entry', {
       termStatus: Board.state.termStatus,
       queueSize: M.inputQueue ? M.inputQueue.length : 0,
     });
-    // busy 중이면 commit 무시 — advanceTurn 이 결과 도착 후 처리한다
+    // If you are busy, commit ignore — advanceTurn will be handled after arrival
     if (Board.state.termStatus === "busy") return;
 
-    // 큐가 비면 nothing to do
+    // getting fucked
     if (M.inputQueue.length === 0) return;
 
-    // 첫 entry 1개만 dequeue (1 turn = 1 메시지)
+    // First entry 1 dequeue (1 turn = 1 message)
     var entry = M.inputQueue.shift();
 
-    // 큐 stack 에서 해당 카드 제거 (dequeue → 처리 시작 시각 신호)
+    // Remove the corresponding card from queue stack (dequeue → process start time signal)
     _removeQueueCard(entry.id);
 
-    // 메시지 흐름에 echo (term-message term-user — 텍스트 + 이미지 thumbnail)
+    // echo in message flow (term-message term-user — text + image thumbnail)
     var div = document.createElement("div");
     div.className = "term-message term-user";
     if (entry.text) div.textContent = entry.text;
@@ -930,7 +930,7 @@
     }
     if (M.appendToOutput) M.appendToOutput(div);
 
-    // T-429: 첨부 카드를 별도 컨테이너로 추가 echo (sendInput 직접 경로와 동일한 분리 렌더).
+    // T-429: Add an attachment card to a separate container echo (sendInput direct route same separating wrender).
     if (entry.attachments && entry.attachments.length > 0 && M.attachmentCard && typeof M.attachmentCard.create === "function") {
       var attachContainer = document.createElement("div");
       attachContainer.className = "term-message-attachments";
@@ -940,14 +940,14 @@
       if (M.appendToOutput) M.appendToOutput(attachContainer);
     }
 
-    // sent 마킹으로 SSE user_input echo 중복 방지 (텍스트만 — 이미지/첨부 echo 는 무관)
+    // SSE user input echo anti-duplication with sent marking (text only — image/perfect echo is indispensable)
     if (entry.text && Board.session && Board.session._markSent) {
       Board.session._markSent(entry.text);
     }
 
-    // ESC 인터럽트 시 입력창 복원용으로 직전 송신 텍스트 저장.
+    // ESC INTERFLOW SHIELD SHIELD SHIELD SHIELD
     M._lastSentText = entry.text || "";
-    // 새 메시지를 보냈으므로 localStorage 의 ESC 복원 텍스트는 클리어.
+    // Since we sent a new message, localStorage's ESC restore text is clear.
     try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
 
     M.startSpinner();
@@ -956,7 +956,7 @@
     if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
     M.updateControlBar();
 
-    // payload 구성 — 텍스트 + 이미지 + 첨부 (있으면 각각 분리 필드)
+    // payload configuration — text + image + attachment (each separated field)
     var payload = { text: entry.text || "" };
     if (entry.images && entry.images.length > 0) {
       payload.images = entry.images.map(function (img) {
@@ -978,31 +978,31 @@
   };
 
   /**
-   * 큐에서 pending entry 를 제거한다 (hint 패널 × 버튼 클릭).
+   * Remove pending entry from the queue (click on the hint panel × button).
    *
-   * - inputQueue 에서만 제거한다.
-   * - outputDiv DOM 에 미리 echo 되지 않으므로 DOM 조작 불필요.
-   * - hint 패널 rerender 는 updateControlBar 에 위임한다.
+   * - Remove the inputQueue only.
+   * - Since outputDiv DOM is not pre-echo, DOM operation is unnecessary.
+   * - hint panel rerender is entrusted to updateControlBar.
    *
-   * @param {string} entryId - 제거할 entry 의 id
+   * @param {string} entryId - Removed entry id
    */
   M.removePendingEntry = function(entryId) {
     M.inputQueue = M.inputQueue.filter(function (e) { return e.id !== entryId; });
-    // 큐 stack 에서 카드 제거 (× 버튼 클릭 시각 반영)
+    // Remove the card from the queue stack (× button click reflect)
     _removeQueueCard(entryId);
-    // hint 패널 rerender
+    // hint panel rerender
     M.updateControlBar();
   };
 
   /**
-   * turn 을 진행한다. result SSE 도착 시 session.js _onResult 가 호출한다.
+   * Turn result SSE session.js  onResult is called upon arrival.
    *
-   * 1:1 turn 모델:
-   * - 잔여 큐 entry 가 있으면 commitQueue() 로 즉시 다음 turn 처리
-   * - 없으면 idle 정리(spinner 중지 / 잠금 해제)
+   * 1:1 turn model:
+   * - If there is a residual queue entry, then turn to commitQueue() immediately
+   * - Without idle clearance (spinner stop / unlock)
    *
-   * commitQueue 호출 전에 spinner 중지 + idle 상태 전환을 수행한다.
-   * commitQueue 내부에서 다시 busy 로 전환한다.
+   * commitQueueue executes spinner stop + idle status conversion before calling.
+   * CommitQueue will switch back to busy inside.
    */
   M.advanceTurn = function() {
     M.stopSpinner();
@@ -1010,10 +1010,10 @@
     Board.state.setTermStatus("idle");
 
     if (M.inputQueue.length > 0) {
-      // 잔여 큐 entry 가 있으면 즉시 다음 entry 전송
+      // If you have a residual queue entry, please immediately send the following entry
       M.commitQueue();
     } else {
-      // 큐 소진 — idle 정리
+      // Curriculum — idle Clearance
       M.updateControlBar();
     }
   };

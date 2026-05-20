@@ -61,12 +61,12 @@ class TestParsePlanTasks(unittest.TestCase):
     def test_parse_table_w_prefix(self):
         """P0: table `| W01 | ... |` should be parsed directly."""
         content = """\
-## 작업 목록
+## Task List
 
-| ID | 작업 | 스킬 |
+| ID | Work | Skills |
 |----|------|------|
-| W01 | 파서 P4 폴백 추가 | convention-python |
-| W02 | 가이드 수정 | document-markdown |
+| W01 | Paseo P4 Poly bag added | convention-python |
+| W02 | Document-markdown |
 """
         path = self._tmp(content)
         tasks, p4_triggered = parse_plan_tasks(path)
@@ -75,11 +75,11 @@ class TestParsePlanTasks(unittest.TestCase):
         self.assertEqual(len(tasks), 2)
 
         self.assertEqual(tasks[0]["taskId"], "W01")
-        self.assertEqual(tasks[0]["description"], "파서 P4 폴백 추가")
+        self.assertEqual(tasks[0]["description"], "Add P4 Poly bag")
         self.assertIn("convention-python", tasks[0]["skills"])
 
         self.assertEqual(tasks[1]["taskId"], "W02")
-        self.assertEqual(tasks[1]["description"], "가이드 수정")
+        self.assertEqual(tasks[1]["description"], "Skip to content")
         self.assertIn("document-markdown", tasks[1]["skills"])
 
     # ── (b) P2: ### W01: heading fallback ────────────────────────────────────
@@ -87,11 +87,11 @@ class TestParsePlanTasks(unittest.TestCase):
     def test_parse_heading_w_prefix(self):
         """P2: ### W01: heading (no table) should be parsed via heading fallback."""
         content = """\
-## 작업 목록
+## Task List
 
-### W01: 파서 P4 폴백 추가
+################################################################################################################################################################################################################################################################
 
-### W02: 가이드 수정
+### W02: Fix Guide
 """
         path = self._tmp(content)
         tasks, p4_triggered = parse_plan_tasks(path)
@@ -100,11 +100,11 @@ class TestParsePlanTasks(unittest.TestCase):
         self.assertEqual(len(tasks), 2)
 
         self.assertEqual(tasks[0]["taskId"], "W01")
-        self.assertEqual(tasks[0]["description"], "파서 P4 폴백 추가")
+        self.assertEqual(tasks[0]["description"], "Add P4 Poly bag")
         self.assertEqual(tasks[0]["skills"], [])
 
         self.assertEqual(tasks[1]["taskId"], "W02")
-        self.assertEqual(tasks[1]["description"], "가이드 수정")
+        self.assertEqual(tasks[1]["description"], "Skip to content")
         self.assertEqual(tasks[1]["skills"], [])
 
     # ── (c) P3: ### Task X.Y heading fallback ────────────────────────────────
@@ -112,11 +112,11 @@ class TestParsePlanTasks(unittest.TestCase):
     def test_parse_heading_task_xy(self):
         """P3: ### Task 1.1: heading should auto-number as W01."""
         content = """\
-## 작업 목록
+## Task List
 
-### Task 1.1: 파서 P4 폴백 추가
+### Task 1.1: Add P4 Poly Bag
 
-### Task 1.2: 가이드 수정
+## Task 1.2: Fix Guide
 """
         path = self._tmp(content)
         tasks, p4_triggered = parse_plan_tasks(path)
@@ -125,11 +125,11 @@ class TestParsePlanTasks(unittest.TestCase):
         self.assertEqual(len(tasks), 2)
 
         self.assertEqual(tasks[0]["taskId"], "W01")
-        self.assertEqual(tasks[0]["description"], "파서 P4 폴백 추가")
+        self.assertEqual(tasks[0]["description"], "Add P4 Poly bag")
         self.assertEqual(tasks[0]["skills"], [])
 
         self.assertEqual(tasks[1]["taskId"], "W02")
-        self.assertEqual(tasks[1]["description"], "가이드 수정")
+        self.assertEqual(tasks[1]["description"], "Skip to content")
         self.assertEqual(tasks[1]["skills"], [])
 
     # ── (d) P4: ### T# heading normalization ─────────────────────────────────
@@ -137,11 +137,11 @@ class TestParsePlanTasks(unittest.TestCase):
     def test_parse_heading_t_prefix_normalized(self):
         """P4: ### T1: heading must be normalized to W01 and set p4_triggered."""
         content = """\
-## 작업 목록
+## Task List
 
-### T1: 파서 P4 폴백 추가
+### T1: Add P4 Poly Bag
 
-### T2: 가이드 수정
+## T2: Fix Guide
 """
         path = self._tmp(content)
         # Capture stderr to verify WARN log is emitted
@@ -159,11 +159,11 @@ class TestParsePlanTasks(unittest.TestCase):
         self.assertEqual(len(tasks), 2)
 
         self.assertEqual(tasks[0]["taskId"], "W01")
-        self.assertEqual(tasks[0]["description"], "파서 P4 폴백 추가")
+        self.assertEqual(tasks[0]["description"], "Add P4 Poly bag")
         self.assertEqual(tasks[0]["skills"], [])
 
         self.assertEqual(tasks[1]["taskId"], "W02")
-        self.assertEqual(tasks[1]["description"], "가이드 수정")
+        self.assertEqual(tasks[1]["description"], "Skip to content")
         self.assertEqual(tasks[1]["skills"], [])
 
         # WARN log must appear in stderr
@@ -179,27 +179,27 @@ class TestParsePlanTasks(unittest.TestCase):
         """
         content = """\
 
-## 작업 목록
+## Task List
 
-### T1: 첫 번째 작업
+### T1: First Work
 
-첫 번째 작업 본문
+First task body
 
-### T2: 두 번째 작업
+### T2: Second Work
 
-두 번째 작업 본문
+The second job body
 
-### T3: 세 번째 작업
+### T3: Third Operation
 
-세 번째 작업 본문
+The third task body
 
-### T4: 네 번째 작업
+## T4: The Fourth Job
 
-네 번째 작업 본문
+The third task body
 
-### T5: 다섯 번째 작업
+### T5: The fifth work
 
-다섯 번째 작업 본문
+The fifth task body
 """
         path = self._tmp(content)
         captured = io.StringIO()

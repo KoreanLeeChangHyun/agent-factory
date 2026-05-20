@@ -40,7 +40,7 @@ DEFAULT_TIMEOUT_SECONDS = code_checks.DEFAULT_TIMEOUT_SECONDS
 
 
 def _has_tool(tool: str) -> bool:
-    """PATH 안에 도구 실행 파일이 존재하면 True."""
+    """True if the tool executable file exists in PATH."""
     return shutil.which(tool) is not None
 
 
@@ -90,7 +90,7 @@ def _resolve_work_root(ctx: WorkflowContext) -> Path:
 
 
 def _detect_pytest_config(root: Path) -> bool:
-    """pytest 설정 존재 여부 — `pyproject.toml` / `pytest.ini` / `setup.cfg` / `tox.ini`."""
+    """Existence of pytest settings — `pyproject.toml` / `pytest.ini` / `setup.cfg` / `tox.ini`."""
     return code_checks.detect_pytest_config(root)
 
 
@@ -104,7 +104,7 @@ def _detect_ruff_config(root: Path) -> bool:
 
 
 def _detect_mypy_config(root: Path) -> bool:
-    """mypy 설정 존재 여부 — `pyproject.toml` / `mypy.ini` / `setup.cfg`."""
+    """Existence of mypy configuration — `pyproject.toml` / `mypy.ini` / `setup.cfg`."""
     return code_checks.detect_mypy_config(root)
 
 
@@ -168,7 +168,7 @@ def _parse_pytest_summary(text: str) -> dict[str, int]:
 
 
 def _parse_pytest_failed_nodes(text: str) -> list[str]:
-    """pytest -q 출력에서 실패 노드 ID 추출 (`FAILED tests/test_x.py::test_y`)."""
+    """Extract failed node ID from pytest -q output (`FAILED tests/test_x.py::test_y`)."""
     return code_checks.parse_pytest_failed_nodes(text)
 
 
@@ -275,7 +275,7 @@ def _run_mypy(root: Path) -> dict[str, Any]:
     }
 
 
-# -------- 통합 entrypoint --------
+# -------- Integration entrypoint --------
 
 
 def run(ctx: WorkflowContext) -> Path:
@@ -301,7 +301,7 @@ def run(ctx: WorkflowContext) -> Path:
             "schema_version": SCHEMA_VERSION,
             "command": ctx.command,
             "command_skip": True,
-            "skip_reason": f"command={ctx.command} (implement 한정)",
+            "skip_reason": f"command={ctx.command} (implement only)",
             "tools": [],
         }
         code_json_path.write_text(
@@ -310,7 +310,7 @@ def run(ctx: WorkflowContext) -> Path:
         )
         append_log(
             ctx,
-            f"[VERIFY-CODE] command={ctx.command} SKIP — code.json 빈 박제",
+            f"[VERIFY-CODE] command={ctx.command} SKIP — code.json stuffed empty",
         )
         return code_json_path
 
@@ -321,7 +321,7 @@ def run(ctx: WorkflowContext) -> Path:
         tools_results.append(_run_ruff(root))
         tools_results.append(_run_mypy(root))
     except Exception as exc:  # noqa: BLE001 — graceful SKIP boundary
-        # 예외 발생 시도 graceful SKIP — driver 전체 중단 안 함.
+        # Attempting to raise an exception graceful SKIP — does not completely stop the driver.
         tools_results.append(
             {
                 "tool": "internal",

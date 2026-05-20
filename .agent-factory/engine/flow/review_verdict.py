@@ -1,47 +1,47 @@
 #!/usr/bin/env -S python3 -u
-"""review_verdict.py - Review 단계 1차 룰베이스 자동 검증.
+"""review verdict.py - Review Phase 1 rulebase automatic verification.
 
-advisory only - verdict 표시 전용. kanban move / status 전이 / sentinel 생성
-절대 금지. 본 모듈은 외부 부수효과로서 오직 (선택적) review-verdict.json
-파일 IO 와 git rev-list subprocess 호출만 수행한다.
+advisory only kanban move / status
+Yes. This module is only (optional) review-verdict.json
+Only the file IO and git rev-list subprocess call.
 
-캐논:
+Tag:
     - feedback_no_speculative_guards_2026-05-08
 
 
 
-based on W11 §A: finalization.py L861 hook insertion (W04 회귀 패턴 캡처
-직후, Step 4 kanban move review 직전 위치). phase_verifier.py
-VerifyResult 패턴(_find_git_root / _check_commits_ahead).
+based on W11 §A: finalization.py L861 hook insertion (W04 revolving pattern capture)
+right after step 4 kanban move review position). phase verifier. py
+VerifyResult Pattern( find git root /  check commits ahead).
 
-12 룰 카탈로그 (workflow.md §3 와 동기 — 단일 진실 공급원):
-    - R-EXIST-1 ~ R-EXIST-4 : 산출물 존재 검증 (4룰)
-    - R-METRIC-2, R-METRIC-3 : metrics.jsonl event_type 발화 (2룰)
-    - R-GUARD-1 ~ R-GUARD-3 : 가드 4종 정합 (3룰)
-    - R-PATH-1 : 산출물 path 정합 (1룰)
-    - R-FSM-1 : FSM 종착점 (1룰)
-    - R-WT-1 : 워크트리 변경 (1룰)
+12 Rule catalog (workflow.) md §3 and motivation — single truth source):
+    - R-EXIST-1 ~ R-EXIST-4 : Verified output exist (4 rules)
+    - R-METRIC-2, R-METRIC-3: metrics.jsonl event type saturation (2 rules)
+    News R-GUARD-1 ~ R-GUARD-3 : 4 types of guard (3 rules)
+    - R-PATH-1
+    - R-FSM-1 : FSM Diffraction (1 rule)
+    - R-WT-1: change of work tree (1 rule)
 
-WARN/FAIL 임계 (advisory only):
-    - PASS = 위반 0건
-    - WARN = 1~2 룰 위반 (hard-fail 0건)
-    - FAIL = 3+ 룰 위반 또는 hard-fail 1건 이상 (R-EXIST-1, R-METRIC-2)
-    - SKIP = workflow_phase 가 DONE/FAILED 아님
+WARN/FAIL:
+    - PASS = 0
+    - WARN = 1~2 violation (hard-fail 0)
+    (R-EXIST-1, R-METRIC-2)
+    - SKIP = workflow phase
 
-advisory 검수 8항 (plan.md §10):
-    1. kanban_cli 호출 0건 (grep 가능)
-    2. update_state.py 호출 0건
-    3. sentinel 생성 0건
-    4. status.json 쓰기 0건 (read-only)
-    5. metrics emit 0건 (advisory 흐름 분리)
-    6. POST/PUT/DELETE 0건
-    7. 자동 회귀 트리거 0건
-    8. LLM 호출 0건
+Advisory Quarantine Section 8 (plan.md §10):
+    1. FAQ kanban cli 0 calls (grep available)
+    2. update state.py call 0
+    3. FAQs sentinel generated 0
+    4. status.json 0 (read-only)
+    5. FAQs metrics emit 0 (advisory flow separation)
+    6. FAQs POST/PUT/DELETE 0
+    7. OEM Automatic Revolving Trigger 0
+    8. FAQs LLM Call 0
 
 CLI:
     python3 review_verdict.py <registry_key> [--workdir PATH] [--project-root PATH]
 
-    종료 코드: 항상 0 - verdict 결과는 stdout 의 JSON 으로 반환.
+    End code: always 0 - verdict results return to stdout's JSON.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def compute_review_verdict(
     project_root: Optional[Path] = None,
     workdir: Optional[Path] = None,
 ) -> VerdictResult:
-    """13 룰 검증 후 verdict 를 반환한다 (advisory only)."""
+    """13 After verifying the rule, a verdict is returned (advisory only)."""
     if workdir is None:
         workdir = _resolve_workdir(registry_key, project_root)
 
@@ -135,7 +135,7 @@ def compute_review_verdict(
     if phase not in ("DONE", "FAILED"):
         return VerdictResult(
             verdict=SKIP,
-            reason=f"workflow_phase={phase!r} not in DONE/FAILED - finalize 미종료",
+            reason=f"workflow_phase={phase!r} not in DONE/FAILED - finalize not completed",
             details={"workflow_phase": phase, "registry_key": registry_key},
         )
 
@@ -182,9 +182,9 @@ def compute_review_verdict(
 
 
 def _resolve_verdict(violations: list[Violation], ctx: dict) -> VerdictResult:
-    """위반 목록 -> verdict 분기.
+    """List of violations -> verdict branch.
 
-    PASS: 0건. WARN: 1~2건 (hard-fail 미포함). FAIL: 3+ 건 또는 hard-fail 포함.
+    PASS: 0 items. WARN: 1~2 times (not hard-fail). FAIL: 3+ guns or hard-fail included.
     """
     n = len(violations)
     hard_fail_hits = [v for v in violations if v.rule_id in HARD_FAIL_RULES]
@@ -220,7 +220,7 @@ def _resolve_verdict(violations: list[Violation], ctx: dict) -> VerdictResult:
 
 
 def _check_exist_1(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-EXIST-1: report.md 존재 + size > 0 (hard-fail)."""
+    """R-EXIST-1: report.md exists + size > 0 (hard-fail)."""
     p = workdir / "report.md"
     if not p.is_file():
         return Violation(
@@ -245,7 +245,7 @@ def _check_exist_1(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_exist_2(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-EXIST-2: plan.md 존재 + size > 0 (research 명령은 SKIP)."""
+    """R-EXIST-2: plan.md exists + size > 0 (research command is SKIP)."""
     if ctx.get("command") in _RESEARCH_COMMANDS:
         return None
     p = workdir / "plan.md"
@@ -272,7 +272,7 @@ def _check_exist_2(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_exist_3(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-EXIST-3: status.json 존재 + JSON parse + workflow_phase 키."""
+    """R-EXIST-3: status.json exists + JSON parse + workflow_phase key."""
     p = workdir / "status.json"
     if not p.is_file():
         return Violation(
@@ -299,7 +299,7 @@ def _check_exist_3(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_exist_4(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-EXIST-4: metrics.jsonl 존재 + 줄 수 >= 1."""
+    """R-EXIST-4: metrics.jsonl exists + number of lines >= 1."""
     p = workdir / "metrics.jsonl"
     if not p.is_file():
         return Violation(
@@ -318,9 +318,9 @@ def _check_exist_4(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_metric_2(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-METRIC-2: 마지막 step.end{step=DONE}.outcome == "ok" (hard-fail).
+    """R-METRIC-2: last step.end{step=DONE}.outcome =="ok" (hard-fail).
 
-    DONE step.end 자체가 0건이면 outcome 미확정으로 hard-fail.
+    DONE step.end 0 results
     """
     lines = ctx.get("metrics_lines") or []
     last_done_outcome: Optional[str] = None
@@ -347,7 +347,7 @@ def _check_metric_2(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_metric_3(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-METRIC-3: tool.deny 이벤트 0건."""
+    """R-METRIC-3: 0 tool.deny events."""
     lines = ctx.get("metrics_lines") or []
     deny_count = sum(1 for ev in lines if ev.get("event_type") == "tool.deny")
     if deny_count >= 1:
@@ -367,13 +367,13 @@ def _check_guard_1(workdir: Path, ctx: dict) -> Optional[Violation]:
         return Violation(
             rule_id="R-GUARD-1",
             severity=SEV_WARN,
-            message="worktree.enabled != true (HOOK_WORKTREE_PATH_GUARD 가드 비활성)",
+            message="worktree.enabled != true (HOOK_WORKTREE_PATH_GUARD guard disabled)",
         )
     return None
 
 
 def _check_guard_2(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-GUARD-2: .context.json:worktree.featureBranch 존재 + git branch --list 매칭."""
+    """R-GUARD-2: .context.json:worktree.featureBranch exists + git branch --list matching."""
     cj = ctx.get("context_json") or {}
     wt = cj.get("worktree") if isinstance(cj, dict) else None
     fb = wt.get("featureBranch") if isinstance(wt, dict) else None
@@ -409,7 +409,7 @@ def _check_guard_2(workdir: Path, ctx: dict) -> Optional[Violation]:
 
 
 def _check_guard_3(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-GUARD-3: metrics.jsonl 의 regression.pattern 이벤트 0건."""
+    """R-GUARD-3: 0 regression.pattern events in metrics.jsonl."""
     lines = ctx.get("metrics_lines") or []
     reg_count = sum(
         1 for ev in lines if ev.get("event_type") == "regression.pattern"
@@ -433,7 +433,7 @@ _PLAN_MD_TOKEN_PATTERN = re.compile(r"\bplan\.md\b")
 
 
 def _check_path_1(workdir: Path, ctx: dict) -> Optional[Violation]:
-    """R-PATH-1: report.md 본문 plan.md 링크 매칭 (research 외)."""
+    """R-PATH-1: report.md body plan.md link matching (research, etc.)."""
     if ctx.get("command") in _RESEARCH_COMMANDS:
         return None
     rep = workdir / "report.md"
@@ -520,7 +520,7 @@ def _check_wt_1(workdir: Path, ctx: dict) -> Optional[Violation]:
         return Violation(
             rule_id="R-WT-1",
             severity=SEV_WARN,
-            message=f"develop..HEAD commits = {ahead} (워커 commit 누락)",
+            message=f"develop..HEAD commits = {ahead} (missing worker commit)",
         )
     return None
 
@@ -528,7 +528,7 @@ def _check_wt_1(workdir: Path, ctx: dict) -> Optional[Violation]:
 def _resolve_workdir(
     registry_key: str, project_root: Optional[Path]
 ) -> Optional[Path]:
-    """registry_key -> workdir 절대 Path. common.resolve_abs_work_dir 활용."""
+    """registry_key -> workdir absolute Path. Utilizing common.resolve_abs_work_dir."""
     if resolve_abs_work_dir is None:
         root = project_root or Path.cwd()
         cand = Path(root) / ".agent-factory" / "runs" / registry_key
@@ -542,7 +542,7 @@ def _resolve_workdir(
 
 
 def _read_fsm_context(workdir: Path) -> dict:
-    """status.json 의 workflow_phase 등 FSM 컨텍스트를 읽는다."""
+    """Read FSM context such as workflow_phase in status.json."""
     p = workdir / "status.json"
     if not p.is_file():
         return {}
@@ -555,7 +555,7 @@ def _read_fsm_context(workdir: Path) -> dict:
 
 
 def _read_command(workdir: Path) -> Optional[str]:
-    """init-result.json 또는 .context.json 에서 command 추출."""
+    """Extract command from init-result.json or .context.json."""
     for fname in ("init-result.json", ".context.json"):
         p = workdir / fname
         if not p.is_file():
@@ -573,7 +573,7 @@ def _read_command(workdir: Path) -> Optional[str]:
 
 
 def _read_context_json(workdir: Path) -> dict:
-    """.context.json 파싱 (실패 시 빈 dict)."""
+    """Parsing .context.json (empty dict on failure)."""
     p = workdir / ".context.json"
     if not p.is_file():
         return {}
@@ -586,7 +586,7 @@ def _read_context_json(workdir: Path) -> dict:
 
 
 def _read_metrics_lines(workdir: Path) -> list[dict]:
-    """metrics.jsonl 한 줄씩 파싱 (실패 라인은 skip)."""
+    """Parse metrics.jsonl line by line (skip failed lines)."""
     p = workdir / "metrics.jsonl"
     if not p.is_file():
         return []
@@ -609,7 +609,7 @@ def _read_metrics_lines(workdir: Path) -> list[dict]:
 
 
 def _find_git_root(start_dir: str) -> Optional[str]:
-    """start_dir 부터 위로 .git 디렉터리/파일 탐색."""
+    """Navigate .git directories/files starting from start_dir upwards."""
     current = os.path.abspath(start_dir)
     while True:
         marker = os.path.join(current, ".git")
@@ -622,30 +622,30 @@ def _find_git_root(start_dir: str) -> Optional[str]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """CLI 진입점 - flow-review-verdict wrapper 에서 호출.
+    """CLI entry point - call flow-review-verdict wrapper.
 
-    출력: VerdictResult.to_dict() 의 JSON dump (stdout).
-    종료 코드: 항상 0 (advisory) - verdict 자체로 판단.
+    Output: JSON dump (stdout) in VerdictResult.to dict().
+    End code: always 0 (advisory) - judged by verdict itself.
     """
     parser = argparse.ArgumentParser(
         prog="review_verdict",
-        description="Review 단계 1차 룰베이스 자동 검증 (advisory)",
+        description="Review stage 1st rule base automatic verification (advisory)",
     )
     parser.add_argument(
         "registry_key",
-        help="워크플로우 registry key (예: 20260510-200712)",
+        help="Workflow registry key (e.g. 20260510-200712)",
     )
     parser.add_argument(
         "--workdir",
         type=Path,
         default=None,
-        help="workdir 직접 지정 (registry_key 해석 우회)",
+        help="Specify workdir directly (bypass registry_key interpretation)",
     )
     parser.add_argument(
         "--project-root",
         type=Path,
         default=None,
-        help="프로젝트 루트 명시 (default: 자동 해석)",
+        help="Specify project root (default: automatic interpretation)",
     )
     args = parser.parse_args(argv)
 

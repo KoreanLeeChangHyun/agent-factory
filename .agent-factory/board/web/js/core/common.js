@@ -22,16 +22,16 @@ Board.fetch = Board.fetch || {};
 
 // ── Debug Logger (server-gated) ──
 //
-// 계측은 코드 전체에 상시 심어두고, 서버 측 플래그 파일로 활성화를 결정한다.
-// Claude 가 .agent-factory/runs/bg/debug.enabled 파일을 touch/rm 하여 제어.
-// 클라는 항상 /api/debug-log 로 POST — 서버가 플래그 파일을 체크해 파일에
-// 쓸지 버릴지 결정한다. 평소 오버헤드는 fetch 한 번(수 ms) 만 발생.
+// The measurement is based on the entire code and determines the activation of the server side flag file.
+// control .agent-factory/runs/bg/debug.enabled file by touch/rm.
+// Cla is always POST — server checks flag files to the file
+// You should decide to write. The usual overhead is only fetch once (ms).
 //
-// 진단 흐름:
-//   1. Claude: touch .../runs/bg/debug.enabled (+ 기존 로그 비우기)
-//   2. 사용자: 문제 재현
-//   3. Claude: cat .../runs/bg/debug.log 로 분석
-//   4. Claude: rm .../runs/bg/debug.enabled (비활성화)
+// Tag:
+//   1. Claude: touch .../runs/bg/debug.enabled (+ existing log empty)
+//   2. User: Reproduction of problem
+//   3. FAQs Claude: Analysis by cat .../runs/bg/debug.log
+//   4. Claude: rm .../runs/bg/debug.enabled (active)
 
 Board.debugLog = function (tag, data) {
   var entry = {
@@ -46,32 +46,32 @@ Board.debugLog = function (tag, data) {
       body: JSON.stringify(entry),
       keepalive: true,
     }).catch(function () {});
-  } catch (e) { /* 네트워크 에러 무시 */ }
+  } catch (e) { /* Network Errors */ }
 };
 
 // ── Terminal Status State Machine ──
 //
-// 메인 터미널 세션의 수명 주기를 표현하는 enum 과 전이 헬퍼.
+// enum and former helper expressing the life cycle of the main terminal session.
 //
-//   stopped   : Claude CLI 프로세스 없음. Start 대기.
-//   starting  : spawn 요청부터 system/init 이벤트 수신 전까지. 입력 비활성.
-//   idle      : Claude 준비 완료. 응답 없음. 입력 가능.
-//   busy      : 사용자 입력 전송 후 result/process_exit 수신 전. 스피너 표시.
-//   archived  : 읽기 전용으로 복원된 과거 세션. 입력 불가.
-//   missing   : 서버가 세션을 못 찾음 (404). 입력 불가.
+//   Stop: No Claude CLI process. Start Wait.
+//   starting : before receiving system/init event from spawn request. Input inert.
+//   idle: Claude ready. No response. Type
+//   busy: result/process exit after sending user input. Spinner display.
+//   archived: the past session restored exclusively for reading. Reservation
+//   missing: Find the server doesn't have a session (404). No input.
 //
-// 일반 수명 주기:
+// Price:
 //   stopped -> starting -> idle -> busy -> idle -> ... -> stopped
 //
-// 비정상/복원 경로:
-//   starting -> stopped      (spawn 실패)
+// Price:
+//   starting -> stop (spawn failure)
 //   busy     -> stopped      (process_exit)
-//   *        -> archived     (archived 로드 시)
+//   * -> archived (archived load)
 //   *        -> missing      (fetchStatus 404)
 //
-// 라벨(UI 표시용):
-//   stopped=종료됨, starting=준비 중, idle=대기, busy=응답 중,
-//   archived=읽기 전용, missing=세션 없음
+// Label:
+//   stopped=subscribed, starting=subject, idle=subject, busy=subject,
+//   archived= read only, missing=no action
 //
 Board.util.TERM_STATUSES = Object.freeze({
   STOPPED: 'stopped',
@@ -91,48 +91,48 @@ Board.util.TERM_STATUS_LABELS = Object.freeze({
   missing: 'Missing',
 });
 
-/** Kill 버튼을 눌러 세션을 종료할 수 있는 상태 */
+/** Kill button can end session */
 Board.util.TERM_STATUS_KILLABLE = Object.freeze(
   new Set(['starting', 'idle', 'busy'])
 );
 
-/** Claude 가 현재 작업 중(스피너 표시)인 상태 */
+/** Claude is currently working (speaker display) */
 Board.util.TERM_STATUS_SPINNING = Object.freeze(new Set(['busy']));
 
-/** 사용자가 새 입력을 보낼 수 있는 상태 */
+/** User can send new input */
 Board.util.TERM_STATUS_INPUTTABLE = Object.freeze(
   new Set(['idle', 'busy'])
 );
 
-/** 서버(`/terminal/status`) 가 권위 있게 판단하는 상태 — 클라 확장 상태는 클라가 관리 */
+/** The server (`/terminal/status`) is authoritatively judged — the clad extension is managed */
 var _SERVER_AUTHORITATIVE = Object.freeze(new Set(['stopped']));
 var _CLIENT_EXTENDED = Object.freeze(
   new Set(['starting', 'idle', 'busy', 'archived', 'missing'])
 );
 
 /**
- * Sets Board.state.termStatus. 단일 진입점으로 써서 전이 규칙을 일관되게 유지한다.
- * @param {string} next 새 상태 (TERM_STATUSES 값 중 하나)
+ * Sets Board.state.termStatus. We use cookies to ensure that we give you the best experience on our website.
+ * @param {string} next new state (TERM STATUSES one of the values)
  */
 Board.state.setTermStatus = function (next) {
   if (typeof next !== 'string') return;
   Board.state.termStatus = next;
 };
 
-// ESC autoResume 윈도우 — process_exit + willAutoResume 진입부터 startSession.setIdle 까지.
-// 이 윈도우 동안엔 termStatus 가 stopped → starting 으로 짧게 전이되지만 setInputLocked
-// 가 input.disabled 를 true 로 만들지 않는다. 입력창 깜빡 (~500ms) 회피 목적.
+// ESC autoResume Windows — process exit + willAutoResume from entry to startSession.setIdle.
+// This window will automatically close when termStatus is stopped → starting, but setInputLocked
+// does not make input.disabled true. Input window flicker (~500ms) for avoidance.
 Board.state._inAutoResume = false;
 
 /**
- * 서버 /terminal/status 응답(stopped/running)을 클라 상태 머신에 병합한다.
- * - 서버가 stopped 를 반환하면 클라도 stopped 로 전이 (권위).
- * - 서버가 running 을 반환하고 클라가 확장 상태(starting/idle/busy/archived/missing)에
- *   있으면 클라 상태를 유지. 그 외엔 idle 로 간주.
- * archived/missing 은 fetchStatus 404 또는 archived_end 등 별도 경로에서 진입하므로
- * 여기서 직접 설정하지 않는다.
+ * merge server /terminal/status response (stopped/running) to the climatic machine.
+ * - When the server returns a stop, the climax stops to the full (recommended).
+ * - Server returns running and crawls to startting/idle/busy/archived/missing
+ *   Keeping the climatic state if it is. Other than others considered idle.
+ * archived/missing enters fetchStatus 404 or archived end
+ * You do not have to set it directly here.
  *
- * @param {string} serverStatus 서버가 보고한 상태 문자열
+ * @param {string} serverStatus server reported status string
  */
 Board.state.reconcileTermStatus = function (serverStatus) {
   var current = Board.state.termStatus;
@@ -145,20 +145,20 @@ Board.state.reconcileTermStatus = function (serverStatus) {
     result = 'stopped';
   } else if (serverStatus === 'running') {
     if (current === 'starting') {
-      // starting 은 client-only transient state. 서버가 'running' 을 보고했다는 건
-      // 서버 측 프로세스가 살아있다는 명확한 신호이므로 idle 로 보정해야 한다.
-      // (이후 awaiting_response 처리에서 busy 로 추가 보정될 수 있음)
+      // Θ client-only transient state. server has reported 'running'
+      // Since the server side process is a clear signal that lives, it should be corrected by idle.
+      // (After awaiting response treatment can be added as busy)
       Board.state.setTermStatus('idle');
       result = 'idle(from-starting)';
     } else if (_CLIENT_EXTENDED.has(current)) {
       result = 'keep(' + current + ')';
     } else {
-      // current 가 stopped 등 비확장 상태인데 서버가 running 보고:
-      // 프로세스는 살아있지만 응답 진행 중인지 여부는 awaiting_response 가 권위.
-      // 여기서는 idle 로만 보정하고, busy 승격은 fetchStatus 의
-      // `if (data.awaiting_response)` 분기가 단독 책임진다.
-      // (과거 'busy(from-stopped)' 룰은 새로고침 시 awaiting_response=false 임에도
-      // 스피너를 무한 회전시키는 회귀 원인이었음 — 2026-05-13 fix)
+      // If the server is running, the server is running:
+      // Awaiting response is authoritative.
+      // where idle is only corrected, and the busy shooting of fetchStatus
+      // 'if (data.awaiting response)' branch is solely responsible.
+      // 'busy(from-stopped)' rule refreshes awaiting response=false
+      // Infinite spinning revolving spinner — 2026-05-13 fix)
       Board.state.setTermStatus('idle');
       result = 'idle(from-' + current + ')';
     }
@@ -332,7 +332,7 @@ function parseTicket(text) {
       const el = meta.querySelector(f);
       if (el && el.textContent) ticket[f] = el.textContent.trim();
     });
-    // 레거시 호환: <datetime> → created/updated 폴백
+    // <datetime>
     if (!ticket.created || !ticket.updated) {
       var dtEl = meta.querySelector("datetime");
       if (dtEl && dtEl.textContent) {
@@ -379,7 +379,7 @@ function parseTicket(text) {
   }
 
   // Legacy done ticket fallback (read-only): <submit>/<subnumber> structure
-  // T-399: Submit transient 단계는 시스템에서 제거됨. 본 블록은 과거 done 티켓 표시 호환만 담당.
+  // T-399: Submit transient step is removed from the system. This block is only compatible with the past done ticket display.
   if (!ticket.prompt && !ticket.command) {
     var submitEl = root.querySelector("submit");
     if (submitEl) {
@@ -566,8 +566,8 @@ let mermaidCounter = 0;
 function renderMd(text, baseUrl) {
   if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
 
-  // T-321 P1 — flow-kanban XML 필드 (--constraints "조건1\n조건2") 등에서 유입되는
-  // 리터럴 백슬래시-n 2글자를 실제 개행으로 치환 (code fence / 인라인 backtick 내부는 보존).
+  // T-321 P1 — flow-kanban XML field (-constraints "Condition1\n condition2")
+  // Litreal backslash-n 2 letters to the actual opening (code fence/inline backtick inside preserved).
   if (Board.util && Board.util.unescapeLiteralNewlines) {
     text = Board.util.unescapeLiteralNewlines(text);
   }
@@ -604,9 +604,9 @@ function renderMd(text, baseUrl) {
 
   let html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
 
-  // T-321 P2 — 인접 <ol> 블록 (텍스트 단락이 끼지 않은 경우) 을 단일 <ol> 로 병합.
-  // 비순차/0-시작 번호 (예: 5.6.7. / 1.2.0.) 가 marked 의 단일 ol 출력에서는 이미 한 부모 안에 있지만,
-  // 사용자 입력 변형 (드물게 marked 가 분리하는 케이스) 에서도 동일 들여쓰기를 보장하기 위한 idempotent 후처리.
+  // T-321 P2 — Merged into a single <ol> block (if text short circuit is not attached).
+  // In a single ol output with a non-pure/0-start number (e.g. 5.6.7. / 1.2.0.) is already in a parent,
+  // idempotent after-treatment to ensure the same indentation in the user input strain (the case with a rare marker).
   if (Board.util && Board.util.mergeAdjacentOrderedLists) {
     html = Board.util.mergeAdjacentOrderedLists(html);
   }
@@ -670,7 +670,7 @@ function initMermaid() {
   });
 }
 
-// async 스크립트 로드 완료 시점에 한 번 더 스캔하여 race window 보충.
+// async script loading once more scans at the end of the race window replacement.
 function _mermaidRescanWhenReady() {
   if (typeof mermaid !== "undefined") { initMermaid(); return; }
   var script = document.querySelector('script[src*="mermaid"]');
@@ -797,8 +797,8 @@ Board.state.dashChartInstances = {};
 // Kanban sort state
 Board.state.kanbanSort = null; // initialized by kanban.js
 
-// Roadmap subtab state — saveUI/loadUI 로 영속화 (활성 phase + 펼친 카드 + 사이드 너비).
-// Contexts 탭(구 Prompt 탭) 의 Roadmap 서브탭이 사용한다 — 별도 패널이 아니므로 panelOpen 없음.
+// Roadmap subtab state — saveUI/loadUI by sequencing (active phase + unfolded card + side width).
+// Contexts Tab (Former Prompt Tab) is used by Roadmap Sub tab — not a separate panel, so no panel Open.
 Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "object")
   ? {
       activePhaseId: typeof savedState.roadmap.activePhaseId === "string"
@@ -818,9 +818,9 @@ Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "obje
       sideWidth: 240,
     };
 
-// Contexts 탭 통합 상태 — saveUI/loadUI 로 영속화.
-// 사용자 이벤트(서브탭 전환, 파일 선택, sidebar 너비 조정, GC bar 토글) 가 모두 새로고침
-// 후 복원되어야 한다는 정책. 각 서브탭 모듈이 default 하드코드 대신 여기서 읽어간다.
+// Contexts tab integration status — saveUI/loadUI to zero.
+// User Event (Swap Tab Switch, File Selection, Sidebar Width Adjustment, GC bar Toggle) is all updated
+// The policy that should be restored after. Each subtab module reads here instead of the default hardcode.
 (function () {
   var rawCx = (savedState.contexts && typeof savedState.contexts === "object")
     ? savedState.contexts : {};
@@ -851,7 +851,7 @@ Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "obje
   };
 })();
 
-// Relations panel state — saveUI/loadUI 로 영속화 (열림/닫힘 + 필터)
+// Relations panel state — saveUI/loadUI by sequencing (open/close + filter)
 Board.state.relations = (savedState.relations && typeof savedState.relations === "object")
   ? {
       filter: {
@@ -957,11 +957,11 @@ Board.util.fetchXmlList = fetchXmlList;
 
 // ── Branch Status Bar Helper ──
 //
-// 상태바(`#terminal-sl-branch`)에 git 브랜치명과 아이콘 SVG 를 그린다.
-// terminal/workflow 페이지 둘 다, 페이지 로드 시점·SSE git_branch 이벤트·
-// /api/branch fetch 결과 등 어디서든 단일 헬퍼로 갱신한다.
+// git brand name and icon SVG on the status bar (`#terminal-sl-branch`).
+// both terminal/workflow pages, page load point·SSE git branch event·
+// /api/branch fetch update to a single helper anywhere.
 //
-// 상태바 element 가 없는 페이지(kanban/dashboard 등)에서는 no-op.
+// No-op on the status bar element page (kanban/dashboard, etc.).
 var BRANCH_ICON_SVG =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
   + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
@@ -1032,12 +1032,12 @@ var _INFO_MODAL_ICONS = {
  * @param {Object} [options]
  * @param {Function} [options.onClose]     - Called when the modal is dismissed by any method.
  * @param {'info'|'warning'|'error'} [options.severity='info'] - Determines icon and modifier class.
- * @param {string} [options.confirmText='확인'] - Label for the confirm button.
+ * @param {string} [options.confirmText='About Us'] - Label for the confirm button.
  */
 function showInfoModal(title, body, options) {
   var opts = options || {};
   var severity = (opts.severity === 'warning' || opts.severity === 'error') ? opts.severity : 'info';
-  var confirmText = opts.confirmText || '확인';
+  var confirmText = opts.confirmText || 'About Us';
   var onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
 
   var uid = 'info-modal-title-' + (++_infoModalCounter);

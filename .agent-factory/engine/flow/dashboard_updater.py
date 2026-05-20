@@ -18,7 +18,7 @@ import shutil
 import sys
 import tempfile
 
-# utils 패키지 import (finalization.py와 동일 sys.path 처리)
+# import utils package (same sys.path processing as finalization.py)
 _engine_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
@@ -33,9 +33,9 @@ PROJECT_ROOT: str = resolve_project_root()
 def _update_skill_frequency() -> None:
     """dashboard/.skills.md의 스킬 목록 컬럼을 파싱하여 스킬별 누적 빈도 집계표를 갱신한다.
 
-    .skills.md의 테이블 행에서 `스킬 목록` 컬럼(인덱스 5, 0-based)을 읽고
+    .skills.md의 테이블 행에서 `Skill List` 컬럼(인덱스 5, 0-based)을 읽고
     `<br>` 구분자로 스킬명을 분리하여 전체 사용 횟수를 카운트한다.
-    집계 결과를 `## 스킬 빈도 집계` 섹션으로 파일 하단에 추가/갱신한다.
+    집계 결과를 `## Skill frequency count` 섹션으로 파일 하단에 추가/갱신한다.
 
     테이블 형식: | 스킬명 | 사용 횟수 | 비율 | (내림차순 정렬)
 
@@ -51,36 +51,36 @@ def _update_skill_frequency() -> None:
         with open(skills_md, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # 스킬 빈도 집계 섹션 마커
-        freq_section_marker = "## 스킬 빈도 집계"
+        # Skill Frequency Count Section Marker
+        freq_section_marker = "## Skill frequency count"
 
-        # 섹션 이전 본문(테이블 부분)만 파싱 대상으로 분리
+        # Separate only the body (table part) before the section as a parsing target
         if freq_section_marker in content:
             table_part = content[:content.index(freq_section_marker)]
         else:
             table_part = content
 
-        # 테이블 행 파싱: `|`로 시작하고 구분선(---|)이 아닌 행
+        # Parsing table rows: rows that start with `|` and are not separator (---|)
         skill_counts: dict[str, int] = {}
         for line in table_part.splitlines():
             line = line.strip()
             if not line.startswith("|"):
                 continue
-            # 구분선 행 건너뜀 (예: |------|--------|...)
+            # Skip separator lines (e.g. |------|--------|...)
             if line.replace("|", "").replace("-", "").replace(" ", "") == "":
                 continue
             cols = [c.strip() for c in line.strip("|").split("|")]
             if len(cols) < 6:
                 continue
             first_col = cols[0].strip()
-            # 헤더 행 건너뜀
-            if first_col in ("날짜", "---") or first_col.startswith("---"):
+            # Skip header row
+            if first_col in ("date", "---") or first_col.startswith("---"):
                 continue
-            # 스킬 목록 컬럼 (0-based index 5)
+            # Skill list column (0-based index 5)
             skills_raw = cols[5].strip()
-            if not skills_raw or skills_raw in ("-", "스킬 목록"):
+            if not skills_raw or skills_raw in ("-", "Skill List"):
                 continue
-            # <br> 구분자로 스킬명 분리 (대소문자 무관)
+            # <br> Separate skill names with separators (case is irrelevant)
             skill_list = [s.strip() for s in skills_raw.replace("<BR>", "<br>").split("<br>") if s.strip()]
             for skill in skill_list:
                 skill_counts[skill] = skill_counts.get(skill, 0) + 1
@@ -88,13 +88,13 @@ def _update_skill_frequency() -> None:
         if not skill_counts:
             return
 
-        # 내림차순 정렬 (동점 시 스킬명 알파벳 순)
+        # Sort in descending order (in case of a tie, in alphabetical order by skill name)
         sorted_skills = sorted(skill_counts.items(), key=lambda x: (-x[1], x[0]))
         total = sum(skill_counts.values())
 
-        # 테이블 생성
+        # Create table
         rows: list[str] = []
-        rows.append("| 스킬명 | 사용 횟수 | 비율 |")
+        rows.append("| Skill name | Number of uses | ratio |")
         rows.append("|--------|----------|------|")
         for skill_name, count in sorted_skills:
             ratio = f"{count / total * 100:.1f}%"
@@ -102,13 +102,13 @@ def _update_skill_frequency() -> None:
 
         freq_section = freq_section_marker + "\n\n" + "\n".join(rows) + "\n"
 
-        # 기존 섹션 교체 또는 하단에 추가
+        # Replace existing section or add to bottom
         if freq_section_marker in content:
             new_content = content[:content.index(freq_section_marker)] + freq_section
         else:
             new_content = content.rstrip("\n") + "\n\n" + freq_section
 
-        # POSIX lock + 원자적 쓰기
+        # POSIX lock + atomic write
         os.makedirs(os.path.dirname(skills_md), exist_ok=True)
         locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(skills_md), suffix=".tmp")
@@ -139,11 +139,11 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
         abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
     """
     try:
-        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+        marker = "<!-- New entries will be added below this line -->"
         logs_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".logs.md")
         lock_dir = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".logs.md.lock")
 
-        # .context.json에서 title, command 읽기
+        # Read title and command from .context.json
         context_file = os.path.join(abs_work_dir, ".context.json")
         context = load_json_file(context_file)
         title = ""
@@ -152,7 +152,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
             title = context.get("title", "")
             command = context.get("command", "")
 
-        # workflow.log 통계 수집
+        # Collect workflow.log statistics
         log_path = os.path.join(abs_work_dir, "workflow.log")
         if os.path.isfile(log_path):
             with open(log_path, "r", encoding="utf-8", errors="replace") as f:
@@ -175,8 +175,8 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
             artifact_count = 0
             size_str = "-"
 
-        # P13: ERROR 임계치 알림
-        # error_count >= ERROR_THRESHOLD이면 workflow.log에 WARN 기록 및 stderr 출력
+        # P13: ERROR threshold notification
+        # If error_count >= ERROR_THRESHOLD, log WARN to workflow.log and print to stderr
         if error_count >= ERROR_THRESHOLD:
             _append_log(
                 abs_work_dir,
@@ -189,10 +189,10 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
                 file=sys.stderr,
                 flush=True,
             )
-            # TODO: Slack 알림 연동 포인트
+            # TODO: Slack notification integration points
             # slack_notify(registry_key, error_count, ERROR_THRESHOLD)
 
-        # 날짜: registryKey에서 MM-DD HH:MM 추출 (YYYYMMDD-HHMMSS)
+        # Date: Extract MM-DD HH:MM from registryKey (YYYYMMDD-HHMMSS)
         date_str = "-"
         try:
             parts = registry_key.split("-")
@@ -203,14 +203,14 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
         except Exception:
             pass
 
-        # 로그 링크: abs_work_dir에서 dashboard 기준 상대 경로 계산
+        # Log link: Calculate relative path relative to dashboard in abs_work_dir
         try:
             rel_work_dir = os.path.relpath(abs_work_dir, os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data"))
-            log_link = f"[로그]({rel_work_dir}/workflow.log)"
+            log_link = f"[Log]({rel_work_dir}/workflow.log)"
         except Exception:
             log_link = "-"
 
-        # 제목 축약 (20자 초과 시)
+        # Shorten title (if exceeding 20 characters)
         title_display = title[:20] + "…" if len(title) > 20 else title
 
         row = (
@@ -218,16 +218,16 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
             f" | {warn_count} | {error_count} | {hallu_count} | {artifact_count} | {size_str} | {log_link} |"
         )
 
-        # .logs.md 읽기
+        # Read .logs.md
         content = ""
         if os.path.exists(logs_md):
             with open(logs_md, "r", encoding="utf-8") as f:
                 content = f.read()
 
         if marker not in content:
-            content = f"# 워크플로우 로그 추적\n\n{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n"
+            content = f"# Workflow log tracking \n \n {marker} \n \n {LOGS_HEADER_LINE} \n {LOGS_SEPARATOR_LINE} \n"
 
-        # 마커 + separator 후에 행 삽입
+        # Insert row after marker + separator
         if LOGS_SEPARATOR_LINE in content:
             marker_pos = content.find(marker)
             if marker_pos >= 0:
@@ -250,7 +250,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
                 marker, f"{marker}\n\n{LOGS_HEADER_LINE}\n{LOGS_SEPARATOR_LINE}\n{row}"
             )
 
-        # POSIX lock + 원자적 쓰기
+        # POSIX lock + atomic write
         os.makedirs(os.path.dirname(logs_md), exist_ok=True)
         locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(logs_md), suffix=".tmp")
@@ -270,7 +270,7 @@ def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
 
 
 def _safe_listdir(path: str) -> list[str]:
-    """디렉터리 목록을 반환한다. 오류 시 빈 리스트 반환."""
+    """Returns a directory listing. In case of error, an empty list is returned."""
     try:
         return os.listdir(path)
     except OSError:
@@ -283,7 +283,7 @@ def _update_step_durations() -> None:
     workflow/ 및 workflow/.history/ 디렉터리를 스캔하여 step이 DONE인
     status.json의 transitions 배열을 읽고, 각 단계(PLAN/WORK/REPORT/DONE) 간
     시간 차이를 초 단위로 계산한다.
-    집계 결과를 `## 단계별 평균 소요 시간` 섹션으로 파일 하단에 추가/갱신한다.
+    집계 결과를 `## Average time spent per step` 섹션으로 파일 하단에 추가/갱신한다.
 
     테이블 형식: | 단계 | 평균 소요 | 최소 | 최대 | 횟수 |
 
@@ -304,12 +304,12 @@ def _update_step_durations() -> None:
         wf_base = os.path.join(PROJECT_ROOT, ".agent-factory", "runs")
         wf_dirs = [wf_base, os.path.join(wf_base, ".history")]
 
-        # PLAN/WORK/REPORT 단계 소요 시간만 집계 (DONE 이후 측정 불가)
+        # Only the time spent in the PLAN/WORK/REPORT step is counted (not measurable after DONE)
         step_label_order = ["PLAN", "WORK", "REPORT"]
         durations: dict[str, list[float]] = {label: [] for label in step_label_order}
 
         def _parse_iso(s: str) -> "float | None":
-            """ISO 8601 타임스탬프를 Unix 타임스탬프(float)로 변환."""
+            """Convert ISO 8601 timestamp to Unix timestamp (float)."""
             try:
                 return _dt.fromisoformat(s).timestamp()
             except Exception:
@@ -341,19 +341,19 @@ def _update_step_durations() -> None:
                 if not isinstance(transitions, list):
                     continue
 
-                # transitions 구조: {from, to, at}
-                # at은 해당 전환이 발생한 시각 (= "to" 단계 진입 시각)
-                # 각 단계 소요 시간 = 다음 단계 진입 시각 - 현재 단계 진입 시각
-                # ex) PLAN 소요 = WORK 진입 at - PLAN 진입 at
-                #     WORK 소요 = REPORT 진입 at - WORK 진입 at
-                #     REPORT 소요 = DONE 진입 at - REPORT 진입 at
-                # transitions에서 to: at 맵으로 변환 (각 단계 진입 시각)
+                # transitions structure: {from, to, at}
+                # at is the time when the conversion occurred (= “to” stage entry time)
+                # Time required for each stage = Next stage entry time - Current stage entry time
+                # ex) PLAN required = WORK entry at - PLAN entry at
+                #     WORK required = REPORT entry at - WORK entry at
+                #     REPORT required = DONE entry at - REPORT entry at
+                # Convert transitions to to: at map (entry time for each step)
                 at_map: dict[str, str] = {}
                 for t in transitions:
                     if isinstance(t, dict) and t.get("to") and t.get("at"):
                         at_map[t["to"]] = t["at"]
 
-                # 단계 소요 = (다음 단계 진입 시각) - (현재 단계 진입 시각)
+                # Step required = (next step entry time) - (current step entry time)
                 step_pairs = [
                     ("PLAN",   _parse_iso(at_map.get("PLAN", "")),   _parse_iso(at_map.get("WORK", ""))),
                     ("WORK",   _parse_iso(at_map.get("WORK", "")),   _parse_iso(at_map.get("REPORT", ""))),
@@ -364,24 +364,24 @@ def _update_step_durations() -> None:
                     if t_start is not None and t_end is not None and t_end > t_start:
                         durations[label].append(t_end - t_start)
 
-        # ── 소요 시간 포매팅 ──
+        # ── Formatting Time Required ──
         def _fmt_seconds(secs: float) -> str:
-            """초 단위 소요 시간을 사람이 읽기 쉬운 형식으로 변환."""
+            """Convert time spent in seconds to human-readable format."""
             if secs < 1:
-                return "<1초"
+                return "<1 second"
             if secs < 60:
-                return f"{secs:.0f}초"
+                return f"{secs:.0f} seconds"
             mins = int(secs) // 60
             rem_secs = int(secs) % 60
             if mins < 60:
-                return f"{mins}분 {rem_secs}초" if rem_secs else f"{mins}분"
+                return f"{mins} minutes {rem_secs} seconds" if rem_secs else f"{mins} minutes"
             hours = mins // 60
             rem_mins = mins % 60
-            return f"{hours}시간 {rem_mins}분" if rem_mins else f"{hours}시간"
+            return f"{hours} hours {rem_mins} minutes" if rem_mins else f"{hours}hours"
 
-        # ── 테이블 생성 ──
+        # ── Create table ──
         rows: list[str] = []
-        rows.append("| 단계 | 평균 소요 | 최소 | 최대 | 횟수 |")
+        rows.append("| steps | Average Takes | Minimum | max | number of times |")
         rows.append("|------|----------|------|------|------|")
         for label in step_label_order:
             vals = durations[label]
@@ -393,23 +393,23 @@ def _update_step_durations() -> None:
                 mx = max(vals)
                 rows.append(f"| {label} | {_fmt_seconds(avg)} | {_fmt_seconds(mn)} | {_fmt_seconds(mx)} | {len(vals)} |")
 
-        section_marker = "## 단계별 평균 소요 시간"
+        section_marker = "## Average time spent per step"
         new_section = section_marker + "\n\n" + "\n".join(rows) + "\n"
 
-        # ── .history.md 읽기 ──
+        # ── Read .history.md ──
         if not os.path.isfile(history_md):
             return
 
         with open(history_md, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # 기존 섹션 교체 또는 하단에 추가
+        # Replace existing section or add to bottom
         if section_marker in content:
             new_content = content[:content.index(section_marker)] + new_section
         else:
             new_content = content.rstrip("\n") + "\n\n" + new_section
 
-        # POSIX lock + 원자적 쓰기
+        # POSIX lock + atomic write
         os.makedirs(os.path.dirname(history_md), exist_ok=True)
         locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(history_md), suffix=".tmp")
@@ -455,7 +455,7 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
         if not os.path.isfile(history_md):
             return
 
-        # 전체 워크플로우 status.json 탐색 (workflow/ 및 workflow/.history/ 포함)
+        # Browse entire workflow status.json (including workflow/ and workflow/.history/)
         search_dirs = [workflow_root]
         history_subdir = os.path.join(workflow_root, ".history")
         if os.path.isdir(history_subdir):
@@ -497,26 +497,26 @@ def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
 
         success_rate = f"{completed_count / total_count * 100:.1f}%"
 
-        # 통계 섹션 생성
-        section_marker = "## 태스크 성공/실패 통계"
+        # Create statistics section
+        section_marker = "## Task success/failure statistics"
         rows: list[str] = [
-            "| 총 태스크 | 성공 | 실패 | 성공률 |",
+            "| Total Tasks | Success | failure | Success Rate |",
             "|----------|------|------|--------|",
             f"| {total_count} | {completed_count} | {failed_count} | {success_rate} |",
         ]
         new_section = section_marker + "\n\n" + "\n".join(rows) + "\n"
 
-        # .history.md 읽기
+        # Read .history.md
         with open(history_md, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # 기존 섹션 교체 또는 하단에 추가
+        # Replace existing section or add to bottom
         if section_marker in content:
             new_content = content[:content.index(section_marker)] + new_section
         else:
             new_content = content.rstrip("\n") + "\n\n" + new_section
 
-        # POSIX lock + 원자적 쓰기
+        # POSIX lock + atomic write
         os.makedirs(os.path.dirname(history_md), exist_ok=True)
         locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(history_md), suffix=".tmp")

@@ -1,8 +1,8 @@
-"""ticket_repository.py - 칸반 티켓 XML CRUD 및 파일 탐색 모듈.
+"""ticket_repository.py - Kanban ticket XML CRUD and file navigation module.
 
-XML 티켓 파일(.kanban/{open,progress,review,done}/T-NNN.xml)의 생성, 읽기,
-갱신, 삭제를 담당하는 데이터 계층 모듈이다. kanban.py에서 분리되었으며,
-순수 IO 작업만 수행한다.
+Creating, reading, and XML ticket files (.kanban/{open,progress,review,done}/T-NNN.xml)
+This is a data layer module responsible for update and delete. Separated from kanban.py,
+Only pure IO operations are performed.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, NoReturn
 
-# ─── 경로 상수 ───────────────────────────────────────────────────────────────
+# ─── Path constant ──────────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
@@ -27,17 +27,17 @@ from common import resolve_project_root
 _PROJECT_ROOT: str = resolve_project_root()
 KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".agent-factory", "tickets")
 
-# ─── 상태별 디렉터리 상수 ─────────────────────────────────────────────────────
+# ─── Directory constants by state ────────────────────────────────────────────────────────
 KANBAN_TODO_DIR: str = os.path.join(KANBAN_DIR, "todo")
 KANBAN_OPEN_DIR: str = os.path.join(KANBAN_DIR, "open")
 KANBAN_PROGRESS_DIR: str = os.path.join(KANBAN_DIR, "progress")
 KANBAN_REVIEW_DIR: str = os.path.join(KANBAN_DIR, "review")
 KANBAN_DONE_DIR: str = os.path.join(KANBAN_DIR, "done")
 
-# 하위 호환: 기존 KANBAN_ACTIVE_DIR를 import하는 코드를 위한 deprecated alias
+# Backward compatibility: deprecated alias for code that imports the existing KANBAN_ACTIVE_DIR
 KANBAN_ACTIVE_DIR: str = KANBAN_OPEN_DIR
 
-# XML <status> 값 -> 디렉터리 경로 매핑
+# XML <status> value -> directory path mapping
 STATUS_DIR_MAP: dict[str, str] = {
     "To Do": KANBAN_TODO_DIR,
     "Open": KANBAN_OPEN_DIR,
@@ -47,21 +47,21 @@ STATUS_DIR_MAP: dict[str, str] = {
     "Done": KANBAN_DONE_DIR,
 }
 
-# ─── 디버그 예약 영역 상수 ─────────────────────────────────────────────────────
-# 자동 채번 시 이 범위를 제외하기 위한 상수. 명시 --number 호출은 영향 없음 (강제 차단 X).
+# ─── Debug reserved area constant ────────────────────────────────────────────────────────
+# Constant to exclude this range when automatically counting. Explicit --number calls have no effect (force blocking X).
 DEBUG_RESERVED_RANGE_START: int = 900
 DEBUG_RESERVED_RANGE_END: int = 999
 
 
-# ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
+# ─── Logging Helper ───────────────────────────────────────────────────────────────────
 
 def resolve_work_dir_for_logging() -> str | None:
-    """현재 워크플로우의 abs_work_dir을 환경변수 또는 .context.json에서 해석한다.
+    """The abs_work_dir of the current workflow is interpreted from the environment variable or .context.json.
 
-    해석 불가 시 None을 반환하여 로깅 실패가 스크립트 실행에 영향을 주지 않도록 한다.
+    If interpretation is not possible, None is returned to prevent logging failure from affecting script execution.
     """
     try:
-        # flow_logger가 존재하면 위임
+        # Delegate if flow_logger exists
         _flow_dir = os.path.dirname(os.path.abspath(__file__))
         if _flow_dir not in sys.path:
             sys.path.insert(0, _flow_dir)
@@ -70,11 +70,11 @@ def resolve_work_dir_for_logging() -> str | None:
     except Exception:
         pass
     try:
-        # 환경변수 WORKFLOW_WORK_DIR 직접 참조
+        # Direct reference to the environment variable WORKFLOW_WORK_DIR
         work_dir = os.environ.get("WORKFLOW_WORK_DIR", "")
         if work_dir and os.path.isdir(work_dir):
             return work_dir
-        # .workflow/ 디렉터리에서 가장 최근 활성 워크플로우 탐색
+        # Browse the most recent active workflows in the .workflow/ directory
         workflow_base = os.path.join(_PROJECT_ROOT, ".agent-factory", "runs")
         if not os.path.isdir(workflow_base):
             return None
@@ -93,9 +93,9 @@ def resolve_work_dir_for_logging() -> str | None:
 
 
 def log(level: str, message: str) -> None:
-    """workflow.log에 이벤트를 기록한다. abs_work_dir 해석 실패 시 조용히 건너뛴다."""
+    """Records events in workflow.log. If abs_work_dir parsing fails, it is quietly skipped."""
     try:
-        # flow_logger가 존재하면 위임
+        # Delegate if flow_logger exists
         _flow_dir = os.path.dirname(os.path.abspath(__file__))
         if _flow_dir not in sys.path:
             sys.path.insert(0, _flow_dir)
@@ -120,47 +120,47 @@ def log(level: str, message: str) -> None:
         pass
 
 
-# ─── 에러 헬퍼 ───────────────────────────────────────────────────────────────
+# ─── Error Helper ───────────────────────────────────────────────────────────────────
 
 def err(msg: str, code: int = 1) -> NoReturn:
-    """에러 메시지를 stderr에 출력하고 종료한다.
+    """Prints an error message to stderr and exits.
 
     Args:
-        msg: 에러 메시지
-        code: 종료 코드 (기본값 1)
+        msg: error message
+        code: exit code (default 1)
     """
     log("ERROR", f"kanban.py: ERROR {msg}")
-    print(f"에러: {msg}", file=sys.stderr)
+    print(f"Error: {msg}", file=sys.stderr)
     sys.exit(code)
 
 
-# ─── XML 헬퍼 ────────────────────────────────────────────────────────────────
+# ─── XML Helper ───────────────────────────────────────────────────────────────────
 
 
 def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "", command: str = "") -> str:
-    """티켓 XML 문자열을 생성하여 반환한다.
+    """Creates and returns a ticket XML string.
 
-    XML은 5개 최상위 요소로 구성되는 flat 구조이다:
-      - <metadata>: 티켓 번호·제목·날짜·상태·커맨드 (필수)
-      - <relations>: 관계 링크 목록 (옵셔널 — 관계 없으면 생략)
-      - <prompt>: 작업 프롬프트 (goal/target/constraints/criteria/context) (필수)
-      - <result>: 워크플로우 실행 결과 (registrykey/workdir/plan/report/merge_commit) (옵셔널 — 미실행 시 self-closing)
-      - <failure>: FAIL 상태 메타데이터 (reason/phase/retry_count/context) (옵셔널 — 정상 완료 시 미존재)
+    XML is a flat structure consisting of five top-level elements:
+      - <metadata>: Ticket number, title, date, status, command (required)
+      - <relations>: list of relationship links (optional — omitted if not relevant)
+      - <prompt>: Action prompt (goal/target/constraints/criteria/context) (required)
+      - <result>: Workflow execution result (registrykey/workdir/plan/report/merge_commit) (Optional — self-closing if not executed)
+      - <failure>: FAIL status metadata (reason/phase/retry_count/context) (optional — does not exist upon normal completion)
 
-    신규 티켓 생성 시 <failure> 요소는 생성하지 않는다 (failure 미존재 == 정상 상태,
-    T-452 §9.2 옵션 A 참조). <failure> 요소는 update_failure() 호출 시 신규 삽입된다.
+    When creating a new ticket, the <failure> element is not created (failure does not exist == normal state,
+    See T-452 §9.2 Option A). The <failure> element is newly inserted when update_failure() is called.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
-        title: 티켓 제목. 빈 문자열 허용.
-        datetime_str: 생성 일시 문자열 (YYYY-MM-DD HH:MM:SS 형식). 빈 문자열이면 현재 시간 사용.
-        command: 실행 커맨드 (implement, research 등). 빈 문자열 허용.
+        ticket_number: Ticket number (T-NNN format).
+        title: Ticket title. Allows empty strings.
+        datetime_str: Creation date string (YYYY-MM-DD HH:MM:SS format). If the string is empty, use the current time.
+        command: Execution command (implement, research, etc.). Allows empty strings.
 
     Returns:
-        UTF-8 XML 선언을 포함한 티켓 XML 문자열.
+        Ticket XML string containing UTF-8 XML declaration.
     """
     root = ET.Element("ticket")
-    # <metadata> 래퍼 요소
+    # <metadata> wrapper element
     metadata_elem = ET.SubElement(root, "metadata")
     ET.SubElement(metadata_elem, "number").text = ticket_number
     title_sub = ET.SubElement(metadata_elem, "title")
@@ -172,14 +172,14 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
     ET.SubElement(metadata_elem, "status").text = "Open"
     if command:
         ET.SubElement(metadata_elem, "command").text = command
-    # <prompt /> self-closing 요소
+    # <prompt /> self-closing element
     ET.SubElement(root, "prompt")
-    # <result /> self-closing 요소
+    # <result /> self-closing element
     ET.SubElement(root, "result")
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode", xml_declaration=False)
-    # 섹션 주석 삽입: <metadata>, <prompt>, <result> 태그 직전에 주석 추가
-    # self-closing 태그(<prompt />, <result />) 및 일반 태그(<prompt>, <result>) 모두 처리
+    # Insert section comments: Add comments just before <metadata>, <prompt>, and <result> tags.
+    # Handles both self-closing tags (<prompt />, <result />) and regular tags (<prompt>, <result>)
     xml_str = re.sub(r"(<metadata[ />])", r"<!-- metadata -->\n  \1", xml_str)
     xml_str = re.sub(r"(<prompt[ />])", r"\n  <!-- prompt -->\n  \1", xml_str)
     xml_str = re.sub(r"(<result[ />])", r"\n  <!-- result -->\n  \1", xml_str)
@@ -187,53 +187,53 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
 
 
 def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False) -> None:
-    """XML Element를 파일에 저장한다.
+    """Save the XML Element to a file.
 
-    <metadata>, <prompt>, <result> flat 구조를 유지하고,
-    prompt 내부 필드 텍스트를 가독성 있게 래핑한다.
+    Maintain the <metadata>, <prompt>, <result> flat structure,
+    Wraps the field text inside the prompt for readability.
 
     Args:
-        filepath: 저장할 파일 경로.
-        root: 저장할 XML 루트 Element.
-        allow_create: True이면 파일이 없어도 새로 생성 허용.
-            False(기본값)이면 파일이 존재하지 않을 때 FileNotFoundError를 raise하여
-            레이스 컨디션으로 인한 빈 파일 생성을 방지한다.
+        filepath: File path to save.
+        root: XML root element to save.
+        allow_create: If True, new creation is allowed even if the file does not exist.
+            If False (default), FileNotFoundError is raised when the file does not exist.
+            Prevents creation of empty files due to race conditions.
 
     Raises:
-        FileNotFoundError: allow_create=False이고 filepath가 존재하지 않을 때.
+        FileNotFoundError: when allow_create=False and filepath does not exist.
     """
-    # 파일이 존재하지 않으면 쓰기 거부 (빈 파일 생성 방지)
+    # Reject write if file does not exist (prevent creation of empty file)
     if not allow_create and not os.path.isfile(filepath):
         raise FileNotFoundError(
-            f"쓰기 대상 파일 없음 (다른 세션이 이동했을 수 있음): {filepath}"
+            f"No file to write to (may have been moved by another session): {filepath}"
         )
-    # updated 타임스탬프 자동 갱신
+    # updated Timestamp auto-renewal
     metadata_elem = root.find("metadata")
     if metadata_elem is not None:
         updated_elem = metadata_elem.find("updated")
         if updated_elem is not None:
             updated_elem.text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
-            # 레거시 호환: updated가 없으면 생성
+            # Legacy Compatibility: Create updated if not present
             ET.SubElement(metadata_elem, "updated").text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ET.indent(root, space="  ")
     xml_str = ET.tostring(root, encoding="unicode")
-    # prompt 내부 필드 텍스트를 개행+들여쓰기로 래핑하여 가독성 확보 (10자 이상만)
+    # Ensure readability by wrapping the field text inside the prompt with newline + indentation (only 10 characters or more)
     _PROMPT_FIELD_INLINE_LIMIT = 10
 
     def _wrap_prompt_field(m: re.Match[str]) -> str:
         indent = m.group(1)
         tag = m.group(2)
         content = m.group(3).strip()
-        # \\n 리터럴(2문자)을 실제 개행문자로 변환
+        # \n Converts a literal (2 characters) to an actual newline character.
         content = content.replace("\\n", "\n")
-        # 리스트 패턴 자동 개행: 숫자) 패턴과 대시(-) 패턴 앞에 개행 삽입 (문자열 시작 제외)
+        # List pattern automatic newline: Insert a newline before numeric) patterns and dash (-) patterns (except at the beginning of a string)
         content = re.sub(r"(?<!^)(?<!\n)(?<!\()(\s)(\d{1,2}\))", r"\n\2", content)
         content = re.sub(r"(?<!^)(?<!\n)(\s*)(- )", r"\n\2", content)
         if len(content) < _PROMPT_FIELD_INLINE_LIMIT:
             return f"{indent}<{tag}>{content}</{tag}>"
         inner_indent = indent + "  "
-        # 각 줄의 기존 공백을 strip 후 빈 줄 제거, 재인덴트 (ET.indent 중첩 방지)
+        # Strip existing white space in each line, remove blank lines, and re-indent (prevent ET.indent overlap)
         lines = content.split("\n")
         lines = [line.strip() for line in lines if line.strip()]
         indented_content = f"\n{inner_indent}".join(lines)
@@ -245,8 +245,8 @@ def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False
         xml_str,
         flags=re.DOTALL,
     )
-    # 섹션 주석 삽입: <metadata>, <relations>, <prompt>, <result> 태그 직전에 주석 추가 (없는 경우에만)
-    # self-closing 태그(<prompt />, <result />) 및 일반 태그(<prompt>, <result>) 모두 처리
+    # Insert section comments: Add comments immediately before <metadata>, <relations>, <prompt>, <result> tags (only if not present)
+    # Handles both self-closing tags (<prompt />, <result />) and regular tags (<prompt>, <result>)
     if "<!-- metadata -->" not in xml_str:
         xml_str = re.sub(r"(<metadata[ />])", r"<!-- metadata -->\n  \1", xml_str)
     if "<!-- relations -->" not in xml_str and "<relations" in xml_str:
@@ -264,39 +264,39 @@ def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False
 
 
 def parse_ticket_xml(filepath: str) -> dict[str, Any]:
-    """티켓 XML 파일을 파싱하여 딕셔너리로 반환한다.
+    """Parse the ticket XML file and return it as a dictionary.
 
-    flat 구조(<metadata>, <prompt>, <result>)를 기본으로 파싱한다.
-    done 디렉터리의 레거시 티켓(<submit>/<subnumber> 또는 <history>/<subnumber> 구조)은 폴백 로직으로 처리한다.
+    Parses based on flat structures (<metadata>, <prompt>, <result>).
+    Legacy tickets (<submit>/<subnumber> or <history>/<subnumber> structures) in the done directory are processed with fallback logic.
 
     Args:
-        filepath: 파싱할 티켓 파일 경로.
+        filepath: Ticket file path to parse.
 
     Returns:
-        파싱된 티켓 정보 딕셔너리:
-            - number (str): 티켓 번호
-            - status (str): 현재 상태
-            - title (str): 티켓 제목
-            - command (str): 실행 커맨드
+        Dictionary of parsed ticket information:
+            - number (str): ticket number
+            - status (str): current status
+            - title (str): ticket title
+            - command (str): Execution command
             - prompt (dict): goal, target, constraints, criteria, context
-            - result (dict | None): registrykey, workdir, plan, report (미실행 시 None)
-            - relations (list[dict]): 관계 목록
+            - result (dict | None): registrykey, workdir, plan, report (None if not executed)
+            - relations (list[dict]): list of relationships
 
     Raises:
-        SystemExit: 파일 읽기 실패 또는 XML 파싱 오류 시.
+        SystemExit: When file reading fails or XML parsing error occurs.
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
     def _text(elem: ET.Element, tag: str, default: str = "") -> str:
-        """자식 Element의 텍스트를 반환하는 헬퍼."""
+        """A helper that returns the text of a child Element."""
         child = elem.find(tag)
         return child.text.strip() if child is not None and child.text else default
 
-    # <metadata> 래퍼에서 number/title/datetime/status/command 파싱
+    # Parse number/title/datetime/status/command in <metadata> wrapper
     metadata_elem = root.find("metadata")
 
     if metadata_elem is not None:
@@ -310,7 +310,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         title = _text(root, "title")
         command = _text(root, "command")
 
-    # done 디렉터리 레거시 폴백: <submit>/<subnumber> 또는 <history>/<subnumber> 구조가 감지되면 기존 로직으로 파싱
+    # done Directory legacy fallback: If a <submit>/<subnumber> or <history>/<subnumber> structure is detected, parse it with existing logic.
     submit_elem = root.find("submit")
     history_elem = root.find("history")
     has_legacy_structure = (
@@ -320,7 +320,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
     if has_legacy_structure:
         return _parse_legacy_ticket(filepath, root, number, status, title, _text)
 
-    # flat 구조: <prompt> 루트 직하에서 5요소 파싱
+    # Flat structure: <prompt> Parse 5 elements directly under the root
     prompt_fields = ("goal", "target", "constraints", "criteria", "context")
     prompt_data: dict[str, str] = {}
     prompt_elem = root.find("prompt")
@@ -331,7 +331,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         for field in prompt_fields:
             prompt_data[field] = ""
 
-    # flat 구조: <result> 루트 직하에서 하위 요소 파싱
+    # Flat structure: <result> parses subelements directly below the root
     result_fields = ("registrykey", "workdir", "plan", "report", "merge_commit")
     result_data: dict[str, str] | None = None
     result_elem = root.find("result")
@@ -340,7 +340,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         for field in result_fields:
             result_data[field] = _text(result_elem, field)
 
-    # flat 구조: <failure> 루트 직하에서 하위 요소 파싱 (옵셔널 — FAIL 상태일 때만 존재)
+    # Flat structure: <failure> Parse sub-elements directly below the root (optional — exists only in FAIL state)
     failure_fields = ("reason", "phase", "retry_count", "context")
     failure_data: dict[str, str] | None = None
     failure_elem = root.find("failure")
@@ -349,7 +349,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         for field in failure_fields:
             failure_data[field] = _text(failure_elem, field)
 
-    # <relations> 요소 파싱 (하위 호환: 없으면 빈 리스트)
+    # Parsing <relations> elements (backwards compatible: empty list if none)
     relations = _parse_relations(root)
 
     return {
@@ -365,7 +365,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
 
 
 def _parse_relations(root: ET.Element) -> list[dict[str, str]]:
-    """<relations> 요소를 파싱하여 관계 리스트를 반환한다."""
+    """Parses the <relations> element and returns a list of relationships."""
     relations: list[dict[str, str]] = []
     relations_elem = root.find("relations")
     if relations_elem is not None:
@@ -385,14 +385,14 @@ def _parse_legacy_ticket(
     title: str,
     _text: Any,
 ) -> dict[str, Any]:
-    """레거시 <submit>/<subnumber> 구조를 파싱하여 새 flat 형식으로 반환한다.
+    """Parses the legacy <submit>/<subnumber> structure and returns it in a new flat format.
 
-    done 디렉터리의 기존 티켓과의 하위 호환을 위해 사용된다.
+    Used for backward compatibility with existing tickets in the done directory.
     """
     submit_elem = root.find("submit")
     history_elem = root.find("history")
 
-    # command와 prompt는 가장 최근(가장 큰 id) subnumber에서 추출
+    # Command and prompt are extracted from the most recent (largest ID) subnumber
     all_subs: list[ET.Element] = []
     if submit_elem is not None:
         all_subs.extend(submit_elem.findall("subnumber"))
@@ -401,7 +401,7 @@ def _parse_legacy_ticket(
     if not all_subs:
         all_subs.extend(root.findall("subnumber"))
 
-    # ID 기준 내림차순 정렬하여 최근 subnumber 우선
+    # Sort by ID in descending order, giving priority to the most recent subnumber.
     all_subs.sort(key=lambda s: int(s.get("id", "0")) if s.get("id", "0").isdigit() else 0, reverse=True)
 
     command = ""
@@ -410,12 +410,12 @@ def _parse_legacy_ticket(
 
     if all_subs:
         latest = all_subs[0]
-        # command: subnumber 직하
+        # command: subnumber
         cmd_elem = latest.find("command")
         if cmd_elem is not None and cmd_elem.text:
             command = cmd_elem.text.strip()
 
-        # prompt: subnumber 내부 <prompt> 래퍼
+        # prompt: subnumber inside <prompt> wrapper
         prompt_elem = latest.find("prompt")
         if prompt_elem is not None:
             for field in ("goal", "target", "constraints", "criteria", "context"):
@@ -423,7 +423,7 @@ def _parse_legacy_ticket(
                 if child is not None and child.text:
                     prompt_data[field] = child.text.strip()
 
-        # result: subnumber 내부 <result> 래퍼
+        # result: subnumber inside <result> wrapper
         result_elem = latest.find("result")
         if result_elem is not None and len(result_elem) > 0:
             result_data = {}
@@ -431,7 +431,7 @@ def _parse_legacy_ticket(
                 text = result_child.text.strip() if result_child.text else ""
                 result_data[result_child.tag] = text
 
-    # <relations> 요소 파싱
+    # Parsing <relations> elements
     relations = _parse_relations(root)
 
     return {
@@ -446,27 +446,27 @@ def _parse_legacy_ticket(
     }
 
 
-# ─── prompt/result 갱신 ──────────────────────────────────────────────────────
+# ─── prompt/result update ─────────────────────────────────────────────────────────
 
 
 def update_prompt(filepath: str, updates: dict[str, str]) -> None:
-    """티켓 XML의 <prompt> 하위 요소와 <metadata>/<command>를 갱신한다.
+    """Update the <prompt> sub-element and <metadata>/<command> of the ticket XML.
 
-    self-closing <prompt /> 태그를 내용 있는 <prompt> 태그로 자동 변환한다.
+    Automatically converts self-closing <prompt /> tags into <prompt> tags with content.
 
     Args:
-        filepath: 티켓 파일 경로.
-        updates: 갱신할 필드 딕셔너리.
-            - command: <metadata>/<command> 갱신
-            - goal, target, constraints, criteria, context: <prompt> 하위 요소 갱신
+        filepath: Ticket file path.
+        updates: Dictionary of fields to update.
+            - command: <metadata>/<command> update
+            - Goal, target, constraints, criteria, context: <prompt> sub-element update
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
-    # <metadata>/<command> 갱신
+    # Update <metadata>/<command>
     if "command" in updates:
         metadata_elem = root.find("metadata")
         if metadata_elem is not None:
@@ -476,14 +476,14 @@ def update_prompt(filepath: str, updates: dict[str, str]) -> None:
             else:
                 ET.SubElement(metadata_elem, "command").text = updates["command"]
 
-    # <prompt> 하위 요소 갱신
+    # Update <prompt> child elements
     prompt_fields = ("goal", "target", "constraints", "criteria", "context")
     prompt_updates = {k: v for k, v in updates.items() if k in prompt_fields}
 
     if prompt_updates:
         prompt_elem = root.find("prompt")
         if prompt_elem is None:
-            # <prompt> 요소가 없으면 생성 (metadata 뒤에 삽입)
+            # Create a <prompt> element if it does not exist (insert it after metadata)
             prompt_elem = ET.Element("prompt")
             insert_idx = 0
             for i, child in enumerate(root):
@@ -492,7 +492,7 @@ def update_prompt(filepath: str, updates: dict[str, str]) -> None:
             root.insert(insert_idx, prompt_elem)
 
         for field, value in prompt_updates.items():
-            # \\n 리터럴을 실제 개행으로 변환
+            # \n Convert literals to actual newlines
             text = str(value).strip().replace("\\n", "\n")
             existing = prompt_elem.find(field)
             if existing is not None:
@@ -504,20 +504,20 @@ def update_prompt(filepath: str, updates: dict[str, str]) -> None:
 
 
 def update_result(filepath: str, updates: dict[str, str]) -> None:
-    """티켓 XML의 <result> 하위 요소를 갱신한다.
+    """Updates the <result> sub-element of ticket XML.
 
-    self-closing <result /> 태그를 내용 있는 <result> 태그로 자동 변환한다.
+    Automatically converts the self-closing <result /> tag into a <result> tag with content.
 
     Args:
-        filepath: 티켓 파일 경로.
-        updates: 갱신할 필드 딕셔너리.
-            - registrykey, workdir, plan, report, merge_commit: <result> 하위 요소 갱신
+        filepath: Ticket file path.
+        updates: Dictionary of fields to update.
+            - registrykey, workdir, plan, report, merge_commit: update <result> sub-elements
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
     result_fields = ("registrykey", "workdir", "plan", "report", "merge_commit")
     result_updates = {k: v for k, v in updates.items() if k in result_fields}
@@ -525,7 +525,7 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
     if result_updates:
         result_elem = root.find("result")
         if result_elem is None:
-            # <result> 요소가 없으면 생성 (루트 마지막에 추가)
+            # Create a <result> element if it does not exist (add it to the end of the root)
             result_elem = ET.SubElement(root, "result")
 
         for field, value in result_updates.items():
@@ -539,24 +539,24 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
 
 
 def update_failure(filepath: str, updates: dict[str, str]) -> None:
-    """티켓 XML의 <failure> 하위 요소를 갱신한다.
+    """Update the <failure> sub-element of ticket XML.
 
-    옵셔널 요소 — FAIL 상태일 때만 호출한다.
-    <failure> 미존재 시 루트 마지막에 신규 생성한다 (<result> 뒤에 자동 배치).
+    Optional element — Called only in FAIL status.
+    If <failure> does not exist, a new one is created at the end of the root (automatically placed after <result>).
 
     Args:
-        filepath: 티켓 파일 경로.
-        updates: 갱신할 필드 딕셔너리.
-            - reason: 실패 사유 식별자 (verifier_failure / validator_failure / sentinel / retry_max 등)
-            - phase: 실패 발생 워크플로우 단계 (INIT / PLAN / WORK / VALIDATE / REPORT)
-            - retry_count: 누적 재시도 횟수 (정수 → 문자열 직렬화)
-            - context: 자유 형식 설명 (multiline 허용)
+        filepath: Ticket file path.
+        updates: Dictionary of fields to update.
+            - reason: Failure reason identifier (verifier_failure / validator_failure / sentinel / retry_max, etc.)
+            - phase: Workflow phase where failure occurs (INIT / PLAN / WORK / VALIDATE / REPORT)
+            - retry_count: Cumulative number of retries (integer → string serialization)
+            - context: Free-form description (multiline allowed)
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
     failure_fields = ("reason", "phase", "retry_count", "context")
     failure_updates = {k: v for k, v in updates.items() if k in failure_fields}
@@ -564,7 +564,7 @@ def update_failure(filepath: str, updates: dict[str, str]) -> None:
     if failure_updates:
         failure_elem = root.find("failure")
         if failure_elem is None:
-            # <failure> 요소가 없으면 생성 (루트 마지막에 추가 — <result> 뒤)
+            # Create a <failure> element if it does not exist (add it to the end of the root — after <result>)
             failure_elem = ET.SubElement(root, "failure")
 
         for field, value in failure_updates.items():
@@ -576,38 +576,38 @@ def update_failure(filepath: str, updates: dict[str, str]) -> None:
 
     write_ticket_xml(filepath, root)
 
-# ─── relations 관련 ─────────────────────────────────────────────────────────
+# ─── relations ───────────────────────────────────────────────────────────
 
 
 def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
-    """티켓 XML에 관계(relation) 요소를 추가한다.
+    """Add a relationship element to the ticket XML.
 
-    <relations> 요소가 없으면 <metadata> 뒤, <prompt> 앞에 새로 생성한다.
-    동일한 type+ticket 조합이 이미 존재하면 중복 추가하지 않는다.
+    If the <relations> element does not exist, a new one is created after <metadata> and before <prompt>.
+    If the same type+ticket combination already exists, it is not added again.
 
     Args:
-        filepath: 티켓 파일 경로.
-        relation_type: 관계 유형 (depends-on, derived-from, blocks).
-        target_ticket: 대상 티켓 번호 (T-NNN 형식).
+        filepath: Ticket file path.
+        relation_type: Relationship type (depends-on, derived-from, blocks).
+        target_ticket: Target ticket number (T-NNN format).
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
     relations_elem = root.find("relations")
 
-    # 중복 검사
+    # duplicate check
     if relations_elem is not None:
         for rel in relations_elem.findall("relation"):
             if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
-                return  # 이미 존재하면 스킵
+                return  # Skip if already exists
 
-    # <relations> 요소가 없으면 생성
+    # Create <relations> element if it does not exist
     if relations_elem is None:
         relations_elem = ET.Element("relations")
-        # <metadata> 뒤, <prompt> 앞에 삽입
+        # Insert after <metadata> and before <prompt>
         insert_idx = 0
         for i, child in enumerate(root):
             if child.tag == "metadata":
@@ -615,7 +615,7 @@ def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
                 break
         root.insert(insert_idx, relations_elem)
 
-    # <relation type="..." ticket="..."/> 추가
+    # Add <relation type="..." ticket="..."/>
     rel_elem = ET.SubElement(relations_elem, "relation")
     rel_elem.set("type", relation_type)
     rel_elem.set("ticket", target_ticket)
@@ -624,59 +624,59 @@ def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
 
 
 def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
-    """티켓 XML에서 관계(relation) 요소를 제거한다.
+    """Remove the relationship element from the ticket XML.
 
-    해당 type+ticket 조합의 relation 요소를 제거하고,
-    <relations>가 비면 요소 자체도 제거한다.
+    Remove the relation element of the type+ticket combination,
+    If <relations> is empty, the element itself is also removed.
 
     Args:
-        filepath: 티켓 파일 경로.
-        relation_type: 관계 유형 (depends-on, derived-from, blocks).
-        target_ticket: 대상 티켓 번호 (T-NNN 형식).
+        filepath: Ticket file path.
+        relation_type: Relationship type (depends-on, derived-from, blocks).
+        target_ticket: Target ticket number (T-NNN format).
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
     relations_elem = root.find("relations")
     if relations_elem is None:
-        return  # relations 요소가 없으면 무시
+        return  # Ignored if there is no relations element
 
-    # 매칭되는 relation 제거
+    # Remove matching relation
     for rel in relations_elem.findall("relation"):
         if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
             relations_elem.remove(rel)
 
-    # <relations>가 비면 요소 자체 제거
+    # If <relations> is empty, remove the element itself
     if len(relations_elem) == 0:
         root.remove(relations_elem)
 
     write_ticket_xml(filepath, root)
 
 
-# ─── 유틸리티 ────────────────────────────────────────────────────────────────
+# ─── Utilities ──────────────────────────────────────────────────────────────────
 
 
 def find_ticket_file(ticket_number: str) -> str | None:
-    """T-NNN.xml 정확 매칭으로 티켓 파일 경로를 탐색하여 반환한다.
+    """T-NNN.xml Searches for and returns the ticket file path through exact matching.
 
-    탐색 순서: todo/ -> open/ -> progress/ -> review/ -> done/ -> active/(폴백) -> kanban/(루트 폴백)
+    Navigation order: todo/ -> open/ -> progress/ -> review/ -> done/ -> active/ (fallback) -> kanban/ (root fallback)
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number (T-NNN format).
 
     Returns:
-        발견된 파일 절대 경로 문자열. 미발견 시 None.
+        Absolute path string to the file found. None if not found.
     """
     filename = f"{ticket_number}.xml"
-    # 상태별 디렉터리 순회
+    # Directory traversal by state
     for status_dir in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR]:
         candidate = os.path.join(status_dir, filename)
         if os.path.isfile(candidate):
             return candidate
-    # 폴백: 마이그레이션 미완료 시 active/ 또는 kanban/ 루트
+    # Fallback: active/ or kanban/ root if migration is incomplete
     active_path = os.path.join(KANBAN_DIR, "active", filename)
     if os.path.isfile(active_path):
         return active_path
@@ -687,40 +687,40 @@ def find_ticket_file(ticket_number: str) -> str | None:
 
 
 def normalize_ticket_number(raw: str) -> str | None:
-    """티켓 번호 문자열을 'T-NNN' 형식으로 정규화한다.
+    """Normalize the ticket number string to 'T-NNN' format.
 
-    T-NNN, NNN, #N 형식을 모두 지원한다.
+    T-NNN, NNN, #All N formats are supported.
 
     Args:
-        raw: 원본 티켓 번호 문자열 (예: '#1', 'T-001', '001', '1')
+        raw: original ticket number string (e.g. '#1', 'T-001', '001', '1')
 
     Returns:
-        정규화된 'T-NNN' 형식 문자열. 변환 불가능하면 None.
+        Normalized 'T-NNN' format string. None if conversion is not possible.
     """
     raw = raw.strip().lstrip("#")
-    # 이미 T-NNN 형식
+    # Already in T-NNN format
     if re.match(r"^T-\d+$", raw, re.IGNORECASE):
         parts = raw.split("-")
         num = int(parts[1])
         return f"T-{num:03d}"
-    # 순수 숫자
+    # pure numbers
     if re.match(r"^\d+$", raw):
         return f"T-{int(raw):03d}"
     return None
 
 
 def extract_report_summary(report_path: str) -> str:
-    """report.md에서 핵심 섹션을 추출하여 요약 문자열을 반환한다.
+    """Extracts key sections from report.md and returns a summary string.
 
-    "## 최종 판정" 또는 "## 판정" 섹션과 "## 이슈" 또는 "## 발견 사항" 섹션을 추출한다.
-    위 섹션이 없으면 report.md 첫 50줄을 fallback으로 사용한다.
-    토큰 절감을 위해 최대 2000자로 제한한다.
+    Extract the "## Final decision" or "## Judgment" section and the "## Issue" or "## Findings" section.
+    If the above section does not exist, the first 50 lines of report.md are used as a fallback.
+    To save tokens, limit to a maximum of 2000 characters.
 
     Args:
-        report_path: report.md 파일 절대 경로.
+        report_path: Absolute path to report.md file.
 
     Returns:
-        추출된 요약 문자열. 파일 읽기 실패 시 빈 문자열.
+        Extracted summary string. Empty string if file read failure.
     """
     try:
         with open(report_path, "r", encoding="utf-8") as f:
@@ -733,7 +733,7 @@ def extract_report_summary(report_path: str) -> str:
 
     lines = content.split("\n")
 
-    # 섹션 추출 헬퍼: ## 헤더 시작부터 다음 ## 헤더 직전까지
+    # Section extraction helper: From the beginning of the ## header to just before the next ## header.
     def _extract_section(header_patterns: list[str]) -> str:
         for pattern in header_patterns:
             for i, line in enumerate(lines):
@@ -746,18 +746,18 @@ def extract_report_summary(report_path: str) -> str:
                     return "\n".join(section_lines).strip()
         return ""
 
-    verdict = _extract_section(["최종 판정", "판정"])
-    issues = _extract_section(["이슈", "발견 사항"])
+    verdict = _extract_section(["final decision", "verdict"])
+    issues = _extract_section(["issue", "Findings"])
 
     summary_parts = [p for p in [verdict, issues] if p]
 
     if summary_parts:
         summary = "\n\n".join(summary_parts)
     else:
-        # fallback: 첫 50줄
+        # fallback: first 50 lines
         summary = "\n".join(lines[:50]).strip()
 
-    # 2000자 제한
+    # 2000 character limit
     if len(summary) > 2000:
         summary = summary[:2000] + "..."
 
@@ -765,18 +765,18 @@ def extract_report_summary(report_path: str) -> str:
 
 
 def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
-    """선행 티켓의 report 요약을 추출하여 반환한다.
+    """Extracts and returns the report summary of the preceding ticket.
 
-    티켓 XML에서 depends-on 및 derived-from 관계를 찾고,
-    각 선행 티켓이 Done 상태이고 report 파일이 존재하면 요약을 추출한다.
+    Find depends-on and derived-from relationships in ticket XML,
+    If each preceding ticket has a status of Done and a report file exists, a summary is extracted.
 
     Args:
-        ticket_number: 현재 티켓 번호 (T-NNN 형식).
+        ticket_number: Current ticket number (T-NNN format).
 
     Returns:
-        선행 티켓 report 정보 리스트. 각 항목은
-        {"ticket": "T-NNN", "type": "depends-on", "summary": "..."} 형태.
-        선행 티켓이 없거나 조건 미충족 시 빈 리스트.
+        List of advance ticket report information. Each item is
+        {"ticket": "T-NNN", "type": "depends-on", "summary": "..."} form.
+        Empty list if there are no advance tickets or conditions are not met.
     """
     ticket_file = find_ticket_file(ticket_number)
     if not ticket_file:
@@ -797,7 +797,7 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
         if rel_type not in predecessor_types or not rel_ticket:
             continue
 
-        # 선행 티켓 파일 찾기
+        # Find advance ticket file
         pred_file = find_ticket_file(rel_ticket)
         if not pred_file:
             continue
@@ -807,11 +807,11 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
         except SystemExit:
             continue
 
-        # Done이 아니면 스킵
+        # Skip if not Done
         if pred_data.get("status", "") != "Done":
             continue
 
-        # result dict에서 report 경로 직접 추출
+        # Extract report path directly from result dict
         report_path_str = ""
         result = pred_data.get("result")
         if isinstance(result, dict) and result.get("report"):
@@ -820,7 +820,7 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
         if not report_path_str:
             continue
 
-        # 상대 경로를 절대 경로로 변환
+        # Convert relative path to absolute path
         abs_report_path = os.path.join(_PROJECT_ROOT, report_path_str)
         if not os.path.isfile(abs_report_path):
             continue
@@ -839,17 +839,17 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
 def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
     """Scan .kanban/{todo,open,progress,review,done}/ XML filenames to find max T-NNN number.
 
-    루트 폴백: .kanban/ 루트도 스캔하여 마이그레이션 미완료 시 채번 충돌을 방지한다.
+    Root fallback: The .kanban/ root is also scanned to prevent number conflicts when migration is not completed.
 
     Args:
-        exclude_debug_range: True 시 과거 디버그 예약 영역을 스캔에서 제외한다.
-            2026-05-05 디버그 영역 폐지(workflow.md "번호 영역 정책" 참조)에 따라 자동 채번 호출
-            (`kanban_cli.py`의 `--number` 미지정 분기)에서만 True 로 사용한다. 기존 활성 잔존
-이 채번 시 잠식되지 않도록 자동 채번 시 max 계산에서 배제하기
-            위함이다. 명시 `--number` 호출에는 영향이 없으며, 충돌 검사는 별도 경로로 수행된다.
+        exclude_debug_range: When True, past debug reserved areas are excluded from scanning.
+            2026-05-05 Automatic number call according to debug area abolition (see workflow.md "Number Area Policy")
+            Used as True only in the `--number` unspecified branch of `kanban_cli.py`. Existing active remaining
+Exclude from the max calculation when automatically picking to prevent this from being encroached upon.
+            It is for this purpose. There is no effect on explicit `--number` calls, and conflict checking is performed in a separate path.
 
     Returns:
-        현재 최대 티켓 번호 정수. 티켓이 없으면 0.
+        Current maximum ticket number integer. 0 if there is no ticket.
     """
     max_num = 0
     for d in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR, KANBAN_DIR]:
@@ -859,7 +859,7 @@ def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
             m = re.match(r"^T-(\d+)\.xml$", fname)
             if m:
                 num = int(m.group(1))
-                # 디버그 예약 영역(900~999) 스킵 — 2026-05-05 폐지, 자동 채번 잠식 방지.
+                # Skip debug reserved area (900~999) — Abolished on 2026-05-05, preventing automatic number encroachment.
                 if exclude_debug_range and DEBUG_RESERVED_RANGE_START <= num <= DEBUG_RESERVED_RANGE_END:
                     continue
                 if num > max_num:
@@ -868,42 +868,42 @@ def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
 
 
 def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
-    """티켓 파일을 대상 상태에 해당하는 디렉터리로 이동한다.
+    """Move the ticket file to the directory corresponding to the target state.
 
-    STATUS_DIR_MAP에서 대상 디렉터리를 조회하고, 현재 파일이 이미 해당
-    디렉터리에 있으면 이동을 스킵한다 (Submit <-> In Progress 전이 시).
+    STATUS_DIR_MAP is looked up for the target directory, and the current file already exists in that directory.
+    If it is in a directory, the movement is skipped (at the Submit <-> In Progress transition).
 
     Args:
-        filepath: 이동할 티켓 파일의 절대 경로.
-        target_status: 대상 상태 문자열 (Open, Submit, In Progress, Review, Done).
+        filepath: Absolute path to the ticket file to be moved.
+        target_status: Target status string (Open, Submit, In Progress, Review, Done).
 
     Returns:
-        이동 후 새 파일 경로. 스킵된 경우 원래 경로 반환.
+        New file path after moving. Returns original route if skipped.
 
     Raises:
-        ValueError: STATUS_DIR_MAP에 없는 상태 문자열인 경우.
-        OSError: 파일 이동 실패 시.
+        ValueError: If the status string is not in STATUS_DIR_MAP.
+        OSError: When file movement fails.
     """
     target_dir = STATUS_DIR_MAP.get(target_status)
     if target_dir is None:
-        raise ValueError(f"알 수 없는 상태: '{target_status}'. 허용값: {', '.join(STATUS_DIR_MAP.keys())}")
+        raise ValueError(f"Unknown status: '{target_status}'. Allowed values: {', '.join(STATUS_DIR_MAP.keys())}")
 
     current_dir = os.path.dirname(filepath)
     if os.path.normpath(current_dir) == os.path.normpath(target_dir):
-        # 같은 디렉터리 — 이동 불필요 (Submit <-> In Progress 등)
+        # Same directory — no need to move (Submit <-> In Progress, etc.)
         return filepath
 
     filename = os.path.basename(filepath)
     new_path = os.path.join(target_dir, filename)
 
-    # 원본 파일이 없으면 이미 다른 세션이 이동한 것
+    # If the original file does not exist, another session has already moved it.
     if not os.path.isfile(filepath):
         expected_path = os.path.join(target_dir, filename)
         if os.path.isfile(expected_path):
-            return expected_path  # 이미 이동 완료
-        raise FileNotFoundError(f"원본 파일 없음: {filepath}")
+            return expected_path  # Already moved
+        raise FileNotFoundError(f"No original file: {filepath}")
 
-    # 대상 경로에 이미 동일 파일이 존재하면 원본만 삭제 (멱등성)
+    # If the same file already exists in the destination path, only the original is deleted (idempotency)
     if os.path.isfile(new_path) and os.path.normpath(filepath) != os.path.normpath(new_path):
         os.remove(filepath)
         return new_path
@@ -914,7 +914,7 @@ def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
 
 
 
-# 컬럼 이름 매핑: CLI 인자 → 컬럼명
+# Column name mapping: CLI argument → column name
 COLUMN_MAP: dict[str, str] = {
     "todo": "To Do",
     "open": "Open",
@@ -923,10 +923,10 @@ COLUMN_MAP: dict[str, str] = {
     "done": "Done",
 }
 
-# 허용 상태 전이 규칙: 현재 상태 → 허용 대상 목록
-# Done으로의 이동은 done 서브커맨드(force=True)만 허용.
-# move 커맨드로 Done 직접 이동은 불가 (Review → Done도 done 서브커맨드 사용 필요).
-# To Do는 Open과의 양방향 전이만 기본 허용하며, 그 외 상태에서의 복귀는 --force 필요.
+# Allowed state transition rule: Current state → Allowed target list
+# Only the done subcommand (force=True) is allowed to move to Done.
+# It is not possible to move directly to Done with the move command (Review → Done also requires the use of the done subcommand).
+# To Do only allows two-way transition to Open by default, and returning from other states requires --force.
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "To Do": ["Open"],
     "Open": ["In Progress", "To Do", "Review"],
@@ -934,61 +934,61 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "Review": ["Open"],
     "Done": ["Open"],
 }
-# Review → In Progress 전이는 폐기 (2026-05-08 사용자 명시).
-# Review 단계 가능 액션: (a) Open 으로 재작업 (/wf -e 또는 우클릭 메뉴),
-# (b) 채팅에 첨부하여 후속 분석/구현 티켓 생성, (c) Done 으로 완료(done 서브커맨드).
+# Review → In Progress transition is discarded (specified by user on 2026-05-08).
+# Review phase possible actions: (a) Rework with Open (/wf -e or right-click menu);
+# (b) attach to chat to create follow-up analysis/implementation ticket, (c) complete with Done (done subcommand).
 
 
 def validate_transition(current_status: str, target_section: str, force: bool = False) -> str | None:
-    """상태 전이 규칙을 검증한다.
+    """Verify state transition rules.
 
-    현재 상태에서 대상 상태로의 전이가 허용되는지 확인한다.
-    이미 같은 상태이면 None을 반환하고, 규칙 위반 시 에러 메시지를 반환한다.
-    force=True이면 규칙을 무시한다.
+    Check whether a transition from the current state to the target state is allowed.
+    If the status is already the same, None is returned, and if the rule is violated, an error message is returned.
+    If force=True, the rule is ignored.
 
     Args:
-        current_status: 현재 티켓 상태 (예: 'Open', 'In Progress').
-        target_section: 대상 상태 (예: 'Review', 'Done').
-        force: 강제 전이 여부.
+        current_status: Current ticket status (e.g. 'Open', 'In Progress').
+        target_section: Target status (e.g. 'Review', 'Done').
+        force: Whether to force transition.
 
     Returns:
-        에러 메시지 문자열. 전이가 허용되면 None.
-        이미 같은 상태이면 빈 문자열("")을 반환한다.
+        Error message string. None if transitions are allowed.
+        If it is already in the same state, an empty string ("") is returned.
     """
-    # 이미 같은 상태이면 빈 문자열 반환 (에러가 아닌 무시 케이스)
+    # If the state is already the same, an empty string is returned (ignored case, not an error).
     if current_status == target_section:
         return ""
 
-    # 상태 전이 규칙 검증
+    # State transition rule verification
     allowed = ALLOWED_TRANSITIONS.get(current_status, [])
     if target_section not in allowed and not force:
         return (
-            f"현재 {current_status}이므로 {target_section}으로 이동할 수 없습니다. "
-            f"--force 플래그로 강제 이동 가능"
+            f"You cannot navigate to {target_section} because it is currently {current_status}."
+            f"You can force movement with the --force flag."
         )
 
     return None
 
 
 def update_ticket_status(filepath: str, new_status: str) -> None:
-    """티켓 XML의 <status> 요소를 갱신한다.
+    """Update the <status> element of ticket XML.
 
-    <metadata> 래퍼 내부의 <status> 요소를 우선 탐색한다.
+    The <status> element inside the <metadata> wrapper is first searched.
 
     Args:
-        filepath: 티켓 파일 경로.
-        new_status: 새 상태 문자열 (예: 'Open', 'In Progress', 'Review', 'Done').
+        filepath: Ticket file path.
+        new_status: New status string (e.g. 'Open', 'In Progress', 'Review', 'Done').
 
     Raises:
-        SystemExit: 파일 읽기/쓰기 실패 시.
+        SystemExit: When file read/write fails.
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({filepath}): {e}")
+        err(f"Failed to parse ticket file ({filepath}): {e}")
 
-    # <metadata> 래퍼 내부의 <status> 우선 탐색
+    # First look for <status> inside the <metadata> wrapper
     metadata_elem = root.find("metadata")
     if metadata_elem is not None:
         status_elem = metadata_elem.find("status")

@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import time
 
-from board.server._common import api_endpoint, logger
+from board.server.support.common import api_endpoint, logger
 
 
 class OpsHandlerMixin:
@@ -52,7 +52,7 @@ class OpsHandlerMixin:
                     break
                 reaped += 1
         except ChildProcessError:
-            # waitpid 가 자식 없을 때 발생 — 정상 종료
+            # Occurs when waitpid has no children — graceful shutdown
             pass
         except OSError as exc:
             logger.error('zombie-reap failed: %s', exc)
@@ -97,7 +97,7 @@ class OpsHandlerMixin:
         currently_enabled = os.path.exists(flag_path)
 
         if requested is None:
-            # 자동 토글
+            # auto toggle
             new_state = not currently_enabled
         elif isinstance(requested, bool):
             new_state = requested
@@ -148,7 +148,7 @@ class OpsHandlerMixin:
         except Exception:  # noqa: BLE001
             sse_clients = -1
 
-        # TerminalSSEChannel (메인 터미널)
+        # TerminalSSEChannel (main terminal)
         try:
             terminal_clients = terminal_sse_channel.client_count
         except Exception:  # noqa: BLE001

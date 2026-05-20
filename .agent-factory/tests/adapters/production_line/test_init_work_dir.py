@@ -1,19 +1,19 @@
-"""T-509 — init.py work_dir 위치 회귀 정정 단위 테스트.
+"""T-509 — init.py work dir location regression set test.
 
-회귀 origin: a473334 (PROJECT_ROOT 를 git common-dir 기준으로 결정) 에서
-`_common.py` 의 PROJECT_ROOT / RUNS_DIR 만 정정되고 `steps/init.py:104-108` 의
+Regression origin: in a473334 (PROJECT ROOT git common-dir)
+` common.py` of PROJECT ROOT / RUNS DIR Only corrected and `steps/init.py:104-108`
 `if worktree_path is not None: work_dir = worktree_path / .agent-factory / runs / ...`
-분기는 정정 누락 — 워크트리에서 호출 시 work_dir 가 worktree 안쪽에 박혀
-finalization R-EXIST / history sync / SSE 인덱스가 산출물을 못 찾는 회귀.
+Branches are missing — work dir is stuck inside worktree when calling on worktree
+the finalization R-EXIST / history sync / SSE index to find the output.
 
-본 fix 후의 불변식:
-  1. make_work_dir(registry_key) 결과 = <PROJECT_ROOT>/.agent-factory/runs/<key>
-     (PROJECT_ROOT 는 git common-dir 의 부모 = 메인 워크트리 root)
-  2. init_step 결과 ctx.work_dir 는 worktree_path 유무와 무관하게 1번과 동일.
-  3. ctx.worktree_path 는 별개 의미로 유지 (auto_commit / verify_code 가 사용).
+Unvariable after this fix:
+  1. FAQ make work dir(registry key) result = <PROJECT ROOT>/.agent-factory/runs/<key>
+     git common-dir
+  2. init step result ctx.work dir is the same as worktree path liberty and unparalleled one.
+  3. FAQs ctx.worktree path maintains a distinct meaning (auto commit / verification code is used).
 
-driver self-reference 회피: driver 가 driver 검증 트리거하면 무한 재귀.
-make_work_dir / init_step 결정 로직만 단위 테스트로 격리한다.
+driver self-reference evacuation: infinite recurring if driver is validated.
+make work dir / init step crystal logic only insulates unit test.
 """
 
 from __future__ import annotations
@@ -35,10 +35,10 @@ def _kanban_dump(command: str = "implement", title: str = "T-509 worktree fix") 
 
 
 def test_project_root_resolves_to_main_git_root() -> None:
-    """PROJECT_ROOT 는 git common-dir 의 부모 (= 메인 워크트리 root) 여야 한다.
+    """git common-dir
 
-    워크트리에서 본 테스트가 실행돼도 PROJECT_ROOT 는 메인 측을 가리킨다.
-    a473334 commit 의 핵심 불변식 — 본 테스트가 깨지면 회귀 origin 자체가 회귀.
+    Project ROOT is the main side.
+    a473334 Commit's core unchanged — the regression origin itself when the test is broken.
     """
     expected = subprocess.run(
         ["git", "rev-parse", "--git-common-dir"],
@@ -55,19 +55,19 @@ def test_project_root_resolves_to_main_git_root() -> None:
 
 
 def test_make_work_dir_uses_project_root_main_side() -> None:
-    """make_work_dir 는 항상 PROJECT_ROOT 기준 경로 반환 — worktree 안쪽 가능성 0."""
+    """make work dir always returns the project ROOT standard path — the possibility inside worktree 0."""
     key = "test-T-509-make-work-dir"
     work_dir = make_work_dir(key)
     try:
         assert work_dir == RUNS_DIR / key
         assert work_dir.parent == RUNS_DIR
         assert (work_dir / "work").is_dir()
-        # 메인 측 검증: PROJECT_ROOT 가 worktrees/<...> 안쪽이면 안 됨
+        # Main side verification: PROJECT ROOT is not inside worktrees/<...>
         assert "/worktrees/" not in str(work_dir), (
             f"work_dir leaked into worktree: {work_dir}"
         )
     finally:
-        # cleanup: 본 테스트가 메인 측 runs/ 에 잔재를 남기지 않도록
+        # cleanup: This test does not leave a residual on the main side runs/
         if (work_dir / "work").is_dir():
             (work_dir / "work").rmdir()
         if work_dir.is_dir():
@@ -77,12 +77,12 @@ def test_make_work_dir_uses_project_root_main_side() -> None:
 def test_init_step_work_dir_ignores_worktree_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """본 fix 의 핵심 — _maybe_create_worktree 가 worktree_path 를 반환해도
-    work_dir 는 make_work_dir(registry_key) 결과 = 메인 측 경로여야 한다.
+    """maybe create worktree returns worktree path
+    make work dir(registry key)
 
-    Red phase (fix 적용 전): init.py:104-108 의 if worktree_path 분기로 인해
-    work_dir = worktree_path / .agent-factory / runs / <key> 가 되어 본 assert 실패.
-    Green phase (fix 적용 후): work_dir = make_work_dir(<key>) = RUNS_DIR / <key>.
+    Red phase (fix before application): init.py:104-108 if worktree path branch
+    work dir = worktree path / .agent-factory / run / <key>
+    RUNS DIR / <key>
     """
     fake_key = "20260519-T509-WORK"
     fake_worktree = tmp_path / "worktrees" / "feat-T-509-test"
@@ -114,30 +114,30 @@ def test_init_step_work_dir_ignores_worktree_path(
         return d
 
     monkeypatch.setattr(init_mod, "make_work_dir", fake_make_work_dir)
-    # user_prompt.txt 가 work_dir 에 쓰여야 하므로 fake_make_work_dir 의 디렉터리는
-    # 실제로 존재. user_prompt_path() 는 work_dir/user_prompt.txt — 부모 디렉터리
-    # 이미 mkdir 된 상태이므로 write_text 가능.
+    # user prompt.txt is a directory of fake make work dir
+    # Indeed. user prompt path() work dir/user prompt.txt — parent directory
+    # You can write text because it is already mkdir.
 
     ctx = init_mod.init_step("T-509")
 
-    # 핵심 assertion: worktree_path 가 fake_worktree 인데도 work_dir 는 메인 측
+    # key assertion: worktree path is fake worktree but also work dir is the main side
     assert ctx.work_dir == expected_work_dir, (
         f"work_dir leaked into worktree:\n"
         f"  expected: {expected_work_dir}\n"
         f"  got:      {ctx.work_dir}\n"
         f"  worktree_path: {ctx.worktree_path}"
     )
-    # worktree_path 는 보존 — auto_commit / verify_code 가 사용
+    # worktree path is preserved — using auto commit / verification code
     assert ctx.worktree_path == fake_worktree
     assert ctx.feature_branch == "feat/T-509-test"
-    # 산출물 디렉터리 메인 측에 실제로 mkdir 됐는지
+    # The output directory is actually mkdir on the main side
     assert (expected_work_dir / "work").is_dir()
 
 
 def test_init_step_research_command_no_worktree(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """research command — worktree 0건. 본 fix 와 무관한 경로 보존 검증."""
+    """Research command — worktree 0. This fix and unparalleled path conservation verification."""
     fake_key = "20260519-T509-RESEARCH"
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
     monkeypatch.setattr(init_mod, "kanban_show", lambda t: _kanban_dump("research"))

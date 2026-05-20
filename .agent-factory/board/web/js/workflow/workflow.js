@@ -47,7 +47,7 @@ const RUN_STAGE_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 // ── Fetch Functions ──
 
 /**
- * Fetches workflow entry list via /api/kanban/workflow-entries (T-513 P3 — kanban 도메인 이전).
+ * Fetches workflow entry list via /api/kanban/workflow-entries (T-513 P3 — kanban domain transfer).
  * Returns sorted hrefs (newest first), no detail fetched yet.
  * @returns {Promise<string[]>}
  */
@@ -83,7 +83,7 @@ function findTicketForWorkflow(w) {
   const wfTicket = (w.ticketNumber || "").trim();
   const tickets = Board.state.TICKETS;
   if (!Array.isArray(tickets) || tickets.length === 0) return null;
-  // 1차: 칸반 ticket.result.workdir / registrykey 매칭
+  // 1st: Kanban ticket.result.workdir / registrykey matching
   for (let ti = 0; ti < tickets.length; ti++) {
     const ticket = tickets[ti];
     const result = ticket.result;
@@ -100,7 +100,7 @@ function findTicketForWorkflow(w) {
       return ticket;
     }
   }
-  // 2차 fallback: 워크플로우 .context.json 의 ticketNumber 로 칸반 lookup
+  // .context.json
   if (wfTicket) {
     for (let ti = 0; ti < tickets.length; ti++) {
       const tn = (tickets[ti].number || "").trim();
@@ -149,15 +149,15 @@ function filterWorkflows(list) {
   const query = Board.state.wfSearchQuery;
   if (!query) return list;
   const q = query.toLowerCase();
-  // 티켓 번호 검색 정규화: "T-446" / "t-446" / "446" 모두 지원하기 위해
-  // 입력이 숫자 + 하이픈만으로 구성되면 "T-" prefix 매칭도 허용한다.
+  // Ticket Number Search Normalization: "T-446" / "t-446" / "446" to support all
+  // "T-" prefix matching is allowed if the input is configured with the number + hyphen.
   const qDigit = q.replace(/^t-?/, "");
   return list.filter(function (w) {
     if (w.task.toLowerCase().indexOf(q) !== -1) return true;
     if (w.command.toLowerCase().indexOf(q) !== -1) return true;
     if (w.step.toLowerCase().indexOf(q) !== -1) return true;
     if (w.entry.indexOf(q) !== -1) return true;
-    // 티켓 번호 매칭: 1차 응답 ticketNumber → 2차 findTicketForWorkflow (workdir/registrykey fallback)
+    // Ticket number matching: 1st response ticketNumber → 2nd findTicketForWorkflow (workdir/registrykey fallback)
     const tn = (w.ticketNumber || "").toLowerCase();
     if (tn && (tn.indexOf(q) !== -1 || (qDigit && tn.indexOf(qDigit) !== -1))) return true;
     const linked = findTicketForWorkflow(w);
@@ -238,12 +238,12 @@ function renderWfCard(w) {
   const stepText = wfEsc(wfStepLabel(w.step || "NONE"));
   const stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + "</span>";
   h += '<td class="wf-row-step">' + stepBadge + "</td>";
-  // ticket cell: linked ticket badge (룰: 워크플로우는 반드시 티켓에 매핑)
+  // Ticket cell: linked ticket (val: map to the ticket must be mapped)
   const linkedTicket = findTicketForWorkflow(w);
   if (linkedTicket) {
     h += '<td class="wf-row-number"><span class="wf-number-badge wf-ticket-badge" data-ticket-num="' + wfEsc(linkedTicket.number) + '">' + wfEsc(linkedTicket.number) + "</span></td>";
   } else {
-    h += '<td class="wf-row-number"><span class="wf-number-fallback" title="티켓 매핑 없음 (룰 위반)">(미연결)</span></td>';
+    h += '<td class="wf-row-number"><span class="wf-number-fallback" title="No ticket mapping (ul violation)">(In connection)</span></td>';
   }
   // command cell
   h += '<td class="wf-row-cmd">' + wfBadge(w.command, WF_CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + "</td>";
@@ -512,25 +512,25 @@ function renderWfDetailView(w) {
 
 // ── Main Render ──
 
-/** Workflow column definitions (단일 진실 공급원). */
+/** Workflow column definitions (single true source). */
 const WF_COLS = [
   { key: "step",       label: "Stage" },
   { key: "ticket",     label: "WorkRequest" },
   { key: "command",    label: "Mode" },
-  { key: "task",       label: "제목" },
-  { key: "query",      label: "질의",   nosort: true },
-  { key: "plan",       label: "계획",    nosort: true },
-  { key: "work",       label: "실행",    nosort: true },
-  { key: "report",     label: "보고",  nosort: true },
-  { key: "summary",    label: "요약", nosort: true },
-  { key: "usage",      label: "사용",   nosort: true },
-  { key: "log",        label: "로그",     nosort: true },
-  { key: "updated_at", label: "일시" },
+  { key: "task",       label: "Title" },
+  { key: "query",      label: "Mature",   nosort: true },
+  { key: "plan",       label: "Schedule",    nosort: true },
+  { key: "work",       label: "Open",    nosort: true },
+  { key: "report",     label: "Notice",  nosort: true },
+  { key: "summary",    label: "About Us", nosort: true },
+  { key: "usage",      label: "T-shirt",   nosort: true },
+  { key: "log",        label: "Log In",     nosort: true },
+  { key: "updated_at", label: "Date" },
 ];
 
 /**
- * 헤더 sort indicator HTML 만 갱신한다 (dom 교체 없이).
- * sort 상태 변경 시 호출되며 검색바·tbody·스크롤·포커스를 보존한다.
+ * header sort indicator HTML only update (without dom rotation).
+ * When changing the sort state, it will be called to preserve the search bar·tbody·scroll·focus.
  */
 function refreshWfSortIndicators(el) {
   el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
@@ -550,8 +550,8 @@ function refreshWfSortIndicators(el) {
 }
 
 /**
- * tbody 만 다시 그린다 (검색바·헤더·스크롤·포커스 보존).
- * 검색 입력, 정렬 변경, SSE ticket 변경, race 보정 모두 본 함수만 호출한다.
+ * tbody only again green (Search bar, header, roll, pointer preserve).
+ * Change the search, change the alignment, change the SSE ticket, the race correction all calls this function only.
  */
 function renderWfTbody() {
   const list = document.getElementById("wf-list");
@@ -573,10 +573,10 @@ function renderWfTbody() {
   updateWfStatus();
 }
 
-/** Renders the full workflow tab shell (search, header, empty tbody) — 1회만 호출한다. */
+/** Renders the full workflow tab shell (search, header, empty tbody) — only one call. */
 function renderWorkflow() {
   const el = document.getElementById("view-workflow");
-  // 이미 shell 이 그려져 있으면 tbody 갱신만 한다 (검색바·스크롤·포커스 보존).
+  // If the shell is already drawn, the tbody update is only (see bar, roll, and pointer retention).
   if (el.querySelector(".wf-search") && el.querySelector("#wf-list")) {
     refreshWfSortIndicators(el);
     renderWfTbody();
@@ -593,7 +593,7 @@ function renderWorkflow() {
   h += '<span class="wf-search-count">' + filtered.length + (hasMore ? "+" : "") + " / " + Board.state.wfEntryHrefs.length + "</span>";
   h += "</div>";
 
-  // Table header (tbody 는 비워두고 renderWfTbody 로 채운다)
+  // Table header (tbody is empty and filled with renderWfTbody)
   h += '<div class="wf-table-wrap"><table class="wf-table">';
   h += "<thead><tr>";
   WF_COLS.forEach(function (col) {
@@ -615,13 +615,13 @@ function renderWorkflow() {
 
   el.innerHTML = h;
 
-  // Search input — 검색 시엔 tbody 만 갱신한다 (검색바 input 자체는 살아있음)
+  // Search input — search sien tbody only update (search bar input itself live)
   el.querySelector(".wf-search").addEventListener("input", function (e) {
     Board.state.wfSearchQuery = e.target.value;
     renderWfTbody();
   });
 
-  // Sort header clicks — indicator + tbody 만 갱신
+  // String header clicks — indicator + tbody only update
   el.querySelectorAll("th[data-sort-key]").forEach(function (th) {
     th.addEventListener("click", function () {
       const key = th.getAttribute("data-sort-key");
@@ -638,7 +638,7 @@ function renderWorkflow() {
 
   bindWfColResize(el);
 
-  // 첫 tbody 채우기
+  // First tbody filling
   renderWfTbody();
 }
 

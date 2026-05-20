@@ -55,14 +55,14 @@ from typing import Any, Optional, Union
 # KST (UTC+9)
 _KST = timezone(timedelta(hours=9))
 
-# 줄당 권고 4KB 한도 (호출측 truncate 권고용 상수)
+# Recommended 4KB limit per line (constant recommended for caller truncate)
 LINE_BYTE_LIMIT: int = 4096
 
-# metrics.jsonl 파일명
+# metrics.jsonl file name
 _METRICS_FILENAME: str = "metrics.jsonl"
 
-# 12종 event_type → payload 필수 키 카탈로그
-# NOTE: metric event 의 'step' 키는 status.json 'workflow_phase' 와 동일 의미 (metric event schema BC — 별도 마이그레이션 트랙).
+# 12 types of event_type → payload required key catalog
+# NOTE: The 'step' key in metric event has the same meaning as 'workflow_phase' in status.json (metric event schema BC — separate migration track).
 _SCHEMA: dict[str, list[str]] = {
     "step.start": ["step", "source"],
     "step.end": ["step", "duration_ms", "outcome", "source"],
@@ -188,7 +188,7 @@ def _load_context_defaults(work_dir: Path) -> dict[str, Optional[str]]:
         return defaults
     if not isinstance(data, dict):
         return defaults
-    # 흔한 키 후보 두 가지 모두 지원 (ticket / ticket_number, registry_key / registryKey)
+    # Supports both common key candidates (ticket / ticket_number, registry_key / registryKey)
     ticket_val = data.get("ticket") or data.get("ticket_number")
     rkey_val = data.get("registry_key") or data.get("registryKey")
     if isinstance(ticket_val, str) and ticket_val:
@@ -253,7 +253,7 @@ class MetricsWriter:
             "work_dir": str(self.work_dir),
             "payload": payload,
         }
-        # 부모 디렉터리 보장 (work_dir 자체가 없으면 호출측 잘못이지만 안전망)
+        # Guaranteed parent directory (it's the caller's fault if work_dir itself doesn't exist, but it's a safety net)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         with open(self.path, "a", encoding="utf-8") as fp:
@@ -262,10 +262,10 @@ class MetricsWriter:
             fp.flush()
 
     def close(self) -> None:
-        """호환성 더미. 본 writer 는 fd 를 보유하지 않으므로 no-op."""
+        """Compatibility dummy. This writer does not have fd, so no-op."""
         return None
 
-    # 컨텍스트 매니저 지원 (with 블록에서 사용 가능)
+    # Context manager support (available in with blocks)
     def __enter__(self) -> "MetricsWriter":
         return self
 
@@ -311,7 +311,7 @@ def append_event(
 
 
 # ---------------------------------------------------------------------------
-# 자가 검증 (__main__)
+# Self-verification (__main__)
 # ---------------------------------------------------------------------------
 
 def _selfcheck() -> int:
@@ -324,7 +324,7 @@ def _selfcheck() -> int:
 
     cases: list[tuple[str, str, dict[str, Any], Optional[type[Exception]]]] = []
 
-    # 12종 정상 케이스 (필수 키만 채움)
+    # 12 types of normal cases (only required keys filled)
     valid_payloads: dict[str, dict[str, Any]] = {
         "step.start": {"step": "INIT", "source": "banner"},
         "step.end": {
@@ -372,12 +372,12 @@ def _selfcheck() -> int:
         },
     }
     for et in known_event_types():
-        cases.append(("정상", et, valid_payloads[et], None))
+        cases.append(("normal", et, valid_payloads[et], None))
 
-    # 비정상 케이스 ≥ 3
+    # Abnormal cases ≥ 3
     cases.append(
         (
-            "비정상-미등록",
+            "Abnormal-unregistered",
             "unknown.event",
             {"foo": "bar"},
             ValueError,
@@ -385,7 +385,7 @@ def _selfcheck() -> int:
     )
     cases.append(
         (
-            "비정상-payload타입",
+            "Abnormal-payload type",
             "step.start",
             ["not", "a", "dict"],  # type: ignore[arg-type]
             ValueError,
@@ -393,15 +393,15 @@ def _selfcheck() -> int:
     )
     cases.append(
         (
-            "비정상-필수키누락",
+            "Abnormal - Required key missing",
             "step.end",
-            {"step": "INIT"},  # duration_ms / outcome / source 누락
+            {"step": "INIT"},  # duration_ms / outcome / source missing
             ValueError,
         )
     )
     cases.append(
         (
-            "비정상-payload=None",
+            "abnormal-payload=None",
             "tool.call",
             None,  # type: ignore[arg-type]
             ValueError,
@@ -433,15 +433,15 @@ def _selfcheck() -> int:
             verdict = "PASS" if ok else "FAIL"
             rows.append((label + " / " + et, exc_name + " (" + actual + ")", verdict))
 
-        # 정상 케이스 줄 수 검증 (jsonl 라인 수 == 12)
+        # Normal case line count verification (jsonl line count == 12)
         path = metrics_path(tmp)
         with open(path, encoding="utf-8") as fp:
             lines = [ln for ln in fp.read().splitlines() if ln.strip()]
-        # 정상 케이스만 기록되었는지 확인
+        # Ensure only normal cases are recorded
         line_check_ok = len(lines) == len(valid_payloads)
         rows.append(
             (
-                "jsonl 줄 수",
+                "jsonl line number",
                 f"{len(lines)} / {len(valid_payloads)}",
                 "PASS" if line_check_ok else "FAIL",
             )
@@ -449,7 +449,7 @@ def _selfcheck() -> int:
         if not line_check_ok:
             failed += 1
 
-        # 모든 줄이 valid JSON 인지 확인
+        # Check if all lines are valid JSON
         json_ok = True
         for ln in lines:
             try:
@@ -459,15 +459,15 @@ def _selfcheck() -> int:
                 break
         rows.append(
             (
-                "jsonl JSON 파싱",
-                f"{len(lines)} 줄",
+                "jsonl JSON parsing",
+                f"{len(lines)} lines",
                 "PASS" if json_ok else "FAIL",
             )
         )
         if not json_ok:
             failed += 1
 
-        # append_event() 함수형 헬퍼 동작 검증 (.context.json 자동 로드)
+        # append_event() Functional helper operation verification (.context.json automatic loading)
         ctx_dir = Path(tmp) / "ctx_test"
         ctx_dir.mkdir()
         with open(ctx_dir / ".context.json", "w", encoding="utf-8") as fp:
@@ -488,7 +488,7 @@ def _selfcheck() -> int:
         )
         rows.append(
             (
-                "append_event 컨텍스트 자동로드",
+                "autoload append_event context",
                 "ticket=T-401 / registry_key=20260505-190000",
                 "PASS" if ctx_ok else "FAIL",
             )
@@ -496,10 +496,10 @@ def _selfcheck() -> int:
         if not ctx_ok:
             failed += 1
 
-    # 표 출력
-    print("metrics.py 자가 검증 결과")
+    # table output
+    print("metrics.py self-verification results")
     print("=" * 88)
-    header = ("케이스", "결과", "판정")
+    header = ("case", "result", "verdict")
     widths = (44, 32, 6)
     print(
         f"{header[0]:<{widths[0]}} | {header[1]:<{widths[1]}} | {header[2]:<{widths[2]}}"
@@ -510,7 +510,7 @@ def _selfcheck() -> int:
             f"{r[0]:<{widths[0]}} | {r[1]:<{widths[1]}} | {r[2]:<{widths[2]}}"
         )
     print("=" * 88)
-    print(f"총 케이스: {len(rows)} / 실패: {failed}")
+    print(f"total cases: {len(rows)} / failures: {failed}")
     return failed
 
 

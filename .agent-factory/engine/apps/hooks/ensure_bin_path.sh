@@ -27,28 +27,28 @@ def main() -> None:
 
     project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
     if not project_dir:
-        # CLAUDE_PROJECT_DIR이 없으면 hooks 디렉터리 기준으로 추론
-        # ensure_bin_path.sh는 .agent-factory/engine/apps/hooks/ 에 위치
-        # 따라서 ../../../../ = project root
+        # If CLAUDE_PROJECT_DIR does not exist, it is inferred based on the hooks directory.
+        # ensure_bin_path.sh is located in .agent-factory/engine/apps/hooks/
+        # So ../../../../ = project root
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_dir = os.path.normpath(os.path.join(script_dir, '..', '..', '..', '..'))
 
     bin_dir = os.path.join(project_dir, '.agent-factory', 'bin')
     if not os.path.isdir(bin_dir):
-        # bin 디렉터리가 없으면 아무것도 하지 않음
+        # Do nothing if there is no bin directory
         sys.exit(0)
 
-    # CLAUDE_ENV_FILE에 PATH export 추가
-    # 이미 해당 경로가 포함되어 있으면 중복 추가 방지
+    # Add PATH export to CLAUDE_ENV_FILE
+    # Avoid adding duplicates if the path is already included
     current_path = os.environ.get('PATH', '')
     if bin_dir in current_path.split(':'):
-        # 이미 PATH에 포함됨 (현재 프로세스 환경 기준)
+        # Already included in PATH (based on current process environment)
         sys.exit(0)
 
     export_line = f'export PATH="{bin_dir}:$PATH"\n'
 
     try:
-        # 파일이 이미 있고 해당 경로가 포함되어 있으면 스킵
+        # Skip if the file already exists and contains its path
         existing = ''
         if os.path.isfile(env_file):
             with open(env_file, 'r', encoding='utf-8') as f:
@@ -59,7 +59,7 @@ def main() -> None:
         with open(env_file, 'a', encoding='utf-8') as f:
             f.write(export_line)
     except OSError:
-        # 파일 쓰기 실패 시 조용히 종료
+        # Quietly exits when file writing fails
         pass
 
     sys.exit(0)

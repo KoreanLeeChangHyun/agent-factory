@@ -23,12 +23,12 @@ import json
 import os
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -39,7 +39,7 @@ from messages import (
     AGENT_INVESTIGATION_MAIN_SESSION_DENIED,
 )
 
-# 허용된 subagent_type 목록 (워크플로우 전용 서브에이전트)
+# List of allowed subagent_types (workflow-only subagents)
 _ALLOWED_SUBAGENT_TYPES: frozenset[str] = frozenset({
     "worker-opus",
     "worker-sonnet",
@@ -78,17 +78,17 @@ def _extract_subagent_type(tool_input: dict) -> str:
     Returns:
         추출된 subagent_type 문자열. 찾지 못한 경우 빈 문자열.
     """
-    # 최상위 키 우선 확인
+    # Check top level key first
     subagent_type = tool_input.get("subagent_type", "")
     if subagent_type:
         return str(subagent_type).strip()
 
-    # prompt 문자열에서 폴백 파싱
+    # Fallback parsing from prompt string
     prompt = tool_input.get("prompt", "")
     if not isinstance(prompt, str):
         return ""
 
-    # subagent_type="..." 또는 subagent_type='...' 패턴 탐색
+    # Subagent_type="..." or subagent_type='...' pattern search
     import re
     pattern = r'subagent_type\s*=\s*["\']([^"\']+)["\']'
     match = re.search(pattern, prompt)
@@ -107,14 +107,14 @@ def main() -> None:
     워크플로우 세션이 아니면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
     세션 유형은 session_identifier.get_session_type()으로 판별한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_AGENT_INVESTIGATION_GUARD") or read_env("HOOK_AGENT_INVESTIGATION_GUARD")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -122,7 +122,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Task 도구가 아니면 통과
+    # Pass if it is not a Task tool
     if tool_name != "Task":
         sys.exit(0)
 
@@ -130,20 +130,20 @@ def main() -> None:
     if not isinstance(tool_input, dict):
         sys.exit(0)
 
-    # subagent_type 추출
+    # extract subagent_type
     subagent_type = _extract_subagent_type(tool_input)
 
-    # 허용 목록에 포함된 subagent_type은 세션 무관하게 통과
+    # subagent_type included in the allow list passes regardless of session.
     if subagent_type in _ALLOWED_SUBAGENT_TYPES:
         sys.exit(0)
 
-    # 허용 목록 외 subagent_type (Explore, general-purpose, 빈값 등)은 차단 후보
-    # 세션 유형 판별: workflow이면 통과, 그 외(main, unknown)는 차단
+    # Subagent_types (Explore, general-purpose, empty value, etc.) other than those in the allow list are candidates for blocking.
+    # Session type determination: Pass if workflow, block otherwise (main, unknown)
     session_type = get_session_type()
     if session_type == "workflow":
         sys.exit(0)
 
-    # 워크플로우 세션이 아니면 차단
+    # Block if not a workflow session
     _deny(AGENT_INVESTIGATION_MAIN_SESSION_DENIED.format(subagent_type=repr(subagent_type)))
 
 

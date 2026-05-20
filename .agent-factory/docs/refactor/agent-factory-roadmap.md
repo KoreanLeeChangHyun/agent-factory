@@ -17,7 +17,7 @@ It does this by:
 
 ### WorkRequest Engineering
 
-Goal: make the 작업 요청서 good enough that both humans and AI understand the
+Goal: make the work request good enough that both humans and AI understand the
 same job.
 
 Core loop:

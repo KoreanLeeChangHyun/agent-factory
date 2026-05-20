@@ -30,12 +30,12 @@ def _find_project_root() -> str:
     # .agent-factory/engine/adapters/hooks/dispatcher.py -> project root is ../../../..
     root = os.path.normpath(os.path.join(d, '..', '..', '..', '..'))
 
-    # 메인 리포이면 그대로 반환 (.settings 존재 확인)
+    # If it is the main repo, it is returned as is (check the existence of .settings)
     cw_dir = os.path.join(root, '.agent-factory')
     if os.path.exists(os.path.join(cw_dir, '.settings')):
         return root
 
-    # 워크트리일 수 있음 — git-common-dir로 메인 리포 탐색
+    # Could be a worktree — navigate the main repo with git-common-dir
     try:
         result = subprocess.run(
             ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
@@ -43,7 +43,7 @@ def _find_project_root() -> str:
         )
         if result.returncode == 0:
             git_common = result.stdout.strip()
-            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            # git-common-dir points to the .git directory in the main repo
             main_root = os.path.dirname(git_common)
             main_cw_dir = os.path.join(main_root, '.agent-factory')
             if os.path.exists(os.path.join(main_cw_dir, '.settings')):

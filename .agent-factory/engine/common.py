@@ -203,7 +203,7 @@ def scan_active_workflows(
         include terminal: Includes True DONE/FAILED/STALE/CANCELLED.
 
     Returns:
-        딕셔너리   볶음밥헌터
+        Dictionary Fried Rice Hunter
         Each value is {"title", "step", "workDir", "command"} format.
         If you don’t have an active workflow, you’ll be blank.
     """

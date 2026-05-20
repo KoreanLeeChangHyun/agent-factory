@@ -1,30 +1,30 @@
-"""flow_logger.py - 워크플로우 공통 로깅 유틸리티.
+"""flow logger.py - Workflow common logging utility.
 
-workflow.log 파일에 이벤트를 INFO/WARN/ERROR 레벨로 기록하는
-공통 함수를 제공합니다.
+INFO/WARN/ERROR
+We provide a common function.
 
-로그 포맷:
+Tag:
     [YYYY-MM-DDTHH:MM:SS] [LEVEL] message
 
-예시:
+Tag:
     from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
-    # abs_work_dir을 직접 알고 있는 경우
+    # If you know abs_work_dir directly:
     append_log("/path/to/workdir", "INFO", "kanban.py: subcommand=list")
-    append_log("/path/to/workdir", "WARN", "kanban.py: 티켓 파일 없음")
-    append_log("/path/to/workdir", "ERROR", "kanban.py: ERROR 상태 전이 실패")
+    append_log("/path/to/workdir", "WARN", "kanban.py: No ticket file")
+    append_log("/path/to/workdir", "ERROR", "kanban.py: ERROR state transition failed")
 
-    # abs_work_dir을 모르는 경우 (워크플로우 외부에서 호출되는 스크립트)
+    # If abs_work_dir is unknown (script called outside of workflow)
     work_dir = resolve_work_dir_for_logging()
     if work_dir:
         append_log(work_dir, "INFO", "script: start")
 
-주의사항:
-    - append_log()는 모든 예외를 조용히 흡수합니다. 로깅 실패가 스크립트
-      정상 실행에 영향을 주지 않습니다.
-    - resolve_work_dir_for_logging()는 해석 불가 시 None을 반환합니다.
-      호출자는 None 반환 시 로깅을 건너뛰어야 합니다.
-    - KST (UTC+9) 기준 타임스탬프를 사용합니다.
+Information:
+    - append log() quietly absorbs all exceptions. Configuring the Script
+      It does not affect normal execution.
+    - resolve work dir for logging() returns None in case of interpretation.
+      The caller must skip the logging when the None return.
+    - Use KST (UTC+9) standard timestamp.
 """
 
 from __future__ import annotations
@@ -40,22 +40,22 @@ from typing import Optional
 # KST (UTC+9)
 _KST = timezone(timedelta(hours=9))
 
-# YYYYMMDD-HHMMSS 패턴 (registryKey)
+# YYYYMMDD-HHMMSS pattern (registryKey)
 _TS_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 
 
 def append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """워크플로우 로그 파일에 이벤트를 기록한다.
+    """Create an event in a workflow log file.
 
-    workflow.log 파일에 KST 타임스탬프와 함께 로그를 추가합니다.
-    모든 예외를 조용히 흡수하여 스크립트 실행에 영향을 주지 않습니다.
+    Add the log with KST timestamp to workflow.log file.
+    We use cookies to give you the best experience on our website. If you continue to use this site we will assume that you are happy with it.Ok
 
     Args:
-        abs_work_dir: 워크플로우 절대 경로. workflow.log가 위치하는 디렉터리.
-        level: 로그 레벨. "INFO", "WARN", "ERROR" 중 하나.
-        message: 로그 메시지.
+        abs work dir: workflow absolute path. directory where workflow.log is located.
+        level: log level. "INFO", "WARN", "ERROR".
+        message: log message.
 
-    로그 포맷:
+    Tag:
         [YYYY-MM-DDTHH:MM:SS] [LEVEL] message
     """
     try:
@@ -70,26 +70,26 @@ def append_log(abs_work_dir: str, level: str, message: str) -> None:
 def resolve_work_dir_for_logging(
     project_root: Optional[str] = None,
 ) -> Optional[str]:
-    """현재 활성 워크플로우의 abs_work_dir을 해석하여 반환한다.
+    """returns the abs work dir in the current active workflow.
 
-    다음 순서로 abs_work_dir을 해석합니다:
-    1. 환경변수 WORKFLOW_WORK_DIR (직접 지정)
-    2. 환경변수 WORKFLOW_REGISTRY_KEY + 디렉터리 스캔
-    3. .workflow/ 디렉터리 스캔 (단일 활성 워크플로우 자동 선택)
+    interpret abs work dir in the following order NEWS
+    1. FAQ Environment variable WORKFLOW WORK DIR (Direct)
+    2. FAQ WORKFLOW REGISTRY KEY + KEY Scan
+    3. FAQs .workflow/Director Scan (Single Acting Workflow Automatic)
 
-    해석 불가 시 None을 반환합니다. 호출자는 None 반환 시 로깅을 건너뜁니다.
+    Returns None in case of interpretation. The caller skips the logging when the None return.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로. None이면 자동 해석.
+        project root: project route absolute path. Automatic interpretation if None.
 
     Returns:
-        abs_work_dir 절대 경로 문자열. 해석 불가 시 None.
+        abs work dir absolute path string. None.
     """
     try:
         if project_root is None:
             project_root = _resolve_project_root()
 
-        # 1. 환경변수 WORKFLOW_WORK_DIR 직접 지정
+        # 1. Directly specify the environment variable WORKFLOW_WORK_DIR
         env_work_dir = os.environ.get("WORKFLOW_WORK_DIR", "").strip()
         if env_work_dir:
             if os.path.isabs(env_work_dir):
@@ -100,14 +100,14 @@ def resolve_work_dir_for_logging(
                 if os.path.isdir(abs_wd):
                     return abs_wd
 
-        # 2. 환경변수 WORKFLOW_REGISTRY_KEY + 디렉터리 스캔
+        # 2. Environment variable WORKFLOW_REGISTRY_KEY + directory scan
         registry_key = os.environ.get("WORKFLOW_REGISTRY_KEY", "").strip()
         if registry_key and _TS_PATTERN.match(registry_key):
             resolved = _resolve_work_dir_from_key(registry_key, project_root)
             if resolved:
                 return resolved
 
-        # 3. .workflow/ 디렉터리 스캔 (단일 활성 워크플로우 자동 선택)
+        # 3. Scan .workflow/ directory (automatically selects single active workflow)
         resolved = _resolve_from_active_workflows(project_root)
         if resolved:
             return resolved
@@ -119,23 +119,23 @@ def resolve_work_dir_for_logging(
 
 
 # =============================================================================
-# 내부 헬퍼 함수
+# Internal helper function
 # =============================================================================
 
 
 def _resolve_project_root() -> str:
-    """프로젝트 루트 절대 경로를 해석한다.
+    """The project route will interpret the absolute path.
 
-    이 파일 위치(flow/) -> scripts -> .claude -> project root 순으로
-    상위 디렉터리를 탐색합니다. 서브에이전트 워크트리(.claude/worktrees/agent-*)
-    에서 실행될 경우 __file__ 기반 4단계 탐색이 워크트리 내부 경로를 반환하므로,
-    git-common-dir 기반으로 메인 리포 루트를 재해석합니다.
+    .claude -> project root
+    Skip to main content (claude/worktrees/agent-*)
+    If running on   file   Based 4 step navigation returns the path inside the worktree, so
+    git-common-dir
 
     Returns:
-        프로젝트 루트 절대 경로.
+        Skip to main content
     """
-    # flow_logger.py 위치: <project_root>/.agent-factory/engine/flow/flow_logger.py
-    # 서브에이전트 워크트리 위치:
+    # flow_logger.py Location: <project_root>/.agent-factory/engine/flow/flow_logger.py
+    # Subagent worktree location:
     #   <main_root>/.claude/worktrees/agent-*/.agent-factory/engine/flow/flow_logger.py
     this_file = os.path.abspath(__file__)
     flow_dir = os.path.dirname(this_file)          # .agent-factory/engine/flow/
@@ -143,13 +143,13 @@ def _resolve_project_root() -> str:
     claude_dir = os.path.dirname(scripts_dir)      # .agent-factory/
     candidate = os.path.dirname(claude_dir)        # <candidate>/
 
-    # .agent-factory/.settings가 있으면 메인 리포 루트 — 즉시 반환
+    # Main repo root if .agent-factory/.settings exists — returns immediately
     cw_dir = os.path.join(candidate, ".agent-factory")
     if os.path.exists(os.path.join(cw_dir, ".settings")):
         return candidate
 
-    # 워크트리 내부일 수 있음 — git-common-dir로 메인 리포 탐색
-    # (dispatcher.py _find_project_root() 와 동일한 패턴)
+    # Could be inside the worktree — browse the main repo with git-common-dir
+    # (same pattern as dispatcher.py _find_project_root())
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -160,7 +160,7 @@ def _resolve_project_root() -> str:
         )
         if result.returncode == 0:
             git_common = result.stdout.strip()
-            # git-common-dir은 메인 리포의 .git 디렉터리를 가리킴
+            # git-common-dir points to the .git directory in the main repo
             main_root = os.path.dirname(git_common)
             main_cw_dir = os.path.join(main_root, ".agent-factory")
             if main_root != candidate and (
@@ -176,17 +176,17 @@ def _resolve_project_root() -> str:
 def _resolve_work_dir_from_key(
     registry_key: str, project_root: str
 ) -> Optional[str]:
-    """registryKey로 abs_work_dir을 디렉터리 스캔으로 해석한다.
+    """abs work dir as registryKey is interpreted as a directory scan.
 
-    T-449 마이그레이션 이후 폴드 구조 하나만 처리한다:
-    .workflow/<YYYYMMDD-HHMMSS>/status.json — base_dir 자체를 반환한다.
+    T-449 handles only the fold structure after migration NEWS
+    . workflow/<YYYYMMDD-HMMSS>/status.json — return base dir itself.
 
     Args:
-        registry_key: YYYYMMDD-HHMMSS 형식 레지스트리 키.
-        project_root: 프로젝트 루트 절대 경로.
+        registry key: YYYMMDD-HMMSS format registry key.
+        project root: project route absolute path.
 
     Returns:
-        abs_work_dir 절대 경로. 해석 실패 시 None.
+        abs work dir absolute path. None when interpretation fails.
     """
     base_dir = os.path.join(project_root, ".agent-factory", "runs", registry_key)
     if not os.path.isdir(base_dir):
@@ -199,18 +199,18 @@ def _resolve_work_dir_from_key(
 
 
 def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
-    """활성 워크플로우를 스캔하여 abs_work_dir을 자동 선택한다.
+    """Automatically select abs work dir by scanning an active workflow.
 
-    .workflow/ 디렉터리에서 터미널 상태(DONE/FAILED/STALE/CANCELLED)가 아닌
-    워크플로우를 수집합니다. 단일 활성 워크플로우면 즉시 반환합니다.
-    복수이면 CLAUDE_SESSION_ID 환경변수로 세션 소유 워크플로우를 먼저 식별하고,
-    매칭 실패 시에만 updated_at 기준 최신 항목을 반환합니다.
+    . DONE/FAILED/STALE/CANCELLED
+    Collect workflows. A single active workflow will return immediately.
+    If you have multiple CLAUDE SESSION ID environment variables, you can first identify session ownership workflow,
+    Returns updated at standard latest items only when matching failed.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로.
+        project root: project route absolute path.
 
     Returns:
-        abs_work_dir 절대 경로. 활성 워크플로우가 없으면 None.
+        abs work dir absolute path. None if there is no active workflow.
     """
     workflow_root = os.path.join(project_root, ".agent-factory", "runs")
     if not os.path.isdir(workflow_root):
@@ -222,7 +222,7 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
     candidates: list[tuple[str, str, list]] = []
 
     def _collect_candidate(cmd_path: str) -> None:
-        """cmd_path/status.json을 읽고 활성 워크플로우면 candidates에 추가."""
+        """Read cmd_path/status.json and add to candidates if active workflow."""
         status_file = os.path.join(cmd_path, "status.json")
         if not os.path.exists(status_file):
             return
@@ -262,8 +262,8 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
     if len(candidates) == 1:
         return candidates[0][0]
 
-    # 복수 후보: CLAUDE_SESSION_ID로 세션 소유 워크플로우를 우선 식별한다.
-    # statusline.py와 동일한 방식으로 linked_sessions 배열을 검사한다.
+    # Multiple candidates: First identify the session-owning workflow by CLAUDE_SESSION_ID.
+    # Check the linked_sessions array in the same way as statusline.py.
     claude_sid = os.environ.get("CLAUDE_SESSION_ID", "").strip()
     if claude_sid:
         session_matches = [
@@ -274,10 +274,10 @@ def _resolve_from_active_workflows(project_root: str) -> Optional[str]:
         if len(session_matches) == 1:
             return session_matches[0][0]
         if len(session_matches) > 1:
-            # 같은 세션에 연결된 복수 후보는 updated_at 기준 최신 선택
+            # Multiple candidates connected to the same session select the latest based on updated_at
             session_matches.sort(key=lambda x: x[1], reverse=True)
             return session_matches[0][0]
 
-    # 세션 매칭 실패 시 updated_at 기준 최신 항목으로 폴백
+    # If session matching fails, fall back to the latest item based on updated_at
     candidates.sort(key=lambda x: x[1], reverse=True)
     return candidates[0][0]

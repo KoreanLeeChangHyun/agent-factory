@@ -123,7 +123,7 @@ def _parse_new_signature(args: list[str]) -> dict[str, str]:
         SystemExit: 인자 수 부족 또는 .context.json 파일 부재/파싱 실패 시
     """
     if len(args) < 2:
-        log_warn("사용법: slack_notify.py <workDir> <상태> [보고서경로] [에이전트]")
+        log_warn("Usage: slack_notify.py <workDir> <state> [report path] [agent]")
         sys.exit(1)
 
     work_dir = args[0]
@@ -133,21 +133,21 @@ def _parse_new_signature(args: list[str]) -> dict[str, str]:
 
     project_root = resolve_project_root()
 
-    # workDir 절대 경로 계산
+    # workDir absolute path calculation
     if os.path.isabs(work_dir):
         abs_work_dir = work_dir
     else:
         abs_work_dir = os.path.join(project_root, work_dir)
 
-    # .context.json 읽기
+    # Read .context.json
     context_file = os.path.join(abs_work_dir, ".context.json")
     if not os.path.isfile(context_file):
-        log_warn(f".context.json을 찾을 수 없습니다: {context_file}")
+        log_warn(f"Cannot find .context.json: {context_file}")
         sys.exit(0)
 
     ctx = load_json_file(context_file)
     if ctx is None:
-        log_warn(f".context.json 파싱 실패: {context_file}")
+        log_warn(f"Failed to parse .context.json: {context_file}")
         sys.exit(0)
 
     title = ctx.get("title", "") or "unknown"
@@ -155,7 +155,7 @@ def _parse_new_signature(args: list[str]) -> dict[str, str]:
     work_name = ctx.get("workName", "") or title
     command = ctx.get("command", "") or "unknown"
 
-    # workDir에서 YYYYMMDD-HHMMSS 식별자 추출
+    # Extract YYYYMMDD-HHMMSS identifier from workDir
     reg_key = extract_registry_key(abs_work_dir)
     if TS_PATTERN.match(reg_key):
         work_id = reg_key
@@ -185,8 +185,8 @@ def _parse_legacy_signature(args: list[str]) -> dict[str, str]:
     """
     if len(args) < 5:
         log_warn(
-            "사용법: slack_notify.py <작업제목> <작업ID> <작업이름> <명령어> <상태> "
-            "[보고서경로] [에이전트]"
+            "Usage: slack_notify.py <Task Title> <Task ID> <Task Name> <Command> <Status>"
+            "[Report Path] [Agent]"
         )
         sys.exit(1)
 
@@ -210,25 +210,25 @@ def main() -> None:
     """
     args = sys.argv[1:]
 
-    # 환경변수 로드 (실패 시 조용히 종료)
+    # Load environment variables (quietly exits on failure)
     if not load_slack_env():
         sys.exit(0)
 
-    # 이중 시그니처 감지
+    # Double signature detection
     if args and (args[0].startswith(".agent-factory/") or args[0].startswith("/")):
         info = _parse_new_signature(args)
     else:
         info = _parse_legacy_signature(args)
 
-    # 에이전트 이모지 결정
+    # Agent Emoji Decision
     agent_emoji = ""
     if info["agent"]:
         agent_emoji = get_agent_emoji(info["agent"])
 
-    # 이모지 접두사 생성
+    # Create an emoji prefix
     emoji_prefix = f"{agent_emoji} " if agent_emoji else ""
 
-    # 보고서 vscode:// 링크 생성
+    # Create report vscode:// link
     report_link = ""
     if info["report_path"]:
         report_path = info["report_path"]
@@ -238,19 +238,19 @@ def main() -> None:
         else:
             abs_report = os.path.join(project_root, report_path)
         vscode_uri = _build_vscode_uri(abs_report)
-        report_link = f"\n- 보고서: <{vscode_uri}|보고서 열기>"
+        report_link = f"\n - Report: <{vscode_uri}|Open Report>"
 
-    # Slack 메시지 구성
+    # Organize Slack messages
     message = (
         f"{emoji_prefix}*{info['title']}*\n"
-        f"- 작업ID: `{info['work_id']}`\n"
-        f"- 작업이름: {info['work_name']}\n"
-        f"- 명령어: `{info['command']}`\n"
-        f"- 상태: {info['status']}"
+        f"- Work ID: `{info['work_id']}` \n"
+        f"- Work name: {info['work_name']} \n"
+        f"- Command: `{info['command']}` \n"
+        f"- Status: {info['status']}"
         f"{report_link}"
     )
 
-    # JSON payload 구성 + Slack 전송
+    # Configure JSON payload + send to Slack
     from slack.slack_common import SLACK_CHANNEL_ID as _channel
     json_payload = build_json_payload(_channel, message)
     send_slack_message(json_payload)

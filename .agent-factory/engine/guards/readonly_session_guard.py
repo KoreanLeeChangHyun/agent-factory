@@ -20,12 +20,12 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -37,29 +37,29 @@ from messages import (
     READONLY_SESSION_WRITE_EDIT_DENIED,
 )
 
-# 읽기 전용 command 목록 (이 command에서는 코드 수정이 금지됨)
+# Read-only command list (code modification is prohibited in these commands)
 _READONLY_COMMANDS = ("research", "review")
 
-# Bash 도구에서 파일을 수정할 수 있는 명령 패턴 (main_session_guard.py와 동일)
+# Command pattern that allows Bash tools to modify files (same as main_session_guard.py)
 _BASH_FILE_MODIFY_PATTERNS: list[str] = [
     r"\bsed\s+-i",                               # sed inplace
     r"\bawk\s+.*-i\s+inplace",                   # awk inplace
-    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf 리다이렉트
-    r"\btee\s+(-a\s+)?\S",                       # tee 쓰기
-    r"\bcat\s*<<",                               # heredoc 리다이렉트
-    r"\bcp\s+",                                  # 파일 복사
-    r"\bmv\s+",                                  # 파일 이동
+    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf redirect
+    r"\btee\s+(-a\s+)?\S",                       # write tee
+    r"\bcat\s*<<",                               # heredoc redirect
+    r"\bcp\s+",                                  # copy files
+    r"\bmv\s+",                                  # move files
     r"\bpython3?\s+(-c\s+|.*\bopen\b.*\bwrite\b)",  # python -c open write
     r"\bperl\s+-.*[pi]",                         # perl inplace
-    r"(?:^|[;&|]\s*)\binstall\s+",               # install 명령 (서브커맨드 제외)
-    r"\bdd\s+",                                  # dd 명령
+    r"(?:^|[;&|]\s*)\binstall\s+",               # install command (excluding subcommands)
+    r"\bdd\s+",                                  # dd command
 ]
 
-# .agent-factory/ 하위 경로 패턴 (보고서/작업 내역 Write/Edit 허용)
+# .agent-factory/ subpath pattern (allows Report/History Write/Edit)
 _WORKFLOW_PATH_PATTERN = re.compile(r"[/\\]?\.claude\.workflow[/\\]")
 
-# 사용자 메모리 디렉터리 패턴: ~/.claude/projects/<encoded>/memory/** 매칭
-# main_session_guard.py와 동일한 정책 (research/review 세션에서도 메모리 작성 허용)
+# User memory directory pattern: ~/.claude/projects/<encoded>/memory/** matching
+# Same policy as main_session_guard.py (allow memory writing in research/review sessions as well)
 _MEMORY_DIR_PATTERN: re.Pattern[str] = re.compile(
     r"(?:^|/)\.claude/projects/[^/]+/memory(?:/|$)"
 )
@@ -93,7 +93,7 @@ def _get_workflow_command() -> str | None:
     """
     project_root = resolve_project_root()
 
-    # 1. WORKFLOW_WORK_DIR 환경변수 확인
+    # 1. Check the WORKFLOW_WORK_DIR environment variable
     env_work_dir = os.environ.get("WORKFLOW_WORK_DIR", "").strip()
     if env_work_dir:
         abs_work_dir = (
@@ -107,13 +107,13 @@ def _get_workflow_command() -> str | None:
             if command:
                 return command
 
-    # 2. .workflow/ 디렉터리 스캔
+    # 2. Scan the .workflow/ directory
     try:
         registry = scan_active_workflows(project_root=project_root)
         if not registry:
             return None
 
-        # updated_at 기준 가장 최근 워크플로우 선택
+        # Select the most recent workflow by updated_at
         best_entry = None
         best_updated = ""
         for _key, entry in registry.items():
@@ -226,14 +226,14 @@ def main() -> None:
     비워크플로우 세션에서는 무조건 통과한다.
     .workflow/ 하위 파일 Write/Edit는 허용한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_READONLY_SESSION_GUARD") or read_env("HOOK_READONLY_SESSION_GUARD")
 
     # Hook disable check (false/0 = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -241,49 +241,49 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Write, Edit, Bash가 아니면 통과
+    # Pass if not Write, Edit, or Bash
     if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
-    # 세션 유형 판별 -- 워크플로우 세션이 아니면 통과 (이 가드의 관심사 아님)
+    # Determine session type -- pass if not a workflow session (not a concern of this guard)
     session_type = get_session_type()
     if session_type != "workflow":
         sys.exit(0)
 
-    # --- 워크플로우 세션 확인됨, command 판별 ---
+    # --- Workflow session confirmed, command determination ---
 
     command = _get_workflow_command()
 
-    # command 조회 실패 시 통과 (false positive 방지)
+    # Passes when command inquiry fails (prevents false positives)
     if command is None:
         sys.exit(0)
 
-    # command 첫 세그먼트 추출 (체인 command 지원: "research>implement" -> "research")
+    # Extract the first segment of the command (support chain command: "research>implement" -> "research")
     first_segment = command.split(">")[0].strip()
 
-    # implement command이면 통과
+    # Passes if implement command
     if first_segment not in _READONLY_COMMANDS:
         sys.exit(0)
 
-    # --- research/review command 확인됨, 차단 판별 ---
+    # --- research/review command confirmed, blocking determined ---
 
     tool_input = data.get("tool_input", {})
 
-    # Write/Edit 도구: .workflow/ 하위 또는 메모리 디렉터리 하위는 허용
+    # Write/Edit tools: .workflow/ sub or memory directory sub is allowed
     if tool_name in ("Write", "Edit"):
         file_path = tool_input.get("file_path", "")
         if _is_workflow_path(file_path) or _is_memory_path(file_path):
             sys.exit(0)
         _deny(READONLY_SESSION_WRITE_EDIT_DENIED)
 
-    # Bash 도구: 파일 수정 패턴만 차단
+    # Bash tool: Block only file modification patterns
     if tool_name == "Bash":
         command_str = tool_input.get("command", "")
         if _is_bash_file_modify(command_str):
             _deny(READONLY_SESSION_BASH_MODIFY_DENIED)
         sys.exit(0)
 
-    # 알 수 없는 도구: 통과
+    # Unknown tool: Passed
     sys.exit(0)
 
 

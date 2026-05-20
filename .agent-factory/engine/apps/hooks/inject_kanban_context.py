@@ -29,14 +29,14 @@ import time
 import xml.etree.ElementTree as ET
 from typing import Any
 
-# ── 상수 ─────────────────────────────────────────────────────────────────────
+# ── Constant ────────────────────────────────────────────────────────────────────────
 
 MAX_PAYLOAD_CHARS = 4096
 MAX_DETAIL_ITEMS = 10
-SESSIONS_TIMEOUT = 0.7   # flow-sessions subprocess timeout (초)
-SOFT_DEADLINE = 0.8      # 전체 soft deadline (초)
+SESSIONS_TIMEOUT = 0.7   # flow-sessions subprocess timeout (seconds)
+SOFT_DEADLINE = 0.8      # Total soft deadline (seconds)
 
-# 컬럼 디렉터리명 → 표시 레이블
+# Column directory name → display label
 COLUMN_LABELS: dict[str, str] = {
     "open": "Open",
     "progress": "In Progress",
@@ -45,19 +45,19 @@ COLUMN_LABELS: dict[str, str] = {
     "done": "Done",
 }
 
-# ── 프로젝트 루트 탐색 ────────────────────────────────────────────────────────
+# ── Project root navigation ───────────────────────────────────────────────────────────
 
 def _find_project_root() -> str:
-    """dispatcher.py 와 동일 로직: git-common-dir 로 메인 리포 루트 탐색."""
+    """Same logic as dispatcher.py: Browse main repo root with git-common-dir."""
     d = os.path.dirname(os.path.abspath(__file__))
     # .agent-factory/engine/apps/hooks/ → project root = ../../../..
     root = os.path.normpath(os.path.join(d, '..', '..', '..', '..'))
 
-    # 메인 리포이면 그대로 반환 (.settings 존재 확인)
+    # If it is the main repo, it is returned as is (check the existence of .settings)
     if os.path.exists(os.path.join(root, '.agent-factory', '.settings')):
         return root
 
-    # 워크트리일 수 있음 — git-common-dir로 메인 리포 탐색
+    # Could be a worktree — navigate the main repo with git-common-dir
     try:
         result = subprocess.run(
             ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
@@ -75,7 +75,7 @@ def _find_project_root() -> str:
     return root
 
 
-# ── 칸반 요약 수집 ─────────────────────────────────────────────────────────────
+# ── Collect Kanban Summary ────────────────────────────────────────────────────────────────
 
 def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
     """XML 파일에서 metadata 필드만 빠르게 추출한다.
@@ -95,10 +95,10 @@ def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
                 text = (elem.text or "").strip()
                 if text:
                     fields[tag] = text
-                # 세 필드 모두 모으면 조기 중단
+                # Stop early when all three fields are collected.
                 if len(fields) >= 3:
                     break
-            # metadata 닫힘 태그 이후는 불필요 — 조기 중단
+            # Not needed after metadata closing tag — stop early
             if tag == "metadata" and len(fields) >= 1:
                 break
         if "number" not in fields:
@@ -133,7 +133,7 @@ def _collect_kanban_summary(project_root: str) -> dict[str, Any]:
         xml_files = glob.glob(os.path.join(col_dir, "T-*.xml"))
         counts[col] = len(xml_files)
 
-        # todo/done 은 카운트만 (상세 불필요)
+        # todo/done is just a count (no details needed)
         if col in ("todo", "done"):
             continue
 
@@ -150,7 +150,7 @@ def _collect_kanban_summary(project_root: str) -> dict[str, Any]:
     return {"counts": counts, "details": details}
 
 
-# ── 활성 세션 수집 ─────────────────────────────────────────────────────────────
+# ── Collect active sessions ────────────────────────────────────────────────────────────────
 
 def _parse_sessions_json(raw: str) -> list[dict[str, str]]:
     """flow-sessions --json 출력을 dict 리스트로 정규화한다.
@@ -189,9 +189,9 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
         return []
 
     sessions: list[dict[str, str]] = []
-    # 새 구조: runs/{registryKey}/.context.json (폴드)
+    # New structure: runs/{registryKey}/.context.json (fold)
     pattern_new = os.path.join(runs_dir, '*', '.context.json')
-    # 구 구조 fallback: runs/{registryKey}/{slug}/implement/.context.json
+    # Spherical structure fallback: runs/{registryKey}/{slug}/implement/.context.json
     pattern_old = os.path.join(runs_dir, '*', '*', 'implement', '.context.json')
     ctx_files = glob.glob(pattern_new) + glob.glob(pattern_old)
 
@@ -207,7 +207,7 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
             registry_key = str(ctx.get("registry_key") or ctx.get("registryKey") or "")
             started_at = ""
             if registry_key and len(registry_key) >= 15:
-                # registryKey = YYYYMMDD-HHMMSS → HHMMSS 추출
+                # registryKey = YYYYMMDD-HHMMSS → extract HHMMSS
                 started_at = registry_key[9:15] if "-" in registry_key else registry_key[-6:]
             sessions.append({
                 "ticket": ticket,
@@ -215,12 +215,12 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
                 "started_at": started_at,
                 "status": "running",
                 "registry_key": registry_key,
-                "_mtime": mtime,  # 정렬용
+                "_mtime": mtime,  # For sorting
             })
         except Exception:
             continue
 
-    # mtime 내림차순 정렬 후 상위 5개만
+    # mtime Sort in descending order, then only the top 5
     sessions.sort(key=lambda x: float(x.get("_mtime", 0)), reverse=True)
     for s in sessions:
         s.pop("_mtime", None)
@@ -250,32 +250,32 @@ def _collect_active_sessions(project_root: str) -> list[dict[str, str]]:
             )
             if result.returncode == 0 and result.stdout.strip():
                 parsed = _parse_sessions_json(result.stdout)
-                if parsed is not None:  # 빈 리스트도 유효한 결과
+                if parsed is not None:  # An empty list is also a valid result
                     return parsed
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError, Exception):
             pass
 
-    # fallback: runs/ 직접 스캔
+    # fallback: runs/ direct scan
     return _fallback_sessions(project_root)
 
 
-# ── 컨텍스트 포맷팅 ────────────────────────────────────────────────────────────
+# ── Context Formatting ────────────────────────────────────────────────────────────────
 
 def _format_hhmm(started_at: str) -> str:
-    """HHMMSS 또는 YYYYMMDD-HHMMSS 형식에서 HH:MM 추출."""
+    """Extract HH:MM from HHMMSS or YYYYMMDD-HHMMSS format."""
     s = started_at.strip()
     if not s:
         return ""
-    # ISO datetime 형식 처리
+    # ISO datetime format handling
     if "T" in s or " " in s:
         parts = s.replace("T", " ").split(" ")
         if len(parts) >= 2:
             time_part = parts[1][:5]  # HH:MM
             return time_part
-    # HHMMSS 형식
+    # HHMMSS format
     if len(s) >= 6 and s.isdigit():
         return f"{s[:2]}:{s[2:4]}"
-    # 기타: 그대로 반환 (최대 8자)
+    # Others: Return as is (maximum 8 characters)
     return s[:8]
 
 
@@ -286,14 +286,14 @@ def _format_context(
     """칸반 요약 + 활성 세션을 markdown 형식으로 합성한다.
 
     출력 예시:
-        ## 칸반 스냅샷 (자동 주입, 사용자 turn 시점)
+        ## Kanban snapshot (automatic injection, user turn point)
         - Open: 1건, In Progress: 1건, Review: 6건 / To Do: 41건, Done: 358건
 
-        ### Open / In Progress 상세
+        ### Open / In Progress Details
 
 
 
-        ### 활성 세션
+        ### Active Session
 
     """
     counts = kanban.get("counts", {})
@@ -306,18 +306,18 @@ def _format_context(
     done_c = counts.get("done", 0)
 
     lines: list[str] = []
-    lines.append("## 칸반 스냅샷 (자동 주입, 사용자 turn 시점)")
+    lines.append("## Kanban snapshot (automatic injection, user turn point)")
     lines.append(
-        f"- Open: {open_c}건, In Progress: {progress_c}건, Review: {review_c}건"
-        f" / To Do: {todo_c}건, Done: {done_c}건"
+        f"- Open: {open_c} cases, In Progress: {progress_c} cases, Review: {review_c} cases"
+        f"/ To Do: {todo_c} case, Done: {done_c} case"
     )
 
-    # Open / In Progress 상세
+    # Open / In Progress Details
     if details:
-        # 최대 MAX_DETAIL_ITEMS 건 제한
+        # Maximum MAX_DETAIL_ITEMS item limit
         display_details = details[:MAX_DETAIL_ITEMS]
         lines.append("")
-        lines.append("### Open / In Progress 상세")
+        lines.append("### Open / In Progress Details")
         for item in display_details:
             number = item.get("number", "")
             title = item.get("title", "")
@@ -325,12 +325,12 @@ def _format_context(
             label = "In Progress" if "progress" in status.lower() or "in progress" in status.lower() else status
             lines.append(f"- {number} [{label}] {title}")
         if len(details) > MAX_DETAIL_ITEMS:
-            lines.append(f"  _(상위 {MAX_DETAIL_ITEMS}건만 표시, 전체 {len(details)}건)_")
+            lines.append(f"_(Show only top {MAX_DETAIL_ITEMS} items, total {len(details)} items)_")
 
-    # 활성 세션
+    # active session
     if sessions:
         lines.append("")
-        lines.append("### 활성 세션")
+        lines.append("### Active sessions")
         for session in sessions:
             ticket = session.get("ticket", "")
             command = session.get("command", "")
@@ -341,7 +341,7 @@ def _format_context(
     return "\n".join(lines)
 
 
-# ── 메인 ──────────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────────
 
 def build_context(project_root: str | None = None) -> str:
     """칸반 + 세션 스냅샷 컨텍스트 텍스트를 빌드한다.
@@ -374,8 +374,8 @@ def main() -> None:
     """
     start_time = time.monotonic()
 
-    # soft deadline 초과 시 SIGALRM으로 partial 출력 후 종료
-    # (SIGALRM은 Unix 전용)
+    # When the soft deadline is exceeded, partial output is performed using SIGALRM and then terminates.
+    # (SIGALRM is for Unix only)
     deadline_hit = [False]
 
     def _on_deadline(_signum: int, _frame: Any) -> None:
@@ -384,13 +384,13 @@ def main() -> None:
     try:
         if hasattr(signal, 'SIGALRM'):
             signal.signal(signal.SIGALRM, _on_deadline)
-            # 0.8s + 여유 0.05s (float → int 올림)
+            # 0.8s + margin 0.05s (float → int rounded up)
             signal.setitimer(signal.ITIMER_REAL, SOFT_DEADLINE)
     except Exception:
         pass
 
     try:
-        # stdin 읽기 (내용 무시 가능, 단 block 없이 빠르게)
+        # Read stdin (contents can be ignored, but quickly without blocks)
         _stdin_raw = sys.stdin.buffer.read()
 
         if deadline_hit[0]:
@@ -406,9 +406,9 @@ def main() -> None:
         if deadline_hit[0] and not context_text:
             sys.exit(0)
 
-        # 페이로드 4096 chars 초과 시 트리밍
+        # Trimming when payload exceeds 4096 chars
         if len(context_text) > MAX_PAYLOAD_CHARS:
-            context_text = context_text[:MAX_PAYLOAD_CHARS] + "\n_(트리밍됨)_"
+            context_text = context_text[:MAX_PAYLOAD_CHARS] + "\n _(trimmed)_"
 
         elapsed = time.monotonic() - start_time
         if elapsed > SOFT_DEADLINE and not context_text:
@@ -425,10 +425,10 @@ def main() -> None:
         sys.stdout.flush()
 
     except Exception:
-        # 어떤 예외에서도 빈 stdout + exit 0 보장
+        # Guaranteed empty stdout + exit 0 on any exception
         pass
     finally:
-        # SIGALRM 해제
+        # SIGALRM OFF
         try:
             if hasattr(signal, 'SIGALRM'):
                 signal.setitimer(signal.ITIMER_REAL, 0)

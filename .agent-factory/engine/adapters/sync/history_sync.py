@@ -55,18 +55,18 @@ except ImportError:
 from engine.constants import STALE_TTL_SECONDS, KEEP_COUNT
 
 # ============================================================
-# 상수 (Phase-상태 매핑)
+# Constant (Phase-state mapping)
 # ============================================================
 
 from engine.constants import HEADER_LINE, SEPARATOR_LINE, STEP_STATUS_MAP
 
 TIMESTAMP_PATTERN = re.compile(r"^\d{8}-\d{6}$")
 EXPECTED_CELL_COUNT = 12
-ORPHAN_STATUS = "삭제됨"
+ORPHAN_STATUS = "deleted"
 
 
 # ============================================================
-# 헬퍼 함수
+# helper function
 # ============================================================
 
 def _escape_pipe(text: str) -> str:
@@ -76,7 +76,7 @@ def _escape_pipe(text: str) -> str:
         text: 이스케이프할 문자열
 
     Returns:
-        파이프 문자(|)가 &#124;로 치환된 문자열
+        파이프 문자(|)가 &#String replaced with 124;
     """
     return text.replace("|", "&#124;")
 
@@ -137,7 +137,7 @@ def is_stale(step: str, updated_at: Optional[str]) -> bool:
     if not updated_at:
         return False
     try:
-        # ISO 8601 형식 파싱 (타임존 포함)
+        # ISO 8601 format parsing (including time zone)
         updated_dt = datetime.fromisoformat(updated_at)
         now = datetime.now(updated_dt.tzinfo)
         elapsed = (now - updated_dt).total_seconds()
@@ -147,7 +147,7 @@ def is_stale(step: str, updated_at: Optional[str]) -> bool:
 
 
 def extract_summary_from_plan(plan_file: str, max_len: int = 60) -> str:
-    """plan.md에서 '## 작업 요약' 섹션의 첫 문장을 추출.
+    """plan.md에서 '## Task Summary' 섹션의 첫 문장을 추출.
 
     Args:
         plan_file: plan.md 파일 경로
@@ -159,8 +159,8 @@ def extract_summary_from_plan(plan_file: str, max_len: int = 60) -> str:
     try:
         with open(plan_file, "r", encoding="utf-8") as f:
             content = f.read()
-        # "## 작업 요약" 헤더 찾기
-        match = re.search(r"##\s*작업\s*요약\s*\n+(.+)", content)
+        # "## Task Summary" 헤더 찾기
+        match = re.search(r"##\s*Task\s*Summary\s* \n +(.+)", content)
         if match:
             summary = match.group(1).strip()
             if len(summary) > max_len:
@@ -243,7 +243,7 @@ def ensure_entry_data(cmd_path: str) -> None:
 
     자동 생성 규칙 (summary.txt):
         다음 우선순위로 요약 텍스트를 추출하여 summary.txt를 생성한다.
-        (a) plan.md의 '## 작업 요약' 섹션 첫 문장
+        (a) plan.md의 '## Task Summary' 섹션 첫 문장
         (b) user_prompt.txt의 첫 줄
         (c) .context.json의 'title' 필드
         모든 소스에서 추출 실패 시 생성하지 않는다.
@@ -257,17 +257,17 @@ def ensure_entry_data(cmd_path: str) -> None:
 
     summary = ""
 
-    # (a) plan.md의 '## 작업 요약' 섹션 첫 문장
+    # (a) plan.md의 '## Task Summary' 섹션 첫 문장
     plan_file = os.path.join(cmd_path, "plan.md")
     if not summary and os.path.exists(plan_file):
         summary = extract_summary_from_plan(plan_file)
 
-    # (b) user_prompt.txt의 첫 줄
+    # (b) First line of user_prompt.txt
     prompt_file = os.path.join(cmd_path, "user_prompt.txt")
     if not summary and os.path.exists(prompt_file):
         summary = extract_summary_from_prompt(prompt_file)
 
-    # (c) .context.json의 'title' 필드
+    # (c) 'title' field in .context.json
     context_file = os.path.join(cmd_path, ".context.json")
     if not summary and os.path.exists(context_file):
         try:
@@ -314,36 +314,36 @@ def _build_entry(
     """
     ensure_entry_data(cmd_path)
 
-    # 파일 경로 구성
+    # Configure file path
     status_file = os.path.join(cmd_path, "status.json")
     plan_file = os.path.join(cmd_path, "plan.md")
     prompt_file = os.path.join(cmd_path, "user_prompt.txt")
     report_file = os.path.join(cmd_path, "report.md")
     files_dir = os.path.join(cmd_path, "files")
 
-    # status.json에서 메타 정보 추출
-    # 우선순위: <command>/status.json > <workName>/status.json
+    # Extract meta information from status.json
+    # Priority: <command>/status.json > <workName>/status.json
     step = "UNKNOWN"
     created_at = None
     updated_at = None
     if os.path.exists(status_file):
         step, created_at, updated_at = extract_status_from_json(status_file)
     else:
-        # fallback: workName 레벨의 status.json
+        # fallback: status.json at workName level
         work_status_file = os.path.join(work_path, "status.json")
         if os.path.exists(work_status_file):
             step, created_at, updated_at = extract_status_from_json(work_status_file)
 
-    # T1: 스테일 감지 - WORK/PLAN 단계에서 2시간 이상 경과 시 "중단"
+    # T1: 스테일 감지 - WORK/PLAN 단계에서 2시간 이상 경과 시 "interruption"
     if is_stale(step, updated_at):
-        status_text = "중단"
+        status_text = "interruption"
     else:
-        status_text = STEP_STATUS_MAP.get(step, "불명")
+        status_text = STEP_STATUS_MAP.get(step, "unknown")
 
-    # 날짜/시간 추출
+    # Date/Time Extraction
     date_str, time_str = parse_timestamp_from_dir(dir_name)
 
-    # 요약 추출 (summary.txt 최우선, plan.md 차선, user_prompt.txt 폴백)
+    # Extract summary (summary.txt first, plan.md second best, user_prompt.txt fallback)
     summary = ""
     summary_file = os.path.join(cmd_path, "summary.txt")
     if os.path.exists(summary_file):
@@ -353,7 +353,7 @@ def _build_entry(
     if not summary and os.path.exists(prompt_file):
         summary = extract_summary_from_prompt(prompt_file)
 
-    # 제목: .context.json의 title 필드 우선, 없으면 work_name 폴백
+    # Title: title field in .context.json takes precedence, if not, fallback to work_name
     context_file = os.path.join(cmd_path, ".context.json")
     title = ""
     if os.path.exists(context_file):
@@ -361,14 +361,14 @@ def _build_entry(
     if not title:
         title = work_name
 
-    # 각 파일/디렉토리 존재 여부
+    # Existence of each file/directory
     has_plan = os.path.exists(plan_file)
     has_prompt = os.path.exists(prompt_file)
     has_files = os.path.isdir(files_dir) and len(os.listdir(files_dir)) > 0
     has_report = os.path.exists(report_file)
     has_work = os.path.isdir(os.path.join(cmd_path, "work"))
 
-    # 이미지 파일 개수 (files 디렉토리)
+    # Number of image files (files directory)
     files_count = 0
     if has_files:
         files_count = len(os.listdir(files_dir))
@@ -419,7 +419,7 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
     for dir_name in os.listdir(base_dir):
         dir_path = os.path.join(base_dir, dir_name)
 
-        # YYYYMMDD-HHMMSS 패턴 확인
+        # Check for YYYYMMDD-HHMMSS pattern
         if not TIMESTAMP_PATTERN.match(dir_name):
             continue
         if not os.path.isdir(dir_path):
@@ -427,9 +427,9 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
 
         new_status_file = os.path.join(dir_path, "status.json")
         if os.path.isfile(new_status_file):
-            # 새 구조: .context.json에서 work_name/command 추출
+            # New structure: extract work_name/command from .context.json
             context_file = os.path.join(dir_path, ".context.json")
-            work_name = dir_name  # 폴백: dir_name 사용
+            work_name = dir_name  # Fallback: use dir_name
             command = "unknown"
             if os.path.exists(context_file):
                 try:
@@ -443,18 +443,18 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
                     pass
             entry = _build_entry(dir_name, work_name, command,
                                  dir_path, dir_path, rel_prefix)
-            # 새 구조: rel_base는 {rel_prefix}/{dir_name} (중간 디렉터리 없음)
+            # New structure: rel_base is {rel_prefix}/{dir_name} (no intermediate directories)
             entry["rel_base"] = f"{rel_prefix}/{dir_name}"
             entries.append(entry)
             continue
 
-        # 구 구조 fallback: 중첩 구조 탐색 <YYYYMMDD-HHMMSS>/<workName>/<command>/
+        # Sphere structure fallback: Nested structure navigation <YYYYMMDD-HHMMSS>/<workName>/<command>/
         for work_name in os.listdir(dir_path):
             work_path = os.path.join(dir_path, work_name)
             if not os.path.isdir(work_path):
                 continue
 
-            # command 서브디렉토리 탐색
+            # command subdirectory navigation
             has_command_subdir = False
             for command in os.listdir(work_path):
                 cmd_path = os.path.join(work_path, command)
@@ -466,7 +466,7 @@ def _scan_entries_in_dir(base_dir: str, rel_prefix: str) -> list[dict[str, objec
                                      cmd_path, work_path, rel_prefix)
                 entries.append(entry)
 
-            # T2: command 디렉토리가 없고, workName에 직접 파일이 존재하는 경우 폴백
+            # T2: Fallback if there is no command directory and a file exists directly in workName.
             if not has_command_subdir:
                 work_status = os.path.join(work_path, "status.json")
                 work_prompt = os.path.join(work_path, "user_prompt.txt")
@@ -495,23 +495,23 @@ def scan_workflow_directory(workflow_dir: str, include_all: bool = False) -> lis
     Returns:
         발견된 워크플로우 엔트리 딕셔너리 목록 (날짜 역순 정렬)
     """
-    # .agent-factory/runs/ 스캔 (우선)
+    # Scan .agent-factory/runs/ (priority)
     entries = _scan_entries_in_dir(workflow_dir, "../workflow")
 
-    # 이미 수집된 work_id 셋 (우선순위 보호)
+    # Already collected work_id set (priority protected)
     seen_ids = {e["work_id"] for e in entries}
 
-    # .agent-factory/runs/.history/ 스캔
+    # Scan .agent-factory/runs/.history/
     history_dir = os.path.join(workflow_dir, ".history")
     history_entries = _scan_entries_in_dir(history_dir, "../workflow/.history")
 
-    # workflow/에 없는 항목만 추가
+    # Add only items not in workflow/
     for entry in history_entries:
         if entry["work_id"] not in seen_ids:
             entries.append(entry)
             seen_ids.add(entry["work_id"])
 
-    # 날짜 역순 정렬 (최신순)
+    # Sort by reverse date (newest)
     entries.sort(key=lambda x: x["work_id"], reverse=True)
     return entries
 
@@ -525,42 +525,42 @@ def format_row(entry: dict[str, object]) -> str:
     Returns:
         마크다운 테이블 행 문자열 (| 구분자 포함)
     """
-    # 날짜 셀: YYYY-MM-DD<br><sub>HH:MM</sub>
+    # Date cell: YYYY-MM-DD<br><sub>HH:MM</sub>
     date_cell = f"{entry['date']}<br><sub>{entry['time']}</sub>"
 
-    # 제목 & 내용 셀: 제목<br><sub>요약</sub>
+    # Title & Content Cell: Title<br><sub>Summary</sub>
     if entry["summary"]:
         title_cell = f"{_escape_pipe(str(entry['title']))}<br><sub>{_escape_pipe(str(entry['summary']))}</sub>"
     else:
         title_cell = _escape_pipe(str(entry["title"]))
 
-    # 질의 링크
+    # query link
     if entry["has_prompt"]:
-        prompt_cell = f"[질의]({entry['rel_base']}/user_prompt.txt)"
+        prompt_cell = f"[Query]({entry['rel_base']}/user_prompt.txt)"
     else:
         prompt_cell = "-"
 
-    # 파일 링크
+    # file link
     if entry["has_files"]:
-        files_cell = f"[파일({entry['files_count']})]({entry['rel_base']}/files/)"
+        files_cell = f"[file({entry['files_count']})]({entry['rel_base']}/files/)"
     else:
         files_cell = "-"
 
-    # 계획 링크
+    # plan link
     if entry["has_plan"]:
-        plan_cell = f"[계획]({entry['rel_base']}/plan.md)"
+        plan_cell = f"[plan]({entry['rel_base']}/plan.md)"
     else:
         plan_cell = "-"
 
-    # 작업 링크
+    # work link
     if entry["has_work"]:
-        work_cell = f"[작업]({entry['rel_base']}/work/)"
+        work_cell = f"[work]({entry['rel_base']}/work/)"
     else:
         work_cell = "-"
 
-    # 보고 링크
+    # reporting link
     if entry["has_report"]:
-        report_cell = f"[보고]({entry['rel_base']}/report.md)"
+        report_cell = f"[report]({entry['rel_base']}/report.md)"
     else:
         report_cell = "-"
 
@@ -568,7 +568,7 @@ def format_row(entry: dict[str, object]) -> str:
 
 
 # ============================================================
-# history.md 파싱
+# Parsing history.md
 # ============================================================
 
 def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]]:
@@ -601,8 +601,8 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
     for i, line in enumerate(lines):
         stripped = line.rstrip("\n")
 
-        # 테이블 헤더/구분선 감지
-        if "| 날짜" in stripped and "작업ID" in stripped:
+        # Table header/separator line detection
+        if "| date" in stripped and "Job ID" in stripped:
             in_table = True
             table_header_seen = True
             header_lines.append(line)
@@ -610,16 +610,16 @@ def parse_history_md(filepath: str) -> tuple[list[str], set[str], int, list[str]
 
         if table_header_seen and stripped.startswith("|---"):
             if not header_separator_seen:
-                # 테이블 헤더 직후 첫 구분선 -> 헤더의 일부
+                # First separator line immediately after the table header -> part of the header
                 header_lines.append(line)
                 header_separator_seen = True
-            # 데이터 행 사이의 중간 구분선은 무시 (data_rows에 추가하지 않음)
+            # Ignore middle separators between data rows (do not add them to data_rows)
             continue
 
-        # 데이터 행
+        # data row
         if in_table and stripped.startswith("|"):
             data_rows.append(stripped)
-            # 작업ID 추출 (2번째 셀)
+            # Extract task ID (2nd cell)
             cells = stripped.split("|")
             if len(cells) >= 3:
                 work_id = cells[2].strip()
@@ -679,7 +679,7 @@ def extract_work_id_from_row(row: str) -> str:
 
 
 # ============================================================
-# sync 명령어
+# sync command
 # ============================================================
 
 def cmd_sync(args: argparse.Namespace) -> int:
@@ -694,36 +694,36 @@ def cmd_sync(args: argparse.Namespace) -> int:
         종료 코드. 0: 성공, 1: 실패
     """
     print("[STATE] HISTORY sync", flush=True)
-    print(">> sync 시작...", flush=True)
+    print(">> Start sync...", flush=True)
 
     workflow_dir = args.workflow_dir
     target = args.target
     dry_run = args.dry_run
     include_all = args.all
 
-    # 상대경로를 PROJECT_ROOT 기준 절대경로로 변환
+    # Convert relative path to absolute path based on PROJECT_ROOT
     if not os.path.isabs(target):
         target = os.path.join(PROJECT_ROOT, target)
     if not os.path.isabs(workflow_dir):
         workflow_dir = os.path.join(PROJECT_ROOT, workflow_dir)
 
-    # .agent-factory/runs/ 스캔
+    # Scan .agent-factory/runs/
     scanned = scan_workflow_directory(workflow_dir, include_all)
     if not scanned:
-        print("[INFO] .agent-factory/runs/ 디렉토리에 작업이 없습니다.")
+        print("[INFO] There are no tasks in the .agent-factory/runs/ directory.")
         return 0
 
-    # history.md 파싱
+    # Parsing history.md
     header_lines, existing_ids, marker_idx, data_rows = parse_history_md(target)
 
-    # scanned 데이터를 work_id -> entry 맵으로 구성
-    # (scan_workflow_directory에서 이미 workflow/ 우선 처리됨)
+    # Organize scanned data into work_id -> entry map
+    # (workflow/ is already prioritized in scan_workflow_directory)
     scanned_map: dict[str, dict[str, object]] = {}
     for entry in scanned:
         scanned_map.setdefault(entry["work_id"], entry)
 
-    # 기존 행을 work_id -> row 딕셔너리로 변환
-    # 레거시 형식 감지를 위해 원본 행도 보존
+    # Convert existing rows to work_id -> row dictionary
+    # Original rows are also preserved for legacy format detection
     existing_rows: dict[str, str] = {}
     original_rows: dict[str, str] = {}
     for row in data_rows:
@@ -735,7 +735,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 existing_rows[wid] = row
             original_rows.setdefault(wid, row)
 
-    # 비교: 누락 항목 및 상태 변경/레거시 형식 항목 탐지
+    # Comparison: Detecting missing items and state change/legacy format items
     new_entries: list[dict[str, object]] = []
     updated_entries: list[dict[str, object]] = []
 
@@ -744,19 +744,19 @@ def cmd_sync(args: argparse.Namespace) -> int:
         if wid not in existing_ids:
             new_entries.append(entry)
         else:
-            # 상태 변경 확인
+            # Check status change
             old_row = original_rows.get(wid, "")
             old_status = extract_status_from_row(old_row)
             new_status = entry["status"]
             if old_status != new_status:
                 updated_entries.append(entry)
             else:
-                # 레거시 형식 행(9컬럼 미만) 탐지: O(1) dict lookup
+                # Detect legacy format rows (less than 9 columns): O(1) dict lookup
                 orig_row = original_rows.get(wid, "")
                 if orig_row and len(orig_row.split("|")) < EXPECTED_CELL_COUNT:
                     updated_entries.append(entry)
 
-    # 중복 행 존재 여부 확인
+    # Check for existence of duplicate rows
     wid_counts: dict[str, int] = {}
     for row in data_rows:
         wid = extract_work_id_from_row(row)
@@ -764,14 +764,14 @@ def cmd_sync(args: argparse.Namespace) -> int:
             wid_counts[wid] = wid_counts.get(wid, 0) + 1
     has_duplicates = any(c > 1 for c in wid_counts.values())
 
-    # 레거시 형식 행 존재 여부 확인 (셀 수 10 미만)
+    # Check for legacy format row existence (cell count less than 10)
     has_legacy = any(
         len(row.split("|")) < EXPECTED_CELL_COUNT
         for row in data_rows
         if extract_work_id_from_row(row)
     )
 
-    # T3: 고아 엔트리 감지 - history.md에는 있으나 파일시스템에 디렉토리가 없는 엔트리
+    # T3: Orphan entry detection - entries in history.md but no directory in filesystem
     orphan_wids: set[str] = set()
     for row in data_rows:
         wid = extract_work_id_from_row(row)
@@ -781,65 +781,65 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 orphan_wids.add(wid)
 
     if not new_entries and not updated_entries and not has_duplicates and not has_legacy and not orphan_wids:
-        print("[INFO] history.md는 최신 상태입니다. 변경 사항 없음.")
+        print("[INFO] history.md is up to date. No changes.")
         return 0
 
-    # dry-run 모드
+    # dry-run mode
     if dry_run:
-        print("[DRY-RUN] 변경 예정 사항:")
-        print(f"  신규 추가: {len(new_entries)}건")
+        print("[DRY-RUN] Scheduled changes:")
+        print(f"New addition: {len(new_entries)} entries")
         for e in new_entries:
             print(f"    + {e['work_id']} | {e['title']} | {e['command']} | {e['status']}")
-        print(f"  상태 업데이트: {len(updated_entries)}건")
+        print(f"Status update: {len(updated_entries)} entries")
         for e in updated_entries:
             old_row = original_rows.get(str(e["work_id"]), "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
         if orphan_wids:
-            print(f"  고아 엔트리(삭제됨 표시): {len(orphan_wids)}건")
+            print(f"Orphan entries (marked deleted): {len(orphan_wids)} occurrences")
             for wid in sorted(orphan_wids, reverse=True):
-                print(f"    ! {wid} | 삭제됨")
+                print(f"! {wid} | deleted")
         return 0
 
-    # 실제 갱신
-    # 1. 기존 행에서 상태 변경 적용
+    # actual renewal
+    # 1. Apply a state change on an existing row
     updated_row_map: dict[str, str] = {}
     for entry in updated_entries:
         updated_row_map[str(entry["work_id"])] = format_row(entry)
 
-    # 2. 전체 데이터 재구성 (기존 행 업데이트 + 신규 행 추가)
+    # 2. Reorganize entire data (update existing rows + add new rows)
     final_rows: list[str] = []
 
-    # 신규 행 생성
+    # Create new row
     new_rows = [format_row(e) for e in new_entries]
 
-    # 기존 행 업데이트 (scanned 데이터가 있으면 format_row로 재생성)
+    # Update existing row (regenerate with format_row if scanned data exists)
     for row in data_rows:
         wid = extract_work_id_from_row(row)
         if wid in updated_row_map:
             final_rows.append(updated_row_map[wid])
         elif wid in scanned_map:
-            # scanned 데이터로 재생성 (레거시 형식/누락 링크 해소)
+            # Regeneration with scanned data (resolving legacy formats/missing links)
             final_rows.append(format_row(scanned_map[wid]))
         elif wid in orphan_wids:
-            # T3: 고아 엔트리 - 상태를 "삭제됨"으로 변경
+            # T3: 고아 엔트리 - 상태를 "deleted"으로 변경
             final_rows.append(replace_status_in_row(row, ORPHAN_STATUS))
         else:
             final_rows.append(row)
 
-    # 신규 행을 날짜순으로 삽입 (전체를 합친 후 재정렬)
-    # 중간 구분선 행을 필터링하여 최종 출력에 포함시키지 않음
+    # Insert new rows by date (merge and reorder everything)
+    # Filter out middle separator rows so they are not included in the final output
     all_rows = [r for r in (final_rows + new_rows) if not r.strip().startswith("|---")]
 
-    # 작업ID(역순)로 정렬
+    # Sort by task ID (reverse order)
     def sort_key(row: str) -> str:
-        """행의 작업ID를 정렬 키로 반환."""
+        """Returns the task ID of the row as the sort key."""
         wid = extract_work_id_from_row(row)
         return wid if wid else ""
 
     all_rows.sort(key=sort_key, reverse=True)
 
-    # work_id 기준 중복 행 제거 (정렬 후 첫 번째 행만 유지)
+    # Remove duplicate rows by work_id (keep only first row after sorting)
     seen_wids: set[str] = set()
     deduped_rows: list[str] = []
     for row in all_rows:
@@ -851,11 +851,11 @@ def cmd_sync(args: argparse.Namespace) -> int:
         deduped_rows.append(row)
     all_rows = deduped_rows
 
-    # history.md 파일 재구성
+    # Reorganize the history.md file
     output_lines: list[str] = []
 
-    # 제목
-    output_lines.append("# 워크플로우 실행 이력\n")
+    # title
+    output_lines.append("# Workflow execution history \n")
     output_lines.append("\n")
     output_lines.append(f"{HEADER_LINE}\n")
     output_lines.append(f"{SEPARATOR_LINE}\n")
@@ -863,7 +863,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     for row in all_rows:
         output_lines.append(f"{row}\n")
 
-    # 원자적 쓰기
+    # Atomic Write
     target_dir = os.path.dirname(target)
     os.makedirs(target_dir, exist_ok=True)
 
@@ -877,29 +877,29 @@ def cmd_sync(args: argparse.Namespace) -> int:
             os.unlink(tmp_path)
         raise
 
-    # 결과 요약
-    print(f"[SYNC] 완료:")
-    print(f"  신규 추가: {len(new_entries)}건")
+    # Summary of Results
+    print(f"[SYNC] Done:")
+    print(f"New addition: {len(new_entries)} entries")
     for e in new_entries:
         print(f"    + {e['work_id']} | {e['title']} | {e['command']} | {e['status']}")
     if updated_entries:
-        print(f"  상태 업데이트: {len(updated_entries)}건")
+        print(f"Status update: {len(updated_entries)} entries")
         for e in updated_entries:
             old_row = original_rows.get(str(e["work_id"]), "")
             old_status = extract_status_from_row(old_row)
             print(f"    ~ {e['work_id']} | {old_status} -> {e['status']}")
     if orphan_wids:
-        print(f"  고아 엔트리(삭제됨 표시): {len(orphan_wids)}건")
+        print(f"Orphan entries (marked deleted): {len(orphan_wids)} occurrences")
         for wid in sorted(orphan_wids, reverse=True):
-            print(f"    ! {wid} | 삭제됨")
-    print(f"  총 행 수: {len(all_rows)}건")
+            print(f"! {wid} | deleted")
+    print(f"Total number of rows: {len(all_rows)}")
 
-    print(">> [OK] sync 완료", flush=True)
+    print(">> [OK] sync completed", flush=True)
     return 0
 
 
 # ============================================================
-# status 명령어
+# status command
 # ============================================================
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -917,46 +917,46 @@ def cmd_status(args: argparse.Namespace) -> int:
     target = args.target
     include_all = args.all
 
-    # 상대경로를 PROJECT_ROOT 기준 절대경로로 변환
+    # Convert relative path to absolute path based on PROJECT_ROOT
     if not os.path.isabs(target):
         target = os.path.join(PROJECT_ROOT, target)
     if not os.path.isabs(workflow_dir):
         workflow_dir = os.path.join(PROJECT_ROOT, workflow_dir)
 
-    # .agent-factory/runs/ 스캔
+    # Scan .agent-factory/runs/
     scanned = scan_workflow_directory(workflow_dir, include_all)
 
-    # history.md 파싱
+    # Parsing history.md
     _, existing_ids, _, data_rows = parse_history_md(target)
 
-    # 누락 항목 계산
+    # Count missing items
     scanned_ids = {e["work_id"] for e in scanned}
     missing_ids = scanned_ids - existing_ids
     extra_ids = existing_ids - scanned_ids
 
-    # 상태별 분류
+    # Classification by status
     status_counts: dict[str, int] = {}
     for entry in scanned:
         s = str(entry["status"])
         status_counts[s] = status_counts.get(s, 0) + 1
 
-    # 출력
+    # output of power
     print("[STATE] HISTORY status", flush=True)
-    print(f">> workflow: {len(scanned)}개, history: {len(data_rows)}행, 누락: {len(missing_ids)}건", flush=True)
+    print(f">> workflow: {len(scanned)} rows, history: {len(data_rows)} rows, missing: {len(missing_ids)} rows", flush=True)
     print("=== history-sync status ===")
-    print(f"  workflow/ 디렉토리 수: {len(scanned)}개")
-    print(f"  history.md 행 수:       {len(data_rows)}행")
-    print(f"  누락 항목:              {len(missing_ids)}건")
+    print(f"Number of workflow/ directories: {len(scanned)}")
+    print(f"history.md row count: {len(data_rows)} rows")
+    print(f"Missing items: {len(missing_ids)}")
     if extra_ids:
-        print(f"  history.md에만 존재:    {len(extra_ids)}건")
+        print(f"Exists only in history.md: {len(extra_ids)} items")
     print()
-    print("  상태별 분류:")
+    print("Classification by status:")
     for status, count in sorted(status_counts.items(), key=lambda x: -x[1]):
-        print(f"    {status}: {count}건")
+        print(f"{status}: {count} cases")
 
     if missing_ids:
         print()
-        print("  누락 항목 목록:")
+        print("List of missing items:")
         for entry in scanned:
             if entry["work_id"] in missing_ids:
                 print(f"    - {entry['work_id']} | {entry['title']} | {entry['command']} | {entry['status']}")
@@ -965,7 +965,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 # ============================================================
-# archive 명령어
+# archive command
 # ============================================================
 
 def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, history_dir: str) -> None:
@@ -984,15 +984,15 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
         None. 실패 시 [WARN] 경고를 출력하고 비차단 처리한다.
     """
     # workflow_dir = .../PROJECT/.agent-factory/workflow
-    # workflow_dir 부모 = .../PROJECT/.agent-factory
+    # workflow_dir parent = .../PROJECT/.agent-factory
     cw_dir = os.path.dirname(workflow_dir)
     tickets_dir = os.path.join(cw_dir, "tickets")
 
     status_dirs = ["open", "progress", "review", "done"]
 
-    # 경로 갱신 함수: .agent-factory/runs/{key}/... -> .agent-factory/runs/.history/{key}/...
+    # Path update function: .agent-factory/runs/{key}/... -> .agent-factory/runs/.history/{key}/...
     def _rewrite_path(text: str) -> str:
-        """workflow/{key}/를 workflow/.history/{key}/に置換."""
+        """Change workflow/{key}/ to workflow/.history/{key}/に置換."""
         if not text:
             return text
         old_prefix = f".agent-factory/runs/{moved_key}/"
@@ -1020,7 +1020,7 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
                 if rk_el is None or (rk_el.text or "").strip() != moved_key:
                     continue
 
-                # registrykey 일치 — workdir/plan/report 경로 갱신
+                # registrykey match — update path workdir/plan/report
                 updated = False
                 for tag in ("workdir", "plan", "report"):
                     el = result_el.find(tag)
@@ -1038,7 +1038,7 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
                     )
             except Exception as exc:
                 print(
-                    f"[WARN] ticket {ticket_number}: XML workdir 갱신 실패 — {exc}",
+                    f"[WARN] ticket {ticket_number}: XML workdir update failed — {exc}",
                     file=sys.stderr,
                 )
 
@@ -1067,7 +1067,7 @@ def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
         if not os.path.isdir(dir_path) or not re.match(r"^[0-9]", dir_name):
             continue
 
-        # 신규 폴드 구조 우선: dir_path/status.json 직속 확인
+        # New fold structure priority: check dir_path/status.json directly
         new_status_file = os.path.join(dir_path, "status.json")
         if os.path.exists(new_status_file):
             phase, _, _ = extract_status_from_json(new_status_file)
@@ -1075,13 +1075,13 @@ def _detect_active_workflow_keys(workflow_dir: str) -> set[str]:
                 active_keys.add(dir_name)
             continue
 
-        # 구 구조 fallback: workName 서브디렉터리 탐색
+        # Phrase structure fallback: workName subdirectory navigation
         for work_name in os.listdir(dir_path):
             work_path = os.path.join(dir_path, work_name)
             if not os.path.isdir(work_path):
                 continue
 
-            # command 서브디렉터리 탐색
+            # command subdirectory navigation
             for command in os.listdir(work_path):
                 cmd_path = os.path.join(work_path, command)
                 if not os.path.isdir(cmd_path):
@@ -1117,10 +1117,10 @@ def cmd_archive(args: argparse.Namespace) -> int:
     history_dir = os.path.join(workflow_dir, ".history")
 
     if not os.path.isdir(workflow_dir):
-        print(">> workflow 디렉터리 없음 — 건너뜀", flush=True)
+        print(">> No workflow directory — skipped", flush=True)
         return 0
 
-    # [0-9]* 패턴 디렉토리를 역순 정렬
+    # [0-9]* Sort pattern directory in reverse order.
     dirs: list[str] = []
     for name in sorted(os.listdir(workflow_dir), reverse=True):
         full_path = os.path.join(workflow_dir, name)
@@ -1128,17 +1128,17 @@ def cmd_archive(args: argparse.Namespace) -> int:
             dirs.append(name)
 
     if not dirs:
-        print(">> 아카이브 대상 없음", flush=True)
+        print(">>No archive destination", flush=True)
         return 0
 
-    # registry_key가 None이면 활성 워크플로우를 자동 감지하여 제외
+    # If registry_key is None, active workflows are automatically detected and excluded.
     if current_key:
         filtered = [d for d in dirs if d != current_key]
         if len(filtered) < KEEP_COUNT - 1:
-            print(">> 보존 수량 미만 — 건너뜀", flush=True)
+            print(">> Less than retention quantity — skipped", flush=True)
             return 0
 
-        # .history/ 디렉토리 생성
+        # Create .history/ directory
         os.makedirs(history_dir, exist_ok=True)
 
         moved = 0
@@ -1159,10 +1159,10 @@ def cmd_archive(args: argparse.Namespace) -> int:
         filtered = [d for d in dirs if d not in active_keys]
         keep = max(0, KEEP_COUNT - len(active_keys))
         if len(filtered) < keep:
-            print(">> 보존 수량 미만 — 건너뜀", flush=True)
+            print(">> Less than retention quantity — skipped", flush=True)
             return 0
 
-        # .history/ 디렉토리 생성
+        # Create .history/ directory
         os.makedirs(history_dir, exist_ok=True)
 
         moved = 0
@@ -1180,9 +1180,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 print(f"[WARN] archive failed: {target} (skipping)", file=sys.stderr)
 
     if moved > 0:
-        print(f">> {moved}개 디렉터리 아카이브됨", flush=True)
+        print(f">> {moved} directories archived", flush=True)
     else:
-        print(">> 변경 없음", flush=True)
+        print(">>No change", flush=True)
 
     if failed > 0:
         print(f"[WARN] {failed} directories failed to archive", file=sys.stderr)
@@ -1207,22 +1207,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="history sync/status core")
     subparsers = parser.add_subparsers(dest="subcmd", required=True)
 
-    # sync 서브커맨드
-    sync_parser = subparsers.add_parser("sync", help="history.md 동기화")
-    sync_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".agent-factory", "runs"), help=".workflow 디렉토리 경로")
-    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".history.md"), help=".history.md 파일 경로")
-    sync_parser.add_argument("--dry-run", action="store_true", help="변경 미리보기만 수행")
-    sync_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
+    # sync subcommand
+    sync_parser = subparsers.add_parser("sync", help="sync history.md")
+    sync_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".agent-factory", "runs"), help=".workflow directory path")
+    sync_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".history.md"), help=".history.md file path")
+    sync_parser.add_argument("--dry-run", action="store_true", help="Only preview changes")
+    sync_parser.add_argument("--all", action="store_true", help="Includes interrupt operations")
 
-    # status 서브커맨드
-    status_parser = subparsers.add_parser("status", help="동기화 상태 요약")
-    status_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".agent-factory", "runs"), help=".workflow 디렉토리 경로")
-    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".history.md"), help=".history.md 파일 경로")
-    status_parser.add_argument("--all", action="store_true", help="중단 작업 포함")
+    # status subcommand
+    status_parser = subparsers.add_parser("status", help="Sync status summary")
+    status_parser.add_argument("--workflow-dir", default=os.path.join(PROJECT_ROOT, ".agent-factory", "runs"), help=".workflow directory path")
+    status_parser.add_argument("--target", default=os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".history.md"), help=".history.md file path")
+    status_parser.add_argument("--all", action="store_true", help="Includes interrupt operations")
 
-    # archive 서브커맨드
-    archive_parser = subparsers.add_parser("archive", help="오래된 워크플로우를 .history/로 아카이브")
-    archive_parser.add_argument("registry_key", nargs='?', default=None, help="현재 워크플로우의 registryKey (생략 시 활성 워크플로우 자동 감지)")
+    # archive subcommand
+    archive_parser = subparsers.add_parser("archive", help="Archive old workflows to .history/")
+    archive_parser.add_argument("registry_key", nargs='?', default=None, help="registryKey of the current workflow (if omitted, active workflow will be automatically detected)")
 
     args = parser.parse_args()
 
@@ -1230,7 +1230,7 @@ def main() -> int:
         try:
             return cmd_sync(args)
         except Exception as e:
-            print(f"[FAIL] sync 실패: {e}", file=sys.stderr)
+            print(f"[FAIL] sync failed: {e}", file=sys.stderr)
             return 1
     elif args.subcmd == "status":
         return cmd_status(args)
@@ -1238,7 +1238,7 @@ def main() -> int:
         try:
             return cmd_archive(args)
         except Exception as e:
-            print(f"[FAIL] archive 실패: {e}", file=sys.stderr)
+            print(f"[FAIL] archive failed: {e}", file=sys.stderr)
             return 1
     else:
         parser.print_help()

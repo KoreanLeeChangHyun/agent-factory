@@ -21,12 +21,12 @@ import re
 import subprocess
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -34,10 +34,10 @@ if _guards_dir not in sys.path:
 from common import read_env
 from messages import MAIN_BRANCH_COMMIT_DENIED
 
-# main/master 브랜치에서 차단할 git commit 패턴
+# git commit patterns to block on main/master branches
 _GIT_COMMIT_PATTERN = re.compile(r"\bgit\s+commit\b")
 
-# 보호 대상 브랜치 집합
+# Set of protected branches
 _PROTECTED_BRANCHES: frozenset[str] = frozenset({"main", "master"})
 
 
@@ -85,14 +85,14 @@ def main() -> None:
     현재 브랜치가 main 또는 master이면 deny 응답을 출력하여 차단한다.
     git 실행 실패 시 안전 통과(exit 0)로 처리한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_MAIN_BRANCH_GUARD") or read_env("HOOK_MAIN_BRANCH_GUARD")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -100,7 +100,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Bash가 아니면 통과
+    # Pass if not Bash
     if tool_name != "Bash":
         sys.exit(0)
 
@@ -109,21 +109,21 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # git commit 패턴 매칭
+    # git commit pattern matching
     if not _GIT_COMMIT_PATTERN.search(command):
         sys.exit(0)
 
-    # 현재 브랜치 조회
+    # Current branch query
     branch = _get_current_branch()
     if branch is None:
-        # git 실행 실패 시 안전 통과
+        # Safe pass when git execution fails
         sys.exit(0)
 
-    # main/master 브랜치이면 차단
+    # Block if main/master branch
     if branch in _PROTECTED_BRANCHES:
         _deny(MAIN_BRANCH_COMMIT_DENIED.format(branch=branch))
 
-    # 보호 대상 브랜치가 아니면 통과
+    # Pass if not a protected branch
     sys.exit(0)
 
 

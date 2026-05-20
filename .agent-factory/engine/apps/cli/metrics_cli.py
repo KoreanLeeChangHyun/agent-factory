@@ -45,20 +45,20 @@ _AGENT_FACTORY_DIR = str(Path(__file__).resolve().parents[3])
 if _AGENT_FACTORY_DIR not in sys.path:
     sys.path.insert(0, _AGENT_FACTORY_DIR)
 
-# W01 모듈 재사용 (이벤트 카탈로그/스키마 단일 진실 공급원)
+# W01 module reuse (event catalog/schema single source of truth)
 from engine.core.metrics import known_event_types  # noqa: E402,F401
 from engine.core.metrics import schema_for  # noqa: E402,F401
 
 # ---------------------------------------------------------------------------
-# 경로 상수
+# path constant
 # ---------------------------------------------------------------------------
 
-# 본 모듈 위치: <ROOT>/.agent-factory/engine/apps/cli/metrics_cli.py
+# Location of this module: <ROOT>/.agent-factory/engine/apps/cli/metrics_cli.py
 # → ROOT = parents[4]
 _ROOT: Path = Path(__file__).resolve().parents[4]
 _RUNS_DIR: Path = _ROOT / ".agent-factory" / "runs"
 
-# regression.pattern.kind 5종 분류 (그 외는 "other" 로 묶음)
+# regression.pattern.kind 5 types (others grouped under “other”)
 _REGRESSION_KINDS: tuple[str, ...] = (
     "worker_false_success",
     "hook_deny",
@@ -67,12 +67,12 @@ _REGRESSION_KINDS: tuple[str, ...] = (
     "other",
 )
 
-# 단계 표시 순서 (가나다순 대신 의미적 흐름순)
+# Order of display of steps (semantic order instead of alphabetical order)
 _STEP_ORDER: tuple[str, ...] = ("INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE")
 
 
 # ---------------------------------------------------------------------------
-# 저수준 헬퍼: jsonl 로딩
+# Low-level helper: jsonl loading
 # ---------------------------------------------------------------------------
 
 
@@ -112,7 +112,7 @@ def _load_events(paths: Iterable[Path]) -> list[dict[str, Any]]:
                     try:
                         events.append(json.loads(ln))
                     except json.JSONDecodeError:
-                        # 깨진 줄은 무시하고 진행 (집계 우선)
+                        # Proceed by ignoring broken lines (aggregation takes precedence)
                         continue
         except OSError:
             continue
@@ -135,7 +135,7 @@ def _list_recent_keys(last: int) -> list[str]:
     for child in _RUNS_DIR.iterdir():
         if not child.is_dir():
             continue
-        # registryKey 디렉터리만 (예: 20260505-183053). bg / chain_launcher.log 같은 파일/잡종 제외.
+        # registryKey directory only (e.g. 20260505-183053). Excluding files/hybrids like bg/chain_launcher.log.
         name = child.name
         if len(name) != 15 or name[8] != "-":
             continue
@@ -149,12 +149,12 @@ def _list_recent_keys(last: int) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# 모듈 함수 API (W06 백엔드가 import 함)
+# Module function API (imported by W06 backend)
 # ---------------------------------------------------------------------------
 
 
 def _classify_regression_kind(kind: Any) -> str:
-    """regression.pattern.kind 를 5종 분류로 정규화한다."""
+    """Normalize regression.pattern.kind into 5 categories."""
     if isinstance(kind, str) and kind in _REGRESSION_KINDS:
         return kind
     return "other"
@@ -171,7 +171,7 @@ def aggregate_run(registry_key: str) -> dict[str, Any]:
 
             {
               "registry_key": "...",
-              "files": [str, ...],          # 집계된 metrics.jsonl 경로
+              "files": [str, ...],          # Aggregated metrics.jsonl path
               "total_events": int,
               "step_durations": {step: {"avg_ms": float, "count": int, "fail": int}},
               "tokens": {"input": int, "output": int,
@@ -285,8 +285,8 @@ def regression_counts(last: int = 10) -> dict[str, Any]:
 
             {
               "scanned_keys": [str, ...],
-              "counts": {kind: int},  # 5종 + other
-              "examples": {kind: [signal_summary, ...]},  # 가장 빈번한 top-3
+              "counts": {kind: int},  # 5 types + other
+              "examples": {kind: [signal_summary, ...]},  # Most frequent top-3
             }
     """
     keys = _list_recent_keys(last)
@@ -302,7 +302,7 @@ def regression_counts(last: int = 10) -> dict[str, Any]:
             counts[kind] += 1
             sig = payload.get("signal_summary")
             if isinstance(sig, str) and sig:
-                # 메모리 절약 — kind 당 최대 5개만 보관
+                # Save memory — keep only up to 5 per kind
                 if len(examples[kind]) < 5:
                     examples[kind].append(sig)
 
@@ -340,7 +340,7 @@ def diff_runs(key1: str, key2: str) -> dict[str, Any]:
     a = aggregate_run(key1)
     b = aggregate_run(key2)
 
-    # step duration diff (avg_ms 기준)
+    # step duration diff (based on avg_ms)
     steps = set(a["step_durations"].keys()) | set(b["step_durations"].keys())
     step_diff: dict[str, float] = {}
     for s in steps:
@@ -352,7 +352,7 @@ def diff_runs(key1: str, key2: str) -> dict[str, Any]:
     for k, av in a["tokens"].items():
         tokens_diff[k] = float(b["tokens"].get(k, 0)) - float(av)
 
-    # 도구 호출 합집합 diff
+    # tool call union diff
     tools = set(a["tool_calls_allowed"].keys()) | set(b["tool_calls_allowed"].keys())
     tool_diff = {
         t: int(b["tool_calls_allowed"].get(t, 0))
@@ -387,7 +387,7 @@ def diff_runs(key1: str, key2: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# 출력 포맷터 (마크다운 파이프 표)
+# Output formatter (Markdown pipe table)
 # ---------------------------------------------------------------------------
 
 
@@ -408,29 +408,29 @@ def _md_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def _sorted_steps(step_durations: dict[str, dict[str, Any]]) -> list[str]:
-    """단계 키를 의미적 흐름 순 → 알파벳 순으로 정렬한다."""
+    """Sort the step keys in semantic flow order → alphabet order."""
     known = [s for s in _STEP_ORDER if s in step_durations]
     rest = sorted(s for s in step_durations.keys() if s not in _STEP_ORDER)
     return known + rest
 
 
 def format_summary(summary: dict[str, Any]) -> str:
-    """``aggregate_run()`` 결과를 사람이 읽기 쉬운 마크다운 문자열로 변환한다."""
+    """``aggregate_run()`` Converts the results into a human-readable Markdown string."""
     lines: list[str] = []
     rkey = summary.get("registry_key", "?")
     lines.append(f"# Workflow Summary — `{rkey}`")
     lines.append("")
     files = summary.get("files", [])
-    lines.append(f"- 집계 metrics.jsonl: {len(files)} 개")
+    lines.append(f"- aggregate metrics.jsonl: {len(files)}")
     for f in files:
         lines.append(f"  - {f}")
-    lines.append(f"- 총 이벤트 수: {summary.get('total_events', 0)}")
+    lines.append(f"- Total number of events: {summary.get('total_events', 0)}")
     lines.append(f"- step.end fail: {summary.get('step_end_fail', 0)}")
-    lines.append(f"- tool.deny 합계: {summary.get('tool_deny', 0)}")
+    lines.append(f"- tool.deny sum: {summary.get('tool_deny', 0)}")
     lines.append("")
 
-    # 단계별 평균 duration
-    lines.append("## 단계별 평균 duration (ms)")
+    # Average duration for each step
+    lines.append("## Average duration (ms) per step")
     sd = summary.get("step_durations", {})
     if sd:
         rows = []
@@ -446,11 +446,11 @@ def format_summary(summary: dict[str, Any]) -> str:
             )
         lines.append(_md_table(["step", "avg_ms", "count", "fail"], rows))
     else:
-        lines.append("_(step.end 이벤트 없음)_")
+        lines.append("_(no step.end event)_")
     lines.append("")
 
-    # 토큰 합계
-    lines.append("## 토큰 합계")
+    # Token Total
+    lines.append("## Token total")
     t = summary.get("tokens", {})
     rows = [
         ["input", str(int(t.get("input", 0)))],
@@ -462,28 +462,28 @@ def format_summary(summary: dict[str, Any]) -> str:
     lines.append(_md_table(["category", "tokens"], rows))
     lines.append("")
 
-    # 도구 호출 카운트 (allowed=true)
-    lines.append("## 도구 호출 카운트 (allowed)")
+    # Tool call count (allowed=true)
+    lines.append("## Tool call count (allowed)")
     tc = summary.get("tool_calls_allowed", {})
     if tc:
         rows = [[k, str(v)] for k, v in sorted(tc.items(), key=lambda x: -x[1])]
         lines.append(_md_table(["tool_name", "count"], rows))
     else:
-        lines.append("_(tool.call allowed 이벤트 없음)_")
+        lines.append("_(no tool.call allowed event)_")
     lines.append("")
 
     # subagent.spawn
-    lines.append("## subagent.spawn 카운트")
+    lines.append("## subagent.spawn count")
     sp = summary.get("subagent_spawn", {})
     if sp:
         rows = [[k, str(v)] for k, v in sorted(sp.items(), key=lambda x: -x[1])]
         lines.append(_md_table(["agent_kind", "count"], rows))
     else:
-        lines.append("_(subagent.spawn 이벤트 없음)_")
+        lines.append("_(no subagent.spawn event)_")
     lines.append("")
 
     # regression.pattern
-    lines.append("## regression.pattern 카운트")
+    lines.append("## regression.pattern count")
     rg = summary.get("regression", {})
     if rg:
         rows = [
@@ -492,21 +492,21 @@ def format_summary(summary: dict[str, Any]) -> str:
         ]
         lines.append(_md_table(["kind", "count"], rows))
     else:
-        lines.append("_(regression.pattern 이벤트 없음)_")
+        lines.append("_(no regression.pattern event)_")
     lines.append("")
 
     return "\n".join(lines)
 
 
 def format_compare(diff: dict[str, Any]) -> str:
-    """``diff_runs()`` 결과를 마크다운 비교 표 문자열로 변환한다."""
+    """``diff_runs()`` Converts the result to a Markdown comparison table string."""
     lines: list[str] = []
     k1, k2 = diff["key1"], diff["key2"]
     lines.append(f"# Workflow Compare — `{k1}` vs `{k2}` (diff = key2 - key1)")
     lines.append("")
 
     # step duration diff
-    lines.append("## 단계별 avg_ms diff")
+    lines.append("## step by step avg_ms diff")
     sd = diff.get("step_duration_diff", {})
     if sd:
         rows = []
@@ -516,15 +516,15 @@ def format_compare(diff: dict[str, Any]) -> str:
             rows.append([s, f"{sign}{v:.1f}"])
         lines.append(_md_table(["step", "diff_ms"], rows))
     else:
-        lines.append("_(양쪽 모두 step.end 이벤트 없음)_")
+        lines.append("_(no step.end event on either side)_")
     lines.append("")
 
     # tokens diff
-    lines.append("## 토큰 합계 diff")
+    lines.append("## token sum diff")
     rows = []
     for k, v in diff.get("tokens_diff", {}).items():
         sign = "+" if v >= 0 else ""
-        # input/output/cache_* 는 정수 의미, effective 는 실수
+        # input/output/cache_* means integer, effective means real number
         if k == "effective":
             rows.append([k, f"{sign}{v:.1f}"])
         else:
@@ -533,7 +533,7 @@ def format_compare(diff: dict[str, Any]) -> str:
     lines.append("")
 
     # tool calls diff
-    lines.append("## 도구 호출 카운트 diff (allowed)")
+    lines.append("## tool call count diff (allowed)")
     tc = diff.get("tool_calls_diff", {})
     if tc:
         rows = []
@@ -542,7 +542,7 @@ def format_compare(diff: dict[str, Any]) -> str:
             rows.append([k, f"{sign}{int(v)}"])
         lines.append(_md_table(["tool_name", "diff"], rows))
     else:
-        lines.append("_(양쪽 모두 tool.call allowed 이벤트 없음)_")
+        lines.append("_(no tool.call allowed event on either side)_")
     lines.append("")
 
     # tool.deny diff + subagent + regression
@@ -554,7 +554,7 @@ def format_compare(diff: dict[str, Any]) -> str:
         rows.append([f"subagent.spawn[{k}]", _signed(v)])
     for k, v in diff.get("regression_diff", {}).items():
         rows.append([f"regression[{k}]", _signed(v)])
-    lines.append("## 기타 카운트 diff")
+    lines.append("## Other count diff")
     lines.append(_md_table(["metric", "diff"], rows))
     lines.append("")
 
@@ -562,7 +562,7 @@ def format_compare(diff: dict[str, Any]) -> str:
 
 
 def _signed(v: Any) -> str:
-    """+/- 부호 포함 정수 문자열."""
+    """Integer string with +/- signs."""
     try:
         n = int(v)
     except (TypeError, ValueError):
@@ -571,24 +571,24 @@ def _signed(v: Any) -> str:
 
 
 def format_regression(report: dict[str, Any]) -> str:
-    """``regression_counts()`` 결과를 마크다운 표로 변환한다."""
+    """Converts the results of ``regression_counts()`` into a Markdown table."""
     lines: list[str] = []
     keys = report.get("scanned_keys", [])
-    lines.append(f"# Regression Patterns — 최근 {len(keys)} 개 워크플로우")
+    lines.append(f"# Regression Patterns — Recent {len(keys)} workflows")
     lines.append("")
     if keys:
-        lines.append("- 스캔 대상 registryKey:")
+        lines.append("- Scan target registryKey:")
         for k in keys:
             lines.append(f"  - {k}")
     else:
-        lines.append("_(스캔 가능한 워크플로우가 없음)_")
+        lines.append("_(no scannable workflow)_")
     lines.append("")
 
     counts = report.get("counts", {})
     examples = report.get("examples", {})
 
-    # 빈도 표
-    lines.append("## kind 별 빈도")
+    # frequency table
+    lines.append("## Frequency by kind")
     rows = [
         [k, str(counts.get(k, 0))]
         for k in sorted(counts.keys(), key=lambda x: -counts.get(x, 0))
@@ -598,15 +598,15 @@ def format_regression(report: dict[str, Any]) -> str:
 
     # top-3 examples
     top3 = sorted(counts.items(), key=lambda x: -x[1])[:3]
-    lines.append("## top-3 signal_summary 예시")
+    lines.append("## top-3 signal_summary example")
     if not any(c for _, c in top3):
-        lines.append("_(regression.pattern 이벤트 없음)_")
+        lines.append("_(no regression.pattern event)_")
     else:
         for kind, cnt in top3:
             if cnt <= 0:
                 continue
             ex_list = examples.get(kind, [])
-            ex = ex_list[0] if ex_list else "_(signal_summary 없음)_"
+            ex = ex_list[0] if ex_list else "_(no signal_summary)_"
             lines.append(f"- **{kind}** (count={cnt}): {ex}")
     lines.append("")
 
@@ -614,7 +614,7 @@ def format_regression(report: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# CLI 진입점
+# CLI entry point
 # ---------------------------------------------------------------------------
 
 
@@ -626,7 +626,7 @@ def _cmd_summarize(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         print(
-            f"  (검색 패턴: {_RUNS_DIR}/{args.registry_key}/metrics.jsonl)",
+            f"(Search pattern: {_RUNS_DIR}/{args.registry_key}/metrics.jsonl)",
             file=sys.stderr,
         )
         return 2
@@ -663,38 +663,38 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flow-metrics",
         description=(
-            "워크플로우 metrics.jsonl 집계 CLI — summarize / compare / regression "
-            "(W01 metrics.py 와 카탈로그 공유)"
+            "Workflow metrics.jsonl Aggregation CLI — summarize / compare / regression"
+            "(Shared catalog with W01 metrics.py)"
         ),
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_sum = sub.add_parser(
         "summarize",
-        help="단일 registryKey 의 metrics.jsonl 요약 표 출력",
+        help="Output metrics.jsonl summary table for single registryKey",
     )
     p_sum.add_argument(
         "registry_key",
-        help="대상 registryKey (예: 20260505-183053)",
+        help="Target registryKey (e.g. 20260505-183053)",
     )
     p_sum.set_defaults(func=_cmd_summarize)
 
     p_cmp = sub.add_parser(
-        "compare", help="두 registryKey 의 summarize diff 표 출력"
+        "compare", help="Output summarized diff table of two registryKeys"
     )
-    p_cmp.add_argument("key1", help="비교 기준 registryKey (이전)")
-    p_cmp.add_argument("key2", help="비교 대상 registryKey (이후)")
+    p_cmp.add_argument("key1", help="Compare by registryKey (old)")
+    p_cmp.add_argument("key2", help="Compare to registryKey (after)")
     p_cmp.set_defaults(func=_cmd_compare)
 
     p_reg = sub.add_parser(
         "regression",
-        help="최근 N 개 워크플로우의 regression.pattern 빈도",
+        help="regression.pattern frequency of N recent workflows",
     )
     p_reg.add_argument(
         "--last",
         type=int,
         default=10,
-        help="집계 대상 최근 워크플로우 개수 (기본 10)",
+        help="Number of recent workflows to be counted (default 10)",
     )
     p_reg.set_defaults(func=_cmd_regression)
 

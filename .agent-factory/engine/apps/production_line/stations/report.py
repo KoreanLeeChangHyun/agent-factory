@@ -39,7 +39,7 @@ def report_step(ctx: WorkflowContext) -> None:
             work_blocks.append(
                 f"### work/{rel.as_posix()}\n\n{md.read_text(encoding='utf-8')}\n"
             )
-    joined_work = "\n".join(work_blocks) if work_blocks else "(work/ 비어있음)"
+    joined_work = "\n".join(work_blocks) if work_blocks else "(work/empty)"
     validate_body = (
         ctx.validate_report_md_path().read_text(encoding="utf-8")
         if ctx.validate_report_md_path().exists()

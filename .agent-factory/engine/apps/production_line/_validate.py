@@ -38,7 +38,7 @@ HARD_FAIL_RULES = get_blocking_rule_ids()
 
 @dataclass
 class RuleResult:
-    """단일 룰 평가 결과."""
+    """Single rule evaluation result."""
 
     rule_id: str
     ok: bool
@@ -48,7 +48,7 @@ class RuleResult:
 
 @dataclass
 class VerdictReport:
-    """SPEC.md §9.1 verdict 판정 결과."""
+    """SPEC.md §9.1 verdict result."""
 
     verdict: str  # PASS / WARN / FAIL / SKIP
     rules: list[RuleResult] = field(default_factory=list)
@@ -63,7 +63,7 @@ class VerdictReport:
         )
 
 
-# -------- 카테고리 평가 함수 --------
+# -------- Category evaluation function --------
 
 
 def _read_jsonl_events(path: Path) -> Iterable[dict]:
@@ -209,7 +209,7 @@ def _r_code_pytest(ctx: WorkflowContext) -> RuleResult:
         return RuleResult(
             "R-CODE-1",
             True,
-            detail="validate/code.json missing — SKIP (driver _verify_code 호출 회귀)",
+            detail="validate/code.json missing — SKIP (driver _verify_code call regression)",
             skip=True,
         )
     if payload.get("command_skip"):
@@ -239,7 +239,7 @@ def _r_code_pytest(ctx: WorkflowContext) -> RuleResult:
         counts = entry.get("counts", {})
         passed = counts.get("passed", 0)
         return RuleResult("R-CODE-1", True, detail=f"pytest passed={passed}")
-    # status == "fail" (또는 알 수 없는 값)
+    # status == "fail" (or unknown value)
     counts = entry.get("counts", {})
     failed = counts.get("failed", 0) + counts.get("errors", 0)
     head = entry.get("head_diagnostics", [])
@@ -315,14 +315,14 @@ def _r_wt_commits_ahead(ctx: WorkflowContext) -> RuleResult:
         return RuleResult(
             "R-WT-1",
             True,
-            detail=f"{ctx.command} SKIP (worktree-less 허용)",
+            detail=f"{ctx.command} SKIP (allow worktree-less)",
             skip=True,
         )
     if not ctx.feature_branch:
         return RuleResult(
             "R-WT-1",
             False,
-            detail="command=implement 인데 feature_branch 없음 — driver init_step 회귀",
+            detail="command=implement but no feature_branch — driver init_step regression",
         )
     result = subprocess.run(
         ["git", "rev-list", "--count", f"develop..{ctx.feature_branch}"],
@@ -343,7 +343,7 @@ def _r_wt_commits_ahead(ctx: WorkflowContext) -> RuleResult:
     return RuleResult("R-WT-1", True, detail=f"commits ahead = {count}")
 
 
-# -------- 12룰 통합 평가 --------
+# -------- 12-rule integrated evaluation --------
 
 
 def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
@@ -368,14 +368,14 @@ def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
     rules.append(_r_metric_no_tool_deny(ctx))
 
     # R-GUARD
-    # R-GUARD-1: worktree 모드 활성. implement 면 ctx.feature_branch 존재로 판정,
-    # research/review 면 SKIP (워크트리-less 허용).
+    # R-GUARD-1: Enable worktree mode. If implement, ctx.feature_branch is determined to exist,
+    # SKIP if research/review (worktree-less allowed).
     if ctx.command in ("research", "review"):
         rules.append(
             RuleResult(
                 "R-GUARD-1",
                 True,
-                detail=f"{ctx.command} SKIP (worktree-less 허용)",
+                detail=f"{ctx.command} SKIP (allow worktree-less)",
                 skip=True,
             ),
         )
@@ -388,7 +388,7 @@ def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
                 detail=(
                     f"worktree active (feature_branch={ctx.feature_branch})"
                     if ok_wt
-                    else "implement 인데 worktree 미활성 — driver init_step 회귀"
+                    else "implement but worktree is inactive — driver init_step regression"
                 ),
             ),
         )
@@ -412,7 +412,7 @@ def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
     else:
         rules.append(_r_wt_commits_ahead(ctx))
 
-    # R-CODE (T-503) — implement 한정. research/review SKIP.
+    # R-CODE (T-503) — implement only. research/review SKIP.
     if ctx.command in ("research", "review"):
         rules.append(
             RuleResult("R-CODE-1", True, detail=f"{ctx.command} SKIP", skip=True),
@@ -427,9 +427,9 @@ def evaluate_rules(ctx: WorkflowContext) -> VerdictReport:
     return _compute_verdict(rules)
 
 
-# Backward-compat alias — 옛 함수명 보존. driver done_step 의 호출 경로 유지.
+# Backward-compat alias — Preserve old function names. Maintain the call path of driver done_step.
 def evaluate_12_rules(ctx: WorkflowContext) -> VerdictReport:
-    """T-503 이전 함수명. `evaluate_rules` 로 위임. 옛 호출자 보존."""
+    """Function name before T-503. Delegate to `evaluate_rules`. Preserving old callers."""
     return evaluate_rules(ctx)
 
 

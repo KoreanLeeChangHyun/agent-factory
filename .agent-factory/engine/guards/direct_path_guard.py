@@ -20,12 +20,12 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -33,13 +33,13 @@ if _guards_dir not in sys.path:
 from common import read_env
 from messages import DIRECT_PATH_CALL_DENIED
 
-# 직접 경로 호출 감지 패턴 (상대경로 + 절대경로 모두 감지)
+# Direct path call detection pattern (detection of both relative and absolute paths)
 _DIRECT_PATH_PATTERN = re.compile(
     r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
     r"(?:\.agent-factory/engine/|/[^\s]*\.agent-factory/engine/)"
 )
 
-# 허용 예외 패턴 (settings.json hooks/statusLine 등에서 고정 호출하는 경로)
+# Allowed exception patterns (fixed calling routes in settings.json hooks/statusLine, etc.)
 _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/"),
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/(?:apps/hooks/)?statusline\.py"),
@@ -47,9 +47,9 @@ _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/(?:apps/cli/)?claude_edit\.py"),
 ]
 
-# && 체인에서 hook 디스패처 뒤에 이어지는 history_sync.py 호출 허용 패턴
-# 예(상대경로): python3 .agent-factory/hooks/... && python3 .agent-factory/engine/adapters/sync/history_sync.py ...
-# 예(절대경로): python3 /path/.agent-factory/hooks/... && python3 /path/.agent-factory/engine/adapters/sync/history_sync.py ...
+# Pattern allowing history_sync.py calls following the hook dispatcher in && chains
+# Example (relative path): python3 .agent-factory/hooks/... && python3 .agent-factory/engine/adapters/sync/history_sync.py ...
+# Example (absolute path): python3 /path/.agent-factory/hooks/... && python3 /path/.agent-factory/engine/adapters/sync/history_sync.py ...
 _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
     r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
     r"(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/\S*\s*&&\s*"
@@ -57,7 +57,7 @@ _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
     r"(?:\.agent-factory/engine/(?:adapters/)?sync/|/[^\s]*\.agent-factory/engine/(?:adapters/)?sync/)history_sync\.py"
 )
 
-# 스크립트 파일명 -> alias 매핑
+# Script file name -> alias mapping
 ALIAS_MAP: dict[str, str] = {
     "update_state.py": "flow-update",
     "skill_mapper.py": "flow-skillmap",
@@ -76,7 +76,7 @@ ALIAS_MAP: dict[str, str] = {
     "migrate_runs_fold.py": "flow-migrate-runs",
 }
 
-# 스크립트 파일명에서 파일명만 추출하는 패턴 (상대경로 + 절대경로 모두 지원)
+# Pattern to extract only the file name from the script file name (both relative and absolute paths supported)
 _SCRIPT_NAME_PATTERN = re.compile(
     r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?"
     r"(?:\.agent-factory/engine/|/[^\s]*\.agent-factory/engine/)(?:\S+/)?(\S+\.py)"
@@ -124,12 +124,12 @@ def _is_allowed(command: str) -> bool:
     Returns:
         허용 예외이면 True, 차단 대상이면 False
     """
-    # 허용 예외 패턴 검사
+    # Allowed exception pattern check
     for pattern in _ALLOWED_PATTERNS:
         if pattern.search(command):
             return True
 
-    # && 체인에서 hook 디스패처 뒤 history_sync.py 호출 허용
+    # Allow history_sync.py call after hook dispatcher in && chain
     if _CHAINED_HISTORY_SYNC_PATTERN.search(command):
         return True
 
@@ -143,14 +143,14 @@ def main() -> None:
     flow-* alias 사용을 안내하는 deny 응답을 출력하여 차단한다.
     settings.json에서 고정 호출하는 경로는 예외로 허용한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_DIRECT_PATH_GUARD") or read_env("HOOK_DIRECT_PATH_GUARD")
 
-    # Hook disable check (미설정 또는 false = disabled)
+    # Hook disable check (not set or false = disabled)
     if not hook_flag or hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -158,7 +158,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Bash가 아니면 통과
+    # Pass if not Bash
     if tool_name != "Bash":
         sys.exit(0)
 
@@ -167,15 +167,15 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # 직접 경로 호출 패턴이 없으면 통과
+    # Pass if there is no direct route call pattern
     if not _DIRECT_PATH_PATTERN.search(command):
         sys.exit(0)
 
-    # 허용 예외 검사
+    # Allow exception check
     if _is_allowed(command):
         sys.exit(0)
 
-    # 스크립트 파일명 추출 및 alias 매핑
+    # Script file name extraction and alias mapping
     script_name = _extract_script_name(command)
     if script_name and script_name in ALIAS_MAP:
         alias_name = ALIAS_MAP[script_name]
@@ -184,13 +184,13 @@ def main() -> None:
             alias_name=alias_name,
         ))
     elif script_name:
-        # ALIAS_MAP에 없는 스크립트 (hook 전용 등) - 일반 차단 메시지
+        # Scripts not in ALIAS_MAP (hook only, etc.) - General blocking message
         _deny(DIRECT_PATH_CALL_DENIED.format(
             script_name=script_name,
-            alias_name="(해당 alias 없음 - hook/내부 전용 스크립트일 수 있습니다)",
+            alias_name="(No applicable alias - may be a hook/internal-only script)",
         ))
     else:
-        # 스크립트명 추출 실패 시 일반 차단
+        # General blocking when script name extraction fails
         _deny(DIRECT_PATH_CALL_DENIED.format(
             script_name=".agent-factory/engine/...",
             alias_name="flow-*",

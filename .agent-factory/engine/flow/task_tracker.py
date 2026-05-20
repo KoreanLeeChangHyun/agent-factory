@@ -15,7 +15,7 @@ import sys
 from collections import Counter
 from datetime import datetime
 
-# scripts 디렉터리를 sys.path에 추가하여 common, data 패키지 import 허용
+# Add the scripts directory to sys.path to allow import of common and data packages
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 )
@@ -41,7 +41,7 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
         'task-status -> skipped (missing args)', 'task-status -> failed'.
     """
     if not task_id or not task_status:
-        print("[WARN] task-status: task_id, status 인자가 필요합니다.", file=sys.stderr)
+        print("[WARN] task-status: task_id and status arguments are required.", file=sys.stderr)
         return "task-status -> skipped (missing args)"
 
     STATUS_ALIASES: dict[str, str] = {"in_progress": "running"}
@@ -49,7 +49,7 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
     valid_statuses: set[str] = {"pending", "running", "completed", "failed"}
     if task_status not in valid_statuses:
         print(
-            f"[WARN] task-status: status는 pending|running|completed|failed 중 하나여야 합니다. (받은 값: {task_status})",
+            f"[WARN] task-status: status must be one of pending|running|completed|failed. (Value received: {task_status})",
             file=sys.stderr,
         )
         return "task-status -> skipped (invalid status)"
@@ -72,14 +72,14 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
         data["tasks"][task_id] = {"status": task_status, "updated_at": now}
         atomic_write_json(status_file, data)
 
-        # 상태별 구조화 로그 기록
+        # Structured log records by status
         abs_work_dir_log: str = os.path.dirname(status_file)
         if task_status == "running":
             _append_log(abs_work_dir_log, "INFO", f"AGENT_DISPATCH: taskId={task_id}")
         elif task_status in {"completed", "failed"}:
             _append_log(abs_work_dir_log, "INFO", f"AGENT_RETURN: taskId={task_id} status={task_status}")
 
-        # P07: stuck 패턴 감지 (비차단 원칙)
+        # P07: Stuck pattern detection (non-blocking principle)
         try:
             _check_stuck(abs_work_dir_log, task_id, task_status)
         except Exception:
@@ -151,7 +151,7 @@ class StuckDetector:
 
         data["task_events"].append(event)
 
-        # 오래된 이벤트 정리: window_size * 2 초과 시 앞에서부터 잘라냄
+        # Clean up old events: if window_size * 2 is exceeded, truncate from the front.
         max_keep = self.window_size * 2
         if len(data["task_events"]) > max_keep:
             data["task_events"] = data["task_events"][-max_keep:]
@@ -190,15 +190,15 @@ class StuckDetector:
 
         warnings: list[str] = []
 
-        # 규칙 1: 연속 오류 — 윈도우 내 모든 이벤트가 failed
+        # Rule 1: Consecutive errors — all events in the window failed
         if len(events) >= self.window_size:
             if all(e.get("status") == "failed" for e in events):
                 warnings.append(
-                    f"STUCK_RULE1: 최근 {self.window_size}개 이벤트 전부 failed "
-                    f"(연속 오류 감지)"
+                    f"STUCK_RULE1: All recent {self.window_size} events failed"
+                    f"(Continuous error detection)"
                 )
 
-        # 규칙 2: 반복 key — 동일 task_id가 3회 이상 failed
+        # Rule 2: Repeat key — same task_id failed more than 3 times
         failed_counter: Counter[str] = Counter(
             e.get("task_id", "")
             for e in events
@@ -207,11 +207,11 @@ class StuckDetector:
         for tid, count in failed_counter.items():
             if count >= 3:
                 warnings.append(
-                    f"STUCK_RULE2: task_id={tid} failed {count}회 반복 "
-                    f"(반복 키 감지)"
+                    f"STUCK_RULE2: task_id={tid} failed Repeat {count} times"
+                    f"(repeated key detection)"
                 )
 
-        # 규칙 3: 진동 패턴 — running->failed 교대 쌍이 4회 이상
+        # Rule 3: Oscillation pattern — running->failed alternating pairs 4 or more times
         alternation_count = 0
         prev_status = ""
         for e in events:
@@ -222,8 +222,8 @@ class StuckDetector:
 
         if alternation_count >= 4:
             warnings.append(
-                f"STUCK_RULE3: running->failed 진동 패턴 {alternation_count}회 "
-                f"(진동 패턴 감지)"
+                f"STUCK_RULE3: running->failed vibration pattern {alternation_count} times"
+                f"(Vibration pattern detection)"
             )
 
         return warnings
@@ -249,8 +249,8 @@ def check_stuck(work_dir: str, task_id: str, status: str) -> None:
         for warn_msg in warnings:
             _append_log(work_dir, "WARN", f"stuck_detector: {warn_msg}")
     except Exception:
-        # 비차단 원칙: 감지 실패가 워크플로우 흐름에 영향 없음
+        # Non-blocking principle: Detection failures have no impact on workflow flow
         pass
 
 
-_check_stuck = check_stuck  # 호출부(line 84) 호환 alias
+_check_stuck = check_stuck  # Caller (line 84) compatible alias

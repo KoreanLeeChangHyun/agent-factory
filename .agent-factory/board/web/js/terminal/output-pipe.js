@@ -55,7 +55,7 @@
         },
 
         table: function (token) {
-          // GFM `:---:` / `---:` / `:---` align 정보는 token.align[i] 에 'center'/'right'/'left'/null 로 들어온다.
+          // GFM `:---:` / `---:` / `:---` align information is entered into 'center'/'right'/'left'/null in token.align[i].
           var align = token.align || [];
           var header = "";
           for (var i = 0; i < token.header.length; i++) {
@@ -131,7 +131,7 @@
   M._historyLoaded = false;
 
   M.showEmptyState = function() {
-    // 재로드 시 복원되지 않는 placeholder는 출력하지 않는다.
+    // placeholder does not output when reloading.
     M._emptyStateShown = true;
   };
 
@@ -189,21 +189,21 @@
       var kind = ev.kind || "text";
       if (ev.in_flight) sawInFlight = true;
 
-      // in_flight 이벤트는 Claude CLI 가 jsonl 에 아직 flush 하지 못한
-      // "현재 스트리밍 중인 블록" 이다. 완성된 블록처럼 DOM 에 추가하면
-      // 이어지는 라이브 text_delta 가 별개 블록을 만들어 응답이 두 조각으로
-      // 쪼개진다. 텍스트/툴은 클라이언트의 "live 스트리밍 버퍼" 에 시딩해서
-      // 다음 delta 가 자연스럽게 이어붙도록 한다.
+      // in flight event Claude CLI has not yet flush in jsonl
+      // "Blocks currently streaming" Add to the DOM like a complete block
+      // Live text delta leads to two pieces of responses to create a distinct block
+      // About Us Text/Tools to "live streaming buffer" in the client
+      // The following delta will lead naturally.
       if (ev.in_flight) {
         if (kind === "text" && ev.role === "assistant") {
-          // 기존 textBuffer 를 교체하지 않고 앞에 붙여 이어받는다.
+          // Paste the existing textBuffer without changing.
           M.textBuffer = (ev.text || "") + (M.textBuffer || "");
         } else if (kind === "tool_use") {
           _renderToolUse(ev);
           if (typeof ev.partial_input_json === "string" && ev.partial_input_json) {
-            // content_block_stop 이 오기 전이라 input 이 부분 JSON 문자열인 경우,
-            // 화면 표시용 버퍼도 partial_json 으로 교체 (유효하지 않은 JSON 이어도
-            // toolInputBuffer 는 렌더링 직전에 문자열 누적으로 처리된다).
+            // content block stop This is an input if this is a JSON string,
+            // Replacing buffer for display screens as partial json (unavailable JSON transition)
+            // toolInputBuffer is handled by strings shortly before rendering).
             M.toolInputBuffer = ev.partial_input_json;
           }
           if (Board.session && typeof Board.session.seedInFlightToolUse === "function") {
@@ -213,9 +213,9 @@
             );
           }
         } else if (kind === "thinking") {
-          // thinking 은 라이브 스트림에서 렌더되지 않는 블록이므로 그대로 완성된
-          // 형태로 그린다. 이후 assistant NDJSON 이 도착해도 thinking 재렌더가
-          // 없으므로 중복 걱정 없음.
+          // Thinking is a block that is not rendered in the live stream, so it is done in the same way.
+          // Green in shape. If the assistant NDJSON arrives, it is a reminder
+          // There is no duplicate.
           if (ev.text) _renderThinking(ev.text);
         }
         continue;
@@ -224,19 +224,19 @@
         var text = ev.text || "";
         if (!text) continue;
         if (ev.role === "user") {
-          // 1:1 turn 모델: user 메시지는 항상 outputDiv 직접 자식으로 append.
-          // turn-card user-group 라우팅 폐기.
+          // 1:1 turn model: user message always append with outputDiv direct self.
+          // turn-card user-group routing disposal.
           var userDiv = document.createElement("div");
           userDiv.className = "term-message term-user";
           if (ev.timestamp) userDiv.setAttribute("data-timestamp", ev.timestamp);
-          // 서버 history 핸들러가 sidecar 매칭 후 interrupted=true 를 부여한
-          // user 이벤트는 .interrupted 클래스를 부여한다 (CSS 가 우측 "중지됨" 배지 표시).
+          // server history handler is given to stoped=true after sidecar matching
+          // user event grants .interrupted classes (CSS displays the “About Us” badge on the right side).
           if (ev.interrupted) userDiv.classList.add("interrupted");
           userDiv.textContent = text;
           M.appendToOutput(userDiv);
-          // T-429: ev.attachments 가 non-empty array 이면 첨부 카드를 별도 컨테이너에 렌더.
-          // 레거시 메시지 (ev.attachments 없음 또는 빈 배열) 는 기존 경로 그대로 (회귀 0).
-          // ESC 인터럽트 메시지도 userDiv 에 .interrupted 클래스 보존한 채로 카드 추가.
+          // T-429: ev.attachments are non-empty array render to separate containers.
+          // The legacy message (no ev.attachments or blank array) is intact (return 0).
+          // ESC intermittent messages also add .interrupted class preserved scoring cards to userDiv.
           if (ev.attachments && ev.attachments.length > 0 &&
               M.attachmentCard && typeof M.attachmentCard.create === "function") {
             var attachContainer = document.createElement("div");
@@ -259,10 +259,10 @@
       }
     }
 
-    // in_flight 이벤트를 만났다는 것은 LLM 이 현재 스트리밍 중이라는 뜻.
-    // 새로고침으로 페이지가 재구성된 상태이므로 스피너를 복구하고 termStatus
-    // 를 busy 로 올려 입력 잠금 등 관련 UI 를 재개한다.
-    // pending_turn 분기(loadHistory 내부)도 동일하게 spinner 복원을 담당한다.
+    // LLM is currently streaming.
+    // Since the page has been reconfigured with a new call, it recovers the spinner and termStatus
+    // Rewrite the related UI, such as holding a busy position.
+    // pending turn branch (in loadHistory) is also responsible for the restoration of spinner.
     if (sawInFlight && !M.isWorkflowMode) {
       if (Board.debugLog) Board.debugLog('renderHistory.inFlightDetected', {
         events: events.length, termStatus: Board.state.termStatus,
@@ -273,22 +273,22 @@
   };
 
   /**
-   * jsonl 에서 복원된 누적 토큰/비용을 in-memory 상태에 반영한다.
-   * 서버 응답의 last_usage / last_cost_usd 는 세션 전체에서 가장 최근 값이므로
-   * set 의미(누적 아님)로 덮어쓴다. 세션 로드/재개/SSE 재연결 시 0 으로
-   * 남아 있는 상태를 재수화하는 역할.
+   * reflects the cumulative token/cost restored in jsonl in-memory status.
+   * The last usage / last cost usd of server response is the most recent value in the entire session
+   * set is covered with meaning (no limit). Session Load/Registration/SSE Reconnect to zero
+   * Responsible roles to resubmit the remaining state.
    *
-   * 가드: 라이브 SSE 이벤트가 이미 토큰을 채워 놓았다면(= 현재 값이 0 이 아님)
-   * 덮어쓰지 않는다. jsonl 은 턴이 끝난 뒤 append 되므로 파일 기반 값이 라이브
-   * 이벤트보다 한 턴 뒤처질 수 있어, 라이브가 항상 최신이다. 첫 로드(=0,0)
-   * 또는 재연결 gap-fill(=동일 값) 경로에서만 실질적으로 반영된다.
+   * Guard: If the live SSE event is already filled with tokens(= current value 0 not)
+   * It is not covered. jsonl is append after turn is finished, so the file-based value is live
+   * If you have any questions, please feel free to contact us. First Road(=0,0)
+   * or reconnecting gap-fill(=Integrity value) only reflects substantially.
    */
   function _applyHistoryUsage(data, force) {
     if (!data) return;
-    // force=true 는 loadHistory(초기 로드/세션 스위치) 경로. 이전 세션의
-    // 토큰이 visible 하게 남아있어도 jsonl 의 last_usage 로 덮어써야 한다.
-    // force=false(기본) 는 fetchHistorySince(gap-fill) 경로. 라이브 이벤트가
-    // 이미 채운 값을 jsonl 의 이전 턴 값으로 되돌리면 안 되므로 guard.
+    // force=true is loadHistory(second load/set switch) path. Previous Session
+    // jsonl jsonl jsonl
+    // force=false(default) is fetchHistorySince(gap-fill) path. Bhubaneswar – Puri – Konark
+    // jsonl jsonl jsonl jsonl
     var alreadyLive = !force && (M.sessionTokens.input !== 0 || M.sessionTokens.output !== 0);
     var changed = false;
     if (!alreadyLive && data.last_usage && typeof data.last_usage === "object") {
@@ -346,13 +346,13 @@
         M.showEmptyState();
         return;
       }
-      // usage/cost 는 events 유무와 무관하게 반영한다.
-      // force=true: 세션 스위치 시 이전 세션의 토큰을 이 세션의 last_usage 로 덮어쓰기.
+      // usage/cost reflects the event inevitable.
+      // force=true: When the session switch is overlapped with the last usage of the previous session.
       _applyHistoryUsage(data, true);
-      // 세션 메타: jsonl 마지막 assistant 메시지의 model 을 status bar 에 복원.
-      // /terminal/status 가 아닌 /terminal/history 에서 가져오는 이유는,
-      // resume 시 새 spawn 프로세스의 라이브 model 이 아니라 "이 세션이 실제로
-      // 사용한 model" 이 의미적으로 옳기 때문이다.
+      // Session meta: jsonl restores the model of last assistant message to status bar.
+      // /terminal/status is not /terminal/history
+      // <% if (imgObj.width >= imgObj.height) { %>
+      // "The model used" is meant to be right.
       if (data.last_model && Board.session && Board.session.applyRawModel) {
         Board.session.applyRawModel(data.last_model);
       }
@@ -362,9 +362,9 @@
       }
       M.renderHistory(data.events);
       M._historyLastTimestamp = data.last_timestamp || "";
-      // pending_turn: 마지막 user 이벤트 직후 응답 대기 중이나 아직 in_flight 없음.
-      // turn-card 를 닫지 않고 spinner 를 활성화한다.
-      // (in_flight 이 있는 경우는 renderHistory 내부의 sawInFlight 분기가 처리)
+      // pending turn: The last user event is immediately after response wait or not yet in flight.
+      // activate spinner without closing turn-card.
+      // (in flight)
       if (data.pending_turn && !M.isWorkflowMode) {
         if (Board.debugLog) Board.debugLog('loadHistory.pendingTurnDetected', {
           events: data.events ? data.events.length : 0,
@@ -375,14 +375,14 @@
       }
       _scrollOutputToBottomSoon();
     }).catch(function () {
-      // 네트워크 오류 등: 최소한 placeholder라도 보이게
+      // Network Error and so on: See also the minimum placeholder
       M.showEmptyState();
     });
   };
 
   function _scrollOutputToBottomSoon() {
     if (!M.outputDiv) return;
-    // 마크다운/mermaid 비동기 렌더 이후 높이가 확장되므로 두 프레임 뒤 스크롤.
+    // Since the markdown/mermaid asynchronous wrench extends its height, scrolling behind the two frames.
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         if (M.outputDiv) M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
@@ -391,17 +391,17 @@
   }
 
   /**
-   * 재연결 gap 보충: 마지막 복원 timestamp 이후의 새 이벤트만 가져와 덧붙인다.
-   * SSE가 라이브만 전달하므로 네트워크 블립 동안 놓친 이벤트는 여기서 메운다.
-   * usage/cost 는 since 와 무관하게 전체 최신값이 실리므로 gap 이 비어 있어도
-   * connectSSE 의 resetTokens() 로 날아간 값을 복구한다.
+   * Reconnecting gap supplements: only new events after the last restore timestamp and added.
+   * SSE is only live, so the event you missed during the network blister is here.
+   * usage/cost is since and the whole new value is unobtrusive, so the gap is empty.
+   * resetTokens()
    */
   M.fetchHistorySince = function(sessionId) {
     if (!sessionId || M.isWorkflowMode) return Promise.resolve();
     var since = M._historyLastTimestamp || "";
-    // since 가 비어 있으면 초기 로드(loadHistory)가 담당해야 한다.
-    // 여기서 전체 history 를 fetch 하면 loadHistory 결과와 겹쳐 렌더되어
-    // Sessions 드롭다운 resume 직후 대화가 2벌로 찍히는 버그가 발생한다.
+    // since, the initial load (loadHistory) must be in charge.
+    // If the whole history is fetched, loadHistory results and foldable rendered
+    // The sessions dropdown immediately after the call is two bugs.
     if (!since) return Promise.resolve();
     var url = "/terminal/history?session_id=" + encodeURIComponent(sessionId)
       + "&since=" + encodeURIComponent(since);
@@ -436,7 +436,7 @@
 
     var follow = M.isNearBottom(M.outputDiv);
 
-    // 모든 element 는 outputDiv 직접 자식으로 append (turn-card 그룹화 폐기).
+    // All elements are outputDiv direct self-proend (turn-card grouping waste).
     while (M.outputDiv.childNodes.length >= MAX_OUTPUT_NODES) {
       M.outputDiv.removeChild(M.outputDiv.firstChild);
     }
@@ -491,14 +491,14 @@
 
     var diffSec = Math.floor((Date.now() - ts) / 1000);
     if (diffSec < 0) diffSec = 0;
-    if (diffSec < 60) return "방금 전";
+    if (diffSec < 60) return "About Us";
     var diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return diffMin + "분 전";
+    if (diffMin < 60) return diffMin + "About Us";
     var diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return diffHour + "시간 전";
+    if (diffHour < 24) return diffHour + "YepTube";
     var diffDay = Math.floor(diffHour / 24);
-    if (diffDay < 7) return diffDay + "일 전";
-    // 7일 이상은 날짜 표기
+    if (diffDay < 7) return diffDay + "About Us";
+    // 7 days or more
     try {
       return dt.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
     } catch (_e2) {

@@ -39,7 +39,7 @@ def _mtime_iso(path: Path) -> str:
 
 
 def _ensure_extended_frontmatter(mem: MemoryFile) -> bool:
-    """importance·last_accessed·access_count 가 없으면 기본값으로 채우고 True 반환."""
+    """If importance·last_accessed·access_count does not exist, fill in the default value and return True."""
     fm = mem.raw_frontmatter
     changed = False
     if 'importance' not in fm:
@@ -63,12 +63,12 @@ def _move_to_type_dir(cfg: GCConfig, mem: MemoryFile) -> Path | None:
     if parent.name in TYPE_DIRS:
         return None
     if mem.type not in TYPE_DIRS:
-        # type 미상 → project 로 폴백
+        # type unknown → fall back to project
         mem.type = 'project'
     dest_dir = cfg.type_dir(mem.type)
     dest = dest_dir / mem.path.name
     if dest.exists() and dest.resolve() != mem.path.resolve():
-        # 충돌 — timestamp suffix
+        # Conflict — timestamp suffix
         dest = dest_dir / f'{mem.path.stem}.dup{int(mem.path.stat().st_mtime)}{mem.path.suffix}'
     shutil.move(str(mem.path), str(dest))
     mem.path = dest
@@ -76,7 +76,7 @@ def _move_to_type_dir(cfg: GCConfig, mem: MemoryFile) -> Path | None:
 
 
 def _clean_stale_locks(cfg: GCConfig) -> list[Path]:
-    """오래된 락 파일 정리 (.consolidate-lock 등)."""
+    """Clean up old lock files (.consolidate-lock, etc.)."""
     cleaned: list[Path] = []
     for name in ('.consolidate-lock',):
         p = cfg.memory_dir / name
@@ -95,7 +95,7 @@ def run_migration(cfg: GCConfig) -> MigrationReport:
     extended: list[Path] = []
     skipped: list[Path] = []
 
-    # 평탄 파일 우선 — type 디렉터리로 이동 + frontmatter 확장
+    # Flat files first — move to type directory + expand frontmatter
     for path in sorted(cfg.memory_dir.glob('*.md')):
         if path.name == 'MEMORY.md':
             continue
@@ -113,7 +113,7 @@ def run_migration(cfg: GCConfig) -> MigrationReport:
         if fm_changed and moved_dest is None:
             extended.append(mem.path)
 
-    # 이미 type 디렉터리에 있는 파일들도 frontmatter 점검
+    # Check frontmatter for files already in the type directory
     for t in TYPE_DIRS:
         d = cfg.type_dir(t)
         if not d.is_dir():
@@ -129,7 +129,7 @@ def run_migration(cfg: GCConfig) -> MigrationReport:
 
     cleaned = _clean_stale_locks(cfg)
 
-    # 인덱스 재생성
+    # Regenerate index
     memories = scan_memories(cfg)
     regenerate_index(cfg, memories)
 

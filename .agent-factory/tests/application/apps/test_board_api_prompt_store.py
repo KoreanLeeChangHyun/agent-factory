@@ -14,13 +14,13 @@ from engine.apps.board_api import prompt_store
 def test_prompt_file_lifecycle_and_compat_exports(tmp_path) -> None:
     assert compat_prompts._write_prompt_file is prompt_store._write_prompt_file
 
-    result = prompt_store._write_prompt_file(str(tmp_path), "review.txt", "검토 기준")
+    result = prompt_store._write_prompt_file(str(tmp_path), "review.txt", "Scots Gaelic")
 
     assert result == {"ok": True, "name": "review.txt"}
     assert prompt_store._read_prompt_file(str(tmp_path), "review.txt") == {
         "name": "review.txt",
-        "content": "검토 기준",
-        "size": len("검토 기준".encode("utf-8")),
+        "content": "Scots Gaelic",
+        "size": len("Scots Gaelic".encode("utf-8")),
     }
     assert [item["name"] for item in prompt_store._list_prompt_files(str(tmp_path))] == [
         "review.txt",
@@ -41,7 +41,7 @@ def test_quick_prompt_lifecycle(tmp_path) -> None:
         "review.default",
         {
             "label": "Review",
-            "prompt": "검토해줘",
+            "prompt": "Get In Touch",
             "bindTo": "review",
             "description": "default review prompt",
         },
@@ -50,7 +50,7 @@ def test_quick_prompt_lifecycle(tmp_path) -> None:
     assert created["ok"] is True
     assert created["items"] == [{
         "id": "review.default",
-        "prompt": "검토해줘",
+        "prompt": "Get In Touch",
         "label": "Review",
         "bindTo": "review",
         "description": "default review prompt",
@@ -61,9 +61,9 @@ def test_quick_prompt_lifecycle(tmp_path) -> None:
     updated = prompt_store._write_quick_prompt(
         str(tmp_path),
         "review.default",
-        {"prompt": "다시 검토해줘"},
+        {"prompt": "{{ data.filesizeHumanReadable }}"},
     )
-    assert updated["items"][0]["prompt"] == "다시 검토해줘"
+    assert updated["items"][0]["prompt"] == "{{ data.filesizeHumanReadable }}"
     assert updated["items"][0]["label"] == "Review"
 
     deleted = prompt_store._delete_quick_prompt(str(tmp_path), "review.default")

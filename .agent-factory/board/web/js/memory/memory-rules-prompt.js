@@ -15,9 +15,9 @@
 
     M.fetchRulesList().then(function (files) {
       files = files || [];
-      // CLAUDE.md 를 "project-meta" special 카테고리 첫 항목으로 prepend.
-      // selectRulesFile / saveRulesFile / deleteRulesFile 가 path === "CLAUDE.md" 분기를 가지므로
-      // 일반 rules 파일과 동일하게 처리된다.
+      // CLAUDE.md "project-meta" prepend as a special category.
+      // selectRulesFile / saveRulesFile / deleteRulesFile has a path === "CLAUDE.md" branch
+      // The same as the regular rules file.
       files.unshift({
         path: "CLAUDE.md",
         name: "CLAUDE.md",
@@ -27,7 +27,7 @@
       });
       Board.state.promptRulesFiles = files;
 
-      // CLAUDE.md 만 있는 케이스(.claude/rules/ 비어있음)는 정상 — 빈 상태 표시 안 함.
+      // The clAUDE.md only case (.claude/rules/ non-reflective) is normal — not empty.
 
       content.innerHTML = M.renderRulesLayout();
       M.bindResizeHandle(content, "rules");
@@ -217,7 +217,7 @@
       }
       if (filenameEl) filenameEl.textContent = data.path || data.name;
       if (saveBtn) saveBtn.disabled = true;
-      // CLAUDE.md 는 시스템 진입점 파일이라 삭제 차단 — Project Meta 편입 후에도 불변.
+      // CLAUDE.md is a system entry file that is deleted — unchanged even after the project Meta intervention.
       if (deleteBtn) deleteBtn.disabled = (path === "CLAUDE.md");
       if (previewBtn) { previewBtn.textContent = "Edit"; previewBtn.classList.remove("active"); }
       if (dirtyEl) dirtyEl.classList.remove("visible");
@@ -297,7 +297,7 @@
         M.refreshRulesFileList();
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        Board.util.showInfoModal("저장 실패", "Failed to save file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
+        Board.util.showInfoModal("Store failure", "Failed to save file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
       }
     });
   };
@@ -314,7 +314,7 @@
         if (M.persistContexts) M.persistContexts();
         M.renderSubRules();
       } else {
-        Board.util.showInfoModal("삭제 실패", "Failed to delete file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
+        Board.util.showInfoModal("Delete failed", "Failed to delete file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
       }
     });
   };
@@ -325,7 +325,7 @@
     if (!category) return;
     category = category.trim().toLowerCase();
     if (category !== "workflow" && category !== "project") {
-      Board.util.showInfoModal("카테고리 오류", "Category must be 'workflow' or 'project'.", { severity: "warning" });
+      Board.util.showInfoModal("Scots Gaelic", "Category must be 'workflow' or 'project'.", { severity: "warning" });
       return;
     }
 
@@ -340,7 +340,7 @@
     // Check for duplicate
     for (var i = 0; i < Board.state.promptRulesFiles.length; i++) {
       if (Board.state.promptRulesFiles[i].path === relPath) {
-        Board.util.showInfoModal("파일 생성 차단", 'File "' + relPath + '" already exists.', { severity: "warning" });
+        Board.util.showInfoModal("File creation block", 'File "' + relPath + '" already exists.', { severity: "warning" });
         return;
       }
     }
@@ -352,7 +352,7 @@
         if (M.persistContexts) M.persistContexts();
         M.renderSubRules();
       } else {
-        Board.util.showInfoModal("생성 실패", "Failed to create file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
+        Board.util.showInfoModal("Getting Started", "Failed to create file." + (result && result.error ? " " + result.error : ""), { severity: "error" });
       }
     });
   };
@@ -634,7 +634,7 @@
         M.refreshPromptFilesList();
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        Board.util.showInfoModal("저장 실패", "Failed to save file.", { severity: "error" });
+        Board.util.showInfoModal("Store failure", "Failed to save file.", { severity: "error" });
       }
     });
   };
@@ -651,7 +651,7 @@
         if (M.persistContexts) M.persistContexts();
         M.renderSubPromptFiles();
       } else {
-        Board.util.showInfoModal("삭제 실패", "Failed to delete file.", { severity: "error" });
+        Board.util.showInfoModal("Delete failed", "Failed to delete file.", { severity: "error" });
       }
     });
   };
@@ -665,7 +665,7 @@
     // Check for duplicate
     for (var i = 0; i < Board.state.promptPromptFiles.length; i++) {
       if (Board.state.promptPromptFiles[i].name === filename) {
-        Board.util.showInfoModal("파일 생성 차단", 'File "' + filename + '" already exists.', { severity: "warning" });
+        Board.util.showInfoModal("File creation block", 'File "' + filename + '" already exists.', { severity: "warning" });
         return;
       }
     }
@@ -677,7 +677,7 @@
         if (M.persistContexts) M.persistContexts();
         M.renderSubPromptFiles();
       } else {
-        Board.util.showInfoModal("생성 실패", "Failed to create file.", { severity: "error" });
+        Board.util.showInfoModal("Getting Started", "Failed to create file.", { severity: "error" });
       }
     });
   };

@@ -1,14 +1,14 @@
-"""test_verify.py — _verify.py 단위 테스트 (T-504 cutover).
+"""test verify.py —  verify.py Module Test (T-504 cutover).
 
-T-504 cutover: 옛 `parse_plan_frontmatter` / `_extract_frontmatter` / `verify_plan_md`
-대상 테스트는 폐기. 신규 PLAN 산출물 (plan/plan.json + plan/plan.md) 검증은
-`verify_plan_artifacts` + `engine.core.planning.loader.parse_plan_json` 으로 분리.
+T-504 cutover: old `parse plan frontmatter` / ` extract frontmatter` / `verify plan md`
+Target tests are closed. New PLAN Output (plan/plan.json + plan/plan.md) Verification
+`verify plan artifacts` + `engine.core.planning.loader.parse plan json` separated.
 
-대상:
+Price:
   - verify_artifact (file exist + size + must_contain)
-  - verify_plan_artifacts (T-504 — JSON + MD 양쪽 + 스키마)
+  - confirmation plan artifacts (T-504 — JSON + MD both + schema)
   - verify_work_md / verify_work_set
-  - verify_report_html (T-504 — 옛 verify_report_md 통째 폐기, plan.md 토큰 매칭)
+  - confirmation report html (T-504 — old verification report md swelling, plan.md token matching)
   - Phase / topo_sort re-export (backward compat)
 """
 
@@ -74,14 +74,14 @@ def test_verify_artifact_must_contain(tmp_path: Path) -> None:
 
 
 def test_verify_plan_artifacts_full(tmp_path: Path) -> None:
-    """T-504 — plan.json + plan.md 모두 있고 schema 정합 → PASS."""
+    """T-504 — plan.json + plan.md both and schema correction → PASS."""
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
     (plan_dir / "plan.json").write_text(
         json.dumps(_good_plan_payload()), encoding="utf-8"
     )
     (plan_dir / "plan.md").write_text(
-        "# plan body\n자연어 본문 (20자 이상)\n" + "x" * 30, encoding="utf-8"
+        "# plan body\\n" + "x" * 30, encoding="utf-8"
     )
     result = verify_plan_artifacts(plan_dir / "plan.json", plan_dir / "plan.md")
     assert result.ok
@@ -109,11 +109,11 @@ def test_verify_plan_artifacts_md_missing(tmp_path: Path) -> None:
 
 
 def test_verify_plan_artifacts_invalid_schema(tmp_path: Path) -> None:
-    """plan.json 스키마 위반 → schema error 추가."""
+    """plan.json schema violation → schema error added."""
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
     bad = _good_plan_payload()
-    bad["phases"] = []  # 빈 phases
+    bad["phases"] = []  # static phases
     (plan_dir / "plan.json").write_text(json.dumps(bad), encoding="utf-8")
     (plan_dir / "plan.md").write_text("body" * 20, encoding="utf-8")
     result = verify_plan_artifacts(plan_dir / "plan.json", plan_dir / "plan.md")
@@ -167,7 +167,7 @@ def test_verify_work_md_size(tmp_path: Path) -> None:
 
 
 def test_phase_topo_sort_re_export() -> None:
-    """T-504 — Phase / topo_sort 는 core planning SSOT 에서 re-export."""
+    """T-504 — Phase / topo sort re-export on core planning SSOT."""
     phases = [
         Phase(id="C", title="", deps=["A", "B"]),
         Phase(id="A", title="", deps=[]),

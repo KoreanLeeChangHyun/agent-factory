@@ -1,14 +1,14 @@
 /**
  * @module roadmap
  *
- * Contexts 탭 (구 Prompt 탭) 의 Roadmap 서브탭.
+ * Roadmap subtab of the Contexts tab (formerly the Prompt tab).
  *
- * `.agent-factory/roadmap/ROADMAP.yaml` (서버에서 JSON 으로 응답) 을 표시한다.
- * 좌측 사이드 (Phase + Milestone 트리, 상태 뱃지) + 우측 본문 (선택 Phase 의
- * 마크다운 본문 + Milestone 카드 그리드). 마크다운 안 mermaid 코드블록은 자동 SVG 변환.
+ * Displays `.agent-factory/roadmap/ROADMAP.yaml` (response as JSON from server).
+ * Left side (Phase + Milestone tree, status badge) + Right side body (select Phase of
+ * Markdown body + Milestone card grid). Mermaid code blocks in Markdown are automatically converted to SVG.
  *
- * 서브탭 진입점은 `Board.render.renderRoadmapSubtab(container)` 로 노출되며,
- * memory-core.js 의 서브탭 디스패처가 호출한다.
+ * The subtab entry point is exposed as `Board.render.renderRoadmapSubtab(container)`,
+ * Called by the subtab dispatcher of memory-core.js.
  *
  * Depends on: common.js (Board.state, Board.util, Board.render — renderMd / initMermaid)
  */
@@ -19,21 +19,21 @@
   var saveUI = Board.util.saveUI;
 
   // ── State ──
-  // common.js 가 Board.state.roadmap 을 초기화한다 (sideWidth / activePhaseId / expandedCardIds).
-  // 본 모듈은 그 객체에 property 단위로 mutate 하면 saveUI 가 자동 영속화한다.
+  // common.js initializes Board.state.roadmap (sideWidth / activePhaseId / expandedCardIds).
+  // In this module, if you mutate the object in property units, saveUI automatically persists it.
   var state = Board.state.roadmap;
 
-  // 데이터 캐시 — fetch 결과 보관, SSE roadmap 이벤트 시 새로고침
+  // Data cache — Store fetch results, refresh on SSE roadmap events
   var data = null;
   var fetching = false;
 
-  // 마지막으로 렌더한 컨테이너 — SSE refresh 시 재렌더 대상.
-  // null 이면 현재 서브탭이 활성 상태가 아님 → 재렌더 생략.
+  // Last rendered container — Re-render target when SSE refresh.
+  // If null, the current subtab is not active → re-render is omitted.
   var activeContainer = null;
 
   // ── Markdown helper ──
-  // Board.render.renderMd 는 mermaid 코드블록을 .mermaid-block placeholder 로 변환한다.
-  // 렌더 후 initMermaid 가 placeholder 를 SVG 로 교체.
+  // Board.render.renderMd converts a mermaid code block into a .mermaid-block placeholder.
+  // After rendering, initMermaid replaces placeholder with SVG.
   function md(text) {
     if (!text) return '';
     if (Board.render && Board.render.renderMd) {
@@ -113,7 +113,7 @@
         + '<path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>'
         + '</svg></div>'
         + '<div class="roadmap-empty-title">Select a phase</div>'
-        + '<div class="roadmap-empty-desc">왼쪽 사이드에서 Phase 를 선택하면 산문 본문과 마일스톤 카드가 표시됩니다.</div>'
+        + '<div class="roadmap-empty-desc">Select Phase on the left side to see the prose body and milestone cards.</div>'
         + '</div>';
     }
 
@@ -163,8 +163,8 @@
   }
 
   // ── Main render ──
-  // 컨테이너 = Prompt 탭의 #prompt-content (flex row, overflow:hidden).
-  // 그 안에 side / resize-handle / body 를 직접 자식으로 박는다 (별도 layout wrapper 없음).
+  // Container = #prompt-content (flex row, overflow:hidden) in Prompt tab.
+  // Insert side / resize-handle / body directly as children (no separate layout wrapper).
   function renderInto(container) {
     if (!container) return;
     activeContainer = container;
@@ -191,14 +191,14 @@
         + '<path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>'
         + '</svg></div>'
         + '<div class="roadmap-empty-title">No roadmap yet</div>'
-        + '<div class="roadmap-empty-desc">.agent-factory/roadmap/ROADMAP.yaml 을 작성하면 여기 표시됩니다.</div>'
+        + '<div class="roadmap-empty-desc">If you write .agent-factory/roadmap/ROADMAP.yaml it will appear here</div>'
         + '</div>'
         + '</div>';
       wireEventHandlers(container);
       return;
     }
 
-    // 활성 phase 결정 — 저장값 무효 시 첫 phase 폴백
+    // Determine active phase — fallback to first phase if stored value is invalid
     var active = null;
     if (state.activePhaseId) {
       for (var i = 0; i < phases.length; i++) {
@@ -257,7 +257,7 @@
   function wireEventHandlers(container) {
     bindResizeHandle(container);
 
-    // Phase title click → activePhaseId 변경
+    // Phase title click → change activePhaseId
     var phaseTitles = container.querySelectorAll('.roadmap-side-phase-title');
     phaseTitles.forEach(function (el) {
       el.addEventListener('click', function () {
@@ -270,7 +270,7 @@
       });
     });
 
-    // Milestone in side → 해당 phase 활성화 + 카드 펼침 + 카드로 스크롤
+    // Milestone in side → Activate corresponding phase + Expand card + Scroll to card
     var sideMilestones = container.querySelectorAll('.roadmap-side-milestone');
     sideMilestones.forEach(function (el) {
       el.addEventListener('click', function (e) {
@@ -320,7 +320,7 @@
       });
     });
 
-    // Ticket chip → viewer 탭 이동
+    // Ticket chip → move to viewer tab
     var chips = container.querySelectorAll('.roadmap-card-ticket-chip');
     chips.forEach(function (chip) {
       chip.addEventListener('click', function (e) {
@@ -355,7 +355,7 @@
   }
 
   // ── Subtab entry point ──
-  // memory-core.js 의 서브탭 디스패처가 호출. 컨테이너는 #prompt-content.
+  // Called by the subtab dispatcher of memory-core.js. The container is #prompt-content.
   Board.render.renderRoadmapSubtab = function (container) {
     if (!container) return;
     activeContainer = container;
@@ -363,7 +363,7 @@
     if (!data) fetchAndRender();
   };
 
-  // SSE roadmap 이벤트 / 외부 트리거에서 호출하는 갱신 진입점.
-  // 활성 컨테이너가 있으면 자동 재렌더, 없으면 데이터만 갱신.
+  // SSE roadmap event/update entry point called from an external trigger.
+  // Automatically re-render if there is an active container, otherwise just update the data.
   Board.render.refreshRoadmap = fetchAndRender;
 })();

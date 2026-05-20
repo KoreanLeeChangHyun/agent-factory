@@ -17,7 +17,7 @@ import shutil
 import sys
 import tempfile
 
-# engine 디렉터리를 sys.path에 추가하여 common 모듈 import 허용
+# Add engine directory to sys.path to allow common module import
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
@@ -44,26 +44,26 @@ def env_manage(action: str, key: str, value: str = "") -> str:
         'env -> unset GUARD_BAR', 'env -> skipped (missing args)', 'env -> failed'.
     """
     if not action or not key:
-        print("[WARN] env: action(set|unset)과 KEY 인자가 필요합니다.", file=sys.stderr)
+        print("[WARN] env: action(set|unset) and KEY arguments are required.", file=sys.stderr)
         return "env -> skipped (missing args)"
 
     if action not in ("set", "unset"):
-        print(f"[WARN] env: action은 set 또는 unset만 허용됩니다. got={action}", file=sys.stderr)
+        print(f"[WARN] env: action only allows set or unset. got={action}", file=sys.stderr)
         return "env -> skipped (invalid action)"
 
     if action == "set" and not value:
-        print("[WARN] env: set 명령에는 VALUE 인자가 필요합니다.", file=sys.stderr)
+        print("[WARN] env: The set command requires a VALUE argument.", file=sys.stderr)
         return "env -> skipped (missing value)"
 
-    # KEY 화이트리스트 검증
+    # KEY whitelist verification
     if not key.startswith("HOOK_") and not key.startswith("GUARD_") and key != "HOOKS_EDIT_ALLOWED":
-        print(f"[WARN] env: 허용되지 않는 KEY입니다: {key} (허용: HOOK_*, GUARD_* 접두사)", file=sys.stderr)
+        print(f"[WARN] env: KEY not allowed: {key} (allowed: HOOK_*, GUARD_* prefixes)", file=sys.stderr)
         return "env -> skipped (disallowed key)"
 
     cw_dir: str = os.path.join(PROJECT_ROOT, ".agent-factory")
     env_file: str = os.path.join(cw_dir, ".settings")
     if not os.path.isfile(env_file):
-        print(f"[WARN] env: 설정 파일을 찾을 수 없습니다: {env_file}", file=sys.stderr)
+        print(f"[WARN] env: Cannot find configuration file: {env_file}", file=sys.stderr)
         return "env -> skipped (file not found)"
 
     try:
@@ -107,7 +107,7 @@ def env_manage(action: str, key: str, value: str = "") -> str:
             lines = new_lines
             label = f"env -> unset {key}"
 
-        # 원자적 쓰기
+        # Atomic Write
         dir_name: str = os.path.dirname(env_file)
         fd: int
         tmp_path: str

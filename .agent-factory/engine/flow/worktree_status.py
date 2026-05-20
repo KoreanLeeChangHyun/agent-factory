@@ -1,12 +1,12 @@
 """Worktree status — kanban card uncommitted indicator + commit action.
 
-T-419 진단 도구는 가치 미달로 폐지(commit 99c9ce0). 본 모듈은 워크플로우
-회귀(워커 commit 누락) 시 사용자가 칸반 카드 우상단 인디케이터를 클릭해
-즉시 commit 할 수 있도록 단순화된 부활 버전.
+T-419 diagnostic tool is a value-less waste paper (commit 99c9ce0). This module is a workflow
+If the user is missing (Watcher Commit), click on the Finder button.
+Simplified Easter version to allow instant commit.
 
-공개 API:
-    get_all_uncommitted: 전체 워크트리의 ticket + uncommitted_count list
-    commit_worktree:     워크트리에서 git add -A && git commit -m 실행
+Public API:
+    get all uncommitted: ticket + uncommitted count list
+    commit worktree: git add -A &&git commit -m executed in worktree
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from flow.worktree_manager import (  # noqa: E402
 
 
 def _count_uncommitted(worktree_path: str) -> int:
-    """워크트리 미커밋 변경(modified + untracked) 파일 수 반환.
+    """Returns the number of files modified + untracked.
 
-    git status --porcelain 라인 수로 계산. 실패 시 0 폴백.
+    git status --porcelain line counting. 0 polybags when failed.
     """
     if not os.path.isdir(worktree_path):
         return 0
@@ -50,10 +50,10 @@ def _count_uncommitted(worktree_path: str) -> int:
 
 
 def get_all_uncommitted() -> list[dict]:
-    """전체 워크트리의 미커밋 카운트 list 반환 (카드 인디케이터 일괄 조회용).
+    """Return of the full work tree’s mitigation count list (for card indicator batch query).
 
     Returns:
-        [{ticket, path, uncommitted_count}, ...] — 워크트리 모드 비활성 시 빈 list.
+        [{ticket, path, uncommitted count}, ...] — empty list when worktree mode is disabled.
     """
     if not is_worktree_enabled():
         return []
@@ -72,11 +72,11 @@ def get_all_uncommitted() -> list[dict]:
 
 
 def commit_worktree(ticket: str, message: str | None = None) -> dict:
-    """워크트리에서 git add -A && git commit -m <msg> 실행.
+    """git add -A && git commit -m <msg> in the work tree.
 
-    워크플로우 회귀(워커 commit 누락) 시 사용자 수동 수습 경로.
-    message 가 비어있으면 자동 메시지(`wip(T-NNN): pending worktree changes`)
-    로 채운다.
+    User manual dehumidification paths when workflow regression (unloading of water commit).
+    'wip(T-NNN): pending worktree changes`
+    Log in
 
     Returns:
         {ok: bool, ticket, path, message, stdout?} | {ok: False, error}

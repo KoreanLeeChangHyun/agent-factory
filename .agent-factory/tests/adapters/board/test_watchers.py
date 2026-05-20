@@ -81,4 +81,4 @@ def test_git_branch_watcher_swallows_callback_errors(tmp_path: Path) -> None:
 
     watcher.check()
 
-    assert logger.exceptions == ["GitBranchWatcher on_change 콜백 실패"]
+    assert logger.exceptions == ["GitBranchWatcher on change Callback failed"]

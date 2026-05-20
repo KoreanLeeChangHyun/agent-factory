@@ -17,7 +17,7 @@ from typing import Any
 
 
 class PlanLoaderError(ValueError):
-    """`plan/plan.json` 파싱·검증 실패. driver 가 잡아 PLAN 재시도 trigger."""
+    """`plan/plan.json` parsing/verification failed. The driver catches the PLAN retry trigger."""
 
 
 @dataclass
@@ -45,7 +45,7 @@ class Phase:
 
 @dataclass
 class Plan:
-    """plan.json 의 top-level."""
+    """top-level of plan.json."""
 
     schema_version: int
     ticket: str
@@ -135,7 +135,7 @@ def _build_plan(raw: Any) -> Plan:
             )
         )
 
-    # deps 가 phases 안에 존재해야 함
+    # deps must exist within phases
     for ph in phases:
         for d in ph.deps:
             if d not in seen_ids:
@@ -143,16 +143,16 @@ def _build_plan(raw: Any) -> Plan:
                     f"phases[{ph.id}].deps references unknown id: {d!r}"
                 )
 
-    # command=implement 면 acceptance_criteria 의무 1+
+    # command=implement if acceptance_criteria obligation 1+
     if command == "implement":
         for ph in phases:
             if not ph.acceptance_criteria:
                 raise PlanLoaderError(
                     f"phases[{ph.id}].acceptance_criteria empty "
-                    "(implement 한정 의무)"
+                    "(implement limited obligation)"
                 )
 
-    # 순환 의존 검출 — Kahn topo sort
+    # Cycle-dependent detection — Kahn topo sort
     if not _has_topo_order(phases):
         raise PlanLoaderError("plan.json phases has circular deps")
 
@@ -166,7 +166,7 @@ def _build_plan(raw: Any) -> Plan:
 
 
 def _has_topo_order(phases: list[Phase]) -> bool:
-    """Kahn topological sort 가 모든 phase 를 소진하면 True (순환 없음)."""
+    """True if the Kahn topological sort exhausts all phases (no cycles)."""
     by_id = {p.id: p for p in phases}
     in_degree: dict[str, int] = {p.id: 0 for p in phases}
     edges: dict[str, list[str]] = {p.id: [] for p in phases}
@@ -233,13 +233,13 @@ def topo_levels(phases: list[Phase]) -> list[list[Phase]]:
     if not phases:
         return []
     by_id = {p.id: p for p in phases}
-    # unknown dep 검출 — 순환이 아니어도 안전 차단
+    # unknown dep detection — safe blocking even if not circulating
     for p in phases:
         for d in p.deps:
             if d not in by_id:
                 return []
     level_of: dict[str, int] = {}
-    # 반복적 해소 — deps level 이 모두 확정된 phase 부터 처리
+    # Iterative resolution — Process starting from the phase when all deps levels are confirmed
     remaining = list(phases)
     while remaining:
         progressed = False
@@ -252,11 +252,11 @@ def topo_levels(phases: list[Phase]) -> list[list[Phase]]:
             else:
                 next_remaining.append(p)
         if not progressed:
-            # 순환 의존 — 남아있는 phase 가 서로를 가리킴
+            # Circular dependence — remaining phases point to each other
             return []
         remaining = next_remaining
     max_level = max(level_of.values())
     levels: list[list[Phase]] = [[] for _ in range(max_level + 1)]
-    for p in phases:  # 입력 순서 보존
+    for p in phases:  # Preserve input order
         levels[level_of[p.id]].append(p)
     return levels

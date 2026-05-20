@@ -42,12 +42,12 @@ from .._verify import (
 from .done import fail_step
 
 
-# session_ids dict assignment 은 GIL 보호이지만 명시 lock 으로 readability ↑
+# session_ids dict assignment is GIL protected, but readability ↑ with explicit lock
 _SESSION_IDS_LOCK = threading.Lock()
 
 
 def _load_plan(ctx: WorkflowContext) -> list[Phase]:
-    """`plan/plan.json` 을 읽어 topo 정렬된 Phase 리스트 반환. 실패 시 []."""
+    """Reads `plan/plan.json` and returns a topo-sorted Phase list. [] on failure."""
     try:
         plan = parse_plan_json(ctx.plan_json_path())
     except PlanLoaderError:
@@ -69,11 +69,11 @@ def _load_deps_block(ctx: WorkflowContext, phase: Phase) -> str:
             blocks.append(
                 f"### {rel.as_posix()}\n\n{dep_path.read_text(encoding='utf-8')}\n"
             )
-    return "\n".join(blocks) if blocks else "(종속 없음)"
+    return "\n".join(blocks) if blocks else "(no dependencies)"
 
 
 def _read_plan_body(ctx: WorkflowContext) -> str:
-    """`plan/plan.md` (자연어 본문) 읽기. 미존재 시 빈 문자열 — driver retry 가 처리."""
+    """Read `plan/plan.md` (natural language text). Empty string if not present — processed by driver retry."""
     md_path = ctx.plan_md_path()
     if not md_path.exists():
         return ""
@@ -81,7 +81,7 @@ def _read_plan_body(ctx: WorkflowContext) -> str:
 
 
 def _record_session_id(ctx: WorkflowContext, logical: str, session_id: str) -> None:
-    """ctx.session_ids 에 thread-safe 박제 + context.json append."""
+    """Thread-safe stuffing in ctx.session_ids + context.json append."""
     with _SESSION_IDS_LOCK:
         ctx.session_ids[logical] = session_id
         write_context(ctx)
@@ -106,10 +106,10 @@ def _spawn_one_worker(
         f"(worker {worker_idx}/{phase.workers})" if phase.workers > 1 else ""
     )
     initial_prompt = (
-        f"plan.md (통째):\n{plan_body}\n\n"
-        f"종속 Phase 산출물:\n{dep_blocks}\n\n"
-        f"본 Phase: {phase.id} — {phase.title} {worker_label}\n"
-        f"산출물: `{artifact_path}` 에 작성."
+        f"plan.md (whole): \n {plan_body} \n \n"
+        f"Dependent Phase artifacts: \n {dep_blocks} \n \n"
+        f"This Phase: {phase.id} — {phase.title} {worker_label} \n"
+        f"Output: Written to `{artifact_path}`."
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "WORK", f"{phase.id}-W{worker_idx}")
@@ -147,7 +147,7 @@ def _spawn_one_phase(
             plan_body=plan_body,
             work_system_prompt=work_system_prompt,
         )
-        # T-506 P7 — workers=1 케이스는 단일 session_id 박제
+        # T-506 P7 — workers=1 case is stuffed with a single session_id
         phase_start(
             ctx,
             phase.id,
@@ -165,7 +165,7 @@ def _spawn_one_phase(
         )
         return result
 
-    # workers > 1 — N worker 동시 spawn
+    # workers > 1 — N workers spawn simultaneously
     phase_start(
         ctx,
         phase.id,
@@ -217,7 +217,7 @@ def _phase_outcome_ok(outcome) -> bool:
     value = outcome.value
     if isinstance(value, VerifyResult):
         return value.ok
-    # _spawn_one_worker tuple (VerifyResult, session_id) — inner parallel_spawn 호환
+    # _spawn_one_worker tuple (VerifyResult, session_id) — inner parallel_spawn compatible
     if isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], VerifyResult):
         return value[0].ok
     return True
@@ -241,13 +241,13 @@ def _run_subprocess_mode(
     max_par = get_max_parallel()
     append_log(
         ctx,
-        f"[WORK] subprocess 모드 {len(levels)} level, "
+        f"[WORK] subprocess mode {len(levels)} level,"
         f"max_parallel={max_par}, fail_policy={'fail_fast' if fail_fast else 'fail_tolerant'}",
     )
     for level_idx, level_phases in enumerate(levels):
         append_log(
             ctx,
-            f"[WORK] level {level_idx}: {len(level_phases)} phase 동시 spawn "
+            f"[WORK] level {level_idx}: {len(level_phases)} phase simultaneous spawn"
             f"({[p.id for p in level_phases]})",
         )
         outcomes = parallel_spawn(
@@ -269,7 +269,7 @@ def _run_subprocess_mode(
         if any_fail and fail_fast:
             append_log(
                 ctx,
-                f"[WORK] level {level_idx} 실패 감지 (fail_fast) — 다음 level 차단",
+                f"[WORK] Detect level {level_idx} failure (fail_fast) — Block next level",
             )
             break
 
@@ -281,18 +281,18 @@ def _run_in_place_mode(
     plan_body: str,
     work_system_prompt: str,
 ) -> None:
-    """기존 in_place 모드 — 1 subprocess 안에서 phase 순차. 회귀 0."""
+    """Existing in_place mode — phase sequential within 1 subprocess. Regression 0."""
     phase_list_text = "\n".join(
         f"- {p.id}: {p.title} (deps={p.deps}, deliverable={p.deliverable})"
         for p in phases
     )
     initial_prompt = (
-        f"plan.md (통째):\n{plan_body}\n\n"
-        f"본 1 subprocess 안에서 다음 Phase 들을 topological 순서대로 처리:\n"
+        f"plan.md (whole): \n {plan_body} \n \n"
+        f"Within this 1 subprocess, the following phases are processed in topological order: \n"
         f"{phase_list_text}\n\n"
-        f"각 Phase 산출물을 plan.json frontmatter 의 deliverable 경로에 작성 "
-        f"(권장: `work/<id>/W1.md` nested / 허용: `work/<id>.md` flat). "
-        f"모두 작성한 뒤 종료."
+        f"Write each phase output in the deliverable path of plan.json frontmatter"
+        f"(Recommended: `work/<id>/W1.md` nested / Allowed: `work/<id>.md` flat)."
+        f"Finish after writing everything."
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "WORK")
@@ -313,13 +313,13 @@ def _run_in_place_mode(
         ok = artifact.is_file() and artifact.stat().st_size > 0
         append_log(
             ctx,
-            f"[WORK] Phase {p.id} 산출물 {'OK' if ok else 'MISS'} "
+            f"[WORK] Phase {p.id} output {'OK' if ok else 'MISS'}"
             f"({artifact.relative_to(ctx.work_dir)})",
         )
 
 
 def work_step(ctx: WorkflowContext) -> bool:
-    """Returns: True 정상 / False phases empty 또는 topo 실패 (fail_step 처리됨)."""
+    """Returns: True normal / False phases empty or topo failed (fail_step handled)."""
     phases = _load_plan(ctx)
     if not phases:
         fail_step(ctx, "plan.json phases empty or topo sort failed")
@@ -328,8 +328,8 @@ def work_step(ctx: WorkflowContext) -> bool:
     plan_body = _read_plan_body(ctx)
     work_system_prompt = load_prompt("work")
 
-    mode_label = "subprocess (격리)" if has_subprocess_mode else "in_place (단일 spawn)"
-    append_log(ctx, f"[WORK] {len(phases)} Phase 진행 시작 (spawn_mode={mode_label})")
+    mode_label = "subprocess (isolation)" if has_subprocess_mode else "in_place (single spawn)"
+    append_log(ctx, f"[WORK] {len(phases)} Phase progress begins (spawn_mode={mode_label})")
     for p in phases:
         append_log(
             ctx,
@@ -351,6 +351,6 @@ def work_step(ctx: WorkflowContext) -> bool:
             plan_body=plan_body,
             work_system_prompt=work_system_prompt,
         )
-    # SPEC §0.1 (Stage 3-E) — worker 산출물 결정론 commit (변경 0건 skip).
+    # SPEC §0.1 (Stage 3-E) — worker output determinism commit (0 changes skipped).
     auto_commit(ctx)
     return True

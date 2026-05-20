@@ -27,14 +27,14 @@ import argparse
 import os
 import sys
 
-# ─── sys.path 설정 ────────────────────────────────────────────────────────────
+# ─── sys.path settings ────────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _AGENT_FACTORY_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 if _AGENT_FACTORY_DIR not in sys.path:
     sys.path.insert(0, _AGENT_FACTORY_DIR)
 
-# ─── 공통 모듈 임포트 ─────────────────────────────────────────────────────────
+# ─── Import common modules ─────────────────────────────────────────────────────────────
 
 from engine.common import (  # noqa: E402
     C_BOLD,
@@ -53,12 +53,12 @@ from engine.common import (  # noqa: E402
 def _build_common_epilog() -> str:
     """Return CLI help footer without depending on flow runtime modules."""
     return (
-        "워크플로우 버전: 2.1.25\n"
-        "문서: .agent-factory/docs/ 또는 .claude/rules/workflow.md 참조\n"
-        "티켓 관리: flow-kanban <서브커맨드> --help"
+        "Workflow version: 2.1.25 \n"
+        "Documentation: See .agent-factory/docs/ or .claude/rules/workflow.md \n"
+        "Ticket management: flow-kanban <subcommand> --help"
     )
 
-# ─── 상수 ─────────────────────────────────────────────────────────────────────
+# ─── Constant ───────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT: str = resolve_project_root()
 SKILLS_DIR: str = os.path.join(PROJECT_ROOT, ".claude", "skills")
@@ -67,7 +67,7 @@ STATE_FILE: str = os.path.join(SKILLS_DIR, "skill-state.json")
 _STATE_VERSION: int = 1
 
 
-# ─── 핵심 함수 ────────────────────────────────────────────────────────────────
+# ─── Core functions ───────────────────────────────────────────────────────────────────
 
 
 def load_skill_state(state_path: str | None = None) -> dict[str, str]:
@@ -163,7 +163,7 @@ def archive_skill(name: str) -> None:
     """
     if not _validate_skill_exists(name):
         print(
-            f"{C_RED}[ERROR]{C_RESET} 스킬 '{name}'이(가) 존재하지 않습니다.",
+            f"{C_RED}[ERROR]{C_RESET} Skill '{name}' does not exist.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -172,7 +172,7 @@ def archive_skill(name: str) -> None:
 
     if is_archived(name, state):
         print("[STATE] SKILL", flush=True)
-        print(f">> [INFO] '{name}'은(는) 이미 archived 상태입니다.", flush=True)
+        print(f">> [INFO] '{name}' is already archived.", flush=True)
         return
 
     state[name] = "archived"
@@ -193,7 +193,7 @@ def activate_skill(name: str) -> None:
     """
     if not _validate_skill_exists(name):
         print(
-            f"{C_RED}[ERROR]{C_RESET} 스킬 '{name}'이(가) 존재하지 않습니다.",
+            f"{C_RED}[ERROR]{C_RESET} Skill '{name}' does not exist.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -202,10 +202,10 @@ def activate_skill(name: str) -> None:
 
     if not is_archived(name, state):
         print("[STATE] SKILL", flush=True)
-        print(f">> [INFO] '{name}'은(는) 이미 active 상태입니다.", flush=True)
+        print(f">> [INFO] '{name}' is already active.", flush=True)
         return
 
-    # 키 삭제로 active 기본값 복원
+    # Restore active default by deleting key
     state.pop(name, None)
     save_skill_state(state)
     print("[STATE] SKILL", flush=True)
@@ -223,7 +223,7 @@ def list_skills(filter_mode: str | None = None) -> None:
     all_names = _get_all_skill_names()
     if not all_names:
         print("[STATE] SKILL", flush=True)
-        print(">> [INFO] 스킬이 없습니다.", flush=True)
+        print(">> [INFO] There is no skill.", flush=True)
         return
 
     state = load_skill_state()
@@ -253,7 +253,7 @@ def list_skills(filter_mode: str | None = None) -> None:
         for name in active_names:
             print(f"  {C_CYAN}{name}{C_RESET}")
     else:
-        # 전체 출력: active 먼저, archived 나중
+        # Total output: active first, archived later
         print(f"{C_BOLD}Active ({len(active_names)}){C_RESET}")
         for name in active_names:
             print(f"  {C_CYAN}{name}{C_RESET}")
@@ -263,7 +263,7 @@ def list_skills(filter_mode: str | None = None) -> None:
                 print(f"  {C_DIM}{name}{C_RESET}")
 
 
-# ─── argparse 파서 구성 ──────────────────────────────────────────────────────
+# ─── argparse parser configuration ──────────────────────────────────────────────────────────
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -274,53 +274,53 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="flow-skill",
-        description="스킬 활성(active)/아카이브(archived) 상태 관리 CLI",
+        description="Skill active/archived status management CLI",
         epilog=_build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="subcommand", required=True)
 
-    # archive 서브커맨드
+    # archive subcommand
     archive_parser = subparsers.add_parser(
         "archive",
-        help="스킬을 archived 상태로 전환한다",
+        help="Switch the skill to archived state",
     )
-    archive_parser.add_argument("skill_name", help="아카이브할 스킬명")
+    archive_parser.add_argument("skill_name", help="Skill name to archive")
 
-    # activate 서브커맨드
+    # activate subcommand
     activate_parser = subparsers.add_parser(
         "activate",
-        help="스킬을 active 상태로 전환한다",
+        help="Switch the skill to active state",
     )
-    activate_parser.add_argument("skill_name", help="활성화할 스킬명")
+    activate_parser.add_argument("skill_name", help="Skill name to activate")
 
-    # list 서브커맨드
+    # list subcommand
     list_parser = subparsers.add_parser(
         "list",
-        help="스킬 상태 목록을 조회한다",
+        help="Check the skill status list",
     )
     list_filter_group = list_parser.add_mutually_exclusive_group()
     list_filter_group.add_argument(
         "--archived",
         action="store_true",
         default=False,
-        help="archived 상태 스킬만 표시한다",
+        help="Only archived status skills are displayed.",
     )
     list_filter_group.add_argument(
         "--active",
         action="store_true",
         default=False,
-        help="active 상태 스킬만 표시한다",
+        help="Displays only skills in active state",
     )
 
     return parser
 
 
-# ─── CLI 진입점 ───────────────────────────────────────────────────────────────
+# ─── CLI entry point ──────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
-    """CLI 진입점. argparse subparsers로 서브커맨드를 파싱하여 해당 핸들러를 호출한다."""
+    """CLI entry point. Parse the subcommand with argparse subparsers and call the corresponding handler."""
     parser = build_parser()
     args = parser.parse_args()
 

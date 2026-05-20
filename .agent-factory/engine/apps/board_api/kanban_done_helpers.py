@@ -32,7 +32,7 @@ def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
         )
         return
 
-    # 워크트리 dirty 가드
+    # Worktree dirty guard
     wt_path: str | None = None
     try:
         engine_dir = os.path.join(project_root, '.agent-factory', 'engine')
@@ -49,16 +49,16 @@ def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
                     'conflicts': [],
                     'dirty_files': dirty_files,
                     'message': (
-                        f'{ticket} 워크트리에 미커밋 변경이 있습니다. '
-                        'force_dirty=true 로 재시도하거나 취소하세요.'
+                        f'There are uncommitted changes in the {ticket} worktree.'
+                        'Retry with force_dirty=true or cancel.'
                     ),
                     'ticket': ticket,
                 })
                 return
     except ImportError:
-        wt_path = None  # 워크트리 비활성 환경 — 가드 생략
+        wt_path = None  # Worktree Inactive Environment — Guard Omitted
 
-    # flow-kanban move <ticket> done --force 호출
+    # flow-kanban move <ticket> done --force call
     try:
         result = subprocess.run(
             [flow_kanban, 'move', ticket, 'done', '--force'],
@@ -86,7 +86,7 @@ def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
         })
         return
 
-    # 워크트리 정리 (force=True: lock 해제 후 강제 삭제)
+    # Clean up the work tree (force=True: Force deletion after releasing the lock)
     worktree_removed = False
     if wt_path:
         try:
@@ -117,7 +117,7 @@ def handle_kanban_done_review(handler, ticket: str,
     2. flow-kanban done <ticket> 호출
     3. stdout 파싱 — merge_commit / merge_skipped / error_kind 분류
     """
-    # Review 상태 사전 확인 — review/ 디렉터리에 티켓 XML 존재 여부로 판별
+    # Pre-check review status — Determined by the presence of ticket XML in the review/ directory
     review_xml = os.path.join(
         project_root, '.agent-factory', 'tickets', 'review', f'{ticket}.xml',
     )
@@ -128,7 +128,7 @@ def handle_kanban_done_review(handler, ticket: str,
         )
         return
 
-    # flow-kanban done 호출 — merge 시간 고려해 timeout 120초
+    # call flow-kanban done — timeout 120 seconds considering merge time
     try:
         result = subprocess.run(
             [flow_kanban, 'done', ticket],
@@ -156,10 +156,10 @@ def handle_kanban_done_review(handler, ticket: str,
                 merge_commit = m.group(2).strip()
                 break
 
-        # rc=0 이지만 merge_commit 이 비어있는 경우 분기:
-        # (1) 충돌 시그널 있음 → merge_conflict
-        # (2) "T-NNN: <prev> → Done" 시그널 있음 → merge_skipped (research 등)
-        # (3) 둘 다 없음 → 백엔드 응답 형식 오류
+        # Branch if rc=0 but merge_commit is empty:
+        # (1) Conflict signal exists → merge_conflict
+        # (2) “T-NNN: <prev> → Done” signal present → merge_skipped (research, etc.)
+        # (3) Neither → backend response format error
         if not merge_commit:
             done_transition_re = re.compile(
                 rf'^{re.escape(ticket)}:\s+\S+\s+→\s+Done\b'
@@ -194,7 +194,7 @@ def handle_kanban_done_review(handler, ticket: str,
                     'error_kind': 'other',
                     'conflicts': [],
                     'dirty_files': [],
-                    'message': 'merge_commit 누락 — 백엔드 응답 형식 오류',
+                    'message': 'merge_commit missing — backend response format error',
                     'ticket': ticket,
                 })
             return
@@ -208,7 +208,7 @@ def handle_kanban_done_review(handler, ticket: str,
         })
         return
 
-    # 실패 — stdout 줄 단위 분석으로 error_kind 분류
+    # Failure — Sorting error_kind with stdout line-by-line analysis
     failure = _classify_done_failure(stdout, result.stderr or '')
     handler._send_json_with_status(409, {
         'ok': False,
@@ -222,7 +222,7 @@ def handle_kanban_done_review(handler, ticket: str,
 
 def check_derived_blocked(ticket: str, kanban_base: str,
                            kanban_all_dirs: tuple) -> list[str]:
-    """ticket 을 derived-from 으로 참조하는 파생 티켓 중 Done 이외 상태인 것을 반환한다."""
+    """Among the derived tickets that refer to ticket as derived-from, returns those with a status other than Done."""
     import xml.etree.ElementTree as ET
 
     not_done: list[str] = []

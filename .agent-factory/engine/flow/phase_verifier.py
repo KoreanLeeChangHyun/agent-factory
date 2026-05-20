@@ -1,40 +1,40 @@
 #!/usr/bin/env -S python3 -u
-"""phase_verifier.py — VALIDATE 단계 rule-based 검증 엔진.
+"""phase verifier.py — VALIDATE step rule-based verification engine.
 
-본 모듈은 LLM 호출 0건. 룰베이스 IO 검증만 수행한다.
-호출 진입점: bin/flow-phase-verify (registryKey 1인자).
+0 LLM calls LUB IO validation only.
+bin/flow-phase-verify
 
-T-452 §1.1 / §2.4 / §10.1 / §10.6 사양 정합.
+T-452 §1.1 / §2.4 / §10.1 / §10.6 Specified.
 
-VALIDATE 단계 책임:
-    - WORK 직후 / REPORT 직전에 끼는 단계.
-    - 산출물 정합성을 룰베이스 검증한다 (LLM 호출 0건).
-    - 입력: work/WXX-*.md, plan.md
-    - 산출물: verifier 결과 + retry-context.json (실패 시)
+VALIDATE Step Charge:
+    - WORK BEFORE / REPORT BEFORE.
+    - Verify the output quantitative rule base ( 0 LLM calls).
+    - Input: work/WXX-*.md, plan. md
+    - Output: verifier results + retry-context.json (with shield)
 
-command 별 검증 분기:
+The command-specific verification branch:
     - implement / refactor / build → _verify_implement_like
-        (1) plan.md 의 모든 W## ID 가 work/<ID>-*.md 로 존재
-        (2) git diff --name-only HEAD 파일 수 ≥ 1
+        (1) All W# ID exists as work/<ID>-*. md
+        (2) git diff --name-only head file number ≥ 1
     - research → _verify_research
-        (1) 모든 W## 산출물 존재
-        (2) report.md 또는 work/RPT-*.md 의 ## 헤더 ≥ 3
-        (3) Mermaid 블록 ≥ 1
+        (1) All W## Outputs
+        (2) report.md or work/RPT-*.md's ## header ≥ 3
+        (3) Mermaid block ≥ 1
     - review / analyze → _verify_review
-        (1) 모든 W## 산출물 존재
-        (2) work/ 또는 report.md 에 "판정"/"결론"/"Decision"/"Verdict" 키워드 ≥ 1
+        (1) All W## Outputs
+        (2) work/or report.md in "verdict"/"conclusion"/"Decision"/"Verdict" keywords ≥ 1
     - architect → _verify_architect
-        (1) 모든 W## 산출물 존재
-        (2) Mermaid 블록 ≥ 2
-        (3) 섹션 헤더 ≥ 4
+        (1) All W## Outputs
+        (2) Mermaid block ≥ 2
+        (3) Section header ≥ 4
 
-LLM 호출 0건 룰베이스 강제:
-    - 본 모듈은 anthropic / claude_* SDK / API 호출 0건.
-    - 모든 검증은 파일 IO + 정규식 + subprocess (git) 만 사용한다.
+LLM call 0 rules base force:
+    - 0 API calls for anthropic / claude * SDK / API.
+    - All verifications only use file IO + regular + subprocess (git).
 
 CLI:
     python3 phase_verifier.py <registry_key>
-    종료 코드: 0 = 통과, 1 = 실패, 2 = 사용법 오류
+    End code: 0 = pass, 1 = failure, 2 = usage error
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ import re
 import subprocess
 import sys
 
-# 프로젝트 루트 결정 (engine/common.py 의 resolve_* 헬퍼 활용)
+# Determine the project root (using resolve_* helpers in engine/common.py)
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 )
@@ -55,36 +55,36 @@ if _engine_dir not in sys.path:
 
 from common import resolve_project_root, resolve_work_dir  # noqa: E402
 
-# Verifier 결과 표준 튜플
+# Verifier results standard tuple
 # (ok: bool, reason: str, failed_step_ids: list[str])
 VerifyResult = tuple[bool, str, list[str]]
 
 
 # ---------------------------------------------------------------------------
-# 메인 진입점
+# main entry point
 # ---------------------------------------------------------------------------
 
 
 def verify_validate_phase(registry_key: str) -> VerifyResult:
-    """VALIDATE 단계 진입점 — command 에 따라 분기한다.
+    """VALIDATE Step entry point — branching according to the command.
 
-    처리 절차:
-        1. registry_key 로 work_dir 결정 (.agent-factory/runs/<key>/).
-        2. init-result.json 또는 .context.json 에서 command 추출.
-        3. plan.md 로드.
-        4. command 분기 4종 dispatch.
-        5. 결과 반환 (실패 시 _write_retry_context_on_fail 호출은 W03 helper).
+    Payment Terms:
+        1. FAQ .agent-factory/runs/<key>/)
+        2. Extract command from init-result.json or .context.json.
+        3. FAQs plan.md load.
+        4. The command quarter 4 dispatch.
+        5. FAQs return result (w03 helper calling  write retry context on fail).
 
     Args:
-        registry_key: 워크플로우 registry key (YYYYMMDD-HHMMSS) 또는 work_dir 경로.
+        registry key: workflow registry key (YYYYMMDD-HMMSS) or work dir path.
 
     Returns:
         VerifyResult (ok, reason, failed_step_ids):
-            - ok: True 시 verifier 통과, False 시 실패.
-            - reason: 통과/실패 사유 1줄 텍스트.
-            - failed_step_ids: 실패 시 verifier 가 지적한 워커 ID 목록.
+            - ok: True Shi verifier passing, False failure.
+            - reason: 1 line text passing / shielding.
+            - failed step ids: List of Warker IDs pointed by verifier when failed.
     """
-    # 1. work_dir 결정 (절대 경로)
+    # 1. Determine work_dir (absolute path)
     project_root = resolve_project_root()
     rel_work_dir = resolve_work_dir(registry_key, project_root=project_root)
     if os.path.isabs(rel_work_dir):
@@ -95,12 +95,12 @@ def verify_validate_phase(registry_key: str) -> VerifyResult:
     if not os.path.isdir(work_dir):
         return (False, f"work_dir not found: {work_dir}", [])
 
-    # 2. command 추출
+    # 2. Command extraction
     command = _read_command(work_dir)
     if command is None:
         return (False, "command not found in init-result.json or .context.json", [])
 
-    # 3. plan.md 로드
+    # 3. Load plan.md
     plan_path = os.path.join(work_dir, "plan.md")
     if not os.path.isfile(plan_path):
         return (False, f"plan.md not found: {plan_path}", [])
@@ -110,7 +110,7 @@ def verify_validate_phase(registry_key: str) -> VerifyResult:
     except OSError as exc:
         return (False, f"plan.md read failed: {exc}", [])
 
-    # 4. command 분기 4종 dispatch
+    # 4. Dispatch of 4 types of command branches
     cmd_lower = command.strip().lower()
     if cmd_lower in {"implement", "refactor", "build"}:
         return _verify_implement_like(work_dir, plan_md)
@@ -125,21 +125,21 @@ def verify_validate_phase(registry_key: str) -> VerifyResult:
 
 
 # ---------------------------------------------------------------------------
-# command 별 분기 4종
+# 4 types of branches per command
 # ---------------------------------------------------------------------------
 
 
 def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
-    """implement / refactor / build 검증.
+    """Implement / refactor / build validation.
 
-    검증 항목:
-        (1) plan.md 의 모든 W## ID 가 work/<ID>-*.md 로 존재.
-        (2) git diff --name-only HEAD 파일 수 ≥ 1 (워크트리 기준).
-        (3) WORKFLOW_WORKTREE=true 시 develop..HEAD 커밋 수 ≥ 1.
+    Payment Terms:
+        (1) All W# ID exists as work/<ID>-*.md.
+        (2) git diff --name-only head file number ≥ 1 (worktree standard).
+        (3) WORKFLOW WORKTREE=true Head commit number ≥ 1.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
-        plan_md: plan.md 파일 내용.
+        work dir: workflow work directory absolute path.
+        plan md: plan.md file content.
 
     Returns:
         VerifyResult (ok, reason, failed_step_ids).
@@ -154,15 +154,15 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
 
     diff_count = _check_git_diff(work_dir)
     if diff_count < 1:
-        return (False, "implement: no git diff (워크트리 변경 0건)", [])
+        return (False, "implement: no git diff (0 worktree changes)", [])
 
-    # 또는 ahead >= 1 (정상) 케이스는 통과시켜 false-positive 를 회피한다.
+    # Or, avoid false-positives by passing ahead >= 1 (normal) cases.
     if _is_worktree_enabled_lazy():
         ahead = _check_commits_ahead(work_dir)
         if ahead == 0:
             return (
                 False,
-                "implement: worktree commits ahead = 0 (워커 commit 누락)",
+                "implement: worktree commits ahead = 0 (missing worker commit)",
                 [],
             )
 
@@ -170,16 +170,16 @@ def _verify_implement_like(work_dir: str, plan_md: str) -> VerifyResult:
 
 
 def _verify_research(work_dir: str, plan_md: str) -> VerifyResult:
-    """research 검증 (경량).
+    """Research validation (light).
 
-    검증 항목:
-        (1) 모든 W## 산출물 존재.
-        (2) report.md 또는 work/RPT-*.md 의 ## 헤더 ≥ 3.
-        (3) Mermaid 블록 ≥ 1.
+    Payment Terms:
+        (1) Existence of output.
+        (2) report.md or work/RPT-*.md's ## header ≥ 3.
+        (3) Mermaid block ≥ 1.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
-        plan_md: plan.md 파일 내용.
+        work dir: workflow work directory absolute path.
+        plan md: plan.md file content.
 
     Returns:
         VerifyResult (ok, reason, failed_step_ids).
@@ -205,15 +205,15 @@ def _verify_research(work_dir: str, plan_md: str) -> VerifyResult:
 
 
 def _verify_review(work_dir: str, plan_md: str) -> VerifyResult:
-    """review / analyze 검증 (경량).
+    """review / analyze validation (contrast).
 
-    검증 항목:
-        (1) 모든 W## 산출물 존재.
-        (2) work/ 또는 report.md 에 "판정"/"결론"/"Decision"/"Verdict" 키워드 ≥ 1.
+    Payment Terms:
+        (1) Existence of output.
+        (2) "verdict" / "conclusion" / "Decision" / "Verdict" keywords ≥ 1.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
-        plan_md: plan.md 파일 내용.
+        work dir: workflow work directory absolute path.
+        plan md: plan.md file content.
 
     Returns:
         VerifyResult (ok, reason, failed_step_ids).
@@ -223,7 +223,7 @@ def _verify_review(work_dir: str, plan_md: str) -> VerifyResult:
         return (False, f"review: missing work files {missing_ids}", missing_ids)
 
     aggregated = _aggregate_md_content(work_dir)
-    keywords = ("판정", "결론", "Decision", "Verdict")
+    keywords = ("verdict", "conclusion", "Decision", "Verdict")
     if not any(kw in aggregated for kw in keywords):
         return (False, "review: missing verdict section", [])
 
@@ -231,16 +231,16 @@ def _verify_review(work_dir: str, plan_md: str) -> VerifyResult:
 
 
 def _verify_architect(work_dir: str, plan_md: str) -> VerifyResult:
-    """architect 검증.
+    """architect verification.
 
-    검증 항목:
-        (1) 모든 W## 산출물 존재.
-        (2) Mermaid 블록 ≥ 2.
-        (3) 섹션 헤더 ≥ 4.
+    Payment Terms:
+        (1) Existence of output.
+        (2) Mermaid block ≥ 2.
+        (3) Section header ≥ 4.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
-        plan_md: plan.md 파일 내용.
+        work dir: workflow work directory absolute path.
+        plan md: plan.md file content.
 
     Returns:
         VerifyResult (ok, reason, failed_step_ids).
@@ -270,20 +270,20 @@ def _verify_architect(work_dir: str, plan_md: str) -> VerifyResult:
 
 
 # ---------------------------------------------------------------------------
-# 공통 헬퍼
+# common helper
 # ---------------------------------------------------------------------------
 
 
-# plan.md 의 H3 헤더에서 W## ID 추출 (skill_mapper.py:670 패턴 정합)
+# Extract W## ID from H3 header of plan.md (skill_mapper.py:670 pattern matching)
 _W_ID_PATTERN = re.compile(r"^###\s+(W\d+)[:\s]", re.MULTILINE)
 
-# fallback: 테이블 ID 컬럼 직접 매칭 (`| W01 |`)
+# fallback: Direct matching of table ID column (`| W01 |`)
 _W_ID_TABLE_PATTERN = re.compile(r"^\s*\|\s*(W\d+)\s*\|", re.MULTILINE)
 
-# 섹션 헤더 (## 또는 ###)
+# Section header (## or ###)
 _SECTION_PATTERN = re.compile(r"^#{2,3}\s+", re.MULTILINE)
 
-# Mermaid 코드 블록
+# Mermaid code block
 _MERMAID_PATTERN = re.compile(r"```mermaid\b", re.MULTILINE)
 
 
@@ -291,20 +291,20 @@ def _check_work_files_exist(
     plan_md_content: str,
     work_dir: str,
 ) -> tuple[list[str], list[str]]:
-    """plan.md 의 W## ID 추출 후 work/<ID>-*.md 존재 여부를 검사한다.
+    """execute the work/<ID>-*.md exists after the W## ID extraction.
 
-    추출 룰:
-        - Primary: H3 헤더 (`### W01:`) — skill_mapper.py:670 패턴.
-        - Fallback: 테이블 ID 컬럼 (`| W01 |`) — plan_validator.py 호환.
+    Extract:
+        - Primary: H3 header (`### W01:`) — skill mapper.py:670 patterns.
+        - Fallback: Table ID column (`  W01 |`) — plan validator.py compatible.
 
-    RPT 헤더 (`### RPT:`) 는 제외 — 본 verifier 는 워커 산출물만 검증.
+    RPT header (`### RPT:`) excludes — this verifier only validates the Walker output.
 
     Args:
-        plan_md_content: plan.md 파일 내용.
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
+        plan md content: plan.md file content.
+        work dir: workflow work directory absolute path.
 
     Returns:
-        (existing_ids, missing_ids): 두 리스트 모두 정렬된 list.
+        (existing ids, missing ids): Both lists are sorted.
     """
     ids: set[str] = set()
     for match in _W_ID_PATTERN.finditer(plan_md_content):
@@ -319,8 +319,8 @@ def _check_work_files_exist(
     for wid in sorted(ids):
         pattern = os.path.join(work_subdir, f"{wid}-*.md")
         matches = glob.glob(pattern)
-        # context 슬라이스 (work/<ID>-context.md / work/context/<ID>*.md) 외에
-        # 실제 산출물 파일이 있는지 확인 — 본 verifier 는 슬라이스 제외 정책.
+        # In addition to the context slice (work/<ID>-context.md / work/context/<ID>*.md)
+        # Verify that there is an actual output file — this verifier has a slice exclusion policy.
         produced = [p for p in matches if not p.endswith("-context.md")]
         if produced:
             existing.append(wid)
@@ -331,40 +331,40 @@ def _check_work_files_exist(
 
 
 def _count_sections(md_content: str) -> int:
-    """## 또는 ### 헤더 라인 수를 카운트한다.
+    """################################################################################################################################################################################################################################################################
 
     Args:
-        md_content: 마크다운 문자열.
+        md content: Markdown string.
 
     Returns:
-        헤더 라인 수.
+        More
     """
     return len(_SECTION_PATTERN.findall(md_content))
 
 
 def _count_mermaid_blocks(md_content: str) -> int:
-    """```mermaid ... ``` 코드 블록 수를 카운트한다.
+    """... Count the number of code blocks.
 
     Args:
-        md_content: 마크다운 문자열.
+        md content: Markdown string.
 
     Returns:
-        Mermaid 코드 블록 수.
+        Mermaid code block number.
     """
     return len(_MERMAID_PATTERN.findall(md_content))
 
 
 def _check_git_diff(work_dir: str) -> int:
-    """git diff --name-only HEAD 의 파일 수를 반환한다.
+    """git diff --name-only HEAD
 
-    워크트리 격리 환경에서는 work_dir 의 git 부모를 찾아 git -C 로 호출.
-    subprocess 실패 / git 미설치 / 5초 timeout 시 0 반환 (graceful fallback).
+    In the work tree isolated environment, find the git parent of work dir and call git -C.
+    subprocess failed / git Uninstalled / Returns 0 when 5 seconds timeout
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
+        work dir: workflow work directory absolute path.
 
     Returns:
-        변경된 파일 수 (line count).
+        Number of changed files (line count).
     """
     git_root = _find_git_root(work_dir)
     if git_root is None:
@@ -389,20 +389,20 @@ def _check_git_diff(work_dir: str) -> int:
 
 
 def _check_commits_ahead(work_dir: str) -> int:
-    """develop..HEAD 사이의 커밋 수를 반환한다.
+    """development.. Returns the number of commits between HEAD.
 
-    워커 commit 누락 회귀 차단용 신호. 워크트리 격리 환경에서
-    `git diff --name-only HEAD` 는 워크트리 변경 1건 이상 보장해도 develop 대비
-    실제 커밋이 없으면 머지 시점에 변경분이 누락된다.
+    Walker Commit Signal for missing turnover. Worktree Insulating Environment
+    `git diff --name-only HEAD` is for development, even if the work tree changes more than 1
+    If you do not have a real commit, the change is missing at the time of your stay.
 
     Returns:
-        ≥ 1: 정상 (커밋 존재)
-        0: 커밋 누락 신호 — 호출자가 차단해야 함
-        -1: 검사 불가 (브랜치/base 미존재, subprocess 실패, 5초 timeout) —
-            호출자가 차단 없이 통과시켜야 함 (false-positive 회피)
+        ≥ 1: Normal (commit existence)
+        0: Commit Missing Signal — Caller Should Block
+        -1: Cannot be checked (brand/base migration, subprocess failure, 5 seconds timeout) —
+            (false-positive)
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
+        work dir: workflow work directory absolute path.
     """
     git_root = _find_git_root(work_dir)
     if git_root is None:
@@ -426,14 +426,14 @@ def _check_commits_ahead(work_dir: str) -> int:
 
 
 def _is_worktree_enabled_lazy() -> bool:
-    """worktree_manager.is_worktree_enabled 를 지연 import 로 호출.
+    """call worktree manager.is worktree enabled as a delay import.
 
-    모듈 독립성 보존을 위해 phase_verifier 모듈 상단에서 worktree_manager 를
-    직접 import 하지 않고, 호출 시점에만 lazy import 한다. 실패 시 False 로
-    fallback 하여 기존 검증 흐름은 영향받지 않는다.
+    Worktree manager at the top of the phase verifier module to preserve modular independence
+    not import directly, but only lazy import at the point of call. False
+    fallback does not affect existing verification flow.
 
     Returns:
-        WORKFLOW_WORKTREE=true 이고 worktree_manager 로드 가능하면 True.
+        WORKFLOW WORKTREE=true and true.
     """
     try:
         from .worktree_manager import is_worktree_enabled
@@ -444,15 +444,15 @@ def _is_worktree_enabled_lazy() -> bool:
 
 
 def _aggregate_md_content(work_dir: str) -> str:
-    """work/W*.md + work/RPT-*.md + report.md 내용을 합쳐 반환한다.
+    """work/W*.md + work/RPT-*.md + report.md
 
-    section/mermaid 카운트 헬퍼의 입력으로 사용.
+    Used as input of section/mermaid counting helper.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
+        work dir: workflow work directory absolute path.
 
     Returns:
-        모든 마크다운 내용을 줄바꿈으로 join 한 문자열.
+        A string that joins all markdown content.
     """
     chunks: list[str] = []
     work_subdir = os.path.join(work_dir, "work")
@@ -467,7 +467,7 @@ def _aggregate_md_content(work_dir: str) -> str:
             if path in seen:
                 continue
             seen.add(path)
-            # context 슬라이스 제외
+            # Excluding context slices
             if path.endswith("-context.md"):
                 continue
             try:
@@ -488,22 +488,22 @@ def _aggregate_md_content(work_dir: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 내부 유틸
+# internal utility
 # ---------------------------------------------------------------------------
 
 
 def _read_command(work_dir: str) -> str | None:
-    """init-result.json 또는 .context.json 에서 command 필드를 추출한다.
+    """init-result.json or .context.json
 
-    탐색 순서:
+    Tag:
         1. init-result.json
         2. .context.json
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
+        work dir: workflow work directory absolute path.
 
     Returns:
-        command 문자열 또는 None (둘 다 없거나 파싱 실패 시).
+        command string or None (unless or parsing failed).
     """
     candidates = [
         os.path.join(work_dir, "init-result.json"),
@@ -524,13 +524,13 @@ def _read_command(work_dir: str) -> str | None:
 
 
 def _find_git_root(start_dir: str) -> str | None:
-    """start_dir 부터 위로 올라가며 .git 디렉터리를 찾는다.
+    """From start dir, go up and find .git directory.
 
     Args:
-        start_dir: 탐색 시작 디렉터리 절대 경로.
+        start dir: navigation start directory absolute path.
 
     Returns:
-        git root 절대 경로 또는 None.
+        git root absolute path or None.
     """
     current = os.path.abspath(start_dir)
     while True:
@@ -545,7 +545,7 @@ def _find_git_root(start_dir: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# 결과 영속화 (W03 scope)
+# Perpetuating results (W03 scope)
 # ---------------------------------------------------------------------------
 
 
@@ -554,24 +554,24 @@ def _write_retry_context_on_fail(
     failure_reason: str,
     failed_steps: list[str],
 ) -> None:
-    """retry-context.json 의 3개 필드를 기록한다.
+    """retry-context.json
 
-    필드:
-        - last_failure_phase: "VALIDATE" 고정.
+    Tag:
+        - last failure phase: Fixed "VALIDATE"
         - last_failure_reason: failure_reason.
         - failed_work_steps: failed_steps.
 
-    나머지 2필드 (retry_count, prompt_hints) 는 T-455 sentinel/handler 가 갱신.
-    기존 파일이 있으면 read-modify-write 로 부분 갱신, 없으면 신설.
+    The rest 2 field (retry count, prompt hints) is updated by T-455 sentinel/handler.
+    If you have an existing file, please update the part with read-modify-write, and we'll update it.
 
     Args:
-        work_dir: 워크플로우 work 디렉터리 절대 경로.
-        failure_reason: verify_validate_phase 가 반환한 reason 메시지.
-        failed_steps: verifier 가 지적한 워커 ID 목록.
+        work dir: workflow work directory absolute path.
+        failure reason: confirmation validate phase return reason message.
+        failed steps: List of Warker IDs with verifier.
     """
     retry_path = os.path.join(work_dir, "retry-context.json")
 
-    # 기존 파일 read (있으면)
+    # Read existing file (if present)
     existing: dict = {}
     if os.path.isfile(retry_path):
         try:
@@ -582,7 +582,7 @@ def _write_retry_context_on_fail(
         except (OSError, json.JSONDecodeError):
             existing = {}
 
-    # 본 티켓 3필드만 갱신, 나머지 보존
+    # Only 3 fields of this ticket are updated, the rest are preserved.
     existing["last_failure_phase"] = "VALIDATE"
     existing["last_failure_reason"] = failure_reason
     existing["failed_work_steps"] = list(failed_steps)
@@ -593,26 +593,26 @@ def _write_retry_context_on_fail(
 
 
 # ---------------------------------------------------------------------------
-# CLI 진입점
+# CLI entry point
 # ---------------------------------------------------------------------------
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI 진입점 — flow-phase-verify wrapper 에서 호출.
+    """CLI entry point — call flow-phase-verify wrapper.
 
-    사용법:
+    Usage:
         python3 phase_verifier.py <registry_key>
 
-    종료 코드:
-        0 = 통과 (verifier ok=True).
-        1 = 실패 (verifier ok=False).
-        2 = 사용법 오류 (인자 누락 / 다중).
+    Tag:
+        0 = Pass (verifier ok=True).
+        1 = failed (verifier ok=False).
+        2 = Usage error (unlimited/multiple).
 
     Args:
-        argv: 명령행 인자 리스트 (None 이면 sys.argv[1:] 사용).
+        argv: command line argument list (None-side sys.argv[1:] use).
 
     Returns:
-        종료 코드.
+        Skip to content
     """
     if argv is None:
         argv = sys.argv[1:]
@@ -632,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         _write_retry_context_on_fail(work_dir, reason, failed)
     except OSError as exc:
-        print(f"[WARN] retry-context.json 기록 실패: {exc}", file=sys.stderr)
+        print(f"[WARN] Failed to write retry-context.json: {exc}", file=sys.stderr)
     return 1
 
 

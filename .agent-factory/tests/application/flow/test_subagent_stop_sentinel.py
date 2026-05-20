@@ -1,14 +1,14 @@
-"""test_subagent_stop_sentinel.py — subagent-stop.py sentinel 감지 단위 테스트 (T-455 W06).
+"""test subagent stop sentinel.py — subagent-stop.py sentinel detection module testing (T-455 W06).
 
-본 테스트는 plan.md §9 Case ④ 를 검증한다:
-  - HOOK_FAIL_RECORD=true 환경변수 설정 시만 flow-fail-record 호출
-  - .workflow-failed sentinel 부재 시 호출 0건
-  - .workflow-failed.recorded 마커 존재 시 호출 0건 (중복 차단)
-  - subprocess.Popen mock (monkeypatch) 으로 호출 인자 + 횟수 검증
+This test validates plan.md §9 Case 4 NEWS
+  - Call flow-fail-record only when setting HOOK FAIL RECORD=true environment variable
+  - .workflow-failed sentinel call 0
+  - 0 calls when .workflow-failed.recorded markers exist
+  - call factor + number verification with subprocess.Popen mock
 
-importlib.util 로 `subagent-stop.py` 를 직접 로드한다 — 파일명 하이픈 때문에
-일반 import 가 불가능하다. dispatcher 의존성을 위해 hooks/ 디렉터리를
-sys.path 에 등록한다.
+importlib.util loads `subagent-stop.py` directly — because the filename is high
+Normal import is impossible. hooks/ directory for dispatcher dependencies
+sys.path
 """
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ from pathlib import Path
 
 import pytest
 
-# sys.path 보장 — hooks/ + engine/ 등록
+# sys.path Warranty — hooks/ + engine/ registration
 _TEST_DIR = Path(__file__).resolve().parent
 _AGENT_FACTORY_ROOT = _TEST_DIR.parents[2]
 _ENGINE_DIR = _AGENT_FACTORY_ROOT / "engine"
-_PROJECT_ROOT = _AGENT_FACTORY_ROOT.parent  # workspace/claude 가 아닌 워크트리 루트
+_PROJECT_ROOT = _AGENT_FACTORY_ROOT.parent  # workspace/claude
 _HOOKS_DIR = _AGENT_FACTORY_ROOT / "hooks"  # .agent-factory/hooks/
 
 if str(_ENGINE_DIR) not in sys.path:
@@ -34,7 +34,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 _SUBAGENT_STOP_PATH = _HOOKS_DIR / "subagent-stop.py"
 assert _SUBAGENT_STOP_PATH.exists(), (
-    f"subagent-stop.py 가 존재해야 함: {_SUBAGENT_STOP_PATH}"
+    f"subagent-stop.py must exist:   FIELD 0  "
 )
 
 _spec = _ilu.spec_from_file_location("subagent_stop_module", _SUBAGENT_STOP_PATH)
@@ -45,15 +45,15 @@ _scan_and_trigger_fail_record = _subagent_stop_mod._scan_and_trigger_fail_record
 
 
 # =============================================================================
-# 헬퍼 — mock workflow 생성 (scan_active_workflows 가 발견하도록)
+# Create a mock workflow (scan active workflows to discover)
 # =============================================================================
 
 
 def _make_mock_runs(project_root: Path, registry_key: str = "20260510-123456") -> Path:
-    """`<project_root>/.agent-factory/runs/<registry_key>/` 모의 디렉터리 생성.
+    """<project root>/.agent-factory/runs/<registry key>/
 
-    scan_active_workflows() 가 status.json 을 읽어 발견하도록 최소 status.json
-    을 작성한다. step 은 활성 phase (예: WORK) 로 설정한다.
+    scan active workflows() read status.json at least status.json
+    Write. step is set to active phase (e.g. WORK).
     """
     runs_dir = project_root / ".agent-factory" / "runs" / registry_key
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -70,10 +70,10 @@ def _make_mock_runs(project_root: Path, registry_key: str = "20260510-123456") -
 
 
 def _install_fake_bin(project_root: Path) -> Path:
-    """`.agent-factory/bin/flow-fail-record` 를 실행 가능한 더미로 생성.
+    """`.agent-factory/bin/flow-fail-record` generates a stack that can be executed.
 
-    `_resolve_fail_record_bin()` 이 실행 파일 존재 + access(X_OK) 를 검사하므로
-    chmod +x 까지 설정한다.
+    ` resolve fail record bin()' This executable file exist + access(X OK)
+    Set up to chmod +x
     """
     bin_dir = project_root / ".agent-factory" / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
@@ -85,19 +85,19 @@ def _install_fake_bin(project_root: Path) -> Path:
 
 @pytest.fixture
 def isolated_project(tmp_path, monkeypatch):
-    """격리된 가짜 project_root 를 만들고 CLAUDE_PROJECT_DIR 로 바인딩.
+    """Created fake project root and binding with CLAUDE PROJECT DIR.
 
-    `_resolve_fail_record_bin()` 이 CLAUDE_PROJECT_DIR 환경변수를 우선 검사하므로
-    이걸로 hooks 모듈이 가짜 root 를 보도록 강제한다.
+    ` resolve fail record bin()` This CLAUDE PROJECT DIR environment variable is first checked
+    This forces hooks module to see fake root.
     """
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
 
-    # scan_active_workflows 는 resolve_project_root 를 호출하므로 그것도 가짜 root 로 패치
+    # scan active workflows call resolve project root, so it also patches with fake root
     import common  # noqa: PLC0415
 
     monkeypatch.setattr(common, "resolve_project_root", lambda: str(tmp_path))
 
-    # .agent-factory/.settings 가 있어야 일부 helper 가 성공 (없어도 무방하지만 안전을 위해)
+    # . agent-factory/.settings should be some helper is successful (for free but safe)
     settings_dir = tmp_path / ".agent-factory"
     settings_dir.mkdir(parents=True, exist_ok=True)
     (settings_dir / ".settings").write_text("", encoding="utf-8")
@@ -107,7 +107,7 @@ def isolated_project(tmp_path, monkeypatch):
 
 @pytest.fixture
 def popen_recorder(monkeypatch):
-    """subprocess.Popen 호출을 가로채 인자를 기록하는 fixture."""
+    """fixture to record subprocess.Popen calls."""
     calls: list[list[str]] = []
 
     class _MockProc:
@@ -120,18 +120,18 @@ def popen_recorder(monkeypatch):
         calls.append(list(cmd))
         return _MockProc()
 
-    # subagent-stop 모듈은 `import subprocess` 후 `subprocess.Popen(...)` 호출
+    # subagent-stop module is called subprocess.Popen(...)
     monkeypatch.setattr(_subagent_stop_mod.subprocess, "Popen", _fake_popen)
     return calls
 
 
 # =============================================================================
-# 테스트
+# T/T
 # =============================================================================
 
 
 def test_no_call_when_flag_disabled(isolated_project, popen_recorder):
-    """HOOK_FAIL_RECORD 미활성 (False) 시 Popen 호출 0건."""
+    """0 Popen calls when HOOK FAIL RECORD inactive (False)."""
     runs_dir = _make_mock_runs(isolated_project)
     (runs_dir / ".workflow-failed").write_text(
         json.dumps({"registry_key": "20260510-123456"}), encoding="utf-8"
@@ -144,19 +144,19 @@ def test_no_call_when_flag_disabled(isolated_project, popen_recorder):
 
 
 def test_no_call_when_flag_missing(isolated_project, popen_recorder):
-    """flag dict 에 키 자체가 없어도 (기본 False) Popen 호출 0건."""
+    """flag dict has no key itself (default False) Popen call 0."""
     runs_dir = _make_mock_runs(isolated_project)
     (runs_dir / ".workflow-failed").write_text("{}", encoding="utf-8")
     _install_fake_bin(isolated_project)
 
-    _scan_and_trigger_fail_record({})  # HOOK_FAIL_RECORD 키 없음
+    _scan_and_trigger_fail_record({})  # HOOK FAIL RECORD Keyless
 
     assert popen_recorder == []
 
 
 def test_no_call_when_sentinel_absent(isolated_project, popen_recorder):
-    """sentinel 부재 시 Popen 호출 0건."""
-    _make_mock_runs(isolated_project)  # status.json 만 생성, sentinel 없음
+    """0 Popen calls when sentinel is broken."""
+    _make_mock_runs(isolated_project)  # status.json
     _install_fake_bin(isolated_project)
 
     _scan_and_trigger_fail_record({"HOOK_FAIL_RECORD": True})
@@ -165,7 +165,7 @@ def test_no_call_when_sentinel_absent(isolated_project, popen_recorder):
 
 
 def test_no_call_when_recorded_marker_exists(isolated_project, popen_recorder):
-    """.workflow-failed.recorded 마커가 이미 있으면 Popen 호출 0건."""
+    """. popen call 0 if workflow-failed.recorded marker already."""
     runs_dir = _make_mock_runs(isolated_project)
     (runs_dir / ".workflow-failed").write_text("{}", encoding="utf-8")
     (runs_dir / ".workflow-failed.recorded").touch()
@@ -177,10 +177,10 @@ def test_no_call_when_recorded_marker_exists(isolated_project, popen_recorder):
 
 
 def test_no_call_when_bin_missing(isolated_project, popen_recorder):
-    """flow-fail-record 실행 파일 부재 시 Popen 호출 0건."""
+    """0 Popen calls for the flow-fail-record executable."""
     runs_dir = _make_mock_runs(isolated_project)
     (runs_dir / ".workflow-failed").write_text("{}", encoding="utf-8")
-    # _install_fake_bin 호출 안 함 — 실행 파일 부재
+    # install fake bin Unsubscribe — Unsubscribe
 
     _scan_and_trigger_fail_record({"HOOK_FAIL_RECORD": True})
 
@@ -188,7 +188,7 @@ def test_no_call_when_bin_missing(isolated_project, popen_recorder):
 
 
 def test_call_dispatched_when_all_conditions_met(isolated_project, popen_recorder):
-    """모든 조건 충족 시 flow-fail-record 비차단 Popen 호출 발생."""
+    """The flow-fail-record non-blocking Popen calls are encountered when all conditions are met."""
     runs_dir = _make_mock_runs(isolated_project, registry_key="20260510-130000")
     (runs_dir / ".workflow-failed").write_text(
         json.dumps({"registry_key": "20260510-130000"}), encoding="utf-8"
@@ -198,11 +198,11 @@ def test_call_dispatched_when_all_conditions_met(isolated_project, popen_recorde
     _scan_and_trigger_fail_record({"HOOK_FAIL_RECORD": True})
 
     assert len(popen_recorder) == 1, (
-        f"Popen 1회 호출 기대, 실제: {len(popen_recorder)}건"
+        f"Popen 1 call expectations, actual:   FIELD 0 "
     )
     cmd = popen_recorder[0]
     assert cmd[0] == str(bin_path), (
-        f"flow-fail-record bin 경로가 cmd[0] 이어야 함: {cmd}"
+        f"The flow-fail-record bin path should be cmd[0]:   FIELD 0  "
     )
     assert cmd[1] == "record"
     assert cmd[2] == "20260510-130000"
@@ -211,13 +211,13 @@ def test_call_dispatched_when_all_conditions_met(isolated_project, popen_recorde
 def test_multiple_workflows_only_failed_ones_dispatch(
     isolated_project, popen_recorder
 ):
-    """다중 워크플로우 중 sentinel 있는 것만 dispatch (idempotency 보존)."""
-    # WF1: sentinel 있음 → dispatch
+    """Only dispatches sentinel during multiple workflows (preserving idempotency)."""
+    # WF1: sentinel available → dispatch
     wf1 = _make_mock_runs(isolated_project, registry_key="20260510-111111")
     (wf1 / ".workflow-failed").write_text(
         json.dumps({"registry_key": "20260510-111111"}), encoding="utf-8"
     )
-    # WF2: sentinel 없음 → skip
+    # WF2: No sendinel → skip
     _make_mock_runs(isolated_project, registry_key="20260510-222222")
     # WF3: sentinel + recorded → skip
     wf3 = _make_mock_runs(isolated_project, registry_key="20260510-333333")
@@ -235,12 +235,12 @@ def test_multiple_workflows_only_failed_ones_dispatch(
 def test_resolve_fail_record_bin_returns_none_when_not_executable(
     isolated_project,
 ):
-    """비실행 파일은 None 으로 처리되어 dispatch skip."""
+    """Undisabled files are processed by None and dispatch skip."""
     bin_dir = isolated_project / ".agent-factory" / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     bin_path = bin_dir / "flow-fail-record"
     bin_path.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
-    bin_path.chmod(0o644)  # 실행 권한 없음
+    bin_path.chmod(0o644)  # No license
 
     resolved = _subagent_stop_mod._resolve_fail_record_bin()
     assert resolved is None

@@ -1,10 +1,10 @@
 // Fixture test for renderer-helpers.unescapeLiteralNewlines (T-321 P1).
 //
-// 검증 대상: `core/renderer-helpers.js` 의 `unescapeLiteralNewlines(text)`.
-// 리터럴 백슬래시-n (`\\n` 2글자) 을 실제 개행 (`\n` 1글자) 으로 치환.
+// Validated against: `unescapeLiteralNewlines(text)` in `core/renderer-helpers.js`.
+// Replace literal backslash-n (` \n ` 2 characters) with an actual newline (` \n ` 1 character).
 //
-// 호환 모드 1: helper 가 CommonJS module.exports 를 지원하면 createRequire 로 import.
-// 호환 모드 2: 미존재 시 ENOENT 로 Red.
+// Compatibility mode 1: If helper supports CommonJS module.exports, import it with createRequire.
+// Compatibility mode 2: Red as ENOENT if not present.
 
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -31,52 +31,52 @@ function assertContains(actual, needle, label) {
   console.log(`PASS  [${label}]`);
 }
 
-// Case A: 리터럴 백슬래시-n → 실제 개행 (3개 항목으로 분리)
-const A_in = "조건1\\n조건2\\n조건3";
+// Case A: Literal backslash-n → actual newline (separated into 3 items)
+const A_in = "Condition 1 \n Condition 2 \n Condition 3";
 const A_out = unescapeLiteralNewlines(A_in);
-assertEqual(A_out, "조건1\n조건2\n조건3", "A: literal \\n → real newline");
-// 마크다운 렌더링 결과 가설 검증 — newline 으로 끊긴 3 라인이 별개의 <p> / <br> / <li> 중 하나로 표현 가능해야 함
-// (helper 단위 검증은 위 assertEqual 로 충족. marked 통합 동작은 P1 W1.md report 에 별도 기록)
+assertEqual(A_out, "Condition 1 \n Condition 2 \n Condition 3", "A: literal \\n → real newline");
+// Hypothesis verification of Markdown rendering results — 3 lines broken by newlines must be able to be expressed as separate <p> / <br> / <li>
+// (The helper unit verification is satisfied with assertEqual above. The marked integrated operation is recorded separately in the P1 W1.md report.)
 
-// Case B: 이미 실제 개행인 입력 (idempotent — 회귀 없음)
-const B_in = "조건1\n조건2";
+// Case B: Input that is already a real newline (idempotent — no regression)
+const B_in = "Condition 1 \n Condition 2";
 const B_out = unescapeLiteralNewlines(B_in);
-assertEqual(B_out, "조건1\n조건2", "B: already-newline idempotent");
+assertEqual(B_out, "Condition 1 \n Condition 2", "B: already-newline idempotent");
 
-// Case C: 백슬래시 미포함 plain text (변동 없음)
-const C_in = "이것은 보통 텍스트입니다.";
+// Case C: plain text without backslash (no change)
+const C_in = "This is plain text.";
 const C_out = unescapeLiteralNewlines(C_in);
 assertEqual(C_out, C_in, "C: plain text unchanged");
 
-// Case D: code fence 내부의 `\\n` 은 보존 (사용자 의도 리터럴) — plan 회피 항목
+// Case D: ` \n ` inside the code fence is preserved (user intent literal) — plan avoidance item
 const D_in = "before\n```\nconst s = \"line1\\nline2\";\n```\nafter\\nend";
 const D_out = unescapeLiteralNewlines(D_in);
-// fence 내부의 `\\n` 은 그대로 유지, fence 외부의 `\\n` (after\nend) 는 실제 개행으로 치환
+// ` \n ` inside the fence remains the same, and ` \n ` (after \n end) outside the fence is replaced with an actual newline.
 assertContains(D_out, "const s = \"line1\\nline2\";", "D-fence: code fence \\n preserved");
-assertContains(D_out, "after\nend", "D-outside: fence-외부 \\n unescaped");
+assertContains(D_out, "after\nend", "D-outside: fence-outside \n unescaped");
 
-// Case E: 인라인 backtick `\\n` 도 보존
-const E_in = "텍스트 `리터럴 \\n` 다음 줄\\n그 다음";
+// Case E: Inline backtick ` \n ` is also preserved
+const E_in = "text `literal \n ` next line \n after that";
 const E_out = unescapeLiteralNewlines(E_in);
-assertContains(E_out, "`리터럴 \\n`", "E-inline: inline code \\n preserved");
-assertContains(E_out, "다음 줄\n그 다음", "E-outside: 인라인 외부 \\n unescaped");
+assertContains(E_out, "`literal \n `", "E-inline: inline code \\n preserved");
+assertContains(E_out, "next line \n then", "E-outside: inline outside \n unescaped");
 
-// Case F: 빈 문자열
+// Case F: empty string
 assertEqual(unescapeLiteralNewlines(""), "", "F: empty string");
 
 // Case G: null / undefined graceful
 assertEqual(unescapeLiteralNewlines(null), null, "G-null");
 assertEqual(unescapeLiteralNewlines(undefined), undefined, "G-undefined");
 
-// ── marked 통합 검증 (acceptance_criteria #2) ────────────────────────────
-// helper 출력 → marked.parse 결과가 실제 개행 기반 마크다운 토큰 (br/p/li 등) 으로 분할되는지.
+// ── marked integrated verification (acceptance_criteria #2) ─────────────────────────────
+// helper output → marked.parse Whether the result is split into actual newline-based markdown tokens (br/p/li, etc.).
 const markedMod = require(resolve(here, "..", "vendor", "marked-15.0.0.min.js"));
 const markedParse = markedMod.parse;
 
-const integ_in = "조건1\\n조건2\\n조건3";
+const integ_in = "Condition 1 \n Condition 2 \n Condition 3";
 const integ_unescaped = unescapeLiteralNewlines(integ_in);
 const integ_html = markedParse(integ_unescaped, { gfm: true, breaks: true });
-// `breaks: true` 옵션 (common.js 와 동일) — 단일 개행이 <br> 로 변환.
+// `breaks: true` option (same as common.js) — Converts single newlines to <br> .
 const hasBr = integ_html.includes("<br>") || integ_html.includes("<br/>") || integ_html.includes("<br />");
 const hasPsplit = (integ_html.match(/<\/p>\s*<p>/g) || []).length > 0;
 const hasLi = integ_html.includes("<li>");
@@ -88,8 +88,8 @@ if (!(hasBr || hasPsplit || hasLi || hasRealNewline)) {
 }
 console.log(`PASS  [marked-integration: br=${hasBr} p-split=${hasPsplit} li=${hasLi} newline=${hasRealNewline}]`);
 
-// 회귀 가드: 이미 개행 입력도 marked 결과에 br/개행 보존
-const integ2_in = "조건1\n조건2";
+// Regression Guard: Preserve br/newline in marked results even if newline input is already entered.
+const integ2_in = "Condition 1 \n Condition 2";
 const integ2_html = markedParse(unescapeLiteralNewlines(integ2_in), { gfm: true, breaks: true });
 const has2Br = integ2_html.includes("<br>") || integ2_html.includes("<br/>") || integ2_html.includes("<br />");
 if (!has2Br) {

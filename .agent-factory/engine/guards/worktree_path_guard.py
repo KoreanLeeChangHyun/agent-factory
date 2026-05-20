@@ -25,12 +25,12 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -42,26 +42,26 @@ from messages import (
     WORKTREE_PATH_WRITE_EDIT_DENIED,
 )
 
-# implement command: 워크트리 격리가 적용되는 command
+# implement command: Command to which worktree isolation is applied
 _IMPLEMENT_COMMAND = "implement"
 
-# Bash 도구에서 파일을 수정할 수 있는 명령 패턴 (readonly_session_guard.py와 동일)
+# Command pattern that allows Bash tools to modify files (same as readonly_session_guard.py)
 _BASH_FILE_MODIFY_PATTERNS: list[str] = [
     r"\bsed\s+-i",                               # sed inplace
     r"\bawk\s+.*-i\s+inplace",                   # awk inplace
-    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf 리다이렉트
-    r"\btee\s+(-a\s+)?\S",                       # tee 쓰기
-    r"\bcat\s*<<",                               # heredoc 리다이렉트
-    r"\bcp\s+",                                  # 파일 복사
-    r"\bmv\s+",                                  # 파일 이동
+    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf redirect
+    r"\btee\s+(-a\s+)?\S",                       # write tee
+    r"\bcat\s*<<",                               # heredoc redirect
+    r"\bcp\s+",                                  # copy files
+    r"\bmv\s+",                                  # move files
     r"\bpython3?\s+(-c\s+|.*\bopen\b.*\bwrite\b)",  # python -c open write
     r"\bperl\s+-.*[pi]",                         # perl inplace
-    r"(?:^|[;&|]\s*)\binstall\s+",               # install 명령 (서브커맨드 제외)
-    r"\bdd\s+",                                  # dd 명령
+    r"(?:^|[;&|]\s*)\binstall\s+",               # install command (excluding subcommands)
+    r"\bdd\s+",                                  # dd command
 ]
 
-# 항상 허용하는 경로 패턴 (메인 리포 산출물·sidecar 디렉터리)
-# 주의: 보수적으로 좁게 정의 — `.agent-factory/board/server/`, `.agent-factory/engine/` 같은
+# Path patterns always allowed (main repo output/sidecar directories)
+# Caution: Conservatively narrow definitions — things like `.agent-factory/board/server/`, `.agent-factory/engine/`
 _ALWAYS_ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"[/\\]\.agent-factory[/\\]runs[/\\]"),
     re.compile(r"[/\\]\.agent-factory[/\\]board[/\\]sessions[/\\]"),
@@ -96,14 +96,14 @@ def _get_workflow_command() -> str | None:
     Returns:
         command 문자열. 조회 실패 시 None.
     """
-    # 1. WORKFLOW_COMMAND 환경변수 우선 (디스크 스캔 race 차단)
+    # 1. WORKFLOW_COMMAND environment variable priority (blocks disk scan race)
     env_command = os.environ.get("WORKFLOW_COMMAND", "").strip()
     if env_command:
         return env_command
 
     project_root = resolve_project_root()
 
-    # 2. WORKFLOW_WORK_DIR 환경변수 확인
+    # 2. Check the WORKFLOW_WORK_DIR environment variable
     env_work_dir = os.environ.get("WORKFLOW_WORK_DIR", "").strip()
     if env_work_dir:
         abs_work_dir = (
@@ -117,13 +117,13 @@ def _get_workflow_command() -> str | None:
             if command:
                 return command
 
-    # 3. .workflow/ 디렉터리 스캔
+    # 3. Scan the .workflow/ directory
     try:
         registry = scan_active_workflows(project_root=project_root)
         if not registry:
             return None
 
-        # updated_at 기준 가장 최근 워크플로우 선택
+        # Select the most recent workflow by updated_at
         best_entry = None
         best_updated = ""
         for _key, entry in registry.items():
@@ -158,14 +158,14 @@ def _get_worktree_path() -> str | None:
     Returns:
         워크트리 절대경로 문자열. 탐색 실패 또는 경로가 없으면 None.
     """
-    # 1. WORKFLOW_WORKTREE_PATH 환경변수 우선
+    # 1. WORKFLOW_WORKTREE_PATH environment variable takes precedence
     env_worktree_path = os.environ.get("WORKFLOW_WORKTREE_PATH", "").strip()
     if env_worktree_path:
         return env_worktree_path
 
     project_root = resolve_project_root()
 
-    # 2. WORKFLOW_WORK_DIR 환경변수 -> .context.json
+    # 2. WORKFLOW_WORK_DIR environment variable -> .context.json
     env_work_dir = os.environ.get("WORKFLOW_WORK_DIR", "").strip()
     if env_work_dir:
         abs_work_dir = (
@@ -181,7 +181,7 @@ def _get_worktree_path() -> str | None:
                 if abs_path:
                     return abs_path
 
-    # 3. .workflow/ 디렉터리 스캔
+    # 3. Scan the .workflow/ directory
     try:
         registry = scan_active_workflows(project_root=project_root)
         if not registry:
@@ -290,7 +290,7 @@ def _get_suggested_path(file_path: str, project_root: str, worktree_path: str) -
         rel = norm_file[len(norm_project) + 1:]
         return os.path.join(worktree_path, rel)
 
-    # 상대 경로인 경우 워크트리 경로에 직접 결합
+    # If the path is relative, bind directly to the worktree path.
     return os.path.join(worktree_path, file_path.lstrip("/"))
 
 
@@ -370,10 +370,10 @@ def _bash_targets_main_repo(command: str, project_root: str, worktree_path: str)
         start = match.start()
         tail = command[start:]
         if tail.startswith(norm_worktree):
-            continue  # 워크트리 prefix → 워크트리 내 작업
+            continue  # Worktree prefix → Tasks within the worktree
         if any(p.search(tail) for p in _ALWAYS_ALLOWED_PATTERNS):
-            continue  # 메인 산출물·sidecar 패턴 → 허용
-        return True  # 메인 소스 경로 직격 → 차단
+            continue  # Main output/sidecar pattern → Allow
+        return True  # Direct hit to main source path → blocked
     return False
 
 
@@ -387,14 +387,14 @@ def main() -> None:
     비tmux 환경, 메인 세션, research/review 세션, 워크트리 없는 세션에서는 통과한다.
     `_ALWAYS_ALLOWED_PATTERNS` 와 일치하는 산출물·sidecar 경로는 항상 허용한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_WORKTREE_PATH_GUARD") or read_env("HOOK_WORKTREE_PATH_GUARD")
 
     # Hook disable check (false/0 = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -402,43 +402,43 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # 검사 대상 도구가 아니면 통과
+    # Pass if the tool is not being checked
     if tool_name not in ("Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"):
         sys.exit(0)
 
-    # 세션 유형 확인 -- 워크플로우 세션이 아니면 통과 (이 가드의 관심사 아님)
+    # Check session type -- pass if not workflow session (not a concern of this guard)
     session_type = get_session_type()
     if session_type != "workflow":
         sys.exit(0)
 
-    # --- 워크플로우 세션 확인됨, command 판별 ---
+    # --- Workflow session confirmed, command determination ---
 
     command = _get_workflow_command()
 
-    # command 조회 실패 시: WORKFLOW_WORKTREE_PATH가 주입돼 있으면 implement 가정,
-    # 아니면 통과 (false positive 방지)
+    # When command search fails: If WORKFLOW_WORKTREE_PATH is injected, implement is assumed.
+    # Otherwise, pass (avoid false positives)
     if command is None:
         if os.environ.get("WORKFLOW_WORKTREE_PATH", "").strip():
             command = _IMPLEMENT_COMMAND
         else:
             sys.exit(0)
 
-    # command 첫 세그먼트 추출 (체인 command 지원: "research>implement" -> "research")
+    # Extract the first segment of the command (support chain command: "research>implement" -> "research")
     first_segment = command.split(">")[0].strip()
 
-    # implement command가 아니면 통과 (research/review는 readonly_session_guard가 담당)
+    # Passes unless it is an implement command (readonly_session_guard is in charge of research/review)
     if first_segment != _IMPLEMENT_COMMAND:
         sys.exit(0)
 
-    # --- implement command 확인됨, 워크트리 경로 조회 ---
+    # --- implement command confirmed, work tree path search ---
 
     worktree_path = _get_worktree_path()
 
-    # 워크트리 경로가 없으면 통과 (비워크트리 implement 세션)
+    # Passes if there is no worktree path (non-worktree implement session)
     if not worktree_path:
         sys.exit(0)
 
-    # --- 워크트리 경로 확인됨, 파일 경로 검사 ---
+    # --- Worktree path confirmed, file path checked ---
 
     project_root = resolve_project_root()
     tool_input = data.get("tool_input", {})
@@ -451,16 +451,16 @@ def main() -> None:
         if not file_path:
             sys.exit(0)
 
-        # 항상 허용 경로(메인 산출물·sidecar)는 통과
+        # Always allow path (main output/sidecar) to pass
         if _is_always_allowed_path(file_path, project_root):
             sys.exit(0)
 
-        # 워크트리 하위 경로이면 통과
+        # Pass if it is a worktree subpath.
         if _is_under_worktree(file_path, worktree_path, project_root):
             sys.exit(0)
 
-        # 상대 경로인 경우: 메인 리포 루트 기준 상대 경로는 통과 불가
-        # (Claude Code가 메인 리포 루트를 cwd로 사용하므로 상대 경로 = 메인 리포 경로)
+        # In case of a relative path: Paths relative to the main repo root cannot be passed.
+        # (Relative path = main repo path since Claude Code uses main repo root as cwd)
         suggested_path = _get_suggested_path(file_path, project_root, worktree_path)
         _deny(
             WORKTREE_PATH_WRITE_EDIT_DENIED.format(
@@ -475,11 +475,11 @@ def main() -> None:
         if not bash_cmd:
             sys.exit(0)
 
-        # 파일 수정 패턴이 없으면 통과
+        # Pass if there is no file modification pattern
         if not _is_bash_file_modify(bash_cmd):
             sys.exit(0)
 
-        # 메인 리포 절대경로를 대상으로 하는 수정이면 차단
+        # Block modifications that target the main repo absolute path.
         if _bash_targets_main_repo(bash_cmd, project_root, worktree_path):
             _deny(
                 WORKTREE_PATH_BASH_MODIFY_DENIED.format(
@@ -488,7 +488,7 @@ def main() -> None:
             )
         sys.exit(0)
 
-    # 알 수 없는 도구: 통과
+    # Unknown tool: Passed
     sys.exit(0)
 
 

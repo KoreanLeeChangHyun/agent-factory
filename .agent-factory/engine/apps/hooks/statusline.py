@@ -29,7 +29,7 @@ if _agent_factory_dir not in sys.path:
 
 from engine.constants import C_RESET, PHASE_COLORS, STEP_COLORS
 
-# -- RESET alias (기존 코드 하위 호환) --
+# -- RESET alias (backward compatibility with existing code) --
 RESET = C_RESET
 
 
@@ -172,7 +172,7 @@ def get_active_workflow(cwd: str) -> dict | None:
     if not current_session:
         return None
 
-    # 디렉터리 스캔으로 활성 워크플로우 조회
+    # Look up active workflows with a directory scan
     try:
         _engine_dir_local = os.path.dirname(os.path.abspath(__file__))
         if _engine_dir_local not in sys.path:

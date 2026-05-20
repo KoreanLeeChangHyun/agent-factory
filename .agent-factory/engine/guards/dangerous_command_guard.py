@@ -17,14 +17,14 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 from common import read_env
 
-# 위험 명령어 패턴 로드 (보안 우선: import 실패 시 전체 차단 폴백)
+# Loading dangerous command patterns (Security priority: full blocking fallback in case of import failure)
 try:
     from constants import DANGER_WHITELIST, DANGER_PATTERNS
     WHITELIST_PATTERNS: list[tuple[str, None]] = [(item["pattern"], None) for item in DANGER_WHITELIST]
@@ -34,15 +34,15 @@ try:
     ]
 except ImportError:
     print(
-        "[dangerous_command_guard] CRITICAL: data.constants import 실패 - 보안 폴백 적용",
+        "[dangerous_command_guard] CRITICAL: data.constants import failed - apply security fallback",
         file=sys.stderr,
     )
     WHITELIST_PATTERNS = []
     DANGER_PATTERN_LIST = [
         (
             r".",
-            "위험 패턴 데이터 로드 실패 (보안 폴백)",
-            "시스템 관리자에게 data/constants.py 파일 상태를 확인 요청하세요.",
+            "Risk pattern data load failure (security fallback)",
+            "Ask your system administrator to check the status of the data/constants.py file.",
         )
     ]
 
@@ -54,7 +54,7 @@ def _deny(blocked: str, alternative: str) -> None:
         blocked: 차단된 명령어 또는 패턴 설명
         alternative: 안전한 대안 안내 문자열
     """
-    reason = f"위험한 명령어가 감지되었습니다: {blocked}. 안전한 대안: {alternative}"
+    reason = f"Dangerous command detected: {blocked}. Safe alternative: {alternative}"
     result = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -73,14 +73,14 @@ def main() -> None:
     매칭 시 deny 응답을 출력하여 실행을 차단한다.
     화이트리스트 패턴에 매칭되면 검사를 건너뛴다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_DANGEROUS_COMMAND") or read_env("HOOK_DANGEROUS_COMMAND")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -88,7 +88,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Bash가 아니면 통과
+    # Pass if not Bash
     if tool_name != "Bash":
         sys.exit(0)
 
@@ -97,17 +97,17 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # 화이트리스트 검사 (안전한 패턴은 통과)
+    # Whitelist check (safe patterns pass)
     for wl_pattern, _ in WHITELIST_PATTERNS:
         if re.search(wl_pattern, command):
             sys.exit(0)
 
-    # 위험 패턴 검사
+    # Risk pattern inspection
     for pattern, blocked, alternative in DANGER_PATTERN_LIST:
         if re.search(pattern, command):
             _deny(blocked, alternative)
 
-    # 위험 패턴 미매칭 시 통과
+    # Passes when risk pattern does not match
     sys.exit(0)
 
 

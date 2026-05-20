@@ -1,21 +1,21 @@
-"""undo_done.py - Done 처리된 워크플로우를 Review 단계로 자동 롤백하는 모듈.
+"""undo done.py - a module that automatically rolls the Done processed workflow to the Review phase.
 
-Done 후 발견된 치명 버그를 깨끗이 되돌리기 위해 다음 단계를 일관 수행한다:
+Done will perform following steps to clean the deadly bugs found after NEWS
 
-  1. 사전 검증 — 티켓 Done 상태 / merge_commit 존재 / merge anchor 정합 /
-     브랜치 + worktree 점유 검사
-  2. 푸시 여부 분기 — `git branch -r --contains <merge_commit>` 출력으로
-     local-only 인지 origin/develop 도달인지 origin/main 도달인지 식별
-  3. develop 복원 —
-       - 전략 1 reset: push 전 + 후속 commit 0개 → `git reset --hard merge_commit^`
-       - 전략 2 revert: push 후 또는 후속 commit 누적 → `git revert -m 1 --no-edit`
-  4. 워크트리 재생성 — `worktree_manager.create_worktree()` 호출
-  5. 칸반 force 전이 — 티켓 XML 을 `done/T-NNN.xml` → `review/T-NNN.xml` 로 이동 +
-     `<status>` 를 "Review" 로 갱신
-  6. 사후 출력 — git status / log / 다음 절차 안내
+  1. FAQ Pre Verification — Ticket Done Status / merge commit existence / merge anchor /
+     Branding + worktree oil inspection
+  2. FAQ git branch --contains <merge commit> output
+     local-only identifies whether origin/develop is reached/main reach
+  3. FAQs development —
+       - Strategic 1 reset: 0 before push + follow-up commit → `git reset --hard merge commit^`
+       - Strategies 2 revert: push or follow-up commit accumulation → git revert -m 1 --no-edit
+  4. FAQs Worktree Regeneration — call `worktree manager.create worktree()`
+  5. FAQs Before the Kanban force — go to the ticket XML as `done/T-NNN.xml` → `review/T-NNN.xml` +
+     "Review"
+  6. Post-Output — git status / log / next procedure
 
-공개 API:
-    main: argparse 진입점 (flow-undo-done wrapper 가 호출)
+Public API:
+    main: argparse entry point (flow-undo-done wrapper call)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import subprocess
 import sys
 from typing import Literal
 
-# ─── sys.path 보장 ────────────────────────────────────────────────────────────
+# ─── sys.path guaranteed ───────────────────────────────────────────────────────────────
 
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -50,129 +50,129 @@ from flow.worktree_manager import (
     get_worktree_path,
 )
 
-# ─── 타입 별칭 ────────────────────────────────────────────────────────────────
+# ─── Type Alias ​​────────────────────────────────────────────────────────────────────
 
 PushState = Literal["local", "pushed", "main"]
 
 
-# ─── 로깅 ─────────────────────────────────────────────────────────────────────
+# ─── Logging ────────────────────────────────────────────────────────────────────────
 
 
 def _log(msg: str) -> None:
-    """단계별 진행 로그를 stdout 으로 출력한다."""
+    """Outputs step-by-step progress logs to stdout."""
     print(f"[undo-done] {msg}", flush=True)
 
 
 def _err(msg: str) -> None:
-    """에러 로그를 stderr 로 출력하고 SystemExit(2) 를 던진다."""
+    """Prints the error log to stderr and throws SystemExit(2)."""
     print(f"[undo-done] ERROR: {msg}", file=sys.stderr, flush=True)
     raise SystemExit(2)
 
 
 def _warn(msg: str) -> None:
-    """경고 로그를 stderr 로 출력한다 (계속 진행)."""
+    """Print warning log to stderr (continue)."""
     print(f"[undo-done] WARN: {msg}", file=sys.stderr, flush=True)
 
 
-# ─── git 헬퍼 ────────────────────────────────────────────────────────────────
+# ─── git helper ────────────────────────────────────────────────────────────────────
 
 
 def _git(
     *args: str, repo_path: str | None = None, check: bool = False
 ) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행한다.
+    """execute git command.
 
     Args:
-        *args: git 서브커맨드 및 인자.
-        repo_path: 저장소 경로. None 이면 프로젝트 루트.
-        check: True 이면 returncode != 0 시 _err 로 abort.
+        *args: git sub-mand and arguments.
+        repo path: repository path. None if the project root.
+        check: true returncode != 0 o'clock  err by abort.
 
     Returns:
-        CompletedProcess 인스턴스.
+        CompletedProcess instance.
     """
     cwd = repo_path or resolve_project_root()
     cmd = ["git", "-C", cwd] + list(args)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if check and result.returncode != 0:
         _err(
-            f"git {' '.join(args)} 실패 (exit={result.returncode}): "
+            f"git {' '.join(args)} failed (exit={result.returncode}):"
             f"{result.stderr.strip()}"
         )
     return result
 
 
-# ─── 사전 검증 (T2.2) ────────────────────────────────────────────────────────
+# ─── Pre-verification (T2.2) ─────────────────────────────────────────────────────────
 
 
 def _validate_ticket_done(ticket_id: str) -> str:
-    """티켓이 Done 디렉터리에 존재하고 status="Done" 인지 검증한다.
+    """The ticket exists in the Done directory and status="Done".
 
     Args:
-        ticket_id: T-NNN 형식 티켓 번호.
+        Ticket id: T-NNN type ticket number.
 
     Returns:
-        티켓 XML 파일 절대 경로.
+        Ticket XML file absolute path.
 
     Raises:
-        SystemExit: Done 상태가 아니거나 파일이 없을 때.
+        SystemExit: No Done status or no file.
     """
     ticket_file = find_ticket_file(ticket_id)
     if ticket_file is None:
-        _err(f"{ticket_id} 티켓 파일을 찾을 수 없습니다")
+        _err(f"Ticket file {ticket_id} not found")
 
     ticket_data = parse_ticket_xml(ticket_file)
     status = ticket_data.get("status", "")
     if status != "Done":
         _err(
-            f"{ticket_id} 은 Done 상태가 아닙니다 (현재: {status!r}). "
-            "undo-done 은 Done 티켓 전용입니다."
+            f"{ticket_id} is not in Done status (currently: {status!r})."
+            "undo-done is for Done tickets only."
         )
 
-    # 파일이 done 디렉터리에 위치해 있는지 확인 (방어적 검증)
+    # Verify that the file is located in the done directory (defensive verification)
     if os.path.normpath(os.path.dirname(ticket_file)) != os.path.normpath(
         KANBAN_DONE_DIR
     ):
         _warn(
-            f"티켓 status 는 Done 이지만 파일이 done/ 외부에 있습니다: "
+            f"Ticket status is Done but the file is outside done/:"
             f"{ticket_file}"
         )
 
-    _log(f"티켓 검증 통과: {ticket_id} status=Done file={ticket_file}")
+    _log(f"Ticket validation passed: {ticket_id} status=Done file={ticket_file}")
     return ticket_file
 
 
 def _load_merge_commit(ticket_id: str, ticket_file: str, force: bool) -> str:
-    """티켓 result.merge_commit 를 로드하고, 누락 시 reflog fallback 을 시도한다.
+    """Load the ticket result.merge commit and try reflog fallback when missing.
 
     Args:
-        ticket_id: T-NNN 형식.
-        ticket_file: 티켓 XML 절대 경로.
-        force: True 이면 누락 시 reflog 에서 추정 시도.
+        ticket id: T-NNN format.
+        ticket file: ticket XML absolute path.
+        force: True attempt to estimate from reflog when missing.
 
     Returns:
-        merge_commit SHA (40자리 hex 또는 짧은 형식).
+        merge commit SHA (40 digit hex or short format).
 
     Raises:
-        SystemExit: merge_commit 가 없고 force 가 False 이거나 fallback 실패.
+        SystemExit: merge commit and force fails False or fallback.
     """
     ticket_data = parse_ticket_xml(ticket_file)
     result = ticket_data.get("result") or {}
     merge_commit = (result.get("merge_commit") or "").strip()
 
     if merge_commit:
-        _log(f"merge_commit 로드: {merge_commit[:8]} (티켓 result 에서)")
+        _log(f"load merge_commit: {merge_commit[:8]} (from ticket result)")
         return merge_commit
 
     if not force:
         _err(
-            f"{ticket_id} result.merge_commit 가 비어있습니다. "
-            "Phase 1 인프라 도입 이전에 Done 처리된 티켓일 수 있습니다. "
-            "--force 플래그로 reflog fallback 을 시도하거나, "
-            f"flow-kanban update-result {ticket_id} --merge-commit <SHA> 로 수동 보강하세요."
+            f"{ticket_id} result.merge_commit is empty."
+            "This may be a ticket that was Done prior to the introduction of Phase 1 infrastructure."
+            "Try reflog fallback with the --force flag, or"
+            f"Manually augment with flow-kanban update-result {ticket_id} --merge-commit <SHA>."
         )
 
-    # reflog fallback: feat/T-NNN-* 머지 메시지 탐색
-    _warn("merge_commit 누락, --force 로 reflog fallback 시도")
+    # reflog fallback: feat/T-NNN-* Merge message navigation
+    _warn("merge_commit missing, try reflog fallback with --force")
     reflog_result = _git(
         "reflog",
         "--grep-reflog=" + f"merge.*feat/{ticket_id}",
@@ -181,51 +181,51 @@ def _load_merge_commit(ticket_id: str, ticket_file: str, force: bool) -> str:
     )
     if reflog_result.returncode != 0 or not reflog_result.stdout.strip():
         _err(
-            "reflog 에서 후보 merge commit 을 찾지 못했습니다. "
-            "reflog 가 만료되었거나 다른 브랜치에 머지된 것으로 추정됩니다. "
-            "수동으로 git log 에서 SHA 를 식별한 후 --merge-commit 로 지정하세요."
+            "No candidate merge commit found in reflog."
+            "It is assumed that the reflog has expired or been merged into another branch."
+            "Manually identify the SHA in git log and then specify it with --merge-commit."
         )
 
     candidate = reflog_result.stdout.strip().splitlines()[0].split(" ", 1)[0]
     _warn(
-        f"reflog fallback 후보 SHA={candidate[:8]} — 신뢰성이 낮으니 사후 git log 를 반드시 검토하세요"
+        f"reflog fallback candidate SHA={candidate[:8]} — Reliability is low, so be sure to review git log afterwards"
     )
     return candidate
 
 
 def _verify_merge_anchor(merge_commit: str, expected_branch: str) -> None:
-    """merge_commit^2 == feature 브랜치 tip 인지 검증한다.
+    """merge commit^2 == feature validation of the branch tip.
 
-    merge_pipeline._stage2_5_verify_merge_anchor 패턴을 답습한다.
-    feature 브랜치가 이미 삭제된 경우는 비차단 (정상 정리 후 상태).
+    merge pipeline. stage2 5 verify merge anchor
+    If the feature brand is already deleted, the non-block (the status after correction).
 
     Args:
-        merge_commit: 검증 대상 머지 커밋 SHA.
-        expected_branch: feat/T-NNN-* 형식 feature 브랜치명 (또는 빈 문자열).
+        merge commit: validation target migration commit SHA.
+        expected branch: feat/T-NNN-* format feature brand name (or empty string).
 
     Raises:
-        SystemExit: parent2 가 expected_branch tip 과 다른 경우 (anchor 깨짐).
+        SystemExit: parent2 is expected branch tip and other cases (anchor broken).
     """
     parent2 = _git("rev-parse", f"{merge_commit}^2")
     if parent2.returncode != 0:
-        # fast-forward 또는 비-merge commit. revert 전략으로만 가능.
+        # fast-forward or non-merge commit. Only possible with revert strategy.
         _warn(
-            f"merge_commit {merge_commit[:8]} 가 parent 가 1개입니다. "
-            "fast-forward 머지로 보이며 reset 전략은 위험합니다. "
-            "revert 전략 강제로 진행됩니다."
+            f"merge_commit {merge_commit[:8]} has 1 parent."
+            "It appears to be a fast-forward merge and the reset strategy is risky."
+            "The revert strategy is forced."
         )
         return
 
     parent2_sha = parent2.stdout.strip()
     if not expected_branch:
-        # feature 브랜치가 이미 삭제되어 있는 정상 경로.
-        _log(f"anchor 검증 스킵: feature 브랜치 미존재 (parent2={parent2_sha[:8]})")
+        # Normal path where the feature branch has already been deleted.
+        _log(f"Skip anchor verification: feature branch does not exist (parent2={parent2_sha[:8]})")
         return
 
     fb_head = _git("rev-parse", expected_branch)
     if fb_head.returncode != 0:
         _log(
-            f"anchor 검증 스킵: feature 브랜치 {expected_branch} 가 이미 삭제됨 "
+            f"Skip anchor verification: feature branch {expected_branch} has already been deleted"
             f"(parent2={parent2_sha[:8]})"
         )
         return
@@ -233,76 +233,76 @@ def _verify_merge_anchor(merge_commit: str, expected_branch: str) -> None:
     fb_sha = fb_head.stdout.strip()
     if parent2_sha != fb_sha:
         _err(
-            f"anchor 검증 실패: merge_commit^2 ({parent2_sha[:8]}) ≠ "
+            f"anchor validation failed: merge_commit^2 ({parent2_sha[:8]}) ≠"
             f"{expected_branch} tip ({fb_sha[:8]}). "
-            "다른 브랜치가 머지되었거나 history 가 변조되었을 가능성. 수동 조사 필요."
+            "Other branches may have been merged or history may have been altered. Manual investigation required."
         )
 
-    _log(f"anchor 검증 통과: parent2={parent2_sha[:8]} == {expected_branch} tip")
+    _log(f"anchor validation passed: parent2={parent2_sha[:8]} == {expected_branch} tip")
 
 
 def _check_branch_worktree_clear(
     ticket_id: str, force: bool = False
 ) -> tuple[str | None, str | None]:
-    """feature 브랜치 + worktree 가 점유 중이지 않은지 검사한다.
+    """feature Brands + worktree checks that are not occupied.
 
     Args:
-        ticket_id: T-NNN 형식.
-        force: True 이면 점유 중이어도 경고만 출력 (실제 정리 책임은 사용자).
+        ticket id: T-NNN format.
+        force: True displacement only output warning (the actual clearance is user).
 
     Returns:
-        (existing_branch, existing_worktree_path) 튜플. 점유 없으면 (None, None).
+        (existing branch, existing worktree path) tuple. (None, None).
 
     Raises:
-        SystemExit: 점유 발견 + force=False.
+        SystemExit: Gas Detector + force=False.
     """
     existing_branch = get_feature_branch_for_ticket(ticket_id)
     existing_wt = get_worktree_path(ticket_id)
 
     if existing_branch is None and existing_wt is None:
-        _log("브랜치/워크트리 점유 검사 통과 (둘 다 비어있음)")
+        _log("Branch/worktree occupancy check passed (both empty)")
         return (None, None)
 
     msg_parts = []
     if existing_branch:
-        msg_parts.append(f"feature 브랜치 {existing_branch} 존재")
+        msg_parts.append(f"feature branch {existing_branch} exists")
     if existing_wt:
-        msg_parts.append(f"worktree {existing_wt} 존재")
+        msg_parts.append(f"worktree {existing_wt} exists")
     msg = ", ".join(msg_parts)
 
     if force:
-        _warn(f"점유 발견 (force 통과): {msg}")
+        _warn(f"Occupancy found (force passed): {msg}")
         return (existing_branch, existing_wt)
 
     _err(
-        f"브랜치/워크트리 점유 감지 — {msg}. "
-        "--force 로 진행 가능하나 충돌 가능성이 큽니다. "
-        f"먼저 'git worktree remove' 와 'git branch -D {existing_branch}' 로 정리하세요."
+        f"Branch/worktree occupancy detection — {msg}."
+        "You can proceed with --force, but there is a high possibility of conflict."
+        f"First, organize it with ‘git worktree remove’ and ‘git branch -D {existing_branch}’."
     )
-    return (existing_branch, existing_wt)  # 도달 불가 (방어용)
+    return (existing_branch, existing_wt)  # Unreachable (defensive)
 
 
-# ─── 푸시 여부 분기 (T2.3) ───────────────────────────────────────────────────
+# ─── Branch to push or not to push (T2.3) ─────────────────────────────────────────────────────
 
 
 def _detect_push_state(merge_commit: str) -> PushState:
-    """merge_commit 의 푸시 상태를 식별한다.
+    """identify the push status of merge commit.
 
-    `git branch -r --contains <merge_commit>` 출력을 파싱하여
-    origin/develop / origin/main 매칭 여부로 분류한다.
+    `git branch -r --contains <merge commit> output
+    sort as origin/develop / origin/main matching or whether.
 
     Args:
-        merge_commit: 검사 대상 SHA.
+        merge commit: scan target SHA.
 
     Returns:
-        - "main": origin/main (또는 origin/master) 에 도달
-        - "pushed": origin/develop 에만 도달
-        - "local": origin/* 에 미도달
+        - "main": reach to origin/main (or origin/master)
+        - "pushed": origin/develop only reach
+        - "local": origin/* to midway
     """
     result = _git("branch", "-r", "--contains", merge_commit)
     if result.returncode != 0:
         _warn(
-            f"git branch -r --contains 실패 — local 로 가정: {result.stderr.strip()}"
+            f"git branch -r --contains failed — assumed local: {result.stderr.strip()}"
         )
         return "local"
 
@@ -319,64 +319,64 @@ def _detect_push_state(merge_commit: str) -> PushState:
         _log(f"push state: pushed (refs={remote_refs})")
         return "pushed"
 
-    _log(f"push state: local (refs 없음 또는 origin/* 비포함)")
+    _log(f"push state: local (no refs or origin/* included)")
     return "local"
 
 
 def _has_followup_commits(merge_commit: str) -> bool:
-    """develop 의 HEAD 가 merge_commit 보다 앞서있는지 (후속 commit 누적) 검사한다.
+    """The head of development checks if it is ahead of merge commit (the follow-up commit accumulation).
 
-    `git rev-list develop ^merge_commit --count` > 0 이면 후속 commit 존재.
+    `git rev-list develop ^merge commit --count` > 0 if the follow-up commit exists.
 
     Args:
-        merge_commit: 기준 SHA.
+        merge commit: standard SHA.
 
     Returns:
-        후속 commit 이 1개 이상이면 True.
+        True if there is more than one end commit.
     """
     result = _git("rev-list", "develop", f"^{merge_commit}", "--count")
     if result.returncode != 0:
         _warn(
-            f"후속 commit 검사 실패 — 안전하게 True 반환: {result.stderr.strip()}"
+            f"Subsequent commit check fails — safely returns True: {result.stderr.strip()}"
         )
         return True
     try:
         count = int(result.stdout.strip())
     except ValueError:
         return True
-    _log(f"후속 commit 수 (develop ^merge_commit): {count}")
+    _log(f"Number of subsequent commits (develop ^merge_commit): {count}")
     return count > 0
 
 
-# ─── 전략 1: reset (T2.4) ───────────────────────────────────────────────────
+# ─── Strategy 1: reset (T2.4) ─────────────────────────────────────────────────────
 
 
 def _strategy_reset(merge_commit: str, ticket_id: str) -> None:
-    """develop 을 merge_commit 직전으로 reset --hard 한다.
+    """merge commit
 
-    백업 reflog 마커(`refs/backup/undo-T-NNN`) 를 사전 작성하여
-    잘못된 입력 시 복구 가능성을 남긴다.
+    Pre-write backup reflog marker(`refs/backup/undo-T-NNN`)
+    Recovers the possibility of recovering incorrect inputs.
 
     Args:
-        merge_commit: 제거할 머지 커밋 SHA.
-        ticket_id: T-NNN (백업 ref 이름에 사용).
+        merge commit: thumb commits to remove SHA.
+        ticket id: T-NNN (used for back-up ref name).
 
     Raises:
-        SystemExit: 후속 commit 누적 시 (자동 revert 분기 강제).
+        SystemExit: After-speed commit accumulation (automatic revert quarterly force).
     """
     if _has_followup_commits(merge_commit):
         _err(
-            "develop 에 후속 commit 이 누적되어 reset 전략을 사용할 수 없습니다 "
-            "(데이터 유실 위험). revert 전략으로만 진행 가능 — "
-            "푸시 여부와 무관하게 _strategy_revert 가 자동 호출되도록 main() 흐름이 보장합니다."
+            "The reset strategy cannot be used because develop has accumulated subsequent commits"
+            "(Risk of data loss). Only possible with revert strategy —"
+            "The main() flow ensures that _strategy_revert is automatically called regardless of whether there is a push or not."
         )
 
-    _log("전략 1: reset --hard 진행")
+    _log("Strategy 1: proceed with reset --hard")
 
     # develop checkout
     _git("checkout", "develop", check=True)
 
-    # 백업 reflog 마커
+    # Backup reflog marker
     backup_ref = f"refs/backup/undo-{ticket_id}"
     update_ref = _git(
         "update-ref",
@@ -386,108 +386,108 @@ def _strategy_reset(merge_commit: str, ticket_id: str) -> None:
         "HEAD",
     )
     if update_ref.returncode == 0:
-        _log(f"백업 ref 작성: {backup_ref} -> HEAD")
+        _log(f"Create backup ref: {backup_ref} -> HEAD")
     else:
         _warn(
-            f"백업 ref 작성 실패 (계속 진행): {update_ref.stderr.strip()}"
+            f"Failed to create backup ref (continue): {update_ref.stderr.strip()}"
         )
 
     # reset --hard merge_commit^
     _git("reset", "--hard", f"{merge_commit}^", check=True)
-    _log(f"develop reset 완료: HEAD = {merge_commit}^ (merge commit 제거)")
+    _log(f"complete develop reset: HEAD = {merge_commit}^ (remove merge commit)")
 
 
-# ─── 전략 2: revert (T2.5) ──────────────────────────────────────────────────
+# ─── Strategy 2: revert (T2.5) ────────────────────────────────────────────────────
 
 
 def _strategy_revert(merge_commit: str) -> None:
-    """develop 에 merge_commit 의 역방향 변경을 추가한다 (revert -m 1).
+    """add a reverse change of merge commit to develop (revert -m 1).
 
     Args:
-        merge_commit: 되돌릴 머지 커밋 SHA.
+        merge commit: rendrilling mitt SHA.
     """
-    _log("전략 2: revert -m 1 진행")
+    _log("Strategy 2: revert -m 1 proceed")
 
     _git("checkout", "develop", check=True)
     revert = _git(
         "revert", "-m", "1", "--no-edit", merge_commit
     )
     if revert.returncode != 0:
-        # 충돌 시 abort
+        # Abort in case of collision
         _git("revert", "--abort")
         _err(
-            f"revert 실패 — 충돌 또는 변경 없음일 수 있습니다: {revert.stderr.strip()}"
+            f"revert fails — may be a crash or no change: {revert.stderr.strip()}"
         )
 
     head = _git("rev-parse", "HEAD")
     new_head = head.stdout.strip() if head.returncode == 0 else "?"
-    _log(f"revert 완료: 새 HEAD = {new_head[:8]}")
+    _log(f"revert done: new HEAD = {new_head[:8]}")
 
 
-# ─── 워크트리 재생성 (T2.6) ─────────────────────────────────────────────────
+# ─── Work tree regeneration (T2.6) ───────────────────────────────────────────────────
 
 
 def _recreate_worktree(ticket_id: str, ticket_file: str) -> WorktreeInfo:
-    """worktree_manager.create_worktree() 로 feature 브랜치 + worktree 를 재생성한다.
+    """worktree manager.create worktree()
 
     Args:
-        ticket_id: T-NNN 형식.
-        ticket_file: 티켓 XML 경로 (title 추출용).
+        ticket id: T-NNN format.
+        ticket file: ticket XML path (title for extraction).
 
     Returns:
-        생성된 WorktreeInfo.
+        Created WorktreeInfo.
 
     Raises:
-        SystemExit: 생성 실패 시.
+        SystemExit: generate failure.
     """
     ticket_data = parse_ticket_xml(ticket_file)
     title = ticket_data.get("title", "") or "untitled"
 
-    _log(f"워크트리 재생성 시작: {ticket_id} (title={title!r})")
+    _log(f"Start work tree regeneration: {ticket_id} (title={title!r})")
     info = create_worktree(ticket_id, title, command="implement")
     if info is None:
         _err(
-            f"worktree 재생성 실패 ({ticket_id}). "
-            "feature 브랜치 또는 디렉터리 점유 가능성. "
-            "수동 정리 후 재시도하세요."
+            f"Failed to recreate worktree ({ticket_id})."
+            "Feature branch or directory occupancy potential."
+            "Please clean up manually and retry."
         )
-    _log(f"워크트리 재생성 완료: path={info.path} branch={info.branch_name}")
+    _log(f"Work tree regeneration completed: path={info.path} branch={info.branch_name}")
     return info
 
 
-# ─── 칸반 force 전이 (T2.7) ─────────────────────────────────────────────────
+# ─── Kanban force transition (T2.7) ────────────────────────────────────────────────────
 
 
 def _force_done_to_review(ticket_id: str, ticket_file: str) -> str:
-    """티켓 XML 파일을 done/ -> review/ 로 이동하고 status 를 갱신한다.
+    """Go to the ticket XML file done/ review ->/ and update status.
 
     Args:
-        ticket_id: T-NNN 형식.
-        ticket_file: 현재 done/ 에 있는 티켓 파일 경로.
+        ticket id: T-NNN format.
+        ticket file: Currently done/ in the ticket file path.
 
     Returns:
-        이동 후 새 파일 경로.
+        New file path after moving.
     """
-    _log(f"칸반 force 전이: Done → Review ({ticket_id})")
+    _log(f"Kanban force transition: Done → Review ({ticket_id})")
 
-    # 1. XML <status> 를 Review 로 갱신 (파일은 아직 done/ 위치)
+    # 1. Update XML <status> to Review (file still in done/ location)
     update_ticket_status(ticket_file, "Review")
-    _log(f"  XML <status> 갱신: Review")
+    _log(f"XML <status> update: Review")
 
-    # 2. 파일을 review/ 디렉터리로 이동
+    # 2. Move the file to the review/ directory
     new_path = move_ticket_to_status_dir(ticket_file, "Review")
-    _log(f"  파일 이동: {ticket_file} → {new_path}")
+    _log(f"Move file: {ticket_file} → {new_path}")
 
     return new_path
 
 
-# ─── 사후 출력 (T2.8) ───────────────────────────────────────────────────────
+# ─── Post-output (T2.8) ────────────────────────────────────────────────────────
 
 
 def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
-    """git status / log + 다음 절차 안내를 출력한다."""
+    """git status / log + Prints the following procedure instructions."""
     _log("=" * 60)
-    _log("롤백 완료 — 사후 상태")
+    _log("Rollback complete — post-state")
     _log("=" * 60)
 
     status_result = _git("status", "--short", "--branch")
@@ -498,20 +498,20 @@ def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
 
     log_result = _git("log", "--oneline", "-5")
     if log_result.returncode == 0:
-        _log("git log (최근 5개):")
+        _log("git log (last 5):")
         for line in log_result.stdout.rstrip().splitlines():
             print(f"  {line}", flush=True)
 
     print("", flush=True)
-    _log(f"다음 절차:")
-    _log(f"  1. 워크트리로 이동: cd {worktree.path}")
-    _log(f"     (feature 브랜치 {worktree.branch_name} 가 재생성되었습니다)")
-    _log(f"  2. 티켓 편집:        /wf -e {ticket_id}")
-    _log(f"  3. 워크플로우 재실행: /wf -s {ticket_id}")
+    _log(f"Next steps:")
+    _log(f"1. Go to the worktree: cd {worktree.path}")
+    _log(f"(feature branch {worktree.branch_name} has been recreated)")
+    _log(f"2. Edit ticket: /wf -e {ticket_id}")
+    _log(f"3. Rerun the workflow: /wf -s {ticket_id}")
     _log("")
     _log(
-        f"칸반 상태: {ticket_id} 는 Review 컬럼으로 복귀했습니다. "
-        "/wf -e 로 Open 강등 또는 직접 수정 후 /wf -d 로 재완료할 수 있습니다."
+        f"Kanban status: {ticket_id} is back in the Review column."
+        "You can demote Open with /wf -e or modify it directly and re-complete with /wf -d."
     )
 
 
@@ -519,20 +519,20 @@ def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """argparse 진입점. flow-undo-done wrapper 가 호출한다.
+    """argparse entry point. flow-undo-done wrapper is called.
 
     Args:
-        argv: 테스트용 인자 리스트 (None 이면 sys.argv 사용).
+        argv: List of arguments for testing (using None sys.argv).
 
     Returns:
-        0 (성공) / 2 (실패; SystemExit 로 raise).
+        0 (Property) / 2 (Property)
     """
     parser = argparse.ArgumentParser(
         prog="flow-undo-done",
         description=(
-            "Done 처리된 워크플로우를 Review 단계로 자동 롤백합니다. "
-            "develop 의 merge 결과를 reset 또는 revert 로 되돌리고, "
-            "feature 브랜치 + worktree 를 재생성한 후, 칸반을 Done → Review 로 이동합니다."
+            "Automatically rolls back finished workflows to the Review stage."
+            "Return the merge result of develop with reset or revert,"
+            "After regenerating the feature branch + worktree, move Kanban to Done → Review."
         ),
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -540,85 +540,85 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "ticket",
         type=ticket_type,
-        help="롤백할 Done 티켓 번호 (T-NNN, NNN, #N 형식).",
+        help="Done ticket number to roll back to (in the format T-NNN, NNN, #N).",
     )
     parser.add_argument(
         "--force",
         action="store_true",
         help=(
-            "검증 단계에서 발견된 점유/누락 등을 경고로 격하시킵니다. "
-            "merge_commit 누락 시 reflog fallback 도 활성화됩니다."
+            "Occupancy/omissions discovered during the verification stage are downgraded to warnings."
+            "If merge_commit is missed, reflog fallback is also activated."
         ),
     )
     args = parser.parse_args(argv)
     ticket_id: str = args.ticket
     force: bool = args.force
 
-    _log(f"=== Done 롤백 시작: {ticket_id} (force={force}) ===")
+    _log(f"=== Done Start rollback: {ticket_id} (force={force}) ===")
 
-    # T2.2 — 사전 검증
+    # T2.2 — Pre-validation
     ticket_file = _validate_ticket_done(ticket_id)
 
-    # merge 없는(merge_skipped) 케이스: research/문서 등 워크트리·브랜치 없이
-    # cmd_done 이 단순 파일 이동만 한 티켓. result.merge_commit 비어있음.
-    # reset/revert 전략 + 워크트리 재생성 모두 skip 하고 파일 이동만 수행한다.
+    # Case without merge (merge_skipped): Without work tree/branch such as research/document
+    # cmd_done This is a ticket for simple file movement only. result.merge_commit empty.
+    # Skip all reset/revert strategy + work tree regeneration and only perform file movement.
     _ticket_data = parse_ticket_xml(ticket_file)
     _result = _ticket_data.get("result") or {}
     if not (_result.get("merge_commit") or "").strip():
         _log(
-            "merge_commit 없음 — 단순 파일 이동 분기 (research/문서 등 merge 없는 Done 케이스)"
+            "No merge_commit — Simple file move branch (Done case without merge like research/documents etc.)"
         )
         _force_done_to_review(ticket_id, ticket_file)
         _log(
-            f"칸반 상태: {ticket_id} 는 Review 컬럼으로 복귀했습니다. "
-            "/wf -e 로 Open 강등 또는 직접 수정 후 /wf -d 로 재완료할 수 있습니다."
+            f"Kanban status: {ticket_id} is back in the Review column."
+            "You can demote Open with /wf -e or modify it directly and re-complete with /wf -d."
         )
         return 0
 
     merge_commit = _load_merge_commit(ticket_id, ticket_file, force)
 
-    # 기존 feature 브랜치 (있다면 anchor 검증에 사용)
+    # Existing feature branch (if present, use for anchor verification)
     existing_branch = get_feature_branch_for_ticket(ticket_id) or ""
     _verify_merge_anchor(merge_commit, existing_branch)
 
-    # 점유 검사
+    # occupancy inspection
     _check_branch_worktree_clear(ticket_id, force=force)
 
-    # T2.3 — 푸시 여부 분기
+    # T2.3 — Branch to push or not to push
     push_state = _detect_push_state(merge_commit)
     has_followup = _has_followup_commits(merge_commit)
 
     if push_state == "main":
         if not force:
             _err(
-                f"merge_commit {merge_commit[:8]} 가 origin/main 에 도달했습니다. "
-                "main 직접 commit 룰 위반을 피하기 위해 reset 전략은 사용 불가, "
-                "revert 전략만 가능합니다. 진행하려면 --force 를 명시하세요."
+                f"merge_commit {merge_commit[:8]} reached origin/main ."
+                "To avoid violating the main direct commit rule, the reset strategy cannot be used."
+                "Only revert strategy is possible. Specify --force to proceed."
             )
-        _log("main 도달 케이스 — revert 전략 강제 + force 동의 확인")
+        _log("main reach case — force revert strategy + force confirm agreement")
         _strategy_revert(merge_commit)
     elif push_state == "pushed" or has_followup:
-        # 푸시되었거나 후속 commit 누적 시 revert 전략 강제 (force-push 회피 + 데이터 유실 방지)
+        # Force revert strategy when pushed or when subsequent commits are accumulated (force-push avoidance + data loss prevention)
         if push_state == "pushed":
-            _log("origin/develop 도달 — revert 전략 (force-push 회피)")
+            _log("origin/develop reach — revert strategy (force-push avoidance)")
         else:
-            _log("후속 commit 누적 — revert 전략 (데이터 유실 방지)")
+            _log("Accumulate subsequent commits — revert strategy (to prevent data loss)")
         _strategy_revert(merge_commit)
     else:
-        # local-only + 후속 commit 없음 → reset 가능
-        _log("local-only + 후속 commit 없음 — reset 전략")
+        # local-only + no subsequent commit → reset possible
+        _log("local-only + no subsequent commits — reset strategy")
         _strategy_reset(merge_commit, ticket_id)
 
-    # T2.6 — 워크트리 재생성
+    # T2.6 — Regenerate the work tree
     worktree = _recreate_worktree(ticket_id, ticket_file)
 
-    # T2.7 — 칸반 force 전이 (Done → Review)
+    # T2.7 — Kanban force transition (Done → Review)
     _force_done_to_review(ticket_id, ticket_file)
 
-    # T2.8 — 사후 출력
+    # T2.8 — Post-output
     _print_postscript(ticket_id, worktree)
 
-    _log(f"=== Done 롤백 완료: {ticket_id} ===")
+    _log(f"=== Done Rollback completed: {ticket_id} ===")
     return 0
 
 

@@ -10,9 +10,9 @@
 
   // ── Session Switcher Engine ──
   //
-  // 세션 전환 시 outputDiv 자식을 cloneNode 로 복제하지 않고 참조를 배열에
-  // 옮긴다. 노드는 detach 후에도 살아있고 이벤트 리스너도 유지되므로,
-  // 복제 비용(O(n×depth))과 delegation 회귀(리스너 유실)에서 자유롭다.
+  // When switching session, outputDiv self-propelled cloneNode to array reference without cloneNode
+  // About Us nodes are alive after detach and they also maintain event listeners.
+  // It is free from reproduction cost (O(n×depth) and delegation regression (release).
 
   M._saveCurrentSession = function() {
     var entry = M._sessionMap[M._activeSessionId];
@@ -38,14 +38,14 @@
   };
 
   /**
-   * 대상 세션의 상태를 활성 변수로 복원한다.
+   * Restores the state of the target session with active variables.
    * @param {string} targetId
    */
   M._restoreSession = function(targetId) {
     var entry = M._sessionMap[targetId];
     if (!entry) return;
 
-    // 세션 모드 변수 업데이트
+    // Session mode variable update
     if (targetId === "main") {
       M.workflowSessionId = null;
       M.isWorkflowMode = false;
@@ -54,7 +54,7 @@
       M.isWorkflowMode = true;
     }
 
-    // 입력 카드 표시/숨김 즉각 반영 (M.updateControlBar 호출 전 동기 처리)
+    // Indication/Remove Immediately Reflecting (Motivation Processing Before Calling M.updateControlBar)
     var inputCardEl = document.querySelector(".terminal-input-card");
     if (inputCardEl) {
       if (M.isWorkflowMode) {
@@ -64,14 +64,14 @@
       }
     }
 
-    // 상태 변수 복원
+    // Restores status variables
     M.sessionCost = entry.cost;
     M.sessionTokens = { input: entry.tokens.input, output: entry.tokens.output };
     M.sessionModel = entry.model;
     Board.state.setTermStatus(entry.status);
     Board.state.termSessionId = targetId === "main" ? null : targetId;
 
-    // M.inputQueue 교체 (참조를 유지하면서 내용만 교체)
+    // M.inputQueueue rotation (replacing contents only while maintaining participation)
     M.inputQueue.length = 0;
     for (var qi = 0; qi < entry.inputQueue.length; qi++) {
       M.inputQueue.push(entry.inputQueue[qi]);
@@ -102,8 +102,8 @@
         M.outputDiv.scrollTop = M.outputDiv.scrollHeight;
       }
 
-      // WorkflowRenderer.reset() 으로 비워진 _stepPanels 맵을 현재 DOM 기준으로
-      // 재구성한다. connectSSE 이전에 수행하여 첫 이벤트부터 정확한 panel 로 라우팅.
+      // WorkflowRenderer.reset()
+      // Reconstructive. routing to the exact panel from the first event to perform before connectSSE.
       if (Board.WorkflowRenderer && Board.WorkflowRenderer.rebuildStepPanelsFromDom) {
         Board.WorkflowRenderer.rebuildStepPanelsFromDom(M.outputDiv);
       }
@@ -111,35 +111,35 @@
   };
 
   /**
-   * 세션을 전환한다.
-   * (a) 현재 세션 상태 저장 → (b) 대상 세션 복원 → (c) SSE 재연결 → (d) 상태바 갱신
+   * Convert Sessions.
+   * (a) Save current session status → (b) Restore target session → (c) SSE Reconnect → (d) Renew status bar
    *
-   * @param {string} targetSessionId - 전환할 세션 ID ("main" 또는 "wf-T-NNN-...")
+   * @param {string} targetSessionId - Session ID to switch ("main" or "wf-T-NNN-...")
    * @returns {Promise<void>}
    */
   M.switchSession = function(targetSessionId) {
     if (!targetSessionId) return Promise.resolve();
     if (targetSessionId === M._activeSessionId) return Promise.resolve();
 
-    // 대상 세션이 맵에 없으면 생성
+    // If the target session is not mapped
     if (!M._sessionMap[targetSessionId]) {
       M._sessionMap[targetSessionId] = M._createSessionEntry(targetSessionId);
     }
 
-    // 1. 현재 세션 저장
+    // 1. FAQ Save Current Sessions
     M._saveCurrentSession();
 
-    // 2. 활성 세션 ID 변경
+    // 2. Change Activity Session ID
     var prevId = M._activeSessionId;
     M._activeSessionId = targetSessionId;
 
-    // 3. SSE 선행 차단 (T-383 Phase 2 / VUL-1 / S4)
-    // _restoreSession 이전에 disconnectSSE 를 호출하여, 복원 도중 들어오는
-    // prev-session SSE 이벤트가 outputDiv 재구성 중인 DOM 에 들러붙는
-    // race window 를 원천 차단한다.
-    // adoptLastEventIdForSession / resetLastEventId 는 disconnectSSE 와
-    // 논리적으로 묶여 있으므로(세션별 last-event-id 를 먼저 복원한 뒤
-    // 연결을 끊어 from-id 재접속 의미 보존) 번들로 함께 이동시킨다.
+    // 3. FAQs (T-383 Phase 2 / VUL-1 / S4)
+    // restoreSession calls disconnectSSE prior to restoration
+    // prev-session SSE event is loaded into the DOM that outputDiv is reconfigured
+    // block race window.
+    // AdoptLastEventIdForSession / resetEventLastId with disconnectSSE
+    // logically tied (the last-event-id per session first restored
+    // Break the connection from-id reconnection means conservation) to move together.
     if (Board.session) {
       if (Board.session.adoptLastEventIdForSession) {
         Board.session.adoptLastEventIdForSession(targetSessionId);
@@ -149,16 +149,16 @@
       Board.session.disconnectSSE();
     }
 
-    // 4. 대상 세션 상태 복원 (M.outputDiv, 변수)
+    // 4. FAQs Restore Target Session Status (M.outputDiv, variable)
     M._restoreSession(targetSessionId);
 
-    // 5. SSE 재연결: 복원 완료 후 새 세션 DOM 을 대상으로 연결
-    // 워크플로우 세션은 SSE 구독 전에 REST /terminal/workflow/history 로 과거
-    // 이벤트를 먼저 주입한다 (T-391 링버퍼 제거 이후 표준 경로). 메인 세션은
-    // _restoreSession 에서 복원되므로 별도 history 주입이 필요 없다.
+    // 5. FAQs SSE Reconnect: Connect to a new session DOM after restoration
+    // Workflow Session REST /terminal/workflow/history before SSE subscription
+    // Inject the event first (T-391 standard path after removing ringbuckle). Main Session
+    // RestoreSession is restored, so there is no need for separate history injection.
     //
-    // T-495 P2 — production-line session 은 별도 진입점 (Board.session.startProductionLineSession)
-    // 으로 분기. v1 SSE 채널 (/terminal/workflow/events) 과 격리.
+    // T-495 P2 — Production-line session is separate entry point (Board.session.startProductionLineSession)
+    // to branch. v1 SSE channel (/terminal/workflow/events) and insulating.
     if (Board.session) {
       var isWfTarget = targetSessionId !== "main" &&
         targetSessionId.indexOf("wf-") === 0;
@@ -167,7 +167,7 @@
         Board.productionLineWorkflow.isProductionLineSessionId(targetSessionId);
 
       if (isProductionLineTarget && Board.session.startProductionLineSession) {
-        // production-line 분기: Board.productionLineWorkflow.subscribe 단일 진입점.
+        // Board.productionLineWorkflow.subscribe Single entry point.
         Board.session.startProductionLineSession(targetSessionId);
       } else {
         var historyChain = isWfTarget && Board.session.injectRestHistory
@@ -180,16 +180,16 @@
       }
     }
 
-    // 6. phase timeline 표시/숨김
+    // 6. phase timeline display/hidden
     var timelineBar = document.getElementById("wf-timeline-bar");
     if (timelineBar) {
       timelineBar.style.display = targetSessionId === "main" ? "none" : "";
     }
 
-    // 7. UI 갱신
+    // 7. OEM UI update
     M.updateControlBar();
 
-    // 탭 바가 있으면 활성 탭 업데이트 (W01에서 구현하는 UI 훅)
+    // Updated Active Tabs ( UI Hooks implemented on W01)
     if (Board.sessionSwitcher && Board.sessionSwitcher._onSwitch) {
       Board.sessionSwitcher._onSwitch(targetSessionId, prevId);
     }

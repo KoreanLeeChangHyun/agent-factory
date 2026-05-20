@@ -23,11 +23,11 @@ import re
 import time
 from urllib.parse import unquote, urlparse
 
-from board.server._common import api_endpoint, logger
-from board.server.state import production_line_registry
+from board.server.support.common import api_endpoint, logger
+from board.server.runtime.state import production_line_registry
 
 
-# /api/v2/sessions/<session_id>[/<sub_path>] 매칭
+# /api/v2/sessions/<session_id>[/<sub_path>] matching
 _SESSION_PATH_RE = re.compile(
     r'^/api/v2/sessions/(?P<session_id>[^/]+)(?:/(?P<sub>.+))?$'
 )
@@ -42,7 +42,7 @@ class ProductionLineWorkflowHandlerMixin:
     """
 
     # ------------------------------------------------------------------
-    # do_GET / do_POST 진입점 — http_router.py 가 호출
+    # do_GET / do_POST entry points — called by http_router.py
     # ------------------------------------------------------------------
 
     def _production_line_dispatch_get(self) -> bool:
@@ -135,7 +135,7 @@ class ProductionLineWorkflowHandlerMixin:
         session_id = unquote(match.group('session_id'))
         sub = match.group('sub')
 
-        # /api/v2/sessions/<id> (sub=None) — 세션 삭제
+        # /api/v2/sessions/<id> (sub=None) — Delete session
         if sub is None:
             self._production_line_handle_session_delete(session_id)
             return True
@@ -274,7 +274,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_handle_session_history(self, session_id: str) -> None:
         """GET /api/v2/sessions/<id>/history — persist NDJSON 이벤트 통째 반환.
 
-        T-513 P1 — 결정점 #2 채택, REST history V2 endpoint 신설. 재접속 시
+        T-513 P1 — 결정점 #2 Adopted, REST history V2 endpoint newly established. When reconnecting
         클라이언트가 라이브 SSE 등록 전 과거 이벤트를 일괄 적재. SSE replay
         링버퍼 사용 X — REST 단일 출처 (board.md §1.1 Terminal SSE replay 정책
         정합).
@@ -309,7 +309,7 @@ class ProductionLineWorkflowHandlerMixin:
                             rec = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        # _meta 라인 (첫 줄) 건너뛰기 — events 만 반환
+                        # Skip the _meta line (first line) — return only events
                         if isinstance(rec, dict) and '_meta' in rec:
                             continue
                         events.append(rec)
@@ -317,7 +317,7 @@ class ProductionLineWorkflowHandlerMixin:
                 logger.error(
                     'production-line history read failed (%s): %s', persist_path, exc,
                 )
-                # graceful — 빈 events 로 반환
+                # graceful — returns empty events
 
         self._send_json({
             'session_id': session_id,
@@ -445,7 +445,7 @@ class ProductionLineWorkflowHandlerMixin:
                 worktree_path=worktree_path,
             )
         except ValueError as exc:
-            # fake/test session_id pattern 차단 (T-495 production endpoint 오염 회귀 차단)
+            # Block fake/test session_id pattern (block T-495 production endpoint contamination regression)
             self._send_error(403, str(exc))
             return
         self._send_json({
@@ -488,7 +488,7 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
-        # T-495 P3 — forward-compatible extras (verdict/commit/retry 등) 통과
+        # T-495 P3 — Pass forward-compatible extras (verdict/commit/retry, etc.)
         extras = self._production_line_collect_extras(data, exclude={'step', 'phase', 'prev_step'})
         session.channel.emit_step(step, phase=phase, prev_step=prev_step, extras=extras)
         self._send_json({'ok': True, 'step': step, 'phase': phase})
@@ -636,7 +636,7 @@ class ProductionLineWorkflowHandlerMixin:
         return extras or None
 
     # ------------------------------------------------------------------
-    # T-511 P4 — DELETE / PATCH / POST artifacts (신설 3 endpoint)
+    # T-511 P4 — DELETE / PATCH / POST artifacts (3 new endpoints)
     # ------------------------------------------------------------------
 
     @api_endpoint("W2", "delete")
@@ -663,7 +663,7 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
-        # force=1 시 work_dir 디렉터리도 삭제
+        # When force=1, the work_dir directory is also deleted.
         force_raw = self._parse_query_param('force')
         force = force_raw in ('1', 'true', 'True')
 
@@ -801,14 +801,14 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(500, f'Write failed: {exc}')
             return
 
-        # session.artifacts 메타데이터 갱신 (있다면)
+        # Update session.artifacts metadata (if any)
         try:
             if hasattr(session, 'artifacts') and isinstance(session.artifacts, dict):
                 session.artifacts[rel_path] = {
                     'size': len(content.encode('utf-8')),
                     'updated_at': time.time(),
                 }
-        except Exception:  # noqa: BLE001 — metadata 실패가 endpoint 자체 실패 유발 X
+        except Exception:  # noqa: BLE001 — metadata failure causes endpoint itself to fail
             pass
 
         self._send_json({

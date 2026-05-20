@@ -34,7 +34,7 @@
   function render(sections) {
     body.innerHTML = '';
 
-    // Actions section (맨 위)
+    // Actions section
     var actions = document.createElement('div');
     actions.className = 'settings-section';
     actions.innerHTML = '<div class="settings-section-title">Actions</div>';
@@ -43,7 +43,7 @@
     syncItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-title">Sync Latest Workflow</div>' +
-        '<div class="settings-item-label">.claude/ 및 .agent-factory/를 최신 버전으로 동기화합니다</div>' +
+        '<div class="settings-item-label">.claude/ and .agent-factory/ synchronize with the latest version</div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-sync-btn">Sync</button>' +
@@ -63,7 +63,7 @@
     restartItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-key">Restart Server</div>' +
-        '<div class="settings-item-label">Board HTTP 서버를 재시작합니다</div>' +
+        '<div class="settings-item-label">Restart theBoard HTTP server</div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
@@ -75,7 +75,7 @@
     buildUrlItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-key">Build URL</div>' +
-        '<div class="settings-item-label">다른 프로젝트에 워크플로우를 설치하는 부트스트랩 명령을 클립보드에 복사합니다</div>' +
+        '<div class="settings-item-label"> Copy the Bootstrap command to install workflow in other projects to the clipboard< /div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-build-url-btn">Copy</button>' +
@@ -149,7 +149,7 @@
     var syncBtn = document.getElementById('settings-sync-btn');
     if (syncBtn) {
       syncBtn.addEventListener('click', function () {
-        if (!confirm('현재 프로젝트의 .claude/ 및 .agent-factory/를 최신 버전으로 덮어씁니다. 계속할까요?')) {
+        if (!confirm('.claude/ and .agent-factory/ of the current project is covered with the latest version. About Us')) {
           return;
         }
 
@@ -162,7 +162,7 @@
         statusEl.style.display = '';
         logEl.style.display = '';
         statusEl.className = 'settings-sync-status starting';
-        statusEl.textContent = '시작';
+        statusEl.textContent = 'Start';
         logEl.innerHTML = '';
 
         function parseSseBuffer(buffer) {
@@ -189,7 +189,7 @@
           .then(function (response) {
             if (response.status === 409) {
               statusEl.className = 'settings-sync-status failed';
-              statusEl.textContent = '이미 동기화가 진행 중입니다.';
+              statusEl.textContent = 'Sync is already in progress.';
               syncBtn.disabled = false;
               syncBtn.textContent = 'Sync';
               return;
@@ -208,7 +208,7 @@
                 parsed.events.forEach(function (evt) {
                   if (evt.type === 'start') {
                     statusEl.className = 'settings-sync-status running';
-                    statusEl.textContent = '진행 중';
+                    statusEl.textContent = 'About Us';
                   } else if (evt.type === 'log') {
                     var line = document.createElement('div');
                     line.className = 'settings-sync-log-line';
@@ -217,17 +217,17 @@
                     logEl.scrollTop = logEl.scrollHeight;
                   } else if (evt.type === 'done') {
                     statusEl.className = 'settings-sync-status done';
-                    statusEl.textContent = '완료 — 서버 재시작 필요';
+                    statusEl.textContent = '— server restart required';
                     if (restartBtn) {
                       restartBtn.classList.add('pulse');
                       setTimeout(function () { restartBtn.classList.remove('pulse'); }, 3000);
                     }
                   } else if (evt.type === 'error') {
                     statusEl.className = 'settings-sync-status failed';
-                    statusEl.textContent = '실패';
+                    statusEl.textContent = 'Failure';
                     var errLine = document.createElement('div');
                     errLine.className = 'settings-sync-log-line error';
-                    errLine.innerHTML = esc((evt.data && evt.data.message) || '오류가 발생했습니다.');
+                    errLine.innerHTML = esc((evt.data && evt.data.message) || 'I\'ve got a problem.');
                     logEl.appendChild(errLine);
                     logEl.scrollTop = logEl.scrollHeight;
                   }
@@ -243,10 +243,10 @@
           })
           .catch(function (err) {
             statusEl.className = 'settings-sync-status failed';
-            statusEl.textContent = '실패';
+            statusEl.textContent = 'Failure';
             var errLine = document.createElement('div');
             errLine.className = 'settings-sync-log-line error';
-            errLine.innerHTML = esc(err && err.message ? err.message : '네트워크 오류가 발생했습니다.');
+            errLine.innerHTML = esc(err && err.message ? err.message : 'I\'ve been using a network error.');
             logEl.appendChild(errLine);
             syncBtn.disabled = false;
             syncBtn.textContent = 'Sync';

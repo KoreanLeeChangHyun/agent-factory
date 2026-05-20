@@ -24,14 +24,14 @@ def validate_step(ctx: WorkflowContext) -> None:
             work_blocks.append(
                 f"### work/{rel.as_posix()}\n\n{md.read_text(encoding='utf-8')}\n"
             )
-    joined_work = "\n".join(work_blocks) if work_blocks else "(work/ 비어있음)"
+    joined_work = "\n".join(work_blocks) if work_blocks else "(work/empty)"
     initial_prompt = (
-        f"plan.md (통째):\n{plan_body}\n\n"
-        f"work/**/*.md (모두 통째):\n{joined_work}\n\n"
-        f"**Quality 평가 자연어** 만 (phase 분해 적정성 / deliverable 완성도 / deps 흐름 일관성 / 종합 자연어)\n"
-        f"`{ctx.validate_report_md_path()}` 에 작성. **14+룰 평가·verdict 산출·코드 검증(pytest/lint) 금지 (SPEC §0.1)** — "
-        f"driver 가 DONE 단계에서 `validate/rules.json` SSOT 결정론 산출 + "
-        f"driver `_verify_code.py` 가 본 VALIDATE Step 안에서 `validate/code.json` 산출."
+        f"plan.md (whole): \n {plan_body} \n \n"
+        f"work/**/*.md (all in its entirety): \n {joined_work} \n \n"
+        f"**Quality evaluation natural language** only (phase decomposition adequacy / deliverable completeness / deps flow consistency / comprehensive natural language) \n"
+        f"Written in `{ctx.validate_report_md_path()}`. **14+ Rule evaluation/verdict calculation/code verification (pytest/lint) prohibited (SPEC §0.1)** —"
+        f"driver calculates `validate/rules.json` SSOT determinism in DONE phase +"
+        f"`validate/code.json` output within the VALIDATE Step seen by driver `_verify_code.py`."
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "VALIDATE")

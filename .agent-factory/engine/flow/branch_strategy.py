@@ -1,15 +1,15 @@
-"""branch_strategy.py - Git 브랜치 전략 관리 모듈.
+"""branch strategy.py - Git brand strategy management module.
 
-워크플로우별 feature 브랜치 생성/삭제/검색 및 develop/main 브랜치
-감지를 담당한다. worktree_manager.py의 기반 모듈이다.
+Create/delete/Search and develop/main Brands by workflow
+Detecting. worktree manager.py
 
-공개 API:
-    get_main_branch: main 또는 master 브랜치 감지
-    ensure_develop_branch: develop 브랜치 확보 (없으면 로컬 생성)
-    create_feature_branch: feat/T-NNN-제목 브랜치 생성
-    delete_feature_branch: feature 브랜치 삭제 (로컬)
-    sanitize_branch_name: 브랜치명 안전 변환
-    get_feature_branch_for_ticket: 티켓에 연결된 feature 브랜치 검색
+Public API:
+    get main branch: main or master branch detection
+    ensure develop branch: create a development brand if there is no local
+    create feature branch: feat/T-NNN - Create a new brand
+    delete feature branch: feature Delete Brand Name (Local)
+    sanitize branch name: Brand Name Safety Conversion
+    get feature branch for ticket: Search feature brand name associated with the ticket
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 
-# ─── sys.path 보장 ────────────────────────────────────────────────────────────
+# ─── sys.path guaranteed ───────────────────────────────────────────────────────────────
 
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -29,30 +29,30 @@ if _engine_dir not in sys.path:
 
 from common import resolve_project_root
 
-# ─── 상수 ─────────────────────────────────────────────────────────────────────
+# ─── Constant ───────────────────────────────────────────────────────────────────────
 
 _BRANCH_NAME_MAX_LEN: int = 50
 _FEATURE_PREFIX: str = "feat/"
 
-# git 브랜치명에 사용 불가한 문자 패턴 (한글은 허용)
-# ~ ^ : ? * [ \ 및 공백, 제어문자, DEL
+# Character patterns that cannot be used in git branch names (Korean characters are allowed)
+# ~ ^ : ? * [\ and space, control characters, DEL
 _GIT_FORBIDDEN_CHARS: re.Pattern[str] = re.compile(r"[~^:?*\[\]\\@{}\x00-\x1f\x7f]")
 
 
-# ─── 내부 유틸리티 ────────────────────────────────────────────────────────────
+# ─── Internal Utilities ────────────────────────────────────────────────────────────────
 
 
 def _git(
     *args: str, repo_path: str | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행하고 결과를 반환한다.
+    """execute git command and return the result.
 
     Args:
-        *args: git 서브커맨드 및 인자.
-        repo_path: git 저장소 경로. None이면 resolve_project_root() 사용.
+        *args: git sub-mand and arguments.
+        repo path: git repository path. use resolve project root() if None.
 
     Returns:
-        CompletedProcess 인스턴스.
+        CompletedProcess instance.
     """
     cwd = repo_path or resolve_project_root()
     cmd = ["git", "-C", cwd] + list(args)
@@ -62,13 +62,13 @@ def _git(
 
 
 def _get_local_branches(repo_path: str | None = None) -> list[str]:
-    """로컬 브랜치 목록을 반환한다.
+    """Returns the local brand list.
 
     Args:
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        로컬 브랜치명 리스트 (refs/heads/ 제외).
+        local brand name list (refs/heads/ excluded).
     """
     result = _git("branch", "--list", "--format=%(refname:short)", repo_path=repo_path)
     if result.returncode != 0:
@@ -77,47 +77,47 @@ def _get_local_branches(repo_path: str | None = None) -> list[str]:
 
 
 def _warn(msg: str) -> None:
-    """경고 메시지를 stderr로 출력한다."""
+    """Prints a warning message to stderr."""
     print(f"[WARN] branch_strategy: {msg}", file=sys.stderr)
 
 
-# ─── 공개 API ─────────────────────────────────────────────────────────────────
+# ─── Public API ─────────────────────────────────────────────────────────────────────
 
 
 def sanitize_branch_name(raw: str) -> str:
-    """브랜치명을 git 안전 형식으로 변환한다.
+    """git converts a brand name into a safe format.
 
-    한글은 허용하며, 공백/언더스코어를 하이픈으로 변환하고
-    git 금지 문자를 제거한다. 연속 하이픈은 단일화하며
-    최대 50자로 제한한다.
+    Hangle is allowed, converting blank/underscour into hyphen
+    Remove git ban character. We are working together with our customers.
+    Limits up to 50 characters.
 
     Args:
-        raw: 원본 문자열 (티켓 제목 등).
+        raw: original string (ticket title etc.).
 
     Returns:
-        git 브랜치명에 안전한 문자열 (최대 50자).
+        Secure strings in git brand name (up to 50 characters).
     """
     name: str = raw.strip()
 
-    # 공백, 언더스코어 → 하이픈
+    # Space, underscore → hyphen
     name = re.sub(r"[\s_]+", "-", name)
 
-    # git 금지 문자 제거
+    # Remove git banned characters
     name = _GIT_FORBIDDEN_CHARS.sub("", name)
 
-    # 점(.)으로 시작/끝나거나 연속 점(..) 방지
+    # Starts/ends with a dot (.) or avoid consecutive dots (..)
     name = re.sub(r"\.{2,}", ".", name)
 
-    # 슬래시 제거 (feature prefix 외 슬래시 방지)
+    # Remove slashes (avoid slashes other than feature prefix)
     name = name.replace("/", "-")
 
-    # 연속 하이픈 → 단일 하이픈
+    # Serial hyphen → single hyphen
     name = re.sub(r"-{2,}", "-", name)
 
-    # 선행/후행 하이픈, 점 제거
+    # Remove leading/trailing hyphens and dots
     name = name.strip("-.")
 
-    # 최대 길이 제한
+    # maximum length limit
     if len(name) > _BRANCH_NAME_MAX_LEN:
         name = name[:_BRANCH_NAME_MAX_LEN].rstrip("-.")
 
@@ -125,16 +125,16 @@ def sanitize_branch_name(raw: str) -> str:
 
 
 def get_main_branch(repo_path: str | None = None) -> str:
-    """main 또는 master 브랜치를 감지하여 반환한다.
+    """returns by detecting the main or master branch.
 
-    로컬 브랜치 목록에서 'main'을 먼저 찾고, 없으면 'master'를 찾는다.
-    둘 다 없으면 기본값 'main'을 반환한다.
+    If you're looking for 'main' in the local brand list, you'll find 'master'.
+    returns the default 'main' without both.
 
     Args:
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        감지된 메인 브랜치명 ('main' 또는 'master'). 둘 다 없으면 'main'.
+        Detected main brand name ('main' or 'master'). 'main' without both.
     """
     branches = _get_local_branches(repo_path)
     if "main" in branches:
@@ -145,17 +145,17 @@ def get_main_branch(repo_path: str | None = None) -> str:
 
 
 def ensure_develop_branch(repo_path: str | None = None) -> bool:
-    """develop 브랜치가 없으면 main 기준으로 로컬 생성한다.
+    """If you don't have a develop brand, you can create locally based on main.
 
-    이미 develop 브랜치가 존재하면 아무 작업도 하지 않고 True를 반환한다.
-    없으면 main/master 브랜치 기준으로 develop 브랜치를 생성한다.
+    If you already have a development branch, return true without any work.
+    create a develop brand based on the main/master brand.
 
     Args:
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        develop 브랜치가 존재하거나 성공적으로 생성되면 True.
-        생성 실패 시 False.
+        True if develop brand exists or successfully generates.
+        False.
     """
     branches = _get_local_branches(repo_path)
     if "develop" in branches:
@@ -164,7 +164,7 @@ def ensure_develop_branch(repo_path: str | None = None) -> bool:
     main_branch = get_main_branch(repo_path)
     result = _git("branch", "develop", main_branch, repo_path=repo_path)
     if result.returncode != 0:
-        _warn(f"develop 브랜치 생성 실패: {result.stderr.strip()}")
+        _warn(f"Failed to create develop branch: {result.stderr.strip()}")
         return False
     return True
 
@@ -175,26 +175,26 @@ def create_feature_branch(
     base: str = "develop",
     repo_path: str | None = None,
 ) -> str:
-    """feature 브랜치를 생성하고 브랜치명을 반환한다.
+    """create a feature brand and return a brand name.
 
-    feat/T-NNN-제목 형식의 브랜치를 base 브랜치 기준으로 생성한다.
-    이미 동일 티켓의 feature 브랜치가 존재하면 기존 브랜치명을 반환한다.
+    feat/T-NNN - Create a brand based on the base brand.
+    If you already have the feature brand of the same ticket, you will return the existing brand name.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001', '001').
-        title: 티켓 제목. sanitize_branch_name으로 정제된다.
-        base: 기준 브랜치. 기본값 'develop'.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket number: ticket number (e.g. 'T-001', '001').
+        title: ticket title. sanitize branch name is refined.
+        base: standard brand. default 'develop'
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        생성된 또는 기존 feature 브랜치명 (예: 'feat/T-001-제목').
-        생성 실패 시 빈 문자열.
+        Created or existing feature brand name (e.g. 'feat/T-001-title').
+        empty strings when the creation fails.
     """
-    # 티켓 번호 정규화: 'T-001' 형식 보장
+    # Ticket number normalization: ensures 'T-001' format
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"
 
-    # 기존 feature 브랜치 검색
+    # Search for existing feature branches
     existing = get_feature_branch_for_ticket(ticket_number, repo_path)
     if existing:
         return existing
@@ -204,7 +204,7 @@ def create_feature_branch(
 
     result = _git("branch", branch_name, base, repo_path=repo_path)
     if result.returncode != 0:
-        _warn(f"feature 브랜치 생성 실패: {result.stderr.strip()}")
+        _warn(f"Failed to create feature branch: {result.stderr.strip()}")
         return ""
 
     return branch_name
@@ -213,23 +213,23 @@ def create_feature_branch(
 def delete_feature_branch(
     branch_name: str, repo_path: str | None = None
 ) -> bool:
-    """로컬 feature 브랜치를 삭제한다.
+    """Delete local feature brand.
 
-    강제 삭제(-D)를 사용하며, 삭제 실패 시 경고만 출력하고
-    False를 반환한다 (프로세스 종료하지 않음).
-    merge_to_develop() 성공 경로에서만 호출되므로 병합 완료가 보장된다.
+    Use Force Delete(-D) and output warning only when deletion failed
+    returns False (not ending process).
+    merge to develop() is only called in the success path, so the merge completion is guaranteed.
 
     Args:
-        branch_name: 삭제할 브랜치명 (예: 'feat/T-001-제목').
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        branch name: Brand name to delete (e.g. 'feat/T-001-title').
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        삭제 성공 시 True, 실패 시 False.
+        True, False fails when deleting success.
     """
     result = _git("branch", "-D", branch_name, repo_path=repo_path)
     if result.returncode != 0:
         _warn(
-            f"브랜치 삭제 실패 ({branch_name}): {result.stderr.strip()}"
+            f"Failed to delete branch ({branch_name}): {result.stderr.strip()}"
         )
         return False
     return True
@@ -238,17 +238,17 @@ def delete_feature_branch(
 def get_feature_branch_for_ticket(
     ticket_number: str, repo_path: str | None = None
 ) -> str | None:
-    """티켓 번호에 연결된 feature 브랜치를 검색한다.
+    """Search the feature branch connected to the ticket number.
 
-    로컬 브랜치 중 'feat/T-NNN-*' 패턴과 일치하는 첫 번째 브랜치를
-    반환한다. 없으면 None.
+    The first brand matching "feat/T-NNN-*" pattern during local branding
+    return. None.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket number: ticket number (e.g. 'T-001').
+        repo path: git repository path. Use the project root if None.
 
     Returns:
-        일치하는 브랜치명 또는 None.
+        Match Brand Name or None.
     """
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"

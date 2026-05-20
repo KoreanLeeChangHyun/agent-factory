@@ -57,7 +57,7 @@ def _strip_frontmatter(content: str) -> str:
     """
     if not content.startswith("---\n"):
         return content
-    # 두 번째 '---' 위치 탐색
+    # Search for the second '---' location
     end_idx = content.find("\n---\n", 4)
     if end_idx == -1:
         return content
@@ -94,8 +94,8 @@ def main() -> None:
     if ticket_id:
         ticket_prefix_block = (
             f"\n<ticket-prefix>\n"
-            f"매 응답의 첫 줄에 [{ticket_id}] 접두사를 반드시 출력하라.\n"
-            f"예시: [{ticket_id}] 응답 내용...\n"
+            f"Be sure to print the [{ticket_id}] prefix on the first line of every response. \n"
+            f"Example: [{ticket_id}] Response content... \n"
             f"</ticket-prefix>"
         )
         content = content + ticket_prefix_block

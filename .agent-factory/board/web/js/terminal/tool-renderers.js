@@ -464,7 +464,7 @@
     var RE_CREATE       = /^(T-\d+):\s+(.+)\(([^)]+)\)\s*$/;
     var RE_DELETE       = /^(T-\d+):\s+삭제됨\s*$/;
     var RE_UPDATE       = /^(T-\d+):\s+(.+)(갱신됨|추가됨|제거됨)\s*$/;
-    var RE_ALREADY      = /^(T-\d+)은\(?는?\)?\s*이미\s+(.+)$/;
+    var RE_ALREADY      = /^(T-\d+)은\(?는?\)?\s*already\s+(.+)$/;
     var RE_LAUNCHER     = /^(LAUNCH|INLINE):\s+(.+)$/;
     var RE_SYSTEM       = /^\[(INIT|DONE|STATE|STEP|PHASE|WORKFLOW)\]\s*(.*)$/;
     var RE_ERROR        = /^\[(ERROR)\]\s*(.*)$/;
@@ -584,7 +584,7 @@
     }
 
     function renderDelete(cl) {
-      var inner = badge(cl.id) + actionLabel('삭제됨', 'flow-cmd-deleted');
+      var inner = badge(cl.id) + actionLabel('Tags', 'flow-cmd-deleted');
       return wrapCard(inner, 'flow-cmd-delete-card');
     }
 
@@ -786,7 +786,7 @@
           case 'transition':
             var details = [];
             if (pendingFileMove) {
-              details.push('파일 이동: ' + pendingFileMove.from + ' → ' + pendingFileMove.to);
+              details.push('Tag:' + pendingFileMove.from + ' → ' + pendingFileMove.to);
               pendingFileMove = null;
             }
             html = renderTransition(cl, details);
@@ -834,7 +834,7 @@
       // Flush remaining file-move as standalone detail
       if (pendingFileMove) {
         cards.push(wrapCard(
-          '<span class="flow-cmd-info-text">파일 이동: ' +
+          '<span class="flow-cmd-info-text">' +
           safeEsc(pendingFileMove.from) + ' → ' + safeEsc(pendingFileMove.to) + '</span>',
           'flow-cmd-info'
         ));

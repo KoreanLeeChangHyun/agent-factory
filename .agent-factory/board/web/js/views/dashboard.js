@@ -7,16 +7,16 @@
  * KPI stats computation, Chart.js chart rendering (usage, command pie,
  * warn/error, skill frequency), and data table rendering with tabs.
  *
- * Phase 2 (T-461): Workflow Metrics 섹션을 통합한다 — metrics.js 의 4개 차트 헬퍼
+ * Phase 2 (T-461): Consolidate Workflow Metrics section — 4 charts of metrics.js
  * (renderStepDurationCard / renderTokensStackedCard / renderFailRatioCard /
- * renderRegressionList) 와 모듈 클로저 state 를 이전한다.
- *   - state 는 Board.state.metricsState 네임스페이스로 승격 (W01 의 dashMetrics*
- *     4개 키를 통합 정리).
- *   - chart 인스턴스는 Board.state.metricsState.chartInstances 로 격리 (대시보드
- *     본체의 dashChartInstances 와 분리).
- *   - collapse 토글 + localStorage('wf_metrics_collapsed') 영속화.
- *   - lazy create: collapsed 상태에서는 차트를 그리지 않고, expand 시점에 비로소
- *     렌더 (Chart.js canvas 크기 0 초기화 위험 회피).
+ * redirect renderRegressionList and module closure state.
+ *   - state embed to Board.state.metricsState namespace (W01 dashMetrics*)
+ *     Consolidate 4 keys.
+ *   Board.state.metricsState.chartInstances
+ *     dashChartInstances and separation of the body.
+ *   - Dissolved toggle + localStorage('wf metrics collapsed')
+ *   - lazy create: unloading the chart at the time of expand
+ *     Wrender (Chart.js canvas size 0 initialized risk avoidance).
  *
  * Depends on: common.js (Board.state, Board.util, Board.render)
  */
@@ -34,17 +34,17 @@ const {
 // ── Constants ──
 const DASH_FILES = ["usage", "logs", "skills"];
 
-// ── Workflow Metrics Constants (테라코타 강조 1축) ──
+// ── Workflow Metrics Constants (Terrace 1st Axis) ──
 const METRICS_DEFAULT_LAST = 20;
 const METRICS_STEP_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 const METRICS_ACCENT = "#D97757";
 const METRICS_STEP_COLORS = {
-  INIT:   "#4ec9b0",  // 청록
-  PLAN:   "#dcdcaa",  // 노랑
-  WORK:   METRICS_ACCENT,  // 테라코타 (가장 핵심 단계)
-  VALIDATE: "#9cdcfe",  // 하늘 (work 직후 검증)
-  REPORT: "#c586c0",  // 보라
-  DONE:   "#858585",  // 회색
+  INIT:   "#4ec9b0",  // Notice
+  PLAN:   "#dcdcaa",  // More
+  WORK:   METRICS_ACCENT,  // Terracotta (top core stage)
+  VALIDATE: "#9cdcfe",  // Heaven (afterwork verification)
+  REPORT: "#c586c0",  // Venue
+  DONE:   "#858585",  // Grey
 };
 const METRICS_TOKEN_COLORS = {
   input:          "#569cd6",
@@ -61,12 +61,12 @@ const METRICS_REGRESSION_KINDS = [
 ];
 const METRICS_COLLAPSE_LS_KEY = "wf_metrics_collapsed";
 
-// ── T-462 Phase 4-A: 6-tier Pace Color 수식 ──
-// claude-usage-tracker (Swift/SwiftUI) §5.4 의 projected-usage tier 함수를 advisory-only
-// 시각 표시용 헬퍼로 이식. 자동 강제 / 자동 전이 / 임계값 차단 0건 — 단순 분류 함수.
-// elapsedFraction < 0.03 (3% noise floor) → null 반환 (호출자가 표시 생략 결정).
-// 매핑 CSS 변수: --pace-comfortable / --pace-on-track / --pace-warming / --pace-pressing
-//             / --pace-critical / --pace-runaway  (dashboard.css :root 정의)
+// T-462 Phase 4-A: 6-tier Pace Color
+// claude-usage-tracker (Swift/SwiftUI) §5.4 of the projected-usage tier function advisory-only
+// Eating with the helper for visual display. Auto Forced / Auto Deflect / Impeding Value 0 — Simple Classification Function.
+// elapsedFraction < 0.03 (3% noise floor) → null return (exporter marked optimum crystal).
+// Mapping CSS Variables: --pace-comfortable / --pace-on-track / --pace-warming / --pace-pressing
+//             / --pace-critical / --pace-runaway (dashboard.css:root definition)
 const PACE_TIER_THRESHOLDS = [
   { max: 0.5, name: "comfortable", cssVar: "--pace-comfortable" },
   { max: 0.8, name: "on-track",    cssVar: "--pace-on-track" },
@@ -101,9 +101,9 @@ function computePaceTier(usedPercentage, elapsedFraction) {
   return { name: PACE_TIER_RUNAWAY.name, cssVar: PACE_TIER_RUNAWAY.cssVar, projected: projected };
 }
 
-// ── Workflow Metrics State (Board.state.metricsState 네임스페이스) ──
-// 모듈 클로저 대신 Board.state 로 승격하여 다른 모듈에서도 검사 가능.
-// W01 의 dashMetrics{Fetched,Data,Last,Error,ChartInstances} 5개 키를 흡수한다.
+// Workflow Metrics State (Board.state.metricsState Namespace) ──
+// Board.state, instead of module closure, can be inspected in different modules.
+// W01 dashMetrics{Fetched,Data,Last,Error,ChartInstances} 5 keys absorb.
 (function initMetricsState() {
   const ms = Board.state.metricsState || {};
   ms.fetched = !!ms.fetched;
@@ -112,7 +112,7 @@ function computePaceTier(usedPercentage, elapsedFraction) {
   ms.data = ms.data || { runs: [], regression: null, launchLatency: null };
   ms.error = ms.error || null;
   ms.chartInstances = ms.chartInstances || {};
-  // collapsed 초기값: localStorage 가 명시적으로 '0' 이 아니면 collapsed=true (default true)
+  // collapsed initial value: localStorage is explicitly '0' or collapsed=true (default true)
   let stored = null;
   try { stored = localStorage.getItem(METRICS_COLLAPSE_LS_KEY); } catch (e) {}
   ms.collapsed = stored !== "0";
@@ -120,8 +120,8 @@ function computePaceTier(usedPercentage, elapsedFraction) {
 })();
 
 // ── T-462 Phase 4-B: SVG progress bar + time marker overlay ──
-// usage-tracker §4-B 의 진행 바 + 현재 시각 marker overlay 컴포넌트를 SVG 로 직접
-// 이식. 외부 아이콘 라이브러리 / 폰트 0건. 자동 동작 0건 — render 함수는 명시 호출만.
+// Use-tracker §4-B Progress Bar + Current Visual Marker overlay component directly to SVG
+// About Us External icon library / 0 fonts. 0 Auto Operations — the render function only has a specified call.
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -210,13 +210,13 @@ function renderTimeMarker(container, fraction) {
 }
 
 // ── T-462 Phase 4-C: status banner (error / stale / ok) ──
-// usage-tracker §4-C 의 상태 배너 (네트워크 끊김 / SSE stale / 정상) 컨셉 이식.
-// SSE 재연결 로직은 core/sse.js 에 이미 있으므로 본 함수는 *표시 전용*. advisory only.
+// Usage-tracker §4-C Status Banner (Network Break / SSE stale / Top) Concept Effort.
+// SSE reconnecting logic is already in core/sse.js, so this function is only for *marking*.  advisor .
 
 /**
  * Renders a status banner inside the given container. Idempotent —
  * existing `.status-banner` is replaced.
- * @param {HTMLElement} container - host element (innerHTML 대신 prepend / replace 사용)
+ * @param {HTMLElement} container - host element (prepend / replace use instead ofinnerHTML)
  * @param {string} state - one of "error" | "stale" | "ok"
  * @param {string} message - human-readable status message
  */
@@ -249,8 +249,8 @@ function renderStatusBanner(container, state, message) {
 }
 
 // ── T-462 Phase 4-D: accordion expand/collapse rows (P8) ──
-// usage-tracker 의 expandable row 컴포넌트를 dashboard 표시용으로 이식. 표시 토글만 —
-// 자동 펼침 / 자동 접힘 / 자동 행 추가 0건. 호출자가 click handler 로 명시 호출.
+// Use-tracker's expandable row component for dashboard display. Mark Toggles Only —
+// Auto Unbreakable / Automatic Folding / Automatic Line Added 0. Call the caller as click handler.
 
 /**
  * Toggles the open state of an accordion row.
@@ -277,11 +277,11 @@ function toggleAccordion(rowElement) {
   return isOpen;
 }
 
-// ── T-462 Phase 4-E: CombinedUsageChart 시간 윈도우 + 네비게이션 ──
-// usage-tracker §4-E 의 시간 윈도우 (5h / 24h / 7d / 30d) + prev/current/next 네비게이션을
-// chart-usage (Chart.js bar+line composite) 에 advisory-only 표시로 이식.
-// 서버 변경 0건 — 기존 usage rows 를 클라이언트 측에서 timestamp 분기로 필터링.
-// 자동 polling / 자동 윈도우 변경 / 자동 차단 0건.
+// ── T-462 Phase 4-E: CombinedUsageChart Time Windows + Navigation ──
+// Usage-tracker §4-E Time Windows (5h/24h/7d/30d) + prev/current/next Navigation
+// The chart-usage (Chart.js bar+line composite) in the advisory-only indicator.
+// 0 server changes — filtering existing usage rows to timestamp quarterly on client side.
+// Automatic polling / automatic window change / automatic blocking 0 cases.
 
 const USAGE_CHART_WINDOWS = ["5h", "24h", "7d", "30d"];
 const USAGE_CHART_WINDOW_MS = {
@@ -291,8 +291,8 @@ const USAGE_CHART_WINDOW_MS = {
   "30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-// Per-window state — 호출자가 window 와 anchor (시점 슬라이딩) 를 외부에서 변경.
-// anchor=Date.now() 가 default — navigateUsageChart('prev') 시 anchor 가 window 만큼 후퇴.
+// Per-window state — change the caller to window and anchor (spot sliding) outside.
+// anchor=Date.now() returns as window when default — navigateUsageChart('prev').
 (function initUsageChartState() {
   const s = Board.state.usageChartState || {};
   if (USAGE_CHART_WINDOWS.indexOf(s.window) < 0) s.window = "24h";
@@ -381,9 +381,9 @@ function _rerenderUsageChartForWindow() {
   renderUsageChart(filtered);
 }
 
-// ── T-462 Phase 4-F: Empty State 컴포넌트 표준화 (C6) ──
-// usage-tracker §4-F 의 empty-state 패턴 (icon + title + description) 을 표준화.
-// SVG icon 직접 생성 — 외부 라이브러리 0건. 자동 retry / auto-dismiss 0건.
+// ── T-462 Phase 4-F: Standardized Empty State Components (C6)
+// standardize usage-tracker §4-F empty-state patterns (icon + title + description).
+// SV iconG create direct — 0 external libraries. auto retry / auto-dismiss 0 cases.
 
 /**
  * Default inline SVG used when caller does not provide a custom icon.
@@ -624,7 +624,7 @@ function renderMdTable(headers, rows) {
   return h;
 }
 
-// ── Chart Management (Dashboard 본체 차트 — chart-usage / chart-command / chart-warn-error / chart-skills) ──
+// ── Chart Management (Dashboard Main Chart — Chart-usage / chart-command /-warn-error / chart-skills) ──
 
 /**
  * Destroys an existing Chart instance by canvas ID, if any.
@@ -653,9 +653,9 @@ function createChart(canvasId, config) {
   return instance;
 }
 
-// ── Metrics Chart Management (Workflow Metrics 섹션 전용 — metricsState.chartInstances) ──
-// 본체 차트(dashChartInstances) 와 인스턴스를 분리하여 collapse / range 변경 시
-// metrics 차트만 destroy 할 수 있게 격리한다.
+// ── Metrics Chart Management (Workflow Metrics section only — metricsState.chartInstances) ──
+// Deletion of the main body chart (dashChartInstances) and instances to change the collapse / range
+// Only metrics charts are isolated.
 
 /** Destroys a metrics Chart instance by canvas ID. */
 function destroyMetricsChart(canvasId) {
@@ -686,7 +686,7 @@ function destroyAllMetricsCharts() {
   Board.state.metricsState.chartInstances = {};
 }
 
-// ── Individual Chart Renderers (Dashboard 본체) ──
+// Individual Chart Renderers
 
 /**
  * Renders token usage bar+line composite chart.
@@ -917,7 +917,7 @@ function renderSkillFreqChart(rows) {
 
 /** Returns an SVG chevron icon used for the Workflow Metrics collapse toggle. */
 function metricsCollapseIcon(collapsed) {
-  // chevron 우(접힘) / 하(펼침). Lucide 스타일, currentColor.
+  // chevron(Welding) / Under(Extrusion). Lucide style, currentColor.
   if (collapsed) {
     return ''
       + '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"'
@@ -1002,7 +1002,7 @@ function renderMetricsSection() {
     + '<span class="dash-metrics-hint">p50 / p95 / p99 per run (ms) — activated after T-475 deployment</span>'
     + '</div>'
     + '<div id="dash-metrics-launchlatency-placeholder" class="dash-metrics-pending">'
-    + 'T-475 배포 후 LAUNCH_* 이벤트가 누적되면 차트가 활성화됩니다.'
+    + 'After T-475 deployment, the LAUNCH * event will be activated.'
     + '</div>'
     + '<div class="dash-metrics-chart-wrap">'
     + '<canvas id="dash-metrics-launchlatency"></canvas>'
@@ -1032,7 +1032,7 @@ function renderStepDurationCard(runs) {
       }),
       borderColor: color,
       backgroundColor: color,
-      borderWidth: step === "WORK" ? 3 : 2,  // WORK 강조
+      borderWidth: step === "WORK" ? 3 : 2,  // WORK HIGHLIGHTS
       pointRadius: 3,
       pointBackgroundColor: color,
       tension: 0.25,
@@ -1131,7 +1131,7 @@ function renderFailRatioCard(runs) {
       totals[step].count += Number(sd[step].count || 0);
     });
   });
-  // 표시 순서: METRICS_STEP_ORDER + 그 외(있다면)
+  // METRICS STEP ORDER + Others
   const allSteps = METRICS_STEP_ORDER.slice();
   Object.keys(totals).forEach(function (s) {
     if (allSteps.indexOf(s) === -1) allSteps.push(s);
@@ -1139,9 +1139,9 @@ function renderFailRatioCard(runs) {
   const ratios = allSteps.map(function (s) {
     const t = totals[s];
     if (!t || !t.count) return 0;
-    return Math.round((t.fail / t.count) * 1000) / 10;  // 소수 첫째자리 % (0~100)
+    return Math.round((t.fail / t.count) * 1000) / 10; // decimal first place % (0~100)
   });
-  // 비율 0 → 청록, 양수 → 주홍 (#f48771 — 워크플로우 실패 색 컨벤션)
+  // Rate 0 → Cyan, Cyan → Scarlet (#f48771 — Workflow Failure Color Convention)
   const bgColors = allSteps.map(function (s) {
     return (totals[s] && totals[s].fail > 0) ? "rgba(244,135,113,0.6)" : "rgba(78,201,176,0.4)";
   });
@@ -1584,7 +1584,7 @@ function renderDashboard() {
     });
   });
 
-  // Render Dashboard 본체 차트 after DOM is populated
+  // Render Dashboard Body Chart after DOM is populated
   renderUsageChart(usageRows);
   renderCommandPieChart(usageRows);
   renderWarnErrorChart(logsRows);
@@ -1618,16 +1618,16 @@ Board.computePaceTier = computePaceTier;
 Board.render.renderProgressBar = renderProgressBar;
 Board.render.renderTimeMarker = renderTimeMarker;
 
-// T-462 Phase 4-C — status banner (advisory display, SSE reconnect 로직은 core/sse.js 재사용).
+// T-462 Phase 4-C — status banner (advisory display, SSE reconnect logic reuse core/sse.js).
 Board.render.renderStatusBanner = renderStatusBanner;
 
-// T-462 Phase 4-D — accordion expand/collapse toggle (명시 호출만, 자동 펼침 0).
+// T-462 Phase 4-D — accordion expand/collapse toggle (release call only, auto unfolding 0).
 Board.toggleAccordion = toggleAccordion;
 
-// T-462 Phase 4-E — CombinedUsageChart 시간 윈도우 + 네비게이션 (advisory).
+// T-462 Phase 4-E — CombinedUsageChart Time Windows + Navigation.
 Board.setUsageChartWindow = setUsageChartWindow;
 Board.navigateUsageChart = navigateUsageChart;
 Board.filterUsageRowsByWindow = filterUsageRowsByWindow;
 
-// T-462 Phase 4-F — Empty State 컴포넌트 (advisory display 표준화).
+// T-462 Phase 4-F — Empty State Components (advisory display standardization).
 Board.render.renderEmptyState = renderEmptyState;

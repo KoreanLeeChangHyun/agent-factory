@@ -30,14 +30,14 @@ from __future__ import annotations
 import os
 import sys
 
-# ─── sys.path 설정 ────────────────────────────────────────────────────────────
+# ─── sys.path settings ────────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-# ─── 모듈 임포트 ─────────────────────────────────────────────────────────────
+# ─── Import module ───────────────────────────────────────────────────────────────
 
 from flow.kanban_cli import build_parser, dispatch  # noqa: E402
 from flow.ticket_repository import log  # noqa: E402
@@ -47,7 +47,7 @@ from flow.ticket_repository import log  # noqa: E402
 
 
 def main() -> None:
-    """CLI 진입점. 서브커맨드를 파싱하여 해당 핸들러를 호출한다."""
+    """CLI entry point. Parse the subcommand and call the corresponding handler."""
     parser = build_parser()
     args = parser.parse_args()
     log("INFO", f"kanban.py: subcommand={args.subcommand}")

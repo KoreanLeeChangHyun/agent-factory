@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 
-from board.server._common import (
+from board.server.support.common import (
     api_endpoint,
     _write_memory_file,
     _delete_memory_file,

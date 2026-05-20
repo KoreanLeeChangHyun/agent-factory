@@ -53,7 +53,7 @@ class SpawnResult:
 
 
 def new_session_uuid() -> str:
-    """claude `--session-id <uuid>` 용 UUID4 — 새 세션 1개당 1개 생성."""
+    """UUID4 for claude `--session-id <uuid>` — Generate 1 per new session."""
     return str(uuid.uuid4())
 
 
@@ -140,7 +140,7 @@ def spawn_claude(
             timed_out=False,
         )
 
-    # prompt 를 stdin 으로 전달 + close (claude 가 EOF 읽고 종료 흐름 시작)
+    # Pass prompt to stdin + close (claude reads EOF and starts exit flow)
     try:
         if proc.stdin is not None:
             proc.stdin.write(prompt_body)
@@ -167,7 +167,7 @@ def spawn_claude(
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
-                # stream-json 외 노이즈 line 은 무시 (테스트 모드에서는 발생 가능)
+                # Ignore noise lines other than stream-json (may occur in test mode)
                 continue
             if not isinstance(obj, dict):
                 continue
@@ -183,12 +183,12 @@ def spawn_claude(
                 try:
                     on_line(obj)
                 except Exception:
-                    pass  # silent — driver 흐름 영향 0
+                    pass  # silent — driver flow impact 0
     except (OSError, ValueError):
         pass
 
-    # 회귀 ③ 차단 — readline 루프 종료 후 completion 처리.
-    # 정상 EOF 면 wait() 즉시 returncode 확보. timeout 이면 kill.
+    # Regression ③ Blocking — Completion processing after the readline loop ends.
+    # If EOF is normal, wait() immediately secures the return code. If timeout, kill.
     if timed_out:
         try:
             proc.kill()
@@ -246,7 +246,7 @@ def spawn_claude_resume(
     add_dirs: tuple[Path, ...] = (),
     on_line: Callable[[dict[str, Any]], None] | None = None,
 ) -> SpawnResult:
-    """SPEC.md §6.3 — 같은 session_id (UUID) 로 이어가기."""
+    """SPEC.md §6.3 — Continuing with the same session_id (UUID)."""
     return spawn_claude(
         prompt_body=prompt_body,
         session_id=session_id,

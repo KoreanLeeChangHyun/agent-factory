@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from board.server.http_router import BoardHTTPRequestHandler
+from board.server.routing.http_router import BoardHTTPRequestHandler
 
 
 def _make_handler(tmp_path: Path):

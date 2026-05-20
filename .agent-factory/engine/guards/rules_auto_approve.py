@@ -31,14 +31,14 @@ import json
 import os
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 from common import read_env
 
-# `.claude/rules/` 하위만 허용하는 경로 키워드
+# Path keyword that only allows children of `.claude/rules/`
 _RULES_PATH_KEYWORD = ".claude/rules/"
 
 
@@ -66,14 +66,14 @@ def main() -> None:
     대상으로 할 때 즉시 allow를 반환한다.
     HOOK_RULES_AUTO_APPROVE=false 설정 시 비활성화된다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_RULES_AUTO_APPROVE") or read_env("HOOK_RULES_AUTO_APPROVE")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -81,7 +81,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Write, Edit이 아니면 통과
+    # Pass if not Write or Edit
     if tool_name not in ("Write", "Edit"):
         sys.exit(0)
 
@@ -91,12 +91,12 @@ def main() -> None:
     if not file_path:
         sys.exit(0)
 
-    # `.claude/rules/` 하위 경로인지 확인
-    # 보안: 정확히 `.claude/rules/` 하위만 허용, 다른 `.claude/` 경로는 불허
+    # Check if it is a subpath of `.claude/rules/`
+    # Security: Only allow `.claude/rules/` subdirections, no other `.claude/` paths are allowed.
     if _RULES_PATH_KEYWORD in file_path:
         _allow("auto-approve .claude/rules/ path")
 
-    # 조건 미충족 시 빈 출력으로 통과 (기존 동작 유지)
+    # Passes as empty output when conditions are not met (maintains existing operation)
     sys.exit(0)
 
 

@@ -1,23 +1,23 @@
-"""test_ticket_repository_failure.py - <failure> XML 요소 파싱/갱신 단위 테스트 (T-456).
+"""test ticket repository failure.py
 
-검증 항목:
+Payment Terms:
   1. test_parse_4element_ticket_returns_failure_none
-     -- 기존 4요소 티켓 파싱 시 result["failure"] is None 검증 (회귀 가드)
+     -- Result ["failure"] is None Verified (return guard) when the existing 4 yoso ticket parsing
   2. test_parse_5element_ticket_returns_failure_dict
-     -- <failure> 포함 티켓 파싱 시 4개 자식 요소 모두 dict 매핑 검증
+     -- <failure> Validation of dict mapping all four child elements in ticket parsing
   3. test_parse_failure_with_empty_children
-     -- <failure> 존재하나 자식 일부 누락 시 빈 문자열 fallback 검증
+     -- <failure> exists and validates empty string fallback when some missing
   4. test_update_failure_inserts_new_element
-     -- failure 미존재 티켓에 update_failure 호출 시 신규 <failure> 요소 + 4 자식 추가 검증
+     -- failure New <failure> element + 4 self-exclusive verification when calling update failure on the Mizone ticket
   5. test_update_failure_preserves_other_elements
-     -- failure 갱신 후 metadata/relations/prompt/result 회귀 0 검증
+     -- failure metadata/relations/prompt/result revolving after update 0 verification
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# sys.path: .agent-factory/engine 포함 -> flow 패키지 import 가능
+# sys.path: .agent-factory/engine included -> flow package importable
 _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
@@ -25,16 +25,16 @@ if _ENGINE_DIR not in sys.path:
 import flow.ticket_repository as ticket_repo  # noqa: E402
 
 
-# --- XML 픽스처 헬퍼 ----------------------------------------------------------
+# --- XML Picker Helper ----------------------------------------------------------
 
 
 def _write_xml(path: Path, content: str) -> None:
-    """XML 문자열을 파일에 저장한다."""
+    """Save the XML string to the file."""
     path.write_text(content, encoding="utf-8")
 
 
 def _xml_4element(ticket_number: str = "T-001") -> str:
-    """기존 4요소 티켓 XML (failure 없음) 픽스처를 반환한다."""
+    """Returns the existing 4-nursing ticket XML (failure) picker."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <ticket>
   <!-- metadata -->
@@ -69,7 +69,7 @@ def _xml_4element(ticket_number: str = "T-001") -> str:
 
 
 def _xml_5element(ticket_number: str = "T-002") -> str:
-    """5요소 티켓 XML (<failure> 포함) 픽스처를 반환한다."""
+    """5Returns the Pictures section including the yoso ticket XML (<failure>)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <ticket>
   <!-- metadata -->
@@ -106,7 +106,7 @@ def _xml_5element(ticket_number: str = "T-002") -> str:
 
 
 def _xml_failure_partial_children(ticket_number: str = "T-003") -> str:
-    """<failure> 존재하나 일부 자식 요소 누락 픽스처 (reason/phase 만 있음)."""
+    """<failure> exists, but some voluntary elements are missing Pics (reson/phase only)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <ticket>
   <!-- metadata -->
@@ -141,7 +141,7 @@ def _xml_failure_partial_children(ticket_number: str = "T-003") -> str:
 
 
 def _xml_no_failure_with_result(ticket_number: str = "T-004") -> str:
-    """failure 미존재 + result 있는 티켓 (update_failure 삽입 테스트용)."""
+    """failure Mizone + result ticket (for update failure insertion test)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <ticket>
   <!-- metadata -->
@@ -180,14 +180,14 @@ def _xml_no_failure_with_result(ticket_number: str = "T-004") -> str:
 """
 
 
-# --- 테스트 케이스 ------------------------------------------------------------
+# --- Test case ------------------------------------------------------------
 
 
 def test_parse_4element_ticket_returns_failure_none(tmp_path):
-    """기존 4요소 티켓 파싱 시 result["failure"] is None (회귀 가드).
+    """Existing 4Yoso ticket parsing result["failure"] is None (return guard).
 
-    <failure> 요소가 없는 기존 티켓을 parse_ticket_xml 로 파싱할 때
-    "failure" 키가 존재하고 값이 None 임을 검증한다.
+    <failure> When parse existing tickets without elements ticket xml
+    "failure" key exists and validate the value is None.
     """
     ticket_file = tmp_path / "T-001.xml"
     _write_xml(ticket_file, _xml_4element("T-001"))
@@ -195,12 +195,12 @@ def test_parse_4element_ticket_returns_failure_none(tmp_path):
     result = ticket_repo.parse_ticket_xml(str(ticket_file))
 
     assert "failure" in result, (
-        "parse_ticket_xml 반환 dict 에 'failure' 키가 없습니다 -- dict key regression"
+        "parse ticket xml return dict to 'failure' -- dict key regression"
     )
     assert result["failure"] is None, (
-        f"4요소 티켓에서 failure 는 None 이어야 하나 {result['failure']!r} 반환"
+        f"4Field tickets to failure must be None   FIELD 0  Return"
     )
-    # 기존 요소 무결성 확인
+    # Configuration
     assert result["number"] == "T-001"
     assert result["status"] == "Done"
     assert isinstance(result["result"], dict)
@@ -208,41 +208,41 @@ def test_parse_4element_ticket_returns_failure_none(tmp_path):
 
 
 def test_parse_5element_ticket_returns_failure_dict(tmp_path):
-    """<failure> 포함 티켓 파싱 시 4개 자식 요소 모두 dict 매핑 검증.
+    """<failure> Validation of dict mapping all four digits when ticket parsing.
 
-    reason/phase/retry_count/context 각 필드가 올바른 문자열 값으로
-    매핑되는지 확인한다.
+    reason/phase/retry count/context Each field is the right string value
+    Check if the map is mapped.
     """
     ticket_file = tmp_path / "T-002.xml"
     _write_xml(ticket_file, _xml_5element("T-002"))
 
     result = ticket_repo.parse_ticket_xml(str(ticket_file))
 
-    assert "failure" in result, "parse_ticket_xml 반환 dict 에 'failure' 키가 없습니다"
+    assert "failure" in result, "parse ticket xml return dict has no 'failure' key"
     assert isinstance(result["failure"], dict), (
-        f"<failure> 포함 티켓에서 failure 는 dict 이어야 하나 {type(result['failure'])} 반환"
+        f"<failure> In the ticket included failure must be dictated one   FIELD 0   return"
     )
     failure = result["failure"]
 
     assert failure["reason"] == "verifier_failure", (
-        f"failure.reason: 'verifier_failure' 기대, {failure['reason']!r} 반환"
+        f"failure.reason: 'verifier failure' expectations,   FIELD 0   return"
     )
     assert failure["phase"] == "VALIDATE", (
-        f"failure.phase: 'VALIDATE' 기대, {failure['phase']!r} 반환"
+        f"failure.phase: 'VALIDATE' expectations,   FIELD 0  return"
     )
     assert failure["retry_count"] == "3", (
-        f"failure.retry_count: '3' 기대, {failure['retry_count']!r} 반환"
+        f"failure.retry count: '3' expectations,   FIELD 0  return"
     )
     assert "R-203" in failure["context"], (
-        f"failure.context 에 'R-203' 이 포함되어야 하나 {failure['context']!r} 반환"
+        f"failure.context must include 'R-203'   FIELD 0  return"
     )
 
 
 def test_parse_failure_with_empty_children(tmp_path):
-    """<failure> 존재하나 자식 일부 누락 시 빈 문자열 fallback 검증.
+    """<failure> exists, but blank string fallback validation for some missing.
 
-    reason/phase 만 있고 retry_count/context 가 없을 때
-    누락 필드는 빈 문자열("")로 반환해야 한다.
+    reason/phase only and retry count/context
+    The missing field should be returned to the empty string("").
     """
     ticket_file = tmp_path / "T-003.xml"
     _write_xml(ticket_file, _xml_failure_partial_children("T-003"))
@@ -250,39 +250,39 @@ def test_parse_failure_with_empty_children(tmp_path):
     result = ticket_repo.parse_ticket_xml(str(ticket_file))
 
     assert isinstance(result["failure"], dict), (
-        "자식 일부 누락 시에도 failure 는 dict 이어야 한다 (요소 존재하므로)"
+        "failures should be dictated even if some missing (as there is no need)"
     )
     failure = result["failure"]
 
     assert failure["reason"] == "sentinel", (
-        f"failure.reason: 'sentinel' 기대, {failure['reason']!r} 반환"
+        f"failure.reason: 'sentinel' expectations,   FIELD 0  return"
     )
     assert failure["phase"] == "WORK", (
-        f"failure.phase: 'WORK' 기대, {failure['phase']!r} 반환"
+        f"failure.phase: 'WORK' expectations,   FIELD 0  return"
     )
     assert failure["retry_count"] == "", (
-        f"누락된 retry_count 는 빈 문자열 기대, {failure['retry_count']!r} 반환"
+        f"missing retry count expects empty strings,   FIELD 0  return"
     )
     assert failure["context"] == "", (
-        f"누락된 context 는 빈 문자열 기대, {failure['context']!r} 반환"
+        f"missing context expects empty strings,   FIELD 0   return"
     )
 
 
 def test_update_failure_inserts_new_element(tmp_path):
-    """failure 미존재 티켓에 update_failure 호출 시 신규 <failure> 요소 + 4 자식 추가 검증.
+    """failure New <failure> element + 4 self-adhesive verification when calling update failure on the Mizone ticket.
 
-    1. failure 없는 티켓 파일 생성
-    2. update_failure 호출 (reason/phase/retry_count/context 전달)
-    3. 파일 다시 파싱하여 failure dict 검증
+    1. Create a ticket file without failure
+    2. update failure call (reason/phase/retry count/context delivery)
+    3. FAQs にほんご (Japanese)
     """
     ticket_file = tmp_path / "T-004.xml"
     _write_xml(ticket_file, _xml_no_failure_with_result("T-004"))
 
-    # 파싱: 초기 상태 failure=None 확인
+    # parsing: initial status failure=None check
     initial = ticket_repo.parse_ticket_xml(str(ticket_file))
-    assert initial["failure"] is None, "초기 상태에서 failure 는 None 이어야 한다"
+    assert initial["failure"] is None, "failure in the initial state should be None"
 
-    # update_failure 호출
+    # update failure call
     ticket_repo.update_failure(str(ticket_file), {
         "reason": "retry_max",
         "phase": "WORK",
@@ -290,52 +290,52 @@ def test_update_failure_inserts_new_element(tmp_path):
         "context": "Max retry (5) reached in WORK phase. Sentinel detected.",
     })
 
-    # 재파싱 -> failure dict 검증
+    # repasing -> failure dict verification
     updated = ticket_repo.parse_ticket_xml(str(ticket_file))
 
     assert isinstance(updated["failure"], dict), (
-        f"update_failure 호출 후 failure 는 dict 이어야 하나 {type(updated['failure'])} 반환"
+        f"update failure After calling failure must be dictated   FIELD 0   Return"
     )
     failure = updated["failure"]
 
     assert failure["reason"] == "retry_max", (
-        f"failure.reason: 'retry_max' 기대, {failure['reason']!r} 반환"
+        f"failure.reason: 'retry max' expectations,   FIELD 0   return"
     )
     assert failure["phase"] == "WORK", (
-        f"failure.phase: 'WORK' 기대, {failure['phase']!r} 반환"
+        f"failure.phase: 'WORK' expectations,   FIELD 0  return"
     )
     assert failure["retry_count"] == "5", (
-        f"failure.retry_count: '5' 기대, {failure['retry_count']!r} 반환"
+        f"failure.retry count: '5' expectations,   FIELD 0  return"
     )
     assert "retry" in failure["context"].lower(), (
-        f"failure.context 에 'retry' 포함 기대, {failure['context']!r} 반환"
+        f"expectations containing 'retry' in failure.context,   FIELD 0  return"
     )
 
-    # XML 파일에 <failure> 태그 직접 확인
+    # <failure> tag direct check in XML file
     xml_content = ticket_file.read_text(encoding="utf-8")
     assert "<failure>" in xml_content or "<failure " in xml_content, (
-        "XML 파일에 <failure> 태그가 없습니다"
+        "No <failure> tags in XML files"
     )
     assert "<reason>retry_max</reason>" in xml_content, (
-        "XML 파일에 <reason>retry_max</reason> 없음"
+        "<reason>retry max</reason>"
     )
     assert "<retry_count>5</retry_count>" in xml_content, (
-        "XML 파일에 <retry_count>5</retry_count> 없음"
+        "<retry count>5</retry count>"
     )
 
 
 def test_update_failure_preserves_other_elements(tmp_path):
-    """failure 갱신 후 metadata/relations/prompt/result 회귀 0 검증.
+    """metadata/relations/prompt/result revolving after failure update 0 verification.
 
-    update_failure 호출 후 기존 요소의 필드값이 변경되지 않아야 한다.
+    After calling update failure, the field value of the existing element should not be changed.
     """
     ticket_file = tmp_path / "T-004b.xml"
     _write_xml(ticket_file, _xml_no_failure_with_result("T-004b"))
 
-    # 초기 파싱으로 기준값 확보
+    # Secure the standard value with initial parsing
     before = ticket_repo.parse_ticket_xml(str(ticket_file))
 
-    # update_failure 호출
+    # update failure call
     ticket_repo.update_failure(str(ticket_file), {
         "reason": "validator_failure",
         "phase": "VALIDATE",
@@ -343,46 +343,46 @@ def test_update_failure_preserves_other_elements(tmp_path):
         "context": "Plan validation failed at VALIDATE phase.",
     })
 
-    # 재파싱
+    # pantyhose
     after = ticket_repo.parse_ticket_xml(str(ticket_file))
 
-    # metadata 필드 보존 확인 (updated 타임스탬프는 write_ticket_xml 이 자동 갱신 -- 허용)
+    # metadata field preservation confirmation (updated timestamp write ticket xml This automatic update -- accepted)
     assert after["number"] == before["number"], (
-        f"number 회귀: {before['number']} -> {after['number']}"
+        f"number Regression:   FIELD 0    FIELD 1  "
     )
     assert after["status"] == before["status"], (
-        f"status 회귀: {before['status']} -> {after['status']}"
+        f"<% if (imgObj.width >= imgObj.height) { %>"
     )
     assert after["title"] == before["title"], (
-        f"title 회귀: {before['title']} -> {after['title']}"
+        f"<% if (imgObj.width >= imgObj.height) { %>"
     )
     assert after["command"] == before["command"], (
-        f"command 회귀: {before['command']} -> {after['command']}"
+        f"command:   FIELD 0   ->   FIELD 1  "
     )
 
-    # relations 보존 확인
+    # Testimonials
     assert after["relations"] == before["relations"], (
-        f"relations 회귀: {before['relations']} -> {after['relations']}"
+        f" FIELD 0  "
     )
 
-    # prompt 필드 보존 확인
+    # Check the prompt field preservation
     assert after["prompt"]["goal"] == before["prompt"]["goal"], (
-        f"prompt.goal 회귀: {before['prompt']['goal']!r} -> {after['prompt']['goal']!r}"
+        f"prompt.goal Regression:   FIELD 0    FIELD 1 "
     )
     assert after["prompt"]["target"] == before["prompt"]["target"], (
-        f"prompt.target 회귀: {before['prompt']['target']!r} -> {after['prompt']['target']!r}"
+        f"prompt.target Regression:   FIELD 0    FIELD 1 "
     )
 
-    # result 필드 보존 확인
-    assert isinstance(after["result"], dict), "result 는 dict 이어야 한다"
+    # Result Field Conservation Check
+    assert isinstance(after["result"], dict), "result must be dictated"
     assert after["result"]["registrykey"] == before["result"]["registrykey"], (
-        f"result.registrykey 회귀: {before['result']['registrykey']!r} -> {after['result']['registrykey']!r}"
+        f"result.registrykey Regression:   FIELD 0 "
     )
     assert after["result"]["workdir"] == before["result"]["workdir"], (
-        "result.workdir 회귀"
+        "result.workdir regression"
     )
 
-    # failure 신규 삽입 확인
-    assert isinstance(after["failure"], dict), "update_failure 후 failure 는 dict 이어야 한다"
+    # failure New insertion check
+    assert isinstance(after["failure"], dict), "update failure failure should be dictated"
     assert after["failure"]["reason"] == "validator_failure"
     assert after["failure"]["phase"] == "VALIDATE"

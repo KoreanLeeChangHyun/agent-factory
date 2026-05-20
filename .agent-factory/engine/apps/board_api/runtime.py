@@ -35,7 +35,7 @@ def resolve_port(
         if not port_in_use(port):
             return port
 
-    raise RuntimeError(f"포트 {range_start}~{range_end} 범위의 모든 포트가 사용 중입니다.")
+    raise RuntimeError(f"Ports All ports in the range {range_start}~{range_end} are in use.")
 
 
 def board_url_file_path(project_root: str) -> Path:

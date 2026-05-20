@@ -19,12 +19,12 @@
    * type: 'local' = client-only, 'remote' = server relay, 'local+remote' = both
    */
   var SLASH_COMMANDS = {
-    '/clear':   { description: '대화 내역 초기화 및 컨텍스트 리셋', type: 'local+remote', handler: handleClear },
-    '/help':    { description: '사용 가능한 명령어 목록 표시',       type: 'local',        handler: handleHelp },
-    '/cost':    { description: '현재 세션 비용 확인',                type: 'remote',       handler: handleRemoteCommand },
-    '/status':  { description: '현재 세션 상태 확인',                type: 'remote',       handler: handleRemoteCommand },
-    '/compact': { description: '컨텍스트 압축',                      type: 'remote',       handler: handleRemoteCommand },
-    '/login':   { description: '계정 인증 및 전환',                  type: 'remote',       handler: handleRemoteCommand },
+    '/clear':   { description: 'Reset and Context Reset', type: 'local+remote', handler: handleClear },
+    '/help':    { description: 'Enabled command list',       type: 'local',        handler: handleHelp },
+    '/cost':    { description: 'Check out the current session cost',                type: 'remote',       handler: handleRemoteCommand },
+    '/status':  { description: 'Check the current session status',                type: 'remote',       handler: handleRemoteCommand },
+    '/compact': { description: 'Context Compression',                      type: 'remote',       handler: handleRemoteCommand },
+    '/login':   { description: 'Account authentication and conversion',                  type: 'remote',       handler: handleRemoteCommand },
   };
 
   /**
@@ -68,7 +68,7 @@
       var entry = SLASH_COMMANDS[name];
       rows += "<tr><td>" + name + "</td><td>" + entry.description + "</td></tr>";
     });
-    var html = "<table><thead><tr><th>명령어</th><th>설명</th></tr></thead>"
+    var html = "<table><thead><tr><th>Name</th><th>Name</th></tr></thead>"
       + "<tbody>" + rows + "</tbody></table>";
     ctx.appendHtmlBlock(html, "term-slash-result");
   }

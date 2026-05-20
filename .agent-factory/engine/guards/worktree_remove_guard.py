@@ -24,7 +24,7 @@ import re
 import subprocess
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
@@ -32,7 +32,7 @@ if _engine_dir not in sys.path:
 from common import read_env
 from flow.worktree_manager import has_uncommitted_changes
 
-# ``git worktree remove [--force] <path>`` 명령 패턴
+# ``git worktree remove [--force] <path>`` command pattern
 _WORKTREE_REMOVE_PATTERN: str = r"\bgit\s+worktree\s+remove\b"
 
 
@@ -44,9 +44,9 @@ def _deny(worktree_path: str, status_output: str) -> None:
         status_output: ``git status --porcelain`` 출력 (미커밋 파일 목록).
     """
     reason = (
-        f"[워크트리 삭제 차단] 미커밋 변경이 있는 워크트리입니다: {worktree_path}\n"
-        f"미커밋 파일 목록:\n{status_output}\n"
-        "flow-merge를 사용하여 정상 경로로 완료하세요."
+        f"[Block worktree deletion] This is a worktree with uncommitted changes: {worktree_path} \n"
+        f"List of uncommitted files: \n {status_output} \n"
+        "Complete with the normal path using flow-merge."
     )
     result = {
         "hookSpecificOutput": {
@@ -71,23 +71,23 @@ def _extract_worktree_path(command: str) -> str | None:
     Returns:
         워크트리 경로 문자열. 추출 실패 시 None.
     """
-    # ``git worktree remove`` 이후 인자만 파싱
+    # After ``git worktree remove``, only the arguments are parsed.
     match = re.search(_WORKTREE_REMOVE_PATTERN, command)
     if not match:
         return None
 
-    # 매칭 종료 위치 이후의 나머지 문자열 추출
+    # Extract remaining string after matching end position
     remainder = command[match.end():].strip()
     if not remainder:
         return None
 
-    # 토큰 분리 (간단한 공백 기반 분리; 따옴표 포함 경로는 처리 범위 밖)
+    # Token separation (simple space-based separation; quoted paths are out of scope for processing)
     tokens = remainder.split()
     for token in tokens:
-        # ``--force`` 또는 ``-f`` 플래그는 건너뜀
+        # ``--force`` or ``-f`` flags are skipped
         if token in ("--force", "-f"):
             continue
-        # 첫 번째 비옵션 인자를 경로로 반환
+        # Returns the first non-optional argument as a path
         return token
 
     return None
@@ -126,14 +126,14 @@ def main() -> None:
 
     경로 추출 실패, 디렉터리 부재, 미커밋 없음 시에는 통과한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_WORKTREE_REMOVE_GUARD") or read_env("HOOK_WORKTREE_REMOVE_GUARD")
 
     # Hook disable check (false/0 = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -141,7 +141,7 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Bash가 아니면 통과
+    # Pass if not Bash
     if tool_name != "Bash":
         sys.exit(0)
 
@@ -150,24 +150,24 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # ``git worktree remove`` 패턴이 없으면 통과
+    # Passes if ``git worktree remove`` pattern is not present
     if not re.search(_WORKTREE_REMOVE_PATTERN, command):
         sys.exit(0)
 
-    # 명령에서 워크트리 경로 추출 (실패 시 통과 — false positive 방지)
+    # Extract worktree path from command (pass on failure — avoid false positives)
     worktree_path = _extract_worktree_path(command)
     if not worktree_path:
         sys.exit(0)
 
-    # 디렉터리가 아니면 통과 (이미 삭제된 경로 등)
+    # Pass if not a directory (already deleted path, etc.)
     if not os.path.isdir(worktree_path):
         sys.exit(0)
 
-    # 미커밋 변경 검사 (실패 시 False 반환 → 통과)
+    # Check for uncommitted changes (if failed, return False → pass)
     if not has_uncommitted_changes(worktree_path):
         sys.exit(0)
 
-    # 미커밋 변경 있음 → 차단
+    # There are uncommitted changes → Blocked
     status_output = _get_status_output(worktree_path)
     _deny(worktree_path, status_output)
 

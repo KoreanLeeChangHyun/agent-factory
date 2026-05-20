@@ -100,7 +100,7 @@ def load_config(env: dict[str, str] | None = None, cwd: str | None = None) -> GC
 
 
 def ensure_skeleton(cfg: GCConfig) -> None:
-    """디렉터리 스켈레톤(type/archive/.gc) 을 멱등 생성."""
+    """Create an idempotent directory skeleton (type/archive/.gc)."""
     cfg.memory_dir.mkdir(parents=True, exist_ok=True)
     for t in TYPE_DIRS:
         cfg.type_dir(t).mkdir(exist_ok=True)

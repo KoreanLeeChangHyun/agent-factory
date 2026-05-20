@@ -6,9 +6,9 @@ import os
 import re
 import sys
 
-# 티켓 번호 형식 정규식
+# Ticket number format regular expression
 _TICKET_RE = re.compile(r'^T-\d+$')
-# 칸반 전체 디렉터리 목록 (derived-from 가드에서 사용)
+# Kanban full directory listing (used in derived-from guard)
 _KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
 
 

@@ -10,10 +10,10 @@
   var M = (Board._memory = Board._memory || {});
 
   // ── State: Contexts tab (shared) ──
-  // 서브탭: roadmap | rules | memory | prompt
-  // CLAUDE.md 는 Rules 서브탭의 "Project Meta" 카테고리에 편입되어 별도 서브탭이 아니다.
-  // 사용자 선택은 Board.state.contexts (common.js, localStorage 영속) 가 단일 진실 공급원.
-  // 아래 변수들은 영속 상태에서 read-only 미러 — 변경 시 M.persistContexts() 호출 필수.
+  // Copyright (C) 2010 - 2018 SQUARE ENIX CO., LTD. All Rights Reserved.
+  // CLAUDE.md is not a separate sub tab that is used in the "Project Meta" category of the Rules sub tab.
+  // Board.state.contexts (common.js, localStorage) is a single truth source.
+  // M.persistContexts() call required when the following variables are read-only mirrors — change.
   var _cx = Board.state.contexts || { subTab: "roadmap", memory: {}, rules: {}, prompt: {} };
   Board.state.promptSubTab = _cx.subTab || "roadmap";
 
@@ -49,8 +49,8 @@
   Board.state.memoryPreview = false;
   Board.state.memoryOriginalContent = "";
 
-  // 영속 상태 동기화 — 모든 사용자 이벤트(서브탭 전환·파일 선택·sidebar resize·GC bar 토글)
-  // 후 호출. Board.state 의 휘발 변수들을 contexts 객체에 반영하고 saveUI() 로 commit.
+  // Synchronization — All user events (Save tabs, select files, sidebar resize·GC bar toggles)
+  // After calling. Board.state's volatile variables reflect the contexts object and commit to saveUI().
   M.persistContexts = function () {
     var cx = Board.state.contexts;
     if (!cx) return;
@@ -105,8 +105,8 @@
       .catch(function () { return []; });
   };
 
-  // CLAUDE.md 가 Rules 사이드바 "Project Meta" 카테고리에 편입되었으므로,
-  // path === "CLAUDE.md" 인 special case 를 fetch/save/delete 시 분기 처리한다.
+  // Since CLAUDE.md has been linked to the Rules sidebar "Project Meta" category,
+  // path === "CLAUDE.md" is handled by fetch/save/delete.
   M.fetchRulesFile = function(path) {
     if (path === "CLAUDE.md") return M.fetchClaudeMd();
     return fetch("/api/prompt/rules/file?path=" + encodeURIComponent(path), { cache: "no-store" })
@@ -185,8 +185,8 @@
       .catch(function () { return null; });
   };
 
-  // 메모리 버튼/단축 명령에서 사용하는 lookup 헬퍼.
-  // 매번 fetch 해서 사용자가 방금 편집한 문구가 즉시 반영되도록 한다.
+  // lookup helper used in memory buttons/shorts commands.
+  // When the user has been edited, the user will be immediately reflected.
   M.getQuickPromptText = function(id, fallback) {
     return M.fetchQuickPrompts().then(function (data) {
       var items = (data && data.items) || [];
@@ -329,7 +329,7 @@
     else if (sub === "prompt") M.renderSubPromptFiles();
   };
 
-  // Roadmap 서브탭 — views/roadmap.js 가 등록한 진입점에 위임.
+  // Roadmap Sub-Tap — The view/roadmap.js is registered in the entry point.
   M.renderSubRoadmap = function() {
     var content = document.getElementById("prompt-content");
     if (!content) return;
@@ -356,7 +356,7 @@
     var sidebar = container.querySelector(".memory-sidebar");
     if (!sidebar) return;
 
-    // 저장된 width 즉시 적용 (kind = "memory" | "rules" | "prompt")
+    // (kind = "memory" | "rules" | "prompt")
     var cx = Board.state.contexts;
     var bucket = (cx && kind && cx[kind]) ? cx[kind] : null;
     if (bucket && typeof bucket.sidebarWidth === "number"
@@ -518,7 +518,7 @@
         M.setClaudeMdDirty(false);
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        Board.util.showInfoModal("저장 실패", "Failed to save CLAUDE.md.", { severity: "error" });
+        Board.util.showInfoModal("Store failure", "Failed to save CLAUDE.md.", { severity: "error" });
       }
     });
   };
@@ -559,8 +559,8 @@
     M.fetchMemoryList().then(function (files) {
       Board.state.memoryFiles = files;
 
-      // GC bar + body 2단 column 분리.
-      // prompt-subtab-content 는 row 라 wrapper 안에서 column 흐름을 잡아준다.
+      // GC bar + 2nd column separated.
+      // prompt-subtab-content takes column flow in row wrapper.
       content.innerHTML =
         '<div class="memory-vertical-wrap">' +
           '<div class="memory-gc-host" id="memory-gc-host"></div>' +
@@ -639,8 +639,8 @@
     );
   };
 
-  // Memory GC 마이그레이션 후 type/archive 카테고리 그루핑.
-  // MEMORY.md 는 별도 최상단, 그 외는 (user / feedback / project / reference / archive/*) 순.
+  // The type/archive category gripping after memory GC migration.
+  // MEMORY.md is the same as the same as the same. (user / feedback / project / reference / archive/*).
   var MEMORY_CATEGORY_ORDER = [
     "flat",
     "user",
@@ -696,7 +696,7 @@
       var f = files[i];
       if (f.isIndex) { indexFile = f; continue; }
       var cat = f.category || "flat";
-      // archive/merged, archive/synthesized, archive/stale → 단일 "archive" 버킷으로 통합
+      // Integration with archive/merged, archive/synthesized, archive/stale → single "archive" bucket
       if (cat.indexOf("archive/") === 0) cat = "archive";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(f);
@@ -704,7 +704,7 @@
 
     var html = "";
     if (indexFile) {
-      // MEMORY.md 는 카테고리 헤더 없이 단독 노출
+      // MEMORY.md undressed without category header
       html += '<div class="memory-cat-group is-index">' + _renderMemoryItem(indexFile) + '</div>';
     }
 
@@ -716,7 +716,7 @@
       if (!catFiles || catFiles.length === 0) continue;
       html += _renderMemoryCategoryGroup(cat, catFiles);
     }
-    // 예약 외 카테고리 (있으면)
+    // Reservations and other categories
     for (var ck in groups) {
       if (seen[ck]) continue;
       html += _renderMemoryCategoryGroup(ck, groups[ck]);
@@ -730,7 +730,7 @@
       items[j].addEventListener("dragstart", M.onMemoryFileItemDragStart);
     }
 
-    // archive 헤더 클릭 → 접힘/펼침 토글
+    // Archive Header Click → Fold / Unfold Toggle
     var archiveHeader = list.querySelector(".memory-cat-group.is-archive .memory-cat-header");
     if (archiveHeader) {
       archiveHeader.addEventListener("click", function() {
@@ -743,8 +743,8 @@
     }
   };
 
-  // Memory 항목 DnD → terminal-input-card 드롭 시 첨부 chip 으로 등록되는 패턴.
-  // 본문은 dragstart 시점에 fetch 하지 않고 (동기 제약), drop handler 가 비동기로 fetch + parse.
+  // Memory Item DnD → terminal-input-card Pattern registered with chip attached when dropping.
+  // The body is not fetched at the time of dragstart (transmitter pharmaceutical), drop handler is asynchronous fetch + parse.
   M.onMemoryFileItemDragStart = function(e) {
     var item = e.currentTarget;
     var name = item.dataset.name;
@@ -758,8 +758,8 @@
     } catch (_e) { /* graceful */ }
   };
 
-  // YAML-like frontmatter (--- ... ---) 의 단순 key: value 라인 추출.
-  // description 추출 용도로만 쓰이며, 복잡한 list/nested 구조는 지원하지 않는다.
+  // YAML-like frontmatter (---... ---) simplicity key: value line extraction.
+  // The description is used only for extraction, and the complex list/nested structure does not support.
   M.parseMemoryFrontmatter = function(content) {
     if (!content) return {};
     var m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -773,7 +773,7 @@
   };
   Board.fetch.parseMemoryFrontmatter = M.parseMemoryFrontmatter;
 
-  // caret SVG: 오른쪽 방향(collapsed) / 아래 방향(expanded)
+  // caret SVG: Right direction (collapsed) / Lower direction (expanded)
   var _CARET_SVG_RIGHT = '<svg class="memory-cat-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
   var _CARET_SVG_DOWN  = '<svg class="memory-cat-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
 
@@ -951,7 +951,7 @@
         M.refreshMemoryFileList();
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        Board.util.showInfoModal("저장 실패", "Failed to save file.", { severity: "error" });
+        Board.util.showInfoModal("Store failure", "Failed to save file.", { severity: "error" });
       }
     });
   };
@@ -968,7 +968,7 @@
         M.persistContexts();
         M.renderSubMemory();
       } else {
-        Board.util.showInfoModal("삭제 실패", "Failed to delete file.", { severity: "error" });
+        Board.util.showInfoModal("Delete failed", "Failed to delete file.", { severity: "error" });
       }
     });
   };
@@ -982,7 +982,7 @@
 
     for (var i = 0; i < Board.state.memoryFiles.length; i++) {
       if (Board.state.memoryFiles[i].name === filename) {
-        Board.util.showInfoModal("파일 생성 차단", 'File "' + filename + '" already exists.', { severity: "warning" });
+        Board.util.showInfoModal("File creation block", 'File "' + filename + '" already exists.', { severity: "warning" });
         return;
       }
     }
@@ -994,7 +994,7 @@
         M.persistContexts();
         M.renderSubMemory();
       } else {
-        Board.util.showInfoModal("생성 실패", "Failed to create file.", { severity: "error" });
+        Board.util.showInfoModal("Getting Started", "Failed to create file.", { severity: "error" });
       }
     });
   };

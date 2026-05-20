@@ -1,13 +1,13 @@
-"""test_auto_commit.py — Stage 3-E §0.1 결정론 commit 단위 테스트.
+"""test auto commit.py — Stage 3-E §0.1 Decision Commit Unit Test.
 
-대상: `_common.auto_commit(ctx)` — WORK 종료 직후 driver 가 호출하는 결정론 git
-add + commit 헬퍼. LLM 위임 0건.
+Target: ` common.auto commit(ctx)` — Determined git calling driver after WORK end
+add + commit helper. 0 LLM commission.
 
-검증 분기:
+Payment Terms:
   1. worktree_path=None → skip (return 0)
-  2. worktree path 미존재 → skip (return 0)
-  3. staged 변경 0건 → skip (return 0)
-  4. staged 변경 있음 → commit 성공 (return 0, HEAD 1 이동)
+  2. worktree path (return 0)
+  3. FAQs skip (return 0)
+  4. FAQs Staged Changes → Commit Success (return 0, Head 1 Move)
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _init_repo(tmp_path: Path) -> Path:
-    """tmp_path 안에 minimal git repo 생성 + initial commit."""
+    """create minimal git repo within tmp path + initial commit."""
     repo = tmp_path / "wt"
     repo.mkdir()
     assert _git(repo, "init", "--initial-branch=main").returncode == 0
@@ -53,12 +53,12 @@ def _make_ctx(tmp_path: Path, *, worktree_path: Path | None) -> WorkflowContext:
         current_step="WORK",
         feature_branch="feat/T-493-smoke" if worktree_path else None,
         worktree_path=worktree_path,
-        title="smoke 티켓",
+        title="Smoke tickets",
     )
 
 
 def test_auto_commit_worktree_less_skips(tmp_path: Path) -> None:
-    """worktree_path=None → skip, return 0, 로그에 'worktree-less' 라인."""
+    """worktree path=None → skip, return 0, 'worktree-less' line on the log."""
     ctx = _make_ctx(tmp_path, worktree_path=None)
     rc = auto_commit(ctx)
     assert rc == 0
@@ -68,30 +68,30 @@ def test_auto_commit_worktree_less_skips(tmp_path: Path) -> None:
 
 
 def test_auto_commit_worktree_path_missing(tmp_path: Path) -> None:
-    """worktree_path 가 존재하지 않는 디렉터리 → skip."""
+    """worktree path does not exist directory → skip."""
     missing = tmp_path / "does-not-exist"
     ctx = _make_ctx(tmp_path, worktree_path=missing)
     rc = auto_commit(ctx)
     assert rc == 0
     log = ctx.workflow_log_path().read_text(encoding="utf-8")
-    assert "미존재" in log
+    assert "About Us" in log
 
 
 def test_auto_commit_no_staged_changes_skips(tmp_path: Path) -> None:
-    """worktree 가 clean 상태 → staged 변경 0건 → skip."""
+    """worktree is clean condition → staged change 0 → skip."""
     repo = _init_repo(tmp_path)
     ctx = _make_ctx(tmp_path, worktree_path=repo)
     head_before = _git(repo, "rev-parse", "HEAD").stdout.strip()
     rc = auto_commit(ctx)
     assert rc == 0
     head_after = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    assert head_before == head_after, "변경 0건인데 commit 발생"
+    assert head_before == head_after, "0 Changes"
     log = ctx.workflow_log_path().read_text(encoding="utf-8")
-    assert "0건" in log or "skip" in log
+    assert "0 items" in log or "skip" in log
 
 
 def test_auto_commit_with_changes_commits(tmp_path: Path) -> None:
-    """worktree 안에 untracked 파일 추가 → auto_commit → HEAD 1 이동 + 메시지 template."""
+    """Add untracked file inside worktree → auto commit → HEAD 1 go + message template."""
     repo = _init_repo(tmp_path)
     (repo / "sample.txt").write_text("hello\n", encoding="utf-8")
     ctx = _make_ctx(tmp_path, worktree_path=repo)
@@ -99,16 +99,16 @@ def test_auto_commit_with_changes_commits(tmp_path: Path) -> None:
     rc = auto_commit(ctx)
     assert rc == 0
     head_after = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    assert head_before != head_after, "변경 있는데 commit 미발생"
-    # 메시지 template 검증
+    assert head_before != head_after, "Changes Commit"
+    # Query template validation
     msg = _git(repo, "log", "-1", "--pretty=%s").stdout.strip()
     assert "T-493" in msg
-    assert "smoke 티켓" in msg
+    assert "Smoke tickets" in msg
     assert "production-line auto-commit" in msg
 
 
 def test_auto_commit_modified_tracked_file(tmp_path: Path) -> None:
-    """tracked 파일 수정 → staged → commit."""
+    """tracked file fixes → staged → commit."""
     repo = _init_repo(tmp_path)
     (repo / "README.md").write_text("modified\n", encoding="utf-8")
     ctx = _make_ctx(tmp_path, worktree_path=repo)

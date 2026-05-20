@@ -1,10 +1,10 @@
 """test_parallel.py — T-506 P3 + P4.
 
-`engine.apps.production_line._parallel.parallel_spawn` 은 같은 level 의 phase / worker 를 동시
-실행하는 ThreadPoolExecutor wrapper.
+`engine.apps.production line. parallel.parallel spawn` simultaneous level of phase/worker
+threadPoolExecutor wrapper
 
-P3: 기본 골격 (성공 / 순서 보존 / max_workers clamp).
-P4: fail_fast / fail_tolerant 분기.
+P3: Basic skeleton (permanent / sequence preservation / max workers clamp).
+P4: fail fast / fail tolerant branch.
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ from engine.apps.production_line import _common
 from engine.apps.production_line._parallel import ParallelOutcome, parallel_spawn
 
 
-# ---------------- P3 기본 골격 ----------------
+# ---------------- P3 Basic skeleton ----------------
 
 
 def test_parallel_spawn_all_success() -> None:
-    """모든 item 성공 — 결과 tuple list 길이 == items 길이."""
+    """All item success — result tuple list length == item length."""
     items = [1, 2, 3, 4]
     results = parallel_spawn(items, fn=lambda x: x * 2, max_workers=2)
     assert len(results) == 4
@@ -32,7 +32,7 @@ def test_parallel_spawn_all_success() -> None:
 
 
 def test_parallel_spawn_preserves_order() -> None:
-    """결과 list 가 입력 items 순서 보존."""
+    """The result list is input items to preserve the order."""
     items = ["a", "b", "c", "d"]
     results = parallel_spawn(items, fn=lambda x: x.upper(), max_workers=4)
     assert [r.item for r in results] == items
@@ -40,18 +40,18 @@ def test_parallel_spawn_preserves_order() -> None:
 
 
 def test_parallel_spawn_max_workers_clamp(monkeypatch: pytest.MonkeyPatch) -> None:
-    """max_workers 가 get_max_parallel() 보다 크면 clamp."""
+    """get max parallel()"""
     monkeypatch.setattr(_common, "_load_settings", lambda: {})
     monkeypatch.delenv("V2_MAX_PARALLEL", raising=False)  # default 4
     items = list(range(10))
-    # max_workers=100 요청 → get_max_parallel()=4 로 clamp. 결과는 모두 처리됨.
+    # max workers=100 request → get max parallel()=4 clamp. All results are processed.
     results = parallel_spawn(items, fn=lambda x: x, max_workers=100)
     assert len(results) == 10
     assert all(r.ok for r in results)
 
 
 def test_parallel_spawn_runs_concurrently() -> None:
-    """ThreadPoolExecutor 가 실제 동시 실행 — wall clock 시간 ≪ items × sleep."""
+    """ThreadPoolExecutor runs real simultaneous — wall clock time ≪ items × sleep."""
     sleep_s = 0.1
 
     def slow(x: int) -> int:
@@ -63,12 +63,12 @@ def test_parallel_spawn_runs_concurrently() -> None:
     results = parallel_spawn(items, fn=slow, max_workers=4)
     elapsed = time.monotonic() - t0
     assert all(r.ok for r in results)
-    # 순차였다면 4*0.1=0.4s. 동시 실행이면 ~0.1s. 0.3s 미만 — 여유 충분
+    # 4*0.1=0.4s -0.1s. Less than 0.3s — Free
     assert elapsed < 0.3, f"elapsed={elapsed:.3f}s — not concurrent"
 
 
 def test_parallel_spawn_empty_items() -> None:
-    """items=[] → 빈 list (no-op)."""
+    """list(no-op)"""
     assert parallel_spawn([], fn=lambda x: x, max_workers=4) == []
 
 
@@ -76,7 +76,7 @@ def test_parallel_spawn_empty_items() -> None:
 
 
 def test_parallel_spawn_fail_tolerant_runs_all() -> None:
-    """fail_fast=False — 일부 실패해도 모든 item 끝까지 실행."""
+    """fail fast=False — run until all item ends even if some failed."""
     started: list[int] = []
     lock = threading.Lock()
 
@@ -97,16 +97,16 @@ def test_parallel_spawn_fail_tolerant_runs_all() -> None:
     assert isinstance(by_item[1].exception, ValueError)
     assert by_item[2].ok is True
     assert by_item[3].ok is True
-    # 모두 시작됨
+    # Get started
     assert set(started) == {0, 1, 2, 3}
 
 
 def test_parallel_spawn_fail_fast_aborts_pending() -> None:
-    """fail_fast=True — 한 item 실패 시 아직 제출 안된 future cancel.
+    """fail fast=True — the future cancel not yet submitted when one item failed.
 
-    제출 단위는 ThreadPoolExecutor 의 worker 수. max_workers=1 + 3 items 케이스에서
-    첫 item 이 fail → 2, 3 은 cancel 되어 ok=False, exception 은 CancelledError-like 또는
-    아예 실행 안 됨.
+    The submission unit can worker of threadPoolExecutor. max workers=1 + 3 items in case
+    ok=False, exception
+    Not run.
     """
     started: list[int] = []
     lock = threading.Lock()
@@ -116,27 +116,27 @@ def test_parallel_spawn_fail_fast_aborts_pending() -> None:
             started.append(x)
         if x == 0:
             raise RuntimeError("first item fails")
-        time.sleep(0.5)  # 충분히 길게 — fail_fast 가 cancel 할 시간 확보
+        time.sleep(0.5)  # long enough — fail fast has time to cancel
         return x
 
     items = [0, 1, 2]
     t0 = time.monotonic()
     results = parallel_spawn(items, fn=fail_first, max_workers=1, fail_fast=True)
     elapsed = time.monotonic() - t0
-    # 결과 list 는 입력 길이 유지 (item, ok, exception) 형태 보존
+    # Results list retains input length (item, ok, exception) form
     assert len(results) == 3
     assert results[0].ok is False
     assert isinstance(results[0].exception, RuntimeError)
-    # 나머지는 cancel 또는 not_started — ok=False
+    # ok=False
     assert results[1].ok is False
     assert results[2].ok is False
-    # max_workers=1 이라 첫 item 만 실행됨. 2,3 은 cancel.
-    # elapsed 가 0.5s × 3 = 1.5s 보다 훨씬 작아야 (fail_fast 동작 증거)
-    assert elapsed < 0.8, f"elapsed={elapsed:.3f}s — fail_fast 동작 안 함"
+    # max workers=1 . 2,3 BIT.
+    # elapsed is much smaller than 0.5s × 3 = 1.5s (fail fast action proof)
+    assert elapsed < 0.8, f"elapsed=   FIELD 0   s — fail fast"
 
 
 def test_parallel_spawn_fail_fast_default_true() -> None:
-    """fail_fast 명시 안 하면 default True (SPEC §3.4 캐논)."""
+    """default True (SPEC §3.4 canon) if fail fast is not specified."""
 
     def fail_first(x: int) -> int:
         if x == 0:
@@ -149,12 +149,12 @@ def test_parallel_spawn_fail_fast_default_true() -> None:
     results = parallel_spawn(items, fn=fail_first, max_workers=1)
     elapsed = time.monotonic() - t0
     assert results[0].ok is False
-    # default fail_fast=True 일 때 빠른 종료
+    # default fail fast=True
     assert elapsed < 0.8
 
 
 def test_parallel_outcome_dataclass_shape() -> None:
-    """ParallelOutcome — item / ok / value / exception 필드."""
+    """ParallelOutcome — item / ok / value / exception field."""
     results = parallel_spawn([42], fn=lambda x: x + 1, max_workers=1)
     r = results[0]
     assert isinstance(r, ParallelOutcome)
@@ -165,7 +165,7 @@ def test_parallel_outcome_dataclass_shape() -> None:
 
 
 def test_parallel_spawn_max_workers_floor() -> None:
-    """max_workers <= 0 이면 1로 clamp (defensive)."""
+    """max workers <= 0 Clamp(dSchool)."""
     items = [1, 2, 3]
     results = parallel_spawn(items, fn=lambda x: x, max_workers=0)
     assert len(results) == 3

@@ -1,9 +1,9 @@
-"""cli_utils.py - flow-* 스크립트 공통 argparse 유틸 모듈.
+"""cli utils.py - flow-* script Common argparse butyl module.
 
-argparse type 함수, 공통 에필로그 빌더, deprecation 경고 유틸을 제공한다.
-W02 이후 각 스크립트의 argparse 전환 시 이 모듈을 import하여 사용한다.
+argparse type function, provides a common epLog builder, deprecation warning utilities.
+When argparse conversion of each script after W02, import this module.
 
-사용 예시:
+Tag:
     from flow.cli_utils import registry_key_type, ticket_type, build_common_epilog
 
     parser = argparse.ArgumentParser(
@@ -22,15 +22,15 @@ import re
 import sys
 
 
-# ─── 버전 로드 ────────────────────────────────────────────────────────────────
+# ─── Load version ───────────────────────────────────────────────────────────────────
 
 def _load_version() -> str:
-    """워크플로우 버전을 .version 파일에서 읽어 반환한다.
+    """return the workflow version from .version file.
 
-    파일 읽기 실패 시 "unknown"을 반환한다.
+    returns "unknown" when file read failed.
 
     Returns:
-        버전 문자열 (예: "2.1.17") 또는 "unknown".
+        Version string (e.g. "2.1.17") or "unknown".
     """
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -43,56 +43,56 @@ def _load_version() -> str:
         return "unknown"
 
 
-# ─── argparse type 함수 ───────────────────────────────────────────────────────
+# ─── argparse type function ───────────────────────────────────────────────────────────
 
 def registry_key_type(value: str) -> str:
-    """YYYYMMDD-HHMMSS 형식 registryKey 검증 argparse type 함수.
+    """YYYYMMDD-HMMSS format registryKey verification argparse type function.
 
-    argparse add_argument(..., type=registry_key_type) 로 사용한다.
-    형식이 맞지 않으면 argparse.ArgumentTypeError를 발생시켜 사용 오류로 처리한다.
+    argparse add argument(..., type=registry key type)
+    argparse.ArgumentTypeError does not match the format and handle it with error.
 
     Args:
-        value: 사용자가 입력한 registryKey 문자열.
+        value: the registryKey string you entered.
 
     Returns:
-        유효한 경우 입력값을 그대로 반환한다.
+        If valid, return the input value.
 
     Raises:
-        argparse.ArgumentTypeError: 형식이 YYYYMMDD-HHMMSS와 다른 경우.
+        argparse.ArgumentTypeError: format YYYYMMDD-HMMSS and other occasions.
 
     Examples:
         >>> registry_key_type("20260329-224421")
         '20260329-224421'
         >>> registry_key_type("bad-key")
-        # ArgumentTypeError 발생
+        # ArgumentTypeError occurs
     """
     pattern = r"^\d{8}-\d{6}$"
     if not re.match(pattern, value):
         raise argparse.ArgumentTypeError(
-            f"registryKey 형식 오류: '{value}' — YYYYMMDD-HHMMSS 형식이어야 합니다 (예: 20260329-224421)"
+            f"registryKey format error: '{value}' — must be in YYYYMMDD-HHMMSS format (e.g. 20260329-224421)"
         )
     return value
 
 
 def ticket_type(value: str) -> str:
-    """T-NNN / NNN / #N 형식 티켓 번호를 T-NNN 으로 정규화하는 argparse type 함수.
+    """argparse type function that is regularized by T-NNN / NNN / #N format ticket number.
 
-    kanban_cli.py / ticket_repository.py 의 normalize_ticket_number 와 동일한
-    정규화 규칙을 따르되, argparse type 함수 인터페이스를 제공한다.
+    kanban cli.py / ticket repository.py
+    argparse type
 
-    지원 입력 형식:
+    Tag:
 
-        - 001, 1 (순수 숫자)
-        - #001, #1 (# 접두사)
+        - 001, 1 (pure number)
+        - #001, #1 (# prefix)
 
     Args:
-        value: 사용자가 입력한 티켓 번호 문자열.
+        value: a string of the ticket number you entered.
 
     Returns:
-        T-NNN 형식으로 정규화된 문자열 (예: "T-042").
+        Normalized string in T-NNN format (e.g. "T-042").
 
     Raises:
-        argparse.ArgumentTypeError: 인식할 수 없는 티켓 번호 형식인 경우.
+        argparse.ArgumentTypeError: In case of an unknown ticket number format.
 
     Examples:
         >>> ticket_type("42")
@@ -103,29 +103,29 @@ def ticket_type(value: str) -> str:
         'T-007'
     """
     raw = value.strip().lstrip("#")
-    # T-NNN 형식 (대소문자 무시)
+    # T-NNN format (ignoring case)
     if re.match(r"^[Tt]-\d+$", raw):
         parts = raw.split("-", 1)
         num = int(parts[1])
         return f"T-{num:03d}"
-    # 순수 숫자
+    # pure numbers
     if re.match(r"^\d+$", raw):
         return f"T-{int(raw):03d}"
     raise argparse.ArgumentTypeError(
-        f"티켓 번호 형식 오류: '{value}' — T-NNN, NNN, #N 형식 중 하나여야 합니다"
+        f"Ticket number format error: '{value}' — must be one of the following formats: T-NNN, NNN, #N"
     )
 
 
-# ─── 공통 에필로그 ────────────────────────────────────────────────────────────
+# ─── Common Epilogue ───────────────────────────────────────────────────────────────
 
 def build_common_epilog() -> str:
-    """argparse 파서에 사용할 공통 도움말 에필로그를 반환한다.
+    """argparse returns a common help erpilgrimage to use.
 
-    워크플로우 버전과 문서 참조 안내를 포함한다.
-    RawDescriptionHelpFormatter와 함께 사용할 것을 권장한다.
+    We use cookies to ensure that we give you the best experience on our website.
+    RawDescriptionHelpFormatter
 
     Returns:
-        여러 줄로 구성된 에필로그 문자열.
+        Epilot string consisting of multiple lines.
 
     Examples:
         parser = argparse.ArgumentParser(
@@ -135,25 +135,25 @@ def build_common_epilog() -> str:
     """
     version = _load_version()
     return (
-        f"워크플로우 버전: {version}\n"
-        "문서: .agent-factory/docs/ 또는 .claude/rules/workflow.md 참조\n"
-        "티켓 관리: flow-kanban <서브커맨드> --help"
+        f"Workflow version: {version} \n"
+        "Documentation: See .agent-factory/docs/ or .claude/rules/workflow.md \n"
+        "Ticket management: flow-kanban <subcommand> --help"
     )
 
 
-# ─── deprecation 경고 유틸 ───────────────────────────────────────────────────
+# ─── deprecation warning utility ────────────────────────────────────────────────────
 
 def deprecation_warning(old: str, new: str) -> None:
-    """하위 호환 경고를 stderr에 출력한다.
+    """output sub-compatible warning to stderr.
 
-    argparse 전환 후 기존 호출 패턴이 일시적으로 허용되는 동안
-    사용자에게 새 형식을 안내하기 위해 사용한다.
+    argparse while the existing call pattern is temporarily allowed after switching
+    Use the user to guide the new format.
 
-    경고는 항상 stderr로 출력되며 프로그램 실행을 중단하지 않는다.
+    Warning is always output with stderr and does not interrupt the program execution.
 
     Args:
-        old: 사용 중인 기존(deprecated) 호출 형식 또는 옵션명.
-        new: 대체할 새 호출 형식 또는 옵션명.
+        old: the existing (deprecated) call format or the optional name.
+        new: New calling format or optional name to replace.
 
     Examples:
         deprecation_warning(
@@ -162,7 +162,7 @@ def deprecation_warning(old: str, new: str) -> None:
         )
     """
     print(
-        f"[DEPRECATED] '{old}' 형식은 향후 제거될 예정입니다. "
-        f"대신 '{new}' 형식을 사용하세요.",
+        f"[DEPRECATED] The '{old}' format will be removed in the future."
+        f"Use the '{new}' format instead.",
         file=sys.stderr,
     )

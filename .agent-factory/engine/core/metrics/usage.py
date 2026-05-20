@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-# utils 패키지 import
+# import the utils package
 _engine_dir = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
@@ -176,7 +176,7 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
         성공 시 None, 실패 시 에러 결과 문자열.
     """
     usage_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".usage.md")
-    marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+    marker = "<!-- New entries will be added below this line -->"
     header_line = USAGE_HEADER_LINE
     separator_line = USAGE_SEPARATOR_LINE
 
@@ -186,9 +186,9 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
             content = f.read()
 
     if marker not in content:
-        content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
+        content = f"# Track workflow usage \n \n {marker} \n \n {header_line} \n {separator_line} \n"
 
-    # row 컬럼 수 검증: 12컬럼이 아니면 삽입하지 않음
+    # Verification of number of row columns: Do not insert unless there are 12 columns
     if row.count("|") - 1 != 12:
         print(
             f"[WARN] usage-finalize: row column count mismatch (expected 12, got {row.count('|') - 1}). row insertion skipped.",
@@ -229,7 +229,7 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
             os.unlink(tmp)
         raise
 
-    return None  # 성공
+    return None  # success
 
 
 def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
@@ -245,14 +245,14 @@ def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
         'usage-pending -> skipped (missing args)', 'usage-pending -> lock failed'.
     """
     if not agent_id or not task_id:
-        print("[WARN] usage-pending: agent_id, task_id 인자가 필요합니다.", file=sys.stderr)
+        print("[WARN] usage-pending: agent_id, task_id arguments are required.", file=sys.stderr)
         return "usage-pending -> skipped (missing args)"
 
     usage_file = os.path.join(abs_work_dir, "usage.json")
     lock_dir = usage_file + ".lockdir"
 
     if not acquire_lock(lock_dir, max_wait=5):
-        print("[WARN] usage-pending: 잠금 획득 실패", file=sys.stderr)
+        print("[WARN] usage-pending: Lock acquisition failed.", file=sys.stderr)
         return "usage-pending -> lock failed"
 
     try:
@@ -298,7 +298,7 @@ def _append_usage_snapshot(
         if not abs_work_dir or not os.path.isdir(abs_work_dir):
             return
 
-        # step: status.json 또는 .context.json 에서 현재 단계 추출
+        # step: extract current step from status.json or .context.json
         step = "UNKNOWN"
         try:
             status_path = os.path.join(abs_work_dir, "status.json")
@@ -361,14 +361,14 @@ def usage_record(
         'usage -> skipped (missing args)', 'usage -> lock failed'.
     """
     if not agent_name or input_tokens is None or output_tokens is None:
-        print("[WARN] usage: agent_name, input_tokens, output_tokens 인자가 필요합니다.", file=sys.stderr)
+        print("[WARN] usage: agent_name, input_tokens, output_tokens arguments are required.", file=sys.stderr)
         return "usage -> skipped (missing args)"
 
     usage_file = os.path.join(abs_work_dir, "usage.json")
     lock_dir = usage_file + ".lockdir"
 
     if not acquire_lock(lock_dir, max_wait=5):
-        print("[WARN] usage: 잠금 획득 실패", file=sys.stderr)
+        print("[WARN] usage: Failed to acquire lock", file=sys.stderr)
         return "usage -> lock failed"
 
     try:
@@ -405,7 +405,7 @@ def usage_record(
         atomic_write_json(usage_file, data)
         _append_log(abs_work_dir, "INFO", f"USAGE_RECORDED: agent={label}")
 
-        # --- metrics: usage.snapshot 이벤트 기록 ---
+        # --- metrics: usage.snapshot event log ---
         eff = _calc_effective(token_data)
         _append_usage_snapshot(abs_work_dir, in_t, out_t, cc_t, cr_t, eff)
 
@@ -434,7 +434,7 @@ def usage_finalize(abs_work_dir: str) -> str:
         if not isinstance(data, dict):
             return "usage-finalize -> skipped (invalid format)"
 
-        # $schema 가드: usage-v2가 아니면 마이그레이션
+        # $schema guard: migrate if not usage-v2
         if data.get("$schema") != "usage-v2":
             data.pop("init", None)
             data.pop("done", None)
@@ -442,7 +442,7 @@ def usage_finalize(abs_work_dir: str) -> str:
 
         agents = data.get("agents", {})
 
-        # 모든 에이전트 토큰 데이터 수집
+        # Collect all agent token data
         all_agents: list[dict[str, Any]] = []
         for key in ["orchestrator", "planner", "explorer", "validator", "reporter"]:
             if key in agents and isinstance(agents[key], dict):
@@ -454,17 +454,17 @@ def usage_finalize(abs_work_dir: str) -> str:
                 if isinstance(w, dict):
                     all_agents.append(w)
 
-        # totals 계산
+        # Calculate totals
         totals = _sum_tokens(all_agents)
         totals["effective_tokens"] = _calc_effective(totals)
         data["totals"] = totals
 
         atomic_write_json(usage_file, data)
 
-        # registryKey 추출
+        # Extract registryKey
         registry_key = extract_registry_key(abs_work_dir)
 
-        # .context.json에서 메타데이터 조회
+        # Look up metadata in .context.json
         reg_title = ""
         reg_command = ""
         ctx_file = os.path.join(abs_work_dir, ".context.json")
@@ -475,7 +475,7 @@ def usage_finalize(abs_work_dir: str) -> str:
 
         title = reg_title[:30] if reg_title else ""
 
-        # 날짜 추출
+        # date extraction
         date_str = ""
         if len(registry_key) >= 15:
             try:
@@ -483,7 +483,7 @@ def usage_finalize(abs_work_dir: str) -> str:
             except Exception:
                 date_str = registry_key
 
-        # 에이전트별 effective_tokens
+        # effective_tokens per agent
         orch_eff = _calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
         plan_eff = _calc_effective(agents.get("planner", {})) if "planner" in agents else 0
         work_eff = (
@@ -497,10 +497,10 @@ def usage_finalize(abs_work_dir: str) -> str:
         total_eff = orch_eff + plan_eff + work_eff + exp_eff + val_eff + report_eff
         eff_weighted = totals.get("effective_tokens", total_eff)
 
-        # 예산 임계치 확인
+        # Check your budget threshold
         budget_label = _check_budget_threshold(abs_work_dir, eff_weighted)
 
-        # usage.md 행 생성 (12칼럼 스키마: 날짜|작업ID|제목|명령|ORC|PLN|WRK|EXP|VAL|RPT|합계|예산)
+        # Create usage.md row (12-column schema: Date|JobID|Title|Command|ORC|PLN|WRK|EXP|VAL|RPT|Total|Budget)
         row = (
             f"| {date_str} "
             f"| {registry_key} "
@@ -516,7 +516,7 @@ def usage_finalize(abs_work_dir: str) -> str:
             f"| {budget_label} |"
         )
 
-        # .dashboard/.usage.md 갱신
+        # Update .dashboard/.usage.md
         md_err = _update_usage_md(row, eff_weighted)
         if md_err is not None:
             return md_err
@@ -538,7 +538,7 @@ def usage_regenerate() -> str:
         'usage-regenerate -> failed'.
     """
     try:
-        # 레거시 행 데이터 수집
+        # Legacy row data collection
         rows_data: list[tuple[str, str, str, str, float, float, float, float, float, float, float]] = []
 
         workflow_base = os.path.join(PROJECT_ROOT, ".agent-factory", "runs")
@@ -547,7 +547,7 @@ def usage_regenerate() -> str:
         dirs_to_scan: list[str] = []
 
         def _collect_dirs(base: str, skip_history: bool = False) -> None:
-            """T-448 폴드 구조: usage.json 위치 디렉터리 수집."""
+            """T-448 fold structure: usage.json location directory collection."""
             for entry in os.listdir(base):
                 if skip_history and entry == ".history":
                     continue
@@ -563,7 +563,7 @@ def usage_regenerate() -> str:
         if os.path.isdir(workflow_history):
             _collect_dirs(workflow_history)
 
-        # 각 워크플로우 디렉터리에서 usage.json과 .context.json 읽기
+        # Read usage.json and .context.json from each workflow directory
         for workflow_dir in dirs_to_scan:
             usage_file = os.path.join(workflow_dir, "usage.json")
             context_file = os.path.join(workflow_dir, ".context.json")
@@ -578,21 +578,21 @@ def usage_regenerate() -> str:
                 if not isinstance(usage_data, dict):
                     continue
 
-                # usage schema 확인
+                # Check usage schema
                 if usage_data.get("$schema") != "usage-v2":
                     continue
 
-                # registryKey 추출
+                # Extract registryKey
                 try:
                     registry_key = extract_registry_key(workflow_dir)
                 except Exception:
                     continue
 
-                # .context.json에서 메타데이터 추출
+                # Extract metadata from .context.json
                 title = context_data.get("title", "")[:30] if isinstance(context_data, dict) else ""
                 command = context_data.get("command", "") if isinstance(context_data, dict) else ""
 
-                # 날짜 추출
+                # date extraction
                 date_str = ""
                 if len(registry_key) >= 15:
                     try:
@@ -600,7 +600,7 @@ def usage_regenerate() -> str:
                     except Exception:
                         date_str = registry_key
 
-                # 에이전트별 effective_tokens 계산
+                # Calculating effective_tokens per agent
                 agents = usage_data.get("agents", {})
                 orch_eff = _calc_effective(agents.get("orchestrator", {})) if "orchestrator" in agents else 0
                 plan_eff = _calc_effective(agents.get("planner", {})) if "planner" in agents else 0
@@ -621,31 +621,31 @@ def usage_regenerate() -> str:
                 ))
 
             except Exception:
-                # 비차단 원칙: 개별 usage.json 파싱 실패해도 계속 진행
+                # Non-blocking principle: Continue even if individual usage.json parsing fails
                 continue
 
-        # registryKey 날짜 내림차순 정렬 (최신이 상단)
+        # Sort by registryKey date descending (newest at top)
         rows_data.sort(key=lambda x: x[0], reverse=True)
 
-        # .dashboard/.usage.md 읽기
+        # Read .dashboard/.usage.md
         usage_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".usage.md")
         content = ""
         if os.path.isfile(usage_md):
             with open(usage_md, "r", encoding="utf-8") as f:
                 content = f.read()
 
-        # 마커와 헤더/분리선 정의
-        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+        # Define markers and headers/separators
+        marker = "<!-- New entries will be added below this line -->"
         header_line = USAGE_HEADER_LINE
         separator_line = USAGE_SEPARATOR_LINE
 
-        # <details> 아카이브 섹션 추출 및 보존
+        # <details> Extract and preserve archive sections
         archive_section = ""
         if "<details>" in content:
             details_start = content.find("<details>")
             archive_section = content[details_start:]
 
-        # 새 usage table 행 생성
+        # Create a new usage table row
         new_rows: list[str] = []
         for (
             reg_key, date_str, title, command,
@@ -667,16 +667,16 @@ def usage_regenerate() -> str:
             )
             new_rows.append(row)
 
-        # 새로운 콘텐츠 구성
-        new_content = f"# 워크플로우 사용량 추적\n\n{marker}\n\n{header_line}\n{separator_line}\n"
+        # Organize new content
+        new_content = f"# Track workflow usage \n \n {marker} \n \n {header_line} \n {separator_line} \n"
         for row in new_rows:
             new_content += row + "\n"
 
-        # 아카이브 섹션 추가 (있으면)
+        # Add archive section (if present)
         if archive_section:
             new_content += "\n" + archive_section
 
-        # .usage.md 원자적 갱신
+        # .usage.md atomic update
         os.makedirs(os.path.dirname(usage_md), exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(usage_md), suffix=".tmp")
         try:

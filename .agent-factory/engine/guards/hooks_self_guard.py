@@ -20,12 +20,12 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -37,7 +37,7 @@ from messages import (
     HOOKS_WRITE_EDIT_DENIED,
 )
 
-# 가드 패턴 로드 (보안 우선: import 실패 시 보수적 폴백)
+# Load guard pattern (security first: conservative fallback on import failure)
 try:
     from constants import (
         GUARD_READONLY_PATTERNS as READONLY_PATTERNS,
@@ -48,7 +48,7 @@ try:
     PROTECTED_PATH_RES: list[re.Pattern[str]] = [re.compile(p) for p in PROTECTED_PATH_PATTERNS]
 except ImportError:
     print(
-        "[hooks_self_guard] CRITICAL: data.constants guard patterns import 실패 - 보안 폴백 적용",
+        "[hooks_self_guard] CRITICAL: data.constants guard patterns import failed - apply security fallback",
         file=sys.stderr,
     )
     READONLY_PATTERNS: list[str] = []
@@ -124,9 +124,9 @@ def _classify_bash_command(bash_cmd: str) -> str | None:
     if not _refs_protected(bash_cmd):
         return None
 
-    # 파이프라인/연결 명령 분리
+    # Separate pipeline/connection commands
     subcmds = re.split(r"\s*(?:&&|\|\||[;|])\s*", bash_cmd)
-    # $() 와 backtick 내부 명령도 추출
+    # $() and backtick internal commands are also extracted
     subcmds += re.findall(r"\$\(([^)]+)\)", bash_cmd)
     subcmds += re.findall(r"\x60([^\x60]+)\x60", bash_cmd)
 
@@ -137,7 +137,7 @@ def _classify_bash_command(bash_cmd: str) -> str | None:
         if not _refs_protected(sc):
             continue
 
-        # 읽기 전용 명령인지 검사
+        # Check if a command is read-only
         is_ro = False
         for ro_pat in READONLY_PATTERNS:
             if re.match(ro_pat, sc):
@@ -145,21 +145,21 @@ def _classify_bash_command(bash_cmd: str) -> str | None:
                 break
 
         if is_ro:
-            # 읽기 전용이라도 인라인 코드 쓰기 패턴이 있으면 MODIFY
+            # MODIFY if there is an inline code writing pattern, even if it is read-only
             if _check_inline_write(sc):
                 return "MODIFY"
             continue
 
-        # 수정 패턴 검사
+        # Correction pattern inspection
         for mod_pat in MODIFY_PATTERNS:
             if re.search(mod_pat, sc):
                 return "MODIFY"
 
-        # 명시적 수정 패턴에 매칭되지 않아도,
-        # 읽기 전용 화이트리스트에도 없으면 안전 차단 (보수적 접근)
+        # Even if it does not match an explicit modification pattern,
+        # Safe blocking if not in read-only whitelist (conservative approach)
         return "MODIFY"
 
-    # 모든 서브커맨드가 읽기 전용이거나 보호 대상 경로를 참조하지 않음
+    # All subcommands are read-only or do not reference the protected path
     return "READONLY"
 
 
@@ -170,7 +170,7 @@ def main() -> None:
     HOOKS_EDIT_ALLOWED 환경변수가 설정된 경우 차단을 우회할 수 있다.
     .agent-factory/runs/bypass 경로는 환경변수 우회 없이 항상 차단된다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_HOOKS_SELF_PROTECT") or read_env("HOOK_HOOKS_SELF_PROTECT")
     hook_edit_allowed = os.environ.get("HOOKS_EDIT_ALLOWED") or read_env("HOOKS_EDIT_ALLOWED")
 
@@ -178,7 +178,7 @@ def main() -> None:
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -186,23 +186,23 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Write, Edit, Bash가 아니면 통과
+    # Pass if not Write, Edit, or Bash
     if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
     tool_input = data.get("tool_input", {})
 
-    # --- Bash 도구 분기 ---
+    # --- Bash tools branch ---
     if tool_name == "Bash":
         bash_cmd = tool_input.get("command", "")
         if not bash_cmd:
             sys.exit(0)
 
-        # command에 보호 대상 경로가 없으면 통과
+        # Passes if there is no protected path in the command
         if not _refs_protected(bash_cmd):
             sys.exit(0)
 
-        # 환경변수 우회 검사
+        # Environment variable bypass check
         if hook_edit_allowed in ("true", "1"):
             sys.exit(0)
 
@@ -210,31 +210,31 @@ def main() -> None:
         if classification == "READONLY":
             sys.exit(0)
 
-        # .agent-factory/runs/bypass 참조 여부에 따라 차단 메시지 분기
+        # Branch blocking messages depending on whether .agent-factory/runs/bypass is referenced or not
         if re.search(r"\.claude\.workflow/workflow/bypass", bash_cmd):
             _deny(HOOKS_BYPASS_FILE_DENIED)
         else:
             _deny(HOOKS_BASH_MODIFY_DENIED)
 
-    # --- Write / Edit 도구 분기 ---
+    # --- Write/Edit tools branch ---
     file_path = tool_input.get("file_path", "")
     if not file_path:
         sys.exit(0)
 
-    # .agent-factory/runs/bypass 경로 포함 여부 검사
+    # Check whether .agent-factory/runs/bypass path is included
     if ".agent-factory/runs/bypass" in file_path:
-        # bypass 파일은 환경변수 우회 불가 (무조건 차단)
+        # Bypass files cannot bypass environment variables (unconditionally blocked)
         _deny(HOOKS_BYPASS_FILE_DENIED)
 
-    # .agent-factory/hooks/ 경로 포함 여부 검사
+    # Check whether .agent-factory/hooks/ path is included
     if ".agent-factory/hooks/" in file_path:
-        # 환경변수 우회 검사
+        # Environment variable bypass check
         if hook_edit_allowed in ("true", "1"):
             sys.exit(0)
 
         _deny(HOOKS_WRITE_EDIT_DENIED)
 
-    # .agent-factory/hooks/ 경로 미매칭 시 통과
+    # Passes when .agent-factory/hooks/ path does not match.
     sys.exit(0)
 
 

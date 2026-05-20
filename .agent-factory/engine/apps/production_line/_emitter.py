@@ -35,19 +35,19 @@ def _now_iso() -> str:
 
 _BOARD_URL_PATH = PROJECT_ROOT / ".agent-factory" / ".board.url"
 
-# T-506 P7 — metrics.jsonl 다중 thread emit 시 line 원자성 보장.
-# 짧은 line 의 OS append (O_APPEND) 는 보통 원자성이지만, 명시 lock 으로 line drop 0 보장.
+# T-506 P7 — metrics.jsonl Guarantees line atomicity when emitting multiple threads.
+# OS append (O_APPEND) of a short line is usually atomic, but an explicit lock guarantees line drop 0.
 _METRICS_APPEND_LOCK = threading.Lock()
 
 
 def _board_post_enabled() -> bool:
-    """env flag gate. 미설정/false 시 driver 흐름 영향 0."""
+    """env flag gate. If not set/false, driver flow impact is 0."""
     raw = os.environ.get("V2_BOARD_POST", "").strip().lower()
     return raw in ("1", "true", "yes", "on")
 
 
 def _read_board_base() -> str | None:
-    """`.board.url` 첫 줄에서 scheme://host:port 추출. 미존재 시 None."""
+    """Extract scheme://host:port from the first line of `.board.url`. None if not present."""
     if not _BOARD_URL_PATH.is_file():
         return None
     try:
@@ -116,8 +116,8 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
             sys.stdout.write(line + "\n")
             sys.stdout.flush()
         except BrokenPipeError:
-            # T-518 — driver subprocess stdout pipe 가 끊긴 경우 graceful skip.
-            # 다른 OSError 는 전파 (진단 정보 손실 방지).
+            # T-518 — graceful skip when driver subprocess stdout pipe is disconnected.
+            # Other OSErrors are propagated (preventing loss of diagnostic information).
             return
         if ctx is not None:
             path = ctx.metrics_jsonl_path()
@@ -127,7 +127,7 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 의미별 board endpoint helper — T-495 P1
+# board endpoint helper by meaning — T-495 P1
 # ---------------------------------------------------------------------------
 
 
@@ -173,7 +173,7 @@ def step_end(
     retry_count: int = 0,
     **extra: Any,
 ) -> None:
-    """Step 종료 — metrics.jsonl only. board side 는 다음 step.start 가 갱신."""
+    """Step End — metrics.jsonl only. The board side is updated by the next step.start."""
     emit(
         ctx,
         "step.end",
@@ -295,7 +295,7 @@ def workflow_finish(
         payload["verdict"] = verdict
     emit(ctx, "workflow.finish", **payload, **extra)
     if ctx.wf_session_id:
-        # backend 가 받는 outcome 은 "ok"|"fail" 둘 중 하나. 그 외는 "fail" 로 안전 매핑.
+        # The outcome that the backend receives is one of the following: "ok"|"fail". Otherwise, safety mapping to “fail”.
         outcome_norm = outcome if outcome in ("ok", "fail") else "fail"
         body: dict[str, Any] = {"outcome": outcome_norm, "summary": summary}
         body.update(extra)
@@ -306,20 +306,20 @@ def workflow_finish(
 
 
 def regression(ctx: WorkflowContext, pattern: str, **extra: Any) -> None:
-    """SPEC.md §10 회귀 5종 차단 — pattern 발견 시 emit (metrics only)."""
+    """SPEC.md §10 Block 5 types of regression — emit when pattern is found (metrics only)."""
     emit(ctx, "regression.pattern", pattern=pattern, ticket=ctx.ticket_no, **extra)
 
 
 def tool_deny(ctx: WorkflowContext, tool: str, **extra: Any) -> None:
-    """R-METRIC-3 — tool.deny 0건 룰 검증용 (metrics only)."""
+    """R-METRIC-3 — tool.deny 0 cases For rule verification (metrics only)."""
     emit(ctx, "tool.deny", tool=tool, ticket=ctx.ticket_no, **extra)
 
 
 # ---------------------------------------------------------------------------
-# Backward-compat alias — 옛 호출자 보존 (init.py 등이 갈아끼우면 제거 가능)
+# Backward-compat alias — Preserve old caller (can be removed if init.py, etc. are replaced)
 # ---------------------------------------------------------------------------
 
 
 def session_start(ctx: WorkflowContext) -> None:
-    """Deprecated — `session_create` 로 갈아끼움. backward-compat alias."""
+    """Deprecated — Replaced with `session_create`. backward-compat alias."""
     session_create(ctx)

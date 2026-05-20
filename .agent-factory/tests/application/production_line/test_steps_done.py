@@ -1,7 +1,7 @@
 """test_steps_done.py — DONE / FAILED Step wire-up (T-503 fix).
 
-T-503 wire-up 회귀 정정: done_step / fail_step 이 write_metadata 를 호출하여
-metadata.json 통합 박제 (옛 summary.txt / usage.json / failure.md 와 동시 작성).
+T-503 wire-up regression correction: done step / fail step by calling this write metadata
+metadata.json Integrity (ex summary.txt / usage.json / failure.md and simultaneous writing).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
         command=command,
         mode="multi",
         current_step="REPORT",
-        title="wire-up 검증 티켓",
+        title="wire-up verification ticket",
     )
 
 
@@ -59,7 +59,7 @@ def _patch_done_externals(monkeypatch):
 
 
 def test_done_step_writes_metadata_json(monkeypatch, tmp_path):
-    """done_step → metadata.json 통합 박제 + finalized_at 채움."""
+    """done step → metadata.json Integration Responsibilities + finalized at debt."""
     ctx = _make_ctx(tmp_path)
     _patch_done_externals(monkeypatch)
 
@@ -76,7 +76,7 @@ def test_done_step_writes_metadata_json(monkeypatch, tmp_path):
 
 
 def test_done_step_preserves_legacy_outputs(monkeypatch, tmp_path):
-    """backward compat — summary.txt / usage.json 도 동시 작성 (점진 마이그)."""
+    """backward compat — summary.txt / usage.json"""
     ctx = _make_ctx(tmp_path)
     _patch_done_externals(monkeypatch)
 
@@ -87,7 +87,7 @@ def test_done_step_preserves_legacy_outputs(monkeypatch, tmp_path):
 
 
 def test_fail_step_writes_metadata_failure(monkeypatch, tmp_path):
-    """fail_step → metadata.json.failure 필드 채움 + 옛 failure.md 보존."""
+    """fail step → metadata.json.failure field + preserve old failure.md."""
     ctx = _make_ctx(tmp_path)
     _patch_done_externals(monkeypatch)
 

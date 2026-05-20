@@ -1,24 +1,24 @@
 #!/usr/bin/env -S python3 -u
-"""skill_mapper.py - Phase 0 스킬 매핑 스크립트.
+"""skill_mapper.py - Phase 0 skill mapping script.
 
-plan.md의 태스크 skills 컬럼 + 명령어 기본 매핑으로
-skill-map.md를 생성한다. LLM 불필요.
+Task skills column in plan.md + basic command mapping
+Create skill-map.md. No LLM required.
 
-사용법:
+Usage:
   python3 .agent-factory/engine/flow/skill_mapper.py <registryKey>
 
-입력:
-  registryKey - YYYYMMDD-HHMMSS 형식 워크플로우 식별자
-                workDir, plan.md 경로, command는 자동 해석
+input:
+  registryKey - Workflow identifier in YYYYMMDD-HHMMSS format.
+                workDir, plan.md path, and command are automatically interpreted
 
-출력:
-  <workDir>/work/skill-map.md (exit 0) 또는 에러 (exit 1) 또는 검증 실패 (exit 2)
-  <workDir>/work/context/WXX-context.md (태스크별 컨텍스트 슬라이스)
+output of power:
+  <workDir>/work/skill-map.md (exit 0) or error (exit 1) or verification failure (exit 2)
+  <workDir>/work/context/WXX-context.md (context slice per task)
 
 exit code:
-  0 - 성공 (스킬 매핑 완료 및 유효성 검증 통과)
-  1 - 오류 (인자 누락, command 미발견 등 실행 오류)
-  2 - 검증 실패 (스킬 미배정 또는 존재하지 않는 스킬명)
+  0 - Success (skill mapping completed and validation passed)
+  1 - Error (execution error such as missing argument, command not found, etc.)
+  2 - Verification failed (skill not assigned or skill name does not exist)
 """
 from __future__ import annotations
 
@@ -30,14 +30,14 @@ import sys
 import tempfile
 from datetime import datetime, timezone, timedelta
 
-# 프로젝트 루트 결정
+# Determine project route
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 from common import acquire_lock, load_json_file, release_lock, resolve_abs_work_dir, resolve_project_root
 
-# flow 디렉토리를 sys.path에 추가 (같은 디렉토리 내 모듈 직접 import용)
+# Add flow directory to sys.path (for direct import of modules in the same directory)
 _flow_dir = os.path.dirname(os.path.abspath(__file__))
 if _flow_dir not in sys.path:
     sys.path.insert(0, _flow_dir)
@@ -48,12 +48,12 @@ from cli_utils import registry_key_type, build_common_epilog
 PROJECT_ROOT = resolve_project_root()
 
 
-# ─── 로깅 헬퍼 ───────────────────────────────────────────────────────────────
+# ─── Logging Helper ───────────────────────────────────────────────────────────────────
 
 def _append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """workflow.log에 이벤트를 기록한다. 실패 시 조용히 건너뛴다."""
+    """Records events in workflow.log. In case of failure, quietly skip."""
     try:
-        # flow_logger가 존재하면 위임
+        # Delegate if flow_logger exists
         from flow_logger import append_log
         append_log(abs_work_dir, level, message)
         return
@@ -71,7 +71,7 @@ def _append_log(abs_work_dir: str, level: str, message: str) -> None:
 SKILLS_DIR = os.path.join(PROJECT_ROOT, ".claude", "skills")
 CATALOG_FILE = os.path.join(SKILLS_DIR, "skill-catalog.md")
 
-# 컨텍스트 토큰 예산 가드레일 (200K 기준 25%)
+# Context token budget guardrail (25% based on 200K)
 TOKEN_BUDGET_LIMIT = 50_000
 
 EXTENSION_SKILL_MAP: dict[str, str] = {
@@ -82,30 +82,30 @@ EXTENSION_SKILL_MAP: dict[str, str] = {
     ".tsx": "convention-front",
 }
 
-# parse_plan_tasks()의 P1 우선 탐색에 사용하는 섹션명 패턴
-# 매칭 실패 시 section_pattern=None 전체 탐색으로 폴백한다
-SECTION_PATTERNS = r"##\s*(작업\s*목록|태스크\s*목록|Task\s*목록|태스크\s*분해|작업\s*계획)"
+# Section name pattern used for P1 priority search in parse_plan_tasks()
+# If matching fails, section_pattern=None falls back to full search.
+SECTION_PATTERNS = r"##\s*(Task\s*List|Task\s*List|Task\s*List|Task\s*Decomposition|Task\s*Plan)"
 
 
 def resolve_skill_file(skill_name: str) -> str:
-    """스킬의 로드 경로를 반환한다.
+    """Returns the load path of the skill.
 
-    COMPACT.md가 존재하면 COMPACT.md 경로를, 없으면 SKILL.md 경로를 반환한다.
-    두 파일 모두 없으면 SKILL.md 경로를 반환한다 (존재 여부 보장 불가).
+    If COMPACT.md exists, the COMPACT.md path is returned. If COMPACT.md does not exist, the SKILL.md path is returned.
+    If both files do not exist, the path to SKILL.md is returned (existence cannot be guaranteed).
 
     Args:
-        skill_name: 스킬 이름 (예: 'convention-python', 'review-code-quality')
+        skill_name: Skill name (e.g. 'convention-python', 'review-code-quality')
 
     Returns:
-        COMPACT.md 또는 SKILL.md의 절대 경로.
+        Absolute path to COMPACT.md or SKILL.md.
 
     Raises:
-        경로 순회 시도 시 fallback으로 workflow-agent/SKILL.md 경로 반환.
+        When attempting to traverse the path, the workflow-agent/SKILL.md path is returned as a fallback.
     """
     skill_dir = os.path.join(SKILLS_DIR, skill_name)
     skill_dir = os.path.normpath(skill_dir)
     if not skill_dir.startswith(os.path.normpath(SKILLS_DIR)):
-        print(f"[WARN] 경로 순회 시도 차단: {skill_name}", file=sys.stderr)
+        print(f"[WARN] Block path traversal attempt: {skill_name}", file=sys.stderr)
         skill_dir = os.path.join(SKILLS_DIR, "workflow-agent")
         return os.path.join(skill_dir, "SKILL.md")
     compact_path = os.path.join(skill_dir, "COMPACT.md")
@@ -116,18 +116,18 @@ def resolve_skill_file(skill_name: str) -> str:
 
 
 def estimate_token_budget(resolved_skills: list[str]) -> int:
-    """스킬 목록의 예상 토큰 합산을 반환한다.
+    """Returns the sum of the expected tokens in the skill list.
 
-    각 스킬의 COMPACT.md 또는 SKILL.md 파일을 바이너리로 읽어
-    ASCII 바이트(ascii_bytes // 4)와 non-ASCII 바이트(non_ascii_bytes // 6)를
-    분리 계산하는 한국어 콘텐츠 보정 방식으로 토큰을 추정한다.
-    합산이 TOKEN_BUDGET_LIMIT를 초과하면 경고 로그를 출력한다.
+    Read each skill's COMPACT.md or SKILL.md file as binary.
+    ASCII bytes (ascii_bytes // 4) and non-ASCII bytes (non_ascii_bytes // 6)
+    Tokens are estimated using the Korean content correction method that is calculated separately.
+    If the sum exceeds TOKEN_BUDGET_LIMIT, a warning log is output.
 
     Args:
-        resolved_skills: 스킬 이름 목록
+        resolved_skills: List of skill names
 
     Returns:
-        예상 토큰 합산 정수값.
+        Expected token sum integer value.
     """
     total_tokens = 0
     for skill_name in resolved_skills:
@@ -144,7 +144,7 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
 
     if total_tokens > TOKEN_BUDGET_LIMIT:
         print(
-            f"[WARN] 스킬 토큰 예산 초과: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
+            f"[WARN] Skill token budget exceeded: {total_tokens} > {TOKEN_BUDGET_LIMIT}",
             file=sys.stderr,
         )
 
@@ -152,10 +152,10 @@ def estimate_token_budget(resolved_skills: list[str]) -> int:
 
 
 def parse_catalog() -> dict[str, list[str]]:
-    """skill-catalog.md에서 command defaults를 파싱한다.
+    """Parse command defaults from skill-catalog.md.
 
     Returns:
-        defaults: command -> [skill_names] 딕셔너리.
+        defaults: command -> [skill_names] dictionary.
     """
     defaults: dict[str, list[str]] = {}
 
@@ -167,7 +167,7 @@ def parse_catalog() -> dict[str, list[str]]:
 
     lines = content.split("\n")
 
-    # Command Default Mapping 섹션 파싱
+    # Command Default Mapping section parsing
     in_cmd = False
     for line in lines:
         if "## Command Default Mapping" in line:
@@ -175,7 +175,7 @@ def parse_catalog() -> dict[str, list[str]]:
             continue
         if in_cmd and line.startswith("## "):
             break
-        if in_cmd and line.startswith("|") and not line.startswith("| 명령어") and not line.startswith("|---"):
+        if in_cmd and line.startswith("|") and not line.startswith("| command") and not line.startswith("|---"):
             parts = [p.strip() for p in line.split("|")]
             if len(parts) >= 3:
                 cmd = parts[1].strip()
@@ -187,30 +187,30 @@ def parse_catalog() -> dict[str, list[str]]:
 
 
 def parse_plan_tasks(plan_path):
-    """plan.md에서 태스크 테이블을 파싱하여 taskId, description, skills를 추출.
+    """Parse the task table from plan.md and extract taskId, description, and skills.
 
     Returns:
         tuple[list[dict], bool]: (tasks, p4_triggered)
-            tasks        — 파싱된 태스크 목록
-            p4_triggered — P4 폴백(### T# 헤딩) 이 사용된 경우 True
+            tasks — List of parsed tasks
+            p4_triggered — P4 fallback (#True if ## T# heading) is used
     """
     tasks = []
     p4_triggered = False
 
     if not os.path.isfile(plan_path):
-        print(f"[ERROR] plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"[ERROR] Unable to find plan.md: {plan_path}", file=sys.stderr)
         return tasks, p4_triggered
 
     with open(plan_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     column_keywords = {
-        "taskId": ["taskid", "태스크", "id"],
-        "description": ["설명", "작업 내용", "description", "작업"],
-        "skills": ["스킬", "skill"],
+        "taskId": ["taskid", "task", "id"],
+        "description": ["explanation", "work detail", "description", "work"],
+        "skills": ["skill", "skill"],
     }
 
-    # P1: SECTION_PATTERNS로 우선 탐색, W-prefix 행이 없으면 전체 탐색으로 폴백
+    # P1: Search first with SECTION_PATTERNS, fallback to full search if no W-prefix rows exist
     rows = parse_md_table_columns(content, SECTION_PATTERNS, column_keywords)
     if not any(re.match(r"^W\d+", r.get("taskId", "")) for r in rows):
         rows = parse_md_table_columns(content, None, column_keywords)
@@ -221,7 +221,7 @@ def parse_plan_tasks(plan_path):
             continue
 
         raw_skills = row.get("skills", "")
-        if raw_skills and raw_skills != "-" and raw_skills != "없음":
+        if raw_skills and raw_skills != "-" and raw_skills != "doesn't exist":
             skills = [s.strip() for s in re.split(r"[+,]", raw_skills) if s.strip()]
         else:
             skills = []
@@ -234,7 +234,7 @@ def parse_plan_tasks(plan_path):
             }
         )
 
-    # 테이블 파싱 결과가 없으면 W-prefix 헤딩 기반 폴백 파싱 시도
+    # If there are no table parsing results, a fallback parse is attempted based on the W-prefix heading.
     if not tasks:
         heading_pattern = re.compile(r"^#{2,3}\s+(W\d+)[:\s]\s*(.+)", re.MULTILINE)
         for m in heading_pattern.finditer(content):
@@ -247,11 +247,11 @@ def parse_plan_tasks(plan_path):
             )
         if tasks:
             print(
-                "[WARN] 테이블 미발견, 헤딩 기반 폴백 파싱 사용",
+                "[WARN] Table not found, use heading-based fallback parsing",
                 file=sys.stderr,
             )
 
-    # P3: W-prefix 헤딩 폴백도 실패하면 Task X.Y 헤딩 폴백 시도
+    # P3: If W-prefix heading fallback also fails, attempt Task X.Y heading fallback
     if not tasks:
         task_xy_pattern = re.compile(
             r"^#{2,4}\s+Task\s*\d+[\.\-]\d+[:\s]\s*(.+)",
@@ -267,12 +267,12 @@ def parse_plan_tasks(plan_path):
             )
         if tasks:
             print(
-                "[WARN] Task X.Y 헤딩 폴백 파싱 사용 (스킬 미배정, command defaults 적용)",
+                "[WARN] Use Task X.Y heading fallback parsing (skill not assigned, command defaults applied)",
                 file=sys.stderr,
             )
 
-    # P4: ### T# / ### T## 헤딩 폴백 시도 (Planner가 W-prefix 대신 T-prefix를 사용한 경우)
-    # T1 → W01, T01 → W01 형태로 정규화하여 빈 skill-map.md 회귀를 차단한다.
+    # P4: Try ### T# / ### T## heading fallback (if Planner used T-prefix instead of W-prefix)
+    # Normalize to T1 → W01, T01 → W01 to block empty skill-map.md regression.
     if not tasks:
         t_prefix_pattern = re.compile(
             r"^#{2,4}\s+T(\d{1,2})[:\s]\s*(.+)",
@@ -291,8 +291,8 @@ def parse_plan_tasks(plan_path):
         if tasks:
             p4_triggered = True
             print(
-                "[WARN] '### T#' 형식 헤딩 폴백 파싱 사용"
-                " (taskId 'T#' → 'W##' 정규화, 스킬 미배정 → command defaults 적용)",
+                "[WARN] Use fallback parsing for '### T#' format headings"
+                "(taskId 'T#' → 'W##' normalized, skill not assigned → command defaults applied)",
                 file=sys.stderr,
             )
 
@@ -300,7 +300,7 @@ def parse_plan_tasks(plan_path):
 
 
 def deduplicate(skills):
-    """순서 유지하면서 중복 제거."""
+    """Remove duplicates while maintaining order."""
     seen = set()
     result = []
     for s in skills:
@@ -311,20 +311,20 @@ def deduplicate(skills):
 
 
 def detect_extension_skills(description: str) -> list[str]:
-    """태스크 description에서 파일 확장자를 감지하여 컨벤션 스킬 목록 반환."""
+    """Detects the file extension in the task description and returns a list of convention skills."""
     found_exts = set()
 
-    # (a) 파일경로.확장자: 단어문자들 + 점 + 확장자
+    # (a) File path.Extension: Word letters + dot + extension
     pattern_a = re.compile(r"\w+(\.[a-zA-Z]+)")
     for m in pattern_a.finditer(description):
         found_exts.add(m.group(1).lower())
 
-    # (b) *.확장자
+    # (b) *.extension
     pattern_b = re.compile(r"\*(\.[a-zA-Z]+)")
     for m in pattern_b.finditer(description):
         found_exts.add(m.group(1).lower())
 
-    # (c) .확장자 뒤 공백/구두점/한글 (독립 확장자 표기)
+    # (c) Space/punctuation mark/Hangul after .extension (independent extension notation)
     pattern_c = re.compile(r"(\.[a-zA-Z]+)(?=[\s,.\u3131-\uD7A3]|$)")
     for m in pattern_c.finditer(description):
         found_exts.add(m.group(1).lower())
@@ -341,62 +341,62 @@ def detect_extension_skills(description: str) -> list[str]:
 
 
 def resolve_skills(task: dict, command: str, defaults: dict) -> list[str]:
-    """4단계(Level 0-1.5-2) 매칭으로 태스크의 최종 스킬 목록 결정.
+    """Determine the final skill list of the task through 4-level (Level 0-1.5-2) matching.
 
-    Level 0~1 매칭 결과가 비어있으면 skill_recommender.py의 TF-IDF 추천을 fallback으로 호출한다.
+    If the Level 0~1 matching result is empty, the TF-IDF recommendation in skill_recommender.py is called as a fallback.
     """
     if not command:
         return []
 
     skills = []
 
-    # Level 0: plan.md에 명시된 스킬
+    # Level 0: Skills specified in plan.md
     if task["skills"]:
         skills.extend(task["skills"])
 
-    # Level 1: 명령어 기본 매핑
+    # Level 1: Command basic mapping
     if command in defaults:
         skills.extend(defaults[command])
 
     skills = deduplicate(skills)
 
-    # Level 1.5: 확장자 기반 컨벤션 스킬 자동 매핑
+    # Level 1.5: Automatic mapping of extension-based convention skills
     if task.get("description"):
         ext_skills = detect_extension_skills(task["description"])
         for s in ext_skills:
             if s not in skills:
                 skills.append(s)
 
-    # Level 2 (fallback): 매칭 결과가 없을 때 TF-IDF 추천 호출
+    # Level 2 (fallback): Call TF-IDF recommendation when there are no matching results
     fallback_skills = []
     if not skills and task.get("description"):
         try:
-            # lazy import: fallback이 필요한 경우에만 로드
+            # lazy import: load only when a fallback is needed
             from skill_recommender import recommend
             candidates = recommend(task["description"])
-            # score 0.1 이상인 스킬명만 추출
+            # Extract only skill names with score 0.1 or higher
             fallback_skills = [name for name, score in candidates if score >= 0.1]
             skills = list(fallback_skills)
         except Exception as e:
-            # import 실패 또는 예상치 못한 오류 시 경고 로그 출력, 폴백 체인 정상 진행
-            print(f"[WARN] skill_recommender 호출 실패: {e}", file=sys.stderr)
+            # In case of import failure or unexpected error, warning log is output and fallback chain continues normally.
+            print(f"[WARN] skill_recommender call failed: {e}", file=sys.stderr)
 
     task["fallback_skills"] = fallback_skills
     return skills
 
 
 def _build_skill_map_header(tasks):
-    """skill-map.md의 헤더 및 요약 테이블 행 목록을 생성."""
+    """Create a list of header and summary table rows in skill-map.md."""
     lines = []
     lines.append("# Skill Map")
     lines.append("")
-    lines.append("> 이 파일은 `skill_mapper.py`에 의해 자동 생성됩니다.")
-    lines.append("> Worker는 매핑 테이블에서 스킬 목록을 확인한 후, 각 스킬 디렉터리의 COMPACT.md (없으면 SKILL.md)를 직접 Read하여 지침을 획득합니다.")
-    lines.append("> `resolve_skill_file()` 기준: COMPACT.md 존재 시 우선 로드, 없으면 SKILL.md 로드.")
+    lines.append("> This file is automatically generated by `skill_mapper.py`.")
+    lines.append("> After checking the list of skills in the mapping table, the worker obtains instructions by directly reading COMPACT.md (if not present, SKILL.md) in each skill directory.")
+    lines.append("> Based on `resolve_skill_file()`: If COMPACT.md exists, load it first, if not, load SKILL.md.")
     lines.append("")
-    lines.append("## 태스크별 스킬 매핑")
+    lines.append("## Skill mapping by task")
     lines.append("")
-    lines.append("| 태스크 | 스킬 |")
+    lines.append("| task | Skill |")
     lines.append("|--------|------|")
     for task in tasks:
         lines.extend(_build_skill_map_rows(task))
@@ -405,23 +405,23 @@ def _build_skill_map_header(tasks):
 
 
 def _build_skill_map_rows(task):
-    """태스크별 매핑 테이블 행 목록을 생성."""
+    """Create a list of mapping table rows for each task."""
     lines = []
     resolved = task.get("resolved", [])
     fallback = set(task.get("fallback_skills", []))
     if resolved:
-        skill_parts = [f"{s} (추천)" if s in fallback else s for s in resolved]
+        skill_parts = [f"{s} (recommended)" if s in fallback else s for s in resolved]
         skill_str = ", ".join(skill_parts)
     else:
-        skill_str = "(없음)"
+        skill_str = "(doesn't exist)"
     lines.append(f"| {task['taskId']} | {skill_str} |")
     return lines
 
 
 def write_skill_map(work_dir, tasks):
-    """skill-map.md를 생성.
+    """Create skill-map.md.
 
-    매핑 테이블만 포함한다. 스킬 지침은 Worker가 직접 Read한다.
+    Contains only mapping tables. Skill instructions are read directly by the worker.
     """
     output_dir = os.path.join(work_dir, "work")
     os.makedirs(output_dir, exist_ok=True)
@@ -436,32 +436,32 @@ def write_skill_map(work_dir, tasks):
 
 
 # =============================================================================
-# .dashboard/.skills.md 갱신
+# Update .dashboard/.skills.md
 # =============================================================================
 
 def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved: list, token_budget: int) -> None:
-    """skill_mapper.py 실행 결과를 .dashboard/.skills.md에 행으로 삽입한다.
+    """Insert the result of skill_mapper.py execution as a line in .dashboard/.skills.md.
 
-    비차단: 모든 예외를 삼켜서 워크플로우 실행에 영향을 주지 않는다.
+    Non-blocking: All exceptions are swallowed and do not affect workflow execution.
     """
     try:
         KST = timezone(timedelta(hours=9))
         skills_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".skills.md")
         lock_dir = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".skills.md.lock")
-        marker = "<!-- 새 항목은 이 줄 아래에 추가됩니다 -->"
+        marker = "<!-- New entries will be added below this line -->"
 
-        # registryKey에서 날짜 추출: YYYYMMDD-HHMMSS → MM-DD HH:MM
+        # Extract date from registryKey: YYYYMMDD-HHMMSS → MM-DD HH:MM
         try:
             date_part, time_part = registry_key.split("/")[0].split("-")
             date_str = f"{date_part[4:6]}-{date_part[6:8]} {time_part[0:2]}:{time_part[2:4]}"
         except Exception:
             date_str = datetime.now(KST).strftime("%m-%d %H:%M")
 
-        # 작업ID: registryKey 전체 (경로 포함)
+        # Job ID: registryKey all (including path)
         work_id = registry_key
 
-        # skill-map.md 링크: .agent-factory/board/data/ 기준 상대 경로
-        # 폴드 구조: ../.agent-factory/runs/{timestamp}/work/skill-map.md
+        # skill-map.md link: relative path based on .agent-factory/board/data/
+        # Fold structure: ../.agent-factory/runs/{timestamp}/work/skill-map.md
         try:
             rel_work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
             rel_work_dir = os.path.relpath(rel_work_dir, PROJECT_ROOT)
@@ -469,24 +469,24 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
         except Exception:
             skill_map_link = work_id
 
-        # 스킬 목록 (<br> 태그 개행 구분, 전체 표시)
-        skills_joined = "<br>".join(all_resolved) if all_resolved else "(없음)"
+        # Skill list (<br> tag newline separated, full display)
+        skills_joined = "<br>".join(all_resolved) if all_resolved else "(doesn't exist)"
 
-        # fallback 여부
+        # Fallback or not?
         has_fallback = any(task.get("fallback_skills") for task in tasks)
         fallback_str = "Y" if has_fallback else "N"
 
-        # 토큰초과 여부
+        # Token exceeded?
         over_budget = "Y" if token_budget > TOKEN_BUDGET_LIMIT else "N"
 
-        # 행 생성
+        # create row
         row = (
             f"| {date_str} | {skill_map_link} | {command} "
             f"| {len(tasks)} | {len(all_resolved)} | {skills_joined} "
             f"| {fallback_str} | {over_budget} |"
         )
 
-        # skills.md 읽기
+        # Read skills.md
         from constants import SKILLS_HEADER_LINE, SKILLS_SEPARATOR_LINE
 
         content = ""
@@ -495,7 +495,7 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
                 content = f.read()
 
         if marker not in content:
-            content = f"# 스킬 매핑 추적\n\n{marker}\n\n{SKILLS_HEADER_LINE}\n{SKILLS_SEPARATOR_LINE}\n"
+            content = f"# Track skill mapping \n \n {marker} \n \n {SKILLS_HEADER_LINE} \n {SKILLS_SEPARATOR_LINE} \n"
 
         separator_line = SKILLS_SEPARATOR_LINE
 
@@ -521,7 +521,7 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
                 marker, f"{marker}\n\n{SKILLS_HEADER_LINE}\n{separator_line}\n{row}"
             )
 
-        # 원자적 쓰기
+        # Atomic Write
         os.makedirs(os.path.dirname(skills_md), exist_ok=True)
         locked = acquire_lock(lock_dir)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(skills_md), suffix=".tmp")
@@ -542,13 +542,13 @@ def _update_skills_md(registry_key: str, command: str, tasks: list, all_resolved
 
 
 def _get_known_skills() -> set[str]:
-    """skill-catalog.md에 등록된 스킬명 집합을 반환한다.
+    """Returns a set of skill names registered in skill-catalog.md.
 
-    CATALOG_FILE에서 Skill Descriptions 섹션을 파싱하여 등록된 스킬명 목록을 추출한다.
-    파일이 없거나 파싱 실패 시 빈 집합을 반환하여 검증을 건너뛴다.
+    Parse the Skill Descriptions section in CATALOG_FILE to extract a list of registered skill names.
+    If the file does not exist or parsing fails, an empty set is returned and verification is skipped.
 
     Returns:
-        등록된 스킬명 집합. 파싱 실패 시 빈 집합.
+        A set of registered skill names. Empty set if parsing fails.
     """
     known: set[str] = set()
 
@@ -569,7 +569,7 @@ def _get_known_skills() -> set[str]:
             continue
         if in_skills and line.startswith("## "):
             break
-        if in_skills and line.startswith("|") and not line.startswith("| 스킬명") and not line.startswith("|---"):
+        if in_skills and line.startswith("|") and not line.startswith("| Skill name") and not line.startswith("|---"):
             parts = [p.strip() for p in line.split("|")]
             if len(parts) >= 2 and parts[1]:
                 known.add(parts[1].strip())
@@ -578,18 +578,18 @@ def _get_known_skills() -> set[str]:
 
 
 def _suggest_similar_skills(unknown_skill: str, known_skills: set[str]) -> list[str]:
-    """unknown_skill과 유사한 등록 스킬을 최대 3개 제안한다.
+    """Up to 3 registration skills similar to unknown_skill are suggested.
 
-    prefix 매칭 방식: unknown_skill의 첫 번째 '-' 구분 접두사(예: 'workflow-')로
-    known_skills를 필터링하여 최대 3개를 반환한다.
-    prefix 매칭 결과가 없으면 빈 리스트를 반환한다.
+    prefix matching method: with the first '-' separator prefix of unknown_skill (e.g. 'workflow-')
+    Filters known_skills and returns up to 3.
+    If there are no prefix matching results, an empty list is returned.
 
     Args:
-        unknown_skill: 미등록 스킬명 (예: 'workflow-unknwon')
-        known_skills: 등록된 스킬명 집합
+        unknown_skill: Unregistered skill name (e.g. ‘workflow-unknwon’)
+        known_skills: Set of registered skill names
 
     Returns:
-        유사 스킬명 목록 (최대 3개). 없으면 빈 리스트.
+        List of similar skill names (maximum 3). If not, an empty list.
     """
     if not unknown_skill or not known_skills:
         return []
@@ -604,22 +604,22 @@ def _suggest_similar_skills(unknown_skill: str, known_skills: set[str]) -> list[
 
 
 def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
-    """태스크 스킬 매핑의 유효성을 검증한다.
+    """Verify the effectiveness of task skill mapping.
 
-    각 태스크에 대해 다음을 검증한다:
-    (a) resolved 스킬이 1개 이상 배정되었는지 확인
-    (b) 배정된 스킬이 skill-catalog.md에 등록된 스킬인지 확인
+    For each task, verify the following:
+    (a) Check whether one or more resolved skills are assigned
+    (b) Check whether the assigned skill is a skill registered in skill-catalog.md
 
-    skill-catalog.md 파싱에 실패하면 (b) 검증을 건너뛰고
-    (a)만 수행한다.
+    If skill-catalog.md parsing fails, (b) verification is skipped.
+    Perform only (a).
 
     Args:
-        tasks: parse_plan_tasks()에서 반환된 태스크 목록.
-               각 태스크는 'taskId'와 'resolved' 키를 포함해야 한다.
+        tasks: List of tasks returned by parse_plan_tasks().
+               Each task must contain 'taskId' and 'resolved' keys.
 
     Returns:
-        (True, "") - 모든 검증 통과
-        (False, "실패 사유 상세") - 검증 실패 시 실패한 태스크 ID와 사유 포함
+        (True, "") - Pass all validations
+        (False, "Failure Reason Details") - Includes failed task ID and reason when verification fails.
     """
     known_skills = _get_known_skills()
     failures: list[str] = []
@@ -628,23 +628,23 @@ def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
         task_id = task.get("taskId", "(unknown)")
         resolved = task.get("resolved", [])
 
-        # (a) 스킬 미배정 확인
+        # (a) Confirmation of skill non-assignment
         if not resolved:
             failures.append(
-                f"  - {task_id}: [실패 이유] 스킬 미배정 (resolved 스킬 없음)\n"
-                f"    [수정 방법] plan.md의 {task_id} 스킬 컬럼에 skill-catalog.md 등록 스킬을 기재하세요\n"
-                f"    [수정 대상] plan.md의 작업 목록 테이블 스킬 컬럼만 수정 (다른 섹션 변경 금지)"
+                f"- {task_id}: [Reason for Failure] Skill not assigned (no resolved skill) \n"
+                f"[How to fix] Enter the skill registered in skill-catalog.md in the {task_id} skill column of plan.md \n"
+                f"[To be modified] Modify only the task list table skill column in plan.md (no changes to other sections)"
             )
             continue
 
-        # (b) 존재하지 않는 스킬명 확인 (catalog 파싱 성공 시에만)
+        # (b) Check non-existent skill name (only when catalog parsing is successful)
         if known_skills:
             unknown = [s for s in resolved if s not in known_skills]
             if unknown:
                 suggestions = []
                 for u in unknown:
                     suggestions.extend(_suggest_similar_skills(u, known_skills))
-                # 중복 제거 및 최대 3개
+                # Deduplication and up to 3
                 seen_sugg: list[str] = []
                 for s in suggestions:
                     if s not in seen_sugg:
@@ -652,40 +652,40 @@ def validate_skill_mapping(tasks: list[dict]) -> tuple[bool, str]:
                 seen_sugg = seen_sugg[:3]
 
                 sugg_str = (
-                    f"유사 스킬 제안: {seen_sugg}" if seen_sugg else "유사 스킬 없음"
+                    f"Similar skill suggestions: {seen_sugg}" if seen_sugg else "No similar skills"
                 )
                 failures.append(
-                    f"  - {task_id}: [실패 이유] 존재하지 않는 스킬명 {unknown} (skill-catalog.md 미등록)\n"
-                    f"    [수정 방법] plan.md의 스킬 컬럼만 수정. 다른 섹션 변경 금지\n"
+                    f"- {task_id}: [Reason for failure] Non-existent skill name {unknown} (skill-catalog.md not registered) \n"
+                    f"[How to edit] Modify only the skill column in plan.md. Do not change other sections \n"
                     f"    [{sugg_str}]\n"
-                    f"    [수정 대상] plan.md의 작업 목록 테이블 스킬 컬럼만 수정 (다른 섹션 변경 금지)"
+                    f"[To be modified] Modify only the task list table skill column in plan.md (no changes to other sections)"
                 )
 
     if failures:
-        reason = "스킬 매핑 검증 실패:\n" + "\n".join(failures)
+        reason = "Skill mapping verification failed: \n" + "\n".join(failures)
         return False, reason
 
     return True, ""
 
 
 def slice_plan_context(plan_path, tasks, output_dir):
-    """plan.md에서 각 워커의 태스크 섹션만 추출하여 work/context/WXX-context.md로 저장.
+    """Extract only the task section of each worker from plan.md and save it as work/context/WXX-context.md.
 
-    "### WXX:" H3 서브섹션을 태스크별로 분리하여 워커가 자신에게 필요한
-    컨텍스트(1-2K 토큰)만 읽을 수 있도록 슬라이싱한다.
-    plan.md 전체(5-10K)를 로드하는 대신 태스크별 컨텍스트만 제공하여
-    워커 컨텍스트 예산을 절감한다.
+    "### WXX:" Separates H3 subsections by task so that workers can
+    Slicing so that only the context (1-2K tokens) is read.
+    Instead of loading the entire plan.md (5-10K), you only need to provide task-specific context.
+    Reduce worker context budget.
 
     Args:
-        plan_path: plan.md 절대 경로
-        tasks: parse_plan_tasks()에서 반환된 태스크 목록 (taskId 필드 필요)
-        output_dir: work/context/ 디렉터리 기준 (work_dir/work/context/)
+        plan_path: absolute path to plan.md
+        tasks: List of tasks returned by parse_plan_tasks() (requires taskId field)
+        output_dir: Based on work/context/ directory (work_dir/work/context/)
 
     Returns:
-        생성된 컨텍스트 파일 경로 목록 (생성 성공한 파일만)
+        List of generated context file paths (only successfully created files)
     """
     if not os.path.isfile(plan_path):
-        print(f"[WARN] slice_plan_context: plan.md를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
+        print(f"[WARN] slice_plan_context: Cannot find plan.md: {plan_path}", file=sys.stderr)
         return []
 
     with open(plan_path, "r", encoding="utf-8") as f:
@@ -693,11 +693,11 @@ def slice_plan_context(plan_path, tasks, output_dir):
 
     lines = content.split("\n")
 
-    # 태스크 ID 집합 (W01, W02 등)
+    # Set of task IDs (W01, W02, etc.)
     task_ids = {task["taskId"] for task in tasks if task.get("taskId")}
 
-    # plan.md에서 "### WXX:" 패턴의 H3 섹션 위치를 탐색
-    # 섹션 시작: "### W01:" 또는 "### W01 " 형태
+    # Navigate to the location of the H3 section for the pattern "### WXX:" in plan.md
+    # Start section: "### W01:" or "### W01 " format
     section_starts = {}  # taskId -> line_index
     h3_pattern = re.compile(r"^###\s+(W\d+)[:\s]")
 
@@ -709,10 +709,10 @@ def slice_plan_context(plan_path, tasks, output_dir):
                 section_starts[tid] = i
 
     if not section_starts:
-        # H3 섹션이 없으면 스킵
+        # Skip if there is no H3 section
         return []
 
-    # 각 태스크 섹션 끝 위치 결정: 다음 H3/H2/H1이 나오거나 파일 끝
+    # Determine where each task section ends: next H3/H2/H1 or end of file
     sorted_starts = sorted(section_starts.items(), key=lambda x: x[1])
     end_pattern = re.compile(r"^#{1,3}\s+")
 
@@ -720,7 +720,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
     created = []
 
     for idx, (task_id, start_line) in enumerate(sorted_starts):
-        # 섹션 끝 탐색: 다음 H1/H2/H3 라인 또는 파일 끝
+        # End-of-section navigation: next H1/H2/H3 line or end of file
         end_line = len(lines)
         for j in range(start_line + 1, len(lines)):
             if end_pattern.match(lines[j]):
@@ -729,7 +729,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
 
         section_lines = lines[start_line:end_line]
 
-        # 후미 빈 줄 제거
+        # Remove trailing blank lines
         while section_lines and not section_lines[-1].strip():
             section_lines.pop()
 
@@ -738,7 +738,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
 
         section_content = "\n".join(section_lines) + "\n"
 
-        # 파일명: WXX-context.md
+        # File name: WXX-context.md
         out_path = os.path.join(output_dir, f"{task_id}-context.md")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(section_content)
@@ -751,7 +751,7 @@ def slice_plan_context(plan_path, tasks, output_dir):
 def main():
     parser = argparse.ArgumentParser(
         prog="flow-skillmap",
-        description="plan.md의 태스크 skills 컬럼으로 skill-map.md를 생성한다.",
+        description="Create skill-map.md with the task skills column of plan.md.",
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -759,13 +759,13 @@ def main():
         "registry_key",
         type=registry_key_type,
         metavar="registryKey",
-        help="YYYYMMDD-HHMMSS 형식 워크플로우 식별자",
+        help="Workflow identifier in YYYYMMDD-HHMMSS format",
     )
     args = parser.parse_args()
 
     registry_key = args.registry_key
 
-    # registryKey → workDir, plan.md, command 자동 해석
+    # registryKey → workDir, plan.md, command automatic interpretation
     work_dir = resolve_abs_work_dir(registry_key, PROJECT_ROOT)
     plan_path = os.path.join(work_dir, "plan.md")
     ctx = load_json_file(os.path.join(work_dir, ".context.json"))
@@ -774,29 +774,29 @@ def main():
     _append_log(work_dir, "INFO", f"skill_mapper: start registryKey={registry_key}")
 
     if not command:
-        print(f"[ERROR] .context.json에서 command를 찾을 수 없습니다: {work_dir}", file=sys.stderr)
+        print(f"[ERROR] Command not found in .context.json: {work_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # 1. 카탈로그 파싱
+    # 1. Catalog parsing
     defaults = parse_catalog()
 
-    # 2. plan.md 태스크 파싱
+    # 2. Parsing the plan.md task
     tasks, p4_triggered = parse_plan_tasks(plan_path)
     if p4_triggered:
-        _append_log(work_dir, "WARN", "planner_id_normalized: T# → W## 형식 정규화")
+        _append_log(work_dir, "WARN", "planner_id_normalized: T# → W## format normalized")
     if not tasks:
-        print(f"[WARN] plan.md에서 태스크를 찾을 수 없습니다: {plan_path}", file=sys.stderr)
-        # 빈 skill-map.md라도 생성
+        print(f"[WARN] Task not found in plan.md: {plan_path}", file=sys.stderr)
+        # Create even an empty skill-map.md
         os.makedirs(os.path.join(work_dir, "work"), exist_ok=True)
         with open(os.path.join(work_dir, "work", "skill-map.md"), "w", encoding="utf-8") as f:
-            f.write("# Skill Map\n\n> 태스크 없음\n")
+            f.write("# Skill Map \n \n > No task \n")
         sys.exit(0)
 
-    # 3. 각 태스크별 스킬 결정
+    # 3. Determine skills for each task
     for task in tasks:
         task["resolved"] = resolve_skills(task, command, defaults)
 
-    # 3.5. 토큰 예산 검증 (write_skill_map 직전)
+    # 3.5. Token budget verification (just before write_skill_map)
     all_resolved = []
     for task in tasks:
         for skill in task.get("resolved", []):
@@ -804,17 +804,17 @@ def main():
                 all_resolved.append(skill)
     token_budget = estimate_token_budget(all_resolved)
 
-    # 4. skill-map.md 생성
+    # 4. Create skill-map.md
     output_path = write_skill_map(work_dir, tasks)
 
-    # 5. 태스크별 컨텍스트 슬라이싱 (plan.md → work/context/WXX-context.md)
+    # 5. Context slicing by task (plan.md → work/context/WXX-context.md)
     context_dir = os.path.join(work_dir, "work", "context")
     created_contexts = slice_plan_context(plan_path, tasks, context_dir)
 
-    # 5.5. 스킬 매핑 대시보드 갱신 (비차단)
+    # 5.5. Skill mapping dashboard update (non-blocking)
     _update_skills_md(registry_key, command, tasks, all_resolved, token_budget)
 
-    # 5.55. 토큰 예산 초과 WARN 기록
+    # 5.55. Token budget exceeded WARN record
     if token_budget > TOKEN_BUDGET_LIMIT:
         _append_log(
             work_dir,
@@ -822,22 +822,22 @@ def main():
             f"TOKEN_BUDGET_EXCEEDED: total={token_budget} limit={TOKEN_BUDGET_LIMIT}",
         )
 
-    # 5.6. 스킬 매핑 유효성 검증 (exit code 2 = 검증 실패)
+    # 5.6. Skill mapping validation (exit code 2 = validation failed)
     valid, reason = validate_skill_mapping(tasks)
     if not valid:
-        _append_log(work_dir, "WARN", f"skill_mapper: validate_skill_mapping 실패 - {reason.splitlines()[0]}")
+        _append_log(work_dir, "WARN", f"skill_mapper: validate_skill_mapping failed - {reason.splitlines()[0]}")
         print(reason, file=sys.stderr)
         sys.exit(2)
 
     _append_log(work_dir, "INFO", f"skill_mapper: complete tasks={len(tasks)} skills={len(all_resolved)}")
 
-    # 배너 출력
+    # Banner output
     rel_path = os.path.relpath(output_path, PROJECT_ROOT)
-    print("[STATE] 스킬 매핑", flush=True)
+    print("[STATE] Skill Mapping", flush=True)
     print(f">> {rel_path}", flush=True)
     if created_contexts:
         rel_ctx = os.path.relpath(context_dir, PROJECT_ROOT)
-        print(f">> {rel_ctx}/ ({len(created_contexts)}개 컨텍스트 슬라이스)", flush=True)
+        print(f">> {rel_ctx}/ ({len(created_contexts)} context slices)", flush=True)
 
 
 if __name__ == "__main__":

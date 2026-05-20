@@ -1,10 +1,10 @@
-"""@api_endpoint decorator 단위 테스트 (T-511 P2).
+"""@api endpoint decorator unit testing (T-511 P2).
 
-검증:
-  1. import 가능 — _common.py 에서 api_endpoint 식별자 노출
-  2. decorator 적용 함수 호출 시 debug.log entry / exit 발화
-  3. exception 발생 시 error 발화
-  4. functools.wraps 정합 — 시그니처/이름 보존
+Warranty:
+  1. FAQ importable —  common.py to api endpoint identifier exposure
+  debug.log entry / exit when calling decorator application function
+  3. FAQs error when an error occurs
+  4. functools.wraps Formulation — Signature/Name Conservation
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import pytest
 
 
 def _load_common() -> types.ModuleType:
-    """_common.py 를 직접 module 로 로드 (board 패키지 의존 회피)."""
+    """Load _common.py directly as a module (avoiding dependency on the board package)."""
     agent_factory_root = Path(__file__).resolve().parents[3]
     common_path = agent_factory_root / "board" / "server" / "_common.py"
     spec = importlib.util.spec_from_file_location("board_server_common_under_test", common_path)
@@ -33,9 +33,9 @@ def _load_common() -> types.ModuleType:
 
 @pytest.fixture()
 def common_mod(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """_common 모듈을 격리된 cwd 안에서 로드.
+    """common module loaded inside cwd.
 
-    cwd 를 tmp_path 로 옮기고 .agent-factory/runs/bg/debug.enabled 플래그를 켜 둠.
+    Move cwd to tmp path and turn on the .agent-factory/runs/bg/debug.enabled flag.
     """
     bg = tmp_path / ".agent-factory" / "runs" / "bg"
     bg.mkdir(parents=True, exist_ok=True)
@@ -57,18 +57,18 @@ def _read_debug_lines(tmp_path) -> list[dict[str, Any]]:
         try:
             lines.append(json.loads(line))
         except json.JSONDecodeError:
-            pytest.fail(f"debug.log 라인 NDJSON 파싱 실패: {line!r}")
+            pytest.fail(f"debug.log line NDJSON parsing failed: {line!r}")
     return lines
 
 
 def test_api_endpoint_is_importable(common_mod):
     """AC: hasattr(_common, 'api_endpoint')."""
     mod, _ = common_mod
-    assert hasattr(mod, "api_endpoint"), "_common.py 에 api_endpoint 식별자가 없음"
+    assert hasattr(mod, "api_endpoint"), "No api_endpoint identifier in _common.py"
 
 
 def test_api_endpoint_decorator_emits_entry_and_exit(common_mod):
-    """decorator 적용 함수 호출 → entry + exit 두 라인 NDJSON 발화."""
+    """Call decorator application function → entry + exit two lines NDJSON utterance."""
     mod, tmp_path = common_mod
 
     @mod.api_endpoint("K", "test_ok")
@@ -83,7 +83,7 @@ def test_api_endpoint_decorator_emits_entry_and_exit(common_mod):
 
 
 def test_api_endpoint_decorator_emits_error_on_exception(common_mod):
-    """exception 발생 시 error 라인 발화 + 예외는 재발생."""
+    """When an exception occurs, an error line is fired + the exception occurs again."""
     mod, tmp_path = common_mod
 
     @mod.api_endpoint("M", "save")
@@ -100,23 +100,23 @@ def test_api_endpoint_decorator_emits_error_on_exception(common_mod):
 
 
 def test_api_endpoint_wraps_preserves_name_and_signature(common_mod):
-    """functools.wraps 정합 — __name__ + __qualname__ + __doc__ 보존."""
+    """functools.wraps Qualification — Preserve __name__ + __qualname__ + __doc__."""
     mod, _ = common_mod
 
     @mod.api_endpoint("W2", "delete")
     def original_handler(_self: Any) -> str:
-        """원본 docstring."""
+        """Original docstring."""
         return "deleted"
 
     assert original_handler.__name__ == "original_handler"
-    assert original_handler.__doc__ == "원본 docstring."
+    assert original_handler.__doc__ == "Original docstring."
 
 
 def test_api_endpoint_no_op_when_debug_disabled(monkeypatch, tmp_path):
-    """debug.enabled 플래그 부재 시 debug.log append 안 함 (오버헤드 차단)."""
+    """In the absence of the debug.enabled flag, do not append debug.log (block overhead)."""
     bg = tmp_path / ".agent-factory" / "runs" / "bg"
     bg.mkdir(parents=True, exist_ok=True)
-    # debug.enabled 일부러 생성 안 함
+    # debug.enabled intentionally not created
     monkeypatch.chdir(tmp_path)
     mod = _load_common()
 
@@ -126,4 +126,4 @@ def test_api_endpoint_no_op_when_debug_disabled(monkeypatch, tmp_path):
 
     handler(object())
     log = bg / "debug.log"
-    assert not log.exists() or log.read_text() == "", "debug.enabled 없을 때 로그가 생성됨"
+    assert not log.exists() or log.read_text() == "", "Logs are generated when debug.enabled is not present"

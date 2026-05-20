@@ -2,9 +2,9 @@
  * @module memory/memory-quick-prompts
  * Contexts > Quick Prompts sub-tab.
  *
- * 사용자가 터미널 헤더의 Memory 버튼 등 UI 트리거에서 송신되는 prompt 문구를
- * 직접 편집·저장하는 영속 관리 인터페이스. 데이터는
- * .agent-factory/board/config/quick-prompts.json 에 저장되며 단건 단위로 PUT.
+ * The user sends prompt phrases from the UI trigger such as the memory button of the terminal header
+ * Direct editing/replacement management interface. About Us
+ * . agent-factory/board/config/quick-prompts.json
  */
 "use strict";
 
@@ -20,7 +20,7 @@
       '<div class="quick-prompts-container">' +
         '<div class="quick-prompts-header">' +
           '<div class="quick-prompts-title">Quick Prompts</div>' +
-          '<div class="quick-prompts-subtitle">UI 트리거(Memory 버튼 등)에서 송신되는 문구를 영속 편집합니다.</div>' +
+          '<div class="quick-prompts-subtitle">You can edit messages sent by UI triggers (Memory buttons, etc.). News /div>' +
         '</div>' +
         '<div class="quick-prompts-list" id="quick-prompts-list">' +
           '<div class="quick-prompts-loading">Loading…</div>' +
@@ -165,8 +165,8 @@
 
     var newPrompt = textarea.value;
 
-    // 기존 항목의 다른 메타필드 (label, bindTo, description) 는 유지하기 위해
-    // promptQuickItems 에서 lookup. 없으면 신규로 간주.
+    // to maintain different metafields (label, bindTo, description) of existing items
+    // promptQuickItems from lookup. If not, it is considered new.
     var meta = null;
     var items = Board.state.promptQuickItems || [];
     for (var i = 0; i < items.length; i++) {
@@ -188,13 +188,13 @@
         M.setQuickPromptDirty(id, false);
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        Board.util.showInfoModal("저장 실패", "Failed to save quick prompt: " + id, { severity: "error" });
+        Board.util.showInfoModal("Store failure", "Failed to save quick prompt: " + id, { severity: "error" });
       }
     });
   };
 
-  // CSS attribute selector 안에 들어가는 id 의 escape — 기본 값들이 알파벳/숫자/.- 만이라
-  // 단순 처리로 충분하지만 안전하게 따옴표·백슬래시는 escape.
+  // id  escape — the default values are alphabet/numeric/.-
+  // It is enough to handle simple, but it is safe to follow and escape.
   function cssEsc(s) {
     if (typeof s !== "string") return "";
     return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

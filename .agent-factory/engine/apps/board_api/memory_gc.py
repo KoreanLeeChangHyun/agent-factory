@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from board.server._common import _memory_gc_run, _memory_gc_prune_archive, api_endpoint
+from board.server.support.common import _memory_gc_run, _memory_gc_prune_archive, api_endpoint
 
 
 class MemoryGcHandlerMixin:

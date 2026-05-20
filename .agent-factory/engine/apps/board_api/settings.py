@@ -13,7 +13,7 @@ import os
 import subprocess
 import time
 
-from board.server._common import (
+from board.server.support.common import (
     _workflow_sync_lock,
     _WORKFLOW_SYNC_URL,
     api_endpoint,
@@ -22,7 +22,7 @@ from board.server._common import (
 
 
 class SettingsHandlerMixin:
-    """시스템 부트스트랩/설정 도메인 endpoint."""
+    """System bootstrap/configuration domain endpoint."""
 
     @api_endpoint("SETTINGS", "workflow_sync")
     def _handle_settings_workflow_sync(self) -> None:
@@ -107,20 +107,20 @@ class SettingsHandlerMixin:
             if exit_code == 0:
                 _sse('done', {
                     'exitCode': 0,
-                    'message': '동기화 완료. 서버 재시작이 필요합니다.',
+                    'message': 'Synchronization complete. A server restart is required.',
                     'ts': time.time(),
                 })
             else:
                 _sse('error', {
                     'exitCode': exit_code,
-                    'message': '동기화 실패',
+                    'message': 'Sync failed',
                     'ts': time.time(),
                 })
         except Exception as exc:  # noqa: BLE001
             logger.exception('settings workflow-sync failed: %s', exc)
             _sse('error', {
                 'exitCode': -1,
-                'message': f'내부 오류: {exc}',
+                'message': f'Internal error: {exc}',
                 'ts': time.time(),
             })
         finally:

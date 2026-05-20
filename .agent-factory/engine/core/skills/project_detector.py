@@ -35,15 +35,15 @@ from engine.common import resolve_project_root
 def _build_common_epilog() -> str:
     """Return CLI help footer without depending on flow runtime modules."""
     return (
-        "워크플로우 버전: 2.1.25\n"
-        "문서: .agent-factory/docs/ 또는 .claude/rules/workflow.md 참조\n"
-        "티켓 관리: flow-kanban <서브커맨드> --help"
+        "Workflow version: 2.1.25 \n"
+        "Documentation: See .agent-factory/docs/ or .claude/rules/workflow.md \n"
+        "Ticket management: flow-kanban <subcommand> --help"
     )
 
-# ─── 스택 감지 규칙 ───────────────────────────────────────────────────────────
+# ─── Stack detection rules ───────────────────────────────────────────────────────────────
 
-# 각 규칙: (파일/디렉터리 패턴, 감지기 함수 또는 None, 기본 스택 태그)
-# 감지기 함수는 파일 내용을 파싱하여 세부 스택 태그를 반환한다.
+# Each rule: (file/directory pattern, detector function or None, default stack tag)
+# The detector function parses the file contents and returns detailed stack tags.
 
 
 def _detect_node_stack(project_root: str) -> list[str]:
@@ -71,7 +71,7 @@ def _detect_node_stack(project_root: str) -> list[str]:
 
     dep_names = set(all_deps.keys())
 
-    # 프레임워크 감지
+    # Framework detection
     if "next" in dep_names:
         tags.append("Next.js")
     if "react" in dep_names:
@@ -87,13 +87,13 @@ def _detect_node_stack(project_root: str) -> list[str]:
     if "nestjs" in dep_names or "@nestjs/core" in dep_names:
         tags.append("NestJS")
 
-    # 상태 관리
+    # State Management
     if "zustand" in dep_names:
         tags.append("Zustand")
     if "redux" in dep_names or "@reduxjs/toolkit" in dep_names:
         tags.append("Redux")
 
-    # 테스트
+    # test
     if "jest" in dep_names:
         tags.append("Jest")
     if "vitest" in dep_names:
@@ -101,7 +101,7 @@ def _detect_node_stack(project_root: str) -> list[str]:
     if "playwright" in dep_names or "@playwright/test" in dep_names:
         tags.append("Playwright")
 
-    # 빌드 도구
+    # build tools
     if "vite" in dep_names:
         tags.append("Vite")
     if "webpack" in dep_names:
@@ -135,7 +135,7 @@ def _detect_python_stack(project_root: str) -> list[str]:
     """
     tags = ["Python"]
 
-    # pyproject.toml 파싱 (간이 TOML 파서 - dependencies 섹션만)
+    # Parse pyproject.toml (simple TOML parser - dependencies section only)
     pyproject_path = os.path.join(project_root, "pyproject.toml")
     req_path = os.path.join(project_root, "requirements.txt")
 
@@ -145,7 +145,7 @@ def _detect_python_stack(project_root: str) -> list[str]:
         try:
             with open(pyproject_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            # 의존성 섹션만 추출하여 파싱 범위 최소화
+            # Minimize parsing scope by extracting only dependency sections
             dep_sections = re.findall(
                 r'\[(?:project\.(?:optional-)?dependencies|tool\.poetry\.(?:dev-)?dependencies)\](.*?)(?=\n\[|\Z)',
                 content,
@@ -154,7 +154,7 @@ def _detect_python_stack(project_root: str) -> list[str]:
             if dep_sections:
                 dep_text = "\n".join(dep_sections)
             else:
-                # 의존성 섹션 패턴 매칭 실패 시 전체 내용으로 폴백
+                # Fallback to full content when dependency section pattern matching fails
                 dep_text = content
         except (IOError, OSError):
             pass
@@ -168,7 +168,7 @@ def _detect_python_stack(project_root: str) -> list[str]:
 
     dep_lower = dep_text.lower()
 
-    # 프레임워크 감지
+    # Framework detection
     if "fastapi" in dep_lower:
         tags.append("FastAPI")
     if "django" in dep_lower:
@@ -188,7 +188,7 @@ def _detect_python_stack(project_root: str) -> list[str]:
     if "sqlmodel" in dep_lower:
         tags.append("SQLModel")
 
-    # 테스트
+    # test
     if "pytest" in dep_lower:
         tags.append("pytest")
     if "hypothesis" in dep_lower:
@@ -204,13 +204,13 @@ def _detect_python_stack(project_root: str) -> list[str]:
     if "tensorflow" in dep_lower:
         tags.append("TensorFlow")
 
-    # 비동기
+    # asynchronous
     if "uvicorn" in dep_lower:
         tags.append("Uvicorn")
     if "celery" in dep_lower:
         tags.append("Celery")
 
-    # 타입
+    # type
     if "pydantic" in dep_lower:
         tags.append("Pydantic")
     if "mypy" in dep_lower:
@@ -309,7 +309,7 @@ def detect_project_stack(project_root: str) -> dict[str, object]:
     stacks: list[str] = []
     infra: list[str] = []
 
-    # 1. 언어/프레임워크 감지
+    # 1. Language/framework detection
     if os.path.isfile(os.path.join(project_root, "package.json")):
         stacks.extend(_detect_node_stack(project_root))
 
@@ -323,7 +323,7 @@ def detect_project_stack(project_root: str) -> dict[str, object]:
     if os.path.isfile(os.path.join(project_root, "Cargo.toml")):
         stacks.extend(_detect_rust_stack(project_root))
 
-    # 2. 인프라 감지
+    # 2. Infrastructure detection
     if os.path.isfile(os.path.join(project_root, "docker-compose.yml")) or \
        os.path.isfile(os.path.join(project_root, "docker-compose.yaml")) or \
        os.path.isfile(os.path.join(project_root, "compose.yml")) or \
@@ -353,20 +353,20 @@ def detect_project_stack(project_root: str) -> dict[str, object]:
        os.path.isdir(os.path.join(project_root, "kubernetes")):
         infra.append("Kubernetes")
 
-    # 3. 모노레포 감지
+    # 3. Monorepo detection
     if os.path.isfile(os.path.join(project_root, "pnpm-workspace.yaml")) or \
        os.path.isfile(os.path.join(project_root, "lerna.json")):
         infra.append("Monorepo")
 
-    # 4. 도메인명 결정
+    # 4. Decide on a domain name
     project_name = os.path.basename(os.path.abspath(project_root))
-    # 도메인명은 프로젝트 디렉터리명을 소문자+하이픈으로 정규화
+    # The domain name is normalized from the project directory name to lowercase letters + hyphens.
     domain_name = re.sub(r"[^a-z0-9-]", "-", project_name.lower())
     domain_name = re.sub(r"-+", "-", domain_name).strip("-")
     if not domain_name:
         domain_name = "unknown"
 
-    # 5. 디렉터리 구조 요약
+    # 5. Directory Structure Summary
     dir_summary = _summarize_directory_structure(project_root)
 
     return {
@@ -399,7 +399,7 @@ def _summarize_directory_structure(project_root: str, max_depth: int = 2) -> lis
     dirs: list[str] = []
 
     def _walk(path: str, depth: int, prefix: str) -> None:
-        """재귀적으로 디렉터리를 탐색한다."""
+        """Searches directories recursively."""
         if depth > max_depth:
             return
         try:
@@ -421,7 +421,7 @@ def _summarize_directory_structure(project_root: str, max_depth: int = 2) -> lis
                 _walk(full, depth + 1, prefix + "  ")
 
     _walk(project_root, 0, "")
-    return dirs[:50]  # 최대 50개까지만
+    return dirs[:50]  # Up to 50 items only
 
 
 def generate_project_skill(
@@ -448,22 +448,22 @@ def generate_project_skill(
     skill_name = f"project-{domain}"
     skill_dir = os.path.join(project_root, ".claude", "skills", skill_name)
 
-    # 스택 문자열
-    stack_str = ", ".join(stacks) if stacks else "(감지된 스택 없음)"
-    infra_str = ", ".join(infra) if infra else "(감지된 인프라 없음)"
+    # stack string
+    stack_str = ", ".join(stacks) if stacks else "(no stack detected)"
+    infra_str = ", ".join(infra) if infra else "(No infrastructure detected)"
 
-    # 트리거 키워드 생성
+    # Create trigger keyword
     triggers: list[str] = []
     for s in stacks[:5]:
         triggers.append(f"'{s}'")
     triggers.append(f"'{project_name}'")
     trigger_str = ", ".join(triggers)
 
-    # 디렉터리 구조 요약 (상위 디렉터리만)
+    # Directory structure summary (parent directory only)
     top_dirs = [d for d in dir_summary if "/" not in d][:10]
-    dir_lines = "\n".join(f"- `{d}/`" for d in top_dirs) if top_dirs else "- (디렉터리 구조 미감지)"
+    dir_lines = "\n".join(f"- `{d}/`" for d in top_dirs) if top_dirs else "- (Directory structure not detected)"
 
-    # SKILL.md 생성
+    # Create SKILL.md
     today = datetime.now().strftime("%Y-%m-%d")
     content = f"""---
 name: {skill_name}
@@ -472,24 +472,24 @@ description: "Project-specific skill for {project_name}. Auto-detected stack: {s
 license: "Apache-2.0"
 ---
 
-# {project_name} 프로젝트 스킬
+# {project_name} project skill
 
 > 이 파일은 `project_skill_detector.py`에 의해 자동 생성되었습니다 ({today}).
 > 프로젝트 고유 도메인 지식, 코딩 컨벤션, 금지 패턴 등을 추가하세요.
 
-## 기술 스택
+##Technology Stack
 
 {stack_str}
 
-## 인프라
+## infrastructure
 
 {infra_str}
 
-## 디렉터리 구조
+## Directory structure
 
 {dir_lines}
 
-## 코딩 컨벤션
+## Coding Convention
 
 > TODO: 프로젝트 고유 코딩 컨벤션을 기술하세요.
 
@@ -497,7 +497,7 @@ license: "Apache-2.0"
 - 파일 구조 규칙: (미설정)
 - 커밋 메시지 규칙: (미설정)
 
-## 도메인 용어집
+## Domain Glossary
 
 > TODO: 프로젝트 고유 도메인 용어를 정의하세요.
 
@@ -505,13 +505,13 @@ license: "Apache-2.0"
 |------|------|
 | (예시) | (예시 정의) |
 
-## 금지 패턴
+## Prohibited pattern
 
 > TODO: 프로젝트에서 금지하는 패턴을 기술하세요.
 
 - (미설정)
 
-## ADR 요약
+##ADRSummary
 
 > TODO: 주요 Architecture Decision Records를 요약하세요.
 
@@ -576,20 +576,20 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(
         prog="flow-detect",
-        description="코드베이스 분석 기반 프로젝트 스킬 자동 감지",
+        description="Automatic detection of project skills based on code base analysis",
         epilog=_build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "project_root",
-        metavar="프로젝트루트",
-        help="감지할 프로젝트의 루트 디렉터리 경로",
+        metavar="project root",
+        help="Root directory path of the project to be discovered",
     )
     parser.add_argument(
         "--generate",
         action="store_true",
         default=False,
-        help="감지 결과를 기반으로 SKILL.md 파일을 실제 생성",
+        help="Actual creation of SKILL.md file based on detection results",
     )
 
     args = parser.parse_args()
@@ -597,25 +597,25 @@ def main() -> None:
     generate = args.generate
 
     if not os.path.isdir(project_root):
-        print(f"[ERROR] 디렉터리를 찾을 수 없습니다: {project_root}", file=sys.stderr)
+        print(f"[ERROR] Directory not found: {project_root}", file=sys.stderr)
         sys.exit(1)
 
-    # 스택 감지
+    # stack detection
     result = detect_project_stack(project_root)
     stacks_detected: list[str] = result["stacks"]  # type: ignore[assignment]
 
-    # 감지 결과 출력
+    # Detection result output
     domain_name = result.get("domain_name", "unknown")
     print("[STATE] DETECT", flush=True)
     print(f">> domain=project-{domain_name}, stacks={len(stacks_detected)}", flush=True)
     print(format_detection_result(result))
 
-    # --generate 플래그 시 SKILL.md 파일 생성
+    # Generate SKILL.md file with --generate flag
     if generate:
         stacks: list[str] = result["stacks"]  # type: ignore[assignment]
         infra: list[str] = result["infra"]  # type: ignore[assignment]
         if not stacks and not infra:
-            print("\n[WARN] 감지된 스택/인프라가 없어 SKILL.md 생성을 건너뜁니다.", file=sys.stderr)
+            print("\n [WARN] Skipping SKILL.md creation as no stack/infrastructure detected.", file=sys.stderr)
             sys.exit(0)
 
         skill_dir, content = generate_project_skill(result, project_root)
@@ -623,7 +623,7 @@ def main() -> None:
         skill_path = os.path.join(skill_dir, "SKILL.md")
 
         if os.path.isfile(skill_path):
-            print(f"\n[WARN] 이미 존재하는 파일을 덮어씁니다: {skill_path}", file=sys.stderr)
+            print(f"\n [WARN] Overwrite already existing file: {skill_path}", file=sys.stderr)
 
         with open(skill_path, "w", encoding="utf-8") as f:
             f.write(content)

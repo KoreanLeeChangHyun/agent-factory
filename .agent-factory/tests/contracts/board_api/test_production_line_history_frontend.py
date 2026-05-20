@@ -1,12 +1,12 @@
-"""T-513 P3 — REST history 단일 출처 frontend 정합 회귀 (T-497 정책).
+"""T-513 P3 — REST history single source frontend static revolving (T-497 policy).
 
-검증:
-  - production-line-workflow.js 가 GET /api/v2/sessions/<id>/history 를 호출하는 REST 단일
-    출처 history loader (fetchHistory) 를 노출
-  - 호출 패턴: fetch + cache no-store (REST + 캐시 무효)
-  - SSE 링버퍼 replay 사용 안 함 (T-497 결정점 정합)
+Warranty:
+  - REST single calling production-line-workflow.js GET /api/v2/sessions/<id>/history
+    Source history loader (fetchHistory) exposed
+  - Call Pattern: fetch + cache no-store (REST + cache invalid)
+  - SSE Ringbuckle Replay Unused (T-497 Crystal)
 
-production endpoint 직접 호출 금지 (board.md §0.1). 본 테스트는 정적 분석만.
+production endpoint direct call ban (board.md §0.1). This test is only static analysis.
 """
 
 from __future__ import annotations
@@ -28,46 +28,46 @@ def _read_production_line_workflow_js() -> str:
 
 
 def test_production_line_workflow_js_exposes_fetch_history() -> None:
-    """production-line-workflow.js 가 Board.productionLineWorkflow.fetchHistory 를 등록한다."""
+    """production-line-workflow.js registers Board.productionLineWorkflow.fetchHistory."""
     src = _read_production_line_workflow_js()
     assert "function fetchHistory(" in src, (
-        "fetchHistory 함수가 production-line-workflow.js 에 정의되지 않음"
+        "fetchHistory function is not defined in production-line-workflow.js"
     )
     assert "fetchHistory: fetchHistory" in src, (
-        "Board.productionLineWorkflow API 표면에 fetchHistory 가 등록되지 않음"
+        "fetchHistory not registered on Board.productionLineWorkflow API surface"
     )
 
 
 def test_production_line_workflow_js_calls_history_endpoint() -> None:
-    """fetchHistory 가 GET /api/v2/sessions/<id>/history 를 호출한다."""
+    """fetchHistory calls GET /api/v2/sessions/<id>/history."""
     src = _read_production_line_workflow_js()
-    # URL 구성 패턴 — /api/v2/sessions/" + encodeURIComponent(sessionId) + "/history
+    # URL construction pattern — /api/v2/sessions/" + encodeURIComponent(sessionId) + "/history
     pattern = re.compile(
         r'["\']/api/v2/sessions/["\']\s*\+\s*encodeURIComponent\(sessionId\)'
         r'\s*\+\s*["\']/history["\']'
     )
     assert pattern.search(src), (
-        "fetchHistory 가 /api/v2/sessions/<id>/history endpoint 를 호출하지 않음"
+        "fetchHistory does not call /api/v2/sessions/<id>/history endpoint"
     )
 
 
 def test_production_line_workflow_js_uses_rest_not_sse_replay() -> None:
-    """fetchHistory 가 fetch 기반 REST — SSE 링버퍼 replay 키워드 없음."""
+    """fetchHistory is fetch-based REST — no SSE ringbuffer replay keyword."""
     src = _read_production_line_workflow_js()
-    # fetchHistory 본체에서 fetch + cache no-store 패턴 사용
-    assert "_fetchJson" in src, "_fetchJson 헬퍼 미사용"
-    # SSE replay 키워드 (history 라이브 SSE 재전송) 가 production-line-workflow.js 에 도입되지 않음
+    # Using fetch + cache no-store pattern in fetchHistory body
+    assert "_fetchJson" in src, "_fetchJson helper not used"
+    # SSE replay keyword (history live SSE replay) is not introduced in production-line-workflow.js
     forbidden = ("ring_buffer", "ringBuffer", "sse_replay", "sseReplay")
     for token in forbidden:
         assert token not in src, (
-            f"production-line-workflow.js 에 SSE 링버퍼/replay 키워드 도입 — REST 단일 출처 위반: {token}"
+            f"Introducing SSE ringbuffer/replay keywords in production-line-workflow.js — REST single-source violation: {token}"
         )
 
 
 def test_production_line_workflow_js_history_doc_present() -> None:
-    """production-line-workflow.js 헤더 문서에 history endpoint 항목 명시 (소비 계약)."""
+    """Specify the history endpoint item in the production-line-workflow.js header document (consumption contract)."""
     src = _read_production_line_workflow_js()
-    # 모듈 docstring 또는 jsdoc 영역에 /api/v2/sessions/<id>/history 명시
+    # Specify /api/v2/sessions/<id>/history in module docstring or jsdoc area
     assert "/api/v2/sessions/<id>/history" in src, (
-        "production-line-workflow.js 모듈 헤더에 history endpoint 명시 누락"
+        "Omission of history endpoint in production-line-workflow.js module header"
     )

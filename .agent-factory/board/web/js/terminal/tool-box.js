@@ -10,12 +10,12 @@
 
   // ── Tool Box Toggle Delegation ──
   //
-  // 세션 전환 시 session-switcher 가 outputDiv 자식을 cloneNode(true) 로 save/restore
-  // 하는데, cloneNode 는 addEventListener 리스너를 복사하지 않는다. 박스 생성 시점에
-  // 개별 요소에 click 리스너를 붙이면 탭 왕복 1회 이후 토글이 죽는다.
+  // session-switcher is outputDiv charitable cloneNode(true) to save/restore
+  // To do, cloneNode does not copy addEventListener listener. When creating a box
+  // If you hold the click listener in the individual element, the toggles will die after one tap return.
   //
-  // outputDiv 는 세션 전환에도 재할당되지 않는 안정 노드이므로, 한 번 델리게이션을
-  // 걸어두면 clone 영향에서 자유롭다.
+  // outputDiv is a stable node that does not revert to session conversions, so once deliguetion
+  // Free from clone impact.
 
   M.setupToolBoxDelegation = function() {
     if (M._toolBoxDelegationBound) return;
@@ -39,14 +39,14 @@
   // ── Tool Box Renderer ──
 
   M.createToolBox = function(toolName, toolUseId) {
-    // 이전 도구 박스가 아직 running이면 done으로 전환
+    // If the previous toolbox is still running, switch to done
     if (M.currentToolBox) {
       var prevStatus = M.currentToolBox.querySelector(".term-tool-status");
       if (prevStatus && prevStatus.classList.contains("running")) {
         prevStatus.className = "term-tool-status done";
         prevStatus.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
       }
-      // 이전 박스의 출력이 비어있으면 DOM에서 선제 제거
+      // If the output of the previous box is empty, remove the premise from the DOM
       var prevFull = M.currentToolBox.querySelector(".term-tool-output-full");
       if (prevFull && prevFull.children.length === 0 && !prevFull.textContent.trim()) {
         M.currentToolBox.remove();
@@ -101,9 +101,9 @@
 
     box.appendChild(outputArea);
 
-    // Toggle handler는 M.setupToolBoxDelegation 의 outputDiv 델리게이션이 담당한다.
-    // 세션 전환 시 cloneNode(true) 로 DOM 이 재주입되면서 inline addEventListener
-    // 가 유실되던 회귀 대응 (T-390 후속).
+    // Toggle handler is responsible for the outputDiv delegation of M.setupToolBoxDelegation.
+    // inline addEventListener when converting session with cloneNode(true)
+    // Regression response (T-390 follow-up).
 
     M.appendToOutput(box);
     M.currentToolBox = box;
@@ -112,7 +112,7 @@
   };
 
   M.removeEmptyToolBox = function(targetToolUseId) {
-    // 특정 toolUseId가 지정된 경우 해당 박스만 정리
+    // If specified a specific toolUseId, only the corresponding box is cleaned
     if (targetToolUseId && M.toolBoxMap[targetToolUseId]) {
       var targetBox = M.toolBoxMap[targetToolUseId];
       var targetFull = targetBox.querySelector(".term-tool-output-full");
@@ -127,7 +127,7 @@
       }
     }
 
-    // M.currentToolBox 정리 (하위 호환)
+    // M.currentToolBox Cleanup (Compatible)
     if (M.currentToolBox) {
       var fullDiv = M.currentToolBox.querySelector(".term-tool-output-full");
       if (fullDiv && fullDiv.children.length === 0 && !fullDiv.textContent.trim()) {
@@ -138,7 +138,7 @@
       }
     }
 
-    // M.toolBoxMap 내 빈 박스 일괄 정리
+    // M.toolBoxMap
     var mapKeys = Object.keys(M.toolBoxMap);
     for (var mi = 0; mi < mapKeys.length; mi++) {
       var mapBox = M.toolBoxMap[mapKeys[mi]];
@@ -151,7 +151,7 @@
       }
     }
 
-    // DOM 직접 순회: toolBoxMap에 등록되지 않은 잔존 빈 박스도 정리
+    // DOM direct congratulation: Unregistered residual empty boxes in toolBoxMap
     if (M.outputDiv) {
       var domBoxes = M.outputDiv.querySelectorAll(".term-tool-box");
       for (var di = 0; di < domBoxes.length; di++) {
@@ -172,7 +172,7 @@
       }
     }
 
-    // 워크플로우 모드 카드도 함께 정리
+    // Workflow Mode Card
     M.removeEmptyWorkflowToolCard();
   };
 
@@ -189,26 +189,26 @@
 
   // ── Path Compression Helpers ──
   //
-  // _compressPathLike: 경로 문자열의 디렉터리 prefix를 제거하고 basename만 반환.
-  // lastIndexOf 방식 채택 — 정규식 global replace 시 각 segment가 concatenate되는
-  // 버그(W01-hotfix)를 방지. 한글 파일명 포함 임의 문자 정상 처리.
-  // 입력이 비문자열/falsy 이면 빈 문자열 반환.
+  // compressPathLike: removes the directory prefix of the path string and returns only basename.
+  // lastIndexOf-type adoption — regular global replace when each segment is concatenate
+  // Prevent bugs (W01-hotfix). One-word filename contains random characters normal processing.
+  // returns empty strings if the input is non-string/falsy.
   M._compressPathLike = function(str) {
     if (typeof str !== "string" || !str) return "";
-    // lastIndexOf 방식: global replace 시 segment가 concatenate 되는 버그 방지.
-    // 정규식 /.*\/([^/]+)$/ 을 사용하면 greedy match로 마지막 segment만 추출.
-    // 한글 파일명(예: 도구-카드-경로-압축)도 정상 처리.
+    // lastIndexOf Method: Preventing bugs that are concatenate when global replace.
+    // greedy match
+    // One-word filename (e.g. tool-card-path-compression) also handles the normal.
     var idx = str.lastIndexOf("/");
     return idx >= 0 ? str.substring(idx + 1) : str;
   };
 
-  // _buildToolInputSummary: insertToolResult / insertWorkflowResult 양쪽이 공유하는
-  // input summary 빌더. 기존 각 함수의 if/else 사다리를 단일 헬퍼로 추출.
-  // 반환값: { summary, title, isFlow, flowCommand }
-  //   summary  - 카드에 textContent 로 노출할 압축된 짧은 설명
-  //   title    - title/aria-label 속성에 부착할 풀경로 (hover 접근성용)
-  //   isFlow   - Bash flow- 명령어 여부
-  //   flowCommand - isFlow 시 flowCommand 원본 (M._formatFlowCommand 입력용)
+  // buildToolInputSummary: insertToolResult / insertWorkflowResult Both Share
+  // input summary builder. If/else ladders of each existing function are extracted into a single helper.
+  // return value: { summary, title, isFlow, flowCommand }
+  //   summary - short description that will be exposed to textContent on the card
+  //   title - title/aria-label
+  //   isFlow - Bash flow-
+  //   flowCommand - flowCommand original (for M. formatFlowCommand input)
   M._buildToolInputSummary = function(toolName, parsedInput) {
     var summary = "";
     var title = "";
@@ -226,14 +226,14 @@
       summary = M._compressPathLike(parsedInput.file_path);
       title = parsedInput.file_path;
     } else if (toolName === "Grep" && parsedInput.pattern) {
-      // pattern 은 압축 금지 (glob 패턴 `**/*.js` 손상 방지)
-      // path 인자에만 압축 적용
+      // pattern for compression (glob pattern `**/*.js` prevents damage)
+      // Apply compression only for path arguments
       var rawPath = parsedInput.path || "";
       var compressedPath = rawPath ? M._compressPathLike(rawPath) : "";
       summary = parsedInput.pattern + (compressedPath ? "  " + compressedPath : "");
       title = parsedInput.pattern + (rawPath ? "  " + rawPath : "");
     } else if (toolName === "Glob" && parsedInput.pattern) {
-      // pattern 전체가 glob 패턴이므로 압축 적용 금지
+      // Because the entire pattern is a glob pattern, it is prohibited to compress
       summary = parsedInput.pattern;
       title = parsedInput.pattern;
     } else {
@@ -291,7 +291,7 @@
   };
 
   M.insertToolResult = function(text, isError, toolName, toolUseId) {
-    // toolUseId가 있으면 toolBoxMap에서 대상 박스 조회, 없으면 M.currentToolBox fallback
+    // M.currentToolBox fallback if you have toolUseId
     var targetBox = (toolUseId && M.toolBoxMap[toolUseId]) ? M.toolBoxMap[toolUseId] : M.currentToolBox;
     if (!targetBox) return;
     if (!text && !isError) { M.removeEmptyToolBox(toolUseId); return; }
@@ -326,8 +326,8 @@
       } else {
         inputDiv.textContent = inputSummary;
       }
-      // OS native hover tooltip 비활성화 (사용자 요청 2026-05-09).
-      // 긴 명령어 전체 보기는 박스 토글 펼침으로 대체. 접근성 위해 aria-label 은 유지.
+      // Disable OS native hover tooltip (user request 2026-05-09).
+      // Long Command Full View Replaces Box Toggle Unload. aria-label is maintained for accessibility.
       inputDiv.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
@@ -382,7 +382,7 @@
       }
     }
 
-    // 결과 삽입 완료 후 toolBoxMap에서 해당 항목 제거 (메모리 누수 방지)
+    // Remove the corresponding item from toolBoxMap after completion of the result insert (Memory leak prevention)
     if (toolUseId && M.toolBoxMap[toolUseId]) {
       delete M.toolBoxMap[toolUseId];
     }
@@ -462,7 +462,7 @@
     cardBody.className = "wf-tool-card-body";
     card.appendChild(cardBody);
 
-    // Toggle handler는 M.setupToolBoxDelegation 델리게이션이 담당
+    // Toggle handler is responsible for M.setupToolBoxDelegation delegation
 
     // Append to current step panel
     Board.WorkflowRenderer.appendDomToCurrentPanel(card);
@@ -513,7 +513,7 @@
         inputTitle = "";
       }
       inputSpan.textContent = inputSummary;
-      // OS native hover tooltip 비활성화 (사용자 요청 2026-05-09). aria-label 만 유지.
+      // Disable OS native hover tooltip (user request 2026-05-09). Only aria-label is maintained.
       inputSpan.setAttribute("aria-label", inputTitle || inputSummary);
       M.toolInputBuffer = "";
     } else if (M.toolInputBuffer) {
@@ -556,10 +556,10 @@
       }
     }
 
-    // Result 도착 = tool 실행 완료. 진행 중 펄스 애니메이션을 끈다.
+    // Result arrival = Complete tool execution. During the process, the pulse animation is sticking.
     card.removeAttribute("data-running");
 
-    // 완료 상태 표시: success / fail. 헤더 우측 시간 옆에 SVG 아이콘 부착.
+    // Complete status display: success / failure. Attach the SVG icon next to the header right time.
     card.setAttribute("data-status", isError ? "fail" : "success");
     var headerEl = card.querySelector(".wf-tool-card-header");
     if (headerEl && !headerEl.querySelector(".wf-tool-card-status-icon")) {

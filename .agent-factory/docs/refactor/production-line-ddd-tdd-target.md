@@ -23,7 +23,7 @@ PREPARE -> PLAN -> EXECUTE -> VERIFY -> REPORT -> COMPLETE
 Korean labels:
 
 ```text
-작업 준비 -> 작업 계획 -> 작업 수행 -> 작업 검증 -> 작업 보고 -> 작업 완료
+Preparing work -> Planning work -> Performing work -> Verifying work -> Reporting work -> Completing work
 ```
 
 `INIT` is a runtime lifecycle event, not a core workflow stage.
@@ -170,7 +170,7 @@ Use these terms consistently:
 
 | Concept | Meaning |
 |---|---|
-| `WorkRequest` | 작업 요청서. The source request that starts one or more workflow runs. |
+| `WorkRequest` | Work Request. The source request that starts one or more workflow runs. |
 | `WorkRequestRef` | Stable reference such as `T-123`; replaces `TicketRef` in the target model. |
 | `WorkflowRun` | One execution cycle for one work request. |
 | `WorkflowStage` | `PREPARE`, `PLAN`, `EXECUTE`, `VERIFY`, `REPORT`, `COMPLETE`. |
@@ -198,7 +198,7 @@ DRAFT -> CLARIFY -> CRITIQUE -> REWRITE -> ACCEPT
 Korean labels:
 
 ```text
-초안 작성 -> 명확화 -> 자기 검토 -> 재작성 -> 승인
+Draft -> Clarify -> Self-review -> Rewrite -> Approval
 ```
 
 Purpose:

@@ -12,7 +12,7 @@ import os
 import sys
 import threading
 
-from board.server._common import api_endpoint, logger
+from board.server.support.common import api_endpoint, logger
 
 
 class SyncHandlerMixin:
@@ -89,11 +89,11 @@ class SyncHandlerMixin:
             except OSError:
                 pass
             entry_script = os.path.join(project_root, '.agent-factory', 'board', 'server.py')
-            # execv로 프로세스를 교체 — 소켓이 자동 해제되어 포트 충돌 없음
+            # Replace process with execv — sockets are automatically released so no port conflicts
             os.execv(sys.executable, [sys.executable, entry_script, '--serve', project_root])
 
         threading.Timer(0.3, _do_restart).start()
 
-    # T-513 P5 — `_handle_workflow_sync` 분기는 handlers/settings.py 의
-    # `_handle_settings_workflow_sync` 로 통째 이전됨. 본 mixin 은 restart +
-    # debug-log endpoint 만 보존.
+    # T-513 P5 — The `_handle_workflow_sync` branch in handlers/settings.py
+    # Moved entirely to `_handle_settings_workflow_sync`. This mixin restart +
+    # Only debug-log endpoints are preserved.

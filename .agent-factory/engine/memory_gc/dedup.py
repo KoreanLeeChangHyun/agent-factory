@@ -1,6 +1,6 @@
 """중복 메모리 클러스터링 + 단순 dedup.
 
-reflection 합성과 분리: 여기서는 "같은 정보를 두 번 적은 경우" 만 처리.
+reflection 합성과 분리: 여기서는 "When the same information is written twice" 만 처리.
 정보 손실 위험을 피해 더 오래된 쪽만 archive/merged/ 로 이동, 새 쪽 유지.
 """
 from __future__ import annotations
@@ -13,8 +13,8 @@ from pathlib import Path
 from .core import MemoryFile
 from .paths import GCConfig
 
-OVERLAP_THRESHOLD: float = 0.6  # 토큰 60% 이상 겹치면 중복 후보
-TOKEN_RE = re.compile(r'[\w가-힣]+')
+OVERLAP_THRESHOLD: float = 0.6  # If tokens overlap by more than 60%, they are duplicate candidates.
+TOKEN_RE = re.compile(r'[\wga-hee]+')
 
 
 def _tokens(text: str) -> set[str]:
@@ -37,7 +37,7 @@ class DedupCandidate:
 
 
 def find_duplicates(memories: list[MemoryFile]) -> list[DedupCandidate]:
-    """같은 type 안에서 description 토큰 jaccard >= threshold 페어를 추출."""
+    """Extract the description token jaccard >= threshold pair within the same type."""
     by_type: dict[str, list[MemoryFile]] = {}
     for m in memories:
         by_type.setdefault(m.type, []).append(m)
@@ -72,7 +72,7 @@ def apply_dedup(cfg: GCConfig, candidates: list[DedupCandidate]) -> list[Path]:
         if src in seen_paths or not src.exists():
             continue
         dest = target_dir / src.name
-        # 충돌 시 timestamp suffix
+        # timestamp suffix on collision
         if dest.exists():
             stem = src.stem
             suffix = src.suffix

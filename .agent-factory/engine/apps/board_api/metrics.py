@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from board.server._common import api_endpoint
+from board.server.support.common import api_endpoint
 from engine.apps.board_api.handler_common import (
     _import_launch_metrics_cli,
     _import_metrics_cli,
@@ -83,7 +83,7 @@ class MetricsHandlerMixin:
             logger.exception('metrics.aggregate failed: %s', exc)
             self._send_error(500, f'aggregate_recent failed: {exc}')
             return
-        # 프론트가 쉽게 다루도록 list 를 dict 로 한번 더 감싼다 (last 메타 포함).
+        # To make it easier for the front desk to handle, wrap the list with a dict once again (including the last meta).
         self._send_json({
             'last': last,
             'count': len(data),
@@ -113,7 +113,7 @@ class MetricsHandlerMixin:
             logger.exception('metrics.regression failed: %s', exc)
             self._send_error(500, f'regression_counts failed: {exc}')
             return
-        # last 를 결과에 합쳐서 프론트가 호출 컨텍스트를 알 수 있게 한다.
+        # We add last to the result so the front knows the calling context.
         data = dict(data)
         data['last'] = last
         self._send_json(data)
@@ -144,8 +144,8 @@ class MetricsHandlerMixin:
         from pathlib import Path
 
         try:
-            # runs_dir 은 git rev-parse --show-toplevel 기준으로 결정한다.
-            # 실패 시 현재 board 서버 cwd 기준으로 fallback 한다.
+            # runs_dir is determined based on git rev-parse --show-toplevel.
+            # In case of failure, it falls back based on the current board server cwd.
             try:
                 root = subprocess.check_output(
                     ['git', 'rev-parse', '--show-toplevel'],

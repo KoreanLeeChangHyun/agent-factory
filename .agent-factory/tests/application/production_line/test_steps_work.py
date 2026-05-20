@@ -1,17 +1,17 @@
-"""test_steps_work.py — steps/work.py 단위 테스트 (T-504 cutover).
+"""test steps work.py — steps/work.py module testing (T-504 cutover).
 
-T-504 cutover — `plan/plan.json` 을 fixture 로 작성, `_load_plan` 이 parse_plan_json
-경유. 옛 YAML frontmatter inline fixture 통째 폐기.
+T-504 cutover — write `plan/plan.json` to fixture, ` load plan` to parse plan json
+Vietnamese The old YAML frontmatter inline fixture is closed.
 
-T-506 추가: subprocess 모드 phase 간 level 병렬 (P5) + workers > 1 phase 안 병렬 (P6).
-실제 claude -p subprocess 발사 회피 위해 _spawn_one_worker 를 monkeypatch.
+T-506 Added: subprocess mode phase inter-level parallel (P5) + workers > 1 phase inner parallel (P6).
+spawn one worker adorpatch for real claude -p subprocess launch avoidance.
 
-대상:
-  - _load_plan (plan.json 정합 / 미존재 / circular dep → [])
-  - _load_deps_block (deps 산출물 inject / 없을 때 fallback)
+Price:
+  -  load plan
+  -  load deps block (deps output inject / fallback when missing)
   - work_step empty phases → fail_step + return False
-  - work_step subprocess 모드 phase 간 level 동시 spawn (P5)
-  - work_step workers>1 phase 안 N worker 동시 spawn (P6)
+  - work step subprocess mode phase simultaneous spawn (P5)
+  - work step workers>1 phase inner N worker simultaneous spawn (P6)
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def _write_plan_json(ctx: WorkflowContext, payload: dict) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     ctx.plan_md_path().write_text(
-        "# plan body\n자연어 본문 (20자 이상 확보)\n" + "x" * 30,
+        "# plan body\\n" + "x" * 30,
         encoding="utf-8",
     )
 
@@ -85,7 +85,7 @@ def test_load_plan_normal(tmp_path: Path) -> None:
     )
     phases = _load_plan(ctx)
     assert len(phases) == 2
-    # topo 순서 — P1 먼저
+    # topo order — P1 first
     assert phases[0].id == "P1"
     assert phases[1].id == "P2"
     assert ctx.mode == "multi"
@@ -93,7 +93,7 @@ def test_load_plan_normal(tmp_path: Path) -> None:
 
 
 def test_load_plan_circular_returns_empty(tmp_path: Path) -> None:
-    """순환 의존 — parse_plan_json 이 PlanLoaderError, _load_plan 은 [] 반환."""
+    """Circulating Dependence — parse plan json This PlanLoaderError,  load plan returns []."""
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
         ctx,
@@ -114,28 +114,28 @@ def test_load_plan_circular_returns_empty(tmp_path: Path) -> None:
 
 
 def test_load_plan_missing_plan_json(tmp_path: Path) -> None:
-    """plan.json 미존재 → []."""
+    """plan.json migration → []."""
     ctx = _make_ctx(tmp_path)
     assert _load_plan(ctx) == []
 
 
 def test_load_deps_block_with_deps(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
-    ctx.work_dir_phase_md("P1").write_text("P1 산출물 본문", encoding="utf-8")
+    ctx.work_dir_phase_md("P1").write_text("P1 Output Body", encoding="utf-8")
     phase = Phase(id="P2", title="next", deps=["P1"])
     block = _load_deps_block(ctx, phase)
-    assert "P1 산출물 본문" in block
+    assert "P1 Output Body" in block
     assert "work/P1.md" in block
 
 
 def test_load_deps_block_no_deps(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     phase = Phase(id="P1", title="first", deps=[])
-    assert _load_deps_block(ctx, phase) == "(종속 없음)"
+    assert _load_deps_block(ctx, phase) == "(no dependence)"
 
 
 def test_work_step_empty_phases_fails(tmp_path: Path) -> None:
-    """plan.json 미존재 시 fail_step + return False."""
+    """failure step + return False."""
     ctx = _make_ctx(tmp_path)
     result = work_step(ctx)
     assert result is False
@@ -145,7 +145,7 @@ def test_work_step_empty_phases_fails(tmp_path: Path) -> None:
 
 
 def test_work_step_topo_fail_invokes_fail_step(tmp_path: Path) -> None:
-    """circular dep — _load_plan [] 반환 → fail_step."""
+    """circular dep —  load plan [] return → fail step."""
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
         ctx,
@@ -167,7 +167,7 @@ def test_work_step_topo_fail_invokes_fail_step(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T-506 P5/P6 — subprocess 모드 level 병렬 + workers>1 phase 안 병렬
+# T-506 P5/P6 — subprocess mode level parallel + workers>1 phase inner parallel
 # ---------------------------------------------------------------------------
 
 
@@ -178,10 +178,10 @@ def _stub_spawn_one_worker(
     sleep_s: float = 0.05,
     fail_phase_ids: set[str] | None = None,
 ) -> threading.Lock:
-    """`_spawn_one_worker` 를 mock — 실제 claude -p 호출 회피.
+    """` spawn one worker` to mock — a real claude -p call syntax.
 
-    - W<n>.md 파일을 실제로 작성 → verify_work_md(20byte) 통과
-    - start_record[phase_id] 에 호출 시작 시간 누적 (동시 spawn 검증용)
+    - Create W<n>.md files in real → pass verification work md(20byte)
+    - start record[phase id]
     """
     lock = threading.Lock()
     fail_phase_ids = fail_phase_ids or set()
@@ -208,10 +208,10 @@ def _stub_spawn_one_worker(
 def test_work_step_subprocess_level_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-506 P5 — subprocess 모드: level 0 의 P1, P2 동시 spawn → P3 진입.
+    """T-506 P5 — subprocess mode: level 0 of P1, P2 simultaneous spawn → P3 entry.
 
     P1, P2 (deps=[], subprocess) / P3 (deps=[P1, P2], subprocess).
-    동시 spawn 검증: P1, P2 시작 시간 차이가 sleep 보다 훨씬 작음.
+    Simultaneous spawn verification: P1, P2 start time difference is much smaller than sleep.
     """
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
@@ -238,18 +238,18 @@ def test_work_step_subprocess_level_parallel(
 
     assert work_step(ctx) is True
 
-    # 모든 산출물 작성됨
+    # All outputs are written
     for pid in ("P1", "P2", "P3"):
         assert ctx.work_phase_w_md(pid, 1).exists()
 
-    # P1, P2 시작 시간 차이가 0.05s 미만 (동시 spawn 증거)
+    # P1, P2 start time difference is less than 0.05s (East spawn proof)
     p1_start = starts["P1"][0]
     p2_start = starts["P2"][0]
     assert abs(p1_start - p2_start) < 0.05, (
         f"P1, P2 not concurrent: {abs(p1_start - p2_start):.3f}s"
     )
 
-    # P3 는 P1, P2 모두 끝난 뒤 시작 — sleep 0.1s 이상 뒤
+    # P3 P1, P2 All Ended Back Start — Sleep Over 0.1s Back
     p3_start = starts["P3"][0]
     assert p3_start - max(p1_start, p2_start) >= 0.08, (
         f"P3 started before deps finished: {p3_start - max(p1_start, p2_start):.3f}s"
@@ -259,7 +259,7 @@ def test_work_step_subprocess_level_parallel(
 def test_work_step_subprocess_workers_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-506 P6 — workers>1: 한 phase 안 N worker 동시 spawn."""
+    """T-506 P6 — workers>1: One phase inner N worker simultaneous spawn."""
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
         ctx,
@@ -281,11 +281,11 @@ def test_work_step_subprocess_workers_parallel(
 
     assert work_step(ctx) is True
 
-    # W1, W2, W3 산출물 모두 작성됨
+    # W1, W2, W3 output
     for n in (1, 2, 3):
         assert ctx.work_phase_w_md("P1", n).exists()
 
-    # 3 worker 동시 시작 — start 시간 spread 가 sleep 보다 훨씬 작음
+    # 3 worker simultaneous start — start time spread much smaller than sleep
     p1_starts = starts["P1"]
     assert len(p1_starts) == 3
     spread = max(p1_starts) - min(p1_starts)
@@ -295,7 +295,7 @@ def test_work_step_subprocess_workers_parallel(
 def test_work_step_subprocess_workers_one_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-506 P6 — workers=1 (default) → 기존 단일 worker 경로 (회귀 0)."""
+    """T-506 P6 — workers=1 (default) → conventional single worker path (regression 0)."""
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
         ctx,
@@ -317,17 +317,17 @@ def test_work_step_subprocess_workers_one_default(
 
     assert work_step(ctx) is True
     assert ctx.work_phase_w_md("P1", 1).exists()
-    # workers=1 → starts["P1"] 길이 1
+    # workers=1 → start["P1"] length 1
     assert len(starts["P1"]) == 1
 
 
 def test_work_step_in_place_mode_regression(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-506 P5 — in_place 모드 경로 보존 (회귀 0).
+    """T-506 P5 — in place mode path conservation (return 0).
 
-    spawn_mode 모두 in_place 면 기존 단일 subprocess 경로 (parallel_spawn 미경유).
-    `_run_in_place_mode` 가 spawn_with_retry 1회만 호출.
+    spawn mode all in place if the existing single subprocess path (parallel spawn mimic oil).
+    ` run in place mode` call only one spawn with retry.
     """
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
@@ -347,13 +347,13 @@ def test_work_step_in_place_mode_regression(
             ],
         },
     )
-    # in_place 는 work_module.spawn_with_retry 1회 호출 — 인자 캡처
+    # in place is one call for work module.spawn with retry — capture argument
     calls: list[dict] = []
 
     def fake_spawn_with_retry(ctx, *, step, initial_prompt, system_prompt,
                                session_id, verify, artifact_path, n_max=None):
         calls.append({"step": step, "session": session_id})
-        # 산출물 작성
+        # Print
         for pid in ("P1", "P2"):
             p = ctx.work_phase_w_md(pid, 1)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -364,7 +364,7 @@ def test_work_step_in_place_mode_regression(
     monkeypatch.setattr(work_module, "auto_commit", lambda ctx: 0)
 
     assert work_step(ctx) is True
-    # 회귀 0 — spawn_with_retry 가 정확히 1회 호출됨 (subprocess 모드 였다면 2회)
+    # Regression 0 — spawn with retry is exactly one call (two times if the subprocess mode)
     assert len(calls) == 1
     assert calls[0]["step"] == "WORK"
 
@@ -372,7 +372,7 @@ def test_work_step_in_place_mode_regression(
 def test_work_step_subprocess_fail_fast_breaks_level(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-506 P5 — fail_fast (default): level 0 fail → level 1 진입 차단."""
+    """T-506 P5 — fail fast (default): level 0 fail → level 1 block."""
     ctx = _make_ctx(tmp_path)
     _write_plan_json(
         ctx,
@@ -400,6 +400,6 @@ def test_work_step_subprocess_fail_fast_breaks_level(
     monkeypatch.setenv("V2_FAIL_POLICY", "fail_fast")
 
     work_step(ctx)
-    # P1 만 시작, P2 는 fail_fast 로 차단
+    # P1 only starts, P2 blocks fail fast
     assert "P1" in starts
     assert "P2" not in starts

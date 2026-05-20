@@ -20,8 +20,8 @@
   var saveUI = Board.util.saveUI;
 
   // ── Module State ──
-  // Board.state.relations.filter 와 참조를 공유. property 단위 mutation/할당만 사용하면
-  // saveUI() 호출 시 자동으로 영속화된다.
+  // Board.state.relations.filter property unit mutation/only
+  // saveUI() is automatically subcontracted when calling.
   var filterState = Board.state.relations.filter;
 
   // Status key normalization for CSS and Mermaid class names
@@ -329,7 +329,7 @@
     h += '<span class="relations-toolbar-label">Filter</span>';
 
     // Status filter buttons
-    // 명시 배열 방식 (T3.2): filterState.statuses는 항상 활성 상태 목록을 담는다.
+    // Explicit Array Method (T3.2): filterState.statuses always lists active status.
     for (var i = 0; i < statusFilters.length; i++) {
       var sf = statusFilters[i];
       var isActive = filterState.statuses.indexOf(sf.key) !== -1;
@@ -373,7 +373,7 @@
     var h = '<div class="relations-legend">';
     h += '<span class="relations-legend-title">Legend</span>';
 
-    // Edge types — line + arrowhead 를 한 SVG 로 그린다. 색은 CSS currentColor 로 주입.
+    // Edge types — line + arrowhead. The color is injected with CSS currentColor.
     var depArrow = '<svg class="relations-legend-edge edge-depends" width="36" height="8" viewBox="0 0 36 8" fill="none" aria-hidden="true">'
       + '<line x1="0" y1="4" x2="26" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>'
       + '<path d="M26 1 L34 4 L26 7 Z" fill="currentColor"/></svg>';
@@ -445,11 +445,11 @@
   // ── C. Main Render Function ──
 
   /**
-   * 그래프 본체(중앙 graph container)만 채우는 비동기 페이즈.
+   * Asynchronous paper filling only graph container.
    *
-   * toolbar/legend 가 이미 그려진 상태에서 호출되며, graph container 내부만
-   * 교체한다. 그래프 빌드 + Mermaid 렌더가 무거우므로 패널 펼침과 분리해
-   * 사용자 입력 → 시각적 피드백 사이의 지연을 줄인다.
+   * toolbar/legend is already invoked, only inside graph container
+   * Add to cart Graph build + Mermaid renderer is unloaded, so it separates panel breakdown
+   * User input → reduce delay between visual feedback.
    */
   function renderGraphBody() {
     var graphEl = document.getElementById("relations-graph");
@@ -457,8 +457,8 @@
 
     var tickets = Board.state.TICKETS || [];
 
-    // 티켓 데이터가 아직 도착 전이면 graph 자리만 waiting spinner 유지.
-    // toolbar/legend 는 Phase A 에서 이미 그려져 있으므로 그대로 보존된다.
+    // If the ticket data is still arrived, graph remains waiting spinner.
+    // toolbar/legend is already drawn from Phase A, so it is preserved.
     if (tickets.length === 0) {
       graphEl.innerHTML = '<div class="relations-loading">'
         + '<div class="relations-loading-spinner"></div>'
@@ -511,17 +511,17 @@
    * Main render entry point for the Relations panel.
    * Registered as Board.render.renderRelations.
    *
-   * 두 페이즈로 분리되어 있다:
-   *   Phase A — toolbar / legend 와 빈 graph container 를 즉시 그린다 (정적, 가벼움).
-   *   Phase B — graph container 안만 setTimeout 으로 비동기 채운다 (Mermaid 렌더, 무거움).
-   * 패널 펼침과 함께 toolbar/legend 가 즉시 보이고, 가운데만 잠깐 spinner 가 돈다.
+   * It is divided into two papers NEWS
+   *   Phase A — toolbar / legend with frequent graph container (static, light).
+   *   Phase B — Graph container Animated with setTimeout (Mermaid wrench).
+   * Toolbar/legend looks immediately with the panel unfolding, and only the middle of the spinner is money.
    */
   function renderRelations() {
     var el = document.getElementById("relations-panel-content");
     if (!el) return;
 
-    // Phase A: 정적 영역(toolbar + legend) 즉시 동기 렌더. 데이터 비의존이라 티켓
-    // 도착 여부와 무관하게 항상 노출된다. graph 자리에는 spinner 박아둔다.
+    // Phase A: static zone (toolbar + legend) instant synchronous renderer. Copyright (C) 2017. All Rights Reserved.
+    // It is always exposed to whether or not you arrive. Graph is spinner.
     var h = '';
     h += renderToolbar();
     h += '<div class="relations-graph-container" id="relations-graph">'
@@ -534,9 +534,9 @@
     el.innerHTML = h;
     wireEventHandlers(el);
 
-    // Phase B: 다음 페인트 이후 그래프 본체 채움.
-    // 150ms — spinner 깜박임/답답함의 균형점. 더 짧으면 Mermaid 렌더 비용에 다시 묶이고
-    // 더 길면 사용자가 답답함을 느낀다.
+    // Phase B: Fill the graph body after the next paint.
+    // 150ms — the balance of spinner blinking/replying. When shorter, it is back to Mermaid wrench cost
+    // If the user feels the answer
     setTimeout(renderGraphBody, 150);
   }
 
@@ -659,8 +659,8 @@
   /**
    * Toggles the relations panel open/closed.
    *
-   * 펼침 시 toolbar/legend 는 renderRelations 의 Phase A 에서 즉시 그려지고,
-   * 가운데 graph 본체만 Phase B 에서 비동기로 채워진다.
+   * renderRelations
+   * The graph body is filled with asynchronous in Phase B.
    */
   function toggleRelationsPanel() {
     var panel = document.getElementById("relations-panel");
@@ -683,10 +683,10 @@
     collapsedBar.addEventListener("click", toggleRelationsPanel);
   }
 
-  // 페이지 로드 시 직전 세션의 panelOpen 상태 복원.
-  // 패널 클래스를 즉시 적용하고 renderRelations 도 즉시 호출한다 — 티켓 데이터가
-  // 아직 없으면 자체 waiting spinner 가 표시되고, 아래 setTimeout 흐름에서 데이터
-  // 도착 후 재호출되어 정상 렌더로 전환된다.
+  // Restore the panelOpen status of the previous session when loading the page.
+  // Instantly apply panel classes and renderRelations also call immediately — ticket data
+  // If not yet, self waiting spinner is displayed, and data from the setTimeout flow below
+  // After arrival, it will be reissued and converted to normal wrench.
   if (Board.state.relations.panelOpen) {
     var initPanel = document.getElementById("relations-panel");
     if (initPanel) initPanel.classList.add("open");
@@ -694,7 +694,7 @@
   }
 
   // Update bar count periodically (tickets may load async).
-  // panelOpen 인 경우에는 같은 시점에 본 렌더를 트리거한다.
+  // In case of panelOpen, we trigger the renderer at the same point.
   setTimeout(function () {
     updateBarCount();
     if (Board.state.relations.panelOpen) {

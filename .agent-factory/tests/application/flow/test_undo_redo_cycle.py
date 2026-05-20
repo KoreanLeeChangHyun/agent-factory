@@ -1,41 +1,41 @@
-"""test_undo_redo_cycle.py - T-441 Done 롤백 + 재머지 통합 회귀 테스트.
+"""test_undo_redo_cycle.py - T-441 Done Rollback + Jammerge integrated regression test.
 
-W05 본격 통합 회귀 테스트. W03 가 추가한 단위 가드(`_stage1_5_premerge_state_guard`)
-를 더 큰 사이클(Done 롤백 → 워크트리 재생성 → 재머지) 안에서 검증한다.
+W05 Full-scale integrated regression test. Unit guard added by W03 (`_stage1_5_premerge_state_guard`)
+Verify within a larger cycle (Done rollback → Worktree regeneration → Remerge).
 
-회귀 차단 (T-440 사례, 2026-05-08):
-  1. flow-merge 가 feat/T-440 을 develop 에 정상 머지 (51555f3)
-  2. undo_done.py:_strategy_reset 이 develop 을 51555f3^ (= ba74608) 로 reset
-  3. 워크트리/feature 브랜치 재생성됐으나 변경분 없음 (빈 브랜치)
-  4. develop 위로 별건 revert commit (6efc6ef) 가 추가됨
-  5. flow-merge --force 로 재머지 시도 → anchor 검증 실패
-  6. _handle_anchor_failure 가 reset --hard pre_merge_develop_sha (= 6efc6ef)
-     실행 → 별건 revert commit 까지 함께 사라지지는 않으나 변경분 소실
-  7. 사용자가 a74fb7a 로 수동 복구
+Regression block (T-440 example, 2026-05-08):
+  1. flow-merge feat/T-440 to develop normal merge (51555f3)
+  2. undo_done.py:_strategy_reset resets develop to 51555f3^ (= ba74608)
+  3. Work tree/feature branch was recreated, but no changes were made (empty branch)
+  4. A separate revert commit (6efc6ef) was added above develop.
+  5. Attempt to remerge with flow-merge --force → anchor verification failed
+  6. _handle_anchor_failure reset --hard pre_merge_develop_sha (= 6efc6ef)
+     Execute → Revert commit does not disappear together, but changes are lost.
+  7. Manual recovery by user as a74fb7a
 
-본 테스트는 위 사이클 각 분기를 격리된 임시 git repo 안에서 시뮬레이션하여
-W03 가드가 차단하는 케이스 / 통과시키는 케이스를 모두 회귀 0 으로 묶는다.
+This test simulates each branch of the above cycle within an isolated temporary git repo.
+All cases blocked/passed by the W03 guard are grouped with regression 0.
 
-검증 시나리오:
-  S1 (정상 경로 / T-906): force 미체크 + 변경분 있는 워크트리/브랜치
-      → Stage 1.5 가드 통과 + Stage 2.5 anchor 검증 통과
-      → develop HEAD = 머지 commit
-  S2 (force + 부재 / 안내 안내): force 체크 + 워크트리/브랜치 부재
-      → 가드 차단 + reflog fallback 안내 메시지 노출 (자동 적용 X)
-      → develop HEAD 변동 0
-  S3 (음성 / 일반): force 미체크 + 워크트리/브랜치 부재
-      → 가드 차단 + 명확한 에러 메시지
-      → 빈 머지 0건, develop HEAD 변동 0
-  S4 (T-905 정상): undo_done push 전 reset 시뮬레이션
-      → develop HEAD = merge_commit^ (별건 commit 손실 0)
-  S5 (T-906 정상 후속): 워크트리에 변경분 commit 후 재머지
-      → develop HEAD 정합 (merge commit + ahead commits 보존)
-  S6 (T-440 회귀 차단 advisory): 별건 commit 위에서 빈 브랜치 머지 시도
-      → Stage 1.5 가드 차단 (anchor 단계 도달 전 차단됨)
-      또한 `_handle_anchor_failure` 직접 호출 시 parent1_mismatch advisory 발동
+Verification Scenario:
+  S1 (normal path / T-906): force unchecked + work tree/branch with changes
+      → Stage 1.5 guard passed + Stage 2.5 anchor verification passed
+      → develop HEAD = merge commit
+  S2 (force + absence / guidance information): force check + work tree/branch absence
+      → Guard blocking + reflog fallback information message exposed (automatically applied
+      → develop HEAD change 0
+  S3 (voice / general): force not checked + work tree/branch absent
+      → Guard blocking + clear error message
+      → 0 empty merges, 0 develop HEAD changes
+  S4 (T-905 normal): reset simulation before undo_done push
+      → develop HEAD = merge_commit^ (no commit loss 0)
+  S5 (T-906 normal follow-up): Remerge after committing changes to the work tree
+      → develop HEAD integration (merge commit + preserve ahead commits)
+  S6 (T-440 regression blocking advisory): Attempting to merge an empty branch above a separate commit
+      → Stage 1.5 guard blocking (blocked before reaching the anchor stage)
+      Also, when calling `_handle_anchor_failure` directly, parent1_mismatch advisory is triggered.
 
-테스트는 unittest 기반으로 기존 `test_premerge_state_guard.py`,
-`test_merge_anchor_safety.py` 의 fixture 패턴과 일관성을 유지한다.
+The test is based on unittest, using the existing `test_premerge_state_guard.py`,
+Maintain consistency with the fixture pattern in `test_merge_anchor_safety.py`.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-# sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
+# sys.path: Enable flow package import by including .agent-factory/engine
 _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
@@ -57,11 +57,11 @@ if _ENGINE_DIR not in sys.path:
 import flow.merge_pipeline as _mp  # noqa: E402
 
 
-# ─── git 헬퍼 ────────────────────────────────────────────────────────────────
+# ─── git helper ────────────────────────────────────────────────────────────────────
 
 
 def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
-    """임시 git 저장소를 대상으로 git 명령을 실행한다."""
+    """Execute the git command targeting the temporary git repository."""
     return subprocess.run(
         ["git", "-C", repo] + list(args),
         capture_output=True,
@@ -70,16 +70,16 @@ def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _git_check(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행하고 실패 시 AssertionError 를 던진다."""
+    """Executes the git command and throws AssertionError on failure."""
     result = _git(repo, *args)
     assert result.returncode == 0, (
-        f"git {' '.join(args)} 실패: {result.stderr}"
+        f"git {' '.join(args)} failed: {result.stderr}"
     )
     return result
 
 
 def _setup_base_repo(repo: str) -> None:
-    """공통 기반 repo 초기화: init + user config + base commit on develop."""
+    """Initialize a common base repo: init + user config + base commit on develop."""
     _git_check(repo, "init", "-b", "develop")
     _git_check(repo, "config", "user.email", "test@example.com")
     _git_check(repo, "config", "user.name", "Test")
@@ -92,23 +92,23 @@ def _setup_base_repo(repo: str) -> None:
 
 
 def _head_sha(repo: str, ref: str = "HEAD") -> str:
-    """ref 가 가리키는 SHA 를 반환한다."""
+    """Returns the SHA pointed to by ref."""
     result = _git_check(repo, "rev-parse", ref)
     return result.stdout.strip()
 
 
 def _log_shas(repo: str, n: int = 20) -> list[str]:
-    """develop log SHA 목록 (newest first)."""
+    """develop log SHA list (newest first)."""
     result = _git_check(repo, "log", "--format=%H", f"-{n}")
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
 def _commit_on(repo: str, branch: str, filename: str, content: str, msg: str) -> str:
-    """branch 위에 파일 commit 후 SHA 반환. branch 가 없으면 분기 생성."""
-    # 현재 브랜치 확인
+    """SHA is returned after committing the file on the branch. If branch does not exist, create a branch."""
+    # Check current branch
     cur = _git_check(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     if cur != branch:
-        # 브랜치 존재 여부 확인
+        # Check if branch exists
         exists = _git(repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}")
         if exists.returncode == 0:
             _git_check(repo, "checkout", branch)
@@ -122,15 +122,15 @@ def _commit_on(repo: str, branch: str, filename: str, content: str, msg: str) ->
     return _head_sha(repo)
 
 
-# ─── 공통 베이스 ─────────────────────────────────────────────────────────────
+# ─── Common Base ────────────────────────────────────────────────────────────────
 
 
 class _CycleTestBase(unittest.TestCase):
-    """모든 사이클 시나리오의 공통 setUp/tearDown.
+    """Common setUp/tearDown for all cycle scenarios.
 
-    각 테스트는 격리된 임시 git repo 에서 develop + feat/T-441-* 브랜치를
-    생성하며, _mp._git 호출을 임시 repo 로 라우팅하는 patched_git fixture 를
-    제공한다.
+    Each test creates a develop + feat/T-441-* branch in an isolated temporary git repo.
+    Create a patched_git fixture that routes _mp._git calls to the temporary repo.
+    Provides.
     """
 
     ticket: str = "T-441"
@@ -157,7 +157,7 @@ class _CycleTestBase(unittest.TestCase):
     def _make_feature_with_change(
         self, branch: str | None = None, filename: str = "feat.py", content: str = 'feat = 1\n'
     ) -> str:
-        """develop 분기 후 feature 브랜치에 변경분 1개 commit. SHA 반환."""
+        """After the develop branch, commit one change to the feature branch. SHA return."""
         target = branch or self.feature_branch
         _git_check(self.repo, "checkout", "develop")
         _git_check(self.repo, "checkout", "-b", target)
@@ -171,14 +171,14 @@ class _CycleTestBase(unittest.TestCase):
         return sha
 
     def _make_empty_feature(self, branch: str | None = None) -> None:
-        """develop 분기 직후 변경 없이 feature 브랜치만 생성 (T-440 회귀 시뮬)."""
+        """Create only a feature branch without changes immediately after the develop branch (T-440 regression simulation)."""
         target = branch or self.feature_branch
         _git_check(self.repo, "branch", target, "develop")
 
     def _add_unrelated_commit_on_develop(
         self, filename: str = "unrelated.py", content: str = "u = 1\n"
     ) -> str:
-        """develop 위에 별건 commit 추가 후 SHA 반환 (T-440 의 6efc6ef 시뮬)."""
+        """After adding a separate commit above develop, SHA is returned (6efc6ef simulation of T-440)."""
         _git_check(self.repo, "checkout", "develop")
         fpath = os.path.join(self.repo, filename)
         with open(fpath, "w") as f:
@@ -188,7 +188,7 @@ class _CycleTestBase(unittest.TestCase):
         return _head_sha(self.repo)
 
     def _non_ff_merge(self, branch: str | None = None) -> str:
-        """develop 으로 checkout 후 branch 를 --no-ff 머지. merge commit SHA 반환."""
+        """After checking out with develop, merge the branch with --no-ff. merge commit returns SHA."""
         target = branch or self.feature_branch
         _git_check(self.repo, "checkout", "develop")
         _git_check(
@@ -202,15 +202,15 @@ class _CycleTestBase(unittest.TestCase):
         return _head_sha(self.repo)
 
 
-# ─── S1: 정상 경로 (force 미체크 + 변경분 있는 워크트리/브랜치) ─────────────
+# ─── S1: Normal path (force unchecked + work tree/branch with changes) ──────────────
 
 
 class TestScenario1NormalPath(_CycleTestBase):
-    """S1 — 정상 경로 (T-906 Review→Done DnD 동등).
+    """S1 — Normal Path (T-906 Review→Done DnD equivalent).
 
-    검증:
-      - Stage 1.5 가드 통과 (commits ahead > 0)
-      - non-ff 머지 후 anchor 검증 통과
+    verification:
+      - Pass Stage 1.5 guard (commits ahead > 0)
+      - Pass anchor verification after non-ff merge
       - develop HEAD == merge commit
     """
 
@@ -218,7 +218,7 @@ class TestScenario1NormalPath(_CycleTestBase):
         feature_sha = self._make_feature_with_change()
         pre_merge_sha = _head_sha(self.repo, "develop")
 
-        # Stage 1.5 가드 통과 검증
+        # Stage 1.5 Guard Pass Verification
         with mock.patch(
             "flow.branch_strategy.get_feature_branch_for_ticket",
             return_value=self.feature_branch,
@@ -226,10 +226,10 @@ class TestScenario1NormalPath(_CycleTestBase):
             ok, msg = _mp._stage1_5_premerge_state_guard(
                 self.ticket, worktree_path=self.repo, force=False
             )
-        self.assertTrue(ok, f"S1 가드는 통과해야 한다 (msg={msg})")
+        self.assertTrue(ok, f"S1 guard must be passed (msg= {msg} )")
         self.assertEqual(msg, "")
 
-        # non-ff 머지 후 anchor 검증 통과
+        # Anchor verification passed after non-ff merge
         merge_commit = self._non_ff_merge()
 
         with mock.patch(
@@ -241,33 +241,33 @@ class TestScenario1NormalPath(_CycleTestBase):
                 dry_run=False,
                 pre_merge_develop_sha=pre_merge_sha,
             )
-        self.assertTrue(anchor_ok, "S1 anchor 검증은 통과해야 한다")
+        self.assertTrue(anchor_ok, "S1 anchor verification must pass")
 
-        # develop HEAD = merge commit (변동 없음)
+        # develop HEAD = merge commit (no change)
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             merge_commit,
-            "S1 정상 머지 후 develop HEAD 는 merge commit 이어야 한다",
+            "After S1 normal merge, develop HEAD must be merge commit",
         )
 
-        # feature 브랜치 변경분이 develop log 에 도달 가능
+        # Feature branch changes can reach develop log
         log = _log_shas(self.repo, n=10)
-        self.assertIn(feature_sha, log, "feature commit 이 develop 에 보존되어야 한다")
+        self.assertIn(feature_sha, log, "Feature commits should be kept in develop")
 
 
-# ─── S2: force + 워크트리/브랜치 부재 (advisory 안내) ─────────────────────────
+# ─── S2: force + absence of work tree/branch (advisory information) ──────────────────────────
 
 
 class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
-    """S2 — force=True + 워크트리/브랜치 부재.
+    """S2 — force=True + absence of worktree/branch.
 
-    회귀 차단: T-440 사례에서 사용자가 빈 워크트리·브랜치 상태로 재머지 시도 시
-    가드가 차단하지 않으면 빈 머지 + reset --hard 별건 commit 위치로 손실 발생.
-    W03 정책: force=True 라도 자동 트리거 금지 + reflog fallback 안내만 노출.
+    Regression blocking: In the T-440 case, when the user attempts to remerge with an empty work tree or branch.
+    If the guard does not block, empty merge + reset --hard will result in loss due to separate commit location.
+    W03 policy: Prohibit automatic triggering even if force=True + only expose reflog fallback notification.
 
-    검증:
-      - 가드 차단 (False 반환) + 안내 메시지 노출
-      - develop HEAD 변동 0
+    verification:
+      - Guard blocking (returns False) + guidance message exposure
+      - develop HEAD change 0
     """
 
     def test_force_with_branch_absent_blocks_with_advisory(self) -> None:
@@ -281,7 +281,7 @@ class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
 
         with mock.patch(
             "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value=None,  # 브랜치 unresolved
+            return_value=None,  # branch unresolved
         ), mock.patch.object(
             _mp, "_git", side_effect=self._patched_git()
         ), mock.patch("builtins.print", side_effect=fake_print):
@@ -289,34 +289,34 @@ class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
                 self.ticket, worktree_path=None, force=True
             )
 
-        self.assertFalse(ok, "force 라도 브랜치 부재는 차단되어야 한다")
-        self.assertIn("부재", msg)
+        self.assertFalse(ok, "Even with force, branch members must be blocked.")
+        self.assertIn("absence", msg)
 
-        # advisory 메시지 노출 (reflog 안내 키워드)
+        # Advisory message exposure (reflog guide keyword)
         all_stderr = "\n".join(captured_stderr)
         self.assertIn(
             "reflog",
             all_stderr.lower(),
-            "force 모드에서 reflog fallback 안내가 노출되어야 한다",
+            "In force mode, reflog fallback information should be exposed.",
         )
 
-        # develop HEAD 변동 0 (reset/머지 자동 트리거 금지)
+        # develop HEAD change 0 (disable reset/merge automatic trigger)
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             pre_merge_sha,
-            "S2 가드 차단 시 develop HEAD 가 변경되어서는 안 된다",
+            "develop HEAD should not be changed when S2 guard is blocked",
         )
 
 
-# ─── S3: 음성 (force 미체크 + 부재) ───────────────────────────────────────────
+# ─── S3: Voice (force not checked + absence) ──────────────────────────────────────────────
 
 
 class TestScenario3NormalAbsentBlocked(_CycleTestBase):
-    """S3 — 음성 시나리오 (force 미체크 + 워크트리/브랜치 부재).
+    """S3 — Negative scenario (force unchecked + work tree/branch absent).
 
-    검증:
-      - 가드 차단 + 명확한 에러 메시지
-      - 빈 머지 0건 / develop HEAD 변동 0
+    verification:
+      - Guard blocking + clear error message
+      - 0 empty merges / develop HEAD change 0
     """
 
     def test_no_force_with_branch_absent_blocks_clearly(self) -> None:
@@ -338,29 +338,29 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
                 self.ticket, worktree_path=None, force=False
             )
 
-        self.assertFalse(ok, "force 미체크 + 부재는 차단되어야 한다")
-        self.assertIn("부재", msg)
+        self.assertFalse(ok, "force unchecked + members must be blocked")
+        self.assertIn("absence", msg)
 
-        # 명확한 에러 메시지 발행 확인
+        # Verify that a clear error message is issued
         all_errors = "\n".join(error_messages)
-        self.assertIn("[GUARD]", all_errors, "가드 식별자가 에러에 포함되어야 한다")
+        self.assertIn("[GUARD]", all_errors, "Guard identifier must be included in error")
 
-        # develop HEAD 변동 0
+        # develop HEAD change 0
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             pre_merge_sha,
-            "S3 가드 차단 시 develop HEAD 가 변경되어서는 안 된다",
+            "develop HEAD should not be changed when S3 guard is blocked",
         )
 
-        # 빈 머지 0건 — develop log 가 동일해야 한다
+        # 0 empty merges — develop logs must be the same
         self.assertEqual(
             _log_shas(self.repo, n=20),
             log_shas_before,
-            "S3 가드 차단 시 develop log 에 새로운 commit 이 추가되어서는 안 된다",
+            "When S3 guard is blocked, new commits should not be added to the develop log.",
         )
 
     def test_no_force_with_empty_branch_blocks(self) -> None:
-        """존재하지만 변경분 0 인 빈 브랜치도 차단 (T-440 회귀 핵심)."""
+        """Also block empty branches that exist but have zero changes (T-440 regression core)."""
         self._make_empty_feature()
         pre_merge_sha = _head_sha(self.repo, "develop")
 
@@ -372,98 +372,98 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
                 self.ticket, worktree_path=self.repo, force=False
             )
 
-        self.assertFalse(ok, "빈 브랜치는 차단되어야 한다")
+        self.assertFalse(ok, "Empty branches should be blocked")
         self.assertIn("Empty branch detected", msg)
 
-        # develop HEAD 변동 0
+        # develop HEAD change 0
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             pre_merge_sha,
-            "빈 브랜치 차단 시 develop HEAD 가 변경되어서는 안 된다",
+            "develop HEAD should not be changed when an empty branch is blocked",
         )
 
 
-# ─── S4: T-905 정상 경로 (push 전 reset --hard merge_commit^) ─────────────────
+# ─── S4: T-905 normal path (reset before push --hard merge_commit^) ──────────────────
 
 
 class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
-    """S4 — undo_done push 전 reset 전략 (`_strategy_reset` 동등 동작).
+    """S4 — reset strategy before undo_done push (equivalent behavior to `_strategy_reset`).
 
-    회귀 차단: undo_done.py:396 의 `git reset --hard <merge_commit>^` 가
-    별건 commit 손실 0 인지 검증.
+    Regression blocking: `git reset --hard <merge_commit>^` in undo_done.py:396
+    Verify that the separate commit loss is 0.
 
-    시나리오:
-      1. develop 에 별건 ahead commit (a1) 추가
-      2. feature 브랜치 분기 + commit
-      3. develop 으로 돌아와 non-ff 머지 → merge_commit (M1)
-      4. undo_done reset 시뮬: `git reset --hard M1^`
-      5. develop HEAD == M1^ == a1 (별건 commit 보존)
+    scenario:
+      1. Add separate ahead commit (a1) to develop
+      2. Branch feature branch + commit
+      3. Return to develop and merge non-ff → merge_commit (M1)
+      4. Simulate undo_done reset: `git reset --hard M1^`
+      5. develop HEAD == M1^ == a1 (preserve commit separately)
     """
 
     def test_undo_done_reset_preserves_unrelated_ahead_commit(self) -> None:
-        # 1. develop 에 별건 ahead commit
+        # 1. Develop ahead commit
         a1_sha = self._add_unrelated_commit_on_develop(
             filename="ahead1.py", content="a1 = 1\n"
         )
 
-        # 2-3. feature 분기 + commit + non-ff 머지
+        # 2-3. feature branch + commit + non-ff merge
         feature_sha = self._make_feature_with_change()
         merge_commit = self._non_ff_merge()
-        # M1^ == a1 이어야 한다 (직전 develop HEAD)
+        # M1^ == a1 (immediately before develop HEAD)
         m1_parent1 = _head_sha(self.repo, f"{merge_commit}^1")
         self.assertEqual(
-            m1_parent1, a1_sha, "M1^1 은 별건 ahead commit 이어야 한다"
+            m1_parent1, a1_sha, "M1^1 must be ahead commit"
         )
 
-        # 4. undo_done reset 시뮬
+        # 4. undo_done reset simulation
         _git_check(self.repo, "reset", "--hard", f"{merge_commit}^")
 
-        # 5. develop HEAD == a1 (별건 commit 보존, feature commit 제외)
+        # 5. develop HEAD == a1 (preserve separate commits, exclude feature commits)
         head_after = _head_sha(self.repo, "develop")
         self.assertEqual(
             head_after,
             a1_sha,
-            "T-905 reset 후 develop HEAD 는 별건 ahead commit 이어야 한다",
+            "After T-905 reset, develop HEAD must be ahead commit.",
         )
 
-        # feature commit 은 develop log 에서 제외되어야 한다
+        # Feature commits should be excluded from develop log
         log = _log_shas(self.repo, n=20)
         self.assertNotIn(
             feature_sha,
             log,
-            "T-905 reset 후 feature commit 은 develop log 에 없어야 한다",
+            "After T-905 reset, feature commits should not be in the develop log.",
         )
-        # 별건 ahead commit 은 보존되어야 한다
+        # Regardless, the commit ahead should be preserved.
         self.assertIn(
             a1_sha,
             log,
-            "T-905 reset 후 별건 ahead commit 은 develop 에 보존되어야 한다",
+            "After T-905 reset, ahead commits must be preserved in develop.",
         )
 
 
-# ─── S5: T-906 정상 경로 (Review→Done DnD 후속 — 워크트리 commit + 재머지) ──
+# ─── S5: T-906 normal path (Review → Done DnD follow-up — Worktree commit + remerge) ──
 
 
 class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
-    """S5 — Done 롤백 후 워크트리에 다시 변경분 commit + 재머지.
+    """S5 — Done After rollback, commit changes back to the work tree + remerge.
 
-    회귀 0 회로: 사용자가 undo_done 후 워크트리에 작업물을 다시 commit 하면
-    feature 브랜치의 commits ahead > 0 이 되어 Stage 1.5 가드 통과 + anchor
-    검증 통과 → develop HEAD = 정상 merge commit.
+    Recurrence 0 circuit: When the user re-commits the work to the work tree after undo_done
+    Feature branch's commits ahead > 0, passing Stage 1.5 guard + anchor
+    Verification passed → develop HEAD = normal merge commit.
 
-    시나리오:
-      1. feature 브랜치 빈 상태 (undo_done 직후 시뮬)
-      2. 워크트리(임시 repo 위 feature 브랜치) 에 변경분 1개 commit
-      3. 가드 통과 + non-ff 머지 + anchor 검증 통과
-      4. develop HEAD = 정상 merge commit
+    scenario:
+      1. Feature branch empty state (simulated right after undo_done)
+      2. Commit one change to the work tree (feature branch on temporary repo)
+      3. Pass guard + non-ff merge + pass anchor verification
+      4. develop HEAD = normal merge commit
     """
 
     def test_remerge_after_fresh_commit_succeeds(self) -> None:
-        # 1. 빈 feature 브랜치 (undo_done 직후 시뮬)
+        # 1. Empty feature branch (simulated right after undo_done)
         self._make_empty_feature()
         pre_merge_sha = _head_sha(self.repo, "develop")
 
-        # 1-1. 빈 상태에서는 가드가 차단해야 한다 (회귀 가드 자체)
+        # 1-1. In an empty state, the guard should block (the regression guard itself)
         with mock.patch(
             "flow.branch_strategy.get_feature_branch_for_ticket",
             return_value=self.feature_branch,
@@ -472,10 +472,10 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
                 self.ticket, worktree_path=self.repo, force=False
             )
         self.assertFalse(
-            ok_empty, "빈 feature 브랜치 상태에서는 가드가 차단해야 한다"
+            ok_empty, "The guard should block in the empty feature branch state."
         )
 
-        # 2. 워크트리에 변경분 1개 commit
+        # 2. Commit one change to the work tree
         _git_check(self.repo, "checkout", self.feature_branch)
         feat_path = os.path.join(self.repo, "feat.py")
         with open(feat_path, "w") as f:
@@ -485,7 +485,7 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
         feature_sha = _head_sha(self.repo)
         _git_check(self.repo, "checkout", "develop")
 
-        # 3. 가드 통과
+        # 3. Pass the guard
         with mock.patch(
             "flow.branch_strategy.get_feature_branch_for_ticket",
             return_value=self.feature_branch,
@@ -494,10 +494,10 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
                 self.ticket, worktree_path=self.repo, force=False
             )
         self.assertTrue(
-            ok, f"변경분 commit 후에는 가드가 통과해야 한다 (msg={msg})"
+            ok, f"After committing the change, the guard must pass (msg= {msg} )"
         )
 
-        # 3-1. non-ff 머지 + anchor 검증 통과
+        # 3-1. Non-ff merge + anchor verification passed
         merge_commit = self._non_ff_merge()
         with mock.patch(
             "flow.worktree_manager.is_worktree_enabled", return_value=True
@@ -508,41 +508,41 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
                 dry_run=False,
                 pre_merge_develop_sha=pre_merge_sha,
             )
-        self.assertTrue(anchor_ok, "재머지 anchor 검증은 통과해야 한다")
+        self.assertTrue(anchor_ok, "Jammerge anchor verification must pass")
 
-        # 4. develop HEAD 정합 + feature commit 보존
+        # 4. Develop HEAD matching + feature commit preservation
         self.assertEqual(_head_sha(self.repo, "develop"), merge_commit)
         log = _log_shas(self.repo, n=20)
-        self.assertIn(feature_sha, log, "재머지 후 feature commit 이 보존되어야 한다")
+        self.assertIn(feature_sha, log, "Feature commits must be preserved after remerging")
 
 
-# ─── S6: T-440 회귀 차단 + parent1_mismatch advisory ─────────────────────────
+# ─── S6: T-440 regression blocking + parent1_mismatch advisory ──────────────────────────
 
 
 class TestScenario6T440RegressionBlocked(_CycleTestBase):
-    """S6 — T-440 회귀 시나리오 차단 (Stage 1.5) + advisory 발동.
+    """S6 — Block T-440 regression scenario (Stage 1.5) + trigger advisory.
 
-    회귀 차단 (T-440 사례, 2026-05-08):
-      - undo_done 직후 빈 워크트리/브랜치 상태에서 develop 위에 별건 revert
-        commit 이 추가됨
-      - flow-merge 가 그 위에서 빈 브랜치를 머지 시도 → anchor 실패 →
-        `_handle_anchor_failure` 가 reset --hard pre_merge_develop_sha (= 별건
-        commit) 실행
-      - W03 의 두 가지 가드가 동시에 작동해야 한다:
-        (1) Stage 1.5: 빈 브랜치 자체를 차단 (1차 방어선)
-        (2) `_handle_anchor_failure` 의 parent1_mismatch advisory: 만약
-            우회 경로로 anchor 단계까지 도달한 경우, reset_target ≠
-            merge_commit^1 일 때 사용자에게 별건 commit 손실 가능성을 경고
-            (advisory only, reset 차단은 하지 않음 — 자동 강제 정책 금지 캐논)
+    Regression block (T-440 example, 2026-05-08):
+      - Immediately after undo_done, revert anything above develop in an empty worktree/branch state
+        commit added
+      - flow-merge attempts to merge an empty branch above it → anchor fails →
+        `_handle_anchor_failure` reset --hard pre_merge_develop_sha (=
+        commit) run
+      - Two guards of W03 must operate simultaneously:
+        (1) Stage 1.5: Blocking the empty branch itself (first line of defense)
+        (2) parent1_mismatch advisory of `_handle_anchor_failure`:
+            If you reach the anchor stage through a detour, reset_target ≠
+            When merge_commit^1, warn the user of the possibility of losing a separate commit.
+            (advisory only, does not block reset — automatic enforcement policy ban canon)
     """
 
     def test_empty_branch_on_unrelated_develop_blocked_at_stage1_5(self) -> None:
-        """1차 방어선: 빈 브랜치 + 별건 commit 추가된 develop 에서 가드 차단."""
-        # T-440 시퀀스 재현
+        """First line of defense: Guard blocking in develop with empty branches + separate commits added."""
+        # T-440 sequence reproduction
         self._add_unrelated_commit_on_develop(
             filename="revert.py", content="r = 1\n"
-        )  # 별건 revert commit (6efc6ef 시뮬)
-        self._make_empty_feature()  # 빈 브랜치 (undo_done 재생성 직후 시뮬)
+        )  # Special thing revert commit (6efc6ef simulation)
+        self._make_empty_feature()  # Empty branch (simulated right after regenerating undo_done)
         pre_state_log = _log_shas(self.repo, n=20)
         pre_state_head = _head_sha(self.repo, "develop")
 
@@ -554,39 +554,39 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
                 self.ticket, worktree_path=self.repo, force=False
             )
 
-        self.assertFalse(ok, "T-440 회귀 시나리오는 Stage 1.5 에서 차단되어야 한다")
+        self.assertFalse(ok, "T-440 regression scenario should be blocked at Stage 1.5")
         self.assertIn("Empty branch detected", msg)
 
-        # develop HEAD / log 변동 0 — 빈 머지 + reset 모두 발생하지 않아야 한다
+        # develop HEAD / log change 0 — empty merge + reset both should not occur
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             pre_state_head,
-            "T-440 차단 시 develop HEAD 가 변경되어서는 안 된다 (별건 commit 보존)",
+            "When T-440 is blocked, develop HEAD must not be changed (separate commits are preserved)",
         )
         self.assertEqual(
             _log_shas(self.repo, n=20),
             pre_state_log,
-            "T-440 차단 시 develop log 가 변경되어서는 안 된다",
+            "Develop log should not be changed when T-440 is blocked.",
         )
 
     def test_handle_anchor_failure_parent1_mismatch_advisory(self) -> None:
-        """2차 방어선: anchor 실패 시 reset_target ≠ merge_commit^1 advisory.
+        """Second line of defense: reset_target ≠ merge_commit^1 advisory when anchor fails.
 
-        advisory only — reset 자체는 차단하지 않으며 사용자에게 의심 케이스를
-        명시 경고한다. 자동 강제 정책 도입 금지 캐논 준수.
+        advisory only — reset itself does not block and alerts users to suspicious cases.
+        Warn explicitly. Canon compliance prohibits introduction of automatic enforcement policies.
         """
-        # 정상 non-ff 머지 commit 을 먼저 만든다 (anchor 비교 대상 확보)
+        # Create a normal non-ff merge commit first (secure anchor comparison target)
         self._make_feature_with_change()
         pre_merge_sha = _head_sha(self.repo, "develop")
         merge_commit = self._non_ff_merge()
-        # merge_commit^1 == pre_merge_sha (정상 케이스)
+        # merge_commit^1 == pre_merge_sha (normal case)
         self.assertEqual(_head_sha(self.repo, f"{merge_commit}^1"), pre_merge_sha)
 
-        # T-440 시뮬: pre_merge_develop_sha 가 별건 commit 으로 캡처된 케이스
-        # 즉 reset_target = bogus_unrelated_sha != merge_commit^1
-        # 이때 _handle_anchor_failure 는 advisory 를 출력해야 한다
-        # (reset 자체는 진행 — advisory only)
-        bogus_sha = "deadbeef" * 5  # 40자 가짜 SHA (실 reset 시도 시 실패)
+        # T-440 Simulation: Case where pre_merge_develop_sha was captured as a separate commit
+        # i.e. reset_target = bogus_unrelated_sha != merge_commit^1
+        # At this time, _handle_anchor_failure must output advisory.
+        # (The reset itself is in progress — advisory only)
+        bogus_sha = "deadbeef" * 5  # 40 character fake SHA (failure when attempting actual reset)
 
         error_messages: list[str] = []
 
@@ -604,20 +604,20 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
             )
 
         all_errors = "\n".join(error_messages)
-        # advisory 마커 확인
+        # Check advisory marker
         self.assertIn(
             "[ANCHOR][T-441]",
             all_errors,
-            "parent1_mismatch advisory 마커가 출력되어야 한다",
+            "parent1_mismatch advisory marker should be output",
         )
         self.assertIn(
-            "의심 케이스",
+            "suspected case",
             all_errors,
-            "advisory 가 의심 케이스를 명시해야 한다",
+            "Advisory must specify suspected cases.",
         )
 
     def test_handle_anchor_failure_normal_case_no_advisory(self) -> None:
-        """정상 케이스 (reset_target == merge_commit^1) 에서는 advisory 미출력 (회귀 0)."""
+        """In the normal case (reset_target == merge_commit^1), advisory is not output (regression 0)."""
         self._make_feature_with_change()
         pre_merge_sha = _head_sha(self.repo, "develop")
         merge_commit = self._non_ff_merge()
@@ -627,7 +627,7 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
         def fake_error(msg: str) -> None:
             error_messages.append(msg)
 
-        # ^2 rev-parse 결과를 변조하여 anchor 실패 강제하고 정상 reset_target 으로 호출
+        # ^2 Modify the rev-parse result to force anchor failure and call reset_target as normal
         orig = _mp._git
         fake_sha = "cafebabe" * 5
 
@@ -652,11 +652,11 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
             )
 
         all_errors = "\n".join(error_messages)
-        # parent1 일치 정상 케이스에서는 [T-441] 의심 케이스 마커가 없어야 한다
+        # parent1 match In a normal case, there should be no [T-441] suspect case marker
         self.assertNotIn(
-            "의심 케이스",
+            "suspected case",
             all_errors,
-            "정상 reset_target == merge_commit^1 케이스에서는 advisory 가 출력되어서는 안 된다",
+            "In the normal reset_target == merge_commit^1 case, advisory should not be output.",
         )
 
 

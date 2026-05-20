@@ -33,12 +33,12 @@ import os
 import re
 import sys
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
-# guard 메시지 모듈 import 경로 설정
+# Guard message module import path setting
 _guards_dir = os.path.dirname(os.path.abspath(__file__))
 if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
@@ -51,28 +51,28 @@ from messages import (
     MAIN_SESSION_WRITE_EDIT_DENIED,
 )
 
-# Bash 도구에서 파일을 수정할 수 있는 명령 패턴 (블랙리스트)
+# Command patterns that allow Bash tools to modify files (blacklist)
 _BASH_FILE_MODIFY_PATTERNS: list[str] = [
     r"\bsed\s+-i",                               # sed inplace
     r"\bawk\s+.*-i\s+inplace",                   # awk inplace
-    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf 리다이렉트
-    r"\btee\s+(-a\s+)?\S",                       # tee 쓰기
-    r"\bcat\s*<<",                               # heredoc 리다이렉트
-    r"\bcp\s+",                                  # 파일 복사
-    r"\bmv\s+",                                  # 파일 이동
+    r"\b(echo|printf)\s+.*\s*>{1,2}\s*\S",       # echo/printf redirect
+    r"\btee\s+(-a\s+)?\S",                       # write tee
+    r"\bcat\s*<<",                               # heredoc redirect
+    r"\bcp\s+",                                  # copy files
+    r"\bmv\s+",                                  # move files
     r"\bpython3?\s+(-c\s+|.*\bopen\b.*\bwrite\b)",  # python -c open write
     r"\bperl\s+-.*[pi]",                         # perl inplace
-    r"(?:^|[;&|]\s*)\binstall\s+",               # install 명령 (서브커맨드 제외)
-    r"\bdd\s+",                                  # dd 명령
+    r"(?:^|[;&|]\s*)\binstall\s+",               # install command (excluding subcommands)
+    r"\bdd\s+",                                  # dd command
 ]
 
-# 사용자 메모리 디렉터리 패턴: ~/.claude/projects/<encoded>/memory/** 매칭
-# <encoded>는 dash-encoding 형태 (예: -home-deus-workspace-claude)
+# User memory directory pattern: ~/.claude/projects/<encoded>/memory/** matching
+# <encoded> is dash-encoding form (e.g. -home-deus-workspace-claude)
 _MEMORY_DIR_PATTERN: re.Pattern[str] = re.compile(
     r"(?:^|/)\.claude/projects/[^/]+/memory(?:/|$)"
 )
 
-# Bash 메모리 화이트리스트 시 차단 유지 대상: 코드 경로 패턴
+# Keep blocking when Bash memory whitelists: code path patterns
 _CODE_PATH_PATTERN: re.Pattern[str] = re.compile(
     r"board/|engine/|hooks/|\.agent-factory/"
 )
@@ -127,9 +127,9 @@ def _strip_quoted_args(command: str) -> str:
     Returns:
         따옴표 내부 내용이 제거된 문자열. 따옴표 기호 자체는 유지된다.
     """
-    # 큰따옴표: 이스케이프된 \" 를 건너뛰고 내용을 빈 문자열로 치환
+    # Double quotes: Skip escaped \" and replace content with empty string
     command = re.sub(r'"(?:[^"\\]|\\.)*"', '""', command)
-    # 작은따옴표: 이스케이프된 \' 를 건너뛰고 내용을 빈 문자열로 치환
+    # Single quote: Skip escaped \' and replace content with empty string
     command = re.sub(r"'(?:[^'\\]|\\.)*'", "''", command)
     return command
 
@@ -151,7 +151,7 @@ def _extract_command_positions(command: str) -> list[str]:
         각 세그먼트의 선행 공백이 제거된 문자열 목록.
         빈 문자열 세그먼트는 제외된다.
     """
-    # &&, ||, 단일 |, ; 구분자로 분할 (|| 를 | 보다 먼저 처리)
+    # &&, ||, single |, ; Split by delimiter (treat || before |)
     parts = re.split(r'&&|\|\||(?<!\|)\|(?!\|)|;', command)
     return [part.lstrip() for part in parts if part.strip()]
 
@@ -174,7 +174,7 @@ def _check_bash_file_modify(command: str) -> None:
         for pattern in _BASH_FILE_MODIFY_PATTERNS:
             if re.search(pattern, segment):
                 _deny(MAIN_SESSION_BASH_FILE_MODIFY_DENIED.format(pattern=pattern))
-    # 파일 수정 패턴이 없으면 통과
+    # Pass if there is no file modification pattern
     sys.exit(0)
 
 
@@ -187,14 +187,14 @@ def main() -> None:
     세션 식별은 session_identifier.get_session_type()에 위임한다.
     Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
     """
-    # .agent-factory/.settings에서 설정 로드
+    # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_MAIN_SESSION_GUARD") or read_env("HOOK_MAIN_SESSION_GUARD")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -202,46 +202,46 @@ def main() -> None:
 
     tool_name = data.get("tool_name", "")
 
-    # Write, Edit, Bash가 아니면 통과
+    # Pass if not Write, Edit, or Bash
     if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
-    # .agent-factory/.version 파일은 메인 세션에서도 수정 허용
+    # .agent-factory/.version files can also be modified in the main session.
     tool_input = data.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
     if file_path.endswith(".agent-factory/.version"):
         sys.exit(0)
 
-    # 메모리 디렉터리 화이트리스트: Write/Edit 도구에서 메모리 경로 하위이면 즉시 통과
+    # Memory Directory Whitelist: Write/Edit tools immediately pass anything below a memory path.
     if tool_name in ("Write", "Edit") and _is_memory_path(file_path):
         sys.exit(0)
 
-    # 세션 유형 판별 (session_identifier에 위임)
+    # Determine session type (delegated to session_identifier)
     session_type = get_session_type()
 
-    # 워크플로우 세션이면 통과
+    # Passes if it is a workflow session.
     if session_type == "workflow":
         sys.exit(0)
 
-    # unknown: 세션 유형 판별 실패 (보수적 차단)
+    # unknown: Session type determination failed (conservative blocking)
     if session_type == "unknown":
         if tool_name == "Bash":
             command = tool_input.get("command", "")
-            # 메모리 경로만 대상이고 코드 경로 미포함이면 통과 (보수적: 혼재 시 차단)
+            # If only the memory path is targeted and the code path is not included, pass (conservative: block if mixed)
             if _MEMORY_DIR_PATTERN.search(command) and not _CODE_PATH_PATTERN.search(command):
                 sys.exit(0)
             _check_bash_file_modify(command)
         _deny(MAIN_SESSION_NO_TMUX_DENIED)
 
-    # main 세션: Bash는 파일 수정 패턴만 차단
+    # main session: Bash blocks only file modification patterns
     if tool_name == "Bash":
         command = tool_input.get("command", "")
-        # 메모리 경로만 대상이고 코드 경로 미포함이면 통과 (보수적: 혼재 시 차단)
+        # If only the memory path is targeted and the code path is not included, pass (conservative: block if mixed)
         if _MEMORY_DIR_PATTERN.search(command) and not _CODE_PATH_PATTERN.search(command):
             sys.exit(0)
         _check_bash_file_modify(command)
 
-    # 메인 세션에서 Write/Edit는 차단
+    # Write/Edit is blocked in the main session
     _deny(MAIN_SESSION_WRITE_EDIT_DENIED.format(window_name=session_type))
 
 

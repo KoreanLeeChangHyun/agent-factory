@@ -193,7 +193,7 @@ def run(stdin_data: bytes) -> tuple[int, bytes]:
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "allow",
-            "permissionDecisionReason": "모든 가드를 통과하였습니다.",
+            "permissionDecisionReason": "Passed all guards.",
         }
     }
     return 0, json.dumps(allow_payload).encode() + b"\n"

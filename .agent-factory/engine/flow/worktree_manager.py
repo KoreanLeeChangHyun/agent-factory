@@ -28,7 +28,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
-# ─── sys.path 보장 ────────────────────────────────────────────────────────────
+# ─── sys.path guaranteed ───────────────────────────────────────────────────────────────
 
 _engine_dir: str = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -56,7 +56,7 @@ from flow.branch_strategy import (
     get_feature_branch_for_ticket,
 )
 
-# ─── 데이터 클래스 ────────────────────────────────────────────────────────────
+# ─── Data class ───────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -97,7 +97,7 @@ class MergeResult:
     error_message: str = ""
 
 
-# ─── 내부 유틸리티 ────────────────────────────────────────────────────────────
+# ─── Internal Utilities ────────────────────────────────────────────────────────────────
 
 
 def _git(
@@ -117,7 +117,7 @@ def _git(
 
 
 def _get_project_root(repo_path: str | None = None) -> str:
-    """프로젝트 루트 절대 경로를 반환한다."""
+    """Returns the absolute path to the project root."""
     return repo_path or resolve_project_root()
 
 
@@ -170,12 +170,12 @@ def _get_current_branch(repo_path: str | None = None) -> str:
 
 
 def _warn(msg: str) -> None:
-    """경고 메시지를 stderr로 출력한다."""
+    """Prints a warning message to stderr."""
     print(f"[WARN] worktree_manager: {msg}", file=sys.stderr)
 
 
 def _info(msg: str) -> None:
-    """정보 메시지를 stderr로 출력한다."""
+    """Prints information messages to stderr."""
     print(f"[INFO] worktree_manager: {msg}", file=sys.stderr)
 
 
@@ -221,7 +221,7 @@ def _append_worktree_io(
         pass
 
 
-# ─── 공개 API ─────────────────────────────────────────────────────────────────
+# ─── Public API ─────────────────────────────────────────────────────────────────────
 
 
 def is_worktree_enabled(repo_path: str | None = None) -> bool:
@@ -249,14 +249,14 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
     Raises:
         RuntimeError: .settings 에 WORKFLOW_WORKTREE 가 미설정이거나 유효하지 않은 값일 때.
     """
-    # .settings 단일 진실 공급원 (T-370 후속) — 추론 폴백 일체 제거
+    # .settings Single Source of Truth (T-370 successor) — Remove all inference fallbacks
     setting_val = read_env("WORKFLOW_WORKTREE") or None
     if setting_val is None:
         raise RuntimeError(
-            "WORKFLOW_WORKTREE 가 .agent-factory/.settings 에 설정되어 있지 않습니다. "
-            "단일 진실 공급원 원칙으로 추론 폴백 (환경변수, develop 브랜치 존재 여부) 이 제거되었습니다. "
-            "복구: build.sh 재실행 (템플릿 머지로 자동 보강) 또는 "
-            ".settings 에 'WORKFLOW_WORKTREE=true' 또는 'WORKFLOW_WORKTREE=false' 명시."
+            "WORKFLOW_WORKTREE is not set in .agent-factory/.settings."
+            "Inference fallbacks (environment variables, presence of develop branch) have been removed in favor of a single source of truth principle."
+            "Recovery: Rerun build.sh (automatically enriched with template merge) or"
+            "Specify 'WORKFLOW_WORKTREE=true' or 'WORKFLOW_WORKTREE=false' in .settings."
         )
 
     normalized = setting_val.strip().lower()
@@ -265,8 +265,8 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
     if normalized in ("0", "false", "no", "off"):
         return False
     raise RuntimeError(
-        f"WORKFLOW_WORKTREE 값이 유효하지 않습니다 (.settings 값: {setting_val!r}). "
-        "허용값: true / false / 1 / 0 / yes / no / on / off"
+        f"The WORKFLOW_WORKTREE value is invalid (.settings value: {setting_val!r})."
+        "Allowed values: true / false / 1 / 0 / yes / no / on / off"
     )
 
 
@@ -328,37 +328,37 @@ def _create_worktree_impl(
     Returns:
         생성된 WorktreeInfo. 실패 시 None + 경고 출력.
     """
-    # command 방어: implement 외에는 worktree 생성을 거부한다
+    # Command defense: Refuse to create worktrees other than implement.
     if command not in ("implement",):
         _warn(
-            f"worktree 생성은 implement 워크플로우 전용입니다 "
-            f"(요청된 command: {command})"
+            f"Worktree creation is only for implement workflows"
+            f"(requested command: {command})"
         )
         return None
 
-    # 티켓 번호 정규화
+    # Ticket number normalization
     ticket_number = normalize_ticket_number(ticket_number)
 
-    # develop 브랜치 확보
+    # Secure the develop branch
     if not ensure_develop_branch(repo_path):
-        _warn("develop 브랜치 생성 실패, worktree를 만들 수 없습니다")
+        _warn("Failed to create develop branch, unable to create worktree")
         return None
 
-    # feature 브랜치 생성
+    # Create feature branch
     branch_name = create_feature_branch(
         ticket_number, title, base=base_branch, repo_path=repo_path
     )
     if not branch_name:
-        _warn("feature 브랜치 생성 실패, worktree를 만들 수 없습니다")
+        _warn("Feature branch creation failed, unable to create worktree")
         return None
 
-    # worktree 디렉터리 경로
+    # worktree directory path
     base_dir = _worktrees_base_dir(repo_path)
     wt_path = str(worktree_path_for_branch(_get_project_root(repo_path), branch_name))
 
-    # 이미 존재하는 worktree 확인
+    # Check for already existing worktree
     if os.path.isdir(wt_path):
-        _info(f"worktree 이미 존재: {wt_path}")
+        _info(f"worktree already exists: {wt_path}")
         return WorktreeInfo(
             path=wt_path,
             branch_name=branch_name,
@@ -367,7 +367,7 @@ def _create_worktree_impl(
             base_branch=base_branch,
         )
 
-    # 상위 디렉터리 확보
+    # Secure parent directory
     os.makedirs(base_dir, exist_ok=True)
 
     # git worktree add --lock
@@ -376,11 +376,11 @@ def _create_worktree_impl(
         repo_path=repo_path,
     )
     if git_result.returncode != 0:
-        _warn(f"worktree 생성 실패: {git_result.stderr.strip()}")
+        _warn(f"Failed to create worktree: {git_result.stderr.strip()}")
         return None
 
     created_at = datetime.now().isoformat()
-    _info(f"worktree 생성: {wt_path} (branch: {branch_name})")
+    _info(f"Create worktree: {wt_path} (branch: {branch_name})")
 
     return WorktreeInfo(
         path=wt_path,
@@ -427,7 +427,7 @@ def count_feature_branch_commits(
             이 경우 차단하지 않고 통과시켜야 한다 (false-positive 방지).
 
     Args:
-        branch_name: 커밋 수를 셀 feature 브랜치명 (예: 'feat/T-001-제목').
+        branch_name: 커밋 수를 셀 feature 브랜치명 (예: 'feat/T-001-title').
         base_branch: 기준 브랜치. 기본값 'develop'.
         repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
 
@@ -497,37 +497,37 @@ def _remove_worktree_impl(
 
     branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
     if not branch_name:
-        # feature 브랜치가 없으면 worktree도 없을 것이므로 성공 처리
+        # If there is no feature branch, there will be no worktree, so success is processed.
         return True
 
     wt_path = str(worktree_path_for_branch(_get_project_root(repo_path), branch_name))
 
-    # worktree 잠금 해제 (--lock으로 생성했으므로)
+    # Unlock the worktree (since you created it with --lock)
     unlock_result = _git("worktree", "unlock", wt_path, repo_path=repo_path)
 
-    # worktree 제거
+    # remove worktree
     if os.path.isdir(wt_path):
         if unlock_result.returncode == 0:
-            # unlock 성공: --force 1회 (dirty 상태 강제 처리)
+            # Unlock success: --force 1 time (force processing of dirty state)
             result = _git(
                 "worktree", "remove", "--force", wt_path, repo_path=repo_path
             )
         else:
-            # unlock 실패: locked 상태 가정, --force --force (locked + dirty 강제 처리)
+            # Unlock failure: Assume locked state, --force --force (force locked + dirty processing)
             result = _git(
                 "worktree", "remove", "--force", "--force", wt_path,
                 repo_path=repo_path,
             )
         if result.returncode != 0:
-            _warn(f"worktree 제거 실패: {result.stderr.strip()}")
+            _warn(f"Failed to remove worktree: {result.stderr.strip()}")
             return False
 
-    # git worktree prune (잔여 정보 정리)
+    # git worktree prune (prune residual information)
     _git("worktree", "prune", repo_path=repo_path)
 
-    _info(f"worktree 제거: {wt_path}")
+    _info(f"Remove worktree: {wt_path}")
 
-    # feature 브랜치 삭제
+    # Delete feature branch
     if delete_branch and branch_name:
         delete_feature_branch(branch_name, repo_path)
 
@@ -578,23 +578,23 @@ def _merge_to_develop_impl(
     """
     ticket_number = normalize_ticket_number(ticket_number)
 
-    # WORKFLOW_WORKTREE=false 환경에서 호출되면 메인 저장소 HEAD가
-    # 사용자에게 수동 merge 명령어를 안내한다.
+    # When called in an environment where WORKFLOW_WORKTREE=false, the main storage HEAD is
+    # Instructs users on the manual merge command.
     if not is_worktree_enabled(repo_path):
         _warn(
-            "비-worktree 모드 (WORKFLOW_WORKTREE=false) 에서 merge_to_develop()이 "
-            "호출되었습니다. 메인 저장소 HEAD 오염을 방지하기 위해 차단합니다."
+            "merge_to_develop() in non-worktree mode (WORKFLOW_WORKTREE=false)"
+            "You have been called. Main storage HEAD is blocked to prevent contamination."
         )
         _warn(
-            "수동 merge 절차: "
+            "Manual merge procedure:"
             "git checkout develop && "
             f"git merge --no-ff <feature-branch-of-{ticket_number}>"
         )
         return MergeResult(
             success=False,
             error_message=(
-                f"비-worktree 모드 — merge_to_develop({ticket_number}) 차단됨. "
-                "WORKFLOW_WORKTREE=true 활성화 또는 수동 merge 필요."
+                f"Non-worktree mode — merge_to_develop({ticket_number}) blocked."
+                "WORKFLOW_WORKTREE=true Requires activation or manual merge."
             ),
         )
 
@@ -602,25 +602,25 @@ def _merge_to_develop_impl(
     if not branch_name:
         return MergeResult(
             success=False,
-            error_message=f"{ticket_number}에 연결된 feature 브랜치를 찾을 수 없습니다",
+            error_message=f"The feature branch linked to {ticket_number} could not be found",
         )
 
     lock_path = _merge_lock_path(repo_path)
     original_branch = _get_current_branch(repo_path)
 
-    # 잠금 획득
+    # acquire lock
     if not acquire_lock(lock_path, max_wait=10, stale_timeout=300):
         return MergeResult(
             success=False,
-            error_message="병합 잠금 획득 실패 (다른 병합이 진행 중일 수 있습니다)",
+            error_message="Failed to acquire merge lock (another merge may be in progress)",
         )
 
     try:
-        # develop 브랜치 확보
+        # Secure the develop branch
         if not ensure_develop_branch(repo_path):
             return MergeResult(
                 success=False,
-                error_message="develop 브랜치 생성 실패",
+                error_message="Failed to create develop branch",
             )
 
         # develop checkout
@@ -628,10 +628,10 @@ def _merge_to_develop_impl(
         if checkout_result.returncode != 0:
             return MergeResult(
                 success=False,
-                error_message=f"develop checkout 실패: {checkout_result.stderr.strip()}",
+                error_message=f"develop checkout failed: {checkout_result.stderr.strip()}",
             )
 
-        # --no-ff 병합
+        # --no-ff merge
         merge_msg = f"Merge {branch_name} into develop"
         merge_result = _git(
             "merge", "--no-ff", "-m", merge_msg, branch_name,
@@ -639,7 +639,7 @@ def _merge_to_develop_impl(
         )
 
         if merge_result.returncode != 0:
-            # 충돌 감지
+            # collision detection
             conflicts = _detect_conflicts(repo_path)
             # merge --abort
             _git("merge", "--abort", repo_path=repo_path)
@@ -648,16 +648,16 @@ def _merge_to_develop_impl(
                 success=False,
                 conflicts=conflicts,
                 merged_branch=branch_name,
-                error_message=f"병합 충돌 발생: {', '.join(conflicts) if conflicts else merge_result.stderr.strip()}",
+                error_message=f"Merge conflicts occur: {', '.join(conflicts) if conflicts else merge_result.stderr.strip()}",
             )
 
-        # 병합 커밋 SHA 획득
+        # Obtain merge commit SHA
         sha_result = _git("rev-parse", "HEAD", repo_path=repo_path)
         merge_commit = sha_result.stdout.strip() if sha_result.returncode == 0 else ""
 
-        _info(f"병합 성공: {branch_name} -> develop ({merge_commit[:8]})")
+        _info(f"Merge successful: {branch_name} -> develop ({merge_commit[:8]})")
 
-        # worktree + feature 브랜치 정리
+        # Organize worktree + feature branches
         remove_worktree(ticket_number, delete_branch=True, repo_path=repo_path)
 
         return MergeResult(
@@ -667,31 +667,31 @@ def _merge_to_develop_impl(
         )
 
     finally:
-        # 원래 브랜치 복원 (develop이 아닌 경우)
+        # Restore original branch (if not develop)
         if original_branch and original_branch != "develop":
-            # 원래 브랜치가 삭제된 경우 (방금 병합 후 정리한 feature 브랜치)
-            # develop에 남아있는 것이 안전함
+            # If the original branch has been deleted (the feature branch you just merged and cleaned up)
+            # It's safe to remain in develop
             restore_result = _git(
                 "checkout", original_branch, repo_path=repo_path
             )
             if restore_result.returncode != 0:
-                # 원래 브랜치 복원 실패 시 develop에 유지
+                # Stay in develop if original branch restoration fails
                 _warn(
-                    f"원래 브랜치 복원 실패 ({original_branch}), "
-                    f"develop에 유지합니다"
+                    f"Failed to restore original branch ({original_branch}),"
+                    f"keep in develop"
                 )
 
-        # 잠금 해제
+        # unlocked
         release_lock(lock_path)
 
 
 _PORCELAIN_CONFLICT_CODES: frozenset[str] = frozenset(
     {"UU", "AA", "DD", "AU", "UA", "DU", "UD"}
 )
-"""git status --porcelain 의 충돌 코드 집합."""
+"""Set of conflicting codes from git status --porcelain ."""
 
 _SENTINEL_UNKNOWN_CONFLICT: str = "<unknown-conflict>"
-"""두 git 소스가 모두 실패했을 때 반환하는 sentinel 값."""
+"""The sentinel value returned when both git sources fail."""
 
 
 def _parse_porcelain_conflicts(stdout: str) -> list[str]:
@@ -714,7 +714,7 @@ def _parse_porcelain_conflicts(stdout: str) -> list[str]:
     for line in stdout.splitlines():
         if len(line) < 4:
             continue
-        # porcelain v1 형식: "XY <path>" (XY = 2자, 공백 1자, 경로)
+        # porcelain v1 format: "XY <path>" (XY = 2 characters, 1 space, path)
         xy = line[:2]
         path = line[3:].strip()
         if xy in _PORCELAIN_CONFLICT_CODES and path:
@@ -746,7 +746,7 @@ def _detect_conflicts(repo_path: str | None = None) -> list[str]:
     Returns:
         충돌 파일 경로 목록. 모든 git 명령 실패 시 sentinel ``["<unknown-conflict>"]``.
     """
-    # 1차 소스: git diff --name-only --diff-filter=U
+    # Primary source: git diff --name-only --diff-filter=U
     diff_result = _git(
         "diff", "--name-only", "--diff-filter=U", repo_path=repo_path
     )
@@ -759,22 +759,22 @@ def _detect_conflicts(repo_path: str | None = None) -> list[str]:
             if line.strip()
         ]
         if diff_files:
-            # 1차 소스에 결과가 있으면 바로 반환
+            # If there is a result in the primary source, it is returned immediately
             return diff_files
 
-    # 2차 소스: git status --porcelain (1차가 빈 리스트이거나 실패했을 때)
+    # Secondary source: git status --porcelain (when primary is empty list or fails)
     porcelain_result = _git("status", "--porcelain", repo_path=repo_path)
     porcelain_ok = porcelain_result.returncode == 0
 
     if not diff_ok and not porcelain_ok:
-        # 두 소스 모두 실패 → sentinel 반환
+        # Both sources fail → sentinel returns
         return [_SENTINEL_UNKNOWN_CONFLICT]
 
     porcelain_files: list[str] = []
     if porcelain_ok:
         porcelain_files = _parse_porcelain_conflicts(porcelain_result.stdout)
 
-    # 합집합 (1차 결과 + 2차 결과, 순서 유지 + 중복 제거)
+    # Union (1st result + 2nd result, maintain order + remove duplicates)
     seen: set[str] = set()
     merged: list[str] = []
     for f in diff_files + porcelain_files:
@@ -803,7 +803,7 @@ def list_worktrees(repo_path: str | None = None) -> list[WorktreeInfo]:
     worktrees: list[WorktreeInfo] = []
     base_dir = _worktrees_base_dir(repo_path)
 
-    # porcelain 출력 파싱: 빈 줄로 구분된 블록
+    # Parsing porcelain output: blocks separated by blank lines
     current: dict[str, str] = {}
     for line in result.stdout.splitlines():
         if not line.strip():
@@ -818,7 +818,7 @@ def list_worktrees(repo_path: str | None = None) -> list[WorktreeInfo]:
         elif line.startswith("branch "):
             current["branch"] = line[len("branch "):]
 
-    # 마지막 블록 처리
+    # Last block processing
     if current:
         wt_info = _parse_worktree_block(current, base_dir)
         if wt_info:
@@ -848,12 +848,12 @@ def _parse_worktree_block(
     if not wt_path or not branch_ref:
         return None
 
-    # refs/heads/ 제거
+    # Remove refs/heads/
     branch_name = branch_ref
     if branch_name.startswith("refs/heads/"):
         branch_name = branch_name[len("refs/heads/"):]
 
-    # feature 브랜치만 필터링
+    # Filter only feature branches
     match = re.match(r"^feat/(T-\d+)-", branch_name)
     if not match:
         return None
@@ -864,7 +864,7 @@ def _parse_worktree_block(
         path=wt_path,
         branch_name=branch_name,
         ticket_number=ticket_number,
-        created_at="",  # porcelain 출력에는 생성 시각 없음
+        created_at="",  # porcelain output has no creation time
     )
 
 
@@ -885,12 +885,12 @@ def get_worktree_path(
     """
     ticket_number = normalize_ticket_number(ticket_number)
 
-    # 활성 worktree 목록에서 검색
+    # Search in list of active worktrees
     for wt in list_worktrees(repo_path):
         if wt.ticket_number == ticket_number:
             return wt.path
 
-    # 목록에 없으면 feature 브랜치명으로 경로 추론
+    # If not in the list, infer the path using the feature branch name.
     branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
     if branch_name:
         candidate = str(

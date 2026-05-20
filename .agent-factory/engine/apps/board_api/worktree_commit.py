@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 
-from board.server._common import api_endpoint, logger
+from board.server.support.common import api_endpoint, logger
 
 
 def _import_worktree_status():

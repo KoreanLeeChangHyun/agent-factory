@@ -15,7 +15,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-# utils 패키지 import 경로 설정
+# Set utils package import path
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
@@ -26,10 +26,10 @@ if _guards_dir not in sys.path:
 
 from common import read_env
 
-# flow-kanban done T-NNN 패턴
+# flow-kanban done T-NNN pattern
 _DONE_PATTERN = re.compile(r"\bflow-kanban\s+done\s+(T-\d{3})\b")
 
-# 칸반 디렉터리
+# Kanban Directory
 KANBAN_DIRS = ["todo", "open", "progress", "review"]
 
 
@@ -46,7 +46,7 @@ def _deny(reason: str) -> None:
 
 
 def _find_ticket_xml(kanban_base: str, ticket_num: str) -> str | None:
-    """모든 칸반 디렉터리에서 티켓 XML 경로를 찾는다."""
+    """Find the ticket XML path in any Kanban directory."""
     for d in KANBAN_DIRS + ["done"]:
         path = os.path.join(kanban_base, d, f"{ticket_num}.xml")
         if os.path.isfile(path):
@@ -55,7 +55,7 @@ def _find_ticket_xml(kanban_base: str, ticket_num: str) -> str | None:
 
 
 def _get_ticket_status(kanban_base: str, ticket_num: str) -> str | None:
-    """티켓의 현재 status를 반환한다."""
+    """Returns the current status of the ticket."""
     path = _find_ticket_xml(kanban_base, ticket_num)
     if not path:
         return None
@@ -68,7 +68,7 @@ def _get_ticket_status(kanban_base: str, ticket_num: str) -> str | None:
 
 
 def _find_derived_tickets(kanban_base: str, source_ticket: str) -> list[str]:
-    """source_ticket을 derived-from으로 참조하는 티켓 목록을 반환한다."""
+    """Returns a list of tickets referencing source_ticket as derived-from."""
     derived = []
     for d in KANBAN_DIRS + ["done"]:
         dir_path = os.path.join(kanban_base, d)
@@ -116,19 +116,19 @@ def main() -> None:
 
     ticket_num = match.group(1)
 
-    # 프로젝트 루트 추정
+    # Project root estimation
     project_root = os.environ.get("PROJECT_ROOT", os.getcwd())
     kanban_base = os.path.join(project_root, ".agent-factory", "tickets")
 
     if not os.path.isdir(kanban_base):
         sys.exit(0)
 
-    # 이 티켓을 derived-from으로 참조하는 파생 티켓 찾기
+    # Find derived tickets that reference this ticket as derived-from
     derived = _find_derived_tickets(kanban_base, ticket_num)
     if not derived:
         sys.exit(0)
 
-    # 파생 티켓 중 Done이 아닌 것 확인
+    # Check if any of the derived tickets are not Done
     not_done = []
     for dt in derived:
         st = _get_ticket_status(kanban_base, dt)
@@ -137,8 +137,8 @@ def main() -> None:
 
     if not_done:
         _deny(
-            f"{ticket_num} Done 차단: 파생 티켓 {', '.join(not_done)}이 "
-            f"아직 완료되지 않았습니다. 파생 티켓 완료 후 진행하세요."
+            f"Block {ticket_num} Done: derived ticket {', '.join(not_done)}"
+            f"It's not done yet. Proceed after completing the derivative ticket."
         )
 
 

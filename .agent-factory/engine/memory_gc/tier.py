@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from .core import MemoryFile
 
-DECAY_RATE: float = 0.005  # 일 단위, 약 138일 반감기 (138 ≈ ln(2)/0.005)
+DECAY_RATE: float = 0.005  # Unit of days, half-life of approximately 138 days (138 ≈ ln(2)/0.005)
 
 
 def _days_since(date_str: str) -> float:

@@ -1,18 +1,18 @@
-"""상태 전이, 컨텍스트 갱신, 세션 링크 모듈.
+"""State transition, context update, and session link modules.
 
-update_state.py에서 분리된 상태 관련 비즈니스 로직을 제공한다.
+Provides state-related business logic separated from update_state.py.
 
-책임 범위:
-    - 상태 전이 배너 출력 (_print_state_banner)
-    - .context.json agent 필드 갱신 (update_context)
-    - status.json FSM 상태 전이 (update_status)
-    - status.json 세션 링크 관리 (link_session)
+Scope of responsibility:
+    - Print state transition banner (_print_state_banner)
+    - Update .context.json agent field (update_context)
+    - status.json FSM status transition (update_status)
+    - status.json session link management (link_session)
 
-주요 함수:
-    _print_state_banner: 상태 전이 배너를 2줄 포맷으로 출력
-    update_context: .context.json의 agent 필드 갱신
-    update_status: status.json 상태 전이 + FSM 검증
-    link_session: status.json linked_sessions 배열에 세션 추가
+Main functions:
+    _print_state_banner: Prints the state transition banner in 2-line format.
+    update_context: Update agent field in .context.json
+    update_status: status.json status transition + FSM verification
+    link_session: status.json Add session to linked_sessions array
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime
 from typing import Any
 
-# sys.path 보장: scripts/ 디렉터리를 path에 추가
+# Ensure sys.path: add scripts/ directory to path
 _engine_dir = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 )
@@ -39,24 +39,24 @@ from common import (  # noqa: E402
 from constants import FSM_TRANSITIONS, KST  # noqa: E402
 from flow.flow_logger import append_log as _append_log  # noqa: E402
 
-# history_sync.py 절대 경로
+# history_sync.py absolute path
 HISTORY_SYNC_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "sync",
     "history_sync.py",
 )
 
-# 프로젝트 루트 (.board.url 위치 해석용)
+# Project root (to resolve .board.url location)
 _PROJECT_ROOT = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
 )
 
 
 def _resolve_board_port() -> int | None:
-    """Board 서버 포트를 해석한다.
+    """Interprets the Board server port.
 
-    `_WF_SERVER_PORT` 환경변수 또는 `.agent-factory/.board.url` 파일에서
-    포트 번호를 추출한다. 둘 다 없으면 None을 반환한다.
+    In the `_WF_SERVER_PORT` environment variable or `.agent-factory/.board.url` file
+    Extract the port number. If neither exists, None is returned.
     """
     port_env = os.environ.get("_WF_SERVER_PORT")
     if port_env:
@@ -79,17 +79,17 @@ def _resolve_board_port() -> int | None:
 
 
 def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
-    """Board 서버에 워크플로우 단계 전이를 통보한다 (best-effort).
+    """Notifies the Board server of the workflow step transition (best-effort).
 
-    `_WF_TICKET_ID` 환경변수에서 ticket_id를 얻어 `/terminal/workflow/list`로
-    session_id를 역검색한 뒤 `/terminal/workflow/step` POST를 호출한다.
-    서버 미기동·매칭 세션 부재·네트워크 오류 시 조용히 패스한다.
+    Obtain ticket_id from the `_WF_TICKET_ID` environment variable and send it to `/terminal/workflow/list`
+    After retrieving the session_id, call `/terminal/workflow/step` POST.
+    If the server does not start, there is no matching session, or a network error occurs, it passes quietly.
 
-    워크플로우 진행을 차단하지 않으며, 모든 예외는 로그만 남기고 무시한다.
+    It does not block workflow progress, and all exceptions are ignored, leaving only a log.
 
     Args:
-        to_step: 전이 목표 단계 이름 (lowercase 변환되어 emit_step 인자로 사용).
-        abs_work_dir: 워크플로우 작업 디렉터리 (로그 기록용, 비어있으면 로그 생략).
+        to_step: Transition target step name (converted to lowercase and used as emit_step argument).
+        abs_work_dir: Workflow work directory (for logging, omit logging if empty).
     """
     try:
         port = _resolve_board_port()
@@ -103,8 +103,8 @@ def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
         with urllib.request.urlopen(list_url, timeout=2) as resp:
             sessions = json.loads(resp.read().decode("utf-8"))
         sessions_iter = sessions if isinstance(sessions, list) else sessions.get("sessions", [])
-        # 동일 ticket 에 다중 세션이 있을 수 있으므로 created_at 기준 최신 매칭을 선택한다.
-        # 활성(non-stopped) 세션을 우선하고, 활성이 없으면 stopped 세션 최신을 fallback.
+        # Since there may be multiple sessions on the same ticket, the latest matching based on created_at is selected.
+        # Priority is given to active (non-stopped) sessions, and if there is no activity, it falls back to the latest stopped session.
         candidates = [
             s for s in sessions_iter
             if isinstance(s, dict) and s.get("ticket_id") == ticket_id and s.get("session_id")
@@ -146,14 +146,14 @@ def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
 def _print_state_banner(
     from_step: str, to_step: str, abs_work_dir: str = ""
 ) -> None:
-    """상태 전이 배너를 2줄 포맷으로 출력한다.
+    """The state transition banner is output in a two-line format.
 
     Args:
-        from_step: 이전 단계 이름 (예: 'PLAN', 'WORK')
-        to_step: 다음 단계 이름 (예: 'WORK', 'REPORT')
-        abs_work_dir: 워크 디렉터리 절대 경로 (로그 기록용, 빈 문자열이면 로그 생략)
+        from_step: Previous step name (e.g. 'PLAN', 'WORK')
+        to_step: Next step name (e.g. 'WORK', 'REPORT')
+        abs_work_dir: Absolute path to work directory (for log recording, omit log if empty string)
     """
-    line1 = "[STATE] 단계 변경"
+    line1 = "[STATE] Change stage"
     line2 = f">> {from_step} -> {to_step}"
     print(line1, flush=True)
     print(line2, flush=True)
@@ -163,14 +163,14 @@ def _print_state_banner(
 
 
 def update_context(local_context: str, agent: str) -> str:
-    """context.json의 agent 필드만 갱신한다.
+    """Only update the agent field in context.json.
 
     Args:
-        local_context: .context.json 파일 절대 경로
-        agent: 설정할 에이전트 이름
+        local_context: Absolute path to the .context.json file
+        agent: Agent name to set
 
     Returns:
-        처리 결과 문자열. 예: 'context -> agent=orchestrator',
+        Processing result string. Example: 'context -> agent=orchestrator',
         'context -> skipped (file not found)', 'context -> failed'.
     """
     if not os.path.exists(local_context):
@@ -195,29 +195,29 @@ def update_context(local_context: str, agent: str) -> str:
 def update_status(
     abs_work_dir: str, status_file: str, from_step: str, to_step: str
 ) -> str:
-    """status.json을 업데이트하고 registry step을 동기화한다.
+    """Update status.json and synchronize registry steps.
 
-    FSM 검증 로직:
-      1. WORKFLOW_SKIP_GUARD=1 환경변수가 설정된 경우 검증을 건너뜀
-      2. current_step 확인: status.json의 현재 step과 from_step이 일치하는지 검증
-      3. allowed 확인: FSM_TRANSITIONS(constants.py)에서 현재 mode/from_step에 허용된
-         대상 목록을 조회하고 to_step이 포함되어 있는지 검증
+    FSM verification logic:
+      1. Skip verification if the WORKFLOW_SKIP_GUARD=1 environment variable is set.
+      2. Check current_step: Verify that the current step and from_step in status.json match.
+      3. Check allowed: In FSM_TRANSITIONS(constants.py), check what is allowed in current mode/from_step.
+         Query the target list and verify that it contains to_step
 
-    비차단 원칙:
-      FSM 검증 실패 시에도 프로세스를 종료하지 않음 (항상 exit 0).
+    Non-blocking principle:
+      Even if FSM verification fails, the process is not terminated (always exit 0).
 
-    호출 방식:
-      CLI 호출 시 from_step은 status.json에서 자동 읽기.
-      라이브러리 호출 시 from_step을 명시적으로 전달 필요.
+    Call method:
+      When calling CLI, from_step is automatically read from status.json.
+      When calling the library, from_step must be explicitly passed.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로
-        status_file: status.json 파일 경로
-        from_step: 전이 시작 단계 이름
-        to_step: 전이 목표 단계 이름
+        abs_work_dir: Absolute path to work directory
+        status_file: status.json file path
+        from_step: name of transition start step
+        to_step: Transition target step name
 
     Returns:
-        처리 결과 문자열. 예: 'status -> PLAN->WORK',
+        Processing result string. Example: 'status -> PLAN->WORK',
         'status -> FSM guard blocked (reason: ...)',
         'status -> skipped (file not found)', 'status -> failed'.
     """
@@ -235,10 +235,10 @@ def update_status(
             _append_log(abs_work_dir, "WARN", f"status.json read failed: {status_file}")
             return "status -> skipped (read failed)"
 
-        # Idempotent same-step transition: 같은 단계로의 전이는 silent skip.
-        # finalize 중복 호출(DONE→DONE 23회) 등 누적 노이즈를 차단한다.
-        # 로그 분석 (2026-04-29) 에서 DONE→DONE / PLAN→PLAN / WORK→WORK 등
-        # same-step 전이가 ERROR 로그로 누적되던 케이스를 정상 무동작으로 처리.
+        # Idempotent same-step transition: Transition to the same step is silent skip.
+        # Blocks accumulated noise such as finalize duplicate calls (DONE → DONE 23 times).
+        # In log analysis (2026-04-29), DONE→DONE / PLAN→PLAN / WORK→WORK, etc.
+        # Cases where same-step transitions were accumulated in the ERROR log were handled as normal no action.
         if from_step == to_step:
             _append_log(
                 abs_work_dir,
@@ -247,7 +247,7 @@ def update_status(
             )
             return f"status -> idempotent (already at {to_step})"
 
-        # FSM 전이 검증
+        # FSM transition verification
         if skip_guard:
             print(
                 f"[AUDIT] WORKFLOW_SKIP_GUARD active: {from_step}->{to_step}",
@@ -267,7 +267,7 @@ def update_status(
             )
             workflow_mode = data.get("mode", "full").lower()
 
-            # allowed_targets는 두 검증 모두에서 에러 메시지에 필요하므로 미리 조회.
+            # Allowed_targets is required for error messages in both verifications, so check it in advance.
             allowed_table = FSM_TRANSITIONS.get(
                 workflow_mode,
                 FSM_TRANSITIONS.get("multi", FSM_TRANSITIONS.get("full", {})),
@@ -315,7 +315,7 @@ def update_status(
                     f"workflow_mode={workflow_mode}, allowed_targets={allowed})"
                 )
 
-        # KST 시간
+        # KST time
         kst = KST
         now = datetime.now(kst).strftime("%Y-%m-%dT%H:%M:%S+09:00")
 
@@ -329,10 +329,10 @@ def update_status(
         atomic_write_json(status_file, data)
         _append_log(abs_work_dir, "INFO", f"State transition: {from_step} -> {to_step}")
 
-        # Board 서버에 단계 전이 통보 (best-effort, 실패 시 워크플로우 진행 차단하지 않음)
+        # Notifies the board server of step transition (best-effort, does not block workflow progress in case of failure)
         _notify_board_step(to_step, abs_work_dir)
 
-        # history_sync.py sync 호출 (비차단 원칙: 실패 시 경고만 출력)
+        # history_sync.py sync call (non-blocking principle: only output a warning in case of failure)
         try:
             subprocess.run(
                 ["python3", HISTORY_SYNC_PATH, "sync"],
@@ -343,7 +343,7 @@ def update_status(
             print(f"[WARN] history sync failed: {e}", file=sys.stderr)
             _append_log(abs_work_dir, "WARN", f"history sync failed: {e}")
 
-        # 반환값에는 ANSI 코드 없음 (배너는 _print_state_banner()가 담당)
+        # No ANSI code in return value (banner is handled by _print_state_banner())
         result = f"status -> {from_step}->{to_step}"
     except Exception as e:
         print(f"[WARN] status.json update failed: {e}", file=sys.stderr)
@@ -354,19 +354,19 @@ def update_status(
 
 
 def link_session(status_file: str, session_id: str) -> str:
-    """status.json의 linked_sessions 배열에 세션 ID를 추가한다.
+    """Add the session ID to the linked_sessions array in status.json.
 
     Args:
-        status_file: status.json 파일 경로
-        session_id: 등록할 Claude 세션 ID
+        status_file: status.json file path
+        session_id: Claude session ID to register
 
     Returns:
-        처리 결과 문자열. 예: 'link-session -> added: abc123 (total: 2)',
+        Processing result string. Example: 'link-session -> added: abc123 (total: 2)',
         'link-session -> already linked: abc123',
         'link-session -> skipped (empty)', 'link-session -> failed'.
     """
     if not session_id:
-        print("[WARN] link-session: sessionId가 비어있어 무시합니다.", file=sys.stderr)
+        print("[WARN] link-session: sessionId is empty so ignored.", file=sys.stderr)
         return "link-session -> skipped (empty)"
 
     if not os.path.exists(status_file):

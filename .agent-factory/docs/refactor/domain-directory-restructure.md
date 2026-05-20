@@ -27,7 +27,7 @@ PREPARE -> PLAN -> EXECUTE -> VERIFY -> REPORT -> COMPLETE
 Korean labels:
 
 ```text
-작업 준비 -> 작업 계획 -> 작업 수행 -> 작업 검증 -> 작업 보고 -> 작업 완료
+Preparing work -> Planning work -> Performing work -> Verifying work -> Reporting work -> Completing work
 ```
 
 This order is not an orchestration choice. It is the domain model.
@@ -43,8 +43,8 @@ to the workflow stage model.
 `WorkRequest`:
 
 ```text
-WorkRequest = 작업 요청서
-WorkflowRun = 작업 요청서를 처리하는 1회 실행
+WorkRequest = Work Request
+WorkflowRun = one-time run to process work request
 ```
 
 Work request authoring uses an Ouroboros loop before orchestration starts:
@@ -60,7 +60,7 @@ and acceptance criteria to enter the absolute workflow.
 
 | Domain | Current Files | Responsibility |
 |---|---|---|
-| Work Request | `engine/flow/ticket_repository.py`, `engine/flow/kanban*.py`, `board/server/handlers/kanban.py`, `board/board_data.py` | 작업 요청서, Ouroboros refinement, kanban/request state |
+| Work Request | `engine/flow/ticket_repository.py`, `engine/flow/kanban*.py`, `board/server/handlers/kanban.py`, `board/board_data.py` | Work request, Ouroboros refinement, kanban/request state |
 | Workflow Model | `engine/apps/production_line/_common.py`, `engine/apps/production_line/driver.py`, `engine/apps/production_line/steps/*` | Absolute stage model, run metadata, stage transition invariants |
 | Orchestration | `engine/apps/production_line/driver.py`, `engine/apps/production_line/steps/*`, `engine/apps/production_line/_retry.py`, `engine/apps/production_line/_parallel.py` | Runtime coordination, retry, adapter invocation, lifecycle events |
 | Planning | `engine/apps/production_line/core/plan_loader.py`, `engine/apps/production_line/steps/plan.py`, `engine/apps/production_line/prompts/plan.txt` | Plan schema, phase graph, PLAN generation |

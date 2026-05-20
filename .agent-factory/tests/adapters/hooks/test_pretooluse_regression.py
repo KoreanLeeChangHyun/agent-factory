@@ -1,27 +1,27 @@
-"""PreToolUse 디스패처 회귀 재현 vehicle (T-484).
+"""PreToolUse Disk Regression Vehicle (T-484).
 
-본 파일은 다음 두 캐논 룰의 동작을 회귀 차단한다:
+This file will block the operation of the following two cannon rules. NEWS
 
-  1. `.claude/rules/workflow/general.md` §"PreToolUse Hook 출력 schema (MUST)"
-     - 통과 시 빈 stdout 금지 → permissionDecision: "allow" JSON 필수
-     - allow JSON 의 updatedInput 필드는 전체 tool_input 교체용; 변경 없으면 생략
-     - "updatedInput": {} 금지
+  1. FAQ schema (MUST)
+     - Empty stdout ban on passing → permissionDecision: "allow" JSON required
+     - allow JSON updatedInput field for full tool input replacement; omit without change
+     - "updatedInput": {} ban
 
-  2. `.claude/rules/workflow/general.md` §".claude/ 편집 (MUST)"
-     - Edit/Write 만 차단 대상 — Bash `sed -i`, `cat`, `grep` 은 차단 안 함
-     - `.claude/` 경로 인자 Bash 명령은 PreToolUse 디스패처를 통과해야 한다
+  2. `.claude/rules/workflow/general.md` §.claude/edit (MUST)'
+     - Edit/Write only blocking target — Bash `sed -i`, `cat`, `grep` is not blocked
+     - `.claude/` path argument Bash command should pass PreToolUse Defender
 
-재현 vehicle:
-    test_regression_reproduction — 사용자 캐논에 명시된 회귀 시나리오를
-    1건 실측한다. fix 전: schema 위반 / 빈 stdout / 잘못된 behavior 필드.
-    fix 후 (현재 상태): hookSpecificOutput.permissionDecision == "allow".
+Mobile Site
+    test regression reproduction — Regression scenarios set out in the user canon
+    1st thread. fix pre: schema violation / blank stdout / wrong behavior field.
+    after fix (current status): hookSpecificOutput.permissionDecision == "allow".
 
-플랜 경로 정정 (T-484 plan 의 stale 경로 보정):
-    - 플랜은 `.agent-factory/engine/hooks/dispatcher/pre-tool-use.py` 와
-      `.agent-factory/engine/workflow_hooks/pretooluse_task.py` 를
-      참조했으나, 실제 dispatcher 는 `.agent-factory/hooks/pre-tool-use.py`
-      에 있고 `workflow_hooks/` 는 T-486 Phase 6-1 (commit 9fd9050) 에서
-      통째 폐기됨. 본 테스트는 실제 디스패처 경로를 사용한다.
+Plan route correction (T-484 plan of stale path correction):
+    - Plan with `.agent-factory/engine/hooks/dispatcher/pre-tool-use.py`
+      `.agent-factory/engine/workflow hooks/pretooluse task.py`
+      .agent-factory/hooks/pre-tool-use.py
+      T-486 Phase 6-1 (commit 9fd9050)
+      pulmonary waste. This test uses the actual dispatcher path.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ DISPATCHER = REPO_ROOT / ".agent-factory" / "hooks" / "pre-tool-use.py"
 
 
 def _run_dispatcher(payload: dict, env_overrides: dict | None = None) -> tuple[str, int]:
-    """PreToolUse 디스패처를 subprocess 로 실행하고 (stdout, returncode) 반환."""
+    """execute PreToolUse Defender as subprocess (stdout, returncode) return."""
     base_env: dict[str, str] = {}
     for key in ("HOME", "PATH", "PYTHONPATH", "LANG", "LC_ALL"):
         if key in os.environ:
@@ -63,26 +63,26 @@ def _run_dispatcher(payload: dict, env_overrides: dict | None = None) -> tuple[s
 
 
 def _parse_hook_output(stdout: str) -> dict:
-    """stdout 의 hookSpecificOutput JSON 을 파싱한다."""
+    """parsing hookSpecificOutput JSON in stdout."""
     data = json.loads(stdout.strip())
     return data.get("hookSpecificOutput", {})
 
 
 class TestPreToolUseRegression(unittest.TestCase):
-    """회귀 재현 vehicle — T-484 plan 의 핵심 시나리오 1건."""
+    """Reproduction vehicle — T-484 plan of core scenarios."""
 
     def test_dispatcher_path_exists(self) -> None:
-        """실제 디스패처 파일이 알려진 경로에 존재한다."""
+        """The actual dispatcher file exists in the path known."""
         self.assertTrue(DISPATCHER.exists(), f"dispatcher missing: {DISPATCHER}")
 
     def test_regression_reproduction(self) -> None:
-        """plan 의 회귀 시나리오 — sed -i 로 .claude/ 경로 인자 Bash 명령.
+        """plan's regression scenario — sed -i by .claude/ path argument Bash command.
 
-        기대 (fix 후 = 현재 GREEN):
-          - stdout 비어있지 않음 (schema 룰 §1: 빈 stdout 금지)
+        Example (fix = current GREEN):
+          - stdout not empty (schema rule §1: empty stdout ban)
           - hookSpecificOutput.hookEventName == "PreToolUse"
           - hookSpecificOutput.permissionDecision == "allow"
-          - updatedInput 키 부재 (schema 룰 §1: 변경 없으면 생략)
+          - updatedInput key absence (schema rule §1: omitted without change)
           - returncode 0
         """
         payload = {
@@ -93,13 +93,13 @@ class TestPreToolUseRegression(unittest.TestCase):
         }
         stdout, rc = _run_dispatcher(payload)
 
-        # 빈 stdout 금지 (canon §1)
+        # Empty stdout ban (canon §1)
         self.assertTrue(
             stdout.strip(),
-            "PreToolUse 디스패처가 빈 stdout 을 반환했다 — schema 위반",
+            "PreToolUse Defender returned empty stdout — violation of schema",
         )
 
-        # JSON parse + schema 검증
+        # JSON parse + schema verification
         hook_out = _parse_hook_output(stdout)
         self.assertEqual(hook_out.get("hookEventName"), "PreToolUse")
         self.assertEqual(
@@ -108,14 +108,14 @@ class TestPreToolUseRegression(unittest.TestCase):
             f"unexpected decision: {hook_out!r}",
         )
 
-        # updatedInput 부재 (canon §1: 변경 없으면 생략)
+        # updatedInput absence (canon §1: omitted without changing)
         self.assertNotIn(
             "updatedInput",
             hook_out,
-            "통과 시 updatedInput 은 생략돼야 한다 — schema 룰 위반 위험",
+            "Upon passing, the updatedInput must be omitted — schema violation risk",
         )
 
-        # 통과 시 returncode 0
+        # returncode 0
         self.assertEqual(rc, 0)
 
 

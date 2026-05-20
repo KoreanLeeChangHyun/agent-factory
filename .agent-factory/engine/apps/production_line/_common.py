@@ -24,7 +24,7 @@ from engine.core.workflows import (
 
 
 def _resolve_project_root() -> Path:
-    """git common dir 의 부모 = 메인 워크트리 root. 워크트리에서 호출돼도 메인 측을 가리킨다."""
+    """Parent of git common dir = main worktree root. Even if it is called from the work tree, it points to the main side."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
@@ -55,7 +55,7 @@ TERMINAL_STEPS = ("DONE", "FAILED")
 
 
 def load_prompt(name: str) -> str:
-    """SPEC.md §8.3 — Step 별 system prompt 외부화 (10KB 이하 정합)."""
+    """SPEC.md §8.3 — Externalization of system prompt for each step (matching less than 10KB)."""
     path = PROMPTS_DIR / f"{name}.txt"
     return path.read_text(encoding="utf-8")
 
@@ -68,8 +68,8 @@ def load_template(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-# SPEC.md §3.4 — Step 별 재시도 한도 (기본값)
-# .agent-factory/.settings 의 V2_RETRY_<STEP> 환경 변수로 override 가능.
+# SPEC.md §3.4 — Retry limit per step (default)
+# Can be overridden with the V2_RETRY_<STEP> environment variable in .agent-factory/.settings.
 _N_MAX_DEFAULT: dict[str, int] = {
     "INIT": 0,
     "PLAN": 2,
@@ -118,15 +118,15 @@ def get_n_max(step: str) -> int:
     return _N_MAX_DEFAULT.get(step, 0)
 
 
-# 하위 호환 — 옛 코드의 N_MAX_BY_STEP.get(step, 0) 호출 보존 (env override 미반영).
-# 신규 코드는 get_n_max(step) 사용 권장.
+# Backward compatibility — Preserve N_MAX_BY_STEP.get(step, 0) call from old code (env override not reflected).
+# It is recommended that new code use get_n_max(step).
 N_MAX_BY_STEP = _N_MAX_DEFAULT
 
 
-# T-506 P1 — 병렬 spawn 한계 / SPEC §3.4 신규
+# T-506 P1 — Parallel spawn limit / SPEC §3.4 new
 _MAX_PARALLEL_DEFAULT = 4
 
-# T-506 P4 — 실패 처리 정책 / SPEC §3.4 신규
+# T-506 P4 — Failure Handling Policy / SPEC §3.4 New
 _FAIL_POLICY_DEFAULT = "fail_fast"
 _FAIL_POLICY_VALID = ("fail_fast", "fail_tolerant")
 
@@ -168,7 +168,7 @@ def get_fail_policy() -> str:
     return _FAIL_POLICY_DEFAULT
 
 
-# SPEC.md §8.1 — Step 별 timeout (초)
+# SPEC.md §8.1 — timeout (seconds) per step
 STEP_TIMEOUT_BY_STEP: dict[str, int] = {
     "PLAN": 300,        # 5min
     "WORK": 1800,       # 30min
@@ -188,13 +188,13 @@ class WorkflowContext:
     registry_key: str                       # "20260514-230000"
     work_dir: Path                          # .agent-factory/runs/<registry_key>/
     command: str = "implement"              # implement | research | review | test
-    mode: str = "multi"                     # single | multi (plan.md frontmatter 가 최종 결정)
+    mode: str = "multi"                     # single | multi (plan.md frontmatter makes the final decision)
     current_step: str = "NONE"
-    feature_branch: str | None = None       # 워크트리 가드 (T-411 잔존, 보존)
+    feature_branch: str | None = None       # Worktree Guard (T-411 remnants, preserved)
     worktree_path: Path | None = None       # SPEC §9.1.1 (Stage 3-D) + §0.1 (Stage 3-E auto_commit)
-    title: str = ""                         # 티켓 제목 (auto_commit 메시지 template 용)
+    title: str = ""                         # Ticket title (for auto_commit message template)
     session_ids: dict[str, str] = field(default_factory=dict)  # Step|Phase → session_id
-    wf_session_id: str | None = None        # Stage 3-B — board side workflow_registry 매핑 ID
+    wf_session_id: str | None = None        # Stage 3-B — board side workflow_registry mapping ID
 
     def status_json_path(self) -> Path:
         return self.work_dir / "status.json"
@@ -209,27 +209,27 @@ class WorkflowContext:
         return self.work_dir / "workflow.log"
 
     def plan_dir(self) -> Path:
-        """T-504 — `plan/` 디렉터리 (PLAN 산출물 영역)."""
+        """T-504 — `plan/` directory (PLAN output area)."""
         return self.work_dir / "plan"
 
     def plan_md_path(self) -> Path:
-        """T-504 cutover — `plan/plan.md` (LLM↔LLM 자연어 본문, 옛 root plan.md 폐기)."""
+        """T-504 cutover — `plan/plan.md` (LLM↔LLM natural language body, discarding old root plan.md)."""
         return self.plan_dir() / "plan.md"
 
     def plan_json_path(self) -> Path:
-        """T-504 신설 — `plan/plan.json` (driver 결정론 파싱 대상, SSOT)."""
+        """New T-504 — `plan/plan.json` (driver deterministic parsing target, SSOT)."""
         return self.plan_dir() / "plan.json"
 
     def work_dir_phase_md(self, phase_id: str) -> Path:
-        """flat 경로 — backward compat (T-503 마이그레이션 hold 기간)."""
+        """flat path — backward compat (T-503 migration hold period)."""
         return self.work_dir / "work" / f"{phase_id}.md"
 
     def work_phase_dir(self, phase_id: str) -> Path:
-        """T-503 디렉터리 nesting — work/<phase>/."""
+        """T-503 directory nesting — work/<phase>/."""
         return self.work_dir / "work" / phase_id
 
     def work_phase_w_md(self, phase_id: str, worker_idx: int = 1) -> Path:
-        """T-503 디렉터리 nesting — work/<phase>/W<n>.md (workers ≥ 1)."""
+        """T-503 directory nesting — work/<phase>/W<n>.md (workers ≥ 1)."""
         return self.work_phase_dir(phase_id) / f"W{worker_idx}.md"
 
     def work_phase_md_resolved(self, phase_id: str) -> Path:
@@ -246,39 +246,39 @@ class WorkflowContext:
         return nested
 
     def validate_dir(self) -> Path:
-        """T-503 — validate/ 디렉터리."""
+        """T-503 — validate/ directory."""
         return self.work_dir / "validate"
 
     def validate_report_md_path(self) -> Path:
-        """validate-report.md — flat (backward compat, T-503 마이그레이션 hold)."""
+        """validate-report.md — flat (backward compat, T-503 migration hold)."""
         return self.work_dir / "validate-report.md"
 
     def validate_report_md_nested_path(self) -> Path:
-        """T-503 — validate/report.md (디렉터리 nesting)."""
+        """T-503 — validate/report.md (directory nesting)."""
         return self.validate_dir() / "report.md"
 
     def validate_rules_json_path(self) -> Path:
-        """validate-rules.json — flat (backward compat, T-503 마이그레이션 hold)."""
+        """validate-rules.json — flat (backward compat, T-503 migration hold)."""
         return self.work_dir / "validate-rules.json"
 
     def validate_rules_json_nested_path(self) -> Path:
-        """T-503 — validate/rules.json (디렉터리 nesting)."""
+        """T-503 — validate/rules.json (directory nesting)."""
         return self.validate_dir() / "rules.json"
 
     def validate_code_json_path(self) -> Path:
-        """T-503 신설 — validate/code.json (driver `_verify_code.py` 산출, implement 한정)."""
+        """New T-503 — validate/code.json (driver `_verify_code.py` output, implement only)."""
         return self.validate_dir() / "code.json"
 
     def validate_verdict_json_path(self) -> Path:
-        """M9 — VERIFY 단계 구조화 verdict (`validate/verdict.json`)."""
+        """M9 — VERIFY step structured verdict (`validate/verdict.json`)."""
         return self.validate_dir() / "verdict.json"
 
     def report_manifest_json_path(self) -> Path:
-        """M9 — REPORT 단계 manifest (`report.json`)."""
+        """M9 — REPORT stage manifest (`report.json`)."""
         return self.work_dir / "report.json"
 
     def final_verdict_json_path(self) -> Path:
-        """M9 — COMPLETE gate 최종 verdict (`final-verdict.json`)."""
+        """M9 — COMPLETE gate final verdict (`final-verdict.json`)."""
         return self.work_dir / "final-verdict.json"
 
     def report_md_path(self) -> Path:
@@ -289,7 +289,7 @@ class WorkflowContext:
         return self.work_dir / "report.html"
 
     def report_html_path(self) -> Path:
-        """T-504 — `report.html` 명시 경로 (사람 가독, HTML template + placeholder)."""
+        """T-504 — `report.html` explicit path (human readable, HTML template + placeholder)."""
         return self.work_dir / "report.html"
 
     def user_prompt_path(self) -> Path:
@@ -305,12 +305,12 @@ class WorkflowContext:
         return self.work_dir / "failure.md"
 
     def metadata_json_path(self) -> Path:
-        """T-503 — metadata.json (옛 .context.json + status.json + summary.txt + failure 흡수)."""
+        """T-503 — metadata.json (absorbs old .context.json + status.json + summary.txt + failure)."""
         return self.work_dir / "metadata.json"
 
 
 def new_registry_key(now: datetime | None = None) -> str:
-    """SPEC.md §4 — registryKey 채번. v1 호환 형식 (YYYYMMDD-HHMMSS)."""
+    """SPEC.md §4 — registryKey number. v1 compatible format (YYYYMMDD-HHMMSS)."""
     moment = now or datetime.now()
     return moment.strftime("%Y%m%d-%H%M%S")
 
@@ -376,7 +376,7 @@ def read_context(ctx: WorkflowContext) -> dict[str, Any]:
 
 
 def write_context(ctx: WorkflowContext) -> None:
-    """`.context.json` 에 ctx 상태 직렬화 — feature_branch / mode / command 등."""
+    """Serialize ctx state to `.context.json` — feature_branch / mode / command etc."""
     payload = {
         "schema_version": 1,
         "ticket_no": ctx.ticket_no,
@@ -397,7 +397,7 @@ def write_context(ctx: WorkflowContext) -> None:
 
 
 def kanban_show(ticket_no: str) -> str:
-    """`.agent-factory/bin/flow-kanban show T-NNN` — stdout 반환."""
+    """`.agent-factory/bin/flow-kanban show T-NNN` — Return stdout."""
     result = subprocess.run(
         [str(KANBAN_BIN), "show", ticket_no],
         capture_output=True,
@@ -424,7 +424,7 @@ def kanban_move(ticket_no: str, target: str) -> int:
 
 
 def append_log(ctx: WorkflowContext, line: str) -> None:
-    """workflow.log 에 line append. 진단 trace."""
+    """Add line to workflow.log. Diagnostic trace."""
     log_path = ctx.workflow_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().isoformat(timespec="seconds")
@@ -458,8 +458,8 @@ def write_metadata(
           "session_ids": {"wf-T-PLAN": "...", ...},
           "workflow_step": "DONE",
           "transitions": [{"from":"INIT","to":"PLAN","ts":"..."}, ...],
-          "finalized_at": "2026-05-18T...",   # DONE 단계에서만 채움 (옛 summary.txt 대체)
-          "failure": {"reason": "...", "ts": "..."} | null,  # FAILED 단계만 (옛 failure.md 대체)
+          "finalized_at": "2026-05-18T...",   # Fill only in DONE step (replaces old summary.txt)
+          "failure": {"reason": "...", "ts": "..."} | null,  # FAILED step only (replaces old failure.md)
         }
     """
     status = read_status(ctx)
@@ -493,7 +493,7 @@ def write_metadata(
 
 
 def read_metadata(ctx: WorkflowContext) -> dict[str, Any]:
-    """T-503 — `metadata.json` reader. 미존재 시 `{}` 반환."""
+    """T-503 — `metadata.json` reader. If not present, `{}` is returned."""
     path = ctx.metadata_json_path()
     if not path.exists():
         return {}
@@ -518,7 +518,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
         return 0
     wt = str(ctx.worktree_path)
     if not Path(wt).is_dir():
-        append_log(ctx, f"[AUTO-COMMIT] worktree path 미존재 ({wt}) — skip")
+        append_log(ctx, f"[AUTO-COMMIT] worktree path does not exist ({wt}) — skip")
         return 0
     # 1. add -A
     add = subprocess.run(
@@ -528,9 +528,9 @@ def auto_commit(ctx: WorkflowContext) -> int:
         check=False,
     )
     if add.returncode != 0:
-        append_log(ctx, f"[AUTO-COMMIT] git add 실패 rc={add.returncode}: {add.stderr.strip()[:200]}")
+        append_log(ctx, f"[AUTO-COMMIT] git add failed rc={add.returncode}: {add.stderr.strip()[:200]}")
         return add.returncode
-    # 2. staged 변경 detect
+    # 2. Detect staged changes
     diff = subprocess.run(
         ["git", "-C", wt, "diff", "--cached", "--quiet"],
         capture_output=True,
@@ -538,9 +538,9 @@ def auto_commit(ctx: WorkflowContext) -> int:
         check=False,
     )
     if diff.returncode == 0:
-        append_log(ctx, "[AUTO-COMMIT] staged 변경 0건 — skip")
+        append_log(ctx, "[AUTO-COMMIT] 0 staged changes — skip")
         return 0
-    # 3. commit 메시지 결정론 template
+    # 3. commit message determinism template
     title = ctx.title or "(no title)"
     msg = f"feat({ctx.ticket_no}): {title} [production-line auto-commit]"
     commit = subprocess.run(
@@ -552,7 +552,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
     if commit.returncode != 0:
         append_log(
             ctx,
-            f"[AUTO-COMMIT] git commit 실패 rc={commit.returncode}: "
+            f"[AUTO-COMMIT] git commit failed rc={commit.returncode}:"
             f"{commit.stderr.strip()[:200]}",
         )
         return commit.returncode

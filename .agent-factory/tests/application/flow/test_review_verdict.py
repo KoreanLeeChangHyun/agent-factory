@@ -1,9 +1,9 @@
-"""test_review_verdict.py - review_verdict.py 단위 테스트 (T-463 W21).
+"""test review verdict.py - review verdict.py Module Test (T-463 W21).
 
-13 룰 각각 위반/통과 페어 + 임계 분기 4종 (PASS/WARN/FAIL/SKIP)
-+ CLI wrapper subprocess 검증.
+13 Rules each violation/exclusive Fair + Paragraph 4 (PASS/WARN/FAIL/SKIP)
++ CLI wrapper subprocess verification.
 
-테스트 케이스 (총 23):
+Test Case (Total 23):
     TestRuleExist:
         test_exist_1_pass / test_exist_1_missing / test_exist_1_empty
         test_exist_2_pass / test_exist_2_missing
@@ -37,10 +37,10 @@
         test_cli_main_outputs_json
         test_wrapper_exit_code
 
-제약:
-    - LLM 호출 0건.
-    - tempfile.TemporaryDirectory 격리.
-    - subprocess 호출 5초 timeout.
+Pharmaceuticals:
+    - 0 LLM calls.
+    - Isolated tempfile.TemporaryDirectory.
+    - subprocess call 5 seconds timeout.
 """
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ class TestRuleExist(_BaseCase):
         self.assertEqual(v.rule_id, "R-EXIST-2")
 
     def test_exist_2_skip_research(self) -> None:
-        # research 명령은 plan.md 부재라도 통과
+        # Research command passed plan.md abdominal
         self.assertIsNone(_check_exist_2(self.workdir, {"command": "research"}))
 
     def test_exist_3_pass(self) -> None:
@@ -232,21 +232,21 @@ class TestRuleGuard(_BaseCase):
 
 class TestRulePath(_BaseCase):
     def test_path_1_pass(self) -> None:
-        self.write_file("report.md", "본문에 [plan.md] 참조\n")
+        self.write_file("report.md", "See [plan.md] in the text\\n")
         self.write_file("plan.md", "# plan\n")
         self.assertIsNone(_check_path_1(self.workdir, {"command": "implement"}))
 
     def test_path_1_missing_plan(self) -> None:
-        self.write_file("report.md", "본문에 plan.md 참조\n")
-        # plan.md 미작성
+        self.write_file("report.md", "see plan.md in the text\\n")
+        # plan.md Beauty
         v = _check_path_1(self.workdir, {"command": "implement"})
         self.assertIsNotNone(v)
         assert v is not None
         self.assertEqual(v.rule_id, "R-PATH-1")
 
     def test_path_1_no_token(self) -> None:
-        # report.md 안에 plan.md 토큰 자체가 없으면 통과 (검증 무의미)
-        self.write_file("report.md", "본문에 다른 내용만\n")
+        # If there is no plan.md token itself in report.md, pass (no test)
+        self.write_file("report.md", "Other contents in the text\\n")
         self.assertIsNone(_check_path_1(self.workdir, {"command": "implement"}))
 
 
@@ -264,7 +264,7 @@ class TestRuleFsm(_BaseCase):
 
 
 class TestThreshold(unittest.TestCase):
-    """_resolve_verdict 임계 분기 4종 검증."""
+    """resolve verdict 4 types validation."""
 
     def test_threshold_pass(self) -> None:
         result = _resolve_verdict([], {"command": "implement"})
@@ -289,24 +289,24 @@ class TestThreshold(unittest.TestCase):
         self.assertIn("3", result.reason)
 
     def test_threshold_fail_hard(self) -> None:
-        # 위반 1건이지만 hard-fail 룰이라 FAIL
+        # 1 violation, but hard-fail rule FAIL
         violations = [Violation("R-EXIST-1", "fail", "missing report.md")]
         result = _resolve_verdict(violations, {})
         self.assertEqual(result.verdict, FAIL)
         self.assertIn("hard-fail", result.reason)
 
     def test_threshold_fail_hard_metric(self) -> None:
-        # R-METRIC-2 도 hard-fail
+        # R-METRIC-2
         violations = [Violation("R-METRIC-2", "fail", "DONE outcome=fail")]
         result = _resolve_verdict(violations, {})
         self.assertEqual(result.verdict, FAIL)
 
 
 class TestEntrypointSkip(_BaseCase):
-    """compute_review_verdict 진입점 SKIP 분기 검증."""
+    """compute review verdict Enterpoint SKIP Quarterly Verification."""
 
     def test_skip_no_workdir(self) -> None:
-        # 존재하지 않는 디렉터리
+        # Director Lee
         bogus = self.workdir / "nonexistent"
         result = compute_review_verdict("bogus", workdir=bogus)
         self.assertEqual(result.verdict, SKIP)
@@ -319,7 +319,7 @@ class TestEntrypointSkip(_BaseCase):
         self.assertIn("WORK", result.reason)
 
     def test_full_pass_done(self) -> None:
-        # 모든 룰 통과 가능한 최소 환경: command=research (plan/path/wt SKIP)
+        # All rules can be passed: command=research (plan/path/wt SKIP)
         # status.json + report.md + metrics.jsonl + .context.json
         self.write_json("status.json", {"workflow_phase": "DONE"})
         self.write_json(".context.json", {
@@ -330,7 +330,7 @@ class TestEntrypointSkip(_BaseCase):
             },
         })
         self.write_file("report.md", "# report\n")
-        # 5 phase 모두 정상 페어 + DONE outcome=ok
+        # 5 phase all-in-one Fair + DONE
         events = []
         for s in ("INIT", "PLAN", "WORK", "REPORT", "DONE"):
             events.append({"event_type": "step.start", "payload": {"step": s}})
@@ -340,14 +340,14 @@ class TestEntrypointSkip(_BaseCase):
             })
         self.write_metrics(events)
         result = compute_review_verdict("test", workdir=self.workdir)
-        # research 라 R-EXIST-2/R-PATH-1/R-WT-1 SKIP, R-GUARD-2 git 검사 불가
-        # 시 통과. 위반은 0~1건 사이.
+        # R-EXIST-2/R-PATH-1/R-WT-1 SKIP
+        # Send violations between 0~1.
         self.assertIn(result.verdict, (PASS, WARN))
 
 
 class TestCli(unittest.TestCase):
     def test_cli_main_outputs_json(self) -> None:
-        # CLI main() 호출 - 존재하지 않는 registry_key 로 SKIP 응답.
+        # CLI main() call - response to SKIP with non-existing registry key.
         captured: list[str] = []
         old_stdout = sys.stdout
 

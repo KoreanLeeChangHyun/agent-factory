@@ -43,7 +43,7 @@ PROJECT_ROOT = resolve_project_root()
 
 
 def _append_log(abs_work_dir: str, level: str, message: str) -> None:
-    """워크플로우 로그에 이벤트를 기록한다."""
+    """Records events in the workflow log."""
     try:
         from datetime import datetime, timezone, timedelta
         kst = timezone(timedelta(hours=9))
@@ -55,7 +55,7 @@ def _append_log(abs_work_dir: str, level: str, message: str) -> None:
         pass
 
 
-# 파일 크기 상한 (50MB)
+# Upper file size limit (50MB)
 MAX_JSONL_SIZE = 50 * 1024 * 1024
 
 VALID_AGENT_TYPES: set[str] = {
@@ -63,7 +63,7 @@ VALID_AGENT_TYPES: set[str] = {
     "validator", "reporter",
 }
 
-# _pending_workers에서 worker 큐 매핑 대상이 아닌 에이전트 타입
+# Agent types that are not subject to worker queue mapping in _pending_workers
 NON_WORKER_AGENT_TYPES: set[str] = {
     "validator", "reporter", "planner", "explorer", "orchestrator",
 }
@@ -104,7 +104,7 @@ def _normalize_agent_type(raw: str) -> tuple[str, str]:
 
 
 # =============================================================================
-# 공통 유틸리티
+# common utilities
 # =============================================================================
 
 def _read_stdin_json() -> dict[str, object]:
@@ -137,7 +137,7 @@ def _extract_session_id_from_transcript_path(transcript_path: str) -> Optional[s
     basename = os.path.basename(transcript_path)
     if not basename.endswith(".jsonl"):
         return None
-    candidate = basename[:-6]  # ".jsonl" 제거
+    candidate = basename[:-6]  # Remove ".jsonl"
     uuid_pattern = re.compile(
         r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
         re.IGNORECASE,
@@ -237,14 +237,14 @@ def _link_sessions_from_stdin(
     """
     registered: set[str] = set()
 
-    # (a) transcript_path basename → 메인 세션 ID
+    # (a) transcript_path basename → main session ID
     main_session_id = _extract_session_id_from_transcript_path(main_transcript_path)
     if main_session_id:
         result = _call_link_session(status_file, main_session_id)
         print(f"[usage-sync] cmd_track: link_session result={result}", file=sys.stderr)
         registered.add(main_session_id)
 
-    # (b) agent jsonl 첫 user 레코드 sessionId → 워커 sessionId (또는 메인 폴백)
+    # (b) agent jsonl first user record sessionId → worker sessionId (or main fallback)
     worker_session_id = _extract_session_id_from_agent_jsonl(agent_transcript_path)
     if worker_session_id and worker_session_id not in registered:
         result = _call_link_session(status_file, worker_session_id)
@@ -296,7 +296,7 @@ def _load_usage(usage_file: str) -> dict[str, object]:
         data["agents"] = {}
     if "totals" not in data:
         data["totals"] = {}
-    # 기존 usage.json에서 "init", "done" 키 정리
+    # Cleaned up "init" and "done" keys in existing usage.json
     for old_key in ("init", "done"):
         data["agents"].pop(old_key, None)
     return data
@@ -409,7 +409,7 @@ def count_tool_use_in_jsonl(filepath: str) -> int:
 
 
 # =============================================================================
-# track: 개별 에이전트 종료 시 증분 추적
+# track: Incremental tracking as individual agents exit.
 # =============================================================================
 
 def cmd_track() -> None:
@@ -429,7 +429,7 @@ def cmd_track() -> None:
     agent_type, model_suffix = _normalize_agent_type(agent_type)
 
     if agent_type not in VALID_AGENT_TYPES:
-        # VALID_AGENT_TYPES 외 에이전트도 link_session 시도 (transcript_path 존재 시)
+        # Agents other than VALID_AGENT_TYPES also attempt link_session (if transcript_path exists)
         if transcript_path and os.path.isfile(transcript_path):
             _try_link_session_from_stdin(transcript_path, main_transcript_path)
         sys.exit(0)
@@ -440,10 +440,10 @@ def cmd_track() -> None:
     if not work_dir:
         sys.exit(0)
 
-    # JSONL 파싱
+    # JSONL parsing
     tokens = parse_jsonl_usage(transcript_path)
 
-    # Hallucination 감지: tool_use 0건 && 대상 에이전트 타입 && 로거 활성
+    # Hallucination detected: tool_use 0 cases && target agent type && logger active
     tool_use_count = count_tool_use_in_jsonl(transcript_path)
     if (
         tool_use_count == 0
@@ -477,17 +477,17 @@ def cmd_track() -> None:
     try:
         usage_data = _load_usage(usage_file)
 
-        # _agent_map에 agent_id -> agent_type 매핑 기록 (batch에서 참조)
+        # Record agent_id -> agent_type mapping in _agent_map (referenced in batch)
         if "_agent_map" not in usage_data:
             usage_data["_agent_map"] = {}
         usage_data["_agent_map"][agent_id] = agent_type
 
-        # 메인 세션 JSONL 경로 기록 (최초 1회만)
+        # Record main session JSONL path (first time only)
         if "_main_transcript" not in usage_data:
             if main_transcript_path and os.path.isfile(main_transcript_path):
                 usage_data["_main_transcript"] = main_transcript_path
 
-        # linked_sessions 등록: 메인 세션 ID + 워커 자체 sessionId (W02)
+        # Register linked_sessions: main session ID + worker's own sessionId (W02)
         status_file = os.path.join(work_dir, "status.json")
         _link_sessions_from_stdin(status_file, transcript_path, main_transcript_path)
 
@@ -501,13 +501,13 @@ def cmd_track() -> None:
             existing_workers = usage_data["agents"]["workers"]
 
             if task_id:
-                # agent_id가 pending key로 직접 매핑된 경우 (이상적 경로)
+                # When agent_id is mapped directly to pending key (ideal path)
                 existing_workers[task_id] = tokens
                 del pending[agent_id]
             else:
-                # agent_id가 hex 문자열이어서 pending에 없는 경우:
-                # pending의 값(task_id) 중 아직 workers에 기록되지 않은 첫 번째 task_id를 큐 방식으로 할당
-                # 비-worker 에이전트 타입(validator, reporter 등)은 큐 후보에서 제외
+                # If agent_id is a hex string and is not in pending:
+                # Among the pending values ​​(task_id), the first task_id that has not yet been recorded in workers is assigned in a queue manner.
+                # Non-worker agent types (validator, reporter, etc.) are excluded from queue candidates.
                 assigned_task_id = None
                 for pkey, ptid in list(pending.items()):
                     if ptid in NON_WORKER_AGENT_TYPES or pkey in NON_WORKER_AGENT_TYPES:
@@ -528,10 +528,10 @@ def cmd_track() -> None:
                         file=sys.stderr,
                     )
                     existing_workers[assigned_task_id] = tokens
-                    # _agent_map에 agent_id -> task_id 관계 기록 (batch 참조용)
+                    # Record agent_id -> task_id relationship in _agent_map (for batch reference)
                     usage_data["_agent_map"][agent_id] = "worker"
                 else:
-                    # 완전히 매핑 불가: agent_id를 키로 폴백 기록
+                    # Completely unmappable: record fallback with agent_id as key
                     print(
                         f"[usage-sync] WARNING: agent_id '{agent_id}' not found in _pending_workers and no unassigned task_id, using agent_id as key",
                         file=sys.stderr,
@@ -550,7 +550,7 @@ def cmd_track() -> None:
 
 
 # =============================================================================
-# batch: 워크플로우 종료 시 전체 JSONL 일괄 정산
+# batch: Settlement of entire JSONL in batch at the end of workflow
 # =============================================================================
 
 def _find_subagents_dir(transcript_path: str) -> Optional[str]:
@@ -598,7 +598,7 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
     Returns:
         메인 세션 JSONL 파일 경로. 없으면 None.
     """
-    # 0차: usage.json의 _main_transcript 경로를 직접 반환
+    # 0th: Directly returns the _main_transcript path in usage.json
     usage_file = os.path.join(work_dir, "usage.json")
     usage_data_early = load_json_file(usage_file)
     if isinstance(usage_data_early, dict):
@@ -613,7 +613,7 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
 
     project_slug = PROJECT_ROOT.replace("/", "-")
 
-    # 1차: linked_sessions 기반 탐색
+    # Round 1: linked_sessions based navigation
     sessions = status.get("linked_sessions", [])
     for claude_base in [
         os.path.expanduser("~/.claude"),
@@ -627,7 +627,7 @@ def _find_main_session_from_status(work_dir: str) -> Optional[str]:
             if os.path.isfile(path):
                 return path
 
-    # 2차: _agent_map에 기록된 알려진 agent_id로 역탐색
+    # 2nd: Back-lookup with known agent_id recorded in _agent_map
     usage_file = os.path.join(work_dir, "usage.json")
     usage_data = load_json_file(usage_file)
     if not isinstance(usage_data, dict):
@@ -684,7 +684,7 @@ def _resolve_agent_type(
     if basename.startswith("agent-") and basename.endswith(".jsonl"):
         agent_id = basename[len("agent-"):-len(".jsonl")]
 
-    # 폴백 1: _agent_map 매핑 조회
+    # Fallback 1: _agent_map mapping lookup
     if agent_id:
         mapped = agent_map.get(agent_id)
         if mapped:
@@ -694,7 +694,7 @@ def _resolve_agent_type(
             )
             return mapped
 
-    # 폴백 2: agent-<id>.meta.json 의 agentType 필드
+    # Fallback 2: agentType field in agent-<id>.meta.json
     if agent_id and subagents_dir:
         meta_path = os.path.join(subagents_dir, f"agent-{agent_id}.meta.json")
         try:
@@ -712,7 +712,7 @@ def _resolve_agent_type(
         except Exception:
             pass
 
-    # 폴백 3 & 4: JSONL 파싱 (slug → attributionAgent)
+    # Fallback 3 & 4: JSONL parsing (slug → attributionAgent)
     try:
         with open(agent_filename, "r", encoding="utf-8") as f:
             first_user_done = False
@@ -727,7 +727,7 @@ def _resolve_agent_type(
                     continue
                 rec_type = rec.get("type")
 
-                # 폴백 3: 첫 user 레코드의 slug
+                # Fallback 3: slug on first user record
                 if rec_type == "user" and not first_user_done:
                     first_user_done = True
                     slug = rec.get("slug", "")
@@ -740,7 +740,7 @@ def _resolve_agent_type(
                             )
                             return normalized
 
-                # 폴백 4: assistant 레코드의 attributionAgent
+                # Fallback 4: attributionAgent on assistant record
                 if rec_type == "assistant" and attribution_candidate is None:
                     attr = rec.get("attributionAgent", "")
                     if attr:
@@ -748,7 +748,7 @@ def _resolve_agent_type(
                         if normalized in VALID_AGENT_TYPES:
                             attribution_candidate = normalized
 
-                # user + attribution 둘 다 처리 완료되면 조기 탈출
+                # Early exit when both user + attribution are completed
                 if first_user_done and attribution_candidate is not None:
                     break
 
@@ -761,7 +761,7 @@ def _resolve_agent_type(
     except Exception:
         pass
 
-    # 폴백 5: agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값
+    # Fallback 5: Defaults to "worker" if agentId is in hex format and subagents_dir is given.
     if agent_id and subagents_dir:
         import re
         if re.fullmatch(r"[0-9a-f]{10,}", agent_id):
@@ -793,10 +793,10 @@ def cmd_batch() -> None:
     if not work_dir:
         sys.exit(0)
 
-    # subagents_dir 결정:
-    #  1) transcript_path 가 worker agent JSONL (부모 == 'subagents/') 이면 직접 사용 (하위호환)
-    #  2) 그 외(메인 세션 JSONL 또는 누락)에는 work_dir 의 status.json.linked_sessions 에서
-    #     메인 세션 JSONL 을 찾아 그 옆의 <session_id>/subagents/ 디렉터리로 역산.
+    # Determine subagents_dir:
+    #  1) If transcript_path is worker agent JSONL (parent == 'subagents/'), use directly (backwards compatible)
+    #  2) For others (main session JSONL or missing), in status.json.linked_sessions in work_dir
+    #     Find the main session JSONL and translate it into the <session_id>/subagents/ directory next to it.
     subagents_dir: Optional[str] = None
     if transcript_path and os.path.isfile(transcript_path):
         subagents_dir = _find_subagents_dir(transcript_path)
@@ -822,14 +822,14 @@ def cmd_batch() -> None:
         usage_data = _load_usage(usage_file)
         agent_map = usage_data.get("_agent_map", {})
 
-        # subagents/ 내 모든 agent-*.jsonl 파일 열거
+        # subagents/ Enumerate all my agent-*.jsonl files
         agent_files = sorted(glob.glob(os.path.join(subagents_dir, "agent-*.jsonl")))
         if not agent_files:
             print("[usage-sync] No agent JSONL files found", file=sys.stderr)
             release_lock(lock_dir)
             sys.exit(0)
 
-        # 에이전트별 JSONL 파싱 (보완 모드: track으로 수집 완료된 에이전트는 스킵)
+        # JSONL parsing for each agent (complementary mode: skip agents that have been collected through track)
         worker_tokens: dict[str, dict[str, int]] = {}
         skipped_agents: list[str] = []
         for agent_file in agent_files:
@@ -841,7 +841,7 @@ def cmd_batch() -> None:
                 )
                 continue
 
-            # 보완 모드 스킵: track으로 수집 완료된 비-worker 에이전트
+            # Skip supplementary mode: non-worker agents collected by track
             if a_type != "worker":
                 existing = usage_data["agents"].get(a_type)
                 if isinstance(existing, dict) and existing.get("method") == "subagent_transcript":
@@ -861,7 +861,7 @@ def cmd_batch() -> None:
             else:
                 usage_data["agents"][a_type] = tokens
 
-        # worker 토큰 처리 (보완 모드: track으로 수집 완료된 worker는 스킵)
+        # Worker token processing (complementary mode: workers that have been collected through track are skipped)
         if worker_tokens:
             if "workers" not in usage_data["agents"]:
                 usage_data["agents"]["workers"] = {}
@@ -869,13 +869,13 @@ def cmd_batch() -> None:
             existing_workers = usage_data["agents"]["workers"]
             pending = usage_data.get("_pending_workers", {})
 
-            # agent_to_task: _pending_workers 값(task_id)이 키인 경우와
-            # agent_id가 키인 경우 모두 처리.
-            # _pending_workers는 {task_id: task_id} 또는 {agent_id: task_id} 형태일 수 있음.
-            # agent_id가 hex 문자열이고 pending이 {task_id: task_id} 형태인 경우:
-            # pending의 값(task_id) 목록과 worker_tokens의 agent_id 목록을 순서대로 매핑.
-            # agent_to_task: _pending_workers의 pkey가 실제 agent_id인 경우 직접 매핑
-            # 비-worker 에이전트 타입(validator, reporter 등)은 worker 큐 매핑에서 제외
+            # agent_to_task: _pending_workers If the value (task_id) is the key and
+            # Process all cases where agent_id is the key.
+            # _pending_workers can be in the form {task_id: task_id} or {agent_id: task_id}.
+            # If agent_id is a hex string and pending is in the form {task_id: task_id}:
+            # Mapping the value (task_id) list of pending and the agent_id list of worker_tokens in order.
+            # agent_to_task: direct mapping if pkey of _pending_workers is actual agent_id
+            # Non-worker agent types (validator, reporter, etc.) are excluded from worker queue mapping.
             agent_to_task: dict[str, str] = {}
             non_worker_pending_keys: list[str] = []
             for pkey, ptid in pending.items():
@@ -891,8 +891,8 @@ def cmd_batch() -> None:
             for nw_key in non_worker_pending_keys:
                 del pending[nw_key]
 
-            # task_id=task_id 형태의 pending만 unassigned 큐에 추가.
-            # agent_id가 hex 문자열일 때 순서대로 매핑하기 위한 폴백 큐.
+            # Add only pending tasks of the form task_id=task_id to the unassigned queue.
+            # Fallback queue for sequential mapping when agent_id is a hex string.
             already_mapped_tasks = set(existing_workers.keys())
             unassigned_queue: list[str] = [
                 ptid for pkey, ptid in pending.items()
@@ -900,11 +900,11 @@ def cmd_batch() -> None:
             ]
 
             for agent_id, tokens in worker_tokens.items():
-                # 우선: agent_to_task에서 직접 매핑 시도
+                # First: try mapping directly from agent_to_task
                 task_id = agent_to_task.get(agent_id)
 
                 if not task_id:
-                    # agent_id가 hex 문자열인 경우: unassigned_queue에서 순서대로 할당
+                    # If agent_id is a hex string: assigned in order from unassigned_queue
                     if unassigned_queue:
                         task_id = unassigned_queue.pop(0)
                         print(
@@ -913,11 +913,11 @@ def cmd_batch() -> None:
                         )
 
                 key = task_id if task_id else agent_id
-                # 보완 모드 스킵: track으로 수집 완료된 worker task
+                # Skip supplementary mode: worker tasks collected as tracks
                 if isinstance(existing_workers.get(key), dict) and existing_workers[key].get("method") == "subagent_transcript":
                     skipped_agents.append(f"worker/{key}")
                     continue
-                # 중복 검사: 4개 토큰 필드 시그니처가 동일한 기존 항목이 있으면 스킵
+                # Duplicate check: Skip if existing item with same 4 token field signature
                 _token_fields = ("input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens")
                 existing_entry = existing_workers.get(key)
                 if isinstance(existing_entry, dict):
@@ -932,11 +932,11 @@ def cmd_batch() -> None:
                         continue
                 existing_workers[key] = tokens
 
-        # 스킵된 에이전트 목록 로그
+        # Skipped agent list log
         if skipped_agents:
             print(f"[usage-sync] batch: skipped already-tracked: {skipped_agents}", file=sys.stderr)
 
-        # 메인 세션 JSONL 파싱 (오케스트레이터 토큰)
+        # Main session JSONL parsing (orchestrator token)
         main_jsonl = _find_main_session_jsonl(subagents_dir)
         if not main_jsonl:
             main_jsonl = _find_main_session_from_status(work_dir)
@@ -959,7 +959,7 @@ def cmd_batch() -> None:
 
 
 # =============================================================================
-# 메인
+# main
 # =============================================================================
 
 def main() -> None:
@@ -968,7 +968,7 @@ def main() -> None:
     서브커맨드가 없으면 track을 기본값으로 사용한다 (하위 호환).
     알 수 없는 서브커맨드는 exit 0 (비차단 원칙).
     """
-    # 서브커맨드 파싱. 인자 없으면 track (하위 호환)
+    # Subcommand parsing. If there are no arguments, track (backwards compatible)
     subcmd = sys.argv[1] if len(sys.argv) > 1 else "track"
 
     if subcmd == "track":

@@ -54,7 +54,7 @@ class TestM8WorkRequestHandler(unittest.TestCase):
             calls.append(args)
             if args[1] == "create":
                 return subprocess.CompletedProcess(args, 0, stdout="T-520: M8 sample [To Do]", stderr="")
-            return subprocess.CompletedProcess(args, 0, stdout="T-520: prompt 갱신됨", stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout="T-520: prompt updated", stderr="")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("os.getcwd", return_value=tmpdir), patch("subprocess.run", side_effect=fake_run):

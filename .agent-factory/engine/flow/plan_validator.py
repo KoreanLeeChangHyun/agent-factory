@@ -1,29 +1,29 @@
 #!/usr/bin/env -S python3 -u
-"""plan_validator.py - 계획서(plan.md) 및 칸반 티켓 구조 검증 스크립트.
+"""plan validator.py - Plans (plan.md) and kanban ticket structure validation script.
 
-plan.md를 입력받아 다음을 검증한다:
-(1) Mermaid 서브그래프에서 Phase별 워커 수 추출, 최대/최소 비율 3배 이상 시 경고
-(2) 작업 목록 테이블에서 워커별 작업 항목 수 파싱, 편차 2 초과 시 경고
-(3) T2(10+) 태스크에서 스킬 1개인 경우 경고
-(4) WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지 (advisory, 비차단)
+Enter plan.md and validate: NEWS
+(1) Warker water extraction by Phase in Mermaid Subgraph, warning at least 3 times the maximum/min rate
+(2) Work list Warker's job item number parsing in table, warning when deviation exceeds 2
+(3) T2(10+) TSK Skill 1 Personal warning
+News 4) What/HOW Deletion Verification: Property/goal/context Reverting Detection (advisory, non-blocking)
 
---mode ticket 시 칸반 티켓 XML 구조 검증을 수행한다:
-(TC-01) 디렉터리 위치 vs XML status 불일치
-(TC-02) derived-from 파생 티켓 미완료 + 원본 done 경고
-(TC-03) 필수 태그 누락 (number/command/prompt)
-(TC-04) command 값 유효성
-(TC-05) goal/target 빈 값 경고
-(TC-06) 복수 항목 필드 개행 누락 경고
-(TC-07) 관계 링크 대상 티켓 존재 여부
+--mode ticket will be valid for the kanban ticket XML structure NEWS
+(TC-01) Directory Location vs XML status
+(TC-02) count-from Derivative Ticket Unfinished + Original done Warning
+(TC-03) Missing required tags (number/command/prompt)
+(TC-04) command value validity
+(TC-05) goal/target empty value warning
+(TC-06) Revenue warning for revenge entry field
+(TC-07) Whether the relevant link is present
 
-사용법:
+Usage:
   flow-validate <plan_path|registryKey>
   flow-validate --mode ticket
   flow-validate --mode ticket --ticket T-001
   flow-validate --help
 
-출력:
-  경고 목록 또는 "검증 통과"
+Output:
+  "Verification passed"
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Any
 
-# 프로젝트 루트 결정
+# Determine project route
 _engine_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
@@ -48,20 +48,20 @@ PROJECT_ROOT: str = resolve_project_root()
 
 
 def parse_mermaid_phases(content: str) -> dict[str, int]:
-    """Mermaid 서브그래프에서 Phase별 워커 수를 추출한다.
+    """Extract the number of Warkers per Phase in the Mermaid SubGraph.
 
-    다중 Mermaid 코드 블록을 모두 순회하여 결과를 병합한다.
-    중첩 subgraph를 스택으로 처리하며, W[숫자]+ 패턴의 노드를 워커로 인식한다.
+    Multi Mermaid code blocks all congratulate results.
+    The stack subgraph is handled as a stack, and the nodes of the W[Number]+ pattern are recognized as a Walker.
 
     Args:
-        content: plan.md 전체 내용 문자열
+        content: plan.md full content string
 
     Returns:
-        {phase_name: worker_count} 형태의 딕셔너리.
+        {phase name: worker count}
     """
     phases = {}
 
-    # 다중 Mermaid 코드 블록 추출
+    # Extract multiple Mermaid code blocks
     mermaid_blocks = re.findall(r"```mermaid\s*\n(.*?)```", content, re.DOTALL)
     if not mermaid_blocks:
         return phases
@@ -71,13 +71,13 @@ def parse_mermaid_phases(content: str) -> dict[str, int]:
 
         current_phase = None
         worker_count = 0
-        # 중첩 subgraph 지원을 위한 스택: (phase_name, worker_count) 쌍 저장
+        # Stack for nested subgraph support: stores (phase_name, worker_count) pairs
         phase_stack = []
 
         for line in lines:
             stripped = line.strip()
 
-            # subgraph 시작: 표준 형식
+            # Start subgraph: standard format
             #   subgraph id["label"]  or  subgraph id[label]  or  subgraph id
             subgraph_match = re.match(
                 r'subgraph\s+(\S+)\s*\[\s*"([^"]*)"\s*\]', stripped
@@ -90,11 +90,11 @@ def parse_mermaid_phases(content: str) -> dict[str, int]:
                 subgraph_match = re.match(r'subgraph\s+(\S+)', stripped)
 
             if subgraph_match:
-                # 현재 subgraph를 스택에 저장 (중첩 지원)
+                # Save current subgraph to stack (nesting supported)
                 phase_stack.append((current_phase, worker_count))
 
                 new_phase = subgraph_match.group(1)
-                # subgraph label이 있으면 사용
+                # Use if there is a subgraph label
                 if subgraph_match.lastindex and subgraph_match.lastindex >= 2:
                     label = subgraph_match.group(2).strip()
                     if label:
@@ -103,11 +103,11 @@ def parse_mermaid_phases(content: str) -> dict[str, int]:
                 worker_count = 0
                 continue
 
-            # end 키워드
+            # end keyword
             if stripped == "end":
                 if current_phase is not None:
                     phases[current_phase] = phases.get(current_phase, 0) + worker_count
-                # 스택에서 외부 subgraph 복원 (비어있으면 None)
+                # Restore external subgraph from stack (None if empty)
                 if phase_stack:
                     current_phase, worker_count = phase_stack.pop()
                 else:
@@ -115,11 +115,11 @@ def parse_mermaid_phases(content: str) -> dict[str, int]:
                     worker_count = 0
                 continue
 
-            # 워커 노드 식별 (W01[label], W01 [label] 패턴)
+            # Worker node identification (W01[label], W01 [label] pattern)
             if current_phase is not None and re.match(r"^\s*W\d+[\[\s\(]", stripped):
                 worker_count += 1
 
-        # 마지막 subgraph 저장 (end 없이 블록이 끝난 경우)
+        # Save the last subgraph (if block ends without end)
         if current_phase is not None:
             phases[current_phase] = phases.get(current_phase, 0) + worker_count
 
@@ -127,40 +127,40 @@ def parse_mermaid_phases(content: str) -> dict[str, int]:
 
 
 def _split_table_row(line: str) -> list[str]:
-    """마크다운 테이블 행을 셀 목록으로 분리한다.
+    """Decide the markdown table rows into the cell list.
 
-    양 끝 빈 셀만 제거하고 내부 빈 셀은 유지한다.
+    Remove the amount end blank cells and maintain the internal blank cells.
 
     Args:
-        line: 마크다운 테이블 행 문자열 (| 구분자 포함)
+        line: Markdown table line string (| with separator)
 
     Returns:
-        셀 값 목록 (각 셀은 strip된 문자열).
+        List of cell values (each cell is striped string).
     """
     raw_parts = [p.strip() for p in line.split("|")]
     return raw_parts[1:-1] if len(raw_parts) >= 2 else raw_parts
 
 
 def _find_table_start(lines: list[str], section_pattern: str | None, column_keywords: dict[str, list[str]]) -> int:
-    """테이블 섹션 시작 위치를 결정한다.
+    """The table section determines the starting position.
 
-    section_pattern이 있으면 해당 섹션 헤더를 먼저 탐색하고,
-    없으면 첫 번째 컬럼 키워드로 테이블 행을 직접 탐색한다.
+    If section pattern, navigate the corresponding section header first,
+    If not, navigate the table line directly with the first column keyword.
 
     Args:
-        lines: 마크다운 파일 행 목록
-        section_pattern: 섹션 헤더 정규식 패턴. None이면 전체 탐색.
-        column_keywords: {field_name: [keyword, ...]} 형태의 컬럼 탐지 키워드 맵
+        lines: Markdown file row list
+        section pattern: section header regular pattern. If none is full navigation.
+        column keywords: {field name: [keyword, ...]} column detection keyword map
 
     Returns:
-        테이블 섹션 시작 행 인덱스. 없으면 -1.
+        Table section Start row index. -1.
     """
     if section_pattern:
         for i, line in enumerate(lines):
             if re.search(section_pattern, line):
                 return i
 
-    # 섹션 헤더 없이 테이블 직접 탐색 (첫 번째 컬럼 키워드로 판별)
+    # Direct table navigation without section header (determined by first column keyword)
     first_field_keywords = next(iter(column_keywords.values()), [])
     for i, line in enumerate(lines):
         if line.startswith("|") and any(k.lower() in line.lower() for k in first_field_keywords):
@@ -174,18 +174,18 @@ def _find_header_and_col_map(
     table_start: int,
     column_keywords: dict[str, list[str]],
 ) -> tuple[int, dict[str, int]]:
-    """헤더 행과 컬럼 인덱스 맵을 결정한다.
+    """Decide header lines and column index maps.
 
-    table_start 위치에서 최대 15행 내에서 헤더 행을 탐색하고
-    column_keywords의 각 필드에 대응하는 컬럼 인덱스를 매핑한다.
+    Explore header lines within up to 15 lines at table start locations
+    maps column indexes that correspond to each field of column keywords.
 
     Args:
-        lines: 마크다운 파일 행 목록
-        table_start: 테이블 탐색 시작 행 인덱스
-        column_keywords: {field_name: [keyword, ...]} 형태의 컬럼 탐지 키워드 맵
+        lines: Markdown file row list
+        table start: table navigation start row index
+        column keywords: {field name: [keyword, ...]} column detection keyword map
 
     Returns:
-        (header_idx, col_map) 튜플. 헤더 없으면 (-1, {}).
+        (header idx, col map) tuple. Without header (-1, {}).
     """
     col_map: dict[str, int] = {}
     first_field = next(iter(column_keywords))
@@ -211,16 +211,16 @@ def _find_header_and_col_map(
 
 def parse_md_table_columns(content, section_pattern, column_keywords):
     """
-    마크다운 테이블에서 헤더 컬럼 인덱스를 매핑하고 데이터 행을 파싱.
+    Map the header column index in the Markdown table and parse data rows.
 
     Args:
-        content: 마크다운 파일 전체 내용 문자열
-        section_pattern: 테이블 섹션 헤더를 찾는 정규식 패턴 (None이면 전체 탐색)
-        column_keywords: {field_name: [keyword, ...]} 형태의 컬럼 탐지 키워드 맵
+        content: Markdown file full content string
+        section pattern: regular pattern to find table section header (None-side full navigation)
+        column keywords: {field name: [keyword, ...]} column detection keyword map
 
     Returns:
-        list[dict]: 각 행이 {field_name: cell_value} 딕셔너리인 리스트.
-                    인식되지 않은 필드는 포함되지 않음.
+        list[dict]: Each line is {field name: cell value} dictionary.
+                    The unacceptable field is not included.
     """
     lines = content.split("\n")
 
@@ -251,31 +251,31 @@ def parse_md_table_columns(content, section_pattern, column_keywords):
 
 
 def parse_task_table(content: str) -> list[dict[str, Any]]:
-    """작업 목록 테이블에서 태스크 정보를 파싱한다.
+    """The task list will parse the task information in the table.
 
     Args:
-        content: plan.md 전체 내용 문자열
+        content: plan.md full content string
 
     Returns:
-        태스크 딕셔너리 목록. 각 항목은 다음 키를 포함:
-            id (str): 태스크 ID (W01 형식)
-            description (str): 작업 설명
-            complexity (str): 복잡도 원문 문자열
-            complexity_score (int): 복잡도 숫자 점수 (없으면 0)
-            skills (list[str]): 스킬 목록
-            phase (str): Phase 식별자
+        Task Dixiety list. Each item contains the following keys:
+            id (str): task ID (W01 format)
+            description (str): description of work
+            complexity (str): complexity text string
+            complexity score (int): Complex number score (if 0)
+            Skill List
+            Phase (str): Phase identifier
     """
     tasks = []
 
     column_keywords = {
         "id": ["id"],
-        "description": ["작업", "설명", "description"],
-        "complexity": ["복잡도", "complexity"],
-        "skills": ["스킬", "skill"],
+        "description": ["work", "explanation", "description"],
+        "complexity": ["complexity", "complexity"],
+        "skills": ["skill", "skill"],
         "phase": ["phase"],
     }
 
-    section_pattern = r"^##\s+작업\s*(목록|리스트|테이블)"
+    section_pattern = r"^##\s+Tasks\s*(list|list|table)"
     rows = parse_md_table_columns(content, section_pattern, column_keywords)
 
     for row in rows:
@@ -290,7 +290,7 @@ def parse_task_table(content: str) -> list[dict[str, Any]]:
             complexity_score = int(score_match.group(1))
 
         raw_skills = row.get("skills", "")
-        if raw_skills and raw_skills != "-" and raw_skills != "없음":
+        if raw_skills and raw_skills != "-" and raw_skills != "doesn't exist":
             skills = [s.strip() for s in re.split(r"[+,]", raw_skills) if s.strip()]
         else:
             skills = []
@@ -310,33 +310,33 @@ def parse_task_table(content: str) -> list[dict[str, Any]]:
 
 
 def count_task_work_items(content: str, task_id: str) -> int:
-    """워커별 작업 상세 섹션에서 해당 태스크의 작업 항목 수를 카운트한다.
+    """You can count the number of tasks in the task details section of the Walker.
 
-    "### WXX:" H3 섹션 내의 번호 리스트 항목 수를 반환한다.
+    "### WXX:" returns the number of number list items within the H3 section.
 
     Args:
-        content: plan.md 전체 내용 문자열
-        task_id: 카운트할 태스크 ID (예: "W01")
+        content: plan.md full content string
+        task id: Task ID counting (e.g. "W01")
 
     Returns:
-        해당 태스크 섹션의 번호 리스트 항목 수.
+        The number list of the corresponding tasks section.
     """
     lines = content.split("\n")
     in_section = False
     item_count = 0
 
     for line in lines:
-        # H3 헤더로 해당 태스크 섹션 시작
+        # Start that task section with an H3 header
         if re.match(rf"^###\s+{re.escape(task_id)}\b", line):
             in_section = True
             continue
 
-        # 다음 H2/H3 헤더로 섹션 종료
+        # End section with the following H2/H3 headers
         if in_section and re.match(r"^#{2,3}\s+", line):
             break
 
         if in_section:
-            # 번호 리스트 항목 카운트 (1., 2., 3., ...)
+            # Number list item count (1., 2., 3., ...)
             if re.match(r"^\d+\.\s+", line.strip()):
                 item_count += 1
 
@@ -344,22 +344,22 @@ def count_task_work_items(content: str, task_id: str) -> int:
 
 
 def validate_phase_balance(phases: dict[str, int]) -> list[str]:
-    """Phase별 워커 수 균형을 검증한다.
+    """Verify the number of Warkers per Phase.
 
-    최대/최소 워커 수 비율이 3배 이상이면 경고를 생성한다.
+    When the maximum/min walker count ratio is more than 3 times, it generates a warning.
 
     Args:
-        phases: {phase_name: worker_count} 형태의 딕셔너리
+        phases: {phase name: worker count}
 
     Returns:
-        경고 메시지 목록. 균형이 맞으면 빈 리스트.
+        Send your inquiry directly to us blank list when balanced.
     """
     warnings = []
 
     if len(phases) < 2:
         return warnings
 
-    # 워커가 0인 Phase 제외
+    # Excluding phases with 0 workers
     active_phases = {k: v for k, v in phases.items() if v > 0}
     if len(active_phases) < 2:
         return warnings
@@ -372,29 +372,29 @@ def validate_phase_balance(phases: dict[str, int]) -> list[str]:
         max_phase = [k for k, v in active_phases.items() if v == max_count][0]
         min_phase = [k for k, v in active_phases.items() if v == min_count][0]
         warnings.append(
-            f"[Phase 균형] Phase 간 워커 수 불균형 (비율 {max_count/min_count:.1f}x): "
-            f"{max_phase}={max_count}명 vs {min_phase}={min_count}명 "
-            f"(기준: 최대/최소 3배 미만 권장)"
+            f"[Phase Balance] Worker count imbalance between phases (ratio {max_count/min_count:.1f}x):"
+            f"{max_phase}={max_count} people vs {min_phase}={min_count} people"
+            f"(Standard: recommended less than 3 times maximum/minimum)"
         )
 
     return warnings
 
 
 def validate_work_item_deviation(tasks: list[dict[str, Any]], content: str) -> list[str]:
-    """같은 Phase 내 워커 간 작업 항목 수 편차를 검증한다.
+    """Verify the number of work entries per phase.
 
-    동일 Phase 내 작업 항목 수 최대-최소 차이가 2를 초과하면 경고를 생성한다.
+    The maximum number of work entries in the same Phase - generates a warning when the minimum difference exceeds 2.
 
     Args:
-        tasks: parse_task_table()이 반환한 태스크 딕셔너리 목록
-        content: plan.md 전체 내용 문자열
+        tasks: parse task table()
+        content: plan.md full content string
 
     Returns:
-        경고 메시지 목록. 편차가 허용 범위 내이면 빈 리스트.
+        Send your inquiry directly to us blank list if deviation is allowed.
     """
     warnings = []
 
-    # Phase별 태스크 그룹화
+    # Task grouping by phase
     phase_groups = {}
     for task in tasks:
         phase = task.get("phase", "")
@@ -408,13 +408,13 @@ def validate_work_item_deviation(tasks: list[dict[str, Any]], content: str) -> l
         if len(group) < 2:
             continue
 
-        # 각 태스크의 작업 항목 수 카운트
+        # Count the number of work items for each task
         item_counts = {}
         for task in group:
             count = count_task_work_items(content, task["id"])
             item_counts[task["id"]] = count
 
-        # 편차 계산
+        # Deviation calculation
         counts = [c for c in item_counts.values() if c > 0]
         if len(counts) < 2:
             continue
@@ -427,63 +427,63 @@ def validate_work_item_deviation(tasks: list[dict[str, Any]], content: str) -> l
             max_task = [k for k, v in item_counts.items() if v == max_count][0]
             min_task = [k for k, v in item_counts.items() if v == min_count][0]
             warnings.append(
-                f"[작업 편차] Phase {phase} 내 워커 간 작업 항목 편차 {deviation} "
-                f"(기준: 2 이내): {max_task}={max_count}개 vs {min_task}={min_count}개"
+                f"[Work Deviation] Work item deviation {deviation} between workers within Phase {phase}"
+                f"(Standard: within 2): {max_task}={max_count} pieces vs {min_task}={min_count} pieces"
             )
 
     return warnings
 
 
 def validate_skill_coverage(tasks: list[dict[str, Any]]) -> list[str]:
-    """T2(10+) 태스크에서 스킬이 1개만 배정된 경우 경고를 생성한다.
+    """In T2(10+) tasks, we generate alerts if one skill is assigned.
 
-    복잡도 점수 10 이상인 태스크에 스킬이 1개만 배정되면
-    도메인 커버리지 부족 가능성 경고를 반환한다.
+    If you have more than 10 skills in the task,
+    Returns the potential warning of domain coverage.
 
     Args:
-        tasks: parse_task_table()이 반환한 태스크 딕셔너리 목록
+        tasks: parse task table()
 
     Returns:
-        경고 메시지 목록. 모든 T2 태스크가 충분한 스킬을 가지면 빈 리스트.
+        Send your inquiry directly to us If all T2 tasks have enough skills, empty list.
     """
     warnings = []
 
     for task in tasks:
         if task["complexity_score"] >= 10 and len(task["skills"]) == 1:
             warnings.append(
-                f"[스킬 부족] {task['id']}는 복잡도 {task['complexity']}이나 "
-                f"스킬이 1개({task['skills'][0]})만 배정됨. "
-                f"2개 이상의 도메인 포함 여부를 확인하세요."
+                f"[Lack of skill] {task['id']} is complexity {task['complexity']} or"
+                f"Only one skill ({task['skills'][0]}) is assigned."
+                f"Please check whether it contains 2 or more domains."
             )
 
     return warnings
 
 
 def _extract_xml_tag(content: str, tag: str) -> str:
-    """XML 태그 내용을 추출한다.
+    """Extract XML tags.
 
     Args:
-        content: 검색 대상 문자열
-        tag: 태그 이름 (예: "criteria", "goal", "context")
+        content: search target string
+        tag: tag name (e.g. "criteria", "goal", "context")
 
     Returns:
-        태그 내용 문자열. 태그가 없으면 빈 문자열.
+        Tag content string. Empty string without tag.
     """
     match = re.search(rf"<{tag}>(.*?)</{tag}>", content, re.DOTALL)
     return match.group(1) if match else ""
 
 
 def _extract_section(content: str, section_names: list[str]) -> str:
-    """plan.md에서 지정된 섹션 이름에 해당하는 섹션 내용을 추출한다.
+    """Extracts section content that corresponds to the specified section name in plan.md.
 
-    ## 헤더로 시작하는 섹션을 탐색하며 다음 ## 헤더까지의 내용을 반환한다.
+    ## Searches the section starting with the header and returns the contents up to the next ## header.
 
     Args:
-        content: plan.md 전체 내용 문자열
-        section_names: 탐색할 섹션 이름 목록 (첫 번째 일치 섹션 반환)
+        content: plan.md full content string
+        section names: List of sections to navigate (Return the first matching section)
 
     Returns:
-        섹션 내용 문자열. 섹션이 없으면 빈 문자열.
+        Section content string. blank string without section.
     """
     lines = content.split("\n")
     in_section = False
@@ -505,22 +505,22 @@ def _extract_section(content: str, section_names: list[str]) -> str:
 
 
 def _normalize_line(line: str) -> str:
-    """공백을 정규화한 행을 반환한다."""
+    """Returns a row with spaces normalized."""
     return re.sub(r"\s+", " ", line).strip()
 
 
 def _count_consecutive_matches(source_lines: list[str], target_text: str) -> int:
-    """source_lines의 연속 행이 target_text에 포함되는 최대 연속 일치 수를 반환한다.
+    """returns the maximum number of consecutive matches included in target text.
 
-    공백 정규화 후 문자열 포함 비교(substring match)를 사용한다.
-    빈 행은 비교에서 제외한다.
+    Use the substring match, including strings after regularization.
+    The empty row is excluded from the comparison.
 
     Args:
-        source_lines: 비교 기준 행 목록 (XML 태그 내용 등)
-        target_text: 대상 텍스트 (plan.md 섹션 내용)
+        source lines: List of comparison criteria (XML tag content, etc.)
+        target text: subject text (plan.md section content)
 
     Returns:
-        최대 연속 일치 행 수.
+        Maximum serial number.
     """
     target_normalized = _normalize_line(target_text)
     max_streak = 0
@@ -529,7 +529,7 @@ def _count_consecutive_matches(source_lines: list[str], target_text: str) -> int
     for line in source_lines:
         norm = _normalize_line(line)
         if not norm:
-            # 빈 행은 연속 카운트를 끊지 않음 (선택적 연속 허용)
+            # Blank rows don't break continuation count (allow optional continuation)
             continue
         if norm in target_normalized:
             current_streak += 1
@@ -541,22 +541,22 @@ def _count_consecutive_matches(source_lines: list[str], target_text: str) -> int
 
 
 def validate_what_how_separation(plan_path: str, user_prompt_path: str) -> list[str]:
-    """WHAT/HOW 분리 검증: criteria/goal/context 재서술 탐지.
+    """What/HOW Deletion Verification: Property/goal/context Revert Detection.
 
-    user_prompt.txt의 XML 태그 내용이 plan.md의 해당 섹션에 재서술되었는지를
-    문자열 비교로 탐지한다. 모든 경고는 advisory(비차단) 수준이다.
+    XML tag content of user prompt.txt was reverted to the corresponding section of plan.md
+    Detects string comparison. All warnings are the advisory level.
 
-    탐지 룰:
-      - criteria 재서술: <criteria> 원문 3줄 이상 연속 일치 시 경고
-      - goal 재서술: <goal> 원문 핵심 구절(10자 이상) 포함 시 경고
-      - context 원문 복사: <context> 원문 2줄 이상 연속 일치 시 경고
+    Tag:
+      - standard re-subscription: <criteria> warning when consecutive matches over 3 lines
+      - Responsibilities: <goal> warning when the main phrase is included (more than 10 characters)
+      - context original copy: <context> warning when consecutive matches over two lines
 
     Args:
-        plan_path: plan.md 파일 경로
-        user_prompt_path: user_prompt.txt 파일 경로
+        plan path: plan.md file path
+        user prompt path: user prompt.txt file path
 
     Returns:
-        advisory 경고 메시지 목록. 이상 없으면 빈 리스트.
+        advisory warning message list. If not, empty list.
     """
     warnings = []
 
@@ -569,29 +569,29 @@ def validate_what_how_separation(plan_path: str, user_prompt_path: str) -> list[
     with open(plan_path, "r", encoding="utf-8") as f:
         plan_content = f.read()
 
-    # 룰 1: criteria 재서술 탐지
+    # Rule 1: criteria redescription detection
     criteria_text = _extract_xml_tag(prompt_content, "criteria")
     if criteria_text:
-        criteria_section = _extract_section(plan_content, ["기술 검증 기준"])
+        criteria_section = _extract_section(plan_content, ["Technology verification criteria"])
         if criteria_section:
             criteria_lines = [l for l in criteria_text.split("\n") if _normalize_line(l)]
             match_count = _count_consecutive_matches(criteria_lines, criteria_section)
             if match_count >= 3:
                 warnings.append(
-                    f"[WHAT/HOW advisory] criteria 재서술 의심: "
-                    f"기술 검증 기준 섹션에 <criteria> 원문과 유사한 내용 {match_count}줄 감지"
+                    f"[WHAT/HOW advisory] criteria Suspicious redescription:"
+                    f"Detection of <criteria> {match_count} lines similar to the original text in the technical verification criteria section"
                 )
 
-    # 룰 2: goal 재서술 탐지
+    # Rule 2: Detect goal redescription
     goal_text = _extract_xml_tag(prompt_content, "goal")
     if goal_text:
-        summary_section = _extract_section(plan_content, ["작업 요약"])
+        summary_section = _extract_section(plan_content, ["task summary"])
         if summary_section:
             summary_normalized = _normalize_line(summary_section)
-            # goal 원문에서 10자 이상 연속 구절 추출 후 포함 여부 확인
+            # goal Extract consecutive phrases of 10 or more characters from the original text and check whether they are included
             goal_normalized = _normalize_line(goal_text)
             found_phrase = False
-            # 슬라이딩 윈도우로 10자 이상 구절 탐지
+            # Detect phrases longer than 10 characters with a sliding window
             words = goal_normalized.split()
             for i in range(len(words)):
                 for j in range(i + 2, len(words) + 1):
@@ -603,65 +603,65 @@ def validate_what_how_separation(plan_path: str, user_prompt_path: str) -> list[
                     break
             if found_phrase:
                 warnings.append(
-                    "[WHAT/HOW advisory] goal 재서술 의심: "
-                    "작업 요약에 <goal> 원문 구절 포함 감지"
+                    "[WHAT/HOW advisory] Suspect goal re-statement:"
+                    "Detect inclusion of <goal> text passage in task summary"
                 )
 
-    # 룰 3: context 원문 블록 복사 탐지
+    # Rule 3: Detect copy of context original block
     context_text = _extract_xml_tag(prompt_content, "context")
     if context_text:
-        note_section = _extract_section(plan_content, ["비고", "현황 스냅샷"])
+        note_section = _extract_section(plan_content, ["note", "Status snapshot"])
         if note_section:
             context_lines = [l for l in context_text.split("\n") if _normalize_line(l)]
             match_count = _count_consecutive_matches(context_lines, note_section)
             if match_count >= 2:
                 warnings.append(
-                    f"[WHAT/HOW advisory] context 원문 복사 의심: "
-                    f"비고 섹션에 <context> 원문 블록 {match_count}줄 복사 감지"
+                    f"[WHAT/HOW advisory] context suspected of copying original text:"
+                    f"Detection of copying {match_count} lines of <context> original text block in remarks section"
                 )
 
     return warnings
 
 
 def validate(plan_path: str) -> list[str]:
-    """plan.md를 검증하고 경고 목록을 반환.
+    """validate the plan.md and return the warning list.
 
-    advisory, non-blocking 성격의 검증 함수이다.
-    반환값은 오케스트레이터의 워크플로우 흐름을 차단하지 않으며,
-    경고 메시지는 로그 출력용으로만 사용된다.
+    advisory is a validation function of non-blocking nature.
+    The return value does not block the workflow flow of the orchestra,
+    Warning messages are only used for log output.
 
     Args:
-        plan_path: plan.md 파일 경로
+        plan path: plan.md file path
 
     Returns:
-        list[str]: 경고 메시지 목록 (빈 리스트면 검증 통과).
-                   반환값에 관계없이 호출자의 흐름을 차단하지 않는다.
+        list[str]: List of warning messages (passes empty list-side verification).
+                   You do not block the flow of the caller regardless of the return value.
     """
     if not os.path.isfile(plan_path):
-        return [f"[ERROR] 파일을 찾을 수 없습니다: {plan_path}"]
+        return [f"[ERROR] File not found: {plan_path}"]
 
     with open(plan_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     warnings = []
 
-    # 1. Mermaid 서브그래프에서 Phase별 워커 수 추출
+    # 1. Extracting the number of workers by phase from the Mermaid subgraph
     phases = parse_mermaid_phases(content)
     if phases:
         warnings.extend(validate_phase_balance(phases))
 
-    # 2. 작업 목록 테이블 파싱
+    # 2. Parse the task list table
     tasks = parse_task_table(content)
 
-    # 3. 워커별 작업 항목 수 편차 검증
+    # 3. Verification of deviation in the number of work items for each worker
     if tasks:
         warnings.extend(validate_work_item_deviation(tasks, content))
 
-    # 4. T2(10+) 태스크 스킬 수 검증
+    # 4. Verification of T2(10+) task skill count
     if tasks:
         warnings.extend(validate_skill_coverage(tasks))
 
-    # 5. WHAT/HOW 분리 검증 (advisory, 비차단)
+    # 5. WHAT/HOW separate verification (advisory, non-blocking)
     plan_dir = os.path.dirname(plan_path)
     user_prompt_path = os.path.join(plan_dir, "user_prompt.txt")
     warnings.extend(validate_what_how_separation(plan_path, user_prompt_path))
@@ -675,10 +675,10 @@ def validate(plan_path: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# ticket 모드 헬퍼 함수
+# ticket mode helper function
 # ---------------------------------------------------------------------------
 
-# 디렉터리명 → XML status 값 매핑 (정규화용)
+# Directory name → XML status value mapping (for normalization)
 _DIR_TO_STATUS: dict[str, str] = {
     "todo": "To Do",
     "open": "Open",
@@ -687,37 +687,37 @@ _DIR_TO_STATUS: dict[str, str] = {
     "done": "Done",
 }
 
-# 유효한 command 값 (체인 구분자 > 포함 시 각 토큰 검증)
+# Valid command value (chain delimiter > verification of each token when included)
 _VALID_COMMANDS: set[str] = {"implement", "review", "research"}
 
-# 복수 항목 필드 목록 (TC-06 대상)
+# Multiple Item Field List (for TC-06)
 _MULTI_FIELDS: list[str] = ["goal", "target", "constraints", "criteria", "context"]
 
 
 def find_kanban_root(project_root: str) -> str:
-    """칸반 루트 디렉터리 경로를 반환한다.
+    """returns the Kanban root directory path.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project root: Project route absolute path
 
     Returns:
-        .agent-factory/kanban 절대 경로
+        . agent-factory/kanban absolute path
     """
     return os.path.join(project_root, ".agent-factory", "tickets")
 
 
 def load_ticket_xml(xml_path: str) -> dict[str, Any]:
-    """티켓 XML 파일을 파싱하여 dict로 반환한다.
+    """return the ticket XML file to dict.
 
-    파싱 실패 시 빈 dict를 반환한다.
+    return empty dict when parsing fails.
 
     Args:
-        xml_path: 티켓 XML 파일 절대 경로
+        xml path: ticket XML file absolute path
 
     Returns:
         {number, title, status, command, goal, target, constraints,
-         criteria, context, relations(list[dict])} 형태의 딕셔너리.
-        파싱 실패 시 빈 dict.
+         . . . . . . .
+        An empty dict when parsing failed.
     """
     if not os.path.isfile(xml_path):
         return {}
@@ -729,7 +729,7 @@ def load_ticket_xml(xml_path: str) -> dict[str, Any]:
         return {}
 
     def _text(tag: str) -> str:
-        """태그 내부 텍스트를 반환한다. 없으면 빈 문자열."""
+        """Returns the text inside the tag. If not, an empty string."""
         el = root.find(".//" + tag)
         return (el.text or "").strip() if el is not None else ""
 
@@ -756,13 +756,13 @@ def load_ticket_xml(xml_path: str) -> dict[str, Any]:
 
 
 def build_ticket_location_map(kanban_root: str) -> dict[str, str]:
-    """칸반 루트의 4개 디렉터리를 순회하여 티켓 번호 → 디렉터리 위치 매핑을 반환한다.
+    """Turn 4 directories of the Kanban route to return ticket number → directory location map.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로 (.agent-factory/kanban)
+        kanban root: Kanban route absolute path (.agent-factory/kanban)
 
     Returns:
-        {T-NNN: "open"|"progress"|"review"|"done"} 딕셔너리.
+        {T-NNN: "open"|"progress"|"review"|"done"} Dinner.
     """
     location_map: dict[str, str] = {}
     for dir_name in ("todo", "open", "progress", "review", "done"):
@@ -772,19 +772,19 @@ def build_ticket_location_map(kanban_root: str) -> dict[str, str]:
         for fname in os.listdir(dir_path):
             if not fname.endswith(".xml"):
                 continue
-            ticket_number = fname[:-4]  # 확장자 제거
+            ticket_number = fname[:-4]  # Remove extension
             location_map[ticket_number] = dir_name
     return location_map
 
 
 def extract_relations(ticket_data: dict[str, Any]) -> list[dict[str, str]]:
-    """ticket_data에서 relations 목록을 반환한다.
+    """returns a statement in the ticket data.
 
     Args:
-        ticket_data: load_ticket_xml()이 반환한 딕셔너리
+        Ticket data: load ticket xml
 
     Returns:
-        [{type, ticket}, ...] 목록.
+        [{type, ticket}, ...] list.
     """
     return ticket_data.get("relations", [])
 
@@ -792,16 +792,16 @@ def extract_relations(ticket_data: dict[str, Any]) -> list[dict[str, str]]:
 def validate_ticket_status_consistency(
     kanban_root: str, location_map: dict[str, str]
 ) -> list[str]:
-    """TC-01: 디렉터리 위치 vs XML <status> 불일치 검증.
+    """TC-01: Directory location vs XML <status> validation.
 
-    디렉터리 위치와 XML <status> 값이 불일치하면 경고를 생성한다.
+    If the directory location and XML <status> value is invalid, it creates a warning.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로
-        location_map: build_ticket_location_map() 반환값
+        kanban root: Kanban Route Absolute Route
+        location map: build ticket location map() return value
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     warnings: list[str] = []
     for ticket_number, dir_name in location_map.items():
@@ -813,8 +813,8 @@ def validate_ticket_status_consistency(
         expected_status = _DIR_TO_STATUS.get(dir_name, "")
         if expected_status and xml_status and xml_status != expected_status:
             warnings.append(
-                f"[TC-01] {ticket_number}: 디렉터리({dir_name}) vs XML status({xml_status}) 불일치 "
-                f"(기대값: {expected_status})"
+                f"[TC-01] {ticket_number}: directory ({dir_name}) vs XML status ({xml_status}) mismatch"
+                f"(Expected value: {expected_status})"
             )
     return warnings
 
@@ -822,16 +822,16 @@ def validate_ticket_status_consistency(
 def validate_derived_ticket_completion(
     kanban_root: str, location_map: dict[str, str]
 ) -> list[str]:
-    """TC-02: derived-from 파생 티켓 미완료 + 원본 done 경고.
+    """TC-02: count-from derivative ticket unfinished + original done alert.
 
-    파생 티켓이 done이 아닌 상태에서 원본 티켓이 done에 있으면 경고를 생성한다.
+    If the original ticket is done not done, it will generate a warning.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로
-        location_map: build_ticket_location_map() 반환값
+        kanban root: Kanban Route Absolute Route
+        location map: build ticket location map() return value
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     warnings: list[str] = []
     for ticket_number, dir_name in location_map.items():
@@ -848,8 +848,8 @@ def validate_derived_ticket_completion(
             origin_dir = location_map.get(origin_ticket, "")
             if origin_dir == "done" and dir_name != "done":
                 warnings.append(
-                    f"[TC-02] {ticket_number}(파생 티켓)이 미완료({dir_name})인데 "
-                    f"원본 {origin_ticket}이 done 상태임"
+                    f"[TC-02] {ticket_number} (derived ticket) is incomplete ({dir_name})"
+                    f"Original {origin_ticket} is done"
                 )
     return warnings
 
@@ -857,73 +857,73 @@ def validate_derived_ticket_completion(
 def validate_ticket_xml_fields(
     ticket_data: dict[str, Any], ticket_number: str, dir_name: str
 ) -> list[str]:
-    """TC-03/04/05/06: 단일 티켓 XML 필드 검증.
+    """TC-03/04/05/06: Single ticket XML field validation.
 
-    TC-03: open/progress/review 티켓에 number/command/prompt 필수 태그 존재
-    TC-04: command 값이 implement|review|research (체인 > 포함)
-    TC-05: open/progress/review 티켓에 goal/target 비어있으면 WARN
-    TC-06: 복수 항목 필드에 \\n 개행 누락 시 WARN (줄 수 대비 개행 비율 기반)
+    TC-03: number/command/prompt required tag presence on open/progress/review ticket
+    TC-04: command value implementation review research (included >)
+    TC-05: Open/progress/review Go to the ticket WARN
+    TC-06: WARN when missing \\n in plural field (based on the return rate of the line)
 
     Args:
-        ticket_data: load_ticket_xml()이 반환한 딕셔너리
-        ticket_number: 티켓 번호 (예: T-001)
-        dir_name: 디렉터리 위치 (open/progress/review/done)
+        Ticket data: load ticket xml
+        ticket number: ticket number (e.g. T-001)
+        dir name: directory location (open/progress/review/done)
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     warnings: list[str] = []
-    # todo는 백로그 상태로 prompt 필수 필드 완결 의무 없음 — open/progress/review만 활성 검증 대상
+    # Todo is in a backlog state and there is no obligation to complete prompt required fields — only open/progress/review is subject to active verification
     is_active = dir_name in ("open", "progress", "review")
 
     if not is_active:
         return warnings
 
-    # TC-03: 필수 태그 존재 여부
+    # TC-03: Presence of required tags
     if not ticket_data.get("number"):
-        warnings.append(f"[TC-03] {ticket_number}: <number> 태그 누락 또는 빈 값")
+        warnings.append(f"[TC-03] {ticket_number}: <number> tag missing or empty value")
     if not ticket_data.get("command"):
-        warnings.append(f"[TC-03] {ticket_number}: <command> 태그 누락 또는 빈 값")
-    # prompt 존재 여부: goal 또는 target 중 하나라도 있으면 prompt 블록 존재로 간주
+        warnings.append(f"[TC-03] {ticket_number}: <command> tag missing or empty value")
+    # Existence of prompt: If either goal or target is present, the prompt block is considered to exist.
     has_prompt = bool(ticket_data.get("goal") or ticket_data.get("target"))
     if not has_prompt:
-        warnings.append(f"[TC-03] {ticket_number}: <prompt> 블록 내 내용 없음")
+        warnings.append(f"[TC-03] {ticket_number}: No content in <prompt> block")
 
-    # TC-04: command 값 유효성
+    # TC-04: Command value validity
     raw_command = ticket_data.get("command", "")
     if raw_command:
-        # 체인 구분자 > 로 분리 후 각 토큰 검증
+        # Separate with chain separator > and verify each token
         tokens = [t.strip() for t in raw_command.split(">") if t.strip()]
         invalid_tokens = [t for t in tokens if t not in _VALID_COMMANDS]
         if invalid_tokens:
             warnings.append(
-                f"[TC-04] {ticket_number}: 유효하지 않은 command 값 {invalid_tokens} "
-                f"(허용: {sorted(_VALID_COMMANDS)})"
+                f"[TC-04] {ticket_number}: Invalid command value {invalid_tokens}"
+                f"(Allow: {sorted(_VALID_COMMANDS)})"
             )
 
-    # TC-05: goal/target 빈 값
+    # TC-05: goal/target empty value
     if not ticket_data.get("goal", "").strip():
-        warnings.append(f"[TC-05] {ticket_number}: <goal> 비어있음")
+        warnings.append(f"[TC-05] {ticket_number}: <goal> empty")
     if not ticket_data.get("target", "").strip():
-        warnings.append(f"[TC-05] {ticket_number}: <target> 비어있음")
+        warnings.append(f"[TC-05] {ticket_number}: <target> empty")
 
-    # TC-06: 복수 항목 필드 개행 누락
+    # TC-06: Missing newlines in multiple entry fields
     for field in _MULTI_FIELDS:
         value = ticket_data.get(field, "")
         if not value:
             continue
         lines = [ln for ln in value.split("\n") if ln.strip()]
-        # 2줄 이상인데 개행 문자(\n)가 없으면 경고
-        # XML 파싱 시 실제 개행은 \n으로 이미 존재하므로,
-        # 원본 텍스트의 실제 줄 수 vs 개행 수로 판단
+        # If there are more than 2 lines and there is no newline character ( \n ), a warning is issued.
+        # When parsing XML, the actual newline already exists as \n,
+        # Judging by the actual number of lines vs. the number of newlines in the original text
         line_count = len(lines)
-        # 2줄 이상이고 실제 줄 수가 1이면 개행 없이 한 줄에 붙여 쓴 것
-        # (XML 파싱 후 stripped 결과로 판단)
+        # If there are more than 2 lines and the actual number of lines is 1, they are written on one line without a newline.
+        # (Judged by stripped results after XML parsing)
         raw_value = ticket_data.get(field, "")
         actual_newlines = raw_value.count("\n")
         if line_count >= 2 and actual_newlines == 0:
             warnings.append(
-                f"[TC-06] {ticket_number}: <{field}> 복수 항목({line_count}개)에 \\n 개행 누락"
+                f"[TC-06] {ticket_number}: Missing \n newlines in multiple <{field}> items ({line_count} items)"
             )
 
     return warnings
@@ -932,14 +932,14 @@ def validate_ticket_xml_fields(
 def validate_all_tickets_xml_fields(
     kanban_root: str, location_map: dict[str, str]
 ) -> list[str]:
-    """TC-03~06: 전체 티켓 XML 필드 일괄 검증.
+    """TC-03~06: Full ticket XML field batch verification.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로
-        location_map: build_ticket_location_map() 반환값
+        kanban root: Kanban Route Absolute Route
+        location map: build ticket location map() return value
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     warnings: list[str] = []
     for ticket_number, dir_name in sorted(location_map.items()):
@@ -956,18 +956,18 @@ def validate_relation_links(
     location_map: dict[str, str],
     full_location_map: dict[str, str] | None = None,
 ) -> list[str]:
-    """TC-07: 관계 링크 대상 티켓 존재 여부 검증.
+    """TC-07: Validation of whether the relevant link is present.
 
-    relations에 참조된 티켓이 칸반에 존재하지 않으면 경고를 생성한다.
+    If the ticket referenced in the field does not exist in the field, it will generate a warning.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로
-        location_map: 검증 대상 티켓 맵 (단일 또는 전체)
-        full_location_map: 링크 존재 여부 확인용 전체 티켓 맵.
-            None이면 location_map을 전체 맵으로 사용한다.
+        kanban root: Kanban Route Absolute Route
+        location map: valid ticket map (single or full)
+        full location map: Full ticket map for check whether the link exists.
+            If none, use the location map to the full map.
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     existence_map = full_location_map if full_location_map is not None else location_map
     warnings: list[str] = []
@@ -982,8 +982,8 @@ def validate_relation_links(
                 continue
             if target_ticket not in existence_map:
                 warnings.append(
-                    f"[TC-07] {ticket_number}: 관계 링크 대상 {target_ticket}({rel.get('type', '')})이 "
-                    f"칸반에 존재하지 않음"
+                    f"[TC-07] {ticket_number}: Relationship link target {target_ticket}({rel.get('type', '')}) is"
+                    f"Doesn't exist in Kanban"
                 )
     return warnings
 
@@ -991,63 +991,63 @@ def validate_relation_links(
 def validate_tickets(
     kanban_root: str, single_ticket: str | None = None
 ) -> list[str]:
-    """칸반 티켓 전체 또는 단일 티켓을 검증하고 경고 목록을 반환한다.
+    """Validate the entire Kanban ticket or a single ticket and return the warning list.
 
-    TC-01~TC-07 7종 검증 규칙을 순차 실행한다.
+    TC-01~TC-07 7 types of verification rules are executed.
 
     Args:
-        kanban_root: 칸반 루트 절대 경로
-        single_ticket: 단일 티켓 검증 시 티켓 번호 (예: T-001). None이면 전체 검증.
+        kanban root: Kanban Route Absolute Route
+        single ticket: Ticket number (e.g. T-001) when validating a single ticket. If none, the full validation.
 
     Returns:
-        경고 메시지 목록.
+        Send your inquiry directly to us
     """
     if not os.path.isdir(kanban_root):
-        return [f"[ERROR] 칸반 루트 디렉터리를 찾을 수 없습니다: {kanban_root}"]
+        return [f"[ERROR] Kanban root directory not found: {kanban_root}"]
 
     full_location_map = build_ticket_location_map(kanban_root)
     if not full_location_map:
-        return ["[WARN] 칸반에서 티켓을 찾을 수 없습니다."]
+        return ["[WARN] Ticket not found in Kanban."]
 
-    # 단일 티켓 모드: TC-01~06은 단일 티켓 맵, TC-07은 전체 맵으로 링크 검증
+    # Single ticket mode: TC-01~06 is a single ticket map, TC-07 is a full map to verify link
     if single_ticket:
         if single_ticket not in full_location_map:
-            return [f"[ERROR] 티켓 {single_ticket}을 칸반에서 찾을 수 없습니다."]
+            return [f"[ERROR] Ticket {single_ticket} not found in Kanban."]
         target_map = {single_ticket: full_location_map[single_ticket]}
     else:
         target_map = full_location_map
 
     warnings: list[str] = []
 
-    # TC-01: 디렉터리 vs XML status 불일치
+    # TC-01: Directory vs XML status mismatch
     warnings.extend(validate_ticket_status_consistency(kanban_root, target_map))
 
-    # TC-02: derived-from 파생 미완료 + 원본 done
+    # TC-02: derived-from derived incomplete + original done
     warnings.extend(validate_derived_ticket_completion(kanban_root, target_map))
 
-    # TC-03~06: XML 필드 검증
+    # TC-03~06: XML field validation
     warnings.extend(validate_all_tickets_xml_fields(kanban_root, target_map))
 
-    # TC-07: 관계 링크 끊김 (TC-07은 전체 location_map 기준으로 존재 여부 확인)
+    # TC-07: Relationship link lost (TC-07 checks for existence based on the entire location_map)
     warnings.extend(validate_relation_links(kanban_root, target_map, full_location_map))
 
     return warnings
 
 
 def _print_validate_result(warnings: list[str], mode_label: str) -> None:
-    """검증 결과를 표준 출력 형식으로 출력한다.
+    """Output verification results in standard output format.
 
     Args:
-        warnings: 경고 메시지 목록
-        mode_label: 모드 레이블 (예: "PLAN", "TICKET")
+        alerts: alert message list
+        mode label: mode label (e.g. "PLAN", "TICKET")
     """
     if not warnings:
         print(
-            f"[STATE] VALIDATE-{mode_label} 검증 통과",
+            f"[STATE] VALIDATE-{mode_label} validation passed",
             flush=True,
         )
         print(
-            ">> 경고 0건",
+            ">> 0 warnings",
             flush=True,
         )
         return
@@ -1057,7 +1057,7 @@ def _print_validate_result(warnings: list[str], mode_label: str) -> None:
         flush=True,
     )
     print(
-        f">> 경고 {len(warnings)}건 발견",
+        f">> Warning {len(warnings)} found",
         flush=True,
     )
     print()
@@ -1066,42 +1066,42 @@ def _print_validate_result(warnings: list[str], mode_label: str) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """plan_validator CLI용 ArgumentParser를 생성하여 반환한다."""
+    """plan_validator Creates and returns ArgumentParser for CLI."""
     parser = argparse.ArgumentParser(
         prog="flow-validate",
         description=(
-            "plan.md 구조 검증 — Phase 균형·작업 편차·스킬 부족·WHAT/HOW 분리를 검사한다.\n"
-            "--mode ticket 시 칸반 티켓 XML 구조 검증(TC-01~07)을 수행한다."
+            "plan.md structure verification — Check phase balance, work deviation, skill deficiency, and WHAT/HOW separation. \n"
+            "In --mode ticket, Kanban ticket XML structure verification (TC-01~07) is performed."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "입력 형식:\n"
-            "  1. registryKey (YYYYMMDD-HHMMSS 패턴):\n"
+            "Input format: \n"
+            "1. registryKey (YYYYMMDD-HHMMSS pattern): \n"
             "       flow-validate 20260303-124206\n"
-            "  2. workDir 경로:\n"
-            "       flow-validate .workflow/20260303-124206/작업명/implement\n"
-            "  3. plan.md 직접 경로:\n"
+            "2. workDir path: \n"
+            "flow-validate .workflow/20260303-124206/task name/implement \n"
+            "3. plan.md direct path: \n"
             "       flow-validate .workflow/20260303-124206/.../implement/plan.md\n"
-            "  4. ticket 모드 (전체):\n"
+            "4. ticket mode (all): \n"
             "       flow-validate --mode ticket\n"
-            "  5. ticket 모드 (단일):\n"
+            "5. ticket mode (single): \n"
             "       flow-validate --mode ticket --ticket T-001\n"
             "\n"
-            "검증 항목 (plan 모드):\n"
-            "  1. Phase 균형  : Mermaid 서브그래프에서 Phase별 워커 수 추출,\n"
-            "                   최대/최소 비율 3배 이상 시 경고\n"
-            "  2. 작업 편차   : 같은 Phase 내 워커 간 작업 항목 수 편차 2 초과 시 경고\n"
-            "  3. 스킬 부족   : T2(10+) 태스크에서 스킬 1개만 배정 시 경고\n"
-            "  4. WHAT/HOW   : criteria/goal/context 재서술 탐지 (advisory)\n"
+            "Verification items (plan mode): \n"
+            "1. Phase balance: Extracting the number of workers per phase from the Mermaid subgraph, \n"
+            "Warning when the maximum/minimum ratio is more than 3 times \n"
+            "2. Work deviation: Warning when the deviation in the number of work items between workers in the same phase exceeds 2. \n"
+            "3. Skill shortage: Warning when only 1 skill is assigned in T2 (10+) task \n"
+            "4. WHAT/HOW: criteria/goal/context redescription detection (advisory) \n"
             "\n"
-            "검증 항목 (ticket 모드):\n"
-            "  TC-01: 디렉터리 위치 vs XML status 불일치\n"
-            "  TC-02: derived-from 파생 미완료 + 원본 done 경고\n"
-            "  TC-03: 필수 태그 누락 (number/command/prompt)\n"
-            "  TC-04: command 값 유효성 (implement|review|research)\n"
-            "  TC-05: goal/target 빈 값 경고\n"
-            "  TC-06: 복수 항목 필드 개행 누락 경고\n"
-            "  TC-07: 관계 링크 대상 티켓 존재 여부\n"
+            "Verification items (ticket mode): \n"
+            "TC-01: Directory location vs XML status mismatch \n"
+            "TC-02: derived-from derived incomplete + original done warning \n"
+            "TC-03: Required tag missing (number/command/prompt) \n"
+            "TC-04: Command value validity (implement|review|research) \n"
+            "TC-05: goal/target empty value warning \n"
+            "TC-06: Multi-entry field missing newline warning \n"
+            "TC-07: Relationship link target ticket exists \n"
             "\n"
             + build_common_epilog()
         ),
@@ -1112,34 +1112,34 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="?",
         default=None,
         help=(
-            "검증할 plan.md 경로, workDir 경로, 또는 registryKey "
-            "(YYYYMMDD-HHMMSS 형식). --mode ticket 시 생략 가능."
+            "plan.md path, workDir path, or registryKey to verify"
+            "(YYYYMMDD-HHMMSS format). Can be omitted when using --mode ticket."
         ),
     )
     parser.add_argument(
         "--mode",
         choices=["plan", "ticket"],
         default="plan",
-        help="검증 모드 선택: plan(기본값) 또는 ticket",
+        help="Select verification mode: plan (default) or ticket",
     )
     parser.add_argument(
         "--ticket",
         metavar="TICKET_NUMBER",
         default=None,
-        help="단일 티켓 검증 (--mode ticket 시 사용, 예: T-001)",
+        help="Single ticket verification (used when --mode ticket, e.g. T-001)",
     )
     return parser
 
 
 def main() -> None:
-    """CLI 진입점. 인자 파싱 후 검증 결과를 출력한다."""
+    """CLI entry point. After parsing the arguments, the verification results are output."""
     parser = _build_parser()
     args = parser.parse_args()
 
     mode: str = args.mode
     _work_dir = resolve_work_dir_for_logging()
 
-    # --- ticket 모드 ---
+    # --- ticket mode ---
     if mode == "ticket":
         if _work_dir:
             append_log(_work_dir, "INFO", "plan_validator: start mode=ticket")
@@ -1154,19 +1154,19 @@ def main() -> None:
         _print_validate_result(warnings, "TICKET")
         sys.exit(0)
 
-    # --- plan 모드 (기본) ---
+    # --- plan mode (default) ---
     plan_path: str | None = args.plan_path
     if plan_path is None:
-        parser.error("plan 모드에서는 plan_path 인자가 필요합니다.")
-        return  # unreachable, mypy 대응
+        parser.error("In plan mode, the plan_path argument is required.")
+        return  # unreachable, mypy response
 
-    # 3단계 경로 해석 분기
+    # Step 3 Path Analysis Branching
     if not plan_path.endswith(".md"):
-        # .md로 끝나지 않는 경우: registryKey 또는 workDir로 해석
+        # If not ending in .md: interpreted as registryKey or workDir
         resolved_dir: str = resolve_work_dir(plan_path, PROJECT_ROOT)
         plan_path = os.path.join(resolved_dir, "plan.md")
 
-    # 상대 경로를 절대 경로로 변환
+    # Convert relative path to absolute path
     if not os.path.isabs(plan_path):
         plan_path = os.path.join(PROJECT_ROOT, plan_path)
 

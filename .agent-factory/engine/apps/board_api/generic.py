@@ -6,8 +6,8 @@ import json
 import os
 import time
 
-from board.server.state import sse_manager, poll_tracker
-from board.server._common import (
+from board.server.runtime.state import sse_manager, poll_tracker
+from board.server.support.common import (
     SERVER_STARTED_AT,
     SERVER_PID,
     api_endpoint,
@@ -80,9 +80,9 @@ class GenericHandlerMixin:
             self._send_json(_read_kanban_tickets(project_root, files))
         elif path == '/api/dashboard':
             self._send_json(_read_dashboard(project_root))
-        # T-513 P2 — 옛 워크플로우 entries/detail inline 분기는 KANBAN 도메인 이전
-        # (KanbanHandlerMixin._handle_kanban_workflow_{entries,detail}). 본 _handle_api
-        # 안 inline 분기는 dead — http_router do_GET 가 직접 위임.
+        # T-513 P2 — Old workflow entries/detail inline branch transferred to KANBAN domain
+        # (KanbanHandlerMixin._handle_kanban_workflow_{entries,detail}). This _handle_api
+        # An inline branch is dead — http_router do_GET delegates directly.
         elif path == '/api/server-info':
             self._send_json({
                 'pid': SERVER_PID,

@@ -1,7 +1,7 @@
-/* Memory GC bar — Memory 서브탭 상단에 GC 상태 + 액션 버튼.
+/* Memory GC bar — GC status + action button at the top of the memory subtab.
  *
- * 백엔드: GET /api/memory/gc/status, POST /api/memory/gc/run, POST /api/memory/gc/prune-archive
- * 디자인: 단일 줄 status + 우측 액션 버튼. 상세 토글로 archive/카테고리 카운트 노출.
+ * <# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #>
+ * Design: Single row status + right action button. View details Toggles archive/Category Count.
  */
 (function () {
   if (!window.Board) return;
@@ -9,7 +9,7 @@
   var R = (Board.render = Board.render || {});
   var GC = (Board._memoryGc = Board._memoryGc || {});
 
-  // expanded 는 사용자 토글이라 영속화 — Board.state.contexts.memory.gcExpanded 가 진실.
+  // expanded is a user toggle — Board.state.contexts.memory.gcExpanded is true.
   function _initialExpanded() {
     var cx = Board.state && Board.state.contexts;
     return !!(cx && cx.memory && cx.memory.gcExpanded);
@@ -19,7 +19,7 @@
     status: null,
     busy: false,
     expanded: _initialExpanded(),
-    flash: null,    // 직전 GC 결과 한줄 요약 (2.5s 노출 후 자동 해제)
+    flash: null,    // Interpretation GC Results Summary (Automatically disclosure after 2.5s exposure)
     flashTimer: null,
   };
 
@@ -59,7 +59,7 @@
   }
 
   function fmtRelative(isoStr) {
-    // YYYY-MM-DDTHH:MM:SS → 시각만 + (m/h ago) 표기
+    // YYYY-MM-DDTHH:MM:SS → Vision Only + (m/h ago) Notation
     if (!isoStr) return "n/a";
     var d = new Date(isoStr);
     if (isNaN(d.getTime())) return isoStr;
@@ -174,8 +174,8 @@
   function runCycle(container, dryRun) {
     GC.state.busy = true;
     render(container);
-    // Reflect (LLM 자동 합성) 는 "never auto-modified" 원칙으로 폐기.
-    // 이 사이클은 dedup + 인덱스 재생성만. LLM 호출 없음.
+    // Reflect (LLM automatic synthesis) is the principle of "never auto-modified".
+    // This cycle is only dedup + index reproduction. No LLM call.
     postRun({ dry_run: dryRun, with_reflection: false }).then(function (res) {
       GC.state.busy = false;
       var label = dryRun ? "Dry-run" : "Run GC";

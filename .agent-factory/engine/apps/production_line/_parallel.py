@@ -82,7 +82,7 @@ def _spawn_fail_tolerant(
     fn: Callable[[Any], Any],
     workers: int,
 ) -> list[ParallelOutcome]:
-    """모든 future 끝까지 wait + 결과 집계."""
+    """Wait until the end of all futures + aggregate results."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         future_to_idx = {
             pool.submit(fn, item): idx for idx, item in enumerate(items_list)
@@ -94,7 +94,7 @@ def _spawn_fail_tolerant(
                 outcomes[idx] = ParallelOutcome(
                     item=items_list[idx], ok=True, value=value, exception=None
                 )
-            except BaseException as exc:  # noqa: BLE001 — outcome 으로 박제
+            except BaseException as exc:  # noqa: BLE001 — Stuffed with outcome
                 outcomes[idx] = ParallelOutcome(
                     item=items_list[idx], ok=False, value=None, exception=exc
                 )
@@ -107,7 +107,7 @@ def _spawn_fail_fast(
     fn: Callable[[Any], Any],
     workers: int,
 ) -> list[ParallelOutcome]:
-    """한 future fail 감지 시 미시작 future cancel + 즉시 종료."""
+    """When a future fail is detected, the non-starting future cancel + terminates immediately."""
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
     try:
         future_to_idx: dict[concurrent.futures.Future, int] = {
@@ -121,19 +121,19 @@ def _spawn_fail_fast(
                 outcomes[idx] = ParallelOutcome(
                     item=items_list[idx], ok=True, value=value, exception=None
                 )
-            except BaseException as exc:  # noqa: BLE001 — outcome 으로 박제
+            except BaseException as exc:  # noqa: BLE001 — Stuffed with outcome
                 outcomes[idx] = ParallelOutcome(
                     item=items_list[idx], ok=False, value=None, exception=exc
                 )
                 aborted = True
-                # 시작 안 한 future cancel — 이미 실행 중인 future 는 GIL 보호
-                # 안에서 자기 결과 박제까지 진행됨 (강제 kill 없음).
+                # Cancel a future that has not started — Futures that are already running are GIL protected
+                # Inside, the animal is even taxidermied (no forced killing).
                 for other in future_to_idx:
                     if not other.done():
                         other.cancel()
                 break
         if aborted:
-            # cancel 된 future 결과 박제 — 빠른 종료
+            # Stuffing canceled future results — quick exit
             for other, other_idx in future_to_idx.items():
                 if outcomes[other_idx].ok or outcomes[other_idx].exception is not None:
                     continue
@@ -145,7 +145,7 @@ def _spawn_fail_fast(
                         exception=concurrent.futures.CancelledError("aborted by fail_fast"),
                     )
                 elif other.done():
-                    # 이미 끝났지만 결과 박제 누락 — 안전망
+                    # Already done but missing the results taxidermy — a safety net
                     try:
                         v = other.result(timeout=0)
                         outcomes[other_idx] = ParallelOutcome(

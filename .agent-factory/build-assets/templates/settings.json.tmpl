@@ -44,7 +44,7 @@
           {
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/pre-tool-use.py",
-            "statusMessage": "pre-tool-use 디스패처 실행 중..."
+            "statusMessage": "pre-tool-use Running dispatcher..."
           }
         ]
       }
@@ -56,7 +56,7 @@
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/subagent-stop.py",
             "timeout": 10,
-            "statusMessage": "subagent-stop 디스패처 실행 중..."
+            "statusMessage": "subagent-stop Running dispatcher..."
           }
         ]
       }
@@ -69,7 +69,7 @@
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/post-tool-use.py",
             "timeout": 30,
             "async": true,
-            "statusMessage": "post-tool-use 디스패처 실행 중..."
+            "statusMessage": "Running post-tool-use dispatcher..."
           }
         ]
       }
@@ -81,7 +81,7 @@
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/user-prompt-submit.py",
             "timeout": 3,
-            "statusMessage": "user-prompt-submit 디스패처 실행 중..."
+            "statusMessage": "user-prompt-submit Running dispatcher..."
           }
         ]
       }

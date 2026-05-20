@@ -1,14 +1,14 @@
-"""test_emitter.py — T-495 P1 의미별 board endpoint helper 검증.
+"""test_emitter.py — Verification of board endpoint helper by T-495 P1 meaning.
 
-대상:
+Target:
   - session_create → POST /api/v2/sessions
   - step_start → POST /api/v2/sessions/<id>/step
   - stdout_chunk → POST /api/v2/sessions/<id>/stdout
   - phase_start/phase_end → POST /api/v2/sessions/<id>/phase
   - workflow_finish → POST /api/v2/sessions/<id>/finish
-  - V2_BOARD_POST gate 시 silent skip
-  - wf_session_id 미설정 시 silent skip
-  - metrics.jsonl 누적 (NDJSON)
+  - Silent skip at V2_BOARD_POST gate
+  - Silent skip when wf_session_id is not set
+  - metrics.jsonl cumulative (NDJSON)
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def enable_board_post(monkeypatch):
 
 
 def _capture_posts(monkeypatch):
-    """_post_to_board 호출 인자 캡처. fire-and-forget thread 우회 — 동기 캡처."""
+    """Capturing _post_to_board call arguments. fire-and-forget thread bypass — synchronous capture."""
     calls: list[tuple[str, dict[str, Any]]] = []
 
     def fake_post(endpoint_path: str, body: dict[str, Any]) -> None:
@@ -94,7 +94,7 @@ def test_step_start_posts_step_endpoint(ctx, monkeypatch):
 
 
 def test_step_end_does_not_post(ctx, monkeypatch):
-    """step_end 는 board POST 안 함 — 다음 step.start 가 backend 갱신."""
+    """step_end does not POST the board — the next step.start updates the backend."""
     calls = _capture_posts(monkeypatch)
     emitter.step_end(ctx, "PLAN", outcome="ok", retry_count=0)
     assert calls == []
@@ -155,11 +155,11 @@ def test_workflow_finish_fail_normalizes_unknown_outcome(ctx, monkeypatch):
     calls = _capture_posts(monkeypatch)
     emitter.workflow_finish(ctx, outcome="weird", summary="x")
     path, body = calls[0]
-    assert body["outcome"] == "fail"  # ok|fail 외는 fail 안전 매핑
+    assert body["outcome"] == "fail"  # Other than ok|fail, fail-safe mapping
 
 
 def test_metrics_jsonl_appended_on_emit(ctx):
-    """emit() 호출이 metrics.jsonl 에 NDJSON line 추가."""
+    """The emit() call adds an NDJSON line to metrics.jsonl."""
     emitter.emit(ctx, "step.start", step="PLAN", ticket=ctx.ticket_no)
     emitter.emit(ctx, "step.end", step="PLAN", ticket=ctx.ticket_no, outcome="ok")
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
@@ -170,9 +170,9 @@ def test_metrics_jsonl_appended_on_emit(ctx):
 
 
 def test_board_post_gate_disabled(ctx, monkeypatch):
-    """V2_BOARD_POST 미설정 시 _post_to_board 가 internal gate 로 skip."""
+    """If V2_BOARD_POST is not set, _post_to_board skips to internal gate."""
     monkeypatch.delenv("V2_BOARD_POST", raising=False)
-    # _post_to_board 의 실제 분기 검사 (mock 안 함)
+    # Check actual branch of _post_to_board (not mock)
     calls: list[tuple[str, dict]] = []
     real_post = emitter._post_to_board
 
@@ -184,14 +184,14 @@ def test_board_post_gate_disabled(ctx, monkeypatch):
 
     with patch("urllib.request.urlopen") as mocked_urlopen:
         emitter.session_create(ctx)
-        # session_create 는 helper 가 직접 _post_to_board 호출 — spy 가 한 번 잡힘
+        # session_create calls _post_to_board directly from helper — spy caught once
         assert len(calls) == 1
-        # 그러나 V2_BOARD_POST 비활성 + _post_to_board 내부 gate 로 urlopen 미호출
+        # However, V2_BOARD_POST is inactive + urlopen is not called with the _post_to_board internal gate.
         mocked_urlopen.assert_not_called()
 
 
 def test_session_start_alias_calls_session_create(ctx, monkeypatch):
-    """backward-compat alias 검증 — session_start = session_create."""
+    """backward-compat alias validation — session_start = session_create."""
     calls = _capture_posts(monkeypatch)
     emitter.session_start(ctx)
     assert len(calls) == 1
@@ -199,12 +199,12 @@ def test_session_start_alias_calls_session_create(ctx, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# T-506 P7 — phase_start/end 다중 session 박제 + thread-safe append
+# T-506 P7 — phase_start/end multi-session stuffing + thread-safe append
 # ---------------------------------------------------------------------------
 
 
 def test_phase_start_session_id_payload(ctx, monkeypatch):
-    """T-506 P7 — phase_start 가 session_id + worker_index payload 박제."""
+    """T-506 P7 — phase_start stuffed with session_id + worker_index payload."""
     _capture_posts(monkeypatch)
     emitter.phase_start(ctx, "P1", session_id="abc-uuid", worker_index=2)
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
@@ -216,7 +216,7 @@ def test_phase_start_session_id_payload(ctx, monkeypatch):
 
 
 def test_phase_end_session_id_payload(ctx, monkeypatch):
-    """T-506 P7 — phase_end 도 session_id + worker_index payload 박제."""
+    """T-506 P7 — phase_end also stuffed with session_id + worker_index payload."""
     _capture_posts(monkeypatch)
     emitter.phase_end(ctx, "P1", outcome="ok", session_id="xyz-uuid", worker_index=3)
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
@@ -227,7 +227,7 @@ def test_phase_end_session_id_payload(ctx, monkeypatch):
 
 
 def test_phase_start_omits_empty_session_id(ctx, monkeypatch):
-    """기존 호출자 시그니처 호환 — session_id="" / worker_index=0 default → payload 미포함."""
+    """Compatible with existing caller signatures — session_id="" / worker_index=0 default → payload not included."""
     _capture_posts(monkeypatch)
     emitter.phase_start(ctx, "P1", spawn_mode="in_place")
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
@@ -238,7 +238,7 @@ def test_phase_start_omits_empty_session_id(ctx, monkeypatch):
 
 
 def test_emit_multi_thread_no_line_drop(ctx):
-    """T-506 P7 — 10 thread × 30 emit = 300 line 모두 metrics.jsonl 박제."""
+    """T-506 P7 — 10 thread × 30 emit = 300 lines all stuffed in metrics.jsonl."""
     import threading
 
     N_THREADS = 10
@@ -264,10 +264,10 @@ def test_emit_multi_thread_no_line_drop(ctx):
     assert len(lines) == N_THREADS * PER_THREAD, (
         f"line drop: expected {N_THREADS * PER_THREAD}, got {len(lines)}"
     )
-    # 각 line 이 valid JSON + event=test.event
+    # Each line is valid JSON + event=test.event
     parsed = [json.loads(line) for line in lines]
     assert all(r["event"] == "test.event" for r in parsed)
-    # 각 (tid, seq) 쌍이 정확히 1번씩 등장
+    # Each (tid, seq) pair occurs exactly once
     pairs = {(r["tid"], r["seq"]) for r in parsed}
     assert len(pairs) == N_THREADS * PER_THREAD
 
@@ -278,7 +278,7 @@ def test_emit_multi_thread_no_line_drop(ctx):
 
 
 class _BrokenStdout:
-    """sys.stdout 대체용 — write 시 BrokenPipeError raise."""
+    """Replaces sys.stdout — raises BrokenPipeError when writing."""
 
     def write(self, data: str) -> int:  # noqa: ARG002
         raise BrokenPipeError("EPIPE")
@@ -288,7 +288,7 @@ class _BrokenStdout:
 
 
 class _OSErrorStdout:
-    """sys.stdout 대체용 — write 시 일반 OSError raise (BrokenPipe 외)."""
+    """Replaces sys.stdout — raises a general OSError when writing (BrokenPipe, etc.)."""
 
     def write(self, data: str) -> int:  # noqa: ARG002
         raise OSError(28, "ENOSPC")
@@ -298,36 +298,36 @@ class _OSErrorStdout:
 
 
 def test_emit_broken_pipe_returns_silently(ctx, monkeypatch):
-    """T-518 — sys.stdout.write 가 BrokenPipeError 를 raise 해도 예외 전파 안 함.
+    """T-518 — Even if sys.stdout.write raises BrokenPipeError, exception is not propagated.
 
-    Root cause (T-514 P6 §1): driver subprocess stdout pipe 가 끊긴 상황. emit()
-    의 BrokenPipeError 미catch 가 driver 사망의 단일 origin 이었음.
+    Root cause (T-514 P6 §1): Driver subprocess stdout pipe is disconnected. emit()
+    BrokenPipeError not caught was the single origin of driver death.
     """
     monkeypatch.setattr(sys, "stdout", _BrokenStdout())
-    # graceful return — 예외 전파 0
+    # graceful return — exception propagation 0
     emitter.emit(ctx, "test.event", payload="x")
 
 
 def test_emit_normal_writes_to_stdout(ctx, capsys):
-    """T-518 — 정상 path 의 stdout 출력 보존 (BrokenPipe catch 가 회귀 없음)."""
+    """T-518 — Preserve stdout output of normal path (no regression of BrokenPipe catch)."""
     emitter.emit(ctx, "test.event", payload="x")
     captured = capsys.readouterr()
     assert '"event": "test.event"' in captured.out
     assert '"payload": "x"' in captured.out
-    # metrics.jsonl 박제도 정상
+    # metrics.jsonl Park Je-do summit
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
     assert any(json.loads(line)["event"] == "test.event" for line in lines)
 
 
 def test_emit_other_oserror_propagates(ctx, monkeypatch):
-    """T-518 — BrokenPipeError 만 swallow; 다른 OSError 는 전파 (진단 정보 손실 방지)."""
+    """T-518 — BrokenPipeError only swallow; Other OSErrors are propagated (preventing loss of diagnostic information)."""
     monkeypatch.setattr(sys, "stdout", _OSErrorStdout())
     with pytest.raises(OSError):
         emitter.emit(ctx, "test.event", payload="x")
 
 
 def test_phase_start_session_ids_list(ctx, monkeypatch):
-    """T-506 P7 — workers > 1 phase 의 session_ids list payload 박제."""
+    """T-506 P7 — workers > 1 phase of session_ids list payload stuffed."""
     _capture_posts(monkeypatch)
     emitter.phase_end(
         ctx,

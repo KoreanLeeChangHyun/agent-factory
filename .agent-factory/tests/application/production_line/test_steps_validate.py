@@ -1,8 +1,8 @@
 """test_steps_validate.py — VALIDATE Step wire-up (T-503 fix).
 
-T-503 wire-up 회귀 정정: validate_step 가 (1) _verify_code.run(ctx) 호출 →
-validate/code.json 산출 (2) validate/report.md nested mirror 작성 (3)
-work/**/*.md 재귀 매칭으로 nested 산출물 inject.
+T-503 wire-up regression correction: validate step (1)  verify code.run(ctx) call →
+validate/code.json output (2) validate/report.md nested mirror creation (3)
+Business nested output inject with md regression matching.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from engine.apps.production_line.stations import validate as validate_mod
 def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
     work_dir = tmp_path / "runs" / "20260518-000000"
     (work_dir / "work").mkdir(parents=True, exist_ok=True)
-    # T-504 cutover — plan/plan.md (nested) 사전 fixture
+    # T-504 cutover — plan/plan.md (nested) pre-curtain
     (work_dir / "plan").mkdir(parents=True, exist_ok=True)
     (work_dir / "plan" / "plan.md").write_text("plan body\n", encoding="utf-8")
     ctx = WorkflowContext(
@@ -26,13 +26,13 @@ def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
         command=command,
         mode="multi",
         current_step="WORK",
-        title="wire-up 검증",
+        title="wire-up verification",
     )
     return ctx
 
 
 def _patch_validate_externals(monkeypatch, *, simulate_llm_artifact: bool = True):
-    """LLM spawn 모킹 — artifact 파일 생성 시뮬레이션."""
+    """LLM spawn moking — Simulation of creation of artifact files."""
     captured = {"verify_code_called": 0}
 
     def fake_spawn_with_retry(ctx, *, step, artifact_path, **kw):
@@ -56,7 +56,7 @@ def _patch_validate_externals(monkeypatch, *, simulate_llm_artifact: bool = True
 
 
 def test_validate_step_invokes_verify_code(monkeypatch, tmp_path):
-    """validate_step → _verify_code.run(ctx) 호출 + validate/code.json 산출."""
+    """validate step →  verify code.run(ctx) call + validate/code.json output."""
     ctx = _make_ctx(tmp_path, command="implement")
     captured = _patch_validate_externals(monkeypatch)
 
@@ -67,7 +67,7 @@ def test_validate_step_invokes_verify_code(monkeypatch, tmp_path):
 
 
 def test_validate_step_writes_nested_report_mirror(monkeypatch, tmp_path):
-    """validate_step → validate/report.md (nested) 동시 작성 (점진 마이그)."""
+    """validate step → validate/report.md (nested) simultaneous creation (document mig)."""
     ctx = _make_ctx(tmp_path)
     _patch_validate_externals(monkeypatch)
 
@@ -81,7 +81,7 @@ def test_validate_step_writes_nested_report_mirror(monkeypatch, tmp_path):
 
 
 def test_validate_step_globs_nested_work_md(monkeypatch, tmp_path):
-    """work/**/*.md 재귀 매칭 — nested work/<phase>/W1.md 도 inject."""
+    """Business md recurring — nested work/<phase>/W1.md also inject."""
     ctx = _make_ctx(tmp_path)
     nested_md = ctx.work_phase_w_md("P1", 1)
     nested_md.parent.mkdir(parents=True, exist_ok=True)

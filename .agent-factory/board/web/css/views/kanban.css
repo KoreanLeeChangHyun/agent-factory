@@ -1004,7 +1004,7 @@
 }
 
 .card-review-verdict.verdict-warn {
-  color: #d97706;        /* 앰버 */
+  color: #d97706;        /* Amber */
   background: rgba(217, 119, 6, 0.10);
   border: 1px solid rgba(217, 119, 6, 0.40);
   opacity: 0.9;

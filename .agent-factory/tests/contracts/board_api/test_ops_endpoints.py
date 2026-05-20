@@ -1,12 +1,12 @@
-"""운영 endpoint 3건 단위 테스트 (T-511 P5).
+"""Operation endpoint 3 unit tests (T-511 P5).
 
-검증:
-  - POST /api/ops/zombie-reap — Claude CLI 좀비 회수 명시 호출
-  - POST /api/ops/debug-toggle — debug.enabled 플래그 토글
-  - GET  /api/ops/sse-status — 3 SSE 채널 상태 dump
+Warranty:
+  - POST /api/ops/zombie-reap — Claude CLI Zombie Replication Call
+  - POST/api/ops/debug-toggle — debug.enabled flag toggle
+  - GET /api/ops/sse-status — 3 SSE Channel status dump
 
-production endpoint 직접 호출 금지 (board.md 절대 금지 §0.1). 본 테스트는
-AST 기반 정적 검증 + 일부 in-process 로직 검증 (debug.enabled 토글).
+production endpoint direct call ban (board.md absolute ban §0.1). This test is
+AST-based static verification + some in-process logic verification (debug.enabled toggle).
 """
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
 _BOARD_API_APP_DIR = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api"
-_HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
+_HTTP_ROUTER = (
+    _REPO_ROOT / ".agent-factory" / "board" / "server" / "routing" / "http_router.py"
+)
 
 
 def _find_ops_file() -> Path | None:
@@ -35,13 +37,13 @@ def _find_ops_file() -> Path | None:
 
 
 def test_ops_handler_file_exists() -> None:
-    """ops_endpoints.py 또는 system.py 파일 존재."""
+    """ops endpoints.py or system.py file exist."""
     p = _find_ops_file()
-    assert p is not None, f"파일 미존재 — {_HANDLERS_DIR}/ops_endpoints.py 또는 system.py 필요"
+    assert p is not None, f"-   FIELD 0   /ops endpoints.py or system.py"
 
 
 def test_ops_zombie_reap_method_exists() -> None:
-    """zombie_reap / reap_zombies 토큰 매칭."""
+    """zombie reap / reap zombies token matching."""
     p = _find_ops_file()
     assert p is not None
     text = p.read_text(encoding="utf-8")
@@ -49,7 +51,7 @@ def test_ops_zombie_reap_method_exists() -> None:
 
 
 def test_ops_debug_toggle_method_exists() -> None:
-    """debug_toggle / toggle_debug 토큰 매칭."""
+    """debug toggle / toggle debug token matching."""
     p = _find_ops_file()
     assert p is not None
     text = p.read_text(encoding="utf-8")
@@ -57,7 +59,7 @@ def test_ops_debug_toggle_method_exists() -> None:
 
 
 def test_ops_sse_status_method_exists() -> None:
-    """sse_status 토큰 매칭."""
+    """sse status token matching."""
     p = _find_ops_file()
     assert p is not None
     text = p.read_text(encoding="utf-8")
@@ -65,15 +67,15 @@ def test_ops_sse_status_method_exists() -> None:
 
 
 def test_http_router_has_ops_routes() -> None:
-    """http_router.py 본문에 /api/ops/ 라우팅 3건 이상."""
+    """http router.py /api/ops/ routing in the body more than 3"""
     src = _HTTP_ROUTER.read_text(encoding="utf-8")
-    assert "/api/ops/" in src, "http_router.py 에 /api/ops/ 매칭 없음"
+    assert "/api/ops/" in src, "http router.py /api/ops/ No matching"
     count = src.count("/api/ops/")
-    assert count >= 3, f"/api/ops/ 라우팅 count={count} (3 이상 기대)"
+    assert count >= 3, f"/api/ops/ routing count=   FIELD 0 (3 or more expected)"
 
 
 def test_ops_handlers_have_api_endpoint_decorator() -> None:
-    """ops 3 endpoint 모두 @api_endpoint('INF', ...) decorator 부착."""
+    """ops 3 endpoint all @api endpoint('INF', ...) with decorator."""
     p = _find_ops_file()
     assert p is not None
     tree = ast.parse(p.read_text(encoding="utf-8"))
@@ -97,21 +99,21 @@ def test_ops_handlers_have_api_endpoint_decorator() -> None:
                             if isinstance(first, ast.Constant) and first.value == "INF":
                                 decorated_with_inf.append(item.name)
     assert len(decorated_with_inf) >= 3, (
-        f"INF domain decorator 부착 count={len(decorated_with_inf)} < 3: "
+        f"INF domain decorator Attachment count=   FIELD 0  < 3:"
         f"{decorated_with_inf}"
     )
 
 
 def test_debug_toggle_flips_flag_in_isolated_dir(tmp_path, monkeypatch):
-    """debug-toggle 핸들러 로직: debug.enabled 플래그 생성/삭제 동작."""
-    # 격리된 cwd 설정
+    """debug-toggle handler logic: debug.enabled flag generation/debug behavior."""
+    # Isolated cwd settings
     bg = tmp_path / ".agent-factory" / "runs" / "bg"
     bg.mkdir(parents=True, exist_ok=True)
     assert not (bg / "debug.enabled").exists()
     monkeypatch.chdir(tmp_path)
 
-    # ops module 로드 가능성만 verify (mixin instance 가 필요한 본체 로직은
-    # 통합 테스트 영역). compile 호출이 SyntaxError 시 fail.
+    # ops Module Loadability Only Verified (mixin instance required body logic)
+    # Integrated Test Area). compile call fails when SyntaxError.
     p = _find_ops_file()
     assert p is not None
     compile(p.read_text(encoding="utf-8"), str(p), "exec")

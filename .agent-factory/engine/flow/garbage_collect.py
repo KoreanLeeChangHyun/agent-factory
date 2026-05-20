@@ -1,14 +1,14 @@
 #!/usr/bin/env -S python3 -u
-"""garbage_collect.py - 좀비 워크플로우 정리 독립 스크립트.
+"""block collect.py - zombie workflow cleanup standalone script.
 
-기능:
-  1. .workflow/ 하위에서 TTL(24시간) 만료 + 미완료 status.json을 STALE로 전환
+Feature:
+  1. .workflow/ TTL(24 hours) expiration + unfinished status.json switch to STALE
 
-사용법:
+Usage:
   flow-gc [project_root]
 
-인자:
-  project_root - (선택적) 프로젝트 루트 경로. 미지정 시 스크립트 위치 기준으로 자동 탐지
+Tag:
+  project root - project route (optional). Copyright (c) 2015 ILSHIN TECH. All Rights Reserved.
 """
 
 from __future__ import annotations
@@ -32,18 +32,18 @@ from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
 _KST = KST
 _TTL_HOURS = ZOMBIE_TTL_HOURS
-_TERMINAL_PHASES = TERMINAL_STEPS  # TERMINAL_STEPS 사용 (TERMINAL_PHASES는 별칭)
+_TERMINAL_PHASES = TERMINAL_STEPS  # Use TERMINAL_STEPS (TERMINAL_PHASES is an alias)
 
 
 def _atomic_write_json(path: str, data: object) -> None:
-    """JSON을 임시 파일에 쓴 후 원자적으로 대상 경로로 이동한다.
+    """After JSON is written in a temporary file, move to the target path.
 
     Args:
-        path: 최종 저장할 파일 경로
-        data: JSON으로 직렬화할 데이터 객체
+        path: file path to save the end
+        data: JSON
 
     Raises:
-        Exception: 쓰기 또는 이동 실패 시 임시 파일을 삭제하고 재발생.
+        Exception: Eliminate and reissue temporary files when writing or moving failures.
     """
     dir_name = os.path.dirname(path)
     os.makedirs(dir_name, exist_ok=True)
@@ -60,15 +60,15 @@ def _atomic_write_json(path: str, data: object) -> None:
 
 
 def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bool:
-    """status.json을 TTL 검사하여 STALE로 전환한다.
+    """Switch status.json to STALE
 
     Args:
-        status_file: 검사할 status.json 파일 경로
-        status_dir: status.json이 위치한 디렉터리 경로
-        now: 현재 시각 (KST timezone-aware)
+        status file: status.json file path to check
+        status dir: directory path where status.json is located
+        now: current timezone-aware
 
     Returns:
-        STALE로 전환되었으면 True, 그렇지 않으면 False.
+        True, otherwise False.
     """
     try:
         with open(status_file, "r", encoding="utf-8") as f:
@@ -105,16 +105,16 @@ def _process_status_file(status_file: str, status_dir: str, now: datetime) -> bo
 
 
 def _step1_mark_stale(workflow_root: str) -> int:
-    """Step 1: .workflow/ 하위에서 TTL 만료 워크플로우를 STALE로 전환한다.
+    """Step 1: Switch TTL expiration workflow to STALE in .workflow/ sub.
 
-    T-449 마이그레이션 이후로는 `.workflow/<YYYYMMDD-HHMMSS>/status.json`
-    폴드 구조 하나만 처리한다. 구 중첩 구조 fallback은 제거되었다.
+    T-449 migration since `.workflow/<YYYMMDD-HMMSS>/status.json`
+    Polypropylene is only processed. Old nesting structure fallback was removed.
 
     Args:
-        workflow_root: .workflow 디렉터리 절대 경로
+        workflow root: .workflow directory absolute path
 
     Returns:
-        STALE로 전환된 워크플로우 수.
+        STALE
     """
     if not os.path.isdir(workflow_root):
         return 0
@@ -139,10 +139,10 @@ def _step1_mark_stale(workflow_root: str) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """garbage_collect CLI argparse 파서를 생성하여 반환한다."""
+    """garbage_collect CLI argparse Creates and returns a parser."""
     parser = argparse.ArgumentParser(
         prog="flow-gc",
-        description="좀비 워크플로우 정리: TTL 만료 + 미완료 status.json을 STALE로 전환",
+        description="Zombie Workflow Cleanup: TTL Expired + Incomplete status.json converted to STALE",
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -151,13 +151,13 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="?",
         default=None,
         metavar="project_root",
-        help="프로젝트 루트 경로 (선택적). 미지정 시 스크립트 위치 기준으로 자동 탐지",
+        help="Project root path (optional). Automatic detection based on script location if not specified",
     )
     return parser
 
 
 def main() -> None:
-    """CLI 진입점. project_root를 인자로 받아 좀비 워크플로우를 정리한다."""
+    """CLI entry point. Receives project_root as an argument and organizes the zombie workflow."""
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -179,10 +179,10 @@ def main() -> None:
 
     if stale_count > 0:
         print("[STATE] GC", flush=True)
-        print(f">> {stale_count}개 정리됨", flush=True)
+        print(f">> {stale_count} cleaned up", flush=True)
     else:
         print("[STATE] GC", flush=True)
-        print(">> 변경 없음", flush=True)
+        print(">>No change", flush=True)
 
 
 if __name__ == "__main__":

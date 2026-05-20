@@ -15,7 +15,7 @@ import re
 import sys
 from pathlib import Path
 
-# 구 구조 → 신 구조 정규식
+# Old structure → New structure regular expression
 # runs(/.history)?/<key>/<work_name>/(implement|research|review)/<file>
 # → runs(/.history)?/<key>/<file>
 PATTERN = re.compile(
@@ -35,8 +35,8 @@ def process_file(path: Path, mode: str) -> dict:
             "path": str,
             "total_lines": int,
             "changed_lines": int,
-            "changed_count": int,  # 총 치환 횟수
-            "samples": list[str],  # 변경된 라인 샘플 (최대 5건)
+            "changed_count": int,  # total number of substitutions
+            "samples": list[str],  # Changed line samples (maximum 5)
         }
     """
     original = path.read_text(encoding="utf-8")
@@ -69,12 +69,12 @@ def process_file(path: Path, mode: str) -> dict:
     if mode == "apply" and changed_count > 0:
         new_content = "".join(new_lines)
         path.write_text(new_content, encoding="utf-8")
-        # 라인 수 불변 검증
+        # Line count invariant verification
         result_lines = new_content.splitlines(keepends=True)
         result["new_total_lines"] = len(result_lines)
         if len(result_lines) != len(lines):
             print(
-                f"[ERROR] 라인 수 불일치: {path} "
+                f"[ERROR] Line count mismatch: {path}"
                 f"before={len(lines)} after={len(result_lines)}",
                 file=sys.stderr,
             )
@@ -85,13 +85,13 @@ def process_file(path: Path, mode: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="board 메타 파일 링크 일괄 정정 (구 구조 → 신 구조)"
+        description="Batch correction of board meta file links (old structure → new structure)"
     )
     parser.add_argument(
         "--mode",
         choices=["dry-run", "apply"],
         default="dry-run",
-        help="dry-run: 변경 내용 미리보기, apply: 실제 파일 수정 (default: dry-run)",
+        help="dry-run: Preview changes, apply: Modify actual files (default: dry-run)",
     )
     parser.add_argument(
         "--target",
@@ -99,7 +99,7 @@ def main():
         dest="targets",
         metavar="PATH",
         required=True,
-        help="처리할 파일 경로 (반복 가능)",
+        help="File path to process (repeatable)",
     )
     args = parser.parse_args()
 
@@ -112,38 +112,38 @@ def main():
     for target_str in args.targets:
         path = Path(target_str)
         if not path.exists():
-            print(f"[WARN] 파일 없음: {path}", file=sys.stderr)
+            print(f"[WARN] No file: {path}", file=sys.stderr)
             continue
 
         result = process_file(path, args.mode)
         total_changed_lines += result["changed_lines"]
         total_changed_count += result["changed_count"]
 
-        print(f"파일: {result['path']}")
-        print(f"  총 라인 수 : {result['total_lines']}")
-        print(f"  변경 라인 수: {result['changed_lines']}")
-        print(f"  치환 횟수  : {result['changed_count']}")
+        print(f"File: {result['path']}")
+        print(f"Total number of lines: {result['total_lines']}")
+        print(f"Number of changed lines: {result['changed_lines']}")
+        print(f"Number of substitutions: {result['changed_count']}")
 
         if result["samples"]:
-            print("  샘플 (최대 5건):")
+            print("Samples (up to 5):")
             for s in result["samples"]:
                 print(f"    {s}")
 
         if args.mode == "apply":
             new_total = result.get("new_total_lines", result["total_lines"])
-            print(f"  적용 후 라인 수: {new_total} (불변 확인)")
+            print(f"Number of lines after applying: {new_total} (check for immutability)")
 
         print()
 
     print("=" * 60)
-    print(f"합계 — 변경 라인 수: {total_changed_lines}, 치환 횟수: {total_changed_count}")
+    print(f"Total — Number of lines changed: {total_changed_lines}, Number of substitutions: {total_changed_count}")
 
     if args.mode == "dry-run":
         print()
-        print("[dry-run 완료] apply 모드로 재실행하면 실제 파일이 수정됩니다.")
+        print("[dry-run complete] If you rerun in apply mode, the actual file will be modified.")
     else:
         print()
-        print("[apply 완료]")
+        print("[apply completed]")
 
 
 if __name__ == "__main__":

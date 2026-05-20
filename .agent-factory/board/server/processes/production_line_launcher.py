@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 # When Popen.communicate ends thread itself removes itself from finally.
 # v1 ` launch reader loop` (kanban.py) share the same set — in kanban.py
-# `from board.server.production_line_launcher import _LAUNCH_READER_THREADS, _LAUNCH_READER_LOCK`
+# `from board.server.processes.production_line_launcher import _LAUNCH_READER_THREADS, _LAUNCH_READER_LOCK`
 # import.
 _LAUNCH_READER_THREADS: set[threading.Thread] = set()
 _LAUNCH_READER_LOCK: threading.Lock = threading.Lock()

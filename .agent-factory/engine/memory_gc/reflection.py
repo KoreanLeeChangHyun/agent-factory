@@ -25,7 +25,7 @@ from .paths import GCConfig
 
 CLAUDE_CLI: str = 'claude'
 HEADLESS_TIMEOUT: int = 90
-CLUSTERING_TIMEOUT: int = 60  # metadata 만 — 합성보다 가벼움
+CLUSTERING_TIMEOUT: int = 60  # metadata only — lighter than synthesis
 
 
 @dataclass(frozen=True)
@@ -38,16 +38,16 @@ class ReflectionCluster:
 
 def _build_clustering_prompt(items: list[dict], threshold: int) -> str:
     return (
-        '다음은 메모리 metadata 리스트입니다. 같은 토픽으로 묶을 수 있는 메모리들을 그룹화하세요.\n\n'
-        '규칙:\n'
-        '- 의미적으로 같은 주제·이슈·결정사항을 다루는 메모리들을 한 클러스터로 묶기\n'
-        f'- 각 클러스터의 cumulative_importance (멤버 importance 합) 가 {threshold} 이상인 그룹만 반환\n'
-        '- 단독 메모리(클러스터 크기 1)는 반환하지 말 것\n'
-        '- 한국어/영어 무관, 의미 기반 판단 (어휘 매칭이 아닌 토픽 매칭)\n'
-        '- 무리하게 묶지 말 것 — 확신이 약하면 클러스터 제외\n\n'
-        '응답은 JSON 으로만 (코드펜스 금지):\n'
-        '{"clusters": [{"members": ["filename1.md", "filename2.md", ...], "reason": "그룹 사유 한 줄"}, ...]}\n\n'
-        '## 메모리 metadata\n\n'
+        'The following is a list of memory metadata. Group memories that can be grouped into the same topic. \n \n'
+        'Rule: \n'
+        '- Group memories that semantically deal with the same topic, issue, or decision into one cluster \n'
+        f'- Returns only groups where the cumulative_importance (sum of member importance) of each cluster is {threshold} or higher \n'
+        '- Do not return exclusive memory (cluster size 1) \n'
+        '- Regardless of Korean/English, meaning-based judgment (topic matching, not vocabulary matching) \n'
+        '- Do not bundle too much — if you are not confident, exclude the cluster \n \n'
+        'Response is in JSON only (no codefencing): \n'
+        '{"clusters": [{"members": ["filename1.md", "filename2.md", ...], "reason": "One line of group reason"}, ...]} \n \n'
+        '## Memory metadata \n \n'
         + json.dumps(items, ensure_ascii=False, indent=2)
     )
 
@@ -85,7 +85,7 @@ def find_clusters(memories: list[MemoryFile], threshold: int) -> list[Reflection
         cum = sum(m.importance for m in members)
         if cum < threshold:
             continue
-        # 멤버 type 다수결 (동률은 첫 만난 type)
+        # Member type majority vote (tie is the first meeting type)
         type_counts: dict[str, int] = {}
         for m in members:
             type_counts[m.type] = type_counts.get(m.type, 0) + 1
@@ -101,17 +101,17 @@ def find_clusters(memories: list[MemoryFile], threshold: int) -> list[Reflection
 
 def _build_prompt(cluster: ReflectionCluster) -> str:
     lines = [
-        '다음은 메모리 파일들입니다. 동일 주제로 중복·파편화되어 있어 하나의 추상 메모리로 합성해주세요.',
+        'Below are the memory files. Please synthesize them into one abstract memory as they are duplicated and fragmented on the same topic.',
         '',
-        '요구 사항:',
-        '- 합성 결과는 frontmatter (name, description, type, importance) 와 본문으로 구성',
-        '- name 은 합성 메모리의 짧은 식별자 (snake_case 단어 2~4개)',
-        '- description 은 한 줄 요약',
-        '- importance 는 1~10, 가장 중요한 원본 importance 와 같거나 1 높게',
-        '- 본문은 Markdown, 핵심 인사이트 + Why/How 구조 권장',
-        '- 응답은 JSON 으로만: {"name": "...", "description": "...", "importance": N, "body": "..."}',
+        'Requirements:',
+        '- The synthesis result consists of frontmatter (name, description, type, importance) and body.',
+        '- name is a short identifier of the synthetic memory (2 to 4 snake_case words)',
+        '- description is a one-line summary',
+        '- importance is 1 to 10, equal to or 1 higher than the most important original importance.',
+        '- Markdown text, core insights + why/how structure recommended',
+        '- Response is in JSON only: {"name": "...", "description": "...", "importance": N, "body": "..."}',
         '',
-        '## 원본 메모리',
+        '## Original memory',
         '',
     ]
     for i, m in enumerate(cluster.members, start=1):
@@ -138,16 +138,16 @@ def _invoke_claude(prompt: str, *, timeout: int = HEADLESS_TIMEOUT) -> dict | No
         return None
     if result.returncode != 0:
         return None
-    # claude -p --output-format json 출력 구조: {"result": "...", ...}
+    # claude -p --output-format json output structure: {"result": "...", ...}
     try:
         envelope = json.loads(result.stdout)
     except json.JSONDecodeError:
         return None
     body = envelope.get('result', '') if isinstance(envelope, dict) else ''
-    # body 안에 우리가 요청한 JSON 이 들어있다 — 파싱
+    # The body contains the JSON we requested — parsing
     body = body.strip()
     if body.startswith('```'):
-        # 코드펜스 제거
+        # Codefence removal
         lines = body.splitlines()
         if lines and lines[0].startswith('```'):
             lines = lines[1:]
@@ -161,7 +161,7 @@ def _invoke_claude(prompt: str, *, timeout: int = HEADLESS_TIMEOUT) -> dict | No
 
 
 def _apply_synthesis(cfg: GCConfig, cluster: ReflectionCluster, payload: dict) -> Path | None:
-    """합성 결과를 신규 메모리 파일로 저장 + 원본은 archive/synthesized/ 이동."""
+    """Save the synthesis result as a new memory file + move the original to archive/synthesized/."""
     name = str(payload.get('name', '')).strip()
     description = str(payload.get('description', '')).strip()
     body = str(payload.get('body', '')).strip()
@@ -186,7 +186,7 @@ def _apply_synthesis(cfg: GCConfig, cluster: ReflectionCluster, payload: dict) -
         raw_frontmatter={'name': name, 'description': description, 'type': cluster.type},
     )
     write_memory_file(mem)
-    # 원본 archive 이동
+    # Move original archive
     archive_dir = cfg.archive_subdir('synthesized')
     archive_dir.mkdir(parents=True, exist_ok=True)
     for m in cluster.members:

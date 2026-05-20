@@ -25,7 +25,7 @@ if _AGENT_FACTORY_DIR not in sys.path:
     sys.path.insert(0, _AGENT_FACTORY_DIR)
 
 from board.server.__main__ import main  # noqa: E402
-from board.server.app import _run_server  # noqa: E402
+from board.server.runtime.app import _run_server  # noqa: E402
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--serve":

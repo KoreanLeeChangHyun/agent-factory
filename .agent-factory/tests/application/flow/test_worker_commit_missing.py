@@ -1,10 +1,10 @@
-"""test_worker_commit_missing.py - 워커 commit 누락 탐지 단위 테스트 (T-411 회귀 차단)
+"""test worker commit missing.py - Watcher commit missing detection unit test (T-411 regression block)
 
-4개 시나리오를 통해 count_feature_branch_commits 와 AND 조건 신호를 검증한다:
-  TC1: feature 브랜치에 커밋 없음 → count == 0
-  TC2: feature 브랜치에 커밋 1건 → count == 1
-  TC3: 존재하지 않는 브랜치 → count == -1 (검사 불가)
-  TC4: untracked 파일 + commit 0 → AND 조건 신호 확인 (T-411 핵심 시나리오)
+Verify count feature branch commits and and conditional signals through 4 scenarios NEWS
+  TC1: No commit to feature branding → count == 0
+  TC2: 1 commit to the feature branch → count == 1
+  TC3: Unexpected Brands → count == -1 (No Inspection)
+  TC4: Untracked File + Commit 0 → AND Condition Signal Verification (T-411 Core Scenario)
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-# sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
+# sys.path: .agent-factory/engine enables flow package import
 _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
@@ -25,7 +25,7 @@ from flow.worktree_manager import count_feature_branch_commits, has_uncommitted_
 
 
 def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
-    """임시 git 저장소를 대상으로 git 명령을 실행한다."""
+    """execute git commands for temporary git repository."""
     return subprocess.run(
         ["git", "-C", repo] + list(args),
         capture_output=True,
@@ -34,41 +34,41 @@ def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 class TestWorkerCommitMissingDetection(unittest.TestCase):
-    """count_feature_branch_commits 와 has_uncommitted_changes AND 조건 검증."""
+    """count feature branch commits with has uncommitted changes and validation."""
 
     def setUp(self) -> None:
-        """격리된 임시 git 저장소를 생성하고 feature 브랜치를 분기한다."""
+        """Create an isolated temporary git repository and branch the feature branch."""
         self.repo = tempfile.mkdtemp(prefix="wf_test_commit_missing_")
         # git init
         _git(self.repo, "init", "-b", "develop")
-        # git config (테스트 환경용 최소 설정)
+        # git config
         _git(self.repo, "config", "user.email", "test@example.com")
         _git(self.repo, "config", "user.name", "Test")
-        # develop 브랜치에 초기 커밋 생성
+        # Create initial commits to develop brand
         init_file = os.path.join(self.repo, "README.md")
         with open(init_file, "w") as f:
             f.write("init\n")
         _git(self.repo, "add", "README.md")
         _git(self.repo, "commit", "-m", "init")
-        # feature 브랜치 생성
+        # create a feature brand
         _git(self.repo, "checkout", "-b", "feat/T-999-test")
 
     def tearDown(self) -> None:
         shutil.rmtree(self.repo, ignore_errors=True)
 
     def test_count_zero_when_no_worker_commit(self) -> None:
-        """TC1: feature 브랜치에 커밋 없이 untracked 파일만 → count == 0."""
+        """TC1: Only untracked files without commit to feature branding → count == 0."""
         untracked = os.path.join(self.repo, "new_file.py")
         with open(untracked, "w") as f:
             f.write("# new\n")
-        # add/commit 없이 count 만 조회
+        # see count only without add/commit
         count = count_feature_branch_commits(
             "feat/T-999-test", base_branch="develop", repo_path=self.repo
         )
-        self.assertEqual(count, 0, "커밋 없는 feature 브랜치는 0을 반환해야 한다")
+        self.assertEqual(count, 0, "Commit-free feature brand must return 0")
 
     def test_count_positive_after_commit(self) -> None:
-        """TC2: feature 브랜치에 커밋 1건 → count == 1."""
+        """TC2: 1 commit to the feature branch → count == 1."""
         work_file = os.path.join(self.repo, "work.py")
         with open(work_file, "w") as f:
             f.write("x = 1\n")
@@ -77,20 +77,20 @@ class TestWorkerCommitMissingDetection(unittest.TestCase):
         count = count_feature_branch_commits(
             "feat/T-999-test", base_branch="develop", repo_path=self.repo
         )
-        self.assertEqual(count, 1, "커밋 1건인 feature 브랜치는 1을 반환해야 한다")
+        self.assertEqual(count, 1, "Commit One feature Brand must return 1")
 
     def test_count_negative_for_missing_branch(self) -> None:
-        """TC3: 존재하지 않는 브랜치 → count == -1 (검사 불가, 차단 금지)."""
+        """TC3: Unexpected Brands → count == -1 (No inspection, no blocking)."""
         count = count_feature_branch_commits(
             "feat/T-000-missing", base_branch="develop", repo_path=self.repo
         )
-        self.assertEqual(count, -1, "존재하지 않는 브랜치는 -1을 반환해야 한다")
+        self.assertEqual(count, -1, "Brands that do not exist should return -1")
 
     def test_uncommitted_and_zero_commit_combo(self) -> None:
-        """TC4: untracked 파일 + commit 0 → AND 조건 신호 확인 (T-411 핵심 시나리오).
+        """TC4: untracked file + commit 0 → AND conditional signal confirmation (T-411 core scenario).
 
-        has_uncommitted_changes == True AND count_feature_branch_commits == 0 이
-        동시에 충족될 때 워커 commit 누락 신호가 발생한다.
+        true and count feature branch commits == 0
+        When meeting at the same time, the watcher commit missing signals occur.
         """
         untracked = os.path.join(self.repo, "worker_output.py")
         with open(untracked, "w") as f:
@@ -101,14 +101,14 @@ class TestWorkerCommitMissingDetection(unittest.TestCase):
             "feat/T-999-test", base_branch="develop", repo_path=self.repo
         )
 
-        self.assertTrue(uncommitted, "untracked 파일이 있으면 uncommitted=True여야 한다")
-        self.assertEqual(count, 0, "add/commit 없는 feature 브랜치는 commit_count=0이어야 한다")
+        self.assertTrue(uncommitted, "uncommitted=True")
+        self.assertEqual(count, 0, "function brand without add/commit must be commit count=0")
 
-        # AND 조건 검증 — 두 신호 모두 충족 시 워커 commit 누락으로 판단
+        # AND Condition Verification — When both signals are met, Warker commit judges to be missing
         worker_commit_missing = uncommitted and count == 0
         self.assertTrue(
             worker_commit_missing,
-            "uncommitted=True AND commit_count=0 조합은 워커 commit 누락 신호여야 한다",
+            "uncommitted=True AND commit count=0 Combination should be missing Walker Commit",
         )
 
 

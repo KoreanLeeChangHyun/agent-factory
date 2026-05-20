@@ -1,9 +1,9 @@
 """Tests for topological planning levels.
 
-`engine.core.planning.loader.topo_levels` 가 Kahn 알고리즘 확장으로 phase 들을
-[level_0_phases, level_1_phases, ...] 형태로 반환.
+`engine.core.planning.loader.topo levels` to expand the Kahn algorithm
+[level 0 phases, level 1 phases, ...] return to form.
 
-driver 가 같은 level 동시 spawn → 다음 level 진입 패턴에 사용.
+same level simultaneous spawn with driver → used in the next level entry pattern.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ def _ids(levels: list[list[Phase]]) -> list[list[str]]:
 
 
 def test_topo_levels_linear_chain() -> None:
-    """P1 → P2 → P3 → P4 — 각 level 1 phase."""
+    """P1 → P2 → P3 → P4"""
     phases = [
         _phase("P1"),
         _phase("P2", ["P1"]),
@@ -31,7 +31,7 @@ def test_topo_levels_linear_chain() -> None:
 
 
 def test_topo_levels_parallel_siblings() -> None:
-    """deps=[] siblings — 모두 level 0."""
+    """deps=[] siblings — all levels 0."""
     phases = [
         _phase("P1"),
         _phase("P2"),
@@ -54,13 +54,13 @@ def test_topo_levels_diamond() -> None:
 
 
 def test_topo_levels_single_phase() -> None:
-    """phase 1 개 → level 0 에 1 phase."""
+    """Phase 1 → level 0 to 1 phase."""
     phases = [_phase("P1")]
     assert _ids(topo_levels(phases)) == [["P1"]]
 
 
 def test_topo_levels_empty_input() -> None:
-    """phases=[] → 빈 list (no-op)."""
+    """phases=[]"""
     assert topo_levels([]) == []
 
 
@@ -79,7 +79,7 @@ def test_topo_levels_mixed_multi_deps() -> None:
 
 
 def test_topo_levels_circular_returns_empty() -> None:
-    """parse_plan_json 이 선검증하지만 안전망: 순환 발견 시 빈 list."""
+    """parse plan json This is a validation but a safety net: empty list when the circulation is found."""
     phases = [
         _phase("A", ["B"]),
         _phase("B", ["A"]),
@@ -88,12 +88,12 @@ def test_topo_levels_circular_returns_empty() -> None:
 
 
 def test_topo_levels_preserves_input_order_within_level() -> None:
-    """같은 level 안에서는 입력 phase 순서 보존 (deterministic)."""
+    """In the same level the input phase sequence retention (deterministic)."""
     phases = [
         _phase("P3"),
         _phase("P1"),
         _phase("P2"),
     ]
     levels = topo_levels(phases)
-    # level 0: 입력 순서 (P3, P1, P2)
+    # level 0: Input order (P3, P1, P2)
     assert [p.id for p in levels[0]] == ["P3", "P1", "P2"]

@@ -1,19 +1,19 @@
-"""PreToolUse `.claude/` 경로 인자 Bash 명령 통합 회귀 매트릭스 (T-484 P3).
+"""PreToolUse `.claude/` path argument Bash command unified regression matrix (T-484 P3).
 
-`general.md` §".claude/ 편집 (MUST)" 의 통과 룰을 4 시나리오로 박제:
+Stuffing the passing rules of `general.md` §".claude/ (MUST)" into 4 scenarios:
 
-| # | 시나리오 | 예시 | 기대 |
+| # | Scenario | Example | expectations |
 |---|---------|------|------|
-| 1 | sed -i 가 .claude/ 경로 인자 | `sed -i 's/X/Y/g' .claude/rules/...` | allow |
-| 2 | cat 으로 .claude/ 파일 읽기 | `cat .claude/settings.json` | allow |
-| 3 | grep -r 으로 .claude/ 트리 검색 | `grep -r "PreToolUse" .claude/` | allow |
+| 1 | sed -i returns .claude/ path argument | `sed -i 's/X/Y/g' .claude/rules/...` | allow |
+| 2 | Reading .claude/ files with cat | `cat .claude/settings.json` | allow |
+| 3 | Search the .claude/ tree with grep -r | `grep -r "PreToolUse" .claude/` | allow |
 | 4 | mixed (.claude/ + .agent-factory/) | `sed -i ... .claude/foo .agent-factory/bar` | allow |
 
-캐논 결정 (`plan.md` §결정 표): Bash `.claude/` 경로 인자 = **통과 (allow JSON)**.
-Edit/Write 만 Claude Code 하드코딩 보호로 차단되고, Bash 간접 도구는 통과.
-flow-claude-edit 동선이 정식 경로이며 본 가드 흐름과 양립한다.
+Canon decision (`plan.md` §decision table): Bash `.claude/` path argument = **Pass (allow JSON)**.
+Only Edit/Write is blocked by Claude Code hardcoding protection, Bash indirect tools are passed.
+The flow-claude-edit route is a formal route and is compatible with the main guard flow.
 
-본 vehicle 은 P1 의 단일 시나리오 vehicle 을 4 시나리오로 확장한 forward 회귀 차단망.
+This vehicle is a forward regression blocking network that extends the single scenario vehicle of P1 to 4 scenarios.
 """
 from __future__ import annotations
 
@@ -46,9 +46,9 @@ def _run_dispatcher(payload: dict) -> tuple[str, int]:
 
 
 def _assert_allow(test: unittest.TestCase, stdout: str, rc: int) -> None:
-    """allow schema + returncode 정합 검증."""
+    """allow schema + returncode matching verification."""
     test.assertEqual(rc, 0)
-    test.assertTrue(stdout.strip(), "빈 stdout — canon §R1 위반")
+    test.assertTrue(stdout.strip(), "Empty stdout — violation of canon §R1")
     data = json.loads(stdout.strip())
     hook_out = data.get("hookSpecificOutput", {})
     test.assertEqual(hook_out.get("hookEventName"), "PreToolUse")
@@ -61,10 +61,10 @@ def _assert_allow(test: unittest.TestCase, stdout: str, rc: int) -> None:
 
 
 class TestDotClaudePathScenarios(unittest.TestCase):
-    """plan §P3 4 시나리오 매트릭스."""
+    """plan §P3 4 Scenario Matrix."""
 
     def test_scenario_1_sed_inline_dotclaude(self) -> None:
-        """sed -i 로 .claude/rules/workflow/general.md 수정 → allow."""
+        """Edit .claude/rules/workflow/general.md with sed -i → allow."""
         stdout, rc = _run_dispatcher({
             "tool_name": "Bash",
             "tool_input": {
@@ -74,7 +74,7 @@ class TestDotClaudePathScenarios(unittest.TestCase):
         _assert_allow(self, stdout, rc)
 
     def test_scenario_2_cat_dotclaude_settings(self) -> None:
-        """cat .claude/settings.json → allow (읽기 전용)."""
+        """cat .claude/settings.json → allow (read-only)."""
         stdout, rc = _run_dispatcher({
             "tool_name": "Bash",
             "tool_input": {"command": "cat .claude/settings.json"},
@@ -90,7 +90,7 @@ class TestDotClaudePathScenarios(unittest.TestCase):
         _assert_allow(self, stdout, rc)
 
     def test_scenario_4_sed_mixed_paths(self) -> None:
-        """sed -i 로 .claude/ + .agent-factory/ 동시 수정 → allow."""
+        """Simultaneous modification of .claude/ + .agent-factory/ with sed -i → allow."""
         stdout, rc = _run_dispatcher({
             "tool_name": "Bash",
             "tool_input": {
@@ -104,10 +104,10 @@ class TestDotClaudePathScenarios(unittest.TestCase):
 
 
 class TestFlowClaudeEditCoexistence(unittest.TestCase):
-    """flow-claude-edit 동선 (사용자 정식 경로) 회귀 안전망.
+    """flow-claude-edit Movement line (user canonical path) regression safety net.
 
-    `.claude/` 편집의 정식 경로는 `flow-claude-edit open/save` 이며,
-    본 Bash 통과 룰은 사용자 동선을 방해하지 않는다 (별도 트래픽).
+    The official path for editing `.claude/` is `flow-claude-edit open/save`,
+    This Bash passing rule does not interfere with user movement (separate traffic).
     """
 
     def test_flow_claude_edit_open_passes(self) -> None:

@@ -35,7 +35,7 @@ _VALID_COMMANDS = {"implement", "research", "review"}
 
 
 def _parse_ticket_meta(dump: str) -> tuple[str, str]:
-    """kanban show 출력에서 (command, title) 추출. fallback: ("implement", "untitled")."""
+    """Extract (command, title) from kanban show output. fallback: ("implement", "untitled")."""
     command = "implement"
     title = "untitled"
     for line in dump.splitlines():
@@ -61,17 +61,17 @@ def _maybe_create_worktree(
     """
     if command != "implement":
         return None, None
-    # v1 인프라 재사용 (SPEC.md §11.3 보존 영역)
-    # flow-wf wrapper 의 PYTHONPATH=.agent-factory 환경 안에서는 fully-qualified
-    # path (engine.flow) 만 import 가능. cwd=.agent-factory/engine 가정의 짧은
-    # `from flow.worktree_manager` 는 ImportError (다른 v1 호출자와 환경 차이).
+    # v1 Infrastructure Reuse (SPEC.md §11.3 Conservation Area)
+    # Fully-qualified within the PYTHONPATH=.agent-factory environment of the flow-wf wrapper
+    # Only path (engine.flow) can be imported. short for assuming cwd=.agent-factory/engine
+    # `from flow.worktree_manager` throws an ImportError (different environment from other v1 callers).
     from engine.flow.worktree_manager import create_worktree  # noqa: E402
 
     info = create_worktree(ticket_no, title, command=command)
     if info is None:
         sys.stderr.write(
-            f"[driver] worktree create 실패 "
-            f"(ticket={ticket_no}, command={command}) — INIT 중단\n"
+            f"[driver] worktree create failed"
+            f"(ticket={ticket_no}, command={command}) — INIT Abort \n"
         )
         raise SystemExit(2)
     return info.branch_name, Path(info.path)
@@ -83,7 +83,7 @@ def init_step(ticket_no: str) -> WorkflowContext:
     ticket 존재 가드: kanban_show 결과 'Number:' 토큰 없으면 SystemExit(2).
     work_dir 생성 전에 가드 — work_dir 잔재 회피.
     """
-    # ticket guard 먼저 (work_dir 생성 전 — 잔재 회피)
+    # ticket guard first (before creating work_dir — avoiding remnants)
     ticket_dump = kanban_show(ticket_no)
     if not ticket_dump or "Number:" not in ticket_dump:
         sys.stderr.write(
@@ -94,23 +94,23 @@ def init_step(ticket_no: str) -> WorkflowContext:
     command, title = _parse_ticket_meta(ticket_dump)
     feature_branch, worktree_path = _maybe_create_worktree(ticket_no, title, command)
 
-    # T-495 P2 — V2_REGISTRY_KEY env 우선 사용. board 가 사전 발급한 키를
-    # 받으면 backend 의 production_line_registry 와 driver 의 work_dir 경로가
-    # 1:1 정합되어, frontend 가 LAUNCH_STARTED 직후 production-line 탭을 즉시 띄울 수 있다.
-    # env 형식: "YYYYMMDD-HHMMSS" 또는 "YYYYMMDD-HHMMSS-NNN" 등 v1 호환 timestamp.
+    # T-495 P2 — Use V2_REGISTRY_KEY env first. The board pre-issued key
+    # Once received, the backend's production_line_registry and driver's work_dir paths are
+    # With a 1:1 match, the frontend can immediately launch the production-line tab right after LAUNCH_STARTED.
+    # env format: v1-compatible timestamp, such as "YYYYMMDD-HHMMSS" or "YYYYMMDD-HHMMSS-NNN".
     env_key = (os.environ.get("V2_REGISTRY_KEY") or "").strip()
     registry_key = env_key if env_key else new_registry_key()
-    # T-509 — work_dir 는 항상 메인 측 (PROJECT_ROOT 기준 RUNS_DIR / <key>).
-    # worktree_path 가 있어도 분기하지 않는다 — a473334 이후 PROJECT_ROOT 는
-    # git common-dir 의 부모 (메인 워크트리 root) 를 가리키므로, worktree 안쪽
-    # .agent-factory/runs/ 에 산출물을 박으면 finalization R-EXIST / history
-    # sync / SSE FileWatcher 인덱스가 모두 메인 측만 보는 SSOT 와 어긋난다.
-    # worktree 자체는 ctx.worktree_path 로 보존 — auto_commit / verify_code 가
-    # 워크트리 cwd 에서 git add/commit 하는 의미는 그대로 유지된다.
+    # T-509 — work_dir is always on the main side (RUNS_DIR/<key> relative to PROJECT_ROOT).
+    # Doesn't branch even if worktree_path exists — PROJECT_ROOT after a473334
+    # Since it points to the parent (main worktree root) of git common-dir, it is located inside the worktree.
+    # If you put the output in .agent-factory/runs/, finalization R-EXIST / history
+    # The sync / SSE FileWatcher indexes are all out of sync with SSOT, which only looks at the main side.
+    # The worktree itself is preserved as ctx.worktree_path — auto_commit / verify_code
+    # The meaning of git add/commit in the worktree cwd remains the same.
     work_dir = make_work_dir(registry_key)
 
-    # Stage 3-B — board side workflow_registry 매핑 ID. driver 측 자체 발급으로
-    # 결정론 유지 (registry_key 가 이미 timestamp 형식이라 충돌 0).
+    # Stage 3-B — board side workflow_registry mapping ID. Issued by the driver itself
+    # Maintain determinism (crash 0 because registry_key is already in timestamp format).
     wf_session_id = f"wf-{ticket_no}-{registry_key}"
     ctx = WorkflowContext(
         ticket_no=ticket_no,
@@ -133,8 +133,8 @@ def init_step(ticket_no: str) -> WorkflowContext:
         f"INIT — registry_key={registry_key}, ticket={ticket_no}, "
         f"command={command}, feature_branch={feature_branch or '(none)'}",
     )
-    # T-495 P1 — session 명시 등록 (POST /api/v2/sessions). lazy create 폐기.
-    # V2_BOARD_POST 미설정 시 silent skip — driver 흐름 영향 0.
+    # T-495 P1 — Session explicit registration (POST /api/v2/sessions). lazy create discard.
+    # If V2_BOARD_POST is not set, silent skip — driver flow impact 0.
     session_create(ctx)
     step_start(ctx, "INIT", prev_step="NONE")
     kanban_move(ticket_no, "progress")

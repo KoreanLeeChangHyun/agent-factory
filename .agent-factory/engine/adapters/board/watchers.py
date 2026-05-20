@@ -131,7 +131,7 @@ class GitBranchWatcher:
             try:
                 self._on_change(new_branch)
             except Exception:  # noqa: BLE001
-                self._logger.exception("GitBranchWatcher on_change 콜백 실패")
+                self._logger.exception("GitBranchWatcher on_change callback failed")
 
 
 __all__ = ["FileWatcher", "GitBranchWatcher"]

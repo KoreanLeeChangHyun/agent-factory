@@ -44,8 +44,8 @@ def _make_stdout_forwarder(ctx: WorkflowContext) -> Callable[[dict], None]:
 
 
 def render_retry_prompt(missing: list[str], artifact_path: Path) -> str:
-    """SPEC.md §6.2 — driver template fill (templates/retry_prompt.txt). LLM 호출 X."""
-    items = "\n".join(f"- {m}" for m in missing) if missing else "- (산출물 누락)"
+    """SPEC.md §6.2 — driver template fill (templates/retry_prompt.txt). LLM Call"""
+    items = "\n".join(f"- {m}" for m in missing) if missing else "- (Missing output)"
     return load_template("retry_prompt.txt").format(
         missing_items=items,
         artifact_path=str(artifact_path),

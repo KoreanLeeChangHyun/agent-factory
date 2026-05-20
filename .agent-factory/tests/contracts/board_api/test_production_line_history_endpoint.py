@@ -1,14 +1,14 @@
-"""T-513 P1 — GET /api/v2/sessions/<id>/history endpoint 단위 회귀.
+"""T-513 P1 — GET /api/v2/sessions/<id>/history endpoint unit regression.
 
-검증:
-  - ProductionLineSSEChannel.persist_path public property 정합
-  - _production_line_handle_session_history handler 존재 + @api_endpoint("W2", "history") decorator
-  - _production_line_dispatch_get sub == 'history' 분기 라우팅
-  - end-to-end: tempfile NDJSON read 결과가 응답 events 와 1:1 (_meta 라인 건너뜀)
+Warranty:
+  - ProductionLineSSEChannel.persist path public property
+  <% if (imgObj.width >= imgObj.height) { %> <% if (image rate > 5) { %>
+  -  production line dispatch get sub == 'history' routing
+  - end-to-end: tempfile NDJSON read results in response events and 1:1 ( meta-line skip)
 
-production endpoint 직접 curl 금지 (board.md §0.1 — production session 오염
-+ naming guard 403 차단). 본 테스트는 tempfile + ProductionLineSessionRegistry
-직접 호출만 사용한다.
+production endpoint direct curl ban (board.md §0.1 — production session contamination
++ naming guard 403 blocking). Production Line
+Use only direct calls.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ def _production_line_methods() -> set[str]:
 
 
 def test_production_line_sse_channel_persist_path_property() -> None:
-    """ProductionLineSSEChannel.persist_path public property — history handler 진입점."""
-    from board.server.production_line_sse_channel import ProductionLineSSEChannel
+    """ProductionLineSSEChannel.persist_path public property — history handler entry point."""
+    from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
     ch = ProductionLineSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/production-line-unit.jsonl')
     assert ch.persist_path == '/tmp/production-line-unit.jsonl'
     ch_none = ProductionLineSSEChannel(session_id='wf-T-513-unit-noper')
@@ -44,13 +44,13 @@ def test_production_line_sse_channel_persist_path_property() -> None:
 
 
 def test_production_line_history_handler_method_exists() -> None:
-    """GET /api/v2/sessions/<id>/history handler 메서드 존재."""
+    """GET /api/v2/sessions/<id>/history handler method exists."""
     methods = _production_line_methods()
     assert "_production_line_handle_session_history" in methods, methods
 
 
 def test_production_line_history_handler_has_endpoint_decorator() -> None:
-    """history handler 가 @api_endpoint('W2', 'history') decorator 부착."""
+    """The history handler attaches the @api_endpoint('W2', 'history') decorator."""
     tree = ast.parse(_PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8"))
     found = False
     for node in ast.walk(tree):
@@ -68,24 +68,24 @@ def test_production_line_history_handler_has_endpoint_decorator() -> None:
                             )
                             if is_api_endpoint:
                                 found = True
-    assert found, "@api_endpoint decorator 누락"
+    assert found, "Missing @api_endpoint decorator"
 
 
 def test_production_line_dispatch_get_routes_history() -> None:
-    """_production_line_dispatch_get 가 sub == 'history' 분기를 처리한다."""
+    """_production_line_dispatch_get handles the sub == 'history' branch."""
     src = _PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8")
     assert "sub == 'history'" in src or 'sub == "history"' in src, (
-        "GET /api/v2/sessions/<id>/history 분기가 _production_line_dispatch_get 에 없음"
+        "GET /api/v2/sessions/<id>/history branch does not exist in _production_line_dispatch_get"
     )
 
 
 def test_production_line_history_ndjson_read_end_to_end() -> None:
-    """tempfile NDJSON 생성 → registry 등록 → broadcast 3건 → history 가 events 3건 반환."""
-    from board.server.production_line_session import ProductionLineSessionRegistry
+    """Create tempfile NDJSON → Register in registry → 3 broadcasts → History returns 3 events."""
+    from board.server.sessions.production_line_session import ProductionLineSessionRegistry
 
     with tempfile.TemporaryDirectory() as td:
         reg = ProductionLineSessionRegistry(persist_dir=td)
-        # production-pattern session_id (fake-pattern guard 통과)
+        # production-pattern session_id (passes fake-pattern guard)
         sid = 'wf-T-513-abc12345-6789-4abc-9def-0123456789ab'
         session = reg.create(
             session_id=sid,
@@ -93,12 +93,12 @@ def test_production_line_history_ndjson_read_end_to_end() -> None:
             command='implement',
             work_dir='/tmp/wd-history-test',
         )
-        # 이벤트 broadcast (클라이언트 0건 — persist 만 확인)
+        # Event broadcast (0 clients — only confirms persist)
         session.channel.broadcast('workflow_step', {'session_id': sid, 'step': 'INIT'})
         session.channel.broadcast('workflow_step', {'session_id': sid, 'step': 'PLAN'})
         session.channel.broadcast('workflow_finish', {'session_id': sid, 'outcome': 'ok'})
 
-        # history handler 본체 로직 simulation — persist 파일 read 결과 events
+        # History handler main body logic simulation — persist file read result events
         persist_path = session.channel.persist_path
         assert persist_path is not None
         events: list = []
@@ -122,7 +122,7 @@ def test_production_line_history_ndjson_read_end_to_end() -> None:
 
 def test_production_line_session_default_persist_path_is_run_local() -> None:
     """No global .workflow-sessions-v2 dir is needed for production-line history."""
-    from board.server.production_line_session import ProductionLineSessionRegistry
+    from board.server.sessions.production_line_session import ProductionLineSessionRegistry
 
     with tempfile.TemporaryDirectory() as td:
         reg = ProductionLineSessionRegistry()
@@ -144,10 +144,11 @@ def test_board_startup_does_not_create_production_line_sessions_root() -> None:
     """The board app no longer initializes the old .workflow-sessions-v2 cache."""
     app_src = (
         Path(__file__).resolve().parents[3].parent
-        / ".agent-factory"
-        / "board"
-        / "server"
-        / "app.py"
+            / ".agent-factory"
+            / "board"
+            / "server"
+            / "runtime"
+            / "app.py"
     ).read_text(encoding="utf-8")
 
     assert "os.makedirs(v2_sessions_dir" not in app_src
@@ -158,10 +159,11 @@ def test_board_startup_does_not_create_v1_workflow_sessions_root() -> None:
     """The board app no longer initializes the old V1 workflow session cache."""
     app_src = (
         Path(__file__).resolve().parents[3].parent
-        / ".agent-factory"
-        / "board"
-        / "server"
-        / "app.py"
+            / ".agent-factory"
+            / "board"
+            / "server"
+            / "runtime"
+            / "app.py"
     ).read_text(encoding="utf-8")
 
     assert "workflow_registry.load_from_disk()" not in app_src

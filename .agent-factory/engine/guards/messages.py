@@ -18,136 +18,136 @@
 from __future__ import annotations
 
 # =============================================================================
-# main_session_guard.py 메시지
+# main_session_guard.py message
 # =============================================================================
 
 MAIN_SESSION_BASH_FILE_MODIFY_DENIED: str = (
-    "메인 세션에서 Bash를 통한 파일 수정이 차단되었습니다. "
-    "(매칭 패턴: {pattern}) "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
+    "Modifying files via Bash in the main session is blocked."
+    "(Matching pattern: {pattern})"
+    "Work in a workflow session (_WF_SESSION_TYPE=workflow)."
 )
-"""플레이스홀더: {pattern} - 매칭된 Bash 파일 수정 패턴 문자열."""
+"""Placeholders: {pattern} - Matched Bash file modification pattern string."""
 
 MAIN_SESSION_NO_TMUX_DENIED: str = (
-    "비워크플로우 환경에서의 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
+    "Code modifications in non-workflow environments are blocked."
+    "Work in a workflow session (_WF_SESSION_TYPE=workflow)."
 )
 
 MAIN_SESSION_WINDOW_QUERY_FAILED: str = (
-    "세션 유형 판별에 실패하여 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
+    "Code modification was blocked because session type determination failed."
+    "Work in a workflow session (_WF_SESSION_TYPE=workflow)."
 )
 
 MAIN_SESSION_WRITE_EDIT_DENIED: str = (
-    "메인 세션(윈도우: {window_name})에서의 코드 수정이 차단되었습니다. "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 작업하세요."
+    "Code modification in the main session (window: {window_name}) is blocked."
+    "Work in a workflow session (_WF_SESSION_TYPE=workflow)."
 )
-"""플레이스홀더: {window_name} - 현재 세션 식별자."""
+"""Placeholder: {window_name} - Current session identifier."""
 
 # =============================================================================
-# agent_investigation_guard.py 메시지
+# agent_investigation_guard.py message
 # =============================================================================
 
 AGENT_INVESTIGATION_MAIN_SESSION_DENIED: str = (
-    "메인 세션에서의 조사 목적 서브에이전트(subagent_type: {subagent_type}) 호출이 차단되었습니다. "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
+    "A call to the investigative subagent (subagent_type: {subagent_type}) in the main session was blocked."
+    "Run it in a workflow session (_WF_SESSION_TYPE=workflow), or have the main agent investigate directly using the tool."
 )
-"""플레이스홀더: {subagent_type} - 차단된 서브에이전트 타입 문자열 (repr 포함)."""
+"""Placeholders: {subagent_type} - Blocked subagent type string (including repr)."""
 
 AGENT_INVESTIGATION_WINDOW_QUERY_FAILED: str = (
-    "세션 유형 판별에 실패하여 조사 목적 서브에이전트(subagent_type: {subagent_type}) 호출이 차단되었습니다. "
-    "워크플로우 세션(_WF_SESSION_TYPE=workflow)에서 실행하거나, 메인 에이전트가 직접 도구를 사용하여 조사하세요."
+    "A call to the investigative subagent (subagent_type: {subagent_type}) was blocked because session type determination failed."
+    "Run it in a workflow session (_WF_SESSION_TYPE=workflow), or have the main agent investigate directly using the tool."
 )
-"""플레이스홀더: {subagent_type} - 차단된 서브에이전트 타입 문자열 (repr 포함)."""
+"""Placeholders: {subagent_type} - Blocked subagent type string (including repr)."""
 
 # =============================================================================
-# kanban_subcommand_guard.py 메시지
+# kanban_subcommand_guard.py message
 # =============================================================================
 
 KANBAN_INVALID_SUBCOMMAND: str = (
-    "flow-kanban의 유효하지 않은 서브커맨드 '{subcommand}'가 차단되었습니다.\n"
-    "유효한 서브커맨드: {valid_list}\n\n"
-    "올바른 사용 예시:\n"
+    "The invalid subcommand '{subcommand}' of flow-kanban was blocked. \n"
+    "Valid subcommands: {valid_list} \n \n"
+    "Correct usage example: \n"
     "  flow-kanban move T-001 progress     # target: open|progress|review|done\n"
-    "  flow-kanban update-title T-001 '새 제목'  # 제목 변경\n"
+    "flow-kanban update-title T-001 'New title' # Change title \n"
     "  flow-kanban done T-001\n"
-    "  flow-kanban update-prompt T-001 --goal '목표'  # 프롬프트 필드 갱신\n\n"
-    "'{subcommand}' 대신 위 예시를 참고하세요."
+    "flow-kanban update-prompt T-001 --goal 'goal' # Update prompt field \n \n"
+    "Please refer to the example above instead of '{subcommand}'."
 )
 """플레이스홀더: {subcommand} - 사용된 유효하지 않은 서브커맨드, {valid_list} - 허용 서브커맨드 목록.
 
 메시지 포맷: 차단 알림 + 유효 서브커맨드 목록 + 올바른 사용 예시(move/update-title/done/update-prompt) + 수정 안내."""
 
 KANBAN_SUBMIT_REMOVED: str = (
-    "Submit 단계는 제거되었습니다 (T-399). "
-    "Open 카드를 In Progress 로 직접 이동하려면 board UI 의 DnD + confirm 모달 "
-    "(POST /api/kanban/submit) 또는 /wf -s N 을 사용하세요. "
-    "5단계 FSM (To Do → Open → In Progress → Review → Done) 만 유효합니다."
+    "Submit step has been removed (T-399)."
+    "To move the Open card directly to In Progress, use the DnD + confirm modal in the board UI."
+    "(POST /api/kanban/submit) or use /wf -s N."
+    "Only level 5 FSM (To Do → Open → In Progress → Review → Done) is valid."
 )
-"""flow-kanban move T-NNN submit 호출 차단 메시지 (T-399). Submit transient 단계 제거 후 가드용."""
+"""flow-kanban move T-NNN submit call blocking message (T-399). For guarding after removing the Submit transient phase."""
 
 # =============================================================================
-# hooks_self_guard.py 메시지
+# hooks_self_guard.py message
 # =============================================================================
 
 HOOKS_BYPASS_FILE_DENIED: str = (
-    ".agent-factory/runs/bypass 파일 생성/수정이 차단되었습니다. "
-    "이 파일은 워크플로우 가드를 우회하는 보안 민감 파일입니다."
+    "Creation/modification of .agent-factory/runs/bypass file blocked."
+    "This file is a security-sensitive file that bypasses workflow guards."
 )
 
 HOOKS_BASH_MODIFY_DENIED: str = (
-    "Bash를 통한 hooks 디렉토리 파일 수정이 차단되었습니다. "
-    "사용자의 명시적 수정 요청이 필요합니다."
+    "Modification of hooks directory file via Bash is blocked."
+    "Requires explicit modification request from user."
 )
 
 HOOKS_WRITE_EDIT_DENIED: str = (
-    "hooks 디렉토리 파일 수정이 차단되었습니다. "
-    "사용자의 명시적 수정 요청이 필요합니다."
+    "Modification of hooks directory file was blocked."
+    "Requires explicit modification request from user."
 )
 
 # =============================================================================
-# main_branch_guard.py 메시지
+# main_branch_guard.py message
 # =============================================================================
 
 MAIN_BRANCH_COMMIT_DENIED: str = (
-    "main/master 브랜치({branch})에서 직접 커밋이 차단되었습니다. "
-    "피처 브랜치를 생성하여 작업하세요."
+    "Direct commits blocked on main/master branch ({branch})."
+    "Create feature branches to work on."
 )
-"""플레이스홀더: {branch} - 현재 브랜치명."""
+"""Placeholder: {branch} - Current branch name."""
 
 # =============================================================================
-# readonly_session_guard.py 메시지
+# readonly_session_guard.py message
 # =============================================================================
 
 READONLY_SESSION_WRITE_EDIT_DENIED: str = (
-    "research/review 워크플로우 세션에서는 코드 수정(Write/Edit)이 금지되어 있습니다. "
-    "보고서에 수정 방안을 기술하세요."
+    "Code modification (Write/Edit) is prohibited in research/review workflow sessions."
+    "Describe your proposed corrections in your report."
 )
 
 READONLY_SESSION_BASH_MODIFY_DENIED: str = (
-    "research/review 워크플로우 세션에서는 Bash를 통한 파일 수정이 금지되어 있습니다. "
-    "보고서에 수정 방안을 기술하세요."
+    "Modifying files via Bash is prohibited in research/review workflow sessions."
+    "Describe your proposed corrections in your report."
 )
 
 # =============================================================================
-# direct_path_guard.py 메시지
+# direct_path_guard.py message
 # =============================================================================
 
 DIRECT_PATH_CALL_DENIED: str = (
-    "python3 직접 경로 호출이 차단되었습니다.\n"
-    "'{script_name}' 대신 alias '{alias_name}'를 사용하세요."
+    "python3 direct path call blocked \n"
+    "Use alias '{alias_name}' instead of '{script_name}'."
 )
-"""플레이스홀더: {script_name} - 차단된 스크립트 파일명, {alias_name} - 대체 alias명."""
+"""Placeholders: {script_name} - blocked script file name, {alias_name} - alternative alias name."""
 
 # =============================================================================
-# worktree_path_guard.py 메시지
+# worktree_path_guard.py message
 # =============================================================================
 
 WORKTREE_PATH_WRITE_EDIT_DENIED: str = (
-    "[워크트리 격리 위반] 메인 리포 경로에 직접 수정할 수 없습니다.\n"
-    "워크트리 경로를 사용하세요: {worktree_path}\n"
-    "현재 파일: {file_path}\n"
-    "워크트리 내 경로: {suggested_path}"
+    "[Worktree isolation violation] Cannot modify directly in the main repo path. \n"
+    "Use the worktree path: {worktree_path} \n"
+    "Current file: {file_path} \n"
+    "Path in worktree: {suggested_path}"
 )
 """플레이스홀더:
     {worktree_path}   - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
@@ -156,18 +156,18 @@ WORKTREE_PATH_WRITE_EDIT_DENIED: str = (
 """
 
 WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
-    "[워크트리 격리 위반] 메인 리포 경로에서 파일 수정 명령이 감지되었습니다.\n"
-    "워크트리 경로에서 작업하세요: {worktree_path}\n"
-    "cd {worktree_path} 후 명령을 실행하세요."
+    "[Worktree Isolation Violation] A file modification command was detected in the main repo path. \n"
+    "Operate on the worktree path: {worktree_path} \n"
+    "Run the command after cd {worktree_path}."
 )
 """플레이스홀더:
     {worktree_path} - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
 """
 
 # =============================================================================
-# worktree_remove_guard.py 메시지
+# worktree_remove_guard.py message
 # =============================================================================
 
 WORKTREE_REMOVE_UNCOMMITTED_DENIED: str = (
-    "미커밋 변경이 있는 워크트리입니다. flow-merge를 사용하여 정상 경로로 완료하세요."
+    "This is a worktree with uncommitted changes. Complete with the normal path using flow-merge."
 )

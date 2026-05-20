@@ -3,10 +3,10 @@
  *
  * Terminal sessions dropdown — main sessions from /terminal/sessions (title + UUID).
  *
- * T-516 — 워크플로우 탭 동기화 책임은 본 모듈에서 제거됨. 클라이언트 측 단일
- * 출처는 localStorage (Board.workflowTabStorage) — terminal.js init 의 render
- * 흐름 + kanban.js 의 LAUNCH_STARTED add 가 라이프사이클을 담당한다. 닫기
- * 버튼만이 유일한 종결 트리거.
+ * T-516 — Workflow Tab Sync Charges are removed from this module. Client Side Single
+ * source localStorage — terminal.js init of render
+ * LAUNCH STARTED add on flow + kanban.js is responsible for lifecycle. Close
+ * Only buttons are the only terminate trigger.
  *
  * Depends on: common.js (Board namespace), session.js (Board.session)
  * Registers:  Board.workflowSessions
@@ -61,7 +61,7 @@
     }).then(function (sessions) {
       sessions = Array.isArray(sessions) ? sessions : [];
 
-      // count 뱃지는 메인 세션 드롭다운에선 사용하지 않음 → 숨김
+      // count Not used in the main session dropdown → hide
       var countEl = document.getElementById("terminal-sessions-count");
       if (countEl) countEl.style.display = "none";
 
@@ -73,7 +73,7 @@
 
       var h = "";
       if (sessions.length === 0) {
-        h += '<div class="terminal-sessions-empty">세션 없음</div>';
+        h += '<div class="terminal-sessions-empty">No Session</div>';
         dropdown.innerHTML = h;
         return;
       }
@@ -110,7 +110,7 @@
       });
       dropdown.innerHTML = h;
 
-      // Wire resume buttons: 세션 클릭 → 해당 UUID로 resume 시도
+      // Wire-reflective buttons: Click on Sessions → Try it with corresponding UUID
       dropdown.querySelectorAll("[data-resume-sid]").forEach(function (btn) {
         btn.addEventListener("click", function (e) {
           e.preventDefault();
@@ -124,18 +124,18 @@
         });
       });
     }).catch(function () {
-      dropdown.innerHTML = '<div class="terminal-sessions-empty">세션 목록 로드 실패</div>';
+      dropdown.innerHTML = '<div class="terminal-sessions-empty">Settle loading failed</div>';
     });
   }
 
   /**
    * Main sessions dropdown refresh.
    *
-   * T-516 — 워크플로우 탭 sync 분기는 폐기. 본 함수는 드롭다운 갱신만 담당.
-   * 매개변수는 callsite 시그니처 호환 유지용 (호출자 수정 회피).
+   * T-516 — Workflow Tab sync Quarterly Closed. This function is only responsible for dropdown updates.
+   * The parameter is for the support of the callsite signature (applicant modification).
    *
-   * @param {string|null} _currentWorkflowSessionId - 미사용 (호환 유지)
-   * @param {boolean} _isWorkflowMode - 미사용 (호환 유지)
+   * @param {string null}
+   * @param {boolean}  isWorkflowMode - Unused (Maintenance)
    */
   function refresh(_currentWorkflowSessionId, _isWorkflowMode) {
     renderMainSessionsDropdown();

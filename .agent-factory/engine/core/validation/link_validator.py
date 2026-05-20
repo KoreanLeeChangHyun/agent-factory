@@ -28,19 +28,19 @@ import sys
 from pathlib import Path
 
 
-# 마크다운 링크 패턴: [text](path)
+# Markdown link pattern: [text](path)
 _MD_LINK_PATTERN: re.Pattern[str] = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 
-# HTML href 패턴: href="path" / href='path'
+# HTML href pattern: href="path" / href='path'
 _HTML_HREF_PATTERN: re.Pattern[str] = re.compile(r"""href=["']([^"']+)["']""", re.IGNORECASE)
 
-# 외부 링크 접두사
+# External link prefix
 _EXTERNAL_PREFIXES: tuple[str, ...] = ("http://", "https://")
 
-# 플레이스홀더 패턴 (템플릿 링크 감지)
+# Placeholder pattern (template link detection)
 _PLACEHOLDER_PATTERN: re.Pattern[str] = re.compile(r"\{\{[^}]+\}\}")
 
-# 프로젝트 루트 기준 경로 접두사
+# Path prefix relative to project root
 _PROJECT_ROOT_PREFIXES: tuple[str, ...] = (".agent-factory/", ".claude/")
 
 
@@ -79,7 +79,7 @@ def scan_markdown_files(
     target_filenames: set[str] = {"report.html", "plan.md"}
     result: list[Path] = []
 
-    # 활성 워크플로우 스캔 (.workflow/ 직접 하위, .history/ 제외)
+    # Scan for active workflows (.workflow/ direct children, excluding .history/)
     for entry in workflow_dir.iterdir():
         if entry.name == ".history":
             continue
@@ -88,7 +88,7 @@ def scan_markdown_files(
                 if link_file.is_file() and link_file.name in target_filenames:
                     result.append(link_file)
 
-    # 히스토리 스캔 (active_only=False 일 때)
+    # History scan (when active_only=False)
     if not active_only:
         history_dir = workflow_dir / ".history"
         if history_dir.exists():
@@ -124,16 +124,16 @@ def _is_skip_link(href: str) -> bool:
     Returns:
         스킵 대상이면 True, 검증 대상이면 False.
     """
-    # 문서 내부 앵커 스킵
+    # Skip anchor inside document
     if href.startswith("#"):
         return True
 
-    # 외부 링크 스킵
+    # Skip external link
     for prefix in _EXTERNAL_PREFIXES:
         if href.startswith(prefix):
             return True
 
-    # 플레이스홀더 포함 링크 스킵 (템플릿)
+    # Skip link with placeholder (template)
     if _PLACEHOLDER_PATTERN.search(href):
         return True
 
@@ -158,13 +158,13 @@ def validate_link(
     Returns:
         파일이 존재하면 True, 존재하지 않으면 False.
     """
-    # 프로젝트 루트 기준 경로
+    # Path relative to project root
     for prefix in _PROJECT_ROOT_PREFIXES:
         if href.startswith(prefix):
             target = project_root / href
             return target.exists()
 
-    # 상대 경로: 마크다운 파일 디렉터리 기준
+    # Relative path: relative to the Markdown file directory
     target = md_file.parent / href
     return target.exists()
 
@@ -191,7 +191,7 @@ def validate_all(
         try:
             content = md_file.read_text(encoding="utf-8")
         except OSError as exc:
-            print(f"[WARN] 파일 읽기 실패: {md_file} ({exc})", file=sys.stderr)
+            print(f"[WARN] Failed to read file: {md_file} ({exc})", file=sys.stderr)
             continue
 
         hrefs = extract_links(content)
@@ -223,21 +223,21 @@ def _print_results(
         project_root: 프로젝트 루트 경로 (상대 경로 표시용).
     """
     total_count = valid_count + invalid_count
-    print(f"링크 검사 결과: 총 {total_count}개 (유효 {valid_count}개, 무효 {invalid_count}개)")
+    print(f"Link inspection results: Total {total_count} (valid {valid_count}, invalid {invalid_count})")
 
     if invalid_links:
-        print("\n무효 링크 목록 (404 예상):")
+        print("\n List of invalid links (404 expected):")
         for md_file, href in invalid_links:
-            # 프로젝트 루트 기준 상대 경로로 표시
+            # Display relative path relative to project root
             try:
                 rel_md = md_file.relative_to(project_root)
             except ValueError:
                 rel_md = md_file
-            print(f"  파일: {rel_md}")
-            print(f"  링크: {href}")
+            print(f"File: {rel_md}")
+            print(f"Link: {href}")
             print()
     else:
-        print("\n모든 내부 링크가 유효합니다.")
+        print("\n All internal links are valid.")
 
 
 def main() -> None:
@@ -247,34 +247,34 @@ def main() -> None:
     무효 링크가 있으면 exitcode 1, 모두 유효하면 0으로 종료한다.
     """
     parser = argparse.ArgumentParser(
-        description=".agent-factory/runs/ 내 마크다운 파일의 링크 유효성을 검사합니다.",
+        description=".agent-factory/runs/ Validates links in my markdown files.",
     )
     parser.add_argument(
         "--active-only",
         action="store_true",
         default=False,
-        help="활성 워크플로우(.agent-factory/runs/ 직접 하위)만 검사합니다. .agent-factory/runs/.history/는 제외.",
+        help="Only active workflows (.agent-factory/runs/ direct children) are checked. Excluding .agent-factory/runs/.history/.",
     )
     args = parser.parse_args()
 
     project_root = _find_project_root()
 
-    # 스캔 대상 파일 수집
+    # Collect files to scan
     md_files = scan_markdown_files(project_root, active_only=args.active_only)
 
-    scope_label = "활성 워크플로우" if args.active_only else "전체 워크플로우(활성+히스토리)"
-    print(f"검사 범위: {scope_label}")
-    print(f"검사 파일 수: {len(md_files)}개")
+    scope_label = "active workflow" if args.active_only else "Entire workflow (active+history)"
+    print(f"Scan scope: {scope_label}")
+    print(f"Number of scanned files: {len(md_files)}")
     print()
 
     if not md_files:
-        print("검사할 파일이 없습니다.")
+        print("There are no files to scan.")
         sys.exit(0)
 
     valid_count, invalid_count, invalid_links = validate_all(md_files, project_root)
     _print_results(valid_count, invalid_count, invalid_links, project_root)
 
-    # 무효 링크 존재 시 exitcode 1
+    # exitcode 1 when invalid link exists
     sys.exit(1 if invalid_count > 0 else 0)
 
 

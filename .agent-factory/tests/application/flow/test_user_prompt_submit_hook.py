@@ -1,13 +1,13 @@
-"""test_user_prompt_submit_hook.py — UserPromptSubmit hook 단위 테스트.
+"""test user prompt submit hook.py — UserPromptSubmit
 
-검증 항목:
-  1. _collect_kanban_summary — mock 칸반 디렉터리에서 컬럼별 카운트 + 상세 추출
-  2. 페이로드 4096 chars 트리밍 동작
-  3. _is_main_session — 워크트리 CWD 를 메인 아님으로 판정 + 메인 리포 CWD 를 메인으로 판정
-  4. 디스패처가 빈 stdin 에서도 비정상 종료하지 않고 exit 0 보장
-  5. _parse_ticket_header — 정상 XML + 비정상 XML graceful skip
-  6. _format_context — 세션 없는 경우 / 세션 있는 경우 출력 형식
-  7. _is_main_session — runs/ 경로 포함 시 False 판정
+Payment Terms:
+  1.  collect kanban summary — Moroccan count + detailed extraction by column in the directory
+  2. Payload 4096 chars trimming action
+  3. FAQs  is main session — Prefix CWD as main argument + prefix CWD as main repository
+  4. FAQs exit 0 guarantee without discarding from empty stdin
+  5. FAQs  parse ticket header — normal XML + abnormal XML graceful skip
+  6.  format context — output format if no session / session
+  7. OEM  is main session — run/path included False
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import sys
 import tempfile
 import textwrap
 
-# sys.path 보장: flow/ 패키지 + engine/ 패키지 import 가능하도록 경로 추가
+# sys.path Warranty: Add routes to import flow/ package + engine/ package
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 _AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_TEST_DIR, "..", "..", ".."))
 _SCRIPTS_DIR = os.path.join(_AGENT_FACTORY_ROOT, "engine")
@@ -27,15 +27,15 @@ _HOOK_HANDLERS_DIR = os.path.join(_SCRIPTS_DIR, "apps", "hooks")
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-# hook-handlers 모듈 직접 임포트
+# Hook-handlers module direct import
 _inject_mod_path = os.path.join(_HOOK_HANDLERS_DIR, "inject_kanban_context.py")
-_dispatcher_hook_path = None  # user-prompt-submit.py 절대경로 (탐색)
+_dispatcher_hook_path = None  # user-prompt-submit.py absolute view (decolor)
 
-# hooks/ 디렉터리 찾기 (워크트리 구조: .agent-factory/hooks/ 는 상위로 3단계)
+# Find hooks/ directory (worktree structure: .agent-factory/hooks/ three steps to the top)
 _HOOKS_DIR = os.path.join(_AGENT_FACTORY_ROOT, "hooks")
 _DISPATCHER_SCRIPT = os.path.join(_HOOKS_DIR, "user-prompt-submit.py")
 
-# inject_kanban_context 모듈을 importlib 로 로드 (패키지 없이도 동작)
+# inject kanban context module importlib to load (without package)
 import importlib.util as _ilu
 
 _inject_spec = _ilu.spec_from_file_location("inject_kanban_context", _inject_mod_path)
@@ -47,10 +47,10 @@ _parse_ticket_header = _inject_mod._parse_ticket_header
 _format_context = _inject_mod._format_context
 MAX_PAYLOAD_CHARS = _inject_mod.MAX_PAYLOAD_CHARS
 
-# user-prompt-submit.py 의 _is_main_session 도 동일 방식으로 로드
+# user-prompt-submit.py  is main session
 _disp_spec = _ilu.spec_from_file_location("user_prompt_submit", _DISPATCHER_SCRIPT)
 _disp_mod = _ilu.module_from_spec(_disp_spec)
-# dispatcher import 없이 _is_main_session 만 테스트하기 위해 실행 대신 수동 처리
+# manual processing instead of running  is main session only without dispatcher import
 try:
     _disp_spec.loader.exec_module(_disp_mod)
     _is_main_session = _disp_mod._is_main_session
@@ -60,10 +60,10 @@ except Exception as _de:
     _is_main_session = None  # type: ignore
 
 
-# ── 헬퍼 ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def _make_ticket_xml(number: str, title: str, status: str = "Open") -> str:
-    """테스트용 간단한 XML 문자열을 반환한다."""
+    """return a simple XML string for testing."""
     return textwrap.dedent(f"""\
         <?xml version="1.0" encoding="UTF-8"?>
         <ticket>
@@ -74,20 +74,20 @@ def _make_ticket_xml(number: str, title: str, status: str = "Open") -> str:
             <command>implement</command>
           </metadata>
           <prompt>
-            <goal>테스트 목표</goal>
+            <goal>Test goal</goal>
           </prompt>
         </ticket>
     """)
 
 
 def _make_mock_kanban_dir(columns: dict[str, list[tuple[str, str, str]]]) -> str:
-    """임시 mock 칸반 디렉터리를 생성하고 경로를 반환한다.
+    """Create a temporary mosque directory and return the path.
 
     Args:
-        columns: {컬럼명: [(number, title, status), ...]} 형태
+        columns: [(number, title, status), ...]} form
 
     Returns:
-        임시 root 경로. 테스트 종료 후 정리 필요.
+        temporary root path. Need to clean after testing ends.
     """
     tmpdir = tempfile.mkdtemp(prefix="mock_kanban_")
     tickets_dir = os.path.join(tmpdir, ".agent-factory", "tickets")
@@ -105,7 +105,7 @@ def _make_mock_kanban_dir(columns: dict[str, list[tuple[str, str, str]]]) -> str
 
 
 def _rm_tree(path: str) -> None:
-    """os.walk 기반 안전한 디렉터리 삭제."""
+    """os.walk-based secure directory deletion."""
     import shutil
     try:
         shutil.rmtree(path)
@@ -113,28 +113,28 @@ def _rm_tree(path: str) -> None:
         pass
 
 
-# ── Case 1: _collect_kanban_summary 컬럼 카운트 + 상세 추출 ─────────────────
+# ── Case 1:  collect kanban summary column count + detailed extraction
 
 def test_collect_kanban_summary_counts_and_details():
-    """mock 칸반 디렉터리에서 컬럼별 카운트 + Open/Progress ID·제목을 정확히 추출한다."""
+    """Exactly extracts column-specific count + Open/Progress ID and statements in the Modal Directory."""
     mock_root = _make_mock_kanban_dir({
         "open": [
-            ("T-001", "오픈 티켓 A", "Open"),
-            ("T-002", "오픈 티켓 B", "Open"),
+            ("T-001", "Open Ticket A", "Open"),
+            ("T-002", "Open Ticket B", "Open"),
         ],
         "progress": [
-            ("T-003", "진행중 티켓 C", "In Progress"),
+            ("T-003", "Ticket C", "In Progress"),
         ],
         "review": [
-            ("T-004", "리뷰 티켓 D", "Review"),
+            ("T-004", "Browse By Tag", "Review"),
         ],
         "todo": [
-            ("T-005", "샘플 티켓 E", "To Do"),
-            ("T-006", "샘플 티켓 F", "To Do"),
-            ("T-007", "샘플 티켓 G", "To Do"),
+            ("T-005", "Sample Ticket E", "To Do"),
+            ("T-006", "Sample Ticket F", "To Do"),
+            ("T-007", "Sample Ticket G", "To Do"),
         ],
         "done": [
-            ("T-008", "완료 티켓 H", "Done"),
+            ("T-008", "Ticket H", "Done"),
         ],
     })
     try:
@@ -143,14 +143,14 @@ def test_collect_kanban_summary_counts_and_details():
         counts = result["counts"]
         details = result["details"]
 
-        # 카운트 검증
+        # Scots Gaelic
         assert counts["open"] == 2, f"open count: expected 2, got {counts['open']}"
         assert counts["progress"] == 1, f"progress count: expected 1, got {counts['progress']}"
         assert counts["review"] == 1, f"review count: expected 1, got {counts['review']}"
         assert counts["todo"] == 3, f"todo count: expected 3, got {counts['todo']}"
         assert counts["done"] == 1, f"done count: expected 1, got {counts['done']}"
 
-        # details 는 open + progress + review (todo/done 제외)
+        # + progress + review
         assert len(details) == 4, f"details count: expected 4, got {len(details)}"
 
         numbers = {d["number"] for d in details}
@@ -158,25 +158,25 @@ def test_collect_kanban_summary_counts_and_details():
         assert "T-002" in numbers, "T-002 not in details"
         assert "T-003" in numbers, "T-003 not in details"
         assert "T-004" in numbers, "T-004 not in details"
-        # todo/done은 details에 포함되지 않아야 함
+        # todo/done should not be included in the details
         assert "T-005" not in numbers, "T-005 (todo) should not be in details"
         assert "T-008" not in numbers, "T-008 (done) should not be in details"
 
-        # 제목 검증 (T-001)
+        # Title Verification (T-001)
         t001 = next((d for d in details if d["number"] == "T-001"), None)
         assert t001 is not None, "T-001 entry not found"
-        assert t001["title"] == "오픈 티켓 A", f"title mismatch: {t001['title']!r}"
+        assert t001["title"] == "Open Ticket A", f"title mismatch: {t001['title']!r}"
         assert t001["column"] == "open", f"column mismatch: {t001['column']!r}"
 
     finally:
         _rm_tree(mock_root)
 
 
-# ── Case 2: 페이로드 4096 chars 트리밍 동작 ────────────────────────────────
+# ── ──────────────────────────────────────────
 
 def test_payload_trimming_4096():
-    """context_text 가 4096 chars 초과 시 트리밍되어야 한다."""
-    # _format_context 는 트리밍하지 않음 — main() 의 트리밍 로직을 직접 테스트
+    """context text should be trimmed over 4096 chars."""
+    # format context does not trim — test the trimming logic of main() directly
     long_title = "X" * 200
     mock_root = _make_mock_kanban_dir({
         "open": [(f"T-{i:03d}", long_title, "Open") for i in range(1, 30)],
@@ -187,26 +187,26 @@ def test_payload_trimming_4096():
     })
     try:
         kanban = _collect_kanban_summary(mock_root)
-        # 세션 없이 포맷 → 긴 문자열 생성
+        # Create a format → long string without a session
         context_text = _format_context(kanban, [])
 
-        # main() 의 트리밍 로직 재현 (MAX_PAYLOAD_CHARS = 4096)
+        # Trimming logic reproduction of main(MAX PAYLOAD CHARS = 4096)
         if len(context_text) > MAX_PAYLOAD_CHARS:
-            trimmed = context_text[:MAX_PAYLOAD_CHARS] + "\n_(트리밍됨)_"
+            trimmed = context_text[:MAX_PAYLOAD_CHARS] + "\\n (trimmed) "
         else:
             trimmed = context_text
 
-        # 결과 검증
+        # Testimonials
         if len(context_text) > MAX_PAYLOAD_CHARS:
-            assert trimmed.endswith("_(트리밍됨)_"), "트리밍 접미사 누락"
-            assert len(trimmed) <= MAX_PAYLOAD_CHARS + len("\n_(트리밍됨)_"), f"트리밍 후 길이 초과: {len(trimmed)}"
+            assert trimmed.endswith("(trimmed) "), "Trimming Minions Missing"
+            assert len(trimmed) <= MAX_PAYLOAD_CHARS + len("\\n (trimmed) "), f"length after trimming:   FIELD 0 "
         else:
-            # 29건 * 약 210chars = 약 6090 → 4096 초과해야 함
-            # MAX_DETAIL_ITEMS = 10 이므로 사실상 10건만 출력 → 2100 chars 수준
-            # 이 경우 트리밍 미발생도 유효 (assert 통과)
+            # 29 * About 210chars = About 6090 → 4096 must be exceeded
+            # MAX DETAIL ITEMS = 10 outputs in fact → 2100 chars level
+            # In this case, trimming missiles are also valid (passing assert)
             pass
 
-        # MAX_DETAIL_ITEMS 상한 검증 (10건 초과 방지)
+        # MAX DETAIL ITEMS
         MAX_DETAIL_ITEMS = _inject_mod.MAX_DETAIL_ITEMS
         lines = context_text.split("\n")
         detail_lines = [l for l in lines if l.startswith("- T-")]
@@ -218,10 +218,10 @@ def test_payload_trimming_4096():
         _rm_tree(mock_root)
 
 
-# ── Case 3: _is_main_session 워크트리/메인 판정 ─────────────────────────────
+# ── ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def test_is_main_session_worktree_cwd_returns_false():
-    """워크트리 CWD 가 포함된 stdin_data 는 False 를 반환해야 한다."""
+    """stdin data with worktree CWD should return False."""
     if not _DISPATCHER_LOADED:
         print("SKIP  _is_main_session test: dispatcher not loaded")
         return
@@ -236,7 +236,7 @@ def test_is_main_session_worktree_cwd_returns_false():
 
 
 def test_is_main_session_main_repo_cwd_returns_true():
-    """메인 리포 CWD (워크트리/runs 경로 아님) 는 True 를 반환해야 한다."""
+    """The main repo CWD (worktri/runs path not) should return true."""
     if not _DISPATCHER_LOADED:
         print("SKIP  _is_main_session test: dispatcher not loaded")
         return
@@ -244,7 +244,7 @@ def test_is_main_session_main_repo_cwd_returns_true():
     main_cwd = "/home/deus/workspace/claude"
     stdin_data = {"cwd": main_cwd, "hook_event_name": "UserPromptSubmit"}
 
-    # _WF_SESSION_TYPE 환경변수가 있으면 제거 후 테스트
+    # WF SESSION TYPE Test after removal if environment variable
     orig = os.environ.pop("_WF_SESSION_TYPE", None)
     try:
         result = _is_main_session(stdin_data)
@@ -257,7 +257,7 @@ def test_is_main_session_main_repo_cwd_returns_true():
 
 
 def test_is_main_session_workflow_env_var_returns_false():
-    """_WF_SESSION_TYPE=workflow 환경변수가 설정된 경우 False 를 반환해야 한다."""
+    """WF SESSION TYPE=workflow The environment variable should return False."""
     if not _DISPATCHER_LOADED:
         print("SKIP  _is_main_session test: dispatcher not loaded")
         return
@@ -278,9 +278,9 @@ def test_is_main_session_workflow_env_var_returns_false():
 
 
 def test_is_main_session_runs_path_returns_false():
-    """cwd 에 /.agent-factory/runs/ 가 포함된 경우 False 를 반환해야 한다.
+    """cwd to return False if included /.agent-factory/runs/.
 
-    T-449 폴드 구조: runs/<key>/ 직속.
+    T-449 pod structure: runs/<key>/ direct.
     """
     if not _DISPATCHER_LOADED:
         print("SKIP  _is_main_session test: dispatcher not loaded")
@@ -299,11 +299,11 @@ def test_is_main_session_runs_path_returns_false():
             os.environ["_WF_SESSION_TYPE"] = orig
 
 
-# ── Case 4: 빈 stdin 에서 exit 0 보장 ─────────────────────────────────────
+# ── Case 4: Get off at blank stdin.
 
 def test_dispatcher_empty_stdin_exit_0():
-    """user-prompt-submit.py 가 빈 stdin 에서도 exit 0 을 반환해야 한다."""
-    # Hook 가드 우회: 임시 스크립트를 /tmp/probe_w05_empty.py 로 작성 후 실행
+    """user-prompt-submit.py should return exit 0 even empty stdin."""
+    # Hook Guard Bypass: Run after creating a temporary script /tmp/probe w05 empty.py
     probe_path = "/tmp/probe_w05_empty_stdin.py"
     probe_code = textwrap.dedent(f"""\
         import subprocess, sys
@@ -335,18 +335,18 @@ def test_dispatcher_empty_stdin_exit_0():
             pass
 
 
-# ── Case 5: _parse_ticket_header 정상 + 비정상 XML ────────────────────────
+# ── ──────────────────────────────────────────────
 
 def test_parse_ticket_header_normal():
-    """정상 XML 에서 number, title, status 필드를 추출해야 한다."""
+    """You need to extract the number, title, and status field in normal XML."""
     fd, path = tempfile.mkstemp(suffix=".xml")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(_make_ticket_xml("T-999", "테스트 제목", "Review"))
+            f.write(_make_ticket_xml("T-999", "Scots Gaelic", "Review"))
         result = _parse_ticket_header(path)
         assert result is not None, "parse_ticket_header returned None"
         assert result["number"] == "T-999", f"number mismatch: {result['number']!r}"
-        assert result["title"] == "테스트 제목", f"title mismatch: {result['title']!r}"
+        assert result["title"] == "Scots Gaelic", f"title mismatch: {result['title']!r}"
     finally:
         try:
             os.unlink(path)
@@ -355,7 +355,7 @@ def test_parse_ticket_header_normal():
 
 
 def test_parse_ticket_header_invalid_xml_returns_none():
-    """비정상 XML 에서 None 을 반환해야 한다 (graceful skip)."""
+    """You should return None from the abnormal XML (graceful skip)."""
     fd, path = tempfile.mkstemp(suffix=".xml")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -369,44 +369,44 @@ def test_parse_ticket_header_invalid_xml_returns_none():
             pass
 
 
-# ── Case 6: _format_context 출력 형식 검증 ───────────────────────────────
+# ── Case 6: ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def test_format_context_no_sessions():
-    """세션이 없는 경우 활성 세션 섹션이 출력되지 않아야 한다."""
+    """If there is no session, the active session section should not be output."""
     kanban = {
         "counts": {"open": 1, "progress": 0, "review": 2, "todo": 5, "done": 10},
-        "details": [{"number": "T-100", "title": "테스트", "status": "Open", "column": "open"}],
+        "details": [{"number": "T-100", "title": "T/T", "status": "Open", "column": "open"}],
     }
     text = _format_context(kanban, [])
 
-    assert "## 칸반 스냅샷" in text, "칸반 스냅샷 헤더 없음"
-    assert "Open: 1건" in text, "Open 카운트 누락"
-    assert "To Do: 5건" in text, "To Do 카운트 누락"
-    assert "Done: 10건" in text, "Done 카운트 누락"
-    assert "T-100" in text, "T-100 상세 누락"
-    assert "### 활성 세션" not in text, "세션 없는 경우 활성 세션 섹션이 출력되면 안 됨"
+    assert "## Kanban Snapshot" in text, "No cracking header"
+    assert "Open: 1" in text, "Open count missing"
+    assert "To Do: 5" in text, "To Do Count Missing"
+    assert "Done: 10" in text, "Done count missing"
+    assert "T-100" in text, "T-100"
+    assert "### Activity Session" not in text, "If there is no session, the active session section should not be output."
 
 
 def test_format_context_with_sessions():
-    """세션이 있는 경우 활성 세션 섹션이 포함되어야 한다."""
+    """If you have a session, you must include an active session section."""
     kanban = {
         "counts": {"open": 1, "progress": 1, "review": 0, "todo": 0, "done": 0},
-        "details": [{"number": "T-414", "title": "hook 도입", "status": "In Progress", "column": "progress"}],
+        "details": [{"number": "T-414", "title": "Hook introduction", "status": "In Progress", "column": "progress"}],
     }
     sessions = [{"ticket": "T-414", "command": "implement", "started_at": "133053", "status": "running"}]
     text = _format_context(kanban, sessions)
 
-    assert "### 활성 세션" in text, "활성 세션 섹션 없음"
-    assert "T-414" in text, "세션 티켓 T-414 누락"
-    assert "implement" in text, "세션 command 누락"
+    assert "### Activity Session" in text, "No Sessions Section"
+    assert "T-414" in text, "Session ticket T-414 missing"
+    assert "implement" in text, "Session command missing"
 
 
-# ── Case 7: 칸반 디렉터리 부재 시 graceful degrade ─────────────────────────
+# ── Case 7: Genderful degrade
 
 def test_collect_kanban_summary_missing_dir():
-    """칸반 디렉터리가 없을 때 0카운트 + 빈 details 를 반환해야 한다."""
+    """You must return 0 count + empty details when you don't have a partition directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # tickets 디렉터리를 만들지 않음
+        # Don't create a ticket directory
         result = _collect_kanban_summary(tmpdir)
         counts = result["counts"]
         details = result["details"]
@@ -416,7 +416,7 @@ def test_collect_kanban_summary_missing_dir():
         assert details == [], f"details should be empty, got {details!r}"
 
 
-# ── 간단한 실행기 (pytest 없이도 동작) ─────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     tests = [

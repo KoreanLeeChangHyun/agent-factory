@@ -70,7 +70,7 @@ def run_cycle(cfg: GCConfig, *, apply: bool, with_reflection: bool = True) -> GC
         except OSError as exc:
             errors.append(f'dedup_failed: {exc}')
 
-    # dedup 후 메모리 재스캔 (반영 시)
+    # Rescan memory after dedup (if reflected)
     memories_after = scan_memories(cfg) if apply and dedup_applied else memories
 
     # 2) reflection
@@ -78,10 +78,10 @@ def run_cycle(cfg: GCConfig, *, apply: bool, with_reflection: bool = True) -> GC
     if with_reflection:
         try:
             refl = run_reflection(cfg, memories_after, apply=apply)
-        except Exception as exc:  # noqa: BLE001 — silent fail 정책
+        except Exception as exc:  # noqa: BLE001 — silent fail policy
             errors.append(f'reflection_failed: {exc!r}')
 
-    # 3) 인덱스 재생성 (apply 시)
+    # 3) Index regeneration (when applying)
     final_memories = scan_memories(cfg) if apply else memories
     if apply:
         try:

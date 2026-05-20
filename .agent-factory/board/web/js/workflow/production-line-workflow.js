@@ -3,56 +3,56 @@
  *
  * Board.productionLineWorkflow — T-495 P2 frontend client for production-line subprocess.
  *
- * v1 의 /terminal/workflow/events 단일 SSE 채널과 분리된 production-line 전용 client.
- * backend 의 7 endpoint 와 1:1 매핑:
+ * v1 /terminal/workflow/events single SSE channel and separated production-line only client.
+ * backend 7 endpoint and 1:1 mapping:
  *   GET  /api/v2/sessions                       — list
  *   GET  /api/v2/sessions/<id>                  — detail (current_step / phase / artifacts / ts)
- *   GET  /api/v2/sessions/<id>/events           — SSE 구독 (per-session)
- *   GET  /api/v2/sessions/<id>/history          — persist NDJSON 이벤트 (REST 단일 출처)
- *   GET  /api/v2/sessions/<id>/artifacts/<rel>  — 산출물 read
+ *   GET /api/v2/sessions/<id>/events — SSE Subscription (per-session)
+ *   GET /api/v2/sessions/<id>/history — persist NDJSON Event (REST Single Source)
+ *   GET /api/v2/sessions/<id>/artifacts/<rel> — output read
  *
- * SSE event 이름 (v1 'stdout'/'result'/'system' 과 분리):
- *   workflow_step    — Step 전이 (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED)
+ * SSE event name (v1 'stdout'/'result'/'system' and separated):
+ *   <% if (imgObj.width >= imgObj.height) { %>
  *   workflow_stdout  — claude -p stdout NDJSON chunk
- *   workflow_phase   — WORK 내부 phase 전이
- *   workflow_finish  — 사이클 종결
+ *   workflow phase — WORK internal phase transformation
+ *   workflow finish — cycle closing
  *
  * Depends on: common.js (Board namespace)
  * Registers:  Board.productionLineWorkflow
  *
- * 공개 API:
+ * Public API:
  *   fetchSessions()                  → Promise<Array<sessionMeta>>
  *   fetchSession(sessionId)          → Promise<sessionDetail|null>
  *   fetchArtifact(sessionId, relPath) → Promise<string|null>
  *   subscribe(sessionId, handlers)   → { close, sessionId }
  *   isProductionLineSessionId(sessionId)         → boolean
  *
- * handlers 매개변수 shape (모두 optional):
+ * handlers parameter shape (full optional):
  *   {
  *     onOpen()                              — EventSource open
  *     onStep({step, prev_step, phase, ts})  — workflow_step
  *     onStdout({text, raw, ts})             — workflow_stdout
  *     onPhase({phase, action, ts})          — workflow_phase
  *     onFinish({outcome, summary, ts})      — workflow_finish
- *     onError(err)                          — 네트워크/파싱 에러
+ *     onError(err) — Network/Pushing Error
  *   }
  */
 "use strict";
 
 (function () {
 
-  // ── 상수 ──
+  // ── VIEW
 
-  /** production-line session_id 패턴 — `wf-T-NNN-<registry_key>`. v1 도 같은 prefix 라 backend 가 권위. */
+  /** production-line session id pattern — `wf-T-NNN-<registry key>`. v1 also like prefix la backend with authority. */
   var PRODUCTION_LINE_SESSION_PREFIX = "wf-";
 
-  /** SSE 재연결 간격 (ms) — v1 session.js 와 동일. */
+  /** SSE reconnect interval (ms) — Same as v1 session.js. */
   var SSE_RECONNECT_INTERVAL = 3000;
 
-  // ── 내부 헬퍼 ──
+  // ── Internal Helper ──
 
   /**
-   * fetch wrapper — JSON 응답을 파싱하여 반환. 404/네트워크 에러는 null 반환.
+   * fetch wrapper — returning JSON response. 404/network error returns null.
    * @param {string} url
    * @returns {Promise<any|null>}
    */
@@ -68,7 +68,7 @@
   }
 
   /**
-   * fetch wrapper — text 응답을 반환 (artifact viewer 용). 404 → null.
+   * fetch wrapper — return text response (for artifact viewer). 404 → null
    * @param {string} url
    * @returns {Promise<string|null>}
    */
@@ -84,7 +84,7 @@
   }
 
   /**
-   * SSE event.data → JSON 파싱. malformed 시 null 반환 + console.error.
+   * SSE event.data → JSON parse. null return + console.error when malformed.
    */
   function _safeParse(raw) {
     if (typeof raw !== "string") return null;
@@ -99,7 +99,7 @@
   // ── REST API ──
 
   /**
-   * 전체 production-line 세션 목록을 반환한다.
+   * return the full production-line session list.
    * @returns {Promise<Array<{session_id, ticket_id, command, work_dir, worktree_path, status, current_step, current_phase, cycle_start_ts, step_ts, created_at}>>}
    */
   function fetchSessions() {
@@ -109,7 +109,7 @@
   }
 
   /**
-   * 단일 production-line 세션의 상세 정보를 반환한다. 404 → null.
+   * Returns the details of a single production-line session. 404 → null
    * @param {string} sessionId
    * @returns {Promise<object|null>}
    */
@@ -119,9 +119,9 @@
   }
 
   /**
-   * 산출물 파일을 text 로 반환한다. work_dir 기준 상대 경로.
+   * returns the output file to text. work dir standard relative path.
    * @param {string} sessionId
-   * @param {string} relPath — 예: "plan.md", "work/P1.md", "metrics.jsonl"
+   * @param {string} relPath — example: "plan.md", "work/P1.md", "metrics.jsonl"
    * @returns {Promise<string|null>}
    */
   function fetchArtifact(sessionId, relPath) {
@@ -132,7 +132,7 @@
   }
 
   /**
-   * 산출물 URL — 새 탭으로 viewer 호출 시 사용.
+   * Output URL — used when calling viewer with a new tab.
    * @param {string} sessionId
    * @param {string} relPath
    * @returns {string}
@@ -143,12 +143,12 @@
   }
 
   /**
-   * T-513 P3 — REST 단일 출처 history loader.
+   * T-513 P3 — REST single source history loader.
    *
-   * 재연결 시 SSE 라이브 등록 전 과거 이벤트를 일괄 적재한다. SSE 링버퍼 replay 는
-   * 사용하지 않고 REST GET /api/v2/sessions/<id>/history 가 단일 출처
-   * (T-497 결정점 정합). 응답 schema: {session_id, total_count,
-   * events: [{ts, event, payload}]}. 404/네트워크 에러 시 빈 배열 반환.
+   * When reconnecting, SSE will load the past event before registration. SSE Ring Buffer Replay
+   * REST GET /api/v2/sessions/<id>/history
+   * (T-497 Crystal). schema: {session id, total count,
+   * event: [{ts, event, payload}]}. 404/network error return empty array.
    *
    * @param {string} sessionId
    * @returns {Promise<Array<{ts:number,event:string,payload:object}>>}
@@ -162,16 +162,16 @@
     });
   }
 
-  // ── SSE 구독 ──
+  // ── SSE Subscription ──
 
   /**
-   * production-line 의 per-session SSE 스트림을 구독한다.
+   * the per-session SSE stream of production-line.
    *
-   * 단일 진입점 — handler 콜백으로 4 종 이벤트 분기 (workflow_step / stdout /
-   * phase / finish). reconnect 는 EventSource 기본 동작에 위임 + 명시적 close 가능.
+   * Single entry point — 4 types event quarters with handler callback (workflow step / stdout /
+   * phase / finish). reconnect can be specified + explicit close for EventSource default operation.
    *
    * @param {string} sessionId
-   * @param {object} handlers - 콜백 모음 (모두 optional)
+   * @param {object} handlers - collection of callbacks (more optional)
    * @returns {{close: function, sessionId: string}}
    */
   function subscribe(sessionId, handlers) {
@@ -266,12 +266,12 @@
     return { close: close, sessionId: sessionId };
   }
 
-  // ── 분기 판정 ──
+  // ── Quarterfinal ──
 
   /**
-   * sessionId 가 production-line backend 에 등록되어 있는지 캐시-우선 판정.
-   * 즉시 사용을 위한 동기 helper — known set 에 없으면 false 반환.
-   * 비동기 확인은 fetchSession 으로.
+   * sessionId is registered in production-line backend and cache-line correction.
+   * synchronous helper for instant use — known set to false return.
+   * Asynchronous check with fetchSession.
    *
    * @param {string} sessionId
    * @returns {boolean}
@@ -282,8 +282,8 @@
   }
 
   /**
-   * 외부 호출자가 backend 응답에서 알게 된 production-line session_id 를 등록한다.
-   * (예: LAUNCH_STARTED 이벤트 payload, /api/v2/sessions 응답 등)
+   * Registered the production-line session id to be found in the backend response.
+   * (e.g. LAUNCH STARTED event payload, /api/v2/sessions response, etc.)
    * @param {string} sessionId
    */
   function registerKnown(sessionId) {
@@ -293,7 +293,7 @@
   }
 
   /**
-   * 알려진 production-line 세션 목록을 한번 동기화 (페이지 로드 시 호출 권장).
+   * Once synchronized the known production-line session list (recommended to call on page load).
    * @returns {Promise<Set<string>>}
    */
   function syncKnownSessions() {
@@ -305,14 +305,14 @@
     });
   }
 
-  // ── 내부 상태 ──
+  // ── Internal Status ──
 
-  /** @type {Set<string>} backend 에 등록된 production-line session_id 캐시 */
+  /** @type {Set<string>} backend registered production-line session id cache */
   var _knownSessions = new Set();
 
   // ── Register on Board namespace ──
   Board.productionLineWorkflow = {
-    // 분기 판정
+    // About Us
     isProductionLineSessionId: isProductionLineSessionId,
     registerKnown: registerKnown,
     syncKnownSessions: syncKnownSessions,
@@ -324,12 +324,12 @@
     fetchHistory: fetchHistory,
     // SSE
     subscribe: subscribe,
-    // 상수 노출 (테스트 / 디버그 용)
+    // Constant exposure (Forest / Debug)
     _PRODUCTION_LINE_SESSION_PREFIX: PRODUCTION_LINE_SESSION_PREFIX,
   };
 
-  // 페이지 로드 시 known 캐시를 backend 와 한 번 동기화.
-  // standalone (terminal.html) 에서는 본 모듈을 로드한 직후 즉시 동기화한다.
+  // Backend and once synchronization with page loads.
+  // standalone (terminal.html) syncs immediately after loading this module.
   if (typeof window !== "undefined") {
     syncKnownSessions().catch(function (err) {
       console.error("[production-line-workflow] initial sync failed:", err);

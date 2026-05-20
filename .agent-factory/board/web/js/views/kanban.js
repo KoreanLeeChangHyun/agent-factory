@@ -20,27 +20,27 @@
   // ── Relations Display ──
   const MAX_VISIBLE_RELATIONS = 5;
 
-  // ── T-475 Stage 3: launch 비동기화 — 클라이언트 상태 머신 ──
-  // idle → submitting → starting → running (LAUNCH_STARTED 수신) | failed (LAUNCH_FAILED / 사용자 선택)
+  // ── T-475 Stage 3: launch asynchronousization — client status machine
+  // idle → submitting → starting → running (LAUNCH STARTED Received) | failed (LAUNCH FAILED / User Selection)
   //
-  // 사용 흐름:
-  //   1. submit 핸들러: HTTP 200 OK ({status:'starting'}) 응답 직후 launchState 등록 + grace 타이머 시작.
-  //   2. SSE 'launch' 이벤트(handleLaunchEvent): LAUNCH_STARTED → launchState 제거 + 배지 제거,
-  //      LAUNCH_FAILED → launchState 제거 + 실패 모달.
-  //   3. grace 60s 만료(onGraceExpired): 사용자 선택 모달만 표시 — 자동 강제 전이 0건 (constraints 준수).
+  // Use Flow:
+  //   1. FAQ submit handler: HTTP 200 OK ({status:'starting'}) start the launchState registration + grace timer immediately after the response.
+  //   2. FAQ SSE 'launch' Event (handleLaunchEvent): LAUNCH STARTED → launchState Removal + Remove Badge,
+  //      LAUNCH FAILED → launchState removal + failure modal.
+  //   3. FAQs Grace 60s Expired (onGraceExpired): User-selection only displays — auto-forced previews 0 (constraints compliance).
   //
-  // 새로고침 복원: sessionStorage('Board.launchState.<ticket>') 에 starting state 저장 →
-  // 페이지 로드 후 restoreLaunchStateFromStorage() 호출로 grace 잔여 시간 재계산하여 타이머 재시작.
+  // Restore a new call: sessionStorage('Board.launchState.<ticket>') to 1.02 state →
+  // Rewrite grace residual time with restoreLaunchStateFromStorage() call and restart timer.
   //
-  // SSE 컨벤션 (my-board-sse-convention §2.4): handleLaunchEvent 는 sse.js 가 단일 listener 로 호출 —
-  // Board.kanban 네임스페이스 노출 (addEventListener 중복 등록 방지).
+  // SSE Convention (my-board-sse-convention §2.4): handleLaunchEvent calls to single listener —
+  // Board.kanban Namespace Exposure (addEventListener Anti-Registration).
   const LAUNCH_GRACE_MS = 60000;             // 60s grace
   const LAUNCH_STORAGE_PREFIX = "Board.launchState.";
   const launchState = new Map();              // ticketNum → {state, since, command, sessionId, graceTimer}
 
   // ── Column Collapsed State (Done / To Do) ──
-  // 컬럼 키별로 접힘 상태를 독립 저장한다. "Done"은 기존 키를 유지해 사용자 설정
-  // 호환성을 보장하고, 그 외 컬럼(현재 "To Do")은 column-collapsed:<key> 형식.
+  // Saves the foldable status by column key. "Done" is a user-configured by maintaining an existing key
+  // To ensure compatibility, other columns (currently "To Do") are column-collapsed:<key> format.
   const LEGACY_DONE_LS_KEY = "claude-board-done-collapsed";
   const COLLAPSIBLE_COLUMNS = new Set(["Done", "To Do"]);
 
@@ -66,8 +66,8 @@
   }
 
   // ── To Do Manual Order ──
-  // To Do 컬럼은 사용자 수동 정렬 (DnD 위치 변경) 지원. 신규 티켓은 항상 최상단 prepend.
-  // 다른 브라우저/기기에서는 동기화되지 않음 (localStorage 한정).
+  // To Do Column supports user manual sorting (DnD location changes). New ticket is always the best prepend.
+  // Not synchronized with other browsers/ devices (localStorage only).
   const TODO_MANUAL_ORDER_LS_KEY = "kanban_todo_manual_order_v1";
   const WR_FORM_STATE_KEY = "agent-factory-workrequest-form-expanded";
 
@@ -86,10 +86,10 @@
   }
 
   /**
-   * 수동 정렬 적용:
-   * - 저장 순서 안의 티켓 = 그 순서대로
-   * - 저장 순서에 없는 티켓 (신규) = 최상단 prepend, 번호 desc 순
-   * - 결과 순서를 다시 저장 (신규 항목이 manual order 에 자동 등록되며 stale 정리)
+   * Tag:
+   * - Save order tickets = in order
+   * - Ticket without storage order (New) = Top quality prepend, number desc
+   * - Save the result order again (New item is automatically registered in manual order and STAle clearance)
    */
   function applyTodoManualOrder(items) {
     const stored = loadTodoManualOrder();
@@ -214,7 +214,7 @@
       + '</section>';
   }
 
-  /** 특정 티켓을 manual order 의 targetIndex 위치로 이동. */
+  /** Go to the targetIndex location of manual order. */
   function reorderTodoManualOrder(ticketNum, targetIndex) {
     const stored = loadTodoManualOrder();
     const filtered = stored.filter(function (n) { return n !== ticketNum; });
@@ -229,7 +229,7 @@
   function loadKanbanSort() {
     const defaults = {};
     COLUMNS.forEach(function (col) {
-      // To Do 는 수동 정렬이 기본값. 나머지는 번호 오름차순.
+      // To Do defaults manual sorting. The rest of the number of times.
       if (col.key === "To Do") {
         defaults[col.key] = { key: "manual", dir: "asc" };
       } else {
@@ -328,41 +328,41 @@
   // ── Fetch Tickets ──
 
   // ── Worktree Uncommitted Cache ──
-  // 카드 우상단 미커밋 인디케이터용. null = not loaded (graceful: 인디케이터 omit).
+  // For the card woo Sangdan woomit indica. null = not loaded
   var _worktreeUncommittedMap = null;
 
   // ── Done Verdict Cache (T-441) ──
-  // Done 카드 머지 정합성 verdict. key=ticket number, value={verdict,reason,details}.
-  // "pending" 값 = 조회 중. undefined = 미조회.
+  // Done Card Mage Combination verdict. key=ticket number, value={verdict,reason,details}.
+  // "pending" value = during the query. undefined = undefined
   var _doneVerdictMap = {};
 
   // ── Review Verdict Cache (T-463) ──
-  // Review 카드 룰베이스 1차 자동 검증 verdict (advisory only).
+  // Review Card Rule Base 1st Auto Verdict (advisory only).
   // key=ticket number, value={verdict, reason, details, violations}.
-  // verdict 값: PASS / WARN / FAIL / SKIP / UNKNOWN.
-  // "pending" 값 = 조회 중. undefined = 미조회.
-  // 캐논: feedback_no_speculative_guards_2026-05-08, T-411 0c970fa, T-413 1ce3c2d.
-  // 자동 강제 전이 / 강제 회귀 / 강제 차단 0건 — 사용자가 verdict FAIL 이어도 Review→Done DnD 강행 가능.
+  // Verdict Value: PASS / WARN / FAIL / SKIP / UNKNOWN.
+  // "pending" value = during the query. undefined = undefined
+  // comment no speculative guards 2026-05-08, T-411 0c970fa, T-413 1ce3c2d.
+  // Auto Forced / Forced Regression / Forced Regression 0 — User can run verdict FAIL
   var _reviewVerdictMap = {};
 
   // ── Audit Verdict Cache (T-477) ──
-  // Review 카드 Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
-  // "pending" = 조회 중. undefined = 미조회.
+  // Review Card Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
+  // "pending" = viewed. undefined = undefined
   var _auditVerdictMap = {};
 
   // ── Active Branch Ticket (T-433 Phase 2) ──
-  // 메인 working tree 가 현재 활성화한 feature 브랜치의 ticket 번호 (예: "T-433"). null = develop.
-  // SSOT: backend GET /api/kanban/branch/active 또는 SSE git_branch 이벤트에서 derive.
-  // 한 카드만 active 보장: render 시 모든 Review 카드를 비교해 매칭만 .active 부여.
+  // The main working tree is currently active feature brand name ticket number (e.g. "T-433"). null = develop.
+  // SSOT: derive from backend GET /api/kanban/branch/active or SSE git branch event.
+  // Only one card is active: Matching only .active, compared all the review cards in render.
   var _activeBranchTicket = null;
-  // 첫 1회 fetch 완료 가드 — 페이지 로드 시 1회 GET 으로 초기 시각 복원.
+  // First one fetch finished guard — initial visual restore with 1 GET when loading page.
   var _activeBranchFetched = false;
-  // T-NNN 추출 정규식 — feat/T-NNN-* 패턴 매칭.
+  // T-NNN extraction regular expression — feat/T-NNN-* pattern matching.
   var _FEAT_BRANCH_RE = /^feat\/(T-\d+)/;
 
   /**
-   * 페이지 로드 시 1회 호출되어 _activeBranchTicket 을 초기화한다.
-   * 응답 도착 시 카드 시각만 .active 토글 (전체 re-render 회피 — DOM 직접 패치).
+   * <# if ( data.meta.album ) { #>{{ data.meta.artist }}<# } #>
+   * .active toggles only when receiving a response (full re-render avoidance — DOM direct patch).
    */
   function fetchAndApplyActiveBranch() {
     if (_activeBranchFetched) return;
@@ -375,15 +375,15 @@
       _activeBranchTicket = ticket;
       applyActiveBranchClassToCards();
     }).catch(function () {
-      // backend not ready — _activeBranchTicket 은 null 유지 (시각 OFF)
+      // backend not ready —  activeBranchTicket retains null (Each OFF)
     });
   }
 
   /**
-   * 현재 _activeBranchTicket 값에 맞춰 모든 Review 카드의 .has-active-branch /
-   * 토글 버튼 .active 클래스를 동기화 한다 (전체 re-render 없이 DOM 직접 패치).
-   * - SSE git_branch 이벤트 도착 후 호출
-   * - 토글 클릭 optimistic update 직후 호출
+   * .has-active-branch /
+   * Sync the Toggle button .active class (directly patch DOM without full re-render).
+   * - Call after arrival of SSE git branch event
+   * - Toggle click optimistic update call immediately
    */
   function applyActiveBranchClassToCards() {
     var cards = document.querySelectorAll('.card[data-col-key="Review"]');
@@ -402,9 +402,9 @@
   }
 
   /**
-   * SSE git_branch 이벤트 도착 시 외부에서 호출 (sse.js).
-   * branch 문자열에서 T-NNN 을 추출해 _activeBranchTicket 업데이트 + DOM 패치.
-   * @param {string|null} branch - "feat/T-NNN-..." 또는 "develop" 등
+   * SSE git branch event calls outside (sse.js).
+   * Extract T-NNN from branch strings  activeBranchTicket Update + DOM Patch.
+   * @param {string null} branch - "feat/T-NNN-..." or "develop"
    */
   function syncActiveBranchFromSSE(branch) {
     var ticket = null;
@@ -412,16 +412,16 @@
       var m = _FEAT_BRANCH_RE.exec(branch);
       if (m) ticket = m[1];
     }
-    if (ticket === _activeBranchTicket) return; // 변동 없음 — skip
+    if (ticket === _activeBranchTicket) return; // Skip to content
     _activeBranchTicket = ticket;
     applyActiveBranchClassToCards();
   }
 
   /**
-   * Review 카드 4행 토글 버튼 클릭 핸들러.
-   * - 현재 카드가 active 면 action=off, 아니면 action=on 으로 POST.
-   * - dirty / needs_restart / 실패 응답에 따라 안내 모달 발동 (자동 stash 절대 X).
-   * @param {string} ticketNum - 클릭된 카드의 T-NNN
+   * Review Card 4 Toggle Button Click Handler.
+   * - Current card is active if action=off, or action=on to POST.
+   * - dirty / needs restart / guided moves according to failure response (automatic stash absolute X).
+   * @param {string} ticketNum - Click Card T-NNN
    */
   function handleBranchToggleClick(ticketNum) {
     if (!ticketNum) return;
@@ -435,62 +435,62 @@
     }).then(function (r) {
       var body = r.body || {};
       if (body.ok === true) {
-        // 성공 — active_ticket 갱신 (서버 응답이 SSOT, optimistic 도 동시 반영)
+        // Success — active ticket update (server response reflect SSOT, optimistic simultaneously)
         _activeBranchTicket = body.active_ticket || null;
         applyActiveBranchClassToCards();
         if (body.needs_restart) {
           Board.util.showInfoModal(
-            "브랜치 활성 — backend 변경 감지",
-            "이 feature 브랜치는 board/server/** 변경을 포함합니다.\n" +
-            "board 서버를 재기동해야 변경된 backend 가 정상 동작합니다.\n\n" +
-            "수동으로 board 서버를 재기동한 뒤 페이지를 새로고침하세요.\n" +
-            "(frontend 정적 파일은 자동 갱신 — hard reload 만 수행하면 충분)",
+            "Brand Name Active — Backend Change Detection",
+            "This feature brand contains board/server/** changes. \\n" +
+            "the backend to reboot the board server is normal. \\n\\n" +
+            "Rewrite the board server manually and refresh the page. \\n" +
+            "(frontend static files are automatically updated — only hard reload is enough)",
             { severity: "warning" }
           );
         }
         return;
       }
-      // 실패 — reason 별 분기
+      // Failure — reason quarterly
       var reason = body.reason || "";
       if (reason === "dirty") {
         var files = (body.files || []).slice(0, 20);
         var fileList = files.map(function (f) { return "  - " + f; }).join("\n");
-        var more = (body.files && body.files.length > 20) ? "\n  ... (" + (body.files.length - 20) + "개 더)" : "";
+        var more = (body.files && body.files.length > 20) ? "\n  ... (" + (body.files.length - 20) + "More" : "";
         var msg = body.modal_message ||
-          ("메인 working tree 에 미커밋 변경이 있습니다.\n" +
-           "수동으로 commit / stash / reset 후 다시 시도하세요.");
+          ("The main working tree has a mitigation change. \\n" +
+           "Retry after commit / stash / reset manually.");
         Board.util.showInfoModal(
-          "브랜치 토글 차단 — dirty",
-          msg + "\n\n변경 파일:\n" + fileList + more,
+          "Broch Toggle Lockout — dirty",
+          msg + "\\n\\n Change Files:\\n" + fileList + more,
           { severity: "warning" }
         );
         return;
       }
       if (reason === "feature_branch_not_found") {
         Board.util.showInfoModal(
-          "브랜치 토글 실패",
-          body.message || "feature 브랜치를 찾을 수 없습니다.",
+          "Branch Toggle Failure",
+          body.message || "feature not found a brand",
           { severity: "error" }
         );
         return;
       }
       if (reason === "git_switch_failed") {
         Board.util.showInfoModal(
-          "git switch 실패",
-          body.message || "git switch 가 실패했습니다.",
+          "git switch failure",
+          body.message || "git switch failed.",
           { severity: "warning" }
         );
         return;
       }
-      // 기타 알 수 없는 실패
+      // Other unknown failures
       Board.util.showInfoModal(
-        "브랜치 토글 실패",
+        "Branch Toggle Failure",
         body.message || JSON.stringify(body),
         { severity: "error" }
       );
     }).catch(function (err) {
       Board.util.showInfoModal(
-        "브랜치 토글 요청 실패",
+        "Branch Toggle request failed",
         (err && err.message) ? err.message : String(err),
         { severity: "error" }
       );
@@ -520,13 +520,13 @@
   }
 
   /**
-   * T-441: 단일 Done 카드 verdict 조회 (advisory).
-   * 결과를 _doneVerdictMap 에 캐시하고, 로드 완료 시 해당 카드 배지를 DOM 에 패치.
-   * 폴링 없음 — 카드 mount 시 1회 호출.
-   * @param {string} ticketNum - 티켓 번호 (예: "T-441")
+   * T-441: Single Done Card Verdict View (advisory).
+   * The result is cached in  doneVerdictMap, and patches the corresponding card badge to DOM when loading is completed.
+   * No polling — 1 call when card mount.
+   * @param {string} ticketNum - ticket number (e.g. "T-441")
    */
   function fetchAndRenderVerdict(ticketNum) {
-    // 이미 조회 중이거나 완료된 경우 건너뜀
+    // If you already have an inquiry or complete, skip
     if (_doneVerdictMap[ticketNum] !== undefined) return;
     _doneVerdictMap[ticketNum] = "pending";
 
@@ -537,7 +537,7 @@
       })
       .then(function (data) {
         _doneVerdictMap[ticketNum] = data;
-        // DOM 패치: 해당 카드의 verdict 배지 교체 (전체 re-render 없이)
+        // DOM Patch: Replace the verdict badge of the corresponding card (without full re-render)
         var badge = document.querySelector(
           '.card[data-num="' + ticketNum + '"][data-col-key="Done"] .card-done-verdict'
         );
@@ -548,43 +548,43 @@
         }
       })
       .catch(function () {
-        _doneVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: { message: "verdict 조회 실패" } };
+        _doneVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: { message: "Verdict View failed" } };
       });
   }
 
   /**
-   * T-441: verdict 데이터를 기반으로 badge span 에 상태를 적용한다.
-   * @param {HTMLElement} el - 대상 span 요소
-   * @param {Object} data - verdict 응답 데이터 ({verdict, reason, details})
+   * T-441: Apply the status in the badge span based on verdict data.
+   * @param {HTMLElement} el - target span element
+   * @param {Object} data - verdict response data ({verdict, reason, details})
    */
   function _applyVerdictBadge(el, data) {
     var verdict = data && data.verdict;
     el.className = "card-done-verdict";
     if (verdict === "OK") {
       el.className += " verdict-ok";
-      el.title = "머지 정합성 확인 (develop HEAD == merge commit)";
+      el.title = "(develop HEAD == merge commit)";
       el.innerHTML = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
     } else if (verdict === "FAIL") {
-      var msg = (data.details && data.details.message) || "develop HEAD 가 머지 commit 아님";
+      var msg = (data.details && data.details.message) || "Develop head is mitigating";
       el.className += " verdict-fail";
-      el.title = "머지 불일치 — " + msg + " (클릭하면 상세 확인)";
+      el.title = "Mudfish —" + msg + "(Click for details)";
       el.setAttribute("data-verdict-msg", msg);
       el.innerHTML = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><line x1="2" y1="2" x2="9" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="9" y1="2" x2="2" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
     } else {
-      // UNKNOWN / SKIP / pending — 배지 숨김 (공간 낭비 없음)
+      // UNKNOWN / SKIP / pending — No space waste
       el.className += " verdict-unknown";
       el.style.display = "none";
     }
   }
 
   /**
-   * T-463: 단일 Review 카드 verdict 조회 (advisory only).
-   * 결과를 _reviewVerdictMap 에 캐시하고, 로드 완료 시 해당 카드 배지를 DOM 에 패치.
-   * 폴링 없음 — 카드 mount 시 1회 호출.
-   * @param {string} ticketNum - 티켓 번호 (예: "T-463")
+   * T-463: Single Review Card Verdict View (advisory only).
+   * Results  reviewVerdictMap Cache, and patch the corresponding card badge to DOM when loading is completed.
+   * No polling — 1 call when card mount.
+   * @param {string} ticketNum - ticket number (e.g. "T-463")
    */
   function fetchAndRenderReviewVerdict(ticketNum) {
-    // 이미 조회 중이거나 완료된 경우 건너뜀
+    // If you already have an inquiry or complete, skip
     if (_reviewVerdictMap[ticketNum] !== undefined) return;
     _reviewVerdictMap[ticketNum] = "pending";
 
@@ -595,7 +595,7 @@
       })
       .then(function (data) {
         _reviewVerdictMap[ticketNum] = data;
-        // DOM 패치: 해당 카드의 verdict 배지 교체 (전체 re-render 없이)
+        // DOM Patch: Replace the verdict badge of the corresponding card (without full re-render)
         var badge = document.querySelector(
           '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .card-review-verdict'
         );
@@ -611,10 +611,10 @@
   }
 
   /**
-   * T-477: Auditor T3 audit verdict badge HTML 생성 (renderKanban 내 인라인 호출).
-   * combined === "NONE" 이면 빈 문자열 반환 (DOM 마운트 X).
-   * @param {string} ticketNum - 티켓 번호
-   * @returns {string} span.audit-badge HTML 또는 빈 문자열
+   * T-477: Auditor T3 audit verdict generates an HTML (inline call in the renderKanban).
+   * combination === "NONE" returns empty string (DOM mount X).
+   * @param {string} ticketNum - ticket number
+   * @returns {string} span.audit-badge HTML or empty string
    */
   function renderAuditBadgeHtml(ticketNum) {
     var data = _auditVerdictMap[ticketNum];
@@ -636,9 +636,9 @@
   }
 
   /**
-   * T-477: Review 카드 단일 audit verdict fetch + DOM 배지 패치.
-   * 결과를 _auditVerdictMap 에 캐시. 폴링 없음 — 카드 mount 시 1회.
-   * @param {string} ticketNum - 티켓 번호
+   * T-477: Review card single audit verdict fetch + DOM badge patch.
+   * Results  auditVerdictMap to cache. No polling — 1 time when card mount.
+   * @param {string} ticketNum - ticket number
    */
   function fetchAndRenderAuditVerdict(ticketNum) {
     if (_auditVerdictMap[ticketNum] !== undefined) return;
@@ -671,28 +671,28 @@
   }
 
   /**
-   * T-463: review verdict 데이터를 기반으로 badge span 에 상태를 적용한다.
-   * - PASS / WARN / FAIL — 텍스트 칩 표시 (verdict-pass / verdict-warn / verdict-fail)
-   * - SKIP / UNKNOWN / pending — 배지 숨김 (display:none)
-   * - tooltip = violations 목록 + "advisory only — Done 이동 자유" 안내 (cursor:help)
-   * - 클릭 자동 액션 0건 (advisory only 캐논)
-   * @param {HTMLElement} el - 대상 span 요소
-   * @param {Object} data - verdict 응답 데이터 ({verdict, reason, details, violations})
+   * T-463: The review verdict data is based on the status of the badge span.
+   * - PASS / WARN / FAIL — Text Chip Display (verdict-pass / verdict-warn / verdict-fail)
+   * - SKIP / UNKNOWN / pending — hidden badge (display:none)
+   * - tooltip = violations list + "advisory only" guide (cursor:help)
+   * - 0 clicks (advisory only canon)
+   * @param {HTMLElement} el - target span element
+   * @param {Object} data - verdict response data ({verdict, reason, details, violations})
    */
   function _applyReviewVerdictBadge(el, data) {
     var verdict = data && data.verdict;
     el.className = "card-review-verdict";
-    // margin-right:auto 인라인 보존 — 4행 actions-row 좌측 고정 + 우측 토글/done 버튼 분리
+    // margin-right:auto inline preservation — 4 action-row left + right toggle/done button separation
     el.style.marginRight = "auto";
     if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
-      // SKIP / UNKNOWN / 알 수 없는 값 — 배지 숨김
+      // SKIP / UNKNOWN / Unknown Value — Unlock Badge
       el.className += " verdict-unknown";
       el.style.display = "none";
       return;
     }
     el.className += " verdict-" + verdict.toLowerCase();
     el.textContent = verdict;
-    // tooltip: violations 목록 또는 reason 만 표시 + advisory 안내
+    // tooltip: violations list or reason only show + advisory guidance
     var violations = (data && data.violations) || [];
     var lines = [];
     if (violations.length > 0) {
@@ -706,27 +706,27 @@
       var reason = (data && data.reason) || "ok";
       lines.push(verdict + " (" + reason + ")");
     }
-    var tooltip = lines.join("\n") + "\n\nadvisory only — Done 이동 자유";
+    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Done Mobile Freedom";
     el.setAttribute("data-verdict-msg", tooltip);
     el.setAttribute("title", tooltip);
   }
 
   /**
-   * T-463: Review 카드 verdict 배지 HTML 을 생성한다.
-   * 캐시에 결과가 없으면 로딩 중 플레이스홀더를 반환하고, 비동기 fetch 완료 시 DOM 패치된다.
-   * 4행 card-actions-row 의 첫 번째 자식으로 삽입되어 margin-right:auto 로 우측 토글과 분리된다.
-   * @param {string} ticketNum - 티켓 번호 (예: "T-463")
+   * T-463: Create a Review Card verdict badge HTML.
+   * If there is no result in the cache, return the placeholder during loading, and the DOM patch will be completed.
+   * The first child of the card-actions-row is inserted into the margin-right:auto and separated to the right top.
+   * @param {string} ticketNum - ticket number (e.g. "T-463")
    * @returns {string} span.card-review-verdict HTML
    */
   function renderReviewVerdictBadge(ticketNum) {
     var data = _reviewVerdictMap[ticketNum];
     if (data === undefined || data === "pending") {
-      // 로딩 중 — 보이지 않는 플레이스홀더. fetch 완료 후 _applyReviewVerdictBadge 가 DOM 패치.
+      // Loading — Unseen Placeholders.  applyReviewVerdictBadge DOM patch after fetch completion.
       return '<span class="card-review-verdict verdict-loading" style="display:none;margin-right:auto"></span>';
     }
     var verdict = data && data.verdict;
     if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
-      // SKIP / UNKNOWN / 알 수 없는 값 — 배지 숨김
+      // SKIP / UNKNOWN / Unknown Value — Unlock Badge
       return '<span class="card-review-verdict verdict-unknown" style="display:none;margin-right:auto"></span>';
     }
     var violations = (data && data.violations) || [];
@@ -742,7 +742,7 @@
       var reason = (data && data.reason) || "ok";
       lines.push(verdict + " (" + reason + ")");
     }
-    var tooltip = lines.join("\n") + "\n\nadvisory only — Done 이동 자유";
+    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Done Mobile Freedom";
     var cls = "verdict-" + verdict.toLowerCase();
     return (
       '<span class="card-review-verdict ' + cls + '"'
@@ -808,9 +808,9 @@
   // ── Kanban Rendering ──
 
   /**
-   * 스테이지 이름을 3글자 약어로 변환한다.
-   * @param {string} stage - 스테이지 이름 (예: "research", "implement", "review")
-   * @returns {string} 3글자 약어 (예: "res", "imp", "rev")
+   * Convert Stage Name to 3 letters.
+   * @param {string} stage - stage name (e.g. "research", "implement", "review")
+   * @returns {string} 3-character Abbreviation (e.g. "res", "imp", "rev")
    */
   function stageAbbr(stage) {
     var abbr = Board.util.CMD_ABBR;
@@ -819,8 +819,8 @@
   }
 
   /**
-   * 체인 커맨드 티켓의 스테이지 아이콘 HTML을 생성한다.
-   * @param {Object} ticket - 티켓 객체
+   * Create a stage icon HTML for the chain command ticket.
+   * @param {Object} ticket object
    * @returns {string} card-chain div HTML
    */
   function renderChainIcons(ticket) {
@@ -852,8 +852,8 @@
   }
 
   /**
-   * 관계 링크 HTML을 생성한다.
-   * @param {Object} ticket - 티켓 객체
+   * Create a relationship link HTML.
+   * @param {Object} ticket object
    * @returns {string} card-relations div HTML
    */
   function renderRelations(ticket) {
@@ -942,9 +942,9 @@
     relations.forEach(function (rel) {
       var info = typeMap[rel.type] || { prefix: "↔", cssClass: "rel-other" };
       var numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
-      var label = rel.type === "derived-from" ? "파생"   // 파생
-        : rel.type === "depends-on" ? "의존"             // 의존
-        : rel.type === "blocks" ? "차단"                 // 차단
+      var label = rel.type === "derived-from" ? "Home"   // Home
+        : rel.type === "depends-on" ? "Venue"             // Venue
+        : rel.type === "blocks" ? "Home"                 // Home
         : esc(rel.type);
       listHtml += '<li class="rel-popover-item ' + info.cssClass + '">'
         + '<span class="rel-popover-prefix">' + info.prefix + '</span>'
@@ -958,7 +958,7 @@
     popover.id = "rel-popover-active";
     popover.className = "rel-popover";
     popover.setAttribute("role", "tooltip");
-    popover.setAttribute("aria-label", "관계 " + relations.length + "개 전체"); // 관계 N개 전체
+    popover.setAttribute("aria-label", "Company" + relations.length + "dog full"); // Relationship N Entire
     popover.innerHTML = listHtml;
     document.body.appendChild(popover);
 
@@ -1091,10 +1091,10 @@
   }
 
   /**
-   * T-457 (Layer 3): 4행 commit 버튼 클릭 시 워크트리 자동 commit 트리거.
-   * 기존 handleUncommittedBadgeClick 의 fetch 로직을 그대로 유지하고,
-   * DOM 조작 대상만 1행 badge → 4행 button 으로 이전.
-   * @param {HTMLButtonElement} btn - .card-commit-action 요소
+   * T-457 (Layer 3): Automatic Commit Trigger with 4 Commit button clicks.
+   * to maintain fetch logic in existing handleUncommittedBadgeClick,
+   * Only one DOM manipulator will be transferred to the 4th button.
+   * .card-commit-action
    */
   function handleCommitButtonClick(btn) {
     var ticket = btn.dataset.commitTicket;
@@ -1111,30 +1111,30 @@
       });
     }).then(function (r) {
       if (r.ok && r.data && r.data.ok) {
-        // 성공 — 카드 갱신 (commit 버튼 + 1행 badge 둘 다 사라짐 기대)
+        // Success — Card Renewal (commit button + expects to disappear both one-on-the-box)
         if (_worktreeUncommittedMap) _worktreeUncommittedMap.delete(ticket);
         Board.render.renderKanban();
       } else {
-        var msg = (r.data && r.data.error) || "commit 실패";
+        var msg = (r.data && r.data.error) || "Commit fails";
         btn.classList.remove("is-commiting");
         btn.disabled = false;
-        Board.util.showInfoModal("커밋 실패", ticket + " commit 실패: " + msg, { severity: "error" });
+        Board.util.showInfoModal("Commit fails", ticket + "Commit fail:" + msg, { severity: "error" });
       }
     }).catch(function (err) {
       btn.classList.remove("is-commiting");
       btn.disabled = false;
-      Board.util.showInfoModal("커밋 실패", ticket + " commit 요청 실패: " + (err && err.message ? err.message : err), { severity: "error" });
+      Board.util.showInfoModal("Commit fails", ticket + "Commit request failed:" + (err && err.message ? err.message : err), { severity: "error" });
     });
   }
 
   /**
-   * In Progress 카드 4행 stop 버튼 클릭 — POST /api/workflow/stop 으로 워크플로우 4축 정리 요청.
-   * confirm 안전판 1회 → fetch → 성공 시 renderKanban / 실패 시 showInfoModal.
+   * In Progress card 4 stop button click — POST /api/workflow/stop with workflow request.
+   * showInfoModal in the event of a successful renderKanban / failure.
    */
   function handleStopButtonClick(btn) {
     var ticket = btn.dataset.stopTicket;
     if (!ticket || btn.classList.contains("is-stopping")) return;
-    var msg = ticket + " 워크플로우를 중지합니다.\n프로세스/jsonl/칸반/워크트리 4축이 정리됩니다.\n\n계속할까요?";
+    var msg = ticket + "Stop workflow. \\nProceeds/jsonl/kanban/worktree 4 axis. \\n\\n?";
     if (!window.confirm(msg)) return;
     btn.classList.add("is-stopping");
     btn.disabled = true;
@@ -1156,74 +1156,74 @@
       } else {
         var errs = (r.data && r.data.errors) || [];
         var errMsg = errs.length ? errs.join("\n") : ("HTTP " + r.status);
-        Board.util.showInfoModal("워크플로우 중지 실패", ticket + " 중지 실패: " + errMsg, { severity: "error" });
+        Board.util.showInfoModal("Workflow failed", ticket + "Warranty:" + errMsg, { severity: "error" });
       }
     }).catch(function (err) {
       btn.classList.remove("is-stopping");
       btn.disabled = false;
-      Board.util.showInfoModal("워크플로우 중지 실패", ticket + " 중지 요청 오류: " + (err && err.message ? err.message : err), { severity: "error" });
+      Board.util.showInfoModal("Workflow failed", ticket + "Tag:" + (err && err.message ? err.message : err), { severity: "error" });
     });
   }
 
   /**
-   * 카드 우상단 미커밋 인디케이터 HTML 을 생성한다.
-   * 워크플로우 회귀(워커 commit 누락) 시 사용자가 클릭으로 즉시 commit.
-   * @param {string} ticketNum - 티켓 번호 (예: "T-422")
-   * @returns {string} span.card-uncommitted-badge HTML 또는 빈 문자열
+   * Create a Card Indication HTML.
+   * When the workflow regression (Watcher Committed), the user immediately commits to click.
+   * @param {string} ticketNum - ticket number (e.g. "T-422")
+   * @returns {string} span.card-uncommitted-badge HTML or empty string
    */
   function renderUncommittedBadge(ticketNum) {
     if (!_worktreeUncommittedMap) return "";
     var item = _worktreeUncommittedMap.get(ticketNum);
     if (!item || item.uncommitted_count <= 0) return "";
     var label = item.uncommitted_count + "M";
-    var tooltip = "미커밋 " + item.uncommitted_count + "건 — 클릭하면 자동 commit"; // "미커밋 N건 — 클릭하면 자동 commit"
+    var tooltip = "Mickey Mouse" + item.uncommitted_count + "— Click Commit"; // "Mickeym N Gun — Automatic Commit"
     return '<span class="card-uncommitted-badge" data-uncommitted-ticket="' + esc(ticketNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
-   * T-457 (Layer 3): 카드 1행 우측 failure tag 렌더 헬퍼.
-   * ticket.failure schema (T-NNN-D 도입 예정): { reason, phase, retry_count, context }
-   * 가드: ticket / ticket.failure 가 falsy 면 빈 문자열 반환 (자연스럽게 비표시).
-   * read-only — pointer-events:none (CSS), 클릭 트리거 없음.
-   * 색상은 placeholder neutral (사용자 결정 대기 — 결정 후 1줄 패치 예정).
-   * @param {object} ticket - 카드 티켓 객체
-   * @returns {string} span.card-failure-tag HTML 또는 빈 문자열
+   * T-457 (Layer 3): Card 1-on-right failure tag wrench.
+   * schema: { reason, phase, retry count, context }
+   * Guard: ticket / ticket.failure returns empty strings if falsy.
+   * read-only — pointer-events:none (CSS), no click trigger.
+   * The color is placeholder neutral (the user decides to wait — the one-line patch after the decision).
+   * @param {object} ticket - card ticket object
+   * @returns {string} span.card-failure-tag HTML or empty string
    */
   function renderFailureTag(ticket) {
     if (!ticket || !ticket.failure) return "";
-    var reason = ticket.failure.reason || "워크플로우 실패";
+    var reason = ticket.failure.reason || "Workflow Failure";
     var phase = ticket.failure.phase || "";
     var label = "FAIL";
-    var tooltip = phase ? (phase + " 단계 실패 — " + reason) : reason;
+    var tooltip = phase ? (phase + "Step Failure —" + reason) : reason;
     return '<span class="card-failure-tag" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
-   * T-441: Done 카드 verdict 배지 HTML 을 생성한다.
-   * 캐시에 결과가 없으면 로딩 중 플레이스홀더를 반환하고 비동기 fetch 트리거.
-   * @param {string} ticketNum - 티켓 번호 (예: "T-441")
-   * @returns {string} span.card-done-verdict HTML 또는 빈 문자열
+   * T-441: Create Done Card verdict badge HTML.
+   * If there is no result in the cache, return the placeholder during loading and the synchronous fetch trigger.
+   * @param {string} ticketNum - ticket number (e.g. "T-441")
+   * @returns {string} span.card-done-verdict HTML or empty string
    */
   function renderDoneVerdictBadge(ticketNum) {
     var data = _doneVerdictMap[ticketNum];
     if (data === undefined || data === "pending") {
-      // 로딩 중 — 작은 플레이스홀더 (보이지 않음, fetch 완료 후 DOM 패치)
+      // Loading — Small Placeholders (not seen, DOM patch after fetch finish)
       return '<span class="card-done-verdict verdict-loading" style="display:none"></span>';
     }
     var verdict = data && data.verdict;
     if (verdict === "OK") {
       return (
-        '<span class="card-done-verdict verdict-ok" title="머지 정합성 확인 (develop HEAD == merge commit)">'
+        '<span class="card-done-verdict verdict-ok" title'
         + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
         + '<polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
         + '</svg></span>'
       );
     }
     if (verdict === "FAIL") {
-      var msg = (data.details && data.details.message) || "develop HEAD 가 머지 commit 아님";
+      var msg = (data.details && data.details.message) || "Develop head is mitigating";
       return (
         '<span class="card-done-verdict verdict-fail"'
-        + ' title="머지 불일치 — ' + esc(msg) + ' (클릭하면 상세 확인)"'
+        + 'title="Merge Unemployment —' + esc(msg) + '(click to check details)"'
         + ' data-verdict-msg="' + esc(msg) + '">'
         + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
         + '<line x1="2" y1="2" x2="9" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
@@ -1231,16 +1231,16 @@
         + '</svg></span>'
       );
     }
-    // UNKNOWN / SKIP — 배지 숨김
+    // UNKNOWN / SKIP
     return '<span class="card-done-verdict verdict-unknown" style="display:none"></span>';
   }
 
   /**
-   * 티켓의 status를 기반으로 상태 라벨 정보를 반환한다.
-   * To Do 카드만 TODO 라벨을 반환한다.
-   * T-399: Submit transient 단계 제거됨. T-445: OPEN 라벨 폐기.
-   * @param {Object} ticket - 티켓 객체
-   * @returns {{ label: string, cssClass: string } | null} 상태 라벨과 CSS 클래스, 또는 null
+   * Returns status label information based on the status of the ticket.
+   * To Do only returns TODO label.
+   * T-399: Submit transient step removed. T-445: OPEN Label Closing.
+   * @param {Object} ticket object
+   * @returns {{ label: string, cssClass: string } | null} State label and CSS class, or null
    */
   function getWorkflowStatus(ticket) {
     if (ticket && ticket.status === "To Do") {
@@ -1250,10 +1250,10 @@
   }
 
   /**
-   * T-399: confirm 모달 표시 — Open → In Progress drop 시 워크플로우 실행 의식 보장.
-   * @param {Object} ticket - 드래그된 티켓 객체 (number, command 포함)
-   * @param {Function} onConfirm - [실행] 클릭 콜백
-   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   * T-399: Confirmation Modal Display — Open → In Progress drop City Workflow Execution consciousness guaranteed.
+   * @param {Object} ticket - Drag ticket object (number, command included)
+   * @param {Function} onConfirm - [Run] Click Callback
+   * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
   function showSubmitConfirmModal(ticket, onConfirm, onCancel) {
     const overlay = document.createElement("div");
@@ -1268,12 +1268,12 @@
     const title = document.createElement("h3");
     title.id = "submit-confirm-title";
     title.className = "submit-confirm-title";
-    title.textContent = "워크플로우 실행";
+    title.textContent = "Skip to content";
 
     const body = document.createElement("p");
     body.className = "submit-confirm-body";
     body.textContent =
-      ticket.number + " 을 In Progress 로 이동하고 워크플로우를 시작합니다. 계속할까요?";
+      ticket.number + "Go to In Progress and start workflow. About Us";
 
     const actions = document.createElement("div");
     actions.className = "submit-confirm-actions";
@@ -1281,12 +1281,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    cancelBtn.textContent = "취소";
+    cancelBtn.textContent = "Venue";
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "실행";
+    confirmBtn.textContent = "Open";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1326,10 +1326,10 @@
   }
 
   /**
-   * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
-   * @param {Object} ticket - 드래그된 티켓 객체 (number 포함)
-   * @param {Function} onConfirm - [완료 처리] 클릭 콜백
-   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   * T-906: Review → Add Done drop (confirm delivery + cmd done commission + result delivery).
+   * @param {Object} ticket - Drag ticket object (number included)
+   * @param {Function} onConfirm - [Finished] Click Callback
+   * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
   function showDoneConfirmModal(ticket, onConfirm, onCancel) {
     const overlay = document.createElement("div");
@@ -1344,22 +1344,22 @@
     const title = document.createElement("h3");
     title.id = "submit-confirm-title";
     title.className = "submit-confirm-title";
-    const ticketNumNode = document.createTextNode(ticket.number + " Done 처리");
+    const ticketNumNode = document.createTextNode(ticket.number + "Done Treatment");
     title.appendChild(ticketNumNode);
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
-    const introText = document.createTextNode("이 티켓을 Done 으로 이동하면 다음이 비가역적으로 수행됩니다:");
+    const introText = document.createTextNode("If you move this ticket to Done, then this will be done in a fairly NEWS");
     body.appendChild(introText);
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
-    li1.textContent = "feature 브랜치를 develop 에 --no-ff 머지";
+    li1.textContent = "Feature Branding on --no-ff mourn";
     const li2 = document.createElement("li");
-    li2.textContent = "워크트리 및 feature 브랜치 삭제";
+    li2.textContent = "Deleting worktree and feature brand";
     ul.appendChild(li1);
     ul.appendChild(li2);
     body.appendChild(ul);
-    const continueText = document.createTextNode("계속할까요?");
+    const continueText = document.createTextNode("About Us");
     body.appendChild(continueText);
 
     const actions = document.createElement("div");
@@ -1368,12 +1368,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    cancelBtn.textContent = "취소";
+    cancelBtn.textContent = "Venue";
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "완료 처리";
+    confirmBtn.textContent = "Venue";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1413,17 +1413,17 @@
   }
 
   /**
-   * T-439: Review 카드 우하단 1-click 완료 액션 핸들러.
-   * showDoneConfirmModal → POST /api/kanban/done → showDoneResultModal 체인을
-   * DnD Review→Done 분기(kanban.js:1791-1826)와 동일한 시그니처로 재사용한다.
-   * @param {Object} ticketObj - 티켓 객체 (number 포함)
+   * T-439: Review Card Velvet 1-click Complete Action Handler.
+   * showDoneConfirmModal → POST /api/kanban/done → showDoneResultModal chain
+   * DnD Review→Done reuse as the same signature as the branch(kanban.js:1791-1826).
+   * @param {Object} ticketObj - ticket object (number included)
    */
   function handleReviewDoneAction(ticketObj) {
     var capturedNum = ticketObj.number;
     showDoneConfirmModal(
       ticketObj,
       function () {
-        // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+        // [Completion] Callback: POST /api/kanban/done → cmd done commission
         fetch("/api/kanban/done", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1449,21 +1449,21 @@
         });
       },
       function () {
-        // [취소]/ESC/overlay 콜백: 카드 원위치 유지
+        // [Cancellation]/ESC/overlay callback: Keep card origin
         renderKanban();
       }
     );
   }
 
   /**
-   * T-418: Open → Done 직접 전이 confirm 모달.
+   * T-418: Open → Done direct transfer check modal.
    *
-   * Review 를 거치지 않고 Done 으로 이동. 워크트리/feature 브랜치 폐기.
-   * "미커밋 변경 폐기 동의" 체크박스 포함. onConfirm 에 force_dirty 값 전달.
+   * Go to Done without mounting the Review. Worktree/feature Branding Waster.
+   * LOGIN JOIN ORDER MYPAGE forward force dirty value to onConfirm.
    *
-   * @param {Object} ticket - 드래그된 티켓 객체 (number 포함)
-   * @param {Function} onConfirm - [직접 Done 처리] 클릭 콜백 (force_dirty: bool 인자 전달)
-   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   * @param {Object} ticket - Drag ticket object (number included)
+   * @param {Function} onConfirm - [Direct Done Treatment] Click Callback (force dirty: bool argument passed)
+   * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
   function showOpenDoneConfirmModal(ticket, onConfirm, onCancel) {
     const overlay = document.createElement("div");
@@ -1478,19 +1478,19 @@
     const title = document.createElement("h3");
     title.id = "open-done-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + " Open → Done 직접 전이"));
+    title.appendChild(document.createTextNode(ticket.number + "Open → Done"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
-    const introText = document.createTextNode("Open 단계에서 Review 를 거치지 않고 Done 으로 직접 이동합니다. 다음이 비가역적으로 수행됩니다:");
+    const introText = document.createTextNode("Go directly to Done without mounting the Review at Open stage. The following are non-invasively performed NEWS");
     body.appendChild(introText);
 
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
-    li1.textContent = "워크트리 및 feature 브랜치 폐기 (develop 병합 없음)";
+    li1.textContent = "Worktree and feature Brand Name Waster (No Development Merged)";
     const li2 = document.createElement("li");
-    li2.textContent = "티켓 상태를 Done 으로 강제 전이";
+    li2.textContent = "Done Ticket Status";
     ul.appendChild(li1);
     ul.appendChild(li2);
     body.appendChild(ul);
@@ -1509,14 +1509,14 @@
     dirtyCheckbox.id = "open-done-force-dirty";
     dirtyCheckbox.style.cursor = "pointer";
 
-    const dirtyLabelText = document.createTextNode("미커밋 변경이 있더라도 폐기하고 진행");
+    const dirtyLabelText = document.createTextNode("If you have any questions, please contact us.");
     dirtyLabel.appendChild(dirtyCheckbox);
     dirtyLabel.appendChild(dirtyLabelText);
     body.appendChild(dirtyLabel);
 
     const continueText = document.createElement("p");
     continueText.style.marginTop = "10px";
-    continueText.appendChild(document.createTextNode("계속할까요?"));
+    continueText.appendChild(document.createTextNode("About Us"));
     body.appendChild(continueText);
 
     const actions = document.createElement("div");
@@ -1525,12 +1525,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    cancelBtn.textContent = "취소";
+    cancelBtn.textContent = "Venue";
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "직접 Done 처리";
+    confirmBtn.textContent = "Direct Done Treatment";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1571,15 +1571,15 @@
   }
 
   /**
-   * T-418: Open → Done 직접 전이 결과 모달.
+   * T-418: Open → Done direct transfer results.
    *
-   * showDoneResultModal 과 달리 merge_commit 없는 성공도 정상 처리.
-   * error_kind='dirty_worktree' 시 "강제 폐기 후 재시도" 버튼 노출.
+   * Unlike showDoneResultModal, success without merge commit also normal processing.
+   * "Causes of rehabilitation after rehabilitation"
    *
-   * @param {"success"|"dirty"|"error"} kind - 결과 종류
-   * @param {Object} payload - 결과 데이터
-   * @param {Function} onClose - 닫기 콜백
-   * @param {Function} onForceDirty - "강제 폐기 후 재시도" 버튼 클릭 콜백 (dirty 시만)
+   * @param {"success" "dirty" "error"} kind - result type
+   * @param {Object} payload - result data
+   * @param {Function} onClose - Close Callback
+   * @param {Function} onForceDirty - "Causes of rehabilitation after rehabilitation" button click callback
    */
   function showOpenDoneResultModal(kind, payload, onClose, onForceDirty) {
     const overlay = document.createElement("div");
@@ -1599,12 +1599,12 @@
     body.className = "submit-confirm-body";
 
     if (kind === "success") {
-      title.textContent = "Open → Done 직접 전이 완료";
+      title.textContent = "Open → Done";
       const msg = document.createElement("p");
-      msg.textContent = (payload.ticket || "") + " 티켓이 Done 으로 이동되었습니다. 워크트리 및 feature 브랜치가 정리되었습니다.";
+      msg.textContent = (payload.ticket || "") + "Tickets were moved to Done. Worktree and feature Brands were cleaned.";
       body.appendChild(msg);
     } else if (kind === "dirty") {
-      title.textContent = "Done 처리 실패 — 미커밋 변경";
+      title.textContent = "Done Processing Failure — Minorm Change";
       const ul = document.createElement("ul");
       const files = (payload.dirty_files || []);
       if (files.length > 0) {
@@ -1615,17 +1615,17 @@
         });
       } else {
         const li = document.createElement("li");
-        li.textContent = "(미커밋 파일 목록 없음)";
+        li.textContent = "(No Micommit File List)";
         ul.appendChild(li);
       }
       body.appendChild(ul);
       const guide = document.createElement("p");
-      guide.textContent = "워크트리에 미커밋 변경이 있습니다. 폐기 동의 후 강제 진행하거나 취소하세요.";
+      guide.textContent = "There is a change to the work tree. If you have any questions, please contact us.";
       body.appendChild(guide);
     } else {
-      title.textContent = "Done 처리 실패";
+      title.textContent = "Done processing failed";
       const msg = document.createElement("p");
-      msg.textContent = (payload && payload.message) ? payload.message : "알 수 없는 오류가 발생했습니다.";
+      msg.textContent = (payload && payload.message) ? payload.message : "You can't see the error.";
       body.appendChild(msg);
     }
 
@@ -1635,7 +1635,7 @@
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    closeBtn.textContent = kind === "success" ? "확인" : "취소";
+    closeBtn.textContent = kind === "success" ? "About Us" : "Venue";
 
     actions.appendChild(closeBtn);
 
@@ -1643,7 +1643,7 @@
       const forceBtn = document.createElement("button");
       forceBtn.type = "button";
       forceBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-      forceBtn.textContent = "강제 폐기 후 재시도";
+      forceBtn.textContent = "Causes of rehabilitation after rehabilitation";
       forceBtn.style.background = "#c0392b";
       forceBtn.style.borderColor = "#c0392b";
       forceBtn.addEventListener("click", function () {
@@ -1684,14 +1684,14 @@
   }
 
   /**
-   * T-418: 티켓 삭제 confirm 모달.
+   * T-418: Deletion of ticket confirmation modal.
    *
-   * 빨간 [삭제] 버튼. POST /api/kanban/delete 호출.
-   * error_kind='derived_blocked' 시 alert 으로 차단 사유 표시.
+   * Red [delete] button. POST /api/kanban/delete calls.
+   * error kind='derived blocked' when alert is blocked by the show.
    *
-   * @param {Object} ticket - 삭제할 티켓 객체 (number 포함)
-   * @param {Function} onConfirm - [삭제] 클릭 콜백
-   * @param {Function} onCancel - [취소]/ESC/overlay 클릭 콜백
+   * @param {Object} ticket - ticket object to delete (number included)
+   * @param {Function} onConfirm - Click Callback
+   * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
   function showDeleteConfirmModal(ticket, onConfirm, onCancel) {
     const overlay = document.createElement("div");
@@ -1706,19 +1706,19 @@
     const title = document.createElement("h3");
     title.id = "delete-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + " 티켓 삭제"));
+    title.appendChild(document.createTextNode(ticket.number + "Scots Gaelic"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
-    const introText = document.createTextNode(ticket.number + " 티켓을 삭제합니다. 이 작업은 되돌릴 수 없습니다.");
+    const introText = document.createTextNode(ticket.number + "Please delete the ticket. This work cannot be reverted.");
     body.appendChild(introText);
 
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
-    li1.textContent = "워크트리 및 feature 브랜치도 함께 정리됩니다.";
+    li1.textContent = "Worktree and feature Brands are also cleaned together.";
     const li2 = document.createElement("li");
-    li2.textContent = "파생 티켓(derived-from)이 미완료 상태면 삭제가 차단됩니다.";
+    li2.textContent = "Deletion is blocked if the derivation ticket (derived-from) is completed.";
     ul.appendChild(li1);
     ul.appendChild(li2);
     body.appendChild(ul);
@@ -1729,12 +1729,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    cancelBtn.textContent = "취소";
+    cancelBtn.textContent = "Venue";
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    deleteBtn.textContent = "삭제";
+    deleteBtn.textContent = "TubeDupe";
     deleteBtn.style.background = "#c0392b";
     deleteBtn.style.borderColor = "#c0392b";
 
@@ -1776,10 +1776,10 @@
   }
 
   /**
-   * T-906: Done 처리 결과 모달.
-   * @param {"success"|"conflict"|"dirty"|"error"} kind - 결과 종류
-   * @param {Object} payload - 결과 데이터 (kind 별 다름)
-   * @param {Function} onClose - 닫기 콜백
+   * T-906: Done treatment result delivery.
+   * @param {"success"|"conflict"|"dirty"|"error"} kind - result type
+   * @param {Object} payload - result data (kind star difference)
+   * @param {Function} onClose - Close Callback
    */
   function showDoneResultModal(kind, payload, onClose) {
     const overlay = document.createElement("div");
@@ -1802,20 +1802,20 @@
       console.warn("[showDoneResultModal] success kind with empty merge_commit — converting to error");
       kind = "error";
       payload = Object.assign({}, payload, {
-        message: "백엔드 응답 형식 오류 — merge_commit 누락. flow-kanban 출력을 확인하세요."
+        message: "backend response format error — merge commit missing. See flow-kanban output."
       });
     }
 
     if (kind === "success") {
-      title.textContent = "Done 처리 완료";
+      title.textContent = "Done Treatment Complete";
       const msg = document.createElement("p");
       const ticketStr = payload.merge_skipped
-        ? (payload.ticket || "") + ": Review → Done (merge 없음 — research/문서 등)"
-        : (payload.ticket || "") + ": " + (payload.merged_branch || "") + " → develop 병합 완료 (" + (payload.merge_commit || "") + ")";
+        ? (payload.ticket || "") + ": Review → Done (No Merge — Research/Document)"
+        : (payload.ticket || "") + ": " + (payload.merged_branch || "") + "→ develop merge completion (" + (payload.merge_commit || "") + ")";
       msg.textContent = ticketStr;
       body.appendChild(msg);
     } else if (kind === "conflict") {
-      title.textContent = "Done 처리 실패 — 병합 충돌";
+      title.textContent = "Done Processing Failure — Merge Collision";
       const ul = document.createElement("ul");
       const files = (payload.conflicts || []);
       if (files.length > 0) {
@@ -1826,15 +1826,15 @@
         });
       } else {
         const li = document.createElement("li");
-        li.textContent = "(충돌 파일 목록 없음)";
+        li.textContent = "(no pistol file list)";
         ul.appendChild(li);
       }
       body.appendChild(ul);
       const guide = document.createElement("p");
-      guide.textContent = "워크트리에서 충돌을 해결한 뒤 다시 시도하세요.";
+      guide.textContent = "Solve crashes in worktree and try again.";
       body.appendChild(guide);
     } else if (kind === "dirty") {
-      title.textContent = "Done 처리 실패 — 미커밋 변경";
+      title.textContent = "Done Processing Failure — Minorm Change";
       const ul = document.createElement("ul");
       const files = (payload.dirty_files || []);
       if (files.length > 0) {
@@ -1845,17 +1845,17 @@
         });
       } else {
         const li = document.createElement("li");
-        li.textContent = "(미커밋 파일 목록 없음)";
+        li.textContent = "(No Micommit File List)";
         ul.appendChild(li);
       }
       body.appendChild(ul);
       const guide = document.createElement("p");
-      guide.textContent = "워크트리에서 변경을 커밋하거나 flow-merge 로 처리한 뒤 다시 시도하세요.";
+      guide.textContent = "commit changes in worktrees or process flow-merge and try again.";
       body.appendChild(guide);
     } else {
-      title.textContent = "Done 처리 실패";
+      title.textContent = "Done processing failed";
       const msg = document.createElement("p");
-      msg.textContent = (payload && payload.message) ? payload.message : "알 수 없는 오류가 발생했습니다.";
+      msg.textContent = (payload && payload.message) ? payload.message : "You can't see the error.";
       body.appendChild(msg);
     }
 
@@ -1865,7 +1865,7 @@
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    closeBtn.textContent = "확인";
+    closeBtn.textContent = "About Us";
 
     actions.appendChild(closeBtn);
     dialog.appendChild(title);
@@ -1899,15 +1899,15 @@
   }
 
   /**
-   * T-905 Phase 3: Done 카드 우클릭 → "Review 로 롤백" 확인 모달.
+   * T-905 Phase 3: Done card click → "Review" check modal.
    *
-   * push 전(local-only) / push 후(origin/develop 도달) 분기 안내 + force 옵션 체크박스.
-   * pre-detect: 칸반 result.merge_commit 존재 여부를 사전 점검하여
-   * 누락 시 force 옵션이 필요함을 명시 안내한다.
+   * push(local-only) / push(origin/develop reach) branch guide + force option checkbox.
+   * pre-detect: pre-check whether the kanban result.merge commit exists
+   * Please note that the force option is required when missing.
    *
-   * @param {Object} ticket - Done 컬럼 카드 티켓 객체 (number/result 포함)
-   * @param {Function} onConfirm - confirm 콜백 (force: bool 인자 전달)
-   * @param {Function} onCancel - 취소/ESC/overlay 콜백
+   * @param {Object} ticket - Done column card ticket object (number/result included)
+   * @param {Function} onConfirm - confirm callback (force: bool argument passed)
+   * @param {Function} onCancel - Cancel/ESC/overlay Callback
    */
   function showUndoDoneConfirmModal(ticket, onConfirm, onCancel) {
     const overlay = document.createElement("div");
@@ -1922,39 +1922,39 @@
     const title = document.createElement("h3");
     title.id = "undo-done-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + " Review 로 롤백"));
+    title.appendChild(document.createTextNode(ticket.number + "Review"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
     const intro = document.createElement("p");
-    intro.textContent = "이 티켓의 Done 처리를 되돌립니다. develop 의 머지 결과를 자동으로 분기 처리합니다:";
+    intro.textContent = "Revert Done processing of this ticket. Developing the thumb result automatically quarterly NEWS";
     body.appendChild(intro);
 
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
-    li1.textContent = "push 전(local-only): reset --hard 로 머지 commit 제거";
+    li1.textContent = "reset --hard";
     const li2 = document.createElement("li");
-    li2.textContent = "push 후(origin/develop 포함): revert -m 1 로 역방향 commit 추가 (force-push 없음)";
+    li2.textContent = "after push(includes origin/develop): add reverse commit to revert -m 1 (noforce-push)";
     const li3 = document.createElement("li");
-    li3.textContent = "feature 브랜치 + 워크트리 재생성 + 칸반 Done → Review 강제 전이";
+    li3.textContent = "feature Brand + Worktree Regeneration + Kanban Done → Review Forced Battle";
     ul.appendChild(li1);
     ul.appendChild(li2);
     ul.appendChild(li3);
     body.appendChild(ul);
 
-    // pre-detect: result.merge_commit 누락 여부
+    // result.merge commit
     const result = ticket.result || {};
     const hasMergeCommit = !!(result.merge_commit && String(result.merge_commit).trim());
     if (!hasMergeCommit) {
       const warn = document.createElement("p");
       warn.style.color = "#D97757";
       warn.style.fontWeight = "600";
-      warn.textContent = "주의: 이 티켓에는 merge_commit 정보가 없습니다 (Phase 1 인프라 도입 이전 Done). reflog fallback 을 시도하려면 아래 force 옵션을 활성화하세요.";
+      warn.textContent = "Note: This ticket does not have merge commit information (Phase 1 Infrastructure introduced earlier Done). To try reflog fallback, please enable the following force option:";
       body.appendChild(warn);
     }
 
-    // force 옵션 체크박스
+    // force option checkbox
     const forceWrapper = document.createElement("label");
     forceWrapper.style.display = "flex";
     forceWrapper.style.alignItems = "center";
@@ -1968,14 +1968,14 @@
       forceCheckbox.checked = true;
     }
     const forceLabel = document.createElement("span");
-    forceLabel.textContent = "--force (점유 경고 무시 + reflog fallback 활성화)";
+    forceLabel.textContent = "--force (lower warning ignore + reflog fallback activation)";
     forceWrapper.appendChild(forceCheckbox);
     forceWrapper.appendChild(forceLabel);
     body.appendChild(forceWrapper);
 
     const tail = document.createElement("p");
     tail.style.marginTop = "10px";
-    tail.textContent = "계속할까요?";
+    tail.textContent = "About Us";
     body.appendChild(tail);
 
     const actions = document.createElement("div");
@@ -1984,12 +1984,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "submit-confirm-btn submit-confirm-btn-cancel";
-    cancelBtn.textContent = "취소";
+    cancelBtn.textContent = "Venue";
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "Review 로 롤백";
+    confirmBtn.textContent = "Review";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -2030,14 +2030,14 @@
   }
 
   /**
-   * T-905 Phase 3: undo-done 결과 모달.
-   * showDoneResultModal 패턴 답습.
+   * T-905 Phase 3: undo-done results modal.
+   * showDoneResultModal pattern answer.
    *
-   * @param {"reset_ok"|"revert_ok"|"unknown_ok"|"error"} kind - 결과 종류
-   * @param {Object} payload - 결과 데이터
+   * "reset ok"
+   * @param {Object} payload - result data
    *   - reset_ok / revert_ok: { ticket, strategy, branch, worktree_path, message }
    *   - error: { ticket, error, message, stderr }
-   * @param {Function} onClose - 닫기 콜백 (성공 시 보드 자동 새로고침에 활용)
+   * @param {Function} onClose - Close callbacks (Utilization on automatic new callbacks in the field)
    */
   function showUndoDoneResultModal(kind, payload, onClose) {
     const overlay = document.createElement("div");
@@ -2057,44 +2057,44 @@
     body.className = "submit-confirm-body";
 
     if (kind === "reset_ok" || kind === "revert_ok" || kind === "unknown_ok") {
-      title.textContent = "Review 로 롤백 완료";
+      title.textContent = "Review";
 
       const summary = document.createElement("p");
       const ticketStr = payload.ticket || "";
       const strategyStr = payload.strategy
-        ? (payload.strategy === "reset" ? "reset --hard (push 전)" : payload.strategy === "revert" ? "revert -m 1 (push 후)" : payload.strategy)
+        ? (payload.strategy === "reset" ? "reset --hard (push ago)" : payload.strategy === "revert" ? "revert -m 1 (after push)" : payload.strategy)
         : "?";
-      summary.textContent = ticketStr + " 롤백 완료 — 전략: " + strategyStr;
+      summary.textContent = ticketStr + "Rollback Finished — Strategy:" + strategyStr;
       body.appendChild(summary);
 
       if (payload.branch) {
         const br = document.createElement("p");
-        br.textContent = "재생성된 feature 브랜치: " + payload.branch;
+        br.textContent = "Renewable feature Brand:" + payload.branch;
         body.appendChild(br);
       }
       if (payload.worktree_path) {
         const wt = document.createElement("p");
-        wt.textContent = "재생성된 워크트리: " + payload.worktree_path;
+        wt.textContent = "Renewable Worktree:" + payload.worktree_path;
         body.appendChild(wt);
       }
 
       const guideTitle = document.createElement("p");
       guideTitle.style.marginTop = "10px";
       guideTitle.style.fontWeight = "600";
-      guideTitle.textContent = "다음 절차:";
+      guideTitle.textContent = "Tag:";
       body.appendChild(guideTitle);
       const ol = document.createElement("ol");
       const liE = document.createElement("li");
-      liE.textContent = "/wf -e " + ticketStr + " 로 티켓을 편집하거나 직접 수정";
+      liE.textContent = "/wf -e " + ticketStr + "Edit tickets or edit them directly";
       const liS = document.createElement("li");
-      liS.textContent = "/wf -s " + ticketStr + " 로 워크플로우 재실행";
+      liS.textContent = "/wf -s " + ticketStr + "Skip to content";
       ol.appendChild(liE);
       ol.appendChild(liS);
       body.appendChild(ol);
     } else {
-      title.textContent = "Review 로 롤백 실패";
+      title.textContent = "Review";
       const msg = document.createElement("p");
-      msg.textContent = (payload && (payload.error || payload.message)) || "알 수 없는 오류가 발생했습니다.";
+      msg.textContent = (payload && (payload.error || payload.message)) || "You can't see the error.";
       body.appendChild(msg);
 
       if (payload && payload.stderr) {
@@ -2120,7 +2120,7 @@
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    closeBtn.textContent = "확인";
+    closeBtn.textContent = "About Us";
 
     actions.appendChild(closeBtn);
     dialog.appendChild(title);
@@ -2154,16 +2154,16 @@
   }
 
   /**
-   * T-905 Phase 3: Done 카드 컨텍스트 메뉴 (우클릭).
+   * T-905 Phase 3: Done card context menu (click).
    *
-   * "Review 로 롤백" 단일 항목 노출. 클릭 시 showUndoDoneConfirmModal 호출.
-   * 메뉴는 documentLevel 클릭 또는 ESC 로 닫힌다.
+   * "Review" single item exposure. showUndoDoneConfirmModal calls when clicked.
+   * Click documentLevel or close to ESC.
    *
-   * @param {MouseEvent} event - contextmenu 이벤트
-   * @param {Object} ticket - Done 카드 티켓 객체
+   * contextmenu
+   * @param {Object} ticket - Done card ticket object
    */
   function showDoneCardContextMenu(event, ticket) {
-    // 기존 컨텍스트 메뉴가 열려 있으면 제거
+    // Removed if the existing context menu is open
     document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
       if (m.parentNode) m.parentNode.removeChild(m);
     });
@@ -2191,7 +2191,7 @@
     item.style.color = "#cccccc";
     item.style.cursor = "pointer";
     item.style.fontSize = "13px";
-    item.textContent = "Review 로 롤백";
+    item.textContent = "Review";
     item.addEventListener("mouseenter", function () {
       item.style.background = "#094771";
     });
@@ -2220,7 +2220,7 @@
       showUndoDoneConfirmModal(
         ticket,
         function (force) {
-          // [Review 로 롤백] 콜백
+          // [Review by Rollback] Callback
           fetch("/api/kanban/undo-done", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2243,7 +2243,7 @@
           });
         },
         function () {
-          // 취소: 아무 것도 안 함
+          // Cancel: No
         }
       );
     });
@@ -2251,7 +2251,7 @@
     menu.appendChild(item);
     document.body.appendChild(menu);
 
-    // 위치 보정: viewport 밖으로 나가지 않도록
+    // location correction: not to go out of viewport
     const x = event.clientX;
     const y = event.clientY;
     menu.style.left = x + "px";
@@ -2264,7 +2264,7 @@
       menu.style.top = (window.innerHeight - rect.height - 8) + "px";
     }
 
-    // 외부 클릭 / ESC 로 닫기
+    // External Click / Close to ESC
     setTimeout(function () {
       document.addEventListener("click", outsideHandler, true);
       document.addEventListener("keydown", onKey);
@@ -2272,19 +2272,19 @@
   }
 
   /**
-   * T-418: Open 카드 컨텍스트 메뉴 (우클릭).
+   * T-418: Open Card context menu (click).
    *
-   * 메뉴 항목 2개:
-   *   - "Done 으로 완료(직접)" → showOpenDoneConfirmModal 호출
-   *   - "삭제" → showDeleteConfirmModal 호출
+   * 2 menu items:
+   *   - "Done" → showOpenDoneConfirmModal call
+   *   - "TubeDupe" → showDeleteConfirmModal call
    *
-   * showDoneCardContextMenu 패턴 답습 (T-905).
+   * showDoneCardContextMenu (T-905)
    *
-   * @param {MouseEvent} event - contextmenu 이벤트
-   * @param {Object} ticket - Open 카드 티켓 객체
+   * contextmenu
+   * @param {Object} ticket - Open card ticket object
    */
   function showOpenCardContextMenu(event, ticket) {
-    // 기존 컨텍스트 메뉴가 열려 있으면 제거
+    // Removed if the existing context menu is open
     document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
       if (m.parentNode) m.parentNode.removeChild(m);
     });
@@ -2323,8 +2323,8 @@
       return item;
     }
 
-    const doneItem = makeMenuItem("Done 으로 완료(직접)");
-    const deleteItem = makeMenuItem("삭제", "#f48771");
+    const doneItem = makeMenuItem("Done");
+    const deleteItem = makeMenuItem("TubeDupe", "#f48771");
 
     function cleanup() {
       document.removeEventListener("click", outsideHandler, true);
@@ -2341,7 +2341,7 @@
       }
     }
 
-    // "Done 으로 완료(직접)" 클릭 핸들러
+    // "Done" Click Handler
     doneItem.addEventListener("click", function (e) {
       e.stopPropagation();
       cleanup();
@@ -2378,12 +2378,12 @@
           callOpenDone(forceDirty);
         },
         function () {
-          // 취소: 아무 것도 안 함
+          // Cancel: No
         }
       );
     });
 
-    // "삭제" 클릭 핸들러
+    // "TubeDupe" click handler
     deleteItem.addEventListener("click", function (e) {
       e.stopPropagation();
       cleanup();
@@ -2403,19 +2403,19 @@
               fetchTickets().then(renderKanban);
             } else {
               if (r.body.error_kind === "derived_blocked") {
-                const derivedList = (r.body.derived_tickets || []).join(", ") || "(목록 없음)";
-                Board.util.showInfoModal("삭제 차단", "삭제 차단: 파생 티켓이 미완료 상태입니다.\n\n미완료 파생 티켓: " + derivedList + "\n\n파생 티켓을 먼저 완료하세요.", { severity: "warning", onClose: function () { renderKanban(); } });
+                const derivedList = (r.body.derived_tickets || []).join(", ") || "(No roll)";
+                Board.util.showInfoModal("Delete block", "Deletion: Derivative tickets are unfinished. \\n\\nComplete Derivative Ticket:" + derivedList + "Complete the \\n\\n parasite ticket first.", { severity: "warning", onClose: function () { renderKanban(); } });
               } else {
-                Board.util.showInfoModal("삭제 실패", "삭제 실패: " + ((r.body && r.body.message) || "알 수 없는 오류"), { severity: "error", onClose: function () { renderKanban(); } });
+                Board.util.showInfoModal("Delete failed", "Delete Failure:" + ((r.body && r.body.message) || "Unknown Errors"), { severity: "error", onClose: function () { renderKanban(); } });
               }
             }
           }).catch(function (err) {
             console.error("[kanban Open contextmenu] delete failed:", err);
-            Board.util.showInfoModal("삭제 실패", "삭제 실패: " + err.message, { severity: "error", onClose: function () { renderKanban(); } });
+            Board.util.showInfoModal("Delete failed", "Delete Failure:" + err.message, { severity: "error", onClose: function () { renderKanban(); } });
           });
         },
         function () {
-          // 취소: 아무 것도 안 함
+          // Cancel: No
         }
       );
     });
@@ -2424,7 +2424,7 @@
     menu.appendChild(deleteItem);
     document.body.appendChild(menu);
 
-    // 위치 보정: viewport 밖으로 나가지 않도록
+    // location correction: not to go out of viewport
     const x = event.clientX;
     const y = event.clientY;
     menu.style.left = x + "px";
@@ -2438,7 +2438,7 @@
       menu.style.top = (window.innerHeight - rect.height - 8) + "px";
     }
 
-    // 외부 클릭 / ESC 로 닫기
+    // External Click / Close to ESC
     setTimeout(function () {
       document.addEventListener("click", outsideHandler, true);
       document.addEventListener("keydown", onKey);
@@ -2446,13 +2446,13 @@
   }
 
   /**
-   * Review 카드 우클릭 컨텍스트 메뉴.
-   * 옵션: (a) Open 으로 재작업 (POST /api/kanban/move).
-   * 채팅 첨부는 DnD 로 일원화 (T-427).
-   * Review → In Progress 전이 폐기 (2026-05-08 사용자 명시).
+   * Review Card Click context menu.
+   * Optional: (a) Open to rework (POST /api/kanban/move).
+   * Chat attachments to DnD (T-427).
+   * Review → Before In Progress, the User Expiration (2026-05-08).
    *
-   * @param {MouseEvent} event - contextmenu 이벤트
-   * @param {Object} ticket - Review 카드 티켓 객체
+   * contextmenu
+   * @param {Object} ticket - Review card ticket object
    */
   function showReviewCardContextMenu(event, ticket) {
     document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
@@ -2489,7 +2489,7 @@
       return item;
     }
 
-    const reopenItem = makeMenuItem("Open 으로 재작업");
+    const reopenItem = makeMenuItem("Rework with Open");
 
     function cleanup() {
       document.removeEventListener("click", outsideHandler, true);
@@ -2514,10 +2514,10 @@
         if (r.res.ok && r.body.ok) {
           fetchTickets().then(renderKanban);
         } else {
-          Board.util.showInfoModal("재작업 실패", "재작업 전이 실패: " + ((r.body && r.body.error) || "알 수 없는 오류"), { severity: "error", onClose: function () { renderKanban(); } });
+          Board.util.showInfoModal("Rework failed", "Pre-work failed:" + ((r.body && r.body.error) || "Unknown Errors"), { severity: "error", onClose: function () { renderKanban(); } });
         }
       }).catch(function (err) {
-        Board.util.showInfoModal("재작업 실패", "재작업 요청 실패: " + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
+        Board.util.showInfoModal("Rework failed", "Rework request failed:" + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
       });
     });
 
@@ -2544,19 +2544,19 @@
   }
 
   /**
-   * 카드 드래그 앤 드랍 핸들러 등록 (T-399: To Do ↔ Open + Open → In Progress).
-   * T-906: Review → Done drop 추가 (confirm 모달 + cmd_done 위임 + 결과 모달).
+   * Card drag and drop handler registration (T-399: To Do ↔ Open + Open → In Progress).
+   * T-906: Review → Add Done drop (confirm delivery + cmd done commission + result delivery).
    *
-   * dragstart: 카드에서 ticket 번호 + 출발 컬럼을 dataTransfer 에 저장.
-   * dragover: drop 가능한 cards-droppable 영역에서 dragover-active 표시.
+   * dragstart: Save the ticket number + Departure column to dataTransfer.
+   * dragover: dragover-active display in dropable cards-droppable area.
    * drop:
-   *   - To Do ↔ Open: POST /api/kanban/move (단순 전이)
-   *   - Open → In Progress: confirm 모달 → POST /api/kanban/submit (워크플로우 실행)
-   *   - Review → Done: confirm 모달 → POST /api/kanban/done (cmd_done 위임)
-   * dragend: 시각 피드백 클래스 정리.
+   *   - To Do ↔ Open: POST /api/kanban/move (In short time)
+   *   - Open → In Progress: Confirm Modal → POST /api/kanban/submit (Workflow Execution)
+   *   - Review → Done: confirm Modal → POST /api/kanban/done (cmd done)
+   * dragend: Clean up your visual feedback class.
    *
-   * In Progress 카드 drag 불가는 의도된 보호 (취소 부수효과 차단).
-   * Review → Done drop 만 confirm 모달로 허용 (T-906).
+   * In Progress card drag Invalid protection (delete degradation).
+   * Review → Done drop only confirm Modal allowed (T-906).
    */
   function bindKanbanDnd(el) {
     let draggedNum = null;
@@ -2568,7 +2568,7 @@
         draggedFrom = card.dataset.colKey;
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", draggedNum);
-        // T-427: ticket JSON 페이로드를 별도 MIME 으로 전달 (터미널 drop 분기 전용)
+        // T-427: Pass the ticket JSON payload to MIME separately (for terminal drop branch only)
         var ticketObj = (Board.state.TICKETS || []).find(function (t) {
           return t.number === draggedNum;
         });
@@ -2582,7 +2582,7 @@
           };
           try {
             e.dataTransfer.setData("application/x-board-ticket", JSON.stringify(payload));
-          } catch (ex) { /* 일부 브라우저 제한 — 무시 */ }
+          } catch (ex) { /* Some browser limits — ignore */ }
         }
         card.classList.add("card-dragging");
       });
@@ -2600,12 +2600,12 @@
     });
 
     /**
-     * draggedFrom → targetCol 전이가 허용되는지 판정.
-     * 허용 표:
+     * draggedFrom → targetCol prefix.
+     * Payment Terms:
      *   To Do  → To Do(reorder) | Open
      *   Open   → To Do | In Progress | Review | Done
      *   Review → Done | Open
-     * 그 외 조합은 dragover 단계에서 drop 거부 (브라우저 cursor 가 no-drop 표시).
+     * Other combinations deny drop in dragover phase (Browner cursor is no-drop display).
      */
     function isValidDropTarget(fromCol, targetCol) {
       if (fromCol === "To Do") return targetCol === "To Do" || targetCol === "Open";
@@ -2615,8 +2615,8 @@
     }
 
     /**
-     * To Do 수동 정렬 모드의 같은 컬럼 reorder dragover 시 삽입 위치 인디케이터 배치.
-     * Y 좌표 기준 target index 계산 후 zone 내부에 indicator element 를 insert/move.
+     * To Do manual alignment mode such as column reorder dragover when insert position indicator placement.
+     * insert/move the indicator element inside the zone after the target index calculation of Y coordinates.
      */
     function placeDropIndicator(zone, clientY) {
       const cards = Array.from(zone.querySelectorAll('.card[data-num]'))
@@ -2644,7 +2644,7 @@
     el.querySelectorAll(".cards-droppable").forEach(function (zone) {
       zone.addEventListener("dragover", function (e) {
         if (!draggedNum) return;
-        // 유효하지 않은 전이는 drop 자체 거부 (preventDefault 미호출 → 브라우저가 drop 차단)
+        // Unvalid predecessor drop self-reject (preventDefault migration → browser drop block)
         if (!isValidDropTarget(draggedFrom, zone.dataset.colKey)) {
           e.dataTransfer.dropEffect = "none";
           return;
@@ -2652,14 +2652,14 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         zone.classList.add("dragover-active");
-        // To Do 수동 정렬 + 같은 컬럼 drag — 삽입 위치 인디케이터 표시
+        // To Do manual sorting + like column drag — insert location indicator display
         if (zone.dataset.colKey === "To Do" && draggedFrom === "To Do"
             && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
           placeDropIndicator(zone, e.clientY);
         }
       });
       zone.addEventListener("dragleave", function (e) {
-        // 진짜로 zone 밖으로 나갈 때만 정리 (자식 element 진입은 무시)
+        // Only cleans up when you go out of real zone (Ignore the child element entry)
         if (!e.relatedTarget || !zone.contains(e.relatedTarget)) {
           zone.classList.remove("dragover-active");
           const ind = zone.querySelector('.card-drop-indicator');
@@ -2671,7 +2671,7 @@
         zone.classList.remove("dragover-active");
         const targetCol = zone.dataset.colKey;
         if (!draggedNum || !targetCol) return;
-        // 같은 컬럼 내 drop: To Do 수동 정렬 모드만 지원, 나머지는 무시
+        // drop in column: To Do manual alignment mode only support, rest ignore
         if (targetCol === draggedFrom) {
           if (targetCol === "To Do" && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
             const cards = Array.from(zone.querySelectorAll('.card[data-num]'))
@@ -2690,20 +2690,20 @@
           return;
         }
 
-        // T-399: In Progress drop 분기 — Open 카드만 허용 + confirm 모달
-        // Review 카드를 Done 이외 컬럼으로 drop 시도 — 차단
-        // T-418: Open 카드를 Done 이외 컬럼으로 drop 시도 시 기존 To Do ↔ Open 전이 로직으로 처리
+        // T-399: In Progress drop quarter — Open card only allowed + confirm modal
+        // Review Card Done Unlike columns to drop — block
+        // T-418: To Do ↔ Open logic when trying to drop the Open Card to Done outside column
         if (draggedFrom === "Review" && targetCol !== "Done" && targetCol !== "Open") {
-          Board.util.showInfoModal("DnD 차단", "Review 카드는 Done 또는 Open 컬럼으로만 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
+          Board.util.showInfoModal("DnD Lockout", "Review cards can only be dragging with Done or Open columns.", { severity: "warning", onClose: function () { renderKanban(); } });
           return;
         }
 
         if (targetCol === "In Progress") {
           if (draggedFrom !== "Open") {
-            // To Do 등 다른 컬럼에서 직접 In Progress 이동은 차단
+            // In Progress move directly from other columns such as To Do
             Board.util.showInfoModal(
-              "To Do → In Progress 규칙",
-              "To Do 카드는 직접 In Progress 로 옮길 수 없습니다.\n먼저 Open 으로 이동하세요.",
+              "To Do → In Progress",
+              "To Do Card cannot be transferred directly to In Progress. \\nReturn to Open",
               {
                 severity: "info",
                 onClose: function () {
@@ -2724,10 +2724,10 @@
           showSubmitConfirmModal(
             ticketObj,
             function () {
-              // [실행] 콜백: POST /api/kanban/submit → driver 호출
-              // Stage 3-B race fix: registerLaunchStarting 을 fetch *직전* 에 호출하여
-              // SSE LAUNCH_STARTED 가 HTTP 응답보다 빠르게 도착해도 누락되지 않도록 보장.
-              // 실패 시 cleanupLaunchState 로 즉시 정리 (stuck 회귀 차단).
+              // [Run] Callback: POST /api/kanban/submit → driver
+              // Stage 3-B race fix: registerLaunchStarting is called in fetch *function*
+              // SSE LAUNCH STARTED guarantees that even if you arrive faster than HTTP response.
+              // Instantly cleanupLaunchState when failure (stuck regression).
               const submitTicket = ticketObj.number;
               const submitCommand = command;
               registerLaunchStarting(submitTicket, submitCommand);
@@ -2746,12 +2746,12 @@
                 return res.json();
               }).then(function (body) {
                 if (!body || body.status !== "starting") {
-                  // 비정상 응답 — launchState 정리 (등록은 fetch 직전 완료)
+                  // static response — launchState clearance (registration complete fetch position)
                   cleanupLaunchState(submitTicket);
                 } else if (body.session_id && Board.workflowTabStorage
                            && Board.workflowTabStorage.add) {
-                  // T-516 — submit 응답 body.session_id 도 localStorage 영속화.
-                  // launch SSE LAUNCH_STARTED 핸들러와 OR 조건 — 헬퍼 dedupe 안전.
+                  // T-516 — submit response body.session id also localStorage.
+                  // Launch SSE LAUNCH STARTED handler and OR conditions — Helper dedupe safety.
                   Board.workflowTabStorage.add(body.session_id);
                 }
                 fetchTickets().then(function () { renderKanban(); });
@@ -2759,34 +2759,34 @@
                 cleanupLaunchState(submitTicket);
                 console.error("[kanban DnD] submit failed:", err);
                 if (err && err.kind === "http") {
-                  // T-475 Stage 3 정정: HTTP 504 단독은 모달 미표시 (SSE LAUNCH_FAILED 대기).
-                  // 본 비동기화 후 504 자체가 사실상 사라지지만, 방어적으로 분기 보존.
+                  // T-475 Stage 3 Static: HTTP 504 alone waiting for Modal Mileage (SSE LAUNCH FAILED).
+                  // The 504 itself disappears after this synchronousization, but the defending quarterly preserved.
                   if (err.status === 504) {
                     renderKanban();
                   } else {
-                    Board.util.showInfoModal("워크플로우 실행 거부",
+                    Board.util.showInfoModal("Skip to content",
                       formatHttpRejectMessage(err.status, err.body),
                       { severity: "error", onClose: function () { renderKanban(); } });
                   }
                 } else {
-                  // network / abort / 기타 — 사용자에게 즉시 알림
-                  Board.util.showInfoModal("워크플로우 실행 실패",
-                    "네트워크 오류: " + ((err && err.message) || String(err)),
+                  // network / abort / other — instant notifications to users
+                  Board.util.showInfoModal("Workflow failed to run",
+                    "Tag:" + ((err && err.message) || String(err)),
                     { severity: "error", onClose: function () { renderKanban(); } });
                 }
               });
             },
             function () {
-              // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+              // [Cancel]/ESC/overlay callback: Return card origin
               renderKanban();
             }
           );
           return;
         } else if (targetCol === "Done") {
-          // T-906: Review → Done drop 분기
-          // T-418: Open → Done 직접 전이 분기 추가
+          // T-906: Review → Done drop quarter
+          // T-418: Open → Done direct prefix
           if (draggedFrom !== "Review" && draggedFrom !== "Open") {
-            Board.util.showInfoModal("DnD 차단", "Review 또는 Open 카드만 Done 으로 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
+            Board.util.showInfoModal("DnD Lockout", "You can drag only Done with Review or Open Card.", { severity: "warning", onClose: function () { renderKanban(); } });
             return;
           }
           const doneTicketObj = (Board.state.TICKETS || []).find(function (t) {
@@ -2796,12 +2796,12 @@
             renderKanban();
             return;
           }
-          // dragend 가 modal 콜백 실행 전 발생해 draggedNum=null 로 reset 되는 회귀 차단:
-          // ticket 번호를 closure 캡처 변수로 보존
+          // dragend has a modal callback before running the regression that is reset to draggedNum=null:
+          // Preserve ticket number to closure capture variable
           const capturedNum = draggedNum;
 
           if (draggedFrom === "Open") {
-            // T-418: Open → Done 직접 전이 (force=true)
+            // T-418: Open → Done Direct Transfer (force=true)
             function callOpenDoneDnd(forceDirty) {
               fetch("/api/kanban/done", {
                 method: "POST",
@@ -2835,16 +2835,16 @@
                 callOpenDoneDnd(forceDirty);
               },
               function () {
-                // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+                // [Cancel]/ESC/overlay callback: Return card origin
                 renderKanban();
               }
             );
           } else {
-            // T-906: Review → Done drop (기존 로직)
+            // T-906: Review → Done drop
             showDoneConfirmModal(
               doneTicketObj,
               function () {
-                // [완료 처리] 콜백: POST /api/kanban/done → cmd_done 위임
+                // [Completion] Callback: POST /api/kanban/done → cmd done commission
                 fetch("/api/kanban/done", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -2870,7 +2870,7 @@
                 });
               },
               function () {
-                // [취소]/ESC/overlay 콜백: 카드 원위치 복귀
+                // [Cancel]/ESC/overlay callback: Return card origin
                 renderKanban();
               }
             );
@@ -2878,13 +2878,13 @@
           return;
         }
 
-        // To Do 는 Open 으로만 이동 허용 (Review/그 외 차단)
+        // To Do allows to move only to Open (Review/Other Blocks)
         if (draggedFrom === "To Do" && targetCol !== "Open") {
-          Board.util.showInfoModal("DnD 차단", "To Do 카드는 Open 컬럼으로만 드래그할 수 있습니다.", { severity: "warning", onClose: function () { renderKanban(); } });
+          Board.util.showInfoModal("DnD Lockout", "To Do cards can be dragging only to Open Column.", { severity: "warning", onClose: function () { renderKanban(); } });
           return;
         }
 
-        // To Do ↔ Open ↔ Review 단순 전이 (Open → Review 직접 이동 포함)
+        // To Do ↔ Open ↔ Review Simplified (includes Open → Review direct transfer)
         const moveToMap = { "To Do": "todo", "Open": "open", "Review": "review" };
         const to = moveToMap[targetCol];
         if (!to) {
@@ -2903,7 +2903,7 @@
           fetchTickets().then(function () { renderKanban(); });
         }).catch(function (err) {
           console.error("[kanban DnD] move failed:", err);
-          Board.util.showInfoModal("티켓 이동 실패", "티켓 이동 실패: " + err.message, { severity: "error" });
+          Board.util.showInfoModal("Ticket Transfer Failure", "Ticket Transfer Failure:" + err.message, { severity: "error" });
         });
       });
     });
@@ -2915,7 +2915,7 @@
     hideRelationsPopover();
 
     const el = document.getElementById("view-kanban");
-    // 컬럼별 스크롤 위치 캡처 — innerHTML 교체로 잃어버리는 scrollTop 복원용
+    // scroll-top location capture by column — scrollTop restore lost with innerHTML rotation
     const scrollPositions = {};
     el.querySelectorAll(".cards[data-col-key]").forEach(function (cards) {
       scrollPositions[cards.dataset.colKey] = cards.scrollTop;
@@ -2936,10 +2936,10 @@
       const sortIcon = colSort.dir === "desc" ? SVG_DESC : SVG_ASC;
 
       // Build dropdown options HTML
-      // To Do 컬럼은 "수동" 옵션을 맨 앞에 추가 (수동이 기본 정렬)
+      // To Do Column adds the option "About Us" in front of the main
       let dropHtml = '<div class="col-sort-dropdown" data-col="' + esc(col.key) + '">';
       const sortKeysForCol = (col.key === "To Do")
-        ? [{ key: "manual", label: "수동" }].concat(SORT_KEYS)
+        ? [{ key: "manual", label: "About Us" }].concat(SORT_KEYS)
         : SORT_KEYS;
       sortKeysForCol.forEach(function (opt) {
         const isActive = (opt.key === colSort.key) ? " active" : "";
@@ -2958,7 +2958,7 @@
       });
       dropHtml += '</div>';
 
-      // Done / To Do 컬럼은 접기 토글 지원
+      // Done / To Do Column Supports Fold Toggle
       const isCollapsible = COLLAPSIBLE_COLUMNS.has(col.key);
       const isCollapsed = isCollapsible && loadColumnCollapsed(col.key);
       const chevronSvg = isCollapsible
@@ -2971,13 +2971,13 @@
       h += '<div class="column' + columnCollapsedClass + '" data-col-key="' + esc(col.key) + '">';
 
       if (isCollapsed) {
-        // 접힌 상태: 세로 바 렌더링
+        // Folded Status: Vertical Bar Rendering
         h += '<div class="column-collapsed-bar" data-col-key="' + esc(col.key) + '">';
         h += '<span class="bar-label">' + esc(col.label) + '</span>';
         h += '<span class="bar-count">' + items.length + '</span>';
         h += '</div>';
       } else {
-        // 펼친 상태: 기존 헤더 + 카드 렌더링
+        // Unfolded Status: Original Header + Card Rendering
         h += '<div class="col-header">';
         h += '<span class="col-dot ' + col.dot + '"></span>';
         h += '<div class="col-sort-wrapper">';
@@ -2990,10 +2990,10 @@
           h += '<button class="column-toggle-btn" data-col-key="' + esc(col.key) + '" title="\uC811\uAE30">' + chevronSvg + '</button>';
         }
         h += "</div>";
-        // DnD drop target: To Do / Open 컬럼만 cards-droppable 클래스 부여
-        // T-399: In Progress 도 drop target 으로 추가 (Open → In Progress 만 confirm 모달로 허용).
-        // T-906: Done 도 drop target 으로 추가 (Review → Done drop 만 confirm 모달로 허용).
-        // Open → Review 직접 전이 추가: Review 도 drop target.
+        // <img height="1" width="1" alt="" alt="" src="https://www.facebook.com/tr?id=2" />
+        // T-399: Added to In Progress drop target (available only on Open → In Progress check modal).
+        // T-906: Added to Done drop target (Review → Done drop only confirm accepted as modal).
+        // Open → Review Adds Directly: Review also drop target.
         const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress" || col.key === "Done" || col.key === "Review");
         const droppableClass = isDroppable ? ' cards-droppable' : '';
         h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
@@ -3003,17 +3003,17 @@
           sortedItems.forEach(function (t) {
             const done = col.key === "Done" ? " done" : "";
             const status = getWorkflowStatus(t);
-            // DnD: To Do / Open 컬럼 카드만 draggable.
-            // T-399: In Progress 카드 drag 불가는 의도된 보호 (워크플로우 취소 부수효과 차단).
-            // T-906: Review 카드 draggable 추가 (Review → Done drop 허용).
-            // Done 카드는 draggable=false (부수효과 보호).
+            // DnD: To Do / Open column card only draggable.
+            // T-399: In Progress card drag indispensable protection (blocking workflow cancellations).
+            // T-906: Added Review card draggable (Review → Done drop allowed).
+            // Done card is draggable=false (preventive protection).
             const isDraggable = (col.key === "To Do" || col.key === "Open" || col.key === "Review");
             const draggableAttr = isDraggable ? ' draggable="true"' : '';
             const draggableClass = isDraggable ? ' card-draggable' : '';
-            // T-433 Phase 2: Review 카드에 한해 has-active-branch 클래스 부여 (외곽 glow 시각).
+            // T-433 Phase 2: The Review Card has-active-branch class grant (external glow vision).
             const branchActiveClass = (col.key === "Review" && _activeBranchTicket === t.number) ? ' has-active-branch' : '';
             h += '<div class="card' + done + draggableClass + branchActiveClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
-            // 상단: 좌측 그룹(티켓번호 + 커맨드배지), 우측 상태라벨
+            // Top: Left Group (Ticket number + Command badge), Right Status Label
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
             h += '<span class="card-num">' + esc(t.number.replace(/^T-/, "")) + "</span>";
@@ -3029,45 +3029,45 @@
               h += '<span class="card-status ' + status.cssClass + '">' + esc(status.label) + "</span>";
             }
             h += renderUncommittedBadge(t.number);
-            // T-457 (Layer 3): failure tag (ticket.failure 존재 시) — 가드는 헬퍼 내부
+            // T-457 (Layer 3): failure tag (ticket.failure exists) — guards inside the helper
             h += renderFailureTag(t);
-            // T-475 Stage 3: launch starting pulse 배지 (submit 직후 ~ LAUNCH_STARTED 수신 전)
+            // T-475 Stage 3: Start starting pulse badge (submit right after ~ LAUNCH STARTED before receiving)
             h += renderLaunchBadge(t.number);
-            // T-441: Done 카드 verdict 배지 (advisory)
+            // T-441: Done Card verdict badge (advisory)
             if (col.key === "Done") {
               h += renderDoneVerdictBadge(t.number);
             }
-            // T-477: Review 카드 Auditor T3 audit 배지 (advisory only)
+            // T-477: Review Card Auditor T3 Auditor (advisory only)
             if (col.key === "Review") {
               h += renderAuditBadgeHtml(t.number);
             }
             h += "</div>";
             h += "</div>";
-            // 2행: 제목 (2줄 clamp)
+            // 2nd row: title (2 row clamp)
             h += '<div class="card-mid"><div class="card-title">' + esc(t.title || "(No title)") + "</div></div>";
-            // 3행: 관계 & 종속 (없어도 자리 보존)
+            // 3: Relationship & Dependence (no spot conservation)
             h += '<div class="card-relations-row">';
             const hasRelations = t.relations && t.relations.length > 0;
             if (hasRelations) {
               h += renderRelations(t);
             }
             h += '</div>';
-            // 4행: Action 버튼 (없어도 자리 보존, 카드 높이 일정 유지)
+            // 4: Action button (no spot conservation, keep card height schedule)
             h += '<div class="card-actions-row">';
-            // T-463: Review 카드 verdict 배지 (advisory only).
-            // 4행 actions-row 첫 자식 + margin-right:auto 로 좌측 고정, 우측 commit/branch-toggle/done 과 분리.
-            // verdict 결과로 자동 차단 / 강제 전이 0건 — 사용자 강행 자유.
+            // T-463: Review Card verdict badge (advisory only).
+            // 4th action-row first child + margin-right:auto to left fixed, right commit/branch-toggle/done and separating.
+            // Auto-blocking / forced pre-determined by verdict results $0 — user-sharing freedom.
             if (col.key === "Review") {
               h += renderReviewVerdictBadge(t.number);
             }
-            // T-457 (Layer 3): 미커밋 워크트리 commit 액션 버튼 — 어느 컬럼이든 미커밋 있으면 표시.
-            // flex-end + 좌→우 추가 순서로 commit 이 왼쪽, done 이 가장 우측에 위치.
+            // T-457 (Layer 3): Micommit Worktree Commit Action Button — Mark if any column or micommit.
+            // flex-end + left → enter the order commit to this left, done this position on the right side.
             if (_worktreeUncommittedMap) {
               var uitem = _worktreeUncommittedMap.get(t.number);
               if (uitem && uitem.uncommitted_count > 0) {
-                var ctip = "미커밋 " + uitem.uncommitted_count + "건 — 클릭하면 자동 commit";
+                var ctip = "Mickey Mouse" + uitem.uncommitted_count + "— Click Commit";
                 h += '<button class="card-commit-action" data-commit-ticket="' + esc(t.number) + '" title="' + esc(ctip) + '" draggable="false">';
-                // SVG (자체 그림 — 외부 라이브러리 금지 룰): commit graph dot 모티프 (원 + 위/아래 짧은 선)
+                // SVG: Commit graph dot motif (won + short line up/down)
                 h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
                 h += '<circle cx="7" cy="7" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none"/>';
                 h += '<line x1="7" y1="0.5" x2="7" y2="4.0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
@@ -3076,25 +3076,25 @@
                 h += '</button>';
               }
             }
-            // In Progress 카드: 워크플로우 중지 버튼 (POST /api/workflow/stop) — 4축 (프로세스/jsonl/칸반/워크트리) 통합 정리.
+            // In Progress card: Workflow stop button (POST /api/workflow/stop) — 4 axis (process/jsonl/bar/worktree) integration.
             if (col.key === "In Progress") {
-              h += '<button class="card-stop-action" data-stop-ticket="' + esc(t.number) + '" title="워크플로우 중지 (프로세스/jsonl/칸반/워크트리 4축 정리)" draggable="false">';
+              h += '<button class="card-stop-action" data-stop-ticket="' + esc(t.number) + '" title="Stop workflow (Proceed/jsonl/Collection/Worktree 4)" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.6" fill="currentColor"/>';
               h += '</svg>';
               h += '</button>';
             }
             if (col.key === "Review") {
-              // T-433 Phase 2: feature 브랜치 활성/해제 토글 버튼 (4행 좌측, done 버튼 좌측에 배치).
-              // OFF: 회색 outline / ON: 테라코타 채움 + 카드 외곽 light glow.
-              // 한 카드만 active 보장 — _activeBranchTicket 상태 기준 .active 부여.
+              // T-433 Phase 2: Feature Brand-Activate/Remote Toggle Button (4-row left, batch button on left).
+              // OFF: Grey outline / ON: Terracotta + Card Exterior Light glow.
+              // Only one card is active guarantee —  activeBranchTicket status standard .active grant.
               var isBranchActive = (_activeBranchTicket === t.number);
               var toggleClass = isBranchActive ? " active" : "";
               var toggleTip = isBranchActive
-                ? "feature 브랜치 활성 중 — 클릭하면 develop 으로 복귀"
-                : "클릭하면 메인 working tree 를 이 feature 브랜치로 전환";
+                ? "feature Brand Name Active — Click to Return to develop"
+                : "Click to switch main working tree to this feature branch";
               h += '<button class="card-branch-toggle' + toggleClass + '" data-branch-ticket="' + esc(t.number) + '" title="' + esc(toggleTip) + '" draggable="false">';
-              // Lucide git-branch SVG (16px, currentColor) — e749003 어휘 일치
+              // Lucide git-branch SVG (16px, currentColor) — e749003 Vocabulary Match
               h += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
               h += '<line x1="6" y1="3" x2="6" y2="15"/>';
               h += '<circle cx="18" cy="6" r="3"/>';
@@ -3102,7 +3102,7 @@
               h += '<path d="M18 9a9 9 0 0 1-9 9"/>';
               h += '</svg>';
               h += '</button>';
-              h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="완료 처리" draggable="false">';
+              h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="finishing" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<polyline points="2,7 5.5,10.5 12,3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
               h += '</svg>';
@@ -3137,7 +3137,7 @@
       });
     }
 
-    // 캡처된 컬럼별 scrollTop 복원
+    // ScrollTop Restore Capture
     Object.keys(scrollPositions).forEach(function (colKey) {
       const cards = el.querySelector('.cards[data-col-key="' + colKey + '"]');
       if (cards) cards.scrollTop = scrollPositions[colKey];
@@ -3146,22 +3146,22 @@
     // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
       card.addEventListener("click", function (e) {
-        // T-457 (Layer 3): 4행 commit 버튼 클릭 → 워크트리 자동 commit 액션 위임.
-        // (1행 .card-uncommitted-badge 는 read-only 표시 라벨로 변경됨 — 클릭 트리거 없음)
+        // T-457 (Layer 3): 4th Commit button click → Worktree auto commit action commission.
+        // .card-uncommitted-badge is modified to read-only mark label — no click trigger)
         var commitBtn = e.target.closest(".card-commit-action");
         if (commitBtn) {
           e.stopPropagation();
           handleCommitButtonClick(commitBtn);
           return;
         }
-        // In Progress 카드 4행 워크플로우 중지 버튼 → handleStopButtonClick 위임
+        // In Progress card 4 workflow stop button → handleStopButtonClick position
         var stopBtn = e.target.closest(".card-stop-action");
         if (stopBtn) {
           e.stopPropagation();
           handleStopButtonClick(stopBtn);
           return;
         }
-        // T-433 Phase 2: Review 카드 4행 feature 브랜치 토글 버튼 클릭 → handleBranchToggleClick 위임
+        // T-433 Phase 2: Click on the Brand Match Toggle button on the Review card → enter handleBranchToggleClick
         var branchToggle = e.target.closest(".card-branch-toggle");
         if (branchToggle) {
           e.stopPropagation();
@@ -3169,7 +3169,7 @@
           handleBranchToggleClick(bnum);
           return;
         }
-        // T-439: Review 카드 우하단 완료 액션 버튼 클릭 → handleReviewDoneAction 위임
+        // T-439: Review Card Velvet Finished Action Button Click → HandleReviewDoneAction
         var doneAction = e.target.closest(".card-done-action");
         if (doneAction) {
           e.stopPropagation();
@@ -3178,19 +3178,19 @@
           if (ticket) handleReviewDoneAction(ticket);
           return;
         }
-        // T-441: Done 카드 verdict FAIL 배지 클릭 → 상세 메시지 표시 (advisory)
+        // T-441: Done card verdict FAIL badge click → Show details message (advisory)
         var verdictFail = e.target.closest(".card-done-verdict.verdict-fail");
         if (verdictFail) {
           e.stopPropagation();
           var ticketNum = card.dataset.num;
-          var msg = verdictFail.dataset.verdictMsg || "develop HEAD 가 머지 commit 아님";
+          var msg = verdictFail.dataset.verdictMsg || "Develop head is mitigating";
           var verdictData = ticketNum ? _doneVerdictMap[ticketNum] : null;
           var detail = (verdictData && verdictData.details) || {};
           var bodyMsg = msg;
           if (detail.develop_head) bodyMsg += "\n\ndevelop HEAD : " + detail.develop_head.slice(0, 8);
           if (detail.merge_commit) bodyMsg += "\nmerge commit: " + detail.merge_commit.slice(0, 8);
-          bodyMsg += "\n\n이 티켓의 변경분이 develop 에 정상 반영되지 않았을 수 있습니다.\n※ advisory only — 자동 재머지 없음. 수동으로 확인하세요.";
-          Board.util.showInfoModal("머지 정합성 FAIL", bodyMsg, { severity: "warning" });
+          bodyMsg += "\\n\\n may not be reflected in development. \\n* advisory only — no automatic ream. Please check it manually.";
+          Board.util.showInfoModal("Mage Commodity FAIL", bodyMsg, { severity: "warning" });
           return;
         }
         const num = card.dataset.num;
@@ -3199,7 +3199,7 @@
       });
     });
 
-    // T-905 Phase 3: Done 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Review 로 롤백")
+    // T-905 Phase 3: Right-click context menu binding to Done column card ("Review")
     el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
@@ -3209,17 +3209,17 @@
       });
     });
 
-    // T-441: Done 카드 verdict fetch 트리거 (advisory)
+    // T-441: Done Card verdict fetch trigger (advisory)
     el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
-        // 미조회 카드만 fetch (캐시 히트 시 스킵)
+        // Mickey Card Only Fetch (Skip when hitting)
         fetchAndRenderVerdict(num);
       }
     });
 
-    // T-463: Review 카드 verdict fetch 트리거 (advisory only)
-    // 카드 mount 시 1회 호출 (폴링 없음). 캐시 히트 시 스킵 — _reviewVerdictMap 가드.
+    // T-463: Review Card Verdict Fetch Trigger (advisory only)
+    // One call (no locking) when card mount. Skip to main content
     el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
@@ -3227,7 +3227,7 @@
       }
     });
 
-    // T-477: Review 카드 audit verdict fetch 트리거 (advisory)
+    // T-477: Review card audit verdict fetch trigger (advisory)
     el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
@@ -3235,7 +3235,7 @@
       }
     });
 
-    // T-418: Open 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Done 으로 완료(직접)" + "삭제")
+    // T-418: Right-click context menu binding on Open Column Card ("Done" + "Tube")
     el.querySelectorAll('.card[data-col-key="Open"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
@@ -3246,7 +3246,7 @@
       });
     });
 
-    // Review 컬럼 카드에 우클릭 컨텍스트 메뉴 바인딩 ("Open 으로 재작업" 단일 옵션)
+    // Review Click context menu binding on column card ("Rework with Open" single option)
     el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
@@ -3257,9 +3257,9 @@
       });
     });
 
-    // ── DnD: To Do ↔ Open 카드 드래그 앤 드랍 ──
-    // 안전 DnD 정책: 부수 효과 없는 전이만 허용 (In Progress / Done 은 별도 명령)
-    // T-418: Open → Done 직접 전이도 confirm 모달로 허용 (force=true)
+    // ── DnD: To Do ↔ Open Card Drag & Drop ──
+    // Safety DnD Policy: Exemption without cracking effect allowed (In Progress / Done separately command)
+    // T-418: Open → Done allows direct transition check modal (force=true)
     bindKanbanDnd(el);
 
     // Bind sort button clicks (toggle dropdown)
@@ -3293,7 +3293,7 @@
       });
     });
 
-    // Bind collapse toggle buttons (펼친 상태 → 접기). Done/To Do 공통.
+    // Bind collapse toggle buttons (unfolded). Done/To Do Common.
     el.querySelectorAll(".column-toggle-btn").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -3304,7 +3304,7 @@
       });
     });
 
-    // Bind collapsed bar click (접힌 상태 → 펼치기). Done/To Do 공통.
+    // Bind collapsed bar click (directed → unfold). Done/To Do Common.
     el.querySelectorAll(".column-collapsed-bar").forEach(function (bar) {
       bar.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -3329,29 +3329,29 @@
     }
     el._sortOutsideHandler = outsideHandler;
 
-    // T-433 Phase 2: 페이지 로드 시 1회 active branch 초기 fetch (이후 호출은 가드로 무시).
-    // SSE git_branch 이벤트 도착 시 syncActiveBranchFromSSE 가 동기화 담당.
+    // T-433 Phase 2: Initial fetch in the first active branch in the page load (after call is ignored by guard).
+    // syncActiveBranchFromSSE is synchronized when SSE git branch event arrives.
     fetchAndApplyActiveBranch();
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // T-475 Stage 3 헬퍼 — launch 비동기화 클라이언트 상태 머신
+  // T-475 Stage 3 Helper — launch asynchronous client state machine
   // ──────────────────────────────────────────────────────────────────────
 
   /**
-   * starting 상태 카드 1행 우측 pulse 배지 HTML.
-   * launchState 에 등록된 ticket 만 'starting' 인 동안 노출.
+   * Starting status card 1 right-hand pulse badge HTML.
+   * Exposure while the ticket registered in launchState is 'starting'.
    */
   function renderLaunchBadge(ticketNum) {
     const cur = launchState.get(ticketNum);
     if (!cur || cur.state !== "starting") return "";
-    return '<span class="card-launch-badge" title="워크플로우 시작 중…">시작 중</span>';
+    return '<span class="card-launch-badge">';
   }
 
   /**
-   * launchState + sessionStorage cleanup 단일 진입점.
-   * grace timer 클리어 + Map 삭제 + storage 삭제 + (옵션) renderKanban.
-   * stuck 회귀 차단을 위한 공통 정리 헬퍼.
+   * launchState + sessionStorage cleanup single entry point.
+   * grace timer Clear + Delete Map + Delete storage + (Optional) renderKanban.
+   * Close-up helper for stuck revolving blocks.
    */
   function cleanupLaunchState(ticketNum, opts) {
     const cur = launchState.get(ticketNum);
@@ -3364,15 +3364,15 @@
   }
 
   /**
-   * submit HTTP 200 OK ({status:'starting'}) 직후 호출 — launchState 등록 + grace 타이머 시작 +
-   * sessionStorage persist (페이지 새로고침 복원용).
+   * Apache HTTP Server Version 2.0
+   * sessionStorage persist (for page refreshment restore).
    *
-   * SSE race 차단을 위해 submit fetch 호출 *직전* 에 호출되어야 한다.
-   * SSE LAUNCH_STARTED 가 HTTP 응답보다 빠르게 도착해도 handleLaunchEvent 가
-   * launchState 를 찾도록 보장 (이전 회귀: fetch.then() 후 호출 → SSE 누락).
+   * For SSE race blocking, you must call submit fetch *Commission*.
+   * SSE LAUNCH STARTED is a handleLaunchEvent if you arrive faster than HTTP response
+   * Guaranteed to find the launchState (i.e. call → SSE missing).
    */
   function registerLaunchStarting(ticketNum, command) {
-    // 기존 항목 정리 (재발사 방어)
+    // Default object view. Click to enlarge
     const prev = launchState.get(ticketNum);
     if (prev && prev.graceTimer) clearTimeout(prev.graceTimer);
     const since = Date.now();
@@ -3389,19 +3389,19 @@
         LAUNCH_STORAGE_PREFIX + ticketNum,
         JSON.stringify({ state: "starting", since: since, command: command })
       );
-    } catch (_) { /* quota / disabled — 동작에는 무영향 */ }
+    } catch (_) { /* quota / disabled — in action */ }
   }
 
   /**
-   * SSE 'launch' 이벤트 핸들러 — sse.js 가 단일 진입점으로 호출 (addEventListener 중복 금지).
+   * SSE 'launch' event handler — call sse.js to a single entry point (addEventListener duplicate).
    *   data.event ∈ {LAUNCH_PENDING, LAUNCH_STARTED, LAUNCH_FAILED}
-   * LAUNCH_PENDING 은 본 클라이언트가 submit 직후 자체 등록하므로 처리 불필요 (다른 클라 모니터링용).
+   * LAUNCH PENDING is registered directly after the submission of this client, so it is unnecessary to handle (for other CL monitoring).
    */
   function handleLaunchEvent(data) {
     if (!data || !data.ticket) return;
     const ticketNum = data.ticket;
     const cur = launchState.get(ticketNum);
-    // 본 클라이언트가 submit 한 카드만 처리 — 다른 탭/브라우저의 submit 은 fetchTickets 로 자연 동기화
+    // This client only handles the submitted card — other tabs/browser submits are synchronized with fetchTickets
     if (!cur) return;
 
     if (data.event === "LAUNCH_STARTED") {
@@ -3413,34 +3413,34 @@
         sessionId: data.session_id || "",
         graceTimer: null,
       });
-      // T-495 P2 — production-line 라면 session_id 를 Board.productionLineWorkflow 의 known set 에
-      // 즉시 등록하여 후속 session-switcher / workflow-sessions 가 production-line 분기를
-      // 인식하도록 한다. mode=production_line 이 명시되거나 session_id 가 wf- prefix 면 추정.
+      // T-495 P2 — production-line ramen session id to board.productionLineWorkflow
+      // Instantly register and follow-up session-switcher/workflow-sessions is a production-line branch
+      // to be recognized. mode=production line This specifies or session id is wf- prefix.
       if (data.session_id && Board.productionLineWorkflow && Board.productionLineWorkflow.registerKnown
           && (data.mode === "production_line" || data.mode === "v2" || data.session_id.indexOf("wf-") === 0)) {
         Board.productionLineWorkflow.registerKnown(data.session_id);
-        // workflow-sessions 즉시 refresh — 탭 바에 production-line 탭 표시
+        // workflow-sessions Instant refresh — Display the production-line tab on the tab bar
         if (Board.workflowSessions && Board.workflowSessions.refresh) {
           try { Board.workflowSessions.refresh(); } catch (_) {}
         }
       }
-      // T-516 — 워크플로우 ID 를 localStorage 단일 출처에 영속화.
-      // 헬퍼가 dedupe 처리하므로 submit 응답 add 호출과 양립 안전 (OR 조건).
+      // T-516 — Workflow ID to localStorage single source.
+      // Because the helper handles dedupe, submit response add calls and compatible safety (OR conditions).
       if (data.session_id && Board.workflowTabStorage && Board.workflowTabStorage.add) {
         Board.workflowTabStorage.add(data.session_id);
       }
-      // running 으로 전이된 직후에는 배지 제거가 목적이므로 즉시 launchState 정리해도 무방.
-      // 단, 디버그/후속 SSE 가능성을 위해 잠시 보존 후 정리 (다음 renderKanban 호출 시 사라짐).
+      // After running, it is necessary to remove the badge immediately after running, so it is possible to clean the launchState immediately.
+      // However, debug/released after conserving the possibility of SSE (the following renderKanban calls disappeared).
       launchState.delete(ticketNum);
       try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
-      // 배지 제거 + In Progress 컬럼 정상 표시
+      // Remove Badge + In Progress Column Top Mark
       if (Board.render.renderKanban) Board.render.renderKanban();
     } else if (data.event === "LAUNCH_FAILED") {
       if (cur.graceTimer) clearTimeout(cur.graceTimer);
       launchState.delete(ticketNum);
       try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
       Board.util.showInfoModal(
-        "워크플로우 실행 실패",
+        "Workflow failed to run",
         formatLaunchFailReason(data.reason, data.error_message),
         {
           severity: "error",
@@ -3452,16 +3452,16 @@
         }
       );
     }
-    // LAUNCH_PENDING / 기타 event 는 무시
+    // LAUNCH PENDING
   }
 
   /**
-   * grace 60s 만료 — Stage 3-B fix:
-   * 모달 표시 + launchState/sessionStorage 자동 cleanup (stuck 회귀 차단).
+   * grace 60s Expiration — Stage 3-B fix:
+   * modal display + launchState/sessionStorage automatic cleanup (stuck regression block).
    *
-   * 변경 이전: launchState 보존 → 사용자 "확인" 후에도 "시작 중" 배지 영구 잔존
-   * + 새로고침 시 sessionStorage 복원 → 영구 stuck. 의도는 "SSE 늦게 와도 처리"
-   * 였으나, 60s 안에 SSE 안 오면 실패 간주가 자연 — 자동 cleanup 으로 정정.
+   * Change Previous: "About Us" badge permanent residency even after launchState preservation → user "About Us"
+   * + Restoration sessionStorage → Restoration. "SSE Late Processing"
+   * However, if the SSE inside the 60s, the failure is considered natural — auto cleanup is corrected.
    */
   function onGraceExpired(ticketNum) {
     const cur = launchState.get(ticketNum);
@@ -3471,44 +3471,44 @@
   }
 
   /**
-   * reason enum → 사용자 친화 한국어 메시지.
-   * 백엔드(_classify_failure_reason)와 enum 동기화: to_do_status / http_post_timeout /
+   * reason enum → user friendly Korean messages.
+   * enum synchronization with classify failure reason: to do status / http post timeout /
    * http_post_error / workflow_start_error / reader_loop_exception / unknown.
    */
   function formatLaunchFailReason(reason, errorMessage) {
     var label;
     switch (reason) {
       case "to_do_status":
-        label = "티켓이 To Do 상태입니다. 먼저 Open 으로 이동한 뒤 다시 시도하세요.";
+        label = "Tickets are To Do status. Go to Open and try again.";
         break;
       case "http_post_timeout":
-        label = "Board 서버가 워크플로우 시작 요청에 응답하지 않았습니다. 서버 상태를 확인하세요.";
+        label = "Board server did not respond to your workflow startup request. Check the server status.";
         break;
       case "http_post_error":
-        label = "Board 서버 통신 중 네트워크 오류가 발생했습니다.";
+        label = "Board server communication has occurred network errors.";
         break;
       case "workflow_start_error":
-        label = "워크플로우 spawn 단계에서 실패했습니다. 워크트리/git 상태를 확인하세요.";
+        label = "failed in the workflow spawn step. See Worktree/git status.";
         break;
       case "reader_loop_exception":
-        label = "워크플로우 시작 모니터 자체에서 예외가 발생했습니다. Board 서버 로그를 확인하세요.";
+        label = "We’ve got an exception from the workflow start monitor itself. Check Board server logs.";
         break;
       default:
-        label = "알 수 없는 사유로 워크플로우 시작에 실패했습니다.";
+        label = "I've failed to start workingflow with unknown reasons.";
         break;
     }
     var detail = (errorMessage || "").toString().trim();
     if (detail.length > 0) {
-      // 너무 길면 일부 잘라 사용자 모달 가독성 보호 (전체는 board 서버 로그)
+      // Too long, some cut user modal toxic protection (full board server log)
       if (detail.length > 400) detail = detail.slice(0, 400) + "…";
-      return label + "\n\n[상세]\n" + detail;
+      return label + "\\n\\n" + detail;
     }
     return label;
   }
 
   /**
-   * HTTP 4xx/5xx (504 제외) 응답에 대한 사용자 메시지.
-   * body.error 가 있으면 우선 사용, 없으면 status 만 표기.
+   * User messages for HTTP 4xx/5xx (504 excluded) responses.
+   * if body.error is used first, not the status only.
    */
   function formatHttpRejectMessage(status, body) {
     var detail = "";
@@ -3516,14 +3516,14 @@
       if (body.error) detail = String(body.error);
       else if (body.message) detail = String(body.message);
     }
-    var prefix = "HTTP " + status + " — Board 서버가 워크플로우 실행을 거부했습니다.";
-    return detail ? prefix + "\n\n[상세]\n" + detail : prefix;
+    var prefix = "HTTP " + status + "— Board server refused to run workflow.";
+    return detail ? prefix + "\\n\\n" + detail : prefix;
   }
 
   /**
-   * 페이지 로드 직후 sessionStorage 에서 starting 상태 복원.
-   * grace 잔여 시간 재계산 (now - since 기준), 만료 즉시면 onGraceExpired 호출.
-   * Board init 흐름(sse.js)에서 단 1회 호출.
+   * Restoration of the sessionStorage after page load.
+   * grace residual time reorganization (now - since standard), immediately call onGraceExpired.
+   * One call in the Board init stream (sse.js).
    */
   function restoreLaunchStateFromStorage() {
     var keys = [];
@@ -3552,9 +3552,9 @@
       var elapsed = Date.now() - since;
       var remaining = LAUNCH_GRACE_MS - elapsed;
       if (remaining <= 0) {
-        // 이미 grace 만료된 stuck — Stage 3-B fix: 자연 cleanup (modal 표시 X).
-        // 페이지 새로고침 시점에 SSE 가 별도 매핑 (workflow_step / launch event) 으로
-        // 카드 상태를 정확히 표시하므로 본 sessionStorage 잔재만 정리하면 충분.
+        // already grace expired stuck — Stage 3-B fix: natural cleanup (modal display X).
+        // SSE at the time of refreshing page is separately mapped (workflow step / launch event)
+        // If the card status is exactly displayed, it is enough to clean this sessionStorage statement.
         try { sessionStorage.removeItem(key); } catch (_) {}
         return;
       } else {
@@ -3573,12 +3573,12 @@
   Board.fetch.fetchTickets = fetchTickets;
   Board.fetch.fetchTicketsByFiles = fetchTicketsByFiles;
   Board.render.renderKanban = renderKanban;
-  // T-433 Phase 2: SSE git_branch 이벤트 listener 가 호출하는 동기화 entry-point.
-  // (sse.js 가 단일 listener — addEventListener 중복 등록 방지 §2.4)
+  // T-433 Phase 2: SSE git branch event listener calls synchronized entry-point.
+  // (sse.js has a single listener — addEventListener duplicate registration prevention §2.4)
   Board.render.syncActiveBranchFromSSE = syncActiveBranchFromSSE;
 
-  // T-475 Stage 3: SSE 'launch' 이벤트 디스패치 + 페이지 로드 시 복원 entry-point.
-  // (sse.js 단일 listener 가 Board.kanban.handleLaunchEvent 호출 — addEventListener 중복 금지)
+  // T-475 Stage 3: SSE 'launch' event dispatch + restore entry-point when loading page.
+  // (sse.js single listener call Board.kanban.handleLaunchEvent — addEventListener duplicate)
   Board.kanban = Board.kanban || {};
   Board.kanban.handleLaunchEvent = handleLaunchEvent;
   Board.kanban.restoreLaunchStateFromStorage = restoreLaunchStateFromStorage;

@@ -63,7 +63,7 @@ def _extract_question(data: dict[str, Any]) -> str:
 
 
 def _extract_options(data: dict[str, Any]) -> str:
-    """stdin JSON에서 선택지(options)를 추출하여 "label - description | ..." 형식으로 반환한다.
+    """Extract options from stdin JSON"label - description | ..." 형식으로 반환한다.
 
     Args:
         data: stdin에서 파싱된 JSON 딕셔너리
@@ -96,55 +96,55 @@ def main() -> None:
     활성 워크플로우 정보를 식별하여 Slack으로 알림을 전송한다.
     환경변수 로드 실패 시 조용히 종료한다.
     """
-    # .agent-factory/.settings에서 환경변수 로드
+    # Load environment variables from .agent-factory/.settings
     if not load_slack_env():
         sys.exit(0)
 
-    # stdin에서 JSON 읽기
+    # Reading JSON from stdin
     try:
         input_data = json.load(sys.stdin)
     except (json.JSONDecodeError, IOError):
         input_data = {}
 
-    # tool_input에서 첫 번째 질문 추출
+    # Extract first question from tool_input
     question = _extract_question(input_data)
 
-    # tool_input에서 선택지(options) 추출
+    # Extract options from tool_input
     options_raw = _extract_options(input_data)
-    options_line = f"\n- 선택지: {options_raw}" if options_raw else ""
+    options_line = f"\n - Options: {options_raw}" if options_raw else ""
 
-    # 활성 워크플로우 식별 (직접 import)
+    # Identify active workflows (direct import)
     project_root = resolve_project_root()
     ctx = resolve_active_workflow(project_root)
 
     if ctx:
-        # 에이전트 이모지 결정
+        # Agent Emoji Decision
         agent_emoji = get_agent_emoji(ctx["agent"])
         emoji_prefix = f"{agent_emoji} " if agent_emoji else ""
 
-        # step 정보 문자열 생성
-        phase_line = f"\n- 현재 단계: {ctx['step']}" if ctx.get("step") else ""
+        # Create step information string
+        phase_line = f"\n - Current step: {ctx['step']}" if ctx.get("step") else ""
 
-        # 통일 포맷 (slack_notify.py와 동일, 에이전트 이모지 포함, 보고서 링크 제외)
+        # Uniform format (same as slack_notify.py, includes agent emoji, but excludes report link)
         message = (
             f"{emoji_prefix}*{ctx['title']}*\n"
-            f"- 작업ID: `{ctx['workId']}`\n"
-            f"- 작업이름: {ctx['workName']}\n"
-            f"- 명령어: `{ctx['command']}`"
+            f"- Work ID: `{ctx['workId']}` \n"
+            f"- Work name: {ctx['workName']} \n"
+            f"- Command: `{ctx['command']}`"
             f"{phase_line}\n"
-            f"- 상태: 사용자 입력 대기 중\n"
-            f"- 질문: {question}"
+            f"- Status: Waiting for user input \n"
+            f"- Question: {question}"
             f"{options_line}"
         )
     else:
-        # 폴백 포맷 (워크플로우 식별 실패)
+        # Fallback format (workflow identification failure)
         message = (
-            f":bell: *사용자 입력 대기 중*\n"
-            f"- 질문: {question}"
+            f":bell: *Waiting for user input* \n"
+            f"- Question: {question}"
             f"{options_line}"
         )
 
-    # JSON payload 구성 + Slack 전송
+    # Configure JSON payload + send to Slack
     from slack.slack_common import SLACK_CHANNEL_ID as _channel
     json_payload = build_json_payload(_channel, message)
     send_slack_message(json_payload)

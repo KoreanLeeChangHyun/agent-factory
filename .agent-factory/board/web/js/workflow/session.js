@@ -18,7 +18,7 @@
   var SSE_RECONNECT_INTERVAL = 3000;
 
   // ── Internal state ──
-  /** 세션 스위치/시작 중복 요청 방지 플래그. spawn 응답이 올 때까지 true. */
+  /** Session switch/start duplicate request prevention flag. True until the spawn response comes. */
   var _startInFlight = false;
   /** @type {EventSource|null} */
   var termEventSource = null;
@@ -75,29 +75,29 @@
   var _sessionArchived = false;
 
   /**
-   * rate_limit 배너 단일 인스턴스 참조. 동일 (status, limitType) 연속 수신 시
-   * DOM 재생성 대신 timestamp 만 갱신하기 위한 dedupe 앵커.
+   * rate_limit banner single instance reference. When receiving the same (status, limitType) continuously
+   * A dedupe anchor to only update timestamps instead of regenerating the DOM.
    * @type {HTMLElement|null}
    */
   var _rateLimitBanner = null;
   /**
-   * `allowed` 상태 배너의 5초 자동 dismiss 타이머 핸들.
-   * 새 배너 생성/명시적 dismiss 시 clearTimeout 대상.
+   * Handle to the 5-second automatic dismissal timer for the `allowed` status banner.
+   * ClearTimeout target when creating a new banner/explicitly dismissing it.
    * @type {number|null}
    */
   var _rateLimitDismissTimer = null;
 
-  // ── task 상태 저장소 (T-390) ──
+  // ── task state storage (T-390) ──
   /**
-   * 서브에이전트 task 상태 맵. task_id -> TaskState.
-   * TaskState 필드: description, status("running"|"completed"|"error"),
+   * Subagent task state map. task_id -> TaskState.
+   * TaskState fields: description, status("running"|"completed"|"error"),
    *   toolName, summary, startedAt, updatedAt.
    * @type {Object<string, {description:string, status:string, toolName:string, summary:string, startedAt:number, updatedAt:number}>}
    */
   var _taskStatusMap = {};
   /**
-   * requestAnimationFrame 토큰. 0 이면 미예약 상태.
-   * 동일 프레임 중복 예약 방지를 위한 가드.
+   * requestAnimationFrame token. If it is 0, it is not reserved.
+   * Guard to prevent duplicate reservation of the same frame.
    * @type {number}
    */
   var _taskRenderRafId = 0;
@@ -120,9 +120,9 @@
     }
   }
 
-  // ── rate_limit 배너 헬퍼 (T-389) ──
-  // SVG inline icons (general.md MUST: 외부 아이콘 라이브러리/폰트 금지).
-  // 16x16 단순 path — info: i-circle, warn/danger: !-triangle, dismiss: x.
+  // ── rate_limit banner helper (T-389) ──
+  // SVG inline icons (general.md MUST: no external icon libraries/fonts).
+  // 16x16 simple path — info: i-circle, warn/danger: !-triangle, dismiss: x.
   var _RL_ICON_INFO =
     '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"' +
     ' xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
@@ -145,8 +145,8 @@
     '</svg>';
 
   /**
-   * status → variant(CSS 클래스 suffix) + icon SVG 매핑.
-   * 미지정 status 는 info 로 defensive fallback.
+   * status → variant (CSS class suffix) + icon SVG mapping.
+   * Unspecified status is a defensive fallback to info.
    */
   function _rateLimitVariant(status) {
     if (status === "exceeded") return { variant: "danger", icon: _RL_ICON_WARN };
@@ -156,7 +156,7 @@
   }
 
   /**
-   * epoch seconds → ko-KR HH:mm 형식. null/invalid 면 빈 문자열.
+   * epoch seconds → ko-KR HH:mm format. If null/invalid, it is an empty string.
    * @param {number|null} resetsAt epoch seconds
    * @returns {string}
    */
@@ -173,7 +173,7 @@
   }
 
   /**
-   * detail 라인("limit_type · resets HH:mm") 빌드. 둘 다 비면 빈 문자열.
+   * Build the detail line ("limit_type · resets HH:mm"). If both are empty, an empty string.
    */
   function _buildRateLimitDetail(limitType, resetsAt) {
     var parts = [];
@@ -184,7 +184,7 @@
   }
 
   /**
-   * rate_limit 배너 DOM 생성. 구조는 plan.md Phase 2 T2-1 스펙 그대로.
+   * rate_limit Banner DOM creation. The structure is the same as the plan.md Phase 2 T2-1 specification.
    * @param {string} status
    * @param {string} limitType
    * @param {number|null} resetsAt epoch seconds or null
@@ -223,7 +223,7 @@
     var btn = document.createElement("button");
     btn.className = "term-rate-limit-dismiss";
     btn.type = "button";
-    btn.setAttribute("aria-label", "닫기");
+    btn.setAttribute("aria-label", "close");
     btn.innerHTML = _RL_ICON_DISMISS;
     btn.addEventListener("click", _dismissRateLimitBanner);
     banner.appendChild(btn);
@@ -232,7 +232,7 @@
   }
 
   /**
-   * dedupe 경로에서 기존 배너의 detail 라인만 갱신. title 은 status 가 같으므로 불변.
+   * In the dedupe path, only the detail line of the existing banner is updated. The title is immutable because its status is the same.
    * @param {HTMLElement} banner
    * @param {string} limitType
    * @param {number|null} resetsAt
@@ -256,7 +256,7 @@
   }
 
   /**
-   * 활성 배너 제거 + 타이머 정리. idempotent.
+   * Remove active banner + clean up timer. idempotent.
    */
   function _dismissRateLimitBanner() {
     if (_rateLimitDismissTimer) {
@@ -269,17 +269,17 @@
           _rateLimitBanner.parentNode.removeChild(_rateLimitBanner);
         }
       } catch (err) {
-        // DOM 이 이미 clearOutput 등으로 정리된 경우 무시
+        // Ignored if DOM has already been cleaned up with clearOutput etc.
       }
       _rateLimitBanner = null;
     }
   }
 
-  // ── task 상태 헬퍼 (T-390) ──
+  // ── task status helper (T-390) ──
 
   /**
-   * _taskStatusMap에서 taskId 항목을 생성하거나 patch로 병합한다.
-   * updatedAt 은 항상 Date.now()로 갱신된다.
+   * Create a taskId item in _taskStatusMap or merge it into a patch.
+   * updatedAt is always updated with Date.now().
    * @param {string} taskId
    * @param {Object} patch
    */
@@ -297,11 +297,11 @@
   }
 
   /**
-   * rAF를 예약해 _flushTaskRender를 1 프레임에 1회만 호출하도록 coalesce한다.
-   * 이미 예약된 경우 중복 예약하지 않는다.
+   * Reserve rAF and coalesce so that _flushTaskRender is called only once per frame.
+   * If a reservation has already been made, do not make a duplicate reservation.
    */
   function _scheduleTaskRender() {
-    if (_taskRenderRafId !== 0) return; // 이미 예약됨 — 스킵
+    if (_taskRenderRafId !== 0) return; // Already booked — skip
     _taskRenderRafId = requestAnimationFrame(function () {
       _taskRenderRafId = 0;
       _flushTaskRender();
@@ -309,7 +309,7 @@
   }
 
   /**
-   * rAF 콜백. 워크플로우 모드일 때만 phaseTimeline.renderTaskRow를 호출한다.
+   * rAF callback. Call phaseTimeline.renderTaskRow only when in workflow mode.
    */
   function _flushTaskRender() {
     if (!_ctx || !_ctx.isWorkflowMode || !_ctx.isWorkflowMode()) return;
@@ -363,10 +363,10 @@
   }
 
   /**
-   * 서버 model 문자열을 파싱해 컨텍스트 윈도우 크기와 모델 표시명을 설정한다.
-   * 1:1 turn 단순화(W01~W04)와 무관하게 동작한다. 토큰 누적 로직도 이 함수와
-   * 별개의 경로(_onStdout data.usage, _onResult data.*)로 처리되므로
-   * turn 모델 변경의 부수 영향이 없음을 확인 (회귀 검증 항목).
+   * Parse the server model string and set the context window size and model display name.
+   * It operates regardless of 1:1 turn simplification (W01~W04). The token accumulation logic is also similar to this function
+   * Because it is processed in separate paths (_onStdout data.usage, _onResult data.*)
+   * Confirm that there is no side effect of changing the turn model (regression verification item).
    */
   function _applyRawModel(raw) {
     if (!_ctx || !raw) return;
@@ -391,7 +391,7 @@
         Board.state.setTermStatus("missing");
         Board.state.termConnected = false;
         _ctx.stopSpinner();
-        _ctx.appendErrorMessage("[Error] 세션을 찾을 수 없습니다. 이미 종료되었거나 정리되었습니다.");
+        _ctx.appendErrorMessage("[Error] Session not found. It has already been terminated or cleaned up.");
         _ctx.updateControlBar();
         return;
       }
@@ -407,15 +407,15 @@
         _sessionArchived = true;
         Board.state.setTermStatus("archived");
       } else {
-        // 서버 응답(stopped/running)과 클라 확장 상태(idle/busy/starting)를 병합.
+        // Merge server response (stopped/running) and server expansion status (idle/busy/starting).
         Board.state.reconcileTermStatus(data.status);
-        // 서버의 awaiting_response=true 는 "사용자 입력 전송 후 result 수신 전" 신호.
-        // claude_process._status 는 result 이후 계속 'idle' 이어서 이것만으로는
-        // 스피너 복구가 불가능하므로, 이 플래그를 별도로 확인해 busy 로 올린다.
+        // The server's awaiting_response=true is the "After sending user input and before receiving result" signal.
+        // claude_process._status continues to be 'idle' after the result, so this alone is not enough.
+        // Since spinner recovery is not possible, check this flag separately and raise it to busy.
         if (data.awaiting_response && !_ctx.isWorkflowMode()) {
           Board.state.setTermStatus("busy");
         }
-        // busy 면 스피너 복구 (idempotent).
+        // If busy, spinner recovery (idempotent).
         if (Board.state.termStatus === "busy" && !_ctx.isWorkflowMode()) {
           var termMod = Board._term;
           if (Board.debugLog) Board.debugLog('fetchStatus.busy-spinner-attempt', {
@@ -424,14 +424,14 @@
           if (termMod && termMod.startSpinner) termMod.startSpinner();
         }
       }
-      // stopped 상태에서 session_id 를 유지하면 서버가 .last-session-id 에서
-      // 복원한 예전 UUID 가 남고, Start 후 첫 system/init 이벤트가 "세션 교체"
-      // 로 오인되어 clearOutput 으로 방금 입력한 사용자 말풍선이 사라진다.
-      // stopped 면 활성 sid 없음으로 간주하고 null 로 세팅한다.
+      // If you keep session_id in stopped state, the server will change .last-session-id to
+      // The restored old UUID remains, and the first system/init event after Start is "Session Replacement"
+      // It is mistaken for , and the user speech bubble just entered with clearOutput disappears.
+      // If stopped, it is assumed that there is no active sid and set to null.
       Board.state.termSessionId = (data.status === "stopped")
         ? null
         : (data.session_id || null);
-      // last_session_id: W01 서버에서 추가된 필드 (이전/현재 세션 UUID)
+      // last_session_id: Field added by W01 server (previous/current session UUID)
       if (data.last_session_id) {
         Board.state.termLastSessionId = data.last_session_id;
       } else if (data.session_id) {
@@ -452,11 +452,11 @@
   // ── SSE Event Handlers (shared between SSE stream and REST history injection) ──
 
   /**
-   * workflow_step 이벤트 데이터 처리.
-   * handleStepEvent 는 멱등이라 replay 중에도 호출하여 FSM 상태를 누적해야
-   * 과거 step 시퀀스가 phase timeline 에 반영된다. 라이브 렌더는 replay 종료
-   * 후 _injectRestHistory 가 일괄 호출하므로 replay 중에는 스킵한다.
-   * @param {Object} data 파싱된 이벤트 data 객체
+   * workflow_step event data processing.
+   * handleStepEvent is idempotent, so it must be called even during replay to accumulate the FSM state.
+   * Past step sequences are reflected in the phase timeline. Live render ends replay
+   * Since _injectRestHistory is called in batches, it is skipped during replay.
+   * @param {Object} data Parsed event data object
    */
   function _onWorkflowStep(data) {
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleStepEvent) {
@@ -468,9 +468,9 @@
   }
 
   /**
-   * stdout 이벤트 데이터 처리.
-   * SSE "stdout" 리스너 및 REST 이벤트 주입에서 공유한다.
-   * @param {Object} data 파싱된 이벤트 data 객체
+   * Processing stdout event data.
+   * Shared by SSE "stdout" listener and REST event injection.
+   * @param {Object} data Parsed event data object
    */
   function _onStdout(data) {
     if (!_ctx) return;
@@ -539,16 +539,16 @@
         _pendingTextBuffer = "";
       }
       _ctx.flushTextBuffer();
-      // [W04/W05 patch] Claude Agent SDK 는 `toolUseResult` (camelCase) 키로 stdout/stderr
-      // 객체를 함께 보낸다. 일부 변형/레거시 페이로드는 `tool_use_result` (snake_case) 일
-      // 수 있어 양쪽 키를 모두 fallback 으로 검사한다. tr 객체 키 구조 자체는 도구별
-      // 동일(stdout / file.content / filenames / content)하므로 회귀 위험 없음.
+      // [W04/W05 patch] Claude Agent SDK supports stdout/stderr with `toolUseResult` (camelCase) key.
+      // Send the object together. Some variant/legacy payloads are `tool_use_result` (snake_case)
+      // Both keys can be checked as fallback. The tr object key structure itself is tool specific.
+      // Same (stdout/file.content/filenames/content) so no risk of regression.
       var tr = data.raw.toolUseResult || data.raw.tool_use_result || null;
       var mc = data.raw.message && data.raw.message.content;
       var resultText = "";
 
-      // tool_use_id 추출: camelCase tr (toolUseResult) 객체에는 tool_use_id 필드가 없으므로
-      // mc[0].tool_use_id 를 1순위로, snake_case tr.tool_use_id 를 2순위 (레거시) 로 둔다.
+      // Extract tool_use_id: camelCase tr(toolUseResult) object has no tool_use_id field, so
+      // Set mc[0].tool_use_id as the 1st priority, and snake_case tr.tool_use_id as the 2nd priority (legacy).
       var userToolUseId = null;
       if (mc && mc[0] && mc[0].tool_use_id) {
         userToolUseId = mc[0].tool_use_id;
@@ -639,9 +639,9 @@
   }
 
   /**
-   * result 이벤트 데이터 처리.
-   * SSE "result" 리스너 및 REST 이벤트 주입에서 공유한다.
-   * @param {Object} data 파싱된 이벤트 data 객체
+   * result Event data processing.
+   * Shared by SSE "result" listener and REST event injection.
+   * @param {Object} data Parsed event data object
    */
   function _onResult(data) {
     if (!_ctx) return;
@@ -689,25 +689,25 @@
       Board.state.setTermStatus("idle");
       _ctx.setReceivedChunks(false);
       _ctx.setInputLocked(false);
-      // interrupt 후 result 도착 — 버튼 비활성 플래그 해제만 수행한다.
-      // [ESC 보존 가드] termSessionId 와 conversation DOM 은 건드리지 않는다.
-      // ESC 인터럽트 후에도 세션 ID 와 대화 히스토리는 그대로 유지되어야 하며,
-      // 새로고침 후 history 복원이 가능해야 한다. 이 경로에서의 상태 변경은
-      // _interruptInFlight 해제에 한정된다 (회귀 방지).
+      // Result arrives after interrupt — Only clears the button inactivity flag.
+      // [ESC Preservation Guard] termSessionId and conversation DOM are not touched.
+      // Even after an ESC interrupt, the session ID and conversation history must remain the same.
+      // It should be possible to restore history after refreshing. State changes on this path are
+      // _interruptInFlight is limited to release (prevents regression).
       var termMod = Board._term;
       if (termMod && termMod._interruptInFlight) termMod._interruptInFlight = false;
       _ctx.updateControlBar();
 
-      // W04 (1:1 turn 모델): result SSE 도착 = 현재 처리 중이던 1개 turn 완료.
-      // advanceTurn 은 spinner 중지 + idle 전환 후 큐에 잔여 entry 가 있으면
-      // commitQueue() 로 다음 1개 entry 를 즉시 send 한다 (1 turn = 1 메시지).
-      // 큐가 비었으면 idle 정리(updateControlBar)만 수행한다.
-      // advanceTurn 미정의 환경(구버전 polyfill)에서는 drainQueue 로 폴백한다.
+      // W04 (1:1 turn model): result SSE arrival = 1 turn currently being processed is completed.
+      // advanceTurn is if there are any remaining entries in the queue after the spinner stops + idle transition.
+      // Immediately send the next entry with commitQueue() (1 turn = 1 message).
+      // If the queue is empty, only idle cleanup (updateControlBar) is performed.
+      // In environments where advanceTurn is not defined (old version polyfill), it falls back to drainQueue.
       //
-      // [ESC race 가드] _recentInterrupt 윈도우에서는 advanceTurn 을 skip 한다.
-      // 직후 도착할 process_exit + autoResume 흐름이 큐 처리를 담당하며,
-      // 여기서 commit 하면 죽어가는 process 로 큐 entry 가 send 되어 응답을
-      // 받지 못하는 회귀 발생 (2026-05-13 fix).
+      // [ESC race guard] _recentInterrupt In Windows, advanceTurn is skipped.
+      // The process_exit + autoResume flow that arrives immediately after is responsible for processing the queue.
+      // If you commit here, a queue entry is sent to the dying process and a response is received.
+      // There was a regression where you couldn't receive it (2026-05-13 fix).
       var termMod2 = Board._term;
       var skipAdvanceForInterrupt = !!(termMod2 && termMod2._recentInterrupt);
       if (Board.debugLog) Board.debugLog('onResult.advanceTurnDecision', {
@@ -716,7 +716,7 @@
         skip: skipAdvanceForInterrupt,
       });
       if (skipAdvanceForInterrupt) {
-        // skip — startSession.setIdle 의 autoResume 완료 시점에서 commitQueue.
+        // skip — commitQueue at the completion of autoResume in startSession.setIdle.
       } else if (termMod2 && typeof termMod2.advanceTurn === "function") {
         termMod2.advanceTurn();
       } else if (_ctx.getInputQueue && _ctx.getInputQueue().length > 0) {
@@ -726,9 +726,9 @@
   }
 
   /**
-   * system 이벤트 데이터 처리.
-   * SSE "system" 리스너 및 REST 이벤트 주입에서 공유한다.
-   * @param {Object} data 파싱된 이벤트 data 객체
+   * System event data processing.
+   * Shared by SSE "system" listener and REST event injection.
+   * @param {Object} data Parsed event data object
    */
   function _onSystem(data) {
     if (!_ctx) return;
@@ -750,10 +750,10 @@
         }
       }
       Board.state.termSessionId = data.session_id;
-      // SDK 는 매 user query 마다 system init 을 재발사한다 (session_id 동일).
-      // 따라서 init 도착 = "세션 시작 또는 swap" 일 때만 idle 강제, 같은 세션의
-      // 새 turn 시는 status 보존 (busy 유지). 이전 무조건 idle 강제 시 busy 가
-      // 즉시 풀려 다음 사용자 입력이 idle 분기로 잘못 빠지는 회귀 발생.
+      // The SDK reissues system init for every user query (session_id is the same).
+      // Therefore, idle is forced only when init arrives = "Start session or swap" in the same session.
+      // When making a new turn, the status is preserved (maintained busy). Previously unconditionally idle was forced to be busy
+      // A regression occurs where the next user input is incorrectly released into the idle branch.
       if (isNewSession) {
         Board.state.setTermStatus("idle");
       }
@@ -764,17 +764,17 @@
         var modeEl = document.getElementById("terminal-sl-mode");
         if (modeEl) modeEl.textContent = data.raw.permissionMode;
       }
-      // setInputLocked / updateControlBar 도 새 세션일 때만. 같은 세션 새 turn 시
-      // commitQueue 가 이미 setInputLocked(true) + updateControlBar 호출했으므로
-      // 여기서 false 로 풀면 busy 중 입력 lock 이 즉시 해제되는 회귀.
+      // setInputLocked / updateControlBar also only when in a new session. Same session on new turn
+      // Because commitQueue already called setInputLocked(true) + updateControlBar
+      // Here, if set to false, the input lock is released immediately while busy.
       if (isNewSession) {
         _ctx.setInputLocked(false);
         _ctx.updateControlBar();
       }
     } else if (data.subtype === "user_input_interrupted") {
-      // ESC 인터럽트로 마지막 user 메시지가 중지되었음을 알리는 라이브 시그널.
-      // outputDiv 에서 timestamp 매칭되는 .term-user 또는 가장 최근 .term-user 에
-      // .interrupted 클래스를 부여하여 시각 마커("중지됨" 배지)를 표시한다.
+      // A live signal indicating that the last user message has been stopped by an ESC interrupt.
+      // timestamp matching .term-user or the most recent .term-user in outputDiv
+      // Give it the .interrupted class to display a visual marker (a "stopped" badge).
       var ts = data.timestamp || "";
       var userMsgs = document.querySelectorAll(".terminal-output .term-user");
       var target = null;
@@ -788,7 +788,7 @@
       }
       if (!target && userMsgs.length > 0) {
         target = userMsgs[userMsgs.length - 1];
-        // timestamp 매칭 실패해도 라이브 시점엔 마지막 user 가 곧 중지된 메시지.
+        // Even if timestamp matching fails, the last user will soon stop the message at the time of live.
         if (ts) target.setAttribute("data-timestamp", ts);
       }
       if (target) target.classList.add("interrupted");
@@ -808,48 +808,48 @@
         _currentToolUseId = null;
         _toolInputMap = {};
       }
-      // [ESC 보존 가드] process_exit 경로에서 termSessionId 와 clearOutput /
-      // _resetSessionDerivedState 를 호출하지 않는다. ESC 인터럽트(exitCode 130)
-      // 또는 정상 완료(exitCode 0), SIGTERM(exitCode 143) 모두 세션 ID 와
-      // conversation DOM 을 보존해야 한다. 사용자가 새로고침해도 history 가
-      // 복원되어야 하므로 이 경로에서 세션 식별자를 건드리는 것은 회귀다.
-      // 세션 ID null 처리는 오직 killSession() 의 _finalizeStoppedUI 에서만 수행한다.
+      // [ESC Preservation Guard] termSessionId and clearOutput/ in process_exit path
+      // Do not call _resetSessionDerivedState. ESC interrupt (exitCode 130)
+      // Or normal completion (exitCode 0), SIGTERM (exitCode 143) both session ID and
+      // The conversation DOM must be preserved. Even if the user refreshes the history
+      // Since it must be restored, touching the session identifier in this path is a regression.
+      // Session ID null processing is only performed in _finalizeStoppedUI of killSession().
       if (Board.debugLog) Board.debugLog('processExit.setStopped', {
         termStatusBefore: Board.state.termStatus,
       });
       Board.state.setTermStatus("stopped");
-      // 토큰/비용은 의도적으로 리셋하지 않는다. 세션 스위치 시 서버가 구 프로세스를
-      // kill 하면서 process_exit 이 먼저 날아오는데, 여기서 0 으로 밀면 뒤이은
-      // loadHistory 가 새 세션의 last_usage 로 채우는 사이에 바가 0% 로 깜박인다.
-      // 사용자가 명시적으로 kill 한 경우엔 _finalizeStoppedUI 가 별도로 리셋한다.
+      // Tokens/costs are not intentionally reset. When a session is switched, the server terminates the old process.
+      // When killing, process_exit comes first, and if you push it to 0 here, the following
+      // The bar blinks to 0% while loadHistory fills with the new session's last_usage.
+      // If the user explicitly kills it, _finalizeStoppedUI resets it separately.
       _ctx.stopSpinner();
-      // process_exit 도 interrupt 응답의 종착점이 될 수 있다 (예: result 없이 종료).
+      // process_exit can also be the end point of an interrupt response (e.g. exit without result).
       var termModExit = Board._term;
       if (termModExit && termModExit._interruptInFlight) termModExit._interruptInFlight = false;
       var exitCode = data.exit_code;
-      // exitCode 0: 정상 종료, 130: SIGINT(ESC 인터럽트), 143: SIGTERM — 에러 메시지 불필요.
-      // 그 외 코드만 에러로 표시한다.
+      // exitCode 0: Normal termination, 130: SIGINT (ESC interrupt), 143: SIGTERM — No error message required.
+      // Only other codes are displayed as errors.
       if (exitCode !== 0 && exitCode !== 130 && exitCode !== 143 && exitCode !== undefined) {
         _ctx.appendErrorMessage("Process exited with code " + exitCode);
       }
 
-      // [ESC 자동 resume] ESC 직후 도착한 process_exit 은 같은 session_id 로
-      // 즉시 재spawn 하여 사용자가 STOPPED 화면 없이 바로 다음 메시지를 이어서
-      // 보낼 수 있게 한다.
+      // [ESC automatic resume] Process_exit that arrives immediately after ESC is with the same session_id.
+      // It respawns immediately so the user can immediately continue to the next message without the STOPPED screen.
+      // Allow it to be sent.
       //
-      // 트리거 조건:
-      // - exitCode 130 (SIGINT 직접) 또는
-      // - _recentInterrupt 플래그 (interruptSession 진입 후 5초 윈도우)
-      //   → SDK 가 SIGINT 받고 graceful shutdown 으로 다른 exit_code 를 반환해도 커버.
+      // Trigger conditions:
+      // - exitCode 130 (SIGINT directly) or
+      // - _recentInterrupt flag (5 second window after entering interruptSession)
+      //   → Covers even if the SDK receives SIGINT and returns a different exit_code through graceful shutdown.
       //
-      // 워크플로우 모드는 자체 라이프사이클이 있으므로 자동 resume 대상 외.
+      // Workflow mode has its own life cycle, so it is not subject to automatic resume.
       var termMod3 = Board._term;
       var isRecentInterrupt = !!(termMod3 && termMod3._recentInterrupt);
       var isMainMode = !_ctx.isWorkflowMode || !_ctx.isWorkflowMode();
-      // localStorage 의 ESC 복원 텍스트는 "ESC 시퀀스 진행 중" 의 영속 시그널.
-      // 새로고침으로 메모리 플래그(_recentInterrupt)가 초기화되어도 이 신호로
-      // 자동 resume 을 트리거할 수 있다. 사용자 명시 Kill 시에는 killSession 이
-      // 이 키를 클리어하므로 자동 resume 이 발동하지 않는다.
+      // The ESC restoration text in localStorage is a persistent signal of "ESC sequence in progress".
+      // Even if the memory flag (_recentInterrupt) is initialized by refreshing, this signal
+      // You can trigger automatic resume. When a user specifies Kill, killSession is
+      // Because this key is cleared, automatic resume is not activated.
       var hasEscRestoreLS = false;
       try { hasEscRestoreLS = !!localStorage.getItem("board.term.lastSentText"); } catch (e) {}
       var willAutoResume = (exitCode === 130 || isRecentInterrupt || hasEscRestoreLS)
@@ -862,10 +862,10 @@
         isMainMode: !!isMainMode,
         willAutoResume: !!willAutoResume,
       });
-      // willAutoResume 분기에서는 _inAutoResume 플래그를 켠다.
-      // 이 플래그가 켜져 있는 동안 setInputLocked 의 inputtable 판정이
-      // stopped/starting 도 허용으로 처리 → input.disabled 유지 없음 → 깜빡 0.
-      // startSession.setIdle 도착 시점에 끈다.
+      // In the willAutoResume branch, turn on the _inAutoResume flag.
+      // While this flag is on, the inputtable verdict of setInputLocked is
+      // Stopped/starting is also treated as allowed → input.disabled is not maintained → blinks 0.
+      // Turn off startSession.setIdle upon arrival.
       if (willAutoResume) {
         Board.state._inAutoResume = true;
       } else {
@@ -875,8 +875,8 @@
       if (willAutoResume) {
         var sidToResume = Board.state.termSessionId;
         setTimeout(function () {
-          // race 가드: 사이에 사용자가 명시적으로 다른 동작(killSession,
-          // 세션 스위치 등)을 했으면 자동 resume 을 포기.
+          // race guard: between user explicit actions (killSession,
+          // If you do a session switch, etc.), give up automatic resume.
           if (Board.debugLog) Board.debugLog('processExit.autoResumeFire', {
             termStatus: Board.state.termStatus,
             sidNow: Board.state.termSessionId || null,
@@ -926,16 +926,16 @@
   }
 
   /**
-   * user_input 이벤트 데이터 처리.
-   * SSE "user_input" 리스너 및 REST 이벤트 주입에서 공유한다.
-   * @param {Object} data 파싱된 이벤트 data 객체
+   * User_input event data processing.
+   * Shared by SSE "user_input" listener and REST event injection.
+   * @param {Object} data Parsed event data object
    */
   function _onUserInput(data) {
     if (!_ctx) return;
     if (!data.text) return;
-    // REST 이벤트 주입(_isReplaying=true) 시에는 _sentTexts 가 비어 있으므로
-    // 항상 DOM 에 렌더링한다. SSE 라이브 수신 시에는 로컬 전송분 중복 방지.
-    // self-echo skip: 텍스트 + 첨부 카드 전체를 skip (직접 echo 경로에서 이미 그려짐).
+    // When REST event injection (_isReplaying=true), _sentTexts is empty, so
+    // Always render to DOM. When receiving SSE live, duplication of local transmission is prevented.
+    // self-echo skip: Skip the entire text + attached card (already drawn in the direct echo path).
     if (!_isReplaying && _sentTexts.has(data.text)) {
       return;
     }
@@ -943,8 +943,8 @@
     div.className = "term-message term-user";
     div.textContent = data.text;
     _ctx.appendToOutput(div);
-    // T-429: attachments 카드 렌더 (REST replay 및 multi-client SSE 경로).
-    // sendInput 직접 echo 경로에서 이미 그린 경우는 위 _sentTexts 체크로 전체 skip됨.
+    // T-429: Render attachments card (REST replay and multi-client SSE paths).
+    // If it has already been drawn in the sendInput direct echo path, it is completely skipped by checking _sentTexts above.
     if (data.attachments && data.attachments.length > 0) {
       var termMod = Board && Board._term;
       if (termMod && termMod.attachmentCard && typeof termMod.attachmentCard.create === "function") {
@@ -959,13 +959,13 @@
   }
 
   /**
-   * REST /terminal/workflow/history 에서 받아온 이벤트 배열을 DOM 에 순차 주입한다.
+   * REST The event array received from /terminal/workflow/history is sequentially injected into the DOM.
    *
-   * - _isReplaying = true 로 설정하여 FSM 전이·rate_limit 배너 등 라이브 전용 경로를 막는다.
-   * - 완료 후 _isReplaying = false 로 복원하고 타임라인 최종 렌더를 수행한다.
-   * - 에러/404 시 console.error 기록 후 resolve (SSE 구독은 계속 진행).
+   * - Set _isReplaying = true to block live-only paths such as FSM transition and rate_limit banner.
+   * - After completion, restore _isReplaying = false and perform final render of the timeline.
+   * - In case of error/404, console.error is recorded and resolved (SSE subscription continues).
    *
-   * @param {string} sessionId 워크플로우 세션 ID
+   * @param {string} sessionId Workflow session ID
    * @returns {Promise<void>}
    */
   function _injectRestHistory(sessionId) {
@@ -980,14 +980,14 @@
         var events = Array.isArray(payload && payload.events) ? payload.events : [];
         if (!events.length) return;
 
-        // replay 플래그 활성: FSM 전이·rate_limit 배너 등 라이브 전용 경로 차단
+        // Enable replay flag: Block live-only paths such as FSM transition and rate_limit banner
         _isReplaying = true;
         try {
           for (var i = 0; i < events.length; i++) {
             var evt = events[i];
             var eventType = evt.event || "";
             var dataObj = evt.data;
-            // data 가 string 이면 파싱 시도 (jsonl 포맷 다양성 대응)
+            // If data is a string, parse is attempted (supports jsonl format diversity)
             if (typeof dataObj === "string") {
               try { dataObj = JSON.parse(dataObj); } catch (e) { /* keep as string */ }
             }
@@ -1004,8 +1004,8 @@
               } else if (eventType === "user_input") {
                 _onUserInput(dataObj);
               }
-              // skill_listing, permission, rate_limit 등 라이브 전용 이벤트는
-              // _isReplaying 중에는 렌더하지 않는다 (의도적 skip).
+              // Live-only events such as skill_listing, permission, rate_limit, etc.
+              // Do not render during _isReplaying (intentional skip).
             } catch (dispatchErr) {
               console.error("[session] REST history event dispatch error (seq=" + evt.seq + ", type=" + eventType + "):", dispatchErr);
             }
@@ -1014,13 +1014,13 @@
           _isReplaying = false;
         }
 
-        // replay 완료 후 타임라인 최종 렌더
+        // Timeline final render after replay completion
         if (_ctx && _ctx.isWorkflowMode()) {
           try { Board.phaseTimeline.render(); } catch (e) {}
         }
-        // REST replay 완료 후 최종 UI 상태 수렴 (fetchStatus)
+        // Converge final UI status after completing REST replay (fetchStatus)
         try { fetchStatus(); } catch (fsErr) {}
-        // 새로고침 후 스크롤을 하단으로 이동 (마크다운/mermaid 비동기 렌더 대비 2 프레임 대기)
+        // Scroll to the bottom after refreshing (wait 2 frames compared to markdown/mermaid asynchronous render)
         var M = Board && Board._term;
         if (M && M.outputDiv) {
           requestAnimationFrame(function () {
@@ -1032,63 +1032,63 @@
       });
     }).catch(function (err) {
       console.error("[session] REST history fetch error for session " + sessionId + ":", err);
-      // 에러 시 _isReplaying 잠금 해제 보장
+      // _isReplaying ensures unlocking in case of error
       _isReplaying = false;
     });
   }
 
-  // ── production-line session 진입점 ──
+  // ── production-line session entry point ──
 
-  /** @type {{close: function, sessionId: string}|null} 현재 활성 production-line 구독 핸들 */
+  /** @type {{close: function, sessionId: string}|null} Handle to the currently active production-line subscription */
   var _productionLineSubscription = null;
 
   /**
-   * production-line session 시작 / 재진입.
+   * Starting/re-entering a production-line session.
    *
-   * Board.productionLineWorkflow.subscribe 로 4종 SSE 이벤트 핸들 직접 등록 (T-507 P3
-   * 에서 옛 production-line-stdout-bridge.js 우회 모듈 폐기 → session.js 단일 흡수점).
+   * Directly register 4 types of SSE event handles with Board.productionLineWorkflow.subscribe (T-507 P3
+   * Discard the old production-line-stdout-bridge.js bypass module → session.js (single absorption point).
    *
-   *   workflow_step   → Board.stepOverlay (Step/Phase 위계 + 종결 처리)
-   *   workflow_stdout → _onProductionLineStdout (text/raw 분기 렌더)
-   *                     + Board.stepOverlay.handleStdout (Step/Phase 안 stdout 컨테이너 forward)
+   *   workflow_step → Board.stepOverlay (Step/Phase hierarchy + termination processing)
+   *   workflow_stdout → _onProductionLineStdout (text/raw branch render)
+   *                     + Board.stepOverlay.handleStdout (Step/Phase not stdout container forward)
    *   workflow_phase  → Board.stepOverlay
-   *   workflow_finish → Board.stepOverlay + 워크플로우 종결 UI
+   *   workflow_finish → Board.stepOverlay + Workflow completion UI
    *
-   * Step/Phase 위계 렌더는 Board.stepOverlay.subscribe 가 독립 구독으로 처리.
-   * session.js 는 stdout 본문 처리 + termStatus / controlBar 라이프사이클
-   * + stepOverlay.handleStdout forward 까지 책임진다.
+   * Step/Phase hierarchical renders are handled as independent subscriptions by Board.stepOverlay.subscribe.
+   * session.js handles stdout body + termStatus / controlBar life cycle
+   * + Responsible for stepOverlay.handleStdout forward.
    *
    * @param {string} sessionId
    */
   function _startProductionLineWorkflowSession(sessionId) {
     if (!sessionId) return;
 
-    // 기존 production-line 구독 정리
+    // Clean up existing production-line subscriptions
     if (_productionLineSubscription) {
       try { _productionLineSubscription.close(); } catch (_) {}
       _productionLineSubscription = null;
     }
 
-    // Step/Phase 위계 별 구독 — stepOverlay 가 자체 _stepMap 머신 유지
+    // Subscription by Step/Phase hierarchy — stepOverlay maintains its own _stepMap machine
     if (Board.stepOverlay && typeof Board.stepOverlay.subscribe === "function") {
       try { Board.stepOverlay.subscribe(sessionId); } catch (_) {}
     }
 
-    // T-508 — localStorage fallback 으로 step/phase ts 우선 복원 (fetchSession 전).
-    // 새로고침 직후 backend GET 응답 도착 전 첫 render 가 0 elapsed 로 깜빡이는
-    // 회귀 차단. fetchSession 응답이 도착하면 더 새로운 ts 로 덮어쓰기 (가드 내장).
+    // T-508 — Restore step/phase ts first (before fetchSession) with localStorage fallback.
+    // Immediately after refreshing and before the backend GET response arrives, the first render blinks as 0 elapsed.
+    // Regression blocking. When a fetchSession response arrives, overwrite it with a newer ts (guard built-in).
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.restoreProductionLineState) {
       try { Board.WorkflowRenderer.restoreProductionLineState(); } catch (_) {}
     }
 
-    // 1) 상세 fetch — 진입 시점의 step/phase 복원 (멱등)
+    // 1) Detailed fetch — Restore step/phase at the point of entry (idempotent)
     if (Board.productionLineWorkflow && Board.productionLineWorkflow.fetchSession) {
       Board.productionLineWorkflow.fetchSession(sessionId).then(function (detail) {
         if (!detail) return;
         if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleProductionLineStepEvent) {
-          // T-508 — backend 응답의 cycle_start_ts / step_ts 를 payload 에 명시 전달.
-          // workflow-bar.js handleProductionLineStepEvent 가 ts 를 흡수해 _state.stepTimestamps
-          // 의 start 를 외부 ts 로 세팅 (Date.now() fallback 차단).
+          // T-508 — Specify cycle_start_ts / step_ts of backend response in payload.
+          // workflow-bar.js handleProductionLineStepEvent absorbs ts into _state.stepTimestamps
+          // Setting start to external ts (blocking Date.now() fallback).
           Board.WorkflowRenderer.handleProductionLineStepEvent({
             session_id: detail.session_id,
             step: detail.current_step,
@@ -1104,10 +1104,10 @@
       });
     }
 
-    // 2) SSE 구독
+    // 2) SSE Subscription
     if (!Board.productionLineWorkflow || !Board.productionLineWorkflow.subscribe) {
       _ctx.appendErrorMessage(
-        "[Error] Board.productionLineWorkflow 미로드 — terminal.html script 누락 확인 필요"
+        "[Error] Board.productionLineWorkflow not loaded — terminal.html script missing. Need to check"
       );
       return;
     }
@@ -1119,16 +1119,16 @@
         _ctx.updateControlBar();
       },
       onStep: function (data) {
-        // Step/Phase 위계 갱신은 Board.stepOverlay 가 별 구독으로 처리.
-        // session.js 는 timeline-bar 만 멱등 재렌더.
+        // Step/Phase hierarchy updates are handled by Board.stepOverlay as a star subscription.
+        // session.js idempotently re-render only the timeline-bar.
         if (Board.phaseTimeline && Board.phaseTimeline.render) {
           try { Board.phaseTimeline.render(); } catch (_) {}
         }
       },
       onStdout: function (data) {
         _onProductionLineStdout(data);
-        // T-507 P3 — 옛 production-line-stdout-bridge.js 의 forward 책임 흡수.
-        // step-overlay 가 현재 활성 Step/Phase 의 stdout 컨테이너에 렌더.
+        // T-507 P3 — Absorbs forward responsibility of old production-line-stdout-bridge.js.
+        // step-overlay renders to the stdout container of the currently active Step/Phase.
         if (Board.stepOverlay && typeof Board.stepOverlay.handleStdout === "function") {
           try { Board.stepOverlay.handleStdout(data); } catch (err) {
             if (Board.debugLog) Board.debugLog("production_line.stdout.forward.error", {
@@ -1167,19 +1167,19 @@
   }
 
   /**
-   * production-line workflow_stdout 이벤트 처리 (T-495 P3 — NDJSON 분기 렌더).
+   * Handling production-line workflow_stdout events (T-495 P3 — NDJSON branch render).
    * payload: { session_id, text, raw? }
    *
-   * raw.type 별 분기 (가시성 8축 #3):
-   *   - assistant: content[] 순회 → text 블록 누적 + tool_use 블록 카드화
-   *   - tool_use:  도구 이름 + input 1줄 요약 카드
-   *   - result:    subtype/duration_ms/usage/terminal_reason 메타 카드
-   *   - system:    init 메타 (model/cwd/tools count) 1회 표시
-   *   - rate_limit_event: warning 마커
-   *   - 그 외 text only: stdout line 누적
+   * Branch by raw.type (visibility 8 axis #3):
+   *   - assistant: content[] traversal → text block accumulation + tool_use block carding
+   *   - tool_use: tool name + input 1-line summary card
+   *   - result: subtype/duration_ms/usage/terminal_reason meta card
+   *   - system: init meta (model/cwd/tools count) displayed once
+   *   - rate_limit_event: warning marker
+   *   - Other text only: stdout line accumulation
    *
-   * regression.pattern 5종 / tool.deny 가 stdout 본문에 흘러오면
-   * 즉시 error/warning 마커 카드 표시 (가시성 #4 보조).
+   * 5 types of regression.pattern / When tool.deny flows into the stdout body
+   * Immediate display of error/warning marker cards (auxiliary to visibility #4).
    *
    * @param {Object} data
    */
@@ -1215,8 +1215,8 @@
   }
 
   /**
-   * assistant NDJSON line 렌더. content[] 순회하여 text 블록은 누적,
-   * tool_use 블록은 카드로 표시.
+   * assistant NDJSON line render. By traversing content[], text blocks are accumulated,
+   * The tool_use block is displayed as a card.
    */
   function _productionLineRenderAssistant(raw, textJoined) {
     var msg = raw && raw.message;
@@ -1238,8 +1238,8 @@
   }
 
   /**
-   * tool_use 카드 렌더 — name + input 1줄 요약.
-   * Bash 의 경우 command, Read/Edit 는 file_path, Grep 은 pattern 우선.
+   * tool_use card render — name + input 1 line summary.
+   * In the case of Bash, command, Read/Edit take precedence over file_path, and Grep takes precedence over pattern.
    */
   function _productionLineRenderToolUse(blk) {
     if (!blk) return;
@@ -1266,7 +1266,7 @@
   }
 
   /**
-   * result NDJSON 카드 — subtype + duration_ms + usage(in/out) + terminal_reason.
+   * result NDJSON card — subtype + duration_ms + usage(in/out) + terminal_reason.
    */
   function _productionLineRenderResult(raw) {
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
@@ -1294,7 +1294,7 @@
     } catch (_) {}
   }
 
-  /** system init 1줄 요약 카드 — model/cwd/tools count. */
+  /** system init one-line summary card — model/cwd/tools count. */
   function _productionLineRenderSystemInit(raw) {
     if (raw.subtype !== "init") return;
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
@@ -1312,7 +1312,7 @@
     } catch (_) {}
   }
 
-  /** rate_limit 등 stream-level warning 마커. */
+  /** Stream-level warning markers such as rate_limit. */
   function _productionLineRenderWarning(kind, raw) {
     if (!Board.WorkflowRenderer || !Board.WorkflowRenderer.insertToCurrentPanel) return;
     var summary = "";
@@ -1328,9 +1328,9 @@
   }
 
   /**
-   * regression.pattern 5종 / tool.deny / hook deny 키워드를 stdout text 에서 즉시 감지.
-   * 발견 시 step 카드에 error/warning 마커 카드 추가.
-   * 5종 = worker_false_success / hook_deny / empty_bash_card /
+   * 5 types of regression.pattern / tool.deny / hook deny keywords are immediately detected in stdout text.
+   * When found, an error/warning marker card is added to the step card.
+   * 5 types = worker_false_success / hook_deny / empty_bash_card /
    *       stage_header_leak / worktree_commit_missing
    */
   var PRODUCTION_LINE_REGRESSION_PATTERNS = [
@@ -1362,7 +1362,7 @@
   }
 
   /**
-   * stdout text 를 현재 활성 step 카드 본문에 append.
+   * Appends stdout text to the body of the currently active step card.
    */
   function _productionLineAppendStdoutText(text) {
     if (!text) return;
@@ -1376,8 +1376,8 @@
   }
 
   /**
-   * production-line 구독을 명시 종료 (세션 스위치 시 호출).
-   * Board.stepOverlay 의 독립 구독도 함께 정리.
+   * Explicitly terminates a production-line subscription (called when a session is switched).
+   * Independent subscriptions to Board.stepOverlay are also organized.
    */
   function _disconnectProductionLine() {
     if (_productionLineSubscription) {
@@ -1442,10 +1442,10 @@
     if (!_ctx) return;
     disconnectSSE();
 
-    // 토큰/비용은 assistant 이벤트 수신 시 set 의미로 덮어쓰기 때문에 누적
-    // 위험이 없다. 재연결마다 리셋하면 SSE gap 이 비어 있거나 gap-fill 응답이
-    // 늦을 때 상태가 0 으로 고착되므로 리셋하지 않는다. 세션 전환/재시작/
-    // process_exit 경로는 각자 resetTokens 을 이미 호출한다.
+    // Tokens/costs are accumulated because they are overwritten with set meaning when receiving an assistant event.
+    // There is no risk. Resetting on every reconnect will result in an empty SSE gap or gap-fill response.
+    // When it is late, the status is fixed at 0 and is not reset. Session switch/restart/
+    // Each process_exit path already calls resetTokens.
 
     // Clear sent-text tracking so that history-replayed user_input events
     // are rendered into the DOM (they are not duplicates).
@@ -1465,25 +1465,25 @@
     var termMod = Board._term;
     if (_lastEventId >= 0) {
       eventsUrl += qsSep() + "last_event_id=" + _lastEventId;
-      // SSE 링버퍼 재생에 가장 최근 assistant 이벤트가 포함되지 않을 수 있으므로
-      // REST 로도 최신 usage/cost 를 재수화한다 (empty gap 이어도 서버는 현재
-      // 총계를 돌려준다).
+      // Because SSE ring buffer playback may not include the most recent assistant events,
+      // Rehydrate the latest usage/cost with REST (even if there is an empty gap, the server is currently
+      // returns the total).
       if (!_ctx.isWorkflowMode() && termMod && termMod._historyLoaded &&
           typeof termMod.fetchHistorySince === "function") {
         termMod.fetchHistorySince(Board.state.termSessionId);
       }
     } else if (!_ctx.isWorkflowMode()) {
-      // 메인 세션: REST /terminal/history 가 과거의 권위 있는 출처이므로
-      // SSE 링버퍼 재생은 생략한다. 서버는 replay_start/end 프레임도 보내지 않는다.
+      // Main session: REST /terminal/history is the authoritative source for the past, so
+      // SSE ring buffer playback is omitted. The server does not even send replay_start/end frames.
       eventsUrl += qsSep() + "skip_replay=1";
-      // 재연결 (already loaded once) 이면 REST 로 gap 을 보충한다.
+      // If reconnected (already loaded once), the gap is filled with REST.
       if (termMod && termMod._historyLoaded && typeof termMod.fetchHistorySince === "function") {
         termMod.fetchHistorySince(Board.state.termSessionId);
       }
     } else {
-      // 워크플로우 세션: 초기 이벤트는 REST /terminal/workflow/history 로 복원하므로
-      // SSE 링버퍼 재생은 항상 생략한다. skip_replay=1 을 명시해 서버 측 replay 경로를
-      // 비활성화한다.
+      // Workflow session: initial events are restored to REST /terminal/workflow/history so
+      // SSE ring buffer playback is always skipped. Specify skip_replay=1 to set the server-side replay path.
+      // Deactivate.
       eventsUrl += qsSep() + "skip_replay=1";
     }
     termEventSource = new EventSource(eventsUrl);
@@ -1500,18 +1500,18 @@
       }
     });
 
-    // T-497: replay_start / replay_end SSE listener 는 서버 발사 0건 + REST
-    // 단일화 결정으로 폐기. _isReplaying SSOT 는 _injectRestHistory 가 driver
-    // (REST /terminal/workflow/history 경로). board.md §1.1 참조.
+    // T-497: replay_start / replay_end SSE listener fires 0 servers + REST
+    // Abolished by unification decision. _isReplaying SSOT is _injectRestHistory driver
+    // (REST /terminal/workflow/history path). board.md See §1.1.
 
-    // T-383 Phase 5 (T5-1, T5-3): replay 중 workflow_step 스킵.
-    // 원칙(T-379 Phase 2): workflow_step SSE 가 FSM 전이의 유일한 경로.
-    // 본 게이트는 이 원칙을 위반하지 않는다 — "아직 전이할 시점이 아니다"
-    // 로 해석한다. replay 중에는 DOM 재건( rebuildStepPanelsFromDom )이
-    // _restoreSession 경로에서 수행되므로 UI 상태는 다른 경로로 수렴하며,
-    // 최종 FSM 상태는 _injectRestHistory finally 직후 fetchStatus()로 보정된다.
-    // _captureEventId 는 replay 중에도 항상 호출하여 재접속 시 from-id 를
-    // 보장한다(누락 시 히스토리 중복 재생 버그 재발 가능).
+    // T-383 Phase 5 (T5-1, T5-3): Skip workflow_step during replay.
+    // Principle (T-379 Phase 2): workflow_step SSE is the only path for FSM transition.
+    // This gate does not violate this principle — "It's not time to transition yet"
+    // It is interpreted as During replay, DOM reconstruction ( rebuildStepPanelsFromDom ) occurs.
+    // _restoreSession is performed on the path, so the UI state converges to another path,
+    // The final FSM status is corrected with fetchStatus() immediately after _injectRestHistory finally.
+    // _captureEventId is always called even during replay and returns from-id when reconnecting.
+    // Guaranteed (if omitted, history duplicate playback bug may reoccur).
     termEventSource.addEventListener("workflow_step", function (e) {
       _captureEventId(e);
       try {
@@ -1714,7 +1714,7 @@
       _captureEventId(e);
       try {
         var data = JSON.parse(e.data);
-        // SSE 라이브 수신 경로: _isReplaying=false 이므로 _sentTexts 중복 방지가 동작한다.
+        // SSE live reception path: _isReplaying=false, so _sentTexts duplication prevention works.
         _onUserInput(data);
       } catch (err) {
         // Ignore parse errors
@@ -1736,9 +1736,9 @@
       }
     });
 
-    // T-389: Claude CLI 의 rate_limit_event 전용 SSE 리스너.
-    // 독립 리스너로 구현하여 기존 stdout 핸들러(L353)와 분리 — TK-4(T-390) 의
-    // stdout 리팩터와 물리적 충돌 회피 (T-386 research G-2 권고).
+    // T-389: Dedicated SSE listener for rate_limit_event in Claude CLI.
+    // Implemented as an independent listener and separated from the existing stdout handler (L353) — TK-4 (T-390)
+    // stdout refactor and physical conflict avoidance (T-386 research G-2 recommendation).
     // Server payload shape (terminal_channel._build_payload):
     //   { kind:"rate_limit", status, resets_at, rate_limit_type,
     //     is_using_overage, overage_status, session_id }
@@ -1750,12 +1750,12 @@
         var limitType = data.rate_limit_type || "";
         var resetsAt = (typeof data.resets_at === "number") ? data.resets_at : null;
 
-        // replay 중에는 DOM 생성을 스킵한다. 복원 시점의 rate_limit 은 과거
-        // 스냅샷이므로 현재 UI 에 잔류시키면 잘못된 정보가 노출될 수 있다.
-        // 라이브 이벤트 수신 시 정상 경로로 배너가 재생성된다.
+        // During replay, DOM creation is skipped. The rate_limit at the time of restoration is in the past
+        // Since it is a snapshot, incorrect information may be exposed if left in the current UI.
+        // When receiving a live event, the banner is regenerated in the normal path.
         if (_isReplaying) return;
 
-        // dedupe: 동일 (status, limitType) 배너가 이미 떠 있으면 timestamp 만 갱신.
+        // dedupe: If the same (status, limitType) banner is already floating, only timestamp is updated.
         if (_rateLimitBanner &&
             _rateLimitBanner.dataset.status === status &&
             _rateLimitBanner.dataset.limitType === limitType) {
@@ -1769,13 +1769,13 @@
         _rateLimitBanner = banner;
         _ctx.appendToOutput(banner);
 
-        // allowed(정보성) 만 자동 dismiss. warning / exceeded / unknown 은 사용자
-        // 수동 dismiss 필요 — reset 시각 확인 기회 확보.
+        // Automatic dismiss only for allowed (informational). warning / exceeded / unknown means user
+        // Requires manual dismiss — ensures opportunity to confirm reset time.
         if (status === "allowed") {
           _rateLimitDismissTimer = setTimeout(_dismissRateLimitBanner, 5000);
         }
       } catch (err) {
-        // Ignore non-JSON rate_limit events (기존 리스너와 동일 silent ignore)
+        // Ignore non-JSON rate_limit events (same as existing listener, silent ignore)
       }
     });
 
@@ -1810,22 +1810,22 @@
       termEventSource.close();
       termEventSource = null;
     }
-    // T-495 P2 — production-line 구독도 함께 정리 (세션 스위치 race 차단)
+    // T-495 P2 — Production-line subscriptions are also organized (session switch race blocked)
     _disconnectProductionLine();
     Board.state.termConnected = false;
   }
 
   // ── Session Management ──
 
-  // UUID v1~v5 느슨한 형식 검증 (하이픈 포함 36자)
+  // UUID v1~v5 loose type validation (36 characters including hyphens)
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   /**
-   * 세션 스위치/재시작 시 누적된 파생 상태를 전부 초기화한다.
-   * - 모듈 스코프: _pendingTextBuffer, _sentTexts, _currentToolUseId, _toolInputMap, _isReplaying
-   * - M 네임스페이스: thinking spinner, tool-box 매핑, toolInputBuffer, currentToolName, sessionTokens/Cost
-   * - WorkflowRenderer reset (있을 때)
-   * DOM 출력은 호출자가 clearOutput 으로 별도 처리.
+   * Upon session switch/restart, all accumulated derived state is initialized.
+   * - Module scope: _pendingTextBuffer, _sentTexts, _currentToolUseId, _toolInputMap, _isReplaying
+   * - M namespace: thinking spinner, tool-box mapping, toolInputBuffer, currentToolName, sessionTokens/Cost
+   * - WorkflowRenderer reset (if present)
+   * DOM output is handled separately by the caller with clearOutput.
    */
   function _resetSessionDerivedState() {
     _pendingTextBuffer = "";
@@ -1833,9 +1833,9 @@
     _currentToolUseId = null;
     _toolInputMap = {};
     _isReplaying = false;
-    // T-389: 이전 세션에서 남은 rate_limit 배너/타이머 제거.
+    // T-389: Remove rate_limit banner/timer left over from previous session.
     _dismissRateLimitBanner();
-    // T-390: task 상태맵 + rAF 토큰 초기화.
+    // T-390: task state map + rAF token initialization.
     _taskStatusMap = {};
     if (_taskRenderRafId !== 0) {
       cancelAnimationFrame(_taskRenderRafId);
@@ -1844,10 +1844,10 @@
     if (_ctx) {
       _ctx.setReceivedChunks && _ctx.setReceivedChunks(false);
     }
-    // 토큰 리셋은 맥락에 따라 다름: fresh start 에서는 startSession 이 명시
-    // 호출, resume/session-switch 에서는 loadHistory 의 _applyHistoryUsage
-    // 가 jsonl 의 last_usage 로 덮어씀. 여기서 0 으로 리셋하면 바가 0% 로
-    // 깜박인 뒤 채워지는 플리커 발생 — 의도적으로 제외한다.
+    // Token reset is context-dependent: in fresh start, startSession is specified.
+    // Call _applyHistoryUsage of loadHistory in resume/session-switch
+    // Overwritten with jsonl's last_usage. If you reset to 0 here, the bar will be 0%.
+    // Flicker that blinks and then fills — intentionally excluded.
     var termMod = Board._term;
     if (termMod) {
       termMod.stopSpinner && termMod.stopSpinner();
@@ -1865,23 +1865,23 @@
 
   function startSession(resumeSessionId, opts) {
     if (!_ctx) return;
-    // 중복 요청 방지: spawn 응답이 올 때까지 추가 클릭 무시.
+    // Avoid duplicate requests: ignore additional clicks until spawn response.
     if (_startInFlight) return;
     var isResume = !!resumeSessionId;
-    // silent: ESC 자동 resume 등 "사용자에게 보이는 대화 보존" 이 필요한 경로 전용.
-    // - clearOutput / loadHistory 를 skip 한다 (DOM 중복/플리커 방지).
-    // - termSessionId 만 보장 세팅, 토큰/SSE 재연결/spawn 흐름은 동일.
+    // silent: Only for paths that require “Preserve user-visible conversations” such as ESC automatic resume.
+    // - Skip clearOutput / loadHistory (prevent DOM duplication/flicker).
+    // - Only termSessionId is guaranteed to be set, token/SSE reconnection/spawn flow is the same.
     var silent = !!(opts && opts.silent);
 
-    // 선제 UUID 검증: resume 요청인데 UUID 형식이 아니면 서버 fallback 대신 즉시 실패 처리
+    // Preemptive UUID verification: If the resume request is not in UUID format, it immediately fails instead of server fallback.
     if (isResume && !UUID_RE.test(String(resumeSessionId))) {
-      _ctx.appendErrorMessage("[오류] 잘못된 세션 ID 형식입니다: " + String(resumeSessionId).substring(0, 16));
+      _ctx.appendErrorMessage("[Error] Invalid session ID format:" + String(resumeSessionId).substring(0, 16));
       return;
     }
 
-    // 이미 활성 세션이 있으면 세션 스위치로 간주하고 연결을 리셋한다.
-    // 서버의 claude_process.spawn() 이 내부에서 기존 프로세스를 kill 하므로
-    // HTTP kill 을 별도로 호출할 필요는 없다.
+    // If there is already an active session, it is considered a session switch and the connection is reset.
+    // Because the server's claude_process.spawn() internally kills existing processes,
+    // There is no need to call HTTP kill separately.
     if (Board.state.termStatus !== "stopped") {
       disconnectSSE();
       Board.state.setTermStatus("stopped");
@@ -1889,28 +1889,28 @@
       _ctx.updateControlBar();
     }
 
-    // 새 세션(isResume=false) 시작 시 termSessionId 를 명시적으로 비운다.
-    // stopped 상태에서 Start 를 누른 경우 fetchStatus 가 이미 null 로 돌려두지만,
-    // 방어적으로 여기서도 클리어해 system/init 의 "세션 교체" 조건을 원천 차단한다.
-    // isResume 경로는 아래 Line 966 부근에서 resumeSessionId 로 명시 세팅된다.
+    // When starting a new session (isResume=false), termSessionId is explicitly cleared.
+    // If you press Start in the stopped state, fetchStatus is already set to null, but
+    // Defensively, it is also cleared here to completely block the "Session Replacement" condition in system/init.
+    // The isResume path is explicitly set as resumeSessionId near Line 966 below.
     if (!isResume) {
       Board.state.termSessionId = null;
     }
 
-    // 파생 상태 전체 리셋 — 이전 세션의 tool-box 매핑 / 텍스트 버퍼가
-    // 새 세션 이벤트 처리에 섞이지 않도록 한다.
+    // Full reset of derived state — tool-box mappings/text buffers from previous session
+    // Avoid mixing in new session event processing.
     _resetSessionDerivedState();
 
-    // fresh start 는 새 대화이므로 명시적으로 토큰을 0 으로 리셋.
-    // resume 은 loadHistory 의 _applyHistoryUsage(force=true) 가 이전 세션의
-    // 누적 토큰을 jsonl 에서 복원하므로 여기서 리셋하지 않는다 — 그렇지 않으면
-    // 바가 0 으로 깜박인 뒤 새 값으로 차는 플리커가 발생.
+    // Since fresh start is a new conversation, we explicitly reset the token to 0.
+    // resume is loadHistory's _applyHistoryUsage(force=true) of the previous session.
+    // I'm restoring the accumulated token from jsonl so I don't reset it here — otherwise
+    // A flicker occurs where the bar blinks to 0 and then fills with a new value.
     if (!isResume) {
       _ctx.resetTokens && _ctx.resetTokens();
     }
 
-    // 새 세션 시작(또는 resume)은 새로운 이벤트 스트림의 시작이므로
-    // 이전 채널의 last-event-id는 의미가 없다.
+    // Since a new session start (or resume) is the start of a new event stream,
+    // The last-event-id of the previous channel is meaningless.
     _lastEventId = -1;
     _sessionArchived = false;
 
@@ -1918,20 +1918,20 @@
       _ctx.clearOutput();
       var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
 
-      // T-495 P2 — production-line 세션이면 Board.productionLineWorkflow.subscribe 단일 진입점 사용.
-      // v1 의 /terminal/workflow/history + /terminal/workflow/events 흐름과 분리.
+      // T-495 P2 — For production-line sessions, use a single entry point: Board.productionLineWorkflow.subscribe.
+      // Separated from v1's /terminal/workflow/history + /terminal/workflow/events flow.
       if (Board.productionLineWorkflow && Board.productionLineWorkflow.isProductionLineSessionId &&
           Board.productionLineWorkflow.isProductionLineSessionId(wfSessionId)) {
         _startProductionLineWorkflowSession(wfSessionId);
         return;
       }
 
-      // 워크플로우 세션 초기 로드 (v1):
-      // 1) REST /terminal/workflow/history 로 전체 과거 이벤트를 DOM 에 주입한다.
-      //    (링버퍼 대체 경로 — _isReplaying=true 가드 하에 순서대로 처리)
-      // 2) REST 완료(성공/실패 무관) 후 SSE 구독을 시작한다.
-      //    SSE URL 에는 skip_replay=1 이 부여되므로 링버퍼 재생이 발생하지 않는다.
-      // 3) REST 실패 시 console.error 기록하고 SSE 구독은 계속 진행한다 (무음 폴백).
+      // Workflow session initial load (v1):
+      // 1) Inject all past events into the DOM with REST /terminal/workflow/history.
+      //    (Ringbuffer alternate path — processed in order under _isReplaying=true guard)
+      // 2) After completing REST (regardless of success or failure), start subscribing to SSE.
+      //    Because skip_replay=1 is given to the SSE URL, ring buffer playback does not occur.
+      // 3) If REST fails, console.error is logged and SSE subscription continues (silent fallback).
       _injectRestHistory(wfSessionId).then(function () {
         return connectSSEReady();
       }).catch(function (err) {
@@ -1941,21 +1941,21 @@
     }
 
     if (silent) {
-      // silent resume (ESC 자동 복귀): DOM 보존이 핵심.
-      // clearOutput / loadHistory 둘 다 skip 하고 termSessionId 만 보장한다.
-      // 화면의 대화는 인터럽트 직전 상태 그대로이며, spawn 응답 후 idle 로
-      // 전환되면 사용자가 곧바로 다음 메시지를 보낼 수 있다.
+      // silent resume (ESC automatic return): DOM preservation is key.
+      // Both clearOutput and loadHistory are skipped and only termSessionId is guaranteed.
+      // The conversation on the screen remains the same as before the interrupt, and returns to idle after the spawn response.
+      // Once converted, the user can immediately send the next message.
       if (isResume) {
         Board.state.termSessionId = resumeSessionId;
       }
     } else {
       _ctx.clearOutput();
       if (isResume) {
-        // 과거 대화를 즉시 UI 에 로드 (Claude CLI spawn 응답을 기다리지 않음).
-        // spawn 은 백그라운드로 진행되며, resume 은 큰 세션에서 10초 이상 걸릴 수
-        // 있으므로 사용자 체감 UX 를 위해 REST /terminal/history 로 먼저 채운다.
-        // 주의: 서버가 graceful fallback 하면 init 이벤트에서 실제 session_id
-        // 가 달리 도착하고, 그때 과거 대화를 재로딩한다 (system/init 리스너 참조).
+        // Load past conversations into the UI immediately (without waiting for Claude CLI spawn response).
+        // spawn runs in the background, and resume may take more than 10 seconds in a large session.
+        // Therefore, fill in REST /terminal/history first for user experience UX.
+        // Caution: If the server gracefully falls back, the actual session_id will be returned in the init event.
+        // otherwise arrives, then reloads the past conversation (see system/init listener).
         Board.state.termSessionId = resumeSessionId;
         var termModResume = Board._term;
         if (termModResume && typeof termModResume.loadHistory === "function") {
@@ -1964,7 +1964,7 @@
       }
     }
 
-    // spawn 요청 ~ init 이벤트 수신 전까지는 "starting". 입력은 아직 비활성.
+    // "starting" until the spawn request ~ init event is received. Input is still inactive.
     if (Board.debugLog) Board.debugLog('startSession.setStarting', {
       isResume: !!isResume,
       silent: !!silent,
@@ -1978,10 +1978,10 @@
       var startBody = isResume ? { resume_session_id: resumeSessionId } : undefined;
       return postJson("/terminal/start", startBody);
     }).then(function (data) {
-      // spawn 응답 = 프로세스 준비 완료. claude -p 는 첫 stdin 입력 전까지
-      // system/init 이벤트를 emit 하지 않기 때문에 init 대기 대신 여기서
-      // idle 로 전이한다. 입력창/버튼을 즉시 활성화한다.
-      // 스피너는 Claude 가 실제로 응답을 시작할 때 sendInput 경로에서 켠다.
+      // spawn response = process ready. claude -p until the first stdin input
+      // Since system/init does not emit events, here instead of waiting for init
+      // Transitions to idle. Immediately activates the input window/button.
+      // The spinner is turned on in the sendInput route when Claude actually starts responding.
       if (data && data.session_id) {
         Board.state.termSessionId = data.session_id;
       }
@@ -1991,14 +1991,14 @@
       });
       var wasInAutoResume = !!Board.state._inAutoResume;
       Board.state.setTermStatus("idle");
-      // ESC autoResume 윈도우 종료 — 정상 idle 도달했으므로 플래그 해제.
+      // ESC autoResume Shut down window — Release flag because normal idle has been reached.
       Board.state._inAutoResume = false;
       _ctx.setInputLocked(false);
       _ctx.updateControlBar();
-      // [ESC race 가드 후속] _onResult 의 advanceTurn 이 _recentInterrupt 윈도우에서
-      // skip 됐으므로, 새 process spawn 완료(setIdle) 시점에 큐 잔여를 처리한다.
-      // wasInAutoResume=true 인 경우만 발사 — 정상 신규 start 흐름은 사용자가 send
-      // 명시로 큐 처리.
+      // [ESC race guard follow-up] _onResult's advanceTurn is _recentInterrupt in window
+      // Since it is skipped, the remaining queue is processed when the new process spawn is completed (setIdle).
+      // Fires only if wasInAutoResume=true — the normal new start flow requires the user to send
+      // Queuing explicitly.
       if (wasInAutoResume) {
         var termModResume = Board._term;
         var queueSize = (termModResume && termModResume.inputQueue)
@@ -2012,10 +2012,10 @@
         }
       }
     }).catch(function (err) {
-      var reason = err && err.message ? err.message : "알 수 없는 오류";
-      var prefix = isResume ? "[오류] 세션 재개 실패" : "[Error] Failed to start session";
+      var reason = err && err.message ? err.message : "unknown error";
+      var prefix = isResume ? "[Error] Session resumption failed" : "[Error] Failed to start session";
       _ctx.appendErrorMessage(prefix + ": " + reason);
-      // autoResume 도중 실패 시 _inAutoResume leak 방지.
+      // Prevent _inAutoResume leak when autoResume fails.
       Board.state._inAutoResume = false;
       Board.state.setTermStatus("stopped");
       _ctx.updateControlBar();
@@ -2026,27 +2026,27 @@
     });
   }
 
-  // 중복 kill 호출 방지 플래그
+  // Flag to prevent duplicate kill calls
   var _killingInProgress = false;
 
   function killSession() {
     if (!_ctx) return;
     var killable = Board.util.TERM_STATUS_KILLABLE;
     if (!killable.has(Board.state.termStatus)) return;
-    // 중복 kill 요청 방지
+    // Avoid duplicate kill requests
     if (_killingInProgress) return;
     _killingInProgress = true;
 
-    // 사용자 명시 Kill = ESC 자동 resume 시퀀스 종료. localStorage 의 복원 텍스트
-    // 시그널을 클리어하여 process_exit 핸들러가 자동 resume 으로 가지 않게 한다.
+    // User specified Kill = ESC Ends automatic resume sequence. Restore text in localStorage
+    // Clear the signal so that the process_exit handler does not automatically resume.
     try { localStorage.removeItem("board.term.lastSentText"); } catch (e) {}
     var termModK = Board._term;
     if (termModK) termModK._recentInterrupt = false;
 
     var prevStatus = Board.state.termStatus;
     var epK = _ctx.endpoints();
-    // Close 시 UI 정리 — process_exit 경로와 동일한 리셋을 수행해
-    // 대화창 / 토큰 / 비용 / 스피너가 stopped 상태에 어색하게 남지 않도록 한다.
+    // Clean up the UI when closing — Perform the same reset as the process_exit path
+    // Prevents dialogs/tokens/costs/spinners from being awkwardly left in the stopped state.
     function _finalizeStoppedUI() {
       _ctx.stopSpinner();
       _ctx.clearOutput();
@@ -2061,22 +2061,22 @@
       if (_ctx.resetToolBoxMap) _ctx.resetToolBoxMap();
       _ctx.clearCurrentToolBox();
       if (_ctx.clearCurrentWorkflowToolCard) _ctx.clearCurrentWorkflowToolCard();
-      // permission mode 표시는 DOM 직접 제어 (setSessionModel 같은 상태 저장소 없음)
+      // Permission mode indication is directly controlled by the DOM (no state storage such as setSessionModel)
       var modeEl = document.getElementById("terminal-sl-mode");
       if (modeEl) modeEl.textContent = "";
       Board.state.termSessionId = null;
     }
-    // 사용자 명시 kill → autoResume 윈도우 즉시 해제 (잔존 플래그 방지).
+    // User-specified kill → autoResume immediately releases the window (prevents residual flags).
     Board.state._inAutoResume = false;
     postJson(epK.kill, epK.inputBody({})).then(function () {
       Board.state.setTermStatus("stopped");
       _ctx.setInputLocked(false);
       _finalizeStoppedUI();
       _ctx.updateControlBar();
-      // kill 성공 후 SSE 연결 정리: 잔여 이벤트가 상태를 되돌리지 않도록 한다
+      // Clean up SSE connection after successful kill: prevent residual events from reversing state
       disconnectSSE();
     }).catch(function (err) {
-      // 409: 프로세스가 이미 종료된 경우 → stopped로 복구
+      // 409: If the process has already ended → recover to stopped
       var is409 = err.message && err.message.indexOf("409") !== -1;
       if (is409) {
         Board.state.setTermStatus("stopped");
@@ -2085,7 +2085,7 @@
         _ctx.updateControlBar();
         disconnectSSE();
       } else {
-        // 그 외 에러: 이전 상태로 복구하여 버튼 고착 방지
+        // Other errors: Restore to previous state to prevent button sticking
         _ctx.appendErrorMessage("[Error] Failed to kill session: " + err.message);
         Board.state.setTermStatus(prevStatus);
         _ctx.setInputLocked(false);
@@ -2097,10 +2097,10 @@
   }
 
   /**
-   * 세션 전환용 SSE 재연결.
-   * disconnectSSE() → connectSSE() → fetchStatus() 순서를 보장한다.
-   * switchSession() 내부에서 직접 호출하는 것과 동일하지만, 외부에서도
-   * 명시적으로 "재연결만" 원할 때 사용할 수 있다.
+   * SSE reconnection for session switching.
+   * The order of disconnectSSE() → connectSSE() → fetchStatus() is guaranteed.
+   * Same as calling switchSession() directly inside, but also outside
+   * You can use "Reconnect only" when you explicitly want to.
    *
    * @returns {Promise<void>}
    */
@@ -2116,12 +2116,12 @@
    * When the corresponding user_input SSE event arrives, the handler
    * will skip DOM insertion to avoid duplicates.
    *
-   * 1:1 turn 모델에서도 시맨틱 변경 없음:
-   * - commitQueue 가 1개 entry 를 echo 한 직후 sendInput 경로에서 markSent 호출
-   * - SSE user_input echo 가 되돌아오면 _sentTexts 에 등록된 텍스트이므로 skip
-   * - 이미 DOM 에 노출된 말풍선의 중복 삽입을 방지한다
-   * - history replay(_isReplaying=true) 중에는 _sentTexts 가 비어 있으므로
-   *   모든 user_input 이벤트가 정상 렌더된다 (새로고침 복원 경로 보장)
+   * No semantic change in 1:1 turn model:
+   * - Call markSent in the sendInput path immediately after commitQueue echoes 1 entry
+   * - If SSE user_input echo returns, skip it because it is the text registered in _sentTexts.
+   * - Prevents duplicate insertion of speech bubbles already exposed to the DOM
+   * - During history replay(_isReplaying=true), _sentTexts is empty, so
+   *   All user_input events are rendered normally (refresh restoration path guaranteed)
    *
    * @param {string} text
    */
@@ -2157,18 +2157,18 @@
   }
 
   /**
-   * 재연결/이력 복원 시 in-flight tool_use 블록을 라이브 input_json_delta 경로에
-   * 다시 연결하기 위한 시드 함수. renderHistory 가 in_flight=true 인 tool_use
-   * 이벤트를 만나면 호출한다.
+   * When reconnecting/restoring history, add the in-flight tool_use block to the live input_json_delta path.
+   * Seed function for reconnecting. tool_use with renderHistory in_flight=true
+   * Called when an event is encountered.
    *
-   * 1:1 turn 단순화 회귀 검증:
-   * - turn-card 그룹화 폐기(W02) 후에도 tool_use 라우팅은 outputDiv 직접 자식으로
-   *   유지되므로 이 함수의 시드 동작에 영향 없음.
-   * - 1개 turn = 1개 메시지 모델에서 in-flight tool 은 단일 turn 내에만 존재하므로
-   *   병렬 tool_use 충돌 가능성도 변경 없음.
+   * 1:1 turn simplified regression verification:
+   * - Even after discarding turn-card grouping (W02), tool_use routing is done as a direct child of outputDiv.
+   *   This has no effect on the seeding behavior of this function, as it is maintained.
+   * - In the 1 turn = 1 message model, the in-flight tool exists only within a single turn.
+   *   No change in probability of parallel tool_use conflicts.
    *
    * @param {string} toolUseId
-   * @param {string} partialJson 이미 수신한 input_json 조각(빈 문자열 가능)
+   * @param {string} partialJson input_json fragment already received (can be an empty string)
    */
   function seedInFlightToolUse(toolUseId, partialJson) {
     if (!toolUseId) return;
@@ -2191,7 +2191,7 @@
     seedInFlightToolUse: seedInFlightToolUse,
     injectRestHistory: _injectRestHistory,
     applyRawModel: _applyRawModel,
-    // T-495 P2 — production-line session 진입점 (외부 호출용)
+    // T-495 P2 — production-line session entry point (for external calls)
     startProductionLineSession: _startProductionLineWorkflowSession,
     disconnectProductionLine: _disconnectProductionLine,
     _bind: bind,

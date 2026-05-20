@@ -23,7 +23,7 @@ import urllib.request
 import urllib.error
 from typing import Any
 
-# data 패키지 import (sys.path 기반)
+# import data package (based on sys.path)
 _engine_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
@@ -35,7 +35,7 @@ from engine.common import read_env
 _EMOJI_MAP: dict[str, str] = SLACK_EMOJI_MAP
 
 
-# 모듈 수준 변수 (load_slack_env 호출 후 설정됨)
+# Module level variable (set after calling load_slack_env)
 SLACK_BOT_TOKEN: str = ""
 SLACK_CHANNEL_ID: str = ""
 
@@ -77,8 +77,8 @@ def load_slack_env(env_file: str | None = None) -> bool:
 
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         log_warn(
-            "CLAUDE_CODE_SLACK_BOT_TOKEN 또는 CLAUDE_CODE_SLACK_CHANNEL_ID가 "
-            "설정되지 않았습니다. Slack 전송을 건너뜁니다."
+            "CLAUDE_CODE_SLACK_BOT_TOKEN or CLAUDE_CODE_SLACK_CHANNEL_ID"
+            "Not set. Skip the Slack transfer."
         )
         return False
 
@@ -157,7 +157,7 @@ def send_slack_message(json_payload: str, token: str | None = None) -> bool:
     """
     bot_token = token or SLACK_BOT_TOKEN
     if not bot_token:
-        log_warn("SLACK_BOT_TOKEN이 설정되지 않았습니다.")
+        log_warn("SLACK_BOT_TOKEN is not set.")
         return False
 
     url = SLACK_API_URL
@@ -177,12 +177,12 @@ def send_slack_message(json_payload: str, token: str | None = None) -> bool:
             response_data = json.loads(resp.read().decode("utf-8"))
 
         if response_data.get("ok"):
-            log_info("Slack 메시지 전송 성공")
+            log_info("Slack message sent successfully")
             return True
         else:
-            log_warn(f"Slack 메시지 전송 실패: {json.dumps(response_data, ensure_ascii=False)}")
+            log_warn(f"Slack message delivery failed: {json.dumps(response_data, ensure_ascii=False)}")
             return False
 
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
-        log_warn(f"Slack 메시지 전송 실패: {e}")
+        log_warn(f"Slack message delivery failed: {e}")
         return False

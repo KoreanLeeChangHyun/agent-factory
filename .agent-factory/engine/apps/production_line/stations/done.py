@@ -1,4 +1,4 @@
-"""DONE / FAILED Step — driver in-process. LLM 호출 없음."""
+"""DONE / FAILED Step — driver in-process. No LLM calls."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from .._verdict import build_final_verdict, save_final_verdict
 def done_step(ctx: WorkflowContext) -> None:
     """DONE — summary.txt + usage.json + metadata.json + driver 14+룰 재검증 + kanban move review.
 
-    SPEC.md §7.1 매핑 표 의 'driver 룰베이스 재검증' 은 본 단계에서 수행 — REPORT
+    SPEC.md §7.1 매핑 표 의 'Driver rule base revalidation' 은 본 단계에서 수행 — REPORT
     완료 + step.end DONE 기록 후가 정합 시점. update_step(_, "DONE") 은 main 의
     update_step("REPORT", "DONE") 가 이미 수행하므로 본 함수는 중복 호출하지 않음.
     """
@@ -36,7 +36,7 @@ def done_step(ctx: WorkflowContext) -> None:
     ctx.usage_json_path().write_text("{}\n", encoding="utf-8")
     write_metadata(ctx, finalized_at=finalized_at)
     step_end(ctx, "DONE", outcome="ok")
-    # 12룰 재검증 (REPORT 완료 + step.end DONE 기록 후 — workflow_step 이미 DONE)
+    # 12Rule re-verification (after completing REPORT + recording step.end DONE — workflow_step already DONE)
     verdict_report = evaluate_12_rules(ctx)
     save_verdict_report(ctx, verdict_report)
     final_verdict = build_final_verdict(ctx, verdict_report)
@@ -77,7 +77,7 @@ def done_step(ctx: WorkflowContext) -> None:
 
 
 def fail_step(ctx: WorkflowContext, reason: str) -> None:
-    """FAILED — failure.md + kanban 자동 회귀 X (SPEC.md §12.4)."""
+    """FAILED — failure.md + kanban autoregressive"""
     failure_body = load_template("failure.md").format(
         ticket_no=ctx.ticket_no,
         registry_key=ctx.registry_key,

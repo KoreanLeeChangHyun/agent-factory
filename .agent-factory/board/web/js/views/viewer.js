@@ -722,9 +722,9 @@
       const parsed = JSON.parse(wfFile.content);
       h += renderDirListing(parsed.files, parsed.baseUrl);
     } else if (wfFile.url.endsWith("report.html") || wfFile.url.endsWith(".html")) {
-      // T-507 P4 — REPORT 단계 산출물은 report.html (driver/LLM 직접 산출).
-      // T-504 산출물 형식 캐논 cutover 이후 markdown→html 변환 불필요.
-      // wfFile.content 가 이미 HTML 이므로 innerHTML 직접 표시.
+      // T-507 P4 — REPORT step output report.html (driver/LLM direct output).
+      // T-504 output format cannon cutover after markdown→html conversion unnecessary.
+      // wfFile.content is already HTML, so innerHTML direct display.
       h += '<div class="md-body">' + wfFile.content + '</div>';
     } else if (wfFile.url.endsWith(".md")) {
       h += '<div class="md-body">' + Board.render.renderMd(wfFile.content, wfFile.url) + '</div>';

@@ -3,35 +3,35 @@
  *
  * Board.stepOverlay — T-505 P3.
  *
- * Step 6박스 (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) + WORK 박스 안
- * Phase sub-패널의 단일 진실 공급원. workflow_step / workflow_phase /
- * workflow_finish 이벤트를 직접 구독하여 FSM 상태와 fold/expand 자동 룰을
- * 관리한다.
+ * Step 6 box (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) + WORK box
+ * Single true source of Phase sub-panel. workflow
+ * FSM status and fold/expand automatic rule by directly subscribed to workflow finish event
+ * Notice
  *
- * 책임 분리:
- *   - 본 모듈: Step/Phase 위계 DOM + fold/expand 자동 룰 + 상태 머신
- *   - production-line-stdout-bridge: workflow_stdout 이벤트 → 본 모듈 handleStdout 으로 forward
- *   - session.js (무수정): 메인 터미널 stdout 렌더 (본 cycle 에서 미관여)
+ * Price:
+ *   - Main module: Step/Phase latometer DOM + fold/expand automatic rule + state machine
+ *   - production-line-stdout-bridge: workflow stdout event → this module handleStdout forward
+ *   - session.js: main terminal stdout renderer (main cycle in unloaded)
  *
- * 데이터 모델 (T-505 P1 §4):
+ * Data Model (T-505 P1 §4):
  *   Step = {id, status, startedAt, finishedAt, collapsed, userOverride, phases}
  *   Phase = {id, title, status, startedAt, finishedAt, collapsed, userOverride}
  *
- * fold/expand 자동 룰 (T-505 P1 §5):
+ * fold/expand automatic rule (T-505 P1 §5):
  *   running → expand
- *   done    → fold (cascade: 모든 phase done 이면 Step 도 fold)
- *   fail    → expand + outline strong (cascade 영향 안 받음)
+ *   done → fold (cascade: all phase done this side step also fold)
+ *   failure → expand + outline strong
  *   pending → fold
- *   user click → userOverride=true (자동 룰 무시)
+ *   user click → userOverride = true
  *
- * 시각 캐논 (board.md §6):
+ * Visual Canon (board.md §6):
  *   - terracotta #D97757 = running
  *   - cyan #4ec9b0      = success
- *   - 주홍 #f48771      = fail
- *   - 1.6s pulse + prefers-reduced-motion 가드 — step-overlay.css 정합
+ *   #f48771
+ *   - 1.6s pulse + prefers-reduced-motion guard — step-overlay.css fixation
  *
- * SPEC §0.1 (LLM 자율 영역 비노출):
- *   spawn_mode / workers / acceptance_criteria 필드는 UI 비표시.
+ * SPEC §0.1:
+ *   Copyright © 2019 CRETeria. All Rights Reserved.
  *
  * Depends on: common.js (Board namespace), production-line-workflow.js (subscribe API)
  * Registers:  Board.stepOverlay
@@ -40,23 +40,23 @@
 
 (function () {
 
-  // ── 상수 ──
+  // ── VIEW
 
-  /** Step 6박스 정의 — 순서 = 위→아래 표시 순서. */
+  /** Step 6box definition — order = up→ bottom display order. */
   var STEP_IDS = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 
-  /** 유효 status 값. */
+  /** Valid status value. */
   var STATUS_PENDING = "pending";
   var STATUS_RUNNING = "running";
   var STATUS_DONE = "done";
   var STATUS_FAIL = "fail";
 
-  // ── 내부 상태 ──
+  // ── Internal Status ──
 
   /** @type {Object<string, {id, status, startedAt, finishedAt, collapsed, userOverride, phases}>} */
   var _stepMap = {};
 
-  /** @type {HTMLElement|null} 루트 DOM */
+  /** @type {HTMLElement null} root DOM */
   var _rootEl = null;
 
   /** @type {{close: function, sessionId: string}|null} */
@@ -65,7 +65,7 @@
   /** @type {string|null} */
   var _activeSessionId = null;
 
-  // ── 초기 state ──
+  // ── Early state ──
 
   function _resetState() {
     _stepMap = {};
@@ -93,7 +93,7 @@
       .replace(/"/g, "&quot;");
   }
 
-  /** SVG inline (board.md §8 — Lucide 스타일). */
+  /** SVG inline (board.md §8 — Lucide Style). */
   function _iconOk() {
     return '<svg class="wf-step-icon-ok" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"'
       + ' fill="none" stroke-linecap="round" stroke-linejoin="round">'
@@ -112,11 +112,11 @@
   }
 
   /**
-   * 루트 DOM 게으른 생성 + 6 Step 박스 초기 렌더.
-   * 외부 컨테이너 (예: terminal.html 의 wf-step-overlay-host) 가 미존재해도
-   * 자체적으로 body 끝에 append.
+   * Root DOM Lazy + 6 Step Box Earlyender.
+   * external containers (e.g. terminal.html wf-step-overlay-host)
+   * append on the body end itself.
    *
-   * @param {HTMLElement} [host]  마운트 컨테이너 override
+   * @param {HTMLElement} [host] mount container override
    * @returns {HTMLElement}
    */
   function mount(host) {
@@ -216,10 +216,10 @@
     return "";
   }
 
-  // ── fold/expand 자동 룰 (T-505 P1 §5) ──
+  // ── fold/expand automatic rule (T-505 P1 §5) ──
 
   /**
-   * Step status 변경 시 자동 fold/expand 적용 (userOverride 가드).
+   * Step status Automatic fold/expand applied when changing (userOverride guard).
    * @param {string} stepId
    * @param {string} newStatus
    */
@@ -258,7 +258,7 @@
     }
     _setPhaseClass(phaseId);
 
-    // cascade: 모든 phase done 이면 WORK Step 도 자동 fold (fail 있으면 보호)
+    // cascade: All phase done side WORK Step also auto fold (protected if thefail)
     var allDone = true;
     var anyFail = false;
     for (var j = 0; j < step.phases.length; j++) {
@@ -291,11 +291,11 @@
     _setPhaseClass(phaseId);
   }
 
-  // ── Phase 동적 생성 (plan.json phases 배열 기반) ──
+  // ── Phase dynamic creation (plan.json phases array based) ──
 
   /**
-   * plan.json 의 phases 배열을 받아 WORK 박스 안에 sub-패널 동적 렌더.
-   * spawn_mode / workers / acceptance_criteria 는 노출하지 않는다 (SPEC §0.1).
+   * sub-panel dynamic renderer in the WORK box with the phases array of plan.json.
+   * spawn mode / workers / acceptance criteria does not expose (SPEC §0.1).
    *
    * @param {Array<{id: string, title: string}>} phases
    */
@@ -354,20 +354,20 @@
     return box;
   }
 
-  // ── SSE 이벤트 핸들러 (workflow_step / phase / finish) ──
+  // ── SSE event handler (workflow step / phase / finish) ──
 
   function _onStep(data) {
     if (!data || !data.step) return;
     var stepId = String(data.step).toUpperCase();
     if (!_stepMap[stepId]) return;
     var prev = data.prev_step ? String(data.prev_step).toUpperCase() : "";
-    // 직전 Step 자동 done (FAILED 가 아니면)
+    // Off-Step Auto done (FAILED or)
     if (prev && _stepMap[prev] && _stepMap[prev].status !== STATUS_FAIL) {
       _stepMap[prev].finishedAt = data.ts || null;
       _autoFoldStep(prev, STATUS_DONE);
     }
     if (stepId === "FAILED") {
-      // FAILED 별칭 — 현재 Step 을 fail 마킹
+      // FAILED alias — current Step Verify
       var curr = prev || "DONE";
       if (_stepMap[curr]) {
         _stepMap[curr].finishedAt = data.ts || null;
@@ -397,9 +397,9 @@
   }
 
   /**
-   * production-line-stdout-bridge 가 호출하는 진입점. payload.raw 가 SDK NDJSON 1줄.
-   * 현재 진행 중인 Step/Phase 의 [data-wf-stdout] 컨테이너에 stdout chunk
-   * 또는 tool_use 카드 1줄을 append.
+   * The entry point where the production-line-stdout-bridge calls. payload.raw with SDK NDJSON 1 line.
+   * Stdout chunk to the current Step/Phase [data-wf-stdout] container
+   * or append the tool use card 1 line.
    *
    * @param {{text?: string, raw?: object}} data
    */
@@ -469,10 +469,10 @@
     container.appendChild(card);
   }
 
-  // ── SSE 구독 진입점 ──
+  // ── SSE Subscription
 
   /**
-   * step / phase / finish 이벤트 구독. stdout 은 production-line-stdout-bridge 가 forward.
+   * step / phase / end event subscription. stdout is a production-line-stdout-bridge with forward.
    *
    * @param {string} sessionId
    * @returns {boolean}
@@ -499,7 +499,7 @@
     _activeSessionId = null;
   }
 
-  // ── 초기화 ──
+  // ── Reset ──
 
   _resetState();
 
@@ -511,7 +511,7 @@
     subscribe: subscribe,
     disconnect: disconnect,
     handleStdout: handleStdout,
-    // 디버그 / 테스트용
+    // Debug / Test
     _state: function () { return _stepMap; },
     _stepIds: STEP_IDS
   };

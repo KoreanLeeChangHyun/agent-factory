@@ -43,17 +43,17 @@ from core.validation.prompt_validator import validate as prompt_validate
 from constants import QUALITY_THRESHOLD
 
 
-# ─── 경로 상수 ───────────────────────────────────────────────────────────────
+# ─── Path constant ──────────────────────────────────────────────────────────────────
 
 from common import resolve_project_root
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT: str = resolve_project_root()
 
-# ─── 병합 충돌 시그널 패턴 ────────────────────────────────────────────────────
+# ─── Merge conflict signal pattern ──────────────────────────────────────────────────────
 
 _CONFLICT_SIGNAL_RE: re.Pattern[str] = re.compile(
-    r"(병합\s*충돌|merge\s+conflict|CONFLICT)",
+    r"(merge\s*conflict|merge\s+conflict|CONFLICT)",
     re.IGNORECASE,
 )
 """merge_result.error_message 에서 충돌 신호를 감지하기 위한 정규식.
@@ -68,7 +68,7 @@ W05 테스트에서 ``from flow.kanban_cli import _CONFLICT_SIGNAL_RE`` 로 직�
 """
 
 
-# ─── 세션 헬퍼 ───────────────────────────────────────────────────────────────
+# ─── Session Helper ──────────────────────────────────────────────────────────────────
 
 import json
 import urllib.request
@@ -84,7 +84,7 @@ def _resolve_server_port() -> "int | None":
     Returns:
         포트 번호(int) 또는 None (해석 불가 시).
     """
-    # 1) 환경변수 우선
+    # 1) Environmental variables take precedence
     port_env = os.environ.get("_WF_SERVER_PORT")
     if port_env:
         try:
@@ -92,12 +92,12 @@ def _resolve_server_port() -> "int | None":
         except ValueError:
             pass
 
-    # 2) .board.url 파일 파싱: http://127.0.0.1:PORT/board
+    # 2) Parse .board.url file: http://127.0.0.1:PORT/board
     board_url_path = os.path.join(_PROJECT_ROOT, ".agent-factory", ".board.url")
     try:
         with open(board_url_path, "r", encoding="utf-8") as f:
             url = f.read().strip()
-        # http://127.0.0.1:PORT/... 형식에서 PORT 추출
+        # Extract PORT from http://127.0.0.1:PORT/... format
         if "://" in url:
             host_part = url.split("://", 1)[1]  # 127.0.0.1:PORT/...
             host_port = host_part.split("/")[0]  # 127.0.0.1:PORT
@@ -122,7 +122,7 @@ def _kill_ticket_session(ticket_number: str) -> None:
     port = _resolve_server_port()
 
     if port is not None:
-        # HTTP API 경로: 세션 목록 조회 후 ticket_id 매칭 세션 kill
+        # HTTP API path: Check the session list and kill the ticket_id matching session.
         try:
             list_url = f"http://127.0.0.1:{port}/terminal/workflow/list"
             req = urllib.request.Request(list_url, method="GET")
@@ -152,17 +152,17 @@ def _kill_ticket_session(ticket_number: str) -> None:
                 log("INFO", f"kanban.py: no active session found for {ticket_number}")
             return
         except Exception:
-            # HTTP 오류는 상태 전이와 무관하므로 무시하고 반환
+            # HTTP errors are unrelated to state transitions, so they are ignored and returned.
             return
 
-    # 포트 미해석 시 tmux 폴백 (하위호환)
+    # tmux fallback when port is not interpreted (backwards compatible)
     if not os.environ.get("TMUX"):
         return
 
     window_name = f"{_TMUX_WINDOW_PREFIX}{ticket_number}"
 
     try:
-        # 윈도우 존재 여부 확인
+        # Check if window exists
         list_result = subprocess.run(
             ["tmux", "list-windows", "-F", "#W"],
             capture_output=True,
@@ -174,13 +174,13 @@ def _kill_ticket_session(ticket_number: str) -> None:
         if window_name not in existing_windows:
             return
 
-        # 윈도우 인덱스 조회 (P:T-NNN의 콜론이 세션:윈도우로 오해석되는 문제 방지)
+        # Window index search (prevents the problem of the colon in P:T-NNN being misinterpreted as session:window)
         idx_result = subprocess.run(
             ["tmux", "list-windows", "-F", "#{window_index}\t#{window_name}"],
             capture_output=True,
             text=True,
         )
-        target = window_name  # 폴백
+        target = window_name  # fallback
         if idx_result.returncode == 0:
             for line in idx_result.stdout.strip().splitlines():
                 parts = line.split("\t", 1)
@@ -194,7 +194,7 @@ def _kill_ticket_session(ticket_number: str) -> None:
         )
         log("INFO", f"kanban.py: tmux kill-window {window_name}")
     except Exception:
-        # tmux 오류는 상태 전이와 무관하므로 무시
+        # Ignore tmux errors as they are independent of state transitions.
         pass
 
 
@@ -228,15 +228,15 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
         if has_uncommitted_changes(wt_path):
             log(
                 "WARN",
-                f"kanban.py: worktree 정리 skip — 미커밋 변경 보존 ({ticket_number}, path={wt_path})",
+                f"kanban.py: skip worktree cleanup — preserve uncommitted changes ({ticket_number}, path={wt_path})",
             )
             print(
-                f"[WARN] {ticket_number} 워크트리에 미커밋 변경 있음 — 자동 정리 skip",
+                f"[WARN] {ticket_number} worktree has uncommitted changes — skip automatic cleanup",
                 flush=True,
             )
-            print(f"[WARN] 경로: {wt_path}", flush=True)
+            print(f"[WARN] Path: {wt_path}", flush=True)
             print(
-                "[WARN] 검토 후 수동으로 commit / 폐기: "
+                "[WARN] Review and manually commit / discard:"
                 f"`git -C {wt_path} status`",
                 flush=True,
             )
@@ -244,16 +244,16 @@ def _cleanup_worktree_on_leave(ticket_number: str) -> None:
 
         success = remove_worktree(ticket_number, delete_branch=True)
         if success:
-            log("INFO", f"kanban.py: worktree 자동 정리 완료 ({ticket_number})")
+            log("INFO", f"kanban.py: Worktree automatic cleanup completed ({ticket_number})")
         else:
-            print(f"[WARN] {ticket_number} 워크트리 정리 실패 (계속 진행)", flush=True)
+            print(f"[WARN] {ticket_number} work tree cleanup failed (continue)", flush=True)
     except ImportError:
-        pass  # worktree 모듈 미설치 시 무시 (하위 호환)
+        pass  # Ignored if the worktree module is not installed (backwards compatible)
     except Exception as e:
-        print(f"[WARN] {ticket_number} 워크트리 정리 중 오류 (계속 진행): {e}", flush=True)
+        print(f"[WARN] Error cleaning worktree {ticket_number} (continue): {e}", flush=True)
 
 
-# ─── 서브커맨드 구현 ─────────────────────────────────────────────────────────
+# ─── Subcommand implementation ─────────────────────────────────────────────────────────────
 
 
 def cmd_create(
@@ -272,51 +272,51 @@ def cmd_create(
         title: 티켓 제목. 빈 문자열 허용.
         command: 워크플로우 커맨드 (implement, review, research 등). 현재 미사용 (하위 호환용).
         status: 초기 상태 키 ("todo" | "open"). COLUMN_MAP을 통해 XML <status> 값으로 변환된다.
-        number: 명시적 티켓 번호 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번.
+        number: 명시적 티켓 번호 (T-NNN, NNN, #N format). Automatic numbering if not specified.
     """
-    # status 키를 상태명("To Do" / "Open")으로 변환
+    # Convert status key to status name ("To Do" / "Open")
     status_label = COLUMN_MAP.get(status)
     if status_label is None or status not in ("todo", "open"):
         err(
-            f"잘못된 --status 값: '{status}'. 'todo' 또는 'open' 중 하나를 명시하세요. "
-            f"(예: flow-kanban create \"제목\" --command implement --status todo)",
+            f"Invalid --status value: '{status}'. Specify either 'todo' or 'open'."
+            f"(Example: flow-kanban create \\"title\\" --command implement --status todo)",
             2,
         )
 
-    # 대상 디렉터리 결정
+    # Determine the target directory
     target_dir = KANBAN_TODO_DIR if status == "todo" else KANBAN_OPEN_DIR
 
     if number is not None:
         normalized = normalize_ticket_number(number)
         if normalized is None:
             err(
-                f"잘못된 --number 값: '{number}'. T-NNN, NNN, #N 형식 중 하나여야 합니다.",
+                f"Invalid --number value: '{number}'. Must be in one of the following formats: T-NNN, NNN, or #N.",
                 2,
             )
         ticket_number = normalized
         existing = find_ticket_file(ticket_number)
         if existing is not None:
             err(
-                f"티켓 번호 충돌: {ticket_number} 이미 존재합니다 ({existing}). "
-                f"번호는 유니크해야 합니다.",
+                f"Ticket number conflict: {ticket_number} already exists ({existing})."
+                f"The number must be unique.",
                 2,
             )
     else:
-        # 디버그 영역(900-999) 자동 부여 차단 — 2026-05-05 폐지 (workflow.md 번호 영역 정책 / 메모리 룰).
-        # 명시 `--number` 호출은 위 if 분기에서 처리되므로 영향 없음.
+        # Block automatic granting of debug area (900-999) — Repealed 2026-05-05 (workflow.md number area policy / memory rule).
+        # Explicit `--number` calls have no effect as they are processed in the if branch above.
         max_num = get_max_ticket_number(exclude_debug_range=True)
         new_num = max_num + 1
         ticket_number = f"T-{new_num:03d}"
 
-    # 파일명: T-NNN.xml 고정
+    # File name: T-NNN.xml fixed
     ticket_file = os.path.join(target_dir, f"{ticket_number}.xml")
 
     os.makedirs(target_dir, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     xml_content = create_ticket_xml(ticket_number, title, datetime_str, command=command)
 
-    # XML <status> 태그 값을 status_label로 교체
-    # create_ticket_xml 은 기본적으로 "Open"을 기록하므로, status=="todo"인 경우에만 치환.
+    # Replace XML <status> tag value with status_label
+    # create_ticket_xml records “Open” by default, so replace only when status=="todo".
     if status_label != "Open":
         xml_content = xml_content.replace(
             "<status>Open</status>", f"<status>{status_label}</status>", 1
@@ -328,7 +328,7 @@ def cmd_create(
             f.write(xml_content)
             f.write("\n")
     except OSError as e:
-        err(f"티켓 파일 생성 실패: {e}")
+        err(f"Failed to create ticket file: {e}")
 
     suffix = f" ({command})" if command else ""
     print(f"{ticket_number}: {title}{suffix} [{status_label}]")
@@ -351,92 +351,92 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
     """
     target_section = COLUMN_MAP.get(target_key)
     if target_section is None:
-        err(f"잘못된 대상 컬럼: '{target_key}'. 허용값: {', '.join(COLUMN_MAP.keys())}")
+        err(f"Invalid target column: '{target_key}'. Allowed values: {', '.join(COLUMN_MAP.keys())}")
 
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     ticket_data = parse_ticket_xml(ticket_file)
     current_section = ticket_data["status"]
 
-    # 상태 전이 규칙 검증 (validate_transition 사용)
+    # Validating state transition rules (using validate_transition)
     validation_error = validate_transition(current_section, target_section, force)
     if validation_error is not None:
         if validation_error == "":
-            # 이미 같은 상태
-            print(f"{ticket_number}은 이미 {target_section} 상태입니다.")
+            # Already in the same state
+            print(f"{ticket_number} is already in {target_section} state.")
             return
         err(
-            f"{ticket_number}은 {validation_error}"
+            f"{ticket_number} is {validation_error}"
         )
 
-    # validate_transition 통과 후, 실제 쓰기 전 파일 존재 재검증 (레이스 컨디션 방어)
+    # After passing validate_transition, re-verify file existence before actual writing (race condition defense)
     if not os.path.isfile(ticket_file):
-        # 다른 세션이 이미 파일을 이동했을 수 있음 — 대상 디렉터리에서 재탐색
+        # Another session may have already moved the file — seek again in the target directory.
         refreshed = find_ticket_file(ticket_number)
         if refreshed is None:
-            err(f"{ticket_number} 티켓 파일이 이동 중 소실되었습니다 (레이스 컨디션)")
-        # 재탐색된 파일로 상태 재확인
+            err(f"{ticket_number} ticket file was lost in transit (race condition)")
+        # Recheck status with rediscovered files
         refreshed_data = parse_ticket_xml(refreshed)
         if refreshed_data["status"] == target_section:
-            print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+            print(f"{ticket_number} is already in {target_section} state. (processed in another session)")
             return
-        # 다른 상태로 이동된 경우 ticket_file 갱신 후 전이 규칙 재검증
+        # If moved to another state, re-validate transition rules after updating ticket_file
         ticket_file = refreshed
         current_section = refreshed_data["status"]
         validation_error = validate_transition(current_section, target_section, force)
         if validation_error is not None:
             if validation_error == "":
-                print(f"{ticket_number}은 이미 {target_section} 상태입니다.")
+                print(f"{ticket_number} is already in {target_section} state.")
                 return
-            err(f"{ticket_number}은 {validation_error}")
+            err(f"{ticket_number} is {validation_error}")
 
-    # XML <status> 갱신
+    # Update XML <status>
     try:
         update_ticket_status(ticket_file, target_section)
     except FileNotFoundError:
-        # write_ticket_xml이 파일 소실을 감지 — 재탐색 후 멱등성 확인
+        # write_ticket_xml detects file loss — check for idempotency after re-scanning
         refreshed = find_ticket_file(ticket_number)
         if refreshed is None:
-            err(f"{ticket_number} 티켓 파일이 상태 갱신 중 소실되었습니다 (레이스 컨디션)")
+            err(f"{ticket_number} ticket file was lost updating status (race condition)")
         refreshed_data = parse_ticket_xml(refreshed)
         if refreshed_data["status"] == target_section:
-            print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+            print(f"{ticket_number} is already in {target_section} state. (processed in another session)")
             return
-        err(f"{ticket_number} 상태 갱신 중 파일 소실 감지. 현재 상태: {refreshed_data['status']}")
+        err(f"File loss detected during {ticket_number} status update. Current status: {refreshed_data['status']}")
 
-    # 상태에 대응하는 디렉터리로 파일 이동
+    # Move files to the directory corresponding to the state
     try:
         new_path = move_ticket_to_status_dir(ticket_file, target_section)
         if new_path != ticket_file:
             src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
             dst_rel = os.path.relpath(new_path, _PROJECT_ROOT)
-            print(f"파일 이동: {src_rel} → {dst_rel}")
+            print(f"Move file: {src_rel} ​​→ {dst_rel}")
         ticket_file = new_path
     except FileNotFoundError:
-        # 이동 중 파일 소실 — 이미 이동된 경우 정상 처리
+        # File loss during movement — handle normally if already moved
         refreshed = find_ticket_file(ticket_number)
         if refreshed is not None:
             refreshed_data = parse_ticket_xml(refreshed)
             if refreshed_data["status"] == target_section:
-                print(f"{ticket_number}은 이미 {target_section} 상태입니다. (다른 세션에서 처리됨)")
+                print(f"{ticket_number} is already in {target_section} state. (processed in another session)")
                 return
-        err(f"{ticket_number} 파일 이동 중 소실 감지")
+        err(f"{ticket_number} file loss detection during movement")
     except OSError as e:
-        err(f"티켓 파일 이동 실패: {e}")
+        err(f"Failed to move ticket file: {e}")
 
     print(f"{ticket_number}: {current_section} → {target_section}")
     log("INFO", f"kanban.py: move {ticket_number} {current_section} → {target_section}")
 
-    # In Progress에서 이탈 시 워크트리 자동 정리
-    # In Progress → Open(재작업) / To Do(강등) 전이에서만 자동 정리.
+    # Automatic cleanup of work tree when leaving In Progress
+    # Automatic cleanup only in In Progress → Open (rework) / To Do (demotion) transitions.
     if current_section == "In Progress" and target_section != "Review":
         _cleanup_worktree_on_leave(ticket_number)
 
-    # Open 전이 시 세션 자동 kill:
-    # In Progress에서 Open으로 복귀하면 해당 티켓의 활성 세션을 종료한다.
-    # 상태 전이 성공 후에 실행하므로 전이 실패 시(err() 호출 후 SystemExit) 여기에 도달하지 않는다.
+    # Automatically kill session when transitioning to Open:
+    # Returning from In Progress to Open ends the active session for that ticket.
+    # Since it is executed after a successful state transition, it does not reach this point if the transition fails (SystemExit after calling err()).
     if target_section == "Open" and current_section == "In Progress":
         _kill_ticket_session(ticket_number)
 
@@ -453,13 +453,13 @@ def cmd_done(ticket_number: str) -> None:
     Args:
         ticket_number: 완료할 티켓 번호 (T-NNN 형식).
     """
-    # ── worktree 병합 훅 (티켓 상태 변경/파일 이동 전) ──
+    # ── Worktree merge hook (before changing ticket status/moving files) ──
     import sys as _sys
     try:
         from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop, has_uncommitted_changes
         from flow.branch_strategy import get_feature_branch_for_ticket
         if is_worktree_enabled():
-            # C-01: dirty worktree 감지 → 미커밋 변경 존재 시 거부
+            # C-01: Detect dirty worktree → Reject if uncommitted changes exist
             _wt_path = get_worktree_path(ticket_number)
             if _wt_path and has_uncommitted_changes(_wt_path):
                 _porcelain = subprocess.run(
@@ -468,21 +468,21 @@ def cmd_done(ticket_number: str) -> None:
                     capture_output=True,
                     text=True,
                 )
-                print(f"[ERROR] 미커밋 변경이 있는 워크트리입니다. Done 전이를 차단합니다.", flush=True)
-                print(f"  미커밋 파일 목록:", flush=True)
+                print(f"[ERROR] This is a work tree with uncommitted changes. Done Blocks the transition.", flush=True)
+                print(f"List of uncommitted files:", flush=True)
                 for _line in _porcelain.stdout.strip().splitlines():
                     print(f"    - {_line.strip()}", flush=True)
-                print(f"  flow-merge를 사용하여 정상 경로로 완료하세요.", flush=True)
+                print(f"Complete with the normal path using flow-merge.", flush=True)
                 _sys.exit(1)
             feat_branch = get_feature_branch_for_ticket(ticket_number)
             if _wt_path or feat_branch:
                 merge_result = merge_to_develop(ticket_number)
                 if not merge_result.success:
-                    # 충돌 판정 이중화:
-                    # (1) merge_result.conflicts 가 비어있지 않음
-                    # (2) error_message 에 충돌 시그널 패턴 포함
-                    # (3) conflicts 에 sentinel "<unknown-conflict>" 가 있음
-                    # 셋 중 하나라도 만족하면 충돌로 간주하여 Done 전이를 차단한다.
+                    # Collision decision redundancy:
+                    # (1) merge_result.conflicts is not empty
+                    # (2) Conflict signal pattern included in error_message
+                    # (3) There is sentinel "<unknown-conflict>" in conflicts
+                    # If any one of the three is satisfied, it is considered a conflict and the Done transition is blocked.
                     _sentinel = "<unknown-conflict>"
                     _has_conflict_files = bool(merge_result.conflicts)
                     _has_signal_in_msg = bool(
@@ -492,62 +492,62 @@ def cmd_done(ticket_number: str) -> None:
                     _is_conflict = _has_conflict_files or _has_signal_in_msg or _has_sentinel
 
                     if _is_conflict:
-                        print(f"[ERROR] {ticket_number} 병합 충돌 발생. Done 전이를 차단합니다.", flush=True)
-                        # 충돌 파일 목록 출력 — sentinel 만 있거나 목록이 빈 경우 안내 메시지로 대체
+                        print(f"[ERROR] {ticket_number} merge conflict occurred. Done Blocks the transition.", flush=True)
+                        # Output a list of conflicting files — if there is only sentinel or the list is empty, replaced by an instruction message
                         if merge_result.conflicts and not (
                             len(merge_result.conflicts) == 1 and merge_result.conflicts[0] == _sentinel
                         ):
-                            print(f"  충돌 파일:", flush=True)
+                            print(f"Conflicting files:", flush=True)
                             for cf in merge_result.conflicts:
                                 print(f"    - {cf}", flush=True)
                         else:
                             print(
-                                f"  (충돌 파일 목록 미상 — error_message 참조)",
+                                f"(List of conflicting files unknown — see error_message)",
                                 flush=True,
                             )
                             if merge_result.error_message:
                                 print(f"  error_message: {merge_result.error_message}", flush=True)
-                        print(f"  worktree에서 충돌을 해결한 후 다시 시도하세요.", flush=True)
+                        print(f"Please resolve the conflict in the worktree and try again.", flush=True)
                         _sys.exit(1)
                     else:
-                        # 충돌 패턴 검사 false — 단순 실패(예: develop checkout 실패): 경고 출력 후 계속 진행
-                        print(f"[WARN] worktree 병합 실패: {merge_result.error_message}", flush=True)
+                        # Conflict pattern check false — Simple failure (e.g. develop checkout failed): print warning and continue
+                        print(f"[WARN] Worktree merge failed: {merge_result.error_message}", flush=True)
                 else:
-                    print(f"{ticket_number}: {merge_result.merged_branch} -> develop 병합 완료 ({merge_result.merge_commit[:8]})", flush=True)
+                    print(f"{ticket_number}: {merge_result.merged_branch} -> develop merge completed ({merge_result.merge_commit[:8]})", flush=True)
                     log("INFO", f"kanban.py: worktree merge {merge_result.merged_branch} -> develop ({merge_result.merge_commit[:8]})")
                     if merge_result.merge_commit:
                         try:
                             _ticket_file_for_result = find_ticket_file(ticket_number)
                             if _ticket_file_for_result is not None:
                                 update_result(_ticket_file_for_result, {"merge_commit": merge_result.merge_commit})
-                                log("INFO", f"kanban.py: result.merge_commit 저장 ({merge_result.merge_commit[:8]})")
+                                log("INFO", f"kanban.py: save result.merge_commit ({merge_result.merge_commit[:8]})")
                         except Exception as _ur_err:
-                            print(f"[WARN] result.merge_commit 저장 실패 (계속 진행): {_ur_err}", flush=True)
+                            print(f"[WARN] result.merge_commit failed to save (continue): {_ur_err}", flush=True)
     except ImportError:
-        pass  # worktree 모듈 미설치 시 무시 (하위 호환)
+        pass  # Ignored if the worktree module is not installed (backwards compatible)
     except Exception as _wt_err:
-        print(f"[WARN] worktree 병합 처리 중 오류 (계속 진행): {_wt_err}", flush=True)
+        print(f"[WARN] Error processing worktree merge (continued): {_wt_err}", flush=True)
 
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     ticket_data = parse_ticket_xml(ticket_file)
     current_section = ticket_data["status"]
 
-    # XML <status> Done으로 갱신
+    # XML <status> updated with Done
     update_ticket_status(ticket_file, "Done")
 
-    # 파일을 kanban/done/T-NNN.xml로 이동
+    # Move the file to kanban/done/T-NNN.xml
     if os.path.isfile(ticket_file):
         try:
             new_path = move_ticket_to_status_dir(ticket_file, "Done")
             if new_path != ticket_file:
                 src_rel = os.path.relpath(ticket_file, _PROJECT_ROOT)
                 dst_rel = os.path.relpath(new_path, _PROJECT_ROOT)
-                print(f"파일 이동: {src_rel} → {dst_rel}")
+                print(f"Move file: {src_rel} ​​→ {dst_rel}")
         except OSError as e:
-            err(f"티켓 파일 이동 실패: {e}")
+            err(f"Failed to move ticket file: {e}")
 
     print(f"{ticket_number}: {current_section} → Done")
     log("INFO", f"kanban.py: done {ticket_number} {current_section} → Done")
@@ -566,14 +566,14 @@ def cmd_delete(ticket_number: str) -> None:
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓을 찾을 수 없습니다")
+        err(f"Ticket {ticket_number} not found")
 
     try:
         os.remove(ticket_file)
     except OSError as e:
-        err(f"티켓 파일 삭제 실패: {e}")
+        err(f"Failed to delete ticket file: {e}")
 
-    print(f"{ticket_number}: 삭제됨")
+    print(f"{ticket_number}: deleted")
 
 
 def cmd_update_title(ticket_number: str, title: str) -> None:
@@ -588,15 +588,15 @@ def cmd_update_title(ticket_number: str, title: str) -> None:
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     try:
         tree = ET.parse(ticket_file)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({ticket_file}): {e}")
+        err(f"Failed to parse ticket file ({ticket_file}): {e}")
 
-    # <metadata> 래퍼 내부의 <title> 우선 탐색
+    # First search for <title> inside the <metadata> wrapper
     metadata_elem = root.find("metadata")
     if metadata_elem is not None:
         title_elem = metadata_elem.find("title")
@@ -613,7 +613,7 @@ def cmd_update_title(ticket_number: str, title: str) -> None:
 
     write_ticket_xml(ticket_file, root)
 
-    print(f"{ticket_number}: 제목 → {title}")
+    print(f"{ticket_number}: Title → {title}")
 
 
 def cmd_set_editing(ticket_number: str, value: bool) -> None:
@@ -628,13 +628,13 @@ def cmd_set_editing(ticket_number: str, value: bool) -> None:
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     try:
         tree = ET.parse(ticket_file)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"티켓 파일 파싱 실패 ({ticket_file}): {e}")
+        err(f"Failed to parse ticket file ({ticket_file}): {e}")
 
     metadata_elem = root.find("metadata")
     if metadata_elem is None:
@@ -682,7 +682,7 @@ def cmd_update_prompt(
 
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     updates: dict[str, str] = {}
     if command:
@@ -699,12 +699,12 @@ def cmd_update_prompt(
         updates["context"] = context
 
     if not updates:
-        err("갱신할 필드가 없습니다.", 2)
+        err("There are no fields to update.", 2)
 
     update_prompt(ticket_file, updates)
-    print(f"{ticket_number}: prompt 갱신됨")
+    print(f"{ticket_number}: prompt updated")
 
-    # ── 품질 검증 ──────────────────────────────────────────────────────────
+    # ── Quality verification ────────────────────────────────────────────────────────────
     if skip_validation:
         return
 
@@ -712,15 +712,15 @@ def cmd_update_prompt(
         with open(ticket_file, "r", encoding="utf-8") as f:
             xml_text = f.read()
     except OSError as e:
-        _sys.stderr.write(f"[WARN] 품질 검증용 파일 재읽기 실패: {e}\n")
+        _sys.stderr.write(f"[WARN] Failed to reread quality verification file: {e} \n")
         return
 
-    # flat 구조: <prompt> 태그 내부 텍스트를 직접 추출
+    # Flat structure: directly extract text inside <prompt> tag
     try:
         from core.validation.prompt_validator import extract_active_prompt
         prompt_text = extract_active_prompt(xml_text)
     except Exception:
-        # extract_active_prompt 실패 시 검증 건너뜀
+        # Skip verification if extract_active_prompt fails
         return
 
     validation_result = prompt_validate(prompt_text)
@@ -728,18 +728,18 @@ def cmd_update_prompt(
 
     if quality_score < QUALITY_THRESHOLD:
         _sys.stderr.write(
-            f"[ERROR] 품질 검증 실패 (score={quality_score:.4f} < threshold={QUALITY_THRESHOLD})\n"
+            f"[ERROR] Quality verification failed (score={quality_score:.4f} < threshold={QUALITY_THRESHOLD}) \n"
         )
         if validation_result["missing_tags"]:
             _sys.stderr.write(
-                f"  누락 태그: {', '.join(validation_result['missing_tags'])}\n"
+                f"Missing tags: {', '.join(validation_result['missing_tags'])} \n"
             )
         if validation_result["empty_tags"]:
             _sys.stderr.write(
-                f"  빈 태그: {', '.join(validation_result['empty_tags'])}\n"
+                f"Empty tags: {', '.join(validation_result['empty_tags'])} \n"
             )
         if validation_result["feedback"]:
-            _sys.stderr.write("  피드백:\n")
+            _sys.stderr.write("Feedback: \n")
             for fb in validation_result["feedback"]:
                 _sys.stderr.write(f"    - {fb}\n")
         _sys.exit(1)
@@ -768,7 +768,7 @@ def cmd_update_result(
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     updates: dict[str, str] = {}
     if registrykey:
@@ -783,10 +783,10 @@ def cmd_update_result(
         updates["merge_commit"] = merge_commit
 
     if not updates:
-        err("갱신할 필드가 없습니다.", 2)
+        err("There are no fields to update.", 2)
 
     update_result(ticket_file, updates)
-    print(f"{ticket_number}: result 갱신됨")
+    print(f"{ticket_number}: result updated")
 
 
 def cmd_show(ticket_number: str) -> None:
@@ -803,7 +803,7 @@ def cmd_show(ticket_number: str) -> None:
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
-        err(f"{ticket_number} 티켓을 찾을 수 없습니다")
+        err(f"Ticket {ticket_number} not found")
 
     ticket_data = parse_ticket_xml(ticket_file)
 
@@ -815,7 +815,7 @@ def cmd_show(ticket_number: str) -> None:
     result_data: dict | None = ticket_data.get("result")
     relations: list = ticket_data.get("relations", [])
 
-    # ── 헤더 및 메타데이터 출력 ──────────────────────────────────────────────
+    # ── Header and metadata output ───────────────────────────────────────────────
     print(f"## {number}: {title}")
     print()
     print("### Metadata")
@@ -825,7 +825,7 @@ def cmd_show(ticket_number: str) -> None:
     if command:
         print(f"- Command: {command}")
 
-    # ── 관계 정보 출력 ────────────────────────────────────────────────────────
+    # ── Output relationship information ──────────────────────────────────────────────────────────
     if relations:
         print()
         print("### Relations")
@@ -834,11 +834,11 @@ def cmd_show(ticket_number: str) -> None:
             rel_ticket: str = rel.get("ticket", "")
             print(f"- {rel_type}: {rel_ticket}")
 
-    # ── 프롬프트 출력 ────────────────────────────────────────────────────────
+    # ── Prompt output ───────────────────────────────────────────────────────────
     has_prompt = any(prompt_data.get(k) for k in ("goal", "target", "constraints", "criteria", "context"))
     if not has_prompt:
         print()
-        print("(프롬프트 없음)")
+        print("(no prompt)")
     else:
         print()
         print("### Prompt")
@@ -863,7 +863,7 @@ def cmd_show(ticket_number: str) -> None:
         if context:
             print(f"- Context: {context.strip()}")
 
-    # ── result 정보 출력 ─────────────────────────────────────────────────────
+    # ── Output result information ────────────────────────────────────────────────────────
     print()
     print("### Result")
 
@@ -889,8 +889,8 @@ def cmd_show(ticket_number: str) -> None:
         print("- Has Result: No")
 
 
-# ─── 관계 양방향 매핑 ────────────────────────────────────────────────────────
-# 각 관계 옵션에 대해 (원본에 기록할 타입, 대상에 기록할 역방향 타입)
+# ─── Relationship Bidirectional Mapping ───────────────────────────────────────────────────────────
+# For each relationship option (type to write to source, reverse type to write to destination)
 _RELATION_PAIRS: dict[str, tuple[str, str]] = {
     "depends_on": ("depends-on", "blocks"),
     "derived_from": ("derived-from", "blocks"),
@@ -917,7 +917,7 @@ def _apply_relation(
     """
     target_file = find_ticket_file(target_ticket)
     if target_file is None:
-        err(f"대상 티켓 {target_ticket} 파일을 찾을 수 없습니다")
+        err(f"Target ticket {target_ticket} file not found")
 
     forward_type, reverse_type = _RELATION_PAIRS[option_name]
     fn = remove_relation if remove else add_relation
@@ -947,7 +947,7 @@ def cmd_link(
     """
     source_file = find_ticket_file(ticket_number)
     if source_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     options = {"depends_on": depends_on, "derived_from": derived_from, "blocks": blocks}
     applied = []
@@ -957,13 +957,13 @@ def cmd_link(
             continue
         normalized = normalize_ticket_number(target)
         if normalized is None:
-            err(f"잘못된 티켓 번호 형식: '{target}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{target}'. Use the format T-NNN, NNN, #N.", 2)
         _apply_relation(source_file, ticket_number, normalized, option_name)
         forward_type = _RELATION_PAIRS[option_name][0]
         applied.append(f"{forward_type} {normalized}")
 
     for desc in applied:
-        print(f"{ticket_number}: {desc} 관계 추가됨")
+        print(f"{ticket_number}: {desc} relationship added")
     log("INFO", f"kanban.py: link {ticket_number} {', '.join(applied)}")
 
 
@@ -985,7 +985,7 @@ def cmd_unlink(
     """
     source_file = find_ticket_file(ticket_number)
     if source_file is None:
-        err(f"{ticket_number} 티켓 파일을 찾을 수 없습니다")
+        err(f"Ticket file {ticket_number} not found")
 
     options = {"depends_on": depends_on, "derived_from": derived_from, "blocks": blocks}
     removed = []
@@ -995,13 +995,13 @@ def cmd_unlink(
             continue
         normalized = normalize_ticket_number(target)
         if normalized is None:
-            err(f"잘못된 티켓 번호 형식: '{target}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{target}'. Use the format T-NNN, NNN, #N.", 2)
         _apply_relation(source_file, ticket_number, normalized, option_name, remove=True)
         forward_type = _RELATION_PAIRS[option_name][0]
         removed.append(f"{forward_type} {normalized}")
 
     for desc in removed:
-        print(f"{ticket_number}: {desc} 관계 제거됨")
+        print(f"{ticket_number}: {desc} relationship removed")
     log("INFO", f"kanban.py: unlink {ticket_number} {', '.join(removed)}")
 
 
@@ -1012,7 +1012,7 @@ def cmd_board() -> None:
     To Do/Open/In Progress/Review 칼럼에 직접 매핑하고, .kanban/done/ 디렉터리의
     티켓을 Done 칼럼에 그룹핑하여 출력한다.
     Done 칼럼은 최근 10건만 표시하고 총 건수를 함께 출력한다.
-    각 칼럼에 티켓이 없으면 "(없음)"을 출력한다.
+    각 칼럼에 티켓이 없으면 "(doesn't exist)"을 출력한다.
 
     출력 포맷:
         ## Kanban Board
@@ -1021,16 +1021,16 @@ def cmd_board() -> None:
         | Ticket | Title | Command |
         ...
 
-        ### Done (총 N건, 최근 10건 표시)
+        ### Done (N total, display the most recent 10)
         | Ticket | Title |
         ...
     """
-    # ── 칼럼 정의 ────────────────────────────────────────────────────────────
+    # ── Column definition ─────────────────────────────────────────────────────────────────
     COLUMNS = ["To Do", "Open", "In Progress", "Review", "Done"]
     grouped: dict[str, list[dict]] = {col: [] for col in COLUMNS}
 
-    # ── 상태별 디렉터리 스캔 (디렉터리가 SSoT) ────────────────────────────────
-    # 디렉터리 -> 칼럼 매핑: todo/ -> To Do, open/ -> Open, progress/ -> In Progress, review/ -> Review
+    # ── Directory scan by status (directory is SSoT) ─────────────────────────────────
+    # Directory -> Column Mapping: todo/ -> To Do, open/ -> Open, progress/ -> In Progress, review/ -> Review
     _DIR_COLUMN_MAP = [
         (KANBAN_TODO_DIR, "To Do"),
         (KANBAN_OPEN_DIR, "Open"),
@@ -1047,7 +1047,7 @@ def cmd_board() -> None:
             try:
                 ticket_data = parse_ticket_xml(fpath)
             except SystemExit:
-                log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
+                log("WARN", f"kanban.py: board - parse_ticket_xml failed: {fname}")
                 continue
 
             grouped[column].append({
@@ -1056,7 +1056,7 @@ def cmd_board() -> None:
                 "command": ticket_data.get("command", ""),
             })
 
-    # ── done 디렉터리 스캔 ───────────────────────────────────────────────────
+    # ── done Directory scan ───────────────────────────────────────────────────────
     if os.path.isdir(KANBAN_DONE_DIR):
         for fname in os.listdir(KANBAN_DONE_DIR):
             if not (fname.startswith("T-") and fname.endswith(".xml")):
@@ -1065,7 +1065,7 @@ def cmd_board() -> None:
             try:
                 ticket_data = parse_ticket_xml(fpath)
             except SystemExit:
-                log("WARN", f"kanban.py: board - parse_ticket_xml 실패: {fname}")
+                log("WARN", f"kanban.py: board - parse_ticket_xml failed: {fname}")
                 continue
 
             grouped["Done"].append({
@@ -1074,7 +1074,7 @@ def cmd_board() -> None:
                 "command": "",
             })
 
-    # ── 번호 기준 정렬 (T-NNN → NNN 숫자 오름차순) ──────────────────────────
+    # ── Sort by number (T-NNN → NNN number ascending) ───────────────────────────
     def _ticket_sort_key(t: dict) -> int:
         num_str = t.get("number", "T-0").lstrip("T-")
         return int(num_str) if num_str.isdigit() else 0
@@ -1082,19 +1082,19 @@ def cmd_board() -> None:
     for col in COLUMNS[:-1]:  # To Do, Open, In Progress, Review
         grouped[col].sort(key=_ticket_sort_key)
 
-    # Done은 번호 내림차순(최신 먼저), 최근 10건만 표시
+    # Done displays only the 10 most recent items in descending number order (newest first).
     grouped["Done"].sort(key=_ticket_sort_key, reverse=True)
     done_total = len(grouped["Done"])
     grouped["Done"] = grouped["Done"][:10]
 
-    # ── 출력 ─────────────────────────────────────────────────────────────────
+    # ── Output ────────────────────────────────────────────────────────────────────
     print("## Kanban Board")
 
     for col in COLUMNS[:-1]:  # To Do, Open, In Progress, Review
         print(f"\n### {col}")
         tickets = grouped[col]
         if not tickets:
-            print("(없음)")
+            print("(doesn't exist)")
         else:
             print("| Ticket | Title | Command |")
             print("|--------|-------|---------|")
@@ -1104,11 +1104,11 @@ def cmd_board() -> None:
                 command = t["command"]
                 print(f"| {number}  | {title} | {command} |")
 
-    # Done 칼럼
-    print(f"\n### Done (총 {done_total}건, 최근 10건 표시)")
+    # Done column
+    print(f"\n ### Done (Total {done_total}, showing the most recent 10)")
     tickets = grouped["Done"]
     if not tickets:
-        print("(없음)")
+        print("(doesn't exist)")
     else:
         print("| Ticket | Title |")
         print("|--------|-------|")
@@ -1118,7 +1118,7 @@ def cmd_board() -> None:
             print(f"| {number}  | {title} |")
 
 
-# 상태 키 -> (디렉터리, 표시 상태명) 매핑
+# State key -> (directory, display state name) mapping
 _STATUS_SCAN_MAP: dict[str, tuple[str, str]] = {
     "todo": (KANBAN_TODO_DIR, "To Do"),
     "open": (KANBAN_OPEN_DIR, "Open"),
@@ -1144,9 +1144,9 @@ def cmd_list(status_filter: str = "") -> None:
     if status_filter:
         scan_targets = [_STATUS_SCAN_MAP[status_filter]]
     else:
-        # 기본: open + progress + review (todo, done 제외)
-        # - todo: 백로그 성격이므로 기본 노출 제외 (--status todo 명시 시만 노출)
-        # - done: 완료 티켓은 기본 노출 제외
+        # Default: open + progress + review (excluding todo, done)
+        # - todo: Excluding default exposure due to backlog nature (exposed only when --status todo is specified)
+        # - done: Completed tickets exclude basic exposure
         scan_targets = [
             _STATUS_SCAN_MAP["open"],
             _STATUS_SCAN_MAP["progress"],
@@ -1171,7 +1171,7 @@ def cmd_list(status_filter: str = "") -> None:
                 "status": status_label,
             })
 
-    # 번호 기준 오름차순 정렬 (T-NNN → NNN 숫자 변환)
+    # Sort in ascending order by number (T-NNN → NNN number conversion)
     def _sort_key(t: dict[str, str]) -> int:
         num_str = t.get("number", "T-0").lstrip("T-")
         return int(num_str) if num_str.isdigit() else 0
@@ -1179,14 +1179,14 @@ def cmd_list(status_filter: str = "") -> None:
     tickets.sort(key=_sort_key)
 
     if not tickets:
-        print("(티켓 없음)")
+        print("(no tickets)")
         return
 
     for t in tickets:
         print(f"{t['number']}  [{t['status']}]  {t['title']}")
 
 
-# ─── argparse 설정 ───────────────────────────────────────────────────────────
+# ─── argparse settings ──────────────────────────────────────────────────────────────
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1197,122 +1197,122 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="kanban.py",
-        description="칸반 보드 상태 관리 CLI",
+        description="Kanban Board Status Management CLI",
     )
     subparsers = parser.add_subparsers(dest="subcommand", required=True)
 
-    # create 서브커맨드
-    create_parser = subparsers.add_parser("create", help="새 티켓을 생성한다")
-    create_parser.add_argument("title", help="티켓 제목")
-    create_parser.add_argument("--command", default="", help="워크플로우 커맨드 (implement, review, research 등)")
+    # create subcommand
+    create_parser = subparsers.add_parser("create", help="Create a new ticket")
+    create_parser.add_argument("title", help="ticket title")
+    create_parser.add_argument("--command", default="", help="Workflow commands (implement, review, research, etc.)")
     create_parser.add_argument(
         "--status",
         required=True,
         choices=["todo", "open"],
         metavar="{todo,open}",
         help=(
-            "초기 상태 (필수). 'todo'=백로그·미래에 할 일, 'open'=지금 집중 대상. "
-            "예: flow-kanban create \"제목\" --command implement --status todo"
+            "Initial state (required). 'todo'=backlog·things to do in the future, 'open'=target of focus now."
+            "Example: flow-kanban create \\"title\\" --command implement --status todo"
         ),
     )
     create_parser.add_argument(
         "--number",
         default=None,
         help=(
-            "티켓 번호 명시 (T-NNN, NNN, #N 형식). 미지정 시 자동 채번. "
-            "동일 번호 존재 시 에러."
+            "Specify ticket number (in the format T-NNN, NNN, #N). Automatic numbering if not specified."
+            "Error when the same number exists."
         ),
     )
 
-    # move 서브커맨드
-    move_parser = subparsers.add_parser("move", help="티켓을 지정 컬럼으로 이동한다")
-    move_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # move subcommand
+    move_parser = subparsers.add_parser("move", help="Move the ticket to the specified column")
+    move_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
     move_parser.add_argument(
         "target",
         choices=list(COLUMN_MAP.keys()),
-        help="대상 컬럼 (todo/open/progress/review/done)",
+        help="Target column (todo/open/progress/review/done)",
     )
-    move_parser.add_argument("--force", action="store_true", help="상태 전이 규칙 무시하고 강제 이동")
+    move_parser.add_argument("--force", action="store_true", help="Ignore state transition rules and force movement")
 
-    # done 서브커맨드
-    done_parser = subparsers.add_parser("done", help="티켓을 Done으로 이동하고 파일을 .kanban/done/으로 이동한다")
-    done_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # done subcommand
+    done_parser = subparsers.add_parser("done", help="Move the ticket to Done and the file to .kanban/done/")
+    done_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
 
-    # delete 서브커맨드
-    delete_parser = subparsers.add_parser("delete", help="티켓을 삭제한다")
-    delete_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # delete subcommand
+    delete_parser = subparsers.add_parser("delete", help="Delete the ticket")
+    delete_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
 
-    # update-prompt 서브커맨드
-    update_prompt_parser = subparsers.add_parser("update-prompt", help="티켓의 prompt 및 command를 갱신한다")
-    update_prompt_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_prompt_parser.add_argument("--command", default="", help="워크플로우 커맨드 (implement, review, research 등)")
-    update_prompt_parser.add_argument("--goal", default="", help="작업 목표")
-    update_prompt_parser.add_argument("--target", default="", help="대상")
-    update_prompt_parser.add_argument("--constraints", default="", help="제약사항 (선택, 프롬프트 5요소)")
-    update_prompt_parser.add_argument("--criteria", default="", help="완료 기준 (선택, 프롬프트 5요소)")
-    update_prompt_parser.add_argument("--context", default="", help="맥락 정보 (선택, 프롬프트 5요소)")
-    update_prompt_parser.add_argument("--skip-validation", action="store_true", default=False, help="품질 검증을 우회한다 (긴급 시 사용)")
+    # update-prompt subcommand
+    update_prompt_parser = subparsers.add_parser("update-prompt", help="Update ticket prompt and command")
+    update_prompt_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    update_prompt_parser.add_argument("--command", default="", help="Workflow commands (implement, review, research, etc.)")
+    update_prompt_parser.add_argument("--goal", default="", help="work goal")
+    update_prompt_parser.add_argument("--target", default="", help="Target")
+    update_prompt_parser.add_argument("--constraints", default="", help="Constraints (optional, prompt 5 elements)")
+    update_prompt_parser.add_argument("--criteria", default="", help="Completion criteria (optional, prompt 5 elements)")
+    update_prompt_parser.add_argument("--context", default="", help="Contextual information (optional, prompt 5 elements)")
+    update_prompt_parser.add_argument("--skip-validation", action="store_true", default=False, help="Bypass quality verification (for emergency use)")
 
-    # update-result 서브커맨드
-    update_result_parser = subparsers.add_parser("update-result", help="티켓의 result 정보를 갱신한다")
-    update_result_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_result_parser.add_argument("--registrykey", default="", help="워크플로우 registryKey (YYYYMMDD-HHMMSS 형식)")
-    update_result_parser.add_argument("--workdir", default="", help="워크플로우 산출물 디렉터리 상대 경로")
-    update_result_parser.add_argument("--plan", default="", help="plan.md 상대 경로")
-    update_result_parser.add_argument("--report", default="", help="report.md 상대 경로")
-    update_result_parser.add_argument("--merge-commit", dest="merge_commit", default="", help="feature -> develop 머지 커밋 SHA")
+    # update-result subcommand
+    update_result_parser = subparsers.add_parser("update-result", help="Update the result information of the ticket")
+    update_result_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    update_result_parser.add_argument("--registrykey", default="", help="Workflow registryKey (YYYYMMDD-HHMMSS format)")
+    update_result_parser.add_argument("--workdir", default="", help="Workflow output directory relative path")
+    update_result_parser.add_argument("--plan", default="", help="plan.md relative path")
+    update_result_parser.add_argument("--report", default="", help="report.md relative path")
+    update_result_parser.add_argument("--merge-commit", dest="merge_commit", default="", help="feature -> develop merge commit SHA")
 
-    # set-editing 서브커맨드
-    set_editing_parser = subparsers.add_parser("set-editing", help="티켓 XML의 <editing> 플래그를 설정한다")
-    set_editing_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # set-editing subcommand
+    set_editing_parser = subparsers.add_parser("set-editing", help="Set the <editing> flag in the ticket XML.")
+    set_editing_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
     set_editing_group = set_editing_parser.add_mutually_exclusive_group(required=True)
-    set_editing_group.add_argument("--on", action="store_true", help="편집 중 상태로 설정")
-    set_editing_group.add_argument("--off", action="store_true", help="편집 중 상태 해제")
+    set_editing_group.add_argument("--on", action="store_true", help="Set state to editing")
+    set_editing_group.add_argument("--off", action="store_true", help="Turn off editing state")
 
-    # update-title 서브커맨드 (update는 update-title의 alias)
-    update_title_parser = subparsers.add_parser("update-title", help="티켓 제목을 갱신한다")
-    update_title_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_title_parser.add_argument("title", nargs="?", default="", help="새 제목")
-    update_title_parser.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
-    update_alias = subparsers.add_parser("update", help="update-title의 alias")
-    update_alias.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    update_alias.add_argument("title", nargs="?", default="", help="새 제목")
-    update_alias.add_argument("--title", dest="title_flag", default="", help="새 제목 (--title 형식)")
+    # update-title subcommand (update is an alias for update-title)
+    update_title_parser = subparsers.add_parser("update-title", help="Update ticket title")
+    update_title_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    update_title_parser.add_argument("title", nargs="?", default="", help="new title")
+    update_title_parser.add_argument("--title", dest="title_flag", default="", help="New title (format --title)")
+    update_alias = subparsers.add_parser("update", help="alias for update-title")
+    update_alias.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    update_alias.add_argument("title", nargs="?", default="", help="new title")
+    update_alias.add_argument("--title", dest="title_flag", default="", help="New title (format --title)")
 
-    # link 서브커맨드
-    link_parser = subparsers.add_parser("link", help="티켓 간 관계를 양방향으로 기록한다")
-    link_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    link_parser.add_argument("--depends-on", dest="depends_on", default="", help="의존 대상 티켓 번호")
-    link_parser.add_argument("--derived-from", dest="derived_from", default="", help="파생 원본 티켓 번호")
-    link_parser.add_argument("--blocks", default="", help="차단 대상 티켓 번호")
+    # link subcommand
+    link_parser = subparsers.add_parser("link", help="Records relationships between tickets in both directions")
+    link_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    link_parser.add_argument("--depends-on", dest="depends_on", default="", help="Depends on ticket number")
+    link_parser.add_argument("--derived-from", dest="derived_from", default="", help="Derived original ticket number")
+    link_parser.add_argument("--blocks", default="", help="Ticket number to block")
 
-    # unlink 서브커맨드
-    unlink_parser = subparsers.add_parser("unlink", help="티켓 간 관계를 양방향으로 제거한다")
-    unlink_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
-    unlink_parser.add_argument("--depends-on", dest="depends_on", default="", help="의존 대상 티켓 번호")
-    unlink_parser.add_argument("--derived-from", dest="derived_from", default="", help="파생 원본 티켓 번호")
-    unlink_parser.add_argument("--blocks", default="", help="차단 대상 티켓 번호")
+    # unlink subcommand
+    unlink_parser = subparsers.add_parser("unlink", help="Remove relationships between tickets in both directions")
+    unlink_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
+    unlink_parser.add_argument("--depends-on", dest="depends_on", default="", help="Depends on ticket number")
+    unlink_parser.add_argument("--derived-from", dest="derived_from", default="", help="Derived original ticket number")
+    unlink_parser.add_argument("--blocks", default="", help="Ticket number to block")
 
-    # board 서브커맨드
-    subparsers.add_parser("board", help="칸반 보드 전체 현황을 조회한다")
+    # board subcommand
+    subparsers.add_parser("board", help="Check the overall status of the Kanban board")
 
-    # list 서브커맨드
-    list_parser = subparsers.add_parser("list", help="칸반 티켓 목록을 조회한다")
+    # list subcommand
+    list_parser = subparsers.add_parser("list", help="View Kanban ticket list")
     list_parser.add_argument(
         "--status",
         choices=["todo", "open", "progress", "review", "done"],
         default="",
-        help="상태 필터 (미지정 시 To Do/Done 제외 전체)",
+        help="Status filter (all except To Do/Done if not specified)",
     )
 
-    # show 서브커맨드
-    show_parser = subparsers.add_parser("show", help="특정 티켓의 상세 정보를 조회한다")
-    show_parser.add_argument("ticket", help="티켓 번호 (T-NNN, NNN, #N 형식)")
+    # show subcommand
+    show_parser = subparsers.add_parser("show", help="View detailed information on a specific ticket")
+    show_parser.add_argument("ticket", help="Ticket number (T-NNN, NNN, #N format)")
 
     return parser
 
 
-# ─── 디스패치 ───────────────────────────────────────────────────────────────
+# ─── Dispatch ──────────────────────────────────────────────────────────────────
 
 
 def dispatch(args: argparse.Namespace) -> None:
@@ -1333,25 +1333,25 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.subcommand == "move":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_move(ticket, args.target, force=args.force)
 
     elif args.subcommand == "done":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_done(ticket)
 
     elif args.subcommand == "delete":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_delete(ticket)
 
     elif args.subcommand == "update-prompt":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_update_prompt(
             ticket,
             command=args.command,
@@ -1366,7 +1366,7 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.subcommand == "update-result":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_update_result(
             ticket,
             registrykey=args.registrykey,
@@ -1379,24 +1379,24 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.subcommand == "set-editing":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_set_editing(ticket, args.on)
 
     elif args.subcommand in ("update-title", "update"):
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         title = args.title or getattr(args, "title_flag", "") or ""
         if not title:
-            err("제목을 지정해야 합니다. 예: flow-kanban update-title T-001 \"새 제목\"", 2)
+            err("You must specify a title. Example: flow-kanban update-title T-001 \\"New title\\"", 2)
         cmd_update_title(ticket, title)
 
     elif args.subcommand == "link":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         if not args.depends_on and not args.derived_from and not args.blocks:
-            err("--depends-on, --derived-from, --blocks 중 최소 1개를 지정해야 합니다.", 2)
+            err("At least one of --depends-on, --derived-from, and --blocks must be specified.", 2)
         cmd_link(
             ticket,
             depends_on=args.depends_on,
@@ -1407,9 +1407,9 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.subcommand == "unlink":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         if not args.depends_on and not args.derived_from and not args.blocks:
-            err("--depends-on, --derived-from, --blocks 중 최소 1개를 지정해야 합니다.", 2)
+            err("At least one of --depends-on, --derived-from, and --blocks must be specified.", 2)
         cmd_unlink(
             ticket,
             depends_on=args.depends_on,
@@ -1426,8 +1426,8 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.subcommand == "show":
         ticket = normalize_ticket_number(args.ticket)
         if ticket is None:
-            err(f"잘못된 티켓 번호 형식: '{args.ticket}'. T-NNN, NNN, #N 형식을 사용하세요.", 2)
+            err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         cmd_show(ticket)
 
     else:
-        err(f"알 수 없는 서브커맨드: '{args.subcommand}'", 2)
+        err(f"Unknown subcommand: '{args.subcommand}'", 2)

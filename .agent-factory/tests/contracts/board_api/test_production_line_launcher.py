@@ -1,11 +1,11 @@
-"""T-500: server/production_line_launcher.py 단위 테스트.
+"""T-500: server/production_line_launcher.py unit test.
 
-검증 대상:
-  - 모듈 import 가능 (spawn_production_line / _production_line_reader_loop callable)
-  - spawn_production_line: env 주입 (V2_BOARD_POST/V2_REGISTRY_KEY), session_id 결정론,
-                    응답 dict 키 정합, Popen 실패 분기, reader thread 등록
-  - _production_line_reader_loop: rc != 0 시 LAUNCH_FAILED, rc == 0 시 silent,
-                            thread set 자기 제거
+Verified by:
+  - Module import possible (spawn_production_line / _production_line_reader_loop callable)
+  - spawn_production_line: env injection (V2_BOARD_POST/V2_REGISTRY_KEY), session_id determinism;
+                    Response dict key matching, Popen failure branch, reader thread registration
+  - _production_line_reader_loop: LAUNCH_FAILED when rc != 0, silent when rc == 0,
+                            thread set self-removal
 """
 
 from __future__ import annotations
@@ -29,15 +29,15 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
 
 
 # ==============================================================================
-# T01 — 모듈 import + 심볼 callable
+# T01 — module import + symbol callable
 # ==============================================================================
 
 
 class TestModuleImport(unittest.TestCase):
-    """production_line_launcher 모듈 import + 핵심 심볼 callable 확인."""
+    """Import production_line_launcher module + check core symbol callable."""
 
     def test_module_import(self):
-        from board.server import production_line_launcher
+        from board.server.processes import production_line_launcher
         self.assertTrue(callable(production_line_launcher.spawn_production_line))
         self.assertTrue(callable(production_line_launcher._production_line_reader_loop))
         self.assertIsInstance(production_line_launcher._LAUNCH_READER_THREADS, set)
@@ -45,12 +45,12 @@ class TestModuleImport(unittest.TestCase):
 
 
 # ==============================================================================
-# T02 — spawn_production_line 부수효과 / 응답 / 환경 변수
+# T02 — spawn_production_line side effects / response / environment variables
 # ==============================================================================
 
 
 def _make_mock_proc(returncode: int = 0, stdout: str = '', stderr: str = '') -> MagicMock:
-    """Popen mock — communicate() 호출 시 (stdout, stderr) 반환."""
+    """Popen mock — Returns (stdout, stderr) when calling communicate()."""
     proc = MagicMock()
     proc.returncode = returncode
     proc.communicate = MagicMock(return_value=(stdout, stderr))
@@ -60,21 +60,21 @@ def _make_mock_proc(returncode: int = 0, stdout: str = '', stderr: str = '') -> 
 class TestSpawnProductionLine(unittest.TestCase):
 
     def setUp(self):
-        from board.server import production_line_launcher
-        # 이전 테스트가 남긴 reader thread 가 set 에 남아있을 수 있어 정리
+        from board.server.processes import production_line_launcher
+        # The reader thread left behind by the previous test may remain in the set.
         with production_line_launcher._LAUNCH_READER_LOCK:
             production_line_launcher._LAUNCH_READER_THREADS.clear()
         self.production_line_launcher = production_line_launcher
 
     def tearDown(self):
-        # join 가능한 thread 는 종료까지 대기 (mock proc.communicate 즉시 반환)
+        # Threads that can join wait until termination (mock proc.communicate returns immediately)
         with self.production_line_launcher._LAUNCH_READER_LOCK:
             threads = list(self.production_line_launcher._LAUNCH_READER_THREADS)
         for t in threads:
             t.join(timeout=2.0)
 
     def test_env_injection(self):
-        """V2_BOARD_POST=true, V2_REGISTRY_KEY=YYYYMMDD-HHMMSS 가 Popen env 에 주입된다."""
+        """V2_BOARD_POST=true, V2_REGISTRY_KEY=YYYYMMDD-HHMMSS is injected into Popen env."""
         captured = {}
 
         def _fake_popen(cmd, **kwargs):
@@ -90,7 +90,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertTrue(result.get('ok'))
         self.assertEqual(captured['env']['V2_BOARD_POST'], 'true')
         registry_key = captured['env']['V2_REGISTRY_KEY']
-        # YYYYMMDD-HHMMSS 형태 — 14자 + 1 dash
+        # Format YYYYMMDD-HHMMSS — 14 characters + 1 dash
         self.assertEqual(len(registry_key), 15)
         self.assertEqual(registry_key[8], '-')
         self.assertTrue(registry_key[:8].isdigit())
@@ -98,7 +98,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertTrue(captured['cwd'])
 
     def test_session_id_determinism(self):
-        """submitted_at 고정 시 session_id == f'wf-{ticket}-{registry_key}'."""
+        """When fixing submitted_at session_id == f'wf-{ticket}-{registry_key}'."""
         fixed_dt = datetime(2026, 5, 19, 12, 30, 45, tzinfo=timezone.utc)
 
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=_make_mock_proc()), \
@@ -110,7 +110,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertEqual(result['submitted_at'], fixed_dt.isoformat())
 
     def test_response_shape(self):
-        """반환 dict 키 set 정합."""
+        """Returns dict key set matching."""
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
             result = self.production_line_launcher.spawn_production_line('T-099', 'implement')
@@ -124,7 +124,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertEqual(result['command'], 'implement')
 
     def test_popen_failure_file_not_found(self):
-        """flow-wf binary 미존재 시 ok=False + error_kind='flow_wf_not_found'."""
+        """If flow-wf binary does not exist, ok=False + error_kind='flow_wf_not_found'."""
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           side_effect=FileNotFoundError('flow-wf')), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
@@ -135,7 +135,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertIn('message', result)
 
     def test_popen_failure_os_error(self):
-        """OSError 시 ok=False + error_kind='popen_failed'."""
+        """When OSError ok=False + error_kind='popen_failed'."""
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           side_effect=OSError('permission denied')), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
@@ -145,8 +145,8 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertEqual(result['error_kind'], 'popen_failed')
 
     def test_reader_thread_registered(self):
-        """spawn 직후 _LAUNCH_READER_THREADS 에 reader 가 1건 추가된다."""
-        # communicate 가 즉시 반환되지 않고 잠시 대기하도록 mock
+        """Immediately after spawn, one reader is added to _LAUNCH_READER_THREADS."""
+        # Mock so that communicate does not return immediately but waits for a while
         proc = MagicMock()
         proc.returncode = 0
 
@@ -162,16 +162,16 @@ class TestSpawnProductionLine(unittest.TestCase):
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
             self.production_line_launcher.spawn_production_line('T-201', 'implement')
 
-            # spawn 직후 thread set 에 등록 확인
+            # Confirm registration in thread set immediately after spawn
             with self.production_line_launcher._LAUNCH_READER_LOCK:
                 count = len(self.production_line_launcher._LAUNCH_READER_THREADS)
             self.assertEqual(count, 1)
 
-            # reader 종료 신호
+            # reader termination signal
             comm_event.set()
 
     def test_emits_pending_and_started(self):
-        """LAUNCH_PENDING + LAUNCH_STARTED 가 _emit 함수에 의해 호출된다."""
+        """LAUNCH_PENDING + LAUNCH_STARTED is called by the _emit function."""
         emitted = []
 
         def _capture_emit(event, ticket, **kwargs):
@@ -187,20 +187,20 @@ class TestSpawnProductionLine(unittest.TestCase):
 
 
 # ==============================================================================
-# T03 — _production_line_reader_loop 동작
+# T03 — _production_line_reader_loop operation
 # ==============================================================================
 
 
 class TestReaderLoop(unittest.TestCase):
 
     def setUp(self):
-        from board.server import production_line_launcher
+        from board.server.processes import production_line_launcher
         with production_line_launcher._LAUNCH_READER_LOCK:
             production_line_launcher._LAUNCH_READER_THREADS.clear()
         self.production_line_launcher = production_line_launcher
 
     def test_silent_on_zero_exit(self):
-        """rc == 0 (정상 완료) 시 LAUNCH_FAILED emit 0 건."""
+        """When rc == 0 (normal completion), LAUNCH_FAILED emits 0 cases."""
         emitted = []
 
         def _capture(event, ticket, **kwargs):
@@ -210,17 +210,17 @@ class TestReaderLoop(unittest.TestCase):
         submitted = datetime.now(timezone.utc)
 
         with patch.object(self.production_line_launcher, '_emit_launch_event_safe', side_effect=_capture):
-            # 직접 호출 (thread spawn 없이)
+            # Direct call (without thread spawn)
             self_thread = threading.current_thread()
             with self.production_line_launcher._LAUNCH_READER_LOCK:
                 self.production_line_launcher._LAUNCH_READER_THREADS.add(self_thread)
             self.production_line_launcher._production_line_reader_loop(proc, 'T-401', 'implement', submitted)
 
-        # LAUNCH_FAILED 호출 0건
+        # LAUNCH_FAILED 0 calls
         self.assertEqual(emitted, [])
 
     def test_emits_failed_on_nonzero_exit(self):
-        """rc != 0 시 LAUNCH_FAILED + reason='driver_nonzero_exit' + returncode/error_message 캐리."""
+        """rc != 0 at LAUNCH_FAILED + reason='driver_nonzero_exit' + returncode/error_message carry."""
         emitted = []
 
         def _capture(event, ticket, **kwargs):
@@ -245,11 +245,11 @@ class TestReaderLoop(unittest.TestCase):
         self.assertIn('driver crashed', payload['error_message'])
 
     def test_thread_set_self_discard(self):
-        """reader 종료 후 자기 자신을 _LAUNCH_READER_THREADS 에서 제거 (GC 누수 차단)."""
+        """After the reader terminates, remove itself from _LAUNCH_READER_THREADS (block GC leak)."""
         proc = _make_mock_proc(returncode=0)
         submitted = datetime.now(timezone.utc)
 
-        # 진짜 thread 로 실행해야 self_thread 식별 의미 있음
+        # Self_thread identification is meaningful only when executed as a real thread.
         with patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
             reader = threading.Thread(
                 target=self.production_line_launcher._production_line_reader_loop,
@@ -266,30 +266,30 @@ class TestReaderLoop(unittest.TestCase):
 
 
 # ==============================================================================
-# T04 — race condition 단위 (P3 보강 — concurrent spawn 후 thread leak 검증)
+# T04 — Race condition unit (P3 reinforcement — thread leak verification after concurrent spawn)
 # ==============================================================================
 
 
 class TestConcurrentSpawn(unittest.TestCase):
-    """P3 race condition 단위 — concurrent spawn 후 thread set 누수/충돌 검증."""
+    """P3 race condition unit — Verification of thread set leaks/conflicts after concurrent spawn."""
 
     def setUp(self):
-        from board.server import production_line_launcher
+        from board.server.processes import production_line_launcher
         with production_line_launcher._LAUNCH_READER_LOCK:
             production_line_launcher._LAUNCH_READER_THREADS.clear()
         self.production_line_launcher = production_line_launcher
 
     def test_concurrent_spawn_no_thread_leak(self):
-        """2회 spawn 후 reader thread 종료까지 대기 → thread set size 0."""
-        # 즉시 종료 mock
+        """After spawning twice, wait until the reader thread ends → thread set size 0."""
+        # terminate immediately mock
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
             self.production_line_launcher.spawn_production_line('T-601', 'implement')
             self.production_line_launcher.spawn_production_line('T-602', 'implement')
 
-        # 양쪽 reader join 대기 (mock proc.communicate 즉시 반환 → reader 곧 종료)
-        # 최대 2초 대기
+        # Wait for both reader joins (mock proc.communicate returns immediately → reader exits soon)
+        # Wait up to 2 seconds
         deadline = time.time() + 2.0
         while time.time() < deadline:
             with self.production_line_launcher._LAUNCH_READER_LOCK:
@@ -302,11 +302,11 @@ class TestConcurrentSpawn(unittest.TestCase):
         self.assertEqual(remaining, 0, 'reader threads leaked')
 
     def test_concurrent_spawn_distinct_session_ids(self):
-        """time.sleep(>=1s) 없이 다른 timestamp 시 session_id 다름 (advisory)."""
-        # datetime.now monkeypatch — 1초 차이 강제
+        """session_id is different for different timestamps without time.sleep(>=1s) (advisory)."""
+        # datetime.now monkeypatch — force 1 second difference
         dt1 = datetime(2026, 5, 19, 12, 30, 45, tzinfo=timezone.utc)
         dt2 = datetime(2026, 5, 19, 12, 30, 46, tzinfo=timezone.utc)
-        seq = iter([dt1, dt2, dt2])  # spawn 안에서 now 1+ 호출 (submitted_at + spawn_elapsed)
+        seq = iter([dt1, dt2, dt2])  # call now 1+ inside spawn (submitted_at + spawn_elapsed)
 
         def _next_now():
             try:
@@ -319,7 +319,7 @@ class TestConcurrentSpawn(unittest.TestCase):
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'), \
              patch.object(self.production_line_launcher, '_now_utc', side_effect=_next_now):
             r1 = self.production_line_launcher.spawn_production_line('T-701', 'implement')
-            # seq 재설정 — 두 번째 호출은 dt2 로 시작
+            # seq reset — second call starts with dt2
             seq2 = iter([dt2, dt2])
 
             def _next_now2():

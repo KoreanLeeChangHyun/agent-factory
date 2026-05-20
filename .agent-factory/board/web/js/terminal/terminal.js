@@ -13,34 +13,34 @@
   var M = (Board._term = Board._term || {});
 
   // ── Session dispatcher ──
-  // T-513 P3 — V1 메인 터미널 워크플로우 모드 폐기 (결정점 #1 + #5).
-  // 옛 URL `?session=wf-...` 진입점 단절 — 메인 터미널은 메인 모드만 활성.
-  // Production-line workflow 는 별도 워크플로우 탭 (production-line-workflow.js) 으로 진입.
+  // T-513 P3 — V1 Main Terminal Workflow Mode Waster (Crystal Point #1 + #5).
+  // The old URL `?session=wf-...` entry point terminal — the main terminal is only active in the main mode.
+  // Production-line workflow enters production-line-workflow.js.
   M.workflowSessionId = null;
 
   M.isWorkflowMode = false;
 
-  // 옛 V1 워크플로우 모드 URL 쿼리 진입점은 폐기 — 본 변수는 null 고정으로
-  // line ~1134 의 `if (M._initialQuerySession)` 분기가 dead 화됨.
+  // Old V1 workflow mode URL query entry is closed — this variable is null fixed
+  // line ~1134 'if(M. initialQuerySession)' branch is dead.
   M._initialQuerySession = null;
 
-  // D5 #5: URL 세션 사전 검증 상태. checked=완료, inFlight=fetch 진행 중
+  // D5 #5: URL session pre-valid status. check=complete, inFlight=fetch progress
   M._initialSessionChecked = false;
 
   M._initialSessionInFlight = false;
 
-  // 검증 실패 시 렌더 후 노출할 사용자 메시지
+  // User messages that are exposed after rendering fails
   M._initialFallbackMessage = null;
 
   // ── Session Switcher State ──
-  // 세션별 상태를 저장하는 맵. key = sessionId ("main" 또는 "wf-T-NNN-...")
+  // Map to save the status of session. key = sessionId ("main" or "wf-T-NNN-...")
   M._sessionMap = {};
 
-  // 현재 활성 세션 ID
+  // Current Activity Session ID
   M._activeSessionId = M.isWorkflowMode ? M.workflowSessionId : "main";
 
   /**
-   * 세션 항목 생성 헬퍼.
+   * Create session entries Helper.
    * @param {string} sessionId
    * @returns {object}
    */
@@ -48,7 +48,7 @@
     return {
       id: sessionId,
       isWorkflow: sessionId !== "main",
-      outputNodes: [],   // M.outputDiv 자식 노드 스냅샷 (Array<Node>)
+      outputNodes: [],   // M.outputDiv Self-catering node snapshot (Array<Node>)
       cost: 0,
       tokens: { input: 0, output: 0 },
       model: "--",
@@ -57,12 +57,12 @@
     };
   };
 
-  // T-383 Phase 1 (VUL-5 / S5): 초기 활성 세션 엔트리를 사전 생성한다.
-  // 과거에는 _sessionMap={} 만 초기화되어 첫 탭 전환 시 _saveCurrentSession 이
-  // !entry 가드로 early return 되어 메인 세션의 outputNodes 가 저장되지 않는
-  // 버그가 발생했다 (탭 왕복 시 "Agent Factory Terminal" 초기 메시지 오출력).
-  // URL 쿼리 세션 경로에서 외부가 동일 ID의 엔트리를 먼저 생성하는 경우와의
-  // 충돌을 방지하기 위해 idempotent 체크를 수행한다.
+  // T-383 Phase 1 (VUL-5/S5): Pre-generate the initial active session entries.
+  // In the past,  sessionMap={} only reset and switch to the first tab  saveCurrentSession
+  // !entry mad to early return and outputNodes of main session is not saved
+  // "Agent Factory Terminal" initial message O/O output when the bug has occurred.
+  // In the URL query session path, if external generates the same ID entry first
+  // Perform idempotent checks to prevent collisions.
   if (!M._sessionMap[M._activeSessionId]) {
     M._sessionMap[M._activeSessionId] = M._createSessionEntry(M._activeSessionId);
   }
@@ -107,21 +107,21 @@
   M.inputLocked = false;
 
   /**
-   * 입력 큐. 각 항목은 pending entry 객체 (1:1 turn 모델 — nextTurn 필드 없음).
+   * Type C. Each item is pending entry object (1:1 turn model — no nextTurn field).
    * @type {Array<{id: string, text: string, ts: number, status: string}>}
    */
   M.inputQueue = [];
 
   /**
-   * IME 조합 중 여부 (compositionstart/end 리스너가 관리).
+   * Whether it’s an IME combination (compositionstart/end listener is managed).
    * @type {boolean}
    */
   M._isComposing = false;
 
   /**
-   * 직전 send 한 사용자 메시지 텍스트.
-   * ESC 인터럽트 시 입력창에 자동 복원하여 사용자가 수정 후 재전송 가능하게 한다.
-   * sendInput / commitQueue 가 send 직전에 저장하고, interruptSession 이 복원 후 클리어한다.
+   * Send the user message text directly.
+   * Automatically restores the ESC intermittent input window and enables users to retransmission after modification.
+   * sendInput / commitQueue will store it immediately before send, and stopSession will be clear after restore.
    * @type {string}
    */
   M._lastSentText = "";
@@ -133,9 +133,9 @@
   M.attachedFiles = [];
 
   /**
-   * 칸반 카드 → 메인 터미널 DnD 로 첨부된 티켓 도메인.
-   * 이미지/파일 첨부와 동일하게 send 직후 자동 비움 (M.clearTickets).
-   * 각 항목은 dragstart 시 직렬화된 ticket payload + drop 시점에 한 번 fetch 한 report.html 텍스트.
+   * Kanban card → ticket domain with main terminal DnD.
+   * Automatic rain after sending the same as image/file attachment (M.clearTickets).
+   * Each item is fetched report.html text at the time of dragstart.
    * @type {Array<{number: string, title: string, command: string, prompt: any, result: any, report: string|null, addedAt: number}>}
    */
   M.attachedTickets = [];
@@ -167,11 +167,11 @@
   // ── Board.state init ──
   Board.state.termConnected = false;
   Board.state.termSessionId = M.isWorkflowMode ? M.workflowSessionId : null;
-  // 워크플로우 모드는 서버 측 채널이 이미 실행 중이라 idle 로 시작한다.
-  // 메인 모드는 Start 전이므로 stopped.
-  // 단, ESC 인터럽트 직후 새로고침 케이스(localStorage 에 ESC 복원 텍스트가 남음)는
-  // 서버 측 프로세스가 자동 resume 으로 살아있을 가능성이 높으므로 'starting' 으로
-  // 시작해 STOPPED 깜박임을 회피한다. fetchStatus 응답으로 idle/busy 로 보정된다.
+  // The workflow mode starts with idle as the server side channel is already running.
+  // The main mode is before Start, so stop.
+  // Single, ESC INTERFAT re-called case (localStorage ESC restore text)
+  // The server side process is likely to live with automatic resume, so as to 'starting'
+  // Launches the STOPPED flash. fetchStatus response is corrected by idle/busy.
   var _hasPendingEscRestore = false;
   try { _hasPendingEscRestore = !!localStorage.getItem("board.term.lastSentText"); } catch (e) {}
   Board.state.termStatus = M.isWorkflowMode
@@ -202,7 +202,7 @@
     spinner.className = "terminal-restart-overlay-spinner";
     var label = document.createElement("div");
     label.className = "terminal-restart-overlay-label";
-    label.textContent = "서버 재기동 중...";
+    label.textContent = "Server rebuild...";
     overlay.appendChild(spinner);
     overlay.appendChild(label);
     document.body.appendChild(overlay);
@@ -215,17 +215,17 @@
     var isMainActive = M._activeSessionId === "main";
     var status = Board.state.termStatus;
     var killable = Board.util.TERM_STATUS_KILLABLE.has(status);
-    // _inAutoResume 윈도우 중에는 stopped/starting 도 입력 가능 — 입력창 깜빡 회피.
+    // inAutoResume Can be stopped/starting in Windows — input window flash.
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE.has(status)
         || !!Board.state._inAutoResume;
     var isStopped = status === "stopped";
     var isBusy = status === "busy";
     if (toggleBtn) {
-      // 토글 버튼은 main 탭 활성 시에만 표시한다.
+      // Toggle button only displays the main tab active.
       if (!isMainActive) {
         toggleBtn.style.display = "none";
       } else if (status === "archived" || status === "missing") {
-        // archived/missing 에선 Start/Kill 모두 의미 없음.
+        // Start/Kill in archived/missing
         toggleBtn.style.display = "none";
       } else if (killable) {
         toggleBtn.style.display = "";
@@ -251,8 +251,8 @@
         memoryBtn.disabled = !inputtable;
         var memHasMsg = !!(M.outputDiv && M.outputDiv.querySelector(".term-message"));
         memoryBtn.title = memHasMsg
-          ? "메모리 업데이트 (현재 세션 내용을 메모리에 영속화 — Clear 전)"
-          : "메모리 로드 (현재 세션에 MEMORY.md 재인지 요청)";
+          ? "Memory Update (Current Session Content to Memory — Clear Before)"
+          : "Memory Load (MMEMORY.md Re-Case request to current session)";
       }
     }
     var loginBtn = document.getElementById("terminal-login");
@@ -272,8 +272,8 @@
     }
     var sessionIdEl = document.getElementById("terminal-session-id");
     if (sessionIdEl) {
-      // stopped 상태에선 .last-session-id 에서 복원된 UUID 가 남아있어도 숨긴다.
-      // 과거 세션은 Sessions 드롭다운에서 명시적으로 resume 한다.
+      // .last-session-id restored UUID remains hidden at stop status.
+      // The past session is explicitly resumed in Sessions dropdown.
       sessionIdEl.textContent = (!isStopped && Board.state.termSessionId) ? Board.state.termSessionId : '';
     }
 
@@ -293,15 +293,15 @@
       } else {
         sendBtn.style.display = "";
         if (M._interruptInFlight) {
-          // interrupt 후 result 대기 중 — 버튼을 잠시 비활성화하여 재클릭 차단
-          // 및 사용자에게 처리 중임을 시각적으로 알린다. result 도착 시
-          // _onResult 가 플래그를 끄고 updateControlBar 호출.
+          // return result after interruption — deactivate button and block re-click
+          // We use cookies to ensure that we give you the best experience on our website. return
+          // onResult turns the flag and call updateControlBar.
           sendBtn.classList.add("is-stop");
           sendBtn.disabled = true;
           sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
           sendBtn.onclick = null;
         } else if (isBusy) {
-          // busy: Claude 응답 중 → interrupt 버튼
+          // busy: Claude response during → interrupt button
           sendBtn.classList.add("is-stop");
           sendBtn.disabled = false;
           sendBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
@@ -318,14 +318,14 @@
     var hintEl = document.querySelector(".terminal-input-hint");
     if (hintEl) {
       if (M.isWorkflowMode) {
-        hintEl.textContent = "자동 실행 전용";
+        hintEl.textContent = "Auto Run Only";
       } else if (isBusy) {
-        // busy: 큐 카운트 노출 (현재 처리 중인 메시지 포함)
+        // busy: Cue Count exposure (includes current processing messages)
         var queueLen = M.inputQueue.length;
         if (queueLen > 0) {
-          hintEl.textContent = "ESC 중지 \u00B7 큐 " + queueLen + "개 (처리 중\u00B7대기)";
+          hintEl.textContent = "ESC Stop \\u00B7 Cue" + queueLen + "(in processing \\u00B7)";
         } else {
-          hintEl.textContent = "ESC 중지";
+          hintEl.textContent = "ESC";
         }
       } else if (status === "starting") {
         hintEl.textContent = "Starting session...";
@@ -334,8 +334,8 @@
       } else if (status === "missing") {
         hintEl.textContent = "Session not found";
       } else {
-        // idle (큐 = 0): 정상 입력 힌트
-        hintEl.textContent = "Shift+Enter 줄바꿈";
+        // idle (Q = 0): Normal input hint
+        hintEl.textContent = "Shift+Enter";
       }
     }
 
@@ -395,7 +395,7 @@
     var el = M.getContainer();
     if (!el) return;
 
-    // D5 #5: URL 세션 사전 검증 — 잘못된 세션이면 메인으로 fallback 후 재호출
+    // D5 #5: URL Session Preliminary Verification — Reissue after fallback in the main
     if (M._initialQuerySession && !M._initialSessionChecked) {
       if (M._initialSessionInFlight) return;
       M._initialSessionInFlight = true;
@@ -415,10 +415,10 @@
             Board.state.setTermStatus("stopped");
             try { history.replaceState(null, "", "terminal.html"); } catch (e) {}
             M._initialFallbackMessage =
-              "[Error] URL 세션 '" + failedId + "'을 찾을 수 없어 메인 세션으로 전환했습니다.";
+              "[Error] URL Session '" + failedId + "You can't find it, switched to the main session.";
           }
         })
-        .catch(function () { /* network error: 기본 동작 유지 */ })
+        .catch(function () { /* network error: */ }
         .then(function () {
           M._initialSessionChecked = true;
           M._initialSessionInFlight = false;
@@ -451,7 +451,7 @@
     h += '<div class="terminal-session-controls">';
     h += '<button class="terminal-btn terminal-btn-start" id="terminal-toggle-btn">Start</button>';
     h += '<span class="terminal-controls-divider"></span>';
-    h += '<button class="terminal-btn terminal-btn-memory" id="terminal-memory-btn" title="메모리 로드 (현재 세션에 MEMORY.md 재인지 요청)">Memory</button>';
+    h += '<button class="terminal-btn terminal-btn-memory" id="terminal-memory-btn" title="MEMORY.md re-order request at current session)">Memory</button>';
     h += '<span class="terminal-controls-divider"></span>';
     h += '<button class="terminal-btn terminal-btn-sessions" id="terminal-sessions-btn" title="Main sessions">';
     h += '<span id="terminal-sessions-label">Sessions</span>';
@@ -492,19 +492,19 @@
     h += '<div class="terminal-input-card">';
     h += '<div class="terminal-image-preview" id="terminal-image-preview"></div>';
     h += '<textarea class="terminal-input" id="terminal-input"'
-      + ' placeholder="메시지를 입력하세요..." rows="1"'
+      + 'placeholder..." rows="1"'
       + ' autocomplete="off" spellcheck="false"'
       + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) ? "" : " disabled")
       + '></textarea>';
     h += '<div class="terminal-input-bottom">';
     h += '<div class="terminal-input-bottom-left">';
-    h += '<button class="terminal-attach-btn" id="terminal-attach-btn" title="이미지 첨부"'
+    h += '<button class="terminal-attach-btn" id="terminal-attach-btn" title="Withimage"'
       + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) ? "" : " disabled")
       + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>';
     h += '<input type="file" id="terminal-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" multiple>';
     h += '</div>';
     h += '<div class="terminal-input-bottom-right">';
-    h += '<span class="terminal-input-hint">Shift+Enter 줄바꿈</span>';
+    h += '<span class="terminal-input-hint">Shift+Enter</span>';
     h += '<button class="terminal-send-btn" id="terminal-send-btn"'
       + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) ? "" : " disabled")
       + '><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>';
@@ -530,11 +530,11 @@
 
     M.initOutputDiv();
 
-    // [ESC 새로고침 복원] localStorage 에 저장된 ESC 직전 메시지가 있으면 입력창에
-    // 자동 채운다 (사용자가 수정/재전송 가능). sendInput/commitQueue 가 send 시점에
-    // localStorage 를 클리어하므로 영구 잔류는 없다.
-    // 입력창에 기존 텍스트가 있으면 (브라우저 form 자동 복원 등) 보존하면서
-    // 앞에 공백 한 칸 띄워 prepend.
+    // [ESC Renewal] If the ESC direct message stored in localStorage is in the input window
+    // Automatic filling (user can edit/transmit). sendInput/commitQueue send to the point of send
+    // Because localStorage is clear, there is no permanent residency.
+    // If you have an existing text in the input window, please keep the browser form automatically restored.
+    // blank one can stand out prepend.
     if (!M.isWorkflowMode) {
       try {
         var savedText = localStorage.getItem("board.term.lastSentText");
@@ -650,11 +650,11 @@
     if (Board.session) {
       Board.session.connectSSE();
       var statusPromise = Board.session.fetchStatus();
-      // 메인 세션 한정: 상태 확정 후 히스토리 복원 또는 빈 상태 표시.
-      // session_id 는 .last-session-id 에서 복원될 수 있어 stopped 상태에도
-      // 남아 있다. 세션이 실제 살아 있을 때(= stopped 아님)만 자동 복원한다.
-      // Start 전 빈 화면을 유지하고, 과거 세션은 드롭다운에서 명시적으로
-      // resume 하는 흐름.
+      // Main Session Limited: Restore or empty status after status is confirmed.
+      // session id can be restored in .last-session-id
+      // About Us When the session is live (= stop not), it will be automatically restored.
+      // Keep an empty screen before Start, and the past session explicitly expressly in dropdown
+      // resume
       if (!M.isWorkflowMode && statusPromise && typeof statusPromise.then === "function") {
         statusPromise.then(function () {
           var sid = Board.state.termSessionId;
@@ -672,7 +672,7 @@
       }
     }
 
-    // D5 #5: URL 세션 사전 검증 실패 알림 (렌더 후 M.outputDiv 준비 완료 시점)
+    // D5 #5: URL Session Pre-verification Failure Notifications (When the M.outputDiv pre-verification is completed after the renderer)
     if (M._initialFallbackMessage) {
       M.appendErrorMessage(M._initialFallbackMessage);
       M._initialFallbackMessage = null;
@@ -690,7 +690,7 @@
         } else if (Board.util.TERM_STATUS_KILLABLE.has(status)) {
           Board.session.killSession();
         }
-        // archived/missing: 버튼 자체가 숨겨져 클릭 도달 안 함 (방어 용도)
+        // archived/missing: The button itself cannot be hidden clicks (reflective use)
       });
     }
 
@@ -736,7 +736,7 @@
       });
     }
     if (inputEl) {
-      // IME 조합 중 플래그 — compositionstart/end 이벤트로 관리
+      // The flag during the IME combination — managed by the compositionstart/end event
       inputEl.addEventListener("compositionstart", function () {
         M._isComposing = true;
       });
@@ -746,17 +746,17 @@
 
       inputEl.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) {
-          // IME 조합 중이면 Enter 를 가로채지 않는다.
-          // e.isComposing: 표준 (Chrome/Firefox/Edge)
-          // M._isComposing: Safari 등 일부 브라우저에서 e.isComposing 이 false 로 빠지는 케이스 대비
+          // If IME combination does not intercept Enter.
+          // About Us isComposing: Standard (Chrome/Firefox/Edge)
+          // M. isComposing: e.isComposing in some browsers such as Safari is false due to case contrast
           if (e.isComposing || M._isComposing) return;
 
           e.preventDefault();
           if (M.isWorkflowMode) return;
 
-          // 모든 분기를 sendInput 으로 통일.
-          // sendInput 내부에서 idle: 즉시 echo + send, busy: enqueueInput (텍스트+이미지)
-          // 으로 분기한다. 이미지 첨부 시도 동일 경로로 큐잉된다.
+          // Unified all quarters to sendInput.
+          // idle inside sendInput: Instant echo + send, busy: enqueueInput (text+image)
+          // Ѵ . The image will be queue to the same path.
           M.sendInput();
           return;
         }
@@ -766,7 +766,7 @@
         this.style.height = "auto";
         this.style.height = Math.min(this.scrollHeight, 120) + "px";
       });
-      // 클립보드 이미지 붙여넣기 (Ctrl+V) + 경로 텍스트 붙여넣기
+      // Paste the clipboard image (Ctrl+V) + Paste the path text
       inputEl.addEventListener("paste", function (e) {
         var items = e.clipboardData && e.clipboardData.items;
         if (!items) return;
@@ -782,18 +782,18 @@
           e.preventDefault();
           return;
         }
-        // image/* 가 없으면 text/plain 경로 패턴 확인
-        // 작은따옴표로 감싸 "/" 로 시작하는 경로가 슬래시 커맨드로 오인되는 것을 차단한다.
+        // text/plain
+        // The path that starts with "/" wrapped with a small quote is blocked to the slash command.
         var text = e.clipboardData.getData("text/plain");
         if (text && M.isFilePath(text)) {
           e.preventDefault();
           M.insertTextAtCursor(inputEl, "'" + text + "'");
         }
-        // 경로가 아닌 일반 텍스트는 기본 paste 동작에 위임
+        // The general text not the path is entrusted to the default paste operation
       });
     }
 
-    // drag/drop 이벤트 핸들러 — .terminal-input-card 요소에 등록
+    // drag/drop event handler — registered with .terminal-input-card element
     var inputCard = el.querySelector(".terminal-input-card");
     if (inputCard) {
       var dragEnterCount = 0;
@@ -806,7 +806,7 @@
           var overlay = document.createElement("div");
           overlay.className = "terminal-drag-overlay";
           var label = document.createElement("span");
-          label.textContent = "파일을 여기에 놓으세요";
+          label.textContent = "Set the file here";
           overlay.appendChild(label);
           inputCard.appendChild(overlay);
         }
@@ -838,9 +838,9 @@
         var targetInput = document.getElementById("terminal-input");
         if (!targetInput) return;
 
-        // (0) 칸반 카드 드롭 — application/x-board-ticket MIME 우선 처리
-        // dragstart 시 kanban.js 가 set 한 ticket JSON 을 파싱하여 첨부 도메인에 등록.
-        // workdir 보유 시 same-origin 으로 report.html 를 한 번 fetch (실패 시 graceful = null).
+        // (0) Split card drop — application/x-board-ticket MIME priority processing
+        // dragstart kanban.js is set and registered in the attached domain by parsing the ticket JSON.
+        // report  report  report  report  report  report  report
         var ticketJson = "";
         try {
           ticketJson = dt.getData("application/x-board-ticket");
@@ -855,14 +855,14 @@
             ticketPayload = null;
           }
           if (ticketPayload && typeof ticketPayload === "object") {
-            // workdir 추출: result.workdir 우선 (kanban.js dragstart payload 규약)
+            // workdir extraction: result.workdir first (kanban.js dragstart payload norm)
             var workdir = "";
             if (ticketPayload.result && typeof ticketPayload.result === "object" && typeof ticketPayload.result.workdir === "string") {
               workdir = ticketPayload.result.workdir;
             }
 
-            // workdir 정규화: 절대 경로 → 그대로, 상대 경로 → "/" 접두 부여
-            // (보드 서버는 same-origin 이므로 origin 기반 경로 사용)
+            // workdir regularization: absolute path → literally, relative path → "/" prefix
+            // (Board server is same-origin, so use the origin-based path)
             var reportUrl = "";
             if (workdir) {
               var normalized = workdir;
@@ -875,8 +875,8 @@
               reportUrl = normalized + "report.html";
             }
 
-            // fetch 는 비동기 — 실패/null 모두 graceful (M.attachTicket 호출은 한 번만)
-            // 1차: reportUrl (active 경로) → 404 시 2차 .history/ fallback → 둘 다 실패 시 null
+            // fetch synchronous — failed/null all graceful (M.attachTicket call is only once)
+            // 1st: reportUrl (active path) → 404 o'clock .history/ fallback → null when both failed
             if (reportUrl) {
               var historyReportUrl = reportUrl.replace(
                 /(\/runs\/)(?!\.history\/)([0-9]{8}-[0-9]{6}\/)/,
@@ -885,7 +885,7 @@
               fetch(reportUrl, { cache: "no-store" })
                 .then(function (res) {
                   if (res && res.ok) return res.text();
-                  // 1차 404 (또는 실패) 이고 fallback URL 이 다를 때만 2차 시도
+                  // 1st 404 (or failure) and fallback URL only try 2nd
                   if (res && res.status === 404 && historyReportUrl !== reportUrl) {
                     return fetch(historyReportUrl, { cache: "no-store" })
                       .then(function (res2) {
@@ -911,10 +911,10 @@
           }
         }
 
-        // (0b) 메모리 카드 드롭 — application/x-board-memory MIME 처리
-        // dragstart 시 memory-core.js 가 set 한 {name, category} JSON 파싱.
-        // 본문은 첨부에 포함하지 않고 (사용자 의도 = 경로만, 어시스턴트가 Read),
-        // attachMemory 가 비동기로 fetchMemoryFile + parseMemoryFrontmatter 수행하여 description 보강.
+        // 0b) Memory card drop — application/x-board-memory MIME processing
+        // dragstart when memory-core.js is set {name, category} JSON parsing.
+        // The text is not included in the attachment (user intention = path only, assign read),
+        // fetchMemoryFile + parseMemoryFrontmatter
         var memoryJson = "";
         try {
           memoryJson = dt.getData("application/x-board-memory");
@@ -934,17 +934,17 @@
           }
         }
 
-        // (a) 파일 드롭 — 이미지: attachedImages에 추가 + 썸네일 / 비이미지: 파일 카드 + 파일명 삽입
+        // (a) File drop — Images: Added to attachedImages + Thumbnails / Images: File card + File name insertion
         if (dt.files && dt.files.length > 0) {
           var names = [];
           for (var fi = 0; fi < dt.files.length; fi++) {
             var droppedFile = dt.files[fi];
             names.push(droppedFile.name);
             if (ALLOWED_MIME.indexOf(droppedFile.type) !== -1) {
-              // 이미지 파일: 기존 M.attachImage() 경로 재사용 (썸네일 렌더링)
+              // Image file: Reuse existing M.attachImage() path (Thumbnail Rendering)
               M.attachImage(droppedFile);
             } else {
-              // 비이미지 파일: attachedFiles에 등록 후 파일 카드 렌더링
+              // Non-Image: rendering file card after registering with an attachedFiles
               M.attachedFiles.push({ file: droppedFile, name: droppedFile.name, size: droppedFile.size, type: droppedFile.type });
               M.renderFilePreview();
               M.insertTextAtCursor(targetInput, droppedFile.name + (fi < dt.files.length - 1 ? "\n" : ""));
@@ -953,18 +953,18 @@
           return;
         }
 
-        // (b) text/plain 이 경로 패턴이면 textarea에 경로 삽입
-        // 작은따옴표로 감싸 "/" 로 시작하는 경로가 슬래시 커맨드로 오인되는 것을 차단한다.
+        // (b) text/plain This path pattern inserts the path to textarea
+        // The path that starts with "/" wrapped with a small quote is blocked to the slash command.
         var dropText = dt.getData("text/plain");
         if (dropText && M.isFilePath(dropText)) {
           M.insertTextAtCursor(targetInput, "'" + dropText + "'");
           return;
         }
-        // (c) 둘 다 아니면 무시 (시나리오 C, Chromium CF_HDROP 버그)
+        // (c) both or ignored (Sinario C, Chromium CF HDROP bug)
       });
     }
 
-    // 첨부 버튼 및 hidden file input 이벤트
+    // Attachment button and hidden file input event
     var attachBtn = document.getElementById("terminal-attach-btn");
     var attachInput = document.getElementById("terminal-attach-input");
     if (attachBtn && attachInput) {
@@ -992,13 +992,13 @@
 
     M.termInitialized = true;
 
-    // Memory shortcut: 세션 상태에 따라 분기
-    //  - 메시지 0 (처음/resume 직후): 메모리 인지 요청 (id: memory.load)
-    //  - 메시지 1+ (중간): 현재 세션 내용 메모리 영속화 (id: memory.persist)
-    // 두 문구는 .agent-factory/board/config/quick-prompts.json 에서 사용자가 편집 가능.
-    // fetch 실패 시 기본 폴백 텍스트 사용 — 오프라인이거나 파일 누락 시에도 동작 유지.
-    var FALLBACK_MEMORY_LOAD = "메모리 로드하세요";
-    var FALLBACK_MEMORY_PERSIST = "이번 세션의 핵심 내용(결정·학습·이슈·규칙)을 메모리에 영속화해주세요. 적절한 type(user/feedback/project/reference)으로 분류하고, 기존 메모와 중복되면 보강.";
+    // Memory shortcut: quarterly based on session status
+    //  - message 0 (first/resume right after): memory request (id: memory.load)
+    //  - Message 1+ (Intermediate): Current Session Content Memory (id: memory.persist)
+    // .agent-factory/board/config/quick-prompts.json
+    // When fetch fails, use the default pollen text — keeping the operation even when offline or missing files.
+    var FALLBACK_MEMORY_LOAD = "Memory Load";
+    var FALLBACK_MEMORY_PERSIST = "Please refresh the core contents of this session (crystal, learning, yishu, rule) to memory. categorized as appropriate type(user/feedback/project/reference), and reinforce when it is overlapsed with existing notes.";
     var memoryBtn = document.getElementById("terminal-memory-btn");
     if (memoryBtn) {
       memoryBtn.addEventListener("click", function (e) {
@@ -1047,8 +1047,8 @@
             var closedSid = closeTab.dataset.session;
             var wasActive = closeTab.classList.contains("active");
             closeTab.parentNode.removeChild(closeTab);
-            // T-516 — localStorage 단일 출처에서도 ID 제거. 닫기 = DOM + 영속 동시.
-            // 새로고침 시 부활 회귀 0 (사용자 명시 닫기만 라이프사이클 종결).
+            // T-516 — localStorage Remove ID from single source. Close = DOM + simultaneously.
+            // Resurrection Resurrection 0 (lasting user’s explicitly close)
             if (closedSid && Board.workflowTabStorage && Board.workflowTabStorage.remove) {
               Board.workflowTabStorage.remove(closedSid);
             }
@@ -1125,53 +1125,53 @@
       });
     };
 
-    // _onSwitch 훅: M.switchSession() 호출 시 탭 바 활성 상태 업데이트
+    // onSwitch Hook: M.switchSession() Updated tab bar active status when calling
     Board.sessionSwitcher._onSwitch = function (newSessionId, _prevId) {
       if (Board.sessionSwitcher.setActiveTab) {
         Board.sessionSwitcher.setActiveTab(newSessionId);
       }
     };
 
-    // URL ?session= 쿼리 파라미터 기반 초기 세션 탭 처리
+    // URL ?session= Initial session tab processing based on query parameters
     if (M._initialQuerySession) {
-      // 탭 바에 초기 세션 추가 (워크플로우 탭)
+      // Add an initial session to the tab bar (workflow tab)
       if (Board.sessionSwitcher.addTab) {
         var initLabel = M._initialQuerySession.replace(/^wf-/, "").replace(/-\d+$/, "");
         Board.sessionSwitcher.addTab(M._initialQuerySession, initLabel, "running");
       }
-      // 탭 활성화 (초기 세션이 활성 탭으로 표시)
+      // Enable Tabs (Inclusion Sessions Display With Active Tabs)
       if (Board.sessionSwitcher.setActiveTab) {
         Board.sessionSwitcher.setActiveTab(M._initialQuerySession);
       }
-      // URL을 terminal.html로 정리 (쿼리 파라미터 제거)
+      // Remove the URL to terminal.html
       try {
         history.replaceState(null, "", "terminal.html");
       } catch (e) {}
     }
 
-    // T-516 — localStorage 단일 출처에서 워크플로우 탭 복원.
-    // 메인 탭은 헬퍼 add 차단 + 본 흐름 우회 (M._initialQuerySession 도 중복 skip).
-    // 서버 registry 에 없는 ID 는 'stopped' (회색) 으로 표시 — 닫기 버튼으로만 제거.
+    // T-516 — restore workflow tabs from localStorage single source.
+    // The main tab blocks the Helper add + bypass the main flow (M. initialQuerySession also duplicate skip).
+    // The ID without server registry is displayed as 'stopped' (great) — only removed by close button.
     if (Board.workflowTabStorage && Board.workflowTabStorage.get) {
       var storedIds = Board.workflowTabStorage.get();
       storedIds.forEach(function (sid) {
         if (!sid || sid === "main") return;
-        if (sid === M._initialQuerySession) return; // 위 분기에서 이미 추가됨
+        if (sid === M._initialQuerySession) return; // Added already in the above branch
         if (Board.sessionSwitcher.addTab) {
           var label = sid.replace(/^wf-/, "").replace(/-\d+$/, "");
           Board.sessionSwitcher.addTab(sid, label, "stopped");
         }
-        // 비동기 status 합성 — /api/v2/sessions/<id> 응답 status 로 dot 갱신.
-        // 응답 누락 / 네트워크 실패 / 404 = 'stopped' 회색 (사용자 명시 결정).
+        // synchronous status synthesis — /api/v2/sessions/<id> response status to dot update.
+        // No response missing / network failure / 404 = 'stopped' gray (user express decision).
         if (Board.productionLineWorkflow && Board.productionLineWorkflow.fetchSession) {
           Board.productionLineWorkflow.fetchSession(sid).then(function (meta) {
-            if (!meta) return; // 404 / null → stopped 유지
+            if (!meta) return; // 404 / null
             var st = (meta.status === "running" || meta.status === "idle")
               ? "running" : "stopped";
             if (Board.sessionSwitcher.setTabStatus) {
               Board.sessionSwitcher.setTabStatus(sid, st);
             }
-          }).catch(function () { /* 네트워크 실패 → stopped 유지 */ });
+          }).catch(function () { /* Network failure → Maintenance */ });
         }
       });
     }
@@ -1181,7 +1181,7 @@
       Board.workflowSessions.refresh(M.workflowSessionId, M.isWorkflowMode);
     }, 5000);
 
-    // Fetch branch on load — SSE git_branch 이벤트(core/sse.js)가 후속 갱신을 담당한다.
+    // Fetch branch on load — SSE git branch event (core/sse.js) is responsible for follow-up updates.
     fetch("/api/branch").then(function (r) { return r.json(); }).then(function (d) {
       Board.util.setBranchStatusBar(d.branch);
     }).catch(function () {});
@@ -1222,14 +1222,14 @@
   Board.render.renderTerminal = M.renderTerminal;
   Board.render.cleanupTerminal = M.cleanupTerminal;
 
-  // ── Board.sessionSwitcher 공개 API ──
-  // M.renderTerminal() 호출 전에도 사용 가능하도록 IIFE 레벨에서 등록한다.
-  // UI 탭 메서드(addTab, removeTab 등)는 M.renderTerminal() 내에서 추가 등록된다.
+  // Board.sessionSwitcher Public API ──
+  // M.renderTerminal() registers at the IIFE level to be available before calling.
+  // The UI tab method (addTab, removeTab, etc.) is added within the M.renderTerminal().
   Board.sessionSwitcher = Board.sessionSwitcher || {};
 
   /**
-   * 세션 전환 공개 API.
-   * @param {string} sessionId - "main" 또는 "wf-T-NNN-..."
+   * Session Conversion Public API.
+   * @param {string} sessionId - "main" or "wf-T-NNN-..."
    * @returns {Promise<void>}
    */
   Board.sessionSwitcher.switchSession = function (sessionId) {
@@ -1237,7 +1237,7 @@
   };
 
   /**
-   * 현재 활성 세션 ID를 반환한다.
+   * returns the current active session ID.
    * @returns {string}
    */
   Board.sessionSwitcher.getCurrentSession = function () {
@@ -1245,7 +1245,7 @@
   };
 
   /**
-   * 등록된 세션 목록을 반환한다.
+   * Returns the registered session list.
    * @returns {Array<{id: string, isWorkflow: boolean, status: string, model: string}>}
    */
   Board.sessionSwitcher.getSessionList = function () {
@@ -1256,9 +1256,9 @@
   };
 
   /**
-   * 새 세션을 등록한다. 이미 존재하면 무시한다.
+   * Register a new session. If you have already existed, it is ignored.
    * @param {string} sessionId
-   * @param {object} [opts] - 초기 상태 오버라이드 (status, model 등)
+   * @param {object} [opts] - initial state override (status, model, etc.)
    */
   Board.sessionSwitcher.addSession = function (sessionId, opts) {
     if (!sessionId) return;
@@ -1272,7 +1272,7 @@
   };
 
   /**
-   * 세션을 목록에서 제거한다. 현재 활성 세션이면 main으로 전환 후 제거한다.
+   * Remove session from the list. If the current active session is switched to main, remove it.
    * @param {string} sessionId
    */
   Board.sessionSwitcher.removeSession = function (sessionId) {
@@ -1284,7 +1284,7 @@
   };
 
   /**
-   * W01 탭 바 UI 전환 훅. W01에서 오버라이드하여 탭 활성화 처리에 사용한다.
+   * W01 Tab-Bar UI Switching Hook. Override from W01 to use tab activation.
    * @param {string} newSessionId
    * @param {string} prevSessionId
    */

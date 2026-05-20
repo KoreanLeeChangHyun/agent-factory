@@ -1,12 +1,12 @@
 """Tests for the core plan.json loader.
 
-대상: `engine.core.planning.loader` 모듈의 `parse_plan_json` (JSON SSOT 파서).
+target: `engine.core.planning.loader` module `parse plan json` (JSON SSOT parser).
 
-T-504 캐논 SSOT (driver = JSON / LLM↔LLM = md / 사람 = HTML) 에 따라
-PLAN LLM 은 `plan/plan.json` + `plan/plan.md` 두 파일을 동시 산출하며,
-driver 는 `plan/plan.json` 만 결정론 파싱한다. 본 테스트는 그 파서를 검증.
+T-504 Canon SSOT (driver = JSON / LLM↔LLM = md / person = HTML)
+The PLAN LLM simultaneously calculates the two files of "plan/plan.json" + "plan/plan.md"
+The driver is parsing only the "plan/plan.json" This test is valid for that parse.
 
-cutover: 옛 `parse_plan_frontmatter` (YAML frontmatter) 는 통째 폐기.
+cutover: the old `parse plan frontmatter` (YAML frontmatter) is a determinant.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def _good_payload() -> dict:
                 "deliverable": "work/P1/W1.md",
                 "spawn_mode": "in_place",
                 "workers": 1,
-                "acceptance_criteria": ["pytest tests/test_x.py 통과"],
+                "acceptance_criteria": ["pytest tests/test x.py pass"],
             },
             {
                 "id": "P2",
@@ -54,7 +54,7 @@ def _good_payload() -> dict:
                 "deliverable": "work/P2/W1.md",
                 "spawn_mode": "in_place",
                 "workers": 1,
-                "acceptance_criteria": ["foo.py 존재"],
+                "acceptance_criteria": ["foo.py"],
             },
         ],
     }
@@ -74,7 +74,7 @@ def test_parse_plan_json_basic(tmp_path: Path) -> None:
     assert plan.phases[1].deps == ["P1"]
     assert plan.phases[1].deliverable == "work/P2/W1.md"
     assert plan.phases[0].workers == 1
-    assert plan.phases[0].acceptance_criteria == ["pytest tests/test_x.py 통과"]
+    assert plan.phases[0].acceptance_criteria == ["pytest tests/test x.py pass"]
 
 
 def test_parse_plan_json_dataclass_types(tmp_path: Path) -> None:
@@ -87,7 +87,7 @@ def test_parse_plan_json_dataclass_types(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_phase_id_duplicate(tmp_path: Path) -> None:
-    """동일 Phase id 두 번 → PlanLoaderError."""
+    """PlanLoaderError"""
     payload = _good_payload()
     payload["phases"][1]["id"] = "P1"  # duplicate
     path = _write_plan_json(tmp_path, payload)
@@ -96,7 +96,7 @@ def test_parse_plan_json_phase_id_duplicate(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_deps_unknown(tmp_path: Path) -> None:
-    """deps 가 존재하지 않는 Phase id 를 참조 → PlanLoaderError."""
+    """see Phase id that deps does not exist → PlanLoaderError."""
     payload = _good_payload()
     payload["phases"][1]["deps"] = ["P_DOES_NOT_EXIST"]
     path = _write_plan_json(tmp_path, payload)
@@ -105,7 +105,7 @@ def test_parse_plan_json_deps_unknown(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_deps_self_reference(tmp_path: Path) -> None:
-    """deps 가 자기 자신을 참조 → PlanLoaderError."""
+    """deps sees themselves → PlanLoaderError."""
     payload = _good_payload()
     payload["phases"][0]["deps"] = ["P1"]
     path = _write_plan_json(tmp_path, payload)
@@ -114,7 +114,7 @@ def test_parse_plan_json_deps_self_reference(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_acceptance_empty_for_implement(tmp_path: Path) -> None:
-    """command=implement 인데 acceptance_criteria 빈 list → PlanLoaderError."""
+    """Copyright © 2020 PlanLoaderError. All rights reserved."""
     payload = _good_payload()
     payload["phases"][0]["acceptance_criteria"] = []
     path = _write_plan_json(tmp_path, payload)
@@ -123,7 +123,7 @@ def test_parse_plan_json_acceptance_empty_for_implement(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_acceptance_empty_for_research_ok(tmp_path: Path) -> None:
-    """command=research 인 경우 acceptance_criteria 빈 list 허용."""
+    """Accepts acceptance criteria empty list for command=research."""
     payload = _good_payload()
     payload["command"] = "research"
     payload["phases"][0]["acceptance_criteria"] = []
@@ -135,7 +135,7 @@ def test_parse_plan_json_acceptance_empty_for_research_ok(tmp_path: Path) -> Non
 
 
 def test_parse_plan_json_schema_version_missing(tmp_path: Path) -> None:
-    """schema_version 누락 → PlanLoaderError."""
+    """schema version missing → PlanLoaderError."""
     payload = _good_payload()
     del payload["schema_version"]
     path = _write_plan_json(tmp_path, payload)
@@ -144,7 +144,7 @@ def test_parse_plan_json_schema_version_missing(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_phases_empty(tmp_path: Path) -> None:
-    """phases 빈 list → PlanLoaderError."""
+    """PlanLoaderError"""
     payload = _good_payload()
     payload["phases"] = []
     path = _write_plan_json(tmp_path, payload)
@@ -153,7 +153,7 @@ def test_parse_plan_json_phases_empty(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_not_json(tmp_path: Path) -> None:
-    """JSON parse 실패 → PlanLoaderError."""
+    """JSON parse failed → PlanLoaderError."""
     path = tmp_path / "plan.json"
     path.write_text("not valid json {", encoding="utf-8")
     with pytest.raises(PlanLoaderError, match="JSON"):
@@ -161,15 +161,15 @@ def test_parse_plan_json_not_json(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_file_missing(tmp_path: Path) -> None:
-    """파일 미존재 → PlanLoaderError."""
+    """File Missing → PlanLoaderError."""
     with pytest.raises(PlanLoaderError, match="not found"):
         parse_plan_json(tmp_path / "missing.json")
 
 
 def test_parse_plan_json_defaults(tmp_path: Path) -> None:
-    """optional 필드 (workers / spawn_mode) 누락 시 default 적용."""
+    """Optional field (workers / spawn mode) Apply default when missing."""
     payload = _good_payload()
-    # workers 와 spawn_mode 제거
+    # workers and spawn mode removal
     del payload["phases"][0]["workers"]
     del payload["phases"][0]["spawn_mode"]
     path = _write_plan_json(tmp_path, payload)
@@ -179,7 +179,7 @@ def test_parse_plan_json_defaults(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_circular_deps(tmp_path: Path) -> None:
-    """순환 의존 → PlanLoaderError (topo sort 실패 검출)."""
+    """Cycle dependence → PlanLoaderError (topo sort failed detection)."""
     payload = _good_payload()
     payload["phases"][0]["deps"] = ["P2"]
     payload["phases"][1]["deps"] = ["P1"]
@@ -189,7 +189,7 @@ def test_parse_plan_json_circular_deps(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_sample_t504(tmp_path: Path) -> None:
-    """본 T-504 plan 의 6 Phase frontmatter 와 동등한 JSON 도 정상 파싱."""
+    """JSON equivalent to 6 Phase frontmatter of this T-504 plan."""
     payload = {
         "schema_version": 2,
         "ticket": "T-504",
@@ -221,7 +221,7 @@ def test_parse_plan_json_sample_t504(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_unexpected_phase_field(tmp_path: Path) -> None:
-    """Phase 안에 spec 외 필드 — 현재는 silent ignore (forward compat)."""
+    """<# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #>"""
     payload = _good_payload()
     payload["phases"][0]["unknown_field"] = "ignored"
     path = _write_plan_json(tmp_path, payload)
@@ -230,7 +230,7 @@ def test_parse_plan_json_unexpected_phase_field(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_default_mode(tmp_path: Path) -> None:
-    """mode 누락 시 default = 'multi'."""
+    """default = 'multi' when missing mode."""
     payload = _good_payload()
     del payload["mode"]
     path = _write_plan_json(tmp_path, payload)
@@ -239,7 +239,7 @@ def test_parse_plan_json_default_mode(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_explicit_single(tmp_path: Path) -> None:
-    """mode=single 도 정상 수용."""
+    """mode=single degree top acceptance."""
     payload = _good_payload()
     payload["mode"] = "single"
     path = _write_plan_json(tmp_path, payload)
@@ -248,9 +248,9 @@ def test_parse_plan_json_explicit_single(tmp_path: Path) -> None:
 
 
 def test_parse_plan_json_textwrap_dedent_ok() -> None:
-    """python source 의 multi-line JSON 도 정상 (textwrap dedent 사용 패턴)."""
-    # 본 테스트는 _good_payload 와 다르게, JSON 문자열을 inline 생성하여
-    # `json.loads` 후 dict 비교 정합성을 검증하는 sanity test.
+    """python source of multi-line JSON as normal (textwrap dedent use pattern)."""
+    # good payload
+    # sanity test to validate dict comparison staticity after `json.loads`.
     raw = textwrap.dedent(
         """\
         {

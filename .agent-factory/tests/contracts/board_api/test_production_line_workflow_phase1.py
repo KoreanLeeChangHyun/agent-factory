@@ -1,10 +1,10 @@
-"""T-495 Phase 1 회귀 테스트 — production-line 워크플로우 백엔드 인프라.
+"""T-495 Phase 1 Regression Test — production-line workflow backend infrastructure.
 
-검증 대상:
+Payment Terms:
   - ProductionLineSession dataclass + ProductionLineSessionRegistry (CRUD + idempotent)
   - ProductionLineSSEChannel (broadcast + emit_* + jsonl persist + client fan-out)
-  - ProductionLineWorkflowHandlerMixin._SESSION_PATH_RE (path parsing 정합)
-  - http_router 임포트 smoke + Mixin 합성 검증
+  - ProductionLineWorkflowHandlerMixin. SESSION PATH RE (path parsing)
+  - http router import smoke + Mixin synthesis verification
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import time
 import unittest
 from pathlib import Path
 
-# sys.path — `.agent-factory/` (board.server.* 절대 import 용)
+# sys.path — `.agent-factory/` (for absolute imports of board.server.*)
 _AGENT_FACTORY_ROOT = Path(__file__).resolve().parents[3]
 _WORKTREE_ROOT = _AGENT_FACTORY_ROOT.parent
 _BOARD_ROOT = _AGENT_FACTORY_ROOT / "board"
@@ -36,8 +36,8 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT, _BOARD_ROOT):
 class TestProductionLineSession(unittest.TestCase):
 
     def test_dataclass_defaults(self):
-        from board.server.production_line_session import ProductionLineSession
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.sessions.production_line_session import ProductionLineSession
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         channel = ProductionLineSSEChannel(session_id='wf-T-001-abc')
         s = ProductionLineSession(
             session_id='wf-T-001-abc',
@@ -58,7 +58,7 @@ class TestProductionLineSession(unittest.TestCase):
 class TestProductionLineSessionRegistry(unittest.TestCase):
 
     def setUp(self):
-        from board.server.production_line_session import ProductionLineSessionRegistry
+        from board.server.sessions.production_line_session import ProductionLineSessionRegistry
         self.tmpdir = tempfile.mkdtemp(prefix='v2reg_')
         self.reg = ProductionLineSessionRegistry(persist_dir=self.tmpdir)
 
@@ -100,7 +100,7 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
         s = self.reg.update_step('wf-T-006-a', 'DONE')
         self.assertEqual(s.status, 'completed')
 
-        # FAILED 매핑 — 새 세션으로
+        # FAILED mapping — to new session
         self.reg.create('wf-T-007-a', 'T-007', 'implement', '/tmp/w7')
         s = self.reg.update_step('wf-T-007-a', 'FAILED')
         self.assertEqual(s.status, 'failed')
@@ -126,10 +126,10 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
         self.reg.create('wf-T-011-a', 'T-011', 'implement', '/tmp/w11')
         fpath = os.path.join(self.tmpdir, 'wf-T-011-a.jsonl')
         self.assertTrue(os.path.exists(fpath))
-        # remove → 디스크 보존
+        # remove → disk preservation
         self.assertTrue(self.reg.remove('wf-T-011-a'))
         self.assertTrue(os.path.exists(fpath))
-        # purge → 디스크 삭제
+        # purge → delete disk
         self.reg.create('wf-T-012-a', 'T-012', 'implement', '/tmp/w12')
         fpath2 = os.path.join(self.tmpdir, 'wf-T-012-a.jsonl')
         self.assertTrue(self.reg.purge('wf-T-012-a'))
@@ -148,7 +148,7 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
         self.assertEqual(meta['engine_version'], 'production_line')
 
     def test_load_from_disk(self):
-        from board.server.production_line_session import ProductionLineSessionRegistry
+        from board.server.sessions.production_line_session import ProductionLineSessionRegistry
         self.reg.create('wf-T-014-a', 'T-014', 'implement', '/tmp/w14')
         self.reg.create('wf-T-015-a', 'T-015', 'research', '/tmp/w15')
 
@@ -160,31 +160,31 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
         self.assertEqual(s.status, 'completed')
 
     def test_is_fake_session_id_helper(self):
-        from board.server.production_line_session import is_fake_session_id
-        # fake/test 패턴 매칭
+        from board.server.sessions.production_line_session import is_fake_session_id
+        # fake/test pattern matching
         self.assertTrue(is_fake_session_id('wf-T-495-test-p2'))
         self.assertTrue(is_fake_session_id('wf-T-495-p3-extras-test-749148'))
         self.assertTrue(is_fake_session_id('wf-smoke-001'))
         self.assertTrue(is_fake_session_id('wf-fake-X'))
-        self.assertTrue(is_fake_session_id('wf-T-001-MOCK-x'))  # 대소문자 무관
-        # 정상 production session_id (uuid 형식) 통과
+        self.assertTrue(is_fake_session_id('wf-T-001-MOCK-x'))  # Case irrelevant
+        # Normal production session_id (uuid format) passed
         self.assertFalse(is_fake_session_id('wf-T-495-123e4567-e89b-12d3-a456-426614174000'))
         self.assertFalse(is_fake_session_id('wf-T-001-a'))
 
     def test_create_rejects_fake_session_id(self):
-        # fake 패턴 4종 모두 ValueError 발생 + persist 안 됨
+        # ValueError occurs for all 4 fake patterns + does not persist
         for sid in ('wf-T-001-test', 'wf-smoke-002', 'wf-fake-003', 'wf-mock-004'):
             with self.assertRaises(ValueError) as ctx:
                 self.reg.create(sid, 'T-001', 'implement', '/tmp/w1')
             self.assertIn('fake/test pattern', str(ctx.exception))
-            # registry 등록 안 됨
+            # Not registered in registry
             self.assertIsNone(self.reg.get(sid))
-            # persist 파일 안 생성
+            # Does not create persist file
             fpath = os.path.join(self.tmpdir, f'{sid}.jsonl')
             self.assertFalse(os.path.exists(fpath))
 
     def test_create_allows_production_session_id(self):
-        # production uuid 패턴은 정상 등록
+        # The production uuid pattern is registered normally.
         s = self.reg.create(
             'wf-T-001-123e4567-e89b-12d3-a456-426614174000',
             'T-001', 'implement', '/tmp/w1'
@@ -199,7 +199,7 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
 
 
 class _FakeWFile:
-    """SSE 전송 대상 mock — bytes 누적."""
+    """SSE transfer destination mock — bytes accumulation."""
 
     def __init__(self):
         self.buf = io.BytesIO()
@@ -225,7 +225,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_broadcast_to_client(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-100-a', persist_path=self.persist_path)
         client = _FakeWFile()
         ch.add(client)
@@ -234,11 +234,11 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         data = client.value().decode('utf-8')
         self.assertIn('event: workflow_step', data)
         self.assertIn('"step": "PLAN"', data)
-        # seq id 가 0 부여
+        # seq id is given as 0
         self.assertIn('id: 0\n', data)
 
     def test_persist_writes_jsonl(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-101-a', persist_path=self.persist_path)
         ch.broadcast('workflow_step', {'step': 'PLAN'})
         ch.broadcast('workflow_step', {'step': 'WORK'})
@@ -250,7 +250,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertEqual(rec1['payload']['step'], 'PLAN')
 
     def test_emit_step_payload(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-102-a')
         client = _FakeWFile()
         ch.add(client)
@@ -261,7 +261,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertIn('"prev_step": "PLAN"', data)
 
     def test_emit_stdout_payload(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-103-a')
         client = _FakeWFile()
         ch.add(client)
@@ -272,7 +272,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertIn('"raw":', data)
 
     def test_emit_phase_payload(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-104-a')
         client = _FakeWFile()
         ch.add(client)
@@ -283,7 +283,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertIn('"action": "end"', data)
 
     def test_emit_finish_payload(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-105-a')
         client = _FakeWFile()
         ch.add(client)
@@ -294,7 +294,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertIn('"summary": "all green"', data)
 
     def test_client_remove(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-106-a')
         client = _FakeWFile()
         ch.add(client)
@@ -303,7 +303,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         self.assertEqual(ch.client_count(), 0)
 
     def test_dead_client_pruned(self):
-        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
         ch = ProductionLineSSEChannel(session_id='wf-T-107-a')
 
         class _BrokenWFile:
@@ -316,7 +316,7 @@ class TestProductionLineSSEChannel(unittest.TestCase):
         client = _BrokenWFile()
         ch.add(client)
         ch.broadcast('workflow_step', {'step': 'PLAN'})
-        # broadcast 후 dead client 가 제거됨
+        # Dead clients are removed after broadcast
         self.assertEqual(ch.client_count(), 0)
 
 
@@ -347,13 +347,13 @@ class TestProductionLineWorkflowPathRegex(unittest.TestCase):
         m = _SESSION_PATH_RE.match('/api/v2/sessions/wf-T-100-a/artifacts/work/P1.md')
         self.assertEqual(m.group('sub'), 'artifacts/work/P1.md')
 
-        # 매칭 실패 케이스
+        # Matching failure case
         self.assertIsNone(_SESSION_PATH_RE.match('/api/v2/sessions'))
         self.assertIsNone(_SESSION_PATH_RE.match('/api/v1/sessions/abc'))
 
 
 # ==============================================================================
-# T04 — Import smoke + Mixin 합성 검증
+# T04 — Import smoke + Mixin synthesis verification
 # ==============================================================================
 
 
@@ -361,27 +361,27 @@ class TestImportSmoke(unittest.TestCase):
 
     def test_import_production_line_modules(self):
         try:
-            from board.server.production_line_session import (
+            from board.server.sessions.production_line_session import (
                 ProductionLineSession,
                 ProductionLineSessionRegistry,
             )
-            from board.server.production_line_sse_channel import ProductionLineSSEChannel
+            from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
             from board.server.handlers.production_line_workflow import ProductionLineWorkflowHandlerMixin
         except ImportError as exc:
             self.fail(f'ImportError: {exc}')
 
     def test_state_singleton_registered(self):
-        from board.server import state
-        from board.server.production_line_session import ProductionLineSessionRegistry
+        from board.server.runtime import state
+        from board.server.sessions.production_line_session import ProductionLineSessionRegistry
         self.assertIsInstance(state.production_line_registry, ProductionLineSessionRegistry)
 
     def test_http_router_mixin_composition(self):
-        from board.server.http_router import BoardHTTPRequestHandler
+        from board.server.routing.http_router import BoardHTTPRequestHandler
         from board.server.handlers.production_line_workflow import ProductionLineWorkflowHandlerMixin
         self.assertTrue(issubclass(BoardHTTPRequestHandler, ProductionLineWorkflowHandlerMixin))
 
     def test_dispatch_methods_exist(self):
-        from board.server.http_router import BoardHTTPRequestHandler
+        from board.server.routing.http_router import BoardHTTPRequestHandler
         self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_dispatch_get'))
         self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_dispatch_post'))
         self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_create'))

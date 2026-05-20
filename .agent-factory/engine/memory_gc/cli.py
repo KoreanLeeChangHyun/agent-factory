@@ -21,7 +21,7 @@ from .runner import load_last_run, run_cycle
 
 
 def _load_settings_env() -> None:
-    """.agent-factory/.settings 를 환경에 로드 (있으면)."""
+    """Load .agent-factory/.settings into the environment (if present)."""
     import os
     from pathlib import Path
     cwd = Path(os.environ.get('CLAUDE_PROJECT_DIR', os.getcwd()))
@@ -88,7 +88,7 @@ def _cmd_prune(args: argparse.Namespace) -> int:
 
 
 def _cmd_auto(args: argparse.Namespace) -> int:
-    """MEMORY_GC_AUTO_TRIGGERS 에 trigger 가 포함된 경우에만 run 호출. silent skip 정책."""
+    """Run is called only when trigger is included in MEMORY_GC_AUTO_TRIGGERS. silent skip 정책."""
     _load_settings_env()
     cfg = load_config()
     if args.trigger not in cfg.auto_triggers:

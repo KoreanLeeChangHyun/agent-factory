@@ -1,11 +1,11 @@
-"""test_merge_conflict_detection.py - 병합 충돌 검출 강화 (T-907) 단위 테스트.
+"""test merge conflict detection.py - Enhanced merge collision detection (T-907) unit testing.
 
-검증 범위:
-  T1: _detect_conflicts — diff --diff-filter=U 가 충돌 파일을 반환하는 기본 경로
-  T2: _detect_conflicts — 1차 빈 결과 시 git status --porcelain fallback
-  T3: _detect_conflicts — 두 git 호출 모두 실패 시 sentinel 반환
-  T4: cmd_done — conflicts=[] + error_message 에 충돌 패턴 → SystemExit(1)
-  T5: cmd_done — 정상 성공 path 가 SystemExit 없이 완료 (회귀 가드)
+Payment Terms:
+  T1:  detect conflicts — diff --diff-filter=U is the default path to return crash files
+  git status --porcelain fallback
+  T3:  detect conflicts — return sentinel when both git calls fail
+  T4: cmd done — conflicts=[] + error message conflict pattern → SystemExit(1)
+  T5: cmd done — Normal success path is completed without SystemExit (Return Guard)
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-# sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
+# sys.path: .agent-factory/engine enables flow package import
 _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
@@ -32,11 +32,11 @@ from flow.worktree_manager import (  # noqa: E402
 )
 
 
-# ─── git 헬퍼 ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 
 
 def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
-    """임시 git 저장소를 대상으로 git 명령을 실행한다."""
+    """execute git commands for temporary git repository."""
     return subprocess.run(
         ["git", "-C", repo] + list(args),
         capture_output=True,
@@ -45,23 +45,23 @@ def _git(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _git_check(repo: str, *args: str) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행하고 실패 시 AssertionError 를 던진다."""
+    """execute git command and throw AssertionError when failed."""
     result = _git(repo, *args)
     assert result.returncode == 0, (
-        f"git {' '.join(args)} 실패: {result.stderr}"
+        f"git   FIELD 0   failed:   FIELD 1   "
     )
     return result
 
 
 def _setup_conflict_repo(repo: str) -> str:
-    """develop + feature 브랜치에서 동일 라인 충돌이 발생한 임시 repo 를 구성한다.
+    """develop + feature construct a temporary repo that occurred the same line collision in the brand.
 
-    - develop: work.py 의 첫 줄을 'x = "develop"\n' 으로 변경 + commit
-    - feature: 같은 줄을 'x = "feature"\n' 으로 변경 + commit
-    - develop 에서 git merge feature (충돌 상태, resolve 하지 않음)
+    - Development: change the first line of work.py to 'x = "develop"\n' + commit
+    - Feature: Change the same line to 'x = "feature"\n' + commit
+    - git merge feature in development (No conflict, not resolve)
 
     Returns:
-        feature 브랜치 이름.
+        feature Brand Name.
     """
     _git_check(repo, "init", "-b", "develop")
     _git_check(repo, "config", "user.email", "test@example.com")
@@ -73,7 +73,7 @@ def _setup_conflict_repo(repo: str) -> str:
     _git_check(repo, "add", "work.py")
     _git_check(repo, "commit", "-m", "init")
 
-    # feature 브랜치: 같은 라인 수정
+    # feature Brand: same line fix
     feature_branch = "feat/T-907-test"
     _git_check(repo, "checkout", "-b", feature_branch)
     with open(work_file, "w") as f:
@@ -81,14 +81,14 @@ def _setup_conflict_repo(repo: str) -> str:
     _git_check(repo, "add", "work.py")
     _git_check(repo, "commit", "-m", "feat: change x")
 
-    # develop 으로 돌아와 같은 라인 수정
+    # Fix the same line to develop
     _git_check(repo, "checkout", "develop")
     with open(work_file, "w") as f:
         f.write('x = "develop"\n')
     _git_check(repo, "add", "work.py")
     _git_check(repo, "commit", "-m", "develop: change x")
 
-    # merge 시도 — 충돌 발생 (비정상 returncode 는 무시)
+    # merge attempt — a collision (unlimited returncode is ignored)
     subprocess.run(
         ["git", "-C", repo, "merge", "--no-ff", feature_branch],
         capture_output=True,
@@ -98,11 +98,11 @@ def _setup_conflict_repo(repo: str) -> str:
     return feature_branch
 
 
-# ─── T1: _detect_conflicts diff --diff-filter=U 기본 경로 ────────────────────
+# ────────────────────────────────────────────────
 
 
 class TestDetectConflictsDiffFilterPopulates(unittest.TestCase):
-    """_detect_conflicts 가 diff --diff-filter=U 에서 충돌 파일을 정확히 반환한다."""
+    """detect conflicts returns the crash file from diff --diff-filter=U."""
 
     def setUp(self) -> None:
         self.repo = tempfile.mkdtemp(prefix="wf_test_t907_conflict_")
@@ -112,9 +112,9 @@ class TestDetectConflictsDiffFilterPopulates(unittest.TestCase):
         shutil.rmtree(self.repo, ignore_errors=True)
 
     def test_detect_conflicts_diff_filter_populates(self) -> None:
-        """임시 repo 에서 충돌 발생 후 _detect_conflicts 가 충돌 파일을 반환한다."""
+        """detect conflicts returns a crash file after collision from temporary repo."""
         conflicts = _detect_conflicts(repo_path=self.repo)
-        # sentinel 이 아니어야 하며, work.py 가 포함되어야 한다
+        # sentinel should not be included, and work.py should be included
         self.assertNotIn(_SENTINEL_UNKNOWN_CONFLICT, conflicts)
         self.assertIn("work.py", conflicts)
 
@@ -123,7 +123,7 @@ class TestDetectConflictsDiffFilterPopulates(unittest.TestCase):
 
 
 class TestDetectConflictsPorcelainFallback(unittest.TestCase):
-    """1차(diff --diff-filter=U) 결과가 빈 리스트일 때 porcelain fallback 으로 충돌 파일을 반환한다."""
+    """1st(diff --diff-filter=U) returns a crash file to porcelain fallback when the result is empty."""
 
     def _make_completed(
         self, returncode: int, stdout: str
@@ -133,17 +133,17 @@ class TestDetectConflictsPorcelainFallback(unittest.TestCase):
         )
 
     def test_detect_conflicts_porcelain_fallback(self) -> None:
-        """diff filter 가 빈 stdout 반환 시 porcelain 결과로 충돌 파일을 반환한다."""
+        """diff filter returns the crash file as porcelain result when empty stdout return."""
         call_count = 0
 
         def fake_git(*args: str, repo_path=None):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                # 1차: diff --name-only --diff-filter=U → 빈 결과
+                # 1st: diff --name-only --diff-filter=U → empty result
                 return self._make_completed(0, "")
             else:
-                # 2차: status --porcelain → UU 코드 포함
+                # 2nd: status --porcelain → UU code included
                 return self._make_completed(0, "UU work.py\n")
 
         with mock.patch.object(worktree_manager, "_git", side_effect=fake_git):
@@ -156,7 +156,7 @@ class TestDetectConflictsPorcelainFallback(unittest.TestCase):
 
 
 class TestDetectConflictsSentinelOnFailure(unittest.TestCase):
-    """두 git 호출이 모두 실패(returncode != 0) 시 sentinel 을 반환한다."""
+    """Both git calls return sentinel if failed (returncode != 0)."""
 
     def _make_failed(self) -> subprocess.CompletedProcess:
         return subprocess.CompletedProcess(
@@ -164,33 +164,33 @@ class TestDetectConflictsSentinelOnFailure(unittest.TestCase):
         )
 
     def test_detect_conflicts_sentinel_on_failure(self) -> None:
-        """두 호출 모두 실패 시 ['<unknown-conflict>'] sentinel 반환."""
+        """['<unknown-conflict>'] sentinel return when both call failed."""
         with mock.patch.object(worktree_manager, "_git", return_value=self._make_failed()):
             conflicts = _detect_conflicts()
 
         self.assertEqual(conflicts, [_SENTINEL_UNKNOWN_CONFLICT])
 
 
-# ─── T4: cmd_done — 빈 conflicts + error_message 충돌 패턴 → SystemExit ───────
+# ─ T4: cmd done — empty conflicts + error message crash patterns → SystemExit ───────
 
 
 class TestCmdDoneExitsOnEmptyConflictsWithSignalMessage(unittest.TestCase):
-    """merge_result.success=False + conflicts=[] + error_message 에 '병합 충돌' 포함 시
-    cmd_done 이 SystemExit(1) 을 발생시킨다.
+    """merge result.success=False + conflicts=[] + error message
+    cmd done generates SystemExit(1).
     """
 
     def test_cmd_done_exits_on_empty_conflicts_with_signal_message(self) -> None:
-        """conflicts 빈 리스트이지만 error_message 에 충돌 패턴 있으면 SystemExit."""
+        """systemExit if the crash pattern in error message is empty."""
         from flow import kanban_cli
         from flow.worktree_manager import MergeResult
 
-        # merge_to_develop 이 충돌 실패를 반환하도록 monkeypatch
+        # merge to develop This crash fails to return monkeypatch
         fake_merge_result = MergeResult(
             success=False,
             merge_commit="",
             merged_branch="feat/T-907-test",
             conflicts=[],
-            error_message="병합 충돌 발생: work.py 에서 충돌이 감지되었습니다",
+            error_message="Merged Collision: Collision detected in work.py",
         )
 
         with mock.patch.object(
@@ -213,21 +213,21 @@ class TestCmdDoneExitsOnEmptyConflictsWithSignalMessage(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
 
 
-# ─── T5: cmd_done — 정상 성공 path 는 SystemExit 없이 완료 (회귀 가드) ─────────
+# ─ T5: cmd done — Normal success path completed without SystemExit (Return Guard) ────────
 
 
 class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
-    """merge_to_develop 성공 시 cmd_done 이 SystemExit 없이 Done 전이를 완료한다."""
+    """merge to develop When successful cmd done completes Done transformation without SystemExit."""
 
     def setUp(self) -> None:
-        # 실제 티켓 파일을 임시 디렉터리에 생성
+        # Create a temporary ticket file in a temporary directory
         self.tmp_dir = tempfile.mkdtemp(prefix="wf_test_t907_done_success_")
         self.done_dir = os.path.join(self.tmp_dir, "done")
         self.review_dir = os.path.join(self.tmp_dir, "review")
         os.makedirs(self.review_dir, exist_ok=True)
         os.makedirs(self.done_dir, exist_ok=True)
 
-        # Review 상태 티켓 XML 생성
+        # Review status ticket XML creation
         self.ticket_id = "T-907"
         self.ticket_file = os.path.join(self.review_dir, f"{self.ticket_id}.xml")
         with open(self.ticket_file, "w", encoding="utf-8") as f:
@@ -251,7 +251,7 @@ class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def test_cmd_done_proceeds_on_success(self) -> None:
-        """merge_to_develop 성공 반환 시 cmd_done 이 Done 전이를 완료한다."""
+        """merge to develop success returns when cmd done completes Done transition."""
         from flow import kanban_cli
         from flow import ticket_repository
         from flow.worktree_manager import MergeResult
@@ -290,11 +290,11 @@ class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
         ), mock.patch.object(
             kanban_cli, "update_result", return_value=None
         ):
-            # SystemExit 없이 완료되어야 한다
+            # SystemExit must be completed
             try:
                 kanban_cli.cmd_done(self.ticket_id)
             except SystemExit as e:
-                self.fail(f"cmd_done 이 예기치 않은 SystemExit({e.code}) 를 발생시켰습니다")
+                self.fail(f"cmd done has caused unexpected SystemExit(   FIELD 0   )")
 
 
 if __name__ == "__main__":

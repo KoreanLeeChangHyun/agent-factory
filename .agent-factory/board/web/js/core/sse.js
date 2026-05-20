@@ -72,8 +72,8 @@
         if (Board.state.activeTab === "relations" && Board.render.renderRelations) {
           Board.render.renderRelations();
         }
-        // workflow 탭은 ticket 매핑(findTicketForWorkflow)에 의존 — TICKETS 갱신 시 tbody 만 갱신
-        // (검색바·스크롤·포커스 보존하기 위해 shell 은 안 건드린다)
+        // workflow tab rely on ticket mapping — TICKETS update only
+        // (Specification of shells to preserve the bar·scroll·spoker)
         if (Board.state.activeTab === "workflow" && Board.render.renderWfTbody) {
           Board.render.renderWfTbody();
         }
@@ -127,10 +127,10 @@
   /**
    * Updates the status bar branch indicator from a fresh value.
    *
-   * SSE git_branch 이벤트는 payload 로 전달된 branch 를 직접 사용하지만,
-   * polling fallback 은 변경 신호만 받기 때문에 /api/branch 를 다시 fetch 한다.
+   * SSE git branch event uses branch delivered by payload directly,
+   * /api/branch re-fetch due to polling fallback only changes signal.
    *
-   * @param {string|null} branch - SSE payload 의 branch 값. 없으면 fetch.
+   * @param {string null} branch - SSE payload branch value. without fetch.
    */
   function refreshBranch(branch) {
     if (branch) {
@@ -214,15 +214,15 @@
         branchVal = null;
       }
       refreshBranch(branchVal);
-      // T-433 Phase 2: Review 카드 토글 시각 동기화 (kanban 모듈 등록 시에만)
+      // T-433 Phase 2: Review Card Toggle Visual Synchronization (only when registering the Kanban module)
       if (Board.render.syncActiveBranchFromSSE) {
         Board.render.syncActiveBranchFromSSE(branchVal);
       }
     });
 
-    // T-475 Stage 3: launch 비동기화 — LAUNCH_PENDING/STARTED/FAILED 디스패치
-    // 백엔드 _emit_launch_event 가 sse_manager.broadcast('launch', data={event:..., ticket:..., ...}) 로 발화.
-    // kanban 모듈의 handleLaunchEvent 가 launchState 머신을 조작 (addEventListener 중복 금지 §2.4).
+    // T-475 Stage 3: Launch Asynchronousization — LAUNCH PENDING/STARTED/FAILED DESIGN
+    // sse manager.broadcast('launch', data={event:..., ticket:..., ...})
+    // handleLaunchEvent in the kanban module manipulates the launchState machine (addEventListener duplicates §2.4).
     es.addEventListener("launch", function (e) {
       try {
         var d = JSON.parse(e.data);
@@ -281,11 +281,11 @@
         if (Board.render.refreshRoadmap) Board.render.refreshRoadmap();
       }
       if (changes.git_branch) {
-        // polling payload 는 [branch] list — 마지막 값을 사용한다
+        // polling payload [branch] list — use the last value
         var arr = changes.git_branch;
         var last = (arr && arr.length) ? arr[arr.length - 1] : null;
         refreshBranch(last);
-        // T-433 Phase 2: polling fallback 에서도 Review 카드 토글 시각 동기화
+        // T-433 Phase 2: Sync Review Card Toggles Vision even polling fallback
         if (Board.render.syncActiveBranchFromSSE) {
           Board.render.syncActiveBranchFromSSE(last);
         }
@@ -312,33 +312,33 @@
   }
 
   // ── Init ──
-  // 쿼리 스트링 우선, localStorage 폴백으로 viewer 상태 복원
+  // Query String First, restore viewer status with localStorage bag
   var qsParams = new URLSearchParams(window.location.search);
   var qsTab = qsParams.get("tab");
   var qsTicket = qsParams.get("ticket");
   var initSavedTabs = (Board.util.loadUI().viewerTabs || []).slice();
 
-  // 쿼리 스트링에 ticket이 있으면 savedTabs에 추가 (중복 방지)
+  // Add to saveTabs if there is a ticket to the query string
   if (qsTab === "viewer" && qsTicket) {
     Board.state.activeTab = "viewer";
     Board.state.activeViewerTab = qsTicket;
     if (initSavedTabs.indexOf(qsTicket) === -1) initSavedTabs.push(qsTicket);
   } else if (qsTab === "metrics") {
-    // ?tab=metrics — Metrics 탭 폐지, Dashboard 로 redirect (T-461 Phase 3)
+    // ? tab=metrics — Metrics tab redirect to Dashboard (T-461 Phase 3)
     Board.state.activeTab = "dashboard";
     var pathOnly = window.location.pathname;
     history.replaceState(null, "", pathOnly);
   }
 
-  // switchTab 전에 placeholder로 viewerTabs 복원 (saveUI 덮어쓰기 방지)
+  // restore viewerTabs as placeholder before switchTab (anti-saveUI)
   initSavedTabs.forEach(function (num) {
     Board.state.viewerTabs.push({ number: num, ticket: null });
   });
   switchTab(Board.state.activeTab);
   document.body.style.opacity = "";
 
-  // T-475 Stage 3: launch starting 상태 sessionStorage 복원 (fetchTickets 응답 전 호출하여
-  // 첫 renderKanban 시점에 pulse 배지가 즉시 노출되도록 함). grace 잔여 시간 재계산 + 타이머 재시작.
+  // T-475 Stage 3: Launch starting status sessionStorage Restore (fetchTickets call before response)
+  // When the first renderKanban point, the pulse badge will be immediately exposed. grace residual time recalculate + restart timer.
   if (Board.kanban && Board.kanban.restoreLaunchStateFromStorage) {
     Board.kanban.restoreLaunchStateFromStorage();
   }
@@ -347,8 +347,8 @@
     Board.state.TICKETS = tickets;
     prevTicketJson = ticketJson(tickets);
     Board.render.renderKanban();
-    // Race 보정: workflow 첫 렌더가 fetchTickets 완료 전에 끝났으면 TICKETS=[]로 모든 행 미연결 고착.
-    // tbody 만 다시 그려서 ticket 매핑을 채운다 (검색바·스크롤·포커스 보존).
+    // Race Calibration: When the first renderer is finished before fetchTickets is finished, TICKETS= resolves all the lines with the[].
+    // Tbody only re-draws and fills the ticket map (Search bar, roll, pointer preserve).
     if (Board.state.wfInitialized && Board.render.renderWfTbody) Board.render.renderWfTbody();
     if (initSavedTabs.length > 0) {
       initSavedTabs.forEach(function (num) {

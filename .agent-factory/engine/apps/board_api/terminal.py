@@ -9,18 +9,18 @@ import time
 import uuid
 from urllib.parse import parse_qs, urlparse
 
-from board.server.state import terminal_sse_channel, claude_process, workflow_registry
-from board.server._common import api_endpoint, logger, _get_git_branch, server_debug_log
+from board.server.runtime.state import terminal_sse_channel, claude_process, workflow_registry
+from board.server.support.common import api_endpoint, logger, _get_git_branch, server_debug_log
 from board.server.channels.event_filter import is_user_visible
-from board.server.terminal_channel import _resolve_last_event_id
-from board.server.claude_process import _validate_images
+from board.server.channels.terminal_channel import _resolve_last_event_id
+from board.server.processes.claude_process import _validate_images
 from board.server.artifacts.attachments_persist import AttachmentsSidecar
 
 
-# 충돌을 막기 위해 ``min_attachment_threshold`` 를 적용한다. (envelope 합성
-# 단계에서 prompt + report 본문이 결합되면 통상 1KB 이상이므로 200자는
-# 충분히 보수적인 하한.)
-_ATTACHMENT_BLOCK_PREFIX = '[첨부 T-'
+# Apply ``min_attachment_threshold`` to prevent collisions. (envelope synthesis
+# When the prompt + report body is combined in the step, it is usually more than 1KB, so 200 characters are required.
+# Sufficiently conservative lower bound.)
+_ATTACHMENT_BLOCK_PREFIX = '[Attachment T-'
 _ATTACHMENT_BLOCK_MIN_LEN = 200
 
 
@@ -57,17 +57,17 @@ def _assign_turn_ids(events: list[dict]) -> list[dict]:
         kind = ev.get('kind', '')
         ts = ev.get('timestamp', '') or ''
 
-        # tool_result 는 user 역할이지만 assistant turn 의 일부로 취급
+        # tool_result is a user role, but is treated as part of assistant turn
         is_tool_result = (role == 'user' and kind == 'tool_result')
         is_real_user = (role == 'user' and not is_tool_result)
 
         if is_real_user:
-            # 새 user 이벤트 = 무조건 새 turn (gap 임계값 무관)
-            # timestamp 없는 레거시 레코드는 극히 드물지만 fallback 처리
+            # New user event = unconditional new turn (regardless of gap threshold)
+            # Fallback processing for extremely rare legacy records without timestamps
             current_turn_id = f"hist-{ts}" if ts else "hist-orphan"
 
-        # current_turn_id 가 없으면 fallback: orphan assistant 이벤트
-        # (첫 이벤트가 assistant 인 엣지 케이스)
+        # If current_turn_id does not exist, fallback: orphan assistant event
+        # (Edge case where the first event is assistant)
         if current_turn_id is None:
             current_turn_id = 'hist-orphan'
 
@@ -161,16 +161,16 @@ def _build_render_events(data: dict) -> list[dict]:
         return []
 
     # ----------------------------------------
-    # user role 의 content 가 length >= 2 인 list 인 경우, 첫 번째 text 블록만
-    # user 텍스트 이벤트로 채택하고 그 이후의 첨부 text 블록(``[첨부 T-`` 로
-    # 시작 + 길이 ``_ATTACHMENT_BLOCK_MIN_LEN`` 이상)은 사용자 메시지 렌더에서
-    # 제외한다. 첨부는 sidecar(``<session_id>.attachments.jsonl``)에 별도
-    # 보관되며, ``_handle_terminal_history`` 가 ts 매칭으로 user 이벤트에
-    # ``attachments`` 필드를 부여한다.
+    # If the user role's content is a list with length >= 2, only the first text block
+    # Adopt it as a user text event and attach the subsequent text block (with ``[Attachment T-``)
+    # start + length ``_ATTACHMENT_BLOCK_MIN_LEN`` or higher) in the user message render.
+    # Exclude. Attachments are separate in the sidecar(``<session_id>.attachments.jsonl``)
+    # It is stored, and ``_handle_terminal_history`` is sent to the user event by ts matching.
+    # Provides an ``attachments`` field.
     #
-    # 길이 임계값(_ATTACHMENT_BLOCK_MIN_LEN=200) 은 사용자가 짧게 직접
-    # frontend send 시 합성하는 첨부 블록은 prompt + report 본문 포함이므로
-    # 보통 1KB 를 초과한다.
+    # The length threshold (_ATTACHMENT_BLOCK_MIN_LEN=200) allows the user to manually
+    # The attachment block synthesized when sending to the frontend includes the prompt + report body, so
+    # Usually exceeds 1KB.
     skip_attachment_blocks = (
         role == 'user' and isinstance(content, list) and len(content) >= 2
     )
@@ -189,18 +189,18 @@ def _build_render_events(data: dict) -> list[dict]:
                 continue
             if skip_attachment_blocks:
                 if not user_text_emitted:
-                    # 첫 번째 user text 블록 = 사용자 자유 입력
+                    # First user text block = user input
                     user_text_emitted = True
                 else:
-                    # 두 번째 이후 블록: 첨부 prefix + 길이 임계 충족 시 스킵
+                    # Second and subsequent blocks: attach prefix + skip when length threshold is met
                     if (
                         text.startswith(_ATTACHMENT_BLOCK_PREFIX)
                         and len(raw_text) >= _ATTACHMENT_BLOCK_MIN_LEN
                     ):
                         continue
-                    # prefix/길이 미충족 시 일반 text 블록으로 그대로 출력
-                    # (사용자가 다중 text 블록을 합법적으로 보낸 케이스
-                    # 회귀 0)
+                    # If the prefix/length is not met, it is output as a general text block.
+                    # (Case where user legitimately sends multiple text blocks
+                    # regression 0)
             events.append({
                 'role': role, 'kind': 'text', 'text': text,
                 'timestamp': timestamp,
@@ -242,7 +242,7 @@ _TITLE_SKIP_PREFIXES = (
     '<system-reminder>',
 )
 _TITLE_SKIP_EXACT = (
-    "첫 메시지입니다. '세션이 초기화 되었습니다.' 라고만 답하세요.",
+    "This is the first message. 'The session has been reset.' Just answer:",
 )
 _TITLE_MAX_LENGTH = 100
 _TITLE_SCAN_MAX_LINES = 300
@@ -277,12 +277,12 @@ def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
                 except (ValueError, json.JSONDecodeError):
                     continue
 
-                # branch: 모든 라인에서 가능한 만큼 갱신 (마지막 등장 값)
+                # branch: update as much as possible on every line (last occurrence of value)
                 if isinstance(event.get('gitBranch'), str) and event['gitBranch']:
                     branch = event['gitBranch']
 
                 if title is not None:
-                    # title 이미 확정 → branch 만 계속 추적
+                    # Title already confirmed → Continue tracking only the branch
                     continue
 
                 if event.get('type') != 'user':
@@ -315,7 +315,7 @@ def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
                     continue
                 title = text[:_TITLE_MAX_LENGTH]
     except (OSError, IOError) as err:
-        logger.debug('세션 메타 추출 실패 (%s): %s', filepath, err)
+        logger.debug('Session meta extraction failed (%s): %s', filepath, err)
     return title, branch
 
 
@@ -349,19 +349,19 @@ class TerminalHandlerMixin:
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
 
-        # 연결 확인용 초기 주석 전송
+        # Send initial annotation to confirm connection
         try:
             self.wfile.write(b': connected\n\n')
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
 
-        # 재접속 시 last_event_id로 중복 재생 방지 (헤더 + 쿼리 파라미터)
+        # Prevent duplicate playback with last_event_id when reconnecting (header + query parameters)
         last_event_id = _resolve_last_event_id(self.headers, self.path)
 
-        # ``skip_replay=1`` 쿼리 플래그: 클라이언트가 REST /terminal/history 로
-        # 과거를 이미 복원했다는 선언. 서버는 링버퍼 재생을 생략하고 라이브
-        # 이벤트만 전달한다. 메인 터미널이 첫 연결 시 사용한다.
+        # ``skip_replay=1`` query flag: client to REST /terminal/history
+        # A declaration that the past has already been restored. The server skips ring buffer playback and goes live.
+        # Only events are delivered. The main terminal is used for the first connection.
         parsed_query = parse_qs(urlparse(self.path).query)
         skip_replay = parsed_query.get('skip_replay', ['0'])[0] == '1'
 
@@ -418,9 +418,9 @@ class TerminalHandlerMixin:
             'permission_mode': claude_process._permission_mode,
             'branch': _get_git_branch(project_root),
             'clients': terminal_sse_channel.client_count,
-            # 새로고침 후 클라이언트가 스피너/입력 잠금 복구를 판단하는 신호.
-            # 사용자 입력 전송 후 result 수신 전까지 True. claude_process._status 만으로는
-            # 생성 중 판정이 불가능 (result 후에도 계속 'idle' 상태로 유지되므로).
+            # Signal for the client to determine spinner/input lock recovery after refresh.
+            # True after sending user input until receiving the result. claude_process._status alone
+            # Judgment during creation is impossible (since the status remains 'idle' even after the result).
             'awaiting_response': awaiting,
         })
 
@@ -436,7 +436,7 @@ class TerminalHandlerMixin:
         응답 항목:
             session_id: UUID (파일명에서 추출)
             last_active: mtime 기반 ISO 8601 형식 시각
-            is_current: 현재 "실행 중"인 세션과 일치 여부 (status != 'stopped')
+            is_current: 현재 "running"인 세션과 일치 여부 (status != 'stopped')
             is_last: ``.last-session-id`` 가 가리키는 마지막 세션 여부
                      (stopped 상태에도 유지되는 복원 후보)
             title: 첫 유효 user 메시지 (최대 100자)
@@ -457,15 +457,15 @@ class TerminalHandlerMixin:
         """
         project_root = os.getcwd()
 
-        # cwd 기반으로 ~/.claude/projects/ 하위 디렉터리 경로 산출
-        # 예: /home/deus/workspace/claude -> -home-deus-workspace-claude
+        # Calculate the ~/.claude/projects/ subdirectory path based on cwd
+        # Example: /home/deus/workspace/claude -> -home-deus-workspace-claude
         home_dir = os.path.expanduser('~')
         project_slug = project_root.replace('/', '-')
         sessions_dir = os.path.join(home_dir, '.claude', 'projects', project_slug)
 
-        # is_current = "지금 실행 중"인 세션. status == 'stopped' 인 경우
-        # .last-session-id 에서 복원된 session_id 는 '마지막 세션'(is_last)
-        # 이지 '현재 세션'이 아니다.
+        # is_current = "Running now"인 세션. status == 'stopped' 인 경우
+        # .last-session-id 에서 복원된 session_id 는 'last session'(is_last)
+        # 이지 'current session'이 아니다.
         last_session_id = claude_process.session_id
         current_session_id = (
             last_session_id if claude_process.status != 'stopped' else ''
@@ -477,7 +477,7 @@ class TerminalHandlerMixin:
                 for entry in it:
                     if not entry.name.endswith('.jsonl'):
                         continue
-                    stem = entry.name[:-6]  # ".jsonl" 제거
+                    stem = entry.name[:-6]  # Remove ".jsonl"
                     try:
                         uuid.UUID(stem)
                     except ValueError:
@@ -488,18 +488,18 @@ class TerminalHandlerMixin:
                         continue
                     entries.append((st.st_mtime, stem, entry.path, st.st_size))
         except OSError as e:
-            logger.debug('세션 디렉터리 스캔 실패: %s', e)
+            logger.debug('Session directory scan failed: %s', e)
             self._send_json([])
             return
 
-        # mtime 내림차순 정렬
+        # Sort by mtime descending
         entries.sort(key=lambda x: x[0], reverse=True)
 
         result = []
         for mtime, session_id, filepath, size_bytes in entries:
             title, branch = _extract_session_meta(filepath)
             if title is None:
-                # 제목 추출 실패 = 임시/초기화 세션으로 간주하여 제외
+                # Title extraction failure = excluded as temporary/reset session
                 continue
             last_active = datetime.datetime.fromtimestamp(
                 mtime, tz=datetime.timezone.utc
@@ -612,11 +612,11 @@ class TerminalHandlerMixin:
                     msg_type = data.get('type', '')
                     line_ts = data.get('timestamp', '') or ''
 
-                    # assistant.message.usage — 각 API 호출 시점의 전체 컨텍스트
-                    # 사용량 (델타 아님). 세션 전체에서 가장 마지막 값만 유지한다.
-                    # SSE 라이브 경로(terminal_channel._build_stream_payload)와
-                    # 동일하게 input_tokens + cache_read + cache_creation 합산을
-                    # 사용해야 상태바 퍼센티지가 일관된다.
+                    # assistant.message.usage — Full context at the time of each API call
+                    # Usage (not delta). Only the last value is maintained throughout the session.
+                    # SSE live path (terminal_channel._build_stream_payload) and
+                    # Similarly, sum input_tokens + cache_read + cache_creation
+                    # It must be used so that the status bar percentage is consistent.
                     if msg_type == 'assistant':
                         msg = data.get('message')
                         if isinstance(msg, dict):
@@ -637,8 +637,8 @@ class TerminalHandlerMixin:
                                     }
                                     last_usage_ts = line_ts
 
-                    # result 타입: 세션 누적 비용(total_cost_usd) + 마지막 usage.
-                    # 샘플 세션엔 없을 수 있음(상호작용 중이거나 subtype 에 따라).
+                    # result type: Session cumulative cost (total_cost_usd) + last usage.
+                    # May not be present in sample session (depending on interaction or subtype).
                     if msg_type == 'result':
                         cost = data.get('total_cost_usd')
                         if isinstance(cost, (int, float)) and line_ts >= last_cost_ts:
@@ -664,7 +664,7 @@ class TerminalHandlerMixin:
                     if not line_events:
                         continue
 
-                    # ISO 8601 문자열은 사전순 비교가 시간순과 일치한다.
+                    # For ISO 8601 strings, alphabetic comparison matches chronological order.
                     for ev in line_events:
                         ts = ev.get('timestamp') or ''
                         if since and ts and ts <= since:
@@ -673,16 +673,16 @@ class TerminalHandlerMixin:
                         if ts and ts > last_timestamp:
                             last_timestamp = ts
         except OSError as err:
-            logger.debug('세션 히스토리 읽기 실패 (%s): %s', filepath, err)
+            logger.debug('Failed to read session history (%s): %s', filepath, err)
             self._send_error(500, 'Failed to read session history')
             return
 
-        # 현재 스트리밍 중인 assistant 메시지를 합친다 (jsonl 에는 아직 없음).
-        # Claude CLI 는 메시지 완료 시점에만 jsonl 에 flush 하므로, 응답 생성
-        # 도중 새로고침 시 부분 내용이 어디에도 없어 UI 에서 통째로 유실된다.
-        # 이 캐시는 그 간격을 메꾼다. 마지막 block 만 `in_flight` 플래그를 달아
-        # 클라이언트가 텍스트 버퍼에 시딩하도록 한다 (DOM 에 완성된 블록으로
-        # 렌더하면 이어지는 live text_delta 가 별도 블록을 만들어 두 조각이 됨).
+        # Merge currently streaming assistant messages (not yet in jsonl).
+        # Claude CLI flushes to jsonl only when the message is completed, so a response is generated
+        # When refreshing, the partial content is nowhere to be found and is completely lost from the UI.
+        # This cache fills that gap. Only the last block has the `in_flight` flag
+        # Have the client seed a text buffer (as a complete block in the DOM)
+        # When rendered, the subsequent live text_delta creates a separate block and becomes two pieces).
         if claude_process.session_id == session_id:
             in_flight = claude_process.get_in_flight_snapshot()
             if in_flight:
@@ -691,7 +691,7 @@ class TerminalHandlerMixin:
                     in_flight_events = _build_render_events(in_flight)
                     if in_flight_events:
                         in_flight_events[-1]['in_flight'] = True
-                        # tool_use 가 in-flight 인 경우 partial_input_json 전달
+                        # Pass partial_input_json if tool_use is in-flight
                         last_block = in_flight.get('message', {}).get('content', [])
                         if last_block:
                             last_raw = last_block[-1]
@@ -705,10 +705,10 @@ class TerminalHandlerMixin:
                             if ts and ts > last_timestamp:
                                 last_timestamp = ts
 
-        # SDK 가 ESC 인터럽트 시 jsonl 에 자동으로 추가하는 placeholder user 메시지
-        # "[Request interrupted by user]" 는 사용자가 보낸 메시지가 아니므로 events
-        # 에서 필터링한다. 같은 정보는 sidecar 매칭으로 우리 .interrupted 배지가
-        # 표시하므로 노이즈 발생을 방지한다.
+        # Placeholder user message automatically added to jsonl when SDK interrupts ESC
+        # "[Request interrupted by user]" is not a message sent by the user, so events
+        # Filter from . The same information matches our .interrupted badge with a sidecar.
+        # display to prevent noise generation.
         events = [
             ev for ev in events
             if not (
@@ -718,12 +718,12 @@ class TerminalHandlerMixin:
             )
         ]
 
-        # turn_id 그룹화: 모든 events(in-flight 포함)에 turn_id 필드 부여
+        # turn_id grouping: give turn_id field to all events (including in-flight)
         _assign_turn_ids(events)
 
-        # ESC 인터럽트 sidecar 적용: <session_id>.interrupted.jsonl 의 timestamp
-        # 와 일치하는 user 이벤트에 ``interrupted=true`` 필드를 추가한다.
-        # tool_result 는 user role 이지만 인터럽트 대상 아님 (제외).
+        # Apply ESC interrupt sidecar: timestamp of <session_id>.interrupted.jsonl
+        # Add the field ``interrupted=true`` to the user event matching .
+        # tool_result is a user role, but is not subject to interrupt (excluding).
         sidecar_path = filepath.replace('.jsonl', '.interrupted.jsonl')
         if os.path.isfile(sidecar_path):
             interrupted_ts: set[str] = set()
@@ -752,24 +752,24 @@ class TerminalHandlerMixin:
                         ev['interrupted'] = True
 
         # -----------------------------------------------------------------
-        # ``<session_id>.attachments.jsonl`` 라인을 읽어 user_msg_ts 와 user
-        # 이벤트의 timestamp 를 매칭하여 ``ev['attachments']`` 를 부여한다.
-        # 매칭 전략(graceful 폴백):
-        #   1) 완전 일치
-        #   2) 초 단위 정규화 일치 (``YYYY-MM-DDTHH:MM:SS`` prefix 비교) —
-        #      Claude CLI jsonl ts 와 우리가 broadcast 시 기록한 ts 의
-        #      sub-second 차이를 흡수
-        #   3) 위 둘 다 실패 시 attachments 부재로 처리 (graceful, 회귀 0)
+        # Read the lines ``<session_id>.attachments.jsonl`` for user_msg_ts and user
+        # Matches the timestamp of the event and gives ``ev['attachments']``.
+        # Matching strategy (graceful fallback):
+        #   1) Exact match
+        #   2) Second normalized matching (compare ``YYYY-MM-DDTHH:MM:SS`` prefix) —
+        #      Claude CLI jsonl ts and the ts we recorded during broadcast
+        #      Absorbs sub-second differences
+        #   3) If both of the above fail, treat as absence of attachments (graceful, regression 0)
         #
-        # tool_result 등 user role 외 또는 user role 의 tool_result 는 제외.
+        # Tool_result, etc. other than user role or tool_result of user role are excluded.
         try:
             attachments_map = AttachmentsSidecar(session_id).load_map()
-        except Exception as exc:  # noqa: BLE001 — sidecar IO 는 best-effort
-            logger.error('attachments sidecar 로드 실패: %s', exc)
+        except Exception as exc:  # noqa: BLE001 — sidecar IO is best-effort
+            logger.error('Failed to load attachments sidecar: %s', exc)
             attachments_map = {}
 
         if attachments_map:
-            # 초 단위 정규화 인덱스 (sub-second 차이 매칭용)
+            # Second normalized index (for sub-second difference matching)
             sec_index: dict[str, list[dict]] = {}
             for ts_key, atts in attachments_map.items():
                 if isinstance(ts_key, str) and len(ts_key) >= 19:
@@ -784,31 +784,31 @@ class TerminalHandlerMixin:
                 ts = ev.get('timestamp') or ''
                 if not ts:
                     continue
-                # 1) 완전 일치
+                # 1) Exact match
                 atts = attachments_map.get(ts)
                 if atts is None:
-                    # 2) 초 단위 정규화 일치
+                    # 2) Second normalized matching
                     if len(ts) >= 19:
                         atts = sec_index.get(ts[:19])
                 if atts:
                     ev['attachments'] = atts
 
-        # pending_turn 플래그: 마지막 user 이벤트 직후 응답 대기 중인 경우
-        # 클라이언트가 turn-card 를 닫지 않고 spinner 를 시드하도록 알린다.
-        # in_flight 이벤트가 이미 있는 경우는 클라이언트가 renderHistory 에서
-        # sawInFlight 로 처리하므로 pending_turn 은 in_flight 없는 경우 보완책.
+        # pending_turn flag: When waiting for a response immediately after the last user event
+        # Informs the client to seed the spinner without closing the turn-card.
+        # If there is already an in_flight event, the client
+        # Since it is handled with sawInFlight, pending_turn is a supplementary solution if in_flight does not exist.
         pending_turn = False
         last_ev_for_log = events[-1] if events else None
         sid_match = claude_process.session_id == session_id
         awaiting_for_log = bool(getattr(claude_process, '_awaiting_response', False))
         if sid_match:
             if getattr(claude_process, '_awaiting_response', False):
-                # 마지막 이벤트가 user 이고 in_flight 이벤트가 없는 경우
+                # If the last event is user and there is no in_flight event
                 if events and not events[-1].get('in_flight'):
                     last_ev = events[-1]
-                    # ESC 로 중지된 user 이벤트(interrupted=true)는 미해결 turn 아님.
-                    # 방어 보강: _awaiting_response 가 진정한 False 로 떨어지지 못한
-                    # 시나리오에서도 interrupted 마지막 user 이벤트는 pending_turn 진입 차단.
+                    # A user event (interrupted=true) stopped by ESC is not an unresolved turn.
+                    # Defense Augmentation: _awaiting_response fails to fall to true False.
+                    # Even in this scenario, the last interrupted user event blocks pending_turn entry.
                     if (last_ev.get('role') == 'user'
                             and last_ev.get('kind') != 'tool_result'
                             and not last_ev.get('interrupted')):
@@ -875,11 +875,11 @@ class TerminalHandlerMixin:
                 pass
 
         if resume_session_id:
-            # UUID 형식 검증: 유효하지 않으면 새 세션으로 시작
+            # UUID format validation: if invalid, start new session
             try:
                 uuid.UUID(str(resume_session_id))
             except ValueError:
-                logger.warning('유효하지 않은 resume_session_id: %s', resume_session_id)
+                logger.warning('Invalid resume_session_id: %s', resume_session_id)
                 resume_session_id = None
 
         if resume_session_id:
@@ -889,11 +889,11 @@ class TerminalHandlerMixin:
 
         result = claude_process.spawn(extra_args)
 
-        # resume 시 Claude CLI가 첫 입력 전까지 init 이벤트를 내놓지 않는 경우가
-        # 있어 session_id 가 빈 값으로 회신되던 문제가 있었다. resume 대상 UUID 는
-        # 이미 알려져 있으므로 응답과 process._session_id 에 선반영하여 클라가
-        # 곧바로 termSessionId 를 세팅할 수 있도록 한다. 이후 init 이벤트가 오면
-        # 동일 값이거나 서버가 fallback 한 새 UUID 로 덮어쓴다.
+        # When resuming, Claude CLI does not issue an init event until the first input.
+        # There was a problem where session_id was returned as an empty value. The resume target UUID is
+        # Since it is already known, it is reflected in the response and process._session_id
+        # Allows you to set termSessionId right away. Afterwards, when the init event comes
+        # It is the same value or overwritten with a new UUID that the server falls back on.
         if resume_session_id and result.get('ok') and not result.get('session_id'):
             result['session_id'] = resume_session_id
             claude_process._session_id = resume_session_id
@@ -905,7 +905,7 @@ class TerminalHandlerMixin:
         """터미널 입력 전송 엔드포인트를 처리한다.
 
         POST /terminal/input: 사용자 메시지를 Claude CLI에 전송한다.
-        요청 본문: {"text": "사용자 메시지"}
+        요청 본문: {"text": "user message"}
 
         프로세스 미시작 시 409 Conflict를 반환한다.
 
@@ -941,8 +941,8 @@ class TerminalHandlerMixin:
         images = data.get('images', None)
         attachments_raw = data.get('attachments', None)
 
-        # 누락된 원소는 무시하여 잘못된 클라이언트가 보낸 데이터로 send 가
-        # 통째로 막히지 않도록 한다 (회귀 가드).
+        # Missing elements are ignored and data sent by the wrong client is sent.
+        # Avoid blocking it entirely (return guard).
         attachments: list[dict] = []
         if isinstance(attachments_raw, list):
             for att in attachments_raw:
@@ -960,20 +960,20 @@ class TerminalHandlerMixin:
                 return
 
         # ------------------------------------
-        # Claude CLI 가 stdin 으로 받은 user envelope 을 jsonl 에 flush 할 때
-        # 자체 timestamp 를 부여한다. 우리가 sidecar 에 기록할 ``user_msg_ts``
-        # 와 jsonl ts 가 sub-second 단위까지 정확히 일치하지 않을 수 있으므로
-        # ``_handle_terminal_history`` 의 매칭 단계에서 (a) 완전 일치 → (b)
-        # 초 단위 정규화 매칭 단계로 graceful 폴백한다. 여기서는 broadcast 와
-        # sidecar 에 동일 ts 를 사용하여 frontend 와 새로고침 후 history 의
-        # 일관성을 보장한다.
+        # When Claude CLI flushes the user envelope received from stdin to jsonl
+        # Gives its own timestamp. ``user_msg_ts`` we will record in the sidecar
+        # and jsonl ts may not match exactly to the sub-second, so
+        # In the matching step of ``_handle_terminal_history`` (a) exact match → (b)
+        # Graceful fallback to second normalization matching step. Here, broadcast and
+        # After refreshing the frontend using the same ts in the sidecar,
+        # Ensure consistency.
         user_msg_ts = (
             datetime.datetime.now(tz=datetime.timezone.utc)
             .strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         )
 
-        # 사용자 입력을 SSE 히스토리에 기록 (텍스트만, 이미지 base64 제외)
-        # SSE payload 크기를 줄인다. 본문은 sidecar 에서만 보존된다.
+        # Log user input to SSE history (text only, no image base64)
+        # Reduce the SSE payload size. The text is preserved only in the sidecar.
         if text or attachments:
             broadcast_payload: dict = {
                 'type': 'user_input',
@@ -995,14 +995,14 @@ class TerminalHandlerMixin:
             text, images=images, attachments=attachments or None,
         )
 
-        # session_id 미정 또는 첨부 부재 시 AttachmentsSidecar 가 no-op 처리.
+        # AttachmentsSidecar handles no-op when session_id is undetermined or there is no attachment.
         if attachments and result.get('ok'):
             try:
                 AttachmentsSidecar(claude_process.session_id or '').append(
                     user_msg_ts, attachments,
                 )
-            except Exception as exc:  # noqa: BLE001 — sidecar IO 는 best-effort
-                logger.error('attachments sidecar append 실패: %s', exc)
+            except Exception as exc:  # noqa: BLE001 — sidecar IO is best-effort
+                logger.error('attachments sidecar append failed: %s', exc)
 
         self._send_json(result)
 

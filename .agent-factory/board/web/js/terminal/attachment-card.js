@@ -1,11 +1,11 @@
 /**
  * @module terminal/attachment-card
- * 첨부 티켓 카드 DOM 생성 헬퍼 — 단일 진실 공급원.
+ * Attachment Ticket Card DOM Generating Helper — Single Truth Supplier.
  *
- * 입력 측(.terminal-image-preview 프리뷰)과 메시지 렌더 측(.term-message-attachments)
- * 모두 Board._term.attachmentCard.create(att) 를 통해 동일한 DOM 구조와 룩앤필을 공유한다.
+ * Input side (.terminal-image-preview preview) and message renderer side (.term-message-attachments)
+ * Board. term.attachmentCard.create(att) to share the same DOM structure and look&fill.
  *
- * att 객체 구조: {number, command, title, prompt?, report?, result?, fetched_at?, subtitle?}
+ * int object structure: {number, command, title, prompt?, report?, result?, fetched at?, subtitle? } else {
  */
 "use strict";
 
@@ -13,8 +13,8 @@
   var M = (Board._term = Board._term || {});
 
   /**
-   * command 코드를 카드 배지 텍스트로 매핑한다.
-   * implement → IMP / research → RSC / review → REV / 기타 → TKT
+   * Map the command code to the card badge text.
+   * T/T, Western Union, MoneyGram
    *
    * @param {string|undefined} command
    * @returns {string}
@@ -29,8 +29,8 @@
   }
 
   /**
-   * workdir 경로의 `runs/YYYYMMDD-HHMMSS/...` 패턴에서 타임스탬프를 추출한다.
-   * 실패 시 null.
+   * Extract timestamp from the `runs/YYYYMMDD-HMMSS/...` pattern of workdir path.
+   * null in failure.
    *
    * @param {string|undefined} workdir
    * @returns {string|null}
@@ -47,19 +47,19 @@
     var hour = parseInt(hms.slice(0, 2), 10);
     var minute = parseInt(hms.slice(2, 4), 10);
     if (!year || !month || !day) return null;
-    var ampm = hour < 12 ? "오전" : "오후";
+    var ampm = hour < 12 ? "Home" : "Afternoon";
     var hour12 = hour % 12;
     if (hour12 === 0) hour12 = 12;
-    return year + "년 " + month + "월 " + day + "일 / " + ampm + " " + hour12 + "시 " + minute + "분";
+    return year + "Year" + month + "Month" + day + "News" + ampm + " " + hour12 + "City" + minute + "About Us";
   }
 
   /**
-   * att 객체로부터 subtitle 문자열을 계산한다.
+   * Calculate subtitle strings from the att object.
    *
-   * subtitle 우선순위:
-   * 1. att.subtitle 명시 값 (외부에서 직접 전달 시)
-   * 2. att.result.workdir 에서 날짜 추출
-   * 3. att.report 줄 수
+   * subtitle Priority:
+   * 1. att.subtitle explicit value (with direct delivery from outside)
+   * 2. Extract date from att.result.workdir
+   * 3. FAQs att.report
    * 4. "no report"
    *
    * @param {object} att
@@ -74,17 +74,17 @@
     }
     if (att.report) {
       var lineCount = String(att.report).split(/\r?\n/).length;
-      return "report " + lineCount + "줄";
+      return "report " + lineCount + "About Us";
     }
     return "no report";
   }
 
   /**
-   * 첨부 티켓 카드 DOM 엘리먼트를 생성하여 반환한다.
+   * returns by creating an attachment ticket card DOM element.
    *
-   * 생성된 카드는 `.terminal-ticket-card` 클래스를 사용한다.
-   * remove 버튼은 포함하지 않는다 — 입력 측 프리뷰에서는 M.renderTicketPreview 가
-   * 별도로 remove 버튼을 붙이며, 메시지 렌더 측은 remove 버튼이 없어야 한다.
+   * The generated card uses the `.terminal-ticket-card` class.
+   * remove button does not include — M.renderTicketPreview in the input side view is
+   * Separately put the remove button, and the message wrender side should not be remove button.
    *
    * @param {object} att - {number, command, title, prompt?, report?, result?, subtitle?}
    * @returns {HTMLElement} .terminal-ticket-card div
@@ -142,10 +142,10 @@
     return card;
   }
 
-  // ── 모듈 노출 ──
+  // ── Module Exposure ──
   M.attachmentCard = {
     create: create,
-    // 내부 헬퍼도 테스트 편의상 노출
+    // internal testing
     _ticketCmdLabel: _ticketCmdLabel,
     _extractTicketDate: _extractTicketDate,
     _resolveSubtitle: _resolveSubtitle

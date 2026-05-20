@@ -6,20 +6,20 @@ import re
 
 
 DONE_MERGE_OK_RE = re.compile(
-    r"(.+?)\s*->\s*develop\s+병합\s+완료\s+\(([0-9a-f]{6,})\)",
+    r"(.+?)\s*->\s*develop\s+Merge\s+Complete\s+\(([0-9a-f]{6,})\)",
 )
 DONE_CONFLICT_HEADER = re.compile(r"^\[ERROR\]")
-DONE_DIRTY_HEADER = re.compile(r"미커밋\s+파일\s+목록\s*:")
+DONE_DIRTY_HEADER = re.compile(r"Uncommitted\s+File\s+List\s*:")
 DONE_PATH_RE = re.compile(r"^\s+-\s+(.+)$")
 DONE_CONFLICT_WARN_RE = re.compile(
-    r"\[WARN\].*(병합\s*충돌|merge\s+conflict)",
+    r"\[WARN\].*(merge\s*conflict|merge\s+conflict)",
     re.IGNORECASE,
 )
 
-UNDO_STRATEGY_RESET = re.compile(r"\[undo-done\]\s+전략\s+1\s*:\s*reset")
-UNDO_STRATEGY_REVERT = re.compile(r"\[undo-done\]\s+전략\s+2\s*:\s*revert")
+UNDO_STRATEGY_RESET = re.compile(r"\[undo-done\]\s+Strategy\s+1\s*:\s*reset")
+UNDO_STRATEGY_REVERT = re.compile(r"\[undo-done\]\s+Strategy\s+2\s*:\s*revert")
 UNDO_WORKTREE_RE = re.compile(
-    r"\[undo-done\]\s+워크트리\s+재생성\s+완료\s*:\s*path=(\S+)\s+branch=(\S+)",
+    r"\[undo-done\]\s+Worktree\s+Recreate\s+Done\s*:\s*path=(\S+)\s+branch=(\S+)",
 )
 UNDO_ERROR_RE = re.compile(r"\[undo-done\]\s+ERROR\s*:\s*(.+)")
 

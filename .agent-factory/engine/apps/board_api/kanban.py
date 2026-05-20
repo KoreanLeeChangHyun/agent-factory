@@ -30,14 +30,14 @@ from engine.apps.board_api.kanban_done_re import (
     _UNDO_STRATEGY_REVERT,
     _UNDO_WORKTREE_RE,
 )
-from board.server._common import (
+from board.server.support.common import (
     _list_workflow_entries,
     _workflow_detail,
     api_endpoint,
     logger,
 )
-from board.server.state import sse_manager
-from board.server.production_line_launcher import (
+from board.server.runtime.state import sse_manager
+from board.server.processes.production_line_launcher import (
     _LAUNCH_READER_LOCK,
     _LAUNCH_READER_THREADS,
     spawn_production_line,
@@ -100,21 +100,21 @@ def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
 
     try:
         sse_manager.broadcast('launch', data=payload)
-    except Exception as exc:  # broadcast 실패가 reader thread 자체를 죽이지 않도록 격리
+    except Exception as exc:  # Isolate broadcast failures so they don't kill the reader thread itself
         logger.error('launch SSE broadcast failed: event=%s ticket=%s exc=%r',
                      event, ticket, exc)
 
-    # 별도 파일 신설 X — logger.info 가 board 서버 stderr/log 로 흐른다.
+    # Create a separate file X — logger.info flows to the board server stderr/log.
     try:
         extra_kv = ' '.join(
             f'{k}={v!r}' for k, v in kwargs.items()
-            if k not in ('error_message',)  # error_message 는 길이 클 수 있어 별도 라인
+            if k not in ('error_message',)  # error_message can be long so it is a separate line
         )
         logger.info('LAUNCH_EVENT %s ticket=%s %s', event, ticket, extra_kv)
         if 'error_message' in kwargs and kwargs['error_message']:
             logger.info('LAUNCH_EVENT %s ticket=%s error_message=%s',
                         event, ticket, str(kwargs['error_message'])[:500])
-    except Exception:  # 로깅 실패도 무시
+    except Exception:  # Ignore logging failures
         pass
 
 
@@ -227,7 +227,7 @@ def _launch_reader_loop(
     try:
         try:
             stdout, stderr = proc.communicate(timeout=None)
-        except Exception as exc:  # Popen 자체 실패 (드물지만 방어)
+        except Exception as exc:  # Popen itself fails (rare but defensive)
             elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
             _emit_launch_event(
                 'LAUNCH_FAILED', ticket,
@@ -264,7 +264,7 @@ def _launch_reader_loop(
                 message=tail,
             )
         elif rc == 0:
-            # returncode=0 인데 stdout 패턴이 LAUNCH:/INLINE: 둘 다 아님 — unknown 분류
+            # returncode=0 but stdout pattern is LAUNCH:/INLINE: neither — unknown classification
             _emit_launch_event(
                 'LAUNCH_FAILED', ticket,
                 reason='unknown',
@@ -283,7 +283,7 @@ def _launch_reader_loop(
                 elapsed_ms=elapsed_ms,
                 command=command,
             )
-    except Exception as exc:  # reader 루프 자체 예외 (방어)
+    except Exception as exc:  # reader loop self exception (defense)
         try:
             elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
             _emit_launch_event(
@@ -296,11 +296,11 @@ def _launch_reader_loop(
         except Exception:
             pass
     finally:
-        # GC 누수 차단 — 자신을 핸들 set 에서 제거
+        # Block GC leaks — remove yourself from handle set
         with _LAUNCH_READER_LOCK:
             _LAUNCH_READER_THREADS.discard(self_thread)
 
-# board/server/** + .agent-factory/board/server/** + .agent-factory/engine/** 셋 모두 backend 도메인
+# board/server/** + .agent-factory/board/server/** + .agent-factory/engine/** All three backend domains
 _BACKEND_GLOB_PATTERNS = (
     'board/server/*',
     'board/server/**',
@@ -474,7 +474,7 @@ class KanbanHandlerMixin:
 
         project_root = os.getcwd()
 
-        # dirty 검증 — 메인 working tree 기준
+        # Dirty verification — based on main working tree
         dirty = self._get_dirty_files(project_root)
         if dirty:
             self._send_json({
@@ -482,9 +482,9 @@ class KanbanHandlerMixin:
                 'reason': 'dirty',
                 'files': dirty,
                 'modal_message': (
-                    f'메인 working tree 에 미커밋 변경이 있습니다 ({len(dirty)}개 파일). '
-                    f'브랜치 토글은 자동 stash/commit/reset 을 수행하지 않습니다. '
-                    f'수동으로 commit / stash / reset 후 다시 시도하세요.'
+                    f'There are uncommitted changes in the main working tree ({len(dirty)} files).'
+                    f'Branch toggle does not perform automatic stash/commit/reset.'
+                    f'Please manually commit / stash / reset and try again.'
                 ),
                 'ticket': ticket,
                 'action': action,
@@ -517,8 +517,8 @@ class KanbanHandlerMixin:
                 'ok': False,
                 'reason': 'feature_branch_not_found',
                 'message': (
-                    f'{ticket} 의 feature 브랜치 (feat/{ticket}-*) 를 찾을 수 없습니다. '
-                    f'워크트리가 등록되어 있는지 확인하세요 (git worktree list).'
+                    f'The feature branch (feat/{ticket}-*) of {ticket} could not be found.'
+                    f'Check if the worktree is registered (git worktree list).'
                 ),
                 'ticket': ticket,
                 'action': action,
@@ -747,8 +747,8 @@ class KanbanHandlerMixin:
                 'ok': False, 'error_kind': 'derived_blocked',
                 'blocked_by': not_done,
                 'message': (
-                    f'{ticket} 삭제 차단: 파생 티켓 {", ".join(not_done)}이 '
-                    '아직 완료되지 않았습니다. 파생 티켓 완료 후 삭제하세요.'
+                    f'Block {ticket} deletion: derived ticket {", ".join(not_done)}'
+                    'It\'s not done yet. Delete the derived ticket after completing it.'
                 ),
                 'ticket': ticket,
             })
@@ -812,7 +812,7 @@ class KanbanHandlerMixin:
         tickets_root = os.path.join(project_root, ".agent-factory", "tickets")
         kanban_dirs = ("todo", "open", "progress", "review", "done")
 
-        # 1순위: XML <result>/<workdir>
+        # #1: XML <result>/<workdir>
         for kdir in kanban_dirs:
             xml_path = os.path.join(tickets_root, kdir, f"{ticket}.xml")
             if not os.path.isfile(xml_path):
@@ -829,7 +829,7 @@ class KanbanHandlerMixin:
             except Exception:
                 pass
 
-        # 2순위: runs/ 디렉터리 순회 (mtime 역순)
+        # 2nd priority: runs/ directory traversal (reverse mtime order)
         runs_root = os.path.join(project_root, ".agent-factory", "runs")
         if not os.path.isdir(runs_root):
             return None
@@ -844,7 +844,7 @@ class KanbanHandlerMixin:
 
         import json as _json
         for rdir in run_dirs:
-            # status.json ticket_number 필드
+            # status.json ticket_number field
             status_path = os.path.join(rdir, "status.json")
             if os.path.isfile(status_path):
                 try:
@@ -990,7 +990,7 @@ class KanbanHandlerMixin:
 
         project_root = os.getcwd()
 
-        # Done 디렉터리에 티켓이 존재하는지 확인 (Done 컬럼 아닌 티켓에는 의미 없음)
+        # Check if a ticket exists in the Done directory (meaningless for tickets other than the Done column)
         done_xml = os.path.join(
             project_root, '.agent-factory', 'tickets', 'done', f'{ticket}.xml',
         )
@@ -999,11 +999,11 @@ class KanbanHandlerMixin:
                 'ticket': ticket,
                 'verdict': 'SKIP',
                 'reason': 'not_done',
-                'details': {'message': f'{ticket} 은 Done 컬럼에 없습니다 — verdict 생략'},
+                'details': {'message': f'{ticket} is not in the Done column — verdict omitted'},
             })
             return
 
-        # merge_commit 읽기: tickets/done/<T-NNN>.xml result/merge_commit 필드
+        # merge_commit Read: tickets/done/<T-NNN>.xml result/merge_commit field
         merge_commit: str | None = None
         try:
             import xml.etree.ElementTree as ET
@@ -1016,12 +1016,12 @@ class KanbanHandlerMixin:
             merge_commit = None
 
         if not merge_commit:
-            # merge_commit 메타 누락 — Phase 1 인프라 도입 이전 Done 티켓
+            # Missing merge_commit meta — Done ticket before Phase 1 infrastructure introduction
             self._send_json({
                 'ticket': ticket,
                 'verdict': 'UNKNOWN',
                 'reason': 'no_merge_commit_meta',
-                'details': {'message': 'merge_commit 정보 없음 (인프라 도입 이전 Done 티켓)'},
+                'details': {'message': 'merge_commit No information (Done ticket before infrastructure introduction)'},
             })
             return
 
@@ -1034,31 +1034,31 @@ class KanbanHandlerMixin:
                 timeout=10,
             )
 
-        # develop HEAD SHA 확인
+        # check develop HEAD SHA
         head_result = _git('rev-parse', 'develop')
         if head_result.returncode != 0:
             self._send_json({
                 'ticket': ticket,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
-                'details': {'message': 'develop HEAD 조회 실패: ' + (head_result.stderr or '').strip()},
+                'details': {'message': 'develop HEAD lookup failed:' + (head_result.stderr or '').strip()},
             })
             return
         develop_head = head_result.stdout.strip()
 
-        # merge_commit SHA 정규화 (full SHA)
+        # merge_commit SHA normalization (full SHA)
         mc_result = _git('rev-parse', merge_commit)
         if mc_result.returncode != 0:
             self._send_json({
                 'ticket': ticket,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
-                'details': {'message': f'merge_commit {merge_commit!r} rev-parse 실패'},
+                'details': {'message': f'merge_commit {merge_commit!r} rev-parse failed'},
             })
             return
         merge_commit_sha = mc_result.stdout.strip()
 
-        # 조건 1: develop HEAD == merge commit
+        # Condition 1: develop HEAD == merge commit
         if develop_head != merge_commit_sha:
             self._send_json({
                 'ticket': ticket,
@@ -1066,7 +1066,7 @@ class KanbanHandlerMixin:
                 'reason': 'develop_head_mismatch',
                 'details': {
                     'message': (
-                        f'develop HEAD 가 머지 commit 아님 — '
+                        f'develop HEAD is not a merge commit —'
                         f'HEAD={develop_head[:8]}, merge_commit={merge_commit_sha[:8]}'
                     ),
                     'develop_head': develop_head,
@@ -1075,19 +1075,19 @@ class KanbanHandlerMixin:
             })
             return
 
-        # 조건 2: merge commit parents에 feature branch tip 포함 여부
+        # Condition 2: Whether feature branch tip is included in merge commit parents
         parents_result = _git('log', merge_commit_sha, '-1', '--format=%P')
         if parents_result.returncode != 0:
             self._send_json({
                 'ticket': ticket,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
-                'details': {'message': 'merge commit parents 조회 실패'},
+                'details': {'message': 'merge commit parents lookup failed'},
             })
             return
         parent_shas = parents_result.stdout.strip().split()
 
-        # feature 브랜치 패턴 (feat/T-NNN-*)
+        # feature branch pattern (feat/T-NNN-*)
         feat_branch_result = _git('branch', '--list', f'feat/{ticket}-*')
         feature_branch_exists = feat_branch_result.returncode == 0 and bool(feat_branch_result.stdout.strip())
 
@@ -1101,7 +1101,7 @@ class KanbanHandlerMixin:
                 feat_tip = feat_tip_result.stdout.strip()
                 feature_tip_in_parents = feat_tip in parent_shas
         else:
-            # 브랜치가 이미 삭제된 경우 — parents가 2개 이상이면 non-ff 머지로 간주 OK
+            # If the branch has already been deleted — If there are more than 2 parents, it is considered a non-ff merge. OK
             feature_tip_in_parents = len(parent_shas) >= 2
 
         if not feature_tip_in_parents and feature_branch_exists:
@@ -1111,7 +1111,7 @@ class KanbanHandlerMixin:
                 'reason': 'feature_tip_not_in_parents',
                 'details': {
                     'message': (
-                        f'merge commit 의 parent 에 feature 브랜치 tip 이 포함되지 않음 — '
+                        f'The feature branch tip is not included in the parent of the merge commit —'
                         f'branch={feature_branch_name}'
                     ),
                     'merge_commit': merge_commit_sha,
@@ -1120,13 +1120,13 @@ class KanbanHandlerMixin:
             })
             return
 
-        # 모든 조건 충족
+        # All conditions met
         self._send_json({
             'ticket': ticket,
             'verdict': 'OK',
             'reason': 'all_checks_passed',
             'details': {
-                'message': 'develop HEAD == merge commit, feature branch tip 포함 확인',
+                'message': 'develop HEAD == merge commit, check feature branch tip inclusion',
                 'develop_head': develop_head,
                 'merge_commit': merge_commit_sha,
                 'parents': parent_shas,
@@ -1174,7 +1174,7 @@ class KanbanHandlerMixin:
         project_root = os.getcwd()
         tickets_base = os.path.join(project_root, '.agent-factory', 'tickets')
 
-        # 1. review/<ticket>.xml 또는 done/<ticket>.xml 탐색
+        # 1. Navigate to review/<ticket>.xml or done/<ticket>.xml
         ticket_xml_path: str | None = None
         review_xml = os.path.join(tickets_base, 'review', f'{ticket}.xml')
         done_xml = os.path.join(tickets_base, 'done', f'{ticket}.xml')
@@ -1184,17 +1184,17 @@ class KanbanHandlerMixin:
         elif os.path.isfile(done_xml):
             ticket_xml_path = done_xml
         else:
-            # todo / open / progress 컬럼 -- Review/Done 이외 -> SKIP
+            # todo / open / progress column -- Other than Review/Done -> SKIP
             self._send_json({
                 'ticket': ticket,
                 'verdict': 'SKIP',
                 'reason': 'not_review',
-                'details': {'message': f'{ticket} 은 Review/Done 컬럼에 없습니다'},
+                'details': {'message': f'{ticket} is not in the Review/Done column'},
                 'violations': [],
             })
             return
 
-        # 2. XML 파싱 -> registrykey 추출
+        # 2. XML parsing -> registrykey extraction
         registry_key: str | None = None
         try:
             tree = ET.parse(ticket_xml_path)
@@ -1210,13 +1210,13 @@ class KanbanHandlerMixin:
                 'ticket': ticket,
                 'verdict': 'UNKNOWN',
                 'reason': 'no_registry_key',
-                'details': {'message': 'registrykey 정보 없음 (워크플로우 인프라 도입 이전 티켓일 수 있음)'},
+                'details': {'message': 'No registrykey information (may be a ticket prior to the introduction of workflow infrastructure)'},
                 'violations': [],
             })
             return
 
-        # 3. review-verdict.json 읽기
-        # runs/<registry_key> 또는 runs/.history/<registry_key> 탐색
+        # 3. Read review-verdict.json
+        # Navigate to runs/<registry_key> or runs/.history/<registry_key>
         runs_base = os.path.join(project_root, '.agent-factory', 'runs')
         verdict_path: Path | None = None
         for candidate in (
@@ -1233,7 +1233,7 @@ class KanbanHandlerMixin:
                 'verdict': 'UNKNOWN',
                 'reason': 'no_verdict_meta',
                 'details': {
-                    'message': f'review-verdict.json 없음 (registry_key={registry_key})',
+                    'message': f'No review-verdict.json (registry_key={registry_key})',
                     'registry_key': registry_key,
                 },
                 'violations': [],
@@ -1248,19 +1248,19 @@ class KanbanHandlerMixin:
                 'verdict': 'UNKNOWN',
                 'reason': 'invalid_verdict_json',
                 'details': {
-                    'message': 'review-verdict.json 파싱 실패',
+                    'message': 'review-verdict.json parsing failed',
                     'registry_key': registry_key,
                 },
                 'violations': [],
             })
             return
 
-        # 4. ticket 필드 주입 후 반환
+        # 4. Return after injection of ticket field
         verdict_dict['ticket'] = ticket
         self._send_json(verdict_dict)
 
     # ------------------------------------------------------------------
-    # T-513 P2 — 도메인 이전 흡수 endpoint (undo-done + workflow-entries + workflow-detail)
+    # T-513 P2 — domain transfer absorption endpoint (undo-done + workflow-entries + workflow-detail)
     # ------------------------------------------------------------------
 
     @api_endpoint("KANBAN", "undo_done")
@@ -1357,7 +1357,7 @@ class KanbanHandlerMixin:
                 'strategy': strategy,
                 'branch': branch,
                 'worktree_path': worktree_path,
-                'message': f'{ticket} 롤백 완료 (전략: {strategy or "?"})',
+                'message': f'{ticket} rollback completed (strategy: {strategy or "?"})',
                 'stdout': stdout.strip(),
             })
             return

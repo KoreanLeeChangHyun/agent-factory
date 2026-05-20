@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_board_http_router_composes_app_boundary_mixins() -> None:
-    from board.server.http_router import BoardHTTPRequestHandler
+    from board.server.routing.http_router import BoardHTTPRequestHandler
     from engine.apps.board_api.files import FilesHandlerMixin
     from engine.apps.board_api.generic import GenericHandlerMixin
     from engine.apps.board_api.kanban import KanbanHandlerMixin

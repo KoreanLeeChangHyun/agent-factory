@@ -1,10 +1,10 @@
-"""main_session_guard.py 단위 테스트 (T-422 메모리 화이트리스트 회귀 차단)
+"""main_session_guard.py unit test (blocks T-422 memory whitelist regression)
 
-12개 시나리오를 통해 가드 동작을 검증한다:
-  TC1-5:  allow — 메모리 디렉터리 Write/Edit/Bash cp + prompt 본문 텍스트 substring
-  TC6:    allow — 워크플로우 세션 분기 회귀 0건 확인
-  TC7-11: deny  — 실제 코드 수정(engine/board/sed/cp) + 메모리+코드 혼재 보수적 차단
-  TC12:   allow — HOOK_MAIN_SESSION_GUARD=false 토글 검증
+Guard operation is verified through 12 scenarios:
+  TC1-5: allow — memory directory Write/Edit/Bash cp + prompt body text substring
+  TC6: allow — 0 workflow session branch regressions observed
+  TC7-11: deny — Actual code modification (engine/board/sed/cp) + conservative blocking of mixed memory + code
+  TC12: allow — HOOK_MAIN_SESSION_GUARD=false toggle validation
 """
 from __future__ import annotations
 
@@ -24,30 +24,30 @@ def _run_guard(
     tool_input: dict,
     env_overrides: dict | None = None,
 ) -> tuple[str, int]:
-    """가드 스크립트를 subprocess 로 실행하고 (stdout, returncode) 반환.
+    """Executes the guard script as subprocess and returns (stdout, returncode).
 
-    기본 환경:
-      - _WF_SESSION_TYPE 미설정 → unknown 분기 (메인 세션 시뮬레이션)
+    Default environment:
+      - _WF_SESSION_TYPE not set → unknown branch (main session simulation)
       - HOOK_MAIN_SESSION_GUARD=true
-      - TMUX_PANE 미설정 → TMUX 폴백 없음
-      - WORKFLOW_WORKTREE_PATH, WORKFLOW_WORK_DIR 미설정 → worktree_path_guard
-        fallback 간섭 회피
+      - TMUX_PANE not set → No TMUX fallback
+      - WORKFLOW_WORKTREE_PATH, WORKFLOW_WORK_DIR not set → worktree_path_guard
+        fallback interference avoidance
     """
     payload = {"tool_name": tool_name, "tool_input": tool_input}
-    # 최소 환경 구성: HOME, PATH, PYTHONPATH 계승 + 가드 토글 ON
-    # TMUX_PANE/TMUX 명시 제거 → tmux 폴백 없이 unknown 분기 사용
+    # Minimum environment configuration: HOME, PATH, PYTHONPATH inheritance + guard toggle ON
+    # Remove explicit TMUX_PANE/TMUX → use unknown branch without tmux fallback
     base_env: dict[str, str] = {}
 
-    # 부모 환경에서 최소 필수 키만 계승
+    # Inherit only the minimum required keys from the parent environment
     for key in ("HOME", "PATH", "PYTHONPATH", "LANG", "LC_ALL"):
         if key in os.environ:
             base_env[key] = os.environ[key]
 
-    # 가드 활성화 기본값
+    # Guard Enabled Default
     base_env["HOOK_MAIN_SESSION_GUARD"] = "true"
 
-    # _WF_SESSION_TYPE 명시 제거 → get_session_type() = unknown (메인 시뮬레이션)
-    # (부모 환경에 _WF_SESSION_TYPE=workflow 가 있으면 기본으로 상속되지 않도록 명시 제외)
+    # Remove explicit _WF_SESSION_TYPE → get_session_type() = unknown (main simulation)
+    # (Except explicitly so that it is not inherited by default if _WF_SESSION_TYPE=workflow exists in the parent environment)
 
     if env_overrides:
         for k, v in env_overrides.items():
@@ -67,7 +67,7 @@ def _run_guard(
 
 
 def _is_deny(stdout: str) -> bool:
-    """stdout 에 deny JSON 이 출력됐는지 확인."""
+    """Check whether deny JSON is output to stdout."""
     if not stdout.strip():
         return False
     try:
@@ -79,16 +79,16 @@ def _is_deny(stdout: str) -> bool:
 
 
 class TestMainSessionGuard(unittest.TestCase):
-    """main_session_guard.py 회귀 테스트.
+    """main_session_guard.py regression testing.
 
-    - allow 케이스 6종: 메모리 디렉터리 Write/Edit/Bash + prompt 텍스트 + 워크플로우 세션
-    - deny  케이스 6종: 실제 코드 수정(engine/board/sed/cp) + 메모리+코드 혼재 + 토글
+    - 6 types of allow cases: Memory directory Write/Edit/Bash + prompt text + workflow session
+    - 6 types of deny cases: actual code modification (engine/board/sed/cp) + memory + code mixing + toggle
     """
 
-    # ── allow 케이스 ──────────────────────────────────────────────────────────
+    # ── allow case ─────────────────────────────────────────────────────────────
 
     def test_01_memory_write_allow(self) -> None:
-        """Write 도구로 메모리 디렉터리 하위 경로 작성 → 통과."""
+        """Write memory directory subpath with Write tool → Pass."""
         stdout, _ = _run_guard(
             "Write",
             {
@@ -99,7 +99,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_02_memory_edit_allow(self) -> None:
-        """Edit 도구로 메모리 디렉터리 하위 절대 경로 수정 → 통과."""
+        """Modify the absolute path under the memory directory using the Edit tool → Pass."""
         home = os.path.expanduser("~")
         abs_path = f"{home}/.claude/projects/-home-deus-claude/memory/MEMORY.md"
         stdout, _ = _run_guard(
@@ -113,7 +113,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_03_memory_bash_cp_allow(self) -> None:
-        """Bash cp 명령으로 메모리 디렉터리에만 복사 → 통과."""
+        """Copy only to the memory directory using the Bash cp command → Pass."""
         stdout, _ = _run_guard(
             "Bash",
             {
@@ -125,41 +125,41 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_04_prompt_text_substring_allow(self) -> None:
-        """Bash flow-kanban update-prompt 의 따옴표 안 메모리 경로 텍스트 → 통과.
+        """Memory path text in quotes of Bash flow-kanban update-prompt → Pass.
 
-        _strip_quoted_args 가 따옴표 내부를 비워 패턴 매칭 대상 외가 됨을 검증.
+        Verify that _strip_quoted_args is not subject to pattern matching by leaving the inside of the quotation marks empty.
         """
         stdout, _ = _run_guard(
             "Bash",
             {
                 "command": (
                     'flow-kanban update-prompt T-422 --target '
-                    '"수정 대상: ~/.claude/projects/-home-deus-claude/memory/feedback/"'
+                    '"Edit to: ~/.claude/projects/-home-deus-claude/memory/feedback/"'
                 )
             },
         )
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_05_prompt_substring_with_code_path_in_quote_allow(self) -> None:
-        """Bash flow-kanban 의 따옴표 안 코드 경로 substring → 통과.
+        """Bash flow-kanban code path substring in quotes → Pass.
 
-        코드 경로가 따옴표 안에 있어 _strip_quoted_args 로 제거됨을 검증.
+        Verifies that the code path is in quotes and is removed with _strip_quoted_args.
         """
         stdout, _ = _run_guard(
             "Bash",
             {
                 "command": (
                     "flow-kanban update-prompt T-422 "
-                    '--constraints "engine/guards/main_session_guard.py 수정"'
+                    '--constraints "Modify engine/guards/main_session_guard.py"'
                 )
             },
         )
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_06_workflow_session_allow(self) -> None:
-        """_WF_SESSION_TYPE=workflow 환경에서 코드 수정 명령 → 통과.
+        """_WF_SESSION_TYPE=Code modification command in workflow environment → Pass.
 
-        기존 워크플로우 세션 분기 회귀 0건 확인.
+        0 existing workflow session branch regressions confirmed.
         """
         stdout, _ = _run_guard(
             "Write",
@@ -171,10 +171,10 @@ class TestMainSessionGuard(unittest.TestCase):
         )
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
-    # ── deny 케이스 ───────────────────────────────────────────────────────────
+    # ── deny case ───────────────────────────────────────────────────────────────
 
     def test_07_main_session_write_engine_deny(self) -> None:
-        """메인 세션에서 Write 도구로 engine 디렉터리 수정 → 차단."""
+        """Modifying the engine directory using the Write tool in the main session → Block."""
         stdout, _ = _run_guard(
             "Write",
             {
@@ -185,7 +185,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertTrue(_is_deny(stdout), f"expected deny: {stdout!r}")
 
     def test_08_main_session_edit_board_deny(self) -> None:
-        """메인 세션에서 Edit 도구로 board 디렉터리 수정 → 차단."""
+        """Modifying the board directory with the Edit tool in the main session → Block."""
         stdout, _ = _run_guard(
             "Edit",
             {
@@ -197,7 +197,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertTrue(_is_deny(stdout), f"expected deny: {stdout!r}")
 
     def test_09_main_session_bash_sed_deny(self) -> None:
-        """메인 세션에서 Bash sed -i 명령 → 차단."""
+        """Bash sed -i command in main session → Block."""
         stdout, _ = _run_guard(
             "Bash",
             {"command": "sed -i 's/a/b/' engine/guards/main_session_guard.py"},
@@ -205,7 +205,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertTrue(_is_deny(stdout), f"expected deny: {stdout!r}")
 
     def test_10_main_session_bash_cp_to_engine_deny(self) -> None:
-        """메인 세션에서 Bash cp로 engine 디렉터리에 파일 복사 → 차단."""
+        """Copy files to the engine directory using Bash cp in the main session → Block."""
         stdout, _ = _run_guard(
             "Bash",
             {"command": "cp /tmp/foo.py .agent-factory/engine/foo.py"},
@@ -213,9 +213,9 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertTrue(_is_deny(stdout), f"expected deny: {stdout!r}")
 
     def test_11_memory_and_engine_mixed_deny(self) -> None:
-        """Bash cp 메모리→engine 혼재 명령 → 보수적 차단.
+        """Bash cp memory→engine mixed commands→conservative blocking.
 
-        메모리 경로가 원본이더라도 대상이 코드 경로이면 차단을 보존.
+        Preserve blocking if the target is a code path even if the memory path is the source.
         """
         stdout, _ = _run_guard(
             "Bash",
@@ -229,7 +229,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertTrue(_is_deny(stdout), f"expected deny: {stdout!r}")
 
     def test_12_guard_disabled_allow(self) -> None:
-        """HOOK_MAIN_SESSION_GUARD=false 환경에서 코드 수정 → 토글로 통과."""
+        """HOOK_MAIN_SESSION_GUARD=false Modify code in environment → Pass with toggle."""
         stdout, _ = _run_guard(
             "Write",
             {

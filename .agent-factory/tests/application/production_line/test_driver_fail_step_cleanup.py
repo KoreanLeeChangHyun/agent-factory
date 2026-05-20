@@ -1,17 +1,17 @@
-"""T-513 P1 — driver fail_step 실측 (SPEC.md §12.4 정합).
+"""T-513 P1 — driver fail step thread (SPEC.md §12.4 static).
 
-acceptance_criteria #4 — "driver fail_step → kanban Open 회귀 + worktree 보존
-동작 실측". SPEC.md §12.4 + feedback_no_speculative_guards_2026-05-08 룰에 따라
-실제 채택된 정책은 "kanban 자동 회귀 X" (auto regression OFF). 본 테스트는 그
-정책을 박제한다:
+support criteria #4 — "driver fail step"
+Operating threads. SPEC.md §12.4 + feedback no speculative guards 2026-05-08 according to the rule
+Actually adopted policy "kanban automatic revolving X" (auto regression OFF). The test is that
+Testimonials NEWS
 
-  - status.json workflow_phase → FAILED 도달
-  - failure.md 작성
-  - metadata.json failure 필드 채움
-  - kanban_move NOT 호출 (자동 회귀 X — Open 회귀는 사용자 명시 트리거만)
-  - worktree 디렉터리 보존 (자동 정리 X)
+  - status.json workflow phase → FAILED
+  - failure.md write
+  - metadata.json failure field
+  - kanban move NOT call (automatic regression X — Open regression only user licence trigger)
+  - Preserving worktree directory (Auto Cleanup X)
 
-production endpoint 호출 0건. 단위 테스트만 — monkeypatch + tempfile 사용.
+<# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #> Unit testing only — using monkeypatch + tempfile.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def _make_ctx(tmp_path: Path) -> WorkflowContext:
         current_step="WORK",
         feature_branch="feat/T-513-test",
         worktree_path=worktree_dir,
-        title="fail_step 실측",
+        title="fail step",
     )
 
 
@@ -62,15 +62,15 @@ def _patch_externals(monkeypatch, kanban_calls: list, finish_calls: list) -> Non
         "workflow_finish",
         lambda *a, **k: finish_calls.append((a, k)),
     )
-    # update_step 은 status.json 을 실제 쓰도록 원본 유지
+    # update step maintains the original to write status.json
 
 
 def test_fail_step_status_json_workflow_phase_failed(monkeypatch, tmp_path):
-    """fail_step → status.json workflow_phase=FAILED 도달."""
+    """fail step → status.json workflow phase=FAILED reaches."""
     ctx = _make_ctx(tmp_path)
     _patch_externals(monkeypatch, [], [])
 
-    done_mod.fail_step(ctx, reason="WORK Step 강제 실패")
+    done_mod.fail_step(ctx, reason="WORK Step forced failure")
 
     status_path = ctx.status_json_path()
     assert status_path.exists()
@@ -80,11 +80,11 @@ def test_fail_step_status_json_workflow_phase_failed(monkeypatch, tmp_path):
     assert len(transitions) >= 1
     last = transitions[-1]
     assert last["to"] == "FAILED"
-    assert last["note"] == "WORK Step 강제 실패"
+    assert last["note"] == "WORK Step forced failure"
 
 
 def test_fail_step_writes_failure_md(monkeypatch, tmp_path):
-    """fail_step → failure.md 작성 + reason 본문 포함."""
+    """fail step → failure.md write + reason text included."""
     ctx = _make_ctx(tmp_path)
     _patch_externals(monkeypatch, [], [])
 
@@ -96,7 +96,7 @@ def test_fail_step_writes_failure_md(monkeypatch, tmp_path):
 
 
 def test_fail_step_metadata_failure_field(monkeypatch, tmp_path):
-    """fail_step → metadata.json failure 필드 채움 (reason + ts)."""
+    """fail step → metadata.json failure field debt (reason + ts)."""
     ctx = _make_ctx(tmp_path)
     _patch_externals(monkeypatch, [], [])
 
@@ -111,7 +111,7 @@ def test_fail_step_metadata_failure_field(monkeypatch, tmp_path):
 
 
 def test_fail_step_does_not_auto_regress_kanban(monkeypatch, tmp_path):
-    """fail_step → kanban_move 호출 0건 (자동 회귀 X — SPEC.md §12.4)."""
+    """fail step → kanban move call 0 (Automatic Regression X — SPEC.md §12.4)."""
     ctx = _make_ctx(tmp_path)
     kanban_calls: list = []
     _patch_externals(monkeypatch, kanban_calls, [])
@@ -119,13 +119,13 @@ def test_fail_step_does_not_auto_regress_kanban(monkeypatch, tmp_path):
     done_mod.fail_step(ctx, reason="auto regression off check")
 
     assert kanban_calls == [], (
-        "fail_step 이 kanban_move 를 호출하면 안 됨 — "
-        "feedback_no_speculative_guards_2026-05-08 + SPEC.md §12.4 정합"
+        "fail step call kanban move —"
+        "feedback no speculative guards 2026-05-08 + SPEC.md §12.4 Formulation"
     )
 
 
 def test_fail_step_preserves_worktree(monkeypatch, tmp_path):
-    """fail_step → ctx.worktree_path 디렉터리 + 산출물 보존 (자동 정리 X)."""
+    """fail step → ctx.worktree path Director + Output Retention (Auto Clear X)."""
     ctx = _make_ctx(tmp_path)
     _patch_externals(monkeypatch, [], [])
     assert ctx.worktree_path is not None
@@ -134,14 +134,14 @@ def test_fail_step_preserves_worktree(monkeypatch, tmp_path):
     done_mod.fail_step(ctx, reason="worktree preservation check")
 
     assert ctx.worktree_path.exists(), (
-        "fail_step 이 worktree 디렉터리를 자동 삭제하면 안 됨"
+        "fail step Automatically delete this worktree directory"
     )
-    assert sentinel.exists(), "worktree 안 산출물도 보존"
+    assert sentinel.exists(), "worktree inner output"
     assert sentinel.read_text(encoding="utf-8") == "preserve me"
 
 
 def test_fail_step_emits_workflow_finish_fail(monkeypatch, tmp_path):
-    """fail_step → workflow_finish(outcome='fail', verdict='FAIL') 발화."""
+    """Failure step → workflow finish(outcome='fail', verdict='FAIL')"""
     ctx = _make_ctx(tmp_path)
     finish_calls: list = []
     _patch_externals(monkeypatch, [], finish_calls)

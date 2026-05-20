@@ -7,9 +7,9 @@
  * flow-claude, flow-init, flow-step, flow-phase, and flow-finish scripts.
  * phaseTimeline renders the timeline bar DOM below .terminal-session-bar.
  *
- * T-507 — stdout / Step·Phase 위계 / 산출물 viewer 는 step-overlay.js +
- * session.js 가 책임진다. 본 모듈은 banner parser + state machine +
- * timeline bar (steps row / task row / artifacts row) 까지만 유지.
+ * T-507 — stdout / step·Phase latency / output viewer is step-overlay.js +
+ * session.js is responsible. git git
+ * timeline bar (steps row / task row / artifacts row)
  *
  * Depends on: common.js (Board namespace)
  * Registers:  Board.WorkflowRenderer, Board.phaseTimeline
@@ -70,7 +70,7 @@
       init:     "#858585",
       plan:     "#569cd6",
       work:     "#D97757",
-      validate: "#dcdcaa",  /* 12룰 검증 step */
+      validate: "#dcdcaa",  /* 12 Rule verification step */
       report:   "#c586c0",
       done:     "#4ec9b0",
       failed:   "#f48771"
@@ -131,8 +131,8 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
-      // T-383 Phase 3: reset 시 _stepPanels 맵을 비우고 _restoreSession 측에서
-      // _rebuildStepPanelsFromDom 으로 현재 DOM 에 맞게 맵을 재건한다.
+      // T-383 Phase 3: When reset  stepPanels empty map  restoreSession side
+      // rebuildStepPanelsFromDom to rebuild maps to current DOM.
       _state = {
         command:      command || "",
         workId:       "",
@@ -162,9 +162,9 @@
     }
 
     /**
-     * outputDiv 의 .wf-step-panel 을 스캔하여 _stepPanels 맵과 _activeStepPanel
-     * 을 현재 DOM 과 동기화. _restoreSession 이 outputDiv 를 cloneNode 로
-     * 교체한 직후 호출된다. 판정 규칙: active 마지막 → 마지막 panel → null.
+     * .wf-step-panel  stepPanels map and  activeStepPanel
+     * Synchronize the current DOM. by cloneNode
+     * It is called after being replaced. Fixed rules: active last → last panel → null.
      *
      * @param {HTMLElement} outputDiv
      */
@@ -181,8 +181,8 @@
         var stepName = panel.getAttribute("data-step");
         if (!stepName) continue;
 
-        // 중복 data-step 이 DOM 에 존재하면 나중(뒤) 것이 이긴다.
-        // (VUL-2 의 중복 panel 시나리오에서 최신 DOM 을 우선)
+        // If the duplicate data-step exists in this DOM, it is better.
+        // (First of the latest DOM in VUL-2 redundancy panel scenario)
         newMap[stepName] = panel;
         lastAny = panel;
         if (panel.getAttribute("data-status") === "active") {
@@ -217,14 +217,14 @@
     }
 
     /**
-     * T-508 — step 전이 + step elapsed ts 기록.
+     * T-508 — step full + step elapsed ts record.
      *
      * @param {string} stepName
      * @param {{startTsMs?: number}} [opts]
-     *   startTsMs: 외부 (backend GET / SSE event) 에서 받은 step 진입 epoch ms.
-     *     미지정 시 Date.now() fallback (v1 분기 / 종래 동작 유지).
-     *     replay 가드: 기존 start 값이 null 이거나 새 값이 더 크면 덮어쓰기.
-     *     기존 값보다 과거 ts 가 들어오면 무시 (음수 elapsed / 점프 차단).
+     *   startTsMs: Step enter epoch ms received from backend GET / SSE event.
+     *     Date.now() fallback(v1 quarter / end operation)
+     *     replay guard: the existing start value is null, or the new value is larger.
+     *     If the past ts are incoming than the existing values, it is ignored (smooth elapsed / jump blocked).
      */
     function _setStep(stepName, opts) {
       var prevStep = _state.currentStep;
@@ -239,11 +239,11 @@
             _state.stepTimestamps[prevStep].end = now;
           }
         }
-        // Start new step — 외부 ts replay 가드
+        // Start new step — external ts replay guard
         var ts = _state.stepTimestamps[newStep];
         if (ts) {
           if (externalTs != null) {
-            // 외부 ts: 기존 값이 null 이거나 새 값이 더 크면 덮어쓰기
+            // External ts: the existing value is null, or the new value is larger
             if (ts.start == null || externalTs > ts.start) {
               ts.start = externalTs;
             }
@@ -276,8 +276,8 @@
     var PRODUCTION_LINE_STATE_STORAGE_PREFIX = "wf_production_line_state_";
 
     /**
-     * 현재 활성 production-line session id 추출 (Board._term.workflowSessionId).
-     * 실패 시 null — storage 호출자가 skip.
+     * Currently active production-line session id extraction (Board. term.workflowSessionId).
+     * null — storage caller skip when failed.
      */
     function _productionLineSessionId() {
       try {
@@ -291,8 +291,8 @@
     }
 
     /**
-     * _state 의 step/phase ts 만 추출해 localStorage 에 write.
-     * production-line session 활성 시에만. v1 분기 영향 없음.
+     * state step/phase ts only extract localStorage to write.
+     * production-line session only when active. v1 No quarter impact.
      */
     function _persistProductionLineState() {
       var sid = _productionLineSessionId();
@@ -315,9 +315,9 @@
     }
 
     /**
-     * localStorage 에서 _state 의 step/phase ts 를 복원.
-     * backend GET 응답이 도착하기 전 새로고침 직후 첫 render 에 사용.
-     * 가드: 기존 _state 값이 더 새로우면 storage 값 무시 (덮어쓰기 차단).
+     * localStorage  state of step/phase ts restored.
+     * The backend GET response is used in the first render immediately after the new call.
+     * Guard: If the existing  state value is refreshed, the storage value is ignored (unlocked).
      */
     function _restoreProductionLineState() {
       var sid = _productionLineSessionId();
@@ -328,7 +328,7 @@
         var snap = JSON.parse(raw);
         if (!snap || typeof snap !== "object") return false;
 
-        // stepTimestamps 복원 — 기존 값이 더 새로우면 그대로
+        // stepTimestamps restore — if the existing value is refreshed
         if (snap.stepTimestamps && _state.stepTimestamps) {
           var steps = Object.keys(_state.stepTimestamps);
           for (var i = 0; i < steps.length; i++) {
@@ -345,7 +345,7 @@
           }
         }
 
-        // phases 복원 — 기존 phases 가 비어있을 때만 (race 없음을 가정)
+        // phases restoration — only when the existing phases are empty (no race)
         if (Array.isArray(snap.phases) && snap.phases.length > 0
             && (!_state.phases || _state.phases.length === 0)) {
           _state.phases = snap.phases.map(function (p) {
@@ -373,13 +373,13 @@
     }
 
     /**
-     * T-495 P3 — workflow_step/phase/finish payload 의 extras 키
-     * (verdict/commit/commit_hash/retry/regression) 를 _state 에 흡수.
+     * T-495 P3 — workflow step/phase/finish payload, extras key
+     * (verdict/commit/commit hash/retry/regression)
      *
-     * driver 가 forward-compatible payload 로 보내면 즉시 _state.v2Meta
-     * 에 누적되며, renderTimelineBar 의 _buildMetaRowHtml 가 배지로 표시.
+     * if the driver sends forward-compatible payload, immediately  state.v2Meta
+     * In this case, renderTimelineBar's  buildMetaRowHtml is displayed as a badge.
      *
-     * 가시성 8축 #4 (verdict) / #5 (commit) / #6 (retry) 충족.
+     * #4 (verdict) / #5 (commit) / #6 (retry) meet.
      */
     function _absorbProductionLineExtras(data) {
       if (!data || typeof data !== "object") return;
@@ -393,7 +393,7 @@
       if (data.commit_hash) m.commit = String(data.commit_hash);
       // retry — rule-based retry counter
       if (data.retry != null) m.retry = data.retry;
-      // regression.pattern (5종) — advisory marker
+      // regression.pattern (5 types) — advisory marker
       if (data.regression) {
         if (!m.regression) m.regression = [];
         m.regression.push(String(data.regression));
@@ -401,22 +401,22 @@
     }
 
     /**
-     * T-508 — phase 진입 + phase elapsed ts 기록.
+     * T-508 — phase entry + phase elapsed ts record.
      *
-     * @param {number} n - phase 번호
+     * @param {number} n - phase number
      * @param {string} mode
      * @param {string[]} agents
      * @param {string[]} taskIds
      * @param {{startTsMs?: number}} [opts]
-     *   startTsMs: 외부 (backend GET / SSE event) 에서 받은 phase 진입 epoch ms.
-     *     미지정 시 Date.now() fallback. 동일 phase n 멱등 — 기존 _state.phases
-     *     맨 끝 항목의 n 과 같으면 push skip (replay 시 중복 push 차단).
+     *   startTsMs: epoch ms in the outside (backend GET / SSE event).
+     *     Date.now() fallback same phase n field — conventional  state.phases
+     *     push skip (replay redundancy push block) if the end is like n.
      */
     function _setPhase(n, mode, agents, taskIds, opts) {
       var externalTs = opts && typeof opts.startTsMs === "number" ? opts.startTsMs : null;
       var now = externalTs != null ? externalTs : Date.now();
 
-      // 멱등 가드: 마지막 phase 가 동일 n 이면 push skip (replay)
+      // <% if (imgObj.width >= imgObj.height) { %>
       if (_state.phases && _state.phases.length > 0) {
         var tail = _state.phases[_state.phases.length - 1];
         if (tail && tail.n === n) {
@@ -448,21 +448,21 @@
       // T-383 Phase 4 (VUL-4 / S2) invariant:
       //   _stepPanels[stepName] <-> outputDiv.querySelector(
       //     '.wf-step-panel[data-step="' + stepName + '"]'
-      //   ) 는 동일한 DOM node 를 참조해야 한다.
-      //   같은 data-step 값을 가진 패널은 outputDiv 내 최대 1 개.
+      //   ) must refer to the same DOM node.
+      //   The panel with the same data-step value is up to one in outputDiv.
       //
-      // _restoreSession 이 outputDiv 를 cloneNode 로 교체한 뒤
-      // _rebuildStepPanelsFromDom(outputDiv) 이 호출되지 않은 경로가
-      // 생기더라도 (defensive layering), 맵 miss 시 DOM querySelector
-      // 로 기존 패널을 찾아 맵에 재바인딩함으로써 동일 data-step 패널이
-      // 두 번 appendChild 되는 VUL-4 중복 생성을 차단한다.
+      // restoreSession This outputDiv to cloneNode
+      // rebuildStepPanelsFromDom(outputDiv) has not been called
+      // If you have a problem, please do not hesitate to contact us.
+      // The same data-step panel is found by rebounding existing panels to maps
+      // Double appendChild to block VUL-4 duplicate creation.
       if (_stepPanels[stepName]) return _stepPanels[stepName];
 
       var outputDiv = document.getElementById("terminal-output");
       if (!outputDiv) return null;
 
-      // DOM fallback: Phase 3 의 _rebuildStepPanelsFromDom 과 동일한
-      // querySelector 패턴을 사용해 일관성을 유지한다.
+      // DOM fallback: Phase 3  rebuildStepPanelsFromDom Same
+      // Maintain consistency using querySelector pattern.
       var existing = outputDiv.querySelector(
         '.wf-step-panel[data-step="' + stepName + '"]'
       );
@@ -667,14 +667,14 @@
       var m;
       var vals;
 
-      // ── [STATE] 단계 변경 (2-line sequence, line 1) ──
+      // ── [STATE] Phase Change (2-line sequence, line 1) ──
       if (P.stateChange.test(line)) {
         _pendingStateChange = true;
         return true;
       }
 
       // ── >> FROM -> TO (2-line sequence, line 2) ──
-      // FSM 전이는 step SSE 이벤트가 담당. 배너만 소비.
+      // FSM is responsible for step SSE events. Only the banner is consumed.
       if (_pendingStateChange && (m = P.stateTransition.exec(line))) {
         _pendingStateChange = false;
         return true;
@@ -703,7 +703,7 @@
         return true;
       }
 
-      // [WORKFLOW] command — 배너 소비 + command 캡처만 (FSM _reset 제거)
+      // [WORKFLOW] command — banner consumption + command capture only (reset removal)
       if (_inBox && (m = P.workflowStartCmd.exec(line))) {
         _boxHasCmd = true;
         _inBox     = false;
@@ -716,7 +716,7 @@
         return true;
       }
 
-      // [STEP] in box — 배너 소비만 (FSM _setStep 제거)
+      // [STEP] in box — Only banner consumption (FSM  setStep removal)
       if (_inBox && !_boxHasCmd && (m = P.stepStart.exec(line))) {
         _inBox = false;
         return true;
@@ -749,7 +749,7 @@
         return true;
       }
 
-      // stepEnd — 배너 소비만 (FSM _setStep 제거)
+      // stepEnd — Only banner consumption (FSM  setStep removal)
       if ((m = P.stepEnd.exec(line))) {
         vals = _pickN(m, 2);
         _pendingStepEnd     = true;
@@ -758,7 +758,7 @@
         return true;
       }
 
-      // [STEP] without box — 배너 소비만 (FSM _setStep 제거)
+      // [STEP] without box — Only banner consumption (FSM  setStep removal)
       if (!_inBox && (m = P.stepStart.exec(line))) {
         return true;
       }
@@ -800,14 +800,14 @@
         return true;
       }
 
-      // finishKey — 배너 소비만 (완료/실패는 step 'done' 이벤트가 담당)
+      // finishKey — Banner consumption only (complete/package is responsible for step 'done' event)
       if (_pendingFinish && (m = P.finishKey.exec(line))) {
         _pendingFinish = false;
         _pendingFinishResult = "";
         return true;
       }
 
-      // FAIL — 배너 소비만
+      // FAIL — Banner Only
       if (P.fail.test(line)) {
         return true;
       }
@@ -822,23 +822,23 @@
       patterns: P,
 
       /**
-       * T-495 P2 — production-line 의 workflow_step 이벤트 처리.
+       * T-495 P2 — production-line workflow step event processing.
        * production-line payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
        *
-       * v1 handleStepEvent 와 차이:
-       *  - production-line is 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE) + VALIDATE 추가
-       *  - phase 는 WORK 내부 sub-단계 (P1/P2/...)
-       *  - 멱등 보장
+       * v1 handleStepEvent
+       *  - INIT/PLAN/WORK/VALIDATE/REPORT/DONE
+       *  - phase WORK internal sub-phase (P1/P2/...)
+       *  - Floor lamp warranty
        */
       handleProductionLineStepEvent: function (data) {
         if (!data || !data.step) return;
         var stepUp = String(data.step).toUpperCase();
         var step = stepUp.toLowerCase();
 
-        // T-495 P3 — extras (verdict/commit/retry) 통과 시 _state 에 누적
+        // T-495 P3 — extras (verdict/commit/retry) when passing  state
         _absorbProductionLineExtras(data);
 
-        // T-508 — backend epoch sec → frontend epoch ms 변환 + cycle_start 누적
+        // T-508 — backend epoch sec → frontend epoch ms conversion + cycle start cumulative
         var stepOpts;
         if (typeof data.step_ts === "number" && data.step_ts > 0) {
           stepOpts = { startTsMs: Math.round(data.step_ts * 1000) };
@@ -850,28 +850,28 @@
           }
         }
 
-        // 종결 step 매핑 (DONE/FAILED → fsm 종결 처리)
+        // Final step mapping (DONE/FAILED → fsm closing processing)
         if (stepUp === "DONE") {
           _complete();
           _persistProductionLineState();
           return;
         }
         if (stepUp === "FAILED") {
-          _fail("워크플로우 실패");
+          _fail("Workflow Failure");
           _persistProductionLineState();
           return;
         }
 
-        // 6 step 정합성 (INIT/PLAN/WORK/VALIDATE/REPORT)
+        // 6 step (INIT/PLAN/WORK/VALIDATE/REPORT)
         if (!{ none:1, init:1, plan:1, work:1, validate:1, report:1 }[step]) {
           return;
         }
 
-        // phase 만 바뀐 경우 (같은 step + 새 phase) 도 허용
+        // if phase is changed (like step + new phase) is allowed
         var samePhase = (data.phase || "") === (_state.currentPhase >= 0
           ? "P" + _state.currentPhase : "");
         if (step === _state.currentStep && samePhase) {
-          // 같은 step + phase 라도 외부 ts 갱신은 흡수
+          // same step + phase external ts update absorbed
           if (stepOpts && _state.stepTimestamps && _state.stepTimestamps[step]) {
             var ts = _state.stepTimestamps[step];
             if (ts.start == null || stepOpts.startTsMs > ts.start) {
@@ -884,7 +884,7 @@
 
         _setStep(step, stepOpts);
 
-        // WORK + phase (P1/P2/...) 진입 시 phase 누적 기록
+        // WORK + phase (P1/P2/...)
         if (step === "work" && data.phase) {
           var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
           if (!isNaN(phaseNum)) {
@@ -896,7 +896,7 @@
       },
 
       /**
-       * T-495 P2 — production-line workflow_phase 이벤트 처리.
+       * T-495 P2 — production-line workflow phase event processing.
        * payload: { session_id, phase: "P1"|"P2"..., action: "start"|"end" }
        */
       handleProductionLinePhaseEvent: function (data) {
@@ -914,7 +914,7 @@
         if (data.action === "start") {
           _setPhase(phaseNum, "sequential", [], [], phaseOpts);
         } else if (data.action === "end") {
-          // phase end — 직전 phase end 기록 (timer 정지 트리거)
+          // phase end — static phase end record (timer stop trigger)
           var endTs = phaseOpts ? phaseOpts.startTsMs : Date.now();
           if (_state.phases && _state.phases.length > 0) {
             var last = _state.phases[_state.phases.length - 1];
@@ -927,7 +927,7 @@
       },
 
       /**
-       * T-495 P2 — production-line workflow_finish 이벤트 처리.
+       * T-495 P2 — production-line workflow finish event processing.
        * payload: { session_id, outcome: "ok"|"fail", summary }
        */
       handleProductionLineFinishEvent: function (data) {
@@ -936,36 +936,36 @@
         if (data.outcome === "ok") {
           _complete();
         } else {
-          _fail(data.summary || "워크플로우 실패");
+          _fail(data.summary || "Workflow Failure");
         }
       },
 
       /**
-       * workflow_step SSE 이벤트를 처리하여 FSM 전이를 수행한다.
-       * 멱등: 동일한 step 이름에 대해 중복 전이를 방지한다.
+       * process workflow step SSE events to perform FSM ex.
+       * The same step name prevents duplicates.
        * @param {object} data - {step, prev_step, trigger, phase?, mode?, result?}
        */
       handleStepEvent: function (data) {
         if (!data || !data.step) return;
         var step = data.step.toLowerCase();
 
-        // done/failed 처리
+        // done/failed treatment
         if (step === "done") {
           if (data.result === "failure") {
-            _fail("워크플로우 실패");
+            _fail("Workflow Failure");
           } else {
             _complete();
           }
           return;
         }
 
-        // 멱등: 동일 step + phase 조합이면 no-op (phase 변경은 허용)
+        // <# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #>
         if (step === _state.currentStep && data.phase === undefined) return;
 
-        // FSM 전이
+        // FSM
         _setStep(step);
 
-        // phase 정보 포함 시 phase 업데이트
+        // Phase update with phase information
         if (data.phase !== undefined) {
           _setPhase(data.phase, data.mode || "sequential", [], []);
         }
@@ -1036,17 +1036,17 @@
       },
 
       /**
-       * T-508 — localStorage 에 저장된 production-line ts 를 _state 에 복원.
-       * session.js 의 _startProductionLineWorkflowSession 진입 시 fetchSession 전 호출.
-       * @returns {boolean} 복원 성공 여부 (key 미존재 / parse 실패 시 false)
+       * T-508 — localStorage stored in production-line ts  state restored.
+       * session.js's  startProductionLineWorkflowSession call before fetchSession.
+       * @returns {boolean} Restores whether or not successful (key Missing / parse fails false)
        */
       restoreProductionLineState: function () {
         return _restoreProductionLineState();
       },
 
       /**
-       * T-508 — 현재 _state 의 step/phase ts 를 localStorage 에 write.
-       * 외부 (session.js) 에서 수동 트리거 가능. 평소엔 handleProductionLine*Event 자동 호출.
+       * T-508 — current  state step/phase ts localStorage to write.
+       * Can be triggered in external (session.js). Automatic call handleProductionLine*Event.
        */
       persistProductionLineState: function () {
         _persistProductionLineState();
@@ -1186,7 +1186,7 @@
       var labels = { init: "INIT", plan: "PLAN", work: "WORK", validate: "VALIDATE", report: "REPORT", done: "DONE", failed: "FAIL" };
       var current = st.currentStep || "init";
 
-      // 6단계 + DONE (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
+      // Step 6 + DONE (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
       var orderedSteps = ["init", "plan", "work", "validate", "report", "done"];
       if (current === "failed") {
         orderedSteps.push("failed");
@@ -1259,9 +1259,9 @@
         html += '<span class="wf-meta-id">#' + _esc(st.workId) + '</span>';
       }
 
-      // [중지] 버튼 — 진행 중 세션에만 표시 (T-904)
+      // [Intermediate] button — only displayed during the session (T-904)
       if (st.status === "running") {
-        html += '<button class="wf-stop-btn" title="워크플로우 강제 중지">중지</button>';
+        html += '<button class="wf-stop-btn" title="Workflow Force Stop">Underground</button>';
       }
       html += '</div>';
       return html;
@@ -1275,7 +1275,7 @@
         if (seen[a.path]) return;
         seen[a.path] = true;
         html += '<a class="wf-timeline-artifact" data-path="' + _esc(a.path) + '"'
-          + ' href="#" title="' + _esc(a.label) + ' 열기">'
+          + ' href="#" title="' + _esc(a.label) + 'News'
           + _esc(a.label) + '</a>';
       });
       html += '</div>';
@@ -1292,7 +1292,7 @@
       if (!st.phases || st.phases.length === 0) return "";
 
       var current = st.currentStep || "init";
-      // 6단계 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
+      // Step 6 (INIT/PLAN/WORK/VALIDATE/REPORT/DONE)
       var stepOrder = { init: 0, plan: 1, work: 2, validate: 3, report: 4, done: 5 };
       var currentIdx = stepOrder[current];
 
@@ -1363,14 +1363,14 @@
           })(links[i]);
         }
 
-        // [중지] 버튼 핸들러 바인딩 (T-904)
+        // [Medical] Button Handler Binding (T-904)
         var stopBtn = bar.querySelector(".wf-stop-btn");
         if (stopBtn) {
           stopBtn.addEventListener("click", function () {
-            if (!confirm("이 워크플로우를 강제 중지합니다. 현재 작업은 폐기될 수 있습니다. 계속하시겠습니까?")) {
+            if (!confirm("Stop forced workflow. The current operation can be closed. Do you want to visit?")) {
               return;
             }
-            // session_id 와 ticket_id 수집
+            // session id and ticket id collection
             var sessionId = (Board._term && Board._term.workflowSessionId) || null;
             var ticketId = null;
             if (sessionId) {
@@ -1379,14 +1379,14 @@
               if (m) ticketId = m[1];
             }
             if (!sessionId && !ticketId) {
-              Board.util.showInfoModal("세션 정보 없음", "세션 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도하세요.", { severity: "warning" });
+              Board.util.showInfoModal("No Session Information", "You cannot find session information. Please refresh the page and try again.", { severity: "warning" });
               return;
             }
-            // T-513 P5 — V1 /api/workflow/stop endpoint 폐기. Production-line ticket-based
-            // stop endpoint 신설은 별 후속 트랙. 본 stop 버튼은 일시 비활성 안내.
+            // T-513 P5 — V1 /api/workflow/stop endpoint disposal. Production-line
+            // stop endpoint new releases the star follow-up track. This stop button is temporarily closed.
             Board.util.showInfoModal(
-              "중지 미지원",
-              "Production-line 워크플로우 중지 기능은 별 트랙 endpoint 신설 후 복원됩니다 (T-513 P5 결정). 현 시점에서는 메인 터미널의 ESC 또는 subprocess 직접 종료를 사용하세요.",
+              "About Us",
+              "Production-line workflow stop function is restored after a star track endpoint fix (T-513 P5 crystal). Use the ESC or subprocess direct termination of the main terminal at the point of view.",
               { severity: "warning" }
             );
           });
@@ -1453,7 +1453,7 @@
         badge.setAttribute("data-status", isOk ? "ok" : "fail");
 
         var iconChar = isOk ? "&#10003;" : "&#10005;";
-        var labelText = isOk ? "워크플로우 완료" : "워크플로우 실패";
+        var labelText = isOk ? "Skip to content" : "Workflow Failure";
         var subText = msg || (isOk
           ? ("#" + (st.workId || "") + " · " + (st.title || ""))
           : (st.error || "FAIL"));
@@ -1525,9 +1525,9 @@
           var taskId = pair[0];
           var task = pair[1];
           var status = task.status || "running";
-          // 풀 경로는 ellipsis 로 잘리면 의미가 사라지므로 마지막 segment(basename)
-          // 만 노출. "Reading .agent-factory/board/web/js/foo.js" →
-          // "Reading foo.js". hover title 에는 원본 summary 가 그대로 유지된다.
+          // ellipsis is the last segment
+          // About Us "Reading.agent-factory/board/web/js/foo.js" →
+          // foo.js hover title is the original summary.
           var rawDesc = task.description || taskId;
           rawDesc = rawDesc.replace(/[\w./-]*\/([\w.-]+)/g, "$1");
           var desc = _esc(rawDesc);

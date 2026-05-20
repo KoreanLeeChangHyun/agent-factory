@@ -1,8 +1,8 @@
-"""test_retry.py — _retry.py 단위 테스트.
+"""test retry.py —  retry.py module testing.
 
-대상:
-  - render_retry_prompt (template fill, missing items 형식, empty fallback)
-  - spawn_with_retry (mock spawn + verify, N_max loop 정합)
+Price:
+  - render retry prompt (template fill, missing items format, empty fallback)
+  - spawn with retry (mock spawn + verification, N max loop fixation)
 """
 
 from __future__ import annotations
@@ -34,20 +34,20 @@ def test_render_retry_prompt_basic(tmp_path: Path) -> None:
     )
     assert "plan.md frontmatter parse failed" in out
     assert "phases empty" in out
-    assert "다시 작성" in out
-    assert "다른 영역 수정 금지" in out
+    assert "Log in" in out
+    assert "Default Search" in out
     assert str(tmp_path / "plan.md") in out
 
 
 def test_render_retry_prompt_empty_missing() -> None:
     out = render_retry_prompt([], Path("/tmp/x.md"))
-    # 빈 missing 시 fallback 메시지
-    assert "(산출물 누락)" in out
+    # empty missing when fallback message
+    assert "(Personal order)" in out
 
 
 @pytest.fixture
 def mock_spawn_calls():
-    """spawn_claude / spawn_claude_resume mock — 호출 카운트 추적."""
+    """spawn claude / spawn claude resume mock — call count tracking."""
     calls = {"initial": 0, "resume": 0}
 
     def fake_initial(**kwargs):
@@ -64,7 +64,7 @@ def mock_spawn_calls():
 
 
 def test_spawn_with_retry_first_pass(mock_spawn_calls, tmp_path: Path) -> None:
-    """verify PASS 즉시 반환 — initial 1회, resume 0회."""
+    """verification PASS Instant return — 1 initial resume, 0 times."""
     ctx = _make_ctx(tmp_path)
     artifact = tmp_path / "plan.md"
 
@@ -87,7 +87,7 @@ def test_spawn_with_retry_first_pass(mock_spawn_calls, tmp_path: Path) -> None:
 
 
 def test_spawn_with_retry_one_retry(mock_spawn_calls, tmp_path: Path) -> None:
-    """첫 verify FAIL, retry 1회 후 PASS — initial 1, resume 1."""
+    """First verification FAIL, one retry pass — initial 1, resume 1."""
     ctx = _make_ctx(tmp_path)
     artifact = tmp_path / "plan.md"
     attempts = {"n": 0}
@@ -114,7 +114,7 @@ def test_spawn_with_retry_one_retry(mock_spawn_calls, tmp_path: Path) -> None:
 
 
 def test_spawn_with_retry_max_exceeded(mock_spawn_calls, tmp_path: Path) -> None:
-    """N_max 초과 — verify 끝까지 FAIL."""
+    """N max exceed — FAIL until the end of verification."""
     ctx = _make_ctx(tmp_path)
     artifact = tmp_path / "plan.md"
 
@@ -132,6 +132,6 @@ def test_spawn_with_retry_max_exceeded(mock_spawn_calls, tmp_path: Path) -> None
     )
     assert not result.ok
     assert retry == 2  # PLAN N_max
-    # initial 1회 + resume N_max 회
+    # 1st + N resume max
     assert mock_spawn_calls["initial"] == 1
     assert mock_spawn_calls["resume"] == 2

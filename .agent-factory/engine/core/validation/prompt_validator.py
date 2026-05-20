@@ -30,7 +30,7 @@ import re
 import sys
 from datetime import datetime, timedelta, timezone
 
-# 프로젝트 루트 결정
+# Determine project route
 _engine_dir = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 )
@@ -43,7 +43,7 @@ REQUIRED_TAGS = ["goal", "target", "constraints", "criteria"]
 OPTIONAL_TAGS = ["context", "approach", "scope", "reference"]
 _KST = timezone(timedelta(hours=9))
 
-# TODO 패턴: "TODO:" 로 시작하거나 전체가 TODO 텍스트만인 경우
+# TODO pattern: Starts with "TODO:" or is entirely TODO text
 _TODO_PATTERN = re.compile(r"^\s*TODO\s*:", re.IGNORECASE)
 
 
@@ -94,7 +94,7 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
     open_pat = re.compile(rf"<{tag_escaped}>", re.IGNORECASE)
     close_pat = re.compile(rf"</{tag_escaped}>", re.IGNORECASE)
 
-    # 개방/폐쇄 태그 위치를 모두 수집
+    # Collect all open/closed tag positions
     events = []
     for m in open_pat.finditer(text):
         events.append((m.start(), "open", m.end()))
@@ -104,16 +104,16 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
     if not events:
         return None
 
-    # 위치 순서로 정렬
+    # Sort by position order
     events.sort(key=lambda e: e[0])
 
-    # 스택 기반으로 가장 외부 태그 쌍 탐색
+    # Explore the most external tag pairs based on the stack
     depth = 0
     outer_start = None
     for pos, kind, end_pos in events:
         if kind == "open":
             if depth == 0:
-                outer_start = end_pos  # 태그 내용 시작 위치
+                outer_start = end_pos  # Tag content start position
             depth += 1
         else:  # close
             if depth > 0:
@@ -138,12 +138,12 @@ def extract_active_prompt(xml_text: str) -> str:
     Returns:
         <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
     """
-    # 레거시 폴백: <submit> 래퍼가 존재하면 기존 subnumber 구조로 파싱
+    # Legacy fallback: If a <submit> wrapper exists, parse it as the existing subnumber structure.
     submit_content = _extract_tag_content(xml_text, "submit")
     if submit_content is not None:
         return _extract_active_prompt_legacy(xml_text, submit_content)
 
-    # flat 구조: 루트 직하 <prompt> 태그 내용을 직접 추출
+    # Flat structure: directly extract the contents of the <prompt> tag directly under the root
     prompt_content = _extract_tag_content(xml_text, "prompt")
     if prompt_content is None:
         return xml_text
@@ -268,23 +268,23 @@ def validate(prompt_text: str) -> dict[str, object]:
     quality_score = round((present_count / 4) * 0.6 + (valid_count / 4) * 0.4, 4)
     has_tags = present_count > 0
 
-    # 선택 태그 존재 여부 확인
+    # Check for existence of selection tag
     found_optional = [
         tag for tag in OPTIONAL_TAGS
         if _extract_tag_content(prompt_text, tag) is not None
     ]
 
-    # 역방향 피드백 생성
+    # Generate backward feedback
     feedback: list[str] = []
     for tag in missing_tags:
         feedback.append(
-            f"<{tag}> 태그가 없습니다. "
-            f"'{tag}' 섹션을 추가하여 planner가 명확히 인식할 수 있도록 보완하세요."
+            f"No <{tag}> tag."
+            f"Add the '{tag}' section to make it clearly recognizable to planners."
         )
     for tag in empty_tags:
         feedback.append(
-            f"<{tag}> 태그 내용이 비어있거나 TODO 텍스트만 있습니다. "
-            f"10자 이상의 구체적인 내용을 작성하세요."
+            f"<{tag}> tag content is empty or contains only TODO text."
+            f"Please be specific and at least 10 characters long."
         )
 
     return {
@@ -305,25 +305,25 @@ def _build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="flow-validate-p",
-        description="티켓 파일 XML 계약 스펙 검증\n\n"
-                    "검증 항목:\n"
-                    "  1. 필수 태그 존재: <goal>, <target>, <constraints>, <criteria>\n"
-                    "  2. 빈 섹션 감지: 내용 없음 / TODO: 패턴 / 10자 미만\n"
-                    "  3. 품질 점수: (존재 태그/4)*0.6 + (유효 내용/4)*0.4\n"
-                    "  4. 선택 태그: <context>, <approach>, <scope>, <reference>\n\n"
-                    "출력 (JSON):\n"
+        description="Validate Ticket File XML Contract Specification \n \n"
+                    "Verification Item: \n"
+                    "1. Required tags present: <goal>, <target>, <constraints>, <criteria> \n"
+                    "2. Detect empty sections: no content / TODO: pattern / less than 10 characters \n"
+                    "3. Quality score: (Existence tags/4)*0.6 + (Effective content/4)*0.4 \n"
+                    "4. Optional tags: <context>, <approach>, <scope>, <reference> \n \n"
+                    "Output (JSON): \n"
                     "  quality_score, has_tags, missing_tags, empty_tags,\n"
                     "  optional_tags, feedback\n\n"
-                    "종료 코드:\n"
-                    "  0  검증 완료\n"
-                    "  1  파일 읽기 실패\n"
-                    "  2  인자 오류",
+                    "Exit code: \n"
+                    "0 Verification completed \n"
+                    "1 Failed to read file \n"
+                    "2 argument error",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=build_common_epilog(),
     )
     parser.add_argument(
         "prompt_file_path",
-        help="검증할 티켓 파일 경로 (예: .agent-factory/tickets/active/T-NNN.xml)",
+        help="Path to the ticket file to validate (e.g. .agent-factory/tickets/active/T-NNN.xml)",
     )
     return parser
 
@@ -339,7 +339,7 @@ def main() -> None:
 
     prompt_path = args.prompt_file_path
 
-    # 상대 경로를 호출 위치 기준 절대 경로로 변환
+    # Convert relative path to absolute path based on call location
     if not os.path.isabs(prompt_path):
         prompt_path = os.path.join(os.getcwd(), prompt_path)
 
@@ -351,7 +351,7 @@ def main() -> None:
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_text = f.read()
     except OSError as e:
-        sys.stderr.write(f"오류: 파일을 읽을 수 없습니다 — {e}\n")
+        sys.stderr.write(f"Error: Unable to read file — {e} \n")
         sys.exit(1)
 
     result = validate(prompt_text)

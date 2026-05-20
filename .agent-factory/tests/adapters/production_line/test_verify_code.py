@@ -1,14 +1,14 @@
-"""test_verify_code.py — T-503 신설 driver 결정론 코드 검증 단위 테스트.
+"""test verify code.py — T-503 Syndrome Driver Crystalline Code Verification Unit Test.
 
-대상:
-  - `run(ctx)` — implement / research-skip / 도구 미설치 / 설정 부재 분기
-  - `_run_pytest` / `_run_ruff` / `_run_mypy` — subprocess 호출 결과 parse
-  - `_parse_pytest_summary` / `_parse_pytest_failed_nodes` — pytest 출력 파싱
-  - `read_code_json` / `tool_result` — 헬퍼
-  - JSON 스키마 회귀
+Price:
+  - `run(ctx)` — execution / research-skip / tool uninstalled / Set-up subsidiaries
+  - ` run pytest` / ` run ruff` / ` run mypy` — subprocess call result parse
+  - ` parse pytest summary` / ` parse pytest failed nodes` — pytest output parsing
+  - `read code json` / `tool result` — Helper
+  - JSON schema revolving
 
-graceful SKIP 검증 우선 — pytest/ruff/mypy 가 실제로 PATH 에 없는 환경에서도
-테스트가 통과해야 한다. PATH 의존성은 monkeypatch 로 회피.
+graceful SKIP Verification Priority — pytest/ruff/mypy is actually not in the PATH environment
+The test must be passed. PATH dependency to the monkeypatch by the recall.
 """
 
 from __future__ import annotations
@@ -29,15 +29,15 @@ def _make_ctx(tmp_path: Path, command: str = "implement") -> WorkflowContext:
         command=command,
         mode="multi",
         current_step="VALIDATE",
-        worktree_path=tmp_path,  # tmp_path 를 워크트리로 사용
+        worktree_path=tmp_path,  # tmp path is used as a work tree
     )
 
 
-# -------- run(ctx) 분기 --------
+# -------- run(ctx) quarter --------
 
 
 def test_run_research_skip(tmp_path: Path) -> None:
-    """command=research → 즉시 SKIP. code.json 의 command_skip=True 박제."""
+    """command=research → immediately SKIP. command skip=True for code.json."""
     ctx = _make_ctx(tmp_path, command="research")
     out = _verify_code.run(ctx)
     assert out == ctx.validate_code_json_path()
@@ -50,7 +50,7 @@ def test_run_research_skip(tmp_path: Path) -> None:
 
 
 def test_run_review_skip(tmp_path: Path) -> None:
-    """command=review → 즉시 SKIP."""
+    """command=review → immediately SKIP."""
     ctx = _make_ctx(tmp_path, command="review")
     out = _verify_code.run(ctx)
     payload = json.loads(out.read_text(encoding="utf-8"))
@@ -58,8 +58,8 @@ def test_run_review_skip(tmp_path: Path) -> None:
 
 
 def test_run_implement_no_tools_graceful(tmp_path: Path, monkeypatch) -> None:
-    """implement 이지만 pytest/ruff/mypy 모두 미설치 — graceful SKIP. driver 중단 없음."""
-    # 모든 도구 미설치 시뮬레이션
+    """implementation but pytest/ruff/mypy all uninstalled — graceful SKIP. no driver interruption."""
+    # © 2020 Sony Corporation. All rights reserved.
     monkeypatch.setattr(_verify_code.shutil, "which", lambda _tool: None)
     ctx = _make_ctx(tmp_path, command="implement")
     out = _verify_code.run(ctx)
@@ -73,19 +73,19 @@ def test_run_implement_no_tools_graceful(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_run_implement_no_config(tmp_path: Path, monkeypatch) -> None:
-    """implement + 도구 설치되었지만 config 부재 — graceful SKIP."""
+    """implementation + tool installation but config absence — graceful SKIP."""
     monkeypatch.setattr(_verify_code.shutil, "which", lambda _tool: "/usr/bin/" + _tool)
-    # tmp_path 안에 pyproject.toml / pytest.ini / tests/ 모두 없음.
+    # pyproject.toml/pytest.ini/test/all in tmp path.
     ctx = _make_ctx(tmp_path, command="implement")
     out = _verify_code.run(ctx)
     payload = json.loads(out.read_text(encoding="utf-8"))
     for entry in payload["tools"]:
-        # config 부재 또는 (호출 가능하지만 fail) — 어느 쪽이든 driver 중단 없음
+        # config absence or (failable but fail) — no driver interruption
         assert entry["status"] in ("skip", "ok", "fail")
 
 
 def test_run_creates_validate_dir(tmp_path: Path) -> None:
-    """validate/ 디렉터리가 없어도 run(ctx) 가 자동 mkdir."""
+    """run(ctx) automatic mkdir without validate/ directory."""
     ctx = _make_ctx(tmp_path, command="research")
     assert not ctx.validate_dir().exists()
     _verify_code.run(ctx)
@@ -149,7 +149,7 @@ def test_detect_mypy_config_missing(tmp_path: Path) -> None:
     assert _verify_code._detect_mypy_config(tmp_path) is False
 
 
-# -------- pytest 결과 parse --------
+# -------- pytest results parse --------
 
 
 def test_parse_pytest_summary_passed_failed() -> None:
@@ -179,7 +179,7 @@ def test_parse_pytest_failed_nodes_empty() -> None:
     assert _verify_code._parse_pytest_failed_nodes(text) == []
 
 
-# -------- _run_pytest 도구 미설치 graceful SKIP --------
+# --------  run pytest tool installation graceful SKIP --------
 
 
 def test_run_pytest_no_tool_skip(tmp_path: Path, monkeypatch) -> None:
@@ -199,7 +199,7 @@ def test_run_pytest_no_config_skip(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_run_pytest_ok_mocked(tmp_path: Path, monkeypatch) -> None:
-    """pytest 호출이 returncode=0 stdout='5 passed in 0.1s' 인 경우 → status=ok."""
+    """pytest call returncode=0 stdout='5 passed in 0.1s' → status=ok."""
     monkeypatch.setattr(_verify_code.shutil, "which", lambda _: "/usr/bin/pytest")
     (tmp_path / "tests").mkdir()
 
@@ -213,7 +213,7 @@ def test_run_pytest_ok_mocked(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_run_pytest_fail_mocked(tmp_path: Path, monkeypatch) -> None:
-    """pytest 호출이 returncode=1 → status=fail. head_diagnostics 박제."""
+    """returncode=1 → status=fail. head diagnostics"""
     monkeypatch.setattr(_verify_code.shutil, "which", lambda _: "/usr/bin/pytest")
     (tmp_path / "tests").mkdir()
 
@@ -251,7 +251,7 @@ def test_run_ruff_no_tool_skip(tmp_path: Path, monkeypatch) -> None:
 
 def test_run_ruff_no_config_skip(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(_verify_code.shutil, "which", lambda _: "/usr/bin/ruff")
-    # config 없음
+    # No config
     result = _verify_code._run_ruff(tmp_path)
     assert result["status"] == "skip"
 
@@ -343,11 +343,11 @@ def test_tool_result_empty() -> None:
     assert _verify_code.tool_result({"tools": []}, "pytest") is None
 
 
-# -------- JSON 스키마 회귀 --------
+# -------- JSON schema revolving --------
 
 
 def test_code_json_schema_research(tmp_path: Path) -> None:
-    """research 모드 — JSON 스키마 기본 키 회귀."""
+    """Research mode — JSON schema default key regression."""
     ctx = _make_ctx(tmp_path, command="research")
     out = _verify_code.run(ctx)
     payload = json.loads(out.read_text(encoding="utf-8"))
@@ -359,8 +359,8 @@ def test_code_json_schema_research(tmp_path: Path) -> None:
 
 
 def test_code_json_schema_implement(tmp_path: Path, monkeypatch) -> None:
-    """implement 모드 — work_root 키 + tools 3건 (pytest/ruff/mypy)."""
-    monkeypatch.setattr(_verify_code.shutil, "which", lambda _: None)  # 모두 SKIP
+    """Execution mode — work root key + tools 3 (pytest/ruff/mypy)."""
+    monkeypatch.setattr(_verify_code.shutil, "which", lambda _: None)  # SKIP
     ctx = _make_ctx(tmp_path, command="implement")
     out = _verify_code.run(ctx)
     payload = json.loads(out.read_text(encoding="utf-8"))

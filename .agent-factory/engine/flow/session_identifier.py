@@ -1,18 +1,18 @@
-"""session_identifier.py - 세션 유형 식별 추상화 레이어.
+"""session identifier.py - Session type identification abstraction layer.
 
-워크플로우 세션과 메인 세션을 구분하는 통합 인터페이스를 제공한다.
-환경변수(_WF_SESSION_TYPE, _WF_TICKET_ID) 우선 경로와
-TMUX_PANE 기반 폴백 경로를 단일 API로 추상화한다.
+We provide integrated interface that distinguishes workflow sessions and main sessions.
+environment variable( WF SESSION TYPE,  WF TICKET ID) priority path and
+The TMUX PANE-based poly bag path is abstracted into a single API.
 
-세션 식별 결정 흐름:
-  1. _WF_SESSION_TYPE 환경변수가 존재하면 그 값을 즉시 반환한다.
-  2. TMUX_PANE 환경변수가 존재하면 tmux display-message로 윈도우명을
-     조회하여 P:T-* 접두사 여부로 판별한다.
-  3. 둘 다 없으면 "unknown"을 반환한다.
+Session Identification Crystal Flow:
+  1. If the  WF SESSION TYPE environment variable exists, the value will be returned immediately.
+  2. When the TMUX PANE environment variable exists, Windows name with tmux display-message
+     P:T-* by inquiry.
+  3. FAQs return "unknown" without both.
 
-하위호환:
-  WINDOW_PREFIX_P, MAIN_WINDOW_DEFAULT 상수를 이관하여
-  기존 tmux_utils.py 소비 코드가 이 모듈로 전환할 수 있다.
+Tag:
+  WINDOW PREFIX P, MAIN WINDOW DEFAULT
+  The existing tmux utils.py consumption code can be switched to this module.
 """
 
 from __future__ import annotations
@@ -29,27 +29,27 @@ __all__ = [
 ]
 
 # ---------------------------------------------------------------------------
-# 하위호환 상수 (tmux_utils.py에서 이관)
+# Backwards compatible constants (migrated from tmux_utils.py)
 # ---------------------------------------------------------------------------
 
 WINDOW_PREFIX_P: str = "P:"
-"""tmux 워크플로우 윈도우명 접두사."""
+"""tmux workflow window name prefix."""
 
 MAIN_WINDOW_DEFAULT: str = "main"
-"""메인 세션 기본 윈도우명."""
+"""Main session default window name."""
 
 # ---------------------------------------------------------------------------
-# 환경변수 키
+# environment variable key
 # ---------------------------------------------------------------------------
 
 _ENV_SESSION_TYPE: str = "_WF_SESSION_TYPE"
-"""세션 유형 환경변수 키. 값: "workflow", "main"."""
+"""Session type environment variable key. value:"workflow", "main"."""
 
 _ENV_TICKET_ID: str = "_WF_TICKET_ID"
-"""티켓 ID 환경변수 키. 값: "T-NNN"."""
+"""Ticket ID environment variable key. value:"T-NNN"."""
 
 # ---------------------------------------------------------------------------
-# 세션 유형 상수
+# session type constant
 # ---------------------------------------------------------------------------
 
 SESSION_TYPE_WORKFLOW: str = "workflow"
@@ -57,18 +57,18 @@ SESSION_TYPE_MAIN: str = "main"
 SESSION_TYPE_UNKNOWN: str = "unknown"
 
 # ---------------------------------------------------------------------------
-# 내부 헬퍼
+# internal helper
 # ---------------------------------------------------------------------------
 
 
 def _get_current_window_name() -> str:
-    """현재 프로세스가 속한 tmux 윈도우 이름을 반환한다.
+    """return the tmux window name in the current process.
 
-    TMUX_PANE 환경변수를 사용하여 프로세스가 실제로 실행 중인 pane의
-    윈도우 이름을 조회한다. TMUX_PANE이 없으면 활성 윈도우 이름을 반환한다.
+    Using TMUX PANE environment variables, the process is actually running pane
+    Please check the window name. If there is no TMUX PANE, return the active Windows name.
 
     Returns:
-        현재 윈도우 이름 문자열. 실패 시 빈 문자열.
+        current window name string. empty strings when failed.
     """
     tmux_pane = os.environ.get("TMUX_PANE")
     if tmux_pane:
@@ -89,28 +89,28 @@ def _get_current_window_name() -> str:
 
 
 # ---------------------------------------------------------------------------
-# 공개 API
+# public API
 # ---------------------------------------------------------------------------
 
 
 def get_session_type() -> str:
-    """현재 세션의 유형을 반환한다.
+    """Returns the type of current session.
 
-    결정 우선순위:
-      1. ``_WF_SESSION_TYPE`` 환경변수 값 (설정되어 있으면 즉시 반환)
-      2. ``TMUX_PANE`` 환경변수가 있으면 tmux 윈도우명을 조회하여
-         ``P:T-*`` 접두사면 ``"workflow"``, 아니면 ``"main"``
-      3. 둘 다 없으면 ``"unknown"``
+    Payment Terms:
+      1. FAQ `` WF SESSION TYPE` environment variable value (if set, return immediately)
+      2. If ``TMUX PANE` environment variable, look for tmux window name
+         ``P:T-*` ``workflow``, or ``main'`
+      3. FAQs "unknown"
 
     Returns:
         ``"workflow"`` | ``"main"`` | ``"unknown"``
     """
-    # 1) 환경변수 우선 경로
+    # 1) Environment variable priority path
     env_type = os.environ.get(_ENV_SESSION_TYPE, "").strip().lower()
     if env_type:
         return env_type
 
-    # 2) TMUX_PANE 폴백 경로
+    # 2) TMUX_PANE fallback path
     tmux_pane = os.environ.get("TMUX_PANE")
     if not tmux_pane:
         return SESSION_TYPE_UNKNOWN
@@ -122,35 +122,35 @@ def get_session_type() -> str:
 
 
 def is_workflow_session() -> bool:
-    """현재 세션이 워크플로우 세션인지 판별한다.
+    """The current session is based on the workflow session.
 
-    ``get_session_type()`` 의 결과가 ``"workflow"`` 인지 확인하는
-    편의 래퍼이다.
+    ``get session type()`''s result is ``workflow'`
+    Convenience Rapper.
 
     Returns:
-        워크플로우 세션이면 ``True``, 그 외 ``False``.
+        If the workflow session is ``True``, and ``False```.
     """
     return get_session_type() == SESSION_TYPE_WORKFLOW
 
 
 def get_session_ticket_id() -> str | None:
-    """현재 세션의 활성 티켓 ID를 반환한다.
+    """Returns the active ticket ID in the current session.
 
-    결정 우선순위:
-      1. ``_WF_TICKET_ID`` 환경변수 값 (설정되어 있으면 즉시 반환)
-      2. ``TMUX_PANE`` 환경변수가 있으면 tmux 윈도우명에서
-         ``P:T-NNN`` 패턴을 파싱하여 ``T-NNN`` 반환
-      3. 추출 실패 시 ``None``
+    Payment Terms:
+      1. FAQ ` WF TICKET ID` environment variable value (if set, return immediately)
+      2. ``TMUX PANE` if environment variable is in tmux window name
+         ``P:T-NNN` returns ``T-NNN`
+      3. FAQs [None]
 
     Returns:
-        티켓 ID 문자열 (예: ``"T-001"``). 추출 실패 시 ``None``.
+        Ticket ID string (e.g. ""T-001" ). ``None``` when extraction failed.
     """
-    # 1) 환경변수 우선 경로
+    # 1) Environment variable priority path
     env_ticket = os.environ.get(_ENV_TICKET_ID, "").strip()
     if env_ticket:
         return env_ticket
 
-    # 2) TMUX_PANE 폴백 경로
+    # 2) TMUX_PANE fallback path
     tmux_pane = os.environ.get("TMUX_PANE")
     if not tmux_pane:
         return None
@@ -160,5 +160,5 @@ def get_session_ticket_id() -> str | None:
     if not window_name.startswith(prefix):
         return None
 
-    # "P:" 접두사를 제거하여 "T-NNN" 부분만 반환
+    # Remove the "P:" prefix to return only the "T-NNN" part
     return window_name[len(WINDOW_PREFIX_P):]

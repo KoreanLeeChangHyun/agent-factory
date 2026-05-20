@@ -1,13 +1,13 @@
-"""endpoint 명세 + alias route + FE diff 회귀 smoke 테스트 (T-511 P6).
+"""endpoint specification + alias route + FE diff revolving smoke test (T-511 P6).
 
-검증:
-  - handler 메서드와 http_router.py 라우팅이 정합 (URL → handler 매칭)
-  - alias route 보존 (기존 URL 변경 0건)
-  - FE 호출부 변경 0건 (`.agent-factory/board/web/js/` git diff stat)
-  - board.md §1.3 의 `memory_update` / `roadmap_update` 보충 매칭
+Warranty:
+  - Set the handler method and http router.py route (URL → handler matching)
+  - alias route conservation (replacement URL change 0)
+  git diff stat
+  - board.md §1.3 'memory update` / `roadmap update` supplement matching
 
-production endpoint 직접 호출 금지 (board.md §0.1 절대 금지 — fake/test session
-으로 호출 시 production state 오염 + 403 차단). 본 테스트는 정적 분석만.
+production endpoint direct call ban (board.md §0.1 absolute ban — fake/test session
+When calling to production state contamination + 403 blocked). This test is only static analysis.
 """
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ import pytest
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
-_HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
+_HTTP_ROUTER = (
+    _REPO_ROOT / ".agent-factory" / "board" / "server" / "routing" / "http_router.py"
+)
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
 _BOARD_API_APP_DIR = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api"
 _FE_JS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "web" / "js"
@@ -27,7 +29,7 @@ _BOARD_MD = _REPO_ROOT / ".claude" / "rules" / "workflow" / "board.md"
 
 
 # ---------------------------------------------------------------------------
-# §1: handler ↔ router 정합
+# §1: Handler ↔ Router Setup
 # ---------------------------------------------------------------------------
 
 def _collect_handler_methods() -> set[str]:
@@ -48,11 +50,11 @@ def _collect_handler_methods() -> set[str]:
 
 
 def test_http_router_handler_methods_all_defined() -> None:
-    """http_router.py 가 호출하는 모든 `_handle_*` / `_production_line_handle_*` 메서드가 mixin 에 정의됨."""
+    """All ` handle *` / ` production line handle *` methods call http router.py are defined in mixin."""
     router_text = _HTTP_ROUTER.read_text(encoding="utf-8")
     defined = _collect_handler_methods()
 
-    # http_router.py 본문에서 `self._handle_xxx(` 또는 `self._production_line_handle_xxx(` 형태 추출
+    # http router.py 'self. handle xxx' or `self. production line handle xxx'
     import re
     called = set(
         re.findall(
@@ -62,11 +64,11 @@ def test_http_router_handler_methods_all_defined() -> None:
     )
 
     missing = called - defined
-    assert not missing, f"http_router.py 가 호출하는 미정의 handler: {missing}"
+    assert not missing, f"handler:   FIELD 0  "
 
 
 # ---------------------------------------------------------------------------
-# §2: alias route — 기존 URL 보존
+# §2: alias route — preserving the existing URL
 # ---------------------------------------------------------------------------
 
 _REQUIRED_URLS_GET = {
@@ -116,50 +118,50 @@ _REQUIRED_URLS_POST = {
 
 
 def test_required_urls_preserved_in_router() -> None:
-    """기존 URL + 신규 (P4/P5) URL 모두 http_router.py 본문에 매칭.
+    """All existing URLs + new (P4/P5) URLs are matched to http router.py body.
 
-    T-513 P5 — V1 워크플로우 엔진 일괄 폐기로 본 가드의 _REQUIRED_URLS_*
-    상단 영역 (terminal/workflow/*, api/workflow/*) 이 의도적으로 부재.
-    가드 본체는 T-513 acceptance (`grep '/api/workflow/'` / `'/terminal/workflow/'`
-    0건) 와 충돌. 본 가드는 T-513 정합화 검증으로 대체됨 — skip.
+    T-513 P5 — V1 Workflow Engine  REQUIRED URLS *
+    top area (terminal/workflow/*, api/workflow/*) This intentionally absence.
+    T-513 acceptance (`grep'/api/workflow/'``'/terminal/workflow/'`)
+    0) and collision. This guard is replaced by T-513 Staticization Verification — skip.
     """
     pytest.skip(
-        "T-513 P5 — V1 워크플로우 엔진 일괄 폐기 정합. 본 가드는 stale "
-        "(P5 acceptance grep 0건이 신규 검증 진입점). "
-        "잔여 URL 정합은 test_http_router_handler_methods_all_defined 가 담당."
+        "T-513 P5 — V1 Workflow Engine Computing Closed-loops. Pattern guard stale"
+        "(P5 gr acceptanceep 0 new verification entry point)"
+        "The error URL correction is in charge of test http router handler methods all defined."
     )
 
 
 # ---------------------------------------------------------------------------
-# §3: FE 호출부 변경 0건
+# §3: 0 changes to FE calls
 # ---------------------------------------------------------------------------
 
 def test_fe_js_files_unchanged_by_t511() -> None:
-    """T-511 본 implement 가 FE JS 변경 0건 가드.
+    """T-511 Implementation with FE JS change 0 guard.
 
-    T-513 P3 — FE V1 path 마이그 (kanban.js / settings.js / workflow.js /
-    workflow-bar.js / terminal.js 5건) 가 의도된 변경. T-511 가드와 충돌 —
-    T-513 정합화 후 본 가드는 stale.
+    T-513 P3 — FE V1 path mig (kanban.js / settings.js / workflow.js /
+    change of workflow-bar.js / terminal.js 5). T-511 Crash with Guard —
+    T-513 Bonded guard stale after fixed.
     """
     pytest.skip(
-        "T-513 P3 — FE V1 path 마이그 + 메인 터미널 워크플로우 모드 폐기 "
-        "정합. T-511 가드는 stale (변경 5건이 의도된 acceptance)."
+        "T-513 P3 — FE V1 path mig + main terminal workflow mode mig"
+        "About Us The T-511 Guard is a stand-alone acceptance."
     )
 
 
 # ---------------------------------------------------------------------------
-# §4: board.md §1.3 보충 (memory_update / roadmap_update)
+# §4: board.md1.3 replacement (memory update / roadmap update)
 # ---------------------------------------------------------------------------
 
 def test_board_md_sse_table_supplemented() -> None:
-    """board.md §1.3 SPA refresh SSE 채널 표에 memory_update / roadmap_update 추가됨."""
+    """memory update / roadmap update added to the board.md §1.3 SPA refresh SSE channel table."""
     text = _BOARD_MD.read_text(encoding="utf-8")
-    assert "memory_update" in text, "board.md 본문에 memory_update 토큰 없음"
-    assert "roadmap_update" in text, "board.md 본문에 roadmap_update 토큰 없음"
+    assert "memory_update" in text, "no memory update token in board.md body"
+    assert "roadmap_update" in text, "board.md No roadmap update token in the body"
 
 
 # ---------------------------------------------------------------------------
-# §5: P4/P5 신설 endpoint 가 P1 메모리 캐논 §4 표 인용과 정합
+# §5: P4/P5 Goddess endpoint with P1 Memory Cannon §4 Mark Quotation
 # ---------------------------------------------------------------------------
 
 _MEMORY_SPEC = (
@@ -169,12 +171,12 @@ _MEMORY_SPEC = (
 
 
 def test_memory_spec_contains_p4_p5_endpoints() -> None:
-    """P1 메모리 캐논 §4 의 W2 + INF 표에 P4/P5 endpoint 매칭."""
+    """P4/P5 endpoint matching on P1 memory canon §4 W2 + INF table."""
     if not _MEMORY_SPEC.exists():
         pytest.skip(f"memory spec not found: {_MEMORY_SPEC}")
     text = _MEMORY_SPEC.read_text(encoding="utf-8")
 
-    # P4 신설 3 endpoint
+    # P4 New 3 endpoint
     for token in ("_production_line_handle_session_delete", "_production_line_handle_session_patch_status",
                   "_production_line_handle_session_post_artifacts"):
         legacy_token = token.replace("_production_line_", "_v" + "2_")
@@ -182,7 +184,7 @@ def test_memory_spec_contains_p4_p5_endpoints() -> None:
             f"memory spec missing P4 token: {token}"
         )
 
-    # P5 신설 3 endpoint
+    # P5 New 3 endpoint
     for token in ("_handle_ops_zombie_reap", "_handle_ops_debug_toggle",
                   "_handle_ops_sse_status"):
         assert token in text, f"memory spec missing P5 token: {token}"

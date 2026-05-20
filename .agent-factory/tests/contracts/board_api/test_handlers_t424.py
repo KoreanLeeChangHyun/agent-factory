@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_board_http_request_handler_imports_current_mixins() -> None:
-    from board.server.http_router import BoardHTTPRequestHandler
+    from board.server.routing.http_router import BoardHTTPRequestHandler
 
     required = [
         "_handle_kanban_move",
@@ -49,14 +49,14 @@ def test_kanban_done_regex_exports_match_done_and_undo_output() -> None:
         _UNDO_WORKTREE_RE,
     )
 
-    done_match = _DONE_MERGE_OK_RE.search("feat/T-424-branch -> develop 병합 완료 (ab12cd34)")
+    done_match = _DONE_MERGE_OK_RE.search("feat/T-424-branch -> Development completion (ab12cd34)")
     assert done_match is not None
     assert done_match.group(1).strip() == "feat/T-424-branch"
     assert done_match.group(2).strip() == "ab12cd34"
     assert _DONE_CONFLICT_WARN_RE.search("[WARN] merge conflict detected in src/app.py")
 
     undo_match = _UNDO_WORKTREE_RE.search(
-        "[undo-done] 워크트리 재생성 완료: path=/tmp/feat-T-424 branch=feat/T-424-test"
+        "[undo-done] Worktree Regeneration: path=/tmp/feat-T-424 branch=feat/T-424-test"
     )
     assert undo_match is not None
     assert undo_match.group(1) == "/tmp/feat-T-424"
@@ -83,7 +83,7 @@ def test_classify_done_failure_distinguishes_conflict_dirty_and_other() -> None:
     assert conflict["error_kind"] == "merge_conflict"
     assert "src/foo.py" in conflict["conflicts"]
 
-    dirty = _classify_done_failure("미커밋 파일 목록 :\n    - src/bar.py\n", "")
+    dirty = _classify_done_failure("src/bar.py\\n", "")
     assert dirty["error_kind"] == "dirty_worktree"
     assert "src/bar.py" in dirty["dirty_files"]
 
@@ -124,7 +124,7 @@ def test_review_xml_present_invokes_flow_kanban_done() -> None:
     result = subprocess.CompletedProcess(
         args=["flow-kanban", "done", "T-424"],
         returncode=0,
-        stdout="feat/T-424-branch -> develop 병합 완료 (ab12cd34)\n",
+        stdout="feat/T-424-branch -> Development completion (ab12cd34)\\n",
         stderr="",
     )
     with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=True), patch(
@@ -206,8 +206,8 @@ def test_kanban_undo_done_parses_success_stdout(tmp_path: Path) -> None:
         args=["flow-undo-done", "T-424"],
         returncode=0,
         stdout=(
-            "[undo-done] 전략 1: reset --hard 진행\n"
-            "[undo-done] 워크트리 재생성 완료: path=/tmp/wt branch=feat/T-424\n"
+            "[undo-done] Strategy 1: reset --hard progress\\n"
+            "[undo-done] Worktree Regeneration: path=/tmp/wt branch=feat/T-424\\n"
         ),
         stderr="",
     )
