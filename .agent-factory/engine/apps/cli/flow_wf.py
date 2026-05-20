@@ -1,14 +1,10 @@
-"""flow-wf CLI application entrypoint.
-
-The active implementation still lives in ``engine.v2.driver``. This module is
-the stable app-layer entrypoint while driver internals continue to be extracted.
-"""
+"""flow-wf CLI application entrypoint."""
 
 from __future__ import annotations
 
 import sys
 
-from engine.v2.driver import main as driver_main
+from engine.apps.production_line import main as driver_main
 
 
 def main(argv: list[str] | None = None) -> int:
