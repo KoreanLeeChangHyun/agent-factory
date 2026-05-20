@@ -72,3 +72,9 @@ def test_direct_path_guard_no_longer_mentions_removed_v1_wrappers() -> None:
     assert "finalization.py" not in ALIAS_MAP
     assert "reload_prompt.py" not in ALIAS_MAP
     assert "skill_recommender.py" not in ALIAS_MAP
+
+
+def test_direct_path_guard_maps_migrate_runs_cli() -> None:
+    from engine.guards.direct_path_guard import ALIAS_MAP
+
+    assert ALIAS_MAP["migrate_runs_fold.py"] == "flow-migrate-runs"
