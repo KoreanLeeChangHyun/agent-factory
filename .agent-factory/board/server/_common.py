@@ -5,21 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sys
 import threading
 import time
 
-# board_data 는 sibling 모듈 (`.agent-factory/board/board_data.py`). 본 파일을
-# `board.server` 패키지 경로로 import 한 환경에서도 bare `from board_data import`
-# 가 통하도록 board/ 디렉터리를 sys.path 에 자체 부트스트랩.
-_BOARD_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _BOARD_PKG_DIR not in sys.path:
-    sys.path.insert(0, _BOARD_PKG_DIR)
-
-# noqa: E402 — sys.path 부트스트랩 이후에 import 필요.
 # noqa: F401 — 본 _common.py 는 board_data 의 식별자를 handlers/* 가 재import 하는
 # hub 역할. _common.py 내부에서 직접 사용 안 해도 export 의무.
-from board_data import (  # noqa: E402, F401
+from board.board_data import (  # noqa: F401
     KANBAN_DIRS_LIST,
     WF_BASE,
     WF_HISTORY,

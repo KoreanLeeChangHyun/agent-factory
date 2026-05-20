@@ -18,17 +18,14 @@ from __future__ import annotations
 import os
 import sys
 
-# board/ 디렉터리를 import 경로에 추가 (board_data.py 및 server/ 접근용)
+# .agent-factory/ 디렉터리를 import 경로에 추가 (board.* 및 engine.* 접근용)
 _BOARD_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BOARD_DIR not in sys.path:
-    sys.path.insert(0, _BOARD_DIR)
-
 _AGENT_FACTORY_DIR = os.path.dirname(_BOARD_DIR)
 if _AGENT_FACTORY_DIR not in sys.path:
     sys.path.insert(0, _AGENT_FACTORY_DIR)
 
-from server.__main__ import main  # noqa: E402
-from server.app import _run_server  # noqa: E402
+from board.server.__main__ import main  # noqa: E402
+from board.server.app import _run_server  # noqa: E402
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--serve":

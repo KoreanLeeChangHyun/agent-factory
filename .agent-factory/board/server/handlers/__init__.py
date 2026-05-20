@@ -1,19 +1,10 @@
-"""HTTP handler Mixins.
+"""Compatibility exports for legacy Board handler imports.
 
-T-513 P5 — V1 워크플로우 엔진 일괄 폐기. WorkflowHandlerMixin +
-WorkflowUndoHandlerMixin 모듈 삭제. settings.py 신설 추가.
+The active implementations live under ``engine.apps.board_api``. This package is
+kept as a lazy compatibility surface for older ``board.server.handlers`` imports.
 """
 
-from .generic import GenericHandlerMixin
-from .files import FilesHandlerMixin
-from .sync import SyncHandlerMixin
-from .settings import SettingsHandlerMixin
-from .terminal import TerminalHandlerMixin
-from .kanban import KanbanHandlerMixin
-from .v2_workflow import V2WorkflowHandlerMixin
-from .metrics import MetricsHandlerMixin
-from .memory_gc import MemoryGcHandlerMixin
-from .worktree_commit import WorktreeCommitHandlerMixin
+from __future__ import annotations
 
 __all__ = [
     'GenericHandlerMixin',
@@ -27,3 +18,28 @@ __all__ = [
     'MemoryGcHandlerMixin',
     'WorktreeCommitHandlerMixin',
 ]
+
+_EXPORT_MODULES = {
+    'GenericHandlerMixin': '.generic',
+    'FilesHandlerMixin': '.files',
+    'SyncHandlerMixin': '.sync',
+    'SettingsHandlerMixin': '.settings',
+    'TerminalHandlerMixin': '.terminal',
+    'KanbanHandlerMixin': '.kanban',
+    'V2WorkflowHandlerMixin': '.v2_workflow',
+    'MetricsHandlerMixin': '.metrics',
+    'MemoryGcHandlerMixin': '.memory_gc',
+    'WorktreeCommitHandlerMixin': '.worktree_commit',
+}
+
+
+def __getattr__(name: str) -> object:
+    if name not in _EXPORT_MODULES:
+        raise AttributeError(name)
+
+    from importlib import import_module
+
+    module = import_module(_EXPORT_MODULES[name], __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
