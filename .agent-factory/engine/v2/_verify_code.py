@@ -29,12 +29,14 @@ import time
 from pathlib import Path
 from typing import Any
 
+from engine.core.validation import code_checks
+
 from ._common import WorkflowContext, append_log
 
 
-SCHEMA_VERSION = 1
-HEAD_DIAGNOSTIC_LIMIT = 10           # 결과 JSON 에 박제하는 진단 메시지 최대 개수
-DEFAULT_TIMEOUT_SECONDS = 600        # 10 분 — pytest + ruff + mypy 통째
+SCHEMA_VERSION = code_checks.SCHEMA_VERSION
+HEAD_DIAGNOSTIC_LIMIT = code_checks.HEAD_DIAGNOSTIC_LIMIT
+DEFAULT_TIMEOUT_SECONDS = code_checks.DEFAULT_TIMEOUT_SECONDS
 
 
 def _has_tool(tool: str) -> bool:
@@ -89,11 +91,7 @@ def _resolve_work_root(ctx: WorkflowContext) -> Path:
 
 def _detect_pytest_config(root: Path) -> bool:
     """pytest 설정 존재 여부 — `pyproject.toml` / `pytest.ini` / `setup.cfg` / `tox.ini`."""
-    for fname in ("pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"):
-        if (root / fname).is_file():
-            return True
-    # 또는 tests/ 디렉터리만 존재해도 OK (pytest -q 가 디스커버리)
-    return (root / "tests").is_dir()
+    return code_checks.detect_pytest_config(root)
 
 
 def _detect_ruff_config(root: Path) -> bool:
@@ -102,35 +100,12 @@ def _detect_ruff_config(root: Path) -> bool:
     ruff 는 설정 없이도 실행 가능하지만, 설정 없이 무차별 실행 시 noise 가 많음.
     설정 있을 때만 진행 — graceful SKIP 도메인.
     """
-    for fname in ("ruff.toml", ".ruff.toml"):
-        if (root / fname).is_file():
-            return True
-    # pyproject.toml 안에 [tool.ruff] 섹션 존재 시
-    pyproject = root / "pyproject.toml"
-    if pyproject.is_file():
-        try:
-            text = pyproject.read_text(encoding="utf-8")
-            if "[tool.ruff" in text:
-                return True
-        except (OSError, UnicodeDecodeError):
-            return False
-    return False
+    return code_checks.detect_ruff_config(root)
 
 
 def _detect_mypy_config(root: Path) -> bool:
     """mypy 설정 존재 여부 — `pyproject.toml` / `mypy.ini` / `setup.cfg`."""
-    for fname in ("mypy.ini", ".mypy.ini"):
-        if (root / fname).is_file():
-            return True
-    pyproject = root / "pyproject.toml"
-    if pyproject.is_file():
-        try:
-            text = pyproject.read_text(encoding="utf-8")
-            if "[tool.mypy" in text:
-                return True
-        except (OSError, UnicodeDecodeError):
-            return False
-    return False
+    return code_checks.detect_mypy_config(root)
 
 
 # -------- pytest --------
@@ -189,26 +164,12 @@ def _parse_pytest_summary(text: str) -> dict[str, int]:
 
     예: "5 passed, 1 failed in 0.34s" → {"passed": 5, "failed": 1}
     """
-    keywords = ("passed", "failed", "errors", "skipped", "xfailed", "xpassed")
-    counts: dict[str, int] = {}
-    for line in text.splitlines()[-20:]:
-        tokens = line.replace(",", " ").split()
-        for i, tok in enumerate(tokens):
-            if tok.isdigit() and i + 1 < len(tokens) and tokens[i + 1] in keywords:
-                counts[tokens[i + 1]] = int(tok)
-    return counts
+    return code_checks.parse_pytest_summary(text)
 
 
 def _parse_pytest_failed_nodes(text: str) -> list[str]:
     """pytest -q 출력에서 실패 노드 ID 추출 (`FAILED tests/test_x.py::test_y`)."""
-    nodes: list[str] = []
-    for line in text.splitlines():
-        s = line.strip()
-        if s.startswith("FAILED "):
-            nodes.append(s[7:].split(" - ")[0].strip())
-        elif s.startswith("ERROR "):
-            nodes.append(s[6:].split(" - ")[0].strip())
-    return nodes
+    return code_checks.parse_pytest_failed_nodes(text)
 
 
 # -------- ruff --------
@@ -397,13 +358,7 @@ def read_code_json(ctx: WorkflowContext) -> dict[str, Any]:
 
     미존재 시 `{}` 반환 (R-CODE 룰이 SKIP 처리).
     """
-    path = ctx.validate_code_json_path()
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {}
+    return code_checks.read_code_json(ctx)
 
 
 def tool_result(code_payload: dict[str, Any], tool: str) -> dict[str, Any] | None:
@@ -412,8 +367,4 @@ def tool_result(code_payload: dict[str, Any], tool: str) -> dict[str, Any] | Non
     `_validate.py` 의 R-CODE-1 (pytest) + R-CODE-2 (ruff) 평가용.
     미발견 시 None.
     """
-    tools = code_payload.get("tools", [])
-    for entry in tools:
-        if isinstance(entry, dict) and entry.get("tool") == tool:
-            return entry
-    return None
+    return code_checks.tool_result(code_payload, tool)
