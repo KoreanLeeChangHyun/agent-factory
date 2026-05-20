@@ -265,6 +265,18 @@ class WorkflowContext:
         """T-503 신설 — validate/code.json (driver `_verify_code.py` 산출, implement 한정)."""
         return self.validate_dir() / "code.json"
 
+    def validate_verdict_json_path(self) -> Path:
+        """M9 — VERIFY 단계 구조화 verdict (`validate/verdict.json`)."""
+        return self.validate_dir() / "verdict.json"
+
+    def report_manifest_json_path(self) -> Path:
+        """M9 — REPORT 단계 manifest (`report.json`)."""
+        return self.work_dir / "report.json"
+
+    def final_verdict_json_path(self) -> Path:
+        """M9 — COMPLETE gate 최종 verdict (`final-verdict.json`)."""
+        return self.work_dir / "final-verdict.json"
+
     def report_md_path(self) -> Path:
         """T-504 cutover — `report.html` (사람 가독, 옛 report.md 폐기).
 

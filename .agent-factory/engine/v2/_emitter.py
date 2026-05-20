@@ -297,9 +297,11 @@ def workflow_finish(
     if ctx.wf_session_id:
         # backend 가 받는 outcome 은 "ok"|"fail" 둘 중 하나. 그 외는 "fail" 로 안전 매핑.
         outcome_norm = outcome if outcome in ("ok", "fail") else "fail"
+        body: dict[str, Any] = {"outcome": outcome_norm, "summary": summary}
+        body.update(extra)
         _post_to_board(
             f"/api/v2/sessions/{ctx.wf_session_id}/finish",
-            {"outcome": outcome_norm, "summary": summary},
+            body,
         )
 
 

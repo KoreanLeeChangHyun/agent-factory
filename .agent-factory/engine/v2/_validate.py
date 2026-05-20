@@ -29,10 +29,11 @@ from pathlib import Path
 from typing import Iterable
 
 from ._common import PROJECT_ROOT, WorkflowContext
+from ._verdict import gate_registry_payload, get_blocking_rule_ids
 from . import _verify_code
 
 
-HARD_FAIL_RULES = ("R-EXIST-1", "R-METRIC-2", "R-WT-1", "R-CODE-1")
+HARD_FAIL_RULES = get_blocking_rule_ids()
 
 
 @dataclass
@@ -457,6 +458,7 @@ def save_verdict_report(ctx: WorkflowContext, report: VerdictReport) -> Path:
         "violation_count": report.violation_count(),
         "has_hard_fail": report.has_hard_fail(),
         "hard_fail_rules": list(HARD_FAIL_RULES),
+        "gate_registry": gate_registry_payload(),
         "rules": [
             {
                 "rule_id": r.rule_id,

@@ -10,6 +10,7 @@ from .. import _verify_code
 from .._common import WorkflowContext, append_log, load_prompt, write_context
 from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
+from .._verdict import write_verify_verdict
 from .._verify import verify_validate_md
 
 
@@ -54,3 +55,7 @@ def validate_step(ctx: WorkflowContext) -> None:
         _verify_code.run(ctx)
     except Exception as exc:  # noqa: BLE001 — graceful boundary
         append_log(ctx, f"[VALIDATE] _verify_code.run failed: {type(exc).__name__}: {exc}")
+    try:
+        write_verify_verdict(ctx)
+    except Exception as exc:  # noqa: BLE001 — structured verdict must not hide validate/report.md
+        append_log(ctx, f"[VALIDATE] write_verify_verdict failed: {type(exc).__name__}: {exc}")

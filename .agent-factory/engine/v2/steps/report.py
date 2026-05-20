@@ -7,6 +7,8 @@ LLM 은 `templates/report.html` placeholder 를 채워 `report.html` 작성.
 
 from __future__ import annotations
 
+import json
+
 from .._common import (
     TEMPLATES_DIR,
     WorkflowContext,
@@ -15,6 +17,7 @@ from .._common import (
 )
 from .._retry import spawn_with_retry
 from .._spawn import logical_session_name, new_session_uuid
+from .._verdict import read_verify_verdict, write_report_manifest
 from .._verify import verify_report_html
 
 
@@ -37,11 +40,18 @@ def report_step(ctx: WorkflowContext) -> None:
         if ctx.validate_report_md_path().exists()
         else ""
     )
+    verify_verdict = read_verify_verdict(ctx)
+    verify_verdict_body = (
+        json.dumps(verify_verdict, ensure_ascii=False, indent=2)
+        if verify_verdict
+        else "{}"
+    )
     template_path = TEMPLATES_DIR / "report.html"
     initial_prompt = (
         f"plan.md (자연어 본문, plan/plan.md):\n{plan_body}\n\n"
         f"work/**/*.md (모두 통째):\n{joined_work}\n\n"
         f"validate/report.md (LLM Quality 평가):\n{validate_body}\n\n"
+        f"validate/verdict.json (driver structured VERIFY data):\n{verify_verdict_body}\n\n"
         f"본 사이클의 사람 가독 보고서 `report.html` 를 `{ctx.report_html_path()}` 에 작성.\n"
         f"- template: `{template_path}` 를 베이스로 placeholder 4종 채움:\n"
         f"  - `{{{{title}}}}` → 티켓 제목\n"
@@ -49,6 +59,7 @@ def report_step(ctx: WorkflowContext) -> None:
         f"  - `{{{{phase_sections}}}}` → Phase 별 산출 인용 (HTML <section> 또는 <h3> 분할)\n"
         f"  - `{{{{plan_md_link}}}}` → plan.md 링크 텍스트 (기본 'plan/plan.md')\n"
         f"- 본문에 `plan.md` 토큰 인용 필수 (R-PATH-1 정합).\n"
+        f"- `validate/verdict.json` 의 request/plan/artifacts/checks 상태를 요약하고, final decision 은 COMPLETE 단계 pending 으로 명시.\n"
         f"- **14+룰 verdict 산출·재평가 금지** (SPEC §0.1) — driver `validate/rules.json` SSOT."
     )
     session_id = new_session_uuid()
@@ -66,3 +77,4 @@ def report_step(ctx: WorkflowContext) -> None:
         ),
         artifact_path=ctx.report_html_path(),
     )
+    write_report_manifest(ctx)

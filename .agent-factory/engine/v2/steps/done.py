@@ -13,6 +13,7 @@ from .._common import (
 )
 from .._emitter import emit, regression, step_end, step_start, workflow_finish
 from .._validate import evaluate_12_rules, save_verdict_report
+from .._verdict import build_final_verdict, save_final_verdict
 
 
 def done_step(ctx: WorkflowContext) -> None:
@@ -38,6 +39,8 @@ def done_step(ctx: WorkflowContext) -> None:
     # 12룰 재검증 (REPORT 완료 + step.end DONE 기록 후 — workflow_step 이미 DONE)
     verdict_report = evaluate_12_rules(ctx)
     save_verdict_report(ctx, verdict_report)
+    final_verdict = build_final_verdict(ctx, verdict_report)
+    save_final_verdict(ctx, final_verdict)
     emit(
         ctx,
         "validate.verdict",
@@ -45,8 +48,31 @@ def done_step(ctx: WorkflowContext) -> None:
         violation_count=verdict_report.violation_count(),
         has_hard_fail=verdict_report.has_hard_fail(),
         ticket=ctx.ticket_no,
+        final_verdict_path=str(ctx.final_verdict_json_path()),
     )
-    workflow_finish(ctx, outcome="ok", verdict=verdict_report.verdict)
+    if final_verdict["blocking_failures"]:
+        regression(
+            ctx,
+            "complete_blocked",
+            blocking_failures=final_verdict["blocking_failures"],
+            final_verdict_path=str(ctx.final_verdict_json_path()),
+        )
+        workflow_finish(
+            ctx,
+            outcome="fail",
+            verdict=verdict_report.verdict,
+            summary="Complete blocked by verification gates",
+            final_verdict_path=str(ctx.final_verdict_json_path()),
+            workrequest_refinement=final_verdict.get("workrequest_refinement", {}),
+        )
+        return
+    workflow_finish(
+        ctx,
+        outcome="ok",
+        verdict=verdict_report.verdict,
+        final_verdict_path=str(ctx.final_verdict_json_path()),
+        workrequest_refinement=final_verdict.get("workrequest_refinement", {}),
+    )
     kanban_move(ctx.ticket_no, "review")
 
 

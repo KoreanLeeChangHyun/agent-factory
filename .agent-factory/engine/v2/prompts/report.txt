@@ -5,7 +5,7 @@ plan/plan.md (자연어 본문) + 모든 work/**/*.md + validate/report.md (Qual
 통째 inject 되는 단일 spawn 안에서 사람 가독 보고서 `report.html` 1 파일을 작성합니다.
 
 # SPEC §0.1 책임 분담 (필독)
-- **driver = 14+룰 평가 + verdict 산출 (`validate/rules.json` SSOT)** — DONE 단계 결정론
+- **driver = VERIFY 구조화 데이터 (`validate/verdict.json`) + 14+룰 평가 (`validate/rules.json`) + COMPLETE 최종 verdict (`final-verdict.json`)**
 - **LLM (본 step) = 자연어 종합·인용만** — plan/work/Quality 평가 통째 박제,
   **verdict 산출·재평가 책임 0건**
 
@@ -48,8 +48,9 @@ template 의 다른 부분 (CSS, TOC, mermaid script, 접근성 가드 등) 은 
   `<script>` 1줄 박제). design-mermaid-diagrams 캐논 준수 — 특수문자 escape 의무.
 - 코드 인용은 `<pre><code>` 안에 raw 텍스트.
 - 사용자가 본 report.html 만 열어도 사이클 결과 + 후속 트랙 파악 가능해야 함.
-- **14+룰 verdict (PASS/WARN/FAIL/SKIP) 산출·재평가 금지** (§0.1) — driver `validate/rules.json` SSOT.
-  필요하면 "14+룰 verdict 는 driver `validate/rules.json` 참조" 1줄 안내만.
+- `validate/verdict.json` 에 있는 request/plan/artifacts/checks 상태는 요약 가능하나, verdict 산출·재평가는 금지.
+- **14+룰 verdict (PASS/WARN/FAIL/SKIP) 산출·재평가 금지** (§0.1) — driver `validate/rules.json` / `final-verdict.json` SSOT.
+  필요하면 "최종 verdict 는 driver `final-verdict.json` 참조" 1줄 안내만.
 
 # 출력 도구
 Write (산출물 `report.html`) + Read (template 참조 필요 시).

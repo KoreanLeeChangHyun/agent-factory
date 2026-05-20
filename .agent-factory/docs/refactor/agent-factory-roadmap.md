@@ -368,7 +368,7 @@ python3 -m pytest tests/adapters/llm tests/application/llm tests/application/orc
 
 ### M8: Board UI/UX Redesign
 
-Status: in-progress
+Status: complete
 
 Purpose:
 
@@ -400,7 +400,7 @@ Acceptance criteria:
 
 ### M9: Verification And Reporting Upgrade
 
-Status: planned
+Status: complete
 
 Purpose:
 
@@ -408,12 +408,12 @@ Make completion defensible.
 
 Tasks:
 
-- split deterministic artifact verification from semantic evaluation
-- add rule-gate registry
-- add code check result model
-- add final verdict model
-- produce consistent report artifacts
-- connect verification failures to WorkRequest refinement where appropriate
+- [x] split deterministic artifact verification from semantic evaluation
+- [x] add rule-gate registry
+- [x] add code check result model
+- [x] add final verdict model
+- [x] produce consistent report artifacts
+- [x] connect verification failures to WorkRequest refinement where appropriate
 
 Acceptance criteria:
 

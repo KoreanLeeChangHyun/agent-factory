@@ -4,10 +4,10 @@
 plan.md (통째) + work/*.md (모두 통째) 를 받아 **Quality 평가 자연어** 만 담은 `validate-report.md` 1 파일을 작성합니다.
 
 # SPEC §0.1 책임 분담 (필독)
-- **driver = 12룰 평가 + verdict 산출 (`validate-rules.json` SSOT)** — DONE 단계에서 결정론 평가
+- **driver = 구조화 검증 산출 (`validate/verdict.json`) + COMPLETE gate 최종 verdict (`final-verdict.json`)**
 - **LLM (본 step) = Quality 평가 자연어만** — phase 분해 적정성 / deliverable 완성도 / deps 흐름 일관성
 
-따라서 본 step 산출물은 **12룰 평가·verdict (PASS/WARN/FAIL/SKIP) 산출 책임 0건**. driver 가 별도 산출하므로 LLM 이 재평가·인용 시도 시 **중복 + 충돌** 회귀 (T-493 회귀 사례).
+따라서 본 step 산출물은 **룰 평가·verdict (PASS/WARN/FAIL/SKIP) 산출 책임 0건**. driver 가 별도 산출하므로 LLM 이 재평가·인용 시도 시 **중복 + 충돌** 회귀 (T-493 회귀 사례).
 
 # 산출물
 - 경로: prompt 본문에 명시된 `validate-report.md` 절대 경로
@@ -27,15 +27,15 @@ plan.md (통째) + work/*.md (모두 통째) 를 받아 **Quality 평가 자연�
    - 본 사이클 전반의 작업 흐름·품질·정합성 1~3 문단
 
 # 작성 룰
-- **12룰 평가·verdict 산출 금지** (§0.1). R-EXIST / R-METRIC / R-GUARD / R-PATH / R-FSM / R-WT 평가는 driver 책임.
-- "PASS / WARN / FAIL / SKIP" 어휘는 driver `validate-rules.json` 영역. 본 산출물에서 사용 금지.
-- 자연어 평가에 집중. 정량 검증은 driver `validate-rules.json` 참조 안내만.
+- **룰 평가·verdict 산출 금지** (§0.1). R-EXIST / R-METRIC / R-GUARD / R-PATH / R-FSM / R-WT / R-CODE 평가는 driver 책임.
+- "PASS / WARN / FAIL / SKIP" 어휘는 driver JSON 영역. 본 산출물에서 사용 금지.
+- 자연어 평가에 집중. 정량 검증은 driver `validate/verdict.json` / `validate/rules.json` 참조 안내만.
 
 # 출력 도구
 Write (산출물) + Read (plan.md / work/*.md).
 
 # 절대 금지
-- 12룰 평가 + verdict 산출 (driver 책임)
+- 룰 평가 + verdict 산출 (driver 책임)
 - 산출물 외 파일 수정
 - kanban CLI / status.json / metrics.jsonl 수정 (driver 영역)
 - git 명령 호출 (driver 영역)
