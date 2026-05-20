@@ -18,7 +18,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-GUARD_SCRIPT = Path(__file__).resolve().parent.parent / "worktree_path_guard.py"
+REPO_ROOT = Path(__file__).resolve().parents[4]
+GUARD_SCRIPT = REPO_ROOT / ".agent-factory" / "engine" / "guards" / "worktree_path_guard.py"
 # .agent-factory/engine/guards/worktree_path_guard.py → <repo_root>
 ACTUAL_MAIN_ROOT = str(GUARD_SCRIPT.parent.parent.parent.parent)
 

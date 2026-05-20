@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Board web | `board/static` | `board/web` | not aligned |
 | Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
-| Legacy tests | excluded roots under `engine/*/tests`, `board/tests` | delete/rewrite under `tests/` | not aligned |
+| Legacy tests | excluded roots under `engine/flow/tests`, `board/tests` | delete/rewrite under `tests/` | partially aligned |
 
 ## Move Policy
 
@@ -478,10 +478,34 @@ Acceptance:
 - provider-specific Claude names remain only in adapters or `.claude/`
   integration surfaces
 
+### M21: Hook And V2 Legacy Test Migration
+
+Status: complete
+
+Goal:
+
+Move green hook, guard, and V2 verdict tests out of legacy excluded roots into
+the canonical `tests/` tree.
+
+Completed slice:
+
+- moved `engine/guards/tests` guard coverage to `tests/adapters/hooks`
+- moved `engine/tests/hooks` PreToolUse coverage to `tests/adapters/hooks`
+- moved `engine/tests/test_v2_m9_verdict.py` to `tests/application/v2`
+- removed empty legacy test package markers under `engine/guards/tests` and
+  `engine/tests`
+- removed `engine/guards/tests` and `engine/tests` from pytest quarantine
+
+Acceptance:
+
+- migrated hook/guard tests pass from the canonical tree
+- migrated V2 verdict tests pass from the canonical tree
+- full pytest includes the migrated tests and passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 384 passed, 2 skipped
+python3 -m pytest  # 430 passed, 2 skipped, 6 subtests passed
 ```

@@ -812,12 +812,43 @@ python3 -m pytest board/tests/test_v2_launcher.py board/tests/test_kanban_audit_
 python3 -m pytest  # 384 passed, 2 skipped
 ```
 
+### M21: Hook And V2 Legacy Test Migration
+
+Status: complete
+
+Purpose:
+
+Reduce the legacy test quarantine by moving green hook, guard, and V2 verdict
+coverage into the canonical `tests/` tree.
+
+Tasks:
+
+- [x] move `engine/guards/tests` coverage into `tests/adapters/hooks`
+- [x] move `engine/tests/hooks` PreToolUse coverage into `tests/adapters/hooks`
+- [x] move `engine/tests/test_v2_m9_verdict.py` into `tests/application/v2`
+- [x] remove now-empty legacy test package markers
+- [x] remove `engine/guards/tests` and `engine/tests` from pytest quarantine
+
+Acceptance criteria:
+
+- migrated hook/guard tests pass from canonical test paths
+- migrated V2 verdict tests pass from canonical test paths
+- canonical tests pass with the migrated tests included
+
+Current verification:
+
+```text
+python3 -m pytest tests/adapters/hooks  # 47 passed, 6 subtests passed
+python3 -m pytest tests/adapters/hooks tests/application/v2/test_m9_verdict.py  # 52 passed, 6 subtests passed
+python3 -m pytest  # 430 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21
 ```
 
 Hard dependencies:

@@ -15,7 +15,8 @@ import sys
 import unittest
 from pathlib import Path
 
-GUARD_SCRIPT = Path(__file__).resolve().parent.parent / "main_session_guard.py"
+REPO_ROOT = Path(__file__).resolve().parents[4]
+GUARD_SCRIPT = REPO_ROOT / ".agent-factory" / "engine" / "guards" / "main_session_guard.py"
 
 
 def _run_guard(
