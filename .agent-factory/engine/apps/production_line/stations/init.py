@@ -95,8 +95,8 @@ def init_step(ticket_no: str) -> WorkflowContext:
     feature_branch, worktree_path = _maybe_create_worktree(ticket_no, title, command)
 
     # T-495 P2 — V2_REGISTRY_KEY env 우선 사용. board 가 사전 발급한 키를
-    # 받으면 backend 의 v2_workflow_registry 와 driver 의 work_dir 경로가
-    # 1:1 정합되어, frontend 가 LAUNCH_STARTED 직후 v2 탭을 즉시 띄울 수 있다.
+    # 받으면 backend 의 production_line_registry 와 driver 의 work_dir 경로가
+    # 1:1 정합되어, frontend 가 LAUNCH_STARTED 직후 production-line 탭을 즉시 띄울 수 있다.
     # env 형식: "YYYYMMDD-HHMMSS" 또는 "YYYYMMDD-HHMMSS-NNN" 등 v1 호환 timestamp.
     env_key = (os.environ.get("V2_REGISTRY_KEY") or "").strip()
     registry_key = env_key if env_key else new_registry_key()

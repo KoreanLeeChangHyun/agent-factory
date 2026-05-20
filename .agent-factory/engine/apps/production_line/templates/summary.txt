@@ -1,4 +1,4 @@
-Workflow v2 finalize
+Production-line workflow finalize
 ticket={ticket_no}
 registry_key={registry_key}
 command={command}

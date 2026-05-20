@@ -3,7 +3,7 @@
 운영 endpoint 3건:
   - POST /api/ops/zombie-reap   — Claude CLI 좀비 회수 명시 호출 (T-403 GC 사이드카 진입점)
   - POST /api/ops/debug-toggle  — debug.enabled 플래그 토글 (`true|false` body)
-  - GET  /api/ops/sse-status    — 3 SSE 채널 (SSEClientManager / TerminalSSEChannel / V2WorkflowSSEChannel)
+  - GET  /api/ops/sse-status    — 3 SSE 채널 (SSEClientManager / TerminalSSEChannel / ProductionLineSSEChannel)
                                   클라이언트 수 + 마지막 이벤트 시각
 
 본 endpoint 들은 외부 도구 / 사용자 명시 호출 진입점이다. 자동 사이드카가 같은
@@ -126,7 +126,7 @@ class OpsHandlerMixin:
         """GET /api/ops/sse-status — 3 SSE 채널 클라이언트 수 + 마지막 이벤트 시각.
 
         SSEClientManager (server-wide) + TerminalSSEChannel (메인 터미널) +
-        V2WorkflowSSEChannel (per-session N) 각각의 라이브 클라이언트 수 dump.
+        ProductionLineSSEChannel (per-session N) 각각의 라이브 클라이언트 수 dump.
 
         method: GET
         url: /api/ops/sse-status
@@ -140,7 +140,7 @@ class OpsHandlerMixin:
         side_effects: read-only snapshot of SSE channel registries
         sse_events: none
         """
-        from ..state import sse_manager, terminal_sse_channel, v2_workflow_registry
+        from ..state import sse_manager, terminal_sse_channel, production_line_registry
 
         # SSEClientManager (server-wide singleton)
         try:
@@ -154,10 +154,10 @@ class OpsHandlerMixin:
         except Exception:  # noqa: BLE001
             terminal_clients = -1
 
-        # V2WorkflowSSEChannel — per-session
+        # ProductionLineSSEChannel — per-session
         v2_sessions: list[dict] = []
         try:
-            for meta in v2_workflow_registry.list_all():
+            for meta in production_line_registry.list_all():
                 v2_sessions.append({
                     'session_id': meta.get('session_id'),
                     'ticket_id': meta.get('ticket_id'),

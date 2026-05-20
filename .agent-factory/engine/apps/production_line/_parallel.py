@@ -1,4 +1,4 @@
-"""v2 parallel — T-506 P3/P4. ThreadPoolExecutor 기반 동시 spawn 인프라.
+"""Production-line parallel — T-506 P3/P4. ThreadPoolExecutor 기반 동시 spawn 인프라.
 
 SPEC.md §3.4 + §6.5 (T-506 추가).
 

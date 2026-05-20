@@ -24,7 +24,7 @@ import time
 from urllib.parse import unquote, urlparse
 
 from board.server._common import api_endpoint, logger
-from board.server.state import v2_workflow_registry
+from board.server.state import production_line_registry
 
 
 # /api/v2/sessions/<session_id>[/<sub_path>] 매칭
@@ -37,7 +37,7 @@ class ProductionLineWorkflowHandlerMixin:
     """Production-line endpoint mixin.
 
     `BoardHTTPRequestHandler` 가 do_GET / do_POST 라우팅 시 본 mixin 의
-        `_handle_v2_*` 메서드를 호출한다. Method names keep the public
+        `_production_line_handle_*` 메서드를 호출한다. Method names keep the public
         `/api/v2/*` HTTP contract stable.
     """
 
@@ -45,7 +45,7 @@ class ProductionLineWorkflowHandlerMixin:
     # do_GET / do_POST 진입점 — http_router.py 가 호출
     # ------------------------------------------------------------------
 
-    def _v2_dispatch_get(self) -> bool:
+    def _production_line_dispatch_get(self) -> bool:
         """internal helper — not exposed as endpoint.
 
         GET /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
@@ -54,7 +54,7 @@ class ProductionLineWorkflowHandlerMixin:
         path = parsed.path
 
         if path == '/api/v2/sessions':
-            self._v2_handle_sessions_list()
+            self._production_line_handle_sessions_list()
             return True
 
         match = _SESSION_PATH_RE.match(path)
@@ -65,25 +65,25 @@ class ProductionLineWorkflowHandlerMixin:
         sub = match.group('sub')
 
         if sub is None:
-            self._v2_handle_session_detail(session_id)
+            self._production_line_handle_session_detail(session_id)
             return True
 
         if sub == 'events':
-            self._v2_handle_session_events(session_id)
+            self._production_line_handle_session_events(session_id)
             return True
 
         if sub == 'history':
-            self._v2_handle_session_history(session_id)
+            self._production_line_handle_session_history(session_id)
             return True
 
         if sub.startswith('artifacts/'):
             artifact_rel = sub[len('artifacts/'):]
-            self._v2_handle_session_artifact(session_id, artifact_rel)
+            self._production_line_handle_session_artifact(session_id, artifact_rel)
             return True
 
         return False
 
-    def _v2_dispatch_post(self) -> bool:
+    def _production_line_dispatch_post(self) -> bool:
         """internal helper — not exposed as endpoint.
 
         POST /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
@@ -92,7 +92,7 @@ class ProductionLineWorkflowHandlerMixin:
         path = parsed.path
 
         if path == '/api/v2/sessions':
-            self._v2_handle_session_create()
+            self._production_line_handle_session_create()
             return True
 
         match = _SESSION_PATH_RE.match(path)
@@ -103,24 +103,24 @@ class ProductionLineWorkflowHandlerMixin:
         sub = match.group('sub')
 
         if sub == 'step':
-            self._v2_handle_session_step(session_id)
+            self._production_line_handle_session_step(session_id)
             return True
         if sub == 'stdout':
-            self._v2_handle_session_stdout(session_id)
+            self._production_line_handle_session_stdout(session_id)
             return True
         if sub == 'phase':
-            self._v2_handle_session_phase(session_id)
+            self._production_line_handle_session_phase(session_id)
             return True
         if sub == 'finish':
-            self._v2_handle_session_finish(session_id)
+            self._production_line_handle_session_finish(session_id)
             return True
         if sub == 'artifacts':
-            self._v2_handle_session_post_artifacts(session_id)
+            self._production_line_handle_session_post_artifacts(session_id)
             return True
 
         return False
 
-    def _v2_dispatch_delete(self) -> bool:
+    def _production_line_dispatch_delete(self) -> bool:
         """internal helper — not exposed as endpoint.
 
         DELETE /api/v2/sessions/<id> 라우팅. 처리되면 True 반환.
@@ -137,12 +137,12 @@ class ProductionLineWorkflowHandlerMixin:
 
         # /api/v2/sessions/<id> (sub=None) — 세션 삭제
         if sub is None:
-            self._v2_handle_session_delete(session_id)
+            self._production_line_handle_session_delete(session_id)
             return True
 
         return False
 
-    def _v2_dispatch_patch(self) -> bool:
+    def _production_line_dispatch_patch(self) -> bool:
         """internal helper — not exposed as endpoint.
 
         PATCH /api/v2/sessions/<id>/status 라우팅. 처리되면 True 반환.
@@ -158,7 +158,7 @@ class ProductionLineWorkflowHandlerMixin:
         sub = match.group('sub')
 
         if sub == 'status':
-            self._v2_handle_session_patch_status(session_id)
+            self._production_line_handle_session_patch_status(session_id)
             return True
 
         return False
@@ -168,40 +168,40 @@ class ProductionLineWorkflowHandlerMixin:
     # ------------------------------------------------------------------
 
     @api_endpoint("W2", "list")
-    def _v2_handle_sessions_list(self) -> None:
+    def _production_line_handle_sessions_list(self) -> None:
         """GET /api/v2/sessions — 전체 세션 목록 (메타 dict 배열).
 
         method: GET
         url: /api/v2/sessions
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_sessions_list
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_sessions_list
         request: query none
         response_ok: [{session_id, ticket_id, command, current_step, ...}]
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
-        side_effects: read v2_workflow_registry (in-memory snapshot)
+        side_effects: read production_line_registry (in-memory snapshot)
         sse_events: none
         """
-        self._send_json(v2_workflow_registry.list_all())
+        self._send_json(production_line_registry.list_all())
 
     @api_endpoint("W2", "detail")
-    def _v2_handle_session_detail(self, session_id: str) -> None:
+    def _production_line_handle_session_detail(self, session_id: str) -> None:
         """GET /api/v2/sessions/<id> — 세션 상세 (current_step / phase / artifacts / ts).
 
         method: GET
         url: /api/v2/sessions/<id>
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_detail
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_detail
         request: path {session_id: str}
         response_ok: {session_id, ticket_id, command, current_step, current_phase, artifacts, ts}
         response_error: {ok: false, error: str}
         status_codes: 200, 404
         auth: none (local-only)
-        side_effects: read v2_workflow_registry
+        side_effects: read production_line_registry
         sse_events: none
         """
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -221,22 +221,22 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
     @api_endpoint("W2", "events")
-    def _v2_handle_session_events(self, session_id: str) -> None:
+    def _production_line_handle_session_events(self, session_id: str) -> None:
         """GET /api/v2/sessions/<id>/events — SSE 구독 (per-session).
 
         method: GET
         url: /api/v2/sessions/<id>/events
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_events
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_events
         request: path {session_id: str}
         response_ok: text/event-stream (workflow_step / workflow_stdout / workflow_phase / workflow_finish)
         response_error: 404 (session not found)
         status_codes: 200, 404
         auth: none (local-only)
         side_effects: register self.wfile to session.channel
-        sse_events: V2WorkflowSSEChannel events (board.md §1.2)
+        sse_events: ProductionLineSSEChannel events (board.md §1.2)
         """
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -271,7 +271,7 @@ class ProductionLineWorkflowHandlerMixin:
             session.channel.remove(self.wfile)
 
     @api_endpoint("W2", "history")
-    def _v2_handle_session_history(self, session_id: str) -> None:
+    def _production_line_handle_session_history(self, session_id: str) -> None:
         """GET /api/v2/sessions/<id>/history — persist NDJSON 이벤트 통째 반환.
 
         T-513 P1 — 결정점 #2 채택, REST history V2 endpoint 신설. 재접속 시
@@ -282,7 +282,7 @@ class ProductionLineWorkflowHandlerMixin:
         method: GET
         url: /api/v2/sessions/<id>/history
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_history
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_history
         request: path {session_id: str}
         response_ok: {session_id, total_count, events: [{ts, event, payload}]}
         response_error: {ok: false, error: str}
@@ -291,7 +291,7 @@ class ProductionLineWorkflowHandlerMixin:
         side_effects: read NDJSON persist file (no registry mutation)
         sse_events: none
         """
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -315,7 +315,7 @@ class ProductionLineWorkflowHandlerMixin:
                         events.append(rec)
             except OSError as exc:
                 logger.error(
-                    'v2 history read failed (%s): %s', persist_path, exc,
+                    'production-line history read failed (%s): %s', persist_path, exc,
                 )
                 # graceful — 빈 events 로 반환
 
@@ -326,7 +326,7 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
     @api_endpoint("W2", "artifact_get")
-    def _v2_handle_session_artifact(self, session_id: str, artifact_rel: str) -> None:
+    def _production_line_handle_session_artifact(self, session_id: str, artifact_rel: str) -> None:
         """GET /api/v2/sessions/<id>/artifacts/<rel> — 산출물 파일 read.
 
         work_dir 기준 상대 경로. path traversal 방지 (.. 차단).
@@ -334,7 +334,7 @@ class ProductionLineWorkflowHandlerMixin:
         method: GET
         url: /api/v2/sessions/<id>/artifacts/<rel>
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_artifact
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_artifact
         request: path {session_id, artifact_rel}
         response_ok: file content (Content-Type by extension)
         response_error: {ok: false, error: str}
@@ -343,7 +343,7 @@ class ProductionLineWorkflowHandlerMixin:
         side_effects: read from work_dir filesystem
         sse_events: none
         """
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -404,7 +404,7 @@ class ProductionLineWorkflowHandlerMixin:
     # ------------------------------------------------------------------
 
     @api_endpoint("W2", "create")
-    def _v2_handle_session_create(self) -> None:
+    def _production_line_handle_session_create(self) -> None:
         """POST /api/v2/sessions — 세션 명시 등록.
 
         본문: {session_id, ticket_id, command, work_dir, worktree_path?}
@@ -413,13 +413,13 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_create
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_create
         request: body {session_id, ticket_id, command, work_dir, worktree_path?}
         response_ok: {ok: true, session_id, created_at}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 403
         auth: none (local-only) — naming guard rejects fake/test session_id (403)
-        side_effects: v2_workflow_registry.create + new V2WorkflowSession instance
+        side_effects: production_line_registry.create + new ProductionLineSession instance
         sse_events: none (subsequent step/stdout/phase/finish events emit via per-session channel)
         """
         data = self._read_json_body()
@@ -437,7 +437,7 @@ class ProductionLineWorkflowHandlerMixin:
             return
 
         try:
-            session = v2_workflow_registry.create(
+            session = production_line_registry.create(
                 session_id=session_id,
                 ticket_id=ticket_id,
                 command=command,
@@ -455,7 +455,7 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
     @api_endpoint("W2", "step")
-    def _v2_handle_session_step(self, session_id: str) -> None:
+    def _production_line_handle_session_step(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/step — Step 전이.
 
         본문: {step: NONE|INIT|PLAN|WORK|VALIDATE|REPORT|DONE|FAILED, phase?: str, prev_step?: str}
@@ -463,14 +463,14 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions/<id>/step
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_step
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_step
         request: body {step: str, phase?: str, prev_step?: str, ...extras}
         response_ok: {ok: true, step, phase}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — driver subprocess only
-        side_effects: v2_workflow_registry.update_step + session.channel.emit_step
-        sse_events: workflow_step (V2WorkflowSSEChannel)
+        side_effects: production_line_registry.update_step + session.channel.emit_step
+        sse_events: workflow_step (ProductionLineSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -483,18 +483,18 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(400, 'Missing "step"')
             return
 
-        session = v2_workflow_registry.update_step(session_id, step, phase)
+        session = production_line_registry.update_step(session_id, step, phase)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
         # T-495 P3 — forward-compatible extras (verdict/commit/retry 등) 통과
-        extras = self._v2_collect_extras(data, exclude={'step', 'phase', 'prev_step'})
+        extras = self._production_line_collect_extras(data, exclude={'step', 'phase', 'prev_step'})
         session.channel.emit_step(step, phase=phase, prev_step=prev_step, extras=extras)
         self._send_json({'ok': True, 'step': step, 'phase': phase})
 
     @api_endpoint("W2", "stdout")
-    def _v2_handle_session_stdout(self, session_id: str) -> None:
+    def _production_line_handle_session_stdout(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/stdout — claude -p stdout chunk forward.
 
         본문: {text: str, raw?: dict}
@@ -502,14 +502,14 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions/<id>/stdout
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_stdout
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_stdout
         request: body {text: str, raw?: dict}
         response_ok: {ok: true}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — driver subprocess only
         side_effects: session.channel.emit_stdout (broadcast to per-session SSE clients)
-        sse_events: workflow_stdout (V2WorkflowSSEChannel)
+        sse_events: workflow_stdout (ProductionLineSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -524,7 +524,7 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(400, '"raw" must be a dict')
             return
 
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -533,7 +533,7 @@ class ProductionLineWorkflowHandlerMixin:
         self._send_json({'ok': True})
 
     @api_endpoint("W2", "phase")
-    def _v2_handle_session_phase(self, session_id: str) -> None:
+    def _production_line_handle_session_phase(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/phase — WORK 내부 phase 전이.
 
         본문: {phase: str, action: start|end}
@@ -541,14 +541,14 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions/<id>/phase
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_phase
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_phase
         request: body {phase: str, action: start|end, ...extras}
         response_ok: {ok: true, phase, action}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — driver subprocess only
-        side_effects: v2_workflow_registry.update_step (phase 갱신) + session.channel.emit_phase
-        sse_events: workflow_phase (V2WorkflowSSEChannel)
+        side_effects: production_line_registry.update_step (phase 갱신) + session.channel.emit_phase
+        sse_events: workflow_phase (ProductionLineSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -563,23 +563,23 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(400, '"action" must be start|end')
             return
 
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
         if action == 'start':
-            v2_workflow_registry.update_step(session_id, session.current_step, phase)
+            production_line_registry.update_step(session_id, session.current_step, phase)
         else:
-            v2_workflow_registry.update_step(session_id, session.current_step, '')
+            production_line_registry.update_step(session_id, session.current_step, '')
 
         # T-495 P3 — forward-compatible extras
-        extras = self._v2_collect_extras(data, exclude={'phase', 'action'})
+        extras = self._production_line_collect_extras(data, exclude={'phase', 'action'})
         session.channel.emit_phase(phase, action=action, extras=extras)
         self._send_json({'ok': True, 'phase': phase, 'action': action})
 
     @api_endpoint("W2", "finish")
-    def _v2_handle_session_finish(self, session_id: str) -> None:
+    def _production_line_handle_session_finish(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/finish — 사이클 종결.
 
         본문: {outcome: ok|fail, summary?: str}
@@ -587,14 +587,14 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions/<id>/finish
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_finish
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_finish
         request: body {outcome: ok|fail, summary?: str, ...extras}
         response_ok: {ok: true, outcome, terminal_step}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — driver subprocess only
-        side_effects: v2_workflow_registry.update_step (terminal DONE|FAILED) + session.channel.emit_finish
-        sse_events: workflow_finish (V2WorkflowSSEChannel)
+        side_effects: production_line_registry.update_step (terminal DONE|FAILED) + session.channel.emit_finish
+        sse_events: workflow_finish (ProductionLineSSEChannel)
         """
         data = self._read_json_body()
         if data is None:
@@ -610,18 +610,18 @@ class ProductionLineWorkflowHandlerMixin:
             return
 
         terminal_step = 'DONE' if outcome == 'ok' else 'FAILED'
-        session = v2_workflow_registry.update_step(session_id, terminal_step, '')
+        session = production_line_registry.update_step(session_id, terminal_step, '')
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
 
         # T-495 P3 — forward-compatible extras (verdict/commit/retry)
-        extras = self._v2_collect_extras(data, exclude={'outcome', 'summary'})
+        extras = self._production_line_collect_extras(data, exclude={'outcome', 'summary'})
         session.channel.emit_finish(outcome, summary=summary, extras=extras)
         self._send_json({'ok': True, 'outcome': outcome, 'terminal_step': terminal_step})
 
     @staticmethod
-    def _v2_collect_extras(data: dict, exclude: set[str]) -> dict | None:
+    def _production_line_collect_extras(data: dict, exclude: set[str]) -> dict | None:
         """internal helper — not exposed as endpoint.
 
         T-495 P3 — frontend forward-compatible 메타 키 추출.
@@ -640,7 +640,7 @@ class ProductionLineWorkflowHandlerMixin:
     # ------------------------------------------------------------------
 
     @api_endpoint("W2", "delete")
-    def _v2_handle_session_delete(self, session_id: str) -> None:
+    def _production_line_handle_session_delete(self, session_id: str) -> None:
         """DELETE /api/v2/sessions/<id> — 세션 강제 종료 + work_dir 폐기.
 
         본 endpoint 는 디버그/회복 용. 사용자 명시 호출만 사용 권장.
@@ -649,16 +649,16 @@ class ProductionLineWorkflowHandlerMixin:
         method: DELETE
         url: /api/v2/sessions/<id>
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_delete
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_delete
         request: query {force?: 1|0}
         response_ok: {ok: true, session_id, removed: bool, work_dir_removed: bool}
         response_error: {ok: false, error: str}
         status_codes: 200, 404, 500
         auth: none (local-only) — debug/recovery use
-        side_effects: v2_workflow_registry.purge + optional work_dir rmtree
+        side_effects: production_line_registry.purge + optional work_dir rmtree
         sse_events: none (channel closed on session purge)
         """
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -675,13 +675,13 @@ class ProductionLineWorkflowHandlerMixin:
                 shutil.rmtree(work_dir)
                 work_dir_removed = True
             except OSError as exc:
-                logger.error('v2 session delete: rmtree %s failed: %s', work_dir, exc)
+                logger.error('production-line session delete: rmtree %s failed: %s', work_dir, exc)
                 self._send_error(500, f'rmtree failed: {exc}')
                 return
 
-        removed = v2_workflow_registry.purge(session_id) if hasattr(
-            v2_workflow_registry, 'purge'
-        ) else v2_workflow_registry.remove(session_id)
+        removed = production_line_registry.purge(session_id) if hasattr(
+            production_line_registry, 'purge'
+        ) else production_line_registry.remove(session_id)
 
         self._send_json({
             'ok': True,
@@ -691,7 +691,7 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
     @api_endpoint("W2", "patch_status")
-    def _v2_handle_session_patch_status(self, session_id: str) -> None:
+    def _production_line_handle_session_patch_status(self, session_id: str) -> None:
         """PATCH /api/v2/sessions/<id>/status — step/phase 강제 갱신.
 
         디버그/회복 용. driver 가 비정상 종료 후 사용자가 수동 보정하거나,
@@ -700,20 +700,20 @@ class ProductionLineWorkflowHandlerMixin:
         method: PATCH
         url: /api/v2/sessions/<id>/status
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_patch_status
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_patch_status
         request: body {step?: str, phase?: str}
         response_ok: {ok: true, session_id, step, phase}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — debug/recovery use
-        side_effects: v2_workflow_registry.update_step (no SSE emit)
+        side_effects: production_line_registry.update_step (no SSE emit)
         sse_events: none (silent patch — 사용자 수동 보정 경로)
         """
         data = self._read_json_body()
         if data is None:
             return
 
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -730,7 +730,7 @@ class ProductionLineWorkflowHandlerMixin:
             self._send_error(400, 'Missing "step" (current_step is also empty)')
             return
 
-        updated = v2_workflow_registry.update_step(session_id, step, phase)
+        updated = production_line_registry.update_step(session_id, step, phase)
         if updated is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -743,7 +743,7 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
     @api_endpoint("W2", "post_artifacts")
-    def _v2_handle_session_post_artifacts(self, session_id: str) -> None:
+    def _production_line_handle_session_post_artifacts(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/artifacts — 산출물 강제 주입.
 
         외부 도구가 work_dir 안에 산출물 파일을 강제 주입할 수 있는 경로.
@@ -752,7 +752,7 @@ class ProductionLineWorkflowHandlerMixin:
         method: POST
         url: /api/v2/sessions/<id>/artifacts
         domain: W2
-        handler: V2WorkflowHandlerMixin._v2_handle_session_post_artifacts
+        handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_post_artifacts
         request: body {path: str (relative), content: str}
         response_ok: {ok: true, session_id, path, bytes_written: int}
         response_error: {ok: false, error: str}
@@ -765,7 +765,7 @@ class ProductionLineWorkflowHandlerMixin:
         if data is None:
             return
 
-        session = v2_workflow_registry.get(session_id)
+        session = production_line_registry.get(session_id)
         if session is None:
             self._send_error(404, f'Session not found: {session_id}')
             return
@@ -797,7 +797,7 @@ class ProductionLineWorkflowHandlerMixin:
             with open(target, 'w', encoding='utf-8') as f:
                 f.write(content)
         except OSError as exc:
-            logger.error('v2 artifact write failed: %s', exc)
+            logger.error('production-line artifact write failed: %s', exc)
             self._send_error(500, f'Write failed: {exc}')
             return
 
@@ -819,4 +819,4 @@ class ProductionLineWorkflowHandlerMixin:
         })
 
 
-V2WorkflowHandlerMixin = ProductionLineWorkflowHandlerMixin
+ProductionLineWorkflowHandlerMixin = ProductionLineWorkflowHandlerMixin

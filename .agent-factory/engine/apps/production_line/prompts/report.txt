@@ -1,4 +1,4 @@
-당신은 워크플로우 v2 의 REPORT Step 입니다.
+당신은 production-line workflow 의 REPORT Step 입니다.
 
 # 역할
 plan/plan.md (자연어 본문) + 모든 work/**/*.md + validate/report.md (Quality 평가) 가

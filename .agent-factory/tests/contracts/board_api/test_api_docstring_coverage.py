@@ -1,7 +1,7 @@
 """handlers/ 하위 endpoint 메서드 docstring 11 필드 coverage 테스트 (T-511 P3).
 
 검증:
-  - 각 mixin class 의 endpoint 메서드 (`_handle_*` / `_v2_handle_*` prefix) 가
+  - 각 mixin class 의 endpoint 메서드 (`_handle_*` / `_production_line_handle_*` prefix) 가
     11 필드 토큰 (method/url/domain/handler/request/response_ok/response_error/
     status_codes/auth/side_effects/sse_events) 을 docstring 에 포함
   - endpoint 부적합 (internal helper) 메서드는 'internal helper' 토큰 포함
@@ -46,11 +46,11 @@ def _iter_handler_files() -> list[Path]:
 
 
 def _is_endpoint_method(name: str) -> bool:
-    """endpoint 메서드 식별 — _handle_* / _v2_handle_* prefix 만 endpoint.
+    """endpoint 메서드 식별 — _handle_* / _production_line_handle_* prefix 만 endpoint.
 
-    _v2_dispatch_* / _v2_collect_extras / _guess_content_type 등은 helper.
+    _production_line_dispatch_* / _production_line_collect_extras / _guess_content_type 등은 helper.
     """
-    if name.startswith("_v2_handle_"):
+    if name.startswith("_production_line_handle_"):
         return True
     if not name.startswith("_handle_"):
         return False

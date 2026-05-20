@@ -104,7 +104,7 @@ def test_auto_commit_with_changes_commits(tmp_path: Path) -> None:
     msg = _git(repo, "log", "-1", "--pretty=%s").stdout.strip()
     assert "T-493" in msg
     assert "smoke 티켓" in msg
-    assert "v2 driver auto-commit" in msg
+    assert "production-line auto-commit" in msg
 
 
 def test_auto_commit_modified_tracked_file(tmp_path: Path) -> None:

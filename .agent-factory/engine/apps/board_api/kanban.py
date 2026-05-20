@@ -35,10 +35,10 @@ from board.server._common import (
     logger,
 )
 from board.server.state import sse_manager
-from board.server.v2_launcher import (
+from board.server.production_line_launcher import (
     _LAUNCH_READER_LOCK,
     _LAUNCH_READER_THREADS,
-    spawn_v2_driver,
+    spawn_production_line,
 )
 
 
@@ -536,13 +536,13 @@ class KanbanHandlerMixin:
 
     @api_endpoint("K", "submit")
     def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: v2 driver 비동기 spawn.
+        """POST /api/kanban/submit — {"ticket","command"}: production-line 비동기 spawn.
 
-        T-500: spawn 책임은 ``server.v2_launcher.spawn_v2_driver()`` 로 분리.
+        T-500: spawn 책임은 ``server.production_line_launcher.spawn_production_line()`` 로 분리.
         본 handler 는 입력 validation → 위임 → JSON 응답만 담당.
 
-        Stage 3-B (T-489) + T-495 P2 의미론은 v2_launcher 안에 보존되어 있다:
-          - flow-wf submit (v2 driver) Popen.
+        Stage 3-B (T-489) + T-495 P2 의미론은 production_line_launcher 안에 보존되어 있다:
+          - flow-wf submit (production-line) Popen.
           - V2_BOARD_POST=true + V2_REGISTRY_KEY env 자동 주입.
           - LAUNCH_PENDING + LAUNCH_STARTED 모두 Popen 직후 즉시 발사.
           - reader thread = driver rc != 0 일 때만 LAUNCH_FAILED 발사.
@@ -558,7 +558,7 @@ class KanbanHandlerMixin:
         response_error: {ok: false, error: str, error_kind?: str}
         status_codes: 200, 400, 500
         auth: none (local-only)
-        side_effects: spawn v2 driver subprocess, kanban Open → In Progress
+        side_effects: spawn production-line subprocess, kanban Open → In Progress
         sse_events: launch (LAUNCH_PENDING, LAUNCH_STARTED), kanban_update
         """
         data = self._read_json_body() or {}
@@ -572,10 +572,10 @@ class KanbanHandlerMixin:
             self._send_error(400, 'Invalid "command" (must be implement/research/review)')
             return
 
-        result = spawn_v2_driver(ticket, command)
+        result = spawn_production_line(ticket, command)
         if not result.get('ok'):
             kind = result.get('error_kind') or 'spawn_failed'
-            msg = result.get('message') or 'v2 driver spawn failed'
+            msg = result.get('message') or 'production-line spawn failed'
             self._send_error(500, f'{kind}: {msg}')
             return
         self._send_json(result)

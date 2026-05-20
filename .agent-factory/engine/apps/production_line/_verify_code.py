@@ -1,4 +1,4 @@
-"""v2 driver 결정론 코드 검증 — pytest -q / ruff check / mypy.
+"""Production-line 결정론 코드 검증 — pytest -q / ruff check / mypy.
 
 T-503 신설. SPEC.md §0.1.1 (검증 2축 분리) + §0.1.2 (TDD 강제) + §3.2.1 (산출물 6 영역 — validate/code.json).
 

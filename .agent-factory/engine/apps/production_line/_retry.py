@@ -1,4 +1,4 @@
-"""v2 retry — 룰베이스 재시도 prompt 템플릿 + claude -p --resume loop.
+"""Production-line retry — 룰베이스 재시도 prompt 템플릿 + claude -p --resume loop.
 
 SPEC.md §6 (재시도 정책) + §3.4 (N_max). LLM 호출 0 — 재시도 prompt 도
 template fill.

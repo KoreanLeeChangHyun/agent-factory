@@ -511,7 +511,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
       3. `git -C <wt> diff --cached --quiet` — 변경 0건이면 returncode 0 → skip, return 0
       4. 결정론 메시지 template 으로 `git -C <wt> commit -m <msg>` → returncode 반환
 
-    메시지 template: "feat(<ticket>): <title> [v2 driver auto-commit]"
+    메시지 template: "feat(<ticket>): <title> [production-line auto-commit]"
     """
     if ctx.worktree_path is None:
         append_log(ctx, "[AUTO-COMMIT] worktree-less — skip")
@@ -542,7 +542,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
         return 0
     # 3. commit 메시지 결정론 template
     title = ctx.title or "(no title)"
-    msg = f"feat({ctx.ticket_no}): {title} [v2 driver auto-commit]"
+    msg = f"feat({ctx.ticket_no}): {title} [production-line auto-commit]"
     commit = subprocess.run(
         ["git", "-C", wt, "commit", "-m", msg],
         capture_output=True,

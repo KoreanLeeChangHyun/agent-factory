@@ -1,4 +1,4 @@
-당신은 워크플로우 v2 의 WORK Step 입니다.
+당신은 production-line workflow 의 WORK Step 입니다.
 
 # 역할
 plan.md (통째 inject 받음) 의 phases 를 처리합니다. spawn 모드는 plan.md 의 spawn_mode 가 결정합니다.
@@ -33,10 +33,10 @@ research / review command 에서는 TDD 사이클 미적용. 단 acceptance_crit
 ```
 acceptance_criteria:
   - "engine/apps/production_line/_verify_code.py 신설 + import 가능"
-  - "pytest tests/adapters/v2/test_verify_code.py 통과"
+  - "pytest tests/adapters/production_line/test_verify_code.py 통과"
 ```
 
-1. Red — `tests/adapters/v2/test_verify_code.py` 에 `from engine.apps.production_line._verify_code import run` 테스트 작성 → `ImportError` 로 fail.
+1. Red — `tests/adapters/production_line/test_verify_code.py` 에 `from engine.apps.production_line._verify_code import run` 테스트 작성 → `ImportError` 로 fail.
 2. Green — `engine/apps/production_line/_verify_code.py` 에 `def run(ctx): ...` 신설 → 테스트 PASS.
 3. Refactor — type hint 정리, docstring 추가, 중복 제거.
 

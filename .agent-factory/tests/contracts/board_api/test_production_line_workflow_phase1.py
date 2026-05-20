@@ -1,9 +1,9 @@
 """T-495 Phase 1 회귀 테스트 — v2 워크플로우 백엔드 인프라.
 
 검증 대상:
-  - V2WorkflowSession dataclass + V2WorkflowSessionRegistry (CRUD + idempotent)
-  - V2WorkflowSSEChannel (broadcast + emit_* + jsonl persist + client fan-out)
-  - V2WorkflowHandlerMixin._SESSION_PATH_RE (path parsing 정합)
+  - ProductionLineSession dataclass + ProductionLineSessionRegistry (CRUD + idempotent)
+  - ProductionLineSSEChannel (broadcast + emit_* + jsonl persist + client fan-out)
+  - ProductionLineWorkflowHandlerMixin._SESSION_PATH_RE (path parsing 정합)
   - http_router 임포트 smoke + Mixin 합성 검증
 """
 
@@ -29,17 +29,17 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT, _BOARD_ROOT):
 
 
 # ==============================================================================
-# T01 — V2WorkflowSession dataclass + Registry CRUD
+# T01 — ProductionLineSession dataclass + Registry CRUD
 # ==============================================================================
 
 
-class TestV2WorkflowSession(unittest.TestCase):
+class TestProductionLineSession(unittest.TestCase):
 
     def test_dataclass_defaults(self):
-        from board.server.v2_workflow_session import V2WorkflowSession
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        channel = V2WorkflowSSEChannel(session_id='wf-T-001-abc')
-        s = V2WorkflowSession(
+        from board.server.production_line_session import ProductionLineSession
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        channel = ProductionLineSSEChannel(session_id='wf-T-001-abc')
+        s = ProductionLineSession(
             session_id='wf-T-001-abc',
             ticket_id='T-001',
             command='implement',
@@ -55,12 +55,12 @@ class TestV2WorkflowSession(unittest.TestCase):
         self.assertEqual(s.artifacts, {})
 
 
-class TestV2WorkflowSessionRegistry(unittest.TestCase):
+class TestProductionLineSessionRegistry(unittest.TestCase):
 
     def setUp(self):
-        from board.server.v2_workflow_session import V2WorkflowSessionRegistry
+        from board.server.production_line_session import ProductionLineSessionRegistry
         self.tmpdir = tempfile.mkdtemp(prefix='v2reg_')
-        self.reg = V2WorkflowSessionRegistry(persist_dir=self.tmpdir)
+        self.reg = ProductionLineSessionRegistry(persist_dir=self.tmpdir)
 
     def tearDown(self):
         import shutil
@@ -148,11 +148,11 @@ class TestV2WorkflowSessionRegistry(unittest.TestCase):
         self.assertEqual(meta['engine_version'], 'v2')
 
     def test_load_from_disk(self):
-        from board.server.v2_workflow_session import V2WorkflowSessionRegistry
+        from board.server.production_line_session import ProductionLineSessionRegistry
         self.reg.create('wf-T-014-a', 'T-014', 'implement', '/tmp/w14')
         self.reg.create('wf-T-015-a', 'T-015', 'research', '/tmp/w15')
 
-        reg2 = V2WorkflowSessionRegistry(persist_dir=self.tmpdir)
+        reg2 = ProductionLineSessionRegistry(persist_dir=self.tmpdir)
         loaded = reg2.load_from_disk()
         self.assertEqual(loaded, 2)
         s = reg2.get('wf-T-014-a')
@@ -160,7 +160,7 @@ class TestV2WorkflowSessionRegistry(unittest.TestCase):
         self.assertEqual(s.status, 'completed')
 
     def test_is_fake_session_id_helper(self):
-        from board.server.v2_workflow_session import is_fake_session_id
+        from board.server.production_line_session import is_fake_session_id
         # fake/test 패턴 매칭
         self.assertTrue(is_fake_session_id('wf-T-495-test-p2'))
         self.assertTrue(is_fake_session_id('wf-T-495-p3-extras-test-749148'))
@@ -194,7 +194,7 @@ class TestV2WorkflowSessionRegistry(unittest.TestCase):
 
 
 # ==============================================================================
-# T02 — V2WorkflowSSEChannel broadcast + persist
+# T02 — ProductionLineSSEChannel broadcast + persist
 # ==============================================================================
 
 
@@ -214,7 +214,7 @@ class _FakeWFile:
         return self.buf.getvalue()
 
 
-class TestV2WorkflowSSEChannel(unittest.TestCase):
+class TestProductionLineSSEChannel(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix='v2chan_')
@@ -225,8 +225,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_broadcast_to_client(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-100-a', persist_path=self.persist_path)
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-100-a', persist_path=self.persist_path)
         client = _FakeWFile()
         ch.add(client)
         self.assertEqual(ch.client_count(), 1)
@@ -238,8 +238,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertIn('id: 0\n', data)
 
     def test_persist_writes_jsonl(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-101-a', persist_path=self.persist_path)
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-101-a', persist_path=self.persist_path)
         ch.broadcast('workflow_step', {'step': 'PLAN'})
         ch.broadcast('workflow_step', {'step': 'WORK'})
         with open(self.persist_path) as f:
@@ -250,8 +250,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertEqual(rec1['payload']['step'], 'PLAN')
 
     def test_emit_step_payload(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-102-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-102-a')
         client = _FakeWFile()
         ch.add(client)
         ch.emit_step('WORK', phase='P1', prev_step='PLAN')
@@ -261,8 +261,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertIn('"prev_step": "PLAN"', data)
 
     def test_emit_stdout_payload(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-103-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-103-a')
         client = _FakeWFile()
         ch.add(client)
         ch.emit_stdout('hello', raw={'type': 'assistant'})
@@ -272,8 +272,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertIn('"raw":', data)
 
     def test_emit_phase_payload(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-104-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-104-a')
         client = _FakeWFile()
         ch.add(client)
         ch.emit_phase('P2', action='end')
@@ -283,8 +283,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertIn('"action": "end"', data)
 
     def test_emit_finish_payload(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-105-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-105-a')
         client = _FakeWFile()
         ch.add(client)
         ch.emit_finish('ok', summary='all green')
@@ -294,8 +294,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertIn('"summary": "all green"', data)
 
     def test_client_remove(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-106-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-106-a')
         client = _FakeWFile()
         ch.add(client)
         self.assertEqual(ch.client_count(), 1)
@@ -303,8 +303,8 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
         self.assertEqual(ch.client_count(), 0)
 
     def test_dead_client_pruned(self):
-        from board.server.v2_sse_channel import V2WorkflowSSEChannel
-        ch = V2WorkflowSSEChannel(session_id='wf-T-107-a')
+        from board.server.production_line_sse_channel import ProductionLineSSEChannel
+        ch = ProductionLineSSEChannel(session_id='wf-T-107-a')
 
         class _BrokenWFile:
             def write(self, _):
@@ -321,14 +321,14 @@ class TestV2WorkflowSSEChannel(unittest.TestCase):
 
 
 # ==============================================================================
-# T03 — V2WorkflowHandlerMixin path parser
+# T03 — ProductionLineWorkflowHandlerMixin path parser
 # ==============================================================================
 
 
-class TestV2WorkflowPathRegex(unittest.TestCase):
+class TestProductionLineWorkflowPathRegex(unittest.TestCase):
 
     def test_session_path_re(self):
-        from board.server.handlers.v2_workflow import _SESSION_PATH_RE
+        from board.server.handlers.production_line_workflow import _SESSION_PATH_RE
 
         m = _SESSION_PATH_RE.match('/api/v2/sessions/wf-T-100-a')
         self.assertIsNotNone(m)
@@ -361,38 +361,38 @@ class TestImportSmoke(unittest.TestCase):
 
     def test_import_v2_modules(self):
         try:
-            from board.server.v2_workflow_session import (
-                V2WorkflowSession,
-                V2WorkflowSessionRegistry,
+            from board.server.production_line_session import (
+                ProductionLineSession,
+                ProductionLineSessionRegistry,
             )
-            from board.server.v2_sse_channel import V2WorkflowSSEChannel
-            from board.server.handlers.v2_workflow import V2WorkflowHandlerMixin
+            from board.server.production_line_sse_channel import ProductionLineSSEChannel
+            from board.server.handlers.production_line_workflow import ProductionLineWorkflowHandlerMixin
         except ImportError as exc:
             self.fail(f'ImportError: {exc}')
 
     def test_state_singleton_registered(self):
         from board.server import state
-        from board.server.v2_workflow_session import V2WorkflowSessionRegistry
-        self.assertIsInstance(state.v2_workflow_registry, V2WorkflowSessionRegistry)
+        from board.server.production_line_session import ProductionLineSessionRegistry
+        self.assertIsInstance(state.production_line_registry, ProductionLineSessionRegistry)
 
     def test_http_router_mixin_composition(self):
         from board.server.http_router import BoardHTTPRequestHandler
-        from board.server.handlers.v2_workflow import V2WorkflowHandlerMixin
-        self.assertTrue(issubclass(BoardHTTPRequestHandler, V2WorkflowHandlerMixin))
+        from board.server.handlers.production_line_workflow import ProductionLineWorkflowHandlerMixin
+        self.assertTrue(issubclass(BoardHTTPRequestHandler, ProductionLineWorkflowHandlerMixin))
 
     def test_dispatch_methods_exist(self):
         from board.server.http_router import BoardHTTPRequestHandler
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_dispatch_get'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_dispatch_post'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_create'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_sessions_list'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_detail'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_events'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_step'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_stdout'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_phase'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_finish'))
-        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_v2_handle_session_artifact'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_dispatch_get'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_dispatch_post'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_create'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_sessions_list'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_detail'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_events'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_step'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_stdout'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_phase'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_finish'))
+        self.assertTrue(hasattr(BoardHTTPRequestHandler, '_production_line_handle_session_artifact'))
 
 
 if __name__ == '__main__':

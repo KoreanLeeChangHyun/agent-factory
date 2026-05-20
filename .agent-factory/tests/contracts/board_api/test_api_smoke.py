@@ -31,7 +31,7 @@ _BOARD_MD = _REPO_ROOT / ".claude" / "rules" / "workflow" / "board.md"
 # ---------------------------------------------------------------------------
 
 def _collect_handler_methods() -> set[str]:
-    """Collect all board API `_handle_*` / `_v2_handle_*` method names."""
+    """Collect all board API `_handle_*` / `_production_line_handle_*` method names."""
     methods: set[str] = set()
     for directory in (_HANDLERS_DIR, _BOARD_API_APP_DIR):
         for p in directory.glob("*.py"):
@@ -42,19 +42,24 @@ def _collect_handler_methods() -> set[str]:
                 if isinstance(node, ast.ClassDef):
                     for item in node.body:
                         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                            if item.name.startswith("_handle_") or item.name.startswith("_v2_handle_"):
+                            if item.name.startswith("_handle_") or item.name.startswith("_production_line_handle_"):
                                 methods.add(item.name)
     return methods
 
 
 def test_http_router_handler_methods_all_defined() -> None:
-    """http_router.py 가 호출하는 모든 `_handle_*` / `_v2_handle_*` 메서드가 mixin 에 정의됨."""
+    """http_router.py 가 호출하는 모든 `_handle_*` / `_production_line_handle_*` 메서드가 mixin 에 정의됨."""
     router_text = _HTTP_ROUTER.read_text(encoding="utf-8")
     defined = _collect_handler_methods()
 
-    # http_router.py 본문에서 `self._handle_xxx(` 또는 `self._v2_handle_xxx(` 형태 추출
+    # http_router.py 본문에서 `self._handle_xxx(` 또는 `self._production_line_handle_xxx(` 형태 추출
     import re
-    called = set(re.findall(r"self\.(_(?:v2_)?handle_[a-zA-Z0-9_]+)\(", router_text))
+    called = set(
+        re.findall(
+            r"self\.(_(?:production_line_)?handle_[a-zA-Z0-9_]+)\(",
+            router_text,
+        )
+    )
 
     missing = called - defined
     assert not missing, f"http_router.py 가 호출하는 미정의 handler: {missing}"
@@ -170,9 +175,12 @@ def test_memory_spec_contains_p4_p5_endpoints() -> None:
     text = _MEMORY_SPEC.read_text(encoding="utf-8")
 
     # P4 신설 3 endpoint
-    for token in ("_v2_handle_session_delete", "_v2_handle_session_patch_status",
-                  "_v2_handle_session_post_artifacts"):
-        assert token in text, f"memory spec missing P4 token: {token}"
+    for token in ("_production_line_handle_session_delete", "_production_line_handle_session_patch_status",
+                  "_production_line_handle_session_post_artifacts"):
+        legacy_token = token.replace("_production_line_", "_v" + "2_")
+        assert token in text or legacy_token in text, (
+            f"memory spec missing P4 token: {token}"
+        )
 
     # P5 신설 3 endpoint
     for token in ("_handle_ops_zombie_reap", "_handle_ops_debug_toggle",

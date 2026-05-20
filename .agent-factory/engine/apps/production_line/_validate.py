@@ -1,4 +1,4 @@
-"""v2 advisory 14+룰 룰베이스 평가 — driver 결정론 재검증.
+"""Production-line advisory 14+룰 룰베이스 평가 — driver 결정론 재검증.
 
 SPEC.md §9 (14+룰 캐논, T-503 확장) + §9.1 (verdict 판정) + §7.1 (driver 룰베이스 재검증).
 LLM 호출 없음.

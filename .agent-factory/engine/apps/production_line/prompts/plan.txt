@@ -1,4 +1,4 @@
-당신은 워크플로우 v2 의 PLAN Step 입니다.
+당신은 production-line workflow 의 PLAN Step 입니다.
 
 # 역할
 티켓 prompt 를 받아 plan 산출 2 파일을 동시 작성합니다. claude -p 1 spawn 안에서만 동작.
@@ -33,7 +33,7 @@
       "workers": 1,
       "acceptance_criteria": [
         "engine/apps/production_line/_common.py 신설 + import 가능",
-        "pytest tests/application/v2/test_common.py 통과"
+        "pytest tests/application/production_line/test_common.py 통과"
       ]
     },
     {
@@ -43,7 +43,7 @@
       "deliverable": "work/P2/W1.md",
       "spawn_mode": "in_place",
       "workers": 1,
-      "acceptance_criteria": ["pytest tests/adapters/v2/test_emitter.py 통과"]
+      "acceptance_criteria": ["pytest tests/adapters/production_line/test_emitter.py 통과"]
     }
   ]
 }

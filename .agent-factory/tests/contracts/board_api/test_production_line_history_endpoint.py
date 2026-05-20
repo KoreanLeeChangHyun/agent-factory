@@ -1,13 +1,13 @@
 """T-513 P1 — GET /api/v2/sessions/<id>/history endpoint 단위 회귀.
 
 검증:
-  - V2WorkflowSSEChannel.persist_path public property 정합
-  - _v2_handle_session_history handler 존재 + @api_endpoint("W2", "history") decorator
-  - _v2_dispatch_get sub == 'history' 분기 라우팅
+  - ProductionLineSSEChannel.persist_path public property 정합
+  - _production_line_handle_session_history handler 존재 + @api_endpoint("W2", "history") decorator
+  - _production_line_dispatch_get sub == 'history' 분기 라우팅
   - end-to-end: tempfile NDJSON read 결과가 응답 events 와 1:1 (_meta 라인 건너뜀)
 
 production endpoint 직접 curl 금지 (board.md §0.1 — production session 오염
-+ naming guard 403 차단). 본 테스트는 tempfile + V2WorkflowSessionRegistry
++ naming guard 403 차단). 본 테스트는 tempfile + ProductionLineSessionRegistry
 직접 호출만 사용한다.
 """
 
@@ -34,22 +34,22 @@ def _v2_methods() -> set[str]:
     return out
 
 
-def test_v2_sse_channel_persist_path_property() -> None:
-    """V2WorkflowSSEChannel.persist_path public property — history handler 진입점."""
-    from board.server.v2_sse_channel import V2WorkflowSSEChannel
-    ch = V2WorkflowSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/v2-unit.jsonl')
+def test_production_line_sse_channel_persist_path_property() -> None:
+    """ProductionLineSSEChannel.persist_path public property — history handler 진입점."""
+    from board.server.production_line_sse_channel import ProductionLineSSEChannel
+    ch = ProductionLineSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/v2-unit.jsonl')
     assert ch.persist_path == '/tmp/v2-unit.jsonl'
-    ch_none = V2WorkflowSSEChannel(session_id='wf-T-513-unit-noper')
+    ch_none = ProductionLineSSEChannel(session_id='wf-T-513-unit-noper')
     assert ch_none.persist_path is None
 
 
-def test_v2_history_handler_method_exists() -> None:
+def test_production_line_history_handler_method_exists() -> None:
     """GET /api/v2/sessions/<id>/history handler 메서드 존재."""
     methods = _v2_methods()
-    assert "_v2_handle_session_history" in methods, methods
+    assert "_production_line_handle_session_history" in methods, methods
 
 
-def test_v2_history_handler_has_endpoint_decorator() -> None:
+def test_production_line_history_handler_has_endpoint_decorator() -> None:
     """history handler 가 @api_endpoint('W2', 'history') decorator 부착."""
     tree = ast.parse(_V2_HANDLER.read_text(encoding="utf-8"))
     found = False
@@ -57,7 +57,7 @@ def test_v2_history_handler_has_endpoint_decorator() -> None:
         if isinstance(node, ast.ClassDef):
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if item.name != "_v2_handle_session_history":
+                    if item.name != "_production_line_handle_session_history":
                         continue
                     for dec in item.decorator_list:
                         if isinstance(dec, ast.Call):
@@ -71,20 +71,20 @@ def test_v2_history_handler_has_endpoint_decorator() -> None:
     assert found, "@api_endpoint decorator 누락"
 
 
-def test_v2_dispatch_get_routes_history() -> None:
-    """_v2_dispatch_get 가 sub == 'history' 분기를 처리한다."""
+def test_production_line_dispatch_get_routes_history() -> None:
+    """_production_line_dispatch_get 가 sub == 'history' 분기를 처리한다."""
     src = _V2_HANDLER.read_text(encoding="utf-8")
     assert "sub == 'history'" in src or 'sub == "history"' in src, (
-        "GET /api/v2/sessions/<id>/history 분기가 _v2_dispatch_get 에 없음"
+        "GET /api/v2/sessions/<id>/history 분기가 _production_line_dispatch_get 에 없음"
     )
 
 
-def test_v2_history_ndjson_read_end_to_end() -> None:
+def test_production_line_history_ndjson_read_end_to_end() -> None:
     """tempfile NDJSON 생성 → registry 등록 → broadcast 3건 → history 가 events 3건 반환."""
-    from board.server.v2_workflow_session import V2WorkflowSessionRegistry
+    from board.server.production_line_session import ProductionLineSessionRegistry
 
     with tempfile.TemporaryDirectory() as td:
-        reg = V2WorkflowSessionRegistry(persist_dir=td)
+        reg = ProductionLineSessionRegistry(persist_dir=td)
         # production-pattern session_id (fake-pattern guard 통과)
         sid = 'wf-T-513-abc12345-6789-4abc-9def-0123456789ab'
         session = reg.create(
@@ -120,12 +120,12 @@ def test_v2_history_ndjson_read_end_to_end() -> None:
         assert events[2]['payload']['outcome'] == 'ok'
 
 
-def test_v2_session_default_persist_path_is_run_local() -> None:
+def test_production_line_session_default_persist_path_is_run_local() -> None:
     """No global .workflow-sessions-v2 dir is needed for V2 history."""
-    from board.server.v2_workflow_session import V2WorkflowSessionRegistry
+    from board.server.production_line_session import ProductionLineSessionRegistry
 
     with tempfile.TemporaryDirectory() as td:
-        reg = V2WorkflowSessionRegistry()
+        reg = ProductionLineSessionRegistry()
         sid = 'wf-T-517-abc12345-6789-4abc-9def-0123456789ab'
         session = reg.create(
             session_id=sid,
@@ -140,7 +140,7 @@ def test_v2_session_default_persist_path_is_run_local() -> None:
         assert Path(session.channel.persist_path).exists()
 
 
-def test_board_startup_does_not_create_v2_workflow_sessions_root() -> None:
+def test_board_startup_does_not_create_production_line_sessions_root() -> None:
     """The board app no longer initializes the old .workflow-sessions-v2 cache."""
     app_src = (
         Path(__file__).resolve().parents[3].parent

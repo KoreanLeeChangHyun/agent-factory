@@ -58,7 +58,7 @@ def test_report_html_template_plan_md_link() -> None:
     assert "plan.md" in text
 
 
-def test_v2_load_template_keeps_report_html_compatibility() -> None:
+def test_production_line_load_template_keeps_report_html_compatibility() -> None:
     assert load_template("report.html") == load_report_template()
 
 

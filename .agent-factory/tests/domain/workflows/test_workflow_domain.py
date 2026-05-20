@@ -54,7 +54,7 @@ def test_workflow_run_rejects_reordered_stages() -> None:
         run.advance_to(WorkflowStage.REPORT)
 
 
-def test_v2_step_mapping_keeps_status_file_compatibility() -> None:
+def test_production_line_step_mapping_keeps_status_file_compatibility() -> None:
     assert stage_from_v2_step("INIT") is WorkflowStage.PREPARE
     assert stage_from_v2_step("WORK") is WorkflowStage.EXECUTE
     assert stage_from_v2_step("VALIDATE") is WorkflowStage.VERIFY

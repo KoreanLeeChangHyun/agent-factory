@@ -5,7 +5,7 @@ from __future__ import annotations
 from engine.apps.cli import flow_wf
 
 
-def test_flow_wf_delegates_to_v2_driver(monkeypatch) -> None:
+def test_flow_wf_delegates_to_production_line(monkeypatch) -> None:
     calls: list[list[str]] = []
 
     def fake_driver_main(argv: list[str] | None = None) -> int:

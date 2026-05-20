@@ -1,4 +1,4 @@
-"""v2 emitter — NDJSON metrics + 의미별 board endpoint helper.
+"""Production-line emitter — NDJSON metrics + 의미별 board endpoint helper.
 
 SPEC.md §12.3 — driver 가 stdout NDJSON emit → board 서버 SSE.
 동시에 metrics.jsonl 에 append (회귀 분석 자료).

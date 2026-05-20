@@ -1,4 +1,4 @@
-"""v2 spawn — claude -p subprocess wrapper.
+"""Production-line spawn — claude -p subprocess wrapper.
 
 SPEC.md §8 — Step 마다 1 subprocess. cwd=work_dir, --append-system-prompt,
 --session-id, --resume <session_id> 재시도 지원.

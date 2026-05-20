@@ -1,16 +1,16 @@
-"""v2 신규 endpoint 3건 단위 테스트 (T-511 P4).
+"""production-line 신규 endpoint 3건 단위 테스트 (T-511 P4).
 
 검증:
   - DELETE /api/v2/sessions/<id> — 세션 강제 종료 + work_dir 폐기 가능
   - PATCH  /api/v2/sessions/<id>/status — step/phase 강제 갱신
   - POST   /api/v2/sessions/<id>/artifacts — 산출물 강제 주입
 
-http_router.py 의 do_DELETE / do_PATCH / do_POST 분기에서 _v2_dispatch_* 가
+http_router.py 의 do_DELETE / do_PATCH / do_POST 분기에서 _production_line_dispatch_* 가
 신규 sub 경로 (delete=빈 sub, status, artifacts) 를 라우팅하는지 확인.
 
 본 테스트는 BoardHTTPRequestHandler 를 직접 import 하지 않고, 핵심 메서드
-(_v2_handle_session_delete / _v2_handle_session_patch_status /
-_v2_handle_session_post_artifacts) 가 V2WorkflowHandlerMixin 위에 존재하는지
+(_production_line_handle_session_delete / _production_line_handle_session_patch_status /
+_production_line_handle_session_post_artifacts) 가 ProductionLineWorkflowHandlerMixin 위에 존재하는지
 AST 로 검증한다 + http_router.py 의 routing 분기 grep.
 
 production endpoint 직접 curl 금지 (board.md 절대 금지 §0.1 — production
@@ -26,12 +26,12 @@ from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
-_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
+_PRODUCTION_LINE_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
 _HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
 
 
-def _v2_methods() -> set[str]:
-    tree = ast.parse(_V2_HANDLER.read_text(encoding="utf-8"))
+def _production_line_methods() -> set[str]:
+    tree = ast.parse(_PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8"))
     out: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -41,31 +41,31 @@ def _v2_methods() -> set[str]:
     return out
 
 
-def test_v2_delete_session_handler_exists() -> None:
+def test_production_line_delete_session_handler_exists() -> None:
     """DELETE /api/v2/sessions/<id> handler 메서드 존재."""
-    methods = _v2_methods()
-    assert "_v2_handle_session_delete" in methods, methods
+    methods = _production_line_methods()
+    assert "_production_line_handle_session_delete" in methods, methods
 
 
-def test_v2_patch_session_status_handler_exists() -> None:
+def test_production_line_patch_session_status_handler_exists() -> None:
     """PATCH /api/v2/sessions/<id>/status handler 메서드 존재."""
-    methods = _v2_methods()
-    assert "_v2_handle_session_patch_status" in methods, methods
+    methods = _production_line_methods()
+    assert "_production_line_handle_session_patch_status" in methods, methods
 
 
-def test_v2_post_session_artifacts_handler_exists() -> None:
+def test_production_line_post_session_artifacts_handler_exists() -> None:
     """POST /api/v2/sessions/<id>/artifacts handler 메서드 존재."""
-    methods = _v2_methods()
-    assert "_v2_handle_session_post_artifacts" in methods, methods
+    methods = _production_line_methods()
+    assert "_production_line_handle_session_post_artifacts" in methods, methods
 
 
-def test_v2_workflow_handlers_have_endpoint_decorator() -> None:
+def test_production_line_workflow_handlers_have_endpoint_decorator() -> None:
     """신설 3 endpoint 모두 @api_endpoint('W2', ...) decorator 부착."""
-    tree = ast.parse(_V2_HANDLER.read_text(encoding="utf-8"))
+    tree = ast.parse(_PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8"))
     targets = {
-        "_v2_handle_session_delete",
-        "_v2_handle_session_patch_status",
-        "_v2_handle_session_post_artifacts",
+        "_production_line_handle_session_delete",
+        "_production_line_handle_session_patch_status",
+        "_production_line_handle_session_post_artifacts",
     }
     decorated: set[str] = set()
     for node in ast.walk(tree):
@@ -86,46 +86,46 @@ def test_v2_workflow_handlers_have_endpoint_decorator() -> None:
     assert not missing, f"@api_endpoint 누락: {missing}"
 
 
-def test_http_router_v2_dispatch_post_routes_artifacts() -> None:
+def test_http_router_production_line_dispatch_post_routes_artifacts() -> None:
     """http_router.py do_POST 가 /api/v2/sessions 의 artifacts sub-path 처리."""
-    src = _V2_HANDLER.read_text(encoding="utf-8")
-    # production_line_workflow.py 내 _v2_dispatch_post 가 sub == 'artifacts' 분기 처리
+    src = _PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8")
+    # production_line_workflow.py 내 _production_line_dispatch_post 가 sub == 'artifacts' 분기 처리
     assert "sub == 'artifacts'" in src or 'sub == "artifacts"' in src, (
-        "POST /api/v2/sessions/<id>/artifacts 분기가 _v2_dispatch_post 에 없음"
+        "POST /api/v2/sessions/<id>/artifacts 분기가 _production_line_dispatch_post 에 없음"
     )
 
 
-def test_http_router_v2_dispatch_delete_routes_session() -> None:
+def test_http_router_production_line_dispatch_delete_routes_session() -> None:
     """http_router.py do_DELETE 가 /api/v2/sessions 의 DELETE 분기 처리."""
     src = _HTTP_ROUTER.read_text(encoding="utf-8")
     # /api/v2/sessions DELETE 라우팅: v2_dispatch_delete 호출 또는 직접 매칭
     assert "/api/v2/sessions" in src
     assert "do_DELETE" in src
-    # do_DELETE 내 v2 분기 존재 — _v2_dispatch_delete 위임 패턴
-    assert "_v2_dispatch_delete" in src, (
-        "http_router.py do_DELETE 가 _v2_dispatch_delete 를 호출하지 않음"
+    # do_DELETE 내 v2 분기 존재 — _production_line_dispatch_delete 위임 패턴
+    assert "_production_line_dispatch_delete" in src, (
+        "http_router.py do_DELETE 가 _production_line_dispatch_delete 를 호출하지 않음"
     )
 
 
-def test_http_router_v2_dispatch_patch_routes_status() -> None:
+def test_http_router_production_line_dispatch_patch_routes_status() -> None:
     """http_router.py do_PATCH 신설 + /api/v2/sessions PATCH 분기."""
     src = _HTTP_ROUTER.read_text(encoding="utf-8")
     assert "do_PATCH" in src, "http_router.py 에 do_PATCH 메서드 없음"
-    assert "_v2_dispatch_patch" in src, (
-        "http_router.py do_PATCH 가 _v2_dispatch_patch 를 호출하지 않음"
+    assert "_production_line_dispatch_patch" in src, (
+        "http_router.py do_PATCH 가 _production_line_dispatch_patch 를 호출하지 않음"
     )
 
 
-def test_v2_dispatch_delete_method_exists() -> None:
-    """_v2_dispatch_delete 메서드 신설."""
-    methods = _v2_methods()
-    assert "_v2_dispatch_delete" in methods, methods
+def test_production_line_dispatch_delete_method_exists() -> None:
+    """_production_line_dispatch_delete 메서드 신설."""
+    methods = _production_line_methods()
+    assert "_production_line_dispatch_delete" in methods, methods
 
 
-def test_v2_dispatch_patch_method_exists() -> None:
-    """_v2_dispatch_patch 메서드 신설."""
-    methods = _v2_methods()
-    assert "_v2_dispatch_patch" in methods, methods
+def test_production_line_dispatch_patch_method_exists() -> None:
+    """_production_line_dispatch_patch 메서드 신설."""
+    methods = _production_line_methods()
+    assert "_production_line_dispatch_patch" in methods, methods
 
 
 def test_generic_delete_dispatch_handler() -> None:
