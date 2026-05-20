@@ -5,11 +5,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ORGANIC_ROOT = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = ORGANIC_ROOT.parent
-BOARD_ROOT = ORGANIC_ROOT / "board"
+AGENT_FACTORY_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = AGENT_FACTORY_ROOT.parent
+BOARD_ROOT = AGENT_FACTORY_ROOT / "board"
 
-for path in (ORGANIC_ROOT, PROJECT_ROOT, BOARD_ROOT):
+for path in (AGENT_FACTORY_ROOT, PROJECT_ROOT, BOARD_ROOT):
     path_s = str(path)
     if path_s in sys.path:
         sys.path.remove(path_s)

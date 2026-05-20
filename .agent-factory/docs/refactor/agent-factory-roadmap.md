@@ -777,12 +777,47 @@ python3 -m pytest tests/architecture/test_boundaries.py  # 2 passed
 python3 -m pytest  # 384 passed, 2 skipped
 ```
 
+### M20: Naming And Rebranding
+
+Status: complete
+
+Purpose:
+
+Make Agent Factory the active product/runtime name while keeping provider names
+only at explicit provider or integration boundaries.
+
+Tasks:
+
+- [x] add active naming policy documentation
+- [x] link the naming policy from the documentation index
+- [x] rename residual `organic` test bootstrap symbols to Agent Factory terms
+- [x] change the standalone board title to `Agent Factory Terminal`
+- [x] change board stylesheet headers from Claude-branded dashboard labels to
+      Agent Factory labels
+- [x] keep Claude names in provider adapters, `.claude/` integration surfaces,
+      Claude Code hook descriptions, and historical migration records
+
+Acceptance criteria:
+
+- active documentation points to Agent Factory naming rules
+- no active test bootstrap uses `organic` naming for `.agent-factory`
+- board standalone terminal title uses Agent Factory naming
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/contracts/board_api/test_api_endpoint_helper.py  # 5 passed
+python3 -m pytest board/tests/test_v2_launcher.py board/tests/test_kanban_audit_verdict.py board/tests/test_v2_workflow_phase1.py  # 60 passed
+python3 -m pytest  # 384 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20
 ```
 
 Hard dependencies:

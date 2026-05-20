@@ -1,4 +1,4 @@
-/* Claude Code Workflow Board - Roadmap Subtab Styles
+/* Agent Factory Workflow Board - Roadmap Subtab Styles
  *
  * Contexts 탭 (#view-memory > .prompt-view-wrapper > #prompt-content) 의 Roadmap
  * 서브탭에 사용된다. #prompt-content 가 이미 flex row + overflow:hidden 컨테이너이므로

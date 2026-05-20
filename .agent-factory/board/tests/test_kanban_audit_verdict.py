@@ -22,8 +22,8 @@ from unittest.mock import patch
 # board package is at <worktree>/.agent-factory/board
 # For 'import board.server...' to work, .agent-factory must be in sys.path
 _WORKTREE_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-_CLAUDE_ORGANIC = os.path.normpath(os.path.join(_WORKTREE_ROOT, ".agent-factory"))
-for _p in (_WORKTREE_ROOT, _CLAUDE_ORGANIC):
+_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, ".agent-factory"))
+for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

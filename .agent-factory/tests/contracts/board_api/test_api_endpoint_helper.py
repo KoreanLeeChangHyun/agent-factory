@@ -21,8 +21,8 @@ import pytest
 
 def _load_common() -> types.ModuleType:
     """_common.py 를 직접 module 로 로드 (board 패키지 의존 회피)."""
-    organic_root = Path(__file__).resolve().parents[3]
-    common_path = organic_root / "board" / "server" / "_common.py"
+    agent_factory_root = Path(__file__).resolve().parents[3]
+    common_path = agent_factory_root / "board" / "server" / "_common.py"
     spec = importlib.util.spec_from_file_location("board_server_common_under_test", common_path)
     assert spec is not None, f"spec_from_file_location failed for {common_path}"
     module = importlib.util.module_from_spec(spec)

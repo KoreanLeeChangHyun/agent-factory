@@ -454,9 +454,23 @@ Acceptance:
 
 ### M20: Naming And Rebranding
 
+Status: complete
+
 Goal:
 
 Clean active user-facing names after layout has stabilized.
+
+Completed slice:
+
+- added `docs/naming-policy.md` as the active naming rule
+- linked the naming policy from the documentation index
+- renamed remaining `organic` test bootstrap variables to Agent Factory terms
+- changed the standalone board title from `Claude Code Terminal` to
+  `Agent Factory Terminal`
+- changed board CSS header comments from Claude-branded dashboard labels to
+  Agent Factory dashboard labels
+- left Claude names where they describe provider adapters, `.claude/`, Claude
+  Code hooks, or historical migration records
 
 Acceptance:
 

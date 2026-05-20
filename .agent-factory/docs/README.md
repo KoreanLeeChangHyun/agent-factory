@@ -7,6 +7,8 @@ execution, verification, reporting, board services, and provider adapters.
 
 - [CLI reference](cli-reference.md): active `flow-*` wrappers.
 - [Common constraints](common-constraints.md): shared workflow constraints.
+- [Naming policy](naming-policy.md): active Agent Factory naming and allowed
+  provider-specific exceptions.
 - [M10 release and migration notes](release-migration-notes.md): cleanup status
   and migration guidance.
 

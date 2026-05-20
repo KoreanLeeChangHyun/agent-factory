@@ -21,9 +21,9 @@ import unittest
 _WORKTREE_ROOT = os.path.normpath(
     os.path.join(os.path.dirname(__file__), '..', '..', '..'),
 )
-_ORGANIC_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, '.agent-factory'))
-_BOARD_ROOT = os.path.join(_ORGANIC_ROOT, 'board')
-for _p in (_WORKTREE_ROOT, _ORGANIC_ROOT, _BOARD_ROOT):
+_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_WORKTREE_ROOT, '.agent-factory'))
+_BOARD_ROOT = os.path.join(_AGENT_FACTORY_ROOT, 'board')
+for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT, _BOARD_ROOT):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
