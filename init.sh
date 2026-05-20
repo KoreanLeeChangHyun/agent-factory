@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 # ==============================================================================
-# init-agent-factory-workflow.sh — 부트스트랩 스크립트
+# init.sh — Agent Factory 부트스트랩 스크립트
 # 원격 저장소를 1회 클론하여 .claude/ + .codex/ + .agent-factory/ 를 설치한 뒤 build.sh 실행
-# 사용법: curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init-agent-factory-workflow.sh | bash
+# 사용법: curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init.sh | bash
 # ==============================================================================
 
 REPO_URL="https://github.com/KoreanLeeChangHyun/claude-workflow.git"
