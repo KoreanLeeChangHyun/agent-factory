@@ -1071,10 +1071,33 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M46: V2 Workflow Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move V2 workflow REST/SSE endpoint handlers into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved V2 Workflow handler implementation to
+  `engine/apps/board_api/v2_workflow.py`
+- kept `board/server/handlers/v2_workflow.py` as a compatibility export
+- updated V2 workflow static contract tests to inspect the app-boundary handler
+- added focused V2 Workflow board API app tests
+
+Acceptance:
+
+- V2 Workflow board API app tests pass
+- V2 workflow endpoint contract tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 779 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 784 passed, 2 skipped, 6 subtests passed
 ```

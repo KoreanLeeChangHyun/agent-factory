@@ -1589,12 +1589,43 @@ python3 -m pytest tests/application/apps/test_board_api_handler_common.py tests/
 python3 -m pytest  # 779 passed, 2 skipped, 6 subtests passed
 ```
 
+### M46: V2 Workflow Board API App Handler
+
+Status: complete
+
+Purpose:
+
+Move V2 workflow REST/SSE Board API handlers into `engine/apps/board_api` while
+preserving the existing board handler import path.
+
+Tasks:
+
+- [x] move V2 Workflow handler implementation to
+      `engine/apps/board_api/v2_workflow.py`
+- [x] keep `board/server/handlers/v2_workflow.py` as a compatibility export
+- [x] update V2 workflow static contract tests to inspect app-boundary handler
+- [x] add focused V2 Workflow board API app tests
+
+Acceptance criteria:
+
+- V2 Workflow board API app tests pass
+- V2 workflow endpoint contract tests pass
+- board API handler/router contract tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_board_api_v2_workflow.py tests/contracts/board_api/test_v2_workflow_phase1.py tests/contracts/board_api/test_v2_endpoints.py tests/contracts/board_api/test_v2_history_endpoint.py tests/contracts/board_api/test_api_docstring_coverage.py tests/contracts/board_api/test_api_smoke.py  # 104 passed, 2 skipped
+python3 -m pytest  # 784 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46
 ```
 
 Hard dependencies:
