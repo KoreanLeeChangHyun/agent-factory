@@ -554,10 +554,41 @@ Acceptance:
 - full pytest includes board handler coverage and passes
 - no tracked files remain under `board/tests`
 
+### M24: Flow Green Test Migration
+
+Status: complete
+
+Goal:
+
+Move green `engine/flow/tests` coverage into the canonical test tree while
+leaving stale V1-era tests quarantined for rewrite/delete decisions.
+
+Completed slice:
+
+- added `tests/application/flow`
+- moved green flow tests for kanban done parsing, merge anchor safety,
+  premerge state guard, review verdict, subagent-stop sentinel, ticket
+  numbering, ticket repository failures, undo/redo cycle, user-prompt-submit,
+  and worker commit detection
+- updated relocated tests to resolve `.agent-factory/engine` and hook paths from
+  the canonical tree
+- left stale or partially stale flow tests quarantined:
+  `test_failure_handler.py`, `test_fsm_8state.py`,
+  `test_http_launcher_timeout.py`, `test_kanban_force_done_handler.py`,
+  `test_merge_conflict_detection.py`, `test_phase_verifier.py`,
+  `test_sessions_status.py`, `test_stop.py`, `test_undo_done.py`, and
+  `test_worker_return_parser.py`
+
+Acceptance:
+
+- migrated flow tests pass from canonical paths
+- full pytest includes migrated flow tests and passes
+- remaining flow quarantine is explicitly narrowed to stale/partial failures
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 504 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 602 passed, 2 skipped, 6 subtests passed
 ```

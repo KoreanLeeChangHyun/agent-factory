@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 # sys.path: .agent-factory/engine 포함 -> flow 패키지 import 가능
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 

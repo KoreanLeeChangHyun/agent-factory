@@ -22,10 +22,10 @@ import pytest
 
 # sys.path 보장 — hooks/ + engine/ 등록
 _TEST_DIR = Path(__file__).resolve().parent
-_FLOW_DIR = _TEST_DIR.parent
-_ENGINE_DIR = _FLOW_DIR.parent
-_PROJECT_ROOT = _ENGINE_DIR.parent.parent  # workspace/claude 가 아닌 워크트리 루트
-_HOOKS_DIR = _ENGINE_DIR.parent / "hooks"  # .agent-factory/hooks/
+_AGENT_FACTORY_ROOT = _TEST_DIR.parents[2]
+_ENGINE_DIR = _AGENT_FACTORY_ROOT / "engine"
+_PROJECT_ROOT = _AGENT_FACTORY_ROOT.parent  # workspace/claude 가 아닌 워크트리 루트
+_HOOKS_DIR = _AGENT_FACTORY_ROOT / "hooks"  # .agent-factory/hooks/
 
 if str(_ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(_ENGINE_DIR))

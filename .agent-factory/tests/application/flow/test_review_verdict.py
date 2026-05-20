@@ -52,7 +52,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 

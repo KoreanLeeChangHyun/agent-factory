@@ -906,12 +906,45 @@ python3 -m pytest tests/contracts/board_api/test_handlers_t424.py  # 11 passed
 python3 -m pytest  # 504 passed, 2 skipped, 6 subtests passed
 ```
 
+### M24: Flow Green Test Migration
+
+Status: complete
+
+Purpose:
+
+Reduce the `engine/flow/tests` quarantine by moving fully green flow coverage
+into the canonical application test tree.
+
+Tasks:
+
+- [x] add `tests/application/flow`
+- [x] move green flow tests for kanban done parsing, merge anchor safety,
+      premerge state guard, review verdict, subagent-stop sentinel, ticket
+      numbering, ticket repository failures, undo/redo cycle,
+      user-prompt-submit, and worker commit detection
+- [x] update relocated tests to resolve engine and hook paths from canonical
+      locations
+- [x] keep stale or partially stale V1-era flow tests quarantined for follow-up
+
+Acceptance criteria:
+
+- migrated flow tests pass from canonical paths
+- canonical tests pass with migrated flow tests included
+- remaining `engine/flow/tests` files are known stale or partial failures
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/flow  # 98 passed
+python3 -m pytest  # 602 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24
 ```
 
 Hard dependencies:

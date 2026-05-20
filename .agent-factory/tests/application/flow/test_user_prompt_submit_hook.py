@@ -20,8 +20,8 @@ import textwrap
 
 # sys.path 보장: flow/ 패키지 + engine/ 패키지 import 가능하도록 경로 추가
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-_FLOW_DIR = os.path.normpath(os.path.join(_TEST_DIR, ".."))
-_SCRIPTS_DIR = os.path.normpath(os.path.join(_FLOW_DIR, ".."))  # engine/
+_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_TEST_DIR, "..", "..", ".."))
+_SCRIPTS_DIR = os.path.join(_AGENT_FACTORY_ROOT, "engine")
 _HOOK_HANDLERS_DIR = os.path.join(_SCRIPTS_DIR, "hook-handlers")
 
 if _SCRIPTS_DIR not in sys.path:
@@ -32,7 +32,7 @@ _inject_mod_path = os.path.join(_HOOK_HANDLERS_DIR, "inject_kanban_context.py")
 _dispatcher_hook_path = None  # user-prompt-submit.py 절대경로 (탐색)
 
 # hooks/ 디렉터리 찾기 (워크트리 구조: .agent-factory/hooks/ 는 상위로 3단계)
-_HOOKS_DIR = os.path.normpath(os.path.join(_SCRIPTS_DIR, "..", "hooks"))
+_HOOKS_DIR = os.path.join(_AGENT_FACTORY_ROOT, "hooks")
 _DISPATCHER_SCRIPT = os.path.join(_HOOKS_DIR, "user-prompt-submit.py")
 
 # inject_kanban_context 모듈을 importlib 로 로드 (패키지 없이도 동작)
