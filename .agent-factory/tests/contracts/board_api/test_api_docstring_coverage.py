@@ -20,6 +20,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
 _HANDLERS_DIR = _REPO_ROOT / ".agent-factory" / "board" / "server" / "handlers"
+_BOARD_API_APP_DIR = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api"
 
 _DOCSTRING_TOKENS = [
     "method:",
@@ -37,7 +38,9 @@ _DOCSTRING_TOKENS = [
 
 def _iter_handler_files() -> list[Path]:
     return sorted(
-        p for p in _HANDLERS_DIR.glob("*.py")
+        p
+        for directory in (_HANDLERS_DIR, _BOARD_API_APP_DIR)
+        for p in directory.glob("*.py")
         if not p.name.startswith("__")
     )
 

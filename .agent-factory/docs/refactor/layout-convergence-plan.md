@@ -981,10 +981,34 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M42: Metrics Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move Metrics endpoint handlers into `engine/apps/board_api` and keep contract
+tests aware of the app-boundary handler location.
+
+Completed slice:
+
+- moved Metrics handler implementation to `engine/apps/board_api/metrics.py`
+- kept `board/server/handlers/metrics.py` as a compatibility export
+- updated Metrics launch latency fallback to use the board server working
+  directory after the module move
+- updated API docstring/decorator coverage tests to scan `engine/apps/board_api`
+- added focused Metrics board API app tests
+
+Acceptance:
+
+- Metrics board API app tests pass
+- board API docstring/decorator and handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 750 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 767 passed, 2 skipped, 6 subtests passed
 ```
