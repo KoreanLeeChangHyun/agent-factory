@@ -37,6 +37,7 @@ Current high-level runtime layout:
       llm/
     apps/
       cli/
+      hooks/
     v2/
       core/
       prompts/
@@ -131,7 +132,7 @@ them. Avoid churn that only changes spelling.
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
 | Board API | `board/server/handlers`, `engine/application/kanban` | `engine/apps/board_api` or thin board handlers | partially aligned |
 | Board web | `board/static` | `board/web` | not aligned |
-| Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
+| Hooks | top-level `hooks/`, `engine/apps/hooks`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
 | Legacy tests | canonical `tests/` root | `tests/` | aligned |
 
@@ -682,10 +683,32 @@ Acceptance:
 - `flow-wf --help` still works
 - full pytest passes
 
+### M29: SessionStart Hook App Entrypoint
+
+Status: complete
+
+Goal:
+
+Start the `engine/apps/hooks` boundary while preserving stable top-level Claude
+Code hook files.
+
+Completed slice:
+
+- added `engine/apps/hooks/session_start.py`
+- moved SessionStart dispatch behavior behind the hook app entrypoint
+- kept `.agent-factory/hooks/session-start.py` as a compatibility wrapper
+- added focused SessionStart app tests
+
+Acceptance:
+
+- SessionStart app test passes
+- top-level `session-start.py` smoke passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 716 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 717 passed, 2 skipped, 6 subtests passed
 ```
