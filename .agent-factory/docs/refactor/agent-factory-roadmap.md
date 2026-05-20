@@ -2280,12 +2280,44 @@ python3 -m pytest tests/adapters/sync/test_sync_adapter_imports.py  # 3 passed
 python3 -m pytest  # 825 passed, 2 skipped, 6 subtests passed
 ```
 
+### M67: Align Maintenance Scripts With CLI Apps
+
+Status: complete
+
+Purpose:
+
+Treat one-off maintenance scripts as CLI app entrypoints instead of leaving
+them under the legacy `scripts/` directory.
+
+Tasks:
+
+- [x] keep `fix_board_links.py` under `engine/apps/cli`
+- [x] keep `migrate_runs_fold.py` under `engine/apps/cli`
+- [x] update `bin/flow-migrate-runs` to execute the app CLI implementation
+- [x] add focused maintenance CLI placement tests
+- [x] extend layout convergence tests to prevent the legacy script paths from
+      returning
+
+Acceptance criteria:
+
+- `flow-migrate-runs --help` executes from the repo root
+- maintenance CLI placement tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+.agent-factory/bin/flow-migrate-runs --help  # exits 0
+python3 -m pytest tests/application/apps/test_cli_maintenance_scripts.py tests/architecture/test_layout_convergence.py  # 15 passed
+python3 -m pytest  # 829 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67
 ```
 
 Hard dependencies:

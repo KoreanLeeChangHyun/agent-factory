@@ -73,6 +73,7 @@ ALIAS_MAP: dict[str, str] = {
     "git_config.py": "flow-gitconfig",
     "project_detector.py": "flow-detect",
     "project_skill_detector.py": "flow-detect",
+    "migrate_runs_fold.py": "flow-migrate-runs",
 }
 
 # 스크립트 파일명에서 파일명만 추출하는 패턴 (상대경로 + 절대경로 모두 지원)

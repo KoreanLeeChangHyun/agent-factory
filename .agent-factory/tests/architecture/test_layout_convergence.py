@@ -89,3 +89,10 @@ def test_legacy_flow_skill_state_manager_source_is_removed() -> None:
     assert not (
         repo_root / ".agent-factory" / "engine" / "flow" / "skill_state_manager.py"
     ).exists()
+
+
+def test_legacy_scripts_directory_sources_are_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    scripts_dir = repo_root / ".agent-factory" / "scripts"
+    assert not scripts_dir.exists()

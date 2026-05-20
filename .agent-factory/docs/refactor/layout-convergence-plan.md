@@ -1594,10 +1594,34 @@ Acceptance:
 - sync adapter tests pass
 - full pytest passes
 
+### M67: Align Maintenance Scripts With CLI Apps
+
+Status: complete
+
+Goal:
+
+Treat one-off maintenance scripts as CLI app entrypoints instead of leaving
+them under the legacy `scripts/` directory.
+
+Completed slice:
+
+- kept `fix_board_links.py` under `engine/apps/cli`
+- kept `migrate_runs_fold.py` under `engine/apps/cli`
+- updated `bin/flow-migrate-runs` to execute the app CLI implementation
+- added focused maintenance CLI placement tests
+- extended layout convergence tests to prevent the legacy script paths from
+  returning
+
+Acceptance:
+
+- `flow-migrate-runs --help` executes from the repo root
+- maintenance CLI placement tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 826 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 829 passed, 2 skipped, 6 subtests passed
 ```

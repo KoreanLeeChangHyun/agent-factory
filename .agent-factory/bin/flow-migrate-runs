@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-exec python3 "$(dirname "$0")/../scripts/migrate_runs_fold.py" "$@"
+ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
+  || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+exec python3 "$ROOT/.agent-factory/engine/apps/cli/migrate_runs_fold.py" "$@"
