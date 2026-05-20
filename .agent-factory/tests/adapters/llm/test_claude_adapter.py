@@ -4,7 +4,7 @@ from pathlib import Path
 
 from engine.adapters.llm import claude
 from engine.adapters.llm.claude import ClaudeAdapter
-from engine.application.llm import LLMEvent, LLMRequest
+from engine.core.ports.llm import LLMEvent, LLMRequest
 from engine.core.workflows import WorkflowStage
 from engine.v2._spawn import SpawnResult
 

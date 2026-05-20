@@ -6,7 +6,7 @@ import pytest
 
 from engine.adapters.llm.codex import CodexAdapter
 from engine.adapters.llm.factory import LLMProviderConfig, make_llm_adapter
-from engine.application.llm import FakeAdapter
+from engine.core.ports.llm import FakeAdapter
 
 
 def test_provider_env_codex_selects_codex(monkeypatch: pytest.MonkeyPatch) -> None:

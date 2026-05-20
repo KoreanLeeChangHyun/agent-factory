@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from engine.application.llm import FakeAdapter, LLMEvent, LLMRequest, LLMResult
+from engine.core.ports.llm import FakeAdapter, LLMEvent, LLMRequest, LLMResult
 
 
 def test_fake_adapter_records_requests_and_emits_events() -> None:
@@ -21,4 +21,3 @@ def test_fake_adapter_records_requests_and_emits_events() -> None:
     assert result.output_text == "done"
     assert adapter.requests == [LLMRequest(prompt="work")]
     assert seen == [LLMEvent(type="assistant", text="hello")]
-

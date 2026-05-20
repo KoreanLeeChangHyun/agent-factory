@@ -5,7 +5,7 @@ from pathlib import Path
 
 from engine.adapters.llm import codex
 from engine.adapters.llm.codex import CodexAdapter
-from engine.application.llm import LLMEvent, LLMRequest
+from engine.core.ports.llm import LLMEvent, LLMRequest
 from engine.core.workflows import WorkflowStage
 
 

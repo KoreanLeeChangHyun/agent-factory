@@ -53,3 +53,9 @@ def test_legacy_engine_sync_sources_are_removed() -> None:
     assert not (legacy_dir / "catalog_sync.py").exists()
     assert not (legacy_dir / "history_sync.py").exists()
     assert not (legacy_dir / "usage_sync.py").exists()
+
+
+def test_legacy_application_llm_wrapper_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (repo_root / ".agent-factory" / "engine" / "application" / "llm.py").exists()

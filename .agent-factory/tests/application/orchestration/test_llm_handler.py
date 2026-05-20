@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from engine.application.llm import FakeAdapter, LLMEvent, LLMResult
+from engine.core.ports.llm import FakeAdapter, LLMEvent, LLMResult
 from engine.application.orchestration import LLMStageHandler, StagePrompt
 from engine.application.orchestration.service import LifecycleEvent
 from engine.core.work_requests import WorkRequestRef
@@ -60,4 +60,3 @@ def test_llm_stage_handler_keeps_driver_stages_out_of_adapter() -> None:
 
     assert result.ok
     assert adapter.requests == []
-

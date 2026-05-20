@@ -2051,12 +2051,42 @@ python3 .agent-factory/engine/adapters/sync/usage_sync.py  # exits 0
 python3 -m pytest  # 813 passed, 2 skipped, 6 subtests passed
 ```
 
+### M60: Remove Application LLM Compatibility Wrapper
+
+Status: complete
+
+Purpose:
+
+Remove the temporary `engine/application/llm.py` compatibility wrapper after the
+LLM contract moved to `engine/core/ports`.
+
+Tasks:
+
+- [x] remove `engine/application/llm.py`
+- [x] update LLM adapter and orchestration tests to import from
+      `engine.core.ports.llm`
+- [x] update core port tests to assert the legacy wrapper is absent
+- [x] extend layout convergence tests to prevent the wrapper from returning
+
+Acceptance criteria:
+
+- LLM port, adapter, and orchestration tests pass
+- layout convergence architecture test passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/domain/ports/test_llm_port.py tests/application/llm/test_fake_adapter.py tests/adapters/llm tests/application/orchestration/test_llm_handler.py tests/application/orchestration/test_service.py tests/architecture/test_layout_convergence.py tests/architecture/test_boundaries.py  # 25 passed
+python3 -m pytest  # 814 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60
 ```
 
 Hard dependencies:

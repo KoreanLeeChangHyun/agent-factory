@@ -1421,10 +1421,33 @@ Acceptance:
 - sync scripts execute from the repo root
 - full pytest passes
 
+### M60: Remove Application LLM Compatibility Wrapper
+
+Status: complete
+
+Goal:
+
+Remove the temporary `engine/application/llm.py` compatibility wrapper after the
+LLM contract moved to `engine/core/ports`.
+
+Completed slice:
+
+- removed `engine/application/llm.py`
+- updated LLM adapter and orchestration tests to import from
+  `engine.core.ports.llm`
+- updated core port tests to assert the legacy wrapper is absent
+- extended layout convergence tests to prevent the wrapper from returning
+
+Acceptance:
+
+- LLM port, adapter, and orchestration tests pass
+- layout convergence architecture test passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 813 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 814 passed, 2 skipped, 6 subtests passed
 ```

@@ -24,9 +24,7 @@ def test_fake_adapter_records_requests_and_replays_events() -> None:
     assert seen == [LLMEvent(type="assistant", text="hello")]
 
 
-def test_application_llm_compat_exports_core_port() -> None:
-    from engine.application import llm as compat
-    from engine.core.ports import llm as core
+def test_application_llm_compat_wrapper_is_removed() -> None:
+    import importlib.util
 
-    assert compat.LLMRequest is core.LLMRequest
-    assert compat.FakeAdapter is core.FakeAdapter
+    assert importlib.util.find_spec("engine.application.llm") is None
