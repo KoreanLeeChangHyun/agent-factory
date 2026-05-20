@@ -98,7 +98,7 @@ def test_http_router_production_line_dispatch_post_routes_artifacts() -> None:
 def test_http_router_production_line_dispatch_delete_routes_session() -> None:
     """http_router.py do_DELETE 가 /api/v2/sessions 의 DELETE 분기 처리."""
     src = _HTTP_ROUTER.read_text(encoding="utf-8")
-    # /api/v2/sessions DELETE 라우팅: v2_dispatch_delete 호출 또는 직접 매칭
+    # /api/v2/sessions DELETE 라우팅: production_line_dispatch_delete 호출 또는 직접 매칭
     assert "/api/v2/sessions" in src
     assert "do_DELETE" in src
     # do_DELETE 내 v2 분기 존재 — _production_line_dispatch_delete 위임 패턴

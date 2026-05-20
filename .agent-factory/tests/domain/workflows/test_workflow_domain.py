@@ -63,7 +63,7 @@ def test_production_line_step_mapping_keeps_status_file_compatibility() -> None:
     assert canonicalize_production_line_step("VERIFY") == "VALIDATE"
 
 
-def test_workflow_run_reads_legacy_v2_status() -> None:
+def test_workflow_run_reads_legacy_production_line_status() -> None:
     run = WorkflowRun.from_production_line_status(
         run_ref=WorkflowRunRef("WF-T-123-20260520-000000"),
         work_request_ref=WorkRequestRef.parse("T-123"),

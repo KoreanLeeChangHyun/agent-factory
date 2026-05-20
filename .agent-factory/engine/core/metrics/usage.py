@@ -530,7 +530,7 @@ def usage_finalize(abs_work_dir: str) -> str:
 def usage_regenerate() -> str:
     """.agent-factory/runs/ 및 .agent-factory/runs/.history/ 하위의 모든 usage.json을 순회하여 .agent-factory/board/data/.usage.md를 재생성한다.
 
-    v2 스키마 행을 전체 재생성한다.
+    usage schema 행을 전체 재생성한다.
     registryKey를 날짜 내림차순으로 정렬하여 최신 항목이 상단에 오도록 배치한다.
 
     Returns:
@@ -578,7 +578,7 @@ def usage_regenerate() -> str:
                 if not isinstance(usage_data, dict):
                     continue
 
-                # v2 스키마 확인
+                # usage schema 확인
                 if usage_data.get("$schema") != "usage-v2":
                     continue
 
@@ -645,7 +645,7 @@ def usage_regenerate() -> str:
             details_start = content.find("<details>")
             archive_section = content[details_start:]
 
-        # 새로운 v2 테이블 행 생성
+        # 새 usage table 행 생성
         new_rows: list[str] = []
         for (
             reg_key, date_str, title, command,

@@ -101,7 +101,7 @@ def _run_server(project_root: str) -> None:
     workflow_registry._persist_dir = None
 
     # production-line workflow history is persisted per run under work_dir/workflow-events.jsonl.
-    # The old root-level V2 session cache is no longer created on startup.
+    # The old root-level production-line session cache is no longer created on startup.
     production_line_registry._persist_dir = None
 
     def _cleanup_runtime_files() -> None:

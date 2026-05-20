@@ -20,11 +20,11 @@ from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
-_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
+_PRODUCTION_LINE_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
 
 
-def _v2_methods() -> set[str]:
-    tree = ast.parse(_V2_HANDLER.read_text(encoding="utf-8"))
+def _production_line_methods() -> set[str]:
+    tree = ast.parse(_PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8"))
     out: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -37,21 +37,21 @@ def _v2_methods() -> set[str]:
 def test_production_line_sse_channel_persist_path_property() -> None:
     """ProductionLineSSEChannel.persist_path public property — history handler 진입점."""
     from board.server.production_line_sse_channel import ProductionLineSSEChannel
-    ch = ProductionLineSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/v2-unit.jsonl')
-    assert ch.persist_path == '/tmp/v2-unit.jsonl'
+    ch = ProductionLineSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/production-line-unit.jsonl')
+    assert ch.persist_path == '/tmp/production-line-unit.jsonl'
     ch_none = ProductionLineSSEChannel(session_id='wf-T-513-unit-noper')
     assert ch_none.persist_path is None
 
 
 def test_production_line_history_handler_method_exists() -> None:
     """GET /api/v2/sessions/<id>/history handler 메서드 존재."""
-    methods = _v2_methods()
+    methods = _production_line_methods()
     assert "_production_line_handle_session_history" in methods, methods
 
 
 def test_production_line_history_handler_has_endpoint_decorator() -> None:
     """history handler 가 @api_endpoint('W2', 'history') decorator 부착."""
-    tree = ast.parse(_V2_HANDLER.read_text(encoding="utf-8"))
+    tree = ast.parse(_PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8"))
     found = False
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -73,7 +73,7 @@ def test_production_line_history_handler_has_endpoint_decorator() -> None:
 
 def test_production_line_dispatch_get_routes_history() -> None:
     """_production_line_dispatch_get 가 sub == 'history' 분기를 처리한다."""
-    src = _V2_HANDLER.read_text(encoding="utf-8")
+    src = _PRODUCTION_LINE_HANDLER.read_text(encoding="utf-8")
     assert "sub == 'history'" in src or 'sub == "history"' in src, (
         "GET /api/v2/sessions/<id>/history 분기가 _production_line_dispatch_get 에 없음"
     )
@@ -121,7 +121,7 @@ def test_production_line_history_ndjson_read_end_to_end() -> None:
 
 
 def test_production_line_session_default_persist_path_is_run_local() -> None:
-    """No global .workflow-sessions-v2 dir is needed for V2 history."""
+    """No global .workflow-sessions-v2 dir is needed for production-line history."""
     from board.server.production_line_session import ProductionLineSessionRegistry
 
     with tempfile.TemporaryDirectory() as td:

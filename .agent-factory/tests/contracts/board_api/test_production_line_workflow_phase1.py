@@ -1,4 +1,4 @@
-"""T-495 Phase 1 회귀 테스트 — v2 워크플로우 백엔드 인프라.
+"""T-495 Phase 1 회귀 테스트 — production-line 워크플로우 백엔드 인프라.
 
 검증 대상:
   - ProductionLineSession dataclass + ProductionLineSessionRegistry (CRUD + idempotent)
@@ -359,7 +359,7 @@ class TestProductionLineWorkflowPathRegex(unittest.TestCase):
 
 class TestImportSmoke(unittest.TestCase):
 
-    def test_import_v2_modules(self):
+    def test_import_production_line_modules(self):
         try:
             from board.server.production_line_session import (
                 ProductionLineSession,

@@ -89,7 +89,7 @@ class WorkflowRunStart:
 
     @property
     def ticket_arg(self) -> str:
-        """Compatibility argument for the current V2 driver."""
+        """Compatibility argument for the current production-line driver."""
 
         return str(self.work_request_ref)
 

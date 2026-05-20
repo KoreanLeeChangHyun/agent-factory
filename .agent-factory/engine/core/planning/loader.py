@@ -5,7 +5,7 @@
 - LLM ↔ LLM 인계용 자연어 본문은 **plan/plan.md** 가 별도로 박제 (PLAN LLM 동시 산출).
 - 본 모듈은 JSON 만 책임.
 
-The V2 runtime keeps a compatibility wrapper at `engine.apps.production_line.core.plan_loader`.
+The production-line runtime keeps a compatibility wrapper at `engine.apps.production_line.core.plan_loader`.
 """
 
 from __future__ import annotations
