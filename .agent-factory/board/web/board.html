@@ -13,7 +13,6 @@
 <link rel="stylesheet" href="css/views/memory.css">
 <link rel="stylesheet" href="css/views/roadmap.css">
 <link rel="stylesheet" href="css/views/relations.css">
-<link rel="stylesheet" href="css/widgets/settings.css">
 <!-- T-505 P3 — Step 6 Box + Phase sub-Panel Overlay CSS. -->
 <link rel="stylesheet" href="css/workflow/step-overlay.css">
 <link id="hljs-theme-dark" rel="stylesheet" href="css/vendor/highlight-github-dark.min.css" media="(prefers-color-scheme: dark)">
@@ -30,17 +29,7 @@
     <button class="tab" data-view="memory">Contexts</button>
     <button class="tab" data-view="viewer">Viewer</button>
   </nav>
-  <button class="header-btn settings-toggle" id="settings-toggle" title="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </header>
-
-<div class="settings-overlay" id="settings-overlay"></div>
-<div class="settings-panel" id="settings-panel">
-  <div class="settings-header">
-    <h2>Settings</h2>
-    <button class="settings-close" id="settings-close">&times;</button>
-  </div>
-  <div class="settings-body" id="settings-body"></div>
-</div>
 
 <div class="relations-panel" id="relations-panel">
   <div class="relations-collapsed-bar" id="relations-collapsed-bar">
@@ -83,7 +72,6 @@
 <script src="js/memory/memory-core.js"></script>
 <script src="js/memory/memory-rules-prompt.js"></script>
 <script src="js/memory/memory-quick-prompts.js"></script>
-<script src="js/views/settings.js"></script>
 <script src="js/terminal/wf-ticket-renderer.js"></script>
 <script src="js/core/sse.js?v=20260509-split"></script>
 </body>

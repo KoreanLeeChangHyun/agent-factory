@@ -63,7 +63,7 @@
     restartItem.innerHTML =
       '<div class="settings-item-info">' +
         '<div class="settings-item-key">Restart Server</div>' +
-        '<div class="settings-item-label">Restart the Board HTTP server</div>' +
+        '<div class="settings-item-label">Restart the Agent Factory Console server</div>' +
       '</div>' +
       '<div class="settings-item-control">' +
         '<button class="settings-action-btn" id="settings-restart-btn">Restart</button>' +
@@ -96,7 +96,7 @@
       '</div>' +
       '<details class="settings-adapter-details">' +
         '<summary>ClaudeAdapter details</summary>' +
-        '<div class="settings-adapter-body">Board process integration uses local Claude Code hooks and .agent-factory runtime paths.</div>' +
+        '<div class="settings-adapter-body">Console process integration uses local Claude Code hooks and .agent-factory runtime paths.</div>' +
       '</details>';
     body.appendChild(provider);
 

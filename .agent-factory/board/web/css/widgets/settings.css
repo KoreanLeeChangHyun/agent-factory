@@ -1,6 +1,6 @@
 /* Settings Panel - Slide-in drawer */
 
-/* .settings-toggle base styles now provided by .header-btn in common.css */
+/* Toggle button styling is provided by the owning shell. */
 
 .settings-overlay {
   position: fixed;
@@ -21,7 +21,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 100vw;
+  width: min(420px, 100vw);
   max-width: 100vw;
   background: var(--af-bg);
   border-left: 1px solid var(--af-border);

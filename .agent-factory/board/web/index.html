@@ -4,9 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Factory Console</title>
+<link rel="stylesheet" href="css/widgets/settings.css">
 <style>
 :root {
   color-scheme: dark;
+  --af-bg: #1E1E1E;
+  --af-surface: #181818;
+  --af-surface-raised: #252526;
+  --af-border: #2D2D2D;
+  --af-border-soft: #333333;
+  --af-text: #CCCCCC;
+  --af-text-muted: #858585;
+  --af-text-subtle: #5A5A5A;
+  --af-primary: #007ACC;
+  --af-primary-soft: rgba(0, 122, 204, 0.16);
+  --af-success: #4EC9B0;
+  --af-success-soft: rgba(78, 201, 176, 0.16);
+  --af-warning: #DCDCAA;
+  --af-warning-soft: rgba(220, 220, 170, 0.16);
+  --af-error: #F48771;
+  --af-error-soft: rgba(244, 135, 113, 0.16);
+  --af-info: #9CDCFE;
+  --af-info-soft: rgba(156, 220, 254, 0.16);
+  --af-accent: #C586C0;
+  --af-accent-soft: rgba(197, 134, 192, 0.16);
+  --af-code: #CE9178;
+  --af-inverse: #FFFFFF;
+  --af-overlay: rgba(0, 0, 0, 0.48);
+  --af-hover: rgba(255, 255, 255, 0.06);
+  --af-hover-strong: rgba(255, 255, 255, 0.1);
   --bg: #1E1E1E;
   --border: #2D2D2D;
   --bar: #181818;
@@ -58,6 +84,33 @@ iframe {
   height: 100%;
   border: 0;
   background: var(--bg);
+}
+
+.console-settings-toggle {
+  position: fixed;
+  z-index: 700;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(24, 24, 24, 0.88);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.78;
+  backdrop-filter: blur(8px);
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.console-settings-toggle:hover {
+  border-color: var(--accent);
+  background: #252526;
+  color: var(--text);
+  opacity: 1;
 }
 
 .split-divider {
@@ -130,6 +183,17 @@ iframe {
     <iframe src="board.html" title="Agent Factory Board"></iframe>
   </section>
 </main>
+<button class="console-settings-toggle" id="settings-toggle" title="Settings" aria-label="Settings">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+<div class="settings-overlay" id="settings-overlay"></div>
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-header">
+    <h2>Settings</h2>
+    <button class="settings-close" id="settings-close">&times;</button>
+  </div>
+  <div class="settings-body" id="settings-body"></div>
+</div>
 <script>
 (function () {
   var shell = document.getElementById("combined-shell");
@@ -190,5 +254,6 @@ iframe {
   restoreWidth();
 })();
 </script>
+<script src="js/views/settings.js"></script>
 </body>
 </html>
