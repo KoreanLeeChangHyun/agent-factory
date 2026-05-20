@@ -800,10 +800,35 @@ Acceptance:
 - top-level `pre-tool-use.py` smoke passes
 - full pytest passes
 
+### M34: Board API Observability App Boundary
+
+Status: complete
+
+Goal:
+
+Introduce the missing `engine/apps/board_api` boundary with a low-risk shared
+Board API helper extraction.
+
+Completed slice:
+
+- added `engine/apps/board_api`
+- moved Board API `server_debug_log` and `api_endpoint` helper implementation
+  into `engine/apps/board_api/observability.py`
+- kept `board/server/_common.py` as the compatibility export surface for
+  existing board handlers and contract tests
+- updated timestamp emission to timezone-aware UTC
+- added focused Board API app tests
+
+Acceptance:
+
+- Board API observability app tests pass
+- existing `api_endpoint` contract tests pass through `_common.py`
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 731 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 733 passed, 2 skipped, 6 subtests passed
 ```

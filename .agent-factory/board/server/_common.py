@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import datetime
-import functools
 import json
 import logging
 import os
 import sys
 import threading
 import time
-from collections.abc import Callable
-from typing import Any
 
 # board_data 는 sibling 모듈 (`.agent-factory/board/board_data.py`). 본 파일을
 # `board.server` 패키지 경로로 import 한 환경에서도 bare `from board_data import`
@@ -63,6 +59,11 @@ from board_data import (  # noqa: E402, F401
     _memory_gc_prune_archive,
 )
 
+from engine.apps.board_api.observability import (  # noqa: E402, F401
+    api_endpoint,
+    server_debug_log,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -98,82 +99,3 @@ _WORKFLOW_SYNC_URL: str = (
     'claude-workflow/main/init-claude-workflow.sh'
 )
 _workflow_sync_lock: threading.Lock = threading.Lock()
-
-
-# ── Server-side debug logger ──
-# 클라이언트 Board.debugLog 와 동일 파일/형식. 플래그 파일이 존재할 때만 append.
-def server_debug_log(tag: str, data: object) -> None:
-    """서버 측 진단 로그를 .agent-factory/runs/bg/debug.log 에 append.
-
-    플래그 파일 .agent-factory/runs/bg/debug.enabled 가 존재할 때만 기록.
-    클라이언트 debugLog 와 같은 NDJSON 형식. 평소 오버헤드는 os.path.exists 한 번.
-    """
-    try:
-        log_dir = os.path.join(os.getcwd(), '.agent-factory', 'runs', 'bg')
-        if not os.path.exists(os.path.join(log_dir, 'debug.enabled')):
-            return
-        entry = {
-            'ts': datetime.datetime.utcnow().isoformat() + 'Z',
-            'tag': 'server.' + str(tag),
-            'data': data,
-        }
-        with open(os.path.join(log_dir, 'debug.log'), 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
-    except (OSError, TypeError, ValueError):
-        pass
-
-
-# ---------------------------------------------------------------------------
-# @api_endpoint decorator (T-511 P2)
-# ---------------------------------------------------------------------------
-# Board BE 의 모든 endpoint handler method 가 동일 디버그 tag 컨벤션으로
-# debug.log 에 entry/exit/error 라인을 발화하도록 강제하는 표준 helper.
-#
-# 사용:
-#     @api_endpoint("K", "move")
-#     def _handle_kanban_move(self) -> None:
-#         """...docstring 11 필드..."""
-#         ...
-#
-# 발화 tag 형식 (project_board_api_spec.md §3):
-#     api.<domain>.<verb>.entry  — 진입 직후
-#     api.<domain>.<verb>.exit   — 정상 반환 직후
-#     api.<domain>.<verb>.error  — 예외 발생 (예외는 그대로 재발생)
-#
-# server_debug_log 가 'server.' prefix 자동 부착 → 최종 NDJSON tag 는
-# `server.api.<domain>.<verb>.<phase>` 가 된다.
-#
-# 오버헤드:
-#   debug.enabled 플래그 부재 시 server_debug_log 가 즉시 return —
-#   decorator 추가 비용은 functools.wraps 호출 + 빈 try/except 한 겹.
-def api_endpoint(domain: str, verb: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Board BE endpoint handler method 표준 decorator.
-
-    Args:
-        domain: 도메인 코드 (project_board_api_spec.md §2 의 11종).
-                K, W1, W2, T, M, PR, MET, WTC, MGC, SYS, INF.
-        verb: 동사/명사 (list, get, save, delete, move, submit, done, …).
-
-    Returns:
-        decorated 함수. entry/exit/error 3 phase 의 debug.log 라인을 발화한다.
-
-    예시 tag:
-        api.K.move.entry / api.K.move.exit / api.K.move.error
-    """
-    base_tag = f"api.{domain}.{verb}"
-
-    def _decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def _wrapped(*args: Any, **kwargs: Any) -> Any:
-            server_debug_log(base_tag + '.entry', {'args_count': len(args), 'kwargs_keys': list(kwargs.keys())})
-            try:
-                result = func(*args, **kwargs)
-            except Exception as exc:
-                server_debug_log(base_tag + '.error', {'type': type(exc).__name__, 'msg': str(exc)})
-                raise
-            server_debug_log(base_tag + '.exit', {'result_type': type(result).__name__})
-            return result
-
-        return _wrapped
-
-    return _decorator

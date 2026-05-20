@@ -1228,12 +1228,45 @@ printf '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}}' | p
 python3 -m pytest  # 731 passed, 2 skipped, 6 subtests passed
 ```
 
+### M34: Board API Observability App Boundary
+
+Status: complete
+
+Purpose:
+
+Create the `engine/apps/board_api` boundary with a low-risk extraction of Board
+API observability helpers.
+
+Tasks:
+
+- [x] add `engine/apps/board_api`
+- [x] move `server_debug_log` implementation into
+      `engine/apps/board_api/observability.py`
+- [x] move `api_endpoint` implementation into
+      `engine/apps/board_api/observability.py`
+- [x] keep `board/server/_common.py` as the compatibility export surface
+- [x] add focused Board API observability app tests
+- [x] remove the inherited `datetime.utcnow()` deprecation warning
+
+Acceptance criteria:
+
+- Board API observability app tests pass
+- existing `api_endpoint` contract tests pass through `_common.py`
+- canonical tests pass without warning regressions
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_board_api_observability.py tests/contracts/board_api/test_api_endpoint_helper.py  # 7 passed
+python3 -m pytest  # 733 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34
 ```
 
 Hard dependencies:
