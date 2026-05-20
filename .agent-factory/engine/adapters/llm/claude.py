@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from engine.application.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
+from engine.core.ports.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
 from engine.core.workflows import stage_to_v2_step
 from engine.v2._spawn import DEFAULT_PERMISSION_MODE, spawn_claude
 
@@ -67,4 +67,3 @@ class ClaudeAdapter:
             terminal_reason=result.terminal_reason,
             events=events,
         )
-

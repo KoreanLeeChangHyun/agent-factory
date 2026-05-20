@@ -1,8 +1,6 @@
-"""Compatibility exports for LLM port contracts."""
+"""Core port contracts."""
 
-from __future__ import annotations
-
-from engine.core.ports.llm import (
+from .llm import (
     EventHandler,
     FakeAdapter,
     LLMAdapter,

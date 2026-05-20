@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from engine.application.llm import FakeAdapter, LLMAdapter
+from engine.core.ports.llm import FakeAdapter, LLMAdapter
 
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
@@ -68,4 +68,3 @@ def make_llm_adapter(config: LLMProviderConfig | None = None) -> LLMAdapter:
     if cfg.provider == "claude":
         return ClaudeAdapter(permission_mode=cfg.claude_permission_mode)
     raise ValueError(f"unknown LLM provider: {cfg.provider!r}")
-

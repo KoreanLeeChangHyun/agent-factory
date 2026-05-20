@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from engine.application.llm import LLMAdapter, LLMEvent, LLMRequest
+from engine.core.ports.llm import LLMAdapter, LLMEvent, LLMRequest
 from engine.core.workflows import WorkflowRun, WorkflowStage
 
 from .service import LifecycleEvent, LifecycleEventSink, StageResult
@@ -65,4 +65,3 @@ class LLMStageHandler:
         if result.ok:
             return StageResult.pass_(result.output_text)
         return StageResult.fail(result.error or f"{stage.value} adapter failed")
-

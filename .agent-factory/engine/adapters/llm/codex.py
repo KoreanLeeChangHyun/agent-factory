@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from engine.application.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
+from engine.core.ports.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
 
 
 CODEX_BIN = "codex"
@@ -142,4 +142,3 @@ class CodexAdapter:
                 on_event(event)
         output_text = "".join(text_parts) if text_parts else stdout
         return events, output_text
-

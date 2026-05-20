@@ -27,6 +27,7 @@ Current high-level runtime layout:
       js/
   engine/
     core/
+      ports/
       work_requests/
       workflows/
     application/
@@ -1284,10 +1285,34 @@ Acceptance:
 - layout convergence architecture test passes
 - full pytest passes
 
+### M55: Move LLM Contract To Core Port
+
+Status: complete
+
+Goal:
+
+Place the provider-independent LLM contract under the target `core/ports`
+boundary.
+
+Completed slice:
+
+- moved `engine/application/llm.py` implementation to
+  `engine/core/ports/llm.py`
+- added `engine/core/ports/__init__.py`
+- kept `engine/application/llm.py` as a compatibility export
+- updated LLM adapters and orchestration handler imports to use the core port
+- added focused core port tests
+
+Acceptance:
+
+- core LLM port tests pass
+- LLM adapter and orchestration tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 803 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 805 passed, 2 skipped, 6 subtests passed
 ```
