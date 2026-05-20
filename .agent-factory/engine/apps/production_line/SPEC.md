@@ -1,14 +1,14 @@
-# 워크플로우 엔진 v2 명세 (SPEC)
+# production-line workflow engine 명세 (SPEC)
 
-> **단일 진실 공급원 (SSOT)**. 본 문서는 v2 의 모든 책임 분담·인터페이스·캐논을 박제한다.
+> **단일 진실 공급원 (SSOT)**. 본 문서는 production-line 의 모든 책임 분담·인터페이스·캐논을 박제한다.
 > 본 문서와 다른 문서(skills/SKILL.md, rules/workflow/workflow.md, agents/*.md) 가 충돌하면 본 문서가 우선이며 다른 문서를 갱신한다.
-> 작성: 2026-05-14 (T-489, Phase 1). 명세 버전: v2.0.0
+> 작성: 2026-05-14 (T-489, Phase 1). 명세 버전: production-line 1.0.0
 
 ---
 
 ## 0. 한 줄 요약
 
-> v2 = **driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개)**.
+> production-line = **driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개)**.
 > 모든 상태 변경·결정·제어 흐름은 driver. claude -p 는 산출물 파일만 작성한다.
 
 ### 0.1 책임 분담 캐논 (사용자 명시 2026-05-15, T-503 확장 2026-05-18)
@@ -20,7 +20,7 @@
 
 ### 0.1.1 검증 2축 분리 (T-503)
 
-> v2 의 검증은 **2 축**으로 명확히 분리된다. 동일 'VALIDATE' 라는 어휘 안에 자연어 평가와 결정론 검증이 섞이는 v1·v2 초기 회귀를 차단한다.
+> production-line 의 검증은 **2 축**으로 명확히 분리된다. 동일 'VALIDATE' 라는 어휘 안에 자연어 평가와 결정론 검증이 섞이는 v1·production-line 초기 회귀를 차단한다.
 
 | 축 | 주체 | 산출물 | 형식 | 본문 |
 |----|------|--------|------|------|
@@ -42,7 +42,7 @@ research / review command 에서는 TDD 미적용 (코드 변경 동반 X). `_ve
 
 ---
 
-## 1. 왜 v2 인가 (Why)
+## 1. 왜 production-line 인가 (Why)
 
 ### 1.1 v1 의 본질적 결함
 
@@ -52,7 +52,7 @@ v1 은 메인 세션 클로드(LLM) 가 오케스트레이터 역할을 했다. 
 2. **hook 흡수 mechanism 의 fragile함**: PreToolUse Hook 으로 Task subagent 호출을 결정론 wrapper 로 변환하려 시도. ZodError schema 회귀, SDK cap (SKILL.md 10KB), Anthropic hardcoded 가드 등 다중 한계.
 3. **메인 세션 컨텍스트 오염**: 워크플로우 진행이 메인 세션의 토큰 예산을 잠식. 사용자가 워크플로우 외 작업을 할 수 없음.
 
-### 1.2 v2 의 해결 방향
+### 1.2 production-line 의 해결 방향
 
 - **오케스트레이션 = 룰베이스 코드**: LLM 의 결정 영역 → driver 의 함수로 흡수. 입력 → 같은 출력 보장.
 - **claude -p subprocess 격리**: 각 Step 의 LLM 작업은 별도 subprocess 로 분리. 메인 세션 컨텍스트 0 영향.
@@ -67,9 +67,9 @@ v1 은 메인 세션 클로드(LLM) 가 오케스트레이터 역할을 했다. 
 
 ## 2. 어휘 정정 (Step vs Phase 반전)
 
-v1 어휘는 동음이의어로 LLM/사람 모두 혼동을 일으켰다. v2 는 정정한다.
+v1 어휘는 동음이의어로 LLM/사람 모두 혼동을 일으켰다. production-line 는 정정한다.
 
-| 계층 | v1 (혼동) | **v2 정정** | 비고 |
+| 계층 | v1 (혼동) | **production-line 정정** | 비고 |
 |------|----------|------------|------|
 | 워크플로우 6단계 | phase (`workflow_phase`) | **Step** (`workflow_step`) | INIT / PLAN / WORK / VALIDATE / REPORT / DONE |
 | WORK 내부 sub-단계 | step (`work_step`) | **Phase** (`work_phase`) | Phase 1, Phase 2, ... |
@@ -78,11 +78,11 @@ v1 어휘는 동음이의어로 LLM/사람 모두 혼동을 일으켰다. v2 는
 
 - `workflow_step`: 6 Step FSM (NONE / INIT / PLAN / WORK / VALIDATE / REPORT / DONE / FAILED)
 - `work_phase`: WORK 내부 Phase 식별자 (P1, P2, ...)
-- 옛 `workflow_phase` 키는 v2 base 에서 사라지고 `workflow_step` 으로 통째 교체
+- 옛 `workflow_phase` 키는 production-line base 에서 사라지고 `workflow_step` 으로 통째 교체
 
 ### 2.2 마이그레이션 코드 불필요
 
-v2 는 b69645a base 에서 새로 시작하므로 옛 `workflow_phase` 키와 공존할 필요 없음. 새 코드는 처음부터 `workflow_step`.
+production-line 는 b69645a base 에서 새로 시작하므로 옛 `workflow_phase` 키와 공존할 필요 없음. 새 코드는 처음부터 `workflow_step`.
 
 ---
 
@@ -227,7 +227,7 @@ asyncio 미채택 결정: claude -p subprocess 는 I/O bound + 기존 `_spawn.sp
 
 ### 4.3 통째 주입 vs 요약 (LLM lossy 압축 회피)
 
-v1 의 회귀 패턴: PLAN 산출을 worker 에게 "요약본" 으로 전달 → worker 가 plan 의 디테일 누락 → 잘못된 구현. v2 는 **통째 inject**. context window 부담은 claude -p subprocess 격리로 메인 세션과 무관.
+v1 의 회귀 패턴: PLAN 산출을 worker 에게 "요약본" 으로 전달 → worker 가 plan 의 디테일 누락 → 잘못된 구현. production-line 는 **통째 inject**. context window 부담은 claude -p subprocess 격리로 메인 세션과 무관.
 
 context window 한도 (200K tokens) 가까이 가면? → Phase 분할로 work/ 디렉터리 N 분할 + 종속 그래프 따라 선택 주입 (모두 통째 inject 는 REPORT 만 적용).
 
@@ -263,7 +263,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "acceptance_criteria": [
         "engine/apps/production_line/_common.py 신설 + import 가능",
         "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재",
-        "pytest tests/application/v2/test_common.py 통과"
+        "pytest tests/application/production_line/test_common.py 통과"
       ]
     },
     {
@@ -275,7 +275,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "workers": 1,
       "acceptance_criteria": [
         "engine/apps/production_line/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처",
-        "pytest tests/adapters/v2/test_emitter.py 통과"
+        "pytest tests/adapters/production_line/test_emitter.py 통과"
       ]
     }
   ]
@@ -402,11 +402,11 @@ board POST endpoint (`/api/v2/sessions/<id>/phase`) body 는 T-495 P1 캐논 호
 
 ---
 
-## 7. driver.py 책임 분담 (v1 오케스트레이터 → v2 driver 매핑)
+## 7. driver.py 책임 분담 (v1 오케스트레이터 → production-line driver 매핑)
 
 ### 7.1 매핑 표
 
-| v1 책임 (메인 세션 LLM) | v2 driver 룰베이스 구현 |
+| v1 책임 (메인 세션 LLM) | production-line driver 룰베이스 구현 |
 |---|---|
 | `/wf -s N` 트리거 → INIT 진입 | argparse + `.context.json` template fill |
 | 티켓 prompt 필드 읽기 | xml parser + dict access |
@@ -518,7 +518,7 @@ result = subprocess.run(
     [
         "claude", "-p",
         "--session-id", session_id,           # Step 마다 고유 (재시도 시 재사용)
-        "--append-system-prompt", system_prompt,  # v2 SKILL.md 의 핵심만 (10KB cap 이하)
+        "--append-system-prompt", system_prompt,  # production-line SKILL.md 의 핵심만 (10KB cap 이하)
         prompt_body,                          # plan.md / work/* / validate-report.md 통째 inject
     ],
     cwd=ctx.work_dir,
@@ -535,7 +535,7 @@ result = subprocess.run(
 
 ### 8.3 system prompt 전달
 
-v1 의 SKILL.md (15KB) 가 SDK cap (10KB) 으로 잘리던 문제 → v2 는 **각 Step 의 system prompt 가 별도** + 10KB 이하 정합.
+v1 의 SKILL.md (15KB) 가 SDK cap (10KB) 으로 잘리던 문제 → production-line 는 **각 Step 의 system prompt 가 별도** + 10KB 이하 정합.
 
 - `engine/apps/production_line/prompts/plan.txt` (PLAN system prompt, target 5KB)
 - `engine/apps/production_line/prompts/work.txt`
@@ -632,14 +632,14 @@ T-489 prototype 검증 criteria. 1 사이클 finalize 시 자동 차단 확인.
 | 회귀 패턴 | 차단 메커니즘 |
 |----------|-------------|
 | `worker_false_success` | driver 의 `verify_artifact` 룰베이스 검증 (file size > 0, regex match) |
-| `hook_deny` | hook 자체 폐기 (v2 는 hook 의존 X) |
+| `hook_deny` | hook 자체 폐기 (production-line 는 hook 의존 X) |
 | `empty_bash_card` | claude -p 가 산출물 파일에 직접 write, Board UI 의 bash card 의존 X |
 | `stage_header_leak` | driver 가 stdout 제어, Step 헤더 형식 driver template fill |
 | `worktree_commit_missing` | R-WT-1 hard-fail 승격 (commits ahead ≥ 1 의무) |
 
 ---
 
-## 11. 사라지는 인프라 (v1 → v2 통째 폐기)
+## 11. 사라지는 인프라 (v1 → production-line 통째 폐기)
 
 revert (b69645a base) 후에도 v1 의 잔재가 살아있다면 추가 폐기:
 
@@ -661,7 +661,7 @@ revert (b69645a base) 후에도 v1 의 잔재가 살아있다면 추가 폐기:
 
 ### 11.3 보존 대상
 
-- `engine/core/` — v1 core 모듈 일부는 driver 안에서 재사용 가능 (`_common.py` 의 path helper 등). 단 v2 driver 가 명세 위반 코드만 사용
+- `engine/core/` — v1 core 모듈 일부는 driver 안에서 재사용 가능 (`_common.py` 의 path helper 등). 단 production-line driver 가 명세 위반 코드만 사용
 - `engine/guards/` — finalize 가드 (R-WT-1 등) 는 driver 가 호출
 - `engine/flow/` — kanban CLI / kanban data model 보존
 - `engine/git/` — git 헬퍼 보존
@@ -754,7 +754,7 @@ Board UI 의 workflow-bar / kanban verdict 배지 모두 본 stream 으로 갱�
 - T-488 삭제 (검증 대상 T-486 사라짐)
 - working tree clean, push 보류
 
-### Phase 1 — v2 명세 박제 (진행 중)
+### Phase 1 — production-line 명세 박제 (진행 중)
 
 - `engine/apps/production_line/SPEC.md` 신설 (본 문서)
 - `.claude/rules/workflow/workflow.md` 갱신 (오케스트레이터 섹션 → driver, Step/Phase 어휘 정정)
@@ -782,7 +782,7 @@ Board UI 의 workflow-bar / kanban verdict 배지 모두 본 stream 으로 갱�
 
 - Phase 4 — 멀티 Phase 격리 모드 (`spawn_mode: subprocess`) 검증
 - Phase 5 — 멀티 사이클 동시 제출 race 차단 (registryKey 충돌 회귀 차단)
-- Phase 6 — Board UI workflow-bar v2 적용 (SSE event 매핑)
+- Phase 6 — Board UI workflow-bar production-line 적용 (SSE event 매핑)
 - Phase 7 — single 모드 (멀티 폐기 vs 보존 결정)
 
 ---
@@ -795,7 +795,7 @@ Board UI 의 workflow-bar / kanban verdict 배지 모두 본 stream 으로 갱�
 
 ### 15.2 변경 절차
 
-- v2 명세 변경 = 본 문서 갱신 + 사용자 합의
+- production-line 명세 변경 = 본 문서 갱신 + 사용자 합의
 - 합의 없는 자율 갱신 금지 (general.md "추측 금지" 룰 적용)
 - 변경 시 `## 변경 이력` 섹션에 날짜·항목·근거 기록
 
@@ -813,7 +813,7 @@ Stage 3-E (§0.1 책임 분담 캐논 박제) 의 작동은 본 T-494 같은 단
 
 | 날짜 | 항목 | 근거 |
 |------|------|------|
-| 2026-05-14 | v2.0.0 초안 작성 (T-489 Phase 1) | 사용자 통찰 시퀀스 (오케스트레이터 폐지 → claude -p 모델 → file-based pipeline → 통째 주입 → 룰베이스 재시도) |
+| 2026-05-14 | production-line 1.0.0 초안 작성 (T-489 Phase 1) | 사용자 통찰 시퀀스 (오케스트레이터 폐지 → claude -p 모델 → file-based pipeline → 통째 주입 → 룰베이스 재시도) |
 | 2026-05-15 | §7.1 + §9.2 — driver 룰베이스 12룰 재검증 시기를 VALIDATE → DONE 단계로 정정 | T-490 Phase 3 검증 회귀 발견 (VALIDATE 시점에 evaluate 호출 시 report.md / step.end DONE 미생성으로 거짓 FAIL 3건 = R-EXIST-1 / R-METRIC-2 / R-PATH-1) |
 | 2026-05-15 | §9.1.1 — command 별 worktree 분기 정책 도입 (Stage 3-D) | T-489 Stage 3-D — implement 의무 / research·review worktree-less / R-WT-1 SKIP 정합 (commit e73dfc1 + 79bf36d) |
 | 2026-05-15 | §0.1 책임 분담 캐논 신설 (Stage 3-E) — driver=12룰+commit+kanban+FSM 결정론 / LLM=자연어 산출만. §3.2 / §7.1 / §7.2 정합 | T-493 smoke 에서 LLM verdict (WARN) ≡ driver verdict (FAIL) 충돌 발견. validate.txt 가 LLM 에게 12룰 평가시키고 verdict 산출시킨 룰 위반 + work.txt 의 git commit 누락. 사용자 명시 캐논 박제 (commit ? + ?) |

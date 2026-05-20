@@ -7,9 +7,9 @@ from engine.core.workflows import (
     WorkflowRun,
     WorkflowRunRef,
     WorkflowStage,
-    canonicalize_v2_step,
-    stage_from_v2_step,
-    stage_to_v2_step,
+    canonicalize_production_line_step,
+    stage_from_production_line_step,
+    stage_to_production_line_step,
 )
 
 
@@ -55,16 +55,16 @@ def test_workflow_run_rejects_reordered_stages() -> None:
 
 
 def test_production_line_step_mapping_keeps_status_file_compatibility() -> None:
-    assert stage_from_v2_step("INIT") is WorkflowStage.PREPARE
-    assert stage_from_v2_step("WORK") is WorkflowStage.EXECUTE
-    assert stage_from_v2_step("VALIDATE") is WorkflowStage.VERIFY
-    assert stage_from_v2_step("DONE") is WorkflowStage.COMPLETE
-    assert stage_to_v2_step(WorkflowStage.EXECUTE) == "WORK"
-    assert canonicalize_v2_step("VERIFY") == "VALIDATE"
+    assert stage_from_production_line_step("INIT") is WorkflowStage.PREPARE
+    assert stage_from_production_line_step("WORK") is WorkflowStage.EXECUTE
+    assert stage_from_production_line_step("VALIDATE") is WorkflowStage.VERIFY
+    assert stage_from_production_line_step("DONE") is WorkflowStage.COMPLETE
+    assert stage_to_production_line_step(WorkflowStage.EXECUTE) == "WORK"
+    assert canonicalize_production_line_step("VERIFY") == "VALIDATE"
 
 
 def test_workflow_run_reads_legacy_v2_status() -> None:
-    run = WorkflowRun.from_v2_status(
+    run = WorkflowRun.from_production_line_status(
         run_ref=WorkflowRunRef("WF-T-123-20260520-000000"),
         work_request_ref=WorkRequestRef.parse("T-123"),
         status={

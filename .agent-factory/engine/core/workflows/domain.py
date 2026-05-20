@@ -1,6 +1,6 @@
 """Pure workflow domain model.
 
-V2 runtime keeps its historical step names in status files while the core
+Production-line runtime keeps its historical step names in status files while the core
 domain uses the provider-independent lifecycle:
 
     PREPARE -> PLAN -> EXECUTE -> VERIFY -> REPORT -> COMPLETE
@@ -42,7 +42,7 @@ _NEXT_STAGE: dict[WorkflowStage, tuple[WorkflowStage, ...]] = {
     WorkflowStage.FAILED: (),
 }
 
-V2_STEP_TO_STAGE: dict[str, WorkflowStage] = {
+PRODUCTION_LINE_STEP_TO_STAGE: dict[str, WorkflowStage] = {
     "NONE": WorkflowStage.PREPARE,
     "INIT": WorkflowStage.PREPARE,
     "PLAN": WorkflowStage.PLAN,
@@ -53,7 +53,7 @@ V2_STEP_TO_STAGE: dict[str, WorkflowStage] = {
     "FAILED": WorkflowStage.FAILED,
 }
 
-STAGE_TO_V2_STEP: dict[WorkflowStage, str] = {
+STAGE_TO_PRODUCTION_LINE_STEP: dict[WorkflowStage, str] = {
     WorkflowStage.PREPARE: "INIT",
     WorkflowStage.PLAN: "PLAN",
     WorkflowStage.EXECUTE: "WORK",
@@ -70,8 +70,8 @@ def _coerce_stage(stage: WorkflowStage | str) -> WorkflowStage:
     value = stage.strip().upper()
     if value in WorkflowStage.__members__:
         return WorkflowStage[value]
-    if value in V2_STEP_TO_STAGE:
-        return V2_STEP_TO_STAGE[value]
+    if value in PRODUCTION_LINE_STEP_TO_STAGE:
+        return PRODUCTION_LINE_STEP_TO_STAGE[value]
     raise ValueError(f"unknown workflow stage: {stage!r}")
 
 
@@ -100,33 +100,33 @@ def assert_valid_stage_transition(
     )
 
 
-def stage_from_v2_step(step: str) -> WorkflowStage:
-    """Map a legacy V2 status step to the canonical workflow stage."""
+def stage_from_production_line_step(step: str) -> WorkflowStage:
+    """Map a current production-line status step to the canonical workflow stage."""
 
     value = step.strip().upper()
     try:
-        return V2_STEP_TO_STAGE[value]
+        return PRODUCTION_LINE_STEP_TO_STAGE[value]
     except KeyError as exc:
-        raise ValueError(f"unknown V2 workflow step: {step!r}") from exc
+        raise ValueError(f"unknown production-line workflow step: {step!r}") from exc
 
 
-def stage_to_v2_step(stage: WorkflowStage | str) -> str:
-    """Map a canonical stage back to the current V2 status vocabulary."""
+def stage_to_production_line_step(stage: WorkflowStage | str) -> str:
+    """Map a canonical stage back to the current production-line status vocabulary."""
 
     canonical = _coerce_stage(stage)
     try:
-        return STAGE_TO_V2_STEP[canonical]
+        return STAGE_TO_PRODUCTION_LINE_STEP[canonical]
     except KeyError as exc:
         raise ValueError(f"unknown workflow stage: {stage!r}") from exc
 
 
-def canonicalize_v2_step(step: str) -> str:
-    """Return the normalized V2 step name, accepting canonical stage names too."""
+def canonicalize_production_line_step(step: str) -> str:
+    """Return the normalized production-line step name, accepting canonical stage names too."""
 
     value = step.strip().upper()
-    if value in V2_STEP_TO_STAGE:
+    if value in PRODUCTION_LINE_STEP_TO_STAGE:
         return value
-    return stage_to_v2_step(value)
+    return stage_to_production_line_step(value)
 
 
 @dataclass(frozen=True)
@@ -186,14 +186,14 @@ class WorkflowRun:
         self.stage = nxt
 
     @classmethod
-    def from_v2_status(
+    def from_production_line_status(
         cls,
         *,
         run_ref: WorkflowRunRef,
         work_request_ref: WorkRequestRef,
         status: dict[str, Any],
     ) -> "WorkflowRun":
-        """Build a domain run from the current V2 `status.json` shape."""
+        """Build a domain run from the current production-line `status.json` shape."""
 
         raw_stage = status.get("workflow_stage") or status.get("workflow_step") or "NONE"
         run = cls(

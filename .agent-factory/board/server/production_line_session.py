@@ -180,7 +180,7 @@ class ProductionLineSessionRegistry:
                         'work_dir': work_dir,
                         'worktree_path': worktree_path,
                         'created_at': session.created_at,
-                        'engine_version': 'v2',
+                        'engine_version': 'production_line',
                     }
                 }
                 with open(persist_path, 'w', encoding='utf-8') as f:

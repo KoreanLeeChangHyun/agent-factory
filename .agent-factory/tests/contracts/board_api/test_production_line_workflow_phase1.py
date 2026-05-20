@@ -145,7 +145,7 @@ class TestProductionLineSessionRegistry(unittest.TestCase):
         self.assertEqual(meta['ticket_id'], 'T-013')
         self.assertEqual(meta['command'], 'implement')
         self.assertEqual(meta['worktree_path'], '/tmp/wt13')
-        self.assertEqual(meta['engine_version'], 'v2')
+        self.assertEqual(meta['engine_version'], 'production_line')
 
     def test_load_from_disk(self):
         from board.server.production_line_session import ProductionLineSessionRegistry

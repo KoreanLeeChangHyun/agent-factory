@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from engine.core.ports.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
-from engine.core.workflows import stage_to_v2_step
+from engine.core.workflows import stage_to_production_line_step
 from engine.apps.production_line._spawn import DEFAULT_PERMISSION_MODE, spawn_claude
 
 
@@ -14,7 +14,7 @@ def _step_name(request: LLMRequest) -> str:
     if request.step:
         return request.step
     if request.stage is not None:
-        return stage_to_v2_step(request.stage)
+        return stage_to_production_line_step(request.stage)
     return ""
 
 

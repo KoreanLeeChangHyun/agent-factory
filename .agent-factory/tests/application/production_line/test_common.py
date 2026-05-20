@@ -150,7 +150,7 @@ def test_context_io_roundtrip(tmp_path: Path) -> None:
     payload = read_context(ctx)
     assert payload["schema_version"] == 1
     assert payload["ticket_no"] == "T-489"
-    assert payload["engine_version"] == "v2"
+    assert payload["engine_version"] == "production_line"
     assert payload["feature_branch"] == "feat/T-489"
     assert payload["worktree_path"] == "/tmp/wt/feat-T-489"
     assert payload["title"] == "샘플 티켓 제목"

@@ -1,13 +1,13 @@
-# V2 DDD/TDD Refactor Target
+# Production-line DDD/TDD Refactor Target
 
 ## Goal
 
-V1 workflow code is not a compatibility target. The product core is V2.
+V1 workflow code is not a compatibility target. The product core is Production-line.
 
 The refactor goal is to make the harness understandable to an LLM and safe to
 change with TDD:
 
-- V2 workflow behavior is the canonical contract.
+- Production-line workflow behavior is the canonical contract.
 - Domain concepts are named explicitly.
 - Claude-specific execution is isolated behind adapters.
 - Tests describe behavior at the same boundary where code is changed.
@@ -49,18 +49,18 @@ The default pytest scope is intentionally limited to the canonical root:
 - `tests/`
 
 Stale V1 tests are excluded from default collection in `pytest.ini`. They
-should be deleted or rewritten against V2 before any source directory move.
+should be deleted or rewritten against Production-line before any source directory move.
 
 ## Test Layout Policy
 
-Green V2 and board API tests now live under one canonical root. Older scattered
+Green Production-line and board API tests now live under one canonical root. Older scattered
 roots remain excluded until they are deleted or rewritten.
 
 Canonical roots:
 
-- `tests/domain/v2`
-- `tests/application/v2`
-- `tests/adapters/v2`
+- `tests/domain/production-line`
+- `tests/application/production_line`
+- `tests/adapters/production_line`
 - `tests/contracts/board_api`
 
 Excluded legacy roots:
@@ -86,9 +86,9 @@ Mapping:
 
 | Current area | Target area |
 |---|---|
-| V2 pure rules and plan loading | `tests/domain/v2` |
-| V2 workflow/application behavior | `tests/application/v2` |
-| V2 subprocess, git, template, and tool adapters | `tests/adapters/v2` |
+| Production-line pure rules and plan loading | `tests/domain/production-line` |
+| Production-line workflow/application behavior | `tests/application/production_line` |
+| Production-line subprocess, git, template, and tool adapters | `tests/adapters/production_line` |
 | board API contracts | `tests/contracts/board_api` |
 | hook tests | `tests/adapters/hooks` |
 | git/worktree tests | `tests/adapters/git` |
@@ -161,7 +161,7 @@ engine/
       adapters/
 ```
 
-`engine/v2/` remains the working implementation during migration. Move code only
+`engine/production-line/` remains the working implementation during migration. Move code only
 when tests exist at the new boundary.
 
 ## Domain Model
@@ -300,7 +300,7 @@ Test levels:
 
 ### Phase 0: Baseline
 
-- Keep `engine/v2` behavior green.
+- Keep `engine/production-line` behavior green.
 - Keep `board/server` tests green.
 - Exclude stale V1 tests from default pytest.
 - Document V1 removal inventory.
@@ -316,12 +316,12 @@ Test levels:
 
 - Delete V1-only tests and missing wrapper expectations.
 - Remove docs that present `flow-init`, `flow-step`, `flow-finish` as current.
-- Replace V1 route references with V2 route references.
-- Keep shared utilities only if V2 imports them.
+- Replace V1 route references with Production-line route references.
+- Keep shared utilities only if Production-line imports them.
 
 ### Phase 2: Boundary Extraction
 
-- Extract domain dataclasses and enums from `engine/v2/_common.py`.
+- Extract domain dataclasses and enums from `engine/production-line/_common.py`.
 - Extract ports for LLM, ticket, artifact, event, worktree.
 - Convert step functions to application services.
 - Keep wrappers and board endpoints stable.
@@ -344,7 +344,7 @@ Test levels:
 The refactor baseline is acceptable when:
 
 - `python3 -m pytest` passes from `.agent-factory/`.
-- V1 tests are gone or explicitly rewritten for V2 behavior.
+- V1 tests are gone or explicitly rewritten for Production-line behavior.
 - No user-facing doc describes V1 as the active workflow.
 - Core workflow logic can be understood without reading board handlers.
 - Claude-specific code is located in adapters or hooks, not domain/application.

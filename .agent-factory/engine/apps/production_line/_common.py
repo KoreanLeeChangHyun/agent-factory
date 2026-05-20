@@ -16,10 +16,10 @@ from typing import Any
 
 from engine.core.reporting.templates import load_report_template
 from engine.core.workflows import (
-    V2_STEP_TO_STAGE,
+    PRODUCTION_LINE_STEP_TO_STAGE,
     assert_valid_stage_transition,
-    canonicalize_v2_step,
-    stage_from_v2_step,
+    canonicalize_production_line_step,
+    stage_from_production_line_step,
 )
 
 
@@ -45,12 +45,12 @@ PROJECT_ROOT = _resolve_project_root()
 RUNS_DIR = PROJECT_ROOT / ".agent-factory" / "runs"
 KANBAN_BIN = PROJECT_ROOT / ".agent-factory" / "bin" / "flow-kanban"
 PRODUCTION_LINE_DIR = Path(__file__).resolve().parent
-ENGINE_V2_DIR = PRODUCTION_LINE_DIR  # compatibility alias
+PRODUCTION_LINE_ENGINE_DIR = PRODUCTION_LINE_DIR  # compatibility alias
 PROMPTS_DIR = PRODUCTION_LINE_DIR / "prompts"
 TEMPLATES_DIR = PRODUCTION_LINE_DIR / "templates"
 
 
-WORKFLOW_STEPS = tuple(V2_STEP_TO_STAGE)
+WORKFLOW_STEPS = tuple(PRODUCTION_LINE_STEP_TO_STAGE)
 TERMINAL_STEPS = ("DONE", "FAILED")
 
 
@@ -327,7 +327,7 @@ def read_status(ctx: WorkflowContext) -> dict[str, Any]:
         return {"workflow_step": "NONE", "transitions": []}
     status = json.loads(path.read_text(encoding="utf-8"))
     if "workflow_step" not in status and "workflow_stage" in status:
-        status["workflow_step"] = canonicalize_v2_step(str(status["workflow_stage"]))
+        status["workflow_step"] = canonicalize_production_line_step(str(status["workflow_stage"]))
     return status
 
 
@@ -343,10 +343,10 @@ def update_step(ctx: WorkflowContext, prev: str, nxt: str, *, note: str = "") ->
 
     SPEC.md §3.3 — driver 가 룰베이스로 전이 결정.
     """
-    prev = canonicalize_v2_step(prev)
-    nxt = canonicalize_v2_step(nxt)
-    prev_stage = stage_from_v2_step(prev)
-    next_stage = stage_from_v2_step(nxt)
+    prev = canonicalize_production_line_step(prev)
+    nxt = canonicalize_production_line_step(nxt)
+    prev_stage = stage_from_production_line_step(prev)
+    next_stage = stage_from_production_line_step(nxt)
     if prev != "NONE":
         assert_valid_stage_transition(prev_stage, next_stage)
     elif nxt not in {"INIT", "PLAN", "FAILED"}:
@@ -388,7 +388,7 @@ def write_context(ctx: WorkflowContext) -> None:
         "title": ctx.title,
         "session_ids": dict(ctx.session_ids),
         "wf_session_id": ctx.wf_session_id,
-        "engine_version": "v2",
+        "engine_version": "production_line",
     }
     ctx.context_json_path().write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -454,7 +454,7 @@ def write_metadata(
           "worktree_path": "...",
           "title": "...",
           "wf_session_id": "...",
-          "engine_version": "v2",
+          "engine_version": "production_line",
           "session_ids": {"wf-T-PLAN": "...", ...},
           "workflow_step": "DONE",
           "transitions": [{"from":"INIT","to":"PLAN","ts":"..."}, ...],
@@ -473,7 +473,7 @@ def write_metadata(
         "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else None,
         "title": ctx.title,
         "wf_session_id": ctx.wf_session_id,
-        "engine_version": "v2",
+        "engine_version": "production_line",
         "session_ids": dict(ctx.session_ids),
         "workflow_step": status.get("workflow_step", ctx.current_step),
         "transitions": status.get("transitions", []),
