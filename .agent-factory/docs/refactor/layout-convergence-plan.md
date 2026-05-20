@@ -271,23 +271,48 @@ Acceptance:
 
 ### M13: Validation Core Extraction
 
+Status: complete
+
 Goal:
 
 Move pure validation/verdict logic into `engine/core/validation` while keeping
 V2 compatibility imports.
 
+Completed slice:
+
+- created `engine/core/validation/artifact_rules.py`
+- moved deterministic artifact checks from `engine/v2/_verify.py`
+- kept `engine/v2/_verify.py` as a V2 compatibility export module
+- created `engine/core/planning/loader.py`
+- moved the pure planning loader from `engine/v2/core/plan_loader.py` because
+  core validation needs plan schema validation without a core-to-V2 import
+- kept `engine/v2/core/plan_loader.py` as a V2 compatibility export module
+- deferred `_verify_code.py`, `_validate.py`, and `_verdict.py` because they
+  still depend on subprocess, runtime context, and verdict artifact writing
+
 Acceptance:
 
+- `tests/domain/validation/test_artifact_rules.py` passes
+- `tests/domain/planning/test_loader.py` passes
 - `tests/domain/v2/test_validate.py` passes
 - `tests/domain/v2/test_verify.py` passes
 - `tests/application/v2/test_steps_validate.py` passes
+- `tests/architecture/test_boundaries.py` passes
 - full pytest passes
 
 ### M14: Planning Loader Extraction
 
+Status: partially complete
+
 Goal:
 
 Move plan loading/parsing into `engine/core/planning`.
+
+Remaining scope:
+
+- migrate canonical plan loader tests from V2 naming into `tests/domain/planning`
+- update runtime imports to prefer `engine.core.planning.loader`
+- leave V2 compatibility imports only for legacy callers
 
 Acceptance:
 
@@ -359,5 +384,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 355 passed, 2 skipped
+python3 -m pytest  # 361 passed, 2 skipped
 ```

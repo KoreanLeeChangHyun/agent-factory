@@ -517,12 +517,53 @@ Current verification:
 python3 -m pytest  # 355 passed, 2 skipped
 ```
 
+### M13: Validation Core Extraction
+
+Status: complete
+
+Purpose:
+
+Start the post-M12 layout convergence by moving pure deterministic validation
+rules out of the active V2 runtime package. The pure planning loader was moved
+with this slice because core validation validates `plan.json` schema and the
+architecture boundary forbids core modules from importing V2 runtime modules.
+
+Tasks:
+
+- [x] create `engine/core/validation`
+- [x] move artifact validation rules into
+      `engine/core/validation/artifact_rules.py`
+- [x] keep `engine/v2/_verify.py` as a compatibility export surface
+- [x] move pure plan loading into `engine/core/planning/loader.py`
+- [x] keep `engine/v2/core/plan_loader.py` as a compatibility export surface
+- [x] add direct domain coverage for the new core validation module
+- [x] add direct domain coverage for the new core planning loader
+- [x] leave coupled code checks, verdict writing, and validate-step orchestration
+      in V2 for later slices
+
+Acceptance criteria:
+
+- core validation artifact rules can be imported without using the V2 `_verify`
+  module
+- existing V2 `_verify` imports continue to work
+- existing V2 `core.plan_loader` imports continue to work
+- PLAN, WORK, VALIDATE, REPORT artifact checks keep existing behavior
+- core architecture tests still forbid core-to-V2 imports
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/domain/validation tests/domain/planning tests/domain/v2/test_parse_plan_json.py tests/domain/v2/test_topo_levels.py tests/domain/v2/test_verify.py tests/adapters/v2/test_report_html_verify.py tests/application/v2/test_steps_work.py tests/application/v2/test_steps_validate.py tests/architecture/test_boundaries.py  # 72 passed
+python3 -m pytest  # 361 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13
 ```
 
 Hard dependencies:
