@@ -939,12 +939,42 @@ python3 -m pytest tests/application/flow  # 98 passed
 python3 -m pytest  # 602 passed, 2 skipped, 6 subtests passed
 ```
 
+### M25: Auditor Green Test Migration
+
+Status: complete
+
+Purpose:
+
+Move green flow auditor tests into the canonical application flow test tree.
+
+Tasks:
+
+- [x] add `tests/application/flow/auditor`
+- [x] move auditor dataclass round-trip tests
+- [x] move auditor rubric tests
+- [x] move auditor runner dry-run tests
+- [x] update relocated tests to resolve engine paths from canonical locations
+- [x] keep stale finalization audit hook coverage quarantined for rewrite/delete
+
+Acceptance criteria:
+
+- migrated auditor tests pass from canonical paths
+- canonical tests pass with migrated auditor tests included
+- remaining auditor quarantine is limited to `test_finalization_audit_hook.py`
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/flow/auditor  # 66 passed
+python3 -m pytest  # 668 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25
 ```
 
 Hard dependencies:

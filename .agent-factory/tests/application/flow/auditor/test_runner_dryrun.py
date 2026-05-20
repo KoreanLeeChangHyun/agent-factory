@@ -28,7 +28,7 @@ from unittest.mock import patch
 import pytest
 
 # Add .agent-factory/engine to sys.path so `flow` package is importable.
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[4] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 

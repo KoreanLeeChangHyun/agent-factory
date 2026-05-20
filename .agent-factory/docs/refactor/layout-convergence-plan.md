@@ -585,10 +585,34 @@ Acceptance:
 - full pytest includes migrated flow tests and passes
 - remaining flow quarantine is explicitly narrowed to stale/partial failures
 
+### M25: Auditor Green Test Migration
+
+Status: complete
+
+Goal:
+
+Move green auditor tests out of `engine/flow/auditor/tests` into the canonical
+application flow test tree.
+
+Completed slice:
+
+- added `tests/application/flow/auditor`
+- moved auditor dataclass, rubric, and runner dry-run tests
+- updated relocated tests to resolve `.agent-factory/engine` from the canonical
+  tree
+- left stale `test_finalization_audit_hook.py` quarantined because it imports
+  removed `flow.finalization`
+
+Acceptance:
+
+- migrated auditor tests pass from canonical paths
+- full pytest includes migrated auditor tests and passes
+- remaining auditor quarantine is narrowed to the stale finalization hook test
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 602 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 668 passed, 2 skipped, 6 subtests passed
 ```
