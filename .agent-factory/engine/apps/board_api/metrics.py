@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from board.server._common import api_endpoint
-from board.server.handlers._handler_common import (
+from engine.apps.board_api.handler_common import (
     _import_launch_metrics_cli,
     _import_metrics_cli,
 )

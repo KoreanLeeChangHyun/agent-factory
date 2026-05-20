@@ -16,7 +16,7 @@ import subprocess
 import threading
 from datetime import datetime, timezone
 
-from ._handler_common import _TICKET_RE, _KANBAN_ALL_DIRS
+from engine.apps.board_api.handler_common import _TICKET_RE, _KANBAN_ALL_DIRS
 from ._kanban_done_helpers import (
     handle_kanban_done_force,
     handle_kanban_done_review,

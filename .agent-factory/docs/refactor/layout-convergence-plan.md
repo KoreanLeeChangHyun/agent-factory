@@ -1048,10 +1048,33 @@ Acceptance:
 - board API docstring/decorator and handler/router contract tests pass
 - full pytest passes
 
+### M45: Board API Handler Common App Helper
+
+Status: complete
+
+Goal:
+
+Move shared Board API handler helper constants and lazy imports into
+`engine/apps/board_api`.
+
+Completed slice:
+
+- moved `_handler_common.py` implementation to
+  `engine/apps/board_api/handler_common.py`
+- kept `board/server/handlers/_handler_common.py` as a compatibility export
+- updated Metrics and Kanban handler imports to use the app-boundary helper
+- added focused handler common app tests
+
+Acceptance:
+
+- handler common app tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 775 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 779 passed, 2 skipped, 6 subtests passed
 ```
