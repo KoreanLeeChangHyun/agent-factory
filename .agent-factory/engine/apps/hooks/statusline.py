@@ -21,12 +21,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-# -- sys.path 보장: data.constants import를 위해 scripts/ 디렉터리 추가 --
-_engine_dir = os.path.dirname(os.path.abspath(__file__))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..')
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-from constants import STEP_COLORS, PHASE_COLORS, C_RESET  # noqa: E402
+from engine.constants import C_RESET, PHASE_COLORS, STEP_COLORS
 
 # -- RESET alias (기존 코드 하위 호환) --
 RESET = C_RESET

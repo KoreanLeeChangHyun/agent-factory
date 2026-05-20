@@ -20,7 +20,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/statusline.py"
+    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/apps/hooks/statusline.py"
   },
   "hooks": {
     "SessionStart": [

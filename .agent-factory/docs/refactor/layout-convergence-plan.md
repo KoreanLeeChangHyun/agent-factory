@@ -1336,10 +1336,36 @@ Acceptance:
 - `flow-claude-edit` executes from the repo root
 - full pytest passes
 
+### M57: Move Statusline Into Hook Apps
+
+Status: complete
+
+Goal:
+
+Move the Claude statusline implementation out of the engine root and into the
+hook app boundary.
+
+Completed slice:
+
+- moved `engine/statusline.py` to `engine/apps/hooks/statusline.py`
+- updated `.claude/settings.json` to execute the new statusline path
+- adjusted direct script execution to add `.agent-factory` to `sys.path`
+- updated direct path guard coverage for the new implementation path
+- added focused statusline hook app tests
+- extended layout convergence tests to prevent the legacy root source from
+  returning
+
+Acceptance:
+
+- statusline hook app tests pass
+- statusline command executes from the repo root
+- direct path guard tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 807 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 809 passed, 2 skipped, 6 subtests passed
 ```

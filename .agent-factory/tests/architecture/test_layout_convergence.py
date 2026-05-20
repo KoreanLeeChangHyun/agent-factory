@@ -29,3 +29,9 @@ def test_legacy_engine_claude_edit_source_is_removed() -> None:
     repo_root = Path(__file__).resolve().parents[3]
 
     assert not (repo_root / ".agent-factory" / "engine" / "claude_edit.py").exists()
+
+
+def test_legacy_engine_statusline_source_is_removed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+
+    assert not (repo_root / ".agent-factory" / "engine" / "statusline.py").exists()

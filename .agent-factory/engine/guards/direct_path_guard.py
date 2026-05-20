@@ -42,7 +42,7 @@ _DIRECT_PATH_PATTERN = re.compile(
 # 허용 예외 패턴 (settings.json hooks/statusLine 등에서 고정 호출하는 경로)
 _ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)hooks/"),
-    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/statusline\.py"),
+    re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/(?:apps/hooks/)?statusline\.py"),
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)board/server\.py"),
     re.compile(r"python3(?:\s+-u)?\s+(?:\$CLAUDE_PROJECT_DIR/)?(?:\.agent-factory/|/[^\s]*\.agent-factory/)engine/(?:apps/cli/)?claude_edit\.py"),
 ]
