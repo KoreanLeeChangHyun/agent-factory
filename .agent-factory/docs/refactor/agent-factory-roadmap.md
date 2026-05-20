@@ -1092,12 +1092,45 @@ printf '{"hook_event_name":"SessionStart","cwd":"/home/deus/workspace/claude"}' 
 python3 -m pytest  # 717 passed, 2 skipped, 6 subtests passed
 ```
 
+### M30: PostToolUse Hook App Entrypoint
+
+Status: complete
+
+Purpose:
+
+Continue the hook app boundary by moving PostToolUse implementation out of the
+top-level Claude Code hook path.
+
+Tasks:
+
+- [x] add `engine/apps/hooks/post_tool_use.py`
+- [x] move PostToolUse dispatch behavior behind the app entrypoint
+- [x] preserve Bash `flow-claude end` cleanup handling
+- [x] preserve skill catalog sync dispatch behavior
+- [x] preserve tool and subagent metrics recording
+- [x] keep `.agent-factory/hooks/post-tool-use.py` as a compatibility wrapper
+- [x] add focused PostToolUse app tests
+
+Acceptance criteria:
+
+- PostToolUse app tests pass
+- top-level PostToolUse hook smoke passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_post_tool_use.py  # 5 passed
+printf '{"hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{},"tool_result":{},"duration_ms":1}' | python3 .agent-factory/hooks/post-tool-use.py  # exit 0
+python3 -m pytest  # 722 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30
 ```
 
 Hard dependencies:

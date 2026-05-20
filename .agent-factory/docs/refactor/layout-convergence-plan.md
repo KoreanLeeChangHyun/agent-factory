@@ -705,10 +705,33 @@ Acceptance:
 - top-level `session-start.py` smoke passes
 - full pytest passes
 
+### M30: PostToolUse Hook App Entrypoint
+
+Status: complete
+
+Goal:
+
+Continue the `engine/apps/hooks` boundary by moving PostToolUse behavior out of
+the stable top-level hook script.
+
+Completed slice:
+
+- added `engine/apps/hooks/post_tool_use.py`
+- moved PostToolUse dispatch, catalog sync triggering, Bash cleanup, and
+  metrics recording behind the hook app entrypoint
+- kept `.agent-factory/hooks/post-tool-use.py` as a compatibility wrapper
+- added focused PostToolUse app tests
+
+Acceptance:
+
+- PostToolUse app tests pass
+- top-level `post-tool-use.py` smoke passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 717 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 722 passed, 2 skipped, 6 subtests passed
 ```
