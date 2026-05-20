@@ -2081,12 +2081,46 @@ python3 -m pytest tests/domain/ports/test_llm_port.py tests/application/llm/test
 python3 -m pytest  # 814 passed, 2 skipped, 6 subtests passed
 ```
 
+### M61: Move Session Prompt Injection Into Hook Apps
+
+Status: complete
+
+Purpose:
+
+Move the SessionStart system-prompt injection helper out of `engine/flow` and
+into the hook app boundary.
+
+Tasks:
+
+- [x] move `engine/flow/inject_prompt.py` to
+      `engine/apps/hooks/inject_prompt.py`
+- [x] update SessionStart dispatch to call the hook app path
+- [x] update imports to use `engine.*` from the app location
+- [x] add focused inject prompt hook app tests
+- [x] extend layout convergence tests to prevent the legacy flow source from
+      returning
+
+Acceptance criteria:
+
+- inject prompt hook app tests pass
+- SessionStart hook app tests pass
+- inject prompt script executes from the repo root
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_inject_prompt.py tests/application/apps/test_hooks_session_start.py tests/architecture/test_layout_convergence.py  # 11 passed
+python3 .agent-factory/engine/apps/hooks/inject_prompt.py  # exits 0
+python3 -m pytest  # 816 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61
 ```
 
 Hard dependencies:

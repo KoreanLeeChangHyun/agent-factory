@@ -1444,10 +1444,35 @@ Acceptance:
 - layout convergence architecture test passes
 - full pytest passes
 
+### M61: Move Session Prompt Injection Into Hook Apps
+
+Status: complete
+
+Goal:
+
+Move the SessionStart system-prompt injection helper out of `engine/flow` and
+into the hook app boundary.
+
+Completed slice:
+
+- moved `engine/flow/inject_prompt.py` to `engine/apps/hooks/inject_prompt.py`
+- updated SessionStart dispatch to call the hook app path
+- updated imports to use `engine.*` from the app location
+- added focused inject prompt hook app tests
+- extended layout convergence tests to prevent the legacy flow source from
+  returning
+
+Acceptance:
+
+- inject prompt hook app tests pass
+- SessionStart hook app tests pass
+- inject prompt script executes from the repo root
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 814 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 816 passed, 2 skipped, 6 subtests passed
 ```

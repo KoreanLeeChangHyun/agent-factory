@@ -17,13 +17,15 @@ from __future__ import annotations
 import os
 import sys
 
-_engine_dir: str = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_agent_factory_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+if _agent_factory_dir not in sys.path:
+    sys.path.insert(0, _agent_factory_dir)
 
-from common import resolve_project_root
-from flow.flow_logger import append_log, resolve_work_dir_for_logging
-from flow.session_identifier import is_workflow_session, get_session_ticket_id
+from engine.common import resolve_project_root
+from engine.flow.flow_logger import append_log, resolve_work_dir_for_logging
+from engine.flow.session_identifier import is_workflow_session, get_session_ticket_id
 
 
 def _extract_ticket_id() -> str | None:

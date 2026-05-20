@@ -31,7 +31,7 @@ def run(stdin_data: bytes) -> int:
 
     r = dispatch(
         "HOOK_SESSION_SYSTEM_PROMPT",
-        scripts_dir("flow", "inject_prompt.py"),
+        scripts_dir("apps", "hooks", "inject_prompt.py"),
         stdin_data,
         flags=flags,
     )

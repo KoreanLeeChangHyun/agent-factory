@@ -35,7 +35,7 @@ def test_session_start_run_dispatches_expected_scripts(monkeypatch) -> None:
         ),
         (
             "HOOK_SESSION_SYSTEM_PROMPT",
-            "/agent/engine/flow/inject_prompt.py",
+            "/agent/engine/apps/hooks/inject_prompt.py",
             b'{"hook_event_name":"SessionStart"}',
             False,
         ),
