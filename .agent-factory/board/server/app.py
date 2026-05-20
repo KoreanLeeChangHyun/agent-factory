@@ -1,12 +1,10 @@
-"""app module — resolve_port, is_port_in_use, _run_server."""
+"""app module — board server process entrypoint."""
 
 from __future__ import annotations
 
 import atexit
-import hashlib
 import os
 import signal
-import socket
 import sys
 import threading
 import time
@@ -28,6 +26,14 @@ from .state import (
     workflow_registry,
     production_line_registry,
 )
+from engine.apps.board_api.runtime import (
+    is_port_in_use,
+    log_reaped_zombies,
+    reap_zombie_children,
+    remove_board_url_file,
+    resolve_port as _resolve_board_port,
+    write_board_url_file,
+)
 
 
 def resolve_port(project_root: str) -> int:
@@ -44,32 +50,11 @@ def resolve_port(project_root: str) -> int:
     Raises:
         RuntimeError: 9900~9999 범위의 포트가 모두 사용 중인 경우
     """
-    range_size = PORT_RANGE_END - PORT_RANGE_START + 1
-    hash_bytes = hashlib.md5(project_root.encode()).digest()
-    hash_int = int.from_bytes(hash_bytes[:4], byteorder='big')
-    start_offset = hash_int % range_size
-
-    for i in range(range_size):
-        port = PORT_RANGE_START + (start_offset + i) % range_size
-        if not is_port_in_use(port):
-            return port
-
-    raise RuntimeError(
-        f"포트 {PORT_RANGE_START}~{PORT_RANGE_END} 범위의 모든 포트가 사용 중입니다."
+    return _resolve_board_port(
+        project_root,
+        range_start=PORT_RANGE_START,
+        range_end=PORT_RANGE_END,
     )
-
-
-def is_port_in_use(port: int) -> bool:
-    """포트가 사용 중인지 확인한다.
-
-    Args:
-        port: 확인할 포트 번호
-
-    Returns:
-        포트가 사용 중이면 True
-    """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('127.0.0.1', port)) == 0
 
 
 def _run_server(project_root: str) -> None:
@@ -81,8 +66,6 @@ def _run_server(project_root: str) -> None:
     os.chdir(project_root)
 
     port = resolve_port(project_root)
-
-    url_file = os.path.join(project_root, '.agent-factory', '.board.url')
 
     # 터미널 세션 persist 파일 경로를 project_root 기준으로 재설정하고 복원
     last_session_file = os.path.join(project_root, '.agent-factory', '.last-session-id')
@@ -106,10 +89,7 @@ def _run_server(project_root: str) -> None:
 
     def _cleanup_runtime_files() -> None:
         """런타임 파일 .agent-factory/.board.url을 삭제한다."""
-        try:
-            os.remove(url_file)
-        except OSError:
-            pass
+        remove_board_url_file(project_root)
 
     def _signal_handler(signum: int, frame: object) -> None:
         """SIGTERM/SIGINT 수신 시 Claude 프로세스와 런타임 파일을 정리하고 종료한다."""
@@ -121,11 +101,7 @@ def _run_server(project_root: str) -> None:
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
 
-    # 런타임 파일 생성 (디렉터리가 없으면 먼저 생성)
-    os.makedirs(os.path.dirname(url_file), exist_ok=True)
-    base = f'http://127.0.0.1:{port}'
-    with open(url_file, 'w') as f:
-        f.write(f'{base}/index.html\n{base}/terminal.html')
+    write_board_url_file(project_root, port)
 
     # Memory 디렉터리를 WATCH_DIRS에 동적 등록 (절대경로 → os.path.join에서 그대로 사용됨)
     mem_dir = _resolve_memory_dir(project_root)
@@ -158,18 +134,7 @@ def _run_server(project_root: str) -> None:
         60초 주기로 수거한다. daemon=True 스레드로 동작하여 서버 종료 시 즉시 정리됨.
         """
         while True:
-            count = 0
-            try:
-                while True:
-                    pid, _status = os.waitpid(-1, os.WNOHANG)
-                    if pid == 0:
-                        break
-                    count += 1
-            except ChildProcessError:
-                # 수거할 자식 프로세스 없음 — 정상 케이스
-                pass
-            if count > 0:
-                logger.info('[zombie-gc] reaped %d child processes', count)
+            log_reaped_zombies(reap_zombie_children(), logger)
             time.sleep(interval)
 
     zombie_gc_thread = threading.Thread(
