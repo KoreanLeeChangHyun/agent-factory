@@ -23,7 +23,7 @@ from pathlib import Path
 from unittest import mock
 
 # sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
@@ -226,7 +226,7 @@ class TestForceDoneToReview(unittest.TestCase):
 
     def test_file_moved_and_status_updated(self) -> None:
         """파일이 done/ → review/ 로 이동하고 status 가 Review 로 갱신된다."""
-        from flow import ticket_repository, ticket_state
+        from flow import ticket_repository
 
         # STATUS_DIR_MAP 과 KANBAN_*_DIR 을 임시 경로로 패치
         patched_map = dict(ticket_repository.STATUS_DIR_MAP)

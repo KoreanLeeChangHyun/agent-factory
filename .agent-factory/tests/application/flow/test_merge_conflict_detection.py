@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest import mock
 
 # sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
@@ -253,7 +253,7 @@ class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
     def test_cmd_done_proceeds_on_success(self) -> None:
         """merge_to_develop 성공 반환 시 cmd_done 이 Done 전이를 완료한다."""
         from flow import kanban_cli
-        from flow import ticket_repository, ticket_state
+        from flow import ticket_repository
         from flow.worktree_manager import MergeResult
 
         fake_merge_result = MergeResult(
@@ -289,8 +289,6 @@ class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
             return_value="feat/T-907-test",
         ), mock.patch.object(
             kanban_cli, "update_result", return_value=None
-        ), mock.patch.object(
-            ticket_state, "validate_transition", return_value=None
         ):
             # SystemExit 없이 완료되어야 한다
             try:

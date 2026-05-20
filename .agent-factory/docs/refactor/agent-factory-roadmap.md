@@ -969,12 +969,47 @@ python3 -m pytest tests/application/flow/auditor  # 66 passed
 python3 -m pytest  # 668 passed, 2 skipped, 6 subtests passed
 ```
 
+### M26: Stale Flow Test Prune And Migration
+
+Status: complete
+
+Purpose:
+
+Finish active flow test cleanup by deleting V1-only tests and moving the
+remaining current flow coverage into `tests/application/flow`.
+
+Tasks:
+
+- [x] delete V1-only tests for removed failure handler, 8-state FSM, HTTP
+      launcher, old force-done generic handler, phase verifier wrapper,
+      sessions status, stop command, and finalization audit hook
+- [x] move merge conflict detection tests to canonical flow tests
+- [x] move undo-done tests to canonical flow tests
+- [x] move worker return parser tests to canonical flow tests
+- [x] update relocated tests for canonical engine path resolution
+- [x] remove stale `ticket_state` imports and obsolete T-446 advisory wording
+      expectation
+- [x] remove empty legacy flow test package markers
+
+Acceptance criteria:
+
+- migrated flow tests pass from canonical paths
+- canonical tests pass with migrated flow tests included
+- legacy flow test roots contain no tracked files
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/flow/test_merge_conflict_detection.py tests/application/flow/test_undo_done.py tests/application/flow/test_worker_return_parser.py  # 47 passed
+python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26
 ```
 
 Hard dependencies:

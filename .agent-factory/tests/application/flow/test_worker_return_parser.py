@@ -26,7 +26,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 # sys.path: .agent-factory/engine 을 포함시켜 flow 패키지 import 가능하게 한다
-_ENGINE_DIR = str(Path(__file__).resolve().parent.parent.parent)
+_ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
@@ -235,8 +235,6 @@ class TestEmitReportAdvisory(unittest.TestCase):
                 self.assertIn(
                     "메인 세션에서 work/ 통합", call_args[0][2], "사용자 수동 수습 경로 안내"
                 )
-                self.assertIn("T-446", call_args[0][2], "T-446 사례 참조 언급")
-
                 # metrics 이벤트 1건 검증
                 mock_append_event.assert_called_once()
                 metrics_call = mock_append_event.call_args

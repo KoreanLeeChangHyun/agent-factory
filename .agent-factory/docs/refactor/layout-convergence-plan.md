@@ -131,7 +131,7 @@ them. Avoid churn that only changes spelling.
 | Board web | `board/static` | `board/web` | not aligned |
 | Hooks | top-level `hooks/`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
-| Legacy tests | excluded roots under `engine/flow/tests` | delete/rewrite under `tests/` | partially aligned |
+| Legacy tests | canonical `tests/` root | `tests/` | aligned |
 
 ## Move Policy
 
@@ -572,7 +572,7 @@ Completed slice:
   and worker commit detection
 - updated relocated tests to resolve `.agent-factory/engine` and hook paths from
   the canonical tree
-- left stale or partially stale flow tests quarantined:
+- left stale or partially stale flow tests quarantined for M26:
   `test_failure_handler.py`, `test_fsm_8state.py`,
   `test_http_launcher_timeout.py`, `test_kanban_force_done_handler.py`,
   `test_merge_conflict_detection.py`, `test_phase_verifier.py`,
@@ -609,10 +609,38 @@ Acceptance:
 - full pytest includes migrated auditor tests and passes
 - remaining auditor quarantine is narrowed to the stale finalization hook test
 
+### M26: Stale Flow Test Prune And Migration
+
+Status: complete
+
+Goal:
+
+Finish active `engine/flow/tests` cleanup by deleting V1-only tests and moving
+the remaining current flow coverage into `tests/application/flow`.
+
+Completed slice:
+
+- deleted V1-only tests for removed failure handler, 8-state FSM,
+  HTTP launcher, old force-done generic handler, phase verifier wrapper,
+  sessions status, stop command, and finalization audit hook
+- moved current merge conflict, undo-done, and worker return parser tests to
+  `tests/application/flow`
+- updated relocated tests to resolve `.agent-factory/engine` from canonical
+  paths
+- removed obsolete `ticket_state` imports and the stale T-446 advisory wording
+  expectation
+- removed empty legacy flow test package markers
+
+Acceptance:
+
+- migrated current flow tests pass from canonical paths
+- full pytest includes migrated current flow tests and passes
+- no tracked files remain under legacy flow test roots
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 668 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
 ```
