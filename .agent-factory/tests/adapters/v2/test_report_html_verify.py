@@ -1,7 +1,7 @@
 """test_report_html_verify.py — T-504 P3 (TDD Red→Green→Refactor).
 
 대상:
-- `engine.v2.templates/report.html` 의 존재 + 필수 토큰 (terracotta / prefers-reduced-motion / placeholder)
+- core reporting `report.html` 의 존재 + 필수 토큰 (terracotta / prefers-reduced-motion / placeholder)
 - `engine.v2._verify.verify_report_html` 의 동작 (T-504 cutover 후 R-EXIST-1 대상 변경)
 - `engine.v2._common.load_template("report.html")` 로 template 본문 로딩 가능
 """
@@ -12,26 +12,27 @@ from pathlib import Path
 
 import pytest
 
-from engine.v2._common import TEMPLATES_DIR, load_template
+from engine.core.reporting.templates import load_report_template, report_template_path
+from engine.v2._common import load_template
 from engine.v2._verify import verify_report_html
 
 
 def test_report_html_template_exists() -> None:
     """`templates/report.html` 파일 실재 + 0 byte 초과."""
-    path = TEMPLATES_DIR / "report.html"
+    path = report_template_path()
     assert path.exists(), f"template missing: {path}"
     assert path.stat().st_size > 0
 
 
 def test_report_html_template_has_terracotta_token() -> None:
     """board.md §6 캐논 — terracotta `#D97757` 1+ 출현."""
-    text = load_template("report.html")
+    text = load_report_template()
     assert "#D97757" in text, "terracotta color token missing"
 
 
 def test_report_html_template_has_prefers_reduced_motion() -> None:
     """접근성 캐논 — `prefers-reduced-motion` 가드 1+ 출현."""
-    text = load_template("report.html")
+    text = load_report_template()
     assert "prefers-reduced-motion" in text, (
         "prefers-reduced-motion accessibility guard missing"
     )
@@ -40,21 +41,25 @@ def test_report_html_template_has_prefers_reduced_motion() -> None:
 def test_report_html_template_has_placeholders() -> None:
     """필수 placeholder 4종 ({{title}} / {{summary}} / {{phase_sections}} /
     {{plan_md_link}}) 모두 존재."""
-    text = load_template("report.html")
+    text = load_report_template()
     for token in ("{{title}}", "{{summary}}", "{{phase_sections}}", "{{plan_md_link}}"):
         assert token in text, f"placeholder {token!r} missing"
 
 
 def test_report_html_template_has_doctype_html() -> None:
-    text = load_template("report.html")
+    text = load_report_template()
     assert "<!DOCTYPE html>" in text or "<!doctype html>" in text.lower()
     assert "<html" in text and "</html>" in text
 
 
 def test_report_html_template_plan_md_link() -> None:
     """plan/plan.md 참조 토큰 — `<a href=` 또는 plain text 'plan.md' 포함."""
-    text = load_template("report.html")
+    text = load_report_template()
     assert "plan.md" in text
+
+
+def test_v2_load_template_keeps_report_html_compatibility() -> None:
+    assert load_template("report.html") == load_report_template()
 
 
 @pytest.fixture

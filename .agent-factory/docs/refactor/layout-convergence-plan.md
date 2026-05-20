@@ -123,7 +123,7 @@ them. Avoid churn that only changes spelling.
 | V2 driver | `engine/v2` | `engine/apps/cli` + application/core services | not aligned |
 | Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
-| Reporting | `engine/v2/steps/report.py`, `templates/report.html` | `core/reporting`, `application/reporting` | not aligned |
+| Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
 | Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/git` | `core/worktrees`, `adapters/git` | not aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py` | `application`/`apps/cli` + adapters | not aligned |
 | Board API | `board/server/handlers` | `engine/apps/board_api` or thin board handlers | not aligned |
@@ -328,16 +328,30 @@ Acceptance:
 
 ### M15: Reporting Service Extraction
 
+Status: complete
+
 Goal:
 
 Move report artifact generation and template ownership toward
 `engine/core/reporting` and `engine/application/reporting`.
+
+Completed slice:
+
+- moved `report.html` template ownership to `engine/core/reporting/templates`
+- added `engine/core/reporting/templates.py`
+- added `engine/application/reporting/prompt.py`
+- updated V2 REPORT step to delegate deterministic prompt construction
+- kept V2 runtime orchestration, retry, verification, and manifest writing in
+  place
+- kept `engine.v2._common.load_template("report.html")` compatibility
 
 Acceptance:
 
 - report HTML tests pass
 - REPORT step tests pass
 - board workflow report artifact tests pass
+- architecture boundary tests pass
+- full pytest passes
 
 ### M16: Worktree/Git Boundary
 
@@ -390,5 +404,5 @@ Acceptance:
 Current baseline:
 
 ```text
-python3 -m pytest  # 363 passed, 2 skipped
+python3 -m pytest  # 366 passed, 2 skipped
 ```

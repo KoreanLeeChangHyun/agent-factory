@@ -594,12 +594,46 @@ python3 -m pytest tests/domain/planning tests/domain/v2/test_plan_loader_compat.
 python3 -m pytest  # 363 passed, 2 skipped
 ```
 
+### M15: Reporting Service Extraction
+
+Status: complete
+
+Purpose:
+
+Move report template ownership and deterministic REPORT prompt construction out
+of the V2 runtime step while keeping the active REPORT driver stable.
+
+Tasks:
+
+- [x] move `report.html` template ownership to `engine/core/reporting`
+- [x] keep `engine.v2._common.load_template("report.html")` compatibility
+- [x] add `engine/application/reporting` prompt construction
+- [x] update the V2 REPORT step to use the reporting application service
+- [x] keep V2 responsible for runtime file reads, session setup, retry, spawn,
+      verification, and manifest writing
+- [x] add focused tests for core template loading and REPORT prompt construction
+
+Acceptance criteria:
+
+- report HTML template tests pass from the core reporting location
+- REPORT prompt construction is covered without V2 runtime imports
+- board workflow report artifact contracts continue to pass
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/reporting tests/adapters/v2/test_report_html_verify.py tests/domain/validation/test_artifact_rules.py tests/application/v2/test_steps_done.py tests/contracts/board_api/test_workflow_report_artifacts.py tests/architecture/test_boundaries.py  # 24 passed
+python3 -m pytest  # 366 passed, 2 skipped
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15
 ```
 
 Hard dependencies:

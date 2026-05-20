@@ -9,8 +9,13 @@ from __future__ import annotations
 
 import json
 
+from engine.application.reporting.prompt import (
+    ReportPromptInput,
+    build_report_initial_prompt,
+)
+from engine.core.reporting.templates import report_template_path
+
 from .._common import (
-    TEMPLATES_DIR,
     WorkflowContext,
     load_prompt,
     write_context,
@@ -46,21 +51,15 @@ def report_step(ctx: WorkflowContext) -> None:
         if verify_verdict
         else "{}"
     )
-    template_path = TEMPLATES_DIR / "report.html"
-    initial_prompt = (
-        f"plan.md (자연어 본문, plan/plan.md):\n{plan_body}\n\n"
-        f"work/**/*.md (모두 통째):\n{joined_work}\n\n"
-        f"validate/report.md (LLM Quality 평가):\n{validate_body}\n\n"
-        f"validate/verdict.json (driver structured VERIFY data):\n{verify_verdict_body}\n\n"
-        f"본 사이클의 사람 가독 보고서 `report.html` 를 `{ctx.report_html_path()}` 에 작성.\n"
-        f"- template: `{template_path}` 를 베이스로 placeholder 4종 채움:\n"
-        f"  - `{{{{title}}}}` → 티켓 제목\n"
-        f"  - `{{{{summary}}}}` → 1~3 문단 자연어 요약 (HTML <p> 인라인)\n"
-        f"  - `{{{{phase_sections}}}}` → Phase 별 산출 인용 (HTML <section> 또는 <h3> 분할)\n"
-        f"  - `{{{{plan_md_link}}}}` → plan.md 링크 텍스트 (기본 'plan/plan.md')\n"
-        f"- 본문에 `plan.md` 토큰 인용 필수 (R-PATH-1 정합).\n"
-        f"- `validate/verdict.json` 의 request/plan/artifacts/checks 상태를 요약하고, final decision 은 COMPLETE 단계 pending 으로 명시.\n"
-        f"- **14+룰 verdict 산출·재평가 금지** (SPEC §0.1) — driver `validate/rules.json` SSOT."
+    initial_prompt = build_report_initial_prompt(
+        ReportPromptInput(
+            plan_body=plan_body,
+            joined_work=joined_work,
+            validate_body=validate_body,
+            verify_verdict_body=verify_verdict_body,
+            report_html_path=ctx.report_html_path(),
+            template_path=report_template_path(),
+        )
     )
     session_id = new_session_uuid()
     logical = logical_session_name(ctx.ticket_no, "REPORT")

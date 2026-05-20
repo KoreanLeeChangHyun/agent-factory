@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from engine.core.reporting.templates import load_report_template
 from engine.core.workflows import (
     V2_STEP_TO_STAGE,
     assert_valid_stage_transition,
@@ -60,6 +61,8 @@ def load_prompt(name: str) -> str:
 
 def load_template(name: str) -> str:
     """driver fill template (retry_prompt / summary / failure)."""
+    if name == "report.html":
+        return load_report_template()
     path = TEMPLATES_DIR / name
     return path.read_text(encoding="utf-8")
 
