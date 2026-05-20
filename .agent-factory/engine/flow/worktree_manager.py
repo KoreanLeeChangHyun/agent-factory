@@ -215,7 +215,7 @@ def _append_worktree_io(
         if error_reason is not None:
             payload["error_reason"] = str(error_reason)[:500]
 
-        from flow.metrics import append_event
+        from engine.core.metrics import append_event
         append_event(work_dir, "worktree.io", payload)
     except Exception:  # noqa: BLE001
         pass

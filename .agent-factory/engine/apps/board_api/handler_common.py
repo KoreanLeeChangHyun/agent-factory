@@ -17,16 +17,16 @@ def _import_metrics_cli():
 
     metrics_cli 모듈을 lazy import 한다.
 
-    engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.metrics_cli`` 를
-    import. board 서버의 sys.path 에는 board/ 만 등록되어 있으므로
+    .agent-factory 디렉터리를 sys.path 에 추가한 뒤
+    ``engine.apps.cli.metrics_cli`` 를 import 한다. board 서버의 sys.path 에는 board/ 만 등록되어 있으므로
     엔진 import 가 필요한 시점에서만 path 를 보충한다.
     """
-    engine_dir = os.path.normpath(
-        os.path.join(os.getcwd(), '.agent-factory', 'engine'),
+    agent_factory_dir = os.path.normpath(
+        os.path.join(os.getcwd(), '.agent-factory'),
     )
-    if engine_dir not in sys.path:
-        sys.path.insert(0, engine_dir)
-    from flow import metrics_cli  # noqa: WPS433
+    if agent_factory_dir not in sys.path:
+        sys.path.insert(0, agent_factory_dir)
+    from engine.apps.cli import metrics_cli  # noqa: WPS433
     return metrics_cli
 
 

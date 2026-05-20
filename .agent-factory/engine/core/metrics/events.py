@@ -8,7 +8,7 @@
 저장 형식:
     JSON Lines (jsonl). 한 줄 = 한 JSON object + ``\\n``.
     공통 필드:
-        - event_type: 11종 카탈로그 중 하나
+        - event_type: 12종 카탈로그 중 하나
         - timestamp: ISO8601 (KST, UTC+9)
         - ticket: T-NNN (또는 None 허용)
         - registry_key: YYYYMMDD-HHMMSS (또는 None 허용)
@@ -33,7 +33,7 @@ IO 규칙:
     - 줄당 4KB 권고 — 본 모듈은 검증만 수행, truncate 는 호출측 책임
 
 예시:
-    >>> from flow.metrics import MetricsWriter, append_event
+    >>> from engine.core.metrics import MetricsWriter, append_event
     >>> w = MetricsWriter("/tmp/run/work", ticket="T-400",
     ...                   registry_key="20260505-183053")
     >>> w.append("step.start", {"step": "INIT", "source": "banner"})
@@ -104,7 +104,7 @@ def schema_for(event_type: str) -> list[str]:
     """event_type 에 대한 payload 필수 키 목록을 반환한다.
 
     Args:
-        event_type: 11종 카탈로그 중 하나.
+        event_type: 12종 카탈로그 중 하나.
 
     Returns:
         필수 payload 키 리스트의 새 복사본 (호출측 변경이 카탈로그에 영향 X).
@@ -145,7 +145,7 @@ def _validate(event_type: str, payload: Any) -> None:
     """event_type / payload 의 형식과 필수 키 존재 여부를 검증한다.
 
     Args:
-        event_type: 11종 카탈로그 중 하나여야 함.
+        event_type: 12종 카탈로그 중 하나여야 함.
         payload: dict 여야 하며 schema_for() 가 요구하는 키를 모두 포함해야 함.
 
     Raises:
@@ -236,7 +236,7 @@ class MetricsWriter:
         """이벤트 한 줄을 jsonl 파일에 append 한다.
 
         Args:
-            event_type: 11종 카탈로그 중 하나.
+            event_type: 12종 카탈로그 중 하나.
             payload: event_type 에 대한 payload dict.
 
         Raises:
@@ -288,7 +288,7 @@ def append_event(
 
     Args:
         work_dir: 워크플로우 작업 디렉터리.
-        event_type: 11종 카탈로그 중 하나.
+        event_type: 12종 카탈로그 중 하나.
         payload: event_type 에 대한 payload dict.
         ticket: 명시 시 .context.json 보다 우선.
         registry_key: 명시 시 .context.json 보다 우선.
@@ -315,7 +315,7 @@ def append_event(
 # ---------------------------------------------------------------------------
 
 def _selfcheck() -> int:
-    """11종 스키마의 정상/누락 케이스를 검증하고 결과 표를 출력한다.
+    """12종 스키마의 정상/누락 케이스를 검증하고 결과 표를 출력한다.
 
     Returns:
         실패 케이스 수. 0 이면 모든 검증 통과.
@@ -324,7 +324,7 @@ def _selfcheck() -> int:
 
     cases: list[tuple[str, str, dict[str, Any], Optional[type[Exception]]]] = []
 
-    # 11종 정상 케이스 (필수 키만 채움)
+    # 12종 정상 케이스 (필수 키만 채움)
     valid_payloads: dict[str, dict[str, Any]] = {
         "step.start": {"step": "INIT", "source": "banner"},
         "step.end": {
@@ -365,6 +365,10 @@ def _selfcheck() -> int:
         "regression.pattern": {
             "kind": "worker_false_success",
             "signal_summary": "Edit count=0 but status=success",
+        },
+        "report.missing": {
+            "report_path": "/tmp/run/work/report.md",
+            "signal_summary": "reporter returned without report.md disk write",
         },
     }
     for et in known_event_types():
@@ -429,7 +433,7 @@ def _selfcheck() -> int:
             verdict = "PASS" if ok else "FAIL"
             rows.append((label + " / " + et, exc_name + " (" + actual + ")", verdict))
 
-        # 정상 케이스 줄 수 검증 (jsonl 라인 수 == 11)
+        # 정상 케이스 줄 수 검증 (jsonl 라인 수 == 12)
         path = metrics_path(tmp)
         with open(path, encoding="utf-8") as fp:
             lines = [ln for ln in fp.read().splitlines() if ln.strip()]

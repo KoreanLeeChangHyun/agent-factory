@@ -36,31 +36,26 @@ from __future__ import annotations
 import argparse
 import glob
 import json
-import os
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-# 같은 engine/ 디렉터리의 flow 패키지를 import 하기 위한 sys.path 보정
-# (다른 엔진 스크립트들과 동일 패턴 — skill_recommender.py 등)
-_engine_dir = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-)
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+_AGENT_FACTORY_DIR = str(Path(__file__).resolve().parents[3])
+if _AGENT_FACTORY_DIR not in sys.path:
+    sys.path.insert(0, _AGENT_FACTORY_DIR)
 
 # W01 모듈 재사용 (이벤트 카탈로그/스키마 단일 진실 공급원)
-from flow.metrics import known_event_types  # noqa: E402,F401
-from flow.metrics import schema_for  # noqa: E402,F401
+from engine.core.metrics import known_event_types  # noqa: E402,F401
+from engine.core.metrics import schema_for  # noqa: E402,F401
 
 # ---------------------------------------------------------------------------
 # 경로 상수
 # ---------------------------------------------------------------------------
 
-# 본 모듈 위치: <ROOT>/.agent-factory/engine/flow/metrics_cli.py
-# → ROOT = parents[3]
-_ROOT: Path = Path(__file__).resolve().parents[3]
+# 본 모듈 위치: <ROOT>/.agent-factory/engine/apps/cli/metrics_cli.py
+# → ROOT = parents[4]
+_ROOT: Path = Path(__file__).resolve().parents[4]
 _RUNS_DIR: Path = _ROOT / ".agent-factory" / "runs"
 
 # regression.pattern.kind 5종 분류 (그 외는 "other" 로 묶음)

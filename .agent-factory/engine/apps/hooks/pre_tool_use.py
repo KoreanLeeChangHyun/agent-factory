@@ -54,7 +54,7 @@ def _record_tool_deny_metrics(
         except Exception:  # noqa: BLE001
             pass
 
-        from flow.metrics import append_event
+        from engine.core.metrics import append_event
 
         append_event(
             work_dir,

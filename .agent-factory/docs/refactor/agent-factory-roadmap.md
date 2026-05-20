@@ -2312,12 +2312,51 @@ python3 -m pytest tests/application/apps/test_cli_maintenance_scripts.py tests/a
 python3 -m pytest  # 829 passed, 2 skipped, 6 subtests passed
 ```
 
+### M68: Move Metrics Core And CLI Boundaries
+
+Status: complete
+
+Purpose:
+
+Move metrics event schema/writer code out of `engine/flow` into the core
+metrics boundary, and move the `flow-metrics` CLI into the app CLI boundary.
+
+Tasks:
+
+- [x] move `engine/flow/metrics.py` to `engine/core/metrics/events.py`
+- [x] add `engine/core/metrics/__init__.py` as the canonical metrics export
+- [x] move `engine/flow/metrics_cli.py` to `engine/apps/cli/metrics_cli.py`
+- [x] update `bin/flow-metrics` to execute the app CLI implementation
+- [x] update runtime metrics emitters to import `engine.core.metrics`
+- [x] update board API lazy import to load the app CLI metrics module
+- [x] fix metrics selfcheck coverage for the full 12-event catalog
+- [x] add focused metrics core and CLI placement tests
+- [x] extend layout convergence tests to prevent legacy flow metrics sources
+      from returning
+
+Acceptance criteria:
+
+- `flow-metrics regression --last 0` executes from the repo root
+- metrics event selfcheck passes
+- metrics core/app placement tests pass
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+.agent-factory/bin/flow-metrics regression --last 0  # exits 0
+python3 .agent-factory/engine/core/metrics/events.py  # exits 0
+python3 -m pytest tests/domain/metrics/test_events.py tests/application/apps/test_metrics_cli.py tests/application/flow/test_worker_return_parser.py tests/application/apps/test_board_api_handler_common.py tests/architecture/test_layout_convergence.py tests/architecture/test_boundaries.py  # 36 passed
+python3 -m pytest  # 835 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65 -> M66 -> M67 -> M68
 ```
 
 Hard dependencies:

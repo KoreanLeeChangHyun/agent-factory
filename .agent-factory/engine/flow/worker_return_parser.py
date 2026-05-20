@@ -168,7 +168,7 @@ def emit_report_advisory(
 
     # metrics 이벤트 emit (try/except 비차단 보호)
     try:
-        from flow.metrics import append_event  # noqa: PLC0415
+        from engine.core.metrics import append_event  # noqa: PLC0415
 
         payload = {
             "report_path": report_path,

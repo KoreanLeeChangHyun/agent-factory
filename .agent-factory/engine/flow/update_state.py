@@ -91,17 +91,12 @@ def _append_fsm_metrics(abs_work_dir: str, from_step: str, to_step: str) -> None
         to_step: 다음 단계 이름 (예: "WORK").
     """
     try:
-        import importlib.util as _ilu
         import time as _time
 
-        _metrics_path = os.path.join(_engine_dir, "flow", "metrics.py")
-        if not os.path.isfile(_metrics_path):
-            return
-        _spec = _ilu.spec_from_file_location("flow.metrics", _metrics_path)
-        if _spec is None or _spec.loader is None:
-            return
-        _metrics_mod = _ilu.module_from_spec(_spec)
-        _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
+        try:
+            from engine.core import metrics as _metrics_mod
+        except ModuleNotFoundError:
+            from core import metrics as _metrics_mod  # type: ignore[no-redef]
 
         # duration 계산: step.start 때 기록한 임시 파일 참조
         _tmp_file = os.path.join(abs_work_dir, f".metrics_step_start_{from_step}.tmp")
@@ -352,23 +347,10 @@ def _handle_metrics_event(args: argparse.Namespace) -> _HandlerResult:
             print("[WARN] metrics-event: work_dir 결정 불가 (registry_key 미전달)", file=sys.stderr)
             return _NO_BANNER
 
-        # metrics.py 동적 import (worktree / main 저장소 양쪽 호환)
-        import importlib.util as _ilu
-        _metrics_candidates = [
-            os.path.join(_engine_dir, "flow", "metrics.py"),
-        ]
-        _metrics_mod = None
-        for _mc in _metrics_candidates:
-            if os.path.isfile(_mc):
-                _spec = _ilu.spec_from_file_location("flow.metrics", _mc)
-                if _spec and _spec.loader:
-                    _metrics_mod = _ilu.module_from_spec(_spec)
-                    _spec.loader.exec_module(_metrics_mod)  # type: ignore[attr-defined]
-                    break
-
-        if _metrics_mod is None:
-            # 정규 import 시도 (sys.path 에 이미 등록된 경우)
-            from flow import metrics as _metrics_mod  # type: ignore[no-redef]
+        try:
+            from engine.core import metrics as _metrics_mod
+        except ModuleNotFoundError:
+            from core import metrics as _metrics_mod  # type: ignore[no-redef]
 
         _metrics_mod.append_event(abs_work_dir, event_type, payload)  # type: ignore[attr-defined]
     except Exception as exc:

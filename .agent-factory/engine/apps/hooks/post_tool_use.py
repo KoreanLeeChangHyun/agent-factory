@@ -37,7 +37,7 @@ def _append_metrics_event(event_type: str, payload: dict) -> None:
         work_dir = _get_metrics_work_dir()
         if not work_dir:
             return
-        from flow.metrics import append_event
+        from engine.core.metrics import append_event
 
         append_event(work_dir, event_type, payload)
     except Exception:  # noqa: BLE001

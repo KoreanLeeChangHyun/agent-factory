@@ -190,7 +190,7 @@ class TestEmitReportAdvisory(unittest.TestCase):
                 f.write("# Report\n")
 
             with patch("flow.worker_return_parser.append_log") as mock_log:
-                with patch("flow.metrics.append_event") as mock_metrics:
+                with patch("engine.core.metrics.append_event") as mock_metrics:
                     emit_report_advisory(
                         registry_key="20260508-225113",
                         abs_work_dir=tmpdir,
@@ -214,12 +214,12 @@ class TestEmitReportAdvisory(unittest.TestCase):
 
             with patch("flow.worker_return_parser.append_log") as mock_log:
                 # metrics.append_event를 동적 import 내부에서도 패치하기 위해
-                # flow.metrics 모듈을 sys.modules에 mock 주입
+                # engine.core.metrics 모듈을 sys.modules에 mock 주입
                 mock_metrics_module = MagicMock()
                 mock_append_event = MagicMock()
                 mock_metrics_module.append_event = mock_append_event
 
-                with patch.dict("sys.modules", {"flow.metrics": mock_metrics_module}):
+                with patch.dict("sys.modules", {"engine.core.metrics": mock_metrics_module}):
                     emit_report_advisory(
                         registry_key="20260508-225113",
                         abs_work_dir=tmpdir,
@@ -279,12 +279,12 @@ class TestEmitReportAdvisory(unittest.TestCase):
             # report.md 없음
 
             with patch("flow.worker_return_parser.append_log") as mock_log:
-                # flow.metrics import를 실패하도록 sys.modules에서 제거
+                # engine.core.metrics import를 실패하도록 sys.modules에서 제거
                 import sys
-                saved = sys.modules.pop("flow.metrics", None)
+                saved = sys.modules.pop("engine.core.metrics", None)
                 try:
-                    # flow.metrics를 ImportError로 강제
-                    sys.modules["flow.metrics"] = None  # type: ignore[assignment]
+                    # engine.core.metrics를 ImportError로 강제
+                    sys.modules["engine.core.metrics"] = None  # type: ignore[assignment]
                     emit_report_advisory(
                         registry_key="20260508-225113",
                         abs_work_dir=tmpdir,
@@ -293,9 +293,9 @@ class TestEmitReportAdvisory(unittest.TestCase):
                 finally:
                     # 복원
                     if saved is not None:
-                        sys.modules["flow.metrics"] = saved
+                        sys.modules["engine.core.metrics"] = saved
                     else:
-                        sys.modules.pop("flow.metrics", None)
+                        sys.modules.pop("engine.core.metrics", None)
 
                 # WARN 로그는 emit되어야 한다
                 mock_log.assert_called_once()

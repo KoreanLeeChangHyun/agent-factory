@@ -309,7 +309,7 @@ def _append_usage_snapshot(
         except Exception:  # noqa: BLE001
             pass
 
-        from flow.metrics import append_event
+        from engine.core.metrics import append_event
         append_event(
             abs_work_dir,
             "usage.snapshot",

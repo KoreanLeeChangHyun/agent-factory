@@ -1618,10 +1618,40 @@ Acceptance:
 - maintenance CLI placement tests pass
 - full pytest passes
 
+### M68: Move Metrics Core And CLI Boundaries
+
+Status: complete
+
+Goal:
+
+Move metrics event schema/writer code out of `engine/flow` into the core
+metrics boundary, and move the `flow-metrics` CLI into the app CLI boundary.
+
+Completed slice:
+
+- moved `engine/flow/metrics.py` to `engine/core/metrics/events.py`
+- added `engine/core/metrics/__init__.py` as the canonical metrics export
+- moved `engine/flow/metrics_cli.py` to `engine/apps/cli/metrics_cli.py`
+- updated `bin/flow-metrics` to execute the app CLI implementation
+- updated runtime metrics emitters to import `engine.core.metrics`
+- updated board API lazy import to load the app CLI metrics module
+- fixed metrics selfcheck coverage for the full 12-event catalog
+- added focused metrics core and CLI placement tests
+- extended layout convergence tests to prevent legacy flow metrics sources from
+  returning
+
+Acceptance:
+
+- `flow-metrics regression --last 0` executes from the repo root
+- metrics event selfcheck passes
+- metrics core/app placement tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 829 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 835 passed, 2 skipped, 6 subtests passed
 ```
