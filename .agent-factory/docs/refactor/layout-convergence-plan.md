@@ -1469,10 +1469,31 @@ Acceptance:
 - inject prompt script executes from the repo root
 - full pytest passes
 
+### M62: Align Flow Catalog Wrapper With Sync Adapter
+
+Status: complete
+
+Goal:
+
+Update the `flow-catalog` CLI wrapper after catalog sync moved to
+`engine/adapters/sync`.
+
+Completed slice:
+
+- updated `bin/flow-catalog` to execute
+  `engine/adapters/sync/catalog_sync.py`
+- added wrapper path regression coverage
+
+Acceptance:
+
+- `flow-catalog --help` executes from the repo root
+- sync adapter tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 816 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 817 passed, 2 skipped, 6 subtests passed
 ```

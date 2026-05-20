@@ -2112,6 +2112,35 @@ Current verification:
 ```text
 python3 -m pytest tests/application/apps/test_hooks_inject_prompt.py tests/application/apps/test_hooks_session_start.py tests/architecture/test_layout_convergence.py  # 11 passed
 python3 .agent-factory/engine/apps/hooks/inject_prompt.py  # exits 0
+python3 -m pytest  # 817 passed, 2 skipped, 6 subtests passed
+```
+
+### M62: Align Flow Catalog Wrapper With Sync Adapter
+
+Status: complete
+
+Purpose:
+
+Update the `flow-catalog` CLI wrapper after catalog sync moved to
+`engine/adapters/sync`.
+
+Tasks:
+
+- [x] update `bin/flow-catalog` to execute
+      `engine/adapters/sync/catalog_sync.py`
+- [x] add wrapper path regression coverage
+
+Acceptance criteria:
+
+- `flow-catalog --help` executes from the repo root
+- sync adapter tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+.agent-factory/bin/flow-catalog --help  # exits 0
+python3 -m pytest tests/adapters/sync/test_sync_adapter_imports.py tests/application/apps/test_hooks_post_tool_use.py tests/application/apps/test_hooks_subagent_stop.py  # 9 passed
 python3 -m pytest  # 816 passed, 2 skipped, 6 subtests passed
 ```
 
@@ -2120,7 +2149,7 @@ python3 -m pytest  # 816 passed, 2 skipped, 6 subtests passed
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62
 ```
 
 Hard dependencies:
