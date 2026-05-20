@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v2 workflow driver wrapper (T-489 / SPEC.md §12.1)
+# workflow driver wrapper (T-489 / SPEC.md §12.1)
 # 호출: flow-wf submit T-NNN [--step PLAN]
 ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
   || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -18,7 +18,7 @@ EOF
   submit)
     cd "$ROOT" || exit 1
     exec env PYTHONPATH="$ROOT/.agent-factory:$PYTHONPATH" \
-      python3 -m engine.v2.driver "$@"
+      python3 -m engine.apps.cli.flow_wf "$@"
     ;;
   *)
     cat <<EOF

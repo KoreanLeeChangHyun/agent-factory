@@ -1030,12 +1030,44 @@ Current verification:
 python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
 ```
 
+### M28: CLI App Entrypoint
+
+Status: complete
+
+Purpose:
+
+Create the target `engine/apps/cli` entrypoint boundary while keeping the active
+V2 driver implementation stable.
+
+Tasks:
+
+- [x] add `engine/apps/cli/flow_wf.py`
+- [x] delegate the app entrypoint to `engine.v2.driver.main`
+- [x] rewire `flow-wf submit` to call `engine.apps.cli.flow_wf`
+- [x] rewire `flow-launcher` to call `engine.apps.cli.flow_wf`
+- [x] add focused delegation tests
+
+Acceptance criteria:
+
+- app entrypoint delegates to the current V2 driver
+- `flow-wf --help` still works
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_cli_flow_wf.py  # 1 passed
+.agent-factory/bin/flow-wf --help  # exit 0
+.agent-factory/bin/flow-launcher --help  # exit 0
+python3 -m pytest  # 716 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28
 ```
 
 Hard dependencies:

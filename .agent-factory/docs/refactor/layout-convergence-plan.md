@@ -35,6 +35,8 @@ Current high-level runtime layout:
       hooks/
       kanban/
       llm/
+    apps/
+      cli/
     v2/
       core/
       prompts/
@@ -121,7 +123,7 @@ them. Avoid churn that only changes spelling.
 | Orchestration app | `engine/application/orchestration` | same | aligned |
 | LLM adapters | `engine/adapters/llm` | same | aligned |
 | Kanban store adapter | `engine/adapters/kanban` | same | aligned |
-| V2 driver | `engine/v2` | `engine/apps/cli` + application/core services | not aligned |
+| V2 driver | `engine/apps/cli`, `engine/v2` | `engine/apps/cli` + application/core services | partially aligned |
 | Planning | `engine/v2/core`, `engine/v2/steps/plan.py` | `core/planning`, `application/planning` | not aligned |
 | Validation | `engine/v2/_verify*.py`, `_validate.py`, `steps/validate.py` | `core/validation`, `application/validation` | not aligned |
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
@@ -657,10 +659,33 @@ Acceptance:
 - canonical pytest still passes
 - `pytest.ini` no longer carries stale legacy test quarantine entries
 
+### M28: CLI App Entrypoint
+
+Status: complete
+
+Goal:
+
+Introduce the target `engine/apps/cli` boundary for the workflow CLI without
+moving the active V2 driver internals.
+
+Completed slice:
+
+- added `engine/apps/cli/flow_wf.py` as the app-layer workflow CLI entrypoint
+- kept `engine.v2.driver` as the active driver implementation
+- rewired `flow-wf submit` and `flow-launcher` to call
+  `engine.apps.cli.flow_wf`
+- added focused delegation coverage for the new CLI app entrypoint
+
+Acceptance:
+
+- CLI app entrypoint delegates to the current V2 driver
+- `flow-wf --help` still works
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 715 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 716 passed, 2 skipped, 6 subtests passed
 ```
