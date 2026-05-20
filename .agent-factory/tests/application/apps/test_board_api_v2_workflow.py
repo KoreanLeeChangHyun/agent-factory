@@ -6,7 +6,7 @@ from board.server.handlers.v2_workflow import (
     _SESSION_PATH_RE as COMPAT_SESSION_PATH_RE,
     V2WorkflowHandlerMixin as CompatV2WorkflowHandlerMixin,
 )
-from engine.apps.board_api.v2_workflow import _SESSION_PATH_RE, V2WorkflowHandlerMixin
+from engine.apps.board_api.production_line_workflow import _SESSION_PATH_RE, V2WorkflowHandlerMixin
 
 
 def test_v2_workflow_handler_compat_export_matches_app_boundary() -> None:

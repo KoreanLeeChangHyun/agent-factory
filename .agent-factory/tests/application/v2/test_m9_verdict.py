@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from engine.v2._common import WorkflowContext
-from engine.v2._emitter import workflow_finish
-from engine.v2._validate import RuleResult, VerdictReport, save_verdict_report
-from engine.v2._verdict import (
+from engine.apps.production_line._common import WorkflowContext
+from engine.apps.production_line._emitter import workflow_finish
+from engine.apps.production_line._validate import RuleResult, VerdictReport, save_verdict_report
+from engine.apps.production_line._verdict import (
     build_final_verdict,
     get_blocking_rule_ids,
     save_final_verdict,
@@ -140,7 +140,7 @@ def test_workflow_finish_posts_final_verdict_extras_for_refinement(tmp_path: Pat
     ctx.wf_session_id = "wf-T-900-test"
     posted: list[tuple[str, dict]] = []
 
-    monkeypatch.setattr("engine.v2._emitter._post_to_board", lambda endpoint, body: posted.append((endpoint, body)))
+    monkeypatch.setattr("engine.apps.production_line._emitter._post_to_board", lambda endpoint, body: posted.append((endpoint, body)))
 
     workflow_finish(
         ctx,

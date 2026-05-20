@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from engine.core.planning import loader as core_loader
-from engine.v2.core import plan_loader as v2_loader
+from engine.apps.production_line.core import plan_loader as v2_loader
 
 
 def test_v2_plan_loader_re_exports_core_types() -> None:

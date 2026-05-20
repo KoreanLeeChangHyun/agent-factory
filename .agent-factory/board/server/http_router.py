@@ -12,7 +12,7 @@ from engine.apps.board_api.sync import SyncHandlerMixin
 from engine.apps.board_api.settings import SettingsHandlerMixin
 from engine.apps.board_api.generic import GenericHandlerMixin
 from engine.apps.board_api.terminal import TerminalHandlerMixin
-from engine.apps.board_api.v2_workflow import V2WorkflowHandlerMixin
+from engine.apps.board_api.production_line_workflow import ProductionLineWorkflowHandlerMixin
 from engine.apps.board_api.kanban import KanbanHandlerMixin
 from engine.apps.board_api.metrics import MetricsHandlerMixin
 from engine.apps.board_api.memory_gc import MemoryGcHandlerMixin
@@ -21,11 +21,11 @@ from engine.apps.board_api.ops_endpoints import OpsHandlerMixin
 
 
 # T-513 P5 — V1 워크플로우 엔진 일괄 폐기. WorkflowHandlerMixin +
-# WorkflowUndoHandlerMixin 제거. V2 단일화 (V2WorkflowHandlerMixin +
-# kanban undo-done 흡수 + settings workflow-sync 흡수).
+# WorkflowUndoHandlerMixin 제거. Production line 단일화
+# (kanban undo-done 흡수 + settings workflow-sync 흡수).
 class BoardHTTPRequestHandler(
     TerminalHandlerMixin,
-    V2WorkflowHandlerMixin,
+    ProductionLineWorkflowHandlerMixin,
     KanbanHandlerMixin,
     MetricsHandlerMixin,
     MemoryGcHandlerMixin,

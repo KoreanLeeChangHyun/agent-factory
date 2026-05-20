@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from engine.v2._common import PROJECT_ROOT, RUNS_DIR, make_work_dir
-from engine.v2.steps import init as init_mod
+from engine.apps.production_line._common import PROJECT_ROOT, RUNS_DIR, make_work_dir
+from engine.apps.production_line.stations import init as init_mod
 
 
 def _kanban_dump(command: str = "implement", title: str = "T-509 worktree fix") -> str:

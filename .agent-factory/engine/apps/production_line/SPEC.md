@@ -184,7 +184,7 @@ WORK Step subprocess 모드의 phase 간 / phase 안 동시 spawn 한계 + 실�
 
 우선순위: env > `.settings` > default. 음수 / 0 / 비숫자 입력 시 default 4 fallback (graceful). `fail_policy` 알 수 없는 값 → `fail_fast` fallback.
 
-driver 구현: `engine/v2/_common.py: get_max_parallel()` + `get_fail_policy()`. `engine/v2/_parallel.py: parallel_spawn()` 가 인프라.
+driver 구현: `engine/apps/production_line/_common.py: get_max_parallel()` + `get_fail_policy()`. `engine/apps/production_line/_parallel.py: parallel_spawn()` 가 인프라.
 
 asyncio 미채택 결정: claude -p subprocess 는 I/O bound + 기존 `_spawn.spawn_claude` 가 동기 `subprocess.Popen` 기반. ThreadPoolExecutor 가 GIL 영향 없이 충분 (subprocess 동안 GIL release). asyncio 이전은 별 트랙.
 
@@ -261,7 +261,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "spawn_mode": "in_place",
       "workers": 1,
       "acceptance_criteria": [
-        "engine/v2/_common.py 신설 + import 가능",
+        "engine/apps/production_line/_common.py 신설 + import 가능",
         "WorkflowContext dataclass 안에 work_dir/registry_key/command 필드 존재",
         "pytest tests/application/v2/test_common.py 통과"
       ]
@@ -274,7 +274,7 @@ T-504 캐논 SSOT (§3.2.0) 에 따라 PLAN 산출은 2 파일로 분리된다:
       "spawn_mode": "in_place",
       "workers": 1,
       "acceptance_criteria": [
-        "engine/v2/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처",
+        "engine/apps/production_line/_emitter.py 신설 + emit(ctx, event, **kwargs) 시그니처",
         "pytest tests/adapters/v2/test_emitter.py 통과"
       ]
     }
@@ -370,7 +370,7 @@ WORK Step subprocess 모드의 phase 간 + phase 안 병렬 spawn 정책. PLAN/V
 
 #### 6.5.1 topo level 동시 spawn (phase 간)
 
-`engine/v2/core/plan_loader.py: topo_levels(phases) -> list[list[Phase]]` 가 deps 그래프를 level 별로 묶음. driver `engine/v2/steps/work.py: _run_subprocess_mode` 가:
+`engine/apps/production_line/core/plan_loader.py: topo_levels(phases) -> list[list[Phase]]` 가 deps 그래프를 level 별로 묶음. driver `engine/apps/production_line/stations/work.py: _run_subprocess_mode` 가:
 
 1. `levels = topo_levels(phases)` 계산
 2. 각 level 별 `parallel_spawn(level_phases, fn=spawn_one_phase, max_workers=get_max_parallel(), fail_fast=...)` 호출
@@ -392,7 +392,7 @@ WORK Step subprocess 모드의 phase 간 + phase 안 병렬 spawn 정책. PLAN/V
 
 `_emitter.phase_start(ctx, phase_id, *, session_id="", worker_index=0, **extra)` / `phase_end(...)` 가 multi-session 박제. 기존 호출자 시그니처 호환 (default 값 → payload 미포함). metrics.jsonl 의 NDJSON record 에 `session_id` / `worker_index` 필드 추가됨.
 
-`engine/v2/_emitter.py` 의 `emit` 함수가 `threading.Lock` 으로 직렬화 — 다중 thread 동시 emit 시 line drop 0 보장.
+`engine/apps/production_line/_emitter.py` 의 `emit` 함수가 `threading.Lock` 으로 직렬화 — 다중 thread 동시 emit 시 line drop 0 보장.
 
 board POST endpoint (`/api/v2/sessions/<id>/phase`) body 는 T-495 P1 캐논 호환 보존 — 추가 필드는 metrics.jsonl 측만 박제.
 
@@ -537,10 +537,10 @@ result = subprocess.run(
 
 v1 의 SKILL.md (15KB) 가 SDK cap (10KB) 으로 잘리던 문제 → v2 는 **각 Step 의 system prompt 가 별도** + 10KB 이하 정합.
 
-- `engine/v2/prompts/plan.txt` (PLAN system prompt, target 5KB)
-- `engine/v2/prompts/work.txt`
-- `engine/v2/prompts/validate.txt`
-- `engine/v2/prompts/report.txt`
+- `engine/apps/production_line/prompts/plan.txt` (PLAN system prompt, target 5KB)
+- `engine/apps/production_line/prompts/work.txt`
+- `engine/apps/production_line/prompts/validate.txt`
+- `engine/apps/production_line/prompts/report.txt`
 
 driver 가 `--append-system-prompt` 로 전달. SDK cap 회피 확실.
 
@@ -656,7 +656,7 @@ revert (b69645a base) 후에도 v1 의 잔재가 살아있다면 추가 폐기:
 ### 11.2 신설 wrapper
 
 - `flow-wf` 단일 entrypoint (`.agent-factory/bin/flow-wf`)
-- 호출: `flow-wf submit T-NNN` → `python3 -m engine.v2.driver T-NNN`
+- 호출: `flow-wf submit T-NNN` → `python3 -m engine.apps.production_line T-NNN`
 - 기존 `/wf` 슬래시 명령은 보존 (사용자 인터페이스), 내부적으로 `flow-wf submit` 호출
 
 ### 11.3 보존 대상
@@ -712,7 +712,7 @@ Board UI 의 workflow-bar / kanban verdict 배지 모두 본 stream 으로 갱�
 ## 13. 디렉터리 구조 (신설)
 
 ```
-.agent-factory/engine/v2/
+.agent-factory/engine/apps/production_line/
 ├── SPEC.md                    # 본 문서 (SSOT)
 ├── driver.py                  # 진입점 + 6 Step orchestration
 ├── _common.py                 # path helper, kanban CLI wrapper, status I/O
@@ -756,7 +756,7 @@ Board UI 의 workflow-bar / kanban verdict 배지 모두 본 stream 으로 갱�
 
 ### Phase 1 — v2 명세 박제 (진행 중)
 
-- `engine/v2/SPEC.md` 신설 (본 문서)
+- `engine/apps/production_line/SPEC.md` 신설 (본 문서)
 - `.claude/rules/workflow/workflow.md` 갱신 (오케스트레이터 섹션 → driver, Step/Phase 어휘 정정)
 - 메모리 `project_workflow_v2_orchestrator_to_driver_canon.md` 신설
 
@@ -819,4 +819,4 @@ Stage 3-E (§0.1 책임 분담 캐논 박제) 의 작동은 본 T-494 같은 단
 | 2026-05-15 | §0.1 책임 분담 캐논 신설 (Stage 3-E) — driver=12룰+commit+kanban+FSM 결정론 / LLM=자연어 산출만. §3.2 / §7.1 / §7.2 정합 | T-493 smoke 에서 LLM verdict (WARN) ≡ driver verdict (FAIL) 충돌 발견. validate.txt 가 LLM 에게 12룰 평가시키고 verdict 산출시킨 룰 위반 + work.txt 의 git commit 누락. 사용자 명시 캐논 박제 (commit ? + ?) |
 | 2026-05-18 | T-503 — §0.1 / §0.1.1 / §0.1.2 / §3.2 / §3.2.1 / §3.2.2 / §5.1 / §5.2 / §7.1 / §9 / §9.2 / §9.3 갱신 — 12룰 → 14+룰 (R-CODE-1/2), 산출물 6 영역 + 폐기 5 파일, 검증 2축 분리 (자연어 보고서 LLM / 결정론 코드 driver), TDD 강제 (acceptance_criteria + Red→Green→Refactor) | 사용자 명시 캐논 확장 (산출물 정합화 + 검증 2축 분리 + TDD prompt 강제). 본 cycle 자체는 옛 driver 처리 — R-CODE 는 다음 cycle 적용. |
 | 2026-05-19 | T-504 — §3.2.0 (형식 결정 캐논 SSOT) / §3.2.1 / §3.2.2 / §3.2 Step 책임 / §3.4 PLAN N_max / §4.1 디렉터리 / §4.2 prompt 주입 매트릭스 / §5 plan/ 디렉터리 구조화 (5.1 / 5.1.1 JSON 스키마 / 5.1.2 plan.md 본문 / 5.2 driver parse_plan_json) 갱신 — 산출물 형식 캐논 SSOT 박제 (driver=JSON / LLM↔LLM=md / 사람=HTML). 옛 root `plan.md` (YAML) + 옛 `report.md` (Markdown) cutover 폐기. 신설 `plan/plan.json` + `plan/plan.md` + `report.html` (template + placeholder). | 사용자 명시 (2026-05-18) "누가 읽나 → 형식 결정" 단일 룰. T-489 cutover 정책 일관 — backward compat shim 0건. 본 cycle 의 P1~P6 가 driver `parse_plan_json` + `core/plan_loader.py` + `templates/report.html` + 검증 함수 (`verify_plan_artifacts` / `verify_report_html`) + prompts (plan.txt / report.txt) 통째 마이그레이션. |
-| 2026-05-19 | T-506 — §3.4.1 병렬 spawn 정책 신설 (`max_parallel` default 4 + `V2_MAX_PARALLEL` / `fail_policy` default `fail_fast` + `V2_FAIL_POLICY` env override). §5.2 `workers >= 1` + `deps=[]` siblings 정합 명시. §5.3.1 `workers` 의미 표 신설 (1=단일 / N=N worker 동시 spawn, `work/<id>/W<n>.md` 산출물 매트릭스). §6.5 병렬 spawn 정책 신설 (6.5.1 topo level 동시 spawn / 6.5.2 phase 안 worker 병렬 / 6.5.3 fail_fast / 6.5.4 emit 정합 / 6.5.5 running subprocess kill 미적용). | T-506 사용자 명시 결정 — Planner LLM 이 plan.json 안에서 phase 간 deps + workers 결정. driver 가 결정론적으로 같은 level 동시 spawn + workers>1 nested pool. 인프라 신설: `engine/v2/_parallel.py` (parallel_spawn) + `engine/v2/core/plan_loader.py: topo_levels` + `engine/v2/_common.py: get_max_parallel/get_fail_policy` + `engine/v2/_verify.py: verify_work_md_multi`. asyncio 미채택 결정 (subprocess I/O bound + 기존 `_spawn` 동기 인프라 보존). |
+| 2026-05-19 | T-506 — §3.4.1 병렬 spawn 정책 신설 (`max_parallel` default 4 + `V2_MAX_PARALLEL` / `fail_policy` default `fail_fast` + `V2_FAIL_POLICY` env override). §5.2 `workers >= 1` + `deps=[]` siblings 정합 명시. §5.3.1 `workers` 의미 표 신설 (1=단일 / N=N worker 동시 spawn, `work/<id>/W<n>.md` 산출물 매트릭스). §6.5 병렬 spawn 정책 신설 (6.5.1 topo level 동시 spawn / 6.5.2 phase 안 worker 병렬 / 6.5.3 fail_fast / 6.5.4 emit 정합 / 6.5.5 running subprocess kill 미적용). | T-506 사용자 명시 결정 — Planner LLM 이 plan.json 안에서 phase 간 deps + workers 결정. driver 가 결정론적으로 같은 level 동시 spawn + workers>1 nested pool. 인프라 신설: `engine/apps/production_line/_parallel.py` (parallel_spawn) + `engine/apps/production_line/core/plan_loader.py: topo_levels` + `engine/apps/production_line/_common.py: get_max_parallel/get_fail_policy` + `engine/apps/production_line/_verify.py: verify_work_md_multi`. asyncio 미채택 결정 (subprocess I/O bound + 기존 `_spawn` 동기 인프라 보존). |

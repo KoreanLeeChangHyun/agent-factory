@@ -21,8 +21,8 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.v2._common import WorkflowContext
-from engine.v2 import _emitter as emitter
+from engine.apps.production_line._common import WorkflowContext
+from engine.apps.production_line import _emitter as emitter
 
 
 @pytest.fixture

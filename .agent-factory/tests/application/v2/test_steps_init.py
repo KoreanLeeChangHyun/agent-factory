@@ -12,8 +12,8 @@ from __future__ import annotations
 
 
 
-from engine.v2.steps.init import _maybe_create_worktree, _parse_ticket_meta
-from engine.v2.steps import init as init_mod
+from engine.apps.production_line.stations.init import _maybe_create_worktree, _parse_ticket_meta
+from engine.apps.production_line.stations import init as init_mod
 
 
 _KANBAN_DUMP_TEMPLATE = """## T-491: 샘플 티켓

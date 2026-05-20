@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from engine.v2._spawn import (
+from engine.apps.production_line._spawn import (
     DEFAULT_PERMISSION_MODE,
     SpawnResult,
     _extract_assistant_text,
@@ -82,7 +82,7 @@ def test_spawn_claude_cmd_construction(tmp_path: Path) -> None:
         captured_cmd.extend(cmd)
         return _make_popen_mock(stdout_lines=[], returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         result = spawn_claude(
             prompt_body="hi",
             session_id="11111111-2222-3333-4444-555555555555",
@@ -115,7 +115,7 @@ def test_spawn_claude_resume_cmd(tmp_path: Path) -> None:
         captured_cmd.extend(cmd)
         return _make_popen_mock(stdout_lines=[], returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         spawn_claude_resume(
             prompt_body="retry",
             session_id="abc-uuid",
@@ -140,7 +140,7 @@ def test_spawn_claude_timeout_captured(tmp_path: Path) -> None:
         proc.wait = MagicMock(side_effect=subprocess.TimeoutExpired(cmd=cmd, timeout=1))
         return proc
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         result = spawn_claude(
             prompt_body="",
             session_id="x",
@@ -204,7 +204,7 @@ def test_spawn_parses_ndjson_lines(tmp_path: Path) -> None:
     def fake_popen(cmd, **kwargs):
         return _make_popen_mock(stdout_lines=lines, returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         result = spawn_claude(
             prompt_body="q",
             session_id="11111111-2222-3333-4444-555555555555",
@@ -232,7 +232,7 @@ def test_spawn_on_line_callback_invoked(tmp_path: Path) -> None:
     def fake_popen(cmd, **kwargs):
         return _make_popen_mock(stdout_lines=lines, returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         spawn_claude(
             prompt_body="",
             session_id="11111111-2222-3333-4444-555555555555",
@@ -264,7 +264,7 @@ def test_spawn_on_line_callback_exception_silent(tmp_path: Path) -> None:
     def fake_popen(cmd, **kwargs):
         return _make_popen_mock(stdout_lines=lines, returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         result = spawn_claude(
             prompt_body="",
             session_id="11111111-2222-3333-4444-555555555555",
@@ -295,7 +295,7 @@ def test_spawn_skips_invalid_json_lines(tmp_path: Path) -> None:
     def fake_popen(cmd, **kwargs):
         return _make_popen_mock(stdout_lines=lines, returncode=0)
 
-    with patch("engine.v2._spawn.subprocess.Popen", side_effect=fake_popen):
+    with patch("engine.apps.production_line._spawn.subprocess.Popen", side_effect=fake_popen):
         result = spawn_claude(
             prompt_body="",
             session_id="11111111-2222-3333-4444-555555555555",

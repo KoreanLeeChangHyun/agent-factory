@@ -26,7 +26,7 @@ from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
-_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "v2_workflow.py"
+_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
 _HTTP_ROUTER = _REPO_ROOT / ".agent-factory" / "board" / "server" / "http_router.py"
 
 
@@ -89,7 +89,7 @@ def test_v2_workflow_handlers_have_endpoint_decorator() -> None:
 def test_http_router_v2_dispatch_post_routes_artifacts() -> None:
     """http_router.py do_POST 가 /api/v2/sessions 의 artifacts sub-path 처리."""
     src = _V2_HANDLER.read_text(encoding="utf-8")
-    # v2_workflow.py 내 _v2_dispatch_post 가 sub == 'artifacts' 분기 처리
+    # production_line_workflow.py 내 _v2_dispatch_post 가 sub == 'artifacts' 분기 처리
     assert "sub == 'artifacts'" in src or 'sub == "artifacts"' in src, (
         "POST /api/v2/sessions/<id>/artifacts 분기가 _v2_dispatch_post 에 없음"
     )

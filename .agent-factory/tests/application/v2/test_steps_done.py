@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from engine.v2._common import WorkflowContext
-from engine.v2.steps import done as done_mod
+from engine.apps.production_line._common import WorkflowContext
+from engine.apps.production_line.stations import done as done_mod
 
 
 def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:

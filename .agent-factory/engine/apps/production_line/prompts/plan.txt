@@ -32,7 +32,7 @@
       "spawn_mode": "in_place",
       "workers": 1,
       "acceptance_criteria": [
-        "engine/v2/_common.py 신설 + import 가능",
+        "engine/apps/production_line/_common.py 신설 + import 가능",
         "pytest tests/application/v2/test_common.py 통과"
       ]
     },

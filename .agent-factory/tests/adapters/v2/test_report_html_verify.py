@@ -2,8 +2,8 @@
 
 대상:
 - core reporting `report.html` 의 존재 + 필수 토큰 (terracotta / prefers-reduced-motion / placeholder)
-- `engine.v2._verify.verify_report_html` 의 동작 (T-504 cutover 후 R-EXIST-1 대상 변경)
-- `engine.v2._common.load_template("report.html")` 로 template 본문 로딩 가능
+- `engine.apps.production_line._verify.verify_report_html` 의 동작 (T-504 cutover 후 R-EXIST-1 대상 변경)
+- `engine.apps.production_line._common.load_template("report.html")` 로 template 본문 로딩 가능
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from engine.core.reporting.templates import load_report_template, report_template_path
-from engine.v2._common import load_template
-from engine.v2._verify import verify_report_html
+from engine.apps.production_line._common import load_template
+from engine.apps.production_line._verify import verify_report_html
 
 
 def test_report_html_template_exists() -> None:

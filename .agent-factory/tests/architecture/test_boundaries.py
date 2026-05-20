@@ -50,7 +50,7 @@ def test_core_has_no_runtime_or_provider_imports() -> None:
             "engine.adapters",
             "engine.application",
             "engine.flow",
-            "engine.v2",
+            "engine.apps.production_line",
         ),
     )
 
@@ -63,6 +63,6 @@ def test_application_does_not_import_provider_or_board_implementations() -> None
             "subprocess",
             "engine.adapters",
             "engine.flow",
-            "engine.v2",
+            "engine.apps.production_line",
         ),
     )

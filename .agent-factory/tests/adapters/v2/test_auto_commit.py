@@ -16,7 +16,7 @@ import subprocess
 from pathlib import Path
 
 
-from engine.v2._common import WorkflowContext, auto_commit
+from engine.apps.production_line._common import WorkflowContext, auto_commit
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

@@ -6,7 +6,7 @@ from engine.adapters.llm import claude
 from engine.adapters.llm.claude import ClaudeAdapter
 from engine.core.ports.llm import LLMEvent, LLMRequest
 from engine.core.workflows import WorkflowStage
-from engine.v2._spawn import SpawnResult
+from engine.apps.production_line._spawn import SpawnResult
 
 
 def test_claude_adapter_maps_request_to_existing_spawn(monkeypatch, tmp_path: Path) -> None:

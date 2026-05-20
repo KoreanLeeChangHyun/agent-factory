@@ -14,7 +14,7 @@ def test_board_http_router_composes_app_boundary_mixins() -> None:
     from engine.apps.board_api.settings import SettingsHandlerMixin
     from engine.apps.board_api.sync import SyncHandlerMixin
     from engine.apps.board_api.terminal import TerminalHandlerMixin
-    from engine.apps.board_api.v2_workflow import V2WorkflowHandlerMixin
+    from engine.apps.board_api.production_line_workflow import V2WorkflowHandlerMixin
     from engine.apps.board_api.worktree_commit import WorktreeCommitHandlerMixin
 
     expected = [

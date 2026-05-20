@@ -12,10 +12,10 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.v2._common import WorkflowContext
-from engine.v2._retry import render_retry_prompt, spawn_with_retry
-from engine.v2._spawn import SpawnResult
-from engine.v2._verify import VerifyResult
+from engine.apps.production_line._common import WorkflowContext
+from engine.apps.production_line._retry import render_retry_prompt, spawn_with_retry
+from engine.apps.production_line._spawn import SpawnResult
+from engine.apps.production_line._verify import VerifyResult
 
 
 def _make_ctx(tmp_path: Path) -> WorkflowContext:
@@ -58,8 +58,8 @@ def mock_spawn_calls():
         calls["resume"] += 1
         return SpawnResult(returncode=0, stdout="", stderr="")
 
-    with patch("engine.v2._retry.spawn_claude", side_effect=fake_initial), \
-         patch("engine.v2._retry.spawn_claude_resume", side_effect=fake_resume):
+    with patch("engine.apps.production_line._retry.spawn_claude", side_effect=fake_initial), \
+         patch("engine.apps.production_line._retry.spawn_claude_resume", side_effect=fake_resume):
         yield calls
 
 

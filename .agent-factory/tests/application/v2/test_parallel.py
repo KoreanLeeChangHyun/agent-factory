@@ -1,6 +1,6 @@
 """test_parallel.py — T-506 P3 + P4.
 
-`engine.v2._parallel.parallel_spawn` 은 같은 level 의 phase / worker 를 동시
+`engine.apps.production_line._parallel.parallel_spawn` 은 같은 level 의 phase / worker 를 동시
 실행하는 ThreadPoolExecutor wrapper.
 
 P3: 기본 골격 (성공 / 순서 보존 / max_workers clamp).
@@ -14,8 +14,8 @@ import time
 
 import pytest
 
-from engine.v2 import _common
-from engine.v2._parallel import ParallelOutcome, parallel_spawn
+from engine.apps.production_line import _common
+from engine.apps.production_line._parallel import ParallelOutcome, parallel_spawn
 
 
 # ---------------- P3 기본 골격 ----------------

@@ -1,6 +1,6 @@
-"""V2WorkflowHandlerMixin — v2 driver subprocess 전용 REST + SSE endpoint.
+"""Production-line workflow REST + SSE endpoint.
 
-v1 `/api/v2/wf-event` 단일 endpoint 는 의미별 endpoint 로 분해됨:
+Legacy `/api/v2/wf-event` 단일 endpoint 는 의미별 endpoint 로 분해됨:
   POST /api/v2/sessions                       — 세션 명시 등록 (lazy create 폐기)
   GET  /api/v2/sessions                       — 전체 세션 목록
   GET  /api/v2/sessions/<id>                  — 세션 상세 (step / phase / artifacts / ts)
@@ -12,7 +12,7 @@ v1 `/api/v2/wf-event` 단일 endpoint 는 의미별 endpoint 로 분해됨:
   POST /api/v2/sessions/<id>/finish           — 사이클 종결 통보 (DONE / FAILED)
   GET  /api/v2/sessions/<id>/artifacts/<path> — 산출물 파일 read (runs/.../)
 
-ClaudeProcess 의존 0건. v1 workflow.py handler 와 별도.
+ClaudeProcess 의존 0건. legacy workflow.py handler 와 별도.
 """
 
 from __future__ import annotations
@@ -33,11 +33,12 @@ _SESSION_PATH_RE = re.compile(
 )
 
 
-class V2WorkflowHandlerMixin:
-    """v2 driver subprocess 전용 endpoint mixin.
+class ProductionLineWorkflowHandlerMixin:
+    """Production-line endpoint mixin.
 
     `BoardHTTPRequestHandler` 가 do_GET / do_POST 라우팅 시 본 mixin 의
-    `_handle_v2_*` 메서드를 호출한다.
+        `_handle_v2_*` 메서드를 호출한다. Method names keep the public
+        `/api/v2/*` HTTP contract stable.
     """
 
     # ------------------------------------------------------------------
@@ -816,3 +817,6 @@ class V2WorkflowHandlerMixin:
             'path': rel_path,
             'bytes_written': len(content.encode('utf-8')),
         })
+
+
+V2WorkflowHandlerMixin = ProductionLineWorkflowHandlerMixin

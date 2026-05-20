@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3].parent
-_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "v2_workflow.py"
+_V2_HANDLER = _REPO_ROOT / ".agent-factory" / "engine" / "apps" / "board_api" / "production_line_workflow.py"
 
 
 def _v2_methods() -> set[str]:

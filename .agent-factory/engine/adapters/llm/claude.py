@@ -7,7 +7,7 @@ from pathlib import Path
 
 from engine.core.ports.llm import EventHandler, LLMEvent, LLMRequest, LLMResult
 from engine.core.workflows import stage_to_v2_step
-from engine.v2._spawn import DEFAULT_PERMISSION_MODE, spawn_claude
+from engine.apps.production_line._spawn import DEFAULT_PERMISSION_MODE, spawn_claude
 
 
 def _step_name(request: LLMRequest) -> str:

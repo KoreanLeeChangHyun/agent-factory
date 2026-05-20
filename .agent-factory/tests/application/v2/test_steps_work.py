@@ -23,10 +23,10 @@ from pathlib import Path
 
 import pytest
 
-from engine.v2._common import WorkflowContext, write_status
-from engine.v2._verify import Phase, VerifyResult
-from engine.v2.steps import work as work_module
-from engine.v2.steps.work import _load_deps_block, _load_plan, work_step
+from engine.apps.production_line._common import WorkflowContext, write_status
+from engine.apps.production_line._verify import Phase, VerifyResult
+from engine.apps.production_line.stations import work as work_module
+from engine.apps.production_line.stations.work import _load_deps_block, _load_plan, work_step
 
 
 def _make_ctx(tmp_path: Path) -> WorkflowContext:

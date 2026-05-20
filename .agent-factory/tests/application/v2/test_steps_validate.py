@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from engine.v2._common import WorkflowContext
-from engine.v2.steps import validate as validate_mod
+from engine.apps.production_line._common import WorkflowContext
+from engine.apps.production_line.stations import validate as validate_mod
 
 
 def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
