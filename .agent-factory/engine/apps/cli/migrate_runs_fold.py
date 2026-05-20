@@ -507,9 +507,9 @@ def cmd_apply(root: Path, backup: bool, verify: bool) -> int:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     default_root = (
-        Path(__file__).parent.parent / "runs" / ".history"
+        Path(__file__).resolve().parents[3] / "runs" / ".history"
     )
 
     parser = argparse.ArgumentParser(
@@ -538,7 +538,7 @@ def main() -> None:
         help="(apply only) Compare file count before/after; abort on mismatch",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.mode == "dry-run":
         sys.exit(cmd_dry_run(args.root))

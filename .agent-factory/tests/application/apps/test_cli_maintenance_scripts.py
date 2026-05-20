@@ -19,3 +19,14 @@ def test_flow_migrate_runs_wrapper_points_to_app_cli() -> None:
     wrapper = repo_root / ".agent-factory" / "bin" / "flow-migrate-runs"
 
     assert "engine/apps/cli/migrate_runs_fold.py" in wrapper.read_text(encoding="utf-8")
+
+
+def test_migrate_runs_default_root_points_to_runtime_history(capsys) -> None:
+    from engine.apps.cli import migrate_runs_fold
+
+    try:
+        migrate_runs_fold.main(["--help"])
+    except SystemExit:
+        pass
+
+    assert ".agent-factory/runs/.history" in capsys.readouterr().out
