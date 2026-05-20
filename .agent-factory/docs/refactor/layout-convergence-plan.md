@@ -917,10 +917,31 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M39: Settings Board API App Handler
+
+Status: complete
+
+Goal:
+
+Continue the Board API handler migration by moving the settings workflow-sync
+handler into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Settings handler implementation to `engine/apps/board_api/settings.py`
+- kept `board/server/handlers/settings.py` as a compatibility export
+- added focused Settings board API app tests
+
+Acceptance:
+
+- Settings board API app tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 744 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 746 passed, 2 skipped, 6 subtests passed
 ```
