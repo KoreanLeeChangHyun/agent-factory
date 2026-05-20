@@ -2213,12 +2213,50 @@ python3 -m pytest tests/domain/validation/test_link_validator.py tests/contracts
 python3 -m pytest  # 822 passed, 2 skipped, 6 subtests passed
 ```
 
+### M65: Move Skill State Manager Into Core Skills
+
+Status: complete
+
+Purpose:
+
+Move skill activation/archive state management out of `engine/flow` and into the
+target `engine/core/skills` boundary.
+
+Tasks:
+
+- [x] move `engine/flow/skill_state_manager.py` to
+      `engine/core/skills/state.py`
+- [x] update `bin/flow-skill` to execute the core skills implementation
+- [x] update catalog sync to import skill state helpers from
+      `engine.core.skills`
+- [x] remove flow runtime imports from the core skills implementation
+- [x] update direct path guard alias coverage for the new filename
+- [x] add focused skill state placement tests
+- [x] extend layout convergence tests to prevent the legacy flow source from
+      returning
+
+Acceptance criteria:
+
+- `flow-skill --help` executes from the repo root
+- skill state placement tests pass
+- sync adapter tests pass
+- architecture boundary tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+.agent-factory/bin/flow-skill --help  # exits 0
+python3 -m pytest tests/domain/skills/test_skill_state.py tests/adapters/sync/test_sync_adapter_imports.py tests/adapters/hooks/test_pretooluse_regression.py tests/architecture/test_layout_convergence.py tests/architecture/test_boundaries.py  # 20 passed
+python3 -m pytest  # 825 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41 -> M42 -> M43 -> M44 -> M45 -> M46 -> M47 -> M48 -> M49 -> M50 -> M51 -> M52 -> M53 -> M54 -> M55 -> M56 -> M57 -> M58 -> M59 -> M60 -> M61 -> M62 -> M63 -> M64 -> M65
 ```
 
 Hard dependencies:

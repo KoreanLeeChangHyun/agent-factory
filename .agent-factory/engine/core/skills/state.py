@@ -30,13 +30,13 @@ import sys
 # ─── sys.path 설정 ────────────────────────────────────────────────────────────
 
 _SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-_SCRIPTS_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
-if _SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPTS_DIR)
+_AGENT_FACTORY_DIR: str = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
+if _AGENT_FACTORY_DIR not in sys.path:
+    sys.path.insert(0, _AGENT_FACTORY_DIR)
 
 # ─── 공통 모듈 임포트 ─────────────────────────────────────────────────────────
 
-from common import (  # noqa: E402
+from engine.common import (  # noqa: E402
     C_BOLD,
     C_CYAN,
     C_DIM,
@@ -48,7 +48,15 @@ from common import (  # noqa: E402
     load_json_file,
     resolve_project_root,
 )
-from flow.cli_utils import build_common_epilog  # noqa: E402
+
+
+def _build_common_epilog() -> str:
+    """Return CLI help footer without depending on flow runtime modules."""
+    return (
+        "워크플로우 버전: 2.1.25\n"
+        "문서: .agent-factory/docs/ 또는 .claude/rules/workflow.md 참조\n"
+        "티켓 관리: flow-kanban <서브커맨드> --help"
+    )
 
 # ─── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -267,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flow-skill",
         description="스킬 활성(active)/아카이브(archived) 상태 관리 CLI",
-        epilog=build_common_epilog(),
+        epilog=_build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="subcommand", required=True)

@@ -1545,10 +1545,38 @@ Acceptance:
 - architecture boundary tests pass
 - full pytest passes
 
+### M65: Move Skill State Manager Into Core Skills
+
+Status: complete
+
+Goal:
+
+Move skill activation/archive state management out of `engine/flow` and into the
+target `engine/core/skills` boundary.
+
+Completed slice:
+
+- moved `engine/flow/skill_state_manager.py` to `engine/core/skills/state.py`
+- updated `bin/flow-skill` to execute the core skills implementation
+- updated catalog sync to import skill state helpers from `engine.core.skills`
+- removed flow runtime imports from the core skills implementation
+- updated direct path guard alias coverage for the new filename
+- added focused skill state placement tests
+- extended layout convergence tests to prevent the legacy flow source from
+  returning
+
+Acceptance:
+
+- `flow-skill --help` executes from the repo root
+- skill state placement tests pass
+- sync adapter tests pass
+- architecture boundary tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 822 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 825 passed, 2 skipped, 6 subtests passed
 ```

@@ -37,7 +37,7 @@ _agent_factory_dir = os.path.normpath(
 if _agent_factory_dir not in sys.path:
     sys.path.insert(0, _agent_factory_dir)
 
-from engine.flow.skill_state_manager import is_archived, load_skill_state
+from engine.core.skills.state import is_archived, load_skill_state
 from engine.flow.cli_utils import build_common_epilog
 
 from engine.common import (

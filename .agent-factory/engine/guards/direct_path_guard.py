@@ -61,6 +61,7 @@ _CHAINED_HISTORY_SYNC_PATTERN = re.compile(
 ALIAS_MAP: dict[str, str] = {
     "update_state.py": "flow-update",
     "skill_mapper.py": "flow-skillmap",
+    "state.py": "flow-skill",
     "skill_state_manager.py": "flow-skill",
     "plan_validator.py": "flow-validate",
     "prompt_validator.py": "flow-validate-p",
