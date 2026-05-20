@@ -752,10 +752,34 @@ Acceptance:
 - top-level `user-prompt-submit.py` workflow-session smoke passes
 - full pytest passes
 
+### M32: SubagentStop Hook App Entrypoint
+
+Status: complete
+
+Goal:
+
+Move SubagentStop implementation into `engine/apps/hooks` while preserving
+sentinel fail-record behavior and stable top-level hook paths.
+
+Completed slice:
+
+- added `engine/apps/hooks/subagent_stop.py`
+- moved usage tracker dispatch, active workflow logging, and fail-record
+  sentinel scanning behind the hook app entrypoint
+- kept `.agent-factory/hooks/subagent-stop.py` as a compatibility wrapper
+- preserved existing sentinel helper re-exports for compatibility tests
+- added focused SubagentStop app tests
+
+Acceptance:
+
+- SubagentStop app and sentinel tests pass
+- top-level `subagent-stop.py` smoke passes
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 725 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 727 passed, 2 skipped, 6 subtests passed
 ```

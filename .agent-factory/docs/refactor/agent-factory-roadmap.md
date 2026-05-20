@@ -1160,12 +1160,46 @@ printf '{"hook_event_name":"UserPromptSubmit","cwd":"/home/deus/workspace/claude
 python3 -m pytest  # 725 passed, 2 skipped, 6 subtests passed
 ```
 
+### M32: SubagentStop Hook App Entrypoint
+
+Status: complete
+
+Purpose:
+
+Move SubagentStop implementation into the hook app boundary while keeping the
+top-level hook path stable for Claude Code.
+
+Tasks:
+
+- [x] add `engine/apps/hooks/subagent_stop.py`
+- [x] move usage tracker dispatch behind the app entrypoint
+- [x] move active workflow logging behind the app entrypoint
+- [x] preserve fail-record sentinel scanning behavior
+- [x] keep `.agent-factory/hooks/subagent-stop.py` as a compatibility wrapper
+- [x] preserve sentinel helper re-exports for existing tests
+- [x] add focused SubagentStop app tests
+
+Acceptance criteria:
+
+- SubagentStop app tests pass
+- existing fail-record sentinel tests pass
+- top-level SubagentStop hook smoke passes
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_hooks_subagent_stop.py tests/application/flow/test_subagent_stop_sentinel.py  # 10 passed
+printf '{"hook_event_name":"SubagentStop"}' | python3 .agent-factory/hooks/subagent-stop.py  # exit 0
+python3 -m pytest  # 727 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32
 ```
 
 Hard dependencies:
