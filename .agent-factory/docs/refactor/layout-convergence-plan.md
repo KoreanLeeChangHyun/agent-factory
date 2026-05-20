@@ -1121,10 +1121,32 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M48: Terminal Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move Terminal REST/SSE endpoint handlers into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Terminal handler implementation to
+  `engine/apps/board_api/terminal.py`
+- kept `board/server/handlers/terminal.py` as a compatibility export
+- updated Terminal handler imports to use absolute board server dependencies
+- added focused Terminal board API app tests
+
+Acceptance:
+
+- Terminal board API app tests pass
+- board API docstring/decorator and handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 790 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 794 passed, 2 skipped, 6 subtests passed
 ```
