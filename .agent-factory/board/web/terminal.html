@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Factory Terminal</title>
+<title>Agent Factory Console</title>
 <link rel="stylesheet" href="css/core/common.css">
 <link rel="stylesheet" href="css/terminal/layout-and-message.css">
 <link rel="stylesheet" href="css/terminal/tool-box.css">
@@ -19,7 +19,7 @@
     padding: 0;
     height: 100vh;
     overflow: hidden;
-    background: #1e1e1e;
+    background: var(--af-bg, #111315);
     color-scheme: dark;
   }
   #terminal-standalone {
@@ -63,21 +63,21 @@
 <script src="js/terminal/terminal-input.js"></script>
 <script src="js/terminal/session-switcher.js"></script>
 <!-- T-516 — Workflow Tab LocalStorage Single Source (Board.workflowTabStorage).
-     terminal.js init / workflow-sessions.js 의존 → 양쪽보다 먼저 로드. -->
+     terminal.js depends on init / workflow-sessions.js → loads before both. -->
 <script src="js/workflow/workflow-tab-storage.js"></script>
 <script src="js/workflow/workflow-bar.js"></script>
 <script src="js/core/slash-commands.js"></script>
 <!-- REST/SSE client (Board.productionLineWorkflow) for production-line subprocess only.
-     반드시 workflow-sessions.js / session.js 보다 먼저 로드 (의존 측에서 Board.productionLineWorkflow.* 호출). -->
+     Must be loaded before workflow-sessions.js / session.js (calling Board.productionLineWorkflow.* on the dependent side). -->
 <script src="js/workflow/production-line-workflow.js"></script>
 <!-- T-505 P3 — Board.stepOverlay (Step 6 box + Phase sub-panel).
-     Board.productionLineWorkflow.subscribe 에 의존하므로 production-line-workflow.js 뒤에 로드. -->
+     Depends on Board.productionLineWorkflow.subscribe, so loads it after production-line-workflow.js. -->
 <script src="js/workflow/step-overlay.js"></script>
 <script src="js/workflow/workflow-sessions.js"></script>
 <script src="js/terminal/wf-ticket-renderer.js"></script>
 <script src="js/workflow/session.js"></script>
 <!-- memory-core: Quick Prompts API Helper (Board.fetch.getQuickPromptText) Registration.
-     terminal.js 의 Memory 버튼 핸들러가 이 헬퍼를 사용하므로 반드시 terminal.js 이전에 로드. -->
+     The Memory button handler in terminal.js uses this helper, so it must be loaded before terminal.js. -->
 <script src="js/memory/memory-core.js"></script>
 <script src="js/terminal/terminal-branch-sync.js"></script>
 <script src="js/terminal/terminal.js"></script>

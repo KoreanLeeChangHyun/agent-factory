@@ -60,7 +60,7 @@
   // T-383 Phase 1 (VUL-5/S5): Pre-generate the initial active session entries.
   // In the past,  sessionMap={} only reset and switch to the first tab  saveCurrentSession
   // !entry mad to early return and outputNodes of main session is not saved
-  // "Agent Factory Terminal" initial message O/O output when the bug has occurred.
+  // "Agent Factory Console" initial message O/O output when the bug has occurred.
   // In the URL query session path, if external generates the same ID entry first
   // Perform idempotent checks to prevent collisions.
   if (!M._sessionMap[M._activeSessionId]) {
@@ -368,7 +368,7 @@
     var barPct = document.getElementById("terminal-sl-bar-pct");
     if (barFill) {
       barFill.style.width = pct.toFixed(1) + "%";
-      barFill.style.backgroundColor = pct < 60 ? "#3fb950" : pct < 85 ? "#d29922" : "#f85149";
+      barFill.style.backgroundColor = pct < 60 ? "#D97757" : pct < 85 ? "#d29922" : "#f85149";
     }
     if (barPct) barPct.textContent = pct.toFixed(1) + "%";
 
@@ -418,7 +418,7 @@
               "[Error] URL Session '" + failedId + "You can't find it, switched to the main session.";
           }
         })
-        .catch(function () { /* network error: */ }
+        .catch(function () { /* network error: */ })
         .then(function () {
           M._initialSessionChecked = true;
           M._initialSessionInFlight = false;

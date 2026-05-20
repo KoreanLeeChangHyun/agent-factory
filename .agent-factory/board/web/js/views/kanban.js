@@ -165,7 +165,7 @@
       });
     }).then(function (r) {
       if (!r.ok || !r.body.ok) {
-        throw new Error((r.body && (r.body.error || r.body.message)) || "WorkRequest update failed");
+        throw new Error((r.body && (r.body.error || r.body.message)) || "Request update failed");
       }
       setWorkRequestFormStatus(root, "ok", r.body.ticket ? r.body.ticket + " updated" : "Updated");
       if (action === "create") {
@@ -186,7 +186,7 @@
     return ''
       + '<section class="wr-author' + (expanded ? ' expanded' : '') + '">'
       + '<div class="wr-author-head">'
-      + '<div><div class="wr-author-title">' + esc(PRODUCT_LABELS.workRequest) + ' authoring</div>'
+      + '<div><div class="wr-author-title">' + esc(PRODUCT_LABELS.workRequest) + ' Console</div>'
       + '<div class="wr-author-meta">Create, refine, and accept requests before execution.</div></div>'
       + '<button class="wr-author-toggle" type="button">' + (expanded ? 'Hide' : 'Author') + '</button>'
       + '</div>'

@@ -3,88 +3,220 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Factory</title>
-<link rel="stylesheet" href="css/core/common.css">
-<link rel="stylesheet" href="css/core/dashboard.css">
-<link rel="stylesheet" href="css/core/modal.css">
-<link rel="stylesheet" href="css/views/kanban.css?v=20260509-dashind">
-<link rel="stylesheet" href="css/views/viewer.css">
-<link rel="stylesheet" href="css/views/workflow.css">
-<link rel="stylesheet" href="css/views/memory.css">
-<link rel="stylesheet" href="css/views/roadmap.css">
-<link rel="stylesheet" href="css/views/relations.css">
-<link rel="stylesheet" href="css/widgets/settings.css">
-<!-- T-505 P3 — Step 6 Box + Phase sub-Panel Overlay CSS. -->
-<link rel="stylesheet" href="css/workflow/step-overlay.css">
-<link id="hljs-theme-dark" rel="stylesheet" href="css/vendor/highlight-github-dark.min.css" media="(prefers-color-scheme: dark)">
-<link id="hljs-theme-light" rel="stylesheet" href="css/vendor/highlight-github.min.css" media="(prefers-color-scheme: light)">
+<title>Agent Factory Console</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #111315;
+  --border: #2a2f33;
+  --bar: #1a1d20;
+  --text: #e7e2d8;
+  --muted: #9b968e;
+  --accent: #d97757;
+  --console-width: 42%;
+  --divider-width: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.combined-shell {
+  display: grid;
+  grid-template-columns:
+    minmax(320px, var(--console-width))
+    var(--divider-width)
+    minmax(420px, 1fr);
+  width: 100vw;
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
+}
+
+.combined-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: var(--bg);
+}
+
+.pane-label {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(155, 150, 142, .24);
+  border-radius: 4px;
+  background: rgba(26, 29, 32, .86);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+
+.pane-label:hover {
+  border-color: rgba(217, 119, 87, .55);
+  color: var(--accent);
+}
+
+iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+}
+
+.split-divider {
+  position: relative;
+  z-index: 5;
+  width: var(--divider-width);
+  min-width: var(--divider-width);
+  height: 100%;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: var(--bar);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.split-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 42px;
+  border-radius: 2px;
+  background: rgba(155, 150, 142, .45);
+  transform: translate(-50%, -50%);
+}
+
+.split-divider:hover::after,
+.combined-shell.is-resizing .split-divider::after {
+  background: var(--accent);
+}
+
+.combined-shell.is-resizing iframe {
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .combined-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(320px, 44fr) var(--divider-width) minmax(460px, 56fr);
+  }
+
+  .split-divider {
+    width: 100%;
+    height: var(--divider-width);
+    min-width: 0;
+    min-height: var(--divider-width);
+    border-top: 1px solid var(--border);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    border-left: 0;
+    cursor: row-resize;
+  }
+
+  .split-divider::after {
+    width: 42px;
+    height: 2px;
+  }
+}
+</style>
 </head>
-<body data-server-no-reload style="opacity:0;transition:opacity .15s">
-
-<header class="header">
-  <div class="header-title"><span class="accent">Agent</span> Factory</div>
-  <nav class="tabs">
-    <button class="tab" data-view="dashboard">Dashboard</button>
-    <button class="tab" data-view="kanban">WorkRequests</button>
-    <button class="tab" data-view="workflow">Runs</button>
-    <button class="tab" data-view="memory">Contexts</button>
-    <button class="tab" data-view="viewer">Viewer</button>
-  </nav>
-  <button class="header-btn settings-toggle" id="settings-toggle" title="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-</header>
-
-<div class="settings-overlay" id="settings-overlay"></div>
-<div class="settings-panel" id="settings-panel">
-  <div class="settings-header">
-    <h2>Settings</h2>
-    <button class="settings-close" id="settings-close">&times;</button>
-  </div>
-  <div class="settings-body" id="settings-body"></div>
-</div>
-
-<div class="relations-panel" id="relations-panel">
-  <div class="relations-collapsed-bar" id="relations-collapsed-bar">
-    <span class="bar-label">Relations</span>
-    <span class="bar-count" id="relations-bar-count"></span>
-  </div>
-  <div class="relations-panel-content" id="relations-panel-content"></div>
-</div>
-
-<main class="main" id="main">
-  <div class="view" id="view-kanban"></div>
-  <div class="view" id="view-dashboard"></div>
-  <div class="view" id="view-workflow"></div>
-  <div class="view" id="view-viewer"></div>
-  <div class="view" id="view-memory"></div>
+<body>
+<main class="combined-shell" id="combined-shell">
+  <section class="combined-pane" aria-label="Agent Factory Console">
+    <a class="pane-label" href="terminal.html" target="_blank" rel="noopener">Console</a>
+    <iframe src="terminal.html" title="Agent Factory Console"></iframe>
+  </section>
+  <div class="split-divider" id="split-divider" role="separator" aria-label="Resize panes" aria-orientation="vertical" tabindex="0"></div>
+  <section class="combined-pane" aria-label="Agent Factory Board">
+    <a class="pane-label" href="board.html" target="_blank" rel="noopener">Board</a>
+    <iframe src="board.html" title="Agent Factory Board"></iframe>
+  </section>
 </main>
+<script>
+(function () {
+  var shell = document.getElementById("combined-shell");
+  var divider = document.getElementById("split-divider");
+  var storageKey = "agentFactoryConsoleWidth";
+  var legacyStorageKey = "agentFactoryCombinedTerminalWidth";
+  var minConsole = 320;
+  var minBoard = 420;
 
-<script src="js/vendor/chart-4.5.0.min.js" async></script>
-<script src="js/vendor/marked-15.0.0.min.js"></script>
-<script async src="js/vendor/mermaid-11.4.1.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
-<script async src="js/vendor/highlight-11.11.1.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='js/vendor/highlight-languages/';var i=0;function loadNext(){if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';s.onload=loadNext;document.head.appendChild(s);}loadNext();})()"></script>
-<!-- T-321 — markdown renderer pure helpers (UMD). common.js direct load duty (Board.util.* registered). -->
-<script src="js/core/renderer-helpers.js"></script>
-<script src="js/core/common.js"></script>
-<!-- T-516 — Workflow Tab LocalStorage Single Source (Board.workflowTabStorage).
-     kanban.js handleLaunchEvent + submit fetch 응답이 Board.workflowTabStorage.add 호출 → kanban.js 보다 먼저 로드. -->
-<script src="js/workflow/workflow-tab-storage.js"></script>
-<script src="js/views/kanban.js?v=20260509-dragblock"></script>
-<script src="js/views/viewer.js"></script>
-<script src="js/workflow/workflow.js?v=20260509-split"></script>
-<!-- T-495 P2 — Board.productionLineWorkflow entry point (kanban.js handleLaunchEvent is a production-line session id cache registered). -->
-<script src="js/workflow/production-line-workflow.js"></script>
-<!-- T-505 P3 — Board.stepOverlay (Step 6 box + Phase sub-panel).
-     Board.productionLineWorkflow.subscribe 의존 → production-line-workflow.js 뒤에 로드. -->
-<script src="js/workflow/step-overlay.js"></script>
-<script src="js/views/dashboard.js"></script>
-<script src="js/views/roadmap.js"></script>
-<script src="js/views/relations.js"></script>
-<script src="js/memory/memory-gc.js"></script>
-<script src="js/memory/memory-core.js"></script>
-<script src="js/memory/memory-rules-prompt.js"></script>
-<script src="js/memory/memory-quick-prompts.js"></script>
-<script src="js/views/settings.js"></script>
-<script src="js/terminal/wf-ticket-renderer.js"></script>
-<script src="js/core/sse.js?v=20260509-split"></script>
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function applyWidth(px) {
+    var rect = shell.getBoundingClientRect();
+    var max = Math.max(minConsole, rect.width - minBoard - divider.offsetWidth);
+    var next = clamp(px, minConsole, max);
+    shell.style.setProperty("--console-width", next + "px");
+    return next;
+  }
+
+  function restoreWidth() {
+    var saved = Number(localStorage.getItem(storageKey) || localStorage.getItem(legacyStorageKey));
+    if (Number.isFinite(saved) && saved > 0) {
+      applyWidth(saved);
+    }
+  }
+
+  function startResize(event) {
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      return;
+    }
+    event.preventDefault();
+    shell.classList.add("is-resizing");
+    divider.setPointerCapture(event.pointerId);
+
+    function move(moveEvent) {
+      var rect = shell.getBoundingClientRect();
+      var next = applyWidth(moveEvent.clientX - rect.left);
+      localStorage.setItem(storageKey, String(next));
+    }
+
+    function stop(stopEvent) {
+      shell.classList.remove("is-resizing");
+      divider.releasePointerCapture(stopEvent.pointerId);
+      divider.removeEventListener("pointermove", move);
+      divider.removeEventListener("pointerup", stop);
+      divider.removeEventListener("pointercancel", stop);
+    }
+
+    divider.addEventListener("pointermove", move);
+    divider.addEventListener("pointerup", stop);
+    divider.addEventListener("pointercancel", stop);
+  }
+
+  divider.addEventListener("pointerdown", startResize);
+  window.addEventListener("resize", restoreWidth);
+  restoreWidth();
+})();
+</script>
 </body>
 </html>

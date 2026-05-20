@@ -173,9 +173,9 @@ Board.state.reconcileTermStatus = function (serverStatus) {
 
 // ── Constants ──
 const PRODUCT_LABELS = {
-  appTitle: "Agent Factory",
-  workRequest: "WorkRequest",
-  workRequests: "WorkRequests",
+  appTitle: "Agent Factory Console",
+  workRequest: "Request",
+  workRequests: "Requests",
   run: "Run",
   runs: "Runs",
   verification: "Verification",

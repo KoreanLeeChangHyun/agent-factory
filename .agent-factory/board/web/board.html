@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Factory Console</title>
+<link rel="stylesheet" href="css/core/common.css">
+<link rel="stylesheet" href="css/core/dashboard.css">
+<link rel="stylesheet" href="css/core/modal.css">
+<link rel="stylesheet" href="css/views/kanban.css?v=20260509-dashind">
+<link rel="stylesheet" href="css/views/viewer.css">
+<link rel="stylesheet" href="css/views/workflow.css">
+<link rel="stylesheet" href="css/views/memory.css">
+<link rel="stylesheet" href="css/views/roadmap.css">
+<link rel="stylesheet" href="css/views/relations.css">
+<link rel="stylesheet" href="css/widgets/settings.css">
+<!-- T-505 P3 — Step 6 Box + Phase sub-Panel Overlay CSS. -->
+<link rel="stylesheet" href="css/workflow/step-overlay.css">
+<link id="hljs-theme-dark" rel="stylesheet" href="css/vendor/highlight-github-dark.min.css" media="(prefers-color-scheme: dark)">
+<link id="hljs-theme-light" rel="stylesheet" href="css/vendor/highlight-github.min.css" media="(prefers-color-scheme: light)">
+</head>
+<body data-server-no-reload style="opacity:0;transition:opacity .15s">
+
+<header class="header">
+  <div class="header-title"><span class="accent">Agent</span> Factory Console</div>
+  <nav class="tabs">
+    <button class="tab" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="kanban">Requests</button>
+    <button class="tab" data-view="workflow">Runs</button>
+    <button class="tab" data-view="memory">Contexts</button>
+    <button class="tab" data-view="viewer">Viewer</button>
+  </nav>
+  <button class="header-btn settings-toggle" id="settings-toggle" title="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+</header>
+
+<div class="settings-overlay" id="settings-overlay"></div>
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-header">
+    <h2>Settings</h2>
+    <button class="settings-close" id="settings-close">&times;</button>
+  </div>
+  <div class="settings-body" id="settings-body"></div>
+</div>
+
+<div class="relations-panel" id="relations-panel">
+  <div class="relations-collapsed-bar" id="relations-collapsed-bar">
+    <span class="bar-label">Relations</span>
+    <span class="bar-count" id="relations-bar-count"></span>
+  </div>
+  <div class="relations-panel-content" id="relations-panel-content"></div>
+</div>
+
+<main class="main" id="main">
+  <div class="view" id="view-kanban"></div>
+  <div class="view" id="view-dashboard"></div>
+  <div class="view" id="view-workflow"></div>
+  <div class="view" id="view-viewer"></div>
+  <div class="view" id="view-memory"></div>
+</main>
+
+<script src="js/vendor/chart-4.5.0.min.js" async></script>
+<script src="js/vendor/marked-15.0.0.min.js"></script>
+<script async src="js/vendor/mermaid-11.4.1.min.js" onload="mermaid.initialize({startOnLoad:false,theme:'dark',suppressErrors:true})"></script>
+<script async src="js/vendor/highlight-11.11.1.min.js" onload="(function(){var langs=['javascript','typescript','python','css','xml'];var base='js/vendor/highlight-languages/';var i=0;function loadNext(){if(i>=langs.length){hljs.configure({ignoreUnescapedHTML:true});return;}var s=document.createElement('script');s.src=base+langs[i++]+'.min.js';s.onload=loadNext;document.head.appendChild(s);}loadNext();})()"></script>
+<!-- T-321 — markdown renderer pure helpers (UMD). common.js direct load duty (Board.util.* registered). -->
+<script src="js/core/renderer-helpers.js"></script>
+<script src="js/core/common.js"></script>
+<!-- T-516 — Workflow Tab LocalStorage Single Source (Board.workflowTabStorage).
+     kanban.js handleLaunchEvent + submit fetch response calls Board.workflowTabStorage.add → loads before kanban.js. -->
+<script src="js/workflow/workflow-tab-storage.js"></script>
+<script src="js/views/kanban.js?v=20260509-dragblock"></script>
+<script src="js/views/viewer.js"></script>
+<script src="js/workflow/workflow.js?v=20260509-split"></script>
+<!-- T-495 P2 — Board.productionLineWorkflow entry point (kanban.js handleLaunchEvent is a production-line session id cache registered). -->
+<script src="js/workflow/production-line-workflow.js"></script>
+<!-- T-505 P3 — Board.stepOverlay (Step 6 box + Phase sub-panel).
+     Depends on Board.productionLineWorkflow.subscribe → Loaded after production-line-workflow.js. -->
+<script src="js/workflow/step-overlay.js"></script>
+<script src="js/views/dashboard.js"></script>
+<script src="js/views/roadmap.js"></script>
+<script src="js/views/relations.js"></script>
+<script src="js/memory/memory-gc.js"></script>
+<script src="js/memory/memory-core.js"></script>
+<script src="js/memory/memory-rules-prompt.js"></script>
+<script src="js/memory/memory-quick-prompts.js"></script>
+<script src="js/views/settings.js"></script>
+<script src="js/terminal/wf-ticket-renderer.js"></script>
+<script src="js/core/sse.js?v=20260509-split"></script>
+</body>
+</html>

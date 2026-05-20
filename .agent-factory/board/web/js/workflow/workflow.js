@@ -460,7 +460,7 @@ function renderWfDetailView(w) {
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Updated</span><span class="wf-detail-info-value">' + wfEsc(wfFormatTime(w.updated_at)) + "</span></div>";
   const infoTicket = findTicketForWorkflow(w);
   if (infoTicket) {
-    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">WorkRequest</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + wfEsc(infoTicket.number) + '">' + wfEsc(infoTicket.number) + "</span></span></div>";
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Request</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + wfEsc(infoTicket.number) + '">' + wfEsc(infoTicket.number) + "</span></span></div>";
   }
   h += "</div>";
   h += "</div>";
@@ -515,7 +515,7 @@ function renderWfDetailView(w) {
 /** Workflow column definitions (single true source). */
 const WF_COLS = [
   { key: "step",       label: "Stage" },
-  { key: "ticket",     label: "WorkRequest" },
+  { key: "ticket",     label: "Request" },
   { key: "command",    label: "Mode" },
   { key: "task",       label: "Title" },
   { key: "query",      label: "Mature",   nosort: true },

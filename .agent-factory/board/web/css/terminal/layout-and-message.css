@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1e1e1e;
+  background: var(--af-bg);
   overflow: hidden;
 }
 
@@ -23,8 +23,8 @@
 .terminal-session-bar {
   display: flex;
   flex-direction: column;
-  background: #181818;
-  border-bottom: 1px solid #2a2a2a;
+  background: var(--af-surface);
+  border-bottom: 1px solid var(--af-border);
   flex-shrink: 0;
   position: relative;
 }
@@ -47,8 +47,8 @@
 .session-tab-bar {
   display: flex;
   align-items: stretch;
-  background: #141414;
-  border-top: 1px solid #222;
+  background: #15181b;
+  border-top: 1px solid var(--af-border-soft);
   min-height: 28px;
   overflow: hidden;
 }
@@ -59,7 +59,7 @@
   flex: 1;
   overflow-x: auto;
   scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
+  scrollbar-color: var(--af-border) transparent;
 }
 
 .session-tab-list::-webkit-scrollbar {
@@ -71,7 +71,7 @@
 }
 
 .session-tab-list::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--af-border);
   border-radius: 1px;
 }
 
@@ -82,7 +82,7 @@
   padding: 0 10px;
   font-size: 12px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
-  color: #777;
+  color: var(--af-text-subtle);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -93,14 +93,14 @@
 }
 
 .session-tab:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #bbb;
+  background: rgba(231, 226, 216, 0.06);
+  color: var(--af-text-muted);
 }
 
 .session-tab.active {
-  color: #ddd;
-  border-bottom-color: #D97757;
-  background: rgba(217, 119, 87, 0.06);
+  color: var(--af-text);
+  border-bottom-color: var(--af-primary);
+  background: var(--af-primary-soft);
 }
 
 .session-tab-dot {
@@ -112,12 +112,12 @@
 }
 
 .session-tab-dot.running {
-  background: #3fb950;
-  box-shadow: 0 0 4px rgba(63, 185, 80, 0.6);
+  background: var(--af-success);
+  box-shadow: 0 0 4px rgba(111, 159, 122, 0.6);
 }
 
 .session-tab-dot.stopped {
-  background: #555;
+  background: var(--af-text-subtle);
 }
 
 .session-tab-label {
@@ -337,7 +337,10 @@
   background: rgba(255, 255, 255, 0.08);
   color: #888;
 }
-.terminal-sessions-item-status[data-status="running"] { background: rgba(56, 161, 105, 0.25); color: #68d391; }
+.terminal-sessions-item-status[data-status="running"] {
+  background: rgba(217, 119, 87, 0.18);
+  color: var(--af-primary, #D97757);
+}
 .terminal-sessions-item-status[data-status="stopped"] { background: rgba(229, 62, 62, 0.25); color: #fc8181; }
 .terminal-sessions-empty {
   padding: 10px 14px;
@@ -437,13 +440,13 @@
 }
 
 .terminal-btn-start {
-  color: #4ec9b0;
-  border-color: rgba(78, 201, 176, 0.25);
+  color: var(--af-primary, #D97757);
+  border-color: rgba(217, 119, 87, 0.32);
 }
 
 .terminal-btn-start:hover:not(:disabled) {
-  background: rgba(78, 201, 176, 0.1);
-  border-color: rgba(78, 201, 176, 0.5);
+  background: rgba(217, 119, 87, 0.1);
+  border-color: rgba(217, 119, 87, 0.5);
 }
 
 .terminal-btn-kill {
@@ -490,8 +493,8 @@
 }
 
 .terminal-status[data-state="running"] .terminal-status-dot {
-  background: #4ec9b0;
-  box-shadow: 0 0 6px rgba(78, 201, 176, 0.6);
+  background: var(--af-primary, #D97757);
+  box-shadow: 0 0 6px rgba(217, 119, 87, 0.6);
   animation: terminal-pulse 1.5s ease-in-out infinite;
 }
 
@@ -517,7 +520,7 @@
   letter-spacing: 0.5px;
 }
 
-.terminal-status[data-state="running"] .terminal-status-text { color: #4ec9b0; }
+.terminal-status[data-state="running"] .terminal-status-text { color: var(--af-primary, #D97757); }
 .terminal-status[data-state="idle"] .terminal-status-text { color: #dcdcaa; }
 .terminal-status[data-state="error"] .terminal-status-text { color: #f48771; }
 
@@ -637,7 +640,7 @@
 }
 
 .term-slash-result th {
-  color: #4ec9b0;
+  color: var(--af-primary, #D97757);
   text-align: left;
   padding: 3px 8px 3px 0;
   border-bottom: 1px solid #2a3a4a;
@@ -660,7 +663,7 @@
 .term-message h1,
 .term-message h2,
 .term-message h3 {
-  color: #4ec9b0;
+  color: var(--af-primary, #D97757);
   font-weight: bold;
   margin: 12px 0 6px;
   line-height: 1.4;
@@ -687,7 +690,7 @@
   margin: 8px 0;
   line-height: 1.5;
   /* Handling instead of horizontal scroll: pre-wrap,
-     긴 토큰(URL/해시 등)은 컨테이너 폭에서 강제로 깨짐(anywhere). */
+     Long tokens (URL/hash, etc.) are forced to break (anywhere) at the width of the container. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -755,7 +758,7 @@
   padding: 6px 12px;
   color: #ccc;
   /* text-align is given by JS table renderer token.align based inline style.
-     하드코딩 left 를 두면 GFM `:---:` / `---:` 정렬이 모두 무력화된다. */
+     Hardcoding left disables all GFM `:---:` / `---:` alignments. */
 }
 
 .term-table th {
@@ -890,17 +893,17 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   Section 3: Queue Hint — 큐 카운트 + 펼침 패널
+   Section 3: Queue Hint — Queue Count + Expand Panel
    ───────────────────────────────────────────────────────
-   .terminal-input-hint        — 입력 하단 hint 텍스트 (큐 카운트 강조 포함)
-   .terminal-queue-pending-panel  — 큐 entry 펼침 패널 (hint 클릭 시 토글)
-   .terminal-queue-pending-entry  — 패널 내 개별 entry row
-   .terminal-queue-pending-remove — entry row × 삭제 버튼
+   .terminal-input-hint — Input bottom hint text (with cue count highlighting)
+   .terminal-queue-pending-panel — Queue entry expansion panel (toggle when clicking on hint)
+   .terminal-queue-pending-entry — Individual entry rows within a panel
+   .terminal-queue-pending-remove — entry row × delete button
    ═══════════════════════════════════════════════════════ */
 
 /* ── Queue Count emphasis (hint text inner count span) ──
-   busy + 큐 ≥ 1 상태에서 카운트 숫자를 테라코타 오렌지로 강조.
-   hint 전체 색상이 아닌 숫자 span 만 강조하여 시각 계층 최소화.
+   In busy + cue ≥ 1 states, count numbers are highlighted in terracotta orange.
+   hint Minimize visual hierarchy by emphasizing only numeric spans rather than entire colors.
 */
 .terminal-input-hint .queue-count {
   font-weight: 600;
@@ -908,9 +911,9 @@
 }
 
 /* ── Cue Entry Unbreakable Panel ──
-   hint 라인 바로 위, .terminal-input-card 기준 absolute 배치.
-   입력 카드 톤과 일관된 어두운 배경 + outline 테두리.
-   border-left 한쪽 색상 디자인 금지 정책 준수 — outline 방식 채택.
+   Absolute placement based on .terminal-input-card, just above the hint line.
+   Dark background + outline border consistent with input card tone.
+   Border-left Compliance with policy prohibiting one-sided color design — outline method adopted.
 */
 .terminal-queue-pending-panel {
   position: absolute;
@@ -927,8 +930,8 @@
 }
 
 /* ── Entry Row ──
-   각 큐 entry 를 텍스트 + × 버튼 좌우 배치.
-   hover 시 배경 미세 변화로 선택 피드백 제공.
+   Place text + × buttons left and right for each cue entry.
+   Provides selection feedback with subtle background changes when hovering.
 */
 .terminal-queue-pending-entry {
   display: flex;
@@ -952,9 +955,9 @@
 }
 
 /* ── × Delete Button ──
-   16x16, flex-shrink: 0 으로 텍스트 영역 침범 방지.
-   hover: 에러 레드(#f44747) — 삭제 행위 의미론적 색상.
-   처리 중(in-flight) entry 에는 이 버튼을 숨겨 취소 오인 방지.
+   Prevent text area invasion with 16x16, flex-shrink: 0.
+   hover: error red (#f44747) — Delete action semantic color.
+   This button is hidden for in-flight entries to prevent misinterpretation of cancellation.
 */
 .terminal-queue-pending-remove {
   display: inline-flex;
@@ -985,10 +988,10 @@
 }
 
 /* ── Input field queue stack (output card, right upper, right alignment) 
-   busy 중 사용자가 보낸 추가 메시지를 카드로 stack.
-   각 카드는 텍스트 한 줄 ellipsis + × 삭제 버튼.
-   메시지가 길어 잘리면 호버 시 OS tooltip(title 속성)으로 전체 노출.
-   카드 max-width 30% — 입력란 가시성 우선.
+   While busy, additional messages sent by the user are stacked on the card.
+   Each card has one line of text ellipsis + × delete button.
+   If the message is long and truncated, the entire message is displayed as an OS tooltip (title property) when hovered.
+   Card max-width 30% — Prioritize field visibility.
 */
 .terminal-input-queue {
   display: flex;
@@ -1047,10 +1050,10 @@
 /* ═══════════════════════════════════════════════════════
    Section 4: Ticket Attachment Card
    ───────────────────────────────────────────────────────
-   .terminal-ticket-card        — 가로형 카드 컨테이너 (배지 | 본문 | remove)
-   .terminal-ticket-card-cmd    — 명령어 배지 (RSC / IMP / REV)
-   .terminal-ticket-card-body   — 제목 + 부제 본문 영역
-   재사용: .terminal-image-remove — ✕ 버튼 (별도 정의 불필요)
+   .terminal-ticket-card — Horizontal card container (badge | body | remove)
+   .terminal-ticket-card-cmd — Command badge (RSC / IMP / REV)
+   .terminal-ticket-card-body — Title + subtitle body area
+   Reuse: .terminal-image-remove — ✕ button (no separate definition required)
    ═══════════════════════════════════════════════════════ */
 
 /* ── Ticket Card Container ── */
@@ -1098,7 +1101,7 @@
 
 /* Memory Attachment Card — Ticket and visual separators with the dealer tone. */
 .terminal-ticket-card[data-att-type="memory"] .terminal-ticket-card-cmd {
-  background: #4ec9b0;
+  background: var(--af-primary, #D97757);
 }
 
 /* ── Body: Title + Subtitle ── */
@@ -1133,9 +1136,9 @@
 }
 
 /* ── Message Wrender Attachment Card Container ──
-   outputDiv 내 사용자 메시지(.term-message.term-user) 아래에 위치하는
-   첨부 카드 나열 영역. 다중 카드는 flex-wrap 으로 줄바꿈 처리.
-   .terminal-ticket-card 클래스는 변경 없이 그대로 재사용 (CSS 변경 없음).
+   Located under the user message (.term-message.term-user) in outputDiv
+   Attachment card listing area. Multiple cards are wrapped with flex-wrap.
+   The .terminal-ticket-card class is reused without change (no CSS changes).
 */
 .term-message-attachments {
   display: flex;
