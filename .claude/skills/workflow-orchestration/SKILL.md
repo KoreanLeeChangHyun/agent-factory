@@ -52,7 +52,7 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 | review | Code review | X |
 | research | Research/investigation and internal asset analysis | X |
 
-> 사용자 요청은 `.claude-organic/tickets/{open,progress,review,done}/T-NNN.xml` 티켓 파일을 통해 전달된다. XML 구조는 [`references/T-NNN.xml`](references/T-NNN.xml) 참조.
+> 사용자 요청은 `.agent-factory/tickets/{open,progress,review,done}/T-NNN.xml` 티켓 파일을 통해 전달된다. XML 구조는 [`references/T-NNN.xml`](references/T-NNN.xml) 참조.
 
 ---
 
@@ -77,7 +77,7 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 |------|------|
 | 관리 브랜치 | `develop` 로컬 통합 + `feat/*` feature 브랜치 (둘 다 로컬 전용, 원격 push 워크플로우가 안 함) |
 | 사용자 수동 영역 | `main`, `staging` — 워크플로우가 절대 수정 X |
-| 격리 실행 | 각 feature 브랜치는 독립 git worktree (`.claude-organic/worktrees/feat-T-NNN-*`) 에서 작업. worktree 경로는 `.context.json.worktreePath` 기록 |
+| 격리 실행 | 각 feature 브랜치는 독립 git worktree (`.agent-factory/worktrees/feat-T-NNN-*`) 에서 작업. worktree 경로는 `.context.json.worktreePath` 기록 |
 | Done 자동 머지 | `/wf -d N` 실행 시 feature 브랜치를 develop 에 `--no-ff` 머지 후 worktree + 브랜치 정리 |
 | 머지 충돌 | 발생 시 Done 전이 차단 + 안내 출력. worktree 디렉터리에서 충돌 해결 후 `git add`/`commit` → `/wf -d N` 재실행 |
 | 비활성 조건 | `develop` 브랜치 부재 시 단일 브랜치 모드 / `WORKFLOW_WORKTREE=false` 강제 비활성 / `WORKFLOW_WORKTREE=true` 강제 활성 |

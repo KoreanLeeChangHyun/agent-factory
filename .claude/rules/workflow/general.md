@@ -96,7 +96,7 @@
 | 티켓 상태/번호/지시어 | `flow-kanban show <T-NNN>` / `list --status N` / `board` |
 | 워크트리 상태 | `git worktree list` + `git -C <wt> status` |
 | 워크트리 commit 누락 | `git -C <wt> rev-list --count develop..HEAD` |
-| 워크플로우 진행 여부 | `ls .claude-organic/runs/` + 최근 `status.json` 조회 |
+| 워크플로우 진행 여부 | `ls .agent-factory/runs/` + 최근 `status.json` 조회 |
 | 서버 재기동 여부 | `.pyc` mtime + `.board.url` mtime + backend live 호출 (PID/lstart 단독 X) |
 | 코드 활성 여부 | grep + ls + cat (메모리 라인 번호도 실측) |
 
@@ -133,7 +133,7 @@
 
 | 어휘 | 의미 | 실체 |
 |------|------|------|
-| **driver** | v2 워크플로우 엔진 본체 | `.claude-organic/bin/flow-wf` → `engine/v2/driver.py`. 룰베이스 결정론 — 14룰 평가 + auto_commit + kanban 전이 + FSM 전이. LLM 호출 X |
+| **driver** | v2 워크플로우 엔진 본체 | `.agent-factory/bin/flow-wf` → `engine/v2/driver.py`. 룰베이스 결정론 — 14룰 평가 + auto_commit + kanban 전이 + FSM 전이. LLM 호출 X |
 | **claude -p subprocess** | Step 별 LLM 작업자 | INIT/PLAN/WORK/VALIDATE/REPORT 각 Step 마다 driver 가 spawn 하는 별도 프로세스. 산출물 .md 본문만 작성 |
 | **메인 세션** | 사용자 대화 전용 | Claude Code 본체. 티켓 관리·상태 확인·결과 리뷰 등 조율. **오케스트레이터 아님** — 워크플로우 진행은 driver 가 담당 |
 | **validator** | 14룰 advisory verdict 엔진 | `engine/v2/_validate.py` (rule-based). 에이전트 아님 |
@@ -155,7 +155,7 @@ working tree modified 잔재 폐기 권장 시, 동일 변경이 다른 곳 (워
 ## 메인 세션 제약
 - 서브에이전트(Agent 도구) 사용 금지 (MUST NOT) — 시간이 오래 걸리므로 티켓 생성 후 워크플로우로 처리
 - `AskUserQuestion` 도구 사용 금지 (MUST NOT) — PreToolUse hook 의 `hookSpecificOutput` 신형 schema 와 SDK 측 구형 permission-callback schema 불일치로 ZodError 발생, 도구 호출 자체 차단됨. 1~4지선다 질의는 텍스트 번호 매기기(1./2./3./4.)로 대체
-- 세션 시작 시 `.claude-organic/.settings` 에서 워크플로우 설정 확인 (MUST) — 특히 `WORKFLOW_WORKTREE` 값으로 워크트리 활성 여부 파악
+- 세션 시작 시 `.agent-factory/.settings` 에서 워크플로우 설정 확인 (MUST) — 특히 `WORKFLOW_WORKTREE` 값으로 워크트리 활성 여부 파악
 
 ## 티켓 운영
 - 티켓 과분리 금지 — 관련 항목은 스프린트/복잡도 단위로 묶기
@@ -188,7 +188,7 @@ working tree modified 잔재 폐기 권장 시, 동일 변경이 다른 곳 (워
 
 ## .claude/ 편집 (MUST)
 - `.claude/` 하위 파일의 생성·수정·삭제는 반드시 `flow-claude-edit` 경유 (MUST)
-- `.claude-organic/` 하위 파일은 Edit/Write 직접 수정 가능 (claude_edit 불필요)
+- `.agent-factory/` 하위 파일은 Edit/Write 직접 수정 가능 (claude_edit 불필요)
 - Edit/Write 직접 수정 불가 — Claude Code hardcoded 보호로 차단됨
 - 절차: `flow-claude-edit open <path>` → staging/ 에서 편집 → `flow-claude-edit save <path>`
 - 신규 생성: `flow-claude-edit new <path>` → staging/ 에 빈 파일 생성 → Edit 도구로 작성 → `flow-claude-edit save <path>` (원본 미존재면 .claude/ 하위 자동 mkdir)

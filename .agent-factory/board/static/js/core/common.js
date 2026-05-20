@@ -1,0 +1,1063 @@
+/**
+ * @module common
+ *
+ * Board SPA shared foundation module.
+ *
+ * Initializes the window.Board namespace and registers shared constants,
+ * utility functions, state objects, XML/directory parsers, Highlight.js
+ * and Markdown helpers, UI persistence, and tab switching logic.
+ *
+ * This module must be loaded before all other Board modules.
+ */
+"use strict";
+
+// ── Namespace Initialization ──
+window.Board = window.Board || {};
+const Board = window.Board;
+
+Board.state = Board.state || {};
+Board.util = Board.util || {};
+Board.render = Board.render || {};
+Board.fetch = Board.fetch || {};
+
+// ── Debug Logger (server-gated) ──
+//
+// 계측은 코드 전체에 상시 심어두고, 서버 측 플래그 파일로 활성화를 결정한다.
+// Claude 가 .agent-factory/runs/bg/debug.enabled 파일을 touch/rm 하여 제어.
+// 클라는 항상 /api/debug-log 로 POST — 서버가 플래그 파일을 체크해 파일에
+// 쓸지 버릴지 결정한다. 평소 오버헤드는 fetch 한 번(수 ms) 만 발생.
+//
+// 진단 흐름:
+//   1. Claude: touch .../runs/bg/debug.enabled (+ 기존 로그 비우기)
+//   2. 사용자: 문제 재현
+//   3. Claude: cat .../runs/bg/debug.log 로 분석
+//   4. Claude: rm .../runs/bg/debug.enabled (비활성화)
+
+Board.debugLog = function (tag, data) {
+  var entry = {
+    ts: new Date().toISOString(),
+    tag: String(tag || ''),
+    data: data === undefined ? null : data,
+  };
+  try {
+    fetch('/api/debug-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+      keepalive: true,
+    }).catch(function () {});
+  } catch (e) { /* 네트워크 에러 무시 */ }
+};
+
+// ── Terminal Status State Machine ──
+//
+// 메인 터미널 세션의 수명 주기를 표현하는 enum 과 전이 헬퍼.
+//
+//   stopped   : Claude CLI 프로세스 없음. Start 대기.
+//   starting  : spawn 요청부터 system/init 이벤트 수신 전까지. 입력 비활성.
+//   idle      : Claude 준비 완료. 응답 없음. 입력 가능.
+//   busy      : 사용자 입력 전송 후 result/process_exit 수신 전. 스피너 표시.
+//   archived  : 읽기 전용으로 복원된 과거 세션. 입력 불가.
+//   missing   : 서버가 세션을 못 찾음 (404). 입력 불가.
+//
+// 일반 수명 주기:
+//   stopped -> starting -> idle -> busy -> idle -> ... -> stopped
+//
+// 비정상/복원 경로:
+//   starting -> stopped      (spawn 실패)
+//   busy     -> stopped      (process_exit)
+//   *        -> archived     (archived 로드 시)
+//   *        -> missing      (fetchStatus 404)
+//
+// 라벨(UI 표시용):
+//   stopped=종료됨, starting=준비 중, idle=대기, busy=응답 중,
+//   archived=읽기 전용, missing=세션 없음
+//
+Board.util.TERM_STATUSES = Object.freeze({
+  STOPPED: 'stopped',
+  STARTING: 'starting',
+  IDLE: 'idle',
+  BUSY: 'busy',
+  ARCHIVED: 'archived',
+  MISSING: 'missing',
+});
+
+Board.util.TERM_STATUS_LABELS = Object.freeze({
+  stopped: 'Stopped',
+  starting: 'Starting',
+  idle: 'Idle',
+  busy: 'Busy',
+  archived: 'Archived',
+  missing: 'Missing',
+});
+
+/** Kill 버튼을 눌러 세션을 종료할 수 있는 상태 */
+Board.util.TERM_STATUS_KILLABLE = Object.freeze(
+  new Set(['starting', 'idle', 'busy'])
+);
+
+/** Claude 가 현재 작업 중(스피너 표시)인 상태 */
+Board.util.TERM_STATUS_SPINNING = Object.freeze(new Set(['busy']));
+
+/** 사용자가 새 입력을 보낼 수 있는 상태 */
+Board.util.TERM_STATUS_INPUTTABLE = Object.freeze(
+  new Set(['idle', 'busy'])
+);
+
+/** 서버(`/terminal/status`) 가 권위 있게 판단하는 상태 — 클라 확장 상태는 클라가 관리 */
+var _SERVER_AUTHORITATIVE = Object.freeze(new Set(['stopped']));
+var _CLIENT_EXTENDED = Object.freeze(
+  new Set(['starting', 'idle', 'busy', 'archived', 'missing'])
+);
+
+/**
+ * Sets Board.state.termStatus. 단일 진입점으로 써서 전이 규칙을 일관되게 유지한다.
+ * @param {string} next 새 상태 (TERM_STATUSES 값 중 하나)
+ */
+Board.state.setTermStatus = function (next) {
+  if (typeof next !== 'string') return;
+  Board.state.termStatus = next;
+};
+
+// ESC autoResume 윈도우 — process_exit + willAutoResume 진입부터 startSession.setIdle 까지.
+// 이 윈도우 동안엔 termStatus 가 stopped → starting 으로 짧게 전이되지만 setInputLocked
+// 가 input.disabled 를 true 로 만들지 않는다. 입력창 깜빡 (~500ms) 회피 목적.
+Board.state._inAutoResume = false;
+
+/**
+ * 서버 /terminal/status 응답(stopped/running)을 클라 상태 머신에 병합한다.
+ * - 서버가 stopped 를 반환하면 클라도 stopped 로 전이 (권위).
+ * - 서버가 running 을 반환하고 클라가 확장 상태(starting/idle/busy/archived/missing)에
+ *   있으면 클라 상태를 유지. 그 외엔 idle 로 간주.
+ * archived/missing 은 fetchStatus 404 또는 archived_end 등 별도 경로에서 진입하므로
+ * 여기서 직접 설정하지 않는다.
+ *
+ * @param {string} serverStatus 서버가 보고한 상태 문자열
+ */
+Board.state.reconcileTermStatus = function (serverStatus) {
+  var current = Board.state.termStatus;
+  var result;
+  if (!serverStatus) {
+    Board.state.setTermStatus('stopped');
+    result = 'stopped(empty)';
+  } else if (serverStatus === 'stopped') {
+    Board.state.setTermStatus('stopped');
+    result = 'stopped';
+  } else if (serverStatus === 'running') {
+    if (current === 'starting') {
+      // starting 은 client-only transient state. 서버가 'running' 을 보고했다는 건
+      // 서버 측 프로세스가 살아있다는 명확한 신호이므로 idle 로 보정해야 한다.
+      // (이후 awaiting_response 처리에서 busy 로 추가 보정될 수 있음)
+      Board.state.setTermStatus('idle');
+      result = 'idle(from-starting)';
+    } else if (_CLIENT_EXTENDED.has(current)) {
+      result = 'keep(' + current + ')';
+    } else {
+      // current 가 stopped 등 비확장 상태인데 서버가 running 보고:
+      // 프로세스는 살아있지만 응답 진행 중인지 여부는 awaiting_response 가 권위.
+      // 여기서는 idle 로만 보정하고, busy 승격은 fetchStatus 의
+      // `if (data.awaiting_response)` 분기가 단독 책임진다.
+      // (과거 'busy(from-stopped)' 룰은 새로고침 시 awaiting_response=false 임에도
+      // 스피너를 무한 회전시키는 회귀 원인이었음 — 2026-05-13 fix)
+      Board.state.setTermStatus('idle');
+      result = 'idle(from-' + current + ')';
+    }
+  } else {
+    Board.state.setTermStatus(serverStatus);
+    result = 'passthrough(' + serverStatus + ')';
+  }
+  if (Board.debugLog) Board.debugLog('reconcileTermStatus', {
+    server: serverStatus, before: current, after: Board.state.termStatus, result: result,
+  });
+};
+
+// ── Constants ──
+const COLUMNS = [
+  { key: "To Do", label: "To Do", dot: "dot-todo" },
+  { key: "Open", label: "Open", dot: "dot-open" },
+  { key: "In Progress", label: "In Progress", dot: "dot-progress" },
+  { key: "Review", label: "Review", dot: "dot-review" },
+  { key: "Done", label: "Done", dot: "dot-done" },
+];
+
+const CMD_COLORS = {
+  implement: { bg: "rgba(86,156,214,0.3)", fg: "#7bb8e8" },
+  review: { bg: "rgba(197,134,192,0.3)", fg: "#d9a0d6" },
+  research: { bg: "rgba(220,220,170,0.3)", fg: "#e8e8b0" },
+  prompt: { bg: "rgba(160,160,160,0.2)", fg: "#a0a0a0" },
+};
+
+const STATUS_COLORS = {
+  "To Do": { bg: "rgba(106,159,181,0.15)", fg: "#6a9fb5" },
+  Open: { bg: "rgba(78,201,176,0.15)", fg: "#4ec9b0" },
+  "In Progress": { bg: "rgba(220,220,170,0.15)", fg: "#dcdcaa" },
+  Review: { bg: "rgba(197,134,192,0.15)", fg: "#c586c0" },
+  Done: { bg: "rgba(133,133,133,0.15)", fg: "#858585" },
+};
+
+const LS_KEY = "claude-board-ui";
+const KANBAN_SORT_LS_KEY = "claude-board-kanban-sort";
+
+// Register constants on Board.util for cross-module access
+Board.util.COLUMNS = COLUMNS;
+Board.util.CMD_COLORS = CMD_COLORS;
+Board.util.STATUS_COLORS = STATUS_COLORS;
+Board.util.LS_KEY = LS_KEY;
+Board.util.KANBAN_SORT_LS_KEY = KANBAN_SORT_LS_KEY;
+
+// ── Utility Functions ──
+
+/** Escapes HTML entities in text. */
+function esc(text) {
+  const d = document.createElement("div");
+  d.textContent = text || "";
+  return d.innerHTML;
+}
+
+/** Extracts text content from an XML element's child tag. */
+function xmlText(el, tag) {
+  const c = el && el.querySelector(tag);
+  return c ? (c.textContent || "").trim() : "";
+}
+
+/** Formats a datetime string to YYYY-MM-DD HH:MM. */
+function formatTime(dt) {
+  return dt ? dt.substring(0, 16) : "";
+}
+
+/** Command name → 3-letter abbreviation map. */
+var CMD_ABBR = {
+  implement: "IMP",
+  research: "RSC",
+  review: "REV",
+  prompt: "PRM",
+  refactor: "REF",
+  test: "TST",
+  deploy: "DEP",
+  design: "DES",
+  plan: "PLN",
+  fix: "FIX",
+  debug: "DBG",
+  analyze: "ANL",
+  document: "DOC",
+};
+Board.util.CMD_ABBR = CMD_ABBR;
+
+/** Renders a colored badge span with 3-letter abbreviation. */
+function badge(text, colors, extraStyle) {
+  if (!text || !colors) return "";
+  var label = CMD_ABBR[text] || text.substring(0, 3).toUpperCase();
+  return '<span class="badge" style="background:' + colors.bg + ";color:" + colors.fg + ";" + (extraStyle || '') + '">' + label + "</span>";
+}
+
+Board.util.esc = esc;
+Board.util.xmlText = xmlText;
+Board.util.formatTime = formatTime;
+Board.util.badge = badge;
+
+// ── XML Ticket Parsing ──
+
+/** Parses a ticket XML string into a ticket data object. */
+function parseTicket(text) {
+  const doc = new DOMParser().parseFromString(text, "text/xml");
+  const root = doc.querySelector("ticket");
+  if (!root) return null;
+
+  const meta = root.querySelector("metadata");
+  const ticket = {
+    number: "", title: "", created: "", updated: "", status: "Open",
+    command: "", prompt: null, result: null,
+    relations: [],
+  };
+
+  if (meta) {
+    ["number", "title", "created", "updated", "status"].forEach(function (f) {
+      const el = meta.querySelector(f);
+      if (el && el.textContent) ticket[f] = el.textContent.trim();
+    });
+    // 레거시 호환: <datetime> → created/updated 폴백
+    if (!ticket.created || !ticket.updated) {
+      var dtEl = meta.querySelector("datetime");
+      if (dtEl && dtEl.textContent) {
+        var dtVal = dtEl.textContent.trim();
+        if (!ticket.created) ticket.created = dtVal;
+        if (!ticket.updated) ticket.updated = dtVal;
+      }
+    }
+    const cmdEl = meta.querySelector("command");
+    if (cmdEl) ticket.command = (cmdEl.textContent || "").trim();
+  }
+
+  // Flat structure: <prompt> directly under <ticket>
+  var promptEls = root.getElementsByTagName("prompt");
+  var promptEl = null;
+  for (var pi = 0; pi < promptEls.length; pi++) {
+    if (promptEls[pi].parentNode === root) { promptEl = promptEls[pi]; break; }
+  }
+  if (promptEl) {
+    var prompt = {};
+    for (var fi = 0; fi < promptEl.children.length; fi++) {
+      var fc = promptEl.children[fi];
+      var ft = (fc.textContent || "").trim();
+      ft = ft.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; }).join("\n");
+      if (ft) prompt[fc.tagName] = ft;
+    }
+    if (Object.keys(prompt).length > 0) ticket.prompt = prompt;
+  }
+
+  // Flat structure: <result> directly under <ticket>
+  var resultEls = root.getElementsByTagName("result");
+  var resultEl = null;
+  for (var rsi = 0; rsi < resultEls.length; rsi++) {
+    if (resultEls[rsi].parentNode === root) { resultEl = resultEls[rsi]; break; }
+  }
+  if (resultEl) {
+    var rObj = {};
+    for (var ri = 0; ri < resultEl.children.length; ri++) {
+      var rc = resultEl.children[ri];
+      var rt = (rc.textContent || "").trim();
+      if (rt) rObj[rc.tagName.toLowerCase()] = rt;
+    }
+    if (Object.keys(rObj).length > 0) ticket.result = rObj;
+  }
+
+  // Legacy done ticket fallback (read-only): <submit>/<subnumber> structure
+  // T-399: Submit transient 단계는 시스템에서 제거됨. 본 블록은 과거 done 티켓 표시 호환만 담당.
+  if (!ticket.prompt && !ticket.command) {
+    var submitEl = root.querySelector("submit");
+    if (submitEl) {
+      var subs = submitEl.querySelectorAll("subnumber");
+      var activeSub = null;
+      for (var si = 0; si < subs.length; si++) {
+        if (subs[si].getAttribute("active") === "true") { activeSub = subs[si]; break; }
+      }
+      if (!activeSub && subs.length > 0) activeSub = subs[subs.length - 1];
+      if (activeSub) {
+        var legacyCmd = (activeSub.querySelector("command") || {}).textContent || "";
+        if (legacyCmd) ticket.command = legacyCmd.trim();
+        var legacyPromptEl = activeSub.querySelector("prompt");
+        if (legacyPromptEl) {
+          var lp = {};
+          for (var lpi = 0; lpi < legacyPromptEl.children.length; lpi++) {
+            var lc = legacyPromptEl.children[lpi];
+            var lt = (lc.textContent || "").trim();
+            if (lt) lp[lc.tagName] = lt;
+          }
+          if (Object.keys(lp).length > 0) ticket.prompt = lp;
+        }
+        var legacyResultEl = activeSub.querySelector("result");
+        if (legacyResultEl) {
+          var lr = {};
+          for (var lri = 0; lri < legacyResultEl.children.length; lri++) {
+            var lrc = legacyResultEl.children[lri];
+            var lrt = (lrc.textContent || "").trim();
+            if (lrt) lr[lrc.tagName.toLowerCase()] = lrt;
+          }
+          if (Object.keys(lr).length > 0) ticket.result = lr;
+        }
+      }
+    }
+  }
+
+  const relationsEl = root.querySelector("relations");
+  if (relationsEl) {
+    const rels = relationsEl.querySelectorAll("relation");
+    for (let k = 0; k < rels.length; k++) {
+      const type = rels[k].getAttribute("type") || "";
+      const relTicket = rels[k].getAttribute("ticket") || "";
+      if (type && relTicket) ticket.relations.push({ type: type, ticket: relTicket });
+    }
+  }
+
+  return ticket;
+}
+
+Board.util.parseTicket = parseTicket;
+
+// ── Directory / Path Utilities ──
+
+/** Parses an HTML directory listing into dirs and files arrays. */
+function parseDirLinks(html) {
+  const dirs = [];
+  const files = [];
+  const re = /href="([^"]+)"/g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1];
+    if (href === "../") continue;
+    if (href.endsWith("/")) dirs.push(href);
+    else files.push(href);
+  }
+  return { dirs: dirs, files: files };
+}
+
+/** Returns the last URL path segment, decoded. */
+function lastSegment(href) {
+  const parts = href.replace(/\/$/, "").split("/");
+  return decodeURIComponent(parts[parts.length - 1]);
+}
+
+/**
+ * Resolves a result path to its actual location, handling archived workflows.
+ * When a workflow is archived to .history/, ticket XML still holds the original
+ * workflow/YYYYMMDD-HHMMSS/ path. This function rewrites the path using the
+ * actual basePath from the WORKFLOWS array.
+ */
+function resolveResultPath(path) {
+  const m = path.match(/\.workflow\/(\d{8}-\d{6})\//);
+  if (!m) return path;
+  const regKey = m[1];
+
+  for (let i = 0; i < Board.state.WORKFLOWS.length; i++) {
+    if (Board.state.WORKFLOWS[i].entry === regKey) {
+      const bp = Board.state.WORKFLOWS[i].basePath || "";
+      if (bp.indexOf(".history/") !== -1) {
+        return path.replace(
+          "workflow/" + regKey + "/",
+          "workflow/.history/" + regKey + "/"
+        );
+      }
+      return path;
+    }
+  }
+  return path;
+}
+
+/** Returns the directory portion of a URL (up to and including the last '/'). */
+function urlDir(url) {
+  if (!url) return "";
+  return url.substring(0, url.lastIndexOf("/") + 1);
+}
+
+function projectRoot() {
+  var path = window.location.pathname;
+  var idx = path.indexOf(".agent-factory/board/");
+  if (idx !== -1) return path.substring(0, idx);
+  return "/";
+}
+
+/**
+ * Builds a full URL path from a .agent-factory/ relative path.
+ * @param {string} wfPath - Path starting with .agent-factory/ or workflow/
+ * @returns {string} Absolute URL path from project root
+ */
+function resolveToRoot(wfPath) {
+  return projectRoot() + resolveResultPath(wfPath);
+}
+
+Board.util.parseDirLinks = parseDirLinks;
+Board.util.lastSegment = lastSegment;
+Board.util.resolveResultPath = resolveResultPath;
+Board.util.resolveToRoot = resolveToRoot;
+Board.util.projectRoot = projectRoot;
+Board.util.urlDir = urlDir;
+
+// ── Highlight.js Language Mapping ──
+
+/** Maps file extension to highlight.js language identifier. */
+function getHighlightLang(url) {
+  const LANG_MAP = {
+    ".py":   "python",
+    ".js":   "javascript",
+    ".ts":   "typescript",
+    ".jsx":  "javascript",
+    ".tsx":  "typescript",
+    ".md":   "markdown",
+    ".xml":  "xml",
+    ".sh":   "bash",
+    ".json": "json",
+    ".css":  "css",
+    ".html": "html",
+    ".yml":  "yaml",
+    ".yaml": "yaml",
+  };
+  const m = url && url.match(/(\.[^./?#]+)(?:[?#].*)?$/);
+  if (!m) return "plaintext";
+  return LANG_MAP[m[1].toLowerCase()] || "plaintext";
+}
+
+/** Applies highlight.js to pending code blocks. */
+function initHighlight() {
+  const blocks = document.querySelectorAll(".code-viewer code.hljs-pending, .md-body code.hljs-pending");
+  blocks.forEach(function (block) {
+    if (block.dataset.highlighted) return;
+    block.dataset.highlighted = "true";
+    block.classList.remove("hljs-pending");
+    if (typeof hljs === "undefined") return;
+    let lang = null;
+    const classes = block.className.split(/\s+/);
+    for (let i = 0; i < classes.length; i++) {
+      const m = classes[i].match(/^language-(.+)$/);
+      if (m) {
+        lang = m[1];
+        break;
+      }
+    }
+    if (lang && lang !== "plaintext" && hljs.getLanguage(lang)) {
+      hljs.highlightElement(block);
+    }
+  });
+}
+
+Board.util.getHighlightLang = getHighlightLang;
+Board.render.initHighlight = initHighlight;
+
+// ── Markdown Rendering ──
+let mermaidCounter = 0;
+
+/** Renders markdown text to HTML, with Mermaid and code highlighting support. */
+function renderMd(text, baseUrl) {
+  if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
+
+  // T-321 P1 — flow-kanban XML 필드 (--constraints "조건1\n조건2") 등에서 유입되는
+  // 리터럴 백슬래시-n 2글자를 실제 개행으로 치환 (code fence / 인라인 backtick 내부는 보존).
+  if (Board.util && Board.util.unescapeLiteralNewlines) {
+    text = Board.util.unescapeLiteralNewlines(text);
+  }
+
+  const renderer = new marked.Renderer();
+  renderer.code = function (opts) {
+    const code = typeof opts === "object" ? opts.text : opts;
+    const lang = typeof opts === "object" ? opts.lang : arguments[1];
+    if (lang === "mermaid") {
+      const id = "mermaid-" + (++mermaidCounter);
+      return '<div class="mermaid-block" data-mermaid-id="' + id + '">' + esc(code) + '</div>';
+    }
+    const langClass = lang ? lang : "plaintext";
+    return '<pre class="md-code"><code class="hljs-pending language-' + esc(langClass) + '">' + esc(code) + '</code></pre>';
+  };
+
+  renderer.link = function (opts) {
+    const href = typeof opts === "object" ? opts.href : opts;
+    const title = typeof opts === "object" ? opts.title : arguments[1];
+    const text = typeof opts === "object" ? opts.text : arguments[2];
+    if (!href) return text || "";
+    if (href.indexOf("http://") === 0 || href.indexOf("https://") === 0) {
+      const titleAttr = title ? ' title="' + esc(title) + '"' : "";
+      return '<a href="' + esc(href) + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + (text || esc(href)) + '</a>';
+    }
+    let resolvedUrl;
+    if (href.indexOf("workflow/") === 0 || href.indexOf(".claude/") === 0) {
+      resolvedUrl = resolveToRoot(href);
+    } else {
+      resolvedUrl = urlDir(baseUrl) + href;
+    }
+    return '<span class="md-file-link" data-filepath="' + esc(href) + '" data-url="' + esc(resolvedUrl) + '">' + (text || esc(href)) + '</span>';
+  };
+
+  let html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
+
+  // T-321 P2 — 인접 <ol> 블록 (텍스트 단락이 끼지 않은 경우) 을 단일 <ol> 로 병합.
+  // 비순차/0-시작 번호 (예: 5.6.7. / 1.2.0.) 가 marked 의 단일 ol 출력에서는 이미 한 부모 안에 있지만,
+  // 사용자 입력 변형 (드물게 marked 가 분리하는 케이스) 에서도 동일 들여쓰기를 보장하기 위한 idempotent 후처리.
+  if (Board.util && Board.util.mergeAdjacentOrderedLists) {
+    html = Board.util.mergeAdjacentOrderedLists(html);
+  }
+
+  const FILE_EXT_RE = /\.(md|js|ts|jsx|tsx|css|html|json|py|txt|log|xml|sh|yml|yaml|toml|env|csv)$/i;
+  html = html.replace(/<code>([^<]+)<\/code>/g, function (match, inner) {
+    const decoded = inner.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    const isFilePath = decoded.indexOf("/") !== -1 || FILE_EXT_RE.test(decoded.trim());
+    if (isFilePath) {
+      const escaped = esc(decoded.trim());
+      return '<code class="md-file-link" data-filepath="' + escaped + '">' + inner + '</code>';
+    }
+    return match;
+  });
+
+  return html;
+}
+
+/** Removes orphan SVG elements inserted by Mermaid into document.body during failed renders. */
+function cleanupMermaidOrphans(id) {
+  // Mermaid v11 may insert a temporary element with id="d<N>" or the render id into body
+  var orphan = document.getElementById(id);
+  if (orphan && orphan !== document.body && !orphan.closest('.mermaid-block')) {
+    orphan.remove();
+  }
+  // Also sweep for any SVG elements directly under body with id starting with "d" followed by digits
+  document.querySelectorAll('body > svg[id], body > div[id]').forEach(function (el) {
+    if (/^d\d+$/.test(el.id)) {
+      el.remove();
+    }
+  });
+}
+
+/** Renders pending Mermaid diagram blocks. */
+function initMermaid() {
+  var defined = typeof mermaid !== "undefined";
+  var blocks = document.querySelectorAll(".mermaid-block");
+  if (Board.debugLog) Board.debugLog('initMermaid.call', {
+    defined: defined, blockCount: blocks.length,
+  });
+  if (!defined) return;
+  blocks.forEach(function (block) {
+    if (block.dataset.rendered) return;
+    block.dataset.rendered = "true";
+    var id = block.dataset.mermaidId;
+    var code = block.textContent;
+    if (Board.debugLog) Board.debugLog('initMermaid.render', {
+      id: id, codeHead: code.slice(0, 80),
+    });
+    mermaid.render(id, code).then(function (result) {
+      block.innerHTML = result.svg;
+      if (Board.debugLog) Board.debugLog('initMermaid.success', { id: id });
+    }).catch(function (err) {
+      console.warn('[initMermaid] Mermaid render failed for id=' + id + ':', err);
+      if (Board.debugLog) Board.debugLog('initMermaid.fail', {
+        id: id, err: String(err && err.message || err),
+      });
+      cleanupMermaidOrphans(id);
+      block.innerHTML = '<pre class="wf-file-content">' + esc(code) + '</pre>';
+    });
+  });
+}
+
+// async 스크립트 로드 완료 시점에 한 번 더 스캔하여 race window 보충.
+function _mermaidRescanWhenReady() {
+  if (typeof mermaid !== "undefined") { initMermaid(); return; }
+  var script = document.querySelector('script[src*="mermaid"]');
+  if (script) script.addEventListener('load', function () { initMermaid(); }, { once: true });
+}
+_mermaidRescanWhenReady();
+
+Board.render.renderMd = renderMd;
+Board.render.initMermaid = initMermaid;
+
+// ── Dashboard Parsers ──
+
+/**
+ * Parses a token string like "1621k" to a number.
+ * @param {string} val
+ * @returns {number}
+ */
+function parseToken(val) {
+  if (!val || val === "-") return 0;
+  const cleaned = val.replace(/,/g, "").trim();
+  if (cleaned.endsWith("k")) return parseFloat(cleaned) * 1000;
+  return parseFloat(cleaned) || 0;
+}
+
+/**
+ * Parses markdown table rows (skipping header and separator rows).
+ * @param {string} text
+ * @returns {Array<Array<string>>}
+ */
+function parseMdTableRows(text) {
+  const rows = [];
+  const lines = (text || "").split("\n");
+  let inTable = false;
+  let headerSeen = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith("|")) {
+      if (inTable) break;
+      continue;
+    }
+    if (!inTable) { inTable = true; headerSeen = false; continue; }
+    if (!headerSeen) { headerSeen = true; continue; }
+    const cells = line.split("|").slice(1, -1).map(function (c) { return c.trim(); });
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/**
+ * Extracts header cells from first markdown table in text.
+ * @param {string} text
+ * @returns {Array<string>}
+ */
+function parseMdTableHeader(text) {
+  const lines = (text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith("|")) {
+      return line.split("|").slice(1, -1).map(function (c) { return c.trim(); });
+    }
+  }
+  return [];
+}
+
+/**
+ * Formats token count to human-readable string (e.g. 1.6M, 500k).
+ * @param {number} n
+ * @returns {string}
+ */
+function formatTokens(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+  if (n >= 1000) return Math.round(n / 1000) + "k";
+  return String(Math.round(n));
+}
+
+Board.util.parseToken = parseToken;
+Board.util.parseMdTableRows = parseMdTableRows;
+Board.util.parseMdTableHeader = parseMdTableHeader;
+Board.util.formatTokens = formatTokens;
+
+// ── State Objects ──
+
+/** Loads persisted UI state from localStorage. */
+function loadUI() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; }
+}
+
+const savedState = loadUI();
+
+/** Migrates legacy tab history entries to object format. */
+function migrateTabHistory(history) {
+  return history.map(function (entry) {
+    if (typeof entry === "string") return { tab: entry, viewerTab: null };
+    return entry;
+  });
+}
+
+// Initialize shared state
+Board.state.TICKETS = [];
+Board.state.WORKFLOWS = [];
+Board.state.COLUMNS = COLUMNS;
+Board.state.viewerTabs = [];
+Board.state.activeViewerTab = savedState.activeViewerTab || null;
+Board.state.activeTab = (savedState.tab === "metrics" ? "dashboard" : (savedState.tab || "dashboard"));
+Board.state.tabHistory = migrateTabHistory(savedState.tabHistory || []);
+Board.state.forwardHistory = migrateTabHistory(savedState.forwardHistory || []);
+Board.state.codeViewerStore = {};
+Board.state.codeViewerIdCounter = 0;
+
+// Workflow shared state (used by workflow.js and sse.js)
+Board.state.wfEntryHrefs = [];
+Board.state.wfLoadedIndex = 0;
+Board.state.wfInitialized = false;
+Board.state.wfSearchQuery = "";
+Board.state.wfSortKey = "updated_at";
+Board.state.wfSortDir = "desc";
+Board.state.wfLoading = false;
+
+// Dashboard shared state
+Board.state.dashData = {};
+Board.state.dashFetched = false;
+Board.state.dashChartInstances = {};
+
+// Kanban sort state
+Board.state.kanbanSort = null; // initialized by kanban.js
+
+// Roadmap subtab state — saveUI/loadUI 로 영속화 (활성 phase + 펼친 카드 + 사이드 너비).
+// Contexts 탭(구 Prompt 탭) 의 Roadmap 서브탭이 사용한다 — 별도 패널이 아니므로 panelOpen 없음.
+Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "object")
+  ? {
+      activePhaseId: typeof savedState.roadmap.activePhaseId === "string"
+        ? savedState.roadmap.activePhaseId
+        : null,
+      expandedCardIds: Array.isArray(savedState.roadmap.expandedCardIds)
+        ? savedState.roadmap.expandedCardIds.slice()
+        : [],
+      sideWidth: typeof savedState.roadmap.sideWidth === "number"
+        && savedState.roadmap.sideWidth >= 140 && savedState.roadmap.sideWidth <= 600
+        ? savedState.roadmap.sideWidth
+        : 240,
+    }
+  : {
+      activePhaseId: null,
+      expandedCardIds: [],
+      sideWidth: 240,
+    };
+
+// Contexts 탭 통합 상태 — saveUI/loadUI 로 영속화.
+// 사용자 이벤트(서브탭 전환, 파일 선택, sidebar 너비 조정, GC bar 토글) 가 모두 새로고침
+// 후 복원되어야 한다는 정책. 각 서브탭 모듈이 default 하드코드 대신 여기서 읽어간다.
+(function () {
+  var rawCx = (savedState.contexts && typeof savedState.contexts === "object")
+    ? savedState.contexts : {};
+  var ALLOWED_SUBTABS = { roadmap: 1, rules: 1, memory: 1, prompt: 1 };
+  var sub = (typeof rawCx.subTab === "string" && ALLOWED_SUBTABS[rawCx.subTab])
+    ? rawCx.subTab : "roadmap";
+  function _ws(v, def) {
+    if (typeof v === "number" && v >= 140 && v <= 600) return v;
+    return def;
+  }
+  function _sub(o) {
+    o = (o && typeof o === "object") ? o : {};
+    return {
+      activeFile: typeof o.activeFile === "string" ? o.activeFile : null,
+      sidebarWidth: _ws(o.sidebarWidth, 280),
+    };
+  }
+  var memorySub = _sub(rawCx.memory);
+  memorySub.gcExpanded = !!(rawCx.memory && rawCx.memory.gcExpanded);
+  memorySub.archiveCollapsed = (rawCx.memory && rawCx.memory.archiveCollapsed != null)
+    ? !!rawCx.memory.archiveCollapsed
+    : true;
+  Board.state.contexts = {
+    subTab: sub,
+    memory: memorySub,
+    rules: _sub(rawCx.rules),
+    prompt: _sub(rawCx.prompt),
+  };
+})();
+
+// Relations panel state — saveUI/loadUI 로 영속화 (열림/닫힘 + 필터)
+Board.state.relations = (savedState.relations && typeof savedState.relations === "object")
+  ? {
+      filter: {
+        statuses: Array.isArray(savedState.relations.filter && savedState.relations.filter.statuses)
+          ? savedState.relations.filter.statuses
+          : ["open", "progress", "review", "done"],
+        direction: (savedState.relations.filter && savedState.relations.filter.direction) || "TD",
+        showIsolated: !!(savedState.relations.filter && savedState.relations.filter.showIsolated),
+      },
+      panelOpen: !!savedState.relations.panelOpen,
+    }
+  : {
+      filter: { statuses: ["open", "progress", "review", "done"], direction: "TD", showIsolated: false },
+      panelOpen: false,
+    };
+
+// ── UI State Persistence ──
+
+/** Saves current UI state to localStorage. */
+function saveUI() {
+  const openNums = Board.state.viewerTabs.map(function (t) { return t.number; });
+  const state = {
+    tab: Board.state.activeTab,
+    viewerTabs: openNums,
+    activeViewerTab: Board.state.activeViewerTab,
+    tabHistory: Board.state.tabHistory,
+    forwardHistory: Board.state.forwardHistory,
+    relations: Board.state.relations,
+    roadmap: Board.state.roadmap,
+    contexts: Board.state.contexts,
+  };
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+Board.util.saveUI = saveUI;
+Board.util.loadUI = loadUI;
+
+// ── Tab Switching ──
+
+const tabs = document.querySelectorAll(".tab");
+const views = document.querySelectorAll(".view");
+
+/** Switches the active tab and triggers rendering for the target view. */
+function switchTab(target, skipPush) {
+  if (!skipPush && Board.state.activeTab) {
+    Board.state.tabHistory.push({
+      tab: Board.state.activeTab,
+      viewerTab: Board.state.activeTab === "viewer" ? Board.state.activeViewerTab : null,
+    });
+    if (Board.state.tabHistory.length > 100) Board.state.tabHistory.shift();
+    Board.state.forwardHistory.length = 0;
+  }
+  Board.state.activeTab = target;
+  tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
+  views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
+  if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
+  if (target === "memory" && Board.render.renderMemory) Board.render.renderMemory();
+  saveUI();
+  if (Board.util.updateQueryString) Board.util.updateQueryString();
+}
+
+tabs.forEach(function (t) {
+  t.addEventListener("click", function () { switchTab(t.dataset.view); });
+});
+
+Board.util.switchTab = switchTab;
+
+// ── Query String Helpers ──
+
+/** Updates URL query string to reflect current viewer state. */
+function updateQueryString() {
+  var params = new URLSearchParams(window.location.search);
+  if (Board.state.activeTab === "viewer" && Board.state.activeViewerTab) {
+    params.set("tab", "viewer");
+    params.set("ticket", Board.state.activeViewerTab);
+  } else {
+    params.delete("tab");
+    params.delete("ticket");
+  }
+  var qs = params.toString();
+  var url = window.location.pathname + (qs ? "?" + qs : "");
+  history.replaceState(null, "", url);
+}
+Board.util.updateQueryString = updateQueryString;
+
+// ── Fetch Utilities ──
+
+/**
+ * Fetches a directory URL and returns .xml file names.
+ * @param {string} dirUrl
+ * @returns {Promise<string[]>}
+ */
+function fetchXmlList(dirUrl) {
+  return fetch(dirUrl, { cache: "no-store" }).then(function (res) {
+    if (!res.ok) return [];
+    return res.text().then(function (html) {
+      return parseDirLinks(html).files.filter(function (f) { return f.endsWith(".xml") && !f.includes("../") && !f.startsWith("/"); });
+    });
+  }).catch(function () { return []; });
+}
+
+Board.util.fetchXmlList = fetchXmlList;
+
+// ── Branch Status Bar Helper ──
+//
+// 상태바(`#terminal-sl-branch`)에 git 브랜치명과 아이콘 SVG 를 그린다.
+// terminal/workflow 페이지 둘 다, 페이지 로드 시점·SSE git_branch 이벤트·
+// /api/branch fetch 결과 등 어디서든 단일 헬퍼로 갱신한다.
+//
+// 상태바 element 가 없는 페이지(kanban/dashboard 등)에서는 no-op.
+var BRANCH_ICON_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+  + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px">'
+  + '<circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>'
+  + '<path d="M6 15V9a6 6 0 0 0 6-6h0a6 6 0 0 0 6 6"/></svg>';
+
+function setBranchStatusBar(branchName) {
+  if (!branchName) return;
+  var el = document.getElementById("terminal-sl-branch");
+  if (!el) return;
+  el.innerHTML = BRANCH_ICON_SVG + branchName;
+}
+
+Board.util.setBranchStatusBar = setBranchStatusBar;
+Board.util.BRANCH_ICON_SVG = BRANCH_ICON_SVG;
+
+// ── Info Modal Helper ──
+//
+// Single-confirm-button informational modal.
+// Replaces native alert() calls throughout the Board UI with an accessible,
+// theme-consistent overlay.
+//
+// Usage:
+//   Board.util.showInfoModal("Title", "Body text", { severity: "warning", onClose: fn });
+//
+// SVG icons per severity:
+//   info    — circle with 'i' indicator (Lucide circle-info style)
+//   warning — triangle alert (Lucide triangle-alert style)
+//   error   — circle with 'x' (Lucide circle-x style)
+
+var _infoModalCounter = 0;
+
+var _INFO_MODAL_ICONS = {
+  info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="12" r="10"/>'
+    + '<line x1="12" y1="16" x2="12" y2="12"/>'
+    + '<line x1="12" y1="8" x2="12.01" y2="8"/>'
+    + '</svg>',
+  warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
+    + '<line x1="12" y1="9" x2="12" y2="13"/>'
+    + '<line x1="12" y1="17" x2="12.01" y2="17"/>'
+    + '</svg>',
+  error: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '
+    + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true" '
+    + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="12" r="10"/>'
+    + '<line x1="15" y1="9" x2="9" y2="15"/>'
+    + '<line x1="9" y1="9" x2="15" y2="15"/>'
+    + '</svg>',
+};
+
+/**
+ * Displays an informational modal dialog with a single confirm button.
+ *
+ * Replaces native alert() calls throughout the Board UI with an accessible,
+ * theme-consistent overlay. Supports three severity levels (info / warning / error)
+ * with distinct SVG icons. Keyboard (ESC) and overlay-click dismissal are both
+ * supported.
+ *
+ * @param {string} title - Dialog title text (required).
+ * @param {string} body  - Dialog body text (required). Rendered as textContent — no HTML injection.
+ * @param {Object} [options]
+ * @param {Function} [options.onClose]     - Called when the modal is dismissed by any method.
+ * @param {'info'|'warning'|'error'} [options.severity='info'] - Determines icon and modifier class.
+ * @param {string} [options.confirmText='확인'] - Label for the confirm button.
+ */
+function showInfoModal(title, body, options) {
+  var opts = options || {};
+  var severity = (opts.severity === 'warning' || opts.severity === 'error') ? opts.severity : 'info';
+  var confirmText = opts.confirmText || '확인';
+  var onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
+
+  var uid = 'info-modal-title-' + (++_infoModalCounter);
+
+  // ── Build overlay ──
+  var overlay = document.createElement('div');
+  overlay.className = 'info-modal-overlay';
+
+  // ── Build dialog ──
+  var dialog = document.createElement('div');
+  dialog.className = 'info-modal-dialog is-' + severity;
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', uid);
+
+  // ── Icon (static trusted SVG string — no user data interpolated) ──
+  var iconEl = document.createElement('div');
+  iconEl.className = 'info-modal-icon';
+  iconEl.innerHTML = _INFO_MODAL_ICONS[severity];
+
+  // ── Title ──
+  var titleEl = document.createElement('h3');
+  titleEl.className = 'info-modal-title';
+  titleEl.id = uid;
+  titleEl.textContent = title;
+
+  // ── Body ──
+  var bodyEl = document.createElement('p');
+  bodyEl.className = 'info-modal-body';
+  bodyEl.textContent = body;
+
+  // ── Actions ──
+  var actionsEl = document.createElement('div');
+  actionsEl.className = 'info-modal-actions';
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.className = 'info-modal-btn is-' + severity;
+  confirmBtn.textContent = confirmText;
+
+  actionsEl.appendChild(confirmBtn);
+
+  // ── Assemble dialog ──
+  dialog.appendChild(iconEl);
+  dialog.appendChild(titleEl);
+  dialog.appendChild(bodyEl);
+  dialog.appendChild(actionsEl);
+
+  overlay.appendChild(dialog);
+
+  // ── Cleanup function ──
+  function closeModal() {
+    document.removeEventListener('keydown', onKeyDown);
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (onClose) onClose();
+  }
+
+  // ── Event: ESC key ──
+  function onKeyDown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    }
+  }
+  document.addEventListener('keydown', onKeyDown);
+
+  // ── Event: overlay backdrop click (not dialog interior) ──
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  // ── Event: confirm button click ──
+  confirmBtn.addEventListener('click', closeModal);
+
+  // ── Mount + auto-focus confirm button ──
+  document.body.appendChild(overlay);
+  confirmBtn.focus();
+}
+
+Board.util.showInfoModal = showInfoModal;
+

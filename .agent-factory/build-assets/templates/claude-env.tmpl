@@ -1,0 +1,164 @@
+# =========================================================================================
+# .agent-factory/.env — Claude Code 워크플로우 환경 변수
+# 이 파일은 build.sh가 생성합니다.
+# 형식: KEY=value (표준 .env 문법)
+# 민감한 정보가 포함될 수 있으므로 .gitignore에 등록하세요.
+# =========================================================================================
+
+# -----------------------------------------------------------------------------------------
+# (1) Slack 연동
+# -----------------------------------------------------------------------------------------
+
+# Slack Bot OAuth Token (xoxb-로 시작)
+# 용도: Claude Code 작업 완료/대기 알림 전송
+CLAUDE_CODE_SLACK_BOT_TOKEN=
+
+# Slack 채널 ID (C로 시작)
+# 용도: 알림이 전송될 채널 지정
+CLAUDE_CODE_SLACK_CHANNEL_ID=
+
+# Slack API 엔드포인트 (오버라이드 가능)
+CLAUDE_SLACK_API_URL=https://slack.com/api/chat.postMessage
+
+# -----------------------------------------------------------------------------------------
+# (2) Git 설정
+# -----------------------------------------------------------------------------------------
+
+CLAUDE_CODE_GIT_USER_NAME=
+CLAUDE_CODE_GIT_USER_EMAIL=
+CLAUDE_CODE_GITHUB_USERNAME=
+CLAUDE_CODE_SSH_KEY_GITHUB=
+
+# -----------------------------------------------------------------------------------------
+# (3) Hook 제어 플래그 (HOOK_* 체계)
+# true/false로 각 hook의 활성/비활성을 제어합니다.
+# -----------------------------------------------------------------------------------------
+
+# pre-tool-use hooks
+HOOK_DANGEROUS_COMMAND=false
+HOOK_HOOKS_SELF_PROTECT=false
+HOOK_SLACK_ASK=false
+HOOK_TASK_HISTORY_SYNC=false
+HOOK_AGENT_INVESTIGATION_GUARD=false
+HOOK_MAIN_BRANCH_GUARD=false
+HOOK_MAIN_SESSION_GUARD=false
+HOOK_KANBAN_SUBCOMMAND_GUARD=false
+HOOK_READONLY_SESSION_GUARD=false
+HOOK_DIRECT_PATH_GUARD=true
+HOOK_DONE_RELATION_GUARD=true
+HOOK_RULES_AUTO_APPROVE=true
+HOOK_WORKTREE_REMOVE_GUARD=true
+HOOK_WORKTREE_PATH_GUARD=true
+HOOK_HALLUCINATION_LOGGER=true
+HOOKS_EDIT_ALLOWED=
+
+# T-483: 워크플로우 결정론 단계 자동 흡수.
+# true 시 .agent-factory/engine/workflow_hooks/ 의 SessionStart/PreToolUse[Task]/
+# PostToolUse[Task] hook 이 flow-update both / flow-step start / flow-phase /
+# flow-skillmap / flow-update task-start|task-status / flow-validate 를 자동 호출한다.
+# 오케스트레이터는 INIT + Task × N + DONE (flow-finish/flow-claude end) 만 명시 호출.
+# false 시 기존 동작 (오케스트레이터가 모든 wrapper 명시 호출).
+HOOK_WORKFLOW_ORCHESTRATION=true
+
+# session-start hooks
+HOOK_SESSION_SYSTEM_PROMPT=true
+
+# stop hooks
+HOOK_WORKFLOW_AUTO_CONTINUE=false
+
+# subagent-stop hooks
+HOOK_USAGE_TRACKER=true
+HOOK_HISTORY_SYNC_TRIGGER=false
+
+# post-tool-use hooks
+HOOK_CATALOG_SYNC=true
+
+# user-prompt-submit hooks (메인 세션 칸반/세션 스냅샷 주입)
+HOOK_USER_PROMPT_KANBAN=true
+
+# Auditor T3 — LLM judge advisory layer (T-477).
+# 기본 비활성 (사용자 명시 활성화 필요, 추측 기반 자동 강제 정책 캐논 준수).
+# 활성화 시 finalization.py Step 4c-AUDIT 가 비차단 advisory 로 호출된다 — verdict
+# 결과는 어떤 칸반 전이/머지 흐름도 차단·강제하지 않는다 (T-411 캐논).
+HOOK_AUDITOR_T3=false
+AUDITOR_T3_MODEL=sonnet
+AUDITOR_T3_EFFORT=low
+
+# -----------------------------------------------------------------------------------------
+# (4) 강제 규칙 제어 플래그 (ENFORCE_* 체계)
+# true/false로 각 강제 규칙의 활성/비활성을 제어합니다.
+# -----------------------------------------------------------------------------------------
+
+# CSO 원칙 (스킬 description 트리거 조건만으로 제한)
+ENFORCE_CSO_PRINCIPLE=true
+
+# 합리화 방지 테이블 강제
+ENFORCE_RATIONALIZATION_GUARD=true
+
+# Verification Result Table 필수화
+ENFORCE_VRT=true
+
+# Self-Review 체크리스트 강제
+ENFORCE_SELF_REVIEW=true
+
+# 토큰 효율 목표값 강제
+ENFORCE_TOKEN_EFFICIENCY=true
+
+# -----------------------------------------------------------------------------------------
+# (5) 워크플로우 설정
+# -----------------------------------------------------------------------------------------
+
+# .agent-factory/runs/ 디렉터리에 유지할 최대 워크플로우 수 (기본값: 10)
+CLAUDE_WORKFLOW_KEEP_COUNT=10
+
+# 체인 스테이지 실패 시 최대 재시도 횟수 (기본값: 2)
+CLAUDE_CHAIN_MAX_RETRY=2
+
+# git worktree 격리 활성화 (단일 진실 공급원 — T-370 후속)
+# 허용값: true (격리 활성, 권장) / false (비활성, 메인 저장소 직접 작업)
+# 미설정 시: is_worktree_enabled() 가 RuntimeError raise — 추론 폴백 제거됨
+# 사용처: .agent-factory/engine/flow/worktree_manager.py
+WORKFLOW_WORKTREE=true
+
+# 프롬프트 품질 임계치 (0.0~1.0). 미달 시 자동 롤백
+CLAUDE_QUALITY_THRESHOLD=0.6
+
+# 워크플로우당 ERROR 카운트 임계치
+CLAUDE_ERROR_THRESHOLD=3
+
+# 세션/워크플로우 stale 판정 (분 단위)
+CLAUDE_STALE_TTL_MINUTES=30
+
+# 좀비 세션 판정 (시간 단위)
+CLAUDE_ZOMBIE_TTL_HOURS=24
+
+# 보고서 TTL (시간 단위)
+CLAUDE_REPORT_TTL_HOURS=1
+
+# 작업 디렉터리 이름 최대 길이
+CLAUDE_WORK_NAME_MAX_LEN=20
+
+# Phase별 retry 최대 횟수 (기본값 0 = retry 비활성, 회귀 0건 보장)
+# T-455: retry/sentinel/flow-fail-record 인프라. 명시 활성화 시에만 retry 동작.
+WORKFLOW_RETRY_INIT=0
+WORKFLOW_RETRY_PLAN=0
+WORKFLOW_RETRY_WORK=0
+WORKFLOW_RETRY_VALIDATE=0
+WORKFLOW_RETRY_REPORT=0
+
+# retry-context.json hint_history 배열 cap (LIFO truncate, 기본값 3)
+WORKFLOW_RETRY_PROMPT_N=3
+
+# 터미널 배너 너비 (빈 값이면 자동)
+CLAUDE_BANNER_WIDTH=
+
+# -----------------------------------------------------------------------------------------
+# (6) 외부 환경 / Python 요구사항
+# -----------------------------------------------------------------------------------------
+
+# 원격 저장소 URL (오버라이드 가능)
+CLAUDE_REPO_URL=https://github.com/KoreanLeeChangHyun/claude-workflow.git
+
+# Python 최소 버전 (build.sh 검증)
+CLAUDE_REQUIRED_PYTHON_MAJOR=3
+CLAUDE_REQUIRED_PYTHON_MINOR=9

@@ -258,7 +258,7 @@ Mermaid는 대괄호 안의 특정 문자를 형상(shape) 구문으로 해석�
 | `E[/path/to/file]` | `[/`가 사다리꼴 형상으로 파싱됨 | `E["/path/to/file"]` | `E["#sol;path#sol;to#sol;file"]` |
 | `F[C:\Users\docs]` | `[\`가 역사다리꼴 형상으로 파싱됨 | `F["C:\Users\docs"]` | `F["C:#bsol;Users#bsol;docs"]` |
 | `G[func(arg)]` | `()`가 형상 구문과 혼동됨 | `G["func(arg)"]` | `G["func#lpar;arg#rpar;"]` |
-| `H[.claude-organic/runs/ 경로]` | 라벨 내 슬래시가 파서 혼동 유발 | `H[".claude-organic/runs/ 경로"]` | `H[".workflow#sol; 경로"]` |
+| `H[.agent-factory/runs/ 경로]` | 라벨 내 슬래시가 파서 혼동 유발 | `H[".agent-factory/runs/ 경로"]` | `H[".workflow#sol; 경로"]` |
 | `B1[curl\|bash 파이프]` | `\|`가 엣지 라벨 PIPE 토큰으로 파싱됨 | `B1["curl #124; bash 파이프"]` | - |
 | `Q[사용자 질의\n"d80 에러"]` | `"`가 STR 토큰과 충돌, `\n`은 개행 아님 | `Q["사용자 질의<br>#quot;d80 에러#quot;"]` | - |
 | `A[첫째 줄\n둘째 줄]` | `\n`이 리터럴로 표시됨 (줄바꿈 안 됨) | `A["첫째 줄<br>둘째 줄"]` | Markdown 문자열 방식도 가능 (해결 방법 3 참조) |
@@ -274,7 +274,7 @@ Mermaid는 대괄호 안의 특정 문자를 형상(shape) 구문으로 해석�
 
 ```mermaid
 flowchart TD
-    A["#sol;sync:history 커맨드"] --> B[".claude-organic/runs/ 경로"]
+    A["#sol;sync:history 커맨드"] --> B[".agent-factory/runs/ 경로"]
     B --> C["func(arg) 호출"]
 ```
 

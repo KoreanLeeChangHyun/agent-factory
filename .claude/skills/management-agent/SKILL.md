@@ -81,9 +81,9 @@ AskUserQuestion을 호출하기 **전에** Slack으로 대기 알림을 전송�
 
 **환경변수 확인:**
 ```bash
-if [ -f ".claude-organic/.env" ]; then
-    SLACK_BOT_TOKEN=$(grep "^CLAUDE_CODE_SLACK_BOT_TOKEN=" .claude-organic/.env | sed 's/^CLAUDE_CODE_SLACK_BOT_TOKEN=//')
-    SLACK_CHANNEL_ID=$(grep "^CLAUDE_CODE_SLACK_CHANNEL_ID=" .claude-organic/.env | sed 's/^CLAUDE_CODE_SLACK_CHANNEL_ID=//')
+if [ -f ".agent-factory/.env" ]; then
+    SLACK_BOT_TOKEN=$(grep "^CLAUDE_CODE_SLACK_BOT_TOKEN=" .agent-factory/.env | sed 's/^CLAUDE_CODE_SLACK_BOT_TOKEN=//')
+    SLACK_CHANNEL_ID=$(grep "^CLAUDE_CODE_SLACK_CHANNEL_ID=" .agent-factory/.env | sed 's/^CLAUDE_CODE_SLACK_CHANNEL_ID=//')
 fi
 ```
 

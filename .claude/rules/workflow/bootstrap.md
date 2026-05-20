@@ -10,8 +10,8 @@
 
 ```python
 _PATH_FIXES = [
-    (".claude.workflow/scripts/", ".claude-organic/engine/"),  # 이중 stale 먼저
-    (".claude.workflow/", ".claude-organic/"),
+    (".claude.workflow/scripts/", ".agent-factory/engine/"),  # 이중 stale 먼저
+    (".claude.workflow/", ".agent-factory/"),
 ]
 ```
 
@@ -24,7 +24,7 @@ _PATH_FIXES = [
 **How (옵션 B 보류 후보)**: `BASH_ENV` 우회 — bash 표준이라 공식 보장.
 
 ```json
-"env": { "BASH_ENV": "/.../.claude-organic/bash_env.sh" }
+"env": { "BASH_ENV": "/.../.agent-factory/bash_env.sh" }
 ```
 
 ```bash
@@ -36,14 +36,14 @@ export CLAUDE_PROJECT_DIR="$PROJECT_ROOT"
 
 자기참조 `$BASH_SOURCE` 로 외부 이식 가능 (init script 가 BASH_ENV 절대경로만 갈아끼우면 됨). 미합의·보류 상태.
 
-## 3. flow-* 호출은 항상 `.claude-organic/bin/` 상대 경로 (MUST)
+## 3. flow-* 호출은 항상 `.agent-factory/bin/` 상대 경로 (MUST)
 
 **Why**: 짧은 이름 (`flow-kanban`) 은 위 비공식 env.PATH 등록에 의존 → 회귀 위험.
 
 **How**:
-- 기본: `.claude-organic/bin/flow-kanban list` (cwd = 프로젝트 루트)
-- cwd 불명확 시: `cd "$(git rev-parse --show-toplevel)" && .claude-organic/bin/flow-kanban ...` 또는 절대경로
-- 금지: `flow-kanban` 짧은 이름, `python3 .claude-organic/engine/...` 직접 호출 (모듈 경로 깨짐)
+- 기본: `.agent-factory/bin/flow-kanban list` (cwd = 프로젝트 루트)
+- cwd 불명확 시: `cd "$(git rev-parse --show-toplevel)" && .agent-factory/bin/flow-kanban ...` 또는 절대경로
+- 금지: `flow-kanban` 짧은 이름, `python3 .agent-factory/engine/...` 직접 호출 (모듈 경로 깨짐)
 
 ## 4. 좀비 board 서버 자동 종료
 
@@ -68,7 +68,7 @@ preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-se
 `flow-*` wrapper 는 확장자 없음 → `find ... -name '*.sh'` 로 안 잡힘:
 
 ```bash
-[ -d ".claude-organic/bin" ] && find ".claude-organic/bin" -type f -exec chmod +x {} +
+[ -d ".agent-factory/bin" ] && find ".agent-factory/bin" -type f -exec chmod +x {} +
 ```
 
 ## 7. CLI 출력 색상 위계 (GREEN 도배 회피)
@@ -94,7 +94,7 @@ preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-se
 **How**:
 - `.claude/` 하위는 `flow-claude-edit open/save` 경유 (정식 경로)
 - Edit/Write 도구만 차단 → Bash `sed -i` 같은 간접 수정은 차단되지 않음 (대량 경로 치환에 활용 가능)
-- `.claude-organic/` 하위는 직접 Edit 가능 (차단 대상 아님)
+- `.agent-factory/` 하위는 직접 Edit 가능 (차단 대상 아님)
 - 신규 파일: `flow-claude-edit new <path>` 호출 → staging/<path> 빈 파일 생성 → Edit 도구로 작성 → `flow-claude-edit save <path>` 호출 시 `.claude/` 로 승격
 
 ## 잔존 위험 점검 포인트

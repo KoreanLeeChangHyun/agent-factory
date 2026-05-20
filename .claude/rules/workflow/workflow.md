@@ -1,6 +1,6 @@
 # 워크플로우 시스템 상세 규칙
 
-> **v2 명세 SSOT**: `.claude-organic/engine/v2/SPEC.md`. 본 문서와 충돌 시 SPEC.md 우선.
+> **v2 명세 SSOT**: `.agent-factory/engine/v2/SPEC.md`. 본 문서와 충돌 시 SPEC.md 우선.
 > v2 = **driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개)**. 메인 세션은 오케스트레이터 아님 — 사용자 대화 전용.
 > 어휘: `workflow_step` (6단계 FSM), `work_phase` (WORK 내부 sub-단계). `workflow_phase` 는 v1 옛 키 — 사용 금지.
 
@@ -76,23 +76,23 @@ flow-kanban create "제목" --command implement --status todo
 - `flow-kanban` 호출 시 bin 레퍼런스에 나열되지 않은 서브커맨드를 사용하지 않는다
 - `/clear` 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook 이 자동 재주입
 - 사용자 발화에 명시되지 않은 행위를 추론하여 수행하지 않는다 — "추가해주세요"는 추가만 의미
-- `python3 .claude-organic/engine/...` 형태로 스크립트를 직접 호출하지 않는다 — `.claude-organic/bin/flow-*` wrapper 사용
+- `python3 .agent-factory/engine/...` 형태로 스크립트를 직접 호출하지 않는다 — `.agent-factory/bin/flow-*` wrapper 사용
 - derived-from 파생 티켓이 미완료(Done 아닌 상태)면 원본 티켓을 Done 처리하지 않는다 — Hook 이 차단
 
 ## bin wrapper 레퍼런스
 
-`.claude-organic/bin/flow-*` 실행 파일을 직접 호출 (alias 아님). 대화형 zsh 셸은 PATH 등록되어 있을 수 있으나, 비대화형 Bash tool 환경에서는 절대/상대 경로로 호출한다 (MUST).
+`.agent-factory/bin/flow-*` 실행 파일을 직접 호출 (alias 아님). 대화형 zsh 셸은 PATH 등록되어 있을 수 있으나, 비대화형 Bash tool 환경에서는 절대/상대 경로로 호출한다 (MUST).
 
 ### flow-kanban 서브커맨드 (이 외 사용 금지)
 create, move, done, delete, update-title, update, update-prompt, update-result, set-editing, link, unlink, list, board, show
 
 예시:
-- `.claude-organic/bin/flow-kanban create "제목" --command implement --status todo`
-- `.claude-organic/bin/flow-kanban update-prompt T-001 --goal "목표" --target "대상"`
-- `.claude-organic/bin/flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"`
-- `.claude-organic/bin/flow-kanban link T-001 --derived-from T-000`
-- `.claude-organic/bin/flow-kanban move T-001 progress`
-- `.claude-organic/bin/flow-kanban done T-001`
+- `.agent-factory/bin/flow-kanban create "제목" --command implement --status todo`
+- `.agent-factory/bin/flow-kanban update-prompt T-001 --goal "목표" --target "대상"`
+- `.agent-factory/bin/flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"`
+- `.agent-factory/bin/flow-kanban link T-001 --derived-from T-000`
+- `.agent-factory/bin/flow-kanban move T-001 progress`
+- `.agent-factory/bin/flow-kanban done T-001`
 
 ### XML 필드 개행 컨벤션
 복수 항목 필드(goal, target, constraints, criteria, context)에 여러 항목을 입력할 때는 반드시 `\n` 개행을 삽입한다 (MUST).
@@ -164,7 +164,7 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 ### 검증 룰 카탈로그 (14 룰 / 7 카테고리)
 
-SSOT = `.claude-organic/engine/v2/_validate.py`. 본 표는 요약.
+SSOT = `.agent-factory/engine/v2/_validate.py`. 본 표는 요약.
 
 #### R-EXIST (산출물 존재, 4룰)
 

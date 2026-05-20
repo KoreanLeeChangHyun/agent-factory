@@ -34,7 +34,7 @@ argument-hint: "[-o|-e|-oe|-s|-d|-c] [N] (티켓 라이프사이클 통합 관�
 | `/wf -d N` | 티켓 종료 (Done 상태로 이동) | `/wf -d 3` |
 | `/wf -c N` | 티켓 삭제 | `/wf -c 3` |
 
-현재 칸반 상태를 확인하려면 `.claude-organic/tickets/` 디렉터리(todo/open/progress/review/done)의 XML 티켓 파일을 참조하세요.
+현재 칸반 상태를 확인하려면 `.agent-factory/tickets/` 디렉터리(todo/open/progress/review/done)의 XML 티켓 파일을 참조하세요.
 ```
 
 ### 라우팅 규칙
@@ -133,7 +133,7 @@ stdout에서 T-NNN을 파싱하고 채번 결과를 출력합니다:
 - `2.` 용도 직접 지정: 트랙 B로 전환
 - `0.` 취소: 티켓 생성 없이 종료
 
-**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.claude-organic/prompts/prompt.txt`를 읽어 메뉴 항목을 로드한 뒤 출력합니다:
+**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/prompts/prompt.txt`를 읽어 메뉴 항목을 로드한 뒤 출력합니다:
 
 ```
 `[T-NNN]` : `[WF -o]` 어떤 목적의 티켓을 생성할까요?
@@ -153,10 +153,10 @@ stdout에서 T-NNN을 파싱하고 채번 결과를 출력합니다:
 #### 1-3. 완료 메시지 출력
 
 ```
-T-NNN 티켓이 생성되었습니다. (파일: .claude-organic/tickets/<선택된 상태>/T-NNN.xml)
+T-NNN 티켓이 생성되었습니다. (파일: .agent-factory/tickets/<선택된 상태>/T-NNN.xml)
 ```
 
-> 선택된 상태가 `todo`이면 `.claude-organic/tickets/todo/T-NNN.xml`, `open`이면 `.claude-organic/tickets/open/T-NNN.xml`에 저장됩니다.
+> 선택된 상태가 `todo`이면 `.agent-factory/tickets/todo/T-NNN.xml`, `open`이면 `.agent-factory/tickets/open/T-NNN.xml`에 저장됩니다.
 
 **맥락 충분 시** (트랙 A에서 constraints/criteria 모두 추론 성공):
 
@@ -184,14 +184,14 @@ T-NNN 티켓이 생성되었습니다. (파일: .claude-organic/tickets/<선택�
 
 #### 1-B-o-1. 티켓 파일 로드
 
-Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/tickets/open/T-NNN.xml`, `.claude-organic/tickets/progress/T-NNN.xml`, `.claude-organic/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. Read 도구로 XML의 `<metadata>/<status>`를 확인하여 분기합니다:
+Glob 도구로 `.agent-factory/tickets/todo/T-NNN.xml`, `.agent-factory/tickets/open/T-NNN.xml`, `.agent-factory/tickets/progress/T-NNN.xml`, `.agent-factory/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. Read 도구로 XML의 `<metadata>/<status>`를 확인하여 분기합니다:
 
 | 상태 | 분기 흐름 |
 |------|----------|
 | `To Do` | 상태 유지. 티켓 내용 표시 후 1-B-o-2로 진행 (Open으로 전이하지 않음) |
 | `Open` | 안내 메시지(`T-NNN은 이미 Open 상태입니다.`) 출력 후 1-B-o-2로 진행 |
 | `In Progress` / `Review` | `flow-kanban move T-NNN open --force` 즉시 실행 후 상태 변경 확인 메시지 출력, 1-B-o-2로 진행 |
-| `Done` (.claude-organic/tickets/done/ 발견) | `flow-kanban move T-NNN open --force` 실행, 1-B-o-2로 진행 |
+| `Done` (.agent-factory/tickets/done/ 발견) | `flow-kanban move T-NNN open --force` 실행, 1-B-o-2로 진행 |
 | 파일 미발견 | 에러 출력 후 종료: `T-NNN 티켓 파일을 찾을 수 없습니다.` |
 
 #### 1-B-o-2. 후속 안내 출력
@@ -302,7 +302,7 @@ Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 �
 - `2.` 용도 직접 지정: 트랙 B로 전환
 - `0.` 취소: 티켓 생성 없이 종료
 
-**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.claude-organic/prompts/prompt.txt`를 읽어 메뉴 항목을 로드합니다.
+**트랙 B: 맥락 미감지 또는 fallback** -- Read 도구로 `.agent-factory/prompts/prompt.txt`를 읽어 메뉴 항목을 로드합니다.
 
 **용도->command 매핑**: 연구=`research`, 구현/버그수정/리팩토링/아키텍처설계=`implement`, 리뷰=`review`
 
@@ -357,7 +357,7 @@ Read 도구로 `.claude/skills/research-prompt-engineering/SKILL.md`를 읽어 �
 #### 1-5. 완료 메시지 출력
 
 ```
-T-NNN 티켓이 생성되었습니다. (파일: .claude-organic/tickets/<선택된 상태>/T-NNN.xml)
+T-NNN 티켓이 생성되었습니다. (파일: .agent-factory/tickets/<선택된 상태>/T-NNN.xml)
 
 ## 후속 커맨드 안내
 
@@ -376,11 +376,11 @@ T-NNN 티켓이 생성되었습니다. (파일: .claude-organic/tickets/<선택�
 
 #### 1-B-1. 티켓 파일 로드
 
-Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/tickets/open/T-NNN.xml`, `.claude-organic/tickets/progress/T-NNN.xml`, `.claude-organic/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다.
+Glob 도구로 `.agent-factory/tickets/todo/T-NNN.xml`, `.agent-factory/tickets/open/T-NNN.xml`, `.agent-factory/tickets/progress/T-NNN.xml`, `.agent-factory/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다.
 
 **파일 발견 시**: XML `<status>` 요소에서 현재 칸반 상태를 판별합니다.
 
-**파일 미발견 시**: `.claude-organic/tickets/done/T-NNN.xml`을 확인합니다:
+**파일 미발견 시**: `.agent-factory/tickets/done/T-NNN.xml`을 확인합니다:
 - 존재하면: `flow-kanban move T-NNN open` 실행 (파일 이동 처리는 kanban_cli.py가 담당)
 - 어디에서도 찾지 못한 경우: 에러 출력 후 종료 (`T-NNN 티켓 파일을 찾을 수 없습니다.`)
 
@@ -450,9 +450,9 @@ T-NNN 티켓이 업데이트되었습니다.
 
 > **칸반 전이**: Open -> **In Progress** (v2 `driver.init_step` 안에서 `flow-kanban move T-NNN progress` 자동 수행) -> **Review** (finalize 직후 `done_step` 안에서 자동 전이).
 >
-> **v2 라우팅 (T-489 Stage 3-A)**: 본 분기는 `.claude-organic/bin/flow-wf submit T-NNN` 단일 진입점으로 단순화되었습니다. v1 의 `flow-launcher launch` / `LAUNCH/INLINE` 분기 / `.claude/skills/workflow-wf/SKILL.md` 메인 세션 직접 로드 흐름은 폐지되었습니다.
+> **v2 라우팅 (T-489 Stage 3-A)**: 본 분기는 `.agent-factory/bin/flow-wf submit T-NNN` 단일 진입점으로 단순화되었습니다. v1 의 `flow-launcher launch` / `LAUNCH/INLINE` 분기 / `.claude/skills/workflow-wf/SKILL.md` 메인 세션 직접 로드 흐름은 폐지되었습니다.
 >
-> driver 가 6 Step (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) 을 룰베이스로 순차 진행하며, PLAN/WORK/VALIDATE/REPORT 4 Step 은 `claude -p` subprocess 로 격리 실행됩니다 (메인 세션 컨텍스트 0 영향). 명세 SSOT = `.claude-organic/engine/v2/SPEC.md`.
+> driver 가 6 Step (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) 을 룰베이스로 순차 진행하며, PLAN/WORK/VALIDATE/REPORT 4 Step 은 `claude -p` subprocess 로 격리 실행됩니다 (메인 세션 컨텍스트 0 영향). 명세 SSOT = `.agent-factory/engine/v2/SPEC.md`.
 
 #### 2-1. 티켓 번호 검증
 
@@ -463,7 +463,7 @@ T-NNN 티켓이 업데이트되었습니다.
 
 #### 2-2. 티켓 파일 로드 및 상태 검증
 
-Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/tickets/open/T-NNN.xml`, `.claude-organic/tickets/progress/T-NNN.xml`, `.claude-organic/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. 미발견 시 에러 출력 후 종료.
+Glob 도구로 `.agent-factory/tickets/todo/T-NNN.xml`, `.agent-factory/tickets/open/T-NNN.xml`, `.agent-factory/tickets/progress/T-NNN.xml`, `.agent-factory/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. 미발견 시 에러 출력 후 종료.
 
 Read 도구로 XML의 `<status>` 요소를 확인합니다. 값이 `To Do`이면 아래 메시지를 출력하고 종료합니다:
 ```
@@ -487,10 +487,10 @@ XML에서 `<prompt>` 요소 존재 여부를 확인합니다:
 
 #### 2-4. v2 driver 발사 (background)
 
-`.claude-organic/bin/flow-wf submit T-NNN` 을 Bash 도구의 `run_in_background: true` 옵션으로 호출합니다. stdout 은 NDJSON event stream (step.start / step.end / phase.start / phase.end / workflow.finish) 이며, stderr 는 driver 진단 로그입니다.
+`.agent-factory/bin/flow-wf submit T-NNN` 을 Bash 도구의 `run_in_background: true` 옵션으로 호출합니다. stdout 은 NDJSON event stream (step.start / step.end / phase.start / phase.end / workflow.finish) 이며, stderr 는 driver 진단 로그입니다.
 
 ```bash
-.claude-organic/bin/flow-wf submit T-NNN
+.agent-factory/bin/flow-wf submit T-NNN
 ```
 
 driver 의 일반 사이클은 4 spawn × claude -p 약 5분 (T-490 검증 기준 5분 14초). 메인 세션은 background 실행 동안 사용자와 자유 대화 가능합니다.
@@ -504,12 +504,12 @@ driver 의 일반 사이클은 4 spawn × claude -p 약 5분 (T-490 검증 기�
 
 | 산출물 | 경로 |
 |--------|------|
-| 산출물 디렉터리 | `.claude-organic/runs/<registryKey>/` (driver 가 INIT 단계에서 생성) |
-| 실시간 로그 | `.claude-organic/runs/<registryKey>/workflow.log` |
+| 산출물 디렉터리 | `.agent-factory/runs/<registryKey>/` (driver 가 INIT 단계에서 생성) |
+| 실시간 로그 | `.agent-factory/runs/<registryKey>/workflow.log` |
 | 이벤트 stream | driver stdout (NDJSON, BashOutput 으로 확인) |
-| 상태 조회 | `.claude-organic/bin/flow-wf status T-NNN` (SPEC §12.1) |
+| 상태 조회 | `.agent-factory/bin/flow-wf status T-NNN` (SPEC §12.1) |
 
-driver 가 6 Step (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) 을 통째 진행한 후 자동으로 `flow-kanban move T-NNN review` 를 수행합니다. 12 advisory 룰 평가 결과는 `.claude-organic/runs/<registryKey>/validate-rules.json` 에 기록됩니다.
+driver 가 6 Step (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) 을 통째 진행한 후 자동으로 `flow-kanban move T-NNN review` 를 수행합니다. 12 advisory 룰 평가 결과는 `.agent-factory/runs/<registryKey>/validate-rules.json` 에 기록됩니다.
 ```
 
 > **v1 호환 미보존**: 본 patch 는 v1 인프라 (`flow-launcher`, `_handle_kanban_submit`, `.claude/skills/workflow-wf/SKILL.md` 메인 세션 로드, 체인 command) 호환을 보존하지 않습니다. Board UI DnD (Open → In Progress) 도 결국 새 세션에서 `/wf -s N` 슬래시 발화로 귀결되므로 본 patch 만으로 자동 흡수됩니다. Board UI 의 실시간 진행 표시 (workflow-bar SSE) 통합은 v2 Stage 3-B 후속 트랙입니다.
@@ -535,7 +535,7 @@ driver 가 6 Step (INIT / PLAN / WORK / VALIDATE / REPORT / DONE) 을 통째 진
 
 #### 3-2. 티켓 상태 확인 및 분기
 
-Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/tickets/open/T-NNN.xml`, `.claude-organic/tickets/progress/T-NNN.xml`, `.claude-organic/tickets/review/T-NNN.xml` 패턴을 순서대로 탐색하고 Read 도구로 `<status>` 요소를 확인하여 분기합니다:
+Glob 도구로 `.agent-factory/tickets/todo/T-NNN.xml`, `.agent-factory/tickets/open/T-NNN.xml`, `.agent-factory/tickets/progress/T-NNN.xml`, `.agent-factory/tickets/review/T-NNN.xml` 패턴을 순서대로 탐색하고 Read 도구로 `<status>` 요소를 확인하여 분기합니다:
 
 | 현재 상태 | 실행 흐름 |
 |----------|----------|
@@ -546,10 +546,10 @@ Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/ticket
 
 ##### 3-A-1. 최근 워크플로우 산출물 탐색
 
-`.claude-organic/runs/` 하위에서 해당 티켓의 가장 최근 워크플로우 디렉터리를 탐색합니다:
-- Glob 도구로 `.claude-organic/runs/*/report.md` (새 구조 우선) 또는 `.claude-organic/runs/*/T-NNN*/*/report.md` / `.claude-organic/runs/*/*/implement/report.md` (기존 `.history/` 호환) 등을 검색합니다
+`.agent-factory/runs/` 하위에서 해당 티켓의 가장 최근 워크플로우 디렉터리를 탐색합니다:
+- Glob 도구로 `.agent-factory/runs/*/report.md` (새 구조 우선) 또는 `.agent-factory/runs/*/T-NNN*/*/report.md` / `.agent-factory/runs/*/*/implement/report.md` (기존 `.history/` 호환) 등을 검색합니다
 - 티켓 XML의 `<result>` 요소의 `<workdir>` 값을 확인하여 정확한 워크플로우 디렉터리를 특정합니다
-- `<workdir>` 값이 없으면 `.claude-organic/runs/` 하위에서 최신 타임스탬프 디렉터리를 탐색합니다
+- `<workdir>` 값이 없으면 `.agent-factory/runs/` 하위에서 최신 타임스탬프 디렉터리를 탐색합니다
 
 ##### 3-A-2. 간단 검토 수행
 
@@ -593,7 +593,7 @@ flow-merge T-NNN --force
 
 성공 시 종료 메시지:
 ```
-`[T-NNN]` : `[WF -d]` T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .claude-organic/tickets/done/T-NNN.xml)
+`[T-NNN]` : `[WF -d]` T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .agent-factory/tickets/done/T-NNN.xml)
 ```
 
 **"2. 상세 review" 선택 시:**
@@ -630,11 +630,11 @@ flow-kanban done T-NNN
 - exit code 1, "이미 Done": 안내 출력 후 종료
 - exit code 0: 종료 메시지 출력
 
-> `flow-kanban done`은 상태 갱신과 파일 이동(상태별 디렉터리(`todo/`, `open/`, `progress/`, `review/`) -> `.claude-organic/tickets/done/T-NNN.xml`)을 내부적으로 처리합니다.
+> `flow-kanban done`은 상태 갱신과 파일 이동(상태별 디렉터리(`todo/`, `open/`, `progress/`, `review/`) -> `.agent-factory/tickets/done/T-NNN.xml`)을 내부적으로 처리합니다.
 
 종료 메시지:
 ```
-T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .claude-organic/tickets/done/T-NNN.xml)
+T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .agent-factory/tickets/done/T-NNN.xml)
 ```
 
 ---
@@ -656,7 +656,7 @@ T-NNN 티켓이 Done 상태로 종료되었습니다. (파일: .claude-organic/t
 
 #### 4-2. 티켓 파일 탐색
 
-Glob 도구로 `.claude-organic/tickets/todo/T-NNN.xml`, `.claude-organic/tickets/open/T-NNN.xml`, `.claude-organic/tickets/progress/T-NNN.xml`, `.claude-organic/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. 미발견 시 `.claude-organic/tickets/done/T-NNN.xml`도 확인합니다. 어디에서도 찾지 못한 경우 에러 출력 후 종료.
+Glob 도구로 `.agent-factory/tickets/todo/T-NNN.xml`, `.agent-factory/tickets/open/T-NNN.xml`, `.agent-factory/tickets/progress/T-NNN.xml`, `.agent-factory/tickets/review/T-NNN.xml` 패턴을 순서대로 검색합니다. 미발견 시 `.agent-factory/tickets/done/T-NNN.xml`도 확인합니다. 어디에서도 찾지 못한 경우 에러 출력 후 종료.
 
 #### 4-3. 삭제 실행
 
@@ -691,7 +691,7 @@ T-NNN 티켓이 삭제되었습니다.
 | `-e N` | Review/In Progress | Open (자동 복귀) | `flow-kanban move T-NNN open` + 편집 루프 (`-oe N`도 동일 동작) |
 | `-e N` | Open | Open (유지) | -- (편집 루프 진입, `-oe N`도 동일 동작) |
 | `-s` | To Do | (에러 종료) | "먼저 /wf -e N으로 Open 승격 후 다시 제출" 안내 출력 후 종료 |
-| `-s` | Open | In Progress | `.claude-organic/bin/flow-wf submit T-NNN` (v2 driver background, SPEC.md §12.1) |
+| `-s` | Open | In Progress | `.agent-factory/bin/flow-wf submit T-NNN` (v2 driver background, SPEC.md §12.1) |
 | `-s` (완료 후) | In Progress | Review | driver `done_step` 안에서 `flow-kanban move T-NNN review` 자동 처리 |
 | `-d` | Review | Done (간단검토 후 완료 선택 시) | 간단검토 -> `flow-merge T-NNN --force`. **Done = 머지 + 사용자 직접 테스트 통과 후의 진짜 종결** |
 | `-d` | Review | Review (상세 review 선택 시) | 새 review 티켓 생성 + `flow-kanban link T-MMM --derived-from T-NNN` |
@@ -718,7 +718,7 @@ T-NNN 티켓이 삭제되었습니다.
 5. **AskUserQuestion 미사용**: 모든 사용자 입력은 텍스트 메뉴 출력 후 자유 입력으로 수신합니다. 접두사는 `` `[T-NNN]` : `[WF -플래그]` `` 형식을 사용합니다
 6. **Task 도구 호출 금지**: 이 명령어는 비워크플로우 독립 명령어이므로 서브에이전트를 호출하지 않습니다
 7. **wf 스킬 직접 로드**: `-s` 플래그 실행 시 SlashCommand/Skill 도구가 아닌 Read 도구로 해당 스킬 파일을 직접 로드하여 실행합니다
-8. **워크플로우 발사 (v2 driver)**: `-s` 플래그는 `.claude-organic/bin/flow-wf submit T-NNN` 단일 진입점으로 v2 driver 를 background 발사합니다 (T-489 Stage 3-A). driver 가 INIT 단계에서 `flow-kanban move T-NNN progress` 를 자동 수행하며, DONE 단계에서 `flow-kanban move T-NNN review` 로 자동 전이합니다. PLAN/WORK/VALIDATE/REPORT 4 Step 은 `claude -p` subprocess 로 격리 실행되므로 메인 세션 컨텍스트는 영향받지 않습니다. v1 의 `flow-launcher` / `LAUNCH/INLINE` 분기 / `_handle_kanban_submit` 흐름은 폐지되었습니다. `-c` 플래그는 별도로 `flow-launcher` 를 계속 사용합니다 (Stage 3-A 범위 외).
+8. **워크플로우 발사 (v2 driver)**: `-s` 플래그는 `.agent-factory/bin/flow-wf submit T-NNN` 단일 진입점으로 v2 driver 를 background 발사합니다 (T-489 Stage 3-A). driver 가 INIT 단계에서 `flow-kanban move T-NNN progress` 를 자동 수행하며, DONE 단계에서 `flow-kanban move T-NNN review` 로 자동 전이합니다. PLAN/WORK/VALIDATE/REPORT 4 Step 은 `claude -p` subprocess 로 격리 실행되므로 메인 세션 컨텍스트는 영향받지 않습니다. v1 의 `flow-launcher` / `LAUNCH/INLINE` 분기 / `_handle_kanban_submit` 흐름은 폐지되었습니다. `-c` 플래그는 별도로 `flow-launcher` 를 계속 사용합니다 (Stage 3-A 범위 외).
 9. **constraints/criteria 필수**: `0. 완료` 선택 시 constraints 또는 criteria가 누락이거나 10자 미만이면 완료를 거부하고 루프를 계속합니다. Step 1-4(신규 생성)와 Step 1-B-5(편집 루프, 최초/추가 사이클 양쪽) 모두에 적용됩니다. `-o` 단독 모드에서는 편집 루프에 진입하지 않으므로 이 검증이 적용되지 않습니다
 10. **Review 분기 흐름**: `-d` 플래그 실행 시 Review 상태 티켓은 간단 검토를 먼저 수행합니다. merge는 사용자의 명시적 "완료" 선택 후에만 실행됩니다. Review 이외 상태에서는 기존과 동일하게 즉시 Done 처리됩니다
 11. **품질 검증 (prompt_validator)**: `flow-kanban update-prompt` 호출 시 `prompt_validator.py`가 자동으로 품질 점수를 계산합니다. 검증 대상 태그는 `goal`, `target`, `constraints`, `criteria` 4개이며 공식은 `score = (존재_태그수/4) × 0.6 + (유효_태그수/4) × 0.4`입니다 (유효 = 10자 이상 & `TODO:` 미시작). 임계값은 `QUALITY_THRESHOLD = 0.6`이며 미달 시 프롬프트가 자동 롤백되고 exit code 1로 종료됩니다. `--skip-validation` 플래그를 추가하면 품질 검증을 건너뜁니다. `-o` 모드(채번+용도선택만)와 `-d` 상세 review 생성 시에는 편집 루프를 거치지 않으므로 `--skip-validation`을 사용합니다. `-e` 모드의 편집 루프에서는 constraints/criteria 10자 이상 검증이 선행되므로 품질 검증을 통과할 수 있습니다

@@ -1,16 +1,16 @@
 ---
 name: my-board-sse-convention
-description: "TRIGGER: board 자체 SSE 코드(.claude-organic/board/static/js/core/sse.js, .claude-organic/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. 또는 refreshKanban / refreshWorkflow dom 갱신 폭주 진단 시, renderWorkflow 회귀 / shell vs tbody 분리 문제 시, EventSource 재연결·wfInitialized race 의심 시. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점·is_user_visible SSOT ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched."
+description: "TRIGGER: board 자체 SSE 코드(.agent-factory/board/static/js/core/sse.js, .agent-factory/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. 또는 refreshKanban / refreshWorkflow dom 갱신 폭주 진단 시, renderWorkflow 회귀 / shell vs tbody 분리 문제 시, EventSource 재연결·wfInitialized race 의심 시. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점·is_user_visible SSOT ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched."
 license: "Apache-2.0"
 ---
 
 # Board SSE 컨벤션
 
-본 프로젝트 board 의 자체 SSE(Server-Sent Events) 사용·구현 컨벤션입니다. board 서버(`.claude-organic/board/server/`)가 클라이언트(`.claude-organic/board/static/js/core/sse.js`)로 보내는 자체 이벤트 스트림이 대상이며, Anthropic API SSE 와는 별개입니다.
+본 프로젝트 board 의 자체 SSE(Server-Sent Events) 사용·구현 컨벤션입니다. board 서버(`.agent-factory/board/server/`)가 클라이언트(`.agent-factory/board/static/js/core/sse.js`)로 보내는 자체 이벤트 스트림이 대상이며, Anthropic API SSE 와는 별개입니다.
 
 ## 사용 시기
 
-- `.claude-organic/board/static/js/core/sse.js` 또는 `.claude-organic/board/server/sse_client_manager.py` 수정 시
+- `.agent-factory/board/static/js/core/sse.js` 또는 `.agent-factory/board/server/sse_client_manager.py` 수정 시
 - 새 SSE 이벤트 타입 추가 / `WATCH_DIRS` 변경 / `broadcast()` 호출 추가 시
 - SSE 트리거에 반응해 dom 을 갱신하는 frontend 렌더 함수(`renderXxx`) 신설 또는 수정 시
 - "검색창 포커스가 사라진다", "행이 안 보인다", "스크롤 리셋된다" 같은 SSE 회귀 진단 시
@@ -20,7 +20,7 @@ license: "Apache-2.0"
 
 ### 1.1 이벤트 타입 SSOT
 
-이벤트 타입은 `.claude-organic/board/server/_common.py:WATCH_DIRS` 가 단일 진실 공급원입니다. 디렉터리 → event_type 매핑 변경 시 본 표를 갱신해야 합니다.
+이벤트 타입은 `.agent-factory/board/server/_common.py:WATCH_DIRS` 가 단일 진실 공급원입니다. 디렉터리 → event_type 매핑 변경 시 본 표를 갱신해야 합니다.
 
 | event | 트리거 (디렉터리·이벤트) | payload | broadcast 위치 |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ license: "Apache-2.0"
 
 ### 1.1.1 사용자 가시성 정책 (SSOT)
 
-`.claude-organic/board/server/event_filter.py:is_user_visible` 헬퍼가 모든 SSE broadcast 와 REST history replay 의 사용자 가시성 게이트키퍼입니다.
+`.agent-factory/board/server/event_filter.py:is_user_visible` 헬퍼가 모든 SSE broadcast 와 REST history replay 의 사용자 가시성 게이트키퍼입니다.
 
 - `isMeta=True` 인 이벤트(Claude Code 하네스가 주입하는 Skill/command 래퍼 user 메시지)는 `False` 반환 → 사용자 채널 제외.
 - 새 SSE 이벤트 타입 추가 시 이 헬퍼의 분기를 갱신하지 않으면 **자동 노출 또는 자동 누락 회귀**가 발생합니다.
@@ -55,7 +55,7 @@ license: "Apache-2.0"
 | `attachment` (skill_listing) | `skill_listing` | True | `terminal_channel.py:broadcast` |
 | (직접 emit) | `workflow_step` | True | `terminal_channel.py:emit_step` |
 
-> `_SYSTEM_TOP_LEVEL_FIELDS` 계약 (`.claude-organic/board/server/terminal_channel.py:_SYSTEM_TOP_LEVEL_FIELDS`): `system` 이벤트 subtype 별로 클라이언트가 top-level 로 접근하는 필드를 명시. 신규 subtype 추가 시 이 dict 에 등록하지 않으면 클라이언트는 `raw` 경유로만 접근 가능.
+> `_SYSTEM_TOP_LEVEL_FIELDS` 계약 (`.agent-factory/board/server/terminal_channel.py:_SYSTEM_TOP_LEVEL_FIELDS`): `system` 이벤트 subtype 별로 클라이언트가 top-level 로 접근하는 필드를 명시. 신규 subtype 추가 시 이 dict 에 등록하지 않으면 클라이언트는 `raw` 경유로만 접근 가능.
 
 ### 1.2 Broadcast API
 
@@ -252,9 +252,9 @@ fetchA.then(function (a) {
 ### 룰·정책 단일 진실 공급원
 - `.claude/rules/workflow/general.md` — UI 컨벤션, 메인 세션 제약, 추측 금지, 메모리 정책
 - `.claude/rules/workflow/workflow.md` — 워크플로우 시스템 룰
-- `.claude-organic/board/server/event_filter.py:is_user_visible` — 사용자 가시성 정책 SSOT
-- `.claude-organic/board/server/terminal_channel.py:_SYSTEM_TOP_LEVEL_FIELDS` — system payload 계약
-- `.claude-organic/board/server/_common.py:WATCH_DIRS` — SSE 이벤트 타입 → 디렉터리 매핑
+- `.agent-factory/board/server/event_filter.py:is_user_visible` — 사용자 가시성 정책 SSOT
+- `.agent-factory/board/server/terminal_channel.py:_SYSTEM_TOP_LEVEL_FIELDS` — system payload 계약
+- `.agent-factory/board/server/_common.py:WATCH_DIRS` — SSE 이벤트 타입 → 디렉터리 매핑
 
 ### 분리된 영역
 - Anthropic API SSE: `.claude/skills/reference-claude-api/references/streaming.md` (별개)

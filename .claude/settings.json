@@ -2,12 +2,12 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
-      "Edit(.claude-organic/engine/**)",
-      "Edit(.claude-organic/hooks/**)",
-      "Edit(.claude-organic/prompts/**)",
-      "Edit(.claude-organic/docs/**)",
-      "Edit(.claude-organic/build-assets/**)",
-      "Edit(.claude-organic/board/**)",
+      "Edit(.agent-factory/engine/**)",
+      "Edit(.agent-factory/hooks/**)",
+      "Edit(.agent-factory/prompts/**)",
+      "Edit(.agent-factory/docs/**)",
+      "Edit(.agent-factory/build-assets/**)",
+      "Edit(.agent-factory/board/**)",
       "Edit(.claude/skills/**)",
       "Edit(.claude/agents/**)",
       "Edit(.claude/commands/**)",
@@ -20,7 +20,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/engine/statusline.py"
+    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/statusline.py"
   },
   "hooks": {
     "SessionStart": [
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude-organic/bin/flow-history sync && $CLAUDE_PROJECT_DIR/.claude-organic/bin/flow-history archive",
+            "command": "$CLAUDE_PROJECT_DIR/.agent-factory/bin/flow-history sync && $CLAUDE_PROJECT_DIR/.agent-factory/bin/flow-history archive",
             "timeout": 30,
             "async": true
           }
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/board/server.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/board/server.py",
             "timeout": 5,
             "async": true
           }
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/session-start.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/session-start.py",
             "timeout": 5
           }
         ]
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/pre-tool-use.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/pre-tool-use.py",
             "statusMessage": "pre-tool-use 디스패처 실행 중..."
           }
         ]
@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/subagent-stop.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/subagent-stop.py",
             "timeout": 10,
             "statusMessage": "subagent-stop 디스패처 실행 중..."
           }
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/post-tool-use.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/post-tool-use.py",
             "timeout": 30,
             "async": true,
             "statusMessage": "post-tool-use 디스패처 실행 중..."
@@ -98,7 +98,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.claude-organic/hooks/user-prompt-submit.py",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/user-prompt-submit.py",
             "timeout": 3,
             "statusMessage": "user-prompt-submit 디스패처 실행 중..."
           }

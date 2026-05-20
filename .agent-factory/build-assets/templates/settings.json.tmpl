@@ -1,0 +1,90 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/statusline.py"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/sync/history_sync.py sync && python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/sync/history_sync.py archive",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/board/server.py",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/session-start.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/pre-tool-use.py",
+            "statusMessage": "pre-tool-use 디스패처 실행 중..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/subagent-stop.py",
+            "timeout": 10,
+            "statusMessage": "subagent-stop 디스패처 실행 중..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/post-tool-use.py",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "post-tool-use 디스패처 실행 중..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/user-prompt-submit.py",
+            "timeout": 3,
+            "statusMessage": "user-prompt-submit 디스패처 실행 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

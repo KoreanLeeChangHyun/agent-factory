@@ -28,13 +28,13 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 ### 디렉터리 구조
 
 ```
-.claude-organic/hooks/                          # Hook 디스패처 (이벤트별 단일 파일)
+.agent-factory/hooks/                          # Hook 디스패처 (이벤트별 단일 파일)
 ├── dispatcher.py                       # 공통 디스패치 유틸리티 (플래그 로드, 프로세스 실행)
 ├── pre-tool-use.py                     # PreToolUse 이벤트 디스패처
 ├── post-tool-use.py                    # PostToolUse 이벤트 디스패처
 └── subagent-stop.py                    # SubagentStop 이벤트 디스패처
 
-.claude-organic/engine/                        # 실제 로직 스크립트
+.agent-factory/engine/                        # 실제 로직 스크립트
 ├── banner/                             # 배너 출력
 │   ├── flow_claude_banner.sh           # 워크플로우 시작/종료 배너
 │   ├── flow_phase_banner.sh            # WORK 페이즈 배너
@@ -80,7 +80,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "python3 -u .claude-organic/engine/sync/history_sync.py sync && python3 -u .claude-organic/engine/sync/history_sync.py archive",
+      "command": "python3 -u .agent-factory/engine/sync/history_sync.py sync && python3 -u .agent-factory/engine/sync/history_sync.py archive",
       "timeout": 30,
       "async": true
     }
@@ -100,7 +100,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "python3 -u .claude-organic/engine/hooks/session_start_system_prompt.py",
+      "command": "python3 -u .agent-factory/engine/hooks/session_start_system_prompt.py",
       "timeout": 5
     }
   ]
@@ -121,7 +121,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "python3 -u .claude-organic/hooks/pre-tool-use.py",
+      "command": "python3 -u .agent-factory/hooks/pre-tool-use.py",
       "statusMessage": "pre-tool-use 디스패처 실행 중..."
     }
   ]
@@ -136,7 +136,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 | AskUserQuestion | `slack/slack_ask.py` | Slack 질문 알림 전송 | async |
 | Bash | `guards/dangerous_command_guard.py` | 위험 명령어 차단 | sync (차단 가능) |
 
-- **플래그 제어**: `.claude-organic/.env`의 `HOOK_*` 환경변수로 개별 가드 활성화/비활성화
+- **플래그 제어**: `.agent-factory/.env`의 `HOOK_*` 환경변수로 개별 가드 활성화/비활성화
 
 #### PostToolUse Hook (디스패처)
 
@@ -145,7 +145,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "python3 -u .claude-organic/hooks/post-tool-use.py",
+      "command": "python3 -u .agent-factory/hooks/post-tool-use.py",
       "timeout": 30,
       "async": true,
       "statusMessage": "post-tool-use 디스패처 실행 중..."
@@ -156,10 +156,10 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 | 도구 | 핸들러 | 스크립트 | 동작 | 모드 |
 |------|--------|----------|------|------|
-| Write, Edit | catalog_sync | `.claude-organic/engine/sync/catalog_sync.py` | SKILL.md 변경 시 카탈로그 자동 갱신 | async |
+| Write, Edit | catalog_sync | `.agent-factory/engine/sync/catalog_sync.py` | SKILL.md 변경 시 카탈로그 자동 갱신 | async |
 | Bash | session_cleanup | 인라인(`post-tool-use.py` 내부) | `flow-claude end` 감지 시 세션 지연 종료 | async |
 
-- **플래그 제어**: `.claude-organic/.env`의 `HOOK_CATALOG_SYNC` 환경변수로 핸들러 활성화/비활성화
+- **플래그 제어**: `.agent-factory/.env`의 `HOOK_CATALOG_SYNC` 환경변수로 핸들러 활성화/비활성화
 
 #### SubagentStop Hook (디스패처)
 
@@ -168,7 +168,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
   "hooks": [
     {
       "type": "command",
-      "command": "python3 -u .claude-organic/hooks/subagent-stop.py",
+      "command": "python3 -u .agent-factory/hooks/subagent-stop.py",
       "timeout": 10,
       "statusMessage": "subagent-stop 디스패처 실행 중..."
     }
@@ -178,7 +178,7 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 | 핸들러 | 스크립트 | 동작 | 모드 |
 |--------|---------|------|------|
-| usage-tracker | `.claude-organic/engine/sync/usage_sync.py` | 토큰 사용량 추적 | async |
+| usage-tracker | `.agent-factory/engine/sync/usage_sync.py` | 토큰 사용량 추적 | async |
 
 > **비고**: history-sync-trigger는 `finalization.py`에서 직접 호출하므로 SubagentStop에서는 비활성
 
@@ -214,8 +214,8 @@ Claude Code Hooks는 특정 이벤트 발생 시 자동으로 실행되는 스�
 
 ### 새 Hook 추가 방법
 
-1. **로직 스크립트 작성**: `.claude-organic/engine/<적절한-디렉터리>/`에 Python 스크립트 생성
-2. **thin wrapper 작성**: `.claude-organic/hooks/<event>.py` 플랫 파일 패턴으로 디스패처 생성
+1. **로직 스크립트 작성**: `.agent-factory/engine/<적절한-디렉터리>/`에 Python 스크립트 생성
+2. **thin wrapper 작성**: `.agent-factory/hooks/<event>.py` 플랫 파일 패턴으로 디스패처 생성
 3. **실행 권한 부여**: `chmod +x` (로직 스크립트 + thin wrapper 모두)
 4. **settings.json 등록**: `hooks.<이벤트>` 배열에 새 Hook 추가
 5. **테스트**: 해당 도구 사용 시 Hook이 정상 동작하는지 확인
@@ -287,32 +287,32 @@ file_status=$(git status --short "$f")
 
 | 디스패처 | 이벤트 | 라우팅 대상 |
 |----------|--------|------------|
-| `.claude-organic/hooks/pre-tool-use.py` | PreToolUse | hooks_self_guard, slack_ask, dangerous_command_guard |
-| `.claude-organic/hooks/post-tool-use.py` | PostToolUse | catalog_sync, session_cleanup |
-| `.claude-organic/hooks/subagent-stop.py` | SubagentStop | usage_sync |
+| `.agent-factory/hooks/pre-tool-use.py` | PreToolUse | hooks_self_guard, slack_ask, dangerous_command_guard |
+| `.agent-factory/hooks/post-tool-use.py` | PostToolUse | catalog_sync, session_cleanup |
+| `.agent-factory/hooks/subagent-stop.py` | SubagentStop | usage_sync |
 
 ### 가드 스크립트
 
 | 파일 | 역할 | 매칭 도구 |
 |------|------|-----------|
-| `.claude-organic/engine/guards/hooks_self_guard.py` | hooks/scripts 자기 보호 | Write, Edit, Bash |
-| `.claude-organic/engine/guards/dangerous_command_guard.py` | 위험 명령어 차단 | Bash |
+| `.agent-factory/engine/guards/hooks_self_guard.py` | hooks/scripts 자기 보호 | Write, Edit, Bash |
+| `.agent-factory/engine/guards/dangerous_command_guard.py` | 위험 명령어 차단 | Bash |
 
 ### 워크플로우 유틸리티
 
 | 파일 | 호출 방식 | 용도 |
 |------|----------|------|
-| `.claude-organic/engine/flow/update_state.py` | `flow-update` alias | 워크플로우 상태 관리 |
-| `.claude-organic/engine/flow/finalization.py` | `flow-finish` alias | 워크플로우 마무리 처리 |
-| `.claude-organic/engine/flow/reload_prompt.py` | `flow-reload` alias | 프롬프트 리로드 |
-| `.claude-organic/engine/flow/garbage_collect.py` | `flow-gc` alias | 좀비 워크플로우 정리 |
-| `.claude-organic/engine/banners/flow_claude_banner.sh` | `flow-claude` alias | 워크플로우 시작/종료 배너 |
-| `.claude-organic/engine/banners/flow_step_banner.sh` | `flow-step` alias | 스텝 시작/종료 배너 |
-| `.claude-organic/engine/banners/flow_phase_banner.sh` | `flow-phase` alias | WORK 페이즈 배너 |
-| `.claude-organic/engine/banners/flow_update_banner.sh` | `flow-update` alias | 상태 전이 시각화 배너 |
+| `.agent-factory/engine/flow/update_state.py` | `flow-update` alias | 워크플로우 상태 관리 |
+| `.agent-factory/engine/flow/finalization.py` | `flow-finish` alias | 워크플로우 마무리 처리 |
+| `.agent-factory/engine/flow/reload_prompt.py` | `flow-reload` alias | 프롬프트 리로드 |
+| `.agent-factory/engine/flow/garbage_collect.py` | `flow-gc` alias | 좀비 워크플로우 정리 |
+| `.agent-factory/engine/banners/flow_claude_banner.sh` | `flow-claude` alias | 워크플로우 시작/종료 배너 |
+| `.agent-factory/engine/banners/flow_step_banner.sh` | `flow-step` alias | 스텝 시작/종료 배너 |
+| `.agent-factory/engine/banners/flow_phase_banner.sh` | `flow-phase` alias | WORK 페이즈 배너 |
+| `.agent-factory/engine/banners/flow_update_banner.sh` | `flow-update` alias | 상태 전이 시각화 배너 |
 
 ## 참고
 
-- `.claude-organic/hooks/` — thin wrapper Hook 스크립트
-- `.claude-organic/engine/` — 실제 로직 스크립트
+- `.agent-factory/hooks/` — thin wrapper Hook 스크립트
+- `.agent-factory/engine/` — 실제 로직 스크립트
 - `.claude/settings.json` — 현재 활성화된 Hooks 확인

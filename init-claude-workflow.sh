@@ -2,7 +2,7 @@
 set -euo pipefail
 # ==============================================================================
 # init-claude-workflow.sh — 부트스트랩 스크립트
-# 원격 저장소를 1회 클론하여 .claude/ + .claude-organic/ 를 설치한 뒤 build.sh 실행
+# 원격 저장소를 1회 클론하여 .claude/ + .agent-factory/ 를 설치한 뒤 build.sh 실행
 # 사용법: curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init-claude-workflow.sh | bash
 # ==============================================================================
 
@@ -92,57 +92,69 @@ if [ -d "$tmp_dir/_claude_preserve_skills" ]; then
 fi
 printf '%s  ✓ .claude/ 디렉터리 교체 완료 (프로젝트 데이터 보존)%s\n' "${CYAN}" "${NC}"
 
-# --- .claude-organic/ 디렉터리 교체 (사용자 데이터 보존) ---
-if [ ! -d "$SRC/.claude-organic" ]; then
-    printf '%s  ✗ 클론된 저장소에 .claude-organic/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
+# --- .agent-factory/ 디렉터리 교체 (사용자 데이터 보존) ---
+if [ ! -d "$SRC/.agent-factory" ]; then
+    printf '%s  ✗ 클론된 저장소에 .agent-factory/ 가 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
 
-preserve_dirs=("tickets" "runs" "roadmap" "memo")
+RUNTIME_DIR=".agent-factory"
+OLD_RUNTIME_DIR=".claude-organic"
+
+# M2 one-time migration: older installs used .claude-organic as the runtime
+# root. Preserve user data by moving it to the canonical .agent-factory root
+# before the normal update path runs. Application code must not search both
+# roots; this bootstrap branch is the only compatibility layer.
+if [ ! -d "$RUNTIME_DIR" ] && [ -d "$OLD_RUNTIME_DIR" ]; then
+    mv "$OLD_RUNTIME_DIR" "$RUNTIME_DIR"
+    printf '%s  ✓ 기존 .claude-organic/ 사용자 데이터를 .agent-factory/ 로 이전%s\n' "${CYAN}" "${NC}"
+fi
+
+preserve_dirs=("tickets" "runs" "roadmap" "memo" "worktrees" "board/data" "logs" "staging")
 preserve_files=(".settings" ".env" ".version" ".board.url" "build.url" ".last-session-id")
 
-if [ -d ".claude-organic" ]; then
+if [ -d "$RUNTIME_DIR" ]; then
     # 업데이트 설치: 사용자 데이터 백업 후 교체
     for pd in "${preserve_dirs[@]}"; do
-        [ -d ".claude-organic/$pd" ] && cp -r ".claude-organic/$pd" "$tmp_dir/_preserve_$pd"
+        [ -d "$RUNTIME_DIR/$pd" ] && { mkdir -p "$tmp_dir/_preserve_$(dirname "$pd")"; cp -r "$RUNTIME_DIR/$pd" "$tmp_dir/_preserve_$pd"; }
     done
     for pf in "${preserve_files[@]}"; do
-        [ -f ".claude-organic/$pf" ] && cp ".claude-organic/$pf" "$tmp_dir/_preserve_$pf"
+        [ -f "$RUNTIME_DIR/$pf" ] && cp "$RUNTIME_DIR/$pf" "$tmp_dir/_preserve_$pf"
     done
-    rm -rf ".claude-organic.new"
-    cp -r "$SRC/.claude-organic" ".claude-organic.new"
-    rm -rf ".claude-organic"; mv ".claude-organic.new" ".claude-organic"
+    rm -rf ".agent-factory.new"
+    cp -r "$SRC/.agent-factory" ".agent-factory.new"
+    rm -rf "$RUNTIME_DIR"; mv ".agent-factory.new" "$RUNTIME_DIR"
     # 사용자 데이터 복원
     for pd in "${preserve_dirs[@]}"; do
-        [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf ".claude-organic/$pd"; mv "$tmp_dir/_preserve_$pd" ".claude-organic/$pd"; }
+        [ -d "$tmp_dir/_preserve_$pd" ] && { rm -rf "$RUNTIME_DIR/$pd"; mkdir -p "$RUNTIME_DIR/$(dirname "$pd")"; mv "$tmp_dir/_preserve_$pd" "$RUNTIME_DIR/$pd"; }
     done
     for pf in "${preserve_files[@]}"; do
-        [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" ".claude-organic/$pf"
+        [ -f "$tmp_dir/_preserve_$pf" ] && mv "$tmp_dir/_preserve_$pf" "$RUNTIME_DIR/$pf"
     done
-    printf '%s  ✓ .claude-organic/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${CYAN}" "${NC}"
+    printf '%s  ✓ .agent-factory/ 업데이트 완료 (사용자 데이터 보존)%s\n' "${CYAN}" "${NC}"
 else
     # 신규 설치: 전체 복사
-    cp -r "$SRC/.claude-organic" ".claude-organic"
-    printf '%s  ✓ .claude-organic/ 신규 설치 완료%s\n' "${CYAN}" "${NC}"
+    cp -r "$SRC/.agent-factory" "$RUNTIME_DIR"
+    printf '%s  ✓ .agent-factory/ 신규 설치 완료%s\n' "${CYAN}" "${NC}"
 fi
 
 # 실행 권한 부여 — .sh 파일 + bin wrapper (확장자 없는 flow-* 실행 파일)
 find ".claude/" -name '*.sh' -exec chmod +x {} +
-find ".claude-organic/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
-[ -d ".claude-organic/bin" ] && find ".claude-organic/bin" -type f -exec chmod +x {} +
+find ".agent-factory/" -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
+[ -d ".agent-factory/bin" ] && find ".agent-factory/bin" -type f -exec chmod +x {} +
 printf '%s  ✓ chmod +x 완료 (.sh + bin wrapper)%s\n' "${CYAN}" "${NC}"
 
 # --- .gitignore 자동 등록 ---
-# .claude/ + .claude-organic/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
+# .claude/ + .agent-factory/ 는 워크플로우 런타임 디렉터리이므로 외부 프로젝트
 # 의 git tracking 에서 제외한다. 본 저장소(또는 fork)에서는 이미 tracking
 # 중이므로 안전하게 skip.
 if git ls-files --error-unmatch .claude > /dev/null 2>&1 || \
-   git ls-files --error-unmatch .claude-organic > /dev/null 2>&1; then
-    printf '%s  → .claude/·.claude-organic/ 이미 tracking 중 — .gitignore 갱신 skip%s\n' "${YELLOW}" "${NC}"
+   git ls-files --error-unmatch .agent-factory > /dev/null 2>&1; then
+    printf '%s  → .claude/·.agent-factory/ 이미 tracking 중 — .gitignore 갱신 skip%s\n' "${YELLOW}" "${NC}"
 else
     GITIGNORE=".gitignore"
     touch "$GITIGNORE"
     changed=0
-    for entry in ".claude/" ".claude-organic/"; do
+    for entry in ".claude/" ".agent-factory/"; do
         if ! grep -qxF "$entry" "$GITIGNORE"; then
             [ -s "$GITIGNORE" ] && [ "$(tail -c1 "$GITIGNORE")" != $'\n' ] && echo "" >> "$GITIGNORE"
             echo "$entry" >> "$GITIGNORE"
@@ -150,14 +162,14 @@ else
         fi
     done
     if [ "$changed" = 1 ]; then
-        printf '%s  ✓ .gitignore 갱신 (.claude/, .claude-organic/)%s\n' "${CYAN}" "${NC}"
+        printf '%s  ✓ .gitignore 갱신 (.claude/, .agent-factory/)%s\n' "${CYAN}" "${NC}"
     else
         printf '%s  ✓ .gitignore 이미 등록됨%s\n' "${CYAN}" "${NC}"
     fi
 fi
 
 # build.sh 실행 (클론 인자 없이)
-BUILD_SH=".claude-organic/build.sh"
+BUILD_SH=".agent-factory/build.sh"
 if [ ! -f "$BUILD_SH" ]; then
     printf '%s  ✗ build.sh를 찾을 수 없습니다%s\n' "${RED}" "${NC}"; exit 1
 fi
@@ -167,13 +179,13 @@ echo ""
 bash "$BUILD_SH"
 
 # --- Board 서버 기동 (백그라운드 데몬) ---
-BOARD_SERVER=".claude-organic/board/server.py"
+BOARD_SERVER=".agent-factory/board/server.py"
 if [ -f "$BOARD_SERVER" ]; then
     # 기존 좀비 board 서버 감지 → 종료
     # 서버 자체에 중복 실행 방지 로직이 있어, 좀비가 살아있으면 새 인스턴스가
     # LISTEN 충돌로 즉시 die → 옛 코드/옛 webroot 가 그대로 유지되는 회귀 차단.
-    if [ -f ".claude-organic/.board.url" ] && command -v lsof &>/dev/null; then
-        OLD_PORT="$(head -1 .claude-organic/.board.url | sed -E 's|.*:([0-9]+)/.*|\1|')"
+    if [ -f ".agent-factory/.board.url" ] && command -v lsof &>/dev/null; then
+        OLD_PORT="$(head -1 .agent-factory/.board.url | sed -E 's|.*:([0-9]+)/.*|\1|')"
         if [ -n "$OLD_PORT" ]; then
             OLD_PID="$(lsof -tiTCP:"$OLD_PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
             if [ -n "$OLD_PID" ]; then

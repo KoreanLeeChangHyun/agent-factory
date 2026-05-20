@@ -51,7 +51,7 @@ Replay 는 별도 endpoint `GET /api/v2/sessions/<id>/history` 가 NDJSON 으로
 |--------|------|------------|
 | kanban_update / workflow_update / dashboard_update | 해당 디렉터리 파일 변경 알림 (SPA 측 fetch 트리거) | `FileWatcher` 콜백 (`app.py`) |
 | memory_update | 메모리 디렉터리 (`.claude/.../memory/`) 파일 변경 알림 | `FileWatcher` 콜백 (memory 디렉터리 watch) |
-| roadmap_update | `roadmap.yaml` 변경 알림 | `FileWatcher` 콜백 (`.claude-organic/roadmap/` watch) |
+| roadmap_update | `roadmap.yaml` 변경 알림 | `FileWatcher` 콜백 (`.agent-factory/roadmap/` watch) |
 | git_branch | 현재 git 브랜치 변경 알림 | `GitBranchWatcher` 콜백 (`app.py`) |
 | launch | 워크플로우 spawn 알림 | handlers/kanban DnD submit 등 |
 
@@ -148,7 +148,7 @@ ESC 의 메타 의도 = **"이 메시지로는 응답을 못 받겠다, 다시 �
 ## 5. Board 서버 재기동·재실행 (MUST)
 
 ### 동의 필수
-- Board 서버 (`python3 .claude-organic/board/server.py`) 재기동/재실행은 **반드시 사용자 사전 동의** 받은 뒤에만 수행
+- Board 서버 (`python3 .agent-factory/board/server.py`) 재기동/재실행은 **반드시 사용자 사전 동의** 받은 뒤에만 수행
 - 자동 재기동 스크립트 호출 금지
 - `execv` 기반 restart 버튼도 동일하게 사용자 트리거 대상
 
@@ -239,10 +239,10 @@ CSS 의 `color` 속성이 `currentColor` 로 SVG 에 전달되어 테마 변경 
 
 ```bash
 # 활성화
-touch .claude-organic/runs/bg/debug.enabled
-: > .claude-organic/runs/bg/debug.log
+touch .agent-factory/runs/bg/debug.enabled
+: > .agent-factory/runs/bg/debug.log
 # 사용자 재현 → 분석 (Read tool) → 비활성화
-rm .claude-organic/runs/bg/debug.enabled
+rm .agent-factory/runs/bg/debug.enabled
 ```
 
 ### 계측 추가

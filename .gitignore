@@ -1,18 +1,18 @@
 
 # Workflow runtime (secrets, data, temp)
-.claude-organic/.settings
-.claude-organic/.env
-.claude-organic/.env*
-.claude-organic/.last-session-id
-.claude-organic/runs/
-.claude-organic/tickets/**/*.xml
-.claude-organic/memo/
-.claude-organic/worktrees/
-.claude-organic/board/data/
-.claude-organic/.board.url
-.claude-organic/.workflow-sessions/
-.claude-organic/staging/
-.claude-organic/logs/
+.agent-factory/.settings
+.agent-factory/.env
+.agent-factory/.env*
+.agent-factory/.last-session-id
+.agent-factory/runs/
+.agent-factory/tickets/**/*.xml
+.agent-factory/memo/
+.agent-factory/worktrees/
+.agent-factory/board/data/
+.agent-factory/.board.url
+.agent-factory/.workflow-sessions/
+.agent-factory/staging/
+.agent-factory/logs/
 .claude/scheduled_tasks.lock
 
 CLAUDE.md
