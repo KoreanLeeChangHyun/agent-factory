@@ -960,10 +960,31 @@ Acceptance:
 - board API handler/router contract tests pass
 - full pytest passes
 
+### M41: Worktree Commit Board API App Handler
+
+Status: complete
+
+Goal:
+
+Move the worktree commit endpoint group into `engine/apps/board_api`.
+
+Completed slice:
+
+- moved Worktree Commit handler implementation to
+  `engine/apps/board_api/worktree_commit.py`
+- kept `board/server/handlers/worktree_commit.py` as a compatibility export
+- added focused Worktree Commit board API app tests
+
+Acceptance:
+
+- Worktree Commit board API app tests pass
+- board API handler/router contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 748 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 750 passed, 2 skipped, 6 subtests passed
 ```

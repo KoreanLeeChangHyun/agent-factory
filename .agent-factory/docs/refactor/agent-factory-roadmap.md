@@ -1439,12 +1439,41 @@ python3 -m pytest tests/application/apps/test_board_api_ops.py tests/contracts/b
 python3 -m pytest  # 748 passed, 2 skipped, 6 subtests passed
 ```
 
+### M41: Worktree Commit Board API App Handler
+
+Status: complete
+
+Purpose:
+
+Move the worktree commit Board API handler group into `engine/apps/board_api`
+while preserving the existing board handler import path.
+
+Tasks:
+
+- [x] move Worktree Commit handler implementation to
+      `engine/apps/board_api/worktree_commit.py`
+- [x] keep `board/server/handlers/worktree_commit.py` as a compatibility export
+- [x] add focused Worktree Commit board API app tests
+
+Acceptance criteria:
+
+- Worktree Commit board API app tests pass
+- board API handler/router contract tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/apps/test_board_api_worktree_commit.py tests/contracts/board_api/test_handlers_t424.py tests/contracts/board_api/test_api_smoke.py  # 16 passed, 2 skipped
+python3 -m pytest  # 750 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36 -> M37 -> M38 -> M39 -> M40 -> M41
 ```
 
 Hard dependencies:
