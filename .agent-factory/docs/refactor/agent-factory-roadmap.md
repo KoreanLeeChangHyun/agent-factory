@@ -1292,12 +1292,40 @@ python3 -m pytest tests/contracts/board_api/test_board_web_static_path.py tests/
 python3 -m pytest  # 735 passed, 2 skipped, 6 subtests passed
 ```
 
+### M36: Skill Mapper Test Canonicalization
+
+Status: complete
+
+Purpose:
+
+Move the remaining tracked flow test out of the source tree and into the
+canonical application test tree.
+
+Tasks:
+
+- [x] move `engine/flow/test_skill_mapper.py` to
+      `tests/application/flow/test_skill_mapper.py`
+- [x] update the relocated test to import `flow.skill_mapper`
+- [x] confirm no tracked `*test*` files remain under `engine/flow`
+
+Acceptance criteria:
+
+- relocated skill mapper tests pass
+- canonical tests pass
+
+Current verification:
+
+```text
+python3 -m pytest tests/application/flow/test_skill_mapper.py  # 5 passed
+python3 -m pytest  # 740 passed, 2 skipped, 6 subtests passed
+```
+
 ## Execution Order
 
 Recommended sequence:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28 -> M29 -> M30 -> M31 -> M32 -> M33 -> M34 -> M35 -> M36
 ```
 
 Hard dependencies:

@@ -18,14 +18,14 @@ import sys
 import tempfile
 import unittest
 
-# Ensure the engine/flow directory is importable
-_flow_dir = os.path.dirname(os.path.abspath(__file__))
-_engine_dir = os.path.normpath(os.path.join(_flow_dir, ".."))
-for _p in (_flow_dir, _engine_dir):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+# Ensure the engine package is importable when the file is run directly.
+_TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+_AGENT_FACTORY_ROOT = os.path.normpath(os.path.join(_TEST_DIR, "..", "..", ".."))
+_ENGINE_DIR = os.path.join(_AGENT_FACTORY_ROOT, "engine")
+if _ENGINE_DIR not in sys.path:
+    sys.path.insert(0, _ENGINE_DIR)
 
-from skill_mapper import parse_plan_tasks  # noqa: E402
+from flow.skill_mapper import parse_plan_tasks  # noqa: E402
 
 
 def _write_tmp(content: str) -> str:

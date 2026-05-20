@@ -849,10 +849,31 @@ Acceptance:
 - board API smoke tests pass
 - full pytest passes
 
+### M36: Skill Mapper Test Canonicalization
+
+Status: complete
+
+Goal:
+
+Remove the remaining tracked source-tree test file from `engine/flow`.
+
+Completed slice:
+
+- moved `engine/flow/test_skill_mapper.py` to
+  `tests/application/flow/test_skill_mapper.py`
+- updated the relocated test to import `flow.skill_mapper` through the engine
+  package path
+- confirmed no tracked `*test*` files remain under `engine/flow`
+
+Acceptance:
+
+- relocated skill mapper tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 735 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 740 passed, 2 skipped, 6 subtests passed
 ```
