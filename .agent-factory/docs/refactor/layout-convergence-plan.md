@@ -21,7 +21,7 @@ Current high-level runtime layout:
   bin/
   board/
     server/
-      handlers/
+      handlers/  # compatibility exports only
     web/
       css/
       js/
@@ -36,6 +36,7 @@ Current high-level runtime layout:
       kanban/
       llm/
     apps/
+      board_api/
       cli/
       hooks/
     v2/
@@ -64,7 +65,8 @@ Current important facts:
 - `engine/v2` remains the active workflow driver/runtime implementation.
 - `engine/flow` still owns many active CLI, kanban, worktree, metrics, and
   skill utilities.
-- `board/server` still owns HTTP handlers and board session/event glue.
+- `board/server` owns the HTTP router plus board session/event glue; handler
+  implementations live under `engine/apps/board_api`.
 - `board/web` is the active web UI; old `/.agent-factory/board/static/*` URLs
   are translated for compatibility.
 - top-level `hooks/` is still the active Claude Code hook entry surface.
@@ -131,7 +133,7 @@ them. Avoid churn that only changes spelling.
 | Reporting | `engine/v2/steps/report.py`, `engine/application/reporting`, `engine/core/reporting` | `core/reporting`, `application/reporting` | partially aligned |
 | Worktree/Git | `engine/flow/worktree_manager.py`, `merge_pipeline.py`, `undo_done.py`, `engine/adapters/git`, `engine/core/worktrees`, `engine/git` | `core/worktrees`, `adapters/git` | partially aligned |
 | Kanban CLI/service | `engine/flow/kanban*.py`, `engine/application/kanban` | `application`/`apps/cli` + adapters | partially aligned |
-| Board API | `board/server/handlers`, `engine/application/kanban` | `engine/apps/board_api` or thin board handlers | partially aligned |
+| Board API | `engine/apps/board_api` with `board/server/handlers` compatibility exports | `engine/apps/board_api` or thin board handlers | aligned |
 | Board web | `board/web` | `board/web` | aligned |
 | Hooks | top-level `hooks/`, `engine/apps/hooks`, `engine/adapters/hooks`, `engine/guards` | `engine/apps/hooks`, `adapters/hooks` | partially aligned |
 | Memory | `engine/memory_gc`, board memory handlers/UI | keep domain-specific package | acceptable |
@@ -1166,10 +1168,35 @@ Acceptance:
 - board API docstring/decorator and handler/router contract tests pass
 - full pytest passes
 
+### M50: Board API Runtime Import Alignment
+
+Status: complete
+
+Goal:
+
+Make the active board runtime depend directly on `engine/apps/board_api` instead
+of compatibility handler modules.
+
+Completed slice:
+
+- updated `board/server/http_router.py` to compose app-boundary Board API mixins
+  directly
+- updated `board/server/v2_launcher.py` to lazy import Kanban launch events from
+  `engine.apps.board_api.kanban`
+- kept `board/server/handlers` as compatibility exports for older import paths
+- added focused router import boundary tests
+- updated the layout gap analysis to mark Board API as aligned
+
+Acceptance:
+
+- router import boundary tests pass
+- board API handler/router and V2 launch contract tests pass
+- full pytest passes
+
 ## Verification Baseline
 
 Current baseline:
 
 ```text
-python3 -m pytest  # 798 passed, 2 skipped, 6 subtests passed
+python3 -m pytest  # 799 passed, 2 skipped, 6 subtests passed
 ```

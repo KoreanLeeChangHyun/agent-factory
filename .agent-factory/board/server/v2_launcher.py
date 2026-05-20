@@ -44,13 +44,13 @@ def _now_utc() -> datetime:
 
 
 def _emit_launch_event_safe(event: str, ticket: str, **kwargs: object) -> None:
-    """`handlers.kanban._emit_launch_event` lazy import wrapper.
+    """`engine.apps.board_api.kanban._emit_launch_event` lazy import wrapper.
 
-    Module top-level import 로 circular import 위험을 차단 (handlers.kanban
+    Module top-level import 로 circular import 위험을 차단 (board API kanban
     이 본 모듈을 module top 에서 import). emit 자체가 broadcast 실패를 흡수.
     """
     try:
-        from board.server.handlers.kanban import _emit_launch_event
+        from engine.apps.board_api.kanban import _emit_launch_event
     except ImportError:  # 방어적 — 본 import 실패는 환경 문제
         return
     _emit_launch_event(event, ticket, **kwargs)

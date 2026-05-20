@@ -7,17 +7,17 @@ import os
 from http.server import SimpleHTTPRequestHandler
 
 from ._common import _update_env_value
-from .handlers.files import FilesHandlerMixin
-from .handlers.sync import SyncHandlerMixin
-from .handlers.settings import SettingsHandlerMixin
-from .handlers.generic import GenericHandlerMixin
-from .handlers.terminal import TerminalHandlerMixin
-from .handlers.v2_workflow import V2WorkflowHandlerMixin
-from .handlers.kanban import KanbanHandlerMixin
-from .handlers.metrics import MetricsHandlerMixin
-from .handlers.memory_gc import MemoryGcHandlerMixin
-from .handlers.worktree_commit import WorktreeCommitHandlerMixin
-from .handlers.ops_endpoints import OpsHandlerMixin
+from engine.apps.board_api.files import FilesHandlerMixin
+from engine.apps.board_api.sync import SyncHandlerMixin
+from engine.apps.board_api.settings import SettingsHandlerMixin
+from engine.apps.board_api.generic import GenericHandlerMixin
+from engine.apps.board_api.terminal import TerminalHandlerMixin
+from engine.apps.board_api.v2_workflow import V2WorkflowHandlerMixin
+from engine.apps.board_api.kanban import KanbanHandlerMixin
+from engine.apps.board_api.metrics import MetricsHandlerMixin
+from engine.apps.board_api.memory_gc import MemoryGcHandlerMixin
+from engine.apps.board_api.worktree_commit import WorktreeCommitHandlerMixin
+from engine.apps.board_api.ops_endpoints import OpsHandlerMixin
 
 
 # T-513 P5 — V1 워크플로우 엔진 일괄 폐기. WorkflowHandlerMixin +
