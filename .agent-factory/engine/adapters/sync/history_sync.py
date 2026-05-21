@@ -968,11 +968,11 @@ def cmd_status(args: argparse.Namespace) -> int:
 # archive command
 # ============================================================
 
-def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, history_dir: str) -> None:
-    """After archiving, update the path field in the ticket XML holding the moved registryKey to the .history/ reflection path.
+def _update_work_request_workdir_after_archive(moved_key: str, workflow_dir: str, history_dir: str) -> None:
+    """After archiving, update the path field in the WorkRequest XML holding the moved registryKey to the .history/ reflection path.
 
-    Tickets Scan the entire directory (open/progress/review/done) to see if <result>/<registrykey> is
-    Find the ticket XML matching moved_key, and replace the <workdir>/<plan>/<report> path text with
+    WorkRequests scan the entire directory (open/progress/review/done) to see if <result>/<registrykey> is
+    Find the WorkRequest XML matching moved_key, and replace the <workdir>/<plan>/<report> path text with
     Update in .agent-factory/runs/.history/{key}/... format.
 
     Args:
@@ -1009,7 +1009,7 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
             if not fname.endswith(".xml"):
                 continue
             xml_path = os.path.join(status_dir, fname)
-            ticket_number = fname[:-4]  # T-NNN
+            work_request_no = fname[:-4]  # WR-NNN
             try:
                 tree = ET.parse(xml_path)
                 root = tree.getroot()
@@ -1034,11 +1034,11 @@ def _update_ticket_workdir_after_archive(moved_key: str, workflow_dir: str, hist
                     tree.write(xml_path, encoding="unicode", xml_declaration=False)
                     new_workdir = (result_el.find("workdir") or result_el).text or ""
                     print(
-                        f"[OK] ticket {ticket_number}: workdir updated to .history/"
+                        f"[OK] WorkRequest {work_request_no}: workdir updated to .history/"
                     )
             except Exception as exc:
                 print(
-                    f"[WARN] ticket {ticket_number}: XML workdir update failed — {exc}",
+                    f"[WARN] WorkRequest {work_request_no}: XML workdir update failed — {exc}",
                     file=sys.stderr,
                 )
 
@@ -1150,7 +1150,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 shutil.move(src, dst)
                 moved += 1
                 print(f"[OK] archived: {target}")
-                _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
+                _update_work_request_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
                 print(f"[WARN] archive failed: {target} (skipping)", file=sys.stderr)
@@ -1174,7 +1174,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 shutil.move(src, dst)
                 moved += 1
                 print(f"[OK] archived: {target}")
-                _update_ticket_workdir_after_archive(target, workflow_dir, history_dir)
+                _update_work_request_workdir_after_archive(target, workflow_dir, history_dir)
             except Exception:
                 failed += 1
                 print(f"[WARN] archive failed: {target} (skipping)", file=sys.stderr)
