@@ -85,6 +85,7 @@ _REQUIRED_URLS_GET = {
     "/api/conveyor/branch/active",
     "/api/v2/sessions",
     "/api/ops/sse-status",
+    "/api/settings/github-auth",
 }
 
 _REQUIRED_URLS_POST = {
@@ -92,6 +93,7 @@ _REQUIRED_URLS_POST = {
     "/api/restart",
     "/api/debug-log",
     "/api/settings/workflow-sync",
+    "/api/settings/github-auth",
     "/terminal/start",
     "/terminal/input",
     "/terminal/interrupt",

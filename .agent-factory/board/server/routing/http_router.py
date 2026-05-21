@@ -96,6 +96,8 @@ class BoardHTTPRequestHandler(
             return
         elif self.path == '/api/ops/sse-status':
             self._handle_ops_sse_status()
+        elif self.path == '/api/settings/github-auth':
+            self._handle_settings_github_auth_status()
         # T-513 P5 — conveyor domain singleization (V1 workflow alias batch waste).
         elif self.path == '/api/conveyor/workflow-entries':
             self._handle_conveyor_workflow_entries()
@@ -125,6 +127,8 @@ class BoardHTTPRequestHandler(
         # T-513 P5 — settings domain singleization (V1 sync alias batch disposal).
         elif self.path == '/api/settings/workflow-sync':
             self._handle_settings_workflow_sync()
+        elif self.path == '/api/settings/github-auth':
+            self._handle_settings_github_auth_start()
         elif self.path == '/terminal/start':
             self._handle_terminal_start()
         elif self.path == '/terminal/input':

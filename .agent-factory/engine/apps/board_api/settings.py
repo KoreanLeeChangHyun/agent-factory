@@ -13,6 +13,7 @@ import os
 import subprocess
 import time
 
+from engine.adapters.git.github_cli import auth_status, start_web_auth
 from board.server.support.common import (
     _workflow_sync_lock,
     _WORKFLOW_SYNC_URL,
@@ -23,6 +24,21 @@ from board.server.support.common import (
 
 class SettingsHandlerMixin:
     """System bootstrap/configuration domain endpoint."""
+
+    @api_endpoint("SETTINGS", "github_auth_status")
+    def _handle_settings_github_auth_status(self) -> None:
+        """GET /api/settings/github-auth — GitHub CLI auth status."""
+        self._send_json(auth_status())
+
+    @api_endpoint("SETTINGS", "github_auth_start")
+    def _handle_settings_github_auth_start(self) -> None:
+        """POST /api/settings/github-auth — start GitHub CLI web auth."""
+        result = start_web_auth()
+        status = 200 if result.get("ok") else 503
+        if status == 200:
+            self._send_json(result)
+        else:
+            self._send_json_with_status(status, result)
 
     @api_endpoint("SETTINGS", "workflow_sync")
     def _handle_settings_workflow_sync(self) -> None:

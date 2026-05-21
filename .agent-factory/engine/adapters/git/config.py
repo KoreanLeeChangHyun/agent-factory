@@ -13,7 +13,7 @@ Usage: python3 git_config.py [--global|--local]
 Environment variables (loaded from .agent-factory/.settings):
   GIT_USER_NAME - Git user.name override (optional)
   GIT_USER_EMAIL - Git user.email override (optional)
-  GITHUB_USERNAME - GitHub username (optional)
+  GITHUB_USERNAME - GitHub username override (optional; defaults to gh auth login)
   SSH_KEY_GITHUB - GitHub SSH key path (optional)
 
 Legacy AGENT_FACTORY_* and CLAUDE_CODE_* names are still accepted for existing installations.
@@ -32,6 +32,7 @@ if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
 from common import read_env
+from adapters.git.github_cli import read_authenticated_login
 from flow.cli_utils import build_common_epilog
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", "..", ".."))
@@ -142,6 +143,7 @@ def main() -> None:
     git_user_email = git_user_email or _read_project_git_config("user.email")
     # Currently not in use - expected to be integrated with GitHub API in the future
     _github_username = _read_setting("GITHUB_USERNAME", "AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
+    _github_username = _github_username or read_authenticated_login()
     ssh_key_github = _read_setting("SSH_KEY_GITHUB", "AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")
 
     # --- Verification of project git identity ---

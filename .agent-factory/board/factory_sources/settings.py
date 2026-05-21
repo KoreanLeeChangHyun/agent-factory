@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 
+from engine.adapters.git.github_cli import read_authenticated_login
+
 
 _GIT_CONFIG_FALLBACKS = {
     'GIT_USER_NAME': 'user.name',
@@ -41,6 +43,8 @@ def _apply_dynamic_defaults(project_root: str, key: str, value: str) -> str:
     git_key = _GIT_CONFIG_FALLBACKS.get(key)
     if git_key:
         return _read_git_config(project_root, git_key)
+    if key == 'GITHUB_USERNAME':
+        return read_authenticated_login()
     return value
 
 

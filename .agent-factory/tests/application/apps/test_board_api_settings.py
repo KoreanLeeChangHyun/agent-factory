@@ -13,6 +13,8 @@ def test_settings_handler_compat_export_matches_app_boundary() -> None:
 
 def test_settings_handler_exposes_expected_endpoint_methods() -> None:
     assert hasattr(SettingsHandlerMixin, "_handle_settings_workflow_sync")
+    assert hasattr(SettingsHandlerMixin, "_handle_settings_github_auth_status")
+    assert hasattr(SettingsHandlerMixin, "_handle_settings_github_auth_start")
 
 
 def test_parse_env_file_uses_project_git_config_for_optional_identity_override(tmp_path, monkeypatch) -> None:
@@ -54,3 +56,18 @@ def test_parse_env_file_does_not_require_git_identity_settings(tmp_path) -> None
     keys = [item["key"] for item in sections[0]["vars"]]
 
     assert keys == ["GITHUB_USERNAME", "SSH_KEY_GITHUB"]
+
+
+def test_parse_env_file_uses_gh_login_for_empty_github_username(tmp_path, monkeypatch) -> None:
+    settings_dir = tmp_path / ".agent-factory"
+    settings_dir.mkdir()
+    (settings_dir / ".settings").write_text(
+        "# (1) Git identity settings\n"
+        "GITHUB_USERNAME=\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_source, "read_authenticated_login", lambda: "octocat")
+
+    sections = settings_source._parse_env_file(str(tmp_path))
+
+    assert sections[0]["vars"][0]["value"] == "octocat"

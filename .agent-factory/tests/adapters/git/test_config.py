@@ -21,3 +21,29 @@ def test_git_config_project_fallback_reads_current_repo_config(monkeypatch) -> N
     monkeypatch.setattr(config.subprocess, "check_output", fake_check_output)
 
     assert config._read_project_git_config("user.email") == "project@example.com"
+
+
+def test_github_cli_status_reports_authenticated_login(monkeypatch) -> None:
+    from engine.adapters.git import github_cli
+
+    monkeypatch.setattr(github_cli, "is_gh_available", lambda: True)
+    monkeypatch.setattr(github_cli, "read_authenticated_login", lambda: "octocat")
+
+    status = github_cli.auth_status()
+
+    assert status["installed"] is True
+    assert status["authenticated"] is True
+    assert status["login"] == "octocat"
+
+
+def test_github_cli_start_auth_reports_existing_login(monkeypatch) -> None:
+    from engine.adapters.git import github_cli
+
+    monkeypatch.setattr(github_cli, "is_gh_available", lambda: True)
+    monkeypatch.setattr(github_cli, "read_authenticated_login", lambda: "octocat")
+
+    result = github_cli.start_web_auth()
+
+    assert result["ok"] is True
+    assert result["started"] is False
+    assert result["login"] == "octocat"

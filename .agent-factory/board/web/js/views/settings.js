@@ -23,7 +23,7 @@
     SLACK_API_URL: 'Slack chat.postMessage endpoint. Change only when using a compatible proxy.',
     GIT_USER_NAME: 'Optional Git author name override. Leave empty to use this project\'s git config.',
     GIT_USER_EMAIL: 'Optional Git author email override. Leave empty to use this project\'s git config.',
-    GITHUB_USERNAME: 'GitHub username used for repository and identity-related automation.',
+    GITHUB_USERNAME: 'Optional GitHub username override. Leave empty to use the active gh auth login.',
     SSH_KEY_GITHUB: 'SSH private key path for GitHub operations, when a custom key is required.',
     HOOK_DANGEROUS_COMMAND: 'Blocks or warns on dangerous shell commands before tool execution.',
     HOOK_HOOKS_SELF_PROTECT: 'Protects Agent Factory hook files from accidental modification.',
@@ -207,6 +207,18 @@
       '</div>';
     actions.appendChild(loginItem);
 
+    var githubAuthItem = document.createElement('div');
+    githubAuthItem.className = 'settings-item';
+    githubAuthItem.innerHTML =
+      '<div class="settings-item-info">' +
+        '<div class="settings-item-key">GitHub Auth</div>' +
+        '<div class="settings-item-label" id="settings-github-auth-label">Checking gh auth status...</div>' +
+      '</div>' +
+      '<div class="settings-item-control">' +
+        '<button class="settings-action-btn" id="settings-github-auth-btn">Authenticate</button>' +
+      '</div>';
+    actions.appendChild(githubAuthItem);
+
     var buildUrlItem = document.createElement('div');
     buildUrlItem.className = 'settings-item';
     buildUrlItem.innerHTML =
@@ -309,6 +321,65 @@
           })
           .catch(function () {
             setTimeout(function () { location.reload(); }, 2000);
+          });
+      });
+    }
+
+    var githubAuthBtn = document.getElementById('settings-github-auth-btn');
+    var githubAuthLabel = document.getElementById('settings-github-auth-label');
+    function setGithubAuthStatus(data) {
+      if (!githubAuthLabel || !githubAuthBtn) return;
+      if (!data || !data.installed) {
+        githubAuthLabel.textContent = 'GitHub CLI is not installed.';
+        githubAuthBtn.textContent = 'Install gh';
+        githubAuthBtn.disabled = true;
+        return;
+      }
+      if (data.authenticated) {
+        githubAuthLabel.textContent = 'Authenticated as ' + data.login + '.';
+        githubAuthBtn.textContent = 'Recheck';
+      } else {
+        githubAuthLabel.textContent = 'Not authenticated. Uses gh auth login.';
+        githubAuthBtn.textContent = 'Authenticate';
+      }
+    }
+
+    function refreshGithubAuthStatus() {
+      if (!githubAuthLabel || !githubAuthBtn) return;
+      fetch('/api/settings/github-auth', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(setGithubAuthStatus)
+        .catch(function () {
+          githubAuthLabel.textContent = 'Failed to check gh auth status.';
+        });
+    }
+
+    if (githubAuthBtn) {
+      refreshGithubAuthStatus();
+      githubAuthBtn.addEventListener('click', function () {
+        if (githubAuthBtn.disabled) return;
+        githubAuthBtn.disabled = true;
+        githubAuthBtn.textContent = 'Starting...';
+        fetch('/api/settings/github-auth', { method: 'POST' })
+          .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+          .then(function (result) {
+            var data = result.data || {};
+            setGithubAuthStatus(data);
+            var modal = window.Board && Board.util && Board.util.showInfoModal;
+            if (modal) {
+              modal(
+                result.ok ? 'GitHub Auth' : 'GitHub Auth Failed',
+                data.message || 'Run gh auth login --web --git-protocol https, then recheck authentication.',
+                { severity: result.ok ? 'info' : 'error', confirmText: 'OK', onClose: refreshGithubAuthStatus }
+              );
+            }
+          })
+          .catch(function () {
+            if (githubAuthLabel) githubAuthLabel.textContent = 'Failed to start gh auth.';
+          })
+          .finally(function () {
+            githubAuthBtn.disabled = false;
+            refreshGithubAuthStatus();
           });
       });
     }
