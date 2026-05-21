@@ -465,10 +465,7 @@
 
     h += '<div class="terminal-session-bar-top">';
     h += '<div class="terminal-session-left">';
-    h += '<div class="terminal-status" data-state="' + esc(Board.state.termStatus) + '">';
-    h += '<span class="terminal-status-dot terminal-status-' + esc(Board.state.termStatus) + '" id="terminal-status-dot"></span>';
-    h += '<span class="terminal-status-text" id="terminal-status-text">' + esc(Board.state.termStatus) + '</span>';
-    h += '</div>';
+    h += '<div class="terminal-brand"><span class="accent">Agent</span> Factory</div>';
     h += '<span class="terminal-session-id" id="terminal-session-id">'
       + esc(Board.state.termSessionId || '')
       + '</span>';
@@ -490,7 +487,8 @@
     h += '<div class="session-tab-bar" id="session-tab-bar">';
     h += '<div class="session-tab-list" id="session-tab-list">';
     h += '<div class="session-tab active" data-session="main">';
-    h += '<span class="session-tab-label">Main</span>';
+    h += '<span class="session-tab-label">Request</span>';
+    h += '<span class="request-status-dot terminal-status-dot terminal-status-' + esc(Board.state.termStatus) + '" id="terminal-status-dot" aria-label="' + esc(Board.state.termStatus) + '"></span>';
     h += '</div>';
     h += '</div>';
     h += '<button class="session-tab-add" id="session-tab-add" title="Add workflow session">';

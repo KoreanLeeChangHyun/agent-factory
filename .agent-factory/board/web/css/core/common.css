@@ -88,6 +88,10 @@ body {
   white-space: nowrap;
 }
 
+.header-title:empty {
+  margin-right: 0;
+}
+
 .header-title .accent { color: var(--af-primary); }
 
 /* ── Header Buttons ── */
