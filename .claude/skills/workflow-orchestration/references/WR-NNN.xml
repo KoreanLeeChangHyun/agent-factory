@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <metadata>
-    <number>T-NNN</number>
+    <number>WR-NNN</number>
     <title>제목</title>
     <datetime>YYYY-MM-DD hh:mm:ss</datetime>
     <status>상태</status>
@@ -9,7 +9,7 @@
   </metadata>
 
   <relations>
-    <relation type="derived-from" ticket="T-NNN-1" />
+    <relation type="derived-from" work_request="WR-NNN-1" />
   </relations>
 
   <prompt>
@@ -21,4 +21,4 @@
   </prompt>
 
   <result />
-</ticket>
+</work_request>

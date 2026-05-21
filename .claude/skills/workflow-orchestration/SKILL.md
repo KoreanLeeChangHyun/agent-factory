@@ -1,13 +1,13 @@
 ---
 name: workflow-orchestration
-description: "Internal skill for full workflow orchestration. Manages the PLAN -> WORK -> VALIDATE -> REPORT -> DONE 5-step workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management."
+description: "Internal skill for full workflow orchestration. Manages the 작업 준비 -> 작업 계획 -> 작업 수행 -> 작업 검사 -> 작업 보고 -> 작업 완료 workflow. Use for workflow orchestration: auto-loaded on /wf command execution for step flow control, sub-agent dispatch, and state management."
 disable-model-invocation: true
 license: "Apache-2.0"
 ---
 
 # Orchestrator
 
-오케스트레이터(메인 워크플로우 세션)는 **Task 서브에이전트 4종 호출** + **INIT 진입** + **DONE 종결** 만 명시 호출한다. 그 사이 모든 결정론 wrapper 호출은 hook 이 자동 흡수한다 (T-483, `HOOK_WORKFLOW_ORCHESTRATION=true`).
+오케스트레이터(메인 워크플로우 세션)는 **Task 서브에이전트 4종 호출** + **작업 준비 진입** + **작업 완료 종결** 만 명시 호출한다. 그 사이 모든 결정론 wrapper 호출은 hook 이 자동 흡수한다 (T-483, `HOOK_WORKFLOW_ORCHESTRATION=true`).
 
 ## FSM State Transition
 
@@ -19,19 +19,19 @@ stateDiagram-v2
     INIT --> FAIL: 초기화 실패
     PLAN --> WORK: 계획 완료
     PLAN --> FAIL: 실패
-    WORK --> VALIDATE
+    WORK --> VERIFY
     WORK --> FAIL: 실패
-    VALIDATE --> REPORT: 통과/경고
-    VALIDATE --> FAIL: 작업내역 전체 누락
-    REPORT --> DONE: 성공
+    VERIFY --> REPORT: 통과/경고
+    VERIFY --> FAIL: 작업내역 전체 누락
+    REPORT --> COMPLETE: 성공
     REPORT --> FAIL: 실패
-    DONE --> [*]
+    COMPLETE --> [*]
     FAIL --> [*]
 ```
 
 ## Step Order
 
-PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validator) -> REPORT -> DONE.
+작업 계획 -> 작업 수행 (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validator) -> 작업 보고 -> 작업 완료.
 
 순서 위반 금지. WORK 중 planner 재호출 금지. validator 의 `작업내역 전체 누락` hard-fail 만 REPORT 차단 + FAILED 전이.
 
@@ -52,17 +52,17 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 | review | Code review | X |
 | research | Research/investigation and internal asset analysis | X |
 
-> 사용자 요청은 `.agent-factory/tickets/{open,progress,review,done}/T-NNN.xml` 티켓 파일을 통해 전달된다. XML 구조는 [`references/T-NNN.xml`](references/T-NNN.xml) 참조.
+> 사용자 요청은 `.agent-factory/work-requests/{accepted,executing,verifying,complete}/WR-NNN.xml` WorkRequest 파일을 통해 전달된다. XML 구조는 [`references/WR-NNN.xml`](references/WR-NNN.xml) 참조.
 
 ---
 
 ## Workflow Session Policy
 
-이 세션은 워크플로우 실행 전용 워크플로우 세션이다. `/wf -s N` 명령으로 전달된 티켓을 실행하고, 완료 후 윈도우를 자동 종료한다.
+이 세션은 워크플로우 실행 전용 워크플로우 세션이다. `/wf -s N` 명령으로 전달된 WorkRequest를 실행하고, 완료 후 윈도우를 자동 종료한다.
 
 - 언어: 한국어 / 톤: 존댓말
 - 본 SKILL.md 는 SessionStart hook 으로 워크플로우 세션의 system prompt 로 직접 inject 된다 (T-483 이후)
-- workflow_phase FSM: NONE → INIT → PLAN → WORK → VALIDATE → REPORT → DONE
+- workflow_phase FSM: NONE → INIT → PLAN → WORK → VERIFY → REPORT → COMPLETE
 - 완료 후 반드시 `flow-finish` + `flow-claude end` 를 실행해야 한다 (MUST)
 - `flow-claude end` 이후 추가 출력/도구 호출 절대 금지 (MUST NOT)
 - 세션은 `flow-finish` Step 5 에서 자동 종료된다 (3초 지연 kill)
@@ -77,9 +77,9 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 |------|------|
 | 관리 브랜치 | `develop` 로컬 통합 + `feat/*` feature 브랜치 (둘 다 로컬 전용, 원격 push 워크플로우가 안 함) |
 | 사용자 수동 영역 | `main`, `staging` — 워크플로우가 절대 수정 X |
-| 격리 실행 | 각 feature 브랜치는 독립 git worktree (`.agent-factory/worktrees/feat-T-NNN-*`) 에서 작업. worktree 경로는 `.context.json.worktreePath` 기록 |
-| Done 자동 머지 | `/wf -d N` 실행 시 feature 브랜치를 develop 에 `--no-ff` 머지 후 worktree + 브랜치 정리 |
-| 머지 충돌 | 발생 시 Done 전이 차단 + 안내 출력. worktree 디렉터리에서 충돌 해결 후 `git add`/`commit` → `/wf -d N` 재실행 |
+| 격리 실행 | 각 feature 브랜치는 독립 git worktree (`.agent-factory/worktrees/feat-WR-NNN-*`) 에서 작업. worktree 경로는 `.context.json.worktreePath` 기록 |
+| Complete 자동 머지 | `/wf -d N` 실행 시 feature 브랜치를 develop 에 `--no-ff` 머지 후 worktree + 브랜치 정리 |
+| 머지 충돌 | 발생 시 Complete 전이 차단 + 안내 출력. worktree 디렉터리에서 충돌 해결 후 `git add`/`commit` → `/wf -d N` 재실행 |
 | 비활성 조건 | `develop` 브랜치 부재 시 단일 브랜치 모드 / `WORKFLOW_WORKTREE=false` 강제 비활성 / `WORKFLOW_WORKTREE=true` 강제 활성 |
 
 ---
@@ -106,7 +106,7 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
 
 1. **INIT (1회)**:
    ```bash
-   cd "$(flow-init <command> --ticket T-NNN | tail -1)"
+   cd "$(flow-init <command> --work-request WR-NNN | tail -1)"
    ```
 2. **Task × N (planner → worker/explorer × M → validator → reporter)**:
    ```
@@ -117,29 +117,29 @@ PLAN -> WORK (Phase 0 skillmap -> Phase 1~N worker/explorer -> Phase N+1 validat
    ```
    > **Task prompt 필수 필드 (hook 흡수가 의존)**: worker/explorer 는 `taskId`, `phase`. validator 는 `phase` (선택, 미지정 시 hook 이 worker 수 +1 로 추론). planner / reporter 는 phase 불필요.
 
-3. **DONE (1회, turn 종료)**:
+3. **COMPLETE (1회, turn 종료)**:
    ```bash
-   flow-update status <registryKey> DONE
-   flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]
+   flow-update status <registryKey> COMPLETE
+   flow-finish <registryKey> 완료 --work-request <WR-NNN> [--workflow-id <id>]
    flow-claude end <registryKey>
    ```
    > **CRITICAL**: `flow-claude end <key>` Bash 반환 후 turn **즉시 종료**. 추가 도구 호출 / 텍스트 출력 일체 금지.
 
-> **DONE 단계는 hook 이 흡수하지 않는다 — 이유**: turn 종료 신호(`flow-claude end`) 는 오케스트레이터의 Bash 호출 자체가 trigger. hook 이 자동 호출하면 LLM 이 추가 turn 을 돌리는 위험.
+> **COMPLETE 단계는 hook 이 흡수하지 않는다 — 이유**: turn 종료 신호(`flow-claude end`) 는 오케스트레이터의 Bash 호출 자체가 trigger. hook 이 자동 호출하면 LLM 이 추가 turn 을 돌리는 위험.
 
 ---
 
 ## INIT (Orchestrator-driven, 1 Bash call)
 
 ```bash
-cd "$(flow-init <command> --ticket T-NNN | tail -1)"
+cd "$(flow-init <command> --work-request WR-NNN | tail -1)"
 ```
 
 - command: implement | review | research | (chain)
 - flow-init: 디렉터리 생성 + worktree 생성(implement만) + init-result.json 기록
 - stdout 마지막 줄: worktreePath 절대경로 (또는 빈 줄). 빈 줄이면 cwd 유지
 
-실패 시 비정상 종료 코드. INIT 결과 요약/출력 MUST NOT — ticket Read / init-result.json Read / dependency ls / TodoWrite 금지.
+실패 시 비정상 종료 코드. INIT 결과 요약/출력 MUST NOT — WorkRequest Read / init-result.json Read / dependency ls / TodoWrite 금지.
 
 INIT 완료 후 즉시 PLAN 진행 (Task(planner) 호출). INIT 결과 요약/출력 MUST NOT.
 
@@ -231,15 +231,15 @@ reporter 가 `{workDir}/report.md` + `summary.txt` 생성. 실패 시 `WORKFLOW_
 
 > **research 보고서 품질 기대치**: command=`research` 인 경우 reporter 는 보고서에 "참고 자료" 출처 섹션 + 주장-근거-출처 3단 구조 결론을 필수 포함한다. 출처 명시 형식: `[등급] 출처명 (URL, YYYY)`.
 
-reporter `상태: 완료` 반환 후 DONE 단계 진행 (3 Bash 호출).
+reporter `상태: 완료` 반환 후 COMPLETE 단계 진행 (3 Bash 호출).
 
 ---
 
-## DONE (Orchestrator-driven, 3 Bash calls, turn termination)
+## COMPLETE (Orchestrator-driven, 3 Bash calls, turn termination)
 
 ```bash
-flow-update status <registryKey> DONE
-flow-finish <registryKey> 완료 --ticket-number <T-NNN> [--workflow-id <id>]
+flow-update status <registryKey> COMPLETE
+flow-finish <registryKey> 완료 --work-request <WR-NNN> [--workflow-id <id>]
 flow-claude end <registryKey>
 ```
 
@@ -248,10 +248,10 @@ flow-claude end <registryKey>
 1. status.json 완료 처리 -- `update_state.py status` (critical)
 2. 사용량 확정 -- `update_state.py usage-finalize` (비차단)
 3. 아카이빙 -- `history_sync.py archive` (비차단)
-4. 칸반 갱신 -- `update-kanban.sh` (workflow_id 있을 때만, 비차단)
+4. Conveyor 갱신 -- `flow-conveyor` (workflow_id 있을 때만, 비차단)
 5. 세션 cleanup -- TMUX_PANE + T-* 윈도우 조건 시 3초 지연 후 kill (비차단)
 
-### Post-DONE Silence (CRITICAL)
+### Post-COMPLETE Silence (CRITICAL)
 
 `flow-claude end <registryKey>` Bash 반환 즉시 **turn 종료**. 추가 도구 호출 / 텍스트 생성 일체 금지. 워크플로우 마지막 행위.
 
@@ -263,14 +263,14 @@ flow-claude end <registryKey>
 
 | Step Completed | Allowed Actions | Prohibited |
 |----------------|----------------|------------|
-| INIT completed | Task(planner) 즉시 호출 | summary, **AskUserQuestion**, 내부 추론 텍스트, ticket Read, init-result.json Read, dependency ls, TodoWrite |
-| PLAN done | Auto-Approve Gate → Task(worker-*/explorer-*) 호출 | plan summary, **AskUserQuestion**[^1], 내부 추론 텍스트 |
-| WORK in progress | 다음 worker/explorer Task 호출 (parallel/sequential) | planner 재호출, autonomous augmentation, 내부 추론 텍스트 |
-| WORK done | Task(reporter) 호출 | work summary, 내부 추론 텍스트 |
-| VALIDATE done | REPORT 진행 (통과/경고 시) | validation report summary, 자동 회귀 트리거 |
-| REPORT done | DONE 3 Bash 호출 → **turn 즉시 종료** | report summary, post-DONE text, 추가 도구 호출 |
+| INIT completed | Task(planner) 즉시 호출 | summary, **AskUserQuestion**, 내부 추론 텍스트, WorkRequest Read, init-result.json Read, dependency ls, TodoWrite |
+| PLAN complete | Auto-Approve Gate → Task(worker-*/explorer-*) 호출 | plan summary, **AskUserQuestion**[^1], 내부 추론 텍스트 |
+| WORK in executing | 다음 worker/explorer Task 호출 (parallel/sequential) | planner 재호출, autonomous augmentation, 내부 추론 텍스트 |
+| WORK complete | Task(reporter) 호출 | work summary, 내부 추론 텍스트 |
+| VERIFY complete | REPORT 진행 (통과/경고 시) | validation report summary, 자동 회귀 트리거 |
+| REPORT complete | COMPLETE 3 Bash 호출 → **turn 즉시 종료** | report summary, post-COMPLETE text, 추가 도구 호출 |
 
-[^1]: `autoApprove=false` (`-n` 플래그) 시에만 AskUserQuestion 허용. 미지정(기본) 시 PLAN~DONE 전 구간 AskUserQuestion 0회.
+[^1]: `autoApprove=false` (`-n` 플래그) 시에만 AskUserQuestion 허용. 미지정(기본) 시 PLAN~COMPLETE 전 구간 AskUserQuestion 0회.
 
 ### Workflow Log Protocol
 
@@ -296,7 +296,7 @@ flow-claude end <registryKey>
 |--------|-------------|
 | INIT cd Bash call | `cd "$(flow-init ... | tail -1)"` (1회) |
 | Task(planner/worker-*/explorer-*/validator/reporter) call | 결정론 wrapper 는 hook 흡수 |
-| DONE 3 Bash calls | `flow-update status DONE` + `flow-finish` + `flow-claude end` |
+| COMPLETE 3 Bash calls | `flow-update status COMPLETE` + `flow-finish` + `flow-claude end` |
 | AskUserQuestion (autoApprove=false 한정) | `-n` 수동 확인 모드 전용 |
 | `<workDir>/plan.md` 1회 read | WORK Step 태스크 디스패치용 |
 
@@ -310,7 +310,7 @@ flow-claude end <registryKey>
 | Plan/report/work-log authoring | Sub-agent exclusive |
 | Sub-agent return interpretation/summary output | Returns are opaque routing tokens |
 | 내부 추론/분석/사고 과정 텍스트 출력 | Terminal Output Protocol 위반 |
-| PLAN 완료 후 티켓 파일 읽기 | initialization.py 실행으로 한정 |
+| PLAN 완료 후 WorkRequest 파일 읽기 | initialization.py 실행으로 한정 |
 | 다른 워크플로우 산출물 읽기 | 현재 workDir 내부로 한정 |
 | `init-result.json` 직접 Read | `flow-init | tail -1` cd 1액션으로 한정 |
 
@@ -330,10 +330,10 @@ flow-claude end <registryKey>
 |-------|---------|----------|----------------|
 | INIT | `_phase_verify_init` (initialization.py:581) | Advisory | `quality_score < 0.6` 시 `[WARN]` workflow.log 기록. blocking 0건 |
 | PLAN | `flow-validate` (hook 흡수) | Advisory | exit 0 고정. 실패해도 WORK 진행 |
-| VALIDATE | `flow-phase-verify` | Hard-Gate | validator `실패` + 작업내역 전체 누락 시 REPORT 차단 + `flow-update status FAILED` 전이. 빌드 FAIL 등 다른 사유는 soft |
-| DONE | `emit_report_advisory` (worker_return_parser.py:125) | Advisory | `report.md` 부재 시 `[WARN]` 로그 + `report.missing` metrics emit |
+| VERIFY | `flow-phase-verify` | Hard-Gate | validator `실패` + 작업내역 전체 누락 시 REPORT 차단 + `flow-update status FAILED` 전이. 빌드 FAIL 등 다른 사유는 soft |
+| COMPLETE | `emit_report_advisory` (worker_return_parser.py:125) | Advisory | `report.md` 부재 시 `[WARN]` 로그 + `report.missing` metrics emit |
 
-> **T-411 폐기 사례 캐논 (commit 0c970fa)**: 추측 기반 자동 차단/강제 전이/칸반 자동 회귀 정책 절대 도입 금지 (MUST NOT). advisory wrapper 는 WARN 로그 + metrics emit 까지만 수행하며, 사용자 수동 수습 경로를 항상 보존한다.
+> **T-411 폐기 사례 캐논 (commit 0c970fa)**: 추측 기반 자동 차단/강제 전이/Conveyor 자동 회귀 정책 절대 도입 금지 (MUST NOT). advisory wrapper 는 WARN 로그 + metrics emit 까지만 수행하며, 사용자 수동 수습 경로를 항상 보존한다.
 
 ---
 
@@ -356,7 +356,7 @@ advisory only — hook 실패가 워크플로우 전이를 영구 차단하지 �
 
 ## Notes
 
-1. `/wf` 명령 시 오케스트레이터는 INIT (`cd "$(flow-init ... | tail -1)"`) → Task × N → DONE (3 Bash) 만 호출. 그 외 결정론 wrapper 는 hook 이 흡수.
-2. Step order (PLAN → WORK → VALIDATE → REPORT → DONE) 엄격 강제. WORK 중 질문 금지 (clarification 은 PLAN 한정).
+1. `/wf` 명령 시 오케스트레이터는 INIT (`cd "$(flow-init ... | tail -1)"`) → Task × N → COMPLETE (3 Bash) 만 호출. 그 외 결정론 wrapper 는 hook 이 흡수.
+2. Step order (PLAN → WORK → VERIFY → REPORT → COMPLETE) 엄격 강제. WORK 중 질문 금지 (clarification 은 PLAN 한정).
 3. Git commits via `/git:commit` separately; Slack failure does not block workflow.
 4. `HOOK_WORKFLOW_ORCHESTRATION=false` 설정 시 기존 동작 (오케스트레이터가 모든 wrapper 명시 호출) 로 폴백. 본 SKILL.md 는 흡수 모드(true) 기준 — false 모드에서는 결정론 호출을 명시해야 한다.
