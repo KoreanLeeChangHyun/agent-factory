@@ -1,4 +1,4 @@
-"""Board API Kanban done helper app-boundary coverage."""
+"""Board API Conveyor complete helper app-boundary coverage."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ def test_conveyor_complete_re_compat_exports_match_app_boundary() -> None:
     from board.server.handlers import _conveyor_complete_re as compat
     from engine.apps.board_api import conveyor_complete_re as app
 
-    assert compat._classify_done_failure is app._classify_done_failure
-    assert compat._DONE_MERGE_OK_RE is app._DONE_MERGE_OK_RE
+    assert compat._classify_complete_failure is app._classify_complete_failure
+    assert compat._COMPLETE_MERGE_OK_RE is app._COMPLETE_MERGE_OK_RE
     assert compat._UNDO_WORKTREE_RE is app._UNDO_WORKTREE_RE
 
 

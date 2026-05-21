@@ -5,14 +5,14 @@ Merging and organizing feature branches into develop in a worktree environment
 Run the 5-step pipeline with a single command.
 
 Usage:
-  flow-merge <ticket_number> [--dry-run] [--force]
+  flow-merge <work_request_number> [--dry-run] [--force]
 
 Pipeline stages:
   1. Detect uncommitted changes and automatically commit them
   2. Merge feature branch into develop with --no-ff
   2.5. Merge anchor verification (active only when WORKFLOW_WORKTREE=true)
   3. worktree unlock + remove (+ delete feature branch)
-  4. Kanban done processing (prevent worktree merge hook duplication)
+  4. Conveyor complete processing (prevent worktree merge hook duplication)
   5. (Delete feature branch is handled in step 3)
 
 Options:
@@ -96,18 +96,18 @@ def _step(num: int, desc: str) -> None:
 # ─── Pipeline stages ──────────────────────────────────────────────────────────────
 
 
-def _normalize_ticket(ticket_number: str) -> str:
-    """Normalize the ticket number to T-NNN format.
+def _normalize_work_request(work_request_number: str) -> str:
+    """Normalize the work_request number to WR-NNN format.
 
     Args:
-        ticket_number: Original ticket number. If you only need numbers, add the T- prefix.
+        work_request_number: Original WorkRequest number. If you only need numbers, add the WR- prefix.
 
     Returns:
-        Ticket number in T-NNN format.
+        WorkRequest number in WR-NNN format.
     """
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
-    return ticket_number
+    if not work_request_number.startswith("WR-"):
+        work_request_number = f"WR-{work_request_number}"
+    return work_request_number
 
 
 def _check_merge_approval(force: bool) -> bool:
@@ -167,20 +167,20 @@ def _branch_exists(branch: str) -> bool:
 
 
 def _stage1_5_premerge_state_guard(
-    ticket_number: str,
+    work_request_number: str,
     worktree_path: str | None,
     force: bool,
 ) -> tuple[bool, str]:
     """Stage 1.5: Guard the worktree/feature branch state just before entering jammerge.
 
-    Regression blocking: After Done rollback (undo_done), the worktree/feature branch is
+    Regression blocking: After Complete rollback (undo_complete), the worktree/feature branch is
     Remerge is carried out in an empty state (recreated without changes) or absent.
     Separately, anchor failed on commit → `reset --hard pre_merge_develop_sha`
     Separately, a regression occurred where changes were reset together.
 
     This guard verifies the following before entering Stage 2 (`merge_to_develop`):
 
-    1. Absence of feature branch → Always blocked (regardless of force). Regenerate immediately after undo_done
+    1. Absence of feature branch → Always blocked (regardless of force). Regenerate immediately after undo_complete
        Cases where steps are missing or the work tree itself does not exist.
     2. Feature branch exists + commits ahead == 0 (empty branch) →
        force=False: block + clear error
@@ -196,7 +196,7 @@ def _stage1_5_premerge_state_guard(
         2026-05-08 Canon). Only messages with user-specified consent are displayed.
 
     Args:
-        ticket_number: Ticket number (T-NNN).
+        work_request_number: WorkRequest number (WR-NNN).
         worktree_path: get_worktree_path return value. None when absent.
         force: Whether to use the --force option.
 
@@ -208,18 +208,18 @@ def _stage1_5_premerge_state_guard(
 
     # branch_strategy has a high call cost, so it is lazy imported.
     try:
-        from flow.branch_strategy import get_feature_branch_for_ticket
+        from flow.branch_strategy import get_feature_branch_for_work_request
     except Exception as exc:  # pragma: no cover - import path abnormal
         _error(f"[GUARD] branch_strategy import failed: {exc}")
         return False, "branch_strategy import failed"
 
-    branch_name = get_feature_branch_for_ticket(ticket_number)
+    branch_name = get_feature_branch_for_work_request(work_request_number)
 
     # ── 1. Absence of feature branch ──
     if not branch_name or not _branch_exists(branch_name):
         wt_status = "absence" if not worktree_path else f"exists({worktree_path})"
         msg = (
-            f"Absence of feature branch: ticket={ticket_number}"
+            f"Absence of feature branch: work_request={work_request_number}"
             f"branch={branch_name or '<unresolved>'} worktree={wt_status}"
         )
         _error(f"[GUARD] {msg}")
@@ -228,10 +228,10 @@ def _stage1_5_premerge_state_guard(
                 "force mode allows destructive behavior and therefore requires explicit user consent."
                 "You need it. \n"
                 "Recovery Options (Manual): \n"
-                "1) Regenerate work tree/branch with `flow-undo-done <T-NNN> --force` \n"
+                "1) Regenerate work tree/branch with `flow-undo-complete <WR-NNN> --force` \n"
                 "2) Check the original merge commit SHA in the develop reflog: \n"
                 "       git reflog develop --grep-reflog='merge.*' | grep "
-                f"feat/{ticket_number}\n"
+                f"feat/{work_request_number}\n"
                 "3) Cherry-pick the SHA containing the changes to a new branch and remerge it.",
                 file=sys.stderr,
                 flush=True,
@@ -239,7 +239,7 @@ def _stage1_5_premerge_state_guard(
         else:
             print(
                 "An empty merge was blocked because the feature branch could not be found. \n"
-                "Recreate it with `flow-undo-done <T-NNN> --force` and retry.",
+                "Recreate it with `flow-undo-complete <WR-NNN> --force` and retry.",
                 file=sys.stderr,
                 flush=True,
             )
@@ -269,9 +269,9 @@ def _stage1_5_premerge_state_guard(
                 "Recovery Options (Manual): \n"
                 "1) Check the original merge commit SHA in the develop reflog: \n"
                 "       git reflog develop --grep-reflog='merge.*' | grep "
-                f"feat/{ticket_number}\n"
+                f"feat/{work_request_number}\n"
                 "2) Cherry-pick the SHA containing the changes to a new branch and remerge \n"
-                "3) Or, after regenerating the work tree with `flow-undo-done <T-NNN> --force`, \n"
+                "3) Or, after regenerating the work tree with `flow-undo-complete <WR-NNN> --force`, \n"
                 "Commit the work again and remerge it",
                 file=sys.stderr,
                 flush=True,
@@ -294,12 +294,12 @@ def _stage1_5_premerge_state_guard(
 
 
 def _stage1_auto_commit(
-    ticket_number: str, worktree_path: str, dry_run: bool
+    work_request_number: str, worktree_path: str, dry_run: bool
 ) -> bool:
     """Stage 1: Detect uncommitted changes in the worktree and automatically commit them.
 
     Args:
-        ticket_number: Ticket number (T-NNN).
+        work_request_number: WorkRequest number (WR-NNN).
         worktree_path: Absolute path to worktree.
         dry_run: If True, only the list of changed files is output.
 
@@ -336,7 +336,7 @@ def _stage1_auto_commit(
         _error(f"git add failed: {add_result.stderr.strip()}")
         return False
 
-    commit_msg = f"chore: auto-commit before merge ({ticket_number})"
+    commit_msg = f"chore: auto-commit before merge ({work_request_number})"
     commit_result = _git(
         "commit", "-m", commit_msg, repo_path=worktree_path
     )
@@ -349,7 +349,7 @@ def _stage1_auto_commit(
 
 
 def _stage2_merge_to_develop(
-    ticket_number: str, dry_run: bool
+    work_request_number: str, dry_run: bool
 ) -> tuple[bool, str, str]:
     """Stage 2: Merge the feature branch into develop with --no-ff.
 
@@ -357,7 +357,7 @@ def _stage2_merge_to_develop(
     In case of merge conflict, abort and output the list of conflicting files.
 
     Args:
-        ticket_number: Ticket number (T-NNN).
+        work_request_number: WorkRequest number (WR-NNN).
         dry_run: If True, only expected actions are output.
 
     Returns:
@@ -366,12 +366,12 @@ def _stage2_merge_to_develop(
     """
     _step(2, "Feature branch -> develop merge")
 
-    from flow.branch_strategy import get_feature_branch_for_ticket
+    from flow.branch_strategy import get_feature_branch_for_work_request
     from flow.worktree_manager import merge_to_develop
 
-    branch_name = get_feature_branch_for_ticket(ticket_number)
+    branch_name = get_feature_branch_for_work_request(work_request_number)
     if not branch_name:
-        _error(f"The feature branch linked to {ticket_number} could not be found")
+        _error(f"The feature branch linked to {work_request_number} could not be found")
         return False, "", ""
 
     print(f"Target branch: {branch_name}", flush=True)
@@ -383,7 +383,7 @@ def _stage2_merge_to_develop(
         )
         return True, "", branch_name
 
-    merge_result = merge_to_develop(ticket_number)
+    merge_result = merge_to_develop(work_request_number)
     if not merge_result.success:
         if merge_result.conflicts:
             _error("Merge conflict occurred (merge --abort completed)")
@@ -424,7 +424,7 @@ def _handle_anchor_failure(
         reason: Reason for failure.
         pre_merge_develop_sha: develop HEAD SHA captured just before entering Stage 2.
             If it is not empty, use `git reset --hard <pre_merge_develop_sha>`
-            Perform an explicit SHA reset (avoid T-403 regression: dictionary of develop
+            Perform an explicit SHA reset (avoid WR-403 regression: dictionary of develop
             ahead commit is automatically preserved).
             If the string is empty, the existing `HEAD^` relative path is used as a fallback for capture failure.
             Perform a reset and output a warning log.
@@ -465,7 +465,7 @@ def _handle_anchor_failure(
             if parent1_sha and parent1_sha != reset_target:
                 parent1_mismatch = True
                 _error(
-                    f"[ANCHOR][T-441] Suspicious case: reset_target"
+                    f"[ANCHOR][WR-441] Suspicious case: reset_target"
                     f"({reset_target[:8]}) != merge_commit^1 "
                     f"({parent1_sha[:8]}). "
                     "Separately, pre_merge_develop_sha was captured above the commit."
@@ -486,7 +486,7 @@ def _handle_anchor_failure(
             )
             if parent1_mismatch:
                 _error(
-                    "[ANCHOR][T-441] Additional commits may be lost after rollback —"
+                    "[ANCHOR][WR-441] Additional commits may be lost after rollback —"
                     "Check the develop reflog and work tree changes directly."
                 )
         else:
@@ -550,7 +550,7 @@ def _stage2_5_verify_merge_anchor(
         feature_branch: Merged feature branch name.
         dry_run: If True, only expected actions are output.
         pre_merge_develop_sha: develop HEAD SHA captured just before entering Stage 2.
-            T-410: If merge_commit == pre_merge_develop_sha, git merge
+            WR-410: If merge_commit == pre_merge_develop_sha, git merge
             Since --no-ff is an already-up-to-date case that did not create a new commit,
             Skip the anchor verification itself (avoiding the ^2 call).
             If the string is empty, it is considered to be in an uncaptured state and the existing branch is followed.
@@ -678,7 +678,7 @@ def _stage2_5_verify_merge_anchor(
 
 
 def _stage3_remove_worktree(
-    ticket_number: str, dry_run: bool
+    work_request_number: str, dry_run: bool
 ) -> bool:
     """Stage 3: worktree unlock + remove (+ delete feature branch).
 
@@ -687,7 +687,7 @@ def _stage3_remove_worktree(
     Prune only if there is a remaining worktree (idempotent).
 
     Args:
-        ticket_number: Ticket number (T-NNN).
+        work_request_number: WorkRequest number (WR-NNN).
         dry_run: If True, only expected actions are output.
 
     Returns:
@@ -697,7 +697,7 @@ def _stage3_remove_worktree(
 
     from flow.worktree_manager import get_worktree_path, remove_worktree
 
-    wt_path = get_worktree_path(ticket_number)
+    wt_path = get_worktree_path(work_request_number)
     if wt_path:
         print(f"worktree path: {wt_path}", flush=True)
     else:
@@ -716,7 +716,7 @@ def _stage3_remove_worktree(
         return True
 
     success = remove_worktree(
-        ticket_number, delete_branch=True
+        work_request_number, delete_branch=True
     )
     if not success:
         _error("Worktree removal failed")
@@ -726,28 +726,26 @@ def _stage3_remove_worktree(
     return True
 
 
-def _stage4_kanban_done(
-    ticket_number: str, dry_run: bool
+def _stage4_conveyor_complete(
+    work_request_number: str, dry_run: bool
 ) -> bool:
-    """Stage 4: Kanban done processing.
+    """Stage 4: Conveyor complete processing.
 
-    Call kanban_cli.cmd_done(). worktree inside cmd_done()
-    The merge hook is because the feature branch has already been deleted.
-    get_feature_branch_for_ticket() returns None, automatically
-    Skip duplicate merges.
+    Call conveyor_cli.cmd_complete(). The worktree/branch was already handled
+    by the preceding stages, so duplicate merge work is skipped.
 
     Args:
-        ticket_number: Ticket number (T-NNN).
+        work_request_number: WorkRequest number (WR-NNN).
         dry_run: If True, only expected actions are output.
 
     Returns:
         True on success, False on failure.
     """
-    _step(4, "kanban done processing")
+    _step(4, "conveyor complete processing")
 
     if dry_run:
         print(
-            f"  [DRY-RUN] kanban done {ticket_number}",
+            f"  [DRY-RUN] conveyor complete {work_request_number}",
             flush=True,
         )
         print(
@@ -757,18 +755,18 @@ def _stage4_kanban_done(
         return True
 
     try:
-        from flow.kanban_cli import cmd_done
+        from flow.conveyor_cli import cmd_complete
 
-        cmd_done(ticket_number)
-        print(f"kanban done done: {ticket_number}", flush=True)
+        cmd_complete(work_request_number)
+        print(f"conveyor complete done: {work_request_number}", flush=True)
         return True
     except SystemExit as e:
         if e.code and e.code != 0:
-            _error(f"kanban done failed (exit code: {e.code})")
+            _error(f"conveyor complete failed (exit code: {e.code})")
             return False
         return True
     except Exception as e:
-        _error(f"kanban done failed: {e}")
+        _error(f"conveyor complete failed: {e}")
         return False
 
 
@@ -776,21 +774,21 @@ def _stage4_kanban_done(
 
 
 def run_pipeline(
-    ticket_number: str, dry_run: bool = False, force: bool = False
+    work_request_number: str, dry_run: bool = False, force: bool = False
 ) -> int:
     """Execute the five-stage merge pipeline sequentially.
 
     Args:
-        ticket_number: Ticket number (T-NNN format or number).
+        work_request_number: WorkRequest number (WR-NNN format or number).
         dry_run: If True, only the expected operation of each step is output.
         force: If True, bypass merge approval check.
 
     Returns:
         Exit code. 0=Success, 1=Merge failed, 2=Not approved.
     """
-    ticket_number = _normalize_ticket(ticket_number)
+    work_request_number = _normalize_work_request(work_request_number)
 
-    print(f"=== flow-merge: {ticket_number} ===", flush=True)
+    print(f"=== flow-merge: {work_request_number} ===", flush=True)
     if dry_run:
         print("[DRY-RUN mode] Does not actually run \n", flush=True)
 
@@ -805,11 +803,11 @@ def run_pipeline(
     # ── Worktree path navigation ──
     from flow.worktree_manager import get_worktree_path
 
-    worktree_path = get_worktree_path(ticket_number)
+    worktree_path = get_worktree_path(work_request_number)
 
     # ── Stage 1: Automatically commit uncommitted changes ──
     if worktree_path:
-        if not _stage1_auto_commit(ticket_number, worktree_path, dry_run):
+        if not _stage1_auto_commit(work_request_number, worktree_path, dry_run):
             return 1
     else:
         _step(1, "Detect uncommitted changes and automatically commit them")
@@ -817,7 +815,7 @@ def run_pipeline(
 
     # Since dry-run does not perform actual merge, the guard result is marked as advisory and passes.
     guard_ok, _guard_msg = _stage1_5_premerge_state_guard(
-        ticket_number, worktree_path, force
+        work_request_number, worktree_path, force
     )
     if not guard_ok:
         if dry_run:
@@ -844,7 +842,7 @@ def run_pipeline(
 
     # ── Stage 2: feature -> develop merge ──
     stage2_success, merge_commit, feature_branch = _stage2_merge_to_develop(
-        ticket_number, dry_run
+        work_request_number, dry_run
     )
     if not stage2_success:
         return 1
@@ -856,20 +854,20 @@ def run_pipeline(
         return 1
 
     # ── Stage 3: Worktree removal + branch deletion ──
-    if not _stage3_remove_worktree(ticket_number, dry_run):
+    if not _stage3_remove_worktree(work_request_number, dry_run):
         # If worktree removal fails, just output a warning and continue.
         _info("Removal of the worktree failed, but the merge was completed, so continue.")
 
-    # ── Stage 4: kanban done ──
-    if not _stage4_kanban_done(ticket_number, dry_run):
-        # If kanban done fails, only a warning is output.
-        _info("kanban done failed, but merge was completed")
+    # ── Stage 4: conveyor complete ──
+    if not _stage4_conveyor_complete(work_request_number, dry_run):
+        # If conveyor complete fails, only a warning is output.
+        _info("conveyor complete failed, but merge was completed")
 
     # ── Stage 5: Delete feature branch (processing completed in Stage 3) ──
     _step(5, "Delete feature branch")
     print("Processing completed in Stage 3 (delete_branch=True)", flush=True)
 
-    print(f"\n === flow-merge completed: {ticket_number} ===", flush=True)
+    print(f"\n === flow-merge completed: {work_request_number} ===", flush=True)
     return 0
 
 
@@ -887,8 +885,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Worktree Merge Pipeline Automation",
     )
     parser.add_argument(
-        "ticket_number",
-        help="Ticket number (T-NNN or numeric)",
+        "work_request_number",
+        help="WorkRequest number (WR-NNN or numeric)",
     )
     parser.add_argument(
         "--dry-run",
@@ -911,7 +909,7 @@ def main() -> None:
     args = parser.parse_args()
 
     exit_code = run_pipeline(
-        ticket_number=args.ticket_number,
+        work_request_number=args.work_request_number,
         dry_run=args.dry_run,
         force=args.force,
     )

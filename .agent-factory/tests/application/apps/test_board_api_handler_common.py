@@ -9,16 +9,16 @@ from engine.apps.board_api import handler_common
 
 
 def test_handler_common_compat_exports_match_app_boundary() -> None:
-    assert compat._TICKET_RE is handler_common._TICKET_RE
-    assert compat._KANBAN_ALL_DIRS is handler_common._KANBAN_ALL_DIRS
+    assert compat._WORK_REQUEST_RE is handler_common._WORK_REQUEST_RE
+    assert compat._CONVEYOR_ALL_DIRS is handler_common._CONVEYOR_ALL_DIRS
     assert compat._import_metrics_cli is handler_common._import_metrics_cli
     assert compat._import_launch_metrics_cli is handler_common._import_launch_metrics_cli
 
 
-def test_ticket_regex_and_kanban_dirs() -> None:
-    assert handler_common._TICKET_RE.match("T-424")
-    assert not handler_common._TICKET_RE.match("X-424")
-    assert "done" in handler_common._KANBAN_ALL_DIRS
+def test_work_request_regex_and_conveyor_dirs() -> None:
+    assert handler_common._WORK_REQUEST_RE.match("WR-424")
+    assert not handler_common._WORK_REQUEST_RE.match("X-424")
+    assert "complete" in handler_common._CONVEYOR_ALL_DIRS
 
 
 def test_board_server_shim_adds_agent_factory_import_root() -> None:

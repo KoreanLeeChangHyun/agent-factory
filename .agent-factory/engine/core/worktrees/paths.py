@@ -9,8 +9,8 @@ WORKTREES_DIR_NAME = Path(".agent-factory") / "worktrees"
 MERGE_LOCK_NAME = "worktree-merge.lockdir"
 
 
-def normalize_ticket_number(ticket_number: str) -> str:
-    return ticket_number if ticket_number.startswith("T-") else f"T-{ticket_number}"
+def normalize_work_request_number(work_request_number: str) -> str:
+    return work_request_number if work_request_number.startswith("WR-") else f"WR-{work_request_number}"
 
 
 def worktree_dir_name(branch_name: str) -> str:

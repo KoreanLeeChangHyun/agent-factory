@@ -1,5 +1,5 @@
 #!/usr/bin/env -S python3 -u
-"""plan validator.py - Plans (plan.md) and kanban ticket structure validation script.
+"""plan validator.py - Plans (plan.md) and conveyor WorkRequest structure validation script.
 
 Enter plan.md and validate: NEWS
 (1) Warker water extraction by Phase in Mermaid Subgraph, warning at least 3 times the maximum/min rate
@@ -7,9 +7,9 @@ Enter plan.md and validate: NEWS
 (3) T2(10+) TSK Skill 1 Personal warning
 News 4) What/HOW Deletion Verification: Property/goal/context Reverting Detection (advisory, non-blocking)
 
---mode ticket will be valid for the kanban ticket XML structure NEWS
+--mode work-request will be valid for the conveyor WorkRequest XML structure NEWS
 (TC-01) Directory Location vs XML status
-(TC-02) count-from Derivative Ticket Unfinished + Original done Warning
+(TC-02) count-from Derivative WorkRequest Unfinished + Original complete Warning
 (TC-03) Missing required tags (number/command/prompt)
 (TC-04) command value validity
 (TC-05) goal/target empty value warning
@@ -18,8 +18,8 @@ News 4) What/HOW Deletion Verification: Property/goal/context Reverting Detectio
 
 Usage:
   flow-validate <plan_path|registryKey>
-  flow-validate --mode ticket
-  flow-validate --mode ticket --ticket T-001
+  flow-validate --mode work-request
+  flow-validate --mode work-request --work-request WR-001
   flow-validate --help
 
 Output:
@@ -675,44 +675,44 @@ def validate(plan_path: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# ticket mode helper function
+# work_request mode helper function
 # ---------------------------------------------------------------------------
 
 # Directory name → XML status value mapping (for normalization)
 _DIR_TO_STATUS: dict[str, str] = {
-    "todo": "To Do",
-    "open": "Open",
-    "progress": "In Progress",
-    "review": "Review",
-    "done": "Done",
+    "draft": "Draft",
+    "accepted": "Accepted",
+    "executing": "Executing",
+    "verifying": "Verifying",
+    "complete": "Complete",
 }
 
 # Valid command value (chain delimiter > verification of each token when included)
-_VALID_COMMANDS: set[str] = {"implement", "review", "research"}
+_VALID_COMMANDS: set[str] = {"implement", "verifying", "research"}
 
 # Multiple Item Field List (for TC-06)
 _MULTI_FIELDS: list[str] = ["goal", "target", "constraints", "criteria", "context"]
 
 
-def find_kanban_root(project_root: str) -> str:
-    """returns the Kanban root directory path.
+def find_conveyor_root(project_root: str) -> str:
+    """returns the Conveyor root directory path.
 
     Args:
         project root: Project route absolute path
 
     Returns:
-        . agent-factory/kanban absolute path
+        . agent-factory/conveyor absolute path
     """
-    return os.path.join(project_root, ".agent-factory", "tickets")
+    return os.path.join(project_root, ".agent-factory", "work-requests")
 
 
-def load_ticket_xml(xml_path: str) -> dict[str, Any]:
-    """return the ticket XML file to dict.
+def load_work_request_xml(xml_path: str) -> dict[str, Any]:
+    """return the WorkRequest XML file to dict.
 
     return empty dict when parsing fails.
 
     Args:
-        xml path: ticket XML file absolute path
+        xml path: WorkRequest XML file absolute path
 
     Returns:
         {number, title, status, command, goal, target, constraints,
@@ -736,9 +736,9 @@ def load_ticket_xml(xml_path: str) -> dict[str, Any]:
     relations: list[dict[str, str]] = []
     for rel in root.findall(".//relations/relation"):
         rel_type = rel.get("type", "")
-        rel_ticket = rel.get("ticket", "")
-        if rel_type and rel_ticket:
-            relations.append({"type": rel_type, "ticket": rel_ticket})
+        rel_work_request = rel.get("work_request", "")
+        if rel_type and rel_work_request:
+            relations.append({"type": rel_type, "work_request": rel_work_request})
 
     return {
         "number": _text("number"),
@@ -755,161 +755,161 @@ def load_ticket_xml(xml_path: str) -> dict[str, Any]:
     }
 
 
-def build_ticket_location_map(kanban_root: str) -> dict[str, str]:
-    """Turn 4 directories of the Kanban route to return ticket number → directory location map.
+def build_work_request_location_map(conveyor_root: str) -> dict[str, str]:
+    """Turn 4 directories of the Conveyor route to return work_request number → directory location map.
 
     Args:
-        kanban root: Kanban route absolute path (.agent-factory/kanban)
+        conveyor root: Conveyor route absolute path (.agent-factory/conveyor)
 
     Returns:
-        {T-NNN: "open"|"progress"|"review"|"done"} Dinner.
+        {WR-NNN: "accepted"|"executing"|"verifying"|"complete"} Dinner.
     """
     location_map: dict[str, str] = {}
-    for dir_name in ("todo", "open", "progress", "review", "done"):
-        dir_path = os.path.join(kanban_root, dir_name)
+    for dir_name in ("draft", "accepted", "executing", "verifying", "complete"):
+        dir_path = os.path.join(conveyor_root, dir_name)
         if not os.path.isdir(dir_path):
             continue
         for fname in os.listdir(dir_path):
             if not fname.endswith(".xml"):
                 continue
-            ticket_number = fname[:-4]  # Remove extension
-            location_map[ticket_number] = dir_name
+            work_request_number = fname[:-4]  # Remove extension
+            location_map[work_request_number] = dir_name
     return location_map
 
 
-def extract_relations(ticket_data: dict[str, Any]) -> list[dict[str, str]]:
-    """returns a statement in the ticket data.
+def extract_relations(work_request_data: dict[str, Any]) -> list[dict[str, str]]:
+    """returns a statement in the work_request data.
 
     Args:
-        Ticket data: load ticket xml
+        WorkRequest data: load WorkRequest XML
 
     Returns:
-        [{type, ticket}, ...] list.
+        [{type, work_request}, ...] list.
     """
-    return ticket_data.get("relations", [])
+    return work_request_data.get("relations", [])
 
 
-def validate_ticket_status_consistency(
-    kanban_root: str, location_map: dict[str, str]
+def validate_work_request_status_consistency(
+    conveyor_root: str, location_map: dict[str, str]
 ) -> list[str]:
     """TC-01: Directory location vs XML <status> validation.
 
     If the directory location and XML <status> value is invalid, it creates a warning.
 
     Args:
-        kanban root: Kanban Route Absolute Route
-        location map: build ticket location map() return value
+        conveyor root: Conveyor Route Absolute Route
+        location map: build work_request location map() return value
 
     Returns:
         Send your inquiry directly to us
     """
     warnings: list[str] = []
-    for ticket_number, dir_name in location_map.items():
-        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
-        data = load_ticket_xml(xml_path)
+    for work_request_number, dir_name in location_map.items():
+        xml_path = os.path.join(conveyor_root, dir_name, f"{work_request_number}.xml")
+        data = load_work_request_xml(xml_path)
         if not data:
             continue
         xml_status = data.get("status", "")
         expected_status = _DIR_TO_STATUS.get(dir_name, "")
         if expected_status and xml_status and xml_status != expected_status:
             warnings.append(
-                f"[TC-01] {ticket_number}: directory ({dir_name}) vs XML status ({xml_status}) mismatch"
+                f"[TC-01] {work_request_number}: directory ({dir_name}) vs XML status ({xml_status}) mismatch"
                 f"(Expected value: {expected_status})"
             )
     return warnings
 
 
-def validate_derived_ticket_completion(
-    kanban_root: str, location_map: dict[str, str]
+def validate_derived_work_request_completion(
+    conveyor_root: str, location_map: dict[str, str]
 ) -> list[str]:
-    """TC-02: count-from derivative ticket unfinished + original done alert.
+    """TC-02: count-from derivative work_request unfinished + original complete alert.
 
-    If the original ticket is done not done, it will generate a warning.
+    If the original work_request is complete not complete, it will generate a warning.
 
     Args:
-        kanban root: Kanban Route Absolute Route
-        location map: build ticket location map() return value
+        conveyor root: Conveyor Route Absolute Route
+        location map: build work_request location map() return value
 
     Returns:
         Send your inquiry directly to us
     """
     warnings: list[str] = []
-    for ticket_number, dir_name in location_map.items():
-        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
-        data = load_ticket_xml(xml_path)
+    for work_request_number, dir_name in location_map.items():
+        xml_path = os.path.join(conveyor_root, dir_name, f"{work_request_number}.xml")
+        data = load_work_request_xml(xml_path)
         if not data:
             continue
         for rel in data.get("relations", []):
             if rel.get("type") != "derived-from":
                 continue
-            origin_ticket = rel.get("ticket", "")
-            if not origin_ticket:
+            origin_work_request = rel.get("work_request", "")
+            if not origin_work_request:
                 continue
-            origin_dir = location_map.get(origin_ticket, "")
-            if origin_dir == "done" and dir_name != "done":
+            origin_dir = location_map.get(origin_work_request, "")
+            if origin_dir == "complete" and dir_name != "complete":
                 warnings.append(
-                    f"[TC-02] {ticket_number} (derived ticket) is incomplete ({dir_name})"
-                    f"Original {origin_ticket} is done"
+                    f"[TC-02] {work_request_number} (derived work_request) is incomplete ({dir_name})"
+                    f"Original {origin_work_request} is complete"
                 )
     return warnings
 
 
-def validate_ticket_xml_fields(
-    ticket_data: dict[str, Any], ticket_number: str, dir_name: str
+def validate_work_request_xml_fields(
+    work_request_data: dict[str, Any], work_request_number: str, dir_name: str
 ) -> list[str]:
-    """TC-03/04/05/06: Single ticket XML field validation.
+    """TC-03/04/05/06: Single WorkRequest XML field validation.
 
-    TC-03: number/command/prompt required tag presence on open/progress/review ticket
-    TC-04: command value implementation review research (included >)
-    TC-05: Open/progress/review Go to the ticket WARN
+    TC-03: number/command/prompt required tag presence on accepted/executing/verifying work_request
+    TC-04: command value implementation verifying research (included >)
+    TC-05: Accepted/executing/verifying Go to the work_request WARN
     TC-06: WARN when missing \\n in plural field (based on the return rate of the line)
 
     Args:
-        Ticket data: load ticket xml
-        ticket number: ticket number (e.g. T-001)
-        dir name: directory location (open/progress/review/done)
+        WorkRequest data: load WorkRequest XML
+        work_request number: work_request number (e.g. WR-001)
+        dir name: directory location (accepted/executing/verifying/complete)
 
     Returns:
         Send your inquiry directly to us
     """
     warnings: list[str] = []
-    # Todo is in a backlog state and there is no obligation to complete prompt required fields — only open/progress/review is subject to active verification
-    is_active = dir_name in ("open", "progress", "review")
+    # Draft is in a backlog state and there is no obligation to complete prompt required fields — only accepted/executing/verifying is subject to active verification
+    is_active = dir_name in ("accepted", "executing", "verifying")
 
     if not is_active:
         return warnings
 
     # TC-03: Presence of required tags
-    if not ticket_data.get("number"):
-        warnings.append(f"[TC-03] {ticket_number}: <number> tag missing or empty value")
-    if not ticket_data.get("command"):
-        warnings.append(f"[TC-03] {ticket_number}: <command> tag missing or empty value")
+    if not work_request_data.get("number"):
+        warnings.append(f"[TC-03] {work_request_number}: <number> tag missing or empty value")
+    if not work_request_data.get("command"):
+        warnings.append(f"[TC-03] {work_request_number}: <command> tag missing or empty value")
     # Existence of prompt: If either goal or target is present, the prompt block is considered to exist.
-    has_prompt = bool(ticket_data.get("goal") or ticket_data.get("target"))
+    has_prompt = bool(work_request_data.get("goal") or work_request_data.get("target"))
     if not has_prompt:
-        warnings.append(f"[TC-03] {ticket_number}: No content in <prompt> block")
+        warnings.append(f"[TC-03] {work_request_number}: No content in <prompt> block")
 
     # TC-04: Command value validity
-    raw_command = ticket_data.get("command", "")
+    raw_command = work_request_data.get("command", "")
     if raw_command:
         # Separate with chain separator > and verify each token
         tokens = [t.strip() for t in raw_command.split(">") if t.strip()]
         invalid_tokens = [t for t in tokens if t not in _VALID_COMMANDS]
         if invalid_tokens:
             warnings.append(
-                f"[TC-04] {ticket_number}: Invalid command value {invalid_tokens}"
+                f"[TC-04] {work_request_number}: Invalid command value {invalid_tokens}"
                 f"(Allow: {sorted(_VALID_COMMANDS)})"
             )
 
     # TC-05: goal/target empty value
-    if not ticket_data.get("goal", "").strip():
-        warnings.append(f"[TC-05] {ticket_number}: <goal> empty")
-    if not ticket_data.get("target", "").strip():
-        warnings.append(f"[TC-05] {ticket_number}: <target> empty")
+    if not work_request_data.get("goal", "").strip():
+        warnings.append(f"[TC-05] {work_request_number}: <goal> empty")
+    if not work_request_data.get("target", "").strip():
+        warnings.append(f"[TC-05] {work_request_number}: <target> empty")
 
     # TC-06: Missing newlines in multiple entry fields
     for field in _MULTI_FIELDS:
-        value = ticket_data.get(field, "")
+        value = work_request_data.get(field, "")
         if not value:
             continue
         lines = [ln for ln in value.split("\n") if ln.strip()]
@@ -919,51 +919,51 @@ def validate_ticket_xml_fields(
         line_count = len(lines)
         # If there are more than 2 lines and the actual number of lines is 1, they are written on one line without a newline.
         # (Judged by stripped results after XML parsing)
-        raw_value = ticket_data.get(field, "")
+        raw_value = work_request_data.get(field, "")
         actual_newlines = raw_value.count("\n")
         if line_count >= 2 and actual_newlines == 0:
             warnings.append(
-                f"[TC-06] {ticket_number}: Missing \n newlines in multiple <{field}> items ({line_count} items)"
+                f"[TC-06] {work_request_number}: Missing \n newlines in multiple <{field}> items ({line_count} items)"
             )
 
     return warnings
 
 
-def validate_all_tickets_xml_fields(
-    kanban_root: str, location_map: dict[str, str]
+def validate_all_work_request_xml_fields(
+    conveyor_root: str, location_map: dict[str, str]
 ) -> list[str]:
-    """TC-03~06: Full ticket XML field batch verification.
+    """TC-03~06: Full WorkRequest XML field batch verification.
 
     Args:
-        kanban root: Kanban Route Absolute Route
-        location map: build ticket location map() return value
+        conveyor root: Conveyor Route Absolute Route
+        location map: build work_request location map() return value
 
     Returns:
         Send your inquiry directly to us
     """
     warnings: list[str] = []
-    for ticket_number, dir_name in sorted(location_map.items()):
-        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
-        data = load_ticket_xml(xml_path)
+    for work_request_number, dir_name in sorted(location_map.items()):
+        xml_path = os.path.join(conveyor_root, dir_name, f"{work_request_number}.xml")
+        data = load_work_request_xml(xml_path)
         if not data:
             continue
-        warnings.extend(validate_ticket_xml_fields(data, ticket_number, dir_name))
+        warnings.extend(validate_work_request_xml_fields(data, work_request_number, dir_name))
     return warnings
 
 
 def validate_relation_links(
-    kanban_root: str,
+    conveyor_root: str,
     location_map: dict[str, str],
     full_location_map: dict[str, str] | None = None,
 ) -> list[str]:
     """TC-07: Validation of whether the relevant link is present.
 
-    If the ticket referenced in the field does not exist in the field, it will generate a warning.
+    If the work_request referenced in the field does not exist in the field, it will generate a warning.
 
     Args:
-        kanban root: Kanban Route Absolute Route
-        location map: valid ticket map (single or full)
-        full location map: Full ticket map for check whether the link exists.
+        conveyor root: Conveyor Route Absolute Route
+        location map: valid work_request map (single or full)
+        full location map: Full work_request map for check whether the link exists.
             If none, use the location map to the full map.
 
     Returns:
@@ -971,65 +971,65 @@ def validate_relation_links(
     """
     existence_map = full_location_map if full_location_map is not None else location_map
     warnings: list[str] = []
-    for ticket_number, dir_name in location_map.items():
-        xml_path = os.path.join(kanban_root, dir_name, f"{ticket_number}.xml")
-        data = load_ticket_xml(xml_path)
+    for work_request_number, dir_name in location_map.items():
+        xml_path = os.path.join(conveyor_root, dir_name, f"{work_request_number}.xml")
+        data = load_work_request_xml(xml_path)
         if not data:
             continue
         for rel in data.get("relations", []):
-            target_ticket = rel.get("ticket", "")
-            if not target_ticket:
+            target_work_request = rel.get("work_request", "")
+            if not target_work_request:
                 continue
-            if target_ticket not in existence_map:
+            if target_work_request not in existence_map:
                 warnings.append(
-                    f"[TC-07] {ticket_number}: Relationship link target {target_ticket}({rel.get('type', '')}) is"
-                    f"Doesn't exist in Kanban"
+                    f"[TC-07] {work_request_number}: Relationship link target {target_work_request}({rel.get('type', '')}) is"
+                    f"Doesn't exist in Conveyor"
                 )
     return warnings
 
 
-def validate_tickets(
-    kanban_root: str, single_ticket: str | None = None
+def validate_work_requests(
+    conveyor_root: str, single_work_request: str | None = None
 ) -> list[str]:
-    """Validate the entire Kanban ticket or a single ticket and return the warning list.
+    """Validate the entire Conveyor work_request or a single work_request and return the warning list.
 
     TC-01~TC-07 7 types of verification rules are executed.
 
     Args:
-        kanban root: Kanban Route Absolute Route
-        single ticket: Ticket number (e.g. T-001) when validating a single ticket. If none, the full validation.
+        conveyor root: Conveyor Route Absolute Route
+        single work_request: WorkRequest number (e.g. WR-001) when validating a single work_request. If none, the full validation.
 
     Returns:
         Send your inquiry directly to us
     """
-    if not os.path.isdir(kanban_root):
-        return [f"[ERROR] Kanban root directory not found: {kanban_root}"]
+    if not os.path.isdir(conveyor_root):
+        return [f"[ERROR] Conveyor root directory not found: {conveyor_root}"]
 
-    full_location_map = build_ticket_location_map(kanban_root)
+    full_location_map = build_work_request_location_map(conveyor_root)
     if not full_location_map:
-        return ["[WARN] Ticket not found in Kanban."]
+        return ["[WARN] WorkRequest not found in Conveyor."]
 
-    # Single ticket mode: TC-01~06 is a single ticket map, TC-07 is a full map to verify link
-    if single_ticket:
-        if single_ticket not in full_location_map:
-            return [f"[ERROR] Ticket {single_ticket} not found in Kanban."]
-        target_map = {single_ticket: full_location_map[single_ticket]}
+    # Single work_request mode: TC-01~06 is a single work_request map, TC-07 is a full map to verify link
+    if single_work_request:
+        if single_work_request not in full_location_map:
+            return [f"[ERROR] WorkRequest {single_work_request} not found in Conveyor."]
+        target_map = {single_work_request: full_location_map[single_work_request]}
     else:
         target_map = full_location_map
 
     warnings: list[str] = []
 
     # TC-01: Directory vs XML status mismatch
-    warnings.extend(validate_ticket_status_consistency(kanban_root, target_map))
+    warnings.extend(validate_work_request_status_consistency(conveyor_root, target_map))
 
-    # TC-02: derived-from derived incomplete + original done
-    warnings.extend(validate_derived_ticket_completion(kanban_root, target_map))
+    # TC-02: derived-from derived incomplete + original complete
+    warnings.extend(validate_derived_work_request_completion(conveyor_root, target_map))
 
     # TC-03~06: XML field validation
-    warnings.extend(validate_all_tickets_xml_fields(kanban_root, target_map))
+    warnings.extend(validate_all_work_request_xml_fields(conveyor_root, target_map))
 
     # TC-07: Relationship link lost (TC-07 checks for existence based on the entire location_map)
-    warnings.extend(validate_relation_links(kanban_root, target_map, full_location_map))
+    warnings.extend(validate_relation_links(conveyor_root, target_map, full_location_map))
 
     return warnings
 
@@ -1039,7 +1039,7 @@ def _print_validate_result(warnings: list[str], mode_label: str) -> None:
 
     Args:
         alerts: alert message list
-        mode label: mode label (e.g. "PLAN", "TICKET")
+        mode label: mode label (e.g. "PLAN", "WORK_REQUEST")
     """
     if not warnings:
         print(
@@ -1071,7 +1071,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="flow-validate",
         description=(
             "plan.md structure verification — Check phase balance, work deviation, skill deficiency, and WHAT/HOW separation. \n"
-            "In --mode ticket, Kanban ticket XML structure verification (TC-01~07) is performed."
+            "In --mode work-request, Conveyor WorkRequest XML structure verification (TC-01~07) is performed."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -1082,10 +1082,10 @@ def _build_parser() -> argparse.ArgumentParser:
             "flow-validate .workflow/20260303-124206/task name/implement \n"
             "3. plan.md direct path: \n"
             "       flow-validate .workflow/20260303-124206/.../implement/plan.md\n"
-            "4. ticket mode (all): \n"
-            "       flow-validate --mode ticket\n"
-            "5. ticket mode (single): \n"
-            "       flow-validate --mode ticket --ticket T-001\n"
+            "4. work_request mode (all): \n"
+            "       flow-validate --mode work-request\n"
+            "5. work_request mode (single): \n"
+            "       flow-validate --mode work-request --work-request WR-001\n"
             "\n"
             "Verification items (plan mode): \n"
             "1. Phase balance: Extracting the number of workers per phase from the Mermaid subgraph, \n"
@@ -1094,14 +1094,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "3. Skill shortage: Warning when only 1 skill is assigned in T2 (10+) task \n"
             "4. WHAT/HOW: criteria/goal/context redescription detection (advisory) \n"
             "\n"
-            "Verification items (ticket mode): \n"
+            "Verification items (work_request mode): \n"
             "TC-01: Directory location vs XML status mismatch \n"
-            "TC-02: derived-from derived incomplete + original done warning \n"
+            "TC-02: derived-from derived incomplete + original complete warning \n"
             "TC-03: Required tag missing (number/command/prompt) \n"
-            "TC-04: Command value validity (implement|review|research) \n"
+            "TC-04: Command value validity (implement|verifying|research) \n"
             "TC-05: goal/target empty value warning \n"
             "TC-06: Multi-entry field missing newline warning \n"
-            "TC-07: Relationship link target ticket exists \n"
+            "TC-07: Relationship link target work_request exists \n"
             "\n"
             + build_common_epilog()
         ),
@@ -1113,20 +1113,20 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "plan.md path, workDir path, or registryKey to verify"
-            "(YYYYMMDD-HHMMSS format). Can be omitted when using --mode ticket."
+            "(YYYYMMDD-HHMMSS format). Can be omitted when using --mode work-request."
         ),
     )
     parser.add_argument(
         "--mode",
-        choices=["plan", "ticket"],
+        choices=["plan", "work-request"],
         default="plan",
-        help="Select verification mode: plan (default) or ticket",
+        help="Select verification mode: plan (default) or work-request",
     )
     parser.add_argument(
-        "--ticket",
-        metavar="TICKET_NUMBER",
+        "--work-request",
+        metavar="WORK_REQUEST_NUMBER",
         default=None,
-        help="Single ticket verification (used when --mode ticket, e.g. T-001)",
+        help="Single work_request verification (used when --mode work-request, e.g. WR-001)",
     )
     return parser
 
@@ -1139,19 +1139,19 @@ def main() -> None:
     mode: str = args.mode
     _work_dir = resolve_work_dir_for_logging()
 
-    # --- ticket mode ---
-    if mode == "ticket":
+    # --- work_request mode ---
+    if mode == "work-request":
         if _work_dir:
-            append_log(_work_dir, "INFO", "plan_validator: start mode=ticket")
-        kanban_root = find_kanban_root(PROJECT_ROOT)
-        warnings = validate_tickets(kanban_root, single_ticket=args.ticket)
+            append_log(_work_dir, "INFO", "plan_validator: start mode=work-request")
+        conveyor_root = find_conveyor_root(PROJECT_ROOT)
+        warnings = validate_work_requests(conveyor_root, single_work_request=args.work_request)
         if _work_dir and warnings:
             append_log(
                 _work_dir,
                 "WARN",
-                f"plan_validator: ticket mode {len(warnings)} warnings found",
+                f"plan_validator: work_request mode {len(warnings)} warnings found",
             )
-        _print_validate_result(warnings, "TICKET")
+        _print_validate_result(warnings, "WORK_REQUEST")
         sys.exit(0)
 
     # --- plan mode (default) ---

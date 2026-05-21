@@ -1,13 +1,13 @@
-"""test undo done.py - Done Rollback System (T-905) + Integrated Test.
+"""test undo_complete.py - Complete Rollback System (WR-905) + Integrated Test.
 
 Phase 4 (T4.1~T4.4) Verification Range:
-  T4.1 unit: _detect_push_state / _verify_merge_anchor / _force_done_to_review /
+  T4.1 unit: _detect_push_state / _verify_merge_anchor / _force_complete_to_verifying /
             _load_merge_commit
   T4.2 edge: reflog expiration / follow-up commit cumulative / brand name crash / run output
   T4.3 Integration: temporary git repo push pre reset branch / revert branch after push
-  T4.4 Regression Verification: cmd done guard (merge commit storage) does not break dirty/Done flow
+  T4.4 Regression Verification: cmd complete guard (merge commit storage) does not break dirty/Complete flow
 
-The test conforms to unittest pattern, environment (e.g. kanban directory, project root) cracking effect
+The test conforms to unittest pattern, environment (e.g. conveyor directory, project root) cracking effect
 git repo + module function as a monkeypatch
 """
 
@@ -27,7 +27,7 @@ _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
-from flow import undo_done  # noqa: E402
+from flow import undo_complete  # noqa: E402
 
 
 # ───────────────────────────────────────────────
@@ -68,7 +68,7 @@ def _setup_repo_with_merge(repo: str) -> tuple[str, str]:
     _git_check(repo, "commit", "-m", "init")
 
     # feature branch
-    feature_branch = "feat/T-999-test"
+    feature_branch = "feat/WR-999-test"
     _git_check(repo, "checkout", "-b", feature_branch)
     work_file = os.path.join(repo, "work.py")
     with open(work_file, "w") as f:
@@ -79,7 +79,7 @@ def _setup_repo_with_merge(repo: str) -> tuple[str, str]:
     # --no-ff merge
     _git_check(repo, "checkout", "develop")
     _git_check(
-        repo, "merge", "--no-ff", "-m", "merge feat/T-999-test", feature_branch
+        repo, "merge", "--no-ff", "-m", "merge feat/WR-999-test", feature_branch
     )
 
     head = _git_check(repo, "rev-parse", "HEAD").stdout.strip()
@@ -101,8 +101,8 @@ class TestDetectPushState(unittest.TestCase):
 
     def _run(self, sha: str) -> str:
         """Replace resolve project root to temporary repo and call  detect push state."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
-            return undo_done._detect_push_state(sha)
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
+            return undo_complete._detect_push_state(sha)
 
     def test_local_when_no_remote_refs(self) -> None:
         """'local' return without origin/* refs."""
@@ -153,20 +153,20 @@ class TestVerifyMergeAnchor(unittest.TestCase):
 
     def test_anchor_pass_when_parent2_matches_feature_tip(self) -> None:
         """top merge: merge commit^2 == feature branding tip."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
             # Pass if SystemExit does not occur
             try:
-                undo_done._verify_merge_anchor(self.merge_commit, self.feature_branch)
+                undo_complete._verify_merge_anchor(self.merge_commit, self.feature_branch)
             except SystemExit:
                 self.fail("Top anchor verification cast SystemExit")
 
     def test_anchor_skip_when_feature_branch_deleted(self) -> None:
         """feature When the brand is already deleted, it passes through the skew."""
         _git_check(self.repo, "branch", "-D", self.feature_branch)
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
             # feature Brand Name Empty String (status after clearing)
             try:
-                undo_done._verify_merge_anchor(self.merge_commit, "")
+                undo_complete._verify_merge_anchor(self.merge_commit, "")
             except SystemExit:
                 self.fail("After deleting the brand, anchor verification cast SystemExit")
 
@@ -181,81 +181,81 @@ class TestVerifyMergeAnchor(unittest.TestCase):
         _git_check(self.repo, "commit", "-m", "bogus extra")
         _git_check(self.repo, "checkout", "develop")
 
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
             with self.assertRaises(SystemExit):
-                undo_done._verify_merge_anchor(self.merge_commit, self.feature_branch)
+                undo_complete._verify_merge_anchor(self.merge_commit, self.feature_branch)
 
 
-# ─── T4.1 unit: _force_done_to_review ───────────────────────────────────────
+# ─── T4.1 unit: _force_complete_to_verifying ───────────────────────────────────────
 
 
-class TestForceDoneToReview(unittest.TestCase):
-    """force done to review: Move the file + status renewal verification."""
+class TestForceCompleteToVerifying(unittest.TestCase):
+    """force complete to verifying: Move the file + status renewal verification."""
 
     def setUp(self) -> None:
         self.tmp_root = tempfile.mkdtemp(prefix="wf_test_undo_force_")
-        # kanban Director
-        self.kanban_dir = os.path.join(self.tmp_root, ".agent-factory", "tickets")
-        self.done_dir = os.path.join(self.kanban_dir, "done")
-        self.review_dir = os.path.join(self.kanban_dir, "review")
-        os.makedirs(self.done_dir, exist_ok=True)
-        os.makedirs(self.review_dir, exist_ok=True)
+        # conveyor Director
+        self.conveyor_dir = os.path.join(self.tmp_root, ".agent-factory", "work-requests")
+        self.complete_dir = os.path.join(self.conveyor_dir, "complete")
+        self.verifying_dir = os.path.join(self.conveyor_dir, "verifying")
+        os.makedirs(self.complete_dir, exist_ok=True)
+        os.makedirs(self.verifying_dir, exist_ok=True)
 
-        # Pile Ticket XML Writing (status=Done)
-        self.ticket_id = "T-999"
-        self.done_file = os.path.join(self.done_dir, f"{self.ticket_id}.xml")
-        with open(self.done_file, "w", encoding="utf-8") as f:
+        # Pile WorkRequest XML Writing (status=Complete)
+        self.work_request_number = "WR-999"
+        self.complete_file = os.path.join(self.complete_dir, f"{self.work_request_number}.xml")
+        with open(self.complete_file, "w", encoding="utf-8") as f:
             f.write(
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
-                "<ticket>\n"
+                "<work_request>\n"
                 "  <metadata>\n"
-                f"    <number>{self.ticket_id}</number>\n"
+                f"    <number>{self.work_request_number}</number>\n"
                 "    <title>test</title>\n"
                 "    <created>2026-05-07 12:00:00</created>\n"
                 "    <updated>2026-05-07 12:00:00</updated>\n"
-                "    <status>Done</status>\n"
+                "    <status>Complete</status>\n"
                 "    <command>implement</command>\n"
                 "  </metadata>\n"
                 "  <prompt />\n"
                 "  <result />\n"
-                "</ticket>\n"
+                "</work_request>\n"
             )
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp_root, ignore_errors=True)
 
     def test_file_moved_and_status_updated(self) -> None:
-        """The file will go to done/ review →/ and status will be updated to Review."""
-        from flow import ticket_repository
+        """The file will go to complete/ verifying →/ and status will be updated to Verifying."""
+        from flow import work_request_repository
 
-        # STATUS DIR MAP and KANBAN * DIR
-        patched_map = dict(ticket_repository.STATUS_DIR_MAP)
-        patched_map["Done"] = self.done_dir
-        patched_map["Review"] = self.review_dir
+        # STATUS DIR MAP and CONVEYOR * DIR
+        patched_map = dict(work_request_repository.STATUS_DIR_MAP)
+        patched_map["Complete"] = self.complete_dir
+        patched_map["Verifying"] = self.verifying_dir
 
         with mock.patch.object(
-            ticket_repository, "STATUS_DIR_MAP", patched_map
+            work_request_repository, "STATUS_DIR_MAP", patched_map
         ), mock.patch.object(
-            ticket_repository, "KANBAN_DONE_DIR", self.done_dir
+            work_request_repository, "CONVEYOR_COMPLETE_DIR", self.complete_dir
         ), mock.patch.object(
-            ticket_repository, "KANBAN_REVIEW_DIR", self.review_dir
+            work_request_repository, "CONVEYOR_VERIFYING_DIR", self.verifying_dir
         ):
-            new_path = undo_done._force_done_to_review(
-                self.ticket_id, self.done_file
+            new_path = undo_complete._force_complete_to_verifying(
+                self.work_request_number, self.complete_file
             )
 
-        # Check if the file is moved to review/
-        expected_path = os.path.join(self.review_dir, f"{self.ticket_id}.xml")
+        # Check if the file is moved to verifying/
+        expected_path = os.path.join(self.verifying_dir, f"{self.work_request_number}.xml")
         self.assertEqual(os.path.normpath(new_path), os.path.normpath(expected_path))
         self.assertTrue(os.path.isfile(expected_path))
-        self.assertFalse(os.path.isfile(self.done_file))
+        self.assertFalse(os.path.isfile(self.complete_file))
 
-        # status check updated to Review (XML parsing)
+        # status check updated to Verifying (XML parsing)
         import xml.etree.ElementTree as ET
         tree = ET.parse(expected_path)
         status_elem = tree.getroot().find("metadata/status")
         self.assertIsNotNone(status_elem)
-        self.assertEqual(status_elem.text, "Review")
+        self.assertEqual(status_elem.text, "Verifying")
 
 
 # ─── T4.1 unit: _load_merge_commit ──────────────────────────────────────────
@@ -266,74 +266,74 @@ class TestLoadMergeCommit(unittest.TestCase):
 
     def setUp(self) -> None:
         self.tmp_root = tempfile.mkdtemp(prefix="wf_test_undo_loadmc_")
-        self.ticket_file = os.path.join(self.tmp_root, "T-999.xml")
-        self.ticket_id = "T-999"
+        self.work_request_file = os.path.join(self.tmp_root, "WR-999.xml")
+        self.work_request_number = "WR-999"
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp_root, ignore_errors=True)
 
-    def _write_ticket(self, merge_commit: str = "") -> None:
+    def _write_work_request(self, merge_commit: str = "") -> None:
         result_xml = (
             f"  <result>\n    <merge_commit>{merge_commit}</merge_commit>\n  </result>\n"
             if merge_commit
             else "  <result />\n"
         )
-        with open(self.ticket_file, "w", encoding="utf-8") as f:
+        with open(self.work_request_file, "w", encoding="utf-8") as f:
             f.write(
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
-                "<ticket>\n"
+                "<work_request>\n"
                 "  <metadata>\n"
-                f"    <number>{self.ticket_id}</number>\n"
+                f"    <number>{self.work_request_number}</number>\n"
                 "    <title>test</title>\n"
                 "    <created>2026-05-07 12:00:00</created>\n"
                 "    <updated>2026-05-07 12:00:00</updated>\n"
-                "    <status>Done</status>\n"
+                "    <status>Complete</status>\n"
                 "  </metadata>\n"
                 "  <prompt />\n"
                 f"{result_xml}"
-                "</ticket>\n"
+                "</work_request>\n"
             )
 
     def test_returns_merge_commit_when_present(self) -> None:
         """result.merge commit"""
-        self._write_ticket(merge_commit="abc123def456")
-        sha = undo_done._load_merge_commit(self.ticket_id, self.ticket_file, force=False)
+        self._write_work_request(merge_commit="abc123def456")
+        sha = undo_complete._load_merge_commit(self.work_request_number, self.work_request_file, force=False)
         self.assertEqual(sha, "abc123def456")
 
     def test_aborts_when_missing_and_no_force(self) -> None:
         """result.merge commit has no force=False if abort."""
-        self._write_ticket(merge_commit="")
+        self._write_work_request(merge_commit="")
         with self.assertRaises(SystemExit):
-            undo_done._load_merge_commit(
-                self.ticket_id, self.ticket_file, force=False
+            undo_complete._load_merge_commit(
+                self.work_request_number, self.work_request_file, force=False
             )
 
     def test_reflog_fallback_when_missing_and_force_no_match(self) -> None:
         """force=True but reflog no matching → abort (T4.2 reflog expire case)."""
-        self._write_ticket(merge_commit="")
+        self._write_work_request(merge_commit="")
 
         # git call to blank stdout
         fake_result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="", stderr=""
         )
-        with mock.patch.object(undo_done, "_git", return_value=fake_result):
+        with mock.patch.object(undo_complete, "_git", return_value=fake_result):
             with self.assertRaises(SystemExit):
-                undo_done._load_merge_commit(
-                    self.ticket_id, self.ticket_file, force=True
+                undo_complete._load_merge_commit(
+                    self.work_request_number, self.work_request_file, force=True
                 )
 
     def test_reflog_fallback_when_missing_and_force_with_match(self) -> None:
         """force=True and reflog matched → first candidate SHA return."""
-        self._write_ticket(merge_commit="")
+        self._write_work_request(merge_commit="")
 
         fake_result = subprocess.CompletedProcess(
             args=[], returncode=0,
-            stdout="abcdef1234567890 merge feat/T-999-test into develop\n",
+            stdout="abcdef1234567890 merge feat/WR-999-test into develop\n",
             stderr="",
         )
-        with mock.patch.object(undo_done, "_git", return_value=fake_result):
-            sha = undo_done._load_merge_commit(
-                self.ticket_id, self.ticket_file, force=True
+        with mock.patch.object(undo_complete, "_git", return_value=fake_result):
+            sha = undo_complete._load_merge_commit(
+                self.work_request_number, self.work_request_file, force=True
             )
             self.assertEqual(sha, "abcdef1234567890")
 
@@ -360,22 +360,22 @@ class TestFollowupCommitsForceRevert(unittest.TestCase):
 
     def test_has_followup_commits_returns_true(self) -> None:
         """Development HEAD is a true if it is a commit ahead of merge commit."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
-            self.assertTrue(undo_done._has_followup_commits(self.merge_commit))
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
+            self.assertTrue(undo_complete._has_followup_commits(self.merge_commit))
 
     def test_strategy_reset_aborts_with_followup(self) -> None:
         """strategy reset call abort with follow-up commit check."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
             with self.assertRaises(SystemExit):
-                undo_done._strategy_reset(self.merge_commit, "T-999")
+                undo_complete._strategy_reset(self.merge_commit, "WR-999")
 
     def test_strategy_reset_no_followup_succeeds(self) -> None:
         """If there is no follow-up commit, reset success + head moves to merge commit^."""
         repo2 = tempfile.mkdtemp(prefix="wf_test_undo_reset_clean_")
         try:
             merge_commit, _ = _setup_repo_with_merge(repo2)
-            with mock.patch.object(undo_done, "resolve_project_root", return_value=repo2):
-                undo_done._strategy_reset(merge_commit, "T-999")
+            with mock.patch.object(undo_complete, "resolve_project_root", return_value=repo2):
+                undo_complete._strategy_reset(merge_commit, "WR-999")
 
             # head == merge commit^
             new_head = _git_check(repo2, "rev-parse", "HEAD").stdout.strip()
@@ -406,37 +406,37 @@ class TestBranchWorktreeClear(unittest.TestCase):
         shutil.rmtree(self.repo, ignore_errors=True)
 
     def test_aborts_when_branch_exists(self) -> None:
-        """The feature of the same ticket is the force=False city abort."""
+        """The feature of the same work_request is the force=False city abort."""
         with mock.patch.object(
-            undo_done, "get_feature_branch_for_ticket", return_value="feat/T-999-test"
+            undo_complete, "get_feature_branch_for_work_request", return_value="feat/WR-999-test"
         ), mock.patch.object(
-            undo_done, "get_worktree_path", return_value=None
+            undo_complete, "get_worktree_path", return_value=None
         ):
             with self.assertRaises(SystemExit):
-                undo_done._check_branch_worktree_clear("T-999", force=False)
+                undo_complete._check_branch_worktree_clear("WR-999", force=False)
 
     def test_passes_when_branch_exists_with_force(self) -> None:
         """force=True is passed even if the oil is found (hard)."""
         with mock.patch.object(
-            undo_done, "get_feature_branch_for_ticket", return_value="feat/T-999-test"
+            undo_complete, "get_feature_branch_for_work_request", return_value="feat/WR-999-test"
         ), mock.patch.object(
-            undo_done, "get_worktree_path", return_value="/tmp/some-worktree"
+            undo_complete, "get_worktree_path", return_value="/tmp/some-worktree"
         ):
-            existing_branch, existing_wt = undo_done._check_branch_worktree_clear(
-                "T-999", force=True
+            existing_branch, existing_wt = undo_complete._check_branch_worktree_clear(
+                "WR-999", force=True
             )
-            self.assertEqual(existing_branch, "feat/T-999-test")
+            self.assertEqual(existing_branch, "feat/WR-999-test")
             self.assertEqual(existing_wt, "/tmp/some-worktree")
 
     def test_passes_when_neither_exists(self) -> None:
         """If you don’t have any brand/worktree (None, None) return."""
         with mock.patch.object(
-            undo_done, "get_feature_branch_for_ticket", return_value=None
+            undo_complete, "get_feature_branch_for_work_request", return_value=None
         ), mock.patch.object(
-            undo_done, "get_worktree_path", return_value=None
+            undo_complete, "get_worktree_path", return_value=None
         ):
-            existing_branch, existing_wt = undo_done._check_branch_worktree_clear(
-                "T-999", force=False
+            existing_branch, existing_wt = undo_complete._check_branch_worktree_clear(
+                "WR-999", force=False
             )
             self.assertIsNone(existing_branch)
             self.assertIsNone(existing_wt)
@@ -496,7 +496,7 @@ class TestRunsArtifactsPreserved(unittest.TestCase):
 class TestIntegrationResetFlow(unittest.TestCase):
     """Integration: Verify the reset branch is normal operation.
 
-    `main()` The entire flow is worktree manager.create worktree / Director of the Kanban
+    `main()` The entire flow is worktree manager.create worktree / Director of the Conveyor
     Required but  strategy reset sole +  detect push state +  has followup commits
     to validate push-pre-quarter operation as a combination.
     """
@@ -510,15 +510,15 @@ class TestIntegrationResetFlow(unittest.TestCase):
 
     def test_local_no_followup_uses_reset(self) -> None:
         """Before pushing + no follow-up commit → select quarterly + run normal."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
-            push_state = undo_done._detect_push_state(self.merge_commit)
-            has_followup = undo_done._has_followup_commits(self.merge_commit)
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
+            push_state = undo_complete._detect_push_state(self.merge_commit)
+            has_followup = undo_complete._has_followup_commits(self.merge_commit)
 
             self.assertEqual(push_state, "local")
             self.assertFalse(has_followup)
 
             # reset
-            undo_done._strategy_reset(self.merge_commit, "T-999")
+            undo_complete._strategy_reset(self.merge_commit, "WR-999")
 
             # head to merge commit^
             new_head = _git_check(self.repo, "rev-parse", "HEAD").stdout.strip()
@@ -550,12 +550,12 @@ class TestIntegrationRevertFlow(unittest.TestCase):
 
     def test_pushed_uses_revert(self) -> None:
         """After push → revert branch selection + add new commit."""
-        with mock.patch.object(undo_done, "resolve_project_root", return_value=self.repo):
-            push_state = undo_done._detect_push_state(self.merge_commit)
+        with mock.patch.object(undo_complete, "resolve_project_root", return_value=self.repo):
+            push_state = undo_complete._detect_push_state(self.merge_commit)
             self.assertEqual(push_state, "pushed")
 
             # revert
-            undo_done._strategy_revert(self.merge_commit)
+            undo_complete._strategy_revert(self.merge_commit)
 
             # new HEAD != merge commit (revert commit added)
             new_head = _git_check(self.repo, "rev-parse", "HEAD").stdout.strip()
@@ -569,21 +569,21 @@ class TestIntegrationRevertFlow(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-class TestCmdDoneRegressionGuard(unittest.TestCase):
-    """T-906 (Review→Done DnD) cmd done to change W01 (merge commit storage)
+class TestCmdCompleteRegressionGuard(unittest.TestCase):
+    """WR-906 (Verifying→Complete DnD) cmd complete to change W01 (merge commit storage)
     Unexpected static + validation of operation.
 
     Verification Point:
       1. FAQ merge commit storage occurs only inside the merge success branch (no influence when merge failed)
-      2. FAQ dirty check / Done guard flow remains true (with guard code in cmd done source)
-      3. FAQs update result call does not break cmd done itself when wrapping with try/except
+      2. FAQ dirty check / Complete guard flow remains true (with guard code in cmd complete source)
+      3. FAQs update result call does not break cmd complete itself when wrapping with try/except
     """
 
     def setUp(self) -> None:
-        self.kanban_cli_path = os.path.join(
-            _ENGINE_DIR, "flow", "kanban_cli.py"
+        self.conveyor_cli_path = os.path.join(
+            _ENGINE_DIR, "flow", "conveyor_cli.py"
         )
-        with open(self.kanban_cli_path, "r", encoding="utf-8") as f:
+        with open(self.conveyor_cli_path, "r", encoding="utf-8") as f:
             self.source = f.read()
 
     def test_merge_commit_save_inside_success_branch(self) -> None:
@@ -598,22 +598,21 @@ class TestCmdDoneRegressionGuard(unittest.TestCase):
             self.source,
             r"if merge_result\.merge_commit:\s*\n\s*try:",
         )
-        # [WARN] output (cmd done not abort itself)
-        self.assertIn("result.merge commit save failed", self.source)
+        # [WARN] output (cmd complete not abort itself)
+        self.assertIn("result.merge_commit failed to save", self.source)
 
     def test_dirty_check_guard_preserved(self) -> None:
-        """dirty worktree check code exists in cmd done (T-906 protection)."""
+        """dirty worktree check code exists in cmd complete (WR-906 protection)."""
         self.assertIn("has_uncommitted_changes(_wt_path)", self.source)
-        self.assertIn("Copyright (c) Micommit All Rights Reserved.", self.source)
-        self.assertIn("Block Done transformation", self.source)
+        self.assertIn("Complete Blocks the transition", self.source)
 
-    def test_done_guard_flow_preserved(self) -> None:
-        """Done Core Flow (find ticket file → update ticket status → Move File)
+    def test_complete_guard_flow_preserved(self) -> None:
+        """Complete Core Flow (find work_request file → update work_request status → Move File)
         This will be maintained.
         """
         # merge commit to enter core flow after saving
-        self.assertIn('update_ticket_status(ticket_file, "Done")', self.source)
-        self.assertIn('move_ticket_to_status_dir(ticket_file, "Done")', self.source)
+        self.assertIn('update_work_request_status(work_request_file, "Complete")', self.source)
+        self.assertIn('move_work_request_to_status_dir(work_request_file, "Complete")', self.source)
 
     def test_update_result_argparse_extension(self) -> None:
         """--merge-commit option added to argparse update-result subdirection."""
@@ -621,28 +620,28 @@ class TestCmdDoneRegressionGuard(unittest.TestCase):
         self.assertIn('dest="merge_commit"', self.source)
 
 
-# ─ T4.4 Regression verification: ticket repository result fields whitelist ──────────
+# ─ T4.4 Regression verification: work_request repository result fields whitelist ──────────
 
 
 class TestResultFieldsWhitelist(unittest.TestCase):
-    """ticket repository.update result's result fields whitelist
+    """work_request repository.update result's result fields whitelist
     static verification that contains 'merge commit'.
     """
 
     def test_merge_commit_in_whitelist(self) -> None:
-        from flow import ticket_repository
+        from flow import work_request_repository
 
         # update result's source from result fields tuning
         import inspect
-        source = inspect.getsource(ticket_repository.update_result)
+        source = inspect.getsource(work_request_repository.update_result)
         self.assertIn('"merge_commit"', source)
 
     def test_parse_includes_merge_commit(self) -> None:
-        """parse ticket xml also must include the merge commit field to result."""
-        from flow import ticket_repository
+        """parse work_request xml also must include the merge commit field to result."""
+        from flow import work_request_repository
 
         import inspect
-        source = inspect.getsource(ticket_repository.parse_ticket_xml)
+        source = inspect.getsource(work_request_repository.parse_work_request_xml)
         self.assertIn('"merge_commit"', source)
 
 

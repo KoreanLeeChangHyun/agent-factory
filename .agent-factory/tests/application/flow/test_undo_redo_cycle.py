@@ -1,11 +1,11 @@
-"""test_undo_redo_cycle.py - T-441 Done Rollback + Jammerge integrated regression test.
+"""test_undo_redo_cycle.py - WR-441 Complete Rollback + Jammerge integrated regression test.
 
 W05 Full-scale integrated regression test. Unit guard added by W03 (`_stage1_5_premerge_state_guard`)
-Verify within a larger cycle (Done rollback → Worktree regeneration → Remerge).
+Verify within a larger cycle (Complete rollback → Worktree regeneration → Remerge).
 
-Regression block (T-440 example, 2026-05-08):
-  1. flow-merge feat/T-440 to develop normal merge (51555f3)
-  2. undo_done.py:_strategy_reset resets develop to 51555f3^ (= ba74608)
+Regression block (WR-440 example, 2026-05-08):
+  1. flow-merge feat/WR-440 to develop normal merge (51555f3)
+  2. undo_complete.py:_strategy_reset resets develop to 51555f3^ (= ba74608)
   3. Work tree/feature branch was recreated, but no changes were made (empty branch)
   4. A separate revert commit (6efc6ef) was added above develop.
   5. Attempt to remerge with flow-merge --force → anchor verification failed
@@ -17,7 +17,7 @@ This test simulates each branch of the above cycle within an isolated temporary 
 All cases blocked/passed by the W03 guard are grouped with regression 0.
 
 Verification Scenario:
-  S1 (normal path / T-906): force unchecked + work tree/branch with changes
+  S1 (normal path / WR-906): force unchecked + work tree/branch with changes
       → Stage 1.5 guard passed + Stage 2.5 anchor verification passed
       → develop HEAD = merge commit
   S2 (force + absence / guidance information): force check + work tree/branch absence
@@ -26,16 +26,16 @@ Verification Scenario:
   S3 (voice / general): force not checked + work tree/branch absent
       → Guard blocking + clear error message
       → 0 empty merges, 0 develop HEAD changes
-  S4 (T-905 normal): reset simulation before undo_done push
+  S4 (WR-905 normal): reset simulation before undo_complete push
       → develop HEAD = merge_commit^ (no commit loss 0)
-  S5 (T-906 normal follow-up): Remerge after committing changes to the work tree
+  S5 (WR-906 normal follow-up): Remerge after committing changes to the work tree
       → develop HEAD integration (merge commit + preserve ahead commits)
-  S6 (T-440 regression blocking advisory): Attempting to merge an empty branch above a separate commit
+  S6 (WR-440 regression blocking advisory): Attempting to merge an empty branch above a separate commit
       → Stage 1.5 guard blocking (blocked before reaching the anchor stage)
       Also, when calling `_handle_anchor_failure` directly, parent1_mismatch advisory is triggered.
 
 The test is based on unittest, using the existing `test_premerge_state_guard.py`,
-Maintain consistency with the fixture pattern in `test_merge_anchor_safety.py`.
+Maintain consistency with the  pattern in `test_merge_anchor_safety.py`.
 """
 
 from __future__ import annotations
@@ -128,13 +128,13 @@ def _commit_on(repo: str, branch: str, filename: str, content: str, msg: str) ->
 class _CycleTestBase(unittest.TestCase):
     """Common setUp/tearDown for all cycle scenarios.
 
-    Each test creates a develop + feat/T-441-* branch in an isolated temporary git repo.
-    Create a patched_git fixture that routes _mp._git calls to the temporary repo.
+    Each test creates a develop + feat/WR-441-* branch in an isolated temporary git repo.
+    Create a patched_git  that routes _mp._git calls to the temporary repo.
     Provides.
     """
 
-    ticket: str = "T-441"
-    feature_branch: str = "feat/T-441-cycle"
+    work_request: str = "WR-441"
+    feature_branch: str = "feat/WR-441-cycle"
 
     def setUp(self) -> None:
         self.repo = tempfile.mkdtemp(prefix="wf_test_t441_cycle_")
@@ -165,20 +165,20 @@ class _CycleTestBase(unittest.TestCase):
         with open(feat_path, "w") as f:
             f.write(content)
         _git_check(self.repo, "add", filename)
-        _git_check(self.repo, "commit", "-m", f"feat({self.ticket}): add {filename}")
+        _git_check(self.repo, "commit", "-m", f"feat({self.work_request}): add {filename}")
         sha = _head_sha(self.repo)
         _git_check(self.repo, "checkout", "develop")
         return sha
 
     def _make_empty_feature(self, branch: str | None = None) -> None:
-        """Create only a feature branch without changes immediately after the develop branch (T-440 regression simulation)."""
+        """Create only a feature branch without changes immediately after the develop branch (WR-440 regression simulation)."""
         target = branch or self.feature_branch
         _git_check(self.repo, "branch", target, "develop")
 
     def _add_unrelated_commit_on_develop(
         self, filename: str = "unrelated.py", content: str = "u = 1\n"
     ) -> str:
-        """After adding a separate commit above develop, SHA is returned (6efc6ef simulation of T-440)."""
+        """After adding a separate commit above develop, SHA is returned (6efc6ef simulation of WR-440)."""
         _git_check(self.repo, "checkout", "develop")
         fpath = os.path.join(self.repo, filename)
         with open(fpath, "w") as f:
@@ -206,7 +206,7 @@ class _CycleTestBase(unittest.TestCase):
 
 
 class TestScenario1NormalPath(_CycleTestBase):
-    """S1 — Normal Path (T-906 Review→Done DnD equivalent).
+    """S1 — Normal Path (WR-906 Verifying→Complete DnD equivalent).
 
     verification:
       - Pass Stage 1.5 guard (commits ahead > 0)
@@ -220,11 +220,11 @@ class TestScenario1NormalPath(_CycleTestBase):
 
         # Stage 1.5 Guard Pass Verification
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=self.feature_branch,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git()):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=self.repo, force=False
+                self.work_request, worktree_path=self.repo, force=False
             )
         self.assertTrue(ok, f"S1 guard must be passed (msg= {msg} )")
         self.assertEqual(msg, "")
@@ -261,7 +261,7 @@ class TestScenario1NormalPath(_CycleTestBase):
 class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
     """S2 — force=True + absence of worktree/branch.
 
-    Regression blocking: In the T-440 case, when the user attempts to remerge with an empty work tree or branch.
+    Regression blocking: In the WR-440 case, when the user attempts to remerge with an empty work tree or branch.
     If the guard does not block, empty merge + reset --hard will result in loss due to separate commit location.
     W03 policy: Prohibit automatic triggering even if force=True + only expose reflog fallback notification.
 
@@ -280,13 +280,13 @@ class TestScenario2ForceAbsentReflogAdvisory(_CycleTestBase):
                 captured_stderr.append(" ".join(str(a) for a in args))
 
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=None,  # branch unresolved
         ), mock.patch.object(
             _mp, "_git", side_effect=self._patched_git()
         ), mock.patch("builtins.print", side_effect=fake_print):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=None, force=True
+                self.work_request, worktree_path=None, force=True
             )
 
         self.assertFalse(ok, "Even with force, branch members must be blocked.")
@@ -329,13 +329,13 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
             error_messages.append(msg)
 
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=None,
         ), mock.patch.object(
             _mp, "_git", side_effect=self._patched_git()
         ), mock.patch.object(_mp, "_error", side_effect=fake_error):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=None, force=False
+                self.work_request, worktree_path=None, force=False
             )
 
         self.assertFalse(ok, "force unchecked + members must be blocked")
@@ -360,16 +360,16 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
         )
 
     def test_no_force_with_empty_branch_blocks(self) -> None:
-        """Also block empty branches that exist but have zero changes (T-440 regression core)."""
+        """Also block empty branches that exist but have zero changes (WR-440 regression core)."""
         self._make_empty_feature()
         pre_merge_sha = _head_sha(self.repo, "develop")
 
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=self.feature_branch,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git()):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=self.repo, force=False
+                self.work_request, worktree_path=self.repo, force=False
             )
 
         self.assertFalse(ok, "Empty branches should be blocked")
@@ -383,24 +383,24 @@ class TestScenario3NormalAbsentBlocked(_CycleTestBase):
         )
 
 
-# ─── S4: T-905 normal path (reset before push --hard merge_commit^) ──────────────────
+# ─── S4: WR-905 normal path (reset before push --hard merge_commit^) ──────────────────
 
 
-class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
-    """S4 — reset strategy before undo_done push (equivalent behavior to `_strategy_reset`).
+class TestScenario4UndoCompleteResetPreservesUnrelated(_CycleTestBase):
+    """S4 — reset strategy before undo_complete push (equivalent behavior to `_strategy_reset`).
 
-    Regression blocking: `git reset --hard <merge_commit>^` in undo_done.py:396
+    Regression blocking: `git reset --hard <merge_commit>^` in undo_complete.py:396
     Verify that the separate commit loss is 0.
 
     scenario:
       1. Add separate ahead commit (a1) to develop
       2. Branch feature branch + commit
       3. Return to develop and merge non-ff → merge_commit (M1)
-      4. Simulate undo_done reset: `git reset --hard M1^`
+      4. Simulate undo_complete reset: `git reset --hard M1^`
       5. develop HEAD == M1^ == a1 (preserve commit separately)
     """
 
-    def test_undo_done_reset_preserves_unrelated_ahead_commit(self) -> None:
+    def test_undo_complete_reset_preserves_unrelated_ahead_commit(self) -> None:
         # 1. Develop ahead commit
         a1_sha = self._add_unrelated_commit_on_develop(
             filename="ahead1.py", content="a1 = 1\n"
@@ -415,7 +415,7 @@ class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
             m1_parent1, a1_sha, "M1^1 must be ahead commit"
         )
 
-        # 4. undo_done reset simulation
+        # 4. undo_complete reset simulation
         _git_check(self.repo, "reset", "--hard", f"{merge_commit}^")
 
         # 5. develop HEAD == a1 (preserve separate commits, exclude feature commits)
@@ -423,7 +423,7 @@ class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
         self.assertEqual(
             head_after,
             a1_sha,
-            "After T-905 reset, develop HEAD must be ahead commit.",
+            "After WR-905 reset, develop HEAD must be ahead commit.",
         )
 
         # Feature commits should be excluded from develop log
@@ -431,45 +431,45 @@ class TestScenario4UndoDoneResetPreservesUnrelated(_CycleTestBase):
         self.assertNotIn(
             feature_sha,
             log,
-            "After T-905 reset, feature commits should not be in the develop log.",
+            "After WR-905 reset, feature commits should not be in the develop log.",
         )
         # Regardless, the commit ahead should be preserved.
         self.assertIn(
             a1_sha,
             log,
-            "After T-905 reset, ahead commits must be preserved in develop.",
+            "After WR-905 reset, ahead commits must be preserved in develop.",
         )
 
 
-# ─── S5: T-906 normal path (Review → Done DnD follow-up — Worktree commit + remerge) ──
+# ─── S5: WR-906 normal path (Verifying → Complete DnD follow-up — Worktree commit + remerge) ──
 
 
 class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
-    """S5 — Done After rollback, commit changes back to the work tree + remerge.
+    """S5 — Complete After rollback, commit changes back to the work tree + remerge.
 
-    Recurrence 0 circuit: When the user re-commits the work to the work tree after undo_done
+    Recurrence 0 circuit: When the user re-commits the work to the work tree after undo_complete
     Feature branch's commits ahead > 0, passing Stage 1.5 guard + anchor
     Verification passed → develop HEAD = normal merge commit.
 
     scenario:
-      1. Feature branch empty state (simulated right after undo_done)
+      1. Feature branch empty state (simulated right after undo_complete)
       2. Commit one change to the work tree (feature branch on temporary repo)
       3. Pass guard + non-ff merge + pass anchor verification
       4. develop HEAD = normal merge commit
     """
 
     def test_remerge_after_fresh_commit_succeeds(self) -> None:
-        # 1. Empty feature branch (simulated right after undo_done)
+        # 1. Empty feature branch (simulated right after undo_complete)
         self._make_empty_feature()
         pre_merge_sha = _head_sha(self.repo, "develop")
 
         # 1-1. In an empty state, the guard should block (the regression guard itself)
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=self.feature_branch,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git()):
             ok_empty, _ = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=self.repo, force=False
+                self.work_request, worktree_path=self.repo, force=False
             )
         self.assertFalse(
             ok_empty, "The guard should block in the empty feature branch state."
@@ -481,17 +481,17 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
         with open(feat_path, "w") as f:
             f.write("feat = 'remerge-success'\n")
         _git_check(self.repo, "add", "feat.py")
-        _git_check(self.repo, "commit", "-m", f"feat({self.ticket}): re-add change")
+        _git_check(self.repo, "commit", "-m", f"feat({self.work_request}): re-add change")
         feature_sha = _head_sha(self.repo)
         _git_check(self.repo, "checkout", "develop")
 
         # 3. Pass the guard
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=self.feature_branch,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git()):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=self.repo, force=False
+                self.work_request, worktree_path=self.repo, force=False
             )
         self.assertTrue(
             ok, f"After committing the change, the guard must pass (msg= {msg} )"
@@ -516,14 +516,14 @@ class TestScenario5RemergeAfterFreshCommit(_CycleTestBase):
         self.assertIn(feature_sha, log, "Feature commits must be preserved after remerging")
 
 
-# ─── S6: T-440 regression blocking + parent1_mismatch advisory ──────────────────────────
+# ─── S6: WR-440 regression blocking + parent1_mismatch advisory ──────────────────────────
 
 
 class TestScenario6T440RegressionBlocked(_CycleTestBase):
-    """S6 — Block T-440 regression scenario (Stage 1.5) + trigger advisory.
+    """S6 — Block WR-440 regression scenario (Stage 1.5) + trigger advisory.
 
-    Regression block (T-440 example, 2026-05-08):
-      - Immediately after undo_done, revert anything above develop in an empty worktree/branch state
+    Regression block (WR-440 example, 2026-05-08):
+      - Immediately after undo_complete, revert anything above develop in an empty worktree/branch state
         commit added
       - flow-merge attempts to merge an empty branch above it → anchor fails →
         `_handle_anchor_failure` reset --hard pre_merge_develop_sha (=
@@ -538,35 +538,35 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
 
     def test_empty_branch_on_unrelated_develop_blocked_at_stage1_5(self) -> None:
         """First line of defense: Guard blocking in develop with empty branches + separate commits added."""
-        # T-440 sequence reproduction
+        # WR-440 sequence reproduction
         self._add_unrelated_commit_on_develop(
             filename="revert.py", content="r = 1\n"
         )  # Special thing revert commit (6efc6ef simulation)
-        self._make_empty_feature()  # Empty branch (simulated right after regenerating undo_done)
+        self._make_empty_feature()  # Empty branch (simulated right after regenerating undo_complete)
         pre_state_log = _log_shas(self.repo, n=20)
         pre_state_head = _head_sha(self.repo, "develop")
 
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=self.feature_branch,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git()):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                self.ticket, worktree_path=self.repo, force=False
+                self.work_request, worktree_path=self.repo, force=False
             )
 
-        self.assertFalse(ok, "T-440 regression scenario should be blocked at Stage 1.5")
+        self.assertFalse(ok, "WR-440 regression scenario should be blocked at Stage 1.5")
         self.assertIn("Empty branch detected", msg)
 
         # develop HEAD / log change 0 — empty merge + reset both should not occur
         self.assertEqual(
             _head_sha(self.repo, "develop"),
             pre_state_head,
-            "When T-440 is blocked, develop HEAD must not be changed (separate commits are preserved)",
+            "When WR-440 is blocked, develop HEAD must not be changed (separate commits are preserved)",
         )
         self.assertEqual(
             _log_shas(self.repo, n=20),
             pre_state_log,
-            "Develop log should not be changed when T-440 is blocked.",
+            "Develop log should not be changed when WR-440 is blocked.",
         )
 
     def test_handle_anchor_failure_parent1_mismatch_advisory(self) -> None:
@@ -582,7 +582,7 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
         # merge_commit^1 == pre_merge_sha (normal case)
         self.assertEqual(_head_sha(self.repo, f"{merge_commit}^1"), pre_merge_sha)
 
-        # T-440 Simulation: Case where pre_merge_develop_sha was captured as a separate commit
+        # WR-440 Simulation: Case where pre_merge_develop_sha was captured as a separate commit
         # i.e. reset_target = bogus_unrelated_sha != merge_commit^1
         # At this time, _handle_anchor_failure must output advisory.
         # (The reset itself is in progress — advisory only)
@@ -606,14 +606,14 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
         all_errors = "\n".join(error_messages)
         # Check advisory marker
         self.assertIn(
-            "[ANCHOR][T-441]",
+            "[ANCHOR][WR-441]",
             all_errors,
             "parent1_mismatch advisory marker should be output",
         )
         self.assertIn(
-            "suspected case",
+            "Suspicious case",
             all_errors,
-            "Advisory must specify suspected cases.",
+            "Advisory must specify Suspicious cases.",
         )
 
     def test_handle_anchor_failure_normal_case_no_advisory(self) -> None:
@@ -652,9 +652,9 @@ class TestScenario6T440RegressionBlocked(_CycleTestBase):
             )
 
         all_errors = "\n".join(error_messages)
-        # parent1 match In a normal case, there should be no [T-441] suspect case marker
+        # parent1 match In a normal case, there should be no [WR-441] suspect case marker
         self.assertNotIn(
-            "suspected case",
+            "Suspicious case",
             all_errors,
             "In the normal reset_target == merge_commit^1 case, advisory should not be output.",
         )

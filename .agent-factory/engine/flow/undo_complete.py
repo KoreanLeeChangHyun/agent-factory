@@ -1,8 +1,8 @@
-"""undo done.py - a module that automatically rolls the Done processed workflow to the Review phase.
+"""undo_complete.py - a module that automatically rolls the Complete processed workflow to the Verifying phase.
 
-Done will perform following steps to clean the deadly bugs found after NEWS
+Complete will perform following steps to clean the deadly bugs found after NEWS
 
-  1. FAQ Pre Verification — Ticket Done Status / merge commit existence / merge anchor /
+  1. FAQ Pre Verification — WorkRequest Complete Status / merge commit existence / merge anchor /
      Branding + worktree oil inspection
   2. FAQ git branch --contains <merge commit> output
      local-only identifies whether origin/develop is reached/main reach
@@ -10,12 +10,12 @@ Done will perform following steps to clean the deadly bugs found after NEWS
        - Strategic 1 reset: 0 before push + follow-up commit → `git reset --hard merge commit^`
        - Strategies 2 revert: push or follow-up commit accumulation → git revert -m 1 --no-edit
   4. FAQs Worktree Regeneration — call `worktree manager.create worktree()`
-  5. FAQs Before the Kanban force — go to the ticket XML as `done/T-NNN.xml` → `review/T-NNN.xml` +
-     "Review"
+  5. FAQs Before the Conveyor force — go to the work_request XML as `complete/WR-NNN.xml` → `verifying/WR-NNN.xml` +
+     "Verifying"
   6. Post-Output — git status / log / next procedure
 
 Public API:
-    main: argparse entry point (flow-undo-done wrapper call)
+    main: argparse entry point (flow-undo-complete wrapper call)
 """
 
 from __future__ import annotations
@@ -35,14 +35,14 @@ if _engine_dir not in sys.path:
     sys.path.insert(0, _engine_dir)
 
 from common import resolve_project_root
-from flow.branch_strategy import get_feature_branch_for_ticket
-from flow.cli_utils import build_common_epilog, ticket_type
-from flow.ticket_repository import (
-    KANBAN_DONE_DIR,
-    find_ticket_file,
-    move_ticket_to_status_dir,
-    parse_ticket_xml,
-    update_ticket_status,
+from flow.branch_strategy import get_feature_branch_for_work_request
+from flow.cli_utils import build_common_epilog, work_request_type
+from flow.work_request_repository import (
+    CONVEYOR_COMPLETE_DIR,
+    find_work_request_file,
+    move_work_request_to_status_dir,
+    parse_work_request_xml,
+    update_work_request_status,
 )
 from flow.worktree_manager import (
     WorktreeInfo,
@@ -60,18 +60,18 @@ PushState = Literal["local", "pushed", "main"]
 
 def _log(msg: str) -> None:
     """Outputs step-by-step progress logs to stdout."""
-    print(f"[undo-done] {msg}", flush=True)
+    print(f"[undo-complete] {msg}", flush=True)
 
 
 def _err(msg: str) -> None:
     """Prints the error log to stderr and throws SystemExit(2)."""
-    print(f"[undo-done] ERROR: {msg}", file=sys.stderr, flush=True)
+    print(f"[undo-complete] ERROR: {msg}", file=sys.stderr, flush=True)
     raise SystemExit(2)
 
 
 def _warn(msg: str) -> None:
     """Print warning log to stderr (continue)."""
-    print(f"[undo-done] WARN: {msg}", file=sys.stderr, flush=True)
+    print(f"[undo-complete] WARN: {msg}", file=sys.stderr, flush=True)
 
 
 # ─── git helper ────────────────────────────────────────────────────────────────────
@@ -104,49 +104,49 @@ def _git(
 # ─── Pre-verification (T2.2) ─────────────────────────────────────────────────────────
 
 
-def _validate_ticket_done(ticket_id: str) -> str:
-    """The ticket exists in the Done directory and status="Done".
+def _validate_work_request_complete(work_request_number: str) -> str:
+    """The work_request exists in the Complete directory and status="Complete".
 
     Args:
-        Ticket id: T-NNN type ticket number.
+        WorkRequest id: WR-NNN type work_request number.
 
     Returns:
-        Ticket XML file absolute path.
+        WorkRequest XML file absolute path.
 
     Raises:
-        SystemExit: No Done status or no file.
+        SystemExit: No Complete status or no file.
     """
-    ticket_file = find_ticket_file(ticket_id)
-    if ticket_file is None:
-        _err(f"Ticket file {ticket_id} not found")
+    work_request_file = find_work_request_file(work_request_number)
+    if work_request_file is None:
+        _err(f"WorkRequest file {work_request_number} not found")
 
-    ticket_data = parse_ticket_xml(ticket_file)
-    status = ticket_data.get("status", "")
-    if status != "Done":
+    work_request_data = parse_work_request_xml(work_request_file)
+    status = work_request_data.get("status", "")
+    if status != "Complete":
         _err(
-            f"{ticket_id} is not in Done status (currently: {status!r})."
-            "undo-done is for Done tickets only."
+            f"{work_request_number} is not in Complete status (currently: {status!r})."
+            "undo-complete is for Complete WorkRequests only."
         )
 
-    # Verify that the file is located in the done directory (defensive verification)
-    if os.path.normpath(os.path.dirname(ticket_file)) != os.path.normpath(
-        KANBAN_DONE_DIR
+    # Verify that the file is located in the complete directory (defensive verification)
+    if os.path.normpath(os.path.dirname(work_request_file)) != os.path.normpath(
+        CONVEYOR_COMPLETE_DIR
     ):
         _warn(
-            f"Ticket status is Done but the file is outside done/:"
-            f"{ticket_file}"
+            f"WorkRequest status is Complete but the file is outside complete/:"
+            f"{work_request_file}"
         )
 
-    _log(f"Ticket validation passed: {ticket_id} status=Done file={ticket_file}")
-    return ticket_file
+    _log(f"WorkRequest validation passed: {work_request_number} status=Complete file={work_request_file}")
+    return work_request_file
 
 
-def _load_merge_commit(ticket_id: str, ticket_file: str, force: bool) -> str:
-    """Load the ticket result.merge commit and try reflog fallback when missing.
+def _load_merge_commit(work_request_number: str, work_request_file: str, force: bool) -> str:
+    """Load the work_request result.merge commit and try reflog fallback when missing.
 
     Args:
-        ticket id: T-NNN format.
-        ticket file: ticket XML absolute path.
+        work_request id: WR-NNN format.
+        work_request file: work_request XML absolute path.
         force: True attempt to estimate from reflog when missing.
 
     Returns:
@@ -155,27 +155,27 @@ def _load_merge_commit(ticket_id: str, ticket_file: str, force: bool) -> str:
     Raises:
         SystemExit: merge commit and force fails False or fallback.
     """
-    ticket_data = parse_ticket_xml(ticket_file)
-    result = ticket_data.get("result") or {}
+    work_request_data = parse_work_request_xml(work_request_file)
+    result = work_request_data.get("result") or {}
     merge_commit = (result.get("merge_commit") or "").strip()
 
     if merge_commit:
-        _log(f"load merge_commit: {merge_commit[:8]} (from ticket result)")
+        _log(f"load merge_commit: {merge_commit[:8]} (from work_request result)")
         return merge_commit
 
     if not force:
         _err(
-            f"{ticket_id} result.merge_commit is empty."
-            "This may be a ticket that was Done prior to the introduction of Phase 1 infrastructure."
+            f"{work_request_number} result.merge_commit is empty."
+            "This may be a work_request that was Complete prior to the introduction of Phase 1 infrastructure."
             "Try reflog fallback with the --force flag, or"
-            f"Manually augment with flow-kanban update-result {ticket_id} --merge-commit <SHA>."
+            f"Manually augment with flow-conveyor update-result {work_request_number} --merge-commit <SHA>."
         )
 
-    # reflog fallback: feat/T-NNN-* Merge message navigation
+    # reflog fallback: feat/WR-NNN-* merge message navigation
     _warn("merge_commit missing, try reflog fallback with --force")
     reflog_result = _git(
         "reflog",
-        "--grep-reflog=" + f"merge.*feat/{ticket_id}",
+        "--grep-reflog=" + f"merge.*feat/{work_request_number}",
         "--format=%H %gs",
         "develop",
     )
@@ -188,7 +188,7 @@ def _load_merge_commit(ticket_id: str, ticket_file: str, force: bool) -> str:
 
     candidate = reflog_result.stdout.strip().splitlines()[0].split(" ", 1)[0]
     _warn(
-        f"reflog fallback candidate SHA={candidate[:8]} — Reliability is low, so be sure to review git log afterwards"
+        f"reflog fallback candidate SHA={candidate[:8]} — Reliability is low, so be sure to verifying git log afterwards"
     )
     return candidate
 
@@ -201,7 +201,7 @@ def _verify_merge_anchor(merge_commit: str, expected_branch: str) -> None:
 
     Args:
         merge commit: validation target migration commit SHA.
-        expected branch: feat/T-NNN-* format feature brand name (or empty string).
+        expected branch: feat/WR-NNN-* format feature brand name (or empty string).
 
     Raises:
         SystemExit: parent2 is expected branch tip and other cases (anchor broken).
@@ -242,12 +242,12 @@ def _verify_merge_anchor(merge_commit: str, expected_branch: str) -> None:
 
 
 def _check_branch_worktree_clear(
-    ticket_id: str, force: bool = False
+    work_request_number: str, force: bool = False
 ) -> tuple[str | None, str | None]:
     """feature Brands + worktree checks that are not occupied.
 
     Args:
-        ticket id: T-NNN format.
+        work_request id: WR-NNN format.
         force: True displacement only output warning (the actual clearance is user).
 
     Returns:
@@ -256,8 +256,8 @@ def _check_branch_worktree_clear(
     Raises:
         SystemExit: Gas Detector + force=False.
     """
-    existing_branch = get_feature_branch_for_ticket(ticket_id)
-    existing_wt = get_worktree_path(ticket_id)
+    existing_branch = get_feature_branch_for_work_request(work_request_number)
+    existing_wt = get_worktree_path(work_request_number)
 
     if existing_branch is None and existing_wt is None:
         _log("Branch/worktree occupancy check passed (both empty)")
@@ -351,15 +351,15 @@ def _has_followup_commits(merge_commit: str) -> bool:
 # ─── Strategy 1: reset (T2.4) ─────────────────────────────────────────────────────
 
 
-def _strategy_reset(merge_commit: str, ticket_id: str) -> None:
+def _strategy_reset(merge_commit: str, work_request_number: str) -> None:
     """merge commit
 
-    Pre-write backup reflog marker(`refs/backup/undo-T-NNN`)
+    Pre-write backup reflog marker(`refs/backup/undo-WR-NNN`)
     Recovers the possibility of recovering incorrect inputs.
 
     Args:
         merge commit: thumb commits to remove SHA.
-        ticket id: T-NNN (used for back-up ref name).
+        work_request id: WR-NNN (used for back-up ref name).
 
     Raises:
         SystemExit: After-speed commit accumulation (automatic revert quarterly force).
@@ -377,11 +377,11 @@ def _strategy_reset(merge_commit: str, ticket_id: str) -> None:
     _git("checkout", "develop", check=True)
 
     # Backup reflog marker
-    backup_ref = f"refs/backup/undo-{ticket_id}"
+    backup_ref = f"refs/backup/undo-{work_request_number}"
     update_ref = _git(
         "update-ref",
         "-m",
-        f"undo-done {ticket_id} backup before reset",
+        f"undo-complete {work_request_number} backup before reset",
         backup_ref,
         "HEAD",
     )
@@ -421,18 +421,18 @@ def _strategy_revert(merge_commit: str) -> None:
 
     head = _git("rev-parse", "HEAD")
     new_head = head.stdout.strip() if head.returncode == 0 else "?"
-    _log(f"revert done: new HEAD = {new_head[:8]}")
+    _log(f"revert complete: new HEAD = {new_head[:8]}")
 
 
 # ─── Work tree regeneration (T2.6) ───────────────────────────────────────────────────
 
 
-def _recreate_worktree(ticket_id: str, ticket_file: str) -> WorktreeInfo:
+def _recreate_worktree(work_request_number: str, work_request_file: str) -> WorktreeInfo:
     """worktree manager.create worktree()
 
     Args:
-        ticket id: T-NNN format.
-        ticket file: ticket XML path (title for extraction).
+        work_request id: WR-NNN format.
+        work_request file: work_request XML path (title for extraction).
 
     Returns:
         Created WorktreeInfo.
@@ -440,14 +440,14 @@ def _recreate_worktree(ticket_id: str, ticket_file: str) -> WorktreeInfo:
     Raises:
         SystemExit: generate failure.
     """
-    ticket_data = parse_ticket_xml(ticket_file)
-    title = ticket_data.get("title", "") or "untitled"
+    work_request_data = parse_work_request_xml(work_request_file)
+    title = work_request_data.get("title", "") or "untitled"
 
-    _log(f"Start work tree regeneration: {ticket_id} (title={title!r})")
-    info = create_worktree(ticket_id, title, command="implement")
+    _log(f"Start work tree regeneration: {work_request_number} (title={title!r})")
+    info = create_worktree(work_request_number, title, command="implement")
     if info is None:
         _err(
-            f"Failed to recreate worktree ({ticket_id})."
+            f"Failed to recreate worktree ({work_request_number})."
             "Feature branch or directory occupancy potential."
             "Please clean up manually and retry."
         )
@@ -455,28 +455,28 @@ def _recreate_worktree(ticket_id: str, ticket_file: str) -> WorktreeInfo:
     return info
 
 
-# ─── Kanban force transition (T2.7) ────────────────────────────────────────────────────
+# ─── Conveyor force transition (T2.7) ────────────────────────────────────────────────────
 
 
-def _force_done_to_review(ticket_id: str, ticket_file: str) -> str:
-    """Go to the ticket XML file done/ review ->/ and update status.
+def _force_complete_to_verifying(work_request_number: str, work_request_file: str) -> str:
+    """Go to the work_request XML file complete/ verifying ->/ and update status.
 
     Args:
-        ticket id: T-NNN format.
-        ticket file: Currently done/ in the ticket file path.
+        work_request id: WR-NNN format.
+        work_request file: Currently complete/ in the work_request file path.
 
     Returns:
         New file path after moving.
     """
-    _log(f"Kanban force transition: Done → Review ({ticket_id})")
+    _log(f"Conveyor force transition: Complete → Verifying ({work_request_number})")
 
-    # 1. Update XML <status> to Review (file still in done/ location)
-    update_ticket_status(ticket_file, "Review")
-    _log(f"XML <status> update: Review")
+    # 1. Update XML <status> to Verifying (file still in complete/ location)
+    update_work_request_status(work_request_file, "Verifying")
+    _log(f"XML <status> update: Verifying")
 
-    # 2. Move the file to the review/ directory
-    new_path = move_ticket_to_status_dir(ticket_file, "Review")
-    _log(f"Move file: {ticket_file} → {new_path}")
+    # 2. Move the file to the verifying/ directory
+    new_path = move_work_request_to_status_dir(work_request_file, "Verifying")
+    _log(f"Move file: {work_request_file} → {new_path}")
 
     return new_path
 
@@ -484,7 +484,7 @@ def _force_done_to_review(ticket_id: str, ticket_file: str) -> str:
 # ─── Post-output (T2.8) ────────────────────────────────────────────────────────
 
 
-def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
+def _print_postscript(work_request_number: str, worktree: WorktreeInfo) -> None:
     """git status / log + Prints the following procedure instructions."""
     _log("=" * 60)
     _log("Rollback complete — post-state")
@@ -506,11 +506,11 @@ def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
     _log(f"Next steps:")
     _log(f"1. Go to the worktree: cd {worktree.path}")
     _log(f"(feature branch {worktree.branch_name} has been recreated)")
-    _log(f"2. Edit ticket: /wf -e {ticket_id}")
-    _log(f"3. Rerun the workflow: /wf -s {ticket_id}")
+    _log(f"2. Edit work_request: /wf -e {work_request_number}")
+    _log(f"3. Rerun the workflow: /wf -s {work_request_number}")
     _log("")
     _log(
-        f"Kanban status: {ticket_id} is back in the Review column."
+        f"Conveyor status: {work_request_number} is back in the Verifying column."
         "You can demote Open with /wf -e or modify it directly and re-complete with /wf -d."
     )
 
@@ -519,7 +519,7 @@ def _print_postscript(ticket_id: str, worktree: WorktreeInfo) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """argparse entry point. flow-undo-done wrapper is called.
+    """argparse entry point. flow-undo-complete wrapper is called.
 
     Args:
         argv: List of arguments for testing (using None sys.argv).
@@ -528,19 +528,19 @@ def main(argv: list[str] | None = None) -> int:
         0 (Property) / 2 (Property)
     """
     parser = argparse.ArgumentParser(
-        prog="flow-undo-done",
+        prog="flow-undo-complete",
         description=(
-            "Automatically rolls back finished workflows to the Review stage."
+            "Automatically rolls back finished workflows to the Verifying stage."
             "Return the merge result of develop with reset or revert,"
-            "After regenerating the feature branch + worktree, move Kanban to Done → Review."
+            "After regenerating the feature branch + worktree, move Conveyor to Complete → Verifying."
         ),
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "ticket",
-        type=ticket_type,
-        help="Done ticket number to roll back to (in the format T-NNN, NNN, #N).",
+        "work_request",
+        type=work_request_type,
+        help="Complete work_request number to roll back to (in the format WR-NNN, NNN, #N).",
     )
     parser.add_argument(
         "--force",
@@ -551,38 +551,38 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
-    ticket_id: str = args.ticket
+    work_request_number: str = args.work_request
     force: bool = args.force
 
-    _log(f"=== Done Start rollback: {ticket_id} (force={force}) ===")
+    _log(f"=== Complete Start rollback: {work_request_number} (force={force}) ===")
 
     # T2.2 — Pre-validation
-    ticket_file = _validate_ticket_done(ticket_id)
+    work_request_file = _validate_work_request_complete(work_request_number)
 
     # Case without merge (merge_skipped): Without work tree/branch such as research/document
-    # cmd_done This is a ticket for simple file movement only. result.merge_commit empty.
+    # cmd_complete This is a work_request for simple file movement only. result.merge_commit empty.
     # Skip all reset/revert strategy + work tree regeneration and only perform file movement.
-    _ticket_data = parse_ticket_xml(ticket_file)
-    _result = _ticket_data.get("result") or {}
+    _work_request_data = parse_work_request_xml(work_request_file)
+    _result = _work_request_data.get("result") or {}
     if not (_result.get("merge_commit") or "").strip():
         _log(
-            "No merge_commit — Simple file move branch (Done case without merge like research/documents etc.)"
+            "No merge_commit — Simple file move branch (Complete case without merge like research/documents etc.)"
         )
-        _force_done_to_review(ticket_id, ticket_file)
+        _force_complete_to_verifying(work_request_number, work_request_file)
         _log(
-            f"Kanban status: {ticket_id} is back in the Review column."
+            f"Conveyor status: {work_request_number} is back in the Verifying column."
             "You can demote Open with /wf -e or modify it directly and re-complete with /wf -d."
         )
         return 0
 
-    merge_commit = _load_merge_commit(ticket_id, ticket_file, force)
+    merge_commit = _load_merge_commit(work_request_number, work_request_file, force)
 
     # Existing feature branch (if present, use for anchor verification)
-    existing_branch = get_feature_branch_for_ticket(ticket_id) or ""
+    existing_branch = get_feature_branch_for_work_request(work_request_number) or ""
     _verify_merge_anchor(merge_commit, existing_branch)
 
     # occupancy inspection
-    _check_branch_worktree_clear(ticket_id, force=force)
+    _check_branch_worktree_clear(work_request_number, force=force)
 
     # T2.3 — Branch to push or not to push
     push_state = _detect_push_state(merge_commit)
@@ -607,18 +607,18 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # local-only + no subsequent commit → reset possible
         _log("local-only + no subsequent commits — reset strategy")
-        _strategy_reset(merge_commit, ticket_id)
+        _strategy_reset(merge_commit, work_request_number)
 
     # T2.6 — Regenerate the work tree
-    worktree = _recreate_worktree(ticket_id, ticket_file)
+    worktree = _recreate_worktree(work_request_number, work_request_file)
 
-    # T2.7 — Kanban force transition (Done → Review)
-    _force_done_to_review(ticket_id, ticket_file)
+    # T2.7 — Conveyor force transition (Complete → Verifying)
+    _force_complete_to_verifying(work_request_number, work_request_file)
 
     # T2.8 — Post-output
-    _print_postscript(ticket_id, worktree)
+    _print_postscript(work_request_number, worktree)
 
-    _log(f"=== Done Rollback completed: {ticket_id} ===")
+    _log(f"=== Complete Rollback completed: {work_request_number} ===")
     return 0
 
 

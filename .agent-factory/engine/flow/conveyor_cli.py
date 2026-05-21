@@ -457,7 +457,7 @@ def cmd_complete(work_request_number: str) -> None:
     import sys as _sys
     try:
         from flow.worktree_manager import is_worktree_enabled, get_worktree_path, merge_to_develop, has_uncommitted_changes
-        from flow.branch_strategy import get_feature_branch_for_ticket
+        from flow.branch_strategy import get_feature_branch_for_work_request
         if is_worktree_enabled():
             # C-01: Detect dirty worktree → Reject if uncommitted changes exist
             _wt_path = get_worktree_path(work_request_number)
@@ -474,7 +474,7 @@ def cmd_complete(work_request_number: str) -> None:
                     print(f"    - {_line.strip()}", flush=True)
                 print(f"Complete with the normal path using flow-merge.", flush=True)
                 _sys.exit(1)
-            feat_branch = get_feature_branch_for_ticket(work_request_number)
+            feat_branch = get_feature_branch_for_work_request(work_request_number)
             if _wt_path or feat_branch:
                 merge_result = merge_to_develop(work_request_number)
                 if not merge_result.success:

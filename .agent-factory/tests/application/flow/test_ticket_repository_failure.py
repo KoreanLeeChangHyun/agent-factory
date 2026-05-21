@@ -1,14 +1,14 @@
-"""test ticket repository failure.py
+"""test work_request repository failure.py
 
 Payment Terms:
-  1. test_parse_4element_ticket_returns_failure_none
-     -- Result ["failure"] is None Verified (return guard) when the existing 4 yoso ticket parsing
-  2. test_parse_5element_ticket_returns_failure_dict
-     -- <failure> Validation of dict mapping all four child elements in ticket parsing
+  1. test_parse_4element_work_request_returns_failure_none
+     -- Result ["failure"] is None Verified (return guard) when the existing 4 yoso work_request parsing
+  2. test_parse_5element_work_request_returns_failure_dict
+     -- <failure> Validation of dict mapping all four child elements in work_request parsing
   3. test_parse_failure_with_empty_children
      -- <failure> exists and validates empty string fallback when some missing
   4. test_update_failure_inserts_new_element
-     -- failure New <failure> element + 4 self-exclusive verification when calling update failure on the Mizone ticket
+     -- failure New <failure> element + 4 self-exclusive verification when calling update failure on the Mizone work_request
   5. test_update_failure_preserves_other_elements
      -- failure metadata/relations/prompt/result revolving after update 0 verification
 """
@@ -22,7 +22,7 @@ _ENGINE_DIR = str(Path(__file__).resolve().parents[3] / "engine")
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
-import flow.ticket_repository as ticket_repo  # noqa: E402
+import flow.work_request_repository as work_request_repo  # noqa: E402
 
 
 # --- XML Picker Helper ----------------------------------------------------------
@@ -33,17 +33,17 @@ def _write_xml(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _xml_4element(ticket_number: str = "T-001") -> str:
-    """Returns the existing 4-nursing ticket XML (failure) picker."""
+def _xml_4element(work_request_number: str = "WR-001") -> str:
+    """Returns the existing 4-nursing work_request XML (failure) picker."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <!-- metadata -->
   <metadata>
-    <number>{ticket_number}</number>
-    <title>Test Ticket</title>
+    <number>{work_request_number}</number>
+    <title>Test WorkRequest</title>
     <created>2026-05-10 00:00:00</created>
     <updated>2026-05-10 00:00:00</updated>
-    <status>Done</status>
+    <status>Complete</status>
     <command>implement</command>
   </metadata>
 
@@ -64,21 +64,21 @@ def _xml_4element(ticket_number: str = "T-001") -> str:
     <report>.agent-factory/runs/20260510-000000/report.md</report>
     <merge_commit>abc1234</merge_commit>
   </result>
-</ticket>
+</work_request>
 """
 
 
-def _xml_5element(ticket_number: str = "T-002") -> str:
-    """5Returns the Pictures section including the yoso ticket XML (<failure>)."""
+def _xml_5element(work_request_number: str = "WR-002") -> str:
+    """5Returns the Pictures section including the yoso work_request XML (<failure>)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <!-- metadata -->
   <metadata>
-    <number>{ticket_number}</number>
-    <title>Failed Ticket</title>
+    <number>{work_request_number}</number>
+    <title>Failed WorkRequest</title>
     <created>2026-05-10 00:00:00</created>
     <updated>2026-05-10 00:00:00</updated>
-    <status>Review</status>
+    <status>Verifying</status>
     <command>implement</command>
   </metadata>
 
@@ -101,21 +101,21 @@ def _xml_5element(ticket_number: str = "T-002") -> str:
     <retry_count>3</retry_count>
     <context>work/W02-*.md missing. phase_verifier rule R-203 not satisfied.</context>
   </failure>
-</ticket>
+</work_request>
 """
 
 
-def _xml_failure_partial_children(ticket_number: str = "T-003") -> str:
+def _xml_failure_partial_children(work_request_number: str = "WR-003") -> str:
     """<failure> exists, but some voluntary elements are missing Pics (reson/phase only)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <!-- metadata -->
   <metadata>
-    <number>{ticket_number}</number>
-    <title>Partial Failure Ticket</title>
+    <number>{work_request_number}</number>
+    <title>Partial Failure WorkRequest</title>
     <created>2026-05-10 00:00:00</created>
     <updated>2026-05-10 00:00:00</updated>
-    <status>Review</status>
+    <status>Verifying</status>
     <command>implement</command>
   </metadata>
 
@@ -136,27 +136,27 @@ def _xml_failure_partial_children(ticket_number: str = "T-003") -> str:
     <reason>sentinel</reason>
     <phase>WORK</phase>
   </failure>
-</ticket>
+</work_request>
 """
 
 
-def _xml_no_failure_with_result(ticket_number: str = "T-004") -> str:
-    """failure Mizone + result ticket (for update failure insertion test)."""
+def _xml_no_failure_with_result(work_request_number: str = "WR-004") -> str:
+    """failure Mizone + result work_request (for update failure insertion test)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <!-- metadata -->
   <metadata>
-    <number>{ticket_number}</number>
+    <number>{work_request_number}</number>
     <title>No Failure Yet</title>
     <created>2026-05-10 00:00:00</created>
     <updated>2026-05-10 00:00:00</updated>
-    <status>In Progress</status>
+    <status>Executing</status>
     <command>implement</command>
   </metadata>
 
   <!-- relations -->
   <relations>
-    <relation type="depends-on" ticket="T-001" />
+    <relation type="depends-on" work_request="WR-001" />
   </relations>
 
   <!-- prompt -->
@@ -176,51 +176,51 @@ def _xml_no_failure_with_result(ticket_number: str = "T-004") -> str:
     <report>.agent-factory/runs/20260510-111111/report.md</report>
     <merge_commit></merge_commit>
   </result>
-</ticket>
+</work_request>
 """
 
 
 # --- Test case ------------------------------------------------------------
 
 
-def test_parse_4element_ticket_returns_failure_none(tmp_path):
-    """Existing 4Yoso ticket parsing result["failure"] is None (return guard).
+def test_parse_4element_work_request_returns_failure_none(tmp_path):
+    """Existing 4Yoso work_request parsing result["failure"] is None (return guard).
 
-    <failure> When parse existing tickets without elements ticket xml
+    <failure> When parse existing work_requests without elements work_request xml
     "failure" key exists and validate the value is None.
     """
-    ticket_file = tmp_path / "T-001.xml"
-    _write_xml(ticket_file, _xml_4element("T-001"))
+    work_request_file = tmp_path / "WR-001.xml"
+    _write_xml(work_request_file, _xml_4element("WR-001"))
 
-    result = ticket_repo.parse_ticket_xml(str(ticket_file))
+    result = work_request_repo.parse_work_request_xml(str(work_request_file))
 
     assert "failure" in result, (
-        "parse ticket xml return dict to 'failure' -- dict key regression"
+        "parse work_request xml return dict to 'failure' -- dict key regression"
     )
     assert result["failure"] is None, (
-        f"4Field tickets to failure must be None   FIELD 0  Return"
+        f"4Field work_requests to failure must be None   FIELD 0  Return"
     )
     # Configuration
-    assert result["number"] == "T-001"
-    assert result["status"] == "Done"
+    assert result["number"] == "WR-001"
+    assert result["status"] == "Complete"
     assert isinstance(result["result"], dict)
     assert result["result"]["registrykey"] == "20260510-000000"
 
 
-def test_parse_5element_ticket_returns_failure_dict(tmp_path):
-    """<failure> Validation of dict mapping all four digits when ticket parsing.
+def test_parse_5element_work_request_returns_failure_dict(tmp_path):
+    """<failure> Validation of dict mapping all four digits when work_request parsing.
 
     reason/phase/retry count/context Each field is the right string value
     Check if the map is mapped.
     """
-    ticket_file = tmp_path / "T-002.xml"
-    _write_xml(ticket_file, _xml_5element("T-002"))
+    work_request_file = tmp_path / "WR-002.xml"
+    _write_xml(work_request_file, _xml_5element("WR-002"))
 
-    result = ticket_repo.parse_ticket_xml(str(ticket_file))
+    result = work_request_repo.parse_work_request_xml(str(work_request_file))
 
-    assert "failure" in result, "parse ticket xml return dict has no 'failure' key"
+    assert "failure" in result, "parse work_request xml return dict has no 'failure' key"
     assert isinstance(result["failure"], dict), (
-        f"<failure> In the ticket included failure must be dictated one   FIELD 0   return"
+        f"<failure> In the work_request included failure must be dictated one   FIELD 0   return"
     )
     failure = result["failure"]
 
@@ -244,10 +244,10 @@ def test_parse_failure_with_empty_children(tmp_path):
     reason/phase only and retry count/context
     The missing field should be returned to the empty string("").
     """
-    ticket_file = tmp_path / "T-003.xml"
-    _write_xml(ticket_file, _xml_failure_partial_children("T-003"))
+    work_request_file = tmp_path / "WR-003.xml"
+    _write_xml(work_request_file, _xml_failure_partial_children("WR-003"))
 
-    result = ticket_repo.parse_ticket_xml(str(ticket_file))
+    result = work_request_repo.parse_work_request_xml(str(work_request_file))
 
     assert isinstance(result["failure"], dict), (
         "failures should be dictated even if some missing (as there is no need)"
@@ -269,21 +269,21 @@ def test_parse_failure_with_empty_children(tmp_path):
 
 
 def test_update_failure_inserts_new_element(tmp_path):
-    """failure New <failure> element + 4 self-adhesive verification when calling update failure on the Mizone ticket.
+    """failure New <failure> element + 4 self-adhesive verification when calling update failure on the Mizone work_request.
 
-    1. Create a ticket file without failure
+    1. Create a work_request file without failure
     2. update failure call (reason/phase/retry count/context delivery)
     3. FAQs にほんご (Japanese)
     """
-    ticket_file = tmp_path / "T-004.xml"
-    _write_xml(ticket_file, _xml_no_failure_with_result("T-004"))
+    work_request_file = tmp_path / "WR-004.xml"
+    _write_xml(work_request_file, _xml_no_failure_with_result("WR-004"))
 
     # parsing: initial status failure=None check
-    initial = ticket_repo.parse_ticket_xml(str(ticket_file))
+    initial = work_request_repo.parse_work_request_xml(str(work_request_file))
     assert initial["failure"] is None, "failure in the initial state should be None"
 
     # update failure call
-    ticket_repo.update_failure(str(ticket_file), {
+    work_request_repo.update_failure(str(work_request_file), {
         "reason": "retry_max",
         "phase": "WORK",
         "retry_count": "5",
@@ -291,7 +291,7 @@ def test_update_failure_inserts_new_element(tmp_path):
     })
 
     # repasing -> failure dict verification
-    updated = ticket_repo.parse_ticket_xml(str(ticket_file))
+    updated = work_request_repo.parse_work_request_xml(str(work_request_file))
 
     assert isinstance(updated["failure"], dict), (
         f"update failure After calling failure must be dictated   FIELD 0   Return"
@@ -312,7 +312,7 @@ def test_update_failure_inserts_new_element(tmp_path):
     )
 
     # <failure> tag direct check in XML file
-    xml_content = ticket_file.read_text(encoding="utf-8")
+    xml_content = work_request_file.read_text(encoding="utf-8")
     assert "<failure>" in xml_content or "<failure " in xml_content, (
         "No <failure> tags in XML files"
     )
@@ -329,14 +329,14 @@ def test_update_failure_preserves_other_elements(tmp_path):
 
     After calling update failure, the field value of the existing element should not be changed.
     """
-    ticket_file = tmp_path / "T-004b.xml"
-    _write_xml(ticket_file, _xml_no_failure_with_result("T-004b"))
+    work_request_file = tmp_path / "WR-004b.xml"
+    _write_xml(work_request_file, _xml_no_failure_with_result("WR-004b"))
 
     # Secure the standard value with initial parsing
-    before = ticket_repo.parse_ticket_xml(str(ticket_file))
+    before = work_request_repo.parse_work_request_xml(str(work_request_file))
 
     # update failure call
-    ticket_repo.update_failure(str(ticket_file), {
+    work_request_repo.update_failure(str(work_request_file), {
         "reason": "validator_failure",
         "phase": "VALIDATE",
         "retry_count": "2",
@@ -344,25 +344,25 @@ def test_update_failure_preserves_other_elements(tmp_path):
     })
 
     # pantyhose
-    after = ticket_repo.parse_ticket_xml(str(ticket_file))
+    after = work_request_repo.parse_work_request_xml(str(work_request_file))
 
-    # metadata field preservation confirmation (updated timestamp write ticket xml This automatic update -- accepted)
+    # metadata field preservation confirmation (updated timestamp write work_request xml This automatic update -- accepted)
     assert after["number"] == before["number"], (
-        f"number Regression:   FIELD 0    FIELD 1  "
+        "number field must be preserved"
     )
     assert after["status"] == before["status"], (
-        f"<% if (imgObj.width >= imgObj.height) { %>"
+        "status field must be preserved"
     )
     assert after["title"] == before["title"], (
-        f"<% if (imgObj.width >= imgObj.height) { %>"
+        "title field must be preserved"
     )
     assert after["command"] == before["command"], (
-        f"command:   FIELD 0   ->   FIELD 1  "
+        "command field must be preserved"
     )
 
     # Testimonials
     assert after["relations"] == before["relations"], (
-        f" FIELD 0  "
+        "relations must be preserved"
     )
 
     # Check the prompt field preservation

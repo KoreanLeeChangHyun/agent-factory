@@ -1,4 +1,4 @@
-"""T-477: /api/kanban/audit/verdict endpoint + _compute_combined_verdict helper unit tests.
+"""T-477: /api/conveyor/audit/verdict endpoint + _compute_combined_verdict helper unit tests.
 
 Test cases:
   (a) audit-verdict.json absent         -> combined=NONE
@@ -32,7 +32,7 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
 
 class TestComputeCombinedVerdict(unittest.TestCase):
     def setUp(self):
-        from board.server.handlers.kanban import ConveyorHandlerMixin
+        from board.server.handlers.conveyor import ConveyorHandlerMixin
         self.fn = ConveyorHandlerMixin._compute_combined_verdict
 
     def test_both_none_returns_none(self):
@@ -71,7 +71,7 @@ class TestComputeCombinedVerdict(unittest.TestCase):
 
 
 def _make_mock_handler(path: str):
-    from board.server.handlers.kanban import ConveyorHandlerMixin
+    from board.server.handlers.conveyor import ConveyorHandlerMixin
 
     class FakeHandler(ConveyorHandlerMixin):
         def __init__(self):
@@ -89,14 +89,14 @@ def _make_mock_handler(path: str):
 
 
 class TestAuditVerdictEndpoint(unittest.TestCase):
-    def test_missing_ticket_param_sends_400(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict")
+    def test_missing_work_request_param_sends_400(self):
+        h = _make_mock_handler("/api/conveyor/audit/verdict")
         h._handle_conveyor_audit_verdict()
         self.assertIsNotNone(h._sent_error)
         self.assertEqual(h._sent_error[0], 400)
 
     def test_verdict_file_absent_returns_none_combined(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-001")
+        h = _make_mock_handler("/api/conveyor/audit/verdict?work_request=WR-001")
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(h, "_resolve_audit_workdir", return_value=tmpdir):
                 with patch("os.getcwd", return_value=tmpdir):
@@ -107,7 +107,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         self.assertIsNone(h._sent_json["tier2"])
 
     def test_tier2_fail_returns_fail(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-002")
+        h = _make_mock_handler("/api/conveyor/audit/verdict?work_request=WR-002")
         verdict_data = {
             "tier1": None,
             "tier2": {"overall": "FAIL", "hard_gate_failed": ["AT-06", "AT-09"], "items": []},
@@ -122,7 +122,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         self.assertEqual(h._sent_json["combined"], "FAIL")
 
     def test_tier1_null_tier2_pass_returns_pass(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-003")
+        h = _make_mock_handler("/api/conveyor/audit/verdict?work_request=WR-003")
         verdict_data = {
             "tier1": None,
             "tier2": {"overall": "PASS", "hard_gate_failed": [], "items": []},
@@ -138,7 +138,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         self.assertIsNone(h._sent_json["tier1"])
 
     def test_hard_gate_failed_exposed(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-004")
+        h = _make_mock_handler("/api/conveyor/audit/verdict?work_request=WR-004")
         verdict_data = {
             "tier1": None,
             "tier2": {"overall": "FAIL", "hard_gate_failed": ["AT-06", "AT-09"], "items": []},
@@ -154,7 +154,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         self.assertIn("AT-09", h._sent_json["tier2"]["hard_gate_failed"])
 
     def test_workdir_not_found_returns_none(self):
-        h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-005")
+        h = _make_mock_handler("/api/conveyor/audit/verdict?work_request=WR-005")
         with patch.object(h, "_resolve_audit_workdir", return_value=None):
             with patch("os.getcwd", return_value="/fake"):
                 h._handle_conveyor_audit_verdict()
@@ -163,7 +163,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
 
 class TestResolveAuditWorkdir(unittest.TestCase):
     def _make_handler(self):
-        from board.server.handlers.kanban import ConveyorHandlerMixin
+        from board.server.handlers.conveyor import ConveyorHandlerMixin
 
         class FakeHandler(ConveyorHandlerMixin):
             def _send_json(self, d): pass
@@ -174,25 +174,25 @@ class TestResolveAuditWorkdir(unittest.TestCase):
     def test_xml_workdir_field_resolved(self):
         h = self._make_handler()
         with tempfile.TemporaryDirectory() as project_root:
-            tickets_dir = os.path.join(project_root, ".agent-factory", "tickets", "review")
-            os.makedirs(tickets_dir)
+            work_requests_dir = os.path.join(project_root, ".agent-factory", "work-requests", "verifying")
+            os.makedirs(work_requests_dir)
             runs_dir = os.path.join(project_root, ".agent-factory", "runs", "20260510-120000")
             os.makedirs(runs_dir)
             xml_content = (
-                "<ticket><result>"
+                "<work_request><result>"
                 "<workdir>.agent-factory/runs/20260510-120000/</workdir>"
-                "</result></ticket>"
+                "</result></work_request>"
             )
-            with open(os.path.join(tickets_dir, "T-010.xml"), "w") as f:
+            with open(os.path.join(work_requests_dir, "WR-010.xml"), "w") as f:
                 f.write(xml_content)
-            result = h._resolve_audit_workdir("T-010", project_root)
+            result = h._resolve_audit_workdir("WR-010", project_root)
         self.assertIsNotNone(result)
         self.assertIn("20260510-120000", result)
 
-    def test_missing_ticket_returns_none(self):
+    def test_missing_work_request_returns_none(self):
         h = self._make_handler()
         with tempfile.TemporaryDirectory() as project_root:
-            result = h._resolve_audit_workdir("T-999", project_root)
+            result = h._resolve_audit_workdir("WR-999", project_root)
         self.assertIsNone(result)
 
 

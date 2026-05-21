@@ -1,4 +1,4 @@
-"""test premerge state guard.py - T-441 Reminder Status Guard Regression Test.
+"""test premerge state guard.py - WR-441 Reminder Status Guard Regression Test.
 
 Verify the core quarter of W03 patch(` stage1 5 premerge state guard`).
 W05 full-fledged revolving test adds 1~3 scenarios in a separate task,
@@ -8,7 +8,7 @@ Payment Terms:
   T1: feature branding absence → always block (force absence)
   T2: empty branch(commits ahead == 0) + force=False → block + clear error
   T3: Empty brand + force=True → Block + reflog fallback guide (Automatic trigger ban)
-  T4: Changeable Brand (T-906 Top Route) → Pass
+  T4: Changeable Brand (WR-906 Top Route) → Pass
   T5: Helper  count commits ahead /  branch exists Module Verification
 """
 
@@ -79,27 +79,27 @@ class TestCountCommitsAhead(_GuardTestBase):
 
     def test_empty_branch_returns_zero(self) -> None:
         """Brands that don't change after quarterly in develop return 0."""
-        _git_check(self.repo, "checkout", "-b", "feat/T-441-empty")
+        _git_check(self.repo, "checkout", "-b", "feat/WR-441-empty")
         with mock.patch.object(_mp, "_git", side_effect=self._patched_git):
-            ahead = _mp._count_commits_ahead("feat/T-441-empty", base="develop")
+            ahead = _mp._count_commits_ahead("feat/WR-441-empty", base="develop")
         self.assertEqual(ahead, 0)
 
     def test_branch_with_commit_returns_positive(self) -> None:
         """The brand that has changed the positive return."""
-        _git_check(self.repo, "checkout", "-b", "feat/T-441-real")
+        _git_check(self.repo, "checkout", "-b", "feat/WR-441-real")
         wf = os.path.join(self.repo, "work.py")
         with open(wf, "w") as f:
             f.write('x = "real"\n')
         _git_check(self.repo, "add", "work.py")
         _git_check(self.repo, "commit", "-m", "feat: real change")
         with mock.patch.object(_mp, "_git", side_effect=self._patched_git):
-            ahead = _mp._count_commits_ahead("feat/T-441-real", base="develop")
+            ahead = _mp._count_commits_ahead("feat/WR-441-real", base="develop")
         self.assertEqual(ahead, 1)
 
     def test_missing_branch_returns_none(self) -> None:
         """Unexpected Brands Returns None."""
         with mock.patch.object(_mp, "_git", side_effect=self._patched_git):
-            ahead = _mp._count_commits_ahead("feat/T-441-missing", base="develop")
+            ahead = _mp._count_commits_ahead("feat/WR-441-missing", base="develop")
         self.assertIsNone(ahead)
 
 
@@ -107,13 +107,13 @@ class TestBranchExists(_GuardTestBase):
     """branch exists helper unit verification."""
 
     def test_existing_branch(self) -> None:
-        _git_check(self.repo, "checkout", "-b", "feat/T-441-x")
+        _git_check(self.repo, "checkout", "-b", "feat/WR-441-x")
         with mock.patch.object(_mp, "_git", side_effect=self._patched_git):
-            self.assertTrue(_mp._branch_exists("feat/T-441-x"))
+            self.assertTrue(_mp._branch_exists("feat/WR-441-x"))
 
     def test_missing_branch(self) -> None:
         with mock.patch.object(_mp, "_git", side_effect=self._patched_git):
-            self.assertFalse(_mp._branch_exists("feat/T-441-missing"))
+            self.assertFalse(_mp._branch_exists("feat/WR-441-missing"))
 
     def test_empty_branch_name(self) -> None:
         self.assertFalse(_mp._branch_exists(""))
@@ -124,22 +124,22 @@ class TestPremergeGuardBranchAbsent(_GuardTestBase):
 
     def test_branch_absent_force_false_blocks(self) -> None:
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=None,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                "T-441", worktree_path=None, force=False
+                "WR-441", worktree_path=None, force=False
             )
         self.assertFalse(ok)
-        self.assertIn("Notice", msg)
+        self.assertIn("Absence of feature branch", msg)
 
     def test_branch_absent_force_true_blocks_with_advisory(self) -> None:
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
             return_value=None,
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                "T-441", worktree_path=None, force=True
+                "WR-441", worktree_path=None, force=True
             )
         # force even auto-pilgrim prohibition (User express consent canon)
         self.assertFalse(ok)
@@ -151,26 +151,26 @@ class TestPremergeGuardEmptyBranch(_GuardTestBase):
     def setUp(self) -> None:
         super().setUp()
         # blank brand without changing the branch in develop
-        _git_check(self.repo, "branch", "feat/T-441-empty")
+        _git_check(self.repo, "branch", "feat/WR-441-empty")
 
     def test_empty_branch_force_false_blocks(self) -> None:
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value="feat/T-441-empty",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
+            return_value="feat/WR-441-empty",
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                "T-441", worktree_path="/tmp/fake", force=False
+                "WR-441", worktree_path="/tmp/fake", force=False
             )
         self.assertFalse(ok)
         self.assertIn("Empty branch detected", msg)
 
     def test_empty_branch_force_true_still_blocks(self) -> None:
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value="feat/T-441-empty",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
+            return_value="feat/WR-441-empty",
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                "T-441", worktree_path="/tmp/fake", force=True
+                "WR-441", worktree_path="/tmp/fake", force=True
             )
         # Auto Force Policy Prohibited Cannon — Force Rado Hollow Branding Block
         self.assertFalse(ok)
@@ -178,11 +178,11 @@ class TestPremergeGuardEmptyBranch(_GuardTestBase):
 
 
 class TestPremergeGuardNormalPass(_GuardTestBase):
-    """T4: Top (T-906 Top Route) → Pass."""
+    """T4: Top (WR-906 Top Route) → Pass."""
 
     def setUp(self) -> None:
         super().setUp()
-        _git_check(self.repo, "checkout", "-b", "feat/T-441-normal")
+        _git_check(self.repo, "checkout", "-b", "feat/WR-441-normal")
         wf = os.path.join(self.repo, "work.py")
         with open(wf, "w") as f:
             f.write('x = "real"\n')
@@ -193,11 +193,11 @@ class TestPremergeGuardNormalPass(_GuardTestBase):
 
     def test_normal_branch_passes(self) -> None:
         with mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value="feat/T-441-normal",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
+            return_value="feat/WR-441-normal",
         ), mock.patch.object(_mp, "_git", side_effect=self._patched_git):
             ok, msg = _mp._stage1_5_premerge_state_guard(
-                "T-441", worktree_path="/tmp/fake", force=False
+                "WR-441", worktree_path="/tmp/fake", force=False
             )
         self.assertTrue(ok, f"Normal Brand must pass (msg=   FIELD 0   )")
         self.assertEqual(msg, "")

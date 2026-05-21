@@ -9,13 +9,13 @@ Data class:
 
 Public API:
     is_worktree_enabled: Determines whether worktree functionality is enabled
-    create_worktree: Create worktree for ticket
+    create_worktree: Create worktree for WorkRequest
     has_uncommitted_changes: Checks for uncommitted changes in the worktree path.
     count_feature_branch_commits: Returns the number of commits in the feature branch (detection of missing worker commits)
     remove_worktree: Remove worktree (idempotent)
     merge_to_develop: Merge feature branch into develop
     list_worktrees: List of active worktrees
-    get_worktree_path: Look up the worktree path associated with the ticket.
+    get_worktree_path: Look up the worktree path associated with the WorkRequest.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ if _engine_dir not in sys.path:
 from engine.adapters.git.cli import run_git
 from engine.core.worktrees.paths import (
     merge_lock_path,
-    normalize_ticket_number,
+    normalize_work_request_number,
     worktree_dir_name,
     worktree_path_for_branch,
     worktrees_base_dir,
@@ -53,7 +53,7 @@ from flow.branch_strategy import (
     create_feature_branch,
     delete_feature_branch,
     ensure_develop_branch,
-    get_feature_branch_for_ticket,
+    get_feature_branch_for_work_request,
 )
 
 # ─── Data class ───────────────────────────────────────────────────────────────
@@ -65,15 +65,15 @@ class WorktreeInfo:
 
     Attributes:
         path: absolute path to the worktree.
-        branch_name: Connected feature branch name (e.g. feat/T-001-title).
-        ticket_number: Ticket number (e.g. T-001).
+        branch_name: Connected feature branch name (e.g. feat/WR-001-title).
+        work_request_number: WorkRequest number (e.g. WR-001).
         created_at: Creation time (ISO 8601 format).
         base_branch: Base branch. Default 'develop'.
     """
 
     path: str
     branch_name: str
-    ticket_number: str
+    work_request_number: str
     created_at: str
     base_branch: str = "develop"
 
@@ -142,7 +142,7 @@ def _merge_lock_path(repo_path: str | None = None) -> str:
 def _worktree_dir_name(branch_name: str) -> str:
     """Convert the branch name to the worktree directory name.
 
-    feat/T-NNN-title -> feat-T-NNN-title (slash with hyphen).
+    feat/WR-NNN-title -> feat-WR-NNN-title (slash with hyphen).
 
     Args:
         branch_name: feature branch name.
@@ -271,20 +271,20 @@ def is_worktree_enabled(repo_path: str | None = None) -> bool:
 
 
 def create_worktree(
-    ticket_number: str,
+    work_request_number: str,
     title: str,
     base_branch: str = "develop",
     repo_path: str | None = None,
     command: str = "implement",
 ) -> WorktreeInfo | None:
-    """Create a worktree for tickets.
+    """Create a worktree for WorkRequests.
 
     After securing the develop branch and creating the feature branch,
     Create an isolated working directory with git worktree add.
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
-        title: Ticket title.
+        work_request_number: WorkRequest number (e.g. 'WR-001').
+        title: WorkRequest title.
         base_branch: Base branch. Default 'develop'.
         repo_path: Git repository path. If None, use the project root.
         command: Workflow command. If it is not 'implement', the creation is refused.
@@ -295,7 +295,7 @@ def create_worktree(
     _t0 = time.monotonic()
     try:
         result = _create_worktree_impl(
-            ticket_number, title, base_branch, repo_path, command
+            work_request_number, title, base_branch, repo_path, command
         )
         duration_ms = int((time.monotonic() - _t0) * 1000)
         if result is not None:
@@ -310,7 +310,7 @@ def create_worktree(
 
 
 def _create_worktree_impl(
-    ticket_number: str,
+    work_request_number: str,
     title: str,
     base_branch: str = "develop",
     repo_path: str | None = None,
@@ -319,8 +319,8 @@ def _create_worktree_impl(
     """create_worktree Actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
-        title: Ticket title.
+        work_request_number: WorkRequest number (e.g. 'WR-001').
+        title: WorkRequest title.
         base_branch: Base branch. Default 'develop'.
         repo_path: Git repository path. If None, use the project root.
         command: Workflow command. If it is not 'implement', the creation is refused.
@@ -336,8 +336,8 @@ def _create_worktree_impl(
         )
         return None
 
-    # Ticket number normalization
-    ticket_number = normalize_ticket_number(ticket_number)
+    # WorkRequest number normalization
+    work_request_number = normalize_work_request_number(work_request_number)
 
     # Secure the develop branch
     if not ensure_develop_branch(repo_path):
@@ -346,7 +346,7 @@ def _create_worktree_impl(
 
     # Create feature branch
     branch_name = create_feature_branch(
-        ticket_number, title, base=base_branch, repo_path=repo_path
+        work_request_number, title, base=base_branch, repo_path=repo_path
     )
     if not branch_name:
         _warn("Feature branch creation failed, unable to create worktree")
@@ -362,7 +362,7 @@ def _create_worktree_impl(
         return WorktreeInfo(
             path=wt_path,
             branch_name=branch_name,
-            ticket_number=ticket_number,
+            work_request_number=work_request_number,
             created_at=datetime.now().isoformat(),
             base_branch=base_branch,
         )
@@ -385,7 +385,7 @@ def _create_worktree_impl(
     return WorktreeInfo(
         path=wt_path,
         branch_name=branch_name,
-        ticket_number=ticket_number,
+        work_request_number=work_request_number,
         created_at=created_at,
         base_branch=base_branch,
     )
@@ -427,7 +427,7 @@ def count_feature_branch_commits(
             In this case, it must be passed rather than blocked (preventing false-positives).
 
     Args:
-        branch_name: The feature branch name to count the number of commits (e.g. 'feat/T-001-title').
+        branch_name: The feature branch name to count the number of commits (e.g. 'feat/WR-001-title').
         base_branch: Base branch. Default 'develop'.
         repo_path: Git repository path. If None, use the project root.
 
@@ -447,18 +447,18 @@ def count_feature_branch_commits(
 
 
 def remove_worktree(
-    ticket_number: str,
+    work_request_number: str,
     delete_branch: bool = True,
     repo_path: str | None = None,
 ) -> bool:
-    """Removes the worktree connected to the ticket.
+    """Removes the worktree connected to the WorkRequest.
 
     Idempotent behavior: returns True if it has already been removed.
     If delete_branch=True, the feature branch is also deleted.
     In case of failure, only False + warning is output and the process is not terminated.
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
+        work_request_number: WorkRequest number (e.g. 'WR-001').
         delete_branch: Whether to also delete the feature branch. Default True.
         repo_path: Git repository path. If None, use the project root.
 
@@ -467,7 +467,7 @@ def remove_worktree(
     """
     _t0 = time.monotonic()
     try:
-        result = _remove_worktree_impl(ticket_number, delete_branch, repo_path)
+        result = _remove_worktree_impl(work_request_number, delete_branch, repo_path)
         duration_ms = int((time.monotonic() - _t0) * 1000)
         outcome = "ok" if result else "fail"
         _append_worktree_io("remove", duration_ms, outcome)
@@ -479,23 +479,23 @@ def remove_worktree(
 
 
 def _remove_worktree_impl(
-    ticket_number: str,
+    work_request_number: str,
     delete_branch: bool = True,
     repo_path: str | None = None,
 ) -> bool:
     """remove_worktree Actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
+        work_request_number: WorkRequest number (e.g. 'WR-001').
         delete_branch: Whether to also delete the feature branch. Default True.
         repo_path: Git repository path. If None, use the project root.
 
     Returns:
         True if the removal was successful (or not already there), False if it failed.
     """
-    ticket_number = normalize_ticket_number(ticket_number)
+    work_request_number = normalize_work_request_number(work_request_number)
 
-    branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
+    branch_name = get_feature_branch_for_work_request(work_request_number, repo_path)
     if not branch_name:
         # If there is no feature branch, there will be no worktree, so success is processed.
         return True
@@ -535,7 +535,7 @@ def _remove_worktree_impl(
 
 
 def merge_to_develop(
-    ticket_number: str, repo_path: str | None = None
+    work_request_number: str, repo_path: str | None = None
 ) -> MergeResult:
     """Merge the feature branch into develop with --no-ff.
 
@@ -544,7 +544,7 @@ def merge_to_develop(
     Organize the feature branch.
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
+        work_request_number: WorkRequest number (e.g. 'WR-001').
         repo_path: Git repository path. If None, use the project root.
 
     Returns:
@@ -552,7 +552,7 @@ def merge_to_develop(
     """
     _t0 = time.monotonic()
     try:
-        merge_result = _merge_to_develop_impl(ticket_number, repo_path)
+        merge_result = _merge_to_develop_impl(work_request_number, repo_path)
         duration_ms = int((time.monotonic() - _t0) * 1000)
         outcome = "ok" if merge_result.success else "fail"
         error_reason = merge_result.error_message if not merge_result.success else None
@@ -565,18 +565,18 @@ def merge_to_develop(
 
 
 def _merge_to_develop_impl(
-    ticket_number: str, repo_path: str | None = None
+    work_request_number: str, repo_path: str | None = None
 ) -> MergeResult:
     """merge_to_develop actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
+        work_request_number: WorkRequest number (e.g. 'WR-001').
         repo_path: Git repository path. If None, use the project root.
 
     Returns:
         MergeResult instance.
     """
-    ticket_number = normalize_ticket_number(ticket_number)
+    work_request_number = normalize_work_request_number(work_request_number)
 
     # When called in an environment where WORKFLOW_WORKTREE=false, the main storage HEAD is
     # Instructs users on the manual merge command.
@@ -588,21 +588,21 @@ def _merge_to_develop_impl(
         _warn(
             "Manual merge procedure:"
             "git checkout develop && "
-            f"git merge --no-ff <feature-branch-of-{ticket_number}>"
+            f"git merge --no-ff <feature-branch-of-{work_request_number}>"
         )
         return MergeResult(
             success=False,
             error_message=(
-                f"Non-worktree mode — merge_to_develop({ticket_number}) blocked."
+                f"Non-worktree mode — merge_to_develop({work_request_number}) blocked."
                 "WORKFLOW_WORKTREE=true Requires activation or manual merge."
             ),
         )
 
-    branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
+    branch_name = get_feature_branch_for_work_request(work_request_number, repo_path)
     if not branch_name:
         return MergeResult(
             success=False,
-            error_message=f"The feature branch linked to {ticket_number} could not be found",
+            error_message=f"The feature branch linked to {work_request_number} could not be found",
         )
 
     lock_path = _merge_lock_path(repo_path)
@@ -658,7 +658,7 @@ def _merge_to_develop_impl(
         _info(f"Merge successful: {branch_name} -> develop ({merge_commit[:8]})")
 
         # Organize worktree + feature branches
-        remove_worktree(ticket_number, delete_branch=True, repo_path=repo_path)
+        remove_worktree(work_request_number, delete_branch=True, repo_path=repo_path)
 
         return MergeResult(
             success=True,
@@ -832,7 +832,7 @@ def _parse_worktree_block(
 ) -> WorktreeInfo | None:
     """Parse the porcelain block into WorktreeInfo.
 
-    Only the feature worktree is returned (feat/T-NNN-* pattern), and the main worktree is
+    Only the feature worktree is returned (feat/WR-NNN-* pattern), and the main worktree is
     Filter.
 
     Args:
@@ -854,44 +854,44 @@ def _parse_worktree_block(
         branch_name = branch_name[len("refs/heads/"):]
 
     # Filter only feature branches
-    match = re.match(r"^feat/(T-\d+)-", branch_name)
+    match = re.match(r"^feat/(WR-\d+)-", branch_name)
     if not match:
         return None
 
-    ticket_number = match.group(1)
+    work_request_number = match.group(1)
 
     return WorktreeInfo(
         path=wt_path,
         branch_name=branch_name,
-        ticket_number=ticket_number,
+        work_request_number=work_request_number,
         created_at="",  # porcelain output has no creation time
     )
 
 
 def get_worktree_path(
-    ticket_number: str, repo_path: str | None = None
+    work_request_number: str, repo_path: str | None = None
 ) -> str | None:
-    """Returns the absolute path to the worktree connected to the ticket.
+    """Returns the absolute path to the worktree connected to the WorkRequest.
 
-    Search by ticket number in list_worktrees() results, or
+    Search by work_request number in list_worktrees() results, or
     Infer the path from the feature branch name.
 
     Args:
-        ticket_number: Ticket number (e.g. 'T-001').
+        work_request_number: WorkRequest number (e.g. 'WR-001').
         repo_path: Git repository path. If None, use the project root.
 
     Returns:
         worktree absolute path or None.
     """
-    ticket_number = normalize_ticket_number(ticket_number)
+    work_request_number = normalize_work_request_number(work_request_number)
 
     # Search in list of active worktrees
     for wt in list_worktrees(repo_path):
-        if wt.ticket_number == ticket_number:
+        if wt.work_request_number == work_request_number:
             return wt.path
 
     # If not in the list, infer the path using the feature branch name.
-    branch_name = get_feature_branch_for_ticket(ticket_number, repo_path)
+    branch_name = get_feature_branch_for_work_request(work_request_number, repo_path)
     if branch_name:
         candidate = str(
             worktree_path_for_branch(_get_project_root(repo_path), branch_name)

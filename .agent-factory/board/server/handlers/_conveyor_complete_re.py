@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from engine.apps.board_api.conveyor_complete_re import (
-    _classify_done_failure,
-    _DONE_CONFLICT_HEADER,
-    _DONE_CONFLICT_WARN_RE,
-    _DONE_DIRTY_HEADER,
-    _DONE_MERGE_OK_RE,
-    _DONE_PATH_RE,
+    _classify_complete_failure,
+    _COMPLETE_CONFLICT_HEADER,
+    _COMPLETE_CONFLICT_WARN_RE,
+    _COMPLETE_DIRTY_HEADER,
+    _COMPLETE_MERGE_OK_RE,
+    _COMPLETE_PATH_RE,
     _UNDO_ERROR_RE,
     _UNDO_STRATEGY_RESET,
     _UNDO_STRATEGY_REVERT,
@@ -16,14 +16,14 @@ from engine.apps.board_api.conveyor_complete_re import (
 )
 
 __all__ = [
-    "_DONE_CONFLICT_HEADER",
-    "_DONE_CONFLICT_WARN_RE",
-    "_DONE_DIRTY_HEADER",
-    "_DONE_MERGE_OK_RE",
-    "_DONE_PATH_RE",
+    "_COMPLETE_CONFLICT_HEADER",
+    "_COMPLETE_CONFLICT_WARN_RE",
+    "_COMPLETE_DIRTY_HEADER",
+    "_COMPLETE_MERGE_OK_RE",
+    "_COMPLETE_PATH_RE",
     "_UNDO_ERROR_RE",
     "_UNDO_STRATEGY_RESET",
     "_UNDO_STRATEGY_REVERT",
     "_UNDO_WORKTREE_RE",
-    "_classify_done_failure",
+    "_classify_complete_failure",
 ]

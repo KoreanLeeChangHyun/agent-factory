@@ -1,11 +1,11 @@
-"""test merge conflict detection.py - Enhanced merge collision detection (T-907) unit testing.
+"""test merge conflict detection.py - Enhanced merge collision detection (WR-907) unit testing.
 
 Payment Terms:
   T1:  detect conflicts — diff --diff-filter=U is the default path to return crash files
   git status --porcelain fallback
   T3:  detect conflicts — return sentinel when both git calls fail
-  T4: cmd done — conflicts=[] + error message conflict pattern → SystemExit(1)
-  T5: cmd done — Normal success path is completed without SystemExit (Return Guard)
+  T4: cmd complete — conflicts=[] + error message conflict pattern → SystemExit(1)
+  T5: cmd complete — Normal success path is completed without SystemExit (Return Guard)
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def _setup_conflict_repo(repo: str) -> str:
     _git_check(repo, "commit", "-m", "init")
 
     # feature Brand: same line fix
-    feature_branch = "feat/T-907-test"
+    feature_branch = "feat/WR-907-test"
     _git_check(repo, "checkout", "-b", feature_branch)
     with open(work_file, "w") as f:
         f.write('x = "feature"\n')
@@ -171,30 +171,30 @@ class TestDetectConflictsSentinelOnFailure(unittest.TestCase):
         self.assertEqual(conflicts, [_SENTINEL_UNKNOWN_CONFLICT])
 
 
-# ─ T4: cmd done — empty conflicts + error message crash patterns → SystemExit ───────
+# ─ T4: cmd complete — empty conflicts + error message crash patterns → SystemExit ───────
 
 
-class TestCmdDoneExitsOnEmptyConflictsWithSignalMessage(unittest.TestCase):
+class TestCmdCompleteExitsOnEmptyConflictsWithSignalMessage(unittest.TestCase):
     """merge result.success=False + conflicts=[] + error message
-    cmd done generates SystemExit(1).
+    cmd complete generates SystemExit(1).
     """
 
-    def test_cmd_done_exits_on_empty_conflicts_with_signal_message(self) -> None:
+    def test_cmd_complete_exits_on_empty_conflicts_with_signal_message(self) -> None:
         """systemExit if the crash pattern in error message is empty."""
-        from flow import kanban_cli
+        from flow import conveyor_cli
         from flow.worktree_manager import MergeResult
 
         # merge to develop This crash fails to return monkeypatch
         fake_merge_result = MergeResult(
             success=False,
             merge_commit="",
-            merged_branch="feat/T-907-test",
+            merged_branch="feat/WR-907-test",
             conflicts=[],
             error_message="Merged Collision: Collision detected in work.py",
         )
 
         with mock.patch.object(
-            kanban_cli, "find_ticket_file", return_value="/tmp/fake/T-907.xml"
+            conveyor_cli, "find_work_request_file", return_value="/tmp/fake/WR-907.xml"
         ), mock.patch(
             "flow.worktree_manager.is_worktree_enabled", return_value=True
         ), mock.patch(
@@ -204,78 +204,78 @@ class TestCmdDoneExitsOnEmptyConflictsWithSignalMessage(unittest.TestCase):
         ), mock.patch(
             "flow.worktree_manager.merge_to_develop", return_value=fake_merge_result
         ), mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value="feat/T-907-test",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
+            return_value="feat/WR-907-test",
         ):
             with self.assertRaises(SystemExit) as ctx:
-                kanban_cli.cmd_done("T-907")
+                conveyor_cli.cmd_complete("WR-907")
 
         self.assertEqual(ctx.exception.code, 1)
 
 
-# ─ T5: cmd done — Normal success path completed without SystemExit (Return Guard) ────────
+# ─ T5: cmd complete — Normal success path completed without SystemExit (Return Guard) ────────
 
 
-class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
-    """merge to develop When successful cmd done completes Done transformation without SystemExit."""
+class TestCmdCompleteProceedsOnSuccess(unittest.TestCase):
+    """merge to develop When successful cmd complete completes Complete transformation without SystemExit."""
 
     def setUp(self) -> None:
-        # Create a temporary ticket file in a temporary directory
-        self.tmp_dir = tempfile.mkdtemp(prefix="wf_test_t907_done_success_")
-        self.done_dir = os.path.join(self.tmp_dir, "done")
-        self.review_dir = os.path.join(self.tmp_dir, "review")
-        os.makedirs(self.review_dir, exist_ok=True)
-        os.makedirs(self.done_dir, exist_ok=True)
+        # Create a temporary WorkRequest file in a temporary directory
+        self.tmp_dir = tempfile.mkdtemp(prefix="wf_test_t907_complete_success_")
+        self.complete_dir = os.path.join(self.tmp_dir, "complete")
+        self.verifying_dir = os.path.join(self.tmp_dir, "verifying")
+        os.makedirs(self.verifying_dir, exist_ok=True)
+        os.makedirs(self.complete_dir, exist_ok=True)
 
-        # Review status ticket XML creation
-        self.ticket_id = "T-907"
-        self.ticket_file = os.path.join(self.review_dir, f"{self.ticket_id}.xml")
-        with open(self.ticket_file, "w", encoding="utf-8") as f:
+        # Verifying status WorkRequest XML creation
+        self.work_request_number = "WR-907"
+        self.work_request_file = os.path.join(self.verifying_dir, f"{self.work_request_number}.xml")
+        with open(self.work_request_file, "w", encoding="utf-8") as f:
             f.write(
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
-                "<ticket>\n"
+                "<work_request>\n"
                 "  <metadata>\n"
-                f"    <number>{self.ticket_id}</number>\n"
-                "    <title>test ticket</title>\n"
+                f"    <number>{self.work_request_number}</number>\n"
+                "    <title>test WorkRequest</title>\n"
                 "    <created>2026-05-07 12:00:00</created>\n"
                 "    <updated>2026-05-07 12:00:00</updated>\n"
-                "    <status>Review</status>\n"
+                "    <status>Verifying</status>\n"
                 "    <command>implement</command>\n"
                 "  </metadata>\n"
                 "  <prompt />\n"
                 "  <result />\n"
-                "</ticket>\n"
+                "</work_request>\n"
             )
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
-    def test_cmd_done_proceeds_on_success(self) -> None:
-        """merge to develop success returns when cmd done completes Done transition."""
-        from flow import kanban_cli
-        from flow import ticket_repository
+    def test_cmd_complete_proceeds_on_success(self) -> None:
+        """merge to develop success returns when cmd complete completes Complete transition."""
+        from flow import conveyor_cli
+        from flow import work_request_repository
         from flow.worktree_manager import MergeResult
 
         fake_merge_result = MergeResult(
             success=True,
             merge_commit="abc12345def67890",
-            merged_branch="feat/T-907-test",
+            merged_branch="feat/WR-907-test",
             conflicts=[],
             error_message="",
         )
 
-        patched_status_map = dict(ticket_repository.STATUS_DIR_MAP)
-        patched_status_map["Review"] = self.review_dir
-        patched_status_map["Done"] = self.done_dir
+        patched_status_map = dict(work_request_repository.STATUS_DIR_MAP)
+        patched_status_map["Verifying"] = self.verifying_dir
+        patched_status_map["Complete"] = self.complete_dir
 
         with mock.patch.object(
-            ticket_repository, "STATUS_DIR_MAP", patched_status_map
+            work_request_repository, "STATUS_DIR_MAP", patched_status_map
         ), mock.patch.object(
-            ticket_repository, "KANBAN_REVIEW_DIR", self.review_dir
+            work_request_repository, "CONVEYOR_VERIFYING_DIR", self.verifying_dir
         ), mock.patch.object(
-            ticket_repository, "KANBAN_DONE_DIR", self.done_dir
+            work_request_repository, "CONVEYOR_COMPLETE_DIR", self.complete_dir
         ), mock.patch.object(
-            kanban_cli, "find_ticket_file", return_value=self.ticket_file
+            conveyor_cli, "find_work_request_file", return_value=self.work_request_file
         ), mock.patch(
             "flow.worktree_manager.is_worktree_enabled", return_value=True
         ), mock.patch(
@@ -285,16 +285,16 @@ class TestCmdDoneProceedsOnSuccess(unittest.TestCase):
         ), mock.patch(
             "flow.worktree_manager.merge_to_develop", return_value=fake_merge_result
         ), mock.patch(
-            "flow.branch_strategy.get_feature_branch_for_ticket",
-            return_value="feat/T-907-test",
+            "flow.branch_strategy.get_feature_branch_for_work_request",
+            return_value="feat/WR-907-test",
         ), mock.patch.object(
-            kanban_cli, "update_result", return_value=None
+            conveyor_cli, "update_result", return_value=None
         ):
             # SystemExit must be completed
             try:
-                kanban_cli.cmd_done(self.ticket_id)
+                conveyor_cli.cmd_complete(self.work_request_number)
             except SystemExit as e:
-                self.fail(f"cmd done has caused unexpected SystemExit(   FIELD 0   )")
+                self.fail(f"cmd complete caused unexpected SystemExit({e.code})")
 
 
 if __name__ == "__main__":

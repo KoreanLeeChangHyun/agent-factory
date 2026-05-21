@@ -6,10 +6,10 @@ Detecting. worktree manager.py
 Public API:
     get main branch: main or master branch detection
     ensure develop branch: create a development brand if there is no local
-    create feature branch: feat/T-NNN - Create a new brand
+    create feature branch: feat/WR-NNN - Create a new brand
     delete feature branch: feature Delete Brand Name (Local)
     sanitize branch name: Brand Name Safety Conversion
-    get feature branch for ticket: Search feature brand name associated with the ticket
+    get feature branch for work_request: Search feature brand name associated with the WorkRequest
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ def sanitize_branch_name(raw: str) -> str:
     Limits up to 50 characters.
 
     Args:
-        raw: original string (ticket title etc.).
+        raw: original string (WorkRequest title etc.).
 
     Returns:
         Secure strings in git brand name (up to 50 characters).
@@ -170,37 +170,37 @@ def ensure_develop_branch(repo_path: str | None = None) -> bool:
 
 
 def create_feature_branch(
-    ticket_number: str,
+    work_request_number: str,
     title: str,
     base: str = "develop",
     repo_path: str | None = None,
 ) -> str:
     """create a feature brand and return a brand name.
 
-    feat/T-NNN - Create a brand based on the base brand.
-    If you already have the feature brand of the same ticket, you will return the existing brand name.
+    feat/WR-NNN - Create a brand based on the base brand.
+    If you already have the feature brand of the same WorkRequest, you will return the existing brand name.
 
     Args:
-        ticket number: ticket number (e.g. 'T-001', '001').
-        title: ticket title. sanitize branch name is refined.
+        work_request number: work_request number (e.g. 'WR-001', '001').
+        title: WorkRequest title. sanitize branch name is refined.
         base: standard brand. default 'develop'
         repo path: git repository path. Use the project root if None.
 
     Returns:
-        Created or existing feature brand name (e.g. 'feat/T-001-title').
+        Created or existing feature brand name (e.g. 'feat/WR-001-title').
         empty strings when the creation fails.
     """
-    # Ticket number normalization: ensures 'T-001' format
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    # WorkRequest number normalization: ensures 'WR-001' format
+    if not work_request_number.startswith("WR-"):
+        work_request_number = f"WR-{work_request_number}"
 
     # Search for existing feature branches
-    existing = get_feature_branch_for_ticket(ticket_number, repo_path)
+    existing = get_feature_branch_for_work_request(work_request_number, repo_path)
     if existing:
         return existing
 
     sanitized = sanitize_branch_name(title)
-    branch_name = f"{_FEATURE_PREFIX}{ticket_number}-{sanitized}"
+    branch_name = f"{_FEATURE_PREFIX}{work_request_number}-{sanitized}"
 
     result = _git("branch", branch_name, base, repo_path=repo_path)
     if result.returncode != 0:
@@ -220,7 +220,7 @@ def delete_feature_branch(
     merge to develop() is only called in the success path, so the merge completion is guaranteed.
 
     Args:
-        branch name: Brand name to delete (e.g. 'feat/T-001-title').
+        branch name: Brand name to delete (e.g. 'feat/WR-001-title').
         repo path: git repository path. Use the project root if None.
 
     Returns:
@@ -235,25 +235,25 @@ def delete_feature_branch(
     return True
 
 
-def get_feature_branch_for_ticket(
-    ticket_number: str, repo_path: str | None = None
+def get_feature_branch_for_work_request(
+    work_request_number: str, repo_path: str | None = None
 ) -> str | None:
-    """Search the feature branch connected to the ticket number.
+    """Search the feature branch connected to the work_request number.
 
-    The first brand matching "feat/T-NNN-*" pattern during local branding
+    The first brand matching "feat/WR-NNN-*" pattern during local branding
     return. None.
 
     Args:
-        ticket number: ticket number (e.g. 'T-001').
+        work_request number: work_request number (e.g. 'WR-001').
         repo path: git repository path. Use the project root if None.
 
     Returns:
         Match Brand Name or None.
     """
-    if not ticket_number.startswith("T-"):
-        ticket_number = f"T-{ticket_number}"
+    if not work_request_number.startswith("WR-"):
+        work_request_number = f"WR-{work_request_number}"
 
-    prefix = f"{_FEATURE_PREFIX}{ticket_number}-"
+    prefix = f"{_FEATURE_PREFIX}{work_request_number}-"
     branches = _get_local_branches(repo_path)
     for branch in branches:
         if branch.startswith(prefix):

@@ -4,7 +4,7 @@ argparse type function, provides a common epLog builder, deprecation warning uti
 When argparse conversion of each script after W02, import this module.
 
 Tag:
-    from flow.cli_utils import registry_key_type, ticket_type, build_common_epilog
+    from flow.cli_utils import registry_key_type, work_request_type, build_common_epilog
 
     parser = argparse.ArgumentParser(
         prog="flow-update",
@@ -74,10 +74,10 @@ def registry_key_type(value: str) -> str:
     return value
 
 
-def ticket_type(value: str) -> str:
-    """argparse type function that is regularized by T-NNN / NNN / #N format ticket number.
+def work_request_type(value: str) -> str:
+    """argparse type function that normalizes WR-NNN / NNN / #N WorkRequest numbers.
 
-    kanban cli.py / ticket repository.py
+    conveyor_cli.py / work_request_repository.py
     argparse type
 
     Tag:
@@ -86,33 +86,33 @@ def ticket_type(value: str) -> str:
         - #001, #1 (# prefix)
 
     Args:
-        value: a string of the ticket number you entered.
+        value: a WorkRequest number string.
 
     Returns:
-        Normalized string in T-NNN format (e.g. "T-042").
+        Normalized string in WR-NNN format (e.g. "WR-042").
 
     Raises:
-        argparse.ArgumentTypeError: In case of an unknown ticket number format.
+        argparse.ArgumentTypeError: In case of an unknown WorkRequest number format.
 
     Examples:
-        >>> ticket_type("42")
-        'T-042'
-        >>> ticket_type("#5")
-        'T-005'
-        >>> ticket_type("T-007")
-        'T-007'
+        >>> work_request_type("42")
+        'WR-042'
+        >>> work_request_type("#5")
+        'WR-005'
+        >>> work_request_type("WR-007")
+        'WR-007'
     """
     raw = value.strip().lstrip("#")
-    # T-NNN format (ignoring case)
-    if re.match(r"^[Tt]-\d+$", raw):
+    # WR-NNN format (ignoring case)
+    if re.match(r"^[Ww][Rr]-\d+$", raw):
         parts = raw.split("-", 1)
         num = int(parts[1])
-        return f"T-{num:03d}"
+        return f"WR-{num:03d}"
     # pure numbers
     if re.match(r"^\d+$", raw):
-        return f"T-{int(raw):03d}"
+        return f"WR-{int(raw):03d}"
     raise argparse.ArgumentTypeError(
-        f"Ticket number format error: '{value}' — must be one of the following formats: T-NNN, NNN, #N"
+        f"WorkRequest number format error: '{value}' — must be one of the following formats: WR-NNN, NNN, #N"
     )
 
 
@@ -137,7 +137,7 @@ def build_common_epilog() -> str:
     return (
         f"Workflow version: {version} \n"
         "Documentation: See .agent-factory/docs/ or .claude/rules/workflow.md \n"
-        "Ticket management: flow-kanban <subcommand> --help"
+        "WorkRequest management: flow-conveyor <subcommand> --help"
     )
 
 

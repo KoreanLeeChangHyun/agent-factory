@@ -59,11 +59,11 @@ def get_all_uncommitted() -> list[dict]:
         return []
     items: list[dict] = []
     for wt in list_worktrees():
-        if not wt.ticket_number:
+        if not wt.work_request_number:
             continue
         items.append(
             {
-                "work_request": wt.ticket_number,
+                "work_request": wt.work_request_number,
                 "path": wt.path,
                 "uncommitted_count": _count_uncommitted(wt.path),
             }
