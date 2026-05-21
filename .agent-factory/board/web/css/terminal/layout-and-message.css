@@ -44,6 +44,13 @@
 }
 
 .terminal-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 116px;
+  height: 100%;
+  padding: 0 14px;
   font-size: 15px;
   font-weight: 600;
   color: var(--af-text);

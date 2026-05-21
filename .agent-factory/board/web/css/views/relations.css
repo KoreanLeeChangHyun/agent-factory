@@ -2,14 +2,14 @@
 
 /* ── Collapsible Panel (below header) ── */
 .relations-panel {
-  background: var(--af-surface-raised);
+  background: var(--af-surface);
   border-bottom: 1px solid var(--af-border);
   overflow: hidden;
   cursor: pointer;
   transition: background 0.15s;
 }
 .relations-panel:hover {
-  background: var(--af-surface-raised);
+  background: var(--af-surface);
 }
 .relations-panel.open {
   cursor: default;

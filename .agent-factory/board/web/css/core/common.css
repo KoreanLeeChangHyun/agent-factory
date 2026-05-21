@@ -109,10 +109,19 @@ body {
 .settings-toggle { margin-left: auto; }
 
 /* ── Tabs ── */
-.tabs { display: flex; }
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 100%;
+}
 
 .tab {
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 500;
   color: var(--af-text-muted);
@@ -120,12 +129,20 @@ body {
   border: none;
   background: none;
   border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   font-family: inherit;
 }
 
-.tab:hover { color: var(--af-text); }
-.tab.active { color: var(--af-text); border-bottom-color: var(--af-primary); }
+.tab:hover {
+  background: var(--af-hover);
+  color: var(--af-text);
+}
+
+.tab.active {
+  background: var(--af-primary-soft);
+  color: var(--af-text);
+  border-bottom-color: var(--af-primary);
+}
 
 /* ── Main ── */
 .main {
