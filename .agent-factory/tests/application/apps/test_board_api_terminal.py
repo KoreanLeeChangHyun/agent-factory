@@ -306,3 +306,84 @@ def test_configure_brain_process_switches_stopped_terminal_to_codex(tmp_path, mo
     finally:
         state.brain_process = original_brain
         state.claude_process = original_alias
+
+
+def test_configure_brain_process_switches_idle_terminal_provider(tmp_path, monkeypatch) -> None:
+    from board.server.runtime import state
+    from board.server.processes.codex_process import CodexProcess
+
+    class IdleBrain:
+        provider = "claude"
+        status = "idle"
+        awaiting_response = False
+        killed = False
+
+        def set_persist_file(self, persist_file):
+            self.persist_file = persist_file
+
+        def kill(self):
+            self.killed = True
+            self.status = "stopped"
+            return {"ok": True, "error": ""}
+
+    original_brain = state.brain_process
+    original_alias = state.claude_process
+    idle_brain = IdleBrain()
+    try:
+        settings_dir = tmp_path / ".agent-factory"
+        settings_dir.mkdir()
+        (settings_dir / ".settings").write_text(
+            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            encoding="utf-8",
+        )
+
+        state.brain_process = idle_brain  # type: ignore[assignment]
+        state.claude_process = idle_brain  # type: ignore[assignment]
+        process = state.configure_brain_process(str(tmp_path))
+
+        assert idle_brain.killed is True
+        assert isinstance(process, CodexProcess)
+        assert state.brain_process is process
+        assert state.claude_process is process
+    finally:
+        state.brain_process = original_brain
+        state.claude_process = original_alias
+
+
+def test_configure_brain_process_keeps_running_terminal_provider(tmp_path) -> None:
+    from board.server.runtime import state
+
+    class RunningBrain:
+        provider = "claude"
+        status = "running"
+        awaiting_response = True
+        killed = False
+
+        def set_persist_file(self, persist_file):
+            self.persist_file = persist_file
+
+        def kill(self):
+            self.killed = True
+            return {"ok": True, "error": ""}
+
+    original_brain = state.brain_process
+    original_alias = state.claude_process
+    running_brain = RunningBrain()
+    try:
+        settings_dir = tmp_path / ".agent-factory"
+        settings_dir.mkdir()
+        (settings_dir / ".settings").write_text(
+            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            encoding="utf-8",
+        )
+
+        state.brain_process = running_brain  # type: ignore[assignment]
+        state.claude_process = running_brain  # type: ignore[assignment]
+        process = state.configure_brain_process(str(tmp_path))
+
+        assert process is running_brain
+        assert running_brain.killed is False
+        assert running_brain.persist_file == str(tmp_path / ".agent-factory" / ".last-session-id")
+    finally:
+        state.brain_process = original_brain
+        state.claude_process = original_alias

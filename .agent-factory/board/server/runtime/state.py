@@ -80,6 +80,13 @@ workflow_registry: WorkflowSessionRegistry = WorkflowSessionRegistry()
 production_line_registry: ProductionLineSessionRegistry = ProductionLineSessionRegistry()
 
 
+def _terminal_process_can_be_replaced(process: BrainProcess) -> bool:
+    status = process.status
+    if status == 'stopped':
+        return True
+    return status == 'idle' and not process.awaiting_response
+
+
 def configure_brain_process(
     project_root: str,
     *,
@@ -94,7 +101,7 @@ def configure_brain_process(
         project_root, '.agent-factory', '.last-session-id',
     )
 
-    if brain_process.status != 'stopped':
+    if not _terminal_process_can_be_replaced(brain_process):
         brain_process.set_persist_file(target_persist)
         return brain_process
 
@@ -102,6 +109,7 @@ def configure_brain_process(
         brain_process.set_persist_file(target_persist)
         return brain_process
 
+    brain_process.kill()
     brain_process = create_brain_process(
         terminal_sse_channel,
         provider=config.provider,
