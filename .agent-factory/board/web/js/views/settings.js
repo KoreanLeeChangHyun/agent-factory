@@ -505,14 +505,14 @@
   }
 
   function terminalCapabilityPill(brain) {
-    if (brain === 'codex') return 'One-shot';
+    if (brain === 'codex') return 'Experimental';
     if (brain === 'fake') return 'No terminal';
     return 'Full';
   }
 
   function terminalCapabilityLabel(brain) {
     if (brain === 'codex') {
-      return 'Codex terminal is experimental: one prompt per process, no resume, no attachments, no permission prompts.';
+      return 'Codex terminal is experimental: current-thread follow-up uses codex exec resume when a session id is available; session list resume, attachments, and permission prompts are not supported yet.';
     }
     if (brain === 'fake') {
       return 'FakeAdapter is for tests and does not expose a live terminal process.';
@@ -522,7 +522,7 @@
 
   function adapterDetails(brain) {
     if (brain === 'codex') {
-      return 'Console process integration uses codex exec --json - and normalizes stdout events into the Terminal stream.';
+      return 'Console process integration uses codex exec --json - and codex exec resume --json to normalize stdout events into the Terminal stream.';
     }
     if (brain === 'fake') {
       return 'FakeAdapter is available for deterministic application tests; terminal start falls back to Claude until a fake process exists.';

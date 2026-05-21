@@ -80,6 +80,7 @@ def test_brain_process_factory_can_create_codex_process() -> None:
     assert process.capabilities["attachments"] is False
     assert process.capabilities["permission_prompts"] is False
     assert process.capabilities["interrupt"] is True
+    assert process.capabilities["multiple_inputs"] is True
 
 
 def test_codex_process_spawn_builds_exec_command(monkeypatch, tmp_path) -> None:
@@ -169,6 +170,93 @@ def test_codex_process_maps_stdout_json_to_terminal_events() -> None:
     assert channel.events[-2]["type"] == "result"
     assert channel.events[-2]["result"] == "hello done"
     assert channel.events[-1]["subtype"] == "process_exit"
+
+
+def test_codex_process_extracts_session_id_from_stdout_json() -> None:
+    from board.server.processes.codex_process import CodexProcess, _event_session_id
+
+    assert _event_session_id({"session_id": "session-top"}) == "session-top"
+    assert _event_session_id({"thread": {"id": "thread-nested"}}) == "thread-nested"
+    assert _event_session_id({"type": "session.created", "id": "session-event"}) == "session-event"
+
+    class FakeChannel:
+        def __init__(self) -> None:
+            self.events: list[dict] = []
+
+        def broadcast(self, data: dict) -> None:
+            self.events.append(data)
+
+    class FakeProcess:
+        stdout = [
+            '{"type":"session.created","id":"codex-session-1"}\n',
+            '{"type":"message","text":"hello"}\n',
+        ]
+        returncode = 0
+
+        def wait(self, timeout=None):
+            return 0
+
+    channel = FakeChannel()
+    process = CodexProcess(channel)  # type: ignore[arg-type]
+    process.set_session_id("codex-placeholder")
+    process._process = FakeProcess()  # type: ignore[assignment]
+
+    process._read_stdout_loop()
+
+    assert process.session_id == "codex-session-1"
+    assert channel.events[-2]["session_id"] == "codex-session-1"
+
+
+def test_codex_process_resumes_finished_session_for_next_input(monkeypatch) -> None:
+    from board.server.channels.terminal_channel import TerminalSSEChannel
+    from board.server.processes import codex_process
+    from board.server.processes.codex_process import CodexProcess
+
+    captured: dict = {"writes": []}
+
+    class FakeStdin:
+        def write(self, text):
+            captured["writes"].append(text)
+
+        def close(self):
+            captured["closed"] = True
+
+    class FakePopen:
+        stdout: list[str] = []
+        returncode = 0
+
+        def __init__(self, cmd, **kwargs):
+            captured["cmd"] = cmd
+            captured.update(kwargs)
+            self.stdin = FakeStdin()
+
+        def poll(self):
+            return 0
+
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(codex_process.subprocess, "Popen", FakePopen)
+
+    process = CodexProcess(TerminalSSEChannel(), codex_bin="codex-test", model="gpt-test")
+    process._codex_session_id = "codex-session-1"
+    result = process.send_input("next prompt")
+    if process._stdout_thread is not None:
+        process._stdout_thread.join(timeout=1)
+
+    assert result == {"ok": True, "error": ""}
+    assert captured["cmd"] == [
+        "codex-test",
+        "exec",
+        "resume",
+        "--json",
+        "--model",
+        "gpt-test",
+        "codex-session-1",
+        "-",
+    ]
+    assert captured["writes"] == ["next prompt", "\n"]
+    assert captured["closed"] is True
 
 
 def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:

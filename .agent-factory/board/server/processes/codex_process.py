@@ -30,8 +30,46 @@ def _event_text(data: dict[str, Any]) -> str:
     return ""
 
 
+def _string_value(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _event_session_id(data: dict[str, Any]) -> str:
+    """Extract a Codex session/thread identifier from known JSON event shapes."""
+    for key in ("session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId"):
+        value = _string_value(data.get(key))
+        if value:
+            return value
+
+    for container_key in ("session", "conversation", "thread", "metadata"):
+        container = data.get(container_key)
+        if not isinstance(container, dict):
+            continue
+        keys = [
+            "session_id",
+            "sessionId",
+            "conversation_id",
+            "conversationId",
+            "thread_id",
+            "threadId",
+        ]
+        if container_key != "metadata":
+            keys = ["id", "name", *keys]
+        for key in keys:
+            value = _string_value(container.get(key))
+            if value:
+                return value
+
+    event_type = str(data.get("type") or data.get("event") or "").lower()
+    if any(token in event_type for token in ("session", "conversation", "thread")):
+        return _string_value(data.get("id"))
+    return ""
+
+
 class CodexProcess:
-    """One-shot `codex exec --json -` process normalized to terminal SSE events."""
+    """Codex CLI process normalized to terminal SSE events."""
 
     def __init__(
         self,
@@ -46,6 +84,7 @@ class CodexProcess:
     ) -> None:
         self._process: subprocess.Popen | None = None
         self._session_id = ""
+        self._codex_session_id = ""
         self._model = model or ""
         self._permission_mode = ""
         self._status = "stopped"
@@ -96,7 +135,7 @@ class CodexProcess:
             "permission_prompts": False,
             "interrupt": True,
             "slash_commands": False,
-            "multiple_inputs": False,
+            "multiple_inputs": True,
         }
 
     def spawn(
@@ -110,6 +149,7 @@ class CodexProcess:
             self._stdout_thread.join(timeout=3)
 
         self._session_id = f"codex-{uuid.uuid4()}"
+        self._codex_session_id = ""
         self._stdin_closed = False
         self._awaiting_response = False
 
@@ -166,6 +206,14 @@ class CodexProcess:
         cmd.append("-")
         return cmd
 
+    def _build_resume_command(self, session_id: str, extra_args: list[str] | None = None) -> list[str]:
+        cmd = [self._codex_bin, "exec", "resume", "--json"]
+        if self._model:
+            cmd += ["--model", self._model]
+        cmd += extra_args or []
+        cmd += [session_id, "-"]
+        return cmd
+
     def send_input(
         self,
         text: str,
@@ -175,9 +223,11 @@ class CodexProcess:
         if images or attachments:
             return {"ok": False, "error": "Codex terminal does not support attachments yet"}
         if not self._process or self._process.poll() is not None:
-            return {"ok": False, "error": "process not running"}
+            start_result = self._resume_finished_session()
+            if not start_result["ok"]:
+                return start_result
         if self._stdin_closed:
-            return {"ok": False, "error": "Codex terminal accepts one prompt per process"}
+            return {"ok": False, "error": "Codex terminal is still processing the previous prompt"}
 
         with self._stdin_lock:
             try:
@@ -192,6 +242,53 @@ class CodexProcess:
                 return {"ok": False, "error": str(exc)}
 
         self._awaiting_response = True
+        return {"ok": True, "error": ""}
+
+    def _resume_finished_session(self) -> dict:
+        if self._stdout_thread and self._stdout_thread.is_alive():
+            self._stdout_thread.join(timeout=3)
+
+        session_id = self._codex_session_id
+        if not session_id:
+            return {"ok": False, "error": "Codex session id unavailable; start a new terminal session"}
+
+        cmd = self._build_resume_command(session_id)
+        try:
+            self._process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
+                cwd=self._cwd,
+            )
+        except FileNotFoundError:
+            self._status = "stopped"
+            return {"ok": False, "error": "codex CLI not found in PATH"}
+        except OSError as exc:
+            self._status = "stopped"
+            return {"ok": False, "error": str(exc)}
+
+        self._session_id = session_id
+        self._stdin_closed = False
+        self._awaiting_response = False
+        self._status = "running"
+        self._persist_session_id()
+        self._channel.broadcast({
+            "type": "system",
+            "subtype": "resume",
+            "session_id": self._session_id,
+            "model": self._model,
+            "permissionMode": self._permission_mode,
+        })
+        self._stdout_thread = threading.Thread(
+            target=self._read_stdout_loop,
+            daemon=True,
+            name="codex-stdout-reader",
+        )
+        self._stdout_thread.start()
         return {"ok": True, "error": ""}
 
     def send_permission_response(
@@ -272,6 +369,12 @@ class CodexProcess:
                         data = {"type": "stdout", "text": str(data)}
                 except json.JSONDecodeError:
                     data = {"type": "stdout", "text": stripped}
+
+                session_id = _event_session_id(data)
+                if session_id and session_id != self._codex_session_id:
+                    self._codex_session_id = session_id
+                    self._session_id = session_id
+                    self._persist_session_id()
 
                 text = _event_text(data)
                 if text:
