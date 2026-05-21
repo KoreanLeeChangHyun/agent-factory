@@ -1,14 +1,14 @@
-"""test verify.py —  verify.py Module Test (T-504 cutover).
+"""test verify.py —  verify.py Module Test (WR-504 cutover).
 
-T-504 cutover: old `parse plan frontmatter` / ` extract frontmatter` / `verify plan md`
+WR-504 cutover: old `parse plan frontmatter` / ` extract frontmatter` / `verify plan md`
 Target tests are closed. New PLAN Output (plan/plan.json + plan/plan.md) Verification
 `verify plan artifacts` + `engine.core.planning.loader.parse plan json` separated.
 
 Price:
   - verify_artifact (file exist + size + must_contain)
-  - confirmation plan artifacts (T-504 — JSON + MD both + schema)
+  - confirmation plan artifacts (WR-504 — JSON + MD both + schema)
   - verify_work_md / verify_work_set
-  - confirmation report html (T-504 — old verification report md swelling, plan.md token matching)
+  - confirmation report html (WR-504 — old verification report md swelling, plan.md token matching)
   - Phase / topo_sort re-export (backward compat)
 """
 
@@ -32,7 +32,7 @@ from engine.apps.production_line._verify import (
 def _good_plan_payload() -> dict:
     return {
         "schema_version": 2,
-        "ticket": "T-504",
+        "work_request": "WR-504",
         "command": "implement",
         "mode": "multi",
         "phases": [
@@ -74,7 +74,7 @@ def test_verify_artifact_must_contain(tmp_path: Path) -> None:
 
 
 def test_verify_plan_artifacts_full(tmp_path: Path) -> None:
-    """T-504 — plan.json + plan.md both and schema correction → PASS."""
+    """WR-504 — plan.json + plan.md both and schema correction → PASS."""
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
     (plan_dir / "plan.json").write_text(
@@ -167,7 +167,7 @@ def test_verify_work_md_size(tmp_path: Path) -> None:
 
 
 def test_phase_topo_sort_re_export() -> None:
-    """T-504 — Phase / topo sort re-export on core planning SSOT."""
+    """WR-504 — Phase / topo sort re-export on core planning SSOT."""
     phases = [
         Phase(id="C", title="", deps=["A", "B"]),
         Phase(id="A", title="", deps=[]),
