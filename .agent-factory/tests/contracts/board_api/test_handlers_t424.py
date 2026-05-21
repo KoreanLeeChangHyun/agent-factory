@@ -1,7 +1,7 @@
 """Current T-424 board handler regression coverage.
 
 The original legacy test expected the removed ``workflow_undo`` handler. Current
-runtime routes undo-done through ``KanbanHandlerMixin._handle_kanban_undo_done``.
+runtime routes undo-done through ``ConveyorHandlerMixin._handle_conveyor_undo_done``.
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ def test_board_http_request_handler_imports_current_mixins() -> None:
     from board.server.routing.http_router import BoardHTTPRequestHandler
 
     required = [
-        "_handle_kanban_move",
-        "_handle_kanban_submit",
-        "_handle_kanban_done",
-        "_handle_kanban_delete",
-        "_handle_kanban_undo_done",
+        "_handle_conveyor_move",
+        "_handle_conveyor_submit",
+        "_handle_conveyor_complete",
+        "_handle_conveyor_delete",
+        "_handle_conveyor_undo_done",
         "_handle_metrics_run",
         "_handle_metrics_aggregate",
         "_handle_metrics_regression",
@@ -40,9 +40,9 @@ def test_board_http_request_handler_imports_current_mixins() -> None:
     assert missing == []
 
 
-def test_kanban_done_regex_exports_match_done_and_undo_output() -> None:
+def test_conveyor_complete_regex_exports_match_done_and_undo_output() -> None:
     from board.server.handlers._handler_common import _KANBAN_ALL_DIRS, _TICKET_RE
-    from board.server.handlers._kanban_done_re import (
+    from board.server.handlers._conveyor_complete_re import (
         _DONE_CONFLICT_WARN_RE,
         _DONE_MERGE_OK_RE,
         _UNDO_ERROR_RE,
@@ -70,7 +70,7 @@ def test_kanban_done_regex_exports_match_done_and_undo_output() -> None:
 
 
 def test_classify_done_failure_distinguishes_conflict_dirty_and_other() -> None:
-    from board.server.handlers._kanban_done_re import _classify_done_failure
+    from board.server.handlers._conveyor_complete_re import _classify_done_failure
 
     assert _classify_done_failure("", "") == {
         "error_kind": "other",
@@ -106,32 +106,32 @@ def _make_done_handler():
 
 
 def test_review_xml_missing_returns_400_for_done_review() -> None:
-    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_review
+    from engine.apps.board_api.conveyor_complete_helpers import handle_conveyor_complete_review
 
     handler = _make_done_handler()
-    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=False):
-        handle_kanban_done_review(handler, "T-424", "/fake/root", "/fake/flow-kanban")
+    with patch("engine.apps.board_api.conveyor_complete_helpers.os.path.isfile", return_value=False):
+        handle_conveyor_complete_review(handler, "T-424", "/fake/root", "/fake/flow-conveyor")
 
     handler._send_error.assert_called_once()
     assert handler._send_error.call_args.args[0] == 400
     assert "not in Review" in handler._send_error.call_args.args[1]
 
 
-def test_review_xml_present_invokes_flow_kanban_done() -> None:
-    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_review
+def test_review_xml_present_invokes_flow_conveyor_complete() -> None:
+    from engine.apps.board_api.conveyor_complete_helpers import handle_conveyor_complete_review
 
     handler = _make_done_handler()
     result = subprocess.CompletedProcess(
-        args=["flow-kanban", "done", "T-424"],
+        args=["flow-conveyor", "done", "T-424"],
         returncode=0,
         stdout="feat/T-424-branch -> Development completion (ab12cd34)\\n",
         stderr="",
     )
-    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=True), patch(
-        "engine.apps.board_api.kanban_done_helpers.subprocess.run",
+    with patch("engine.apps.board_api.conveyor_complete_helpers.os.path.isfile", return_value=True), patch(
+        "engine.apps.board_api.conveyor_complete_helpers.subprocess.run",
         return_value=result,
     ) as run:
-        handle_kanban_done_review(handler, "T-424", "/fake/root", "/fake/flow-kanban")
+        handle_conveyor_complete_review(handler, "T-424", "/fake/root", "/fake/flow-conveyor")
 
     cmd = run.call_args.args[0]
     assert "done" in cmd
@@ -141,9 +141,9 @@ def test_review_xml_present_invokes_flow_kanban_done() -> None:
 
 class _UndoHandler:
     def __init__(self, body: dict | None = None) -> None:
-        from board.server.handlers.kanban import KanbanHandlerMixin
+        from board.server.handlers.kanban import ConveyorHandlerMixin
 
-        self._mixin = KanbanHandlerMixin
+        self._mixin = ConveyorHandlerMixin
         self._body = body or {"ticket": "T-424", "force": False}
         self.errors: list[tuple[int, str]] = []
         self.responses: list[object] = []
@@ -161,7 +161,7 @@ class _UndoHandler:
         self.responses.append((status, data))
 
     def run(self) -> None:
-        self._mixin._handle_kanban_undo_done(self)
+        self._mixin._handle_conveyor_undo_done(self)
 
 
 def test_kanban_undo_done_missing_done_xml_returns_400(tmp_path: Path) -> None:
@@ -224,11 +224,11 @@ def test_kanban_undo_done_parses_success_stdout(tmp_path: Path) -> None:
 
 
 def test_force_done_open_xml_missing_returns_400() -> None:
-    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_force
+    from engine.apps.board_api.conveyor_complete_helpers import handle_conveyor_complete_force
 
     handler = _make_done_handler()
-    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=False):
-        handle_kanban_done_force(handler, "T-424", False, "/fake/root", "/fake/flow-kanban")
+    with patch("engine.apps.board_api.conveyor_complete_helpers.os.path.isfile", return_value=False):
+        handle_conveyor_complete_force(handler, "T-424", False, "/fake/root", "/fake/flow-conveyor")
 
     handler._send_error.assert_called_once()
     assert handler._send_error.call_args.args[0] == 400
@@ -236,7 +236,7 @@ def test_force_done_open_xml_missing_returns_400() -> None:
 
 
 def test_force_done_dirty_guard_returns_409() -> None:
-    from engine.apps.board_api.kanban_done_helpers import handle_kanban_done_force
+    from engine.apps.board_api.conveyor_complete_helpers import handle_conveyor_complete_force
 
     handler = _make_done_handler()
     handler._get_dirty_files = MagicMock(return_value=["src/foo.py"])
@@ -244,11 +244,11 @@ def test_force_done_dirty_guard_returns_409() -> None:
     worktree_manager.get_worktree_path.return_value = "/fake/wt"
     worktree_manager.has_uncommitted_changes.return_value = True
 
-    with patch("engine.apps.board_api.kanban_done_helpers.os.path.isfile", return_value=True), patch.dict(
+    with patch("engine.apps.board_api.conveyor_complete_helpers.os.path.isfile", return_value=True), patch.dict(
         sys.modules,
         {"flow": types.SimpleNamespace(worktree_manager=worktree_manager)},
     ):
-        handle_kanban_done_force(handler, "T-424", False, "/fake/root", "/fake/flow-kanban")
+        handle_conveyor_complete_force(handler, "T-424", False, "/fake/root", "/fake/flow-conveyor")
 
     handler._send_json_with_status.assert_called_once()
     status, payload = handler._send_json_with_status.call_args.args

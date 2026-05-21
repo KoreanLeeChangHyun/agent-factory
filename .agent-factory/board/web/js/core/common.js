@@ -174,7 +174,7 @@ Board.state.reconcileTermStatus = function (serverStatus) {
 // ── Constants ──
 const PRODUCT_LABELS = {
   appTitle: "Agent Factory Console",
-  workRequest: "Work Item",
+  work_request: "Work Item",
   workRequests: "Conveyor",
   run: "Run",
   runs: "Runs",
@@ -184,11 +184,11 @@ const PRODUCT_LABELS = {
 };
 
 const STATUS_LABELS = {
-  "To Do": "Draft",
-  Open: "Accepted",
-  "In Progress": "Executing",
-  Review: "Verifying",
-  Done: "Complete",
+  "Draft": "Draft",
+  Accepted: "Accepted",
+  "Executing": "Executing",
+  Verifying: "Verifying",
+  Complete: "Complete",
 };
 
 const STEP_LABELS = {
@@ -205,16 +205,16 @@ const STEP_LABELS = {
 const COMMAND_LABELS = {
   implement: "Execute",
   research: "Research",
-  review: "Review",
+  review: "Verifying",
   prompt: "Prompt",
 };
 
 const COLUMNS = [
-  { key: "To Do", label: STATUS_LABELS["To Do"], dot: "dot-todo" },
-  { key: "Open", label: STATUS_LABELS.Open, dot: "dot-open" },
-  { key: "In Progress", label: STATUS_LABELS["In Progress"], dot: "dot-progress" },
-  { key: "Review", label: STATUS_LABELS.Review, dot: "dot-review" },
-  { key: "Done", label: STATUS_LABELS.Done, dot: "dot-done" },
+  { key: "Draft", label: STATUS_LABELS["Draft"], dot: "dot-todo" },
+  { key: "Accepted", label: STATUS_LABELS.Accepted, dot: "dot-open" },
+  { key: "Executing", label: STATUS_LABELS["Executing"], dot: "dot-progress" },
+  { key: "Verifying", label: STATUS_LABELS.Verifying, dot: "dot-review" },
+  { key: "Complete", label: STATUS_LABELS.Complete, dot: "dot-done" },
 ];
 
 const CMD_COLORS = {
@@ -225,15 +225,15 @@ const CMD_COLORS = {
 };
 
 const STATUS_COLORS = {
-  "To Do": { bg: "rgba(156,220,254,0.14)", fg: "#9CDCFE" },
-  Open: { bg: "rgba(78,201,176,0.14)", fg: "#4EC9B0" },
-  "In Progress": { bg: "rgba(220,220,170,0.14)", fg: "#DCDCAA" },
-  Review: { bg: "rgba(197,134,192,0.14)", fg: "#C586C0" },
-  Done: { bg: "rgba(133,133,133,0.15)", fg: "#858585" },
+  "Draft": { bg: "rgba(156,220,254,0.14)", fg: "#9CDCFE" },
+  Accepted: { bg: "rgba(78,201,176,0.14)", fg: "#4EC9B0" },
+  "Executing": { bg: "rgba(220,220,170,0.14)", fg: "#DCDCAA" },
+  Verifying: { bg: "rgba(197,134,192,0.14)", fg: "#C586C0" },
+  Complete: { bg: "rgba(133,133,133,0.15)", fg: "#858585" },
 };
 
 const LS_KEY = "claude-board-ui";
-const KANBAN_SORT_LS_KEY = "claude-board-kanban-sort";
+const CONVEYOR_SORT_LS_KEY = "claude-board-conveyor-sort";
 
 // Register constants on Board.util for cross-module access
 Board.util.COLUMNS = COLUMNS;
@@ -244,7 +244,7 @@ Board.util.STATUS_LABELS = STATUS_LABELS;
 Board.util.STEP_LABELS = STEP_LABELS;
 Board.util.COMMAND_LABELS = COMMAND_LABELS;
 Board.util.LS_KEY = LS_KEY;
-Board.util.KANBAN_SORT_LS_KEY = KANBAN_SORT_LS_KEY;
+Board.util.CONVEYOR_SORT_LS_KEY = CONVEYOR_SORT_LS_KEY;
 
 // ── Utility Functions ──
 
@@ -312,17 +312,17 @@ Board.util.stepLabel = stepLabel;
 Board.util.commandLabel = commandLabel;
 Board.util.badge = badge;
 
-// ── XML Ticket Parsing ──
+// ── XML WorkRequest Parsing ──
 
-/** Parses a ticket XML string into a ticket data object. */
-function parseTicket(text) {
+/** Parses a workRequest XML string into a workRequest data object. */
+function parseWorkRequest(text) {
   const doc = new DOMParser().parseFromString(text, "text/xml");
-  const root = doc.querySelector("ticket");
+  const root = doc.querySelector("work_request");
   if (!root) return null;
 
   const meta = root.querySelector("metadata");
-  const ticket = {
-    number: "", title: "", created: "", updated: "", status: "Open",
+  const workRequest = {
+    number: "", title: "", created: "", updated: "", status: "Accepted",
     command: "", prompt: null, result: null,
     relations: [],
   };
@@ -330,22 +330,22 @@ function parseTicket(text) {
   if (meta) {
     ["number", "title", "created", "updated", "status"].forEach(function (f) {
       const el = meta.querySelector(f);
-      if (el && el.textContent) ticket[f] = el.textContent.trim();
+      if (el && el.textContent) workRequest[f] = el.textContent.trim();
     });
     // <datetime>
-    if (!ticket.created || !ticket.updated) {
+    if (!workRequest.created || !workRequest.updated) {
       var dtEl = meta.querySelector("datetime");
       if (dtEl && dtEl.textContent) {
         var dtVal = dtEl.textContent.trim();
-        if (!ticket.created) ticket.created = dtVal;
-        if (!ticket.updated) ticket.updated = dtVal;
+        if (!workRequest.created) workRequest.created = dtVal;
+        if (!workRequest.updated) workRequest.updated = dtVal;
       }
     }
     const cmdEl = meta.querySelector("command");
-    if (cmdEl) ticket.command = (cmdEl.textContent || "").trim();
+    if (cmdEl) workRequest.command = (cmdEl.textContent || "").trim();
   }
 
-  // Flat structure: <prompt> directly under <ticket>
+  // Flat structure: <prompt> directly under <workRequest>
   var promptEls = root.getElementsByTagName("prompt");
   var promptEl = null;
   for (var pi = 0; pi < promptEls.length; pi++) {
@@ -359,10 +359,10 @@ function parseTicket(text) {
       ft = ft.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; }).join("\n");
       if (ft) prompt[fc.tagName] = ft;
     }
-    if (Object.keys(prompt).length > 0) ticket.prompt = prompt;
+    if (Object.keys(prompt).length > 0) workRequest.prompt = prompt;
   }
 
-  // Flat structure: <result> directly under <ticket>
+  // Flat structure: <result> directly under <workRequest>
   var resultEls = root.getElementsByTagName("result");
   var resultEl = null;
   for (var rsi = 0; rsi < resultEls.length; rsi++) {
@@ -375,12 +375,12 @@ function parseTicket(text) {
       var rt = (rc.textContent || "").trim();
       if (rt) rObj[rc.tagName.toLowerCase()] = rt;
     }
-    if (Object.keys(rObj).length > 0) ticket.result = rObj;
+    if (Object.keys(rObj).length > 0) workRequest.result = rObj;
   }
 
-  // Legacy done ticket fallback (read-only): <submit>/<subnumber> structure
-  // T-399: Submit transient step is removed from the system. This block is only compatible with the past done ticket display.
-  if (!ticket.prompt && !ticket.command) {
+  // Legacy done workRequest fallback (read-only): <submit>/<subnumber> structure
+  // WR-399: Submit transient step is removed from the system. This block is only compatible with the past done workRequest display.
+  if (!workRequest.prompt && !workRequest.command) {
     var submitEl = root.querySelector("submit");
     if (submitEl) {
       var subs = submitEl.querySelectorAll("subnumber");
@@ -391,7 +391,7 @@ function parseTicket(text) {
       if (!activeSub && subs.length > 0) activeSub = subs[subs.length - 1];
       if (activeSub) {
         var legacyCmd = (activeSub.querySelector("command") || {}).textContent || "";
-        if (legacyCmd) ticket.command = legacyCmd.trim();
+        if (legacyCmd) workRequest.command = legacyCmd.trim();
         var legacyPromptEl = activeSub.querySelector("prompt");
         if (legacyPromptEl) {
           var lp = {};
@@ -400,7 +400,7 @@ function parseTicket(text) {
             var lt = (lc.textContent || "").trim();
             if (lt) lp[lc.tagName] = lt;
           }
-          if (Object.keys(lp).length > 0) ticket.prompt = lp;
+          if (Object.keys(lp).length > 0) workRequest.prompt = lp;
         }
         var legacyResultEl = activeSub.querySelector("result");
         if (legacyResultEl) {
@@ -410,7 +410,7 @@ function parseTicket(text) {
             var lrt = (lrc.textContent || "").trim();
             if (lrt) lr[lrc.tagName.toLowerCase()] = lrt;
           }
-          if (Object.keys(lr).length > 0) ticket.result = lr;
+          if (Object.keys(lr).length > 0) workRequest.result = lr;
         }
       }
     }
@@ -421,15 +421,15 @@ function parseTicket(text) {
     const rels = relationsEl.querySelectorAll("relation");
     for (let k = 0; k < rels.length; k++) {
       const type = rels[k].getAttribute("type") || "";
-      const relTicket = rels[k].getAttribute("ticket") || "";
-      if (type && relTicket) ticket.relations.push({ type: type, ticket: relTicket });
+      const relWorkRequest = rels[k].getAttribute("work_request") || "";
+      if (type && relWorkRequest) workRequest.relations.push({ type: type, work_request: relWorkRequest });
     }
   }
 
-  return ticket;
+  return workRequest;
 }
 
-Board.util.parseTicket = parseTicket;
+Board.util.parseWorkRequest = parseWorkRequest;
 
 // ── Directory / Path Utilities ──
 
@@ -456,7 +456,7 @@ function lastSegment(href) {
 
 /**
  * Resolves a result path to its actual location, handling archived workflows.
- * When a workflow is archived to .history/, ticket XML still holds the original
+ * When a workflow is archived to .history/, workRequest XML still holds the original
  * workflow/YYYYMMDD-HHMMSS/ path. This function rewrites the path using the
  * actual basePath from the WORKFLOWS array.
  */
@@ -566,7 +566,7 @@ let mermaidCounter = 0;
 function renderMd(text, baseUrl) {
   if (typeof marked === "undefined") return '<pre class="wf-file-content">' + esc(text) + '</pre>';
 
-  // T-321 P1 — flow-kanban XML field (-constraints "Condition1\n condition2")
+  // WR-321 P1 — flow-conveyor XML field (-constraints "Condition1\n condition2")
   // Litreal backslash-n 2 letters to the actual opening (code fence/inline backtick inside preserved).
   if (Board.util && Board.util.unescapeLiteralNewlines) {
     text = Board.util.unescapeLiteralNewlines(text);
@@ -604,7 +604,7 @@ function renderMd(text, baseUrl) {
 
   let html = marked.parse(text, { renderer: renderer, gfm: true, breaks: true });
 
-  // T-321 P2 — Merged into a single <ol> block (if text short circuit is not attached).
+  // WR-321 P2 — Merged into a single <ol> block (if text short circuit is not attached).
   // In a single ol output with a non-pure/0-start number (e.g. 5.6.7. / 1.2.0.) is already in a parent,
   // idempotent after-treatment to ensure the same indentation in the user input strain (the case with a rare marker).
   if (Board.util && Board.util.mergeAdjacentOrderedLists) {
@@ -769,7 +769,7 @@ function migrateTabHistory(history) {
 }
 
 // Initialize shared state
-Board.state.TICKETS = [];
+Board.state.WORK_REQUESTS = [];
 Board.state.WORKFLOWS = [];
 Board.state.COLUMNS = COLUMNS;
 Board.state.viewerTabs = [];
@@ -794,11 +794,11 @@ Board.state.dashData = {};
 Board.state.dashFetched = false;
 Board.state.dashChartInstances = {};
 
-// Kanban sort state
-Board.state.kanbanSort = null; // initialized by kanban.js
+// Conveyor sort state
+Board.state.conveyorSort = null; // initialized by conveyor.js
 
 // Roadmap subtab state — saveUI/loadUI by sequencing (active phase + unfolded card + side width).
-// Contexts Tab (Former Prompt Tab) is used by Roadmap Sub tab — not a separate panel, so no panel Open.
+// Contexts Tab (Former Prompt Tab) is used by Roadmap Sub tab — not a separate panel, so no panel Accepted.
 Board.state.roadmap = (savedState.roadmap && typeof savedState.roadmap === "object")
   ? {
       activePhaseId: typeof savedState.roadmap.activePhaseId === "string"
@@ -861,11 +861,11 @@ Board.state.relations = (savedState.relations && typeof savedState.relations ===
         direction: (savedState.relations.filter && savedState.relations.filter.direction) || "TD",
         showIsolated: !!(savedState.relations.filter && savedState.relations.filter.showIsolated),
       },
-      panelOpen: !!savedState.relations.panelOpen,
+      panelAccepted: !!savedState.relations.panelAccepted,
     }
   : {
       filter: { statuses: ["open", "progress", "review", "done"], direction: "TD", showIsolated: false },
-      panelOpen: false,
+      panelAccepted: false,
     };
 
 // ── UI State Persistence ──
@@ -908,7 +908,7 @@ function switchTab(target, skipPush) {
   tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
   views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
   if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
-  if (target === "kanban" && Board.render.renderKanban) Board.render.renderKanban();
+  if (target === "conveyor" && Board.render.renderConveyor) Board.render.renderConveyor();
   if (target === "workflow" && Board.render.renderWorkflow) Board.render.renderWorkflow();
   if (target === "viewer" && Board.render.renderViewer) Board.render.renderViewer();
   if (target === "memory" && Board.render.renderMemory) Board.render.renderMemory();
@@ -929,10 +929,10 @@ function updateQueryString() {
   var params = new URLSearchParams(window.location.search);
   if (Board.state.activeTab === "viewer" && Board.state.activeViewerTab) {
     params.set("tab", "viewer");
-    params.set("ticket", Board.state.activeViewerTab);
+    params.set("work_request", Board.state.activeViewerTab);
   } else {
     params.delete("tab");
-    params.delete("ticket");
+    params.delete("work_request");
   }
   var qs = params.toString();
   var url = window.location.pathname + (qs ? "?" + qs : "");
@@ -964,7 +964,7 @@ Board.util.fetchXmlList = fetchXmlList;
 // both terminal/workflow pages, page load point·SSE git branch event·
 // /api/branch fetch update to a single helper anywhere.
 //
-// No-op on the status bar element page (kanban/dashboard, etc.).
+// No-op on the status bar element page (conveyor/dashboard, etc.).
 var BRANCH_ICON_SVG =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
   + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" '

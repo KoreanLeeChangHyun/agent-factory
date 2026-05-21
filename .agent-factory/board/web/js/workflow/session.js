@@ -87,7 +87,7 @@
    */
   var _rateLimitDismissTimer = null;
 
-  // ── task state storage (T-390) ──
+  // ── task state storage (WR-390) ──
   /**
    * Subagent task state map. task_id -> TaskState.
    * TaskState fields: description, status("running"|"completed"|"error"),
@@ -120,7 +120,7 @@
     }
   }
 
-  // ── rate_limit banner helper (T-389) ──
+  // ── rate_limit banner helper (WR-389) ──
   // SVG inline icons (general.md MUST: no external icon libraries/fonts).
   // 16x16 simple path — info: i-circle, warn/danger: !-triangle, dismiss: x.
   var _RL_ICON_INFO =
@@ -275,7 +275,7 @@
     }
   }
 
-  // ── task status helper (T-390) ──
+  // ── task status helper (WR-390) ──
 
   /**
    * Create a taskId item in _taskStatusMap or merge it into a patch.
@@ -950,7 +950,7 @@
     div.className = "term-message term-user";
     div.textContent = data.text;
     _ctx.appendToOutput(div);
-    // T-429: Render attachments card (REST replay and multi-client SSE paths).
+    // WR-429: Render attachments card (REST replay and multi-client SSE paths).
     // If it has already been drawn in the sendInput direct echo path, it is completely skipped by checking _sentTexts above.
     if (data.attachments && data.attachments.length > 0) {
       var termMod = Board && Board._term;
@@ -1052,7 +1052,7 @@
   /**
    * Starting/re-entering a production-line session.
    *
-   * Directly register 4 types of SSE event handles with Board.productionLineWorkflow.subscribe (T-507 P3
+   * Directly register 4 types of SSE event handles with Board.productionLineWorkflow.subscribe (WR-507 P3
    * Discard the old production-line-stdout-bridge.js bypass module → session.js (single absorption point).
    *
    *   workflow_step → Board.stepOverlay (Step/Phase hierarchy + termination processing)
@@ -1081,7 +1081,7 @@
       try { Board.stepOverlay.subscribe(sessionId); } catch (_) {}
     }
 
-    // T-508 — Restore step/phase ts first (before fetchSession) with localStorage fallback.
+    // WR-508 — Restore step/phase ts first (before fetchSession) with localStorage fallback.
     // Immediately after refreshing and before the backend GET response arrives, the first render blinks as 0 elapsed.
     // Regression blocking. When a fetchSession response arrives, overwrite it with a newer ts (guard built-in).
     if (Board.WorkflowRenderer && Board.WorkflowRenderer.restoreProductionLineState) {
@@ -1093,7 +1093,7 @@
       Board.productionLineWorkflow.fetchSession(sessionId).then(function (detail) {
         if (!detail) return;
         if (Board.WorkflowRenderer && Board.WorkflowRenderer.handleProductionLineStepEvent) {
-          // T-508 — Specify cycle_start_ts / step_ts of backend response in payload.
+          // WR-508 — Specify cycle_start_ts / step_ts of backend response in payload.
           // workflow-bar.js handleProductionLineStepEvent absorbs ts into _state.stepTimestamps
           // Setting start to external ts (blocking Date.now() fallback).
           Board.WorkflowRenderer.handleProductionLineStepEvent({
@@ -1120,7 +1120,7 @@
     }
 
     _productionLineSubscription = Board.productionLineWorkflow.subscribe(sessionId, {
-      onOpen: function () {
+      onAccepted: function () {
         Board.state.termConnected = true;
         Board.state.setTermStatus("running");
         _ctx.updateControlBar();
@@ -1134,7 +1134,7 @@
       },
       onStdout: function (data) {
         _onProductionLineStdout(data);
-        // T-507 P3 — Absorbs forward responsibility of old production-line-stdout-bridge.js.
+        // WR-507 P3 — Absorbs forward responsibility of old production-line-stdout-bridge.js.
         // step-overlay renders to the stdout container of the currently active Step/Phase.
         if (Board.stepOverlay && typeof Board.stepOverlay.handleStdout === "function") {
           try { Board.stepOverlay.handleStdout(data); } catch (err) {
@@ -1174,7 +1174,7 @@
   }
 
   /**
-   * Handling production-line workflow_stdout events (T-495 P3 — NDJSON branch render).
+   * Handling production-line workflow_stdout events (WR-495 P3 — NDJSON branch render).
    * payload: { session_id, text, raw? }
    *
    * Branch by raw.type (visibility 8 axis #3):
@@ -1427,20 +1427,20 @@
         return;
       }
 
-      function onOpen() {
+      function onAccepted() {
         clearTimeout(timer);
-        source.removeEventListener("open", onOpen);
+        source.removeEventListener("open", onAccepted);
         resolve();
       }
 
       function onError() {
         clearTimeout(timer);
-        source.removeEventListener("open", onOpen);
+        source.removeEventListener("open", onAccepted);
         source.removeEventListener("error", onError);
         reject(new Error("SSE connection failed"));
       }
 
-      source.addEventListener("open", onOpen);
+      source.addEventListener("open", onAccepted);
       source.addEventListener("error", onError);
     });
   }
@@ -1507,12 +1507,12 @@
       }
     });
 
-    // T-497: replay_start / replay_end SSE listener fires 0 servers + REST
+    // WR-497: replay_start / replay_end SSE listener fires 0 servers + REST
     // Abolished by unification decision. _isReplaying SSOT is _injectRestHistory driver
     // (REST /terminal/workflow/history path). board.md See §1.1.
 
-    // T-383 Phase 5 (T5-1, T5-3): Skip workflow_step during replay.
-    // Principle (T-379 Phase 2): workflow_step SSE is the only path for FSM transition.
+    // WR-383 Phase 5 (T5-1, T5-3): Skip workflow_step during replay.
+    // Principle (WR-379 Phase 2): workflow_step SSE is the only path for FSM transition.
     // This gate does not violate this principle — "It's not time to transition yet"
     // It is interpreted as During replay, DOM reconstruction ( rebuildStepPanelsFromDom ) occurs.
     // _restoreSession is performed on the path, so the UI state converges to another path,
@@ -1743,9 +1743,9 @@
       }
     });
 
-    // T-389: Dedicated SSE listener for rate_limit_event in Claude CLI.
-    // Implemented as an independent listener and separated from the existing stdout handler (L353) — TK-4 (T-390)
-    // stdout refactor and physical conflict avoidance (T-386 research G-2 recommendation).
+    // WR-389: Dedicated SSE listener for rate_limit_event in Claude CLI.
+    // Implemented as an independent listener and separated from the existing stdout handler (L353) — TK-4 (WR-390)
+    // stdout refactor and physical conflict avoidance (WR-386 research G-2 recommendation).
     // Server payload shape (terminal_channel._build_payload):
     //   { kind:"rate_limit", status, resets_at, rate_limit_type,
     //     is_using_overage, overage_status, session_id }
@@ -1817,7 +1817,7 @@
       termEventSource.close();
       termEventSource = null;
     }
-    // T-495 P2 — Production-line subscriptions are also organized (session switch race blocked)
+    // WR-495 P2 — Production-line subscriptions are also organized (session switch race blocked)
     _disconnectProductionLine();
     Board.state.termConnected = false;
   }
@@ -1840,9 +1840,9 @@
     _currentToolUseId = null;
     _toolInputMap = {};
     _isReplaying = false;
-    // T-389: Remove rate_limit banner/timer left over from previous session.
+    // WR-389: Remove rate_limit banner/timer left over from previous session.
     _dismissRateLimitBanner();
-    // T-390: task state map + rAF token initialization.
+    // WR-390: task state map + rAF token initialization.
     _taskStatusMap = {};
     if (_taskRenderRafId !== 0) {
       cancelAnimationFrame(_taskRenderRafId);
@@ -1930,7 +1930,7 @@
       _ctx.clearOutput();
       var wfSessionId = _ctx.getWorkflowSessionId && _ctx.getWorkflowSessionId();
 
-      // T-495 P2 — For production-line sessions, use a single entry point: Board.productionLineWorkflow.subscribe.
+      // WR-495 P2 — For production-line sessions, use a single entry point: Board.productionLineWorkflow.subscribe.
       // Separated from v1's /terminal/workflow/history + /terminal/workflow/events flow.
       if (Board.productionLineWorkflow && Board.productionLineWorkflow.isProductionLineSessionId &&
           Board.productionLineWorkflow.isProductionLineSessionId(wfSessionId)) {
@@ -2203,7 +2203,7 @@
     seedInFlightToolUse: seedInFlightToolUse,
     injectRestHistory: _injectRestHistory,
     applyRawModel: _applyRawModel,
-    // T-495 P2 — production-line session entry point (for external calls)
+    // WR-495 P2 — production-line session entry point (for external calls)
     startProductionLineSession: _startProductionLineWorkflowSession,
     disconnectProductionLine: _disconnectProductionLine,
     _bind: bind,

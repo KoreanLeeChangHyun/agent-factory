@@ -1,16 +1,16 @@
-"""inject_kanban_context.py — UserPromptSubmit hook: Kanban/session snapshot context builder.
+"""inject_conveyor_context.py — UserPromptSubmit hook: Conveyor/session snapshot context builder.
 
 Input: stdin JSON (UserPromptSubmit payload, content can be ignored)
 Output: stdout JSON
   {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "<text>"}}
 
 use:
-  The main session automatically recognizes the Kanban board status + active workflow session every user turn.
+  The main session automatically recognizes the Conveyor board status + active workflow session every user turn.
   Injected as additionalContext. Because the W03 dispatcher skips the call in a workflow session,
   This module does not contain main session identification logic.
 
 Output Limit:
-  - When the payload exceeds 4096 chars, only the top 10 are displayed in Open/In Progress details.
+  - When the payload exceeds 4096 chars, only the top 10 are displayed in Accepted/Executing details.
   - 0.8s soft deadline: When exceeded, partial payload is output and terminated.
 
 Failure Policy:
@@ -38,11 +38,11 @@ SOFT_DEADLINE = 0.8      # Total soft deadline (seconds)
 
 # Column directory name → display label
 COLUMN_LABELS: dict[str, str] = {
-    "open": "Open",
-    "progress": "In Progress",
-    "review": "Review",
-    "todo": "To Do",
-    "done": "Done",
+    "accepted": "Accepted",
+    "executing": "Executing",
+    "verifying": "Verifying",
+    "draft": "Draft",
+    "complete": "Complete",
 }
 
 # ── Project root navigation ───────────────────────────────────────────────────────────
@@ -75,15 +75,15 @@ def _find_project_root() -> str:
     return root
 
 
-# ── Collect Kanban Summary ────────────────────────────────────────────────────────────────
+# ── Collect Conveyor Summary ────────────────────────────────────────────────────────────────
 
 def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
     """Quickly extracts only metadata fields from XML files.
 
     Early stopping after parsing metadata sections using ET.iterparse.
     Input/Output:
-        xml_path: Absolute path to T-NNN.xml
-        return: {"number": "T-NNN", "title": "...", "status": "..."} or None
+        xml_path: Absolute path to WR-NNN.xml
+        return: {"number": "WR-NNN", "title": "...", "status": "..."} or None
     """
     try:
         fields: dict[str, str] = {}
@@ -108,33 +108,33 @@ def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
         return None
 
 
-def _collect_kanban_summary(project_root: str) -> dict[str, Any]:
-    """Collect ticket summaries by Kanban column.
+def _collect_conveyor_summary(project_root: str) -> dict[str, Any]:
+    """Collect work_request summaries by Conveyor column.
 
-    The open/progress/review column extracts ID + title + status.
+    The accepted/executing/verifying column extracts ID + title + status.
     The todo/done column returns only counts (saving payload size).
 
     Input: project_root — Main repo root path
     output: {
-        "counts": {"open": N, "progress": M, "review": K, "todo": A, "done": B},
-        "details": [{"number": "T-NNN", "title": "...", "status": "...", "column": "open"}, ...]
+        "counts": {"accepted": N, "executing": M, "verifying": K, "draft": A, "complete": B},
+        "details": [{"number": "WR-NNN", "title": "...", "status": "...", "column": "accepted"}, ...]
     }
     """
-    tickets_dir = os.path.join(project_root, '.agent-factory', 'tickets')
+    work_requests_dir = os.path.join(project_root, '.agent-factory', 'work-requests')
     counts: dict[str, int] = {}
     details: list[dict[str, str]] = []
 
-    for col in ("open", "progress", "review", "todo", "done"):
-        col_dir = os.path.join(tickets_dir, col)
+    for col in ("accepted", "executing", "verifying", "draft", "complete"):
+        col_dir = os.path.join(work_requests_dir, col)
         if not os.path.isdir(col_dir):
             counts[col] = 0
             continue
 
-        xml_files = glob.glob(os.path.join(col_dir, "T-*.xml"))
+        xml_files = glob.glob(os.path.join(col_dir, "WR-*.xml"))
         counts[col] = len(xml_files)
 
         # todo/done is just a count (no details needed)
-        if col in ("todo", "done"):
+        if col in ("draft", "complete"):
             continue
 
         for xml_path in sorted(xml_files):
@@ -156,7 +156,7 @@ def _parse_sessions_json(raw: str) -> list[dict[str, str]]:
     """flow-sessions --Normalize json output to a dict list.
 
     flow-sessions --json returns a session array JSON or an empty array.
-    Output format: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
+    Output format: [{"work_request": "WR-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
     """
     try:
         data = json.loads(raw)
@@ -167,7 +167,7 @@ def _parse_sessions_json(raw: str) -> list[dict[str, str]]:
             if not isinstance(item, dict):
                 continue
             sessions.append({
-                "ticket": str(item.get("ticket_id") or item.get("ticket") or ""),
+                "work_request": str(item.get("work_request") or ""),
                 "command": str(item.get("command") or ""),
                 "started_at": str(item.get("started_at") or item.get("start_time") or ""),
                 "status": str(item.get("status") or "running"),
@@ -202,7 +202,7 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
                 ctx = json.load(f)
             if not isinstance(ctx, dict):
                 continue
-            ticket = str(ctx.get("ticket_id") or ctx.get("ticketNumber") or "")
+            work_request = str(ctx.get("work_request") or "")
             command = str(ctx.get("command") or "")
             registry_key = str(ctx.get("registry_key") or ctx.get("registryKey") or "")
             started_at = ""
@@ -210,7 +210,7 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
                 # registryKey = YYYYMMDD-HHMMSS → extract HHMMSS
                 started_at = registry_key[9:15] if "-" in registry_key else registry_key[-6:]
             sessions.append({
-                "ticket": ticket,
+                "work_request": work_request,
                 "command": command,
                 "started_at": started_at,
                 "status": "running",
@@ -234,7 +234,7 @@ def _collect_active_sessions(project_root: str) -> list[dict[str, str]]:
     1st: call flow-sessions --json subprocess (timeout=0.7s)
     Secondary fallback: .agent-factory/runs/ direct stat
 
-    Output: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
+    Output: [{"work_request": "WR-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
     """
     bin_dir = os.path.join(project_root, '.agent-factory', 'bin')
     flow_sessions = os.path.join(bin_dir, 'flow-sessions')
@@ -280,49 +280,49 @@ def _format_hhmm(started_at: str) -> str:
 
 
 def _format_context(
-    kanban: dict[str, Any],
+    conveyor: dict[str, Any],
     sessions: list[dict[str, str]],
 ) -> str:
-    """Compose Kanban summary + active sessions in markdown format.
+    """Compose Conveyor summary + active sessions in markdown format.
 
     Example output:
-        ## Kanban snapshot (automatic injection, user turn point)
-        - Open: 1 case, In Progress: 1 case, Review: 6 cases / To Do: 41 cases, Done: 358 cases
+        ## Conveyor snapshot (automatic injection, user turn point)
+        - Accepted: 1 case, Executing: 1 case, Verifying: 6 cases / Draft: 41 cases, Complete: 358 cases
 
-        ### Open / In Progress Details
+        ### Accepted / Executing Details
 
 
 
         ### Active Session
 
     """
-    counts = kanban.get("counts", {})
-    details = kanban.get("details", [])
+    counts = conveyor.get("counts", {})
+    details = conveyor.get("details", [])
 
-    open_c = counts.get("open", 0)
-    progress_c = counts.get("progress", 0)
-    review_c = counts.get("review", 0)
-    todo_c = counts.get("todo", 0)
-    done_c = counts.get("done", 0)
+    accepted_c = counts.get("accepted", 0)
+    executing_c = counts.get("executing", 0)
+    verifying_c = counts.get("verifying", 0)
+    draft_c = counts.get("draft", 0)
+    complete_c = counts.get("complete", 0)
 
     lines: list[str] = []
-    lines.append("## Kanban snapshot (automatic injection, user turn point)")
+    lines.append("## Conveyor snapshot (automatic injection, user turn point)")
     lines.append(
-        f"- Open: {open_c} cases, In Progress: {progress_c} cases, Review: {review_c} cases"
-        f"/ To Do: {todo_c} case, Done: {done_c} case"
+        f"- Accepted: {accepted_c} cases, Executing: {executing_c} cases, Verifying: {verifying_c} cases"
+        f"/ Draft: {draft_c} case, Complete: {complete_c} case"
     )
 
-    # Open / In Progress Details
+    # Accepted / Executing Details
     if details:
         # Maximum MAX_DETAIL_ITEMS item limit
         display_details = details[:MAX_DETAIL_ITEMS]
         lines.append("")
-        lines.append("### Open / In Progress Details")
+        lines.append("### Accepted / Executing Details")
         for item in display_details:
             number = item.get("number", "")
             title = item.get("title", "")
             status = item.get("status", "")
-            label = "In Progress" if "progress" in status.lower() or "in progress" in status.lower() else status
+            label = "Executing" if "progress" in status.lower() or "in progress" in status.lower() else status
             lines.append(f"- {number} [{label}] {title}")
         if len(details) > MAX_DETAIL_ITEMS:
             lines.append(f"_(Show only top {MAX_DETAIL_ITEMS} items, total {len(details)} items)_")
@@ -332,11 +332,11 @@ def _format_context(
         lines.append("")
         lines.append("### Active sessions")
         for session in sessions:
-            ticket = session.get("ticket", "")
+            work_request = session.get("work_request", "")
             command = session.get("command", "")
             started = _format_hhmm(session.get("started_at", ""))
             time_str = f" ({started})" if started else ""
-            lines.append(f"- {ticket} {command}{time_str}")
+            lines.append(f"- {work_request} {command}{time_str}")
 
     return "\n".join(lines)
 
@@ -344,7 +344,7 @@ def _format_context(
 # ── Main ─────────────────────────────────────────────────────────────────────────
 
 def build_context(project_root: str | None = None) -> str:
-    """Build Kanban + session snapshot context text.
+    """Build Conveyor + session snapshot context text.
 
     An entry point that can be called directly from the outside (can be imported from the W03 dispatcher).
 
@@ -357,9 +357,9 @@ def build_context(project_root: str | None = None) -> str:
     if project_root is None:
         project_root = _find_project_root()
 
-    kanban = _collect_kanban_summary(project_root)
+    conveyor = _collect_conveyor_summary(project_root)
     sessions = _collect_active_sessions(project_root)
-    return _format_context(kanban, sessions)
+    return _format_context(conveyor, sessions)
 
 
 def main() -> None:
@@ -370,7 +370,7 @@ def main() -> None:
     exit code: always 0 (no blocking of user turn)
 
     0.8s soft deadline: partial payload output when exceeded.
-    When the payload exceeds 4096 chars, Open/In Progress details are only available for the top 10 cases.
+    When the payload exceeds 4096 chars, Accepted/Executing details are only available for the top 10 cases.
     """
     start_time = time.monotonic()
 

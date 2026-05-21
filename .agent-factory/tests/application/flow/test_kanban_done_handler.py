@@ -15,7 +15,7 @@ import unittest
 
 def _load_classify_done_failure():
     """classify done failure"""
-    from engine.apps.board_api.kanban_done_re import _classify_done_failure
+    from engine.apps.board_api.conveyor_complete_re import _classify_done_failure
 
     return _classify_done_failure
 

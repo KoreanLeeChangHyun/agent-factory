@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 # fake/test session id pattern — production registry registration + persist blocking.
-# T-495 cycle in P2/P3 worker call curl directly to production endpoint
+# WR-495 cycle in P2/P3 worker call curl directly to production endpoint
 # News added after workflow-sessions-v2/` is contaminated revolving (2026-05-17).
 _FAKE_SESSION_PATTERNS: tuple[str, ...] = (
     '-test', '-smoke', '-fake', '-mock',
@@ -34,7 +34,7 @@ _FAKE_SESSION_PATTERNS: tuple[str, ...] = (
 def is_fake_session_id(session_id: str) -> bool:
     """session id is fake/test pattern if true.
 
-    production driver issuance session id with pattern in the format `wf-T-NNN-<uuid>
+    production driver issuance session id with pattern in the format `wf-WR-NNN-<uuid>
     Not a collision. + persist skip.
     """
     lower = session_id.lower()
@@ -53,8 +53,8 @@ class ProductionLineSession:
     - channel is ProductionLineSSEChannel instance (TerminalSSEChannel and separated)
 
     Attributes:
-        session id: driver issue session ID (wf-T-NNN-<uuid>)
-        Ticket ID (T-NNN)
+        session id: driver issue session ID (wf-WR-NNN-<uuid>)
+        WorkRequest (WR-NNN)
         command: implement / research / review
         work dir: run/<registryKey>/ absolute path
         worktree path: execution-only worktree absolute path (no empty string)
@@ -69,7 +69,7 @@ class ProductionLineSession:
     """
 
     session_id: str
-    ticket_id: str
+    work_request: str
     command: str
     work_dir: str
     channel: 'ProductionLineSSEChannel' = field(repr=False)
@@ -119,7 +119,7 @@ class ProductionLineSessionRegistry:
     def create(
         self,
         session_id: str,
-        ticket_id: str,
+        work_request: str,
         command: str,
         work_dir: str,
         worktree_path: str = '',
@@ -130,8 +130,8 @@ class ProductionLineSessionRegistry:
         Unlike lazy create v1 create external POST /api/v2/sessions entry point.
 
         Args:
-            session id: driver issue session ID (wf-T-NNN-<uuid>)
-            ticket_id: T-NNN
+            session id: driver issue session ID (wf-WR-NNN-<uuid>)
+            work_request: WR-NNN
             command: implement / research / review
             work dir: run/<registryKey>/ absolute path
             worktree path: execution-only worktree absolute path (bin strings when research/review)
@@ -142,7 +142,7 @@ class ProductionLineSessionRegistry:
         if is_fake_session_id(session_id):
             logger.warning(
                 "production_line_session: fake/test session_id pattern detected (%s) — "
-                "+ persist skip (T-495 production endpoint contamination block)",
+                "+ persist skip (WR-495 production endpoint contamination block)",
                 session_id,
             )
             raise ValueError(
@@ -162,7 +162,7 @@ class ProductionLineSessionRegistry:
 
         session = ProductionLineSession(
             session_id=session_id,
-            ticket_id=ticket_id,
+            work_request=work_request,
             command=command,
             work_dir=work_dir,
             worktree_path=worktree_path,
@@ -175,7 +175,7 @@ class ProductionLineSessionRegistry:
                 meta = {
                     '_meta': {
                         'session_id': session_id,
-                        'ticket_id': ticket_id,
+                        'work_request': work_request,
                         'command': command,
                         'work_dir': work_dir,
                         'worktree_path': worktree_path,
@@ -201,11 +201,11 @@ class ProductionLineSessionRegistry:
         with self._lock:
             return self._sessions.get(session_id)
 
-    def get_by_ticket(self, ticket_id: str) -> ProductionLineSession | None:
-        """Check the session with the ticket ID (first matching at multiple times)."""
+    def get_by_work_request(self, work_request: str) -> ProductionLineSession | None:
+        """Check the session with the work_request ID (first matching at multiple times)."""
         with self._lock:
             for session in self._sessions.values():
-                if session.ticket_id == ticket_id:
+                if session.work_request == work_request:
                     return session
             return None
 
@@ -239,7 +239,7 @@ class ProductionLineSessionRegistry:
         """Returns the full session list to dict list.
 
         Returns:
-            Session meta dict list. key: session id, ticket id, command, work dir,
+            Session meta dict list. key: session id, WorkRequest, command, work dir,
             worktree_path, status, current_step, current_phase, cycle_start_ts,
             step_ts, created_at
         """
@@ -247,7 +247,7 @@ class ProductionLineSessionRegistry:
             return [
                 {
                     'session_id': s.session_id,
-                    'ticket_id': s.ticket_id,
+                    'work_request': s.work_request,
                     'command': s.command,
                     'work_dir': s.work_dir,
                     'worktree_path': s.worktree_path,
@@ -353,7 +353,7 @@ class ProductionLineSessionRegistry:
             channel = ProductionLineSSEChannel(session_id=session_id, persist_path=fpath)
             session = ProductionLineSession(
                 session_id=session_id,
-                ticket_id=meta.get('ticket_id', ''),
+                work_request=meta.get('work_request', ''),
                 command=meta.get('command', ''),
                 work_dir=meta.get('work_dir', ''),
                 worktree_path=meta.get('worktree_path', ''),

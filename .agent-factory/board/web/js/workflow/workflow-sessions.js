@@ -3,9 +3,9 @@
  *
  * Terminal sessions dropdown — main sessions from /terminal/sessions (title + UUID).
  *
- * T-516 — Workflow Tab Sync Charges are removed from this module. Client Side Single
+ * WR-516 — Workflow Tab Sync Charges are removed from this module. Client Side Single
  * source localStorage — terminal.js init of render
- * LAUNCH STARTED add on flow + kanban.js is responsible for lifecycle. Close
+ * LAUNCH STARTED add on flow + conveyor.js is responsible for lifecycle. Close
  * Only buttons are the only terminate trigger.
  *
  * Depends on: common.js (Board namespace), session.js (Board.session)
@@ -131,7 +131,7 @@
   /**
    * Main sessions dropdown refresh.
    *
-   * T-516 — Workflow Tab sync Quarterly Closed. This function is only responsible for dropdown updates.
+   * WR-516 — Workflow Tab sync Quarterly Closed. This function is only responsible for dropdown updates.
    * The parameter is for the support of the callsite signature (applicant modification).
    *
    * @param {string null}

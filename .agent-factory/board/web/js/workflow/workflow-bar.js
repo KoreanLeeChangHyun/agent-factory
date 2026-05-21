@@ -7,7 +7,7 @@
  * flow-claude, flow-init, flow-step, flow-phase, and flow-finish scripts.
  * phaseTimeline renders the timeline bar DOM below .terminal-session-bar.
  *
- * T-507 — stdout / step·Phase latency / output viewer is step-overlay.js +
+ * WR-507 — stdout / step·Phase latency / output viewer is step-overlay.js +
  * session.js is responsible. git git
  * timeline bar (steps row / task row / artifacts row)
  *
@@ -55,7 +55,7 @@
       stepAsk:           /(?:║\s+\[ASK\]\s+(\S+)$|\[ASK\]\s+(\S+)$)/,
       phase:             /(?:║\s+STATE:\s+Phase\s+(\d+)\s+(sequential|parallel)|\[PHASE\]\s+(\d+)\s+(sequential|parallel))/,
       phaseAgents:       /(?:║\s+>>\s+([^\[]+?)(?:\s+\[([^\]]+)\])?$|^>>\s+([^\[]+?)(?:\s+\[([^\]]+)\])?$)/,
-      finishDone:        /(?:║\s+DONE:\s+Workflow\s+(Complete|Failed)|\[DONE\]\s+Workflow\s+(Complete|Failed))/,
+      finishComplete:        /(?:║\s+DONE:\s+Workflow\s+(Complete|Failed)|\[DONE\]\s+Workflow\s+(Complete|Failed))/,
       finishKey:         /(?:║\s+(\d{8}-\d{6})$|^(\d{8}-\d{6})$)/,
       stateChange:       /\[STATE\]\s+Step\s+changed/,
       stateTransition:   /^>>\s+(\w+)\s*->\s*(\w+)$/,
@@ -99,7 +99,7 @@
         init:     { start: null, end: null },
         plan:     { start: null, end: null },
         work:     { start: null, end: null },
-        validate: { start: null, end: null }, /* T-495 P2 */
+        validate: { start: null, end: null }, /* WR-495 P2 */
         report:   { start: null, end: null },
         done:     { start: null, end: null }
       },
@@ -131,7 +131,7 @@
     var _pendingStateChange = false;
 
     function _reset(command) {
-      // T-383 Phase 3: When reset  stepPanels empty map  restoreSession side
+      // WR-383 Phase 3: When reset  stepPanels empty map  restoreSession side
       // rebuildStepPanelsFromDom to rebuild maps to current DOM.
       _state = {
         command:      command || "",
@@ -217,7 +217,7 @@
     }
 
     /**
-     * T-508 — step full + step elapsed ts record.
+     * WR-508 — step full + step elapsed ts record.
      *
      * @param {string} stepName
      * @param {{startTsMs?: number}} [opts]
@@ -272,7 +272,7 @@
       _activeStepPanel = _getOrCreateStepPanel(_state.currentStep);
     }
 
-    // ── T-508 — production-line elapsed ts persist (localStorage fallback) ──
+    // ── WR-508 — production-line elapsed ts persist (localStorage fallback) ──
     var PRODUCTION_LINE_STATE_STORAGE_PREFIX = "wf_production_line_state_";
 
     /**
@@ -373,7 +373,7 @@
     }
 
     /**
-     * T-495 P3 — workflow step/phase/finish payload, extras key
+     * WR-495 P3 — workflow step/phase/finish payload, extras key
      * (verdict/commit/commit hash/retry/regression)
      *
      * if the driver sends forward-compatible payload, immediately  state.v2Meta
@@ -401,7 +401,7 @@
     }
 
     /**
-     * T-508 — phase entry + phase elapsed ts record.
+     * WR-508 — phase entry + phase elapsed ts record.
      *
      * @param {number} n - phase number
      * @param {string} mode
@@ -445,7 +445,7 @@
     // ── Step Panel DOM management ──
 
     function _getOrCreateStepPanel(stepName) {
-      // T-383 Phase 4 (VUL-4 / S2) invariant:
+      // WR-383 Phase 4 (VUL-4 / S2) invariant:
       //   _stepPanels[stepName] <-> outputDiv.querySelector(
       //     '.wf-step-panel[data-step="' + stepName + '"]'
       //   ) must refer to the same DOM node.
@@ -794,7 +794,7 @@
         return true;
       }
 
-      if ((m = P.finishDone.exec(line))) {
+      if ((m = P.finishComplete.exec(line))) {
         _pendingFinish       = true;
         _pendingFinishResult = _pick(m);
         return true;
@@ -822,7 +822,7 @@
       patterns: P,
 
       /**
-       * T-495 P2 — production-line workflow step event processing.
+       * WR-495 P2 — production-line workflow step event processing.
        * production-line payload shape: { session_id, step ∈ {NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED}, phase, prev_step }
        *
        * v1 handleStepEvent
@@ -835,10 +835,10 @@
         var stepUp = String(data.step).toUpperCase();
         var step = stepUp.toLowerCase();
 
-        // T-495 P3 — extras (verdict/commit/retry) when passing  state
+        // WR-495 P3 — extras (verdict/commit/retry) when passing  state
         _absorbProductionLineExtras(data);
 
-        // T-508 — backend epoch sec → frontend epoch ms conversion + cycle start cumulative
+        // WR-508 — backend epoch sec → frontend epoch ms conversion + cycle start cumulative
         var stepOpts;
         if (typeof data.step_ts === "number" && data.step_ts > 0) {
           stepOpts = { startTsMs: Math.round(data.step_ts * 1000) };
@@ -896,16 +896,16 @@
       },
 
       /**
-       * T-495 P2 — production-line workflow phase event processing.
+       * WR-495 P2 — production-line workflow phase event processing.
        * payload: { session_id, phase: "P1"|"P2"..., action: "start"|"end" }
        */
       handleProductionLinePhaseEvent: function (data) {
         if (!data || !data.phase) return;
-        _absorbProductionLineExtras(data);  // T-495 P3 — verdict/commit/retry/regression
+        _absorbProductionLineExtras(data);  // WR-495 P3 — verdict/commit/retry/regression
         var phaseNum = parseInt(String(data.phase).replace(/^P/i, ""), 10);
         if (isNaN(phaseNum)) return;
 
-        // T-508 — backend epoch sec → frontend epoch ms
+        // WR-508 — backend epoch sec → frontend epoch ms
         var phaseOpts;
         if (typeof data.step_ts === "number" && data.step_ts > 0) {
           phaseOpts = { startTsMs: Math.round(data.step_ts * 1000) };
@@ -927,12 +927,12 @@
       },
 
       /**
-       * T-495 P2 — production-line workflow finish event processing.
+       * WR-495 P2 — production-line workflow finish event processing.
        * payload: { session_id, outcome: "ok"|"fail", summary }
        */
       handleProductionLineFinishEvent: function (data) {
         if (!data) return;
-        _absorbProductionLineExtras(data);  // T-495 P3 — verdict/commit/retry
+        _absorbProductionLineExtras(data);  // WR-495 P3 — verdict/commit/retry
         if (data.outcome === "ok") {
           _complete();
         } else {
@@ -1036,7 +1036,7 @@
       },
 
       /**
-       * T-508 — localStorage stored in production-line ts  state restored.
+       * WR-508 — localStorage stored in production-line ts  state restored.
        * session.js's  startProductionLineWorkflowSession call before fetchSession.
        * @returns {boolean} Restores whether or not successful (key Missing / parse fails false)
        */
@@ -1045,7 +1045,7 @@
       },
 
       /**
-       * T-508 — current  state step/phase ts localStorage to write.
+       * WR-508 — current  state step/phase ts localStorage to write.
        * Can be triggered in external (session.js). Automatic call handleProductionLine*Event.
        */
       persistProductionLineState: function () {
@@ -1259,7 +1259,7 @@
         html += '<span class="wf-meta-id">#' + _esc(st.workId) + '</span>';
       }
 
-      // [Intermediate] button — only displayed during the session (T-904)
+      // [Intermediate] button — only displayed during the session (WR-904)
       if (st.status === "running") {
         html += '<button class="wf-stop-btn" title="Workflow Force Stop">Underground</button>';
       }
@@ -1363,30 +1363,30 @@
           })(links[i]);
         }
 
-        // [Medical] Button Handler Binding (T-904)
+        // [Medical] Button Handler Binding (WR-904)
         var stopBtn = bar.querySelector(".wf-stop-btn");
         if (stopBtn) {
           stopBtn.addEventListener("click", function () {
             if (!confirm("Stop forced workflow. The current operation can be closed. Do you want to visit?")) {
               return;
             }
-            // session id and ticket id collection
+            // session id and workRequest id collection
             var sessionId = (Board._term && Board._term.workflowSessionId) || null;
-            var ticketId = null;
+            var workRequestId = null;
             if (sessionId) {
-              // "wf-T-NNN-YYYYMMDD-HHMMSS" → "T-NNN"
-              var m = sessionId.match(/^wf-(T-\d+)/);
-              if (m) ticketId = m[1];
+              // "wf-WR-NNN-YYYYMMDD-HHMMSS" → "WR-NNN"
+              var m = sessionId.match(/^wf-(WR-\d+)/);
+              if (m) workRequestId = m[1];
             }
-            if (!sessionId && !ticketId) {
+            if (!sessionId && !workRequestId) {
               Board.util.showInfoModal("No Session Information", "You cannot find session information. Please refresh the page and try again.", { severity: "warning" });
               return;
             }
-            // T-513 P5 — V1 /api/workflow/stop endpoint disposal. Production-line
+            // WR-513 P5 — V1 /api/workflow/stop endpoint disposal. Production-line
             // stop endpoint new releases the star follow-up track. This stop button is temporarily closed.
             Board.util.showInfoModal(
               "About Us",
-              "Production-line workflow stop function is restored after a star track endpoint fix (T-513 P5 crystal). Use the ESC or subprocess direct termination of the main terminal at the point of view.",
+              "Production-line workflow stop function is restored after a star track endpoint fix (WR-513 P5 crystal). Use the ESC or subprocess direct termination of the main terminal at the point of view.",
               { severity: "warning" }
             );
           });

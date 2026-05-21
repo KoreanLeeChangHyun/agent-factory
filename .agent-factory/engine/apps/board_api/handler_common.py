@@ -6,12 +6,8 @@ import os
 import re
 import sys
 
-# WorkRequest number format regular expression
 _WORK_REQUEST_RE = re.compile(r'^WR-\d+$')
-_TICKET_RE = re.compile(r'^T-\d+$')
-# Conveyor full directory listing (used in derived-from guard)
 _CONVEYOR_ALL_DIRS = ('draft', 'accepted', 'executing', 'verifying', 'complete')
-_KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
 
 
 def _import_metrics_cli():

@@ -1,6 +1,6 @@
 /**
  * @module terminal/attachment-card
- * Attachment Ticket Card DOM Generating Helper — Single Truth Supplier.
+ * Attachment WorkRequest Card DOM Generating Helper — Single Truth Supplier.
  *
  * Input side (.terminal-image-preview preview) and message renderer side (.term-message-attachments)
  * Board. term.attachmentCard.create(att) to share the same DOM structure and look&fill.
@@ -19,7 +19,7 @@
    * @param {string|undefined} command
    * @returns {string}
    */
-  function _ticketCmdLabel(command) {
+  function _workRequestCmdLabel(command) {
     if (!command) return "TKT";
     var c = String(command).toLowerCase();
     if (c === "implement") return "IMP";
@@ -35,7 +35,7 @@
    * @param {string|undefined} workdir
    * @returns {string|null}
    */
-  function _extractTicketDate(workdir) {
+  function _extractWorkRequestDate(workdir) {
     if (!workdir) return null;
     var m = String(workdir).match(/runs\/(\d{8})-(\d{6})/);
     if (!m) return null;
@@ -69,7 +69,7 @@
     if (att.subtitle) return att.subtitle;
     var workdir = att.result && att.result.workdir;
     if (workdir) {
-      var dateStr = _extractTicketDate(workdir);
+      var dateStr = _extractWorkRequestDate(workdir);
       if (dateStr) return dateStr;
     }
     if (att.report) {
@@ -80,53 +80,53 @@
   }
 
   /**
-   * returns by creating an attachment ticket card DOM element.
+   * returns by creating an attachment workRequest card DOM element.
    *
-   * The generated card uses the `.terminal-ticket-card` class.
-   * remove button does not include — M.renderTicketPreview in the input side view is
+   * The generated card uses the `.terminal-work-request-card` class.
+   * remove button does not include — M.renderWorkRequestPreview in the input side view is
    * Separately put the remove button, and the message wrender side should not be remove button.
    *
    * @param {object} att - {number, command, title, prompt?, report?, result?, subtitle?}
-   * @returns {HTMLElement} .terminal-ticket-card div
+   * @returns {HTMLElement} .terminal-work-request-card div
    */
   function create(att) {
     att = att || {};
-    var attType = att.type || "ticket";
+    var attType = att.type || "work-request";
 
     var card = document.createElement("div");
-    card.className = "terminal-ticket-card";
+    card.className = "terminal-work-request-card";
     card.setAttribute("data-att-type", attType);
     if (att.number) {
-      card.setAttribute("data-ticket-number", att.number);
+      card.setAttribute("data-work-request-number", att.number);
     }
     if (attType === "memory" && att.name) {
       card.setAttribute("data-memory-name", att.name);
     }
 
-    // Badge: ticket = command code (IMP/RSC/REV/TKT) / memory = "MEM"
+    // Badge: workRequest = command code (IMP/RSC/REV/TKT) / memory = "MEM"
     var cmdEl = document.createElement("div");
-    cmdEl.className = "terminal-ticket-card-cmd";
-    cmdEl.textContent = attType === "memory" ? "MEM" : _ticketCmdLabel(att.command);
+    cmdEl.className = "terminal-work-request-card-cmd";
+    cmdEl.textContent = attType === "memory" ? "MEM" : _workRequestCmdLabel(att.command);
 
     // Body: title + subtitle
     var bodyEl = document.createElement("div");
-    bodyEl.className = "terminal-ticket-card-body";
+    bodyEl.className = "terminal-work-request-card-body";
 
     var titleEl = document.createElement("div");
-    titleEl.className = "terminal-ticket-card-title";
+    titleEl.className = "terminal-work-request-card-title";
     var titleText;
     if (attType === "memory") {
       titleText = att.title || att.name || "memory";
     } else {
-      var numStr = att.number || "T-???";
-      var ticketTitle = (att.title || "").trim();
-      titleText = ticketTitle ? (numStr + " " + ticketTitle) : numStr;
+      var numStr = att.number || "WR-???";
+      var workRequestTitle = (att.title || "").trim();
+      titleText = workRequestTitle ? (numStr + " " + workRequestTitle) : numStr;
     }
     titleEl.textContent = titleText;
     titleEl.title = titleText;
 
     var subtitleEl = document.createElement("div");
-    subtitleEl.className = "terminal-ticket-card-sub";
+    subtitleEl.className = "terminal-work-request-card-sub";
     var subtitle = attType === "memory"
       ? (att.subtitle || att.name || "")
       : _resolveSubtitle(att);
@@ -146,8 +146,8 @@
   M.attachmentCard = {
     create: create,
     // internal testing
-    _ticketCmdLabel: _ticketCmdLabel,
-    _extractTicketDate: _extractTicketDate,
+    _workRequestCmdLabel: _workRequestCmdLabel,
+    _extractWorkRequestDate: _extractWorkRequestDate,
     _resolveSubtitle: _resolveSubtitle
   };
 

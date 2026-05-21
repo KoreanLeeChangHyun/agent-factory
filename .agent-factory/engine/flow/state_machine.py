@@ -81,7 +81,7 @@ def _resolve_board_port() -> int | None:
 def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
     """Notifies the Board server of the workflow step transition (best-effort).
 
-    Obtain ticket_id from the `_WF_TICKET_ID` environment variable and send it to `/terminal/workflow/list`
+    Obtain WorkRequest from the `_WF_WORK_REQUEST` environment variable and send it to `/terminal/workflow/list`
     After retrieving the session_id, call `/terminal/workflow/step` POST.
     If the server does not start, there is no matching session, or a network error occurs, it passes quietly.
 
@@ -95,19 +95,19 @@ def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
         port = _resolve_board_port()
         if port is None:
             return
-        ticket_id = os.environ.get("_WF_TICKET_ID", "").strip()
-        if not ticket_id:
+        work_request = os.environ.get("_WF_WORK_REQUEST", "").strip()
+        if not work_request:
             return
 
         list_url = f"http://127.0.0.1:{port}/terminal/workflow/list"
         with urllib.request.urlopen(list_url, timeout=2) as resp:
             sessions = json.loads(resp.read().decode("utf-8"))
         sessions_iter = sessions if isinstance(sessions, list) else sessions.get("sessions", [])
-        # Since there may be multiple sessions on the same ticket, the latest matching based on created_at is selected.
+        # Since there may be multiple sessions on the same WorkRequest, the latest matching based on created_at is selected.
         # Priority is given to active (non-stopped) sessions, and if there is no activity, it falls back to the latest stopped session.
         candidates = [
             s for s in sessions_iter
-            if isinstance(s, dict) and s.get("ticket_id") == ticket_id and s.get("session_id")
+            if isinstance(s, dict) and s.get("work_request") == work_request and s.get("session_id")
         ]
         if not candidates:
             return
@@ -136,7 +136,7 @@ def _notify_board_step(to_step: str, abs_work_dir: str = "") -> None:
             _append_log(
                 abs_work_dir,
                 "INFO",
-                f"BOARD_STEP_NOTIFY: ticket={ticket_id} session={session_id} step={to_step.lower()}",
+                f"BOARD_STEP_NOTIFY: work_request={work_request} session={session_id} step={to_step.lower()}",
             )
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as exc:
         if abs_work_dir:

@@ -4,11 +4,11 @@
  * Board SPA real-time update module.
  *
  * Manages Server-Sent Events (SSE) connection with automatic fallback to
- * polling when SSE is unavailable or fails. Handles kanban, workflow,
+ * polling when SSE is unavailable or fails. Handles conveyor, workflow,
  * and dashboard refresh on data changes. Also contains the application
  * initialization sequence (must be loaded last).
  *
- * Depends on: common.js, kanban.js, viewer.js, workflow.js, dashboard.js
+ * Depends on: common.js, conveyor.js, viewer.js, workflow.js, dashboard.js
  */
 "use strict";
 
@@ -27,64 +27,64 @@
   let sseRetryTimerId = null;
   let pollTimerId = null;
 
-  let prevTicketJson = "";
+  let prevWorkRequestJson = "";
   let prevWfJson = "";
 
   // ── Helpers ──
 
   /**
-   * Serializes tickets to a JSON string for change detection.
-   * @param {Array} tickets - ticket array
+   * Serializes workRequests to a JSON string for change detection.
+   * @param {Array} workRequests - workRequest array
    * @returns {string} JSON string
    */
-  function ticketJson(tickets) {
-    return JSON.stringify(tickets.map(function (t) {
+  function workRequestJson(workRequests) {
+    return JSON.stringify(workRequests.map(function (t) {
       return { number: t.number, title: t.title, status: t.status,
                command: t.command, prompt: t.prompt, result: t.result };
     }));
   }
 
-  // ── Kanban Refresh (SSE/Polling shared) ──
+  // ── Conveyor Refresh (SSE/Polling shared) ──
 
   /**
-   * Refreshes the kanban board.
+   * Refreshes the conveyor board.
    * @param {string[]} [files] - Changed file names. If provided, selective fetch; otherwise full fetch.
    */
-  function refreshKanban(files) {
+  function refreshConveyor(files) {
     var fetchPromise = (files && files.length > 0)
-      ? Board.fetch.fetchTicketsByFiles(files).then(function () { return Board.state.TICKETS; })
-      : Board.fetch.fetchTickets().then(function (tickets) {
+      ? Board.fetch.fetchWorkRequestsByFiles(files).then(function () { return Board.state.WORK_REQUESTS; })
+      : Board.fetch.fetchWorkRequests().then(function (workRequests) {
           // Preserve existing data if fetch returned empty due to error
-          // (fetchTickets catch handler returns [] on failure; skip overwrite if we already have data)
-          if (!tickets || (tickets.length === 0 && Board.state.TICKETS.length > 0)) {
-            return Board.state.TICKETS;
+          // (fetchWorkRequests catch handler returns [] on failure; skip overwrite if we already have data)
+          if (!workRequests || (workRequests.length === 0 && Board.state.WORK_REQUESTS.length > 0)) {
+            return Board.state.WORK_REQUESTS;
           }
-          Board.state.TICKETS = tickets;
-          return Board.state.TICKETS;
+          Board.state.WORK_REQUESTS = workRequests;
+          return Board.state.WORK_REQUESTS;
         });
 
-    fetchPromise.then(function (tickets) {
-      if (!tickets) return; // fetch failed: preserve existing data, skip update
-      const json = ticketJson(tickets);
-      if (json !== prevTicketJson) {
-        prevTicketJson = json;
-        Board.render.renderKanban();
+    fetchPromise.then(function (workRequests) {
+      if (!workRequests) return; // fetch failed: preserve existing data, skip update
+      const json = workRequestJson(workRequests);
+      if (json !== prevWorkRequestJson) {
+        prevWorkRequestJson = json;
+        Board.render.renderConveyor();
         if (Board.state.activeTab === "relations" && Board.render.renderRelations) {
           Board.render.renderRelations();
         }
-        // workflow tab rely on ticket mapping — TICKETS update only
+        // workflow tab rely on workRequest mapping — WORK_REQUESTS update only
         // (Specification of shells to preserve the bar·scroll·spoker)
         if (Board.state.activeTab === "workflow" && Board.render.renderWfTbody) {
           Board.render.renderWfTbody();
         }
         Board.state.viewerTabs.forEach(function (vt) {
-          if (vt.ticket) {
-            const fresh = Board.state.TICKETS.find(function (t) { return t.number === vt.number; });
-            if (fresh) vt.ticket = fresh;
+          if (vt.workRequest) {
+            const fresh = Board.state.WORK_REQUESTS.find(function (t) { return t.number === vt.number; });
+            if (fresh) vt.workRequest = fresh;
           }
         });
         const activeVt = Board.state.viewerTabs.find(function (t) { return t.number === Board.state.activeViewerTab; });
-        if (activeVt && activeVt.ticket && Board.state.activeTab === "viewer") Board.render.renderViewer();
+        if (activeVt && activeVt.workRequest && Board.state.activeTab === "viewer") Board.render.renderViewer();
       }
     });
   }
@@ -175,17 +175,17 @@
       sseConnected = true;
       stopPolling();
       // Compensate for changes missed during polling period
-      refreshKanban();
+      refreshConveyor();
       refreshWorkflow();
       refreshDashboard();
     };
 
-    es.addEventListener("kanban", function (e) {
+    es.addEventListener("conveyor", function (e) {
       try {
         var d = JSON.parse(e.data);
-        refreshKanban(d.files);
+        refreshConveyor(d.files);
       } catch (_) {
-        refreshKanban();
+        refreshConveyor();
       }
     });
 
@@ -214,20 +214,20 @@
         branchVal = null;
       }
       refreshBranch(branchVal);
-      // T-433 Phase 2: Review Card Toggle Visual Synchronization (only when registering the Kanban module)
+      // WR-433 Phase 2: Verifying Card Toggle Visual Synchronization (only when registering the Conveyor module)
       if (Board.render.syncActiveBranchFromSSE) {
         Board.render.syncActiveBranchFromSSE(branchVal);
       }
     });
 
-    // T-475 Stage 3: Launch Asynchronousization — LAUNCH PENDING/STARTED/FAILED DESIGN
-    // sse manager.broadcast('launch', data={event:..., ticket:..., ...})
-    // handleLaunchEvent in the kanban module manipulates the launchState machine (addEventListener duplicates §2.4).
+    // WR-475 Stage 3: Launch Asynchronousization — LAUNCH PENDING/STARTED/FAILED DESIGN
+    // sse manager.broadcast('launch', data={event:..., work_request:..., ...})
+    // handleLaunchEvent in the conveyor module manipulates the launchState machine (addEventListener duplicates §2.4).
     es.addEventListener("launch", function (e) {
       try {
         var d = JSON.parse(e.data);
-        if (Board.kanban && Board.kanban.handleLaunchEvent) {
-          Board.kanban.handleLaunchEvent(d);
+        if (Board.conveyor && Board.conveyor.handleLaunchEvent) {
+          Board.conveyor.handleLaunchEvent(d);
         }
       } catch (_) { /* malformed payload — silently skip */ }
     });
@@ -265,8 +265,8 @@
       if (!res.ok) throw new Error("poll failed");
       return res.json();
     }).then(function (changes) {
-      if (changes.kanban) {
-        refreshKanban(changes.kanban);
+      if (changes.conveyor) {
+        refreshConveyor(changes.conveyor);
       }
       if (changes.workflow) {
         refreshWorkflow();
@@ -285,7 +285,7 @@
         var arr = changes.git_branch;
         var last = (arr && arr.length) ? arr[arr.length - 1] : null;
         refreshBranch(last);
-        // T-433 Phase 2: Sync Review Card Toggles Vision even polling fallback
+        // WR-433 Phase 2: Sync Verifying Card Toggles Vision even polling fallback
         if (Board.render.syncActiveBranchFromSSE) {
           Board.render.syncActiveBranchFromSSE(last);
         }
@@ -315,16 +315,16 @@
   // Query String First, restore viewer status with localStorage bag
   var qsParams = new URLSearchParams(window.location.search);
   var qsTab = qsParams.get("tab");
-  var qsTicket = qsParams.get("ticket");
+  var qsWorkRequest = qsParams.get("work_request");
   var initSavedTabs = (Board.util.loadUI().viewerTabs || []).slice();
 
-  // Add to saveTabs if there is a ticket to the query string
-  if (qsTab === "viewer" && qsTicket) {
+  // Add to saveTabs if there is a workRequest to the query string
+  if (qsTab === "viewer" && qsWorkRequest) {
     Board.state.activeTab = "viewer";
-    Board.state.activeViewerTab = qsTicket;
-    if (initSavedTabs.indexOf(qsTicket) === -1) initSavedTabs.push(qsTicket);
+    Board.state.activeViewerTab = qsWorkRequest;
+    if (initSavedTabs.indexOf(qsWorkRequest) === -1) initSavedTabs.push(qsWorkRequest);
   } else if (qsTab === "metrics") {
-    // ? tab=metrics — Metrics tab redirect to Dashboard (T-461 Phase 3)
+    // ? tab=metrics — Metrics tab redirect to Dashboard (WR-461 Phase 3)
     Board.state.activeTab = "dashboard";
     var pathOnly = window.location.pathname;
     history.replaceState(null, "", pathOnly);
@@ -332,31 +332,31 @@
 
   // restore viewerTabs as placeholder before switchTab (anti-saveUI)
   initSavedTabs.forEach(function (num) {
-    Board.state.viewerTabs.push({ number: num, ticket: null });
+    Board.state.viewerTabs.push({ number: num, workRequest: null });
   });
   switchTab(Board.state.activeTab);
   document.body.style.opacity = "";
 
-  // T-475 Stage 3: Launch starting status sessionStorage Restore (fetchTickets call before response)
-  // When the first renderKanban point, the pulse badge will be immediately exposed. grace residual time recalculate + restart timer.
-  if (Board.kanban && Board.kanban.restoreLaunchStateFromStorage) {
-    Board.kanban.restoreLaunchStateFromStorage();
+  // WR-475 Stage 3: Launch starting status sessionStorage Restore (fetchWorkRequests call before response)
+  // When the first renderConveyor point, the pulse badge will be immediately exposed. grace residual time recalculate + restart timer.
+  if (Board.conveyor && Board.conveyor.restoreLaunchStateFromStorage) {
+    Board.conveyor.restoreLaunchStateFromStorage();
   }
 
-  Board.fetch.fetchTickets().then(function (tickets) {
-    Board.state.TICKETS = tickets;
-    prevTicketJson = ticketJson(tickets);
-    Board.render.renderKanban();
-    // Race Calibration: When the first renderer is finished before fetchTickets is finished, TICKETS= resolves all the lines with the[].
-    // Tbody only re-draws and fills the ticket map (Search bar, roll, pointer preserve).
+  Board.fetch.fetchWorkRequests().then(function (workRequests) {
+    Board.state.WORK_REQUESTS = workRequests;
+    prevWorkRequestJson = workRequestJson(workRequests);
+    Board.render.renderConveyor();
+    // Race Calibration: When the first renderer is finished before fetchWorkRequests is finished, WORK_REQUESTS= resolves all the lines with the[].
+    // Tbody only re-draws and fills the workRequest map (Search bar, roll, pointer preserve).
     if (Board.state.wfInitialized && Board.render.renderWfTbody) Board.render.renderWfTbody();
     if (initSavedTabs.length > 0) {
       initSavedTabs.forEach(function (num) {
-        var ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
+        var workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
         var existing = Board.state.viewerTabs.find(function (t) { return t.number === num; });
-        if (ticket && existing) {
-          existing.ticket = ticket;
-        } else if (!ticket && existing) {
+        if (workRequest && existing) {
+          existing.workRequest = workRequest;
+        } else if (!workRequest && existing) {
           Board.state.viewerTabs = Board.state.viewerTabs.filter(function (t) { return t.number !== num; });
         }
       });
@@ -379,7 +379,7 @@
     if (!document.hidden) {
       if (sseConnected) {
         // SSE connected: compensate for potentially missed events
-        refreshKanban();
+        refreshConveyor();
         refreshWorkflow();
       } else if (sseGaveUp) {
         // Polling mode: resume polling immediately on tab return

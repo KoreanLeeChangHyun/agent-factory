@@ -3,10 +3,10 @@
  *
  * Board SPA relations tab module.
  *
- * Builds a dependency graph from ticket relations and renders it as a
+ * Builds a dependency graph from workRequest relations and renders it as a
  * Mermaid flowchart. Provides status filters, layout direction toggle,
  * isolated node toggle, statistics cards, and legend. Clicking a node
- * opens the ticket in the Viewer tab.
+ * opens the workRequest in the Viewer tab.
  *
  * Depends on: common.js (Board.state, Board.util, Board.render)
  */
@@ -26,18 +26,18 @@
 
   // Status key normalization for CSS and Mermaid class names
   var STATUS_CLASS_MAP = {
-    "To Do": "todo",
-    "Open": "open",
+    "Draft": "todo",
+    "Accepted": "open",
     "Submit": "open",
-    "In Progress": "progress",
-    "Review": "review",
-    "Done": "done",
+    "Executing": "progress",
+    "Verifying": "review",
+    "Complete": "done",
   };
 
   // ── Utility: Escape title for Mermaid ──
 
   /**
-   * Escapes special characters in ticket titles for safe Mermaid embedding.
+   * Escapes special characters in workRequest titles for safe Mermaid embedding.
    * Mermaid uses `"` wrapped labels, so we escape HTML entities.
    * @param {string} title
    * @returns {string}
@@ -69,7 +69,7 @@
   }
 
   /**
-   * Converts a ticket number like "T-001" to a Mermaid-safe node ID "T_001".
+   * Converts a workRequest number like "WR-001" to a Mermaid-safe node ID "T_001".
    * @param {string} num
    * @returns {string}
    */
@@ -80,23 +80,23 @@
   // ── A. Graph Build Function ──
 
   /**
-   * Builds a dependency graph from ticket data.
-   * @param {Array} tickets - Board.state.TICKETS array
+   * Builds a dependency graph from workRequest data.
+   * @param {Array} workRequests - Board.state.WORK_REQUESTS array
    * @param {Object} opts - { statuses: string[], showIsolated: boolean }
    * @returns {{ nodes: Object, edges: Array, relatedNumbers: Set }}
    */
-  function buildDependencyGraph(tickets, opts) {
+  function buildDependencyGraph(workRequests, opts) {
     var statuses = (opts && opts.statuses && opts.statuses.length > 0) ? opts.statuses : null;
     var showIsolated = (opts && opts.showIsolated) || false;
 
-    // Build node map for all tickets (we need targets of relations too)
+    // Build node map for all workRequests (we need targets of relations too)
     var allNodes = {};
-    for (var i = 0; i < tickets.length; i++) {
-      var t = tickets[i];
+    for (var i = 0; i < workRequests.length; i++) {
+      var t = workRequests[i];
       allNodes[t.number] = {
         number: t.number,
         title: t.title || "",
-        status: t.status || "Open",
+        status: t.status || "Accepted",
         command: t.command || "",
         relations: t.relations || [],
       };
@@ -111,7 +111,7 @@
       var rels = node.relations;
       for (var ri = 0; ri < rels.length; ri++) {
         var rel = rels[ri];
-        var targetNum = rel.ticket;
+        var targetNum = rel.workRequest;
         var type = rel.type;
 
         // Determine edge direction based on relation type
@@ -247,18 +247,18 @@
 
   /**
    * Computes statistics for the relations view.
-   * @param {Array} tickets
+   * @param {Array} workRequests
    * @param {Set} relatedNumbers
    * @returns {Object}
    */
-  function computeStats(tickets, relatedNumbers) {
-    var total = tickets.length;
+  function computeStats(workRequests, relatedNumbers) {
+    var total = workRequests.length;
     var related = relatedNumbers.size;
     var byStatus = { todo: 0, open: 0, progress: 0, review: 0, done: 0 };
     var byRelType = { "depends-on": 0, "derived-from": 0, "blocks": 0 };
 
-    for (var i = 0; i < tickets.length; i++) {
-      var t = tickets[i];
+    for (var i = 0; i < workRequests.length; i++) {
+      var t = workRequests[i];
       var cls = STATUS_CLASS_MAP[t.status] || "open";
       byStatus[cls] = (byStatus[cls] || 0) + 1;
 
@@ -288,13 +288,13 @@
    */
   function renderStatsCards(stats) {
     var cards = [
-      { label: "Total Tickets", value: stats.total, cls: "stat-total", sub: "all tickets" },
-      { label: "With Relations", value: stats.related, cls: "stat-relations", sub: "linked tickets" },
-      { label: "To Do", value: stats.byStatus.todo, cls: "stat-todo", sub: "backlog" },
-      { label: "Open", value: stats.byStatus.open, cls: "stat-open", sub: "open / submit" },
-      { label: "In Progress", value: stats.byStatus.progress, cls: "stat-progress", sub: "running" },
-      { label: "Review", value: stats.byStatus.review, cls: "stat-review", sub: "awaiting review" },
-      { label: "Done", value: stats.byStatus.done, cls: "stat-done", sub: "completed" },
+      { label: "Total WorkRequests", value: stats.total, cls: "stat-total", sub: "all workRequests" },
+      { label: "With Relations", value: stats.related, cls: "stat-relations", sub: "linked workRequests" },
+      { label: "Draft", value: stats.byStatus.todo, cls: "stat-todo", sub: "backlog" },
+      { label: "Accepted", value: stats.byStatus.open, cls: "stat-open", sub: "open / submit" },
+      { label: "Executing", value: stats.byStatus.progress, cls: "stat-progress", sub: "running" },
+      { label: "Verifying", value: stats.byStatus.review, cls: "stat-review", sub: "awaiting review" },
+      { label: "Complete", value: stats.byStatus.done, cls: "stat-done", sub: "completed" },
     ];
 
     var h = '<div class="relations-stats">';
@@ -316,11 +316,11 @@
    */
   function renderToolbar() {
     var statusFilters = [
-      { key: "todo", label: "To Do" },
-      { key: "open", label: "Open" },
-      { key: "progress", label: "In Progress" },
-      { key: "review", label: "Review" },
-      { key: "done", label: "Done" },
+      { key: "todo", label: "Draft" },
+      { key: "open", label: "Accepted" },
+      { key: "progress", label: "Executing" },
+      { key: "review", label: "Verifying" },
+      { key: "done", label: "Complete" },
     ];
 
     var h = '<div class="relations-toolbar">';
@@ -394,27 +394,27 @@
     // Node statuses
     h += '<div class="relations-legend-item">';
     h += '<span class="relations-legend-dot dot-todo"></span>';
-    h += '<span>To Do</span>';
+    h += '<span>Draft</span>';
     h += '</div>';
 
     h += '<div class="relations-legend-item">';
     h += '<span class="relations-legend-dot dot-open"></span>';
-    h += '<span>Open</span>';
+    h += '<span>Accepted</span>';
     h += '</div>';
 
     h += '<div class="relations-legend-item">';
     h += '<span class="relations-legend-dot dot-progress"></span>';
-    h += '<span>In Progress</span>';
+    h += '<span>Executing</span>';
     h += '</div>';
 
     h += '<div class="relations-legend-item">';
     h += '<span class="relations-legend-dot dot-review"></span>';
-    h += '<span>Review</span>';
+    h += '<span>Verifying</span>';
     h += '</div>';
 
     h += '<div class="relations-legend-item">';
     h += '<span class="relations-legend-dot dot-done"></span>';
-    h += '<span>Done</span>';
+    h += '<span>Complete</span>';
     h += '</div>';
 
     h += '</div>';
@@ -432,12 +432,12 @@
       + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
       + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
       + '</svg></div>';
-    h += '<div class="relations-empty-title">No ticket relations found</div>';
+    h += '<div class="relations-empty-title">No workRequest relations found</div>';
     h += '<div class="relations-empty-desc">';
-    h += 'The relations visualizes dependencies between tickets. ';
-    h += 'Link tickets using the CLI to see them here.';
+    h += 'The relations visualizes dependencies between workRequests. ';
+    h += 'Link workRequests using the CLI to see them here.';
     h += '</div>';
-    h += '<div class="relations-empty-hint">flow-kanban link T-001 --depends-on T-002</div>';
+    h += '<div class="relations-empty-hint">flow-conveyor link WR-001 --depends-on WR-002</div>';
     h += '</div>';
     return h;
   }
@@ -455,14 +455,14 @@
     var graphEl = document.getElementById("relations-graph");
     if (!graphEl) return;
 
-    var tickets = Board.state.TICKETS || [];
+    var workRequests = Board.state.WORK_REQUESTS || [];
 
-    // If the ticket data is still arrived, graph remains waiting spinner.
+    // If the workRequest data is still arrived, graph remains waiting spinner.
     // toolbar/legend is already drawn from Phase A, so it is preserved.
-    if (tickets.length === 0) {
+    if (workRequests.length === 0) {
       graphEl.innerHTML = '<div class="relations-loading">'
         + '<div class="relations-loading-spinner"></div>'
-        + '<span>Waiting for ticket data...</span>'
+        + '<span>Waiting for workRequest data...</span>'
         + '</div>';
       return;
     }
@@ -471,7 +471,7 @@
       statuses: filterState.statuses,
       showIsolated: filterState.showIsolated,
     };
-    var graph = buildDependencyGraph(tickets, displayOpts);
+    var graph = buildDependencyGraph(workRequests, displayOpts);
     var nodeKeys = Object.keys(graph.nodes);
 
     if (nodeKeys.length === 0) {
@@ -620,22 +620,22 @@
     var svgNodes = graphEl.querySelectorAll(".node");
     svgNodes.forEach(function (svgNode) {
       var nodeId = svgNode.id || "";
-      // Extract ticket number from node ID: "flowchart-T_NNN-N" -> "T_NNN"
+      // Extract workRequest number from node ID: "flowchart-T_NNN-N" -> "T_NNN"
       var match = nodeId.match(/flowchart-(T_\d+)/);
       if (!match) return;
 
-      var ticketIdUnder = match[1]; // e.g. "T_001"
-      var ticketNum = ticketIdUnder.replace(/_/g, "-"); // e.g. "T-001"
+      var workRequestIdUnder = match[1]; // e.g. "T_001"
+      var workRequestNum = workRequestIdUnder.replace(/_/g, "-"); // e.g. "WR-001"
 
-      if (!nodes[ticketNum]) return;
+      if (!nodes[workRequestNum]) return;
 
       svgNode.style.cursor = "pointer";
       svgNode.addEventListener("click", function () {
-        var ticket = Board.state.TICKETS.find(function (t) {
-          return t.number === ticketNum;
+        var workRequest = Board.state.WORK_REQUESTS.find(function (t) {
+          return t.number === workRequestNum;
         });
-        if (ticket && Board.render.openViewer) {
-          Board.render.openViewer(ticket);
+        if (workRequest && Board.render.openViewer) {
+          Board.render.openViewer(workRequest);
           Board.util.switchTab("viewer");
         }
       });
@@ -645,13 +645,13 @@
   // ── Panel Toggle ──
 
   /**
-   * Updates the collapsed bar ticket count.
+   * Updates the collapsed bar workRequest count.
    */
   function updateBarCount() {
     var countEl = document.getElementById("relations-bar-count");
     if (!countEl) return;
-    var tickets = Board.state.TICKETS || [];
-    var fullGraph = buildDependencyGraph(tickets, { statuses: [], showIsolated: false });
+    var workRequests = Board.state.WORK_REQUESTS || [];
+    var fullGraph = buildDependencyGraph(workRequests, { statuses: [], showIsolated: false });
     var linked = Object.keys(fullGraph.nodes).length;
     countEl.textContent = linked > 0 ? linked + " linked" : "";
   }
@@ -666,11 +666,11 @@
     var panel = document.getElementById("relations-panel");
     if (!panel) return;
 
-    var isOpen = panel.classList.toggle("open");
-    Board.state.relations.panelOpen = isOpen;
+    var isAccepted = panel.classList.toggle("open");
+    Board.state.relations.panelAccepted = isAccepted;
     if (saveUI) saveUI();
 
-    if (isOpen) {
+    if (isAccepted) {
       renderRelations();
     } else {
       updateBarCount();
@@ -683,21 +683,21 @@
     collapsedBar.addEventListener("click", toggleRelationsPanel);
   }
 
-  // Restore the panelOpen status of the previous session when loading the page.
-  // Instantly apply panel classes and renderRelations also call immediately — ticket data
+  // Restore the panelAccepted status of the previous session when loading the page.
+  // Instantly apply panel classes and renderRelations also call immediately — workRequest data
   // If not yet, self waiting spinner is displayed, and data from the setTimeout flow below
   // After arrival, it will be reissued and converted to normal wrench.
-  if (Board.state.relations.panelOpen) {
+  if (Board.state.relations.panelAccepted) {
     var initPanel = document.getElementById("relations-panel");
     if (initPanel) initPanel.classList.add("open");
     renderRelations();
   }
 
-  // Update bar count periodically (tickets may load async).
-  // In case of panelOpen, we trigger the renderer at the same point.
+  // Update bar count periodically (workRequests may load async).
+  // In case of panelAccepted, we trigger the renderer at the same point.
   setTimeout(function () {
     updateBarCount();
-    if (Board.state.relations.panelOpen) {
+    if (Board.state.relations.panelAccepted) {
       renderRelations();
     }
   }, 2000);

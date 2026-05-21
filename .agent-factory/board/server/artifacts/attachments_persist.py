@@ -1,7 +1,7 @@
 """jsonl sidecar
 
 jsonl content is only short text according to T-429 policy
-Keep and the attached ticket card will be preserved by separate sidecar files.
+Keep and the attached WorkRequest card will be preserved by separate sidecar files.
 
 File path
 ---------

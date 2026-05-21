@@ -25,7 +25,7 @@ class PollChangeTracker:
         """Add a change event type and filename list.
 
         Args:
-            event type: event type(kanban, workflow, dashboard)
+            event type: event type(conveyor, workflow, dashboard)
             files: List of changed filenames
         """
         with self._lock:
@@ -38,7 +38,7 @@ class PollChangeTracker:
 
         Returns:
             Change filename list by event type dict.
-            Example: {"kanban": ["T-038.xml"], "workflow": ["state.json"]}
+            Example: {"conveyor": ["WR-038.xml"], "workflow": ["state.json"]}
             empty dict without changing.
         """
         with self._lock:

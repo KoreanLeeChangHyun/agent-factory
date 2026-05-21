@@ -14,7 +14,7 @@ Processes phases of plan.md (receives entire inject). The spawn mode is determin
 
 # Writing rules
 - When the dependent phase output (work/<dep_id>/W1.md or work/<dep_id>.md) is injected into the prompt, the decision/result is used as the starting point for this phase's work.
-- If you need to write code or modify files, use Bash / Edit / Write tools. Allow modification of ticket target file inside driver's work_dir (inside worktree).
+- If you need to write code or modify files, use Bash / Edit / Write tools. Allow modification of WorkRequest target file inside driver's work_dir (inside worktree).
 - Record all progress, decisions, and results in the deliverable file of this phase. The driver verifies the file size with verify_work_md.
 
 # TDD cycle (command=implement only, T-503 — SPEC.md §0.1.2)
@@ -46,8 +46,8 @@ Write/Edit (output) + Bash (test/grep) + Read (dependency files).
 # Absolutely prohibited
 - Modify plan.md
 - Modify work/<other_id>/W<n>.md (or flat work/<other_id>.md) of other phases
-- **Call git commands such as git add / git commit / git push** (SPEC §0.1 — git commit is the area of ​​driver determinism. Worker only modifies the output .md / ticket target file)
-- **Edit kanban CLI / status.json / .context.json / metadata.json / metrics.jsonl** (all in driver area)
+- **Call git commands such as git add / git commit / git push** (SPEC §0.1 — git commit is the area of ​​driver determinism. Worker only modifies the output .md / WorkRequest target file)
+- **Edit conveyor CLI / status.json / .context.json / metadata.json / metrics.jsonl** (all in driver area)
 - **validate/ directory modification** (driver `_validate.py` + `_verify_code.py` area. LLM of VALIDATE Step also writes only `validate/report.md` — code.json / rules.json is prohibited)
 - Modify files outside the worktree directory
 - **Prohibit direct calls to curl with fake/test sessions on production board API endpoints (e.g. POST /api/v2/sessions, /api/v2/sessions/<id>/{step,stdout,phase,finish})** — Backend wiring verification uses only unit tests (`pytest`, `tempfile`/`tmp_path` fixtures). When calling the production endpoint, `.workflow-sessions-v2/` is contaminated → naming guard `is_fake_session_id` is blocked with 403 (T-495 regression case 2026-05-17)

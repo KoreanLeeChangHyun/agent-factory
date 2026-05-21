@@ -25,7 +25,7 @@ Human-readable output is **HTML** (template + placeholder). The entire old `repo
 
 # 4 types of template placeholders (required filling)
 ```
-{{title}} → Ticket title (e.g. "Workflow Output Format Canon")
+{{title}} → WorkRequest title (e.g. "Workflow Output Format Canon")
 {{summary}} → 1-3 paragraph natural language summary (HTML <p> inline)
 {{phase_sections}} → Calculated quotation by phase (HTML <section> or <h3> division)
 {{plan_md_link}} → ​​plan.md link text (default "plan/plan.md")
@@ -59,7 +59,7 @@ Write (output `report.html`) + Read (template reference if necessary).
 - Edit files other than output
 - Modify plan/plan.md / work/**/*.md / validate/report.md
 - **14+ rule verdict calculation/re-evaluation** (driver responsibility)
-- Modify kanban CLI / status.json / metrics.jsonl (driver area)
+- Modify conveyor CLI / status.json / metrics.jsonl (driver area)
 - Call git command (driver area)
 - Old `report.md` (Markdown) output (T-504 cutover — HTML single)
 - Leave the raw `{{...}}` as is without filling the placeholder.

@@ -17,12 +17,12 @@ from board.server.channels.terminal_channel import TerminalSSEChannel
 class WorkflowSession:
     """Data class indicating one of the workflow sessions.
 
-    Each workflow ticket runs an independent BrainProcess and TerminalSSEChannel
+    Each workflow WorkRequest runs an independent BrainProcess and TerminalSSEChannel
     is identified as session id.
 
     Attributes:
-        session id: Session Original ID (Type: wf-T-NNN-timestamp)
-        ticket id: Kanban ticket ID (e.g. T-238)
+        session id: Session Original ID (Type: wf-WR-NNN-timestamp)
+        WorkRequest: Conveyor WorkRequest (e.g. WR-238)
         command: execution command (implement, review, research, etc.)
         work dir: task directory absolute path
         process: terminal process manager instance
@@ -33,7 +33,7 @@ class WorkflowSession:
     """
 
     session_id: str
-    ticket_id: str
+    work_request: str
     command: str
     work_dir: str
     process: BrainProcess = field(repr=False)
@@ -77,7 +77,7 @@ class WorkflowSessionRegistry:
 
     def create(
         self,
-        ticket_id: str,
+        work_request: str,
         command: str,
         work_dir: str,
     ) -> WorkflowSession:
@@ -87,7 +87,7 @@ class WorkflowSessionRegistry:
         Create session id to register in the registry.
 
         Args:
-            ticket id: Kanban ticket ID (e.g. T-238)
+            WorkRequest: Conveyor WorkRequest (e.g. WR-238)
             command: execution command (implement, review, research, etc.)
             work dir: task directory absolute path
 
@@ -95,7 +95,7 @@ class WorkflowSessionRegistry:
             Created WorkflowSession instance
         """
         timestamp = time.strftime('%Y%m%d-%H%M%S')
-        session_id = f'wf-{ticket_id}-{timestamp}'
+        session_id = f'wf-{work_request}-{timestamp}'
 
         persist_path = self._session_file(session_id)
         channel = TerminalSSEChannel(persist_path=persist_path)
@@ -103,7 +103,7 @@ class WorkflowSessionRegistry:
 
         session = WorkflowSession(
             session_id=session_id,
-            ticket_id=ticket_id,
+            work_request=work_request,
             command=command,
             work_dir=work_dir,
             process=process,
@@ -121,7 +121,7 @@ class WorkflowSessionRegistry:
                 meta = {
                     '_meta': {
                         'session_id': session_id,
-                        'ticket_id': ticket_id,
+                        'work_request': work_request,
                         'command': command,
                         'work_dir': work_dir,
                         'created_at': session.created_at,
@@ -175,7 +175,7 @@ class WorkflowSessionRegistry:
             process = create_brain_process(channel)
             session = WorkflowSession(
                 session_id=meta['session_id'],
-                ticket_id=meta.get('ticket_id', ''),
+                work_request=meta.get('work_request', ''),
                 command=meta.get('command', ''),
                 work_dir=meta.get('work_dir', ''),
                 process=process,
@@ -235,7 +235,7 @@ class WorkflowSessionRegistry:
         process = create_brain_process(channel)
         session = WorkflowSession(
             session_id=meta['session_id'],
-            ticket_id=meta.get('ticket_id', ''),
+            work_request=meta.get('work_request', ''),
             command=meta.get('command', ''),
             work_dir=meta.get('work_dir', ''),
             process=process,
@@ -278,13 +278,13 @@ class WorkflowSessionRegistry:
 
         Returns:
             Session metadata dict list. Angle dict key:
-            session_id, ticket_id, command, work_dir, status, created_at
+            session_id, work_request, command, work_dir, status, created_at
         """
         with self._lock:
             return [
                 {
                     'session_id': s.session_id,
-                    'ticket_id': s.ticket_id,
+                    'work_request': s.work_request,
                     'command': s.command,
                     'work_dir': s.work_dir,
                     'status': s.process.status,
@@ -293,20 +293,20 @@ class WorkflowSessionRegistry:
                 for s in self._sessions.values()
             ]
 
-    def get_by_ticket(self, ticket_id: str) -> WorkflowSession | None:
-        """Check the session with the ticket ID.
+    def get_by_work_request(self, work_request: str) -> WorkflowSession | None:
+        """Check the session with the work_request ID.
 
-        If there are multiple sessions in the same ticket, return the first matching.
+        If there are multiple sessions in the same work_request, return the first matching.
 
         Args:
-            Ticket ID: T-238)
+            WorkRequest: WR-238)
 
         Returns:
             WorkflowSession instance. None.
         """
         with self._lock:
             for session in self._sessions.values():
-                if session.ticket_id == ticket_id:
+                if session.work_request == work_request:
                     return session
             return None
 

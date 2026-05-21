@@ -21,7 +21,7 @@ class ProductionLineSSEChannel:
     """SSE channel for production-line — per-session client fan-out.
 
     Attributes:
-        session id: possession session ID (wf-T-NNN-<uuid>)
+        session id: possession session ID (wf-WR-NNN-<uuid>)
         clients: SSE client wfile list connected
         lock: Client List Access Lock
         client locks: per-client Lock by wfile
@@ -49,7 +49,7 @@ class ProductionLineSSEChannel:
     def persist_path(self) -> str | None:
         """NDJSON persist file absolute path (perist inactive None).
 
-        T-513 P1 — `GET /api/v2/sessions/<id>/history` endpoint
+        WR-513 P1 — `GET /api/v2/sessions/<id>/history` endpoint
         read returns past events (REST Single Source Policy Completion).
         """
         return self._persist_path
@@ -123,7 +123,7 @@ class ProductionLineSSEChannel:
             Step: New Step (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED)
             phase: WORK internal sub-phase (P1, P2, ...). Without empty string
             prev step: Direct Step (frontend FSM verification)
-            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
+            Extras: WR-495 P3 — forward-compatible meta such as verdict/commit/retry.
                 Fixed key (session id/step/phase/prev step) is protected.
         """
         payload = {
@@ -162,7 +162,7 @@ class ProductionLineSSEChannel:
         Args:
             phase: P1, P2, ...
             action: start | end
-            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
+            Extras: WR-495 P3 — forward-compatible meta such as verdict/commit/retry.
         """
         payload = {
             'session_id': self.session_id,
@@ -184,7 +184,7 @@ class ProductionLineSSEChannel:
         Args:
             outcome: ok | fail
             summary: ending oil / one line summary
-            Extras: T-495 P3 — forward-compatible meta such as verdict/commit/retry.
+            Extras: WR-495 P3 — forward-compatible meta such as verdict/commit/retry.
         """
         payload = {
             'session_id': self.session_id,

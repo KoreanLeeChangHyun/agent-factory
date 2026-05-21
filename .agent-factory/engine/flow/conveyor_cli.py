@@ -132,7 +132,7 @@ def _kill_work_request_session(work_request_number: str) -> None:
             sessions = data if isinstance(data, list) else data.get("sessions", [])
             session_id = None
             for session in sessions:
-                if session.get("ticket_id") == work_request_number or session.get("work_request") == work_request_number:
+                if session.get("work_request") == work_request_number:
                     session_id = session.get("session_id") or session.get("id")
                     break
 

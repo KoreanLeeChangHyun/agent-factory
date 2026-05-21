@@ -78,10 +78,6 @@ class GenericHandlerMixin:
             files_param = qs.get('files', [None])[0]
             files = files_param.split(",") if files_param else None
             self._send_json(_read_conveyor_work_requests(project_root, files))
-        elif path == '/api/kanban':
-            files_param = qs.get('files', [None])[0]
-            files = files_param.split(",") if files_param else None
-            self._send_json(_read_conveyor_work_requests(project_root, files))
         elif path == '/api/dashboard':
             self._send_json(_read_dashboard(project_root))
         # T-513 P2 — Old workflow entries/detail inline branch transferred to Conveyor domain
@@ -162,16 +158,10 @@ class GenericHandlerMixin:
             self._handle_worktree_uncommitted_all()
         elif path == '/api/conveyor/verifying-verdict':
             self._handle_conveyor_verifying_verdict()
-        elif path == '/api/kanban/review-verdict':
-            self._handle_kanban_review_verdict()
         elif path == '/api/conveyor/audit/verdict':
             self._handle_conveyor_audit_verdict()
-        elif path == '/api/kanban/audit/verdict':
-            self._handle_kanban_audit_verdict()
         elif path == '/api/conveyor/complete-verdict':
             self._handle_conveyor_complete_verdict()
-        elif path == '/api/kanban/done-verdict':
-            self._handle_kanban_done_verdict()
         else:
             self.send_response(404)
             self.end_headers()

@@ -4,7 +4,7 @@
 Detect the flow-conveyor complete command in the PreToolUse(Bash) event,
 If the work_request derived from the work_request in question is not Complete, it is blocked.
 
-Toggle: Environment variable HOOK_DONE_RELATION_GUARD (false/0 = disabled, default enabled)
+Toggle: Environment variable HOOK_COMPLETE_RELATION_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -26,11 +26,10 @@ if _guards_dir not in sys.path:
 
 from common import read_env
 
-# flow-conveyor complete WR-NNN pattern
-_DONE_PATTERN = re.compile(r"\bflow-conveyor\s+complete\s+(T-\d{3})\b")
+_COMPLETE_PATTERN = re.compile(r"\bflow-conveyor\s+complete\s+(WR-\d{3})\b")
 
 # Conveyor Directory
-CONVEYOR_DIRS = ["draft", "open", "executing", "verifying"]
+CONVEYOR_DIRS = ["draft", "accepted", "executing", "verifying"]
 
 
 def _deny(reason: str) -> None:
@@ -94,7 +93,7 @@ def _find_derived_work_requests(conveyor_base: str, source_work_request: str) ->
 
 
 def main() -> None:
-    hook_flag = os.environ.get("HOOK_DONE_RELATION_GUARD") or read_env("HOOK_DONE_RELATION_GUARD")
+    hook_flag = os.environ.get("HOOK_COMPLETE_RELATION_GUARD") or read_env("HOOK_COMPLETE_RELATION_GUARD")
     if hook_flag in ("false", "0"):
         sys.exit(0)
 
@@ -110,7 +109,7 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    match = _DONE_PATTERN.search(command)
+    match = _COMPLETE_PATTERN.search(command)
     if not match:
         sys.exit(0)
 

@@ -104,8 +104,8 @@
   ToolResultRenderer.util.linkifyIds = function (escapedText) {
     if (!escapedText) return escapedText;
 
-    var result = escapedText.replace(/\bT-(\d{3,4})\b/g, function (_, id) {
-      return '<a class="term-id-link" data-kind="ticket_id" data-id="T-' + id + '">T-' + id + '</a>';
+    var result = escapedText.replace(/\bWR-(\d{3,4})\b/g, function (_, id) {
+      return '<a class="term-id-link" data-kind="work_request" data-id="WR-' + id + '">WR-' + id + '</a>';
     });
 
     result = result.replace(/task_id["']?\s*:\s*["']?([a-z0-9]{6,12})/g, function (match, id) {
@@ -453,25 +453,25 @@
   /**
    * flowCommand renderer — flow-* Bash command output rendering.
    *
-   * Detects structured output patterns from flow-kanban, flow-init,
+   * Detects structured output patterns from flow-conveyor, flow-init,
    * flow-finish, flow-launcher, flow-update and renders compact cards.
    */
   ToolResultRenderer.renderers.flowCommand = (function () {
 
     // ── Pattern constants ──
 
-    var RE_TRANSITION   = /^(T-\d+):\s+(.+?)\s*→\s*(.+)$/;
-    var RE_CREATE       = /^(T-\d+):\s+(.+)\(([^)]+)\)\s*$/;
-    var RE_DELETE       = /^(T-\d+):\s+(?:Deleted|deleted)\s*$/;
-    var RE_UPDATE       = /^(T-\d+):\s+(.+)(Updated|Added|Removed|updated|added|removed)\s*$/;
-    var RE_ALREADY      = /^(T-\d+)\s+already\s+(.+)$/;
+    var RE_TRANSITION   = /^(WR-\d+):\s+(.+?)\s*→\s*(.+)$/;
+    var RE_CREATE       = /^(WR-\d+):\s+(.+)\(([^)]+)\)\s*$/;
+    var RE_DELETE       = /^(WR-\d+):\s+(?:Deleted|deleted)\s*$/;
+    var RE_UPDATE       = /^(WR-\d+):\s+(.+)(Updated|Added|Removed|updated|added|removed)\s*$/;
+    var RE_ALREADY      = /^(WR-\d+)\s+already\s+(.+)$/;
     var RE_LAUNCHER     = /^(LAUNCH|INLINE):\s+(.+)$/;
     var RE_SYSTEM       = /^\[(INIT|DONE|STATE|STEP|PHASE|WORKFLOW)\]\s*(.*)$/;
     var RE_ERROR        = /^\[(ERROR)\]\s*(.*)$/;
     var RE_WARN         = /^\[(WARN)\]\s*(.*)$/;
     var RE_FAIL         = /^FAIL$/;
-    var RE_SHOW_HEADER  = /^##\s+(T-\d+):\s+(.+)$/;
-    var RE_BOARD_HEADER = /^##\s+Kanban Board/;
+    var RE_SHOW_HEADER  = /^##\s+(WR-\d+):\s+(.+)$/;
+    var RE_BOARD_HEADER = /^##\s+Conveyor Board/;
     var RE_DETAIL_LINE  = /^>>\s*(.+)$/;
     var RE_FILE_MOVE    = /^File moved:\s+(.+?)\s*→\s*(.+)$/;
 
@@ -496,8 +496,8 @@
     var safeEsc = ToolResultRenderer.util.safeEsc;
     var linkifyIds = ToolResultRenderer.util.linkifyIds;
 
-    function badge(ticketId) {
-      return '<span class="flow-cmd-badge">' + linkifyIds(safeEsc(ticketId)) + '</span>';
+    function badge(workRequestId) {
+      return '<span class="flow-cmd-badge">' + linkifyIds(safeEsc(workRequestId)) + '</span>';
     }
 
     function actionLabel(text, cls) {
@@ -627,9 +627,9 @@
       return wrapCard(inner + detailBlock(details), 'flow-cmd-warn');
     }
 
-    // ── Multiline: kanban show ──
+    // ── Multiline: conveyor show ──
 
-    function renderKanbanShow(text) {
+    function renderConveyorShow(text) {
       var lines = text.split('\n');
       var html = '<div class="flow-cmd-multi flow-cmd-show">';
       var headerMatch = RE_SHOW_HEADER.exec(lines[0]);
@@ -687,12 +687,12 @@
       return html;
     }
 
-    // ── Multiline: kanban board/list ──
+    // ── Multiline: conveyor board/list ──
 
-    function renderKanbanBoard(text) {
+    function renderConveyorBoard(text) {
       var lines = text.split('\n');
       var html = '<div class="flow-cmd-multi flow-cmd-board">';
-      html += '<div class="flow-cmd-board-header">Kanban Board</div>';
+      html += '<div class="flow-cmd-board-header">Conveyor Board</div>';
 
       var currentColumn = '';
       for (var i = 1; i < lines.length; i++) {
@@ -708,7 +708,7 @@
           continue;
         }
 
-        var itemMatch = trimmed.match(/^-\s+(T-\d+):\s+(.+)$/);
+        var itemMatch = trimmed.match(/^-\s+(WR-\d+):\s+(.+)$/);
         if (itemMatch) {
           html += '<div class="flow-cmd-board-item">' +
             badge(itemMatch[1]) +
@@ -737,11 +737,11 @@
       var firstLine = text.split('\n')[0];
 
       if (RE_SHOW_HEADER.test(firstLine)) {
-        return renderKanbanShow(text);
+        return renderConveyorShow(text);
       }
 
       if (RE_BOARD_HEADER.test(firstLine)) {
-        return renderKanbanBoard(text);
+        return renderConveyorBoard(text);
       }
 
       // Process line-by-line for single or multi-line simple outputs
@@ -878,7 +878,7 @@
     if (toolName === 'Bash') {
       if (/Command running in background with ID:/.test(t)) return 'taskStream';
       // flow-* command output detection
-      if (/T-\d+:|T-\d+\s+already/.test(t) ||
+      if (/WR-\d+:|WR-\d+\s+already/.test(t) ||
           /^(LAUNCH|INLINE):/m.test(t) ||
           /^\[(INIT|DONE|STATE|STEP|PHASE|WORKFLOW|ERROR|WARN)\]/m.test(t) ||
           /^FAIL$/m.test(t)) {

@@ -430,13 +430,13 @@
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-/* Workflow result link in ticket viewer */
+/* Workflow result link in workRequest viewer */
 .tv-result-workflow {
   font-weight: 600;
 }
 
-/* WF table: ticket badge next to workflow number */
-.wf-ticket-badge {
+/* WF table: workRequest badge next to workflow number */
+.wf-work-request-badge {
   font-size: 9px;
   font-weight: 600;
   color: var(--af-primary);
@@ -448,18 +448,18 @@
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 }
 
-.wf-ticket-badge:hover {
+.wf-work-request-badge:hover {
   background: var(--af-primary-soft);
   color: var(--af-success);
 }
 
-/* WF detail view: ticket link in Info section */
-.wf-detail-ticket-link {
+/* WF detail view: workRequest link in Info section */
+.wf-detail-workRequest-link {
   color: var(--af-primary);
   cursor: pointer;
   text-decoration: underline dotted;
 }
 
-.wf-detail-ticket-link:hover {
+.wf-detail-workRequest-link:hover {
   text-decoration: underline solid;
 }

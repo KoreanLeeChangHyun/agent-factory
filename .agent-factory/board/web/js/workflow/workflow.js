@@ -70,23 +70,23 @@ function fetchEntryDetail(entryHref) {
   }).catch(function () { return []; });
 }
 
-// ── Ticket-Workflow Linkage ──
+// ── WorkRequest-Workflow Linkage ──
 
 /**
- * Finds the ticket linked to a given workflow entry by matching workdir or registrykey.
+ * Finds the workRequest linked to a given workflow entry by matching workdir or registrykey.
  * @param {Object} w - workflow item
- * @returns {Object|null} matched ticket or null
+ * @returns {Object|null} matched workRequest or null
  */
-function findTicketForWorkflow(w) {
+function findWorkRequestForWorkflow(w) {
   const basePath = w.basePath || "";
   const entry = w.entry || "";
-  const wfTicket = (w.ticketNumber || "").trim();
-  const tickets = Board.state.TICKETS;
-  if (!Array.isArray(tickets) || tickets.length === 0) return null;
-  // 1st: Kanban ticket.result.workdir / registrykey matching
-  for (let ti = 0; ti < tickets.length; ti++) {
-    const ticket = tickets[ti];
-    const result = ticket.result;
+  const wfWorkRequest = (w.workRequestNumber || "").trim();
+  const workRequests = Board.state.WORK_REQUESTS;
+  if (!Array.isArray(workRequests) || workRequests.length === 0) return null;
+  // 1st: Conveyor workRequest.result.workdir / registrykey matching
+  for (let ti = 0; ti < workRequests.length; ti++) {
+    const workRequest = workRequests[ti];
+    const result = workRequest.result;
     if (!result) continue;
     if (result.workdir) {
       let wd = result.workdir;
@@ -94,30 +94,30 @@ function findTicketForWorkflow(w) {
       const normalized = "../" + wd;
       const normalizedResolved = "../" + wfResolveResultPath(wd);
       if (decodeURIComponent(normalized) === decodeURIComponent(basePath)
-          || decodeURIComponent(normalizedResolved) === decodeURIComponent(basePath)) return ticket;
+          || decodeURIComponent(normalizedResolved) === decodeURIComponent(basePath)) return workRequest;
     }
     if (result.registrykey && entry && result.registrykey === entry) {
-      return ticket;
+      return workRequest;
     }
   }
   // .context.json
-  if (wfTicket) {
-    for (let ti = 0; ti < tickets.length; ti++) {
-      const tn = (tickets[ti].number || "").trim();
-      if (tn === wfTicket) return tickets[ti];
+  if (wfWorkRequest) {
+    for (let ti = 0; ti < workRequests.length; ti++) {
+      const tn = (workRequests[ti].number || "").trim();
+      if (tn === wfWorkRequest) return workRequests[ti];
     }
   }
   return null;
 }
 
 /**
- * Returns array of workflows linked from a ticket via its result field.
- * @param {Object} ticket - ticket data object
+ * Returns array of workflows linked from a workRequest via its result field.
+ * @param {Object} workRequest - workRequest data object
  * @returns {Array} matched workflow items
  */
-function findWorkflowsForTicket(ticket) {
+function findWorkflowsForWorkRequest(workRequest) {
   const found = [];
-  const result = ticket.result;
+  const result = workRequest.result;
   if (!result) return found;
   const workflows = Board.state.WORKFLOWS;
   for (let wi = 0; wi < workflows.length; wi++) {
@@ -149,18 +149,18 @@ function filterWorkflows(list) {
   const query = Board.state.wfSearchQuery;
   if (!query) return list;
   const q = query.toLowerCase();
-  // Ticket Number Search Normalization: "T-446" / "t-446" / "446" to support all
-  // "T-" prefix matching is allowed if the input is configured with the number + hyphen.
+  // WorkRequest Number Search Normalization: "WR-446" / "t-446" / "446" to support all
+  // "WR-" prefix matching is allowed if the input is configured with the number + hyphen.
   const qDigit = q.replace(/^t-?/, "");
   return list.filter(function (w) {
     if (w.task.toLowerCase().indexOf(q) !== -1) return true;
     if (w.command.toLowerCase().indexOf(q) !== -1) return true;
     if (w.step.toLowerCase().indexOf(q) !== -1) return true;
     if (w.entry.indexOf(q) !== -1) return true;
-    // Ticket number matching: 1st response ticketNumber → 2nd findTicketForWorkflow (workdir/registrykey fallback)
-    const tn = (w.ticketNumber || "").toLowerCase();
+    // WorkRequest number matching: 1st response workRequestNumber → 2nd findWorkRequestForWorkflow (workdir/registrykey fallback)
+    const tn = (w.workRequestNumber || "").toLowerCase();
     if (tn && (tn.indexOf(q) !== -1 || (qDigit && tn.indexOf(qDigit) !== -1))) return true;
-    const linked = findTicketForWorkflow(w);
+    const linked = findWorkRequestForWorkflow(w);
     if (linked) {
       const ln = (linked.number || "").toLowerCase();
       if (ln && (ln.indexOf(q) !== -1 || (qDigit && ln.indexOf(qDigit) !== -1))) return true;
@@ -175,9 +175,9 @@ function sortWorkflows(list) {
   const dir = Board.state.wfSortDir === "asc" ? 1 : -1;
   return list.slice().sort(function (a, b) {
     let av, bv;
-    if (key === "ticket") {
-      const at = findTicketForWorkflow(a);
-      const bt = findTicketForWorkflow(b);
+    if (key === "workRequest") {
+      const at = findWorkRequestForWorkflow(a);
+      const bt = findWorkRequestForWorkflow(b);
       av = at ? at.number : "";
       bv = bt ? bt.number : "";
     } else {
@@ -233,17 +233,17 @@ function updateWfStatus() {
 function renderWfCard(w) {
   let h = '<tr class="wf-row" data-entry="' + wfEsc(w.entry) + '" data-task="' + wfEsc(w.task) + '" data-cmd="' + wfEsc(w.command) + '">';
   // step cell
-  const stepIsDone = (w.step || "").toUpperCase() === "DONE";
-  const stepColors = stepIsDone ? WF_STATUS_COLORS.Done : WF_STATUS_COLORS["In Progress"];
+  const stepIsComplete = (w.step || "").toUpperCase() === "DONE";
+  const stepColors = stepIsComplete ? WF_STATUS_COLORS.Complete : WF_STATUS_COLORS["Executing"];
   const stepText = wfEsc(wfStepLabel(w.step || "NONE"));
   const stepBadge = '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + stepText + "</span>";
   h += '<td class="wf-row-step">' + stepBadge + "</td>";
-  // Ticket cell: linked ticket (val: map to the ticket must be mapped)
-  const linkedTicket = findTicketForWorkflow(w);
-  if (linkedTicket) {
-    h += '<td class="wf-row-number"><span class="wf-number-badge wf-ticket-badge" data-ticket-num="' + wfEsc(linkedTicket.number) + '">' + wfEsc(linkedTicket.number) + "</span></td>";
+  // WorkRequest cell: linked workRequest (val: map to the workRequest must be mapped)
+  const linkedWorkRequest = findWorkRequestForWorkflow(w);
+  if (linkedWorkRequest) {
+    h += '<td class="wf-row-number"><span class="wf-number-badge wf-work-request-badge" data-work-request-num="' + wfEsc(linkedWorkRequest.number) + '">' + wfEsc(linkedWorkRequest.number) + "</span></td>";
   } else {
-    h += '<td class="wf-row-number"><span class="wf-number-fallback" title="No ticket mapping (ul violation)">(In connection)</span></td>';
+    h += '<td class="wf-row-number"><span class="wf-number-fallback" title="No workRequest mapping (ul violation)">(In connection)</span></td>';
   }
   // command cell
   h += '<td class="wf-row-cmd">' + wfBadge(w.command, WF_CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" }) + "</td>";
@@ -370,13 +370,13 @@ function bindWfFileLinks(container) {
   });
 }
 
-/** Binds click handlers on workflow table rows and ticket badges. */
+/** Binds click handlers on workflow table rows and workRequest badges. */
 function bindWfRowClicks(container) {
   container.querySelectorAll(".wf-row:not([data-row-bound])").forEach(function (row) {
     row.setAttribute("data-row-bound", "1");
     row.addEventListener("click", function (e) {
       if (e.target.closest(".wf-file-indicator.active")) return;
-      if (e.target.closest(".wf-ticket-badge")) return;
+      if (e.target.closest(".wf-work-request-badge")) return;
       const entryKey = row.dataset.entry;
       const taskKey = row.dataset.task;
       const cmdKey = row.dataset.cmd;
@@ -386,14 +386,14 @@ function bindWfRowClicks(container) {
       if (w) openWfDetail(w);
     });
   });
-  // Ticket badge clicks: navigate to the linked ticket
-  container.querySelectorAll(".wf-ticket-badge:not([data-badge-bound])").forEach(function (badgeEl) {
+  // WorkRequest badge clicks: navigate to the linked workRequest
+  container.querySelectorAll(".wf-work-request-badge:not([data-badge-bound])").forEach(function (badgeEl) {
     badgeEl.setAttribute("data-badge-bound", "1");
     badgeEl.addEventListener("click", function (e) {
       e.stopPropagation();
-      const ticketNum = badgeEl.dataset.ticketNum;
-      const ticket = Board.state.TICKETS.find(function (t) { return t.number === ticketNum; });
-      if (ticket) Board.render.openViewer(ticket);
+      const workRequestNum = badgeEl.dataset.workRequestNum;
+      const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === workRequestNum; });
+      if (workRequest) Board.render.openViewer(workRequest);
     });
   });
 }
@@ -401,14 +401,14 @@ function bindWfRowClicks(container) {
 // ── Detail View ──
 
 /**
- * Opens a workflow detail view as a viewer tab.
+ * Accepteds a workflow detail view as a viewer tab.
  * @param {Object} w - workflow item
  */
 function openWfDetail(w) {
   const tabId = "wfDetail:" + w.entry + "/" + w.task + "/" + w.command;
   const exists = Board.state.viewerTabs.find(function (t) { return t.number === tabId; });
   if (!exists) {
-    Board.state.viewerTabs.push({ number: tabId, ticket: null, wfFile: null, wfDetail: w });
+    Board.state.viewerTabs.push({ number: tabId, work_request: null, wfFile: null, wfDetail: w });
   } else {
     exists.wfDetail = w;
   }
@@ -427,16 +427,16 @@ function renderWfDetailView(w) {
   let h = '<div class="tv-container wf-detail-container">';
 
   // Header
-  const headerLinkedTicket = findTicketForWorkflow(w);
+  const headerLinkedWorkRequest = findWorkRequestForWorkflow(w);
   h += '<div class="tv-header">';
   h += '<div class="tv-header-top">';
-  if (headerLinkedTicket) {
-    h += '<span class="tv-number">' + wfEsc(headerLinkedTicket.number) + "</span>";
+  if (headerLinkedWorkRequest) {
+    h += '<span class="tv-number">' + wfEsc(headerLinkedWorkRequest.number) + "</span>";
   } else {
     h += '<span class="tv-number wf-number-fallback">' + wfEsc(w.entry) + "</span>";
   }
-  const stepIsDone = (w.step || "").toUpperCase() === "DONE";
-  const stepColors = stepIsDone ? WF_STATUS_COLORS.Done : WF_STATUS_COLORS["In Progress"];
+  const stepIsComplete = (w.step || "").toUpperCase() === "DONE";
+  const stepColors = stepIsComplete ? WF_STATUS_COLORS.Complete : WF_STATUS_COLORS["Executing"];
   h += '<span class="badge wf-step-badge" style="background:' + stepColors.bg + ";color:" + stepColors.fg + '">' + wfEsc(wfStepLabel(w.step || "NONE")) + "</span>";
   if (w.command) {
     h += wfBadge(w.command, WF_CMD_COLORS[w.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" });
@@ -458,9 +458,9 @@ function renderWfDetailView(w) {
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Stage</span><span class="wf-detail-info-value">' + wfEsc(wfStepLabel(w.step || "NONE")) + "</span></div>";
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Created</span><span class="wf-detail-info-value">' + wfEsc(wfFormatTime(w.created_at)) + "</span></div>";
   h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Updated</span><span class="wf-detail-info-value">' + wfEsc(wfFormatTime(w.updated_at)) + "</span></div>";
-  const infoTicket = findTicketForWorkflow(w);
-  if (infoTicket) {
-    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Work Item</span><span class="wf-detail-info-value"><span class="wf-detail-ticket-link" data-ticket-num="' + wfEsc(infoTicket.number) + '">' + wfEsc(infoTicket.number) + "</span></span></div>";
+  const infoWorkRequest = findWorkRequestForWorkflow(w);
+  if (infoWorkRequest) {
+    h += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Work Item</span><span class="wf-detail-info-value"><span class="wf-detail-work-request-link" data-work-request-num="' + wfEsc(infoWorkRequest.number) + '">' + wfEsc(infoWorkRequest.number) + "</span></span></div>";
   }
   h += "</div>";
   h += "</div>";
@@ -503,8 +503,8 @@ function renderWfDetailView(w) {
     h += "</div>";
   }
 
-  // Connected ticket section placeholder
-  h += '<div class="wf-detail-ticket-section" data-basepath="' + wfEsc(wfProjectRoot() + (w.basePath || "")) + '"></div>';
+  // Connected work-request section placeholder
+  h += '<div class="wf-detail-work-request-section" data-basepath="' + wfEsc(wfProjectRoot() + (w.basePath || "")) + '"></div>';
 
   h += "</div>";
   return h;
@@ -515,15 +515,15 @@ function renderWfDetailView(w) {
 /** Workflow column definitions (single true source). */
 const WF_COLS = [
   { key: "step",       label: "Stage" },
-  { key: "ticket",     label: "Work Item" },
+  { key: "workRequest",     label: "Work Item" },
   { key: "command",    label: "Mode" },
   { key: "task",       label: "Title" },
   { key: "query",      label: "Mature",   nosort: true },
   { key: "plan",       label: "Schedule",    nosort: true },
-  { key: "work",       label: "Open",    nosort: true },
+  { key: "work",       label: "Accepted",    nosort: true },
   { key: "report",     label: "Notice",  nosort: true },
   { key: "summary",    label: "About Us", nosort: true },
-  { key: "usage",      label: "T-shirt",   nosort: true },
+  { key: "usage",      label: "WR-shirt",   nosort: true },
   { key: "log",        label: "Log In",     nosort: true },
   { key: "updated_at", label: "Date" },
 ];
@@ -551,7 +551,7 @@ function refreshWfSortIndicators(el) {
 
 /**
  * tbody only again green (Search bar, header, roll, pointer preserve).
- * Change the search, change the alignment, change the SSE ticket, the race correction all calls this function only.
+ * Change the search, change the alignment, change the SSE workRequest, the race correction all calls this function only.
  */
 function renderWfTbody() {
   const list = document.getElementById("wf-list");
@@ -701,8 +701,8 @@ Board.render.renderWorkflow = renderWorkflow;
 Board.render.renderWfTbody = renderWfTbody;
 Board.render.openWfDetail = openWfDetail;
 Board.render.renderWfDetailView = renderWfDetailView;
-Board.render.findTicketForWorkflow = findTicketForWorkflow;
-Board.render.findWorkflowsForTicket = findWorkflowsForTicket;
+Board.render.findWorkRequestForWorkflow = findWorkRequestForWorkflow;
+Board.render.findWorkflowsForWorkRequest = findWorkflowsForWorkRequest;
 Board.render.renderWfCard = renderWfCard;
 Board.render.bindWfFileLinks = bindWfFileLinks;
 Board.render.bindWfRowClicks = bindWfRowClicks;

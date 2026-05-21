@@ -1,7 +1,7 @@
 """session identifier.py - Session type identification abstraction layer.
 
 We provide integrated interface that distinguishes workflow sessions and main sessions.
-environment variable( WF SESSION TYPE,  WF TICKET ID) priority path and
+environment variable( WF SESSION TYPE, WF WORK REQUEST) priority path and
 The TMUX PANE-based poly bag path is abstracted into a single API.
 
 Session Identification Crystal Flow:
@@ -23,7 +23,7 @@ import subprocess
 __all__ = [
     "get_session_type",
     "is_workflow_session",
-    "get_session_ticket_id",
+    "get_session_work_request",
     "WINDOW_PREFIX_P",
     "MAIN_WINDOW_DEFAULT",
 ]
@@ -45,8 +45,8 @@ MAIN_WINDOW_DEFAULT: str = "main"
 _ENV_SESSION_TYPE: str = "_WF_SESSION_TYPE"
 """Session type environment variable key. value:"workflow", "main"."""
 
-_ENV_TICKET_ID: str = "_WF_TICKET_ID"
-"""Ticket ID environment variable key. value:"T-NNN"."""
+_ENV_WORK_REQUEST: str = "_WF_WORK_REQUEST"
+"""WorkRequest environment variable key. value:"WR-NNN"."""
 
 # ---------------------------------------------------------------------------
 # session type constant
@@ -116,7 +116,7 @@ def get_session_type() -> str:
         return SESSION_TYPE_UNKNOWN
 
     window_name = _get_current_window_name()
-    if window_name.startswith(f"{WINDOW_PREFIX_P}T-"):
+    if window_name.startswith(f"{WINDOW_PREFIX_P}WR-"):
         return SESSION_TYPE_WORKFLOW
     return SESSION_TYPE_MAIN
 
@@ -133,22 +133,22 @@ def is_workflow_session() -> bool:
     return get_session_type() == SESSION_TYPE_WORKFLOW
 
 
-def get_session_ticket_id() -> str | None:
-    """Returns the active ticket ID in the current session.
+def get_session_work_request() -> str | None:
+    """Returns the active WorkRequest in the current session.
 
     Payment Terms:
-      1. FAQ ` WF TICKET ID` environment variable value (if set, return immediately)
+      1. FAQ ` WF WORK REQUEST` environment variable value (if set, return immediately)
       2. ``TMUX PANE` if environment variable is in tmux window name
-         ``P:T-NNN` returns ``T-NNN`
+         ``P:WR-NNN` returns ``WR-NNN`
       3. FAQs [None]
 
     Returns:
-        Ticket ID string (e.g. ""T-001" ). ``None``` when extraction failed.
+        WorkRequest string (e.g. ""WR-001" ). ``None``` when extraction failed.
     """
     # 1) Environment variable priority path
-    env_ticket = os.environ.get(_ENV_TICKET_ID, "").strip()
-    if env_ticket:
-        return env_ticket
+    env_work_request = os.environ.get(_ENV_WORK_REQUEST, "").strip()
+    if env_work_request:
+        return env_work_request
 
     # 2) TMUX_PANE fallback path
     tmux_pane = os.environ.get("TMUX_PANE")
@@ -156,9 +156,9 @@ def get_session_ticket_id() -> str | None:
         return None
 
     window_name = _get_current_window_name()
-    prefix = f"{WINDOW_PREFIX_P}T-"
+    prefix = f"{WINDOW_PREFIX_P}WR-"
     if not window_name.startswith(prefix):
         return None
 
-    # Remove the "P:" prefix to return only the "T-NNN" part
+    # Remove the "P:" prefix to return only the "WR-NNN" part
     return window_name[len(WINDOW_PREFIX_P):]

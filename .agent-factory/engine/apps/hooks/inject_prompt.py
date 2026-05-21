@@ -9,7 +9,7 @@ Must be session loaded, so consolidated into a single source of truth.
 movement:
   - Determine workflow session (session_identifier.is_workflow_session) → If not, terminate immediately
   - Output .claude/skills/workflow-orchestration/SKILL.md body (frontmatter removed) to stdout
-  - Add <ticket-prefix> XML block when detecting an active ticket (T-NNN) inject
+  - Add <work-request-prefix> XML block when detecting an active WorkRequest (WR-NNN) inject
 """
 
 from __future__ import annotations
@@ -25,18 +25,18 @@ if _agent_factory_dir not in sys.path:
 
 from engine.common import resolve_project_root
 from engine.flow.flow_logger import append_log, resolve_work_dir_for_logging
-from engine.flow.session_identifier import is_workflow_session, get_session_ticket_id
+from engine.flow.session_identifier import is_workflow_session, get_session_work_request
 
 
-def _extract_ticket_id() -> str | None:
-    """Returns the active ticket ID (T-NNN) of the current session.
+def _extract_work_request() -> str | None:
+    """Returns the active WorkRequest (WR-NNN) of the current session.
 
-    Delegates to session_identifier.get_session_ticket_id().
+    Delegates to session_identifier.get_session_work_request().
 
     Returns:
-        Ticket ID string (e.g. "T-001"). None if not in a workflow session or if extraction fails.
+        WorkRequest string (e.g. "WR-001"). None if not in a workflow session or if extraction fails.
     """
-    return get_session_ticket_id()
+    return get_session_work_request()
 
 
 def _is_workflow_session() -> bool:
@@ -90,15 +90,15 @@ def main() -> None:
         raw = f.read()
     content = _strip_frontmatter(raw)
 
-    ticket_id = _extract_ticket_id()
-    if ticket_id:
-        ticket_prefix_block = (
-            f"\n<ticket-prefix>\n"
-            f"Be sure to print the [{ticket_id}] prefix on the first line of every response. \n"
-            f"Example: [{ticket_id}] Response content... \n"
-            f"</ticket-prefix>"
+    work_request = _extract_work_request()
+    if work_request:
+        work_request_prefix_block = (
+            f"\n<work-request-prefix>\n"
+            f"Be sure to print the [{work_request}] prefix on the first line of every response. \n"
+            f"Example: [{work_request}] Response content... \n"
+            f"</work-request-prefix>"
         )
-        content = content + ticket_prefix_block
+        content = content + work_request_prefix_block
 
     print(content, end="")
     sys.exit(0)

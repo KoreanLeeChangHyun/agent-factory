@@ -176,7 +176,7 @@ class ProductionLineWorkflowHandlerMixin:
         domain: W2
         handler: ProductionLineWorkflowHandlerMixin._production_line_handle_sessions_list
         request: query none
-        response_ok: [{session_id, ticket_id, command, current_step, ...}]
+        response_ok: [{session_id, work_request, command, current_step, ...}]
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
@@ -194,7 +194,7 @@ class ProductionLineWorkflowHandlerMixin:
         domain: W2
         handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_detail
         request: path {session_id: str}
-        response_ok: {session_id, ticket_id, command, current_step, current_phase, artifacts, ts}
+        response_ok: {session_id, work_request, command, current_step, current_phase, artifacts, ts}
         response_error: {ok: false, error: str}
         status_codes: 200, 404
         auth: none (local-only)
@@ -207,7 +207,7 @@ class ProductionLineWorkflowHandlerMixin:
             return
         self._send_json({
             'session_id': session.session_id,
-            'ticket_id': session.ticket_id,
+            'work_request': session.work_request,
             'command': session.command,
             'work_dir': session.work_dir,
             'worktree_path': session.worktree_path,
@@ -407,14 +407,14 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_handle_session_create(self) -> None:
         """POST /api/v2/sessions — Register a session explicitly.
 
-        Body: {session_id, ticket_id, command, work_dir, worktree_path?}
+        Body: {session_id, work_request, command, work_dir, worktree_path?}
         When re-invoking the same session_id, the original is returned (idempotent).
 
         method: POST
         url: /api/v2/sessions
         domain: W2
         handler: ProductionLineWorkflowHandlerMixin._production_line_handle_session_create
-        request: body {session_id, ticket_id, command, work_dir, worktree_path?}
+        request: body {session_id, work_request, command, work_dir, worktree_path?}
         response_ok: {ok: true, session_id, created_at}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 403
@@ -427,19 +427,19 @@ class ProductionLineWorkflowHandlerMixin:
             return
 
         session_id = (data.get('session_id') or '').strip()
-        ticket_id = (data.get('ticket_id') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
         command = (data.get('command') or '').strip()
         work_dir = (data.get('work_dir') or '').strip()
         worktree_path = (data.get('worktree_path') or '').strip()
 
-        if not session_id or not ticket_id or not command:
-            self._send_error(400, 'Missing "session_id" / "ticket_id" / "command"')
+        if not session_id or not work_request or not command:
+            self._send_error(400, 'Missing "session_id" / "work_request" / "command"')
             return
 
         try:
             session = production_line_registry.create(
                 session_id=session_id,
-                ticket_id=ticket_id,
+                work_request=work_request,
                 command=command,
                 work_dir=work_dir,
                 worktree_path=worktree_path,

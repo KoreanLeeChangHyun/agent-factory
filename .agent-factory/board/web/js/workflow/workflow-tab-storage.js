@@ -1,7 +1,7 @@
 /**
  * @module workflow-tab-storage
  *
- * T-516 — Workflow Tab Lifecycle Single Source (localStorage).
+ * WR-516 — Workflow Tab Lifecycle Single Source (localStorage).
  *
  * client side single true source: `localStorage['terminal.workflow.tabs']`
  * (battery of workflow ID string).
@@ -53,7 +53,7 @@
    * The main tab ID ('main') is not the target of this heap — no-op.
    * empty strings / null / undefined / non-string input also no-op.
    *
-   * @param {string} id - Workflow ID (e.g. "wf-T-516-20260519-173839")
+   * @param {string} id - Workflow ID (e.g. "wf-WR-516-20260519-173839")
    */
   function add(id) {
     if (typeof id !== "string" || id.length === 0) return;

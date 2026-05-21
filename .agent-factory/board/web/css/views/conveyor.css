@@ -1,18 +1,18 @@
-/* Agent Factory Dashboard - Kanban Styles */
+/* Agent Factory Dashboard - Conveyor Styles */
 /* Extracted from board.css: L201-401 */
 
-/* ── Kanban ── */
-#view-kanban {
+/* ── Conveyor ── */
+#view-conveyor {
   padding: 8px;
   flex-direction: column;
   gap: 8px;
 }
 
-#view-kanban.active {
+#view-conveyor.active {
   display: flex;
 }
 
-.kanban-board {
+.conveyor-board {
   display: flex;
   gap: 8px;
   flex: 1;
@@ -60,7 +60,7 @@
   margin-left: auto;
 }
 
-/* ── Kanban Sort Dropdown ── */
+/* ── Conveyor Sort Dropdown ── */
 .col-sort-btn {
   display: flex;
   align-items: center;
@@ -219,7 +219,7 @@
   min-height: 22px;
 }
 
-.card-done-action {
+.card-complete-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,7 +235,7 @@
   flex-shrink: 0;
 }
 
-.card-done-action:hover {
+.card-complete-action:hover {
   color: var(--af-primary);
   border-color: var(--af-primary-soft);
   background: var(--af-primary-soft);
@@ -273,7 +273,7 @@
   color: var(--af-info);
 }
 
-/* T-457 (Layer 3): One-on-the-clock mark label (read-only).
+/* WR-457 (Layer 3): One-on-the-clock mark label (read-only).
  * Click Trigger has been transferred to .card-commit-action for four times — cursor:default + hover removal. */
 .card-uncommitted-badge {
   font-size: 9px;
@@ -289,7 +289,7 @@
   pointer-events: none;
 }
 
-/* T-457 (Layer 3): failure read-only label.
+/* WR-457 (Layer 3): failure read-only label.
  * The color is placeholder neutral — scheduled to patch one line after the user decides. */
 .card-failure-tag {
   font-size: 9px;
@@ -305,8 +305,8 @@
   pointer-events: none;
 }
 
-/* T-475 Stage 3: launch asynchronousization — starting the right-hand pulse of the status card.
- * Trigger: client launchState[ticket].state === 'starting' (submit 200 OK right after ~ LAUNCH STARTED SSE before receiving).
+/* WR-475 Stage 3: launch asynchronousization — starting the right-hand pulse of the status card.
+ * Trigger: client launchState[workRequest].state === 'starting' (submit 200 OK right after ~ LAUNCH STARTED SSE before receiving).
  * Reference workflow visual conventions: Terracotta var(--af-primary) + pulse 1.6s ease-in-out infinite.
  * border-color + box-shadow modulation — `.wf-tool-card[data-running="true"]` Same rhythm.
  * prefers-reduced-motion: reduce the static color fallback (animation: none). */
@@ -342,8 +342,8 @@
   }
 }
 
-/* T-457 (Layer 3): 4th Commit Action Button (Ttree Micommit Auto Commit Entry Point).
- * . Same size as card-done-action (20×20) — 4 lines min-height: 22px safety. */
+/* WR-457 (Layer 3): 4th Commit Action Button (Ttree Micommit Auto Commit Entry Point).
+ * . Same size as card-complete-action (20×20) — 4 lines min-height: 22px safety. */
 .card-commit-action {
   display: inline-flex;
   align-items: center;
@@ -371,7 +371,7 @@
   cursor: wait;
 }
 
-/* In Progress card 4 workflow stop button (POST /api/workflow/stop).
+/* Executing card 4 workflow stop button (POST /api/workflow/stop).
  * var(--af-error) (fail color) — stop meaning and shadow. 20×20 — 4 min-height: 22px Safety. */
 .card-stop-action {
   display: inline-flex;
@@ -400,10 +400,10 @@
   cursor: wait;
 }
 
-/* T-399: .status-submit removed (Submit transient step removal). */
+/* WR-399: .status-submit removed (Submit transient step removal). */
 
 /* ─────────────────────────────────────────────────────────────────────────
- * T-433 Phase 2 — Review Card 4 feature Brand Match Toggle Button.
+ * WR-433 Phase 2 — Verifying Card 4 feature Brand Match Toggle Button.
  * - 16px SVG (Lucide git-branch, external library ban — inline SVG)
  * - OFF: Grey outline (border-only, transparent background)
  * - ON: Terracotta(var(--af-primary)) 4 way box-shadow glow
@@ -444,7 +444,7 @@
 }
 
 /* Card external light glow (4-way box-shadow — border-left compliance with one ban.)
- * . has-active-branch is granted to the Review Card .card. */
+ * . has-active-branch is granted to the Verifying Card .card. */
 .card.has-active-branch {
   box-shadow:
     0 0 0 1px var(--af-primary-soft),
@@ -452,7 +452,7 @@
 }
 
 
-/* ── Column Collapse Toggle (Done / To Do) ── */
+/* ── Column Collapse Toggle (Complete / Draft) ── */
 .column-toggle-btn {
   display: flex;
   align-items: center;
@@ -479,7 +479,7 @@
   display: block;
 }
 
-/* ── Collapsed Column State (Done / To Do) ── */
+/* ── Collapsed Column State (Complete / Draft) ── */
 .column.collapsed {
   flex: none;
   width: 40px;
@@ -655,7 +655,7 @@
   }
 }
 
-/* ── DnD: To Do ↔ Open Drag & Drop (Safe DnD Policy) ── */
+/* ── DnD: Draft ↔ Accepted Drag & Drop (Safe DnD Policy) ── */
 .card-draggable {
   cursor: grab;
 }
@@ -668,7 +668,7 @@
   opacity: 0.4;
 }
 
-/* To Do manual alignment reorder insert position indicator (terracotta line) */
+/* Draft manual alignment reorder insert position indicator (terracotta line) */
 .card-drop-indicator {
   height: 0;
   margin: 2px 0;
@@ -683,23 +683,23 @@
   border-radius: 4px;
 }
 
-/* T-399: In Progress drop hover — warning tone (workflow execution consciousness) */
-.cards-droppable[data-col-key="In Progress"].dragover-active {
+/* WR-399: Executing drop hover — warning tone (workflow execution consciousness) */
+.cards-droppable[data-col-key="Executing"].dragover-active {
   background: var(--af-primary-soft);
   outline: 2px dashed var(--af-primary);
   outline-offset: -4px;
   box-shadow: inset 0 0 0 1px var(--af-primary-soft);
 }
 
-/* T-906: Done drop hover — consciousness highlight (box-shadow enhancement) */
-.cards-droppable[data-col-key="Done"].dragover-active {
+/* WR-906: Complete drop hover — consciousness highlight (box-shadow enhancement) */
+.cards-droppable[data-col-key="Complete"].dragover-active {
   background: var(--af-primary-soft);
   outline: 2px dashed var(--af-primary);
   outline-offset: -4px;
   box-shadow: inset 0 0 0 1px var(--af-primary-soft);
 }
 
-/* T-399: Confirm Modal (Open → In Progress drop) */
+/* WR-399: Confirm Modal (Accepted → Executing drop) */
 .submit-confirm-overlay {
   position: fixed;
   inset: 0;
@@ -736,7 +736,7 @@
   color: var(--af-text);
 }
 
-/* T-906: The resulting crash/measure file list style */
+/* WR-906: The resulting crash/measure file list style */
 .submit-confirm-body ul {
   margin: 8px 0 0;
   padding-left: 18px;
@@ -781,8 +781,8 @@
   color: var(--af-code);
 }
 
-/* T-441: Done Card Merchandise Verdict Badge (advisory only) */
-.card-done-verdict {
+/* WR-441: Complete Card Merchandise Verdict Badge (advisory only) */
+.card-complete-verdict {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -793,16 +793,16 @@
   transition: opacity 0.15s;
 }
 
-.card-done-verdict.verdict-ok {
+.card-complete-verdict.verdict-ok {
   color: var(--af-primary);
   opacity: 0.75;
 }
 
-.card-done-verdict.verdict-ok:hover {
+.card-complete-verdict.verdict-ok:hover {
   opacity: 1;
 }
 
-.card-done-verdict.verdict-fail {
+.card-complete-verdict.verdict-fail {
   color: var(--af-primary);
   background: var(--af-primary-soft);
   border: 1px solid var(--af-primary-soft);
@@ -810,19 +810,19 @@
   opacity: 0.9;
 }
 
-.card-done-verdict.verdict-fail:hover {
+.card-complete-verdict.verdict-fail:hover {
   background: var(--af-primary-soft);
   border-color: var(--af-primary);
   opacity: 1;
 }
 
-.card-done-verdict.verdict-unknown,
-.card-done-verdict.verdict-loading {
+.card-complete-verdict.verdict-unknown,
+.card-complete-verdict.verdict-loading {
   display: none;
 }
-/* T-477: Auditor T3 verdict Badge (Review Card Velvet, Advisory only)
+/* WR-477: Auditor T3 verdict Badge (Verifying Card Velvet, Advisory only)
  * Form: Round Pills (border-radius as). location: card-top-right flexbox right alignment.
- * T-457 failure tag (right-right label) and position/type separation — No collision.
+ * WR-457 failure tag (right-right label) and position/type separation — No collision.
  */
 .audit-badge {
   display: inline-flex;
@@ -841,10 +841,10 @@
   pointer-events: auto;
 }
 
-/* T-463: Review Card Rule Base Primary Automatic Verdict Badge (advisory only) */
-/* T-441 .card-done-verdict Pattern Dynamic — Single, Text Chip Mode + 4-row Action-row Left Batch */
-/* T-457 failure tag and visual vocabulary separated: failure tag = 1 line right grey read-only / verdict = 4 line left chip color + cursor:help interactive */
-.card-review-verdict {
+/* WR-463: Verifying Card Rule Base Primary Automatic Verdict Badge (advisory only) */
+/* WR-441 .card-complete-verdict Pattern Dynamic — Single, Text Chip Mode + 4-row Action-row Left Batch */
+/* WR-457 failure tag and visual vocabulary separated: failure tag = 1 line right grey read-only / verdict = 4 line left chip color + cursor:help interactive */
+.card-verifying-verdict {
   display: inline-flex;
   align-items: center;
   font-size: 9px;
@@ -860,46 +860,46 @@
   transition: opacity 0.15s;
 }
 
-.card-review-verdict.verdict-pass {
+.card-verifying-verdict.verdict-pass {
   color: var(--af-primary);        /* Bluerock — same tone as done verdict-ok */
   background: var(--af-primary-soft);
   border: 1px solid var(--af-primary-soft);
   opacity: 0.85;
 }
 
-.card-review-verdict.verdict-pass:hover {
+.card-verifying-verdict.verdict-pass:hover {
   opacity: 1;
 }
 
-.card-review-verdict.verdict-warn {
+.card-verifying-verdict.verdict-warn {
   color: var(--af-warning);        /* Amber */
   background: var(--af-warning-soft);
   border: 1px solid var(--af-warning-soft);
   opacity: 0.9;
 }
 
-.card-review-verdict.verdict-warn:hover {
+.card-verifying-verdict.verdict-warn:hover {
   background: var(--af-warning-soft);
   border-color: var(--af-warning);
   opacity: 1;
 }
 
-.card-review-verdict.verdict-fail {
+.card-verifying-verdict.verdict-fail {
   color: var(--af-error);        /* Jhong — Vision highlight */
   background: var(--af-error-soft);
   border: 1px solid var(--af-error-soft);
   opacity: 0.9;
 }
 
-.card-review-verdict.verdict-fail:hover {
+.card-verifying-verdict.verdict-fail:hover {
   background: var(--af-error-soft);
   border-color: var(--af-error);
   opacity: 1;
 }
 
-.card-review-verdict.verdict-skip,
-.card-review-verdict.verdict-unknown,
-.card-review-verdict.verdict-loading {
+.card-verifying-verdict.verdict-skip,
+.card-verifying-verdict.verdict-unknown,
+.card-verifying-verdict.verdict-loading {
   display: none;          /* SKIP / UNKNOWN / Loading — hidden without space waste */
 }
 

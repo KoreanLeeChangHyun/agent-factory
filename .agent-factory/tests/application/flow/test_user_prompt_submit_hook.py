@@ -28,7 +28,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 # Hook-handlers module direct import
-_inject_mod_path = os.path.join(_HOOK_HANDLERS_DIR, "inject_kanban_context.py")
+_inject_mod_path = os.path.join(_HOOK_HANDLERS_DIR, "inject_conveyor_context.py")
 _dispatcher_hook_path = None  # user-prompt-submit.py absolute view (decolor)
 
 # Find hooks/ directory (worktree structure: .agent-factory/hooks/ three steps to the top)

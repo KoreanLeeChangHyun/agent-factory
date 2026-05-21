@@ -235,40 +235,40 @@
     M.renderFilePreview();
   };
 
-  // ── Ticket Attachment ──
+  // ── WorkRequest Attachment ──
 
   /**
    * #terminal-image-preview
    * Share the same container with the image/file card to manage it with one line attachment strip.
-   * Only the existing ticket card (`[data-ticket-idx]`), the image/file card is maintained.
+   * Only the existing workRequest card (`[data-work-request-idx]`), the image/file card is maintained.
    *
    * The Card DOM body is a single truth source helper of-card.js
    * (Board. term.attachmentCard.create)
-   * add the data-ticket-idx property and remove button to the wrapper pattern.
+   * add the data-work-request-idx property and remove button to the wrapper pattern.
    * This will always match the message renderer card and the look&fill of the input side card.
    */
-  M.renderTicketPreview = function() {
+  M.renderWorkRequestPreview = function() {
     var container = document.getElementById("terminal-image-preview");
     if (!container) return;
 
-    var existingCards = container.querySelectorAll("[data-ticket-idx]");
+    var existingCards = container.querySelectorAll("[data-work-request-idx]");
     existingCards.forEach(function (card) { card.parentNode.removeChild(card); });
 
-    if (!M.attachedTickets) return;
+    if (!M.attachedWorkRequests) return;
 
     var helper = M.attachmentCard;
     if (!helper || typeof helper.create !== "function") return;
 
-    M.attachedTickets.forEach(function (ticket, idx) {
-      var card = helper.create(ticket);
-      card.setAttribute("data-ticket-idx", idx);
+    M.attachedWorkRequests.forEach(function (workRequest, idx) {
+      var card = helper.create(workRequest);
+      card.setAttribute("data-work-request-idx", idx);
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "terminal-image-remove";
       removeBtn.title = "About Us";
       removeBtn.innerHTML = "×";
       removeBtn.addEventListener("click", (function (capturedIdx) {
-        return function () { M.removeTicket(capturedIdx); };
+        return function () { M.removeWorkRequest(capturedIdx); };
       })(idx));
 
       card.appendChild(removeBtn);
@@ -277,17 +277,17 @@
   };
 
   /**
-   * Add ticket attachment.
-   * If the same ticket number is already attached, ignore + appendSystemMessage.
+   * Add workRequest attachment.
+   * If the same workRequest number is already attached, ignore + appendSystemMessage.
    *
    * @param {{number, title, command, prompt, result}} payload
    * @param {string null} reportText - report.html
    */
-  M.attachTicket = function(payload, reportText) {
+  M.attachWorkRequest = function(payload, reportText) {
     if (!payload || !payload.number) return;
-    if (!M.attachedTickets) M.attachedTickets = [];
+    if (!M.attachedWorkRequests) M.attachedWorkRequests = [];
 
-    var dup = M.attachedTickets.some(function (t) { return t.number === payload.number; });
+    var dup = M.attachedWorkRequests.some(function (t) { return t.number === payload.number; });
     if (dup) {
       if (M.appendSystemMessage) {
         M.appendSystemMessage("NEWS" + payload.number + "{{ data.filesizeHumanReadable }}");
@@ -295,7 +295,7 @@
       return;
     }
 
-    M.attachedTickets.push({
+    M.attachedWorkRequests.push({
       number: payload.number,
       title: payload.title || "",
       command: payload.command || "",
@@ -304,18 +304,18 @@
       report: reportText || null,
       addedAt: Date.now()
     });
-    M.renderTicketPreview();
+    M.renderWorkRequestPreview();
   };
 
-  M.removeTicket = function(index) {
-    if (!M.attachedTickets) return;
-    M.attachedTickets.splice(index, 1);
-    M.renderTicketPreview();
+  M.removeWorkRequest = function(index) {
+    if (!M.attachedWorkRequests) return;
+    M.attachedWorkRequests.splice(index, 1);
+    M.renderWorkRequestPreview();
   };
 
-  M.clearTickets = function() {
-    M.attachedTickets = [];
-    M.renderTicketPreview();
+  M.clearWorkRequests = function() {
+    M.attachedWorkRequests = [];
+    M.renderWorkRequestPreview();
   };
 
   // ── Memory
@@ -415,26 +415,26 @@
   };
 
   /**
-   * Convert the attached ticket arrangement to the payload structure for backend transmission.
-   * Text prepend policy pulmonary (T-427 → T-429) — User message text only,
+   * Convert the attached workRequest arrangement to the payload structure for backend transmission.
+   * Text prepend policy pulmonary (WR-427 → WR-429) — User message text only,
    * SDK Encoding content
    * Combines the user role in the array with additional text blocks.
    *
    * null return null return (payload tos attachment field not insert).
    *
-   * @param {Array<{number,title,command,prompt,result,report,addedAt}>|undefined} tickets
+   * @param {Array<{number,title,command,prompt,result,report,addedAt}>|undefined} workRequests
    * @returns {Array<{number,command,title,prompt,report,fetched_at}>|null}
    */
-  function _buildAttachmentsPayload(tickets) {
-    if (!tickets || tickets.length === 0) return null;
-    return tickets.map(function (t) {
+  function _buildAttachmentsPayload(workRequests) {
+    if (!workRequests || workRequests.length === 0) return null;
+    return workRequests.map(function (t) {
       return {
         number: t.number || "",
         command: t.command || "",
         title: t.title || "",
         prompt: t.prompt || "",
         report: t.report || "",
-        // When attaching(=DnD after client is fetched the ticket payload + report.html)
+        // When attaching(=DnD after client is fetched the workRequest payload + report.html)
         // Backend / sidecar is easy to identify with the same message string.
         fetched_at: t.addedAt || null
       };
@@ -545,19 +545,19 @@
     if (!input) return;
     var text = input.value.trim();
     var hasImages = M.attachedImages.length > 0;
-    var hasTickets = M.attachedTickets && M.attachedTickets.length > 0;
+    var hasWorkRequests = M.attachedWorkRequests && M.attachedWorkRequests.length > 0;
     var hasMemories = M.attachedMemories && M.attachedMemories.length > 0;
     if (Board.debugLog) Board.debugLog('sendInput.entry', {
       termStatus: Board.state.termStatus,
       textLen: text.length,
       hasImages: hasImages,
-      hasTickets: hasTickets,
+      hasWorkRequests: hasWorkRequests,
       hasMemories: hasMemories,
       queueSize: M.inputQueue ? M.inputQueue.length : 0,
       willQueue: Board.state.termStatus === "busy",
     });
-    if (!text && !hasImages && !hasTickets && !hasMemories) return;
-    if ((hasImages || hasTickets) && !M.hasCapability("attachments")) {
+    if (!text && !hasImages && !hasWorkRequests && !hasMemories) return;
+    if ((hasImages || hasWorkRequests) && !M.hasCapability("attachments")) {
       M.appendErrorMessage("[Error] Current provider does not support attachments");
       return;
     }
@@ -570,9 +570,9 @@
     input.value = "";
     input.style.height = "auto";
 
-    // Route slash commands (to process immediately without putting on the order) — Slash commands for the future if images/Tickets/Memory
+    // Route slash commands (to process immediately without putting on the order) — Slash commands for the future if images/WorkRequests/Memory
     // M.isFilePath() check: /home/... The file path is not routed as a slash command
-    if (!hasImages && !hasTickets && !hasMemories && text.charAt(0) === "/" && !M.isFilePath(text)) {
+    if (!hasImages && !hasWorkRequests && !hasMemories && text.charAt(0) === "/" && !M.isFilePath(text)) {
       if (!M.hasCapability("slash_commands")) {
         M.appendErrorMessage("[Error] Current provider does not support slash commands");
         input.value = text;
@@ -589,8 +589,8 @@
       return;
     }
 
-    // T-429: Attachment body prepend policy closure — sendText is user text intact.
-    // Attached ticket body sends to separates payload field (backend is SDK)
+    // WR-429: Attachment body prepend policy closure — sendText is user text intact.
+    // Attached workRequest body sends to separates payload field (backend is SDK)
     // When the user role content array is combined with additional text blocks.
     //
     // memory attachments inline the body with the path only prefix block (user crystal: body fetch
@@ -604,12 +604,12 @@
       var prefixBlock = "[Note Memory]\\n" + memoryLines.join("\n");
       sendText = text ? prefixBlock + "\n\n" + text : prefixBlock;
     }
-    var attachmentsPayload = hasTickets ? _buildAttachmentsPayload(M.attachedTickets) : null;
-    // meta snapshot for outputDiv card renderer (preserved before ticket/memory clear)
-    var ticketsSnapshot = hasTickets ? M.attachedTickets.slice() : null;
+    var attachmentsPayload = hasWorkRequests ? _buildAttachmentsPayload(M.attachedWorkRequests) : null;
+    // meta snapshot for outputDiv card renderer (preserved before workRequest/memory clear)
+    var workRequestsSnapshot = hasWorkRequests ? M.attachedWorkRequests.slice() : null;
     var memoriesSnapshot = hasMemories ? M.attachedMemories.slice() : null;
 
-    // If you have a busy status (with response wait), you can route it to enqueueInput (with image/ticket).
+    // If you have a busy status (with response wait), you can route it to enqueueInput (with image/workRequest).
     // cue entry is not pre-echo in outputDiv, and only exposure to cue stack cards.
     if (Board.state.termStatus === "busy") {
       var imagesSnapshot = hasImages
@@ -621,8 +621,8 @@
         M.clearImages();
         M.clearFiles();
       }
-      if (hasTickets) {
-        M.clearTickets();
+      if (hasWorkRequests) {
+        M.clearWorkRequests();
       }
       if (hasMemories) {
         M.clearMemories();
@@ -646,16 +646,16 @@
     }
     M.appendToOutput(div);
 
-    // T-429: Added echo to .term-message-attachments container with div and alias.
+    // WR-429: Added echo to .term-message-attachments container with div and alias.
     // Attach-card.js reuses a single true source heaper to match the input side card and the look&pilot.
     // echo by type="memory" in the same container as memory attachment.
-    var hasAttachmentEcho = (ticketsSnapshot && ticketsSnapshot.length > 0)
+    var hasAttachmentEcho = (workRequestsSnapshot && workRequestsSnapshot.length > 0)
       || (memoriesSnapshot && memoriesSnapshot.length > 0);
     if (hasAttachmentEcho && M.attachmentCard && typeof M.attachmentCard.create === "function") {
       var attachContainer = document.createElement("div");
       attachContainer.className = "term-message-attachments";
-      if (ticketsSnapshot) {
-        ticketsSnapshot.forEach(function (att) {
+      if (workRequestsSnapshot) {
+        workRequestsSnapshot.forEach(function (att) {
           attachContainer.appendChild(M.attachmentCard.create(att));
         });
       }
@@ -685,7 +685,7 @@
     }
     M.clearImages();
     M.clearFiles();
-    if (hasTickets) M.clearTickets();
+    if (hasWorkRequests) M.clearWorkRequests();
     if (hasMemories) M.clearMemories();
 
     // Mark sendText as locally sent so the user_input SSE echo is skipped.
@@ -744,8 +744,8 @@
     Board.session.postJson("/terminal/interrupt").then(function () {
       M.stopSpinner();
       if (M.textBuffer) {
-        if (Board.WfTicketRenderer && Board.WfTicketRenderer.detect(M.textBuffer)) {
-          Board.WfTicketRenderer.render(M.textBuffer);
+        if (Board.WfWorkRequestRenderer && Board.WfWorkRequestRenderer.detect(M.textBuffer)) {
+          Board.WfWorkRequestRenderer.render(M.textBuffer);
         } else {
           var html = M.renderMarkdownToHtml(M.textBuffer);
           M.appendHtmlBlock(html, "term-message term-assistant");
@@ -868,7 +868,7 @@
   M.enqueueInput = function(text, images, attachments) {
     text = text || "";
     images = images || null;
-    // T-429: Retention to attachments — echo + separating transmission equally when commitQueueue.
+    // WR-429: Retention to attachments — echo + separating transmission equally when commitQueueue.
     var attachList = (attachments && attachments.length > 0) ? attachments : null;
     var hasImages = images && images.length > 0;
     var hasAttachments = !!attachList;
@@ -942,7 +942,7 @@
     }
     if (M.appendToOutput) M.appendToOutput(div);
 
-    // T-429: Add an attachment card to a separate container echo (sendInput direct route same separating wrender).
+    // WR-429: Add an attachment card to a separate container echo (sendInput direct route same separating wrender).
     if (entry.attachments && entry.attachments.length > 0 && M.attachmentCard && typeof M.attachmentCard.create === "function") {
       var attachContainer = document.createElement("div");
       attachContainer.className = "term-message-attachments";

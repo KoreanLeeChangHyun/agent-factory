@@ -2,6 +2,15 @@
   var panel = document.getElementById('settings-panel');
   var overlay = document.getElementById('settings-overlay');
   var body = document.getElementById('settings-body');
+  var resizeHandle = document.getElementById('settings-resize-handle');
+  var SETTINGS_WIDTH_KEY = 'agentFactorySettingsWidth';
+  var SETTING_OPTIONS = {
+    AGENT_FACTORY_LLM_PROVIDER: [
+      { value: 'claude', label: 'Claude' },
+      { value: 'codex', label: 'Codex' },
+      { value: 'fake', label: 'Fake' }
+    ]
+  };
   var ENV_DESCRIPTIONS = {
     AGENT_FACTORY_SLACK_BOT_TOKEN: 'Slack Bot OAuth token used to send task notifications. Leave empty to disable Slack notifications.',
     AGENT_FACTORY_SLACK_CHANNEL_ID: 'Slack channel ID where Agent Factory notifications are posted.',
@@ -17,24 +26,24 @@
     HOOK_AGENT_INVESTIGATION_GUARD: 'Requires stronger investigation before agent or sub-agent related changes.',
     HOOK_MAIN_BRANCH_GUARD: 'Prevents unsafe work directly on the main branch.',
     HOOK_MAIN_SESSION_GUARD: 'Guards actions that should only run from the main session.',
-    HOOK_KANBAN_SUBCOMMAND_GUARD: 'Guards direct Kanban subcommands that bypass the intended workflow.',
+    HOOK_CONVEYOR_SUBCOMMAND_GUARD: 'Guards direct Conveyor subcommands that bypass the intended workflow.',
     HOOK_READONLY_SESSION_GUARD: 'Prevents writes from read-only or archived sessions.',
     HOOK_DIRECT_PATH_GUARD: 'Blocks direct script paths when the supported Agent Factory command should be used.',
-    HOOK_DONE_RELATION_GUARD: 'Checks ticket relation consistency when moving work to Done.',
+    HOOK_COMPLETE_RELATION_GUARD: 'Checks WorkRequest relation consistency when moving work to Complete.',
     HOOK_RULES_AUTO_APPROVE: 'Allows rules-related operations to be auto-approved when safe.',
     HOOK_WORKTREE_REMOVE_GUARD: 'Protects workflow worktrees from unsafe removal.',
     HOOK_WORKTREE_PATH_GUARD: 'Ensures workflow worktree paths stay inside the expected Agent Factory area.',
     HOOK_HALLUCINATION_LOGGER: 'Records suspected hallucination or unsupported-claim events for review.',
     HOOKS_EDIT_ALLOWED: 'Optional allowlist for hook editing. Leave empty unless you need scoped hook changes.',
-    HOOK_WORKFLOW_ORCHESTRATION: 'Enables Agent Factory workflow orchestration around ticket execution.',
+    HOOK_WORKFLOW_ORCHESTRATION: 'Enables Agent Factory workflow orchestration around WorkRequest execution.',
     HOOK_SESSION_SYSTEM_PROMPT: 'Injects the Agent Factory system prompt context at session start.',
     HOOK_WORKFLOW_AUTO_CONTINUE: 'Allows workflow automation to continue after stop events.',
     HOOK_USAGE_TRACKER: 'Tracks usage metadata after sub-agent sessions stop.',
     HOOK_HISTORY_SYNC_TRIGGER: 'Triggers history synchronization when sub-agent sessions stop.',
     HOOK_CATALOG_SYNC: 'Synchronizes catalog metadata after tool execution.',
-    HOOK_USER_PROMPT_KANBAN: 'Injects Kanban and session snapshot context into main user prompts.',
+    HOOK_USER_PROMPT_CONVEYOR: 'Injects Conveyor and session snapshot context into main user prompts.',
     HOOK_AUDITOR_T3: 'Enables the non-blocking LLM audit advisory layer.',
-    AUDITOR_T3_MODEL: 'Model name used by the audit advisory layer.',
+    AUDITOR_T3_MODEL: 'Optional model override used by the audit advisory layer. Leave empty to use the active provider default.',
     AUDITOR_T3_EFFORT: 'Reasoning effort used by the audit advisory layer.',
     ENFORCE_CSO_PRINCIPLE: 'Enforces skill trigger discipline based on skill descriptions.',
     ENFORCE_RATIONALIZATION_GUARD: 'Requires anti-rationalization checks in relevant workflow outputs.',
@@ -78,6 +87,7 @@
   });
 
   function open() {
+    applySavedWidth();
     panel.classList.add('open');
     overlay.classList.add('open');
     load();
@@ -86,6 +96,49 @@
   function close() {
     panel.classList.remove('open');
     overlay.classList.remove('open');
+  }
+
+  function clampWidth(px) {
+    var min = Math.min(420, window.innerWidth);
+    var max = Math.max(min, Math.min(880, window.innerWidth));
+    return Math.max(min, Math.min(max, px));
+  }
+
+  function applySavedWidth() {
+    try {
+      var saved = parseInt(localStorage.getItem(SETTINGS_WIDTH_KEY), 10);
+      if (Number.isFinite(saved)) {
+        panel.style.width = clampWidth(saved) + 'px';
+      }
+    } catch (e) {}
+  }
+
+  if (resizeHandle) {
+    resizeHandle.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      resizeHandle.setPointerCapture(e.pointerId);
+      panel.classList.add('resizing');
+
+      function move(ev) {
+        var next = clampWidth(window.innerWidth - ev.clientX);
+        panel.style.width = next + 'px';
+      }
+
+      function done(ev) {
+        move(ev);
+        panel.classList.remove('resizing');
+        try { localStorage.setItem(SETTINGS_WIDTH_KEY, String(Math.round(panel.getBoundingClientRect().width))); } catch (err) {}
+        resizeHandle.releasePointerCapture(ev.pointerId);
+        resizeHandle.removeEventListener('pointermove', move);
+        resizeHandle.removeEventListener('pointerup', done);
+        resizeHandle.removeEventListener('pointercancel', done);
+      }
+
+      resizeHandle.addEventListener('pointermove', move);
+      resizeHandle.addEventListener('pointerup', done);
+      resizeHandle.addEventListener('pointercancel', done);
+    });
   }
 
   function load() {
@@ -215,6 +268,7 @@
         var pill = document.getElementById('settings-provider-pill');
         if (pill) pill.textContent = adapterLabel(selectedBrain);
         updateProviderCapability(selectedBrain);
+        syncProviderSelects(selectedBrain);
         save('AGENT_FACTORY_LLM_PROVIDER', providerValue(selectedBrain), brainSelect);
       });
     }
@@ -439,6 +493,34 @@
       cb.addEventListener('change', function () {
         save(v.key, cb.checked ? 'true' : 'false');
       });
+    } else if (SETTING_OPTIONS[v.key]) {
+      var select = document.createElement('select');
+      select.className = 'settings-select';
+      select.setAttribute('data-setting-key', v.key);
+      SETTING_OPTIONS[v.key].forEach(function (opt) {
+        var option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+      });
+      select.value = providerValue(normalizeBrain(v.value));
+      select.addEventListener('change', function () {
+        var selected = normalizeBrain(select.value);
+        select.value = providerValue(selected);
+        if (v.key === 'AGENT_FACTORY_LLM_PROVIDER') {
+          if (window.AgentFactoryBrain) {
+            window.AgentFactoryBrain.setBrain(selected);
+          }
+          var topSelect = document.getElementById('settings-brain-theme');
+          if (topSelect) topSelect.value = providerValue(selected);
+          var pill = document.getElementById('settings-provider-pill');
+          if (pill) pill.textContent = adapterLabel(selected);
+          updateProviderCapability(selected);
+          syncProviderSelects(selected);
+        }
+        save(v.key, select.value, select);
+      });
+      ctrl.appendChild(select);
     } else {
       var inp = document.createElement('input');
       inp.className = 'settings-input';
@@ -551,6 +633,13 @@
         ? 'Send /login to the active Console session.'
         : 'Login command is not supported by this terminal provider';
     }
+  }
+
+  function syncProviderSelects(brain) {
+    var value = providerValue(brain);
+    document.querySelectorAll('select[data-setting-key="AGENT_FACTORY_LLM_PROVIDER"]').forEach(function (select) {
+      select.value = value;
+    });
   }
 
   function flash(el, cls) {

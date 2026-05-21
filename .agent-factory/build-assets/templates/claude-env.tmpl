@@ -6,26 +6,8 @@
 # =========================================================================================
 
 # -----------------------------------------------------------------------------------------
-# (1) Adapter settings
+# (1) Brain adapter settings
 # -----------------------------------------------------------------------------------------
-
-# Slack adapter settings.
-# Slack Bot OAuth Token (starts with xoxb-)
-# Purpose: Sending Agent Factory task completion/waiting notifications
-AGENT_FACTORY_SLACK_BOT_TOKEN=
-
-# Slack channel ID (starts with C)
-# Purpose: Specifies the channel through which notifications will be sent.
-AGENT_FACTORY_SLACK_CHANNEL_ID=
-
-# Slack API endpoint (can be overridden)
-AGENT_FACTORY_SLACK_API_URL=https://slack.com/api/chat.postMessage
-
-# Git adapter settings.
-AGENT_FACTORY_GIT_USER_NAME=
-AGENT_FACTORY_GIT_USER_EMAIL=
-AGENT_FACTORY_GITHUB_USERNAME=
-AGENT_FACTORY_SSH_KEY_GITHUB=
 
 # LLM adapter settings.
 # Brain provider for provider-neutral LLM adapter paths.
@@ -43,7 +25,33 @@ CODEX_SANDBOX=workspace-write
 CODEX_APPROVAL_POLICY=never
 
 # -----------------------------------------------------------------------------------------
-# (2) Hook control flag (HOOK_* system)
+# (2) Slack integration
+# -----------------------------------------------------------------------------------------
+
+# Slack notification settings.
+# Slack Bot OAuth Token (starts with xoxb-)
+# Purpose: Sending Agent Factory task completion/waiting notifications
+AGENT_FACTORY_SLACK_BOT_TOKEN=
+
+# Slack channel ID (starts with C)
+# Purpose: Specifies the channel through which notifications will be sent.
+AGENT_FACTORY_SLACK_CHANNEL_ID=
+
+# Slack API endpoint (can be overridden)
+AGENT_FACTORY_SLACK_API_URL=https://slack.com/api/chat.postMessage
+
+# -----------------------------------------------------------------------------------------
+# (3) Git identity settings
+# -----------------------------------------------------------------------------------------
+
+# Git identity settings.
+AGENT_FACTORY_GIT_USER_NAME=
+AGENT_FACTORY_GIT_USER_EMAIL=
+AGENT_FACTORY_GITHUB_USERNAME=
+AGENT_FACTORY_SSH_KEY_GITHUB=
+
+# -----------------------------------------------------------------------------------------
+# (4) Hook control flag (HOOK_* system)
 # Control the activation/deactivation of each hook with true/false.
 # -----------------------------------------------------------------------------------------
 
@@ -55,17 +63,17 @@ HOOK_TASK_HISTORY_SYNC=false
 HOOK_AGENT_INVESTIGATION_GUARD=false
 HOOK_MAIN_BRANCH_GUARD=false
 HOOK_MAIN_SESSION_GUARD=false
-HOOK_KANBAN_SUBCOMMAND_GUARD=false
+HOOK_CONVEYOR_SUBCOMMAND_GUARD=false
 HOOK_READONLY_SESSION_GUARD=false
 HOOK_DIRECT_PATH_GUARD=true
-HOOK_DONE_RELATION_GUARD=true
+HOOK_COMPLETE_RELATION_GUARD=true
 HOOK_RULES_AUTO_APPROVE=true
 HOOK_WORKTREE_REMOVE_GUARD=true
 HOOK_WORKTREE_PATH_GUARD=true
 HOOK_HALLUCINATION_LOGGER=true
 HOOKS_EDIT_ALLOWED=
 
-# V2 workflow orchestration is driven by `flow-wf submit T-NNN`.
+# V2 workflow orchestration is driven by `flow-wf submit WR-NNN`.
 # Historical flow-init/flow-step/flow-phase/flow-finish banner wrappers are not
 # part of the active operator contract.
 HOOK_WORKFLOW_ORCHESTRATION=true
@@ -83,19 +91,19 @@ HOOK_HISTORY_SYNC_TRIGGER=false
 # post-tool-use hooks
 HOOK_CATALOG_SYNC=true
 
-# user-prompt-submit hooks (main session kanban/session snapshot injection)
-HOOK_USER_PROMPT_KANBAN=true
+# user-prompt-submit hooks (main session Conveyor/session snapshot injection)
+HOOK_USER_PROMPT_CONVEYOR=true
 
 # Auditor T3 — LLM judge advisory layer (T-477).
 # Disabled by default (requires user-specified activation, adheres to speculative auto-enforcement policy canon).
 # When activated, finalization.py Step 4c-AUDIT is called as a non-blocking advisory — verdict
-# The result is that no Kanban transition/merge flow is blocked or forced (T-411 canon).
+# The result is that no Conveyor transition/merge flow is blocked or forced (T-411 canon).
 HOOK_AUDITOR_T3=false
-AUDITOR_T3_MODEL=sonnet
+AUDITOR_T3_MODEL=
 AUDITOR_T3_EFFORT=low
 
 # -----------------------------------------------------------------------------------------
-# (3) Enforced rule control flags (ENFORCE_* scheme)
+# (5) Enforced rule control flags (ENFORCE_* scheme)
 # true/false controls the activation/deactivation of each enforcement rule.
 # -----------------------------------------------------------------------------------------
 
@@ -115,7 +123,7 @@ ENFORCE_SELF_REVIEW=true
 ENFORCE_TOKEN_EFFICIENCY=true
 
 # -----------------------------------------------------------------------------------------
-# (4) Agent Factory workflow settings
+# (6) Agent Factory workflow settings
 # -----------------------------------------------------------------------------------------
 
 # Maximum number of workflows to keep in the .agent-factory/runs/ directory (default: 10)
@@ -163,7 +171,7 @@ WORKFLOW_RETRY_PROMPT_N=3
 AGENT_FACTORY_BANNER_WIDTH=
 
 # -----------------------------------------------------------------------------------------
-# (5) Bootstrap and external source settings
+# (7) Bootstrap and external source settings
 # -----------------------------------------------------------------------------------------
 
 # Remote repository URL (can be overridden)

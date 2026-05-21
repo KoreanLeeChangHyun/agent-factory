@@ -21,7 +21,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(420px, 100vw);
+  width: clamp(420px, 38vw, 760px);
   max-width: 100vw;
   background: var(--af-bg);
   border-left: 1px solid var(--af-border);
@@ -33,6 +33,32 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 .settings-panel.open { transform: translateX(0); }
+
+.settings-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.settings-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.settings-resize-handle:hover::after,
+.settings-panel.resizing .settings-resize-handle::after {
+  background: var(--af-primary);
+}
 
 .settings-header {
   display: flex;
@@ -162,8 +188,10 @@
   transition: border-color 0.15s;
 }
 .settings-input:focus { border-color: var(--af-primary); }
-.settings-input.saved { border-color: var(--af-success); }
-.settings-input.error { border-color: var(--af-error); }
+.settings-input.saved,
+.settings-select.saved { border-color: var(--af-success); }
+.settings-input.error,
+.settings-select.error { border-color: var(--af-error); }
 
 /* ── Action Buttons ── */
 .settings-action-btn {

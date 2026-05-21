@@ -13,7 +13,7 @@ def plan_step(ctx: WorkflowContext) -> None:
     # T-504 — plan/ directory dictionary mkdir (LLM ensures parent dir when writing these two files).
     ctx.plan_dir().mkdir(parents=True, exist_ok=True)
     initial_prompt = (
-        f"Ticket prompt: \n {work_request_dump} \n \n"
+        f"WorkRequest prompt: \n {work_request_dump} \n \n"
         f"Break down the tasks in the above WorkRequest into phases and create the following two files simultaneously: \n"
         f"1. `{ctx.plan_json_path()}` — JSON SSOT (driver deterministic parsing target). \n"
         f"2. `{ctx.plan_md_path()}` — Markdown natural language body (WORK/VALIDATE/REPORT for LLM handover). \n"

@@ -19,7 +19,7 @@
   background: var(--af-bg);
 }
 
-/* ── Collapsed Bar (horizontal, like Done column) ── */
+/* ── Collapsed Bar (horizontal, like Complete column) ── */
 .relations-collapsed-bar {
   display: flex;
   align-items: center;

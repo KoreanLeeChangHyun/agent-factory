@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="css/core/common.css">
 <link rel="stylesheet" href="css/core/dashboard.css">
 <link rel="stylesheet" href="css/core/modal.css">
-<link rel="stylesheet" href="css/views/kanban.css?v=20260509-dashind">
+<link rel="stylesheet" href="css/views/conveyor.css?v=20260509-dashind">
 <link rel="stylesheet" href="css/views/viewer.css">
 <link rel="stylesheet" href="css/views/workflow.css">
 <link rel="stylesheet" href="css/views/memory.css">
@@ -24,7 +24,7 @@
   <div class="header-title"><span class="accent">Agent</span> Factory Console</div>
   <nav class="tabs">
     <button class="tab" data-view="dashboard">Monitor</button>
-    <button class="tab" data-view="kanban">Conveyor</button>
+    <button class="tab" data-view="conveyor">Conveyor</button>
     <button class="tab" data-view="workflow">Runs</button>
     <button class="tab" data-view="memory">Contexts</button>
     <button class="tab" data-view="viewer">Viewer</button>
@@ -40,7 +40,7 @@
 </div>
 
 <main class="main" id="main">
-  <div class="view" id="view-kanban"></div>
+  <div class="view" id="view-conveyor"></div>
   <div class="view" id="view-dashboard"></div>
   <div class="view" id="view-workflow"></div>
   <div class="view" id="view-viewer"></div>
@@ -56,12 +56,12 @@
 <script src="js/core/brain-theme.js"></script>
 <script src="js/core/common.js"></script>
 <!-- T-516 — Workflow Tab LocalStorage Single Source (Board.workflowTabStorage).
-     kanban.js handleLaunchEvent + submit fetch response calls Board.workflowTabStorage.add → loads before kanban.js. -->
+     conveyor.js handleLaunchEvent + submit fetch response calls Board.workflowTabStorage.add → loads before conveyor.js. -->
 <script src="js/workflow/workflow-tab-storage.js"></script>
-<script src="js/views/kanban.js?v=20260509-dragblock"></script>
+<script src="js/views/conveyor.js?v=20260509-dragblock"></script>
 <script src="js/views/viewer.js"></script>
 <script src="js/workflow/workflow.js?v=20260509-split"></script>
-<!-- T-495 P2 — Board.productionLineWorkflow entry point (kanban.js handleLaunchEvent is a production-line session id cache registered). -->
+<!-- T-495 P2 — Board.productionLineWorkflow entry point (conveyor.js handleLaunchEvent is a production-line session id cache registered). -->
 <script src="js/workflow/production-line-workflow.js"></script>
 <!-- T-505 P3 — Board.stepOverlay (Step 6 box + Phase sub-panel).
      Depends on Board.productionLineWorkflow.subscribe → Loaded after production-line-workflow.js. -->
@@ -73,7 +73,7 @@
 <script src="js/memory/memory-core.js"></script>
 <script src="js/memory/memory-rules-prompt.js"></script>
 <script src="js/memory/memory-quick-prompts.js"></script>
-<script src="js/terminal/wf-ticket-renderer.js"></script>
+<script src="js/terminal/wf-workrequest-renderer.js"></script>
 <script src="js/core/sse.js?v=20260509-split"></script>
 </body>
 </html>

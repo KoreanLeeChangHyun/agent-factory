@@ -3,7 +3,7 @@
  *
  * Board SPA viewer tab module.
  *
- * Manages viewer tabs (ticket view, workflow file view, workflow detail view),
+ * Manages viewer tabs (WorkRequest view, workflow file view, workflow detail view),
  * code viewer with lazy loading and search, markdown rendering, and directory
  * listing. Registers openViewer, renderViewer, openWfFile on Board.render.
  *
@@ -18,18 +18,18 @@
   // ── Viewer Tab Management ──
 
   /**
-   * Opens a ticket in the viewer tab, creating a new tab if needed.
-   * @param {Object} ticket - Ticket data object
+   * Opens a workRequest in the viewer tab, creating a new tab if needed.
+   * @param {Object} workRequest - WorkRequest data object
    */
-  function openViewer(ticket) {
-    const exists = Board.state.viewerTabs.find(function (t) { return t.number === ticket.number; });
+  function openViewer(workRequest) {
+    const exists = Board.state.viewerTabs.find(function (t) { return t.number === workRequest.number; });
     if (!exists) {
-      Board.state.viewerTabs.push({ number: ticket.number, ticket: ticket });
+      Board.state.viewerTabs.push({ number: workRequest.number, workRequest: workRequest });
     } else {
-      exists.ticket = ticket;
+      exists.workRequest = workRequest;
     }
     switchTab("viewer");
-    Board.state.activeViewerTab = ticket.number;
+    Board.state.activeViewerTab = workRequest.number;
     renderViewer();
     saveUI();
     Board.util.updateQueryString();
@@ -63,7 +63,7 @@
     Board.state.viewerTabs.forEach(function (t) {
       const ac = t.number === Board.state.activeViewerTab ? " vt-tab-active" : "";
       h += '<div class="vt-tab' + ac + '" data-num="' + esc(t.number) + '">';
-      const tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number.replace(/^T-/, ""));
+      const tabLabel = t.wfDetail ? (t.wfDetail.number || t.wfDetail.entry) : (t.wfFile ? t.wfFile.label : t.number.replace(/^WR-/, ""));
       h += '<span class="vt-tab-label">' + esc(tabLabel) + '</span>';
       h += '<span class="vt-tab-close" data-close="' + esc(t.number) + '">&times;</span>';
       h += '</div>';
@@ -77,8 +77,8 @@
       h += Board.render.renderWfDetailView(active.wfDetail);
     } else if (active && active.wfFile) {
       h += renderWfFileView(active.wfFile);
-    } else if (active && active.ticket) {
-      h += renderTicketHtml(active.ticket);
+    } else if (active && active.workRequest) {
+      h += renderWorkRequestHtml(active.workRequest);
     } else {
       h += '<div class="empty" style="margin-top:64px">No open tabs</div>';
     }
@@ -131,8 +131,8 @@
       });
     });
 
-    // Lazy-load connected ticket for wfDetail views
-    el.querySelectorAll(".wf-detail-ticket-section[data-basepath]").forEach(function (section) {
+    // Lazy-load connected workRequest for wfDetail views
+    el.querySelectorAll(".wf-detail-work-request-section[data-basepath]").forEach(function (section) {
       const basePath = section.dataset.basepath;
       if (!basePath || section.dataset.fetched) return;
       section.dataset.fetched = "1";
@@ -141,14 +141,14 @@
         return r.json();
       }).then(function (ctx) {
         if (!ctx) return;
-        const ticketNum = ctx.ticketNumber || "";
+        const workRequestNum = ctx.workRequestNumber || "";
         const title = ctx.title || "";
         const workId = ctx.workId || "";
-        if (!ticketNum && !title && !workId) return;
+        if (!workRequestNum && !title && !workId) return;
         let ctxHtml = '<div class="tv-section">';
         ctxHtml += '<div class="tv-section-title">Context</div>';
         ctxHtml += '<div class="wf-detail-info">';
-        if (ticketNum) ctxHtml += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Ticket</span><span class="wf-detail-info-value">' + esc(ticketNum) + '</span></div>';
+        if (workRequestNum) ctxHtml += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">WorkRequest</span><span class="wf-detail-info-value">' + esc(workRequestNum) + '</span></div>';
         if (title) ctxHtml += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Title</span><span class="wf-detail-info-value">' + esc(title) + '</span></div>';
         if (workId) ctxHtml += '<div class="wf-detail-info-row"><span class="wf-detail-info-label">Work ID</span><span class="wf-detail-info-value">' + esc(workId) + '</span></div>';
         ctxHtml += '</div></div>';
@@ -172,10 +172,10 @@
             return;
           }
           Board.state.forwardHistory.push({ tab: Board.state.activeTab, viewerTab: Board.state.activeTab === "viewer" ? Board.state.activeViewerTab : null });
-          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          switchTab(entry && entry.tab ? entry.tab : "conveyor", true);
           return;
         }
-        switchTab("kanban", true);
+        switchTab("conveyor", true);
       });
     }
 
@@ -197,31 +197,31 @@
           }
           Board.state.tabHistory.push({ tab: Board.state.activeTab, viewerTab: Board.state.activeTab === "viewer" ? Board.state.activeViewerTab : null });
           if (Board.state.tabHistory.length > 100) Board.state.tabHistory.shift();
-          switchTab(entry && entry.tab ? entry.tab : "kanban", true);
+          switchTab(entry && entry.tab ? entry.tab : "conveyor", true);
           return;
         }
       });
     }
 
-    // Bind wfDetail ticket link clicks
-    el.querySelectorAll(".wf-detail-ticket-link").forEach(function (link) {
+    // Bind wfDetail workRequest link clicks
+    el.querySelectorAll(".wf-detail-work-request-link").forEach(function (link) {
       link.addEventListener("click", function () {
-        const ticketNum = link.dataset.ticketNum;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === ticketNum; });
-        if (ticket) openViewer(ticket);
+        const workRequestNum = link.dataset.workRequestNum;
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === workRequestNum; });
+        if (workRequest) openViewer(workRequest);
       });
     });
 
-    // Bind relation ticket link clicks
-    el.querySelectorAll(".tv-relation-ticket-link").forEach(function (link) {
+    // Bind relation workRequest link clicks
+    el.querySelectorAll(".tv-relation-work-request-link").forEach(function (link) {
       link.addEventListener("click", function () {
-        const ticketNum = link.dataset.ticketNum;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === ticketNum; });
-        if (ticket) openViewer(ticket);
+        const workRequestNum = link.dataset.workRequestNum;
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === workRequestNum; });
+        if (workRequest) openViewer(workRequest);
       });
     });
 
-    // Bind ticket viewer workflow links
+    // Bind WorkRequest viewer workflow links
     el.querySelectorAll(".tv-result-workflow[data-wf-entry]").forEach(function (link) {
       link.addEventListener("click", function () {
         const entryKey = link.dataset.wfEntry;
@@ -490,32 +490,32 @@
     requestAnimationFrame(Board.render.initHighlight);
   }
 
-  // ── Ticket HTML Rendering ──
+  // ── WorkRequest HTML Rendering ──
 
   /**
-   * Renders a ticket's detail view HTML.
-   * @param {Object} ticket - Ticket data object
+   * Renders a workRequest's detail view HTML.
+   * @param {Object} workRequest - WorkRequest data object
    * @returns {string} HTML string
    */
-  function renderTicketHtml(ticket) {
-    const sc = STATUS_COLORS[ticket.status] || STATUS_COLORS.Open;
+  function renderWorkRequestHtml(workRequest) {
+    const sc = STATUS_COLORS[workRequest.status] || STATUS_COLORS.Draft;
     let h = '<div class="tv-container">';
 
     h += '<div class="tv-header">';
     h += '<div class="tv-header-top">';
-    h += '<span class="tv-number">' + esc(ticket.number.replace(/^T-/, "")) + "</span>";
-    h += '<span class="badge" style="background:' + sc.bg + ';color:' + sc.fg + '">' + esc(statusLabel(ticket.status)) + '</span>';
+    h += '<span class="tv-number">' + esc(workRequest.number.replace(/^WR-/, "")) + "</span>";
+    h += '<span class="badge" style="background:' + sc.bg + ';color:' + sc.fg + '">' + esc(statusLabel(workRequest.status)) + '</span>';
     h += "</div>";
-    h += '<h1 class="tv-title">' + esc(ticket.title || "(No title)") + "</h1>";
+    h += '<h1 class="tv-title">' + esc(workRequest.title || "(No title)") + "</h1>";
     h += '<div class="tv-meta">';
-    h += '<span class="tv-time">' + esc(formatTime(ticket.updated || ticket.created)) + "</span>";
-    if (ticket.command) {
-      const cc = CMD_COLORS[ticket.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" };
-      h += '<span class="badge" style="background:' + cc.bg + ';color:' + cc.fg + '">' + esc(commandLabel(ticket.command) || ticket.command) + '</span>';
+    h += '<span class="tv-time">' + esc(formatTime(workRequest.updated || workRequest.created)) + "</span>";
+    if (workRequest.command) {
+      const cc = CMD_COLORS[workRequest.command] || { bg: "rgba(133,133,133,0.25)", fg: "#a0a0a0" };
+      h += '<span class="badge" style="background:' + cc.bg + ';color:' + cc.fg + '">' + esc(commandLabel(workRequest.command) || workRequest.command) + '</span>';
     }
     h += "</div></div>";
 
-    if (ticket.relations && ticket.relations.length > 0) {
+    if (workRequest.relations && workRequest.relations.length > 0) {
       const RELATION_COLORS = {
         "depends-on":   { bg: "rgba(210,100,0,0.25)",  fg: "#e07820" },
         "derived-from": { bg: "rgba(150,80,180,0.25)", fg: "#b87de0" },
@@ -524,30 +524,30 @@
       h += '<div class="tv-section">';
       h += '<div class="tv-section-title">Relations</div>';
       h += '<div class="tv-result-links">';
-      ticket.relations.forEach(function (rel) {
+      workRequest.relations.forEach(function (rel) {
         const colors = RELATION_COLORS[rel.type] || { bg: "rgba(100,100,100,0.2)", fg: "#aaaaaa" };
         h += '<span class="badge" style="background:' + colors.bg + ';color:' + colors.fg + '">' + esc(rel.type) + '</span>';
-        h += '<span class="tv-result-link tv-relation-ticket-link" data-ticket-num="' + esc(rel.ticket) + '">' + esc(rel.ticket) + '</span>';
+        h += '<span class="tv-result-link tv-relation-work-request-link" data-work-request-num="' + esc(rel.workRequest) + '">' + esc(rel.workRequest) + '</span>';
       });
       h += "</div>";
       h += "</div>";
     }
 
-    if (ticket.prompt) {
+    if (workRequest.prompt) {
       h += '<div class="tv-section">';
       h += '<div class="tv-section-title">Work Item Contract</div>';
-      h += renderPromptFields(ticket.prompt);
+      h += renderPromptFields(workRequest.prompt);
       h += "</div>";
     }
 
-    if (ticket.result) {
+    if (workRequest.result) {
       h += '<div class="tv-section tv-result-section">';
       h += '<div class="tv-section-title">Report</div>';
-      h += renderResultLinks(ticket.result);
+      h += renderResultLinks(workRequest.result);
       h += "</div>";
     }
 
-    const connectedWfs = Board.render.findWorkflowsForTicket(ticket);
+    const connectedWfs = Board.render.findWorkflowsForWorkRequest(workRequest);
     if (connectedWfs.length > 0) {
       h += '<div class="tv-section">';
       h += '<div class="tv-section-title">Runs</div>';
@@ -560,7 +560,7 @@
       h += "</div>";
     }
 
-    if (!ticket.prompt && !ticket.result) {
+    if (!workRequest.prompt && !workRequest.result) {
       h += '<div class="empty" style="margin-top:32px">No request contract or report data</div>';
     }
 
@@ -648,7 +648,7 @@
     const tabId = "wf:" + url;
     const exists = Board.state.viewerTabs.find(function (t) { return t.number === tabId; });
     if (!exists) {
-      Board.state.viewerTabs.push({ number: tabId, ticket: null, wfFile: { label: label, url: url, content: null, isDir: isDir || url.endsWith("/") } });
+      Board.state.viewerTabs.push({ number: tabId, workRequest: null, wfFile: { label: label, url: url, content: null, isDir: isDir || url.endsWith("/") } });
     }
     switchTab("viewer");
     Board.state.activeViewerTab = tabId;

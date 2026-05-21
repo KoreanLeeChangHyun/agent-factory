@@ -245,14 +245,14 @@
   line-height: 1.4;
 }
 
-.roadmap-card-tickets {
+.roadmap-card-work-requests {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 6px;
 }
 
-.roadmap-card-ticket-chip {
+.roadmap-card-work-request-chip {
   display: inline-block;
   font-size: 10px;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
@@ -263,7 +263,7 @@
   cursor: pointer;
   transition: background 0.12s;
 }
-.roadmap-card-ticket-chip:hover {
+.roadmap-card-work-request-chip:hover {
   background: var(--af-info-soft);
 }
 

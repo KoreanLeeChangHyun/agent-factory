@@ -120,11 +120,11 @@ def run(stdin_raw: bytes) -> tuple[int, bytes]:
             return 0, b""
 
         flags = load_env_flags()
-        target_script = scripts_dir("apps", "hooks", "inject_kanban_context.py")
+        target_script = scripts_dir("apps", "hooks", "inject_conveyor_context.py")
         _debug_log(f"[user-prompt-submit] dispatching to {target_script!r}")
 
         result = dispatch(
-            "HOOK_USER_PROMPT_KANBAN",
+            "HOOK_USER_PROMPT_CONVEYOR",
             target_script,
             stdin_raw,
             flags=flags,

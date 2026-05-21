@@ -114,7 +114,7 @@
    * Convert Sessions.
    * (a) Save current session status → (b) Restore target session → (c) SSE Reconnect → (d) Renew status bar
    *
-   * @param {string} targetSessionId - Session ID to switch ("main" or "wf-T-NNN-...")
+   * @param {string} targetSessionId - Session ID to switch ("main" or "wf-WR-NNN-...")
    * @returns {Promise<void>}
    */
   M.switchSession = function(targetSessionId) {
@@ -133,7 +133,7 @@
     var prevId = M._activeSessionId;
     M._activeSessionId = targetSessionId;
 
-    // 3. FAQs (T-383 Phase 2 / VUL-1 / S4)
+    // 3. FAQs (WR-383 Phase 2 / VUL-1 / S4)
     // restoreSession calls disconnectSSE prior to restoration
     // prev-session SSE event is loaded into the DOM that outputDiv is reconfigured
     // block race window.
@@ -154,10 +154,10 @@
 
     // 5. FAQs SSE Reconnect: Connect to a new session DOM after restoration
     // Workflow Session REST /terminal/workflow/history before SSE subscription
-    // Inject the event first (T-391 standard path after removing ringbuckle). Main Session
+    // Inject the event first (WR-391 standard path after removing ringbuckle). Main Session
     // RestoreSession is restored, so there is no need for separate history injection.
     //
-    // T-495 P2 — Production-line session is separate entry point (Board.session.startProductionLineSession)
+    // WR-495 P2 — Production-line session is separate entry point (Board.session.startProductionLineSession)
     // to branch. v1 SSE channel (/terminal/workflow/events) and insulating.
     if (Board.session) {
       var isWfTarget = targetSessionId !== "main" &&

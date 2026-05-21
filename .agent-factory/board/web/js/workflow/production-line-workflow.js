@@ -1,7 +1,7 @@
 /**
  * @module production-line-workflow
  *
- * Board.productionLineWorkflow — T-495 P2 frontend client for production-line subprocess.
+ * Board.productionLineWorkflow — WR-495 P2 frontend client for production-line subprocess.
  *
  * v1 /terminal/workflow/events single SSE channel and separated production-line only client.
  * backend 7 endpoint and 1:1 mapping:
@@ -43,7 +43,7 @@
 
   // ── VIEW
 
-  /** production-line session id pattern — `wf-T-NNN-<registry key>`. v1 also like prefix la backend with authority. */
+  /** production-line session id pattern — `wf-WR-NNN-<registry key>`. v1 also like prefix la backend with authority. */
   var PRODUCTION_LINE_SESSION_PREFIX = "wf-";
 
   /** SSE reconnect interval (ms) — Same as v1 session.js. */
@@ -100,7 +100,7 @@
 
   /**
    * return the full production-line session list.
-   * @returns {Promise<Array<{session_id, ticket_id, command, work_dir, worktree_path, status, current_step, current_phase, cycle_start_ts, step_ts, created_at}>>}
+   * @returns {Promise<Array<{session_id, work_request, command, work_dir, worktree_path, status, current_step, current_phase, cycle_start_ts, step_ts, created_at}>>}
    */
   function fetchSessions() {
     return _fetchJson("/api/v2/sessions").then(function (data) {
@@ -143,11 +143,11 @@
   }
 
   /**
-   * T-513 P3 — REST single source history loader.
+   * WR-513 P3 — REST single source history loader.
    *
    * When reconnecting, SSE will load the past event before registration. SSE Ring Buffer Replay
    * REST GET /api/v2/sessions/<id>/history
-   * (T-497 Crystal). schema: {session id, total count,
+   * (WR-497 Crystal). schema: {session id, total count,
    * event: [{ts, event, payload}]}. 404/network error return empty array.
    *
    * @param {string} sessionId

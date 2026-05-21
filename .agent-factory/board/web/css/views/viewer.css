@@ -1,7 +1,7 @@
 /* Agent Factory Dashboard - Viewer Styles */
 /* Extracted from board.css: L415-666, L914-948, L1002-1067, L1068-1234 */
 
-/* ── Ticket Viewer ── */
+/* ── WorkRequest Viewer ── */
 #view-viewer { padding: 0; }
 #view-viewer.active { display: flex; flex-direction: column; }
 

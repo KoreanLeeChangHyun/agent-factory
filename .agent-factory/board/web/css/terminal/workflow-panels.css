@@ -113,7 +113,7 @@
   border-color: var(--af-border);
 }
 
-/* Done (already completed) */
+/* Complete (already completed) */
 .wf-timeline-step.done {
   color: var(--af-primary);
   background: var(--af-primary-soft);
@@ -763,11 +763,11 @@
 }
 
 /* ============================================
-   WF Ticket UI
+   WF WorkRequest UI
    ============================================ */
 
 /* Standard Card Container */
-.wf-ticket-block {
+.wf-work-request-block {
   border: 1px solid var(--af-info-soft);
   background: var(--af-info-soft);
   padding: 12px 16px;
@@ -776,22 +776,22 @@
 }
 
 /* Header Area */
-.wf-ticket-header {
+.wf-work-request-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-/* Ticket ID badge */
-.wf-ticket-id {
+/* WorkRequest ID badge */
+.wf-work-request-id {
   font-weight: bold;
   color: var(--af-info);
   font-family: monospace;
 }
 
 /* WF Flagship */
-.wf-ticket-flag {
+.wf-work-request-flag {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 3px;
@@ -801,14 +801,14 @@
 }
 
 /* Address
-.wf-ticket-body {
+.wf-work-request-body {
   color: var(--af-text);
   line-height: 1.5;
   font-size: 11px;
 }
 
 /* Optional button container */
-.wf-ticket-menu {
+.wf-work-request-menu {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -816,7 +816,7 @@
 }
 
 /* Select button */
-.wf-ticket-btn {
+.wf-work-request-btn {
   border: none;
   border-radius: 4px;
   padding: 8px 14px;
@@ -827,11 +827,11 @@
   font-size: 14px;
   transition: background 0.15s;
 }
-.wf-ticket-btn:hover { background: var(--af-border); }
-.wf-ticket-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wf-work-request-btn:hover { background: var(--af-border); }
+.wf-work-request-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 0 Cancel/Finished Button */
-.wf-ticket-btn.is-cancel {
+.wf-work-request-btn.is-cancel {
   color: var(--af-text-muted);
   border-top: 1px solid var(--af-border);
   margin-top: 4px;
@@ -839,17 +839,17 @@
 }
 
 /* Number Part */
-.wf-ticket-btn .btn-number {
+.wf-work-request-btn .btn-number {
   font-weight: bold;
   color: var(--af-info);
   margin-right: 8px;
 }
 
 /* Fixd status after click */
-.wf-ticket-actions-resolved .wf-ticket-btn { /* All buttons inactive */ }
+.wf-work-request-actions-resolved .wf-work-request-btn { /* All buttons inactive */ }
 
 /* Select Button Highlight */
-.wf-ticket-selected {
+.wf-work-request-selected {
   background: var(--af-info-soft);
   border-color: var(--af-info);
 }
@@ -875,7 +875,7 @@
 }
 
 /* Reservation
-.wf-ticket-hint {
+.wf-work-request-hint {
   color: var(--af-text-subtle);
   font-size: 85%;
   margin-top: 6px;
@@ -900,7 +900,7 @@
   flex-wrap: wrap;
 }
 
-/* ── .flow-cmd-badge: ticket ID badge ── */
+/* ── .flow-cmd-badge: WorkRequest ID badge ── */
 .flow-cmd-badge {
   font-family: monospace;
   font-weight: bold;
@@ -1135,7 +1135,7 @@
   font-style: italic;
 }
 
-/* ── Kanban show card ── */
+/* ── Conveyor show card ── */
 .flow-cmd-show {
   border: 1px solid var(--af-primary-soft);
   border-radius: 6px;
@@ -1188,7 +1188,7 @@
   border-radius: 3px;
 }
 
-/* ── Kanban board card ── */
+/* ── Conveyor board card ── */
 .flow-cmd-board {
   border: 1px solid var(--af-primary-soft);
   border-radius: 6px;

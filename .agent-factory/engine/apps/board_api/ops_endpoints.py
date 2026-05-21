@@ -160,7 +160,7 @@ class OpsHandlerMixin:
             for meta in production_line_registry.list_all():
                 v2_sessions.append({
                     'session_id': meta.get('session_id'),
-                    'ticket_id': meta.get('ticket_id'),
+                    'work_request': meta.get('work_request'),
                     'current_step': meta.get('current_step'),
                     'step_ts': meta.get('step_ts'),
                 })

@@ -34,7 +34,7 @@ def _compose_user_content(
         text: user free input text. Allows empty strings.
         images: List of image blocks. Each item ``{"data": str, "media type": str}`.
                 None No images.
-        attachments: list of attachment tickets. Each item contains a minimum ``{"number": dict.
+        attachments: list of attachment WorkRequests. Each item contains a minimum ``{"number": dict.
                      None or empty arrangements are not attached.
 
     Returns:
@@ -290,7 +290,7 @@ class ClaudeProcess:
             text: user message text to send
             images: List of attachments. {"data": str, "media type": str} form.
                     None
-            attachments: list of attachment tickets. Each item contains a minimum {"number": str} dict.
+            attachments: list of attachment WorkRequests. Each item contains a minimum {"number": str} dict.
                          None or empty arrangements are not attached.
                          if content array is synthesized as text block, which is cognitive.
 

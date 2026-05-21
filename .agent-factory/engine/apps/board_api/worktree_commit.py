@@ -39,7 +39,7 @@ class WorktreeCommitHandlerMixin:
         domain: WTC
         handler: WorktreeCommitHandlerMixin._handle_worktree_uncommitted_all
         request: query none
-        response_ok: [{ticket, branch, dirty_count, ...}]
+        response_ok: [{work_request, branch, dirty_count, ...}]
         response_error: {ok: false, error: str}
         status_codes: 200, 500
         auth: none (local-only)
@@ -59,14 +59,14 @@ class WorktreeCommitHandlerMixin:
     def _handle_worktree_commit(self) -> None:
         """POST /api/conveyor/worktree-commit — Worktree automatic commit.
 
-        Body: {ticket: "T-NNN", message?: "..."}.
-        If message is not specified, `wip(T-NNN): pending worktree changes` is automatically filled.
+        Body: {work_request: "WR-NNN", message?: "..."}.
+        If message is not specified, `wip(WR-NNN): pending worktree changes` is automatically filled.
 
         method: POST
         url: /api/conveyor/worktree-commit
         domain: WTC
         handler: WorktreeCommitHandlerMixin._handle_worktree_commit
-        request: body {ticket: str, message?: str}
+        request: body {work_request: str, message?: str}
         response_ok: {ok: true, commit_hash: str, message: str}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 409, 500
@@ -77,9 +77,9 @@ class WorktreeCommitHandlerMixin:
         data = self._read_json_body()
         if data is None:
             return
-        ticket = data.get('ticket')
-        if not ticket or not isinstance(ticket, str):
-            self._send_error(400, 'Missing or invalid "ticket" field')
+        work_request = data.get('work_request')
+        if not work_request or not isinstance(work_request, str):
+            self._send_error(400, 'Missing or invalid "work_request" field')
             return
         message = data.get('message')
         if message is not None and not isinstance(message, str):
@@ -87,7 +87,7 @@ class WorktreeCommitHandlerMixin:
             return
         try:
             mod = _import_worktree_status()
-            result = mod.commit_worktree(ticket, message)
+            result = mod.commit_worktree(work_request, message)
         except Exception as exc:  # noqa: BLE001
             logger.exception('worktree_commit failed: %s', exc)
             self._send_error(500, f'commit_worktree failed: {exc}')

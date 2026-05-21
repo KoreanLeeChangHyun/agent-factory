@@ -1,11 +1,11 @@
-"""Worktree status — kanban card uncommitted indicator + commit action.
+"""Worktree status — Conveyor card uncommitted indicator + commit action.
 
 T-419 diagnostic tool is a value-less waste paper (commit 99c9ce0). This module is a workflow
 If the user is missing (Watcher Commit), click on the Finder button.
 Simplified Easter version to allow instant commit.
 
 Public API:
-    get all uncommitted: ticket + uncommitted count list
+    get all uncommitted: WorkRequest + uncommitted count list
     commit worktree: git add -A &&git commit -m executed in worktree
 """
 
@@ -53,7 +53,7 @@ def get_all_uncommitted() -> list[dict]:
     """Return of the full work tree’s mitigation count list (for card indicator batch query).
 
     Returns:
-        [{ticket, path, uncommitted count}, ...] — empty list when worktree mode is disabled.
+        [{work_request, path, uncommitted_count}, ...] — empty list when worktree mode is disabled.
     """
     if not is_worktree_enabled():
         return []
@@ -63,7 +63,7 @@ def get_all_uncommitted() -> list[dict]:
             continue
         items.append(
             {
-                "ticket": wt.ticket_number,
+                "work_request": wt.ticket_number,
                 "path": wt.path,
                 "uncommitted_count": _count_uncommitted(wt.path),
             }
@@ -71,24 +71,24 @@ def get_all_uncommitted() -> list[dict]:
     return items
 
 
-def commit_worktree(ticket: str, message: str | None = None) -> dict:
+def commit_worktree(work_request: str, message: str | None = None) -> dict:
     """git add -A && git commit -m <msg> in the work tree.
 
     User manual dehumidification paths when workflow regression (unloading of water commit).
-    'wip(T-NNN): pending worktree changes`
+    'wip(WR-NNN): pending worktree changes`
     Log in
 
     Returns:
-        {ok: bool, ticket, path, message, stdout?} | {ok: False, error}
+        {ok: bool, work_request, path, message, stdout?} | {ok: False, error}
     """
-    if not ticket.startswith("T-"):
-        ticket = f"T-{ticket}"
-    wt_path = get_worktree_path(ticket)
+    if not work_request.startswith("WR-"):
+        work_request = f"WR-{work_request}"
+    wt_path = get_worktree_path(work_request)
     if not wt_path or not os.path.isdir(wt_path):
-        return {"ok": False, "error": f"worktree not found for {ticket}"}
+        return {"ok": False, "error": f"worktree not found for {work_request}"}
 
     if not message or not message.strip():
-        message = f"wip({ticket}): pending worktree changes"
+        message = f"wip({work_request}): pending worktree changes"
 
     add = subprocess.run(
         ["git", "-C", wt_path, "add", "-A"],
@@ -119,7 +119,7 @@ def commit_worktree(ticket: str, message: str | None = None) -> dict:
 
     return {
         "ok": True,
-        "ticket": ticket,
+        "work_request": work_request,
         "path": wt_path,
         "message": message,
         "stdout": commit.stdout.strip(),

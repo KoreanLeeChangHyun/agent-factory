@@ -147,8 +147,8 @@ def run(stdin_data: bytes) -> tuple[int, bytes]:
             ("HOOK_DANGEROUS_COMMAND", "dangerous_command_guard.py"),
             ("HOOK_DIRECT_PATH_GUARD", "direct_path_guard.py"),
             ("HOOK_MAIN_BRANCH_GUARD", "main_branch_guard.py"),
-            ("HOOK_KANBAN_SUBCOMMAND_GUARD", "kanban_subcommand_guard.py"),
-            ("HOOK_DONE_RELATION_GUARD", "done_relation_guard.py"),
+            ("HOOK_CONVEYOR_SUBCOMMAND_GUARD", "conveyor_subcommand_guard.py"),
+            ("HOOK_COMPLETE_RELATION_GUARD", "complete_relation_guard.py"),
             ("HOOK_WORKTREE_REMOVE_GUARD", "worktree_remove_guard.py"),
         ):
             sync_results.append(

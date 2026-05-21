@@ -1,4 +1,4 @@
-"""SSE client manager for kanban/workflow/dashboard events."""
+"""SSE client manager for conveyor/workflow/dashboard events."""
 
 from __future__ import annotations
 
@@ -79,8 +79,8 @@ class SSEClientManager:
         prevent concurrent write with heartbeat loop with per-client lock.
 
         Args:
-            event type: SSE event type (kanban, workflow, dashboard, git branch, etc.)
-            files: List of changed files. kanban event contains JSON in data field.
+            event type: SSE event type (conveyor, workflow, dashboard, git branch, etc.)
+            files: List of changed files. conveyor event contains JSON in data field.
             data: random payload dict. Default file size
                   All files and data are sent to data for timestamp strings.
         """

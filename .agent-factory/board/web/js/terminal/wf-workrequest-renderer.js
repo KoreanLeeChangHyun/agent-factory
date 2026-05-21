@@ -1,24 +1,24 @@
 /**
- * @module wf-ticket-renderer
+ * @module wf-work-request-renderer
  *
  * Parses /wf command output in the Board terminal and renders it as
  * interactive card UI with clickable menu buttons.
  *
- * Detects patterns like:  `[T-NNN]` : `[WF -e]` ...
+ * Detects patterns like:  `[WR-NNN]` : `[WF -e]` ...
  * Parses numbered menu items:  `N.` text -- description
  *
  * Depends on: common.js (Board namespace)
- * Registers: Board.WfTicketRenderer
+ * Registers: Board.WfWorkRequestRenderer
  */
 "use strict";
 
-Board.WfTicketRenderer = (function () {
+Board.WfWorkRequestRenderer = (function () {
 
   // ── Pattern constants ──
 
-  var RE_HEADER    = /`\[T-\d+\]`\s*:\s*`\[WF/;
+  var RE_HEADER    = /`\[WR-\d+\]`\s*:\s*`\[WF/;
   var RE_MENU_ITEM = /^`?(\d+)\.`?\s+(.+)$/;
-  var RE_TICKET_ID = /`\[(T-\d+)\]`/;
+  var RE_TICKET_ID = /`\[(WR-\d+)\]`/;
   var RE_WF_FLAG   = /`\[WF\s*([^\]]*)\]`/;
 
   // ── Context references (injected via setContext) ──
@@ -53,10 +53,10 @@ Board.WfTicketRenderer = (function () {
   // ── Internal parsers ──
 
   function _parseHeader(text) {
-    var ticketMatch = RE_TICKET_ID.exec(text);
+    var workRequestMatch = RE_TICKET_ID.exec(text);
     var flagMatch   = RE_WF_FLAG.exec(text);
     return {
-      ticketId: ticketMatch ? ticketMatch[1] : "",
+      workRequestId: workRequestMatch ? workRequestMatch[1] : "",
       flag:     flagMatch   ? flagMatch[1].trim() : ""
     };
   }
@@ -118,21 +118,21 @@ Board.WfTicketRenderer = (function () {
 
     // Card container
     var card = document.createElement("div");
-    card.className = "wf-ticket-block";
+    card.className = "wf-work-request-block";
 
     // Header row
     var hdr = document.createElement("div");
-    hdr.className = "wf-ticket-header";
+    hdr.className = "wf-work-request-header";
 
-    if (header.ticketId) {
+    if (header.workRequestId) {
       var idSpan = document.createElement("span");
-      idSpan.className = "wf-ticket-id";
-      idSpan.textContent = header.ticketId;
+      idSpan.className = "wf-work-request-id";
+      idSpan.textContent = header.workRequestId;
       hdr.appendChild(idSpan);
     }
     if (header.flag) {
       var flagSpan = document.createElement("span");
-      flagSpan.className = "wf-ticket-flag";
+      flagSpan.className = "wf-work-request-flag";
       flagSpan.textContent = "WF " + header.flag;
       hdr.appendChild(flagSpan);
     }
@@ -141,14 +141,14 @@ Board.WfTicketRenderer = (function () {
     // Body (markdown rendered)
     if (body) {
       var bodyDiv = document.createElement("div");
-      bodyDiv.className = "wf-ticket-body";
+      bodyDiv.className = "wf-work-request-body";
       bodyDiv.innerHTML = _renderMd(body);
       card.appendChild(bodyDiv);
     }
 
     // Menu buttons container
     var menu = document.createElement("div");
-    menu.className = "wf-ticket-menu";
+    menu.className = "wf-work-request-menu";
 
     // Separate normal items and cancel item (0)
     var normalItems = [];
@@ -164,7 +164,7 @@ Board.WfTicketRenderer = (function () {
     // Create buttons for normal items
     function createBtn(item) {
       var btn = document.createElement("button");
-      btn.className = "wf-ticket-btn";
+      btn.className = "wf-work-request-btn";
       btn.type = "button";
 
       var numSpan = document.createElement("span");
@@ -210,13 +210,13 @@ Board.WfTicketRenderer = (function () {
 
   function _handleMenuClick(num, clickedBtn, menuEl) {
     // Disable all buttons
-    var buttons = menuEl.querySelectorAll(".wf-ticket-btn");
+    var buttons = menuEl.querySelectorAll(".wf-work-request-btn");
     for (var i = 0; i < buttons.length; i++) {
       buttons[i].disabled = true;
     }
 
     // Highlight selected button
-    clickedBtn.classList.add("wf-ticket-selected");
+    clickedBtn.classList.add("wf-work-request-selected");
 
     // Insert user message bubble
     var userDiv = document.createElement("div");
@@ -248,31 +248,31 @@ Board.WfTicketRenderer = (function () {
 
   function _renderStatus(text) {
     var header = _parseHeader(text);
-    var isOk   = /Complete|Done|Success/.test(text);
+    var isOk   = /Complete|Complete|Success/.test(text);
 
     var card = document.createElement("div");
-    card.className = "wf-ticket-block " + (isOk ? "wf-status-ok" : "wf-status-err");
+    card.className = "wf-work-request-block " + (isOk ? "wf-status-ok" : "wf-status-err");
 
     var hdr = document.createElement("div");
-    hdr.className = "wf-ticket-header";
+    hdr.className = "wf-work-request-header";
 
-    if (header.ticketId) {
+    if (header.workRequestId) {
       var idSpan = document.createElement("span");
-      idSpan.className = "wf-ticket-id";
-      idSpan.textContent = header.ticketId;
+      idSpan.className = "wf-work-request-id";
+      idSpan.textContent = header.workRequestId;
       hdr.appendChild(idSpan);
     }
 
     var badge = document.createElement("span");
     badge.className = "wf-status-badge";
-    badge.textContent = isOk ? "Done" : "Error";
+    badge.textContent = isOk ? "Complete" : "Error";
     hdr.appendChild(badge);
 
     card.appendChild(hdr);
 
     // Body
     var bodyDiv = document.createElement("div");
-    bodyDiv.className = "wf-ticket-body";
+    bodyDiv.className = "wf-work-request-body";
     bodyDiv.innerHTML = _renderMd(text);
     card.appendChild(bodyDiv);
 
@@ -285,27 +285,27 @@ Board.WfTicketRenderer = (function () {
     var header = _parseHeader(text);
 
     var card = document.createElement("div");
-    card.className = "wf-ticket-block";
+    card.className = "wf-work-request-block";
 
     var hdr = document.createElement("div");
-    hdr.className = "wf-ticket-header";
+    hdr.className = "wf-work-request-header";
 
-    if (header.ticketId) {
+    if (header.workRequestId) {
       var idSpan = document.createElement("span");
-      idSpan.className = "wf-ticket-id";
-      idSpan.textContent = header.ticketId;
+      idSpan.className = "wf-work-request-id";
+      idSpan.textContent = header.workRequestId;
       hdr.appendChild(idSpan);
     }
     if (header.flag) {
       var flagSpan = document.createElement("span");
-      flagSpan.className = "wf-ticket-flag";
+      flagSpan.className = "wf-work-request-flag";
       flagSpan.textContent = "WF " + header.flag;
       hdr.appendChild(flagSpan);
     }
     card.appendChild(hdr);
 
     var bodyDiv = document.createElement("div");
-    bodyDiv.className = "wf-ticket-body";
+    bodyDiv.className = "wf-work-request-body";
     bodyDiv.innerHTML = _renderMd(text);
     card.appendChild(bodyDiv);
 
@@ -319,7 +319,7 @@ Board.WfTicketRenderer = (function () {
   function render(text) {
     if (_isMenuOutput(text)) {
       _renderMenu(text);
-    } else if (/Complete|Done|Success|Failed|Error/.test(text) && !_isMenuOutput(text)) {
+    } else if (/Complete|Complete|Success|Failed|Error/.test(text) && !_isMenuOutput(text)) {
       _renderStatus(text);
     } else {
       _renderDefault(text);

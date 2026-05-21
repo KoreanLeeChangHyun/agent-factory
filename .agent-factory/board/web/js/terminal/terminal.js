@@ -13,7 +13,7 @@
   var M = (Board._term = Board._term || {});
 
   // ── Session dispatcher ──
-  // T-513 P3 — V1 Main Terminal Workflow Mode Waster (Crystal Point #1 + #5).
+  // WR-513 P3 — V1 Main Terminal Workflow Mode Waster (Crystal Point #1 + #5).
   // The old URL `?session=wf-...` entry point terminal — the main terminal is only active in the main mode.
   // Production-line workflow enters production-line-workflow.js.
   M.workflowSessionId = null;
@@ -33,7 +33,7 @@
   M._initialFallbackMessage = null;
 
   // ── Session Switcher State ──
-  // Map to save the status of session. key = sessionId ("main" or "wf-T-NNN-...")
+  // Map to save the status of session. key = sessionId ("main" or "wf-WR-NNN-...")
   M._sessionMap = {};
 
   // Current Activity Session ID
@@ -57,7 +57,7 @@
     };
   };
 
-  // T-383 Phase 1 (VUL-5/S5): Pre-generate the initial active session entries.
+  // WR-383 Phase 1 (VUL-5/S5): Pre-generate the initial active session entries.
   // In the past,  sessionMap={} only reset and switch to the first tab  saveCurrentSession
   // !entry mad to early return and outputNodes of main session is not saved
   // "Agent Factory Console" initial message O/O output when the bug has occurred.
@@ -148,12 +148,12 @@
   M.attachedFiles = [];
 
   /**
-   * Kanban card → ticket domain with main terminal DnD.
-   * Automatic rain after sending the same as image/file attachment (M.clearTickets).
+   * Conveyor card → workRequest domain with main terminal DnD.
+   * Automatic rain after sending the same as image/file attachment (M.clearWorkRequests).
    * Each item is fetched report.html text at the time of dragstart.
    * @type {Array<{number: string, title: string, command: string, prompt: any, result: any, report: string|null, addedAt: number}>}
    */
-  M.attachedTickets = [];
+  M.attachedWorkRequests = [];
 
   /** @type {boolean} */
   M.receivedChunks = false;
@@ -604,8 +604,8 @@
                 '<div class="wf-assistant-block">' + wfHtml + '</div>'
               );
             } else {
-              if (Board.WfTicketRenderer && Board.WfTicketRenderer.detect(M.textBuffer)) {
-                Board.WfTicketRenderer.render(M.textBuffer);
+              if (Board.WfWorkRequestRenderer && Board.WfWorkRequestRenderer.detect(M.textBuffer)) {
+                Board.WfWorkRequestRenderer.render(M.textBuffer);
               } else {
                 var html = M.renderMarkdownToHtml(M.textBuffer);
                 M.appendHtmlBlock(html, "term-message term-assistant");
@@ -646,9 +646,9 @@
       });
     }
 
-    // Bind WfTicketRenderer context
-    if (Board.WfTicketRenderer) {
-      Board.WfTicketRenderer.setContext({
+    // Bind WfWorkRequestRenderer context
+    if (Board.WfWorkRequestRenderer) {
+      Board.WfWorkRequestRenderer.setContext({
         appendToOutput: M.appendToOutput || M.appendHtmlBlock,
         endpoints: M.endpoints,
         renderMarkdownToHtml: M.renderMarkdownToHtml,
@@ -816,27 +816,27 @@
           return;
         }
 
-        // (0) Split card drop — application/x-board-ticket MIME priority processing
-        // dragstart kanban.js is set and registered in the attached domain by parsing the ticket JSON.
+        // (0) Split card drop — application/x-board-work-request MIME priority processing
+        // dragstart conveyor.js is set and registered in the attached domain by parsing the workRequest JSON.
         // report  report  report  report  report  report  report
-        var ticketJson = "";
+        var workRequestJson = "";
         try {
-          ticketJson = dt.getData("application/x-board-ticket");
+          workRequestJson = dt.getData("application/x-board-work-request");
         } catch (_e) {
-          ticketJson = "";
+          workRequestJson = "";
         }
-        if (ticketJson) {
-          var ticketPayload = null;
+        if (workRequestJson) {
+          var workRequestPayload = null;
           try {
-            ticketPayload = JSON.parse(ticketJson);
+            workRequestPayload = JSON.parse(workRequestJson);
           } catch (_parseErr) {
-            ticketPayload = null;
+            workRequestPayload = null;
           }
-          if (ticketPayload && typeof ticketPayload === "object") {
-            // workdir extraction: result.workdir first (kanban.js dragstart payload norm)
+          if (workRequestPayload && typeof workRequestPayload === "object") {
+            // workdir extraction: result.workdir first (conveyor.js dragstart payload norm)
             var workdir = "";
-            if (ticketPayload.result && typeof ticketPayload.result === "object" && typeof ticketPayload.result.workdir === "string") {
-              workdir = ticketPayload.result.workdir;
+            if (workRequestPayload.result && typeof workRequestPayload.result === "object" && typeof workRequestPayload.result.workdir === "string") {
+              workdir = workRequestPayload.result.workdir;
             }
 
             // workdir regularization: absolute path → literally, relative path → "/" prefix
@@ -853,7 +853,7 @@
               reportUrl = normalized + "report.html";
             }
 
-            // fetch synchronous — failed/null all graceful (M.attachTicket call is only once)
+            // fetch synchronous — failed/null all graceful (M.attachWorkRequest call is only once)
             // 1st: reportUrl (active path) → 404 o'clock .history/ fallback → null when both failed
             if (reportUrl) {
               var historyReportUrl = reportUrl.replace(
@@ -878,12 +878,12 @@
                   return null;
                 })
                 .then(function (reportText) {
-                  if (typeof M.attachTicket === "function") {
-                    M.attachTicket(ticketPayload, reportText || null);
+                  if (typeof M.attachWorkRequest === "function") {
+                    M.attachWorkRequest(workRequestPayload, reportText || null);
                   }
                 });
-            } else if (typeof M.attachTicket === "function") {
-              M.attachTicket(ticketPayload, null);
+            } else if (typeof M.attachWorkRequest === "function") {
+              M.attachWorkRequest(workRequestPayload, null);
             }
             return;
           }
@@ -1029,7 +1029,7 @@
             var closedSid = closeTab.dataset.session;
             var wasActive = closeTab.classList.contains("active");
             closeTab.parentNode.removeChild(closeTab);
-            // T-516 — localStorage Remove ID from single source. Close = DOM + simultaneously.
+            // WR-516 — localStorage Remove ID from single source. Close = DOM + simultaneously.
             // Resurrection Resurrection 0 (lasting user’s explicitly close)
             if (closedSid && Board.workflowTabStorage && Board.workflowTabStorage.remove) {
               Board.workflowTabStorage.remove(closedSid);
@@ -1131,7 +1131,7 @@
       } catch (e) {}
     }
 
-    // T-516 — restore workflow tabs from localStorage single source.
+    // WR-516 — restore workflow tabs from localStorage single source.
     // The main tab blocks the Helper add + bypass the main flow (M. initialQuerySession also duplicate skip).
     // The ID without server registry is displayed as 'stopped' (great) — only removed by close button.
     if (Board.workflowTabStorage && Board.workflowTabStorage.get) {
@@ -1211,7 +1211,7 @@
 
   /**
    * Session Conversion Public API.
-   * @param {string} sessionId - "main" or "wf-T-NNN-..."
+   * @param {string} sessionId - "main" or "wf-WR-NNN-..."
    * @returns {Promise<void>}
    */
   Board.sessionSwitcher.switchSession = function (sessionId) {

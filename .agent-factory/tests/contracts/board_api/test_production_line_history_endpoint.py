@@ -1,4 +1,4 @@
-"""T-513 P1 — GET /api/v2/sessions/<id>/history endpoint unit regression.
+"""WR-513 P1 — GET /api/v2/sessions/<id>/history endpoint unit regression.
 
 Warranty:
   - ProductionLineSSEChannel.persist path public property
@@ -37,9 +37,9 @@ def _production_line_methods() -> set[str]:
 def test_production_line_sse_channel_persist_path_property() -> None:
     """ProductionLineSSEChannel.persist_path public property — history handler entry point."""
     from board.server.channels.production_line_sse_channel import ProductionLineSSEChannel
-    ch = ProductionLineSSEChannel(session_id='wf-T-513-unit', persist_path='/tmp/production-line-unit.jsonl')
+    ch = ProductionLineSSEChannel(session_id='wf-WR-513-unit', persist_path='/tmp/production-line-unit.jsonl')
     assert ch.persist_path == '/tmp/production-line-unit.jsonl'
-    ch_none = ProductionLineSSEChannel(session_id='wf-T-513-unit-noper')
+    ch_none = ProductionLineSSEChannel(session_id='wf-WR-513-unit-noper')
     assert ch_none.persist_path is None
 
 
@@ -86,10 +86,10 @@ def test_production_line_history_ndjson_read_end_to_end() -> None:
     with tempfile.TemporaryDirectory() as td:
         reg = ProductionLineSessionRegistry(persist_dir=td)
         # production-pattern session_id (passes fake-pattern guard)
-        sid = 'wf-T-513-abc12345-6789-4abc-9def-0123456789ab'
+        sid = 'wf-WR-513-abc12345-6789-4abc-9def-0123456789ab'
         session = reg.create(
             session_id=sid,
-            ticket_id='T-513',
+            work_request='WR-513',
             command='implement',
             work_dir='/tmp/wd-history-test',
         )
@@ -126,10 +126,10 @@ def test_production_line_session_default_persist_path_is_run_local() -> None:
 
     with tempfile.TemporaryDirectory() as td:
         reg = ProductionLineSessionRegistry()
-        sid = 'wf-T-517-abc12345-6789-4abc-9def-0123456789ab'
+        sid = 'wf-WR-517-abc12345-6789-4abc-9def-0123456789ab'
         session = reg.create(
             session_id=sid,
-            ticket_id='T-517',
+            work_request='WR-517',
             command='implement',
             work_dir=td,
         )

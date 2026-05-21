@@ -32,8 +32,8 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY_ROOT):
 
 class TestComputeCombinedVerdict(unittest.TestCase):
     def setUp(self):
-        from board.server.handlers.kanban import KanbanHandlerMixin
-        self.fn = KanbanHandlerMixin._compute_combined_verdict
+        from board.server.handlers.kanban import ConveyorHandlerMixin
+        self.fn = ConveyorHandlerMixin._compute_combined_verdict
 
     def test_both_none_returns_none(self):
         self.assertEqual(self.fn(None, None), "NONE")
@@ -71,9 +71,9 @@ class TestComputeCombinedVerdict(unittest.TestCase):
 
 
 def _make_mock_handler(path: str):
-    from board.server.handlers.kanban import KanbanHandlerMixin
+    from board.server.handlers.kanban import ConveyorHandlerMixin
 
-    class FakeHandler(KanbanHandlerMixin):
+    class FakeHandler(ConveyorHandlerMixin):
         def __init__(self):
             self.path = path
             self._sent_json = None
@@ -91,7 +91,7 @@ def _make_mock_handler(path: str):
 class TestAuditVerdictEndpoint(unittest.TestCase):
     def test_missing_ticket_param_sends_400(self):
         h = _make_mock_handler("/api/kanban/audit/verdict")
-        h._handle_kanban_audit_verdict()
+        h._handle_conveyor_audit_verdict()
         self.assertIsNotNone(h._sent_error)
         self.assertEqual(h._sent_error[0], 400)
 
@@ -100,7 +100,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(h, "_resolve_audit_workdir", return_value=tmpdir):
                 with patch("os.getcwd", return_value=tmpdir):
-                    h._handle_kanban_audit_verdict()
+                    h._handle_conveyor_audit_verdict()
         self.assertIsNotNone(h._sent_json)
         self.assertEqual(h._sent_json["combined"], "NONE")
         self.assertIsNone(h._sent_json["tier1"])
@@ -118,7 +118,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
                 json.dump(verdict_data, f)
             with patch.object(h, "_resolve_audit_workdir", return_value=tmpdir):
                 with patch("os.getcwd", return_value=tmpdir):
-                    h._handle_kanban_audit_verdict()
+                    h._handle_conveyor_audit_verdict()
         self.assertEqual(h._sent_json["combined"], "FAIL")
 
     def test_tier1_null_tier2_pass_returns_pass(self):
@@ -133,7 +133,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
                 json.dump(verdict_data, f)
             with patch.object(h, "_resolve_audit_workdir", return_value=tmpdir):
                 with patch("os.getcwd", return_value=tmpdir):
-                    h._handle_kanban_audit_verdict()
+                    h._handle_conveyor_audit_verdict()
         self.assertEqual(h._sent_json["combined"], "PASS")
         self.assertIsNone(h._sent_json["tier1"])
 
@@ -149,7 +149,7 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
                 json.dump(verdict_data, f)
             with patch.object(h, "_resolve_audit_workdir", return_value=tmpdir):
                 with patch("os.getcwd", return_value=tmpdir):
-                    h._handle_kanban_audit_verdict()
+                    h._handle_conveyor_audit_verdict()
         self.assertIn("AT-06", h._sent_json["tier2"]["hard_gate_failed"])
         self.assertIn("AT-09", h._sent_json["tier2"]["hard_gate_failed"])
 
@@ -157,15 +157,15 @@ class TestAuditVerdictEndpoint(unittest.TestCase):
         h = _make_mock_handler("/api/kanban/audit/verdict?ticket=T-005")
         with patch.object(h, "_resolve_audit_workdir", return_value=None):
             with patch("os.getcwd", return_value="/fake"):
-                h._handle_kanban_audit_verdict()
+                h._handle_conveyor_audit_verdict()
         self.assertEqual(h._sent_json["combined"], "NONE")
 
 
 class TestResolveAuditWorkdir(unittest.TestCase):
     def _make_handler(self):
-        from board.server.handlers.kanban import KanbanHandlerMixin
+        from board.server.handlers.kanban import ConveyorHandlerMixin
 
-        class FakeHandler(KanbanHandlerMixin):
+        class FakeHandler(ConveyorHandlerMixin):
             def _send_json(self, d): pass
             def _send_error(self, c, m): pass
 

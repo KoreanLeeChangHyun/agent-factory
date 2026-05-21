@@ -131,7 +131,7 @@ ok(mergeAdjacentOrderedLists(undefined) === undefined, "H-5-undefined");
   ok(html.includes("<p>text between</p>"), "E-2: Preserve text paragraphs");
 }
 
-// F: Input literal \n (P1 association) — flow-kanban XML field simulation
+// F: Input literal \n (P1 association) — flow-conveyor XML field simulation
 {
   const html = render("1. A\\n2. B\\n0. C");
   ok(countMatches(html, /<ol\b/g) === 1, "F-1: Literal \n input is also a single ol",

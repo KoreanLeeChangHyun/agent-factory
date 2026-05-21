@@ -15,7 +15,7 @@ Therefore, the output of this step is **rule evaluation·verdict (PASS/WARN/FAIL
 
 # Required sections
 1. ## phase decomposition adequacy
-   - Is the phase decomposition of plan.md appropriate for the ticket goal and scope?
+   - Is the phase decomposition of plan.md appropriate for the WorkRequest goal and scope?
    - Natural language evaluation for over-decomposition (unnecessary phases) / over-compression (one phase has multiple responsibilities)
 2. ## deliverable completeness
    - Does work/<id>.md of each phase meet the deliverable specification of plan.md?
@@ -37,6 +37,6 @@ Write (output) + Read (plan.md / work/*.md).
 # Absolutely prohibited
 - Rule evaluation + verdict calculation (driver responsibility)
 - Edit files other than output
-- Modify kanban CLI / status.json / metrics.jsonl (driver area)
+- Modify conveyor CLI / status.json / metrics.jsonl (driver area)
 - Call git command (driver area)
 - **Directly calling production board API endpoint** — Wiring verification is only done through unit tests (`pytest`, `tempfile`). Naming guard `is_fake_session_id` blocks 403 (T-495 regression case)

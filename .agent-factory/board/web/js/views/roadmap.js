@@ -141,12 +141,12 @@
         h += '<div class="roadmap-card-title">' + esc(m.title || m.id) + '</div>';
         h += badge(m.status || 'planned');
         h += '</div>';
-        var tickets = m.tickets || [];
-        if (tickets.length > 0) {
-          h += '<div class="roadmap-card-tickets">';
-          for (var k = 0; k < tickets.length; k++) {
-            h += '<span class="roadmap-card-ticket-chip" data-ticket="' + esc(tickets[k]) + '">'
-              + esc(tickets[k]) + '</span>';
+        var workRequests = m.workRequests || [];
+        if (workRequests.length > 0) {
+          h += '<div class="roadmap-card-work-requests">';
+          for (var k = 0; k < workRequests.length; k++) {
+            h += '<span class="roadmap-card-work-request-chip" data-work-request="' + esc(workRequests[k]) + '">'
+              + esc(workRequests[k]) + '</span>';
           }
           h += '</div>';
         }
@@ -306,7 +306,7 @@
     var cards = container.querySelectorAll('.roadmap-card');
     cards.forEach(function (card) {
       card.addEventListener('click', function (e) {
-        if (e.target && e.target.classList && e.target.classList.contains('roadmap-card-ticket-chip')) {
+        if (e.target && e.target.classList && e.target.classList.contains('roadmap-card-work-request-chip')) {
           return;
         }
         var pid = card.getAttribute('data-phase-id');
@@ -320,16 +320,16 @@
       });
     });
 
-    // Ticket chip → move to viewer tab
-    var chips = container.querySelectorAll('.roadmap-card-ticket-chip');
+    // WorkRequest chip → move to viewer tab
+    var chips = container.querySelectorAll('.roadmap-card-work-request-chip');
     chips.forEach(function (chip) {
       chip.addEventListener('click', function (e) {
         e.stopPropagation();
-        var tid = chip.getAttribute('data-ticket');
+        var tid = chip.getAttribute('data-work-request');
         if (!tid) return;
-        var ticket = (Board.state.TICKETS || []).find(function (t) { return t.number === tid; });
-        if (ticket && Board.render.openViewer) {
-          Board.render.openViewer(ticket);
+        var workRequest = (Board.state.WORK_REQUESTS || []).find(function (t) { return t.number === tid; });
+        if (workRequest && Board.render.openViewer) {
+          Board.render.openViewer(workRequest);
           if (Board.util.switchTab) Board.util.switchTab('viewer');
         }
       });

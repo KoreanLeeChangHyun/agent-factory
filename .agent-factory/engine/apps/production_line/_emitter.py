@@ -142,7 +142,7 @@ def session_create(ctx: WorkflowContext) -> None:
         return
     body = {
         "session_id": ctx.wf_session_id,
-        "ticket_id": ctx.work_request_no,
+        "work_request": ctx.work_request_no,
         "command": ctx.command,
         "work_dir": str(ctx.work_dir),
         "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else "",
@@ -290,7 +290,7 @@ def workflow_finish(
         verdict: 12 rule verdict (PASS/WARN/FAIL/SKIP) — records only metrics
         summary: One-line summary — board exposed to frontend
     """
-    payload: dict[str, Any] = {"outcome": outcome, "ticket": ctx.work_request_no}
+    payload: dict[str, Any] = {"outcome": outcome, "work_request": ctx.work_request_no}
     if verdict is not None:
         payload["verdict"] = verdict
     emit(ctx, "workflow.finish", **payload, **extra)

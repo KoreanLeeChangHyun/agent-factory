@@ -1,11 +1,11 @@
 /**
- * @module kanban
+ * @module conveyor
  *
- * Board SPA kanban tab module.
+ * Board SPA conveyor tab module.
  *
- * Handles ticket fetching, sorting, and kanban board rendering with
- * per-column sort dropdowns. Registers fetchTickets, fetchTicketsByFiles
- * on Board.fetch and renderKanban on Board.render.
+ * Handles workRequest fetching, sorting, and conveyor board rendering with
+ * per-column sort dropdowns. Registers fetchWorkRequests, fetchWorkRequestsByFiles
+ * on Board.fetch and renderConveyor on Board.render.
  *
  * Depends on: common.js (Board.util, Board.state)
  */
@@ -13,13 +13,13 @@
 
 (function () {
   const {
-    esc, badge, fetchXmlList, parseTicket, CMD_COLORS, COLUMNS, KANBAN_SORT_LS_KEY,
+    esc, badge, fetchXmlList, parseWorkRequest, CMD_COLORS, COLUMNS, CONVEYOR_SORT_LS_KEY,
   } = Board.util;
 
   // ── Relations Display ──
   const MAX_VISIBLE_RELATIONS = 5;
 
-  // ── T-475 Stage 3: launch asynchronousization — client status machine
+  // ── WR-475 Stage 3: launch asynchronousization — client status machine
   // idle → submitting → starting → running (LAUNCH STARTED Received) | failed (LAUNCH FAILED / User Selection)
   //
   // Use Flow:
@@ -28,23 +28,23 @@
   //      LAUNCH FAILED → launchState removal + failure modal.
   //   3. FAQs Grace 60s Expired (onGraceExpired): User-selection only displays — auto-forced previews 0 (constraints compliance).
   //
-  // Restore a new call: sessionStorage('Board.launchState.<ticket>') to 1.02 state →
+  // Restore a new call: sessionStorage('Board.launchState.<workRequest>') to 1.02 state →
   // Rewrite grace residual time with restoreLaunchStateFromStorage() call and restart timer.
   //
   // SSE Convention (my-board-sse-convention §2.4): handleLaunchEvent calls to single listener —
-  // Board.kanban Namespace Exposure (addEventListener Anti-Registration).
+  // Board.conveyor Namespace Exposure (addEventListener Anti-Registration).
   const LAUNCH_GRACE_MS = 60000;             // 60s grace
   const LAUNCH_STORAGE_PREFIX = "Board.launchState.";
-  const launchState = new Map();              // ticketNum → {state, since, command, sessionId, graceTimer}
+  const launchState = new Map();              // workRequestNum → {state, since, command, sessionId, graceTimer}
 
-  // ── Column Collapsed State (Done / To Do) ──
-  // Saves the foldable status by column key. "Done" is a user-configured by maintaining an existing key
-  // To ensure compatibility, other columns (currently "To Do") are column-collapsed:<key> format.
+  // ── Column Collapsed State (Complete / Draft) ──
+  // Saves the foldable status by column key. "Complete" is a user-configured by maintaining an existing key
+  // To ensure compatibility, other columns (currently "Draft") are column-collapsed:<key> format.
   const LEGACY_DONE_LS_KEY = "claude-board-done-collapsed";
-  const COLLAPSIBLE_COLUMNS = new Set(["Done", "To Do"]);
+  const COLLAPSIBLE_COLUMNS = new Set(["Complete", "Draft"]);
 
   function columnCollapsedKey(colKey) {
-    if (colKey === "Done") return LEGACY_DONE_LS_KEY;
+    if (colKey === "Complete") return LEGACY_DONE_LS_KEY;
     return "claude-board-column-collapsed:" + colKey;
   }
 
@@ -64,10 +64,10 @@
     } catch (e) {}
   }
 
-  // ── To Do Manual Order ──
-  // To Do Column supports user manual sorting (DnD location changes). New ticket is always the best prepend.
+  // ── Draft Manual Order ──
+  // Draft Column supports user manual sorting (DnD location changes). New workRequest is always the best prepend.
   // Not synchronized with other browsers/ devices (localStorage only).
-  const TODO_MANUAL_ORDER_LS_KEY = "kanban_todo_manual_order_v1";
+  const TODO_MANUAL_ORDER_LS_KEY = "conveyor_todo_manual_order_v1";
   function loadTodoManualOrder() {
     try {
       const stored = JSON.parse(localStorage.getItem(TODO_MANUAL_ORDER_LS_KEY));
@@ -84,8 +84,8 @@
 
   /**
    * Tag:
-   * - Save order tickets = in order
-   * - Ticket without storage order (New) = Top quality prepend, number desc
+   * - Save order workRequests = in order
+   * - WorkRequest without storage order (New) = Top quality prepend, number desc
    * - Save the result order again (New item is automatically registered in manual order and STAle clearance)
    */
   function applyTodoManualOrder(items) {
@@ -116,29 +116,29 @@
   }
 
   /** Go to the targetIndex location of manual order. */
-  function reorderTodoManualOrder(ticketNum, targetIndex) {
+  function reorderTodoManualOrder(workRequestNum, targetIndex) {
     const stored = loadTodoManualOrder();
-    const filtered = stored.filter(function (n) { return n !== ticketNum; });
+    const filtered = stored.filter(function (n) { return n !== workRequestNum; });
     const clamped = Math.max(0, Math.min(targetIndex, filtered.length));
-    filtered.splice(clamped, 0, ticketNum);
+    filtered.splice(clamped, 0, workRequestNum);
     saveTodoManualOrder(filtered);
   }
 
-  // ── Kanban Sort State ──
+  // ── Conveyor Sort State ──
 
-  /** Loads persisted kanban sort state from localStorage. */
-  function loadKanbanSort() {
+  /** Loads persisted conveyor sort state from localStorage. */
+  function loadConveyorSort() {
     const defaults = {};
     COLUMNS.forEach(function (col) {
-      // To Do defaults manual sorting. The rest of the number of times.
-      if (col.key === "To Do") {
+      // Draft defaults manual sorting. The rest of the number of times.
+      if (col.key === "Draft") {
         defaults[col.key] = { key: "manual", dir: "asc" };
       } else {
         defaults[col.key] = { key: "number", dir: "asc" };
       }
     });
     try {
-      const stored = JSON.parse(localStorage.getItem(KANBAN_SORT_LS_KEY));
+      const stored = JSON.parse(localStorage.getItem(CONVEYOR_SORT_LS_KEY));
       if (stored && typeof stored === "object") {
         COLUMNS.forEach(function (col) {
           if (!stored[col.key] || !stored[col.key].key) {
@@ -151,21 +151,21 @@
     return defaults;
   }
 
-  const kanbanSort = loadKanbanSort();
-  Board.state.kanbanSort = kanbanSort;
+  const conveyorSort = loadConveyorSort();
+  Board.state.conveyorSort = conveyorSort;
 
-  /** Persists kanban sort state to localStorage. */
-  function saveKanbanSort() {
+  /** Persists conveyor sort state to localStorage. */
+  function saveConveyorSort() {
     try {
-      localStorage.setItem(KANBAN_SORT_LS_KEY, JSON.stringify(kanbanSort));
+      localStorage.setItem(CONVEYOR_SORT_LS_KEY, JSON.stringify(conveyorSort));
     } catch (e) {}
   }
 
-  // ── Kanban Sort Logic ──
+  // ── Conveyor Sort Logic ──
 
   /**
-   * Returns the most recent datetime from a ticket's datetime field.
-   * @param {Object} t - Ticket object
+   * Returns the most recent datetime from a workRequest's datetime field.
+   * @param {Object} t - WorkRequest object
    * @returns {string} Most recent datetime string
    */
   function getModifiedDate(t) {
@@ -177,13 +177,13 @@
   }
 
   /**
-   * Sorts ticket array by the given key and direction.
-   * @param {Array} items - Ticket array
+   * Sorts workRequest array by the given key and direction.
+   * @param {Array} items - WorkRequest array
    * @param {string} sortKey - Sort key (number, created, modified, title)
    * @param {string} sortDir - Sort direction (asc, desc)
-   * @returns {Array} Sorted copy of the ticket array
+   * @returns {Array} Sorted copy of the workRequest array
    */
-  function sortTickets(items, sortKey, sortDir) {
+  function sortWorkRequests(items, sortKey, sortDir) {
     const dir = sortDir === "desc" ? -1 : 1;
     return items.slice().sort(function (a, b) {
       let av, bv, cmp;
@@ -226,40 +226,40 @@
     { dir: "desc", label: "\uB0B4\uB9BC\uCC28\uC21C" },
   ];
 
-  // ── Fetch Tickets ──
+  // ── Fetch WorkRequests ──
 
   // ── Worktree Uncommitted Cache ──
   // For the card woo Sangdan woomit indica. null = not loaded
   var _worktreeUncommittedMap = null;
 
-  // ── Done Verdict Cache (T-441) ──
-  // Done Card Mage Combination verdict. key=ticket number, value={verdict,reason,details}.
+  // ── Complete Verdict Cache (WR-441) ──
+  // Complete Card Mage Combination verdict. key=workRequest number, value={verdict,reason,details}.
   // "pending" value = during the query. undefined = undefined
-  var _doneVerdictMap = {};
+  var _completeVerdictMap = {};
 
-  // ── Review Verdict Cache (T-463) ──
-  // Review Card Rule Base 1st Auto Verdict (advisory only).
-  // key=ticket number, value={verdict, reason, details, violations}.
+  // ── Verifying Verdict Cache (WR-463) ──
+  // Verifying Card Rule Base 1st Auto Verdict (advisory only).
+  // key=workRequest number, value={verdict, reason, details, violations}.
   // Verdict Value: PASS / WARN / FAIL / SKIP / UNKNOWN.
   // "pending" value = during the query. undefined = undefined
-  // comment no speculative guards 2026-05-08, T-411 0c970fa, T-413 1ce3c2d.
+  // comment no speculative guards 2026-05-08, WR-411 0c970fa, WR-413 1ce3c2d.
   // Auto Forced / Forced Regression / Forced Regression 0 — User can run verdict FAIL
-  var _reviewVerdictMap = {};
+  var _verifyingVerdictMap = {};
 
-  // ── Audit Verdict Cache (T-477) ──
-  // Review Card Auditor T3 advisory verdict. key=ticket number, value={tier1,tier2,combined}.
+  // ── Audit Verdict Cache (WR-477) ──
+  // Verifying Card Auditor T3 advisory verdict. key=workRequest number, value={tier1,tier2,combined}.
   // "pending" = viewed. undefined = undefined
   var _auditVerdictMap = {};
 
-  // ── Active Branch Ticket (T-433 Phase 2) ──
-  // The main working tree is currently active feature brand name ticket number (e.g. "T-433"). null = develop.
-  // SSOT: derive from backend GET /api/kanban/branch/active or SSE git branch event.
+  // ── Active Branch WorkRequest (WR-433 Phase 2) ──
+  // The main working tree is currently active feature brand name workRequest number (e.g. "WR-433"). null = develop.
+  // SSOT: derive from backend GET /api/conveyor/branch/active or SSE git branch event.
   // Only one card is active: Matching only .active, compared all the review cards in render.
-  var _activeBranchTicket = null;
+  var _activeBranchWorkRequest = null;
   // First one fetch finished guard — initial visual restore with 1 GET when loading page.
   var _activeBranchFetched = false;
-  // T-NNN extraction regular expression — feat/T-NNN-* pattern matching.
-  var _FEAT_BRANCH_RE = /^feat\/(T-\d+)/;
+  // WR-NNN extraction regular expression — feat/WR-NNN-* pattern matching.
+  var _FEAT_BRANCH_RE = /^feat\/(WR-\d+)/;
 
   /**
    * <# if ( data.meta.album ) { #>{{ data.meta.artist }}<# } #>
@@ -268,15 +268,15 @@
   function fetchAndApplyActiveBranch() {
     if (_activeBranchFetched) return;
     _activeBranchFetched = true;
-    fetch("/api/kanban/branch/active", { cache: "no-store" }).then(function (res) {
+    fetch("/api/conveyor/branch/active", { cache: "no-store" }).then(function (res) {
       if (!res.ok) return null;
       return res.json();
     }).then(function (data) {
-      var ticket = (data && data.active_ticket) || null;
-      _activeBranchTicket = ticket;
+      var workRequest = (data && data.active_work_request) || null;
+      _activeBranchWorkRequest = workRequest;
       applyActiveBranchClassToCards();
     }).catch(function () {
-      // backend not ready —  activeBranchTicket retains null (Each OFF)
+      // backend not ready —  activeBranchWorkRequest retains null (Each OFF)
     });
   }
 
@@ -287,11 +287,11 @@
    * - Toggle click optimistic update call immediately
    */
   function applyActiveBranchClassToCards() {
-    var cards = document.querySelectorAll('.card[data-col-key="Review"]');
+    var cards = document.querySelectorAll('.card[data-col-key="Verifying"]');
     cards.forEach(function (card) {
       var num = card.dataset.num;
       var btn = card.querySelector(".card-branch-toggle");
-      var isActive = (num && _activeBranchTicket === num);
+      var isActive = (num && _activeBranchWorkRequest === num);
       if (isActive) {
         card.classList.add("has-active-branch");
         if (btn) btn.classList.add("active");
@@ -304,40 +304,40 @@
 
   /**
    * SSE git branch event calls outside (sse.js).
-   * Extract T-NNN from branch strings  activeBranchTicket Update + DOM Patch.
-   * @param {string null} branch - "feat/T-NNN-..." or "develop"
+   * Extract WR-NNN from branch strings  activeBranchWorkRequest Update + DOM Patch.
+   * @param {string null} branch - "feat/WR-NNN-..." or "develop"
    */
   function syncActiveBranchFromSSE(branch) {
-    var ticket = null;
+    var workRequest = null;
     if (branch && typeof branch === "string") {
       var m = _FEAT_BRANCH_RE.exec(branch);
-      if (m) ticket = m[1];
+      if (m) workRequest = m[1];
     }
-    if (ticket === _activeBranchTicket) return; // Skip to content
-    _activeBranchTicket = ticket;
+    if (workRequest === _activeBranchWorkRequest) return; // Skip to content
+    _activeBranchWorkRequest = workRequest;
     applyActiveBranchClassToCards();
   }
 
   /**
-   * Review Card 4 Toggle Button Click Handler.
+   * Verifying Card 4 Toggle Button Click Handler.
    * - Current card is active if action=off, or action=on to POST.
    * - dirty / needs restart / guided moves according to failure response (automatic stash absolute X).
-   * @param {string} ticketNum - Click Card T-NNN
+   * @param {string} workRequestNum - Click Card WR-NNN
    */
-  function handleBranchToggleClick(ticketNum) {
-    if (!ticketNum) return;
-    var action = (_activeBranchTicket === ticketNum) ? "off" : "on";
-    fetch("/api/kanban/branch/toggle", {
+  function handleBranchToggleClick(workRequestNum) {
+    if (!workRequestNum) return;
+    var action = (_activeBranchWorkRequest === workRequestNum) ? "off" : "on";
+    fetch("/api/conveyor/branch/toggle", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticket_number: ticketNum, action: action })
+      body: JSON.stringify({ work_request_number: workRequestNum, action: action })
     }).then(function (res) {
       return res.json().then(function (body) { return { ok: res.ok, body: body }; });
     }).then(function (r) {
       var body = r.body || {};
       if (body.ok === true) {
-        // Success — active ticket update (server response reflect SSOT, optimistic simultaneously)
-        _activeBranchTicket = body.active_ticket || null;
+        // Success — active workRequest update (server response reflect SSOT, optimistic simultaneously)
+        _activeBranchWorkRequest = body.active_work_request || null;
         applyActiveBranchClassToCards();
         if (body.needs_restart) {
           Board.util.showInfoModal(
@@ -409,8 +409,8 @@
         if (!Array.isArray(list)) return;
         var map = new Map();
         list.forEach(function (item) {
-          if (item && item.ticket && item.uncommitted_count > 0) {
-            map.set(item.ticket, item);
+          if (item && item.work_request && item.uncommitted_count > 0) {
+            map.set(item.work_request, item);
           }
         });
         _worktreeUncommittedMap = map;
@@ -421,26 +421,26 @@
   }
 
   /**
-   * T-441: Single Done Card Verdict View (advisory).
+   * WR-441: Single Complete Card Verdict View (advisory).
    * The result is cached in  doneVerdictMap, and patches the corresponding card badge to DOM when loading is completed.
    * No polling — 1 call when card mount.
-   * @param {string} ticketNum - ticket number (e.g. "T-441")
+   * @param {string} workRequestNum - workRequest number (e.g. "WR-441")
    */
-  function fetchAndRenderVerdict(ticketNum) {
+  function fetchAndRenderVerdict(workRequestNum) {
     // If you already have an inquiry or complete, skip
-    if (_doneVerdictMap[ticketNum] !== undefined) return;
-    _doneVerdictMap[ticketNum] = "pending";
+    if (_completeVerdictMap[workRequestNum] !== undefined) return;
+    _completeVerdictMap[workRequestNum] = "pending";
 
-    fetch("/api/kanban/done-verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+    fetch("/api/conveyor/complete-verdict?work_request=" + encodeURIComponent(workRequestNum), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function (data) {
-        _doneVerdictMap[ticketNum] = data;
+        _completeVerdictMap[workRequestNum] = data;
         // DOM Patch: Replace the verdict badge of the corresponding card (without full re-render)
         var badge = document.querySelector(
-          '.card[data-num="' + ticketNum + '"][data-col-key="Done"] .card-done-verdict'
+          '.card[data-num="' + workRequestNum + '"][data-col-key="Complete"] .card-complete-verdict'
         );
         if (badge) {
           var newBadge = document.createElement("span");
@@ -449,18 +449,18 @@
         }
       })
       .catch(function () {
-        _doneVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: { message: "Verdict View failed" } };
+        _completeVerdictMap[workRequestNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: { message: "Verdict View failed" } };
       });
   }
 
   /**
-   * T-441: Apply the status in the badge span based on verdict data.
+   * WR-441: Apply the status in the badge span based on verdict data.
    * @param {HTMLElement} el - target span element
    * @param {Object} data - verdict response data ({verdict, reason, details})
    */
   function _applyVerdictBadge(el, data) {
     var verdict = data && data.verdict;
-    el.className = "card-done-verdict";
+    el.className = "card-complete-verdict";
     if (verdict === "OK") {
       el.className += " verdict-ok";
       el.title = "(develop HEAD == merge commit)";
@@ -479,46 +479,46 @@
   }
 
   /**
-   * T-463: Single Review Card Verdict View (advisory only).
+   * WR-463: Single Verifying Card Verdict View (advisory only).
    * Results  reviewVerdictMap Cache, and patch the corresponding card badge to DOM when loading is completed.
    * No polling — 1 call when card mount.
-   * @param {string} ticketNum - ticket number (e.g. "T-463")
+   * @param {string} workRequestNum - workRequest number (e.g. "WR-463")
    */
-  function fetchAndRenderReviewVerdict(ticketNum) {
+  function fetchAndRenderVerifyingVerdict(workRequestNum) {
     // If you already have an inquiry or complete, skip
-    if (_reviewVerdictMap[ticketNum] !== undefined) return;
-    _reviewVerdictMap[ticketNum] = "pending";
+    if (_verifyingVerdictMap[workRequestNum] !== undefined) return;
+    _verifyingVerdictMap[workRequestNum] = "pending";
 
-    fetch("/api/kanban/review-verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+    fetch("/api/conveyor/verifying-verdict?work_request=" + encodeURIComponent(workRequestNum), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function (data) {
-        _reviewVerdictMap[ticketNum] = data;
+        _verifyingVerdictMap[workRequestNum] = data;
         // DOM Patch: Replace the verdict badge of the corresponding card (without full re-render)
         var badge = document.querySelector(
-          '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .card-review-verdict'
+          '.card[data-num="' + workRequestNum + '"][data-col-key="Verifying"] .card-verifying-verdict'
         );
         if (badge) {
           var newBadge = document.createElement("span");
-          _applyReviewVerdictBadge(newBadge, data);
+          _applyVerifyingVerdictBadge(newBadge, data);
           badge.parentNode.replaceChild(newBadge, badge);
         }
       })
       .catch(function () {
-        _reviewVerdictMap[ticketNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: {}, violations: [] };
+        _verifyingVerdictMap[workRequestNum] = { verdict: "UNKNOWN", reason: "fetch_error", details: {}, violations: [] };
       });
   }
 
   /**
-   * T-477: Auditor T3 audit verdict generates an HTML (inline call in the renderKanban).
+   * WR-477: Auditor T3 audit verdict generates an HTML (inline call in the renderConveyor).
    * combination === "NONE" returns empty string (DOM mount X).
-   * @param {string} ticketNum - ticket number
+   * @param {string} workRequestNum - workRequest number
    * @returns {string} span.audit-badge HTML or empty string
    */
-  function renderAuditBadgeHtml(ticketNum) {
-    var data = _auditVerdictMap[ticketNum];
+  function renderAuditBadgeHtml(workRequestNum) {
+    var data = _auditVerdictMap[workRequestNum];
     if (!data || data === "pending") {
       return '<span class="audit-badge audit-loading" style="display:none"></span>';
     }
@@ -537,27 +537,27 @@
   }
 
   /**
-   * T-477: Review card single audit verdict fetch + DOM badge patch.
+   * WR-477: Verifying card single audit verdict fetch + DOM badge patch.
    * Results  auditVerdictMap to cache. No polling — 1 time when card mount.
-   * @param {string} ticketNum - ticket number
+   * @param {string} workRequestNum - workRequest number
    */
-  function fetchAndRenderAuditVerdict(ticketNum) {
-    if (_auditVerdictMap[ticketNum] !== undefined) return;
-    _auditVerdictMap[ticketNum] = "pending";
+  function fetchAndRenderAuditVerdict(workRequestNum) {
+    if (_auditVerdictMap[workRequestNum] !== undefined) return;
+    _auditVerdictMap[workRequestNum] = "pending";
 
-    fetch("/api/kanban/audit/verdict?ticket=" + encodeURIComponent(ticketNum), { cache: "no-store" })
+    fetch("/api/conveyor/audit/verdict?work_request=" + encodeURIComponent(workRequestNum), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function (data) {
-        _auditVerdictMap[ticketNum] = data;
+        _auditVerdictMap[workRequestNum] = data;
         if ((data.combined || "NONE") === "NONE") return;
         var placeholder = document.querySelector(
-          '.card[data-num="' + ticketNum + '"][data-col-key="Review"] .audit-badge'
+          '.card[data-num="' + workRequestNum + '"][data-col-key="Verifying"] .audit-badge'
         );
         if (placeholder) {
-          var newHtml = renderAuditBadgeHtml(ticketNum);
+          var newHtml = renderAuditBadgeHtml(workRequestNum);
           if (newHtml) {
             var tmp = document.createElement("span");
             tmp.innerHTML = newHtml;
@@ -567,12 +567,12 @@
         }
       })
       .catch(function () {
-        _auditVerdictMap[ticketNum] = { tier1: null, tier2: null, combined: "NONE" };
+        _auditVerdictMap[workRequestNum] = { tier1: null, tier2: null, combined: "NONE" };
       });
   }
 
   /**
-   * T-463: The review verdict data is based on the status of the badge span.
+   * WR-463: The review verdict data is based on the status of the badge span.
    * - PASS / WARN / FAIL — Text Chip Display (verdict-pass / verdict-warn / verdict-fail)
    * - SKIP / UNKNOWN / pending — hidden badge (display:none)
    * - tooltip = violations list + "advisory only" guide (cursor:help)
@@ -580,9 +580,9 @@
    * @param {HTMLElement} el - target span element
    * @param {Object} data - verdict response data ({verdict, reason, details, violations})
    */
-  function _applyReviewVerdictBadge(el, data) {
+  function _applyVerifyingVerdictBadge(el, data) {
     var verdict = data && data.verdict;
-    el.className = "card-review-verdict";
+    el.className = "card-verifying-verdict";
     // margin-right:auto inline preservation — 4 action-row left + right toggle/done button separation
     el.style.marginRight = "auto";
     if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
@@ -607,28 +607,28 @@
       var reason = (data && data.reason) || "ok";
       lines.push(verdict + " (" + reason + ")");
     }
-    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Done Mobile Freedom";
+    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Complete Mobile Freedom";
     el.setAttribute("data-verdict-msg", tooltip);
     el.setAttribute("title", tooltip);
   }
 
   /**
-   * T-463: Create a Review Card verdict badge HTML.
+   * WR-463: Create a Verifying Card verdict badge HTML.
    * If there is no result in the cache, return the placeholder during loading, and the DOM patch will be completed.
    * The first child of the card-actions-row is inserted into the margin-right:auto and separated to the right top.
-   * @param {string} ticketNum - ticket number (e.g. "T-463")
-   * @returns {string} span.card-review-verdict HTML
+   * @param {string} workRequestNum - workRequest number (e.g. "WR-463")
+   * @returns {string} span.card-verifying-verdict HTML
    */
-  function renderReviewVerdictBadge(ticketNum) {
-    var data = _reviewVerdictMap[ticketNum];
+  function renderVerifyingVerdictBadge(workRequestNum) {
+    var data = _verifyingVerdictMap[workRequestNum];
     if (data === undefined || data === "pending") {
-      // Loading — Unseen Placeholders.  applyReviewVerdictBadge DOM patch after fetch completion.
-      return '<span class="card-review-verdict verdict-loading" style="display:none;margin-right:auto"></span>';
+      // Loading — Unseen Placeholders.  applyVerifyingVerdictBadge DOM patch after fetch completion.
+      return '<span class="card-verifying-verdict verdict-loading" style="display:none;margin-right:auto"></span>';
     }
     var verdict = data && data.verdict;
     if (verdict !== "PASS" && verdict !== "WARN" && verdict !== "FAIL") {
       // SKIP / UNKNOWN / Unknown Value — Unlock Badge
-      return '<span class="card-review-verdict verdict-unknown" style="display:none;margin-right:auto"></span>';
+      return '<span class="card-verifying-verdict verdict-unknown" style="display:none;margin-right:auto"></span>';
     }
     var violations = (data && data.violations) || [];
     var lines = [];
@@ -643,10 +643,10 @@
       var reason = (data && data.reason) || "ok";
       lines.push(verdict + " (" + reason + ")");
     }
-    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Done Mobile Freedom";
+    var tooltip = lines.join("\n") + "\\n\\nadvisory only — Complete Mobile Freedom";
     var cls = "verdict-" + verdict.toLowerCase();
     return (
-      '<span class="card-review-verdict ' + cls + '"'
+      '<span class="card-verifying-verdict ' + cls + '"'
       + ' style="margin-right:auto"'
       + ' title="' + esc(tooltip) + '"'
       + ' data-verdict-msg="' + esc(tooltip) + '">'
@@ -655,50 +655,50 @@
     );
   }
 
-  /** Fetches all tickets via /api/kanban (single request). */
-  function fetchTickets() {
-    return fetch("/api/kanban", { cache: "no-store" }).then(function (res) {
+  /** Fetches all workRequests via /api/conveyor (single request). */
+  function fetchWorkRequests() {
+    return fetch("/api/conveyor", { cache: "no-store" }).then(function (res) {
       if (!res.ok) return [];
       return res.json();
     }).then(function (map) {
-      var tickets = [];
+      var workRequests = [];
       Object.keys(map).forEach(function (fn) {
         if (map[fn]) {
-          var t = parseTicket(map[fn]);
-          if (t) tickets.push(t);
+          var t = parseWorkRequest(map[fn]);
+          if (t) workRequests.push(t);
         }
       });
-      return tickets;
-    }).catch(function () { return []; }).then(function (tickets) {
-      // Co-fetch worktree uncommitted so renderKanban always has fresh data.
+      return workRequests;
+    }).catch(function () { return []; }).then(function (workRequests) {
+      // Co-fetch worktree uncommitted so renderConveyor always has fresh data.
       return fetchAndCacheWorktreeUncommitted().then(
-        function () { return tickets; },
-        function () { return tickets; }
+        function () { return workRequests; },
+        function () { return workRequests; }
       );
     });
   }
 
   /**
-   * Selectively fetches and updates tickets by file names via /api/kanban?files=...
-   * @param {string[]} files - Changed file names (e.g. ["T-038.xml"])
+   * Selectively fetches and updates workRequests by file names via /api/conveyor?files=...
+   * @param {string[]} files - Changed file names (e.g. ["WR-038.xml"])
    * @returns {Promise<void>}
    */
-  function fetchTicketsByFiles(files) {
-    return fetch("/api/kanban?files=" + encodeURIComponent(files.join(",")), { cache: "no-store" }).then(function (res) {
+  function fetchWorkRequestsByFiles(files) {
+    return fetch("/api/conveyor?files=" + encodeURIComponent(files.join(",")), { cache: "no-store" }).then(function (res) {
       if (!res.ok) return;
       return res.json().then(function (map) {
         Object.keys(map).forEach(function (fn) {
           var baseName = fn.replace(/\.xml$/, "");
           if (map[fn] === null) {
-            Board.state.TICKETS = Board.state.TICKETS.filter(function (t) { return t.number !== baseName; });
+            Board.state.WORK_REQUESTS = Board.state.WORK_REQUESTS.filter(function (t) { return t.number !== baseName; });
           } else {
-            var incoming = parseTicket(map[fn]);
+            var incoming = parseWorkRequest(map[fn]);
             if (!incoming) return;
-            var idx = Board.state.TICKETS.findIndex(function (t) { return t.number === incoming.number; });
+            var idx = Board.state.WORK_REQUESTS.findIndex(function (t) { return t.number === incoming.number; });
             if (idx !== -1) {
-              Board.state.TICKETS[idx] = incoming;
+              Board.state.WORK_REQUESTS[idx] = incoming;
             } else {
-              Board.state.TICKETS.push(incoming);
+              Board.state.WORK_REQUESTS.push(incoming);
             }
           }
         });
@@ -706,7 +706,7 @@
     }).catch(function () {});
   }
 
-  // ── Kanban Rendering ──
+  // ── Conveyor Rendering ──
 
   /**
    * Convert Stage Name to 3 letters.
@@ -720,21 +720,21 @@
   }
 
   /**
-   * Create a stage icon HTML for the chain command ticket.
-   * @param {Object} ticket object
+   * Create a stage icon HTML for the chain command workRequest.
+   * @param {Object} workRequest object
    * @returns {string} card-chain div HTML
    */
-  function renderChainIcons(ticket) {
-    const stages = ticket.command.split(">").map(function (s) { return s.trim(); }).filter(Boolean);
+  function renderChainIcons(workRequest) {
+    const stages = workRequest.command.split(">").map(function (s) { return s.trim(); }).filter(Boolean);
     if (stages.length === 0) return "";
 
-    const isDone = ticket.status === "Done";
-    const isInProgress = ticket.status === "In Progress";
+    const isComplete = workRequest.status === "Complete";
+    const isInProgress = workRequest.status === "Executing";
 
     let parts = [];
     stages.forEach(function (stage, idx) {
       let stateClass;
-      if (isDone) {
+      if (isComplete) {
         stateClass = "done";
       } else if (isInProgress && idx === 0) {
         stateClass = "active";
@@ -754,11 +754,11 @@
 
   /**
    * Create a relationship link HTML.
-   * @param {Object} ticket object
+   * @param {Object} workRequest object
    * @returns {string} card-relations div HTML
    */
-  function renderRelations(ticket) {
-    if (!ticket.relations || ticket.relations.length === 0) return "";
+  function renderRelations(workRequest) {
+    if (!workRequest.relations || workRequest.relations.length === 0) return "";
 
     const typeMap = {
       "derived-from": { prefix: "\u2190", cssClass: "rel-derived" },   // ←
@@ -766,7 +766,7 @@
       "blocks":       { prefix: "\u2192", cssClass: "rel-blocks" },    // →
     };
 
-    const relations = ticket.relations;
+    const relations = workRequest.relations;
     const visible = relations.length > MAX_VISIBLE_RELATIONS
       ? relations.slice(0, MAX_VISIBLE_RELATIONS)
       : relations;
@@ -777,17 +777,17 @@
     let parts = [];
     visible.forEach(function (rel) {
       const info = typeMap[rel.type] || { prefix: "\u2194", cssClass: "rel-other" };
-      const numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
+      const numStr = rel.workRequest ? rel.workRequest.replace(/^WR-/, "") : "?";
       parts.push('<span class="rel-item ' + info.cssClass + '">' + info.prefix + numStr + "</span>");
     });
 
     if (overflow > 0) {
-      const ticketNum = ticket.number || "";
+      const workRequestNum = workRequest.number || "";
       const encodedRelations = esc(JSON.stringify(relations));
       const totalCount = relations.length;
       parts.push(
         '<button class="rel-overflow-chip"' +
-        ' data-ticket="' + esc(ticketNum) + '"' +
+        ' data-work-request="' + esc(workRequestNum) + '"' +
         ' data-relations="' + encodedRelations + '"' +
         ' aria-label="\uad00\uacc4 ' + totalCount + '\uac1c \ubaa8\ub450 \ubcf4\uae30">' +
         '+' + overflow +
@@ -827,7 +827,7 @@
    * Applies viewport boundary flip (top / right-align) when popover would overflow.
    *
    * @param {HTMLElement} triggerEl - .rel-overflow-chip element that was activated
-   * @param {Array<{type: string, ticket: string}>} relations - full relations array
+   * @param {Array<{type: string, work_request: string}>} relations - full relations array
    */
   function showRelationsPopover(triggerEl, relations) {
     hideRelationsPopover();
@@ -838,18 +838,18 @@
       "blocks":       { prefix: "→", cssClass: "rel-blocks" },   // →
     };
 
-    // Build list HTML — prefix + ticket# + type label per row
+    // Build list HTML — prefix + workRequest# + type label per row
     var listHtml = '<ul class="rel-popover-list" role="list">';
     relations.forEach(function (rel) {
       var info = typeMap[rel.type] || { prefix: "↔", cssClass: "rel-other" };
-      var numStr = rel.ticket ? rel.ticket.replace(/^T-/, "") : "?";
+      var numStr = rel.workRequest ? rel.workRequest.replace(/^WR-/, "") : "?";
       var label = rel.type === "derived-from" ? "Home"   // Home
         : rel.type === "depends-on" ? "Venue"             // Venue
         : rel.type === "blocks" ? "Home"                 // Home
         : esc(rel.type);
       listHtml += '<li class="rel-popover-item ' + info.cssClass + '">'
         + '<span class="rel-popover-prefix">' + info.prefix + '</span>'
-        + '<span class="rel-popover-num">T-' + esc(numStr) + '</span>'
+        + '<span class="rel-popover-num">WR-' + esc(numStr) + '</span>'
         + '<span class="rel-popover-type">' + label + '</span>'
         + '</li>';
     });
@@ -919,7 +919,7 @@
   /**
    * Binds delegated event listeners for relations popover on document.
    * Must be called once at module init time (guarded by _relPopoverBound).
-   * Delegates to document so listeners survive kanban re-renders.
+   * Delegates to document so listeners survive conveyor re-renders.
    *
    * Triggers:
    *   - click on .rel-overflow-chip → open (toggle: second click closes)
@@ -992,20 +992,20 @@
   }
 
   /**
-   * T-457 (Layer 3): Automatic Commit Trigger with 4 Commit button clicks.
+   * WR-457 (Layer 3): Automatic Commit Trigger with 4 Commit button clicks.
    * to maintain fetch logic in existing handleUncommittedBadgeClick,
    * Only one DOM manipulator will be transferred to the 4th button.
    * .card-commit-action
    */
   function handleCommitButtonClick(btn) {
-    var ticket = btn.dataset.commitTicket;
-    if (!ticket || btn.classList.contains("is-commiting")) return;
+    var workRequest = btn.dataset.commitWorkRequest;
+    if (!workRequest || btn.classList.contains("is-commiting")) return;
     btn.classList.add("is-commiting");
     btn.disabled = true;
-    fetch("/api/kanban/worktree-commit", {
+    fetch("/api/conveyor/worktree-commit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticket: ticket }),
+      body: JSON.stringify({ work_request: workRequest }),
     }).then(function (res) {
       return res.json().then(function (data) {
         return { ok: res.ok, data: data };
@@ -1013,36 +1013,36 @@
     }).then(function (r) {
       if (r.ok && r.data && r.data.ok) {
         // Success — Card Renewal (commit button + expects to disappear both one-on-the-box)
-        if (_worktreeUncommittedMap) _worktreeUncommittedMap.delete(ticket);
-        Board.render.renderKanban();
+        if (_worktreeUncommittedMap) _worktreeUncommittedMap.delete(workRequest);
+        Board.render.renderConveyor();
       } else {
         var msg = (r.data && r.data.error) || "Commit fails";
         btn.classList.remove("is-commiting");
         btn.disabled = false;
-        Board.util.showInfoModal("Commit fails", ticket + "Commit fail:" + msg, { severity: "error" });
+        Board.util.showInfoModal("Commit fails", workRequest + "Commit fail:" + msg, { severity: "error" });
       }
     }).catch(function (err) {
       btn.classList.remove("is-commiting");
       btn.disabled = false;
-      Board.util.showInfoModal("Commit fails", ticket + "Commit request failed:" + (err && err.message ? err.message : err), { severity: "error" });
+      Board.util.showInfoModal("Commit fails", workRequest + "Commit request failed:" + (err && err.message ? err.message : err), { severity: "error" });
     });
   }
 
   /**
-   * In Progress card 4 stop button click — POST /api/workflow/stop with workflow request.
-   * showInfoModal in the event of a successful renderKanban / failure.
+   * Executing card 4 stop button click — POST /api/workflow/stop with workflow request.
+   * showInfoModal in the event of a successful renderConveyor / failure.
    */
   function handleStopButtonClick(btn) {
-    var ticket = btn.dataset.stopTicket;
-    if (!ticket || btn.classList.contains("is-stopping")) return;
-    var msg = ticket + "Stop workflow. \\nProceeds/jsonl/kanban/worktree 4 axis. \\n\\n?";
+    var workRequest = btn.dataset.stopWorkRequest;
+    if (!workRequest || btn.classList.contains("is-stopping")) return;
+    var msg = workRequest + "Stop workflow. \\nProceeds/jsonl/conveyor/worktree 4 axis. \\n\\n?";
     if (!window.confirm(msg)) return;
     btn.classList.add("is-stopping");
     btn.disabled = true;
     fetch("/api/workflow/stop", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticket: ticket }),
+      body: JSON.stringify({ work_request: workRequest }),
     }).then(function (res) {
       return res.json().then(function (data) {
         return { status: res.status, ok: res.ok, data: data };
@@ -1053,68 +1053,68 @@
       btn.classList.remove("is-stopping");
       btn.disabled = false;
       if (r.ok && r.data && r.data.ok !== false) {
-        if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
+        if (Board.render && Board.render.renderConveyor) Board.render.renderConveyor();
       } else {
         var errs = (r.data && r.data.errors) || [];
         var errMsg = errs.length ? errs.join("\n") : ("HTTP " + r.status);
-        Board.util.showInfoModal("Workflow failed", ticket + "Warranty:" + errMsg, { severity: "error" });
+        Board.util.showInfoModal("Workflow failed", workRequest + "Warranty:" + errMsg, { severity: "error" });
       }
     }).catch(function (err) {
       btn.classList.remove("is-stopping");
       btn.disabled = false;
-      Board.util.showInfoModal("Workflow failed", ticket + "Tag:" + (err && err.message ? err.message : err), { severity: "error" });
+      Board.util.showInfoModal("Workflow failed", workRequest + "Tag:" + (err && err.message ? err.message : err), { severity: "error" });
     });
   }
 
   /**
    * Create a Card Indication HTML.
    * When the workflow regression (Watcher Committed), the user immediately commits to click.
-   * @param {string} ticketNum - ticket number (e.g. "T-422")
+   * @param {string} workRequestNum - workRequest number (e.g. "WR-422")
    * @returns {string} span.card-uncommitted-badge HTML or empty string
    */
-  function renderUncommittedBadge(ticketNum) {
+  function renderUncommittedBadge(workRequestNum) {
     if (!_worktreeUncommittedMap) return "";
-    var item = _worktreeUncommittedMap.get(ticketNum);
+    var item = _worktreeUncommittedMap.get(workRequestNum);
     if (!item || item.uncommitted_count <= 0) return "";
     var label = item.uncommitted_count + "M";
     var tooltip = "Mickey Mouse" + item.uncommitted_count + "— Click Commit"; // "Mickeym N Gun — Automatic Commit"
-    return '<span class="card-uncommitted-badge" data-uncommitted-ticket="' + esc(ticketNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
+    return '<span class="card-uncommitted-badge" data-uncommitted-work-request="' + esc(workRequestNum) + '" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
-   * T-457 (Layer 3): Card 1-on-right failure tag wrench.
+   * WR-457 (Layer 3): Card 1-on-right failure tag wrench.
    * schema: { reason, phase, retry count, context }
-   * Guard: ticket / ticket.failure returns empty strings if falsy.
+   * Guard: workRequest / workRequest.failure returns empty strings if falsy.
    * read-only — pointer-events:none (CSS), no click trigger.
    * The color is placeholder neutral (the user decides to wait — the one-line patch after the decision).
-   * @param {object} ticket - card ticket object
+   * @param {object} workRequest - card workRequest object
    * @returns {string} span.card-failure-tag HTML or empty string
    */
-  function renderFailureTag(ticket) {
-    if (!ticket || !ticket.failure) return "";
-    var reason = ticket.failure.reason || "Workflow Failure";
-    var phase = ticket.failure.phase || "";
+  function renderFailureTag(workRequest) {
+    if (!workRequest || !workRequest.failure) return "";
+    var reason = workRequest.failure.reason || "Workflow Failure";
+    var phase = workRequest.failure.phase || "";
     var label = "FAIL";
     var tooltip = phase ? (phase + "Step Failure —" + reason) : reason;
     return '<span class="card-failure-tag" title="' + esc(tooltip) + '">' + esc(label) + "</span>";
   }
 
   /**
-   * T-441: Create Done Card verdict badge HTML.
+   * WR-441: Create Complete Card verdict badge HTML.
    * If there is no result in the cache, return the placeholder during loading and the synchronous fetch trigger.
-   * @param {string} ticketNum - ticket number (e.g. "T-441")
-   * @returns {string} span.card-done-verdict HTML or empty string
+   * @param {string} workRequestNum - workRequest number (e.g. "WR-441")
+   * @returns {string} span.card-complete-verdict HTML or empty string
    */
-  function renderDoneVerdictBadge(ticketNum) {
-    var data = _doneVerdictMap[ticketNum];
+  function renderCompleteVerdictBadge(workRequestNum) {
+    var data = _completeVerdictMap[workRequestNum];
     if (data === undefined || data === "pending") {
       // Loading — Small Placeholders (not seen, DOM patch after fetch finish)
-      return '<span class="card-done-verdict verdict-loading" style="display:none"></span>';
+      return '<span class="card-complete-verdict verdict-loading" style="display:none"></span>';
     }
     var verdict = data && data.verdict;
     if (verdict === "OK") {
       return (
-        '<span class="card-done-verdict verdict-ok" title'
+        '<span class="card-complete-verdict verdict-ok" title'
         + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
         + '<polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
         + '</svg></span>'
@@ -1123,7 +1123,7 @@
     if (verdict === "FAIL") {
       var msg = (data.details && data.details.message) || "Develop head is mitigating";
       return (
-        '<span class="card-done-verdict verdict-fail"'
+        '<span class="card-complete-verdict verdict-fail"'
         + 'title="Merge Unemployment —' + esc(msg) + '(click to check details)"'
         + ' data-verdict-msg="' + esc(msg) + '">'
         + '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
@@ -1133,30 +1133,30 @@
       );
     }
     // UNKNOWN / SKIP
-    return '<span class="card-done-verdict verdict-unknown" style="display:none"></span>';
+    return '<span class="card-complete-verdict verdict-unknown" style="display:none"></span>';
   }
 
   /**
-   * Returns status label information based on the status of the ticket.
-   * To Do only returns TODO label.
-   * T-399: Submit transient step removed. T-445: OPEN Label Closing.
-   * @param {Object} ticket object
+   * Returns status label information based on the status of the workRequest.
+   * Draft only returns TODO label.
+   * WR-399: Submit transient step removed. WR-445: OPEN Label Closing.
+   * @param {Object} workRequest object
    * @returns {{ label: string, cssClass: string } | null} State label and CSS class, or null
    */
-  function getWorkflowStatus(ticket) {
-    if (ticket && ticket.status === "To Do") {
+  function getWorkflowStatus(workRequest) {
+    if (workRequest && workRequest.status === "Draft") {
       return { label: "TODO", cssClass: "status-todo" };
     }
     return null;
   }
 
   /**
-   * T-399: Confirmation Modal Display — Open → In Progress drop City Workflow Execution consciousness guaranteed.
-   * @param {Object} ticket - Drag ticket object (number, command included)
+   * WR-399: Confirmation Modal Display — Accepted → Executing drop City Workflow Execution consciousness guaranteed.
+   * @param {Object} workRequest - Drag workRequest object (number, command included)
    * @param {Function} onConfirm - [Run] Click Callback
    * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
-  function showSubmitConfirmModal(ticket, onConfirm, onCancel) {
+  function showSubmitConfirmModal(workRequest, onConfirm, onCancel) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1174,7 +1174,7 @@
     const body = document.createElement("p");
     body.className = "submit-confirm-body";
     body.textContent =
-      ticket.number + "Go to In Progress and start workflow. About Us";
+      workRequest.number + "Go to Executing and start workflow. About Us";
 
     const actions = document.createElement("div");
     actions.className = "submit-confirm-actions";
@@ -1187,7 +1187,7 @@
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "Open";
+    confirmBtn.textContent = "Accepted";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1227,12 +1227,12 @@
   }
 
   /**
-   * T-906: Review → Add Done drop (confirm delivery + cmd done commission + result delivery).
-   * @param {Object} ticket - Drag ticket object (number included)
+   * WR-906: Verifying → Add Complete drop (confirm delivery + cmd done commission + result delivery).
+   * @param {Object} workRequest - Drag workRequest object (number included)
    * @param {Function} onConfirm - [Finished] Click Callback
    * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
-  function showDoneConfirmModal(ticket, onConfirm, onCancel) {
+  function showCompleteConfirmModal(workRequest, onConfirm, onCancel) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1245,12 +1245,12 @@
     const title = document.createElement("h3");
     title.id = "submit-confirm-title";
     title.className = "submit-confirm-title";
-    const ticketNumNode = document.createTextNode(ticket.number + "Done Treatment");
-    title.appendChild(ticketNumNode);
+    const workRequestNumNode = document.createTextNode(workRequest.number + "Complete Treatment");
+    title.appendChild(workRequestNumNode);
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
-    const introText = document.createTextNode("If you move this ticket to Done, then this will be done in a fairly NEWS");
+    const introText = document.createTextNode("If you move this workRequest to Complete, then this will be done in a fairly NEWS");
     body.appendChild(introText);
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
@@ -1314,59 +1314,59 @@
   }
 
   /**
-   * T-439: Review Card Velvet 1-click Complete Action Handler.
-   * showDoneConfirmModal → POST /api/kanban/done → showDoneResultModal chain
-   * DnD Review→Done reuse as the same signature as the branch(kanban.js:1791-1826).
-   * @param {Object} ticketObj - ticket object (number included)
+   * WR-439: Verifying Card Velvet 1-click Complete Action Handler.
+   * showCompleteConfirmModal → POST /api/conveyor/complete → showCompleteResultModal chain
+   * DnD Verifying→Complete reuse as the same signature as the branch(conveyor.js:1791-1826).
+   * @param {Object} workRequestObj - workRequest object (number included)
    */
-  function handleReviewDoneAction(ticketObj) {
-    var capturedNum = ticketObj.number;
-    showDoneConfirmModal(
-      ticketObj,
+  function handleVerifyingCompleteAction(workRequestObj) {
+    var capturedNum = workRequestObj.number;
+    showCompleteConfirmModal(
+      workRequestObj,
       function () {
-        // [Completion] Callback: POST /api/kanban/done → cmd done commission
-        fetch("/api/kanban/done", {
+        // [Completion] Callback: POST /api/conveyor/complete → cmd done commission
+        fetch("/api/conveyor/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticket: capturedNum }),
+          body: JSON.stringify({ work_request: capturedNum }),
         }).then(function (res) {
           return res.json().then(function (body) {
             return { res: res, body: body };
           });
         }).then(function (r) {
           if (r.res.ok && r.body.ok) {
-            showDoneResultModal("success", r.body, function () {
-              fetchTickets().then(renderKanban);
+            showCompleteResultModal("success", r.body, function () {
+              fetchWorkRequests().then(renderConveyor);
             });
           } else {
             var kind = r.body.error_kind === "merge_conflict" ? "conflict"
               : r.body.error_kind === "dirty_worktree" ? "dirty"
               : "error";
-            showDoneResultModal(kind, r.body, function () { renderKanban(); });
+            showCompleteResultModal(kind, r.body, function () { renderConveyor(); });
           }
         }).catch(function (err) {
-          console.error("[kanban card-done-action] done failed:", err);
-          showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+          console.error("[conveyor card-complete-action] complete failed:", err);
+          showCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
         });
       },
       function () {
         // [Cancellation]/ESC/overlay callback: Keep card origin
-        renderKanban();
+        renderConveyor();
       }
     );
   }
 
   /**
-   * T-418: Open → Done direct transfer check modal.
+   * WR-418: Accepted → Complete direct transfer check modal.
    *
-   * Go to Done without mounting the Review. Worktree/feature Branding Waster.
+   * Go to Complete without mounting the Verifying. Worktree/feature Branding Waster.
    * LOGIN JOIN ORDER MYPAGE forward force dirty value to onConfirm.
    *
-   * @param {Object} ticket - Drag ticket object (number included)
-   * @param {Function} onConfirm - [Direct Done Treatment] Click Callback (force dirty: bool argument passed)
+   * @param {Object} workRequest - Drag workRequest object (number included)
+   * @param {Function} onConfirm - [Direct Complete Treatment] Click Callback (force dirty: bool argument passed)
    * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
-  function showOpenDoneConfirmModal(ticket, onConfirm, onCancel) {
+  function showAcceptedCompleteConfirmModal(workRequest, onConfirm, onCancel) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1379,19 +1379,19 @@
     const title = document.createElement("h3");
     title.id = "open-done-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + "Open → Done"));
+    title.appendChild(document.createTextNode(workRequest.number + "Accepted → Complete"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
-    const introText = document.createTextNode("Go directly to Done without mounting the Review at Open stage. The following are non-invasively performed NEWS");
+    const introText = document.createTextNode("Go directly to Complete without mounting the Verifying at Accepted stage. The following are non-invasively performed NEWS");
     body.appendChild(introText);
 
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
     li1.textContent = "Worktree and feature Brand Name Waster (No Development Merged)";
     const li2 = document.createElement("li");
-    li2.textContent = "Done Ticket Status";
+    li2.textContent = "Complete WorkRequest Status";
     ul.appendChild(li1);
     ul.appendChild(li2);
     body.appendChild(ul);
@@ -1431,7 +1431,7 @@
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "Direct Done Treatment";
+    confirmBtn.textContent = "Direct Complete Treatment";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1472,9 +1472,9 @@
   }
 
   /**
-   * T-418: Open → Done direct transfer results.
+   * WR-418: Accepted → Complete direct transfer results.
    *
-   * Unlike showDoneResultModal, success without merge commit also normal processing.
+   * Unlike showCompleteResultModal, success without merge commit also normal processing.
    * "Causes of rehabilitation after rehabilitation"
    *
    * @param {"success" "dirty" "error"} kind - result type
@@ -1482,7 +1482,7 @@
    * @param {Function} onClose - Close Callback
    * @param {Function} onForceDirty - "Causes of rehabilitation after rehabilitation" button click callback
    */
-  function showOpenDoneResultModal(kind, payload, onClose, onForceDirty) {
+  function showAcceptedCompleteResultModal(kind, payload, onClose, onForceDirty) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1500,12 +1500,12 @@
     body.className = "submit-confirm-body";
 
     if (kind === "success") {
-      title.textContent = "Open → Done";
+      title.textContent = "Accepted → Complete";
       const msg = document.createElement("p");
-      msg.textContent = (payload.ticket || "") + "Tickets were moved to Done. Worktree and feature Brands were cleaned.";
+      msg.textContent = (payload.work_request || "") + "WorkRequests were moved to Complete. Worktree and feature Brands were cleaned.";
       body.appendChild(msg);
     } else if (kind === "dirty") {
-      title.textContent = "Done Processing Failure — Minorm Change";
+      title.textContent = "Complete Processing Failure — Minorm Change";
       const ul = document.createElement("ul");
       const files = (payload.dirty_files || []);
       if (files.length > 0) {
@@ -1524,7 +1524,7 @@
       guide.textContent = "There is a change to the work tree. If you have any questions, please contact us.";
       body.appendChild(guide);
     } else {
-      title.textContent = "Done processing failed";
+      title.textContent = "Complete processing failed";
       const msg = document.createElement("p");
       msg.textContent = (payload && payload.message) ? payload.message : "You can't see the error.";
       body.appendChild(msg);
@@ -1585,16 +1585,16 @@
   }
 
   /**
-   * T-418: Deletion of ticket confirmation modal.
+   * WR-418: Deletion of workRequest confirmation modal.
    *
-   * Red [delete] button. POST /api/kanban/delete calls.
+   * Red [delete] button. POST /api/conveyor/delete calls.
    * error kind='derived blocked' when alert is blocked by the show.
    *
-   * @param {Object} ticket - ticket object to delete (number included)
+   * @param {Object} workRequest - workRequest object to delete (number included)
    * @param {Function} onConfirm - Click Callback
    * @param {Function} onCancel - [Cancel]/ESC/overlay Click Callback
    */
-  function showDeleteConfirmModal(ticket, onConfirm, onCancel) {
+  function showDeleteConfirmModal(workRequest, onConfirm, onCancel) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1607,19 +1607,19 @@
     const title = document.createElement("h3");
     title.id = "delete-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + "Scots Gaelic"));
+    title.appendChild(document.createTextNode(workRequest.number + "Scots Gaelic"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
-    const introText = document.createTextNode(ticket.number + "Please delete the ticket. This work cannot be reverted.");
+    const introText = document.createTextNode(workRequest.number + "Please delete the workRequest. This work cannot be reverted.");
     body.appendChild(introText);
 
     const ul = document.createElement("ul");
     const li1 = document.createElement("li");
     li1.textContent = "Worktree and feature Brands are also cleaned together.";
     const li2 = document.createElement("li");
-    li2.textContent = "Deletion is blocked if the derivation ticket (derived-from) is completed.";
+    li2.textContent = "Deletion is blocked if the derivation workRequest (derived-from) is completed.";
     ul.appendChild(li1);
     ul.appendChild(li2);
     body.appendChild(ul);
@@ -1677,12 +1677,12 @@
   }
 
   /**
-   * T-906: Done treatment result delivery.
+   * WR-906: Complete treatment result delivery.
    * @param {"success"|"conflict"|"dirty"|"error"} kind - result type
    * @param {Object} payload - result data (kind star difference)
    * @param {Function} onClose - Close Callback
    */
-  function showDoneResultModal(kind, payload, onClose) {
+  function showCompleteResultModal(kind, payload, onClose) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1700,23 +1700,23 @@
     body.className = "submit-confirm-body";
 
     if (kind === "success" && !payload.merge_commit && !payload.merge_skipped) {
-      console.warn("[showDoneResultModal] success kind with empty merge_commit — converting to error");
+      console.warn("[showCompleteResultModal] success kind with empty merge_commit — converting to error");
       kind = "error";
       payload = Object.assign({}, payload, {
-        message: "backend response format error — merge commit missing. See flow-kanban output."
+        message: "backend response format error — merge commit missing. See flow-conveyor output."
       });
     }
 
     if (kind === "success") {
-      title.textContent = "Done Treatment Complete";
+      title.textContent = "Complete Treatment Complete";
       const msg = document.createElement("p");
-      const ticketStr = payload.merge_skipped
-        ? (payload.ticket || "") + ": Review → Done (No Merge — Research/Document)"
-        : (payload.ticket || "") + ": " + (payload.merged_branch || "") + "→ develop merge completion (" + (payload.merge_commit || "") + ")";
-      msg.textContent = ticketStr;
+      const workRequestStr = payload.merge_skipped
+        ? (payload.work_request || "") + ": Verifying → Complete (No Merge — Research/Document)"
+        : (payload.work_request || "") + ": " + (payload.merged_branch || "") + "→ develop merge completion (" + (payload.merge_commit || "") + ")";
+      msg.textContent = workRequestStr;
       body.appendChild(msg);
     } else if (kind === "conflict") {
-      title.textContent = "Done Processing Failure — Merge Collision";
+      title.textContent = "Complete Processing Failure — Merge Collision";
       const ul = document.createElement("ul");
       const files = (payload.conflicts || []);
       if (files.length > 0) {
@@ -1735,7 +1735,7 @@
       guide.textContent = "Solve crashes in worktree and try again.";
       body.appendChild(guide);
     } else if (kind === "dirty") {
-      title.textContent = "Done Processing Failure — Minorm Change";
+      title.textContent = "Complete Processing Failure — Minorm Change";
       const ul = document.createElement("ul");
       const files = (payload.dirty_files || []);
       if (files.length > 0) {
@@ -1754,7 +1754,7 @@
       guide.textContent = "commit changes in worktrees or process flow-merge and try again.";
       body.appendChild(guide);
     } else {
-      title.textContent = "Done processing failed";
+      title.textContent = "Complete processing failed";
       const msg = document.createElement("p");
       msg.textContent = (payload && payload.message) ? payload.message : "You can't see the error.";
       body.appendChild(msg);
@@ -1800,17 +1800,17 @@
   }
 
   /**
-   * T-905 Phase 3: Done card click → "Review" check modal.
+   * WR-905 Phase 3: Complete card click → "Verifying" check modal.
    *
    * push(local-only) / push(origin/develop reach) branch guide + force option checkbox.
-   * pre-detect: pre-check whether the kanban result.merge commit exists
+   * pre-detect: pre-check whether the conveyor result.merge commit exists
    * Please note that the force option is required when missing.
    *
-   * @param {Object} ticket - Done column card ticket object (number/result included)
+   * @param {Object} workRequest - Complete column card workRequest object (number/result included)
    * @param {Function} onConfirm - confirm callback (force: bool argument passed)
    * @param {Function} onCancel - Cancel/ESC/overlay Callback
    */
-  function showUndoDoneConfirmModal(ticket, onConfirm, onCancel) {
+  function showUndoCompleteConfirmModal(workRequest, onConfirm, onCancel) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1823,13 +1823,13 @@
     const title = document.createElement("h3");
     title.id = "undo-done-confirm-title";
     title.className = "submit-confirm-title";
-    title.appendChild(document.createTextNode(ticket.number + "Review"));
+    title.appendChild(document.createTextNode(workRequest.number + "Verifying"));
 
     const body = document.createElement("div");
     body.className = "submit-confirm-body";
 
     const intro = document.createElement("p");
-    intro.textContent = "Revert Done processing of this ticket. Developing the thumb result automatically quarterly NEWS";
+    intro.textContent = "Revert Complete processing of this workRequest. Developing the thumb result automatically quarterly NEWS";
     body.appendChild(intro);
 
     const ul = document.createElement("ul");
@@ -1838,20 +1838,20 @@
     const li2 = document.createElement("li");
     li2.textContent = "after push(includes origin/develop): add reverse commit to revert -m 1 (noforce-push)";
     const li3 = document.createElement("li");
-    li3.textContent = "feature Brand + Worktree Regeneration + Kanban Done → Review Forced Battle";
+    li3.textContent = "feature Brand + Worktree Regeneration + Conveyor Complete → Verifying Forced Battle";
     ul.appendChild(li1);
     ul.appendChild(li2);
     ul.appendChild(li3);
     body.appendChild(ul);
 
     // result.merge commit
-    const result = ticket.result || {};
+    const result = workRequest.result || {};
     const hasMergeCommit = !!(result.merge_commit && String(result.merge_commit).trim());
     if (!hasMergeCommit) {
       const warn = document.createElement("p");
       warn.style.color = "#D97757";
       warn.style.fontWeight = "600";
-      warn.textContent = "Note: This ticket does not have merge commit information (Phase 1 Infrastructure introduced earlier Done). To try reflog fallback, please enable the following force option:";
+      warn.textContent = "Note: This workRequest does not have merge commit information (Phase 1 Infrastructure introduced earlier Complete). To try reflog fallback, please enable the following force option:";
       body.appendChild(warn);
     }
 
@@ -1890,7 +1890,7 @@
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.className = "submit-confirm-btn submit-confirm-btn-confirm";
-    confirmBtn.textContent = "Review";
+    confirmBtn.textContent = "Verifying";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1931,16 +1931,16 @@
   }
 
   /**
-   * T-905 Phase 3: undo-done results modal.
-   * showDoneResultModal pattern answer.
+   * WR-905 Phase 3: undo-done results modal.
+   * showCompleteResultModal pattern answer.
    *
    * "reset ok"
    * @param {Object} payload - result data
-   *   - reset_ok / revert_ok: { ticket, strategy, branch, worktree_path, message }
-   *   - error: { ticket, error, message, stderr }
+   *   - reset_ok / revert_ok: { workRequest, strategy, branch, worktree_path, message }
+   *   - error: { workRequest, error, message, stderr }
    * @param {Function} onClose - Close callbacks (Utilization on automatic new callbacks in the field)
    */
-  function showUndoDoneResultModal(kind, payload, onClose) {
+  function showUndoCompleteResultModal(kind, payload, onClose) {
     const overlay = document.createElement("div");
     overlay.className = "submit-confirm-overlay";
 
@@ -1958,14 +1958,14 @@
     body.className = "submit-confirm-body";
 
     if (kind === "reset_ok" || kind === "revert_ok" || kind === "unknown_ok") {
-      title.textContent = "Review";
+      title.textContent = "Verifying";
 
       const summary = document.createElement("p");
-      const ticketStr = payload.ticket || "";
+      const workRequestStr = payload.work_request || "";
       const strategyStr = payload.strategy
         ? (payload.strategy === "reset" ? "reset --hard (push ago)" : payload.strategy === "revert" ? "revert -m 1 (after push)" : payload.strategy)
         : "?";
-      summary.textContent = ticketStr + "Rollback Finished — Strategy:" + strategyStr;
+      summary.textContent = workRequestStr + "Rollback Finished — Strategy:" + strategyStr;
       body.appendChild(summary);
 
       if (payload.branch) {
@@ -1986,14 +1986,14 @@
       body.appendChild(guideTitle);
       const ol = document.createElement("ol");
       const liE = document.createElement("li");
-      liE.textContent = "/wf -e " + ticketStr + "Edit tickets or edit them directly";
+      liE.textContent = "/wf -e " + workRequestStr + "Edit workRequests or edit them directly";
       const liS = document.createElement("li");
-      liS.textContent = "/wf -s " + ticketStr + "Skip to content";
+      liS.textContent = "/wf -s " + workRequestStr + "Skip to content";
       ol.appendChild(liE);
       ol.appendChild(liS);
       body.appendChild(ol);
     } else {
-      title.textContent = "Review";
+      title.textContent = "Verifying";
       const msg = document.createElement("p");
       msg.textContent = (payload && (payload.error || payload.message)) || "You can't see the error.";
       body.appendChild(msg);
@@ -2055,22 +2055,22 @@
   }
 
   /**
-   * T-905 Phase 3: Done card context menu (click).
+   * WR-905 Phase 3: Complete card context menu (click).
    *
-   * "Review" single item exposure. showUndoDoneConfirmModal calls when clicked.
+   * "Verifying" single item exposure. showUndoCompleteConfirmModal calls when clicked.
    * Click documentLevel or close to ESC.
    *
    * contextmenu
-   * @param {Object} ticket - Done card ticket object
+   * @param {Object} workRequest - Complete card workRequest object
    */
-  function showDoneCardContextMenu(event, ticket) {
+  function showCompleteCardContextMenu(event, workRequest) {
     // Removed if the existing context menu is open
-    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+    document.querySelectorAll(".conveyor-card-context-menu").forEach(function (m) {
       if (m.parentNode) m.parentNode.removeChild(m);
     });
 
     const menu = document.createElement("div");
-    menu.className = "kanban-card-context-menu";
+    menu.className = "conveyor-card-context-menu";
     menu.style.position = "fixed";
     menu.style.zIndex = "10000";
     menu.style.background = "#252526";
@@ -2092,7 +2092,7 @@
     item.style.color = "#cccccc";
     item.style.cursor = "pointer";
     item.style.fontSize = "13px";
-    item.textContent = "Review";
+    item.textContent = "Verifying";
     item.addEventListener("mouseenter", function () {
       item.style.background = "#094771";
     });
@@ -2118,29 +2118,29 @@
     item.addEventListener("click", function (e) {
       e.stopPropagation();
       cleanup();
-      showUndoDoneConfirmModal(
-        ticket,
+      showUndoCompleteConfirmModal(
+        workRequest,
         function (force) {
-          // [Review by Rollback] Callback
-          fetch("/api/kanban/undo-done", {
+          // [Verifying by Rollback] Callback
+          fetch("/api/conveyor/undo-done", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticket: ticket.number, force: force }),
+            body: JSON.stringify({ work_request: workRequest.number, force: force }),
           }).then(function (res) {
             return res.json().then(function (body) {
               return { res: res, body: body };
             });
           }).then(function (r) {
             if (r.res.ok && r.body.ok) {
-              showUndoDoneResultModal(r.body.kind || "unknown_ok", r.body, function () {
-                fetchTickets().then(renderKanban);
+              showUndoCompleteResultModal(r.body.kind || "unknown_ok", r.body, function () {
+                fetchWorkRequests().then(renderConveyor);
               });
             } else {
-              showUndoDoneResultModal("error", r.body || {}, function () { renderKanban(); });
+              showUndoCompleteResultModal("error", r.body || {}, function () { renderConveyor(); });
             }
           }).catch(function (err) {
-            console.error("[kanban undo-done] failed:", err);
-            showUndoDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+            console.error("[conveyor undo-done] failed:", err);
+            showUndoCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
           });
         },
         function () {
@@ -2173,25 +2173,25 @@
   }
 
   /**
-   * T-418: Open Card context menu (click).
+   * WR-418: Accepted Card context menu (click).
    *
    * 2 menu items:
-   *   - "Done" → showOpenDoneConfirmModal call
+   *   - "Complete" → showAcceptedCompleteConfirmModal call
    *   - "TubeDupe" → showDeleteConfirmModal call
    *
-   * showDoneCardContextMenu (T-905)
+   * showCompleteCardContextMenu (WR-905)
    *
    * contextmenu
-   * @param {Object} ticket - Open card ticket object
+   * @param {Object} workRequest - Accepted card workRequest object
    */
-  function showOpenCardContextMenu(event, ticket) {
+  function showAcceptedCardContextMenu(event, workRequest) {
     // Removed if the existing context menu is open
-    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+    document.querySelectorAll(".conveyor-card-context-menu").forEach(function (m) {
       if (m.parentNode) m.parentNode.removeChild(m);
     });
 
     const menu = document.createElement("div");
-    menu.className = "kanban-card-context-menu";
+    menu.className = "conveyor-card-context-menu";
     menu.style.position = "fixed";
     menu.style.zIndex = "10000";
     menu.style.background = "#252526";
@@ -2224,7 +2224,7 @@
       return item;
     }
 
-    const doneItem = makeMenuItem("Done");
+    const doneItem = makeMenuItem("Complete");
     const deleteItem = makeMenuItem("TubeDupe", "#f48771");
 
     function cleanup() {
@@ -2242,41 +2242,41 @@
       }
     }
 
-    // "Done" Click Handler
+    // "Complete" Click Handler
     doneItem.addEventListener("click", function (e) {
       e.stopPropagation();
       cleanup();
-      function callOpenDone(forceDirty) {
-        fetch("/api/kanban/done", {
+      function callAcceptedComplete(forceDirty) {
+        fetch("/api/conveyor/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticket: ticket.number, force: true, force_dirty: forceDirty }),
+          body: JSON.stringify({ work_request: workRequest.number, force: true, force_dirty: forceDirty }),
         }).then(function (res) {
           return res.json().then(function (body) {
             return { res: res, body: body };
           });
         }).then(function (r) {
           if (r.res.ok && r.body.ok) {
-            showOpenDoneResultModal("success", r.body, function () {
-              fetchTickets().then(renderKanban);
+            showAcceptedCompleteResultModal("success", r.body, function () {
+              fetchWorkRequests().then(renderConveyor);
             });
           } else {
             const kind = r.body.error_kind === "dirty_worktree" ? "dirty" : "error";
-            showOpenDoneResultModal(kind, r.body, function () {
-              renderKanban();
+            showAcceptedCompleteResultModal(kind, r.body, function () {
+              renderConveyor();
             }, kind === "dirty" ? function () {
-              callOpenDone(true);
+              callAcceptedComplete(true);
             } : undefined);
           }
         }).catch(function (err) {
-          console.error("[kanban Open contextmenu] open-done failed:", err);
-          showOpenDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+          console.error("[conveyor Accepted contextmenu] open-complete failed:", err);
+          showAcceptedCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
         });
       }
-      showOpenDoneConfirmModal(
-        ticket,
+      showAcceptedCompleteConfirmModal(
+        workRequest,
         function (forceDirty) {
-          callOpenDone(forceDirty);
+          callAcceptedComplete(forceDirty);
         },
         function () {
           // Cancel: No
@@ -2289,30 +2289,30 @@
       e.stopPropagation();
       cleanup();
       showDeleteConfirmModal(
-        ticket,
+        workRequest,
         function () {
-          fetch("/api/kanban/delete", {
+          fetch("/api/conveyor/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticket: ticket.number }),
+            body: JSON.stringify({ work_request: workRequest.number }),
           }).then(function (res) {
             return res.json().then(function (body) {
               return { res: res, body: body };
             });
           }).then(function (r) {
             if (r.res.ok && r.body.ok) {
-              fetchTickets().then(renderKanban);
+              fetchWorkRequests().then(renderConveyor);
             } else {
               if (r.body.error_kind === "derived_blocked") {
-                const derivedList = (r.body.derived_tickets || []).join(", ") || "(No roll)";
-                Board.util.showInfoModal("Delete block", "Deletion: Derivative tickets are unfinished. \\n\\nComplete Derivative Ticket:" + derivedList + "Complete the \\n\\n parasite ticket first.", { severity: "warning", onClose: function () { renderKanban(); } });
+                const derivedList = (r.body.derived_workRequests || []).join(", ") || "(No roll)";
+                Board.util.showInfoModal("Delete block", "Deletion: Derivative workRequests are unfinished. \\n\\nComplete Derivative WorkRequest:" + derivedList + "Complete the \\n\\n parasite workRequest first.", { severity: "warning", onClose: function () { renderConveyor(); } });
               } else {
-                Board.util.showInfoModal("Delete failed", "Delete Failure:" + ((r.body && r.body.message) || "Unknown Errors"), { severity: "error", onClose: function () { renderKanban(); } });
+                Board.util.showInfoModal("Delete failed", "Delete Failure:" + ((r.body && r.body.message) || "Unknown Errors"), { severity: "error", onClose: function () { renderConveyor(); } });
               }
             }
           }).catch(function (err) {
-            console.error("[kanban Open contextmenu] delete failed:", err);
-            Board.util.showInfoModal("Delete failed", "Delete Failure:" + err.message, { severity: "error", onClose: function () { renderKanban(); } });
+            console.error("[conveyor Accepted contextmenu] delete failed:", err);
+            Board.util.showInfoModal("Delete failed", "Delete Failure:" + err.message, { severity: "error", onClose: function () { renderConveyor(); } });
           });
         },
         function () {
@@ -2347,21 +2347,21 @@
   }
 
   /**
-   * Review Card Click context menu.
-   * Optional: (a) Open to rework (POST /api/kanban/move).
-   * Chat attachments to DnD (T-427).
-   * Review → Before In Progress, the User Expiration (2026-05-08).
+   * Verifying Card Click context menu.
+   * Optional: (a) Accepted to rework (POST /api/conveyor/move).
+   * Chat attachments to DnD (WR-427).
+   * Verifying → Before Executing, the User Expiration (2026-05-08).
    *
    * contextmenu
-   * @param {Object} ticket - Review card ticket object
+   * @param {Object} workRequest - Verifying card workRequest object
    */
-  function showReviewCardContextMenu(event, ticket) {
-    document.querySelectorAll(".kanban-card-context-menu").forEach(function (m) {
+  function showVerifyingCardContextMenu(event, workRequest) {
+    document.querySelectorAll(".conveyor-card-context-menu").forEach(function (m) {
       if (m.parentNode) m.parentNode.removeChild(m);
     });
 
     const menu = document.createElement("div");
-    menu.className = "kanban-card-context-menu";
+    menu.className = "conveyor-card-context-menu";
     menu.style.position = "fixed";
     menu.style.zIndex = "10000";
     menu.style.background = "#252526";
@@ -2390,7 +2390,7 @@
       return item;
     }
 
-    const reopenItem = makeMenuItem("Rework with Open");
+    const reopenItem = makeMenuItem("Rework with Accepted");
 
     function cleanup() {
       document.removeEventListener("click", outsideHandler, true);
@@ -2405,20 +2405,20 @@
     reopenItem.addEventListener("click", function (e) {
       e.stopPropagation();
       cleanup();
-      fetch("/api/kanban/move", {
+      fetch("/api/conveyor/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: ticket.number, to: "open" }),
+        body: JSON.stringify({ work_request: workRequest.number, to: "accepted" }),
       }).then(function (res) {
         return res.json().then(function (body) { return { res: res, body: body }; });
       }).then(function (r) {
         if (r.res.ok && r.body.ok) {
-          fetchTickets().then(renderKanban);
+          fetchWorkRequests().then(renderConveyor);
         } else {
-          Board.util.showInfoModal("Rework failed", "Pre-work failed:" + ((r.body && r.body.error) || "Unknown Errors"), { severity: "error", onClose: function () { renderKanban(); } });
+          Board.util.showInfoModal("Rework failed", "Pre-work failed:" + ((r.body && r.body.error) || "Unknown Errors"), { severity: "error", onClose: function () { renderConveyor(); } });
         }
       }).catch(function (err) {
-        Board.util.showInfoModal("Rework failed", "Rework work item failed:" + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
+        Board.util.showInfoModal("Rework failed", "Rework work item failed:" + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderConveyor(); } });
       });
     });
 
@@ -2445,21 +2445,21 @@
   }
 
   /**
-   * Card drag and drop handler registration (T-399: To Do ↔ Open + Open → In Progress).
-   * T-906: Review → Add Done drop (confirm delivery + cmd done commission + result delivery).
+   * Card drag and drop handler registration (WR-399: Draft ↔ Accepted + Accepted → Executing).
+   * WR-906: Verifying → Add Complete drop (confirm delivery + cmd done commission + result delivery).
    *
-   * dragstart: Save the ticket number + Departure column to dataTransfer.
+   * dragstart: Save the workRequest number + Departure column to dataTransfer.
    * dragover: dragover-active display in dropable cards-droppable area.
    * drop:
-   *   - To Do ↔ Open: POST /api/kanban/move (In short time)
-   *   - Open → In Progress: Confirm Modal → POST /api/kanban/submit (Workflow Execution)
-   *   - Review → Done: confirm Modal → POST /api/kanban/done (cmd done)
+   *   - Draft ↔ Accepted: POST /api/conveyor/move (In short time)
+   *   - Accepted → Executing: Confirm Modal → POST /api/conveyor/submit (Workflow Execution)
+   *   - Verifying → Complete: confirm Modal → POST /api/conveyor/complete (cmd done)
    * dragend: Clean up your visual feedback class.
    *
-   * In Progress card drag Invalid protection (delete degradation).
-   * Review → Done drop only confirm Modal allowed (T-906).
+   * Executing card drag Invalid protection (delete degradation).
+   * Verifying → Complete drop only confirm Modal allowed (WR-906).
    */
-  function bindKanbanDnd(el) {
+  function bindConveyorDnd(el) {
     let draggedNum = null;
     let draggedFrom = null;
 
@@ -2469,20 +2469,20 @@
         draggedFrom = card.dataset.colKey;
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", draggedNum);
-        // T-427: Pass the ticket JSON payload to MIME separately (for terminal drop branch only)
-        var ticketObj = (Board.state.TICKETS || []).find(function (t) {
+        // WR-427: Pass the workRequest JSON payload to MIME separately (for terminal drop branch only)
+        var workRequestObj = (Board.state.WORK_REQUESTS || []).find(function (t) {
           return t.number === draggedNum;
         });
-        if (ticketObj) {
+        if (workRequestObj) {
           var payload = {
-            number: ticketObj.number,
-            title: ticketObj.title || "",
-            command: ticketObj.command || "",
-            prompt: ticketObj.prompt || null,
-            result: ticketObj.result || null,
+            number: workRequestObj.number,
+            title: workRequestObj.title || "",
+            command: workRequestObj.command || "",
+            prompt: workRequestObj.prompt || null,
+            result: workRequestObj.result || null,
           };
           try {
-            e.dataTransfer.setData("application/x-board-ticket", JSON.stringify(payload));
+            e.dataTransfer.setData("application/x-board-work-request", JSON.stringify(payload));
           } catch (ex) { /* Some browser limits — ignore */ }
         }
         card.classList.add("card-dragging");
@@ -2503,20 +2503,20 @@
     /**
      * draggedFrom → targetCol prefix.
      * Payment Terms:
-     *   To Do  → To Do(reorder) | Open
-     *   Open   → To Do | In Progress | Review | Done
-     *   Review → Done | Open
+     *   Draft  → Draft(reorder) | Accepted
+     *   Accepted   → Draft | Executing | Verifying | Complete
+     *   Verifying → Complete | Accepted
      * Other combinations deny drop in dragover phase (Browner cursor is no-drop display).
      */
     function isValidDropTarget(fromCol, targetCol) {
-      if (fromCol === "To Do") return targetCol === "To Do" || targetCol === "Open";
-      if (fromCol === "Open") return targetCol === "To Do" || targetCol === "In Progress" || targetCol === "Review" || targetCol === "Done";
-      if (fromCol === "Review") return targetCol === "Done" || targetCol === "Open";
+      if (fromCol === "Draft") return targetCol === "Draft" || targetCol === "Accepted";
+      if (fromCol === "Accepted") return targetCol === "Draft" || targetCol === "Executing" || targetCol === "Verifying" || targetCol === "Complete";
+      if (fromCol === "Verifying") return targetCol === "Complete" || targetCol === "Accepted";
       return false;
     }
 
     /**
-     * To Do manual alignment mode such as column reorder dragover when insert position indicator placement.
+     * Draft manual alignment mode such as column reorder dragover when insert position indicator placement.
      * insert/move the indicator element inside the zone after the target index calculation of Y coordinates.
      */
     function placeDropIndicator(zone, clientY) {
@@ -2553,9 +2553,9 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         zone.classList.add("dragover-active");
-        // To Do manual sorting + like column drag — insert location indicator display
-        if (zone.dataset.colKey === "To Do" && draggedFrom === "To Do"
-            && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
+        // Draft manual sorting + like column drag — insert location indicator display
+        if (zone.dataset.colKey === "Draft" && draggedFrom === "Draft"
+            && conveyorSort["Draft"] && conveyorSort["Draft"].key === "manual") {
           placeDropIndicator(zone, e.clientY);
         }
       });
@@ -2572,9 +2572,9 @@
         zone.classList.remove("dragover-active");
         const targetCol = zone.dataset.colKey;
         if (!draggedNum || !targetCol) return;
-        // drop in column: To Do manual alignment mode only support, rest ignore
+        // drop in column: Draft manual alignment mode only support, rest ignore
         if (targetCol === draggedFrom) {
-          if (targetCol === "To Do" && kanbanSort["To Do"] && kanbanSort["To Do"].key === "manual") {
+          if (targetCol === "Draft" && conveyorSort["Draft"] && conveyorSort["Draft"].key === "manual") {
             const cards = Array.from(zone.querySelectorAll('.card[data-num]'))
               .filter(function (c) { return c.dataset.num !== draggedNum; });
             let targetIdx = cards.length;
@@ -2586,56 +2586,56 @@
               }
             }
             reorderTodoManualOrder(draggedNum, targetIdx);
-            renderKanban();
+            renderConveyor();
           }
           return;
         }
 
-        // T-399: In Progress drop quarter — Open card only allowed + confirm modal
-        // Review Card Done Unlike columns to drop — block
-        // T-418: To Do ↔ Open logic when trying to drop the Open Card to Done outside column
-        if (draggedFrom === "Review" && targetCol !== "Done" && targetCol !== "Open") {
-          Board.util.showInfoModal("DnD Lockout", "Review cards can only be dragging with Done or Open columns.", { severity: "warning", onClose: function () { renderKanban(); } });
+        // WR-399: Executing drop quarter — Accepted card only allowed + confirm modal
+        // Verifying Card Complete Unlike columns to drop — block
+        // WR-418: Draft ↔ Accepted logic when trying to drop the Accepted Card to Complete outside column
+        if (draggedFrom === "Verifying" && targetCol !== "Complete" && targetCol !== "Accepted") {
+          Board.util.showInfoModal("DnD Lockout", "Verifying cards can only be dragging with Complete or Accepted columns.", { severity: "warning", onClose: function () { renderConveyor(); } });
           return;
         }
 
-        if (targetCol === "In Progress") {
-          if (draggedFrom !== "Open") {
-            // In Progress move directly from other columns such as To Do
+        if (targetCol === "Executing") {
+          if (draggedFrom !== "Accepted") {
+            // Executing move directly from other columns such as Draft
             Board.util.showInfoModal(
-              "To Do → In Progress",
-              "To Do Card cannot be transferred directly to In Progress. \\nReturn to Open",
+              "Draft → Executing",
+              "Draft Card cannot be transferred directly to Executing. \\nReturn to Accepted",
               {
                 severity: "info",
                 onClose: function () {
-                  renderKanban();
+                  renderConveyor();
                 }
               }
             );
             return;
           }
-          const ticketObj = (Board.state.TICKETS || []).find(function (t) {
+          const workRequestObj = (Board.state.WORK_REQUESTS || []).find(function (t) {
             return t.number === draggedNum;
           });
-          if (!ticketObj) {
-            renderKanban();
+          if (!workRequestObj) {
+            renderConveyor();
             return;
           }
-          const command = ticketObj.command || "implement";
+          const command = workRequestObj.command || "implement";
           showSubmitConfirmModal(
-            ticketObj,
+            workRequestObj,
             function () {
-              // [Run] Callback: POST /api/kanban/submit → driver
+              // [Run] Callback: POST /api/conveyor/submit → driver
               // Stage 3-B race fix: registerLaunchStarting is called in fetch *function*
               // SSE LAUNCH STARTED guarantees that even if you arrive faster than HTTP response.
               // Instantly cleanupLaunchState when failure (stuck regression).
-              const submitTicket = ticketObj.number;
+              const submitWorkRequest = workRequestObj.number;
               const submitCommand = command;
-              registerLaunchStarting(submitTicket, submitCommand);
-              fetch("/api/kanban/submit", {
+              registerLaunchStarting(submitWorkRequest, submitCommand);
+              fetch("/api/conveyor/submit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: submitTicket, command: submitCommand }),
+                body: JSON.stringify({ work_request: submitWorkRequest, command: submitCommand }),
               }).then(function (res) {
                 if (!res.ok) {
                   return res.json().then(function (j) {
@@ -2648,197 +2648,197 @@
               }).then(function (body) {
                 if (!body || body.status !== "starting") {
                   // static response — launchState clearance (registration complete fetch position)
-                  cleanupLaunchState(submitTicket);
+                  cleanupLaunchState(submitWorkRequest);
                 } else if (body.session_id && Board.workflowTabStorage
                            && Board.workflowTabStorage.add) {
-                  // T-516 — submit response body.session id also localStorage.
+                  // WR-516 — submit response body.session id also localStorage.
                   // Launch SSE LAUNCH STARTED handler and OR conditions — Helper dedupe safety.
                   Board.workflowTabStorage.add(body.session_id);
                 }
-                fetchTickets().then(function () { renderKanban(); });
+                fetchWorkRequests().then(function () { renderConveyor(); });
               }).catch(function (err) {
-                cleanupLaunchState(submitTicket);
-                console.error("[kanban DnD] submit failed:", err);
+                cleanupLaunchState(submitWorkRequest);
+                console.error("[conveyor DnD] submit failed:", err);
                 if (err && err.kind === "http") {
-                  // T-475 Stage 3 Static: HTTP 504 alone waiting for Modal Mileage (SSE LAUNCH FAILED).
+                  // WR-475 Stage 3 Static: HTTP 504 alone waiting for Modal Mileage (SSE LAUNCH FAILED).
                   // The 504 itself disappears after this synchronousization, but the defending quarterly preserved.
                   if (err.status === 504) {
-                    renderKanban();
+                    renderConveyor();
                   } else {
                     Board.util.showInfoModal("Skip to content",
                       formatHttpRejectMessage(err.status, err.body),
-                      { severity: "error", onClose: function () { renderKanban(); } });
+                      { severity: "error", onClose: function () { renderConveyor(); } });
                   }
                 } else {
                   // network / abort / other — instant notifications to users
                   Board.util.showInfoModal("Workflow failed to run",
                     "Tag:" + ((err && err.message) || String(err)),
-                    { severity: "error", onClose: function () { renderKanban(); } });
+                    { severity: "error", onClose: function () { renderConveyor(); } });
                 }
               });
             },
             function () {
               // [Cancel]/ESC/overlay callback: Return card origin
-              renderKanban();
+              renderConveyor();
             }
           );
           return;
-        } else if (targetCol === "Done") {
-          // T-906: Review → Done drop quarter
-          // T-418: Open → Done direct prefix
-          if (draggedFrom !== "Review" && draggedFrom !== "Open") {
-            Board.util.showInfoModal("DnD Lockout", "You can drag only Done with Review or Open Card.", { severity: "warning", onClose: function () { renderKanban(); } });
+        } else if (targetCol === "Complete") {
+          // WR-906: Verifying → Complete drop quarter
+          // WR-418: Accepted → Complete direct prefix
+          if (draggedFrom !== "Verifying" && draggedFrom !== "Accepted") {
+            Board.util.showInfoModal("DnD Lockout", "You can drag only Complete with Verifying or Accepted Card.", { severity: "warning", onClose: function () { renderConveyor(); } });
             return;
           }
-          const doneTicketObj = (Board.state.TICKETS || []).find(function (t) {
+          const doneWorkRequestObj = (Board.state.WORK_REQUESTS || []).find(function (t) {
             return t.number === draggedNum;
           });
-          if (!doneTicketObj) {
-            renderKanban();
+          if (!doneWorkRequestObj) {
+            renderConveyor();
             return;
           }
           // dragend has a modal callback before running the regression that is reset to draggedNum=null:
-          // Preserve ticket number to closure capture variable
+          // Preserve workRequest number to closure capture variable
           const capturedNum = draggedNum;
 
-          if (draggedFrom === "Open") {
-            // T-418: Open → Done Direct Transfer (force=true)
-            function callOpenDoneDnd(forceDirty) {
-              fetch("/api/kanban/done", {
+          if (draggedFrom === "Accepted") {
+            // WR-418: Accepted → Complete Direct Transfer (force=true)
+            function callAcceptedCompleteDnd(forceDirty) {
+              fetch("/api/conveyor/complete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ticket: capturedNum, force: true, force_dirty: forceDirty }),
+                body: JSON.stringify({ work_request: capturedNum, force: true, force_dirty: forceDirty }),
               }).then(function (res) {
                 return res.json().then(function (body) {
                   return { res: res, body: body };
                 });
               }).then(function (r) {
                 if (r.res.ok && r.body.ok) {
-                  showOpenDoneResultModal("success", r.body, function () {
-                    fetchTickets().then(renderKanban);
+                  showAcceptedCompleteResultModal("success", r.body, function () {
+                    fetchWorkRequests().then(renderConveyor);
                   });
                 } else {
                   const kind = r.body.error_kind === "dirty_worktree" ? "dirty" : "error";
-                  showOpenDoneResultModal(kind, r.body, function () {
-                    renderKanban();
+                  showAcceptedCompleteResultModal(kind, r.body, function () {
+                    renderConveyor();
                   }, kind === "dirty" ? function () {
-                    callOpenDoneDnd(true);
+                    callAcceptedCompleteDnd(true);
                   } : undefined);
                 }
               }).catch(function (err) {
-                console.error("[kanban DnD] open-done failed:", err);
-                showOpenDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+                console.error("[conveyor DnD] open-complete failed:", err);
+                showAcceptedCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
               });
             }
-            showOpenDoneConfirmModal(
-              doneTicketObj,
+            showAcceptedCompleteConfirmModal(
+              doneWorkRequestObj,
               function (forceDirty) {
-                callOpenDoneDnd(forceDirty);
+                callAcceptedCompleteDnd(forceDirty);
               },
               function () {
                 // [Cancel]/ESC/overlay callback: Return card origin
-                renderKanban();
+                renderConveyor();
               }
             );
           } else {
-            // T-906: Review → Done drop
-            showDoneConfirmModal(
-              doneTicketObj,
+            // WR-906: Verifying → Complete drop
+            showCompleteConfirmModal(
+              doneWorkRequestObj,
               function () {
-                // [Completion] Callback: POST /api/kanban/done → cmd done commission
-                fetch("/api/kanban/done", {
+                // [Completion] Callback: POST /api/conveyor/complete → cmd done commission
+                fetch("/api/conveyor/complete", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ ticket: capturedNum }),
+                  body: JSON.stringify({ work_request: capturedNum }),
                 }).then(function (res) {
                   return res.json().then(function (body) {
                     return { res: res, body: body };
                   });
                 }).then(function (r) {
                   if (r.res.ok && r.body.ok) {
-                    showDoneResultModal("success", r.body, function () {
-                      fetchTickets().then(renderKanban);
+                    showCompleteResultModal("success", r.body, function () {
+                      fetchWorkRequests().then(renderConveyor);
                     });
                   } else {
                     const kind = r.body.error_kind === "merge_conflict" ? "conflict"
                       : r.body.error_kind === "dirty_worktree" ? "dirty"
                       : "error";
-                    showDoneResultModal(kind, r.body, function () { renderKanban(); });
+                    showCompleteResultModal(kind, r.body, function () { renderConveyor(); });
                   }
                 }).catch(function (err) {
-                  console.error("[kanban DnD] done failed:", err);
-                  showDoneResultModal("error", { message: err.message }, function () { renderKanban(); });
+                  console.error("[conveyor DnD] complete failed:", err);
+                  showCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
                 });
               },
               function () {
                 // [Cancel]/ESC/overlay callback: Return card origin
-                renderKanban();
+                renderConveyor();
               }
             );
           }
           return;
         }
 
-        // To Do allows to move only to Open (Review/Other Blocks)
-        if (draggedFrom === "To Do" && targetCol !== "Open") {
-          Board.util.showInfoModal("DnD Lockout", "To Do cards can be dragging only to Open Column.", { severity: "warning", onClose: function () { renderKanban(); } });
+        // Draft allows to move only to Accepted (Verifying/Other Blocks)
+        if (draggedFrom === "Draft" && targetCol !== "Accepted") {
+          Board.util.showInfoModal("DnD Lockout", "Draft cards can be dragging only to Accepted Column.", { severity: "warning", onClose: function () { renderConveyor(); } });
           return;
         }
 
-        // To Do ↔ Open ↔ Review Simplified (includes Open → Review direct transfer)
-        const moveToMap = { "To Do": "todo", "Open": "open", "Review": "review" };
+        // Draft ↔ Accepted ↔ Verifying Simplified (includes Accepted → Verifying direct transfer)
+        const moveToMap = { "Draft": "todo", "Accepted": "open", "Verifying": "review" };
         const to = moveToMap[targetCol];
         if (!to) {
-          console.error("[kanban DnD] unknown target column:", targetCol);
-          renderKanban();
+          console.error("[conveyor DnD] unknown target column:", targetCol);
+          renderConveyor();
           return;
         }
-        fetch("/api/kanban/move", {
+        fetch("/api/conveyor/move", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticket: draggedNum, to: to }),
+          body: JSON.stringify({ work_request: draggedNum, to: to }),
         }).then(function (res) {
           if (!res.ok) return res.json().then(function (j) { throw new Error(j.error || res.statusText); });
           return res.json();
         }).then(function () {
-          fetchTickets().then(function () { renderKanban(); });
+          fetchWorkRequests().then(function () { renderConveyor(); });
         }).catch(function (err) {
-          console.error("[kanban DnD] move failed:", err);
-          Board.util.showInfoModal("Ticket Transfer Failure", "Ticket Transfer Failure:" + err.message, { severity: "error" });
+          console.error("[conveyor DnD] move failed:", err);
+          Board.util.showInfoModal("WorkRequest Transfer Failure", "WorkRequest Transfer Failure:" + err.message, { severity: "error" });
         });
       });
     });
   }
 
-  /** Renders the kanban board with columns, cards, and sort controls. */
-  function renderKanban() {
+  /** Renders the conveyor board with columns, cards, and sort controls. */
+  function renderConveyor() {
     // Dismiss any stale popover before re-rendering the board DOM
     hideRelationsPopover();
 
-    const el = document.getElementById("view-kanban");
+    const el = document.getElementById("view-conveyor");
     // scroll-top location capture by column — scrollTop restore lost with innerHTML rotation
     const scrollPositions = {};
     el.querySelectorAll(".cards[data-col-key]").forEach(function (cards) {
       scrollPositions[cards.dataset.colKey] = cards.scrollTop;
     });
-    let h = '<div class="kanban-board">';
+    let h = '<div class="conveyor-board">';
     COLUMNS.forEach(function (col) {
-      const items = Board.state.TICKETS.filter(function (t) {
-        if (col.key === "To Do") { return t.status === "To Do"; }
-        if (col.key === "Open") { return t.status === "Open"; }
+      const items = Board.state.WORK_REQUESTS.filter(function (t) {
+        if (col.key === "Draft") { return t.status === "Draft"; }
+        if (col.key === "Accepted") { return t.status === "Accepted"; }
         return t.status === col.key;
       });
-      const colSort = kanbanSort[col.key] || { key: "number", dir: "asc" };
-      const isManualTodo = (col.key === "To Do" && colSort.key === "manual");
+      const colSort = conveyorSort[col.key] || { key: "number", dir: "asc" };
+      const isManualTodo = (col.key === "Draft" && colSort.key === "manual");
       const sortedItems = isManualTodo
         ? applyTodoManualOrder(items)
-        : sortTickets(items, colSort.key, colSort.dir);
+        : sortWorkRequests(items, colSort.key, colSort.dir);
       const sortIcon = colSort.dir === "desc" ? SVG_DESC : SVG_ASC;
 
       // Build dropdown options HTML
-      // To Do Column adds the option "About Us" in front of the main
+      // Draft Column adds the option "About Us" in front of the main
       let dropHtml = '<div class="col-sort-dropdown" data-col="' + esc(col.key) + '">';
-      const sortKeysForCol = (col.key === "To Do")
+      const sortKeysForCol = (col.key === "Draft")
         ? [{ key: "manual", label: "About Us" }].concat(SORT_KEYS)
         : SORT_KEYS;
       sortKeysForCol.forEach(function (opt) {
@@ -2858,7 +2858,7 @@
       });
       dropHtml += '</div>';
 
-      // Done / To Do Column Supports Fold Toggle
+      // Complete / Draft Column Supports Fold Toggle
       const isCollapsible = COLLAPSIBLE_COLUMNS.has(col.key);
       const isCollapsed = isCollapsible && loadColumnCollapsed(col.key);
       const chevronSvg = isCollapsible
@@ -2891,54 +2891,54 @@
         }
         h += "</div>";
         // <img height="1" width="1" alt="" alt="" src="https://www.facebook.com/tr?id=2" />
-        // T-399: Added to In Progress drop target (available only on Open → In Progress check modal).
-        // T-906: Added to Done drop target (Review → Done drop only confirm accepted as modal).
-        // Open → Review Adds Directly: Review also drop target.
-        const isDroppable = (col.key === "To Do" || col.key === "Open" || col.key === "In Progress" || col.key === "Done" || col.key === "Review");
+        // WR-399: Added to Executing drop target (available only on Accepted → Executing check modal).
+        // WR-906: Added to Complete drop target (Verifying → Complete drop only confirm accepted as modal).
+        // Accepted → Verifying Adds Directly: Verifying also drop target.
+        const isDroppable = (col.key === "Draft" || col.key === "Accepted" || col.key === "Executing" || col.key === "Complete" || col.key === "Verifying");
         const droppableClass = isDroppable ? ' cards-droppable' : '';
         h += '<div class="cards' + droppableClass + '" data-col-key="' + esc(col.key) + '">';
         if (sortedItems.length === 0) {
           h += '<div class="empty">No items</div>';
         } else {
           sortedItems.forEach(function (t) {
-            const done = col.key === "Done" ? " done" : "";
+            const done = col.key === "Complete" ? " done" : "";
             const status = getWorkflowStatus(t);
-            // DnD: To Do / Open column card only draggable.
-            // T-399: In Progress card drag indispensable protection (blocking workflow cancellations).
-            // T-906: Added Review card draggable (Review → Done drop allowed).
-            // Done card is draggable=false (preventive protection).
-            const isDraggable = (col.key === "To Do" || col.key === "Open" || col.key === "Review");
+            // DnD: Draft / Accepted column card only draggable.
+            // WR-399: Executing card drag indispensable protection (blocking workflow cancellations).
+            // WR-906: Added Verifying card draggable (Verifying → Complete drop allowed).
+            // Complete card is draggable=false (preventive protection).
+            const isDraggable = (col.key === "Draft" || col.key === "Accepted" || col.key === "Verifying");
             const draggableAttr = isDraggable ? ' draggable="true"' : '';
             const draggableClass = isDraggable ? ' card-draggable' : '';
-            // T-433 Phase 2: The Review Card has-active-branch class grant (external glow vision).
-            const branchActiveClass = (col.key === "Review" && _activeBranchTicket === t.number) ? ' has-active-branch' : '';
+            // WR-433 Phase 2: The Verifying Card has-active-branch class grant (external glow vision).
+            const branchActiveClass = (col.key === "Verifying" && _activeBranchWorkRequest === t.number) ? ' has-active-branch' : '';
             h += '<div class="card' + done + draggableClass + branchActiveClass + '" data-num="' + esc(t.number) + '" data-col-key="' + esc(col.key) + '"' + draggableAttr + '>';
-            // Top: Left Group (Ticket number + Command badge), Right Status Label
+            // Top: Left Group (WorkRequest number + Command badge), Right Status Label
             h += '<div class="card-top">';
             h += '<div class="card-top-left">';
-            h += '<span class="card-num">' + esc(t.number.replace(/^T-/, "")) + "</span>";
+            h += '<span class="card-num">' + esc(t.number.replace(/^WR-/, "")) + "</span>";
             if (t.command && t.command.indexOf(">") !== -1) {
               h += renderChainIcons(t);
             } else if (t.command) {
-              var badgeAnim = (t.status === "In Progress") ? "animation:chain-pulse 1.5s ease-in-out infinite" : "";
+              var badgeAnim = (t.status === "Executing") ? "animation:chain-pulse 1.5s ease-in-out infinite" : "";
               h += badge(t.command, CMD_COLORS[t.command], badgeAnim);
             }
             h += "</div>";
             h += '<div class="card-top-right">';
-            if (col.key === "To Do" && status) {
+            if (col.key === "Draft" && status) {
               h += '<span class="card-status ' + status.cssClass + '">' + esc(status.label) + "</span>";
             }
             h += renderUncommittedBadge(t.number);
-            // T-457 (Layer 3): failure tag (ticket.failure exists) — guards inside the helper
+            // WR-457 (Layer 3): failure tag (workRequest.failure exists) — guards inside the helper
             h += renderFailureTag(t);
-            // T-475 Stage 3: Start starting pulse badge (submit right after ~ LAUNCH STARTED before receiving)
+            // WR-475 Stage 3: Start starting pulse badge (submit right after ~ LAUNCH STARTED before receiving)
             h += renderLaunchBadge(t.number);
-            // T-441: Done Card verdict badge (advisory)
-            if (col.key === "Done") {
-              h += renderDoneVerdictBadge(t.number);
+            // WR-441: Complete Card verdict badge (advisory)
+            if (col.key === "Complete") {
+              h += renderCompleteVerdictBadge(t.number);
             }
-            // T-477: Review Card Auditor T3 Auditor (advisory only)
-            if (col.key === "Review") {
+            // WR-477: Verifying Card Auditor T3 Auditor (advisory only)
+            if (col.key === "Verifying") {
               h += renderAuditBadgeHtml(t.number);
             }
             h += "</div>";
@@ -2954,19 +2954,19 @@
             h += '</div>';
             // 4: Action button (no spot conservation, keep card height schedule)
             h += '<div class="card-actions-row">';
-            // T-463: Review Card verdict badge (advisory only).
+            // WR-463: Verifying Card verdict badge (advisory only).
             // 4th action-row first child + margin-right:auto to left fixed, right commit/branch-toggle/done and separating.
             // Auto-blocking / forced pre-determined by verdict results $0 — user-sharing freedom.
-            if (col.key === "Review") {
-              h += renderReviewVerdictBadge(t.number);
+            if (col.key === "Verifying") {
+              h += renderVerifyingVerdictBadge(t.number);
             }
-            // T-457 (Layer 3): Micommit Worktree Commit Action Button — Mark if any column or micommit.
+            // WR-457 (Layer 3): Micommit Worktree Commit Action Button — Mark if any column or micommit.
             // flex-end + left → enter the order commit to this left, done this position on the right side.
             if (_worktreeUncommittedMap) {
               var uitem = _worktreeUncommittedMap.get(t.number);
               if (uitem && uitem.uncommitted_count > 0) {
                 var ctip = "Mickey Mouse" + uitem.uncommitted_count + "— Click Commit";
-                h += '<button class="card-commit-action" data-commit-ticket="' + esc(t.number) + '" title="' + esc(ctip) + '" draggable="false">';
+                h += '<button class="card-commit-action" data-commit-work-request="' + esc(t.number) + '" title="' + esc(ctip) + '" draggable="false">';
                 // SVG: Commit graph dot motif (won + short line up/down)
                 h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
                 h += '<circle cx="7" cy="7" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none"/>';
@@ -2976,24 +2976,24 @@
                 h += '</button>';
               }
             }
-            // In Progress card: Workflow stop button (POST /api/workflow/stop) — 4 axis (process/jsonl/bar/worktree) integration.
-            if (col.key === "In Progress") {
-              h += '<button class="card-stop-action" data-stop-ticket="' + esc(t.number) + '" title="Stop workflow (Proceed/jsonl/Collection/Worktree 4)" draggable="false">';
+            // Executing card: Workflow stop button (POST /api/workflow/stop) — 4 axis (process/jsonl/bar/worktree) integration.
+            if (col.key === "Executing") {
+              h += '<button class="card-stop-action" data-stop-work-request="' + esc(t.number) + '" title="Stop workflow (Proceed/jsonl/Collection/Worktree 4)" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.6" fill="currentColor"/>';
               h += '</svg>';
               h += '</button>';
             }
-            if (col.key === "Review") {
-              // T-433 Phase 2: Feature Brand-Activate/Remote Toggle Button (4-row left, batch button on left).
+            if (col.key === "Verifying") {
+              // WR-433 Phase 2: Feature Brand-Activate/Remote Toggle Button (4-row left, batch button on left).
               // OFF: Grey outline / ON: Terracotta + Card Exterior Light glow.
-              // Only one card is active guarantee —  activeBranchTicket status standard .active grant.
-              var isBranchActive = (_activeBranchTicket === t.number);
+              // Only one card is active guarantee —  activeBranchWorkRequest status standard .active grant.
+              var isBranchActive = (_activeBranchWorkRequest === t.number);
               var toggleClass = isBranchActive ? " active" : "";
               var toggleTip = isBranchActive
                 ? "feature Brand Name Active — Click to Return to develop"
                 : "Click to switch main working tree to this feature branch";
-              h += '<button class="card-branch-toggle' + toggleClass + '" data-branch-ticket="' + esc(t.number) + '" title="' + esc(toggleTip) + '" draggable="false">';
+              h += '<button class="card-branch-toggle' + toggleClass + '" data-branch-work-request="' + esc(t.number) + '" title="' + esc(toggleTip) + '" draggable="false">';
               // Lucide git-branch SVG (16px, currentColor) — e749003 Vocabulary Match
               h += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
               h += '<line x1="6" y1="3" x2="6" y2="15"/>';
@@ -3002,7 +3002,7 @@
               h += '<path d="M18 9a9 9 0 0 1-9 9"/>';
               h += '</svg>';
               h += '</button>';
-              h += '<button class="card-done-action" data-num="' + esc(t.number) + '" title="finishing" draggable="false">';
+              h += '<button class="card-complete-action" data-num="' + esc(t.number) + '" title="finishing" draggable="false">';
               h += '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
               h += '<polyline points="2,7 5.5,10.5 12,3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
               h += '</svg>';
@@ -3029,7 +3029,7 @@
     // Bind card clicks
     el.querySelectorAll(".card").forEach(function (card) {
       card.addEventListener("click", function (e) {
-        // T-457 (Layer 3): 4th Commit button click → Worktree auto commit action commission.
+        // WR-457 (Layer 3): 4th Commit button click → Worktree auto commit action commission.
         // .card-uncommitted-badge is modified to read-only mark label — no click trigger)
         var commitBtn = e.target.closest(".card-commit-action");
         if (commitBtn) {
@@ -3037,37 +3037,37 @@
           handleCommitButtonClick(commitBtn);
           return;
         }
-        // In Progress card 4 workflow stop button → handleStopButtonClick position
+        // Executing card 4 workflow stop button → handleStopButtonClick position
         var stopBtn = e.target.closest(".card-stop-action");
         if (stopBtn) {
           e.stopPropagation();
           handleStopButtonClick(stopBtn);
           return;
         }
-        // T-433 Phase 2: Click on the Brand Match Toggle button on the Review card → enter handleBranchToggleClick
+        // WR-433 Phase 2: Click on the Brand Match Toggle button on the Verifying card → enter handleBranchToggleClick
         var branchToggle = e.target.closest(".card-branch-toggle");
         if (branchToggle) {
           e.stopPropagation();
-          var bnum = branchToggle.dataset.branchTicket || card.dataset.num;
+          var bnum = branchToggle.dataset.branchWorkRequest || card.dataset.num;
           handleBranchToggleClick(bnum);
           return;
         }
-        // T-439: Review Card Velvet Finished Action Button Click → HandleReviewDoneAction
-        var doneAction = e.target.closest(".card-done-action");
+        // WR-439: Verifying Card Velvet Finished Action Button Click → HandleVerifyingCompleteAction
+        var doneAction = e.target.closest(".card-complete-action");
         if (doneAction) {
           e.stopPropagation();
           const num = card.dataset.num;
-          const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-          if (ticket) handleReviewDoneAction(ticket);
+          const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
+          if (workRequest) handleVerifyingCompleteAction(workRequest);
           return;
         }
-        // T-441: Done card verdict FAIL badge click → Show details message (advisory)
-        var verdictFail = e.target.closest(".card-done-verdict.verdict-fail");
+        // WR-441: Complete card verdict FAIL badge click → Show details message (advisory)
+        var verdictFail = e.target.closest(".card-complete-verdict.verdict-fail");
         if (verdictFail) {
           e.stopPropagation();
-          var ticketNum = card.dataset.num;
+          var workRequestNum = card.dataset.num;
           var msg = verdictFail.dataset.verdictMsg || "Develop head is mitigating";
-          var verdictData = ticketNum ? _doneVerdictMap[ticketNum] : null;
+          var verdictData = workRequestNum ? _completeVerdictMap[workRequestNum] : null;
           var detail = (verdictData && verdictData.details) || {};
           var bodyMsg = msg;
           if (detail.develop_head) bodyMsg += "\n\ndevelop HEAD : " + detail.develop_head.slice(0, 8);
@@ -3077,23 +3077,23 @@
           return;
         }
         const num = card.dataset.num;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-        if (ticket) Board.render.openViewer(ticket);
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
+        if (workRequest) Board.render.openViewer(workRequest);
       });
     });
 
-    // T-905 Phase 3: Right-click context menu binding to Done column card ("Review")
-    el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
+    // WR-905 Phase 3: Right-click context menu binding to Complete column card ("Verifying")
+    el.querySelectorAll('.card[data-col-key="Complete"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
         const num = card.dataset.num;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-        if (ticket) showDoneCardContextMenu(e, ticket);
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
+        if (workRequest) showCompleteCardContextMenu(e, workRequest);
       });
     });
 
-    // T-441: Done Card verdict fetch trigger (advisory)
-    el.querySelectorAll('.card[data-col-key="Done"]').forEach(function (card) {
+    // WR-441: Complete Card verdict fetch trigger (advisory)
+    el.querySelectorAll('.card[data-col-key="Complete"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
         // Mickey Card Only Fetch (Skip when hitting)
@@ -3101,60 +3101,60 @@
       }
     });
 
-    // T-463: Review Card Verdict Fetch Trigger (advisory only)
+    // WR-463: Verifying Card Verdict Fetch Trigger (advisory only)
     // One call (no locking) when card mount. Skip to main content
-    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+    el.querySelectorAll('.card[data-col-key="Verifying"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
-        fetchAndRenderReviewVerdict(num);
+        fetchAndRenderVerifyingVerdict(num);
       }
     });
 
-    // T-477: Review card audit verdict fetch trigger (advisory)
-    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+    // WR-477: Verifying card audit verdict fetch trigger (advisory)
+    el.querySelectorAll('.card[data-col-key="Verifying"]').forEach(function (card) {
       var num = card.dataset.num;
       if (num) {
         fetchAndRenderAuditVerdict(num);
       }
     });
 
-    // T-418: Right-click context menu binding on Open Column Card ("Done" + "Tube")
-    el.querySelectorAll('.card[data-col-key="Open"]').forEach(function (card) {
+    // WR-418: Right-click context menu binding on Accepted Column Card ("Complete" + "Tube")
+    el.querySelectorAll('.card[data-col-key="Accepted"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
         e.stopPropagation();
         const num = card.dataset.num;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-        if (ticket) showOpenCardContextMenu(e, ticket);
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
+        if (workRequest) showAcceptedCardContextMenu(e, workRequest);
       });
     });
 
-    // Review Click context menu binding on column card ("Rework with Open" single option)
-    el.querySelectorAll('.card[data-col-key="Review"]').forEach(function (card) {
+    // Verifying Click context menu binding on column card ("Rework with Accepted" single option)
+    el.querySelectorAll('.card[data-col-key="Verifying"]').forEach(function (card) {
       card.addEventListener("contextmenu", function (e) {
         e.preventDefault();
         e.stopPropagation();
         const num = card.dataset.num;
-        const ticket = Board.state.TICKETS.find(function (t) { return t.number === num; });
-        if (ticket) showReviewCardContextMenu(e, ticket);
+        const workRequest = Board.state.WORK_REQUESTS.find(function (t) { return t.number === num; });
+        if (workRequest) showVerifyingCardContextMenu(e, workRequest);
       });
     });
 
-    // ── DnD: To Do ↔ Open Card Drag & Drop ──
-    // Safety DnD Policy: Exemption without cracking effect allowed (In Progress / Done separately command)
-    // T-418: Open → Done allows direct transition check modal (force=true)
-    bindKanbanDnd(el);
+    // ── DnD: Draft ↔ Accepted Card Drag & Drop ──
+    // Safety DnD Policy: Exemption without cracking effect allowed (Executing / Complete separately command)
+    // WR-418: Accepted → Complete allows direct transition check modal (force=true)
+    bindConveyorDnd(el);
 
     // Bind sort button clicks (toggle dropdown)
     el.querySelectorAll(".col-sort-btn").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
         const dropdown = btn.parentNode.querySelector(".col-sort-dropdown");
-        const isOpen = dropdown.classList.contains("open");
+        const isAccepted = dropdown.classList.contains("open");
         el.querySelectorAll(".col-sort-dropdown.open").forEach(function (d) {
           d.classList.remove("open");
         });
-        if (!isOpen) {
+        if (!isAccepted) {
           dropdown.classList.add("open");
         }
       });
@@ -3165,36 +3165,36 @@
       opt.addEventListener("click", function (e) {
         e.stopPropagation();
         const colKey = opt.dataset.col;
-        const current = kanbanSort[colKey] || { key: "number", dir: "asc" };
+        const current = conveyorSort[colKey] || { key: "number", dir: "asc" };
         if (opt.dataset.sortKey && !opt.dataset.sortDir) {
-          kanbanSort[colKey] = { key: opt.dataset.sortKey, dir: current.dir };
+          conveyorSort[colKey] = { key: opt.dataset.sortKey, dir: current.dir };
         } else if (opt.dataset.sortDir && !opt.dataset.sortKey) {
-          kanbanSort[colKey] = { key: current.key, dir: opt.dataset.sortDir };
+          conveyorSort[colKey] = { key: current.key, dir: opt.dataset.sortDir };
         }
-        saveKanbanSort();
-        renderKanban();
+        saveConveyorSort();
+        renderConveyor();
       });
     });
 
-    // Bind collapse toggle buttons (unfolded). Done/To Do Common.
+    // Bind collapse toggle buttons (unfolded). Complete/Draft Common.
     el.querySelectorAll(".column-toggle-btn").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
         const colKey = btn.dataset.colKey;
         if (!colKey) return;
         saveColumnCollapsed(colKey, !loadColumnCollapsed(colKey));
-        renderKanban();
+        renderConveyor();
       });
     });
 
-    // Bind collapsed bar click (directed → unfold). Done/To Do Common.
+    // Bind collapsed bar click (directed → unfold). Complete/Draft Common.
     el.querySelectorAll(".column-collapsed-bar").forEach(function (bar) {
       bar.addEventListener("click", function (e) {
         e.stopPropagation();
         const colKey = bar.dataset.colKey;
         if (!colKey) return;
         saveColumnCollapsed(colKey, false);
-        renderKanban();
+        renderConveyor();
       });
     });
 
@@ -3212,37 +3212,37 @@
     }
     el._sortOutsideHandler = outsideHandler;
 
-    // T-433 Phase 2: Initial fetch in the first active branch in the page load (after call is ignored by guard).
+    // WR-433 Phase 2: Initial fetch in the first active branch in the page load (after call is ignored by guard).
     // syncActiveBranchFromSSE is synchronized when SSE git branch event arrives.
     fetchAndApplyActiveBranch();
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // T-475 Stage 3 Helper — launch asynchronous client state machine
+  // WR-475 Stage 3 Helper — launch asynchronous client state machine
   // ──────────────────────────────────────────────────────────────────────
 
   /**
    * Starting status card 1 right-hand pulse badge HTML.
-   * Exposure while the ticket registered in launchState is 'starting'.
+   * Exposure while the workRequest registered in launchState is 'starting'.
    */
-  function renderLaunchBadge(ticketNum) {
-    const cur = launchState.get(ticketNum);
+  function renderLaunchBadge(workRequestNum) {
+    const cur = launchState.get(workRequestNum);
     if (!cur || cur.state !== "starting") return "";
     return '<span class="card-launch-badge">';
   }
 
   /**
    * launchState + sessionStorage cleanup single entry point.
-   * grace timer Clear + Delete Map + Delete storage + (Optional) renderKanban.
+   * grace timer Clear + Delete Map + Delete storage + (Optional) renderConveyor.
    * Close-up helper for stuck revolving blocks.
    */
-  function cleanupLaunchState(ticketNum, opts) {
-    const cur = launchState.get(ticketNum);
+  function cleanupLaunchState(workRequestNum, opts) {
+    const cur = launchState.get(workRequestNum);
     if (cur && cur.graceTimer) clearTimeout(cur.graceTimer);
-    launchState.delete(ticketNum);
-    try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
-    if (opts && opts.render && Board.render && Board.render.renderKanban) {
-      Board.render.renderKanban();
+    launchState.delete(workRequestNum);
+    try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + workRequestNum); } catch (_) {}
+    if (opts && opts.render && Board.render && Board.render.renderConveyor) {
+      Board.render.renderConveyor();
     }
   }
 
@@ -3254,9 +3254,9 @@
    * SSE LAUNCH STARTED is a handleLaunchEvent if you arrive faster than HTTP response
    * Guaranteed to find the launchState (i.e. call → SSE missing).
    */
-  function registerLaunchStarting(ticketNum, command) {
+  function registerLaunchStarting(workRequestNum, command) {
     // Default object view. Click to enlarge
-    const prev = launchState.get(ticketNum);
+    const prev = launchState.get(workRequestNum);
     if (prev && prev.graceTimer) clearTimeout(prev.graceTimer);
     const since = Date.now();
     const entry = {
@@ -3264,12 +3264,12 @@
       since: since,
       command: command,
       sessionId: null,
-      graceTimer: setTimeout(function () { onGraceExpired(ticketNum); }, LAUNCH_GRACE_MS),
+      graceTimer: setTimeout(function () { onGraceExpired(workRequestNum); }, LAUNCH_GRACE_MS),
     };
-    launchState.set(ticketNum, entry);
+    launchState.set(workRequestNum, entry);
     try {
       sessionStorage.setItem(
-        LAUNCH_STORAGE_PREFIX + ticketNum,
+        LAUNCH_STORAGE_PREFIX + workRequestNum,
         JSON.stringify({ state: "starting", since: since, command: command })
       );
     } catch (_) { /* quota / disabled — in action */ }
@@ -3281,22 +3281,22 @@
    * LAUNCH PENDING is registered directly after the submission of this client, so it is unnecessary to handle (for other CL monitoring).
    */
   function handleLaunchEvent(data) {
-    if (!data || !data.ticket) return;
-    const ticketNum = data.ticket;
-    const cur = launchState.get(ticketNum);
-    // This client only handles the submitted card — other tabs/browser submits are synchronized with fetchTickets
+    if (!data || !data.work_request) return;
+    const workRequestNum = data.work_request;
+    const cur = launchState.get(workRequestNum);
+    // This client only handles the submitted card — other tabs/browser submits are synchronized with fetchWorkRequests
     if (!cur) return;
 
     if (data.event === "LAUNCH_STARTED") {
       if (cur.graceTimer) clearTimeout(cur.graceTimer);
-      launchState.set(ticketNum, {
+      launchState.set(workRequestNum, {
         state: "running",
         since: cur.since,
         command: cur.command,
         sessionId: data.session_id || "",
         graceTimer: null,
       });
-      // T-495 P2 — production-line ramen session id to board.productionLineWorkflow
+      // WR-495 P2 — production-line ramen session id to board.productionLineWorkflow
       // Instantly register and follow-up session-switcher/workflow-sessions is a production-line branch
       // to be recognized. mode=production line This specifies or session id is wf- prefix.
       if (data.session_id && Board.productionLineWorkflow && Board.productionLineWorkflow.registerKnown
@@ -3307,29 +3307,29 @@
           try { Board.workflowSessions.refresh(); } catch (_) {}
         }
       }
-      // T-516 — Workflow ID to localStorage single source.
+      // WR-516 — Workflow ID to localStorage single source.
       // Because the helper handles dedupe, submit response add calls and compatible safety (OR conditions).
       if (data.session_id && Board.workflowTabStorage && Board.workflowTabStorage.add) {
         Board.workflowTabStorage.add(data.session_id);
       }
       // After running, it is necessary to remove the badge immediately after running, so it is possible to clean the launchState immediately.
-      // However, debug/released after conserving the possibility of SSE (the following renderKanban calls disappeared).
-      launchState.delete(ticketNum);
-      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
-      // Remove Badge + In Progress Column Top Mark
-      if (Board.render.renderKanban) Board.render.renderKanban();
+      // However, debug/released after conserving the possibility of SSE (the following renderConveyor calls disappeared).
+      launchState.delete(workRequestNum);
+      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + workRequestNum); } catch (_) {}
+      // Remove Badge + Executing Column Top Mark
+      if (Board.render.renderConveyor) Board.render.renderConveyor();
     } else if (data.event === "LAUNCH_FAILED") {
       if (cur.graceTimer) clearTimeout(cur.graceTimer);
-      launchState.delete(ticketNum);
-      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + ticketNum); } catch (_) {}
+      launchState.delete(workRequestNum);
+      try { sessionStorage.removeItem(LAUNCH_STORAGE_PREFIX + workRequestNum); } catch (_) {}
       Board.util.showInfoModal(
         "Workflow failed to run",
         formatLaunchFailReason(data.reason, data.error_message),
         {
           severity: "error",
           onClose: function () {
-            if (Board.fetch.fetchTickets && Board.render.renderKanban) {
-              Board.fetch.fetchTickets().then(function () { Board.render.renderKanban(); });
+            if (Board.fetch.fetchWorkRequests && Board.render.renderConveyor) {
+              Board.fetch.fetchWorkRequests().then(function () { Board.render.renderConveyor(); });
             }
           },
         }
@@ -3346,11 +3346,11 @@
    * + Restoration sessionStorage → Restoration. "SSE Late Processing"
    * However, if the SSE inside the 60s, the failure is considered natural — auto cleanup is corrected.
    */
-  function onGraceExpired(ticketNum) {
-    const cur = launchState.get(ticketNum);
+  function onGraceExpired(workRequestNum) {
+    const cur = launchState.get(workRequestNum);
     if (!cur || cur.state !== "starting") return;
-    cleanupLaunchState(ticketNum);
-    if (Board.render && Board.render.renderKanban) Board.render.renderKanban();
+    cleanupLaunchState(workRequestNum);
+    if (Board.render && Board.render.renderConveyor) Board.render.renderConveyor();
   }
 
   /**
@@ -3362,7 +3362,7 @@
     var label;
     switch (reason) {
       case "to_do_status":
-        label = "Tickets are To Do status. Go to Open and try again.";
+        label = "WorkRequests are Draft status. Go to Accepted and try again.";
         break;
       case "http_post_timeout":
         label = "Board server did not respond to your workflow startup request. Check the server status.";
@@ -3430,7 +3430,7 @@
         try { sessionStorage.removeItem(key); } catch (_) {}
         return;
       }
-      var ticketNum = key.slice(LAUNCH_STORAGE_PREFIX.length);
+      var workRequestNum = key.slice(LAUNCH_STORAGE_PREFIX.length);
       var since = stored.since || Date.now();
       var elapsed = Date.now() - since;
       var remaining = LAUNCH_GRACE_MS - elapsed;
@@ -3441,32 +3441,32 @@
         try { sessionStorage.removeItem(key); } catch (_) {}
         return;
       } else {
-        launchState.set(ticketNum, {
+        launchState.set(workRequestNum, {
           state: "starting",
           since: since,
           command: stored.command || "",
           sessionId: null,
-          graceTimer: setTimeout(function () { onGraceExpired(ticketNum); }, remaining),
+          graceTimer: setTimeout(function () { onGraceExpired(workRequestNum); }, remaining),
         });
       }
     });
   }
 
   // ── Register on Board namespace ──
-  Board.fetch.fetchTickets = fetchTickets;
-  Board.fetch.fetchTicketsByFiles = fetchTicketsByFiles;
-  Board.render.renderKanban = renderKanban;
-  // T-433 Phase 2: SSE git branch event listener calls synchronized entry-point.
+  Board.fetch.fetchWorkRequests = fetchWorkRequests;
+  Board.fetch.fetchWorkRequestsByFiles = fetchWorkRequestsByFiles;
+  Board.render.renderConveyor = renderConveyor;
+  // WR-433 Phase 2: SSE git branch event listener calls synchronized entry-point.
   // (sse.js has a single listener — addEventListener duplicate registration prevention §2.4)
   Board.render.syncActiveBranchFromSSE = syncActiveBranchFromSSE;
 
-  // T-475 Stage 3: SSE 'launch' event dispatch + restore entry-point when loading page.
-  // (sse.js single listener call Board.kanban.handleLaunchEvent — addEventListener duplicate)
-  Board.kanban = Board.kanban || {};
-  Board.kanban.handleLaunchEvent = handleLaunchEvent;
-  Board.kanban.restoreLaunchStateFromStorage = restoreLaunchStateFromStorage;
+  // WR-475 Stage 3: SSE 'launch' event dispatch + restore entry-point when loading page.
+  // (sse.js single listener call Board.conveyor.handleLaunchEvent — addEventListener duplicate)
+  Board.conveyor = Board.conveyor || {};
+  Board.conveyor.handleLaunchEvent = handleLaunchEvent;
+  Board.conveyor.restoreLaunchStateFromStorage = restoreLaunchStateFromStorage;
 
-  // T-473: Bind relations popover delegated events once at module init time.
+  // WR-473: Bind relations popover delegated events once at module init time.
   // bindRelationsPopoverEvents() is idempotent (_relPopoverBound guard),
   // but we call it once here to ensure listeners are registered before first render.
   if (document.readyState === "loading") {
