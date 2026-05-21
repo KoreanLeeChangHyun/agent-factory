@@ -16,7 +16,7 @@ from engine.core.validation.artifact_rules import (
 def _good_plan_payload() -> dict:
     return {
         "schema_version": 2,
-        "ticket": "T-504",
+        "work_request": "WR-504",
         "command": "implement",
         "mode": "multi",
         "phases": [
@@ -87,4 +87,3 @@ def test_verify_report_html_requires_plan_reference(tmp_path: Path) -> None:
     result = verify_report_html(report, plan)
     assert not result.ok
     assert result.missing == ["missing token 'plan.md' in report.html"]
-
