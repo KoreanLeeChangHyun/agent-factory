@@ -122,7 +122,7 @@ universal behavior.
 ### 6. Update UI
 
 - Show active provider in the terminal status surface.
-- Show terminal capability next to the Brain provider setting.
+- Show terminal capability next to the LLM provider setting.
 - Keep color theme tied to the selected brain.
 - Keep unsupported provider controls disabled with concise labels.
 

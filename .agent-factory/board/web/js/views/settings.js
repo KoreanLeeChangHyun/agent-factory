@@ -17,7 +17,7 @@
     ]
   };
   var ENV_DESCRIPTIONS = {
-    LLM_PROVIDER: 'Brain provider for provider-neutral LLM adapter paths. Supported values: claude, codex, fake.',
+    LLM_PROVIDER: 'Active LLM provider for provider-neutral adapter paths. Supported values: claude, codex, fake.',
     SLACK_BOT_TOKEN: 'Slack Bot OAuth token used to send task notifications. Leave empty to disable Slack notifications.',
     SLACK_CHANNEL_ID: 'Slack channel ID where Agent Factory notifications are posted.',
     SLACK_API_URL: 'Slack chat.postMessage endpoint. Change only when using a compatible proxy.',
