@@ -465,7 +465,7 @@
 
     h += '<div class="terminal-session-bar-top">';
     h += '<div class="terminal-session-left">';
-    h += '<div class="terminal-brand"><span class="accent">Agent</span><span>Factory</span></div>';
+    h += '<div class="terminal-brand"><span class="accent">Agent</span><span>Factory</span><span>System</span></div>';
     h += '<span class="terminal-session-id" id="terminal-session-id">'
       + esc(Board.state.termSessionId || '')
       + '</span>';
