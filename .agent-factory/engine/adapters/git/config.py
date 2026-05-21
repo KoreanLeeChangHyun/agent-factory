@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
 """Git Config auto-configuration script.
 
-Automatically configures git config by reading Git configuration information from .agent-factory/.settings.
+Automatically configures git config from the current project git identity.
 
 Main functions:
     main: Git configuration application entry point
@@ -11,8 +11,8 @@ Usage: python3 git_config.py [--global|--local]
   --local Local configuration (.git/config)
 
 Environment variables (loaded from .agent-factory/.settings):
-  GIT_USER_NAME - Git user.name (required)
-  GIT_USER_EMAIL - Git user.email (required)
+  GIT_USER_NAME - Git user.name override (optional)
+  GIT_USER_EMAIL - Git user.email override (optional)
   GITHUB_USERNAME - GitHub username (optional)
   SSH_KEY_GITHUB - GitHub SSH key path (optional)
 
@@ -89,8 +89,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flow-gitconfig",
         description=(
-            "Read Git configuration information from .agent-factory/.settings"
-            "Automatically applies git config."
+            "Read Git identity from the current project git config and "
+            "apply it to the requested git config scope."
         ),
         epilog=build_common_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -121,7 +121,7 @@ def main() -> None:
     Compare and output the status before and after the change.
 
     Raises:
-        SystemExit: When a configuration file is missing, required environment variables are missing, or an unknown option is specified.
+        SystemExit: When a configuration file is missing, git identity is missing, or an unknown option is specified.
     """
     # --- Option parsing ---
     parser = _build_parser()
@@ -144,13 +144,13 @@ def main() -> None:
     _github_username = _read_setting("GITHUB_USERNAME", "AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
     ssh_key_github = _read_setting("SSH_KEY_GITHUB", "AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")
 
-    # --- Verification of required environment variables ---
+    # --- Verification of project git identity ---
     if not git_user_name:
-        print("[ERROR] GIT_USER_NAME is not set in .settings.", file=sys.stderr)
+        print("[ERROR] git config user.name is not set for this project.", file=sys.stderr)
         sys.exit(1)
 
     if not git_user_email:
-        print("[ERROR] GIT_USER_EMAIL is not set in .settings.", file=sys.stderr)
+        print("[ERROR] git config user.email is not set for this project.", file=sys.stderr)
         sys.exit(1)
 
     # --- Before state collection ---
