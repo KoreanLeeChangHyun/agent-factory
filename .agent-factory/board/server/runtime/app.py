@@ -23,7 +23,7 @@ from board.server.routing.http_router import BoardHTTPRequestHandler
 from board.server.runtime.state import (
     sse_manager,
     poll_tracker,
-    claude_process,
+    brain_process,
     workflow_registry,
     production_line_registry,
 )
@@ -71,13 +71,13 @@ def _run_server(project_root: str) -> None:
 
     # Reset and restore terminal session persist file path based on project root
     last_session_file = os.path.join(project_root, '.agent-factory', '.last-session-id')
-    claude_process._persist_file = last_session_file
+    brain_process.set_persist_file(last_session_file)
     if os.path.isfile(last_session_file):
         try:
             with open(last_session_file) as _sf:
                 _saved_id = _sf.read().strip()
             if _saved_id:
-                claude_process._session_id = _saved_id
+                brain_process.set_session_id(_saved_id)
                 logger.debug('Terminal session id Restore: %s', _saved_id)
         except OSError as _e:
             logger.debug('session id restore failed: %s', _e)
@@ -94,8 +94,8 @@ def _run_server(project_root: str) -> None:
         remove_board_url_file(project_root)
 
     def _signal_handler(signum: int, frame: object) -> None:
-        """When receiving SIGTERM/SIGINT, clean and exit Claude process and runtime files."""
-        claude_process.kill()
+        """When receiving SIGTERM/SIGINT, clean terminal process and runtime files."""
+        brain_process.kill()
         _cleanup_runtime_files()
         sys.exit(0)
 
@@ -164,7 +164,7 @@ def _run_server(project_root: str) -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        claude_process.kill()
+        brain_process.kill()
         watcher.stop()
         git_watcher.stop()
         server.shutdown()

@@ -9,11 +9,11 @@ import time
 import uuid
 from urllib.parse import parse_qs, urlparse
 
-from board.server.runtime.state import terminal_sse_channel, claude_process, workflow_registry
+from board.server.runtime.state import terminal_sse_channel, brain_process, workflow_registry
 from board.server.support.common import api_endpoint, logger, _get_git_branch, server_debug_log
 from board.server.channels.event_filter import is_user_visible
 from board.server.channels.terminal_channel import _resolve_last_event_id
-from board.server.processes.claude_process import _validate_images
+from board.server.processes.brain_process import validate_images
 from board.server.artifacts.attachments_persist import AttachmentsSidecar
 
 
@@ -400,26 +400,26 @@ class TerminalHandlerMixin:
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
-        side_effects: read claude_process snapshot
+        side_effects: read brain_process snapshot
         sse_events: none
         """
         project_root = os.getcwd()
-        awaiting = bool(getattr(claude_process, '_awaiting_response', False))
+        awaiting = bool(brain_process.awaiting_response)
         server_debug_log('status.response', {
-            'status': claude_process.status,
-            'session_id': claude_process.session_id,
+            'status': brain_process.status,
+            'session_id': brain_process.session_id,
             'awaiting_response': awaiting,
         })
         self._send_json({
-            'status': claude_process.status,
-            'session_id': claude_process.session_id,
-            'last_session_id': claude_process.session_id,
-            'model': claude_process._model,
-            'permission_mode': claude_process._permission_mode,
+            'status': brain_process.status,
+            'session_id': brain_process.session_id,
+            'last_session_id': brain_process.session_id,
+            'model': brain_process.model,
+            'permission_mode': brain_process.permission_mode,
             'branch': _get_git_branch(project_root),
             'clients': terminal_sse_channel.client_count,
             # Signal for the client to determine spinner/input lock recovery after refresh.
-            # True after sending user input until receiving the result. claude_process._status alone
+            # True after sending user input until receiving the result. Process status alone
             # Judgment during creation is impossible (since the status remains 'idle' even after the result).
             'awaiting_response': awaiting,
         })
@@ -466,9 +466,9 @@ class TerminalHandlerMixin:
         # Session with is_current = "Running now". If status == 'stopped'
         # The session_id restored from .last-session-id is 'last session' (is_last)
         # This is not ‘current session’.
-        last_session_id = claude_process.session_id
+        last_session_id = brain_process.session_id
         current_session_id = (
-            last_session_id if claude_process.status != 'stopped' else ''
+            last_session_id if brain_process.status != 'stopped' else ''
         )
 
         entries: list[tuple[float, str, str, int]] = []  # (mtime, session_id, filepath, size)
@@ -683,8 +683,8 @@ class TerminalHandlerMixin:
         # This cache fills that gap. Only the last block has the `in_flight` flag
         # Have the client seed a text buffer (as a complete block in the DOM)
         # When rendered, the subsequent live text_delta creates a separate block and becomes two pieces).
-        if claude_process.session_id == session_id:
-            in_flight = claude_process.get_in_flight_snapshot()
+        if brain_process.session_id == session_id:
+            in_flight = brain_process.get_in_flight_snapshot()
             if in_flight:
                 in_flight_ts = in_flight.get('timestamp', '') or ''
                 if not since or (in_flight_ts and in_flight_ts > since):
@@ -799,15 +799,15 @@ class TerminalHandlerMixin:
         # Since it is handled with sawInFlight, pending_turn is a supplementary solution if in_flight does not exist.
         pending_turn = False
         last_ev_for_log = events[-1] if events else None
-        sid_match = claude_process.session_id == session_id
-        awaiting_for_log = bool(getattr(claude_process, '_awaiting_response', False))
+        sid_match = brain_process.session_id == session_id
+        awaiting_for_log = bool(brain_process.awaiting_response)
         if sid_match:
-            if getattr(claude_process, '_awaiting_response', False):
+            if brain_process.awaiting_response:
                 # If the last event is user and there is no in_flight event
                 if events and not events[-1].get('in_flight'):
                     last_ev = events[-1]
                     # A user event (interrupted=true) stopped by ESC is not an unresolved turn.
-                    # Defense Augmentation: _awaiting_response fails to fall to true False.
+                    # Defense Augmentation: awaiting_response can fail to fall to false.
                     # Even in this scenario, the last interrupted user event blocks pending_turn entry.
                     if (last_ev.get('role') == 'user'
                             and last_ev.get('kind') != 'tool_result'
@@ -887,7 +887,7 @@ class TerminalHandlerMixin:
         else:
             extra_args = []
 
-        result = claude_process.spawn(extra_args)
+        result = brain_process.spawn(extra_args)
 
         # When resuming, Claude CLI does not issue an init event until the first input.
         # There was a problem where session_id was returned as an empty value. The resume target UUID is
@@ -896,7 +896,7 @@ class TerminalHandlerMixin:
         # It is the same value or overwritten with a new UUID that the server falls back on.
         if resume_session_id and result.get('ok') and not result.get('session_id'):
             result['session_id'] = resume_session_id
-            claude_process._session_id = resume_session_id
+            brain_process.set_session_id(resume_session_id)
 
         self._send_json(result)
 
@@ -921,7 +921,7 @@ class TerminalHandlerMixin:
         side_effects: feed NDJSON envelope to Claude CLI stdin + sidecar append
         sse_events: user_input (TerminalSSEChannel)
         """
-        if claude_process.status == 'stopped':
+        if brain_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
             return
 
@@ -954,7 +954,7 @@ class TerminalHandlerMixin:
             return
 
         if images is not None:
-            validation_error = _validate_images(images)
+            validation_error = validate_images(images)
             if validation_error:
                 self._send_error(400, validation_error)
                 return
@@ -991,14 +991,14 @@ class TerminalHandlerMixin:
                 ]
             terminal_sse_channel.broadcast(broadcast_payload)
 
-        result = claude_process.send_input(
+        result = brain_process.send_input(
             text, images=images, attachments=attachments or None,
         )
 
         # AttachmentsSidecar handles no-op when session_id is undetermined or there is no attachment.
         if attachments and result.get('ok'):
             try:
-                AttachmentsSidecar(claude_process.session_id or '').append(
+                AttachmentsSidecar(brain_process.session_id or '').append(
                     user_msg_ts, attachments,
                 )
             except Exception as exc:  # noqa: BLE001 — sidecar IO is best-effort
@@ -1026,11 +1026,11 @@ class TerminalHandlerMixin:
         side_effects: SIGTERM Claude CLI subprocess
         sse_events: process_exit (TerminalSSEChannel system event)
         """
-        if claude_process.status == 'stopped':
+        if brain_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
             return
 
-        result = claude_process.kill()
+        result = brain_process.kill()
         self._send_json(result)
 
     @api_endpoint("T", "command")
@@ -1057,7 +1057,7 @@ class TerminalHandlerMixin:
         side_effects: feed slash command to Claude CLI stdin
         sse_events: stdout / result (downstream Claude output)
         """
-        if claude_process.status == 'stopped':
+        if brain_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
             return
 
@@ -1082,7 +1082,7 @@ class TerminalHandlerMixin:
             self._send_error(400, 'Command must start with "/"')
             return
 
-        result = claude_process.send_input(command)
+        result = brain_process.send_input(command)
         self._send_json(result)
 
     @api_endpoint("T", "permission")
@@ -1094,7 +1094,7 @@ class TerminalHandlerMixin:
         Optional field: "session_id" (for workflow sessions)
 
         If session_id is present, use the process of that session in workflow_registry,
-        If not, use claude_process (main terminal).
+        If not, use brain_process (main terminal).
 
         If the process is not executed, 409 Conflict is returned, and if an incorrect request is made, 400 Bad Request is returned.
 
@@ -1133,7 +1133,7 @@ class TerminalHandlerMixin:
                 return
             process = session.process
         else:
-            process = claude_process
+            process = brain_process
 
         if process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
@@ -1150,9 +1150,8 @@ class TerminalHandlerMixin:
         Does not terminate the process, but only stops generating the current response.
 
         Guaranteed session retention:
-        - This endpoint only performs calls to ``claude_process.interrupt()``.
-        - ``claude_process._status``, ``claude_process._session_id``,
-          Do not change session identifiers or status fields such as conversation history.
+        - This endpoint only performs calls to ``brain_process.interrupt()``.
+        - Do not change session identifiers or status fields such as conversation history.
         - Therefore, even if the client refreshes after SIGINT, the conversation history
           It can be restored as is in jsonl.
 
@@ -1170,9 +1169,9 @@ class TerminalHandlerMixin:
         side_effects: SIGINT to Claude CLI subprocess (session preserved)
         sse_events: system (subtype=user_input_interrupted)
         """
-        if claude_process.status == 'stopped':
+        if brain_process.status == 'stopped':
             self._send_error(409, 'Claude process not running')
             return
 
-        result = claude_process.interrupt()
+        result = brain_process.interrupt()
         self._send_json(result)

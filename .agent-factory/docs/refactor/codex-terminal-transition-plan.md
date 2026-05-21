@@ -10,10 +10,13 @@ Current state:
 - `AGENT_FACTORY_LLM_PROVIDER=codex` selects Codex for provider-neutral
   `LLMAdapter` paths.
 - Board Settings can expose and save the active brain provider.
+- `BrainProcess` exists as the provider-neutral board terminal process
+  contract, with `ClaudeBrainProcess` wrapping the current `ClaudeProcess`.
 - The interactive Terminal surface still runs through `ClaudeProcess`.
 
-This means Codex can be selected for adapter-backed workflow paths, but the
-live Console terminal is not yet a Codex terminal.
+This means Codex can be selected for adapter-backed workflow paths, and the
+live Console terminal has a provider-neutral process boundary. It is not yet a
+Codex terminal.
 
 ## Goal
 
@@ -145,7 +148,7 @@ Manual verification:
 
 ## Recommended Implementation Order
 
-1. Add `BrainProcess` contract and `ClaudeBrainProcess` wrapper.
+1. Add `BrainProcess` contract and `ClaudeBrainProcess` wrapper. (done)
 2. Move route usage from direct `ClaudeProcess` access to the process factory.
 3. Add `CodexProcess` with stdout normalization only.
 4. Add provider capability reporting.

@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 
 from board.server.support.common import logger
-from board.server.processes.claude_process import ClaudeProcess
+from board.server.processes.brain_process import BrainProcess, create_brain_process
 from board.server.channels.terminal_channel import TerminalSSEChannel
 
 
@@ -17,7 +17,7 @@ from board.server.channels.terminal_channel import TerminalSSEChannel
 class WorkflowSession:
     """Data class indicating one of the workflow sessions.
 
-    Each workflow ticket runs an independent ClaudeProcess and TerminalSSEChannel
+    Each workflow ticket runs an independent BrainProcess and TerminalSSEChannel
     is identified as session id.
 
     Attributes:
@@ -25,7 +25,7 @@ class WorkflowSession:
         ticket id: Kanban ticket ID (e.g. T-238)
         command: execution command (implement, review, research, etc.)
         work dir: task directory absolute path
-        process: Claude CLI process manager instance
+        process: terminal process manager instance
         channel: terminal SSE broadcast channel instance
         created at: Session creation time (ISO format)
         current step: current workflow stage (e.g. PLAN, WORK, REPORT)
@@ -36,7 +36,7 @@ class WorkflowSession:
     ticket_id: str
     command: str
     work_dir: str
-    process: ClaudeProcess = field(repr=False)
+    process: BrainProcess = field(repr=False)
     channel: TerminalSSEChannel = field(repr=False)
     created_at: str = field(default_factory=lambda: time.strftime('%Y-%m-%dT%H:%M:%S'))
     current_step: str = ''
@@ -47,7 +47,7 @@ class WorkflowSessionRegistry:
     """Multi-Workflow Session Registry.
 
     thread-safe creates a workflow session.
-    Each session holds an independent ClaudeProcess + TerminalSSEChannel pair.
+    Each session holds an independent BrainProcess + TerminalSSEChannel pair.
 
     Attributes:
         sessions: session id -> WorkflowSession map
@@ -83,7 +83,7 @@ class WorkflowSessionRegistry:
     ) -> WorkflowSession:
         """Create a new workflow session.
 
-        allocates independent terminalSSEChannel and ClaudeProcess instances,
+        allocates independent TerminalSSEChannel and BrainProcess instances,
         Create session id to register in the registry.
 
         Args:
@@ -99,7 +99,7 @@ class WorkflowSessionRegistry:
 
         persist_path = self._session_file(session_id)
         channel = TerminalSSEChannel(persist_path=persist_path)
-        process = ClaudeProcess(channel)
+        process = create_brain_process(channel)
 
         session = WorkflowSession(
             session_id=session_id,
@@ -143,7 +143,7 @@ class WorkflowSessionRegistry:
         The first line of each *.jsonl file  meta only reads the WorkflowSession object.
         Event data is not restored in memory — Clients are redirected
         read directly from jsonl file via REST /workflow/history.
-        process is created with new ClaudeProcess (status='stopped').
+        process is created with new BrainProcess (status='stopped').
 
         Returns:
             Load more
@@ -172,7 +172,7 @@ class WorkflowSessionRegistry:
                 continue
 
             channel = TerminalSSEChannel(persist_path=fpath)
-            process = ClaudeProcess(channel)
+            process = create_brain_process(channel)
             session = WorkflowSession(
                 session_id=meta['session_id'],
                 ticket_id=meta.get('ticket_id', ''),
@@ -232,7 +232,7 @@ class WorkflowSessionRegistry:
             return None
 
         channel = TerminalSSEChannel(persist_path=None)
-        process = ClaudeProcess(channel)
+        process = create_brain_process(channel)
         session = WorkflowSession(
             session_id=meta['session_id'],
             ticket_id=meta.get('ticket_id', ''),

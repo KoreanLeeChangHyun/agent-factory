@@ -28,3 +28,37 @@ def test_terminal_handler_exposes_router_methods() -> None:
 
     missing = [name for name in expected if not hasattr(TerminalHandlerMixin, name)]
     assert missing == []
+
+
+def test_brain_process_factory_wraps_claude_process() -> None:
+    from board.server.channels.terminal_channel import TerminalSSEChannel
+    from board.server.processes.brain_process import ClaudeBrainProcess, create_brain_process
+    from board.server.processes.claude_process import ClaudeProcess
+
+    process = create_brain_process(TerminalSSEChannel())
+
+    assert isinstance(process, ClaudeBrainProcess)
+    assert not isinstance(process, ClaudeProcess)
+    assert process.status == "stopped"
+
+    process.set_session_id("session-123")
+    assert process.session_id == "session-123"
+
+
+def test_runtime_exposes_brain_process_compat_alias() -> None:
+    from board.server.runtime import state
+    from board.server.processes.brain_process import BrainProcess
+
+    assert state.brain_process is state.claude_process
+    assert isinstance(state.brain_process, BrainProcess)
+
+
+def test_workflow_session_registry_uses_brain_process(tmp_path) -> None:
+    from board.server.processes.brain_process import BrainProcess
+    from board.server.sessions.workflow_session import WorkflowSessionRegistry
+
+    registry = WorkflowSessionRegistry(persist_dir=str(tmp_path))
+    session = registry.create("T-100", "implement", "/tmp/work")
+
+    assert isinstance(session.process, BrainProcess)
+    assert session.process.status == "stopped"
