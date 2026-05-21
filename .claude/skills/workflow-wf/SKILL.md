@@ -1,6 +1,6 @@
 ---
 name: workflow-wf
-description: "Workflow command skills for wf commands: implement, prompt, research, review, submit. Handles code implementation, prompt co-authoring, research/analysis, code review, and ticket submission workflows."
+description: "Workflow command skills for wf commands: implement, prompt, research, review, submit. Handles code implementation, prompt co-authoring, research/analysis, code review, and WorkRequest submission workflows."
 disable-model-invocation: true
 skills:
   - research-prompt-engineering
@@ -10,7 +10,7 @@ license: "Apache-2.0"
 # Workflow-WF Command Skills
 
 워크플로우 `/wf` 명령어 5종(implement, prompt, research, review, submit)의 통합 스킬.
-PLAN→WORK→REPORT→DONE FSM은 `workflow-orchestration/SKILL.md`를 따른다. prompt·submit은 FSM과 무관한 독립 명령어.
+작업 준비→작업 계획→작업 수행→작업 검사→작업 보고→작업 완료 FSM은 `workflow-orchestration/SKILL.md`를 따른다. prompt·submit은 FSM과 무관한 독립 명령어.
 
 > **워크플로우 스킬 로드**: implement·research·review 실행 시작 전 `.claude/skills/workflow-orchestration/SKILL.md`를 Read로 로드하세요.
 
@@ -85,20 +85,20 @@ PLAN→WORK→REPORT→DONE FSM은 `workflow-orchestration/SKILL.md`를 따른�
 
 ### 프로젝트 플로우 연동 (implement)
 
-REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
+작업 보고 STEP 완료 후 WorkRequest 상태를 자동 전이한다.
 
 ```bash
-flow-kanban move T-NNN review
+flow-conveyor move WR-NNN verifying
 ```
 
-티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/open/T-NNN.xml`이다.
+WorkRequest 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. WorkRequest 파일 경로는 `.agent-factory/work-requests/accepted/WR-NNN.xml`이다.
 
-- 구현이 완료된 티켓을 Review 상태로 전이한다
-- `wf -s implement #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
+- 구현이 완료된 WorkRequest를 Verifying 상태로 전이한다
+- `wf -s implement #N` 실행 시 `wf.md`가 이미 WorkRequest XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
 
-> **Review 후속 흐름**: Review 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
+> **Verifying 후속 흐름**: Verifying 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
 
-> **중복 move submit 방지**: 워크플로우 세션(INLINE 모드)에서는 메인 세션이 이미 `move submit`을 실행했으므로 중복 실행하지 않는다. `kanban_cli.py`의 멱등성이 보장되어 실행되어도 무해하나, 불필요한 호출을 방지한다.
+> **중복 move submit 방지**: 워크플로우 세션(INLINE 모드)에서는 메인 세션이 이미 `move submit`을 실행했으므로 중복 실행하지 않는다. `conveyor_cli.py`의 멱등성이 보장되어 실행되어도 무해하나, 불필요한 호출을 방지한다.
 
 ### cleanup 절차 (implement/research/review 공통)
 
@@ -114,12 +114,12 @@ flow-kanban move T-NNN review
 
 > **스킬 의존성**: `research-prompt-engineering` (frontmatter `skills:` 필드에 명시됨)
 
-`.kanban/open/T-NNN.xml` 티켓 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선하는 워크플로우 커맨드 스킬. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어.
+`.agent-factory/work-requests/accepted/WR-NNN.xml` WorkRequest 파일을 사용자와의 자유 대화를 통해 점진적으로 작성하거나 개선하는 워크플로우 커맨드 스킬. 워크플로우(FSM/가드/서브에이전트)와 무관한 독립 명령어.
 
-티켓 파일은 flat XML 구조를 사용합니다:
-- 루트 요소: `<ticket>`
+WorkRequest 파일은 flat XML 구조를 사용합니다:
+- 루트 요소: `<work_request>`
 - `<metadata>`: `<number>`, `<title>`, `<datetime>`, `<status>`, `<command>`
-- `<relations>`: 티켓 간 관계 링크 (`<relation type="derived-from" ticket="T-NNN" />`)
+- `<relations>`: WorkRequest 간 관계 링크 (`<relation type="derived-from" work_request="WR-NNN" />`)
 - `<prompt>`: 작업 정의 필드 (`<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>`)
 - `<result>`: 실행 결과 (`<registrykey>`, `<workdir>`, `<summary>`) 또는 미실행 시 self-closing `<result />`
 
@@ -139,12 +139,12 @@ flow-kanban move T-NNN review
 | 에이전트, 서브에이전트, 도구 | `references/claude-code-patterns.md` |
 | 용도 불명확 | `references/prompt-templates.md` + `references/claude-code-patterns.md` 모두 |
 
-### XML 티켓 처리 규칙
+### XML WorkRequest 처리 규칙
 
-- `<command>` 태그는 `<metadata>` 직하(자식)에 위치. 잠금 판정은 XML `<status>` 요소(`Open`/`In Progress`/`Review`)로 판별
-- `<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>` 태그는 티켓 루트 직하의 `<prompt>` 래퍼 안에 위치
+- `<command>` 태그는 `<metadata>` 직하(자식)에 위치. 잠금 판정은 XML `<status>` 요소(`Accepted`/`Executing`/`Verifying`)로 판별
+- `<goal>`, `<target>`, `<constraints>`, `<criteria>`, `<context>` 태그는 WorkRequest 루트 직하의 `<prompt>` 래퍼 안에 위치
 - 사용자 입력 갱신은 `<prompt>` 래퍼 자식 요소를 대상으로 함
-- 기존 티켓 편집 시 원시 XML 대신 읽기 쉬운 구조화 형식으로 출력
+- 기존 WorkRequest 편집 시 원시 XML 대신 읽기 쉬운 구조화 형식으로 출력
 
 ### 웹검색/코드탐색 자율 수행
 
@@ -160,7 +160,7 @@ flow-kanban move T-NNN review
 
 ### 비워크플로우 독립 명령어 (prompt)
 
-이 스킬은 워크플로우 FSM과 무관하게 독립 실행된다. 사용 가능 도구: Bash, Read, Write, AskUserQuestion, Glob, Grep, WebSearch, WebFetch. Task 도구 호출 금지. Bash는 Step D(티켓 종료), done 폴백 복원, Step 2 새 티켓 생성에서 허용.
+이 스킬은 워크플로우 FSM과 무관하게 독립 실행된다. 사용 가능 도구: Bash, Read, Write, AskUserQuestion, Glob, Grep, WebSearch, WebFetch. Task 도구 호출 금지. Bash는 Step D(WorkRequest 종료), complete 폴백 복원, Step 2 새 WorkRequest 생성에서 허용.
 
 이 스킬의 실행 절차는 대응 커맨드 파일(`.claude/commands/wf.md`)이 Single Source of Truth이다.
 
@@ -284,22 +284,22 @@ flow-kanban move T-NNN review
 
 ### 프로젝트 플로우 연동 (research)
 
-REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
+작업 보고 STEP 완료 후 WorkRequest 상태를 자동 전이한다.
 
 ```bash
-flow-kanban move T-NNN review
+flow-conveyor move WR-NNN verifying
 ```
 
-티켓 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. 티켓 파일 경로는 `.kanban/open/T-NNN.xml`이다.
+WorkRequest 번호는 `wf.md` Steps 3-1~3-4에서 파싱된 `#N` 인자를 사용한다. WorkRequest 파일 경로는 `.agent-factory/work-requests/accepted/WR-NNN.xml`이다.
 
-- 연구/분석이 완료된 티켓을 Review 상태로 전이한다
-- `wf -s research #N` 실행 시 `wf.md`가 이미 티켓 XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
+- 연구/분석이 완료된 WorkRequest를 Verifying 상태로 전이한다
+- `wf -s research #N` 실행 시 `wf.md`가 이미 WorkRequest XML 내용을 파싱하여 전달하므로 별도 파싱은 불필요하다
 
-> **Review 후속 흐름**: Review 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
+> **Verifying 후속 흐름**: Verifying 전이 후 사용자가 `/wf -d N`으로 간단 검토 -> 완료/상세 review 분기를 진행한다. 워크플로우 완료 시점에서 자동 merge는 수행되지 않는다.
 
 ---
 
-## Review Command
+## Verifying Command
 
 코드 리뷰를 수행하는 워크플로우 커맨드 스킬.
 
@@ -313,7 +313,7 @@ flow-kanban move T-NNN review
 
 ### 코드 수정 금지 제약
 
-> **WARNING**: 리뷰 워크플로우에서 Edit/Write 도구로 소스 코드를 수정하는 행위는 절대 금지된다. T-092 사고에서 리뷰 워커가 common.js, kanban.js, kanban.css를 직접 수정하여 Submit 컬럼을 잘못 추가한 월권이 발생하였다. 이 제약은 동일 사고 재발을 방지하기 위해 명문화된 것이다.
+> **WARNING**: 리뷰 워크플로우에서 Edit/Write 도구로 소스 코드를 수정하는 행위는 절대 금지된다. T-092 사고에서 리뷰 워커가 common.js, legacy board files를 직접 수정하여 Submit 컬럼을 잘못 추가한 월권이 발생하였다. 이 제약은 동일 사고 재발을 방지하기 위해 명문화된 것이다.
 
 | 구분 | 대상 | 허용 여부 |
 |------|------|----------|
@@ -384,32 +384,32 @@ git log --oneline -5 -- <파일경로>
 
 ### 프로젝트 플로우 연동 (review)
 
-REPORT 단계 완료 후 티켓 상태를 자동 전이한다.
+작업 보고 STEP 완료 후 WorkRequest 상태를 자동 전이한다.
 
 ```bash
-flow-kanban move T-NNN review
+flow-conveyor move WR-NNN verifying
 ```
 
-티켓 파일은 `.kanban/open/T-NNN.xml`이다.
+WorkRequest 파일은 `.agent-factory/work-requests/accepted/WR-NNN.xml`이다.
 
 ---
 
-## Review Completion Flow
+## Verifying Completion Flow
 
-워크플로우 완료 후 Review 상태가 된 티켓의 검토 및 완료 처리 절차.
+워크플로우 완료 후 Verifying 상태가 된 WorkRequest의 검토 및 완료 처리 절차.
 
 ### 개요
 
-implement/research 워크플로우 완료 시 finalization.py가 티켓을 Review 상태로 전이한다. 이후 사용자가 `/wf -d N`을 실행하면 아래 3-way 분기가 동작한다.
+implement/research 워크플로우 완료 시 finalization.py가 WorkRequest를 Verifying 상태로 전이한다. 이후 사용자가 `/wf -d N`을 실행하면 아래 3-way 분기가 동작한다.
 
 ### 분기 흐름
 
 | 분기 | 트리거 | 결과 |
 |------|--------|------|
-| 간단 검토 통과 + 완료 선택 | 검토 항목 전체 OK + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done |
-| 간단 검토 경고 + 완료 선택 | 검토 항목 WARN + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Done (경고 무시) |
-| 상세 review 선택 | 사용자 "2" 선택 | 새 review 티켓 생성 + `derived-from` link -> /wf -s N으로 review 워크플로우 실행 |
-| 취소 | 사용자 "0" 선택 | Review 상태 유지 |
+| 간단 검토 통과 + 완료 선택 | 검토 항목 전체 OK + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Complete |
+| 간단 검토 경고 + 완료 선택 | 검토 항목 WARN + 사용자 "1" 선택 | flow-merge 파이프라인 실행 -> Complete (경고 무시) |
+| 상세 review 선택 | 사용자 "2" 선택 | 새 review WorkRequest 생성 + `derived-from` link -> /wf -s N으로 review 워크플로우 실행 |
+| 취소 | 사용자 "0" 선택 | Verifying 상태 유지 |
 
 ### 간단 검토 항목
 
@@ -421,29 +421,29 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 
 ### merge 실행 조건
 
-> **CRITICAL**: merge는 반드시 사용자의 명시적 "완료" 선택 후에만 실행된다. 워크플로우 완료(DONE 전이) 시점에서는 kanban Review 전이만 수행하고, 커밋/merge/worktree 정리는 수행하지 않는다.
+> **CRITICAL**: merge는 반드시 사용자의 명시적 "완료" 선택 후에만 실행된다. 워크플로우 완료(COMPLETE 전이) 시점에서는 Conveyor Verifying 전이만 수행하고, 커밋/merge/worktree 정리는 수행하지 않는다.
 
 ### 상세 review 연계
 
-상세 review 선택 시 새 review 티켓을 생성하여 기존 review command 워크플로우를 재활용한다:
-1. `flow-kanban create "T-NNN review" --command review`로 새 review 티켓 생성
-2. `flow-kanban link T-NEW --derived-from T-NNN`으로 원본 티켓과 관계 설정
+상세 review 선택 시 새 review WorkRequest를 생성하여 기존 review command 워크플로우를 재활용한다:
+1. `flow-conveyor create "WR-NNN review" --command review`로 새 review WorkRequest 생성
+2. `flow-conveyor link WR-NEW --derived-from WR-NNN`으로 원본 WorkRequest와 관계 설정
 3. 사용자가 `/wf -s NEW`로 review 워크플로우 실행
-4. review 완료 후 원본 티켓은 Review 상태 유지
+4. review 완료 후 원본 WorkRequest은 Verifying 상태 유지
 5. 사용자가 `/wf -d N`으로 최종 완료 처리
 
 ### 관련 스크립트
 
 | 스크립트 | 역할 |
 |---------|------|
-| flow-merge (merge_pipeline.py) | 커밋 -> merge -> worktree 정리 -> kanban done 파이프라인 |
-| finalization.py | 워크플로우 완료 시 Review 전이 (자동 merge 금지) |
+| flow-merge (merge_pipeline.py) | 커밋 -> merge -> worktree 정리 -> Conveyor complete 파이프라인 |
+| finalization.py | 워크플로우 완료 시 Verifying 전이 (자동 merge 금지) |
 
 ---
 
-## Submit Command (티켓 제출)
+## Submit Command (WorkRequest 제출)
 
-상태별 디렉터리(`.kanban/open/`, `.kanban/progress/`, `.kanban/review/`)의 `T-NNN.xml` 티켓 파일의 `<command>` 태그를 읽어 해당 워크플로우를 자동 실행하는 커맨드 스킬.
+상태별 디렉터리(`.agent-factory/work-requests/accepted/`, `.agent-factory/work-requests/executing/`, `.agent-factory/work-requests/verifying/`)의 `WR-NNN.xml` WorkRequest 파일의 `<command>` 태그를 읽어 해당 워크플로우를 자동 실행하는 커맨드 스킬.
 
 상세 실행 절차는 `.claude/commands/wf.md`를 참조한다.
 
@@ -455,10 +455,10 @@ implement/research 워크플로우 완료 시 finalization.py가 티켓을 Revie
 | `research` | `/wf -s #N` (research 모드) |
 | `review` | `/wf -s #N` (review 모드) |
 
-### 티켓 파일 처리 규칙
+### WorkRequest 파일 처리 규칙
 
-- `#N` 지정 시: `.kanban/open/T-NNN.xml`, `.kanban/progress/T-NNN.xml`, `.kanban/review/T-NNN.xml` 순으로 탐색
-- `#N` 미지정 시: `.kanban/open/` 디렉터리의 XML 파일을 스캔하여 Open 상태 티켓을 자동 선택
+- `#N` 지정 시: `.agent-factory/work-requests/accepted/WR-NNN.xml`, `.agent-factory/work-requests/executing/WR-NNN.xml`, `.agent-factory/work-requests/verifying/WR-NNN.xml` 순으로 탐색
+- `#N` 미지정 시: `.agent-factory/work-requests/accepted/` 디렉터리의 XML 파일을 스캔하여 Accepted 상태 WorkRequest를 자동 선택
 - `<command>` 미존재 또는 빈 값 시: 에러 출력 후 종료
 - `<command>` 유효 값: `implement`, `research`, `review`
 
