@@ -61,7 +61,7 @@ def test_workflow_session_registry_uses_brain_process(tmp_path) -> None:
     from board.server.sessions.workflow_session import WorkflowSessionRegistry
 
     registry = WorkflowSessionRegistry(persist_dir=str(tmp_path))
-    session = registry.create("T-100", "implement", "/tmp/work")
+    session = registry.create("WR-100", "implement", "/tmp/work")
 
     assert isinstance(session.process, BrainProcess)
     assert session.process.status == "stopped"
