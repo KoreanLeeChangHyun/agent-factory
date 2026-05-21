@@ -27,7 +27,7 @@ from engine.apps.production_line._validate import (
 def _make_ctx(tmp_path: Path, command: str = "implement") -> WorkflowContext:
     (tmp_path / "work").mkdir(exist_ok=True)
     ctx = WorkflowContext(
-        ticket_no="T-489",
+        work_request_no="WR-489",
         registry_key="20260515-000000",
         work_dir=tmp_path,
         command=command,
