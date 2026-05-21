@@ -47,6 +47,17 @@ def _read_setting(key: str, *legacy_keys: str) -> str:
     return ""
 
 
+def _read_project_git_config(key: str) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", _PROJECT_ROOT, "config", "--get", key],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).decode().strip()
+    except Exception:
+        return ""
+
+
 def _git_config_get(scope: str, key: str) -> str:
     """Reads and returns the git config value.
 
@@ -127,6 +138,8 @@ def main() -> None:
     # --- Load environment variables ---
     git_user_name = _read_setting("GIT_USER_NAME", "AGENT_FACTORY_GIT_USER_NAME", "CLAUDE_CODE_GIT_USER_NAME")
     git_user_email = _read_setting("GIT_USER_EMAIL", "AGENT_FACTORY_GIT_USER_EMAIL", "CLAUDE_CODE_GIT_USER_EMAIL")
+    git_user_name = git_user_name or _read_project_git_config("user.name")
+    git_user_email = git_user_email or _read_project_git_config("user.email")
     # Currently not in use - expected to be integrated with GitHub API in the future
     _github_username = _read_setting("GITHUB_USERNAME", "AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
     ssh_key_github = _read_setting("SSH_KEY_GITHUB", "AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")

@@ -4,11 +4,44 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
+
+
+_GIT_CONFIG_FALLBACKS = {
+    'GIT_USER_NAME': 'user.name',
+    'GIT_USER_EMAIL': 'user.email',
+}
 
 
 def _resolve_settings_file(project_root: str) -> str:
     """Return .settings path."""
     return os.path.join(project_root, '.agent-factory', '.settings')
+
+
+def _read_git_config(project_root: str, key: str) -> str:
+    """Read a git config value scoped to the current project."""
+    try:
+        proc = subprocess.run(
+            ['git', '-C', project_root, 'config', '--get', key],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+    if proc.returncode != 0:
+        return ''
+    return proc.stdout.strip()
+
+
+def _apply_dynamic_defaults(project_root: str, key: str, value: str) -> str:
+    if value:
+        return value
+    git_key = _GIT_CONFIG_FALLBACKS.get(key)
+    if git_key:
+        return _read_git_config(project_root, git_key)
+    return value
 
 
 def _parse_env_file(project_root: str) -> list[dict]:
@@ -64,6 +97,7 @@ def _parse_env_file(project_root: str) -> list[dict]:
                 inline_comment = m.group(2).strip()
             else:
                 value = rest.strip()
+            value = _apply_dynamic_defaults(project_root, key, value)
 
             # Detect type
             var_type = 'string'
