@@ -11,10 +11,17 @@ def test_core_metrics_exports_event_schema_and_writer(tmp_path) -> None:
     assert "step.start" in known_event_types()
     assert schema_for("step.start") == ["step", "source"]
 
+    (tmp_path / ".context.json").write_text(
+        json.dumps({"work_request_no": "WR-700", "registry_key": "20260522-101500"}),
+        encoding="utf-8",
+    )
+
     append_event(tmp_path, "step.start", {"step": "PLAN", "source": "test"})
 
     lines = metrics_path(tmp_path).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     record = json.loads(lines[0])
     assert record["event_type"] == "step.start"
+    assert record["work_request"] == "WR-700"
+    assert "ticket" not in record
     assert record["payload"] == {"step": "PLAN", "source": "test"}

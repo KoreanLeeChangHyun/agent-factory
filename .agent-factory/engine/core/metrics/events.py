@@ -10,7 +10,7 @@ Save format:
     Common fields:
         - event_type: One of 12 catalogs
         - timestamp: ISO8601 (KST, UTC+9)
-        - ticket: T-NNN (or None allowed)
+        - work_request: WR-NNN (or None allowed)
         - registry_key: YYYYMMDD-HHMMSS (or None is allowed)
         - work_dir: absolute path
         - payload: dict (verification of required keys by event_type)
@@ -34,7 +34,7 @@ IO Rules:
 
 example:
     >>> from engine.core.metrics import MetricsWriter, append_event
-    >>> w = MetricsWriter("/tmp/run/work", ticket="T-400",
+    >>> w = MetricsWriter("/tmp/run/work", work_request="WR-400",
     ...                   registry_key="20260505-183053")
     >>> w.append("step.start", {"step": "INIT", "source": "banner"})
     >>> w.close()
@@ -42,7 +42,7 @@ example:
     Or in functional form:
     >>> append_event("/tmp/run/work", "step.start",
     ...              {"step": "INIT", "source": "banner"},
-    ...              ticket="T-400", registry_key="20260505-183053")
+    ...              work_request="WR-400", registry_key="20260505-183053")
 """
 from __future__ import annotations
 
@@ -170,17 +170,17 @@ def _validate(event_type: str, payload: Any) -> None:
 
 
 def _load_context_defaults(work_dir: Path) -> dict[str, Optional[str]]:
-    """Load ticket / registry_key default values ​​from .context.json in work_dir.
+    """Load work_request / registry_key default values from .context.json in work_dir.
 
     Args:
         work_dir: Workflow working directory.
 
     Returns:
-        {"ticket": <T-NNN | None>, "registry_key": <YYYYMMDD-HHMMSS | None>}
+        {"work_request": <WR-NNN | None>, "registry_key": <YYYYMMDD-HHMMSS | None>}
         Absence of file / Parsing failure / No key → Filled with None.
     """
     ctx_path = Path(work_dir) / ".context.json"
-    defaults: dict[str, Optional[str]] = {"ticket": None, "registry_key": None}
+    defaults: dict[str, Optional[str]] = {"work_request": None, "registry_key": None}
     try:
         with open(ctx_path, encoding="utf-8") as fp:
             data = json.load(fp)
@@ -188,11 +188,10 @@ def _load_context_defaults(work_dir: Path) -> dict[str, Optional[str]]:
         return defaults
     if not isinstance(data, dict):
         return defaults
-    # Supports both common key candidates (ticket / ticket_number, registry_key / registryKey)
-    ticket_val = data.get("ticket") or data.get("ticket_number")
+    work_request_val = data.get("work_request") or data.get("work_request_no")
     rkey_val = data.get("registry_key") or data.get("registryKey")
-    if isinstance(ticket_val, str) and ticket_val:
-        defaults["ticket"] = ticket_val
+    if isinstance(work_request_val, str) and work_request_val:
+        defaults["work_request"] = work_request_val
     if isinstance(rkey_val, str) and rkey_val:
         defaults["registry_key"] = rkey_val
     return defaults
@@ -203,7 +202,7 @@ class MetricsWriter:
 
     Attributes:
         work_dir: Workflow working directory (absolute path recommended).
-        ticket: Ticket number (e.g. "T-400"). None allowed.
+        work_request: Work request number (e.g. "WR-400"). None allowed.
         registry_key: registryKey (e.g. "20260505-183053"). None allowed.
         path: ``<work_dir>/metrics.jsonl`` absolute path.
 
@@ -217,18 +216,18 @@ class MetricsWriter:
     def __init__(
         self,
         work_dir: Union[str, Path],
-        ticket: Optional[str] = None,
+        work_request: Optional[str] = None,
         registry_key: Optional[str] = None,
     ) -> None:
         """Initializes a Writer instance.
 
         Args:
             work_dir: Workflow working directory.
-            ticket: Ticket number (e.g. "T-400"). Contains common header for all events.
+            work_request: Work request number (e.g. "WR-400"). Contains common header for all events.
             registry_key: registryKey (e.g. "20260505-183053").
         """
         self.work_dir: Path = Path(work_dir)
-        self.ticket: Optional[str] = ticket
+        self.work_request: Optional[str] = work_request
         self.registry_key: Optional[str] = registry_key
         self.path: Path = metrics_path(self.work_dir)
 
@@ -248,7 +247,7 @@ class MetricsWriter:
         record: dict[str, Any] = {
             "event_type": event_type,
             "timestamp": _now_kst_iso(),
-            "ticket": self.ticket,
+            "work_request": self.work_request,
             "registry_key": self.registry_key,
             "work_dir": str(self.work_dir),
             "payload": payload,
@@ -278,19 +277,19 @@ def append_event(
     event_type: str,
     payload: dict[str, Any],
     *,
-    ticket: Optional[str] = None,
+    work_request: Optional[str] = None,
     registry_key: Optional[str] = None,
 ) -> None:
     """Functional helper — When performing a one-time append, instance creation is omitted and called.
 
-    If work_dir/.context.json exists, ticket / registry_key is automatically set
+    If work_dir/.context.json exists, work_request / registry_key is automatically set
     Load it and use it as the default value when the specified argument is None.
 
     Args:
         work_dir: Workflow working directory.
         event_type: One of 12 catalogs.
         payload: payload dict for event_type.
-        ticket: When specified, takes precedence over .context.json.
+        work_request: When specified, takes precedence over .context.json.
         registry_key: When specified, takes precedence over .context.json.
 
     Raises:
@@ -298,14 +297,14 @@ def append_event(
         OSError: When disk IO fails.
     """
     work_dir_path = Path(work_dir)
-    if ticket is None or registry_key is None:
+    if work_request is None or registry_key is None:
         defaults = _load_context_defaults(work_dir_path)
-        if ticket is None:
-            ticket = defaults.get("ticket")
+        if work_request is None:
+            work_request = defaults.get("work_request")
         if registry_key is None:
             registry_key = defaults.get("registry_key")
     writer = MetricsWriter(
-        work_dir=work_dir_path, ticket=ticket, registry_key=registry_key
+        work_dir=work_dir_path, work_request=work_request, registry_key=registry_key
     )
     writer.append(event_type, payload)
 
@@ -412,7 +411,7 @@ def _selfcheck() -> int:
     failed = 0
     with tempfile.TemporaryDirectory() as tmp:
         writer = MetricsWriter(
-            work_dir=tmp, ticket="T-400", registry_key="20260505-183053"
+            work_dir=tmp, work_request="WR-400", registry_key="20260505-183053"
         )
         for label, et, payload, expected_exc in cases:
             try:
@@ -472,7 +471,7 @@ def _selfcheck() -> int:
         ctx_dir.mkdir()
         with open(ctx_dir / ".context.json", "w", encoding="utf-8") as fp:
             json.dump(
-                {"ticket": "T-401", "registry_key": "20260505-190000"}, fp
+                {"work_request_no": "WR-401", "registry_key": "20260505-190000"}, fp
             )
         append_event(
             ctx_dir,
@@ -482,14 +481,14 @@ def _selfcheck() -> int:
         with open(metrics_path(ctx_dir), encoding="utf-8") as fp:
             rec = json.loads(fp.readline())
         ctx_ok = (
-            rec["ticket"] == "T-401"
+            rec["work_request"] == "WR-401"
             and rec["registry_key"] == "20260505-190000"
             and rec["event_type"] == "step.start"
         )
         rows.append(
             (
                 "autoload append_event context",
-                "ticket=T-401 / registry_key=20260505-190000",
+                "work_request=WR-401 / registry_key=20260505-190000",
                 "PASS" if ctx_ok else "FAIL",
             )
         )
