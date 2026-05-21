@@ -42,8 +42,15 @@ class LLMProviderConfig:
         def get(key: str, default: str | None = None) -> str | None:
             return os.environ.get(key) or settings.get(key) or default
 
+        def get_any(key: str, *legacy_keys: str, default: str | None = None) -> str | None:
+            for candidate in (key, *legacy_keys):
+                value = os.environ.get(candidate) or settings.get(candidate)
+                if value:
+                    return value
+            return default
+
         return cls(
-            provider=str(get("AGENT_FACTORY_LLM_PROVIDER", "fake")).strip().lower(),
+            provider=str(get_any("LLM_PROVIDER", "AGENT_FACTORY_LLM_PROVIDER", default="fake")).strip().lower(),
             codex_bin=str(get("CODEX_BIN", "codex")),
             codex_model=get("CODEX_MODEL"),
             codex_profile=get("CODEX_PROFILE"),

@@ -262,11 +262,12 @@ def test_codex_process_resumes_finished_session_for_next_input(monkeypatch) -> N
 def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:
     from board.server.runtime.state import load_terminal_provider_config
 
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("AGENT_FACTORY_LLM_PROVIDER", raising=False)
     settings_dir = tmp_path / ".agent-factory"
     settings_dir.mkdir()
     (settings_dir / ".settings").write_text(
-        "AGENT_FACTORY_LLM_PROVIDER=codex\n"
+        "LLM_PROVIDER=codex\n"
         "CODEX_BIN=codex-test\n"
         "CODEX_MODEL=gpt-test\n"
         "CODEX_PROFILE=work\n"
@@ -283,6 +284,20 @@ def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:
     assert config.codex_sandbox == "danger-full-access"
 
 
+def test_terminal_provider_config_accepts_legacy_provider_key(tmp_path, monkeypatch) -> None:
+    from board.server.runtime.state import load_terminal_provider_config
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("AGENT_FACTORY_LLM_PROVIDER", raising=False)
+    settings_dir = tmp_path / ".agent-factory"
+    settings_dir.mkdir()
+    (settings_dir / ".settings").write_text("AGENT_FACTORY_LLM_PROVIDER=codex\n", encoding="utf-8")
+
+    config = load_terminal_provider_config(str(tmp_path))
+
+    assert config.provider == "codex"
+
+
 def test_configure_brain_process_switches_stopped_terminal_to_codex(tmp_path, monkeypatch) -> None:
     from board.server.runtime import state
     from board.server.processes.codex_process import CodexProcess
@@ -293,7 +308,7 @@ def test_configure_brain_process_switches_stopped_terminal_to_codex(tmp_path, mo
         settings_dir = tmp_path / ".agent-factory"
         settings_dir.mkdir()
         (settings_dir / ".settings").write_text(
-            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            "LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
             encoding="utf-8",
         )
 
@@ -333,7 +348,7 @@ def test_configure_brain_process_switches_idle_terminal_provider(tmp_path, monke
         settings_dir = tmp_path / ".agent-factory"
         settings_dir.mkdir()
         (settings_dir / ".settings").write_text(
-            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            "LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
             encoding="utf-8",
         )
 
@@ -373,7 +388,7 @@ def test_configure_brain_process_keeps_running_terminal_provider(tmp_path) -> No
         settings_dir = tmp_path / ".agent-factory"
         settings_dir.mkdir()
         (settings_dir / ".settings").write_text(
-            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            "LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
             encoding="utf-8",
         )
 

@@ -11,12 +11,12 @@ Usage: python3 git_config.py [--global|--local]
   --local Local configuration (.git/config)
 
 Environment variables (loaded from .agent-factory/.settings):
-  AGENT_FACTORY_GIT_USER_NAME - Git user.name (required)
-  AGENT_FACTORY_GIT_USER_EMAIL - Git user.email (required)
-  AGENT_FACTORY_GITHUB_USERNAME - GitHub username (optional)
-  AGENT_FACTORY_SSH_KEY_GITHUB - GitHub SSH key path (optional)
+  GIT_USER_NAME - Git user.name (required)
+  GIT_USER_EMAIL - Git user.email (required)
+  GITHUB_USERNAME - GitHub username (optional)
+  SSH_KEY_GITHUB - GitHub SSH key path (optional)
 
-Legacy CLAUDE_CODE_* names are still accepted for existing installations.
+Legacy AGENT_FACTORY_* and CLAUDE_CODE_* names are still accepted for existing installations.
 """
 
 from __future__ import annotations
@@ -39,11 +39,12 @@ _CW_DIR = os.path.join(_PROJECT_ROOT, ".agent-factory")
 _ENV_FILE = os.path.join(_CW_DIR, ".settings")
 
 
-def _read_setting(key: str, legacy_key: str = "") -> str:
-    value = read_env(key, env_file=_ENV_FILE)
-    if value or not legacy_key:
-        return value
-    return read_env(legacy_key, env_file=_ENV_FILE)
+def _read_setting(key: str, *legacy_keys: str) -> str:
+    for candidate in (key, *legacy_keys):
+        value = read_env(candidate, env_file=_ENV_FILE)
+        if value:
+            return value
+    return ""
 
 
 def _git_config_get(scope: str, key: str) -> str:
@@ -124,19 +125,19 @@ def main() -> None:
         sys.exit(1)
 
     # --- Load environment variables ---
-    git_user_name = _read_setting("AGENT_FACTORY_GIT_USER_NAME", "CLAUDE_CODE_GIT_USER_NAME")
-    git_user_email = _read_setting("AGENT_FACTORY_GIT_USER_EMAIL", "CLAUDE_CODE_GIT_USER_EMAIL")
+    git_user_name = _read_setting("GIT_USER_NAME", "AGENT_FACTORY_GIT_USER_NAME", "CLAUDE_CODE_GIT_USER_NAME")
+    git_user_email = _read_setting("GIT_USER_EMAIL", "AGENT_FACTORY_GIT_USER_EMAIL", "CLAUDE_CODE_GIT_USER_EMAIL")
     # Currently not in use - expected to be integrated with GitHub API in the future
-    _github_username = _read_setting("AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
-    ssh_key_github = _read_setting("AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")
+    _github_username = _read_setting("GITHUB_USERNAME", "AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
+    ssh_key_github = _read_setting("SSH_KEY_GITHUB", "AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")
 
     # --- Verification of required environment variables ---
     if not git_user_name:
-        print("[ERROR] AGENT_FACTORY_GIT_USER_NAME is not set in .settings.", file=sys.stderr)
+        print("[ERROR] GIT_USER_NAME is not set in .settings.", file=sys.stderr)
         sys.exit(1)
 
     if not git_user_email:
-        print("[ERROR] AGENT_FACTORY_GIT_USER_EMAIL is not set in .settings.", file=sys.stderr)
+        print("[ERROR] GIT_USER_EMAIL is not set in .settings.", file=sys.stderr)
         sys.exit(1)
 
     # --- Before state collection ---

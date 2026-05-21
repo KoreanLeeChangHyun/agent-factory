@@ -7,8 +7,8 @@ Main functions:
     main: Slack notification sending entry point
 
 Environment variables (loaded from .agent-factory/.settings):
-    AGENT_FACTORY_SLACK_BOT_TOKEN - Slack Bot OAuth Token
-    AGENT_FACTORY_SLACK_CHANNEL_ID - Slack Channel ID
+    SLACK_BOT_TOKEN - Slack Bot OAuth Token
+    SLACK_CHANNEL_ID - Slack Channel ID
 
 Workflow identification method (based on directory scan):
     1. Scan the .workflow/ directory to view the list of active workflows

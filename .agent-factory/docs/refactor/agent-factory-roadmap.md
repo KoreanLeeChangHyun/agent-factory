@@ -355,7 +355,7 @@ Tasks:
 
 Acceptance criteria:
 
-- `AGENT_FACTORY_LLM_PROVIDER=codex` selects Codex
+- `LLM_PROVIDER=codex` selects Codex
 - Codex can run at least PLAN or REPORT in a controlled smoke
 - FakeAdapter remains the default in unit/application tests
 - Claude is no longer hard-coded in orchestration

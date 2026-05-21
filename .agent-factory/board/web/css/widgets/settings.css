@@ -295,6 +295,20 @@
   font-weight: 600;
 }
 
+.settings-provider-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+.settings-provider-meta-label {
+  color: var(--af-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .settings-capability-pill {
   display: inline-block;
   padding: 3px 8px;

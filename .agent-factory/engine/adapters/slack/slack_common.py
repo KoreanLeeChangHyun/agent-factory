@@ -40,11 +40,12 @@ SLACK_BOT_TOKEN: str = ""
 SLACK_CHANNEL_ID: str = ""
 
 
-def _read_setting(key: str, legacy_key: str, env_file: str | None = None) -> str:
-    value = read_env(key, "", env_file)
-    if value:
-        return value
-    return read_env(legacy_key, "", env_file)
+def _read_setting(key: str, *legacy_keys: str, env_file: str | None = None) -> str:
+    for candidate in (key, *legacy_keys):
+        value = read_env(candidate, "", env_file)
+        if value:
+            return value
+    return ""
 
 
 def log_info(msg: str) -> None:
@@ -79,12 +80,22 @@ def load_slack_env(env_file: str | None = None) -> bool:
     """
     global SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
 
-    SLACK_BOT_TOKEN = _read_setting("AGENT_FACTORY_SLACK_BOT_TOKEN", "CLAUDE_CODE_SLACK_BOT_TOKEN", env_file)
-    SLACK_CHANNEL_ID = _read_setting("AGENT_FACTORY_SLACK_CHANNEL_ID", "CLAUDE_CODE_SLACK_CHANNEL_ID", env_file)
+    SLACK_BOT_TOKEN = _read_setting(
+        "SLACK_BOT_TOKEN",
+        "AGENT_FACTORY_SLACK_BOT_TOKEN",
+        "CLAUDE_CODE_SLACK_BOT_TOKEN",
+        env_file=env_file,
+    )
+    SLACK_CHANNEL_ID = _read_setting(
+        "SLACK_CHANNEL_ID",
+        "AGENT_FACTORY_SLACK_CHANNEL_ID",
+        "CLAUDE_CODE_SLACK_CHANNEL_ID",
+        env_file=env_file,
+    )
 
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         log_warn(
-            "AGENT_FACTORY_SLACK_BOT_TOKEN or AGENT_FACTORY_SLACK_CHANNEL_ID "
+            "SLACK_BOT_TOKEN or SLACK_CHANNEL_ID "
             "Not set. Skip the Slack transfer."
         )
         return False

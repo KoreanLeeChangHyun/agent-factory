@@ -7,7 +7,7 @@ Planned.
 Current state:
 
 - `CodexAdapter` exists under `engine/adapters/llm`.
-- `AGENT_FACTORY_LLM_PROVIDER=codex` selects Codex for provider-neutral
+- `LLM_PROVIDER=codex` selects Codex for provider-neutral
   `LLMAdapter` paths.
 - Board Settings can expose and save the active brain provider.
 - `BrainProcess` exists as the provider-neutral board terminal process
@@ -15,7 +15,7 @@ Current state:
 - `CodexProcess` exists as an experimental one-shot `codex exec --json -`
   process that normalizes stdout JSON into terminal SSE events.
 - `/terminal/start` resolves the active provider from
-  `AGENT_FACTORY_LLM_PROVIDER` before spawning a stopped terminal process.
+  `LLM_PROVIDER` before spawning a stopped terminal process.
 - `/terminal/status` reports provider capabilities and the frontend disables
   unsupported resume, attachment, slash-command, and permission paths.
 - The interactive Terminal surface still defaults to `ClaudeProcess`.
@@ -49,7 +49,7 @@ BrainProcess
 
 ### 1. Freeze Current Provider Semantics
 
-- Keep `AGENT_FACTORY_LLM_PROVIDER` as the source of truth for adapter-backed
+- Keep `LLM_PROVIDER` as the source of truth for adapter-backed
   LLM paths.
 - In Settings, label the terminal capability separately from the selected
   provider.

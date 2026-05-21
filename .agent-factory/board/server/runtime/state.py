@@ -47,7 +47,14 @@ def load_terminal_provider_config(project_root: str) -> TerminalProviderConfig:
     def get(key: str, default: str | None = None) -> str | None:
         return os.environ.get(key) or settings.get(key) or default
 
-    provider = str(get('AGENT_FACTORY_LLM_PROVIDER', 'claude')).strip().lower()
+    def get_any(key: str, *legacy_keys: str, default: str | None = None) -> str | None:
+        for candidate in (key, *legacy_keys):
+            value = os.environ.get(candidate) or settings.get(candidate)
+            if value:
+                return value
+        return default
+
+    provider = str(get_any('LLM_PROVIDER', 'AGENT_FACTORY_LLM_PROVIDER', default='claude')).strip().lower()
     if provider not in ('claude', 'codex'):
         provider = 'claude'
     return TerminalProviderConfig(

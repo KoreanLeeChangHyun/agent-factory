@@ -4,21 +4,27 @@
   var body = document.getElementById('settings-body');
   var resizeHandle = document.getElementById('settings-resize-handle');
   var SETTINGS_WIDTH_KEY = 'agentFactorySettingsWidth';
+  var PROVIDER_SETTING_KEY = 'LLM_PROVIDER';
+  var PROVIDER_LEGACY_SETTING_KEYS = ['AGENT_FACTORY_LLM_PROVIDER'];
+  var SETTINGS_PANEL_OWNED_KEYS = {};
+  SETTINGS_PANEL_OWNED_KEYS[PROVIDER_SETTING_KEY] = true;
+  PROVIDER_LEGACY_SETTING_KEYS.forEach(function (key) { SETTINGS_PANEL_OWNED_KEYS[key] = true; });
   var SETTING_OPTIONS = {
-    AGENT_FACTORY_LLM_PROVIDER: [
+    LLM_PROVIDER: [
       { value: 'claude', label: 'Claude' },
       { value: 'codex', label: 'Codex' },
       { value: 'fake', label: 'Fake' }
     ]
   };
   var ENV_DESCRIPTIONS = {
-    AGENT_FACTORY_SLACK_BOT_TOKEN: 'Slack Bot OAuth token used to send task notifications. Leave empty to disable Slack notifications.',
-    AGENT_FACTORY_SLACK_CHANNEL_ID: 'Slack channel ID where Agent Factory notifications are posted.',
-    AGENT_FACTORY_SLACK_API_URL: 'Slack chat.postMessage endpoint. Change only when using a compatible proxy.',
-    AGENT_FACTORY_GIT_USER_NAME: 'Git author name used by Agent Factory automation.',
-    AGENT_FACTORY_GIT_USER_EMAIL: 'Git author email used by Agent Factory automation.',
-    AGENT_FACTORY_GITHUB_USERNAME: 'GitHub username used for repository and identity-related automation.',
-    AGENT_FACTORY_SSH_KEY_GITHUB: 'SSH private key path for GitHub operations, when a custom key is required.',
+    LLM_PROVIDER: 'Brain provider for provider-neutral LLM adapter paths. Supported values: claude, codex, fake.',
+    SLACK_BOT_TOKEN: 'Slack Bot OAuth token used to send task notifications. Leave empty to disable Slack notifications.',
+    SLACK_CHANNEL_ID: 'Slack channel ID where Agent Factory notifications are posted.',
+    SLACK_API_URL: 'Slack chat.postMessage endpoint. Change only when using a compatible proxy.',
+    GIT_USER_NAME: 'Git author name used by Agent Factory automation.',
+    GIT_USER_EMAIL: 'Git author email used by Agent Factory automation.',
+    GITHUB_USERNAME: 'GitHub username used for repository and identity-related automation.',
+    SSH_KEY_GITHUB: 'SSH private key path for GitHub operations, when a custom key is required.',
     HOOK_DANGEROUS_COMMAND: 'Blocks or warns on dangerous shell commands before tool execution.',
     HOOK_HOOKS_SELF_PROTECT: 'Protects Agent Factory hook files from accidental modification.',
     HOOK_SLACK_ASK: 'Routes selected approval/ask events through Slack integration.',
@@ -50,27 +56,26 @@
     ENFORCE_VRT: 'Requires Verification Result Table output where applicable.',
     ENFORCE_SELF_REVIEW: 'Requires self-review checklist output where applicable.',
     ENFORCE_TOKEN_EFFICIENCY: 'Enforces token-efficiency guidance in workflow behavior.',
-    AGENT_FACTORY_WORKFLOW_KEEP_COUNT: 'Maximum number of workflow run records retained under .agent-factory/runs.',
-    AGENT_FACTORY_CHAIN_MAX_RETRY: 'Maximum retry count when a chain stage fails.',
+    WORKFLOW_KEEP_COUNT: 'Maximum number of workflow run records retained under .agent-factory/runs.',
+    CHAIN_MAX_RETRY: 'Maximum retry count when a chain stage fails.',
     WORKFLOW_WORKTREE: 'Enables isolated git worktrees for workflow execution.',
-    AGENT_FACTORY_QUALITY_THRESHOLD: 'Prompt quality threshold from 0.0 to 1.0 for workflow quality checks.',
-    AGENT_FACTORY_ERROR_THRESHOLD: 'Error count threshold before workflow health is considered degraded.',
-    AGENT_FACTORY_STALE_TTL_MINUTES: 'Minutes before a session or workflow is considered stale.',
-    AGENT_FACTORY_ZOMBIE_TTL_HOURS: 'Hours before an abandoned session is treated as zombie state.',
-    AGENT_FACTORY_REPORT_TTL_HOURS: 'Hours before generated report data is considered expired.',
-    AGENT_FACTORY_WORK_NAME_MAX_LEN: 'Maximum generated working directory name length.',
+    QUALITY_THRESHOLD: 'Prompt quality threshold from 0.0 to 1.0 for workflow quality checks.',
+    ERROR_THRESHOLD: 'Error count threshold before workflow health is considered degraded.',
+    STALE_TTL_MINUTES: 'Minutes before a session or workflow is considered stale.',
+    ZOMBIE_TTL_HOURS: 'Hours before an abandoned session is treated as zombie state.',
+    REPORT_TTL_HOURS: 'Hours before generated report data is considered expired.',
+    WORK_NAME_MAX_LEN: 'Maximum generated working directory name length.',
     WORKFLOW_RETRY_INIT: 'Retry count for the init phase.',
     WORKFLOW_RETRY_PLAN: 'Retry count for the plan phase.',
     WORKFLOW_RETRY_WORK: 'Retry count for the work phase.',
     WORKFLOW_RETRY_VALIDATE: 'Retry count for the validate phase.',
     WORKFLOW_RETRY_REPORT: 'Retry count for the report phase.',
     WORKFLOW_RETRY_PROMPT_N: 'Maximum retry-context hint history entries retained.',
-    AGENT_FACTORY_BANNER_WIDTH: 'Terminal banner width. Leave empty to auto-detect terminal width.',
-    AGENT_FACTORY_REPO_URL: 'Remote Agent Factory repository URL used by sync/bootstrap.',
-    AGENT_FACTORY_REQUIRED_PYTHON_MAJOR: 'Required Python major version checked by bootstrap.',
-    AGENT_FACTORY_REQUIRED_PYTHON_MINOR: 'Required Python minor version checked by bootstrap.',
+    BANNER_WIDTH: 'Terminal banner width. Leave empty to auto-detect terminal width.',
+    REPO_URL: 'Remote Agent Factory repository URL used by sync/bootstrap.',
+    REQUIRED_PYTHON_MAJOR: 'Required Python major version checked by bootstrap.',
+    REQUIRED_PYTHON_MINOR: 'Required Python minor version checked by bootstrap.',
     HOOK_WORKTREE_PATH: 'Current workflow worktree path, usually maintained by Agent Factory automatically.',
-    AGENT_FACTORY_LLM_PROVIDER: 'Brain provider for provider-neutral LLM adapter paths. Supported values: claude, codex, fake.',
     CLAUDE_PERMISSION_MODE: 'Claude adapter permission mode for non-interactive runs.',
     CODEX_BIN: 'Codex executable name or path used by CodexAdapter.',
     CODEX_MODEL: 'Optional Codex model override. Leave empty to use Codex defaults.',
@@ -217,24 +222,21 @@
 
     var provider = document.createElement('div');
     provider.className = 'settings-section settings-provider';
-    var brain = getSettingValue(sections, 'AGENT_FACTORY_LLM_PROVIDER') || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
+    var brain = getSettingValue(sections, PROVIDER_SETTING_KEY, PROVIDER_LEGACY_SETTING_KEYS) || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
     brain = normalizeBrain(brain);
     if (window.AgentFactoryBrain) {
       window.AgentFactoryBrain.setBrain(brain);
     }
     provider.innerHTML =
-      '<div class="settings-section-title">Brain</div>' +
-      '<div class="settings-item">' +
+      '<div class="settings-section-title">Provider</div>' +
+      '<div class="settings-item settings-provider-item">' +
         '<div class="settings-item-info">' +
-          '<div class="settings-item-key">Active adapter</div>' +
-          '<div class="settings-item-label">Provider-specific naming is isolated to adapter details.</div>' +
-        '</div>' +
-        '<div class="settings-item-control"><span class="settings-provider-pill" id="settings-provider-pill">' + adapterLabel(brain) + '</span></div>' +
-      '</div>' +
-      '<div class="settings-item">' +
-        '<div class="settings-item-info">' +
-          '<div class="settings-item-key">Brain provider</div>' +
-          '<div class="settings-item-label">Changes the provider setting and matches the Console, Terminal, and Board accent color.</div>' +
+          '<div class="settings-item-key">' + PROVIDER_SETTING_KEY + '</div>' +
+          '<div class="settings-item-label">Controls the active LLM adapter, Console terminal process, and Board accent color.</div>' +
+          '<div class="settings-provider-meta">' +
+            '<span class="settings-provider-meta-label">Active adapter</span>' +
+            '<span class="settings-provider-pill" id="settings-provider-pill">' + adapterLabel(brain) + '</span>' +
+          '</div>' +
         '</div>' +
         '<div class="settings-item-control">' +
           '<select class="settings-select" id="settings-brain-theme">' +
@@ -268,8 +270,7 @@
         var pill = document.getElementById('settings-provider-pill');
         if (pill) pill.textContent = adapterLabel(selectedBrain);
         updateProviderCapability(selectedBrain);
-        syncProviderSelects(selectedBrain);
-        save('AGENT_FACTORY_LLM_PROVIDER', providerValue(selectedBrain), brainSelect);
+        save(PROVIDER_SETTING_KEY, providerValue(selectedBrain), brainSelect);
       });
     }
 
@@ -429,7 +430,7 @@
 
     var loginBtn = document.getElementById('settings-login-btn');
     if (loginBtn) {
-      var loginBrain = getSettingValue(sections, 'AGENT_FACTORY_LLM_PROVIDER') || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
+      var loginBrain = getSettingValue(sections, PROVIDER_SETTING_KEY, PROVIDER_LEGACY_SETTING_KEYS) || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
       if (!supportsSlashCommands(normalizeBrain(loginBrain))) {
         loginBtn.disabled = true;
         loginBtn.title = 'Login command is not supported by this terminal provider';
@@ -461,10 +462,14 @@
 
     // Settings sections
     sections.forEach(function (sec) {
+      var visibleVars = (sec.vars || []).filter(function (v) {
+        return !SETTINGS_PANEL_OWNED_KEYS[v.key];
+      });
+      if (!visibleVars.length) return;
       var el = document.createElement('div');
       el.className = 'settings-section';
       el.innerHTML = '<div class="settings-section-title">' + esc(sec.section) + '</div>';
-      sec.vars.forEach(function (v) { el.appendChild(createItem(v)); });
+      visibleVars.forEach(function (v) { el.appendChild(createItem(v)); });
       body.appendChild(el);
     });
   }
@@ -507,16 +512,13 @@
       select.addEventListener('change', function () {
         var selected = normalizeBrain(select.value);
         select.value = providerValue(selected);
-        if (v.key === 'AGENT_FACTORY_LLM_PROVIDER') {
+        if (v.key === PROVIDER_SETTING_KEY) {
           if (window.AgentFactoryBrain) {
             window.AgentFactoryBrain.setBrain(selected);
           }
-          var topSelect = document.getElementById('settings-brain-theme');
-          if (topSelect) topSelect.value = providerValue(selected);
           var pill = document.getElementById('settings-provider-pill');
           if (pill) pill.textContent = adapterLabel(selected);
           updateProviderCapability(selected);
-          syncProviderSelects(selected);
         }
         save(v.key, select.value, select);
       });
@@ -558,7 +560,16 @@
       });
   }
 
-  function getSettingValue(sections, key) {
+  function getSettingValue(sections, key, legacyKeys) {
+    var keys = [key].concat(legacyKeys || []);
+    for (var k = 0; k < keys.length; k++) {
+      var value = getExactSettingValue(sections, keys[k]);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function getExactSettingValue(sections, key) {
     for (var i = 0; i < sections.length; i++) {
       var vars = sections[i].vars || [];
       for (var j = 0; j < vars.length; j++) {
@@ -633,13 +644,6 @@
         ? 'Send /login to the active Console session.'
         : 'Login command is not supported by this terminal provider';
     }
-  }
-
-  function syncProviderSelects(brain) {
-    var value = providerValue(brain);
-    document.querySelectorAll('select[data-setting-key="AGENT_FACTORY_LLM_PROVIDER"]').forEach(function (select) {
-      select.value = value;
-    });
   }
 
   function flash(el, cls) {
