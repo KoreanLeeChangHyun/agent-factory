@@ -1,6 +1,6 @@
-"""test_steps_done.py — DONE / FAILED Step wire-up (T-503 fix).
+"""test_steps_done.py — DONE / FAILED Step wire-up (WR-503 fix).
 
-T-503 wire-up regression correction: done step / fail step by calling this write metadata
+WR-503 wire-up regression correction: done step / fail step by calling this write metadata
 metadata.json Integrity (ex summary.txt / usage.json / failure.md and simultaneous writing).
 """
 
@@ -17,13 +17,13 @@ def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
     work_dir = tmp_path / "runs" / "20260518-000000"
     (work_dir / "work").mkdir(parents=True, exist_ok=True)
     return WorkflowContext(
-        ticket_no="T-999",
+        work_request_no="WR-999",
         registry_key="20260518-000000",
         work_dir=work_dir,
         command=command,
         mode="multi",
         current_step="REPORT",
-        title="wire-up verification ticket",
+        title="wire-up verification work request",
     )
 
 
@@ -33,7 +33,7 @@ def _patch_done_externals(monkeypatch):
     monkeypatch.setattr(done_mod, "emit", lambda *a, **k: None)
     monkeypatch.setattr(done_mod, "workflow_finish", lambda *a, **k: None)
     monkeypatch.setattr(done_mod, "regression", lambda *a, **k: None)
-    monkeypatch.setattr(done_mod, "kanban_move", lambda *a, **k: 0)
+    monkeypatch.setattr(done_mod, "conveyor_move", lambda *a, **k: 0)
     monkeypatch.setattr(done_mod, "update_step", lambda *a, **k: None)
 
     class _FakeVerdict:
@@ -52,9 +52,9 @@ def _patch_done_externals(monkeypatch):
     monkeypatch.setattr(
         done_mod,
         "load_template",
-        lambda name: "ticket={ticket_no} key={registry_key} cmd={command} mode={mode} ts={finalized_at}"
+        lambda name: "work_request={work_request_no} key={registry_key} cmd={command} mode={mode} ts={finalized_at}"
         if name == "summary.txt"
-        else "ticket={ticket_no} key={registry_key} reason={reason} ts={ts}",
+        else "work_request={work_request_no} key={registry_key} reason={reason} ts={ts}",
     )
 
 
@@ -68,7 +68,7 @@ def test_done_step_writes_metadata_json(monkeypatch, tmp_path):
     metadata_path = ctx.metadata_json_path()
     assert metadata_path.exists(), "metadata.json must be written by done_step"
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["ticket_no"] == "T-999"
+    assert payload["work_request_no"] == "WR-999"
     assert payload["registry_key"] == "20260518-000000"
     assert payload["command"] == "implement"
     assert payload["finalized_at"] is not None

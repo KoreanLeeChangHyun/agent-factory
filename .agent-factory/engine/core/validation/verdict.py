@@ -124,7 +124,7 @@ def write_verify_verdict(ctx: Any) -> Path:
     payload = {
         "schema_version": SCHEMA_VERSION,
         "stage": "VERIFY",
-        "ticket_no": ctx.ticket_no,
+        "work_request_no": ctx.work_request_no,
         "registry_key": ctx.registry_key,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "deterministic_artifacts": checks[:2],
@@ -168,7 +168,7 @@ def write_report_manifest(ctx: Any) -> Path:
     payload = {
         "schema_version": SCHEMA_VERSION,
         "stage": "REPORT",
-        "ticket_no": ctx.ticket_no,
+        "work_request_no": ctx.work_request_no,
         "registry_key": ctx.registry_key,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "request": str(ctx.user_prompt_path()),
@@ -219,16 +219,16 @@ def build_final_verdict(ctx: Any, verdict_report: Any) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "stage": "COMPLETE",
-        "ticket_no": ctx.ticket_no,
+        "work_request_no": ctx.work_request_no,
         "registry_key": ctx.registry_key,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "verdict": getattr(verdict_report, "verdict", "FAIL"),
         "complete_outcome": complete_outcome,
         "blocking_failures": failures,
         "advisory_failures": advisory_failures,
-        "workrequest_refinement": {
+        "work_request_refinement": {
             "suggested": bool(failures),
-            "ticket": ctx.ticket_no,
+            "work_request": ctx.work_request_no,
             "reason": "; ".join(refinement_reasons)[:500],
             "fields": {
                 "context": f"Verification blocked COMPLETE. See {ctx.final_verdict_json_path()}",

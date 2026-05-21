@@ -63,7 +63,7 @@ def done_step(ctx: WorkflowContext) -> None:
             verdict=verdict_report.verdict,
             summary="Complete blocked by verification gates",
             final_verdict_path=str(ctx.final_verdict_json_path()),
-            workrequest_refinement=final_verdict.get("workrequest_refinement", {}),
+            work_request_refinement=final_verdict.get("work_request_refinement", {}),
         )
         return
     workflow_finish(
@@ -71,7 +71,7 @@ def done_step(ctx: WorkflowContext) -> None:
         outcome="ok",
         verdict=verdict_report.verdict,
         final_verdict_path=str(ctx.final_verdict_json_path()),
-        workrequest_refinement=final_verdict.get("workrequest_refinement", {}),
+        work_request_refinement=final_verdict.get("work_request_refinement", {}),
     )
     conveyor_move(ctx.work_request_no, "verifying")
 

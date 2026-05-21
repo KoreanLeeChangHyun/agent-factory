@@ -26,7 +26,7 @@ def _ctx(tmp_path: Path, command: str = "implement") -> WorkflowContext:
     work_dir = tmp_path / "run"
     work_dir.mkdir()
     return WorkflowContext(
-        ticket_no="T-900",
+        work_request_no="WR-900",
         registry_key="20260520-120000",
         work_dir=work_dir,
         command=command,
@@ -38,8 +38,8 @@ def _write_minimal_artifacts(ctx: WorkflowContext) -> None:
     ctx.plan_dir().mkdir(parents=True, exist_ok=True)
     ctx.plan_json_path().write_text(
         json.dumps({
-            "schema_version": 1,
-            "ticket": ctx.ticket_no,
+            "schema_version": 2,
+            "work_request": ctx.work_request_no,
             "command": ctx.command,
             "mode": "multi",
             "phases": [
@@ -121,7 +121,7 @@ def test_final_verdict_blocks_complete_on_blocking_gate(tmp_path: Path) -> None:
     assert saved["complete_outcome"] == "blocked"
     assert saved["blocking_failures"][0]["rule_id"] == "R-CODE-1"
     assert saved["advisory_failures"][0]["rule_id"] == "R-CODE-2"
-    assert saved["workrequest_refinement"]["suggested"] is True
+    assert saved["work_request_refinement"]["suggested"] is True
 
 
 def test_rules_report_includes_gate_registry(tmp_path: Path) -> None:
@@ -137,7 +137,7 @@ def test_rules_report_includes_gate_registry(tmp_path: Path) -> None:
 
 def test_workflow_finish_posts_final_verdict_extras_for_refinement(tmp_path: Path, monkeypatch) -> None:
     ctx = _ctx(tmp_path)
-    ctx.wf_session_id = "wf-T-900-test"
+    ctx.wf_session_id = "wf-WR-900-test"
     posted: list[tuple[str, dict]] = []
 
     monkeypatch.setattr("engine.apps.production_line._emitter._post_to_board", lambda endpoint, body: posted.append((endpoint, body)))
@@ -148,10 +148,10 @@ def test_workflow_finish_posts_final_verdict_extras_for_refinement(tmp_path: Pat
         verdict="FAIL",
         summary="blocked",
         final_verdict_path=str(ctx.final_verdict_json_path()),
-        workrequest_refinement={"suggested": True, "ticket": ctx.ticket_no},
+        work_request_refinement={"suggested": True, "work_request": ctx.work_request_no},
     )
 
-    assert posted[0][0].endswith("/api/v2/sessions/wf-T-900-test/finish")
+    assert posted[0][0].endswith("/api/v2/sessions/wf-WR-900-test/finish")
     assert posted[0][1]["outcome"] == "fail"
     assert posted[0][1]["final_verdict_path"].endswith("final-verdict.json")
-    assert posted[0][1]["workrequest_refinement"]["suggested"] is True
+    assert posted[0][1]["work_request_refinement"]["suggested"] is True
