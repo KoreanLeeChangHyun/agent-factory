@@ -18,8 +18,8 @@ Price:
 T-453: Multi-key 8 status (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED alias).
 """
 
-#   workflow_phase / work_step / kanban_status / artifact / final_report
-#   phase_verify / ticket_validate / verifier_failure / validator_failure / retry_context
+#   workflow_phase / work_step / conveyor_status / artifact / final_report
+#   phase_verify / work_request_validate / verifier_failure / validator_failure / retry_context
 
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ WORK_NAME_MAX_LEN = int(_env_alias("WORK_NAME_MAX_LEN", "AGENT_FACTORY_WORK_NAME
 
 # =============================================================================
 # Terminal filename
-#   - kanban status (To Do/Open/In Progress/Review/Done) and workflow phase (INIT.DONE)
+#   - conveyor status (Draft/Accepted/Executing/Verifying/Complete) and workflow phase (INIT.DONE)
 # =============================================================================
 STATUS_FILENAME = "status.json"
 CONTEXT_FILENAME = ".context.json"
@@ -430,7 +430,7 @@ DANGER_PATTERNS = [
     {"pattern": "(sudo\\s+)?chmod\\s+ugo\\+rwx", "blocked": "chmod ugo+rwx", "alternative": "chmod 755"},
     {"pattern": "(sudo\\s+)?mkfs", "blocked": "mkfs (desk format)", "alternative": "Disk format is very dangerous. Please check the target device."},
     {"pattern": "(sudo\\s+)?dd\\s+if=", "blocked": "dd if=", "alternative": "dd command cannot be returned. Please check the target device."},
-    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+.*\\.claude\\.workflow/kanban", "blocked": "rm -rf .agent-factory/kanban (delete directory)", "alternative": "The Kanban Director is a workflow core data. Do not delete it."},
+    {"pattern": "(sudo\\s+)?rm\\s+-r[f]*\\s+.*\\.agent-factory/work-requests", "blocked": "rm -rf .agent-factory/work-requests (delete work request directory)", "alternative": "The Conveyor work request directory is workflow core data. Do not delete it."},
 ]
 
 # =============================================================================

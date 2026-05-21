@@ -1,2 +1,1 @@
-"""Kanban application services."""
-
+"""Conveyor application services."""

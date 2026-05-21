@@ -1,12 +1,12 @@
 ---
 name: agent-factory-workrequest-ouroboros
-description: Use when creating, refining, or accepting Agent Factory WorkRequests or tickets. Apply the Ouroboros authoring loop to turn vague intent into executable goal, target, constraints, criteria, and context before workflow execution.
+description: Use when creating, refining, or accepting Agent Factory WorkRequests. Apply the Ouroboros authoring loop to turn vague intent into executable goal, target, constraints, criteria, and context before workflow execution.
 ---
 
 # Agent Factory WorkRequest Ouroboros
 
 Use this skill whenever a user asks to create, edit, refine, split, or accept a
-WorkRequest/ticket.
+WorkRequest.
 
 ## Purpose
 
@@ -20,7 +20,7 @@ DRAFT -> CLARIFY -> CRITIQUE -> REWRITE -> ACCEPT
 ```
 
 The loop belongs to WorkRequest authoring, not to WorkflowRun execution.
-When the ticket XML exists, preserve the authoring trail in
+When the WorkRequest XML exists, preserve the authoring trail in
 `<ouroboros_history>` entries with `phase`, `created_at`, and text.
 
 ## WorkRequest Fields
@@ -51,13 +51,13 @@ make conservative assumptions and write them into `context` or `constraints`.
 Create a draft:
 
 ```bash
-flow-kanban create "TITLE" --command implement --status todo
+flow-conveyor create "TITLE" --command implement --status draft
 ```
 
 Write or refine the prompt:
 
 ```bash
-flow-kanban update-prompt T-NNN \
+flow-conveyor update-prompt WR-NNN \
   --command implement \
   --goal "..." \
   --target "..." \
@@ -66,10 +66,10 @@ flow-kanban update-prompt T-NNN \
   --context "..."
 ```
 
-Accept by moving the WorkRequest to Open:
+Accept by moving the WorkRequest to Accepted:
 
 ```bash
-flow-kanban move T-NNN open
+flow-conveyor move WR-NNN accepted
 ```
 
 Persistence shape:
