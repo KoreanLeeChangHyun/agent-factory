@@ -60,7 +60,7 @@ def new_session_uuid() -> str:
 def logical_session_name(work_request_no: str, step: str, phase_id: str | None = None) -> str:
     """Logical name for debug/log quoting. Not passed to claude.
 
-    Example: "wf-T489-PLAN", "wf-T489-WORK-P1". Used as key of ctx.session_ids.
+    Example: "wf-WR489-PLAN", "wf-WR489-WORK-P1". Used as key of ctx.session_ids.
     """
     base = f"wf-{work_request_no.replace('-', '')}-{step}"
     if phase_id is not None:

@@ -1,4 +1,4 @@
-"""test_emitter.py — Verification of board endpoint helper by T-495 P1 meaning.
+"""test_emitter.py — Verification of board endpoint helper by WR-495 P1 meaning.
 
 Target:
   - session_create → POST /api/v2/sessions
@@ -30,12 +30,12 @@ def ctx(tmp_path: Path) -> WorkflowContext:
     work = tmp_path / "20260517-203000"
     (work / "work").mkdir(parents=True, exist_ok=True)
     return WorkflowContext(
-        ticket_no="T-495",
+        work_request_no="WR-495",
         registry_key="20260517-203000",
         work_dir=work,
         command="implement",
-        title="dummy ticket",
-        wf_session_id="wf-T-495-20260517-203000",
+        title="dummy work request",
+        wf_session_id="wf-WR-495-20260517-203000",
     )
 
 
@@ -64,8 +64,8 @@ def test_session_create_endpoint_and_body(ctx, monkeypatch):
     assert len(calls) == 1
     path, body = calls[0]
     assert path == "/api/v2/sessions"
-    assert body["session_id"] == "wf-T-495-20260517-203000"
-    assert body["ticket_id"] == "T-495"
+    assert body["session_id"] == "wf-WR-495-20260517-203000"
+    assert body["work_request"] == "WR-495"
     assert body["command"] == "implement"
     assert body["work_dir"] == str(ctx.work_dir)
     assert body["worktree_path"] == ""
@@ -74,7 +74,7 @@ def test_session_create_endpoint_and_body(ctx, monkeypatch):
 def test_session_create_skips_when_no_session_id(tmp_path, monkeypatch):
     calls = _capture_posts(monkeypatch)
     ctx_no_id = WorkflowContext(
-        ticket_no="T-495",
+        work_request_no="WR-495",
         registry_key="k",
         work_dir=tmp_path,
         command="implement",
@@ -160,8 +160,8 @@ def test_workflow_finish_fail_normalizes_unknown_outcome(ctx, monkeypatch):
 
 def test_metrics_jsonl_appended_on_emit(ctx):
     """The emit() call adds an NDJSON line to metrics.jsonl."""
-    emitter.emit(ctx, "step.start", step="PLAN", ticket=ctx.ticket_no)
-    emitter.emit(ctx, "step.end", step="PLAN", ticket=ctx.ticket_no, outcome="ok")
+    emitter.emit(ctx, "step.start", step="PLAN", work_request=ctx.work_request_no)
+    emitter.emit(ctx, "step.end", step="PLAN", work_request=ctx.work_request_no, outcome="ok")
     lines = ctx.metrics_jsonl_path().read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["event"] == "step.start"
@@ -251,7 +251,7 @@ def test_emit_multi_thread_no_line_drop(ctx):
                 "test.event",
                 tid=tid,
                 seq=i,
-                ticket=ctx.ticket_no,
+                work_request=ctx.work_request_no,
             )
 
     threads = [threading.Thread(target=worker, args=(t,)) for t in range(N_THREADS)]

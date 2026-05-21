@@ -20,7 +20,7 @@ from engine.apps.production_line._verify import VerifyResult
 
 def _make_ctx(tmp_path: Path) -> WorkflowContext:
     return WorkflowContext(
-        ticket_no="T-489",
+        work_request_no="WR-489",
         registry_key="20260515-000000",
         work_dir=tmp_path,
         current_step="PLAN",
@@ -34,15 +34,15 @@ def test_render_retry_prompt_basic(tmp_path: Path) -> None:
     )
     assert "plan.md frontmatter parse failed" in out
     assert "phases empty" in out
-    assert "Log in" in out
-    assert "Default Search" in out
+    assert "Rewrite by filling in only the above items." in out
+    assert "Artifact Path:" in out
     assert str(tmp_path / "plan.md") in out
 
 
 def test_render_retry_prompt_empty_missing() -> None:
     out = render_retry_prompt([], Path("/tmp/x.md"))
     # empty missing when fallback message
-    assert "(Personal order)" in out
+    assert "(Missing output)" in out
 
 
 @pytest.fixture

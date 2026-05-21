@@ -45,15 +45,15 @@ def _make_ctx(tmp_path: Path, *, worktree_path: Path | None) -> WorkflowContext:
     work_dir = tmp_path / "run"
     work_dir.mkdir(exist_ok=True)
     return WorkflowContext(
-        ticket_no="T-493",
+        work_request_no="WR-493",
         registry_key="20260515-000000",
         work_dir=work_dir,
         command="implement",
         mode="multi",
         current_step="WORK",
-        feature_branch="feat/T-493-smoke" if worktree_path else None,
+        feature_branch="feat/WR-493-smoke" if worktree_path else None,
         worktree_path=worktree_path,
-        title="Smoke tickets",
+        title="Smoke work requests",
     )
 
 
@@ -74,7 +74,7 @@ def test_auto_commit_worktree_path_missing(tmp_path: Path) -> None:
     rc = auto_commit(ctx)
     assert rc == 0
     log = ctx.workflow_log_path().read_text(encoding="utf-8")
-    assert "About Us" in log
+    assert "worktree path does not exist" in log
 
 
 def test_auto_commit_no_staged_changes_skips(tmp_path: Path) -> None:
@@ -102,8 +102,8 @@ def test_auto_commit_with_changes_commits(tmp_path: Path) -> None:
     assert head_before != head_after, "Changes Commit"
     # Query template validation
     msg = _git(repo, "log", "-1", "--pretty=%s").stdout.strip()
-    assert "T-493" in msg
-    assert "Smoke tickets" in msg
+    assert "WR-493" in msg
+    assert "Smoke work requests" in msg
     assert "production-line auto-commit" in msg
 
 

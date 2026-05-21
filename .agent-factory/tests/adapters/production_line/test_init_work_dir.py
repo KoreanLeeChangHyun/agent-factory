@@ -1,4 +1,4 @@
-"""T-509 — init.py work dir location regression set test.
+"""WR-509 — init.py work dir location regression set test.
 
 Regression origin: in a473334 (PROJECT ROOT git common-dir)
 ` common.py` of PROJECT ROOT / RUNS DIR Only corrected and `steps/init.py:104-108`
@@ -27,10 +27,10 @@ from engine.apps.production_line._common import PROJECT_ROOT, RUNS_DIR, make_wor
 from engine.apps.production_line.stations import init as init_mod
 
 
-def _kanban_dump(command: str = "implement", title: str = "T-509 worktree fix") -> str:
+def _conveyor_dump(command: str = "implement", title: str = "WR-509 worktree fix") -> str:
     return (
-        f"## T-509: {title}\n\n### Metadata\n"
-        f"- Number: T-509\n- Title: {title}\n- Status: Open\n- Command: {command}\n"
+        f"## WR-509: {title}\n\n### Metadata\n"
+        f"- Number: WR-509\n- Title: {title}\n- Status: Open\n- Command: {command}\n"
     )
 
 
@@ -56,7 +56,7 @@ def test_project_root_resolves_to_main_git_root() -> None:
 
 def test_make_work_dir_uses_project_root_main_side() -> None:
     """make work dir always returns the project ROOT standard path — the possibility inside worktree 0."""
-    key = "test-T-509-make-work-dir"
+    key = "test-WR-509-make-work-dir"
     work_dir = make_work_dir(key)
     try:
         assert work_dir == RUNS_DIR / key
@@ -84,14 +84,14 @@ def test_init_step_work_dir_ignores_worktree_path(
     work dir = worktree path / .agent-factory / run / <key>
     RUNS DIR / <key>
     """
-    fake_key = "20260519-T509-WORK"
-    fake_worktree = tmp_path / "worktrees" / "feat-T-509-test"
+    fake_key = "20260519-WR509-WORK"
+    fake_worktree = tmp_path / "worktrees" / "feat-WR-509-test"
     fake_worktree.mkdir(parents=True, exist_ok=True)
     expected_work_dir = tmp_path / "main-runs" / fake_key
 
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
-    monkeypatch.setattr(init_mod, "kanban_show", lambda t: _kanban_dump("implement"))
-    monkeypatch.setattr(init_mod, "kanban_move", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod, "conveyor_show", lambda t: _conveyor_dump("implement"))
+    monkeypatch.setattr(init_mod, "conveyor_move", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "session_create", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_start", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_end", lambda *a, **k: None)
@@ -105,7 +105,7 @@ def test_init_step_work_dir_ignores_worktree_path(
     monkeypatch.setattr(
         init_mod,
         "_maybe_create_worktree",
-        lambda tn, ti, cm: ("feat/T-509-test", fake_worktree),
+        lambda tn, ti, cm: ("feat/WR-509-test", fake_worktree),
     )
 
     def fake_make_work_dir(rk: str) -> Path:
@@ -118,7 +118,7 @@ def test_init_step_work_dir_ignores_worktree_path(
     # Indeed. user prompt path() work dir/user prompt.txt — parent directory
     # You can write text because it is already mkdir.
 
-    ctx = init_mod.init_step("T-509")
+    ctx = init_mod.init_step("WR-509")
 
     # key assertion: worktree path is fake worktree but also work dir is the main side
     assert ctx.work_dir == expected_work_dir, (
@@ -129,7 +129,7 @@ def test_init_step_work_dir_ignores_worktree_path(
     )
     # worktree path is preserved — using auto commit / verification code
     assert ctx.worktree_path == fake_worktree
-    assert ctx.feature_branch == "feat/T-509-test"
+    assert ctx.feature_branch == "feat/WR-509-test"
     # The output directory is actually mkdir on the main side
     assert (expected_work_dir / "work").is_dir()
 
@@ -138,10 +138,10 @@ def test_init_step_research_command_no_worktree(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Research command — worktree 0. This fix and unparalleled path conservation verification."""
-    fake_key = "20260519-T509-RESEARCH"
+    fake_key = "20260519-WR509-RESEARCH"
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
-    monkeypatch.setattr(init_mod, "kanban_show", lambda t: _kanban_dump("research"))
-    monkeypatch.setattr(init_mod, "kanban_move", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod, "conveyor_show", lambda t: _conveyor_dump("research"))
+    monkeypatch.setattr(init_mod, "conveyor_move", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "session_create", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_start", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_end", lambda *a, **k: None)
@@ -159,7 +159,7 @@ def test_init_step_research_command_no_worktree(
 
     monkeypatch.setattr(init_mod, "make_work_dir", fake_make_work_dir)
 
-    ctx = init_mod.init_step("T-509")
+    ctx = init_mod.init_step("WR-509")
 
     assert ctx.worktree_path is None
     assert ctx.feature_branch is None

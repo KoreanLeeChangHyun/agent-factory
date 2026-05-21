@@ -1,6 +1,6 @@
-"""test_steps_validate.py — VALIDATE Step wire-up (T-503 fix).
+"""test_steps_validate.py — VALIDATE Step wire-up (WR-503 fix).
 
-T-503 wire-up regression correction: validate step (1)  verify code.run(ctx) call →
+WR-503 wire-up regression correction: validate step (1)  verify code.run(ctx) call →
 validate/code.json output (2) validate/report.md nested mirror creation (3)
 Business nested output inject with md regression matching.
 """
@@ -20,7 +20,7 @@ def _make_ctx(tmp_path: Path, *, command: str = "implement") -> WorkflowContext:
     (work_dir / "plan").mkdir(parents=True, exist_ok=True)
     (work_dir / "plan" / "plan.md").write_text("plan body\n", encoding="utf-8")
     ctx = WorkflowContext(
-        ticket_no="T-999",
+        work_request_no="WR-999",
         registry_key="20260518-000000",
         work_dir=work_dir,
         command=command,

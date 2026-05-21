@@ -54,20 +54,20 @@ def test_new_session_uuid_unique() -> None:
 
 
 def test_logical_session_name_no_phase() -> None:
-    assert logical_session_name("T-489", "PLAN") == "wf-T489-PLAN"
-    assert logical_session_name("T-489", "VALIDATE") == "wf-T489-VALIDATE"
+    assert logical_session_name("WR-489", "PLAN") == "wf-WR489-PLAN"
+    assert logical_session_name("WR-489", "VALIDATE") == "wf-WR489-VALIDATE"
 
 
 def test_logical_session_name_with_phase() -> None:
-    assert logical_session_name("T-489", "WORK", "P1") == "wf-T489-WORK-P1"
-    assert logical_session_name("T-1", "WORK", "P9") == "wf-T1-WORK-P9"
+    assert logical_session_name("WR-489", "WORK", "P1") == "wf-WR489-WORK-P1"
+    assert logical_session_name("WR-1", "WORK", "P9") == "wf-WR1-WORK-P9"
 
 
 def test_logical_session_name_strips_dash() -> None:
-    name = logical_session_name("T-901", "REPORT")
+    name = logical_session_name("WR-901", "REPORT")
     assert "-" in name
-    assert "T-901" not in name
-    assert "T901" in name
+    assert "WR-901" not in name
+    assert "WR901" in name
 
 
 def test_default_permission_mode() -> None:

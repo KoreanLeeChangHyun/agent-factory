@@ -1,14 +1,14 @@
-"""T-513 P1 — driver fail step thread (SPEC.md §12.4 static).
+"""WR-513 P1 — driver fail step thread (SPEC.md §12.4 static).
 
 support criteria #4 — "driver fail step"
 Operating threads. SPEC.md §12.4 + feedback no speculative guards 2026-05-08 according to the rule
-Actually adopted policy "kanban automatic revolving X" (auto regression OFF). The test is that
+Actually adopted policy "conveyor automatic revolving X" (auto regression OFF). The test is that
 Testimonials NEWS
 
   - status.json workflow phase → FAILED
   - failure.md write
   - metadata.json failure field
-  - kanban move NOT call (automatic regression X — Open regression only user licence trigger)
+  - conveyor move NOT call (automatic regression X — Open regression only user licence trigger)
   - Preserving worktree directory (Auto Cleanup X)
 
 <# if ( data.meta.album ) { #>{{ data.meta.album }}<# } #> Unit testing only — using monkeypatch + tempfile.
@@ -26,35 +26,35 @@ from engine.apps.production_line.stations import done as done_mod
 def _make_ctx(tmp_path: Path) -> WorkflowContext:
     work_dir = tmp_path / "runs" / "20260520-000000"
     (work_dir / "work").mkdir(parents=True, exist_ok=True)
-    worktree_dir = tmp_path / "worktrees" / "feat-T-513-test"
+    worktree_dir = tmp_path / "worktrees" / "feat-WR-513-test"
     worktree_dir.mkdir(parents=True, exist_ok=True)
     sentinel = worktree_dir / "sentinel.txt"
     sentinel.write_text("preserve me", encoding="utf-8")
     return WorkflowContext(
-        ticket_no="T-513",
+        work_request_no="WR-513",
         registry_key="20260520-000000",
         work_dir=work_dir,
         command="implement",
         mode="multi",
         current_step="WORK",
-        feature_branch="feat/T-513-test",
+        feature_branch="feat/WR-513-test",
         worktree_path=worktree_dir,
         title="fail step",
     )
 
 
-def _patch_externals(monkeypatch, kanban_calls: list, finish_calls: list) -> None:
+def _patch_externals(monkeypatch, conveyor_calls: list, finish_calls: list) -> None:
     monkeypatch.setattr(
         done_mod,
         "load_template",
         lambda name: (
-            "ticket={ticket_no} key={registry_key} reason={reason} ts={ts}"
+            "work_request={work_request_no} key={registry_key} reason={reason} ts={ts}"
         ),
     )
     monkeypatch.setattr(
         done_mod,
-        "kanban_move",
-        lambda *args, **kwargs: kanban_calls.append(args) or 0,
+        "conveyor_move",
+        lambda *args, **kwargs: conveyor_calls.append(args) or 0,
     )
     monkeypatch.setattr(done_mod, "regression", lambda *a, **k: None)
     monkeypatch.setattr(
@@ -110,16 +110,16 @@ def test_fail_step_metadata_failure_field(monkeypatch, tmp_path):
     assert "ts" in payload["failure"]
 
 
-def test_fail_step_does_not_auto_regress_kanban(monkeypatch, tmp_path):
-    """fail step → kanban move call 0 (Automatic Regression X — SPEC.md §12.4)."""
+def test_fail_step_does_not_auto_regress_conveyor(monkeypatch, tmp_path):
+    """fail step → conveyor move call 0 (Automatic Regression X — SPEC.md §12.4)."""
     ctx = _make_ctx(tmp_path)
-    kanban_calls: list = []
-    _patch_externals(monkeypatch, kanban_calls, [])
+    conveyor_calls: list = []
+    _patch_externals(monkeypatch, conveyor_calls, [])
 
     done_mod.fail_step(ctx, reason="auto regression off check")
 
-    assert kanban_calls == [], (
-        "fail step call kanban move —"
+    assert conveyor_calls == [], (
+        "fail step call conveyor move —"
         "feedback no speculative guards 2026-05-08 + SPEC.md §12.4 Formulation"
     )
 

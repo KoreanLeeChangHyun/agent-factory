@@ -1,4 +1,4 @@
-"""test verify code.py — T-503 Syndrome Driver Crystalline Code Verification Unit Test.
+"""test verify code.py — WR-503 Syndrome Driver Crystalline Code Verification Unit Test.
 
 Price:
   - `run(ctx)` — execution / research-skip / tool uninstalled / Set-up subsidiaries
@@ -23,7 +23,7 @@ from engine.apps.production_line._common import WorkflowContext
 def _make_ctx(tmp_path: Path, command: str = "implement") -> WorkflowContext:
     (tmp_path / "work").mkdir(exist_ok=True)
     return WorkflowContext(
-        ticket_no="T-503",
+        work_request_no="WR-503",
         registry_key="20260518-000000",
         work_dir=tmp_path,
         command=command,
