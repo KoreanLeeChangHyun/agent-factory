@@ -162,7 +162,7 @@
     // Actions section
     var actions = document.createElement('div');
     actions.className = 'settings-section';
-    actions.innerHTML = '<div class="settings-section-title">Actions</div>';
+    actions.innerHTML = '<div class="settings-section-title">ACTIONS</div>';
     var syncItem = document.createElement('div');
     syncItem.className = 'settings-item';
     syncItem.innerHTML =
