@@ -15,8 +15,8 @@ from engine.core.workflows import (
 
 def _run() -> WorkflowRun:
     return WorkflowRun(
-        ref=WorkflowRunRef("WF-T-123-20260520-000000"),
-        work_request_ref=WorkRequestRef.parse("T-123"),
+        ref=WorkflowRunRef("WF-WR-123-20260520-000000"),
+        work_request_ref=WorkRequestRef.parse("WR-123"),
     )
 
 
@@ -65,8 +65,8 @@ def test_production_line_step_mapping_keeps_status_file_compatibility() -> None:
 
 def test_workflow_run_reads_legacy_production_line_status() -> None:
     run = WorkflowRun.from_production_line_status(
-        run_ref=WorkflowRunRef("WF-T-123-20260520-000000"),
-        work_request_ref=WorkRequestRef.parse("T-123"),
+        run_ref=WorkflowRunRef("WF-WR-123-20260520-000000"),
+        work_request_ref=WorkRequestRef.parse("WR-123"),
         status={
             "workflow_step": "VALIDATE",
             "transitions": [

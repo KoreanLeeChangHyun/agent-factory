@@ -131,7 +131,7 @@ def canonicalize_production_line_step(step: str) -> str:
 
 @dataclass(frozen=True)
 class WorkflowRunRef:
-    """Stable internal reference for one workflow run, for example `WF-T-123-20260520`."""
+    """Stable internal reference for one workflow run, for example `WF-WR-123-20260520`."""
 
     value: str
 

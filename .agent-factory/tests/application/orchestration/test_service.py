@@ -19,8 +19,8 @@ from engine.core.workflows import WorkflowRun, WorkflowRunRef, WorkflowStage
 
 def _run() -> WorkflowRun:
     return WorkflowRun(
-        ref=WorkflowRunRef("WF-T-123-20260520-000000"),
-        work_request_ref=WorkRequestRef.parse("T-123"),
+        ref=WorkflowRunRef("WF-WR-123-20260520-000000"),
+        work_request_ref=WorkRequestRef.parse("WR-123"),
     )
 
 
