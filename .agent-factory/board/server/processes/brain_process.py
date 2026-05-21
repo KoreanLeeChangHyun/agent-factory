@@ -6,6 +6,7 @@ from typing import Protocol, runtime_checkable
 
 from board.server.channels.terminal_channel import TerminalSSEChannel
 from board.server.processes.claude_process import ClaudeProcess, _validate_images
+from board.server.processes.codex_process import CodexProcess
 
 
 def validate_images(images: list) -> str | None:
@@ -144,13 +145,27 @@ def create_brain_process(
     channel: TerminalSSEChannel,
     provider: str = "claude",
     persist_file: str | None = None,
+    *,
+    codex_bin: str = "codex",
+    codex_model: str | None = None,
+    codex_profile: str | None = None,
+    codex_sandbox: str = "workspace-write",
+    cwd: str | None = None,
 ) -> BrainProcess:
     """Create the active terminal process for a provider.
 
-    Only Claude has a live terminal process today. Codex selection is handled
-    by adapter-backed workflow paths until CodexProcess is introduced.
+    Claude remains the default live terminal. Codex is available as an
+    experimental one-shot terminal process.
     """
     normalized = provider.strip().lower() if provider else "claude"
-    if normalized != "claude":
-        normalized = "claude"
+    if normalized == "codex":
+        return CodexProcess(
+            channel,
+            persist_file=persist_file,
+            codex_bin=codex_bin,
+            model=codex_model,
+            profile=codex_profile,
+            sandbox=codex_sandbox,
+            cwd=cwd,
+        )
     return ClaudeBrainProcess(channel, persist_file=persist_file)

@@ -12,11 +12,14 @@ Current state:
 - Board Settings can expose and save the active brain provider.
 - `BrainProcess` exists as the provider-neutral board terminal process
   contract, with `ClaudeBrainProcess` wrapping the current `ClaudeProcess`.
+- `CodexProcess` exists as an experimental one-shot `codex exec --json -`
+  process that normalizes stdout JSON into terminal SSE events.
 - The interactive Terminal surface still runs through `ClaudeProcess`.
 
 This means Codex can be selected for adapter-backed workflow paths, and the
-live Console terminal has a provider-neutral process boundary. It is not yet a
-Codex terminal.
+live Console terminal has a provider-neutral process boundary. A Codex terminal
+process exists for controlled wiring tests, but the live Console still defaults
+to Claude.
 
 ## Goal
 
@@ -150,7 +153,7 @@ Manual verification:
 
 1. Add `BrainProcess` contract and `ClaudeBrainProcess` wrapper. (done)
 2. Move route usage from direct `ClaudeProcess` access to the process factory.
-3. Add `CodexProcess` with stdout normalization only.
+3. Add `CodexProcess` with stdout normalization only. (done, experimental one-shot)
 4. Add provider capability reporting.
 5. Update Settings and Terminal UI capability labels.
 6. Add route-level and adapter-level tests.
