@@ -111,7 +111,7 @@ def _write_baseline_artifacts(work_dir: Path, command: str = "implement") -> Non
     work_dir.mkdir(parents=True, exist_ok=True)
 
     (work_dir / "user_prompt.txt").write_text(
-        f"<ticket>\n  <number>T-477</number>\n  <command>{command}</command>\n"
+        f"<ticket>\n  <number>WR-477</number>\n  <command>{command}</command>\n"
         f"  <goal>Test goal for runner dry-run.</goal>\n"
         f"  <criteria>Test criteria.</criteria>\n"
         f"</ticket>\n",
@@ -173,7 +173,7 @@ class TestRunnerImplementFlow:
 
         with patch("flow.auditor.runner.shutil.which", return_value="/usr/bin/claude"):
             with patch("flow.auditor.runner.subprocess.run", side_effect=fake_run) as run_mock:
-                verdict = run_auditor(str(tmp_path), ticket_id="T-477")
+                verdict = run_auditor(str(tmp_path), work_request_id="WR-477")
 
         # 12 calls (AT-01..AT-12 all dispatched for implement).
         assert run_mock.call_count == 12
@@ -213,7 +213,7 @@ class TestRunnerImplementFlow:
         assert len(lines) == 1
         event = json.loads(lines[0])
         assert event["event_type"] == "auditor_t3.summary"
-        assert event["ticket_id"] == "T-477"
+        assert event["work_request_id"] == "WR-477"
         assert event["overall"] == "FAIL"
         assert event["total_tokens_in"] == 12 * 100
         assert event["total_tokens_out"] == 12 * 20

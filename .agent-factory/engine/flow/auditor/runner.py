@@ -69,7 +69,7 @@ Two side effects (and only these two) at the end of every call:
 2. ``<work_dir>/metrics.jsonl`` — single line appended with shape::
 
        {"event_type": "auditor_t3.summary",
-        "ticket_id": "T-NNN" or null,
+        "work_request_id": "WR-NNN" or null,
         "overall": "PASS|WARN|FAIL|INCONCLUSIVE",
         "total_tokens_in": int, "total_tokens_out": int,
         "total_cost_usd": float, "total_duration_ms": int,
@@ -140,7 +140,7 @@ def run_auditor(
     *,
     model: str = "sonnet",
     effort: str = "low",
-    ticket_id: Optional[str] = None,
+    work_request_id: Optional[str] = None,
 ) -> AuditVerdict:
     """Run all applicable AT-NN evaluations and persist the verdict.
 
@@ -152,7 +152,7 @@ def run_auditor(
             ``"sonnet"``.
         effort: Effort level passed to ``claude --effort``.  Default
             ``"low"`` (per plan.md AUDITOR_T3_EFFORT default).
-        ticket_id: Optional T-NNN id recorded in the metrics event for
+        work_request_id: Optional WR-NNN id recorded in the metrics event for
             downstream aggregation.  Set to ``None`` when unknown.
 
     Returns:
@@ -260,7 +260,7 @@ def run_auditor(
     _append_metrics_event(
         work_dir_path,
         verdict=verdict,
-        ticket_id=ticket_id,
+        work_request_id=work_request_id,
     )
 
     return verdict
@@ -679,7 +679,7 @@ def _append_metrics_event(
     work_dir: Path,
     *,
     verdict: AuditVerdict,
-    ticket_id: Optional[str],
+    work_request_id: Optional[str],
 ) -> None:
     """Append a single ``auditor_t3.summary`` event to ``metrics.jsonl``.
 
@@ -689,7 +689,7 @@ def _append_metrics_event(
     target = work_dir / "metrics.jsonl"
     event = {
         "event_type": "auditor_t3.summary",
-        "ticket_id": ticket_id,
+        "work_request_id": work_request_id,
         "overall": verdict.overall,
         "total_tokens_in": verdict.tokens_in,
         "total_tokens_out": verdict.tokens_out,
