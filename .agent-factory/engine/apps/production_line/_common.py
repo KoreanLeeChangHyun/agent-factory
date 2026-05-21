@@ -123,16 +123,16 @@ def get_n_max(step: str) -> int:
 N_MAX_BY_STEP = _N_MAX_DEFAULT
 
 
-# T-506 P1 — Parallel spawn limit / SPEC §3.4 new
+# WR-506 P1 — Parallel spawn limit / SPEC §3.4 new
 _MAX_PARALLEL_DEFAULT = 4
 
-# T-506 P4 — Failure Handling Policy / SPEC §3.4 New
+# WR-506 P4 — Failure Handling Policy / SPEC §3.4 New
 _FAIL_POLICY_DEFAULT = "fail_fast"
 _FAIL_POLICY_VALID = ("fail_fast", "fail_tolerant")
 
 
 def get_max_parallel() -> int:
-    """T-506 P1 — Same topo level simultaneous spawn limit return.
+    """WR-506 P1 — Same topo level simultaneous spawn limit return.
 
     Priority: os.environ.V2_MAX_PARALLEL > .settings.V2_MAX_PARALLEL > 4.
     When entering a negative number / 0 / non-number, default 4 fallback (graceful).
@@ -152,7 +152,7 @@ def get_max_parallel() -> int:
 
 
 def get_fail_policy() -> str:
-    """T-506 P4 — Returns parallel spawn failure handling policy.
+    """WR-506 P4 — Returns parallel spawn failure handling policy.
 
     Priority: os.environ.V2_FAIL_POLICY > .settings.V2_FAIL_POLICY > 'fail_fast'.
     Valid values: 'fail_fast' | 'fail_tolerant'. For other inputs, default 'fail_fast'.
@@ -190,7 +190,7 @@ class WorkflowContext:
     command: str = "implement"              # implement | research | review | test
     mode: str = "multi"                     # single | multi (plan.md frontmatter makes the final decision)
     current_step: str = "NONE"
-    feature_branch: str | None = None       # Worktree Guard (T-411 remnants, preserved)
+    feature_branch: str | None = None       # Worktree Guard (WR-411 remnants, preserved)
     worktree_path: Path | None = None       # SPEC §9.1.1 (Stage 3-D) + §0.1 (Stage 3-E auto_commit)
     title: str = ""                         # WorkRequest title (for auto_commit message template)
     session_ids: dict[str, str] = field(default_factory=dict)  # Step|Phase → session_id
@@ -209,31 +209,31 @@ class WorkflowContext:
         return self.work_dir / "workflow.log"
 
     def plan_dir(self) -> Path:
-        """T-504 — `plan/` directory (PLAN output area)."""
+        """WR-504 — `plan/` directory (PLAN output area)."""
         return self.work_dir / "plan"
 
     def plan_md_path(self) -> Path:
-        """T-504 cutover — `plan/plan.md` (LLM↔LLM natural language body, discarding old root plan.md)."""
+        """WR-504 cutover — `plan/plan.md` (LLM↔LLM natural language body, discarding old root plan.md)."""
         return self.plan_dir() / "plan.md"
 
     def plan_json_path(self) -> Path:
-        """New T-504 — `plan/plan.json` (driver deterministic parsing target, SSOT)."""
+        """New WR-504 — `plan/plan.json` (driver deterministic parsing target, SSOT)."""
         return self.plan_dir() / "plan.json"
 
     def work_dir_phase_md(self, phase_id: str) -> Path:
-        """flat path — backward compat (T-503 migration hold period)."""
+        """flat path — backward compat (WR-503 migration hold period)."""
         return self.work_dir / "work" / f"{phase_id}.md"
 
     def work_phase_dir(self, phase_id: str) -> Path:
-        """T-503 directory nesting — work/<phase>/."""
+        """WR-503 directory nesting — work/<phase>/."""
         return self.work_dir / "work" / phase_id
 
     def work_phase_w_md(self, phase_id: str, worker_idx: int = 1) -> Path:
-        """T-503 directory nesting — work/<phase>/W<n>.md (workers ≥ 1)."""
+        """WR-503 directory nesting — work/<phase>/W<n>.md (workers ≥ 1)."""
         return self.work_phase_dir(phase_id) / f"W{worker_idx}.md"
 
     def work_phase_md_resolved(self, phase_id: str) -> Path:
-        """T-503 — Tries both flat and nested paths, returning the one that exists.
+        """WR-503 — Tries both flat and nested paths, returning the one that exists.
 
         Priority: nested (work/<phase>/W1.md) > flat (work/<phase>.md). If both do not exist, return the nested default path (can be used as write-target).
         """
@@ -246,27 +246,27 @@ class WorkflowContext:
         return nested
 
     def validate_dir(self) -> Path:
-        """T-503 — validate/ directory."""
+        """WR-503 — validate/ directory."""
         return self.work_dir / "validate"
 
     def validate_report_md_path(self) -> Path:
-        """validate-report.md — flat (backward compat, T-503 migration hold)."""
+        """validate-report.md — flat (backward compat, WR-503 migration hold)."""
         return self.work_dir / "validate-report.md"
 
     def validate_report_md_nested_path(self) -> Path:
-        """T-503 — validate/report.md (directory nesting)."""
+        """WR-503 — validate/report.md (directory nesting)."""
         return self.validate_dir() / "report.md"
 
     def validate_rules_json_path(self) -> Path:
-        """validate-rules.json — flat (backward compat, T-503 migration hold)."""
+        """validate-rules.json — flat (backward compat, WR-503 migration hold)."""
         return self.work_dir / "validate-rules.json"
 
     def validate_rules_json_nested_path(self) -> Path:
-        """T-503 — validate/rules.json (directory nesting)."""
+        """WR-503 — validate/rules.json (directory nesting)."""
         return self.validate_dir() / "rules.json"
 
     def validate_code_json_path(self) -> Path:
-        """New T-503 — validate/code.json (driver `_verify_code.py` output, implement only)."""
+        """New WR-503 — validate/code.json (driver `_verify_code.py` output, implement only)."""
         return self.validate_dir() / "code.json"
 
     def validate_verdict_json_path(self) -> Path:
@@ -282,14 +282,14 @@ class WorkflowContext:
         return self.work_dir / "final-verdict.json"
 
     def report_md_path(self) -> Path:
-        """T-504 cutover — `report.html` (human readable, obsolete old report.md).
+        """WR-504 cutover — `report.html` (human readable, obsolete old report.md).
 
         The function name is backward compat alias (REPORT step + R-EXIST-1 caller preservation).
         """
         return self.work_dir / "report.html"
 
     def report_html_path(self) -> Path:
-        """T-504 — `report.html` explicit path (human readable, HTML template + placeholder)."""
+        """WR-504 — `report.html` explicit path (human readable, HTML template + placeholder)."""
         return self.work_dir / "report.html"
 
     def user_prompt_path(self) -> Path:
@@ -305,7 +305,7 @@ class WorkflowContext:
         return self.work_dir / "failure.md"
 
     def metadata_json_path(self) -> Path:
-        """T-503 — metadata.json (absorbs old .context.json + status.json + summary.txt + failure)."""
+        """WR-503 — metadata.json (absorbs old .context.json + status.json + summary.txt + failure)."""
         return self.work_dir / "metadata.json"
 
 
@@ -438,7 +438,7 @@ def write_metadata(
     finalized_at: str | None = None,
     failure_reason: str | None = None,
 ) -> Path:
-    """T-503 — `metadata.json` integrated writer.
+    """WR-503 — `metadata.json` integrated writer.
 
     Old output 4 files (`.context.json` + `status.json` + `summary.txt` + `failure.md`)
     stuffed into a single JSON. Call a function that only sees new cycles. Consistent output from one driver writer.
@@ -455,7 +455,7 @@ def write_metadata(
           "title": "...",
           "wf_session_id": "...",
           "engine_version": "production_line",
-          "session_ids": {"wf-T-PLAN": "...", ...},
+          "session_ids": {"wf-WR-PLAN": "...", ...},
           "workflow_step": "DONE",
           "transitions": [{"from":"INIT","to":"PLAN","ts":"..."}, ...],
           "finalized_at": "2026-05-18T...",   # Fill only in DONE step (replaces old summary.txt)
@@ -493,7 +493,7 @@ def write_metadata(
 
 
 def read_metadata(ctx: WorkflowContext) -> dict[str, Any]:
-    """T-503 — `metadata.json` reader. If not present, `{}` is returned."""
+    """WR-503 — `metadata.json` reader. If not present, `{}` is returned."""
     path = ctx.metadata_json_path()
     if not path.exists():
         return {}
