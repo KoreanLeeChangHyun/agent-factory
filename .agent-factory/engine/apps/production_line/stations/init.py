@@ -4,7 +4,7 @@ SPEC.md §9.1.1 (Stage 3-D): Worktree branching by command.
 - implement → git worktree add + create feature_branch (reuse v1 worktree_manager)
 - research|review → develop directly (allows worktree-less)
 
-T-495 P2: V2_REGISTRY_KEY env priority — board conveyor submit handler
+WR-495 P2: V2_REGISTRY_KEY env priority — board conveyor submit handler
 Inject registry_key determinism externally to pre-issue session_id
 Make it possible. If env is not set, existing new_registry_key() behavior is preserved.
 """
@@ -94,13 +94,13 @@ def init_step(work_request_no: str) -> WorkflowContext:
     command, title = _parse_work_request_meta(work_request_dump)
     feature_branch, worktree_path = _maybe_create_worktree(work_request_no, title, command)
 
-    # T-495 P2 — Use V2_REGISTRY_KEY env first. The board pre-issued key
+    # WR-495 P2 — Use V2_REGISTRY_KEY env first. The board pre-issued key
     # Once received, the backend's production_line_registry and driver's work_dir paths are
     # With a 1:1 match, the frontend can immediately launch the production-line tab right after LAUNCH_STARTED.
     # env format: v1-compatible timestamp, such as "YYYYMMDD-HHMMSS" or "YYYYMMDD-HHMMSS-NNN".
     env_key = (os.environ.get("V2_REGISTRY_KEY") or "").strip()
     registry_key = env_key if env_key else new_registry_key()
-    # T-509 — work_dir is always on the main side (RUNS_DIR/<key> relative to PROJECT_ROOT).
+    # WR-509 — work_dir is always on the main side (RUNS_DIR/<key> relative to PROJECT_ROOT).
     # Doesn't branch even if worktree_path exists — PROJECT_ROOT after a473334
     # Since it points to the parent (main worktree root) of git common-dir, it is located inside the worktree.
     # If you put the output in .agent-factory/runs/, finalization R-EXIST / history
@@ -133,7 +133,7 @@ def init_step(work_request_no: str) -> WorkflowContext:
         f"INIT — registry_key={registry_key}, work_request={work_request_no}, "
         f"command={command}, feature_branch={feature_branch or '(none)'}",
     )
-    # T-495 P1 — Session explicit registration (POST /api/v2/sessions). lazy create discard.
+    # WR-495 P1 — Session explicit registration (POST /api/v2/sessions). lazy create discard.
     # If V2_BOARD_POST is not set, silent skip — driver flow impact 0.
     session_create(ctx)
     step_start(ctx, "INIT", prev_step="NONE")

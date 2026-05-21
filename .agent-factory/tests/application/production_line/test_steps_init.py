@@ -1,9 +1,9 @@
 """test steps init.py — INIT Step Helper Unit Test.
 
 Target (SPEC.md §9.1.1, Stage 3-D):
-  -  parse ticket meta: kanban show output (command, title) extraction
+  -  parse work request meta: conveyor show output (command, title) extraction
   -  maybe create worktree: command=research review(None, None) return
-  - init step (T-495 P2): V2 REGISTRY KEY env priority use (board pre-issued)
+  - init step (WR-495 P2): V2 REGISTRY KEY env priority use (board pre-issued)
 
 Integrated (worktree real creation) is valid for smoke cycles.
 """
@@ -11,89 +11,88 @@ Integrated (worktree real creation) is valid for smoke cycles.
 from __future__ import annotations
 
 
-
-from engine.apps.production_line.stations.init import _maybe_create_worktree, _parse_ticket_meta
+from engine.apps.production_line.stations.init import _maybe_create_worktree, _parse_work_request_meta
 from engine.apps.production_line.stations import init as init_mod
 
 
-_KANBAN_DUMP_TEMPLATE = """## T-491: Sample Tickets
+_CONVEYOR_DUMP_TEMPLATE = """## WR-491: Sample WorkRequests
 
 ### Metadata
-- Number: T-491
+- Number: WR-491
 - Title: {title}
-- Status: Review
+- Status: Accepted
 - Command: {command}
 
 ### Relations
-- derived-from: T-489
+- derived-from: WR-489
 
 ### Prompt
 - Goal: Verification
 """
 
 
-def test_parse_ticket_meta_implement() -> None:
-    dump = _KANBAN_DUMP_TEMPLATE.format(command="implement", title="Automated Ticket Samples")
-    command, title = _parse_ticket_meta(dump)
+def test_parse_work_request_meta_implement() -> None:
+    dump = _CONVEYOR_DUMP_TEMPLATE.format(command="implement", title="Automated WorkRequest Samples")
+    command, title = _parse_work_request_meta(dump)
     assert command == "implement"
-    assert title == "Automated Ticket Samples"
+    assert title == "Automated WorkRequest Samples"
 
 
-def test_parse_ticket_meta_research() -> None:
-    dump = _KANBAN_DUMP_TEMPLATE.format(command="research", title="Home")
-    command, title = _parse_ticket_meta(dump)
+def test_parse_work_request_meta_research() -> None:
+    dump = _CONVEYOR_DUMP_TEMPLATE.format(command="research", title="Home")
+    command, title = _parse_work_request_meta(dump)
     assert command == "research"
     assert title == "Home"
 
 
-def test_parse_ticket_meta_review() -> None:
-    dump = _KANBAN_DUMP_TEMPLATE.format(command="review", title="Search")
-    command, title = _parse_ticket_meta(dump)
+def test_parse_work_request_meta_review() -> None:
+    dump = _CONVEYOR_DUMP_TEMPLATE.format(command="review", title="Search")
+    command, title = _parse_work_request_meta(dump)
     assert command == "review"
     assert title == "Search"
 
 
-def test_parse_ticket_meta_unknown_command_fallback() -> None:
+def test_parse_work_request_meta_unknown_command_fallback() -> None:
     """Unknown command is executed to fallback (safe default)."""
-    dump = _KANBAN_DUMP_TEMPLATE.format(command="bogus", title="Title")
-    command, _ = _parse_ticket_meta(dump)
+    dump = _CONVEYOR_DUMP_TEMPLATE.format(command="bogus", title="Title")
+    command, _ = _parse_work_request_meta(dump)
     assert command == "implement"
 
 
-def test_parse_ticket_meta_missing_command_default() -> None:
+def test_parse_work_request_meta_missing_command_default() -> None:
     """execute default when missing Command line."""
-    dump = "################################################################################################################################################################################################################################################################"
-    command, title = _parse_ticket_meta(dump)
+    dump = "- Number: WR-491\n- Title: Title\n- Status: Accepted\n"
+    command, title = _parse_work_request_meta(dump)
     assert command == "implement"
     assert title == "Title"
 
 
 def test_maybe_create_worktree_research_returns_none() -> None:
     """command=research → worktree creation X."""
-    fb, wp = _maybe_create_worktree("T-491", "Company", "research")
+    fb, wp = _maybe_create_worktree("WR-491", "Company", "research")
     assert fb is None
     assert wp is None
 
 
 def test_maybe_create_worktree_review_returns_none() -> None:
     """command=review → worktree creation X."""
-    fb, wp = _maybe_create_worktree("T-491", "Browse By Tag", "review")
+    fb, wp = _maybe_create_worktree("WR-491", "Browse By Tag", "review")
     assert fb is None
     assert wp is None
 
 
 def test_init_step_writes_metadata_json(monkeypatch, tmp_path):
-    """T-503 wire-up — init step → metadata.json (Ex .context.json/status.json also preserved)."""
+    """WR-503 wire-up — init step → metadata.json (Ex .context.json/status.json also preserved)."""
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
 
-    def fake_kanban_show(ticket_no):
+    def fake_conveyor_show(work_request_no):
         return (
-            "## T-491: Validation of Metadata\\n## Metadata\\n"
-            "- Number: T-491\n- Title: meta\n- Status: Open\n- Command: research\n"
+            "## WR-491: Validation of Metadata\\n## Metadata\\n"
+            "- Number: WR-491\n- Title: meta\n- Status: Accepted\n- Command: research\n"
         )
 
-    monkeypatch.setattr(init_mod, "kanban_show", fake_kanban_show)
-    monkeypatch.setattr(init_mod, "kanban_move", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod, "conveyor_show", fake_conveyor_show)
+    monkeypatch.setattr(init_mod, "conveyor_move", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "session_create", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_start", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_end", lambda *a, **k: None)
@@ -108,13 +107,13 @@ def test_init_step_writes_metadata_json(monkeypatch, tmp_path):
 
     monkeypatch.setattr(init_mod, "make_work_dir", fake_make_work_dir)
 
-    ctx = init_mod.init_step("T-491")
+    ctx = init_mod.init_step("WR-491")
 
     metadata_path = ctx.metadata_json_path()
     assert metadata_path.exists(), "init_step must write metadata.json"
     import json as _json
     payload = _json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["ticket_no"] == "T-491"
+    assert payload["work_request_no"] == "WR-491"
     assert payload["registry_key"] == "20260518-100000"
     assert payload["command"] == "research"
     assert payload["finalized_at"] is None
@@ -122,20 +121,20 @@ def test_init_step_writes_metadata_json(monkeypatch, tmp_path):
 
 
 def test_init_step_uses_v2_registry_key_env(monkeypatch, tmp_path):
-    """T-495 P2 — V2 REGISTRY KEY env prior use. board pre-issued session id sum."""
+    """WR-495 P2 — V2 REGISTRY KEY env prior use. board pre-issued session id sum."""
     fake_key = "20260517-204200"
     monkeypatch.setenv("V2_REGISTRY_KEY", fake_key)
 
     captured = {}
 
-    def fake_kanban_show(ticket_no):
+    def fake_conveyor_show(work_request_no):
         return (
-            "## T-495: Sample Tickets\\n\\n## Metadata\\n"
-            "- Number: T-495\n- Title: dummy\n- Status: Open\n- Command: research\n"
+            "## WR-495: Sample WorkRequests\\n\\n## Metadata\\n"
+            "- Number: WR-495\n- Title: dummy\n- Status: Accepted\n- Command: research\n"
         )
 
-    def fake_kanban_move(ticket_no, target):
-        captured["kanban_move"] = (ticket_no, target)
+    def fake_conveyor_move(work_request_no, target):
+        captured["conveyor_move"] = (work_request_no, target)
 
     def fake_session_create(ctx):
         captured["session_id"] = ctx.wf_session_id
@@ -152,8 +151,8 @@ def test_init_step_uses_v2_registry_key_env(monkeypatch, tmp_path):
         (d / "work").mkdir(parents=True, exist_ok=True)
         return d
 
-    monkeypatch.setattr(init_mod, "kanban_show", fake_kanban_show)
-    monkeypatch.setattr(init_mod, "kanban_move", fake_kanban_move)
+    monkeypatch.setattr(init_mod, "conveyor_show", fake_conveyor_show)
+    monkeypatch.setattr(init_mod, "conveyor_move", fake_conveyor_move)
     monkeypatch.setattr(init_mod, "session_create", fake_session_create)
     monkeypatch.setattr(init_mod, "step_start", fake_step_start)
     monkeypatch.setattr(init_mod, "step_end", fake_step_end)
@@ -172,11 +171,11 @@ def test_init_step_uses_v2_registry_key_env(monkeypatch, tmp_path):
 
     monkeypatch.setattr(init_mod, "new_registry_key", fake_new_key)
 
-    ctx = init_mod.init_step("T-495")
+    ctx = init_mod.init_step("WR-495")
 
     assert ctx.registry_key == fake_key
-    assert ctx.wf_session_id == f"wf-T-495-{fake_key}"
-    assert captured["session_id"] == f"wf-T-495-{fake_key}"
+    assert ctx.wf_session_id == f"wf-WR-495-{fake_key}"
+    assert captured["session_id"] == f"wf-WR-495-{fake_key}"
     assert captured["registry_key"] == fake_key
     assert new_key_called["n"] == 0  # new registry key
 
@@ -185,14 +184,14 @@ def test_init_step_falls_back_to_new_registry_key_when_env_missing(monkeypatch, 
     """V2 REGISTRY KEY env Unset new registry key() Normal call."""
     monkeypatch.delenv("V2_REGISTRY_KEY", raising=False)
 
-    def fake_kanban_show(ticket_no):
+    def fake_conveyor_show(work_request_no):
         return (
-            "## T-495: Sample\\n\\n## Metadata\\n"
-            "- Number: T-495\n- Title: dummy\n- Status: Open\n- Command: research\n"
+            "## WR-495: Sample\\n\\n## Metadata\\n"
+            "- Number: WR-495\n- Title: dummy\n- Status: Accepted\n- Command: research\n"
         )
 
-    monkeypatch.setattr(init_mod, "kanban_show", fake_kanban_show)
-    monkeypatch.setattr(init_mod, "kanban_move", lambda *a, **k: None)
+    monkeypatch.setattr(init_mod, "conveyor_show", fake_conveyor_show)
+    monkeypatch.setattr(init_mod, "conveyor_move", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "session_create", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_start", lambda *a, **k: None)
     monkeypatch.setattr(init_mod, "step_end", lambda *a, **k: None)
@@ -208,7 +207,7 @@ def test_init_step_falls_back_to_new_registry_key_when_env_missing(monkeypatch, 
 
     monkeypatch.setattr(init_mod, "new_registry_key", lambda: "fresh-fallback-key")
 
-    ctx = init_mod.init_step("T-495")
+    ctx = init_mod.init_step("WR-495")
 
     assert ctx.registry_key == "fresh-fallback-key"
-    assert ctx.wf_session_id == "wf-T-495-fresh-fallback-key"
+    assert ctx.wf_session_id == "wf-WR-495-fresh-fallback-key"
