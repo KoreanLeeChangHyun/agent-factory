@@ -21,7 +21,7 @@ def test_workflow_detail_exposes_report_html_file_map(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (run_dir / ".context.json").write_text(
-        json.dumps({"command": "implement", "ticketNumber": "T-001", "title": "Report"}),
+        json.dumps({"command": "implement", "work_request_no": "WR-001", "title": "Report"}),
         encoding="utf-8",
     )
     (run_dir / "report.html").write_text("<html>report</html>", encoding="utf-8")
@@ -29,6 +29,8 @@ def test_workflow_detail_exposes_report_html_file_map(tmp_path: Path) -> None:
     detail = _workflow_detail(str(tmp_path), ".agent-factory/runs/20260520-120000/")
 
     assert len(detail) == 1
+    assert detail[0]["work_request"] == "WR-001"
+    assert "ticketNumber" not in detail[0]
     assert detail[0]["fileMap"]["report"] == {
         "exists": True,
         "url": ".agent-factory/runs/20260520-120000/report.html",

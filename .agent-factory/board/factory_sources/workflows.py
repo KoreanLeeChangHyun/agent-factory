@@ -94,7 +94,7 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
         if isinstance(status, dict):
             command = ''
             work_name = entry_name
-            ticket_number = ''
+            work_request = ''
             title = ''
             ctx_path = os.path.join(entry_abs, '.context.json')
             try:
@@ -103,7 +103,7 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 if isinstance(ctx, dict):
                     command = ctx.get('command', '') or ''
                     work_name = ctx.get('workName', '') or entry_name
-                    ticket_number = (ctx.get('ticketNumber', '') or '').strip()
+                    work_request = (ctx.get('work_request_no', '') or '').strip()
                     title = ctx.get('title', '') or ''
             except (OSError, json.JSONDecodeError):
                 pass
@@ -119,7 +119,7 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'updated_at': status.get('updated_at', ''),
                 'transitions': status.get('transitions', []),
                 'fileMap': _build_file_map(entry_abs, entry_rel),
-                'ticketNumber': ticket_number,
+                'work_request': work_request,
                 'title': title,
             })
 
@@ -150,14 +150,14 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
             except (OSError, json.JSONDecodeError):
                 continue
             base_path = entry_rel + task + '/' + cmd + '/'
-            ticket_number = ''
+            work_request = ''
             title = ''
             ctx_path = os.path.join(cmd_abs, '.context.json')
             try:
                 with open(ctx_path, encoding='utf-8') as f:
                     ctx = json.load(f)
                 if isinstance(ctx, dict):
-                    ticket_number = (ctx.get('ticketNumber', '') or '').strip()
+                    work_request = (ctx.get('work_request_no', '') or '').strip()
                     title = ctx.get('title', '') or ''
             except (OSError, json.JSONDecodeError):
                 pass
@@ -173,7 +173,7 @@ def _workflow_detail(project_root: str, entry_rel: str) -> list[dict]:
                 'updated_at': status.get('updated_at', ''),
                 'transitions': status.get('transitions', []),
                 'fileMap': _build_file_map(cmd_abs, base_path),
-                'ticketNumber': ticket_number,
+                'work_request': work_request,
                 'title': title,
             })
     return items
