@@ -19,9 +19,9 @@ for _p in (_WORKTREE_ROOT, _AGENT_FACTORY):
 
 
 def _handler(body: dict):
-    from board.server.handlers.kanban import KanbanHandlerMixin
+    from board.server.handlers.conveyor import ConveyorHandlerMixin
 
-    class FakeHandler(KanbanHandlerMixin):
+    class FakeHandler(ConveyorHandlerMixin):
         def __init__(self):
             self._body = body
             self._sent_json = None
@@ -40,12 +40,12 @@ def _handler(body: dict):
 
 
 class TestM8WorkRequestHandler(unittest.TestCase):
-    def test_create_uses_flow_kanban_create_and_prompt_update(self):
+    def test_create_uses_flow_conveyor_create_and_prompt_update(self):
         h = _handler({
             "action": "create",
             "title": "M8 sample",
             "command": "implement",
-            "status": "todo",
+            "status": "draft",
             "goal": "Build the request",
         })
         calls: list[list[str]] = []
@@ -53,66 +53,66 @@ class TestM8WorkRequestHandler(unittest.TestCase):
         def fake_run(args, **kwargs):
             calls.append(args)
             if args[1] == "create":
-                return subprocess.CompletedProcess(args, 0, stdout="T-520: M8 sample [To Do]", stderr="")
-            return subprocess.CompletedProcess(args, 0, stdout="T-520: prompt updated", stderr="")
+                return subprocess.CompletedProcess(args, 0, stdout="WR-520: M8 sample [Draft]", stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout="WR-520: prompt updated", stderr="")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("os.getcwd", return_value=tmpdir), patch("subprocess.run", side_effect=fake_run):
-                h._handle_kanban_workrequest()
+                h._handle_conveyor_workrequest()
 
         self.assertIsNone(h._sent_error)
-        self.assertEqual(h._sent_json["ticket"], "T-520")
+        self.assertEqual(h._sent_json["work_request"], "WR-520")
         self.assertEqual(calls[0][1:5], ["create", "M8 sample", "--command", "implement"])
         self.assertIn("update-prompt", calls[1])
 
     def test_accept_moves_to_open(self):
-        h = _handler({"action": "accept", "ticket": "T-520"})
+        h = _handler({"action": "accept", "work_request": "WR-520"})
 
         def fake_run(args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="T-520: To Do -> Open", stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout="WR-520: Draft -> Accepted", stderr="")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("os.getcwd", return_value=tmpdir), patch("subprocess.run", side_effect=fake_run) as run:
-                h._handle_kanban_workrequest()
+                h._handle_conveyor_workrequest()
 
         self.assertIsNone(h._sent_error)
         self.assertEqual(h._sent_json["action"], "accept")
-        self.assertEqual(run.call_args.args[0][1:], ["move", "T-520", "open"])
+        self.assertEqual(run.call_args.args[0][1:], ["move", "WR-520", "accepted"])
 
     def test_accept_records_ouroboros_history_when_ticket_exists(self):
-        h = _handler({"action": "accept", "ticket": "T-520"})
+        h = _handler({"action": "accept", "work_request": "WR-520"})
 
         def fake_run(args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="T-520: To Do -> Open", stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout="WR-520: Draft -> Accepted", stderr="")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            tickets = Path(tmpdir) / ".agent-factory" / "tickets" / "todo"
-            tickets.mkdir(parents=True)
-            (tickets / "T-520.xml").write_text(
+            requests = Path(tmpdir) / ".agent-factory" / "work-requests" / "draft"
+            requests.mkdir(parents=True)
+            (requests / "WR-520.xml").write_text(
                 """<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <metadata>
-    <number>T-520</number>
+    <number>WR-520</number>
     <title>Accept sample</title>
-    <status>To Do</status>
+    <status>Draft</status>
     <command>implement</command>
   </metadata>
   <prompt>
     <goal>Accept the request</goal>
     <criteria>- history is recorded</criteria>
   </prompt>
-</ticket>
+</work_request>
 """,
                 encoding="utf-8",
             )
             with patch("os.getcwd", return_value=tmpdir), patch("subprocess.run", side_effect=fake_run):
-                h._handle_kanban_workrequest()
+                h._handle_conveyor_workrequest()
 
-            from engine.adapters.kanban import XmlWorkRequestStore
+            from engine.adapters.conveyor import XmlWorkRequestStore
             from engine.core.work_requests import OuroborosPhase, WorkRequestRef
 
-            request = XmlWorkRequestStore(Path(tmpdir) / ".agent-factory" / "tickets").get(
-                WorkRequestRef.parse("T-520")
+            request = XmlWorkRequestStore(Path(tmpdir) / ".agent-factory" / "work-requests").get(
+                WorkRequestRef.parse("WR-520")
             )
 
         self.assertIsNone(h._sent_error)
@@ -124,7 +124,7 @@ class TestM8WorkRequestHandler(unittest.TestCase):
 
     def test_invalid_action_returns_400(self):
         h = _handler({"action": "bogus"})
-        h._handle_kanban_workrequest()
+        h._handle_conveyor_workrequest()
         self.assertEqual(h._sent_error[0], 400)
 
 

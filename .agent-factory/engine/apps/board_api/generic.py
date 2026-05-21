@@ -12,7 +12,7 @@ from board.server.support.common import (
     SERVER_PID,
     api_endpoint,
     _parse_env_file,
-    _read_kanban_tickets,
+    _read_conveyor_work_requests,
     _read_dashboard,
     _get_git_branch,
     _list_memory_files,
@@ -31,7 +31,7 @@ from engine.apps.board_api.prompt_store import (
 
 
 class GenericHandlerMixin:
-    """Kanban / dashboard / workflow / memory / rules / prompt API + SSE."""
+    """Conveyor / dashboard / workflow / memory / rules / prompt API + SSE."""
 
     def _handle_api_delete(self) -> None:
         """internal helper — not exposed as endpoint.
@@ -74,14 +74,14 @@ class GenericHandlerMixin:
 
         if path == '/api/env':
             self._send_json(_parse_env_file(project_root))
-        elif path == '/api/kanban':
+        elif path == '/api/conveyor':
             files_param = qs.get('files', [None])[0]
             files = files_param.split(",") if files_param else None
-            self._send_json(_read_kanban_tickets(project_root, files))
+            self._send_json(_read_conveyor_work_requests(project_root, files))
         elif path == '/api/dashboard':
             self._send_json(_read_dashboard(project_root))
-        # T-513 P2 — Old workflow entries/detail inline branch transferred to KANBAN domain
-        # (KanbanHandlerMixin._handle_kanban_workflow_{entries,detail}). This _handle_api
+        # T-513 P2 — Old workflow entries/detail inline branch transferred to Conveyor domain
+        # (ConveyorHandlerMixin._handle_conveyor_workflow_{entries,detail}). This _handle_api
         # An inline branch is dead — http_router do_GET delegates directly.
         elif path == '/api/server-info':
             self._send_json({
@@ -156,12 +156,12 @@ class GenericHandlerMixin:
             self._handle_metrics_launch_latency(last=last)
         elif path == '/api/worktree/uncommitted/all':
             self._handle_worktree_uncommitted_all()
-        elif path == '/api/kanban/review-verdict':
-            self._handle_kanban_review_verdict()
-        elif path == '/api/kanban/audit/verdict':
-            self._handle_kanban_audit_verdict()
-        elif path == '/api/kanban/done-verdict':
-            self._handle_kanban_done_verdict()
+        elif path == '/api/conveyor/verifying-verdict':
+            self._handle_conveyor_verifying_verdict()
+        elif path == '/api/conveyor/audit/verdict':
+            self._handle_conveyor_audit_verdict()
+        elif path == '/api/conveyor/complete-verdict':
+            self._handle_conveyor_complete_verdict()
         else:
             self.send_response(404)
             self.end_headers()
@@ -200,7 +200,7 @@ class GenericHandlerMixin:
         domain: SYS
         handler: GenericHandlerMixin._handle_sse
         request: query none (long-lived connection)
-        response_ok: text/event-stream (kanban_update / workflow_update / dashboard_update / memory_update / roadmap_update / launch / git_branch)
+        response_ok: text/event-stream (conveyor_update / workflow_update / dashboard_update / memory_update / roadmap_update / launch / git_branch)
         response_error: n/a (HTTP keep-alive stream)
         status_codes: 200
         auth: none (local-only)

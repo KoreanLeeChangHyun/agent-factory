@@ -1,6 +1,6 @@
 """Agent Factory production-line app entrypoint.
 
-This is the operator-facing production line for processing one ticket.
+This is the operator-facing production line for processing one WorkRequest.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from .stations import (
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Agent Factory production line")
-    parser.add_argument("ticket", help="T-NNN")
+    parser.add_argument("work_request", help="WR-NNN")
     parser.add_argument(
         "--step",
         choices=["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"],
@@ -32,43 +32,43 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    ticket = init_step(args.ticket)
+    work_request = init_step(args.work_request)
     if args.step == "INIT":
         return 0
 
     try:
-        plan_step(ticket)
-        if not ticket.plan_json_path().exists() or not ticket.plan_md_path().exists():
-            fail_step(ticket, "plan/plan.json or plan/plan.md not produced after retries")
+        plan_step(work_request)
+        if not work_request.plan_json_path().exists() or not work_request.plan_md_path().exists():
+            fail_step(work_request, "plan/plan.json or plan/plan.md not produced after retries")
             return 2
-        update_step(ticket, "PLAN", "WORK")
+        update_step(work_request, "PLAN", "WORK")
         if args.step == "PLAN":
             return 0
 
-        if not work_step(ticket):
+        if not work_step(work_request):
             return 2
-        update_step(ticket, "WORK", "VALIDATE")
+        update_step(work_request, "WORK", "VALIDATE")
         if args.step == "WORK":
             return 0
 
-        validate_step(ticket)
-        update_step(ticket, "VALIDATE", "REPORT")
+        validate_step(work_request)
+        update_step(work_request, "VALIDATE", "REPORT")
         if args.step == "VALIDATE":
             return 0
 
-        report_step(ticket)
-        if not ticket.report_html_path().exists():
-            fail_step(ticket, "report.html not produced after retries")
+        report_step(work_request)
+        if not work_request.report_html_path().exists():
+            fail_step(work_request, "report.html not produced after retries")
             return 2
-        update_step(ticket, "REPORT", "DONE")
+        update_step(work_request, "REPORT", "DONE")
         if args.step == "REPORT":
             return 0
 
-        done_step(ticket)
+        done_step(work_request)
         return 0
     except Exception as exc:
         try:
-            (ticket.work_dir / "failure.md").write_text(
+            (work_request.work_dir / "failure.md").write_text(
                 f"# production line failure\n\n"
                 f"- ts: {datetime.now().isoformat(timespec='seconds')}\n"
                 f"- exception: `{exc!r}`\n\n"
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         except OSError:
             pass
-        fail_step(ticket, f"unhandled exception: {exc!r}")
+        fail_step(work_request, f"unhandled exception: {exc!r}")
         return 3
 
 

@@ -1,6 +1,6 @@
 # Workflow FAILED
 
-- ticket: {ticket_no}
+- work_request: {work_request_no}
 - registry_key: {registry_key}
 - reason: {reason}
 - ts: {ts}

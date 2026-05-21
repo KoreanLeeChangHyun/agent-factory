@@ -1,4 +1,4 @@
-"""WorkRequestStore backed by the existing kanban XML ticket layout."""
+"""WorkRequestStore backed by the conveyor WorkRequest XML layout."""
 
 from __future__ import annotations
 
@@ -17,20 +17,20 @@ from engine.core.work_requests.repository import WorkRequestStore
 
 
 _STATUS_DIRS = {
-    WorkRequestStatus.TODO: "todo",
-    WorkRequestStatus.OPEN: "open",
-    WorkRequestStatus.IN_PROGRESS: "progress",
-    WorkRequestStatus.REVIEW: "review",
-    WorkRequestStatus.DONE: "done",
+    WorkRequestStatus.DRAFT: "draft",
+    WorkRequestStatus.ACCEPTED: "accepted",
+    WorkRequestStatus.EXECUTING: "executing",
+    WorkRequestStatus.VERIFYING: "verifying",
+    WorkRequestStatus.COMPLETE: "complete",
 }
 _STATUS_BY_VALUE = {status.value: status for status in WorkRequestStatus}
 
 
 class XmlWorkRequestStore(WorkRequestStore):
-    """Adapter for `.agent-factory/tickets/{state}/T-NNN.xml` files."""
+    """Adapter for `.agent-factory/work-requests/{state}/WR-NNN.xml` files."""
 
-    def __init__(self, tickets_root: str | Path) -> None:
-        self.tickets_root = Path(tickets_root)
+    def __init__(self, work_requests_root: str | Path) -> None:
+        self.work_requests_root = Path(work_requests_root)
 
     def get(self, ref: WorkRequestRef) -> WorkRequest:
         path = self._find_path(ref)
@@ -40,12 +40,12 @@ class XmlWorkRequestStore(WorkRequestStore):
 
     def save(self, request: WorkRequest) -> None:
         current_path = self._find_path(request.ref)
-        target_dir = self.tickets_root / _STATUS_DIRS[request.status]
+        target_dir = self.work_requests_root / _STATUS_DIRS[request.status]
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / f"{request.ref}.xml"
 
         if current_path is None:
-            root = ET.Element("ticket")
+            root = ET.Element("work_request")
         else:
             tree = ET.parse(current_path)
             root = tree.getroot()
@@ -59,8 +59,12 @@ class XmlWorkRequestStore(WorkRequestStore):
 
     def _find_path(self, ref: WorkRequestRef) -> Path | None:
         filename = f"{ref}.xml"
-        for dirname in ("todo", "open", "progress", "review", "done", "active", ""):
-            candidate = self.tickets_root / dirname / filename if dirname else self.tickets_root / filename
+        for dirname in ("draft", "accepted", "executing", "verifying", "complete", ""):
+            candidate = (
+                self.work_requests_root / dirname / filename
+                if dirname
+                else self.work_requests_root / filename
+            )
             if candidate.is_file():
                 return candidate
         return None
@@ -73,7 +77,7 @@ class XmlWorkRequestStore(WorkRequestStore):
         prompt = root.find("prompt")
 
         ref = WorkRequestRef.parse(_child_text(metadata, "number") or path.stem)
-        status = _STATUS_BY_VALUE.get(_child_text(metadata, "status"), WorkRequestStatus.OPEN)
+        status = _STATUS_BY_VALUE.get(_child_text(metadata, "status"), WorkRequestStatus.ACCEPTED)
         command = _child_text(metadata, "command") or "implement"
         title = _child_text(metadata, "title") or str(ref)
 

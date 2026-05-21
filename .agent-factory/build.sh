@@ -287,6 +287,14 @@ except Exception as e:
 _PATH_FIXES = [
     (".claude.workflow/scripts/", ".agent-factory/engine/"),
     (".claude.workflow/", ".agent-factory/"),
+    (
+        "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/sync/history_sync.py",
+        "$CLAUDE_PROJECT_DIR/.agent-factory/bin/flow-history",
+    ),
+    (
+        "$CLAUDE_PROJECT_DIR/.agent-factory/engine/statusline.py",
+        "$CLAUDE_PROJECT_DIR/.agent-factory/engine/apps/hooks/statusline.py",
+    ),
 ]
 
 stale_fixed = []
@@ -385,6 +393,38 @@ setup_settings_json() {
 _merge_kv_settings() {
     local existing_file="$1" tmpl_file="$2"
     [ ! -f "$existing_file" ] || [ ! -f "$tmpl_file" ] && return 1
+
+    local rename_pair old_key new_key tmp_rename
+    local rename_pairs=(
+        "CLAUDE_CODE_SLACK_BOT_TOKEN AGENT_FACTORY_SLACK_BOT_TOKEN"
+        "CLAUDE_CODE_SLACK_CHANNEL_ID AGENT_FACTORY_SLACK_CHANNEL_ID"
+        "CLAUDE_SLACK_API_URL AGENT_FACTORY_SLACK_API_URL"
+        "CLAUDE_CODE_GIT_USER_NAME AGENT_FACTORY_GIT_USER_NAME"
+        "CLAUDE_CODE_GIT_USER_EMAIL AGENT_FACTORY_GIT_USER_EMAIL"
+        "CLAUDE_CODE_GITHUB_USERNAME AGENT_FACTORY_GITHUB_USERNAME"
+        "CLAUDE_CODE_SSH_KEY_GITHUB AGENT_FACTORY_SSH_KEY_GITHUB"
+        "CLAUDE_WORKFLOW_KEEP_COUNT AGENT_FACTORY_WORKFLOW_KEEP_COUNT"
+        "CLAUDE_CHAIN_MAX_RETRY AGENT_FACTORY_CHAIN_MAX_RETRY"
+        "CLAUDE_QUALITY_THRESHOLD AGENT_FACTORY_QUALITY_THRESHOLD"
+        "CLAUDE_ERROR_THRESHOLD AGENT_FACTORY_ERROR_THRESHOLD"
+        "CLAUDE_STALE_TTL_MINUTES AGENT_FACTORY_STALE_TTL_MINUTES"
+        "CLAUDE_ZOMBIE_TTL_HOURS AGENT_FACTORY_ZOMBIE_TTL_HOURS"
+        "CLAUDE_REPORT_TTL_HOURS AGENT_FACTORY_REPORT_TTL_HOURS"
+        "CLAUDE_WORK_NAME_MAX_LEN AGENT_FACTORY_WORK_NAME_MAX_LEN"
+        "CLAUDE_BANNER_WIDTH AGENT_FACTORY_BANNER_WIDTH"
+        "CLAUDE_REPO_URL AGENT_FACTORY_REPO_URL"
+        "CLAUDE_REQUIRED_PYTHON_MAJOR AGENT_FACTORY_REQUIRED_PYTHON_MAJOR"
+        "CLAUDE_REQUIRED_PYTHON_MINOR AGENT_FACTORY_REQUIRED_PYTHON_MINOR"
+    )
+    for rename_pair in "${rename_pairs[@]}"; do
+        old_key="${rename_pair%% *}"
+        new_key="${rename_pair##* }"
+        if grep -q "^${old_key}=" "$existing_file" 2>/dev/null && ! grep -q "^${new_key}=" "$existing_file" 2>/dev/null; then
+            tmp_rename="$(mktemp)" || return 1
+            sed "s/^${old_key}=/${new_key}=/" "$existing_file" > "$tmp_rename" || { rm -f "$tmp_rename"; return 1; }
+            mv "$tmp_rename" "$existing_file" || { rm -f "$tmp_rename"; return 1; }
+        fi
+    done
 
     # Extract KEY list from existing file (start with uppercase letter + underscore)
     local existing_keys

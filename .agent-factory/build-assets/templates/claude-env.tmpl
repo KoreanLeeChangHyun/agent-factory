@@ -6,31 +6,44 @@
 # =========================================================================================
 
 # -----------------------------------------------------------------------------------------
-# (1) Slack integration
+# (1) Adapter settings
 # -----------------------------------------------------------------------------------------
 
+# Slack adapter settings.
 # Slack Bot OAuth Token (starts with xoxb-)
-# Purpose: Sending Claude Code task completion/waiting notifications
-CLAUDE_CODE_SLACK_BOT_TOKEN=
+# Purpose: Sending Agent Factory task completion/waiting notifications
+AGENT_FACTORY_SLACK_BOT_TOKEN=
 
 # Slack channel ID (starts with C)
 # Purpose: Specifies the channel through which notifications will be sent.
-CLAUDE_CODE_SLACK_CHANNEL_ID=
+AGENT_FACTORY_SLACK_CHANNEL_ID=
 
 # Slack API endpoint (can be overridden)
-CLAUDE_SLACK_API_URL=https://slack.com/api/chat.postMessage
+AGENT_FACTORY_SLACK_API_URL=https://slack.com/api/chat.postMessage
+
+# Git adapter settings.
+AGENT_FACTORY_GIT_USER_NAME=
+AGENT_FACTORY_GIT_USER_EMAIL=
+AGENT_FACTORY_GITHUB_USERNAME=
+AGENT_FACTORY_SSH_KEY_GITHUB=
+
+# LLM adapter settings.
+# Brain provider for provider-neutral LLM adapter paths.
+# Supported values: claude / codex / fake
+AGENT_FACTORY_LLM_PROVIDER=claude
+
+# Claude adapter permission mode for non-interactive runs.
+CLAUDE_PERMISSION_MODE=bypassPermissions
+
+# Codex adapter settings.
+CODEX_BIN=codex
+CODEX_MODEL=
+CODEX_PROFILE=
+CODEX_SANDBOX=workspace-write
+CODEX_APPROVAL_POLICY=never
 
 # -----------------------------------------------------------------------------------------
-# (2) Git settings
-# -----------------------------------------------------------------------------------------
-
-CLAUDE_CODE_GIT_USER_NAME=
-CLAUDE_CODE_GIT_USER_EMAIL=
-CLAUDE_CODE_GITHUB_USERNAME=
-CLAUDE_CODE_SSH_KEY_GITHUB=
-
-# -----------------------------------------------------------------------------------------
-# (3) Hook control flag (HOOK_* system)
+# (2) Hook control flag (HOOK_* system)
 # Control the activation/deactivation of each hook with true/false.
 # -----------------------------------------------------------------------------------------
 
@@ -82,7 +95,7 @@ AUDITOR_T3_MODEL=sonnet
 AUDITOR_T3_EFFORT=low
 
 # -----------------------------------------------------------------------------------------
-# (4) Enforced rule control flags (ENFORCE_* scheme)
+# (3) Enforced rule control flags (ENFORCE_* scheme)
 # true/false controls the activation/deactivation of each enforcement rule.
 # -----------------------------------------------------------------------------------------
 
@@ -102,32 +115,14 @@ ENFORCE_SELF_REVIEW=true
 ENFORCE_TOKEN_EFFICIENCY=true
 
 # -----------------------------------------------------------------------------------------
-# (5) Agent Factory brain / adapter settings
-# -----------------------------------------------------------------------------------------
-
-# Brain provider for provider-neutral LLM adapter paths.
-# Supported values: claude / codex / fake
-AGENT_FACTORY_LLM_PROVIDER=claude
-
-# Claude adapter permission mode for non-interactive runs.
-CLAUDE_PERMISSION_MODE=bypassPermissions
-
-# Codex adapter settings.
-CODEX_BIN=codex
-CODEX_MODEL=
-CODEX_PROFILE=
-CODEX_SANDBOX=workspace-write
-CODEX_APPROVAL_POLICY=never
-
-# -----------------------------------------------------------------------------------------
-# (6) Agent Factory workflow settings
+# (4) Agent Factory workflow settings
 # -----------------------------------------------------------------------------------------
 
 # Maximum number of workflows to keep in the .agent-factory/runs/ directory (default: 10)
-CLAUDE_WORKFLOW_KEEP_COUNT=10
+AGENT_FACTORY_WORKFLOW_KEEP_COUNT=10
 
 # Maximum number of retries when chain stage fails (default: 2)
-CLAUDE_CHAIN_MAX_RETRY=2
+AGENT_FACTORY_CHAIN_MAX_RETRY=2
 
 # Enable git worktree isolation (single source of truth — successor to T-370)
 # Allowed values: true (isolation active, recommended) / false (disabled, work directly with main repository)
@@ -136,22 +131,22 @@ CLAUDE_CHAIN_MAX_RETRY=2
 WORKFLOW_WORKTREE=true
 
 # Prompt quality threshold (0.0 to 1.0). Automatic rollback when insufficient
-CLAUDE_QUALITY_THRESHOLD=0.6
+AGENT_FACTORY_QUALITY_THRESHOLD=0.6
 
 # ERROR count threshold per workflow
-CLAUDE_ERROR_THRESHOLD=3
+AGENT_FACTORY_ERROR_THRESHOLD=3
 
 # Session/workflow stale determination (in minutes)
-CLAUDE_STALE_TTL_MINUTES=30
+AGENT_FACTORY_STALE_TTL_MINUTES=30
 
 # Zombie session verdict (unit of time)
-CLAUDE_ZOMBIE_TTL_HOURS=24
+AGENT_FACTORY_ZOMBIE_TTL_HOURS=24
 
 # Report TTL (in hours)
-CLAUDE_REPORT_TTL_HOURS=1
+AGENT_FACTORY_REPORT_TTL_HOURS=1
 
 # Working directory name maximum length
-CLAUDE_WORK_NAME_MAX_LEN=20
+AGENT_FACTORY_WORK_NAME_MAX_LEN=20
 
 # Maximum number of retry per phase (default value 0 = retry inactive, 0 regressions guaranteed)
 # T-455: retry/sentinel/flow-fail-record infrastructure. Retry only works when explicitly activated.
@@ -165,15 +160,15 @@ WORKFLOW_RETRY_REPORT=0
 WORKFLOW_RETRY_PROMPT_N=3
 
 # Terminal banner width (automatic if empty)
-CLAUDE_BANNER_WIDTH=
+AGENT_FACTORY_BANNER_WIDTH=
 
 # -----------------------------------------------------------------------------------------
-# (6) External environment / Python requirements
+# (5) Bootstrap and external source settings
 # -----------------------------------------------------------------------------------------
 
 # Remote repository URL (can be overridden)
-CLAUDE_REPO_URL=https://github.com/KoreanLeeChangHyun/claude-workflow.git
+AGENT_FACTORY_REPO_URL=https://github.com/KoreanLeeChangHyun/claude-workflow.git
 
 # Python minimum version (verified build.sh)
-CLAUDE_REQUIRED_PYTHON_MAJOR=3
-CLAUDE_REQUIRED_PYTHON_MINOR=9
+AGENT_FACTORY_REQUIRED_PYTHON_MAJOR=3
+AGENT_FACTORY_REQUIRED_PYTHON_MINOR=9

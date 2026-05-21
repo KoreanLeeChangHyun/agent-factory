@@ -11,10 +11,12 @@ Usage: python3 git_config.py [--global|--local]
   --local Local configuration (.git/config)
 
 Environment variables (loaded from .agent-factory/.settings):
-  CLAUDE_CODE_GIT_USER_NAME - Git user.name (required)
-  CLAUDE_CODE_GIT_USER_EMAIL - Git user.email (required)
-  CLAUDE_CODE_GITHUB_USERNAME - GitHub username (optional)
-  CLAUDE_CODE_SSH_KEY_GITHUB - GitHub SSH key path (optional)
+  AGENT_FACTORY_GIT_USER_NAME - Git user.name (required)
+  AGENT_FACTORY_GIT_USER_EMAIL - Git user.email (required)
+  AGENT_FACTORY_GITHUB_USERNAME - GitHub username (optional)
+  AGENT_FACTORY_SSH_KEY_GITHUB - GitHub SSH key path (optional)
+
+Legacy CLAUDE_CODE_* names are still accepted for existing installations.
 """
 
 from __future__ import annotations
@@ -35,6 +37,13 @@ from flow.cli_utils import build_common_epilog
 _PROJECT_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "..", "..", ".."))
 _CW_DIR = os.path.join(_PROJECT_ROOT, ".agent-factory")
 _ENV_FILE = os.path.join(_CW_DIR, ".settings")
+
+
+def _read_setting(key: str, legacy_key: str = "") -> str:
+    value = read_env(key, env_file=_ENV_FILE)
+    if value or not legacy_key:
+        return value
+    return read_env(legacy_key, env_file=_ENV_FILE)
 
 
 def _git_config_get(scope: str, key: str) -> str:
@@ -115,19 +124,19 @@ def main() -> None:
         sys.exit(1)
 
     # --- Load environment variables ---
-    git_user_name = read_env("CLAUDE_CODE_GIT_USER_NAME", env_file=_ENV_FILE)
-    git_user_email = read_env("CLAUDE_CODE_GIT_USER_EMAIL", env_file=_ENV_FILE)
+    git_user_name = _read_setting("AGENT_FACTORY_GIT_USER_NAME", "CLAUDE_CODE_GIT_USER_NAME")
+    git_user_email = _read_setting("AGENT_FACTORY_GIT_USER_EMAIL", "CLAUDE_CODE_GIT_USER_EMAIL")
     # Currently not in use - expected to be integrated with GitHub API in the future
-    _github_username = read_env("CLAUDE_CODE_GITHUB_USERNAME", env_file=_ENV_FILE)
-    ssh_key_github = read_env("CLAUDE_CODE_SSH_KEY_GITHUB", env_file=_ENV_FILE)
+    _github_username = _read_setting("AGENT_FACTORY_GITHUB_USERNAME", "CLAUDE_CODE_GITHUB_USERNAME")
+    ssh_key_github = _read_setting("AGENT_FACTORY_SSH_KEY_GITHUB", "CLAUDE_CODE_SSH_KEY_GITHUB")
 
     # --- Verification of required environment variables ---
     if not git_user_name:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_NAME is not set in .settings.", file=sys.stderr)
+        print("[ERROR] AGENT_FACTORY_GIT_USER_NAME is not set in .settings.", file=sys.stderr)
         sys.exit(1)
 
     if not git_user_email:
-        print("[ERROR] CLAUDE_CODE_GIT_USER_EMAIL is not set in .settings.", file=sys.stderr)
+        print("[ERROR] AGENT_FACTORY_GIT_USER_EMAIL is not set in .settings.", file=sys.stderr)
         sys.exit(1)
 
     # --- Before state collection ---

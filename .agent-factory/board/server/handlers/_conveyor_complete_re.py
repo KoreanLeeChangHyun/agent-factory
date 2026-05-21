@@ -1,8 +1,8 @@
-"""Compatibility exports for flow-kanban done / undo stdout parsing."""
+"""Compatibility exports for flow-conveyor complete / undo stdout parsing."""
 
 from __future__ import annotations
 
-from engine.apps.board_api.kanban_done_re import (
+from engine.apps.board_api.conveyor_complete_re import (
     _classify_done_failure,
     _DONE_CONFLICT_HEADER,
     _DONE_CONFLICT_WARN_RE,

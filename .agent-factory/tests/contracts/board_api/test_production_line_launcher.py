@@ -1,4 +1,4 @@
-"""T-500: server/production_line_launcher.py unit test.
+"""WR-d00: server/production_line_launcher.py unit test.
 
 Verified by:
   - Module import possible (spawn_production_line / _production_line_reader_loop callable)
@@ -85,7 +85,7 @@ class TestSpawnProductionLine(unittest.TestCase):
 
         with patch.object(self.production_line_launcher.subprocess, 'Popen', side_effect=_fake_popen), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            result = self.production_line_launcher.spawn_production_line('T-001', 'implement')
+            result = self.production_line_launcher.spawn_production_line('WR-d01', 'implement')
 
         self.assertTrue(result.get('ok'))
         self.assertEqual(captured['env']['V2_BOARD_POST'], 'true')
@@ -98,29 +98,29 @@ class TestSpawnProductionLine(unittest.TestCase):
         self.assertTrue(captured['cwd'])
 
     def test_session_id_determinism(self):
-        """When fixing submitted_at session_id == f'wf-{ticket}-{registry_key}'."""
+        """When fixing submitted_at session_id == f'wf-{work_request}-{registry_key}'."""
         fixed_dt = datetime(2026, 5, 19, 12, 30, 45, tzinfo=timezone.utc)
 
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'), \
              patch.object(self.production_line_launcher, '_now_utc', return_value=fixed_dt):
-            result = self.production_line_launcher.spawn_production_line('T-042', 'research')
+            result = self.production_line_launcher.spawn_production_line('WR-d42', 'research')
 
-        self.assertEqual(result['session_id'], 'wf-T-042-20260519-123045')
+        self.assertEqual(result['session_id'], 'wf-WR-d42-20260519-123045')
         self.assertEqual(result['submitted_at'], fixed_dt.isoformat())
 
     def test_response_shape(self):
         """Returns dict key set matching."""
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            result = self.production_line_launcher.spawn_production_line('T-099', 'implement')
+            result = self.production_line_launcher.spawn_production_line('WR-d99', 'implement')
 
         self.assertEqual(set(result.keys()), {
-            'ok', 'status', 'ticket', 'command', 'submitted_at', 'session_id',
+            'ok', 'status', 'work_request', 'command', 'submitted_at', 'session_id',
         })
         self.assertTrue(result['ok'])
         self.assertEqual(result['status'], 'starting')
-        self.assertEqual(result['ticket'], 'T-099')
+        self.assertEqual(result['work_request'], 'WR-d99')
         self.assertEqual(result['command'], 'implement')
 
     def test_popen_failure_file_not_found(self):
@@ -128,7 +128,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           side_effect=FileNotFoundError('flow-wf')), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            result = self.production_line_launcher.spawn_production_line('T-001', 'implement')
+            result = self.production_line_launcher.spawn_production_line('WR-d01', 'implement')
 
         self.assertFalse(result['ok'])
         self.assertEqual(result['error_kind'], 'flow_wf_not_found')
@@ -139,7 +139,7 @@ class TestSpawnProductionLine(unittest.TestCase):
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           side_effect=OSError('permission denied')), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            result = self.production_line_launcher.spawn_production_line('T-002', 'implement')
+            result = self.production_line_launcher.spawn_production_line('WR-d02', 'implement')
 
         self.assertFalse(result['ok'])
         self.assertEqual(result['error_kind'], 'popen_failed')
@@ -160,7 +160,7 @@ class TestSpawnProductionLine(unittest.TestCase):
 
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=proc), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            self.production_line_launcher.spawn_production_line('T-201', 'implement')
+            self.production_line_launcher.spawn_production_line('WR-d01', 'implement')
 
             # Confirm registration in thread set immediately after spawn
             with self.production_line_launcher._LAUNCH_READER_LOCK:
@@ -174,12 +174,12 @@ class TestSpawnProductionLine(unittest.TestCase):
         """LAUNCH_PENDING + LAUNCH_STARTED is called by the _emit function."""
         emitted = []
 
-        def _capture_emit(event, ticket, **kwargs):
-            emitted.append((event, ticket, kwargs))
+        def _capture_emit(event, work_request, **kwargs):
+            emitted.append((event, work_request, kwargs))
 
         with patch.object(self.production_line_launcher.subprocess, 'Popen', return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe', side_effect=_capture_emit):
-            self.production_line_launcher.spawn_production_line('T-301', 'review')
+            self.production_line_launcher.spawn_production_line('WR-d01', 'review')
 
         events = [e[0] for e in emitted]
         self.assertIn('LAUNCH_PENDING', events)
@@ -203,8 +203,8 @@ class TestReaderLoop(unittest.TestCase):
         """When rc == 0 (normal completion), LAUNCH_FAILED emits 0 cases."""
         emitted = []
 
-        def _capture(event, ticket, **kwargs):
-            emitted.append((event, ticket, kwargs))
+        def _capture(event, work_request, **kwargs):
+            emitted.append((event, work_request, kwargs))
 
         proc = _make_mock_proc(returncode=0, stdout='ok', stderr='')
         submitted = datetime.now(timezone.utc)
@@ -214,7 +214,7 @@ class TestReaderLoop(unittest.TestCase):
             self_thread = threading.current_thread()
             with self.production_line_launcher._LAUNCH_READER_LOCK:
                 self.production_line_launcher._LAUNCH_READER_THREADS.add(self_thread)
-            self.production_line_launcher._production_line_reader_loop(proc, 'T-401', 'implement', submitted)
+            self.production_line_launcher._production_line_reader_loop(proc, 'WR-d01', 'implement', submitted)
 
         # LAUNCH_FAILED 0 calls
         self.assertEqual(emitted, [])
@@ -223,8 +223,8 @@ class TestReaderLoop(unittest.TestCase):
         """rc != 0 at LAUNCH_FAILED + reason='driver_nonzero_exit' + returncode/error_message carry."""
         emitted = []
 
-        def _capture(event, ticket, **kwargs):
-            emitted.append((event, ticket, kwargs))
+        def _capture(event, work_request, **kwargs):
+            emitted.append((event, work_request, kwargs))
 
         proc = _make_mock_proc(returncode=1, stdout='', stderr='driver crashed')
         submitted = datetime.now(timezone.utc)
@@ -233,12 +233,12 @@ class TestReaderLoop(unittest.TestCase):
             self_thread = threading.current_thread()
             with self.production_line_launcher._LAUNCH_READER_LOCK:
                 self.production_line_launcher._LAUNCH_READER_THREADS.add(self_thread)
-            self.production_line_launcher._production_line_reader_loop(proc, 'T-402', 'implement', submitted)
+            self.production_line_launcher._production_line_reader_loop(proc, 'WR-d02', 'implement', submitted)
 
         self.assertEqual(len(emitted), 1)
-        event, ticket, payload = emitted[0]
+        event, work_request, payload = emitted[0]
         self.assertEqual(event, 'LAUNCH_FAILED')
-        self.assertEqual(ticket, 'T-402')
+        self.assertEqual(work_request, 'WR-d02')
         self.assertEqual(payload['reason'], 'driver_nonzero_exit')
         self.assertEqual(payload['returncode'], 1)
         self.assertEqual(payload['command'], 'implement')
@@ -253,7 +253,7 @@ class TestReaderLoop(unittest.TestCase):
         with patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
             reader = threading.Thread(
                 target=self.production_line_launcher._production_line_reader_loop,
-                args=(proc, 'T-501', 'implement', submitted),
+                args=(proc, 'WR-d01', 'implement', submitted),
                 daemon=True,
             )
             with self.production_line_launcher._LAUNCH_READER_LOCK:
@@ -285,8 +285,8 @@ class TestConcurrentSpawn(unittest.TestCase):
         with patch.object(self.production_line_launcher.subprocess, 'Popen',
                           return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'):
-            self.production_line_launcher.spawn_production_line('T-601', 'implement')
-            self.production_line_launcher.spawn_production_line('T-602', 'implement')
+            self.production_line_launcher.spawn_production_line('WR-d01', 'implement')
+            self.production_line_launcher.spawn_production_line('WR-d02', 'implement')
 
         # Wait for both reader joins (mock proc.communicate returns immediately → reader exits soon)
         # Wait up to 2 seconds
@@ -318,7 +318,7 @@ class TestConcurrentSpawn(unittest.TestCase):
                           return_value=_make_mock_proc()), \
              patch.object(self.production_line_launcher, '_emit_launch_event_safe'), \
              patch.object(self.production_line_launcher, '_now_utc', side_effect=_next_now):
-            r1 = self.production_line_launcher.spawn_production_line('T-701', 'implement')
+            r1 = self.production_line_launcher.spawn_production_line('WR-d01', 'implement')
             # seq reset — second call starts with dt2
             seq2 = iter([dt2, dt2])
 
@@ -329,7 +329,7 @@ class TestConcurrentSpawn(unittest.TestCase):
                     return dt2
 
             with patch.object(self.production_line_launcher, '_now_utc', side_effect=_next_now2):
-                r2 = self.production_line_launcher.spawn_production_line('T-702', 'implement')
+                r2 = self.production_line_launcher.spawn_production_line('WR-d02', 'implement')
 
         self.assertNotEqual(r1['session_id'], r2['session_id'])
 

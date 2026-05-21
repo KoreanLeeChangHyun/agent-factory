@@ -65,7 +65,7 @@ _BASH_FILE_MODIFY_PATTERNS: list[str] = [
 _ALWAYS_ALLOWED_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"[/\\]\.agent-factory[/\\]runs[/\\]"),
     re.compile(r"[/\\]\.agent-factory[/\\]board[/\\]sessions[/\\]"),
-    re.compile(r"[/\\]\.agent-factory[/\\](?:catalog|kanban|history|sessions)[/\\]"),
+    re.compile(r"[/\\]\.agent-factory[/\\](?:catalog|conveyor|history|sessions)[/\\]"),
 ]
 
 
@@ -384,7 +384,7 @@ def main() -> None:
     If the current session is a workflow implement session and the worktree is set,
     Blocks modification of the main repo path file and guides the work tree path.
 
-    It passes in non-tmux environments, main sessions, research/review sessions, and sessions without worktrees.
+    It passes in non-tmux environments, main sessions, research/verifying sessions, and sessions without worktrees.
     Output/sidecar paths matching `_ALWAYS_ALLOWED_PATTERNS` are always allowed.
     """
     # Load settings from .agent-factory/.settings
@@ -426,7 +426,7 @@ def main() -> None:
     # Extract the first segment of the command (support chain command: "research>implement" -> "research")
     first_segment = command.split(">")[0].strip()
 
-    # Passes unless it is an implement command (readonly_session_guard is in charge of research/review)
+    # Passes unless it is an implement command (readonly_session_guard is in charge of research/verifying)
     if first_segment != _IMPLEMENT_COMMAND:
         sys.exit(0)
 

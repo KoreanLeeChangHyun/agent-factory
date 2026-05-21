@@ -1,4 +1,4 @@
-"""Production-line stations for one ticket run."""
+"""Production-line stations for one WorkRequest run."""
 
 from .done import done_step, fail_step
 from .init import init_step

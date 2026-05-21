@@ -112,7 +112,7 @@ def _spawn_one_worker(
         f"Output: Written to `{artifact_path}`."
     )
     session_id = new_session_uuid()
-    logical = logical_session_name(ctx.ticket_no, "WORK", f"{phase.id}-W{worker_idx}")
+    logical = logical_session_name(ctx.work_request_no, "WORK", f"{phase.id}-W{worker_idx}")
     _record_session_id(ctx, logical, session_id)
     v, _, _ = spawn_with_retry(
         ctx,
@@ -295,7 +295,7 @@ def _run_in_place_mode(
         f"Finish after writing everything."
     )
     session_id = new_session_uuid()
-    logical = logical_session_name(ctx.ticket_no, "WORK")
+    logical = logical_session_name(ctx.work_request_no, "WORK")
     ctx.session_ids[logical] = session_id
     write_context(ctx)
     artifact_paths = [ctx.work_phase_md_resolved(p.id) for p in phases]

@@ -1,7 +1,8 @@
-"""ticket_repository.py - Kanban ticket XML CRUD and file navigation module.
+"""work_request_repository.py - Conveyor WorkRequest XML CRUD and file navigation module.
 
-Creating, reading, and XML ticket files (.kanban/{open,progress,review,done}/T-NNN.xml)
-This is a data layer module responsible for update and delete. Separated from kanban.py,
+Creating, reading, and XML WorkRequest files
+(.agent-factory/work-requests/{draft,accepted,executing,verifying,complete}/WR-NNN.xml).
+This is a data layer module responsible for update and delete. Separated from conveyor.py,
 Only pure IO operations are performed.
 """
 
@@ -25,26 +26,24 @@ if _SCRIPTS_DIR not in sys.path:
 from common import resolve_project_root
 
 _PROJECT_ROOT: str = resolve_project_root()
-KANBAN_DIR: str = os.path.join(_PROJECT_ROOT, ".agent-factory", "tickets")
+CONVEYOR_DIR: str = os.path.join(_PROJECT_ROOT, ".agent-factory", "work-requests")
 
 # ─── Directory constants by state ────────────────────────────────────────────────────────
-KANBAN_TODO_DIR: str = os.path.join(KANBAN_DIR, "todo")
-KANBAN_OPEN_DIR: str = os.path.join(KANBAN_DIR, "open")
-KANBAN_PROGRESS_DIR: str = os.path.join(KANBAN_DIR, "progress")
-KANBAN_REVIEW_DIR: str = os.path.join(KANBAN_DIR, "review")
-KANBAN_DONE_DIR: str = os.path.join(KANBAN_DIR, "done")
+CONVEYOR_DRAFT_DIR: str = os.path.join(CONVEYOR_DIR, "draft")
+CONVEYOR_ACCEPTED_DIR: str = os.path.join(CONVEYOR_DIR, "accepted")
+CONVEYOR_EXECUTING_DIR: str = os.path.join(CONVEYOR_DIR, "executing")
+CONVEYOR_VERIFYING_DIR: str = os.path.join(CONVEYOR_DIR, "verifying")
+CONVEYOR_COMPLETE_DIR: str = os.path.join(CONVEYOR_DIR, "complete")
 
-# Backward compatibility: deprecated alias for code that imports the existing KANBAN_ACTIVE_DIR
-KANBAN_ACTIVE_DIR: str = KANBAN_OPEN_DIR
+CONVEYOR_ACTIVE_DIR: str = CONVEYOR_ACCEPTED_DIR
 
 # XML <status> value -> directory path mapping
 STATUS_DIR_MAP: dict[str, str] = {
-    "To Do": KANBAN_TODO_DIR,
-    "Open": KANBAN_OPEN_DIR,
-    "Submit": KANBAN_PROGRESS_DIR,
-    "In Progress": KANBAN_PROGRESS_DIR,
-    "Review": KANBAN_REVIEW_DIR,
-    "Done": KANBAN_DONE_DIR,
+    "Draft": CONVEYOR_DRAFT_DIR,
+    "Accepted": CONVEYOR_ACCEPTED_DIR,
+    "Executing": CONVEYOR_EXECUTING_DIR,
+    "Verifying": CONVEYOR_VERIFYING_DIR,
+    "Complete": CONVEYOR_COMPLETE_DIR,
 }
 
 # ─── Debug reserved area constant ────────────────────────────────────────────────────────
@@ -129,7 +128,7 @@ def err(msg: str, code: int = 1) -> NoReturn:
         msg: error message
         code: exit code (default 1)
     """
-    log("ERROR", f"kanban.py: ERROR {msg}")
+    log("ERROR", f"conveyor.py: ERROR {msg}")
     print(f"Error: {msg}", file=sys.stderr)
     sys.exit(code)
 
@@ -137,39 +136,39 @@ def err(msg: str, code: int = 1) -> NoReturn:
 # ─── XML Helper ───────────────────────────────────────────────────────────────────
 
 
-def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "", command: str = "") -> str:
-    """Creates and returns a ticket XML string.
+def create_work_request_xml(work_request_number: str, title: str = "", datetime_str: str = "", command: str = "") -> str:
+    """Creates and returns a work_request XML string.
 
     XML is a flat structure consisting of five top-level elements:
-      - <metadata>: Ticket number, title, date, status, command (required)
+      - <metadata>: WorkRequest number, title, date, status, command (required)
       - <relations>: list of relationship links (optional — omitted if not relevant)
       - <prompt>: Action prompt (goal/target/constraints/criteria/context) (required)
       - <result>: Workflow execution result (registrykey/workdir/plan/report/merge_commit) (Optional — self-closing if not executed)
       - <failure>: FAIL status metadata (reason/phase/retry_count/context) (optional — does not exist upon normal completion)
 
-    When creating a new ticket, the <failure> element is not created (failure does not exist == normal state,
-    See T-452 §9.2 Option A). The <failure> element is newly inserted when update_failure() is called.
+    When creating a new work_request, the <failure> element is not created (failure does not exist == normal state,
+    See WR-452 §9.2 Option A). The <failure> element is newly inserted when update_failure() is called.
 
     Args:
-        ticket_number: Ticket number (T-NNN format).
-        title: Ticket title. Allows empty strings.
+        work_request_number: WorkRequest number (WR-NNN format).
+        title: WorkRequest title. Allows empty strings.
         datetime_str: Creation date string (YYYY-MM-DD HH:MM:SS format). If the string is empty, use the current time.
         command: Execution command (implement, research, etc.). Allows empty strings.
 
     Returns:
-        Ticket XML string containing UTF-8 XML declaration.
+        WorkRequest XML string containing UTF-8 XML declaration.
     """
-    root = ET.Element("ticket")
+    root = ET.Element("work_request")
     # <metadata> wrapper element
     metadata_elem = ET.SubElement(root, "metadata")
-    ET.SubElement(metadata_elem, "number").text = ticket_number
+    ET.SubElement(metadata_elem, "number").text = work_request_number
     title_sub = ET.SubElement(metadata_elem, "title")
     if title:
         title_sub.text = title
     now_str = datetime_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ET.SubElement(metadata_elem, "created").text = now_str
     ET.SubElement(metadata_elem, "updated").text = now_str
-    ET.SubElement(metadata_elem, "status").text = "Open"
+    ET.SubElement(metadata_elem, "status").text = "Accepted"
     if command:
         ET.SubElement(metadata_elem, "command").text = command
     # <prompt /> self-closing element
@@ -186,7 +185,7 @@ def create_ticket_xml(ticket_number: str, title: str = "", datetime_str: str = "
     return xml_str
 
 
-def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False) -> None:
+def write_work_request_xml(filepath: str, root: ET.Element, allow_create: bool = False) -> None:
     """Save the XML Element to a file.
 
     Maintain the <metadata>, <prompt>, <result> flat structure,
@@ -263,20 +262,20 @@ def write_ticket_xml(filepath: str, root: ET.Element, allow_create: bool = False
         f.write("\n")
 
 
-def parse_ticket_xml(filepath: str) -> dict[str, Any]:
-    """Parse the ticket XML file and return it as a dictionary.
+def parse_work_request_xml(filepath: str) -> dict[str, Any]:
+    """Parse the work_request XML file and return it as a dictionary.
 
     Parses based on flat structures (<metadata>, <prompt>, <result>).
-    Legacy tickets (<submit>/<subnumber> or <history>/<subnumber> structures) in the done directory are processed with fallback logic.
+    Legacy work_requests (<submit>/<subnumber> or <history>/<subnumber> structures) in the complete directory are processed with fallback logic.
 
     Args:
-        filepath: Ticket file path to parse.
+        filepath: WorkRequest file path to parse.
 
     Returns:
-        Dictionary of parsed ticket information:
-            - number (str): ticket number
+        Dictionary of parsed work_request information:
+            - number (str): work_request number
             - status (str): current status
-            - title (str): ticket title
+            - title (str): work_request title
             - command (str): Execution command
             - prompt (dict): goal, target, constraints, criteria, context
             - result (dict | None): registrykey, workdir, plan, report (None if not executed)
@@ -289,7 +288,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     def _text(elem: ET.Element, tag: str, default: str = "") -> str:
         """A helper that returns the text of a child Element."""
@@ -310,7 +309,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         title = _text(root, "title")
         command = _text(root, "command")
 
-    # done Directory legacy fallback: If a <submit>/<subnumber> or <history>/<subnumber> structure is detected, parse it with existing logic.
+    # complete Directory legacy fallback: If a <submit>/<subnumber> or <history>/<subnumber> structure is detected, parse it with existing logic.
     submit_elem = root.find("submit")
     history_elem = root.find("history")
     has_legacy_structure = (
@@ -318,7 +317,7 @@ def parse_ticket_xml(filepath: str) -> dict[str, Any]:
         (history_elem is not None and history_elem.find("subnumber") is not None)
     )
     if has_legacy_structure:
-        return _parse_legacy_ticket(filepath, root, number, status, title, _text)
+        return _parse_legacy_work_request(filepath, root, number, status, title, _text)
 
     # Flat structure: <prompt> Parse 5 elements directly under the root
     prompt_fields = ("goal", "target", "constraints", "criteria", "context")
@@ -371,13 +370,13 @@ def _parse_relations(root: ET.Element) -> list[dict[str, str]]:
     if relations_elem is not None:
         for rel in relations_elem.findall("relation"):
             rel_type = rel.get("type", "")
-            rel_ticket = rel.get("ticket", "")
-            if rel_type and rel_ticket:
-                relations.append({"type": rel_type, "ticket": rel_ticket})
+            rel_work_request = rel.get("work_request", "")
+            if rel_type and rel_work_request:
+                relations.append({"type": rel_type, "work_request": rel_work_request})
     return relations
 
 
-def _parse_legacy_ticket(
+def _parse_legacy_work_request(
     filepath: str,
     root: ET.Element,
     number: str,
@@ -387,7 +386,7 @@ def _parse_legacy_ticket(
 ) -> dict[str, Any]:
     """Parses the legacy <submit>/<subnumber> structure and returns it in a new flat format.
 
-    Used for backward compatibility with existing tickets in the done directory.
+    Used for backward compatibility with existing work_requests in the complete directory.
     """
     submit_elem = root.find("submit")
     history_elem = root.find("history")
@@ -450,12 +449,12 @@ def _parse_legacy_ticket(
 
 
 def update_prompt(filepath: str, updates: dict[str, str]) -> None:
-    """Update the <prompt> sub-element and <metadata>/<command> of the ticket XML.
+    """Update the <prompt> sub-element and <metadata>/<command> of the work_request XML.
 
     Automatically converts self-closing <prompt /> tags into <prompt> tags with content.
 
     Args:
-        filepath: Ticket file path.
+        filepath: WorkRequest file path.
         updates: Dictionary of fields to update.
             - command: <metadata>/<command> update
             - Goal, target, constraints, criteria, context: <prompt> sub-element update
@@ -464,7 +463,7 @@ def update_prompt(filepath: str, updates: dict[str, str]) -> None:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     # Update <metadata>/<command>
     if "command" in updates:
@@ -500,16 +499,16 @@ def update_prompt(filepath: str, updates: dict[str, str]) -> None:
             else:
                 ET.SubElement(prompt_elem, field).text = text
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)
 
 
 def update_result(filepath: str, updates: dict[str, str]) -> None:
-    """Updates the <result> sub-element of ticket XML.
+    """Updates the <result> sub-element of work_request XML.
 
     Automatically converts the self-closing <result /> tag into a <result> tag with content.
 
     Args:
-        filepath: Ticket file path.
+        filepath: WorkRequest file path.
         updates: Dictionary of fields to update.
             - registrykey, workdir, plan, report, merge_commit: update <result> sub-elements
     """
@@ -517,7 +516,7 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     result_fields = ("registrykey", "workdir", "plan", "report", "merge_commit")
     result_updates = {k: v for k, v in updates.items() if k in result_fields}
@@ -535,17 +534,17 @@ def update_result(filepath: str, updates: dict[str, str]) -> None:
             else:
                 ET.SubElement(result_elem, field).text = str(value)
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)
 
 
 def update_failure(filepath: str, updates: dict[str, str]) -> None:
-    """Update the <failure> sub-element of ticket XML.
+    """Update the <failure> sub-element of work_request XML.
 
     Optional element — Called only in FAIL status.
     If <failure> does not exist, a new one is created at the end of the root (automatically placed after <result>).
 
     Args:
-        filepath: Ticket file path.
+        filepath: WorkRequest file path.
         updates: Dictionary of fields to update.
             - reason: Failure reason identifier (verifier_failure / validator_failure / sentinel / retry_max, etc.)
             - phase: Workflow phase where failure occurs (INIT / PLAN / WORK / VALIDATE / REPORT)
@@ -556,7 +555,7 @@ def update_failure(filepath: str, updates: dict[str, str]) -> None:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     failure_fields = ("reason", "phase", "retry_count", "context")
     failure_updates = {k: v for k, v in updates.items() if k in failure_fields}
@@ -574,34 +573,34 @@ def update_failure(filepath: str, updates: dict[str, str]) -> None:
             else:
                 ET.SubElement(failure_elem, field).text = str(value)
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)
 
 # ─── relations ───────────────────────────────────────────────────────────
 
 
-def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
-    """Add a relationship element to the ticket XML.
+def add_relation(filepath: str, relation_type: str, target_work_request: str) -> None:
+    """Add a relationship element to the work_request XML.
 
     If the <relations> element does not exist, a new one is created after <metadata> and before <prompt>.
-    If the same type+ticket combination already exists, it is not added again.
+    If the same type+work_request combination already exists, it is not added again.
 
     Args:
-        filepath: Ticket file path.
+        filepath: WorkRequest file path.
         relation_type: Relationship type (depends-on, derived-from, blocks).
-        target_ticket: Target ticket number (T-NNN format).
+        target_work_request: Target work_request number (WR-NNN format).
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     relations_elem = root.find("relations")
 
     # duplicate check
     if relations_elem is not None:
         for rel in relations_elem.findall("relation"):
-            if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
+            if rel.get("type") == relation_type and rel.get("work_request") == target_work_request:
                 return  # Skip if already exists
 
     # Create <relations> element if it does not exist
@@ -615,30 +614,30 @@ def add_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
                 break
         root.insert(insert_idx, relations_elem)
 
-    # Add <relation type="..." ticket="..."/>
+    # Add <relation type="..." work_request="..."/>
     rel_elem = ET.SubElement(relations_elem, "relation")
     rel_elem.set("type", relation_type)
-    rel_elem.set("ticket", target_ticket)
+    rel_elem.set("work_request", target_work_request)
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)
 
 
-def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> None:
-    """Remove the relationship element from the ticket XML.
+def remove_relation(filepath: str, relation_type: str, target_work_request: str) -> None:
+    """Remove the relationship element from the work_request XML.
 
-    Remove the relation element of the type+ticket combination,
+    Remove the relation element of the type+work_request combination,
     If <relations> is empty, the element itself is also removed.
 
     Args:
-        filepath: Ticket file path.
+        filepath: WorkRequest file path.
         relation_type: Relationship type (depends-on, derived-from, blocks).
-        target_ticket: Target ticket number (T-NNN format).
+        target_work_request: Target work_request number (WR-NNN format).
     """
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     relations_elem = root.find("relations")
     if relations_elem is None:
@@ -646,66 +645,66 @@ def remove_relation(filepath: str, relation_type: str, target_ticket: str) -> No
 
     # Remove matching relation
     for rel in relations_elem.findall("relation"):
-        if rel.get("type") == relation_type and rel.get("ticket") == target_ticket:
+        if rel.get("type") == relation_type and rel.get("work_request") == target_work_request:
             relations_elem.remove(rel)
 
     # If <relations> is empty, remove the element itself
     if len(relations_elem) == 0:
         root.remove(relations_elem)
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)
 
 
 # ─── Utilities ──────────────────────────────────────────────────────────────────
 
 
-def find_ticket_file(ticket_number: str) -> str | None:
-    """T-NNN.xml Searches for and returns the ticket file path through exact matching.
+def find_work_request_file(work_request_number: str) -> str | None:
+    """WR-NNN.xml Searches for and returns the work_request file path through exact matching.
 
-    Navigation order: todo/ -> open/ -> progress/ -> review/ -> done/ -> active/ (fallback) -> kanban/ (root fallback)
+    Navigation order: draft/ -> accepted/ -> executing/ -> verifying/ -> complete/ -> active/ (fallback) -> conveyor/ (root fallback)
 
     Args:
-        ticket_number: Ticket number (T-NNN format).
+        work_request_number: WorkRequest number (WR-NNN format).
 
     Returns:
         Absolute path string to the file found. None if not found.
     """
-    filename = f"{ticket_number}.xml"
+    filename = f"{work_request_number}.xml"
     # Directory traversal by state
-    for status_dir in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR]:
+    for status_dir in [CONVEYOR_DRAFT_DIR, CONVEYOR_ACCEPTED_DIR, CONVEYOR_EXECUTING_DIR, CONVEYOR_VERIFYING_DIR, CONVEYOR_COMPLETE_DIR]:
         candidate = os.path.join(status_dir, filename)
         if os.path.isfile(candidate):
             return candidate
-    # Fallback: active/ or kanban/ root if migration is incomplete
-    active_path = os.path.join(KANBAN_DIR, "active", filename)
+    # Fallback: active/ or conveyor/ root if migration is incomplete
+    active_path = os.path.join(CONVEYOR_DIR, "active", filename)
     if os.path.isfile(active_path):
         return active_path
-    root_path = os.path.join(KANBAN_DIR, filename)
+    root_path = os.path.join(CONVEYOR_DIR, filename)
     if os.path.isfile(root_path):
         return root_path
     return None
 
 
-def normalize_ticket_number(raw: str) -> str | None:
-    """Normalize the ticket number string to 'T-NNN' format.
+def normalize_work_request_number(raw: str) -> str | None:
+    """Normalize the work_request number string to 'WR-NNN' format.
 
-    T-NNN, NNN, #All N formats are supported.
+    WR-NNN, NNN, #All N formats are supported.
 
     Args:
-        raw: original ticket number string (e.g. '#1', 'T-001', '001', '1')
+        raw: original WorkRequest number string (e.g. '#1', 'WR-001', '001', '1')
 
     Returns:
-        Normalized 'T-NNN' format string. None if conversion is not possible.
+        Normalized 'WR-NNN' format string. None if conversion is not possible.
     """
     raw = raw.strip().lstrip("#")
-    # Already in T-NNN format
-    if re.match(r"^T-\d+$", raw, re.IGNORECASE):
+    # Already in WR-NNN format
+    if re.match(r"^WR-\d+$", raw, re.IGNORECASE):
         parts = raw.split("-")
         num = int(parts[1])
-        return f"T-{num:03d}"
+        return f"WR-{num:03d}"
     # pure numbers
     if re.match(r"^\d+$", raw):
-        return f"T-{int(raw):03d}"
+        return f"WR-{int(raw):03d}"
     return None
 
 
@@ -764,51 +763,51 @@ def extract_report_summary(report_path: str) -> str:
     return summary
 
 
-def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
-    """Extracts and returns the report summary of the preceding ticket.
+def get_predecessor_reports(work_request_number: str) -> list[dict[str, str]]:
+    """Extracts and returns the report summary of the preceding work_request.
 
-    Find depends-on and derived-from relationships in ticket XML,
-    If each preceding ticket has a status of Done and a report file exists, a summary is extracted.
+    Find depends-on and derived-from relationships in work_request XML,
+    If each preceding work_request has a status of Complete and a report file exists, a summary is extracted.
 
     Args:
-        ticket_number: Current ticket number (T-NNN format).
+        work_request_number: Current work_request number (WR-NNN format).
 
     Returns:
-        List of advance ticket report information. Each item is
-        {"ticket": "T-NNN", "type": "depends-on", "summary": "..."} form.
-        Empty list if there are no advance tickets or conditions are not met.
+        List of advance work_request report information. Each item is
+        {"work_request": "WR-NNN", "type": "depends-on", "summary": "..."} form.
+        Empty list if there are no advance work_requests or conditions are not met.
     """
-    ticket_file = find_ticket_file(ticket_number)
-    if not ticket_file:
+    work_request_file = find_work_request_file(work_request_number)
+    if not work_request_file:
         return []
 
     try:
-        ticket_data = parse_ticket_xml(ticket_file)
+        work_request_data = parse_work_request_xml(work_request_file)
     except SystemExit:
         return []
 
-    relations = ticket_data.get("relations", [])
+    relations = work_request_data.get("relations", [])
     predecessor_types = {"depends-on", "derived-from"}
     results: list[dict[str, str]] = []
 
     for rel in relations:
         rel_type = rel.get("type", "")
-        rel_ticket = rel.get("ticket", "")
-        if rel_type not in predecessor_types or not rel_ticket:
+        rel_work_request = rel.get("work_request", "")
+        if rel_type not in predecessor_types or not rel_work_request:
             continue
 
-        # Find advance ticket file
-        pred_file = find_ticket_file(rel_ticket)
+        # Find advance work_request file
+        pred_file = find_work_request_file(rel_work_request)
         if not pred_file:
             continue
 
         try:
-            pred_data = parse_ticket_xml(pred_file)
+            pred_data = parse_work_request_xml(pred_file)
         except SystemExit:
             continue
 
-        # Skip if not Done
-        if pred_data.get("status", "") != "Done":
+        # Skip if not Complete
+        if pred_data.get("status", "") != "Complete":
             continue
 
         # Extract report path directly from result dict
@@ -828,7 +827,7 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
         summary = extract_report_summary(abs_report_path)
         if summary:
             results.append({
-                "ticket": rel_ticket,
+                "work_request": rel_work_request,
                 "type": rel_type,
                 "summary": summary,
             })
@@ -836,27 +835,27 @@ def get_predecessor_reports(ticket_number: str) -> list[dict[str, str]]:
     return results
 
 
-def get_max_ticket_number(exclude_debug_range: bool = False) -> int:
-    """Scan .kanban/{todo,open,progress,review,done}/ XML filenames to find max T-NNN number.
+def get_max_work_request_number(exclude_debug_range: bool = False) -> int:
+    """Scan .conveyor/{draft,accepted,executing,verifying,complete}/ XML filenames to find max WR-NNN number.
 
-    Root fallback: The .kanban/ root is also scanned to prevent number conflicts when migration is not completed.
+    Root fallback: The .conveyor/ root is also scanned to prevent number conflicts when migration is not completed.
 
     Args:
         exclude_debug_range: When True, past debug reserved areas are excluded from scanning.
             2026-05-05 Automatic number call according to debug area abolition (see workflow.md "Number Area Policy")
-            Used as True only in the `--number` unspecified branch of `kanban_cli.py`. Existing active remaining
+            Used as True only in the `--number` unspecified branch of `conveyor_cli.py`. Existing active remaining
 Exclude from the max calculation when automatically picking to prevent this from being encroached upon.
             It is for this purpose. There is no effect on explicit `--number` calls, and conflict checking is performed in a separate path.
 
     Returns:
-        Current maximum ticket number integer. 0 if there is no ticket.
+        Current maximum work_request number integer. 0 if there is no work_request.
     """
     max_num = 0
-    for d in [KANBAN_TODO_DIR, KANBAN_OPEN_DIR, KANBAN_PROGRESS_DIR, KANBAN_REVIEW_DIR, KANBAN_DONE_DIR, KANBAN_DIR]:
+    for d in [CONVEYOR_DRAFT_DIR, CONVEYOR_ACCEPTED_DIR, CONVEYOR_EXECUTING_DIR, CONVEYOR_VERIFYING_DIR, CONVEYOR_COMPLETE_DIR, CONVEYOR_DIR]:
         if not os.path.isdir(d):
             continue
         for fname in os.listdir(d):
-            m = re.match(r"^T-(\d+)\.xml$", fname)
+            m = re.match(r"^WR-(\d+)\.xml$", fname)
             if m:
                 num = int(m.group(1))
                 # Skip debug reserved area (900~999) — Abolished on 2026-05-05, preventing automatic number encroachment.
@@ -867,15 +866,15 @@ Exclude from the max calculation when automatically picking to prevent this from
     return max_num
 
 
-def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
-    """Move the ticket file to the directory corresponding to the target state.
+def move_work_request_to_status_dir(filepath: str, target_status: str) -> str:
+    """Move the work_request file to the directory corresponding to the target state.
 
     STATUS_DIR_MAP is looked up for the target directory, and the current file already exists in that directory.
-    If it is in a directory, the movement is skipped (at the Submit <-> In Progress transition).
+    If it is already in the target directory, the movement is skipped.
 
     Args:
-        filepath: Absolute path to the ticket file to be moved.
-        target_status: Target status string (Open, Submit, In Progress, Review, Done).
+        filepath: Absolute path to the work_request file to be moved.
+        target_status: Target status string (Draft, Accepted, Executing, Verifying, Complete).
 
     Returns:
         New file path after moving. Returns original route if skipped.
@@ -890,7 +889,7 @@ def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
 
     current_dir = os.path.dirname(filepath)
     if os.path.normpath(current_dir) == os.path.normpath(target_dir):
-        # Same directory — no need to move (Submit <-> In Progress, etc.)
+        # Same directory — no need to move.
         return filepath
 
     filename = os.path.basename(filepath)
@@ -916,27 +915,28 @@ def move_ticket_to_status_dir(filepath: str, target_status: str) -> str:
 
 # Column name mapping: CLI argument → column name
 COLUMN_MAP: dict[str, str] = {
-    "todo": "To Do",
-    "open": "Open",
-    "progress": "In Progress",
-    "review": "Review",
-    "done": "Done",
+    "draft": "Draft",
+    "accepted": "Accepted",
+    "executing": "Executing",
+    "verifying": "Verifying",
+    "complete": "Complete",
 }
 
 # Allowed state transition rule: Current state → Allowed target list
-# Only the done subcommand (force=True) is allowed to move to Done.
-# It is not possible to move directly to Done with the move command (Review → Done also requires the use of the done subcommand).
-# To Do only allows two-way transition to Open by default, and returning from other states requires --force.
+# Only the complete subcommand (force=True) is allowed to move to Complete.
+# It is not possible to move directly to Complete with the move command.
+# Verifying → Complete requires the complete subcommand.
+# Draft only allows a default transition to Accepted, and returning from other states requires --force.
 ALLOWED_TRANSITIONS: dict[str, list[str]] = {
-    "To Do": ["Open"],
-    "Open": ["In Progress", "To Do", "Review"],
-    "In Progress": ["Review", "Open"],
-    "Review": ["Open"],
-    "Done": ["Open"],
+    "Draft": ["Accepted"],
+    "Accepted": ["Executing", "Draft", "Verifying"],
+    "Executing": ["Verifying", "Accepted"],
+    "Verifying": ["Accepted", "Complete"],
+    "Complete": ["Accepted"],
 }
-# Review → In Progress transition is discarded (specified by user on 2026-05-08).
-# Review phase possible actions: (a) Rework with Open (/wf -e or right-click menu);
-# (b) attach to chat to create follow-up analysis/implementation ticket, (c) complete with Done (done subcommand).
+# Verifying → Executing transition is intentionally not allowed.
+# Verifying phase possible actions: (a) Rework with Accepted (/wf -e or right-click menu);
+# (b) attach to chat to create follow-up analysis/implementation WorkRequest, (c) complete with Complete (complete subcommand).
 
 
 def validate_transition(current_status: str, target_section: str, force: bool = False) -> str | None:
@@ -947,8 +947,8 @@ def validate_transition(current_status: str, target_section: str, force: bool = 
     If force=True, the rule is ignored.
 
     Args:
-        current_status: Current ticket status (e.g. 'Open', 'In Progress').
-        target_section: Target status (e.g. 'Review', 'Done').
+        current_status: Current WorkRequest status (e.g. 'Accepted', 'Executing').
+        target_section: Target status (e.g. 'Verifying', 'Complete').
         force: Whether to force transition.
 
     Returns:
@@ -970,14 +970,14 @@ def validate_transition(current_status: str, target_section: str, force: bool = 
     return None
 
 
-def update_ticket_status(filepath: str, new_status: str) -> None:
-    """Update the <status> element of ticket XML.
+def update_work_request_status(filepath: str, new_status: str) -> None:
+    """Update the <status> element of work_request XML.
 
     The <status> element inside the <metadata> wrapper is first searched.
 
     Args:
-        filepath: Ticket file path.
-        new_status: New status string (e.g. 'Open', 'In Progress', 'Review', 'Done').
+        filepath: WorkRequest file path.
+        new_status: New status string (e.g. 'Accepted', 'Executing', 'Verifying', 'Complete').
 
     Raises:
         SystemExit: When file read/write fails.
@@ -986,7 +986,7 @@ def update_ticket_status(filepath: str, new_status: str) -> None:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except (OSError, ET.ParseError) as e:
-        err(f"Failed to parse ticket file ({filepath}): {e}")
+        err(f"Failed to parse work_request file ({filepath}): {e}")
 
     # First look for <status> inside the <metadata> wrapper
     metadata_elem = root.find("metadata")
@@ -1003,4 +1003,4 @@ def update_ticket_status(filepath: str, new_status: str) -> None:
         else:
             ET.SubElement(root, "status").text = new_status
 
-    write_ticket_xml(filepath, root)
+    write_work_request_xml(filepath, root)

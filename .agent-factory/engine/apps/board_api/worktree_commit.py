@@ -57,13 +57,13 @@ class WorktreeCommitHandlerMixin:
 
     @api_endpoint("WTC", "commit")
     def _handle_worktree_commit(self) -> None:
-        """POST /api/kanban/worktree-commit — Worktree automatic commit.
+        """POST /api/conveyor/worktree-commit — Worktree automatic commit.
 
         Body: {ticket: "T-NNN", message?: "..."}.
         If message is not specified, `wip(T-NNN): pending worktree changes` is automatically filled.
 
         method: POST
-        url: /api/kanban/worktree-commit
+        url: /api/conveyor/worktree-commit
         domain: WTC
         handler: WorktreeCommitHandlerMixin._handle_worktree_commit
         request: body {ticket: str, message?: str}
@@ -72,7 +72,7 @@ class WorktreeCommitHandlerMixin:
         status_codes: 200, 400, 409, 500
         auth: none (local-only) — user-triggered
         side_effects: git add + git commit in worktree
-        sse_events: kanban_update (via FileWatcher if status changes)
+        sse_events: conveyor_update (via FileWatcher if status changes)
         """
         data = self._read_json_body()
         if data is None:

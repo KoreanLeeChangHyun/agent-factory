@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from engine.application.kanban.done_result import (
+from engine.application.conveyor.done_result import (
     DONE_MERGE_OK_RE,
     UNDO_ERROR_RE,
     UNDO_STRATEGY_RESET,

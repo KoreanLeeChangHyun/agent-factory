@@ -15,8 +15,8 @@ Main functions:
     main: Slack notification sending entry point
 
 Environment variables (loaded from .agent-factory/.settings):
-    CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
-    CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
+    AGENT_FACTORY_SLACK_BOT_TOKEN - Slack Bot OAuth Token
+    AGENT_FACTORY_SLACK_CHANNEL_ID - Slack Channel ID
 
 Agent-specific colored emojis:
     When the agent argument is received, the emoji is determined based on that value.

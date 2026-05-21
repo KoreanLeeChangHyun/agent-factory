@@ -1,7 +1,25 @@
 {
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Edit(.agent-factory/engine/**)",
+      "Edit(.agent-factory/hooks/**)",
+      "Edit(.agent-factory/docs/**)",
+      "Edit(.agent-factory/build-assets/**)",
+      "Edit(.agent-factory/board/**)",
+      "Edit(.claude/skills/**)",
+      "Edit(.claude/agents/**)",
+      "Edit(.claude/commands/**)",
+      "Edit(.claude/rules/**)",
+      "Write(.claude/skills/**)",
+      "Write(.claude/agents/**)",
+      "Write(.claude/commands/**)",
+      "Write(.claude/rules/**)"
+    ]
+  },
   "statusLine": {
     "type": "command",
-    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/statusline.py"
+    "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/apps/hooks/statusline.py"
   },
   "hooks": {
     "SessionStart": [
@@ -10,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/sync/history_sync.py sync && python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/engine/sync/history_sync.py archive",
+            "command": "$CLAUDE_PROJECT_DIR/.agent-factory/bin/flow-history sync && $CLAUDE_PROJECT_DIR/.agent-factory/bin/flow-history archive",
             "timeout": 30,
             "async": true
           }
@@ -44,7 +62,7 @@
           {
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/pre-tool-use.py",
-            "statusMessage": "pre-tool-use Running dispatcher..."
+            "statusMessage": "pre-tool-use 디스패처 실행 중..."
           }
         ]
       }
@@ -56,7 +74,7 @@
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/subagent-stop.py",
             "timeout": 10,
-            "statusMessage": "subagent-stop Running dispatcher..."
+            "statusMessage": "subagent-stop 디스패처 실행 중..."
           }
         ]
       }
@@ -69,7 +87,7 @@
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/post-tool-use.py",
             "timeout": 30,
             "async": true,
-            "statusMessage": "Running post-tool-use dispatcher..."
+            "statusMessage": "post-tool-use 디스패처 실행 중..."
           }
         ]
       }
@@ -81,7 +99,7 @@
             "type": "command",
             "command": "python3 -u $CLAUDE_PROJECT_DIR/.agent-factory/hooks/user-prompt-submit.py",
             "timeout": 3,
-            "statusMessage": "user-prompt-submit Running dispatcher..."
+            "statusMessage": "user-prompt-submit 디스패처 실행 중..."
           }
         ]
       }

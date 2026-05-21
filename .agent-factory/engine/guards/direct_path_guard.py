@@ -66,7 +66,7 @@ ALIAS_MAP: dict[str, str] = {
     "plan_validator.py": "flow-validate",
     "prompt_validator.py": "flow-validate-p",
     "garbage_collect.py": "flow-gc",
-    "kanban.py": "flow-kanban",
+    "conveyor.py": "flow-conveyor",
     "merge_pipeline.py": "flow-merge",
     "history_sync.py": "flow-history",
     "catalog_sync.py": "flow-catalog",
@@ -107,7 +107,7 @@ def _extract_script_name(command: str) -> str | None:
         command: Bash command string
 
     Returns:
-        Script file name (e.g. "kanban.py") or None
+        Script file name (e.g. "conveyor.py") or None
     """
     match = _SCRIPT_NAME_PATTERN.search(command)
     if match:

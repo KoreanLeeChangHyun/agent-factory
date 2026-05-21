@@ -4,7 +4,7 @@
  * Board SPA workflow tab module.
  *
  * Handles workflow data fetching, table rendering, search/sort/pagination,
- * detail view, column resize, and ticket-workflow linkage functions.
+ * detail view, column resize, and WorkRequest-workflow linkage functions.
  *
  * Depends on: common.js (Board.state, Board.util, Board.render, Board.fetch)
  */
@@ -47,24 +47,24 @@ const RUN_STAGE_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 // ── Fetch Functions ──
 
 /**
- * Fetches workflow entry list via /api/kanban/workflow-entries (T-513 P3 — kanban domain transfer).
+ * Fetches workflow entry list via /api/conveyor/workflow-entries.
  * Returns sorted hrefs (newest first), no detail fetched yet.
  * @returns {Promise<string[]>}
  */
 function fetchWorkflowEntries() {
-  return fetch("/api/kanban/workflow-entries", { cache: "no-store" }).then(function (res) {
+  return fetch("/api/conveyor/workflow-entries", { cache: "no-store" }).then(function (res) {
     if (!res.ok) return [];
     return res.json();
   }).catch(function () { return []; });
 }
 
 /**
- * Fetches detailed info for a single workflow entry via /api/kanban/workflow-detail (T-513 P3).
+ * Fetches detailed info for a single workflow entry via /api/conveyor/workflow-detail.
  * @param {string} entryHref - relative path of the entry (e.g. ".agent-factory/runs/20260325-150854/")
  * @returns {Promise<Array>} flat array of workflow item objects
  */
 function fetchEntryDetail(entryHref) {
-  return fetch("/api/kanban/workflow-detail?entry=" + encodeURIComponent(entryHref), { cache: "no-store" }).then(function (res) {
+  return fetch("/api/conveyor/workflow-detail?entry=" + encodeURIComponent(entryHref), { cache: "no-store" }).then(function (res) {
     if (!res.ok) return [];
     return res.json();
   }).catch(function () { return []; });

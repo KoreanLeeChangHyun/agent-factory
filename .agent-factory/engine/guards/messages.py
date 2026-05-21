@@ -6,7 +6,7 @@ Messages with placeholders are used by replacing them with the .format() method.
 Main constant groups:
     MAIN_SESSION_*: messages using main_session_guard.py
     AGENT_INVESTIGATION_*: message using agent_investigation_guard.py
-    KANBAN_*: kanban_subcommand_guard.py usage messages
+    CONVEYOR_*: conveyor_subcommand_guard.py usage messages
     HOOKS_*: hooks_self_guard.py usage message
     MAIN_BRANCH_*: main_branch_guard.py usage messages
     READONLY_SESSION_*: messages using readonly_session_guard.py
@@ -61,30 +61,30 @@ AGENT_INVESTIGATION_WINDOW_QUERY_FAILED: str = (
 """Placeholders: {subagent_type} - Blocked subagent type string (including repr)."""
 
 # =============================================================================
-# kanban_subcommand_guard.py message
+# conveyor_subcommand_guard.py message
 # =============================================================================
 
-KANBAN_INVALID_SUBCOMMAND: str = (
-    "The invalid subcommand '{subcommand}' of flow-kanban was blocked. \n"
+CONVEYOR_INVALID_SUBCOMMAND: str = (
+    "The invalid subcommand '{subcommand}' of flow-conveyor was blocked. \n"
     "Valid subcommands: {valid_list} \n \n"
     "Correct usage example: \n"
-    "  flow-kanban move T-001 progress     # target: open|progress|review|done\n"
-    "flow-kanban update-title T-001 'New title' # Change title \n"
-    "  flow-kanban done T-001\n"
-    "flow-kanban update-prompt T-001 --goal 'goal' # Update prompt field \n \n"
+    "  flow-conveyor move WR-001 executing     # target: draft|accepted|executing|verifying|complete\n"
+    "flow-conveyor update-title WR-001 'New title' # Change title \n"
+    "  flow-conveyor complete WR-001\n"
+    "flow-conveyor update-prompt WR-001 --goal 'goal' # Update prompt field \n \n"
     "Please refer to the example above instead of '{subcommand}'."
 )
 """Placeholders: {subcommand} - invalid subcommands used, {valid_list} - list of allowed subcommands.
 
-Message format: Block notification + list of valid subcommands + examples of correct use (move/update-title/done/update-prompt) + modification instructions."""
+Message format: Block notification + list of valid subcommands + examples of correct use (move/update-title/complete/update-prompt) + modification instructions."""
 
-KANBAN_SUBMIT_REMOVED: str = (
+CONVEYOR_SUBMIT_REMOVED: str = (
     "Submit step has been removed (T-399)."
-    "To move the Open card directly to In Progress, use the DnD + confirm modal in the board UI."
-    "(POST /api/kanban/submit) or use /wf -s N."
-    "Only level 5 FSM (To Do → Open → In Progress → Review → Done) is valid."
+    "To move the Accepted card directly to Executing, use the DnD + confirm modal in the board UI."
+    "(POST /api/conveyor/submit) or use /wf -s N."
+    "Only level 5 FSM (Draft → Accepted → Executing → Verifying → Complete) is valid."
 )
-"""flow-kanban move T-NNN submit call blocking message (T-399). For guarding after removing the Submit transient phase."""
+"""flow-conveyor move WR-NNN submit call blocking message (T-399). For guarding after removing the Submit transient phase."""
 
 # =============================================================================
 # hooks_self_guard.py message
@@ -120,12 +120,12 @@ MAIN_BRANCH_COMMIT_DENIED: str = (
 # =============================================================================
 
 READONLY_SESSION_WRITE_EDIT_DENIED: str = (
-    "Code modification (Write/Edit) is prohibited in research/review workflow sessions."
+    "Code modification (Write/Edit) is prohibited in research/verifying workflow sessions."
     "Describe your proposed corrections in your report."
 )
 
 READONLY_SESSION_BASH_MODIFY_DENIED: str = (
-    "Modifying files via Bash is prohibited in research/review workflow sessions."
+    "Modifying files via Bash is prohibited in research/verifying workflow sessions."
     "Describe your proposed corrections in your report."
 )
 
@@ -150,7 +150,7 @@ WORKTREE_PATH_WRITE_EDIT_DENIED: str = (
     "Path in worktree: {suggested_path}"
 )
 """Placeholder:
-    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-T-NNN-...)
+    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-WR-NNN-...)
     {file_path} - Absolute path to blocked file
     {suggested_path} - Corresponding path in the work tree (recommended path based on file name)
 """
@@ -161,7 +161,7 @@ WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
     "Run the command after cd {worktree_path}."
 )
 """Placeholder:
-    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-T-NNN-...)
+    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-WR-NNN-...)
 """
 
 # =============================================================================

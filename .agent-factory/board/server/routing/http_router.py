@@ -13,7 +13,7 @@ from engine.apps.board_api.settings import SettingsHandlerMixin
 from engine.apps.board_api.generic import GenericHandlerMixin
 from engine.apps.board_api.terminal import TerminalHandlerMixin
 from engine.apps.board_api.production_line_workflow import ProductionLineWorkflowHandlerMixin
-from engine.apps.board_api.kanban import KanbanHandlerMixin
+from engine.apps.board_api.conveyor import ConveyorHandlerMixin
 from engine.apps.board_api.metrics import MetricsHandlerMixin
 from engine.apps.board_api.memory_gc import MemoryGcHandlerMixin
 from engine.apps.board_api.worktree_commit import WorktreeCommitHandlerMixin
@@ -22,11 +22,11 @@ from engine.apps.board_api.ops_endpoints import OpsHandlerMixin
 
 # T-513 P5 — V1 workflow engine batch disposal. WorkflowHandlerMixin +
 # WorkflowUndoHandlerMixin Removal. Production Line
-# (kanban undo-done absorption + settings workflow-sync absorption).
+# (conveyor undo-complete absorption + settings workflow-sync absorption).
 class BoardHTTPRequestHandler(
     TerminalHandlerMixin,
     ProductionLineWorkflowHandlerMixin,
-    KanbanHandlerMixin,
+    ConveyorHandlerMixin,
     MetricsHandlerMixin,
     MemoryGcHandlerMixin,
     WorktreeCommitHandlerMixin,
@@ -90,17 +90,17 @@ class BoardHTTPRequestHandler(
             self._handle_terminal_sessions()
         elif self.path.startswith('/terminal/history'):
             self._handle_terminal_history()
-        elif self.path == '/api/kanban/branch/active':
-            self._handle_kanban_branch_active()
+        elif self.path == '/api/conveyor/branch/active':
+            self._handle_conveyor_branch_active()
         elif self.path.startswith('/api/v2/sessions') and self._production_line_dispatch_get():
             return
         elif self.path == '/api/ops/sse-status':
             self._handle_ops_sse_status()
-        # T-513 P5 — kanban domain singleization (V1 workflow alias batch waste).
-        elif self.path == '/api/kanban/workflow-entries':
-            self._handle_kanban_workflow_entries()
-        elif self.path.startswith('/api/kanban/workflow-detail'):
-            self._handle_kanban_workflow_detail()
+        # T-513 P5 — conveyor domain singleization (V1 workflow alias batch waste).
+        elif self.path == '/api/conveyor/workflow-entries':
+            self._handle_conveyor_workflow_entries()
+        elif self.path.startswith('/api/conveyor/workflow-detail'):
+            self._handle_conveyor_workflow_detail()
         elif self.path.startswith('/api/'):
             self._handle_api()
         else:
@@ -153,23 +153,23 @@ class BoardHTTPRequestHandler(
             self._handle_memory_gc_run()
         elif self.path == '/api/memory/gc/prune-archive':
             self._handle_memory_gc_prune()
-        elif self.path == '/api/kanban/move':
-            self._handle_kanban_move()
-        elif self.path == '/api/kanban/workrequest':
-            self._handle_kanban_workrequest()
-        elif self.path == '/api/kanban/submit':
-            self._handle_kanban_submit()
-        elif self.path == '/api/kanban/done':
-            self._handle_kanban_done()
-        elif self.path == '/api/kanban/delete':
-            self._handle_kanban_delete()
-        elif self.path == '/api/kanban/branch/toggle':
-            self._handle_kanban_branch_toggle()
-        elif self.path == '/api/kanban/worktree-commit':
+        elif self.path == '/api/conveyor/move':
+            self._handle_conveyor_move()
+        elif self.path == '/api/conveyor/workrequest':
+            self._handle_conveyor_workrequest()
+        elif self.path == '/api/conveyor/submit':
+            self._handle_conveyor_submit()
+        elif self.path == '/api/conveyor/complete':
+            self._handle_conveyor_complete()
+        elif self.path == '/api/conveyor/delete':
+            self._handle_conveyor_delete()
+        elif self.path == '/api/conveyor/branch/toggle':
+            self._handle_conveyor_branch_toggle()
+        elif self.path == '/api/conveyor/worktree-commit':
             self._handle_worktree_commit()
-        # T-513 P5 — kanban domain singleization (V1 undo-done alias batch disposal).
-        elif self.path == '/api/kanban/undo-done':
-            self._handle_kanban_undo_done()
+        # T-513 P5 — conveyor domain singleization (V1 undo-complete alias batch disposal).
+        elif self.path == '/api/conveyor/undo-complete':
+            self._handle_conveyor_undo_complete()
         elif self.path == '/api/ops/zombie-reap':
             self._handle_ops_zombie_reap()
         elif self.path == '/api/ops/debug-toggle':

@@ -62,7 +62,7 @@ def report_step(ctx: WorkflowContext) -> None:
         )
     )
     session_id = new_session_uuid()
-    logical = logical_session_name(ctx.ticket_no, "REPORT")
+    logical = logical_session_name(ctx.work_request_no, "REPORT")
     ctx.session_ids[logical] = session_id
     write_context(ctx)
     spawn_with_retry(

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -u
-"""flow-kanban subcommand validation guard Hook script.
+"""flow-conveyor subcommand validation guard Hook script.
 
-By parsing the subcommand of the flow-kanban command in the PreToolUse(Bash) event,
+By parsing the subcommand of the flow-conveyor command in the PreToolUse(Bash) event,
 Block the use of invalid subcommands.
 
 Main functions:
@@ -10,7 +10,7 @@ Main functions:
 Input: JSON to stdin (tool_name, tool_input)
 Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-Toggle: Environment variable HOOK_KANBAN_SUBCOMMAND_GUARD (false/0 = disabled, default enabled)
+Toggle: Environment variable HOOK_CONVEYOR_SUBCOMMAND_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -31,13 +31,13 @@ if _guards_dir not in sys.path:
     sys.path.insert(0, _guards_dir)
 
 from common import read_env
-from messages import KANBAN_INVALID_SUBCOMMAND, KANBAN_SUBMIT_REMOVED
+from messages import CONVEYOR_INVALID_SUBCOMMAND, CONVEYOR_SUBMIT_REMOVED
 
-# flow-kanban valid subcommand set
+# flow-conveyor valid subcommand set
 VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "create",
     "move",
-    "done",
+    "complete",
     "delete",
     "update-title",
     "update",
@@ -45,17 +45,17 @@ VALID_SUBCOMMANDS: frozenset[str] = frozenset({
     "update-result",
     "link",
     "unlink",
-    "list",   # Ticket list inquiry
-    "board",  # Check overall Kanban board status
-    "show",   # View specific ticket details
+    "list",   # WorkRequest list inquiry
+    "board",  # Check overall Conveyor board status
+    "show",   # View specific work_request details
 })
 
-# flow-kanban command detection and subcommand extraction pattern
-# Parse the first argument after flow-kanban as a subcommand
-_FLOW_KANBAN_PATTERN = re.compile(r"\bflow-kanban\s+([a-zA-Z][\w-]*)")
+# flow-conveyor command detection and subcommand extraction pattern
+# Parse the first argument after flow-conveyor as a subcommand
+_FLOW_CONVEYOR_PATTERN = re.compile(r"\bflow-conveyor\s+([a-zA-Z][\w-]*)")
 
 # The Submit transient step has been removed, so submit cannot be used as the target argument of move.
-_FLOW_KANBAN_MOVE_SUBMIT_PATTERN = re.compile(r"\bflow-kanban\s+move\s+T-\d+\s+submit\b")
+_FLOW_CONVEYOR_MOVE_SUBMIT_PATTERN = re.compile(r"\bflow-conveyor\s+move\s+WR-\d+\s+submit\b")
 
 
 def _deny(reason: str) -> None:
@@ -76,13 +76,13 @@ def _deny(reason: str) -> None:
 
 
 def main() -> None:
-    """Entry point of flow-kanban subcommand validation hook.
+    """Entry point of flow-conveyor subcommand validation hook.
 
-    Detect the Bash tool's flow-kanban command by reading JSON from stdin,
+    Detect the Bash tool's flow-conveyor command by reading JSON from stdin,
     If the subcommand is not in the valid set, it outputs a deny response and blocks it.
     """
     # Load settings from .agent-factory/.settings
-    hook_flag = os.environ.get("HOOK_KANBAN_SUBCOMMAND_GUARD") or read_env("HOOK_KANBAN_SUBCOMMAND_GUARD")
+    hook_flag = os.environ.get("HOOK_CONVEYOR_SUBCOMMAND_GUARD") or read_env("HOOK_CONVEYOR_SUBCOMMAND_GUARD")
 
     # Hook disable check (false = disabled)
     if hook_flag in ("false", "0"):
@@ -105,27 +105,27 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # Pass if flow-kanban command is not included
-    if "flow-kanban" not in command:
+    # Pass if flow-conveyor command is not included
+    if "flow-conveyor" not in command:
         sys.exit(0)
 
     # Subcommand extraction
-    match = _FLOW_KANBAN_PATTERN.search(command)
+    match = _FLOW_CONVEYOR_PATTERN.search(command)
     if not match:
-        # Passes if there is only flow-kanban and no subcommands (help, etc.)
+        # Passes if there is only flow-conveyor and no subcommands (help, etc.)
         sys.exit(0)
 
     subcommand = match.group(1)
 
     # Valid subcommand check
     if subcommand in VALID_SUBCOMMANDS:
-        if subcommand == "move" and _FLOW_KANBAN_MOVE_SUBMIT_PATTERN.search(command):
-            _deny(KANBAN_SUBMIT_REMOVED)
+        if subcommand == "move" and _FLOW_CONVEYOR_MOVE_SUBMIT_PATTERN.search(command):
+            _deny(CONVEYOR_SUBMIT_REMOVED)
         sys.exit(0)
 
     # Blocking invalid subcommands
     valid_list = ", ".join(sorted(VALID_SUBCOMMANDS))
-    _deny(KANBAN_INVALID_SUBCOMMAND.format(subcommand=subcommand, valid_list=valid_list))
+    _deny(CONVEYOR_INVALID_SUBCOMMAND.format(subcommand=subcommand, valid_list=valid_list))
 
 
 if __name__ == "__main__":

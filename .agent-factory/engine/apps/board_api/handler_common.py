@@ -1,4 +1,4 @@
-"""Shared infrastructure for handler mixins — ticket regex, kanban dirs, engine lazy imports."""
+"""Shared infrastructure for handler mixins — WorkRequest regex, conveyor dirs, engine lazy imports."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import os
 import re
 import sys
 
-# Ticket number format regular expression
-_TICKET_RE = re.compile(r'^T-\d+$')
-# Kanban full directory listing (used in derived-from guard)
-_KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
+# WorkRequest number format regular expression
+_WORK_REQUEST_RE = re.compile(r'^WR-\d+$')
+# Conveyor full directory listing (used in derived-from guard)
+_CONVEYOR_ALL_DIRS = ('draft', 'accepted', 'executing', 'verifying', 'complete')
 
 
 def _import_metrics_cli():
@@ -36,7 +36,7 @@ def _import_launch_metrics_cli():
     Lazy import the launch_metrics_cli module.
 
     After adding the engine/ directory to sys.path, type ``flow.launch_metrics_cli``
-    import. Engine import is done with the same pattern as _import_metrics_cli.
+    import. Engine import is complete with the same pattern as _import_metrics_cli.
     Supplement path only when necessary.
     """
     engine_dir = os.path.normpath(

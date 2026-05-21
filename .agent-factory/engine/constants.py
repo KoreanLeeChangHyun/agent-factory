@@ -11,9 +11,9 @@ Price:
     TERMINAL STEPS: Termination status assembly
     FSM TRANSITIONS: FSM status pre-registration rules
     DANGER PATTERNS: List of risk command blocking patterns
-    KEEP COUNT: .workflow/ directory retaining maximum number (environmental variable CLAUDE WORKFLOW KEEP COUNT)
+    KEEP COUNT: .workflow/ directory retaining maximum number (environmental variable AGENT FACTORY WORKFLOW KEEP COUNT)
     CHAIN SEPARATOR: Chain command separator (">" character)
-    CHAIN MAX RETRY: The maximum number of reciprocating times when the chain stage fails (can override the environment variable CLAUDE CHAIN MAX RETRY)
+    CHAIN MAX RETRY: The maximum number of reciprocating times when the chain stage fails (can override the environment variable AGENT FACTORY CHAIN MAX RETRY)
 
 T-453: Multi-key 8 status (NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAIL=FAILED alias).
 """
@@ -101,6 +101,17 @@ def _env(key: str, default: str) -> str:
     return os.environ.get(key, _DOTENV.get(key, default))
 
 
+def _env_alias(key: str, legacy_key: str, default: str) -> str:
+    """Read a provider-neutral setting with a legacy provider-specific fallback."""
+    return os.environ.get(
+        key,
+        _DOTENV.get(
+            key,
+            os.environ.get(legacy_key, _DOTENV.get(legacy_key, default)),
+        ),
+    )
+
+
 def _env_int(key: str, default: int) -> int:
     return int(_env(key, str(default)))
 
@@ -156,11 +167,11 @@ KST = timezone(timedelta(hours=9))
 # =============================================================================
 # {{ data.filesizeHumanReadable }}
 # =============================================================================
-STALE_TTL_MINUTES = _env_int("CLAUDE_STALE_TTL_MINUTES", 30)
-ZOMBIE_TTL_HOURS = _env_int("CLAUDE_ZOMBIE_TTL_HOURS", 24)
-REPORT_TTL_HOURS = _env_int("CLAUDE_REPORT_TTL_HOURS", 1)
-KEEP_COUNT = _env_int("CLAUDE_WORKFLOW_KEEP_COUNT", 10)
-WORK_NAME_MAX_LEN = _env_int("CLAUDE_WORK_NAME_MAX_LEN", 20)
+STALE_TTL_MINUTES = int(_env_alias("AGENT_FACTORY_STALE_TTL_MINUTES", "CLAUDE_STALE_TTL_MINUTES", "30"))
+ZOMBIE_TTL_HOURS = int(_env_alias("AGENT_FACTORY_ZOMBIE_TTL_HOURS", "CLAUDE_ZOMBIE_TTL_HOURS", "24"))
+REPORT_TTL_HOURS = int(_env_alias("AGENT_FACTORY_REPORT_TTL_HOURS", "CLAUDE_REPORT_TTL_HOURS", "1"))
+KEEP_COUNT = int(_env_alias("AGENT_FACTORY_WORKFLOW_KEEP_COUNT", "CLAUDE_WORKFLOW_KEEP_COUNT", "10"))
+WORK_NAME_MAX_LEN = int(_env_alias("AGENT_FACTORY_WORK_NAME_MAX_LEN", "CLAUDE_WORK_NAME_MAX_LEN", "20"))
 
 # =============================================================================
 # Terminal filename
@@ -206,7 +217,7 @@ VALID_MODES = {"full", "light"}
 # Chain command
 # =============================================================================
 CHAIN_SEPARATOR = ">"
-CHAIN_MAX_RETRY = _env_int("CLAUDE_CHAIN_MAX_RETRY", 2)
+CHAIN_MAX_RETRY = int(_env_alias("AGENT_FACTORY_CHAIN_MAX_RETRY", "CLAUDE_CHAIN_MAX_RETRY", "2"))
 
 # =============================================================================
 # Default 0 = retry inactive (Return 0 guarantee). .settings only retry operations when explicitly activated.
@@ -248,7 +259,7 @@ def get_phase_retry_max(phase: str) -> int:
 # =============================================================================
 # Quality verification threshold
 # =============================================================================
-QUALITY_THRESHOLD = _env_float("CLAUDE_QUALITY_THRESHOLD", 0.6)
+QUALITY_THRESHOLD = float(_env_alias("AGENT_FACTORY_QUALITY_THRESHOLD", "CLAUDE_QUALITY_THRESHOLD", "0.6"))
 
 # =============================================================================
 # Configuring a bidder
@@ -265,7 +276,7 @@ HALLU_TARGET_AGENT_TYPES: set[str] = {"worker", "explorer"}
 # =============================================================================
 # ERROR Settlement Notification
 # =============================================================================
-ERROR_THRESHOLD = _env_int("CLAUDE_ERROR_THRESHOLD", 3)  # ERROR count threshold for workflow
+ERROR_THRESHOLD = int(_env_alias("AGENT_FACTORY_ERROR_THRESHOLD", "CLAUDE_ERROR_THRESHOLD", "3"))
 
 
 def parse_chain_command(raw: str) -> list[str]:
@@ -320,12 +331,20 @@ BYTES_KB = 1024
 # =============================================================================
 # External API URL
 # =============================================================================
-SLACK_API_URL = _env("CLAUDE_SLACK_API_URL", "https://slack.com/api/chat.postMessage")
+SLACK_API_URL = _env_alias(
+    "AGENT_FACTORY_SLACK_API_URL",
+    "CLAUDE_SLACK_API_URL",
+    "https://slack.com/api/chat.postMessage",
+)
 
 # =============================================================================
 # Log In
 # =============================================================================
-CODE_SYNC_REMOTE_REPO = _env("CLAUDE_REPO_URL", "https://github.com/KoreanLeeChangHyun/claude-workflow.git")
+CODE_SYNC_REMOTE_REPO = _env_alias(
+    "AGENT_FACTORY_REPO_URL",
+    "CLAUDE_REPO_URL",
+    "https://github.com/KoreanLeeChangHyun/claude-workflow.git",
+)
 STALE_TTL_SECONDS = STALE_TTL_MINUTES * 60
 
 # =============================================================================

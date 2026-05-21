@@ -142,7 +142,7 @@ def session_create(ctx: WorkflowContext) -> None:
         return
     body = {
         "session_id": ctx.wf_session_id,
-        "ticket_id": ctx.ticket_no,
+        "ticket_id": ctx.work_request_no,
         "command": ctx.command,
         "work_dir": str(ctx.work_dir),
         "worktree_path": str(ctx.worktree_path) if ctx.worktree_path else "",
@@ -156,7 +156,7 @@ def step_start(ctx: WorkflowContext, step: str, **extra: Any) -> None:
     If the board endpoint sends only one step transition, the backend updates current_step.
     step_end only records metrics.jsonl (avoiding duplicate calls to transitive endpoints).
     """
-    emit(ctx, "step.start", step=step, ticket=ctx.ticket_no, **extra)
+    emit(ctx, "step.start", step=step, work_request=ctx.work_request_no, **extra)
     if ctx.wf_session_id:
         prev = extra.get("prev_step", "") or ""
         _post_to_board(
@@ -178,7 +178,7 @@ def step_end(
         ctx,
         "step.end",
         step=step,
-        ticket=ctx.ticket_no,
+        work_request=ctx.work_request_no,
         outcome=outcome,
         retry_count=retry_count,
         **extra,
@@ -231,7 +231,7 @@ def phase_start(
         "phase.start",
         step="WORK",
         phase=phase_id,
-        ticket=ctx.ticket_no,
+        work_request=ctx.work_request_no,
         **payload,
     )
     if ctx.wf_session_id:
@@ -264,7 +264,7 @@ def phase_end(
         "phase.end",
         step="WORK",
         phase=phase_id,
-        ticket=ctx.ticket_no,
+        work_request=ctx.work_request_no,
         outcome=outcome,
         **payload,
     )
@@ -290,7 +290,7 @@ def workflow_finish(
         verdict: 12 rule verdict (PASS/WARN/FAIL/SKIP) — records only metrics
         summary: One-line summary — board exposed to frontend
     """
-    payload: dict[str, Any] = {"outcome": outcome, "ticket": ctx.ticket_no}
+    payload: dict[str, Any] = {"outcome": outcome, "ticket": ctx.work_request_no}
     if verdict is not None:
         payload["verdict"] = verdict
     emit(ctx, "workflow.finish", **payload, **extra)
@@ -307,12 +307,12 @@ def workflow_finish(
 
 def regression(ctx: WorkflowContext, pattern: str, **extra: Any) -> None:
     """SPEC.md §10 Block 5 types of regression — emit when pattern is found (metrics only)."""
-    emit(ctx, "regression.pattern", pattern=pattern, ticket=ctx.ticket_no, **extra)
+    emit(ctx, "regression.pattern", pattern=pattern, work_request=ctx.work_request_no, **extra)
 
 
 def tool_deny(ctx: WorkflowContext, tool: str, **extra: Any) -> None:
     """R-METRIC-3 — tool.deny 0 cases For rule verification (metrics only)."""
-    emit(ctx, "tool.deny", tool=tool, ticket=ctx.ticket_no, **extra)
+    emit(ctx, "tool.deny", tool=tool, work_request=ctx.work_request_no, **extra)
 
 
 # ---------------------------------------------------------------------------

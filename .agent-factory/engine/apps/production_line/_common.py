@@ -1,4 +1,4 @@
-"""Production-line utilities: ticket context, status I/O, kanban wrapper, paths.
+"""Production-line utilities: WorkRequest context, status I/O, conveyor wrapper, paths.
 
 SPEC.md §13 (directory) + §4 (output) + §3.4 (retry limit) + §8 (claude -p) absorption.
 No LLM calls. Rule base decision only.
@@ -43,7 +43,7 @@ def _resolve_project_root() -> Path:
 
 PROJECT_ROOT = _resolve_project_root()
 RUNS_DIR = PROJECT_ROOT / ".agent-factory" / "runs"
-KANBAN_BIN = PROJECT_ROOT / ".agent-factory" / "bin" / "flow-kanban"
+CONVEYOR_BIN = PROJECT_ROOT / ".agent-factory" / "bin" / "flow-conveyor"
 PRODUCTION_LINE_DIR = Path(__file__).resolve().parent
 PRODUCTION_LINE_ENGINE_DIR = PRODUCTION_LINE_DIR  # compatibility alias
 PROMPTS_DIR = PRODUCTION_LINE_DIR / "prompts"
@@ -184,7 +184,7 @@ class WorkflowContext:
     SPEC.md §4 output model + §7.2 driver.py pseudocode based.
     """
 
-    ticket_no: str                          # "T-489"
+    work_request_no: str                          # "WR-489"
     registry_key: str                       # "20260514-230000"
     work_dir: Path                          # .agent-factory/runs/<registry_key>/
     command: str = "implement"              # implement | research | review | test
@@ -192,7 +192,7 @@ class WorkflowContext:
     current_step: str = "NONE"
     feature_branch: str | None = None       # Worktree Guard (T-411 remnants, preserved)
     worktree_path: Path | None = None       # SPEC §9.1.1 (Stage 3-D) + §0.1 (Stage 3-E auto_commit)
-    title: str = ""                         # Ticket title (for auto_commit message template)
+    title: str = ""                         # WorkRequest title (for auto_commit message template)
     session_ids: dict[str, str] = field(default_factory=dict)  # Step|Phase → session_id
     wf_session_id: str | None = None        # Stage 3-B — board side workflow_registry mapping ID
 
@@ -379,7 +379,7 @@ def write_context(ctx: WorkflowContext) -> None:
     """Serialize ctx state to `.context.json` — feature_branch / mode / command etc."""
     payload = {
         "schema_version": 1,
-        "ticket_no": ctx.ticket_no,
+        "work_request_no": ctx.work_request_no,
         "registry_key": ctx.registry_key,
         "command": ctx.command,
         "mode": ctx.mode,
@@ -396,10 +396,10 @@ def write_context(ctx: WorkflowContext) -> None:
     )
 
 
-def kanban_show(ticket_no: str) -> str:
-    """`.agent-factory/bin/flow-kanban show T-NNN` — Return stdout."""
+def conveyor_show(work_request_no: str) -> str:
+    """`.agent-factory/bin/flow-conveyor show WR-NNN` — Return stdout."""
     result = subprocess.run(
-        [str(KANBAN_BIN), "show", ticket_no],
+        [str(CONVEYOR_BIN), "show", work_request_no],
         capture_output=True,
         text=True,
         cwd=str(PROJECT_ROOT),
@@ -408,13 +408,13 @@ def kanban_show(ticket_no: str) -> str:
     return result.stdout
 
 
-def kanban_move(ticket_no: str, target: str) -> int:
-    """`flow-kanban move T-NNN <target>` — Open/In Progress/Review/Done/Todo.
+def conveyor_move(work_request_no: str, target: str) -> int:
+    """`flow-conveyor move WR-NNN <target>` — Draft/Accepted/Executing/Verifying/Complete.
 
-    SPEC.md §12.4 — in_progress when entering INIT, review when ending DONE, auto-regressive X when entering FAILED.
+    INIT moves Accepted to Executing; DONE moves Executing to Verifying.
     """
     result = subprocess.run(
-        [str(KANBAN_BIN), "move", ticket_no, target],
+        [str(CONVEYOR_BIN), "move", work_request_no, target],
         capture_output=True,
         text=True,
         cwd=str(PROJECT_ROOT),
@@ -446,7 +446,7 @@ def write_metadata(
     Schema:
         {
           "schema_version": 1,
-          "ticket_no": "T-NNN",
+          "work_request_no": "WR-NNN",
           "registry_key": "...",
           "command": "implement",
           "mode": "multi",
@@ -465,7 +465,7 @@ def write_metadata(
     status = read_status(ctx)
     payload = {
         "schema_version": 1,
-        "ticket_no": ctx.ticket_no,
+        "work_request_no": ctx.work_request_no,
         "registry_key": ctx.registry_key,
         "command": ctx.command,
         "mode": ctx.mode,
@@ -511,7 +511,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
       3. `git -C <wt> diff --cached --quiet` — If there are 0 changes, returncode 0 → skip, return 0
       4. Deterministic message template `git -C <wt> commit -m <msg>` → returncode is returned
 
-    Message template: "feat(<ticket>): <title> [production-line auto-commit]"
+    Message template: "feat(<work_request>): <title> [production-line auto-commit]"
     """
     if ctx.worktree_path is None:
         append_log(ctx, "[AUTO-COMMIT] worktree-less — skip")
@@ -542,7 +542,7 @@ def auto_commit(ctx: WorkflowContext) -> int:
         return 0
     # 3. commit message determinism template
     title = ctx.title or "(no title)"
-    msg = f"feat({ctx.ticket_no}): {title} [production-line auto-commit]"
+    msg = f"feat({ctx.work_request_no}): {title} [production-line auto-commit]"
     commit = subprocess.run(
         ["git", "-C", wt, "commit", "-m", msg],
         capture_output=True,

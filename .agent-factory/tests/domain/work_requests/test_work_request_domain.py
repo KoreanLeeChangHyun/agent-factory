@@ -11,16 +11,16 @@ from engine.core.work_requests import (
 )
 
 
-def test_work_request_ref_normalizes_external_ticket_ids() -> None:
-    assert str(WorkRequestRef.parse("7")) == "T-007"
-    assert str(WorkRequestRef.parse("t-12")) == "T-012"
+def test_work_request_ref_normalizes_external_work_request_ids() -> None:
+    assert str(WorkRequestRef.parse("7")) == "WR-007"
+    assert str(WorkRequestRef.parse("wr-12")) == "WR-012"
 
 
 def test_work_request_requires_intent_and_acceptance_before_workflow_run() -> None:
     request = WorkRequest(
-        ref=WorkRequestRef.parse("T-123"),
+        ref=WorkRequestRef.parse("WR-123"),
         title="Add importer",
-        intent="Import existing ticket XML as work requests",
+        intent="Import existing WorkRequest XML as work requests",
     )
 
     with pytest.raises(ValueError, match="acceptance"):
@@ -29,8 +29,8 @@ def test_work_request_requires_intent_and_acceptance_before_workflow_run() -> No
     request.acceptance_criteria.append(AcceptanceCriteria("XML round-trip passes"))
     run = request.start_workflow_run()
 
-    assert run.work_request_ref == WorkRequestRef.parse("T-123")
-    assert run.ticket_arg == "T-123"
+    assert run.work_request_ref == WorkRequestRef.parse("WR-123")
+    assert run.work_request_arg == "WR-123"
     assert run.initial_stage == "PREPARE"
 
 
@@ -40,7 +40,7 @@ def test_ouroboros_refinement_allows_rewrite_loop_and_acceptance() -> None:
     state.advance(OuroborosPhase.CLARIFY, "Need storage compatibility")
     state.advance(OuroborosPhase.CRITIQUE, "Acceptance criteria are vague")
     state.advance(OuroborosPhase.REWRITE, "Add XML round-trip acceptance")
-    state.advance(OuroborosPhase.CLARIFY, "Keep T-123 IDs")
+    state.advance(OuroborosPhase.CLARIFY, "Keep WR-123 IDs")
     state.advance(OuroborosPhase.CRITIQUE, "Ready")
     state.advance(OuroborosPhase.ACCEPT, "Accepted")
 
@@ -59,4 +59,3 @@ def test_ouroboros_rejects_illegal_transition() -> None:
     state = OuroborosState()
     with pytest.raises(ValueError, match="illegal Ouroboros transition"):
         state.advance(OuroborosPhase.ACCEPT, "too early")
-

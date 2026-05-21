@@ -1,8 +1,8 @@
 #!/usr/bin/env -S python3 -u
-"""flow-kanban done Guards verification of completion of derived ticket when executed.
+"""flow-conveyor complete Guards verification of completion of derived work_request when executed.
 
-Detect the flow-kanban done command in the PreToolUse(Bash) event,
-If the ticket derived from the ticket in question is not Done, it is blocked.
+Detect the flow-conveyor complete command in the PreToolUse(Bash) event,
+If the work_request derived from the work_request in question is not Complete, it is blocked.
 
 Toggle: Environment variable HOOK_DONE_RELATION_GUARD (false/0 = disabled, default enabled)
 """
@@ -26,11 +26,11 @@ if _guards_dir not in sys.path:
 
 from common import read_env
 
-# flow-kanban done T-NNN pattern
-_DONE_PATTERN = re.compile(r"\bflow-kanban\s+done\s+(T-\d{3})\b")
+# flow-conveyor complete WR-NNN pattern
+_DONE_PATTERN = re.compile(r"\bflow-conveyor\s+complete\s+(T-\d{3})\b")
 
-# Kanban Directory
-KANBAN_DIRS = ["todo", "open", "progress", "review"]
+# Conveyor Directory
+CONVEYOR_DIRS = ["draft", "open", "executing", "verifying"]
 
 
 def _deny(reason: str) -> None:
@@ -45,18 +45,18 @@ def _deny(reason: str) -> None:
     sys.exit(0)
 
 
-def _find_ticket_xml(kanban_base: str, ticket_num: str) -> str | None:
-    """Find the ticket XML path in any Kanban directory."""
-    for d in KANBAN_DIRS + ["done"]:
-        path = os.path.join(kanban_base, d, f"{ticket_num}.xml")
+def _find_work_request_xml(conveyor_base: str, work_request_num: str) -> str | None:
+    """Find the work_request XML path in any Conveyor directory."""
+    for d in CONVEYOR_DIRS + ["complete"]:
+        path = os.path.join(conveyor_base, d, f"{work_request_num}.xml")
         if os.path.isfile(path):
             return path
     return None
 
 
-def _get_ticket_status(kanban_base: str, ticket_num: str) -> str | None:
-    """Returns the current status of the ticket."""
-    path = _find_ticket_xml(kanban_base, ticket_num)
+def _get_work_request_status(conveyor_base: str, work_request_num: str) -> str | None:
+    """Returns the current status of the work_request."""
+    path = _find_work_request_xml(conveyor_base, work_request_num)
     if not path:
         return None
     try:
@@ -67,11 +67,11 @@ def _get_ticket_status(kanban_base: str, ticket_num: str) -> str | None:
         return None
 
 
-def _find_derived_tickets(kanban_base: str, source_ticket: str) -> list[str]:
-    """Returns a list of tickets referencing source_ticket as derived-from."""
+def _find_derived_work_requests(conveyor_base: str, source_work_request: str) -> list[str]:
+    """Returns a list of work_requests referencing source_work_request as derived-from."""
     derived = []
-    for d in KANBAN_DIRS + ["done"]:
-        dir_path = os.path.join(kanban_base, d)
+    for d in CONVEYOR_DIRS + ["complete"]:
+        dir_path = os.path.join(conveyor_base, d)
         if not os.path.isdir(dir_path):
             continue
         try:
@@ -82,7 +82,7 @@ def _find_derived_tickets(kanban_base: str, source_ticket: str) -> list[str]:
                     tree = ET.parse(entry.path)
                     for rel in tree.findall(".//relations/relation"):
                         if (rel.get("type") == "derived-from"
-                                and rel.get("ticket") == source_ticket):
+                                and rel.get("work_request") == source_work_request):
                             num_el = tree.find(".//metadata/number")
                             if num_el is not None and num_el.text:
                                 derived.append(num_el.text.strip())
@@ -114,31 +114,31 @@ def main() -> None:
     if not match:
         sys.exit(0)
 
-    ticket_num = match.group(1)
+    work_request_num = match.group(1)
 
     # Project root estimation
     project_root = os.environ.get("PROJECT_ROOT", os.getcwd())
-    kanban_base = os.path.join(project_root, ".agent-factory", "tickets")
+    conveyor_base = os.path.join(project_root, ".agent-factory", "work_requests")
 
-    if not os.path.isdir(kanban_base):
+    if not os.path.isdir(conveyor_base):
         sys.exit(0)
 
-    # Find derived tickets that reference this ticket as derived-from
-    derived = _find_derived_tickets(kanban_base, ticket_num)
+    # Find derived work_requests that reference this work_request as derived-from
+    derived = _find_derived_work_requests(conveyor_base, work_request_num)
     if not derived:
         sys.exit(0)
 
-    # Check if any of the derived tickets are not Done
-    not_done = []
+    # Check if any of the derived work_requests are not Complete
+    not_complete = []
     for dt in derived:
-        st = _get_ticket_status(kanban_base, dt)
-        if st != "Done":
-            not_done.append(f"{dt}({st or '?'})")
+        st = _get_work_request_status(conveyor_base, dt)
+        if st != "Complete":
+            not_complete.append(f"{dt}({st or '?'})")
 
-    if not_done:
+    if not_complete:
         _deny(
-            f"Block {ticket_num} Done: derived ticket {', '.join(not_done)}"
-            f"It's not done yet. Proceed after completing the derivative ticket."
+            f"Block {work_request_num} Complete: derived work_request {', '.join(not_complete)}"
+            f"It's not complete yet. Proceed after completing the derivative work_request."
         )
 
 

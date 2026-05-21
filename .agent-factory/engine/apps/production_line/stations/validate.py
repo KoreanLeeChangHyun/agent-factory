@@ -34,7 +34,7 @@ def validate_step(ctx: WorkflowContext) -> None:
         f"`validate/code.json` output within the VALIDATE Step seen by driver `_verify_code.py`."
     )
     session_id = new_session_uuid()
-    logical = logical_session_name(ctx.ticket_no, "VALIDATE")
+    logical = logical_session_name(ctx.work_request_no, "VALIDATE")
     ctx.session_ids[logical] = session_id
     write_context(ctx)
     spawn_with_retry(

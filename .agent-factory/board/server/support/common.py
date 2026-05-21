@@ -11,7 +11,7 @@ import time
 # noqa: F401 — Pattern  common.py handlers/* reimport identifiers of factory data
 # hub role.  common.py direct use in internally export duty.
 from board.factory_data import (  # noqa: F401
-    KANBAN_DIRS_LIST,
+    CONVEYOR_DIRS_LIST,
     WF_BASE,
     WF_HISTORY,
     DASH_BASE,
@@ -21,7 +21,7 @@ from board.factory_data import (  # noqa: F401
     _resolve_settings_file,
     _parse_env_file,
     _update_env_value,
-    _read_kanban_tickets,
+    _read_conveyor_work_requests,
     _read_dashboard,
     _list_workflow_entries,
     _get_git_branch,
@@ -70,10 +70,11 @@ SERVER_PID: int = os.getpid()
 
 # Monitoring Target Path -> SSE Event Type Mapping
 WATCH_DIRS: dict[str, str] = {
-    os.path.join('.agent-factory', 'tickets', 'open'): 'kanban',
-    os.path.join('.agent-factory', 'tickets', 'progress'): 'kanban',
-    os.path.join('.agent-factory', 'tickets', 'review'): 'kanban',
-    os.path.join('.agent-factory', 'tickets', 'done'): 'kanban',
+    os.path.join('.agent-factory', 'work-requests', 'draft'): 'conveyor',
+    os.path.join('.agent-factory', 'work-requests', 'accepted'): 'conveyor',
+    os.path.join('.agent-factory', 'work-requests', 'executing'): 'conveyor',
+    os.path.join('.agent-factory', 'work-requests', 'verifying'): 'conveyor',
+    os.path.join('.agent-factory', 'work-requests', 'complete'): 'conveyor',
     os.path.join('.agent-factory', 'runs'): 'workflow',
     os.path.join('.agent-factory', 'runs', '.history'): 'workflow',
     os.path.join('.agent-factory', 'board', 'data'): 'dashboard',

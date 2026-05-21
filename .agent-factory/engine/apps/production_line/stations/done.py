@@ -6,7 +6,7 @@ from datetime import datetime
 
 from .._common import (
     WorkflowContext,
-    kanban_move,
+    conveyor_move,
     load_template,
     update_step,
     write_metadata,
@@ -17,7 +17,7 @@ from .._verdict import build_final_verdict, save_final_verdict
 
 
 def done_step(ctx: WorkflowContext) -> None:
-    """DONE — summary.txt + usage.json + metadata.json + driver 14+ rule re-verification + kanban move review.
+    """DONE — summary.txt + usage.json + metadata.json + driver 14+ rule re-verification + conveyor move Verifying.
 
     ‘Driver rule base revalidation’ in SPEC.md §7.1 mapping table is performed in this step — REPORT
     Finish + step.end DONE Registration point after recording. update_step(_, "DONE") in main
@@ -26,7 +26,7 @@ def done_step(ctx: WorkflowContext) -> None:
     step_start(ctx, "DONE")
     finalized_at = datetime.now().isoformat(timespec="seconds")
     summary_text = load_template("summary.txt").format(
-        ticket_no=ctx.ticket_no,
+        work_request_no=ctx.work_request_no,
         registry_key=ctx.registry_key,
         command=ctx.command,
         mode=ctx.mode,
@@ -47,7 +47,7 @@ def done_step(ctx: WorkflowContext) -> None:
         verdict=verdict_report.verdict,
         violation_count=verdict_report.violation_count(),
         has_hard_fail=verdict_report.has_hard_fail(),
-        ticket=ctx.ticket_no,
+        work_request=ctx.work_request_no,
         final_verdict_path=str(ctx.final_verdict_json_path()),
     )
     if final_verdict["blocking_failures"]:
@@ -73,13 +73,13 @@ def done_step(ctx: WorkflowContext) -> None:
         final_verdict_path=str(ctx.final_verdict_json_path()),
         workrequest_refinement=final_verdict.get("workrequest_refinement", {}),
     )
-    kanban_move(ctx.ticket_no, "review")
+    conveyor_move(ctx.work_request_no, "verifying")
 
 
 def fail_step(ctx: WorkflowContext, reason: str) -> None:
-    """FAILED — failure.md + kanban autoregressive"""
+    """FAILED — failure.md + conveyor autoregressive"""
     failure_body = load_template("failure.md").format(
-        ticket_no=ctx.ticket_no,
+        work_request_no=ctx.work_request_no,
         registry_key=ctx.registry_key,
         reason=reason,
         ts=datetime.now().isoformat(timespec="seconds"),

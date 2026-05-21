@@ -4,7 +4,7 @@ SPEC.md §9.1.1 (Stage 3-D): Worktree branching by command.
 - implement → git worktree add + create feature_branch (reuse v1 worktree_manager)
 - research|review → develop directly (allows worktree-less)
 
-T-495 P2: V2_REGISTRY_KEY env priority — board kanban submit handler
+T-495 P2: V2_REGISTRY_KEY env priority — board conveyor submit handler
 Inject registry_key determinism externally to pre-issue session_id
 Make it possible. If env is not set, existing new_registry_key() behavior is preserved.
 """
@@ -19,8 +19,8 @@ from pathlib import Path
 from .._common import (
     WorkflowContext,
     append_log,
-    kanban_move,
-    kanban_show,
+    conveyor_move,
+    conveyor_show,
     make_work_dir,
     new_registry_key,
     update_step,
@@ -34,8 +34,8 @@ from .._emitter import session_create, step_end, step_start
 _VALID_COMMANDS = {"implement", "research", "review"}
 
 
-def _parse_ticket_meta(dump: str) -> tuple[str, str]:
-    """Extract (command, title) from kanban show output. fallback: ("implement", "untitled")."""
+def _parse_work_request_meta(dump: str) -> tuple[str, str]:
+    """Extract (command, title) from conveyor show output. fallback: ("implement", "untitled")."""
     command = "implement"
     title = "untitled"
     for line in dump.splitlines():
@@ -52,7 +52,7 @@ def _parse_ticket_meta(dump: str) -> tuple[str, str]:
 
 
 def _maybe_create_worktree(
-    ticket_no: str, title: str, command: str
+    work_request_no: str, title: str, command: str
 ) -> tuple[str | None, Path | None]:
     """If command=implement, call v1 worktree_manager.create_worktree.
 
@@ -67,32 +67,32 @@ def _maybe_create_worktree(
     # `from flow.worktree_manager` throws an ImportError (different environment from other v1 callers).
     from engine.flow.worktree_manager import create_worktree  # noqa: E402
 
-    info = create_worktree(ticket_no, title, command=command)
+    info = create_worktree(work_request_no, title, command=command)
     if info is None:
         sys.stderr.write(
             f"[driver] worktree create failed"
-            f"(ticket={ticket_no}, command={command}) — INIT Abort \n"
+            f"(work_request={work_request_no}, command={command}) — INIT Abort \n"
         )
         raise SystemExit(2)
     return info.branch_name, Path(info.path)
 
 
-def init_step(ticket_no: str) -> WorkflowContext:
-    """INIT — kanban Open→In Progress, work_dir + worktree (command branch) + status.json.
+def init_step(work_request_no: str) -> WorkflowContext:
+    """INIT — conveyor Accepted→Executing, work_dir + worktree (command branch) + status.json.
 
-    ticket presence guard: If token 'Number:' is not found in kanban_show result, SystemExit(2).
+    WorkRequest presence guard: If token 'Number:' is not found in conveyor_show result, SystemExit(2).
     Guard before creating work_dir — Avoid work_dir remnants.
     """
-    # ticket guard first (before creating work_dir — avoiding remnants)
-    ticket_dump = kanban_show(ticket_no)
-    if not ticket_dump or "Number:" not in ticket_dump:
+    # WorkRequest guard first (before creating work_dir — avoiding remnants)
+    work_request_dump = conveyor_show(work_request_no)
+    if not work_request_dump or "Number:" not in work_request_dump:
         sys.stderr.write(
-            f"[driver] ticket {ticket_no} not found in kanban — aborting INIT\n"
+            f"[driver] WorkRequest {work_request_no} not found in conveyor — aborting INIT\n"
         )
         raise SystemExit(2)
 
-    command, title = _parse_ticket_meta(ticket_dump)
-    feature_branch, worktree_path = _maybe_create_worktree(ticket_no, title, command)
+    command, title = _parse_work_request_meta(work_request_dump)
+    feature_branch, worktree_path = _maybe_create_worktree(work_request_no, title, command)
 
     # T-495 P2 — Use V2_REGISTRY_KEY env first. The board pre-issued key
     # Once received, the backend's production_line_registry and driver's work_dir paths are
@@ -111,9 +111,9 @@ def init_step(ticket_no: str) -> WorkflowContext:
 
     # Stage 3-B — board side workflow_registry mapping ID. Issued by the driver itself
     # Maintain determinism (crash 0 because registry_key is already in timestamp format).
-    wf_session_id = f"wf-{ticket_no}-{registry_key}"
+    wf_session_id = f"wf-{work_request_no}-{registry_key}"
     ctx = WorkflowContext(
-        ticket_no=ticket_no,
+        work_request_no=work_request_no,
         registry_key=registry_key,
         work_dir=work_dir,
         command=command,
@@ -124,20 +124,20 @@ def init_step(ticket_no: str) -> WorkflowContext:
         title=title,
         wf_session_id=wf_session_id,
     )
-    ctx.user_prompt_path().write_text(ticket_dump, encoding="utf-8")
+    ctx.user_prompt_path().write_text(work_request_dump, encoding="utf-8")
     write_status(ctx, {"workflow_step": "INIT", "transitions": []})
     write_context(ctx)
     write_metadata(ctx)
     append_log(
         ctx,
-        f"INIT — registry_key={registry_key}, ticket={ticket_no}, "
+        f"INIT — registry_key={registry_key}, work_request={work_request_no}, "
         f"command={command}, feature_branch={feature_branch or '(none)'}",
     )
     # T-495 P1 — Session explicit registration (POST /api/v2/sessions). lazy create discard.
     # If V2_BOARD_POST is not set, silent skip — driver flow impact 0.
     session_create(ctx)
     step_start(ctx, "INIT", prev_step="NONE")
-    kanban_move(ticket_no, "progress")
+    conveyor_move(work_request_no, "executing")
     step_end(ctx, "INIT", outcome="ok")
     update_step(ctx, "INIT", "PLAN")
     return ctx

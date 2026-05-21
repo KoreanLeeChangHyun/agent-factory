@@ -1,9 +1,4 @@
-"""Pure WorkRequest domain model.
-
-`Ticket` remains a storage/UI compatibility term. New core code should model
-the executable request as a WorkRequest and keep the stable external `T-123`
-identifier through WorkRequestRef.
-"""
+"""Pure WorkRequest domain model."""
 
 from __future__ import annotations
 
@@ -12,22 +7,22 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-_WORK_REQUEST_REF_RE = re.compile(r"^T-\d{3,}$")
+_WORK_REQUEST_REF_RE = re.compile(r"^WR-\d{3,}$")
 
 
 class WorkRequestStatus(str, Enum):
-    """Board-facing request lifecycle states."""
+    """Conveyor-facing WorkRequest lifecycle states."""
 
-    TODO = "To Do"
-    OPEN = "Open"
-    IN_PROGRESS = "In Progress"
-    REVIEW = "Review"
-    DONE = "Done"
+    DRAFT = "Draft"
+    ACCEPTED = "Accepted"
+    EXECUTING = "Executing"
+    VERIFYING = "Verifying"
+    COMPLETE = "Complete"
 
 
 @dataclass(frozen=True)
 class WorkRequestRef:
-    """Stable external reference for a work request, for example `T-123`."""
+    """Stable external reference for a work request, for example `WR-123`."""
 
     value: str
 
@@ -39,8 +34,8 @@ class WorkRequestRef:
     def parse(cls, raw: str) -> "WorkRequestRef":
         value = raw.strip().upper()
         if re.fullmatch(r"\d+", value):
-            value = f"T-{int(value):03d}"
-        elif re.fullmatch(r"T-\d+", value):
+            value = f"WR-{int(value):03d}"
+        elif re.fullmatch(r"WR-\d+", value):
             prefix, number = value.split("-", 1)
             value = f"{prefix}-{int(number):03d}"
         return cls(value)
@@ -88,8 +83,8 @@ class WorkflowRunStart:
     initial_stage: str = "PREPARE"
 
     @property
-    def ticket_arg(self) -> str:
-        """Compatibility argument for the current production-line driver."""
+    def work_request_arg(self) -> str:
+        """Argument passed to the workflow runner."""
 
         return str(self.work_request_ref)
 
@@ -106,7 +101,7 @@ class WorkRequest:
     acceptance_criteria: list[AcceptanceCriteria] = field(default_factory=list)
     non_goals: list[str] = field(default_factory=list)
     risk_notes: list[RiskNote] = field(default_factory=list)
-    status: WorkRequestStatus = WorkRequestStatus.OPEN
+    status: WorkRequestStatus = WorkRequestStatus.ACCEPTED
     command: str = "implement"
     ouroboros_history: list[object] = field(default_factory=list)
 
@@ -141,4 +136,3 @@ class WorkRequest:
             command=self.command,
             title=self.title,
         )
-

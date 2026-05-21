@@ -18,11 +18,11 @@ from board.factory_sources.settings import (
     _update_env_value,
 )
 from board.factory_sources.overview import (
+    CONVEYOR_DIRS_LIST,
     DASH_BASE,
     DASH_FILES,
-    KANBAN_DIRS_LIST,
     _read_dashboard,
-    _read_kanban_tickets,
+    _read_conveyor_work_requests,
 )
 from board.factory_sources.workflows import (
     WF_BASE,

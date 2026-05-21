@@ -1,9 +1,9 @@
-"""Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes.
+"""Conveyor DnD POST handlers (move/submit/complete/delete) — preserves cb7427f regression fixes.
 
-T-513 P2 — `_handle_kanban_undo_done` / `_handle_kanban_workflow_entries` /
-Absorb `_handle_kanban_workflow_detail` (old V1 undo / generic branch / list+entries+detail
+T-513 P2 — `_handle_conveyor_undo_complete` / `_handle_conveyor_workflow_entries` /
+Absorb `_handle_conveyor_workflow_detail` (old V1 undo / generic branch / list+entries+detail
 domain transfer). V1 endpoint body + alias routing is collectively discarded in P5 — this mixin
-KANBAN domain single point of entry.
+CONVEYOR domain single point of entry.
 """
 
 from __future__ import annotations
@@ -17,14 +17,14 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from engine.adapters.kanban import XmlWorkRequestStore
-from engine.apps.board_api.handler_common import _TICKET_RE, _KANBAN_ALL_DIRS
-from engine.apps.board_api.kanban_done_helpers import (
-    handle_kanban_done_force,
-    handle_kanban_done_review,
+from engine.adapters.conveyor import XmlWorkRequestStore
+from engine.apps.board_api.handler_common import _WORK_REQUEST_RE, _CONVEYOR_ALL_DIRS
+from engine.apps.board_api.conveyor_complete_helpers import (
+    handle_conveyor_complete_force,
+    handle_conveyor_complete_review,
     check_derived_blocked,
 )
-from engine.apps.board_api.kanban_done_re import (
+from engine.apps.board_api.conveyor_complete_re import (
     _UNDO_ERROR_RE,
     _UNDO_STRATEGY_RESET,
     _UNDO_STRATEGY_REVERT,
@@ -60,7 +60,7 @@ def _classify_failure_reason(returncode: int, stderr: str) -> str:
     Reasons for abnormal termination of flow-launcher are classified into stderr·returncode patterns.
 
     T-450 Report §5 reason enum:
-      - to_do_status: Launcher side pre-verification denied (ticket is in To Do status)
+      - to_do_status: Launcher side pre-verification denied (work_request is in Draft status)
       - http_post_timeout:   H4 urllib timeout=10s
       - http_post_error: H4 urllib general error (URLError, etc.)
       - workflow_start_error: WorkflowHandler spawn failure
@@ -69,7 +69,7 @@ def _classify_failure_reason(returncode: int, stderr: str) -> str:
     if returncode == 0:
         return 'unknown'
     err = stderr or ''
-    if 'To Do' in err:
+    if 'Draft' in err:
         return 'to_do_status'
     if 'urllib timed out' in err or 'timed out' in err:
         return 'http_post_timeout'
@@ -80,7 +80,7 @@ def _classify_failure_reason(returncode: int, stderr: str) -> str:
     return 'unknown'
 
 
-def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
+def _emit_launch_event(event: str, work_request: str, **kwargs: object) -> None:
     """internal helper — not exposed as endpoint.
 
     LAUNCH_* events are recorded simultaneously in SSE broadcast + workflow.log.
@@ -90,19 +90,19 @@ def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
 
     Args:
         event:  'LAUNCH_PENDING' | 'LAUNCH_STARTED' | 'LAUNCH_FAILED'
-        ticket: T-NNN
+        work_request: WR-NNN
         **kwargs: Additional payload fields (command, mode, reason, error_message,
                   latency_ms, submitted_at, session_id, returncode, elapsed_ms, etc.)
     """
     ts = datetime.now(timezone.utc).isoformat()
-    payload: dict[str, object] = {'event': event, 'ts': ts, 'ticket': ticket}
+    payload: dict[str, object] = {'event': event, 'ts': ts, 'work_request': work_request}
     payload.update(kwargs)
 
     try:
         sse_manager.broadcast('launch', data=payload)
     except Exception as exc:  # Isolate broadcast failures so they don't kill the reader thread itself
-        logger.error('launch SSE broadcast failed: event=%s ticket=%s exc=%r',
-                     event, ticket, exc)
+        logger.error('launch SSE broadcast failed: event=%s work_request=%s exc=%r',
+                     event, work_request, exc)
 
     # Create a separate file X — logger.info flows to the board server stderr/log.
     try:
@@ -110,25 +110,25 @@ def _emit_launch_event(event: str, ticket: str, **kwargs: object) -> None:
             f'{k}={v!r}' for k, v in kwargs.items()
             if k not in ('error_message',)  # error_message can be long so it is a separate line
         )
-        logger.info('LAUNCH_EVENT %s ticket=%s %s', event, ticket, extra_kv)
+        logger.info('LAUNCH_EVENT %s work_request=%s %s', event, work_request, extra_kv)
         if 'error_message' in kwargs and kwargs['error_message']:
-            logger.info('LAUNCH_EVENT %s ticket=%s error_message=%s',
-                        event, ticket, str(kwargs['error_message'])[:500])
+            logger.info('LAUNCH_EVENT %s work_request=%s error_message=%s',
+                        event, work_request, str(kwargs['error_message'])[:500])
     except Exception:  # Ignore logging failures
         pass
 
 
 def _record_workrequest_ouroboros(
     project_root: str,
-    ticket: str,
+    work_request: str,
     action: str,
     text: str,
 ) -> bool:
     """internal helper — persist authoring-loop history after facade success."""
 
     try:
-        store = XmlWorkRequestStore(Path(project_root) / ".agent-factory" / "tickets")
-        request = store.get(WorkRequestRef.parse(ticket))
+        store = XmlWorkRequestStore(Path(project_root) / ".agent-factory" / "work-requests")
+        request = store.get(WorkRequestRef.parse(work_request))
         entries = _ouroboros_entries_for_action(request.ouroboros_history, action, text)
         if not entries:
             return True
@@ -136,7 +136,7 @@ def _record_workrequest_ouroboros(
         store.save(request)
         return True
     except (FileNotFoundError, TypeError, ValueError) as exc:
-        logger.debug("Could not record WorkRequest Ouroboros history for %s: %s", ticket, exc)
+        logger.debug("Could not record WorkRequest Ouroboros history for %s: %s", work_request, exc)
         return False
 
 
@@ -210,7 +210,7 @@ def _advance_to_accept(state: OuroborosState, text: str) -> None:
 
 def _launch_reader_loop(
     proc: subprocess.Popen,
-    ticket: str,
+    work_request: str,
     command: str,
     submitted_at: datetime,
 ) -> None:
@@ -230,7 +230,7 @@ def _launch_reader_loop(
         except Exception as exc:  # Popen itself fails (rare but defensive)
             elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
             _emit_launch_event(
-                'LAUNCH_FAILED', ticket,
+                'LAUNCH_FAILED', work_request,
                 reason='reader_loop_exception',
                 returncode=None,
                 error_message=repr(exc),
@@ -247,7 +247,7 @@ def _launch_reader_loop(
             tail = first_line[len('LAUNCH:'):].strip()
             session_id = tail.split()[0] if tail else ''
             _emit_launch_event(
-                'LAUNCH_STARTED', ticket,
+                'LAUNCH_STARTED', work_request,
                 session_id=session_id,
                 mode='launched',
                 spawn_duration_ms=elapsed_ms,
@@ -256,7 +256,7 @@ def _launch_reader_loop(
         elif rc == 0 and first_line.startswith('INLINE:'):
             tail = first_line[len('INLINE:'):].strip()
             _emit_launch_event(
-                'LAUNCH_STARTED', ticket,
+                'LAUNCH_STARTED', work_request,
                 session_id='',
                 mode='inline',
                 spawn_duration_ms=elapsed_ms,
@@ -266,7 +266,7 @@ def _launch_reader_loop(
         elif rc == 0:
             # returncode=0 but stdout pattern is LAUNCH:/INLINE: neither — unknown classification
             _emit_launch_event(
-                'LAUNCH_FAILED', ticket,
+                'LAUNCH_FAILED', work_request,
                 reason='unknown',
                 returncode=0,
                 error_message=(first_line or 'no stdout')[:500],
@@ -276,7 +276,7 @@ def _launch_reader_loop(
         else:
             reason = _classify_failure_reason(rc, stderr or '')
             _emit_launch_event(
-                'LAUNCH_FAILED', ticket,
+                'LAUNCH_FAILED', work_request,
                 reason=reason,
                 returncode=rc,
                 error_message=((stderr or stdout or '').strip())[:500],
@@ -287,7 +287,7 @@ def _launch_reader_loop(
         try:
             elapsed_ms = int((datetime.now(timezone.utc) - submitted_at).total_seconds() * 1000)
             _emit_launch_event(
-                'LAUNCH_FAILED', ticket,
+                'LAUNCH_FAILED', work_request,
                 reason='reader_loop_exception',
                 error_message=repr(exc),
                 elapsed_ms=elapsed_ms,
@@ -310,11 +310,11 @@ _BACKEND_GLOB_PATTERNS = (
     '.agent-factory/engine/**',
 )
 
-_FEAT_BRANCH_RE = re.compile(r'^feat/(T-\d+)-')
+_FEAT_BRANCH_RE = re.compile(r'^feat/(WR-\d+)-')
 
 
-class KanbanHandlerMixin:
-    """Kanban DnD POST handlers (move/submit/done/delete) — preserves cb7427f regression fixes."""
+class ConveyorHandlerMixin:
+    """Conveyor DnD POST handlers (move/submit/complete/delete) — preserves cb7427f regression fixes."""
 
     def _get_dirty_files(self, wt_path: str) -> list[str]:
         """internal helper — not exposed as endpoint.
@@ -335,13 +335,13 @@ class KanbanHandlerMixin:
     # ------------------------------------------------------------------
     # ------------------------------------------------------------------
 
-    def _resolve_feat_branch(self, ticket: str, project_root: str) -> str | None:
+    def _resolve_feat_branch(self, work_request: str, project_root: str) -> str | None:
         """internal helper — not exposed as endpoint.
 
-        Search for the exact feat/T-NNN-* branch name using the ticket number.
+        Search for the exact feat/WR-NNN-* branch name using the work_request number.
 
-        Parse the output of ``git worktree list --porcelain`` into ``refs/heads/feat/T-NNN-*``
-        Extract only the ``feat/T-NNN-*`` part from the form. None if the work tree is not registered.
+        Parse the output of ``git worktree list --porcelain`` into ``refs/heads/feat/WR-NNN-*``
+        Extract only the ``feat/WR-NNN-*`` part from the form. None if the work tree is not registered.
         """
         try:
             r = subprocess.run(
@@ -361,7 +361,7 @@ class KanbanHandlerMixin:
             if ref.startswith('refs/heads/'):
                 ref = ref[len('refs/heads/'):]
             m = _FEAT_BRANCH_RE.match(ref)
-            if m and m.group(1) == ticket:
+            if m and m.group(1) == work_request:
                 return ref
         return None
 
@@ -430,16 +430,16 @@ class KanbanHandlerMixin:
         return True, (r.stdout or '').strip()
 
     @api_endpoint("K", "branch_toggle")
-    def _handle_kanban_branch_toggle(self) -> None:
-        """POST /api/kanban/branch/toggle — Enable/disable Review card feature branch.
+    def _handle_conveyor_branch_toggle(self) -> None:
+        """POST /api/conveyor/branch/toggle — Enable/disable Verifying card feature branch.
 
-        Request: ``{"ticket_number": "T-NNN", "action": "on"|"off"}``
+        Request: ``{"work_request_number": "WR-NNN", "action": "on"|"off"}``
 
         on:
           - Verify main working tree dirty (git status --porcelain) → Reject if dirty
-          - feat/T-NNN-* branch matching (git worktree list --porcelain)
+          - feat/WR-NNN-* branch matching (git worktree list --porcelain)
           - ``git switch <feat branch>`` in the main working tree
-          - Automatic detection of backend changes (git diff develop..feat/T-NNN-* result glob matching)
+          - Automatic detection of backend changes (git diff develop..feat/WR-NNN-* result glob matching)
 
         off:
           - Same as main working tree dirty verification
@@ -450,10 +450,10 @@ class KanbanHandlerMixin:
           - feedback_no_speculative_guards Canon compliance
 
         method: POST
-        url: /api/kanban/branch/toggle
+        url: /api/conveyor/branch/toggle
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_branch_toggle
-        request: body {ticket_number: str, action: on|off}
+        handler: ConveyorHandlerMixin._handle_conveyor_branch_toggle
+        request: body {work_request_number: str, action: on|off}
         response_ok: {ok: true, branch: str, needs_restart: bool}
         response_error: {ok: false, error: str, dirty_files?: list}
         status_codes: 200, 400, 409
@@ -462,11 +462,11 @@ class KanbanHandlerMixin:
         sse_events: git_branch (via GitBranchWatcher)
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket_number') or '').strip()
+        work_request = (data.get('work_request_number') or '').strip()
         action = (data.get('action') or '').strip().lower()
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket_number" (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request_number" (WR-NNN required)')
             return
         if action not in ('on', 'off'):
             self._send_error(400, 'Invalid "action" (must be "on" or "off")')
@@ -486,7 +486,7 @@ class KanbanHandlerMixin:
                     f'Branch toggle does not perform automatic stash/commit/reset.'
                     f'Please manually commit / stash / reset and try again.'
                 ),
-                'ticket': ticket,
+                'work_request': work_request,
                 'action': action,
             })
             return
@@ -498,7 +498,7 @@ class KanbanHandlerMixin:
                     'ok': False,
                     'reason': 'git_switch_failed',
                     'message': msg,
-                    'ticket': ticket,
+                    'work_request': work_request,
                     'action': action,
                 })
                 return
@@ -506,21 +506,21 @@ class KanbanHandlerMixin:
                 'ok': True,
                 'branch': 'develop',
                 'needs_restart': False,
-                'active_ticket': None,
+                'active_work_request': None,
             })
             return
 
         # action == 'on'
-        feat_branch = self._resolve_feat_branch(ticket, project_root)
+        feat_branch = self._resolve_feat_branch(work_request, project_root)
         if not feat_branch:
             self._send_json({
                 'ok': False,
                 'reason': 'feature_branch_not_found',
                 'message': (
-                    f'The feature branch (feat/{ticket}-*) of {ticket} could not be found.'
+                    f'The feature branch (feat/{work_request}-*) of {work_request} could not be found.'
                     f'Check if the worktree is registered (git worktree list).'
                 ),
-                'ticket': ticket,
+                'work_request': work_request,
                 'action': action,
             })
             return
@@ -531,7 +531,7 @@ class KanbanHandlerMixin:
                 'ok': False,
                 'reason': 'git_switch_failed',
                 'message': msg,
-                'ticket': ticket,
+                'work_request': work_request,
                 'action': action,
                 'branch': feat_branch,
             })
@@ -542,24 +542,24 @@ class KanbanHandlerMixin:
             'ok': True,
             'branch': feat_branch,
             'needs_restart': needs_restart,
-            'active_ticket': ticket,
+            'active_work_request': work_request,
         })
 
     @api_endpoint("K", "branch_active")
-    def _handle_kanban_branch_active(self) -> None:
-        """GET /api/kanban/branch/active — Returns the current main working tree HEAD branch + active_ticket.
+    def _handle_conveyor_branch_active(self) -> None:
+        """GET /api/conveyor/branch/active — Returns the current main working tree HEAD branch + active_work_request.
 
-        Response: ``{"branch": "feat/T-NNN-...", "active_ticket": "T-NNN"}`` or
-              ``{"branch": "develop", "active_ticket": null}``
+        Response: ``{"branch": "feat/WR-NNN-...", "active_work_request": "WR-NNN"}`` or
+              ``{"branch": "develop", "active_work_request": null}``
 
         Used by the frontend to restore the active card visual when the page is loaded.
 
         method: GET
-        url: /api/kanban/branch/active
+        url: /api/conveyor/branch/active
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_branch_active
+        handler: ConveyorHandlerMixin._handle_conveyor_branch_active
         request: query none
-        response_ok: {branch: str|null, active_ticket: T-NNN|null}
+        response_ok: {branch: str|null, active_work_request: WR-NNN|null}
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
@@ -569,72 +569,72 @@ class KanbanHandlerMixin:
         project_root = os.getcwd()
         branch = self._get_current_branch(project_root)
         if not branch:
-            self._send_json({'branch': None, 'active_ticket': None})
+            self._send_json({'branch': None, 'active_work_request': None})
             return
 
         m = _FEAT_BRANCH_RE.match(branch)
-        active_ticket = m.group(1) if m else None
+        active_work_request = m.group(1) if m else None
         self._send_json({
             'branch': branch,
-            'active_ticket': active_ticket,
+            'active_work_request': active_work_request,
         })
 
-    def _check_derived_blocked(self, ticket: str, kanban_base: str) -> list[str]:
+    def _check_derived_blocked(self, work_request: str, conveyor_base: str) -> list[str]:
         """internal helper — not exposed as endpoint.
 
-        derived-from Returns derived tickets with a status other than Done (delegation).
+        derived-from Returns derived work_requests with a status other than Complete (delegation).
         """
-        return check_derived_blocked(ticket, kanban_base, _KANBAN_ALL_DIRS)
+        return check_derived_blocked(work_request, conveyor_base, _CONVEYOR_ALL_DIRS)
 
     @api_endpoint("K", "move")
-    def _handle_kanban_move(self) -> None:
-        """POST /api/kanban/move — {"ticket","to"}: Allow transition To Do ↔ Open + Open → Review + Review → Open.
+    def _handle_conveyor_move(self) -> None:
+        """POST /api/conveyor/move — {"work_request","to"}: Allow transition Draft ↔ Accepted + Accepted → Verifying + Verifying → Accepted.
 
         method: POST
-        url: /api/kanban/move
+        url: /api/conveyor/move
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_move
-        request: body {ticket: T-NNN, to: todo|open|review}
-        response_ok: {ok: true, ticket, to, stdout: str}
+        handler: ConveyorHandlerMixin._handle_conveyor_move
+        request: body {work_request: WR-NNN, to: draft|accepted|verifying}
+        response_ok: {ok: true, work_request, to, stdout: str}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 500, 504
         auth: none (local-only)
-        side_effects: flow-kanban move subprocess
-        sse_events: kanban_update (via FileWatcher)
+        side_effects: flow-conveyor move subprocess
+        sse_events: conveyor_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
         to = (data.get('to') or '').strip().lower()
 
-        if not ticket or not ticket.startswith('T-'):
-            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
             return
-        if to not in ('todo', 'open', 'review'):
-            self._send_error(400, 'DnD allows only "todo" / "open" / "review" transitions')
+        if to not in ('draft', 'accepted', 'verifying'):
+            self._send_error(400, 'DnD allows only "draft" / "accepted" / "verifying" transitions')
             return
 
         project_root = os.getcwd()
-        flow_kanban = os.path.join(project_root, '.agent-factory', 'bin', 'flow-kanban')
+        flow_conveyor = os.path.join(project_root, '.agent-factory', 'bin', 'flow-conveyor')
         try:
             result = subprocess.run(
-                [flow_kanban, 'move', ticket, to],
+                [flow_conveyor, 'move', work_request, to],
                 cwd=project_root, capture_output=True, text=True, timeout=10,
             )
         except subprocess.TimeoutExpired:
-            self._send_error(504, 'flow-kanban move timed out')
+            self._send_error(504, 'flow-conveyor move timed out')
             return
         except FileNotFoundError:
-            self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+            self._send_error(500, f'flow-conveyor not found: {flow_conveyor}')
             return
 
         if result.returncode != 0:
-            self._send_error(400, f'flow-kanban move failed: {(result.stderr or result.stdout or "").strip()}')
+            self._send_error(400, f'flow-conveyor move failed: {(result.stderr or result.stdout or "").strip()}')
             return
-        self._send_json({'ok': True, 'ticket': ticket, 'to': to, 'stdout': result.stdout.strip()})
+        self._send_json({'ok': True, 'work_request': work_request, 'to': to, 'stdout': result.stdout.strip()})
 
     @api_endpoint("K", "submit")
-    def _handle_kanban_submit(self) -> None:
-        """POST /api/kanban/submit — {"ticket","command"}: production-line asynchronous spawn.
+    def _handle_conveyor_submit(self) -> None:
+        """POST /api/conveyor/submit — {"work_request","command"}: production-line asynchronous spawn.
 
         T-500: Spawn responsibility is separated into ``server.production_line_launcher.spawn_production_line()``.
         This handler is only responsible for input validation → delegation → JSON response.
@@ -644,33 +644,33 @@ class KanbanHandlerMixin:
           - V2_BOARD_POST=true + V2_REGISTRY_KEY env auto-injection.
           - LAUNCH_PENDING + LAUNCH_STARTED Both fire immediately after Popen.
           - LAUNCH_FAILED fires only when reader thread = driver rc != 0.
-          - Response key ``{ok, status:'starting', ticket, command, submitted_at, session_id}``
+          - Response key ``{ok, status:'starting', work_request, command, submitted_at, session_id}``
             Full retention (0 regressions).
 
         method: POST
-        url: /api/kanban/submit
+        url: /api/conveyor/submit
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_submit
-        request: body {ticket: T-NNN, command: implement|research|review}
-        response_ok: {ok: true, status: starting, ticket, command, submitted_at, session_id}
+        handler: ConveyorHandlerMixin._handle_conveyor_submit
+        request: body {work_request: WR-NNN, command: implement|research|review}
+        response_ok: {ok: true, status: starting, work_request, command, submitted_at, session_id}
         response_error: {ok: false, error: str, error_kind?: str}
         status_codes: 200, 400, 500
         auth: none (local-only)
-        side_effects: spawn production-line subprocess, kanban Open → In Progress
-        sse_events: launch (LAUNCH_PENDING, LAUNCH_STARTED), kanban_update
+        side_effects: spawn production-line subprocess, conveyor Accepted → Executing
+        sse_events: launch (LAUNCH_PENDING, LAUNCH_STARTED), conveyor_update
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
         command = (data.get('command') or '').strip()
 
-        if not ticket or not re.match(r'^T-\d+$', ticket):
-            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+        if not work_request or not re.match(r'^WR-\d+$', work_request):
+            self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
             return
         if command not in ('implement', 'research', 'review'):
-            self._send_error(400, 'Invalid "command" (must be implement/research/review)')
+            self._send_error(400, 'Invalid "command" (must be implement/research/verifying)')
             return
 
-        result = spawn_production_line(ticket, command)
+        result = spawn_production_line(work_request, command)
         if not result.get('ok'):
             kind = result.get('error_kind') or 'spawn_failed'
             msg = result.get('message') or 'production-line spawn failed'
@@ -678,100 +678,100 @@ class KanbanHandlerMixin:
             return
         self._send_json(result)
 
-    @api_endpoint("K", "done")
-    def _handle_kanban_done(self) -> None:
-        """POST /api/kanban/done — {"ticket","force","force_dirty"}.
+    @api_endpoint("K", "complete")
+    def _handle_conveyor_complete(self) -> None:
+        """POST /api/conveyor/complete — {"work_request","force","force_dirty"}.
 
-        force=false: Review → Done.
-        force=true:  Open → Done.
-        Detailed logic is delegated to _kanban_done_helpers.py.
+        force=false: Verifying → Complete.
+        force=true:  Accepted → Complete.
+        Detailed logic is delegated to _conveyor_complete_helpers.py.
 
         method: POST
-        url: /api/kanban/done
+        url: /api/conveyor/complete
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_done
-        request: body {ticket: T-NNN, force?: bool, force_dirty?: bool}
-        response_ok: {ok: true, ticket, merge_commit?, message}
+        handler: ConveyorHandlerMixin._handle_conveyor_complete
+        request: body {work_request: WR-NNN, force?: bool, force_dirty?: bool}
+        response_ok: {ok: true, work_request, merge_commit?, message}
         response_error: {ok: false, error: str, blocked_derived?: list}
         status_codes: 200, 400, 409, 500, 504
         auth: none (local-only) — user-triggered
-        side_effects: flow-merge subprocess (commit + worktree cleanup + kanban move)
-        sse_events: kanban_update (via FileWatcher)
+        side_effects: flow-merge subprocess (commit + worktree cleanup + conveyor move)
+        sse_events: conveyor_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
         force = bool(data.get('force', False))
         force_dirty = bool(data.get('force_dirty', False))
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
             return
 
         project_root = os.getcwd()
-        flow_kanban = os.path.join(project_root, '.agent-factory', 'bin', 'flow-kanban')
+        flow_conveyor = os.path.join(project_root, '.agent-factory', 'bin', 'flow-conveyor')
 
         if force:
-            handle_kanban_done_force(self, ticket, force_dirty, project_root, flow_kanban)
+            handle_conveyor_complete_force(self, work_request, force_dirty, project_root, flow_conveyor)
         else:
-            handle_kanban_done_review(self, ticket, project_root, flow_kanban)
+            handle_conveyor_complete_review(self, work_request, project_root, flow_conveyor)
 
     @api_endpoint("K", "delete")
-    def _handle_kanban_delete(self) -> None:
-        """POST /api/kanban/delete — {"ticket"}: derived-from guard + delete + worktree cleanup.
+    def _handle_conveyor_delete(self) -> None:
+        """POST /api/conveyor/delete — {"work_request"}: derived-from guard + delete + worktree cleanup.
 
         method: POST
-        url: /api/kanban/delete
+        url: /api/conveyor/delete
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_delete
-        request: body {ticket: T-NNN}
-        response_ok: {ok: true, ticket, stdout, worktree_removed: bool}
+        handler: ConveyorHandlerMixin._handle_conveyor_delete
+        request: body {work_request: WR-NNN}
+        response_ok: {ok: true, work_request, stdout, worktree_removed: bool}
         response_error: {ok: false, error_kind: derived_blocked|other, blocked_by, message}
         status_codes: 200, 400, 409, 500, 504
         auth: none (local-only) — user-triggered
-        side_effects: flow-kanban delete + worktree_manager.remove_worktree
-        sse_events: kanban_update (via FileWatcher)
+        side_effects: flow-conveyor delete + worktree_manager.remove_worktree
+        sse_events: conveyor_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
             return
 
         project_root = os.getcwd()
-        kanban_base = os.path.join(project_root, '.agent-factory', 'tickets')
+        conveyor_base = os.path.join(project_root, '.agent-factory', 'work-requests')
 
-        not_done = self._check_derived_blocked(ticket, kanban_base)
-        if not_done:
+        not_complete = self._check_derived_blocked(work_request, conveyor_base)
+        if not_complete:
             self._send_json_with_status(409, {
                 'ok': False, 'error_kind': 'derived_blocked',
-                'blocked_by': not_done,
+                'blocked_by': not_complete,
                 'message': (
-                    f'Block {ticket} deletion: derived ticket {", ".join(not_done)}'
-                    'It\'s not done yet. Delete the derived ticket after completing it.'
+                    f'Block {work_request} deletion: derived work_request {", ".join(not_complete)}'
+                    'It\'s not complete yet. Delete the derived work_request after completing it.'
                 ),
-                'ticket': ticket,
+                'work_request': work_request,
             })
             return
 
-        flow_kanban = os.path.join(project_root, '.agent-factory', 'bin', 'flow-kanban')
+        flow_conveyor = os.path.join(project_root, '.agent-factory', 'bin', 'flow-conveyor')
         try:
             result = subprocess.run(
-                [flow_kanban, 'delete', ticket],
+                [flow_conveyor, 'delete', work_request],
                 cwd=project_root, capture_output=True, text=True, timeout=30,
             )
         except subprocess.TimeoutExpired:
-            self._send_error(504, 'flow-kanban delete timed out (30s)')
+            self._send_error(504, 'flow-conveyor delete timed out (30s)')
             return
         except FileNotFoundError:
-            self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+            self._send_error(500, f'flow-conveyor not found: {flow_conveyor}')
             return
 
         if result.returncode != 0:
             self._send_json_with_status(409, {
                 'ok': False, 'error_kind': 'other', 'blocked_by': [],
-                'message': (result.stderr or result.stdout or '').strip() or 'flow-kanban delete failed',
-                'ticket': ticket,
+                'message': (result.stderr or result.stdout or '').strip() or 'flow-conveyor delete failed',
+                'work_request': work_request,
             })
             return
 
@@ -782,13 +782,13 @@ class KanbanHandlerMixin:
                 sys.path.insert(0, engine_dir)
             from flow import worktree_manager as _wm  # noqa: WPS433
             worktree_removed = _wm.remove_worktree(
-                ticket, delete_branch=True, repo_path=project_root,
+                work_request, delete_branch=True, repo_path=project_root,
             )
         except ImportError:
             pass
 
         self._send_json({
-            'ok': True, 'ticket': ticket,
+            'ok': True, 'work_request': work_request,
             'stdout': (result.stdout or '').strip(),
             'worktree_removed': worktree_removed,
         })
@@ -796,25 +796,25 @@ class KanbanHandlerMixin:
     # ------------------------------------------------------------------
     # ------------------------------------------------------------------
 
-    def _resolve_audit_workdir(self, ticket: str, project_root: str) -> 'str | None':
+    def _resolve_audit_workdir(self, work_request: str, project_root: str) -> 'str | None':
         """internal helper — not exposed as endpoint.
 
-        Determine the latest work_dir path using the ticket number.
+        Determine the latest work_dir path using the work_request number.
 
-        1st priority: See <result>/<workdir> field in tickets/<status>/<T-NNN>.xml
-        2nd priority: Runs/ directories in reverse mtime order to match status.json ticket_number
+        1st priority: See <result>/<workdir> field in work_requests/<status>/<WR-NNN>.xml
+        2nd priority: Runs/ directories in reverse mtime order to match status.json work_request_number
 
         Returns None if not found.
         """
         import xml.etree.ElementTree as ET
         import glob as _glob
 
-        tickets_root = os.path.join(project_root, ".agent-factory", "tickets")
-        kanban_dirs = ("todo", "open", "progress", "review", "done")
+        work_requests_root = os.path.join(project_root, ".agent-factory", "work-requests")
+        conveyor_dirs = ("draft", "accepted", "executing", "verifying", "complete")
 
         # #1: XML <result>/<workdir>
-        for kdir in kanban_dirs:
-            xml_path = os.path.join(tickets_root, kdir, f"{ticket}.xml")
+        for kdir in conveyor_dirs:
+            xml_path = os.path.join(work_requests_root, kdir, f"{work_request}.xml")
             if not os.path.isfile(xml_path):
                 continue
             try:
@@ -844,13 +844,13 @@ class KanbanHandlerMixin:
 
         import json as _json
         for rdir in run_dirs:
-            # status.json ticket_number field
+            # status.json work_request_number field
             status_path = os.path.join(rdir, "status.json")
             if os.path.isfile(status_path):
                 try:
-                    with open(status_path, encoding="utf-8") as f:
+                    with accepted(status_path, encoding="utf-8") as f:
                         sdata = _json.load(f)
-                    if sdata.get("ticket_number") == ticket:
+                    if sdata.get("work_request_number") == work_request:
                         return rdir
                 except Exception:
                     pass
@@ -871,7 +871,7 @@ class KanbanHandlerMixin:
           5. one None + non-PASS     -> NONE
           6. both None               -> NONE
 
-        advisory only — No Kanban transitions/blocks.
+        advisory only — No Conveyor transitions/blocks.
         """
         def _overall(d) -> "str | None":
             if d is None:
@@ -892,21 +892,21 @@ class KanbanHandlerMixin:
         return "NONE"
 
     @api_endpoint("K", "audit_verdict")
-    def _handle_kanban_audit_verdict(self) -> None:
-        """GET /api/kanban/audit/verdict?ticket=T-NNN — Auditor T3 advisory verdict inquiry.
+    def _handle_conveyor_audit_verdict(self) -> None:
+        """GET /api/conveyor/audit/verdict?work_request=WR-NNN — Auditor T3 advisory verdict inquiry.
 
         W04 runner.py reads audit-verdict.json persistent in the work_dir root.
-        Returns {ticket, tier1, tier2, combined}.
+        Returns {work_request, tier1, tier2, combined}.
 
         If the file does not exist, {"tier1": null, "tier2": null, "combined": "NONE"} is returned (404
-        advisory only — No autoblock/forced transition/kanban regression (feedback_no_speculative_guards canon).
+        advisory only — No autoblock/forced transition/conveyor regression (feedback_no_speculative_guards canon).
 
         method: GET
-        url: /api/kanban/audit/verdict
+        url: /api/conveyor/audit/verdict
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_audit_verdict
-        request: query {ticket: T-NNN}
-        response_ok: {ticket, tier1: dict|null, tier2: dict|null, combined: PASS|WARN|FAIL|NONE}
+        handler: ConveyorHandlerMixin._handle_conveyor_audit_verdict
+        request: query {work_request: WR-NNN}
+        response_ok: {work_request, tier1: dict|null, tier2: dict|null, combined: PASS|WARN|FAIL|NONE}
         response_error: {ok: false, error: str}
         status_codes: 200, 400
         auth: none (local-only)
@@ -918,16 +918,16 @@ class KanbanHandlerMixin:
 
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
-        ticket = (qs.get("ticket", [None])[0] or "").strip()
+        work_request = (qs.get("work_request", [None])[0] or "").strip()
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket" query param (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" query param (WR-NNN required)')
             return
 
         _NONE_RESPONSE = {"tier1": None, "tier2": None, "combined": "NONE"}
 
         project_root = os.getcwd()
-        work_dir = self._resolve_audit_workdir(ticket, project_root)
+        work_dir = self._resolve_audit_workdir(work_request, project_root)
         if not work_dir:
             self._send_json(_NONE_RESPONSE)
             return
@@ -938,7 +938,7 @@ class KanbanHandlerMixin:
             return
 
         try:
-            with open(verdict_path, encoding="utf-8") as f:
+            with accepted(verdict_path, encoding="utf-8") as f:
                 data = _json.load(f)
         except Exception:
             self._send_json(_NONE_RESPONSE)
@@ -951,28 +951,28 @@ class KanbanHandlerMixin:
         combined = self._compute_combined_verdict(tier1, tier2)
 
         self._send_json({
-            "ticket": ticket,
+            "work_request": work_request,
             "tier1": tier1,
             "tier2": tier2,
             "combined": combined,
         })
 
-    @api_endpoint("K", "done_verdict")
-    def _handle_kanban_done_verdict(self) -> None:
-        """GET /api/kanban/done-verdict?ticket=T-NNN — Done card merge consistency advisory verdict.
+    @api_endpoint("K", "complete_verdict")
+    def _handle_conveyor_complete_verdict(self) -> None:
+        """GET /api/conveyor/complete-verdict?work_request=WR-NNN — Complete card merge consistency advisory verdict.
 
-        T-441: After Review→Done DnD develop HEAD == merge commit consistency check.
+        T-441: After Verifying→Complete DnD develop HEAD == merge commit consistency check.
         verdict OK: develop HEAD == merge commit && merge commit parents include feature branch tip.
         verdict FAIL: The above conditions are not met (develop HEAD is not a merge commit, etc.).
 
         advisory only — No autoregression/forced transitions (feedback_no_speculative_guards canon).
 
         method: GET
-        url: /api/kanban/done-verdict
+        url: /api/conveyor/complete-verdict
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_done_verdict
-        request: query {ticket: T-NNN}
-        response_ok: {ticket, verdict: OK|FAIL|NONE, details: dict}
+        handler: ConveyorHandlerMixin._handle_conveyor_complete_verdict
+        request: query {work_request: WR-NNN}
+        response_ok: {work_request, verdict: OK|FAIL|NONE, details: dict}
         response_error: {ok: false, error: str}
         status_codes: 200, 400
         auth: none (local-only)
@@ -982,32 +982,32 @@ class KanbanHandlerMixin:
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
-        ticket = (qs.get('ticket', [None])[0] or '').strip()
+        work_request = (qs.get('work_request', [None])[0] or '').strip()
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket" query param (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" query param (WR-NNN required)')
             return
 
         project_root = os.getcwd()
 
-        # Check if a ticket exists in the Done directory (meaningless for tickets other than the Done column)
-        done_xml = os.path.join(
-            project_root, '.agent-factory', 'tickets', 'done', f'{ticket}.xml',
+        # Check if a work_request exists in the Complete directory (meaningless for work_requests other than the Complete column)
+        complete_xml = os.path.join(
+            project_root, '.agent-factory', 'work-requests', 'complete', f'{work_request}.xml',
         )
-        if not os.path.isfile(done_xml):
+        if not os.path.isfile(complete_xml):
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'SKIP',
-                'reason': 'not_done',
-                'details': {'message': f'{ticket} is not in the Done column — verdict omitted'},
+                'reason': 'not_complete',
+                'details': {'message': f'{work_request} is not in the Complete column — verdict omitted'},
             })
             return
 
-        # merge_commit Read: tickets/done/<T-NNN>.xml result/merge_commit field
+        # merge_commit Read: work_requests/complete/<WR-NNN>.xml result/merge_commit field
         merge_commit: str | None = None
         try:
             import xml.etree.ElementTree as ET
-            tree = ET.parse(done_xml)
+            tree = ET.parse(complete_xml)
             root = tree.getroot()
             result_el = root.find('.//result/merge_commit')
             if result_el is not None and result_el.text:
@@ -1016,12 +1016,12 @@ class KanbanHandlerMixin:
             merge_commit = None
 
         if not merge_commit:
-            # Missing merge_commit meta — Done ticket before Phase 1 infrastructure introduction
+            # Missing merge_commit meta — Complete work_request before Phase 1 infrastructure introduction
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'no_merge_commit_meta',
-                'details': {'message': 'merge_commit No information (Done ticket before infrastructure introduction)'},
+                'details': {'message': 'merge_commit No information (Complete work_request before infrastructure introduction)'},
             })
             return
 
@@ -1038,7 +1038,7 @@ class KanbanHandlerMixin:
         head_result = _git('rev-parse', 'develop')
         if head_result.returncode != 0:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
                 'details': {'message': 'develop HEAD lookup failed:' + (head_result.stderr or '').strip()},
@@ -1050,7 +1050,7 @@ class KanbanHandlerMixin:
         mc_result = _git('rev-parse', merge_commit)
         if mc_result.returncode != 0:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
                 'details': {'message': f'merge_commit {merge_commit!r} rev-parse failed'},
@@ -1061,7 +1061,7 @@ class KanbanHandlerMixin:
         # Condition 1: develop HEAD == merge commit
         if develop_head != merge_commit_sha:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'FAIL',
                 'reason': 'develop_head_mismatch',
                 'details': {
@@ -1079,7 +1079,7 @@ class KanbanHandlerMixin:
         parents_result = _git('log', merge_commit_sha, '-1', '--format=%P')
         if parents_result.returncode != 0:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'git_error',
                 'details': {'message': 'merge commit parents lookup failed'},
@@ -1087,8 +1087,8 @@ class KanbanHandlerMixin:
             return
         parent_shas = parents_result.stdout.strip().split()
 
-        # feature branch pattern (feat/T-NNN-*)
-        feat_branch_result = _git('branch', '--list', f'feat/{ticket}-*')
+        # feature branch pattern (feat/WR-NNN-*)
+        feat_branch_result = _git('branch', '--list', f'feat/{work_request}-*')
         feature_branch_exists = feat_branch_result.returncode == 0 and bool(feat_branch_result.stdout.strip())
 
         feature_tip_in_parents = False
@@ -1106,7 +1106,7 @@ class KanbanHandlerMixin:
 
         if not feature_tip_in_parents and feature_branch_exists:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'FAIL',
                 'reason': 'feature_tip_not_in_parents',
                 'details': {
@@ -1122,7 +1122,7 @@ class KanbanHandlerMixin:
 
         # All conditions met
         self._send_json({
-            'ticket': ticket,
+            'work_request': work_request,
             'verdict': 'OK',
             'reason': 'all_checks_passed',
             'details': {
@@ -1133,26 +1133,26 @@ class KanbanHandlerMixin:
             },
         })
 
-    @api_endpoint("K", "review_verdict")
-    def _handle_kanban_review_verdict(self) -> None:
-        """GET /api/kanban/review-verdict?ticket=T-NNN -- Review card rule base advisory verdict.
+    @api_endpoint("K", "verifying_verdict")
+    def _handle_conveyor_verifying_verdict(self) -> None:
+        """GET /api/conveyor/verifying-verdict?work_request=WR-NNN -- Verifying card rule base advisory verdict.
 
-        T-463: finalization.py Read review-verdict.json generated by W04 hook
+        T-463: finalization.py Read verifying-verdict.json generated by W04 hook
         Returns verdict (PASS / WARN / FAIL / SKIP / UNKNOWN).
 
-        advisory only -- no kanban move / status transition / auto regression.
+        advisory only -- no conveyor move / status transition / auto regression.
         (feedback_no_speculative_guards canon / T-411 commit 0c970fa deprecation case)
 
         method: GET
-        url: /api/kanban/review-verdict
+        url: /api/conveyor/verifying-verdict
         domain: K
-        handler: KanbanHandlerMixin._handle_kanban_review_verdict
-        request: query {ticket: T-NNN}
-        response_ok: {ticket, verdict: PASS|WARN|FAIL|SKIP|UNKNOWN, violations: list}
+        handler: ConveyorHandlerMixin._handle_conveyor_verifying_verdict
+        request: query {work_request: WR-NNN}
+        response_ok: {work_request, verdict: PASS|WARN|FAIL|SKIP|UNKNOWN, violations: list}
         response_error: {ok: false, error: str}
         status_codes: 200, 400
         auth: none (local-only)
-        side_effects: read review-verdict.json from work_dir
+        side_effects: read verifying-verdict.json from work_dir
         sse_events: none
         """
         import json as _json
@@ -1162,34 +1162,34 @@ class KanbanHandlerMixin:
 
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
-        ticket = (qs.get('ticket', [None])[0] or '').strip()
+        work_request = (qs.get('work_request', [None])[0] or '').strip()
 
-        if not ticket:
-            self._send_error(400, 'ticket parameter required')
+        if not work_request:
+            self._send_error(400, 'work_request parameter required')
             return
-        if not _TICKET_RE.match(ticket):
-            self._send_error(400, 'invalid ticket format')
+        if not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'invalid work_request format')
             return
 
         project_root = os.getcwd()
-        tickets_base = os.path.join(project_root, '.agent-factory', 'tickets')
+        work_requests_base = os.path.join(project_root, '.agent-factory', 'work-requests')
 
-        # 1. Navigate to review/<ticket>.xml or done/<ticket>.xml
-        ticket_xml_path: str | None = None
-        review_xml = os.path.join(tickets_base, 'review', f'{ticket}.xml')
-        done_xml = os.path.join(tickets_base, 'done', f'{ticket}.xml')
+        # 1. Navigate to verifying/<work_request>.xml or complete/<work_request>.xml
+        work_request_xml_path: str | None = None
+        verifying_xml = os.path.join(work_requests_base, 'verifying', f'{work_request}.xml')
+        complete_xml = os.path.join(work_requests_base, 'complete', f'{work_request}.xml')
 
-        if os.path.isfile(review_xml):
-            ticket_xml_path = review_xml
-        elif os.path.isfile(done_xml):
-            ticket_xml_path = done_xml
+        if os.path.isfile(verifying_xml):
+            work_request_xml_path = verifying_xml
+        elif os.path.isfile(complete_xml):
+            work_request_xml_path = complete_xml
         else:
-            # todo / open / progress column -- Other than Review/Done -> SKIP
+            # draft / accepted / executing column -- Other than Verifying/Complete -> SKIP
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'SKIP',
                 'reason': 'not_review',
-                'details': {'message': f'{ticket} is not in the Review/Done column'},
+                'details': {'message': f'{work_request} is not in the Verifying/Complete column'},
                 'violations': [],
             })
             return
@@ -1197,7 +1197,7 @@ class KanbanHandlerMixin:
         # 2. XML parsing -> registrykey extraction
         registry_key: str | None = None
         try:
-            tree = ET.parse(ticket_xml_path)
+            tree = ET.parse(work_request_xml_path)
             root = tree.getroot()
             rk_el = root.find('.//result/registrykey')
             if rk_el is not None and rk_el.text:
@@ -1207,21 +1207,21 @@ class KanbanHandlerMixin:
 
         if not registry_key:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'no_registry_key',
-                'details': {'message': 'No registrykey information (may be a ticket prior to the introduction of workflow infrastructure)'},
+                'details': {'message': 'No registrykey information (may be a work_request prior to the introduction of workflow infrastructure)'},
                 'violations': [],
             })
             return
 
-        # 3. Read review-verdict.json
+        # 3. Read verifying-verdict.json
         # Navigate to runs/<registry_key> or runs/.history/<registry_key>
         runs_base = os.path.join(project_root, '.agent-factory', 'runs')
         verdict_path: Path | None = None
         for candidate in (
-            Path(runs_base) / registry_key / 'review-verdict.json',
-            Path(runs_base) / '.history' / registry_key / 'review-verdict.json',
+            Path(runs_base) / registry_key / 'verifying-verdict.json',
+            Path(runs_base) / '.history' / registry_key / 'verifying-verdict.json',
         ):
             if candidate.is_file():
                 verdict_path = candidate
@@ -1229,11 +1229,11 @@ class KanbanHandlerMixin:
 
         if verdict_path is None:
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'no_verdict_meta',
                 'details': {
-                    'message': f'No review-verdict.json (registry_key={registry_key})',
+                    'message': f'No verifying-verdict.json (registry_key={registry_key})',
                     'registry_key': registry_key,
                 },
                 'violations': [],
@@ -1244,67 +1244,67 @@ class KanbanHandlerMixin:
             verdict_dict = _json.loads(verdict_path.read_text(encoding='utf-8'))
         except (ValueError, OSError):
             self._send_json({
-                'ticket': ticket,
+                'work_request': work_request,
                 'verdict': 'UNKNOWN',
                 'reason': 'invalid_verdict_json',
                 'details': {
-                    'message': 'review-verdict.json parsing failed',
+                    'message': 'verifying-verdict.json parsing failed',
                     'registry_key': registry_key,
                 },
                 'violations': [],
             })
             return
 
-        # 4. Return after injection of ticket field
-        verdict_dict['ticket'] = ticket
+        # 4. Return after injection of work_request field
+        verdict_dict['work_request'] = work_request
         self._send_json(verdict_dict)
 
     # ------------------------------------------------------------------
-    # T-513 P2 — domain transfer absorption endpoint (undo-done + workflow-entries + workflow-detail)
+    # T-513 P2 — domain transfer absorption endpoint (undo-complete + workflow-entries + workflow-detail)
     # ------------------------------------------------------------------
 
-    @api_endpoint("KANBAN", "undo_done")
-    def _handle_kanban_undo_done(self) -> None:
-        """POST /api/kanban/undo-done — Rolls back the Done workflow to Review.
+    @api_endpoint("CONVEYOR", "undo_complete")
+    def _handle_conveyor_undo_complete(self) -> None:
+        """POST /api/conveyor/undo-complete — Rolls back the Complete workflow to Verifying.
 
-        T-513 P2 — Transfer of old V1 undo handler to kanban domain. flow-undo-done
-        Invocation + Kanban force transition is essentially a kanban task, so KANBAN domain matching.
+        T-513 P2 — Transfer of old V1 undo handler to conveyor domain. flow-undo-complete
+        Invocation + Conveyor force transition is essentially a conveyor task, so CONVEYOR domain matching.
 
         method: POST
-        url: /api/kanban/undo-done
-        domain: KANBAN
-        handler: KanbanHandlerMixin._handle_kanban_undo_done
-        request: body {ticket: T-NNN, force?: bool}
-        response_ok: {ok: true, kind, ticket, strategy, branch, worktree_path, stdout, message}
-        response_error: {ok: false, kind: error, ticket, error, stdout, stderr}
+        url: /api/conveyor/undo-complete
+        domain: CONVEYOR
+        handler: ConveyorHandlerMixin._handle_conveyor_undo_complete
+        request: body {work_request: WR-NNN, force?: bool}
+        response_ok: {ok: true, kind, work_request, strategy, branch, worktree_path, stdout, message}
+        response_error: {ok: false, kind: error, work_request, error, stdout, stderr}
         status_codes: 200, 400, 409, 500, 504
         auth: none (local-only) — user-triggered
-        side_effects: develop reset/revert + worktree recreate + kanban force move
-        sse_events: kanban_update (via FileWatcher)
+        side_effects: develop reset/revert + worktree recreate + conveyor force move
+        sse_events: conveyor_update (via FileWatcher)
         """
         data = self._read_json_body() or {}
-        ticket = (data.get('ticket') or '').strip()
+        work_request = (data.get('work_request') or '').strip()
         force = bool(data.get('force', False))
 
-        if not ticket or not _TICKET_RE.match(ticket):
-            self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+        if not work_request or not _WORK_REQUEST_RE.match(work_request):
+            self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
             return
 
         project_root = os.getcwd()
-        done_xml = os.path.join(
-            project_root, '.agent-factory', 'tickets', 'done', f'{ticket}.xml',
+        complete_xml = os.path.join(
+            project_root, '.agent-factory', 'work-requests', 'complete', f'{work_request}.xml',
         )
-        if not os.path.isfile(done_xml):
+        if not os.path.isfile(complete_xml):
             self._send_error(
                 400,
-                f'{ticket} is not in Done column (undo-done targets Done tickets only)',
+                f'{work_request} is not in Complete column (undo-complete targets Complete work_requests only)',
             )
             return
 
-        flow_undo_done = os.path.join(
-            project_root, '.agent-factory', 'bin', 'flow-undo-done',
+        flow_undo_complete = os.path.join(
+            project_root, '.agent-factory', 'bin', 'flow-undo-complete',
         )
-        cmd_args = [flow_undo_done, ticket]
+        cmd_args = [flow_undo_complete, work_request]
         if force:
             cmd_args.append('--force')
         try:
@@ -1316,10 +1316,10 @@ class KanbanHandlerMixin:
                 timeout=180,
             )
         except subprocess.TimeoutExpired:
-            self._send_error(504, 'flow-undo-done timed out (180s)')
+            self._send_error(504, 'flow-undo-complete timed out (180s)')
             return
         except FileNotFoundError:
-            self._send_error(500, f'flow-undo-done not found: {flow_undo_done}')
+            self._send_error(500, f'flow-undo-complete not found: {flow_undo_complete}')
             return
 
         stdout = result.stdout or ''
@@ -1353,11 +1353,11 @@ class KanbanHandlerMixin:
             self._send_json({
                 'ok': True,
                 'kind': kind,
-                'ticket': ticket,
+                'work_request': work_request,
                 'strategy': strategy,
                 'branch': branch,
                 'worktree_path': worktree_path,
-                'message': f'{ticket} rollback completed (strategy: {strategy or "?"})',
+                'message': f'{work_request} rollback completed (strategy: {strategy or "?"})',
                 'stdout': stdout.strip(),
             })
             return
@@ -1369,32 +1369,32 @@ class KanbanHandlerMixin:
                     error_message = stripped
                     break
         if not error_message:
-            error_message = f'flow-undo-done exited with code {result.returncode}'
+            error_message = f'flow-undo-complete exited with code {result.returncode}'
 
         self._send_json_with_status(409, {
             'ok': False,
             'kind': 'error',
-            'ticket': ticket,
+            'work_request': work_request,
             'error': error_message,
             'message': error_message,
             'stdout': stdout.strip(),
             'stderr': stderr.strip(),
         })
 
-    @api_endpoint("KANBAN", "workflow_entries")
-    def _handle_kanban_workflow_entries(self) -> None:
-        """GET /api/kanban/workflow-entries — List of workflow entries (runs/<key>/).
+    @api_endpoint("CONVEYOR", "workflow_entries")
+    def _handle_conveyor_workflow_entries(self) -> None:
+        """GET /api/conveyor/workflow-entries — List of workflow entries (runs/<key>/).
 
         T-513 P2 — old workflow entries inline branch in handlers/generic.py
-        Moved to kanban domain. Workflow entries are Kanban card side information.
-        Because it is consumed, KANBAN domain matching.
+        Moved to conveyor domain. Workflow entries are Conveyor card side information.
+        Because it is consumed, CONVEYOR domain matching.
 
         method: GET
-        url: /api/kanban/workflow-entries
-        domain: KANBAN
-        handler: KanbanHandlerMixin._handle_kanban_workflow_entries
+        url: /api/conveyor/workflow-entries
+        domain: CONVEYOR
+        handler: ConveyorHandlerMixin._handle_conveyor_workflow_entries
         request: query none
-        response_ok: [{registry_key, ticket_id, command, status, ts, ...}]
+        response_ok: [{registry_key, work_request, command, status, ts, ...}]
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
@@ -1404,17 +1404,17 @@ class KanbanHandlerMixin:
         project_root = os.getcwd()
         self._send_json(_list_workflow_entries(project_root))
 
-    @api_endpoint("KANBAN", "workflow_detail")
-    def _handle_kanban_workflow_detail(self) -> None:
-        """GET /api/kanban/workflow-detail?entry=<key> — Workflow entry details.
+    @api_endpoint("CONVEYOR", "workflow_detail")
+    def _handle_conveyor_workflow_detail(self) -> None:
+        """GET /api/conveyor/workflow-detail?entry=<key> — Workflow entry details.
 
         T-513 P2 — old workflow detail inline branch in handlers/generic.py
-        Moved to kanban domain. If the entry query is empty, an empty array is returned.
+        Moved to conveyor domain. If the entry query is empty, an empty array is returned.
 
         method: GET
-        url: /api/kanban/workflow-detail
-        domain: KANBAN
-        handler: KanbanHandlerMixin._handle_kanban_workflow_detail
+        url: /api/conveyor/workflow-detail
+        domain: CONVEYOR
+        handler: ConveyorHandlerMixin._handle_conveyor_workflow_detail
         request: query {entry: str (registry_key)}
         response_ok: [...]
         response_error: n/a (always 200, empty array for empty entry)
@@ -1430,60 +1430,60 @@ class KanbanHandlerMixin:
         project_root = os.getcwd()
         self._send_json(_workflow_detail(project_root, entry))
     @api_endpoint("K", "workrequest")
-    def _handle_kanban_workrequest(self) -> None:
-        """POST /api/kanban/workrequest — WorkRequest create/refine/accept facade.
+    def _handle_conveyor_workrequest(self) -> None:
+        """POST /api/conveyor/workrequest — WorkRequest create/refine/accept facade.
 
-        The storage model still uses ticket XML and ``flow-kanban``. This endpoint
+        The storage model still uses work_request XML and ``flow-conveyor``. This endpoint
         gives the Board UI an M8 product-language API without changing existing
         workflow contracts.
 
         method: POST
-        url: /api/kanban/workrequest
-        domain: KANBAN
-        handler: KanbanHandlerMixin._handle_kanban_workrequest
-        request: JSON {action, title?, command?, status?, ticket?, fields?}
+        url: /api/conveyor/workrequest
+        domain: CONVEYOR
+        handler: ConveyorHandlerMixin._handle_conveyor_workrequest
+        request: JSON {action, title?, command?, status?, work_request?, fields?}
         response_ok: WorkRequest facade payload or command output
         response_error: JSON error for invalid input, missing command, or timeout
         status_codes: 200, 400, 500, 504
         auth: none (local-only)
-        side_effects: may create or update .agent-factory/tickets XML via flow-kanban
+        side_effects: may create or update .agent-factory/work-requests XML via flow-conveyor
         sse_events: none
         """
         data = self._read_json_body() or {}
         action = (data.get('action') or '').strip().lower()
         project_root = os.getcwd()
-        flow_kanban = os.path.join(project_root, '.agent-factory', 'bin', 'flow-kanban')
+        flow_conveyor = os.path.join(project_root, '.agent-factory', 'bin', 'flow-conveyor')
 
         def _run(args: list[str], timeout: int = 15) -> subprocess.CompletedProcess[str] | None:
             try:
                 return subprocess.run(
-                    [flow_kanban] + args,
+                    [flow_conveyor] + args,
                     cwd=project_root,
                     capture_output=True,
                     text=True,
                     timeout=timeout,
                 )
             except subprocess.TimeoutExpired:
-                self._send_error(504, 'flow-kanban timed out')
+                self._send_error(504, 'flow-conveyor timed out')
                 return None
             except FileNotFoundError:
-                self._send_error(500, f'flow-kanban not found: {flow_kanban}')
+                self._send_error(500, f'flow-conveyor not found: {flow_conveyor}')
                 return None
 
         def _send_run_error(result: subprocess.CompletedProcess[str]) -> None:
-            self._send_error(400, (result.stderr or result.stdout or 'flow-kanban failed').strip())
+            self._send_error(400, (result.stderr or result.stdout or 'flow-conveyor failed').strip())
 
         if action == 'create':
             title = (data.get('title') or '').strip()
             command = (data.get('command') or 'implement').strip()
-            status = (data.get('status') or 'todo').strip().lower()
+            status = (data.get('status') or 'draft').strip().lower()
             if not title:
                 self._send_error(400, 'Missing "title"')
                 return
             if command not in ('implement', 'research', 'review'):
                 self._send_error(400, 'Invalid "command"')
                 return
-            if status not in ('todo', 'open'):
+            if status not in ('draft', 'accepted'):
                 self._send_error(400, 'Invalid "status"')
                 return
 
@@ -1493,16 +1493,16 @@ class KanbanHandlerMixin:
             if result.returncode != 0:
                 _send_run_error(result)
                 return
-            match = re.search(r'\b(T-\d+)\b', result.stdout or '')
-            ticket = match.group(1) if match else ''
+            match = re.search(r'\b(WR-\d+)\b', result.stdout or '')
+            work_request = match.group(1) if match else ''
 
             prompt_args = []
             for field in ('goal', 'target', 'constraints', 'criteria', 'context'):
                 value = (data.get(field) or '').strip()
                 if value:
                     prompt_args.extend([f'--{field}', value])
-            if ticket and prompt_args:
-                update = _run(['update-prompt', ticket, '--command', command, '--skip-validation'] + prompt_args)
+            if work_request and prompt_args:
+                update = _run(['update-prompt', work_request, '--command', command, '--skip-validation'] + prompt_args)
                 if update is None:
                     return
                 if update.returncode != 0:
@@ -1510,29 +1510,29 @@ class KanbanHandlerMixin:
                     return
 
             recorded = False
-            if ticket:
+            if work_request:
                 recorded = _record_workrequest_ouroboros(
                     project_root,
-                    ticket,
+                    work_request,
                     action,
                     f"Created WorkRequest draft: {title}",
                 )
             self._send_json({
                 'ok': True,
                 'action': action,
-                'ticket': ticket,
+                'work_request': work_request,
                 'stdout': result.stdout.strip(),
                 'ouroborosRecorded': recorded,
             })
             return
 
         if action == 'refine':
-            ticket = (data.get('ticket') or '').strip()
+            work_request = (data.get('work_request') or '').strip()
             command = (data.get('command') or '').strip()
-            if not ticket or not _TICKET_RE.match(ticket):
-                self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            if not work_request or not re.match(r'^WR-\d+$', work_request):
+                self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
                 return
-            args = ['update-prompt', ticket, '--skip-validation']
+            args = ['update-prompt', work_request, '--skip-validation']
             if command:
                 if command not in ('implement', 'research', 'review'):
                     self._send_error(400, 'Invalid "command"')
@@ -1553,25 +1553,25 @@ class KanbanHandlerMixin:
                 return
             recorded = _record_workrequest_ouroboros(
                 project_root,
-                ticket,
+                work_request,
                 action,
                 "Rewrote WorkRequest prompt fields through Board refinement.",
             )
             self._send_json({
                 'ok': True,
                 'action': action,
-                'ticket': ticket,
+                'work_request': work_request,
                 'stdout': result.stdout.strip(),
                 'ouroborosRecorded': recorded,
             })
             return
 
         if action == 'accept':
-            ticket = (data.get('ticket') or '').strip()
-            if not ticket or not _TICKET_RE.match(ticket):
-                self._send_error(400, 'Missing or invalid "ticket" (T-NNN required)')
+            work_request = (data.get('work_request') or '').strip()
+            if not work_request or not re.match(r'^WR-\d+$', work_request):
+                self._send_error(400, 'Missing or invalid "work_request" (WR-NNN required)')
                 return
-            result = _run(['move', ticket, 'open'])
+            result = _run(['move', work_request, 'accepted'])
             if result is None:
                 return
             if result.returncode != 0:
@@ -1579,14 +1579,14 @@ class KanbanHandlerMixin:
                 return
             recorded = _record_workrequest_ouroboros(
                 project_root,
-                ticket,
+                work_request,
                 action,
                 "Accepted WorkRequest for workflow execution.",
             )
             self._send_json({
                 'ok': True,
                 'action': action,
-                'ticket': ticket,
+                'work_request': work_request,
                 'stdout': result.stdout.strip(),
                 'ouroborosRecorded': recorded,
             })

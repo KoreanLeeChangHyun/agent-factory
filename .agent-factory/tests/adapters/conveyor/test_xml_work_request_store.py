@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from engine.adapters.kanban import XmlWorkRequestStore
+from engine.adapters.conveyor import XmlWorkRequestStore
 from engine.core.work_requests import (
     AcceptanceCriteria,
     OuroborosEntry,
@@ -14,21 +14,21 @@ from engine.core.work_requests import (
 )
 
 
-def test_xml_store_loads_existing_ticket_as_work_request(tmp_path: Path) -> None:
-    ticket_dir = tmp_path / "open"
-    ticket_dir.mkdir()
-    (ticket_dir / "T-123.xml").write_text(
+def test_xml_store_loads_existing_work_request(tmp_path: Path) -> None:
+    request_dir = tmp_path / "accepted"
+    request_dir.mkdir()
+    (request_dir / "WR-123.xml").write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
-<ticket>
+<work_request>
   <metadata>
-    <number>T-123</number>
+    <number>WR-123</number>
     <title>Importer</title>
-    <status>Open</status>
+    <status>Accepted</status>
     <command>implement</command>
   </metadata>
   <prompt>
     <goal>Map current XML storage</goal>
-    <context>Keep current ticket files</context>
+    <context>Keep current work request files</context>
     <constraints>- no broad move</constraints>
     <criteria>- round-trip passes
 - can start workflow</criteria>
@@ -36,14 +36,14 @@ def test_xml_store_loads_existing_ticket_as_work_request(tmp_path: Path) -> None
   <ouroboros_history>
     <entry phase="CLARIFY" created_at="2026-05-21T00:00:00+00:00">Checked missing fields</entry>
   </ouroboros_history>
-</ticket>
+</work_request>
 """,
         encoding="utf-8",
     )
 
     request = XmlWorkRequestStore(tmp_path).get(WorkRequestRef.parse("123"))
 
-    assert request.ref == WorkRequestRef.parse("T-123")
+    assert request.ref == WorkRequestRef.parse("WR-123")
     assert request.title == "Importer"
     assert request.intent == "Map current XML storage"
     assert request.constraints == ["no broad move"]
@@ -52,18 +52,18 @@ def test_xml_store_loads_existing_ticket_as_work_request(tmp_path: Path) -> None
         "can start workflow",
     ]
     assert [entry.phase for entry in request.ouroboros_history] == [OuroborosPhase.CLARIFY]
-    assert request.start_workflow_run().ticket_arg == "T-123"
+    assert request.start_workflow_run().work_request_arg == "WR-123"
 
 
-def test_xml_store_round_trips_work_request_to_existing_ticket_layout(tmp_path: Path) -> None:
+def test_xml_store_round_trips_work_request_layout(tmp_path: Path) -> None:
     request = WorkRequest(
-        ref=WorkRequestRef.parse("T-124"),
+        ref=WorkRequestRef.parse("WR-124"),
         title="Round trip",
-        intent="Persist WorkRequest through XML ticket storage",
+        intent="Persist WorkRequest through XML storage",
         context="Existing files remain the migration bridge",
         constraints=["canonical tests only"],
         acceptance_criteria=[AcceptanceCriteria("load after save returns same fields")],
-        non_goals=["rename ticket files"],
+        non_goals=["rename WorkRequest files"],
         risk_notes=[RiskNote("board terminology is migrated gradually", severity="low")],
         ouroboros_history=[
             OuroborosEntry(
@@ -72,15 +72,15 @@ def test_xml_store_round_trips_work_request_to_existing_ticket_layout(tmp_path: 
                 created_at="2026-05-21T00:00:00+00:00",
             )
         ],
-        status=WorkRequestStatus.OPEN,
+        status=WorkRequestStatus.ACCEPTED,
         command="research",
     )
     store = XmlWorkRequestStore(tmp_path)
 
     store.save(request)
-    loaded = store.get(WorkRequestRef.parse("T-124"))
+    loaded = store.get(WorkRequestRef.parse("WR-124"))
 
-    assert (tmp_path / "open" / "T-124.xml").is_file()
+    assert (tmp_path / "accepted" / "WR-124.xml").is_file()
     assert loaded.ref == request.ref
     assert loaded.command == "research"
     assert loaded.context == request.context
@@ -92,15 +92,15 @@ def test_xml_store_round_trips_work_request_to_existing_ticket_layout(tmp_path: 
 def test_xml_store_moves_file_when_status_changes(tmp_path: Path) -> None:
     store = XmlWorkRequestStore(tmp_path)
     request = WorkRequest(
-        ref=WorkRequestRef.parse("T-125"),
+        ref=WorkRequestRef.parse("WR-125"),
         title="Move",
         intent="Move status directory",
-        acceptance_criteria=[AcceptanceCriteria("file appears under progress")],
+        acceptance_criteria=[AcceptanceCriteria("file appears under executing")],
     )
     store.save(request)
 
-    request.status = WorkRequestStatus.IN_PROGRESS
+    request.status = WorkRequestStatus.EXECUTING
     store.save(request)
 
-    assert not (tmp_path / "open" / "T-125.xml").exists()
-    assert (tmp_path / "progress" / "T-125.xml").is_file()
+    assert not (tmp_path / "accepted" / "WR-125.xml").exists()
+    assert (tmp_path / "executing" / "WR-125.xml").is_file()

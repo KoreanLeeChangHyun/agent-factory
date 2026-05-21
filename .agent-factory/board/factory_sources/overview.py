@@ -1,23 +1,23 @@
-"""Kanban and dashboard readers for the Board backend."""
+"""Conveyor and dashboard readers for the Board backend."""
 
 from __future__ import annotations
 
 import os
 import json
 
-KANBAN_DIRS_LIST: list[str] = ['todo', 'open', 'progress', 'review', 'done']
+CONVEYOR_DIRS_LIST: list[str] = ['draft', 'accepted', 'executing', 'verifying', 'complete']
 DASH_BASE: str = os.path.join('.agent-factory', 'board', 'data')
 DASH_FILES: list[str] = ['usage', 'logs', 'skills']
 
 
-def _read_kanban_tickets(
+def _read_conveyor_work_requests(
     project_root: str, files: list[str] | None = None,
 ) -> dict[str, str | None]:
-    """Read the XML ticket in the kanban directory and return the dict."""
-    kanban = os.path.join(project_root, '.agent-factory', 'tickets')
+    """Read the XML WorkRequest files in the conveyor directory."""
+    conveyor = os.path.join(project_root, '.agent-factory', 'work-requests')
     result: dict[str, str | None] = {}
-    for d in KANBAN_DIRS_LIST:
-        dp = os.path.join(kanban, d)
+    for d in CONVEYOR_DIRS_LIST:
+        dp = os.path.join(conveyor, d)
         if not os.path.isdir(dp):
             continue
         try:
