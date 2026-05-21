@@ -117,7 +117,7 @@ def main() -> None:
 
     # Project root estimation
     project_root = os.environ.get("PROJECT_ROOT", os.getcwd())
-    conveyor_base = os.path.join(project_root, ".agent-factory", "work_requests")
+    conveyor_base = os.path.join(project_root, ".agent-factory", "work-requests")
 
     if not os.path.isdir(conveyor_base):
         sys.exit(0)

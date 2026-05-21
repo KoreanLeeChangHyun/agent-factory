@@ -848,7 +848,7 @@ class ConveyorHandlerMixin:
             status_path = os.path.join(rdir, "status.json")
             if os.path.isfile(status_path):
                 try:
-                    with accepted(status_path, encoding="utf-8") as f:
+                    with open(status_path, encoding="utf-8") as f:
                         sdata = _json.load(f)
                     if sdata.get("work_request_number") == work_request:
                         return rdir
@@ -938,7 +938,7 @@ class ConveyorHandlerMixin:
             return
 
         try:
-            with accepted(verdict_path, encoding="utf-8") as f:
+            with open(verdict_path, encoding="utf-8") as f:
                 data = _json.load(f)
         except Exception:
             self._send_json(_NONE_RESPONSE)

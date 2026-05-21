@@ -1818,10 +1818,10 @@
     dialog.className = "submit-confirm-dialog";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-labelledby", "undo-done-confirm-title");
+    dialog.setAttribute("aria-labelledby", "undo-complete-confirm-title");
 
     const title = document.createElement("h3");
-    title.id = "undo-done-confirm-title";
+    title.id = "undo-complete-confirm-title";
     title.className = "submit-confirm-title";
     title.appendChild(document.createTextNode(workRequest.number + "Verifying"));
 
@@ -1864,7 +1864,7 @@
     forceWrapper.style.cursor = "pointer";
     const forceCheckbox = document.createElement("input");
     forceCheckbox.type = "checkbox";
-    forceCheckbox.id = "undo-done-force";
+    forceCheckbox.id = "undo-complete-force";
     if (!hasMergeCommit) {
       forceCheckbox.checked = true;
     }
@@ -1931,7 +1931,7 @@
   }
 
   /**
-   * WR-905 Phase 3: undo-done results modal.
+   * WR-905 Phase 3: undo-complete results modal.
    * showCompleteResultModal pattern answer.
    *
    * "reset ok"
@@ -1948,10 +1948,10 @@
     dialog.className = "submit-confirm-dialog";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-labelledby", "undo-done-result-title");
+    dialog.setAttribute("aria-labelledby", "undo-complete-result-title");
 
     const title = document.createElement("h3");
-    title.id = "undo-done-result-title";
+    title.id = "undo-complete-result-title";
     title.className = "submit-confirm-title";
 
     const body = document.createElement("div");
@@ -2122,7 +2122,7 @@
         workRequest,
         function (force) {
           // [Verifying by Rollback] Callback
-          fetch("/api/conveyor/undo-done", {
+          fetch("/api/conveyor/undo-complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ work_request: workRequest.number, force: force }),
@@ -2139,7 +2139,7 @@
               showUndoCompleteResultModal("error", r.body || {}, function () { renderConveyor(); });
             }
           }).catch(function (err) {
-            console.error("[conveyor undo-done] failed:", err);
+            console.error("[conveyor undo-complete] failed:", err);
             showUndoCompleteResultModal("error", { message: err.message }, function () { renderConveyor(); });
           });
         },
