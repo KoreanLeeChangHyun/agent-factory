@@ -396,7 +396,7 @@ class TerminalHandlerMixin:
         domain: T
         handler: TerminalHandlerMixin._handle_terminal_status
         request: query none
-        response_ok: {status, session_id, model, permission_mode, branch, clients, awaiting_response}
+        response_ok: {status, session_id, model, permission_mode, provider, capabilities, branch, clients, awaiting_response}
         response_error: n/a (always 200)
         status_codes: 200
         auth: none (local-only)
@@ -404,6 +404,7 @@ class TerminalHandlerMixin:
         sse_events: none
         """
         project_root = os.getcwd()
+        runtime_state.configure_brain_process(project_root)
         awaiting = bool(runtime_state.brain_process.awaiting_response)
         server_debug_log('status.response', {
             'status': runtime_state.brain_process.status,
@@ -417,6 +418,7 @@ class TerminalHandlerMixin:
             'model': runtime_state.brain_process.model,
             'permission_mode': runtime_state.brain_process.permission_mode,
             'provider': runtime_state.brain_process.provider,
+            'capabilities': runtime_state.brain_process.capabilities,
             'branch': _get_git_branch(project_root),
             'clients': runtime_state.terminal_sse_channel.client_count,
             # Signal for the client to determine spinner/input lock recovery after refresh.
@@ -883,12 +885,19 @@ class TerminalHandlerMixin:
                 logger.warning('Invalid resume_session_id: %s', resume_session_id)
                 resume_session_id = None
 
+        runtime_state.configure_brain_process(os.getcwd())
+        if (
+            resume_session_id
+            and not runtime_state.brain_process.capabilities.get('resume', False)
+        ):
+            self._send_error(400, 'Current terminal provider does not support resume')
+            return
+
         if resume_session_id:
             extra_args = ['--resume', resume_session_id]
         else:
             extra_args = []
 
-        runtime_state.configure_brain_process(os.getcwd())
         result = runtime_state.brain_process.spawn(extra_args)
 
         # When resuming, Claude CLI does not issue an init event until the first input.
@@ -960,6 +969,12 @@ class TerminalHandlerMixin:
             if validation_error:
                 self._send_error(400, validation_error)
                 return
+        if (
+            (images or attachments)
+            and not runtime_state.brain_process.capabilities.get('attachments', False)
+        ):
+            self._send_error(400, 'Current terminal provider does not support attachments')
+            return
 
         # ------------------------------------
         # When Claude CLI flushes the user envelope received from stdin to jsonl
@@ -1083,6 +1098,9 @@ class TerminalHandlerMixin:
         if not command.startswith('/'):
             self._send_error(400, 'Command must start with "/"')
             return
+        if not runtime_state.brain_process.capabilities.get('slash_commands', False):
+            self._send_error(400, 'Current terminal provider does not support slash commands')
+            return
 
         result = runtime_state.brain_process.send_input(command)
         self._send_json(result)
@@ -1136,6 +1154,10 @@ class TerminalHandlerMixin:
             process = session.process
         else:
             process = runtime_state.brain_process
+
+        if not process.capabilities.get('permission_prompts', False):
+            self._send_error(400, 'Current terminal provider does not support permission prompts')
+            return
 
         if process.status == 'stopped':
             self._send_error(409, 'Claude process not running')

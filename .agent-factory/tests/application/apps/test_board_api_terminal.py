@@ -43,6 +43,9 @@ def test_brain_process_factory_wraps_claude_process() -> None:
 
     process.set_session_id("session-123")
     assert process.session_id == "session-123"
+    assert process.capabilities["resume"] is True
+    assert process.capabilities["attachments"] is True
+    assert process.capabilities["permission_prompts"] is True
 
 
 def test_runtime_exposes_brain_process_compat_alias() -> None:
@@ -73,6 +76,10 @@ def test_brain_process_factory_can_create_codex_process() -> None:
 
     assert isinstance(process, CodexProcess)
     assert process.status == "stopped"
+    assert process.capabilities["resume"] is False
+    assert process.capabilities["attachments"] is False
+    assert process.capabilities["permission_prompts"] is False
+    assert process.capabilities["interrupt"] is True
 
 
 def test_codex_process_spawn_builds_exec_command(monkeypatch, tmp_path) -> None:

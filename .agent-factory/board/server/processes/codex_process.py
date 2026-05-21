@@ -88,6 +88,17 @@ class CodexProcess:
     def provider(self) -> str:
         return "codex"
 
+    @property
+    def capabilities(self) -> dict[str, bool]:
+        return {
+            "resume": False,
+            "attachments": False,
+            "permission_prompts": False,
+            "interrupt": True,
+            "slash_commands": False,
+            "multiple_inputs": False,
+        }
+
     def spawn(
         self,
         extra_args: list[str] | None = None,

@@ -532,7 +532,10 @@
     }
     var attachBtn = document.getElementById("terminal-attach-btn");
     if (attachBtn) {
-      attachBtn.disabled = shouldDisable;
+      attachBtn.disabled = shouldDisable || !M.hasCapability("attachments");
+      attachBtn.title = M.hasCapability("attachments")
+        ? "Withimage"
+        : "Attachments are not supported by this provider";
     }
   };
 
@@ -554,6 +557,10 @@
       willQueue: Board.state.termStatus === "busy",
     });
     if (!text && !hasImages && !hasTickets && !hasMemories) return;
+    if ((hasImages || hasTickets) && !M.hasCapability("attachments")) {
+      M.appendErrorMessage("[Error] Current provider does not support attachments");
+      return;
+    }
     var inputtable = Board.util.TERM_STATUS_INPUTTABLE;
     // inAutoResume Allows stop/starting even send during Windows — after process new spawn
     // Instant idle arrives so you can try to send user even in short races.
@@ -566,6 +573,11 @@
     // Route slash commands (to process immediately without putting on the order) — Slash commands for the future if images/Tickets/Memory
     // M.isFilePath() check: /home/... The file path is not routed as a slash command
     if (!hasImages && !hasTickets && !hasMemories && text.charAt(0) === "/" && !M.isFilePath(text)) {
+      if (!M.hasCapability("slash_commands")) {
+        M.appendErrorMessage("[Error] Current provider does not support slash commands");
+        input.value = text;
+        return;
+      }
       Board.slashCommands.handle(text, {
         isWorkflowMode: M.isWorkflowMode,
         appendSystemMessage: M.appendSystemMessage,

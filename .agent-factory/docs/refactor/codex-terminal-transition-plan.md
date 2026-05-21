@@ -16,6 +16,8 @@ Current state:
   process that normalizes stdout JSON into terminal SSE events.
 - `/terminal/start` resolves the active provider from
   `AGENT_FACTORY_LLM_PROVIDER` before spawning a stopped terminal process.
+- `/terminal/status` reports provider capabilities and the frontend disables
+  unsupported resume, attachment, slash-command, and permission paths.
 - The interactive Terminal surface still defaults to `ClaudeProcess`.
 
 This means Codex can be selected for adapter-backed workflow paths, and the
@@ -156,6 +158,6 @@ Manual verification:
 1. Add `BrainProcess` contract and `ClaudeBrainProcess` wrapper. (done)
 2. Move route usage from direct `ClaudeProcess` access to the process factory. (done)
 3. Add `CodexProcess` with stdout normalization only. (done, experimental one-shot)
-4. Add provider capability reporting.
-5. Update Settings and Terminal UI capability labels.
+4. Add provider capability reporting. (done)
+5. Update Settings and Terminal UI capability labels. (partial: Terminal controls)
 6. Add route-level and adapter-level tests.

@@ -106,6 +106,21 @@
   /** @type {boolean} */
   M.inputLocked = false;
 
+  M.terminalProvider = "claude";
+
+  M.terminalCapabilities = {
+    resume: true,
+    attachments: true,
+    permission_prompts: true,
+    interrupt: true,
+    slash_commands: true,
+    multiple_inputs: true
+  };
+
+  M.hasCapability = function(name) {
+    return !!(M.terminalCapabilities && M.terminalCapabilities[name]);
+  };
+
   /**
    * Type C. Each item is pending entry object (1:1 turn model — no nextTurn field).
    * @type {Array<{id: string, text: string, ts: number, status: string}>}
@@ -220,6 +235,8 @@
         || !!Board.state._inAutoResume;
     var isStopped = status === "stopped";
     var isBusy = status === "busy";
+    var supportsResume = M.hasCapability("resume");
+    var supportsAttachments = M.hasCapability("attachments");
     if (toggleBtn) {
       // Toggle button only displays the main tab active.
       if (!isMainActive) {
@@ -254,6 +271,11 @@
           ? "Memory Update (Current Session Content to Memory — Clear Before)"
           : "Memory Load (MMEMORY.md Re-Case request to current session)";
       }
+    }
+    var sessionsBtn = document.getElementById("terminal-sessions-btn");
+    if (sessionsBtn) {
+      sessionsBtn.disabled = !supportsResume;
+      sessionsBtn.title = supportsResume ? "Main sessions" : "Session resume is not supported by this provider";
     }
     if (statusDot) {
       statusDot.className = "terminal-status-dot terminal-status-" + status;
@@ -348,7 +370,14 @@
     var slTokens = document.getElementById("terminal-sl-tokens");
     var slCost = document.getElementById("terminal-sl-cost");
 
-    if (slModel) slModel.textContent = M.sessionModel;
+    if (slModel) {
+      var providerLabel = M.terminalProvider
+        ? M.terminalProvider.charAt(0).toUpperCase() + M.terminalProvider.slice(1)
+        : "";
+      slModel.textContent = providerLabel
+        ? providerLabel + (M.sessionModel && M.sessionModel !== "--" ? " " + M.sessionModel : "")
+        : M.sessionModel;
+    }
 
     var slBranch = document.getElementById("terminal-sl-branch");
     if (slBranch) {
@@ -484,7 +513,7 @@
     h += '<div class="terminal-input-bottom">';
     h += '<div class="terminal-input-bottom-left">';
     h += '<button class="terminal-attach-btn" id="terminal-attach-btn" title="Withimage"'
-      + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) ? "" : " disabled")
+      + (Board.util.TERM_STATUS_INPUTTABLE.has(Board.state.termStatus) && M.hasCapability("attachments") ? "" : " disabled")
       + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>';
     h += '<input type="file" id="terminal-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" multiple>';
     h += '</div>';
@@ -758,6 +787,7 @@
 
       inputCard.addEventListener("dragover", function (e) {
         e.preventDefault();
+        if (!M.hasCapability("attachments")) return;
         inputCard.classList.add("drag-over");
       });
 
@@ -781,6 +811,10 @@
         var dt = e.dataTransfer;
         var targetInput = document.getElementById("terminal-input");
         if (!targetInput) return;
+        if (!M.hasCapability("attachments")) {
+          M.appendErrorMessage("Current provider does not support attachments");
+          return;
+        }
 
         // (0) Split card drop — application/x-board-ticket MIME priority processing
         // dragstart kanban.js is set and registered in the attached domain by parsing the ticket JSON.
@@ -913,6 +947,10 @@
     var attachInput = document.getElementById("terminal-attach-input");
     if (attachBtn && attachInput) {
       attachBtn.addEventListener("click", function () {
+        if (!M.hasCapability("attachments")) {
+          M.appendErrorMessage("Current provider does not support attachments");
+          return;
+        }
         attachInput.click();
       });
       attachInput.addEventListener("change", function () {

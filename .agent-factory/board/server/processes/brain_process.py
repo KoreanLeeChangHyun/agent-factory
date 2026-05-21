@@ -36,6 +36,9 @@ class BrainProcess(Protocol):
     @property
     def provider(self) -> str: ...
 
+    @property
+    def capabilities(self) -> dict[str, bool]: ...
+
     def spawn(
         self,
         extra_args: list[str] | None = None,
@@ -103,6 +106,17 @@ class ClaudeBrainProcess:
     @property
     def provider(self) -> str:
         return "claude"
+
+    @property
+    def capabilities(self) -> dict[str, bool]:
+        return {
+            "resume": True,
+            "attachments": True,
+            "permission_prompts": True,
+            "interrupt": True,
+            "slash_commands": True,
+            "multiple_inputs": True,
+        }
 
     def spawn(
         self,

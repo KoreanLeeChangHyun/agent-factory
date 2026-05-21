@@ -403,6 +403,13 @@
         status: data.status, archived: !!data.archived, session_id: data.session_id,
         awaiting_response: !!data.awaiting_response,
       });
+      var termModStatus = Board._term;
+      if (termModStatus) {
+        termModStatus.terminalProvider = data.provider || termModStatus.terminalProvider || "claude";
+        if (data.capabilities && typeof data.capabilities === "object") {
+          termModStatus.terminalCapabilities = data.capabilities;
+        }
+      }
       if (data.archived) {
         _sessionArchived = true;
         Board.state.setTermStatus("archived");
@@ -440,9 +447,9 @@
       if (data.model) {
         _applyRawModel(data.model);
       }
-      if (data.permission_mode) {
+      if (data.permission_mode || data.provider) {
         var modeEl = document.getElementById("terminal-sl-mode");
-        if (modeEl) modeEl.textContent = data.permission_mode;
+        if (modeEl) modeEl.textContent = data.permission_mode || data.provider;
       }
       Board.util.setBranchStatusBar(data.branch);
       _ctx.updateControlBar();
@@ -1872,6 +1879,11 @@
     // - Skip clearOutput / loadHistory (prevent DOM duplication/flicker).
     // - Only termSessionId is guaranteed to be set, token/SSE reconnection/spawn flow is the same.
     var silent = !!(opts && opts.silent);
+    var termModStart = Board._term;
+    if (isResume && termModStart && termModStart.hasCapability && !termModStart.hasCapability("resume")) {
+      _ctx.appendErrorMessage("[Error] Current provider does not support session resume");
+      return;
+    }
 
     // Preemptive UUID verification: If the resume request is not in UUID format, it immediately fails instead of server fallback.
     if (isResume && !UUID_RE.test(String(resumeSessionId))) {
