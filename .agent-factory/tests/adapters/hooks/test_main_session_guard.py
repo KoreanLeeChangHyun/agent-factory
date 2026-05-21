@@ -125,7 +125,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_04_prompt_text_substring_allow(self) -> None:
-        """Memory path text in quotes of Bash flow-kanban update-prompt → Pass.
+        """Memory path text in quotes of Bash flow-conveyor update-prompt → Pass.
 
         Verify that _strip_quoted_args is not subject to pattern matching by leaving the inside of the quotation marks empty.
         """
@@ -133,7 +133,7 @@ class TestMainSessionGuard(unittest.TestCase):
             "Bash",
             {
                 "command": (
-                    'flow-kanban update-prompt T-422 --target '
+                    'flow-conveyor update-prompt WR-422 --target '
                     '"Edit to: ~/.claude/projects/-home-deus-claude/memory/feedback/"'
                 )
             },
@@ -141,7 +141,7 @@ class TestMainSessionGuard(unittest.TestCase):
         self.assertFalse(_is_deny(stdout), f"unexpected deny: {stdout!r}")
 
     def test_05_prompt_substring_with_code_path_in_quote_allow(self) -> None:
-        """Bash flow-kanban code path substring in quotes → Pass.
+        """Bash flow-conveyor code path substring in quotes → Pass.
 
         Verifies that the code path is in quotes and is removed with _strip_quoted_args.
         """
@@ -149,7 +149,7 @@ class TestMainSessionGuard(unittest.TestCase):
             "Bash",
             {
                 "command": (
-                    "flow-kanban update-prompt T-422 "
+                    "flow-conveyor update-prompt WR-422 "
                     '--constraints "Modify engine/guards/main_session_guard.py"'
                 )
             },

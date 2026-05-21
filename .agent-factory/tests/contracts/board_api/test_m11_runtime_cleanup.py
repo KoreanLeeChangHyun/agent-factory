@@ -44,7 +44,7 @@ def test_direct_path_guard_blocks_agent_factory_engine_direct_call() -> None:
     payload = {
         "tool_name": "Bash",
         "tool_input": {
-            "command": "python3 .agent-factory/engine/flow/kanban.py list",
+            "command": "python3 .agent-factory/engine/flow/conveyor.py list",
         },
     }
     env = os.environ.copy()
@@ -62,7 +62,7 @@ def test_direct_path_guard_blocks_agent_factory_engine_direct_call() -> None:
     body = json.loads(proc.stdout)
     hook_output = body["hookSpecificOutput"]
     assert hook_output["permissionDecision"] == "deny"
-    assert "flow-kanban" in hook_output["permissionDecisionReason"]
+    assert "flow-conveyor" in hook_output["permissionDecisionReason"]
 
 
 def test_direct_path_guard_no_longer_mentions_removed_v1_wrappers() -> None:

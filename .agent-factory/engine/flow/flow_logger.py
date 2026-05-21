@@ -10,9 +10,9 @@ Tag:
     from flow.flow_logger import append_log, resolve_work_dir_for_logging
 
     # If you know abs_work_dir directly:
-    append_log("/path/to/workdir", "INFO", "kanban.py: subcommand=list")
-    append_log("/path/to/workdir", "WARN", "kanban.py: No ticket file")
-    append_log("/path/to/workdir", "ERROR", "kanban.py: ERROR state transition failed")
+    append_log("/path/to/workdir", "INFO", "conveyor.py: subcommand=list")
+    append_log("/path/to/workdir", "WARN", "conveyor.py: No work_request file")
+    append_log("/path/to/workdir", "ERROR", "conveyor.py: ERROR state transition failed")
 
     # If abs_work_dir is unknown (script called outside of workflow)
     work_dir = resolve_work_dir_for_logging()

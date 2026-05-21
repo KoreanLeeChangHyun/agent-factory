@@ -37,7 +37,7 @@ def _build_common_epilog() -> str:
     return (
         "Workflow version: 2.1.25 \n"
         "Documentation: See .agent-factory/docs/ or .claude/rules/workflow.md \n"
-        "Ticket management: flow-kanban <subcommand> --help"
+        "WorkRequest management: flow-conveyor <subcommand> --help"
     )
 
 # ─── Stack detection rules ───────────────────────────────────────────────────────────────
