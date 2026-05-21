@@ -20,13 +20,7 @@ from board.server.support.common import (
     _get_git_branch,
 )
 from board.server.routing.http_router import BoardHTTPRequestHandler
-from board.server.runtime.state import (
-    sse_manager,
-    poll_tracker,
-    brain_process,
-    workflow_registry,
-    production_line_registry,
-)
+from board.server.runtime import state as runtime_state
 from engine.apps.board_api.runtime import (
     is_port_in_use,
     log_reaped_zombies,
@@ -71,23 +65,23 @@ def _run_server(project_root: str) -> None:
 
     # Reset and restore terminal session persist file path based on project root
     last_session_file = os.path.join(project_root, '.agent-factory', '.last-session-id')
-    brain_process.set_persist_file(last_session_file)
+    runtime_state.configure_brain_process(project_root, persist_file=last_session_file)
     if os.path.isfile(last_session_file):
         try:
             with open(last_session_file) as _sf:
                 _saved_id = _sf.read().strip()
             if _saved_id:
-                brain_process.set_session_id(_saved_id)
+                runtime_state.brain_process.set_session_id(_saved_id)
                 logger.debug('Terminal session id Restore: %s', _saved_id)
         except OSError as _e:
             logger.debug('session id restore failed: %s', _e)
 
     # Legacy V1 workflow session cache is no longer created on startup.
-    workflow_registry._persist_dir = None
+    runtime_state.workflow_registry._persist_dir = None
 
     # production-line workflow history is persisted per run under work_dir/workflow-events.jsonl.
     # The old root-level production-line session cache is no longer created on startup.
-    production_line_registry._persist_dir = None
+    runtime_state.production_line_registry._persist_dir = None
 
     def _cleanup_runtime_files() -> None:
         """.agent-factory/.board.url"""
@@ -95,7 +89,7 @@ def _run_server(project_root: str) -> None:
 
     def _signal_handler(signum: int, frame: object) -> None:
         """When receiving SIGTERM/SIGINT, clean terminal process and runtime files."""
-        brain_process.kill()
+        runtime_state.brain_process.kill()
         _cleanup_runtime_files()
         sys.exit(0)
 
@@ -113,8 +107,8 @@ def _run_server(project_root: str) -> None:
     # FileWatcher
     def on_change(event_type: str, files: list[str]) -> None:
         """File change detection callback."""
-        sse_manager.broadcast(event_type, files)
-        poll_tracker.add(event_type, files)
+        runtime_state.sse_manager.broadcast(event_type, files)
+        runtime_state.poll_tracker.add(event_type, files)
 
     watcher = FileWatcher(
         project_root,
@@ -127,8 +121,8 @@ def _run_server(project_root: str) -> None:
 
     # GitBranchWatcher starts — ‘.git/HEAD’ changes detection → SSE git branch event push
     def on_branch_change(branch: str) -> None:
-        sse_manager.broadcast('git_branch', data={'branch': branch})
-        poll_tracker.add('git_branch', [branch])
+        runtime_state.sse_manager.broadcast('git_branch', data={'branch': branch})
+        runtime_state.poll_tracker.add('git_branch', [branch])
 
     git_watcher = GitBranchWatcher(
         project_root,
@@ -164,7 +158,7 @@ def _run_server(project_root: str) -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        brain_process.kill()
+        runtime_state.brain_process.kill()
         watcher.stop()
         git_watcher.stop()
         server.shutdown()

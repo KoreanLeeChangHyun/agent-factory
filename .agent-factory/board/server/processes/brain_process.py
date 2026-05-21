@@ -33,6 +33,9 @@ class BrainProcess(Protocol):
     @property
     def awaiting_response(self) -> bool: ...
 
+    @property
+    def provider(self) -> str: ...
+
     def spawn(
         self,
         extra_args: list[str] | None = None,
@@ -69,8 +72,6 @@ class BrainProcess(Protocol):
 class ClaudeBrainProcess:
     """BrainProcess adapter around the existing Claude terminal process."""
 
-    provider = "claude"
-
     def __init__(
         self,
         channel: TerminalSSEChannel,
@@ -98,6 +99,10 @@ class ClaudeBrainProcess:
     @property
     def awaiting_response(self) -> bool:
         return bool(getattr(self._process, "_awaiting_response", False))
+
+    @property
+    def provider(self) -> str:
+        return "claude"
 
     def spawn(
         self,

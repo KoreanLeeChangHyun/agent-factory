@@ -33,8 +33,6 @@ def _event_text(data: dict[str, Any]) -> str:
 class CodexProcess:
     """One-shot `codex exec --json -` process normalized to terminal SSE events."""
 
-    provider = "codex"
-
     def __init__(
         self,
         channel: TerminalSSEChannel,
@@ -85,6 +83,10 @@ class CodexProcess:
     @property
     def awaiting_response(self) -> bool:
         return self._awaiting_response
+
+    @property
+    def provider(self) -> str:
+        return "codex"
 
     def spawn(
         self,

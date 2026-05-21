@@ -162,3 +162,52 @@ def test_codex_process_maps_stdout_json_to_terminal_events() -> None:
     assert channel.events[-2]["type"] == "result"
     assert channel.events[-2]["result"] == "hello done"
     assert channel.events[-1]["subtype"] == "process_exit"
+
+
+def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:
+    from board.server.runtime.state import load_terminal_provider_config
+
+    monkeypatch.delenv("AGENT_FACTORY_LLM_PROVIDER", raising=False)
+    settings_dir = tmp_path / ".agent-factory"
+    settings_dir.mkdir()
+    (settings_dir / ".settings").write_text(
+        "AGENT_FACTORY_LLM_PROVIDER=codex\n"
+        "CODEX_BIN=codex-test\n"
+        "CODEX_MODEL=gpt-test\n"
+        "CODEX_PROFILE=work\n"
+        "CODEX_SANDBOX=danger-full-access\n",
+        encoding="utf-8",
+    )
+
+    config = load_terminal_provider_config(str(tmp_path))
+
+    assert config.provider == "codex"
+    assert config.codex_bin == "codex-test"
+    assert config.codex_model == "gpt-test"
+    assert config.codex_profile == "work"
+    assert config.codex_sandbox == "danger-full-access"
+
+
+def test_configure_brain_process_switches_stopped_terminal_to_codex(tmp_path, monkeypatch) -> None:
+    from board.server.runtime import state
+    from board.server.processes.codex_process import CodexProcess
+
+    original_brain = state.brain_process
+    original_alias = state.claude_process
+    try:
+        settings_dir = tmp_path / ".agent-factory"
+        settings_dir.mkdir()
+        (settings_dir / ".settings").write_text(
+            "AGENT_FACTORY_LLM_PROVIDER=codex\nCODEX_BIN=codex-test\n",
+            encoding="utf-8",
+        )
+
+        process = state.configure_brain_process(str(tmp_path))
+
+        assert isinstance(process, CodexProcess)
+        assert state.brain_process is process
+        assert state.claude_process is process
+        assert process.provider == "codex"
+    finally:
+        state.brain_process = original_brain
+        state.claude_process = original_alias
