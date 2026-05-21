@@ -48,7 +48,7 @@ class Plan:
     """top-level of plan.json."""
 
     schema_version: int
-    ticket: str
+    work_request: str
     command: str
     mode: str
     phases: list[Phase]
@@ -61,7 +61,7 @@ def parse_plan_json(path: Path) -> Plan:
 
     Verification items:
     1. File exists + JSON parse success
-    2. Required keys (schema_version / ticket / command / mode / phases) exist
+    2. Required keys (schema_version / work_request / command / mode / phases) exist
     3. No empty list of phases
     4. Phase id unique
     5. deps exist within phases + self-reference is prohibited
@@ -90,9 +90,9 @@ def _build_plan(raw: Any) -> Plan:
     if not isinstance(schema_version, int):
         raise PlanLoaderError("plan.json 'schema_version' must be int")
 
-    ticket = str(raw.get("ticket", "")).strip()
-    if not ticket:
-        raise PlanLoaderError("plan.json missing 'ticket'")
+    work_request = str(raw.get("work_request", "")).strip()
+    if not work_request:
+        raise PlanLoaderError("plan.json missing 'work_request'")
     command = str(raw.get("command", "implement")).strip() or "implement"
     mode = str(raw.get("mode", "multi")).strip() or "multi"
 
@@ -158,7 +158,7 @@ def _build_plan(raw: Any) -> Plan:
 
     return Plan(
         schema_version=schema_version,
-        ticket=ticket,
+        work_request=work_request,
         command=command,
         mode=mode,
         phases=phases,

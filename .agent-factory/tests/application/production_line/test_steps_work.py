@@ -32,7 +32,7 @@ from engine.apps.production_line.stations.work import _load_deps_block, _load_pl
 def _make_ctx(tmp_path: Path) -> WorkflowContext:
     (tmp_path / "work").mkdir(exist_ok=True)
     ctx = WorkflowContext(
-        ticket_no="T-489",
+        work_request_no="WR-489",
         registry_key="20260515-000000",
         work_dir=tmp_path,
         current_step="WORK",
@@ -58,7 +58,7 @@ def test_load_plan_normal(tmp_path: Path) -> None:
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-489",
+            "work_request": "WR-489",
             "command": "implement",
             "mode": "multi",
             "phases": [
@@ -99,7 +99,7 @@ def test_load_plan_circular_returns_empty(tmp_path: Path) -> None:
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-1",
+            "work_request": "WR-1",
             "command": "research",
             "mode": "multi",
             "phases": [
@@ -131,7 +131,7 @@ def test_load_deps_block_with_deps(tmp_path: Path) -> None:
 def test_load_deps_block_no_deps(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     phase = Phase(id="P1", title="first", deps=[])
-    assert _load_deps_block(ctx, phase) == "(no dependence)"
+    assert _load_deps_block(ctx, phase) == "(no dependencies)"
 
 
 def test_work_step_empty_phases_fails(tmp_path: Path) -> None:
@@ -151,7 +151,7 @@ def test_work_step_topo_fail_invokes_fail_step(tmp_path: Path) -> None:
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-1",
+            "work_request": "WR-1",
             "command": "research",
             "mode": "multi",
             "phases": [
@@ -218,7 +218,7 @@ def test_work_step_subprocess_level_parallel(
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-506",
+            "work_request": "WR-506",
             "command": "implement",
             "mode": "multi",
             "phases": [
@@ -265,7 +265,7 @@ def test_work_step_subprocess_workers_parallel(
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-506",
+            "work_request": "WR-506",
             "command": "implement",
             "mode": "multi",
             "phases": [
@@ -301,7 +301,7 @@ def test_work_step_subprocess_workers_one_default(
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-506",
+            "work_request": "WR-506",
             "command": "implement",
             "mode": "multi",
             "phases": [
@@ -334,7 +334,7 @@ def test_work_step_in_place_mode_regression(
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-506",
+            "work_request": "WR-506",
             "command": "implement",
             "mode": "multi",
             "phases": [
@@ -378,7 +378,7 @@ def test_work_step_subprocess_fail_fast_breaks_level(
         ctx,
         {
             "schema_version": 2,
-            "ticket": "T-506",
+            "work_request": "WR-506",
             "command": "implement",
             "mode": "multi",
             "phases": [

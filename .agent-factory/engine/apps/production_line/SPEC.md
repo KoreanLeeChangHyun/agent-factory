@@ -13,10 +13,10 @@
 
 ### 0.1 Shared responsibility canon (user specified 2026-05-15, T-503 expanded 2026-05-18)
 
-> **driver = 14+ rule evaluation + code determinism verification (pytest/lint) + git commit + kanban transition + FSM** (all determinism)
+> **driver = 14+ rule evaluation + code determinism verification (pytest/lint) + git commit + conveyor transition + FSM** (all determinism)
 > **LLM = Writing the body of the output .md** (**natural language part only** of plan/work/validate natural language evaluation/report)
 
-All prompt areas that delegate 14+ rule evaluation, code determinism verification (pytest -q / ruff / mypy), verdict calculation, git commit, kanban transition, and FSM transition to LLM are **rule violations**. Recover to the driver determinism domain.
+All prompt areas that delegate 14+ rule evaluation, code determinism verification (pytest -q / ruff / mypy), verdict calculation, git commit, conveyor transition, and FSM transition to LLM are **rule violations**. Recover to the driver determinism domain.
 
 ### 0.1.1 Verification 2-axis separation (T-503)
 
@@ -100,12 +100,12 @@ NONE → INIT → PLAN → WORK → VALIDATE → REPORT → DONE
 
 | Step | subject | LLM Call | output | Core Responsibilities |
 |------|------|---------|--------|----------|
-| INIT | driver (in-process) | X | `metadata.json` (initial) / `workflow.log` (start append) | Parse ticket prompt, create work_dir, kanban Open→In Progress |
+| INIT | driver (in-process) | X | `metadata.json` (initial) / `workflow.log` (start append) | Parse WorkRequest prompt, create work_dir, conveyor Accepted→Executing |
 | PLAN | driver → claude -p | 1 spawn | `plan/plan.json` (driver=JSON SSOT) + `plan/plan.md` (LLM↔LLM=md natural language body) | Work decomposition, Phase·worker·deps·acceptance_criteria specification (T-504 separate) |
 | WORK | driver → claude -p | 1 spawn (inside Phase loop) | `work/<phase_id>/W<n>.md` × N (directory nesting) | Create output for each phase, follow dependency graph, TDD Red→Green→Refactor (implement) |
 | VALIDATE | driver → claude -p + driver | 1 spawn (LLM) + driver in-process | `validate/report.md` (LLM) + `validate/rules.json` (driver) + `validate/code.json` (driver, implement only) | **Quality evaluation natural language only (LLM)** — phase decomposition adequacy / deliverable completeness. **14+Rule evaluation/code determinism verification (driver)** — pytest/ruff/mypy + R-CODE-1/2 (§0.1.1 canon) |
 | REPORT | driver → claude -p | 1 spawn | `report.html` (person=HTML, template + placeholder 4 types) | plan + work + validate overall, T-504 cutover |
-| DONE | driver (in-process) | X | `metadata.json` (finalize absorption — summary/usage/finalized_at) | kanban In Progress→Review, regression metric emit |
+| DONE | driver (in-process) | X | `metadata.json` (finalize absorption — summary/usage/finalized_at) | conveyor Executing→Verifying, regression metric emit |
 | FAILED | driver (in-process) | X | `metadata.json` (failure field absorbed) | fail-fast when retries exceed N or when hard-fail rule is violated |
 
 #### 3.2.0 Determination of output format Canon SSOT (T-504, user specified 2026-05-18)
@@ -135,7 +135,7 @@ Formats other than these rules (CSV / YAML / old `summary.txt` / old `failure.md
 
 | file | Reason | Absorber |
 |------|------|--------|
-| `user_prompt.txt` | The ticket prompt is SSOT | (Ticket body) |
+| `user_prompt.txt` | The WorkRequest prompt is SSOT | (WorkRequest body) |
 | `summary.txt` | report.html is a natural language report SSOT | `report.html` |
 | `.context.json` + `status.json` | Output integration and registration | `metadata.json` |
 | `failure.md` | A single JSON field is sufficient | `metadata.json.failure` |
@@ -198,7 +198,7 @@ Decided not to adopt asyncio: claude -p subprocess is I/O bound + existing `_spa
 .agent-factory/runs/<registryKey>/
 ├── metadata.json # cycle meta (driver write, T-503 — absorb old .context/status/summary/failure)
 ├── metrics.jsonl          # event stream (driver append, NDJSON)
-├── user_prompt.txt # INIT step ticket prompt quote
+├── user_prompt.txt # INIT step WorkRequest prompt quote
 ├── plan/ # PLAN calculation (T-504 — directory nesting)
 │ ├── plan.json # driver=JSON SSOT (driver determinism parsing target)
 │ └── plan.md # LLM↔LLM=md (natural language text, WORK/VALIDATE/REPORT inject)
@@ -219,7 +219,7 @@ Decided not to adopt asyncio: claude -p subprocess is I/O bound + existing `_spa
 | Step | File injected in its entirety into the text of the prompt |
 |------|----------------------------------|
 | INIT | (None — driver in-process) |
-| PLAN | `metadata.json` (initial) + ticket prompt (XML 5 fields) |
+| PLAN | `metadata.json` (initial) + WorkRequest prompt (XML 5 fields) |
 | WORK | `metadata.json` + `plan/plan.md` (full natural language text) + dependent work/`<deps>`.md (optional) |
 | VALIDATE | `metadata.json` + `plan/plan.md` (whole) + `work/**/*.md` (whole) |
 | REPORT | `metadata.json` + `plan/plan.md` + `work/**/*.md` + `validate/report.md` + `templates/report.html` (all in its entirety) |
@@ -239,7 +239,7 @@ What if I get close to the context window limit (200K tokens)? → N division of
 
 According to T-504 Canon SSOT (§3.2.0) the PLAN output is separated into 2 files:
 
-- **`plan/plan.json`** — driver deterministic parsing target (SSOT). schema_version / ticket / command / mode / phases.
+- **`plan/plan.json`** — driver deterministic parsing target (SSOT). schema_version / work_request / command / mode / phases.
 - **`plan/plan.md`** — WORK / VALIDATE / REPORT Natural language body for LLM handover (background / decision / diagram, etc.).
 
 Old root `plan.md` (YAML frontmatter + body) completely discarded — backward compat 0 cases.
@@ -249,7 +249,7 @@ Old root `plan.md` (YAML frontmatter + body) completely discarded — backward c
 ```json
 {
   "schema_version": 2,
-  "ticket": "T-NNN",
+  "work_request": "WR-NNN",
   "command": "implement",
   "mode": "multi",
   "phases": [
@@ -362,7 +362,7 @@ LLM does not create a retry prompt. The driver's `_render_retry_prompt(missing_i
 
 ### When exceeding 6.4 N_max
 
-Write `Step FAILED` marker to status.json → Create `failure.md` (driver template) → End cycle → Kanban card remains In Progress (waiting for user decision, automatic regression X).
+Write `Step FAILED` marker to status.json → Create `failure.md` (driver template) → End cycle → Conveyor WorkRequest remains Executing (waiting for user decision, automatic regression X).
 
 ### 6.5 Parallel spawn policy (T-506 new)
 
@@ -409,7 +409,7 @@ When `fail_fast`, `cancel_futures=True` **cancels only futures that have not sta
 | v1 Responsibilities (Main Session LLM) | production-line driver rule base implementation |
 |---|---|
 | `/wf -s N` trigger → INIT entry | argparse + `.context.json` template fill |
-| Read ticket prompt field | xml parser + dict access |
+| Read WorkRequest prompt field | xml parser + dict access |
 | command branch (implement/research/review/test) | str match → prompt template by command |
 | mode branch (single/multi) | auto_router 8 signal → threshold rule (LLM call
 | Enter PLAN stage + call planner subagent | `subprocess.run(["claude","-p",...])` |
@@ -428,7 +428,7 @@ When `fail_fast`, `cancel_futures=True` **cancels only futures that have not sta
 | REPORT reporter subagent | `subprocess.run(["claude","-p",...])` |
 | report.md comprehensive | verify + size match (whole inject verification) |
 | finalize (summary + usage) | `summary.txt` template + `usage.json` aggregate |
-| kanban transition (In Progress → Review) | kanban CLI subprocess |
+| conveyor transition (Executing → Verifying) | conveyor CLI subprocess |
 | Regression Processing | conditional + `metrics.jsonl` emit |
 | User Progress Reporting | driver stdout + SSE event emit |
 | PreToolUse hook absorption | **hook self-disposal** — driver deterministic progress |
@@ -438,10 +438,10 @@ When `fail_fast`, `cancel_futures=True` **cancels only futures that have not sta
 ### 7.2 driver.py pseudocode
 
 ```python
-def main(ticket_no: str) -> int:
+def main(work_request_no: str) -> int:
     # 1. INIT (driver in-process, LLM calls X)
-    ctx = init_step(ticket_no)
-    kanban_move(ticket_no, "in_progress")
+    ctx = init_step(work_request_no)
+    conveyor_move(work_request_no, "executing")
     update_status(ctx, "INIT", "PLAN")
 
     # 2. PLAN
@@ -503,7 +503,7 @@ def main(ticket_no: str) -> int:
     verdict = evaluate_12_rules(ctx)
     save_verdict_report(ctx, verdict)  # validate-rules.json — SSOT
     finalize(ctx)
-    kanban_move(ticket_no, "review")
+    conveyor_move(work_request_no, "verifying")
     return 0
 ```
 
@@ -580,7 +580,7 @@ T-463 12 rules (already stuffed in v1) + T-503 new R-CODE-1/2. However, some rul
 
 > **Critical recalculation (T-503)**: WARN 1~2 / FAIL 3+ criticality is the same even after expansion from 12 rules → 14+ rules. hard-fail rules = `R-EXIST-1` + `R-METRIC-2` + `R-WT-1` + `R-CODE-1` 4 types.
 
-Even if the verdict is FAIL, you can still proceed with Review→Done DnD (advisory only). Auto guard/auto regression: 0 cases.
+Even if the verdict is FAIL, you can still proceed with Verifying→Complete DnD (advisory only). Auto guard/auto regression: 0 cases.
 
 ### 9.1.1 worktree policy (branching by command, T-489 Stage 3-D)
 
@@ -588,15 +588,15 @@ User-specified policy (2026-05-15): **Worktree isolation is required for tickets
 
 | command | worktree branch | feature_branch | R-WT-1 Evaluation |
 |---------|--------------|---------------|------------|
-| `implement` | `git worktree add` + create feature_branch (driver init_step) | `feat/T-NNN-<title>` | **hard-fail** (commits ahead ≥ 1 obligation) |
+| `implement` | `git worktree add` + create feature_branch (driver init_step) | `feat/WR-NNN-<title>` | **hard-fail** (commits ahead ≥ 1 obligation) |
 | `research` | Create work tree X (develop directly) | `null` | SKIP (`research` mark) |
 | `review` | Create work tree X (develop directly) | `null` | SKIP (`review` mark) |
 
-Call `worktree_manager.create_worktree(ticket_no, title, command=...)` inside driver `init_step` and return None if `command != "implement"` → ctx.feature_branch=null + work_dir is main `.agent-factory/runs/<key>/`. If `command == "implement"`, ctx.feature_branch + work_dir is not in `<worktree_path>/.agent-factory/runs/<key>/`.
+Call `worktree_manager.create_worktree(work_request_no, title, command=...)` inside driver `init_step` and return None if `command != "implement"` → ctx.feature_branch=null + work_dir is main `.agent-factory/runs/<key>/`. If `command == "implement"`, ctx.feature_branch + work_dir is not in `<worktree_path>/.agent-factory/runs/<key>/`.
 
 ### 9.2 When to evaluate (DONE stage)
 
-The call to the driver rule base `evaluate_rules` (T-503 — old `evaluate_12_rules`) is performed **inside the DONE Step** (inside the `done_step` function, after recording `step_end DONE outcome=ok` + after `update_step(_, "DONE")` + before `kanban_move review`).
+The call to the driver rule base `evaluate_rules` (T-503 — old `evaluate_12_rules`) is performed **inside the DONE Step** (inside the `done_step` function, after recording `step_end DONE outcome=ok` + after `update_step(_, "DONE")` + before `conveyor_move review`).
 
 reason:
 - R-EXIST-1 (`report.md` exists) — Match only after completion of the REPORT step
@@ -656,14 +656,14 @@ If remnants of v1 are still alive after revert (b69645a base), further discard:
 ### 11.2 New wrapper
 
 - `flow-wf` single entrypoint (`.agent-factory/bin/flow-wf`)
-- Call: `flow-wf submit T-NNN` → `python3 -m engine.apps.production_line T-NNN`
+- Call: `flow-wf submit WR-NNN` → `python3 -m engine.apps.production_line WR-NNN`
 - Existing `/wf` slash commands are preserved (user interface), internally calling `flow-wf submit`
 
 ### 11.3 What to preserve
 
 - `engine/core/` — Some v1 core modules can be reused within the driver (path helper in `_common.py`, etc.). However, the production-line driver only uses specification-violating code.
 - `engine/guards/` — finalize guards (R-WT-1, etc.) are called by the driver.
-- `engine/flow/` — kanban CLI / kanban data model preservation
+- `engine/flow/` — conveyor CLI / conveyor data model preservation
 - `engine/git/` — Preserve git helpers
 - `engine/sync/` — Preserve history sync
 - `engine/memory_gc/` — Memory GC retention
@@ -677,10 +677,10 @@ If remnants of v1 are still alive after revert (b69645a base), further discard:
 
 ```bash
 # User entry
-flow-wf submit T-NNN # Execute Step 0~6 (driver spawn)
-flow-wf submit T-NNN --step PLAN # Execute only specific Steps (debug)
-flow-wf status T-NNN # Check progress status (status.json read)
-flow-wf abort T-NNN # abort cycle (claude -p subprocess kill + status FAILED)
+flow-wf submit WR-NNN # Execute Step 0~6 (driver spawn)
+flow-wf submit WR-NNN --step PLAN # Execute only specific Steps (debug)
+flow-wf status WR-NNN # Check progress status (status.json read)
+flow-wf abort WR-NNN # abort cycle (claude -p subprocess kill + status FAILED)
 ```
 
 ### 12.2 Slash command
@@ -692,20 +692,20 @@ flow-wf abort T-NNN # abort cycle (claude -p subprocess kill + status FAILED)
 Driver emits NDJSON to stdout → Board server sends client to SSE:
 
 ```json
-{"event":"step.start","step":"PLAN","ticket":"T-489","ts":"2026-05-14T..."}
+{"event":"step.start","step":"PLAN","work_request":"WR-489","ts":"2026-05-14T..."}
 {"event":"step.end","step":"PLAN","outcome":"ok","retry_count":0,"ts":"..."}
 {"event":"phase.start","step":"WORK","phase":"P1","ts":"..."}
 {"event":"phase.end","step":"WORK","phase":"P1","outcome":"ok","ts":"..."}
 {"event":"workflow.finish","outcome":"ok","verdict":"PASS","ts":"..."}
 ```
 
-Both workflow-bar / kanban verdict badges in Board UI are updated to this stream.
+Both workflow-bar / conveyor verdict badges in Board UI are updated to this stream.
 
-### 12.4 kanban transition
+### 12.4 conveyor transition
 
-- When entering INIT: `kanban move T-NNN in_progress` (driver)
-- When DONE ends: `kanban move T-NNN review` (driver)
-- Upon termination of FAILED: kanban automatic regression
+- When entering INIT: `conveyor move WR-NNN executing` (driver)
+- When DONE ends: `conveyor move WR-NNN verifying` (driver)
+- Upon termination of FAILED: conveyor automatic regression
 
 ---
 
@@ -715,7 +715,7 @@ Both workflow-bar / kanban verdict badges in Board UI are updated to this stream
 .agent-factory/engine/apps/production_line/
 ├── SPEC.md # This document (SSOT)
 ├── driver.py # Entry point + 6 Step orchestration
-├── _common.py                 # path helper, kanban CLI wrapper, status I/O
+├── _common.py                 # path helper, conveyor CLI wrapper, status I/O
 ├── _emitter.py                # SSE event NDJSON emit
 ├── _verify.py # Collection of rule base output verification functions
 ├── _retry.py # Retry prompt template + claude -p --resume
@@ -749,7 +749,7 @@ Both workflow-bar / kanban verdict badges in Board UI are updated to this stream
 
 ### Phase 0 — Secure revert base (complete)
 
-- T-489 To Do → Open
+- WR-489 Draft → Accepted
 - develop reset --hard b69645a (39 commit revert, user specified exception)
 - Delete T-488 (T-486 subject to verification disappears)
 - working tree clean, push hold
@@ -771,8 +771,8 @@ Both workflow-bar / kanban verdict badges in Board UI are updated to this stream
 
 ### Phase 3 — 1 cycle finalize verification
 
-- Create 1 new ticket for verification (T-490 candidate, simple implement)
-- Execute `flow-wf submit T-490` → driver proceeds through all 6 steps
+- Create 1 new WorkRequest for verification (T-490 candidate, simple implement)
+- Execute `flow-wf submit WR-490` → driver proceeds through all 6 steps
 - Verification of consistency of 5 types of output: plan.md / work/*.md / validate-report.md / report.md / .context.json
 - Verification of 5 types of regression blocking (R-WT-1 + worker_false_success, etc.)
 - Measure token usage (compared to v1 SDK Task model 1 cycle)
@@ -805,7 +805,7 @@ When referencing v1 regression examples within this document, quote the commit h
 
 ### 15.4 Stage 3-E Verification Procedure
 
-The operation of Stage 3-E (§0.1 Separation of Responsibility Canon Taxidermy) is verified by finalizing a simple output ticket 1 cycle, such as this T-494. On the driver side, 12 rule evaluation, verdict calculation, git commit (auto_commit), kanban transition, and FSM transition are all performed deterministically, and at the same time, claude -p subprocess (PLAN/WORK/REPORT) is passed if only the natural language part of the output .md body is written and does not violate the driver's responsibility. The core of this procedure is to check whether regressions such as the conflict between the LLM verdict and the driver verdict found in T-493 smoke (violation of the rule that validate.txt evaluated 12 rules to LLM + omission of git commit in work.txt) have disappeared. For detailed division of responsibility, refer to §0.1 / §3.2 (Responsibility by Step) / §7.1 (driver.py mapping).
+The operation of Stage 3-E (§0.1 Separation of Responsibility Canon Taxidermy) is verified by finalizing a simple output WorkRequest 1 cycle, such as this T-494. On the driver side, 12 rule evaluation, verdict calculation, git commit (auto_commit), conveyor transition, and FSM transition are all performed deterministically, and at the same time, claude -p subprocess (PLAN/WORK/REPORT) is passed if only the natural language part of the output .md body is written and does not violate the driver's responsibility. The core of this procedure is to check whether regressions such as the conflict between the LLM verdict and the driver verdict found in T-493 smoke (violation of the rule that validate.txt evaluated 12 rules to LLM + omission of git commit in work.txt) have disappeared. For detailed division of responsibility, refer to §0.1 / §3.2 (Responsibility by Step) / §7.1 (driver.py mapping).
 
 ---
 
@@ -816,7 +816,7 @@ The operation of Stage 3-E (§0.1 Separation of Responsibility Canon Taxidermy) 
 | 2026-05-14 | Production-line 1.0.0 Draft (T-489 Phase 1) | User insight sequence (abolish orchestrator → claude -p model → file-based pipeline → complete injection → retry rule base) |
 | 2026-05-15 | §7.1 + §9.2 — driver rule base 12 Rule re-verification period corrected to VALIDATE → DONE stage | T-490 Phase 3 verification regression discovered (3 false FAILs due to report.md / step.end DONE not being created when evaluate is called at the time of VALIDATE = R-EXIST-1 / R-METRIC-2 / R-PATH-1) |
 | 2026-05-15 | §9.1.1 — Introducing worktree branching policy for each command (Stage 3-D) | T-489 Stage 3-D — implement obligation / research·review worktree-less / R-WT-1 SKIP coordination (commit e73dfc1 + 79bf36d) |
-| 2026-05-15 | §0.1 New responsibility sharing canon (Stage 3-E) — driver=12 rules+commit+kanban+FSM determinism / LLM=natural language calculation only. §3.2 / §7.1 / §7.2 matching | LLM verdict (WARN) ≡ driver verdict (FAIL) conflict discovered in T-493 smoke. Validate.txt violates the rule that LLM evaluates 12 rules and calculates verdict + missing git commit in work.txt. User specified canon taxidermy (commit ? + ?) |
+| 2026-05-15 | §0.1 New responsibility sharing canon (Stage 3-E) — driver=12 rules+commit+conveyor+FSM determinism / LLM=natural language calculation only. §3.2 / §7.1 / §7.2 matching | LLM verdict (WARN) ≡ driver verdict (FAIL) conflict discovered in T-493 smoke. Validate.txt violates the rule that LLM evaluates 12 rules and calculates verdict + missing git commit in work.txt. User specified canon taxidermy (commit ? + ?) |
 | 2026-05-18 | T-503 — §0.1 / §0.1.1 / §0.1.2 / §3.2 / §3.2.1 / §3.2.2 / §5.1 / §5.2 / §7.1 / §9 / §9.2 / §9.3 Update — 12 rules → 14+ rules (R-CODE-1/2), output 6 areas + discard 5 files, verification 2-axis separation (natural language report LLM / determinism code driver), TDD enforcement (acceptance_criteria + Red→Green→Refactor) | User-specified Canon extension (output consistency + verification 2-axis separation + forced TDD prompt). This cycle itself processes the old driver — R-CODE applies the next cycle. |
 | 2026-05-19 | T-504 — §3.2.0 (format decision canon SSOT) / §3.2.1 / §3.2.2 / §3.2 Step responsibility / §3.4 PLAN N_max / §4.1 directory / §4.2 prompt injection matrix / §5 plan/ directory structuring (5.1 / 5.1.1 JSON schema / 5.1.2 plan.md body / 5.2 driver parse_plan_json) — Output Format Canon SSOT Taxidermy (driver=JSON / LLM↔LLM=md / person=HTML). Discard old root `plan.md` (YAML) + old `report.md` (Markdown) cutover. New `plan/plan.json` + `plan/plan.md` + `report.html` (template + placeholder). | User specified (2026-05-18) “Who reads → format decision” single rule. T-489 cutover policy consistent — backward compat shim 0 cases. P1~P6 of this cycle migrates the entire driver `parse_plan_json` + `core/plan_loader.py` + `templates/report.html` + verification function (`verify_plan_artifacts` / `verify_report_html`) + prompts (plan.txt / report.txt). |
 | 2026-05-19 | T-506 — §3.4.1 New parallel spawn policy (`max_parallel` default 4 + `V2_MAX_PARALLEL` / `fail_policy` default `fail_fast` + `V2_FAIL_POLICY` env override). §5.2 Specifies `workers >= 1` + `deps=[]` siblings matching. §5.3.1 New `workers` semantic table (1=single / N=N worker simultaneous spawn, `work/<id>/W<n>.md` output matrix). §6.5 New parallel spawn policy (6.5.1 topo level simultaneous spawn / 6.5.2 worker parallel within phase / 6.5.3 fail_fast / 6.5.4 emit matching / 6.5.5 running subprocess kill not applied). | T-506 User-specified decision — Planner LLM determines deps + workers between phases in plan.json. driver has deterministically same level simultaneous spawn + workers > 1 nested pool. New infrastructure: `engine/apps/production_line/_parallel.py` (parallel_spawn) + `engine/apps/production_line/core/plan_loader.py: topo_levels` + `engine/apps/production_line/_common.py: get_max_parallel/get_fail_policy` + `engine/apps/production_line/_verify.py: verify_work_md_multi`. Decided not to adopt asyncio (subprocess I/O bound + preserving existing `_spawn` synchronous infrastructure). |
