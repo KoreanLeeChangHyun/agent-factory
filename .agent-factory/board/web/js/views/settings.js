@@ -246,13 +246,6 @@
           '</select>' +
         '</div>' +
       '</div>' +
-      '<div class="settings-item">' +
-        '<div class="settings-item-info">' +
-          '<div class="settings-item-key">Terminal Capability</div>' +
-          '<div class="settings-item-label" id="settings-terminal-capability-label">' + terminalCapabilityLabel(brain) + '</div>' +
-        '</div>' +
-        '<div class="settings-item-control"><span class="settings-capability-pill" id="settings-terminal-capability-pill">' + terminalCapabilityPill(brain) + '</span></div>' +
-      '</div>' +
       '<details class="settings-adapter-details">' +
         '<summary id="settings-adapter-summary">' + adapterLabel(brain) + ' details</summary>' +
         '<div class="settings-adapter-body" id="settings-adapter-body">' + adapterDetails(brain) + '</div>' +
@@ -269,7 +262,7 @@
         }
         var pill = document.getElementById('settings-provider-pill');
         if (pill) pill.textContent = adapterLabel(selectedBrain);
-        updateProviderCapability(selectedBrain);
+        updateProviderDetails(selectedBrain);
         save(PROVIDER_SETTING_KEY, providerValue(selectedBrain), brainSelect);
       });
     }
@@ -430,11 +423,6 @@
 
     var loginBtn = document.getElementById('settings-login-btn');
     if (loginBtn) {
-      var loginBrain = getSettingValue(sections, PROVIDER_SETTING_KEY, PROVIDER_LEGACY_SETTING_KEYS) || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
-      if (!supportsSlashCommands(normalizeBrain(loginBrain))) {
-        loginBtn.disabled = true;
-        loginBtn.title = 'Login command is not supported by this terminal provider';
-      }
       loginBtn.addEventListener('click', function () {
         if (loginBtn.disabled) return;
         loginBtn.disabled = true;
@@ -518,7 +506,7 @@
           }
           var pill = document.getElementById('settings-provider-pill');
           if (pill) pill.textContent = adapterLabel(selected);
-          updateProviderCapability(selected);
+          updateProviderDetails(selected);
         }
         save(v.key, select.value, select);
       });
@@ -597,22 +585,6 @@
     return 'ClaudeAdapter';
   }
 
-  function terminalCapabilityPill(brain) {
-    if (brain === 'codex') return 'Experimental';
-    if (brain === 'fake') return 'No terminal';
-    return 'Full';
-  }
-
-  function terminalCapabilityLabel(brain) {
-    if (brain === 'codex') {
-      return 'Codex terminal is experimental: current-thread follow-up uses codex exec resume when a session id is available; session list resume, attachments, and permission prompts are not supported yet.';
-    }
-    if (brain === 'fake') {
-      return 'FakeAdapter is for tests and does not expose a live terminal process.';
-    }
-    return 'Claude terminal supports resume, attachments, slash commands, permission prompts, and interrupts.';
-  }
-
   function adapterDetails(brain) {
     if (brain === 'codex') {
       return 'Console process integration uses codex exec --json - and codex exec resume --json to normalize stdout events into the Terminal stream.';
@@ -623,27 +595,11 @@
     return 'Console process integration uses local Claude Code hooks and .agent-factory runtime paths.';
   }
 
-  function supportsSlashCommands(brain) {
-    return brain === 'claude';
-  }
-
-  function updateProviderCapability(brain) {
-    var capLabel = document.getElementById('settings-terminal-capability-label');
-    if (capLabel) capLabel.textContent = terminalCapabilityLabel(brain);
-    var capPill = document.getElementById('settings-terminal-capability-pill');
-    if (capPill) capPill.textContent = terminalCapabilityPill(brain);
+  function updateProviderDetails(brain) {
     var summary = document.getElementById('settings-adapter-summary');
     if (summary) summary.textContent = adapterLabel(brain) + ' details';
     var body = document.getElementById('settings-adapter-body');
     if (body) body.textContent = adapterDetails(brain);
-    var loginBtn = document.getElementById('settings-login-btn');
-    if (loginBtn) {
-      var supported = supportsSlashCommands(brain);
-      loginBtn.disabled = !supported;
-      loginBtn.title = supported
-        ? 'Send /login to the active Console session.'
-        : 'Login command is not supported by this terminal provider';
-    }
   }
 
   function flash(el, cls) {
