@@ -159,5 +159,5 @@ Manual verification:
 2. Move route usage from direct `ClaudeProcess` access to the process factory. (done)
 3. Add `CodexProcess` with stdout normalization only. (done, experimental one-shot)
 4. Add provider capability reporting. (done)
-5. Update Settings and Terminal UI capability labels. (partial: Terminal controls)
+5. Update Settings and Terminal UI capability labels. (done)
 6. Add route-level and adapter-level tests.

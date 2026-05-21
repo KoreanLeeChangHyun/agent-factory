@@ -191,9 +191,16 @@
           '</select>' +
         '</div>' +
       '</div>' +
+      '<div class="settings-item">' +
+        '<div class="settings-item-info">' +
+          '<div class="settings-item-key">Terminal capability</div>' +
+          '<div class="settings-item-label" id="settings-terminal-capability-label">' + terminalCapabilityLabel(brain) + '</div>' +
+        '</div>' +
+        '<div class="settings-item-control"><span class="settings-capability-pill" id="settings-terminal-capability-pill">' + terminalCapabilityPill(brain) + '</span></div>' +
+      '</div>' +
       '<details class="settings-adapter-details">' +
-        '<summary>ClaudeAdapter details</summary>' +
-        '<div class="settings-adapter-body">Console process integration uses local Claude Code hooks and .agent-factory runtime paths.</div>' +
+        '<summary id="settings-adapter-summary">' + adapterLabel(brain) + ' details</summary>' +
+        '<div class="settings-adapter-body" id="settings-adapter-body">' + adapterDetails(brain) + '</div>' +
       '</details>';
     body.appendChild(provider);
 
@@ -207,6 +214,7 @@
         }
         var pill = document.getElementById('settings-provider-pill');
         if (pill) pill.textContent = adapterLabel(selectedBrain);
+        updateProviderCapability(selectedBrain);
         save('AGENT_FACTORY_LLM_PROVIDER', providerValue(selectedBrain), brainSelect);
       });
     }
@@ -367,7 +375,13 @@
 
     var loginBtn = document.getElementById('settings-login-btn');
     if (loginBtn) {
+      var loginBrain = getSettingValue(sections, 'AGENT_FACTORY_LLM_PROVIDER') || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
+      if (!supportsSlashCommands(normalizeBrain(loginBrain))) {
+        loginBtn.disabled = true;
+        loginBtn.title = 'Login command is not supported by this terminal provider';
+      }
       loginBtn.addEventListener('click', function () {
+        if (loginBtn.disabled) return;
         loginBtn.disabled = true;
         loginBtn.textContent = 'Sending...';
         fetch('/terminal/command', {
@@ -488,6 +502,55 @@
     if (brain === 'codex') return 'CodexAdapter';
     if (brain === 'fake') return 'FakeAdapter';
     return 'ClaudeAdapter';
+  }
+
+  function terminalCapabilityPill(brain) {
+    if (brain === 'codex') return 'One-shot';
+    if (brain === 'fake') return 'No terminal';
+    return 'Full';
+  }
+
+  function terminalCapabilityLabel(brain) {
+    if (brain === 'codex') {
+      return 'Codex terminal is experimental: one prompt per process, no resume, no attachments, no permission prompts.';
+    }
+    if (brain === 'fake') {
+      return 'FakeAdapter is for tests and does not expose a live terminal process.';
+    }
+    return 'Claude terminal supports resume, attachments, slash commands, permission prompts, and interrupts.';
+  }
+
+  function adapterDetails(brain) {
+    if (brain === 'codex') {
+      return 'Console process integration uses codex exec --json - and normalizes stdout events into the Terminal stream.';
+    }
+    if (brain === 'fake') {
+      return 'FakeAdapter is available for deterministic application tests; terminal start falls back to Claude until a fake process exists.';
+    }
+    return 'Console process integration uses local Claude Code hooks and .agent-factory runtime paths.';
+  }
+
+  function supportsSlashCommands(brain) {
+    return brain === 'claude';
+  }
+
+  function updateProviderCapability(brain) {
+    var capLabel = document.getElementById('settings-terminal-capability-label');
+    if (capLabel) capLabel.textContent = terminalCapabilityLabel(brain);
+    var capPill = document.getElementById('settings-terminal-capability-pill');
+    if (capPill) capPill.textContent = terminalCapabilityPill(brain);
+    var summary = document.getElementById('settings-adapter-summary');
+    if (summary) summary.textContent = adapterLabel(brain) + ' details';
+    var body = document.getElementById('settings-adapter-body');
+    if (body) body.textContent = adapterDetails(brain);
+    var loginBtn = document.getElementById('settings-login-btn');
+    if (loginBtn) {
+      var supported = supportsSlashCommands(brain);
+      loginBtn.disabled = !supported;
+      loginBtn.title = supported
+        ? 'Send /login to the active Console session.'
+        : 'Login command is not supported by this terminal provider';
+    }
   }
 
   function flash(el, cls) {
