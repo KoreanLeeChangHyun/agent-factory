@@ -19,9 +19,9 @@ from typing import Callable
 def _find_project_root() -> str:
     """Find project root by locating .agent-factory directory.
 
-    워크트리에서 실행 시 메인 리포 루트를 반환한다.
-    .agent-factory/.settings는 메인 리포에만 존재하므로,
-    git-common-dir로 메인 리포를 탐색한다.
+    When executed in the work tree, the main repo root is returned.
+    Since .agent-factory/.settings only exists in the main repo,
+    Browse the main repo with git-common-dir.
 
     Returns:
         Absolute path to the project root directory.
@@ -153,13 +153,13 @@ def dispatch(
 
 
 def _find_workflow_log(log_dir: str | None = None) -> str | None:
-    """활성 워크플로우의 workflow.log 경로를 탐색하여 반환한다.
+    """Searches for and returns the workflow.log path of the active workflow.
 
     Args:
-        log_dir: 명시적 로그 디렉터리 경로. None이면 scan_active_workflows로 자동 탐색.
+        log_dir: Explicit log directory path. If None, auto-discovery with scan_active_workflows.
 
     Returns:
-        workflow.log 파일의 절대 경로. 찾지 못하면 None.
+        Absolute path to the workflow.log file. None if not found.
     """
     try:
         if log_dir is not None:

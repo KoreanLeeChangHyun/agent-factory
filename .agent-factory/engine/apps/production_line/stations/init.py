@@ -1,12 +1,12 @@
-"""INIT Step — driver in-process. LLM 호출 없음.
+"""INIT Step — driver in-process. No LLM calls.
 
-SPEC.md §9.1.1 (Stage 3-D): command 별 worktree 분기.
-- implement → git worktree add + feature_branch 생성 (v1 worktree_manager 재사용)
-- research|review → develop 직접 (worktree-less 허용)
+SPEC.md §9.1.1 (Stage 3-D): Worktree branching by command.
+- implement → git worktree add + create feature_branch (reuse v1 worktree_manager)
+- research|review → develop directly (allows worktree-less)
 
-T-495 P2: V2_REGISTRY_KEY env 우선 — board kanban submit 핸들러가
-session_id 를 사전 발급할 수 있도록 registry_key 결정론을 외부에서 주입
-가능하게 한다. env 미설정 시 기존 new_registry_key() 동작 보존.
+T-495 P2: V2_REGISTRY_KEY env priority — board kanban submit handler
+Inject registry_key determinism externally to pre-issue session_id
+Make it possible. If env is not set, existing new_registry_key() behavior is preserved.
 """
 
 from __future__ import annotations
@@ -54,10 +54,10 @@ def _parse_ticket_meta(dump: str) -> tuple[str, str]:
 def _maybe_create_worktree(
     ticket_no: str, title: str, command: str
 ) -> tuple[str | None, Path | None]:
-    """command=implement 면 v1 worktree_manager.create_worktree 호출.
+    """If command=implement, call v1 worktree_manager.create_worktree.
 
-    Returns: (feature_branch_name, worktree_path). command != implement 면 (None, None).
-    실패 시 SystemExit(2).
+    Returns: (feature_branch_name, worktree_path). If command != implement (None, None).
+    SystemExit(2) on failure.
     """
     if command != "implement":
         return None, None
@@ -78,10 +78,10 @@ def _maybe_create_worktree(
 
 
 def init_step(ticket_no: str) -> WorkflowContext:
-    """INIT — kanban Open→In Progress, work_dir + worktree (command 분기) + status.json.
+    """INIT — kanban Open→In Progress, work_dir + worktree (command branch) + status.json.
 
-    ticket 존재 가드: kanban_show 결과 'Number:' 토큰 없으면 SystemExit(2).
-    work_dir 생성 전에 가드 — work_dir 잔재 회피.
+    ticket presence guard: If token 'Number:' is not found in kanban_show result, SystemExit(2).
+    Guard before creating work_dir — Avoid work_dir remnants.
     """
     # ticket guard first (before creating work_dir — avoiding remnants)
     ticket_dump = kanban_show(ticket_no)

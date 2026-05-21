@@ -1,6 +1,6 @@
-"""1회성 마이그레이션 — 평탄 디렉터리 → type 별 디렉터리 + frontmatter 확장.
+"""One-time migration — flat directory → directory by type + frontmatter expansion.
 
-멱등: 이미 type 디렉터리에 있는 파일은 건너뛴다. 재실행 안전.
+Idempotent: Files already in the type directory are skipped. Replay safe.
 """
 from __future__ import annotations
 
@@ -55,9 +55,9 @@ def _ensure_extended_frontmatter(mem: MemoryFile) -> bool:
 
 
 def _move_to_type_dir(cfg: GCConfig, mem: MemoryFile) -> Path | None:
-    """평탄 위치(=memory_dir 직접 자식) 인 파일을 type/ 디렉터리로 이동.
+    """Move flat-located files (direct children of =memory_dir) to the type/ directory.
 
-    이미 type 디렉터리에 있으면 None 반환 (스킵).
+    If the type directory already exists, return None (skip it).
     """
     parent = mem.path.parent
     if parent.name in TYPE_DIRS:

@@ -1,16 +1,16 @@
 #!/usr/bin/env -S python3 -u
-"""hooks 디렉토리 자기 보호 가드 Hook 스크립트.
+"""hooks directory Self-protection guard Hook script.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 .agent-factory/hooks/ 경로 파일 수정을 차단.
+Block modification of .agent-factory/hooks/ path file in PreToolUse(Write|Edit|Bash) event.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 보호 경로 수정 차단
+Main functions:
+    main: Hook entry point, blocks protection path modification after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-우회: 환경변수 HOOKS_EDIT_ALLOWED=1 설정 시 차단 해제
-      (오케스트레이터가 `.agent-factory/engine/flow/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1` 명령으로 설정/해제)
+Bypass: Unblock when setting the environment variable HOOKS_EDIT_ALLOWED=1
+      (The orchestrator turns it on/off with the command `.agent-factory/engine/flow/update_state.py env <registryKey> set HOOKS_EDIT_ALLOWED 1`)
 """
 
 from __future__ import annotations
@@ -58,10 +58,10 @@ except ImportError:
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -75,13 +75,13 @@ def _deny(reason: str) -> None:
 
 
 def _refs_protected(text: str) -> bool:
-    """텍스트가 보호 대상 경로를 참조하는지 확인한다.
+    """Verify that the text refers to the protected path.
 
     Args:
-        text: 검사할 텍스트 문자열
+        text: text string to check
 
     Returns:
-        보호 대상 경로 패턴에 매칭되면 True, 그렇지 않으면 False
+        True if matches the protected path pattern, False otherwise.
     """
     for p_re in PROTECTED_PATH_RES:
         if p_re.search(text):
@@ -90,13 +90,13 @@ def _refs_protected(text: str) -> bool:
 
 
 def _check_inline_write(subcmd: str) -> bool:
-    """인라인 코드(-c/-e 플래그) 내에서 보호 대상 경로에 대한 쓰기를 탐지한다.
+    """Detects writes to protected paths within inline code (-c/-e flags).
 
     Args:
-        subcmd: 검사할 서브커맨드 문자열
+        subcmd: Subcommand string to check
 
     Returns:
-        인라인 쓰기 패턴이 감지되면 True, 그렇지 않으면 False
+        True if an inline write pattern is detected, False otherwise.
     """
     if not re.search(r"\s+-(c|e)\s", subcmd):
         return False
@@ -109,17 +109,17 @@ def _check_inline_write(subcmd: str) -> bool:
 
 
 def _classify_bash_command(bash_cmd: str) -> str | None:
-    """Bash 명령을 분류하여 'READONLY' 또는 'MODIFY'를 반환한다.
+    """Classifies Bash commands and returns 'READONLY' or 'MODIFY'.
 
-    보호 대상 경로를 참조하지 않으면 None (통과).
+    None (pass) if no protected path is referenced.
 
     Args:
-        bash_cmd: 분류할 Bash 명령 문자열
+        bash_cmd: Bash command string to categorize
 
     Returns:
-        'READONLY': 읽기 전용 명령만 포함된 경우
-        'MODIFY': 수정 작업이 감지된 경우
-        None: 보호 대상 경로를 참조하지 않는 경우
+        'READONLY': if it contains only read-only commands
+        'MODIFY': if a modification operation is detected
+        None: If no protected path is referenced.
     """
     if not _refs_protected(bash_cmd):
         return None
@@ -164,11 +164,11 @@ def _classify_bash_command(bash_cmd: str) -> str | None:
 
 
 def main() -> None:
-    """hooks 디렉토리 자기 보호 가드 Hook의 진입점.
+    """hooks directory Self-protection guard Entry point for Hook.
 
-    stdin에서 JSON을 읽어 Write/Edit/Bash 도구 실행 시 보호 경로 수정을 차단한다.
-    HOOKS_EDIT_ALLOWED 환경변수가 설정된 경우 차단을 우회할 수 있다.
-    .agent-factory/runs/bypass 경로는 환경변수 우회 없이 항상 차단된다.
+    Blocks protection path modification when reading JSON from stdin and executing Write/Edit/Bash tools.
+    If the HOOKS_EDIT_ALLOWED environment variable is set, blocking can be bypassed.
+    The .agent-factory/runs/bypass path is always blocked without bypassing environment variables.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_HOOKS_SELF_PROTECT") or read_env("HOOK_HOOKS_SELF_PROTECT")

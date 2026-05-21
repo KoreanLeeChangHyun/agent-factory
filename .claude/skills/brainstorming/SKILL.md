@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "신규 기능 컨셉을 티켓 생성 직전 단계까지 정리할 때 호출. grill-me 와 짝을 이뤄 컨셉 탐색에 집중. 트리거: '브레인스토밍', '아이디어 정리', '컨셉 잡아줘', '구상 도와줘', 모호한 신규 기능 발화."
+description: "신규 기능 컨셉을 티켓 생성 직전 단계까지 정리할 때 호출. grill-me 의 Ouroboros 5단계 (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 루프 진입 직전 단계로, DRAFT 의 raw 발화를 다듬는 컨셉 탐색에 집중. 트리거: '브레인스토밍', '아이디어 정리', '컨셉 잡아줘', '구상 도와줘', 모호한 신규 기능 발화."
 license: "MIT (derived, partial)"
 ---
 
@@ -11,12 +11,12 @@ license: "MIT (derived, partial)"
 ## 1. 사용 시기
 
 - 신규 기능 컨셉 탐색 (구체 요구사항 도출 직전 단계)
-- `grill-me` 호출 전 큰 그림이 더 필요한 상태 (스코프·목적·성공 기준이 미정)
+- `grill-me` 의 Ouroboros 5단계 루프 진입 전 큰 그림이 더 필요한 상태 (스코프·목적·성공 기준이 미정 — DRAFT raw 발화 자체가 흐릿한 경우)
 - 티켓 생성 직전 정리 — 한 줄 요약·산출물 형태·우선순위가 모호한 경우
 
-## 2. grill-me 와의 관계
+## 2. grill-me (Ouroboros 루프) 와의 관계
 
-`grill-me` 는 인터뷰(질문)에 특화, `brainstorming` 은 컨셉 정리(큰 그림)에 특화합니다. 컨셉이 모이면 `grill-me` 또는 `flow-kanban create --status todo` 로 인계합니다.
+`grill-me` 는 Ouroboros 5단계 루프 (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 로 WorkRequest 를 실행 전 계약으로 다듬는 데 특화, `brainstorming` 은 그 이전 단계의 컨셉 정리(큰 그림)에 특화합니다. 컨셉이 모이면 `grill-me` (DRAFT 진입) 또는 `flow-kanban create --status todo` (직접 생성) 로 인계합니다.
 
 ## 3. 호출 흐름 (4단계 압축)
 
@@ -25,11 +25,11 @@ license: "MIT (derived, partial)"
 1. **도구 우선 컨텍스트 탐색** — `flow-kanban list/show/board`, `git worktree list`, `git log --oneline -20`, `MEMORY.md` (auto memory) 조회로 답할 수 있는 정보는 사용자에게 묻지 않습니다.
 2. **1~2개 인터뷰** — 도구로 답을 알 수 없는 결정점만 자연어로 한 번에 1~2개 묻습니다 (메뉴 형태 금지).
 3. **추천 1안 제시** — 옵션 나열 회피, 근본 1안 우선. 정말 필요할 때만 1~3개 단순화하고 추천 1안을 명시합니다.
-4. **인계** — 합의되면 `grill-me` (세부 인터뷰 필요 시) 또는 `flow-kanban create --status todo` (바로 티켓 생성 가능 시) 로 넘깁니다.
+4. **인계** — 합의되면 `grill-me` (Ouroboros 5단계 루프 진입, 세부 인터뷰·CRITIQUE 필요 시) 또는 `flow-kanban create --status todo` (바로 티켓 생성 가능 시) 로 넘깁니다.
 
 ## 4. 묻는 대상 / 묻지 않는 대상
 
-룰 정의의 단일 진실 공급원은 `.claude/rules/workflow/workflow.md` (티켓 생성 규칙 + DO 인터뷰 룰) 입니다. 본 스킬에서 보충하는 컨셉 정리용 결정점은 다음과 같습니다.
+룰 정의의 단일 진실 공급원은 `.claude/rules/workflow/workflow.md` (티켓 생성 규칙 + DO Ouroboros 루프 룰) 입니다. 본 스킬에서 보충하는 컨셉 정리용 결정점은 다음과 같습니다.
 
 - **묻는 대상** (workflow.md 인터뷰 룰 + 보충): 작업 범위 / 산출물 형태 / 제약 / 우선순위 / 목적 / 성공 기준
 - **묻지 않는 대상** (workflow.md 동일): 티켓 상태(자동 To Do), 기본 생성 옵션(기본값), 1=A/2=B 메뉴 형태
@@ -47,9 +47,9 @@ license: "MIT (derived, partial)"
 
 ## 6. 출처
 
-- 원본: `/home/deus/workspace/claude/.repo/superpowers/skills/brainstorming/SKILL.md` (MIT License, Jesse Vincent, 2025)
+- 원본: `/home/deus/workspace/claude/repo/superpowers/skills/brainstorming/SKILL.md` (MIT License, Jesse Vincent, 2025)
 - 인용 형태: **부분 차용 (컨셉만), 무거운 부분 폐기**.
-- 변경 요약: 한국어/존댓말로 재작성, 9단계 → 4단계 압축, HARD-GATE/spec-reviewer/자동 commit/2-3 접근법 강제/writing-plans 위임 폐기, 본 프로젝트 도구(`flow-kanban`, `git worktree`, auto memory)로 컨텍스트 탐색 매핑, `grill-me` 와의 dual-skill 관계 명시.
+- 변경 요약: 한국어/존댓말로 재작성, 9단계 → 4단계 압축, HARD-GATE/spec-reviewer/자동 commit/2-3 접근법 강제/writing-plans 위임 폐기, 본 프로젝트 도구(`flow-kanban`, `git worktree`, auto memory)로 컨텍스트 탐색 매핑, `grill-me` (Ouroboros 5단계 루프) 와의 dual-skill 관계 명시.
 
 ## 7. 시스템 스킬 분류
 

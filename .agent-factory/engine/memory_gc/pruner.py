@@ -1,6 +1,6 @@
-"""Archive 영구 prune — TTL(archive_ttl_days) 초과 파일 영구 삭제.
+"""Archive Permanent prune — Permanently delete files that exceed TTL (archive_ttl_days).
 
-사용자 명시 호출만. 자동 트리거 X.
+User-specified calls only. Auto trigger
 """
 from __future__ import annotations
 

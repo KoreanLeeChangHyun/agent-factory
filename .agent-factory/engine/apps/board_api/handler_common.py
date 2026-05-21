@@ -15,11 +15,11 @@ _KANBAN_ALL_DIRS = ('todo', 'open', 'progress', 'review', 'done')
 def _import_metrics_cli():
     """internal helper — not exposed as endpoint.
 
-    metrics_cli 모듈을 lazy import 한다.
+    Lazy import the metrics_cli module.
 
-    .agent-factory 디렉터리를 sys.path 에 추가한 뒤
-    ``engine.apps.cli.metrics_cli`` 를 import 한다. board 서버의 sys.path 에는 board/ 만 등록되어 있으므로
-    엔진 import 가 필요한 시점에서만 path 를 보충한다.
+    After adding the .agent-factory directory to sys.path
+    Import ``engine.apps.cli.metrics_cli``. Since only board/ is registered in the sys.path of the board server,
+    The path is supplemented only when engine import is necessary.
     """
     agent_factory_dir = os.path.normpath(
         os.path.join(os.getcwd(), '.agent-factory'),
@@ -33,11 +33,11 @@ def _import_metrics_cli():
 def _import_launch_metrics_cli():
     """internal helper — not exposed as endpoint.
 
-    launch_metrics_cli 모듈을 lazy import 한다.
+    Lazy import the launch_metrics_cli module.
 
-    engine/ 디렉터리를 sys.path 에 추가한 뒤 ``flow.launch_metrics_cli`` 를
-    import. _import_metrics_cli 와 동일한 패턴으로 엔진 import 가
-    필요한 시점에서만 path 를 보충한다.
+    After adding the engine/ directory to sys.path, type ``flow.launch_metrics_cli``
+    import. Engine import is done with the same pattern as _import_metrics_cli.
+    Supplement path only when necessary.
     """
     engine_dir = os.path.normpath(
         os.path.join(os.getcwd(), '.agent-factory', 'engine'),

@@ -30,7 +30,7 @@ from flow.flow_logger import append_log
 _COMMIT_LINE_RE = re.compile(r"^Commit:\s*([0-9a-f]{7,40}|None)\s*$", re.IGNORECASE)
 
 # Status line regular expression: "Status: Success | Partial success | failure"
-_STATUS_LINE_RE = re.compile(r"^Status:\s*(Success|Partial Success|Failure)\s*$")
+_STATUS_LINE_RE = re.compile(r"^Status:\s*(Success|Partial Success|Failure|Failed)\s*$")
 
 
 def parse_worker_return(stdout: str) -> tuple[Optional[str], Optional[str]]:
@@ -66,7 +66,13 @@ def parse_worker_return(stdout: str) -> tuple[Optional[str], Optional[str]]:
     if not status_match:
         return (None, None)
 
-    status: str = status_match.group(1)
+    status_map = {
+        "Success": "success",
+        "Partial Success": "Partial success",
+        "Failure": "failure",
+        "Failed": "failure",
+    }
+    status: str = status_map[status_match.group(1)]
 
     # Parse the second commit line (if none, legacy 1-line format)
     if len(lines) < 2:
@@ -78,6 +84,8 @@ def parse_worker_return(stdout: str) -> tuple[Optional[str], Optional[str]]:
         return (status, None)
 
     commit: str = commit_match.group(1)
+    if commit.lower() == "none":
+        commit = "doesn't exist"
     return (status, commit)
 
 
@@ -161,7 +169,7 @@ def emit_report_advisory(
     message = (
         f"[ADVISORY] reporter returned without report.md (path={report_path})\n"
         f"- Possibility that the SDK blocked the write of the subagent \n"
-        f"- User manual repair: report.md can be created by integrating work/in the main session"
+        f"- User manual repair: report.md can be created by work/ integration in main session"
     )
     # Non-blocking: append_log silently absorbs all exceptions
     append_log(abs_work_dir, "WARN", message)

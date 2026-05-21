@@ -1,6 +1,6 @@
-"""Production-line retry — 룰베이스 재시도 prompt 템플릿 + claude -p --resume loop.
+"""Production-line retry — rulebase retry prompt template + claude -p --resume loop.
 
-SPEC.md §6 (재시도 정책) + §3.4 (N_max). LLM 호출 0 — 재시도 prompt 도
+SPEC.md §6 (retry policy) + §3.4 (N_max). LLM call 0 — no retry prompt
 template fill.
 """
 
@@ -24,11 +24,11 @@ VerifyFn = Callable[[], VerifyResult]
 
 
 def _make_stdout_forwarder(ctx: WorkflowContext) -> Callable[[dict], None]:
-    """spawn on_line 콜백 — NDJSON line 마다 board /stdout 으로 forward.
+    """spawn on_line callback — Forward to board /stdout for each NDJSON line.
 
-    T-495 P1 — claude -p stream-json line 을 의미별 endpoint 로 보낸다.
-    text 는 assistant message.content[].text join. 다른 type 은 빈 문자열로 보내고
-    raw 만 frontend 분기 렌더에 활용 (text_delta / tool_use / result 등).
+    T-495 P1 — claude -p stream-json Send line to endpoint by meaning.
+    text is assistant message.content[].text join. Other types are sent as empty strings.
+    Only raw is used for frontend branch renders (text_delta / tool_use / result, etc.).
     """
 
     def _on_line(obj: dict) -> None:
@@ -63,10 +63,10 @@ def spawn_with_retry(
     artifact_path: Path,
     n_max: int | None = None,
 ) -> tuple[VerifyResult, SpawnResult | None, int]:
-    """spawn → verify → 실패 시 resume 재시도 N_max 까지.
+    """spawn → verify → in case of failure, resume retry up to N_max.
 
     Returns: (final VerifyResult, last SpawnResult, retry_count).
-    PASS 도달 시 즉시 반환. N_max 초과 시 마지막 실패 결과.
+    Immediate return upon reaching PASS. Last failure result when N_max is exceeded.
     """
     if n_max is None:
         n_max = get_n_max(step)
@@ -127,10 +127,10 @@ def _log_spawn_result(
     *,
     attempt: int,
 ) -> None:
-    """SpawnResult 상세 로그 — returncode + stdout/stderr 길이 + timeout 표시.
+    """SpawnResult verbose log — displays returncode + stdout/stderr length + timeout.
 
-    요구사항 ②: 워크플로우 스크립트 실행 상세 로그 기록.
-    stdout/stderr 전체는 metrics.jsonl + workflow.log 비대화 회피 위해 길이만 기록.
+    Requirement ②: Detailed log of workflow script execution.
+    The entire stdout/stderr records only the length of metrics.jsonl + workflow.log to avoid bloating.
     """
     suffix = "" if attempt == 0 else f" attempt={attempt}"
     if result.timed_out:

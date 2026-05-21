@@ -1,17 +1,17 @@
 """Production-line spawn — claude -p subprocess wrapper.
 
-SPEC.md §8 — Step 마다 1 subprocess. cwd=work_dir, --append-system-prompt,
---session-id, --resume <session_id> 재시도 지원.
+SPEC.md §8 — 1 subprocess per step. cwd=work_dir, --append-system-prompt,
+--session-id, --resume <session_id> Retry support.
 
-T-495 Phase 2 (driver) — `--output-format stream-json --verbose` 로 갈아끼움 +
-subprocess.run → Popen + readline 루프 + line callback. driver 가 NDJSON
-line 마다 의미별 endpoint 로 forward 한다.
+T-495 Phase 2 (driver) — Replaced with `--output-format stream-json --verbose` +
+subprocess.run → Popen + readline loop + line callback. driver is NDJSON
+Each line is forwarded to an endpoint for each meaning.
 
-회귀 fix (Phase 2-A 검토 회귀 4건):
-- session_id 는 claude CLI `--session-id <uuid>` 규약상 UUID 필수
-- logical_name (`wf-T489-PLAN`) 은 디버그/로그 인용용으로 분리
-- --permission-mode 명시 (non-interactive `-p` 모드 권한 차단 회피)
-- --add-dir 으로 work_dir 도구 접근 허용 (cwd 보강)
+Regression fix (4 regressions reviewed in Phase 2-A):
+- session_id is a required UUID according to the claude CLI `--session-id <uuid>` protocol.
+- logical_name (`wf-T489-PLAN`) is separated for debug/log quoting purposes.
+- Specify --permission-mode (avoid non-interactive `-p` mode permission blocking)
+- Allow work_dir tool access with --add-dir (cwd reinforcement)
 """
 
 from __future__ import annotations
@@ -33,15 +33,15 @@ DEFAULT_PERMISSION_MODE = "bypassPermissions"
 
 @dataclass
 class SpawnResult:
-    """claude -p subprocess 결과.
+    """claude -p subprocess result.
 
     Attributes:
-        returncode: process returncode (timeout 시 -1)
-        stdout: assistant message.content[].text 누적 (호환용 — verify 는 artifact 파일 read)
-        stderr: stderr 전체
-        timed_out: deadline 초과 여부
-        ndjson_lines: 파싱된 NDJSON line dict 목록 (테스트 + 진단용)
-        terminal_reason: result.terminal_reason ("completed" 등). 없으면 빈 문자열
+        returncode: process returncode (-1 on timeout)
+        stdout: assistant message.content[].text accumulated (for compatibility — verify reads artifact file)
+        stderr: stderr all
+        timed_out: Whether deadline is exceeded
+        ndjson_lines: List of parsed NDJSON line dict (for testing + diagnosis)
+        terminal_reason: result.terminal_reason ("completed", etc.). If not, an empty string
     """
 
     returncode: int
@@ -58,9 +58,9 @@ def new_session_uuid() -> str:
 
 
 def logical_session_name(ticket_no: str, step: str, phase_id: str | None = None) -> str:
-    """디버그/로그 인용용 logical name. claude 에 전달하지 않음.
+    """Logical name for debug/log quoting. Not passed to claude.
 
-    예: "wf-T489-PLAN", "wf-T489-WORK-P1". ctx.session_ids 의 key 로 사용.
+    Example: "wf-T489-PLAN", "wf-T489-WORK-P1". Used as key of ctx.session_ids.
     """
     base = f"wf-{ticket_no.replace('-', '')}-{step}"
     if phase_id is not None:
@@ -69,9 +69,9 @@ def logical_session_name(ticket_no: str, step: str, phase_id: str | None = None)
 
 
 def _extract_assistant_text(obj: dict[str, Any]) -> str:
-    """assistant NDJSON line 에서 text block 만 join.
+    """Join only the text block in the assistant NDJSON line.
 
-    shape (claude -p stream-json 실측):
+    shape (claude -p stream-json ground truth):
         {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
     """
     if obj.get("type") != "assistant":
@@ -98,17 +98,17 @@ def spawn_claude(
     add_dirs: tuple[Path, ...] = (),
     on_line: Callable[[dict[str, Any]], None] | None = None,
 ) -> SpawnResult:
-    """claude -p subprocess 발사 (stream-json 모드).
+    """claude -p subprocess fire (stream-json mode).
 
-    - cwd=work_dir 로 산출물 작성 위치 지정 (SPEC.md §8.4)
+    - Specify output creation location with cwd=work_dir (SPEC.md §8.4)
     - --output-format stream-json --verbose (T-495 P1)
-    - --append-system-prompt 로 Step 별 system prompt 주입 (10KB 이하)
-    - --session-id <uuid> 또는 --resume <uuid>
-    - --permission-mode <mode> 명시 (default: bypassPermissions)
-    - --add-dir <path> 으로 도구 접근 허용 디렉터리 추가
-    - prompt_body 는 stdin 으로 전달
-    - on_line(obj) 콜백 — NDJSON line 마다 호출 (None 이면 skip)
-      콜백 예외는 silent 흡수 — driver 흐름 영향 0
+    - Inject system prompt for each step with --append-system-prompt (10KB or less)
+    - --session-id <uuid> or --resume <uuid>
+    - Specify --permission-mode <mode> (default: bypassPermissions)
+    - Add a directory that allows tool access with --add-dir <path>
+    - prompt_body is passed to stdin
+    - on_line(obj) callback — Called every NDJSON line (skip if None)
+      Callback exceptions are absorbed silently — driver flow impact 0
     """
     effective_timeout = timeout if timeout is not None else STEP_TIMEOUT_BY_STEP.get(step, 600)
     cmd = [CLAUDE_BIN, "-p", "--output-format", "stream-json", "--verbose"]

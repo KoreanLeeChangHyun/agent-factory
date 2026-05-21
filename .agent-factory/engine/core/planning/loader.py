@@ -1,9 +1,9 @@
 """Core planning loader for `plan/plan.json`.
 
-산출물 형식 결정 캐논 (T-504):
-- driver (기계) 는 **JSON** 파일을 읽는다 — json.loads + dataclass 검증 결정론.
-- LLM ↔ LLM 인계용 자연어 본문은 **plan/plan.md** 가 별도로 박제 (PLAN LLM 동시 산출).
-- 본 모듈은 JSON 만 책임.
+Output Format Determination Canon (T-504):
+- driver (machine) reads **JSON** file — json.loads + dataclass validation determinism.
+- Natural language text for LLM ↔ LLM handover is stuffed separately in **plan/plan.md** (PLAN LLM is calculated simultaneously).
+- This module is only responsible for JSON.
 
 The production-line runtime keeps a compatibility wrapper at `engine.apps.production_line.core.plan_loader`.
 """
@@ -22,16 +22,16 @@ class PlanLoaderError(ValueError):
 
 @dataclass
 class Phase:
-    """plan.json 의 phases[] 1개.
+    """1 phases[] in plan.json.
 
-    필드:
-    - id: 영문+숫자 (P1, P2, ...). Phase 그래프 안에서 unique.
-    - title: 짧은 한 줄.
-    - deps: 의존 Phase id 리스트. 빈 list 허용. 자기참조/미존재 ID 금지.
-    - deliverable: `work/<id>/W<n>.md` (nested) 또는 `work/<id>.md` (flat backward compat).
+    Field:
+    - id: English letters + numbers (P1, P2, ...). Unique within the Phase graph.
+    - title: A short line.
+    - deps: Dependent Phase id list. Allow empty list. No self-referencing/non-existent IDs.
+    - deliverable: `work/<id>/W<n>.md` (nested) or `work/<id>.md` (flat backward compat).
     - spawn_mode: in_place (default) | subprocess.
-    - workers: 본 phase 안에서 spawn 할 worker 수 (default 1, 2+ 는 별 트랙).
-    - acceptance_criteria: command=implement 한정 의무. list[str], 1+ 항목.
+    - workers: Number of workers to spawn within this phase (default 1, 2+ are separate tracks).
+    - acceptance_criteria: command=implement qualified obligation. list[str], 1+ items.
     """
 
     id: str
@@ -55,18 +55,18 @@ class Plan:
 
 
 def parse_plan_json(path: Path) -> Plan:
-    """`plan/plan.json` 을 읽어 검증된 `Plan` 반환.
+    """Reads `plan/plan.json` and returns verified `Plan`.
 
-    실패 시 `PlanLoaderError` raise. driver 가 PLAN 재시도 trigger 로 사용.
+    On failure, raise `PlanLoaderError`. The driver is used as a PLAN retry trigger.
 
-    검증 항목:
-    1. 파일 존재 + JSON parse 성공
-    2. 필수 키 (schema_version / ticket / command / mode / phases) 존재
-    3. phases 빈 list 금지
+    Verification items:
+    1. File exists + JSON parse success
+    2. Required keys (schema_version / ticket / command / mode / phases) exist
+    3. No empty list of phases
     4. Phase id unique
-    5. deps 가 phases 안에 존재 + 자기 자신 참조 금지
-    6. command=implement 인 경우 acceptance_criteria 1+ 항목 의무 (빈 list 금지)
-    7. deps 그래프 순환 없음 (Kahn topological sort)
+    5. deps exist within phases + self-reference is prohibited
+    6. If command=implement, acceptance_criteria 1+ item obligation (no empty list)
+    7. No deps graph rotation (Kahn topological sort)
     """
     if not path.exists():
         raise PlanLoaderError(f"plan.json not found: {path}")
@@ -187,13 +187,13 @@ def _has_topo_order(phases: list[Phase]) -> bool:
 
 
 def topo_sort(phases: list[Phase]) -> list[Phase] | None:
-    """Kahn topological sort — 실행 순서 결정.
+    """Kahn topological sort — determining execution order.
 
-    `parse_plan_json` 통과한 plan 은 순환 없음 보장. 본 함수는 driver 가
-    WORK Step 에서 실행 순서 결정 용도.
+    Plans that pass `parse_plan_json` are guaranteed to have no cycles. This function has a driver
+    Used to determine execution order in WORK Step.
 
     Returns:
-        topologically sorted Phase 리스트. 순환 발견 시 None.
+        A topologically sorted Phase list. None if cycle is detected.
     """
     by_id = {p.id: p for p in phases}
     in_degree: dict[str, int] = {p.id: 0 for p in phases}
@@ -219,16 +219,16 @@ def topo_sort(phases: list[Phase]) -> list[Phase] | None:
 
 
 def topo_levels(phases: list[Phase]) -> list[list[Phase]]:
-    """T-506 P2 — Kahn 확장. phase 들을 topological level 별로 묶어 반환.
+    """T-506 P2 — Kahn extension. Returns the phases grouped by topological level.
 
-    level k 의 phase 는 deps 가 가리키는 phase 중 최대 level 이 k-1.
-    deps=[] phase 는 level 0. driver 가 같은 level 동시 spawn → 모든 phase
-    완료 후 다음 level 진입하는 패턴에 사용.
+    The maximum level of the phase of level k is k-1 among the phases indicated by deps.
+    deps=[] phase is level 0. Driver spawns at the same level → all phases
+    Used for patterns that enter the next level after completion.
 
     Returns:
-        `[[level_0_phases], [level_1_phases], ...]`. 같은 level 안 phase 순서는
-        입력 phase 리스트의 순서 보존 (deterministic).
-        순환 의존 또는 unknown dep 시 빈 list 반환 (parse_plan_json 이 선검증).
+        `[[level_0_phases], [level_1_phases], ...]`. Phase order within the same level
+        Preserves the order of the input phase list (deterministic).
+        In case of circular dependency or unknown dep, an empty list is returned (parse_plan_json pre-verifies).
     """
     if not phases:
         return []

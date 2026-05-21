@@ -22,6 +22,14 @@ def test_translate_path_uses_board_web_root(tmp_path) -> None:
     assert resolved == str(tmp_path / ".agent-factory" / "board" / "web" / "index.html")
 
 
+def test_translate_path_serves_board_page_from_board_web_root(tmp_path) -> None:
+    handler = _make_handler(tmp_path)
+
+    resolved = handler.translate_path("/board.html")
+
+    assert resolved == str(tmp_path / ".agent-factory" / "board" / "web" / "board.html")
+
+
 def test_translate_path_keeps_legacy_board_static_url_compatible(tmp_path) -> None:
     handler = _make_handler(tmp_path)
 

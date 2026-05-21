@@ -1,10 +1,10 @@
-"""3축 점수 계산 + Hot/Warm/Cold 계층 결정.
+"""3-axis score calculation + Hot/Warm/Cold tier determination.
 
-Hot   = 인덱스 상위 hot_limit 개 (사용자 컨텍스트에 자동 노출)
-Warm  = 그 외 type 디렉터리 거주
-Cold  = archive 거주 (인덱스 제외)
+Hot = index top hot_limit (automatically exposed to user context)
+Warm = resides in other type directories
+Cold = archive resident (excluding index)
 
-파일 위치는 옮기지 않는다 — Hot 은 단지 정렬·표기 기준.
+It does not change the file location — Hot is just a sorting/notation criterion.
 """
 from __future__ import annotations
 

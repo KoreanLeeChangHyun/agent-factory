@@ -225,7 +225,7 @@
     }
 
     // classDef for status colors
-    lines.push("  classDef todo fill:#1e1e1e,stroke:#6a9fb5,stroke-width:2px,color:#e0e0e0");
+    lines.push("  classDef todo fill:#1e1e1e,stroke:#569cd6,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef open fill:#1e1e1e,stroke:#4ec9b0,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef progress fill:#1e1e1e,stroke:#dcdcaa,stroke-width:2px,color:#e0e0e0");
     lines.push("  classDef review fill:#1e1e1e,stroke:#c586c0,stroke-width:2px,color:#e0e0e0");

@@ -1,45 +1,45 @@
-"""metrics.py - 워크플로우 metrics jsonl writer 인프라.
+"""metrics.py - Workflow metrics jsonl writer infrastructure.
 
-워크플로우 한 번 실행될 때마다 발생하는 12종 이벤트를 단일 jsonl
-파일(`<workDir>/metrics.jsonl`)에 append-only 로 기록한다. 호출 측은
-`MetricsWriter` 클래스 또는 함수형 헬퍼 `append_event()` 둘 중 하나를
-사용한다.
+Single jsonl for 12 types of events that occur each time a workflow is executed
+Record as append-only in the file (`<workDir>/metrics.jsonl`). The calling party
+Either the `MetricsWriter` class or the functional helper `append_event()`
+Use it.
 
-저장 형식:
-    JSON Lines (jsonl). 한 줄 = 한 JSON object + ``\\n``.
-    공통 필드:
-        - event_type: 12종 카탈로그 중 하나
+Save format:
+    JSON Lines (jsonl). One line = one JSON object + `` \n ``.
+    Common fields:
+        - event_type: One of 12 catalogs
         - timestamp: ISO8601 (KST, UTC+9)
-        - ticket: T-NNN (또는 None 허용)
-        - registry_key: YYYYMMDD-HHMMSS (또는 None 허용)
-        - work_dir: 절대 경로
-        - payload: dict (event_type 별 필수 키 검증)
+        - ticket: T-NNN (or None allowed)
+        - registry_key: YYYYMMDD-HHMMSS (or None is allowed)
+        - work_dir: absolute path
+        - payload: dict (verification of required keys by event_type)
 
-12종 event_type 카탈로그:
+12 event_type catalogs:
     step.start, step.end, phase.start, phase.end, tool.call, tool.deny,
     usage.snapshot, subagent.spawn, subagent.end, worktree.io,
     regression.pattern, report.missing
 
-검증 규칙:
-    - event_type 미등록 → ValueError
-    - payload 가 dict 가 아님 → ValueError
-    - payload 필수 키 누락 → ValueError
-    - timestamp 자동 생성 (KST ISO8601)
+Validation Rules:
+    - event_type not registered → ValueError
+    - payload is not a dict → ValueError
+    - Payload required key missing → ValueError
+    - Automatic creation of timestamp (KST ISO8601)
 
-IO 규칙:
+IO Rules:
     - append-only (open mode "a")
-    - write 후 flush() (no fsync)
-    - ensure_ascii=False (한국어 보존)
-    - 줄당 4KB 권고 — 본 모듈은 검증만 수행, truncate 는 호출측 책임
+    - flush() after write (no fsync)
+    - ensure_ascii=False (Korean preserved)
+    - 4KB per line recommended — This module only performs verification, truncate is the responsibility of the caller.
 
-예시:
+example:
     >>> from engine.core.metrics import MetricsWriter, append_event
     >>> w = MetricsWriter("/tmp/run/work", ticket="T-400",
     ...                   registry_key="20260505-183053")
     >>> w.append("step.start", {"step": "INIT", "source": "banner"})
     >>> w.close()
 
-    또는 함수형:
+    Or in functional form:
     >>> append_event("/tmp/run/work", "step.start",
     ...              {"step": "INIT", "source": "banner"},
     ...              ticket="T-400", registry_key="20260505-183053")
@@ -92,25 +92,25 @@ _SCHEMA: dict[str, list[str]] = {
 
 
 def _now_kst_iso() -> str:
-    """현재 시각을 KST ISO8601 형식으로 반환한다.
+    """Returns the current time in KST ISO8601 format.
 
     Returns:
-        예: "2026-05-05T18:30:53.123456+09:00"
+        Example: "2026-05-05T18:30:53.123456+09:00"
     """
     return datetime.now(_KST).isoformat()
 
 
 def schema_for(event_type: str) -> list[str]:
-    """event_type 에 대한 payload 필수 키 목록을 반환한다.
+    """Returns a list of payload required keys for event_type.
 
     Args:
-        event_type: 12종 카탈로그 중 하나.
+        event_type: One of 12 catalogs.
 
     Returns:
-        필수 payload 키 리스트의 새 복사본 (호출측 변경이 카탈로그에 영향 X).
+        A new copy of the required payload key list (caller changes do not affect the catalog).
 
     Raises:
-        KeyError: event_type 이 카탈로그에 없을 때.
+        KeyError: when event_type is not in the catalog.
     """
     if event_type not in _SCHEMA:
         raise KeyError(
@@ -121,35 +121,35 @@ def schema_for(event_type: str) -> list[str]:
 
 
 def known_event_types() -> list[str]:
-    """등록된 12종 event_type 카탈로그를 정렬해 반환한다.
+    """Sorts and returns the 12 registered event_type catalogs.
 
     Returns:
-        event_type 문자열 리스트 (사전순 정렬).
+        event_type List of strings (sorted alphabetically).
     """
     return sorted(_SCHEMA.keys())
 
 
 def metrics_path(work_dir: Union[str, Path]) -> Path:
-    """work_dir 에 대한 metrics.jsonl 절대 경로를 반환한다.
+    """Returns the absolute path to metrics.jsonl for work_dir.
 
     Args:
-        work_dir: 워크플로우 작업 디렉터리 (str 또는 Path).
+        work_dir: Workflow working directory (str or Path).
 
     Returns:
-        ``<work_dir>/metrics.jsonl`` 의 Path 객체.
+        Path object of ``<work_dir>/metrics.jsonl``.
     """
     return Path(work_dir) / _METRICS_FILENAME
 
 
 def _validate(event_type: str, payload: Any) -> None:
-    """event_type / payload 의 형식과 필수 키 존재 여부를 검증한다.
+    """Verify the format of event_type / payload and the presence of required keys.
 
     Args:
-        event_type: 12종 카탈로그 중 하나여야 함.
-        payload: dict 여야 하며 schema_for() 가 요구하는 키를 모두 포함해야 함.
+        event_type: Must be one of 12 catalogs.
+        payload: Must be a dict and contain all keys required by schema_for().
 
     Raises:
-        ValueError: 검증 실패 시. 메시지에 사유 포함.
+        ValueError: When verification fails. Include reason in message.
     """
     if event_type not in _SCHEMA:
         raise ValueError(
@@ -170,14 +170,14 @@ def _validate(event_type: str, payload: Any) -> None:
 
 
 def _load_context_defaults(work_dir: Path) -> dict[str, Optional[str]]:
-    """work_dir 의 .context.json 에서 ticket / registry_key 기본값을 로드한다.
+    """Load ticket / registry_key default values ​​from .context.json in work_dir.
 
     Args:
-        work_dir: 워크플로우 작업 디렉터리.
+        work_dir: Workflow working directory.
 
     Returns:
         {"ticket": <T-NNN | None>, "registry_key": <YYYYMMDD-HHMMSS | None>}
-        파일 부재 / 파싱 실패 / 키 없음 → None 으로 채움.
+        Absence of file / Parsing failure / No key → Filled with None.
     """
     ctx_path = Path(work_dir) / ".context.json"
     defaults: dict[str, Optional[str]] = {"ticket": None, "registry_key": None}
@@ -199,19 +199,19 @@ def _load_context_defaults(work_dir: Path) -> dict[str, Optional[str]]:
 
 
 class MetricsWriter:
-    """metrics.jsonl 파일에 이벤트를 append 하는 writer.
+    """A writer who appends events to the metrics.jsonl file.
 
     Attributes:
-        work_dir: 워크플로우 작업 디렉터리 (절대 경로 권장).
-        ticket: 티켓 번호 (예: "T-400"). None 허용.
-        registry_key: registryKey (예: "20260505-183053"). None 허용.
-        path: ``<work_dir>/metrics.jsonl`` 절대 경로.
+        work_dir: Workflow working directory (absolute path recommended).
+        ticket: Ticket number (e.g. "T-400"). None allowed.
+        registry_key: registryKey (e.g. "20260505-183053"). None allowed.
+        path: ``<work_dir>/metrics.jsonl`` absolute path.
 
     Notes:
-        - 인스턴스는 fd 를 보유하지 않는다. 매 append 시 short-lived
-          ``open(..., "a")`` → write → flush → close 하여 동시성/충돌
-          위험을 최소화한다 (subagent + 메인 동시 쓰기 시나리오 고려).
-        - close() 는 호환성을 위해 제공되며 no-op.
+        - Instance does not hold fd. Every append is short-lived
+          Concurrency/conflict by ``open(..., "a")`` → write → flush → close
+          Minimize risk (consider subagent + main simultaneous write scenario).
+        - close() is provided for compatibility and is a no-op.
     """
 
     def __init__(
@@ -220,12 +220,12 @@ class MetricsWriter:
         ticket: Optional[str] = None,
         registry_key: Optional[str] = None,
     ) -> None:
-        """Writer 인스턴스를 초기화한다.
+        """Initializes a Writer instance.
 
         Args:
-            work_dir: 워크플로우 작업 디렉터리.
-            ticket: 티켓 번호 (예: "T-400"). 모든 이벤트의 공통 헤더에 들어감.
-            registry_key: registryKey (예: "20260505-183053").
+            work_dir: Workflow working directory.
+            ticket: Ticket number (e.g. "T-400"). Contains common header for all events.
+            registry_key: registryKey (e.g. "20260505-183053").
         """
         self.work_dir: Path = Path(work_dir)
         self.ticket: Optional[str] = ticket
@@ -233,16 +233,16 @@ class MetricsWriter:
         self.path: Path = metrics_path(self.work_dir)
 
     def append(self, event_type: str, payload: dict[str, Any]) -> None:
-        """이벤트 한 줄을 jsonl 파일에 append 한다.
+        """Append one event line to the jsonl file.
 
         Args:
-            event_type: 12종 카탈로그 중 하나.
-            payload: event_type 에 대한 payload dict.
+            event_type: One of 12 catalogs.
+            payload: payload dict for event_type.
 
         Raises:
-            ValueError: event_type 이 미등록이거나, payload 형식 오류 또는
-                필수 키 누락 시.
-            OSError: 디스크 IO 실패 시 (호출측에서 try/except 권고).
+            ValueError: event_type is not registered, payload format error, or
+                In case of missing required key.
+            OSError: When disk IO fails (try/except recommended on the call side).
         """
         _validate(event_type, payload)
         record: dict[str, Any] = {
@@ -281,21 +281,21 @@ def append_event(
     ticket: Optional[str] = None,
     registry_key: Optional[str] = None,
 ) -> None:
-    """함수형 헬퍼 — 1회성 append 시 인스턴스 생성을 생략하고 호출.
+    """Functional helper — When performing a one-time append, instance creation is omitted and called.
 
-    work_dir/.context.json 이 존재하면 ticket / registry_key 를 자동
-    로드하여 명시 인자가 None 일 때 기본값으로 사용한다.
+    If work_dir/.context.json exists, ticket / registry_key is automatically set
+    Load it and use it as the default value when the specified argument is None.
 
     Args:
-        work_dir: 워크플로우 작업 디렉터리.
-        event_type: 12종 카탈로그 중 하나.
-        payload: event_type 에 대한 payload dict.
-        ticket: 명시 시 .context.json 보다 우선.
-        registry_key: 명시 시 .context.json 보다 우선.
+        work_dir: Workflow working directory.
+        event_type: One of 12 catalogs.
+        payload: payload dict for event_type.
+        ticket: When specified, takes precedence over .context.json.
+        registry_key: When specified, takes precedence over .context.json.
 
     Raises:
-        ValueError: 검증 실패 시.
-        OSError: 디스크 IO 실패 시.
+        ValueError: When verification fails.
+        OSError: When disk IO fails.
     """
     work_dir_path = Path(work_dir)
     if ticket is None or registry_key is None:
@@ -315,10 +315,10 @@ def append_event(
 # ---------------------------------------------------------------------------
 
 def _selfcheck() -> int:
-    """12종 스키마의 정상/누락 케이스를 검증하고 결과 표를 출력한다.
+    """Verifies normal/missing cases of 12 types of schema and outputs a result table.
 
     Returns:
-        실패 케이스 수. 0 이면 모든 검증 통과.
+        Number of failure cases. If it is 0, all verification passes.
     """
     import tempfile
 

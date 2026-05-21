@@ -44,7 +44,7 @@
       var prevStatus = M.currentToolBox.querySelector(".term-tool-status");
       if (prevStatus && prevStatus.classList.contains("running")) {
         prevStatus.className = "term-tool-status done";
-        prevStatus.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        prevStatus.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97757" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
       }
       // If the output of the previous box is empty, remove the premise from the DOM
       var prevFull = M.currentToolBox.querySelector(".term-tool-output-full");
@@ -370,7 +370,7 @@
       statusEl.className = isError ? "term-tool-status error" : "term-tool-status done";
       statusEl.innerHTML = isError
         ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97757" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     }
 
     if (!isError) {

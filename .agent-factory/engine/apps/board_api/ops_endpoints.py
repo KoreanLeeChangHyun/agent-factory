@@ -1,14 +1,14 @@
 """OpsHandlerMixin — INF domain endpoints (T-511 P5).
 
-운영 endpoint 3건:
-  - POST /api/ops/zombie-reap   — Claude CLI 좀비 회수 명시 호출 (T-403 GC 사이드카 진입점)
-  - POST /api/ops/debug-toggle  — debug.enabled 플래그 토글 (`true|false` body)
-  - GET  /api/ops/sse-status    — 3 SSE 채널 (SSEClientManager / TerminalSSEChannel / ProductionLineSSEChannel)
-                                  클라이언트 수 + 마지막 이벤트 시각
+3 operational endpoints:
+  - POST /api/ops/zombie-reap — Claude CLI zombie retrieval explicit call (T-403 GC sidecar entry point)
+  - POST /api/ops/debug-toggle — Toggle debug.enabled flag (`true|false` body)
+  - GET /api/ops/sse-status — 3 SSE channels (SSEClientManager / TerminalSSEChannel / ProductionLineSSEChannel)
+                                  Number of clients + last event time
 
-본 endpoint 들은 외부 도구 / 사용자 명시 호출 진입점이다. 자동 사이드카가 같은
-기능을 결정론적으로 수행하는 영역 (T-403 GC daemon thread 등) 도 본 endpoint
-로 즉시 트리거 가능 — debug / recovery / operator 진입로 일관화.
+These endpoints are entry points for external tool/user specified calls. Automatic sidecar like
+This endpoint also includes areas that perform functions deterministically (T-403 GC daemon thread, etc.)
+Can be instantly triggered with — consistent debug/recovery/operator ramp.
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ class OpsHandlerMixin:
 
     @api_endpoint("INF", "zombie_reap")
     def _handle_ops_zombie_reap(self) -> None:
-        """POST /api/ops/zombie-reap — Claude CLI 좀비 subprocess 회수 명시 호출.
+        """POST /api/ops/zombie-reap — Claude CLI zombie subprocess recall explicit call.
 
-        T-403 GC 사이드카 daemon thread 가 결정론적으로 동일 작업을 60s 주기로
-        수행한다. 본 endpoint 는 사용자/외부 도구가 즉시 트리거하는 명시 진입점.
+        The T-403 GC sidecar daemon thread deterministically performs the same task in 60s cycle.
+        Perform. This endpoint is an explicit entry point that is immediately triggered by the user/external tool.
 
-        구현: `os.waitpid(-1, os.WNOHANG)` 루프로 종료된 자식 reap. 평소 비용 0
-        (os 호출 한 번 + 빈 루프).
+        Implementation: Child reap terminated with `os.waitpid(-1, os.WNOHANG)` loop. Usual cost 0
+        (one os call + empty loop).
 
         method: POST
         url: /api/ops/zombie-reap
@@ -41,7 +41,7 @@ class OpsHandlerMixin:
         response_error: n/a (always 200 / 500 on os error)
         status_codes: 200, 500
         auth: none (local-only) — operator trigger
-        side_effects: os.waitpid 호출로 좀비 자식 회수 (state.py 영향 X)
+        side_effects: Retrieve zombie children by calling os.waitpid (state.py affects X)
         sse_events: none
         """
         reaped = 0
@@ -63,17 +63,17 @@ class OpsHandlerMixin:
 
     @api_endpoint("INF", "debug_toggle")
     def _handle_ops_debug_toggle(self) -> None:
-        """POST /api/ops/debug-toggle — debug.enabled 플래그 토글.
+        """POST /api/ops/debug-toggle — Toggle the debug.enabled flag.
 
-        본문 `{enabled: true|false}` 또는 body 없을 시 현재 상태 토글.
-        플래그 파일 (.agent-factory/runs/bg/debug.enabled) 생성/삭제로
-        debug.log NDJSON 적재 활성/비활성 게이트.
+        Body `{enabled: true|false}` or toggle the current state if there is no body.
+        By creating/deleting the flag file (.agent-factory/runs/bg/debug.enabled)
+        debug.log NDJSON load enable/disable gate.
 
         method: POST
         url: /api/ops/debug-toggle
         domain: INF
         handler: OpsHandlerMixin._handle_ops_debug_toggle
-        request: body {enabled?: bool} (생략 시 자동 토글)
+        request: body {enabled?: bool} (automatic toggle if omitted)
         response_ok: {ok: true, enabled: bool, path: str}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 500
@@ -123,10 +123,10 @@ class OpsHandlerMixin:
 
     @api_endpoint("INF", "sse_status")
     def _handle_ops_sse_status(self) -> None:
-        """GET /api/ops/sse-status — 3 SSE 채널 클라이언트 수 + 마지막 이벤트 시각.
+        """GET /api/ops/sse-status — Number of 3 SSE channel clients + time of last event.
 
-        SSEClientManager (server-wide) + TerminalSSEChannel (메인 터미널) +
-        ProductionLineSSEChannel (per-session N) 각각의 라이브 클라이언트 수 dump.
+        SSEClientManager (server-wide) + TerminalSSEChannel (main terminal) +
+        ProductionLineSSEChannel (per-session N) Dump number of live clients for each.
 
         method: GET
         url: /api/ops/sse-status

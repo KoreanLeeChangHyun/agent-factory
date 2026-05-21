@@ -1,11 +1,11 @@
-"""flow-memory-gc 진입점 — argparse 기반.
+"""flow-memory-gc entry point — argparse based.
 
-서브커맨드:
-  migrate         디렉터리 재편 + frontmatter 확장 (1회성, 멱등)
-  run             GC 사이클 적용 (dedup 머지, reflection 합성, 인덱스 갱신)
-  dry-run         후보만 보고, 실제 변경 없음
-  prune-archive   archive TTL 만료 영구 삭제 (수동 전용)
-  status          last_run.json + 현재 디렉터리 상태 출력
+Subcommand:
+  migrate directory reorganization + frontmatter extension (one-off, idempotent)
+  Apply run GC cycle (dedup merge, reflection synthesis, index update)
+  Dry-run only candidates, no actual changes
+  prune-archive archive TTL expired permanent deletion (manual only)
+  status last_run.json + Current directory status output
 """
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ def _cmd_prune(args: argparse.Namespace) -> int:
 
 
 def _cmd_auto(args: argparse.Namespace) -> int:
-    """Run is called only when trigger is included in MEMORY_GC_AUTO_TRIGGERS. silent skip 정책."""
+    """Run is called only when trigger is included in MEMORY_GC_AUTO_TRIGGERS. silent skip policy."""
     _load_settings_env()
     cfg = load_config()
     if args.trigger not in cfg.auto_triggers:

@@ -121,7 +121,7 @@ Deliverables:
 - domain directory move map
 - runtime root rename plan
 - LLMAdapter plan
-- `.repo` reference catalog
+- `repo` reference catalog
 
 Acceptance criteria:
 

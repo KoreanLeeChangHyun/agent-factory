@@ -1,26 +1,26 @@
 #!/usr/bin/env -S python3 -u
-"""Slack 메시지 전송 스크립트.
+"""Slack message sending script.
 
-새 시그니처 (workDir 기반):
-    python3 slack_notify.py <workDir> <상태> [보고서경로] [에이전트]
-    - workDir이 .agent-factory/ 또는 절대경로(/)로 시작하면 새 방식으로 감지
-    - workDir 형식: .agent-factory/runs/YYYYMMDD-HHMMSS/
-      또는 구 형식: .agent-factory/runs/YYYYMMDD-HHMMSS/<workName>/<command> (하위 호환)
-    - .context.json에서 title, workId, workName, command 자동 읽기
+New signature (based on workDir):
+    python3 slack_notify.py <workDir> <state> [report path] [agent]
+    - Detected in a new way if workDir starts with .agent-factory/ or an absolute path (/)
+    - workDir format: .agent-factory/runs/YYYYMMDD-HHMMSS/
+      Or the old format: .agent-factory/runs/YYYYMMDD-HHMMSS/<workName>/<command> (backwards compatible)
+    - Automatically read title, workId, workName, and command from .context.json
 
-기존 시그니처 (하위 호환):
-    python3 slack_notify.py <작업제목> <작업ID> <작업이름> <명령어> <상태> [보고서경로] [에이전트]
+Existing signatures (backwards compatible):
+    python3 slack_notify.py <Task Title> <Task ID> <Task Name> <Command> <Status> [Report Path] [Agent]
 
-주요 함수:
-    main: Slack 알림 전송 진입점
+Main functions:
+    main: Slack notification sending entry point
 
-환경변수 (.agent-factory/.settings에서 로드):
+Environment variables (loaded from .agent-factory/.settings):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
 
-에이전트별 색상 이모지:
-    agent 인자를 전달받으면 해당 값으로 이모지 결정
-    agent 인자가 없으면 이모지 없이 기존 포맷 유지
+Agent-specific colored emojis:
+    When the agent argument is received, the emoji is determined based on that value.
+    If there is no agent argument, the existing format is maintained without emojis.
 """
 
 from __future__ import annotations
@@ -52,10 +52,10 @@ from engine.common import (
 
 
 def _detect_wsl() -> bool:
-    """WSL 환경인지 감지한다.
+    """Detects whether it is a WSL environment.
 
     Returns:
-        WSL 환경이면 True, 그렇지 않으면 False
+        True if it is a WSL environment, False otherwise.
     """
     try:
         with open("/proc/version", "r") as f:
@@ -65,12 +65,12 @@ def _detect_wsl() -> bool:
 
 
 def _get_wsl_distro_name() -> str:
-    """WSL 배포판 이름을 추출한다.
+    """Extract the WSL distribution name.
 
-    /etc/os-release에서 배포판 이름과 버전을 읽어 'Ubuntu-22.04' 형식으로 반환.
+    Reads the distribution name and version from /etc/os-release and returns it in 'Ubuntu-22.04' format.
 
     Returns:
-        'Distro-Version' 형식의 배포판 이름 문자열. 파싱 실패 시 빈 문자열 반환.
+        A distro name string in the format 'Distro-Version'. If parsing fails, an empty string is returned.
     """
     distro = ""
     version = ""
@@ -91,15 +91,15 @@ def _get_wsl_distro_name() -> str:
 
 
 def _build_vscode_uri(abs_path: str) -> str:
-    """파일 경로를 vscode:// URI로 변환한다.
+    """Convert the file path to vscode:// URI.
 
-    WSL, Mac, Linux 환경을 각각 감지하여 적절한 URI 형식으로 변환.
+    Detects WSL, Mac, and Linux environments respectively and converts them to appropriate URI format.
 
     Args:
-        abs_path: 변환할 파일의 절대 경로
+        abs_path: Absolute path of the file to convert
 
     Returns:
-        vscode:// 스킴의 URI 문자열
+        URI string in vscode:// scheme
     """
     encoded = urllib.parse.quote(abs_path, safe="/")
     if _detect_wsl():
@@ -109,18 +109,18 @@ def _build_vscode_uri(abs_path: str) -> str:
 
 
 def _parse_new_signature(args: list[str]) -> dict[str, str]:
-    """새 시그니처를 파싱한다: <workDir> <상태> [보고서경로] [에이전트].
+    """Parse the new signature: <workDir> <state> [reportpath] [agent].
 
-    .context.json에서 title, work_id, work_name, command를 자동으로 읽어온다.
+    The title, work_id, work_name, and command are automatically read from .context.json.
 
     Args:
-        args: 명령행 인자 리스트 (sys.argv[1:])
+        args: Command line argument list (sys.argv[1:])
 
     Returns:
-        title, work_id, work_name, command, status, report_path, agent 키를 가진 딕셔너리
+        Dictionary with keys title, work_id, work_name, command, status, report_path, agent
 
     Raises:
-        SystemExit: 인자 수 부족 또는 .context.json 파일 부재/파싱 실패 시
+        SystemExit: Insufficient number of arguments or absence of .context.json file/parsing failure
     """
     if len(args) < 2:
         log_warn("Usage: slack_notify.py <workDir> <state> [report path] [agent]")
@@ -172,16 +172,16 @@ def _parse_new_signature(args: list[str]) -> dict[str, str]:
 
 
 def _parse_legacy_signature(args: list[str]) -> dict[str, str]:
-    """기존 시그니처를 파싱한다: <작업제목> <작업ID> <작업이름> <명령어> <상태> [보고서경로] [에이전트].
+    """Parse existing signatures: <task title> <task ID> <task name> <command> <state> [report path] [agent].
 
     Args:
-        args: 명령행 인자 리스트 (sys.argv[1:])
+        args: Command line argument list (sys.argv[1:])
 
     Returns:
-        title, work_id, work_name, command, status, report_path, agent 키를 가진 딕셔너리
+        Dictionary with keys title, work_id, work_name, command, status, report_path, agent
 
     Raises:
-        SystemExit: 필수 인자 5개 미만인 경우
+        SystemExit: If there are less than 5 required arguments
     """
     if len(args) < 5:
         log_warn(
@@ -202,11 +202,11 @@ def _parse_legacy_signature(args: list[str]) -> dict[str, str]:
 
 
 def main() -> None:
-    """Slack 메시지 전송의 진입점.
+    """Entry point for sending Slack messages.
 
-    명령행 인자를 파싱하여 새 시그니처(workDir 기반) 또는 기존 시그니처 방식으로
-    작업 정보를 구성하고 Slack으로 알림을 전송한다.
-    환경변수 로드 실패 시 조용히 종료한다.
+    Parses command line arguments and creates a new signature (based on workDir) or an existing signature.
+    Organize task information and send notifications to Slack.
+    Quietly exits if environment variable loading fails.
     """
     args = sys.argv[1:]
 

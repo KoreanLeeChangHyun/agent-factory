@@ -36,13 +36,13 @@ class GenericHandlerMixin:
     def _handle_api_delete(self) -> None:
         """internal helper — not exposed as endpoint.
 
-        T-511 P4 — /api/* DELETE 라우팅 dispatcher. 4 DELETE endpoint 를
-        mixin handler 메서드 (_handle_memory_delete / _handle_rules_delete /
-        _handle_prompt_delete / _handle_quick_prompt_delete) 로 위임.
+        T-511 P4 — /api/* DELETE routing dispatcher. 4 DELETE endpoint
+        mixin handler method (_handle_memory_delete / _handle_rules_delete /
+        Delegate to _handle_prompt_delete / _handle_quick_prompt_delete).
 
-        http_router.py do_DELETE 의 inline 분기 폐지 후 본 dispatcher 가 단일
-        라우팅 진입점. handler 메서드는 query/path 파싱 + 에러 응답 위임 패턴
-        보존.
+        After abolishing the inline branch of http_router.py do_DELETE, this dispatcher becomes a single
+        Routing entry point. The handler method is a query/path parsing + error response delegation pattern.
+        preservation.
         """
         from urllib.parse import urlparse
         parsed = urlparse(self.path)
@@ -63,8 +63,8 @@ class GenericHandlerMixin:
     def _handle_api(self) -> None:
         """internal helper — not exposed as endpoint.
 
-        /api/* GET 라우팅 dispatcher. 각 URL → 본 메서드 안에서 분기 후
-        inline (board_data 함수 직접 호출) 또는 mixin handler (_handle_*) 위임.
+        /api/* GET routing dispatcher. Each URL → After branching within this method
+        inline (call board_data function directly) or delegate to mixin handler (_handle_*).
         """
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
@@ -168,7 +168,7 @@ class GenericHandlerMixin:
 
     @api_endpoint("SYS", "poll")
     def _handle_poll(self) -> None:
-        """폴링 엔드포인트를 처리한다.
+        """Handles polling endpoints.
 
         method: GET
         url: /poll
@@ -193,7 +193,7 @@ class GenericHandlerMixin:
 
     @api_endpoint("SYS", "sse")
     def _handle_sse(self) -> None:
-        """SSE 엔드포인트를 처리한다.
+        """Handles SSE endpoints.
 
         method: GET
         url: /events

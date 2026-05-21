@@ -111,7 +111,7 @@ ok(mergeAdjacentOrderedLists(undefined) === undefined, "H-5-undefined");
   ok(countMatches(html, /<ol\b/g) === 1, "C-1: 5.6.7. → single ol");
   ok(countMatches(html, /<li>/g) === 3, "C-2: 3 li");
   // keep start=5 (keep start number)
-  ok(/<ol\s+start="5"/.test(html), "C-3: Preserve start=\\"5\\"", `html=${html}`);
+  ok(/<ol\s+start="5"/.test(html), "C-3: Preserve start=\"5\"", `html=${html}`);
 }
 
 // D: 0 start
@@ -119,7 +119,7 @@ ok(mergeAdjacentOrderedLists(undefined) === undefined, "H-5-undefined");
   const html = render("0. A\n0. B\n0. C");
   ok(countMatches(html, /<ol\b/g) === 1, "D-1: 0.0.0. → single ol");
   ok(countMatches(html, /<li>/g) === 3, "D-2: 3 li");
-  ok(/<ol\s+start="0"/.test(html), "D-3: Preserve start=\\"0\\"");
+  ok(/<ol\s+start="0"/.test(html), "D-3: Preserve start=\"0\"");
 }
 
 // E: Case where there is a text paragraph, but it is absorbed into a single ol by merging the helper.

@@ -1,20 +1,20 @@
 #!/usr/bin/env -S python3 -u
-"""Git Config 자동 설정 스크립트.
+"""Git Config auto-configuration script.
 
-.agent-factory/.settings에서 Git 설정 정보를 읽어 git config를 자동으로 설정합니다.
+Automatically configures git config by reading Git configuration information from .agent-factory/.settings.
 
-주요 함수:
-    main: Git 설정 적용 진입점
+Main functions:
+    main: Git configuration application entry point
 
-사용법: python3 git_config.py [--global|--local]
-  --global  전역 설정 (~/.gitconfig) [기본값]
-  --local   로컬 설정 (.git/config)
+Usage: python3 git_config.py [--global|--local]
+  --global Global settings (~/.gitconfig) [default]
+  --local Local configuration (.git/config)
 
-환경변수 (.agent-factory/.settings에서 로드):
-  CLAUDE_CODE_GIT_USER_NAME    - Git user.name (필수)
-  CLAUDE_CODE_GIT_USER_EMAIL   - Git user.email (필수)
-  CLAUDE_CODE_GITHUB_USERNAME  - GitHub 사용자명 (선택)
-  CLAUDE_CODE_SSH_KEY_GITHUB   - GitHub SSH 키 경로 (선택)
+Environment variables (loaded from .agent-factory/.settings):
+  CLAUDE_CODE_GIT_USER_NAME - Git user.name (required)
+  CLAUDE_CODE_GIT_USER_EMAIL - Git user.email (required)
+  CLAUDE_CODE_GITHUB_USERNAME - GitHub username (optional)
+  CLAUDE_CODE_SSH_KEY_GITHUB - GitHub SSH key path (optional)
 """
 
 from __future__ import annotations
@@ -38,14 +38,14 @@ _ENV_FILE = os.path.join(_CW_DIR, ".settings")
 
 
 def _git_config_get(scope: str, key: str) -> str:
-    """git config 값을 읽어 반환한다.
+    """Reads and returns the git config value.
 
     Args:
-        scope: git config 범위 ('--global' 또는 '--local')
-        key: 읽을 설정 키 (예: 'user.name')
+        scope: git config scope ('--global' or '--local')
+        key: configuration key to read (e.g. 'user.name')
 
     Returns:
-        설정 값 문자열. 설정이 없거나 오류 발생 시 '(Not set)' 반환.
+        Setting value string. If there is no setting or an error occurs, '(Not set)' is returned.
     """
     try:
         return subprocess.check_output(
@@ -57,13 +57,13 @@ def _git_config_get(scope: str, key: str) -> str:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """git_config 전용 ArgumentParser를 생성하여 반환한다.
+    """Creates and returns an ArgumentParser exclusive to git_config.
 
-    --global / --local 은 mutually exclusive group으로 구성되며
-    기본값은 --global 이다.
+    --global / --local are composed of mutually exclusive groups.
+    The default is --global.
 
     Returns:
-        구성된 ArgumentParser 인스턴스.
+        A configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         prog="flow-gitconfig",
@@ -93,14 +93,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Git config 자동 설정의 진입점.
+    """Entry point for Git config autoconfiguration.
 
-    .agent-factory/.settings에서 환경변수를 읽어 git user.name, user.email,
-    core.sshCommand를 지정된 범위(global/local)에 적용한다.
-    변경 전후 상태를 비교하여 출력한다.
+    Read environment variables from .agent-factory/.settings to create git user.name, user.email,
+    Apply core.sshCommand to the specified scope (global/local).
+    Compare and output the status before and after the change.
 
     Raises:
-        SystemExit: 설정 파일 부재, 필수 환경변수 누락, 알 수 없는 옵션 지정 시
+        SystemExit: When a configuration file is missing, required environment variables are missing, or an unknown option is specified.
     """
     # --- Option parsing ---
     parser = _build_parser()

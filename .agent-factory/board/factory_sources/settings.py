@@ -124,7 +124,9 @@ def _update_env_value(project_root: str, key: str, new_value: str) -> bool:
             lines[i] = f"{key}={new_value}\n"
         break
     else:
-        return False
+        if not lines or not lines[-1].endswith('\n'):
+            lines.append('\n')
+        lines.append(f"{key}={new_value}\n")
 
     with open(env_file, 'w', encoding='utf-8') as f:
         f.writelines(lines)

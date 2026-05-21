@@ -4,9 +4,12 @@
 /* ── Kanban ── */
 #view-kanban {
   padding: 8px;
-  display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+#view-kanban.active {
+  display: flex;
 }
 
 .wr-author {
@@ -180,10 +183,10 @@
   flex-shrink: 0;
 }
 
-.dot-todo { background: var(--af-primary); }
-.dot-open { background: var(--af-primary); }
-.dot-progress { background: var(--af-primary); }
-.dot-review { background: var(--af-primary); }
+.dot-todo { background: var(--af-info); }
+.dot-open { background: var(--af-success); }
+.dot-progress { background: var(--af-warning); }
+.dot-review { background: var(--af-accent); }
 .dot-done { background: var(--af-text-muted); }
 
 .col-count {
@@ -401,8 +404,8 @@
 }
 
 .status-todo {
-  background: var(--af-primary-soft);
-  color: var(--af-primary);
+  background: var(--af-info-soft);
+  color: var(--af-info);
 }
 
 /* T-457 (Layer 3): One-on-the-clock mark label (read-only).
@@ -1081,6 +1084,7 @@
   .wr-author-grid-fields {
     grid-template-columns: 1fr;
   }
+
   .wr-author-wide {
     grid-column: auto;
   }

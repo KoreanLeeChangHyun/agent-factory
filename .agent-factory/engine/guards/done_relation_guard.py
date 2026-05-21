@@ -1,10 +1,10 @@
 #!/usr/bin/env -S python3 -u
-"""flow-kanban done 실행 시 파생 티켓 완료 여부 검증 가드.
+"""flow-kanban done Guards verification of completion of derived ticket when executed.
 
-PreToolUse(Bash) 이벤트에서 flow-kanban done 명령을 감지하고,
-해당 티켓에서 derived-from으로 파생된 티켓이 Done이 아니면 차단한다.
+Detect the flow-kanban done command in the PreToolUse(Bash) event,
+If the ticket derived from the ticket in question is not Done, it is blocked.
 
-토글: 환경변수 HOOK_DONE_RELATION_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_DONE_RELATION_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations

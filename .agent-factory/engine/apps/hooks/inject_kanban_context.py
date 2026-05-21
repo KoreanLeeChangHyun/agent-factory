@@ -1,20 +1,20 @@
-"""inject_kanban_context.py — UserPromptSubmit hook: 칸반/세션 스냅샷 컨텍스트 빌더.
+"""inject_kanban_context.py — UserPromptSubmit hook: Kanban/session snapshot context builder.
 
-입력: stdin JSON (UserPromptSubmit 페이로드, 내용 무시 가능)
-출력: stdout JSON
+Input: stdin JSON (UserPromptSubmit payload, content can be ignored)
+Output: stdout JSON
   {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "<text>"}}
 
-사용 목적:
-  메인 세션이 사용자 turn마다 칸반 보드 현황 + 활성 워크플로우 세션을 자동으로 인지하도록
-  additionalContext로 주입한다. 워크플로우 세션에서는 W03 디스패처가 호출을 생략하므로
-  이 모듈은 메인 세션 식별 로직을 포함하지 않는다.
+use:
+  The main session automatically recognizes the Kanban board status + active workflow session every user turn.
+  Injected as additionalContext. Because the W03 dispatcher skips the call in a workflow session,
+  This module does not contain main session identification logic.
 
-출력 제한:
-  - 페이로드 4096 chars 초과 시 Open/In Progress 상세는 상위 10건만 표기
-  - 0.8s soft deadline: 초과 시 partial 페이로드 출력 후 종료
+Output Limit:
+  - When the payload exceeds 4096 chars, only the top 10 are displayed in Open/In Progress details.
+  - 0.8s soft deadline: When exceeded, partial payload is output and terminated.
 
-실패 정책:
-  - 어떤 예외에서도 exit 0 + 빈 stdout 보장 (사용자 turn 차단 금지)
+Failure Policy:
+  - Guaranteed exit 0 + empty stdout in any exception (no blocking of user turn)
 """
 
 from __future__ import annotations
@@ -78,12 +78,12 @@ def _find_project_root() -> str:
 # ── Collect Kanban Summary ────────────────────────────────────────────────────────────────
 
 def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
-    """XML 파일에서 metadata 필드만 빠르게 추출한다.
+    """Quickly extracts only metadata fields from XML files.
 
-    ET.iterparse를 사용하여 metadata 섹션 파싱 후 조기 중단.
-    입력/출력:
-        xml_path: T-NNN.xml 절대경로
-        return: {"number": "T-NNN", "title": "...", "status": "..."} 또는 None
+    Early stopping after parsing metadata sections using ET.iterparse.
+    Input/Output:
+        xml_path: Absolute path to T-NNN.xml
+        return: {"number": "T-NNN", "title": "...", "status": "..."} or None
     """
     try:
         fields: dict[str, str] = {}
@@ -109,13 +109,13 @@ def _parse_ticket_header(xml_path: str) -> dict[str, str] | None:
 
 
 def _collect_kanban_summary(project_root: str) -> dict[str, Any]:
-    """칸반 컬럼별 티켓 요약을 수집한다.
+    """Collect ticket summaries by Kanban column.
 
-    open/progress/review 컬럼은 ID + 제목 + status 추출.
-    todo/done 컬럼은 카운트만 반환 (페이로드 부피 절감).
+    The open/progress/review column extracts ID + title + status.
+    The todo/done column returns only counts (saving payload size).
 
-    입력: project_root — 메인 리포 루트 경로
-    출력: {
+    Input: project_root — Main repo root path
+    output: {
         "counts": {"open": N, "progress": M, "review": K, "todo": A, "done": B},
         "details": [{"number": "T-NNN", "title": "...", "status": "...", "column": "open"}, ...]
     }
@@ -153,10 +153,10 @@ def _collect_kanban_summary(project_root: str) -> dict[str, Any]:
 # ── Collect active sessions ────────────────────────────────────────────────────────────────
 
 def _parse_sessions_json(raw: str) -> list[dict[str, str]]:
-    """flow-sessions --json 출력을 dict 리스트로 정규화한다.
+    """flow-sessions --Normalize json output to a dict list.
 
-    flow-sessions --json 은 세션 배열 JSON 또는 빈 배열을 반환한다.
-    출력 형식: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
+    flow-sessions --json returns a session array JSON or an empty array.
+    Output format: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
     """
     try:
         data = json.loads(raw)
@@ -179,10 +179,10 @@ def _parse_sessions_json(raw: str) -> list[dict[str, str]]:
 
 
 def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
-    """.agent-factory/runs/ 하위 context.json mtime stat fallback.
+    """.agent-factory/runs/ sub context.json mtime stat fallback.
 
-    Board 서버 미기동 + flow-sessions 실패 시 runs/ 디렉터리 직접 스캔.
-    가장 최근 mtime 기준 상위 5개만 반환.
+    Board server does not start + directly scans the runs/ directory when flow-sessions fail.
+    Returns only the top 5 by most recent mtime.
     """
     runs_dir = os.path.join(project_root, '.agent-factory', 'runs')
     if not os.path.isdir(runs_dir):
@@ -229,12 +229,12 @@ def _fallback_sessions(project_root: str) -> list[dict[str, str]]:
 
 
 def _collect_active_sessions(project_root: str) -> list[dict[str, str]]:
-    """활성 워크플로우 세션 목록을 수집한다.
+    """Collect a list of active workflow sessions.
 
-    1차: flow-sessions --json subprocess 호출 (timeout=0.7s)
-    2차 fallback: .agent-factory/runs/ 직접 stat
+    1st: call flow-sessions --json subprocess (timeout=0.7s)
+    Secondary fallback: .agent-factory/runs/ direct stat
 
-    출력: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
+    Output: [{"ticket": "T-NNN", "command": "implement", "started_at": "HHMMSS", "status": "running"}, ...]
     """
     bin_dir = os.path.join(project_root, '.agent-factory', 'bin')
     flow_sessions = os.path.join(bin_dir, 'flow-sessions')
@@ -283,11 +283,11 @@ def _format_context(
     kanban: dict[str, Any],
     sessions: list[dict[str, str]],
 ) -> str:
-    """칸반 요약 + 활성 세션을 markdown 형식으로 합성한다.
+    """Compose Kanban summary + active sessions in markdown format.
 
-    출력 예시:
+    Example output:
         ## Kanban snapshot (automatic injection, user turn point)
-        - Open: 1건, In Progress: 1건, Review: 6건 / To Do: 41건, Done: 358건
+        - Open: 1 case, In Progress: 1 case, Review: 6 cases / To Do: 41 cases, Done: 358 cases
 
         ### Open / In Progress Details
 
@@ -344,15 +344,15 @@ def _format_context(
 # ── Main ─────────────────────────────────────────────────────────────────────────
 
 def build_context(project_root: str | None = None) -> str:
-    """칸반 + 세션 스냅샷 컨텍스트 텍스트를 빌드한다.
+    """Build Kanban + session snapshot context text.
 
-    외부에서 직접 호출 가능한 진입점 (W03 디스패처에서 import 가능).
+    An entry point that can be called directly from the outside (can be imported from the W03 dispatcher).
 
     Args:
-        project_root: 메인 리포 루트 경로. None이면 자동 탐색.
+        project_root: Main repo root path. If None, auto-discovery.
 
     Returns:
-        markdown 형식의 컨텍스트 텍스트. 실패 시 빈 문자열.
+        Context text in markdown format. Empty string on failure.
     """
     if project_root is None:
         project_root = _find_project_root()
@@ -363,14 +363,14 @@ def build_context(project_root: str | None = None) -> str:
 
 
 def main() -> None:
-    """UserPromptSubmit hook 컨텍스트 빌더 메인 함수.
+    """UserPromptSubmit hook context builder main function.
 
-    stdin: UserPromptSubmit JSON 페이로드 (내용 무시)
+    stdin: UserPromptSubmit JSON payload (ignore content)
     stdout: {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "<text>"}}
-    exit code: 항상 0 (사용자 turn 차단 금지)
+    exit code: always 0 (no blocking of user turn)
 
-    0.8s soft deadline: 초과 시 partial 페이로드 출력.
-    페이로드 4096 chars 초과 시 Open/In Progress 상세는 상위 10건만.
+    0.8s soft deadline: partial payload output when exceeded.
+    When the payload exceeds 4096 chars, Open/In Progress details are only available for the top 10 cases.
     """
     start_time = time.monotonic()
 

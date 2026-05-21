@@ -1,31 +1,31 @@
 #!/usr/bin/env -S python3 -u
-"""metrics_cli.py - flow-metrics CLI 진입점.
+"""metrics_cli.py - flow-metrics CLI entry point.
 
-W01 (`metrics.py`) 가 기록한 ``<workDir>/metrics.jsonl`` jsonl 파일들을
-집계해 사람이 읽기 쉬운 표 형식으로 출력하는 3종 서브커맨드를 제공한다.
+``<workDir>/metrics.jsonl`` jsonl files recorded by W01 (`metrics.py`)
+It provides three types of subcommands that aggregate data and output it in a table format that is easy for humans to read.
 
-서브커맨드:
+Subcommand:
     summarize <registryKey>
-        ``.agent-factory/runs/<registryKey>/*/*/metrics.jsonl`` 글롭으로
-        해당 워크플로우 한 번의 모든 jsonl 줄을 모아 단계/토큰/도구/회귀
-        요약 표를 출력.
+        ``.agent-factory/runs/<registryKey>/*/*/metrics.jsonl`` glob
+        Gather all jsonl lines in that workflow once step/token/tool/regression
+        Print a summary table.
     compare <key1> <key2>
-        두 registryKey 의 summarize 결과를 diff (key2 - key1) 표로 출력.
+        Output the summarized results of the two registryKeys in a diff (key2 - key1) table.
     regression [--last N]
-        ``.agent-factory/runs/`` 하위 최근 N (기본 10) 개 워크플로우의
-        regression.pattern 빈도와 top-3 의 signal_summary 예시를 출력.
+        ``.agent-factory/runs/`` of the most recent N (default 10) workflows.
+        Outputs regression.pattern frequency and top-3 signal_summary examples.
 
-설계 노트:
-    - 표준 라이브러리만 사용 (argparse, json, glob, pathlib, sys, ...).
-    - W01 ``metrics.py`` 의 ``schema_for`` / ``known_event_types`` 를
-      재사용한다 — 스키마/이벤트 타입 카탈로그 중복 정의 금지.
-    - 백엔드 API (W06) 가 import 해서 쓸 수 있도록 모듈 함수 인터페이스를
-      별도로 노출 — ``aggregate_run / aggregate_recent /
-      regression_counts / diff_runs``. CLI 진입점은 이 함수들의 thin
+Design notes:
+    - Use only standard libraries (argparse, json, glob, pathlib, sys, ...).
+    - W01 ``schema_for`` / ``known_event_types`` of ``metrics.py``
+      Reuse — Do not duplicate schema/event type catalog definitions.
+    - Create a module function interface so that the backend API (W06) can import and use it.
+      Exposed separately — ``aggregate_run / aggregate_recent /
+      regression_counts / diff_runs``. The CLI entry point is a thin
       wrapper.
-    - 출력은 마크다운 파이프 표 (compatible with terminal + 마크다운 렌더).
+    - The output is a Markdown pipe table (compatible with terminal + Markdown render).
 
-CLI 사용 예시::
+CLI usage example::
 
     $ flow-metrics summarize 20260505-183053
     $ flow-metrics compare 20260504-115242 20260505-183053
@@ -77,14 +77,14 @@ _STEP_ORDER: tuple[str, ...] = ("INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "D
 
 
 def _iter_metrics_files(registry_key: str) -> list[Path]:
-    """registryKey 에 해당하는 모든 metrics.jsonl 파일 경로를 반환한다.
+    """Returns all metrics.jsonl file paths corresponding to registryKey.
 
     Args:
-        registry_key: ``YYYYMMDD-HHMMSS`` 형식.
+        registry_key: ``YYYYMMDD-HHMMSS`` format.
 
     Returns:
-        존재하는 파일 경로 리스트 (정렬됨). 워크플로우 한 번에는 보통
-        1개지만 chain 등 다중 command 시 여러 개일 수 있음.
+        List of existing file paths (sorted). One workflow usually
+        There is only one number, but it can be multiple when using multiple commands such as chain.
     """
     pattern = str(_RUNS_DIR / registry_key / "metrics.jsonl")
     paths = sorted(Path(p) for p in glob.glob(pattern))
@@ -92,14 +92,14 @@ def _iter_metrics_files(registry_key: str) -> list[Path]:
 
 
 def _load_events(paths: Iterable[Path]) -> list[dict[str, Any]]:
-    """파일 경로 리스트의 jsonl 줄을 모두 읽어 dict 리스트로 반환한다.
+    """Reads all jsonl lines in the file path list and returns them as a dict list.
 
     Args:
-        paths: metrics.jsonl 파일 경로들.
+        paths: metrics.jsonl file paths.
 
     Returns:
-        파싱된 이벤트 dict 리스트. JSON 파싱 실패 줄은 건너뛴다 (무결성
-        보다 가용성 우선 — 깨진 한 줄 때문에 전체가 실패하지 않도록).
+        Parsed event dict list. JSON parse failure lines are skipped (integrity
+        Prioritize availability — so that the whole thing doesn't fail because of one broken line).
     """
     events: list[dict[str, Any]] = []
     for p in paths:
@@ -120,14 +120,14 @@ def _load_events(paths: Iterable[Path]) -> list[dict[str, Any]]:
 
 
 def _list_recent_keys(last: int) -> list[str]:
-    """최근 N 개 registryKey 를 mtime 내림차순으로 반환한다.
+    """Returns the most recent N registryKeys in descending order of mtime.
 
     Args:
-        last: 가져올 개수.
+        last: Number to fetch.
 
     Returns:
-        registryKey 문자열 리스트 (가장 최근이 0번째). runs 디렉터리가
-        없으면 빈 리스트.
+        registryKey List of strings (0th most recent). The runs directory is
+        If not, an empty list.
     """
     if not _RUNS_DIR.is_dir():
         return []
@@ -161,13 +161,13 @@ def _classify_regression_kind(kind: Any) -> str:
 
 
 def aggregate_run(registry_key: str) -> dict[str, Any]:
-    """단일 registryKey 의 모든 metrics.jsonl 을 집계하여 dict 로 반환한다.
+    """Aggregates all metrics.jsonl of a single registryKey and returns it as a dict.
 
     Args:
-        registry_key: 집계 대상 registryKey.
+        registry_key: registryKey to aggregate.
 
     Returns:
-        다음 키를 갖는 dict::
+        A dict with the following keys::
 
             {
               "registry_key": "...",
@@ -184,7 +184,7 @@ def aggregate_run(registry_key: str) -> dict[str, Any]:
               "step_end_fail": int,
             }
 
-        파일이 하나도 없으면 ``files=[]``, ``total_events=0`` 인 빈 dict 반환.
+        If there are no files, an empty dict with ``files=[]`` and ``total_events=0`` is returned.
     """
     paths = _iter_metrics_files(registry_key)
     events = _load_events(paths)
@@ -263,25 +263,25 @@ def aggregate_run(registry_key: str) -> dict[str, Any]:
 
 
 def aggregate_recent(last: int = 20) -> list[dict[str, Any]]:
-    """최근 N 개 워크플로우의 summary dict 리스트를 반환한다.
+    """Returns a summary dict list of the most recent N workflows.
 
     Args:
-        last: 가져올 개수 (기본 20).
+        last: Number to fetch (default 20).
 
     Returns:
-        ``aggregate_run()`` 결과 dict 의 리스트. 가장 최근이 0번째.
+        ``aggregate_run()`` A list of result dicts. The most recent is number 0.
     """
     return [aggregate_run(k) for k in _list_recent_keys(last)]
 
 
 def regression_counts(last: int = 10) -> dict[str, Any]:
-    """최근 N 개 워크플로우의 regression.pattern 빈도를 집계한다.
+    """Counts the regression.pattern frequency of the last N workflows.
 
     Args:
-        last: 집계 범위 (기본 10).
+        last: Aggregation range (default 10).
 
     Returns:
-        다음 형식의 dict::
+        A dict of the form::
 
             {
               "scanned_keys": [str, ...],
@@ -314,16 +314,16 @@ def regression_counts(last: int = 10) -> dict[str, Any]:
 
 
 def diff_runs(key1: str, key2: str) -> dict[str, Any]:
-    """두 registryKey 의 summarize 결과를 비교한 diff dict 를 반환한다.
+    """Returns a diff dict comparing the summarized results of two registryKeys.
 
-    diff 의미는 ``key2 - key1`` 로 통일 (양수 = key2 가 큼, 음수 = 작음).
+    The diff meaning is unified as ``key2 - key1`` (positive number = key2 is large, negative number = small).
 
     Args:
-        key1: 비교 기준 (이전).
-        key2: 비교 대상 (이후).
+        key1: Comparison criteria (old).
+        key2: Comparison target (hereafter).
 
     Returns:
-        다음 형식의 dict::
+        A dict of the form::
 
             {
               "key1": "...", "key2": "...",
@@ -392,14 +392,14 @@ def diff_runs(key1: str, key2: str) -> dict[str, Any]:
 
 
 def _md_table(headers: list[str], rows: list[list[str]]) -> str:
-    """마크다운 파이프 테이블 문자열을 생성한다.
+    """Creates a Markdown pipe table string.
 
     Args:
-        headers: 헤더 셀 리스트.
-        rows: 각 행의 셀 문자열 리스트. 셀은 모두 str 가정 (호출측 책임).
+        headers: Header cell list.
+        rows: List of cell strings for each row. All cells assume str (caller responsibility).
 
     Returns:
-        ``| h1 | h2 |\\n|---|---|\\n| r1 | r2 |\\n...`` 형식 문자열.
+        ``| h1 | h2 | \n |---|---| \n | r1 | r2 | \n ...`` format string.
     """
     head = "| " + " | ".join(headers) + " |"
     sep = "| " + " | ".join("---" for _ in headers) + " |"

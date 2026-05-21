@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""`.claude/` 파일 간접 편집 유틸리티.
+"""`.claude/` file indirect editing utility.
 
-Claude Code가 `.claude/` 경로에 대한 직접 Edit/Write를 차단하므로,
-`.agent-factory/staging/`를 중간 편집 영역으로 사용한다.
+Since Claude Code blocks direct Edit/Write to the `.claude/` path,
+Use `.agent-factory/staging/` as the intermediate editing area.
 
-사용법:
+Usage:
     python3 claude_edit.py open <relative_path>   # .claude/ → edit/ Copy
     python3 claude_edit.py save <relative_path>    # edit/ → .claude/ overwrite
     python3 claude_edit.py diff <relative_path>    # Edit/ vs .claude/ Check the difference
     python3 claude_edit.py new  <relative_path>    # Create empty file in edit/ (new)
 
-예시:
+example:
     python3 claude_edit.py open settings.json
     # → Edit in .agent-factory/staging/settings.json
     python3 claude_edit.py save settings.json

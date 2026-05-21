@@ -55,9 +55,9 @@
       stepAsk:           /(?:║\s+\[ASK\]\s+(\S+)$|\[ASK\]\s+(\S+)$)/,
       phase:             /(?:║\s+STATE:\s+Phase\s+(\d+)\s+(sequential|parallel)|\[PHASE\]\s+(\d+)\s+(sequential|parallel))/,
       phaseAgents:       /(?:║\s+>>\s+([^\[]+?)(?:\s+\[([^\]]+)\])?$|^>>\s+([^\[]+?)(?:\s+\[([^\]]+)\])?$)/,
-      finishDone:        /(?:║\s+DONE:\s+워크플로우\s+(완료|실패)|\[DONE\]\s+워크플로우\s+(완료|실패))/,
+      finishDone:        /(?:║\s+DONE:\s+Workflow\s+(Complete|Failed)|\[DONE\]\s+Workflow\s+(Complete|Failed))/,
       finishKey:         /(?:║\s+(\d{8}-\d{6})$|^(\d{8}-\d{6})$)/,
-      stateChange:       /\[STATE\]\s+단계\s+변경/,
+      stateChange:       /\[STATE\]\s+Step\s+changed/,
       stateTransition:   /^>>\s+(\w+)\s*->\s*(\w+)$/,
       taskStatus:        /AGENT_(DISPATCH|RETURN):\s+taskId=(\w+)(?:\s+status=(\w+))?/,
       fail:              /^FAIL$/
@@ -68,11 +68,11 @@
     var STEP_COLORS = {
       unknown:  "#858585",
       init:     "#858585",
-      plan:     "#569cd6",
+      plan:     "#569CD6",
       work:     "#D97757",
-      validate: "#dcdcaa",  /* 12 Rule verification step */
-      report:   "#c586c0",
-      done:     "#4ec9b0",
+      validate: "#DCDCAA",  /* 12 Rule verification step */
+      report:   "#C586C0",
+      done:     "#4EC9B0",
       failed:   "#f48771"
     };
 

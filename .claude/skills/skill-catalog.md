@@ -1,25 +1,25 @@
 # Skill Catalog
 
-> 이 파일은 `catalog_sync.py`에 의해 자동 생성됩니다. 직접 편집하지 마세요.
-> 활성 스킬: 62개 (전문화: 62, 프로젝트: 0)
+> This file is automatically created by `catalog_sync.py`. Please do not edit it yourself.
+> Active Skills: 62 (Specialization: 62, Project: 0)
 
 ## Command Default Mapping
 
-| 명령어 | 자동 로드 스킬 | 용도 |
+| command | Autoload Skill | Use |
 |--------|---------------|------|
-| implement | review-code-quality, workflow-system | 코드 품질 검사(Generator-Critic 루프 포함), 완료 전 검증(점진적 검증 포함). 에셋 관리 키워드 감지 시 매니저 스킬 조건부 로드 |
-| review | review-requesting, review-code-quality | 리뷰 체크리스트 적용 + 정량적 품질 검사. 보안/아키텍처/프론트엔드/성능 키워드 감지 시 전문 리뷰 스킬 조건부 로드 |
-| research | research-general, research-integrated | 웹 조사(research-general) + 통합 조사(research-integrated). references/ 가이드로 교차 검증 및 출처 평가 지원. 키워드별 병렬/검증 스킬 자동 로드. 분석 키워드 감지 시 analyze-* 스킬 조건부 로드. 코드 탐색(research-deep)은 planner LLM 판단으로 조건부 로드 |
+| implement | review-code-quality, workflow-system | Code quality checks (including Generator-Critic loops), verification before completion (including incremental verification). Conditional loading of manager skills when detecting asset management keywords |
+| review | review-requesting, review-code-quality | Apply review checklist + quantitative quality check. Conditional loading of expert review skills when security/architecture/frontend/performance keywords are detected |
+| research | research-general, research-integrated | Web research (research-general) + research-integrated. Supports cross-validation and source evaluation with references/ guide. Automatically loads parallel/verification skills for each keyword. Conditional loading of analyze-* skills when analysis keyword is detected. Code exploration (research-deep) is conditionally loaded based on planner LLM judgment |
 
 ## Skill Descriptions
 
-| 스킬명 | description |
+| Skill name | description |
 |--------|-------------|
 | analyze-codebase | Analyzes project structure, architecture, dependencies, and code quality for codebase inspection. Use when examining codebase architecture, reviewing dependency graphs, analyzing module structure, or assessing overall code quality and project organization. |
 | analyze-data | Performs dataset exploration, statistical analysis, visualization, and insight extraction. Use when conducting EDA on CSV/JSON/Excel datasets, running statistical analysis and distribution checks, inspecting data quality for missing values or outliers, or extracting insights from structured data. |
 | analyze-database | Analyzes database schema, table structure, relationships, indexes, and query performance. Use when reviewing schema structure or generating ERD, visualizing table relationships, identifying index and query performance bottlenecks, or assessing normalization level and data integrity. |
 | analyze-srs | Systematically analyzes ambiguous requests to produce a concrete Software Requirements Specification. Use when clarifying vague requirements, defining project goals and scope, identifying constraints and expected deliverables, or classifying functional and non-functional requirements before starting implementation. |
-| brainstorming | 신규 기능 컨셉을 티켓 생성 직전 단계까지 정리할 때 호출. grill-me 와 짝을 이뤄 컨셉 탐색에 집중. 트리거: '브레인스토밍', '아이디어 정리', '컨셉 잡아줘', '구상 도와줘', 모호한 신규 기능 발화. |
+| brainstorming | 신규 기능 컨셉을 티켓 생성 직전 단계까지 정리할 때 호출. grill-me 의 Ouroboros 5단계 (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 루프 진입 직전 단계로, DRAFT 의 raw 발화를 다듬는 컨셉 탐색에 집중. 트리거: '브레인스토밍', '아이디어 정리', '컨셉 잡아줘', '구상 도와줘', 모호한 신규 기능 발화. |
 | convention-front | Enforces frontend coding conventions for HTML, CSS, JavaScript, and TypeScript files. Use when writing or reviewing HTML for semantic markup and accessibility, applying CSS BEM methodology and property ordering, enforcing camelCase naming and type annotations in JS/TS, or ensuring TSDoc documentation standards across .html/.css/.js/.ts/.jsx/.tsx files. |
 | convention-oop | Provides language-agnostic OOP principles and patterns guide covering SOLID, GRASP, GoF design patterns, and DDD tactical patterns with Python/JS/TS code examples. Use when writing or reviewing object-oriented code, applying design patterns, modeling domain logic with Entity/Value Object/Aggregate/Repository patterns, or handling Domain Events. |
 | convention-python | Enforces Python coding conventions for .py files, ensuring PEP 8 naming, full type hints, and Google-style docstrings. Use when writing or reviewing Python code, adding type annotations, writing docstrings, or ensuring consistent code style across Python modules. |
@@ -44,7 +44,7 @@
 | framework-fastapi | Provides production-ready FastAPI project structure and best practices including Domain-Driven directory layout, router/schema/service patterns, dependency injection, and async DB integration. Use when initializing a FastAPI project, setting up a Python web server structure, designing API endpoints with Pydantic schemas, or referencing production patterns for FastAPI development. |
 | framework-react | Provides Bulletproof React architecture-based Feature-Based project structure, Next.js App Router layout, recommended tech stack (Vite, Zustand, React Query, Tailwind), and unidirectional dependency principles. Use when initializing a React or Next.js project, setting up a Feature-Based directory structure, configuring the frontend framework tech stack, or applying architecture-driven development principles. |
 | framework-react-best-practices | Provides React/Next.js code-level best practices covering 8 categories with 40+ rules: component design, state management, hook rules, rendering optimization, error boundaries, server components, data fetching. Use when authoring React or Next.js component code, optimizing rendering performance, applying hook compliance rules, separating server and client components, or conducting code review on React codebases. Covers code patterns and performance rules; for project structure use framework-react. |
-| grill-me | 사용자 요구사항이 모호하거나 새 티켓을 생성하기 직전 의도를 캐물어 명확화해야 할 때 호출. 트리거: '티켓 만들어줘', '/wf -o', '티켓 생성해줘', 'grill me', '캐물어줘', '제대로 물어봐', '인터뷰해줘', 작업 범위·산출물·제약·우선순위가 모호한 요구사항 발화. 한 번에 1~2개 자연어 질문으로 좁혀가며, 도구로 답할 수 있는 것은 사용자에게 묻지 않는다. |
+| grill-me | 사용자 요구사항이 모호하거나 새 티켓을 생성하기 직전 의도를 캐물어 명확화해야 할 때 호출. Ouroboros 5단계 (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 루프로 WorkRequest 를 실행 전 계약 수준까지 다듬는다. 트리거: '티켓 만들어줘', '/wf -o', '티켓 생성해줘', 'grill me', '캐물어줘', '제대로 물어봐', '인터뷰해줘', 작업 범위·산출물·제약·우선순위가 모호한 요구사항 발화. 도구로 답할 수 있는 것은 사용자에게 묻지 않는다. |
 | management-agent | Unified management skill for creating and modifying Claude Code agents (sub-agents). Collects model info (sonnet/opus/haiku/inherit) and tool info (Read, Edit, Bash, etc.) from the user. Use when creating a new agent, updating or modifying an existing sub-agent, or managing agent lifecycle including model selection, tool configuration, and scope settings. |
 | management-command | Unified management skill for creating and modifying Claude Code slash commands. Collects command name, purpose, and scope (project/personal), then creates or modifies SKILL.md files. Use when creating a new slash command, updating or modifying an existing custom command, or configuring command scope, argument hints, and invocation control settings. |
 | management-keybindings | Guides customization of Claude Code keyboard shortcuts via ~/.claude/keybindings.json. Use when rebinding keys, adding chord bindings, changing the submit key, or managing any keyboard shortcut configuration for Claude Code. |
@@ -52,7 +52,7 @@
 | management-scope-decomposer | Systematically decomposes large-scale requests into epics (3-7) and stories (5-10/epic) with RICE score-based prioritization (P0-P3), dependency graph generation, and MECE principle validation. Use when decomposing a large-scale feature or initiative into structured epics and stories, defining project scope and priority with RICE scoring, detecting infra epic requirements, or producing a dependency graph for a complex multi-domain request. |
 | management-skill | Unified management skill for creating and modifying Claude Code skills. Creates or modifies skill packages in .claude/skills/ directory conforming to the SKILL.md frontmatter spec. Use when creating a new skill, updating or modifying an existing skill's content or metadata, or deleting an obsolete skill from the local skill library. |
 | management-skill-integrator | Automated skill integration pipeline that searches, downloads, converts, and installs external AI skills from SkillsMP marketplace into .claude/skills/ directory. Use when searching for and installing external skills, importing marketplace skills into the local agent, auto-integrating a discovered skill package, or finding an appropriate skill to add to the current workflow. |
-| my-board-sse-convention | TRIGGER: board 자체 SSE 코드(.agent-factory/board/static/js/core/sse.js, .agent-factory/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점 ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched. |
+| my-board-sse-convention | TRIGGER: board 자체 SSE 코드(.agent-factory/board/static/js/core/sse.js, .agent-factory/board/server/sse_client_manager.py, broadcast 호출, WATCH_DIRS, /events·/poll 엔드포인트) 추가·수정 시 자동 호출. 또는 refreshKanban / refreshWorkflow dom 갱신 폭주 진단 시, renderWorkflow 회귀 / shell vs tbody 분리 문제 시, EventSource 재연결·wfInitialized race 의심 시. board 가 클라이언트로 보내는 자체 EventSource 이벤트 스트림의 발사·수신 컨벤션을 정의한다 — ① 백엔드 이벤트 종류·payload schema·트리거 시점·is_user_visible SSOT ② 프론트엔드 dom 갱신 규약(shell vs tbody 분리, focus·스크롤·selection 보존, prevJson 가드, addEventListener 중복 금지) ③ 운영·디버그 회귀 진단 절차(race 보정, 무한 재렌더 검출, EventSource 재연결, 캐시 버스터). Anthropic API SSE 와 분리 — 그쪽은 .claude/skills/reference-claude-api/references/streaming.md. SKIP only when no board SSE code is being touched. |
 | reference-anthropic-sdk | Anthropic Python/TypeScript Client SDK 및 Claude Agent SDK 레퍼런스. 설치, 클라이언트 초기화, Messages API, 스트리밍, Tool Use, 에러 처리, Agent SDK(query, ClaudeAgentOptions, 도구, 훅, 서브에이전트, 세션, MCP)의 코드 예시와 공식문서 링크를 제공한다. Use when: Anthropic SDK 설치법·API 사용법을 확인할 때, Agent SDK로 에이전트를 구현할 때, 스트리밍·Tool Use·에러 처리 패턴을 참조할 때 |
 | reference-claude-api | Reference skill for Anthropic Claude API. Use when implementing or debugging Claude API integrations: Messages API parameters, Tool Use schema and flow, Streaming SSE events, Extended Thinking, Prompt Caching, model selection, and error handling. |
 | reference-claude-code | Use when you need Claude Code configuration reference: hooks event types and JSON schemas, settings.json keys and their types, built-in slash commands, CLI flags, keybindings, MCP integration, skills/agents frontmatter, or any Claude Code-specific API/behavior details. |
@@ -80,4 +80,4 @@
 
 ## Project Skills
 
-(프로젝트 스킬 없음)
+(No project skills)

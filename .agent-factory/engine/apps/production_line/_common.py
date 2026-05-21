@@ -1,7 +1,7 @@
 """Production-line utilities: ticket context, status I/O, kanban wrapper, paths.
 
-SPEC.md §13 (디렉터리) + §4 (산출물) + §3.4 (재시도 한도) + §8 (claude -p) 흡수.
-LLM 호출 없음. 룰베이스 결정만.
+SPEC.md §13 (directory) + §4 (output) + §3.4 (retry limit) + §8 (claude -p) absorption.
+No LLM calls. Rule base decision only.
 """
 
 from __future__ import annotations
@@ -81,9 +81,9 @@ _N_MAX_DEFAULT: dict[str, int] = {
 
 
 def _load_settings() -> dict[str, str]:
-    """`.agent-factory/.settings` (KEY=value, # 주석) 을 dict 로 읽는다.
+    """Read `.agent-factory/.settings` (KEY=value, # comment) as a dict.
 
-    파일 미존재·파싱 실패는 silent skip — driver 가 기본값으로 동작 보장.
+    Silent skip for file non-existence or parsing failure — the driver guarantees operation as default.
     """
     settings_path = PROJECT_ROOT / ".agent-factory" / ".settings"
     if not settings_path.is_file():
@@ -102,9 +102,9 @@ def _load_settings() -> dict[str, str]:
 
 
 def get_n_max(step: str) -> int:
-    """Step 별 재시도 한도 반환. `V2_RETRY_<STEP>` env override 우선.
+    """Returns the retry limit for each step. `V2_RETRY_<STEP>` env override takes priority.
 
-    우선순위: os.environ > .settings > _N_MAX_DEFAULT > 0.
+    Priority: os.environ > .settings > _N_MAX_DEFAULT > 0.
     """
     env_key = f"V2_RETRY_{step.upper()}"
     raw = os.environ.get(env_key) or _load_settings().get(env_key)
@@ -132,10 +132,10 @@ _FAIL_POLICY_VALID = ("fail_fast", "fail_tolerant")
 
 
 def get_max_parallel() -> int:
-    """T-506 P1 — 같은 topo level 동시 spawn 한계 반환.
+    """T-506 P1 — Same topo level simultaneous spawn limit return.
 
-    우선순위: os.environ.V2_MAX_PARALLEL > .settings.V2_MAX_PARALLEL > 4.
-    음수 / 0 / 비숫자 입력 시 default 4 fallback (graceful).
+    Priority: os.environ.V2_MAX_PARALLEL > .settings.V2_MAX_PARALLEL > 4.
+    When entering a negative number / 0 / non-number, default 4 fallback (graceful).
     """
     raw = os.environ.get("V2_MAX_PARALLEL")
     if raw is None:
@@ -152,10 +152,10 @@ def get_max_parallel() -> int:
 
 
 def get_fail_policy() -> str:
-    """T-506 P4 — 병렬 spawn 실패 처리 정책 반환.
+    """T-506 P4 — Returns parallel spawn failure handling policy.
 
-    우선순위: os.environ.V2_FAIL_POLICY > .settings.V2_FAIL_POLICY > 'fail_fast'.
-    유효값: 'fail_fast' | 'fail_tolerant'. 그 외 입력 시 default 'fail_fast'.
+    Priority: os.environ.V2_FAIL_POLICY > .settings.V2_FAIL_POLICY > 'fail_fast'.
+    Valid values: 'fail_fast' | 'fail_tolerant'. For other inputs, default 'fail_fast'.
     """
     raw = os.environ.get("V2_FAIL_POLICY")
     if raw is None:
@@ -179,9 +179,9 @@ STEP_TIMEOUT_BY_STEP: dict[str, int] = {
 
 @dataclass
 class WorkflowContext:
-    """1 사이클 상태 — driver in-process state.
+    """1 cycle state — driver in-process state.
 
-    SPEC.md §4 산출물 모델 + §7.2 driver.py 의사 코드 기반.
+    SPEC.md §4 output model + §7.2 driver.py pseudocode based.
     """
 
     ticket_no: str                          # "T-489"
@@ -233,9 +233,9 @@ class WorkflowContext:
         return self.work_phase_dir(phase_id) / f"W{worker_idx}.md"
 
     def work_phase_md_resolved(self, phase_id: str) -> Path:
-        """T-503 — flat 과 nested 경로 양쪽을 시도, 존재하는 쪽 반환.
+        """T-503 — Tries both flat and nested paths, returning the one that exists.
 
-        우선순위: nested (work/<phase>/W1.md) > flat (work/<phase>.md). 양쪽 모두 미존재 시 nested 기본 경로 반환 (write-target 으로 사용 가능).
+        Priority: nested (work/<phase>/W1.md) > flat (work/<phase>.md). If both do not exist, return the nested default path (can be used as write-target).
         """
         nested = self.work_phase_w_md(phase_id, 1)
         if nested.exists():
@@ -282,9 +282,9 @@ class WorkflowContext:
         return self.work_dir / "final-verdict.json"
 
     def report_md_path(self) -> Path:
-        """T-504 cutover — `report.html` (사람 가독, 옛 report.md 폐기).
+        """T-504 cutover — `report.html` (human readable, obsolete old report.md).
 
-        함수명은 backward compat alias (REPORT step + R-EXIST-1 호출자 보존).
+        The function name is backward compat alias (REPORT step + R-EXIST-1 caller preservation).
         """
         return self.work_dir / "report.html"
 
@@ -339,9 +339,9 @@ def write_status(ctx: WorkflowContext, status: dict[str, Any]) -> None:
 
 
 def update_step(ctx: WorkflowContext, prev: str, nxt: str, *, note: str = "") -> None:
-    """workflow_step 전이 — status.json 에 transition 기록.
+    """workflow_step transition — Record transition in status.json.
 
-    SPEC.md §3.3 — driver 가 룰베이스로 전이 결정.
+    SPEC.md §3.3 — Driver decides to transition to rule base.
     """
     prev = canonicalize_production_line_step(prev)
     nxt = canonicalize_production_line_step(nxt)
@@ -411,7 +411,7 @@ def kanban_show(ticket_no: str) -> str:
 def kanban_move(ticket_no: str, target: str) -> int:
     """`flow-kanban move T-NNN <target>` — Open/In Progress/Review/Done/Todo.
 
-    SPEC.md §12.4 — INIT 진입 시 in_progress, DONE 종결 시 review, FAILED 시 자동 회귀 X.
+    SPEC.md §12.4 — in_progress when entering INIT, review when ending DONE, auto-regressive X when entering FAILED.
     """
     result = subprocess.run(
         [str(KANBAN_BIN), "move", ticket_no, target],
@@ -438,12 +438,12 @@ def write_metadata(
     finalized_at: str | None = None,
     failure_reason: str | None = None,
 ) -> Path:
-    """T-503 — `metadata.json` 통합 writer.
+    """T-503 — `metadata.json` integrated writer.
 
-    옛 산출물 4 파일 (`.context.json` + `status.json` + `summary.txt` + `failure.md`)
-    을 단일 JSON 으로 통합 박제. 신규 cycle 만 본 함수 호출. driver writer 1 곳에서 일관 산출.
+    Old output 4 files (`.context.json` + `status.json` + `summary.txt` + `failure.md`)
+    stuffed into a single JSON. Call a function that only sees new cycles. Consistent output from one driver writer.
 
-    스키마:
+    Schema:
         {
           "schema_version": 1,
           "ticket_no": "T-NNN",
@@ -501,17 +501,17 @@ def read_metadata(ctx: WorkflowContext) -> dict[str, Any]:
 
 
 def auto_commit(ctx: WorkflowContext) -> int:
-    """SPEC §0.1 (Stage 3-E) — worker 산출물 결정론 commit.
+    """SPEC §0.1 (Stage 3-E) — worker output determinism commit.
 
-    WORK Step 종료 직후 driver 가 호출. LLM 위임 0건.
+    The driver is called immediately after the WORK Step ends. 0 LLM mandates.
 
-    동작:
-      1. ctx.worktree_path 가 None (worktree-less 또는 init 회귀) → skip, return 0
-      2. `git -C <wt> add -A` — worker 산출물 + work/*.md 모두 stage
-      3. `git -C <wt> diff --cached --quiet` — 변경 0건이면 returncode 0 → skip, return 0
-      4. 결정론 메시지 template 으로 `git -C <wt> commit -m <msg>` → returncode 반환
+    movement:
+      1. ctx.worktree_path is None (worktree-less or init regression) → skip, return 0
+      2. `git -C <wt> add -A` — worker output + work/*.md all stage
+      3. `git -C <wt> diff --cached --quiet` — If there are 0 changes, returncode 0 → skip, return 0
+      4. Deterministic message template `git -C <wt> commit -m <msg>` → returncode is returned
 
-    메시지 template: "feat(<ticket>): <title> [production-line auto-commit]"
+    Message template: "feat(<ticket>): <title> [production-line auto-commit]"
     """
     if ctx.worktree_path is None:
         append_log(ctx, "[AUTO-COMMIT] worktree-less — skip")

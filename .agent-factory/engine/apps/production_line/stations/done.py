@@ -17,11 +17,11 @@ from .._verdict import build_final_verdict, save_final_verdict
 
 
 def done_step(ctx: WorkflowContext) -> None:
-    """DONE — summary.txt + usage.json + metadata.json + driver 14+룰 재검증 + kanban move review.
+    """DONE — summary.txt + usage.json + metadata.json + driver 14+ rule re-verification + kanban move review.
 
-    SPEC.md §7.1 매핑 표 의 'Driver rule base revalidation' 은 본 단계에서 수행 — REPORT
-    완료 + step.end DONE 기록 후가 정합 시점. update_step(_, "DONE") 은 main 의
-    update_step("REPORT", "DONE") 가 이미 수행하므로 본 함수는 중복 호출하지 않음.
+    ‘Driver rule base revalidation’ in SPEC.md §7.1 mapping table is performed in this step — REPORT
+    Finish + step.end DONE Registration point after recording. update_step(_, "DONE") in main
+    Since update_step("REPORT", "DONE") has already been performed, this function is not called repeatedly.
     """
     step_start(ctx, "DONE")
     finalized_at = datetime.now().isoformat(timespec="seconds")

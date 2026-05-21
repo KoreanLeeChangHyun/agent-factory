@@ -1,16 +1,16 @@
 #!/usr/bin/env -S python3 -u
-"""직접 경로 호출 차단 가드 Hook 스크립트.
+"""Direct route call blocking guard Hook script.
 
-PreToolUse(Bash) 이벤트에서 python3 .agent-factory/engine/ 패턴의 직접 경로 호출을
-감지하여 flow-* alias 사용을 안내하는 가드 스크립트.
+In the PreToolUse(Bash) event, make a direct path call of the python3 .agent-factory/engine/ pattern.
+A guard script that detects and guides the use of flow-* alias.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 직접 경로 호출 차단
+Main functions:
+    main: Hook entry point, blocks direct route calls after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_DIRECT_PATH_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_DIRECT_PATH_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -84,10 +84,10 @@ _SCRIPT_NAME_PATTERN = re.compile(
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -101,13 +101,13 @@ def _deny(reason: str) -> None:
 
 
 def _extract_script_name(command: str) -> str | None:
-    """명령어에서 .agent-factory/engine/ 하위 스크립트 파일명을 추출한다.
+    """Extract the .agent-factory/engine/ subscript file name from the command.
 
     Args:
-        command: Bash 명령어 문자열
+        command: Bash command string
 
     Returns:
-        스크립트 파일명 (예: "kanban.py") 또는 None
+        Script file name (e.g. "kanban.py") or None
     """
     match = _SCRIPT_NAME_PATTERN.search(command)
     if match:
@@ -116,13 +116,13 @@ def _extract_script_name(command: str) -> str | None:
 
 
 def _is_allowed(command: str) -> bool:
-    """명령어가 허용 예외 패턴에 해당하는지 확인한다.
+    """Check whether the command corresponds to the allowed exception pattern.
 
     Args:
-        command: Bash 명령어 문자열
+        command: Bash command string
 
     Returns:
-        허용 예외이면 True, 차단 대상이면 False
+        True if an exception is allowed, False if it is a blocked exception.
     """
     # Allowed exception pattern check
     for pattern in _ALLOWED_PATTERNS:
@@ -137,11 +137,11 @@ def _is_allowed(command: str) -> bool:
 
 
 def main() -> None:
-    """직접 경로 호출 차단 가드 Hook의 진입점.
+    """Entry point for direct route call blocking guard Hook.
 
-    stdin에서 JSON을 읽어 Bash 도구의 python3 .agent-factory/engine/ 직접 호출을 감지하고,
-    flow-* alias 사용을 안내하는 deny 응답을 출력하여 차단한다.
-    settings.json에서 고정 호출하는 경로는 예외로 허용한다.
+    Detect direct calls to python3 .agent-factory/engine/ from Bash tools by reading JSON from stdin,
+    Blocks by outputting a deny response that guides the use of flow-* alias.
+    Exceptions are allowed for fixed calling routes in settings.json.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_DIRECT_PATH_GUARD") or read_env("HOOK_DIRECT_PATH_GUARD")

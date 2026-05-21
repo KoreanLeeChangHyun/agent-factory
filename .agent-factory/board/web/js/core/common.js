@@ -174,8 +174,8 @@ Board.state.reconcileTermStatus = function (serverStatus) {
 // ── Constants ──
 const PRODUCT_LABELS = {
   appTitle: "Agent Factory Console",
-  workRequest: "Request",
-  workRequests: "Requests",
+  workRequest: "Work Item",
+  workRequests: "Conveyor",
   run: "Run",
   runs: "Runs",
   verification: "Verification",
@@ -218,17 +218,17 @@ const COLUMNS = [
 ];
 
 const CMD_COLORS = {
-  implement: { bg: "rgba(86,156,214,0.3)", fg: "#7bb8e8" },
-  review: { bg: "rgba(197,134,192,0.3)", fg: "#d9a0d6" },
-  research: { bg: "rgba(220,220,170,0.3)", fg: "#e8e8b0" },
-  prompt: { bg: "rgba(160,160,160,0.2)", fg: "#a0a0a0" },
+  implement: { bg: "rgba(86,156,214,0.22)", fg: "#9CDCFE" },
+  review: { bg: "rgba(197,134,192,0.22)", fg: "#C586C0" },
+  research: { bg: "rgba(220,220,170,0.22)", fg: "#DCDCAA" },
+  prompt: { bg: "rgba(160,160,160,0.16)", fg: "#A0A0A0" },
 };
 
 const STATUS_COLORS = {
-  "To Do": { bg: "rgba(106,159,181,0.15)", fg: "#6a9fb5" },
-  Open: { bg: "rgba(78,201,176,0.15)", fg: "#4ec9b0" },
-  "In Progress": { bg: "rgba(220,220,170,0.15)", fg: "#dcdcaa" },
-  Review: { bg: "rgba(197,134,192,0.15)", fg: "#c586c0" },
+  "To Do": { bg: "rgba(156,220,254,0.14)", fg: "#9CDCFE" },
+  Open: { bg: "rgba(78,201,176,0.14)", fg: "#4EC9B0" },
+  "In Progress": { bg: "rgba(220,220,170,0.14)", fg: "#DCDCAA" },
+  Review: { bg: "rgba(197,134,192,0.14)", fg: "#C586C0" },
   Done: { bg: "rgba(133,133,133,0.15)", fg: "#858585" },
 };
 
@@ -908,6 +908,9 @@ function switchTab(target, skipPush) {
   tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.view === target); });
   views.forEach(function (v) { v.classList.toggle("active", v.id === "view-" + target); });
   if (target === "dashboard" && Board.render.renderDashboard) Board.render.renderDashboard();
+  if (target === "kanban" && Board.render.renderKanban) Board.render.renderKanban();
+  if (target === "workflow" && Board.render.renderWorkflow) Board.render.renderWorkflow();
+  if (target === "viewer" && Board.render.renderViewer) Board.render.renderViewer();
   if (target === "memory" && Board.render.renderMemory) Board.render.renderMemory();
   saveUI();
   if (Board.util.updateQueryString) Board.util.updateQueryString();

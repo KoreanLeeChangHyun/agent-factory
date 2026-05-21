@@ -1,8 +1,8 @@
 """REPORT Step — claude -p 1 spawn → report.html (T-504 cutover).
 
-산출물 형식 캐논 §1 영역 3 — 사람 가독은 HTML. plan/plan.md (LLM 자연어) +
-work/**/*.md (Phase 산출) + validate/report.md (Quality 평가) 통째 inject.
-LLM 은 `templates/report.html` placeholder 를 채워 `report.html` 작성.
+Output Format Canon §1 Area 3 — Human readable HTML. plan/plan.md (LLM Natural Language) +
+work/**/*.md (Phase calculation) + validate/report.md (Quality evaluation) whole inject.
+LLM creates `report.html` by filling in the `templates/report.html` placeholder.
 """
 
 from __future__ import annotations

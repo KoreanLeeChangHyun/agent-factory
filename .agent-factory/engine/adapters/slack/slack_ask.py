@@ -1,25 +1,25 @@
 #!/usr/bin/env -S python3 -u
-"""AskUserQuestion 호출 시 Slack 알림 전송 스크립트.
+"""Script to send Slack notification when AskUserQuestion is called.
 
-PreToolUse Hook에서 호출됨 (stdin으로 JSON 입력 수신).
+Called from PreToolUse Hook (receives JSON input to stdin).
 
-주요 함수:
-    main: Slack 알림 전송 진입점
+Main functions:
+    main: Slack notification sending entry point
 
-환경변수 (.agent-factory/.settings에서 로드):
+Environment variables (loaded from .agent-factory/.settings):
     CLAUDE_CODE_SLACK_BOT_TOKEN - Slack Bot OAuth Token
     CLAUDE_CODE_SLACK_CHANNEL_ID - Slack Channel ID
 
-워크플로우 식별 방식 (디렉터리 스캔 기반):
-    1. .workflow/ 디렉터리 스캔으로 활성 워크플로우 목록 조회
-    2. 활성 워크플로우 1개 -> 해당 워크플로우 선택
-    3. 복수 -> phase="PLAN" 인 워크플로우 필터링
-    4. PLAN 복수 -> 각 워크플로우의 status.json에서 가장 최근 updated_at인 워크플로우 선택
-    5. 식별된 워크플로우의 로컬 <workDir>/.context.json 읽어 메시지 구성
-    6. 식별 실패 시 기존 폴백 포맷 사용
+Workflow identification method (based on directory scan):
+    1. Scan the .workflow/ directory to view the list of active workflows
+    2. 1 active workflow -> select that workflow
+    3. Multiple -> Filter workflows with phase="PLAN"
+    4. Multiple PLAN -> Select the workflow with the most recent updated_at in the status.json of each workflow
+    5. Construct messages by reading the local <workDir>/.context.json of the identified workflow
+    6. Use existing fallback format in case of identification failure
 
-에이전트별 색상 이모지:
-    로컬 .context.json의 agent 필드를 읽어 해당 에이전트의 이모지를 메시지 앞에 표시
+Agent-specific colored emojis:
+    Read the local .context.json's agent field and display that agent's emoji in front of the message.
 """
 
 from __future__ import annotations
@@ -49,13 +49,13 @@ from engine.common import (
 
 
 def _extract_question(data: dict[str, Any]) -> str:
-    """stdin JSON에서 첫 번째 질문 텍스트를 추출한다.
+    """Extract the first question text from stdin JSON.
 
     Args:
-        data: stdin에서 파싱된 JSON 딕셔너리
+        data: JSON dictionary parsed from stdin
 
     Returns:
-        첫 번째 질문 문자열. 추출 실패 시 'N/A' 반환.
+        First question string. If extraction fails, 'N/A' is returned.
     """
     return extract_json_field(
         data, "tool_input", "questions", 0, "question", default="N/A"
@@ -63,13 +63,13 @@ def _extract_question(data: dict[str, Any]) -> str:
 
 
 def _extract_options(data: dict[str, Any]) -> str:
-    """Extract options from stdin JSON"label - description | ..." 형식으로 반환한다.
+    """Extract options from stdin JSON Returns in "label - description | ..." format.
 
     Args:
-        data: stdin에서 파싱된 JSON 딕셔너리
+        data: JSON dictionary parsed from stdin
 
     Returns:
-        'label - description | ...' 형식의 선택지 문자열. 선택지가 없으면 빈 문자열 반환.
+        'label - description | An optional string in the format '...'. If there are no options, an empty string is returned.
     """
     options = extract_json_field(
         data, "tool_input", "questions", 0, "options", default=[]
@@ -90,11 +90,11 @@ def _extract_options(data: dict[str, Any]) -> str:
 
 
 def main() -> None:
-    """AskUserQuestion 훅 Slack 알림 전송의 진입점.
+    """AskUserQuestion hook Entry point for sending Slack notifications.
 
-    stdin에서 JSON을 읽어 사용자 질문 내용을 파싱하고,
-    활성 워크플로우 정보를 식별하여 Slack으로 알림을 전송한다.
-    환경변수 로드 실패 시 조용히 종료한다.
+    Read JSON from stdin and parse the user question content,
+    Identify active workflow information and send notifications to Slack.
+    Quietly exits if environment variable loading fails.
     """
     # Load environment variables from .agent-factory/.settings
     if not load_slack_env():

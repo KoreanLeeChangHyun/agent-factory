@@ -53,12 +53,25 @@ flow-kanban create "제목" --command implement --status todo
   - 선행 작업이 필요한 경우 → `--depends-on` (의존)
   - 후속 작업을 차단하는 경우 → `--blocks` (차단)
 - 티켓 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status todo` 로 생성한다. Open 승격은 사용자가 칸반 DnD 로 직접 수행
-- 티켓 생성 전 사용자 요구사항이 모호하면 **인터뷰 식**으로 자연어 질문한다 (MUST). 메뉴 (1=A/2=B) 형태 질의 금지. 한 번에 1~2개씩만 묻고 답을 받아 다음 질문으로 진행
-  - **호출 강제 (MUST)**: 아래 트리거 감지 시 description match 에 의존하지 말고 **즉시 Skill 도구로 `grill-me` 명시 호출**. 본 룰이 호출 강제의 단일 진실 공급원
+- 티켓 생성 전 사용자 요구사항이 모호하면 **Ouroboros 5단계 루프** (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 로 WorkRequest 를 실행 전 계약 수준까지 다듬는다 (MUST). CLARIFY 단계에서는 메뉴 (1=A/2=B) 형태 질의 금지, 한 번에 1~2개씩만 자연어로 묻고 답을 받아 다음 질문으로 진행
+  - **호출 강제 (MUST)**: 아래 트리거 감지 시 description match 에 의존하지 말고 **즉시 Skill 도구로 `grill-me` 명시 호출** (스킬은 Ouroboros 5단계 루프를 구현). 본 룰이 호출 강제의 단일 진실 공급원
   - **트리거 키워드**: `티켓 만들어줘`, `/wf -o`, `티켓 생성해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화
-  - 묻는 대상: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
-  - 묻지 않는 대상: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
-  - 상세 호출 절차 / 예시: `.claude/skills/grill-me/SKILL.md` (인터뷰), `.claude/skills/brainstorming/SKILL.md` (컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원
+  - **5단계 책임 분담**:
+    - **DRAFT**: 사용자 발화·제목·command (`implement`/`research`/`review`) 초안 채집 + `flow-kanban create "" --command init --status todo` 로 빈 티켓 채번
+    - **CLARIFY**: `goal`/`target`/`constraints`/`criteria`/`context` 5필드 중 도구로 답할 수 없는 항목만 한 번에 1~2개 자연어 질문 (메뉴 형태 금지)
+    - **CRITIQUE**: 어시스턴트가 모호한 대상·검증 불가능한 기준·범위 확장 위험·숨은 의존성을 명시 짚음 (사용자가 묻기 전 선제적으로)
+    - **REWRITE**: `flow-kanban update-prompt T-NNN --command ... --goal ... --target ... --constraints ... --criteria ... --context ...` 호출. 추론한 제약·가정·위험은 `context` 또는 `constraints` 에 명시
+    - **ACCEPT**: 품질 점수 ≥ 0.6 (`goal`/`target`/`constraints`/`criteria` 4태그 각 10자 이상 + `TODO:` 미시작) + 사용자 합의 시 종결. 이후 `/wf -s N` 으로 v2 driver 발사
+  - **합법 전이** (`.agent-factory/engine/core/work_requests/ouroboros.py` `_NEXT_PHASE`):
+    - `DRAFT → CLARIFY` 필수
+    - `CLARIFY → CRITIQUE` 필수
+    - `CRITIQUE → REWRITE` 또는 `CRITIQUE → ACCEPT`
+    - `REWRITE → CLARIFY` (재인터뷰) 또는 `REWRITE → ACCEPT` (충분 시)
+    - `ACCEPT → (terminal)`
+  - **묻는 대상**: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
+  - **묻지 않는 대상**: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
+  - **이력 기록**: 가능한 경우 티켓 XML `<ouroboros_history>` 에 각 단계 진입 시각·텍스트를 누적 기록 (`OuroborosEntry` 형태)
+  - **상세 호출 절차 / 예시**: `.claude/skills/grill-me/SKILL.md` (Ouroboros 5단계 루프 구현), `.claude/skills/brainstorming/SKILL.md` (DRAFT 진입 전 컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원
 - 사용자가 설계·아키텍처·워크플로우·구조 제안을 공유하면 **사용자가 "어때요?" 명시 요청하기 전에 즉시 약점을 짚는다** (MUST). 시각화·옵션 질의만 하고 약점 분석을 미루는 것 금지 (MUST NOT). 점검 7축:
   1. **재시도/실패 처리 의미론**: 실패 사유 피드백 루프 / 재시도 범위 / MAX 도달 시 후속 처리
   2. **컴포넌트 간 책임 중복**: 같은 일을 두 곳에서 하지 않는가 / 책임이 비어있는 영역은 없는가

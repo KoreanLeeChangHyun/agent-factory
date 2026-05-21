@@ -1,28 +1,28 @@
 #!/usr/bin/env -S python3 -u
-r"""`.claude/rules/` 경로 자동 승인 가드 Hook 스크립트.
+r"""`.claude/rules/` path automatic approval guard Hook script.
 
-PreToolUse(Write|Edit) 이벤트에서 `.claude/rules/` 하위 파일 대상 요청을 감지하여
-`permissionDecision: allow`를 즉시 반환한다.
+In the PreToolUse(Write|Edit) event, detect a request targeting a `.claude/rules/` subfile and
+Returns `permissionDecision: allow` immediately.
 
-배경:
-    Claude Code는 `.claude/` 디렉터리를 민감 파일로 분류하여 Write/Edit 시
-    사용자 승인 프롬프트를 표시한다. `.claude/rules/` 는 워크플로우 규칙 파일이므로
-    워커 에이전트가 자유롭게 수정할 수 있어야 한다.
+background:
+    Claude Code classifies the `.claude/` directory as a sensitive file and prevents it from being written/edited.
+    Prompt for user approval. `.claude/rules/` is the workflow rules file, so
+    Worker agents must be able to freely modify it.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 조건 충족 시 allow 반환
+Main functions:
+    main: Hook entry point, returns allow when conditions are met after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 조건 충족 시 permissionDecision: allow JSON, 미충족 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: permissionDecision: allow JSON if condition is met, empty output if not met
 
-보안 제약:
-    - `.claude/rules/` 하위만 승인 (정규식: r'\.claude/rules/')
-    - `.claude/settings.json`, `.claude/settings.local.json` 등 다른 민감 경로는 승인하지 않음
-    - `.claude/skills/`, `.claude/commands/`, `.claude/agents/` 등 다른 `.claude/` 경로도 승인하지 않음
+Security constraints:
+    - Only `.claude/rules/` children are accepted (regular expression: r'\.claude/rules/')
+    - Other sensitive paths such as `.claude/settings.json` and `.claude/settings.local.json` are not approved.
+    - Other `.claude/` paths, such as `.claude/skills/`, `.claude/commands/`, and `.claude/agents/`, are also not accepted.
 
-토글:
-    환경변수 HOOK_RULES_AUTO_APPROVE=false 설정 시 이 가드를 비활성화한다.
-    비활성화 시 기존 Claude Code의 기본 승인 프롬프트 동작이 유지된다.
+Toggle:
+    When setting the environment variable HOOK_RULES_AUTO_APPROVE=false, this guard is disabled.
+    When disabled, the default approval prompt behavior of existing Claude Code is maintained.
 """
 
 from __future__ import annotations
@@ -43,10 +43,10 @@ _RULES_PATH_KEYWORD = ".claude/rules/"
 
 
 def _allow(reason: str) -> None:
-    """자동 승인 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the auto-acknowledgment JSON to stdout and terminates the process.
 
     Args:
-        reason: 승인 사유 문자열
+        reason: approval reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -60,11 +60,11 @@ def _allow(reason: str) -> None:
 
 
 def main() -> None:
-    """`rules/` 경로 자동 승인 가드 Hook의 진입점.
+    """Entry point for the `rules/` path auto-approval guard hook.
 
-    stdin에서 JSON을 읽어 Write/Edit 도구가 `.claude/rules/` 하위 파일을
-    대상으로 할 때 즉시 allow를 반환한다.
-    HOOK_RULES_AUTO_APPROVE=false 설정 시 비활성화된다.
+    Read the JSON from stdin so that the Write/Edit tool can create a `.claude/rules/` subfile.
+    Allow is returned immediately when targeted.
+    Disabled when HOOK_RULES_AUTO_APPROVE=false is set.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_RULES_AUTO_APPROVE") or read_env("HOOK_RULES_AUTO_APPROVE")

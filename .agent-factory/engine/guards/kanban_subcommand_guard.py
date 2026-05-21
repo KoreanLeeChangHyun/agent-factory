@@ -1,16 +1,16 @@
 #!/usr/bin/env -S python3 -u
-"""flow-kanban 서브커맨드 유효성 검증 가드 Hook 스크립트.
+"""flow-kanban subcommand validation guard Hook script.
 
-PreToolUse(Bash) 이벤트에서 flow-kanban 명령의 서브커맨드를 파싱하여
-유효하지 않은 서브커맨드 사용을 차단한다.
+By parsing the subcommand of the flow-kanban command in the PreToolUse(Bash) event,
+Block the use of invalid subcommands.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 유효하지 않은 서브커맨드 차단
+Main functions:
+    main: Hook entry point, blocks invalid subcommands after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_KANBAN_SUBCOMMAND_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_KANBAN_SUBCOMMAND_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -59,10 +59,10 @@ _FLOW_KANBAN_MOVE_SUBMIT_PATTERN = re.compile(r"\bflow-kanban\s+move\s+T-\d+\s+s
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -76,10 +76,10 @@ def _deny(reason: str) -> None:
 
 
 def main() -> None:
-    """flow-kanban 서브커맨드 유효성 검증 Hook의 진입점.
+    """Entry point of flow-kanban subcommand validation hook.
 
-    stdin에서 JSON을 읽어 Bash 도구의 flow-kanban 명령을 감지하고,
-    서브커맨드가 유효 집합에 없으면 deny 응답을 출력하여 차단한다.
+    Detect the Bash tool's flow-kanban command by reading JSON from stdin,
+    If the subcommand is not in the valid set, it outputs a deny response and blocks it.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_KANBAN_SUBCOMMAND_GUARD") or read_env("HOOK_KANBAN_SUBCOMMAND_GUARD")

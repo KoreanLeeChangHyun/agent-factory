@@ -39,17 +39,17 @@ const METRICS_DEFAULT_LAST = 20;
 const METRICS_STEP_ORDER = ["INIT", "PLAN", "WORK", "VALIDATE", "REPORT", "DONE"];
 const METRICS_ACCENT = "#D97757";
 const METRICS_STEP_COLORS = {
-  INIT:   "#4ec9b0",  // Notice
-  PLAN:   "#dcdcaa",  // More
+  INIT:   "#4EC9B0",  // Notice
+  PLAN:   "#DCDCAA",  // More
   WORK:   METRICS_ACCENT,  // Terracotta (top core stage)
   VALIDATE: "#9cdcfe",  // Heaven (afterwork verification)
-  REPORT: "#c586c0",  // Venue
+  REPORT: "#C586C0",  // Venue
   DONE:   "#858585",  // Grey
 };
 const METRICS_TOKEN_COLORS = {
-  input:          "#569cd6",
-  output:         "#4ec9b0",
-  cache_creation: "#dcdcaa",
+  input:          "#569CD6",
+  output:         "#4EC9B0",
+  cache_creation: "#DCDCAA",
   cache_read:     "#858585",
 };
 const METRICS_REGRESSION_KINDS = [
@@ -577,10 +577,10 @@ function computeKpiStats(data) {
  */
 function renderDashCards(stats) {
   const cards = [
-    { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time", accent: "#569cd6" },
-    { label: "Total Tokens", value: dashFormatTokens(stats.totalTokens), sub: "cumulative", accent: "#4ec9b0" },
-    { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs", accent: "#dcdcaa" },
-    { label: "Top Skill", value: stats.topSkill, sub: "most used", accent: "#c586c0" },
+    { label: "Total Workflows", value: String(stats.totalWorkflows), sub: "all time", accent: "#569CD6" },
+    { label: "Total Tokens", value: dashFormatTokens(stats.totalTokens), sub: "cumulative", accent: "#4EC9B0" },
+    { label: "Warn / Error", value: String(stats.warnErrors), sub: "across all runs", accent: "#DCDCAA" },
+    { label: "Top Skill", value: stats.topSkill, sub: "most used", accent: "#C586C0" },
   ];
   let h = '<div class="dash-cards">';
   cards.forEach(function (card) {
@@ -707,7 +707,7 @@ function renderUsageChart(rows) {
           label: "Tokens",
           data: values,
           backgroundColor: "rgba(86,156,214,0.6)",
-          borderColor: "#569cd6",
+          borderColor: "#569CD6",
           borderWidth: 1,
           order: 2,
         },
@@ -715,11 +715,11 @@ function renderUsageChart(rows) {
           label: "Trend",
           data: values,
           type: "line",
-          borderColor: "#4ec9b0",
+          borderColor: "#4EC9B0",
           backgroundColor: "transparent",
           borderWidth: 2,
           pointRadius: 2,
-          pointBackgroundColor: "#4ec9b0",
+          pointBackgroundColor: "#4EC9B0",
           tension: 0.3,
           order: 1,
         },
@@ -758,9 +758,9 @@ function renderCommandPieChart(rows) {
   });
 
   const colorMap = {
-    implement: "#569cd6",
-    review: "#c586c0",
-    research: "#dcdcaa",
+    implement: "#569CD6",
+    review: "#C586C0",
+    research: "#DCDCAA",
   };
 
   const labels = Object.keys(cmdCount);
@@ -810,11 +810,11 @@ function renderWarnErrorChart(rows) {
         {
           label: "WARN",
           data: warns,
-          borderColor: "#dcdcaa",
+          borderColor: "#DCDCAA",
           backgroundColor: "rgba(220,220,170,0.1)",
           borderWidth: 2,
           pointRadius: 3,
-          pointBackgroundColor: "#dcdcaa",
+          pointBackgroundColor: "#DCDCAA",
           fill: true,
           tension: 0.2,
         },
@@ -887,7 +887,7 @@ function renderSkillFreqChart(rows) {
         label: "Frequency",
         data: values,
         backgroundColor: "rgba(197,134,192,0.6)",
-        borderColor: "#c586c0",
+        borderColor: "#C586C0",
         borderWidth: 1,
       }],
     },
@@ -1146,7 +1146,7 @@ function renderFailRatioCard(runs) {
     return (totals[s] && totals[s].fail > 0) ? "rgba(244,135,113,0.6)" : "rgba(78,201,176,0.4)";
   });
   const borderColors = allSteps.map(function (s) {
-    return (totals[s] && totals[s].fail > 0) ? "#f48771" : "#4ec9b0";
+    return (totals[s] && totals[s].fail > 0) ? "#f48771" : "#4EC9B0";
   });
   createMetricsChart("dash-metrics-failratio", {
     type: "bar",
@@ -1289,7 +1289,7 @@ function renderLaunchLatencyCard(launchLatency) {
           {
             label: "p50 (global)",
             data: p50data,
-            borderColor: "#4ec9b0",
+            borderColor: "#4EC9B0",
             backgroundColor: "transparent",
             borderWidth: 1,
             borderDash: [4, 3],
@@ -1300,7 +1300,7 @@ function renderLaunchLatencyCard(launchLatency) {
           {
             label: "p95 (global)",
             data: p95data,
-            borderColor: "#dcdcaa",
+            borderColor: "#DCDCAA",
             backgroundColor: "transparent",
             borderWidth: 1,
             borderDash: [4, 3],
@@ -1335,8 +1335,8 @@ function renderLaunchLatencyCard(launchLatency) {
       labels: labels,
       datasets: [
         { label: "avg (per run)", data: [], borderColor: METRICS_ACCENT, backgroundColor: METRICS_ACCENT, borderWidth: 2, pointRadius: 3, tension: 0.2 },
-        { label: "p50", data: [], borderColor: "#4ec9b0", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
-        { label: "p95", data: [], borderColor: "#dcdcaa", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
+        { label: "p50", data: [], borderColor: "#4EC9B0", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
+        { label: "p95", data: [], borderColor: "#DCDCAA", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
         { label: "p99", data: [], borderColor: "#f48771", backgroundColor: "transparent", borderWidth: 1, borderDash: [4, 3], pointRadius: 0, tension: 0 },
       ],
     },

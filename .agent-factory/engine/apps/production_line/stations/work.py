@@ -1,11 +1,11 @@
-"""WORK Step — Phase loop. spawn_mode 에 따라 in_place / subprocess.
+"""WORK Step — Phase loop. in_place / subprocess depending on spawn_mode.
 
-T-504 cutover — `plan/plan.json` (SSOT) 를 parse_plan_json 으로 로딩.
-plan body inject 는 `plan/plan.md` (자연어 본문) 사용.
+T-504 cutover — Loading `plan/plan.json` (SSOT) into parse_plan_json.
+plan body inject uses `plan/plan.md` (natural language body).
 
-T-506 — subprocess 모드 분기는 topo_levels + parallel_spawn 으로 같은 level 동시
-spawn + phase.workers > 1 시 nested parallel_spawn 으로 N worker 동시 spawn.
-in_place 경로는 기존 단일 subprocess 보존 (회귀 0).
+T-506 — Subprocess mode branching is topo_levels + parallel_spawn at the same level simultaneously.
+spawn + phase.workers > 1 N workers spawn simultaneously with nested parallel_spawn.
+The in_place path preserves the existing single subprocess (regression 0).
 """
 
 from __future__ import annotations
@@ -95,10 +95,10 @@ def _spawn_one_worker(
     plan_body: str,
     work_system_prompt: str,
 ) -> tuple[VerifyResult, str]:
-    """phase 안 1 worker spawn → W<n>.md 작성 검증.
+    """Phase 1 worker spawn → W<n>.md creation verification.
 
-    Returns: (VerifyResult, session_id) — session_id 는 phase_start/end emit 박제용.
-    workers=1 (default) 일 때도 동일 경로. worker_idx 1-based.
+    Returns: (VerifyResult, session_id) — session_id emits phase_start/end.
+    Same path even when workers=1 (default). worker_idx 1-based.
     """
     artifact_path = ctx.work_phase_w_md(phase.id, worker_idx)
     dep_blocks = _load_deps_block(ctx, phase)
@@ -133,10 +133,10 @@ def _spawn_one_phase(
     plan_body: str,
     work_system_prompt: str,
 ) -> VerifyResult:
-    """1 phase 처리 — workers=1 (default) 또는 workers>1 nested parallel_spawn.
+    """1 phase processing — workers=1 (default) or workers>1 nested parallel_spawn.
 
-    SPEC §0.1 — driver 결정론 영역. phase_start/end emit 박제.
-    T-506 P7 — phase 단위 emit 1쌍. workers>1 시 session_ids list 를 extra payload 박제.
+    SPEC §0.1 — driver determinism domain. phase_start/end emit stuffed.
+    T-506 P7 — 1 pair of phase unit emits. workers>1 when the session_ids list is stuffed with extra payload.
     """
     workers = max(1, int(phase.workers or 1))
     if workers == 1:
@@ -207,10 +207,10 @@ def _spawn_one_phase(
 
 
 def _phase_outcome_ok(outcome) -> bool:
-    """parallel_spawn 결과를 phase 성공 여부로 환산.
+    """Convert parallel_spawn result to phase success or failure.
 
-    `_spawn_one_phase` 가 VerifyResult 를 반환하므로 `outcome.ok` (예외 무여부) 만으로는
-    부족. 실제 산출물 검증 결과 (`VerifyResult.ok`) 까지 확인.
+    Since `_spawn_one_phase` returns VerifyResult, `outcome.ok` (with or without exception) is not enough.
+    shortage. Check the actual product verification result (`VerifyResult.ok`).
     """
     if not outcome.ok:
         return False
@@ -230,11 +230,11 @@ def _run_subprocess_mode(
     plan_body: str,
     work_system_prompt: str,
 ) -> None:
-    """T-506 P5 — phase 간 level 병렬 spawn (subprocess 모드).
+    """T-506 P5 — level parallel spawn between phases (subprocess mode).
 
-    `topo_levels` 로 level 별 묶음 → 같은 level 동시 spawn → 모두 완료 후
-    다음 level 진입. fail_fast 정책은 level 안 phase 들에만 적용 — 다음 level
-    진입 여부는 본 함수가 결정 (level 단위 fail 검출 시 break).
+    Bundle each level with `topo_levels` → Simultaneous spawn at the same level → After all are completed
+    Enter the next level. The fail_fast policy only applies to phases within the level — next level
+    This function determines whether to enter or not (break when level-level failure is detected).
     """
     levels = topo_levels(phases)
     fail_fast = get_fail_policy() == "fail_fast"

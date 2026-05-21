@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# T-513 P4 — v2 driver entry 재배선.
-# 옛 본문: engine/flow/http_launcher.py (V1 launcher) → P5 일괄 폐기.
-# 신규: engine/apps/cli/flow_wf.py 호출. `flow-wf submit T-NNN` 과 동등
-# (subcommand 없이 driver 인자 직접 전달).
+# T-513 P4 — v2 driver entry rewiring.
+# Old text: engine/flow/http_launcher.py (V1 launcher) → P5 was discarded in bulk.
+# New: Call engine/apps/cli/flow_wf.py. Equivalent to `flow-wf submit T-NNN`
+# (Direct driver argument passing without subcommand).
 ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
   || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT" || exit 1

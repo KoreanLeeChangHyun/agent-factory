@@ -1,23 +1,23 @@
-"""Production-line 결정론 코드 검증 — pytest -q / ruff check / mypy.
+"""Production-line deterministic code verification — pytest -q / ruff check / mypy.
 
-T-503 신설. SPEC.md §0.1.1 (검증 2축 분리) + §0.1.2 (TDD 강제) + §3.2.1 (산출물 6 영역 — validate/code.json).
+T-503 newly established. SPEC.md §0.1.1 (validation 2 axes separation) + §0.1.2 (TDD enforcement) + §3.2.1 (output 6 areas — validate/code.json).
 
-LLM 호출 0. driver 결정론.
+LLM calls 0. driver determinism.
 
-호출 시기: VALIDATE Step 의 driver 측 sub-단계 (claude -p 로 `validate/report.md` 자연어 평가 받은 후 driver 가 본 모듈 호출).
+When to call: Driver side sub-step of VALIDATE Step (call the module seen by the driver after receiving natural language evaluation of `validate/report.md` with claude -p).
 
-산출물: `validate/code.json` — `{schema_version, command, tools: [{tool, status, counts, head_diagnostics, duration_ms, ...}], ...}`
+Output: `validate/code.json` — `{schema_version, command, tools: [{tool, status, counts, head_diagnostics, duration_ms, ...}], ...}`
 
-룰 (T-503 SPEC §9):
-- R-CODE-1: pytest 통과 hard-fail (implement 한정). status ∈ {ok, skip} 이면 PASS, fail 이면 hard-fail.
-- R-CODE-2: lint clean advisory FAIL (implement 한정). ruff counts == 0 또는 status == skip 이면 PASS, 위반 시 advisory FAIL.
+Rules (T-503 SPEC §9):
+- R-CODE-1: pytest passed hard-fail (implementation only). If status ∈ {ok, skip}, PASS, if fail, hard-fail.
+- R-CODE-2: lint clean advisory FAIL (implementation only). PASS if ruff counts == 0 or status == skip, advisory FAIL in case of violation.
 
-implement 한정. research/review 는 본 모듈 SKIP — `run(ctx)` 가 `code.json` 안에 `command_skip: true` flag 만 박제 후 return.
+implement limited. Research/review is this module SKIP — `run(ctx)` returns after stuffing only the `command_skip: true` flag in `code.json`.
 
 graceful SKIP:
-- 도구 미설치 (PATH 못 찾음) → status=skip + reason="<tool> not installed"
-- 설정 파일 부재 (pytest 의 `pyproject.toml` / `pytest.ini` 부재) → status=skip + reason="no test config"
-- 예외 발생 → status=skip + reason="<exception>" (driver 전체 중단 안 함)
+- Tool not installed (PATH not found) → status=skip + reason="<tool> not installed"
+- Absence of configuration file (absence of `pyproject.toml` / `pytest.ini` of pytest) → status=skip + reason="no test config"
+- Exception occurs → status=skip + reason="<exception>" (does not stop the entire driver)
 """
 
 from __future__ import annotations
@@ -49,9 +49,9 @@ def _run_subprocess(
     cwd: Path,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> tuple[int, str, str, int]:
-    """subprocess.run wrapper — (returncode, stdout, stderr, duration_ms) 반환.
+    """subprocess.run wrapper — returns (returncode, stdout, stderr, duration_ms).
 
-    예외 발생 시 (-1, "", str(exc), 0) 반환 — graceful SKIP 처리.
+    When an exception occurs, return (-1, "", str(exc), 0) — graceful SKIP processing.
     """
     start = time.monotonic()
     try:
@@ -73,11 +73,11 @@ def _run_subprocess(
 
 
 def _resolve_work_root(ctx: WorkflowContext) -> Path:
-    """pytest / ruff / mypy 를 실행할 cwd 결정. worktree 안의 프로젝트 루트.
+    """Determine which cwd to run pytest / ruff / mypy on. Project root in the worktree.
 
-    우선순위:
-    1. ctx.worktree_path — implement 모드 worktree
-    2. ctx.work_dir.parents[2] — 옛 worktree-less 모드 (.agent-factory/runs/<key>/) 의 프로젝트 루트
+    Priority:
+    1. ctx.worktree_path — implement mode worktree
+    2. ctx.work_dir.parents[2] — Project root in old worktree-less mode (.agent-factory/runs/<key>/)
     3. ctx.work_dir — fallback
     """
     if ctx.worktree_path is not None and Path(ctx.worktree_path).is_dir():
@@ -95,10 +95,10 @@ def _detect_pytest_config(root: Path) -> bool:
 
 
 def _detect_ruff_config(root: Path) -> bool:
-    """ruff 설정 존재 여부 — `pyproject.toml` / `ruff.toml` / `.ruff.toml`.
+    """Existence of ruff setting — `pyproject.toml` / `ruff.toml` / `.ruff.toml`.
 
-    ruff 는 설정 없이도 실행 가능하지만, 설정 없이 무차별 실행 시 noise 가 많음.
-    설정 있을 때만 진행 — graceful SKIP 도메인.
+    ruff can be run without configuration, but there is a lot of noise when run indiscriminately without configuration.
+    Proceed only when set up — graceful SKIP domain.
     """
     return code_checks.detect_ruff_config(root)
 
@@ -112,11 +112,11 @@ def _detect_mypy_config(root: Path) -> bool:
 
 
 def _run_pytest(root: Path) -> dict[str, Any]:
-    """`pytest -q` subprocess 실행 → result dict.
+    """Run `pytest -q` subprocess → result dict.
 
     status: ok | fail | skip
     counts: {"passed": N, "failed": N, "errors": N, "skipped": N}
-    head_diagnostics: 실패 노드 ID 목록 (HEAD_DIAGNOSTIC_LIMIT)
+    head_diagnostics: List of failed node IDs (HEAD_DIAGNOSTIC_LIMIT)
     """
     if not _has_tool("pytest"):
         return {
@@ -160,9 +160,9 @@ def _run_pytest(root: Path) -> dict[str, Any]:
 
 
 def _parse_pytest_summary(text: str) -> dict[str, int]:
-    """pytest -q 의 마지막 summary 라인 (`N passed, M failed in X.XXs`) parse.
+    """Parse the last summary line of pytest -q (`N passed, M failed in X.XXs`).
 
-    예: "5 passed, 1 failed in 0.34s" → {"passed": 5, "failed": 1}
+    Example: "5 passed, 1 failed in 0.34s" → {"passed": 5, "failed": 1}
     """
     return code_checks.parse_pytest_summary(text)
 
@@ -176,11 +176,11 @@ def _parse_pytest_failed_nodes(text: str) -> list[str]:
 
 
 def _run_ruff(root: Path) -> dict[str, Any]:
-    """`ruff check .` subprocess 실행 → result dict.
+    """`ruff check .` Subprocess execution → result dict.
 
     status: ok | fail | skip
     counts: {"diagnostics": N}
-    head_diagnostics: 첫 HEAD_DIAGNOSTIC_LIMIT 줄
+    head_diagnostics: first HEAD_DIAGNOSTIC_LIMIT line
     """
     if not _has_tool("ruff"):
         return {
@@ -227,7 +227,7 @@ def _run_ruff(root: Path) -> dict[str, Any]:
 
 
 def _run_mypy(root: Path) -> dict[str, Any]:
-    """`mypy <root>` subprocess 실행 → result dict.
+    """Execute `mypy <root>` subprocess → result dict.
 
     status: ok | fail | skip
     counts: {"errors": N}
@@ -279,19 +279,19 @@ def _run_mypy(root: Path) -> dict[str, Any]:
 
 
 def run(ctx: WorkflowContext) -> Path:
-    """driver 결정론 코드 검증 entrypoint.
+    """driver deterministic code verification entrypoint.
 
-    호출 시기: VALIDATE Step 안에서 driver 가 본 함수 호출 (claude -p 로
-    validate/report.md 자연어 평가 받은 후).
+    When to call: Call the function seen by the driver within the VALIDATE Step (with claude -p)
+    validate/report.md after receiving natural language evaluation).
 
-    동작:
-      1. ctx.command != "implement" → 즉시 SKIP + `validate/code.json` 박제
-      2. pytest -q / ruff check / mypy 순차 실행
-      3. 각 도구 결과 dict 를 `tools` list 에 누적
-      4. `ctx.validate_code_json_path()` 에 JSON 직렬화
-      5. driver workflow.log 에 trace 1 줄 append
+    movement:
+      1. ctx.command != "implement" → Immediately SKIP + `validate/code.json` stuffed
+      2. Sequential execution of pytest -q / ruff check / mypy
+      3. Accumulate each tool result dict in the `tools` list
+      4. JSON serialization with `ctx.validate_code_json_path()`
+      5. Append trace 1 line to driver workflow.log
 
-    Returns: 산출된 `validate/code.json` 의 Path.
+    Returns: Path of the calculated `validate/code.json`.
     """
     code_json_path = ctx.validate_code_json_path()
     code_json_path.parent.mkdir(parents=True, exist_ok=True)
@@ -354,17 +354,17 @@ def run(ctx: WorkflowContext) -> Path:
 
 
 def read_code_json(ctx: WorkflowContext) -> dict[str, Any]:
-    """`validate/code.json` reader — `_validate.py` 의 R-CODE 룰 입력.
+    """`validate/code.json` reader — R-CODE rule input in `_validate.py`.
 
-    미존재 시 `{}` 반환 (R-CODE 룰이 SKIP 처리).
+    If not present, `{}` is returned (R-CODE rule skips processing).
     """
     return code_checks.read_code_json(ctx)
 
 
 def tool_result(code_payload: dict[str, Any], tool: str) -> dict[str, Any] | None:
-    """`code.json` 의 `tools` list 에서 특정 도구 결과 추출.
+    """Extract specific tool results from the `tools` list in `code.json`.
 
-    `_validate.py` 의 R-CODE-1 (pytest) + R-CODE-2 (ruff) 평가용.
-    미발견 시 None.
+    For evaluation of R-CODE-1 (pytest) + R-CODE-2 (ruff) in `_validate.py`.
+    None if not found.
     """
     return code_checks.tool_result(code_payload, tool)

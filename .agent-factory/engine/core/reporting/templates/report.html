@@ -140,36 +140,36 @@
     <nav class="toc">
       <h2>Contents</h2>
       <ol>
-        <li><a href="#summary">요약</a></li>
-        <li><a href="#plan">plan 인용</a></li>
-        <li><a href="#work">work 산출</a></li>
-        <li><a href="#quality">Quality 평가</a></li>
-        <li><a href="#conclusion">결론</a></li>
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#plan">Plan Excerpt</a></li>
+        <li><a href="#work">Work Output</a></li>
+        <li><a href="#quality">Quality Evaluation</a></li>
+        <li><a href="#conclusion">Conclusion</a></li>
       </ol>
     </nav>
     <main>
       <h1>{{title}}</h1>
       <section id="summary">
-        <h2>요약</h2>
+        <h2>Summary</h2>
         {{summary}}
       </section>
       <section id="plan">
-        <h2>plan 인용</h2>
-        <p>본 사이클의 plan 자연어 본문은 <a href="plan/plan.md">{{plan_md_link}}</a>
-          (plan.md) 를 참조. 결정론 schema 는 <code>plan/plan.json</code>.</p>
+        <h2>Plan Excerpt</h2>
+        <p>For the natural-language plan body in this cycle, see <a href="plan/plan.md">{{plan_md_link}}</a>
+          (plan.md). The deterministic schema is <code>plan/plan.json</code>.</p>
       </section>
       <section id="work">
-        <h2>work 산출</h2>
+        <h2>Work Output</h2>
         {{phase_sections}}
       </section>
       <section id="quality">
-        <h2>Quality 평가</h2>
-        <p>VALIDATE 단계 LLM 자연어 평가 (<code>validate/report.md</code>) 인용.</p>
+        <h2>Quality Evaluation</h2>
+        <p>Excerpt from the VALIDATE step LLM natural-language evaluation (<code>validate/report.md</code>).</p>
       </section>
       <section id="conclusion">
-        <h2>결론</h2>
-        <p>본 사이클 결과 + 후속 트랙은 위 요약 + Quality 평가 참조.
-          14+룰 verdict 는 driver <code>validate/rules.json</code> SSOT 를 별도 참조.</p>
+        <h2>Conclusion</h2>
+        <p>For this cycle's result and follow-up tracks, see the summary and quality evaluation above.
+          For the 14+ rule verdict, see the driver SSOT at <code>validate/rules.json</code>.</p>
       </section>
     </main>
   </div>

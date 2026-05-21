@@ -117,7 +117,7 @@ The runtime root rename away from `.claude-organic/` is tracked separately in
 Provider independence is tracked in
 `docs/refactor/llm-adapter-architecture.md`.
 
-Reference material from `.repo/` is cataloged in
+Reference material from `repo/` is cataloged in
 `docs/refactor/repo-reference-assets.md`.
 
 The executable milestone roadmap lives in

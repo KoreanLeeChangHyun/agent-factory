@@ -20,8 +20,8 @@ class MetricsHandlerMixin:
     def _parse_metrics_last(qs: dict, default: int) -> int:
         """internal helper — not exposed as endpoint.
 
-        쿼리스트링 last 파라미터를 안전하게 정수로 파싱한다.
-        음수/0/비정수는 default 로 보정한다 (잘못된 입력에 graceful 처리).
+        Safely parses the query string last parameter as an integer.
+        Negative numbers/0/non-integers are corrected by default (graceful processing for incorrect input).
         """
         raw = (qs.get('last') or [None])[0]
         if raw is None:
@@ -34,7 +34,7 @@ class MetricsHandlerMixin:
 
     @api_endpoint("MET", "run")
     def _handle_metrics_run(self, registry_key: str) -> None:
-        """GET /api/metrics/run/<registryKey> — 단일 워크플로우 집계 결과 응답.
+        """GET /api/metrics/run/<registryKey> — Single workflow aggregate result response.
 
         method: GET
         url: /api/metrics/run/<registry_key>
@@ -62,7 +62,7 @@ class MetricsHandlerMixin:
 
     @api_endpoint("MET", "aggregate")
     def _handle_metrics_aggregate(self, last: int) -> None:
-        """GET /api/metrics/aggregate?last=N — 최근 N개 run summary list 응답.
+        """GET /api/metrics/aggregate?last=N — Last N run summary list responses.
 
         method: GET
         url: /api/metrics/aggregate
@@ -92,7 +92,7 @@ class MetricsHandlerMixin:
 
     @api_endpoint("MET", "regression")
     def _handle_metrics_regression(self, last: int) -> None:
-        """GET /api/metrics/regression?last=N — 회귀 패턴 빈도 + 예시 응답.
+        """GET /api/metrics/regression?last=N — Regression pattern frequency + example response.
 
         method: GET
         url: /api/metrics/regression
@@ -120,12 +120,12 @@ class MetricsHandlerMixin:
 
     @api_endpoint("MET", "launch_latency")
     def _handle_metrics_launch_latency(self, last: int = 10) -> None:
-        """GET /api/metrics/launch_latency?last=N — launch spawn_duration_ms 분포 응답.
+        """GET /api/metrics/launch_latency?last=N — launch spawn_duration_ms distributed response.
 
-        workflow.log 의 LAUNCH_START/LAUNCH_OK 이벤트를 파싱해 spawn_duration_ms
-        분포 통계(p50/p95/p99/min/max/mean)와 느린 spawn 목록, per-run 요약을 반환한다.
+        Parse LAUNCH_START/LAUNCH_OK events in workflow.log and spawn_duration_ms
+        Returns distribution statistics (p50/p95/p99/min/max/mean), list of slow spawns, and per-run summary.
 
-        T-475 미배포 시에는 LAUNCH_* 이벤트 0건으로 graceful 응답한다.
+        When T-475 is not distributed, it responds gracefully with 0 LAUNCH_* events.
         (distribution.count=0, p50/p95/p99/min/max/mean=None)
 
         method: GET

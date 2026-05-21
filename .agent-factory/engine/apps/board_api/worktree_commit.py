@@ -1,8 +1,8 @@
 """Worktree uncommitted indicator + commit action handlers.
 
-T-419 진단형 핸들러 폐지(99c9ce0) 후 워크플로우 회귀 시 사용자 수동
-수습 경로로 단순화 부활. 카드 우상단 인디케이터 일괄 조회 + 자동 commit
-액션만 제공.
+User manual when workflow regresses after T-419 diagnostic handler abolition (99c9ce0)
+Bringing back simplicity with apprenticeship paths. Batch inquiry of indicators at the top right of the card + automatic commit
+Action only provided.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from board.server.support.common import api_endpoint, logger
 def _import_worktree_status():
     """internal helper — not exposed as endpoint.
 
-    engine/flow/worktree_status 모듈을 lazy import 한다.
+    Lazy import the engine/flow/worktree_status module.
     """
     engine_dir = os.path.normpath(
         os.path.join(os.getcwd(), '.agent-factory', 'engine'),
@@ -32,7 +32,7 @@ class WorktreeCommitHandlerMixin:
 
     @api_endpoint("WTC", "uncommitted_all")
     def _handle_worktree_uncommitted_all(self) -> None:
-        """GET /api/worktree/uncommitted/all — 전체 워크트리 미커밋 카운트 list.
+        """GET /api/worktree/uncommitted/all — List of entire worktree uncommitted counts.
 
         method: GET
         url: /api/worktree/uncommitted/all
@@ -57,10 +57,10 @@ class WorktreeCommitHandlerMixin:
 
     @api_endpoint("WTC", "commit")
     def _handle_worktree_commit(self) -> None:
-        """POST /api/kanban/worktree-commit — 워크트리 자동 commit.
+        """POST /api/kanban/worktree-commit — Worktree automatic commit.
 
         Body: {ticket: "T-NNN", message?: "..."}.
-        message 미지정 시 `wip(T-NNN): pending worktree changes` 자동 채움.
+        If message is not specified, `wip(T-NNN): pending worktree changes` is automatically filled.
 
         method: POST
         url: /api/kanban/worktree-commit

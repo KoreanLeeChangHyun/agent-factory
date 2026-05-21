@@ -32,9 +32,9 @@ function assertContains(actual, needle, label) {
 }
 
 // Case A: Literal backslash-n → actual newline (separated into 3 items)
-const A_in = "Condition 1 \n Condition 2 \n Condition 3";
+const A_in = "Condition 1\\nCondition 2\\nCondition 3";
 const A_out = unescapeLiteralNewlines(A_in);
-assertEqual(A_out, "Condition 1 \n Condition 2 \n Condition 3", "A: literal \\n → real newline");
+assertEqual(A_out, "Condition 1\nCondition 2\nCondition 3", "A: literal \\n → real newline");
 // Hypothesis verification of Markdown rendering results — 3 lines broken by newlines must be able to be expressed as separate <p> / <br> / <li>
 // (The helper unit verification is satisfied with assertEqual above. The marked integrated operation is recorded separately in the P1 W1.md report.)
 
@@ -53,13 +53,13 @@ const D_in = "before\n```\nconst s = \"line1\\nline2\";\n```\nafter\\nend";
 const D_out = unescapeLiteralNewlines(D_in);
 // ` \n ` inside the fence remains the same, and ` \n ` (after \n end) outside the fence is replaced with an actual newline.
 assertContains(D_out, "const s = \"line1\\nline2\";", "D-fence: code fence \\n preserved");
-assertContains(D_out, "after\nend", "D-outside: fence-outside \n unescaped");
+assertContains(D_out, "after\nend", "D-outside: fence-outside \\n unescaped");
 
 // Case E: Inline backtick ` \n ` is also preserved
-const E_in = "text `literal \n ` next line \n after that";
+const E_in = "text `literal \\n` next line\\nafter that";
 const E_out = unescapeLiteralNewlines(E_in);
-assertContains(E_out, "`literal \n `", "E-inline: inline code \\n preserved");
-assertContains(E_out, "next line \n then", "E-outside: inline outside \n unescaped");
+assertContains(E_out, "`literal \\n`", "E-inline: inline code \\n preserved");
+assertContains(E_out, "next line\nafter that", "E-outside: inline outside \\n unescaped");
 
 // Case F: empty string
 assertEqual(unescapeLiteralNewlines(""), "", "F: empty string");
@@ -73,7 +73,7 @@ assertEqual(unescapeLiteralNewlines(undefined), undefined, "G-undefined");
 const markedMod = require(resolve(here, "..", "vendor", "marked-15.0.0.min.js"));
 const markedParse = markedMod.parse;
 
-const integ_in = "Condition 1 \n Condition 2 \n Condition 3";
+const integ_in = "Condition 1\\nCondition 2\\nCondition 3";
 const integ_unescaped = unescapeLiteralNewlines(integ_in);
 const integ_html = markedParse(integ_unescaped, { gfm: true, breaks: true });
 // `breaks: true` option (same as common.js) — Converts single newlines to <br> .

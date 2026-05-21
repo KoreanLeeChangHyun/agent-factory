@@ -1,15 +1,15 @@
-"""Reflection — LLM-as-clusterer 기반 의미 클러스터링 + LLM 합성.
+"""Reflection — LLM-as-clusterer based semantic clustering + LLM synthesis.
 
-2-step 흐름:
-  1) 모든 메모리의 metadata (name/description/importance/type) 를 LLM 에 보내
-     같은 토픽 그룹으로 묶도록 요청 → cumulative_importance >= threshold 인 클러스터만 채택.
-  2) 각 클러스터의 본문을 포함하여 LLM 에 합성 요청 → 합성본 생성.
+2-step flow:
+  1) Send metadata (name/description/importance/type) of all memories to LLM
+     Request to group the same topic → Only clusters with cumulative_importance >= threshold are accepted.
+  2) Request synthesis to LLM including the text of each cluster → Generate composite copy.
 
-LLM 호출은 모두 Claude Code CLI 헤드리스 (claude -p ... --output-format json).
-실패는 silent — 합성 없이 후보만 반환.
+All LLM calls are Claude Code CLI headless (claude -p ... --output-format json).
+Failure is silent — only returns candidates without synthesis.
 
-이전 버전의 jaccard 기반 find_clusters 는 한국어 짧은 description 에서 임계 0.35 가
-너무 빡빡하여 클러스터 0개 문제를 초래. LLM-as-clusterer 로 의미 기반 판단으로 교체.
+Older versions of jaccard-based find_clusters had a threshold of 0.35 in the Korean short description:
+Too tight, resulting in zero cluster problem. Replaced with semantic-based judgment with LLM-as-clusterer.
 """
 from __future__ import annotations
 
@@ -53,11 +53,11 @@ def _build_clustering_prompt(items: list[dict], threshold: int) -> str:
 
 
 def find_clusters(memories: list[MemoryFile], threshold: int) -> list[ReflectionCluster]:
-    """LLM-as-clusterer 로 의미 기반 클러스터링.
+    """Semantic-based clustering with LLM-as-clusterer.
 
-    metadata 만 한 번의 LLM 호출로 전달하고 그룹화 결과를 받는다.
-    cumulative_importance < threshold 또는 멤버 < 2 인 클러스터는 자체 필터.
-    LLM 호출 실패 시 빈 리스트 반환 (silent).
+    Only metadata is passed in one LLM call and the grouping results are received.
+    Clusters with cumulative_importance < threshold or members < 2 have their own filter.
+    When LLM call fails, an empty list is returned (silent).
     """
     if not memories:
         return []
@@ -124,9 +124,9 @@ def _build_prompt(cluster: ReflectionCluster) -> str:
 
 
 def _invoke_claude(prompt: str, *, timeout: int = HEADLESS_TIMEOUT) -> dict | None:
-    """Claude Code CLI 헤드리스 호출. 결과 JSON 파싱.
+    """Claude Code CLI headless calls. Parse the resulting JSON.
 
-    실패 시 None.
+    None on failure.
     """
     cmd = [CLAUDE_CLI, '-p', prompt, '--output-format', 'json',
            '--allowed-tools', 'Read,Write']

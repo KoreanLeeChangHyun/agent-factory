@@ -1,24 +1,24 @@
 #!/usr/bin/env -S python3 -u
-"""prompt_validator.py - 티켓 파일 XML 계약 스펙 검증 스크립트.
+"""prompt_validator.py - Ticket file XML contract specification validation script.
 
-티켓 파일을 입력받아 다음을 검증한다:
-(1) 필수 태그 4개(<goal>, <target>, <constraints>, <criteria>) 존재 확인
-(2) 빈 섹션 감지 (내용 없음 또는 TODO: 패턴만 존재, 최소 10자 미만)
-(3) 품질 점수 산출: (존재 필수 태그 수 / 4) * 0.6 + (유효 내용 태그 수 / 4) * 0.4
-(4) 선택 태그(<context>, <approach>, <scope>, <reference>) 존재 여부 기재
+Take the ticket file as input and verify the following:
+(1) Check the presence of 4 required tags (<goal>, <target>, <constraints>, <criteria>)
+(2) Detect empty sections (no content or TODO: only patterns, less than 10 characters)
+(3) Calculate quality score: (Number of required tags / 4) * 0.6 + (Number of valid content tags / 4) * 0.4
+(4) Describe the presence of optional tags (<context>, <approach>, <scope>, <reference>)
 
-사용법:
+Usage:
   python3 prompt_validator.py <prompt_file_path>
   python3 prompt_validator.py --help
 
-출력:
+output of power:
   JSON stdout: quality_score, has_tags, missing_tags, empty_tags,
                optional_tags, feedback
 
-종료 코드:
-  0  검증 완료
-  1  파일 읽기 실패
-  2  인자 오류
+Exit code:
+  0 Verification completed
+  1 File read failed
+  2 argument error
 """
 
 from __future__ import annotations
@@ -72,23 +72,23 @@ def resolve_work_dir_for_logging() -> str | None:
 
 
 def _extract_tag_content(text: str, tag: str) -> str | None:
-    """태그 내용을 추출한다. 존재하지 않으면 None을 반환.
+    """Extract tag contents. Returns None if not present.
 
-    자기 중첩 태그(예: <goal>...<goal>...</goal>...</goal>)를
-    스택 기반으로 파싱하여 가장 외부 태그 쌍의 내용을 반환한다.
+    Self-nested tags (e.g. <goal>...<goal>...</goal>...</goal>)
+    Parses on a stack basis and returns the contents of the outermost tag pair.
 
-    XML 구조 호환성 주석:
-        이 함수는 전체 텍스트에서 태그를 검색하므로 <prompt> 래퍼 내부 깊이와
-        무관하게 동작한다. flat 구조(<prompt>가 루트 직하)와 레거시 구조
-        (<submit>/<subnumber>/<prompt> 중첩) 모두에서 정규식 패턴이
-        전체 텍스트를 대상으로 검색하므로 정상 매칭된다.
+    XML structure compatibility comments:
+        This function searches the entire text for tags, so the depth inside the <prompt> wrapper and
+        It operates regardless. Flat structure (<prompt> is directly below the root) and legacy structure
+        (<submit>/<subnumber>/<prompt> nested) The regex pattern in all
+        Since the search targets the entire text, it matches normally.
 
     Args:
-        text: 검색할 전체 텍스트
-        tag: 추출할 태그 이름 (꺾쇠 제외)
+        text: the entire text to search for
+        tag: Tag name to extract (excluding angle brackets)
 
     Returns:
-        태그 내부 텍스트. 태그가 없으면 None.
+        Text inside tag. None if there is no tag.
     """
     tag_escaped = re.escape(tag)
     open_pat = re.compile(rf"<{tag_escaped}>", re.IGNORECASE)
@@ -125,18 +125,18 @@ def _extract_tag_content(text: str, tag: str) -> str | None:
 
 
 def extract_active_prompt(xml_text: str) -> str:
-    """전체 XML에서 <prompt> 내용을 추출한다.
+    """Extract the <prompt> content from the entire XML.
 
-    flat 구조의 티켓 XML에서 루트 직하 <prompt> 태그 내용을 직접 추출한다.
+    The contents of the <prompt> tag directly under the root are directly extracted from the flat-structured ticket XML.
 
-    레거시 폴백: <submit> 래퍼가 감지되면 기존 subnumber 구조로 파싱하여
-    active="true" subnumber 내부의 <prompt> 내용을 반환한다 (done 티켓 참조 등).
+    Legacy fallback: When a <submit> wrapper is detected, it is parsed into the existing subnumber structure and
+    active="true" Returns the contents of the <prompt> inside subnumber (see done ticket, etc.).
 
     Args:
-        xml_text: 전체 티켓 XML 텍스트
+        xml_text: Full ticket XML text
 
     Returns:
-        <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
+        <prompt> content. Returns the original xml_text when extraction fails.
     """
     # Legacy fallback: If a <submit> wrapper exists, parse it as the existing subnumber structure.
     submit_content = _extract_tag_content(xml_text, "submit")
@@ -152,17 +152,17 @@ def extract_active_prompt(xml_text: str) -> str:
 
 
 def _extract_active_prompt_legacy(xml_text: str, submit_content: str) -> str:
-    """레거시 subnumber 구조에서 활성 <prompt> 내용을 추출한다.
+    """Extracts the active <prompt> content from the legacy subnumber structure.
 
-    <submit> 래퍼 내부에서 active="true" 속성을 가진 <subnumber> 요소를
-    찾아 해당 요소 내부의 <prompt> 태그 내용을 반환한다.
+    Inside the <submit> wrapper, you create a <subnumber> element with the active="true" attribute.
+    Finds and returns the contents of the <prompt> tag inside the element.
 
     Args:
-        xml_text: 전체 티켓 XML 텍스트 (폴백 반환용)
-        submit_content: <submit> 태그 내부 텍스트
+        xml_text: Full ticket XML text (for fallback return)
+        submit_content: Text inside <submit> tag
 
     Returns:
-        활성 subnumber의 <prompt> 내용. 추출 실패 시 원본 xml_text 반환.
+        <prompt> content of the active subnumber. Returns the original xml_text when extraction fails.
     """
     active_open_pat = re.compile(
         r'<subnumber[^>]*\bactive\s*=\s*"true"[^>]*>', re.IGNORECASE
@@ -214,15 +214,15 @@ def _extract_active_prompt_legacy(xml_text: str, submit_content: str) -> str:
 
 
 def _is_valid_content(content: str) -> bool:
-    """태그 내용이 유효한지 판별한다.
+    """Determines whether the tag content is valid.
 
-    유효 조건: 공백 제거 후 10자 이상이며, TODO: 패턴만으로 구성되지 않음.
+    Valid conditions: At least 10 characters after removing spaces, and does not consist of only the TODO: pattern.
 
     Args:
-        content: 검사할 태그 내용 문자열
+        content: tag content string to inspect
 
     Returns:
-        내용이 유효하면 True, 그렇지 않으면 False.
+        True if the content is valid, False otherwise.
     """
     stripped = content.strip()
     if len(stripped) < 10:
@@ -233,19 +233,19 @@ def _is_valid_content(content: str) -> bool:
 
 
 def validate(prompt_text: str) -> dict[str, object]:
-    """prompt_text를 검증하고 결과 dict를 반환한다.
+    """Verifies prompt_text and returns the resulting dict.
 
     Args:
-        prompt_text: 검증할 프롬프트 텍스트
+        prompt_text: Prompt text to verify
 
     Returns:
-        검증 결과 딕셔너리. 다음 키를 포함한다:
-        - quality_score (float): 0.0~1.0 품질 점수
-        - has_tags (bool): 필수 태그가 하나 이상 존재하는지 여부
-        - missing_tags (list[str]): 누락된 필수 태그 목록
-        - empty_tags (list[str]): 내용이 비어있는 필수 태그 목록
-        - optional_tags (list[str]): 발견된 선택 태그 목록
-        - feedback (list[str]): 개선 피드백 메시지 목록
+        Verification result dictionary. Includes the following keys:
+        - quality_score (float): 0.0~1.0 quality score
+        - has_tags (bool): Whether one or more required tags exist
+        - missing_tags (list[str]): List of required missing tags.
+        - empty_tags (list[str]): List of required tags with empty content
+        - optional_tags (list[str]): List of optional tags found.
+        - feedback (list[str]): List of improvement feedback messages
     """
     present_tags: list[str] = []
     missing_tags: list[str] = []
@@ -298,10 +298,10 @@ def validate(prompt_text: str) -> dict[str, object]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """CLI 인자 파서를 생성하여 반환한다.
+    """Creates and returns a CLI argument parser.
 
     Returns:
-        설정된 ArgumentParser 인스턴스.
+        Set ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         prog="flow-validate-p",
@@ -329,10 +329,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """CLI 진입점. 인자를 파싱하여 validate()를 실행하고 JSON을 출력한다.
+    """CLI entry point. Parses the arguments, executes validate(), and outputs JSON.
 
     Raises:
-        SystemExit: 인자 오류(2), 파일 읽기 실패(1), 정상 완료(0).
+        SystemExit: Argument error (2), file read failure (1), normal completion (0).
     """
     parser = _build_parser()
     args = parser.parse_args()

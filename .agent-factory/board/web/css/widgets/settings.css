@@ -267,6 +267,24 @@
   font-weight: 600;
 }
 
+.settings-select {
+  width: 128px;
+  max-width: 100%;
+  border: 1px solid var(--af-border);
+  border-radius: 4px;
+  background: var(--af-surface-raised);
+  color: var(--af-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+}
+
+.settings-select:focus {
+  border-color: var(--af-primary);
+  box-shadow: 0 0 0 2px var(--af-primary-soft);
+}
+
 .settings-adapter-details {
   margin-top: 8px;
   border: 1px solid var(--af-border);

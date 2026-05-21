@@ -1,28 +1,28 @@
 #!/usr/bin/env -S python3 -u
-"""merge_pipeline.py - 워크트리 병합 파이프라인 자동화 스크립트.
+"""merge_pipeline.py - Worktree merge pipeline automation script.
 
-worktree 환경에서 feature 브랜치를 develop에 병합하고 정리하는
-5단계 파이프라인을 단일 커맨드로 실행한다.
+Merging and organizing feature branches into develop in a worktree environment
+Run the 5-step pipeline with a single command.
 
-사용법:
+Usage:
   flow-merge <ticket_number> [--dry-run] [--force]
 
-파이프라인 단계:
-  1. 미커밋 변경사항 감지 및 자동 커밋
-  2. feature 브랜치를 develop에 --no-ff 병합
-  2.5. merge anchor 검증 (WORKFLOW_WORKTREE=true 시에만 활성)
-  3. worktree unlock + remove (+ feature 브랜치 삭제)
-  4. kanban done 처리 (worktree merge hook 중복 방지)
-  5. (feature 브랜치 삭제는 3단계에서 처리됨)
+Pipeline stages:
+  1. Detect uncommitted changes and automatically commit them
+  2. Merge feature branch into develop with --no-ff
+  2.5. Merge anchor verification (active only when WORKFLOW_WORKTREE=true)
+  3. worktree unlock + remove (+ delete feature branch)
+  4. Kanban done processing (prevent worktree merge hook duplication)
+  5. (Delete feature branch is handled in step 3)
 
-옵션:
-  --dry-run   각 단계의 예상 동작만 출력하고 실제 수행하지 않음
-  --force     merge 승인 검사를 우회 (직접 호출 시)
+Options:
+  --dry-run Prints only the expected behavior of each step and does not actually perform it.
+  --force merge Bypass approval checking (when called directly)
 
-종료 코드:
-  0  성공
-  1  병합 충돌 또는 실패
-  2  인자 오류 또는 승인 미비
+Exit code:
+  0 success
+  1 Merge conflict or failure
+  2 Input error or lack of approval
 """
 
 from __future__ import annotations
@@ -64,14 +64,14 @@ _KST = timezone(timedelta(hours=9))
 def _git(
     *args: str, repo_path: str | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행하고 결과를 반환한다.
+    """Executes a git command and returns the results.
 
     Args:
-        *args: git 서브커맨드 및 인자.
-        repo_path: git 저장소 경로. None이면 resolve_project_root() 사용.
+        *args: git subcommands and arguments.
+        repo_path: Git repository path. If None, use resolve_project_root().
 
     Returns:
-        CompletedProcess 인스턴스.
+        CompletedProcess instance.
     """
     cwd = repo_path or resolve_project_root()
     cmd = ["git", "-C", cwd] + list(args)
@@ -97,13 +97,13 @@ def _step(num: int, desc: str) -> None:
 
 
 def _normalize_ticket(ticket_number: str) -> str:
-    """티켓 번호를 T-NNN 형식으로 정규화한다.
+    """Normalize the ticket number to T-NNN format.
 
     Args:
-        ticket_number: 원본 티켓 번호. 숫자만 있으면 T- 접두사 추가.
+        ticket_number: Original ticket number. If you only need numbers, add the T- prefix.
 
     Returns:
-        T-NNN 형식 티켓 번호.
+        Ticket number in T-NNN format.
     """
     if not ticket_number.startswith("T-"):
         ticket_number = f"T-{ticket_number}"
@@ -111,16 +111,16 @@ def _normalize_ticket(ticket_number: str) -> str:
 
 
 def _check_merge_approval(force: bool) -> bool:
-    """merge 승인 여부를 검사한다.
+    """Check whether the merge is approved.
 
-    직접 flow-merge 호출 시 WORKFLOW_MERGE_APPROVED 환경변수가
-    설정되어 있거나 --force 옵션이 있어야 실행을 허용한다.
+    When calling flow-merge directly, the WORKFLOW_MERGE_APPROVED environment variable is set to
+    Execution is allowed only if it is set or the --force option is present.
 
     Args:
-        force: --force 옵션 사용 여부.
+        force: Whether to use the --force option.
 
     Returns:
-        승인되었으면 True, 미승인이면 False.
+        True if approved, False if not approved.
     """
     if force:
         return True
@@ -130,14 +130,14 @@ def _check_merge_approval(force: bool) -> bool:
 
 
 def _count_commits_ahead(branch: str, base: str = "develop") -> int | None:
-    """`git rev-list base..branch --count` 결과를 반환한다.
+    """`git rev-list base..branch --count` returns the result.
 
     Args:
-        branch: 검사 대상 feature 브랜치명.
-        base: 기준 브랜치명 (기본 develop).
+        branch: Name of feature branch to be inspected.
+        base: Base branch name (default develop).
 
     Returns:
-        commits ahead 개수. 명령 실패(브랜치 부재 등) 시 None.
+        Number of commits ahead. None in case of command failure (branch absence, etc.).
     """
     result = _git("rev-list", f"{base}..{branch}", "--count")
     if result.returncode != 0:
@@ -152,13 +152,13 @@ def _count_commits_ahead(branch: str, base: str = "develop") -> int | None:
 
 
 def _branch_exists(branch: str) -> bool:
-    """로컬에 feature 브랜치가 존재하는지 검사한다.
+    """Check whether a feature branch exists locally.
 
     Args:
-        branch: 검사할 브랜치명.
+        branch: Branch name to check.
 
     Returns:
-        존재하면 True, 없으면 False.
+        True if present, False if not.
     """
     if not branch:
         return False
@@ -171,38 +171,38 @@ def _stage1_5_premerge_state_guard(
     worktree_path: str | None,
     force: bool,
 ) -> tuple[bool, str]:
-    """Stage 1.5: 재머지 진입 직전 워크트리/feature 브랜치 상태 가드.
+    """Stage 1.5: Guard the worktree/feature branch state just before entering jammerge.
 
-    회귀 차단: Done 롤백(undo_done) 후 워크트리·feature 브랜치가
-    빈 상태(변경분 없이 재생성됨)이거나 부재인 채로 재머지가 진행되어
-    별건 commit 위에서 anchor 실패 → `reset --hard pre_merge_develop_sha` 가
-    별건 변경분을 함께 reset 하는 회귀가 발생했다.
+    Regression blocking: After Done rollback (undo_done), the worktree/feature branch is
+    Remerge is carried out in an empty state (recreated without changes) or absent.
+    Separately, anchor failed on commit → `reset --hard pre_merge_develop_sha`
+    Separately, a regression occurred where changes were reset together.
 
-    본 가드는 Stage 2(`merge_to_develop`) 진입 전에 다음을 검증한다:
+    This guard verifies the following before entering Stage 2 (`merge_to_develop`):
 
-    1. feature 브랜치 부재 → 항상 차단(force 무관). undo_done 직후 재생성
-       단계 누락이거나 워크트리 자체가 없는 케이스.
-    2. feature 브랜치 존재 + commits ahead == 0(빈 브랜치) →
-       force=False: 차단 + 명확한 에러
-       force=True: 차단 + reflog fallback 안내 (자동 트리거 금지)
-    3. 정상(commits ahead > 0) → 통과
+    1. Absence of feature branch → Always blocked (regardless of force). Regenerate immediately after undo_done
+       Cases where steps are missing or the work tree itself does not exist.
+    2. Feature branch exists + commits ahead == 0 (empty branch) →
+       force=False: block + clear error
+       force=True: Block + reflog fallback guidance (auto trigger prohibited)
+    3. Normal (commits ahead > 0) → Pass
 
-    회귀 0 보장:
+    Guaranteed regression 0:
 
-        commits ahead > 0 이므로 통과.
+        Passes because commits ahead > 0.
 
-        재머지 단계에서만 작동.
-      - 자동 회귀·자동 reflog 적용 금지(feedback_no_speculative_guards
-        2026-05-08 캐논). 사용자 명시 동의 메시지만 노출.
+        Only works in the jammer phase.
+      - Prohibit application of auto regression/auto reflog (feedback_no_speculative_guards
+        2026-05-08 Canon). Only messages with user-specified consent are displayed.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN).
-        worktree_path: get_worktree_path 반환값. 부재 시 None.
-        force: --force 옵션 사용 여부.
+        ticket_number: Ticket number (T-NNN).
+        worktree_path: get_worktree_path return value. None when absent.
+        force: Whether to use the --force option.
 
     Returns:
-        (ok, message) 튜플. ok=True 면 통과, False 면 호출자가 즉시 종료.
-        message 는 stderr 로그 용도(통과 시 빈 문자열).
+        (ok, message) tuple. If ok=True, it passes, if False, the caller terminates immediately.
+        message is for stderr log purposes (empty string when passed).
     """
     _step(1, "Jammer state guard (Stage 1.5)")
 
@@ -296,15 +296,15 @@ def _stage1_5_premerge_state_guard(
 def _stage1_auto_commit(
     ticket_number: str, worktree_path: str, dry_run: bool
 ) -> bool:
-    """Stage 1: worktree 내 미커밋 변경사항을 감지하고 자동 커밋한다.
+    """Stage 1: Detect uncommitted changes in the worktree and automatically commit them.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN).
-        worktree_path: worktree 절대 경로.
-        dry_run: True이면 변경 파일 목록만 출력.
+        ticket_number: Ticket number (T-NNN).
+        worktree_path: Absolute path to worktree.
+        dry_run: If True, only the list of changed files is output.
 
     Returns:
-        성공 시 True, 실패 시 False.
+        True on success, False on failure.
     """
     _step(1, "Detect uncommitted changes and automatically commit them")
 
@@ -351,18 +351,18 @@ def _stage1_auto_commit(
 def _stage2_merge_to_develop(
     ticket_number: str, dry_run: bool
 ) -> tuple[bool, str, str]:
-    """Stage 2: feature 브랜치를 develop에 --no-ff 병합한다.
+    """Stage 2: Merge the feature branch into develop with --no-ff.
 
-    worktree_manager.merge_to_develop()를 재사용한다.
-    병합 충돌 시 abort 후 충돌 파일 목록을 출력한다.
+    Reuse worktree_manager.merge_to_develop().
+    In case of merge conflict, abort and output the list of conflicting files.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN).
-        dry_run: True이면 예상 동작만 출력.
+        ticket_number: Ticket number (T-NNN).
+        dry_run: If True, only expected actions are output.
 
     Returns:
-        (success, merge_commit_sha, feature_branch) 튜플.
-        성공 시 (True, sha, branch), 실패 시 (False, "", "").
+        (success, merge_commit_sha, feature_branch) tuple.
+        On success (True, sha, branch), on failure (False, "", "").
     """
     _step(2, "Feature branch -> develop merge")
 
@@ -412,22 +412,22 @@ def _handle_anchor_failure(
     reason: str,
     pre_merge_develop_sha: str = "",
 ) -> None:
-    """merge anchor 검증 실패 시 롤백 및 로그 기록을 수행한다.
+    """If merge anchor verification fails, rollback and log recording are performed.
 
-    현재 HEAD가 merge_commit과 일치하면 명시적 SHA 리셋(`pre_merge_develop_sha`)
-    또는 fallback 으로 `HEAD^` 리셋을 수행하고,
-    .agent-factory/logs/merge-anchor-failures.log에 JSONL 형식으로 기록한다.
+    Explicit SHA reset (`pre_merge_develop_sha`) if current HEAD matches merge_commit
+    Or perform a `HEAD^` reset with fallback,
+    Record in JSONL format in .agent-factory/logs/merge-anchor-failures.log.
 
     Args:
-        merge_commit: 병합 커밋 SHA.
-        feature_branch: feature 브랜치명.
-        reason: 실패 이유.
-        pre_merge_develop_sha: Stage 2 진입 직전 캡처한 develop HEAD SHA.
-            비어있지 않으면 `git reset --hard <pre_merge_develop_sha>` 로
-            명시적 SHA 리셋을 수행한다 (T-403 회귀 방지: develop 의 사전
-            ahead commit 이 자동 보존됨).
-            빈 문자열이면 캡처 실패 fallback 으로 기존 `HEAD^` 상대 경로
-            리셋을 수행하고 경고 로그를 출력한다.
+        merge_commit: Merge commit SHA.
+        feature_branch: Feature branch name.
+        reason: Reason for failure.
+        pre_merge_develop_sha: develop HEAD SHA captured just before entering Stage 2.
+            If it is not empty, use `git reset --hard <pre_merge_develop_sha>`
+            Perform an explicit SHA reset (avoid T-403 regression: dictionary of develop
+            ahead commit is automatically preserved).
+            If the string is empty, the existing `HEAD^` relative path is used as a fallback for capture failure.
+            Perform a reset and output a warning log.
     """
     project_root = resolve_project_root()
 
@@ -451,7 +451,7 @@ def _handle_anchor_failure(
 
     # Forensics 1.5: Check if reset_target matches the first parent of merge commit.
     # A separate commit (`6efc6ef` revert, etc.) had been added, and pre_merge_develop_sha had been added.
-    # 그 별건 commit 으로 캡처되어 `reset --hard <commit separately>` 이 실행되면서
+    # That separate thing is captured as a commit and `reset --hard <commit separately>` is executed.
     # Reset to a different location from the develop state just before merging → Possibility of loss of changes.
     # If parent1 == reset_target, normal (reverts to the state just before merging),
     # Otherwise, it is a suspicious case captured above the commit, so the warning log is strengthened.
@@ -538,25 +538,25 @@ def _stage2_5_verify_merge_anchor(
     dry_run: bool,
     pre_merge_develop_sha: str = "",
 ) -> bool:
-    """Stage 2.5: merge anchor 검증을 수행한다.
+    """Stage 2.5: Perform merge anchor verification.
 
-    WORKFLOW_WORKTREE=false(기본값)이면 즉시 True를 반환하여 스킵한다.
-    활성화 시 두 가지 검증을 수행한다:
-      1. 병합 커밋의 두 번째 부모(^2) SHA == feature_branch HEAD SHA
-      2. git diff {merge_commit}^2 {merge_commit} 출력이 비어있어야 함
+    If WORKFLOW_WORKTREE=false (default value), it immediately returns True and is skipped.
+    Upon activation, two verifications are performed:
+      1. Second parent (^2) SHA of merge commit == feature_branch HEAD SHA
+      2. git diff {merge_commit}^2 {merge_commit} output should be empty
 
     Args:
-        merge_commit: Stage 2에서 생성된 병합 커밋 SHA.
-        feature_branch: 병합된 feature 브랜치명.
-        dry_run: True이면 예상 동작만 출력.
-        pre_merge_develop_sha: Stage 2 진입 직전 캡처한 develop HEAD SHA.
-            T-410: merge_commit == pre_merge_develop_sha 이면 git merge
-            --no-ff 가 새 commit 을 만들지 않은 already-up-to-date 케이스이므로
-            anchor 검증 자체를 skip 한다 (^2 호출 회피).
-            빈 문자열이면 미캡처 상태로 간주하고 기존 분기를 따른다.
+        merge_commit: Merge commit SHA generated in Stage 2.
+        feature_branch: Merged feature branch name.
+        dry_run: If True, only expected actions are output.
+        pre_merge_develop_sha: develop HEAD SHA captured just before entering Stage 2.
+            T-410: If merge_commit == pre_merge_develop_sha, git merge
+            Since --no-ff is an already-up-to-date case that did not create a new commit,
+            Skip the anchor verification itself (avoiding the ^2 call).
+            If the string is empty, it is considered to be in an uncaptured state and the existing branch is followed.
 
     Returns:
-        검증 성공(또는 스킵) 시 True, 실패(롤백 완료) 시 False.
+        True if verification is successful (or skipped), False if verification fails (rollback complete).
     """
     _step(2, "Merge anchor verification (Stage 2.5)")
 
@@ -680,18 +680,18 @@ def _stage2_5_verify_merge_anchor(
 def _stage3_remove_worktree(
     ticket_number: str, dry_run: bool
 ) -> bool:
-    """Stage 3: worktree unlock + remove (+ feature 브랜치 삭제).
+    """Stage 3: worktree unlock + remove (+ delete feature branch).
 
-    worktree_manager.remove_worktree()를 재사용한다.
-    merge_to_develop()가 이미 remove_worktree를 호출하므로,
-    잔여 worktree가 있는 경우에만 정리한다 (멱등).
+    Reuse worktree_manager.remove_worktree().
+    Since merge_to_develop() already calls remove_worktree,
+    Prune only if there is a remaining worktree (idempotent).
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN).
-        dry_run: True이면 예상 동작만 출력.
+        ticket_number: Ticket number (T-NNN).
+        dry_run: If True, only expected actions are output.
 
     Returns:
-        성공 시 True, 실패 시 False.
+        True on success, False on failure.
     """
     _step(3, "Remove worktree + delete feature branch")
 
@@ -729,19 +729,19 @@ def _stage3_remove_worktree(
 def _stage4_kanban_done(
     ticket_number: str, dry_run: bool
 ) -> bool:
-    """Stage 4: kanban done 처리.
+    """Stage 4: Kanban done processing.
 
-    kanban_cli.cmd_done()을 호출한다. cmd_done() 내부의 worktree
-    merge hook은 feature 브랜치가 이미 삭제된 상태이므로
-    get_feature_branch_for_ticket()이 None을 반환하여 자동으로
-    중복 merge를 건너뛴다.
+    Call kanban_cli.cmd_done(). worktree inside cmd_done()
+    The merge hook is because the feature branch has already been deleted.
+    get_feature_branch_for_ticket() returns None, automatically
+    Skip duplicate merges.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN).
-        dry_run: True이면 예상 동작만 출력.
+        ticket_number: Ticket number (T-NNN).
+        dry_run: If True, only expected actions are output.
 
     Returns:
-        성공 시 True, 실패 시 False.
+        True on success, False on failure.
     """
     _step(4, "kanban done processing")
 
@@ -778,15 +778,15 @@ def _stage4_kanban_done(
 def run_pipeline(
     ticket_number: str, dry_run: bool = False, force: bool = False
 ) -> int:
-    """5단계 병합 파이프라인을 순차 실행한다.
+    """Execute the five-stage merge pipeline sequentially.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식 또는 숫자).
-        dry_run: True이면 각 단계의 예상 동작만 출력.
-        force: True이면 merge 승인 검사를 우회.
+        ticket_number: Ticket number (T-NNN format or number).
+        dry_run: If True, only the expected operation of each step is output.
+        force: If True, bypass merge approval check.
 
     Returns:
-        종료 코드. 0=성공, 1=병합실패, 2=승인미비.
+        Exit code. 0=Success, 1=Merge failed, 2=Not approved.
     """
     ticket_number = _normalize_ticket(ticket_number)
 
@@ -877,10 +877,10 @@ def run_pipeline(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """CLI 인자 파서를 구성한다.
+    """Configure the CLI argument parser.
 
     Returns:
-        구성된 ArgumentParser 인스턴스.
+        A configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         prog="flow-merge",

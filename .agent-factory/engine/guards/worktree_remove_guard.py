@@ -1,19 +1,19 @@
 #!/usr/bin/env -S python3 -u
-"""워크트리 삭제 전 미커밋 변경 방어 가드 Hook 스크립트.
+"""Hook script to guard against uncommitted changes before deleting the work tree.
 
-PreToolUse(Bash) 이벤트에서 ``git worktree remove`` 명령을 감지하고,
-대상 워크트리에 미커밋 변경이 있으면 차단한다.
+Detects the ``git worktree remove`` command in the PreToolUse(Bash) event,
+If there are uncommitted changes in the target worktree, they are blocked.
 
-경로 추출에 실패하거나 대상 디렉터리가 존재하지 않으면 통과(false positive 방지).
-미커밋 변경이 없으면 통과.
+Pass if path extraction fails or the target directory does not exist (avoiding false positives).
+Passes if there are no uncommitted changes.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 워크트리 미커밋 변경 차단
+Main functions:
+    main: Hook entry point, blocks uncommitted work tree changes after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_WORKTREE_REMOVE_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_WORKTREE_REMOVE_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -37,11 +37,11 @@ _WORKTREE_REMOVE_PATTERN: str = r"\bgit\s+worktree\s+remove\b"
 
 
 def _deny(worktree_path: str, status_output: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        worktree_path: 미커밋 변경이 감지된 워크트리 경로.
-        status_output: ``git status --porcelain`` 출력 (미커밋 파일 목록).
+        worktree_path: Worktree path where uncommitted changes were detected.
+        status_output: ``git status --porcelain`` output (list of uncommitted files).
     """
     reason = (
         f"[Block worktree deletion] This is a worktree with uncommitted changes: {worktree_path} \n"
@@ -60,16 +60,16 @@ def _deny(worktree_path: str, status_output: str) -> None:
 
 
 def _extract_worktree_path(command: str) -> str | None:
-    """``git worktree remove [--force] <path>`` 명령에서 경로 인자를 추출한다.
+    """Extracts the path argument from the ``git worktree remove [--force] <path>`` command.
 
-    ``--force`` 플래그를 건너뛰고 첫 번째 비옵션 인자를 경로로 반환한다.
-    추출에 실패하거나 인자가 없으면 None을 반환한다.
+    Skips the ``--force`` flag and returns the first non-optional argument as the path.
+    If extraction fails or there are no arguments, None is returned.
 
     Args:
-        command: Bash 도구의 command 문자열.
+        command: Command string of Bash tool.
 
     Returns:
-        워크트리 경로 문자열. 추출 실패 시 None.
+        Worktree path string. None if extraction fails.
     """
     # After ``git worktree remove``, only the arguments are parsed.
     match = re.search(_WORKTREE_REMOVE_PATTERN, command)
@@ -94,15 +94,15 @@ def _extract_worktree_path(command: str) -> str | None:
 
 
 def _get_status_output(worktree_path: str) -> str:
-    """워크트리 경로에서 ``git status --porcelain`` 출력을 반환한다.
+    """Returns the output of ``git status --porcelain`` in the worktree path.
 
-    명령 실행에 실패하면 빈 문자열을 반환한다.
+    If the command execution fails, an empty string is returned.
 
     Args:
-        worktree_path: 검사할 워크트리 디렉터리 경로.
+        worktree_path: Worktree directory path to check.
 
     Returns:
-        ``git status --porcelain`` 표준 출력. 실패 시 빈 문자열.
+        ``git status --porcelain`` standard output. Empty string on failure.
     """
     try:
         result = subprocess.run(
@@ -119,12 +119,12 @@ def _get_status_output(worktree_path: str) -> str:
 
 
 def main() -> None:
-    """워크트리 삭제 전 미커밋 변경 방어 가드 Hook의 진입점.
+    """Entry point of the uncommitted change defense guard hook before deleting the work tree.
 
-    stdin에서 JSON을 읽어 Bash 도구의 ``git worktree remove`` 명령을 감지하고,
-    대상 워크트리에 미커밋 변경이 있으면 deny 응답을 출력하여 삭제를 차단한다.
+    Detect the Bash tool's ``git worktree remove`` command by reading JSON from stdin,
+    If there are uncommitted changes in the target worktree, a deny response is output to block deletion.
 
-    경로 추출 실패, 디렉터리 부재, 미커밋 없음 시에는 통과한다.
+    If path extraction fails, directory does not exist, or there is no commit, it passes.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_WORKTREE_REMOVE_GUARD") or read_env("HOOK_WORKTREE_REMOVE_GUARD")

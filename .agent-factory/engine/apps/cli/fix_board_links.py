@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-fix_board_links.py — board 메타 파일 링크 일괄 정정 스크립트
+fix_board_links.py — Board meta file link batch correction script
 
-구 구조: runs/<key>/<work_name>/<command>/<file>
-신 구조: runs/<key>/<file>
+Sphere structure: runs/<key>/<work_name>/<command>/<file>
+New structure: runs/<key>/<file>
 
 Usage:
     python3 fix_board_links.py --mode dry-run --target <path> [--target <path> ...]
@@ -28,7 +28,7 @@ REPLACEMENT = r'\1/\2'
 
 def process_file(path: Path, mode: str) -> dict:
     """
-    파일을 처리하고 결과 통계를 반환한다.
+    Processes the file and returns the resulting statistics.
 
     Returns:
         {

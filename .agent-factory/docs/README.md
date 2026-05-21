@@ -20,6 +20,8 @@ execution, verification, reporting, board services, and provider adapters.
   application, adapter, and contract boundaries.
 - [LLM adapter architecture](refactor/llm-adapter-architecture.md): provider
   replacement strategy.
+- [Codex terminal transition plan](refactor/codex-terminal-transition-plan.md):
+  planned provider-neutral Console terminal migration.
 - [Domain directory restructure](refactor/domain-directory-restructure.md):
   planned source layout.
 - [Layout convergence plan](refactor/layout-convergence-plan.md): current

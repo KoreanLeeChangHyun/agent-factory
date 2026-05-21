@@ -60,7 +60,14 @@
     CLAUDE_REPO_URL: 'Remote Agent Factory repository URL used by sync/bootstrap.',
     CLAUDE_REQUIRED_PYTHON_MAJOR: 'Required Python major version checked by bootstrap.',
     CLAUDE_REQUIRED_PYTHON_MINOR: 'Required Python minor version checked by bootstrap.',
-    HOOK_WORKTREE_PATH: 'Current workflow worktree path, usually maintained by Agent Factory automatically.'
+    HOOK_WORKTREE_PATH: 'Current workflow worktree path, usually maintained by Agent Factory automatically.',
+    AGENT_FACTORY_LLM_PROVIDER: 'Brain provider for provider-neutral LLM adapter paths. Supported values: claude, codex, fake.',
+    CLAUDE_PERMISSION_MODE: 'Claude adapter permission mode for non-interactive runs.',
+    CODEX_BIN: 'Codex executable name or path used by CodexAdapter.',
+    CODEX_MODEL: 'Optional Codex model override. Leave empty to use Codex defaults.',
+    CODEX_PROFILE: 'Optional Codex profile name from Codex config.',
+    CODEX_SANDBOX: 'Codex sandbox mode, for example workspace-write.',
+    CODEX_APPROVAL_POLICY: 'Codex approval policy, for example never.'
   };
 
   document.getElementById('settings-toggle').addEventListener('click', open);
@@ -157,20 +164,52 @@
 
     var provider = document.createElement('div');
     provider.className = 'settings-section settings-provider';
+    var brain = getSettingValue(sections, 'AGENT_FACTORY_LLM_PROVIDER') || (window.AgentFactoryBrain ? window.AgentFactoryBrain.getBrain() : 'claude');
+    brain = normalizeBrain(brain);
+    if (window.AgentFactoryBrain) {
+      window.AgentFactoryBrain.setBrain(brain);
+    }
     provider.innerHTML =
-      '<div class="settings-section-title">Provider</div>' +
+      '<div class="settings-section-title">Brain</div>' +
       '<div class="settings-item">' +
         '<div class="settings-item-info">' +
           '<div class="settings-item-key">Active adapter</div>' +
           '<div class="settings-item-label">Provider-specific naming is isolated to adapter details.</div>' +
         '</div>' +
-        '<div class="settings-item-control"><span class="settings-provider-pill">ClaudeAdapter</span></div>' +
+        '<div class="settings-item-control"><span class="settings-provider-pill" id="settings-provider-pill">' + adapterLabel(brain) + '</span></div>' +
+      '</div>' +
+      '<div class="settings-item">' +
+        '<div class="settings-item-info">' +
+          '<div class="settings-item-key">Brain provider</div>' +
+          '<div class="settings-item-label">Changes the provider setting and matches the Console, Terminal, and Board accent color.</div>' +
+        '</div>' +
+        '<div class="settings-item-control">' +
+          '<select class="settings-select" id="settings-brain-theme">' +
+            '<option value="claude">Claude</option>' +
+            '<option value="codex">Codex</option>' +
+            '<option value="fake">Fake</option>' +
+          '</select>' +
+        '</div>' +
       '</div>' +
       '<details class="settings-adapter-details">' +
         '<summary>ClaudeAdapter details</summary>' +
         '<div class="settings-adapter-body">Console process integration uses local Claude Code hooks and .agent-factory runtime paths.</div>' +
       '</details>';
     body.appendChild(provider);
+
+    var brainSelect = document.getElementById('settings-brain-theme');
+    if (brainSelect) {
+      brainSelect.value = brain;
+      brainSelect.addEventListener('change', function () {
+        var selectedBrain = normalizeBrain(brainSelect.value);
+        if (window.AgentFactoryBrain) {
+          window.AgentFactoryBrain.setBrain(selectedBrain);
+        }
+        var pill = document.getElementById('settings-provider-pill');
+        if (pill) pill.textContent = adapterLabel(selectedBrain);
+        save('AGENT_FACTORY_LLM_PROVIDER', providerValue(selectedBrain), brainSelect);
+      });
+    }
 
     var buildUrlBtn = document.getElementById('settings-build-url-btn');
     if (buildUrlBtn) {
@@ -421,6 +460,34 @@
       .catch(function () {
         if (inputEl) flash(inputEl, 'error');
       });
+  }
+
+  function getSettingValue(sections, key) {
+    for (var i = 0; i < sections.length; i++) {
+      var vars = sections[i].vars || [];
+      for (var j = 0; j < vars.length; j++) {
+        if (vars[j].key === key) return String(vars[j].value || '').trim();
+      }
+    }
+    return '';
+  }
+
+  function normalizeBrain(value) {
+    var brain = String(value || 'claude').toLowerCase();
+    if (brain === 'openai') return 'codex';
+    if (brain === 'fake') return 'fake';
+    if (brain === 'codex') return 'codex';
+    return 'claude';
+  }
+
+  function providerValue(brain) {
+    return brain === 'fake' ? 'fake' : brain === 'codex' ? 'codex' : 'claude';
+  }
+
+  function adapterLabel(brain) {
+    if (brain === 'codex') return 'CodexAdapter';
+    if (brain === 'fake') return 'FakeAdapter';
+    return 'ClaudeAdapter';
   }
 
   function flash(el, cls) {

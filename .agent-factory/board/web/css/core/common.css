@@ -12,6 +12,8 @@
   --af-text: #CCCCCC;
   --af-text-muted: #858585;
   --af-text-subtle: #5A5A5A;
+  --brain-accent: #D97757;
+  --brain-accent-soft: rgba(217, 119, 87, 0.18);
   --af-primary: #007ACC;
   --af-primary-soft: rgba(0, 122, 204, 0.16);
   --af-success: #4EC9B0;
@@ -29,6 +31,27 @@
   --af-overlay: rgba(0, 0, 0, 0.48);
   --af-hover: rgba(255, 255, 255, 0.06);
   --af-hover-strong: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-brain="claude"] {
+  --brain-accent: #D97757;
+  --brain-accent-soft: rgba(217, 119, 87, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
+}
+
+:root[data-brain="codex"] {
+  --brain-accent: #10A37F;
+  --brain-accent-soft: rgba(16, 163, 127, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
+}
+
+:root[data-brain="gemini"] {
+  --brain-accent: #4796E3;
+  --brain-accent-soft: rgba(145, 119, 199, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

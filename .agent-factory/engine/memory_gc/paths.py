@@ -1,7 +1,7 @@
-"""메모리 GC 경로·환경변수 단일 진실 공급원.
+"""Memory GC path/environment variable single source of truth.
 
-memory_dir 자동 계산: ~/.claude/projects/<sanitized-cwd>/memory/
-환경변수 override: MEMORY_GC_DIR
+Automatic calculation of memory_dir: ~/.claude/projects/<sanitized-cwd>/memory/
+Environment variable override: MEMORY_GC_DIR
 """
 from __future__ import annotations
 
@@ -80,10 +80,10 @@ def _parse_csv(env_value: str | None, default: tuple[str, ...]) -> tuple[str, ..
 
 
 def load_config(env: dict[str, str] | None = None, cwd: str | None = None) -> GCConfig:
-    """환경변수에서 GCConfig 를 로드한다.
+    """Load GCConfig from environment variables.
 
-    .agent-factory/.settings 가 미리 환경에 로드되어 있다고 가정.
-    미설정 시 기본값 사용.
+    Assuming .agent-factory/.settings is preloaded in the environment.
+    If not set, default value is used.
     """
     e = env if env is not None else os.environ
     raw_dir = e.get('MEMORY_GC_DIR', '').strip()

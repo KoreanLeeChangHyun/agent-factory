@@ -248,7 +248,7 @@ Board.WfTicketRenderer = (function () {
 
   function _renderStatus(text) {
     var header = _parseHeader(text);
-    var isOk   = /완료|Done|성공/.test(text);
+    var isOk   = /Complete|Done|Success/.test(text);
 
     var card = document.createElement("div");
     card.className = "wf-ticket-block " + (isOk ? "wf-status-ok" : "wf-status-err");
@@ -319,7 +319,7 @@ Board.WfTicketRenderer = (function () {
   function render(text) {
     if (_isMenuOutput(text)) {
       _renderMenu(text);
-    } else if (/완료|Done|성공|실패|Error/.test(text) && !_isMenuOutput(text)) {
+    } else if (/Complete|Done|Success|Failed|Error/.test(text) && !_isMenuOutput(text)) {
       _renderStatus(text);
     } else {
       _renderDefault(text);

@@ -1,26 +1,26 @@
 #!/usr/bin/env -S python3 -u
-"""스킬 카탈로그 생성/갱신 CLI (단일 소스).
+"""Skill catalog creation/update CLI (single source of truth).
 
-.claude/skills/*/SKILL.md를 전수 스캔하여 frontmatter를 파싱하고,
-내장된 Command Default Mapping 데이터와 결합하여
-skill-catalog.md를 생성합니다.
+Scans .claude/skills/*/SKILL.md to parse frontmatter,
+Combined with the built-in Command Default Mapping data
+Create skill-catalog.md.
 
-매핑 데이터는 이 파일이 단일 소스(Single Source of Truth)입니다.
-기존 command-skill-map.md는 폐기되었으며, 매핑 변경 시 이 파일의
-COMMAND_DEFAULTS 상수를 수정하세요.
+This file is the single source of truth for mapping data.
+The existing command-skill-map.md has been discarded, and when changing mapping, this file
+Modify the COMMAND_DEFAULTS constant.
 
-주요 함수:
-    parse_frontmatter: SKILL.md frontmatter 파싱
-    scan_skills: 전체 스킬 디렉터리 스캔
-    build_command_default_mapping: 명령어 기본 스킬 매핑 테이블 생성
-    generate_catalog: skill-catalog.md 내용 생성
-    main: CLI 진입점
+Main functions:
+    parse_frontmatter: Parse SKILL.md frontmatter
+    scan_skills: Scan entire skills directory
+    build_command_default_mapping: Create command default skill mapping table
+    generate_catalog: Generate content of skill-catalog.md
+    main: CLI entry point
 
-사용법:
+Usage:
     python3 .agent-factory/engine/sync/catalog_sync.py              # Create/Update Catalog
     python3 .agent-factory/engine/sync/catalog_sync.py --dry-run     # Preview (no file writing)
 
-종료 코드: 0 성공, 1 실패
+Exit code: 0 success, 1 failure
 """
 
 from __future__ import annotations
@@ -63,14 +63,14 @@ COMMAND_DEFAULTS: list[tuple[str, str, str]] = [
 
 
 def parse_frontmatter(filepath: str) -> Optional[dict[str, object]]:
-    """SKILL.md의 YAML frontmatter에서 name, description, disable-model-invocation을 파싱.
+    """Parse name, description, and disable-model-invocation from YAML frontmatter in SKILL.md.
 
     Args:
-        filepath: SKILL.md 파일의 절대 경로
+        filepath: Absolute path to the SKILL.md file
 
     Returns:
-        파싱된 frontmatter 딕셔너리. 파일 읽기 실패 또는 frontmatter 없으면 None.
-        키: name, description, disable-model-invocation, scope
+        Parsed frontmatter dictionary. None if file read fails or frontmatter is not present.
+        Keys: name, description, disable-model-invocation, scope
     """
     result: dict[str, object] = {"name": None, "description": None, "disable-model-invocation": False, "scope": "global"}
     try:
@@ -117,16 +117,16 @@ def parse_frontmatter(filepath: str) -> Optional[dict[str, object]]:
 
 
 def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
-    """모든 SKILL.md를 스캔하여 활성 스킬 목록을 전문화/프로젝트로 분류하여 반환.
+    """Scans all SKILL.mds and returns a list of active skills sorted by specialization/project.
 
-    SKILLS_DIR 하위 디렉터리를 순회하며 각 스킬의 frontmatter를 파싱한다.
-    disable-model-invocation: true 스킬과 EXCLUDE_PREFIXES 접두사 스킬은 제외한다.
+    Traverses the SKILLS_DIR subdirectory and parses the frontmatter of each skill.
+    disable-model-invocation: true Excludes skills and EXCLUDE_PREFIXES prefix skills.
 
     Returns:
         tuple: (global_skills, project_skills, excluded_count)
-            - global_skills: scope=global 스킬 목록 (name, description 포함)
-            - project_skills: scope=project 스킬 목록 (name, description 포함)
-            - excluded_count: 제외된 스킬 수
+            - global_skills: scope=global list of skills (including name, description)
+            - project_skills: scope=project skill list (including name and description)
+            - excluded_count: Number of excluded skills
     """
     global_skills: list[dict[str, str]] = []
     project_skills: list[dict[str, str]] = []
@@ -182,10 +182,10 @@ def scan_skills() -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
 
 
 def build_command_default_mapping() -> str:
-    """내장 COMMAND_DEFAULTS 상수에서 명령어별 기본 스킬 매핑 테이블을 생성.
+    """Create a basic skill mapping table for each command from the built-in COMMAND_DEFAULTS constant.
 
     Returns:
-        마크다운 테이블 형식의 명령어-스킬 매핑 문자열 (개행 문자 포함)
+        Command-skill mapping string in Markdown table format (including newlines)
     """
     lines = []
     lines.append("| command | Autoload Skill | Use |")
@@ -200,15 +200,15 @@ def generate_catalog(
     project_skills: list[dict[str, str]],
     command_mapping: str,
 ) -> str:
-    """skill-catalog.md 내용을 생성.
+    """Create skill-catalog.md content.
 
     Args:
-        global_skills: 전문화(global) 스킬 목록. 각 항목은 name, description 키를 포함.
-        project_skills: 프로젝트(project) 스킬 목록. 각 항목은 name, description 키를 포함.
-        command_mapping: 명령어 기본 스킬 매핑 마크다운 테이블 문자열
+        global_skills: List of specialization (global) skills. Each item includes name and description keys.
+        project_skills: List of project skills. Each item includes name and description keys.
+        command_mapping: Command basic skill mapping markdown table string
 
     Returns:
-        skill-catalog.md 파일에 쓸 전체 내용 문자열
+        Full content string to write to skill-catalog.md file
     """
     total = len(global_skills) + len(project_skills)
     lines = []
@@ -253,10 +253,10 @@ def generate_catalog(
 
 
 def main() -> None:
-    """CLI 진입점. 스킬 카탈로그를 생성하거나 미리보기를 출력한다.
+    """CLI entry point. Create a skill catalog or print a preview.
 
-    --dry-run 플래그가 있으면 파일을 쓰지 않고 예상 결과만 출력한다.
-    종료 코드: 0 성공, 1 실패
+    If the --dry-run flag is present, no file is written and only the expected results are output.
+    Exit code: 0 success, 1 failure
     """
     parser = argparse.ArgumentParser(
         prog="flow-catalog",

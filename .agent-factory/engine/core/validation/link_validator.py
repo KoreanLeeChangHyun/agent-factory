@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""마크다운/HTML 파일 링크 유효성 검사 스크립트.
+"""Markdown/HTML file link validation script.
 
-.agent-factory/runs/ 디렉터리 내 report.html, plan.md 파일에서 링크를 추출하고,
-각 내부 링크 대상 파일의 존재 여부를 검증한다.
+Extract the links from report.html and plan.md files in the .agent-factory/runs/ directory,
+Verifies the existence of each internal link target file.
 
-이 스크립트는 자동 hook에 연결되어 있지 않으며, 수동으로 실행하는 유틸리티입니다.
-워크플로우 완료 후 또는 보고서 작성 후 링크 유효성을 점검할 때 사용합니다.
+This script is not connected to an automatic hook; it is a manually run utility.
+Used to check link validity after completing a workflow or creating a report.
 
-실행 예시:
+Running example:
     python3 .agent-factory/engine/guards/link_validator.py
     python3 .agent-factory/engine/guards/link_validator.py --active-only
 
-주요 함수:
-    main: 진입점, CLI 인자 파싱 후 검증 수행
-    scan_markdown_files: 스캔 대상 마크다운 파일 목록 반환
-    extract_links: 마크다운 텍스트에서 링크 추출
-    validate_link: 단일 링크의 유효성 검사
-    validate_all: 전체 파일 목록에 대한 링크 검증 실행
+Main functions:
+    main: Entry point, parses CLI arguments and performs verification
+    scan_markdown_files: Returns a list of markdown files to scan
+    extract_links: Extract links from markdown text
+    validate_link: Validate a single link
+    validate_all: Run link validation for the entire file list.
 """
 
 from __future__ import annotations
@@ -45,13 +45,13 @@ _PROJECT_ROOT_PREFIXES: tuple[str, ...] = (".agent-factory/", ".claude/")
 
 
 def _find_project_root() -> Path:
-    """프로젝트 루트 디렉터리를 찾아 반환한다.
+    """Finds and returns the project root directory.
 
-    이 스크립트는 .agent-factory/engine/core/validation/ 하위에 위치하므로,
-    4단계 상위 디렉터리가 프로젝트 루트이다.
+    Since this script is located under .agent-factory/engine/core/validation/,
+    Level 4 The upper directory is the project root.
 
     Returns:
-        프로젝트 루트 Path 객체.
+        Project root Path object.
     """
     return Path(__file__).resolve().parent.parent.parent.parent.parent
 
@@ -60,17 +60,17 @@ def scan_markdown_files(
     project_root: Path,
     active_only: bool = False,
 ) -> list[Path]:
-    """검증 대상 마크다운 파일 목록을 반환한다.
+    """Returns a list of Markdown files subject to verification.
 
-    .agent-factory/runs/ 디렉터리 하위의 report.html, plan.md 파일을 수집한다.
-    active_only=True이면 .agent-factory/runs/.history/는 제외한다.
+    Collect report.html and plan.md files under the .agent-factory/runs/ directory.
+    If active_only=True, .agent-factory/runs/.history/ is excluded.
 
     Args:
-        project_root: 프로젝트 루트 디렉터리 경로.
-        active_only: True이면 활성 워크플로우(.agent-factory/runs/ 직접 하위)만 스캔.
+        project_root: Project root directory path.
+        active_only: If True, only scan active workflows (direct children of .agent-factory/runs/).
 
     Returns:
-        스캔 대상 마크다운 파일 경로 목록.
+        List of Markdown file paths to scan.
     """
     workflow_dir = project_root / ".agent-factory" / "runs"
     if not workflow_dir.exists():
@@ -100,13 +100,13 @@ def scan_markdown_files(
 
 
 def extract_links(content: str) -> list[str]:
-    """마크다운/HTML 텍스트에서 링크 경로(href) 목록을 추출한다.
+    """Extracts a list of link paths (hrefs) from Markdown/HTML text.
 
     Args:
-        content: 마크다운 파일 텍스트 내용.
+        content: Markdown file text content.
 
     Returns:
-        추출된 링크 href 문자열 목록.
+        List of extracted link href strings.
     """
     md_matches = [href for _text, href in _MD_LINK_PATTERN.findall(content)]
     html_matches = _HTML_HREF_PATTERN.findall(content)
@@ -114,15 +114,15 @@ def extract_links(content: str) -> list[str]:
 
 
 def _is_skip_link(href: str) -> bool:
-    """링크를 검증 대상에서 제외해야 하는지 판단한다.
+    """Determine whether the link should be excluded from verification.
 
-    외부 링크(http/https)와 템플릿 플레이스홀더 링크는 스킵한다.
+    External links (http/https) and template placeholder links are skipped.
 
     Args:
-        href: 링크 경로 문자열.
+        href: Link path string.
 
     Returns:
-        스킵 대상이면 True, 검증 대상이면 False.
+        True if it is a skip target, False if it is a verification target.
     """
     # Skip anchor inside document
     if href.startswith("#"):
@@ -145,18 +145,18 @@ def validate_link(
     md_file: Path,
     project_root: Path,
 ) -> bool:
-    """단일 링크 경로의 파일 존재 여부를 검증한다.
+    """Verifies the existence of a file in a single link path.
 
-    프로젝트 루트 기준 경로(.agent-factory/, .claude/ 시작)는 project_root에서 해석하고,
-    그 외 상대 경로는 md_file이 위치한 디렉터리 기준으로 해석한다.
+    The project root standard path (starting from .agent-factory/, .claude/) is interpreted from project_root,
+    Other relative paths are interpreted based on the directory where md_file is located.
 
     Args:
-        href: 링크 경로 문자열.
-        md_file: 링크가 포함된 마크다운 파일 경로.
-        project_root: 프로젝트 루트 디렉터리 경로.
+        href: Link path string.
+        md_file: Markdown file path containing the link.
+        project_root: Project root directory path.
 
     Returns:
-        파일이 존재하면 True, 존재하지 않으면 False.
+        True if the file exists, False if it does not exist.
     """
     # Path relative to project root
     for prefix in _PROJECT_ROOT_PREFIXES:
@@ -173,15 +173,15 @@ def validate_all(
     md_files: list[Path],
     project_root: Path,
 ) -> tuple[int, int, list[tuple[Path, str]]]:
-    """전체 마크다운 파일 목록에 대해 링크 유효성을 검사한다.
+    """Checks link validity against the entire list of Markdown files.
 
     Args:
-        md_files: 검사할 마크다운 파일 경로 목록.
-        project_root: 프로젝트 루트 디렉터리 경로.
+        md_files: List of Markdown file paths to check.
+        project_root: Project root directory path.
 
     Returns:
-        (유효한 링크 수, 무효한 링크 수, 무효 링크 목록) 튜플.
-        무효 링크 목록의 각 항목은 (마크다운 파일 경로, href) 튜플.
+        (Number of valid links, Number of invalid links, List of invalid links) tuple.
+        Each item in the invalid link list is a (markdown file path, href) tuple.
     """
     valid_count: int = 0
     invalid_count: int = 0
@@ -214,13 +214,13 @@ def _print_results(
     invalid_links: list[tuple[Path, str]],
     project_root: Path,
 ) -> None:
-    """검증 결과를 stdout에 출력한다.
+    """The verification results are output to stdout.
 
     Args:
-        valid_count: 유효한 링크 수.
-        invalid_count: 무효한 링크 수.
-        invalid_links: 무효 링크 목록 (마크다운 파일 경로, href) 튜플 리스트.
-        project_root: 프로젝트 루트 경로 (상대 경로 표시용).
+        valid_count: Number of valid links.
+        invalid_count: Number of invalid links.
+        invalid_links: list of invalid links (markdown file path, href) tuple list.
+        project_root: Project root path (to display relative paths).
     """
     total_count = valid_count + invalid_count
     print(f"Link inspection results: Total {total_count} (valid {valid_count}, invalid {invalid_count})")
@@ -241,10 +241,10 @@ def _print_results(
 
 
 def main() -> None:
-    """링크 유효성 검사 스크립트의 진입점.
+    """Entry point for the link validation script.
 
-    CLI 인자를 파싱하고 검증을 수행한 뒤,
-    무효 링크가 있으면 exitcode 1, 모두 유효하면 0으로 종료한다.
+    After parsing the CLI arguments and performing verification,
+    If there is an invalid link, it exits with exitcode 1, and if all are valid, it exits with 0.
     """
     parser = argparse.ArgumentParser(
         description=".agent-factory/runs/ Validates links in my markdown files.",

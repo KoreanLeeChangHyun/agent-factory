@@ -1,7 +1,7 @@
 """VALIDATE Step — claude -p 1 spawn → validate-report.md (advisory).
 
-driver 룰베이스 12룰 재검증은 done_step 에서 수행 (REPORT 완료 + DONE step.end 기록
-후가 정합 시점 — VALIDATE 시점은 report.md / step.end DONE 미생성으로 거짓 FAIL).
+Driver rule base 12 rule re-verification is performed in done_step (REPORT completed + DONE step.end recorded)
+Post-registration point — VALIDATE point is false due to report.md / step.end DONE not being created (FAIL).
 """
 
 from __future__ import annotations

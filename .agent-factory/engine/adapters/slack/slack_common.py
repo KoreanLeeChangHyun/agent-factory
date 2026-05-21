@@ -1,17 +1,17 @@
 #!/usr/bin/env -S python3 -u
-"""Slack 공용 함수 라이브러리.
+"""Slack common function library.
 
-slack_notify.py, slack_ask.py에서 import하여 사용.
-기존 slack-common.sh의 Python 1:1 포팅.
+Used by importing from slack_notify.py and slack_ask.py.
+Python 1:1 port of the existing slack-common.sh.
 
-주요 함수:
-    load_slack_env: .agent-factory/.settings에서 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID 로드
-    get_agent_emoji: 에이전트별 Slack 이모지 매핑
-    extract_json_field: 딕셔너리에서 중첩 키 추출
-    build_json_payload: Slack API용 JSON payload 구성
-    send_slack_message: urllib로 Slack API 호출 + 응답 검증
-    log_info: stderr로 정보 로그 출력
-    log_warn: stderr로 경고 로그 출력
+Main functions:
+    load_slack_env: Load SLACK_BOT_TOKEN, SLACK_CHANNEL_ID from .agent-factory/.settings
+    get_agent_emoji: Slack emoji mapping per agent
+    extract_json_field: Extract nested keys from dictionary
+    build_json_payload: Configure JSON payload for Slack API
+    send_slack_message: Call Slack API with urllib + verify response
+    log_info: Output information log to stderr
+    log_warn: Print warning log to stderr
 """
 
 from __future__ import annotations
@@ -41,34 +41,34 @@ SLACK_CHANNEL_ID: str = ""
 
 
 def log_info(msg: str) -> None:
-    """stderr로 정보 로그를 출력한다.
+    """Prints information logs to stderr.
 
     Args:
-        msg: 출력할 정보 메시지
+        msg: Informational message to print
     """
     print(f"[OK] {msg}", file=sys.stderr)
 
 
 def log_warn(msg: str) -> None:
-    """stderr로 경고 로그를 출력한다.
+    """Prints warning logs to stderr.
 
     Args:
-        msg: 출력할 경고 메시지
+        msg: warning message to print
     """
     print(f"[WARN] {msg}", file=sys.stderr)
 
 
 def load_slack_env(env_file: str | None = None) -> bool:
     """
-    .agent-factory/.settings에서 Slack 환경변수 로드.
+    Load Slack environment variables from .agent-factory/.settings.
 
-    설정 후 모듈 변수 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID 사용 가능.
+    After setting, module variables SLACK_BOT_TOKEN and SLACK_CHANNEL_ID can be used.
 
     Args:
-        env_file: .agent-factory/.settings 파일 경로 (None이면 자동 해석)
+        env_file: .agent-factory/.settings file path (automatically interpreted if None)
 
     Returns:
-        True이면 로드 성공, False이면 필수 환경변수 누락
+        If True, the load was successful. If False, required environment variables are missing.
     """
     global SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
 
@@ -86,30 +86,30 @@ def load_slack_env(env_file: str | None = None) -> bool:
 
 
 def get_agent_emoji(agent_name: str) -> str:
-    """에이전트 이름에 대응하는 Slack 이모지를 반환한다.
+    """Returns the Slack emoji corresponding to the agent name.
 
     Args:
-        agent_name: 에이전트 이름 (init|planner|worker|reporter)
+        agent_name: Agent name (init|planner|worker|reporter)
 
     Returns:
-        이모지 문자열. 매칭되는 에이전트가 없으면 빈 문자열 반환.
+        Emoji string. If there is no matching agent, an empty string is returned.
     """
     return _EMOJI_MAP.get(agent_name, "")
 
 
 def extract_json_field(data: Any, *keys: Any, default: Any = "N/A") -> Any:
-    """딕셔너리에서 중첩 키를 안전하게 추출한다.
+    """Safely extract nested keys from a dictionary.
 
-    기존 shell 스크립트의 jq/python3 폴백 체인을 단순화.
-    순수 Python이므로 별도 폴백 불필요.
+    Simplifying the jq/python3 fallback chain of existing shell scripts.
+    Since it is pure Python, no separate fallback is required.
 
     Args:
-        data: JSON 파싱 결과 딕셔너리 또는 리스트
-        *keys: 중첩 키 경로 (예: 'tool_input', 'questions', 0, 'question')
-        default: 키가 없을 때 반환할 기본값
+        data: JSON parsing result dictionary or list
+        *keys: Nested key paths (e.g. 'tool_input', 'questions', 0, 'question')
+        default: Default value to return when key does not exist
 
     Returns:
-        추출된 값. 키가 없거나 오류 발생 시 default 반환.
+        Extracted value. Returns default if the key is missing or an error occurs.
     """
     current = data
     for key in keys:
@@ -128,14 +128,14 @@ def extract_json_field(data: Any, *keys: Any, default: Any = "N/A") -> Any:
 
 
 def build_json_payload(channel: str, text: str) -> str:
-    """Slack API용 JSON payload를 구성한다.
+    """Configure JSON payload for Slack API.
 
     Args:
-        channel: Slack 채널 ID
-        text: 전송할 메시지 텍스트
+        channel: Slack channel ID
+        text: Message text to send
 
     Returns:
-        JSON 직렬화된 payload 문자열
+        JSON serialized payload string
     """
     payload = {
         "channel": channel,
@@ -146,14 +146,14 @@ def build_json_payload(channel: str, text: str) -> str:
 
 
 def send_slack_message(json_payload: str, token: str | None = None) -> bool:
-    """Slack API로 메시지를 전송하고 응답을 검증한다.
+    """Send a message to the Slack API and verify the response.
 
     Args:
-        json_payload: JSON payload 문자열
-        token: Slack Bot Token. None이면 모듈 변수 SLACK_BOT_TOKEN 사용.
+        json_payload: JSON payload string
+        token: Slack Bot Token. If None, use module variable SLACK_BOT_TOKEN.
 
     Returns:
-        True이면 전송 성공, False이면 전송 실패
+        If True, transmission is successful. If False, transmission fails.
     """
     bot_token = token or SLACK_BOT_TOKEN
     if not bot_token:

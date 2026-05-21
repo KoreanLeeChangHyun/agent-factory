@@ -1,13 +1,13 @@
-"""워크플로우 종료 시 board/data/ 대시보드(.skills.md / .logs.md / .history.md) 갱신.
+"""Update board/data/ dashboard (.skills.md / .logs.md / .history.md) when workflow ends.
 
-finalization.py 비차단 후처리에서 분리. 호출 시그니처와 비차단 패턴(호출부 try/except) 동일.
+Separate finalization.py from non-blocking post-processing. The call signature and non-blocking pattern (caller try/except) are the same.
 
-함수:
-    _update_skill_frequency()                       — .skills.md 스킬 빈도 집계
-    _update_logs_md(registry_key, abs_work_dir)     — .logs.md 워크플로우 로그 행 삽입
-    _update_step_durations()                        — .history.md 단계별 평균 소요 시간
-    _update_task_stats(registry_key, abs_work_dir)  — .history.md 태스크 성공/실패 통계
-    _safe_listdir(path)                             — 헬퍼 (오류 시 빈 리스트 반환)
+Function:
+    _update_skill_frequency() — .skills.md Skill frequency count
+    _update_logs_md(registry_key, abs_work_dir) — Insert .logs.md workflow log row
+    _update_step_durations() — Average time spent per step in .history.md
+    _update_task_stats(registry_key, abs_work_dir) — .history.md task success/failure statistics
+    _safe_listdir(path) — Helper (returns empty list on error)
 """
 
 from __future__ import annotations
@@ -31,15 +31,15 @@ PROJECT_ROOT: str = resolve_project_root()
 
 
 def _update_skill_frequency() -> None:
-    """dashboard/.skills.md의 스킬 목록 컬럼을 파싱하여 스킬별 누적 빈도 집계표를 갱신한다.
+    """Parse the skill list column of dashboard/.skills.md and update the cumulative frequency table for each skill.
 
-    .skills.md의 테이블 행에서 `Skill List` 컬럼(인덱스 5, 0-based)을 읽고
-    `<br>` 구분자로 스킬명을 분리하여 전체 사용 횟수를 카운트한다.
-    집계 결과를 `## Skill frequency count` 섹션으로 파일 하단에 추가/갱신한다.
+    Read the `Skill List` column (index 5, 0-based) from the table row in .skills.md.
+    Separate the skill name with a `<br>` delimiter and count the total number of uses.
+    Add/update the aggregate results as the `## Skill frequency count` section at the bottom of the file.
 
-    테이블 형식: | 스킬명 | 사용 횟수 | 비율 | (내림차순 정렬)
+    Table Format: | Skill name | Number of uses | ratio | (Sort in descending order)
 
-    예외 발생 시 무시하고 계속 진행한다.
+    If an exception occurs, ignore it and continue.
     """
     try:
         skills_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".skills.md")
@@ -128,15 +128,15 @@ def _update_skill_frequency() -> None:
 
 
 def _update_logs_md(registry_key: str, abs_work_dir: str) -> None:
-    """dashboard/.logs.md 파일에 워크플로우 로그 통계 행을 삽입한다.
+    """Insert workflow log statistics rows in the dashboard/.logs.md file.
 
-    workflow.log 파일에서 WARN/ERROR 카운트와 파일 크기를 수집하여
-    마크다운 테이블 행을 구성하고 원자적으로 삽입한다.
-    예외 발생 시 무시하고 계속 진행한다.
+    Collect WARN/ERROR counts and file sizes from the workflow.log file
+    Constructs and atomically inserts Markdown table rows.
+    If an exception occurs, ignore it and continue.
 
     Args:
-        registry_key: YYYYMMDD-HHMMSS 형식 워크플로우 식별자
-        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로
+        registry_key: Workflow identifier in YYYYMMDD-HHMMSS format.
+        abs_work_dir: Absolute path to the workflow work directory.
     """
     try:
         marker = "<!-- New entries will be added below this line -->"
@@ -278,22 +278,22 @@ def _safe_listdir(path: str) -> list[str]:
 
 
 def _update_step_durations() -> None:
-    """모든 완료된 워크플로우의 단계별 소요 시간을 집계하여 .history.md 하단에 표시한다.
+    """The time taken for each step of all completed workflows is tallied and displayed at the bottom of .history.md.
 
-    workflow/ 및 workflow/.history/ 디렉터리를 스캔하여 step이 DONE인
-    status.json의 transitions 배열을 읽고, 각 단계(PLAN/WORK/REPORT/DONE) 간
-    시간 차이를 초 단위로 계산한다.
-    집계 결과를 `## Average time spent per step` 섹션으로 파일 하단에 추가/갱신한다.
+    Scan the workflow/ and workflow/.history/ directories for step DONE
+    Read the transitions array of status.json and move between each step (PLAN/WORK/REPORT/DONE).
+    Calculate the time difference in seconds.
+    Add/update the aggregated results in the `## Average time spent per step` section at the bottom of the file.
 
-    테이블 형식: | 단계 | 평균 소요 | 최소 | 최대 | 횟수 |
+    Table Format: | steps | Average Takes | Minimum | max | number of times |
 
-    단계 레이블:
-        PLAN  : NONE/INIT → PLAN (created_at 기준)
+    Step label:
+        PLAN: NONE/INIT → PLAN (based on created_at)
         WORK  : PLAN → WORK
         REPORT: WORK → REPORT
         DONE  : REPORT → DONE
 
-    예외 발생 시 무시하고 계속 진행한다.
+    If an exception occurs, ignore it and continue.
     """
     try:
         from datetime import datetime as _dt
@@ -429,23 +429,23 @@ def _update_step_durations() -> None:
 
 
 def _update_task_stats(registry_key: str, abs_work_dir: str) -> None:
-    """dashboard/.history.md 하단에 태스크 성공/실패 누적 통계 섹션을 추가/갱신한다.
+    """Add/update the cumulative task success/failure statistics section at the bottom of dashboard/.history.md.
 
-    전체 워크플로우(workflow/ 및 workflow/.history/)의 status.json을 순회하여
-    tasks 객체의 상태별 누적 집계를 계산하고 .history.md에 표시한다.
+    By traversing the status.json of the entire workflow (workflow/ and workflow/.history/)
+    Calculates the cumulative total for each state of the tasks object and displays it in .history.md.
 
-    집계 기준:
-        - completed: 성공 카운트
-        - failed: 실패 카운트
-        - running/skipped/기타: 미완료로 집계 제외
+    Count by:
+        - completed: success count
+        - failed: failure count
+        - running/skipped/other: excluded from counting as incomplete
 
-    테이블 형식: | 총 태스크 | 성공 | 실패 | 성공률 |
+    Table Format: | Total Tasks | Success | failure | Success Rate |
 
     Args:
-        registry_key: YYYYMMDD-HHMMSS 형식 워크플로우 식별자 (로그용)
-        abs_work_dir: 워크플로우 작업 디렉터리 절대 경로 (로그용)
+        registry_key: Workflow identifier in YYYYMMDD-HHMMSS format (for logs)
+        abs_work_dir: Absolute path to workflow work directory (for logs)
 
-    예외 발생 시 무시하고 계속 진행한다.
+    If an exception occurs, ignore it and continue.
     """
     try:
         history_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".history.md")

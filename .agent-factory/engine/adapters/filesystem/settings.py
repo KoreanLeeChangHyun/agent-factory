@@ -1,14 +1,14 @@
-"""settings.py - 환경변수 설정 파일 관리 어댑터.
+"""settings.py - Environment variable settings file management adapter.
 
-.agent-factory/.settings 파일의 환경 변수를 set/unset하는 책임을 담당한다.
-HOOK_*, GUARD_* 접두사 및 HOOKS_EDIT_ALLOWED 키만 허용하는
-화이트리스트 기반 환경변수 관리를 수행한다.
+Responsible for setting/unsetting environment variables in the .agent-factory/.settings file.
+Allows only HOOK_*, GUARD_* prefixes and HOOKS_EDIT_ALLOWED keys.
+Performs whitelist-based environment variable management.
 
-책임 범위:
-    - .agent-factory/.settings 환경변수 설정 (set)
-    - .agent-factory/.settings 환경변수 해제 (unset)
-    - KEY 화이트리스트 검증
-    - 원자적 파일 쓰기
+Scope of responsibility:
+    - .agent-factory/.settings environment variable settings (set)
+    - Unset .agent-factory/.settings environment variables
+    - KEY whitelist verification
+    - Atomic file writes
 """
 from __future__ import annotations
 
@@ -30,17 +30,17 @@ PROJECT_ROOT: str = resolve_project_root()
 
 
 def env_manage(action: str, key: str, value: str = "") -> str:
-    """.agent-factory/.settings 파일의 환경 변수를 관리한다.
+    """Manage environment variables in the .agent-factory/.settings file.
 
-    .settings 파일을 수정한다.
+    Edit the .settings file.
 
     Args:
-        action: 수행할 동작. 허용값: 'set', 'unset'.
-        key: 환경 변수 키. HOOK_* 또는 GUARD_* 접두사, 또는 HOOKS_EDIT_ALLOWED만 허용.
-        value: 설정할 값 (action='set'일 때 필수)
+        action: Action to perform. Allowed values: 'set', 'unset'.
+        key: Environment variable key. Only HOOK_* or GUARD_* prefixes, or HOOKS_EDIT_ALLOWED are allowed.
+        value: Value to set (required when action='set')
 
     Returns:
-        처리 결과 문자열. 예: 'env -> set HOOK_FOO=bar',
+        Processing result string. Example: 'env -> set HOOK_FOO=bar',
         'env -> unset GUARD_BAR', 'env -> skipped (missing args)', 'env -> failed'.
     """
     if not action or not key:

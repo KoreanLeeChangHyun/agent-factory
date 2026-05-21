@@ -1,21 +1,21 @@
 #!/usr/bin/env -S python3 -u
-"""워크트리 경로 격리 가드 Hook 스크립트.
+"""Worktree path isolation guard Hook script.
 
-PreToolUse(Write|Edit|MultiEdit|NotebookEdit|Bash) 이벤트에서 현재 세션이
-워크플로우 세션이고 활성 워크플로우의 command가 implement이면,
-메인 리포 경로 파일 수정 시도를 차단하고 워크트리 절대경로를 피드백에 포함한다.
+In the PreToolUse(Write|Edit|MultiEdit|NotebookEdit|Bash) event, the current session
+If it is a workflow session and the command of the active workflow is implement,
+Attempts to modify the main repo path file are blocked and the worktree absolute path is included in the feedback.
 
-Claude Code가 세션 시작 시 프로젝트 루트(메인 리포)를 cwd로 결정하여
-워크트리 경로 대신 메인 리포 경로를 기준으로 파일 수정을 시도하는 문제를
-PreToolUse 훅 레이어에서 차단하는 방어 계층(Defense-in-depth)이다.
+When Claude Code starts a session, it determines the project root (main repo) as cwd.
+Problem of attempting to modify a file based on the main repo path instead of the worktree path
+It is a defense-in-depth layer that blocks at the PreToolUse hook layer.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 메인 리포 경로 수정 차단
+Main functions:
+    main: Hook entry point, blocks modification of main repo path after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_WORKTREE_PATH_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_WORKTREE_PATH_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -70,10 +70,10 @@ _ALWAYS_ALLOWED_PATTERNS: list[re.Pattern[str]] = [
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -87,14 +87,14 @@ def _deny(reason: str) -> None:
 
 
 def _get_workflow_command() -> str | None:
-    """활성 워크플로우의 command 필드를 반환한다.
+    """Returns the command field of the active workflow.
 
-    1. WORKFLOW_COMMAND 환경변수 우선 (워커 spawn 시 launcher가 직접 주입 — race-free).
-    2. WORKFLOW_WORK_DIR 환경변수 → .context.json.
-    3. .workflow/ 디렉터리를 스캔하여 가장 최근 .context.json.
+    1. WORKFLOW_COMMAND environment variable takes priority (directly injected by the launcher when a worker spawns — race-free).
+    2. WORKFLOW_WORK_DIR environment variable → .context.json.
+    3. Scan the .workflow/ directory for the most recent .context.json.
 
     Returns:
-        command 문자열. 조회 실패 시 None.
+        command string. None if search fails.
     """
     # 1. WORKFLOW_COMMAND environment variable priority (blocks disk scan race)
     env_command = os.environ.get("WORKFLOW_COMMAND", "").strip()
@@ -148,15 +148,15 @@ def _get_workflow_command() -> str | None:
 
 
 def _get_worktree_path() -> str | None:
-    """현재 워크플로우 세션의 워크트리 절대경로를 반환한다.
+    """Returns the absolute path to the work tree of the current workflow session.
 
-    다음 순서로 워크트리 경로를 탐색한다:
-    1. WORKFLOW_WORKTREE_PATH 환경변수
-    2. WORKFLOW_WORK_DIR 환경변수 -> .context.json -> worktree.absPath
-    3. .workflow/ 디렉터리 스캔 -> .context.json -> worktree.absPath
+    Search the worktree path in the following order:
+    1. WORKFLOW_WORKTREE_PATH environment variable
+    2. WORKFLOW_WORK_DIR environment variable -> .context.json -> worktree.absPath
+    3. Scan .workflow/ directory -> .context.json -> worktree.absPath
 
     Returns:
-        워크트리 절대경로 문자열. 탐색 실패 또는 경로가 없으면 None.
+        Worktree absolute path string. None if navigation fails or no route exists.
     """
     # 1. WORKFLOW_WORKTREE_PATH environment variable takes precedence
     env_worktree_path = os.environ.get("WORKFLOW_WORKTREE_PATH", "").strip()
@@ -223,17 +223,17 @@ def _get_worktree_path() -> str | None:
 
 
 def _is_always_allowed_path(file_path: str, project_root: str | None = None) -> bool:
-    """파일 경로가 항상 허용되는 경로인지 확인한다.
+    """Make sure the file path is always an allowed path.
 
-    `_ALWAYS_ALLOWED_PATTERNS`는 메인 리포 산출물·sidecar 디렉터리 패턴이며,
-    상대 경로의 경우 `project_root` 기준으로 절대 경로화한 뒤 매칭한다.
+    `_ALWAYS_ALLOWED_PATTERNS` is the main repo output/sidecar directory pattern,
+    In the case of a relative path, it is converted to an absolute path based on `project_root` and then matched.
 
     Args:
-        file_path: 검사할 파일 경로 (절대 또는 상대)
-        project_root: 메인 리포 절대경로 (상대 경로 정규화에 사용)
+        file_path: File path to check (absolute or relative)
+        project_root: Absolute path to main repo (used for relative path normalization)
 
     Returns:
-        항상 허용 경로이면 True.
+        True if the path is always allowed.
     """
     if not os.path.isabs(file_path) and project_root:
         target = os.path.normpath(os.path.join(project_root, file_path))
@@ -250,17 +250,17 @@ def _is_under_worktree(
     worktree_path: str,
     project_root: str | None = None,
 ) -> bool:
-    """파일 경로가 워크트리 경로 하위인지 확인한다.
+    """Check whether the file path is under the worktree path.
 
-    상대 경로면 `project_root` 기준으로 절대 경로화한 뒤 워크트리 prefix와 비교한다.
+    If it is a relative path, make it an absolute path based on `project_root` and compare it with the work tree prefix.
 
     Args:
-        file_path: 검사할 파일 경로 (절대 또는 상대)
-        worktree_path: 워크트리 절대경로
-        project_root: 메인 리포 절대경로 (상대 경로 정규화에 사용)
+        file_path: File path to check (absolute or relative)
+        worktree_path: Worktree absolute path
+        project_root: Absolute path to main repo (used for relative path normalization)
 
     Returns:
-        워크트리 하위 경로이면 True.
+        True if it is a worktree subpath.
     """
     norm_worktree = os.path.normpath(worktree_path)
     if os.path.isabs(file_path):
@@ -273,15 +273,15 @@ def _is_under_worktree(
 
 
 def _get_suggested_path(file_path: str, project_root: str, worktree_path: str) -> str:
-    """메인 리포 경로를 워크트리 내 경로로 변환하여 반환한다.
+    """Converts the main repo path to a path in the work tree and returns it.
 
     Args:
-        file_path: 원본 파일 경로
-        project_root: 메인 리포 절대경로
-        worktree_path: 워크트리 절대경로
+        file_path: Original file path
+        project_root: Absolute path to main repo
+        worktree_path: Worktree absolute path
 
     Returns:
-        워크트리 내 경로 문자열.
+        Path string in the worktree.
     """
     norm_project = os.path.normpath(project_root)
     norm_file = os.path.normpath(file_path) if os.path.isabs(file_path) else file_path
@@ -295,13 +295,13 @@ def _get_suggested_path(file_path: str, project_root: str, worktree_path: str) -
 
 
 def _strip_quoted_args(command: str) -> str:
-    """명령 문자열에서 따옴표로 감싼 영역의 내용을 빈 문자열로 치환한다.
+    """Replaces the contents of the area surrounded by quotation marks in the command string with an empty string.
 
     Args:
-        command: Bash 도구의 원본 command 문자열
+        command: Original command string from Bash tool
 
     Returns:
-        따옴표 내부 내용이 제거된 문자열.
+        A string with the content inside the quotes removed.
     """
     command = re.sub(r'"(?:[^"\\]|\\.)*"', '""', command)
     command = re.sub(r"'(?:[^'\\]|\\.)*'", "''", command)
@@ -309,30 +309,30 @@ def _strip_quoted_args(command: str) -> str:
 
 
 def _extract_command_positions(command: str) -> list[str]:
-    """명령 문자열을 파이프/체인 구분자로 분할하여 세그먼트 목록을 반환한다.
+    """Splits the command string by the pipe/chain delimiter and returns a list of segments.
 
     Args:
-        command: 따옴표 strip이 완료된 명령 문자열
+        command: command string complete with quoted strip
 
     Returns:
-        각 세그먼트의 선행 공백이 제거된 문자열 목록.
+        A list of strings with leading spaces removed from each segment.
     """
     parts = re.split(r'&&|\|\||(?<!\|)\|(?!\|)|;', command)
     return [part.lstrip() for part in parts if part.strip()]
 
 
 def _is_bash_file_modify(command: str) -> bool:
-    """Bash 명령에서 파일 수정 패턴 포함 여부를 검사한다.
+    """Checks whether a file modification pattern is included in the Bash command.
 
-    따옴표로 감싼 인자 영역을 먼저 제거한 뒤,
-    파이프/체인 구분자로 세그먼트를 분할하여
-    각 세그먼트에서 _BASH_FILE_MODIFY_PATTERNS 패턴을 검사한다.
+    After first removing the argument area surrounded by quotation marks,
+    Divide segments with pipe/chain separators
+    Check the _BASH_FILE_MODIFY_PATTERNS pattern in each segment.
 
     Args:
-        command: Bash 도구의 command 문자열
+        command: Command string of Bash tool
 
     Returns:
-        파일 수정 패턴이 매칭되면 True, 아니면 False.
+        True if the file modification pattern matches, False otherwise.
     """
     stripped = _strip_quoted_args(command)
     segments = _extract_command_positions(stripped)
@@ -344,21 +344,21 @@ def _is_bash_file_modify(command: str) -> bool:
 
 
 def _bash_targets_main_repo(command: str, project_root: str, worktree_path: str) -> bool:
-    """Bash 명령이 메인 리포 경로를 대상으로 파일 수정을 시도하는지 확인한다.
+    """Check whether the Bash command attempts to modify files targeting the main repo path.
 
-    명령 문자열에서 메인 리포 절대경로의 모든 등장을 검사하고,
-    각 등장이 워크트리 prefix이거나 산출물·sidecar 패턴이면 통과,
-    그 외(메인 소스 경로 직격)는 차단한다. cross-tree copy
-    (`cp /worktree/foo.py /main/.agent-factory/board/server/app.py`)가
-    워크트리 경로 동시 등장으로 우회하는 회귀를 finditer 기반 prefix 검사로 차단한다.
+    Check all occurrences of the main repo absolute path in the command string,
+    Passes if each occurrence is a worktree prefix or output/sidecar pattern.
+    Others (direct hits to the main source path) are blocked. cross-tree copy
+    (`cp /worktree/foo.py /main/.agent-factory/board/server/app.py`)
+    Regressions that bypass worktree paths due to simultaneous appearance are blocked using finditer-based prefix inspection.
 
     Args:
-        command: Bash 도구의 command 문자열
-        project_root: 메인 리포 절대경로
-        worktree_path: 워크트리 절대경로
+        command: Command string of Bash tool
+        project_root: Absolute path to main repo
+        worktree_path: Worktree absolute path
 
     Returns:
-        메인 리포 경로를 타겟으로 하는 수정이면 True.
+        True if the modification targets the main repo path.
     """
     norm_project = os.path.normpath(project_root)
     norm_worktree = os.path.normpath(worktree_path)
@@ -378,14 +378,14 @@ def _bash_targets_main_repo(command: str, project_root: str, worktree_path: str)
 
 
 def main() -> None:
-    """워크트리 경로 격리 가드 Hook의 진입점.
+    """Entry point of the worktree path isolation guard Hook.
 
-    stdin에서 JSON을 읽어 Write/Edit/MultiEdit/NotebookEdit/Bash 도구 사용 시
-    현재 세션이 워크플로우 implement 세션이고 워크트리가 설정된 경우,
-    메인 리포 경로 파일 수정을 차단하고 워크트리 경로를 안내한다.
+    When using Write/Edit/MultiEdit/NotebookEdit/Bash tools by reading JSON from stdin
+    If the current session is a workflow implement session and the worktree is set,
+    Blocks modification of the main repo path file and guides the work tree path.
 
-    비tmux 환경, 메인 세션, research/review 세션, 워크트리 없는 세션에서는 통과한다.
-    `_ALWAYS_ALLOWED_PATTERNS` 와 일치하는 산출물·sidecar 경로는 항상 허용한다.
+    It passes in non-tmux environments, main sessions, research/review sessions, and sessions without worktrees.
+    Output/sidecar paths matching `_ALWAYS_ALLOWED_PATTERNS` are always allowed.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_WORKTREE_PATH_GUARD") or read_env("HOOK_WORKTREE_PATH_GUARD")

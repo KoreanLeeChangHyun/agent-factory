@@ -1,17 +1,17 @@
 #!/usr/bin/env -S python3 -u
-"""project_skill_detector.py - 코드베이스 분석 기반 프로젝트 스킬 자동 감지.
+"""project_skill_detector.py - Automatic detection of project skills based on codebase analysis.
 
-프로젝트 루트의 매니페스트 파일(package.json, pyproject.toml, go.mod 등)을
-분석하여 기술 스택을 식별하고, scope: project 스킬 초안(SKILL.md)을 자동 생성한다.
+Manifest files (package.json, pyproject.toml, go.mod, etc.) in the project root.
+Analysis identifies the technology stack and automatically creates a scope: project skill draft (SKILL.md).
 
-사용법:
-  flow-detect <프로젝트루트>
-  flow-detect <프로젝트루트> --generate
+Usage:
+  flow-detect <project root>
+  flow-detect <project root> --generate
   flow-detect --help
 
-출력:
-  (기본) 감지 결과를 stdout으로 출력
-  (--generate) .claude/skills/project-<도메인명>/SKILL.md 파일 생성
+output of power:
+  (Default) Output detection results to stdout
+  (--generate) Generate .claude/skills/project-<domain name>/SKILL.md file
 """
 
 from __future__ import annotations
@@ -47,13 +47,13 @@ def _build_common_epilog() -> str:
 
 
 def _detect_node_stack(project_root: str) -> list[str]:
-    """package.json에서 Node.js 기술 스택을 감지한다.
+    """Detect Node.js technology stack in package.json.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project_root: absolute path to the project root
 
     Returns:
-        감지된 스택 태그 목록. 최소 ["Node.js"] 포함.
+        List of detected stack tags. Contains at least ["Node.js"].
     """
     tags = ["Node.js"]
     pkg_path = os.path.join(project_root, "package.json")
@@ -125,13 +125,13 @@ def _detect_node_stack(project_root: str) -> list[str]:
 
 
 def _detect_python_stack(project_root: str) -> list[str]:
-    """pyproject.toml 또는 requirements.txt에서 Python 기술 스택을 감지한다.
+    """Detect your Python technology stack in pyproject.toml or requirements.txt.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project_root: absolute path to the project root
 
     Returns:
-        감지된 스택 태그 목록. 최소 ["Python"] 포함.
+        List of detected stack tags. Contains at least ["Python"].
     """
     tags = ["Python"]
 
@@ -220,13 +220,13 @@ def _detect_python_stack(project_root: str) -> list[str]:
 
 
 def _detect_go_stack(project_root: str) -> list[str]:
-    """go.mod에서 Go 기술 스택을 감지한다.
+    """Detect the Go technology stack in go.mod.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project_root: absolute path to the project root
 
     Returns:
-        감지된 스택 태그 목록. 최소 ["Go"] 포함.
+        List of detected stack tags. Contains at least ["Go"].
     """
     tags = ["Go"]
     gomod_path = os.path.join(project_root, "go.mod")
@@ -254,13 +254,13 @@ def _detect_go_stack(project_root: str) -> list[str]:
 
 
 def _detect_rust_stack(project_root: str) -> list[str]:
-    """Cargo.toml에서 Rust 기술 스택을 감지한다.
+    """Detect Rust technology stack in Cargo.toml.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project_root: absolute path to the project root
 
     Returns:
-        감지된 스택 태그 목록. 최소 ["Rust"] 포함.
+        List of detected stack tags. Contains at least ["Rust"].
     """
     tags = ["Rust"]
     cargo_path = os.path.join(project_root, "Cargo.toml")
@@ -290,21 +290,21 @@ def _detect_rust_stack(project_root: str) -> list[str]:
 
 
 def detect_project_stack(project_root: str) -> dict[str, object]:
-    """프로젝트 루트에서 기술 스택을 식별한다.
+    """Identify the technology stack at the project root.
 
-    매니페스트 파일 존재 여부를 확인하고, 존재하는 경우
-    파일 내용을 파싱하여 세부 기술 스택을 감지한다.
+    Check if the manifest file exists, if it exists
+    Detect detailed technology stack by parsing file contents.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
+        project_root: absolute path to the project root
 
     Returns:
-        감지 결과 딕셔너리. 다음 키를 포함한다:
-        - stacks (list[str]): 감지된 기술 스택 태그 목록
-        - infra (list[str]): 감지된 인프라 태그 목록
-        - domain_name (str): 프로젝트 도메인명 (스킬 디렉터리명에 사용)
-        - project_name (str): 프로젝트 디렉터리명
-        - dir_summary (list[str]): 최상위 디렉터리 구조 요약 (상대 경로)
+        Detection result dictionary. Includes the following keys:
+        - stacks (list[str]): List of detected technology stack tags
+        - infra (list[str]): List of detected infrastructure tags
+        - domain_name (str): Project domain name (used for skill directory name)
+        - project_name (str): Project directory name
+        - dir_summary (list[str]): Top-level directory structure summary (relative path)
     """
     stacks: list[str] = []
     infra: list[str] = []
@@ -379,16 +379,16 @@ def detect_project_stack(project_root: str) -> dict[str, object]:
 
 
 def _summarize_directory_structure(project_root: str, max_depth: int = 2) -> list[str]:
-    """프로젝트 루트의 최상위 디렉터리 구조를 요약한다.
+    """Summarizes the top-level directory structure of the project root.
 
-    .git, node_modules, __pycache__, .claude 등 무관한 디렉터리는 제외한다.
+    Exclude irrelevant directories such as .git, node_modules, __pycache__, and .claude.
 
     Args:
-        project_root: 프로젝트 루트 절대 경로
-        max_depth: 최대 탐색 깊이 (기본값: 2)
+        project_root: absolute path to the project root
+        max_depth: maximum search depth (default: 2)
 
     Returns:
-        디렉터리 경로 목록 (상대 경로). 최대 50개.
+        List of directory paths (relative paths). Up to 50 pieces.
     """
     exclude = {
         ".git", "node_modules", "__pycache__", ".claude", ".agent-factory",
@@ -428,16 +428,16 @@ def generate_project_skill(
     detection_result: dict[str, object],
     project_root: str,
 ) -> tuple[str, str]:
-    """감지된 스택 정보를 기반으로 프로젝트 스킬 SKILL.md 초안을 생성한다.
+    """Create a draft project skill SKILL.md based on the detected stack information.
 
     Args:
-        detection_result: detect_project_stack()의 반환값
-        project_root: 프로젝트 루트 절대 경로
+        detection_result: Return value of detect_project_stack()
+        project_root: absolute path to the project root
 
     Returns:
-        2-튜플 (skill_dir_path, skill_content):
-        - skill_dir_path: 스킬 디렉터리 절대 경로
-        - skill_content: SKILL.md 파일 내용 문자열
+        2-tuple (skill_dir_path, skill_content):
+        - skill_dir_path: Absolute path to skill directory
+        - skill_content: SKILL.md file content string
     """
     domain = detection_result["domain_name"]
     project_name = detection_result["project_name"]
@@ -474,8 +474,8 @@ license: "Apache-2.0"
 
 # {project_name} project skill
 
-> 이 파일은 `project_skill_detector.py`에 의해 자동 생성되었습니다 ({today}).
-> 프로젝트 고유 도메인 지식, 코딩 컨벤션, 금지 패턴 등을 추가하세요.
+> This file was automatically generated by `project_skill_detector.py` ({today}).
+> Add project-specific domain knowledge, coding conventions, prohibited patterns, etc.
 
 ##Technology Stack
 
@@ -491,44 +491,44 @@ license: "Apache-2.0"
 
 ## Coding Convention
 
-> TODO: 프로젝트 고유 코딩 컨벤션을 기술하세요.
+> TODO: Describe project-specific coding conventions.
 
-- 네이밍 규칙: (미설정)
-- 파일 구조 규칙: (미설정)
-- 커밋 메시지 규칙: (미설정)
+- Naming rule: (not set)
+- File structure rules: (not set)
+- Commit message rule: (not set)
 
 ## Domain Glossary
 
-> TODO: 프로젝트 고유 도메인 용어를 정의하세요.
+> TODO: Define project-specific domain terms.
 
-| 용어 | 정의 |
+| Terminology | definition |
 |------|------|
-| (예시) | (예시 정의) |
+| (Example) | (example definition) |
 
 ## Prohibited pattern
 
-> TODO: 프로젝트에서 금지하는 패턴을 기술하세요.
+> TODO: Describe patterns that are prohibited in your project.
 
-- (미설정)
+- (Not set)
 
 ##ADRSummary
 
-> TODO: 주요 Architecture Decision Records를 요약하세요.
+> TODO: Summarize key Architecture Decision Records.
 
-- (미설정)
+- (Not set)
 """
 
     return skill_dir, content
 
 
 def format_detection_result(result: dict[str, object]) -> str:
-    """감지 결과를 사람이 읽기 쉬운 형태로 포맷한다.
+    """Format the detection results in a format that is easy for humans to read.
 
     Args:
-        result: detect_project_stack()의 반환값
+        result: Return value of detect_project_stack()
 
     Returns:
-        포맷된 감지 결과 문자열.
+        Formatted detection result string.
     """
     lines: list[str] = []
     lines.append(f"Project: {result['project_name']}")
@@ -567,12 +567,12 @@ def format_detection_result(result: dict[str, object]) -> str:
 
 
 def main() -> None:
-    """CLI 진입점. 프로젝트 루트를 분석하여 기술 스택 감지 결과를 출력한다.
+    """CLI entry point. Analyzes the project root and outputs technology stack detection results.
 
-    --generate 플래그가 있으면 SKILL.md 파일도 생성한다.
+    If the --generate flag is present, the SKILL.md file is also created.
 
     Raises:
-        SystemExit: 인자 부족(1), 디렉터리 미존재(1), 정상 완료(0).
+        SystemExit: Insufficient arguments (1), directory does not exist (1), normal completion (0).
     """
     parser = argparse.ArgumentParser(
         prog="flow-detect",

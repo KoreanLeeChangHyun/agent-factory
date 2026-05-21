@@ -1,13 +1,13 @@
 #!/usr/bin/env -S python3 -u
-"""위험한 명령어 차단 Hook 스크립트.
+"""Hook script to block dangerous commands.
 
-PreToolUse(Bash) 이벤트에서 위험 명령어 패턴 매칭 후 차단.
+Blocks dangerous commands after pattern matching in PreToolUse(Bash) event.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 위험 명령어 차단
+Main functions:
+    main: Hook entry point, blocks dangerous commands after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 """
 
 from __future__ import annotations
@@ -48,11 +48,11 @@ except ImportError:
 
 
 def _deny(blocked: str, alternative: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        blocked: 차단된 명령어 또는 패턴 설명
-        alternative: 안전한 대안 안내 문자열
+        blocked: Description of blocked command or pattern
+        alternative: Safe alternative instruction string
     """
     reason = f"Dangerous command detected: {blocked}. Safe alternative: {alternative}"
     result = {
@@ -67,11 +67,11 @@ def _deny(blocked: str, alternative: str) -> None:
 
 
 def main() -> None:
-    """위험한 명령어 차단 Hook의 진입점.
+    """Entry point of a dangerous command blocking hook.
 
-    stdin에서 JSON을 읽어 Bash 도구 실행 시 위험 패턴을 검사하고,
-    매칭 시 deny 응답을 출력하여 실행을 차단한다.
-    화이트리스트 패턴에 매칭되면 검사를 건너뛴다.
+    Read JSON from stdin to check for risk patterns when running Bash tools,
+    When matching, a deny response is output to block execution.
+    If it matches a whitelist pattern, the check is skipped.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_DANGEROUS_COMMAND") or read_env("HOOK_DANGEROUS_COMMAND")

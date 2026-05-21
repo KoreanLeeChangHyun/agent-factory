@@ -1,6 +1,6 @@
-# `.repo` Reference Assets
+# `repo` Reference Assets
 
-The `.repo/` directory contains external reference implementations and templates
+The `repo/` directory contains external reference implementations and templates
 that should inform `.agent-factory`, but should not be copied blindly.
 
 Use these repos as design references while preserving our domain language:
@@ -13,7 +13,7 @@ LLMAdapter -> Claude / Codex / Gemini / Fake
 
 ## High-Value References
 
-### `.repo/ouroboros`
+### `repo/ouroboros`
 
 Best fit:
 
@@ -45,7 +45,7 @@ Do not copy directly:
 - project branding
 - full Agent OS scope
 
-### `.repo/OpenHarness`
+### `repo/OpenHarness`
 
 Best fit:
 
@@ -74,7 +74,7 @@ Do not copy directly:
 - UI/marketing structure
 - broad chatbot/channel product scope unless it supports WorkRequest execution
 
-### `.repo/ai-harness-template`
+### `repo/ai-harness-template`
 
 Best fit:
 
@@ -105,7 +105,7 @@ Do not copy directly:
 
 ## Secondary References
 
-### `.repo/everything-claude-code`
+### `repo/everything-claude-code`
 
 Use for:
 
@@ -117,7 +117,7 @@ Avoid:
 
 - reinforcing Claude as the core runtime
 
-### `.repo/oh-my-claudecode`
+### `repo/oh-my-claudecode`
 
 Use for:
 
@@ -128,7 +128,7 @@ Avoid:
 
 - Claude-centric architecture decisions
 
-### `.repo/andrej-karpathy-skills`, `.repo/skills`, `.repo/superpowers`
+### `repo/andrej-karpathy-skills`, `repo/skills`, `repo/superpowers`
 
 Use for:
 
@@ -138,7 +138,7 @@ Use for:
 
 Apply later after WorkRequest and LLMAdapter boundaries are stable.
 
-### `.repo/Claude-Usage-Tracker`
+### `repo/Claude-Usage-Tracker`
 
 Use for:
 
@@ -146,7 +146,7 @@ Use for:
 
 Mostly unrelated to the refactor core.
 
-### `.repo/gstack`, `.repo/gsd-2`
+### `repo/gstack`, `repo/gsd-2`
 
 Not yet classified. Review only if they contain provider orchestration,
 developer workflow, or UI patterns relevant to `.agent-factory`.
@@ -159,7 +159,7 @@ developer workflow, or UI patterns relevant to `.agent-factory`.
   - `WorkRequest`, not ticket/spec/seed as the primary domain term.
   - `LLMAdapter`, not provider-specific runner.
   - `PREPARE -> PLAN -> EXECUTE -> VERIFY -> REPORT -> COMPLETE`.
-- Add a focused test before importing any behavior inspired by `.repo`.
+- Add a focused test before importing any behavior inspired by `repo`.
 - Do not introduce a new methodology unless it improves WorkRequest quality,
   Harness Engineering, or Verification/Reporting.
 

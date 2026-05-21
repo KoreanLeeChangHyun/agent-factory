@@ -1,12 +1,12 @@
-"""task_tracker.py - 태스크 상태 관리 모듈.
+"""task tracker.py - task status management module.
 
-status.json의 tasks 객체에 대한 태스크 상태(pending, running, completed, failed)를
-기록하고 관리하는 책임을 담당한다.
+execute, execute, completed, failed
+We are responsible for record and management.
 
-책임 범위:
-    - 태스크 상태 기록 (update_task_status)
-    - 태스크 상태 유효성 검증
-    - 상태별 구조화 로그 기록 (AGENT_DISPATCH, AGENT_RETURN)
+Payment Terms:
+    - Task Status Record (update task status)
+    - Validation of task status
+    (AGENT DISPATCH, AGENT RETURN)
 """
 from __future__ import annotations
 
@@ -28,16 +28,16 @@ from flow.flow_logger import append_log as _append_log
 
 
 def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
-    """status.json의 tasks 객체에 태스크 상태를 기록한다.
+    """status.json's task object writes the task status.
 
     Args:
-        status_file: status.json 파일 경로
-        task_id: 태스크 ID (예: 'W01', 'W02')
-        task_status: 태스크 상태. 허용값: pending|running|completed|failed.
-            in_progress는 running으로 자동 변환.
+        status file: status.json file path
+        task id: task ID (e.g. 'W01', 'W02')
+        task status: task status. pending running completed failed.
+            in progress automatically converts to running.
 
     Returns:
-        처리 결과 문자열. 예: 'task-status -> W01: completed (updated_at: ...)',
+        The resulting string. Example: 'task-status -> W01: completed (updated at: ...)',
         'task-status -> skipped (missing args)', 'task-status -> failed'.
     """
     if not task_id or not task_status:
@@ -94,33 +94,33 @@ def update_task_status(status_file: str, task_id: str, task_status: str) -> str:
 
 
 class StuckDetector:
-    """슬라이딩 윈도우 기반 stuck 패턴 감지기.
+    """Sliding window-based stuck pattern sensor.
 
-    status.json의 task_events 배열에 이벤트를 기록하고,
-    최근 window_size개 이벤트를 분석하여 stuck 패턴을 감지한다.
+    status.json's task events array,
+    The window size event is analyzed and detects the stuck pattern.
 
     Attributes:
-        work_dir: 워크플로우 절대 경로 (status.json 위치).
-        window_size: 슬라이딩 윈도우 크기 (기본 6).
+        work dir: Workflow absolute path (status.json location).
+        window size: sliding window size (default 6).
     """
 
     def __init__(self, work_dir: str, window_size: int = 6) -> None:
-        """StuckDetector 초기화.
+        """StuckDetector initialization.
 
         Args:
-            work_dir: 워크플로우 절대 경로. status.json이 위치하는 디렉터리.
-            window_size: 슬라이딩 윈도우 크기. 최근 N개 이벤트만 감지에 사용.
+            work dir: workflow absolute path. directory where status.json is located.
+            window size: sliding window size. Use only N events.
         """
         self.work_dir = work_dir
         self.window_size = window_size
         self._status_file = os.path.join(work_dir, "status.json")
 
     def _load_events(self) -> list[dict]:
-        """status.json의 task_events 배열에서 최근 window_size개 이벤트를 로드한다.
+        """loads recent window size events in status.json's task events array.
 
         Returns:
-            최근 window_size개 이벤트 딕셔너리 리스트.
-            status.json이 없거나 task_events 필드가 없으면 빈 리스트 반환.
+            Recent Window size Event Dixie List.
+            return empty list without status.json or if there is no task events field.
         """
         data = load_json_file(self._status_file)
         if not isinstance(data, dict):
@@ -131,13 +131,13 @@ class StuckDetector:
         return events[-self.window_size:]
 
     def _save_event(self, event: dict) -> None:
-        """이벤트를 status.json의 task_events 배열에 추가한다.
+        """add event to the task events array in status.json.
 
-        슬라이딩 윈도우 원칙을 적용하여 window_size * 2개 이상이면
-        오래된 이벤트를 잘라낸다 (메모리/디스크 부담 최소화).
+        Window size * 2 or more
+        Cut out old events (Minimum of memory / disk burden).
 
         Args:
-            event: 기록할 이벤트 딕셔너리. {task_id, status, timestamp} 구조.
+            event: Event Dixie to record. {task id, status, timestamp} structure.
         """
         if not os.path.exists(self._status_file):
             return
@@ -159,11 +159,11 @@ class StuckDetector:
         atomic_write_json(self._status_file, data)
 
     def record_event(self, task_id: str, status: str) -> None:
-        """태스크 이벤트를 status.json에 기록한다.
+        """The task event is recorded in status.json.
 
         Args:
-            task_id: 태스크 ID (예: 'W01', 'W02').
-            status: 태스크 상태 (예: 'running', 'failed', 'completed').
+            task id: task ID (e.g. 'W01', 'W02').
+            status: "running", "failed", "completed"
         """
         now: str = datetime.now(KST).strftime("%Y-%m-%dT%H:%M:%S+09:00")
         event = {
@@ -174,15 +174,15 @@ class StuckDetector:
         self._save_event(event)
 
     def detect(self) -> list[str]:
-        """슬라이딩 윈도우 내 이벤트를 분석하여 stuck 패턴을 감지한다.
+        """This window will automatically close when payment is processed.
 
-        3가지 규칙을 독립적으로 검사한다:
-            규칙 1: 윈도우 내 모든 이벤트가 failed 상태 (연속 오류).
-            규칙 2: 동일 task_id가 3회 이상 failed로 반복 (반복 key).
-            규칙 3: running->failed 교대 패턴이 4쌍 이상 (진동 패턴).
+        3 rules independently checked NEWS
+            Rule 1: All events in Windows failed status (continuous errors).
+            Rule 2: Repeat the same task id to 3 times failed (back key).
+            Rule 3: Running->failed shift patterns over 4 pairs (vibration patterns).
 
         Returns:
-            감지된 경고 메시지 목록. 없으면 빈 리스트.
+            List of detected alert messages. Without empty list.
         """
         events = self._load_events()
         if not events:
@@ -230,17 +230,17 @@ class StuckDetector:
 
 
 def check_stuck(work_dir: str, task_id: str, status: str) -> None:
-    """stuck 패턴 감지 편의 함수.
+    """Convenience function to detect the stuck pattern.
 
-    StuckDetector를 생성하고, 이벤트를 기록한 후 감지 결과를
-    workflow.log에 WARN으로 기록한다.
+    Create StuckDetector and record events and detect results
+    write to WARN in workflow.log.
 
-    비차단 원칙: 모든 예외를 조용히 흡수한다.
+    Non-blocking principles: Quietly absorb all exceptions.
 
     Args:
-        work_dir: 워크플로우 절대 경로. status.json이 위치하는 디렉터리.
-        task_id: 태스크 ID (예: 'W01').
-        status: 태스크 상태 (예: 'running', 'failed', 'completed').
+        work dir: workflow absolute path. directory where status.json is located.
+        task id: task ID (e.g. 'W01').
+        status: "running", "failed", "completed"
     """
     try:
         detector = StuckDetector(work_dir)

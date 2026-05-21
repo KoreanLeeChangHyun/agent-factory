@@ -54,7 +54,7 @@ class TestParseWorkerReturn(unittest.TestCase):
         self.assertEqual(status, "success", "Status parsing should be 'success'")
         self.assertIsNone(commit, "If there is no commit line, it should be None")
 
-    def test_tc3_commit_없음_two_line(self) -> None:
+    def test_tc3_commit_none_two_line(self) -> None:
         """TC3: 'Commit: None' — Advisory branch fire target."""
         stdout = "Status: Success \n Commit: None"
         status, commit = parse_worker_return(stdout)
@@ -92,7 +92,7 @@ class TestParseWorkerReturn(unittest.TestCase):
 class TestEmitCommitAdvisory(unittest.TestCase):
     """emit_commit_advisory action + 0 enforced policy verifications."""
 
-    def test_tc3_없음_emits_warn_log(self) -> None:
+    def test_tc3_none_emits_warn_log(self) -> None:
         """TC3: commit='none' → 1 append_log WARN call, 0 forced transitions."""
         with patch("flow.worker_return_parser.append_log") as mock_log:
             emit_commit_advisory(

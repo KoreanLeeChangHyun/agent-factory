@@ -1,6 +1,6 @@
-"""GC 사이클 오케스트레이터 + 실행 결과 영속화.
+"""GC cycle orchestrator + persistence of execution results.
 
-run(): 점수 → dedup → reflection → 인덱스 재생성 → last_run.json 기록
+run(): Score → dedup → reflection → index regeneration → record last_run.json
 """
 from __future__ import annotations
 
@@ -47,11 +47,11 @@ def _persist(cfg: GCConfig, report: GCRunReport) -> None:
 
 
 def run_cycle(cfg: GCConfig, *, apply: bool, with_reflection: bool = True) -> GCRunReport:
-    """전체 GC 사이클.
+    """Full GC cycle.
 
     Args:
-        apply: True 면 dedup·reflection 결과 실제 반영. False 면 후보 집계만.
-        with_reflection: False 면 reflection LLM 호출 스킵.
+        apply: If True, dedup·reflection results are actually reflected. If False, only candidate counting.
+        with_reflection: If False, the reflection LLM call is skipped.
     """
     started = dt.datetime.now().isoformat(timespec='seconds')
     ensure_skeleton(cfg)

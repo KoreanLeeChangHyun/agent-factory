@@ -1,18 +1,18 @@
-"""Production-line emitter — NDJSON metrics + 의미별 board endpoint helper.
+"""Production-line emitter — NDJSON metrics + semantic board endpoint helper.
 
-SPEC.md §12.3 — driver 가 stdout NDJSON emit → board 서버 SSE.
-동시에 metrics.jsonl 에 append (회귀 분석 자료).
+SPEC.md §12.3 — driver emits NDJSON to stdout → board server SSE.
+At the same time, append to metrics.jsonl (regression analysis data).
 
-T-495 Phase 2 (driver) — v1 단일 `/api/v2/wf-event` 호출은 폐기되고
-backend Phase 1 의 7 endpoint 로 분해된다:
+T-495 Phase 2 (driver) — v1 single `/api/v2/wf-event` call is deprecated
+Backend Phase 1 is decomposed into 7 endpoints:
   POST /api/v2/sessions                       — session_create
-  POST /api/v2/sessions/<id>/step             — step_start (전이 통보)
+  POST /api/v2/sessions/<id>/step — step_start (transition notification)
   POST /api/v2/sessions/<id>/stdout           — stdout_chunk (NDJSON forward)
   POST /api/v2/sessions/<id>/phase            — phase_start / phase_end
   POST /api/v2/sessions/<id>/finish           — finish (DONE/FAILED)
 
-board push 는 env `V2_BOARD_POST=true` gate. fire-and-forget thread, 1s
-timeout, 실패 silent skip — driver 흐름 영향 0.
+board push is env `V2_BOARD_POST=true` gate. fire-and-forget thread, 1s
+timeout, failure silent skip — driver flow impact 0.
 """
 
 from __future__ import annotations
@@ -67,11 +67,11 @@ def _post_to_board(endpoint_path: str, body: dict[str, Any]) -> None:
     """fire-and-forget POST to `<board>/api/v2/...`.
 
     Args:
-        endpoint_path: "/api/v2/sessions" / "/api/v2/sessions/<id>/step" 등 절대 path
-        body: JSON 직렬화 가능한 dict
+        endpoint_path: Absolute path such as "/api/v2/sessions" / "/api/v2/sessions/<id>/step"
+        body: JSON serializable dict
 
-    실패 silent skip — 네트워크 오류 / board 미기동 / endpoint 404 등.
-    timeout 1s 로 driver subprocess 지연 차단.
+    Failure silent skip — network error / board not starting / endpoint 404, etc.
+    Block driver subprocess delay with timeout 1s.
     """
     if not _board_post_enabled():
         return
@@ -102,12 +102,12 @@ def _post_to_board(endpoint_path: str, body: dict[str, Any]) -> None:
 
 
 def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
-    """NDJSON line — stdout + metrics.jsonl append (ctx 있을 때만).
+    """NDJSON line — stdout + metrics.jsonl append (only when ctx exists).
 
-    board POST 는 본 함수가 하지 않음 (의미별 helper 가 endpoint 호출).
+    This function does not do board POST (the helper calls the endpoint depending on the meaning).
 
-    T-506 P7 — 다중 thread 가 동시 emit 시 line drop 0 보장.
-    `_METRICS_APPEND_LOCK` 으로 file open + write 구간 직렬화.
+    T-506 P7 — Guaranteed line drop 0 when multiple threads emit simultaneously.
+    Serialize the file open + write section with `_METRICS_APPEND_LOCK`.
     """
     record = {"event": event, "ts": _now_iso(), **payload}
     line = json.dumps(record, ensure_ascii=False)
@@ -132,11 +132,11 @@ def emit(ctx: WorkflowContext | None, event: str, **payload: Any) -> None:
 
 
 def session_create(ctx: WorkflowContext) -> None:
-    """POST /api/v2/sessions — 세션 명시 등록 (lazy create 폐기).
+    """POST /api/v2/sessions — explicitly register a session (lazy create discarded).
 
-    INIT Step 진입 직후 driver 가 1회 호출. board 가 발급한 session_id 와
-    정합 — 본 driver 는 `ctx.wf_session_id` 를 직접 발급해 board 에 통보한다.
-    실패 silent skip (board 미기동 / 환경 미설정 시 등).
+    Immediately after entering the INIT Step, the driver is called once. session_id issued by the board and
+    Matching — This driver directly issues `ctx.wf_session_id` and notifies the board.
+    Failure silent skip (when the board is not started / the environment is not set, etc.).
     """
     if not ctx.wf_session_id:
         return
@@ -151,10 +151,10 @@ def session_create(ctx: WorkflowContext) -> None:
 
 
 def step_start(ctx: WorkflowContext, step: str, **extra: Any) -> None:
-    """Step 전이 시작 — metrics.jsonl + board POST /step.
+    """Step Start transition — metrics.jsonl + board POST /step.
 
-    board endpoint 는 step 전이 1건만 보내면 backend 가 current_step 갱신.
-    step_end 는 metrics.jsonl 만 기록 (전이 endpoint 중복 호출 회피).
+    If the board endpoint sends only one step transition, the backend updates current_step.
+    step_end only records metrics.jsonl (avoiding duplicate calls to transitive endpoints).
     """
     emit(ctx, "step.start", step=step, ticket=ctx.ticket_no, **extra)
     if ctx.wf_session_id:
@@ -192,8 +192,8 @@ def stdout_chunk(
 ) -> None:
     """POST /api/v2/sessions/<id>/stdout — claude -p NDJSON line forward.
 
-    spawn 의 on_line 콜백이 이 함수를 호출한다. fire-and-forget,
-    실패 silent — driver 흐름 영향 0 (위험 ② broadcast chunk 부하 차단).
+    spawn 's on_line callback calls this function. fire-and-forget,
+    Failure silent — driver flow impact 0 (risk ② broadcast chunk load shedding).
     """
     if ctx is None or not ctx.wf_session_id:
         return
@@ -214,12 +214,12 @@ def phase_start(
     worker_index: int = 0,
     **extra: Any,
 ) -> None:
-    """WORK 내부 phase 시작 — metrics.jsonl + board POST /phase action=start.
+    """WORK internal phase start — metrics.jsonl + board POST /phase action=start.
 
-    T-506 P7 — `session_id` / `worker_index` payload 박제 (UI/UX 가 같은 level 동시
-    진행 시각화 + phase × worker 매트릭스 디스플레이 용).
-    backend Phase 1 endpoint `/api/v2/sessions/<id>/phase` 본문은 호환 보존 —
-    추가 필드는 metrics.jsonl 측만 박제.
+    T-506 P7 — `session_id` / `worker_index` payload stuffed (UI/UX at same level
+    for progress visualization + phase × worker matrix display).
+    backend Phase 1 endpoint `/api/v2/sessions/<id>/phase` body is kept compatible —
+    Additional fields are only stuffed in the metrics.jsonl side.
     """
     payload: dict[str, Any] = dict(extra)
     if session_id:
@@ -250,9 +250,9 @@ def phase_end(
     worker_index: int = 0,
     **extra: Any,
 ) -> None:
-    """WORK 내부 phase 종료 — metrics.jsonl + board POST /phase action=end.
+    """WORK internal phase end — metrics.jsonl + board POST /phase action=end.
 
-    T-506 P7 — `session_id` / `worker_index` payload 박제. backend body 호환 보존.
+    T-506 P7 — Stuffed `session_id` / `worker_index` payload. Backend body compatible preservation.
     """
     payload: dict[str, Any] = dict(extra)
     if session_id:
@@ -283,12 +283,12 @@ def workflow_finish(
     summary: str = "",
     **extra: Any,
 ) -> None:
-    """사이클 종결 — metrics.jsonl + board POST /finish.
+    """Cycle closure — metrics.jsonl + board POST /finish.
 
     Args:
         outcome: "ok" | "fail"
-        verdict: 12룰 verdict (PASS/WARN/FAIL/SKIP) — metrics 만 기록
-        summary: 한 줄 요약 — board 가 frontend 에 노출
+        verdict: 12 rule verdict (PASS/WARN/FAIL/SKIP) — records only metrics
+        summary: One-line summary — board exposed to frontend
     """
     payload: dict[str, Any] = {"outcome": outcome, "ticket": ctx.ticket_no}
     if verdict is not None:

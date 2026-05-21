@@ -1,8 +1,8 @@
-"""kanban_cli.py - 칸반 보드 서브커맨드 구현 및 CLI 파서 모듈.
+"""kanban_cli.py - Kanban board subcommand implementation and CLI parser module.
 
-서브커맨드별 비즈니스 로직(cmd_* 함수), argparse 파서 구성(build_parser),
-서브커맨드 디스패치(dispatch)를 담당하는 비즈니스 계층 모듈이다.
-kanban.py에서 분리되었으며, ticket_repository.py와 ticket_state.py에 의존한다.
+Business logic for each subcommand (cmd_* functions), argparse parser configuration (build_parser),
+This is a business layer module responsible for subcommand dispatch.
+It is separated from kanban.py and depends on ticket_repository.py and ticket_state.py.
 """
 
 from __future__ import annotations
@@ -56,15 +56,15 @@ _CONFLICT_SIGNAL_RE: re.Pattern[str] = re.compile(
     r"(merge\s*conflict|merge\s+conflict|CONFLICT)",
     re.IGNORECASE,
 )
-"""merge_result.error_message 에서 충돌 신호를 감지하기 위한 정규식.
+"""Regular expression to detect conflict signals in merge_result.error_message.
 
-W05 테스트에서 ``from flow.kanban_cli import _CONFLICT_SIGNAL_RE`` 로 직접 import
-가능하도록 모듈 레벨에 노출한다.
+In the W05 test, import directly with ``from flow.kanban_cli import _CONFLICT_SIGNAL_RE``
+If possible, expose it at the module level.
 
-매칭 패턴:
-- ``병합 충돌`` / ``병합충돌`` (한국어, 공백 선택적)
-- ``merge conflict`` / ``Merge Conflict`` 등 (대소문자 무관)
-- ``CONFLICT`` (git stdout 접두사 형식)
+Matching pattern:
+- ``Merge Conflict`` / ``Merge Conflict`` (Korean, space optional)
+- ``merge conflict`` / ``Merge Conflict``, etc. (case irrelevant)
+- ``CONFLICT`` (git stdout prefix format)
 """
 
 
@@ -77,12 +77,12 @@ _TMUX_WINDOW_PREFIX: str = "P:"
 
 
 def _resolve_server_port() -> "int | None":
-    """서버 포트를 해석한다.
+    """Resolve the server port.
 
-    _WF_SERVER_PORT 환경변수 또는 .agent-factory/.board.url 파일에서 포트를 추출한다.
+    Extract the port from the _WF_SERVER_PORT environment variable or the .agent-factory/.board.url file.
 
     Returns:
-        포트 번호(int) 또는 None (해석 불가 시).
+        Port number (int) or None (if not interpretable).
     """
     # 1) Environmental variables take precedence
     port_env = os.environ.get("_WF_SERVER_PORT")
@@ -110,14 +110,14 @@ def _resolve_server_port() -> "int | None":
 
 
 def _kill_ticket_session(ticket_number: str) -> None:
-    """활성 세션에서 해당 티켓의 워크플로우 세션을 종료한다.
+    """Terminates the workflow session for the ticket in the active session.
 
-    HTTP API(서버 기동 중)를 통해 세션을 종료하고,
-    서버 미기동 시 tmux kill-window 폴백을 사용한다.
-    상태 전이 성공 후에만 호출되어야 한다.
+    Terminate the session via HTTP API (server running),
+    When the server is not started, tmux kill-window fallback is used.
+    It should be called only after a successful state transition.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number (T-NNN format).
     """
     port = _resolve_server_port()
 
@@ -199,16 +199,16 @@ def _kill_ticket_session(ticket_number: str) -> None:
 
 
 def _cleanup_worktree_on_leave(ticket_number: str) -> None:
-    """In Progress에서 이탈할 때 연결된 워크트리를 자동 정리한다.
+    """When leaving In Progress, the connected work tree is automatically cleaned up.
 
-    워크트리 비활성 환경이거나 해당 티켓의 워크트리가 없으면 조용히 건너뛴다.
-    미커밋 변경이 있는 경우 데이터 손실을 막기 위해 정리를 skip 하고
-    사용자에게 경로를 명시한다 (T-411: 워커 commit 누락 / finalization 실패 시
-    워크트리 자동 삭제로 인한 작업물 영구 손실 차단).
-    정리 실패 시 경고만 출력하고 예외를 전파하지 않는다 (상태 전이 차단 금지).
+    If the work tree is in an inactive environment or there is no work tree for the ticket, it is quietly skipped.
+    If there are uncommitted changes, skip cleanup to prevent data loss.
+    Specifies the path to the user (T-411: When worker commit is missing / finalization fails
+    Prevent permanent loss of work due to automatic deletion of the work tree).
+    If cleanup fails, only a warning is issued and no exceptions are propagated (no blocking of state transitions).
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number (T-NNN format).
     """
     try:
         from flow.worktree_manager import (
@@ -262,24 +262,24 @@ def cmd_create(
     status: str,
     number: str | None = None,
 ) -> None:
-    """새 티켓 XML을 생성한다.
+    """Create a new ticket XML.
 
-    번호 미지정 시 XML 파일명에서 최대 T-NNN 번호를 스캔하여 +1 자동 채번한다.
-    번호 명시 시 정규화 후 동일 번호 충돌을 검사하고, 존재하면 에러로 거부한다.
-    status 값에 따라 .kanban/todo/ 또는 .kanban/open/ 아래에 T-NNN.xml 파일을 생성한다.
+    If the number is not specified, the maximum T-NNN number is scanned from the XML file name and automatically numbered +1.
+    When specifying a number, after normalization, identical number collisions are checked and, if present, are rejected as an error.
+    Depending on the status value, a T-NNN.xml file is created under .kanban/todo/ or .kanban/open/.
 
     Args:
-        title: 티켓 제목. 빈 문자열 허용.
-        command: 워크플로우 커맨드 (implement, review, research 등). 현재 미사용 (하위 호환용).
-        status: 초기 상태 키 ("todo" | "open"). COLUMN_MAP을 통해 XML <status> 값으로 변환된다.
-        number: 명시적 티켓 번호 (T-NNN, NNN, #N format). Automatic numbering if not specified.
+        title: Ticket title. Allows empty strings.
+        command: Workflow command (implement, review, research, etc.). Currently unused (for backwards compatibility).
+        status: initial status key ("todo" | "open"). Converted to XML <status> value through COLUMN_MAP.
+        number: Explicit ticket number (T-NNN, NNN, #N format). Automatic numbering if not specified.
     """
     # Convert status key to status name ("To Do" / "Open")
     status_label = COLUMN_MAP.get(status)
     if status_label is None or status not in ("todo", "open"):
         err(
             f"Invalid --status value: '{status}'. Specify either 'todo' or 'open'."
-            f"(Example: flow-kanban create \\"title\\" --command implement --status todo)",
+            f"(Example: flow-kanban create \"title\" --command implement --status todo)",
             2,
         )
 
@@ -336,18 +336,18 @@ def cmd_create(
 
 
 def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
-    """티켓 상태를 변경한다.
+    """Change ticket status.
 
-    허용 상태 전이 규칙을 검증하고, 위반 시 에러를 출력한다.
-    --force 플래그가 있으면 규칙을 무시하고 강제 이동한다.
+    Verifies the allowable state transition rules and outputs an error if violated.
+    If the --force flag is present, the rule is ignored and the movement is forced.
 
     Args:
-        ticket_number: 이동할 티켓 번호 (T-NNN 형식).
-        target_key: 대상 컬럼 키 (todo/open/progress/review/done).
-        force: 강제 이동 여부.
+        ticket_number: Ticket number to move to (T-NNN format).
+        target_key: Target column key (todo/open/progress/review/done).
+        force: Whether to force movement.
 
     Raises:
-        SystemExit: 티켓이 없거나 전이 규칙 위반 시.
+        SystemExit: When there is no ticket or a transition rule is violated.
     """
     target_section = COLUMN_MAP.get(target_key)
     if target_section is None:
@@ -442,16 +442,16 @@ def cmd_move(ticket_number: str, target_key: str, force: bool = False) -> None:
 
 
 def cmd_done(ticket_number: str) -> None:
-    """티켓을 Done으로 변경하고 파일을 .kanban/done/으로 이동한다.
+    """Change the ticket to Done and move the file to .kanban/done/.
 
-    worktree가 활성화된 경우, 상태 변경/파일 이동 전에 feature 브랜치를
-    develop에 병합한다. 병합 충돌 시 Done 전이를 차단한다.
+    If worktree is enabled, create a feature branch before changing state/moving files.
+    Merge into develop. In case of merge conflict, the Done transition is blocked.
 
-    XML의 <status>를 Done으로 갱신하고,
-    move_ticket_to_status_dir()를 통해 .kanban/done/T-NNN.xml로 이동한다.
+    Update <status> in XML to Done,
+    Move to .kanban/done/T-NNN.xml through move_ticket_to_status_dir().
 
     Args:
-        ticket_number: 완료할 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number to complete (T-NNN format).
     """
     # ── Worktree merge hook (before changing ticket status/moving files) ──
     import sys as _sys
@@ -554,15 +554,15 @@ def cmd_done(ticket_number: str) -> None:
 
 
 def cmd_delete(ticket_number: str) -> None:
-    """티켓 XML 파일을 삭제한다.
+    """Delete the ticket XML file.
 
-    Done과 달리 히스토리를 보존하지 않고 파일을 삭제한다.
+    Unlike Done, it deletes the file without preserving the history.
 
     Args:
-        ticket_number: 삭제할 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number to delete (T-NNN format).
 
     Raises:
-        SystemExit: 티켓을 찾을 수 없는 경우.
+        SystemExit: If ticket not found.
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
@@ -577,14 +577,14 @@ def cmd_delete(ticket_number: str) -> None:
 
 
 def cmd_update_title(ticket_number: str, title: str) -> None:
-    """티켓 XML의 <title> 요소를 갱신한다.
+    """Updates the <title> element of the ticket XML.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
-        title: 새 제목 문자열.
+        ticket_number: Ticket number (T-NNN format).
+        title: New title string.
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
+        SystemExit: When ticket file cannot be found or write fails.
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
@@ -617,14 +617,14 @@ def cmd_update_title(ticket_number: str, title: str) -> None:
 
 
 def cmd_set_editing(ticket_number: str, value: bool) -> None:
-    """티켓 XML의 <metadata> 내부에 <editing> 요소를 생성(없으면) 또는 갱신한다.
+    """Creates (if not present) or updates the <editing> element within the <metadata> of the ticket XML.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
-        value: True이면 "true", False이면 "false"로 설정.
+        ticket_number: Ticket number (T-NNN format).
+        value: Set to “true” if True, “false” if False.
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
+        SystemExit: When ticket file cannot be found or write fails.
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
@@ -661,22 +661,22 @@ def cmd_update_prompt(
     context: str = "",
     skip_validation: bool = False,
 ) -> None:
-    """티켓 XML의 <prompt> 및 <metadata>/<command>를 갱신한다.
+    """Update <prompt> and <metadata>/<command> in ticket XML.
 
-    갱신 후 품질 검증을 수행하여 QUALITY_THRESHOLD 미만이면 에러를 출력한다.
+    After updating, quality verification is performed and an error is output if it is less than QUALITY_THRESHOLD.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
-        command: 워크플로우 커맨드 (implement, review, research 등).
-        goal: 작업 목표.
-        target: 대상.
-        constraints: 제약사항 (선택, 프롬프트 5요소).
-        criteria: 완료 기준 (선택, 프롬프트 5요소).
-        context: 맥락 정보 (선택, 프롬프트 5요소).
-        skip_validation: True이면 품질 검증을 건너뛴다 (긴급 시 사용).
+        ticket_number: Ticket number (T-NNN format).
+        command: Workflow command (implement, review, research, etc.).
+        goal: The task goal.
+        target: target.
+        constraints: Constraints (optional, prompt 5 elements).
+        criteria: Completion criteria (optional, prompt 5 elements).
+        context: Context information (optional, prompt 5 elements).
+        skip_validation: If True, quality verification is skipped (used in emergency cases).
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없거나, 품질 검증 실패 시.
+        SystemExit: When the ticket file cannot be found or quality verification fails.
     """
     import sys as _sys
 
@@ -753,18 +753,18 @@ def cmd_update_result(
     report: str = "",
     merge_commit: str = "",
 ) -> None:
-    """티켓 XML의 <result> 하위 요소를 갱신한다.
+    """Updates the <result> sub-element of ticket XML.
 
     Args:
-        ticket_number: 티켓 번호 (T-NNN 형식).
-        registrykey: 워크플로우 registryKey (YYYYMMDD-HHMMSS 형식).
-        workdir: 워크플로우 산출물 디렉터리 상대 경로.
-        plan: plan.md 상대 경로.
-        report: report.md 상대 경로.
-        merge_commit: feature -> develop 머지 커밋 SHA (40자 hex).
+        ticket_number: Ticket number (T-NNN format).
+        registrykey: Workflow registryKey (in YYYYMMDD-HHMMSS format).
+        workdir: Relative path to the workflow output directory.
+        plan: plan.md relative path.
+        report: report.md relative path.
+        merge_commit: feature -> develop Merge commit SHA (40 characters hex).
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없거나 쓰기 실패 시.
+        SystemExit: When ticket file cannot be found or write fails.
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
@@ -790,16 +790,16 @@ def cmd_update_result(
 
 
 def cmd_show(ticket_number: str) -> None:
-    """특정 티켓의 상세 정보를 구조화된 텍스트로 출력한다.
+    """Outputs detailed information about a specific ticket as structured text.
 
-    메타데이터, 관계 정보, 프롬프트(goal/target/constraints/criteria/context)
-    및 result 정보를 순서대로 출력한다.
+    Metadata, relationship information, prompts (goal/target/constraints/criteria/context)
+    and result information are output in order.
 
     Args:
-        ticket_number: 조회할 티켓 번호 (T-NNN 형식).
+        ticket_number: Ticket number to search (T-NNN format).
 
     Raises:
-        SystemExit: 티켓 파일을 찾을 수 없는 경우.
+        SystemExit: If the ticket file cannot be found.
     """
     ticket_file = find_ticket_file(ticket_number)
     if ticket_file is None:
@@ -906,14 +906,14 @@ def _apply_relation(
     *,
     remove: bool = False,
 ) -> None:
-    """단일 관계 옵션에 대해 양방향 관계를 기록하거나 제거한다.
+    """Record or remove bidirectional relationships for the single relationship option.
 
     Args:
-        source_file: 원본 티켓 파일 경로.
-        source_ticket: 원본 티켓 번호 (T-NNN).
-        target_ticket: 대상 티켓 번호 (T-NNN).
-        option_name: 관계 옵션 이름 (depends_on, derived_from, blocks).
-        remove: True이면 관계를 제거한다.
+        source_file: Original ticket file path.
+        source_ticket: Original ticket number (T-NNN).
+        target_ticket: Target ticket number (T-NNN).
+        option_name: Relationship option name (depends_on, derived_from, blocks).
+        remove: If True, the relationship is removed.
     """
     target_file = find_ticket_file(target_ticket)
     if target_file is None:
@@ -932,18 +932,18 @@ def cmd_link(
     derived_from: str = "",
     blocks: str = "",
 ) -> None:
-    """티켓 간 관계를 양방향으로 기록한다.
+    """Records relationships between tickets in both directions.
 
-    각 관계 옵션에 대해 원본 티켓과 대상 티켓 양쪽에 관계를 추가한다.
-    - --depends-on T-MMM: 원본에 depends-on T-MMM + T-MMM에 blocks T-NNN
-    - --derived-from T-MMM: 원본에 derived-from T-MMM + T-MMM에 blocks T-NNN
-    - --blocks T-MMM: 원본에 blocks T-MMM + T-MMM에 depends-on T-NNN
+    For each relationship option, a relationship is added to both the source ticket and the target ticket.
+    - --depends-on T-MMM: depends-on T-MMM on original + blocks T-NNN on T-MMM
+    - --derived-from T-MMM: derived-from T-MMM to original + blocks T-NNN to T-MMM
+    - --blocks T-MMM: blocks T-MMM on original + depends-on T-NNN on T-MMM
 
     Args:
-        ticket_number: 원본 티켓 번호 (T-NNN 형식).
-        depends_on: 의존 대상 티켓 번호.
-        derived_from: 파생 원본 티켓 번호.
-        blocks: 차단 대상 티켓 번호.
+        ticket_number: Original ticket number (T-NNN format).
+        depends_on: Depending on ticket number.
+        derived_from: Derived original ticket number.
+        blocks: Ticket number to block.
     """
     source_file = find_ticket_file(ticket_number)
     if source_file is None:
@@ -973,15 +973,15 @@ def cmd_unlink(
     derived_from: str = "",
     blocks: str = "",
 ) -> None:
-    """티켓 간 관계를 양방향으로 제거한다.
+    """Remove relationships between tickets in both directions.
 
-    cmd_link의 역방향으로 양쪽 XML에서 관계를 제거한다.
+    Remove the relationship from both XML in the reverse direction of cmd_link.
 
     Args:
-        ticket_number: 원본 티켓 번호 (T-NNN 형식).
-        depends_on: 의존 대상 티켓 번호.
-        derived_from: 파생 원본 티켓 번호.
-        blocks: 차단 대상 티켓 번호.
+        ticket_number: Original ticket number (T-NNN format).
+        depends_on: Depending on ticket number.
+        derived_from: Derived original ticket number.
+        blocks: Ticket number to block.
     """
     source_file = find_ticket_file(ticket_number)
     if source_file is None:
@@ -1006,15 +1006,15 @@ def cmd_unlink(
 
 
 def cmd_board() -> None:
-    """칸반 보드 전체 현황을 마크다운 테이블 형식으로 출력한다.
+    """The entire Kanban board status is output in Markdown table format.
 
-    .kanban/todo/, .kanban/open/, .kanban/progress/, .kanban/review/ 디렉터리를 각각 스캔하여
-    To Do/Open/In Progress/Review 칼럼에 직접 매핑하고, .kanban/done/ 디렉터리의
-    티켓을 Done 칼럼에 그룹핑하여 출력한다.
-    Done 칼럼은 최근 10건만 표시하고 총 건수를 함께 출력한다.
-    각 칼럼에 티켓이 없으면 "(doesn't exist)"을 출력한다.
+    Scan the .kanban/todo/, .kanban/open/, .kanban/progress/, and .kanban/review/ directories respectively.
+    Map directly to the To Do/Open/In Progress/Review column and in the .kanban/done/ directory.
+    Tickets are grouped and printed in the Done column.
+    The Done column displays only the most recent 10 cases and also outputs the total number of cases.
+    If there is no ticket in each column, "(doesn't exist)" is output.
 
-    출력 포맷:
+    Output Format:
         ## Kanban Board
 
         ### To Do
@@ -1129,17 +1129,17 @@ _STATUS_SCAN_MAP: dict[str, tuple[str, str]] = {
 
 
 def cmd_list(status_filter: str = "") -> None:
-    """칸반 티켓 목록을 한 줄 요약 형식으로 출력한다.
+    """Prints the list of Kanban tickets in a one-line summary format.
 
-    --status 옵션으로 특정 상태만 필터링할 수 있다.
-    미지정 시 To Do/Done을 제외한 open/progress/review 전체를 출력한다.
-    (To Do는 백로그 성격이므로 기본 노출에서 제외, 명시 요청 시에만 출력한다.)
+    You can filter only specific statuses with the --status option.
+    If not specified, all open/progress/review except To Do/Done are output.
+    (Because To Do is a backlog, it is excluded from basic exposure and is output only when explicitly requested.)
 
-    출력 포맷: T-NNN  [상태]  제목 (번호 오름차순)
+    Output Format: T-NNN [Status] Title (number ascending)
 
     Args:
-        status_filter: 상태 필터 키 (todo/open/progress/review/done).
-            빈 문자열이면 To Do/Done 제외 전체.
+        status_filter: Status filter key (todo/open/progress/review/done).
+            If the string is empty, all except To Do/Done.
     """
     if status_filter:
         scan_targets = [_STATUS_SCAN_MAP[status_filter]]
@@ -1190,10 +1190,10 @@ def cmd_list(status_filter: str = "") -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """argparse 기반 CLI 파서를 구성하여 반환한다.
+    """Constructs and returns an argparse-based CLI parser.
 
     Returns:
-        구성된 ArgumentParser 인스턴스.
+        A configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         prog="kanban.py",
@@ -1212,7 +1212,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="{todo,open}",
         help=(
             "Initial state (required). 'todo'=backlog·things to do in the future, 'open'=target of focus now."
-            "Example: flow-kanban create \\"title\\" --command implement --status todo"
+            "Example: flow-kanban create \"title\" --command implement --status todo"
         ),
     )
     create_parser.add_argument(
@@ -1316,16 +1316,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def dispatch(args: argparse.Namespace) -> None:
-    """파싱된 CLI 인자를 해당 서브커맨드 핸들러로 디스패치한다.
+    """Dispatch the parsed CLI argument to the corresponding subcommand handler.
 
-    main()의 서브커맨드별 분기 로직을 독립 함수로 추출한 것이다.
-    티켓 번호 정규화 및 유효성 검증을 포함한다.
+    The branching logic for each subcommand of main() is extracted as an independent function.
+    Includes ticket number normalization and validation.
 
     Args:
-        args: argparse.parse_args()의 반환값.
+        args: Return value of argparse.parse_args().
 
     Raises:
-        SystemExit: 잘못된 티켓 번호 또는 서브커맨드 실행 오류 시.
+        SystemExit: In case of incorrect ticket number or subcommand execution error.
     """
     if args.subcommand == "create":
         cmd_create(args.title, args.command, args.status, args.number)
@@ -1388,7 +1388,7 @@ def dispatch(args: argparse.Namespace) -> None:
             err(f"Invalid ticket number format: '{args.ticket}'. Use the format T-NNN, NNN, #N.", 2)
         title = args.title or getattr(args, "title_flag", "") or ""
         if not title:
-            err("You must specify a title. Example: flow-kanban update-title T-001 \\"New title\\"", 2)
+            err("You must specify a title. Example: flow-kanban update-title T-001 \"New title\"", 2)
         cmd_update_title(ticket, title)
 
     elif args.subcommand == "link":

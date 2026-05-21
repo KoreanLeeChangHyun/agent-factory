@@ -12,7 +12,7 @@ class MemoryGcHandlerMixin:
 
     @api_endpoint("MGC", "run")
     def _handle_memory_gc_run(self) -> None:
-        """POST /api/memory/gc/run — Memory GC 즉시 실행.
+        """POST /api/memory/gc/run — Run Memory GC immediately.
 
         method: POST
         url: /api/memory/gc/run
@@ -36,7 +36,7 @@ class MemoryGcHandlerMixin:
 
     @api_endpoint("MGC", "prune_archive")
     def _handle_memory_gc_prune(self) -> None:
-        """POST /api/memory/gc/prune-archive — archive 디렉터리 정리.
+        """POST /api/memory/gc/prune-archive — Prune the archive directory.
 
         method: POST
         url: /api/memory/gc/prune-archive

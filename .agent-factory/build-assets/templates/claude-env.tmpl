@@ -102,7 +102,25 @@ ENFORCE_SELF_REVIEW=true
 ENFORCE_TOKEN_EFFICIENCY=true
 
 # -----------------------------------------------------------------------------------------
-# (5) Agent Factory workflow settings
+# (5) Agent Factory brain / adapter settings
+# -----------------------------------------------------------------------------------------
+
+# Brain provider for provider-neutral LLM adapter paths.
+# Supported values: claude / codex / fake
+AGENT_FACTORY_LLM_PROVIDER=claude
+
+# Claude adapter permission mode for non-interactive runs.
+CLAUDE_PERMISSION_MODE=bypassPermissions
+
+# Codex adapter settings.
+CODEX_BIN=codex
+CODEX_MODEL=
+CODEX_PROFILE=
+CODEX_SANDBOX=workspace-write
+CODEX_APPROVAL_POLICY=never
+
+# -----------------------------------------------------------------------------------------
+# (6) Agent Factory workflow settings
 # -----------------------------------------------------------------------------------------
 
 # Maximum number of workflows to keep in the .agent-factory/runs/ directory (default: 10)

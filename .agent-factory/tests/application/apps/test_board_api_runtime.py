@@ -53,6 +53,7 @@ def test_write_and_remove_board_url_file(tmp_path) -> None:
     assert base == "http://127.0.0.1:9912"
     assert path.read_text(encoding="utf-8").splitlines() == [
         "http://127.0.0.1:9912/index.html",
+        "http://127.0.0.1:9912/board.html",
         "http://127.0.0.1:9912/terminal.html",
     ]
 
@@ -71,6 +72,7 @@ def test_read_and_refresh_existing_board_url(tmp_path) -> None:
     assert read_board_url_port(str(tmp_path)) == 9913
     assert board_url_file_path(str(tmp_path)).read_text(encoding="utf-8").splitlines() == [
         "http://127.0.0.1:9913/index.html",
+        "http://127.0.0.1:9913/board.html",
         "http://127.0.0.1:9913/terminal.html",
     ]
 

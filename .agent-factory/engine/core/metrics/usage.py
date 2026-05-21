@@ -1,12 +1,12 @@
-"""사용량 추적 모듈.
+"""Usage tracking module.
 
-워크플로우 에이전트별 토큰 사용량 기록, 정산, .dashboard/.usage.md 관리를 담당한다.
+Responsible for recording, settlement, and .dashboard/.usage.md management of token usage for each workflow agent.
 
-주요 함수:
-    usage_pending: _pending_workers에 에이전트-태스크 매핑 등록
-    usage_record: 에이전트별 토큰 데이터 기록
-    usage_finalize: totals 계산 및 .usage.md 행 추가
-    usage_regenerate: .usage.md 전체 재생성
+Main functions:
+    usage_pending: Register agent-task mapping with _pending_workers
+    usage_record: Record token data per agent
+    usage_finalize: Calculate totals and add .usage.md line
+    usage_regenerate: Regenerate entire .usage.md
 """
 from __future__ import annotations
 
@@ -50,14 +50,14 @@ def _append_log(abs_work_dir: str, level: str, message: str) -> None:
 
 
 def _calc_effective(d: dict[str, Any]) -> float:
-    """토큰 데이터 dict에서 effective_tokens를 계산한다.
+    """Calculate effective_tokens from token data dict.
 
     Args:
-        d: 토큰 데이터 딕셔너리 (input_tokens, output_tokens,
-           cache_creation_tokens, cache_read_tokens 키 포함)
+        d: token data dictionary (input_tokens, output_tokens,
+           (includes cache_creation_tokens, cache_read_tokens keys)
 
     Returns:
-        가중 합산된 effective_tokens 값.
+        Weighted sum of effective_tokens values.
     """
     return (
         d.get("input_tokens", 0)
@@ -68,14 +68,14 @@ def _calc_effective(d: dict[str, Any]) -> float:
 
 
 def _sum_tokens(agents_list: list[dict[str, Any]]) -> dict[str, int]:
-    """에이전트 토큰 데이터 리스트의 합계를 반환한다.
+    """Returns the sum of the agent token data list.
 
     Args:
-        agents_list: 토큰 데이터 딕셔너리 목록
+        agents_list: Token data dictionary list
 
     Returns:
         input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens
-        합산 딕셔너리.
+        Summation dictionary.
     """
     totals: dict[str, int] = {
         "input_tokens": 0,
@@ -90,41 +90,41 @@ def _sum_tokens(agents_list: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _to_k(n: float | int) -> str:
-    """숫자를 k 단위 문자열로 변환한다. 0이면 '-'.
+    """Convert a number to a k-unit string. If it is 0, it is '-'.
 
     Args:
-        n: 변환할 숫자
+        n: Number to convert
 
     Returns:
-        k 단위 문자열 (예: '10k', '-').
+        A string in k units (e.g. '10k', '-').
     """
     return "-" if n == 0 else f"{int(n) // 1000}k"
 
 
 def _to_k_precise(n: float | int) -> str:
-    """숫자를 소수점 1자리 k 단위 문자열로 변환한다. 0이면 '-'.
+    """Converts a number to a k unit string with 1 decimal place. If it is 0, it is '-'.
 
     Args:
-        n: 변환할 숫자
+        n: Number to convert
 
     Returns:
-        소수점 1자리 k 단위 문자열 (예: '10.5k', '-').
+        A k unit string with 1 decimal place (e.g. '10.5k', '-').
     """
     return "-" if n == 0 else f"{n / 1000:.1f}k"
 
 
 def _get_budget_label(ratio: float) -> str:
-    """ratio(%) 값에 해당하는 예산 임계치 라벨을 반환한다.
+    """Returns the budget threshold label corresponding to the ratio(%) value.
 
-    BUDGET_THRESHOLDS의 각 임계치를 내림차순으로 비교하여 해당 구간 라벨을 반환한다.
-    ratio >= 100이면 "CRITICAL", >= 90이면 "HIGH", >= 80이면 "WARN", >= 75이면 "INFO".
-    미달 시 "-" 반환.
+    Compares each threshold of BUDGET_THRESHOLDS in descending order and returns the corresponding section label.
+    “CRITICAL” if ratio >= 100, “HIGH” if >= 90, “WARN” if >= 80, “INFO” if >= 75.
+    If it falls short, “-” is returned.
 
     Args:
-        ratio: 예산 사용률 (%) 값
+        ratio: Budget utilization (%) value
 
     Returns:
-        해당 구간 라벨 문자열 (예: "CRITICAL", "HIGH", "WARN", "INFO", "-")
+        Corresponding interval label string (e.g. "CRITICAL", "HIGH", "WARN", "INFO", "-")
     """
     for threshold in sorted(BUDGET_THRESHOLDS.keys(), reverse=True):
         if ratio >= threshold:
@@ -133,17 +133,17 @@ def _get_budget_label(ratio: float) -> str:
 
 
 def _check_budget_threshold(abs_work_dir: str, eff_weighted: float) -> str:
-    """예산 임계치를 확인하여 라벨을 반환하고 필요 시 로그를 기록한다.
+    """Check budget thresholds, return labels, and log if necessary.
 
-    BUDGET_CEILING == 0이면 비활성 상태로 즉시 "-"를 반환한다.
-    임계치 도달 시 workflow.log에 WARN 레벨로 기록하고 stderr에 출력한다.
+    If BUDGET_CEILING == 0, “-” is immediately returned to the inactive state.
+    When the threshold is reached, it is recorded at WARN level in workflow.log and output to stderr.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로 (로그 기록용)
-        eff_weighted: 가중 합산 effective_tokens 값
+        abs_work_dir: Absolute path to work directory (for logging purposes)
+        eff_weighted: Weighted sum effective_tokens value
 
     Returns:
-        예산 임계치 라벨 문자열 (예: "CRITICAL", "HIGH", "WARN", "INFO", "-")
+        Budget threshold label string (e.g. "CRITICAL", "HIGH", "WARN", "INFO", "-")
     """
     if BUDGET_CEILING == 0:
         return "-"
@@ -166,14 +166,14 @@ def _check_budget_threshold(abs_work_dir: str, eff_weighted: float) -> str:
 
 
 def _update_usage_md(row: str, eff_weighted: float) -> str | None:
-    """.agent-factory/board/data/.usage.md 파일에 사용량 행을 삽입한다.
+    """Insert a usage line into the .agent-factory/board/data/.usage.md file.
 
     Args:
-        row: 삽입할 마크다운 테이블 행 문자열 (12컬럼 스키마)
-        eff_weighted: 가중 합산 effective_tokens (경고 메시지 생성용)
+        row: Markdown table row string to insert (12-column schema)
+        eff_weighted: Weighted sum of effective_tokens (for generating warning messages)
 
     Returns:
-        성공 시 None, 실패 시 에러 결과 문자열.
+        None on success, error result string on failure.
     """
     usage_md = os.path.join(PROJECT_ROOT, ".agent-factory", "board", "data", ".usage.md")
     marker = "<!-- New entries will be added below this line -->"
@@ -233,15 +233,15 @@ def _update_usage_md(row: str, eff_weighted: float) -> str | None:
 
 
 def usage_pending(abs_work_dir: str, agent_id: str, task_id: str) -> str:
-    """usage.json의 _pending_workers에 agent_id->taskId 매핑을 등록한다.
+    """Register agent_id->taskId mapping in _pending_workers of usage.json.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로
-        agent_id: 에이전트 ID (예: 'W01')
-        task_id: 매핑할 태스크 ID (예: 'W01')
+        abs_work_dir: Absolute path to work directory
+        agent_id: Agent ID (e.g. 'W01')
+        task_id: Task ID to map (e.g. 'W01')
 
     Returns:
-        처리 결과 문자열. 예: 'usage-pending -> W01=W01',
+        Processing result string. Example: 'usage-pending -> W01=W01',
         'usage-pending -> skipped (missing args)', 'usage-pending -> lock failed'.
     """
     if not agent_id or not task_id:
@@ -281,18 +281,18 @@ def _append_usage_snapshot(
     cache_read: int,
     effective: float,
 ) -> None:
-    """usage.snapshot 이벤트를 metrics.jsonl에 기록한다.
+    """Records the usage.snapshot event to metrics.jsonl.
 
-    모든 예외를 조용히 흡수하여 usage_record 호출에 영향을 주지 않는다.
-    work_dir이 유효하지 않거나 워크플로우 외부 호출 시 silently skip.
+    All exceptions are quietly absorbed and have no effect on usage_record calls.
+    Silently skips when work_dir is invalid or is called outside the workflow.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로.
-        input_tokens: 입력 토큰 수.
-        output_tokens: 출력 토큰 수.
-        cache_creation: 캐시 생성 토큰 수.
-        cache_read: 캐시 읽기 토큰 수.
-        effective: 가중 effective_tokens.
+        abs_work_dir: Absolute path to the work directory.
+        input_tokens: Number of input tokens.
+        output_tokens: Number of output tokens.
+        cache_creation: Number of cache creation tokens.
+        cache_read: Number of cache read tokens.
+        effective: weighted effective_tokens.
     """
     try:
         if not abs_work_dir or not os.path.isdir(abs_work_dir):
@@ -344,19 +344,19 @@ def usage_record(
     cache_read: int | str = 0,
     task_id: str = "",
 ) -> str:
-    """usage.json의 agents 객체에 에이전트별 토큰 데이터를 기록한다.
+    """Token data for each agent is recorded in the agents object of usage.json.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로
-        agent_name: 에이전트 이름 (예: 'orchestrator', 'worker')
-        input_tokens: 입력 토큰 수
-        output_tokens: 출력 토큰 수
-        cache_creation: 캐시 생성 토큰 수 (기본값 0)
-        cache_read: 캐시 읽기 토큰 수 (기본값 0)
-        task_id: worker 에이전트의 태스크 ID (agent_name='worker'일 때만 사용)
+        abs_work_dir: Absolute path to work directory
+        agent_name: Agent name (e.g. 'orchestrator', 'worker')
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+        cache_creation: Number of cache creation tokens (default 0)
+        cache_read: Number of cache read tokens (default 0)
+        task_id: Task ID of the worker agent (only used when agent_name='worker')
 
     Returns:
-        처리 결과 문자열. 예: 'usage -> orchestrator: in=1000 out=500 cc=0 cr=0',
+        Processing result string. Example: 'usage -> orchestrator: in=1000 out=500 cc=0 cr=0',
         'usage -> workers.W01: in=2000 out=1000 cc=100 cr=50',
         'usage -> skipped (missing args)', 'usage -> lock failed'.
     """
@@ -415,13 +415,13 @@ def usage_record(
 
 
 def usage_finalize(abs_work_dir: str) -> str:
-    """totals를 계산하고 effective_tokens를 산출하여 .dashboard/.usage.md에 행을 추가한다.
+    """Calculate totals and calculate effective_tokens and add a row to .dashboard/.usage.md.
 
     Args:
-        abs_work_dir: 워크 디렉터리 절대 경로 (usage.json이 위치하는 디렉터리)
+        abs_work_dir: Absolute path to work directory (directory where usage.json is located)
 
     Returns:
-        처리 결과 문자열. 예: 'usage-finalize -> totals: eff=12.5k, usage.md updated',
+        Processing result string. Example: 'usage-finalize -> totals: eff=12.5k, usage.md updated',
         'usage-finalize -> skipped (file not found)', 'usage-finalize -> failed'.
     """
     usage_file = os.path.join(abs_work_dir, "usage.json")
@@ -528,13 +528,13 @@ def usage_finalize(abs_work_dir: str) -> str:
 
 
 def usage_regenerate() -> str:
-    """.agent-factory/runs/ 및 .agent-factory/runs/.history/ 하위의 모든 usage.json을 순회하여 .agent-factory/board/data/.usage.md를 재생성한다.
+    """Iterate through all usage.json under .agent-factory/runs/ and .agent-factory/runs/.history/ and regenerate .agent-factory/board/data/.usage.md.
 
-    usage schema 행을 전체 재생성한다.
-    registryKey를 날짜 내림차순으로 정렬하여 최신 항목이 상단에 오도록 배치한다.
+    Regenerate the entire usage schema row.
+    Sort registryKeys in descending date order so that the most recent entries are at the top.
 
     Returns:
-        처리 결과 문자열. 예: 'usage-regenerate -> rows regenerated: 10',
+        Processing result string. Example: 'usage-regenerate -> rows regenerated: 10',
         'usage-regenerate -> failed'.
     """
     try:

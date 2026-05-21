@@ -1,16 +1,16 @@
-"""Production-line parallel — T-506 P3/P4. ThreadPoolExecutor 기반 동시 spawn 인프라.
+"""Production-line parallel — T-506 P3/P4. ThreadPoolExecutor based concurrent spawn infrastructure.
 
-SPEC.md §3.4 + §6.5 (T-506 추가).
+SPEC.md §3.4 + §6.5 (added T-506).
 
-driver 가 같은 topo level 의 phase 들 / 같은 phase 안 workers>1 일 때
-worker 들을 동시 spawn 하는 wrapper. LLM 호출 X — 결정론 인프라.
+When drivers are in phases of the same topo level / workers in the same phase > 1
+A wrapper that spawns workers simultaneously. LLM Calls X — Deterministic Infrastructure.
 
-핵심:
-- ThreadPoolExecutor (asyncio 미채택, T-506 plan §캐논 SSOT 결정)
-- max_workers 는 get_max_parallel() 가드로 clamp
-- fail_fast=True (default): 한 item 실패 시 미시작 future 들 cancel
-- fail_fast=False: 모든 item 끝까지 실행 후 결과 집계
-- 결과 list 는 입력 items 순서 보존 (deterministic)
+core:
+- ThreadPoolExecutor (asyncio not adopted, T-506 plan §Canon SSOT decision)
+- max_workers clamps to the get_max_parallel() guard
+- fail_fast=True (default): Cancel non-starting futures when one item fails
+- fail_fast=False: Run all items to the end and aggregate results
+- The resulting list preserves the order of input items (deterministic)
 """
 
 from __future__ import annotations
@@ -24,14 +24,14 @@ from ._common import get_max_parallel
 
 @dataclass
 class ParallelOutcome:
-    """parallel_spawn 한 item 의 결과.
+    """parallel_spawn Result of one item.
 
     Attributes:
-        item: 입력 item (예: Phase 객체, int, str ...)
-        ok: 호출 성공 여부
-        value: fn(item) 반환값 (실패 시 None)
-        exception: 실패 시 raise 된 예외 (성공 시 None). fail_fast 가 cancel 한
-                   future 는 CancelledError 또는 None.
+        item: input item (e.g. Phase object, int, str...)
+        ok: Whether the call was successful or not
+        value: fn(item) return value (None on failure)
+        exception: Exception raised on failure (None on success). fail_fast cancels
+                   future is CancelledError or None.
     """
 
     item: Any
@@ -47,18 +47,18 @@ def parallel_spawn(
     max_workers: int,
     fail_fast: bool = True,
 ) -> list[ParallelOutcome]:
-    """같은 level 의 items 를 ThreadPoolExecutor 로 동시 실행.
+    """Simultaneously execute items of the same level with ThreadPoolExecutor.
 
     Args:
-        items: 처리할 item 리스트 (Phase / worker 등). order 보존.
-        fn: 1 item → 결과값 함수. 예외 raise 시 outcome.ok=False.
-        max_workers: 동시 worker 한계 — `get_max_parallel()` 로 clamp.
-            <=0 → 1 로 floor (defensive).
-        fail_fast: True (default) — 한 item 실패 시 미시작 future cancel + 즉시 종료.
-            False — 모든 item 끝까지 실행 후 집계.
+        items: List of items to be processed (Phase / worker, etc.). order preservation.
+        fn: 1 item → result value function. When exception is raised, outcome.ok=False.
+        max_workers: Simultaneous worker limit — clamped with `get_max_parallel()`.
+            <=0 → 1 floor (defensive).
+        fail_fast: True (default) — If one item fails, future cancel + immediate termination.
+            False — All items are executed to the end and then counted.
 
     Returns:
-        입력 items 순서를 보존한 `ParallelOutcome` 리스트.
+        A `ParallelOutcome` list that preserves the order of input items.
     """
     items_list = list(items)
     if not items_list:

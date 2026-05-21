@@ -1,18 +1,18 @@
 """Production-line workflow REST + SSE endpoint.
 
-Legacy `/api/v2/wf-event` 단일 endpoint 는 의미별 endpoint 로 분해됨:
-  POST /api/v2/sessions                       — 세션 명시 등록 (lazy create 폐기)
-  GET  /api/v2/sessions                       — 전체 세션 목록
-  GET  /api/v2/sessions/<id>                  — 세션 상세 (step / phase / artifacts / ts)
-  GET  /api/v2/sessions/<id>/events           — SSE 구독 (per-session client fan-out)
-  GET  /api/v2/sessions/<id>/history          — persist NDJSON 이벤트 통째 (T-513 P1)
-  POST /api/v2/sessions/<id>/step             — Step 전이 통보 (workflow_step 발화)
+Legacy `/api/v2/wf-event` single endpoint is decomposed into semantic endpoints:
+  POST /api/v2/sessions — Session explicit registration (lazy create discarded)
+  GET /api/v2/sessions — Full session list
+  GET /api/v2/sessions/<id> — session details (step / phase / artifacts / ts)
+  GET /api/v2/sessions/<id>/events — SSE subscription (per-session client fan-out)
+  GET /api/v2/sessions/<id>/history — persist entire NDJSON event (T-513 P1)
+  POST /api/v2/sessions/<id>/step — Step transition notification (workflow_step firing)
   POST /api/v2/sessions/<id>/stdout           — claude -p stdout chunk forward
-  POST /api/v2/sessions/<id>/phase            — WORK 내부 phase 통보
-  POST /api/v2/sessions/<id>/finish           — 사이클 종결 통보 (DONE / FAILED)
-  GET  /api/v2/sessions/<id>/artifacts/<path> — 산출물 파일 read (runs/.../)
+  POST /api/v2/sessions/<id>/phase — WORK internal phase notification
+  POST /api/v2/sessions/<id>/finish — cycle termination notification (DONE / FAILED)
+  GET /api/v2/sessions/<id>/artifacts/<path> — read artifact file (runs/.../)
 
-ClaudeProcess 의존 0건. legacy workflow.py handler 와 별도.
+0 ClaudeProcess dependencies. Separate from legacy workflow.py handler.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ _SESSION_PATH_RE = re.compile(
 class ProductionLineWorkflowHandlerMixin:
     """Production-line endpoint mixin.
 
-    `BoardHTTPRequestHandler` 가 do_GET / do_POST 라우팅 시 본 mixin 의
-        `_production_line_handle_*` 메서드를 호출한다. Method names keep the public
+    `BoardHTTPRequestHandler` is used in this mixin when routing do_GET / do_POST.
+        Call the `_production_line_handle_*` method. Method names keep public
         `/api/v2/*` HTTP contract stable.
     """
 
@@ -48,7 +48,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_dispatch_get(self) -> bool:
         """internal helper — not exposed as endpoint.
 
-        GET /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
+        GET /api/v2/sessions[...] routing. Returns True when processed.
         """
         parsed = urlparse(self.path)
         path = parsed.path
@@ -86,7 +86,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_dispatch_post(self) -> bool:
         """internal helper — not exposed as endpoint.
 
-        POST /api/v2/sessions[...] 라우팅. 처리되면 True 반환.
+        POST /api/v2/sessions[...] routing. Returns True when processed.
         """
         parsed = urlparse(self.path)
         path = parsed.path
@@ -123,7 +123,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_dispatch_delete(self) -> bool:
         """internal helper — not exposed as endpoint.
 
-        DELETE /api/v2/sessions/<id> 라우팅. 처리되면 True 반환.
+        DELETE /api/v2/sessions/<id> routing. Returns True when processed.
         """
         parsed = urlparse(self.path)
         path = parsed.path
@@ -145,7 +145,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_dispatch_patch(self) -> bool:
         """internal helper — not exposed as endpoint.
 
-        PATCH /api/v2/sessions/<id>/status 라우팅. 처리되면 True 반환.
+        PATCH /api/v2/sessions/<id>/status routing. Returns True when processed.
         """
         parsed = urlparse(self.path)
         path = parsed.path
@@ -169,7 +169,7 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "list")
     def _production_line_handle_sessions_list(self) -> None:
-        """GET /api/v2/sessions — 전체 세션 목록 (메타 dict 배열).
+        """GET /api/v2/sessions — Full list of sessions (meta dict array).
 
         method: GET
         url: /api/v2/sessions
@@ -187,7 +187,7 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "detail")
     def _production_line_handle_session_detail(self, session_id: str) -> None:
-        """GET /api/v2/sessions/<id> — 세션 상세 (current_step / phase / artifacts / ts).
+        """GET /api/v2/sessions/<id> — Session details (current_step / phase / artifacts / ts).
 
         method: GET
         url: /api/v2/sessions/<id>
@@ -222,7 +222,7 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "events")
     def _production_line_handle_session_events(self, session_id: str) -> None:
-        """GET /api/v2/sessions/<id>/events — SSE 구독 (per-session).
+        """GET /api/v2/sessions/<id>/events — SSE subscription (per-session).
 
         method: GET
         url: /api/v2/sessions/<id>/events
@@ -272,12 +272,12 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "history")
     def _production_line_handle_session_history(self, session_id: str) -> None:
-        """GET /api/v2/sessions/<id>/history — persist NDJSON 이벤트 통째 반환.
+        """GET /api/v2/sessions/<id>/history — Returns the entire persist NDJSON event.
 
-        T-513 P1 — 결정점 #2 Adopted, REST history V2 endpoint newly established. When reconnecting
-        클라이언트가 라이브 SSE 등록 전 과거 이벤트를 일괄 적재. SSE replay
-        링버퍼 사용 X — REST 단일 출처 (board.md §1.1 Terminal SSE replay 정책
-        정합).
+        T-513 P1 — Decision point #2 Adopted, REST history V2 endpoint newly established. When reconnecting
+        Past events are loaded in batches before the client registers for live SSE. SSE replay
+        Use ringbuffer
+        adjustment).
 
         method: GET
         url: /api/v2/sessions/<id>/history
@@ -327,9 +327,9 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "artifact_get")
     def _production_line_handle_session_artifact(self, session_id: str, artifact_rel: str) -> None:
-        """GET /api/v2/sessions/<id>/artifacts/<rel> — 산출물 파일 read.
+        """GET /api/v2/sessions/<id>/artifacts/<rel> — Read artifact files.
 
-        work_dir 기준 상대 경로. path traversal 방지 (.. 차단).
+        Relative path based on work_dir. Prevent path traversal (..block).
 
         method: GET
         url: /api/v2/sessions/<id>/artifacts/<rel>
@@ -386,7 +386,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _guess_content_type(rel_path: str) -> str:
         """internal helper — not exposed as endpoint.
 
-        확장자 기반 content-type 추측.
+        Extension-based content-type guessing.
         """
         lower = rel_path.lower()
         if lower.endswith('.md'):
@@ -405,10 +405,10 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "create")
     def _production_line_handle_session_create(self) -> None:
-        """POST /api/v2/sessions — 세션 명시 등록.
+        """POST /api/v2/sessions — Register a session explicitly.
 
-        본문: {session_id, ticket_id, command, work_dir, worktree_path?}
-        동일 session_id 재호출 시 기존 반환 (idempotent).
+        Body: {session_id, ticket_id, command, work_dir, worktree_path?}
+        When re-invoking the same session_id, the original is returned (idempotent).
 
         method: POST
         url: /api/v2/sessions
@@ -456,9 +456,9 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "step")
     def _production_line_handle_session_step(self, session_id: str) -> None:
-        """POST /api/v2/sessions/<id>/step — Step 전이.
+        """POST /api/v2/sessions/<id>/step — Step transition.
 
-        본문: {step: NONE|INIT|PLAN|WORK|VALIDATE|REPORT|DONE|FAILED, phase?: str, prev_step?: str}
+        Body: {step: NONE|INIT|PLAN|WORK|VALIDATE|REPORT|DONE|FAILED, phase?: str, prev_step?: str}
 
         method: POST
         url: /api/v2/sessions/<id>/step
@@ -497,7 +497,7 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_handle_session_stdout(self, session_id: str) -> None:
         """POST /api/v2/sessions/<id>/stdout — claude -p stdout chunk forward.
 
-        본문: {text: str, raw?: dict}
+        Body: {text: str, raw?: dict}
 
         method: POST
         url: /api/v2/sessions/<id>/stdout
@@ -534,9 +534,9 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "phase")
     def _production_line_handle_session_phase(self, session_id: str) -> None:
-        """POST /api/v2/sessions/<id>/phase — WORK 내부 phase 전이.
+        """POST /api/v2/sessions/<id>/phase — WORK internal phase transition.
 
-        본문: {phase: str, action: start|end}
+        Body: {phase: str, action: start|end}
 
         method: POST
         url: /api/v2/sessions/<id>/phase
@@ -547,7 +547,7 @@ class ProductionLineWorkflowHandlerMixin:
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 404
         auth: none (local-only) — driver subprocess only
-        side_effects: production_line_registry.update_step (phase 갱신) + session.channel.emit_phase
+        side_effects: production_line_registry.update_step (phase update) + session.channel.emit_phase
         sse_events: workflow_phase (ProductionLineSSEChannel)
         """
         data = self._read_json_body()
@@ -580,9 +580,9 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "finish")
     def _production_line_handle_session_finish(self, session_id: str) -> None:
-        """POST /api/v2/sessions/<id>/finish — 사이클 종결.
+        """POST /api/v2/sessions/<id>/finish — End cycle.
 
-        본문: {outcome: ok|fail, summary?: str}
+        Body: {outcome: ok|fail, summary?: str}
 
         method: POST
         url: /api/v2/sessions/<id>/finish
@@ -624,11 +624,11 @@ class ProductionLineWorkflowHandlerMixin:
     def _production_line_collect_extras(data: dict, exclude: set[str]) -> dict | None:
         """internal helper — not exposed as endpoint.
 
-        T-495 P3 — frontend forward-compatible 메타 키 추출.
+        T-495 P3 — frontend forward-compatible meta key extraction.
 
-        body 의 fixed 키 (step/phase/prev_step/outcome/summary/action) 외
-        모든 키를 extras 로 추림. driver 가 verdict/commit_hash/retry/regression
-        을 보내면 SSE payload 에 그대로 통과.
+        Fixed key of body (step/phase/prev_step/outcome/summary/action), etc.
+        All keys are summarized as extras. driver has verdict/commit_hash/retry/regression
+        If you send it, it passes straight through to the SSE payload.
         """
         if not isinstance(data, dict):
             return None
@@ -641,10 +641,10 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "delete")
     def _production_line_handle_session_delete(self, session_id: str) -> None:
-        """DELETE /api/v2/sessions/<id> — 세션 강제 종료 + work_dir 폐기.
+        """DELETE /api/v2/sessions/<id> — Force kill session + dispose of work_dir.
 
-        본 endpoint 는 디버그/회복 용. 사용자 명시 호출만 사용 권장.
-        force 쿼리 파라미터로 work_dir 디렉터리도 함께 삭제 가능.
+        This endpoint is for debug/recovery. Recommended to use only user-specified calls.
+        The work_dir directory can also be deleted with the force query parameter.
 
         method: DELETE
         url: /api/v2/sessions/<id>
@@ -692,10 +692,10 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "patch_status")
     def _production_line_handle_session_patch_status(self, session_id: str) -> None:
-        """PATCH /api/v2/sessions/<id>/status — step/phase 강제 갱신.
+        """PATCH /api/v2/sessions/<id>/status — Force step/phase update.
 
-        디버그/회복 용. driver 가 비정상 종료 후 사용자가 수동 보정하거나,
-        외부 도구가 세션 상태를 강제로 다른 step 으로 이동시킬 때 사용.
+        For debug/recovery. After the driver terminates abnormally, the user may manually correct the
+        Used when an external tool forcibly moves the session state to another step.
 
         method: PATCH
         url: /api/v2/sessions/<id>/status
@@ -707,7 +707,7 @@ class ProductionLineWorkflowHandlerMixin:
         status_codes: 200, 400, 404
         auth: none (local-only) — debug/recovery use
         side_effects: production_line_registry.update_step (no SSE emit)
-        sse_events: none (silent patch — 사용자 수동 보정 경로)
+        sse_events: none (silent patch — user manual correction path)
         """
         data = self._read_json_body()
         if data is None:
@@ -744,10 +744,10 @@ class ProductionLineWorkflowHandlerMixin:
 
     @api_endpoint("W2", "post_artifacts")
     def _production_line_handle_session_post_artifacts(self, session_id: str) -> None:
-        """POST /api/v2/sessions/<id>/artifacts — 산출물 강제 주입.
+        """POST /api/v2/sessions/<id>/artifacts — Force injection of artifacts.
 
-        외부 도구가 work_dir 안에 산출물 파일을 강제 주입할 수 있는 경로.
-        본 endpoint 는 재시도 / 수동 보정 용. path traversal 차단.
+        Path where external tools can force-inject output files into work_dir.
+        This endpoint is for retry/manual calibration. Block path traversal.
 
         method: POST
         url: /api/v2/sessions/<id>/artifacts

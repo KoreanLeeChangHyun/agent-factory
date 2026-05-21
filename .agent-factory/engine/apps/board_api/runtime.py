@@ -47,7 +47,10 @@ def write_board_url_file(project_root: str, port: int) -> str:
     url_file = board_url_file_path(project_root)
     url_file.parent.mkdir(parents=True, exist_ok=True)
     base = f"http://127.0.0.1:{port}"
-    url_file.write_text(f"{base}/index.html\n{base}/terminal.html", encoding="utf-8")
+    url_file.write_text(
+        f"{base}/index.html\n{base}/board.html\n{base}/terminal.html",
+        encoding="utf-8",
+    )
     return base
 
 

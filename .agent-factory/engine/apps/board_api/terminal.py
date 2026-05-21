@@ -33,22 +33,22 @@ _HISTORY_SKIP_TYPES = frozenset({
 def _assign_turn_ids(events: list[dict]) -> list[dict]:
     """internal helper — not exposed as endpoint.
 
-    시간순 render events 배열에 turn_id 필드를 부여하고 그대로 반환한다.
+    Give a turn_id field to the chronological render events array and return it as is.
 
-    1:1 단순화 규칙 (1 user 이벤트 = 1 turn):
-    - user 이벤트가 등장할 때마다 무조건 새 turn_id 를 시작한다.
-      timestamp 인접성(gap 임계값) / turn_has_assistant 분기는 폐기.
-    - tool_result 는 user 역할이지만 assistant turn 의 일부로 취급하여
-      새 turn 을 시작하지 않는다.
-    - assistant/tool 이벤트는 직전 user turn_id 를 그대로 상속한다.
-    - turn_id 형식: f"hist-{ev_timestamp}" — user 이벤트 timestamp 기반
-      결정론적 ID. 새로고침 후에도 동일 이벤트가 동일 id 를 받는다.
+    1:1 simplification rule (1 user event = 1 turn):
+    - Whenever a user event appears, a new turn_id is unconditionally started.
+      Timestamp adjacency (gap threshold) / turn_has_assistant branch is discarded.
+    - tool_result is a user role, but is treated as part of assistant turn
+      Does not start a new turn.
+    - The assistant/tool ​​event inherits the previous user turn_id.
+    - turn_id format: f"hist-{ev_timestamp}" — based on user event timestamp
+      Deterministic ID. Even after refreshing, the same event receives the same ID.
 
-    orphan 처리:
-    - 첫 이벤트가 assistant 인 엣지 케이스에서는 'hist-orphan' 을 할당한다.
+    Orphan handling:
+    - In the edge case where the first event is assistant, 'hist-orphan' is assigned.
 
-    side-effect: 각 ev dict 에 'turn_id' 키가 추가된다 (in-place).
-    반환값은 편의를 위해 동일 리스트를 그대로 반환한다.
+    side-effect: The 'turn_id' key is added (in-place) to each ev dict.
+    The return value returns the same list for convenience.
     """
     current_turn_id: str | None = None
 
@@ -79,10 +79,10 @@ def _assign_turn_ids(events: list[dict]) -> list[dict]:
 def _extract_tool_result_text(content: object) -> str:
     """internal helper — not exposed as endpoint.
 
-    tool_result content에서 평문 텍스트만 추출한다.
+    Only plain text is extracted from tool_result content.
 
-    content는 (a) 문자열 또는 (b) [{type:text|image, ...}, ...] 배열.
-    image 블록은 제외한다.
+    content is (a) a string or (b) an array [{type:text|image, ...}, ...].
+    The image block is excluded.
     """
     if isinstance(content, str):
         return content
@@ -103,7 +103,7 @@ def _extract_tool_result_text(content: object) -> str:
 def _is_system_wrapper_text(text: str) -> bool:
     """internal helper — not exposed as endpoint.
 
-    슬래시 커맨드 래퍼, system-reminder 등 히스토리에서 숨겨야 할 user 메시지를 판별한다.
+    Determines user messages that need to be hidden in the history, such as slash command wrappers and system-reminder.
     """
     stripped = text.lstrip()
     if stripped.startswith(_TITLE_SKIP_PREFIXES):
@@ -116,21 +116,21 @@ def _is_system_wrapper_text(text: str) -> bool:
 def _build_render_events(data: dict) -> list[dict]:
     """internal helper — not exposed as endpoint.
 
-    jsonl 라인 한 줄을 0~N개의 렌더 이벤트로 전개한다.
+    Each jsonl line is expanded into 0~N render events.
 
-    하나의 assistant 메시지가 thinking + text + tool_use 여러 블록을 포함할 수
-    있으므로 블록 수만큼의 이벤트를 반환한다. 빈 텍스트, 시스템 래퍼 user
-    메시지는 제외된다.
+    One assistant message can contain multiple blocks thinking + text + tool_use
+    Therefore, events equal to the number of blocks are returned. Empty text, system wrapper user
+    Messages are excluded.
 
-    반환 이벤트 스키마:
+    Return event schema:
         - role: 'user' | 'assistant'
         - kind: 'text' | 'thinking' | 'tool_use' | 'tool_result'
-        - text: 본문 (tool_use 제외)
+        - text: text (excluding tool_use)
         - tool_use_id: kind in {tool_use, tool_result}
         - name: kind == 'tool_use'
         - input: kind == 'tool_use' (dict)
         - is_error: kind == 'tool_result' (bool)
-        - timestamp: ISO 8601 (원본 유지)
+        - timestamp: ISO 8601 (maintain original)
     """
     timestamp = data.get('timestamp', '') or ''
     if not is_user_visible(data):
@@ -251,18 +251,18 @@ _TITLE_SCAN_MAX_LINES = 300
 def _extract_session_meta(filepath: str) -> tuple[str | None, str]:
     """internal helper — not exposed as endpoint.
 
-    jsonl 파일에서 (title, branch) 를 한 번의 스캔으로 추출한다.
+    Extract (title, branch) from the jsonl file in one scan.
 
-    title: 첫 유효 user 메시지 (필터 규칙은 기존 _extract_session_title 동일)
-    branch: 가장 최근에 등장한 ``gitBranch`` 필드 값 (없으면 빈 문자열)
+    title: First valid user message (filter rules are the same as existing _extract_session_title)
+    branch: The value of the most recent ``gitBranch`` field (empty string if none)
 
-    - toolUseResult 포함 메시지(툴 결과)는 title 후보에서 스킵
-    - 슬래시 명령 래퍼(<command-*>)는 스킵하되 플래그를 세워두고
-      그 직후의 `# ` 시작 마크다운은 명령어 .md 본문 주입으로 간주하여 추가 스킵
-    - 로컬 커맨드 / 시스템 리마인더 래퍼도 스킵
-    - resume 초기화 템플릿 메시지는 스킵
-    - 최대 _TITLE_SCAN_MAX_LINES 라인까지만 검사 (branch 도 같은 범위에서만 추출)
-    - title 이 끝까지 없으면 (None, branch) 반환 → 호출부에서 결과 제외 판단
+    - Messages (tool results) including toolUseResult are skipped from title candidates.
+    - Skip the slash command wrapper (<command-*>) but leave the flag set.
+      Markdown that immediately begins with `# ` is considered as command .md body injection and is further skipped.
+    - Skip local commands/system reminder wrappers as well
+    - Skip the resume initialization template message
+    - Only checks up to _TITLE_SCAN_MAX_LINES lines (branch is also extracted only in the same range)
+    - If the title is not complete (None, branch), it is returned → The caller decides to exclude the result.
     """
     title: str | None = None
     branch = ''
@@ -324,11 +324,11 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "sse")
     def _handle_terminal_sse(self) -> None:
-        """터미널 전용 SSE 엔드포인트를 처리한다.
+        """Handles terminal-only SSE endpoints.
 
-        /terminal/events 경로에 대해 TerminalSSEChannel로부터
-        Claude CLI stdout 이벤트를 클라이언트에 스트리밍한다.
-        기존 /events SSE와 완전히 독립된 채널을 사용한다.
+        From TerminalSSEChannel for path /terminal/events
+        Claude CLI Streams stdout events to the client.
+        It uses a completely independent channel from the existing /events SSE.
 
         method: GET
         url: /terminal/events
@@ -387,9 +387,9 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "status")
     def _handle_terminal_status(self) -> None:
-        """터미널 상태 조회 엔드포인트를 처리한다.
+        """Processes the terminal status inquiry endpoint.
 
-        GET /terminal/status: Claude 프로세스의 현재 상태를 JSON으로 응답한다.
+        GET /terminal/status: Returns the current status of the Claude process as JSON.
 
         method: GET
         url: /terminal/status
@@ -426,22 +426,22 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "sessions")
     def _handle_terminal_sessions(self) -> None:
-        """세션 목록 조회 엔드포인트를 처리한다.
+        """Processes the session list query endpoint.
 
-        GET /terminal/sessions: ~/.claude/projects/<project-path>/ 디렉터리에서
-        .jsonl 파일을 mtime 기준 내림차순으로 전수 스캔하여 JSON 배열로 반환한다.
-        각 파일에서 최초 유효 user 메시지를 파싱하여 title 필드를 추출한다.
-        유효 메시지가 없는 임시/초기화 세션은 결과에서 제외한다.
+        GET /terminal/sessions: from directory ~/.claude/projects/<project-path>/
+        All .jsonl files are scanned in descending order based on mtime and returned as a JSON array.
+        The title field is extracted by parsing the first valid user message from each file.
+        Temporary/initialized sessions without valid messages are excluded from the results.
 
-        응답 항목:
-            session_id: UUID (파일명에서 추출)
-            last_active: mtime 기반 ISO 8601 형식 시각
-            is_current: 현재 "running"인 세션과 일치 여부 (status != 'stopped')
-            is_last: ``.last-session-id`` 가 가리키는 마지막 세션 여부
-                     (stopped 상태에도 유지되는 복원 후보)
-            title: 첫 유효 user 메시지 (최대 100자)
-            branch: 세션 jsonl 의 마지막 ``gitBranch`` 값 (없으면 "")
-            size_bytes: jsonl 파일 크기 (바이트)
+        Response item:
+            session_id: UUID (extracted from file name)
+            last_active: mtime based ISO 8601 format time
+            is_current: Matches a session that is currently "running" (status != 'stopped')
+            is_last: Whether the last session indicated by ``.last-session-id``
+                     (Restore candidates that remain even in stopped state)
+            title: First valid user message (maximum 100 characters)
+            branch: Last ``gitBranch`` value of session jsonl ("" if not present)
+            size_bytes: jsonl file size (bytes)
 
         method: GET
         url: /terminal/sessions
@@ -463,9 +463,9 @@ class TerminalHandlerMixin:
         project_slug = project_root.replace('/', '-')
         sessions_dir = os.path.join(home_dir, '.claude', 'projects', project_slug)
 
-        # is_current = "Running now"인 세션. status == 'stopped' 인 경우
-        # .last-session-id 에서 복원된 session_id 는 'last session'(is_last)
-        # 이지 'current session'이 아니다.
+        # Session with is_current = "Running now". If status == 'stopped'
+        # The session_id restored from .last-session-id is 'last session' (is_last)
+        # This is not ‘current session’.
         last_session_id = claude_process.session_id
         current_session_id = (
             last_session_id if claude_process.status != 'stopped' else ''
@@ -518,11 +518,11 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "history")
     def _handle_terminal_history(self) -> None:
-        """세션 대화 히스토리 조회 엔드포인트를 처리한다.
+        """Processes session conversation history inquiry endpoint.
 
         GET /terminal/history?session_id=<uuid>[&since=<iso-timestamp>]:
-        ``~/.claude/projects/<project-slug>/<session_id>.jsonl`` 파일을 읽어
-        렌더 이벤트 배열로 반환한다.
+        Read the file ``~/.claude/projects/<project-slug>/<session_id>.jsonl``
+        Returns as a render event array.
 
         method: GET
         url: /terminal/history
@@ -536,16 +536,16 @@ class TerminalHandlerMixin:
         side_effects: read session jsonl file
         sse_events: none
 
-        jsonl 이벤트를 text / thinking / tool_use / tool_result 4종 kind로
-        전개하여 SSE 라이브와 동일한 입도로 복원한다. ``since`` 가 주어지면
-        해당 시점보다 timestamp 가 큰 이벤트만 반환한다 (재연결 gap 보충).
+        jsonl events in 4 types: text / thinking / tool_use / tool_result
+        Expand and restore to the same granularity as SSE Live. If ``since`` is given
+        Only events with timestamps larger than the relevant point in time are returned (supplementing the reconnection gap).
 
-        ``last_usage`` / ``last_cost_usd`` 필드는 ``since`` 와 무관하게
-        세션 전체에서 가장 최근 값을 반환한다. 재연결 시 클라이언트가
-        ``resetTokens()`` 로 0 초기화된 상태를 복원하기 위한 용도이므로
-        gap 여부와 관계없이 항상 현재 총계가 필요하기 때문이다.
+        The ``last_usage`` / ``last_cost_usd`` fields are independent of ``since``
+        Returns the most recent value across sessions. When reconnecting, the client
+        This is for restoring the state initialized to 0 with ``resetTokens()``.
+        This is because the current total is always needed regardless of whether there is a gap or not.
 
-        응답 스키마:
+        Response schema:
             {
               "session_id": "<uuid>",
               "last_timestamp": "<iso>",
@@ -845,10 +845,10 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "start")
     def _handle_terminal_start(self) -> None:
-        """터미널 세션 시작 엔드포인트를 처리한다.
+        """Handles the terminal session start endpoint.
 
-        POST /terminal/start: Claude CLI 프로세스를 시작한다.
-        요청 본문에 {"args": [...]} 형태로 추가 CLI 인자를 지정할 수 있다.
+        POST /terminal/start: Starts the Claude CLI process.
+        Additional CLI arguments can be specified in the request body in the form {"args": [...]}.
 
         method: POST
         url: /terminal/start
@@ -902,12 +902,12 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "input")
     def _handle_terminal_input(self) -> None:
-        """터미널 입력 전송 엔드포인트를 처리한다.
+        """Processes terminal input transmission endpoints.
 
-        POST /terminal/input: 사용자 메시지를 Claude CLI에 전송한다.
-        요청 본문: {"text": "user message"}
+        POST /terminal/input: Sends a user message to Claude CLI.
+        Request body: {"text": "user message"}
 
-        프로세스 미시작 시 409 Conflict를 반환한다.
+        If the process does not start, 409 Conflict is returned.
 
         method: POST
         url: /terminal/input
@@ -1008,11 +1008,11 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "kill")
     def _handle_terminal_kill(self) -> None:
-        """터미널 세션 종료 엔드포인트를 처리한다.
+        """Handles the terminal session termination endpoint.
 
-        POST /terminal/kill: Claude CLI 프로세스를 종료한다.
+        POST /terminal/kill: Terminates the Claude CLI process.
 
-        프로세스 미시작 시 409 Conflict를 반환한다.
+        If the process does not start, 409 Conflict is returned.
 
         method: POST
         url: /terminal/kill
@@ -1035,15 +1035,15 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "command")
     def _handle_terminal_command(self) -> None:
-        """슬래시 명령어 전달 엔드포인트를 처리한다.
+        """Processes the slash command delivery endpoint.
 
-        POST /terminal/command: 클라이언트에서 전송한 슬래시 명령어를 Claude CLI stdin에
-        전달한다. 기존 send_input() 메서드를 재사용하여 NDJSON 엔벨로프로 전송한다.
+        POST /terminal/command: Slash command sent from the client to Claude CLI stdin.
+        Deliver. Reuse the existing send_input() method to send with an NDJSON envelope.
 
-        요청 본문: {"command": "/clear"}
-        선택 필드: "session_id" (현재 미사용, 메인 세션 전용)
+        Request body: {"command": "/clear"}
+        Optional field: "session_id" (currently unused, main session only)
 
-        프로세스 미시작 시 409 Conflict를 반환한다.
+        If the process does not start, 409 Conflict is returned.
 
         method: POST
         url: /terminal/command
@@ -1087,16 +1087,16 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "permission")
     def _handle_terminal_permission(self) -> None:
-        """permission 요청에 대한 승인/거부 응답 엔드포인트를 처리한다.
+        """Processes approval/denial response endpoints for permission requests.
 
         POST /terminal/permission
-        요청 본문: {"request_id": "...", "decision": "allow"|"deny"}
-        선택 필드: "session_id" (워크플로우 세션용)
+        Request body: {"request_id": "...", "decision": "allow"|"deny"}
+        Optional field: "session_id" (for workflow sessions)
 
-        session_id가 있으면 workflow_registry에서 해당 세션의 프로세스를 사용하고,
-        없으면 claude_process(메인 터미널)를 사용한다.
+        If session_id is present, use the process of that session in workflow_registry,
+        If not, use claude_process (main terminal).
 
-        프로세스 미실행 시 409 Conflict, 잘못된 요청 시 400 Bad Request를 반환한다.
+        If the process is not executed, 409 Conflict is returned, and if an incorrect request is made, 400 Bad Request is returned.
 
         method: POST
         url: /terminal/permission
@@ -1144,19 +1144,19 @@ class TerminalHandlerMixin:
 
     @api_endpoint("T", "interrupt")
     def _handle_terminal_interrupt(self) -> None:
-        """현재 응답 생성 중단 엔드포인트를 처리한다.
+        """Handles the current response generation aborted endpoint.
 
-        POST /terminal/interrupt: Claude CLI 프로세스에 SIGINT를 전송한다.
-        프로세스를 종료하지 않고 현재 응답 생성만 중단한다.
+        POST /terminal/interrupt: Sends SIGINT to the Claude CLI process.
+        Does not terminate the process, but only stops generating the current response.
 
-        세션 보존 보장:
-        - 이 엔드포인트는 ``claude_process.interrupt()`` 호출만 수행한다.
+        Guaranteed session retention:
+        - This endpoint only performs calls to ``claude_process.interrupt()``.
         - ``claude_process._status``, ``claude_process._session_id``,
-          conversation history 등 세션 식별자나 상태 필드를 변경하지 않는다.
-        - 따라서 SIGINT 이후 클라이언트가 새로고침해도 conversation history 를
-          jsonl 에서 그대로 복원할 수 있다.
+          Do not change session identifiers or status fields such as conversation history.
+        - Therefore, even if the client refreshes after SIGINT, the conversation history
+          It can be restored as is in jsonl.
 
-        프로세스가 stopped 상태이면 409 Conflict를 반환한다.
+        If the process is stopped, 409 Conflict is returned.
 
         method: POST
         url: /terminal/interrupt

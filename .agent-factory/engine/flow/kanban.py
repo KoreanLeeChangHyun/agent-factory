@@ -1,10 +1,10 @@
 #!/usr/bin/env -S python3 -u
-"""kanban.py - 칸반 보드 상태 관리 CLI 라우터.
+"""kanban.py - Kanban board state management CLI router.
 
-XML 티켓 파일(.kanban/active/T-NNN.xml)을 Single Source of Truth(SSoT)로 사용한다.
-LLM 호출 없음 (순수 IO).
+Use the XML ticket file (.kanban/active/T-NNN.xml) as the Single Source of Truth (SSoT).
+No LLM calls (pure IO).
 
-사용법:
+Usage:
   python3 kanban.py create <title>
   python3 kanban.py move <ticket> <target>
   python3 kanban.py done <ticket>
@@ -19,10 +19,10 @@ LLM 호출 없음 (순수 IO).
   python3 kanban.py show <ticket>
   python3 kanban.py list [status]
 
-비즈니스 로직은 아래 모듈에 위임한다:
-  flow.ticket_repository  - XML CRUD, 파일 탐색, 유틸리티
-  flow.ticket_state        - 상태 전이 규칙, 상태 갱신
-  flow.kanban_cli          - 서브커맨드 구현, argparse 파서, dispatch
+Business logic is delegated to the modules below:
+  flow.ticket_repository - XML ​​CRUD, file navigation, utilities
+  flow.ticket_state - State transition rules, state updates
+  flow.kanban_cli - subcommand implementation, argparse parser, dispatch
 """
 
 from __future__ import annotations

@@ -1,21 +1,21 @@
-"""worktree_manager.py - Git worktree 격리 실행 관리 모듈.
+"""worktree_manager.py - Git worktree isolated execution management module.
 
-워크플로우별 독립 git worktree를 생성/삭제하고, feature 브랜치를
-develop에 병합하는 기능을 제공한다. branch_strategy.py에 의존한다.
+Create/delete independent git worktrees for each workflow and create feature branches
+Provides the function to merge into develop. Depends on branch_strategy.py.
 
-데이터 클래스:
-    WorktreeInfo: worktree 메타데이터
-    MergeResult: 병합 결과
+Data class:
+    WorktreeInfo: worktree metadata
+    MergeResult: merge result
 
-공개 API:
-    is_worktree_enabled: worktree 기능 활성화 여부 판단
-    create_worktree: 티켓용 worktree 생성
-    has_uncommitted_changes: worktree 경로의 미커밋 변경 여부 검사
-    count_feature_branch_commits: feature 브랜치의 커밋 수 반환 (워커 commit 누락 탐지)
-    remove_worktree: worktree 제거 (멱등)
-    merge_to_develop: feature 브랜치를 develop에 병합
-    list_worktrees: 활성 worktree 목록 조회
-    get_worktree_path: 티켓에 연결된 worktree 경로 조회
+Public API:
+    is_worktree_enabled: Determines whether worktree functionality is enabled
+    create_worktree: Create worktree for ticket
+    has_uncommitted_changes: Checks for uncommitted changes in the worktree path.
+    count_feature_branch_commits: Returns the number of commits in the feature branch (detection of missing worker commits)
+    remove_worktree: Remove worktree (idempotent)
+    merge_to_develop: Merge feature branch into develop
+    list_worktrees: List of active worktrees
+    get_worktree_path: Look up the worktree path associated with the ticket.
 """
 
 from __future__ import annotations
@@ -61,14 +61,14 @@ from flow.branch_strategy import (
 
 @dataclass
 class WorktreeInfo:
-    """worktree 메타데이터를 담는 데이터 클래스.
+    """A data class that contains worktree metadata.
 
     Attributes:
-        path: worktree 절대 경로.
-        branch_name: 연결된 feature 브랜치명 (예: feat/T-001-제목).
-        ticket_number: 티켓 번호 (예: T-001).
-        created_at: 생성 시각 (ISO 8601 형식).
-        base_branch: 기준 브랜치. 기본값 'develop'.
+        path: absolute path to the worktree.
+        branch_name: Connected feature branch name (e.g. feat/T-001-title).
+        ticket_number: Ticket number (e.g. T-001).
+        created_at: Creation time (ISO 8601 format).
+        base_branch: Base branch. Default 'develop'.
     """
 
     path: str
@@ -80,14 +80,14 @@ class WorktreeInfo:
 
 @dataclass
 class MergeResult:
-    """병합 결과를 담는 데이터 클래스.
+    """A data class that contains the merge results.
 
     Attributes:
-        success: 병합 성공 여부.
-        conflicts: 충돌 파일 목록 (실패 시).
-        merged_branch: 병합된 feature 브랜치명 (성공 시).
-        merge_commit: 병합 커밋 SHA (성공 시).
-        error_message: 에러 메시지 (실패 시).
+        success: Whether the merge was successful.
+        conflicts: List of conflicting files (in case of failure).
+        merged_branch: Merged feature branch name (if successful).
+        merge_commit: Merge commit SHA (if successful).
+        error_message: Error message (in case of failure).
     """
 
     success: bool
@@ -103,14 +103,14 @@ class MergeResult:
 def _git(
     *args: str, repo_path: str | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """git 명령을 실행하고 결과를 반환한다.
+    """Executes a git command and returns the results.
 
     Args:
-        *args: git 서브커맨드 및 인자.
-        repo_path: git 저장소 경로. None이면 resolve_project_root() 사용.
+        *args: git subcommands and arguments.
+        repo_path: Git repository path. If None, use resolve_project_root().
 
     Returns:
-        CompletedProcess 인스턴스.
+        CompletedProcess instance.
     """
     cwd = repo_path or resolve_project_root()
     return run_git(*args, repo_path=cwd, timeout=30)
@@ -122,45 +122,45 @@ def _get_project_root(repo_path: str | None = None) -> str:
 
 
 def _worktrees_base_dir(repo_path: str | None = None) -> str:
-    """worktree가 저장되는 상위 디렉터리 경로를 반환한다.
+    """Returns the path to the parent directory where the worktree is stored.
 
     Returns:
-        프로젝트 루트 아래 .worktrees/ 절대 경로.
+        Absolute path to .worktrees/ under the project root.
     """
     return str(worktrees_base_dir(_get_project_root(repo_path)))
 
 
 def _merge_lock_path(repo_path: str | None = None) -> str:
-    """병합 잠금 디렉터리 경로를 반환한다.
+    """Returns the merge lock directory path.
 
     Returns:
-        .git/worktree-merge.lockdir 절대 경로.
+        .git/worktree-merge.lockdir absolute path.
     """
     return str(merge_lock_path(_get_project_root(repo_path)))
 
 
 def _worktree_dir_name(branch_name: str) -> str:
-    """브랜치명을 worktree 디렉터리명으로 변환한다.
+    """Convert the branch name to the worktree directory name.
 
-    feat/T-NNN-제목 -> feat-T-NNN-제목 (슬래시를 하이픈으로).
+    feat/T-NNN-title -> feat-T-NNN-title (slash with hyphen).
 
     Args:
-        branch_name: feature 브랜치명.
+        branch_name: feature branch name.
 
     Returns:
-        디렉터리명 (슬래시 없음).
+        Directory name (no slash).
     """
     return worktree_dir_name(branch_name)
 
 
 def _get_current_branch(repo_path: str | None = None) -> str:
-    """현재 체크아웃된 브랜치명을 반환한다.
+    """Returns the currently checked out branch name.
 
     Args:
-        repo_path: git 저장소 경로.
+        repo_path: Git repository path.
 
     Returns:
-        현재 브랜치명. detached HEAD이면 빈 문자열.
+        Current branch name. Empty string if detached HEAD.
     """
     result = _git("rev-parse", "--abbrev-ref", "HEAD", repo_path=repo_path)
     if result.returncode != 0:
@@ -185,17 +185,17 @@ def _append_worktree_io(
     outcome: str,
     error_reason: str | None = None,
 ) -> None:
-    """worktree.io 이벤트를 metrics.jsonl에 기록한다.
+    """Record worktree.io events in metrics.jsonl.
 
-    work_dir 는 WORKFLOW_WORK_DIR 또는 _WF_WORK_DIR 환경변수에서 추출한다.
-    추출 실패 시 (워크플로우 외부 호출 등) silently skip.
-    모든 예외를 조용히 흡수하여 worktree_manager 동작에 영향을 주지 않는다.
+    work_dir is extracted from the WORKFLOW_WORK_DIR or _WF_WORK_DIR environment variable.
+    In case of extraction failure (external call to workflow, etc.), silently skip.
+    All exceptions are quietly absorbed and do not affect worktree_manager operation.
 
     Args:
-        op: 작업 종류 ('create' | 'remove' | 'merge').
-        duration_ms: 작업 소요 시간(ms).
-        outcome: 결과 ('ok' | 'fail').
-        error_reason: 실패 시 예외 메시지 (성공 시 None).
+        op: operation type ('create' | 'remove' | 'merge').
+        duration_ms: Time taken for the task (ms).
+        outcome: result ('ok' | 'fail').
+        error_reason: Exception message on failure (None on success).
     """
     try:
         work_dir: str | None = None
@@ -225,29 +225,29 @@ def _append_worktree_io(
 
 
 def is_worktree_enabled(repo_path: str | None = None) -> bool:
-    """worktree 기능 활성화 여부를 판단한다.
+    """Determines whether the worktree function is activated.
 
-    .agent-factory/.settings 의 WORKFLOW_WORKTREE 값을 단일 진실 공급원으로 사용한다 (T-370 후속).
+    Uses the WORKFLOW_WORKTREE value in .agent-factory/.settings as the single source of truth (T-370 successor).
 
-    제거된 폴백 경로:
-      - os.environ 의 WORKFLOW_WORKTREE — 환경변수와 .settings 의 이중 진실 공급원으로 인한
-        동기화 회귀를 차단한다.
-      - develop 브랜치 존재 여부 추론 — 단일 진실 공급원 원칙 준수, 추론 동작 일체 제거.
+    Removed fallback paths:
+      - WORKFLOW_WORKTREE in os.environ — due to dual sources of truth in environment variables and .settings
+        Prevent synchronization regression.
+      - Inferring the existence of a develop branch — Following the single source of truth principle, eliminating all inference operations.
 
-    부트스트랩 보장: build.sh + claude-env.tmpl 이 .settings 에 WORKFLOW_WORKTREE 항목을
-    자동으로 머지한다 (_merge_kv_settings KEY 매칭). 정상 환경에서는 raise 가 발생하지 않는다.
+    Bootstrap guarantee: build.sh + claude-env.tmpl has WORKFLOW_WORKTREE entry in .settings
+    Merge automatically (_merge_kv_settings KEY matching). In a normal environment, raise does not occur.
 
-    활성화 표현: "true", "1", "yes", "on" -> True.
-    비활성화 표현: "false", "0", "no", "off" -> False.
+    Activation expression: "true", "1", "yes", "on" -> True.
+    Disable expression: "false", "0", "no", "off" -> False.
 
     Args:
-        repo_path: git 저장소 경로 (호환성 유지용 — 현재 미사용).
+        repo_path: Git repository path (to maintain compatibility — currently unused).
 
     Returns:
-        worktree 기능 활성화 여부.
+        Whether to enable the worktree feature.
 
     Raises:
-        RuntimeError: .settings 에 WORKFLOW_WORKTREE 가 미설정이거나 유효하지 않은 값일 때.
+        RuntimeError: When WORKFLOW_WORKTREE is not set in .settings or is an invalid value.
     """
     # .settings Single Source of Truth (T-370 successor) — Remove all inference fallbacks
     setting_val = read_env("WORKFLOW_WORKTREE") or None
@@ -277,20 +277,20 @@ def create_worktree(
     repo_path: str | None = None,
     command: str = "implement",
 ) -> WorktreeInfo | None:
-    """티켓용 worktree를 생성한다.
+    """Create a worktree for tickets.
 
-    develop 브랜치를 확보하고, feature 브랜치를 생성한 후,
-    git worktree add로 격리된 작업 디렉터리를 만든다.
+    After securing the develop branch and creating the feature branch,
+    Create an isolated working directory with git worktree add.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        title: 티켓 제목.
-        base_branch: 기준 브랜치. 기본값 'develop'.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
-        command: 워크플로우 커맨드. 'implement'가 아니면 생성을 거부한다.
+        ticket_number: Ticket number (e.g. 'T-001').
+        title: Ticket title.
+        base_branch: Base branch. Default 'develop'.
+        repo_path: Git repository path. If None, use the project root.
+        command: Workflow command. If it is not 'implement', the creation is refused.
 
     Returns:
-        생성된 WorktreeInfo. 실패 시 None + 경고 출력.
+        Created WorktreeInfo. None + warning output in case of failure.
     """
     _t0 = time.monotonic()
     try:
@@ -316,17 +316,17 @@ def _create_worktree_impl(
     repo_path: str | None = None,
     command: str = "implement",
 ) -> WorktreeInfo | None:
-    """create_worktree 실제 구현 (metrics timing 래퍼와 분리).
+    """create_worktree Actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        title: 티켓 제목.
-        base_branch: 기준 브랜치. 기본값 'develop'.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
-        command: 워크플로우 커맨드. 'implement'가 아니면 생성을 거부한다.
+        ticket_number: Ticket number (e.g. 'T-001').
+        title: Ticket title.
+        base_branch: Base branch. Default 'develop'.
+        repo_path: Git repository path. If None, use the project root.
+        command: Workflow command. If it is not 'implement', the creation is refused.
 
     Returns:
-        생성된 WorktreeInfo. 실패 시 None + 경고 출력.
+        Created WorktreeInfo. None + warning output in case of failure.
     """
     # Command defense: Refuse to create worktrees other than implement.
     if command not in ("implement",):
@@ -392,17 +392,17 @@ def _create_worktree_impl(
 
 
 def has_uncommitted_changes(worktree_path: str) -> bool:
-    """worktree 경로에 미커밋 변경이 있는지 검사한다.
+    """Check whether there are uncommitted changes in the worktree path.
 
-    ``git status --porcelain`` 출력이 비어있지 않으면 미커밋 변경이 있음을
-    의미한다. 경로가 존재하지 않거나 git 명령 실행에 실패한 경우 False를
-    반환하여 false positive를 방지한다.
+    ``git status --porcelain`` If the output is not empty, it means there are uncommitted changes.
+    It means. False if the path does not exist or the git command execution failed.
+    Return to prevent false positives.
 
     Args:
-        worktree_path: 검사할 worktree 디렉터리 경로.
+        worktree_path: Worktree directory path to check.
 
     Returns:
-        미커밋 변경이 있으면 True, 없거나 검사 불가 시 False.
+        True if there are uncommitted changes, False if there are none or inspection is not possible.
     """
     result = _git("status", "--porcelain", repo_path=worktree_path)
     if result.returncode != 0:
@@ -415,24 +415,24 @@ def count_feature_branch_commits(
     base_branch: str = "develop",
     repo_path: str | None = None,
 ) -> int:
-    """feature 브랜치에서 base_branch 이후 누적된 커밋 수를 반환한다.
+    """Returns the number of commits accumulated since base_branch in the feature branch.
 
-    ``git rev-list --count <base_branch>..<branch_name>`` 를 실행하여
-    feature 브랜치가 base_branch 분기점 이후 만든 커밋 수를 계산한다.
+    Run ``git rev-list --count <base_branch>..<branch_name>``
+    Calculate the number of commits the feature branch made after the base_branch branch point.
 
-    워커 commit 누락 탐지 신호로 사용된다:
-      - 0: 워커가 커밋을 한 건도 만들지 않은 상태 (commit 누락 신호)
-      - 양수: 정상 (커밋이 존재)
-      - -1: 검사 불가 (브랜치 미존재, base_branch 미존재 등) — 호출자는
-            이 경우 차단하지 않고 통과시켜야 한다 (false-positive 방지).
+    It is used as a worker commit missing detection signal:
+      - 0: State in which the worker has not made a single commit (commit missing signal)
+      - Positive number: normal (commit exists)
+      - -1: Cannot be checked (branch does not exist, base_branch does not exist, etc.) — the caller must
+            In this case, it must be passed rather than blocked (preventing false-positives).
 
     Args:
-        branch_name: 커밋 수를 셀 feature 브랜치명 (예: 'feat/T-001-title').
-        base_branch: 기준 브랜치. 기본값 'develop'.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        branch_name: The feature branch name to count the number of commits (e.g. 'feat/T-001-title').
+        base_branch: Base branch. Default 'develop'.
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        커밋 수 (0 이상의 정수). 검사 불가 시 -1.
+        Number of commits (an integer greater than or equal to 0). -1 if inspection is not possible.
     """
     result = _git(
         "rev-list", "--count", f"{base_branch}..{branch_name}",
@@ -451,19 +451,19 @@ def remove_worktree(
     delete_branch: bool = True,
     repo_path: str | None = None,
 ) -> bool:
-    """티켓에 연결된 worktree를 제거한다.
+    """Removes the worktree connected to the ticket.
 
-    멱등 동작: 이미 제거되었으면 True를 반환한다.
-    delete_branch=True이면 feature 브랜치도 삭제한다.
-    실패 시 False + 경고만 출력하며 프로세스를 종료하지 않는다.
+    Idempotent behavior: returns True if it has already been removed.
+    If delete_branch=True, the feature branch is also deleted.
+    In case of failure, only False + warning is output and the process is not terminated.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        delete_branch: feature 브랜치도 삭제할지 여부. 기본값 True.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket_number: Ticket number (e.g. 'T-001').
+        delete_branch: Whether to also delete the feature branch. Default True.
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        제거 성공(또는 이미 없음) 시 True, 실패 시 False.
+        True if the removal was successful (or not already there), False if it failed.
     """
     _t0 = time.monotonic()
     try:
@@ -483,15 +483,15 @@ def _remove_worktree_impl(
     delete_branch: bool = True,
     repo_path: str | None = None,
 ) -> bool:
-    """remove_worktree 실제 구현 (metrics timing 래퍼와 분리).
+    """remove_worktree Actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        delete_branch: feature 브랜치도 삭제할지 여부. 기본값 True.
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket_number: Ticket number (e.g. 'T-001').
+        delete_branch: Whether to also delete the feature branch. Default True.
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        제거 성공(또는 이미 없음) 시 True, 실패 시 False.
+        True if the removal was successful (or not already there), False if it failed.
     """
     ticket_number = normalize_ticket_number(ticket_number)
 
@@ -537,18 +537,18 @@ def _remove_worktree_impl(
 def merge_to_develop(
     ticket_number: str, repo_path: str | None = None
 ) -> MergeResult:
-    """feature 브랜치를 develop에 --no-ff 병합한다.
+    """Merge the feature branch into develop with --no-ff.
 
-    mkdir 기반 잠금으로 동시 병합을 방지하며, 충돌 시 자동으로
-    git merge --abort를 수행한다. 병합 성공 후 worktree와
-    feature 브랜치를 정리한다.
+    Prevents simultaneous merges with mkdir-based locking, and automatically
+    Execute git merge --abort. After a successful merge, the worktree and
+    Organize the feature branch.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket_number: Ticket number (e.g. 'T-001').
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        MergeResult 인스턴스.
+        MergeResult instance.
     """
     _t0 = time.monotonic()
     try:
@@ -567,14 +567,14 @@ def merge_to_develop(
 def _merge_to_develop_impl(
     ticket_number: str, repo_path: str | None = None
 ) -> MergeResult:
-    """merge_to_develop 실제 구현 (metrics timing 래퍼와 분리).
+    """merge_to_develop actual implementation (separate from metrics timing wrapper).
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket_number: Ticket number (e.g. 'T-001').
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        MergeResult 인스턴스.
+        MergeResult instance.
     """
     ticket_number = normalize_ticket_number(ticket_number)
 
@@ -695,16 +695,16 @@ _SENTINEL_UNKNOWN_CONFLICT: str = "<unknown-conflict>"
 
 
 def _parse_porcelain_conflicts(stdout: str) -> list[str]:
-    """``git status --porcelain`` 출력에서 충돌 파일 목록을 파싱한다.
+    """Parse the list of conflicting files from the ``git status --porcelain`` output.
 
-    XY 형식의 porcelain 상태 코드 중 충돌 코드(UU, AA, DD, AU, UA, DU, UD)가
-    포함된 행만 필터링하여 파일 경로를 반환한다.
+    Among the porcelain status codes in XY format, the conflict codes (UU, AA, DD, AU, UA, DU, UD) are
+    Returns the file path by filtering only the included rows.
 
     Args:
-        stdout: ``git status --porcelain`` 의 표준 출력 문자열.
+        stdout: The standard output string of ``git status --porcelain``.
 
     Returns:
-        충돌 파일 경로 목록. 충돌 없으면 빈 리스트.
+        List of conflicting file paths. An empty list if there are no conflicts.
 
     Examples:
         >>> _parse_porcelain_conflicts("UU foo.py\\nAA bar.py\\n M baz.py\\n")
@@ -723,28 +723,28 @@ def _parse_porcelain_conflicts(stdout: str) -> list[str]:
 
 
 def _detect_conflicts(repo_path: str | None = None) -> list[str]:
-    """병합 충돌 파일 목록을 반환한다.
+    """Returns a list of merge conflict files.
 
-    두 단계 소스로 충돌 파일을 탐지하며, 모든 소스 실패 시 sentinel을 반환한다.
+    Conflicting files are detected with a two-step source, and a sentinel is returned if all sources fail.
 
-    | 단계 | 소스 | 조건 |
+    | steps | Source | Conditions |
     |------|------|------|
-    | 1차  | ``git diff --name-only --diff-filter=U`` | 항상 시도. 결과 비면 2차로 진행 |
-    | 2차  | ``git status --porcelain`` (UU/AA/DD/AU/UA/DU/UD) | 1차 결과가 빈 리스트일 때만 시도 |
-    | sentinel | ``["<unknown-conflict>"]`` | 두 소스 모두 returncode != 0 일 때 반환 |
+    | 1st | ``git diff --name-only --diff-filter=U`` | Always try. If the result is empty, proceed to the second round |
+    | 2nd | ``git status --porcelain`` (UU/AA/DD/AU/UA/DU/UD) | Try only if the primary result is an empty list |
+    | sentinel | ``["<unknown-conflict>"]`` | Both sources return when returncode != 0 |
 
-    1차 소스가 결과를 반환하면 바로 리턴(2차 시도 없음).
-    1차 성공 + 빈 리스트이면 2차 시도. 2차도 성공하면 두 결과의 합집합(중복 제거).
-    1차와 2차 모두 returncode != 0 이면 ``["<unknown-conflict>"]`` sentinel 반환.
+    Return immediately when the primary source returns a result (no secondary attempt).
+    1st success + 2nd attempt if empty list. If the second round is also successful, the two results are combined (removing duplicates).
+    If returncode != 0 for both the first and second, ``["<unknown-conflict>"]`` sentinel is returned.
 
-    sentinel 의미: 충돌이 발생했지만 파일 목록을 확인할 수 없는 상태.
-    호출자는 ``"<unknown-conflict>" in conflicts`` 로 sentinel을 구분할 수 있다.
+    sentinel Meaning: A conflict has occurred, but the file list cannot be checked.
+    The caller can distinguish sentinels with ``"<unknown-conflict>" in conflicts``.
 
     Args:
-        repo_path: git 저장소 경로.
+        repo_path: Git repository path.
 
     Returns:
-        충돌 파일 경로 목록. 모든 git 명령 실패 시 sentinel ``["<unknown-conflict>"]``.
+        List of conflicting file paths. sentinel ``["<unknown-conflict>"]`` if any git command fails.
     """
     # Primary source: git diff --name-only --diff-filter=U
     diff_result = _git(
@@ -785,16 +785,16 @@ def _detect_conflicts(repo_path: str | None = None) -> list[str]:
 
 
 def list_worktrees(repo_path: str | None = None) -> list[WorktreeInfo]:
-    """활성 worktree 목록을 반환한다.
+    """Returns a list of active worktrees.
 
-    git worktree list --porcelain 출력을 파싱하여 프로젝트 내
-    feature worktree만 필터링한다.
+    git worktree list --porcelain Parse the output and place it within your project.
+    Filter only the feature worktree.
 
     Args:
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        WorktreeInfo 리스트. 파싱 실패 시 빈 리스트.
+        WorktreeInfo list. Empty list if parsing fails.
     """
     result = _git("worktree", "list", "--porcelain", repo_path=repo_path)
     if result.returncode != 0:
@@ -830,17 +830,17 @@ def list_worktrees(repo_path: str | None = None) -> list[WorktreeInfo]:
 def _parse_worktree_block(
     block: dict[str, str], base_dir: str
 ) -> WorktreeInfo | None:
-    """porcelain 블록을 WorktreeInfo로 파싱한다.
+    """Parse the porcelain block into WorktreeInfo.
 
-    feature worktree만 반환하며 (feat/T-NNN-* 패턴), 메인 worktree는
-    필터링한다.
+    Only the feature worktree is returned (feat/T-NNN-* pattern), and the main worktree is
+    Filter.
 
     Args:
-        block: porcelain 파싱 중간 결과 딕셔너리.
-        base_dir: .worktrees/ 디렉터리 절대 경로.
+        block: porcelain parsing intermediate result dictionary.
+        base_dir: Absolute path to the .worktrees/ directory.
 
     Returns:
-        WorktreeInfo 또는 None (feature worktree가 아닌 경우).
+        WorktreeInfo or None (if not a feature worktree).
     """
     wt_path = block.get("path", "")
     branch_ref = block.get("branch", "")
@@ -871,17 +871,17 @@ def _parse_worktree_block(
 def get_worktree_path(
     ticket_number: str, repo_path: str | None = None
 ) -> str | None:
-    """티켓에 연결된 worktree 절대 경로를 반환한다.
+    """Returns the absolute path to the worktree connected to the ticket.
 
-    list_worktrees() 결과에서 티켓 번호로 검색하거나,
-    feature 브랜치명으로 경로를 추론한다.
+    Search by ticket number in list_worktrees() results, or
+    Infer the path from the feature branch name.
 
     Args:
-        ticket_number: 티켓 번호 (예: 'T-001').
-        repo_path: git 저장소 경로. None이면 프로젝트 루트 사용.
+        ticket_number: Ticket number (e.g. 'T-001').
+        repo_path: Git repository path. If None, use the project root.
 
     Returns:
-        worktree 절대 경로 또는 None.
+        worktree absolute path or None.
     """
     ticket_number = normalize_ticket_number(ticket_number)
 

@@ -70,7 +70,6 @@
   // Not synchronized with other browsers/ devices (localStorage only).
   const TODO_MANUAL_ORDER_LS_KEY = "kanban_todo_manual_order_v1";
   const WR_FORM_STATE_KEY = "agent-factory-workrequest-form-expanded";
-
   function loadTodoManualOrder() {
     try {
       const stored = JSON.parse(localStorage.getItem(TODO_MANUAL_ORDER_LS_KEY));
@@ -187,13 +186,13 @@
       + '<section class="wr-author' + (expanded ? ' expanded' : '') + '">'
       + '<div class="wr-author-head">'
       + '<div><div class="wr-author-title">' + esc(PRODUCT_LABELS.workRequest) + ' Console</div>'
-      + '<div class="wr-author-meta">Create, refine, and accept requests before execution.</div></div>'
+      + '<div class="wr-author-meta">Create, refine, and accept work items before execution.</div></div>'
       + '<button class="wr-author-toggle" type="button">' + (expanded ? 'Hide' : 'Author') + '</button>'
       + '</div>'
       + '<form class="wr-author-form">'
       + '<div class="wr-author-grid wr-author-grid-top">'
       + '<label>Existing ID<input name="ticket" placeholder="T-520"></label>'
-      + '<label>Title<input name="title" placeholder="Short request title"></label>'
+      + '<label>Title<input name="title" placeholder="Short work item title"></label>'
       + '<label>Mode<select name="command"><option value="implement">Execute</option><option value="research">Research</option><option value="review">Review</option></select></label>'
       + '<label>Initial state<select name="status"><option value="todo">Draft</option><option value="open">Accepted</option></select></label>'
       + '</div>'
@@ -2517,7 +2516,7 @@
           Board.util.showInfoModal("Rework failed", "Pre-work failed:" + ((r.body && r.body.error) || "Unknown Errors"), { severity: "error", onClose: function () { renderKanban(); } });
         }
       }).catch(function (err) {
-        Board.util.showInfoModal("Rework failed", "Rework request failed:" + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
+        Board.util.showInfoModal("Rework failed", "Rework work item failed:" + (err && err.message ? err.message : err), { severity: "error", onClose: function () { renderKanban(); } });
       });
     });
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env -S python3 -u
-"""research/review 세션 Write/Edit/Bash 차단 가드 Hook 스크립트.
+"""research/review session Write/Edit/Bash blocking guard Hook script.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션이고
-활성 워크플로우의 command가 research 또는 review이면 코드 수정을 차단한다.
+In the PreToolUse(Write|Edit|Bash) event, the current session is the workflow session and
+If the command of the active workflow is research or review, code modification is blocked.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 research/review 세션 Write/Edit/Bash 차단
+Main functions:
+    main: Hook entry point, parse stdin JSON and block research/review session Write/Edit/Bash
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_READONLY_SESSION_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_READONLY_SESSION_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -66,10 +66,10 @@ _MEMORY_DIR_PATTERN: re.Pattern[str] = re.compile(
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -83,13 +83,13 @@ def _deny(reason: str) -> None:
 
 
 def _get_workflow_command() -> str | None:
-    """활성 워크플로우의 command 필드를 반환한다.
+    """Returns the command field of the active workflow.
 
-    WORKFLOW_WORK_DIR 환경변수를 먼저 확인하고,
-    없으면 .workflow/ 디렉터리를 스캔하여 가장 최근 .context.json을 읽는다.
+    Check the WORKFLOW_WORK_DIR environment variable first,
+    If not, it scans the .workflow/ directory and reads the most recent .context.json.
 
     Returns:
-        command 문자열. 조회 실패 시 None.
+        command string. None if search fails.
     """
     project_root = resolve_project_root()
 
@@ -138,13 +138,13 @@ def _get_workflow_command() -> str | None:
 
 
 def _strip_quoted_args(command: str) -> str:
-    """명령 문자열에서 따옴표로 감싼 영역의 내용을 빈 문자열로 치환한다.
+    """Replaces the contents of the area surrounded by quotation marks in the command string with an empty string.
 
     Args:
-        command: Bash 도구의 원본 command 문자열
+        command: Original command string from Bash tool
 
     Returns:
-        따옴표 내부 내용이 제거된 문자열.
+        A string with the content inside the quotes removed.
     """
     command = re.sub(r'"(?:[^"\\]|\\.)*"', '""', command)
     command = re.sub(r"'(?:[^'\\]|\\.)*'", "''", command)
@@ -152,30 +152,30 @@ def _strip_quoted_args(command: str) -> str:
 
 
 def _extract_command_positions(command: str) -> list[str]:
-    """명령 문자열을 파이프/체인 구분자로 분할하여 세그먼트 목록을 반환한다.
+    """Splits the command string by the pipe/chain delimiter and returns a list of segments.
 
     Args:
-        command: 따옴표 strip이 완료된 명령 문자열
+        command: command string complete with quoted strip
 
     Returns:
-        각 세그먼트의 선행 공백이 제거된 문자열 목록.
+        A list of strings with leading spaces removed from each segment.
     """
     parts = re.split(r'&&|\|\||(?<!\|)\|(?!\|)|;', command)
     return [part.lstrip() for part in parts if part.strip()]
 
 
 def _is_bash_file_modify(command: str) -> bool:
-    """Bash 명령에서 파일 수정 패턴 포함 여부를 검사한다.
+    """Checks whether a file modification pattern is included in the Bash command.
 
-    따옴표로 감싼 인자 영역을 먼저 제거한 뒤,
-    파이프/체인 구분자로 세그먼트를 분할하여
-    각 세그먼트에서 _BASH_FILE_MODIFY_PATTERNS 패턴을 검사한다.
+    After first removing the argument area surrounded by quotation marks,
+    Divide segments with pipe/chain separators
+    Check the _BASH_FILE_MODIFY_PATTERNS pattern in each segment.
 
     Args:
-        command: Bash 도구의 command 문자열
+        command: Command string of Bash tool
 
     Returns:
-        파일 수정 패턴이 매칭되면 True, 아니면 False.
+        True if the file modification pattern matches, False otherwise.
     """
     stripped = _strip_quoted_args(command)
     segments = _extract_command_positions(stripped)
@@ -187,28 +187,28 @@ def _is_bash_file_modify(command: str) -> bool:
 
 
 def _is_workflow_path(file_path: str) -> bool:
-    """파일 경로가 .workflow/ 하위인지 확인한다.
+    """Check whether the file path is under .workflow/.
 
     Args:
-        file_path: 검사할 파일 경로
+        file_path: File path to check
 
     Returns:
-        .workflow/ 하위 경로이면 True.
+        True if it is a .workflow/ subpath.
     """
     return bool(_WORKFLOW_PATH_PATTERN.search(file_path))
 
 
 def _is_memory_path(path: str) -> bool:
-    """파일 경로가 사용자 메모리 디렉터리 하위인지 확인한다.
+    """Check whether the file path is under the user memory directory.
 
-    ~/.claude/projects/<encoded>/memory/ 또는 그 하위 경로를 매칭한다.
-    main_session_guard.py와 동일한 로직.
+    Matches ~/.claude/projects/<encoded>/memory/ or its subpath.
+    Same logic as main_session_guard.py.
 
     Args:
-        path: 검사할 파일 경로 (절대경로 또는 ~ 시작 경로)
+        path: File path to check (absolute path or ~start path)
 
     Returns:
-        메모리 디렉터리 하위 경로이면 True, 아니면 False.
+        True if it is a subpath of the memory directory, False otherwise.
     """
     if not path:
         return False
@@ -217,14 +217,14 @@ def _is_memory_path(path: str) -> bool:
 
 
 def main() -> None:
-    """research/review 세션 Write/Edit/Bash 차단 Hook의 진입점.
+    """Research/review session Write/Edit/Bash Blocking Hook's entry point.
 
-    stdin에서 JSON을 읽어 Write/Edit/Bash 도구 사용 시 현재 세션이
-    워크플로우 세션이고 command가 research/review이면
-    deny 응답을 출력하여 코드 수정을 차단한다.
+    When using Write/Edit/Bash tools by reading JSON from stdin, the current session
+    If it is a workflow session and the command is research/review,
+    Blocks code modification by outputting a deny response.
 
-    비워크플로우 세션에서는 무조건 통과한다.
-    .workflow/ 하위 파일 Write/Edit는 허용한다.
+    In non-workflow sessions, it unconditionally passes.
+    Write/Edit of .workflow/ subfiles is allowed.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_READONLY_SESSION_GUARD") or read_env("HOOK_READONLY_SESSION_GUARD")

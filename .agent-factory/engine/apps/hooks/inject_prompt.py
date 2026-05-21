@@ -1,15 +1,15 @@
 #!/usr/bin/env -S python3 -u
-"""inject_prompt.py - SessionStart hook으로 워크플로우 세션 전용 system-prompt를 주입한다.
+"""inject_prompt.py - Injects a system-prompt dedicated to the workflow session with the SessionStart hook.
 
-T-483 (2026-05-13): system-prompt-wf.xml 폐기 + SKILL.md 직접 inject 로 통합.
-워크플로우 세션의 system prompt = .claude/skills/workflow-orchestration/SKILL.md
-(frontmatter 제거 후 본문). 워크플로우 엔진 실행에 필요한 SKILL.md 가 이미 매
-세션 로드되어야 하므로 단일 진실 공급원으로 통합.
+T-483 (2026-05-13): Discard system-prompt-wf.xml + integrate SKILL.md directly with inject.
+system prompt in workflow session = .claude/skills/workflow-orchestration/SKILL.md
+(Body after frontmatter removal). The SKILL.md required to run the workflow engine has already been installed.
+Must be session loaded, so consolidated into a single source of truth.
 
-동작:
-  - 워크플로우 세션 판별 (session_identifier.is_workflow_session) → 아닌 경우 즉시 종료
-  - .claude/skills/workflow-orchestration/SKILL.md 본문(frontmatter 제거) 을 stdout 출력
-  - 활성 티켓(T-NNN) 감지 시 <ticket-prefix> XML 블록 추가 inject
+movement:
+  - Determine workflow session (session_identifier.is_workflow_session) → If not, terminate immediately
+  - Output .claude/skills/workflow-orchestration/SKILL.md body (frontmatter removed) to stdout
+  - Add <ticket-prefix> XML block when detecting an active ticket (T-NNN) inject
 """
 
 from __future__ import annotations
@@ -29,31 +29,31 @@ from engine.flow.session_identifier import is_workflow_session, get_session_tick
 
 
 def _extract_ticket_id() -> str | None:
-    """현재 세션의 활성 티켓 ID(T-NNN)를 반환한다.
+    """Returns the active ticket ID (T-NNN) of the current session.
 
-    session_identifier.get_session_ticket_id()에 위임한다.
+    Delegates to session_identifier.get_session_ticket_id().
 
     Returns:
-        티켓 ID 문자열 (예: "T-001"). 워크플로우 세션이 아니거나 추출 실패 시 None.
+        Ticket ID string (e.g. "T-001"). None if not in a workflow session or if extraction fails.
     """
     return get_session_ticket_id()
 
 
 def _is_workflow_session() -> bool:
-    """현재 세션이 워크플로우 세션인지 판별한다.
+    """Determines whether the current session is a workflow session.
 
-    session_identifier.is_workflow_session()에 위임한다.
+    Delegates to session_identifier.is_workflow_session().
 
     Returns:
-        워크플로우 세션이면 True, 그 외 False.
+        True if it is a workflow session, False otherwise.
     """
     return is_workflow_session()
 
 
 def _strip_frontmatter(content: str) -> str:
-    """SKILL.md 의 YAML frontmatter (--- ... ---) 를 제거하고 본문만 반환한다.
+    """Remove YAML frontmatter (--- ... ---) from SKILL.md and return only the body.
 
-    frontmatter 가 없으면 원본 그대로 반환.
+    If frontmatter is not present, the original is returned.
     """
     if not content.startswith("---\n"):
         return content
@@ -65,10 +65,10 @@ def _strip_frontmatter(content: str) -> str:
 
 
 def main() -> None:
-    """세션 유형을 판별하고 워크플로우 세션일 때만 SKILL.md 본문을 stdout에 출력한다.
+    """Determines the session type and outputs the SKILL.md body to stdout only when it is a workflow session.
 
-    메인 세션(워크플로우 세션이 아닌 경우)에서는 아무것도 출력하지 않고 즉시 종료한다.
-    메인 세션 정책은 CLAUDE.md + .claude/rules/workflow.md 가 담당한다.
+    The main session (if it is not a workflow session) ends immediately without outputting anything.
+    The main session policy is handled by CLAUDE.md + .claude/rules/workflow.md.
     """
     project_root = resolve_project_root()
 

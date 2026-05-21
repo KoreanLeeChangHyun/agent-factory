@@ -1,18 +1,18 @@
-"""messages.py - guard 스크립트에서 사용하는 사용자 대면 메시지 상수 모듈.
+"""messages.py - User-facing message constants module used by guard scripts.
 
-이 모듈은 순수 상수만 정의하며, 다른 모듈을 import하지 않는 leaf 모듈입니다.
-플레이스홀더가 있는 메시지는 .format() 메서드로 치환하여 사용합니다.
+This module is a leaf module that defines only pure constants and does not import any other modules.
+Messages with placeholders are used by replacing them with the .format() method.
 
-주요 상수 그룹:
-    MAIN_SESSION_*: main_session_guard.py 사용 메시지
-    AGENT_INVESTIGATION_*: agent_investigation_guard.py 사용 메시지
-    KANBAN_*: kanban_subcommand_guard.py 사용 메시지
-    HOOKS_*: hooks_self_guard.py 사용 메시지
-    MAIN_BRANCH_*: main_branch_guard.py 사용 메시지
-    READONLY_SESSION_*: readonly_session_guard.py 사용 메시지
-    DIRECT_PATH_*: direct_path_guard.py 사용 메시지
-    WORKTREE_PATH_*: worktree_path_guard.py 사용 메시지
-    WORKTREE_REMOVE_*: worktree_remove_guard.py 사용 메시지
+Main constant groups:
+    MAIN_SESSION_*: messages using main_session_guard.py
+    AGENT_INVESTIGATION_*: message using agent_investigation_guard.py
+    KANBAN_*: kanban_subcommand_guard.py usage messages
+    HOOKS_*: hooks_self_guard.py usage message
+    MAIN_BRANCH_*: main_branch_guard.py usage messages
+    READONLY_SESSION_*: messages using readonly_session_guard.py
+    DIRECT_PATH_*: messages using direct_path_guard.py
+    WORKTREE_PATH_*: worktree_path_guard.py usage message
+    WORKTREE_REMOVE_*: Messages using worktree_remove_guard.py
 """
 
 from __future__ import annotations
@@ -74,9 +74,9 @@ KANBAN_INVALID_SUBCOMMAND: str = (
     "flow-kanban update-prompt T-001 --goal 'goal' # Update prompt field \n \n"
     "Please refer to the example above instead of '{subcommand}'."
 )
-"""플레이스홀더: {subcommand} - 사용된 유효하지 않은 서브커맨드, {valid_list} - 허용 서브커맨드 목록.
+"""Placeholders: {subcommand} - invalid subcommands used, {valid_list} - list of allowed subcommands.
 
-메시지 포맷: 차단 알림 + 유효 서브커맨드 목록 + 올바른 사용 예시(move/update-title/done/update-prompt) + 수정 안내."""
+Message format: Block notification + list of valid subcommands + examples of correct use (move/update-title/done/update-prompt) + modification instructions."""
 
 KANBAN_SUBMIT_REMOVED: str = (
     "Submit step has been removed (T-399)."
@@ -149,10 +149,10 @@ WORKTREE_PATH_WRITE_EDIT_DENIED: str = (
     "Current file: {file_path} \n"
     "Path in worktree: {suggested_path}"
 )
-"""플레이스홀더:
-    {worktree_path}   - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
-    {file_path}       - 차단된 파일 절대경로
-    {suggested_path}  - 워크트리 내 대응 경로 (파일명 기준 추천 경로)
+"""Placeholder:
+    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-T-NNN-...)
+    {file_path} - Absolute path to blocked file
+    {suggested_path} - Corresponding path in the work tree (recommended path based on file name)
 """
 
 WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
@@ -160,8 +160,8 @@ WORKTREE_PATH_BASH_MODIFY_DENIED: str = (
     "Operate on the worktree path: {worktree_path} \n"
     "Run the command after cd {worktree_path}."
 )
-"""플레이스홀더:
-    {worktree_path} - 워크트리 절대경로 (예: /home/.../worktrees/feat-T-NNN-...)
+"""Placeholder:
+    {worktree_path} - Absolute worktree path (e.g. /home/.../worktrees/feat-T-NNN-...)
 """
 
 # =============================================================================

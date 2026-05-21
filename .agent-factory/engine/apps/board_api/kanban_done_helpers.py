@@ -15,12 +15,12 @@ from engine.apps.board_api.kanban_done_re import (
 
 def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
                               project_root: str, flow_kanban: str) -> None:
-    """force=True 분기: Open → Done 직접 전이.
+    """force=True branch: Open → Done direct transition.
 
-    1. open/<ticket>.xml 존재 검증
-    2. dirty 워크트리 가드 (force_dirty=false 면 409 차단)
-    3. flow-kanban move <ticket> done --force 호출
-    4. worktree_manager.remove_worktree 로 워크트리/브랜치 정리
+    1. Verify the existence of open/<ticket>.xml
+    2. Dirty work tree guard (blocks 409 if force_dirty=false)
+    3. call flow-kanban move <ticket> done --force
+    4. Clean up the work tree/branch with worktree_manager.remove_worktree
     """
     open_xml = os.path.join(
         project_root, '.agent-factory', 'tickets', 'open', f'{ticket}.xml',
@@ -111,11 +111,11 @@ def handle_kanban_done_force(handler, ticket: str, force_dirty: bool,
 
 def handle_kanban_done_review(handler, ticket: str,
                                project_root: str, flow_kanban: str) -> None:
-    """force=False 분기: Review → Done 전이.
+    """force=False Branch: Review → Done transition.
 
-    1. review/<ticket>.xml 존재 검증 (os.path.isfile — dict→list 회귀 fix)
-    2. flow-kanban done <ticket> 호출
-    3. stdout 파싱 — merge_commit / merge_skipped / error_kind 분류
+    1. Review/<ticket>.xml existence verification (os.path.isfile — dict→list regression fix)
+    2. Call flow-kanban done <ticket>
+    3. stdout parsing — merge_commit / merge_skipped / error_kind classification
     """
     # Pre-check review status — Determined by the presence of ticket XML in the review/ directory
     review_xml = os.path.join(

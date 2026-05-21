@@ -462,9 +462,9 @@
 
     var RE_TRANSITION   = /^(T-\d+):\s+(.+?)\s*→\s*(.+)$/;
     var RE_CREATE       = /^(T-\d+):\s+(.+)\(([^)]+)\)\s*$/;
-    var RE_DELETE       = /^(T-\d+):\s+삭제됨\s*$/;
-    var RE_UPDATE       = /^(T-\d+):\s+(.+)(갱신됨|추가됨|제거됨)\s*$/;
-    var RE_ALREADY      = /^(T-\d+)은\(?는?\)?\s*already\s+(.+)$/;
+    var RE_DELETE       = /^(T-\d+):\s+(?:Deleted|deleted)\s*$/;
+    var RE_UPDATE       = /^(T-\d+):\s+(.+)(Updated|Added|Removed|updated|added|removed)\s*$/;
+    var RE_ALREADY      = /^(T-\d+)\s+already\s+(.+)$/;
     var RE_LAUNCHER     = /^(LAUNCH|INLINE):\s+(.+)$/;
     var RE_SYSTEM       = /^\[(INIT|DONE|STATE|STEP|PHASE|WORKFLOW)\]\s*(.*)$/;
     var RE_ERROR        = /^\[(ERROR)\]\s*(.*)$/;
@@ -473,7 +473,7 @@
     var RE_SHOW_HEADER  = /^##\s+(T-\d+):\s+(.+)$/;
     var RE_BOARD_HEADER = /^##\s+Kanban Board/;
     var RE_DETAIL_LINE  = /^>>\s*(.+)$/;
-    var RE_FILE_MOVE    = /^파일 이동:\s+(.+?)\s*→\s*(.+)$/;
+    var RE_FILE_MOVE    = /^File moved:\s+(.+?)\s*→\s*(.+)$/;
 
     // ── Status color mapping ──
 
@@ -878,7 +878,7 @@
     if (toolName === 'Bash') {
       if (/Command running in background with ID:/.test(t)) return 'taskStream';
       // flow-* command output detection
-      if (/T-\d+:|T-\d+은/.test(t) ||
+      if (/T-\d+:|T-\d+\s+already/.test(t) ||
           /^(LAUNCH|INLINE):/m.test(t) ||
           /^\[(INIT|DONE|STATE|STEP|PHASE|WORKFLOW|ERROR|WARN)\]/m.test(t) ||
           /^FAIL$/m.test(t)) {

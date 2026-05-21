@@ -1,11 +1,11 @@
-"""MemoryFile 모델 + frontmatter 파싱·갱신 + 인덱스 재생성.
+"""MemoryFile model + frontmatter parsing/update + index regeneration.
 
-frontmatter 스킴 확장:
-  name, description, type            (기본)
-  importance: 1~10                   (3축 점수, Claude 자가평가 기본 5)
-  last_accessed: YYYY-MM-DD          (3축 점수 recency)
-  access_count: int                  (3축 점수)
-  synthesis_of: [path, ...]          (reflection 합성본일 때 원본 path 배열)
+frontmatter scheme extension:
+  name, description, type (default)
+  importance: 1~10 (3 axis scores, Claude self-assessment default 5)
+  last_accessed: YYYY-MM-DD (3-axis score recency)
+  access_count: int (3-axis score)
+  synthesis_of: [path, ...] (original path array when reflection synthesis)
 """
 from __future__ import annotations
 
@@ -50,10 +50,10 @@ class MemoryFile:
 
 
 def _parse_frontmatter_block(block: str) -> dict:
-    """간이 YAML 파서 — 우리 frontmatter 형태에 한정.
+    """A lightweight YAML parser — limited to our frontmatter types.
 
-    지원: scalar(int/str), list ([a, b]), 다중 줄 string(>- 같은 건 미지원).
-    PyYAML 의존 회피로 최소 구현.
+    Supported: scalar(int/str), list ([a, b]), multi-line string (>- not supported).
+    Minimal implementation with PyYAML dependency avoidance.
     """
     out: dict = {}
     for line in block.splitlines():
@@ -133,10 +133,10 @@ def parse_memory_file(path: Path) -> MemoryFile | None:
 
 
 def write_memory_file(mem: MemoryFile) -> None:
-    """frontmatter + body 를 디스크에 다시 쓴다.
+    """Rewrite frontmatter + body to disk.
 
-    raw_frontmatter 가 있으면 거기에 확장 필드만 덮어쓰기.
-    없으면 기본 필드로 새로 작성.
+    If raw_frontmatter exists, overwrite only the extended fields there.
+    If it does not exist, create a new one with default fields.
     """
     fm = dict(mem.raw_frontmatter) if mem.raw_frontmatter else {}
     fm.update({
@@ -158,10 +158,10 @@ def write_memory_file(mem: MemoryFile) -> None:
 
 
 def scan_memories(cfg: GCConfig, *, include_archive: bool = False) -> list[MemoryFile]:
-    """메모리 디렉터리 전수 스캔.
+    """Scans all memory directories.
 
-    type 디렉터리 + 평탄 파일(마이그레이션 전 호환) 모두 수집.
-    archive 는 옵션으로 포함.
+    Collect all type directories + flat files (compatible before migration).
+    archive is included as an option.
     """
     out: list[MemoryFile] = []
     if not cfg.memory_dir.is_dir():
@@ -224,9 +224,9 @@ def _format_index_block(memories_by_type: dict[str, list[MemoryFile]]) -> str:
 
 
 def regenerate_index(cfg: GCConfig, memories: list[MemoryFile]) -> None:
-    """MEMORY.md 의 AUTO_INDEX 영역을 교체. 외부 사용자 영역은 보존.
+    """Replace AUTO_INDEX area in MEMORY.md. External user areas are preserved.
 
-    파일이 없거나 마커가 없으면 헤더 + 자동 영역만으로 새로 작성.
+    If the file does not exist or there is no marker, create a new one with only header + automatic area.
     """
     by_type: dict[str, list[MemoryFile]] = {t: [] for t, _ in CATEGORY_ORDER}
     # Sort descending by importance·last_accessed

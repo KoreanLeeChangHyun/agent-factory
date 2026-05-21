@@ -34,7 +34,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("M", "save")
     def _handle_memory_write(self) -> None:
-        """메모리 파일 생성/수정 엔드포인트를 처리한다.
+        """Processes memory file creation/modification endpoints.
 
         method: POST
         url: /api/memory/file
@@ -74,7 +74,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("M", "delete")
     def _handle_memory_delete(self) -> None:
-        """메모리 파일 삭제 엔드포인트를 처리한다.
+        """Processes the memory file deletion endpoint.
 
         method: DELETE
         url: /api/memory/file
@@ -101,7 +101,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("M", "rules_save")
     def _handle_rules_write(self) -> None:
-        """rules 파일 생성/수정 엔드포인트를 처리한다.
+        """Processes the rules file creation/modification endpoint.
 
         method: POST
         url: /api/prompt/rules/file
@@ -111,7 +111,7 @@ class FilesHandlerMixin:
         response_ok: {ok: true, path: str}
         response_error: {ok: false, error: str}
         status_codes: 200, 400, 500
-        auth: none (local-only) — claude_edit subprocess 경유
+        auth: none (local-only) — via claude_edit subprocess
         side_effects: write to .claude/rules/.. via claude_edit
         sse_events: none (direct file write)
         """
@@ -135,7 +135,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("M", "rules_delete")
     def _handle_rules_delete(self) -> None:
-        """rules 파일 삭제 엔드포인트를 처리한다.
+        """Processes the rules file deletion endpoint.
 
         method: DELETE
         url: /api/prompt/rules/file
@@ -164,7 +164,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("PR", "save")
     def _handle_prompt_write(self) -> None:
-        """prompt 파일 생성/수정 엔드포인트를 처리한다.
+        """Processes the prompt file creation/edit endpoint.
 
         method: POST
         url: /api/prompt/prompt-files/file
@@ -196,7 +196,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("PR", "delete")
     def _handle_prompt_delete(self) -> None:
-        """prompt 파일 삭제 엔드포인트를 처리한다.
+        """Prompt Processes the file deletion endpoint.
 
         method: DELETE
         url: /api/prompt/prompt-files/file
@@ -223,7 +223,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("PR", "claude_md_save")
     def _handle_claude_md_write(self) -> None:
-        """CLAUDE.md 수정 엔드포인트를 처리한다.
+        """CLAUDE.md handles modification endpoints.
 
         method: POST
         url: /api/prompt/claude-md
@@ -251,7 +251,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("PR", "quick_save")
     def _handle_quick_prompt_write(self) -> None:
-        """quick prompt 단건 생성/갱신 엔드포인트.
+        """quick prompt Single item creation/update endpoint.
 
         method: POST
         url: /api/quick-prompts/item
@@ -282,7 +282,7 @@ class FilesHandlerMixin:
 
     @api_endpoint("PR", "quick_delete")
     def _handle_quick_prompt_delete(self) -> None:
-        """quick prompt 단건 삭제 엔드포인트.
+        """quick prompt single delete endpoint.
 
         method: DELETE
         url: /api/quick-prompts/item

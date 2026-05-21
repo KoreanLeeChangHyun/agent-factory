@@ -66,7 +66,7 @@
 - 상태 보고 전 `flow-kanban board` / `flow-kanban list` 조회 필수 — 기억 기반 보고 금지
 - 티켓 관련 발화(티켓 번호 언급 / 티켓 생성·수정·이동·삭제 / 티켓 상태 보고 / "이거/저거/그거" 같은 지시어로 티켓 가리킴) 시 반드시 `flow-kanban show <T-NNN>` 또는 `flow-kanban board` 등으로 **현재 상태를 먼저 조회한 뒤 응답** (MUST). 기억·auto memory·jsonl 헤더(`_meta.ticket_id`)·세션 파일명·로그·이전 응답 결과 등 **칸반 외 보조 단서로 티켓 식별·상태 단정 금지** (MUST NOT) — 칸반이 single source of truth. 칸반은 다른 세션·UI(board DnD)에서도 변경되므로 stale 보조 정보로 사용자 혼선 유발
 - 브랜치 그래프 차이 설명 시 **"앞선다/뒤처진다(ahead/behind)" 표현은 변경 내용(코드/파일)이 있을 때만** 사용 (MUST). PR `--merge` 방식의 자동 생성 merge commit 노드만 차이날 때는 명시적으로 "코드 동일, merge commit 노드만 차이"라고 쓴다 — 변경 내용 있는 것처럼 들려 사용자가 동기화 필요 여부를 오판하는 사례 차단
-- 어시스턴트→사용자 출력에 "티켓 생성" 표현 사용 금지 (MUST NOT). 작업 진행 의향을 물을 때는 "티켓 생성 진행할까요" / "룰 추가할까요" / "메모리 등록할까요" 등 구체 작업 어휘로 대체. 단 사용자 발화 트리거 키워드(`티켓 생성해줘` 등)는 grill-me 호출 트리거로 그대로 보존
+- 어시스턴트→사용자 출력에 "티켓 생성" 표현 사용 금지 (MUST NOT). 작업 진행 의향을 물을 때는 "티켓 생성 진행할까요" / "룰 추가할까요" / "메모리 등록할까요" 등 구체 작업 어휘로 대체. 단 사용자 발화 트리거 키워드(`티켓 생성해줘` 등)는 grill-me Ouroboros 5단계 루프 (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 진입 트리거로 그대로 보존
 - 코드 블록(fenced code block, ```...```)은 **실제 소스 코드를 보여줄 때만** 사용 (MUST). ASCII 다이어그램·디렉터리 트리·카드 구조도·레이아웃 스케치는 코드 블록 회피 (일반 텍스트·표·불릿으로 표현). frontmatter/JSON/YAML 등 실제 파일 내용 인용은 OK. 명령어 (`flow-kanban create` 등) 는 인라인 backtick OK, fenced block 은 다중 줄 코드일 때만
 
 ## 사용자 응대 캐논 (MUST)

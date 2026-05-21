@@ -26,7 +26,7 @@
  *
  * Visual Canon (board.md §6):
  *   - terracotta #D97757 = running
- *   - cyan #4ec9b0      = success
+ *   - cyan #D97757      = success
  *   #f48771
  *   - 1.6s pulse + prefers-reduced-motion guard — step-overlay.css fixation
  *

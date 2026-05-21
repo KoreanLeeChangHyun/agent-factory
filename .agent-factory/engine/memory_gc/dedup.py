@@ -1,7 +1,7 @@
-"""중복 메모리 클러스터링 + 단순 dedup.
+"""Redundant memory clustering + simple dedup.
 
-reflection 합성과 분리: 여기서는 "When the same information is written twice" 만 처리.
-정보 손실 위험을 피해 더 오래된 쪽만 archive/merged/ 로 이동, 새 쪽 유지.
+Separate from reflection composition: here we only handle “When the same information is written twice”.
+To avoid the risk of information loss, move only the older page to archive/merged/ and keep the new page.
 """
 from __future__ import annotations
 
@@ -59,9 +59,9 @@ def find_duplicates(memories: list[MemoryFile]) -> list[DedupCandidate]:
 
 
 def apply_dedup(cfg: GCConfig, candidates: list[DedupCandidate]) -> list[Path]:
-    """중복 후보의 drop 측을 archive/merged/ 로 이동. reversible.
+    """Move the drop side of duplicate candidates to archive/merged/. reversible.
 
-    Returns: 이동된 archive 경로 리스트.
+    Returns: List of moved archive paths.
     """
     moved: list[Path] = []
     target_dir = cfg.archive_subdir('merged')

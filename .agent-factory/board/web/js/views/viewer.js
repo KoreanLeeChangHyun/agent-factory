@@ -535,7 +535,7 @@
 
     if (ticket.prompt) {
       h += '<div class="tv-section">';
-      h += '<div class="tv-section-title">Request Contract</div>';
+      h += '<div class="tv-section-title">Work Item Contract</div>';
       h += renderPromptFields(ticket.prompt);
       h += "</div>";
     }

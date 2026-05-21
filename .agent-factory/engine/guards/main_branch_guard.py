@@ -1,16 +1,16 @@
 #!/usr/bin/env -S python3 -u
-"""main 브랜치 커밋 차단 가드 Hook 스크립트.
+"""Main branch commit blocking guard Hook script.
 
-PreToolUse(Bash) 이벤트에서 git commit 명령 감지 시 현재 브랜치가
-main 또는 master이면 차단한다.
+When the git commit command is detected in the PreToolUse (Bash) event, the current branch is
+If it is main or master, it blocks.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 main/master 브랜치 커밋 차단
+Main functions:
+    main: Hook entry point, blocks main/master branch commit after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_MAIN_BRANCH_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_MAIN_BRANCH_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -42,10 +42,10 @@ _PROTECTED_BRANCHES: frozenset[str] = frozenset({"main", "master"})
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -59,10 +59,10 @@ def _deny(reason: str) -> None:
 
 
 def _get_current_branch() -> str | None:
-    """현재 git 브랜치명을 반환한다.
+    """Returns the current git branch name.
 
     Returns:
-        현재 브랜치명 문자열. git 실행 실패 시 None.
+        Current branch name string. None if git execution fails.
     """
     try:
         result = subprocess.run(
@@ -79,11 +79,11 @@ def _get_current_branch() -> str | None:
 
 
 def main() -> None:
-    """main/master 브랜치 커밋 차단 Hook의 진입점.
+    """Entry point for main/master branch commit blocking Hook.
 
-    stdin에서 JSON을 읽어 Bash 도구의 git commit 명령을 감지하고,
-    현재 브랜치가 main 또는 master이면 deny 응답을 출력하여 차단한다.
-    git 실행 실패 시 안전 통과(exit 0)로 처리한다.
+    Detect the Bash tool's git commit command by reading JSON from stdin,
+    If the current branch is main or master, a deny response is output and blocked.
+    If git execution fails, it is treated as a safe pass (exit 0).
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_MAIN_BRANCH_GUARD") or read_env("HOOK_MAIN_BRANCH_GUARD")

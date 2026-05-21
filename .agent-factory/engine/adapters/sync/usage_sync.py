@@ -1,18 +1,18 @@
 #!/usr/bin/env -S python3 -u
-"""워크플로우 토큰 사용량 추적 (증분 + 일괄).
+"""Track workflow token usage (incremental + batch).
 
-서브커맨드:
-    track   SubagentStop 훅에서 호출. 개별 에이전트 종료 시 증분 토큰 추적
-    batch   finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 최종 정산
+Subcommand:
+    Called from the track SubagentStop hook. Incremental token tracking upon individual agent termination
+    Called from batch finalization.py. Final settlement by batch parsing of entire JSONL
 
-주요 함수:
-    parse_jsonl_usage: JSONL 파일의 usage 합산
-    cmd_track: track 서브커맨드 실행
-    cmd_batch: batch 서브커맨드 실행
-    main: CLI 진입점
+Main functions:
+    parse_jsonl_usage: Sum up usage of JSONL files
+    cmd_track: Execute track subcommand
+    cmd_batch: Execute batch subcommand
+    main: CLI entry point
 
-입력 (stdin JSON): agent_type, agent_id, agent_transcript_path
-비차단 원칙: 모든 에러 경로에서 exit 0
+Input (stdin JSON): agent_type, agent_id, agent_transcript_path
+Non-blocking principle: exit 0 on all error paths
 """
 
 from __future__ import annotations
@@ -70,19 +70,19 @@ NON_WORKER_AGENT_TYPES: set[str] = {
 
 
 def _normalize_agent_type(raw: str) -> tuple[str, str]:
-    """agent_type 원시 문자열을 VALID_AGENT_TYPES 중 하나로 정규화한다.
+    """agent_type Normalizes the raw string to one of VALID_AGENT_TYPES.
 
-    "worker-opus", "worker-sonnet" 등 모델 접미사가 붙은 타입을
-    정규 타입과 모델 접미사 튜플로 변환한다.
-    예외를 발생시키지 않는 순수 문자열 비교 함수.
+    Types with model suffixes such as "worker-opus", "worker-sonnet", etc.
+    Convert to regular type and model suffix tuple.
+    A pure string comparison function that does not throw exceptions.
 
     Args:
-        raw: 정규화 전 agent_type 문자열
+        raw: agent_type string before normalization
 
     Returns:
-        (normalized_type, model_suffix) 튜플.
-        - normalized_type: VALID_AGENT_TYPES에 속하는 정규 타입. 매칭 없으면 원본 raw.
-        - model_suffix: 모델 접미사 문자열. 예: "sonnet", "opus". 없으면 빈 문자열.
+        (normalized_type, model_suffix) tuple.
+        - normalized_type: Normal type belonging to VALID_AGENT_TYPES. If there is no match, the original raw.
+        - model_suffix: Model suffix string. Examples: "sonnet", "opus". If not, an empty string.
 
     Examples:
         >>> _normalize_agent_type("worker-sonnet")
@@ -108,10 +108,10 @@ def _normalize_agent_type(raw: str) -> tuple[str, str]:
 # =============================================================================
 
 def _read_stdin_json() -> dict[str, object]:
-    """stdin에서 JSON을 읽어 반환. 실패 시 exit 0.
+    """Reads JSON from stdin and returns it. In case of failure, exit 0.
 
     Returns:
-        파싱된 JSON 딕셔너리
+        Parsed JSON dictionary
     """
     try:
         return json.load(sys.stdin)
@@ -120,16 +120,16 @@ def _read_stdin_json() -> dict[str, object]:
 
 
 def _extract_session_id_from_transcript_path(transcript_path: str) -> Optional[str]:
-    """transcript_path(메인 세션 jsonl) basename에서 세션 ID를 추출한다.
+    """transcript_path (main session jsonl) Extract session ID from basename.
 
-    Claude 세션 파일 명명 규칙: <session_id>.jsonl
-    세션 ID는 UUID 형식(8-4-4-4-12 hex)이어야 유효로 판정한다.
+    Claude session file naming convention: <session_id>.jsonl
+    The session ID must be in UUID format (8-4-4-4-12 hex) to be considered valid.
 
     Args:
-        transcript_path: stdin의 transcript_path(=메인 세션 jsonl 경로)
+        transcript_path: transcript_path from stdin (=main session jsonl path)
 
     Returns:
-        추출된 세션 ID 문자열. 파싱 실패 또는 UUID 형식 불일치 시 None.
+        Extracted session ID string. None if parsing fails or UUID format mismatch.
     """
     import re
     if not transcript_path:
@@ -148,13 +148,13 @@ def _extract_session_id_from_transcript_path(transcript_path: str) -> Optional[s
 
 
 def _extract_session_id_from_agent_jsonl(agent_transcript_path: str) -> Optional[str]:
-    """agent jsonl 첫 줄 user 레코드의 sessionId 필드를 읽어 세션 ID를 반환한다.
+    """Agent jsonl Reads the sessionId field of the first line of the user record and returns the session ID.
 
     Args:
-        agent_transcript_path: agent jsonl 파일 경로 (stdin의 agent_transcript_path)
+        agent_transcript_path: agent jsonl file path (agent_transcript_path in stdin)
 
     Returns:
-        추출된 세션 ID 문자열. 읽기 실패 시 None.
+        Extracted session ID string. None if reading fails.
     """
     if not agent_transcript_path or not os.path.isfile(agent_transcript_path):
         return None
@@ -178,16 +178,16 @@ def _extract_session_id_from_agent_jsonl(agent_transcript_path: str) -> Optional
 
 
 def _call_link_session(status_file: str, session_id: str) -> str:
-    """flow.state_machine.link_session을 동적 import로 호출한다.
+    """Call flow.state_machine.link_session with dynamic import.
 
-    모듈 레벨 순환 import를 피하기 위해 호출 직전 동적 import를 사용한다.
+    To avoid module-level circular import, use dynamic import immediately before calling.
 
     Args:
-        status_file: status.json 파일 절대 경로
-        session_id: 등록할 세션 ID
+        status_file: absolute path to status.json file
+        session_id: Session ID to register
 
     Returns:
-        link_session 반환값 문자열 (added/already linked/skipped/failed).
+        link_session Return value string (added/already linked/skipped/failed).
     """
     try:
         from flow.state_machine import link_session  # noqa: PLC0415
@@ -201,14 +201,14 @@ def _try_link_session_from_stdin(
     agent_transcript_path: str,
     main_transcript_path: str,
 ) -> None:
-    """stdin 경로에서 세션 ID를 추출하여 status.json linked_sessions에 등록한다.
+    """Extract the session ID from the stdin path and register it in status.json linked_sessions.
 
-    work_dir를 _find_work_dir()로 구하고, status.json 경로를 조합한다.
-    VALID_AGENT_TYPES 외 에이전트의 조기 exit 경로에서 호출된다.
+    Find work_dir with _find_work_dir() and combine the status.json path.
+    Called in the early exit path of agents other than VALID_AGENT_TYPES.
 
     Args:
-        agent_transcript_path: stdin의 agent_transcript_path
-        main_transcript_path: stdin의 transcript_path (메인 세션 jsonl)
+        agent_transcript_path: agent_transcript_path on stdin
+        main_transcript_path: transcript_path from stdin (main session jsonl)
     """
     work_dir = _find_work_dir()
     if not work_dir:
@@ -222,18 +222,18 @@ def _link_sessions_from_stdin(
     agent_transcript_path: str,
     main_transcript_path: str,
 ) -> None:
-    """stdin 경로에서 메인 + 워커 세션 ID를 추출해 status.json linked_sessions에 등록한다.
+    """Extract the main + worker session ID from the stdin path and register it in status.json linked_sessions.
 
-    추출 우선순위:
-      (a) transcript_path basename의 <session_id>.jsonl 패턴 — 메인 세션 ID
-      (b) agent_transcript_path 첫 user 레코드의 sessionId 필드 — 폴백 또는 워커 ID
+    Extraction priority:
+      (a) <session_id>.jsonl pattern in transcript_path basename — main session ID
+      (b) agent_transcript_path sessionId field of the first user record — fallback or worker ID
 
-    두 경로 모두 실패 시 silent skip.
+    Silent skip if both paths fail.
 
     Args:
-        status_file: status.json 절대 경로 (lock 없이 호출 — state_machine.link_session이 내부에서 atomic_write 처리)
-        agent_transcript_path: stdin의 agent_transcript_path
-        main_transcript_path: stdin의 transcript_path (메인 세션 jsonl)
+        status_file: absolute path to status.json (called without lock — state_machine.link_session handles atomic_write internally)
+        agent_transcript_path: agent_transcript_path on stdin
+        main_transcript_path: transcript_path from stdin (main session jsonl)
     """
     registered: set[str] = set()
 
@@ -262,10 +262,10 @@ def _link_sessions_from_stdin(
 
 
 def _find_work_dir() -> Optional[str]:
-    """디렉터리 스캔으로 활성 워크플로우의 workDir을 조회.
+    """Directory scan to look up the workDir of an active workflow.
 
     Returns:
-        활성 워크플로우의 절대 workDir 경로. 없으면 None.
+        Absolute workDir path of the active workflow. If not, None.
     """
     workflows = scan_active_workflows(project_root=PROJECT_ROOT)
     if not workflows:
@@ -281,13 +281,13 @@ def _find_work_dir() -> Optional[str]:
 
 
 def _load_usage(usage_file: str) -> dict[str, object]:
-    """usage.json을 로드. 없으면 기본 스키마 반환.
+    """Load usage.json. If not found, returns the default schema.
 
     Args:
-        usage_file: usage.json 파일 경로
+        usage_file: usage.json file path
 
     Returns:
-        usage 데이터 딕셔너리. agents, totals, _pending_workers 키 포함.
+        usage data dictionary. Includes keys agents, totals, and _pending_workers.
     """
     data = load_json_file(usage_file)
     if not isinstance(data, dict):
@@ -303,15 +303,15 @@ def _load_usage(usage_file: str) -> dict[str, object]:
 
 
 def parse_jsonl_usage(filepath: str) -> Optional[dict[str, int]]:
-    """JSONL 파일의 모든 assistant 레코드 usage를 합산한다.
+    """Sum up the usage of all assistant records in the JSONL file.
 
     Args:
-        filepath: JSONL 파일 경로
+        filepath: JSONL file path
 
     Returns:
-        합산된 토큰 수 딕셔너리.
-        키: input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens.
-        파일 없거나 파싱 실패 시 None.
+        Dictionary of the total number of tokens.
+        Keys: input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens.
+        None if there is no file or parsing fails.
     """
     totals: dict[str, int] = {
         "input_tokens": 0,
@@ -367,15 +367,15 @@ def parse_jsonl_usage(filepath: str) -> Optional[dict[str, int]]:
 
 
 def count_tool_use_in_jsonl(filepath: str) -> int:
-    """JSONL 파일에서 assistant 레코드의 tool_use 항목 수를 카운트한다.
+    """Counts the number of tool_use items in assistant records in the JSONL file.
 
-    type == "assistant" 레코드의 content 배열 내 type == "tool_use" 항목을 모두 합산한다.
+    Sum up all type == "tool_use" items in the content array of the type == "assistant" record.
 
     Args:
-        filepath: JSONL 파일 경로
+        filepath: JSONL file path
 
     Returns:
-        tool_use 항목 총 개수. 파일 없거나 파싱 실패 시 -1 반환 (비차단 원칙).
+        Total number of tool_use items. If there is no file or parsing fails, -1 is returned (non-blocking principle).
     """
     if not os.path.isfile(filepath):
         return -1
@@ -413,11 +413,11 @@ def count_tool_use_in_jsonl(filepath: str) -> int:
 # =============================================================================
 
 def cmd_track() -> None:
-    """SubagentStop 훅에서 호출. 개별 에이전트 토큰을 usage.json에 기록.
+    """Called from SubagentStop hook. Record individual agent tokens in usage.json.
 
-    stdin에서 JSON을 읽어 agent_type, agent_id, agent_transcript_path를 파싱하고
-    JSONL 파일에서 토큰 사용량을 추출하여 usage.json에 증분 기록한다.
-    모든 에러 경로에서 exit 0 (비차단 원칙).
+    Read JSON from stdin and parse agent_type, agent_id, agent_transcript_path, and
+    Extract token usage from the JSONL file and record it incrementally in usage.json.
+    exit 0 on all error paths (non-blocking principle).
     """
     input_data = _read_stdin_json()
 
@@ -554,13 +554,13 @@ def cmd_track() -> None:
 # =============================================================================
 
 def _find_subagents_dir(transcript_path: str) -> Optional[str]:
-    """agent_transcript_path에서 subagents/ 디렉터리 경로를 역산.
+    """Reverse subagents/ directory path from agent_transcript_path.
 
     Args:
-        transcript_path: agent JSONL 파일 절대 경로
+        transcript_path: agent JSONL file absolute path
 
     Returns:
-        subagents/ 디렉터리 경로. transcript_path의 부모가 subagents/가 아니면 None.
+        subagents/ directory path. None if the parent of transcript_path is not subagents/.
     """
     parent = os.path.dirname(transcript_path)
     if os.path.basename(parent) == "subagents":
@@ -569,13 +569,13 @@ def _find_subagents_dir(transcript_path: str) -> Optional[str]:
 
 
 def _find_main_session_jsonl(subagents_dir: str) -> Optional[str]:
-    """subagents/ 상위에서 메인 세션 JSONL을 찾는다.
+    """Find the main session JSONL at the top of subagents/.
 
     Args:
-        subagents_dir: subagents/ 디렉터리 절대 경로
+        subagents_dir: absolute path to subagents/ directory
 
     Returns:
-        메인 세션 JSONL 파일 경로. 없으면 None.
+        Main session JSONL file path. If not, None.
     """
     session_dir = os.path.dirname(subagents_dir)
     session_jsonl = session_dir + ".jsonl"
@@ -585,18 +585,18 @@ def _find_main_session_jsonl(subagents_dir: str) -> Optional[str]:
 
 
 def _find_main_session_from_status(work_dir: str) -> Optional[str]:
-    """status.json의 linked_sessions 또는 _agent_map에서 메인 세션 JSONL 경로를 구성.
+    """Configure the main session JSONL path in linked_sessions or _agent_map in status.json.
 
-    0차(최우선): usage.json의 _main_transcript 경로를 직접 반환.
-    1차: linked_sessions에 기록된 세션 ID로 <session_id>.jsonl을 직접 탐색.
-    2차(대체): linked_sessions가 비어있을 때, usage.json의 _agent_map에 기록된
-         알려진 agent_id로 subagents 디렉터리를 역탐색하여 상위 세션 JSONL을 반환.
+    0th order (highest priority): Directly returns the _main_transcript path in usage.json.
+    1st: Directly search <session_id>.jsonl with the session ID recorded in linked_sessions.
+    Secondary (replacement): when linked_sessions is empty, recorded in _agent_map in usage.json
+         Backtracks the subagents directory with a known agent_id and returns the parent session JSONL.
 
     Args:
-        work_dir: 워크플로우 작업 디렉터리 절대 경로
+        work_dir: Absolute path to the workflow working directory.
 
     Returns:
-        메인 세션 JSONL 파일 경로. 없으면 None.
+        Main session JSONL file path. If not, None.
     """
     # 0th: Directly returns the _main_transcript path in usage.json
     usage_file = os.path.join(work_dir, "usage.json")
@@ -662,22 +662,22 @@ def _resolve_agent_type(
     agent_map: dict[str, str],
     subagents_dir: Optional[str] = None,
 ) -> Optional[str]:
-    """agent-<id>.jsonl의 agent_type을 식별. 다중 폴백 체인 적용.
+    """Identifies the agent_type of agent-<id>.jsonl. Apply multiple fallback chains.
 
-    폴백 순서:
-      1. _agent_map 매핑 조회 (source=agent_map)
-      2. agent-<id>.meta.json 의 agentType 필드 (source=meta_json)
-      3. JSONL 첫 user 레코드의 slug 키 (source=jsonl_slug)
-      4. JSONL 첫 assistant 레코드의 attributionAgent 키 (source=jsonl_attribution)
-      5. agentId가 hex 형식이고 subagents_dir 주어진 경우 "worker" 기본값 (source=hex_default)
+    Fallback order:
+      1. _agent_map mapping query (source=agent_map)
+      2. agentType field in agent-<id>.meta.json (source=meta_json)
+      3. JSONL slug key of the first user record (source=jsonl_slug)
+      4. JSONL attributionAgent key of the first assistant record (source=jsonl_attribution)
+      5. If agentId is in hex format and subagents_dir is given, "worker" defaults (source=hex_default)
 
     Args:
-        agent_filename: agent JSONL 파일 경로
-        agent_map: agent_id -> agent_type 매핑 딕셔너리
-        subagents_dir: subagents/ 디렉터리 경로. None 이면 meta.json 폴백·hex_default 비활성.
+        agent_filename: agent JSONL file path
+        agent_map: agent_id -> agent_type mapping dictionary
+        subagents_dir: subagents/ directory path. If None, meta.json fallback·hex_default is disabled.
 
     Returns:
-        식별된 agent_type 문자열. 식별 불가 시 None.
+        Identified agent_type string. None if identification is not possible.
     """
     basename = os.path.basename(agent_filename)
     agent_id: Optional[str] = None
@@ -775,15 +775,15 @@ def _resolve_agent_type(
 
 
 def cmd_batch() -> None:
-    """finalization.py에서 호출. 전체 JSONL 일괄 파싱으로 usage.json 최종 정산.
+    """Called from finalization.py. Final settlement of usage.json by batch parsing of entire JSONL.
 
-    stdin에서 JSON을 읽어 agent_transcript_path를 파싱한다. 입력 경로가 worker
-    agent JSONL(부모가 ``subagents/``)이면 그 디렉터리를 직접 사용하고, 그렇지
-    않으면(예: finalization.py 가 orchestrator 메인 세션 JSONL 을 넘긴 경우)
-    work_dir → status.json.linked_sessions → 메인 세션 JSONL 옆 ``subagents/`` 로
-    역산하는 폴백 경로를 사용한다.
-    track으로 수집 완료된 에이전트는 보완 모드로 스킵한다.
-    모든 에러 경로에서 exit 0 (비차단 원칙).
+    Read JSON from stdin and parse agent_transcript_path. The input path is worker
+    If agent JSONL (parent is ``subagents/``), use that directory directly, otherwise
+    Otherwise (e.g. finalization.py passes the orchestrator main session JSONL)
+    work_dir → status.json.linked_sessions → ``subagents/`` next to main session JSONL
+    Use a fallback path that inverts.
+    Agents that have been collected through track are skipped to supplementary mode.
+    exit 0 on all error paths (non-blocking principle).
     """
     input_data = _read_stdin_json()
 
@@ -963,10 +963,10 @@ def cmd_batch() -> None:
 # =============================================================================
 
 def main() -> None:
-    """CLI 진입점. 서브커맨드(track/batch)를 파싱하여 실행한다.
+    """CLI entry point. Parse and execute subcommands (track/batch).
 
-    서브커맨드가 없으면 track을 기본값으로 사용한다 (하위 호환).
-    알 수 없는 서브커맨드는 exit 0 (비차단 원칙).
+    If there is no subcommand, track is used as the default (backwards compatible).
+    Unknown subcommands exit 0 (non-blocking principle).
     """
     # Subcommand parsing. If there are no arguments, track (backwards compatible)
     subcmd = sys.argv[1] if len(sys.argv) > 1 else "track"

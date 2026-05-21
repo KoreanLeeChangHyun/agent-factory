@@ -1,24 +1,24 @@
 #!/usr/bin/env -S python3 -u
-"""스킬 활성화/아카이브 상태 관리 CLI 모듈.
+"""Skill activation/archive status management CLI module.
 
-스킬의 활성(active)/아카이브(archived) 상태를 skill-state.json 파일로 관리한다.
-CLI를 통해 스킬 아카이브, 활성화, 상태 목록 조회를 수행하며,
-catalog_sync.py에서 import하여 아카이브된 스킬을 카탈로그에서 제외한다.
+Manage the active/archived status of a skill with the skill-state.json file.
+Perform skill archive, activation, and status list queries through CLI.
+Exclude archived skills from the catalog by importing them from catalog_sync.py.
 
-주요 함수:
-    load_skill_state: skill-state.json 로드
-    save_skill_state: skill-state.json 원자적 저장
-    archive_skill: 스킬을 archived 상태로 전환
-    activate_skill: 스킬을 active 상태로 전환
-    list_skills: active/archived 상태 구분 출력
-    is_archived: 아카이브 여부 판별 헬퍼
+Main functions:
+    load_skill_state: Load skill-state.json
+    save_skill_state: skill-state.json atomic save
+    archive_skill: Switch skill to archived state
+    activate_skill: Switch skill to active state
+    list_skills: Active/archived status classification output
+    is_archived: Archive status helper
 
-사용법:
+Usage:
     flow-skill archive <skill_name>
     flow-skill activate <skill_name>
     flow-skill list [--archived | --active]
 
-종료 코드: 0 성공, 1 실패
+Exit code: 0 success, 1 failure
 """
 
 from __future__ import annotations
@@ -71,16 +71,16 @@ _STATE_VERSION: int = 1
 
 
 def load_skill_state(state_path: str | None = None) -> dict[str, str]:
-    """skill-state.json에서 스킬 상태를 로드한다.
+    """Load the skill state from skill-state.json.
 
-    파일이 존재하지 않으면 빈 딕셔너리를 반환하여 모든 스킬을 active로 간주한다.
+    If the file does not exist, an empty dictionary is returned and all skills are considered active.
 
     Args:
-        state_path: skill-state.json 경로. None이면 기본 경로 사용.
+        state_path: skill-state.json path. If None, use the default path.
 
     Returns:
-        스킬명을 키, 상태("active" 또는 "archived")를 값으로 하는 딕셔너리.
-        파일 미존재 또는 파싱 실패 시 빈 딕셔너리.
+        A dictionary with the skill name as the key and the status ("active" or "archived") as the value.
+        Empty dictionary if file does not exist or parsing fails.
     """
     path = state_path or STATE_FILE
     data = load_json_file(path)
@@ -93,11 +93,11 @@ def load_skill_state(state_path: str | None = None) -> dict[str, str]:
 
 
 def save_skill_state(state: dict[str, str], state_path: str | None = None) -> None:
-    """스킬 상태를 skill-state.json에 원자적으로 저장한다.
+    """Store the skill state atomically in skill-state.json.
 
     Args:
-        state: 스킬명-상태 딕셔너리.
-        state_path: skill-state.json 경로. None이면 기본 경로 사용.
+        state: Skill name-state dictionary.
+        state_path: skill-state.json path. If None, use the default path.
     """
     path = state_path or STATE_FILE
     data = {
@@ -108,39 +108,39 @@ def save_skill_state(state: dict[str, str], state_path: str | None = None) -> No
 
 
 def is_archived(name: str, state: dict[str, str]) -> bool:
-    """스킬이 아카이브 상태인지 판별한다.
+    """Determine whether the skill is in archive status.
 
-    state에 키가 없으면 active로 간주하여 False를 반환한다.
+    If there is no key in the state, it is considered active and returns False.
 
     Args:
-        name: 스킬명.
-        state: load_skill_state()가 반환한 상태 딕셔너리.
+        name: Skill name.
+        state: State dictionary returned by load_skill_state().
 
     Returns:
-        archived이면 True, 그 외(active 또는 키 없음)이면 False.
+        True if archived, False if otherwise (active or no key).
     """
     return state.get(name) == "archived"
 
 
 def _validate_skill_exists(name: str) -> bool:
-    """스킬 디렉터리가 존재하는지 검증한다.
+    """Verifies whether the skill directory exists.
 
     Args:
-        name: 스킬명.
+        name: Skill name.
 
     Returns:
-        디렉터리 존재 시 True, 미존재 시 False.
+        True if the directory exists, False if it does not exist.
     """
     skill_dir = os.path.join(SKILLS_DIR, name)
     return os.path.isdir(skill_dir)
 
 
 def _get_all_skill_names() -> list[str]:
-    """skills 디렉터리에서 전체 스킬명 목록을 스캔한다.
+    """Scans the entire list of skill names in the skills directory.
 
     Returns:
-        정렬된 스킬명 목록. 디렉터리가 아닌 항목과 skill-state.json,
-        skill-catalog.md 등 파일은 제외.
+        Sorted list of skill names. Non-directory items and skill-state.json,
+        Excluding files such as skill-catalog.md.
     """
     if not os.path.isdir(SKILLS_DIR):
         return []
@@ -153,13 +153,13 @@ def _get_all_skill_names() -> list[str]:
 
 
 def archive_skill(name: str) -> None:
-    """스킬을 archived 상태로 전환한다.
+    """Switch the skill to archived state.
 
-    스킬 디렉터리가 존재하지 않으면 에러 메시지를 출력하고 exit 1로 종료.
-    이미 archived 상태이면 안내 메시지를 출력하고 정상 종료.
+    If the skill directory does not exist, an error message is displayed and exit 1.
+    If it is already archived, an information message is displayed and the operation terminates normally.
 
     Args:
-        name: 아카이브할 스킬명.
+        name: The name of the skill to archive.
     """
     if not _validate_skill_exists(name):
         print(
@@ -182,14 +182,14 @@ def archive_skill(name: str) -> None:
 
 
 def activate_skill(name: str) -> None:
-    """스킬을 active 상태로 전환한다.
+    """Switches the skill to active state.
 
-    active 전환 시 상태 딕셔너리에서 키를 삭제하여 기본값(active)으로 복원한다.
-    스킬 디렉터리가 존재하지 않으면 에러 메시지를 출력하고 exit 1로 종료.
-    이미 active 상태이면 안내 메시지를 출력하고 정상 종료.
+    When switching to active, the key is deleted from the state dictionary and restored to the default value (active).
+    If the skill directory does not exist, an error message is displayed and exit 1.
+    If it is already in the active state, an information message is displayed and the system terminates normally.
 
     Args:
-        name: 활성화할 스킬명.
+        name: The name of the skill to activate.
     """
     if not _validate_skill_exists(name):
         print(
@@ -213,12 +213,12 @@ def activate_skill(name: str) -> None:
 
 
 def list_skills(filter_mode: str | None = None) -> None:
-    """스킬 상태 목록을 출력한다.
+    """Prints a list of skill status.
 
-    filter_mode에 따라 전체, archived만, active만 출력한다.
+    Depending on filter_mode, all, only archived, and only active are output.
 
     Args:
-        filter_mode: "archived"이면 archived만, "active"이면 active만, None이면 전체 출력.
+        filter_mode: If "archived", only archived, if "active", only active, if None, output all.
     """
     all_names = _get_all_skill_names()
     if not all_names:
@@ -267,10 +267,10 @@ def list_skills(filter_mode: str | None = None) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """argparse 기반 CLI 파서를 구성하여 반환한다.
+    """Constructs and returns an argparse-based CLI parser.
 
     Returns:
-        구성된 ArgumentParser 인스턴스.
+        A configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         prog="flow-skill",

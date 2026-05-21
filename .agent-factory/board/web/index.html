@@ -16,6 +16,8 @@
   --af-text: #CCCCCC;
   --af-text-muted: #858585;
   --af-text-subtle: #5A5A5A;
+  --brain-accent: #D97757;
+  --brain-accent-soft: rgba(217, 119, 87, 0.18);
   --af-primary: #007ACC;
   --af-primary-soft: rgba(0, 122, 204, 0.16);
   --af-success: #4EC9B0;
@@ -41,6 +43,30 @@
   --accent: #007ACC;
   --console-width: 42%;
   --divider-width: 8px;
+}
+
+:root[data-brain="claude"] {
+  --brain-accent: #D97757;
+  --brain-accent-soft: rgba(217, 119, 87, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
+  --accent: var(--brain-accent);
+}
+
+:root[data-brain="codex"] {
+  --brain-accent: #10A37F;
+  --brain-accent-soft: rgba(16, 163, 127, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
+  --accent: var(--brain-accent);
+}
+
+:root[data-brain="gemini"] {
+  --brain-accent: #4796E3;
+  --brain-accent-soft: rgba(145, 119, 199, 0.18);
+  --af-primary: var(--brain-accent);
+  --af-primary-soft: var(--brain-accent-soft);
+  --accent: var(--brain-accent);
 }
 
 * {
@@ -180,7 +206,7 @@ iframe {
   </section>
   <div class="split-divider" id="split-divider" role="separator" aria-label="Resize panes" aria-orientation="vertical" tabindex="0"></div>
   <section class="combined-pane" aria-label="Agent Factory Board">
-    <iframe src="board.html" title="Agent Factory Board"></iframe>
+    <iframe id="board-frame" src="board.html" title="Agent Factory Board"></iframe>
   </section>
 </main>
 <button class="console-settings-toggle" id="settings-toggle" title="Settings" aria-label="Settings">
@@ -194,6 +220,7 @@ iframe {
   </div>
   <div class="settings-body" id="settings-body"></div>
 </div>
+<script src="js/core/brain-theme.js"></script>
 <script>
 (function () {
   var shell = document.getElementById("combined-shell");
@@ -252,6 +279,21 @@ iframe {
   divider.addEventListener("pointerdown", startResize);
   window.addEventListener("resize", restoreWidth);
   restoreWidth();
+
+  var boardFrame = document.getElementById("board-frame");
+  if (boardFrame) {
+    function exposeBoardFrameNamespace() {
+      try {
+        if (boardFrame.contentWindow && boardFrame.contentWindow.Board) {
+          window.Board = boardFrame.contentWindow.Board;
+        }
+      } catch (_) {}
+    }
+    boardFrame.addEventListener("load", exposeBoardFrameNamespace);
+    setTimeout(exposeBoardFrameNamespace, 0);
+    setTimeout(exposeBoardFrameNamespace, 500);
+    setTimeout(exposeBoardFrameNamespace, 1500);
+  }
 })();
 </script>
 <script src="js/views/settings.js"></script>

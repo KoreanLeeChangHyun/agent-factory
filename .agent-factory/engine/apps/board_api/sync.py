@@ -1,8 +1,8 @@
 """SyncHandlerMixin — restart + debug-log endpoints.
 
-T-513 P5 — `_handle_workflow_sync` 분기는 handlers/settings.py 의
-`_handle_settings_workflow_sync` 로 통째 이전 (P2 신설 후 alias 제거 시점).
-본 모듈은 restart + debug-log endpoint 만 보존.
+T-513 P5 — The `_handle_workflow_sync` branch in handlers/settings.py
+Completely transferred to `_handle_settings_workflow_sync` (when alias was removed after P2 was newly established).
+This module preserves only the restart + debug-log endpoint.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ class SyncHandlerMixin:
 
     @api_endpoint("SYS", "debug_log")
     def _handle_debug_log(self) -> None:
-        """클라 debugLog 이벤트를 서버 파일에 적재한다 (플래그 게이트).
+        """Load client debugLog events to server file (flag gate).
 
         method: POST
         url: /api/debug-log
@@ -63,7 +63,7 @@ class SyncHandlerMixin:
 
     @api_endpoint("SYS", "restart")
     def _handle_restart(self) -> None:
-        """서버 재시작 요청을 처리한다.
+        """Processes server restart requests.
 
         method: POST
         url: /api/restart

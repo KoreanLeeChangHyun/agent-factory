@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""ensure_bin_path.sh - Claude Code Bash tool 환경에 .agent-factory/bin PATH를 주입한다.
+"""ensure_bin_path.sh - Injects .agent-factory/bin into the Claude Code Bash tool environment.
 
-SessionStart hook에서 호출되며, CLAUDE_ENV_FILE에 PATH export 문을 작성한다.
-Claude Code는 CLAUDE_ENV_FILE의 export 문을 이후 Bash tool 실행 환경에 적용한다.
+Called by the SessionStart hook and writes a PATH export statement to CLAUDE_ENV_FILE.
+Claude Code applies the export statements in CLAUDE_ENV_FILE to subsequent Bash tool environments.
 
-stdout: 없음 (SessionStart hook stdout은 system prompt로 주입되므로 아무것도 출력하지 않는다)
-stderr: 디버그 로그 (필요 시)
-exit code: 0 (항상 성공)
+stdout: none (SessionStart hook stdout is injected into the system prompt, so nothing is printed)
+stderr: debug logs when needed
+exit code: 0 (always succeeds)
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ import sys
 
 
 def main() -> None:
-    """CLAUDE_ENV_FILE에 .agent-factory/bin PATH export를 작성한다.
+    """Write the .agent-factory/bin PATH export to CLAUDE_ENV_FILE.
 
-    CLAUDE_PROJECT_DIR 환경변수를 사용하여 bin 디렉터리 경로를 결정한다.
-    CLAUDE_ENV_FILE이 설정되지 않았거나 bin 디렉터리가 없으면 조용히 종료한다.
+    Uses the CLAUDE_PROJECT_DIR environment variable to determine the bin directory path.
+    Exits quietly if CLAUDE_ENV_FILE is not set or the bin directory does not exist.
     """
     env_file = os.environ.get('CLAUDE_ENV_FILE', '')
     if not env_file:

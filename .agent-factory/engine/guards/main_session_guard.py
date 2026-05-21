@@ -1,29 +1,29 @@
 #!/usr/bin/env -S python3 -u
-"""메인 세션 Write/Edit/Bash 차단 가드 Hook 스크립트.
+"""Main session Write/Edit/Bash blocking guard Hook script.
 
-PreToolUse(Write|Edit|Bash) 이벤트에서 현재 세션이 워크플로우 세션
-(_WF_SESSION_TYPE=workflow 또는 P:T-* tmux 윈도우)이 아닌 메인 세션이면
-코드 수정을 차단한다.
-비워크플로우 환경에서도 차단한다.
-Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
+In the PreToolUse(Write|Edit|Bash) event, the current session is the workflow session.
+If the main session is not (_WF_SESSION_TYPE=workflow or P:T-*tmux window)
+Block code modification.
+Blocks even in non-workflow environments.
+For Bash tools, only commands containing file modification patterns are blocked.
 
-세션 식별은 session_identifier.get_session_type()에 위임한다.
+Session identification is delegated to session_identifier.get_session_type().
 
-화이트리스트 정책:
-    - .agent-factory/.version: 메인 세션에서도 수정 허용
-    - 사용자 메모리 디렉터리 (~/.claude/projects/<encoded>/memory/**):
-      코드와 무관한 auto memory 영역으로 가드 범위 외.
-      Write/Edit file_path가 메모리 디렉터리 하위이면 즉시 통과.
-      Bash 명령에서 메모리 경로 인자만 대상이고 코드 경로 미포함이면 통과.
-      메모리 경로와 코드 경로 혼재 시 차단 보존(보수적 분기).
+Whitelist Policy:
+    - .agent-factory/.version: Modification is also allowed in the main session.
+    - User memory directory (~/.claude/projects/<encoded>/memory/**):
+      An auto memory area unrelated to the code and outside the guard range.
+      If Write/Edit file_path is under a memory directory, it passes immediately.
+      In a Bash command, if only the memory path argument is targeted and the code path is not included, it passes.
+      Blocking preservation (conservative branching) when memory paths and code paths are mixed.
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 메인 세션 Write/Edit/Bash 차단
+Main functions:
+    main: Hook entry point, blocks main session Write/Edit/Bash after parsing stdin JSON
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_MAIN_SESSION_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_MAIN_SESSION_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -79,16 +79,16 @@ _CODE_PATH_PATTERN: re.Pattern[str] = re.compile(
 
 
 def _is_memory_path(path: str) -> bool:
-    """파일 경로가 사용자 메모리 디렉터리 하위인지 확인한다.
+    """Check whether the file path is under the user memory directory.
 
-    ~/.claude/projects/<encoded>/memory/ 또는 그 하위 경로를 매칭한다.
-    os.path.expanduser로 ~ 를 절대경로로 변환한 뒤 패턴 검사한다.
+    Matches ~/.claude/projects/<encoded>/memory/ or its subpath.
+    Convert ~ to an absolute path with os.path.expanduser and check the pattern.
 
     Args:
-        path: 검사할 파일 경로 (절대경로 또는 ~ 시작 경로)
+        path: File path to check (absolute path or ~start path)
 
     Returns:
-        메모리 디렉터리 하위 경로이면 True, 아니면 False.
+        True if it is a subpath of the memory directory, False otherwise.
     """
     if not path:
         return False
@@ -97,10 +97,10 @@ def _is_memory_path(path: str) -> bool:
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -114,18 +114,18 @@ def _deny(reason: str) -> None:
 
 
 def _strip_quoted_args(command: str) -> str:
-    """명령 문자열에서 따옴표로 감싼 영역의 내용을 빈 문자열로 치환한다.
+    """Replaces the contents of the area surrounded by quotation marks in the command string with an empty string.
 
-    작은따옴표('...') 및 큰따옴표("...") 내부 텍스트를 제거하여
-    인자 값에 위험 명령어 텍스트가 포함되어도 패턴 매칭 대상에서
-    제외되도록 전처리한다. 이스케이프된 따옴표(\\", \\')는 따옴표
-    종료로 인식하지 않는다.
+    By removing text inside single quotes ('...') and double quotes ("..."),
+    Even if the argument value contains dangerous command text, the pattern matching target
+    Preprocess to exclude. Escaped quotation marks (\\", \\') are quotation marks.
+    It is not recognized as an end.
 
     Args:
-        command: Bash 도구의 원본 command 문자열
+        command: Original command string from Bash tool
 
     Returns:
-        따옴표 내부 내용이 제거된 문자열. 따옴표 기호 자체는 유지된다.
+        A string with the content inside the quotes removed. The quotation marks themselves are preserved.
     """
     # Double quotes: Skip escaped \" and replace content with empty string
     command = re.sub(r'"(?:[^"\\]|\\.)*"', '""', command)
@@ -135,21 +135,21 @@ def _strip_quoted_args(command: str) -> str:
 
 
 def _extract_command_positions(command: str) -> list[str]:
-    """명령 문자열을 파이프/체인 구분자로 분할하여 세그먼트 목록을 반환한다.
+    """Splits the command string by the pipe/chain delimiter and returns a list of segments.
 
-    따옴표 strip 후의 명령 문자열을 파이프(|), 세미콜론(;), AND(&&),
-    OR(||) 구분자로 분할한다. 각 세그먼트 선행 공백을 제거하여
-    명령어 토큰이 세그먼트 시작 위치에 오도록 한다.
+    The command string after the strip quotes is pipe (|), semicolon (;), AND (&&),
+    Split with OR(||) delimiter. By removing leading spaces from each segment,
+    Ensure that the command token is at the start of the segment.
 
-    분할 순서: &&, ||를 먼저 처리하고, 이후 |, ; 순으로 분할한다.
-    단일 | 는 || 와 구별하기 위해 (?<!|)\\|(?!|) 패턴으로 매칭한다.
+    Splitting order: &&, || are processed first, followed by |, ; Divide in order.
+    single | is || To distinguish it from , it matches with the pattern (?<!|)\\|(?!|).
 
     Args:
-        command: 따옴표 strip이 완료된 명령 문자열
+        command: command string complete with quoted strip
 
     Returns:
-        각 세그먼트의 선행 공백이 제거된 문자열 목록.
-        빈 문자열 세그먼트는 제외된다.
+        A list of strings with leading spaces removed from each segment.
+        Empty string segments are excluded.
     """
     # &&, ||, single |, ; Split by delimiter (treat || before |)
     parts = re.split(r'&&|\|\||(?<!\|)\|(?!\|)|;', command)
@@ -157,16 +157,16 @@ def _extract_command_positions(command: str) -> list[str]:
 
 
 def _check_bash_file_modify(command: str) -> None:
-    """Bash 명령에서 파일 수정 패턴을 검사하고 매칭 시 차단한다.
+    """Bash commands check file modification patterns and block when matching.
 
-    따옴표로 감싼 인자 영역을 먼저 제거(_strip_quoted_args)한 뒤,
-    파이프/체인 구분자로 세그먼트를 분할(_extract_command_positions)하여
-    각 세그먼트에서 _BASH_FILE_MODIFY_PATTERNS 패턴을 검사한다.
-    하나라도 매칭되면 _deny()를 호출한다.
-    매칭되지 않으면 sys.exit(0)으로 통과한다.
+    First remove the argument area surrounded by quotes (_strip_quoted_args), then
+    Split segments by pipe/chain separator (_extract_command_positions)
+    Check the _BASH_FILE_MODIFY_PATTERNS pattern in each segment.
+    If at least one match is made, _deny() is called.
+    If it does not match, it passes through sys.exit(0).
 
     Args:
-        command: Bash 도구의 command 문자열
+        command: Command string of Bash tool
     """
     stripped = _strip_quoted_args(command)
     segments = _extract_command_positions(stripped)
@@ -179,13 +179,13 @@ def _check_bash_file_modify(command: str) -> None:
 
 
 def main() -> None:
-    """메인 세션 Write/Edit/Bash 차단 Hook의 진입점.
+    """Main session Write/Edit/Bash blocking Hook entry point.
 
-    stdin에서 JSON을 읽어 Write/Edit/Bash 도구 사용 시 현재 세션이
-    워크플로우 세션인지 확인하고, 메인 세션이면 deny 응답을 출력하여
-    코드 수정을 차단한다.
-    세션 식별은 session_identifier.get_session_type()에 위임한다.
-    Bash 도구의 경우 파일 수정 패턴이 포함된 명령만 차단한다.
+    When using Write/Edit/Bash tools by reading JSON from stdin, the current session
+    Check if it is a workflow session, and if it is a main session, output a deny response
+    Block code modification.
+    Session identification is delegated to session_identifier.get_session_type().
+    For Bash tools, only commands containing file modification patterns are blocked.
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_MAIN_SESSION_GUARD") or read_env("HOOK_MAIN_SESSION_GUARD")

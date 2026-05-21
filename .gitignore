@@ -37,9 +37,6 @@ __pycache__/
 .codex/tmp/
 .codex/.tmp/
 
-.temp/*
-.temp/
-
 temp/
 
 .vscode/
@@ -48,4 +45,4 @@ uploads
 
 work/
 
-.repo
+repo

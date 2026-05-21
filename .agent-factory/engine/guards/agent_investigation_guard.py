@@ -1,20 +1,20 @@
 #!/usr/bin/env -S python3 -u
-"""메인 세션 조사 목적 서브에이전트 차단 가드 Hook 스크립트.
+"""Main session investigation purpose Subagent blocking guard Hook script.
 
-PreToolUse(Task) 이벤트에서 subagent_type이 조사 목적(Explore, general-purpose)이거나
-허용 목록에 없는 미지정값인 경우, 현재 세션이 워크플로우 세션이 아니면
-해당 서브에이전트 호출을 차단한다.
-세션 유형은 session_identifier.get_session_type()으로 판별한다.
+In the PreToolUse(Task) event, the subagent_type is Explore, general-purpose, or
+If the value is unspecified and not in the allow list, the current session is not a workflow session.
+Blocks the subagent call.
+The session type is determined with session_identifier.get_session_type().
 
-허용 subagent_type: worker-opus, worker-sonnet, planner, reporter, validator
+Allowed subagent_types: worker-opus, worker-sonnet, planner, reporter, validator
 
-주요 함수:
-    main: Hook 진입점, stdin JSON 파싱 후 조사 목적 서브에이전트 차단
+Main functions:
+    main: Hook entry point, parses stdin JSON and blocks subagent for investigation purposes
 
-입력: stdin으로 JSON (tool_name, tool_input)
-출력: 차단 시 hookSpecificOutput JSON, 통과 시 빈 출력
+Input: JSON to stdin (tool_name, tool_input)
+Output: hookSpecificOutput JSON when blocking, empty output when passing.
 
-토글: 환경변수 HOOK_AGENT_INVESTIGATION_GUARD (false/0 = 비활성, 기본 활성)
+Toggle: Environment variable HOOK_AGENT_INVESTIGATION_GUARD (false/0 = disabled, default enabled)
 """
 
 from __future__ import annotations
@@ -50,10 +50,10 @@ _ALLOWED_SUBAGENT_TYPES: frozenset[str] = frozenset({
 
 
 def _deny(reason: str) -> None:
-    """차단 JSON을 stdout에 출력하고 프로세스를 종료한다.
+    """Prints the blocking JSON to stdout and terminates the process.
 
     Args:
-        reason: 차단 사유 문자열
+        reason: Blocking reason string
     """
     result = {
         "hookSpecificOutput": {
@@ -67,16 +67,16 @@ def _deny(reason: str) -> None:
 
 
 def _extract_subagent_type(tool_input: dict) -> str:
-    """tool_input에서 subagent_type을 추출한다.
+    """Extract subagent_type from tool_input.
 
-    tool_input 딕셔너리의 최상위 키 'subagent_type'을 우선 확인하고,
-    없는 경우 'prompt' 문자열에서 파싱을 시도한다.
+    First check the top key 'subagent_type' of the tool_input dictionary,
+    If not present, parsing is attempted from the 'prompt' string.
 
     Args:
-        tool_input: Task 도구의 tool_input 딕셔너리
+        tool_input: tool_input dictionary of Task tools
 
     Returns:
-        추출된 subagent_type 문자열. 찾지 못한 경우 빈 문자열.
+        Extracted subagent_type string. Empty string if not found.
     """
     # Check top level key first
     subagent_type = tool_input.get("subagent_type", "")
@@ -99,13 +99,13 @@ def _extract_subagent_type(tool_input: dict) -> str:
 
 
 def main() -> None:
-    """메인 세션 조사 목적 서브에이전트 차단 Hook의 진입점.
+    """Entry point of main session investigation purpose subagent blocking hook.
 
-    stdin에서 JSON을 읽어 Task 도구 사용 시 subagent_type이 조사 목적
-    (Explore, general-purpose)이거나 허용 목록에 없는 미지정값인 경우,
-    현재 세션이 워크플로우 세션인지 확인하고,
-    워크플로우 세션이 아니면 deny 응답을 출력하여 서브에이전트 호출을 차단한다.
-    세션 유형은 session_identifier.get_session_type()으로 판별한다.
+    When reading JSON from stdin and using the Task tool, subagent_type is used for investigation purposes.
+    (Explore, general-purpose) or an unspecified value not in the allow list,
+    Check if the current session is a workflow session,
+    If it is not a workflow session, a deny response is output to block the subagent call.
+    The session type is determined with session_identifier.get_session_type().
     """
     # Load settings from .agent-factory/.settings
     hook_flag = os.environ.get("HOOK_AGENT_INVESTIGATION_GUARD") or read_env("HOOK_AGENT_INVESTIGATION_GUARD")

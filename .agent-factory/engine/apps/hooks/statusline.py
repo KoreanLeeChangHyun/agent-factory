@@ -6,10 +6,10 @@
 """
 Claude Code Statusline - Context Usage Progress Bar
 
-stdin으로 JSON 데이터를 받아 컨텍스트 사용률 프로그레스 바를 stdout으로 출력합니다.
-외부 의존성 없이 Python 3.8+ 표준 라이브러리만 사용합니다.
+It receives JSON data to stdin and outputs a context utilization progress bar to stdout.
+It uses only the Python 3.8+ standard library with no external dependencies.
 
-CCWO의 설계 패턴을 참고하되, 우리 시스템(.workflow/ 기반)에 맞게 재작성했습니다.
+We refer to CCWO's design pattern, but rewrite it to fit our system (.workflow/ based).
 """
 
 from __future__ import annotations
