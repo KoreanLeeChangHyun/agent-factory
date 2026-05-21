@@ -4,63 +4,61 @@
 > v2 = **driver script 1 프로세스 (룰베이스, LLM 호출 X) + claude -p subprocess N개 (Step 마다 1개)**. 메인 세션은 오케스트레이터 아님 — 사용자 대화 전용.
 > 어휘: `workflow_step` (6단계 FSM), `work_phase` (WORK 내부 sub-단계). `workflow_phase` 는 v1 옛 키 — 사용 금지.
 
-## 칸반 상태 흐름
+## Conveyor 상태 흐름
 
 ### 5단계 FSM
 
-> 이 5단계는 `kanban_status` 도메인이며 워크플로우 8상태(`workflow_step`: NONE/INIT/PLAN/WORK/VALIDATE/REPORT/DONE/FAILED) 와 분리됨.
+> 이 5단계는 `conveyor_status` 도메인이며 워크플로우 STEP(`workflow_step`: PREPARE/PLAN/WORK/VERIFY/REPORT/COMPLETE/FAILED) 과 분리됨.
 
-```
-To Do → Open → In Progress → Review → Done
-```
+Draft → Accepted → Executing → Verifying → Complete
 
-- **To Do**: 미래에 할 백로그·아이디어 저장소 (티켓 생성 공간). 지금 당장 집중하지 않는 작업.
-- **Open**: 지금 집중해야 하는 임박 작업. 워크플로우 실행(`/wf -s N`) 대상.
-- **In Progress**: 워크플로우 실행 중인 상태.
-- **Review**: 워크플로우 완료 후 보고서 검토 + 카드 4행 토글로 feature 브랜치 활성화 → 사용자 직접 테스트 + 사용자 리뷰. (토글 ON: feature 브랜치로 git switch, OFF: develop 복귀)
-- **Done**: 머지 + 사용자 직접 테스트 통과 후의 진짜 종결. 작업 흐름(코드 머지) + 사용자 검증(직접 테스트) 양쪽이 끝난 상태만 Done으로 처리한다.
+- **Draft**: 미래에 할 백로그·아이디어 저장소 (WorkRequest 생성 공간). 지금 당장 집중하지 않는 작업.
+- **Accepted**: 지금 집중해야 하는 임박 작업. 워크플로우 실행(`/wf -s N`) 대상.
+- **Executing**: 워크플로우 엔진이 작업 준비 → 작업 계획 → 작업 수행 → 작업 검사 → 작업 보고 → 작업 완료 STEP을 수행하는 상태.
+- **Verifying**: 워크플로우 완료 후 보고서 검토 + 카드 4행 토글로 feature 브랜치 활성화 → 사용자 직접 테스트 + 사용자 리뷰. (토글 ON: feature 브랜치로 git switch, OFF: develop 복귀)
+- **Complete**: 머지 + 사용자 직접 테스트 통과 후의 진짜 종결. 작업 흐름(코드 머지) + 사용자 검증(직접 테스트) 양쪽이 끝난 상태만 Complete로 처리한다.
 
 ### 전이 규칙
 
 | 전이 | 방법 | 비고 |
 |------|------|------|
-| To Do → Open | `flow-kanban move T-NNN open` | 승격 |
-| Open → To Do | `flow-kanban move T-NNN todo` | 강등 |
-| Open → In Progress | `/wf -s N` | 워크플로우 실행 |
-| In Progress → Review | 워크플로우 자동 전이 | driver finalize |
-| Review → Done | `/wf -d N` | |
-| Review → Open | `/wf -e N` | 재작업 |
+| Draft → Accepted | `flow-conveyor move WR-NNN accepted` | 승격 |
+| Accepted → Draft | `flow-conveyor move WR-NNN draft` | 강등 |
+| Accepted → Executing | `/wf -s N` | 워크플로우 실행 |
+| Executing → Verifying | 워크플로우 자동 전이 | driver finalize |
+| Verifying → Complete | `/wf -d N` | |
+| Verifying → Accepted | `/wf -e N` | 재작업 |
 
-### 티켓 생성 규칙
+### WorkRequest 생성 규칙
 
-티켓은 **무조건 To Do 상태로 생성**한다 (MUST). 사용자가 즉시 집중하려면 칸반 DnD (To Do → Open) 한 번으로 충분하므로 생성 시점 상태 결정·메뉴 질의는 불필요한 낭비.
+WorkRequest는 **무조건 Draft 상태로 생성**한다 (MUST). 사용자가 즉시 집중하려면 Conveyor DnD (Draft → Accepted) 한 번으로 충분하므로 생성 시점 상태 결정·메뉴 질의는 불필요한 낭비.
 
 ```bash
-flow-kanban create "제목" --command implement --status todo
+flow-conveyor create "제목" --command implement --status draft
 ```
 
 ### 번호 영역 정책
 
-티켓 번호는 단일 영역 (T-001 ~ T-NNN). 자동 채번은 `max(전체) + 1`, 또는 `--number` 로 명시. 동일 번호 충돌 시 에러.
+WorkRequest 번호는 단일 영역 (WR-001 ~ WR-NNN). 자동 채번은 `max(전체) + 1`, 또는 `--number` 로 명시. 동일 번호 충돌 시 에러.
 
 ## DO
-- 코드 수정은 기본적으로 `/wf -e` 로 티켓 생성/편집 후 `/wf -s N` 으로 실행
+- 코드 수정은 기본적으로 `/wf -e` 로 WorkRequest 생성/편집 후 `/wf -s N` 으로 실행
 - 사용자가 직접 수정을 명시 요청한 경우에만 메인 세션에서 직접 수정
-- 메인 세션은 기본적으로 티켓 관리·상태 확인·결과 리뷰 등 조율 역할 담당
+- 메인 세션은 기본적으로 WorkRequest 관리·상태 확인·결과 리뷰 등 조율 역할 담당
 - 자연어 요청도 워크플로우 명령으로 변환하여 처리 (아래 자연어 매핑 참조)
-- 티켓 생성 시 대화 맥락에서 관련 티켓이 있으면 `flow-kanban link` 로 관계를 자동 연결한다 (SHOULD)
-  - 기존 티켓 실행 중 발견된 버그/이슈 → `--derived-from` (파생)
+- WorkRequest 생성 시 대화 맥락에서 관련 WorkRequest가 있으면 `flow-conveyor link` 로 관계를 자동 연결한다 (SHOULD)
+  - 기존 WorkRequest 실행 중 발견된 버그/이슈 → `--derived-from` (파생)
   - 선행 작업이 필요한 경우 → `--depends-on` (의존)
   - 후속 작업을 차단하는 경우 → `--blocks` (차단)
-- 티켓 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status todo` 로 생성한다. Open 승격은 사용자가 칸반 DnD 로 직접 수행
-- 티켓 생성 전 사용자 요구사항이 모호하면 **Ouroboros 5단계 루프** (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 로 WorkRequest 를 실행 전 계약 수준까지 다듬는다 (MUST). CLARIFY 단계에서는 메뉴 (1=A/2=B) 형태 질의 금지, 한 번에 1~2개씩만 자연어로 묻고 답을 받아 다음 질문으로 진행
+- WorkRequest 생성 시 상태 메뉴 질의 금지 (MUST NOT). 무조건 `--status draft` 로 생성한다. Accepted 승격은 사용자가 Conveyor DnD 로 직접 수행
+- WorkRequest 생성 전 사용자 요구사항이 모호하면 **Ouroboros 5단계 루프** (DRAFT → CLARIFY → CRITIQUE → REWRITE → ACCEPT) 로 WorkRequest 를 실행 전 계약 수준까지 다듬는다 (MUST). CLARIFY 단계에서는 메뉴 (1=A/2=B) 형태 질의 금지, 한 번에 1~2개씩만 자연어로 묻고 답을 받아 다음 질문으로 진행
   - **호출 강제 (MUST)**: 아래 트리거 감지 시 description match 에 의존하지 말고 **즉시 Skill 도구로 `grill-me` 명시 호출** (스킬은 Ouroboros 5단계 루프를 구현). 본 룰이 호출 강제의 단일 진실 공급원
-  - **트리거 키워드**: `티켓 만들어줘`, `/wf -o`, `티켓 생성해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화
+  - **트리거 키워드**: `WorkRequest 만들어줘`, `/wf -o`, `WorkRequest 생성해줘`, `grill me`, `캐물어줘`, `제대로 물어봐`, `인터뷰해줘`, 또는 **작업 범위·산출물 형태·제약·우선순위** 중 하나라도 모호한 신규 요청 발화
   - **5단계 책임 분담**:
-    - **DRAFT**: 사용자 발화·제목·command (`implement`/`research`/`review`) 초안 채집 + `flow-kanban create "" --command init --status todo` 로 빈 티켓 채번
+    - **DRAFT**: 사용자 발화·제목·command (`implement`/`research`/`review`) 초안 채집 + `flow-conveyor create "" --command init --status draft` 로 빈 WorkRequest 채번
     - **CLARIFY**: `goal`/`target`/`constraints`/`criteria`/`context` 5필드 중 도구로 답할 수 없는 항목만 한 번에 1~2개 자연어 질문 (메뉴 형태 금지)
     - **CRITIQUE**: 어시스턴트가 모호한 대상·검증 불가능한 기준·범위 확장 위험·숨은 의존성을 명시 짚음 (사용자가 묻기 전 선제적으로)
-    - **REWRITE**: `flow-kanban update-prompt T-NNN --command ... --goal ... --target ... --constraints ... --criteria ... --context ...` 호출. 추론한 제약·가정·위험은 `context` 또는 `constraints` 에 명시
+    - **REWRITE**: `flow-conveyor update-prompt WR-NNN --command ... --goal ... --target ... --constraints ... --criteria ... --context ...` 호출. 추론한 제약·가정·위험은 `context` 또는 `constraints` 에 명시
     - **ACCEPT**: 품질 점수 ≥ 0.6 (`goal`/`target`/`constraints`/`criteria` 4태그 각 10자 이상 + `TODO:` 미시작) + 사용자 합의 시 종결. 이후 `/wf -s N` 으로 v2 driver 발사
   - **합법 전이** (`.agent-factory/engine/core/work_requests/ouroboros.py` `_NEXT_PHASE`):
     - `DRAFT → CLARIFY` 필수
@@ -69,43 +67,43 @@ flow-kanban create "제목" --command implement --status todo
     - `REWRITE → CLARIFY` (재인터뷰) 또는 `REWRITE → ACCEPT` (충분 시)
     - `ACCEPT → (terminal)`
   - **묻는 대상**: 작업 범위 / 산출물 형태 / 제약 / 우선순위 등 연구·구현 방향에 결정적인 모호 포인트
-  - **묻지 않는 대상**: 티켓 상태 (자동 To Do), 기본 생성 옵션 (기본값 사용)
-  - **이력 기록**: 가능한 경우 티켓 XML `<ouroboros_history>` 에 각 단계 진입 시각·텍스트를 누적 기록 (`OuroborosEntry` 형태)
+  - **묻지 않는 대상**: WorkRequest 상태 (자동 Draft), 기본 생성 옵션 (기본값 사용)
+  - **이력 기록**: 가능한 경우 WorkRequest XML `<ouroboros_history>` 에 각 단계 진입 시각·텍스트를 누적 기록 (`OuroborosEntry` 형태)
   - **상세 호출 절차 / 예시**: `.claude/skills/grill-me/SKILL.md` (Ouroboros 5단계 루프 구현), `.claude/skills/brainstorming/SKILL.md` (DRAFT 진입 전 컨셉 정리). 룰 정의는 본 문서가 단일 진실 공급원
 - 사용자가 설계·아키텍처·워크플로우·구조 제안을 공유하면 **사용자가 "어때요?" 명시 요청하기 전에 즉시 약점을 짚는다** (MUST). 시각화·옵션 질의만 하고 약점 분석을 미루는 것 금지 (MUST NOT). 점검 7축:
   1. **재시도/실패 처리 의미론**: 실패 사유 피드백 루프 / 재시도 범위 / MAX 도달 시 후속 처리
   2. **컴포넌트 간 책임 중복**: 같은 일을 두 곳에서 하지 않는가 / 책임이 비어있는 영역은 없는가
   3. **기존 인프라와의 매핑**: 신설 vs 흡수 vs 폐지 결정점 / 기존 가드·규약과의 충돌
-  4. **FSM 경계 명시**: 새 `workflow_step` 이 기존 칸반 FSM(`kanban_status`) 의 어느 단계 안에 있는지 / 회귀 가능성
+  4. **FSM 경계 명시**: 새 `workflow_step` 이 기존 Conveyor FSM(`conveyor_status`) 의 어느 단계 안에 있는지 / 회귀 가능성
   5. **비용 vs 가치**: LLM 호출 추가 시 cost / skip 조건 정의 가능성
   6. **다른 모드와의 양립성**: 명령(research/implement/review) 분기와 일관성
   7. **명명 모호성**: 동음이의어 회피 — 동의어 페어마다 영어 식별자 분리
-- `flow-kanban create` 호출 시 `--status todo` 명시 (MUST)
-- 메인 클로드가 develop 브랜치에 직접 commit 하지 않는다 (MUST NOT) — 워크플로우 회귀 진단·복구 등 즉각 차단 케이스라도 `fix/...` 또는 `hotfix/...` 별도 브랜치 경유를 권장 (SHOULD). 머지 시 `--no-ff` 권장. 즉흥 브랜치 OK — 티켓 채번 없이 `fix/short-desc` 형태 브랜치 바로 생성 가능
+- `flow-conveyor create` 호출 시 `--status draft` 명시 (MUST)
+- 메인 클로드가 develop 브랜치에 직접 commit 하지 않는다 (MUST NOT) — 워크플로우 회귀 진단·복구 등 즉각 차단 케이스라도 `fix/...` 또는 `hotfix/...` 별도 브랜치 경유를 권장 (SHOULD). 머지 시 `--no-ff` 권장. 즉흥 브랜치 OK — WorkRequest 채번 없이 `fix/short-desc` 형태 브랜치 바로 생성 가능
 
 ## DO NOT
 - PreToolUse Hook 활성 시 직접 수정 시도하지 않는다 — 차단되므로 토큰 낭비
-- 서브에이전트(Agent 도구)를 통해 조사·수정을 직접 시도하지 않는다 — 티켓 생성 후 워크플로우로 처리
-- `flow-kanban` 호출 시 bin 레퍼런스에 나열되지 않은 서브커맨드를 사용하지 않는다
+- 서브에이전트(Agent 도구)를 통해 조사·수정을 직접 시도하지 않는다 — WorkRequest 생성 후 워크플로우로 처리
+- `flow-conveyor` 호출 시 bin 레퍼런스에 나열되지 않은 서브커맨드를 사용하지 않는다
 - `/clear` 후 시스템 프롬프트가 소실되었다고 가정하지 않는다 — SessionStart hook 이 자동 재주입
 - 사용자 발화에 명시되지 않은 행위를 추론하여 수행하지 않는다 — "추가해주세요"는 추가만 의미
 - `python3 .agent-factory/engine/...` 형태로 스크립트를 직접 호출하지 않는다 — `.agent-factory/bin/flow-*` wrapper 사용
-- derived-from 파생 티켓이 미완료(Done 아닌 상태)면 원본 티켓을 Done 처리하지 않는다 — Hook 이 차단
+- derived-from 파생 WorkRequest가 미완료(Complete 아닌 상태)면 원본 WorkRequest를 Complete 처리하지 않는다 — Hook 이 차단
 
 ## bin wrapper 레퍼런스
 
 `.agent-factory/bin/flow-*` 실행 파일을 직접 호출 (alias 아님). 대화형 zsh 셸은 PATH 등록되어 있을 수 있으나, 비대화형 Bash tool 환경에서는 절대/상대 경로로 호출한다 (MUST).
 
-### flow-kanban 서브커맨드 (이 외 사용 금지)
-create, move, done, delete, update-title, update, update-prompt, update-result, set-editing, link, unlink, list, board, show
+### flow-conveyor 서브커맨드 (이 외 사용 금지)
+create, move, complete, delete, update-title, update, update-prompt, update-result, set-editing, link, unlink, list, board, show
 
 예시:
-- `.agent-factory/bin/flow-kanban create "제목" --command implement --status todo`
-- `.agent-factory/bin/flow-kanban update-prompt T-001 --goal "목표" --target "대상"`
-- `.agent-factory/bin/flow-kanban update-result T-001 --registrykey "20260329-180635" --workdir "경로"`
-- `.agent-factory/bin/flow-kanban link T-001 --derived-from T-000`
-- `.agent-factory/bin/flow-kanban move T-001 progress`
-- `.agent-factory/bin/flow-kanban done T-001`
+- `.agent-factory/bin/flow-conveyor create "제목" --command implement --status draft`
+- `.agent-factory/bin/flow-conveyor update-prompt WR-001 --goal "목표" --target "대상"`
+- `.agent-factory/bin/flow-conveyor update-result WR-001 --registrykey "20260329-180635" --workdir "경로"`
+- `.agent-factory/bin/flow-conveyor link WR-001 --derived-from WR-000`
+- `.agent-factory/bin/flow-conveyor move WR-001 accepted`
+- `.agent-factory/bin/flow-conveyor complete WR-001`
 
 ### XML 필드 개행 컨벤션
 복수 항목 필드(goal, target, constraints, criteria, context)에 여러 항목을 입력할 때는 반드시 `\n` 개행을 삽입한다 (MUST).
@@ -120,16 +118,16 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 
 | wrapper | 용도 |
 |---------|------|
-| `flow-wf` | **v2 워크플로우 driver 진입점** (`submit T-NNN [--step STEP]`) |
+| `flow-wf` | **v2 워크플로우 driver 진입점** (`submit WR-NNN [--step STEP]`) |
 | `flow-launcher` | 워크플로우 spawn (board UI 측 진입 — driver 호출 wrap) |
-| `flow-kanban` | 칸반 티켓 라이프사이클 (위 서브커맨드 참조) |
+| `flow-conveyor` | Conveyor WorkRequest 라이프사이클 (위 서브커맨드 참조) |
 | `flow-claude` | 세션 라이프사이클 (`start`, `end`) |
 | `flow-claude-edit` | `.claude/` 파일 편집 (`open`, `save`, `new`) — 직접 Edit/Write 차단 영역 우회 |
 | `flow-merge` | 워크트리 → develop 머지 (`--force` 시 워커 commit 누락도 자동 commit + merge) |
-| `flow-undo-done` | Done 처리 롤백 |
+| `flow-undo-complete` | Complete 처리 롤백 |
 | `flow-review-verdict` | 14룰 advisory verdict 단발 평가 |
 | `flow-validate` | plan.md 단계 검증 (rule-based) |
-| `flow-validate-p` | 티켓 XML prompt 필드 완성도 검수 |
+| `flow-validate-p` | WorkRequest XML prompt 필드 완성도 검수 |
 | `flow-skill` | 스킬 archive/activate/list |
 | `flow-skillmap` | 스킬맵 생성 |
 | `flow-catalog` | 스킬 카탈로그 갱신 (`--dry-run`) |
@@ -144,17 +142,17 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 > 스크립트 호출 시 반드시 위 bin wrapper 를 사용 (MUST). `python3` 직접 경로 호출 금지 (MUST NOT).
 
 ## 워크플로우 요약
-- entry-point: `/wf` 명령어 (단일 진입점). 내부적으로 `flow-wf submit T-NNN` 호출
-- lifecycle: 위 "칸반 상태 흐름" 5단계 FSM 참조
+- entry-point: `/wf` 명령어 (단일 진입점). 내부적으로 `flow-wf submit WR-NNN` 호출
+- lifecycle: 위 "Conveyor 상태 흐름" 5단계 FSM 참조
 - commands:
-  - `/wf -o`: 새 티켓 생성 (채번+용도선택만)
-  - `/wf -o N`: 기존 티켓 열람
-  - `/wf -e`: 새 티켓 생성 + 프롬프트 편집
-  - `/wf -e N`: 기존 티켓 편집
+  - `/wf -o`: 새 WorkRequest 생성 (채번+용도선택만)
+  - `/wf -o N`: 기존 WorkRequest 열람
+  - `/wf -e`: 새 WorkRequest 생성 + 프롬프트 편집
+  - `/wf -e N`: 기존 WorkRequest 편집
   - `/wf -oe` / `/wf -oe N`: `-o -e` 단축 별칭
-  - `/wf -s N`: 티켓 제출 및 워크플로우 실행
-  - `/wf -d N`: 티켓 종료 (Done)
-  - `/wf -c N`: 티켓 삭제
+  - `/wf -s N`: WorkRequest 제출 및 워크플로우 실행
+  - `/wf -d N`: WorkRequest 종료 (Complete)
+  - `/wf -c N`: WorkRequest 삭제
 - 상세 참조: `.claude/commands/wf.md`, `.claude/skills/workflow-wf/`
 
 ## 자연어 매핑
@@ -163,17 +161,17 @@ create, move, done, delete, update-title, update, update-prompt, update-result, 
 |--------|---------------|------|
 | "이거 수정해줘" / "코드 고쳐줘" | `/wf -e` → `/wf -s N` | - |
 | "분석해줘" / "조사해줘" | `/wf -e` (research) → `/wf -s N` | - |
-| "티켓 만들어" | `/wf -o` | - |
+| "WorkRequest 만들어" | `/wf -o` | - |
 | "리뷰해줘" | `/wf -e` (review) → `/wf -s N` | - |
 | "종료해줘" | `/wf -d N` | - |
-| "티켓 편집해줘" | `/wf -e N` | - |
-| "티켓 생성해줘" / "나중에" / "언젠가" / "백로그" | `/wf -o` | To Do 자동 |
-| "지금 집중" / "바로 해야 함" / "이번에 하자" | `/wf -o` → DnD | To Do 생성 후 사용자가 칸반 DnD 로 Open 승격 |
+| "WorkRequest 편집해줘" | `/wf -e N` | - |
+| "WorkRequest 생성해줘" / "나중에" / "언젠가" / "백로그" | `/wf -o` | Draft 자동 |
+| "지금 집중" / "바로 해야 함" / "이번에 하자" | `/wf -o` → DnD | Draft 생성 후 사용자가 Conveyor DnD 로 Accepted 승격 |
 | "데브루프 고정" / "데브루프에 올려" / "데브루프 동기화" / "올리자" | develop ff merge + origin push | "데브루프" = develop branch. 현재 작업 브랜치 → develop ff → `origin develop` push. non-FF 면 사용자 옵션 묻기. main 머지는 별도 release 결정 |
 
-## Review 단계 1차 룰베이스 자동 검증 (advisory)
+## Verifying 단계 1차 룰베이스 자동 검증 (advisory)
 
-> Review 컬럼 진입 직후 driver `_validate.py` 가 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건**. 사용자는 verdict FAIL 이어도 Review→Done DnD 강행 가능.
+> Verifying 컬럼 진입 직후 driver `_validate.py` 가 룰베이스 1차 자동 검증을 수행하여 advisory verdict (PASS / WARN / FAIL / SKIP) 를 카드 배지로 표시. **자동 강제 전이 / 강제 회귀 / 강제 차단 0건**. 사용자는 verdict FAIL 이어도 Verifying→Complete DnD 강행 가능.
 
 ### 검증 룰 카탈로그 (14 룰 / 7 카테고리)
 
@@ -237,7 +235,7 @@ SSOT = `.agent-factory/engine/v2/_validate.py`. 본 표는 요약.
 
 ### advisory 보장
 
-- `review_verdict.py` — kanban move / status 전이 / sentinel 호출 0건
+- `review_verdict.py` — Conveyor move / status 전이 / sentinel 호출 0건
 - driver finalize 직후 — try/except 흡수 비차단
 - Board API endpoint — GET only
 - UI 배지 — tooltip only (클릭 자동 액션 0건)
@@ -246,7 +244,7 @@ SSOT = `.agent-factory/engine/v2/_validate.py`. 본 표는 요약.
 
 ### 사용자 안내
 
-- verdict FAIL 이어도 Review→Done DnD 강행 가능 — advisory 권고일 뿐 차단 아님
+- verdict FAIL 이어도 Verifying→Complete DnD 강행 가능 — advisory 권고일 뿐 차단 아님
 - 배지 색: PASS=청록 / WARN=앰버 / FAIL=주홍 / SKIP/UNKNOWN=숨김
 - 배지 hover 시 violations 목록 tooltip 표시
 
@@ -262,9 +260,9 @@ SSOT = `.agent-factory/engine/v2/_validate.py`. 본 표는 요약.
 
 워크플로우 1건은 다음 두 조건을 모두 만족해야 한다 (MUST):
 
-### (1) 티켓 연결 필수
-- `.context.json` 의 `ticketNumber` 필드가 비어있지 않고 칸반에 실존해야 한다
-- 워크플로우 제목(title) = 티켓 제목과 동일
+### (1) WorkRequest 연결 필수
+- `.context.json` 의 `work_request_no` 필드가 비어있지 않고 Conveyor에 실존해야 한다
+- 워크플로우 제목(title) = WorkRequest 제목과 동일
 
 ### (2) v2 산출물 6 영역 (SPEC.md §3 캐논)
 
@@ -283,7 +281,7 @@ SSOT = `.agent-factory/engine/v2/_validate.py`. 본 표는 요약.
 
 ### How to apply
 - 정합성 검증·`flow-history sync` 도구는 위 두 조건을 검증 항목으로 포함
-- 옛 워크플로우 cleanup 시 룰 위반 케이스 (티켓 미연결 + 산출물 누락) 는 자동 폐기가 아니라 **사용자 결정 받기**
+- 옛 워크플로우 cleanup 시 룰 위반 케이스 (WorkRequest 미연결 + 산출물 누락) 는 자동 폐기가 아니라 **사용자 결정 받기**
 - 룰 위반은 advisory only — 자동 강제 차단·status 강제 전이 도입 금지 (general.md "추측 금지" 참조)
 
 ## Research 워크플로우 품질 룰 (MUST)
@@ -307,17 +305,17 @@ Research 워크플로우 (`/wf -s N` command=research) 산출물 품질은 **메
 
 ## Hook 가드 derived-from 우회 경로 (MUST)
 
-`flow-kanban done T-NNN` 호출 시 Hook 가드가 평가하는 derived-from 자식 상태는 **그 호출 시점의 칸반 상태**다. Done 처리 후 추가로 link 한 자식은 가드 대상이 아니다.
+`flow-conveyor complete WR-NNN` 호출 시 Hook 가드가 평가하는 derived-from 자식 상태는 **그 호출 시점의 Conveyor 상태**다. Complete 처리 후 추가로 link 한 자식은 가드 대상이 아니다.
 
 ### Why
-- 룰: derived-from 파생 티켓 미완료 시 원본 Done 차단 (DO NOT 섹션의 derived-from 룰)
-- 가드는 unlink 가능. unlink → done → relink 시퀀스로 정상 우회 가능 (관계 추적성 유지)
+- 룰: derived-from 파생 WorkRequest 미완료 시 원본 Complete 차단 (DO NOT 섹션의 derived-from 룰)
+- 가드는 unlink 가능. unlink → complete → relink 시퀀스로 정상 우회 가능 (관계 추적성 유지)
 
 ### How to apply
-- **권장 순서 (research → implement)**: research 티켓 Review 진입 → 사용자 검토 → research Done **먼저** → 후속 implement 티켓 등록 + `--derived-from research` link
-- **이미 link 된 후 Done 차단 시 우회 시퀀스**:
-  1. `flow-kanban unlink T-자식 --derived-from T-부모` (자식 모두 반복)
-  2. `flow-kanban done T-부모`
-  3. `flow-kanban link T-자식 --derived-from T-부모` (관계 복원)
-- Done 후 link 는 부모의 Relations 에 `blocks T-자식` 형태로 표시 (양방향 reverse)
+- **권장 순서 (research → implement)**: research WorkRequest Verifying 진입 → 사용자 검토 → research Complete **먼저** → 후속 implement WorkRequest 등록 + `--derived-from research` link
+- **이미 link 된 후 Complete 차단 시 우회 시퀀스**:
+  1. `flow-conveyor unlink WR-자식 --derived-from WR-부모` (자식 모두 반복)
+  2. `flow-conveyor complete WR-부모`
+  3. `flow-conveyor link WR-자식 --derived-from WR-부모` (관계 복원)
+- Complete 후 link 는 부모의 Relations 에 `blocks WR-자식` 형태로 표시 (양방향 reverse)
 - **가드 우회를 위해 derived-from 을 영구 제거하지 말 것** — 관계 추적성 손실
