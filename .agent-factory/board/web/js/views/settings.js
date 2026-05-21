@@ -248,7 +248,7 @@
       '</div>' +
       '<div class="settings-item">' +
         '<div class="settings-item-info">' +
-          '<div class="settings-item-key">Terminal capability</div>' +
+          '<div class="settings-item-key">Terminal Capability</div>' +
           '<div class="settings-item-label" id="settings-terminal-capability-label">' + terminalCapabilityLabel(brain) + '</div>' +
         '</div>' +
         '<div class="settings-item-control"><span class="settings-capability-pill" id="settings-terminal-capability-pill">' + terminalCapabilityPill(brain) + '</span></div>' +
