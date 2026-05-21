@@ -14,5 +14,5 @@ def test_flow_wf_delegates_to_production_line(monkeypatch) -> None:
 
     monkeypatch.setattr(flow_wf, "driver_main", fake_driver_main)
 
-    assert flow_wf.main(["T-123", "--step", "PLAN"]) == 17
-    assert calls == [["T-123", "--step", "PLAN"]]
+    assert flow_wf.main(["WR-123", "--step", "PLAN"]) == 17
+    assert calls == [["WR-123", "--step", "PLAN"]]
