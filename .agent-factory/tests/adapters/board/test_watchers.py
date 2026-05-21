@@ -18,21 +18,21 @@ class _Logger:
 
 
 def test_file_watcher_reports_added_files_by_event_type(tmp_path: Path) -> None:
-    watched = tmp_path / "tickets" / "open"
+    watched = tmp_path / "work-requests" / "accepted"
     watched.mkdir(parents=True)
     events: list[tuple[str, list[str]]] = []
 
     watcher = FileWatcher(
         str(tmp_path),
         lambda event_type, files: events.append((event_type, sorted(files))),
-        watch_dirs={os.path.join("tickets", "open"): "kanban"},
+        watch_dirs={os.path.join("work-requests", "accepted"): "conveyor"},
         interval=0.01,
     )
 
-    (watched / "T-001.xml").write_text("<ticket />", encoding="utf-8")
+    (watched / "WR-001.xml").write_text("<work_request />", encoding="utf-8")
     watcher.check_changes()
 
-    assert events == [("kanban", ["T-001.xml"])]
+    assert events == [("conveyor", ["WR-001.xml"])]
 
 
 def test_git_branch_watcher_reports_branch_change(tmp_path: Path) -> None:
@@ -81,4 +81,4 @@ def test_git_branch_watcher_swallows_callback_errors(tmp_path: Path) -> None:
 
     watcher.check()
 
-    assert logger.exceptions == ["GitBranchWatcher on change Callback failed"]
+    assert logger.exceptions == ["GitBranchWatcher on_change callback failed"]
