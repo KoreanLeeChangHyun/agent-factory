@@ -14,7 +14,7 @@ def test_parse_plan_json_loads_core_plan(tmp_path: Path) -> None:
         json.dumps(
             {
                 "schema_version": 2,
-                "ticket": "T-504",
+                "work_request": "WR-504",
                 "command": "implement",
                 "mode": "multi",
                 "phases": [
@@ -33,7 +33,7 @@ def test_parse_plan_json_loads_core_plan(tmp_path: Path) -> None:
 
     plan = parse_plan_json(path)
 
-    assert plan.ticket == "T-504"
+    assert plan.work_request == "WR-504"
     assert plan.phases[0].id == "P1"
 
 
@@ -50,4 +50,3 @@ def test_topo_levels_groups_parallel_phases() -> None:
         ["P1", "P2"],
         ["P3"],
     ]
-

@@ -1,6 +1,6 @@
 """Core planning loader for `plan/plan.json`.
 
-Output Format Determination Canon (T-504):
+Output Format Determination Canon (WR-504):
 - driver (machine) reads **JSON** file — json.loads + dataclass validation determinism.
 - Natural language text for LLM ↔ LLM handover is stuffed separately in **plan/plan.md** (PLAN LLM is calculated simultaneously).
 - This module is only responsible for JSON.

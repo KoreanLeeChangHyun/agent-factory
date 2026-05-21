@@ -2,7 +2,7 @@
 
 target: `engine.core.planning.loader` module `parse plan json` (JSON SSOT parser).
 
-T-504 Canon SSOT (driver = JSON / LLM↔LLM = md / person = HTML)
+WR-504 Canon SSOT (driver = JSON / LLM↔LLM = md / person = HTML)
 The PLAN LLM simultaneously calculates the two files of "plan/plan.json" + "plan/plan.md"
 The driver is parsing only the "plan/plan.json" This test is valid for that parse.
 
@@ -34,7 +34,7 @@ def _write_plan_json(tmp_path: Path, payload: dict) -> Path:
 def _good_payload() -> dict:
     return {
         "schema_version": 2,
-        "ticket": "T-504",
+        "work_request": "WR-504",
         "command": "implement",
         "mode": "multi",
         "phases": [
@@ -65,7 +65,7 @@ def test_parse_plan_json_basic(tmp_path: Path) -> None:
     plan = parse_plan_json(path)
     assert isinstance(plan, Plan)
     assert plan.schema_version == 2
-    assert plan.ticket == "T-504"
+    assert plan.work_request == "WR-504"
     assert plan.command == "implement"
     assert plan.mode == "multi"
     assert len(plan.phases) == 2
@@ -188,11 +188,11 @@ def test_parse_plan_json_circular_deps(tmp_path: Path) -> None:
         parse_plan_json(path)
 
 
-def test_parse_plan_json_sample_t504(tmp_path: Path) -> None:
-    """JSON equivalent to 6 Phase frontmatter of this T-504 plan."""
+def test_parse_plan_json_sample_wr504(tmp_path: Path) -> None:
+    """JSON equivalent to 6 Phase frontmatter of this WR-504 plan."""
     payload = {
         "schema_version": 2,
-        "ticket": "T-504",
+        "work_request": "WR-504",
         "command": "implement",
         "mode": "multi",
         "phases": [
@@ -255,7 +255,7 @@ def test_parse_plan_json_textwrap_dedent_ok() -> None:
         """\
         {
           "schema_version": 2,
-          "ticket": "T-504",
+          "work_request": "WR-504",
           "command": "implement",
           "mode": "multi",
           "phases": [
