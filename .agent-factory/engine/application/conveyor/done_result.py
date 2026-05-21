@@ -6,26 +6,28 @@ import re
 
 
 DONE_MERGE_OK_RE = re.compile(
-    r"(.+?)\s*->\s*develop\s+Merge\s+Complete\s+\(([0-9a-f]{6,})\)",
+    r"(.+?)\s*->\s*(?:develop\s+Merge\s+Complete|Complete\s+development\s+merge|Development\s+completion)\s+\(([0-9a-f]{6,})\)",
 )
-DONE_CONFLICT_HEADER = re.compile(r"^\[ERROR\]")
-DONE_DIRTY_HEADER = re.compile(r"Uncommitted\s+File\s+List\s*:")
+DONE_CONFLICT_HEADER = re.compile(r"^\[ERROR\].*(merge|conflict|collision)", re.IGNORECASE)
+DONE_DIRTY_HEADER = re.compile(r"(Uncommitted|Micommit)\s+File\s+List\s*:|Crash\s+file\s*:", re.IGNORECASE)
 DONE_PATH_RE = re.compile(r"^\s+-\s+(.+)$")
 DONE_CONFLICT_WARN_RE = re.compile(
-    r"\[WARN\].*(merge\s*conflict|merge\s+conflict)",
+    r"\[WARN\].*(merge\s*conflict|merge\s+conflict|merging\s+conflict)",
     re.IGNORECASE,
 )
 
 UNDO_STRATEGY_RESET = re.compile(r"\[undo-done\]\s+Strategy\s+1\s*:\s*reset")
 UNDO_STRATEGY_REVERT = re.compile(r"\[undo-done\]\s+Strategy\s+2\s*:\s*revert")
 UNDO_WORKTREE_RE = re.compile(
-    r"\[undo-done\]\s+Worktree\s+Recreate\s+Done\s*:\s*path=(\S+)\s+branch=(\S+)",
+    r"\[undo-done\]\s+Worktree\s+(?:Recreate\s+Done|Regeneration)\s*:\s*path=(\S+)\s+branch=(\S+)",
 )
 UNDO_ERROR_RE = re.compile(r"\[undo-done\]\s+ERROR\s*:\s*(.+)")
 
 
 def classify_done_failure(stdout: str, stderr: str) -> dict:
     """Classify `flow-kanban done` failures for board API responses."""
+    stdout = stdout.replace("\\n", "\n")
+    stderr = stderr.replace("\\n", "\n")
     lines = stdout.splitlines()
     error_kind = "other"
     conflicts: list[str] = []
@@ -45,14 +47,20 @@ def classify_done_failure(stdout: str, stderr: str) -> dict:
                 error_message = line.strip()
             in_dirty_block = False
         elif DONE_DIRTY_HEADER.search(line):
-            error_kind = "dirty_worktree"
-            in_dirty_block = True
+            if error_kind == "merge_conflict":
+                in_dirty_block = False
+            else:
+                error_kind = "dirty_worktree"
+                in_dirty_block = True
         elif DONE_PATH_RE.match(line):
             path_val = DONE_PATH_RE.match(line).group(1).strip()
             if error_kind == "merge_conflict":
                 conflicts.append(path_val)
             elif in_dirty_block:
                 dirty_files.append(path_val)
+        elif error_kind == "other" and line.strip() and not line.lstrip().startswith("["):
+            error_kind = "dirty_worktree"
+            dirty_files.append(line.strip())
         else:
             in_dirty_block = False
             if not error_message and line.strip():
@@ -68,4 +76,3 @@ def classify_done_failure(stdout: str, stderr: str) -> dict:
         "dirty_files": dirty_files,
         "message": error_message,
     }
-
