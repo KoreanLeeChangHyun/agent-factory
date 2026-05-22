@@ -34,7 +34,7 @@ def test_provider_config_can_read_settings_file(tmp_path: Path, monkeypatch: pyt
     monkeypatch.delenv("AGENT_FACTORY_LLM_PROVIDER", raising=False)
     settings = tmp_path / ".settings"
     settings.write_text(
-        "LLM_PROVIDER=codex\nCODEX_MODEL=gpt-test\n",
+        "LLM_PROVIDER=codex\nCODEX_MODEL=gpt-test\nCODEX_APPROVAL_POLICY=on-request\n",
         encoding="utf-8",
     )
 
@@ -42,6 +42,7 @@ def test_provider_config_can_read_settings_file(tmp_path: Path, monkeypatch: pyt
 
     assert config.provider == "codex"
     assert config.codex_model == "gpt-test"
+    assert config.codex_approval_policy == "on-request"
 
 
 def test_provider_config_accepts_legacy_settings_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

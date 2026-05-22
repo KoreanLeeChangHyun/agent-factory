@@ -169,6 +169,7 @@ def create_brain_process(
     codex_model: str | None = None,
     codex_profile: str | None = None,
     codex_sandbox: str = "workspace-write",
+    codex_approval_policy: str = "never",
     cwd: str | None = None,
 ) -> BrainProcess:
     """Create the active terminal process for a provider.
@@ -185,6 +186,7 @@ def create_brain_process(
             model=codex_model,
             profile=codex_profile,
             sandbox=codex_sandbox,
+            approval_policy=codex_approval_policy,
             cwd=cwd,
         )
     return ClaudeBrainProcess(channel, persist_file=persist_file)

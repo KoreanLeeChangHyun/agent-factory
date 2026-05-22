@@ -20,6 +20,7 @@ class TerminalProviderConfig:
     codex_model: str | None = None
     codex_profile: str | None = None
     codex_sandbox: str = 'workspace-write'
+    codex_approval_policy: str = 'never'
 
 
 def _read_settings(project_root: str) -> dict[str, str]:
@@ -63,6 +64,7 @@ def load_terminal_provider_config(project_root: str) -> TerminalProviderConfig:
         codex_model=get('CODEX_MODEL'),
         codex_profile=get('CODEX_PROFILE'),
         codex_sandbox=str(get('CODEX_SANDBOX', 'workspace-write')),
+        codex_approval_policy=str(get('CODEX_APPROVAL_POLICY', 'never')),
     )
 
 # Module Level SSE Client Manager (Share with Server instances)
@@ -125,6 +127,7 @@ def configure_brain_process(
         codex_model=config.codex_model,
         codex_profile=config.codex_profile,
         codex_sandbox=config.codex_sandbox,
+        codex_approval_policy=config.codex_approval_policy,
         cwd=project_root,
     )
     claude_process = brain_process

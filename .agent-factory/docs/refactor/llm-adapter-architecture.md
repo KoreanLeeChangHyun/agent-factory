@@ -17,6 +17,11 @@ vendors and coding agents are plugins behind an adapter boundary.
 The core workflow must not know whether a step is executed by Claude, Codex,
 Gemini, or a deterministic fake used for tests.
 
+For Desk rendering, adapters normalize provider events into
+`ActionRenderEvent`; see [Action render event](action-render-event.md).
+`LLMEvent` and `LLMResult` are runtime execution contracts, not the Desk UI
+rendering contract.
+
 ## Vocabulary
 
 Use `LLMAdapter` as the boundary name.
@@ -81,6 +86,10 @@ The current Production-line behavior already collects stream-json lines, so the 
 migration can preserve collected events and add live forwarding later.
 
 ## Provider Adapters
+
+Provider adapters should collect raw provider output, preserve enough metadata
+for debugging, and emit provider-neutral runtime events. A separate projection
+maps those runtime events into `ActionRenderEvent` for Desk.
 
 ### ClaudeAdapter
 
@@ -175,11 +184,14 @@ Codex runtime constraints:
 
 - Codex runs through `codex exec` in non-interactive mode.
 - Prompts are passed on stdin with `-`; the adapter enables `--json` and maps
-  JSONL stdout events to `LLMEvent`.
+  JSONL stdout events to `LLMEvent`. Current Codex CLI message text may arrive
+  as either top-level text fields or nested `item.text` fields.
 - `system_prompt` is prepended to the user prompt because Codex CLI does not
   expose the same `--append-system-prompt` contract as Claude.
 - Default sandbox is `workspace-write` and default approval policy is `never`
-  so controlled workflow runs do not block on interactive approval.
+  so controlled workflow runs do not block on interactive approval. Codex
+  approval policy is passed as a CLI config override:
+  `-c approval_policy="never"`.
 - Application services must depend on `LLMAdapter`; provider selection belongs
   to `engine.adapters.llm.factory`.
 

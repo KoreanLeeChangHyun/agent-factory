@@ -30,6 +30,10 @@ def _event_text(data: dict[str, Any]) -> str:
     return ""
 
 
+def _config_override(key: str, value: str) -> str:
+    return f"{key}={json.dumps(value)}"
+
+
 def _string_value(value: Any) -> str:
     if not isinstance(value, str):
         return ""
@@ -80,6 +84,7 @@ class CodexProcess:
         model: str | None = None,
         profile: str | None = None,
         sandbox: str = "workspace-write",
+        approval_policy: str = "never",
         cwd: str | None = None,
     ) -> None:
         self._process: subprocess.Popen | None = None
@@ -96,6 +101,7 @@ class CodexProcess:
         self._codex_bin = codex_bin
         self._profile = profile
         self._sandbox = sandbox
+        self._approval_policy = approval_policy
         self._cwd = cwd
         self._stdin_closed = False
 
@@ -194,6 +200,8 @@ class CodexProcess:
 
     def _build_command(self, extra_args: list[str]) -> list[str]:
         cmd = [self._codex_bin, "exec", "--json"]
+        if self._approval_policy:
+            cmd += ["-c", _config_override("approval_policy", self._approval_policy)]
         if self._cwd:
             cmd += ["--cd", self._cwd]
         if self._model:
@@ -208,6 +216,8 @@ class CodexProcess:
 
     def _build_resume_command(self, session_id: str, extra_args: list[str] | None = None) -> list[str]:
         cmd = [self._codex_bin, "exec", "resume", "--json"]
+        if self._approval_policy:
+            cmd += ["-c", _config_override("approval_policy", self._approval_policy)]
         if self._model:
             cmd += ["--model", self._model]
         cmd += extra_args or []

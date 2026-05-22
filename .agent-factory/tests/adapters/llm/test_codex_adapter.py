@@ -44,6 +44,9 @@ def test_codex_adapter_maps_json_events_to_llm_result(monkeypatch, tmp_path: Pat
     assert result.metadata["provider"] == "codex"
     assert captured["cmd"][:2] == ["codex-test", "exec"]
     assert "--json" in captured["cmd"]
+    assert "-c" in captured["cmd"]
+    assert 'approval_policy="never"' in captured["cmd"]
+    assert "--ask-for-approval" not in captured["cmd"]
     assert captured["input"] == "system\n\nmake a plan"
     assert captured["cwd"] == str(tmp_path)
     assert seen == [
@@ -69,3 +72,45 @@ def test_codex_adapter_controlled_plan_smoke(monkeypatch, tmp_path: Path) -> Non
 
     assert result.ok
     assert "PLAN smoke ok" in result.output_text
+
+
+def test_codex_adapter_extracts_current_cli_item_text(monkeypatch, tmp_path: Path) -> None:
+    def fake_subprocess_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout=(
+                '{"type":"thread.started","thread_id":"thread-1"}\n'
+                '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"codex ok"}}\n'
+                '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":2}}\n'
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(codex.subprocess, "run", fake_subprocess_run)
+
+    result = CodexAdapter(codex_bin="codex-test").complete(
+        LLMRequest(prompt="current schema", cwd=tmp_path)
+    )
+
+    assert result.ok
+    assert result.output_text == "codex ok"
+    assert result.events[1].text == "codex ok"
+    assert result.metadata["codex_session_id"] == "thread-1"
+
+
+def test_codex_adapter_can_disable_approval_policy_config(monkeypatch, tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def fake_subprocess_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(codex.subprocess, "run", fake_subprocess_run)
+
+    result = CodexAdapter(codex_bin="codex-test", approval_policy="").complete(
+        LLMRequest(prompt="no approval config", cwd=tmp_path)
+    )
+
+    assert result.ok
+    assert "-c" not in captured["cmd"]

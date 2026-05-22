@@ -18,3 +18,6 @@ provider boundary:
 
 Do not introduce new `organic`, `claude-organic`, or provider-branded names for
 core, application, board, or workflow concepts.
+
+Use `ActionRenderEvent` for the provider-neutral Desk rendering contract. Avoid
+`DeskRenderEvent`: Desk is the surface, while the renderable unit is an action.

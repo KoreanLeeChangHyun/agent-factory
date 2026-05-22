@@ -124,6 +124,8 @@ def test_codex_process_spawn_builds_exec_command(monkeypatch, tmp_path) -> None:
         "codex-test",
         "exec",
         "--json",
+        "-c",
+        'approval_policy="never"',
         "--cd",
         str(tmp_path),
         "--model",
@@ -250,6 +252,8 @@ def test_codex_process_resumes_finished_session_for_next_input(monkeypatch) -> N
         "exec",
         "resume",
         "--json",
+        "-c",
+        'approval_policy="never"',
         "--model",
         "gpt-test",
         "codex-session-1",
@@ -271,7 +275,8 @@ def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:
         "CODEX_BIN=codex-test\n"
         "CODEX_MODEL=gpt-test\n"
         "CODEX_PROFILE=work\n"
-        "CODEX_SANDBOX=danger-full-access\n",
+        "CODEX_SANDBOX=danger-full-access\n"
+        "CODEX_APPROVAL_POLICY=on-request\n",
         encoding="utf-8",
     )
 
@@ -282,6 +287,7 @@ def test_terminal_provider_config_reads_settings(tmp_path, monkeypatch) -> None:
     assert config.codex_model == "gpt-test"
     assert config.codex_profile == "work"
     assert config.codex_sandbox == "danger-full-access"
+    assert config.codex_approval_policy == "on-request"
 
 
 def test_terminal_provider_config_accepts_legacy_provider_key(tmp_path, monkeypatch) -> None:

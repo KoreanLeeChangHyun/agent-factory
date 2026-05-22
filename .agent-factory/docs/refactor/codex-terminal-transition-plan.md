@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned.
+Active / experimental.
 
 Current state:
 
@@ -24,6 +24,10 @@ This means Codex can be selected for adapter-backed workflow paths, and the
 live Console terminal has a provider-neutral process boundary. A Codex terminal
 process exists for controlled wiring tests and can be selected for the next
 stopped terminal session, but the live Console still defaults to Claude.
+
+Desk rendering is tracked separately through
+[Action render event](action-render-event.md). Console terminal events are raw
+provider/process events; Desk should render normalized actions.
 
 ## Goal
 
