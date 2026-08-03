@@ -9,4 +9,4 @@
 [submodule "web"]
 	path = web
 	url = git@github.com:KoreanLeeChangHyun/agent-factroy-web.git
-	branch = develop
+	branch = main

@@ -9,7 +9,7 @@ Agent Factory 관련 프로젝트를 하나의 작업공간에서 관리하는 �
 | --- | --- | --- |
 | `plugin/` | Codex plugin | `main` |
 | `extension/` | VS Code extension | `main` |
-| `web/` | Web application | `develop` |
+| `web/` | Web application | `main` |
 
 ## 클론
 
