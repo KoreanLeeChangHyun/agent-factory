@@ -1,1 +1,0 @@
-"""Slack integration adapter scripts."""

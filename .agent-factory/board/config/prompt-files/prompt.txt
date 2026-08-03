@@ -1,6 +1,0 @@
-1. FAQ Research — Technical investigation, comparison analysis, data collection request
-2. Implementation — Request for new features, modules, and function implementation                                                                                                                                                                                                                                                                                                       
-3. FAQs Bug fixes — bug cause figures and fix requests                                                                                                                                           
-4. Refactoring — Improved code structure, cleanup, separating request                                                                                                                                               
-5. FAQs Architecture Design — System Design, Structure Decision Request                  
-6. FAQs Review — Code Reviews, Request Quality Review 

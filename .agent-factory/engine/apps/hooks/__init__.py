@@ -1,1 +1,0 @@
-"""Hook application entrypoints."""

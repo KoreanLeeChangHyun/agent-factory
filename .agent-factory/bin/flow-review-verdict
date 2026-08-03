@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# flow-review-verdict - T-463 Review stage 1st rule base automatic verification entry point
-# Usage: flow-review-verdict <registryKey> [--workdir PATH] [--project-root PATH]
-# Output: VerdictResult JSON (stdout)
-# Exit code: always 0 (advisory only)
-ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null)" \
-  || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-exec python3 "$ROOT/.agent-factory/engine/flow/review_verdict.py" "$@"

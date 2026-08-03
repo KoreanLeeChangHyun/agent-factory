@@ -1,1 +1,0 @@
-curl -fsSL https://raw.githubusercontent.com/KoreanLeeChangHyun/claude-workflow/main/init.sh | bash

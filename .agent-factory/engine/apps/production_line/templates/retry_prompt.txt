@@ -1,5 +1,0 @@
-Verification of previous output failed. Missing/error items:
-{missing_items}
-
-Rewrite by filling in only the above items. Modification of other areas is prohibited.
-Artifact Path: {artifact_path}

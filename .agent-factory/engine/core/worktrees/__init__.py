@@ -1,2 +1,0 @@
-"""Core worktree domain helpers."""
-

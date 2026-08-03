@@ -1,2 +1,0 @@
-"""Board API app boundary."""
-

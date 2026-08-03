@@ -1,2 +1,0 @@
-"""Core reporting domain helpers."""
-
