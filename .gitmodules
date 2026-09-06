@@ -6,7 +6,3 @@
 	path = extension
 	url = git@github.com:KoreanLeeChangHyun/agent-factory-vscode-extension.git
 	branch = main
-[submodule "web"]
-	path = web
-	url = git@github.com:KoreanLeeChangHyun/agent-factroy-web.git
-	branch = main

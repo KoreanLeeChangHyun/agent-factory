@@ -9,7 +9,6 @@ Agent Factory 관련 프로젝트를 하나의 작업공간에서 관리하는 �
 | --- | --- | --- |
 | `plugin/` | Codex plugin | `main` |
 | `extension/` | VS Code extension | `main` |
-| `web/` | Web application | `main` |
 
 ## 클론
 
@@ -38,7 +37,7 @@ git submodule update --init --remote --recursive
 각 프로젝트에서 직접 작업할 때는 해당 디렉터리로 이동합니다.
 
 ```bash
-cd plugin    # 또는 extension, web
+cd plugin    # 또는 extension
 git status
 ```
 
@@ -46,7 +45,7 @@ submodule의 새 커밋을 상위 저장소에 반영하려면 상위 디렉터�
 
 ```bash
 cd ..
-git add plugin extension web
+git add plugin extension
 git commit -m "Update component revisions"
 git push
 ```
