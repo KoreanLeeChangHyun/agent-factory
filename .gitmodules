@@ -6,3 +6,7 @@
 	path = extension
 	url = git@github.com:KoreanLeeChangHyun/agent-factory-vscode-extension.git
 	branch = main
+[submodule "mcp"]
+	path = mcp
+	url = git@github.com:KoreanLeeChangHyun/agent-factory-mcp.git
+	branch = main
