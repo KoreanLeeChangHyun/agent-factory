@@ -1,0 +1,52 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": [
+        "Agents 상단 tab row 40px와 selected session header 32px visual hierarchy가 보존된다.",
+        "User card, Assistant transparent text, message area, Composer card와 22px status line의 승인된 runtime 계층이 보존된다.",
+        "Composer는 완전한 rounded container이며 각진 top border 또는 이중 테두리가 없다.",
+        "입력은 빈 상태 20px에서 최대 144px까지 자동 확장하고 native resize handle 없이 초과 내용을 내부 스크롤한다.",
+        "28px send 또는 cancel action은 Composer card 내부 우측 하단에 정렬된다.",
+        "Session 전환, submit, cancel, reconnect, draft, keyboard, IME, CSP와 inline SVG 회귀가 없다.",
+        "기존 Specification의 Agents acceptance 및 quality requirements가 manager-valid 상태다."
+      ]
+    },
+    {
+      "id": "DOD-001",
+      "kind": "definition-of-done",
+      "content": [
+        "두 완료 branch와 current main의 관련 차이를 evidence로 확인한다.",
+        "실패 회귀 테스트를 먼저 기록하거나 기존 실패를 재현한 후 구현으로 통과시킨다.",
+        "Agents unit, integration, package 및 필요한 runtime geometry 검증이 통과한다.",
+        "Specification manager full validation이 통과한다.",
+        "실행 evidence, AI review, report와 한국어 Human review 방법이 준비된다.",
+        "integration, cleanup, push와 배포는 Human 승인 전 수행하지 않는다."
+      ]
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": [
+        "unit: session header, message, Composer, action, status DOM 및 CSS 계약",
+        "integration: submit, cancel, reconnect, draft, keyboard, IME, CSP와 session ownership",
+        "runtime: 필요한 경우 동일 viewport DOM geometry와 screenshot",
+        "package: Agents check 및 linux-x64 VSIX contents",
+        "boundary: workspace tracked source 및 tests 무변경"
+      ]
+    },
+    {
+      "id": "QUALITY-STATUS",
+      "kind": "quality-check",
+      "content": "검증 대기",
+      "attributes": {
+        "status": "pending",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

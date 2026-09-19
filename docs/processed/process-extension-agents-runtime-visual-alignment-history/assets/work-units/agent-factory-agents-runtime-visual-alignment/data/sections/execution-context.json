@@ -1,0 +1,21 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "agent-factory-agents-runtime-visual-alignment",
+        "objective": "Agents 패널의 session-open shell을 현재 지원 기능 안에서 Web runtime과 시각적으로 정합하고 검증한다.",
+        "execInvocation": "/goal agent-factory-agents-runtime-visual-alignment",
+        "executionAgent": "Codex",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "branch": "work-unit/agent-factory-agents-runtime-visual-alignment",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-agents-runtime-visual-alignment"
+      }
+    }
+  ],
+  "subsections": []
+}

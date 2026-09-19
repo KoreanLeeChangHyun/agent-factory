@@ -1,0 +1,4 @@
+interface:
+  display_name: "Platform Design"
+  short_description: "Apply accepted platform architecture and design"
+  default_prompt: "Use $design-platform to implement this request against the accepted platform design."

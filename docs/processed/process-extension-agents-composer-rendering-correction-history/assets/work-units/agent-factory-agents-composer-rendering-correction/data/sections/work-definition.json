@@ -1,0 +1,46 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": "Web 기준으로 Agents composer의 20px 초기 높이, 144px 자동 확장, bottom action과 22px status line rendering을 교정하고 기존 Chat 계약을 보존한다."
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": [
+        "chatView composer textarea CSS를 20px 초기 높이와 native resize 없는 구조로 교정",
+        "내용 기반 자동 높이 계산과 최대 144px 이후 내부 overflow 처리",
+        "28px send 또는 cancel action의 우측 12px, 하단 12px 배치 보존",
+        "22px status line과 정상 완료 후 IDLE 전환",
+        "입력, 상태, keyboard, IME, draft, submit, cancel, reconnect 단위 및 통합 회귀 검증",
+        "VS Code Extension Host E2E 및 linux-x64 VSIX package 검증",
+        "AI Review, 실행 보고서와 한국어 Human review 자료 준비"
+      ]
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": [
+        "Web 애플리케이션 source 변경",
+        "Codex backend, model reasoning 또는 session state 계약 변경",
+        "새로운 chat 기능과 unsupported controls 추가",
+        "다른 플랫폼 패키지",
+        "Human 승인 없는 integration, cleanup, 내부 재배포, push와 PR promotion",
+        "다른 Work Unit 변경"
+      ]
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": [
+        "Web rendering 기준과 정합한 Agents composer 및 status line",
+        "기존 Chat runtime 계약을 보존하는 passing verification evidence",
+        "설치 가능한 linux-x64 VSIX"
+      ]
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,95 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "agent-factory-workspace-kanban-notice-visibility-persistence",
+        "objective": "Kanban notice를 제거하고 칼럼 표시 선택을 영속화하며 카드를 정적인 타이틀 전용 항목으로 만든다.",
+        "execInvocation": "python3 /home/deus/.codex/plugins/cache/agent-factory/agent-factory/0.1.0+codex.20260728203314/skills/work-unit-execution/scripts/app_server_goal.py --repository /home/deus/workspace/agent-factory/vscode-extension --work-unit-id agent-factory-workspace-kanban-notice-visibility-persistence",
+        "executionAgent": "Codex Workflow Agent",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "executionMode": "worktree",
+        "branch": "work-unit/agent-factory-workspace-kanban-notice-visibility-persistence",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-workspace-kanban-notice-visibility-persistence"
+      }
+    },
+    {
+      "id": "EXECUTION-STATE-001",
+      "kind": "execution-state",
+      "content": {
+        "contractVersion": "2.0.0",
+        "state": "done",
+        "currentRevision": 1,
+        "currentAttempt": 1,
+        "invocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8",
+        "invocationChain": [
+          "019fc206-7fe0-72c1-be10-f0cbc59a4da8"
+        ],
+        "history": [],
+        "progress": {
+          "completedSteps": [
+            "plan",
+            "work",
+            "ai-review",
+            "report"
+          ],
+          "pendingStep": null,
+          "records": [
+            {
+              "stepId": "plan",
+              "state": "pending",
+              "idempotencyKey": "rev-1-attempt-1-plan-pending"
+            },
+            {
+              "stepId": "plan",
+              "state": "completed",
+              "idempotencyKey": "rev-1-attempt-1-plan-completed"
+            },
+            {
+              "stepId": "work",
+              "state": "pending",
+              "idempotencyKey": "rev-1-attempt-1-work-pending"
+            },
+            {
+              "stepId": "work",
+              "state": "completed",
+              "idempotencyKey": "rev-1-attempt-1-work-completed"
+            },
+            {
+              "stepId": "ai-review",
+              "state": "pending",
+              "idempotencyKey": "rev-1-attempt-1-ai-review-pending"
+            },
+            {
+              "stepId": "ai-review",
+              "state": "completed",
+              "idempotencyKey": "rev-1-attempt-1-ai-review-completed"
+            },
+            {
+              "stepId": "report",
+              "state": "pending",
+              "idempotencyKey": "rev-1-attempt-1-report-pending"
+            },
+            {
+              "stepId": "report",
+              "state": "completed",
+              "idempotencyKey": "rev-1-attempt-1-report-completed"
+            }
+          ],
+          "retry": {}
+        },
+        "recovery": {
+          "status": "running",
+          "ownerInvocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8",
+          "blockerId": null,
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

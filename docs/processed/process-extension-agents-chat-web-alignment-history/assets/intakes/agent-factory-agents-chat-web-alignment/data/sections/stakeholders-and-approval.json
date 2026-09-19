@@ -1,0 +1,41 @@
+{
+  "id": "stakeholders-and-approval",
+  "title": "Stakeholders and Approval",
+  "content": [
+    {
+      "id": "STAKEHOLDER-001",
+      "kind": "stakeholder",
+      "content": {
+        "affected": [
+          "내부 배포된 Linux x64 VS Code Agents 확장을 사용하는 Human",
+          "Agents 확장의 유지보수와 검증을 수행하는 실행 Agent"
+        ]
+      }
+    },
+    {
+      "id": "DECISION-OWNER-001",
+      "kind": "decision-owner",
+      "content": {
+        "owner": "Human",
+        "decisions": [
+          "UI 정합성 범위",
+          "keyboard submission 동작",
+          "Human review 승인",
+          "integration, 배포와 후속 플랫폼 확대"
+        ]
+      }
+    },
+    {
+      "id": "APPROVAL-BOUNDARY-001",
+      "kind": "approval-boundary",
+      "content": {
+        "boundaries": [
+          "Human은 Workspace와 동일한 탭·헤더·외부 gutter 방식 A를 선택했다.",
+          "Human은 Web 시각 구조와 Enter·Shift+Enter 동작 및 기존 단축키 호환 B를 선택했다.",
+          "Intake checkpoint, Work Unit checkpoint, integration, cleanup, 재배포와 PR promotion은 각각 별도 승인이다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

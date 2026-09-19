@@ -1,0 +1,1217 @@
+{
+  "id": "interview-preimplementation",
+  "type": "Processed",
+  "date": "2026-09-16",
+  "status": "paused-by-human",
+  "source": "현재 사용자 대화",
+  "fidelity": "질문·선택지·추천은 의미 보존 정리. 사용자 선택 응답은 원문 보존. 추천의 부가 구현 제안을 개별 확정 결정으로 자동 승격하지 않음.",
+  "originalDecisionInventory": [
+    {
+      "group": "계정·조직",
+      "topic": "복수 조직 가입",
+      "number": 1
+    },
+    {
+      "group": "계정·조직",
+      "topic": "구독 소유 단위",
+      "number": 2
+    },
+    {
+      "group": "계정·조직",
+      "topic": "조직 소유자 구성",
+      "number": 3
+    },
+    {
+      "group": "계정·조직",
+      "topic": "소유권 이전",
+      "number": 4
+    },
+    {
+      "group": "계정·조직",
+      "topic": "계정 탈퇴 시 처리",
+      "number": 5
+    },
+    {
+      "group": "작업공간",
+      "topic": "개인→조직 이전",
+      "number": 6
+    },
+    {
+      "group": "작업공간",
+      "topic": "조직 간 이전",
+      "number": 7
+    },
+    {
+      "group": "작업공간",
+      "topic": "생성 권한",
+      "number": 8
+    },
+    {
+      "group": "작업공간",
+      "topic": "보관·삭제·복구",
+      "number": 9
+    },
+    {
+      "group": "작업공간",
+      "topic": "작업공간 간 자료 공유",
+      "number": 10
+    },
+    {
+      "group": "권한",
+      "topic": "권한 적용 세분화",
+      "number": 11
+    },
+    {
+      "group": "권한",
+      "topic": "권한 합산·거부 우선순위",
+      "number": 12
+    },
+    {
+      "group": "권한",
+      "topic": "조직 소유자의 콘텐츠 접근",
+      "number": 13
+    },
+    {
+      "group": "권한",
+      "topic": "관리자 위임 범위",
+      "number": 14
+    },
+    {
+      "group": "권한",
+      "topic": "MCP 사용자·서비스 계정 구분",
+      "number": 15
+    },
+    {
+      "group": "커스텀 작업",
+      "topic": "작성 언어 지원 범위",
+      "number": 16
+    },
+    {
+      "group": "커스텀 작업",
+      "topic": "공유·배포 범위",
+      "number": 17
+    },
+    {
+      "group": "커스텀 작업",
+      "topic": "게시 승인",
+      "number": 18
+    },
+    {
+      "group": "커스텀 작업",
+      "topic": "업데이트·버전 적용",
+      "number": 19
+    },
+    {
+      "group": "커스텀 작업",
+      "topic": "외부 라이브러리 허용",
+      "number": 20
+    },
+    {
+      "group": "렌더링·편집",
+      "topic": "커스텀 코드의 외부 통신",
+      "number": 21
+    },
+    {
+      "group": "렌더링·편집",
+      "topic": "커스텀 작업의 데이터 접근",
+      "number": 22
+    },
+    {
+      "group": "렌더링·편집",
+      "topic": "동시 편집 방식",
+      "number": 23
+    },
+    {
+      "group": "렌더링·편집",
+      "topic": "사용자별 화면 설정 저장",
+      "number": 24
+    },
+    {
+      "group": "렌더링·편집",
+      "topic": "모바일 지원 범위",
+      "number": 25
+    },
+    {
+      "group": "외부 데이터",
+      "topic": "초기 지원 DB",
+      "number": 26
+    },
+    {
+      "group": "외부 데이터",
+      "topic": "읽기·쓰기·DDL 범위",
+      "number": 27
+    },
+    {
+      "group": "외부 데이터",
+      "topic": "실시간 조회·수집 방식",
+      "number": 28
+    },
+    {
+      "group": "외부 데이터",
+      "topic": "데이터 모델 작성 기능",
+      "number": 29
+    },
+    {
+      "group": "외부 데이터",
+      "topic": "사설망 연결 지원",
+      "number": 30
+    },
+    {
+      "group": "관제·일정",
+      "topic": "지시 배정 방식",
+      "number": 31
+    },
+    {
+      "group": "관제·일정",
+      "topic": "여러 에이전트의 중복 수신 처리",
+      "number": 32
+    },
+    {
+      "group": "관제·일정",
+      "topic": "완료·사람 검수 관계",
+      "number": 33
+    },
+    {
+      "group": "관제·일정",
+      "topic": "중단·연결 끊김 처리",
+      "number": 34
+    },
+    {
+      "group": "관제·일정",
+      "topic": "일정이 생성하는 지시 범위",
+      "number": 35
+    },
+    {
+      "group": "문서·연동·테스트",
+      "topic": "문서 편집 형식",
+      "number": 36
+    },
+    {
+      "group": "문서·연동·테스트",
+      "topic": "문서 명세 승인 주체",
+      "number": 37
+    },
+    {
+      "group": "문서·연동·테스트",
+      "topic": "검색 범위·방식",
+      "number": 38
+    },
+    {
+      "group": "문서·연동·테스트",
+      "topic": "초기 외부 연동 목록",
+      "number": 39
+    },
+    {
+      "group": "문서·연동·테스트",
+      "topic": "표준 ‘테스트’ 작업의 기능",
+      "number": 40
+    },
+    {
+      "group": "사람 간 채팅",
+      "topic": "대화·채널 범위",
+      "number": 41
+    },
+    {
+      "group": "사람 간 채팅",
+      "topic": "참여·열람 권한",
+      "number": 42
+    },
+    {
+      "group": "사람 간 채팅",
+      "topic": "메시지 수정·삭제",
+      "number": 43
+    },
+    {
+      "group": "사람 간 채팅",
+      "topic": "첨부파일·읽음 표시",
+      "number": 44
+    },
+    {
+      "group": "사람 간 채팅",
+      "topic": "보존·검색 범위",
+      "number": 45
+    },
+    {
+      "group": "플랜·비용",
+      "topic": "초기 결제 구현 범위",
+      "number": 46
+    },
+    {
+      "group": "플랜·비용",
+      "topic": "플랜별 기능 배정",
+      "number": 47
+    },
+    {
+      "group": "플랜·비용",
+      "topic": "한도 설정·변경 권한",
+      "number": 48
+    },
+    {
+      "group": "플랜·비용",
+      "topic": "한도 수치·비용 상한",
+      "number": 49
+    },
+    {
+      "group": "플랜·비용",
+      "topic": "다운그레이드·구독 종료 처리",
+      "number": 50
+    },
+    {
+      "group": "보안·감사",
+      "topic": "공통 필수 감사 범위",
+      "number": 51
+    },
+    {
+      "group": "보안·감사",
+      "topic": "플랜별 감사 제한 방식",
+      "number": 52
+    },
+    {
+      "group": "보안·감사",
+      "topic": "조회 감사 실패 처리",
+      "number": 53
+    },
+    {
+      "group": "보안·감사",
+      "topic": "기업 보안 기능 범위",
+      "number": 54
+    },
+    {
+      "group": "보안·감사",
+      "topic": "SaaS 관리자의 고객 데이터 접근",
+      "number": 55
+    },
+    {
+      "group": "운영·작업 계약",
+      "topic": "초기 공개·운영 대상",
+      "number": 56
+    },
+    {
+      "group": "운영·작업 계약",
+      "topic": "백업·보존 위치",
+      "number": 57
+    },
+    {
+      "group": "운영·작업 계약",
+      "topic": "복구 자원·부재 중 대응",
+      "number": 58
+    },
+    {
+      "group": "운영·작업 계약",
+      "topic": "기존 데이터·호환성 유지 범위",
+      "number": 59
+    },
+    {
+      "group": "운영·작업 계약",
+      "topic": "무인 작업의 허용 행동·중단·검수 기준",
+      "number": 60
+    }
+  ],
+  "currentDecisionInventory": [
+    {
+      "number": 1,
+      "originalNumber": 1,
+      "group": "계정·조직",
+      "topic": "복수 조직 가입",
+      "status": "answered"
+    },
+    {
+      "number": 2,
+      "originalNumber": 2,
+      "group": "계정·조직",
+      "topic": "구독 소유 단위",
+      "status": "answered"
+    },
+    {
+      "number": 3,
+      "originalNumber": 3,
+      "group": "계정·조직",
+      "topic": "조직 소유자 구성",
+      "status": "answered"
+    },
+    {
+      "number": 4,
+      "originalNumber": 4,
+      "group": "계정·조직",
+      "topic": "소유권 이전",
+      "status": "answered"
+    },
+    {
+      "number": 5,
+      "originalNumber": 5,
+      "group": "계정·조직",
+      "topic": "계정 탈퇴 시 처리",
+      "status": "answered"
+    },
+    {
+      "number": 6,
+      "originalNumber": null,
+      "group": "계정·보안",
+      "topic": "관리자 동결 권한 범위",
+      "status": "answered"
+    },
+    {
+      "number": 7,
+      "originalNumber": null,
+      "group": "계정·보안",
+      "topic": "시스템 보안 잠금 해제 절차",
+      "status": "answered"
+    },
+    {
+      "number": 8,
+      "originalNumber": 6,
+      "group": "작업공간",
+      "topic": "개인→조직 이전",
+      "status": "answered"
+    },
+    {
+      "number": 9,
+      "originalNumber": 7,
+      "group": "작업공간",
+      "topic": "조직 간 이전",
+      "status": "answered"
+    },
+    {
+      "number": 10,
+      "originalNumber": 8,
+      "group": "작업공간",
+      "topic": "생성 권한",
+      "status": "answered"
+    },
+    {
+      "number": 11,
+      "originalNumber": 9,
+      "group": "작업공간",
+      "topic": "보관·삭제·복구",
+      "status": "answered"
+    },
+    {
+      "number": 12,
+      "originalNumber": 10,
+      "group": "작업공간",
+      "topic": "작업공간 간 자료 공유",
+      "status": "asked-unanswered"
+    },
+    {
+      "number": 13,
+      "originalNumber": 11,
+      "group": "권한",
+      "topic": "권한 적용 세분화",
+      "status": "not-asked"
+    },
+    {
+      "number": 14,
+      "originalNumber": 12,
+      "group": "권한",
+      "topic": "권한 합산·거부 우선순위",
+      "status": "not-asked"
+    },
+    {
+      "number": 15,
+      "originalNumber": 13,
+      "group": "권한",
+      "topic": "조직 소유자의 콘텐츠 접근",
+      "status": "not-asked"
+    },
+    {
+      "number": 16,
+      "originalNumber": 14,
+      "group": "권한",
+      "topic": "관리자 위임 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 17,
+      "originalNumber": 15,
+      "group": "권한",
+      "topic": "MCP 사용자·서비스 계정 구분",
+      "status": "not-asked"
+    },
+    {
+      "number": 18,
+      "originalNumber": 16,
+      "group": "커스텀 작업",
+      "topic": "작성 언어 지원 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 19,
+      "originalNumber": 17,
+      "group": "커스텀 작업",
+      "topic": "공유·배포 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 20,
+      "originalNumber": 18,
+      "group": "커스텀 작업",
+      "topic": "게시 승인",
+      "status": "not-asked"
+    },
+    {
+      "number": 21,
+      "originalNumber": 19,
+      "group": "커스텀 작업",
+      "topic": "업데이트·버전 적용",
+      "status": "not-asked"
+    },
+    {
+      "number": 22,
+      "originalNumber": 20,
+      "group": "커스텀 작업",
+      "topic": "외부 라이브러리 허용",
+      "status": "not-asked"
+    },
+    {
+      "number": 23,
+      "originalNumber": 21,
+      "group": "렌더링·편집",
+      "topic": "커스텀 코드의 외부 통신",
+      "status": "not-asked"
+    },
+    {
+      "number": 24,
+      "originalNumber": 22,
+      "group": "렌더링·편집",
+      "topic": "커스텀 작업의 데이터 접근",
+      "status": "not-asked"
+    },
+    {
+      "number": 25,
+      "originalNumber": 23,
+      "group": "렌더링·편집",
+      "topic": "동시 편집 방식",
+      "status": "not-asked"
+    },
+    {
+      "number": 26,
+      "originalNumber": 24,
+      "group": "렌더링·편집",
+      "topic": "사용자별 화면 설정 저장",
+      "status": "not-asked"
+    },
+    {
+      "number": 27,
+      "originalNumber": 25,
+      "group": "렌더링·편집",
+      "topic": "모바일 지원 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 28,
+      "originalNumber": 26,
+      "group": "외부 데이터",
+      "topic": "초기 지원 DB",
+      "status": "not-asked"
+    },
+    {
+      "number": 29,
+      "originalNumber": 27,
+      "group": "외부 데이터",
+      "topic": "읽기·쓰기·DDL 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 30,
+      "originalNumber": 28,
+      "group": "외부 데이터",
+      "topic": "실시간 조회·수집 방식",
+      "status": "not-asked"
+    },
+    {
+      "number": 31,
+      "originalNumber": 29,
+      "group": "외부 데이터",
+      "topic": "데이터 모델 작성 기능",
+      "status": "not-asked"
+    },
+    {
+      "number": 32,
+      "originalNumber": 30,
+      "group": "외부 데이터",
+      "topic": "사설망 연결 지원",
+      "status": "not-asked"
+    },
+    {
+      "number": 33,
+      "originalNumber": 31,
+      "group": "관제·일정",
+      "topic": "지시 배정 방식",
+      "status": "not-asked"
+    },
+    {
+      "number": 34,
+      "originalNumber": 32,
+      "group": "관제·일정",
+      "topic": "여러 에이전트의 중복 수신 처리",
+      "status": "not-asked"
+    },
+    {
+      "number": 35,
+      "originalNumber": 33,
+      "group": "관제·일정",
+      "topic": "완료·사람 검수 관계",
+      "status": "not-asked"
+    },
+    {
+      "number": 36,
+      "originalNumber": 34,
+      "group": "관제·일정",
+      "topic": "중단·연결 끊김 처리",
+      "status": "not-asked"
+    },
+    {
+      "number": 37,
+      "originalNumber": 35,
+      "group": "관제·일정",
+      "topic": "일정이 생성하는 지시 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 38,
+      "originalNumber": 36,
+      "group": "문서·연동·테스트",
+      "topic": "문서 편집 형식",
+      "status": "not-asked"
+    },
+    {
+      "number": 39,
+      "originalNumber": 37,
+      "group": "문서·연동·테스트",
+      "topic": "문서 명세 승인 주체",
+      "status": "not-asked"
+    },
+    {
+      "number": 40,
+      "originalNumber": 38,
+      "group": "문서·연동·테스트",
+      "topic": "검색 범위·방식",
+      "status": "not-asked"
+    },
+    {
+      "number": 41,
+      "originalNumber": 39,
+      "group": "문서·연동·테스트",
+      "topic": "초기 외부 연동 목록",
+      "status": "not-asked"
+    },
+    {
+      "number": 42,
+      "originalNumber": 40,
+      "group": "문서·연동·테스트",
+      "topic": "표준 ‘테스트’ 작업의 기능",
+      "status": "not-asked"
+    },
+    {
+      "number": 43,
+      "originalNumber": 41,
+      "group": "사람 간 채팅",
+      "topic": "대화·채널 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 44,
+      "originalNumber": 42,
+      "group": "사람 간 채팅",
+      "topic": "참여·열람 권한",
+      "status": "not-asked"
+    },
+    {
+      "number": 45,
+      "originalNumber": 43,
+      "group": "사람 간 채팅",
+      "topic": "메시지 수정·삭제",
+      "status": "not-asked"
+    },
+    {
+      "number": 46,
+      "originalNumber": 44,
+      "group": "사람 간 채팅",
+      "topic": "첨부파일·읽음 표시",
+      "status": "not-asked"
+    },
+    {
+      "number": 47,
+      "originalNumber": 45,
+      "group": "사람 간 채팅",
+      "topic": "보존·검색 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 48,
+      "originalNumber": 46,
+      "group": "플랜·비용",
+      "topic": "초기 결제 구현 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 49,
+      "originalNumber": 47,
+      "group": "플랜·비용",
+      "topic": "플랜별 기능 배정",
+      "status": "not-asked"
+    },
+    {
+      "number": 50,
+      "originalNumber": 48,
+      "group": "플랜·비용",
+      "topic": "한도 설정·변경 권한",
+      "status": "not-asked"
+    },
+    {
+      "number": 51,
+      "originalNumber": 49,
+      "group": "플랜·비용",
+      "topic": "한도 수치·비용 상한",
+      "status": "not-asked"
+    },
+    {
+      "number": 52,
+      "originalNumber": 50,
+      "group": "플랜·비용",
+      "topic": "다운그레이드·구독 종료 처리",
+      "status": "not-asked"
+    },
+    {
+      "number": 53,
+      "originalNumber": 51,
+      "group": "보안·감사",
+      "topic": "공통 필수 감사 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 54,
+      "originalNumber": 52,
+      "group": "보안·감사",
+      "topic": "플랜별 감사 제한 방식",
+      "status": "not-asked"
+    },
+    {
+      "number": 55,
+      "originalNumber": 53,
+      "group": "보안·감사",
+      "topic": "조회 감사 실패 처리",
+      "status": "not-asked"
+    },
+    {
+      "number": 56,
+      "originalNumber": 54,
+      "group": "보안·감사",
+      "topic": "기업 보안 기능 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 57,
+      "originalNumber": 55,
+      "group": "보안·감사",
+      "topic": "SaaS 관리자의 고객 데이터 접근",
+      "status": "not-asked"
+    },
+    {
+      "number": 58,
+      "originalNumber": 56,
+      "group": "운영·작업 계약",
+      "topic": "초기 공개·운영 대상",
+      "status": "not-asked"
+    },
+    {
+      "number": 59,
+      "originalNumber": 57,
+      "group": "운영·작업 계약",
+      "topic": "백업·보존 위치",
+      "status": "not-asked"
+    },
+    {
+      "number": 60,
+      "originalNumber": 58,
+      "group": "운영·작업 계약",
+      "topic": "복구 자원·부재 중 대응",
+      "status": "not-asked"
+    },
+    {
+      "number": 61,
+      "originalNumber": 59,
+      "group": "운영·작업 계약",
+      "topic": "기존 데이터·호환성 유지 범위",
+      "status": "not-asked"
+    },
+    {
+      "number": 62,
+      "originalNumber": 60,
+      "group": "운영·작업 계약",
+      "topic": "무인 작업의 허용 행동·중단·검수 기준",
+      "status": "not-asked"
+    }
+  ],
+  "questionCount": 62,
+  "answeredCount": 11,
+  "activeQuestion": "Q12",
+  "remainingCount": 51,
+  "pauseRequest": "일단 여기까지 기록해두셈",
+  "countRevisions": [
+    {
+      "after": "Q5",
+      "from": 60,
+      "to": 62,
+      "reason": "계정 동결·보안 잠금 요구 추가. 동결 권한 범위와 잠금 해제를 새 Q6·Q7로 삽입.",
+      "mapping": "원래 Q1–Q5 유지. 원래 Q6–Q60은 현재 Q8–Q62로 이동."
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q1",
+      "number": 1,
+      "totalWhenAsked": 60,
+      "question": "한 사용자가 개인 작업공간을 유지하면서 여러 조직에 동시에 가입할 수 있도록 할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "개인 작업공간과 복수 조직 가입 모두 허용",
+          "advantage": "개인·회사·외부 협업을 한 계정으로 이용",
+          "disadvantage": "조직 전환과 권한 격리 필요"
+        },
+        {
+          "number": 2,
+          "decision": "개인 작업공간과 조직 한 곳만 허용",
+          "advantage": "소속·화면 구성이 단순",
+          "disadvantage": "여러 조직 활동 시 별도 계정 필요"
+        },
+        {
+          "number": 3,
+          "decision": "개인용 계정과 조직용 계정을 분리",
+          "advantage": "사용 맥락 분리",
+          "disadvantage": "계정·로그인 관리 불편"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "계정 하나를 유지하고 개인·조직별 데이터·권한·구독 분리. 개인 작업공간 초대를 허용하는 것은 아님.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "개인 작업공간을 유지하면서 여러 조직에 동시에 가입 가능.",
+      "status": "answered"
+    },
+    {
+      "id": "Q2",
+      "number": 2,
+      "totalWhenAsked": 60,
+      "question": "구독은 누구에게 귀속되도록 할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "개인 플랜은 사용자, 팀·엔터프라이즈는 조직",
+          "advantage": "개인·조직 비용과 권한 분리",
+          "disadvantage": "조직별 구독 관리 필요"
+        },
+        {
+          "number": 2,
+          "decision": "모든 플랜은 사용자, 조직은 구독자의 이용 권한으로 운영",
+          "advantage": "사용자 중심 구독 관리",
+          "disadvantage": "탈퇴·소유권 이전 시 복잡"
+        },
+        {
+          "number": 3,
+          "decision": "개인 플랜은 사용자, 팀·엔터프라이즈는 작업공간별",
+          "advantage": "작업공간별 다른 플랜 적용",
+          "disadvantage": "조직 안에서 기능·결제 분산"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 조직 소유자가 바뀌어도 구독은 조직에 남음. 개인 1개 무료·추가 개수별 구독 유지.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "개인 구독은 사용자, 팀·엔터프라이즈 구독은 조직에 귀속.",
+      "status": "answered"
+    },
+    {
+      "id": "Q3",
+      "number": 3,
+      "totalWhenAsked": 60,
+      "question": "조직 소유자는 한 명만 둘까요, 여러 명을 허용할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "여러 소유자 허용, 활성 소유자 최소 1명",
+          "advantage": "부재·퇴사 대응",
+          "disadvantage": "소유자 간 중요 변경 충돌 관리"
+        },
+        {
+          "number": 2,
+          "decision": "소유자는 정확히 1명, 나머지는 관리자",
+          "advantage": "최종 책임 명확",
+          "disadvantage": "소유자 부재 대응 어려움"
+        },
+        {
+          "number": 3,
+          "decision": "대표 소유자 1명과 공동 소유자 구분",
+          "advantage": "최종 책임·운영 분담",
+          "disadvantage": "두 소유자 유형 권한 설계"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 마지막 활성 소유자의 탈퇴·제거 방지 제안.",
+      "humanReply": "2 단, 소유자 이전 허용",
+      "selectedOption": 2,
+      "decision": "조직 소유자는 정확히 1명. 소유권 이전 허용.",
+      "status": "answered"
+    },
+    {
+      "id": "Q4",
+      "number": 4,
+      "totalWhenAsked": 60,
+      "question": "조직 소유권 이전은 어떤 절차로 진행할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "활성 구성원에게 요청하고 상대방 수락 시 이전",
+          "advantage": "잘못된 지정·일방적 이전 방지",
+          "disadvantage": "수락까지 대기"
+        },
+        {
+          "number": 2,
+          "decision": "활성 구성원 지정 즉시 이전",
+          "advantage": "간단하고 빠름",
+          "disadvantage": "동의 없이 책임 이전"
+        },
+        {
+          "number": 3,
+          "decision": "상대방 수락과 SaaS 운영자 승인 후 이전",
+          "advantage": "운영자 확인",
+          "disadvantage": "운영 개입·처리 지연"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 현재 소유자 재인증을 공통 전제로 제시. 수락 전 기존 소유자 유지, 수락 시 원자적 교체. 기존 소유자를 관리자로 전환하는 부가 제안도 제시.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "현재 소유자의 재인증 후 활성 구성원에게 요청하고, 상대방 수락 시 이전.",
+      "status": "answered"
+    },
+    {
+      "id": "Q5",
+      "number": 5,
+      "totalWhenAsked": 60,
+      "question": "계정 탈퇴는 어떤 방식으로 처리할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "즉시 접근 차단, 복구 유예 후 삭제",
+          "advantage": "실수 탈퇴 복구",
+          "disadvantage": "유예 상태·삭제 예약 관리"
+        },
+        {
+          "number": 2,
+          "decision": "접근 차단 후 유예 없이 삭제 절차 시작",
+          "advantage": "빠른 처리",
+          "disadvantage": "진행 시 복구 어려움"
+        },
+        {
+          "number": 3,
+          "decision": "요청 후 운영자 확인 처리",
+          "advantage": "예외 개별 확인",
+          "disadvantage": "운영 부담·지연"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 세션·MCP 토큰 폐기와 본인 확인 후 유예 내 철회 제안. 조직 소유자는 이전 또는 조직 삭제 절차 선행. 조직 자료는 계정 탈퇴만으로 삭제하지 않음.",
+      "humanReply": "1 계정 탈퇴 말고도 계정 동결 계정 잠금도 있어야함 (동결은 관리자가) 잠금은 시스템이 보안 위험 감지 하면 자동 잠금",
+      "selectedOption": 1,
+      "decision": "접근 차단·복구 유예·삭제 방식 채택. 관리자 동결과 시스템 보안 위험 감지에 따른 자동 잠금 추가.",
+      "status": "answered"
+    },
+    {
+      "id": "Q6",
+      "number": 6,
+      "totalWhenAsked": 62,
+      "question": "관리자의 계정 동결 권한은 어디까지 허용할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "SaaS 관리자는 계정 전체 동결, 조직 관리자는 자기 조직 멤버십만 정지",
+          "advantage": "전체 계정·조직 권한 분리",
+          "disadvantage": "두 상태 구분 관리"
+        },
+        {
+          "number": 2,
+          "decision": "SaaS 관리자만 동결·정지, 조직 관리자는 요청만",
+          "advantage": "중앙 통제",
+          "disadvantage": "조직 대응이 운영자에게 의존"
+        },
+        {
+          "number": 3,
+          "decision": "조직별 멤버십 정지만 제공",
+          "advantage": "다른 조직·개인 이용에 영향 없음",
+          "disadvantage": "전체 계정 수동 동결 불가"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 조직 관리자가 개인 작업공간·다른 조직 이용까지 차단하지 않도록 분리.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "SaaS 관리자는 계정 전체 동결, 조직 관리자는 자기 조직의 멤버십만 정지.",
+      "status": "answered"
+    },
+    {
+      "id": "Q7",
+      "number": 7,
+      "totalWhenAsked": 62,
+      "question": "시스템 보안 잠금은 어떻게 해제할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "위험 수준별 본인 확인 또는 SaaS 관리자 검토",
+          "advantage": "보안·복구 편의 균형",
+          "disadvantage": "위험 수준별 기준 필요"
+        },
+        {
+          "number": 2,
+          "decision": "모든 잠금을 본인 확인 후 사용자가 해제",
+          "advantage": "빠른 복구·운영 부담 감소",
+          "disadvantage": "탈취 시 확인 수단도 위험"
+        },
+        {
+          "number": 3,
+          "decision": "모든 잠금을 SaaS 관리자 검토 후 해제",
+          "advantage": "직접 통제",
+          "disadvantage": "대기·운영 부담"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 위험 판정·본인 확인 수단은 상세 설계. 시간 경과만으로 모든 잠금 자동 해제하지 않는 안. 잠금 해제로 관리자 동결은 해제되지 않음.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "보안 잠금은 위험 수준별 본인 확인 또는 SaaS 관리자 검토로 해제. 관리자 동결은 별도로 유지.",
+      "status": "answered"
+    },
+    {
+      "id": "Q8",
+      "number": 8,
+      "totalWhenAsked": 62,
+      "question": "개인 작업공간을 조직 소유로 이전할 수 있도록 할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "개인 소유자 요청과 대상 조직 소유자 수락 후 이전",
+          "advantage": "개인 작업을 조직 업무로 연결",
+          "disadvantage": "권한·연결·사용량 검증"
+        },
+        {
+          "number": 2,
+          "decision": "직접 이전 금지, 허용 자료만 복사",
+          "advantage": "소유권 경계 유지",
+          "disadvantage": "이력·설정 이어가기 어려움"
+        },
+        {
+          "number": 3,
+          "decision": "초기 이전·복사 미제공",
+          "advantage": "구현 단순",
+          "disadvantage": "자료·설정 재구성"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 대상 조직 한도 확인, 기존 MCP 토큰·외부 연결 권한 재검증 제안.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "개인 소유자 요청과 대상 조직 소유자 수락 후 개인 작업공간을 조직 소유로 이전 가능.",
+      "status": "answered"
+    },
+    {
+      "id": "Q9",
+      "number": 9,
+      "totalWhenAsked": 62,
+      "question": "조직 소유 작업공간을 다른 조직으로 이전할 수 있도록 할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "현재 조직 소유자 요청과 대상 조직 소유자 수락 후 이전",
+          "advantage": "조직 개편·사업 이관 대응",
+          "disadvantage": "구성원·권한·연결·한도 검증"
+        },
+        {
+          "number": 2,
+          "decision": "직접 이전 금지, 양쪽 승인 후 허용 자료만 복사",
+          "advantage": "원본 소유권·이력 유지",
+          "disadvantage": "전체 작업공간 연속성 어려움"
+        },
+        {
+          "number": 3,
+          "decision": "초기 이전·복사 미제공",
+          "advantage": "조직 간 이동 경계 단순",
+          "disadvantage": "자료·설정 재구성"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 이전 대상·영향 확인, 구성원 권한·MCP 토큰·외부 연결 재검증 제안.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "현재 조직 소유자 요청과 대상 조직 소유자 수락 후 조직 간 작업공간 이전 가능.",
+      "status": "answered"
+    },
+    {
+      "id": "Q10",
+      "number": 10,
+      "totalWhenAsked": 62,
+      "question": "조직 작업공간 생성 권한은 어떻게 정할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "소유자와 생성 권한을 부여받은 구성원",
+          "advantage": "권한 집합으로 위임",
+          "disadvantage": "생성 권한 관리"
+        },
+        {
+          "number": 2,
+          "decision": "소유자와 조직 관리자만",
+          "advantage": "운영 책임자 중심 통제",
+          "disadvantage": "생성만 별도 위임 불가"
+        },
+        {
+          "number": 3,
+          "decision": "모든 활성 구성원",
+          "advantage": "자율 구성",
+          "disadvantage": "증가·한도 소진 관리"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 생성 권한과 구독·한도 변경 권한 분리. 자동 유료 증설은 허용하지 않는 안.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "조직 소유자와 작업공간 생성 권한을 부여받은 구성원이 조직 한도 내에서 생성 가능.",
+      "status": "answered"
+    },
+    {
+      "id": "Q11",
+      "number": 11,
+      "totalWhenAsked": 62,
+      "question": "작업공간의 보관·삭제·복구는 어떻게 제공할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "읽기 전용 보관과 삭제 유예 내 복구",
+          "advantage": "업무 보존·실수 복구",
+          "disadvantage": "상태별 접근·보존 관리"
+        },
+        {
+          "number": 2,
+          "decision": "보관 없이 삭제 유예 내 복구만",
+          "advantage": "단순한 수명주기",
+          "disadvantage": "완료 작업공간 읽기 전용 유지 어려움"
+        },
+        {
+          "number": 3,
+          "decision": "보관만 제공, 최종 삭제는 운영자 요청",
+          "advantage": "삭제 전 개별 확인",
+          "disadvantage": "운영 부담·지연"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 보관 중 새 지시·빌드·배치·변경 차단, 인가된 조회 허용. 보관 자료도 한도에서 자동 제외하지 않는 부가 제안.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "작업공간은 읽기 전용 보관과 삭제 유예 기간 내 복구 제공.",
+      "status": "answered"
+    },
+    {
+      "id": "Q12",
+      "number": 12,
+      "totalWhenAsked": 62,
+      "question": "서로 다른 작업공간 사이에서 자료를 공유할 수 있도록 할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "권한 확인 후 복사만 허용",
+          "advantage": "독립된 소유권·수명",
+          "disadvantage": "원본 변경 자동 반영 안 됨"
+        },
+        {
+          "number": 2,
+          "decision": "원본 참조 실시간 공유만 허용",
+          "advantage": "최신 자료를 한곳에서 관리",
+          "disadvantage": "권한 회수·삭제가 다른 공간에 영향"
+        },
+        {
+          "number": 3,
+          "decision": "복사와 실시간 공유 모두 제공",
+          "advantage": "용도별 선택",
+          "disadvantage": "두 방식의 권한·이력·삭제 처리"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번. 복사 가능 유형·출처 기록·별도 반출입 권한 검사 제안. 토큰·연결 자격증명은 제외.",
+      "humanReply": null,
+      "selectedOption": null,
+      "decision": null,
+      "status": "asked-unanswered"
+    }
+  ],
+  "summary": [
+    {
+      "id": "Q1",
+      "decision": "개인 작업공간을 유지하면서 여러 조직에 동시에 가입 가능."
+    },
+    {
+      "id": "Q2",
+      "decision": "개인 구독은 사용자, 팀·엔터프라이즈 구독은 조직에 귀속."
+    },
+    {
+      "id": "Q3",
+      "decision": "조직 소유자는 정확히 1명. 소유권 이전 허용."
+    },
+    {
+      "id": "Q4",
+      "decision": "현재 소유자의 재인증 후 활성 구성원에게 요청하고, 상대방 수락 시 이전."
+    },
+    {
+      "id": "Q5",
+      "decision": "접근 차단·복구 유예·삭제 방식 채택. 관리자 동결과 시스템 보안 위험 감지에 따른 자동 잠금 추가."
+    },
+    {
+      "id": "Q6",
+      "decision": "SaaS 관리자는 계정 전체 동결, 조직 관리자는 자기 조직의 멤버십만 정지."
+    },
+    {
+      "id": "Q7",
+      "decision": "보안 잠금은 위험 수준별 본인 확인 또는 SaaS 관리자 검토로 해제. 관리자 동결은 별도로 유지."
+    },
+    {
+      "id": "Q8",
+      "decision": "개인 소유자 요청과 대상 조직 소유자 수락 후 개인 작업공간을 조직 소유로 이전 가능."
+    },
+    {
+      "id": "Q9",
+      "decision": "현재 조직 소유자 요청과 대상 조직 소유자 수락 후 조직 간 작업공간 이전 가능."
+    },
+    {
+      "id": "Q10",
+      "decision": "조직 소유자와 작업공간 생성 권한을 부여받은 구성원이 조직 한도 내에서 생성 가능."
+    },
+    {
+      "id": "Q11",
+      "decision": "작업공간은 읽기 전용 보관과 삭제 유예 기간 내 복구 제공."
+    }
+  ],
+  "unresolvedDetails": [
+    "Q12 자료 공유 방식은 미답변. 기록 요청을 선택지 1 승인으로 해석하지 않음.",
+    "소유권 이전 후 이전 소유자를 관리자로 전환하는 내용은 부가 제안이며 독립 확정으로 취급하지 않음.",
+    "탈퇴·작업공간 삭제 유예 기간, 자료별 보존·삭제 기준은 미정.",
+    "동결 해제 권한·절차, 보안 위험 기준·본인 확인 수단·예외 복구 상세는 아직 정의하지 않음.",
+    "작업공간 이전의 데이터·토큰·연결·구성원 처리 상세와 보관 상태 비용 산정은 후속 설계·검수 대상.",
+    "현재 질문 수는 62개. 후속 답변으로 독립 결정이 추가되면 이유와 수를 명시적으로 변경."
+  ],
+  "resume": {
+    "questionId": "Q12",
+    "questionNumber": 12,
+    "total": 62,
+    "previousDecision": "작업공간은 읽기 전용 보관과 삭제 유예 기간 내 복구 제공.",
+    "instruction": "재개 요청 시 Q12의 기존 선택지와 추천부터 이어간다. Q1–Q11 재질문 금지. 아직 묻지 않은 질문의 선택지·답변은 만들지 않음."
+  },
+  "priorRecords": [
+    "../interview-service-boundaries/index.html",
+    "../interview-execution-service-scope/index.html"
+  ],
+  "limits": [
+    "이번 추가 인터뷰만 11/62 답변 완료. 이전 7개·4개 인터뷰와 구분.",
+    "인터뷰는 중간 저장 후 중단 상태이며 완료 아님.",
+    "기존 명세·전체 목표 구조·코드·DB·배포는 이 기록 작업으로 변경하지 않음.",
+    "장기 구현 시작 승인이나 명세 승격으로 간주하지 않음."
+  ]
+}

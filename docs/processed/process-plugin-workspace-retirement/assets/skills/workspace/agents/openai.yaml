@@ -1,0 +1,6 @@
+interface:
+  display_name: "Agent Factory Workspace"
+  short_description: "Manage the six-part Agent Factory control tower"
+  default_prompt: "Use $workspace to create or maintain the Human-facing Agent Factory project control tower."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,19 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": [
+        "1. ready Work Unit과 Intake의 Web CSS evidence를 읽고 현재 source 및 테스트 경계를 재확인한다.",
+        "2. Agents 단위·통합 테스트와 Workspace 단위 테스트를 Web 참조 geometry 기준으로 먼저 변경하고 기존 구현에서 실패함을 확인한다.",
+        "3. agents/src/chatView.js와 workspace/src/webviewShell.js의 대응 최소 높이만 같은 기준으로 수정한다.",
+        "4. 두 package의 syntax, unit 및 Agents integration 검증과 git diff check를 실행한다.",
+        "5. 변경 범위, geometry 정합성, 아이콘·DOM·동작 보존을 AI Review한다.",
+        "6. 검증 evidence, Report와 한국어 Human checklist 및 검토 방법을 기록한다."
+      ]
+    }
+  ],
+  "subsections": []
+}

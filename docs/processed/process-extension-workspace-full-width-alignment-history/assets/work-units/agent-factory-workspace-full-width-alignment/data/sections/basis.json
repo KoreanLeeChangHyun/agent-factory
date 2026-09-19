@@ -1,0 +1,23 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-INTAKE-001",
+      "kind": "intake-basis-ref",
+      "content": "검증된 전체 폭 정렬 Intake의 WORK-UNIT-BASIS-001",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-workspace-full-width-alignment",
+          "path": ".agent-factory/intakes/agent-factory-workspace-full-width-alignment",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-001"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,50 @@
+{
+  "id": "work-unit-basis",
+  "title": "Work Unit Basis",
+  "content": [
+    {
+      "id": "SPECIFICATION-IMPACT-001",
+      "kind": "specification-impact",
+      "content": {
+        "status": "not-applicable",
+        "reason": "이번 범위는 accepted implementation의 로컬 packaging 및 installation이며 기능 또는 설계 요구사항을 변경하지 않는다."
+      },
+      "attributes": {
+        "status": "not-applicable"
+      }
+    },
+    {
+      "id": "BASIS-001",
+      "kind": "work-unit-basis",
+      "content": {
+        "title": "Agents와 Workspace linux-x64 VSIX 로컬 배포",
+        "goal": "main 기준 두 확장을 검증·패키징하고 현재 VS Code 설치본에 force update한다.",
+        "scope": [
+          "두 package check",
+          "Agents 기존 package 및 verify scripts",
+          "Workspace vsce package",
+          "두 VSIX force install과 installed version 확인"
+        ],
+        "expectedOutputs": [
+          "새 Agents linux-x64 VSIX",
+          "새 Workspace linux-x64 VSIX",
+          "두 install command 결과와 installed version evidence",
+          "한국어 Human reload 안내"
+        ],
+        "verification": [
+          "npm package checks",
+          "Agents verify:vsix",
+          "VSIX file existence 및 size",
+          "code install exit status",
+          "installed extension version listing",
+          "main Git clean state"
+        ],
+        "dependencies": [
+          "Human A 배포 결정",
+          "main의 완료된 tab header geometry integration"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

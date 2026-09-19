@@ -1,0 +1,25 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "INTAKE-BASIS-001",
+      "kind": "intake-basis-ref",
+      "content": {
+        "summary": "Ready Intake의 Kanban 전체 높이 복원 및 runtime geometry 검증 요구를 실행 기준으로 사용한다."
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "workspace-kanban-full-height-restoration",
+          "path": ".agent-factory/intakes/workspace-kanban-full-height-restoration",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-001"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

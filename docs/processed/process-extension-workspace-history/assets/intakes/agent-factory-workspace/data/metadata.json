@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "2.0.0",
+  "documentVersion": "1.0.60",
+  "id": "agent-factory-workspace",
+  "artifactType": "intake",
+  "projectId": "agent-factory-workspace",
+  "lifecycle": {
+    "phase": "intake",
+    "status": "ready"
+  },
+  "createdAt": "2026-07-21T10:43:29+00:00",
+  "updatedAt": "2026-07-25T14:18:30+00:00",
+  "language": "ko",
+  "theme": "default",
+  "provenance": {
+    "createdBy": "Human",
+    "generatedBy": "Agent Factory intake manager",
+    "sourceRefs": []
+  },
+  "relations": [],
+  "readiness": {
+    "reviewedAt": "2026-07-25T14:18:18Z",
+    "contractValid": true,
+    "evidenceComplete": true,
+    "requirementsComplete": true,
+    "specificationConsistent": true,
+    "executionReady": true,
+    "findings": []
+  }
+}

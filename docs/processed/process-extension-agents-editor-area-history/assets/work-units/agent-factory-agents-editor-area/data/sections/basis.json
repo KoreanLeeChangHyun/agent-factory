@@ -1,0 +1,33 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-REF-001",
+      "kind": "intake-basis-ref",
+      "content": "승인된 Agents editor area 및 Agent Factory launcher basis",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-agents-editor-area",
+          "path": ".agent-factory/intakes/agent-factory-agents-editor-area",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-001"
+          }
+        },
+        {
+          "artifactType": "specification",
+          "id": "project-core",
+          "path": ".agent-factory/specifications/project-core"
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

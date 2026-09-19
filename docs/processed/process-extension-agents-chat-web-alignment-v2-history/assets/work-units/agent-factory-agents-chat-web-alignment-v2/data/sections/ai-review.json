@@ -1,0 +1,47 @@
+{
+  "id": "ai-review",
+  "title": "AI Review",
+  "content": [
+    {
+      "id": "AI-CHECKLIST-001",
+      "kind": "ai-checklist",
+      "content": {
+        "items": [
+          "Intake와 Work Unit 범위 준수",
+          "기존 세션 및 backend 계약 보존",
+          "CSP와 inline SVG 준수",
+          "키보드, IME와 좁은 폭 회귀 확인",
+          "관련 검증 증거 확인"
+        ]
+      }
+    },
+    {
+      "id": "AI-REVIEW-STATUS",
+      "kind": "ai-review-result",
+      "content": {
+        "status": "통과",
+        "findings": [
+          "Intake와 Work Unit 범위를 준수했고 Web runtime 및 source를 변경하지 않았다.",
+          "기존 submit, cancel, reconnect, draft, session ownership과 backend allowlist를 보존했다.",
+          "touched icon 영역은 inline SVG이며 CSP와 textContent 경계를 유지했다.",
+          "Enter, Shift+Enter, Ctrl 또는 Cmd+Enter와 IME composing 회귀 검증이 통과했다.",
+          "20px 초기 높이, 144px 상한, 내부 스크롤, resize handle 부재, 22px status와 완료 후 IDLE을 검증했다."
+        ],
+        "remainingRisks": [
+          "실제 설치본 화면의 Human 시각 검토와 실제 인증 메시지 smoke는 아직 수행되지 않았다."
+        ]
+      },
+      "attributes": {
+        "result": "pass",
+        "checklistResult": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67",
+          "revision": 1,
+          "attempt": 1
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

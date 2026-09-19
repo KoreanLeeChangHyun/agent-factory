@@ -1,0 +1,25 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-REF-001",
+      "kind": "intake-basis-ref",
+      "content": {
+        "summary": "Human이 확정한 이미지 범위의 기존 agents VS Code 확장 구현"
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-agents-chat-web-alignment",
+          "path": ".agent-factory/intakes/agent-factory-agents-chat-web-alignment",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-002"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

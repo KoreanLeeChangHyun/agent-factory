@@ -1,0 +1,29 @@
+{
+  "id": "ai-review",
+  "title": "AI Review",
+  "content": [
+    {
+      "id": "AI-CHECKLIST-001",
+      "kind": "ai-checklist",
+      "content": [
+        "Agents-only scope와 exclusions를 준수했는가",
+        "Web runtime screenshot과 measured geometry를 실제 구현 기준으로 사용했는가",
+        "unsupported Web controls를 추가하거나 가장하지 않았는가",
+        "Session -> DOM -> State와 backend message allowlist를 보존했는가",
+        "keyboard, IME, submit, cancel, reconnect, draft, CSP와 inline SVG 회귀를 막았는가",
+        "runtime evidence와 자동 검증 결과가 보고서와 일치하는가"
+      ]
+    },
+    {
+      "id": "AI-REVIEW-STATUS",
+      "kind": "ai-review-result",
+      "content": "AI review 대기",
+      "attributes": {
+        "result": "pending",
+        "checklistResult": "pending",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

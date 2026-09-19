@@ -1,0 +1,85 @@
+{
+  "id": "report",
+  "title": "Report",
+  "content": [
+    {
+      "id": "REPORT-STATUS",
+      "kind": "report-result",
+      "content": {
+        "summary": "커밋 9837463이 .vscode/launch.json을 추가하며 구현·집중 검증·AI Review가 통과했고 Work Unit은 Human review 상태다.",
+        "commit": "983746354ad1cf673887ae812e80767c0b52448f",
+        "aiReview": "통과",
+        "lifecycleRecovery": "Manager 소유 ready → backlog → blocked → review 전이로 revision 1, attempt 1과 기존 결과를 보존하면서 상태 불일치를 해소했다.",
+        "humanExecution": "VS Code Run and Debug에서 Agent Factory: Workspace + Agents를 선택하고 F5를 누른다.",
+        "integrationRequired": true,
+        "deliveredScope": [
+          "루트 개발 호스트 실행 구성 하나",
+          "Workspace와 Agents 개발 경로 동시 전달",
+          "현재 저장소 루트를 개발 호스트에서 열기"
+        ],
+        "exclusions": [
+          "확장 소스 변경 없음",
+          "VSIX 생성·설치 없음",
+          "배포 없음",
+          "서버 재시작 없음",
+          "기존 테스트 변경 없음"
+        ],
+        "changedPaths": [
+          ".vscode/launch.json"
+        ],
+        "verificationCommands": [
+          "node -e \"JSON.parse(require(\\\"node:fs\\\").readFileSync(\\\".vscode/launch.json\\\",\\\"utf8\\\")); console.log(\\\"JSON parse passed\\\")\"",
+          "node -e \"const c=require(\\\"./.vscode/launch.json\\\"),x=c.configurations[0],d=\\\"$\\\"+\\\"{workspaceFolder}\\\"; require(\\\"node:assert\\\").deepStrictEqual({version:c.version,name:x.name,type:x.type,request:x.request,runtimeExecutable:x.runtimeExecutable,args:x.args},{version:\\\"0.2.0\\\",name:\\\"Agent Factory: Workspace + Agents\\\",type:\\\"extensionHost\\\",request:\\\"launch\\\",runtimeExecutable:\\\"$\\\"+\\\"{execPath}\\\",args:[d,\\\"--extensionDevelopmentPath=\\\"+d+\\\"/workspace\\\",\\\"--extensionDevelopmentPath=\\\"+d+\\\"/agents\\\"]})\"",
+          "git show --check --format=oneline --no-ext-diff 9837463",
+          "test \"$(git diff-tree --no-commit-id --name-only -r 9837463)\" = \".vscode/launch.json\""
+        ],
+        "verificationResults": [
+          "JSON parse passed",
+          "configuration boundary passed",
+          "git show --check 통과",
+          "changed path boundary passed",
+          "worktree inspect: clean",
+          "Work Unit full validation: pass"
+        ],
+        "remainingRisks": [
+          "Human의 F5 시각 확인은 아직 수행되지 않았다."
+        ]
+      },
+      "attributes": {
+        "verificationResult": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc1db-90b1-7891-88d4-4399f291a81f",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/launch.json"
+        ]
+      }
+    },
+    {
+      "id": "INTEGRATION-B372D7A510E3EE2F",
+      "kind": "integration-result",
+      "content": {
+        "operationResult": "fast-forwarded",
+        "relationship": "fast-forwardable",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "sourceBranch": "work-unit/vscode-extension-development-host-preview",
+        "sourceCommit": "983746354ad1cf673887ae812e80767c0b52448f",
+        "strategy": "ff-only",
+        "targetAfterCommit": "983746354ad1cf673887ae812e80767c0b52448f",
+        "targetBeforeCommit": "f6ff8f8d34013f0bdbd81c27cd22e55c4afda659",
+        "targetBranch": "main",
+        "workUnitId": "vscode-extension-development-host-preview",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/vscode-extension-development-host-preview",
+        "receiptSha256": "b372d7a510e3ee2fa1164af417ba59f05616ebfaebdca5b411ef33a090f92af0"
+      },
+      "attributes": {
+        "status": "integrated"
+      },
+      "blockRef": "blocks/evidence/integration-receipt.json"
+    }
+  ],
+  "subsections": []
+}

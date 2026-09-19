@@ -1,0 +1,32 @@
+{
+  "id": "human-review",
+  "title": "Human Review",
+  "content": [
+    {
+      "id": "HUMAN-CHECKLIST-001",
+      "kind": "human-checklist",
+      "content": [
+        "Agents editor panel에서 session-open visual hierarchy가 승인된 runtime 결과와 일치하는지 확인한다.",
+        "Composer가 하나의 rounded container이며 action이 내부 우측 하단에 정렬되는지 확인한다.",
+        "빈 입력, multiline auto-grow, overflow와 status line을 확인한다.",
+        "세션 전환, draft, submit, cancel, reconnect와 한글 IME를 확인한다.",
+        "Workspace 화면과 기능이 변경되지 않았는지 확인한다.",
+        "승인 또는 rework를 결정하고 integration, cleanup, push와 배포는 별도로 결정한다."
+      ]
+    },
+    {
+      "id": "HUMAN-REVIEW-METHOD-001",
+      "kind": "human-review-method",
+      "content": "검증 evidence와 필요한 screenshot을 확인하고 생성된 linux-x64 VSIX를 설치한 뒤 Reload Window 후 Agents editor panel에서 체크리스트를 수행한다."
+    },
+    {
+      "id": "HUMAN-REVIEW-STATUS",
+      "kind": "human-review-result",
+      "content": "Human 검토 대기",
+      "attributes": {
+        "status": "pending"
+      }
+    }
+  ],
+  "subsections": []
+}

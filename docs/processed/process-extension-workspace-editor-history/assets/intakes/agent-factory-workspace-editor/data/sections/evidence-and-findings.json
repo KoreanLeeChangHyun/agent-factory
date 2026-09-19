@@ -1,0 +1,76 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "code",
+        "source": "workspace/src/webviewShell.js; workspace/test/unit/webviewShell.test.js; .agent-factory/specifications/agent-factory-workspace-requirements; Agent Factory common-document-contract.md",
+        "method": "repository and canonical contract inspection",
+        "findings": [
+          "Design과 View는 현재 실제 읽기 또는 편집 기능이 없는 placeholder다.",
+          "탭 생성, panel 생성, 선택 헤더, 키보드 탐색과 vscode state 저장은 TAB_DEFINITIONS 기반이다.",
+          "기존 Specification은 다섯 탭과 Design 및 View 분리를 명시하므로 정렬이 필요하다.",
+          "세 artifact는 공통 물리 골격을 사용하지만 각 manager와 profile은 별도다."
+        ],
+        "interpretations": [
+          "단일 Editor는 공통 읽기 모델을 공유하되 쓰기는 artifact별 manager adapter로 분리해야 한다."
+        ],
+        "limitations": [
+          "현재 저장소에는 범용 Editor controller나 artifact manager adapter가 없다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-FUNCTION-001",
+      "kind": "interview",
+      "content": {
+        "question": "Editor 탭 기능 범위 결정",
+        "recommendation": "C",
+        "rationale": "공통 JSON 골격과 manager 검증 규칙을 함께 활용해 중복 탭을 제거한다.",
+        "answer": "C",
+        "state": "answered",
+        "choices": [
+          "A: Editor placeholder만 제공",
+          "B: 공통 JSON 읽기 전용 Editor",
+          "C: 공통 JSON을 읽고 artifact별 manager로 수정하는 Editor"
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-LAYOUT-002",
+      "kind": "interview",
+      "content": {
+        "question": "Editor 편집 UI 방식 결정",
+        "recommendation": "C",
+        "rationale": "원시 JSON 직접 저장을 피하면서 구조 탐색과 안전한 편집을 함께 제공한다.",
+        "answer": "C",
+        "state": "answered",
+        "choices": [
+          "A: JSON 전체 텍스트 편집",
+          "B: 필드별 폼 편집",
+          "C: artifact/section 트리, 구조화 필드 편집, 읽기 전용 JSON 미리보기"
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-TAB-ORDER-003",
+      "kind": "interview",
+      "content": {
+        "question": "Editor 탭 위치 결정",
+        "recommendation": "A",
+        "rationale": "기존 Design 위치를 계승하고 View만 제거해 변화 범위를 최소화한다.",
+        "answer": "A",
+        "state": "answered",
+        "choices": [
+          "A: Dashboard, Editor, Kanban, Context",
+          "B: Dashboard, Kanban, Context, Editor",
+          "C: Dashboard, Kanban, Editor, Context"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

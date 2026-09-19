@@ -1,0 +1,53 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": [
+        "빈 composer input은 20px 계산 높이로 시작한다.",
+        "multiline input은 내용에 따라 최대 144px까지 자동 확장하고 초과 내용은 내부 스크롤한다.",
+        "native textarea resize handle이 없다.",
+        "composer card는 최소 72px, 12px padding을 유지하고 28px action은 우측 12px, 하단 12px에 정렬된다.",
+        "status line은 22px 높이이며 정상 완료 후 지속적인 완료 문구 대신 IDLE을 표시한다.",
+        "좁은 editor group에서도 input과 action이 겹치지 않는다.",
+        "현재 chat.ready, submit, cancel, reconnect, draft, CSP, SVG, session DOM ownership, keyboard와 IME 계약이 유지된다."
+      ]
+    },
+    {
+      "id": "DOD-001",
+      "kind": "definition-of-done",
+      "content": [
+        "TDD로 composer rendering과 status line 실패 테스트를 먼저 기록하고 구현 후 통과시킨다.",
+        "변경 범위가 chatView composer, 관련 test와 E2E에 한정된다.",
+        "npm run check와 npm run test:e2e를 통과한다.",
+        "linux-x64 VSIX를 생성하고 runtime 및 archive contents를 검증한다.",
+        "실행 evidence, AI checklist, AI review result, report와 한국어 Human review 방법을 canonical Work Unit에 기록한다.",
+        "integration, cleanup, 내부 재배포, push와 PR promotion은 Human 승인 전 수행하지 않는다."
+      ]
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": [
+        "unit: CSS의 20px height, 144px max-height, resize none, overflow와 22px status row를 검증한다.",
+        "unit: content-driven resize가 input, session switch, draft restore, submit clear에 적용되고 144px에서 clamp되는지 검증한다.",
+        "unit: complete가 IDLE로 표시되고 running, cancelling, cancelled, error 상태가 유지되는지 검증한다.",
+        "unit/integration: 기존 submit, cancel, reconnect, draft restore, keyboard, IME, session-owned DOM과 CSP 회귀를 검증한다.",
+        "E2E: Extension Host editor panel에서 composer contract와 status line을 검증한다.",
+        "package: linux-x64 VSIX 생성과 archive contents를 검증한다."
+      ]
+    },
+    {
+      "id": "QUALITY-STATUS",
+      "kind": "quality-check",
+      "content": "실행 전 품질 검증 대기",
+      "attributes": {
+        "status": "planned",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,65 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "configuration",
+        "source": "agents/package.json; workspace/package.json; agents/.vscodeignore; workspace/.vscodeignore",
+        "method": "repository inspection",
+        "findings": [
+          "Agents package.json은 check, package:linux-x64와 verify:vsix를 제공한다.",
+          "Workspace package.json은 check를 제공하지만 package script는 제공하지 않는다.",
+          "두 확장의 version은 0.0.1이며 VS Code engine은 ^1.129.0이다.",
+          "두 .vscodeignore는 test와 package 산출물을 제외한다."
+        ],
+        "interpretations": [
+          "Agents는 기록된 npm scripts를 사용하고 Workspace는 같은 repository에 설치된 vsce parser가 허용한 package 명령을 직접 사용해야 한다."
+        ],
+        "limitations": [
+          "실제 설치 결과와 reload 필요 여부는 Execution에서 확인해야 한다."
+        ]
+      }
+    },
+    {
+      "id": "INTERNAL-EVIDENCE-002",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "runtime",
+        "source": "code --version; code --list-extensions --show-versions; agents/node_modules/.bin/vsce --version; vsce package --help; code --help",
+        "method": "installed CLI inspection",
+        "findings": [
+          "VS Code CLI는 install-extension path와 force update 및 installed version listing을 지원한다.",
+          "설치된 VS Code는 1.129.1 x64이다.",
+          "두 Agent Factory extension은 0.0.1로 설치되어 있다.",
+          "설치된 vsce는 3.9.2이며 linux-x64 target과 explicit output path를 지원한다."
+        ],
+        "interpretations": [
+          "현재 환경에서 두 VSIX를 생성하고 동일 버전 설치본을 force update한 뒤 목록으로 확인할 수 있다."
+        ],
+        "limitations": [
+          "VS Code window reload는 자동 실행하지 않아 현재 열린 window의 module reload는 별도 Human 동작일 수 있다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-001",
+      "kind": "interview",
+      "content": {
+        "question": "배포 범위를 무엇으로 할지 결정",
+        "choices": [
+          "A: Agents와 Workspace VSIX 재패키징 후 현재 VS Code에 설치",
+          "B: 두 VSIX 패키지만 생성",
+          "C: Git 원격 push와 PR 배포"
+        ],
+        "recommendation": "A",
+        "rationale": "양쪽 UI 변경을 현재 환경에서 함께 사용하려면 두 설치본을 동시에 갱신해야 한다.",
+        "answer": "A",
+        "state": "answered"
+      }
+    }
+  ],
+  "subsections": []
+}

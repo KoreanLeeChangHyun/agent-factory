@@ -1,0 +1,44 @@
+{
+  "id": "requirements-and-constraints",
+  "title": "Requirements and Constraints",
+  "content": [
+    {
+      "id": "REQUIREMENT-AGENTS-001",
+      "kind": "requirement",
+      "content": {
+        "requirements": [
+          "현재 main을 기준으로 승인된 Agents runtime visual alignment와 Composer rendering correction 결과를 함께 보존한다.",
+          "Session -> DOM -> State, submit, cancel, reconnect, draft, keyboard, IME, CSP와 backend message allowlist를 보존한다.",
+          "기존 agent-factory-workspace-requirements Specification의 Agents acceptance와 quality requirements를 보존한다.",
+          "충돌 해결은 source, tests와 canonical Specification manager 검증으로 확인한다."
+        ]
+      }
+    },
+    {
+      "id": "REQUIREMENT-WORKSPACE-001",
+      "kind": "requirement",
+      "content": {
+        "requirements": [
+          "현재 main의 Kanban 컬럼별 표시 선택 기능을 보존한다.",
+          "승인된 Workspace selected header 실제 32px 결과를 함께 반영한다.",
+          "Workspace DOM, 문구, 키보드, 상태 보존과 기존 Kanban 동작을 불필요하게 변경하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "ACCEPTANCE-CRITERION-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "Agents 정합 결과에서 runtime visual hierarchy와 Composer rounded container, auto-grow, action 및 status 동작이 함께 검증된다.",
+          "Agents 관련 unit, integration, package 및 필요한 runtime geometry 검증이 통과한다.",
+          "Workspace 정합 결과에서 Kanban 컬럼 표시 선택과 32px selected header가 함께 검증된다.",
+          "Workspace syntax 및 unit 검증이 통과하고 current main 기능 회귀가 없다.",
+          "Specification 및 Work Unit package full validation이 통과한다.",
+          "integration 전 Human review 자료와 별도 승인 경계가 준비된다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

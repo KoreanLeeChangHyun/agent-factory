@@ -1,0 +1,23 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-INTAKE-001",
+      "kind": "intake-basis-ref",
+      "content": "검증된 기존 Intake의 corrective BASIS-002",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-extension-tab-header-web-alignment",
+          "path": ".agent-factory/intakes/agent-factory-extension-tab-header-web-alignment",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "BASIS-002"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

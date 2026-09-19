@@ -1,0 +1,28 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-REF-001",
+      "kind": "intake-basis-ref",
+      "content": "승인된 Agents Web runtime 시각 정합성 Intake BASIS-003",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-extension-tab-header-web-alignment",
+          "path": ".agent-factory/intakes/agent-factory-extension-tab-header-web-alignment",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "BASIS-003"
+          }
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

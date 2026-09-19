@@ -1,0 +1,28 @@
+{
+  "id": "decisions-and-open-items",
+  "title": "Decisions and Open Items",
+  "content": [
+    {
+      "id": "DECISION-STATUS-001",
+      "kind": "decision-status",
+      "content": {
+        "state": "approved",
+        "decisions": [
+          "최근 Kanban 단순화 기능을 유지하고 높이만 복원한다.",
+          "실제 geometry 기반 회귀 검증을 추가한다."
+        ]
+      }
+    },
+    {
+      "id": "OPEN-ITEMS-STATUS-001",
+      "kind": "open-items-status",
+      "content": {
+        "nonBlocking": [
+          "구체적인 CSS 수정 방식은 runtime geometry evidence로 결정한다."
+        ],
+        "blocking": []
+      }
+    }
+  ],
+  "subsections": []
+}

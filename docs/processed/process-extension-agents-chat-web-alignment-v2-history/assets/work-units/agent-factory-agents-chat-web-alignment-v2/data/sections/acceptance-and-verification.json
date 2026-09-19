@@ -1,0 +1,66 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "상단 Main Agent Sessions 및 Workflow Session 탭과 세션 헤더가 이미지의 계층을 따른다.",
+          "메시지 영역과 하단 composer가 이미지 수준의 배치와 현재 기능을 제공한다.",
+          "현재 session, submit, cancel, reconnect, draft, CSP와 SVG 계약이 유지된다."
+        ]
+      }
+    },
+    {
+      "id": "DOD-001",
+      "kind": "definition-of-done",
+      "content": {
+        "items": [
+          "범위 내 구현과 회귀 테스트가 완료된다.",
+          "관련 검증이 통과하고 증거가 Work Unit에 등록된다.",
+          "AI Review와 한국어 Human review 자료가 완료된다."
+        ]
+      }
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": {
+        "tests": [
+          "agents 단위 테스트",
+          "agents 통합 또는 Extension Host E2E",
+          "변경 JavaScript 구문 및 패키지 check"
+        ]
+      }
+    },
+    {
+      "id": "QUALITY-001",
+      "kind": "quality-check",
+      "content": {
+        "result": "pass",
+        "checks": [
+          "npm run check: syntax, unit 25건, integration 1건 통과",
+          "npm run test:e2e: VS Code 1.129.1 Extension Host 통과",
+          "npm run package:linux-x64 및 npm run verify:vsix 통과",
+          "git diff --check 및 git show --check 통과",
+          "SVG-only, CSP, allowlist, session ownership 회귀 테스트 통과"
+        ]
+      },
+      "attributes": {
+        "status": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/verification.txt"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

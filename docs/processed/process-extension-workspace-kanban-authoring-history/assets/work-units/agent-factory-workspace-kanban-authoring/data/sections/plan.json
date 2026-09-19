@@ -1,0 +1,19 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "plan-tdd-kanban-transitions",
+      "kind": "plan-step",
+      "content": [
+        "1. 승인된 DnD/Action-only 결정과 현재 board·manager 계약을 실패 테스트로 고정한다.",
+        "2. manager discovery, argv allowlist, canonical root와 transition capability negative test를 먼저 작성한다.",
+        "3. drag와 Move가 동일 action request를 생성하고 허용 target만 활성화하는 테스트를 먼저 작성한다.",
+        "4. stale snapshot, 중복 요청, manager failure와 authoritative refresh 테스트를 먼저 작성한다.",
+        "5. 최소 host runner와 Webview wiring으로 backlog·ready·blocked 전이를 구현한다.",
+        "6. 단위·manager 통합·VS Code E2E·접근성·테마·보안 검증과 AI Review를 완료한다."
+      ]
+    }
+  ],
+  "subsections": []
+}

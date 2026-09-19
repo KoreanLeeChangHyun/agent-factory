@@ -1,0 +1,23 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "basis-ref-kanban-board",
+      "kind": "intake-basis-ref",
+      "content": "검증된 Kanban Operations Intake의 첫 번째 보드 기반 Work Unit basis",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-workspace-kanban-viewer",
+          "path": ".agent-factory/intakes/agent-factory-workspace-kanban-viewer",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "work-unit-basis-kanban-board"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

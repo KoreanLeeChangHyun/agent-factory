@@ -1,0 +1,53 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": {
+        "goal": "Kanban notice를 제거하고 칼럼 표시 선택을 localStorage에 영속화하며 카드를 정적인 타이틀 전용 항목으로 단순화한다."
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "workspace/src/webviewShell.js의 data-kanban-notice DOM과 CSS 제거",
+          "일반 전이 notice 쓰기 제거",
+          "닫힌 Kanban 칼럼 ID의 localStorage 저장 및 초기 복원",
+          "카드의 타이틀 외 id, meta와 action DOM 제거",
+          "카드 draggable, click, tap, focus와 keyboard Move 제거",
+          "workspace/test/unit/webviewShell.test.js 회귀 테스트"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "Kanban manager와 snapshot 오류 계약 변경",
+          "카드 액션, DnD, keyboard Move 또는 대체 메뉴 재도입",
+          "검색, 필터 또는 수동 새로 고침 추가",
+          "다른 탭의 상태 저장 변경",
+          "배포와 서버 재시작"
+        ]
+      }
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": {
+        "items": [
+          "notice 라인이 없는 Kanban Webview",
+          "재개방 후 복원되는 칸반 표시 선택",
+          "타이틀만 보이는 정적 Kanban 카드",
+          "관련 회귀 테스트와 검증 보고"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

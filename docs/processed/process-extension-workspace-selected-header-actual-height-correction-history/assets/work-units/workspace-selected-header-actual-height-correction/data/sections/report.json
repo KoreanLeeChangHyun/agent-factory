@@ -1,0 +1,20 @@
+{
+  "id": "report",
+  "title": "Report",
+  "content": [
+    {
+      "id": "REPORT-RESULT-001",
+      "kind": "report-result",
+      "content": "수정 Report 미작성",
+      "attributes": {
+        "verificationResult": "not-run",
+        "remainingRisks": [
+          "현재 Extension Host 반영에는 Human의 window reload가 필요할 수 있다.",
+          "cleanup과 integration은 별도 Human 결정이다."
+        ],
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,45 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "facts": [
+          "현재 VS Code는 1.129.1 x64이다.",
+          "agent-factory.agent-factory-agents와 agent-factory.agent-factory-workspace가 각각 0.0.1로 설치되어 있다.",
+          "Agents는 기존 linux-x64 package 및 VSIX verification script를 제공한다.",
+          "Workspace는 package script가 없지만 repository에 설치된 vsce 3.9.2와 .vscodeignore를 사용할 수 있다.",
+          "main은 clean이며 tab header geometry 변경과 integration 기록을 포함한다."
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "agents package check, linux-x64 VSIX 재생성 및 verify:vsix",
+          "workspace package check와 linux-x64 VSIX 생성",
+          "code CLI를 통한 두 VSIX force install",
+          "code CLI를 통한 설치 extension id 및 version 확인"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "소스 코드와 package version 변경",
+          "서버 또는 VS Code 재시작 및 window reload",
+          "Marketplace publish, Git push와 PR promotion",
+          "기존 Work Unit worktree cleanup",
+          "Windows, macOS, arm64 패키지"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

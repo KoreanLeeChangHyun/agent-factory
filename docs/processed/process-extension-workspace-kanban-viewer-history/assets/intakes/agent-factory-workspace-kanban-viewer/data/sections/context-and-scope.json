@@ -1,0 +1,43 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "context-existing-shell",
+      "kind": "context",
+      "content": {
+        "context": "workspace 확장은 현재 Dashboard, Design, Kanban, Context, View의 5개 탭 shell만 제공하며 Kanban 패널은 후속 Work Unit 안내문만 표시한다."
+      }
+    },
+    {
+      "id": "scope-read-only-kanban",
+      "kind": "scope",
+      "content": {
+        "included": [
+          "workspace 확장 호스트의 canonical Work Unit 읽기 모델",
+          "확장 호스트와 Webview 사이의 요청·응답 및 진행 상태 메시지 경계",
+          "GitHub Projects를 참고한 lifecycle 상태별 Kanban 표시와 탐색",
+          "Work Unit 생성·편집·실행·상태 변경",
+          "Human 승인 기반 Git 병합과 PR 생성",
+          "빈 상태·오류·진행·승인 대기 상태",
+          "단위·통합·핵심 E2E와 Human 검토 자료"
+        ]
+      }
+    },
+    {
+      "id": "out-of-scope-kanban-mutations",
+      "kind": "out-of-scope",
+      "content": {
+        "excluded": [
+          "canonical JSON 직접 변경",
+          "Human 승인 없는 Work Unit 실행·병합·PR",
+          "강제 Git 작업과 dirty worktree 삭제",
+          "Dashboard, Design, Context 기능 구현",
+          "agents 확장 변경",
+          "web 저장소 변경"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

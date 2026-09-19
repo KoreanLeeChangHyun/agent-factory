@@ -1,0 +1,116 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "code",
+        "source": "agents/package.json; agents/src/extension.js; agents/test/unit/manifest.test.js; agents/test/suite/index.js; workspace/package.json; workspace/src/extension.js; workspace/test",
+        "method": "repository inspection",
+        "findings": [
+          "Agents는 viewsContainers.activitybar 아래 Explorer Tree View와 Agents Webview View를 함께 기여하고 registerWebviewViewProvider로 채팅을 Primary Sidebar에 소유한다.",
+          "Workspace는 agentFactoryWorkspace.open command가 createWebviewPanel을 ViewColumn.Active에 생성해 editor area의 단일 panel을 열고 기존 panel은 reveal한다.",
+          "Agents E2E는 sidebar container와 agentFactoryAgents.chat.focus command를 직접 열도록 고정돼 있어 전환 시 manifest, activation, extension lifecycle과 E2E 계약을 함께 변경해야 한다."
+        ],
+        "interpretations": [
+          "Agents chat을 editor area로 이동하려면 기존 Webview View registration을 Webview Panel command 및 panel lifecycle로 교체해야 한다."
+        ],
+        "limitations": [
+          "Explorer를 Sidebar에 유지할지와 Agents editor opener를 어디에 노출할지는 Human 결정이 필요하다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-001",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Webview API",
+        "url": "https://code.visualstudio.com/api/extension-guides/webview",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-27",
+        "findings": [
+          "createWebviewPanel로 만든 Webview Panel은 VS Code에서 별도 editor로 표시된다.",
+          "Webview View는 Sidebar 또는 Panel 영역의 view로 렌더링된다.",
+          "Webview Panel은 reveal을 통해 기존 editor tab을 전면으로 가져올 수 있다."
+        ],
+        "limitations": [
+          "프로젝트 고유 command id와 Explorer 유지 여부는 공식 API 문서가 결정하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-002",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code UX Guidelines: Views",
+        "url": "https://code.visualstudio.com/api/ux-guidelines/views",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-27",
+        "findings": [
+          "View Container는 Activity Bar 또는 Panel에서 Views를 소유한다.",
+          "공식 UX 지침은 Activity Bar Item을 editor Webview를 여는 용도로 사용하지 말라고 명시한다.",
+          "View toolbar의 command action은 지원되는 발견 가능성 경계다."
+        ],
+        "limitations": [
+          "toolbar action 사용 여부와 위치는 프로젝트 UX 결정이다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-OPEN-SURFACE-001",
+      "kind": "interview",
+      "content": {
+        "question": "Explorer를 유지하면서 Agents editor panel을 여는 진입점을 어디에 둘지 결정",
+        "recommendation": "A",
+        "rationale": "Explorer는 기존 native 책임을 유지하고, Explorer title action과 Command Palette가 동일한 singleton editor command를 호출하면 공식 VS Code UX 경계를 지키면서 발견 가능성과 유지보수성을 함께 확보한다.",
+        "answer": "C",
+        "state": "answered",
+        "choices": [
+          "A: Explorer Sidebar는 유지하고 title action 및 Command Palette에서 singleton Agents editor panel을 연다.",
+          "B: Explorer Sidebar는 유지하고 Command Palette에서만 Agents editor panel을 연다.",
+          "C: Activity Bar와 Explorer까지 제거하고 Agents editor command만 유지한다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-LAUNCHER-SURFACE-002",
+      "kind": "interview",
+      "content": {
+        "question": "기존 선택 C를 유지할지, Agents와 Workspace를 여는 launcher surface로 변경할지 결정",
+        "recommendation": "B",
+        "rationale": "Human의 최신 피드백을 직접 반영하면서 file Explorer와 sidebar Chat은 제거하고, 하나의 launcher view가 두 editor panel command만 제공하면 중앙 작업 영역 소유권과 두 확장의 진입점을 분리할 수 있다.",
+        "answer": "B",
+        "state": "answered",
+        "choices": [
+          "A: 기존 C 유지 — Activity Bar와 Explorer를 제거하고 Agents와 Workspace를 각 Command Palette에서 연다.",
+          "B: 선택 변경 — 하나의 Agent Factory launcher view에서 Agents와 Workspace editor panel을 연다. file Explorer와 sidebar Chat은 제거한다.",
+          "C: 중앙 Home editor panel에서 Agents와 Workspace를 선택해 연다. Activity Bar와 Explorer는 제거한다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-003",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Contribution Points: viewsWelcome",
+        "url": "https://code.visualstudio.com/api/references/contribution-points#contributes.viewsWelcome",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-27",
+        "findings": [
+          "viewsWelcome은 empty Tree View에 native welcome content를 제공한다.",
+          "독립된 command link는 button으로 표시할 수 있고 지정 command를 실행한다.",
+          "Welcome View를 사용하면 file tree item을 command button으로 오용하거나 별도 launcher Webview를 만들 필요가 없다."
+        ],
+        "limitations": [
+          "empty TreeDataProvider registration과 exact command ids는 구현 및 테스트에서 검증해야 한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

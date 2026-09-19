@@ -1,0 +1,42 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "facts": [
+          "배포 설치본과 main의 agents/src/chatView.js SHA-256가 일치한다.",
+          "제공된 842x153 스크린샷에는 큰 초기 textarea, 우측 하단 resize handle과 완료 상태가 보인다.",
+          "VS 확장은 textarea를 사용하며 height와 rows를 지정하지 않고 resize: vertical을 설정한다.",
+          "Web은 contenteditable chat-input-box를 사용하며 min-height 20px, max-height 144px, overflow-y auto를 적용하고 native resize handle이 없다."
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "agents/src/chatView.js composer DOM, CSS와 상태 표시",
+          "composer rendering 및 keyboard regression tests",
+          "VS Code Extension Host E2E와 linux-x64 VSIX 재검증"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "Web 애플리케이션 수정",
+          "Agents backend, Codex adapter와 session ownership 변경",
+          "model, reasoning, image attachment와 goal controls 추가",
+          "Human 승인 없는 integration, cleanup와 재배포"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

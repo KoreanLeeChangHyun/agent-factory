@@ -1,0 +1,94 @@
+{
+  "id": "report",
+  "title": "Report",
+  "content": [
+    {
+      "id": "REPORT-STATUS",
+      "kind": "report-result",
+      "content": {
+        "summary": "Agents 화면의 기존 탭, 세션 헤더, role turn, 세션 계약을 보존하면서 composer의 남은 Web 정합성 차이를 구현했고 모든 자동 검증이 통과했다.",
+        "commit": "30fd8d719acc5045a97608d5d18901e7e0c4ecaf",
+        "aiReview": "통과: 범위, session/backend, CSP, SVG, keyboard, IME, 좁은 폭 input/action 경계를 검토했다.",
+        "integrationRequired": true,
+        "deliveredScope": [
+          "textarea가 20px에서 시작해 내용에 따라 최대 144px까지 자동 확장한다.",
+          "144px 초과 내용은 내부 스크롤되고 native resize handle은 노출되지 않는다.",
+          "status line은 22px 고정이며 정상 완료 후 빈 IDLE 표시로 복귀한다.",
+          "기존 Main Agent Sessions 및 Workflow Session 탭, session header, user card와 assistant transparent turn hierarchy를 유지한다.",
+          "Enter 전송, Shift+Enter 줄바꿈, Ctrl 또는 Cmd+Enter와 IME 보호를 유지한다."
+        ],
+        "exclusions": [
+          "Web runtime 및 Web source 변경 없음",
+          "지원되지 않는 Web 전용 모델, Goal, 도구 control 추가 없음",
+          "push, 배포, PR promotion, merge와 worktree cleanup 수행 안 함"
+        ],
+        "changedPaths": [
+          "agents/src/chatView.js",
+          "agents/test/unit/chatView.test.js",
+          "agents/test/suite/index.js"
+        ],
+        "verificationCommands": [
+          "npm run check",
+          "npm run test:e2e",
+          "npm run package:linux-x64",
+          "npm run verify:vsix",
+          "git diff --check",
+          "git show --check --stat --oneline 30fd8d719acc5045a97608d5d18901e7e0c4ecaf",
+          "worktree.py inspect --repository /home/deus/workspace/agent-factory/vscode-extension --work-unit-id agent-factory-agents-chat-web-alignment-v2"
+        ],
+        "verificationResults": [
+          "syntax 통과",
+          "unit 25건 통과",
+          "integration 1건 통과",
+          "VS Code 1.129.1 Extension Host E2E 통과",
+          "linux-x64 VSIX 19개 파일 생성 및 Codex CLI 0.145.0 포함 확인",
+          "diff 및 commit whitespace 검사 통과",
+          "전용 worktree clean 및 main에서 fast-forward 가능"
+        ],
+        "remainingRisks": [
+          "Development Host에서 기준 이미지와 실제 시각 대조는 Human review로 남는다.",
+          "실제 Codex 인증 환경의 메시지 smoke는 Human review로 남는다."
+        ],
+        "executionNotes": [
+          "worktree.py prepare는 attempt-start 이후 lifecycle status가 working이라는 이유로 admission을 거부했다.",
+          "canonical 상태를 직접 편집하지 않고 동일한 canonical branch/path, no-checkout, lock, sparse checkout 계약으로 linked worktree를 구성했으며 이후 worktree.py inspect가 등록 상태와 .agent-factory 제외 및 clean 상태를 확인했다."
+        ]
+      },
+      "attributes": {
+        "verificationResult": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/verification.txt"
+        ]
+      }
+    },
+    {
+      "id": "INTEGRATION-6E987C1FCFF31E12",
+      "kind": "integration-result",
+      "content": {
+        "operationResult": "fast-forwarded",
+        "relationship": "fast-forwardable",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "sourceBranch": "work-unit/agent-factory-agents-chat-web-alignment-v2",
+        "sourceCommit": "30fd8d719acc5045a97608d5d18901e7e0c4ecaf",
+        "strategy": "ff-only",
+        "targetAfterCommit": "30fd8d719acc5045a97608d5d18901e7e0c4ecaf",
+        "targetBeforeCommit": "88e3e406378fd199592e1e757bb4f0f19d6e7f82",
+        "targetBranch": "main",
+        "workUnitId": "agent-factory-agents-chat-web-alignment-v2",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-agents-chat-web-alignment-v2",
+        "receiptSha256": "6e987c1fcff31e128486b2708e5045d7dabce604879bfefc1bd4ff9c95f58f45"
+      },
+      "attributes": {
+        "status": "integrated"
+      },
+      "blockRef": "blocks/evidence/integration-receipt.json"
+    }
+  ],
+  "subsections": []
+}

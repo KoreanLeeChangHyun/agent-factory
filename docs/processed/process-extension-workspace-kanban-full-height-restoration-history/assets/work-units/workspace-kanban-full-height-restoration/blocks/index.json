@@ -1,0 +1,18 @@
+{
+  "blocks": [
+    {
+      "path": "blocks/evidence/integration-receipt.json",
+      "mediaType": "application/json",
+      "description": "Raw Work Unit integration receipt",
+      "sha256": "1a51af5764274e5748b3f74aba187b000769ad3d13ac899938dc42dba6897cd6",
+      "sizeBytes": 1947
+    },
+    {
+      "path": "blocks/evidence/workspace-kanban-full-height-restoration.md",
+      "mediaType": "text/markdown",
+      "description": "Attempt 1 TDD, geometry, verification, AI review, and clean repository evidence",
+      "sha256": "227ad63f6d2dcc3b4b2dced1d30088fe1bc4d6d0eb39e4e0bbb58be4aa085c23",
+      "sizeBytes": 2850
+    }
+  ]
+}

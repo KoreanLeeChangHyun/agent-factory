@@ -1,0 +1,28 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-REF-001",
+      "kind": "intake-basis-ref",
+      "content": "ready Intake의 Workspace header 통합 정합 basis",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-completed-work-unit-integration-reconciliation",
+          "path": ".agent-factory/intakes/agent-factory-completed-work-unit-integration-reconciliation",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-WORKSPACE-001"
+          }
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,33 @@
+{
+  "id": "stakeholders-and-approval",
+  "title": "Stakeholders and Approval",
+  "content": [
+    {
+      "id": "STAKEHOLDER-001",
+      "kind": "stakeholder",
+      "content": {
+        "role": "Human 요청자 및 독립 Extension 범위 결정권자"
+      }
+    },
+    {
+      "id": "DECISION-OWNER-001",
+      "kind": "decision-owner",
+      "content": {
+        "owner": "Human"
+      }
+    },
+    {
+      "id": "APPROVAL-BOUNDARY-001",
+      "kind": "approval-boundary",
+      "content": {
+        "humanOwned": [
+          "포팅 기능 깊이 결정",
+          "Intake 및 Work Unit 체크포인트 승인",
+          "실행 결과 검토",
+          "main 병합, 배포, push 및 PR 승격 결정"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

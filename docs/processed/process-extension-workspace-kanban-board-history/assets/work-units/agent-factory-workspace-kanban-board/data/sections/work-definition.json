@@ -1,0 +1,45 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "goal-kanban-board",
+      "kind": "goal",
+      "content": "canonical Work Unit 읽기 모델과 GitHub Projects 참고 Kanban 보드 기반을 구현한다."
+    },
+    {
+      "id": "scope-kanban-board",
+      "kind": "scope",
+      "content": [
+        "요구사항 Specification 정합성 확인",
+        "schemaVersion 4.0.0 Work Unit reader와 안전한 project root 경계",
+        "확장 호스트-Webview snapshot 및 오류 message contract",
+        "backlog, ready, working, review, done, blocked 6개 칼럼",
+        "카드 정보, 항목 수, 제목·id filter, empty·partial-error 상태",
+        "filesystem watcher와 Webview state 복원",
+        "카드별 transition capability와 drag·Move affordance의 비변경 기반",
+        "단위·통합·핵심 VS Code E2E, 접근성·테마·보안 검증"
+      ]
+    },
+    {
+      "id": "out-of-scope-kanban-board",
+      "kind": "out-of-scope",
+      "content": [
+        "canonical Work Unit 생성·편집·상태 변경",
+        "Codex 실행",
+        "Human review 승인·rework",
+        "Git integration과 PR 생성",
+        "다른 workspace 탭과 agents·web 변경"
+      ]
+    },
+    {
+      "id": "expected-output-kanban-board",
+      "kind": "expected-output",
+      "content": [
+        "workspace/src",
+        "workspace/test"
+      ]
+    }
+  ],
+  "subsections": []
+}

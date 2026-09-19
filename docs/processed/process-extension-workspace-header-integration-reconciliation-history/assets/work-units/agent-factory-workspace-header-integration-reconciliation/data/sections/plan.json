@@ -1,0 +1,32 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": "현재 main과 완료 Workspace header branch의 webviewShell 및 unit test 차이를 읽고 충돌 구간을 식별한다."
+    },
+    {
+      "id": "PLAN-002",
+      "kind": "plan-step",
+      "content": "Kanban picker를 보존하면서 selected header 실제 32px를 요구하는 실패 회귀 테스트를 먼저 작성하거나 확인한다."
+    },
+    {
+      "id": "PLAN-003",
+      "kind": "plan-step",
+      "content": "workspace/src/webviewShell.js와 대응 unit test만 최소 수정해 두 결과를 정합한다."
+    },
+    {
+      "id": "PLAN-004",
+      "kind": "plan-step",
+      "content": "Workspace syntax 및 focused unit 검증을 실행하고 current main Kanban 회귀를 확인한다."
+    },
+    {
+      "id": "PLAN-005",
+      "kind": "plan-step",
+      "content": "전용 worktree final inspect, AI review, 실행 report와 한국어 Human review 자료를 기록한다."
+    }
+  ],
+  "subsections": []
+}

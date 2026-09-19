@@ -1,0 +1,33 @@
+{
+  "id": "human-review",
+  "title": "Human Review",
+  "content": [
+    {
+      "id": "HUMAN-CHECKLIST-001",
+      "kind": "human-checklist",
+      "content": [
+        "Reload Window 후 Agents editor panel을 열고 빈 입력창이 한 줄 높이로 자연스럽게 보이는지 확인한다.",
+        "우측 하단에 native resize handle이 없는지 확인한다.",
+        "여러 줄을 입력하면 입력창이 자동 확장하고 충분히 길어지면 내부 스크롤하는지 확인한다.",
+        "전송 버튼이 composer card 우측 하단에 정렬되고 input과 겹치지 않는지 확인한다.",
+        "메시지 완료 후 22px status line이 완료 문구를 계속 남기지 않고 IDLE로 복귀하는지 확인한다.",
+        "전송, Shift+Enter 줄바꿈, 취소, 세션 전환과 draft 복원이 정상인지 확인한다.",
+        "검토 후 승인 또는 rework를 결정하고 integration, cleanup, 내부 재배포, push와 PR promotion은 각각 별도로 결정한다."
+      ]
+    },
+    {
+      "id": "HUMAN-REVIEW-METHOD-001",
+      "kind": "human-review-method",
+      "content": "생성된 linux-x64 VSIX를 내부 설치 환경에 설치하고 Reload Window 후 Agents editor panel에서 빈 입력, multiline auto-grow, overflow, action 정렬, status line 및 기존 Chat 동작을 체크리스트 순서로 확인한 뒤 승인 또는 rework를 결정한다."
+    },
+    {
+      "id": "HUMAN-REVIEW-STATUS",
+      "kind": "human-review-result",
+      "content": "Human 검토 대기",
+      "attributes": {
+        "status": "pending"
+      }
+    }
+  ],
+  "subsections": []
+}

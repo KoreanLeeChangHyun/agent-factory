@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "4.0.0",
+  "documentVersion": "1.0.24",
+  "id": "agent-factory-agents-composer-rendering-correction",
+  "artifactType": "work-unit",
+  "projectId": "agent-factory-workspace",
+  "lifecycle": {
+    "phase": "work-unit",
+    "status": "ready"
+  },
+  "createdAt": "2026-07-26T18:32:58+00:00",
+  "updatedAt": "2026-07-26T18:35:31+00:00",
+  "language": "ko",
+  "theme": "default",
+  "provenance": {
+    "createdBy": "Human",
+    "generatedBy": "Agent Factory work-unit manager",
+    "sourceRefs": []
+  },
+  "relations": [],
+  "readiness": {
+    "reviewedAt": "2026-07-26T18:32:23+00:00",
+    "contractValid": true,
+    "intakeTraceabilityValid": true,
+    "definitionComplete": true,
+    "executionContextComplete": true,
+    "verificationPlanComplete": true,
+    "findings": []
+  }
+}

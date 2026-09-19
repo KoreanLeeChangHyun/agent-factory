@@ -1,0 +1,61 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "vscode-extension-development-host-preview",
+        "objective": "배포 없이 두 확장을 함께 여는 VS Code Extension Development Host 실행 설정을 추가한다.",
+        "execInvocation": "python3 /home/deus/.codex/plugins/cache/agent-factory/agent-factory/0.1.0+codex.20260728203314/skills/work-unit-execution/scripts/app_server_goal.py --repository /home/deus/workspace/agent-factory/vscode-extension --work-unit-id vscode-extension-development-host-preview",
+        "executionAgent": "Codex Workflow Agent",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "executionMode": "worktree",
+        "branch": "work-unit/vscode-extension-development-host-preview",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/vscode-extension-development-host-preview"
+      }
+    },
+    {
+      "id": "EXECUTION-STATE-001",
+      "kind": "execution-state",
+      "content": {
+        "contractVersion": "2.0.0",
+        "state": "done",
+        "currentRevision": 1,
+        "currentAttempt": 1,
+        "invocationId": "019fc1db-90b1-7891-88d4-4399f291a81f",
+        "invocationChain": [
+          "019fc1db-90b1-7891-88d4-4399f291a81f"
+        ],
+        "history": [],
+        "progress": {
+          "completedSteps": [],
+          "pendingStep": "worktree-prepare",
+          "records": [],
+          "retry": {
+            "worktree-prepare": {
+              "count": 1,
+              "maxRetries": 2,
+              "events": [
+                {
+                  "idempotencyKey": "019fc1db-90b1-7891-88d4-4399f291a81f:worktree-prepare:failure:1",
+                  "classification": "transient",
+                  "evidence": "Initial prepare was refused because attempt-start had already moved the package from ready to working; recover through the manager-owned working-to-ready transition, prepare, and a new retry attempt."
+                }
+              ]
+            }
+          }
+        },
+        "recovery": {
+          "status": "running",
+          "ownerInvocationId": "019fc1db-90b1-7891-88d4-4399f291a81f",
+          "blockerId": null,
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

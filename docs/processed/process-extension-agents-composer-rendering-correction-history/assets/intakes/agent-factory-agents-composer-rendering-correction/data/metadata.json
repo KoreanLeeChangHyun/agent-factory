@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "2.0.0",
+  "documentVersion": "1.0.27",
+  "id": "agent-factory-agents-composer-rendering-correction",
+  "artifactType": "intake",
+  "projectId": "agent-factory-workspace",
+  "lifecycle": {
+    "phase": "intake",
+    "status": "ready"
+  },
+  "createdAt": "2026-07-26T18:25:40+00:00",
+  "updatedAt": "2026-07-26T18:32:37+00:00",
+  "language": "ko",
+  "theme": "default",
+  "provenance": {
+    "createdBy": "Human",
+    "generatedBy": "Agent Factory intake manager",
+    "sourceRefs": []
+  },
+  "relations": [],
+  "readiness": {
+    "reviewedAt": "2026-07-26T18:32:23+00:00",
+    "contractValid": true,
+    "evidenceComplete": true,
+    "requirementsComplete": true,
+    "specificationConsistent": true,
+    "executionReady": true,
+    "findings": []
+  }
+}

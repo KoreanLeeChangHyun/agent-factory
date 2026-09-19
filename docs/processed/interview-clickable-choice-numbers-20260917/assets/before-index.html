@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>클릭 가능한 선택형 질문 설계</title>
+<script type="application/json" id="specification-metadata">{
+  "document-type": "Specification",
+  "category": "design",
+  "domain": null,
+  "name": "clickable-questions",
+  "specification-id": "design-clickable-questions",
+  "version": "1.0.0",
+  "semantic-revision": 1,
+  "sync-base-revision": 1,
+  "modified-at": "2026-09-17T12:45:31Z",
+  "projection": "human",
+  "language": "ko",
+  "counterpart": "../../../.codex/skills/design-clickable-questions/SKILL.md",
+  "provenance": {
+    "initial-request": "/home/deus/.agent-factory/projects/project-c0fa88296a30438da4dff2dded77cedc/agents/main-0e9bb0c1-78b6-41f8-a602-a0efd9aee8bc/runs/run-20260917T123127298757Z-23c5a2c5/request.md",
+    "activation-answer": "/home/deus/.agent-factory/projects/project-c0fa88296a30438da4dff2dded77cedc/agents/main-0e9bb0c1-78b6-41f8-a602-a0efd9aee8bc/runs/run-20260917T123621477743Z-bd84a033/request.md",
+    "scope-answer": "/home/deus/.agent-factory/projects/project-c0fa88296a30438da4dff2dded77cedc/agents/main-0e9bb0c1-78b6-41f8-a602-a0efd9aee8bc/runs/run-20260917T123722937127Z-dc0b95ac/request.md",
+    "identity-and-completion-answer": "/home/deus/.agent-factory/projects/project-c0fa88296a30438da4dff2dded77cedc/agents/main-0e9bb0c1-78b6-41f8-a602-a0efd9aee8bc/runs/run-20260917T124242593296Z-81a6be72/request.md",
+    "q3-context": "/home/deus/.agent-factory/projects/project-c0fa88296a30438da4dff2dded77cedc/agents/work-choice-interview-20260917/runs/run-20260917T124321060258Z-5b0e2d62/request.md",
+    "interview-record": "../../../docs/processed/interview-clickable-choices-20260917/SKILL.md"
+  }
+}</script>
+</head>
+<body>
+<main>
+<h1>클릭 가능한 선택형 질문 설계</h1>
+<p>수락된 Specification입니다. 문서 식별자는 <code>design-clickable-questions</code>이며 버전은 1.0.0입니다.</p>
+<section id="clickable-questions.activation" data-clause-id="clickable-questions.activation">
+<h2>1. 선택 시 즉시 전송</h2>
+<p>클릭 가능한 선택지를 활성화하면 선택한 답변을 즉시 전송해야 합니다. 별도의 전송 확인 단계를 두지 않습니다.</p>
+</section>
+<section id="clickable-questions.designation" data-clause-id="clickable-questions.designation">
+<h2>2. Agent가 지정한 질문에만 적용</h2>
+<p>클릭 가능한 선택지는 Agent가 명시적으로 지정한 질문에만 적용해야 합니다. 임의의 비교표를 자동으로 클릭 가능한 선택지로 변환하지 않습니다.</p>
+</section>
+<section>
+<h2>출처와 확정 이력</h2>
+<p>질문 1의 Human 응답 2로 즉시 전송을, 질문 2의 응답 3으로 Agent 지정 범위를 수락하셨습니다. 질문 3의 응답 1은 별도 design-clickable-questions 확정과 인터뷰 완료를 명시적으로 포함한 선택지에 대한 응답입니다. 이 완료 신호에 따라 이미 요청된 Specification 승격을 적용했습니다. 기존 제품 결정의 정정은 없습니다.</p>
+<p>질문 3의 의미와 완료 포함 여부는 메타데이터의 q3-context에 기록된 Main 위임 요청에 근거하며, 응답 원문은 identity-and-completion-answer에 있습니다.</p>
+<p><a href="../../processed/interview-clickable-choices-20260917/SKILL.md">전체 Processed 인터뷰 이력</a> · <a href="../../../skills/design-clickable-questions/SKILL.md" rel="alternate" hreflang="en">영어 Skill 투영</a></p>
+<p>명시적인 사용자 요구에 따라 한국어 HTML과 영어 Skill을 함께 작성했습니다. 두 투영은 같은 식별자, 버전, 의미 리비전, 동기화 기준 리비전, 수정 시각 및 조항 식별자를 공유합니다.</p>
+</section>
+<section>
+<h2>구현 범위의 한계</h2>
+<p>기술적 전송 형식, UI 스타일, 영속화는 아직 정하지 않은 구현 세부사항입니다. 이 문서는 이를 추가 요구사항으로 규정하지 않으며 기능 구현 완료를 나타내지 않습니다. 문서 정체성과 인터뷰 완료에 관한 미해결 Human 결정은 없습니다.</p>
+</section>
+</main>
+</body>
+</html>

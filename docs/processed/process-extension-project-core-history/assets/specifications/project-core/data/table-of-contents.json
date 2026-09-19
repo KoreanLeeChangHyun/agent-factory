@@ -1,0 +1,26 @@
+{
+  "managerOwned": true,
+  "sections": [
+    {
+      "id": "purpose-and-scope",
+      "path": "data/sections/purpose-and-scope.json",
+      "subsections": []
+    },
+    {
+      "id": "basis-and-relations",
+      "path": "data/sections/basis-and-relations.json",
+      "subsections": []
+    },
+    {
+      "id": "decisions-and-open-items",
+      "path": "data/sections/decisions-and-open-items.json",
+      "subsections": []
+    },
+    {
+      "id": "verification-and-traceability",
+      "path": "data/sections/verification-and-traceability.json",
+      "subsections": []
+    }
+  ],
+  "sha256": "c610742bbef5ea51477160b285d783f28a826a47493d7e82f517a93b95b2bf35"
+}

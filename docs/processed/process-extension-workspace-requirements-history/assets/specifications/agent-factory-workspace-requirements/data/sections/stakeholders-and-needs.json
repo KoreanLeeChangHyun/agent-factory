@@ -1,0 +1,12 @@
+{
+  "id": "stakeholders-and-needs",
+  "title": "stakeholders-and-needs",
+  "content": [
+    {
+      "id": "human-owner-need",
+      "kind": "stakeholder-need",
+      "content": "Human 요청자는 VS Code 안에서 Agent Factory 산출물을 열람하고 Work Unit을 관리해야 한다."
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,11 @@
+{
+  "blocks": [
+    {
+      "path": "blocks/evidence/composer-rendering-feedback.png",
+      "mediaType": "image/png",
+      "description": "Human-provided screenshot of the deployed Agents composer rendering",
+      "sha256": "8db71467be50592d5c86da28f7e0167d38fa30d005a350ef0b45969d083ee54f",
+      "sizeBytes": 4836
+    }
+  ]
+}

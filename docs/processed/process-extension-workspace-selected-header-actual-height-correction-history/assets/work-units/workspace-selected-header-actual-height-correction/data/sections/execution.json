@@ -1,0 +1,17 @@
+{
+  "id": "execution",
+  "title": "Execution",
+  "content": [
+    {
+      "id": "EXECUTION-RESULT-001",
+      "kind": "execution-result",
+      "content": "수정 실행 전",
+      "attributes": {
+        "status": "not-started",
+        "verificationResult": "not-run",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

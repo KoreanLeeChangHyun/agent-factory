@@ -1,0 +1,40 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": "Workspace 선택 헤더의 실제 렌더링 높이를 Agents와 같은 32px로 수정한다."
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": [
+        "workspace/src/webviewShell.js의 kanban-board-tab 최소 높이",
+        "workspace/test/unit/webviewShell.test.js의 부모-자식 높이 회귀 assertion",
+        "Workspace check, linux-x64 VSIX 재패키징, --force 재설치와 설치본 hash 검증"
+      ]
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": [
+        "Agents 소스 변경",
+        "DOM, 문구, 아이콘, 이벤트, 키보드와 상태 변경",
+        "VS Code window reload 또는 runtime 재시작",
+        "cleanup, push와 PR promotion"
+      ]
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": [
+        "실제 32px Workspace 선택 헤더",
+        "43px 자식 높이 회귀 방지 테스트",
+        "재설치된 Workspace 0.0.1과 source hash evidence"
+      ]
+    }
+  ],
+  "subsections": []
+}

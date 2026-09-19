@@ -1,0 +1,41 @@
+{
+  "managerOwned": true,
+  "sections": [
+    {
+      "id": "request-and-goal",
+      "path": "data/sections/request-and-goal.json",
+      "subsections": []
+    },
+    {
+      "id": "context-and-scope",
+      "path": "data/sections/context-and-scope.json",
+      "subsections": []
+    },
+    {
+      "id": "stakeholders-and-approval",
+      "path": "data/sections/stakeholders-and-approval.json",
+      "subsections": []
+    },
+    {
+      "id": "evidence-and-findings",
+      "path": "data/sections/evidence-and-findings.json",
+      "subsections": []
+    },
+    {
+      "id": "requirements-and-constraints",
+      "path": "data/sections/requirements-and-constraints.json",
+      "subsections": []
+    },
+    {
+      "id": "decisions-and-open-items",
+      "path": "data/sections/decisions-and-open-items.json",
+      "subsections": []
+    },
+    {
+      "id": "work-unit-basis",
+      "path": "data/sections/work-unit-basis.json",
+      "subsections": []
+    }
+  ],
+  "sha256": "34eca5214a2f4e016ab9819d1a6285c40f0e3aaeece2d3a03ca4dc62fbf14ae2"
+}

@@ -1,0 +1,54 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "configuration",
+        "source": "workspace/package.json; agents/package.json; workspace/test/runTest.js; agents/test/runTest.js; repository .vscode paths",
+        "method": "repository file and command inspection",
+        "findings": [
+          "두 확장은 JavaScript 진입점이 있어 별도 빌드 없이 개발 호스트에서 로드할 수 있다.",
+          "Agents E2E는 두 extensionDevelopmentPath를 함께 전달한다.",
+          "기존 루트 개발 실행 설정은 없다."
+        ],
+        "interpretations": [],
+        "limitations": []
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-001",
+      "kind": "web-evidence",
+      "content": {
+        "title": "Testing Extensions | Visual Studio Code Extension API",
+        "url": "https://code.visualstudio.com/api/working-with-extensions/testing-extension",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-08-02",
+        "findings": [
+          "VS Code 공식 문서는 extensionHost launch configuration과 --extensionDevelopmentPath를 개발 확장 실행 방식으로 제시한다."
+        ],
+        "limitations": []
+      }
+    },
+    {
+      "id": "INTERVIEW-EXECUTION-001",
+      "kind": "interview",
+      "content": {
+        "question": "vscode-extension-development-host-preview Work Unit을 어떻게 진행할까요?",
+        "recommendation": "A",
+        "rationale": "Human이 요청한 개발 호스트 설정을 완료하려면 준비된 Work Unit 실행이 필요하며 범위가 작고 되돌릴 수 있다.",
+        "answer": "A",
+        "decisionState": "answered",
+        "choices": [
+          "A: 지금 실행",
+          "B: 준비 상태로 유지",
+          "C: 범위 수정"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

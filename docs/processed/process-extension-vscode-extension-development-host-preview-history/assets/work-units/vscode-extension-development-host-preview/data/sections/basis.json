@@ -1,0 +1,25 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "INTAKE-BASIS-001",
+      "kind": "intake-basis-ref",
+      "content": {
+        "summary": "Ready Intake의 개발 호스트 미리보기 범위와 근거를 실행 기준으로 사용한다."
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "vscode-extension-development-host-preview",
+          "path": ".agent-factory/intakes/vscode-extension-development-host-preview",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-001"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

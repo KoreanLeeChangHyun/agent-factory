@@ -1,0 +1,66 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "launch.json은 JSON 파싱에 성공한다.",
+          "구성 type은 extensionHost이고 request는 launch이다.",
+          "args에 workspace와 agents 개발 경로가 각각 포함된다.",
+          "runtimeExecutable은 ${execPath}이다."
+        ]
+      }
+    },
+    {
+      "id": "DONE-001",
+      "kind": "definition-of-done",
+      "content": {
+        "criteria": [
+          ".vscode/launch.json만 구현 파일로 추가된다.",
+          "설정 검증이 통과한다.",
+          "Human이 F5 실행 방법을 전달받는다."
+        ]
+      }
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": {
+        "tests": [
+          "node로 launch.json JSON 파싱",
+          "설정 필드와 extensionDevelopmentPath 인자에 대한 집중 검증"
+        ]
+      }
+    },
+    {
+      "id": "QUALITY-001",
+      "kind": "quality-check",
+      "content": {
+        "result": "pass",
+        "checks": [
+          "JSON 파싱과 정확한 필드 검증 통과",
+          "workspace와 agents 확장 루트 존재 확인",
+          "git diff 검사 통과",
+          "커밋 변경 경로가 .vscode/launch.json 하나임을 확인",
+          "VS Code 공식 extensionHost 형식과 일치"
+        ]
+      },
+      "attributes": {
+        "status": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc1db-90b1-7891-88d4-4399f291a81f",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/launch.json"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,280 @@
+{
+  "id": "interview-service-boundaries",
+  "type": "Processed",
+  "status": "interview-complete-specification-promotion-pending",
+  "date": "2026-09-15",
+  "source": "현재 사용자 대화",
+  "fidelity": "질문·선택지·추천은 의미 보존 정리이며 전체 대화의 원문 전사는 아님. 사용자 선택 응답은 그대로 기록.",
+  "originalDecisionInventory": [
+    "초기 서비스의 독립 배포 수준",
+    "DB 격리 수준",
+    "권한 회수 시 실행 중 작업 처리",
+    "사용량 검사 장애 시 실행 중 작업 처리",
+    "감사 기록 장애 시 중요 변경 허용 여부",
+    "허용 가능한 서비스 중단 시간",
+    "허용 가능한 데이터 손실 범위"
+  ],
+  "questionCount": 7,
+  "countRevisions": [],
+  "questions": [
+    {
+      "id": "Q1",
+      "question": "초기 운영부터 서비스별 독립 배포를 어느 수준까지 원하시나요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "확정된 업무 서비스 모두 독립 실행·배포",
+          "advantage": "처음부터 서비스별 변경·확장 가능",
+          "disadvantage": "배포·통신·장애 관리 비용 증가"
+        },
+        {
+          "number": 2,
+          "decision": "빌드·실행·채팅 등 격리가 중요한 서비스부터 독립 배포",
+          "advantage": "주요 위험을 분리하면서 운영 부담 조절",
+          "disadvantage": "나머지는 공동 배포하며 추후 분리 필요"
+        },
+        {
+          "number": 3,
+          "decision": "업무 서버는 함께 배포하고 내부 모듈만 분리",
+          "advantage": "운영과 배포가 단순",
+          "disadvantage": "독립 배포하려면 추가 개편 필요"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "초기부터 경계를 확실히 가져가려는 방향에 따라 1번 추천. 서비스 수는 8개로 확정하지 않고 호출·트랜잭션 분석으로 조정. 물리 서버 분리와는 별개.",
+      "humanReply": "1번",
+      "selectedOption": 1,
+      "decision": "확정된 업무 서비스는 초기부터 모두 독립 실행·배포."
+    },
+    {
+      "id": "Q2",
+      "question": "서비스별 DB는 어디까지 분리하시겠습니까?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "PostgreSQL 인스턴스 하나 안에서 서비스별 DB·계정 분리",
+          "advantage": "데이터 접근을 분리하면서 운영 부담 절감",
+          "disadvantage": "DB 프로세스 장애·자원 경쟁은 공유"
+        },
+        {
+          "number": 2,
+          "decision": "서비스마다 PostgreSQL 인스턴스까지 분리",
+          "advantage": "DB별 재시작·업데이트·자원 관리 가능",
+          "disadvantage": "메모리·백업·운영 부담 증가"
+        },
+        {
+          "number": 3,
+          "decision": "DB 하나 안에서 서비스별 스키마·계정만 분리",
+          "advantage": "가장 단순하고 자원 소모가 적음",
+          "disadvantage": "서비스별 이전·복구 경계가 약함"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "초기 로컬 운영에는 1번 추천. 필요한 서비스부터 인스턴스 분리 가능. 같은 물리 서버에서는 서버 장애 공유.",
+      "humanReply": "1번",
+      "selectedOption": 1,
+      "decision": "PostgreSQL 인스턴스 하나 안에서 서비스별 DB·계정을 분리."
+    },
+    {
+      "id": "Q3",
+      "question": "사용자의 권한이 회수되면, 그 권한으로 이미 실행 중인 작업은 어떻게 처리할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "다음 안전 지점에서 권한을 재검사하고 중단",
+          "advantage": "데이터 손상 위험을 줄이며 추가 동작 차단",
+          "disadvantage": "이미 진행 중인 외부 요청은 끝날 수 있음"
+        },
+        {
+          "number": 2,
+          "decision": "즉시 취소를 요청하고 가능한 실행은 강제 종료",
+          "advantage": "권한 회수 후 실행 시간 최소화",
+          "disadvantage": "부분 처리·복구 문제 가능"
+        },
+        {
+          "number": 3,
+          "decision": "새 요청만 차단하고 기존 작업은 완료 허용",
+          "advantage": "진행 중 업무의 연속성 유지",
+          "disadvantage": "회수된 권한으로 작업 지속"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번 추천. 외부 호출·데이터 변경 직전에 검사. 이미 완료된 동작은 자동으로 되돌리지 않음.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "권한 회수 시 다음 안전 지점에서 권한을 재검사하고 작업 중단."
+    },
+    {
+      "id": "Q4",
+      "question": "사용량·한도 검사 시스템에 장애가 나면, 이미 실행 중인 작업은 어떻게 처리할까요? 신규 실행은 검사가 복구될 때까지 차단하는 것을 전제로 합니다.",
+      "options": [
+        {
+          "number": 1,
+          "decision": "기존 사용권의 유효기간까지만 허용하고 갱신 실패 시 안전하게 중단",
+          "advantage": "허용된 범위 안에서 일시 장애를 견딤",
+          "disadvantage": "장애가 길어지면 작업 중단"
+        },
+        {
+          "number": 2,
+          "decision": "장애 감지 즉시 취소 요청",
+          "advantage": "추가 자원 소비 최소화",
+          "disadvantage": "짧은 장애에도 작업 중단·복구 발생"
+        },
+        {
+          "number": 3,
+          "decision": "별도 유예 시간 동안 계속 실행",
+          "advantage": "일시 장애에 대한 연속성 확보",
+          "disadvantage": "한도 초과 가능·유예 기준 추가 설계 필요"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번 추천. 사용권 만료 후 무제한 실행되지 않도록 실행 차단·중단 장치 함께 설계.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "신규 실행 차단. 기존 실행은 사용권 유효기간까지만 허용하고 갱신 실패 시 안전하게 중단."
+    },
+    {
+      "id": "Q5",
+      "question": "권한 변경·토큰 발급 같은 중요 작업에서 감사 기록을 안전하게 남길 수 없다면, 요청을 어떻게 처리할까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "소유 서비스 DB에 감사 전달 기록을 함께 저장하면 허용하고 그것도 실패하면 거절",
+          "advantage": "증빙을 보존하면서 중앙 감사 서비스 장애를 견딤",
+          "disadvantage": "재전송·중복 방지 구현 필요"
+        },
+        {
+          "number": 2,
+          "decision": "중앙 감사 서비스의 저장 확인까지 받아야 허용",
+          "advantage": "중앙 기록 여부 즉시 확인",
+          "disadvantage": "감사 서비스 장애가 중요 업무 차단"
+        },
+        {
+          "number": 3,
+          "decision": "감사 저장 실패에도 업무는 허용하고 경보 발생",
+          "advantage": "업무 연속성 유지",
+          "disadvantage": "감사 증빙 누락 가능"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번 추천. 업무 변경과 감사 전달 기록을 같은 트랜잭션으로 저장하고 중앙 감사 서비스 복구 후 재전송.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "중요 업무 변경과 감사 전달 기록을 같은 DB 트랜잭션으로 저장. 저장 실패 시 거절, 중앙 감사 서비스 장애 시 재전송."
+    },
+    {
+      "id": "Q6",
+      "question": "초기 로컬 운영에서 심각한 장애가 발생했을 때, 핵심 서비스의 복구 목표 시간(RTO)을 어느 수준으로 잡을까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "4시간 이내 복구 목표",
+          "advantage": "초기 운영 부담과 가용성의 절충",
+          "disadvantage": "수 시간 서비스 중단 가능"
+        },
+        {
+          "number": 2,
+          "decision": "1시간 이내 복구 목표",
+          "advantage": "사용자 영향 최소화",
+          "disadvantage": "신속한 장애 대응·자동 복구·예비 자원 필요"
+        },
+        {
+          "number": 3,
+          "decision": "24시간 이내 복구 목표",
+          "advantage": "초기 운영 부담이 낮음",
+          "disadvantage": "장시간 서비스 중단 가능"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "초기 로컬 운영은 1번 추천. 서버 고장·부재 중 장애 대응에는 예비 자원·자동화 필요. 설계 목표이지 고객 SLA가 아님.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "초기 로컬 핵심 서비스 RTO: 4시간 이내."
+    },
+    {
+      "id": "Q7",
+      "question": "DB 장애 후 백업으로 복구할 때, 최근 데이터의 허용 손실 범위(RPO)를 어느 수준으로 잡을까요?",
+      "options": [
+        {
+          "number": 1,
+          "decision": "최대 5분",
+          "advantage": "데이터 보호와 초기 운영 부담의 절충",
+          "disadvantage": "지속적인 변경 기록 보관·외부 백업 필요"
+        },
+        {
+          "number": 2,
+          "decision": "손실 없음",
+          "advantage": "성공 응답한 데이터의 손실 방지 목표",
+          "disadvantage": "별도 장애 영역의 동기 복제 등 비용·복잡도 증가"
+        },
+        {
+          "number": 3,
+          "decision": "최대 1시간",
+          "advantage": "백업·복구 운영 부담 완화",
+          "disadvantage": "최근 1시간의 작업·메시지 등이 손실될 수 있음"
+        }
+      ],
+      "recommendedOption": 1,
+      "recommendation": "1번 추천. DB와 문서·작업 산출물 저장소를 함께 설계하고 복원으로 확인. 아직 보장된 수치 아님.",
+      "humanReply": "1",
+      "selectedOption": 1,
+      "decision": "허용 데이터 손실 RPO: 최대 5분."
+    }
+  ],
+  "clarifications": [
+    {
+      "after": "Q1 질문, 답변 전",
+      "humanQuestions": [
+        "서비스라 함은?",
+        "그럼 리파지토리가 각각 생기는거임?"
+      ],
+      "explanation": "서비스는 독립 실행·배포 가능한 업무 프로그램. 물리 서버와 Git 저장소는 별도 경계. 단일 저장소에서 여러 서비스 운영 가능. 모노레포 유지는 추천으로 설명했으며 별도 저장소 분리 결정은 받지 않음."
+    },
+    {
+      "after": "Q3 질문, 답변 전",
+      "humanQuestions": [
+        "여러 DB 연결 시 DSO → DLO → DMO 사용 가능 여부와 용어 보편성",
+        "웹검색 기반 업계 표준 용어 선택 요청"
+      ],
+      "humanDecision": "데이터 소스, 데이터 셋 데이터 모델 이렇게 가죠",
+      "terms": [
+        [
+          "데이터 소스",
+          "Data Source",
+          "외부 DB·API 등 데이터 원천"
+        ],
+        [
+          "데이터셋",
+          "Dataset",
+          "조회·활용하는 데이터 단위"
+        ],
+        [
+          "데이터 모델",
+          "Data Model",
+          "필드·관계·매핑을 정의한 업무용 모델"
+        ]
+      ],
+      "limits": "용어 채택만 결정. 수집형·연합 조회·혼합형, 저장 위치, 쓰기 권한, 별도 데이터 서비스 도입은 미결정.",
+      "countReason": "용어 결정은 대화 중 해결한 보충 결정이므로 미해결 질문 추가 없음. 본 인터뷰 7개 운영 결정 수 유지."
+    },
+    {
+      "after": "용어 결정 후 Q3 재질문",
+      "correction": "Q3 선택지 3에 기존 정책 개정 필요를 명시. 선택 의미는 동일하며 사용자는 선택지 1을 결정."
+    }
+  ],
+  "preInterviewCorrection": "정식 지침 적용 전 초기 출시 범위를 질문했으나 답변이 없었음. 지침 확인 후 서비스·DB 경계의 7개 운영 결정으로 인터뷰 범위를 명시적으로 한정. 출시 범위가 결정됐다고 간주하지 않음.",
+  "unresolved": [
+    "최종 서비스 수·도메인 묶음·공개 API와 파일 배치",
+    "사용권 TTL·갱신 간격·안전 지점·실행 차단 및 fencing 방식",
+    "RTO/RPO의 장애 범위·측정 기준·백업·외부 보관·복구 자동화·예비 자원",
+    "감사 중요 작업 목록·이벤트 전달 계약·보존 기간",
+    "데이터셋 수집·연합 조회·혼합 방식 및 데이터 모델 상세",
+    "기존 명세 충돌의 정합화·명세 승격·구현 범위 승인"
+  ],
+  "limits": [
+    "사용자 선택은 명시적 입력으로 보존. Processed 문서 자체가 Specification으로 자동 승격되는 것은 아님.",
+    "서비스 8개 후보 전체 승인 아님.",
+    "RTO/RPO 달성·테스트·서비스 배포·DB 이동을 검증하지 않음.",
+    "기존 목표 트리·생산 코드·개인 설정·비밀 값은 변경하지 않음."
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "id": "work-unit-basis",
+  "title": "Work Unit Basis",
+  "content": [
+    {
+      "id": "SPECIFICATION-IMPACT-001",
+      "kind": "specification-impact",
+      "content": {
+        "status": "gap-accepted-for-work-unit",
+        "reason": "기존 agent-factory-workspace Specification은 Editor Webview shell만 정의하고 native Activity Bar와 Primary Sidebar 기반 agents 독립 Extension을 포함하지 않는다. 새 Work Unit에서 Project Core와 요구사항 Specification을 먼저 정렬한다.",
+        "specificationId": "project-core, agent-factory-workspace-requirements",
+        "changes": [
+          "Project Core에 native Activity Bar 및 Primary Sidebar 독립 Extension 범위 추가",
+          "요구사항 Specification에 agents package, Explorer Tree View, Chat Webview View와 backend 제외 경계 추가"
+        ]
+      },
+      "attributes": {
+        "status": "gap-accepted-for-work-unit"
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "specification",
+          "id": "project-core",
+          "path": ".agent-factory/specifications/project-core"
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    },
+    {
+      "id": "WORK-UNIT-BASIS-001",
+      "kind": "work-unit-basis",
+      "content": {
+        "workUnitId": "agent-factory-agents-left-region-port",
+        "goal": "../web의 왼쪽 영역을 agents 독립 VS Code Extension의 native Activity Bar, Workspace Explorer Tree View와 로컬 Chat Webview View로 포팅한다.",
+        "specificationImpactRef": "SPECIFICATION-IMPACT-001",
+        "executionOrder": 1,
+        "scope": [
+          "Project Core와 요구사항 Specification 정렬",
+          "agents 독립 Extension manifest와 host 진입점",
+          "native Activity Bar View Container",
+          "실제 Workspace Explorer Tree View",
+          "Main 및 Workflow Chat 탭",
+          "로컬 세션 생성, 선택과 세션별 Composer draft",
+          "SVG icon, CSP, 키보드 접근성과 테스트"
+        ],
+        "outOfScope": [
+          "메시지 전송과 backend 연결",
+          "원격 세션 복원과 스트리밍",
+          "../web과 workspace 수정",
+          "오른쪽 Workspace 포팅",
+          "main 병합, push, 배포와 PR 승격"
+        ],
+        "expectedOutputs": [
+          ".agent-factory/specifications/project-core",
+          ".agent-factory/specifications/agent-factory-workspace-requirements",
+          "agents/package.json",
+          "agents/src/extension.js",
+          "agents/src/explorerTree.js",
+          "agents/src/chatView.js",
+          "agents/media/agent-factory.svg",
+          "agents/test",
+          "검증 및 Human review 근거"
+        ],
+        "acceptanceCriteria": [
+          "agents가 독립 Extension으로 설치 가능한 manifest와 진입점을 가진다.",
+          "Activity Bar container와 Explorer 및 Chat Views가 등록된다.",
+          "Explorer가 현재 Workspace Folder를 계층적으로 표시한다.",
+          "Chat이 Main과 Workflow 전환, 로컬 세션 생성과 선택, 세션별 draft 상태를 제공한다.",
+          "메시지 전송과 backend 연결은 노출하지 않는다.",
+          "모든 사용자 아이콘은 SVG이며 접근성, CSP, 단위 및 Extension Host 검증이 통과한다.",
+          "../web과 workspace는 변경되지 않는다."
+        ],
+        "verification": [
+          "TDD 단위 테스트",
+          "npm run check",
+          "npm run test:e2e",
+          "manifest contribution 검증",
+          "SVG-only source 검사",
+          "Human Extension Development Host 화면 검토"
+        ],
+        "evidenceRefs": [
+          "HUMAN-REQUEST-001",
+          "INTERNAL-EVIDENCE-001",
+          "INTERNAL-EVIDENCE-002",
+          "WEB-EVIDENCE-001",
+          "WEB-EVIDENCE-002",
+          "INTERVIEW-001",
+          "INTERVIEW-002"
+        ],
+        "decisionRefs": [
+          "DECISION-001",
+          "DECISION-002"
+        ],
+        "dependencies": []
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "specification",
+          "id": "project-core",
+          "path": ".agent-factory/specifications/project-core"
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

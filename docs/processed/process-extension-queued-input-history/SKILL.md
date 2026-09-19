@@ -1,0 +1,119 @@
+---
+name: extension-queued-input-history
+description: 대기 메시지 이전 기록을 출처와 함께 보존하는 비권위 Processed 기록입니다. 현재 명세 적용 지침이 아닙니다.
+document-type: processed
+category: process
+domain: null
+language: ko
+provenance:
+  prior-provenance:
+    historical-source-path: docs/queued-input.md
+    preserved-record: docs/processed/other-queued-input-history/SKILL.md
+    captured-on: '2026-09-16'
+    organization-authority: Human requested only original, processed and specification
+      roots and authorized migration of these four historical records.
+    fidelity: 기존 본문과 앞선 정리 안내를 보존하고 안내의 상대 링크만 새 위치에 맞게 변경했습니다.
+    status: historical-snapshot
+  merged-from:
+  - docs/processed/other-queued-input-history/SKILL.md
+  source-language-policy: 원문·인용·코드·식별자는 원래 언어를 보존합니다.
+  merge-request: run-20260918T152016183617Z-2d18ad49
+  source-metadata:
+    name: other-queued-input-history
+    description: 대기 메시지 이전 기록을 출처와 함께 보존하는 비권위 Processed 기록입니다. 현재 명세 적용 지침이 아닙니다.
+    metadata:
+      document-type: processed
+      category: other
+      domain: null
+      name: queued-input-history
+      language: ko
+      provenance:
+        historical-source-path: docs/queued-input.md
+        preserved-record: docs/processed/other-queued-input-history/SKILL.md
+        captured-on: '2026-09-16'
+        organization-authority: Human requested only original, processed and specification
+          roots and authorized migration of these four historical records.
+        fidelity: 기존 본문과 앞선 정리 안내를 보존하고 안내의 상대 링크만 새 위치에 맞게 변경했습니다.
+        status: historical-snapshot
+  renamed-from: docs/processed/other-queued-input-history
+  classification-request: run-20260918T154226499325Z-8d8d4959
+---
+
+
+# 대기 메시지 이전 기록
+
+- 이 패키지는 앞선 명세 정리 시 남겼던 `docs/queued-input.md`의 이전 기록을 보존합니다. 옛 경로는 출처 식별자이며 현재 파일 위치가 아닙니다.
+- 문서 유형은 Processed입니다. 역사 기록이라는 상태는 네 번째 문서 유형이나 저장 루트가 아닙니다. `other`는 내용을 분석·판정하지 않고 보존하는 가공 기록의 범주입니다.
+- 현재 요구사항과 설계의 권위는 아래 링크된 기존 Specification에 있습니다. 이번 이전은 현재 명세를 강등하거나 요구사항을 폐기하지 않습니다.
+- 아래 과거 경로·목표 트리·구현 설명·확인 요청·외부 근거는 당시 기록입니다. 새 검증 결과나 현재 실행 지시로 간주하지 마십시오.
+
+<a id="보존된-이전-문서"></a>
+
+## 1. 보존된 이전 문서
+
+<!-- Historical source preserved during the approved specification organization, 2026-09-16 KST. -->
+> **역사 자료 — 현재 편집 원문은 [design-main-chat](../../skills/design-main-chat/SKILL.md)입니다.**
+> 아래는 정리 직전 본문을 보존한 출처 자료이며 최신 명세의 경쟁 원본이 아닙니다. 과거 런타임 경로·구현 설명·당시 확인 요청은 현재 사실이나 검증 결과로 사용하지 마십시오. 의미 변경은 링크된 명세에서 관리합니다.
+
+<a id="대기-메시지"></a>
+
+## 2. 대기 메시지
+
+- 실행 중 입력은 원래 순서와 개별 메시지 ID를 유지하여 보관합니다. 전송 동작은 현재 실행을 중지하거나 런타임에 추가 지시를 보내지 않습니다.
+- 현재 작업이 끝나면 그때까지 받은 대기 메시지를 **하나의 요청으로 병합하여 한 번 실행**합니다. 이미 받은 입력의 첨부 준비까지 기다린 뒤 묶음을 확정합니다.
+- 병합 접수를 시작한 뒤 새로 들어온 입력은 다음 묶음에 포함합니다. 유휴 상태의 단일 입력은 기존처럼 단독으로 처리합니다.
+- 진행 표시줄 오른쪽 **대기 N** 버튼은 원래 메시지 수를 표시합니다. 접수 후에는 병합된 큰 메시지 대신 원래 메시지들을 순서대로 각각 대화에 표시합니다.
+- 빈 입력창의 중지 버튼과 Esc는 현재 실행만 중지합니다.
+
+<a id="병합-내용과-설정"></a>
+
+## 3. 병합 내용과 설정
+
+| 항목 | 정책 |
+| --- | --- |
+| 본문 | 메시지별 번호·시작·끝 경계로 원래 순서를 보존합니다. |
+| 첨부 | 각 메시지 구간에 첨부 참조를 포함하고, 파일·폴더·이미지 전체를 원래 순서대로 전달합니다. 첨부만 있는 입력도 유지합니다. |
+| 작업 모드·모델·추론·Fast | 묶음의 첫 메시지에 저장된 설정을 적용합니다. 뒤의 메시지 설정으로 덮어쓰지 않습니다. |
+| 명시 실행 권한 | `workspace-write` → `danger-full-access` → `bypass` 순서 중 더 제한적인 권한을 적용합니다. 앞의 두 값은 Human 승인 정책을 `required`로 유지합니다. |
+| 상속 권한 | 전부 상속(`cli-default` 또는 생략)이면 기존 세션 정책을 유지합니다. 명시 권한과 섞이면 읽기 전용 가능성 등을 추정하지 않고 병합 접수를 중단합니다. |
+| 실행 주체·검증 대상 | `actor`와 `verifiedWorkRunId`가 모두 일치해야 합니다. 불일치하면 원래 입력들을 복원 가능한 상태로 남깁니다. |
+| Goal | 모든 메시지가 Goal을 명시적으로 켰고 목표도 같을 때만 유지합니다. 그 외에는 병합 실행에서 Goal을 끄고 별도 목표 인자를 전달하지 않습니다. |
+
+- 권한·주체·검증 대상의 병합이 불가능하면 이유를 표시하고, 원래 메시지마다 **입력창으로 복원**을 제공합니다. 같은 권한 또는 원래 대상별로 다시 입력할 수 있습니다. 일부 메시지만 임의로 실행하지 않습니다.
+- 실행 권한은 호스트 수신 시, 나머지 설정·첨부는 각 입력 시점에 보관합니다. 복원할 때도 원래 개별 설정과 첨부를 사용합니다.
+- 병합 이미지도 기존 런타임의 이미지 수·크기 한도를 따릅니다. 한도를 넘으면 이미지를 버리거나 묶음을 임의 분할하지 않고 원래 입력들의 복원을 제공합니다.
+
+<a id="종료연결실패-정책"></a>
+
+## 4. 종료·연결·실패 정책
+
+| 상황 | 처리 |
+| --- | --- |
+| 현재 실행 완료·실패·명시적 취소 결과 확인 | 보관된 메시지를 한 묶음으로 실행합니다. |
+| 사용자 결정 필요 | 대기열을 유지합니다. 승인 버튼이나 새 답변을 먼저 단독 처리하고, 그 실행 종료 후 대기 메시지를 병합합니다. |
+| 상태 조회·연결 실패 | 실행 종료를 추정하지 않습니다. 현재 실행 ID와 원래 입력·완료 대기를 보존합니다. 재연결 후 한 번만 병합 접수합니다. |
+| 병합 요청 접수 확인 실패 | 자동 재전송하지 않습니다. 해당 묶음의 모든 원래 입력을 복원할 수 있습니다. 접수 여부가 불명확하면 실행 기록을 먼저 확인해야 합니다. |
+| 접수 후 연결 실패 | 원래 메시지는 이미 표시된 상태로 유지하고 기존 실행에 재연결합니다. 같은 묶음을 다시 제출하지 않습니다. |
+| 화면 재연결 | 호스트가 원래 메시지별 접수 알림을 재전달하며 ID로 중복 표시를 방지합니다. |
+| 확장 호스트 재시작 | 화면에 저장된 입력은 보존하되 자동 재전송하지 않습니다. 메모리 큐를 잃은 항목은 입력창으로 복원할 수 있습니다. |
+
+- 대기 입력을 추가해도 현재 실행의 시작 시간·진행 표시·하위 에이전트 목록은 초기화되지 않습니다.
+- 같은 메시지 ID의 중복 수신은 다시 제출하지 않습니다. 접수 알림과 화면 목록은 패널 단위입니다.
+- 프로세스 종료를 넘는 런타임 제출의 원자적 중복 제거는 제공하지 않으므로 접수 여부가 불명확한 요청은 자동 재시도하지 않습니다.
+
+<a id="main-확인-범위"></a>
+
+## 5. Main 확인 범위
+
+- Work는 테스트·빌드·검증 명령을 실행하지 않았습니다.
+
+```sh
+npm run typecheck
+node --test tests/unit/queue-lifecycle.test.mjs
+node --test --test-name-pattern='batch|queue|FIFO|reconnect|Goal control serializes|decision' tests/unit/runtime-adapter.test.mjs
+```
+
+- 실행 중 두 개 이상 입력 → 런타임 추가 실행 한 번, 원래 사용자 메시지 각각 표시.
+- 병합 접수 중 새 입력 → 다음 묶음으로 분리.
+- 첨부 준비 경합·첨부 전용 입력·사용자 결정·명시적 중지·실패·재연결.
+- 서로 다른 권한·주체·검증 대상의 병합 중단과 원래 입력 복원.

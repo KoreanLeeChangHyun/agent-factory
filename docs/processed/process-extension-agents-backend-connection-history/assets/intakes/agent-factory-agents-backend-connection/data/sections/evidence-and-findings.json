@@ -1,0 +1,211 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERVIEW-001",
+      "kind": "interview",
+      "content": {
+        "question": "어떤 운영 기능을 먼저 구현할까요?",
+        "choiceA": "Artifact View부터 구현",
+        "choiceB": "Kanban 운영 기능부터 구현",
+        "choiceC": "Agents 백엔드 연결부터 구현",
+        "recommendation": "A",
+        "rationale": "기존 Intake의 실행 순서는 Artifact View를 Kanban의 선행 의존성으로 기록했지만, Human이 Agents 백엔드 연결 우선을 선택했다.",
+        "answer": "C",
+        "decisionState": "accepted"
+      }
+    },
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "code",
+        "source": "agents/src/chatView.js, agents/src/extension.js, agents/test/unit/chatView.test.js, ../web/backend/api/chat.py, ../web/backend/api/agent_sessions.py, ../web/backend/main.py, ../web/frontend/src/shared/api/backendTransport.js, ../web/frontend/src/shared/api/backendClient.js",
+        "method": "현재 Agents Webview 경계와 인접 Agent Factory 백엔드 API 및 웹 클라이언트 계약 검사",
+        "findings": [
+          "Agents Chat은 현재 Webview 상태에 로컬 세션과 draft만 저장하며 send control, postMessage 및 backend transport가 없다.",
+          "Agent Factory 백엔드는 기본 http://127.0.0.1:7777에서 /chat/jobs 생성, GET SSE 재개 스트림, 취소, agent-session 상태 API를 제공한다.",
+          "기존 웹 클라이언트는 chat job 생성 후 sequence 기반 SSE 스트림을 읽어 완료까지 복구 가능한 구조를 사용한다.",
+          "백엔드 CORS 허용 origin은 웹 프런트엔드 주소로 제한되어 있다."
+        ],
+        "interpretations": [
+          "VS Code Webview가 백엔드에 직접 접속하기보다 Extension Host가 HTTP와 스트림을 소유하고 검증된 postMessage 계약으로 UI와 통신하는 경계가 현재 CSP와 책임 분리에 부합한다."
+        ],
+        "limitations": [
+          "Human은 연결 우선순위만 선택했으며 비스트리밍 최소 연결, job 스트리밍, 세션 복원 중 구현 깊이는 아직 결정하지 않았다.",
+          "백엔드 주소의 구성 방식과 백엔드 프로세스 시작 책임은 아직 결정되지 않았다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-001",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Webview API",
+        "url": "https://code.visualstudio.com/api/extension-guides/webview",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "Webview는 acquireVsCodeApi().postMessage로 Extension Host에 메시지를 보내고 Extension Host는 onDidReceiveMessage로 이를 처리한다.",
+          "VS Code API 객체는 전역에 노출하지 않아야 한다."
+        ],
+        "limitations": [
+          "이 문서는 Agent Factory 백엔드의 job 및 SSE payload 계약을 정의하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-002",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Remote Extensions",
+        "url": "https://code.visualstudio.com/api/advanced-topics/remote-extensions",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "로컬 서비스와 상호작용하는 Webview도 HTML에서 localhost에 직접 접속하는 대신 Extension Host의 메시지 전달 경계를 사용할 수 있다.",
+          "이 패턴은 Remote Development와 Codespaces에서 Webview와 Extension Host 위치 차이를 다룬다."
+        ],
+        "limitations": [
+          "현재 Work Unit이 VS Code Web까지 지원해야 하는지는 아직 Human이 결정하지 않았다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-003",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Contribution Points Configuration",
+        "url": "https://code.visualstudio.com/api/references/contribution-points#contributes.configuration",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "Extension은 contributes.configuration으로 사용자 설정을 제공하고 workspace.getConfiguration으로 읽을 수 있다.",
+          "machine 또는 machine-overridable scope는 머신별 백엔드 주소와 같이 동기화하면 안 되는 설정에 사용할 수 있다."
+        ],
+        "limitations": [
+          "백엔드 주소 설정의 정확한 키와 기본값은 프로젝트 결정이다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-002",
+      "kind": "interview",
+      "content": {
+        "question": "첫 백엔드 연결의 구현 깊이를 어디까지 포함할까요?",
+        "choiceA": "Chat Job 생성, SSE 스트리밍, 취소·재연결, 세션 복원까지 구현",
+        "choiceB": "/chat 단일 요청·응답만 구현",
+        "choiceC": "Chat Job 생성과 상태 조회만 구현",
+        "recommendation": "A",
+        "rationale": "기존 백엔드의 비동기 job과 sequence 기반 SSE 재개 계약을 직접 사용해 임시 호환 계층 없이 운영 복구를 지원한다.",
+        "answer": "A",
+        "decisionState": "accepted"
+      }
+    },
+    {
+      "id": "INTERVIEW-003",
+      "kind": "interview",
+      "content": {
+        "question": "백엔드 프로세스와 주소를 누가 관리할까요?",
+        "choiceA": "별도로 실행 중인 백엔드에 연결하고 주소를 VS Code 머신 설정으로 제공",
+        "choiceB": "확장이 ../web 백엔드를 찾아 자동 시작·종료",
+        "choiceC": "백엔드를 VSIX에 포함해 확장이 직접 관리",
+        "recommendation": "A",
+        "rationale": "통신과 프로세스 실행 책임을 분리하면 설치와 재시작 위험이 낮다.",
+        "answer": "C",
+        "decisionState": "accepted"
+      }
+    },
+    {
+      "id": "INTERNAL-EVIDENCE-002",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "runtime",
+        "source": "codex-cli 0.145.0, codex exec --help, codex exec resume --help, codex app-server --help, installed @openai/codex package metadata",
+        "method": "설치된 Codex CLI 명령·패키지와 공식 수동 실행 경계 검사",
+        "findings": [
+          "codex exec는 비대화형 실행, JSONL 이벤트 출력과 명시적 session id resume를 지원한다.",
+          "codex app-server는 stdio JSONL을 제공하지만 공식 수동에서 experimental로 분류된다.",
+          "@openai/codex npm 패키지는 플랫폼별 optional dependency 바이너리를 사용하며 현재 설치본 전체 크기는 약 347MB다."
+        ],
+        "interpretations": [
+          "독립 VS Code 확장은 ../web API를 복제하기보다 안정된 codex exec JSONL과 resume를 Extension Host에서 직접 어댑트할 수 있다."
+        ],
+        "limitations": [
+          "Codex 인증은 VSIX 설치만으로 자동 생성되지 않으며 사용자의 ChatGPT 로그인 또는 지원되는 credential이 필요하다.",
+          "다중 플랫폼 바이너리를 한 VSIX에 모두 넣으면 크기가 커지므로 플랫폼별 패키징 결정이 필요하다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-004",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Publishing Extensions - Platform-specific extensions",
+        "url": "https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "VS Code는 Windows, Linux와 macOS의 아키텍처별 VSIX 패키지를 지원한다.",
+          "플랫폼별 패키지는 native dependency와 정확한 바이너리만 포함하도록 제어할 수 있다."
+        ],
+        "limitations": [
+          "Codex 인증과 Agent Factory 세션 모델은 VS Code 패키징 문서가 정의하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-005",
+      "kind": "web-evidence",
+      "content": {
+        "title": "OpenAI Codex Manual - Developer commands and authentication",
+        "url": "https://developers.openai.com/codex/codex-manual.md",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "codex exec는 stable 비대화형 명령이며 stdout 또는 JSONL 이벤트와 session resume를 지원한다.",
+          "codex app-server는 experimental이며 로컬 개발·디버깅용으로 변경될 수 있다.",
+          "Codex 로컬 실행은 사용자 로그인, API key 또는 지원되는 access token 인증이 필요하다."
+        ],
+        "limitations": [
+          "공식 수동은 이 사용자 정의 VS Code 확장의 UI와 상태 모델을 정의하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-004",
+      "kind": "interview",
+      "content": {
+        "question": "독립 VS Code 확장의 실행 백엔드를 어떤 방식으로 제공할까요?",
+        "choiceA": "플랫폼별 VSIX에 Codex CLI를 포함하고 Extension Host가 codex exec --json과 resume를 직접 실행",
+        "choiceB": "확장 전용 Node 백엔드가 OpenAI API를 직접 호출",
+        "choiceC": "첫 실행 시 Codex CLI를 인터넷에서 자동 다운로드",
+        "recommendation": "A",
+        "rationale": "Web과 VS Code 확장을 분리하고 설치 시 실행 파일을 함께 제공하면서 안정된 Codex exec JSONL 경계를 재사용한다.",
+        "answer": "A",
+        "decisionState": "accepted"
+      }
+    },
+    {
+      "id": "INTERVIEW-005",
+      "kind": "interview",
+      "content": {
+        "question": "첫 Work Unit에서 어떤 플랫폼용 자동 설치 패키지를 제공할까요?",
+        "choiceA": "현재 환경인 linux-x64부터 완성하고 플랫폼 확장 가능한 패키징 구조 구축",
+        "choiceB": "Linux, Windows, macOS의 x64 패키지를 동시에 제공",
+        "choiceC": "Linux, Windows, macOS의 x64와 arm64를 모두 제공",
+        "recommendation": "A",
+        "rationale": "현재 환경에서 설치와 E2E를 실제 검증하면서 플랫폼별 패키징 구조는 후속 확장이 가능하도록 분리한다.",
+        "answer": "A",
+        "decisionState": "accepted"
+      }
+    }
+  ],
+  "subsections": []
+}

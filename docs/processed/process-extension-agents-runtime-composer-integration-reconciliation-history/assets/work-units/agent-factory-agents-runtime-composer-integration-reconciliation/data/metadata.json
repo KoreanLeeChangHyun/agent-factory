@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "4.0.0",
+  "documentVersion": "1.0.13",
+  "id": "agent-factory-agents-runtime-composer-integration-reconciliation",
+  "artifactType": "work-unit",
+  "projectId": "agent-factory-workspace",
+  "lifecycle": {
+    "phase": "work-unit",
+    "status": "ready"
+  },
+  "createdAt": "2026-07-28T13:35:42+00:00",
+  "updatedAt": "2026-07-28T15:49:51+00:00",
+  "language": "ko",
+  "theme": "vscode-native",
+  "provenance": {
+    "createdBy": "Human",
+    "generatedBy": "Agent Factory work-unit manager",
+    "sourceRefs": []
+  },
+  "relations": [],
+  "readiness": {
+    "reviewedAt": "2026-07-28T13:32:01Z",
+    "contractValid": true,
+    "intakeTraceabilityValid": true,
+    "definitionComplete": true,
+    "executionContextComplete": true,
+    "verificationPlanComplete": true,
+    "findings": []
+  }
+}

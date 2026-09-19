@@ -1,0 +1,51 @@
+{
+  "managerOwned": true,
+  "sections": [
+    {
+      "id": "basis",
+      "path": "data/sections/basis.json",
+      "subsections": []
+    },
+    {
+      "id": "work-definition",
+      "path": "data/sections/work-definition.json",
+      "subsections": []
+    },
+    {
+      "id": "plan",
+      "path": "data/sections/plan.json",
+      "subsections": []
+    },
+    {
+      "id": "execution-context",
+      "path": "data/sections/execution-context.json",
+      "subsections": []
+    },
+    {
+      "id": "acceptance-and-verification",
+      "path": "data/sections/acceptance-and-verification.json",
+      "subsections": []
+    },
+    {
+      "id": "execution",
+      "path": "data/sections/execution.json",
+      "subsections": []
+    },
+    {
+      "id": "ai-review",
+      "path": "data/sections/ai-review.json",
+      "subsections": []
+    },
+    {
+      "id": "human-review",
+      "path": "data/sections/human-review.json",
+      "subsections": []
+    },
+    {
+      "id": "report",
+      "path": "data/sections/report.json",
+      "subsections": []
+    }
+  ],
+  "sha256": "4a8363811987f4621de17cd4a3e6236ac56604194d77f23102abf340412bb6ff"
+}

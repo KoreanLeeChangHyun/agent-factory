@@ -1,0 +1,27 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": "갱신 시각, 열별 toggle, padding과 gap에 대한 실패 테스트를 먼저 작성한다."
+    },
+    {
+      "id": "PLAN-002",
+      "kind": "plan-step",
+      "content": "상단 전체 보드 visibility control과 state 복원을 구현하고 열별 toggle state를 제거한다."
+    },
+    {
+      "id": "PLAN-003",
+      "kind": "plan-step",
+      "content": "Kanban workspace 좌우 padding과 board gap을 0으로 수정한다."
+    },
+    {
+      "id": "PLAN-004",
+      "kind": "plan-step",
+      "content": "unit, manager integration, Extension Host E2E, viewport와 VSIX package를 검증하고 Human review 자료를 준비한다."
+    }
+  ],
+  "subsections": []
+}

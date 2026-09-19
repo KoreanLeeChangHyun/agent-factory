@@ -1,0 +1,41 @@
+{
+  "id": "request-and-goal",
+  "title": "Request and Goal",
+  "content": [
+    {
+      "id": "HUMAN-REQUEST-001",
+      "kind": "human-request",
+      "content": {
+        "request": "Human은 축소된 Kanban 높이를 수정해 본문이 남은 작업 영역을 다시 채우도록 요청했다."
+      }
+    },
+    {
+      "id": "DESIRED-OUTCOME-001",
+      "kind": "desired-outcome",
+      "content": {
+        "outcome": "기존 단순화 동작을 보존하면서 Kanban 보드와 빈 칼럼이 탭 및 헤더 아래의 가용 높이를 채운다."
+      }
+    },
+    {
+      "id": "HUMAN-FEEDBACK-001",
+      "kind": "human-feedback",
+      "content": {
+        "feedback": "Human은 스크린샷으로 Kanban 높이가 항목 영역까지만 축소된 회귀를 지적하고 수정을 승인했다."
+      },
+      "blockRef": "blocks/evidence/kanban-height-regression.png"
+    },
+    {
+      "id": "SUCCESS-CRITERION-001",
+      "kind": "success-criterion",
+      "content": {
+        "criteria": [
+          "Kanban 보드가 탭과 헤더 아래 남은 viewport 높이를 채운다.",
+          "빈 칼럼의 본문도 보드 전체 높이를 유지한다.",
+          "workspace 외부 스크롤이 생기지 않는다.",
+          "notice 제거, 칼럼 선택 영속화, 제목 전용 정적 카드는 유지된다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

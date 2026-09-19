@@ -1,0 +1,40 @@
+{
+  "id": "stakeholders-and-approval",
+  "title": "Stakeholders and Approval",
+  "content": [
+    {
+      "id": "STAKEHOLDER-001",
+      "kind": "stakeholder",
+      "content": {
+        "affected": [
+          "Agent Factory Workspace 확장에서 lifecycle artifact를 열람하고 수정하는 Human",
+          "Intake, Specification, Work Unit manager 및 Workspace 확장 유지보수 담당자"
+        ]
+      }
+    },
+    {
+      "id": "DECISION-OWNER-001",
+      "kind": "decision-owner",
+      "content": {
+        "owner": "Human",
+        "decisions": [
+          "Editor 기능 범위와 탭 순서",
+          "Human review 승인",
+          "integration, cleanup, 배포, push와 PR promotion"
+        ]
+      }
+    },
+    {
+      "id": "APPROVAL-BOUNDARY-001",
+      "kind": "approval-boundary",
+      "content": {
+        "boundaries": [
+          "Human은 manager 기반 읽기·쓰기 Editor 범위와 구조화 편집 UI를 승인했다.",
+          "Human은 Dashboard, Editor, Kanban, Context 순서를 승인했다.",
+          "Intake checkpoint, Work Unit checkpoint, Human review, integration, cleanup, 배포, push와 PR promotion은 각각 별도 결정이다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,34 @@
+{
+  "id": "request-and-goal",
+  "title": "Request and Goal",
+  "content": [
+    {
+      "id": "HUMAN-REQUEST-001",
+      "kind": "human-request",
+      "content": {
+        "request": "Human은 충돌이 확인된 완료 Work Unit 결과를 현재 main 기준으로 정합하기 위해 새 Intake와 Agents 및 Workspace Work Unit을 생성하는 선택 A를 승인했다."
+      }
+    },
+    {
+      "id": "DESIRED-OUTCOME-001",
+      "kind": "desired-outcome",
+      "content": {
+        "outcome": "완료된 Agents runtime, Composer, Workspace header 결과를 현재 main과 정합하는 독립 Work Unit 두 개를 준비한다."
+      }
+    },
+    {
+      "id": "SUCCESS-CRITERION-001",
+      "kind": "success-criterion",
+      "content": {
+        "criteria": [
+          "Agents runtime 및 Composer 승인 결과가 함께 보존된다.",
+          "Workspace의 현재 Kanban 컬럼 표시 선택 기능과 승인된 32px selected header 결과가 함께 보존된다.",
+          "현재 main 기준 충돌을 해소하고 관련 단위 및 통합 검증이 통과한다.",
+          "Specification 정합성과 canonical Work Unit evidence가 유지된다.",
+          "integration, cleanup, push와 배포는 각각 별도 Human 결정으로 남는다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,49 @@
+{
+  "id": "requirements-and-constraints",
+  "title": "Requirements and Constraints",
+  "content": [
+    {
+      "id": "REQUIREMENT-001",
+      "kind": "requirement",
+      "content": {
+        "requirements": [
+          "Workspace tablist는 Dashboard, Editor, Kanban, Context 순서의 네 탭을 제공해야 한다.",
+          "저장된 selectedTab이 design 또는 view이면 editor를 선택해야 한다.",
+          "Editor는 프로젝트의 canonical Intake, Specification, Work Unit package를 탐색해야 한다.",
+          "Editor는 선택한 artifact의 sectioned JSON 구조를 트리와 읽기 전용 미리보기로 표시해야 한다.",
+          "수정 가능한 semantic field는 구조화된 control로 편집하고 저장은 해당 artifact manager의 allowlisted 명령으로 수행해야 한다.",
+          "저장 성공 후 canonical package를 다시 읽고 manager validation 결과를 표시해야 한다."
+        ]
+      }
+    },
+    {
+      "id": "CONSTRAINT-001",
+      "kind": "constraint",
+      "content": {
+        "constraints": [
+          "Webview 입력으로 임의 executable path, shell command 또는 raw filesystem write를 허용하지 않는다.",
+          "Extension Host가 project root, package identity, artifact type, manager allowlist와 message allowlist를 소유한다.",
+          "공통 읽기 모델과 artifact별 쓰기 adapter를 분리한다.",
+          "기존 Kanban controller, manager 실행 및 capability 계약을 변경하지 않는다.",
+          "canonical artifact JSON은 manager 외 경로로 수정하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "ACCEPTANCE-CRITERION-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "네 탭의 순서, 접근 가능한 tablist, 키보드 탐색과 selectedTab 이전이 검증된다.",
+          "Editor 트리는 Intake, Specification, Work Unit과 해당 section을 표시한다.",
+          "선택 artifact의 JSON 미리보기는 읽기 전용이며 textContent 기반으로 렌더링된다.",
+          "구조화 편집 요청은 allowlisted artifact manager와 semantic operation으로만 실행된다.",
+          "경로 이탈, symlink package, 미지원 artifact, 임의 manager 명령과 malformed message를 실행 전에 거부한다.",
+          "저장 성공과 manager validation 실패 모두 authoritative refresh 및 오류 경계로 검증된다.",
+          "기존 Kanban unit, manager integration과 Extension Host E2E가 통과한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

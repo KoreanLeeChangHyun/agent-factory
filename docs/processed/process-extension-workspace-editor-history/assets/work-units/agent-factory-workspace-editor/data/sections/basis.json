@@ -1,0 +1,28 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-REF-001",
+      "kind": "intake-basis-ref",
+      "content": "승인된 Workspace unified Editor Intake basis",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-workspace-editor",
+          "path": ".agent-factory/intakes/agent-factory-workspace-editor",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "WORK-UNIT-BASIS-001"
+          }
+        },
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,19 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": [
+        "1. 공식 VS Code 근거와 Intake 수용 기준을 Specification에 반영하고 전체 검증한다.",
+        "2. manifest contribution, Explorer model, Chat HTML과 상태 경계의 실패 단위 테스트를 먼저 작성한다.",
+        "3. Extension Host에서 Activity Bar container와 Views 등록을 확인하는 E2E 테스트를 먼저 작성한다.",
+        "4. agents manifest, SVG asset, Extension Host, Tree View와 Chat Webview View를 최소 구현한다.",
+        "5. 구문, 단위, Extension Host E2E, SVG-only, CSP, 접근성과 범위 밖 파일 검증을 실행한다.",
+        "6. AI Review, Report와 한국어 Human 검토 자료를 작성한다."
+      ]
+    }
+  ],
+  "subsections": []
+}

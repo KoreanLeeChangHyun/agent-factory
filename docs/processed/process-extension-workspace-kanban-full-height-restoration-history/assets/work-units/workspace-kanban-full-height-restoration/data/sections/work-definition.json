@@ -1,0 +1,50 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": {
+        "goal": "Kanban 보드와 빈 칼럼이 탭 및 헤더 아래의 전체 가용 높이를 다시 채우도록 복원한다."
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "workspace/src/webviewShell.js에서 Kanban layout height ownership 수정",
+          "workspace/test/unit/webviewShell.test.js 또는 적합한 runtime test에서 실제 geometry 회귀 검증",
+          "focused unit test와 workspace package check"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "notice 재도입",
+          "localStorage 기반 칼럼 표시 선택 변경",
+          "카드 metadata, actions, DnD 또는 keyboard interaction 재도입",
+          "Agents Chat 및 다른 Workspace 탭 변경",
+          "배포, 서버 재시작과 push"
+        ]
+      }
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": {
+        "items": [
+          "가용 영역 전체를 채우는 Kanban board",
+          "전체 높이를 유지하는 빈 columns",
+          "실제 layout geometry를 검증하는 regression test",
+          "검증 및 Human review 보고"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

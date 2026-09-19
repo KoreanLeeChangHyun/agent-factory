@@ -1,0 +1,42 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": "Agents 패널의 session header, message area, composer와 status 표시를 현재 지원 기능 안에서 저장된 Web runtime evidence와 정합한다."
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": [
+        "agents/src/chatView.js의 session-open shell DOM과 CSS",
+        "agents/test/unit/chatView.test.js와 agents/test/suite/index.js 회귀 검증",
+        "Agents 동일 viewport Chromium DOM geometry 및 screenshot 검증",
+        "Agents package check와 linux-x64 VSIX 생성 검증"
+      ]
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": [
+        "workspace/src 이하 Workspace 구현과 테스트 변경",
+        "Web source, Web backend와 Web runtime 변경",
+        "provider, model, reasoning, context, branch, timeline 및 session-list 등 미지원 기능 추가 또는 가짜 controls 표시",
+        "Human 승인 없는 integration, 배포, cleanup, push와 PR promotion"
+      ]
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": [
+        "저장된 Web runtime과 시각 계층이 정합한 Agents session-open 화면",
+        "40px 상단 탭과 32px selected session header의 실제 DOM geometry 검증",
+        "기존 Agents 기능 계약을 보존하는 단위와 통합 회귀 테스트",
+        "비교 screenshot, verification evidence와 한국어 Human review 방법"
+      ]
+    }
+  ],
+  "subsections": []
+}

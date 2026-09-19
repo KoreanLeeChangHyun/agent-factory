@@ -1,0 +1,56 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "SCOPE-001",
+      "kind": "scope-status",
+      "content": {
+        "inScope": [
+          "Webview 색상 표현",
+          "탭과 헤더 및 본문 여백",
+          "본문 콘텐츠 폭과 배치"
+        ],
+        "outOfScope": [
+          "탭 이름 및 순서 변경",
+          "키보드 탐색 변경",
+          "상태 보존 변경",
+          "Dashboard, Design, Kanban, Context, View 기능 구현"
+        ]
+      }
+    },
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "context": "현재 설치된 Agent Factory Workspace shell의 Human 검토 스크린샷과 main의 workspace/src/webviewShell.js를 기준으로 개선한다."
+      }
+    },
+    {
+      "id": "SCOPE-002",
+      "kind": "scope",
+      "content": {
+        "included": [
+          "VS Code theme token 기반 표면 계층",
+          "탭, 선택 헤더, 본문 여백과 간격",
+          "본문 콘텐츠 폭과 배치",
+          "다크 및 라이트 테마 호환 검증"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "excluded": [
+          "탭 이름과 순서 변경",
+          "보이는 문구 변경",
+          "DOM 구조와 키보드 동작 변경",
+          "상태 보존 변경",
+          "각 탭의 실제 기능 구현"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,18 @@
+{
+  "blocks": [
+    {
+      "path": "blocks/evidence/integration-receipt.json",
+      "mediaType": "application/json",
+      "description": "Raw Work Unit integration receipt",
+      "sha256": "b372d7a510e3ee2fa1164af417ba59f05616ebfaebdca5b411ef33a090f92af0",
+      "sizeBytes": 1081
+    },
+    {
+      "path": "blocks/evidence/launch.json",
+      "mediaType": "application/json",
+      "description": "Verified VS Code dual-extension development host launch configuration",
+      "sha256": "1b6703a0e227eb5b5373855805986540a5b3230ebbf1c7fb50d290495c426a2b",
+      "sizeBytes": 399
+    }
+  ]
+}

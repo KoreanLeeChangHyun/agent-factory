@@ -1,0 +1,35 @@
+{
+  "id": "request-and-goal",
+  "title": "Request and Goal",
+  "content": [
+    {
+      "id": "HUMAN-REQUEST-001",
+      "kind": "human-request",
+      "content": {
+        "request": "Human은 배포된 Agents 입력창 스크린샷을 제공하며 구현이 애매하게 됐다고 피드백했다."
+      },
+      "blockRef": "blocks/evidence/composer-rendering-feedback.png"
+    },
+    {
+      "id": "DESIRED-OUTCOME-001",
+      "kind": "desired-outcome",
+      "content": {
+        "outcome": "Agents composer의 초기 높이, 입력 확장, 전송 버튼과 상태 표시를 의도한 Web 정렬 또는 editor 최적화 방향으로 교정한다."
+      }
+    },
+    {
+      "id": "SUCCESS-CRITERION-001",
+      "kind": "success-criterion",
+      "content": {
+        "criteria": [
+          "빈 입력창이 불필요하게 두 줄 높이로 렌더링되지 않는다.",
+          "native textarea resize handle이 표시되지 않는다.",
+          "입력 내용에 따라 composer가 제한된 높이 안에서 확장된다.",
+          "전송·취소·draft·IME·session ownership 회귀가 없다.",
+          "완료 상태 표시는 Human이 선택한 정책과 일치한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

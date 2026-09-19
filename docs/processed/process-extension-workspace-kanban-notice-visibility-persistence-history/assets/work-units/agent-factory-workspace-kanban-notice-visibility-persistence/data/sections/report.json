@@ -1,0 +1,97 @@
+{
+  "id": "report",
+  "title": "Report",
+  "content": [
+    {
+      "id": "REPORT-STATUS",
+      "kind": "report-result",
+      "content": {
+        "summary": "커밋 69a0c245가 Kanban notice 제거, 칼럼 표시 localStorage 영속화와 title-only 정적 카드를 구현했고 검증과 AI Review가 통과해 Human review 준비가 완료됐다.",
+        "commit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "aiReview": "통과",
+        "integrationRequired": true,
+        "deliveredScope": [
+          "Kanban 일반 notice DOM, CSS, query와 상태 쓰기 제거",
+          "닫힌 칼럼 ID를 고정 localStorage key에 저장하고 유효 ID만 복원",
+          "localStorage 손상 및 접근 실패 fallback",
+          "카드 title-only DOM과 모든 카드 action 및 interaction 제거",
+          "Requirements Specification 정렬"
+        ],
+        "exclusions": [
+          "Kanban manager와 snapshot 오류 계약 변경 없음",
+          "검색, 필터와 수동 새로 고침 추가 없음",
+          "다른 탭 상태 저장 변경 없음",
+          "merge, integration, cleanup, push, deploy, install, reload와 restart 없음"
+        ],
+        "changedPaths": [
+          "workspace/src/webviewShell.js",
+          "workspace/test/unit/webviewShell.test.js",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/metadata.json",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/sections/functional-requirements.json",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/sections/decisions-and-open-items.json",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/sections/quality-and-non-functional-requirements.json",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/sections/acceptance-criteria.json",
+          ".agent-factory/specifications/agent-factory-workspace-requirements/data/sections/verification-and-traceability.json"
+        ],
+        "verificationCommands": [
+          "node --test test/unit/webviewShell.test.js",
+          "npm run check",
+          "generated Webview script compilation and eight-condition acceptance audit",
+          "git diff --check",
+          "git show --check --format=oneline --no-ext-diff HEAD",
+          "specification.py validate --full",
+          "work_unit.py validate",
+          "worktree.py inspect"
+        ],
+        "verificationResults": [
+          "focused test 11/11 passed",
+          "workspace syntax and unit tests 32/32 passed",
+          "acceptance audit 8/8 true",
+          "source and canonical diff checks passed",
+          "Requirements Specification full validation passed",
+          "dedicated linked worktree clean at implementation commit"
+        ],
+        "remainingRisks": [
+          "Extension Development Host에서 Webview 재개방 localStorage 복원과 시각 상태를 Human이 확인해야 한다.",
+          "worktree.py prepare의 ready-only admission이 attempt-start 이후 working 상태와 충돌해 exact public worktree contract Git operations로 생성했고 worktree.py inspect로 검증했다."
+        ]
+      },
+      "attributes": {
+        "verificationResult": "pass",
+        "implementationCommit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/kanban-notice-visibility-persistence-verification.txt"
+        ]
+      }
+    },
+    {
+      "id": "INTEGRATION-2426FA1C4634378B",
+      "kind": "integration-result",
+      "content": {
+        "operationResult": "fast-forwarded",
+        "relationship": "fast-forwardable",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "sourceBranch": "work-unit/agent-factory-workspace-kanban-notice-visibility-persistence",
+        "sourceCommit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "strategy": "ff-only",
+        "targetAfterCommit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "targetBeforeCommit": "5b5c78a5be96172aef2c5ba24f2e3dcbf3167829",
+        "targetBranch": "main",
+        "workUnitId": "agent-factory-workspace-kanban-notice-visibility-persistence",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-workspace-kanban-notice-visibility-persistence",
+        "receiptSha256": "2426fa1c4634378b3bccde11133329dc7ab0944a5ab4d51750eeb76064b13251"
+      },
+      "attributes": {
+        "status": "integrated"
+      },
+      "blockRef": "blocks/evidence/integration-receipt.json"
+    }
+  ],
+  "subsections": []
+}

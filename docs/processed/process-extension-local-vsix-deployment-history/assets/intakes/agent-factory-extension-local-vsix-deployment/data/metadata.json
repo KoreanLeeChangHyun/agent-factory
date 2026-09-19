@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "2.0.0",
+  "documentVersion": "1.0.10",
+  "id": "agent-factory-extension-local-vsix-deployment",
+  "artifactType": "intake",
+  "projectId": "agent-factory-workspace",
+  "lifecycle": {
+    "phase": "intake",
+    "status": "ready"
+  },
+  "createdAt": "2026-07-27T14:37:08+00:00",
+  "updatedAt": "2026-07-27T14:37:27+00:00",
+  "language": "ko",
+  "theme": "default",
+  "provenance": {
+    "createdBy": "Human",
+    "generatedBy": "Agent Factory intake manager",
+    "sourceRefs": []
+  },
+  "relations": [],
+  "readiness": {
+    "reviewedAt": "2026-07-27T23:37:25+09:00",
+    "contractValid": true,
+    "evidenceComplete": true,
+    "requirementsComplete": true,
+    "specificationConsistent": true,
+    "executionReady": true,
+    "findings": []
+  }
+}

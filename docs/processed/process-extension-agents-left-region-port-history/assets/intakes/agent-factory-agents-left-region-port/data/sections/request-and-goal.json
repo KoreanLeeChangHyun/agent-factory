@@ -1,0 +1,35 @@
+{
+  "id": "request-and-goal",
+  "title": "Request and Goal",
+  "content": [
+    {
+      "id": "HUMAN-REQUEST-001",
+      "kind": "human-request",
+      "content": {
+        "request": "../web의 왼쪽 영역을 /home/deus/workspace/agent-factory/vscode-extension/agents에 VS Code Extension에 맞춰 원본을 유지한 채 복사 포팅한다.",
+        "desiredOutcome": "agents 디렉터리에서 독립적으로 빌드와 테스트가 가능한 왼쪽 영역 전용 VS Code Extension을 제공한다."
+      }
+    },
+    {
+      "id": "DESIRED-OUTCOME-001",
+      "kind": "desired-outcome",
+      "content": {
+        "outcome": "웹의 왼쪽 영역이 VS Code 네이티브 컨테이너와 Extension API 경계에 맞게 포팅된다.",
+        "successMeaning": "독립 Extension이 Activity Bar에서 열리고 Explorer와 Chat 영역을 VS Code 안에서 제공하며 ../web 원본은 변경되지 않는다."
+      }
+    },
+    {
+      "id": "SUCCESS-CRITERION-001",
+      "kind": "success-criterion",
+      "content": {
+        "criteria": [
+          "agents가 독립 VS Code Extension manifest와 진입점을 가진다.",
+          "Activity Bar 항목과 Primary Sidebar View가 VS Code 네이티브 contribution으로 등록된다.",
+          "Explorer와 Chat 포팅 범위가 검증 가능한 테스트로 보호된다.",
+          "../web 및 workspace의 기존 구현은 변경하지 않는다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

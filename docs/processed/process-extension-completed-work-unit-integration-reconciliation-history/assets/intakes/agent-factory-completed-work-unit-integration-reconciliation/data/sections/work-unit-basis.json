@@ -1,0 +1,82 @@
+{
+  "id": "work-unit-basis",
+  "title": "Work Unit Basis",
+  "content": [
+    {
+      "id": "SPECIFICATION-IMPACT-001",
+      "kind": "specification-impact",
+      "content": {
+        "summary": "현재 Specification은 Agents composer, runtime 계층과 tab header acceptance를 포함하고 manager full validation을 통과한다. 새 요구사항 추가가 아니라 기존 승인 결과를 현재 main에 정합하는 작업이므로 aligned다."
+      },
+      "attributes": {
+        "status": "aligned"
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    },
+    {
+      "id": "WORK-UNIT-BASIS-AGENTS-001",
+      "kind": "work-unit-basis",
+      "content": {
+        "id": "agent-factory-agents-runtime-composer-integration-reconciliation",
+        "goal": "현재 main 기준으로 승인된 Agents runtime visual alignment와 Composer rendering correction 결과를 정합하고 검증한다.",
+        "scope": [
+          "agents/src/chatView.js의 runtime visual hierarchy와 Composer rendering 정합",
+          "agents/test/unit/chatView.test.js 및 agents/test/suite/index.js 회귀 정합",
+          "agent-factory-workspace-requirements의 manager 기반 정합 확인",
+          "Agents focused unit, integration, package 및 필요한 runtime geometry 검증"
+        ],
+        "expectedOutputs": [
+          "현재 main과 충돌 없이 정합된 Agents 구현 및 테스트",
+          "manager-valid Specification과 실행 evidence",
+          "Human review 및 integration 결정 자료"
+        ],
+        "exclusions": [
+          "Workspace source 및 tests 변경",
+          "새 사용자 기능 또는 미지원 control 추가",
+          "Human 승인 없는 integration, cleanup, push와 배포"
+        ],
+        "evidenceRefs": [
+          "INTERNAL-EVIDENCE-001",
+          "INTERVIEW-INTEGRATION-APPROACH-001",
+          "DECISION-INTEGRATION-APPROACH-001",
+          "SPECIFICATION-IMPACT-001"
+        ]
+      }
+    },
+    {
+      "id": "WORK-UNIT-BASIS-WORKSPACE-001",
+      "kind": "work-unit-basis",
+      "content": {
+        "id": "agent-factory-workspace-header-integration-reconciliation",
+        "goal": "현재 main의 Kanban 컬럼 표시 선택 기능과 승인된 Workspace selected header 32px 결과를 정합하고 검증한다.",
+        "scope": [
+          "workspace/src/webviewShell.js의 Kanban header 및 컬럼 표시 선택 정합",
+          "workspace/test/unit/webviewShell.test.js의 32px geometry와 picker 회귀 검증",
+          "Workspace focused syntax 및 unit 검증"
+        ],
+        "expectedOutputs": [
+          "Kanban picker와 32px selected header를 함께 보존한 Workspace 구현",
+          "검증 evidence와 Human review 자료"
+        ],
+        "exclusions": [
+          "Agents source 및 tests 변경",
+          "Kanban 데이터 모델, DnD, manager 또는 filesystem 계약 변경",
+          "Human 승인 없는 integration, cleanup, push와 배포"
+        ],
+        "evidenceRefs": [
+          "INTERNAL-EVIDENCE-001",
+          "INTERVIEW-INTEGRATION-APPROACH-001",
+          "DECISION-INTEGRATION-APPROACH-001",
+          "SPECIFICATION-IMPACT-001"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

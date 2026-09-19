@@ -1,0 +1,23 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "basis-ref-intake",
+      "kind": "intake-basis-ref",
+      "content": "검증된 agent-factory-workspace Intake의 확장 shell 구현 basis",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-workspace",
+          "path": ".agent-factory/intakes/agent-factory-workspace",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "work-unit-basis-foundation-specification"
+          }
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

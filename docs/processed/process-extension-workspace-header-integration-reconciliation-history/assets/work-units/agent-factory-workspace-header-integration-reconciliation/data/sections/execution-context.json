@@ -1,0 +1,21 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "agent-factory-workspace-header-integration-reconciliation",
+        "objective": "현재 main의 Kanban picker와 Workspace selected header 32px 결과를 정합하고 검증한다.",
+        "execInvocation": "/goal agent-factory-workspace-header-integration-reconciliation",
+        "executionAgent": "Codex",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "branch": "work-unit/agent-factory-workspace-header-integration-reconciliation",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-workspace-header-integration-reconciliation"
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,35 @@
+{
+  "id": "requirements-and-constraints",
+  "title": "Requirements and Constraints",
+  "content": [
+    {
+      "id": "REQUIREMENT-001",
+      "kind": "requirement",
+      "content": {
+        "requirements": [
+          "composer input은 빈 상태에서 20px로 시작하고 내용에 따라 최대 144px까지 자동 확장한 뒤 내부 스크롤한다.",
+          "native resize handle을 제거한다.",
+          "28px 전송 또는 취소 action을 composer card 우측 12px, 하단 12px 위치에 유지한다.",
+          "status line은 22px 고정 높이로 유지하고 정상 완료 후 Web 기준 IDLE로 복귀하며 실행, 취소와 오류 상태는 의미 있게 표시한다.",
+          "Session -> DOM -> State, draft, submit, cancel과 IME 계약을 보존한다."
+        ]
+      }
+    },
+    {
+      "id": "ACCEPTANCE-CRITERION-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "빈 composer input의 계산 높이가 20px 기준으로 시작한다.",
+          "native resize handle이 표시되지 않는다.",
+          "multiline 입력은 최대 144px까지 자동 확장되고 초과 내용은 내부 스크롤한다.",
+          "action은 card 우측 하단에 정렬되고 좁은 editor group에서도 input과 겹치지 않는다.",
+          "status line은 22px이며 정상 완료 후 지속적인 완료 문구 대신 IDLE을 표시한다.",
+          "Enter, Shift+Enter, Ctrl 또는 Cmd+Enter, IME, draft, submit, cancel과 reconnect 회귀가 없다.",
+          "단위, 통합, Extension Host E2E와 linux-x64 VSIX 검증이 통과한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

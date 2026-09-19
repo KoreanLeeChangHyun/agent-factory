@@ -1,0 +1,48 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": [
+        "Kanban 탭에서 selected header row가 유지되고 우측에 컬럼별 표시 picker가 있다.",
+        "selected header의 실제 외곽 높이는 32px다.",
+        "picker는 여섯 lifecycle 컬럼을 개별 표시 또는 숨김 처리하고 Webview state로 복원한다.",
+        "현재 main의 탭 40px, picker 문구, 접근성 group, 컬럼 DOM과 Kanban 동작이 보존된다.",
+        "Workspace 이외 tracked source 및 tests 변경이 없다."
+      ]
+    },
+    {
+      "id": "DOD-001",
+      "kind": "definition-of-done",
+      "content": [
+        "현재 main과 완료 header branch 차이를 evidence로 확인한다.",
+        "picker와 32px geometry 결합을 검증하는 실패 테스트를 먼저 기록하거나 기존 실패를 재현한다.",
+        "Workspace syntax 및 focused unit 검증이 통과한다.",
+        "실행 evidence, AI review, report와 한국어 Human review 방법이 준비된다.",
+        "integration, cleanup, push와 배포는 Human 승인 전 수행하지 않는다."
+      ]
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": [
+        "syntax: workspace/src/webviewShell.js",
+        "unit: picker DOM, 여섯 option, state persistence와 column hidden behavior",
+        "unit: workspace tab 40px와 selected header 실제 32px geometry",
+        "boundary: agents tracked source 및 tests 무변경"
+      ]
+    },
+    {
+      "id": "QUALITY-STATUS",
+      "kind": "quality-check",
+      "content": "검증 대기",
+      "attributes": {
+        "status": "pending",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

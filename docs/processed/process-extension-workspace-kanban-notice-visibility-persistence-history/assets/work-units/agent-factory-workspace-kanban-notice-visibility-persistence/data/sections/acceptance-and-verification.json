@@ -1,0 +1,74 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "생성 HTML에 data-kanban-notice와 kanban-notice가 없다.",
+          "notice query와 notice.textContent 쓰기가 없다.",
+          "오류는 기존 data-kanban-error 영역에 남는다.",
+          "닫힌 칼럼 ID는 고정 localStorage key에 저장되고 유효한 ID만 복원된다.",
+          "localStorage 실패가 렌더링을 중단하지 않는다.",
+          "카드 DOM은 h4 title만 포함하고 id, meta, select와 button이 없다.",
+          "카드에 draggable, tabindex, drag, click와 keydown handler가 없다."
+        ]
+      }
+    },
+    {
+      "id": "DONE-001",
+      "kind": "definition-of-done",
+      "content": {
+        "criteria": [
+          "요청 범위 소스, 테스트와 정렬된 Specification만 변경된다.",
+          "focused unit test와 workspace npm run check가 통과한다.",
+          "AI Review와 실행 보고가 현재 attempt에 바인딩된다."
+        ]
+      }
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": {
+        "tests": [
+          "notice DOM과 notice 쓰기 부재 단위 테스트",
+          "localStorage 저장, 유효 ID 복원, 손상 데이터와 접근 실패 fallback 단위 테스트",
+          "카드 title-only DOM과 상호작용 부재 단위 테스트",
+          "workspace npm run check",
+          "git diff --check"
+        ]
+      }
+    },
+    {
+      "id": "QUALITY-001",
+      "kind": "quality-check",
+      "content": {
+        "result": "pass",
+        "checks": [
+          "notice DOM, CSS, query와 모든 notice 쓰기 부재",
+          "기존 snapshot 및 manager 오류 영역 보존",
+          "고정 localStorage key, 유효 ID 정규화와 접근 실패 안전성",
+          "카드 title-only DOM과 모든 interaction affordance 부재",
+          "workspace npm run check 32/32, 생성 script compile과 git diff --check 통과",
+          "Requirements Specification full validation 통과"
+        ]
+      },
+      "attributes": {
+        "status": "pass",
+        "implementationCommit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/kanban-notice-visibility-persistence-verification.txt"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

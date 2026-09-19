@@ -1,0 +1,46 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "facts": [
+          "main head는 4eee632611946442686dce08e05758d392767f5e이며 clean 상태다.",
+          "Agents Composer 완료 branch head는 f1c9b0d80e82e44c5d5918cbe58f3b42ccf8633c이다.",
+          "Agents runtime 정합 완료 branch head는 2c96cb3acb6c9ddf6f4c61d7fb4fcf07ddc50b65이다.",
+          "Workspace selected header 완료 branch head는 97af7c90c532d3d8c42133dd4b7acafcb931dd9a이다.",
+          "main과 Composer branch는 Specification metadata에서 merge conflict가 난다.",
+          "main과 runtime branch는 runtime Work Unit metadata에서 merge conflict가 난다.",
+          "main과 Workspace header branch는 workspace/src/webviewShell.js에서 merge conflict가 난다.",
+          "Composer와 runtime branch는 Specification metadata, agents/src/chatView.js, agents/test/suite/index.js, agents/test/unit/chatView.test.js에서 merge conflict가 난다."
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "Agents runtime 및 Composer 완료 결과의 현재 main 기준 코드, 테스트, Specification 정합",
+          "Workspace selected header 완료 결과와 현재 main Kanban 컬럼 표시 선택 기능의 정합",
+          "각 정합 결과의 focused 검증, full package 검증 및 Human review 자료"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "새 사용자 기능 또는 미지원 control 추가",
+          "완료 branch의 강제 재작성, reset, force 작업",
+          "Human 승인 없는 integration, cleanup, push, PR promotion과 배포",
+          "Agents와 Workspace 사이의 범위 혼합"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

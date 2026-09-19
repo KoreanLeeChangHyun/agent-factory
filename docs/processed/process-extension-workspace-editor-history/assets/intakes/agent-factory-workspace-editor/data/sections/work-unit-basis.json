@@ -1,0 +1,59 @@
+{
+  "id": "work-unit-basis",
+  "title": "Work Unit Basis",
+  "content": [
+    {
+      "id": "SPECIFICATION-IMPACT-001",
+      "kind": "specification-impact",
+      "content": {
+        "summary": "Agent Factory Workspace requirements Specification을 Dashboard, Editor, Kanban, Context 탭, 공통 artifact Editor, manager 전용 저장, 안전 경계와 검증 기준으로 정렬했고 full validation이 통과했다."
+      },
+      "attributes": {
+        "status": "aligned"
+      },
+      "sourceRefs": [
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    },
+    {
+      "id": "WORK-UNIT-BASIS-001",
+      "kind": "work-unit-basis",
+      "content": {
+        "id": "agent-factory-workspace-editor",
+        "goal": "Design과 View를 단일 manager 기반 Editor로 통합하고 공통 sectioned artifact를 안전하게 탐색·편집하면서 기존 Kanban 계약을 보존한다.",
+        "scope": [
+          "Dashboard, Editor, Kanban, Context 네 탭과 selectedTab 상태 이전",
+          "Intake, Specification, Work Unit package 및 section 탐색",
+          "artifact/section 트리, 구조화 필드 편집, 읽기 전용 JSON 미리보기",
+          "artifact별 manager allowlist를 통한 저장, validation과 authoritative refresh",
+          "경로, symlink, stale version, malformed message와 manager 오류 경계",
+          "단위, manager integration, Extension Host E2E와 Human review"
+        ],
+        "expectedOutputs": [
+          "Design과 View를 대체하는 단일 Editor 탭",
+          "공통 sectioned artifact reader와 artifact별 manager adapter",
+          "구조화 편집 및 읽기 전용 JSON 미리보기 UI",
+          "안전 경계와 회귀 테스트 evidence"
+        ],
+        "exclusions": [
+          "원시 JSON 직접 쓰기",
+          "Agent Factory manager 및 profile 변경",
+          "Kanban DnD와 Action 계약 변경",
+          "Human 승인 없는 integration, cleanup, 배포, push와 PR promotion"
+        ],
+        "evidenceRefs": [
+          "INTERNAL-EVIDENCE-001",
+          "INTERVIEW-FUNCTION-001",
+          "INTERVIEW-LAYOUT-002",
+          "INTERVIEW-TAB-ORDER-003",
+          "SPECIFICATION-IMPACT-001"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

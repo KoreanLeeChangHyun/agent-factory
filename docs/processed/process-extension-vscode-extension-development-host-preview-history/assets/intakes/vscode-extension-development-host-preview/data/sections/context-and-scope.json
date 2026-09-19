@@ -1,0 +1,40 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "facts": [
+          "루트와 두 확장 폴더에 launch.json 또는 tasks.json이 없다.",
+          "agents/test/runTest.js는 extensionDevelopmentPath 배열로 agents와 workspace를 함께 로드한다.",
+          "두 package.json의 main은 각각 src/extension.js를 가리킨다."
+        ]
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "items": [
+          "루트 .vscode/launch.json에 두 확장을 함께 로드하는 extensionHost 실행 구성 추가"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "items": [
+          "확장 소스 변경",
+          "VSIX 생성 또는 설치",
+          "배포",
+          "서버 재시작",
+          "기존 테스트 계약 변경"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

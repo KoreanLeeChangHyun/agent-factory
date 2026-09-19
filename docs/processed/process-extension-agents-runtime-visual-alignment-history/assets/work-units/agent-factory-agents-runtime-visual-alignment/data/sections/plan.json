@@ -1,0 +1,32 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": "현재 Agents session-open DOM을 Web runtime screenshot 및 measured geometry와 비교하는 실패 회귀 테스트를 먼저 추가한다."
+    },
+    {
+      "id": "PLAN-002",
+      "kind": "plan-step",
+      "content": "agents/src/chatView.js의 header, message, composer와 status 시각 구조를 현재 기능 계약 안에서 최소 수정한다."
+    },
+    {
+      "id": "PLAN-003",
+      "kind": "plan-step",
+      "content": "Agents 단위, 통합, package check를 실행하고 기존 session, submit, cancel, reconnect, keyboard, CSP와 SVG 회귀를 수정한다."
+    },
+    {
+      "id": "PLAN-004",
+      "kind": "plan-step",
+      "content": "동일 viewport Chromium에서 세션이 열린 화면의 DOM geometry를 측정하고 비교 screenshot을 생성한다."
+    },
+    {
+      "id": "PLAN-005",
+      "kind": "plan-step",
+      "content": "Workspace 무변경을 확인하고 AI Review, 실행 보고서와 한국어 Human review 자료를 기록한다."
+    }
+  ],
+  "subsections": []
+}

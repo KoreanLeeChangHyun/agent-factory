@@ -1,0 +1,88 @@
+.diagram-renderer {
+  margin: 0.65rem 0;
+  padding: 0.65rem;
+  overflow: auto;
+  border: 1px solid var(--border, #3a3a3a);
+  border-radius: 0.4rem;
+  background: var(--surface, #242424);
+}
+
+.diagram-renderer .mermaid {
+  margin: 0;
+  min-width: min-content;
+  color: inherit;
+  background: transparent;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.diagram-renderer svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.table.table-enhanced {
+  overflow: visible;
+  border: 0;
+}
+
+.table-enhanced > .tabulator {
+  border: 1px solid var(--border, #3a3a3a);
+  border-radius: 0.35rem;
+  background: var(--surface, #242424);
+  color: var(--text, #e8e8e8);
+  font: inherit;
+}
+
+.table-enhanced .tabulator-header,
+.table-enhanced .tabulator-header .tabulator-col,
+.table-enhanced .tabulator-row,
+.table-enhanced .tabulator-row .tabulator-cell {
+  border-color: var(--border, #3a3a3a);
+  background: var(--surface, #242424);
+  color: var(--text, #e8e8e8);
+}
+
+.table-enhanced .tabulator-header .tabulator-col {
+  background: var(--surface-strong, #2b2b2b);
+}
+
+.table-enhanced .tabulator-header .tabulator-col-content,
+.table-enhanced .tabulator-row .tabulator-cell {
+  padding: 0.48rem 0.65rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.table-enhanced .tabulator-row:hover,
+.table-enhanced .tabulator-row:hover .tabulator-cell {
+  background: var(--surface-hover, #303030);
+}
+
+.table-enhanced .tabulator-col-resize-handle {
+  width: 0.5rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .table-enhanced > .tabulator,
+  .table-enhanced .tabulator-header,
+  .table-enhanced .tabulator-header .tabulator-col,
+  .table-enhanced .tabulator-row,
+  .table-enhanced .tabulator-row .tabulator-cell {
+    border-color: var(--border, #d4d4d4);
+    background: var(--surface, #fff);
+    color: var(--text, #222);
+  }
+
+  .table-enhanced .tabulator-header .tabulator-col {
+    background: var(--surface-strong, #f1f1f1);
+  }
+
+  .table-enhanced .tabulator-row:hover,
+  .table-enhanced .tabulator-row:hover .tabulator-cell {
+    background: var(--surface-hover, #f5f5f5);
+  }
+}

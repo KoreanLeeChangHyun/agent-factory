@@ -1,0 +1,21 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "agent-factory-agents-composer-rendering-correction",
+        "objective": "Web 기준 Agents composer rendering correction을 구현하고 검증한다.",
+        "execInvocation": "/goal agent-factory-agents-composer-rendering-correction",
+        "executionAgent": "Codex",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "branch": "work-unit/agent-factory-agents-composer-rendering-correction",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-agents-composer-rendering-correction"
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,49 @@
+{
+  "id": "acceptance-and-verification",
+  "title": "Acceptance and Verification",
+  "content": [
+    {
+      "id": "ACCEPTANCE-001",
+      "kind": "acceptance-criterion",
+      "content": [
+        "Agents 상단 tab header 외곽은 40px이고 selected session header 외곽은 32px이다.",
+        "세션이 열린 화면의 session header, message area, composer와 status 시각 계층이 저장된 Web runtime evidence와 정합한다.",
+        "현재 지원하지 않는 Web controls는 표시하지 않는다.",
+        "기존 session, submit, cancel, reconnect, draft, keyboard, CSP와 inline SVG 계약이 유지된다.",
+        "workspace 경로에는 tracked 변경이 없다."
+      ]
+    },
+    {
+      "id": "DOD-001",
+      "kind": "definition-of-done",
+      "content": [
+        "실제 DOM geometry 또는 screenshot 비교 실패 테스트를 먼저 기록하고 구현 후 통과시킨다.",
+        "Agents unit, integration, package check와 Chromium layout 검증을 통과한다.",
+        "linux-x64 VSIX를 생성하고 contents를 검증한다.",
+        "실행 evidence, AI checklist, AI review result, report와 한국어 Human review 방법을 canonical Work Unit에 기록한다.",
+        "integration, 배포, cleanup, push와 PR promotion은 Human 승인 전 수행하지 않는다."
+      ]
+    },
+    {
+      "id": "TEST-001",
+      "kind": "test-criterion",
+      "content": [
+        "unit: Agents DOM, CSS, session header, composer, message 및 status 구조를 검증한다.",
+        "unit/integration: submit, cancel, reconnect, draft, keyboard, IME, CSP와 SVG 회귀를 검증한다.",
+        "runtime: 동일 viewport Chromium에서 session-open DOM rectangle과 screenshot을 검증한다.",
+        "boundary: git diff에서 workspace tracked source와 tests가 변경되지 않았음을 검증한다.",
+        "package: linux-x64 VSIX 생성과 archive contents를 검증한다."
+      ]
+    },
+    {
+      "id": "QUALITY-STATUS",
+      "kind": "quality-check",
+      "content": "검증 대기",
+      "attributes": {
+        "status": "pending",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

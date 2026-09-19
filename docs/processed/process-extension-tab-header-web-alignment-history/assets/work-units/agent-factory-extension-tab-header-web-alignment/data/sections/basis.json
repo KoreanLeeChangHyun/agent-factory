@@ -1,0 +1,35 @@
+{
+  "id": "basis",
+  "title": "Basis",
+  "content": [
+    {
+      "id": "BASIS-INTAKE-001",
+      "kind": "intake-basis-ref",
+      "content": "검증된 Agents와 Workspace 탭 헤더 Web 정합성 Intake의 BASIS-001",
+      "sourceRefs": [
+        {
+          "artifactType": "intake",
+          "id": "agent-factory-extension-tab-header-web-alignment",
+          "path": ".agent-factory/intakes/agent-factory-extension-tab-header-web-alignment",
+          "anchor": {
+            "sectionId": "work-unit-basis",
+            "itemId": "BASIS-001"
+          }
+        }
+      ]
+    },
+    {
+      "id": "BASIS-SPECIFICATION-001",
+      "kind": "specification-ref",
+      "content": "Agents와 Workspace의 공통 Web 참조 geometry 규칙과 acceptance criterion",
+      "sourceRefs": [
+        {
+          "artifactType": "specification",
+          "id": "agent-factory-workspace-requirements",
+          "path": ".agent-factory/specifications/agent-factory-workspace-requirements"
+        }
+      ]
+    }
+  ],
+  "subsections": []
+}

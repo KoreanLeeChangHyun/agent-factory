@@ -1,0 +1,25 @@
+{
+  "id": "execution",
+  "title": "Execution",
+  "content": [
+    {
+      "id": "EXECUTION-RESULT-001",
+      "kind": "execution-result",
+      "content": "Kanban board를 두 번째 grid row에 명시적으로 배치해 active panel의 전체 가용 높이를 복원하고 Chromium geometry 회귀 테스트를 추가했다.",
+      "attributes": {
+        "status": "complete",
+        "verificationResult": "pass",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc33b-37a8-79e1-a7b5-ea8ef4bd9d8c",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/workspace-kanban-full-height-restoration.md"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

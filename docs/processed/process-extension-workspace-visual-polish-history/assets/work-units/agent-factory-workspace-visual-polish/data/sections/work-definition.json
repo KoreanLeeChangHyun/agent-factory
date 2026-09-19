@@ -1,0 +1,41 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": "Agent Factory Workspace Webview shell의 색상 계층, 여백, 간격과 콘텐츠 폭을 균형형 워크스페이스 방향으로 개선한다."
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": [
+        "VS Code theme token 기반 표면 계층 조정",
+        "탭, 선택 헤더, 본문 panel과 empty-state의 여백 및 간격 조정",
+        "넓은 편집 영역을 고려한 제한된 콘텐츠 폭과 균형 배치",
+        "시각 스타일 회귀 테스트와 기존 shell 검증"
+      ]
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": [
+        "탭 이름과 순서 및 보이는 문구 변경",
+        "DOM 구조, 이벤트, 키보드 탐색, 상태 보존 변경",
+        "각 탭의 실제 기능 구현",
+        "Webview 메시지 경계 변경"
+      ]
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": [
+        "workspace/src/webviewShell.js 시각 스타일 개선",
+        "workspace/test/unit/webviewShell.test.js 시각 경계 회귀 테스트",
+        "단위·E2E·Human 화면 검토 근거"
+      ]
+    }
+  ],
+  "subsections": []
+}

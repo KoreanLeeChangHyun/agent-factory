@@ -1,0 +1,42 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "GOAL-001",
+      "kind": "goal",
+      "content": "Agents와 Workspace VS Code 확장의 상단 탭과 선택 헤더를 저장된 Web 참조 geometry로 통일한다."
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": [
+        "agents/src/chatView.js의 mode tab 및 session header geometry",
+        "workspace/src/webviewShell.js의 workspace tab 및 selected header geometry",
+        "agents/test/unit/chatView.test.js와 agents/test/suite/index.js의 geometry 회귀 assertion",
+        "workspace/test/unit/webviewShell.test.js의 geometry 회귀 assertion"
+      ]
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": [
+        "탭 이름, 순서, 보이는 문구와 아이콘 변경",
+        "DOM 구조, 이벤트, 키보드 동작, 상태와 데이터 계약 변경",
+        "composer, message history, 본문 panel과 Kanban 내부 layout 변경",
+        "Web 소스 또는 runtime 변경",
+        "패키징, 설치, integration, cleanup, push와 PR promotion"
+      ]
+    },
+    {
+      "id": "EXPECTED-OUTPUT-001",
+      "kind": "expected-output",
+      "content": [
+        "Agents와 Workspace가 공유하는 Web 기준 tab 및 selected header geometry",
+        "두 확장의 geometry drift를 방지하는 명시적 회귀 테스트",
+        "집중 검증 결과와 한국어 Human 시각 검토 방법"
+      ]
+    }
+  ],
+  "subsections": []
+}

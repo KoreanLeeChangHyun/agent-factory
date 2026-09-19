@@ -1,0 +1,75 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXECUTION-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "workspace-kanban-full-height-restoration",
+        "objective": "Kanban 전체 가용 높이를 복원하고 실제 geometry 기반 회귀 검증을 추가한다.",
+        "execInvocation": "python3 /home/deus/.codex/plugins/cache/agent-factory/agent-factory/0.1.0+codex.20260728203314/skills/work-unit-execution/scripts/app_server_goal.py --repository /home/deus/workspace/agent-factory/vscode-extension --work-unit-id workspace-kanban-full-height-restoration",
+        "executionAgent": "Codex Workflow Agent",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "executionMode": "worktree",
+        "branch": "work-unit/workspace-kanban-full-height-restoration",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/workspace-kanban-full-height-restoration"
+      }
+    },
+    {
+      "id": "EXECUTION-STATE-001",
+      "kind": "execution-state",
+      "content": {
+        "contractVersion": "2.0.0",
+        "state": "done",
+        "currentRevision": 1,
+        "currentAttempt": 1,
+        "invocationId": "019fc33b-37a8-79e1-a7b5-ea8ef4bd9d8c",
+        "invocationChain": [
+          "019fc33b-37a8-79e1-a7b5-ea8ef4bd9d8c"
+        ],
+        "history": [],
+        "progress": {
+          "completedSteps": [
+            "Plan",
+            "Work",
+            "AI-Review",
+            "Report"
+          ],
+          "pendingStep": null,
+          "records": [
+            {
+              "stepId": "Plan",
+              "state": "completed",
+              "idempotencyKey": "019fc33b-plan-completed"
+            },
+            {
+              "stepId": "Work",
+              "state": "completed",
+              "idempotencyKey": "019fc33b-work-completed"
+            },
+            {
+              "stepId": "AI-Review",
+              "state": "completed",
+              "idempotencyKey": "019fc33b-ai-review-completed"
+            },
+            {
+              "stepId": "Report",
+              "state": "completed",
+              "idempotencyKey": "019fc33b-report-completed"
+            }
+          ],
+          "retry": {}
+        },
+        "recovery": {
+          "status": "running",
+          "ownerInvocationId": "019fc33b-37a8-79e1-a7b5-ea8ef4bd9d8c",
+          "blockerId": null,
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,38 @@
+{
+  "id": "context-and-scope",
+  "title": "Context and Scope",
+  "content": [
+    {
+      "id": "CONTEXT-001",
+      "kind": "context",
+      "content": {
+        "context": "완료·병합된 agent-factory-workspace-visual-polish 결과를 Human이 화면 검토한 뒤 후속 레이아웃 수정을 요청했다. 기존 Work Unit은 done 상태라 재작업할 수 없어 새 후속 lifecycle을 사용한다."
+      }
+    },
+    {
+      "id": "SCOPE-001",
+      "kind": "scope",
+      "content": {
+        "included": [
+          "workspace-body, workspace-panel, empty-state의 전체 폭 배치",
+          "5개 workspace-tab의 동일 너비 전체 폭 배치",
+          "VS Code semantic theme token 기반 탭, 헤더, 본문 표면 정렬",
+          "관련 단위·E2E·Human 화면 검증"
+        ]
+      }
+    },
+    {
+      "id": "OUT-OF-SCOPE-001",
+      "kind": "out-of-scope",
+      "content": {
+        "excluded": [
+          "탭 이름, 순서와 보이는 문구 변경",
+          "DOM 구조, 이벤트, 키보드 탐색과 상태 보존 변경",
+          "각 탭의 실제 기능 구현",
+          "Webview 메시지 및 보안 경계 변경"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

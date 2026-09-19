@@ -1,0 +1,19 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "PLAN-001",
+      "kind": "plan-step",
+      "content": {
+        "steps": [
+          "Plan: notice, 칼럼 저장과 카드 상호작용 소유권을 재확인한다.",
+          "Work: 회귀 테스트를 먼저 추가하고 notice, storage, 카드 렌더링을 최소 변경한다.",
+          "AI Review: 오류 영역, 유효 ID 복원, 저장 실패 안전성과 완전한 카드 액션 제거를 점검한다.",
+          "Report: 웹 근거, 변경 경로, 테스트와 Human 시각 검토를 기록한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

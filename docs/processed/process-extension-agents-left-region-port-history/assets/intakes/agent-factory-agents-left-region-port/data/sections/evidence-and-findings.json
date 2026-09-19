@@ -1,0 +1,113 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "code",
+        "source": "../web/frontend/index.html, ../web/frontend/src/app/appShellRuntime.js, ../web/frontend/src/features/workspace/explorerSidebar.js, ../web/frontend/src/features/workspace/workspaceResize.js, ../web/frontend/src/features/chat, ../web/backend/application/workspace_tree/service.py",
+        "method": "소스 구조, DOM 소유권, 이벤트, API와 테스트 경계 검사",
+        "findings": [
+          "웹 왼쪽 영역은 48px Activity Bar, 가변 Explorer Sidebar, 가변 Chat Panel의 3중 구조다.",
+          "Explorer는 repository tree와 Git status를 가져와 파일 트리와 Git 장식을 렌더링한다.",
+          "Chat Panel은 세션별 DOM, 메시지, planning, composer와 status surface를 소유한다."
+        ],
+        "interpretations": [
+          "VS Code 포팅에서는 Workbench Activity Bar를 Webview 안에 재현하지 않고 native contribution으로 대체하는 편이 공식 API 구조와 일치한다."
+        ],
+        "limitations": [
+          "Chat 실행을 Extension에서 연결할 전송 계약과 backend 위치는 아직 Human이 결정하지 않았다."
+        ]
+      }
+    },
+    {
+      "id": "INTERNAL-EVIDENCE-002",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "code",
+        "source": "workspace/package.json, workspace/src/extension.js, workspace/src/webviewShell.js, workspace/test",
+        "method": "기존 VS Code Extension manifest, Webview CSP, 상태 보존, 테스트 구조 검사",
+        "findings": [
+          "workspace는 command로 Editor Webview Panel을 여는 독립 Extension이다.",
+          "nonce CSP, 제한된 localResourceRoots, VS Code state API와 키보드 탭 탐색을 사용한다.",
+          "agents 디렉터리는 비어 있다."
+        ],
+        "interpretations": [
+          "agents는 workspace를 수정하지 않고 동일 저장소의 독립 Extension 패키지 패턴을 참고할 수 있다."
+        ],
+        "limitations": [
+          "agents의 package identity와 Chat transport는 기존 코드에 정의되어 있지 않다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-001",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code UX Guidelines: Views",
+        "url": "https://code.visualstudio.com/api/ux-guidelines/views",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "View Container는 Activity Bar 또는 Panel에 배치되고 Views를 소유한다.",
+          "계층 데이터와 목록에는 Tree View 사용이 권장된다.",
+          "Custom Webview View 사용은 필요한 경우로 제한한다."
+        ],
+        "limitations": [
+          "프로젝트의 Chat backend 연결 방식은 이 문서가 정의하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "WEB-EVIDENCE-002",
+      "kind": "web-evidence",
+      "content": {
+        "title": "VS Code Extension API: Contribution Points",
+        "url": "https://code.visualstudio.com/api/references/contribution-points",
+        "authorityTier": "T1 authoritative primary",
+        "freshness": "F5",
+        "retrievedAt": "2026-07-26",
+        "findings": [
+          "viewsContainers.activitybar는 custom Activity Bar View Container를 등록한다.",
+          "contributes.views는 Tree View 또는 Webview View로 채울 수 있다.",
+          "Activity Bar container icon은 24x24 단색 SVG가 권장된다."
+        ],
+        "limitations": [
+          "Extension 고유 ID와 명령 naming은 프로젝트가 결정해야 한다."
+        ]
+      }
+    },
+    {
+      "id": "INTERVIEW-001",
+      "kind": "interview",
+      "content": {
+        "question": "빈 agents를 어떤 VS Code Extension 경계로 만들까요?",
+        "choiceA": "agents를 왼쪽 영역 전용 독립 Extension으로 구성",
+        "choiceB": "agents에 모듈을 두고 기존 workspace Extension이 가져다 사용",
+        "choiceC": "agents를 사용하지 않고 workspace 안에 포팅",
+        "recommendation": "A",
+        "rationale": "사용자가 agents를 정확한 대상으로 지정했고 왼쪽 영역은 기존 5개 Workspace 탭과 책임이 다르므로 독립 패키지가 변경과 검증 경계를 분리한다.",
+        "answer": "A",
+        "decisionState": "accepted"
+      }
+    },
+    {
+      "id": "INTERVIEW-002",
+      "kind": "interview",
+      "content": {
+        "question": "이번 첫 포팅에서 기능 깊이를 어디까지 포함할까요?",
+        "choiceA": "실제 Workspace Explorer와 Chat UI, 세션 탭, Composer 로컬 동작까지 구현하되 메시지 전송은 제외",
+        "choiceB": "웹의 Chat backend 연결과 메시지 실행까지 전부 포팅",
+        "choiceC": "Activity Bar, Explorer, Chat의 시각적 Shell만 포팅",
+        "recommendation": "A",
+        "rationale": "실제 Explorer와 로컬 Chat 상태는 독립 검증할 수 있고 정의되지 않은 backend 전송 계약을 발명하지 않는다.",
+        "answer": "A",
+        "decisionState": "accepted"
+      }
+    }
+  ],
+  "subsections": []
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Platform Information"
+  short_description: "Consult maintained platform facts and guidance"
+  default_prompt: "Use $info-platform to locate and apply the relevant maintained platform information."

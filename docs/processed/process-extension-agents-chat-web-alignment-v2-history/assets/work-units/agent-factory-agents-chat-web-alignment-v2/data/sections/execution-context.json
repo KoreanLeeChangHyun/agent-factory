@@ -1,0 +1,86 @@
+{
+  "id": "execution-context",
+  "title": "Execution Context",
+  "content": [
+    {
+      "id": "EXEC-CONTEXT-001",
+      "kind": "execution-context",
+      "content": {
+        "goalId": "agent-factory-agents-chat-web-alignment-v2",
+        "objective": "기존 agents VS Code 확장을 제공 이미지 수준의 화면과 현재 지원 기능 범위로 구현한다.",
+        "execInvocation": "python3 /home/deus/.codex/plugins/cache/agent-factory/agent-factory/0.1.0+codex.20260728203314/skills/work-unit-execution/scripts/app_server_goal.py --repository /home/deus/workspace/agent-factory/vscode-extension --work-unit-id agent-factory-agents-chat-web-alignment-v2",
+        "executionAgent": "Workflow Agent",
+        "repository": "/home/deus/workspace/agent-factory/vscode-extension",
+        "baseRef": "main",
+        "executionMode": "worktree",
+        "branch": "work-unit/agent-factory-agents-chat-web-alignment-v2",
+        "worktreePath": "/home/deus/workspace/agent-factory/vscode-extension/.agent-factory/worktree/agent-factory-agents-chat-web-alignment-v2"
+      }
+    },
+    {
+      "id": "EXECUTION-STATE-001",
+      "kind": "execution-state",
+      "content": {
+        "contractVersion": "2.0.0",
+        "state": "done",
+        "currentRevision": 1,
+        "currentAttempt": 1,
+        "invocationId": "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67",
+        "invocationChain": [
+          "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67"
+        ],
+        "history": [],
+        "progress": {
+          "completedSteps": [
+            "plan",
+            "work",
+            "verification",
+            "ai-review",
+            "report"
+          ],
+          "pendingStep": null,
+          "records": [
+            {
+              "stepId": "plan",
+              "state": "completed",
+              "idempotencyKey": "v1-a1-plan-evidence-reviewed"
+            },
+            {
+              "stepId": "work",
+              "state": "completed",
+              "idempotencyKey": "v1-a1-work-30fd8d7"
+            },
+            {
+              "stepId": "verification",
+              "state": "completed",
+              "idempotencyKey": "v1-a1-verification-pass"
+            },
+            {
+              "stepId": "ai-review",
+              "state": "completed",
+              "idempotencyKey": "v1-a1-ai-review-pass"
+            },
+            {
+              "stepId": "report",
+              "state": "pending",
+              "idempotencyKey": "v1-a1-report-pending"
+            },
+            {
+              "stepId": "report",
+              "state": "completed",
+              "idempotencyKey": "v1-a1-report-complete"
+            }
+          ],
+          "retry": {}
+        },
+        "recovery": {
+          "status": "running",
+          "ownerInvocationId": "019fc2dc-2786-7f83-8f3a-e2bd27b7bd67",
+          "blockerId": null,
+          "evidence": null
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

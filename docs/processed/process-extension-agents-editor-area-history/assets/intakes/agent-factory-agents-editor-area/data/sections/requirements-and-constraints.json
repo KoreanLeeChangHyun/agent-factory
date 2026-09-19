@@ -1,0 +1,49 @@
+{
+  "id": "requirements-and-constraints",
+  "title": "Requirements and Constraints",
+  "content": [
+    {
+      "id": "REQUIREMENT-001",
+      "kind": "requirement",
+      "content": {
+        "requirements": [
+          "Agent Factory Activity Bar container에는 하나의 native launcher View만 제공해야 한다.",
+          "launcher View는 Agents와 Workspace를 여는 두 command links를 제공해야 한다.",
+          "Agents open command는 editor area에 singleton Agents Webview panel을 열고 재호출 시 reveal해야 한다.",
+          "Workspace command link는 설치된 Workspace 확장의 기존 open command를 실행해야 한다.",
+          "file Explorer Tree View와 sidebar Agents Chat Webview View를 제거해야 한다.",
+          "Agents panel은 기존 Main 및 Workflow, 세션별 DOM, draft, submit, cancel, reconnect와 Codex process ownership을 보존해야 한다."
+        ]
+      }
+    },
+    {
+      "id": "CONSTRAINT-001",
+      "kind": "constraint",
+      "content": {
+        "constraints": [
+          "launcher는 별도 custom Webview를 추가하지 않고 empty native View와 viewsWelcome command links를 사용한다.",
+          "Workspace 소스와 Web 애플리케이션 소스는 변경하지 않는다.",
+          "현재 chat.ready, chat.submit, chat.cancel message allowlist와 Codex adapter 계약을 변경하지 않는다.",
+          "기존 Agent Factory Activity Bar SVG icon은 유지한다.",
+          "agents package 밖의 다른 Work Unit 미커밋 파일을 변경하거나 staging하지 않는다."
+        ]
+      }
+    },
+    {
+      "id": "ACCEPTANCE-CRITERION-001",
+      "kind": "acceptance-criterion",
+      "content": {
+        "criteria": [
+          "manifest에는 하나의 Activity Bar container, 하나의 launcher View, Agents open command와 viewsWelcome command links가 존재한다.",
+          "manifest에는 기존 file Explorer View와 sidebar Agents Chat Webview View가 존재하지 않는다.",
+          "Agents open command는 createWebviewPanel을 editor area에 생성하고 재호출 시 동일 panel을 reveal한다.",
+          "panel dispose 시 Webview binding, controller와 runner가 정리되고 다음 open에서 정상 재생성된다.",
+          "Workspace command link는 agentFactoryWorkspace.open을 실행한다.",
+          "기존 chat render, submit, cancel, reconnect, draft, CSP, session ownership과 Codex adapter 테스트가 통과한다.",
+          "npm run check, npm run test:e2e, package:linux-x64와 verify:vsix가 통과한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

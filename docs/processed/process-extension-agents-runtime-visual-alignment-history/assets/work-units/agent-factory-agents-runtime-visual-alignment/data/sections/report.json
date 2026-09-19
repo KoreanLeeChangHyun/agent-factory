@@ -1,0 +1,16 @@
+{
+  "id": "report",
+  "title": "Report",
+  "content": [
+    {
+      "id": "REPORT-STATUS",
+      "kind": "report-result",
+      "content": "실행 전 보고 대기",
+      "attributes": {
+        "verificationResult": "pending",
+        "evidence": []
+      }
+    }
+  ],
+  "subsections": []
+}

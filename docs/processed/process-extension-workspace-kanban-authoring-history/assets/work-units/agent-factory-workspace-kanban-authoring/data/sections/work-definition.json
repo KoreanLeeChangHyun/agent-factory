@@ -1,0 +1,44 @@
+{
+  "id": "work-definition",
+  "title": "Work Definition",
+  "content": [
+    {
+      "id": "goal-kanban-transitions",
+      "kind": "goal",
+      "content": "Kanban에서 capability 제한 DnD와 동등한 Move Action으로 안전한 lifecycle 상태 전이를 구현한다."
+    },
+    {
+      "id": "scope-kanban-transitions",
+      "kind": "scope",
+      "content": [
+        "설치된 Work Unit manager discovery와 지원 계약 확인",
+        "capability 기반 dragstart, dragover, drop과 click·tap·keyboard Move 메뉴",
+        "backlog, ready, blocked 전이 및 action-specific validation",
+        "authoritative manager 응답 후 refresh와 stale·failure 표시",
+        "경로·symlink·message spoofing·command injection negative test",
+        "단위·manager 통합·VS Code E2E와 Human 검토"
+      ]
+    },
+    {
+      "id": "out-of-scope-kanban-transitions",
+      "kind": "out-of-scope",
+      "content": [
+        "Work Unit 생성·편집 UI",
+        "Codex execution orchestration",
+        "Human review done 승인",
+        "Git integration",
+        "PR 생성",
+        "direct canonical JSON mutation"
+      ]
+    },
+    {
+      "id": "expected-output-kanban-transitions",
+      "kind": "expected-output",
+      "content": [
+        "workspace/src",
+        "workspace/test"
+      ]
+    }
+  ],
+  "subsections": []
+}

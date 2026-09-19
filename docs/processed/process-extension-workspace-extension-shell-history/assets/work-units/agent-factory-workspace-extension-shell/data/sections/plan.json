@@ -1,0 +1,19 @@
+{
+  "id": "plan",
+  "title": "Plan",
+  "content": [
+    {
+      "id": "plan-tdd-shell",
+      "kind": "plan-step",
+      "content": [
+        "1. Specification 프로필과 공식 VS Code 근거로 수용 기준을 테스트로 고정한다.",
+        "2. package manifest 및 확장 활성화 단위 테스트를 먼저 작성한다.",
+        "3. Webview shell DOM·탭 선택·상태 보존 테스트를 먼저 작성한다.",
+        "4. 최소 구현으로 테스트를 통과시킨다.",
+        "5. 단위·통합·E2E·접근성·테마·보안 검증을 실행한다.",
+        "6. AI Review와 Report 및 Human 검토 자료를 작성한다."
+      ]
+    }
+  ],
+  "subsections": []
+}

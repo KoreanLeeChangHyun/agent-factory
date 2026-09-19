@@ -1,0 +1,41 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "source": "agents/src/chatView.js; agents/test/unit/chatView.test.js; web/frontend/index.html; web/frontend/src/shared/styles/chat-composer.css; web/frontend/src/shared/styles/chat-input-box.css",
+        "method": "repository, installed-source and screenshot inspection",
+        "findings": [
+          "현재 큰 초기 높이는 textarea 기본 2행 intrinsic height와 padding-bottom 32px가 결합된 결과다.",
+          "resize: vertical이 스크린샷의 우측 하단 handle을 만든다.",
+          "Web contenteditable은 빈 상태 20px 높이이며 native resize handle이 없다.",
+          "완료 문구는 statusLabel(complete)이 정상 완료 후 계속 반환한다."
+        ],
+        "limitations": [
+          "Human이 Web 동작을 그대로 복원할지 editor용 compact 변형을 원하는지는 아직 결정되지 않았다."
+        ]
+      },
+      "blockRef": "blocks/evidence/composer-rendering-feedback.png"
+    },
+    {
+      "id": "INTERVIEW-COMPOSER-RENDERING-001",
+      "kind": "interview",
+      "content": {
+        "question": "Agents composer rendering을 어떤 기준으로 교정할지 결정",
+        "recommendation": "A",
+        "rationale": "현재 Web의 20px 시작 높이, 144px 자동 확장, native resize 없음, bottom action과 22px status line 계약을 그대로 적용하면 Human이 지적한 시각적 불일치를 직접 해소하면서 기존 session 및 submit 계약을 보존할 수 있다.",
+        "answer": "A",
+        "state": "answered",
+        "choices": [
+          "A: Web 동작 정렬 — 20px 시작, 최대 144px 자동 확장, resize handle 제거, 22px status line 유지 및 완료 후 IDLE.",
+          "B: Editor compact — 동일한 입력 동작에 유휴 및 완료 status line을 숨긴다.",
+          "C: 최소 수정 — 초기 높이와 resize handle만 교정하고 status 표현은 유지한다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

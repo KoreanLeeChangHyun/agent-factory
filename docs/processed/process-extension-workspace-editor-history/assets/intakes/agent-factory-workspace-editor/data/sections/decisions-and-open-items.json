@@ -1,0 +1,50 @@
+{
+  "id": "decisions-and-open-items",
+  "title": "Decisions and Open Items",
+  "content": [
+    {
+      "id": "DECISION-EDITOR-001",
+      "kind": "decision-status",
+      "content": {
+        "decision": "Human은 Design과 View를 manager 기반 읽기·쓰기 Editor 하나로 통합하고 artifact/section 트리, 구조화 편집, 읽기 전용 JSON 미리보기를 사용하도록 선택했다.",
+        "state": "approved",
+        "interviewRefs": [
+          "INTERVIEW-FUNCTION-001",
+          "INTERVIEW-LAYOUT-002"
+        ]
+      }
+    },
+    {
+      "id": "DECISION-TAB-ORDER-002",
+      "kind": "decision-status",
+      "content": {
+        "decision": "Human은 Dashboard, Editor, Kanban, Context 순서를 선택했고 기존 design 또는 view 선택 상태는 editor로 이전한다.",
+        "state": "approved",
+        "interviewRef": "INTERVIEW-TAB-ORDER-003"
+      }
+    },
+    {
+      "id": "OPEN-ITEMS-STATUS-001",
+      "kind": "open-items-status",
+      "content": {
+        "nonBlocking": [
+          "실제 설치본에서 artifact 탐색, 편집, validation 오류와 상태 이전을 Human이 검토해야 한다.",
+          "integration, cleanup, 배포, push와 PR promotion은 별도 Human 결정이다."
+        ],
+        "blocking": []
+      }
+    },
+    {
+      "id": "RISK-001",
+      "kind": "risk",
+      "content": {
+        "risks": [
+          "범용 편집 요청이 raw JSON 또는 임의 manager invocation으로 확장되면 canonical validation 경계를 우회할 수 있다.",
+          "다른 프로세스가 artifact를 갱신하면 stale edit가 최신 내용을 덮을 수 있으므로 저장 직전 identity 및 documentVersion 재검증이 필요하다.",
+          "기존 design 또는 view 상태를 editor로 이전하지 않으면 첫 로드가 Dashboard로 되돌아갈 수 있다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

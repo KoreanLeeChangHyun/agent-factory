@@ -1,0 +1,40 @@
+{
+  "id": "stakeholders-and-approval",
+  "title": "Stakeholders and Approval",
+  "content": [
+    {
+      "id": "STAKEHOLDER-001",
+      "kind": "stakeholder",
+      "content": {
+        "affected": [
+          "내부 배포된 Linux x64 VS Code Agent Factory 확장을 사용하는 Human",
+          "Agents와 Workspace 확장 유지보수 및 검증 담당자"
+        ]
+      }
+    },
+    {
+      "id": "DECISION-OWNER-001",
+      "kind": "decision-owner",
+      "content": {
+        "owner": "Human",
+        "decisions": [
+          "launcher surface와 editor area ownership",
+          "Human review 승인",
+          "integration, cleanup, 내부 재배포, push와 PR promotion"
+        ]
+      }
+    },
+    {
+      "id": "APPROVAL-BOUNDARY-001",
+      "kind": "approval-boundary",
+      "content": {
+        "boundaries": [
+          "Human은 최종 선택 B로 하나의 Agent Factory launcher View에서 Agents와 Workspace editor panel을 열도록 결정했다.",
+          "앞선 Activity Bar 및 Explorer 전체 제거 선택 C는 후속 선택 B에 의해 대체됐다.",
+          "Intake checkpoint, Work Unit checkpoint, integration, cleanup, 재배포, push와 PR promotion은 각각 별도 승인이다."
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}

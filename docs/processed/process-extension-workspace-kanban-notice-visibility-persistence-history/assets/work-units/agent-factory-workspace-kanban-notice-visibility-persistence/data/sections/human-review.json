@@ -1,0 +1,38 @@
+{
+  "id": "human-review",
+  "title": "Human Review",
+  "content": [
+    {
+      "id": "HUMAN-CHECKLIST-001",
+      "kind": "human-checklist",
+      "content": [
+        "Kanban 본문에 상태 전이가 적용되지 않았습니다. 라인과 빈 영역이 없는지 확인한다.",
+        "칸반 표시에서 칼럼을 숨기고 Webview를 다시 열어 선택이 유지되는지 확인한다.",
+        "각 카드에는 타이틀만 보이고 ID, 상태와 Move UI가 없는지 확인한다.",
+        "카드를 drag, click, tap 또는 keyboard로 조작할 수 없는지 확인한다.",
+        "오류 표시와 다른 Workspace 탭이 유지되는지 확인한다."
+      ]
+    },
+    {
+      "id": "HUMAN-REVIEW-METHOD-001",
+      "kind": "human-review-method",
+      "content": "Extension Development Host에서 Workspace Kanban을 열어 notice 부재, 칼럼 표시 재개방 복원, 카드 title-only 정적 상태와 오류 표시를 순서대로 확인한다."
+    },
+    {
+      "id": "HUMAN-REVIEW-STATUS",
+      "kind": "human-review-result",
+      "content": "Human 검토 대기",
+      "attributes": {
+        "status": "complete",
+        "decidedAt": "2026-08-02T11:20:05+00:00",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "revision": 1,
+          "attempt": 1,
+          "invocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8"
+        }
+      }
+    }
+  ],
+  "subsections": []
+}

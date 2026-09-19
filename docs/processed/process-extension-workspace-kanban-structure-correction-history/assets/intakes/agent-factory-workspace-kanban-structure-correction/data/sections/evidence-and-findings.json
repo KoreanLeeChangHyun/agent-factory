@@ -1,0 +1,27 @@
+{
+  "id": "evidence-and-findings",
+  "title": "Evidence and Findings",
+  "content": [
+    {
+      "id": "INTERNAL-EVIDENCE-001",
+      "kind": "internal-evidence",
+      "content": {
+        "kind": "runtime",
+        "source": "uploads/image copy 7.png; workspace/src/webviewShell.js; commit 629443c",
+        "method": "배포 화면과 현재 source 및 변경 이력 대조",
+        "findings": [
+          "배포 화면은 상태를 tablist와 tab으로 표시하고 선택 상태 하나만 본문에 표시한다.",
+          "workspace-body overflow와 고정 viewport 높이 계산이 Webview 바깥 스크롤을 만든다.",
+          "수동 새로 고침 버튼은 Human 요청 없이 구현되었다.",
+          "selected header가 활성 탭 이름 Kanban을 중복 표시한다.",
+          "단일 보드 변경 전 구현은 여러 칼럼을 표시했지만 1430px 최소 폭으로 좁은 화면에서 잘렸다."
+        ],
+        "interpretations": [
+          "이전 구현을 그대로 복원하지 않고 다중 칼럼 구조와 실제 viewport 경계를 함께 수정해야 한다."
+        ],
+        "limitations": []
+      }
+    }
+  ],
+  "subsections": []
+}

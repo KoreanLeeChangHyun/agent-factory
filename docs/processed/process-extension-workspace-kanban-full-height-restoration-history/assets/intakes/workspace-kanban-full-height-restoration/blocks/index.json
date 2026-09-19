@@ -1,0 +1,11 @@
+{
+  "blocks": [
+    {
+      "path": "blocks/evidence/kanban-height-regression.png",
+      "mediaType": "image/png",
+      "description": "Human screenshot showing the Kanban board collapsed to content height",
+      "sha256": "bfb8184b8dc8049354334a00960d1b88c84a0cfbd02805822a55efc496bb1fd9",
+      "sizeBytes": 16481
+    }
+  ]
+}

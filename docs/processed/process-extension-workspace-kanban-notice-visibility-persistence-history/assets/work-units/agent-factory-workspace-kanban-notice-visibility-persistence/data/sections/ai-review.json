@@ -1,0 +1,38 @@
+{
+  "id": "ai-review",
+  "title": "AI Review",
+  "content": [
+    {
+      "id": "AI-CHECKLIST-001",
+      "kind": "ai-checklist",
+      "content": [
+        "notice 전용 DOM과 모든 notice 쓰기가 제거됐는가",
+        "기존 오류 영역이 유지되는가",
+        "localStorage 값은 유효 칼럼 ID로 제한되고 실패가 안전한가",
+        "카드에는 title 외 content와 interaction이 전혀 없는가",
+        "DnD 관련 hidden event와 focusability가 남지 않았는가",
+        "테스트와 보고가 실제 변경과 일치하는가"
+      ]
+    },
+    {
+      "id": "AI-REVIEW-STATUS",
+      "kind": "ai-review-result",
+      "content": "통과: notice 제거, 오류 보존, localStorage 유효값 복원과 실패 안전성, title-only 정적 카드, 상호작용 부재, 테스트 및 Specification 정렬이 현재 구현과 일치한다.",
+      "attributes": {
+        "result": "pass",
+        "checklistResult": "pass",
+        "implementationCommit": "69a0c245b42f7075d4496b3264848594a714d57e",
+        "executionTarget": {
+          "contractVersion": "2.0.0",
+          "invocationId": "019fc206-7fe0-72c1-be10-f0cbc59a4da8",
+          "revision": 1,
+          "attempt": 1
+        },
+        "evidence": [
+          "blocks/evidence/kanban-notice-visibility-persistence-verification.txt"
+        ]
+      }
+    }
+  ],
+  "subsections": []
+}
