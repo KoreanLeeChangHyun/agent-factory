@@ -1,4 +1,0 @@
-interface:
-  display_name: "UI Rules"
-  short_description: "Keep this MCP cloud SaaS interface consistent"
-  default_prompt: "Use $rule-ui to design or audit this MCP cloud SaaS interface consistently."

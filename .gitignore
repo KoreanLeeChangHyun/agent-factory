@@ -2,3 +2,6 @@
 /.agent-factory/agent/
 feedback/
 artifact/
+/.vscode/
+/.codex/
+/docs/

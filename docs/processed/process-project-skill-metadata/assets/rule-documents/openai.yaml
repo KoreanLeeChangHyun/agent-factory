@@ -1,4 +1,0 @@
-interface:
-  display_name: "Document Lifecycle"
-  short_description: "Apply the Original, Processed, Specification structure"
-  default_prompt: "Use $rule-documents to organize repository knowledge into Original, Processed, and Specification documents."

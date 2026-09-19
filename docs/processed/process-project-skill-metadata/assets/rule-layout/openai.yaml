@@ -1,4 +1,0 @@
-interface:
-  display_name: "Agent Factory 레이아웃 명칭"
-  short_description: "SaaS의 세 기본 화면 영역 명칭을 일관되게 적용"
-  default_prompt: "Use $rule-layout to apply the canonical Agent Factory SaaS layout terminology."

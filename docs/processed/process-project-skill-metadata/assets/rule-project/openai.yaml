@@ -1,4 +1,0 @@
-interface:
-  display_name: "Project Rules"
-  short_description: "Apply this repository’s structure and engineering rules"
-  default_prompt: "Use $rule-project to make this change according to the repository rules."

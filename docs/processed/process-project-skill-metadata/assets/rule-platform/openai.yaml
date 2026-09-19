@@ -1,4 +1,0 @@
-interface:
-  display_name: "Platform Rules"
-  short_description: "Apply mandatory platform behavior and policy"
-  default_prompt: "Use $rule-platform to implement this request against the mandatory platform rules."
