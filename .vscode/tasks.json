@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build: extension",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "build"],
+            "options": {
+                "cwd": "${workspaceFolder}/extension"
+            },
+            "problemMatcher": "$tsc",
+            "group": "build"
+        }
+    ]
+}

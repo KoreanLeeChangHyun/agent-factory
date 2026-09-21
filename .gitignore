@@ -2,6 +2,8 @@
 /.agent-factory/agent/
 feedback/
 artifact/
-/.vscode/
+/.vscode/*
+!/.vscode/launch.json
+!/.vscode/tasks.json
 /.codex/
 /docs/
