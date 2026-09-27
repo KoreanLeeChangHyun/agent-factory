@@ -3,13 +3,28 @@
 This parent repository brings Agent Factory projects together in a single workspace.
 Each project is an independent Git repository linked as a submodule.
 
+## Core features
+
+- **Document system:** Organize sources, working knowledge, accepted specifications,
+  progress, and lessons with clear ownership and one editable source per document.
+- **Contracts → Work–Verification loop:** Define scope and completion criteria,
+  execute the contracted tasks, and return verification findings for correction.
+- **Interviews:** Resolve material requirements and decisions through guided
+  questions, options, and a summary of your choices.
+- **Lessons learned:** Record errors and judgment differences, retrieve relevant
+  experience before work, and consolidate supported lessons into rules when requested.
+
+See the [extension guide](extension/README.md#2-core-features) and
+[plugin guide](plugin/README.md#core-features) for the detailed local workflow.
+The MCP service is independently operated and is not required by the plugin or extension.
+
 ## Project Structure
 
 | Path | Project | Branch |
 | --- | --- | --- |
-| `plugin/` | Codex plugin | `main` |
-| `extension/` | VS Code extension | `main` |
-| `mcp/` | Cloud workspace and MCP server | `main` |
+| [plugin/](plugin/README.md) | Agent execution, conventions, and document Skills | `main` |
+| [extension/](extension/README.md) | VS Code chat interface | `main` |
+| [mcp/](mcp/README.md) | Independent cloud Workspace and MCP server | `main` |
 
 ## Clone
 
@@ -28,12 +43,15 @@ git submodule update --init --recursive
 
 ## Update
 
-Update the parent repository and the configured branch of each submodule:
+Use the component revisions recorded by the parent repository:
 
 ```bash
 git pull
-git submodule update --init --remote --recursive
+git submodule update --init --recursive
 ```
+
+To advance submodules to their configured remote branches, run
+`git submodule update --init --remote --recursive` and review the changed revisions.
 
 To work directly on a project, switch to its directory:
 
@@ -47,20 +65,32 @@ To record new submodule commits in the parent repository, commit the updated poi
 ```bash
 cd ..
 git add plugin extension mcp
-git commit -m "Update component revisions"
+git commit -m "chore: update component revisions / 구성 요소 참조 갱신"
 git push
 ```
 
 ## Project Documentation
 
-The editable source documents are maintained in the parent repository's `docs/` directory.
+- The parent checkout's `docs/` directory owns project documentation.
+- Component README and AGENTS.md files are entry points. User-distributed Skills
+  in `plugin/skills/` remain separate from developer documentation.
 
-- [Original](docs/original/): Metadata and links identifying external sources.
-- [Processed](docs/processed/): Research, interviews, analysis, past decisions, and execution records.
-- [Project Specifications](docs/skills/): The single source of truth for current information, rules, and designs.
+| Location | Purpose |
+| --- | --- |
+| `docs/original/` | Metadata and links identifying external sources |
+| `docs/refined/` | Research, interviews, analysis, and historical records |
+| `docs/skills/` | Accepted project information, rules, and designs |
+| `docs/progress/` | Versioned contracts, task progress, and execution evidence |
+| `docs/lessons-learned/` | Error and judgment records with causes, outcomes, and applications |
 
-Each Processed or Specification document consists of one topic-specific `SKILL.md` and any required `assets/`. HTML documents, English documents, and scattered references covering the same topic are consolidated into the document that owns it, preserving existing source text, sources, code, and identifiers. Follow the [project documentation rules](docs/skills/rule-documents/SKILL.md) for the current requirements.
+- Refined documents retain the `processed` metadata type for compatibility.
+- Follow the [project documentation rules](docs/skills/rule-documents/SKILL.md)
+  for package structure, source preservation, and ownership.
+- After changing `docs/skills/`, run the Document Skill's
+  `sync_documents.py --project-root <agent-factory-root>` and check the result.
+  `.codex/skills/` is derived and must not be edited directly.
 
-Component README and AGENTS.md files remain entry points. `plugin/skills/` contains execution skills distributed to users and is separate from project documentation.
+## Runtime installation links
 
-After modifying `docs/skills/`, run the Document skill's `sync_documents.py --project-root <agent-factory-root>`. `.codex/skills/` is a derived copy and must not be edited directly. Links in both the source and derived copies must point to the same canonical documents.
+- [Codex CLI](https://developers.openai.com/codex/cli/)
+- [Claude Code](https://code.claude.com/docs/en/setup)
