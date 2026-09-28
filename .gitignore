@@ -6,4 +6,5 @@ artifact/
 !/.vscode/launch.json
 !/.vscode/tasks.json
 /.codex/
+/.claude/
 /docs/

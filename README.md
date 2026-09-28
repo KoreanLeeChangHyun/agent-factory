@@ -13,16 +13,18 @@ Each project is an independent Git repository linked as a submodule.
   questions, options, and a summary of your choices.
 - **Lessons learned:** Record errors and judgment differences, retrieve relevant
   experience before work, and consolidate supported lessons into rules when requested.
+- **Agent settings:** Choose Main, Work, and Verification models and reasoning levels
+  per chat, project, or globally, with Codex and Claude Code runtimes.
 
-See the [extension guide](extension/README.md#2-core-features) and
-[plugin guide](plugin/README.md#core-features) for the detailed local workflow.
+See the [extension guide](extension/README.md#2-core-features) for the detailed local
+workflow and the [plugin source guide](plugin/README.md) for host distributions and tests.
 The MCP service is independently operated and is not required by the plugin or extension.
 
 ## Project Structure
 
 | Path | Project | Branch |
 | --- | --- | --- |
-| [plugin/](plugin/README.md) | Agent execution, conventions, and document Skills | `main` |
+| [plugin/](plugin/README.md) | Single source for Skills, runtime, and Codex/Claude Code distributions | `main` |
 | [extension/](extension/README.md) | VS Code chat interface | `main` |
 | [mcp/](mcp/README.md) | Independent cloud Workspace and MCP server | `main` |
 
@@ -71,7 +73,8 @@ git push
 
 ## Project Documentation
 
-- The parent checkout's `docs/` directory owns project documentation.
+- The parent checkout's `docs/` directory owns project documentation. It is
+  excluded from the parent repository's Git history and is maintained locally.
 - Component README and AGENTS.md files are entry points. User-distributed Skills
   in `plugin/skills/` remain separate from developer documentation.
 
@@ -82,13 +85,14 @@ git push
 | `docs/skills/` | Accepted project information, rules, and designs |
 | `docs/progress/` | Versioned contracts, task progress, and execution evidence |
 | `docs/lessons-learned/` | Error and judgment records with causes, outcomes, and applications |
+| `docs/artifact/` | AI-generated outputs outside Document packages, such as mockups and release files |
 
 - Refined documents retain the `processed` metadata type for compatibility.
 - Follow the [project documentation rules](docs/skills/rule-documents/SKILL.md)
   for package structure, source preservation, and ownership.
 - After changing `docs/skills/`, run the Document Skill's
   `sync_documents.py --project-root <agent-factory-root>` and check the result.
-  `.codex/skills/` is derived and must not be edited directly.
+  `.codex/skills/` and `.claude/skills/` are derived and must not be edited directly.
 
 ## Runtime installation links
 
