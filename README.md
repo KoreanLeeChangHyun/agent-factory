@@ -84,6 +84,27 @@ git commit -m "chore: update component revisions"
 git push
 ```
 
+## Release
+
+The extension and every plugin repository (source plus the Codex, Claude Code and
+Antigravity hosts) always release together at one identical version. MCP is
+released independently. Use `joint_release.py` instead of running the steps by hand:
+
+```bash
+python3 joint_release.py doctor --fix     # tools, repositories, remotes, hooks, versions
+python3 joint_release.py release X.Y.Z --summary-en '...' --summary-ko '...'         # plan
+python3 joint_release.py release X.Y.Z --summary-en '...' --summary-ko '...' --yes   # run
+```
+
+`release --yes` runs the tests, commits and pushes the plugin source and hosts,
+verifies the versions, builds the extension VSIX, creates the GitHub releases,
+updates the submodule pointers and verifies the result. Rerunning it resumes
+after a failure. Marketplace publication stays a separate step.
+
+Commits must not carry AI co-author trailers. `python3 joint_release.py hooks`
+installs a `commit-msg` hook that strips them and a `pre-push` hook that rejects
+them; `scan` reports any that remain.
+
 ## Project Documentation
 
 - The parent checkout's `docs/` directory owns project documentation. It is
