@@ -7,4 +7,5 @@ artifact/
 !/.vscode/tasks.json
 /.codex/
 /.claude/
+/.agents/
 /docs/
