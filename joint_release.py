@@ -473,6 +473,7 @@ def run_tests():
     summary = (result.stdout.strip().splitlines() or [""])[-1]
     print(summary)
     if result.returncode != 0:
+        print("\n".join(line for line in result.stdout.splitlines() if line.startswith(("FAILED", "ERROR", "E  "))))
         raise Failure(f"plugin tests failed: {summary}")
     plugin_passed = int(re.search(r"(\d+) passed", summary).group(1))
     step("Extension tests")
