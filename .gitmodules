@@ -10,3 +10,7 @@
 	path = mcp
 	url = git@github.com:KoreanLeeChangHyun/agent-factory-mcp.git
 	branch = main
+[submodule "docs"]
+	path = docs
+	url = git@github.com:KoreanLeeChangHyun/agent-factory-docs.git
+	branch = main
