@@ -21,19 +21,19 @@ Each project is an independent Git repository linked as a submodule.
 - **Work Units:** Isolate a task in its own Git worktree and branch, carry the
   conversation's decisions into a new chat, and merge the result back.
 
-See the [extension guide](extension/README.md#2-core-features) for the detailed local
-workflow, including the [chat workspace](extension/README.md#3-chat-workspace) and
-[agent settings](extension/README.md#4-agent-settings), and the
-[plugin source guide](plugin/README.md) for host distributions and tests.
+See the [extension guide](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/blob/main/README.md#2-core-features) for the detailed local
+workflow, including the [chat workspace](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/blob/main/README.md#3-chat-workspace) and
+[agent settings](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/blob/main/README.md#4-agent-settings), and the
+[plugin source guide](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/blob/main/README.md) for host distributions and tests.
 The MCP service is independently operated and is not required by the plugin or extension.
 
 ## Project Structure
 
 | Path | Project | Branch |
 | --- | --- | --- |
-| [plugin/](plugin/README.md) | Single source for Skills, runtime, and Codex/Claude Code distributions | `main` |
-| [extension/](extension/README.md) | VS Code chat interface | `main` |
-| [mcp/](mcp/README.md) | Independent cloud Workspace and MCP server | `main` |
+| [plugin/](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/tree/main) | Single source for Skills, runtime, and Codex/Claude Code distributions | `main` |
+| [extension/](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/tree/main) | VS Code chat interface | `main` |
+| [mcp/](https://github.com/KoreanLeeChangHyun/agent-factory-mcp/tree/main) | Independent cloud Workspace and MCP server | `main` |
 
 - The Branch column is the remote branch configured in `.gitmodules`. A local
   checkout may use another branch for ongoing work.
