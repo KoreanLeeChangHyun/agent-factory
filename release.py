@@ -71,7 +71,7 @@ while read -r lref lsha rref rsha; do
     set -- "$rsha..$lsha"
   fi
   if git log --format=%B "$@" | grep -Eiq '^co-authored-by:.*(claude|anthropic\\.com)|generated with \\[claude code\\]'; then
-    echo "pre-push: $lref contains AI co-author trailers; run joint_release.py strip-trailers" >&2
+    echo "pre-push: $lref contains AI co-author trailers; run release.py strip-trailers" >&2
     exit 1
   fi
 done

@@ -88,11 +88,11 @@ git push
 
 The extension and every plugin repository (source plus the Codex, Claude Code and
 Antigravity hosts) always release together at one identical version. MCP is
-released independently. Use `joint_release.py` instead of running the steps by hand:
+released independently. Use `release.py` instead of running the steps by hand:
 
 ```bash
-python3 joint_release.py setup-token   # once: store the signed-in gh token as RELEASE_TOKEN
-python3 joint_release.py release       # confirm, then release the next patch version
+python3 release.py setup-token   # once: store the signed-in gh token as RELEASE_TOKEN
+python3 release.py release       # confirm, then release the next patch version
 ```
 
 `release` runs the tests, commits and pushes the plugin source and hosts, verifies
@@ -109,7 +109,7 @@ stores the signed-in gh token and opens a browser sign-in when gh is not signed 
 Use **Create deployment pipeline** in the message action menu to add a similar
 workflow to other projects.
 
-Commits must not carry AI co-author trailers. `python3 joint_release.py hooks`
+Commits must not carry AI co-author trailers. `python3 release.py hooks`
 installs a `commit-msg` hook that strips them and a `pre-push` hook that rejects
 them; `scan` reports any that remain.
 
@@ -143,4 +143,4 @@ them; `scan` reports any that remain.
   automatically, and their models become available together:
   - [Codex CLI](https://developers.openai.com/codex/cli/)
   - [Claude Code](https://code.claude.com/docs/en/setup)
-  - Antigravity CLI (`agy`), signed in to a Google AI subscription
+  - [Antigravity CLI](https://antigravity.google/docs/getting-started?tab=cli)

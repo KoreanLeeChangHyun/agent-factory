@@ -1,11 +1,11 @@
 name: Joint release
 
 # Releases the extension, plugin source and every plugin host at one version by
-# running joint_release.py. Start it from the Actions tab or the Agent Factory
+# running release.py. Start it from the Actions tab or the Agent Factory
 # chat's Git menu ("Deploy"). Leave the version empty for the next patch; release
 # notes are summarized from commit subjects since the last tag.
 #
-# Requires the RELEASE_TOKEN secret (`python3 joint_release.py setup-token` stores the
+# Requires the RELEASE_TOKEN secret (`python3 release.py setup-token` stores the
 # signed-in gh token), or a fine-grained PAT with Contents read/write on
 # agent-factory, agent-factory-plugin-source, agent-factory-vscode-extension,
 # agent-factory-codex-plugin, agent-factory-claude-plugin and
@@ -37,7 +37,7 @@ jobs:
       - name: Require release token
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Add the RELEASE_TOKEN secret (python3 joint_release.py setup-token)."
+            echo "::error::Add the RELEASE_TOKEN secret (python3 release.py setup-token)."
             exit 1
           fi
 
@@ -85,13 +85,13 @@ jobs:
 
       - name: Doctor
         run: |
-          python3 joint_release.py hooks
-          python3 joint_release.py doctor || true
+          python3 release.py hooks
+          python3 release.py doctor || true
 
       - name: Release
         env:
           VERSION: ${{ inputs.version }}
-        run: python3 joint_release.py release ${VERSION:+"$VERSION"} --yes
+        run: python3 release.py release ${VERSION:+"$VERSION"} --yes
 
       - name: Upload VSIX
         if: ${{ always() }}
