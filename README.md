@@ -110,6 +110,8 @@ git push
 ## Requirements
 
 - Python 3.10+.
-- At least one agent runtime: [Codex CLI](https://developers.openai.com/codex/cli/) or
-  [Claude Code](https://code.claude.com/docs/en/setup).
-- Optional: the Antigravity CLI (`agy`), signed in to a Google AI subscription.
+- At least one of the following agent runtimes. Installed runtimes are detected
+  automatically, and their models become available together:
+  - [Codex CLI](https://developers.openai.com/codex/cli/)
+  - [Claude Code](https://code.claude.com/docs/en/setup)
+  - Antigravity CLI (`agy`), signed in to a Google AI subscription
