@@ -101,6 +101,14 @@ verifies the versions, builds the extension VSIX, creates the GitHub releases,
 updates the submodule pointers and verifies the result. Rerunning it resumes
 after a failure. Marketplace publication stays a separate step.
 
+The same release runs on GitHub Actions through `.github/workflows/release.yml`
+(**Joint release**). Start it from the Actions tab or from the Main chat's Git menu
+(**Deploy: Joint release**), which detects manually dispatchable workflows, collects
+their inputs and shows a review step before dispatching. Leave `execute` unchecked to
+print the plan only. The workflow needs a `RELEASE_TOKEN` secret: a fine-grained PAT
+with Contents read/write on this repository, the plugin source, the extension and the
+three plugin host repositories.
+
 Commits must not carry AI co-author trailers. `python3 joint_release.py hooks`
 installs a `commit-msg` hook that strips them and a `pre-push` hook that rejects
 them; `scan` reports any that remain.
