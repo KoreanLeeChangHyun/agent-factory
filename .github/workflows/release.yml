@@ -2,9 +2,11 @@ name: Joint release
 
 # Releases the extension, plugin source and every plugin host at one version by
 # running joint_release.py. Start it from the Actions tab or the Agent Factory
-# chat's Git menu ("Deploy to GitHub"). Without `execute` it only prints the plan.
+# chat's Git menu ("Deploy"). Leave the version empty for the next patch; release
+# notes are summarized from commit subjects since the last tag.
 #
-# Requires the RELEASE_TOKEN secret: a fine-grained PAT with Contents read/write on
+# Requires the RELEASE_TOKEN secret (`python3 joint_release.py setup-token` stores the
+# signed-in gh token), or a fine-grained PAT with Contents read/write on
 # agent-factory, agent-factory-plugin-source, agent-factory-vscode-extension,
 # agent-factory-codex-plugin, agent-factory-claude-plugin and
 # agent-factory-antigravity-plugin.
@@ -13,22 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (X.Y.Z)"
-        required: true
-        type: string
-      summary_en:
-        description: "One English sentence describing the release"
-        required: true
-        type: string
-      summary_ko:
-        description: "The same sentence in Korean"
-        required: true
-        type: string
-      execute:
-        description: "Commit, push and publish (unchecked prints the plan only)"
+        description: "Release version (X.Y.Z); empty releases the next patch"
         required: false
-        default: false
-        type: boolean
+        type: string
 
 concurrency:
   group: joint-release
@@ -46,10 +35,9 @@ jobs:
       OWNER: ${{ github.repository_owner }}
     steps:
       - name: Require release token
-        if: ${{ inputs.execute }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Add the RELEASE_TOKEN secret before running with execute."
+            echo "::error::Add the RELEASE_TOKEN secret (python3 joint_release.py setup-token)."
             exit 1
           fi
 
@@ -57,7 +45,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
@@ -74,7 +62,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
-          if [ -n "$GH_TOKEN" ]; then gh auth setup-git; fi
+          gh auth setup-git
 
       - name: Clone release repositories
         run: |
@@ -103,18 +91,12 @@ jobs:
       - name: Release
         env:
           VERSION: ${{ inputs.version }}
-          SUMMARY_EN: ${{ inputs.summary_en }}
-          SUMMARY_KO: ${{ inputs.summary_ko }}
-          EXECUTE: ${{ inputs.execute }}
-        run: |
-          args=(release "$VERSION" --summary-en "$SUMMARY_EN" --summary-ko "$SUMMARY_KO")
-          if [ "$EXECUTE" = "true" ]; then args+=(--yes); fi
-          python3 joint_release.py "${args[@]}"
+        run: python3 joint_release.py release ${VERSION:+"$VERSION"} --yes
 
       - name: Upload VSIX
-        if: ${{ inputs.execute }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: vsix-${{ inputs.version }}
+          name: vsix
           path: extension/releases/*.vsix
           if-no-files-found: ignore

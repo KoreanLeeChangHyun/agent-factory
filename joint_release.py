@@ -14,12 +14,16 @@ Commands (all default to read-only; nothing is pushed or published without --yes
   hooks                 Install commit-msg (strip AI trailers) and pre-push
                         (reject AI trailers) hooks in every repository.
   scan                  Report AI co-author trailers in local and remote history.
-  release VERSION       Plan the joint release; with --yes run it:
+  release [VERSION]     Confirm and run the joint release (VERSION defaults to
+                        the next patch; summaries come from commit subjects;
+                        --plan prints the plan, --yes skips the prompt):
                         tests -> plugin source + hosts commit/push -> version
                         preflight -> extension release (VSIX, stops before
                         Marketplace) -> GitHub releases for source, hosts and
                         extension -> parent submodule pointers -> final verify.
                         Every step detects completed work, so rerunning resumes.
+  setup-token           Store the signed-in gh token as the RELEASE_TOKEN
+                        secret; signs in through the browser when needed.
   strip-trailers        Plan removing AI co-author trailers from history; --yes
                         rewrites only affected commits, remaps parent gitlinks,
                         force-pushes with lease and fixes release-note hashes.
@@ -614,10 +618,47 @@ def final_verify(version, hosts):
     print(f"All components released at {version}. Marketplace publication is a separate step (npm run release -- --resume).")
 
 
+def next_version():
+    major, minor, patch = map(int, read_json(EXTENSION / "package.json")["version"].split("+")[0].split("."))
+    return f"{major}.{minor}.{patch + 1}"
+
+
+NOISE = re.compile(r"^(chore|release|merge|test|ci|style|build)(\(.+\))?:|^Merge ", re.I)
+
+
+def auto_summary():
+    """Summarize feature/fix commits since the last release tag from their bilingual `en / ko` subjects."""
+    english, korean = [], []
+    for path in (EXTENSION, SOURCE):
+        last = git(path, "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "origin/main", check=False)
+        span = f"{last}..origin/main" if last else "origin/main"
+        for subject in git(path, "log", span, "--no-merges", "--format=%s", check=False).splitlines():
+            if NOISE.search(subject):
+                continue
+            text = re.sub(r"^\w+(\(.+\))?!?:\s*", "", subject)
+            en, _, ko = text.partition(" / ")
+            if en and en not in english:
+                english.append(en.strip())
+                korean.append((ko or en).strip())
+    if not english:
+        return "Maintenance release with internal updates.", "내부 개선을 포함한 유지보수 릴리스입니다."
+    shown = 6
+    more_en = f" and {len(english) - shown} more" if len(english) > shown else ""
+    more_ko = f" 외 {len(english) - shown}건" if len(english) > shown else ""
+    return ("Changes: " + "; ".join(english[:shown]) + more_en + ".",
+            "변경 사항: " + "; ".join(korean[:shown]) + more_ko + ".")
+
+
 def cmd_release(args):
-    version = args.version.removeprefix("v")
+    version = (args.version or next_version()).removeprefix("v")
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise Failure(f"invalid version {args.version}")
+    for path in (EXTENSION, SOURCE):
+        git(path, "fetch", "-q", "origin", "--tags", "--force", check=False)
+    if not (args.summary_en and args.summary_ko):
+        summary_en, summary_ko = auto_summary()
+        args.summary_en = args.summary_en or summary_en
+        args.summary_ko = args.summary_ko or summary_ko
     hosts = discover_hosts(args.checkout)
     step("Plan")
     plan = {
@@ -628,12 +669,17 @@ def cmd_release(args):
                   f"GitHub releases v{version} for source, {', '.join(hosts)}, extension",
                   "parent submodule pointers commit and push", "final verification"],
     }
+    plan["summary"] = {"en": args.summary_en, "ko": args.summary_ko}
     print(json.dumps(plan, indent=2, ensure_ascii=False))
-    if not (args.summary_en and args.summary_ko):
-        raise Failure("--summary-en and --summary-ko are required: one sentence each describing what the release changes")
-    if not args.yes:
-        print("\nPlan only. Rerun with --yes to commit, push and publish.")
+    if args.plan:
+        print("\nPlan only.")
         return 0
+    if not args.yes:
+        if not sys.stdin.isatty():
+            raise Failure("pass --yes to release non-interactively")
+        if input(f"\nRelease {version} to GitHub? [y/N] ").strip().lower() not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
     doctor = argparse.Namespace(checkout=args.checkout, fix=False)
     if cmd_doctor(doctor) != 0:
         # Version mismatches are expected before the release; everything else must be fixed first.
@@ -667,25 +713,41 @@ def collect_blocking(hosts):
     return blocking
 
 
+# ----------------------------------------------------------------- setup-token
+
+def cmd_setup_token(args):
+    """Store the signed-in gh token as RELEASE_TOKEN; sign in through the browser first when needed."""
+    repo = slug(ROOT)
+    token = run(["gh", "auth", "token"], check=False).stdout.strip()
+    if not token:
+        print("No gh token found; opening the browser to sign in to GitHub.")
+        run(["gh", "auth", "login", "--hostname", "github.com", "--web", "--git-protocol", "https", "--scopes", "repo,workflow"], capture=False)
+        token = run(["gh", "auth", "token"]).stdout.strip()
+    run(["gh", "secret", "set", "RELEASE_TOKEN", "-R", repo], data=token)
+    print(f"RELEASE_TOKEN set on {repo} from the signed-in gh account.")
+    return 0
+
+
 # ------------------------------------------------------------------------ main
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("doctor", "hooks", "scan", "release", "strip-trailers"):
+    for name in ("doctor", "hooks", "scan", "release", "strip-trailers", "setup-token"):
         command = sub.add_parser(name)
         command.add_argument("--checkout", action="append", metavar="HOST=PATH", help="Override a host clone path.")
         if name == "doctor":
             command.add_argument("--fix", action="store_true", help="Fix host fetch URLs, parent upstream and hooks.")
         if name == "release":
-            command.add_argument("version")
-            command.add_argument("--summary-en", help="One English sentence describing the release.")
-            command.add_argument("--summary-ko", help="The same sentence in Korean.")
-            command.add_argument("--yes", action="store_true", help="Commit, push and publish.")
+            command.add_argument("version", nargs="?", help="Defaults to the next patch of the extension version.")
+            command.add_argument("--summary-en", help="Defaults to a summary of feature/fix commits since the last tag.")
+            command.add_argument("--summary-ko", help="Korean counterpart; defaults like --summary-en.")
+            command.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
+            command.add_argument("--plan", action="store_true", help="Print the plan only.")
         if name == "strip-trailers":
             command.add_argument("--yes", action="store_true", help="Rewrite, force-push with lease and fix release notes.")
     args = parser.parse_args()
-    handler = {"doctor": cmd_doctor, "hooks": cmd_hooks, "scan": cmd_scan,
+    handler = {"doctor": cmd_doctor, "hooks": cmd_hooks, "scan": cmd_scan, "setup-token": cmd_setup_token,
                "release": cmd_release, "strip-trailers": cmd_strip}[args.command]
     return handler(args)
 

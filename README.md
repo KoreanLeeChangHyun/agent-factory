@@ -91,23 +91,23 @@ Antigravity hosts) always release together at one identical version. MCP is
 released independently. Use `joint_release.py` instead of running the steps by hand:
 
 ```bash
-python3 joint_release.py doctor --fix     # tools, repositories, remotes, hooks, versions
-python3 joint_release.py release X.Y.Z --summary-en '...' --summary-ko '...'         # plan
-python3 joint_release.py release X.Y.Z --summary-en '...' --summary-ko '...' --yes   # run
+python3 joint_release.py setup-token   # once: store the signed-in gh token as RELEASE_TOKEN
+python3 joint_release.py release       # confirm, then release the next patch version
 ```
 
-`release --yes` runs the tests, commits and pushes the plugin source and hosts,
-verifies the versions, builds the extension VSIX, creates the GitHub releases,
-updates the submodule pointers and verifies the result. Rerunning it resumes
-after a failure. Marketplace publication stays a separate step.
+`release` runs the tests, commits and pushes the plugin source and hosts, verifies
+the versions, builds the extension VSIX, creates the GitHub releases with notes
+summarized from commit subjects, updates the submodule pointers and verifies the
+result. Pass a version to override the next patch, `--plan` to print the plan only,
+and rerun after a failure to resume. Marketplace publication stays a separate step.
 
 The same release runs on GitHub Actions through `.github/workflows/release.yml`
-(**Joint release**). Start it from the Actions tab or from the Main chat's Git menu
-(**Deploy: Joint release**), which detects manually dispatchable workflows, collects
-their inputs and shows a review step before dispatching. Leave `execute` unchecked to
-print the plan only. The workflow needs a `RELEASE_TOKEN` secret: a fine-grained PAT
-with Contents read/write on this repository, the plugin source, the extension and the
-three plugin host repositories.
+(**Joint release**). In the Main chat, open the Git menu and choose
+**Deploy: Joint release**, then **Deploy** in the confirmation. If the workflow's
+`RELEASE_TOKEN` secret is missing, the menu offers **Set up token** first, which
+stores the signed-in gh token and opens a browser sign-in when gh is not signed in.
+Use **Create deployment pipeline** in the message action menu to add a similar
+workflow to other projects.
 
 Commits must not carry AI co-author trailers. `python3 joint_release.py hooks`
 installs a `commit-msg` hook that strips them and a `pre-push` hook that rejects
