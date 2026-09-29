@@ -1,7 +1,8 @@
 # Agent Factory
 
-This parent repository brings Agent Factory projects together in a single workspace.
-Each project is an independent Git repository linked as a submodule.
+This parent repository brings the three Agent Factory components — the extension,
+the MCP service, and the plugin — together in a single workspace. Each component is
+an independent Git repository linked as a submodule that tracks its `main` branch.
 
 ## Core features
 
@@ -31,10 +32,12 @@ The MCP service is independently operated and is not required by the plugin or e
 
 | Path | Project | Branch |
 | --- | --- | --- |
-| [plugin/](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/tree/main) | Single source for Skills, runtime, and Codex/Claude Code distributions | `main` |
-| [extension/](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/tree/main) | VS Code chat interface | `main` |
+| [extension/](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/tree/main) | VS Code Main chat interface | `main` |
 | [mcp/](https://github.com/KoreanLeeChangHyun/agent-factory-mcp/tree/main) | Independent cloud Workspace and MCP server | `main` |
+| [plugin/](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/tree/main) | Single source for Skills, runtime, and Codex/Claude Code/Antigravity distributions | `main` |
 
+- Path links open each repository's `main` branch. GitHub's file list shows
+  submodules as `name @ commit` and links to the recorded commit instead.
 - The Branch column is the remote branch configured in `.gitmodules`. A local
   checkout may use another branch for ongoing work.
 
@@ -68,7 +71,7 @@ To advance submodules to their configured remote branches, run
 To work directly on a project, switch to its directory:
 
 ```bash
-cd plugin    # or extension, mcp
+cd extension    # or mcp, plugin
 git status
 ```
 
@@ -76,7 +79,7 @@ To record new submodule commits in the parent repository, commit the updated poi
 
 ```bash
 cd ..
-git add plugin extension mcp
+git add extension mcp plugin
 git commit -m "chore: update component revisions"
 git push
 ```
@@ -98,7 +101,7 @@ git push
 | `docs/artifact/` | AI-generated outputs outside Document packages, such as mockups and release files |
 
 - Refined documents retain the `processed` metadata type for compatibility.
-- Follow the [project documentation rules](docs/skills/rule-documents/SKILL.md)
+- Follow the project documentation rules in `docs/skills/rule-documents/SKILL.md`
   for package structure, source preservation, and ownership.
 - After changing `docs/skills/`, run the Document Skill's
   `sync_documents.py --project-root <agent-factory-root>` and check the result.
