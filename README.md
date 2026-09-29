@@ -84,35 +84,6 @@ git commit -m "chore: update component revisions"
 git push
 ```
 
-## Release
-
-The extension and every plugin repository (source plus the Codex, Claude Code and
-Antigravity hosts) always release together at one identical version. MCP is
-released independently. Use `release.py` instead of running the steps by hand:
-
-```bash
-python3 release.py setup-token   # once: store the signed-in gh token as RELEASE_TOKEN
-python3 release.py release       # confirm, then release the next patch version
-```
-
-`release` runs the tests, commits and pushes the plugin source and hosts, verifies
-the versions, builds the extension VSIX, creates the GitHub releases with notes
-summarized from commit subjects, updates the submodule pointers and verifies the
-result. Pass a version to override the next patch, `--plan` to print the plan only,
-and rerun after a failure to resume. Marketplace publication stays a separate step.
-
-The same release runs on GitHub Actions through `.github/workflows/release.yml`
-(**Joint release**). In the Main chat, open the Git menu and choose
-**Deploy: Joint release**, then **Deploy** in the confirmation. If the workflow's
-`RELEASE_TOKEN` secret is missing, the menu offers **Set up token** first, which
-stores the signed-in gh token and opens a browser sign-in when gh is not signed in.
-Use **Create deployment pipeline** in the message action menu to add a similar
-workflow to other projects.
-
-Commits must not carry AI co-author trailers. `python3 release.py hooks`
-installs a `commit-msg` hook that strips them and a `pre-push` hook that rejects
-them; `scan` reports any that remain.
-
 ## Project Documentation
 
 - The parent checkout's `docs/` directory owns project documentation. It is

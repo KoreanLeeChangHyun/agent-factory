@@ -9,3 +9,7 @@ artifact/
 /.claude/
 /.agents/
 /docs/
+
+# Local release tooling.
+/release.py
+/.github/workflows/release.yml
