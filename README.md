@@ -14,10 +14,17 @@ Each project is an independent Git repository linked as a submodule.
 - **Lessons learned:** Record errors and judgment differences, retrieve relevant
   experience before work, and consolidate supported lessons into rules when requested.
 - **Agent settings:** Choose Main, Work, and Verification models and reasoning levels
-  per chat, project, or globally, with Codex and Claude Code runtimes.
+  per chat, project, or globally, save them as presets, and run on Codex, Claude Code,
+  or Antigravity.
+- **Chat workspace:** Choose a per-message action (document, contract, interview,
+  planning, or delegated execution), queue messages, keep notes, and follow run status.
+- **Work Units:** Isolate a task in its own Git worktree and branch, carry the
+  conversation's decisions into a new chat, and merge the result back.
 
 See the [extension guide](extension/README.md#2-core-features) for the detailed local
-workflow and the [plugin source guide](plugin/README.md) for host distributions and tests.
+workflow, including the [chat workspace](extension/README.md#3-chat-workspace) and
+[agent settings](extension/README.md#4-agent-settings), and the
+[plugin source guide](plugin/README.md) for host distributions and tests.
 The MCP service is independently operated and is not required by the plugin or extension.
 
 ## Project Structure
@@ -27,6 +34,9 @@ The MCP service is independently operated and is not required by the plugin or e
 | [plugin/](plugin/README.md) | Single source for Skills, runtime, and Codex/Claude Code distributions | `main` |
 | [extension/](extension/README.md) | VS Code chat interface | `main` |
 | [mcp/](mcp/README.md) | Independent cloud Workspace and MCP server | `main` |
+
+- The Branch column is the remote branch configured in `.gitmodules`. A local
+  checkout may use another branch for ongoing work.
 
 ## Clone
 
@@ -67,7 +77,7 @@ To record new submodule commits in the parent repository, commit the updated poi
 ```bash
 cd ..
 git add plugin extension mcp
-git commit -m "chore: update component revisions / 구성 요소 참조 갱신"
+git commit -m "chore: update component revisions"
 git push
 ```
 
@@ -94,7 +104,9 @@ git push
   `sync_documents.py --project-root <agent-factory-root>` and check the result.
   `.codex/skills/` and `.claude/skills/` are derived and must not be edited directly.
 
-## Runtime installation links
+## Requirements
 
-- [Codex CLI](https://developers.openai.com/codex/cli/)
-- [Claude Code](https://code.claude.com/docs/en/setup)
+- Python 3.10+.
+- At least one agent runtime: [Codex CLI](https://developers.openai.com/codex/cli/) or
+  [Claude Code](https://code.claude.com/docs/en/setup).
+- Optional: the Antigravity CLI (`agy`), signed in to a Google AI subscription.
