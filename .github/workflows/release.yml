@@ -1,0 +1,120 @@
+name: Joint release
+
+# Releases the extension, plugin source and every plugin host at one version by
+# running joint_release.py. Start it from the Actions tab or the Agent Factory
+# chat's Git menu ("Deploy to GitHub"). Without `execute` it only prints the plan.
+#
+# Requires the RELEASE_TOKEN secret: a fine-grained PAT with Contents read/write on
+# agent-factory, agent-factory-plugin-source, agent-factory-vscode-extension,
+# agent-factory-codex-plugin, agent-factory-claude-plugin and
+# agent-factory-antigravity-plugin.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (X.Y.Z)"
+        required: true
+        type: string
+      summary_en:
+        description: "One English sentence describing the release"
+        required: true
+        type: string
+      summary_ko:
+        description: "The same sentence in Korean"
+        required: true
+        type: string
+      execute:
+        description: "Commit, push and publish (unchecked prints the plan only)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: joint-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Require release token
+        if: ${{ inputs.execute }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Add the RELEASE_TOKEN secret before running with execute."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          if [ -n "$GH_TOKEN" ]; then gh auth setup-git; fi
+
+      - name: Clone release repositories
+        run: |
+          # Plain clones (not submodule git files) so release scripts find their .git directories.
+          for pair in plugin:agent-factory-plugin-source extension:agent-factory-vscode-extension; do
+            dir=${pair%%:*}; repo=${pair#*:}
+            rmdir "$dir" 2>/dev/null || true
+            git clone --quiet "https://github.com/$OWNER/$repo" "$dir"
+          done
+          for host in $(python3 -c 'import json; print(" ".join(json.load(open("plugin/distribution/package.json"))["hosts"]))'); do
+            git clone --quiet "https://github.com/$OWNER/agent-factory-$host-plugin" "../agent-factory-$host-plugin"
+          done
+          git fetch --quiet origin --tags
+          git checkout --quiet -B main origin/main
+          git branch --quiet --set-upstream-to=origin/main main
+
+      - name: Install extension dependencies
+        working-directory: extension
+        run: npm ci --no-audit --no-fund
+
+      - name: Doctor
+        run: |
+          python3 joint_release.py hooks
+          python3 joint_release.py doctor || true
+
+      - name: Release
+        env:
+          VERSION: ${{ inputs.version }}
+          SUMMARY_EN: ${{ inputs.summary_en }}
+          SUMMARY_KO: ${{ inputs.summary_ko }}
+          EXECUTE: ${{ inputs.execute }}
+        run: |
+          args=(release "$VERSION" --summary-en "$SUMMARY_EN" --summary-ko "$SUMMARY_KO")
+          if [ "$EXECUTE" = "true" ]; then args+=(--yes); fi
+          python3 joint_release.py "${args[@]}"
+
+      - name: Upload VSIX
+        if: ${{ inputs.execute }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ inputs.version }}
+          path: extension/releases/*.vsix
+          if-no-files-found: ignore

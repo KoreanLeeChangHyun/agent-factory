@@ -147,7 +147,7 @@ def discover_hosts(overrides):
 
 def repositories(hosts, include_mcp=True):
     repos = {"parent": ROOT, "plugin": SOURCE, "extension": EXTENSION}
-    if include_mcp:
+    if include_mcp and (MCP / ".git").exists():  # CI clones only the release repositories
         repos["mcp"] = MCP
     repos.update({f"host:{h}": p for h, p in hosts.items()})
     return repos
