@@ -1,15 +1,17 @@
 # Agent Factory
 
 This parent repository brings the three Agent Factory components — the extension,
-the MCP service, and the plugin — together in a single workspace. Each component is
-an independent Git repository linked as a submodule that tracks its `main` branch.
+the MCP service, and the plugin — together with the shared project documentation in a
+single workspace. Each is an independent Git repository linked as a submodule that
+tracks its `main` branch.
 
 ## Core features
 
 - **Document system:** Organize sources, working knowledge, accepted specifications,
   progress, and lessons with clear ownership and one editable source per document.
-- **Contracts → Work–Verification loop:** Define scope and completion criteria,
-  execute the contracted tasks, and return verification findings for correction.
+- **Contracts → Work–Verification loop:** Define the goal, file structure, workers, and
+  order in a versioned contract, execute the contracted tasks, record results in the
+  contract, and return verification findings for correction.
 - **Interviews:** Resolve material requirements and decisions through guided
   questions, options, and a summary of your choices.
 - **Lessons learned:** Record errors and judgment differences, retrieve relevant
@@ -35,6 +37,7 @@ The MCP service is independently operated and is not required by the plugin or e
 | [extension/](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/tree/main) | VS Code Main chat interface | `main` |
 | [mcp/](https://github.com/KoreanLeeChangHyun/agent-factory-mcp/tree/main) | Independent cloud Workspace and MCP server | `main` |
 | [plugin/](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/tree/main) | Single source for Skills, runtime, and Codex/Claude Code/Antigravity distributions | `main` |
+| [docs/](https://github.com/KoreanLeeChangHyun/agent-factory-docs/tree/main) | Shared project documentation | `main` |
 
 - Path links open each repository's `main` branch. GitHub's file list shows
   submodules as `name @ commit` and links to the recorded commit instead.
@@ -71,7 +74,7 @@ To advance submodules to their configured remote branches, run
 To work directly on a project, switch to its directory:
 
 ```bash
-cd extension    # or mcp, plugin
+cd extension    # or mcp, plugin, docs
 git status
 ```
 
@@ -79,15 +82,15 @@ To record new submodule commits in the parent repository, commit the updated poi
 
 ```bash
 cd ..
-git add extension mcp plugin
+git add extension mcp plugin docs
 git commit -m "chore: update component revisions"
 git push
 ```
 
 ## Project Documentation
 
-- The parent checkout's `docs/` directory owns project documentation. It is
-  excluded from the parent repository's Git history and is maintained locally.
+- The `docs/` submodule owns project documentation. Commit document changes in
+  `docs/`, then record the updated pointer in the parent repository.
 - Component README and AGENTS.md files are entry points. User-distributed Skills
   in `plugin/skills/` remain separate from developer documentation.
 
@@ -105,7 +108,8 @@ git push
   for package structure, source preservation, and ownership.
 - After changing `docs/skills/`, run the Document Skill's
   `sync_documents.py --project-root <agent-factory-root>` and check the result.
-  `.codex/skills/` and `.claude/skills/` are derived and must not be edited directly.
+  `.codex/skills/`, `.claude/skills/`, and `.agents/skills/` (Antigravity) are derived,
+  ignored by Git, and must not be edited directly.
 
 ## Requirements
 
@@ -115,3 +119,7 @@ git push
   - [Codex CLI](https://developers.openai.com/codex/cli/)
   - [Claude Code](https://code.claude.com/docs/en/setup)
   - [Antigravity CLI](https://antigravity.google/docs/getting-started?tab=cli)
+
+## License
+
+MIT License. See [LICENSE](LICENSE). Each component repository carries its own license.
