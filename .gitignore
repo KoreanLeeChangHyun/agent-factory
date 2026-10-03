@@ -10,6 +10,10 @@ artifact/
 /.agents/
 /docs/
 
-# Local release tooling.
+# Local release tooling and plugin host distribution clones.
 /release.py
+/hosts/
+
+# Local backups.
+/backup/
 /.github/workflows/release.yml
