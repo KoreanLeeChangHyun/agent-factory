@@ -14,6 +14,9 @@ artifact/
 /release.py
 /hosts/
 
+# sandbox
+/sandbox/
+
 # Local backups.
 /backup/
 /.github/workflows/release.yml
