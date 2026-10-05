@@ -9,9 +9,12 @@ tracks its `main` branch.
 
 - **Document system:** Organize sources, working knowledge, accepted specifications,
   progress, and lessons with clear ownership and one editable source per document.
-- **Contracts → Work–Verification loop:** Define the goal, file structure, workers, and
-  order in a versioned contract, execute the contracted tasks, record results in the
-  contract, and return verification findings for correction.
+- **Contracts → Work–Verification loop:** Define workers, task goals, constraints, the
+  file structure, and task order in a versioned contract, execute the contracted tasks,
+  record results in the contract, and return verification findings for correction.
+- **Orchestrator mode:** By default Main converses, plans, and routes while Work agents
+  (light or heavy) make the changes; Verification runs when you ask for it. Worker mode
+  lets Main implement directly.
 - **Interviews:** Resolve material requirements and decisions through guided
   questions, options, and a summary of your choices.
 - **Lessons learned:** Record errors and judgment differences, retrieve relevant
@@ -29,6 +32,27 @@ workflow, including the [chat workspace](https://github.com/KoreanLeeChangHyun/a
 [agent settings](https://github.com/KoreanLeeChangHyun/agent-factory-vscode-extension/blob/main/README.md#4-agent-settings), and the
 [plugin source guide](https://github.com/KoreanLeeChangHyun/agent-factory-plugin-source/blob/main/README.md) for host distributions and tests.
 The MCP service is independently operated and is not required by the plugin or extension.
+
+## How the components fit
+
+```mermaid
+flowchart LR
+  accTitle: Agent Factory components
+  accDescr: The VS Code extension installs the plugin and launches Codex, Claude Code or Antigravity runtimes. The docs repository holds shared documentation. The MCP service is independent.
+  EXT["extension<br/>VS Code Main chat"]
+  PLG["plugin<br/>Skills and runtime"]
+  RT["Codex · Claude Code · Antigravity<br/>agent CLIs"]
+  DOCS["docs<br/>shared documentation"]
+  MCP["mcp<br/>cloud Workspace and MCP server"]
+  EXT -->|installs and updates| PLG
+  EXT -->|runs chats through| PLG
+  PLG -->|launches| RT
+  PLG -->|reads and writes| DOCS
+  MCP -.->|independent, not required| PLG
+```
+
+- The extension drives the local workflow; the plugin owns Skills and the runtime that
+  launches the agent CLIs. The MCP service is optional and independently operated.
 
 ## Project Structure
 
