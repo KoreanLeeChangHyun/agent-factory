@@ -101,7 +101,7 @@ git push
 | `docs/skills/` | Accepted project information, rules, and designs |
 | `docs/progress/` | Versioned contracts, task progress, and execution evidence |
 | `docs/lessons-learned/` | Error and judgment records with causes, outcomes, and applications |
-| `docs/artifact/` | AI-generated outputs outside Document packages, such as mockups and release files |
+| `docs/artifact/{preview,evidence,media,release}/` | Standalone demos, retained check evidence, reusable media and versioned release bundles; canonical reports belong in Refined |
 
 - Refined documents retain the `processed` metadata type for compatibility.
 - Follow the project documentation rules in `docs/skills/rule-documents/SKILL.md`
