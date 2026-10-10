@@ -131,9 +131,9 @@ git push
 - Follow the project documentation rules in `docs/skills/rule-documents/SKILL.md`
   for package structure, source preservation, and ownership.
 - After changing `docs/skills/`, run the Document Skill's
-  `sync_documents.py --project-root <agent-factory-root>` and check the result.
-  `.codex/skills/`, `.claude/skills/`, and `.agents/skills/` (Antigravity) are derived,
-  ignored by Git, and must not be edited directly.
+  `sync_documents.py --project-root <agent-factory-root> --host antigravity` and check the result.
+  `.agents/skills/` (Antigravity) is the derived, ignored project-local Skill path and must
+  not be edited directly.
 
 ## Requirements
 
