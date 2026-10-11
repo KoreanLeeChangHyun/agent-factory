@@ -12,18 +12,24 @@ tracks its `main` branch.
 - **Contracts → Work–Verification loop:** Define workers, task goals, constraints, the
   file structure, and task order in a versioned contract, execute the contracted tasks,
   record results in the contract, and return verification findings for correction.
-- **Orchestrator mode:** By default Main converses, plans, and routes while Work agents
-  (light or heavy) make the changes; Verification runs when you ask for it. Worker mode
-  lets Main implement directly.
+- **Orchestrator mode:** By default Main converses, plans, and routes while Work profiles
+  (Expert, Worker, Explorer, or Scribe) make the changes; Verification runs when you ask
+  for it. Direct mode lets Main implement directly. A project model table can
+  recommend a Work model by task type.
+- **Control Center:** Follow workers and tasks per project on a worker list and a task
+  board, instruct a worker directly, request rework, hand a task to another model, and
+  read supervision reports on unfinished work. Task and session records can be
+  searched.
 - **Interviews:** Resolve material requirements and decisions through guided
   questions, options, and a summary of your choices.
 - **Lessons learned:** Record errors and judgment differences, retrieve relevant
   experience before work, and consolidate supported lessons into rules when requested.
-- **Agent settings:** Choose Main, Work, and Verification models and reasoning levels
-  per chat, project, or globally, save them as presets, and run on Codex, Claude Code,
+- **Agent settings:** Choose models and reasoning levels for each role per chat, keep
+  them in built-in or custom sets with a project default, and run on Codex, Claude Code,
   or Antigravity.
-- **Chat workspace:** Choose a per-message action (document, contract, interview,
-  planning, or delegated execution), queue messages, keep notes, and follow run status.
+- **Chat workspace:** Choose a per-message action (planning, interview, document
+  migration, lessons, contract, Work, Work–Verification, deployment pipeline, or Goal),
+  queue messages, keep notes, and follow run status.
 - **Work Units:** Isolate a task in its own Git worktree and branch, carry the
   conversation's decisions into a new chat, and merge the result back.
 
