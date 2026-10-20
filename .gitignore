@@ -15,6 +15,7 @@ artifact/
 /hosts/
 
 # sandbox
+/sandbox
 /sandbox/
 
 # Local backups.
